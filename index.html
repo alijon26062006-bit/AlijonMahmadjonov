@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alijon Mahmadjonov — Telegram-боты и автоматизация</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav class="nav" data-screen-label="00 Nav">
+  <div class="nav-inner">
+    <a href="#top" class="nav-brand">
+      <span class="ava" style="background-image:url('assets/alijon.jpg')"></span>
+      <span>Alijon M.</span>
+    </a>
+    <div class="nav-links">
+      <a href="#about">О себе</a>
+      <a href="#services">Услуги</a>
+      <a href="#skills">Стек</a>
+      <a href="#experience">Опыт</a>
+      <a href="#mentor">Наставник</a>
+    </div>
+    <a href="#chat" class="nav-cta" data-tg-open>Написать →</a>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="top" data-screen-label="01 Hero">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-status reveal"><span class="ll"></span> Открыт для новых проектов</div>
+
+        <h1 class="h1 reveal d1">
+          <span class="line">Создаю</span>
+          <span class="line grad-text">Telegram-ботов,</span>
+          <span class="line dim">которые работают.</span>
+        </h1>
+
+        <p class="lead reveal d2">
+          Привет, я <strong style="color:var(--ink)">Alijon Mahmadjonov</strong> — разработчик из Душанбе. Делаю умных Telegram-ботов и автоматизирую бизнес-процессы.
+        </p>
+
+        <div class="hero-actions reveal d3">
+          <a class="btn btn-primary" href="#chat" data-tg-open>
+            Написать в Telegram <span class="arr">→</span>
+          </a>
+          <a class="btn btn-ghost" href="#about">Подробнее обо мне</a>
+        </div>
+
+        <!-- iOS-style dock with social icons -->
+        <div class="dock reveal d4">
+          <span class="label mono">// Соцсети</span>
+
+          <a class="app-icon tg" href="https://t.me/rutsiyax" target="_blank" rel="noopener" data-label="Telegram · @rutsiyax">
+            <svg viewBox="0 0 24 24" fill="#fff"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+          </a>
+
+          <a class="app-icon ig" href="https://instagram.com/aliubnabdullo" target="_blank" rel="noopener" data-label="Instagram · @aliubnabdullo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="5"/>
+              <circle cx="12" cy="12" r="4"/>
+              <circle cx="17.5" cy="6.5" r="1" fill="#fff" stroke="none"/>
+            </svg>
+          </a>
+
+          <a class="app-icon gmail" href="mailto:alijon26.06.2006@gmail.com" data-label="Email · alijon26.06.2006@gmail.com">
+            <svg viewBox="0 0 32 32"><path fill="#4285F4" d="M5 9.5v15A1.5 1.5 0 0 0 6.5 26H10V16L5 9.5z"/><path fill="#34A853" d="M27 9.5L22 16v10h3.5a1.5 1.5 0 0 0 1.5-1.5v-15z"/><path fill="#FBBC04" d="M10 26V16l6 4.5L22 16v10H10z"/><path fill="#EA4335" d="M10 16L5 9.5C5 7.6 7.2 6.5 8.6 7.5L16 13l7.4-5.5c1.4-1 3.6.1 3.6 2L22 16l-6 4.5L10 16z"/></svg>
+          </a>
+
+          <a class="app-icon gh" href="https://github.com/" target="_blank" rel="noopener" data-label="GitHub">
+            <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.5 2 2 6.6 2 12.3c0 4.5 2.9 8.4 6.8 9.7.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.4-3.4-1.4-.5-1.1-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1 .8-.2 1.7-.3 2.5-.3s1.7.1 2.5.3c1.9-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.3 4.7-4.5 5 .4.3.7.9.7 1.8v2.7c0 .3.2.6.7.5 4-1.4 6.8-5.2 6.8-9.7C22 6.6 17.5 2 12 2z"/></svg>
+          </a>
+
+          <a class="app-icon wa" href="https://wa.me/" target="_blank" rel="noopener" data-label="WhatsApp">
+            <svg viewBox="0 0 24 24" fill="#fff"><path d="M20.5 3.5A11 11 0 0 0 3.6 17.2L2 22l4.9-1.6a11 11 0 0 0 5.3 1.4 11 11 0 0 0 11-11 11 11 0 0 0-2.7-7.3zm-1.4 15.4a9 9 0 0 1-4.6 1.2 9 9 0 0 1-4.5-1.2l-.3-.2-3 1 1-2.9-.2-.3a9 9 0 0 1-1.4-4.8 9 9 0 0 1 18 0 9 9 0 0 1-5 8.2zm5-4.4c-.3-.1-1.6-.8-1.9-.9-.3-.1-.4 0-.6.2-.2.3-.7.9-.9 1-.2.2-.3.2-.6 0-.3-.1-1.2-.4-2.3-1.4-.9-.8-1.5-1.7-1.6-2-.2-.3 0-.4.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.9-2.1c-.2-.5-.4-.5-.6-.5h-.5c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.3s1 2.7 1.2 2.9c.1.2 2.1 3.3 5.2 4.5 1.9.8 2.6.8 3.6.7.6-.1 1.6-.7 1.9-1.3.2-.6.2-1.2.1-1.3 0-.1-.2-.2-.5-.3z"/></svg>
+          </a>
+        </div>
+
+        <div class="hero-meta reveal d4">
+          <div class="it">
+            <span class="v"><span data-count="12" data-suffix="+">0</span></span>
+            <span class="l">Запущенных ботов</span>
+          </div>
+          <div class="it">
+            <span class="v"><span data-count="2" data-suffix=" года">0</span></span>
+            <span class="l">Опыт в IT</span>
+          </div>
+          <div class="it">
+            <span class="v"><span data-count="100" data-suffix="%">0</span></span>
+            <span class="l">На связи</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone-stage reveal d2">
+        <div class="phone-floats">
+          <div class="float-card fc1">
+            <span class="ic tg">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+            </span>
+            <div>
+              <div class="lbl">Бот запущен</div>
+              <div class="sub">Готов к работе</div>
+            </div>
+          </div>
+          <div class="float-card fc2">
+            <span class="ic lime">✓</span>
+            <div>
+              <div class="lbl">+ 12 заказов</div>
+              <div class="sub">сегодня</div>
+            </div>
+          </div>
+          <div class="float-card fc3">
+            <span class="ic pink">★</span>
+            <div>
+              <div class="lbl">5.0 отзыв</div>
+              <div class="sub">от клиента</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-status">
+            <span>9:41</span>
+            <div class="icons">
+              <svg viewBox="0 0 16 12"><path d="M1 7h2v4H1zM5 5h2v6H5zM9 3h2v8H9zM13 1h2v10h-2z"/></svg>
+              <svg viewBox="0 0 24 12"><rect x="1" y="1" width="20" height="10" rx="2.5" stroke="#fff" stroke-width="1" fill="none"/><rect x="3" y="3" width="16" height="6" rx="1" fill="#fff"/></svg>
+            </div>
+          </div>
+          <div class="phone-screen">
+            <img src="assets/alijon.jpg" alt="Alijon Mahmadjonov">
+            <div class="phone-msg bot">
+              <div class="head">
+                <svg viewBox="0 0 24 24" fill="#229ED9"><circle cx="12" cy="12" r="12"/><path fill="#fff" d="M17.5 7.5L15.4 17c-.2.7-.6.9-1.2.6L11 15.3l-1.6 1.5c-.2.2-.3.3-.6.3l.2-3 5.5-5c.2-.2 0-.3-.3-.1l-6.8 4.3-2.9-.9c-.6-.2-.6-.6.1-.9l11.4-4.4c.5-.2 1 .1.9.7z"/></svg>
+                <span class="nm">Клиент</span>
+                <span class="tm">5 мин</span>
+              </div>
+              <div class="body-tx">Спасибо! Всё чётко работает 🔥</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mini control interface under the phone -->
+        <div class="phone-panel">
+          <div class="pp-row">
+            <div class="pp-ava" style="background-image:url('assets/alijon.jpg')"></div>
+            <div class="pp-info">
+              <div class="pp-title">Сейчас работаю</div>
+              <div class="pp-sub">
+                <span class="pp-dot"></span>
+                Бот для кофейни «Vibe» · v1.2
+              </div>
+            </div>
+            <button class="pp-btn" title="Play">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+            </button>
+          </div>
+          <div class="pp-progress">
+            <div class="pp-progress-fill"></div>
+          </div>
+          <div class="pp-stats">
+            <div class="pp-stat">
+              <span class="pp-stat-v">247</span>
+              <span class="pp-stat-l">сообщ.</span>
+            </div>
+            <div class="pp-stat">
+              <span class="pp-stat-v">12</span>
+              <span class="pp-stat-l">заказа</span>
+            </div>
+            <div class="pp-stat">
+              <span class="pp-stat-v">99.9%</span>
+              <span class="pp-stat-l">uptime</span>
+            </div>
+            <div class="pp-stat">
+              <span class="pp-stat-v"><svg width="11" height="11" viewBox="0 0 24 24" fill="#10F985"><circle cx="12" cy="12" r="6"/></svg></span>
+              <span class="pp-stat-l">online</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MENTOR ============ -->
+<section class="section mentor-section" id="mentor" data-screen-label="06 Mentor">
+  <div class="wrap">
+    <div class="section-head reveal" style="text-align:center;margin-left:auto;margin-right:auto;">
+      <div class="eyebrow" style="justify-content:center;">Мой наставник</div>
+      <h2 class="h2">Человек, с которого <span class="grad-text">всё началось</span>.</h2>
+      <p class="lead" style="margin:20px auto 0;">Без него не было бы ни этого сайта, ни проектов, ни первой строчки кода.</p>
+    </div>
+
+    <div class="mentor-card reveal d1">
+      <div class="mentor-glow"></div>
+
+      <div class="mentor-grid">
+        <!-- LEFT: Photo with frame -->
+        <div class="mentor-photo-col">
+          <div class="mentor-photo-wrap">
+            <div class="mentor-photo-ring"></div>
+            <div class="mentor-photo">
+              <img src="assets/amiri.jpg" alt="Amiri — IT-наставник">
+            </div>
+            <div class="mentor-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              <span>Mentor</span>
+            </div>
+          </div>
+
+          <div class="mentor-meta">
+            <div class="mentor-meta-it">
+              <span class="v">17.9K</span>
+              <span class="l">подписчиков</span>
+            </div>
+            <div class="mentor-meta-it">
+              <span class="v">150+</span>
+              <span class="l">учеников</span>
+            </div>
+            <div class="mentor-meta-it">
+              <span class="v">413</span>
+              <span class="l">публикаций</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Info -->
+        <div class="mentor-info">
+          <div class="mentor-name-row">
+            <h3 class="mentor-name">Amiri</h3>
+            <span class="mentor-verify" title="Verified" aria-label="Verified">
+              <svg width="26" height="26" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#1DA1F2" d="M20 3.5c1.4 0 2.7.7 3.5 1.9 1.4-.6 3-.4 4.2.5 1.2.9 1.8 2.3 1.7 3.8 1.5.1 2.9.7 3.8 1.9.9 1.2 1.1 2.8.5 4.2 1.2.8 1.9 2.1 1.9 3.5s-.7 2.7-1.9 3.5c.6 1.4.4 3-.5 4.2-.9 1.2-2.3 1.8-3.8 1.7-.1 1.5-.7 2.9-1.9 3.8-1.2.9-2.8 1.1-4.2.5-.8 1.2-2.1 1.9-3.5 1.9s-2.7-.7-3.5-1.9c-1.4.6-3 .4-4.2-.5-1.2-.9-1.8-2.3-1.7-3.8-1.5-.1-2.9-.7-3.8-1.9-.9-1.2-1.1-2.8-.5-4.2C4.7 22.7 4 21.4 4 20s.7-2.7 1.9-3.5c-.6-1.4-.4-3 .5-4.2.9-1.2 2.3-1.8 3.8-1.7.1-1.5.7-2.9 1.9-3.8 1.2-.9 2.8-1.1 4.2-.5.8-1.2 2.1-1.9 3.5-1.9z"/>
+                <path d="M13 20.5l4.5 4.5L27 14.5" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </div>
+          <p class="mentor-role">Программист · Python-разработчик · IT-Ментор</p>
+
+          <div class="mentor-tags">
+            <span class="mentor-tag">Python</span>
+            <span class="mentor-tag">Telegram Bots</span>
+            <span class="mentor-tag">AI</span>
+            <span class="mentor-tag">IT-Mentoring</span>
+          </div>
+
+          <blockquote class="mentor-quote">
+            <svg class="quote-mark" width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M10 11H6.21c.13-2.05 1.34-3.4 3.79-4l-.21-2C5.71 5.66 4 8.49 4 12v6h6v-7zm10 0h-3.79c.13-2.05 1.34-3.4 3.79-4l-.21-2C15.71 5.66 14 8.49 14 12v6h6v-7z"/></svg>
+            <p>Он просто <strong>гений</strong>. Если бы не он — я бы до сих пор не знал, что значит «написать свою первую программу». Терпеливый, ясный в объяснениях, всегда на связи. Учитель, который вдохновляет идти дальше.</p>
+            <cite>— Alijon, ученик</cite>
+          </blockquote>
+
+          <!-- Story timeline -->
+          <div class="mentor-story">
+            <div class="ms-item">
+              <div class="ms-dot">1</div>
+              <div class="ms-text">
+                <div class="ms-title">Знакомство в Instagram</div>
+                <div class="ms-sub">Наткнулся на его страницу <span class="mono">@amiri_coder</span> — короткие видео про код и Python. Подписался, начал смотреть.</div>
+              </div>
+            </div>
+            <div class="ms-item">
+              <div class="ms-dot">2</div>
+              <div class="ms-text">
+                <div class="ms-title">Старт обучения · 2025</div>
+                <div class="ms-sub">Записался на его курс. Python с нуля, основы, синтаксис, первые скрипты — всё структурно и понятно.</div>
+              </div>
+            </div>
+            <div class="ms-item">
+              <div class="ms-dot">3</div>
+              <div class="ms-text">
+                <div class="ms-title">Telegram-боты + AI</div>
+                <div class="ms-sub">Дальше — углубление: aiogram, работа с API, подключение AI. Каждый проект — новая ступень.</div>
+              </div>
+            </div>
+            <div class="ms-item">
+              <div class="ms-dot">4</div>
+              <div class="ms-text">
+                <div class="ms-title">Сейчас — продолжаем онлайн</div>
+                <div class="ms-sub">Учусь в его школе <a href="https://mycourse.tj" target="_blank" rel="noopener" class="ms-link">MyCourse.tj</a> — расту в практике и реальных проектах.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Project highlight -->
+          <a class="mentor-project" href="https://mycourse.tj" target="_blank" rel="noopener">
+            <div class="mp-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+            </div>
+            <div class="mp-text">
+              <div class="mp-title">MyCourse.tj</div>
+              <div class="mp-sub">Образовательная платформа Amiri — где я учусь</div>
+            </div>
+            <span class="mp-arrow">→</span>
+          </a>
+
+          <!-- Social CTAs -->
+          <div class="mentor-actions">
+            <a class="mentor-btn ig" href="https://www.instagram.com/amiri_coder" target="_blank" rel="noopener">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="5"/>
+                <circle cx="12" cy="12" r="4"/>
+                <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+              </svg>
+              <span>Instagram</span>
+              <span class="mono small">@amiri_coder</span>
+            </a>
+            <a class="mentor-btn tg" href="https://t.me/amiri_coder" target="_blank" rel="noopener">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+              <span>Telegram</span>
+              <span class="mono small">@amiri_coder</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MARQUEE ============ -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-inner">
+    <span><em>Telegram-боты</em><span class="star"></span> <em>AI-ассистенты</em><span class="star"></span> <em>Автоматизация</em><span class="star"></span> <em>Парсеры</em><span class="star"></span> <em>Интеграции</em><span class="star"></span></span>
+    <span><em>Telegram-боты</em><span class="star"></span> <em>AI-ассистенты</em><span class="star"></span> <em>Автоматизация</em><span class="star"></span> <em>Парсеры</em><span class="star"></span> <em>Интеграции</em><span class="star"></span></span>
+  </div>
+</div>
+
+<!-- ============ ABOUT ============ -->
+<section class="section" id="about" data-screen-label="02 About">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">О себе</div>
+      <h2 class="h2">Начинающий разработчик с <span class="grad-text">большими планами</span>.</h2>
+    </div>
+
+    <div class="about-grid">
+      <div class="about-text reveal d1">
+        <p>Я изучаю программирование, автоматизацию и современные технологии. Создаю <strong>полезных и удобных Telegram-ботов</strong> для разных задач — от приёма заказов до AI-ассистентов.</p>
+        <p>Каждый проект для меня — это возможность вырасти. Я не просто пишу код, я разбираюсь в задаче клиента и предлагаю лучшее решение.</p>
+        <p>Сейчас фокусируюсь на <strong>Python, aiogram и интеграциях с AI</strong>. Открыт к сложным задачам и долгосрочным проектам.</p>
+      </div>
+
+      <div class="profile-card reveal d2">
+        <div class="top">
+          <div class="ava" style="background-image:url('assets/alijon.jpg')"></div>
+          <div>
+            <div class="nm">Alijon Mahmadjonov</div>
+            <div class="rl">Bot Developer · Душанбе</div>
+          </div>
+        </div>
+        <ul>
+          <li><span class="k">Возраст</span><span class="v">19 лет</span></li>
+          <li><span class="k">Локация</span><span class="v">Душанбе, TJ</span></li>
+          <li><span class="k">Опыт</span><span class="v">с 2024</span></li>
+          <li><span class="k">Стек</span><span class="v">Python · aiogram</span></li>
+          <li><span class="k">Языки</span><span class="v">RU · TJ · EN</span></li>
+          <li><span class="k">Telegram</span><span class="v">@rutsiyax</span></li>
+          <li><span class="k">Статус</span><span class="v dot">Доступен</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SERVICES ============ -->
+<section class="section" id="services" data-screen-label="03 Services">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Услуги</div>
+      <h2 class="h2">Что я делаю.</h2>
+      <p class="lead">Четыре направления работы — от простых ботов до интеграций с AI и автоматизации бизнеса.</p>
+    </div>
+
+    <div class="services-grid">
+      <div class="service reveal d1">
+        <div class="ic">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </div>
+        <h3>Telegram-боты под ключ</h3>
+        <p>Сделаю бота с нуля: приём заявок, меню, кнопки, оплата, база клиентов. От ТЗ до запуска в продакшен.</p>
+        <span class="price">от 5 000 ₽</span>
+      </div>
+
+      <div class="service reveal d2">
+        <div class="ic">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg>
+        </div>
+        <h3>AI-ассистенты</h3>
+        <p>Подключение ChatGPT / OpenAI к Telegram. Бот отвечает за тебя на повторяющиеся вопросы и держит контекст.</p>
+        <span class="price">от 15 000 ₽</span>
+      </div>
+
+      <div class="service reveal d3">
+        <div class="ic">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <h3>Автоматизация</h3>
+        <p>Парсеры, уведомления, рассылки, интеграции с Google Sheets, CRM и платёжками. Меньше рутины — больше дела.</p>
+        <span class="price">от 8 000 ₽</span>
+      </div>
+
+      <div class="service reveal d4">
+        <div class="ic">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </div>
+        <h3>Консультация</h3>
+        <p>30 минут — разберём задачу, предложу архитектуру и оценку. Без обязательств. Просто напиши в Telegram.</p>
+        <span class="price">бесплатно</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SKILLS ============ -->
+<section class="section" id="skills" data-screen-label="04 Skills">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Стек</div>
+      <h2 class="h2">С чем работаю.</h2>
+    </div>
+
+    <div class="skills-grid">
+      <div class="skill reveal d1" style="--w: 88%"><div class="top"><span class="name">Python</span><span class="lvl">Advanced</span></div><div class="bar"><div class="fill"></div></div></div>
+      <div class="skill reveal d1" style="--w: 92%"><div class="top"><span class="name">aiogram</span><span class="lvl">Expert</span></div><div class="bar"><div class="fill"></div></div></div>
+      <div class="skill reveal d1" style="--w: 85%"><div class="top"><span class="name">Telegram API</span><span class="lvl">Advanced</span></div><div class="bar"><div class="fill"></div></div></div>
+      <div class="skill reveal d1" style="--w: 75%"><div class="top"><span class="name">OpenAI API</span><span class="lvl">Solid</span></div><div class="bar"><div class="fill"></div></div></div>
+      <div class="skill reveal d2" style="--w: 78%"><div class="top"><span class="name">SQLite · Postgres</span><span class="lvl">Solid</span></div><div class="bar"><div class="fill"></div></div></div>
+      <div class="skill reveal d2" style="--w: 70%"><div class="top"><span class="name">JavaScript</span><span class="lvl">Solid</span></div><div class="bar"><div class="fill"></div></div></div>
+      <div class="skill reveal d2" style="--w: 72%"><div class="top"><span class="name">HTML / CSS</span><span class="lvl">Solid</span></div><div class="bar"><div class="fill"></div></div></div>
+      <div class="skill reveal d2" style="--w: 65%"><div class="top"><span class="name">Linux · Docker</span><span class="lvl">Intermediate</span></div><div class="bar"><div class="fill"></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EXPERIENCE ============ -->
+<section class="section" id="experience" data-screen-label="05 Experience">
+  <div class="wrap-narrow">
+    <div class="section-head reveal">
+      <div class="eyebrow">Опыт</div>
+      <h2 class="h2">Мой путь в IT.</h2>
+    </div>
+
+    <div class="timeline">
+      <div class="tl-item reveal d1">
+        <div class="yr">2024 · Старт</div>
+        <h4>Первые шаги в программировании</h4>
+        <p>Начал изучать Python и автоматизацию. Прочитал первые книги, прошёл практические курсы, написал первые скрипты.</p>
+      </div>
+      <div class="tl-item reveal d1">
+        <div class="yr">2024 · конец года</div>
+        <h4>Первый Telegram-бот</h4>
+        <p>Запустил первого бота — парсер цен с уведомлениями. Понял, что хочу делать это для людей.</p>
+      </div>
+      <div class="tl-item reveal d2">
+        <div class="yr">2025</div>
+        <h4>Фриланс и первые клиенты</h4>
+        <p>Беру первые заказы. Делаю ботов для малого бизнеса, магазинов и сервисов. Учусь общению с клиентами.</p>
+      </div>
+      <div class="tl-item reveal d2">
+        <div class="yr">2025 · вторая половина</div>
+        <h4>AI &amp; Scale</h4>
+        <p>Интегрирую OpenAI API в ботов. Углубляюсь в архитектуру, базы данных и DevOps. Расту в сложности задач.</p>
+      </div>
+      <div class="tl-item reveal d3">
+        <div class="yr">2026 · сейчас</div>
+        <h4>Открыт к большим задачам</h4>
+        <p>Помогаю автоматизировать бизнес-процессы и делать удобные сервисы в Telegram. Готов к долгосрочному сотрудничеству.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TELEGRAM ============ -->
+<section class="section" id="telegram" data-screen-label="06 Telegram">
+  <div class="wrap-narrow">
+    <div class="section-head reveal" style="text-align:center;margin-left:auto;margin-right:auto;">
+      <div class="eyebrow" style="justify-content:center;">Telegram</div>
+      <h2 class="h2">Найди меня в <span class="grad-text">Telegram</span>.</h2>
+    </div>
+
+    <div class="tg-card reveal d1">
+      <div class="tg-card-glow"></div>
+
+      <!-- Anonymous mask pattern bg -->
+      <div class="tg-pattern" aria-hidden="true"></div>
+
+      <div class="tg-top">
+        <div class="tg-ava-wrap">
+          <div class="tg-ava-ring">
+            <div class="tg-ava" style="background-image:url('assets/telegram-avatar.jpg')"></div>
+          </div>
+        </div>
+
+        <div class="tg-name">uways</div>
+        <div class="tg-status">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>был(а) недавно</span>
+        </div>
+        <a class="tg-handle" href="https://t.me/rutsiyax" target="_blank" rel="noopener">@rutsiyax</a>
+      </div>
+
+      <div class="tg-actions">
+        <div class="tg-chip">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          <span>звонок</span>
+        </div>
+        <div class="tg-chip">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span>звук</span>
+        </div>
+        <div class="tg-chip">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span>поиск</span>
+        </div>
+        <div class="tg-chip">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+          <span>ещё</span>
+        </div>
+      </div>
+
+      <a class="tg-cta" href="https://t.me/rutsiyax" target="_blank" rel="noopener" data-tg-open>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+        <span>Перейти в Telegram</span>
+        <span class="arr">→</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ INSTAGRAM ============ -->
+<section class="section" id="instagram" data-screen-label="06 Instagram">
+  <div class="wrap-narrow">
+    <div class="section-head reveal" style="text-align:center;margin-left:auto;margin-right:auto;">
+      <div class="eyebrow" style="justify-content:center;">Instagram</div>
+      <h2 class="h2">Загляни ко мне в <span class="grad-text">Instagram</span>.</h2>
+    </div>
+
+    <div class="ig-card reveal d1">
+      <div class="ig-card-glow"></div>
+
+      <div class="ig-top">
+        <div class="ig-ava-wrap">
+          <div class="ig-ava-ring">
+            <div class="ig-ava" style="background-image:url('assets/instagram-profile.jpg')"></div>
+          </div>
+        </div>
+
+        <div class="ig-info">
+          <div class="ig-name-row">
+            <div class="ig-name">Uways</div>
+            <a class="ig-handle" href="https://instagram.com/aliubnabdullo" target="_blank" rel="noopener">@aliubnabdullo</a>
+          </div>
+
+          <div class="ig-stats">
+            <div class="ig-stat">
+              <span class="ig-stat-v"><span data-count="0">0</span></span>
+              <span class="ig-stat-l">публикации</span>
+            </div>
+            <div class="ig-stat">
+              <span class="ig-stat-v"><span data-count="1586">0</span></span>
+              <span class="ig-stat-l">подписчики</span>
+            </div>
+            <div class="ig-stat">
+              <span class="ig-stat-v"><span data-count="179">0</span></span>
+              <span class="ig-stat-l">подписки</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ig-bio">
+        <p>• I restore myself</p>
+        <p>– when I am alone 😉</p>
+      </div>
+
+      <a class="ig-cta" href="https://instagram.com/aliubnabdullo" target="_blank" rel="noopener">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="5"/>
+          <circle cx="12" cy="12" r="4"/>
+          <circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/>
+        </svg>
+        <span>Перейти на профиль</span>
+        <span class="arr">→</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CHAT ============ -->
+<section class="section chat-section" id="chat" data-screen-label="06 Chat">
+  <div class="wrap">
+    <div class="chat-wrap">
+      <div class="chat-intro">
+        <div class="eyebrow reveal">Прямой чат</div>
+        <h2 class="h2 reveal d1">Напиши мне <span class="grad-text">прямо сейчас</span>.</h2>
+        <p class="lead reveal d2">Опиши задачу — отвечу в течение нескольких минут. Можешь начать здесь, а продолжим в Telegram.</p>
+
+        <div class="chat-features">
+          <div class="chat-feature reveal d2">
+            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="tx">Отвечаю в течение 15 минут</div>
+          </div>
+          <div class="chat-feature reveal d3">
+            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.94 0 3.73.6 5.22 1.65"/></svg></div>
+            <div class="tx">Бесплатная оценка задачи</div>
+          </div>
+          <div class="chat-feature reveal d3">
+            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+            <div class="tx">Прозрачный процесс работы</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-window reveal d2">
+        <div class="chat-header">
+          <div class="ava" style="background-image:url('assets/alijon.jpg')"></div>
+          <div class="who">
+            <div class="nm">Alijon M.</div>
+            <div class="st">@rutsiyax · online</div>
+          </div>
+          <div class="tg-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+          </div>
+        </div>
+
+        <div class="chat-body" id="chat-body"></div>
+
+        <div class="chat-quick">
+          <button data-text="Привет">👋 Привет</button>
+          <button data-text="Нужен бот">🤖 Нужен бот</button>
+          <button data-text="Сколько стоит?">💰 Цена</button>
+          <button data-text="Сроки">⏱ Сроки</button>
+          <button class="primary" data-tg-open>→ В Telegram</button>
+        </div>
+
+        <div class="chat-input">
+          <input id="chat-input" type="text" placeholder="Напиши сообщение..." autocomplete="off">
+          <button id="chat-send" class="send" aria-label="Отправить">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer" id="contacts" data-screen-label="07 Footer">
+  <div class="wrap">
+    <div class="footer-cta reveal">
+      <h2 class="h2">Готов сделать <span class="grad-text">твоего бота</span>?</h2>
+      <p>Напиши в Telegram — отвечу быстро и предложу решение под твою задачу.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://t.me/rutsiyax" target="_blank" rel="noopener" data-tg-open>
+          Написать в Telegram <span class="arr">→</span>
+        </a>
+        <a class="btn btn-ghost" href="https://instagram.com/aliubnabdullo" target="_blank" rel="noopener">Instagram</a>
+      </div>
+    </div>
+
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand">
+          <div class="ava" style="background-image:url('assets/alijon.jpg')"></div>
+          <div>
+            <div class="nm">Alijon Mahmadjonov</div>
+            <div class="rl">Bot Developer · Душанбе, TJ</div>
+          </div>
+        </div>
+        <p class="footer-tag">Делаю Telegram-ботов и автоматизирую бизнес-процессы. Открыт к новым задачам.</p>
+      </div>
+      <div>
+        <h5>// Навигация</h5>
+        <ul>
+          <li><a href="#about">О себе</a></li>
+          <li><a href="#services">Услуги</a></li>
+          <li><a href="#skills">Стек</a></li>
+          <li><a href="#experience">Опыт</a></li>
+          <li><a href="#mentor">Наставник</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>// Соцсети</h5>
+        <ul>
+          <li><a href="https://t.me/rutsiyax" target="_blank" rel="noopener">Telegram — @rutsiyax</a></li>
+          <li><a href="https://instagram.com/aliubnabdullo" target="_blank" rel="noopener">Instagram — @aliubnabdullo</a></li>
+          <li><a href="mailto:alijon26.06.2006@gmail.com">alijon26.06.2006@gmail.com</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span>© 2026 Alijon Mahmadjonov</span>
+      <span>made with ☕ &amp; python</span>
+    </div>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
