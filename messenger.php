@@ -535,7 +535,7 @@ function face_module() {
     'https://unpkg.com/@vladmandic/face-api/dist/face-api.js'
   ];
   const MODEL_SOURCES=[
-    'face-models',                                                        // ← локальная папка с моделями
+    '.',                                                                  // ← модели лежат в КОРНЕ, рядом с messenger.php (без папки)
     'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model',
     'https://unpkg.com/@vladmandic/face-api/model'
   ];
