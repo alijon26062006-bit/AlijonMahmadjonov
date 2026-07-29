@@ -26,6 +26,26 @@ const io = new IntersectionObserver((entries) => {
 }, { threshold: 0.14, rootMargin: '0px 0px -40px 0px' });
 document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 
+// Animated counters
+function runCounter(el) {
+  const target = parseFloat(el.dataset.count);
+  const suffix = el.dataset.suffix || '';
+  const dur = 1500, start = performance.now();
+  function step(t) {
+    const p = Math.min(1, (t - start) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(target * eased) + suffix;
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+const counterIO = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) { runCounter(e.target); counterIO.unobserve(e.target); }
+  });
+}, { threshold: 0.6 });
+document.querySelectorAll('[data-count]').forEach(el => counterIO.observe(el));
+
 // Smooth offset for anchor links (fixed nav)
 document.querySelectorAll('a[href^="#"]').forEach(a => {
   a.addEventListener('click', (ev) => {
