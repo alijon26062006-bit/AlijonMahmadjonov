@@ -521,7 +521,7 @@ function face_module() {
   let chSeq=[],chIdx=0,alignFrames=0,challengeStart=0,lastDet=0,grabDescs=[];
   // Калибровка «прямого лица» этого человека (считаем движения относительно него)
   // + пауза между шагами и состояние моргания.
-  let baseEAR=0,baseYaw=0,baseN=0,stepCd=0,eyesOpen=false;
+  let baseEAR=0,baseYaw=0,baseN=0,stepCd=0,eyesOpen=false,closedFr=0;
   function avgDesc(list){ const n=list.length,L=list[0].length,out=new Array(L).fill(0); for(const d of list)for(let i=0;i<L;i++)out[i]+=d[i]; for(let i=0;i<L;i++)out[i]/=n; return out; }
   // Источники библиотеки и моделей: основной CDN + запасной.
   // Если один CDN недоступен (медленный интернет/блокировки в регионе) —
@@ -575,7 +575,7 @@ function face_module() {
   // Возвращаем 3 РАЗНЫХ движения в случайном порядке (2, если эмоций нет),
   // чтобы систему нельзя было обмануть фото или заранее записанным видео.
   function pickCh(){
-    const pool=[{k:'blink',t:'Моргните'},{k:'turn',t:'Поверните голову в сторону'}];
+    const pool=[{k:'blink',t:'Закройте глаза на секунду'},{k:'turn',t:'Поверните голову в сторону'}];
     if(hasExpr) pool.push({k:'smile',t:'Улыбнитесь'});
     for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=pool[i]; pool[i]=pool[j]; pool[j]=t; } // перемешать
     return pool.slice(0, hasExpr?3:2);
@@ -638,10 +638,15 @@ function face_module() {
             ok = baseYaw>0 && Math.abs(yawV-baseYaw)/baseYaw > 0.35;
           } else {
             // моргание = глаза закрылись, а потом снова открылись (полный цикл)
-            // сначала убеждаемся, что глаза были открыты, затем ловим закрытие —
-            // засчитываем моргание в момент закрытия (срабатывает легче и быстрее)
-            if(earV > baseEAR*0.80) eyesOpen=true;
-            if(eyesOpen && earV < baseEAR*0.72){ ok=true; eyesOpen=false; }
+            // «Закройте глаза на секунду»: пока глаза ЗАКРЫТЫ и держатся так,
+            // это видно в нескольких кадрах подряд — ловится гарантированно
+            // даже на медленных телефонах (короткое моргание камера часто
+            // просто не успевала снять между кадрами).
+            if(earV > baseEAR*0.85){ eyesOpen=true; closedFr=0; fsub('Движение '+(chIdx+1)+' из '+chSeq.length); }
+            else if(eyesOpen && earV < baseEAR*0.78){
+              closedFr++; fsub('Держите глаза закрытыми…');
+              if(closedFr>=2){ ok=true; eyesOpen=false; closedFr=0; }   // 2 кадра подряд = глаза точно закрыты
+            }
           }
           if(ok){
             frame('ok'); chIdx++; dots();                       // шаг пройден — точка загорается
@@ -657,7 +662,7 @@ function face_module() {
       }
     }catch(e){}
     faceBusy=false; }
-  function showCh(){ challengeStart=performance.now(); eyesOpen=false; fmsg(chSeq[chIdx].t); fsub('Движение '+(chIdx+1)+' из '+chSeq.length); dots(); }
+  function showCh(){ challengeStart=performance.now(); eyesOpen=false; closedFr=0; fmsg(chSeq[chIdx].t); fsub('Движение '+(chIdx+1)+' из '+chSeq.length); dots(); }
   async function submitFace(){ const desc=capturedDesc;
     if(!desc){ faceState='align'; alignFrames=0; chSeq=pickCh(); chIdx=0; stepCd=0; loopFace(); return; }
     if(faceMode==='enroll'){ fmsg('Сохранение…'); frame('ok'); fsub('');
