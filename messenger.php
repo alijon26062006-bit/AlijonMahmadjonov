@@ -573,16 +573,10 @@ function face_module() {
       fmsg('Загрузка модели 4/4…'); try{ await loadNet(faceapi.nets.faceExpressionNet); hasExpr=true; }catch(e){ hasExpr=false; }
       faceReady=true;return true;
     }catch(e){ faceErr=(e&&e.message)?e.message:String(e); return false; } }
-  // Набор проверок «живости». «Моргните» и «Поверните голову» работают всегда
-  // (по точкам лица), «Улыбнитесь» — только если загружена модель эмоций.
-  // Возвращаем 3 РАЗНЫХ движения в случайном порядке (2, если эмоций нет),
-  // чтобы систему нельзя было обмануть фото или заранее записанным видео.
-  function pickCh(){
-    const pool=[{k:'blink',t:'Закройте глаза на секунду'},{k:'turn',t:'Поверните голову в сторону'}];
-    if(hasExpr) pool.push({k:'smile',t:'Улыбнитесь'});
-    for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=pool[i]; pool[i]=pool[j]; pool[j]=t; } // перемешать
-    return pool.slice(0, hasExpr?3:2);
-  }
+  // Проверка «живости» — ОДИН простой шаг: закройте глаза на секунду.
+  // Глаза закрылись (видно в двух кадрах подряд) → человек живой → сразу вход.
+  // По фото так не пройти: у фотографии глаза не закрываются.
+  function pickCh(){ return [{k:'blink',t:'Закройте глаза на секунду'}]; }
   window.openFace=async function(mode){ faceMode=mode||'login'; faceErr=''; grabFails=0; capturedDesc=null;
     document.getElementById('faceOv').style.display='flex'; frame(''); fsub(''); fmsg('Загрузка…');
     const ok=await ensureFace(); if(!ok){fmsg('Ошибка загрузки сканера');fsub(faceErr||'Проверьте интернет');return;}
@@ -893,10 +887,10 @@ if (empty($_SESSION['user_id'])) {
         <h1>Payom</h1>
         <!-- шаг 1: номер -->
         <div id="step1">
-            <p class="s">Быстрый вход по Face ID / отпечатку.<br>Первый раз — подтвердите номер телефона.</p>
-            <div id="regHint" class="err" style="display:none;background:#1E3A2A;color:#4ADE80">Подтвердите номер — и включите быстрый вход по биометрии.</div>
+            <p class="s">Быстрый вход по лицу.<br>Первый раз — подтвердите номер телефона.</p>
+            <div id="regHint" class="err" style="display:none;background:#1E3A2A;color:#4ADE80">Лицо новое — подтвердите номер, и оно сохранится.</div>
             <div id="err1" class="err" style="display:none"></div>
-            <button class="btn" id="bioBtn" style="padding:18px;font-size:16px" onclick="bioLogin()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;vertical-align:-5px;margin-right:8px"><path d="M7 3H5a2 2 0 00-2 2v2M17 3h2a2 2 0 012 2v2M7 21H5a2 2 0 01-2-2v-2M17 21h2a2 2 0 002-2v-2M9 10h.01M15 10h.01M9 15c.8.7 1.9 1 3 1s2.2-.3 3-1"/></svg><span id="bioBtnTxt">Войти по Face ID / отпечатку</span></button>
+            <button class="btn" style="padding:18px;font-size:16px" onclick="openFace('smart')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;vertical-align:-5px;margin-right:8px"><path d="M7 3H5a2 2 0 00-2 2v2M17 3h2a2 2 0 012 2v2M7 21H5a2 2 0 01-2-2v-2M17 21h2a2 2 0 002-2v-2M9 10h.01M15 10h.01M9 15c.8.7 1.9 1 3 1s2.2-.3 3-1"/></svg>Войти по лицу</button>
             <div id="phoneBlock" style="display:none;margin-top:14px">
                 <input type="tel" id="loginPhone" placeholder="+7 777 123 45 67">
                 <button class="btn" onclick="tgStart()">Продолжить</button>
@@ -904,7 +898,7 @@ if (empty($_SESSION['user_id'])) {
             <button id="phoneToggle" class="btn" style="background:#2A2A3C;margin-top:10px" onclick="showPhone()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px;vertical-align:-3px;margin-right:7px"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.4-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.7.7a2 2 0 011.7 2z"/></svg>Войти по номеру телефона</button>
             <div style="margin-top:16px;padding:13px 14px;background:rgba(124,92,255,.1);border:1px solid rgba(124,92,255,.28);border-radius:14px;text-align:left">
                 <div style="display:flex;align-items:center;gap:8px;font-weight:800;font-size:13.5px;color:#B9A9FF;margin-bottom:7px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px;flex-shrink:0"><path d="M12 2l8 4v6c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>Это безопасно</div>
-                <div style="font-size:12.5px;color:var(--sub);line-height:1.55">Биометрия (Face ID, отпечаток) проверяется только на вашем устройстве и никуда не передаётся. Сервер хранит лишь открытый ключ и проверяет цифровую подпись — как в банковских приложениях (технология Passkeys).</div>
+                <div style="font-size:12.5px;color:var(--sub);line-height:1.55">Сохраняется не фото, а зашифрованный код (AES-256). По нему нельзя восстановить лицо. Используется только для вашего личного входа — ни владелец, ни разработчик не могут его посмотреть или где-либо применить.</div>
             </div>
         </div>
         <!-- шаг 2: подтверждение -->
@@ -955,45 +949,8 @@ if (empty($_SESSION['user_id'])) {
     }
     function tgBack(){ if(tgPoll)clearInterval(tgPoll); tgToken=null; document.getElementById('step2').style.display='none'; document.getElementById('step1').style.display='block'; }
     function showErr(t){ const e=document.getElementById('err1'); e.textContent=t; e.style.display='block'; }
-
-    /* ==== Биометрический вход (WebAuthn/Passkeys) ==== */
-    let bioBusy=false;
-    async function bioLogin(){
-        if(bioBusy) return; bioBusy=true;
-        const btn=document.getElementById('bioBtn'), txt=document.getElementById('bioBtnTxt');
-        try{
-            if(!window.PayomBio||!PayomBio.ok){ showErr('Биометрия здесь не поддерживается — войдите по номеру'); showPhone(); return; }
-            txt.textContent='Подтвердите биометрию…'; btn.disabled=true;
-            const r=await PayomBio.login();
-            if(r&&r.ok){ txt.textContent='Добро пожаловать!'; location.href='messenger.php'; return; }
-            const er=(r&&r.error)||'';
-            if(er==='cancel'){ /* пользователь передумал — молчим */ }
-            else if(er==='unknown_credential'){                    // сменил устройство / ключ удалён
-                try{localStorage.removeItem('payomBio');}catch(_){}
-                showErr('Ключ не найден (новое устройство?). Войдите по номеру и включите биометрию заново.'); showPhone();
-            }
-            else if(er==='expired'){ showErr('Время проверки вышло — нажмите ещё раз'); }
-            else if(er==='rate_limited'||er==='too_many'){ showErr('Слишком много попыток, подождите минуту'); }
-            else if(er==='unsupported'||er==='security'){ showErr('Биометрия недоступна — войдите по номеру'); showPhone(); }
-            else if(er==='network'){ showErr('Нет связи с сервером, попробуйте ещё раз'); }
-            else if(er){ showErr('Не получилось — войдите по номеру телефона'); showPhone(); }
-        } finally {
-            bioBusy=false; btn.disabled=false; txt.textContent='Войти по Face ID / отпечатку';
-        }
-    }
-    /* Автонастройка экрана: нет поддержки — сразу показываем вход по номеру;
-       биометрия уже включалась на этом устройстве — запускаем её сами. */
-    window.addEventListener('load', function(){ setTimeout(async function(){
-        try{
-            if(!window.PayomBio||!PayomBio.ok||!(await PayomBio.platform())){
-                document.getElementById('bioBtn').style.display='none';
-                showPhone(); return;
-            }
-            if(localStorage.getItem('payomBio')==='1') bioLogin();
-        }catch(_){ }
-    }, 250); });
     </script>
-    <?= function_exists('bio_client_module') ? bio_client_module() : '' ?>
+    <?= face_module() ?>
     </body></html>
     <?php exit;
 }
@@ -3356,7 +3313,7 @@ input:checked + .tgl::after{transform:translateX(19px)}
         <div class="st-h">Безопасность</div>
         <div style="padding:14px 16px;background:var(--panel)">
             <button class="st-btn" id="installRow" style="background:linear-gradient(135deg,#8E6BFF,#5B3FE0);color:#fff" onclick="doInstall()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg><span id="installRowTxt">Установить приложение</span></button>
-            <button class="st-btn" id="faceBtn" style="background:var(--panel2);color:var(--txt)" onclick="faceSetting()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3H5a2 2 0 00-2 2v2M17 3h2a2 2 0 012 2v2M7 21H5a2 2 0 01-2-2v-2M17 21h2a2 2 0 002-2v-2M9 10h.01M15 10h.01M9 15c.8.7 1.9 1 3 1s2.2-.3 3-1"/></svg><span id="faceBtnTxt">Вход по Face ID / отпечатку</span></button>
+            <button class="st-btn" id="faceBtn" style="background:var(--panel2);color:var(--txt)" onclick="faceSetting()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3H5a2 2 0 00-2 2v2M17 3h2a2 2 0 012 2v2M7 21H5a2 2 0 01-2-2v-2M17 21h2a2 2 0 002-2v-2M9 10h.01M15 10h.01M9 15c.8.7 1.9 1 3 1s2.2-.3 3-1"/></svg><span id="faceBtnTxt">Вход по лицу</span></button>
             <button class="st-btn" style="background:var(--panel2);color:var(--txt)" onclick="openLockSettings()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>Блокировка приложения</button>
             <button class="st-btn" style="background:var(--panel2);color:var(--txt)" onclick="openDevices()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>Устройства (активные сеансы)</button>
             <button class="st-btn" id="sndBtn" style="background:var(--panel2);color:var(--txt);display:flex;align-items:center;justify-content:space-between" onclick="toggleSnd()"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;vertical-align:-4px;margin-right:9px"><path d="M11 5L6 9H2v6h4l5 4V5zM15.5 8.5a5 5 0 010 7M19 5a9 9 0 010 14"/></svg>Звук сообщений</span><span id="sndState" style="color:var(--blue)">Вкл</span></button>
@@ -4166,51 +4123,17 @@ async function renderBlocked(){
 async function unblockUser(id){ await api('unblock','POST',{user:id}); renderBlocked(); }
 /* безопасность / аккаунт */
 async function logoutAll(){ if(confirm('Выйти на всех устройствах? Нужно будет войти заново.')){ await api('logout_all','POST',{}); location.href='messenger.php'; } }
-/* ==== Биометрический вход (WebAuthn/Passkeys): настройка в меню ==== */
 let faceEnabled=false;
-async function refreshFaceStatus(){
-    const t=document.getElementById('faceBtnTxt');
-    if(!window.PayomBio||!PayomBio.ok){ faceEnabled=false; if(t)t.textContent='Биометрия недоступна в этом браузере'; return; }
-    const r=await api('bio_status'); faceEnabled=!!(r&&r.has);
-    if(t)t.textContent=faceEnabled?('Вход по Face ID / отпечатку: включён ('+(r.count||1)+')'):'Включить вход по Face ID / отпечатку';
-}
-async function faceSetting(){
-    if(!window.PayomBio||!PayomBio.ok){ alert('Этот браузер не поддерживает биометрию (нужен современный браузер и https). Вход остаётся по номеру.'); return; }
+async function refreshFaceStatus(){ const r=await api('face_has'); faceEnabled=!!(r&&r.has); const t=document.getElementById('faceBtnTxt'); if(t)t.textContent=faceEnabled?('Вход по лицу: включён ('+r.samples+') — настроить'):'Настроить вход по лицу'; }
+window.afterFaceEnroll=function(){ refreshFaceStatus(); };
+function faceSetting(){
     if(faceEnabled){
-        if(confirm('Биометрический вход включён.\n\nОтключить и удалить все ключи? (войти можно будет по номеру телефона)')){
-            await api('bio_disable','POST',{});
-            try{localStorage.removeItem('payomBio');}catch(e){}
-            toast('Биометрический вход отключён');
-            refreshFaceStatus();
-        }
-        return;
+        if(confirm('Добавить ещё один образец лица? (точнее распознавание)\n\nОК — добавить · Отмена — меню')){ openFace('enroll'); }
+        else if(confirm('Отключить вход по лицу и удалить сохранённые данные лица?')){ api('face_disable','POST',{}).then(()=>refreshFaceStatus()); }
+    } else {
+        if(confirm('Включить быстрый вход по лицу?\n\nПроверка простая: закройте глаза на секунду.\n\nБезопасность: сохраняется не фото, а зашифрованный код (AES-256), по нему нельзя восстановить лицо.')){ openFace('enroll'); }
     }
-    if(!(await PayomBio.platform())){ alert('На этом устройстве нет Face ID / отпечатка (или он не настроен в системе).'); return; }
-    const r=await PayomBio.enroll();
-    if(r&&r.ok){ toast('Готово! Теперь можно входить по Face ID / отпечатку'); }
-    else if(r&&r.error==='cancel'){ /* передумал */ }
-    else if(r&&r.error==='exists'){ try{localStorage.setItem('payomBio','1');}catch(e){} toast('Ключ уже создан на этом устройстве'); }
-    else if(r&&r.error==='expired'){ alert('Время вышло, попробуйте ещё раз'); }
-    else alert('Не получилось включить ('+((r&&r.error)||'ошибка')+')');
-    refreshFaceStatus();
 }
-/* После первого входа по номеру — один раз предложить включить биометрию. */
-setTimeout(async function(){
-    try{
-        if(!window.PayomBio||!PayomBio.ok) return;
-        if(localStorage.getItem('payomBioAsked')==='1') return;
-        if(!(await PayomBio.platform())) return;
-        const s=await api('bio_status');
-        if(s&&s.has){ localStorage.setItem('payomBio','1'); localStorage.setItem('payomBioAsked','1'); return; }
-        localStorage.setItem('payomBioAsked','1');
-        if(confirm('Включить быстрый вход по Face ID / отпечатку?\n\nБиометрия проверяется только на вашем устройстве и никуда не передаётся. Сервер хранит лишь открытый ключ (технология Passkeys, как в банках).')){
-            const r=await PayomBio.enroll();
-            if(r&&r.ok) toast('Биометрический вход включён');
-            else if(r&&r.error&&r.error!=='cancel') alert('Не получилось: '+r.error);
-            refreshFaceStatus();
-        }
-    }catch(e){}
-}, 2500);
 async function clearCacheAll(){ try{ if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations(); for(const r of rs)await r.unregister();} if(window.caches){const ks=await caches.keys(); for(const k of ks)await caches.delete(k);} }catch(e){} alert('Кэш очищен'); location.reload(true); }
 async function deleteAccount(){ if(!confirm('Удалить аккаунт? Вы выйдете, а для других вы станете «Пользователь Payom». Войти снова по этому лицу/номеру будет нельзя.'))return; if(!confirm('Точно удалить аккаунт?'))return; await api('delete_account','POST',{}); alert('Аккаунт удалён'); location.href='messenger.php'; }
 async function uploadAva(inp){
@@ -5521,7 +5444,7 @@ document.addEventListener('mouseup',    onUp);
 })();
 /* конец PAYOM-UPDATE-v2 */
 </script>
-<?= function_exists('bio_client_module') ? bio_client_module() : '' ?>
+<?= face_module() ?>
 <script>
 
 /* PAYOM-CHANNELS */
