@@ -678,9 +678,20 @@ if (!defined('APP_ENC_KEY')) define('APP_ENC_KEY', 'payom_Pkhe5Bp9qi6efW5BUM2Doa
 if (!defined('WS_URL'))    define('WS_URL',    '');   // например wss://ws.example.com/ws
 if (!defined('WS_SECRET')) define('WS_SECRET', '');
 
+/* Реалтайм через Pusher (для обычного хостинга). Ключи задаются в realtime.php.
+   Если файла нет или ключи пустые — мгновенная доставка просто выключена,
+   и мессенджер работает по-старому (опросом). Полностью безопасно. */
+if (is_file(__DIR__ . '/realtime.php')) require_once __DIR__ . '/realtime.php';
+
 /* Отправляет событие в комнату чата. Не задерживает ответ пользователю:
    таймаут короткий, любые сбои молча игнорируются. */
 function ws_publish($chatId, array $payload, $type = 'message') {
+    // 1) Мгновенная доставка через Pusher (работает на обычном хостинге).
+    //    Внутри — тихий выход, если ключи Pusher не заданы.
+    if (function_exists('pusher_publish')) {
+        pusher_publish('chat-' . (int)$chatId, $type, $payload);
+    }
+    // 2) Доставка через собственный WS-сервер на VPS (если он настроен).
     if (WS_URL === '' || WS_SECRET === '') return;
     $base = preg_replace('~^wss?://~', 'https://', WS_URL);
     $base = preg_replace('~/ws$~', '', $base);
@@ -5174,6 +5185,63 @@ window.addEventListener('beforeunload', function(){ closing = true; if (sock) tr
 connect();
 })();
 </script>
+
+<!-- ==== МГНОВЕННАЯ ДОСТАВКА через Pusher (для обычного хостинга) ==== -->
+<script>
+/* Если ключ не задан в realtime.php — блок ничего не делает, работает опрос.
+   Когда Pusher включён — открытый чат обновляется мгновенно, без ожидания опроса. */
+window.PUSHER_KEY     = '<?= defined('PUSHER_KEY') ? addslashes(PUSHER_KEY) : '' ?>';
+window.PUSHER_CLUSTER = '<?= defined('PUSHER_CLUSTER') ? addslashes(PUSHER_CLUSTER) : '' ?>';
+(function(){
+'use strict';
+if (!window.PUSHER_KEY || !window.PUSHER_CLUSTER) return;   // реалтайм выключен — остаётся опрос
+
+var pusher = null, curChan = null;
+
+/* Подгружаем клиент Pusher с их CDN только когда он реально нужен. */
+function loadPusher(){
+    return new Promise(function(res, rej){
+        if (window.Pusher) return res();
+        var s = document.createElement('script');
+        s.src = 'https://js.pusher.com/8.4.0/pusher.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+    });
+}
+
+/* Подписка на канал открытого чата: chat-<id>. */
+function bindChan(chatId){
+    if (!pusher || !chatId) return;
+    var name = 'chat-' + chatId;
+    if (curChan === name) return;                 // уже подписаны на этот чат
+    if (curChan) { try { pusher.unsubscribe(curChan); } catch(e){} }
+    curChan = name;
+    var ch = pusher.subscribe(name);
+    // Новое сообщение в этом чате — мгновенно перезагружаем (sig сбрасываем,
+    // чтобы обновление точно отрисовалось; anti-overlap внутри loadMsgs защитит).
+    ch.bind('message', function(){
+        var box = document.getElementById('msgsArea');
+        if (box) box.dataset.sig = '';
+        if (typeof loadMsgs === 'function') loadMsgs(false);
+    });
+}
+
+loadPusher().then(function(){
+    try { pusher = new Pusher(window.PUSHER_KEY, { cluster: window.PUSHER_CLUSTER, forceTLS: true }); }
+    catch(e){ return; }                            // не удалось — остаётся опрос
+    /* Реалтайм поднялся: старый частый интервал-опрос можно погасить
+       (умный лёгкий опрос ping остаётся как резерв). */
+    try { if (window.msgPoll) { clearInterval(window.msgPoll); window.msgPoll = null; } } catch(e){}
+    if (window.curChat) bindChan(window.curChat);
+    /* при открытии чата — переподписываемся на его канал */
+    if (typeof openChat === 'function') {
+        var _oc = openChat;
+        window.openChat = function(id){ var r = _oc.apply(this, arguments); bindChan(id); return r; };
+    }
+}).catch(function(){ /* CDN не загрузился — тихо остаёмся на опросе */ });
+})();
+</script>
+
 <script>window.CALL_CFG = { role: 'user', myId: <?= $ME ?>, url: 'messenger.php', app: 'messenger' };</script>
 <script src="mcall.js">
 /* PAYOM-UPDATE-v2 */
