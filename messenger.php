@@ -521,7 +521,7 @@ function face_module() {
   let chSeq=[],chIdx=0,alignFrames=0,challengeStart=0,lastDet=0,grabDescs=[];
   // Калибровка «прямого лица» этого человека (считаем движения относительно него)
   // + пауза между шагами и состояние моргания.
-  let baseEAR=0,baseYaw=0,baseN=0,stepCd=0,eyesClosed=false;
+  let baseEAR=0,baseYaw=0,baseN=0,stepCd=0,eyesOpen=false;
   function avgDesc(list){ const n=list.length,L=list[0].length,out=new Array(L).fill(0); for(const d of list)for(let i=0;i<L;i++)out[i]+=d[i]; for(let i=0;i<L;i++)out[i]/=n; return out; }
   // Источники библиотеки и моделей: основной CDN + запасной.
   // Если один CDN недоступен (медленный интернет/блокировки в регионе) —
@@ -589,7 +589,7 @@ function face_module() {
     try{await v.play();}catch(e){}
     fmsg('Запуск камеры…'); let tries=0; while((!v.videoWidth||v.videoWidth<10)&&tries<50){ await new Promise(r=>setTimeout(r,60)); tries++; }
     if(!v.videoWidth){ fmsg('Камера не запустилась'); fsub('Обновите страницу'); return; }
-    chSeq=pickCh(); chIdx=0; stepCd=0; eyesClosed=false; baseEAR=0; baseYaw=0; baseN=0; alignFrames=0; grabDescs=[]; faceState='align'; dots();
+    chSeq=pickCh(); chIdx=0; stepCd=0; eyesOpen=false; baseEAR=0; baseYaw=0; baseN=0; alignFrames=0; grabDescs=[]; faceState='align'; dots();
     fmsg('Поместите лицо в овал'); fsub('Смотрите прямо в камеру'); loopFace(); };
   window.closeFace=function(){ faceState='idle'; if(faceRAF)cancelAnimationFrame(faceRAF); faceRAF=null;
     if(faceStream){faceStream.getTracks().forEach(t=>t.stop());faceStream=null;}
@@ -638,24 +638,26 @@ function face_module() {
             ok = baseYaw>0 && Math.abs(yawV-baseYaw)/baseYaw > 0.35;
           } else {
             // моргание = глаза закрылись, а потом снова открылись (полный цикл)
-            if(earV < baseEAR*0.62) eyesClosed=true;
-            if(eyesClosed && earV > baseEAR*0.85){ ok=true; eyesClosed=false; }
+            // сначала убеждаемся, что глаза были открыты, затем ловим закрытие —
+            // засчитываем моргание в момент закрытия (срабатывает легче и быстрее)
+            if(earV > baseEAR*0.80) eyesOpen=true;
+            if(eyesOpen && earV < baseEAR*0.72){ ok=true; eyesOpen=false; }
           }
           if(ok){
             frame('ok'); chIdx++; dots();                       // шаг пройден — точка загорается
             if(chIdx>=chSeq.length){ faceState='idle'; if(faceRAF)cancelAnimationFrame(faceRAF); submitFace(); }
-            else { stepCd=now+900; eyesClosed=false; fmsg('Отлично ✓'); fsub('Приготовьтесь…');
+            else { stepCd=now+900; eyesOpen=false; fmsg('Отлично ✓'); fsub('Приготовьтесь…');
                    setTimeout(function(){ if(faceState==='challenge') showCh(); }, 950); }
           } else if(now-challengeStart>15000){
             // слишком долго на одном шаге — начинаем проверку заново
             fmsg('Давайте заново'); faceState='align'; alignFrames=0; capturedDesc=null;
-            chSeq=pickCh(); chIdx=0; stepCd=0; eyesClosed=false; baseEAR=0; baseYaw=0; baseN=0;
+            chSeq=pickCh(); chIdx=0; stepCd=0; eyesOpen=false; baseEAR=0; baseYaw=0; baseN=0;
           }
         }
       }
     }catch(e){}
     faceBusy=false; }
-  function showCh(){ challengeStart=performance.now(); eyesClosed=false; fmsg(chSeq[chIdx].t); fsub('Движение '+(chIdx+1)+' из '+chSeq.length); dots(); }
+  function showCh(){ challengeStart=performance.now(); eyesOpen=false; fmsg(chSeq[chIdx].t); fsub('Движение '+(chIdx+1)+' из '+chSeq.length); dots(); }
   async function submitFace(){ const desc=capturedDesc;
     if(!desc){ faceState='align'; alignFrames=0; chSeq=pickCh(); chIdx=0; stepCd=0; loopFace(); return; }
     if(faceMode==='enroll'){ fmsg('Сохранение…'); frame('ok'); fsub('');
