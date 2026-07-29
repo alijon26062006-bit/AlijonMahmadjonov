@@ -513,7 +513,10 @@ function face_module() {
     <div id="faceDots" class="face-dots"></div>
     <div id="faceMsg" class="face-msg">Загрузка…</div>
     <div id="faceSub" class="face-sub"></div>
-    <button class="face-close" onclick="closeFace()">Отмена</button>
+    <div style="display:flex;gap:10px">
+        <button class="face-close" id="faceVoiceBtn" onclick="faceVoiceToggle(this)" title="Голос команд" style="min-width:56px">🔊</button>
+        <button class="face-close" onclick="closeFace()">Отмена</button>
+    </div>
 </div>
 <script>
 (function(){
@@ -549,6 +552,27 @@ function face_module() {
   function fmsg(t){const e=document.getElementById('faceMsg');if(e)e.textContent=t;}
   function fsub(t){const e=document.getElementById('faceSub');if(e)e.textContent=t||'';}
   function frame(c){const e=document.getElementById('faceFrame');if(e)e.className='face-frame'+(c?' '+c:'');}
+  // ---- ГОЛОСОВЫЕ КОМАНДЫ (синтез речи браузера) ----
+  // Система вслух проговаривает движения: «Моргните», «Поверните голову»…
+  // Работает офлайн, ничего ставить не нужно. Всё в try/catch: если голос
+  // недоступен (или выключен) — вход по лицу всё равно работает молча.
+  let fvoice=null;
+  function pickVoice(){ try{ const vs=(window.speechSynthesis&&speechSynthesis.getVoices())||[];
+    fvoice = vs.find(v=>/^ru/i.test(v.lang)) || vs.find(v=>/russ|русск/i.test(v.name)) || null; }catch(e){} }
+  if('speechSynthesis'in window){ try{ speechSynthesis.onvoiceschanged=pickVoice; pickVoice(); }catch(e){} }
+  function fspeak(t){ try{
+    if(!('speechSynthesis'in window) || !t) return;
+    if(localStorage.getItem('faceVoice')==='0') return;   // пользователь выключил звук
+    speechSynthesis.cancel();                             // прерываем прошлую фразу
+    const u=new SpeechSynthesisUtterance(t); u.lang='ru-RU'; u.rate=1; u.pitch=1;
+    if(!fvoice) pickVoice(); if(fvoice) u.voice=fvoice;
+    speechSynthesis.speak(u);
+  }catch(e){} }
+  function fstopVoice(){ try{ if('speechSynthesis'in window) speechSynthesis.cancel(); }catch(e){} }
+  // Кнопка вкл/выкл голоса (состояние запоминается в браузере).
+  window.faceVoiceToggle=function(btn){ const wasOn=localStorage.getItem('faceVoice')!=='0';
+    localStorage.setItem('faceVoice', wasOn?'0':'1'); if(wasOn) fstopVoice();
+    if(btn) btn.textContent = wasOn?'🔇':'🔊'; };
   function dots(){const d=document.getElementById('faceDots');if(!d)return;d.innerHTML=chSeq.map((c,i)=>'<span class="fdot '+(i<chIdx?'done':(i===chIdx?'cur':''))+'"></span>').join('');}
   async function ensureFace(){ if(faceReady)return true;
     try{
@@ -575,6 +599,8 @@ function face_module() {
   }
   window.openFace=async function(mode){ faceMode=mode||'login'; faceErr=''; grabFails=0; capturedDesc=null;
     document.getElementById('faceOv').style.display='flex'; frame(''); fsub(''); fmsg('Загрузка…');
+    // синхронизируем иконку кнопки звука с сохранённым выбором пользователя
+    const _vb=document.getElementById('faceVoiceBtn'); if(_vb) _vb.textContent = (localStorage.getItem('faceVoice')==='0'?'🔇':'🔊');
     const ok=await ensureFace(); if(!ok){fmsg('Ошибка загрузки сканера');fsub(faceErr||'Проверьте интернет');return;}
     try{ faceStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:480},height:{ideal:480}}}); }
     catch(e){ fmsg('Нет доступа к камере'); fsub('Разрешите камеру в настройках браузера'); return; }
@@ -583,8 +609,8 @@ function face_module() {
     fmsg('Запуск камеры…'); let tries=0; while((!v.videoWidth||v.videoWidth<10)&&tries<50){ await new Promise(r=>setTimeout(r,60)); tries++; }
     if(!v.videoWidth){ fmsg('Камера не запустилась'); fsub('Обновите страницу'); return; }
     chSeq=pickCh(); chIdx=0; chNeedNeutral=false; alignFrames=0; grabDescs=[]; faceState='align'; dots();
-    fmsg('Поместите лицо в овал'); fsub('Смотрите прямо в камеру'); loopFace(); };
-  window.closeFace=function(){ faceState='idle'; if(faceRAF)cancelAnimationFrame(faceRAF); faceRAF=null;
+    fmsg('Поместите лицо в овал'); fsub('Смотрите прямо в камеру'); fspeak('Поместите лицо в овал и смотрите прямо в камеру'); loopFace(); };
+  window.closeFace=function(){ faceState='idle'; fstopVoice(); if(faceRAF)cancelAnimationFrame(faceRAF); faceRAF=null;
     if(faceStream){faceStream.getTracks().forEach(t=>t.stop());faceStream=null;}
     const v=document.getElementById('faceVid'); if(v)v.srcObject=null;
     document.getElementById('faceOv').style.display='none'; };
@@ -634,7 +660,7 @@ function face_module() {
             if(ok){
               frame('ok'); chIdx++; dots();                    // шаг пройден — отмечаем точку
               if(chIdx>=chSeq.length){ faceState='idle'; if(faceRAF)cancelAnimationFrame(faceRAF); submitFace(); }
-              else { chNeedNeutral=true; fmsg('Отлично ✓'); fsub('Верните лицо в исходное — и следующее движение'); }
+              else { chNeedNeutral=true; fmsg('Отлично ✓'); fsub('Верните лицо в исходное — и следующее движение'); fspeak('Отлично'); }
             } else if(performance.now()-challengeStart>15000){
               // на один шаг ушло слишком много времени — начинаем проверку заново
               fmsg('Давайте заново'); faceState='align'; alignFrames=0; capturedDesc=null;
@@ -645,19 +671,19 @@ function face_module() {
       }
     }catch(e){}
     faceBusy=false; }
-  function showCh(){ challengeStart=performance.now(); fmsg(chSeq[chIdx].t); fsub('Движение '+(chIdx+1)+' из '+chSeq.length+' · подтвердите, что вы живой'); dots(); }
+  function showCh(){ challengeStart=performance.now(); fmsg(chSeq[chIdx].t); fsub('Движение '+(chIdx+1)+' из '+chSeq.length+' · подтвердите, что вы живой'); fspeak(chSeq[chIdx].t); dots(); }
   async function submitFace(){ const desc=capturedDesc;
     if(!desc){ faceState='align'; alignFrames=0; chSeq=pickCh(); chIdx=0; chNeedNeutral=false; loopFace(); return; }
     if(faceMode==='enroll'){ fmsg('Сохранение…'); frame('ok'); fsub('');
       const r=await fetch('messenger.php?action=face_enroll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({descriptor:desc})}).then(x=>x.json()).catch(e=>({error:'network'}));
-      if(r&&r.ok){ fmsg('Лицо сохранено ✓'); fsub('Готово, образцов: '+r.samples); setTimeout(()=>{closeFace(); if(window.afterFaceEnroll)window.afterFaceEnroll();},1100); }
+      if(r&&r.ok){ fmsg('Лицо сохранено ✓'); fsub('Готово, образцов: '+r.samples); fspeak('Лицо сохранено'); setTimeout(()=>{closeFace(); if(window.afterFaceEnroll)window.afterFaceEnroll();},1100); }
       else{ fmsg('Ошибка сохранения'); fsub('Сервер: '+((r&&r.error)||'нет ответа')); setTimeout(()=>{faceState='align';alignFrames=0;capturedDesc=null;chSeq=pickCh();loopFace();},2600); }
       return;
     }
     // умный вход: есть лицо в базе → сразу входим; нет → просим номер
     fmsg('Проверка лица…'); frame('ok'); fsub('');
     const r=await fetch('messenger.php?action=face_login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({descriptor:desc})}).then(x=>x.json()).catch(e=>({error:'network'}));
-    if(r&&r.ok){ fmsg('Добро пожаловать'); setTimeout(()=>{location.href='messenger.php';},600); }
+    if(r&&r.ok){ fmsg('Добро пожаловать'); fspeak('Добро пожаловать'); setTimeout(()=>{location.href='messenger.php';},600); }
     else if(r&&r.error==='nomatch'){ window.pendingFaceDesc=desc; fmsg('Лицо новое'); fsub('Подтвердите номер — и лицо сохранится'); setTimeout(()=>{ closeFace(); if(window.afterFaceNeedsPhone)window.afterFaceNeedsPhone(); },1400); }
     else{ fmsg('Ошибка'); fsub('Сервер: '+((r&&r.error)||'нет ответа')); setTimeout(()=>{faceState='align';alignFrames=0;capturedDesc=null;chSeq=pickCh();fmsg('Попробуйте снова');loopFace();},2600); }
   }
