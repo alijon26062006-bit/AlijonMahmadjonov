@@ -11,14 +11,13 @@ function escapeHtml(s) {
 // ----- chat widget -----
 const initialMessages = [
   { from: 'in', text: 'Привет! 👋 Я Алиджон.', time: '' },
-  { from: 'in', text: 'Делаю Telegram-ботов под ключ. Чем могу помочь?', time: '' },
+  { from: 'in', text: 'Учусь на Python и делаю Telegram-ботов. Пиши — всегда рад пообщаться!', time: '' },
 ];
 
 const replies = {
-  'Нужен бот': 'Отлично! Расскажи коротко: что бот должен делать? Принимать заказы, отвечать клиентам, парсить данные?',
-  'Сколько стоит?': 'Зависит от задачи. Простой бот — от 5 000 ₽, с интеграциями и AI — от 15 000 ₽. Точную цену скажу после короткого брифа.',
-  'Сроки': 'Обычно 3–7 дней на простой бот, до 2–3 недель на сложный с базой и API. Срочно? Сделаем приоритет.',
-  'Привет': 'Привет 🙂 Чем могу быть полезен? Опиши задачу — отвечу с предложением.',
+  'Учёба': 'Учусь программировать на Python и создавать Telegram-ботов на aiogram. Практикуюсь каждый день 🙂',
+  'Боты': 'Сейчас пишу своих первых ботов на aiogram — команды, кнопки, меню. Дальше хочу подключать AI 🤖',
+  'Привет': 'Привет 🙂 Рад знакомству! Спрашивай про учёбу, Python или ботов.',
 };
 
 let chatMessages = initialMessages.slice();
@@ -65,7 +64,7 @@ function botReply(userText) {
     for (const key in replies) {
       if (userText.toLowerCase().includes(key.toLowerCase())) { reply = replies[key]; break; }
     }
-    if (!reply) reply = 'Понял тебя 👌 Чтобы продолжить с деталями и файлами, открой Telegram — там удобнее.';
+    if (!reply) reply = 'Понял тебя 👌 Давай продолжим в Telegram — там удобнее общаться.';
     addMsg({ from: 'in', text: reply, time: nowTime() });
     setTimeout(() => {
       addMsg({ from: 'in', text: '➜ Продолжим в Telegram: @' + TG_USER, time: nowTime() });
