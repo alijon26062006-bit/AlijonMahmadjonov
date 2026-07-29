@@ -513,15 +513,15 @@ function face_module() {
     <div id="faceDots" class="face-dots"></div>
     <div id="faceMsg" class="face-msg">Загрузка…</div>
     <div id="faceSub" class="face-sub"></div>
-    <div style="display:flex;gap:10px">
-        <button class="face-close" id="faceVoiceBtn" onclick="faceVoiceToggle(this)" title="Голос команд" style="min-width:56px">🔊</button>
-        <button class="face-close" onclick="closeFace()">Отмена</button>
-    </div>
+    <button class="face-close" onclick="closeFace()">Отмена</button>
 </div>
 <script>
 (function(){
   let faceReady=false,faceStream=null,faceRAF=null,faceState='idle',faceMode='login',faceBusy=false,capturedDesc=null,faceErr='',grabFails=0,hasExpr=true;
-  let chSeq=[],chIdx=0,alignFrames=0,challengeStart=0,lastDet=0,grabDescs=[],chNeedNeutral=false;
+  let chSeq=[],chIdx=0,alignFrames=0,challengeStart=0,lastDet=0,grabDescs=[];
+  // Калибровка «прямого лица» этого человека (считаем движения относительно него)
+  // + пауза между шагами и состояние моргания.
+  let baseEAR=0,baseYaw=0,baseN=0,stepCd=0,eyesClosed=false;
   function avgDesc(list){ const n=list.length,L=list[0].length,out=new Array(L).fill(0); for(const d of list)for(let i=0;i<L;i++)out[i]+=d[i]; for(let i=0;i<L;i++)out[i]/=n; return out; }
   // Источники библиотеки и моделей: основной CDN + запасной.
   // Если один CDN недоступен (медленный интернет/блокировки в регионе) —
@@ -552,27 +552,6 @@ function face_module() {
   function fmsg(t){const e=document.getElementById('faceMsg');if(e)e.textContent=t;}
   function fsub(t){const e=document.getElementById('faceSub');if(e)e.textContent=t||'';}
   function frame(c){const e=document.getElementById('faceFrame');if(e)e.className='face-frame'+(c?' '+c:'');}
-  // ---- ГОЛОСОВЫЕ КОМАНДЫ (синтез речи браузера) ----
-  // Система вслух проговаривает движения: «Моргните», «Поверните голову»…
-  // Работает офлайн, ничего ставить не нужно. Всё в try/catch: если голос
-  // недоступен (или выключен) — вход по лицу всё равно работает молча.
-  let fvoice=null;
-  function pickVoice(){ try{ const vs=(window.speechSynthesis&&speechSynthesis.getVoices())||[];
-    fvoice = vs.find(v=>/^ru/i.test(v.lang)) || vs.find(v=>/russ|русск/i.test(v.name)) || null; }catch(e){} }
-  if('speechSynthesis'in window){ try{ speechSynthesis.onvoiceschanged=pickVoice; pickVoice(); }catch(e){} }
-  function fspeak(t){ try{
-    if(!('speechSynthesis'in window) || !t) return;
-    if(localStorage.getItem('faceVoice')==='0') return;   // пользователь выключил звук
-    speechSynthesis.cancel();                             // прерываем прошлую фразу
-    const u=new SpeechSynthesisUtterance(t); u.lang='ru-RU'; u.rate=1; u.pitch=1;
-    if(!fvoice) pickVoice(); if(fvoice) u.voice=fvoice;
-    speechSynthesis.speak(u);
-  }catch(e){} }
-  function fstopVoice(){ try{ if('speechSynthesis'in window) speechSynthesis.cancel(); }catch(e){} }
-  // Кнопка вкл/выкл голоса (состояние запоминается в браузере).
-  window.faceVoiceToggle=function(btn){ const wasOn=localStorage.getItem('faceVoice')!=='0';
-    localStorage.setItem('faceVoice', wasOn?'0':'1'); if(wasOn) fstopVoice();
-    if(btn) btn.textContent = wasOn?'🔇':'🔊'; };
   function dots(){const d=document.getElementById('faceDots');if(!d)return;d.innerHTML=chSeq.map((c,i)=>'<span class="fdot '+(i<chIdx?'done':(i===chIdx?'cur':''))+'"></span>').join('');}
   async function ensureFace(){ if(faceReady)return true;
     try{
@@ -599,8 +578,6 @@ function face_module() {
   }
   window.openFace=async function(mode){ faceMode=mode||'login'; faceErr=''; grabFails=0; capturedDesc=null;
     document.getElementById('faceOv').style.display='flex'; frame(''); fsub(''); fmsg('Загрузка…');
-    // синхронизируем иконку кнопки звука с сохранённым выбором пользователя
-    const _vb=document.getElementById('faceVoiceBtn'); if(_vb) _vb.textContent = (localStorage.getItem('faceVoice')==='0'?'🔇':'🔊');
     const ok=await ensureFace(); if(!ok){fmsg('Ошибка загрузки сканера');fsub(faceErr||'Проверьте интернет');return;}
     try{ faceStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:480},height:{ideal:480}}}); }
     catch(e){ fmsg('Нет доступа к камере'); fsub('Разрешите камеру в настройках браузера'); return; }
@@ -608,9 +585,9 @@ function face_module() {
     try{await v.play();}catch(e){}
     fmsg('Запуск камеры…'); let tries=0; while((!v.videoWidth||v.videoWidth<10)&&tries<50){ await new Promise(r=>setTimeout(r,60)); tries++; }
     if(!v.videoWidth){ fmsg('Камера не запустилась'); fsub('Обновите страницу'); return; }
-    chSeq=pickCh(); chIdx=0; chNeedNeutral=false; alignFrames=0; grabDescs=[]; faceState='align'; dots();
-    fmsg('Поместите лицо в овал'); fsub('Смотрите прямо в камеру'); fspeak('Поместите лицо в овал и смотрите прямо в камеру'); loopFace(); };
-  window.closeFace=function(){ faceState='idle'; fstopVoice(); if(faceRAF)cancelAnimationFrame(faceRAF); faceRAF=null;
+    chSeq=pickCh(); chIdx=0; stepCd=0; eyesClosed=false; baseEAR=0; baseYaw=0; baseN=0; alignFrames=0; grabDescs=[]; faceState='align'; dots();
+    fmsg('Поместите лицо в овал'); fsub('Смотрите прямо в камеру'); loopFace(); };
+  window.closeFace=function(){ faceState='idle'; if(faceRAF)cancelAnimationFrame(faceRAF); faceRAF=null;
     if(faceStream){faceStream.getTracks().forEach(t=>t.stop());faceStream=null;}
     const v=document.getElementById('faceVid'); if(v)v.srcObject=null;
     document.getElementById('faceOv').style.display='none'; };
@@ -619,7 +596,7 @@ function face_module() {
   function fEAR(lm){return (ear(lm.getLeftEye())+ear(lm.getRightEye()))/2;}
   function fYaw(lm){const j=lm.getJawOutline(),n=lm.getNose();const tip=n[n.length-1];const ld=Math.abs(tip.x-j[0].x),rd=Math.abs(j[16].x-tip.x);return ld/(rd||1);}
   async function loopFace(){ if(faceState==='idle')return; faceRAF=requestAnimationFrame(loopFace);
-    const now=performance.now(); if(faceBusy||now-lastDet<150)return; lastDet=now; faceBusy=true;
+    const now=performance.now(); const gap=(faceState==='challenge')?90:150; if(faceBusy||now-lastDet<gap)return; lastDet=now; faceBusy=true;
     const v=document.getElementById('faceVid');
     try{
       if(faceState==='align'){
@@ -632,58 +609,61 @@ function face_module() {
         if(centered&&sized){ frame('ok'); fmsg('Отлично, держите');
           let g=null; try{ g=await faceapi.detectSingleFace(v,new faceapi.TinyFaceDetectorOptions({inputSize:224,scoreThreshold:0.4})).withFaceLandmarks().withFaceDescriptor(); }catch(e){ faceErr=e.message||String(e); }
           if(g&&g.descriptor&&g.descriptor.length>=100){ grabDescs.push(Array.from(g.descriptor)); grabFails=0; fsub('Снимаем лицо… '+grabDescs.length+'/5');
-            if(grabDescs.length>=5){ capturedDesc=avgDesc(grabDescs); grabDescs=[]; faceState='challenge'; showCh(); }
+            // запоминаем «прямое лицо» этого человека — от него будем считать движения
+            baseEAR+=fEAR(g.landmarks); baseYaw+=fYaw(g.landmarks); baseN++;
+            if(grabDescs.length>=5){ capturedDesc=avgDesc(grabDescs); grabDescs=[];
+              baseEAR = baseN?baseEAR/baseN:0.3; baseYaw = baseN?baseYaw/baseN:1;   // усреднённый базовый уровень
+              faceState='challenge'; showCh(); }
           } else { grabFails++; if(grabFails>18){ fmsg('Не получается снять лицо'); fsub(faceErr?('Ошибка: '+faceErr):'Больше света, лицо ближе, не двигайтесь'); } }
         } else { grabFails=0; grabDescs=[]; frame(''); fmsg(!sized?(b.width<=vw*0.30?'Придвиньтесь ближе':'Отодвиньтесь немного'):'Лицо в центр овала'); fsub(''); }
       } else if(faceState==='challenge'){
-        // Эмоции запрашиваем только если 4-я модель загружена (иначе упадёт).
+        // Небольшая пауза между движениями — чтобы одно движение не засчиталось дважды.
+        if(now < stepCd){ faceBusy=false; return; }
         let _q=faceapi.detectSingleFace(v,new faceapi.TinyFaceDetectorOptions({inputSize:160,scoreThreshold:0.4})).withFaceLandmarks();
         if(hasExpr) _q=_q.withFaceExpressions();
         const det=await _q;
         if(det){
-          const earV=fEAR(det.landmarks);                       // насколько открыты глаза (меньше = закрыты)
-          const yawV=fYaw(det.landmarks);                       // поворот головы (≈1.0 — смотрит прямо)
+          const earV=fEAR(det.landmarks);                       // открыты ли глаза (меньше = закрыты)
+          const yawV=fYaw(det.landmarks);                       // поворот головы
           const happyV=(hasExpr&&det.expressions)?det.expressions.happy:0;
-          // «Нейтраль» — исходное положение: глаза открыты, голова прямо, без улыбки.
-          const neutral = earV>0.25 && yawV>0.72 && yawV<1.40 && happyV<0.30;
-          if(chNeedNeutral){
-            // Между движениями ждём возврата в исходное — чтобы КАЖДЫЙ шаг
-            // засчитывался как отдельное осознанное движение (защита от видео).
-            frame('');
-            if(neutral){ chNeedNeutral=false; showCh(); }
-            else fsub('Верните лицо в исходное положение');
+          const ch=chSeq[chIdx]; let ok=false;
+          if(ch.k==='smile'){
+            ok = happyV>0.55;                                   // улыбка
+          } else if(ch.k==='turn'){
+            // поворот = голова заметно отклонилась от СВОЕГО прямого положения (>35%)
+            ok = baseYaw>0 && Math.abs(yawV-baseYaw)/baseYaw > 0.35;
           } else {
-            const ch=chSeq[chIdx]; let ok=false;
-            if(ch.k==='smile')     ok = happyV>0.5;             // улыбка
-            else if(ch.k==='turn') ok = (yawV>1.6 || yawV<0.6);// заметный поворот головы в сторону
-            else                   ok = earV<0.20;             // моргание — глаза закрылись
-            if(ok){
-              frame('ok'); chIdx++; dots();                    // шаг пройден — отмечаем точку
-              if(chIdx>=chSeq.length){ faceState='idle'; if(faceRAF)cancelAnimationFrame(faceRAF); submitFace(); }
-              else { chNeedNeutral=true; fmsg('Отлично ✓'); fsub('Верните лицо в исходное — и следующее движение'); fspeak('Отлично'); }
-            } else if(performance.now()-challengeStart>15000){
-              // на один шаг ушло слишком много времени — начинаем проверку заново
-              fmsg('Давайте заново'); faceState='align'; alignFrames=0; capturedDesc=null;
-              chSeq=pickCh(); chIdx=0; chNeedNeutral=false;
-            }
+            // моргание = глаза закрылись, а потом снова открылись (полный цикл)
+            if(earV < baseEAR*0.62) eyesClosed=true;
+            if(eyesClosed && earV > baseEAR*0.85){ ok=true; eyesClosed=false; }
+          }
+          if(ok){
+            frame('ok'); chIdx++; dots();                       // шаг пройден — точка загорается
+            if(chIdx>=chSeq.length){ faceState='idle'; if(faceRAF)cancelAnimationFrame(faceRAF); submitFace(); }
+            else { stepCd=now+900; eyesClosed=false; fmsg('Отлично ✓'); fsub('Приготовьтесь…');
+                   setTimeout(function(){ if(faceState==='challenge') showCh(); }, 950); }
+          } else if(now-challengeStart>15000){
+            // слишком долго на одном шаге — начинаем проверку заново
+            fmsg('Давайте заново'); faceState='align'; alignFrames=0; capturedDesc=null;
+            chSeq=pickCh(); chIdx=0; stepCd=0; eyesClosed=false; baseEAR=0; baseYaw=0; baseN=0;
           }
         }
       }
     }catch(e){}
     faceBusy=false; }
-  function showCh(){ challengeStart=performance.now(); fmsg(chSeq[chIdx].t); fsub('Движение '+(chIdx+1)+' из '+chSeq.length+' · подтвердите, что вы живой'); fspeak(chSeq[chIdx].t); dots(); }
+  function showCh(){ challengeStart=performance.now(); eyesClosed=false; fmsg(chSeq[chIdx].t); fsub('Движение '+(chIdx+1)+' из '+chSeq.length); dots(); }
   async function submitFace(){ const desc=capturedDesc;
-    if(!desc){ faceState='align'; alignFrames=0; chSeq=pickCh(); chIdx=0; chNeedNeutral=false; loopFace(); return; }
+    if(!desc){ faceState='align'; alignFrames=0; chSeq=pickCh(); chIdx=0; stepCd=0; loopFace(); return; }
     if(faceMode==='enroll'){ fmsg('Сохранение…'); frame('ok'); fsub('');
       const r=await fetch('messenger.php?action=face_enroll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({descriptor:desc})}).then(x=>x.json()).catch(e=>({error:'network'}));
-      if(r&&r.ok){ fmsg('Лицо сохранено ✓'); fsub('Готово, образцов: '+r.samples); fspeak('Лицо сохранено'); setTimeout(()=>{closeFace(); if(window.afterFaceEnroll)window.afterFaceEnroll();},1100); }
+      if(r&&r.ok){ fmsg('Лицо сохранено ✓'); fsub('Готово, образцов: '+r.samples); setTimeout(()=>{closeFace(); if(window.afterFaceEnroll)window.afterFaceEnroll();},1100); }
       else{ fmsg('Ошибка сохранения'); fsub('Сервер: '+((r&&r.error)||'нет ответа')); setTimeout(()=>{faceState='align';alignFrames=0;capturedDesc=null;chSeq=pickCh();loopFace();},2600); }
       return;
     }
     // умный вход: есть лицо в базе → сразу входим; нет → просим номер
     fmsg('Проверка лица…'); frame('ok'); fsub('');
     const r=await fetch('messenger.php?action=face_login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({descriptor:desc})}).then(x=>x.json()).catch(e=>({error:'network'}));
-    if(r&&r.ok){ fmsg('Добро пожаловать'); fspeak('Добро пожаловать'); setTimeout(()=>{location.href='messenger.php';},600); }
+    if(r&&r.ok){ fmsg('Добро пожаловать'); setTimeout(()=>{location.href='messenger.php';},600); }
     else if(r&&r.error==='nomatch'){ window.pendingFaceDesc=desc; fmsg('Лицо новое'); fsub('Подтвердите номер — и лицо сохранится'); setTimeout(()=>{ closeFace(); if(window.afterFaceNeedsPhone)window.afterFaceNeedsPhone(); },1400); }
     else{ fmsg('Ошибка'); fsub('Сервер: '+((r&&r.error)||'нет ответа')); setTimeout(()=>{faceState='align';alignFrames=0;capturedDesc=null;chSeq=pickCh();fmsg('Попробуйте снова');loopFace();},2600); }
   }
