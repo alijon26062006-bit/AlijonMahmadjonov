@@ -517,27 +517,53 @@ function face_module() {
 </div>
 <script>
 (function(){
-  let faceReady=false,faceStream=null,faceRAF=null,faceState='idle',faceMode='login',faceBusy=false,capturedDesc=null,faceErr='',grabFails=0;
+  let faceReady=false,faceStream=null,faceRAF=null,faceState='idle',faceMode='login',faceBusy=false,capturedDesc=null,faceErr='',grabFails=0,hasExpr=true;
   let chSeq=[],chIdx=0,alignFrames=0,challengeStart=0,lastDet=0,grabDescs=[];
   function avgDesc(list){ const n=list.length,L=list[0].length,out=new Array(L).fill(0); for(const d of list)for(let i=0;i<L;i++)out[i]+=d[i]; for(let i=0;i<L;i++)out[i]/=n; return out; }
-  const MODELS='https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-  const LIB='https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js';
-  function ls(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('не загрузилась библиотека'));document.head.appendChild(s);});}
+  // Источники библиотеки и моделей: основной CDN + запасной.
+  // Если один CDN недоступен (медленный интернет/блокировки в регионе) —
+  // автоматически пробуем второй. Это главная причина, почему вход по лицу
+  // раньше «висел на загрузке».
+  const LIB_SOURCES=[
+    'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js',
+    'https://unpkg.com/@vladmandic/face-api/dist/face-api.js'
+  ];
+  const MODEL_SOURCES=[
+    'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model',
+    'https://unpkg.com/@vladmandic/face-api/model'
+  ];
+  // Загрузка внешнего скрипта с ТАЙМАУТОМ — чтобы не «висло» вечно на плохой сети.
+  function ls(src){return new Promise((res,rej)=>{const s=document.createElement('script');let done=false;
+    const to=setTimeout(()=>{if(!done){done=true;try{s.remove();}catch(e){}rej(new Error('таймаут загрузки'));}},15000);
+    s.src=src;s.onload=()=>{if(!done){done=true;clearTimeout(to);res();}};
+    s.onerror=()=>{if(!done){done=true;clearTimeout(to);rej(new Error('ошибка загрузки'));}};
+    document.head.appendChild(s);});}
+  // Пробуем загрузить библиотеку по очереди со всех источников.
+  async function loadLib(){ if(window.faceapi)return; let last;
+    for(const url of LIB_SOURCES){ try{ await ls(url); if(window.faceapi)return; }catch(e){ last=e; } }
+    throw last||new Error('библиотека не загрузилась'); }
+  // Пробуем загрузить модель по очереди со всех источников.
+  async function loadNet(net){ let last;
+    for(const base of MODEL_SOURCES){ try{ await net.loadFromUri(base); return; }catch(e){ last=e; } }
+    throw last||new Error('модель не загрузилась'); }
   function fmsg(t){const e=document.getElementById('faceMsg');if(e)e.textContent=t;}
   function fsub(t){const e=document.getElementById('faceSub');if(e)e.textContent=t||'';}
   function frame(c){const e=document.getElementById('faceFrame');if(e)e.className='face-frame'+(c?' '+c:'');}
   function dots(){const d=document.getElementById('faceDots');if(!d)return;d.innerHTML=chSeq.map((c,i)=>'<span class="fdot '+(i<chIdx?'done':(i===chIdx?'cur':''))+'"></span>').join('');}
   async function ensureFace(){ if(faceReady)return true;
     try{
-      fmsg('Загрузка библиотеки…'); if(!window.faceapi)await ls(LIB);
+      fmsg('Загрузка библиотеки…'); await loadLib();
       if(faceapi.tf){ try{await faceapi.tf.setBackend('webgl');}catch(e){} try{await faceapi.tf.ready();}catch(e){} }
-      fmsg('Загрузка модели 1/4…'); await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS);
-      fmsg('Загрузка модели 2/4…'); await faceapi.nets.faceLandmark68Net.loadFromUri(MODELS);
-      fmsg('Загрузка модели 3/4…'); await faceapi.nets.faceRecognitionNet.loadFromUri(MODELS);
-      fmsg('Загрузка модели 4/4…'); await faceapi.nets.faceExpressionNet.loadFromUri(MODELS);
+      // Три модели обязательны (детектор, точки лица, распознавание).
+      fmsg('Загрузка модели 1/4…'); await loadNet(faceapi.nets.tinyFaceDetector);
+      fmsg('Загрузка модели 2/4…'); await loadNet(faceapi.nets.faceLandmark68Net);
+      fmsg('Загрузка модели 3/4…'); await loadNet(faceapi.nets.faceRecognitionNet);
+      // Четвёртая (эмоции) — НЕобязательная: нужна только для проверки «улыбнитесь».
+      // Если не загрузилась — вход всё равно работает через «моргните».
+      fmsg('Загрузка модели 4/4…'); try{ await loadNet(faceapi.nets.faceExpressionNet); hasExpr=true; }catch(e){ hasExpr=false; }
       faceReady=true;return true;
     }catch(e){ faceErr=(e&&e.message)?e.message:String(e); return false; } }
-  function pickCh(){ const a=[{k:'smile',t:'Улыбнитесь'},{k:'blink',t:'Моргните'}]; return [a[Math.floor(Math.random()*a.length)]]; }
+  function pickCh(){ const a=[{k:'blink',t:'Моргните'}]; if(hasExpr)a.push({k:'smile',t:'Улыбнитесь'}); return [a[Math.floor(Math.random()*a.length)]]; }
   window.openFace=async function(mode){ faceMode=mode||'login'; faceErr=''; grabFails=0; capturedDesc=null;
     document.getElementById('faceOv').style.display='flex'; frame(''); fsub(''); fmsg('Загрузка…');
     const ok=await ensureFace(); if(!ok){fmsg('Ошибка загрузки сканера');fsub(faceErr||'Проверьте интернет');return;}
@@ -575,7 +601,10 @@ function face_module() {
           } else { grabFails++; if(grabFails>18){ fmsg('Не получается снять лицо'); fsub(faceErr?('Ошибка: '+faceErr):'Больше света, лицо ближе, не двигайтесь'); } }
         } else { grabFails=0; grabDescs=[]; frame(''); fmsg(!sized?(b.width<=vw*0.30?'Придвиньтесь ближе':'Отодвиньтесь немного'):'Лицо в центр овала'); fsub(''); }
       } else if(faceState==='challenge'){
-        const det=await faceapi.detectSingleFace(v,new faceapi.TinyFaceDetectorOptions({inputSize:160,scoreThreshold:0.4})).withFaceLandmarks().withFaceExpressions();
+        // Эмоции запрашиваем только если 4-я модель загружена (иначе упадёт).
+        let _q=faceapi.detectSingleFace(v,new faceapi.TinyFaceDetectorOptions({inputSize:160,scoreThreshold:0.4})).withFaceLandmarks();
+        if(hasExpr) _q=_q.withFaceExpressions();
+        const det=await _q;
         if(det){ const ch=chSeq[chIdx]; let ok=false;
           if(ch.k==='smile') ok=det.expressions&&det.expressions.happy>0.5;
           else ok=fEAR(det.landmarks)<0.22;
