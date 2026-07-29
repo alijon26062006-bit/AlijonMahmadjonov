@@ -527,11 +527,15 @@ function face_module() {
   // Если один CDN недоступен (медленный интернет/блокировки в регионе) —
   // автоматически пробуем второй. Это главная причина, почему вход по лицу
   // раньше «висел на загрузке».
+  // Сначала пробуем ЛОКАЛЬНЫЕ файлы на твоём хостинге (быстро и надёжно в любом
+  // регионе). Если их ещё не загрузили — автоматически берём с запасных CDN.
   const LIB_SOURCES=[
-    'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js',
+    'face-api.js',                                                        // ← локально, рядом с messenger.php
+    'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js', // запасные CDN
     'https://unpkg.com/@vladmandic/face-api/dist/face-api.js'
   ];
   const MODEL_SOURCES=[
+    'face-models',                                                        // ← локальная папка с моделями
     'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model',
     'https://unpkg.com/@vladmandic/face-api/model'
   ];
