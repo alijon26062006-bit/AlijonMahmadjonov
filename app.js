@@ -1,224 +1,48 @@
-// ============ APP.JS — Dark immersive portfolio ============
+// ===== Alijon Mahmadjonov — site v2 =====
 
-const TG_USER = 'rutsiyax';
+// Nav background on scroll
+const nav = document.querySelector('.nav');
+const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 30);
+onScroll();
+window.addEventListener('scroll', onScroll, { passive: true });
 
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[c]));
+// Mobile menu
+const burger = document.getElementById('burger');
+const menu = document.getElementById('menu');
+if (burger && menu) {
+  const toggle = (open) => {
+    menu.classList.toggle('open', open);
+    burger.classList.toggle('open', open);
+  };
+  burger.addEventListener('click', () => toggle(!menu.classList.contains('open')));
+  menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => toggle(false)));
 }
 
-// ----- chat widget -----
-const initialMessages = [
-  { from: 'in', text: 'Привет! 👋 Я Алиджон.', time: '' },
-  { from: 'in', text: 'Учусь на Python и делаю Telegram-ботов. Пиши — всегда рад пообщаться!', time: '' },
-];
-
-const replies = {
-  'Учёба': 'Учусь программировать на Python и создавать Telegram-ботов на aiogram. Практикуюсь каждый день 🙂',
-  'Боты': 'Сейчас пишу своих первых ботов на aiogram — команды, кнопки, меню. Дальше хочу подключать AI 🤖',
-  'Привет': 'Привет 🙂 Рад знакомству! Спрашивай про учёбу, Python или ботов.',
-};
-
-let chatMessages = initialMessages.slice();
-function chatBody() { return document.getElementById('chat-body'); }
-
-function renderChat() {
-  const body = chatBody();
-  if (!body) return;
-  body.innerHTML = chatMessages.map(m => `
-    <div class="msg ${m.from}">
-      <div class="bubble">${escapeHtml(m.text)}</div>
-      ${m.time ? `<div class="time">${escapeHtml(m.time)}</div>` : ''}
-    </div>
-  `).join('');
-  body.scrollTop = body.scrollHeight;
-}
-
-function addMsg(msg) { chatMessages.push(msg); renderChat(); }
-
-function showTyping() {
-  const body = chatBody();
-  const node = document.createElement('div');
-  node.className = 'msg in typing';
-  node.id = 'typing-indicator';
-  node.innerHTML = '<div class="bubble"><i></i><i></i><i></i></div>';
-  body.appendChild(node);
-  body.scrollTop = body.scrollHeight;
-}
-function hideTyping() {
-  const n = document.getElementById('typing-indicator');
-  if (n) n.remove();
-}
-
-function nowTime() {
-  const d = new Date();
-  return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
-}
-
-function botReply(userText) {
-  showTyping();
-  setTimeout(() => {
-    hideTyping();
-    let reply = null;
-    for (const key in replies) {
-      if (userText.toLowerCase().includes(key.toLowerCase())) { reply = replies[key]; break; }
-    }
-    if (!reply) reply = 'Понял тебя 👌 Давай продолжим в Telegram — там удобнее общаться.';
-    addMsg({ from: 'in', text: reply, time: nowTime() });
-    setTimeout(() => {
-      addMsg({ from: 'in', text: '➜ Продолжим в Telegram: @' + TG_USER, time: nowTime() });
-    }, 700);
-  }, 900);
-}
-
-function initChat() {
-  renderChat();
-  const input = document.getElementById('chat-input');
-  const sendBtn = document.getElementById('chat-send');
-
-  function send(text) {
-    if (!text || !text.trim()) return;
-    addMsg({ from: 'out', text: text.trim(), time: nowTime() });
-    if (input) input.value = '';
-    botReply(text);
-  }
-
-  if (sendBtn) sendBtn.addEventListener('click', () => send(input.value));
-  if (input) input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') send(input.value);
+// Reveal on scroll
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
   });
-  document.querySelectorAll('.chat-quick button[data-text]').forEach(b => {
-    b.addEventListener('click', () => send(b.dataset.text));
+}, { threshold: 0.14, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+// Smooth offset for anchor links (fixed nav)
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', (ev) => {
+    const id = a.getAttribute('href');
+    if (id.length < 2) return;
+    const t = document.querySelector(id);
+    if (!t) return;
+    ev.preventDefault();
+    const top = t.getBoundingClientRect().top + window.scrollY - 70;
+    window.scrollTo({ top, behavior: 'smooth' });
   });
-
-  document.querySelectorAll('[data-tg-open]').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
-      const last = chatMessages.filter(m => m.from === 'out').slice(-1)[0];
-      const txt = last ? last.text : 'Привет! Пишу с сайта';
-      const url = `https://t.me/${TG_USER}?text=${encodeURIComponent(txt)}`;
-      window.open(url, '_blank', 'noopener');
-    });
-  });
-}
-
-// ----- reveal on scroll -----
-function initReveal() {
-  const els = document.querySelectorAll('.reveal');
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach(en => {
-      if (en.isIntersecting) {
-        en.target.classList.add('in');
-        io.unobserve(en.target);
-      }
-    });
-  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-  els.forEach(el => io.observe(el));
-}
-
-// ----- animated counters -----
-function animateCounter(el) {
-  const target = parseFloat(el.dataset.count);
-  const suffix = el.dataset.suffix || '';
-  const dur = 1400;
-  const start = performance.now();
-  function step(t) {
-    const p = Math.min(1, (t - start) / dur);
-    const eased = 1 - Math.pow(1 - p, 3);
-    const v = Math.round(target * eased);
-    el.textContent = v + suffix;
-    if (p < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-function initCounters() {
-  const els = document.querySelectorAll('[data-count]');
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach(en => {
-      if (en.isIntersecting) {
-        animateCounter(en.target);
-        io.unobserve(en.target);
-      }
-    });
-  }, { threshold: 0.5 });
-  els.forEach(el => io.observe(el));
-}
-
-function initSkillBars() {
-  const els = document.querySelectorAll('.skill');
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach(en => {
-      if (en.isIntersecting) {
-        en.target.classList.add('in');
-        io.unobserve(en.target);
-      }
-    });
-  }, { threshold: 0.3 });
-  els.forEach(el => io.observe(el));
-}
-
-function initSmoothNav() {
-  document.querySelectorAll('a[href^="#"]').forEach(a => {
-    a.addEventListener('click', (e) => {
-      const id = a.getAttribute('href');
-      if (id.length < 2) return;
-      const t = document.querySelector(id);
-      if (t) {
-        e.preventDefault();
-        const top = t.getBoundingClientRect().top + window.scrollY - 80;
-        window.scrollTo({ top, behavior: 'smooth' });
-      }
-    });
-  });
-}
-
-// ----- cursor spotlight -----
-function initSpotlight() {
-  if (window.matchMedia('(hover: none)').matches) return;
-  const sp = document.createElement('div');
-  sp.className = 'spotlight';
-  sp.style.opacity = '0';
-  document.body.appendChild(sp);
-  let tx = window.innerWidth / 2, ty = window.innerHeight / 2;
-  let x = tx, y = ty;
-  window.addEventListener('mousemove', (e) => {
-    tx = e.clientX; ty = e.clientY;
-    sp.style.opacity = '1';
-  });
-  window.addEventListener('mouseleave', () => { sp.style.opacity = '0'; });
-  function tick() {
-    x += (tx - x) * 0.15;
-    y += (ty - y) * 0.15;
-    sp.style.left = x + 'px';
-    sp.style.top = y + 'px';
-    requestAnimationFrame(tick);
-  }
-  tick();
-}
-
-// ----- magnetic buttons -----
-function initMagnetic() {
-  if (window.matchMedia('(hover: none)').matches) return;
-  document.querySelectorAll('.btn').forEach(btn => {
-    btn.addEventListener('mousemove', (e) => {
-      const r = btn.getBoundingClientRect();
-      const x = e.clientX - r.left - r.width / 2;
-      const y = e.clientY - r.top - r.height / 2;
-      btn.style.transform = `translate(${x * 0.15}px, ${y * 0.2}px)`;
-    });
-    btn.addEventListener('mouseleave', () => {
-      btn.style.transform = '';
-    });
-  });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  initChat();
-  initReveal();
-  initCounters();
-  initSkillBars();
-  initSmoothNav();
-  initSpotlight();
-  initMagnetic();
 });
+
+// Ensure autoplay kicks in on some mobile browsers
+const vid = document.querySelector('.bg-video');
+if (vid) {
+  const play = () => vid.play().catch(() => {});
+  vid.addEventListener('canplay', play);
+  document.addEventListener('touchstart', play, { once: true });
+}
