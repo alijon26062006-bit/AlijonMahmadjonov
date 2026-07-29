@@ -518,7 +518,7 @@ function face_module() {
 <script>
 (function(){
   let faceReady=false,faceStream=null,faceRAF=null,faceState='idle',faceMode='login',faceBusy=false,capturedDesc=null,faceErr='',grabFails=0,hasExpr=true;
-  let chSeq=[],chIdx=0,alignFrames=0,challengeStart=0,lastDet=0,grabDescs=[];
+  let chSeq=[],chIdx=0,alignFrames=0,challengeStart=0,lastDet=0,grabDescs=[],chNeedNeutral=false;
   function avgDesc(list){ const n=list.length,L=list[0].length,out=new Array(L).fill(0); for(const d of list)for(let i=0;i<L;i++)out[i]+=d[i]; for(let i=0;i<L;i++)out[i]/=n; return out; }
   // Источники библиотеки и моделей: основной CDN + запасной.
   // Если один CDN недоступен (медленный интернет/блокировки в регионе) —
@@ -563,7 +563,16 @@ function face_module() {
       fmsg('Загрузка модели 4/4…'); try{ await loadNet(faceapi.nets.faceExpressionNet); hasExpr=true; }catch(e){ hasExpr=false; }
       faceReady=true;return true;
     }catch(e){ faceErr=(e&&e.message)?e.message:String(e); return false; } }
-  function pickCh(){ const a=[{k:'blink',t:'Моргните'}]; if(hasExpr)a.push({k:'smile',t:'Улыбнитесь'}); return [a[Math.floor(Math.random()*a.length)]]; }
+  // Набор проверок «живости». «Моргните» и «Поверните голову» работают всегда
+  // (по точкам лица), «Улыбнитесь» — только если загружена модель эмоций.
+  // Возвращаем 3 РАЗНЫХ движения в случайном порядке (2, если эмоций нет),
+  // чтобы систему нельзя было обмануть фото или заранее записанным видео.
+  function pickCh(){
+    const pool=[{k:'blink',t:'Моргните'},{k:'turn',t:'Поверните голову в сторону'}];
+    if(hasExpr) pool.push({k:'smile',t:'Улыбнитесь'});
+    for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=pool[i]; pool[i]=pool[j]; pool[j]=t; } // перемешать
+    return pool.slice(0, hasExpr?3:2);
+  }
   window.openFace=async function(mode){ faceMode=mode||'login'; faceErr=''; grabFails=0; capturedDesc=null;
     document.getElementById('faceOv').style.display='flex'; frame(''); fsub(''); fmsg('Загрузка…');
     const ok=await ensureFace(); if(!ok){fmsg('Ошибка загрузки сканера');fsub(faceErr||'Проверьте интернет');return;}
@@ -573,7 +582,7 @@ function face_module() {
     try{await v.play();}catch(e){}
     fmsg('Запуск камеры…'); let tries=0; while((!v.videoWidth||v.videoWidth<10)&&tries<50){ await new Promise(r=>setTimeout(r,60)); tries++; }
     if(!v.videoWidth){ fmsg('Камера не запустилась'); fsub('Обновите страницу'); return; }
-    chSeq=pickCh(); chIdx=0; alignFrames=0; grabDescs=[]; faceState='align'; dots();
+    chSeq=pickCh(); chIdx=0; chNeedNeutral=false; alignFrames=0; grabDescs=[]; faceState='align'; dots();
     fmsg('Поместите лицо в овал'); fsub('Смотрите прямо в камеру'); loopFace(); };
   window.closeFace=function(){ faceState='idle'; if(faceRAF)cancelAnimationFrame(faceRAF); faceRAF=null;
     if(faceStream){faceStream.getTracks().forEach(t=>t.stop());faceStream=null;}
@@ -605,18 +614,40 @@ function face_module() {
         let _q=faceapi.detectSingleFace(v,new faceapi.TinyFaceDetectorOptions({inputSize:160,scoreThreshold:0.4})).withFaceLandmarks();
         if(hasExpr) _q=_q.withFaceExpressions();
         const det=await _q;
-        if(det){ const ch=chSeq[chIdx]; let ok=false;
-          if(ch.k==='smile') ok=det.expressions&&det.expressions.happy>0.5;
-          else ok=fEAR(det.landmarks)<0.22;
-          if(ok){ faceState='idle'; if(faceRAF)cancelAnimationFrame(faceRAF); submitFace(); }
-          else if(performance.now()-challengeStart>12000){ fmsg('Ещё раз'); faceState='align'; alignFrames=0; capturedDesc=null; chSeq=pickCh(); }
+        if(det){
+          const earV=fEAR(det.landmarks);                       // насколько открыты глаза (меньше = закрыты)
+          const yawV=fYaw(det.landmarks);                       // поворот головы (≈1.0 — смотрит прямо)
+          const happyV=(hasExpr&&det.expressions)?det.expressions.happy:0;
+          // «Нейтраль» — исходное положение: глаза открыты, голова прямо, без улыбки.
+          const neutral = earV>0.25 && yawV>0.72 && yawV<1.40 && happyV<0.30;
+          if(chNeedNeutral){
+            // Между движениями ждём возврата в исходное — чтобы КАЖДЫЙ шаг
+            // засчитывался как отдельное осознанное движение (защита от видео).
+            frame('');
+            if(neutral){ chNeedNeutral=false; showCh(); }
+            else fsub('Верните лицо в исходное положение');
+          } else {
+            const ch=chSeq[chIdx]; let ok=false;
+            if(ch.k==='smile')     ok = happyV>0.5;             // улыбка
+            else if(ch.k==='turn') ok = (yawV>1.6 || yawV<0.6);// заметный поворот головы в сторону
+            else                   ok = earV<0.20;             // моргание — глаза закрылись
+            if(ok){
+              frame('ok'); chIdx++; dots();                    // шаг пройден — отмечаем точку
+              if(chIdx>=chSeq.length){ faceState='idle'; if(faceRAF)cancelAnimationFrame(faceRAF); submitFace(); }
+              else { chNeedNeutral=true; fmsg('Отлично ✓'); fsub('Верните лицо в исходное — и следующее движение'); }
+            } else if(performance.now()-challengeStart>15000){
+              // на один шаг ушло слишком много времени — начинаем проверку заново
+              fmsg('Давайте заново'); faceState='align'; alignFrames=0; capturedDesc=null;
+              chSeq=pickCh(); chIdx=0; chNeedNeutral=false;
+            }
+          }
         }
       }
     }catch(e){}
     faceBusy=false; }
-  function showCh(){ challengeStart=performance.now(); fmsg(chSeq[chIdx].t); fsub('Подтвердите, что вы живой'); dots(); }
+  function showCh(){ challengeStart=performance.now(); fmsg(chSeq[chIdx].t); fsub('Движение '+(chIdx+1)+' из '+chSeq.length+' · подтвердите, что вы живой'); dots(); }
   async function submitFace(){ const desc=capturedDesc;
-    if(!desc){ faceState='align'; alignFrames=0; chSeq=pickCh(); loopFace(); return; }
+    if(!desc){ faceState='align'; alignFrames=0; chSeq=pickCh(); chIdx=0; chNeedNeutral=false; loopFace(); return; }
     if(faceMode==='enroll'){ fmsg('Сохранение…'); frame('ok'); fsub('');
       const r=await fetch('messenger.php?action=face_enroll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({descriptor:desc})}).then(x=>x.json()).catch(e=>({error:'network'}));
       if(r&&r.ok){ fmsg('Лицо сохранено ✓'); fsub('Готово, образцов: '+r.samples); setTimeout(()=>{closeFace(); if(window.afterFaceEnroll)window.afterFaceEnroll();},1100); }
