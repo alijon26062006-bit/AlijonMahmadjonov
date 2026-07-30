@@ -1,0 +1,17 @@
+# Logs
+logs/*.log
+
+# Uploaded media (keep the folder structure, ignore user content)
+uploads/posters/*
+uploads/banners/*
+uploads/trailers/*
+uploads/screenshots/*
+!uploads/**/.gitkeep
+
+# Local secrets override (optional). The committed config.php uses safe
+# placeholders + env overrides, so keeping it is fine; ignore any local copy.
+config/config.local.php
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db

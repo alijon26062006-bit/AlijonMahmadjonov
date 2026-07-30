@@ -1,0 +1,5 @@
+# Serve media only; never execute uploaded files as scripts
+php_flag engine off
+<FilesMatch "\.(php|phtml|phar|cgi|pl)$">
+  Require all denied
+</FilesMatch>
