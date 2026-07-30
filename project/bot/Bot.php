@@ -68,14 +68,29 @@ final class Bot
             (new User())->upsertFromTelegram($from);
         }
 
-        // Active admin dialog takes priority (AI wizard first, then manual)
-        if ($this->isAdmin($tid)) {
+        // Global commands ALWAYS break out of any active wizard.
+        $isCommand = $text === '/start' || str_starts_with($text, '/start ')
+            || $text === '/admin' || $text === '⚙ Панель'
+            || $text === '/cancel';
+        if ($isCommand) {
+            $this->store->clear($tid);
+        }
+
+        // Active admin dialog takes priority (unless a global command was sent)
+        if (!$isCommand && $this->isAdmin($tid)) {
             if ($this->aiFlow->handle($chatId, $tid, $msg)) {
                 return;
             }
             if ($this->flow->handle($chatId, $tid, $msg)) {
                 return;
             }
+        }
+
+        if ($text === '/cancel') {
+            $this->api->sendMessage($chatId, '❌ Отменено. Напишите /admin для меню.', [
+                'reply_markup' => json_encode(['remove_keyboard' => true]),
+            ]);
+            return;
         }
 
         if ($text === '/start' || str_starts_with($text, '/start ')) {

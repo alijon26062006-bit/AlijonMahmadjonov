@@ -56,8 +56,9 @@ final class AiFlow
             : '⚠️ AI-ключ не настроен — карточку нужно будет заполнить вручную, но постер обработается автоматически.';
         $this->api->sendMessage(
             $chatId,
-            "🤖 <b>AI-добавление фильма</b>\n\n<b>Шаг 1.</b> Отправьте постер фильма 🖼\n\n{$note}",
-            ['reply_markup' => json_encode(['keyboard' => [[['text' => '✖️ Отмена']]], 'resize_keyboard' => true])]
+            "🤖 <b>AI-добавление фильма</b>\n\n<b>Шаг 1.</b> Отправьте постер фильма 🖼\n\n{$note}\n\n"
+            . "В любой момент можно нажать «❌ Отмена» или отправить /start.",
+            $this->cancelInline()
         );
     }
 
@@ -144,7 +145,8 @@ final class AiFlow
         $this->store->set($tid, 'ai_title', $payload);
         $this->api->sendMessage(
             $chatId,
-            "🤔 Не удалось точно распознать фильм.\n<b>Напишите название вручную:</b>"
+            "🤔 Не удалось точно распознать фильм.\n<b>Напишите название вручную:</b>",
+            $this->cancelInline()
         );
         return true;
     }
@@ -204,9 +206,13 @@ final class AiFlow
         $this->store->set($tid, 'ai_video', $payload);
         $this->api->sendMessage(
             $chatId,
-            "<b>Шаг 2.</b> Пришлите видеофайл фильма или ссылку для просмотра.\n"
-            . "Большие видео не хранятся на сервере — сохраняется только Telegram File ID.\n\n"
-            . "Отправьте «-», чтобы пропустить."
+            "<b>Шаг 2.</b> Видео фильма (чтобы работала кнопка «Смотреть»):\n"
+            . "• <b>перешлите видео из вашего закрытого канала</b>, или\n"
+            . "• отправьте видеофайл, или\n"
+            . "• пришлите ссылку.\n\n"
+            . "Большие видео на сервере не хранятся — бот отдаёт их сам, внутри чата.\n"
+            . "Можно «⏭ Пропустить».",
+            $this->skipCancelInline()
         );
     }
 
@@ -293,6 +299,14 @@ final class AiFlow
             $this->cleanup($payload);
             $this->store->clear($tid);
             $this->api->sendMessage($chatId, '❌ Добавление отменено.');
+            return true;
+        }
+
+        if ($data === 'aic:skipvideo') {
+            $this->api->answerCallbackQuery($cbId, 'Пропущено');
+            if ($state['state'] === 'ai_video') {
+                $this->showConfirmation($chatId, $tid, $payload);
+            }
             return true;
         }
 
@@ -477,5 +491,22 @@ final class AiFlow
     private function removeKeyboard(): array
     {
         return ['reply_markup' => json_encode(['remove_keyboard' => true])];
+    }
+
+    private function cancelInline(): array
+    {
+        return ['reply_markup' => json_encode([
+            'inline_keyboard' => [[['text' => '❌ Отмена', 'callback_data' => 'aic:cancel']]],
+        ])];
+    }
+
+    private function skipCancelInline(): array
+    {
+        return ['reply_markup' => json_encode([
+            'inline_keyboard' => [
+                [['text' => '⏭ Пропустить', 'callback_data' => 'aic:skipvideo']],
+                [['text' => '❌ Отмена', 'callback_data' => 'aic:cancel']],
+            ],
+        ])];
     }
 }
