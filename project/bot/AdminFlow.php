@@ -205,7 +205,19 @@ final class AdminFlow
         }
 
         if ($payload['flow'] === 'announcement') {
-            $id = $this->repo->createAnnouncement($data);
+            try {
+                $id = $this->repo->createAnnouncement($data);
+            } catch (\Throwable $e) {
+                \Core\Logger::error('createAnnouncement: ' . $e->getMessage());
+                $this->store->clear($tid);
+                $this->api->sendMessage(
+                    $chatId,
+                    "\u{26A0}\u{FE0F} \u{41D}\u{435} \u{443}\u{434}\u{430}\u{43B}\u{43E}\u{441}\u{44C} \u{441}\u{43E}\u{445}\u{440}\u{430}\u{43D}\u{438}\u{442}\u{44C} \u{430}\u{43D}\u{43E}\u{43D}\u{441}:\n<code>"
+                    . htmlspecialchars($e->getMessage(), ENT_QUOTES) . "</code>",
+                    $this->removeKeyboard()
+                );
+                return;
+            }
             $this->store->clear($tid);
             $this->api->sendMessage(
                 $chatId,
@@ -219,7 +231,19 @@ final class AdminFlow
             $data['genres'] = array_map('trim', explode(',', $data['genres']));
         }
 
-        $id = $this->repo->createMovie($data);
+        try {
+            $id = $this->repo->createMovie($data);
+        } catch (\Throwable $e) {
+            \Core\Logger::error('createMovie: ' . $e->getMessage());
+            $this->store->clear($tid);
+            $this->api->sendMessage(
+                $chatId,
+                "\u{26A0}\u{FE0F} \u{41D}\u{435} \u{443}\u{434}\u{430}\u{43B}\u{43E}\u{441}\u{44C} \u{441}\u{43E}\u{445}\u{440}\u{430}\u{43D}\u{438}\u{442}\u{44C}:\n<code>"
+                . htmlspecialchars($e->getMessage(), ENT_QUOTES) . "</code>",
+                $this->removeKeyboard()
+            );
+            return;
+        }
         $this->store->clear($tid);
         $label = [
             'movie' => "\u{424}\u{438}\u{43B}\u{44C}\u{43C}", 'series' => "\u{421}\u{435}\u{440}\u{438}\u{430}\u{43B}",

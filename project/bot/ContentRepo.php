@@ -32,7 +32,7 @@ final class ContentRepo
                      :rating, :language, :director, :actors, :keywords, :similar_titles, :status,
                      :is_new, :is_popular, :is_recommended)";
 
-        $release = $d['release_date'] ?? null;
+        $release = $this->normalizeDate($d['release_date'] ?? null);
         $year    = $release ? (int) substr($release, 0, 4) : ($d['year'] ?? null);
 
         $similar = $d['similar_titles'] ?? null;
@@ -193,25 +193,54 @@ final class ContentRepo
             ':category'     => $d['category'] ?? 'movie',
             ':genre'        => $d['genre'] ?? null,
             ':rating'       => isset($d['rating']) ? (float) $d['rating'] : 0,
-            ':release_date' => $d['release_date'] ?? null,
+            ':release_date' => $this->normalizeDate($d['release_date'] ?? null),
             ':priority'     => (int) ($d['priority'] ?? 10),
         ]);
         $annId = (int) $this->db->lastInsertId();
 
-        // Also surface as a hero banner if a backdrop is present
-        if (!empty($d['backdrop']) || !empty($d['poster'])) {
+        // Also surface as a hero banner if an image is present
+        $image = ($d['backdrop'] ?? null) ?: ($d['poster'] ?? null);
+        if ($image) {
             $this->db->prepare(
                 "INSERT INTO banners (title, subtitle, image, announcement_id, priority, is_active)
                  VALUES (?, ?, ?, ?, ?, 1)"
             )->execute([
                 $d['title'],
                 $d['genre'] ?? null,
-                $d['backdrop'] ?: $d['poster'],
+                $image,
                 $annId,
                 (int) ($d['priority'] ?? 10),
             ]);
         }
         return $annId;
+    }
+
+    /**
+     * Accepts a date typed by a human and returns a MySQL DATE or null.
+     * Supports YYYY-MM-DD, DD.MM.YYYY (also / and -), and a bare year;
+     * anything unrecognised becomes null instead of failing the INSERT.
+     */
+    private function normalizeDate($value): ?string
+    {
+        $v = trim((string) $value);
+        if ($v === '' || $v === '-') {
+            return null;
+        }
+        if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $v, $m)) {
+            return checkdate((int) $m[2], (int) $m[3], (int) $m[1])
+                ? sprintf('%04d-%02d-%02d', $m[1], $m[2], $m[3])
+                : null;
+        }
+        if (preg_match('#^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$#', $v, $m)) {
+            return checkdate((int) $m[2], (int) $m[1], (int) $m[3])
+                ? sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1])
+                : null;
+        }
+        if (preg_match('/^(\d{4})$/', $v, $m)) {
+            return $m[1] . '-01-01';
+        }
+        $ts = strtotime($v);
+        return $ts !== false ? date('Y-m-d', $ts) : null;
     }
 
     public function attachGenres(int $movieId, array $genreNames): void
@@ -250,17 +279,53 @@ final class ContentRepo
 
     public function stats(): array
     {
-        $one = fn (string $sql) => (int) $this->db->query($sql)->fetchColumn();
+        // Each metric is isolated so a missing table (e.g. episodes before the
+        // upgrade) degrades to 0 instead of breaking the whole report.
+        $one = function (string $sql): int {
+            try {
+                return (int) $this->db->query($sql)->fetchColumn();
+            } catch (\Throwable $e) {
+                return 0;
+            }
+        };
+
         return [
-            'users'         => $one("SELECT COUNT(*) FROM users"),
-            'movies'        => $one("SELECT COUNT(*) FROM movies"),
-            'series'        => $one("SELECT COUNT(*) FROM movies WHERE category='series'"),
-            'anime'         => $one("SELECT COUNT(*) FROM movies WHERE category='anime'"),
-            'cartoons'      => $one("SELECT COUNT(*) FROM movies WHERE category='cartoon'"),
-            'announcements' => $one("SELECT COUNT(*) FROM announcements"),
-            'favorites'     => $one("SELECT COUNT(*) FROM favorites"),
-            'views'         => $one("SELECT COUNT(*) FROM views"),
+            'users'          => $one("SELECT COUNT(*) FROM users"),
+            'users_today'    => $one("SELECT COUNT(*) FROM users WHERE DATE(created_at) = CURDATE()"),
+            'users_week'     => $one("SELECT COUNT(*) FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"),
+            'users_active'   => $one("SELECT COUNT(*) FROM users WHERE last_seen_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"),
+
+            'total'          => $one("SELECT COUNT(*) FROM movies"),
+            'movies'         => $one("SELECT COUNT(*) FROM movies WHERE category='movie'"),
+            'series'         => $one("SELECT COUNT(*) FROM movies WHERE category='series'"),
+            'anime'          => $one("SELECT COUNT(*) FROM movies WHERE category='anime'"),
+            'cartoons'       => $one("SELECT COUNT(*) FROM movies WHERE category='cartoon'"),
+            'coming_soon'    => $one("SELECT COUNT(*) FROM movies WHERE status='coming_soon'"),
+            'episodes'       => $one("SELECT COUNT(*) FROM episodes"),
+            'with_video'     => $one("SELECT COUNT(*) FROM movies WHERE telegram_file_id IS NOT NULL AND telegram_file_id <> ''"),
+            'announcements'  => $one("SELECT COUNT(*) FROM announcements"),
+
+            'favorites'      => $one("SELECT COUNT(*) FROM favorites"),
+            'history'        => $one("SELECT COUNT(*) FROM history"),
+            'views'          => $one("SELECT COUNT(*) FROM views"),
+            'views_today'    => $one("SELECT COUNT(*) FROM views WHERE DATE(viewed_at) = CURDATE()"),
+            'views_week'     => $one("SELECT COUNT(*) FROM views WHERE viewed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"),
         ];
+    }
+
+    /** Most viewed titles, for the admin statistics screen. */
+    public function topMovies(int $limit = 5): array
+    {
+        $limit = max(1, min(20, $limit));
+        try {
+            return $this->db->query(
+                "SELECT title, views_count FROM movies
+                 WHERE views_count > 0
+                 ORDER BY views_count DESC LIMIT $limit"
+            )->fetchAll();
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     /** @return int[] telegram_ids of all users */

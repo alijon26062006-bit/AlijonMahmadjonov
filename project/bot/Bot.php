@@ -273,17 +273,7 @@ final class Bot
 
         switch ($data) {
             case 'adm:stats':
-                $s = $this->repo->stats();
-                $text = "\u{1F4CA} <b>\u{421}\u{442}\u{430}\u{442}\u{438}\u{441}\u{442}\u{438}\u{43A}\u{430}</b>\n\n"
-                      . "\u{1F465} \u{41F}\u{43E}\u{43B}\u{44C}\u{437}\u{43E}\u{432}\u{430}\u{442}\u{435}\u{43B}\u{435}\u{439}: <b>{$s['users']}</b>\n"
-                      . "\u{1F3A5} \u{424}\u{438}\u{43B}\u{44C}\u{43C}\u{43E}\u{432}: <b>{$s['movies']}</b>\n"
-                      . "\u{1F4FA} \u{421}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{43E}\u{432}: <b>{$s['series']}</b>\n"
-                      . "\u{1F38C} \u{410}\u{43D}\u{438}\u{43C}\u{435}: <b>{$s['anime']}</b>\n"
-                      . "\u{1F476} \u{41C}\u{443}\u{43B}\u{44C}\u{442}\u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{43E}\u{432}: <b>{$s['cartoons']}</b>\n"
-                      . "\u{1F4E3} \u{410}\u{43D}\u{43E}\u{43D}\u{441}\u{43E}\u{432}: <b>{$s['announcements']}</b>\n"
-                      . "\u{2764}\u{FE0F} \u{412} \u{438}\u{437}\u{431}\u{440}\u{430}\u{43D}\u{43D}\u{43E}\u{43C}: <b>{$s['favorites']}</b>\n"
-                      . "\u{1F441} \u{41F}\u{440}\u{43E}\u{441}\u{43C}\u{43E}\u{442}\u{440}\u{43E}\u{432}: <b>{$s['views']}</b>";
-                $this->api->editMessageText($chatId, $msgId, $text, ['reply_markup' => json_encode($this->backMenu())]);
+                $this->sendStats($chatId, $msgId);
                 return;
 
             case 'adm:broadcast':
@@ -343,6 +333,52 @@ final class Bot
         $this->api->editMessageText($chatId, $msgId, "\u{1F5D1} <b>\u{423}\u{434}\u{430}\u{43B}\u{435}\u{43D}\u{438}\u{435} \u{43A}\u{43E}\u{43D}\u{442}\u{435}\u{43D}\u{442}\u{430}</b>\n\u{41D}\u{430}\u{436}\u{43C}\u{438}\u{442}\u{435} \u{43D}\u{430} \u{44D}\u{43B}\u{435}\u{43C}\u{435}\u{43D}\u{442}, \u{447}\u{442}\u{43E}\u{431}\u{44B} \u{443}\u{434}\u{430}\u{43B}\u{438}\u{442}\u{44C}:", [
             'reply_markup' => json_encode(['inline_keyboard' => $rows]),
         ]);
+    }
+
+    /** Full statistics screen for administrators. */
+    private function sendStats(int $chatId, int $msgId): void
+    {
+        $s = $this->repo->stats();
+        $n = static fn ($v) => number_format((int) $v, 0, '.', ' ');
+
+        $text = "\u{1F4CA} <b>\u{421}\u{442}\u{430}\u{442}\u{438}\u{441}\u{442}\u{438}\u{43A}\u{430}</b>\n\n"
+            . "\u{1F465} <b>\u{41F}\u{43E}\u{43B}\u{44C}\u{437}\u{43E}\u{432}\u{430}\u{442}\u{435}\u{43B}\u{438}</b>\n"
+            . "  \u{412}\u{441}\u{435}\u{433}\u{43E}: <b>" . $n($s['users']) . "</b>\n"
+            . "  \u{421}\u{435}\u{433}\u{43E}\u{434}\u{43D}\u{44F}: <b>" . $n($s['users_today']) . "</b>   \u{417}\u{430} \u{43D}\u{435}\u{434}\u{435}\u{43B}\u{44E}: <b>" . $n($s['users_week']) . "</b>\n"
+            . "  \u{410}\u{43A}\u{442}\u{438}\u{432}\u{43D}\u{44B}\u{445} \u{437}\u{430} 7 \u{434}\u{43D}\u{435}\u{439}: <b>" . $n($s['users_active']) . "</b>\n\n"
+
+            . "\u{1F3AC} <b>\u{41A}\u{43E}\u{43D}\u{442}\u{435}\u{43D}\u{442}</b> (\u{432}\u{441}\u{435}\u{433}\u{43E} " . $n($s['total']) . ")\n"
+            . "  \u{1F3A5} \u{424}\u{438}\u{43B}\u{44C}\u{43C}\u{44B}: <b>" . $n($s['movies']) . "</b>\n"
+            . "  \u{1F4FA} \u{421}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{44B}: <b>" . $n($s['series']) . "</b>   \u{1F38C} \u{410}\u{43D}\u{438}\u{43C}\u{435}: <b>" . $n($s['anime']) . "</b>\n"
+            . "  \u{1F476} \u{41C}\u{443}\u{43B}\u{44C}\u{442}\u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{44B}: <b>" . $n($s['cartoons']) . "</b>\n"
+            . "  \u{1F39E} \u{421}\u{435}\u{440}\u{438}\u{439}: <b>" . $n($s['episodes']) . "</b>\n"
+            . "  \u{1F4E3} \u{410}\u{43D}\u{43E}\u{43D}\u{441}\u{43E}\u{432}: <b>" . $n($s['announcements']) . "</b>\n"
+            . "  \u{23F3} \u{421}\u{43A}\u{43E}\u{440}\u{43E} \u{432}\u{44B}\u{439}\u{434}\u{435}\u{442}: <b>" . $n($s['coming_soon']) . "</b>\n"
+            . "  \u{25B6}\u{FE0F} \u{421} \u{432}\u{438}\u{434}\u{435}\u{43E}: <b>" . $n($s['with_video']) . "</b>\n\n"
+
+            . "\u{1F441} <b>\u{41F}\u{440}\u{43E}\u{441}\u{43C}\u{43E}\u{442}\u{440}\u{44B}</b>\n"
+            . "  \u{412}\u{441}\u{435}\u{433}\u{43E}: <b>" . $n($s['views']) . "</b>\n"
+            . "  \u{421}\u{435}\u{433}\u{43E}\u{434}\u{43D}\u{44F}: <b>" . $n($s['views_today']) . "</b>   \u{417}\u{430} \u{43D}\u{435}\u{434}\u{435}\u{43B}\u{44E}: <b>" . $n($s['views_week']) . "</b>\n\n"
+
+            . "\u{2764}\u{FE0F} \u{412} \u{438}\u{437}\u{431}\u{440}\u{430}\u{43D}\u{43D}\u{43E}\u{43C}: <b>" . $n($s['favorites']) . "</b>\n"
+            . "\u{1F552} \u{417}\u{430}\u{43F}\u{438}\u{441}\u{435}\u{439} \u{432} \u{438}\u{441}\u{442}\u{43E}\u{440}\u{438}\u{438}: <b>" . $n($s['history']) . "</b>";
+
+        $top = $this->repo->topMovies(5);
+        if ($top) {
+            $text .= "\n\n\u{1F3C6} <b>\u{421}\u{430}\u{43C}\u{44B}\u{435} \u{43F}\u{43E}\u{43F}\u{443}\u{43B}\u{44F}\u{440}\u{43D}\u{44B}\u{435}</b>\n";
+            $place = 1;
+            foreach ($top as $t) {
+                $title = htmlspecialchars(mb_strimwidth((string) $t['title'], 0, 28, "\u{2026}"), ENT_QUOTES);
+                $text .= '  ' . $place . '. ' . $title . " \u{2014} " . $n($t['views_count']) . "\n";
+                $place++;
+            }
+        }
+
+        $kb = ['inline_keyboard' => [
+            [['text' => "\u{1F504} \u{41E}\u{431}\u{43D}\u{43E}\u{432}\u{438}\u{442}\u{44C}", 'callback_data' => 'adm:stats']],
+            [['text' => "\u{2B05}\u{FE0F} \u{41D}\u{430}\u{437}\u{430}\u{434}", 'callback_data' => 'adm:home']],
+        ]];
+        $this->api->editMessageText($chatId, $msgId, $text, ['reply_markup' => json_encode($kb)]);
     }
 
     private function sendSeriesList(int $chatId, int $msgId): void
