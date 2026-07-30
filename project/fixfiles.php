@@ -67,6 +67,18 @@ foreach ($files as $path) {
         }
     }
 
+    // 4. Ubiraem declare(strict_types=1): eta stroka daet fatalnuyu oshibku
+    //    pri lyubom lishnem bayte pered <?php. Bez nee kod rabotaet tak zhe.
+    if (preg_match('/^[ \t]*declare[ \t]*\([ \t]*strict_types[ \t]*=[ \t]*1[ \t]*\)[ \t]*;[ \t]*$/m', $src)) {
+        $src = preg_replace(
+            '/^[ \t]*declare[ \t]*\([ \t]*strict_types[ \t]*=[ \t]*1[ \t]*\)[ \t]*;[ \t]*\R/m',
+            '',
+            $src,
+            1
+        );
+        $note[] = 'ubran strict_types';
+    }
+
     if ($src === $orig) {
         $okCount++;
         continue;
@@ -119,6 +131,21 @@ if ($failed) {
 
 if (!$fixed && !$failed) {
     echo "Vse fayly v poryadke - remont ne trebuetsya.\n\n";
+}
+
+// Diagnostika: pokazyvaem nachalo klyuchevogo fayla pobaytno.
+$probe = $root . '/bot/Bot.php';
+if (is_file($probe)) {
+    $head = (string) file_get_contents($probe, false, null, 0, 60);
+    echo "=== NACHALO bot/Bot.php (pervye baytu) ===\n";
+    echo 'HEX:  ' . trim(chunk_split(strtoupper(bin2hex($head)), 2, ' ')) . "\n";
+    $vis = '';
+    for ($i = 0, $n = strlen($head); $i < $n; $i++) {
+        $ch = $head[$i];
+        $o  = ord($ch);
+        $vis .= $ch === "\n" ? '\\n' : ($ch === "\r" ? '\\r' : ($o < 32 || $o > 126 ? '[' . $o . ']' : $ch));
+    }
+    echo 'TEKST: ' . $vis . "\n\n";
 }
 
 echo "Teper otkroyte bottest.php i proverte bota.\n";
