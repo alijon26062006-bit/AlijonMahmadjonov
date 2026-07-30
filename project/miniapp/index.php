@@ -3,15 +3,14 @@ $config = require __DIR__ . '/../config/config.php';
 $appName = htmlspecialchars($config['app']['name'], ENT_QUOTES);
 // API base is resolved relative to this file; ?route= keeps it host-agnostic.
 
-// Prefer minified assets (built via `php assets/build.php`) and cache-bust by mtime.
-$asset = static function (string $min, string $src): string {
-    $base = __DIR__ . '/../assets/';
-    $rel  = is_file($base . $min) ? $min : $src;
-    $ver  = @filemtime($base . $rel) ?: time();
+// Always load the source assets with mtime cache-busting, so an updated
+// app.js/app.css takes effect immediately (stale .min files can't shadow them).
+$asset = static function (string $rel): string {
+    $ver = @filemtime(__DIR__ . '/../assets/' . $rel) ?: time();
     return '../assets/' . $rel . '?v=' . $ver;
 };
-$cssHref = $asset('css/app.min.css', 'css/app.css');
-$jsSrc   = $asset('js/app.min.js', 'js/app.js');
+$cssHref = $asset('css/app.css');
+$jsSrc   = $asset('js/app.js');
 // Bot username (without @) enables watch-via-deep-link: the app closes and the
 // film is delivered in the bot chat.
 $botUser = ltrim((string) ($config['telegram']['bot_username'] ?? ''), '@');

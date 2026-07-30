@@ -527,8 +527,10 @@
 
   // ---- Views / nav ----
   function switchView(name) {
+    // Never leave the app on a blank screen: unknown view -> home.
+    if (!$(`#view-${name}`)) name = 'home';
     $$('.view').forEach(v => v.classList.remove('view--active'));
-    $(`#view-${name}`)?.classList.add('view--active');
+    $(`#view-${name}`).classList.add('view--active');
     if (!['detail', 'catalog', 'profile'].includes(name)) {
       $$('.nav-item').forEach(n => n.classList.toggle('is-active', n.dataset.nav === name));
     }
