@@ -38,7 +38,16 @@
     const opts = { method, headers };
     if (body) { headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
     const res = await fetch(url.toString(), opts);
-    const json = await res.json().catch(() => ({ success: false, error: 'bad json' }));
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      // Surface what the server actually returned (PHP error page, stray
+      // output, empty body) instead of a generic "bad json".
+      const snippet = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220);
+      throw new Error('HTTP ' + res.status + ' | ' + (snippet || '(empty response)'));
+    }
     if (!json.success) throw new Error(json.error || 'request failed');
     return json;
   }

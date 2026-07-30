@@ -1,4 +1,8 @@
 <?php
+// Buffer everything: any stray byte emitted by an included file (BOM, notice)
+// is discarded in Response::json(), so the client always receives clean JSON.
+ob_start();
+
 /**
  * REST API front controller.
  *
