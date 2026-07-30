@@ -43,6 +43,17 @@ final class Bot
             $config['telegram']['miniapp_url']
         );
         $this->episodeFlow = new EpisodeFlow($this->api, $this->repo, $this->store);
+
+        // Values hardcoded in config.php take priority: sync them into settings
+        // so every flow (archive posts, deep links) uses the same source.
+        $cfgChannel = (string) ($config['telegram']['archive_channel_id'] ?? '');
+        if ($cfgChannel !== '' && $this->repo->getSetting('archive_channel_id') !== $cfgChannel) {
+            $this->repo->setSetting('archive_channel_id', $cfgChannel);
+        }
+        $cfgUser = ltrim((string) ($config['telegram']['bot_username'] ?? ''), '@');
+        if ($cfgUser !== '' && $this->repo->getSetting('bot_username') !== $cfgUser) {
+            $this->repo->setSetting('bot_username', $cfgUser);
+        }
     }
 
     public function handleUpdate(array $update): void
@@ -104,6 +115,11 @@ final class Bot
         }
 
         if ($text === '/start' || str_starts_with($text, '/start ')) {
+            // Deep link from the archive channel: /start movie_<id> or ep_<m>_<s>_<e>
+            $param = trim((string) substr($text, 6));
+            if ($param !== '' && $this->handleDeepLink($chatId, $param)) {
+                return;
+            }
             $this->sendWelcome($chatId, $from);
             return;
         }
@@ -350,6 +366,64 @@ final class Bot
             "\u{1F4FA} <b>\u{421}\u{435}\u{440}\u{438}\u{438} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{430}</b>\n\u{412}\u{44B}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}/\u{430}\u{43D}\u{438}\u{43C}\u{435}, \u{447}\u{442}\u{43E}\u{431}\u{44B} \u{434}\u{43E}\u{431}\u{430}\u{432}\u{438}\u{442}\u{44C} \u{441}\u{435}\u{437}\u{43E}\u{43D}\u{44B} \u{438} \u{441}\u{435}\u{440}\u{438}\u{438}:",
             ['reply_markup' => json_encode(['inline_keyboard' => $rows])]
         );
+    }
+
+    // ---- Deep links (from archive-channel buttons) ----------------------
+
+    /**
+     * Handles /start payloads: `movie_<id>` delivers the film, and
+     * `ep_<movieId>_<season>_<episode>` delivers one series episode.
+     * @return bool true when the payload was recognised and handled.
+     */
+    private function handleDeepLink(int $chatId, string $param): bool
+    {
+        if (preg_match('/^movie_(\d+)$/', $param, $m)) {
+            $play = $this->repo->playable((int) $m[1]);
+            if (!$play) {
+                return false;
+            }
+            $title = htmlspecialchars((string) $play['title'], ENT_QUOTES);
+
+            if (!empty($play['telegram_file_id'])) {
+                $res = $this->api->sendVideo($chatId, (string) $play['telegram_file_id'], "\u{1F3AC} <b>{$title}</b>", $this->openAppInline());
+                if (!empty($res['ok'])) {
+                    return true;
+                }
+            }
+            if (!empty($play['watch_url'])) {
+                $this->api->sendMessage($chatId, "\u{1F3AC} <b>{$title}</b>", ['reply_markup' => json_encode([
+                    'inline_keyboard' => [[['text' => "\u{25B6}\u{FE0F} \u{421}\u{43C}\u{43E}\u{442}\u{440}\u{435}\u{442}\u{44C}", 'url' => (string) $play['watch_url']]]],
+                ])]);
+                return true;
+            }
+            $this->api->sendMessage($chatId, "\u{26A0}\u{FE0F} \u{418}\u{441}\u{442}\u{43E}\u{447}\u{43D}\u{438}\u{43A} \u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{430} \u{43F}\u{43E}\u{43A}\u{430} \u{43D}\u{435} \u{434}\u{43E}\u{431}\u{430}\u{432}\u{43B}\u{435}\u{43D}.", $this->openAppInline());
+            return true;
+        }
+
+        if (preg_match('/^ep_(\d+)_(\d+)_(\d+)$/', $param, $m)) {
+            $ep = $this->repo->episodePlayable((int) $m[1], (int) $m[2], (int) $m[3]);
+            if (!$ep) {
+                return false;
+            }
+            $title = htmlspecialchars((string) $ep['title'], ENT_QUOTES);
+            $caption = "\u{1F4FA} <b>{$title}</b> \u{2014} \u{421}\u{435}\u{437}\u{43E}\u{43D} {$ep['season']}, \u{441}\u{435}\u{440}\u{438}\u{44F} {$ep['episode']}";
+
+            if (!empty($ep['telegram_file_id'])) {
+                $res = $this->api->sendVideo($chatId, (string) $ep['telegram_file_id'], $caption, $this->openAppInline());
+                if (!empty($res['ok'])) {
+                    return true;
+                }
+            }
+            if (!empty($ep['watch_url'])) {
+                $this->api->sendMessage($chatId, $caption, ['reply_markup' => json_encode([
+                    'inline_keyboard' => [[['text' => "\u{25B6}\u{FE0F} \u{421}\u{43C}\u{43E}\u{442}\u{440}\u{435}\u{442}\u{44C}", 'url' => (string) $ep['watch_url']]]],
+                ])]);
+                return true;
+            }
+            return false;
+        }
+
+        return false;
     }
 
     // ---- Archive channel -------------------------------------------------

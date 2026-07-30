@@ -25,8 +25,13 @@ $DB_USER = 'root';              // пользователь MySQL
 $DB_PASS = '';                  // пароль MySQL
 
 $BOT_TOKEN      = 'PUT_YOUR_BOT_TOKEN_HERE';   // токен от @BotFather
+$BOT_USERNAME   = '';                          // юзернейм бота БЕЗ @, напр. KinoMixPoiskBot
 $ADMIN_IDS      = '123456789';                 // ваш Telegram ID (через запятую можно несколько)
 $WEBHOOK_SECRET = 'change_me_random_secret';   // любая случайная строка
+
+// Закрытый канал-архив: сюда бот публикует фильмы с кнопкой «Смотреть в боте».
+// ID канала вида -1001234567890 (можно узнать: /admin -> 📡 Канал-архив).
+$ARCHIVE_CHANNEL_ID = '';
 
 $OPENAI_API_KEY = 'PUT_YOUR_OPENAI_KEY_HERE';  // ключ OpenAI (можно оставить пустым)
 
@@ -79,9 +84,11 @@ return [
 
     'telegram' => [
         'bot_token'      => $env('BOT_TOKEN', $BOT_TOKEN),
+        'bot_username'   => ltrim((string) $env('BOT_USERNAME', $BOT_USERNAME), '@'),
         'miniapp_url'    => $env('MINIAPP_URL', $base . '/miniapp/'),
         'webhook_url'    => $env('WEBHOOK_URL', $base . '/bot/webhook.php'),
         'webhook_secret' => $env('WEBHOOK_SECRET', $WEBHOOK_SECRET),
+        'archive_channel_id' => (string) $env('ARCHIVE_CHANNEL_ID', $ARCHIVE_CHANNEL_ID),
         'admin_ids'      => array_filter(array_map(
             'intval',
             explode(',', (string) $env('ADMIN_IDS', $ADMIN_IDS))

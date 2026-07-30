@@ -502,10 +502,19 @@ final class AiFlow
         }
         $caption .= "\n\n#" . $movieId;
 
+        // "Watch in bot" deep-link button: t.me/<bot>?start=movie_<id>
+        $btn = [];
+        $username = $this->botUsername();
+        if ($username !== '') {
+            $btn = ['reply_markup' => json_encode(['inline_keyboard' => [[
+                ['text' => "\u{25B6}\u{FE0F} \u{421}\u{43C}\u{43E}\u{442}\u{440}\u{435}\u{442}\u{44C} \u{432} \u{431}\u{43E}\u{442}\u{435}", 'url' => "https://t.me/{$username}?start=movie_{$movieId}"],
+            ]]])];
+        }
+
         if (!empty($payload['poster_file_id'])) {
-            $res = $this->api->sendPhoto($channel, $payload['poster_file_id'], $caption);
+            $res = $this->api->sendPhoto($channel, $payload['poster_file_id'], $caption, $btn);
         } else {
-            $res = $this->api->sendMessage($channel, $caption);
+            $res = $this->api->sendMessage($channel, $caption, $btn);
         }
         $ok = !empty($res['ok']);
 
@@ -513,7 +522,8 @@ final class AiFlow
             $v = $this->api->sendVideo(
                 $channel,
                 (string) $d['telegram_file_id'],
-                "\u{1F3AC} <b>" . htmlspecialchars((string) ($d['title'] ?? ''), ENT_QUOTES) . "</b>"
+                "\u{1F3AC} <b>" . htmlspecialchars((string) ($d['title'] ?? ''), ENT_QUOTES) . "</b>",
+                $btn
             );
             $ok = !empty($v['ok']);
         }
@@ -529,6 +539,21 @@ final class AiFlow
     }
 
     // ---- Helpers --------------------------------------------------------
+
+    /** Bot @username for deep links: config/settings first, getMe as fallback. */
+    private function botUsername(): string
+    {
+        $u = (string) ($this->repo->getSetting('bot_username') ?? '');
+        if ($u !== '') {
+            return $u;
+        }
+        $me = $this->api->call('getMe');
+        $u = (string) ($me['result']['username'] ?? '');
+        if ($u !== '') {
+            $this->repo->setSetting('bot_username', $u);
+        }
+        return $u;
+    }
 
     private function cleanup(array $payload): void
     {

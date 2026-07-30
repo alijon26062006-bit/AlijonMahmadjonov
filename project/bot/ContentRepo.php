@@ -144,6 +144,18 @@ final class ContentRepo
         return (int) $stmt->fetchColumn();
     }
 
+    /** Playable source of one episode addressed by movie/season/episode numbers. */
+    public function episodePlayable(int $movieId, int $season, int $episode): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT e.telegram_file_id, e.watch_url, e.season, e.episode, m.title
+             FROM episodes e JOIN movies m ON m.id = e.movie_id
+             WHERE e.movie_id = ? AND e.season = ? AND e.episode = ?"
+        );
+        $stmt->execute([$movieId, $season, $episode]);
+        return $stmt->fetch() ?: null;
+    }
+
     /** Recent series / anime titles (for the "add episodes" picker). */
     public function recentSeries(int $limit = 15): array
     {

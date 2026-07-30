@@ -153,7 +153,16 @@ final class EpisodeFlow
         $title = htmlspecialchars((string) ($play['title'] ?? ''), ENT_QUOTES);
         $cap   = "\u{1F4FA} <b>{$title}</b> \u{2014} \u{421}\u{435}\u{437}\u{43E}\u{43D} {$season}, \u{441}\u{435}\u{440}\u{438}\u{44F} {$episode} (#{$movieId})";
 
-        $res = $this->api->sendVideo($channel, $fileId, $cap);
+        // "Watch in bot" deep-link button for channel viewers.
+        $btn = [];
+        $username = $this->botUsername();
+        if ($username !== '') {
+            $btn = ['reply_markup' => json_encode(['inline_keyboard' => [[
+                ['text' => "\u{25B6}\u{FE0F} \u{421}\u{43C}\u{43E}\u{442}\u{440}\u{435}\u{442}\u{44C} \u{432} \u{431}\u{43E}\u{442}\u{435}", 'url' => "https://t.me/{$username}?start=ep_{$movieId}_{$season}_{$episode}"],
+            ]]])];
+        }
+
+        $res = $this->api->sendVideo($channel, $fileId, $cap, $btn);
         return !empty($res['ok'])
             ? "\n\u{1F4E1} \u{421}\u{435}\u{440}\u{438}\u{44F} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{43B}\u{435}\u{43D}\u{430} \u{432} \u{43A}\u{430}\u{43D}\u{430}\u{43B}-\u{430}\u{440}\u{445}\u{438}\u{432}."
             : "\n\u{26A0}\u{FE0F} \u{41D}\u{435} \u{443}\u{434}\u{430}\u{43B}\u{43E}\u{441}\u{44C} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{438}\u{442}\u{44C} \u{432} \u{43A}\u{430}\u{43D}\u{430}\u{43B}-\u{430}\u{440}\u{445}\u{438}\u{432} (\u{431}\u{43E}\u{442} \u{434}\u{43E}\u{43B}\u{436}\u{435}\u{43D} \u{431}\u{44B}\u{442}\u{44C} \u{430}\u{434}\u{43C}\u{438}\u{43D}\u{43E}\u{43C} \u{43A}\u{430}\u{43D}\u{430}\u{43B}\u{430}).";
@@ -181,6 +190,21 @@ final class EpisodeFlow
             return true;
         }
         return false;
+    }
+
+    /** Bot @username for deep links: settings first, getMe as fallback. */
+    private function botUsername(): string
+    {
+        $u = (string) ($this->repo->getSetting('bot_username') ?? '');
+        if ($u !== '') {
+            return $u;
+        }
+        $me = $this->api->call('getMe');
+        $u = (string) ($me['result']['username'] ?? '');
+        if ($u !== '') {
+            $this->repo->setSetting('bot_username', $u);
+        }
+        return $u;
     }
 
     private function cancelInline(): array
