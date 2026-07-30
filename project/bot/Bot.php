@@ -46,13 +46,20 @@ final class Bot
 
         // Values hardcoded in config.php take priority: sync them into settings
         // so every flow (archive posts, deep links) uses the same source.
-        $cfgChannel = (string) ($config['telegram']['archive_channel_id'] ?? '');
-        if ($cfgChannel !== '' && $this->repo->getSetting('archive_channel_id') !== $cfgChannel) {
-            $this->repo->setSetting('archive_channel_id', $cfgChannel);
-        }
-        $cfgUser = ltrim((string) ($config['telegram']['bot_username'] ?? ''), '@');
-        if ($cfgUser !== '' && $this->repo->getSetting('bot_username') !== $cfgUser) {
-            $this->repo->setSetting('bot_username', $cfgUser);
+        // Guarded so a partially updated deployment can never brick the bot.
+        if (method_exists($this->repo, 'getSetting') && method_exists($this->repo, 'setSetting')) {
+            try {
+                $cfgChannel = (string) ($config['telegram']['archive_channel_id'] ?? '');
+                if ($cfgChannel !== '' && $this->repo->getSetting('archive_channel_id') !== $cfgChannel) {
+                    $this->repo->setSetting('archive_channel_id', $cfgChannel);
+                }
+                $cfgUser = ltrim((string) ($config['telegram']['bot_username'] ?? ''), '@');
+                if ($cfgUser !== '' && $this->repo->getSetting('bot_username') !== $cfgUser) {
+                    $this->repo->setSetting('bot_username', $cfgUser);
+                }
+            } catch (\Throwable $e) {
+                \Core\Logger::error('Settings sync skipped: ' . $e->getMessage());
+            }
         }
     }
 
