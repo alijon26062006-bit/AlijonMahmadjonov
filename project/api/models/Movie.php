@@ -5,10 +5,12 @@ namespace Models;
 
 final class Movie extends Model
 {
-    /** Columns returned in list views (lightweight). */
+    /** Columns returned in list views (lightweight).
+     *  created_at is included so `ORDER BY created_at` stays valid alongside
+     *  SELECT DISTINCT under MySQL strict mode (ONLY_FULL_GROUP_BY / err 3065). */
     private const LIST_COLS =
         'id, title, slug, poster, thumbnail, backdrop, banner, category, country, year, release_date,
-         age_rating, duration, rating, status, is_new, is_popular, is_recommended, views_count';
+         age_rating, duration, rating, status, is_new, is_popular, is_recommended, views_count, created_at';
 
     /**
      * Fetch a single movie with genres and formatted fields.
