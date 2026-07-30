@@ -232,6 +232,13 @@ final class AdminFlow
             "\u{2705} {$label} <b>\u{AB}{$data['title']}\u{BB}</b> (#{$id}) \u{434}\u{43E}\u{431}\u{430}\u{432}\u{43B}\u{435}\u{43D} \u{432} \u{43A}\u{430}\u{442}\u{430}\u{43B}\u{43E}\u{433}.",
             $this->openAppKeyboard()
         );
+
+        // Notify the private archive channel, if connected.
+        $channel = $this->repo->getSetting('archive_channel_id');
+        if ($channel) {
+            $safeTitle = htmlspecialchars((string) $data['title'], ENT_QUOTES);
+            $this->api->sendMessage($channel, "\u{1F3AC} <b>{$safeTitle}</b> (#{$id}) \u{434}\u{43E}\u{431}\u{430}\u{432}\u{43B}\u{435}\u{43D} \u{432} \u{43A}\u{430}\u{442}\u{430}\u{43B}\u{43E}\u{433}.");
+        }
     }
 
     private function doBroadcast(int $chatId, int $tid, string $text): void

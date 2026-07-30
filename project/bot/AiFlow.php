@@ -480,6 +480,52 @@ final class AiFlow
             . "\u{423}\u{436}\u{435} \u{432}\u{438}\u{434}\u{435}\u{43D} \u{43D}\u{430} \u{433}\u{43B}\u{430}\u{432}\u{43D}\u{43E}\u{439} Mini App: Hero-\u{431}\u{430}\u{43D}\u{43D}\u{435}\u{440}, \u{41D}\u{43E}\u{432}\u{438}\u{43D}\u{43A}\u{438}, \u{41A}\u{430}\u{442}\u{435}\u{433}\u{43E}\u{440}\u{438}\u{438}, \u{41F}\u{43E}\u{438}\u{441}\u{43A}.{$extra}",
             ['reply_markup' => json_encode(['inline_keyboard' => $rows])]
         );
+
+        // Auto-publish the film into the private archive channel, if connected.
+        $this->postToArchive($chatId, $id, $d, $payload);
+    }
+
+    /**
+     * Post the published movie into the private archive channel:
+     * card (poster + caption), then the video itself. Order: card first, film last.
+     */
+    private function postToArchive(int $adminChatId, int $movieId, array $d, array $payload): void
+    {
+        $channel = $this->repo->getSetting('archive_channel_id');
+        if (!$channel) {
+            return; // no archive channel connected
+        }
+
+        $caption = $this->cardCaption($d);
+        if (mb_strlen($caption) > 1000) {
+            $caption = mb_substr($caption, 0, 1000) . "\u{2026}";
+        }
+        $caption .= "\n\n#" . $movieId;
+
+        if (!empty($payload['poster_file_id'])) {
+            $res = $this->api->sendPhoto($channel, $payload['poster_file_id'], $caption);
+        } else {
+            $res = $this->api->sendMessage($channel, $caption);
+        }
+        $ok = !empty($res['ok']);
+
+        if ($ok && !empty($d['telegram_file_id'])) {
+            $v = $this->api->sendVideo(
+                $channel,
+                (string) $d['telegram_file_id'],
+                "\u{1F3AC} <b>" . htmlspecialchars((string) ($d['title'] ?? ''), ENT_QUOTES) . "</b>"
+            );
+            $ok = !empty($v['ok']);
+        }
+
+        if ($ok) {
+            $this->api->sendMessage($adminChatId, "\u{1F4E1} \u{424}\u{438}\u{43B}\u{44C}\u{43C} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{43B}\u{435}\u{43D} \u{432} \u{43A}\u{430}\u{43D}\u{430}\u{43B}-\u{430}\u{440}\u{445}\u{438}\u{432}.");
+        } else {
+            $this->api->sendMessage(
+                $adminChatId,
+                "\u{26A0}\u{FE0F} \u{41D}\u{435} \u{443}\u{434}\u{430}\u{43B}\u{43E}\u{441}\u{44C} \u{43E}\u{43F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{43E}\u{432}\u{430}\u{442}\u{44C} \u{432} \u{43A}\u{430}\u{43D}\u{430}\u{43B}-\u{430}\u{440}\u{445}\u{438}\u{432}. \u{41F}\u{440}\u{43E}\u{432}\u{435}\u{440}\u{44C}\u{442}\u{435}, \u{447}\u{442}\u{43E} \u{431}\u{43E}\u{442} \u{2014} \u{430}\u{434}\u{43C}\u{438}\u{43D}\u{438}\u{441}\u{442}\u{440}\u{430}\u{442}\u{43E}\u{440} \u{43A}\u{430}\u{43D}\u{430}\u{43B}\u{430} (/admin \u{2192} \u{1F4E1} \u{41A}\u{430}\u{43D}\u{430}\u{43B}-\u{430}\u{440}\u{445}\u{438}\u{432})."
+            );
+        }
     }
 
     // ---- Helpers --------------------------------------------------------

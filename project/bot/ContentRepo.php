@@ -104,6 +104,23 @@ final class ContentRepo
         return $movieId;
     }
 
+    /** Read one value from the settings table. */
+    public function getSetting(string $key): ?string
+    {
+        $stmt = $this->db->prepare("SELECT `value` FROM settings WHERE `key` = ?");
+        $stmt->execute([$key]);
+        $v = $stmt->fetchColumn();
+        return $v === false ? null : (string) $v;
+    }
+
+    /** Write one value into the settings table. */
+    public function setSetting(string $key, string $value): void
+    {
+        $sql = "INSERT INTO settings (`key`, `value`) VALUES (:k, :v)
+                ON DUPLICATE KEY UPDATE `value` = :v2";
+        $this->db->prepare($sql)->execute([':k' => $key, ':v' => $value, ':v2' => $value]);
+    }
+
     /** Insert or update one episode of a series/anime. */
     public function createEpisode(int $movieId, int $season, int $episode, ?string $fileId, ?string $url, ?string $title = null): int
     {

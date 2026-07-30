@@ -80,6 +80,11 @@ final class Bot
 
         // Active admin dialog takes priority (unless a global command was sent)
         if (!$isCommand && $this->isAdmin($tid)) {
+            $st = $this->store->get($tid);
+            if ($st['state'] === 'set_channel') {
+                $this->onSetChannel($chatId, $tid, $msg);
+                return;
+            }
             if ($this->aiFlow->handle($chatId, $tid, $msg)) {
                 return;
             }
@@ -204,6 +209,7 @@ final class Bot
             [['text' => "\u{2795} \u{41C}\u{443}\u{43B}\u{44C}\u{442}\u{444}\u{438}\u{43B}\u{44C}\u{43C}", 'callback_data' => 'add:cartoon'], ['text' => "\u{2795} \u{410}\u{43D}\u{438}\u{43C}\u{435}", 'callback_data' => 'add:anime']],
             [['text' => "\u{1F4E3} \u{414}\u{43E}\u{431}\u{430}\u{432}\u{438}\u{442}\u{44C} \u{430}\u{43D}\u{43E}\u{43D}\u{441}", 'callback_data' => 'add:announcement']],
             [['text' => "\u{1F4FA} \u{421}\u{435}\u{440}\u{438}\u{438} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{430} (\u{441}\u{435}\u{437}\u{43E}\u{43D}\u{44B}/\u{441}\u{435}\u{440}\u{438}\u{438})", 'callback_data' => 'adm:series']],
+            [['text' => "\u{1F4E1} \u{41A}\u{430}\u{43D}\u{430}\u{43B}-\u{430}\u{440}\u{445}\u{438}\u{432}", 'callback_data' => 'adm:channel']],
             [['text' => "\u{1F5D1} \u{423}\u{434}\u{430}\u{43B}\u{438}\u{442}\u{44C}", 'callback_data' => 'adm:list'], ['text' => "\u{1F4CA} \u{421}\u{442}\u{430}\u{442}\u{438}\u{441}\u{442}\u{438}\u{43A}\u{430}", 'callback_data' => 'adm:stats']],
             [['text' => "\u{1F4E2} \u{420}\u{430}\u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{430}", 'callback_data' => 'adm:broadcast'], ['text' => "\u{2699} \u{41D}\u{430}\u{441}\u{442}\u{440}\u{43E}\u{439}\u{43A}\u{438}", 'callback_data' => 'adm:settings']],
         ]];
@@ -280,6 +286,10 @@ final class Bot
                 $this->sendSeriesList($chatId, $msgId);
                 return;
 
+            case 'adm:channel':
+                $this->sendChannelSetup($chatId, $msgId, $tid);
+                return;
+
             case 'adm:home':
                 $this->api->editMessageText($chatId, $msgId, "\u{1F6E0} <b>\u{41F}\u{430}\u{43D}\u{435}\u{43B}\u{44C} \u{430}\u{434}\u{43C}\u{438}\u{43D}\u{438}\u{441}\u{442}\u{440}\u{430}\u{442}\u{43E}\u{440}\u{430}</b>\n\u{412}\u{44B}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{434}\u{435}\u{439}\u{441}\u{442}\u{432}\u{438}\u{435}:", [
                     'reply_markup' => json_encode($this->adminMenu()),
@@ -339,6 +349,70 @@ final class Bot
             $msgId,
             "\u{1F4FA} <b>\u{421}\u{435}\u{440}\u{438}\u{438} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{430}</b>\n\u{412}\u{44B}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}/\u{430}\u{43D}\u{438}\u{43C}\u{435}, \u{447}\u{442}\u{43E}\u{431}\u{44B} \u{434}\u{43E}\u{431}\u{430}\u{432}\u{438}\u{442}\u{44C} \u{441}\u{435}\u{437}\u{43E}\u{43D}\u{44B} \u{438} \u{441}\u{435}\u{440}\u{438}\u{438}:",
             ['reply_markup' => json_encode(['inline_keyboard' => $rows])]
+        );
+    }
+
+    // ---- Archive channel -------------------------------------------------
+
+    /** Show archive-channel status and start the connect dialog. */
+    private function sendChannelSetup(int $chatId, int $msgId, int $tid): void
+    {
+        $cid   = $this->repo->getSetting('archive_channel_id');
+        $title = $this->repo->getSetting('archive_channel_title');
+        $cur = $cid
+            ? "\u{41F}\u{43E}\u{434}\u{43A}\u{43B}\u{44E}\u{447}\u{451}\u{43D}: <b>" . htmlspecialchars((string) $title, ENT_QUOTES) . '</b> (<code>' . htmlspecialchars((string) $cid, ENT_QUOTES) . '</code>)'
+            : "\u{41D}\u{435} \u{43F}\u{43E}\u{434}\u{43A}\u{43B}\u{44E}\u{447}\u{451}\u{43D}";
+
+        $this->store->set($tid, 'set_channel', []);
+        $text = "\u{1F4E1} <b>\u{41A}\u{430}\u{43D}\u{430}\u{43B}-\u{430}\u{440}\u{445}\u{438}\u{432}</b>\n\n"
+            . "\u{41A}\u{430}\u{436}\u{434}\u{44B}\u{439} \u{43E}\u{43F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{43E}\u{432}\u{430}\u{43D}\u{43D}\u{44B}\u{439} \u{444}\u{438}\u{43B}\u{44C}\u{43C} \u{431}\u{43E}\u{442} \u{431}\u{443}\u{434}\u{435}\u{442} \u{430}\u{432}\u{442}\u{43E}\u{43C}\u{430}\u{442}\u{438}\u{447}\u{435}\u{441}\u{43A}\u{438} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{43B}\u{44F}\u{442}\u{44C} \u{432} \u{44D}\u{442}\u{43E}\u{442} \u{437}\u{430}\u{43A}\u{440}\u{44B}\u{442}\u{44B}\u{439} \u{43A}\u{430}\u{43D}\u{430}\u{43B} (\u{43A}\u{430}\u{440}\u{442}\u{43E}\u{447}\u{43A}\u{430} + \u{432}\u{438}\u{434}\u{435}\u{43E}).\n\n"
+            . "\u{421}\u{435}\u{439}\u{447}\u{430}\u{441}: {$cur}\n\n"
+            . "<b>\u{41A}\u{430}\u{43A} \u{43F}\u{43E}\u{434}\u{43A}\u{43B}\u{44E}\u{447}\u{438}\u{442}\u{44C}:</b>\n"
+            . "1) \u{421}\u{43E}\u{437}\u{434}\u{430}\u{439}\u{442}\u{435} \u{437}\u{430}\u{43A}\u{440}\u{44B}\u{442}\u{44B}\u{439} \u{43A}\u{430}\u{43D}\u{430}\u{43B}\n"
+            . "2) \u{414}\u{43E}\u{431}\u{430}\u{432}\u{44C}\u{442}\u{435} \u{44D}\u{442}\u{43E}\u{433}\u{43E} \u{431}\u{43E}\u{442}\u{430} \u{432} \u{43A}\u{430}\u{43D}\u{430}\u{43B} \u{43A}\u{430}\u{43A} <b>\u{430}\u{434}\u{43C}\u{438}\u{43D}\u{438}\u{441}\u{442}\u{440}\u{430}\u{442}\u{43E}\u{440}\u{430}</b>\n"
+            . "3) \u{41F}\u{435}\u{440}\u{435}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{441}\u{44E}\u{434}\u{430} \u{43B}\u{44E}\u{431}\u{43E}\u{435} \u{441}\u{43E}\u{43E}\u{431}\u{449}\u{435}\u{43D}\u{438}\u{435} \u{438}\u{437} \u{43A}\u{430}\u{43D}\u{430}\u{43B}\u{430}\n\n"
+            . "\u{414}\u{43B}\u{44F} \u{43E}\u{442}\u{43C}\u{435}\u{43D}\u{44B} \u{2014} /cancel";
+        $this->api->editMessageText($chatId, $msgId, $text, ['reply_markup' => json_encode($this->backMenu())]);
+    }
+
+    /** Receive a forwarded channel message and save the channel as archive. */
+    private function onSetChannel(int $chatId, int $tid, array $msg): void
+    {
+        // New Bot API: forward_origin {type:'channel', chat:{...}}; legacy: forward_from_chat.
+        $origin = $msg['forward_origin'] ?? null;
+        $chat = null;
+        if (is_array($origin) && ($origin['type'] ?? '') === 'channel' && !empty($origin['chat'])) {
+            $chat = $origin['chat'];
+        } elseif (!empty($msg['forward_from_chat']) && ($msg['forward_from_chat']['type'] ?? '') === 'channel') {
+            $chat = $msg['forward_from_chat'];
+        }
+
+        if (!$chat || empty($chat['id'])) {
+            $this->api->sendMessage($chatId, "\u{26A0}\u{FE0F} \u{41D}\u{443}\u{436}\u{43D}\u{43E} \u{438}\u{43C}\u{435}\u{43D}\u{43D}\u{43E} <b>\u{43F}\u{435}\u{440}\u{435}\u{441}\u{43B}\u{430}\u{442}\u{44C}</b> \u{441}\u{43E}\u{43E}\u{431}\u{449}\u{435}\u{43D}\u{438}\u{435} \u{438}\u{437} \u{43A}\u{430}\u{43D}\u{430}\u{43B}\u{430}. \u{41F}\u{43E}\u{43F}\u{440}\u{43E}\u{431}\u{443}\u{439}\u{442}\u{435} \u{435}\u{449}\u{451} \u{440}\u{430}\u{437} (\u{438}\u{43B}\u{438} /cancel).");
+            return;
+        }
+
+        $cid   = (string) $chat['id'];
+        $title = (string) ($chat['title'] ?? "\u{43A}\u{430}\u{43D}\u{430}\u{43B}");
+
+        // Verify the bot can post there (it must be a channel admin).
+        $test = $this->api->sendMessage($cid, "\u{2705} \u{41A}\u{430}\u{43D}\u{430}\u{43B}-\u{430}\u{440}\u{445}\u{438}\u{432} \u{43F}\u{43E}\u{434}\u{43A}\u{43B}\u{44E}\u{447}\u{451}\u{43D} \u{43A} \u{431}\u{43E}\u{442}\u{443}.");
+        if (empty($test['ok'])) {
+            $this->api->sendMessage(
+                $chatId,
+                "\u{26A0}\u{FE0F} \u{41D}\u{435} \u{443}\u{434}\u{430}\u{43B}\u{43E}\u{441}\u{44C} \u{43D}\u{430}\u{43F}\u{438}\u{441}\u{430}\u{442}\u{44C} \u{432} \u{43A}\u{430}\u{43D}\u{430}\u{43B} \u{AB}" . htmlspecialchars($title, ENT_QUOTES) . "\u{BB}.\n"
+                . "\u{423}\u{431}\u{435}\u{434}\u{438}\u{442}\u{435}\u{441}\u{44C}, \u{447}\u{442}\u{43E} \u{431}\u{43E}\u{442} \u{434}\u{43E}\u{431}\u{430}\u{432}\u{43B}\u{435}\u{43D} \u{432} \u{43A}\u{430}\u{43D}\u{430}\u{43B} \u{43A}\u{430}\u{43A} <b>\u{430}\u{434}\u{43C}\u{438}\u{43D}\u{438}\u{441}\u{442}\u{440}\u{430}\u{442}\u{43E}\u{440}</b> (\u{43F}\u{440}\u{430}\u{432}\u{43E} \u{43F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{43E}\u{432}\u{430}\u{442}\u{44C}), \u{438} \u{43F}\u{435}\u{440}\u{435}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{441}\u{43E}\u{43E}\u{431}\u{449}\u{435}\u{43D}\u{438}\u{435} \u{435}\u{449}\u{451} \u{440}\u{430}\u{437}."
+            );
+            return;
+        }
+
+        $this->repo->setSetting('archive_channel_id', $cid);
+        $this->repo->setSetting('archive_channel_title', $title);
+        $this->store->clear($tid);
+        $this->api->sendMessage(
+            $chatId,
+            "\u{2705} \u{41A}\u{430}\u{43D}\u{430}\u{43B}-\u{430}\u{440}\u{445}\u{438}\u{432} \u{43F}\u{43E}\u{434}\u{43A}\u{43B}\u{44E}\u{447}\u{451}\u{43D}: <b>" . htmlspecialchars($title, ENT_QUOTES) . "</b>\n"
+            . "\u{422}\u{435}\u{43F}\u{435}\u{440}\u{44C} \u{43A}\u{430}\u{436}\u{434}\u{44B}\u{439} \u{43E}\u{43F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{43E}\u{432}\u{430}\u{43D}\u{43D}\u{44B}\u{439} \u{444}\u{438}\u{43B}\u{44C}\u{43C} \u{431}\u{443}\u{434}\u{435}\u{442} \u{430}\u{432}\u{442}\u{43E}\u{43C}\u{430}\u{442}\u{438}\u{447}\u{435}\u{441}\u{43A}\u{438} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{43B}\u{44F}\u{442}\u{44C}\u{441}\u{44F} \u{432} \u{43A}\u{430}\u{43D}\u{430}\u{43B}."
         );
     }
 
