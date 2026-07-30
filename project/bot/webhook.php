@@ -1,6 +1,4 @@
 <?php
-declare(strict_types=1);
-
 /**
  * Telegram webhook entry point. Point BotFather's webhook here:
  *   https://your-domain/project/bot/webhook.php

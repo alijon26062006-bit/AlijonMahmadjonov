@@ -11,8 +11,6 @@
  * не нужен.  ПОСЛЕ УСПЕХА УДАЛИТЕ ЭТОТ ФАЙЛ с хостинга.
  */
 
-declare(strict_types=1);
-
 header('Content-Type: text/plain; charset=utf-8');
 
 $config = require __DIR__ . '/config/config.php';

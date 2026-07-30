@@ -1,6 +1,4 @@
 <?php
-declare(strict_types=1);
-
 /**
  * One-off helper to register the Telegram webhook.
  * Run from CLI:   php bot/set_webhook.php

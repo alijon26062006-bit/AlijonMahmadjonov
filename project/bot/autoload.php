@@ -1,6 +1,4 @@
 <?php
-declare(strict_types=1);
-
 /**
  * Autoloader for the bot layer. Reuses the API's Core/Models classes and adds
  * the Bot\ namespace.

@@ -1,6 +1,4 @@
 <?php
-declare(strict_types=1);
-
 /**
  * PSR-4 style autoloader for the API layer.
  *   Core\*        -> api/core/*.php

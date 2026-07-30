@@ -4,7 +4,6 @@
  *   https://ваш-домен/kino/enc.php?key=ВАШ_WEBHOOK_SECRET
  * После проверки — УДАЛИТЕ.
  */
-declare(strict_types=1);
 header('Content-Type: text/plain; charset=utf-8');
 
 $config = require __DIR__ . '/config/config.php';
