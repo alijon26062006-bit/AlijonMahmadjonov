@@ -49,6 +49,10 @@ $runSqlFile = static function (PDO $pdo, string $file): int {
         if ($stmt === '') {
             continue;
         }
+        // Пропускаем выбор/создание базы — таблицы идут в уже подключённую базу.
+        if (preg_match('/^(CREATE\s+DATABASE|USE)\b/i', $stmt)) {
+            continue;
+        }
         $pdo->exec($stmt);
         $count++;
     }
