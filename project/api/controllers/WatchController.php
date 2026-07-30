@@ -53,14 +53,14 @@ final class WatchController extends Controller
         if (!empty($play['telegram_file_id']) && $chatId) {
             require_once __DIR__ . '/../../bot/TelegramApi.php';
             $api = new \Bot\TelegramApi($this->config['telegram']['bot_token']);
-            $caption = '🎬 <b>' . htmlspecialchars((string) $play['title'], ENT_QUOTES) . '</b>';
+            $caption = "\u{1F3AC} <b>" . htmlspecialchars((string) $play['title'], ENT_QUOTES) . '</b>';
             $res = $api->sendVideo((int) $chatId, (string) $play['telegram_file_id'], $caption);
 
             if (!empty($res['ok'])) {
                 Response::ok([
                     'via'       => 'telegram',
                     'delivered' => true,
-                    'message'   => 'Фильм отправлен в чат с ботом',
+                    'message'   => "\u{424}\u{438}\u{43B}\u{44C}\u{43C} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{43B}\u{435}\u{43D} \u{432} \u{447}\u{430}\u{442} \u{441} \u{431}\u{43E}\u{442}\u{43E}\u{43C}",
                 ]);
             }
             // Fall through to a link if Telegram delivery failed.
@@ -76,7 +76,7 @@ final class WatchController extends Controller
             ]);
         }
 
-        Response::error('Источник просмотра пока не добавлен', 404);
+        Response::error("\u{418}\u{441}\u{442}\u{43E}\u{447}\u{43D}\u{438}\u{43A} \u{43F}\u{440}\u{43E}\u{441}\u{43C}\u{43E}\u{442}\u{440}\u{430} \u{43F}\u{43E}\u{43A}\u{430} \u{43D}\u{435} \u{434}\u{43E}\u{431}\u{430}\u{432}\u{43B}\u{435}\u{43D}", 404);
     }
 
     /** Deliver one series/anime episode via the bot, or return its link. */
@@ -87,7 +87,7 @@ final class WatchController extends Controller
             Response::error('Episode not found', 404);
         }
 
-        $caption = '🎬 <b>' . htmlspecialchars((string) $ep['movie_title'], ENT_QUOTES) . '</b> — '
+        $caption = "\u{1F3AC} <b>" . htmlspecialchars((string) $ep['movie_title'], ENT_QUOTES) . "</b> \u{2014} "
             . 'S' . (int) $ep['season'] . 'E' . (int) $ep['episode'];
 
         if (!empty($ep['telegram_file_id']) && $chatId) {
@@ -95,7 +95,7 @@ final class WatchController extends Controller
             $api = new \Bot\TelegramApi($this->config['telegram']['bot_token']);
             $res = $api->sendVideo((int) $chatId, (string) $ep['telegram_file_id'], $caption);
             if (!empty($res['ok'])) {
-                Response::ok(['via' => 'telegram', 'delivered' => true, 'message' => 'Серия отправлена в чат с ботом']);
+                Response::ok(['via' => 'telegram', 'delivered' => true, 'message' => "\u{421}\u{435}\u{440}\u{438}\u{44F} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{43B}\u{435}\u{43D}\u{430} \u{432} \u{447}\u{430}\u{442} \u{441} \u{431}\u{43E}\u{442}\u{43E}\u{43C}"]);
             }
         }
 
@@ -103,6 +103,6 @@ final class WatchController extends Controller
             Response::ok(['via' => 'link', 'watch_url' => $ep['watch_url']]);
         }
 
-        Response::error('Источник серии пока не добавлен', 404);
+        Response::error("\u{418}\u{441}\u{442}\u{43E}\u{447}\u{43D}\u{438}\u{43A} \u{441}\u{435}\u{440}\u{438}\u{438} \u{43F}\u{43E}\u{43A}\u{430} \u{43D}\u{435} \u{434}\u{43E}\u{431}\u{430}\u{432}\u{43B}\u{435}\u{43D}", 404);
     }
 }

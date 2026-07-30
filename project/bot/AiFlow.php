@@ -28,12 +28,12 @@ use Core\OpenAiClient;
 final class AiFlow
 {
     private const CAT_LABELS = [
-        'movie' => 'Фильм', 'series' => 'Сериал',
-        'anime' => 'Аниме', 'cartoon' => 'Мультфильм',
+        'movie' => "\u{424}\u{438}\u{43B}\u{44C}\u{43C}", 'series' => "\u{421}\u{435}\u{440}\u{438}\u{430}\u{43B}",
+        'anime' => "\u{410}\u{43D}\u{438}\u{43C}\u{435}", 'cartoon' => "\u{41C}\u{443}\u{43B}\u{44C}\u{442}\u{444}\u{438}\u{43B}\u{44C}\u{43C}",
     ];
     private const STATUS_LABELS = [
-        'published' => 'Опубликован', 'coming_soon' => 'Скоро выйдет',
-        'in_cinema' => 'Сейчас в кино', 'draft' => 'Черновик',
+        'published' => "\u{41E}\u{43F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{43E}\u{432}\u{430}\u{43D}", 'coming_soon' => "\u{421}\u{43A}\u{43E}\u{440}\u{43E} \u{432}\u{44B}\u{439}\u{434}\u{435}\u{442}",
+        'in_cinema' => "\u{421}\u{435}\u{439}\u{447}\u{430}\u{441} \u{432} \u{43A}\u{438}\u{43D}\u{43E}", 'draft' => "\u{427}\u{435}\u{440}\u{43D}\u{43E}\u{432}\u{438}\u{43A}",
     ];
 
     public function __construct(
@@ -52,12 +52,12 @@ final class AiFlow
     {
         $this->store->set($tid, 'ai_poster', ['data' => [], 'images' => []]);
         $note = $this->ai->isEnabled()
-            ? 'AI распознает фильм и сам заполнит карточку.'
-            : '⚠️ AI-ключ не настроен — карточку нужно будет заполнить вручную, но постер обработается автоматически.';
+            ? "AI \u{440}\u{430}\u{441}\u{43F}\u{43E}\u{437}\u{43D}\u{430}\u{435}\u{442} \u{444}\u{438}\u{43B}\u{44C}\u{43C} \u{438} \u{441}\u{430}\u{43C} \u{437}\u{430}\u{43F}\u{43E}\u{43B}\u{43D}\u{438}\u{442} \u{43A}\u{430}\u{440}\u{442}\u{43E}\u{447}\u{43A}\u{443}."
+            : "\u{26A0}\u{FE0F} AI-\u{43A}\u{43B}\u{44E}\u{447} \u{43D}\u{435} \u{43D}\u{430}\u{441}\u{442}\u{440}\u{43E}\u{435}\u{43D} \u{2014} \u{43A}\u{430}\u{440}\u{442}\u{43E}\u{447}\u{43A}\u{443} \u{43D}\u{443}\u{436}\u{43D}\u{43E} \u{431}\u{443}\u{434}\u{435}\u{442} \u{437}\u{430}\u{43F}\u{43E}\u{43B}\u{43D}\u{438}\u{442}\u{44C} \u{432}\u{440}\u{443}\u{447}\u{43D}\u{443}\u{44E}, \u{43D}\u{43E} \u{43F}\u{43E}\u{441}\u{442}\u{435}\u{440} \u{43E}\u{431}\u{440}\u{430}\u{431}\u{43E}\u{442}\u{430}\u{435}\u{442}\u{441}\u{44F} \u{430}\u{432}\u{442}\u{43E}\u{43C}\u{430}\u{442}\u{438}\u{447}\u{435}\u{441}\u{43A}\u{438}.";
         $this->api->sendMessage(
             $chatId,
-            "🤖 <b>AI-добавление фильма</b>\n\n<b>Шаг 1.</b> Отправьте постер фильма 🖼\n\n{$note}\n\n"
-            . "В любой момент можно нажать «❌ Отмена» или отправить /start.",
+            "\u{1F916} <b>AI-\u{434}\u{43E}\u{431}\u{430}\u{432}\u{43B}\u{435}\u{43D}\u{438}\u{435} \u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{430}</b>\n\n<b>\u{428}\u{430}\u{433} 1.</b> \u{41E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{44C}\u{442}\u{435} \u{43F}\u{43E}\u{441}\u{442}\u{435}\u{440} \u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{430} \u{1F5BC}\n\n{$note}\n\n"
+            . "\u{412} \u{43B}\u{44E}\u{431}\u{43E}\u{439} \u{43C}\u{43E}\u{43C}\u{435}\u{43D}\u{442} \u{43C}\u{43E}\u{436}\u{43D}\u{43E} \u{43D}\u{430}\u{436}\u{430}\u{442}\u{44C} \u{AB}\u{274C} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{430}\u{BB} \u{438}\u{43B}\u{438} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{438}\u{442}\u{44C} /start.",
             $this->cancelInline()
         );
     }
@@ -74,10 +74,10 @@ final class AiFlow
         }
 
         $text = trim((string) ($message['text'] ?? ''));
-        if (in_array($text, ['/cancel', '✖️ Отмена'], true)) {
+        if (in_array($text, ['/cancel', "\u{2716}\u{FE0F} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{430}"], true)) {
             $this->cleanup($state['payload']);
             $this->store->clear($tid);
-            $this->api->sendMessage($chatId, '❌ Добавление отменено.', $this->removeKeyboard());
+            $this->api->sendMessage($chatId, "\u{274C} \u{414}\u{43E}\u{431}\u{430}\u{432}\u{43B}\u{435}\u{43D}\u{438}\u{435} \u{43E}\u{442}\u{43C}\u{435}\u{43D}\u{435}\u{43D}\u{43E}.", $this->removeKeyboard());
             return true;
         }
 
@@ -101,17 +101,17 @@ final class AiFlow
             $fileId = $message['document']['file_id'];
         }
         if (!$fileId) {
-            $this->api->sendMessage($chatId, '⚠️ Пришлите именно изображение (постер).');
+            $this->api->sendMessage($chatId, "\u{26A0}\u{FE0F} \u{41F}\u{440}\u{438}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{438}\u{43C}\u{435}\u{43D}\u{43D}\u{43E} \u{438}\u{437}\u{43E}\u{431}\u{440}\u{430}\u{436}\u{435}\u{43D}\u{438}\u{435} (\u{43F}\u{43E}\u{441}\u{442}\u{435}\u{440}).");
             return true;
         }
 
         $this->api->call('sendChatAction', ['chat_id' => $chatId, 'action' => 'upload_photo']);
-        $this->api->sendMessage($chatId, '⏳ Обрабатываю постер: Smart Crop, баннер, WebP…');
+        $this->api->sendMessage($chatId, "\u{23F3} \u{41E}\u{431}\u{440}\u{430}\u{431}\u{430}\u{442}\u{44B}\u{432}\u{430}\u{44E} \u{43F}\u{43E}\u{441}\u{442}\u{435}\u{440}: Smart Crop, \u{431}\u{430}\u{43D}\u{43D}\u{435}\u{440}, WebP\u{2026}");
 
         // Download the original for processing (removed afterwards).
         $rel = $this->media->save($fileId, 'tmp', 'jpg');
         if ($rel === null) {
-            $this->api->sendMessage($chatId, '⚠️ Не удалось сохранить изображение. Попробуйте ещё раз.');
+            $this->api->sendMessage($chatId, "\u{26A0}\u{FE0F} \u{41D}\u{435} \u{443}\u{434}\u{430}\u{43B}\u{43E}\u{441}\u{44C} \u{441}\u{43E}\u{445}\u{440}\u{430}\u{43D}\u{438}\u{442}\u{44C} \u{438}\u{437}\u{43E}\u{431}\u{440}\u{430}\u{436}\u{435}\u{43D}\u{438}\u{435}. \u{41F}\u{43E}\u{43F}\u{440}\u{43E}\u{431}\u{443}\u{439}\u{442}\u{435} \u{435}\u{449}\u{451} \u{440}\u{430}\u{437}.");
             return true;
         }
         $originalAbs = $this->uploadsDir . '/' . $rel;
@@ -133,9 +133,9 @@ final class AiFlow
             }
             $this->api->sendMessage(
                 $chatId,
-                "🔎 Распознано: <b>{$ident['title']}</b>"
+                "\u{1F50E} \u{420}\u{430}\u{441}\u{43F}\u{43E}\u{437}\u{43D}\u{430}\u{43D}\u{43E}: <b>{$ident['title']}</b>"
                 . ($ident['year'] ? " ({$ident['year']})" : '')
-                . "\n🤖 Заполняю карточку…"
+                . "\n\u{1F916} \u{417}\u{430}\u{43F}\u{43E}\u{43B}\u{43D}\u{44F}\u{44E} \u{43A}\u{430}\u{440}\u{442}\u{43E}\u{447}\u{43A}\u{443}\u{2026}"
             );
             $this->enrichAndAskVideo($chatId, $tid, $ident['title'], $ident['year'] ?? null, $ident['type'] ?? null, $payload);
             return true;
@@ -145,7 +145,7 @@ final class AiFlow
         $this->store->set($tid, 'ai_title', $payload);
         $this->api->sendMessage(
             $chatId,
-            "🤔 Не удалось точно распознать фильм.\n<b>Напишите название вручную:</b>",
+            "\u{1F914} \u{41D}\u{435} \u{443}\u{434}\u{430}\u{43B}\u{43E}\u{441}\u{44C} \u{442}\u{43E}\u{447}\u{43D}\u{43E} \u{440}\u{430}\u{441}\u{43F}\u{43E}\u{437}\u{43D}\u{430}\u{442}\u{44C} \u{444}\u{438}\u{43B}\u{44C}\u{43C}.\n<b>\u{41D}\u{430}\u{43F}\u{438}\u{448}\u{438}\u{442}\u{435} \u{43D}\u{430}\u{437}\u{432}\u{430}\u{43D}\u{438}\u{435} \u{432}\u{440}\u{443}\u{447}\u{43D}\u{443}\u{44E}:</b>",
             $this->cancelInline()
         );
         return true;
@@ -154,11 +154,11 @@ final class AiFlow
     private function onTitle(int $chatId, int $tid, string $text, array $payload): bool
     {
         if ($text === '') {
-            $this->api->sendMessage($chatId, '⚠️ Введите название текстом.');
+            $this->api->sendMessage($chatId, "\u{26A0}\u{FE0F} \u{412}\u{432}\u{435}\u{434}\u{438}\u{442}\u{435} \u{43D}\u{430}\u{437}\u{432}\u{430}\u{43D}\u{438}\u{435} \u{442}\u{435}\u{43A}\u{441}\u{442}\u{43E}\u{43C}.");
             return true;
         }
         $payload['data']['title'] = $text;
-        $this->api->sendMessage($chatId, "🤖 Собираю информацию о «<b>{$text}</b>»…");
+        $this->api->sendMessage($chatId, "\u{1F916} \u{421}\u{43E}\u{431}\u{438}\u{440}\u{430}\u{44E} \u{438}\u{43D}\u{444}\u{43E}\u{440}\u{43C}\u{430}\u{446}\u{438}\u{44E} \u{43E} \u{AB}<b>{$text}</b>\u{BB}\u{2026}");
         $this->enrichAndAskVideo($chatId, $tid, $text, $payload['data']['year'] ?? null, null, $payload);
         return true;
     }
@@ -173,7 +173,7 @@ final class AiFlow
         } elseif (preg_match('#^https?://#i', $text)) {
             $payload['data']['watch_url'] = $text;
         } elseif (!$this->isSkip($text)) {
-            $this->api->sendMessage($chatId, '⚠️ Пришлите видеофайл, ссылку (http…) или «-», чтобы пропустить.');
+            $this->api->sendMessage($chatId, "\u{26A0}\u{FE0F} \u{41F}\u{440}\u{438}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{432}\u{438}\u{434}\u{435}\u{43E}\u{444}\u{430}\u{439}\u{43B}, \u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{443} (http\u{2026}) \u{438}\u{43B}\u{438} \u{AB}-\u{BB}, \u{447}\u{442}\u{43E}\u{431}\u{44B} \u{43F}\u{440}\u{43E}\u{43F}\u{443}\u{441}\u{442}\u{438}\u{442}\u{44C}.");
             return true;
         }
         $this->showConfirmation($chatId, $tid, $payload);
@@ -206,12 +206,12 @@ final class AiFlow
         $this->store->set($tid, 'ai_video', $payload);
         $this->api->sendMessage(
             $chatId,
-            "<b>Шаг 2.</b> Видео фильма (чтобы работала кнопка «Смотреть»):\n"
-            . "• <b>перешлите видео из вашего закрытого канала</b>, или\n"
-            . "• отправьте видеофайл, или\n"
-            . "• пришлите ссылку.\n\n"
-            . "Большие видео на сервере не хранятся — бот отдаёт их сам, внутри чата.\n"
-            . "Можно «⏭ Пропустить».",
+            "<b>\u{428}\u{430}\u{433} 2.</b> \u{412}\u{438}\u{434}\u{435}\u{43E} \u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{430} (\u{447}\u{442}\u{43E}\u{431}\u{44B} \u{440}\u{430}\u{431}\u{43E}\u{442}\u{430}\u{43B}\u{430} \u{43A}\u{43D}\u{43E}\u{43F}\u{43A}\u{430} \u{AB}\u{421}\u{43C}\u{43E}\u{442}\u{440}\u{435}\u{442}\u{44C}\u{BB}):\n"
+            . "\u{2022} <b>\u{43F}\u{435}\u{440}\u{435}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{432}\u{438}\u{434}\u{435}\u{43E} \u{438}\u{437} \u{432}\u{430}\u{448}\u{435}\u{433}\u{43E} \u{437}\u{430}\u{43A}\u{440}\u{44B}\u{442}\u{43E}\u{433}\u{43E} \u{43A}\u{430}\u{43D}\u{430}\u{43B}\u{430}</b>, \u{438}\u{43B}\u{438}\n"
+            . "\u{2022} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{44C}\u{442}\u{435} \u{432}\u{438}\u{434}\u{435}\u{43E}\u{444}\u{430}\u{439}\u{43B}, \u{438}\u{43B}\u{438}\n"
+            . "\u{2022} \u{43F}\u{440}\u{438}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{443}.\n\n"
+            . "\u{411}\u{43E}\u{43B}\u{44C}\u{448}\u{438}\u{435} \u{432}\u{438}\u{434}\u{435}\u{43E} \u{43D}\u{430} \u{441}\u{435}\u{440}\u{432}\u{435}\u{440}\u{435} \u{43D}\u{435} \u{445}\u{440}\u{430}\u{43D}\u{44F}\u{442}\u{441}\u{44F} \u{2014} \u{431}\u{43E}\u{442} \u{43E}\u{442}\u{434}\u{430}\u{451}\u{442} \u{438}\u{445} \u{441}\u{430}\u{43C}, \u{432}\u{43D}\u{443}\u{442}\u{440}\u{438} \u{447}\u{430}\u{442}\u{430}.\n"
+            . "\u{41C}\u{43E}\u{436}\u{43D}\u{43E} \u{AB}\u{23ED} \u{41F}\u{440}\u{43E}\u{43F}\u{443}\u{441}\u{442}\u{438}\u{442}\u{44C}\u{BB}.",
             $this->skipCancelInline()
         );
     }
@@ -225,14 +225,14 @@ final class AiFlow
 
         $caption = $this->cardCaption($d);
         $kb = ['inline_keyboard' => [
-            [['text' => '✅ Опубликовать', 'callback_data' => 'aic:pub']],
-            [['text' => '✏ Редактировать', 'callback_data' => 'aic:edit'],
-             ['text' => '❌ Отмена', 'callback_data' => 'aic:cancel']],
+            [['text' => "\u{2705} \u{41E}\u{43F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{43E}\u{432}\u{430}\u{442}\u{44C}", 'callback_data' => 'aic:pub']],
+            [['text' => "\u{270F} \u{420}\u{435}\u{434}\u{430}\u{43A}\u{442}\u{438}\u{440}\u{43E}\u{432}\u{430}\u{442}\u{44C}", 'callback_data' => 'aic:edit'],
+             ['text' => "\u{274C} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{430}", 'callback_data' => 'aic:cancel']],
         ]];
 
         $extra = ['reply_markup' => json_encode($kb)];
         // Remove the reply keyboard first, then show the preview card with poster.
-        $this->api->sendMessage($chatId, '👇 Проверьте карточку перед публикацией:', $this->removeKeyboard());
+        $this->api->sendMessage($chatId, "\u{1F447} \u{41F}\u{440}\u{43E}\u{432}\u{435}\u{440}\u{44C}\u{442}\u{435} \u{43A}\u{430}\u{440}\u{442}\u{43E}\u{447}\u{43A}\u{443} \u{43F}\u{435}\u{440}\u{435}\u{434} \u{43F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{430}\u{446}\u{438}\u{435}\u{439}:", $this->removeKeyboard());
 
         if (!empty($payload['poster_file_id'])) {
             $this->api->sendPhoto($chatId, $payload['poster_file_id'], $caption, $extra);
@@ -246,33 +246,33 @@ final class AiFlow
         $e = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES);
         $genres = !empty($d['genres'])
             ? implode(', ', array_map($e, (array) $d['genres']))
-            : '—';
+            : "\u{2014}";
         $meta = array_filter([
-            !empty($d['rating']) ? '⭐ ' . number_format((float) $d['rating'], 1) : null,
+            !empty($d['rating']) ? "\u{2B50} " . number_format((float) $d['rating'], 1) : null,
             !empty($d['age_rating']) ? $e($d['age_rating']) : null,
-            !empty($d['duration']) ? $d['duration'] . ' мин' : null,
+            !empty($d['duration']) ? $d['duration'] . " \u{43C}\u{438}\u{43D}" : null,
         ]);
         $desc = $d['description_short'] ?? $d['description'] ?? '';
         if (mb_strlen((string) $desc) > 350) {
-            $desc = mb_substr((string) $desc, 0, 350) . '…';
+            $desc = mb_substr((string) $desc, 0, 350) . "\u{2026}";
         }
 
-        return "🎬 <b>" . $e($d['title'] ?? '') . "</b>"
+        return "\u{1F3AC} <b>" . $e($d['title'] ?? '') . "</b>"
             . (!empty($d['year']) ? " ({$d['year']})" : '') . "\n"
             . (!empty($d['original_title']) ? '<i>' . $e($d['original_title']) . "</i>\n" : '')
-            . (!empty($meta) ? implode(' • ', $meta) . "\n" : '')
-            . "\n🏷 " . (self::CAT_LABELS[$d['category'] ?? 'movie'] ?? 'Фильм')
-            . " · " . (self::STATUS_LABELS[$d['status'] ?? 'published'] ?? 'Опубликован') . "\n"
-            . "🎭 {$genres}\n"
-            . (!empty($d['country']) ? '🌍 ' . $e($d['country']) . "\n" : '')
-            . (!empty($d['director']) ? '🎥 ' . $e($d['director']) . "\n" : '')
-            . (!empty($d['actors']) ? '👥 ' . $e($d['actors']) . "\n" : '')
-            . ($desc !== '' ? "\n📝 " . $e($desc) : '');
+            . (!empty($meta) ? implode(" \u{2022} ", $meta) . "\n" : '')
+            . "\n\u{1F3F7} " . (self::CAT_LABELS[$d['category'] ?? 'movie'] ?? "\u{424}\u{438}\u{43B}\u{44C}\u{43C}")
+            . " \u{B7} " . (self::STATUS_LABELS[$d['status'] ?? 'published'] ?? "\u{41E}\u{43F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{43E}\u{432}\u{430}\u{43D}") . "\n"
+            . "\u{1F3AD} {$genres}\n"
+            . (!empty($d['country']) ? "\u{1F30D} " . $e($d['country']) . "\n" : '')
+            . (!empty($d['director']) ? "\u{1F3A5} " . $e($d['director']) . "\n" : '')
+            . (!empty($d['actors']) ? "\u{1F465} " . $e($d['actors']) . "\n" : '')
+            . ($desc !== '' ? "\n\u{1F4DD} " . $e($desc) : '');
     }
 
     private function onConfirmStray(int $chatId): bool
     {
-        $this->api->sendMessage($chatId, 'Используйте кнопки под карточкой: ✅ / ✏ / ❌');
+        $this->api->sendMessage($chatId, "\u{418}\u{441}\u{43F}\u{43E}\u{43B}\u{44C}\u{437}\u{443}\u{439}\u{442}\u{435} \u{43A}\u{43D}\u{43E}\u{43F}\u{43A}\u{438} \u{43F}\u{43E}\u{434} \u{43A}\u{430}\u{440}\u{442}\u{43E}\u{447}\u{43A}\u{43E}\u{439}: \u{2705} / \u{270F} / \u{274C}");
         return true;
     }
 
@@ -295,15 +295,15 @@ final class AiFlow
         $payload = $state['payload'];
 
         if ($data === 'aic:cancel') {
-            $this->api->answerCallbackQuery($cbId, 'Отменено');
+            $this->api->answerCallbackQuery($cbId, "\u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{435}\u{43D}\u{43E}");
             $this->cleanup($payload);
             $this->store->clear($tid);
-            $this->api->sendMessage($chatId, '❌ Добавление отменено.');
+            $this->api->sendMessage($chatId, "\u{274C} \u{414}\u{43E}\u{431}\u{430}\u{432}\u{43B}\u{435}\u{43D}\u{438}\u{435} \u{43E}\u{442}\u{43C}\u{435}\u{43D}\u{435}\u{43D}\u{43E}.");
             return true;
         }
 
         if ($data === 'aic:skipvideo') {
-            $this->api->answerCallbackQuery($cbId, 'Пропущено');
+            $this->api->answerCallbackQuery($cbId, "\u{41F}\u{440}\u{43E}\u{43F}\u{443}\u{449}\u{435}\u{43D}\u{43E}");
             if ($state['state'] === 'ai_video') {
                 $this->showConfirmation($chatId, $tid, $payload);
             }
@@ -311,7 +311,7 @@ final class AiFlow
         }
 
         if ($data === 'aic:pub') {
-            $this->api->answerCallbackQuery($cbId, 'Публикую…');
+            $this->api->answerCallbackQuery($cbId, "\u{41F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{443}\u{44E}\u{2026}");
             $this->publish($chatId, $tid, $payload);
             return true;
         }
@@ -342,16 +342,16 @@ final class AiFlow
     {
         $b = static fn (string $label, string $f) => ['text' => $label, 'callback_data' => 'aif:' . $f];
         $kb = ['inline_keyboard' => [
-            [$b('📝 Название', 'title'), $b('🗓 Год', 'year')],
-            [$b('📄 Описание', 'description'), $b('🎭 Жанры', 'genres')],
-            [$b('🌍 Страна', 'country'), $b('🎥 Режиссёр', 'director')],
-            [$b('👥 Актёры', 'actors'), $b('⏱ Длительность', 'duration')],
-            [$b('⭐ Рейтинг', 'rating'), $b('🔞 Возраст', 'age_rating')],
-            [$b('🏷 Категория', 'category'), $b('📌 Статус', 'status')],
-            [$b('▶️ Видео/ссылка', 'video')],
-            [['text' => '⬅️ Назад к карточке', 'callback_data' => 'aic:back']],
+            [$b("\u{1F4DD} \u{41D}\u{430}\u{437}\u{432}\u{430}\u{43D}\u{438}\u{435}", 'title'), $b("\u{1F5D3} \u{413}\u{43E}\u{434}", 'year')],
+            [$b("\u{1F4C4} \u{41E}\u{43F}\u{438}\u{441}\u{430}\u{43D}\u{438}\u{435}", 'description'), $b("\u{1F3AD} \u{416}\u{430}\u{43D}\u{440}\u{44B}", 'genres')],
+            [$b("\u{1F30D} \u{421}\u{442}\u{440}\u{430}\u{43D}\u{430}", 'country'), $b("\u{1F3A5} \u{420}\u{435}\u{436}\u{438}\u{441}\u{441}\u{451}\u{440}", 'director')],
+            [$b("\u{1F465} \u{410}\u{43A}\u{442}\u{451}\u{440}\u{44B}", 'actors'), $b("\u{23F1} \u{414}\u{43B}\u{438}\u{442}\u{435}\u{43B}\u{44C}\u{43D}\u{43E}\u{441}\u{442}\u{44C}", 'duration')],
+            [$b("\u{2B50} \u{420}\u{435}\u{439}\u{442}\u{438}\u{43D}\u{433}", 'rating'), $b("\u{1F51E} \u{412}\u{43E}\u{437}\u{440}\u{430}\u{441}\u{442}", 'age_rating')],
+            [$b("\u{1F3F7} \u{41A}\u{430}\u{442}\u{435}\u{433}\u{43E}\u{440}\u{438}\u{44F}", 'category'), $b("\u{1F4CC} \u{421}\u{442}\u{430}\u{442}\u{443}\u{441}", 'status')],
+            [$b("\u{25B6}\u{FE0F} \u{412}\u{438}\u{434}\u{435}\u{43E}/\u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{430}", 'video')],
+            [['text' => "\u{2B05}\u{FE0F} \u{41D}\u{430}\u{437}\u{430}\u{434} \u{43A} \u{43A}\u{430}\u{440}\u{442}\u{43E}\u{447}\u{43A}\u{435}", 'callback_data' => 'aic:back']],
         ]];
-        $this->api->sendMessage($chatId, '✏ <b>Что изменить?</b>', ['reply_markup' => json_encode($kb)]);
+        $this->api->sendMessage($chatId, "\u{270F} <b>\u{427}\u{442}\u{43E} \u{438}\u{437}\u{43C}\u{435}\u{43D}\u{438}\u{442}\u{44C}?</b>", ['reply_markup' => json_encode($kb)]);
     }
 
     private function promptEdit(int $chatId, int $tid, string $field, array $payload): void
@@ -360,25 +360,25 @@ final class AiFlow
         $this->store->set($tid, 'ai_edit', $payload);
 
         if ($field === 'category') {
-            $rows = [[['text' => 'Фильм']], [['text' => 'Сериал']], [['text' => 'Мультфильм']], [['text' => 'Аниме']], [['text' => '✖️ Отмена']]];
-            $this->api->sendMessage($chatId, 'Выберите категорию:', ['reply_markup' => json_encode(['keyboard' => $rows, 'resize_keyboard' => true, 'one_time_keyboard' => true])]);
+            $rows = [[['text' => "\u{424}\u{438}\u{43B}\u{44C}\u{43C}"]], [['text' => "\u{421}\u{435}\u{440}\u{438}\u{430}\u{43B}"]], [['text' => "\u{41C}\u{443}\u{43B}\u{44C}\u{442}\u{444}\u{438}\u{43B}\u{44C}\u{43C}"]], [['text' => "\u{410}\u{43D}\u{438}\u{43C}\u{435}"]], [['text' => "\u{2716}\u{FE0F} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{430}"]]];
+            $this->api->sendMessage($chatId, "\u{412}\u{44B}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{43A}\u{430}\u{442}\u{435}\u{433}\u{43E}\u{440}\u{438}\u{44E}:", ['reply_markup' => json_encode(['keyboard' => $rows, 'resize_keyboard' => true, 'one_time_keyboard' => true])]);
             return;
         }
         if ($field === 'status') {
-            $rows = [[['text' => 'Опубликовать']], [['text' => 'Скоро выйдет']], [['text' => 'Сейчас в кино']], [['text' => '✖️ Отмена']]];
-            $this->api->sendMessage($chatId, 'Выберите статус:', ['reply_markup' => json_encode(['keyboard' => $rows, 'resize_keyboard' => true, 'one_time_keyboard' => true])]);
+            $rows = [[['text' => "\u{41E}\u{43F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{43E}\u{432}\u{430}\u{442}\u{44C}"]], [['text' => "\u{421}\u{43A}\u{43E}\u{440}\u{43E} \u{432}\u{44B}\u{439}\u{434}\u{435}\u{442}"]], [['text' => "\u{421}\u{435}\u{439}\u{447}\u{430}\u{441} \u{432} \u{43A}\u{438}\u{43D}\u{43E}"]], [['text' => "\u{2716}\u{FE0F} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{430}"]]];
+            $this->api->sendMessage($chatId, "\u{412}\u{44B}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{441}\u{442}\u{430}\u{442}\u{443}\u{441}:", ['reply_markup' => json_encode(['keyboard' => $rows, 'resize_keyboard' => true, 'one_time_keyboard' => true])]);
             return;
         }
 
         $prompts = [
-            'title' => '📝 Новое название:', 'year' => '🗓 Год (число):',
-            'description' => '📄 Описание:', 'genres' => '🎭 Жанры через запятую:',
-            'country' => '🌍 Страна:', 'director' => '🎥 Режиссёр:',
-            'actors' => '👥 Актёры через запятую:', 'duration' => '⏱ Длительность в минутах:',
-            'rating' => '⭐ Рейтинг 0–10:', 'age_rating' => '🔞 Возраст (0+,6+,12+,16+,18+):',
-            'video' => '▶️ Пришлите видеофайл или ссылку (http…):',
+            'title' => "\u{1F4DD} \u{41D}\u{43E}\u{432}\u{43E}\u{435} \u{43D}\u{430}\u{437}\u{432}\u{430}\u{43D}\u{438}\u{435}:", 'year' => "\u{1F5D3} \u{413}\u{43E}\u{434} (\u{447}\u{438}\u{441}\u{43B}\u{43E}):",
+            'description' => "\u{1F4C4} \u{41E}\u{43F}\u{438}\u{441}\u{430}\u{43D}\u{438}\u{435}:", 'genres' => "\u{1F3AD} \u{416}\u{430}\u{43D}\u{440}\u{44B} \u{447}\u{435}\u{440}\u{435}\u{437} \u{437}\u{430}\u{43F}\u{44F}\u{442}\u{443}\u{44E}:",
+            'country' => "\u{1F30D} \u{421}\u{442}\u{440}\u{430}\u{43D}\u{430}:", 'director' => "\u{1F3A5} \u{420}\u{435}\u{436}\u{438}\u{441}\u{441}\u{451}\u{440}:",
+            'actors' => "\u{1F465} \u{410}\u{43A}\u{442}\u{451}\u{440}\u{44B} \u{447}\u{435}\u{440}\u{435}\u{437} \u{437}\u{430}\u{43F}\u{44F}\u{442}\u{443}\u{44E}:", 'duration' => "\u{23F1} \u{414}\u{43B}\u{438}\u{442}\u{435}\u{43B}\u{44C}\u{43D}\u{43E}\u{441}\u{442}\u{44C} \u{432} \u{43C}\u{438}\u{43D}\u{443}\u{442}\u{430}\u{445}:",
+            'rating' => "\u{2B50} \u{420}\u{435}\u{439}\u{442}\u{438}\u{43D}\u{433} 0\u{2013}10:", 'age_rating' => "\u{1F51E} \u{412}\u{43E}\u{437}\u{440}\u{430}\u{441}\u{442} (0+,6+,12+,16+,18+):",
+            'video' => "\u{25B6}\u{FE0F} \u{41F}\u{440}\u{438}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{432}\u{438}\u{434}\u{435}\u{43E}\u{444}\u{430}\u{439}\u{43B} \u{438}\u{43B}\u{438} \u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{443} (http\u{2026}):",
         ];
-        $this->api->sendMessage($chatId, $prompts[$field] ?? 'Новое значение:', ['reply_markup' => json_encode(['keyboard' => [[['text' => '✖️ Отмена']]], 'resize_keyboard' => true])]);
+        $this->api->sendMessage($chatId, $prompts[$field] ?? "\u{41D}\u{43E}\u{432}\u{43E}\u{435} \u{437}\u{43D}\u{430}\u{447}\u{435}\u{43D}\u{438}\u{435}:", ['reply_markup' => json_encode(['keyboard' => [[['text' => "\u{2716}\u{FE0F} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{430}"]]], 'resize_keyboard' => true])]);
     }
 
     private function onEditValue(int $chatId, int $tid, array $message, string $text, array $payload): bool
@@ -398,11 +398,11 @@ final class AiFlow
                 $payload['data']['genres'] = array_values(array_filter(array_map('trim', explode(',', $text))));
                 break;
             case 'category':
-                $map = ['Фильм' => 'movie', 'Сериал' => 'series', 'Мультфильм' => 'cartoon', 'Аниме' => 'anime'];
+                $map = ["\u{424}\u{438}\u{43B}\u{44C}\u{43C}" => 'movie', "\u{421}\u{435}\u{440}\u{438}\u{430}\u{43B}" => 'series', "\u{41C}\u{443}\u{43B}\u{44C}\u{442}\u{444}\u{438}\u{43B}\u{44C}\u{43C}" => 'cartoon', "\u{410}\u{43D}\u{438}\u{43C}\u{435}" => 'anime'];
                 $payload['data']['category'] = $map[$text] ?? ($payload['data']['category'] ?? 'movie');
                 break;
             case 'status':
-                $map = ['Опубликовать' => 'published', 'Скоро выйдет' => 'coming_soon', 'Сейчас в кино' => 'in_cinema'];
+                $map = ["\u{41E}\u{43F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{43E}\u{432}\u{430}\u{442}\u{44C}" => 'published', "\u{421}\u{43A}\u{43E}\u{440}\u{43E} \u{432}\u{44B}\u{439}\u{434}\u{435}\u{442}" => 'coming_soon', "\u{421}\u{435}\u{439}\u{447}\u{430}\u{441} \u{432} \u{43A}\u{438}\u{43D}\u{43E}" => 'in_cinema'];
                 $payload['data']['status'] = $map[$text] ?? ($payload['data']['status'] ?? 'published');
                 break;
             case 'video':
@@ -432,7 +432,7 @@ final class AiFlow
         $img = $payload['images'] ?? [];
 
         $movie = [
-            'title'          => $d['title'] ?? 'Без названия',
+            'title'          => $d['title'] ?? "\u{411}\u{435}\u{437} \u{43D}\u{430}\u{437}\u{432}\u{430}\u{43D}\u{438}\u{44F}",
             'original_title' => $d['original_title'] ?? null,
             'description'    => $d['description'] ?? ($d['description_short'] ?? null),
             'poster'         => $img['poster'] ?? null,
@@ -461,23 +461,23 @@ final class AiFlow
         $id = $this->repo->createMovie($movie);
         $this->store->clear($tid);
 
-        $label = self::CAT_LABELS[$movie['category']] ?? 'Контент';
+        $label = self::CAT_LABELS[$movie['category']] ?? "\u{41A}\u{43E}\u{43D}\u{442}\u{435}\u{43D}\u{442}";
 
         $rows = [];
         // For series / anime offer to add seasons & episodes right away.
         if (in_array($movie['category'], ['series', 'anime'], true)) {
-            $rows[] = [['text' => '➕ Добавить серии', 'callback_data' => 'ep:add:' . $id]];
+            $rows[] = [['text' => "\u{2795} \u{414}\u{43E}\u{431}\u{430}\u{432}\u{438}\u{442}\u{44C} \u{441}\u{435}\u{440}\u{438}\u{438}", 'callback_data' => 'ep:add:' . $id]];
         }
-        $rows[] = [['text' => '🎬 Открыть кино', 'web_app' => ['url' => $this->miniappUrl]]];
+        $rows[] = [['text' => "\u{1F3AC} \u{41E}\u{442}\u{43A}\u{440}\u{44B}\u{442}\u{44C} \u{43A}\u{438}\u{43D}\u{43E}", 'web_app' => ['url' => $this->miniappUrl]]];
 
         $extra = in_array($movie['category'], ['series', 'anime'], true)
-            ? "\n\nТеперь добавьте сезоны и серии кнопкой ниже."
+            ? "\n\n\u{422}\u{435}\u{43F}\u{435}\u{440}\u{44C} \u{434}\u{43E}\u{431}\u{430}\u{432}\u{44C}\u{442}\u{435} \u{441}\u{435}\u{437}\u{43E}\u{43D}\u{44B} \u{438} \u{441}\u{435}\u{440}\u{438}\u{438} \u{43A}\u{43D}\u{43E}\u{43F}\u{43A}\u{43E}\u{439} \u{43D}\u{438}\u{436}\u{435}."
             : '';
 
         $this->api->sendMessage(
             $chatId,
-            "✅ {$label} <b>«{$movie['title']}»</b> (#{$id}) опубликован!\n"
-            . "Уже виден на главной Mini App: Hero-баннер, Новинки, Категории, Поиск.{$extra}",
+            "\u{2705} {$label} <b>\u{AB}{$movie['title']}\u{BB}</b> (#{$id}) \u{43E}\u{43F}\u{443}\u{431}\u{43B}\u{438}\u{43A}\u{43E}\u{432}\u{430}\u{43D}!\n"
+            . "\u{423}\u{436}\u{435} \u{432}\u{438}\u{434}\u{435}\u{43D} \u{43D}\u{430} \u{433}\u{43B}\u{430}\u{432}\u{43D}\u{43E}\u{439} Mini App: Hero-\u{431}\u{430}\u{43D}\u{43D}\u{435}\u{440}, \u{41D}\u{43E}\u{432}\u{438}\u{43D}\u{43A}\u{438}, \u{41A}\u{430}\u{442}\u{435}\u{433}\u{43E}\u{440}\u{438}\u{438}, \u{41F}\u{43E}\u{438}\u{441}\u{43A}.{$extra}",
             ['reply_markup' => json_encode(['inline_keyboard' => $rows])]
         );
     }
@@ -495,7 +495,7 @@ final class AiFlow
 
     private function isSkip(string $text): bool
     {
-        return in_array(mb_strtolower($text), ['-', '—', 'skip', '/skip', 'нет', 'пропустить'], true);
+        return in_array(mb_strtolower($text), ['-', "\u{2014}", 'skip', '/skip', "\u{43D}\u{435}\u{442}", "\u{43F}\u{440}\u{43E}\u{43F}\u{443}\u{441}\u{442}\u{438}\u{442}\u{44C}"], true);
     }
 
     private function removeKeyboard(): array
@@ -506,7 +506,7 @@ final class AiFlow
     private function cancelInline(): array
     {
         return ['reply_markup' => json_encode([
-            'inline_keyboard' => [[['text' => '❌ Отмена', 'callback_data' => 'aic:cancel']]],
+            'inline_keyboard' => [[['text' => "\u{274C} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{430}", 'callback_data' => 'aic:cancel']]],
         ])];
     }
 
@@ -514,8 +514,8 @@ final class AiFlow
     {
         return ['reply_markup' => json_encode([
             'inline_keyboard' => [
-                [['text' => '⏭ Пропустить', 'callback_data' => 'aic:skipvideo']],
-                [['text' => '❌ Отмена', 'callback_data' => 'aic:cancel']],
+                [['text' => "\u{23ED} \u{41F}\u{440}\u{43E}\u{43F}\u{443}\u{441}\u{442}\u{438}\u{442}\u{44C}", 'callback_data' => 'aic:skipvideo']],
+                [['text' => "\u{274C} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{430}", 'callback_data' => 'aic:cancel']],
             ],
         ])];
     }

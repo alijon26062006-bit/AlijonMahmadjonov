@@ -72,7 +72,7 @@ final class Bot
 
         // Global commands ALWAYS break out of any active wizard.
         $isCommand = $text === '/start' || str_starts_with($text, '/start ')
-            || $text === '/admin' || $text === '⚙ Панель'
+            || $text === '/admin' || $text === "\u{2699} \u{41F}\u{430}\u{43D}\u{435}\u{43B}\u{44C}"
             || $text === '/cancel';
         if ($isCommand) {
             $this->store->clear($tid);
@@ -92,7 +92,7 @@ final class Bot
         }
 
         if ($text === '/cancel') {
-            $this->api->sendMessage($chatId, '❌ Отменено. Напишите /admin для меню.', [
+            $this->api->sendMessage($chatId, "\u{274C} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{435}\u{43D}\u{43E}. \u{41D}\u{430}\u{43F}\u{438}\u{448}\u{438}\u{442}\u{435} /admin \u{434}\u{43B}\u{44F} \u{43C}\u{435}\u{43D}\u{44E}.", [
                 'reply_markup' => json_encode(['remove_keyboard' => true]),
             ]);
             return;
@@ -103,52 +103,52 @@ final class Bot
             return;
         }
 
-        if ($text === '/admin' || $text === '⚙ Панель') {
+        if ($text === '/admin' || $text === "\u{2699} \u{41F}\u{430}\u{43D}\u{435}\u{43B}\u{44C}") {
             $this->sendAdminPanel($chatId, $tid);
             return;
         }
 
         // User navigation (reply keyboard labels)
         switch ($text) {
-            case '🎬 Открыть кино':
+            case "\u{1F3AC} \u{41E}\u{442}\u{43A}\u{440}\u{44B}\u{442}\u{44C} \u{43A}\u{438}\u{43D}\u{43E}":
                 // Handled natively by the web_app keyboard button; nothing to do.
                 return;
-            case '🔥 Новинки':
-                $this->openSection($chatId, 'new', '🔥 Новинки');
+            case "\u{1F525} \u{41D}\u{43E}\u{432}\u{438}\u{43D}\u{43A}\u{438}":
+                $this->openSection($chatId, 'new', "\u{1F525} \u{41D}\u{43E}\u{432}\u{438}\u{43D}\u{43A}\u{438}");
                 return;
-            case '🎞 Категории':
+            case "\u{1F39E} \u{41A}\u{430}\u{442}\u{435}\u{433}\u{43E}\u{440}\u{438}\u{438}":
                 $this->sendCategories($chatId);
                 return;
-            case '❤️ Избранное':
-                $this->openSection($chatId, 'favorites', '❤️ Избранное');
+            case "\u{2764}\u{FE0F} \u{418}\u{437}\u{431}\u{440}\u{430}\u{43D}\u{43D}\u{43E}\u{435}":
+                $this->openSection($chatId, 'favorites', "\u{2764}\u{FE0F} \u{418}\u{437}\u{431}\u{440}\u{430}\u{43D}\u{43D}\u{43E}\u{435}");
                 return;
-            case '🕒 История':
-                $this->openSection($chatId, 'history', '🕒 История');
+            case "\u{1F552} \u{418}\u{441}\u{442}\u{43E}\u{440}\u{438}\u{44F}":
+                $this->openSection($chatId, 'history', "\u{1F552} \u{418}\u{441}\u{442}\u{43E}\u{440}\u{438}\u{44F}");
                 return;
-            case '⚙ Настройки':
-                $this->api->sendMessage($chatId, "⚙ <b>Настройки</b>\n\nЯзык интерфейса и тема определяются автоматически из Telegram. Управляйте избранным и историей прямо в приложении.", $this->openAppInline());
+            case "\u{2699} \u{41D}\u{430}\u{441}\u{442}\u{440}\u{43E}\u{439}\u{43A}\u{438}":
+                $this->api->sendMessage($chatId, "\u{2699} <b>\u{41D}\u{430}\u{441}\u{442}\u{440}\u{43E}\u{439}\u{43A}\u{438}</b>\n\n\u{42F}\u{437}\u{44B}\u{43A} \u{438}\u{43D}\u{442}\u{435}\u{440}\u{444}\u{435}\u{439}\u{441}\u{430} \u{438} \u{442}\u{435}\u{43C}\u{430} \u{43E}\u{43F}\u{440}\u{435}\u{434}\u{435}\u{43B}\u{44F}\u{44E}\u{442}\u{441}\u{44F} \u{430}\u{432}\u{442}\u{43E}\u{43C}\u{430}\u{442}\u{438}\u{447}\u{435}\u{441}\u{43A}\u{438} \u{438}\u{437} Telegram. \u{423}\u{43F}\u{440}\u{430}\u{432}\u{43B}\u{44F}\u{439}\u{442}\u{435} \u{438}\u{437}\u{431}\u{440}\u{430}\u{43D}\u{43D}\u{44B}\u{43C} \u{438} \u{438}\u{441}\u{442}\u{43E}\u{440}\u{438}\u{435}\u{439} \u{43F}\u{440}\u{44F}\u{43C}\u{43E} \u{432} \u{43F}\u{440}\u{438}\u{43B}\u{43E}\u{436}\u{435}\u{43D}\u{438}\u{438}.", $this->openAppInline());
                 return;
-            case '❓ Помощь':
+            case "\u{2753} \u{41F}\u{43E}\u{43C}\u{43E}\u{449}\u{44C}":
                 $this->sendHelp($chatId);
                 return;
         }
 
         // Fallback
-        $this->api->sendMessage($chatId, 'Нажмите «🎬 Открыть кино», чтобы перейти в каталог.', $this->userKeyboard($tid));
+        $this->api->sendMessage($chatId, "\u{41D}\u{430}\u{436}\u{43C}\u{438}\u{442}\u{435} \u{AB}\u{1F3AC} \u{41E}\u{442}\u{43A}\u{440}\u{44B}\u{442}\u{44C} \u{43A}\u{438}\u{43D}\u{43E}\u{BB}, \u{447}\u{442}\u{43E}\u{431}\u{44B} \u{43F}\u{435}\u{440}\u{435}\u{439}\u{442}\u{438} \u{432} \u{43A}\u{430}\u{442}\u{430}\u{43B}\u{43E}\u{433}.", $this->userKeyboard($tid));
     }
 
     private function sendWelcome(int $chatId, array $from): void
     {
-        $name = htmlspecialchars($from['first_name'] ?? 'друг', ENT_QUOTES);
+        $name = htmlspecialchars($from['first_name'] ?? "\u{434}\u{440}\u{443}\u{433}", ENT_QUOTES);
         $app  = htmlspecialchars($this->cfg['app']['name']);
-        $text = "🎬 <b>{$app}</b>\n\n"
-              . "Привет, {$name}! Добро пожаловать в кинотеку нового поколения.\n\n"
-              . "Здесь тебя ждут:\n"
-              . "🔥 свежие новинки и анонсы\n"
-              . "🎥 фильмы, сериалы, аниме и мультфильмы\n"
-              . "⭐ подборки и рекомендации\n"
-              . "❤️ избранное и «продолжить просмотр»\n\n"
-              . "Нажми кнопку ниже, чтобы открыть каталог 👇";
+        $text = "\u{1F3AC} <b>{$app}</b>\n\n"
+              . "\u{41F}\u{440}\u{438}\u{432}\u{435}\u{442}, {$name}! \u{414}\u{43E}\u{431}\u{440}\u{43E} \u{43F}\u{43E}\u{436}\u{430}\u{43B}\u{43E}\u{432}\u{430}\u{442}\u{44C} \u{432} \u{43A}\u{438}\u{43D}\u{43E}\u{442}\u{435}\u{43A}\u{443} \u{43D}\u{43E}\u{432}\u{43E}\u{433}\u{43E} \u{43F}\u{43E}\u{43A}\u{43E}\u{43B}\u{435}\u{43D}\u{438}\u{44F}.\n\n"
+              . "\u{417}\u{434}\u{435}\u{441}\u{44C} \u{442}\u{435}\u{431}\u{44F} \u{436}\u{434}\u{443}\u{442}:\n"
+              . "\u{1F525} \u{441}\u{432}\u{435}\u{436}\u{438}\u{435} \u{43D}\u{43E}\u{432}\u{438}\u{43D}\u{43A}\u{438} \u{438} \u{430}\u{43D}\u{43E}\u{43D}\u{441}\u{44B}\n"
+              . "\u{1F3A5} \u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{44B}, \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{44B}, \u{430}\u{43D}\u{438}\u{43C}\u{435} \u{438} \u{43C}\u{443}\u{43B}\u{44C}\u{442}\u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{44B}\n"
+              . "\u{2B50} \u{43F}\u{43E}\u{434}\u{431}\u{43E}\u{440}\u{43A}\u{438} \u{438} \u{440}\u{435}\u{43A}\u{43E}\u{43C}\u{435}\u{43D}\u{434}\u{430}\u{446}\u{438}\u{438}\n"
+              . "\u{2764}\u{FE0F} \u{438}\u{437}\u{431}\u{440}\u{430}\u{43D}\u{43D}\u{43E}\u{435} \u{438} \u{AB}\u{43F}\u{440}\u{43E}\u{434}\u{43E}\u{43B}\u{436}\u{438}\u{442}\u{44C} \u{43F}\u{440}\u{43E}\u{441}\u{43C}\u{43E}\u{442}\u{440}\u{BB}\n\n"
+              . "\u{41D}\u{430}\u{436}\u{43C}\u{438} \u{43A}\u{43D}\u{43E}\u{43F}\u{43A}\u{443} \u{43D}\u{438}\u{436}\u{435}, \u{447}\u{442}\u{43E}\u{431}\u{44B} \u{43E}\u{442}\u{43A}\u{440}\u{44B}\u{442}\u{44C} \u{43A}\u{430}\u{442}\u{430}\u{43B}\u{43E}\u{433} \u{1F447}";
 
         $this->api->sendMessage($chatId, $text, $this->userKeyboard((int) ($from['id'] ?? 0)));
     }
@@ -158,29 +158,29 @@ final class Bot
         $url = $this->cfg['telegram']['miniapp_url'];
         $btn = static fn (string $label, string $frag) => ['text' => $label, 'web_app' => ['url' => $url . '#' . $frag]];
         $kb  = ['inline_keyboard' => [
-            [$btn('🎥 Фильмы', 'movies'), $btn('📺 Сериалы', 'series')],
-            [$btn('🎌 Аниме', 'anime'), $btn('👶 Мультфильмы', 'cartoons')],
-            [$btn('🍿 Сейчас в кино', 'in_cinema'), $btn('🎞 Скоро выйдет', 'coming_soon')],
+            [$btn("\u{1F3A5} \u{424}\u{438}\u{43B}\u{44C}\u{43C}\u{44B}", 'movies'), $btn("\u{1F4FA} \u{421}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{44B}", 'series')],
+            [$btn("\u{1F38C} \u{410}\u{43D}\u{438}\u{43C}\u{435}", 'anime'), $btn("\u{1F476} \u{41C}\u{443}\u{43B}\u{44C}\u{442}\u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{44B}", 'cartoons')],
+            [$btn("\u{1F37F} \u{421}\u{435}\u{439}\u{447}\u{430}\u{441} \u{432} \u{43A}\u{438}\u{43D}\u{43E}", 'in_cinema'), $btn("\u{1F39E} \u{421}\u{43A}\u{43E}\u{440}\u{43E} \u{432}\u{44B}\u{439}\u{434}\u{435}\u{442}", 'coming_soon')],
         ]];
-        $this->api->sendMessage($chatId, '🎞 <b>Категории</b>\nВыберите раздел:', ['reply_markup' => json_encode($kb)]);
+        $this->api->sendMessage($chatId, "\u{1F39E} <b>\u{41A}\u{430}\u{442}\u{435}\u{433}\u{43E}\u{440}\u{438}\u{438}</b>\\n\u{412}\u{44B}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{440}\u{430}\u{437}\u{434}\u{435}\u{43B}:", ['reply_markup' => json_encode($kb)]);
     }
 
     private function sendHelp(int $chatId): void
     {
-        $text = "❓ <b>Помощь</b>\n\n"
-              . "• «🎬 Открыть кино» — каталог фильмов и анонсов.\n"
-              . "• «🔥 Новинки» — самые свежие поступления.\n"
-              . "• «🎞 Категории» — фильмы, сериалы, аниме, мультфильмы.\n"
-              . "• «❤️ Избранное» и «🕒 История» — сохранённое и просмотренное.\n\n"
-              . "Приятного просмотра!";
+        $text = "\u{2753} <b>\u{41F}\u{43E}\u{43C}\u{43E}\u{449}\u{44C}</b>\n\n"
+              . "\u{2022} \u{AB}\u{1F3AC} \u{41E}\u{442}\u{43A}\u{440}\u{44B}\u{442}\u{44C} \u{43A}\u{438}\u{43D}\u{43E}\u{BB} \u{2014} \u{43A}\u{430}\u{442}\u{430}\u{43B}\u{43E}\u{433} \u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{43E}\u{432} \u{438} \u{430}\u{43D}\u{43E}\u{43D}\u{441}\u{43E}\u{432}.\n"
+              . "\u{2022} \u{AB}\u{1F525} \u{41D}\u{43E}\u{432}\u{438}\u{43D}\u{43A}\u{438}\u{BB} \u{2014} \u{441}\u{430}\u{43C}\u{44B}\u{435} \u{441}\u{432}\u{435}\u{436}\u{438}\u{435} \u{43F}\u{43E}\u{441}\u{442}\u{443}\u{43F}\u{43B}\u{435}\u{43D}\u{438}\u{44F}.\n"
+              . "\u{2022} \u{AB}\u{1F39E} \u{41A}\u{430}\u{442}\u{435}\u{433}\u{43E}\u{440}\u{438}\u{438}\u{BB} \u{2014} \u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{44B}, \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{44B}, \u{430}\u{43D}\u{438}\u{43C}\u{435}, \u{43C}\u{443}\u{43B}\u{44C}\u{442}\u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{44B}.\n"
+              . "\u{2022} \u{AB}\u{2764}\u{FE0F} \u{418}\u{437}\u{431}\u{440}\u{430}\u{43D}\u{43D}\u{43E}\u{435}\u{BB} \u{438} \u{AB}\u{1F552} \u{418}\u{441}\u{442}\u{43E}\u{440}\u{438}\u{44F}\u{BB} \u{2014} \u{441}\u{43E}\u{445}\u{440}\u{430}\u{43D}\u{451}\u{43D}\u{43D}\u{43E}\u{435} \u{438} \u{43F}\u{440}\u{43E}\u{441}\u{43C}\u{43E}\u{442}\u{440}\u{435}\u{43D}\u{43D}\u{43E}\u{435}.\n\n"
+              . "\u{41F}\u{440}\u{438}\u{44F}\u{442}\u{43D}\u{43E}\u{433}\u{43E} \u{43F}\u{440}\u{43E}\u{441}\u{43C}\u{43E}\u{442}\u{440}\u{430}!";
         $this->api->sendMessage($chatId, $text, $this->openAppInline());
     }
 
     private function openSection(int $chatId, string $frag, string $title): void
     {
         $url = $this->cfg['telegram']['miniapp_url'] . '#' . $frag;
-        $kb  = ['inline_keyboard' => [[['text' => "Открыть: {$title}", 'web_app' => ['url' => $url]]]]];
-        $this->api->sendMessage($chatId, "Открываю раздел <b>{$title}</b> 👇", ['reply_markup' => json_encode($kb)]);
+        $kb  = ['inline_keyboard' => [[['text' => "\u{41E}\u{442}\u{43A}\u{440}\u{44B}\u{442}\u{44C}: {$title}", 'web_app' => ['url' => $url]]]]];
+        $this->api->sendMessage($chatId, "\u{41E}\u{442}\u{43A}\u{440}\u{44B}\u{432}\u{430}\u{44E} \u{440}\u{430}\u{437}\u{434}\u{435}\u{43B} <b>{$title}</b> \u{1F447}", ['reply_markup' => json_encode($kb)]);
     }
 
     // ---- Admin ----------------------------------------------------------
@@ -188,10 +188,10 @@ final class Bot
     private function sendAdminPanel(int $chatId, int $tid): void
     {
         if (!$this->isAdmin($tid)) {
-            $this->api->sendMessage($chatId, '⛔ Доступ только для администраторов.');
+            $this->api->sendMessage($chatId, "\u{26D4} \u{414}\u{43E}\u{441}\u{442}\u{443}\u{43F} \u{442}\u{43E}\u{43B}\u{44C}\u{43A}\u{43E} \u{434}\u{43B}\u{44F} \u{430}\u{434}\u{43C}\u{438}\u{43D}\u{438}\u{441}\u{442}\u{440}\u{430}\u{442}\u{43E}\u{440}\u{43E}\u{432}.");
             return;
         }
-        $this->api->sendMessage($chatId, "🛠 <b>Панель администратора</b>\nВыберите действие:", [
+        $this->api->sendMessage($chatId, "\u{1F6E0} <b>\u{41F}\u{430}\u{43D}\u{435}\u{43B}\u{44C} \u{430}\u{434}\u{43C}\u{438}\u{43D}\u{438}\u{441}\u{442}\u{440}\u{430}\u{442}\u{43E}\u{440}\u{430}</b>\n\u{412}\u{44B}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{434}\u{435}\u{439}\u{441}\u{442}\u{432}\u{438}\u{435}:", [
             'reply_markup' => json_encode($this->adminMenu()),
         ]);
     }
@@ -199,13 +199,13 @@ final class Bot
     private function adminMenu(): array
     {
         return ['inline_keyboard' => [
-            [['text' => '🤖 AI: добавить фильм по постеру', 'callback_data' => 'ai:add']],
-            [['text' => '➕ Фильм', 'callback_data' => 'add:movie'], ['text' => '➕ Сериал', 'callback_data' => 'add:series']],
-            [['text' => '➕ Мультфильм', 'callback_data' => 'add:cartoon'], ['text' => '➕ Аниме', 'callback_data' => 'add:anime']],
-            [['text' => '📣 Добавить анонс', 'callback_data' => 'add:announcement']],
-            [['text' => '📺 Серии сериала (сезоны/серии)', 'callback_data' => 'adm:series']],
-            [['text' => '🗑 Удалить', 'callback_data' => 'adm:list'], ['text' => '📊 Статистика', 'callback_data' => 'adm:stats']],
-            [['text' => '📢 Рассылка', 'callback_data' => 'adm:broadcast'], ['text' => '⚙ Настройки', 'callback_data' => 'adm:settings']],
+            [['text' => "\u{1F916} AI: \u{434}\u{43E}\u{431}\u{430}\u{432}\u{438}\u{442}\u{44C} \u{444}\u{438}\u{43B}\u{44C}\u{43C} \u{43F}\u{43E} \u{43F}\u{43E}\u{441}\u{442}\u{435}\u{440}\u{443}", 'callback_data' => 'ai:add']],
+            [['text' => "\u{2795} \u{424}\u{438}\u{43B}\u{44C}\u{43C}", 'callback_data' => 'add:movie'], ['text' => "\u{2795} \u{421}\u{435}\u{440}\u{438}\u{430}\u{43B}", 'callback_data' => 'add:series']],
+            [['text' => "\u{2795} \u{41C}\u{443}\u{43B}\u{44C}\u{442}\u{444}\u{438}\u{43B}\u{44C}\u{43C}", 'callback_data' => 'add:cartoon'], ['text' => "\u{2795} \u{410}\u{43D}\u{438}\u{43C}\u{435}", 'callback_data' => 'add:anime']],
+            [['text' => "\u{1F4E3} \u{414}\u{43E}\u{431}\u{430}\u{432}\u{438}\u{442}\u{44C} \u{430}\u{43D}\u{43E}\u{43D}\u{441}", 'callback_data' => 'add:announcement']],
+            [['text' => "\u{1F4FA} \u{421}\u{435}\u{440}\u{438}\u{438} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{430} (\u{441}\u{435}\u{437}\u{43E}\u{43D}\u{44B}/\u{441}\u{435}\u{440}\u{438}\u{438})", 'callback_data' => 'adm:series']],
+            [['text' => "\u{1F5D1} \u{423}\u{434}\u{430}\u{43B}\u{438}\u{442}\u{44C}", 'callback_data' => 'adm:list'], ['text' => "\u{1F4CA} \u{421}\u{442}\u{430}\u{442}\u{438}\u{441}\u{442}\u{438}\u{43A}\u{430}", 'callback_data' => 'adm:stats']],
+            [['text' => "\u{1F4E2} \u{420}\u{430}\u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{430}", 'callback_data' => 'adm:broadcast'], ['text' => "\u{2699} \u{41D}\u{430}\u{441}\u{442}\u{440}\u{43E}\u{439}\u{43A}\u{438}", 'callback_data' => 'adm:settings']],
         ]];
     }
 
@@ -218,7 +218,7 @@ final class Bot
         $cbId   = (string) ($cb['id'] ?? '');
 
         if (!$this->isAdmin($tid)) {
-            $this->api->answerCallbackQuery($cbId, '⛔ Только для админов', true);
+            $this->api->answerCallbackQuery($cbId, "\u{26D4} \u{422}\u{43E}\u{43B}\u{44C}\u{43A}\u{43E} \u{434}\u{43B}\u{44F} \u{430}\u{434}\u{43C}\u{438}\u{43D}\u{43E}\u{432}", true);
             return;
         }
 
@@ -247,15 +247,15 @@ final class Bot
         switch ($data) {
             case 'adm:stats':
                 $s = $this->repo->stats();
-                $text = "📊 <b>Статистика</b>\n\n"
-                      . "👥 Пользователей: <b>{$s['users']}</b>\n"
-                      . "🎥 Фильмов: <b>{$s['movies']}</b>\n"
-                      . "📺 Сериалов: <b>{$s['series']}</b>\n"
-                      . "🎌 Аниме: <b>{$s['anime']}</b>\n"
-                      . "👶 Мультфильмов: <b>{$s['cartoons']}</b>\n"
-                      . "📣 Анонсов: <b>{$s['announcements']}</b>\n"
-                      . "❤️ В избранном: <b>{$s['favorites']}</b>\n"
-                      . "👁 Просмотров: <b>{$s['views']}</b>";
+                $text = "\u{1F4CA} <b>\u{421}\u{442}\u{430}\u{442}\u{438}\u{441}\u{442}\u{438}\u{43A}\u{430}</b>\n\n"
+                      . "\u{1F465} \u{41F}\u{43E}\u{43B}\u{44C}\u{437}\u{43E}\u{432}\u{430}\u{442}\u{435}\u{43B}\u{435}\u{439}: <b>{$s['users']}</b>\n"
+                      . "\u{1F3A5} \u{424}\u{438}\u{43B}\u{44C}\u{43C}\u{43E}\u{432}: <b>{$s['movies']}</b>\n"
+                      . "\u{1F4FA} \u{421}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{43E}\u{432}: <b>{$s['series']}</b>\n"
+                      . "\u{1F38C} \u{410}\u{43D}\u{438}\u{43C}\u{435}: <b>{$s['anime']}</b>\n"
+                      . "\u{1F476} \u{41C}\u{443}\u{43B}\u{44C}\u{442}\u{444}\u{438}\u{43B}\u{44C}\u{43C}\u{43E}\u{432}: <b>{$s['cartoons']}</b>\n"
+                      . "\u{1F4E3} \u{410}\u{43D}\u{43E}\u{43D}\u{441}\u{43E}\u{432}: <b>{$s['announcements']}</b>\n"
+                      . "\u{2764}\u{FE0F} \u{412} \u{438}\u{437}\u{431}\u{440}\u{430}\u{43D}\u{43D}\u{43E}\u{43C}: <b>{$s['favorites']}</b>\n"
+                      . "\u{1F441} \u{41F}\u{440}\u{43E}\u{441}\u{43C}\u{43E}\u{442}\u{440}\u{43E}\u{432}: <b>{$s['views']}</b>";
                 $this->api->editMessageText($chatId, $msgId, $text, ['reply_markup' => json_encode($this->backMenu())]);
                 return;
 
@@ -265,10 +265,10 @@ final class Bot
 
             case 'adm:settings':
                 $adminList = implode(', ', $this->cfg['telegram']['admin_ids']);
-                $text = "⚙ <b>Настройки бота</b>\n\n"
-                      . "Приложение: <b>" . htmlspecialchars($this->cfg['app']['name']) . "</b>\n"
+                $text = "\u{2699} <b>\u{41D}\u{430}\u{441}\u{442}\u{440}\u{43E}\u{439}\u{43A}\u{438} \u{431}\u{43E}\u{442}\u{430}</b>\n\n"
+                      . "\u{41F}\u{440}\u{438}\u{43B}\u{43E}\u{436}\u{435}\u{43D}\u{438}\u{435}: <b>" . htmlspecialchars($this->cfg['app']['name']) . "</b>\n"
                       . "Mini App: <code>" . htmlspecialchars($this->cfg['telegram']['miniapp_url']) . "</code>\n"
-                      . "Администраторы: <code>{$adminList}</code>";
+                      . "\u{410}\u{434}\u{43C}\u{438}\u{43D}\u{438}\u{441}\u{442}\u{440}\u{430}\u{442}\u{43E}\u{440}\u{44B}: <code>{$adminList}</code>";
                 $this->api->editMessageText($chatId, $msgId, $text, ['reply_markup' => json_encode($this->backMenu())]);
                 return;
 
@@ -281,7 +281,7 @@ final class Bot
                 return;
 
             case 'adm:home':
-                $this->api->editMessageText($chatId, $msgId, "🛠 <b>Панель администратора</b>\nВыберите действие:", [
+                $this->api->editMessageText($chatId, $msgId, "\u{1F6E0} <b>\u{41F}\u{430}\u{43D}\u{435}\u{43B}\u{44C} \u{430}\u{434}\u{43C}\u{438}\u{43D}\u{438}\u{441}\u{442}\u{440}\u{430}\u{442}\u{43E}\u{440}\u{430}</b>\n\u{412}\u{44B}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{434}\u{435}\u{439}\u{441}\u{442}\u{432}\u{438}\u{435}:", [
                     'reply_markup' => json_encode($this->adminMenu()),
                 ]);
                 return;
@@ -290,7 +290,7 @@ final class Bot
         if (str_starts_with($data, 'del:')) {
             $id = (int) substr($data, 4);
             if ($this->repo->deleteMovie($id)) {
-                $this->api->answerCallbackQuery($cbId, 'Удалено ✅');
+                $this->api->answerCallbackQuery($cbId, "\u{423}\u{434}\u{430}\u{43B}\u{435}\u{43D}\u{43E} \u{2705}");
                 $this->sendDeleteList($chatId, $msgId);
             }
             return;
@@ -301,15 +301,15 @@ final class Bot
     {
         $movies = $this->repo->recentMovies(12);
         if (!$movies) {
-            $this->api->editMessageText($chatId, $msgId, 'Каталог пуст — добавьте контент.', ['reply_markup' => json_encode($this->backMenu())]);
+            $this->api->editMessageText($chatId, $msgId, "\u{41A}\u{430}\u{442}\u{430}\u{43B}\u{43E}\u{433} \u{43F}\u{443}\u{441}\u{442} \u{2014} \u{434}\u{43E}\u{431}\u{430}\u{432}\u{44C}\u{442}\u{435} \u{43A}\u{43E}\u{43D}\u{442}\u{435}\u{43D}\u{442}.", ['reply_markup' => json_encode($this->backMenu())]);
             return;
         }
         $rows = [];
         foreach ($movies as $m) {
-            $rows[] = [['text' => '🗑 ' . mb_strimwidth($m['title'], 0, 40, '…'), 'callback_data' => 'del:' . $m['id']]];
+            $rows[] = [['text' => "\u{1F5D1} " . mb_strimwidth($m['title'], 0, 40, "\u{2026}"), 'callback_data' => 'del:' . $m['id']]];
         }
-        $rows[] = [['text' => '⬅️ Назад', 'callback_data' => 'adm:home']];
-        $this->api->editMessageText($chatId, $msgId, "🗑 <b>Удаление контента</b>\nНажмите на элемент, чтобы удалить:", [
+        $rows[] = [['text' => "\u{2B05}\u{FE0F} \u{41D}\u{430}\u{437}\u{430}\u{434}", 'callback_data' => 'adm:home']];
+        $this->api->editMessageText($chatId, $msgId, "\u{1F5D1} <b>\u{423}\u{434}\u{430}\u{43B}\u{435}\u{43D}\u{438}\u{435} \u{43A}\u{43E}\u{43D}\u{442}\u{435}\u{43D}\u{442}\u{430}</b>\n\u{41D}\u{430}\u{436}\u{43C}\u{438}\u{442}\u{435} \u{43D}\u{430} \u{44D}\u{43B}\u{435}\u{43C}\u{435}\u{43D}\u{442}, \u{447}\u{442}\u{43E}\u{431}\u{44B} \u{443}\u{434}\u{430}\u{43B}\u{438}\u{442}\u{44C}:", [
             'reply_markup' => json_encode(['inline_keyboard' => $rows]),
         ]);
     }
@@ -321,7 +321,7 @@ final class Bot
             $this->api->editMessageText(
                 $chatId,
                 $msgId,
-                'Сначала добавьте сериал или аниме (🤖 AI или ➕ Сериал), затем сюда — добавлять серии.',
+                "\u{421}\u{43D}\u{430}\u{447}\u{430}\u{43B}\u{430} \u{434}\u{43E}\u{431}\u{430}\u{432}\u{44C}\u{442}\u{435} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B} \u{438}\u{43B}\u{438} \u{430}\u{43D}\u{438}\u{43C}\u{435} (\u{1F916} AI \u{438}\u{43B}\u{438} \u{2795} \u{421}\u{435}\u{440}\u{438}\u{430}\u{43B}), \u{437}\u{430}\u{442}\u{435}\u{43C} \u{441}\u{44E}\u{434}\u{430} \u{2014} \u{434}\u{43E}\u{431}\u{430}\u{432}\u{43B}\u{44F}\u{442}\u{44C} \u{441}\u{435}\u{440}\u{438}\u{438}.",
                 ['reply_markup' => json_encode($this->backMenu())]
             );
             return;
@@ -329,22 +329,22 @@ final class Bot
         $rows = [];
         foreach ($series as $s) {
             $rows[] = [[
-                'text' => '📺 ' . mb_strimwidth($s['title'], 0, 40, '…'),
+                'text' => "\u{1F4FA} " . mb_strimwidth($s['title'], 0, 40, "\u{2026}"),
                 'callback_data' => 'ep:add:' . $s['id'],
             ]];
         }
-        $rows[] = [['text' => '⬅️ Назад', 'callback_data' => 'adm:home']];
+        $rows[] = [['text' => "\u{2B05}\u{FE0F} \u{41D}\u{430}\u{437}\u{430}\u{434}", 'callback_data' => 'adm:home']];
         $this->api->editMessageText(
             $chatId,
             $msgId,
-            "📺 <b>Серии сериала</b>\nВыберите сериал/аниме, чтобы добавить сезоны и серии:",
+            "\u{1F4FA} <b>\u{421}\u{435}\u{440}\u{438}\u{438} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{430}</b>\n\u{412}\u{44B}\u{431}\u{435}\u{440}\u{438}\u{442}\u{435} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}/\u{430}\u{43D}\u{438}\u{43C}\u{435}, \u{447}\u{442}\u{43E}\u{431}\u{44B} \u{434}\u{43E}\u{431}\u{430}\u{432}\u{438}\u{442}\u{44C} \u{441}\u{435}\u{437}\u{43E}\u{43D}\u{44B} \u{438} \u{441}\u{435}\u{440}\u{438}\u{438}:",
             ['reply_markup' => json_encode(['inline_keyboard' => $rows])]
         );
     }
 
     private function backMenu(): array
     {
-        return ['inline_keyboard' => [[['text' => '⬅️ Назад', 'callback_data' => 'adm:home']]]];
+        return ['inline_keyboard' => [[['text' => "\u{2B05}\u{FE0F} \u{41D}\u{430}\u{437}\u{430}\u{434}", 'callback_data' => 'adm:home']]]];
     }
 
     // ---- Keyboards ------------------------------------------------------
@@ -353,13 +353,13 @@ final class Bot
     {
         $url  = $this->cfg['telegram']['miniapp_url'];
         $rows = [
-            [['text' => '🎬 Открыть кино', 'web_app' => ['url' => $url]]],
-            [['text' => '🔥 Новинки'], ['text' => '🎞 Категории']],
-            [['text' => '❤️ Избранное'], ['text' => '🕒 История']],
-            [['text' => '⚙ Настройки'], ['text' => '❓ Помощь']],
+            [['text' => "\u{1F3AC} \u{41E}\u{442}\u{43A}\u{440}\u{44B}\u{442}\u{44C} \u{43A}\u{438}\u{43D}\u{43E}", 'web_app' => ['url' => $url]]],
+            [['text' => "\u{1F525} \u{41D}\u{43E}\u{432}\u{438}\u{43D}\u{43A}\u{438}"], ['text' => "\u{1F39E} \u{41A}\u{430}\u{442}\u{435}\u{433}\u{43E}\u{440}\u{438}\u{438}"]],
+            [['text' => "\u{2764}\u{FE0F} \u{418}\u{437}\u{431}\u{440}\u{430}\u{43D}\u{43D}\u{43E}\u{435}"], ['text' => "\u{1F552} \u{418}\u{441}\u{442}\u{43E}\u{440}\u{438}\u{44F}"]],
+            [['text' => "\u{2699} \u{41D}\u{430}\u{441}\u{442}\u{440}\u{43E}\u{439}\u{43A}\u{438}"], ['text' => "\u{2753} \u{41F}\u{43E}\u{43C}\u{43E}\u{449}\u{44C}"]],
         ];
         if ($this->isAdmin($tid)) {
-            $rows[] = [['text' => '⚙ Панель']];
+            $rows[] = [['text' => "\u{2699} \u{41F}\u{430}\u{43D}\u{435}\u{43B}\u{44C}"]];
         }
         return ['reply_markup' => json_encode(['keyboard' => $rows, 'resize_keyboard' => true])];
     }
@@ -367,7 +367,7 @@ final class Bot
     private function openAppInline(): array
     {
         return ['reply_markup' => json_encode([
-            'inline_keyboard' => [[['text' => '🎬 Открыть кино', 'web_app' => ['url' => $this->cfg['telegram']['miniapp_url']]]]],
+            'inline_keyboard' => [[['text' => "\u{1F3AC} \u{41E}\u{442}\u{43A}\u{440}\u{44B}\u{442}\u{44C} \u{43A}\u{438}\u{43D}\u{43E}", 'web_app' => ['url' => $this->cfg['telegram']['miniapp_url']]]]],
         ])];
     }
 

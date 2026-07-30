@@ -26,7 +26,7 @@ final class EpisodeFlow
         $this->store->set($tid, 'ep_season', ['movie_id' => $movieId]);
         $this->api->sendMessage(
             $chatId,
-            "📺 <b>Добавление серии</b>\n\nВведите номер <b>сезона</b> (число):",
+            "\u{1F4FA} <b>\u{414}\u{43E}\u{431}\u{430}\u{432}\u{43B}\u{435}\u{43D}\u{438}\u{435} \u{441}\u{435}\u{440}\u{438}\u{438}</b>\n\n\u{412}\u{432}\u{435}\u{434}\u{438}\u{442}\u{435} \u{43D}\u{43E}\u{43C}\u{435}\u{440} <b>\u{441}\u{435}\u{437}\u{43E}\u{43D}\u{430}</b> (\u{447}\u{438}\u{441}\u{43B}\u{43E}):",
             $this->cancelInline()
         );
     }
@@ -40,9 +40,9 @@ final class EpisodeFlow
         }
 
         $text = trim((string) ($message['text'] ?? ''));
-        if (in_array($text, ['/cancel', '✖️ Отмена'], true)) {
+        if (in_array($text, ['/cancel', "\u{2716}\u{FE0F} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{430}"], true)) {
             $this->store->clear($tid);
-            $this->api->sendMessage($chatId, '❌ Отменено.', ['reply_markup' => json_encode(['remove_keyboard' => true])]);
+            $this->api->sendMessage($chatId, "\u{274C} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{435}\u{43D}\u{43E}.", ['reply_markup' => json_encode(['remove_keyboard' => true])]);
             return true;
         }
 
@@ -60,12 +60,12 @@ final class EpisodeFlow
     {
         $season = (int) preg_replace('/\D/', '', $text);
         if ($season <= 0) {
-            $this->api->sendMessage($chatId, '⚠️ Введите номер сезона числом (например 1).', $this->cancelInline());
+            $this->api->sendMessage($chatId, "\u{26A0}\u{FE0F} \u{412}\u{432}\u{435}\u{434}\u{438}\u{442}\u{435} \u{43D}\u{43E}\u{43C}\u{435}\u{440} \u{441}\u{435}\u{437}\u{43E}\u{43D}\u{430} \u{447}\u{438}\u{441}\u{43B}\u{43E}\u{43C} (\u{43D}\u{430}\u{43F}\u{440}\u{438}\u{43C}\u{435}\u{440} 1).", $this->cancelInline());
             return true;
         }
         $payload['season'] = $season;
         $this->store->set($tid, 'ep_episode', $payload);
-        $this->api->sendMessage($chatId, "Сезон {$season}. Теперь введите номер <b>серии</b> (число):", $this->cancelInline());
+        $this->api->sendMessage($chatId, "\u{421}\u{435}\u{437}\u{43E}\u{43D} {$season}. \u{422}\u{435}\u{43F}\u{435}\u{440}\u{44C} \u{432}\u{432}\u{435}\u{434}\u{438}\u{442}\u{435} \u{43D}\u{43E}\u{43C}\u{435}\u{440} <b>\u{441}\u{435}\u{440}\u{438}\u{438}</b> (\u{447}\u{438}\u{441}\u{43B}\u{43E}):", $this->cancelInline());
         return true;
     }
 
@@ -73,18 +73,18 @@ final class EpisodeFlow
     {
         $episode = (int) preg_replace('/\D/', '', $text);
         if ($episode <= 0) {
-            $this->api->sendMessage($chatId, '⚠️ Введите номер серии числом (например 1).', $this->cancelInline());
+            $this->api->sendMessage($chatId, "\u{26A0}\u{FE0F} \u{412}\u{432}\u{435}\u{434}\u{438}\u{442}\u{435} \u{43D}\u{43E}\u{43C}\u{435}\u{440} \u{441}\u{435}\u{440}\u{438}\u{438} \u{447}\u{438}\u{441}\u{43B}\u{43E}\u{43C} (\u{43D}\u{430}\u{43F}\u{440}\u{438}\u{43C}\u{435}\u{440} 1).", $this->cancelInline());
             return true;
         }
         $payload['episode'] = $episode;
         $this->store->set($tid, 'ep_video', $payload);
         $this->api->sendMessage(
             $chatId,
-            "Сезон {$payload['season']}, серия {$episode}.\n\n"
-            . "Теперь пришлите видео серии:\n"
-            . "• <b>перешлите из закрытого канала</b>, или\n"
-            . "• отправьте видеофайл, или\n"
-            . "• пришлите ссылку.",
+            "\u{421}\u{435}\u{437}\u{43E}\u{43D} {$payload['season']}, \u{441}\u{435}\u{440}\u{438}\u{44F} {$episode}.\n\n"
+            . "\u{422}\u{435}\u{43F}\u{435}\u{440}\u{44C} \u{43F}\u{440}\u{438}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{432}\u{438}\u{434}\u{435}\u{43E} \u{441}\u{435}\u{440}\u{438}\u{438}:\n"
+            . "\u{2022} <b>\u{43F}\u{435}\u{440}\u{435}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{438}\u{437} \u{437}\u{430}\u{43A}\u{440}\u{44B}\u{442}\u{43E}\u{433}\u{43E} \u{43A}\u{430}\u{43D}\u{430}\u{43B}\u{430}</b>, \u{438}\u{43B}\u{438}\n"
+            . "\u{2022} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{44C}\u{442}\u{435} \u{432}\u{438}\u{434}\u{435}\u{43E}\u{444}\u{430}\u{439}\u{43B}, \u{438}\u{43B}\u{438}\n"
+            . "\u{2022} \u{43F}\u{440}\u{438}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{443}.",
             $this->cancelInline()
         );
         return true;
@@ -103,7 +103,7 @@ final class EpisodeFlow
         } elseif (preg_match('#^https?://#i', $text)) {
             $url = $text;
         } else {
-            $this->api->sendMessage($chatId, '⚠️ Пришлите видео (можно переслать из канала) или ссылку http…', $this->cancelInline());
+            $this->api->sendMessage($chatId, "\u{26A0}\u{FE0F} \u{41F}\u{440}\u{438}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{432}\u{438}\u{434}\u{435}\u{43E} (\u{43C}\u{43E}\u{436}\u{43D}\u{43E} \u{43F}\u{435}\u{440}\u{435}\u{441}\u{43B}\u{430}\u{442}\u{44C} \u{438}\u{437} \u{43A}\u{430}\u{43D}\u{430}\u{43B}\u{430}) \u{438}\u{43B}\u{438} \u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{443} http\u{2026}", $this->cancelInline());
             return true;
         }
 
@@ -116,12 +116,12 @@ final class EpisodeFlow
         $this->store->clear($tid);
 
         $kb = ['inline_keyboard' => [
-            [['text' => '➕ Ещё серия', 'callback_data' => 'ep:add:' . $movieId]],
-            [['text' => '✅ Готово', 'callback_data' => 'ep:done']],
+            [['text' => "\u{2795} \u{415}\u{449}\u{451} \u{441}\u{435}\u{440}\u{438}\u{44F}", 'callback_data' => 'ep:add:' . $movieId]],
+            [['text' => "\u{2705} \u{413}\u{43E}\u{442}\u{43E}\u{432}\u{43E}", 'callback_data' => 'ep:done']],
         ]];
         $this->api->sendMessage(
             $chatId,
-            "✅ Сохранено: Сезон {$season}, серия {$episode}.\nВсего серий у сериала: <b>{$total}</b>.",
+            "\u{2705} \u{421}\u{43E}\u{445}\u{440}\u{430}\u{43D}\u{435}\u{43D}\u{43E}: \u{421}\u{435}\u{437}\u{43E}\u{43D} {$season}, \u{441}\u{435}\u{440}\u{438}\u{44F} {$episode}.\n\u{412}\u{441}\u{435}\u{433}\u{43E} \u{441}\u{435}\u{440}\u{438}\u{439} \u{443} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{430}: <b>{$total}</b>.",
             ['reply_markup' => json_encode($kb)]
         );
         return true;
@@ -137,15 +137,15 @@ final class EpisodeFlow
             return true;
         }
         if ($data === 'ep:done') {
-            $this->api->answerCallbackQuery($cbId, 'Готово ✅');
+            $this->api->answerCallbackQuery($cbId, "\u{413}\u{43E}\u{442}\u{43E}\u{432}\u{43E} \u{2705}");
             $this->store->clear($tid);
-            $this->api->sendMessage($chatId, '✅ Серии сохранены. Они уже видны в приложении на странице сериала.');
+            $this->api->sendMessage($chatId, "\u{2705} \u{421}\u{435}\u{440}\u{438}\u{438} \u{441}\u{43E}\u{445}\u{440}\u{430}\u{43D}\u{435}\u{43D}\u{44B}. \u{41E}\u{43D}\u{438} \u{443}\u{436}\u{435} \u{432}\u{438}\u{434}\u{43D}\u{44B} \u{432} \u{43F}\u{440}\u{438}\u{43B}\u{43E}\u{436}\u{435}\u{43D}\u{438}\u{438} \u{43D}\u{430} \u{441}\u{442}\u{440}\u{430}\u{43D}\u{438}\u{446}\u{435} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{430}.");
             return true;
         }
         if ($data === 'ep:cancel') {
-            $this->api->answerCallbackQuery($cbId, 'Отменено');
+            $this->api->answerCallbackQuery($cbId, "\u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{435}\u{43D}\u{43E}");
             $this->store->clear($tid);
-            $this->api->sendMessage($chatId, '❌ Отменено.');
+            $this->api->sendMessage($chatId, "\u{274C} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{435}\u{43D}\u{43E}.");
             return true;
         }
         return false;
@@ -154,7 +154,7 @@ final class EpisodeFlow
     private function cancelInline(): array
     {
         return ['reply_markup' => json_encode([
-            'inline_keyboard' => [[['text' => '❌ Отмена', 'callback_data' => 'ep:cancel']]],
+            'inline_keyboard' => [[['text' => "\u{274C} \u{41E}\u{442}\u{43C}\u{435}\u{43D}\u{430}", 'callback_data' => 'ep:cancel']]],
         ])];
     }
 }
