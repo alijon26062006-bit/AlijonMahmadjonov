@@ -3,7 +3,7 @@
 --  Run after schema.sql:  mysql -u root -p cinema < database/seed.sql
 --  Images use remote placeholder URLs so the app renders immediately.
 -- =============================================================
-USE `cinema`;
+-- Импортируйте в ТЕКУЩУЮ выбранную базу (сначала выберите её в phpMyAdmin).
 
 INSERT INTO `movies`
     (title, slug, description, poster, backdrop, trailer, watch_url, category, country,

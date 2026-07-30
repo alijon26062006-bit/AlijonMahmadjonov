@@ -5,11 +5,10 @@
 --  Run:  mysql -u root -p < database/schema.sql
 -- =============================================================
 
-CREATE DATABASE IF NOT EXISTS `cinema`
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-USE `cinema`;
+-- ВАЖНО: таблицы создаются в ТЕКУЩЕЙ выбранной базе.
+-- В phpMyAdmin: сначала слева выберите вашу базу (напр. u59_65ca5928),
+-- затем откройте вкладку «Импорт» и загрузите этот файл.
+-- (Строки CREATE DATABASE / USE специально убраны для shared-хостинга.)
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;

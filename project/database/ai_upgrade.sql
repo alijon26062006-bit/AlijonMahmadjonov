@@ -5,7 +5,7 @@
 --      mysql -u root -p cinema < database/ai_upgrade.sql
 --  (Fresh installs already include these columns via schema.sql.)
 -- =============================================================
-USE `cinema`;
+-- Импортируйте в ТЕКУЩУЮ выбранную базу (сначала выберите её в phpMyAdmin).
 
 ALTER TABLE `movies`
     ADD COLUMN `original_title`   VARCHAR(255) DEFAULT NULL AFTER `title`,
