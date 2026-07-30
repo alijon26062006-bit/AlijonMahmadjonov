@@ -28,7 +28,9 @@ final class TelegramAuth
         }
 
         $hash = $params['hash'];
-        unset($params['hash']);
+        // Exclude `hash` and the newer Ed25519 `signature` field — neither is part
+        // of the HMAC data-check-string (recent Telegram clients send `signature`).
+        unset($params['hash'], $params['signature']);
 
         // Build the data-check-string: keys sorted alphabetically, "key=value" joined by \n
         ksort($params);
