@@ -196,6 +196,31 @@
 
   // ---- Hero carousel ----
   let heroTimer, heroIndex = 0, heroCount = 0;
+
+  // Video background when the banner has a playable clip; the poster is used
+  // as the video's poster frame so something is visible while it buffers.
+  function heroMedia(b) {
+    if (b.video) {
+      return `<video class="hero__video" muted loop playsinline preload="none"
+        ${b.image ? `poster="${esc(b.image)}"` : ''} data-src="${esc(b.video)}"></video>`;
+    }
+    return lazy(b.image, b.title);
+  }
+
+  // Only the visible slide plays: saves traffic and battery.
+  function syncHeroVideo() {
+    $$('.hero__slide').forEach((slide, idx) => {
+      const v = slide.querySelector('.hero__video');
+      if (!v) return;
+      if (idx === heroIndex) {
+        if (!v.src && v.dataset.src) v.src = v.dataset.src;
+        const p = v.play();
+        if (p && p.catch) p.catch(() => {});
+      } else {
+        v.pause();
+      }
+    });
+  }
   function renderHero(banners) {
     const track = $('#heroTrack'), dots = $('#heroDots');
     clearInterval(heroTimer);
@@ -210,7 +235,7 @@
       ].filter(Boolean).join(' \u2022 ');
       return `
         <div class="hero__slide ${i===0?'active':''}" data-hero="${i}" data-movie="${b.movie_id||''}">
-          <div class="hero__bg">${lazy(b.image, b.title)}</div>
+          <div class="hero__bg">${heroMedia(b)}</div>
           <span class="hero__badge">\u041F\u0440\u0435\u043C\u044C\u0435\u0440\u0430</span>
           <h1 class="hero__title">${esc(b.title)}</h1>
           <div class="hero__meta">${meta}</div>
@@ -225,12 +250,14 @@
     }).join('');
     dots.innerHTML = banners.map((_, i) => `<i class="${i===0?'active':''}"></i>`).join('');
     bindLazy(track);
+    syncHeroVideo();
     heroTimer = setInterval(nextHero, 6000);
   }
   function goHero(i) {
     heroIndex = (i + heroCount) % heroCount;
     $$('.hero__slide').forEach((s, idx) => s.classList.toggle('active', idx === heroIndex));
     $$('#heroDots i').forEach((d, idx) => d.classList.toggle('active', idx === heroIndex));
+    syncHeroVideo();
   }
   const nextHero = () => goHero(heroIndex + 1);
 
@@ -289,7 +316,7 @@
 
     $('#detailContent').innerHTML = `
       <div class="detail__hero">
-        <div class="detail__bg">${lazy(m.backdrop || m.poster, m.title)}</div>
+        <div class="detail__bg">${detailMedia(m)}</div>
         <div class="detail__floatbar">
           <button class="back-btn" data-back>\u2039</button>
           <button class="icon-btn ${fav}" data-fav="${m.id}" style="width:38px;height:38px">
@@ -363,7 +390,30 @@
     } catch (e) { toast('\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043A\u0440\u044B\u0442\u044C'); }
   }
 
+  // Direct video files can autoplay inline; page links (YouTube etc.) cannot.
+  function isVideoFile(url) {
+    if (!url) return false;
+    return /\.(mp4|webm|m4v|mov)(\?|#|$)/i.test(url);
+  }
+
+  /**
+   * Detail header media: when the title has a short preview clip it plays
+   * automatically (muted, looping) instead of showing a static backdrop.
+   */
+  function detailMedia(m) {
+    if (isVideoFile(m.trailer)) {
+      return `<video class="detail__video" autoplay muted loop playsinline
+        ${m.backdrop || m.poster ? `poster="${esc(m.backdrop || m.poster)}"` : ''}
+        src="${esc(m.trailer)}"></video>`;
+    }
+    return lazy(m.backdrop || m.poster, m.title);
+  }
+
   function embedTrailer(url) {
+    // A real file gets a native player with sound and controls.
+    if (isVideoFile(url)) {
+      return `<video class="trailer-video" controls playsinline preload="metadata" src="${esc(url)}"></video>`;
+    }
     const yt = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{11})/);
     if (yt) return `<iframe src="https://www.youtube.com/embed/${yt[1]}" allowfullscreen allow="encrypted-media"></iframe>`;
     return `<iframe src="${esc(url)}" allowfullscreen></iframe>`;
@@ -538,6 +588,8 @@
   function switchView(name) {
     // Never leave the app on a blank screen: unknown view -> home.
     if (!$(`#view-${name}`)) name = 'home';
+    // Stop any playing clip before leaving the current view.
+    $$('video').forEach(v => { try { v.pause(); } catch (e) {} });
     $$('.view').forEach(v => v.classList.remove('view--active'));
     $(`#view-${name}`).classList.add('view--active');
     if (!['detail', 'catalog', 'profile'].includes(name)) {

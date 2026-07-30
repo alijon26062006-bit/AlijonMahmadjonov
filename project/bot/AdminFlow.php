@@ -48,7 +48,7 @@ final class AdminFlow
                 ['type' => 'text',  'key' => 'description',  'prompt' => "\u{1F4C4} \u{41E}\u{43F}\u{438}\u{441}\u{430}\u{43D}\u{438}\u{435}:"],
                 ['type' => 'photo', 'key' => 'poster',       'prompt' => "\u{1F5BC} \u{41E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{44C}\u{442}\u{435} \u{43F}\u{43E}\u{441}\u{442}\u{435}\u{440} (\u{444}\u{43E}\u{442}\u{43E}):", 'subdir' => 'posters'],
                 ['type' => 'photo', 'key' => 'backdrop',     'prompt' => "\u{1F304} \u{41E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{44C}\u{442}\u{435} \u{444}\u{43E}\u{43D}\u{43E}\u{432}\u{43E}\u{435} \u{438}\u{437}\u{43E}\u{431}\u{440}\u{430}\u{436}\u{435}\u{43D}\u{438}\u{435} (\u{444}\u{43E}\u{442}\u{43E}):", 'subdir' => 'banners'],
-                ['type' => 'text',  'key' => 'trailer',      'prompt' => "\u{1F3AC} \u{421}\u{441}\u{44B}\u{43B}\u{43A}\u{430} \u{43D}\u{430} \u{442}\u{440}\u{435}\u{439}\u{43B}\u{435}\u{440} (\u{438}\u{43B}\u{438} \u{AB}-\u{BB}):", 'skip' => true],
+                ['type' => 'video', 'key' => 'trailer',      'prompt' => "\u{1F3AC} \u{412}\u{438}\u{434}\u{435}\u{43E} \u{434}\u{43B}\u{44F} \u{431}\u{430}\u{43D}\u{43D}\u{435}\u{440}\u{430}: \u{43F}\u{440}\u{438}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{440}\u{43E}\u{43B}\u{438}\u{43A} \u{444}\u{430}\u{439}\u{43B}\u{43E}\u{43C} (\u{434}\u{43E} 20 \u{41C}\u{411}) \u{438}\u{43B}\u{438} \u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{443} .mp4 (\u{438}\u{43B}\u{438} \u{AB}-\u{BB}):", 'skip' => true],
                 ['type' => 'text',  'key' => 'genre',        'prompt' => "\u{1F3AD} \u{416}\u{430}\u{43D}\u{440} (\u{438}\u{43B}\u{438} \u{AB}-\u{BB}):", 'skip' => true],
                 ['type' => 'text',  'key' => 'release_date', 'prompt' => "\u{1F4C5} \u{414}\u{430}\u{442}\u{430} \u{432}\u{44B}\u{445}\u{43E}\u{434}\u{430} \u{413}\u{413}\u{413}\u{413}-\u{41C}\u{41C}-\u{414}\u{414} (\u{438}\u{43B}\u{438} \u{AB}-\u{BB}):", 'skip' => true],
                 $category,
@@ -61,7 +61,7 @@ final class AdminFlow
             ['type' => 'text',  'key' => 'description',  'prompt' => "\u{1F4C4} \u{41E}\u{43F}\u{438}\u{441}\u{430}\u{43D}\u{438}\u{435}:"],
             ['type' => 'photo', 'key' => 'poster',       'prompt' => "\u{1F5BC} \u{41E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{44C}\u{442}\u{435} \u{43F}\u{43E}\u{441}\u{442}\u{435}\u{440} (\u{444}\u{43E}\u{442}\u{43E}):", 'subdir' => 'posters'],
             ['type' => 'photo', 'key' => 'backdrop',     'prompt' => "\u{1F304} \u{41E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{44C}\u{442}\u{435} \u{444}\u{43E}\u{43D}\u{43E}\u{432}\u{43E}\u{435} \u{438}\u{437}\u{43E}\u{431}\u{440}\u{430}\u{436}\u{435}\u{43D}\u{438}\u{435} (\u{444}\u{43E}\u{442}\u{43E}):", 'subdir' => 'banners'],
-            ['type' => 'text',  'key' => 'trailer',      'prompt' => "\u{1F3AC} \u{421}\u{441}\u{44B}\u{43B}\u{43A}\u{430} \u{43D}\u{430} \u{442}\u{440}\u{435}\u{439}\u{43B}\u{435}\u{440} (\u{438}\u{43B}\u{438} \u{AB}-\u{BB}):", 'skip' => true],
+            ['type' => 'video', 'key' => 'trailer',      'prompt' => "\u{1F3AC} \u{412}\u{438}\u{434}\u{435}\u{43E} \u{434}\u{43B}\u{44F} \u{431}\u{430}\u{43D}\u{43D}\u{435}\u{440}\u{430}: \u{43F}\u{440}\u{438}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{440}\u{43E}\u{43B}\u{438}\u{43A} \u{444}\u{430}\u{439}\u{43B}\u{43E}\u{43C} (\u{434}\u{43E} 20 \u{41C}\u{411}) \u{438}\u{43B}\u{438} \u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{443} .mp4 (\u{438}\u{43B}\u{438} \u{AB}-\u{BB}):", 'skip' => true],
             ['type' => 'text',  'key' => 'genres',       'prompt' => "\u{1F3AD} \u{416}\u{430}\u{43D}\u{440}\u{44B} \u{447}\u{435}\u{440}\u{435}\u{437} \u{437}\u{430}\u{43F}\u{44F}\u{442}\u{443}\u{44E}, \u{43D}\u{430}\u{43F}\u{440}. \u{AB}\u{411}\u{43E}\u{435}\u{432}\u{438}\u{43A}, \u{414}\u{440}\u{430}\u{43C}\u{430}\u{BB} (\u{438}\u{43B}\u{438} \u{AB}-\u{BB}):", 'skip' => true],
             ['type' => 'text',  'key' => 'country',      'prompt' => "\u{1F30D} \u{421}\u{442}\u{440}\u{430}\u{43D}\u{430} (\u{438}\u{43B}\u{438} \u{AB}-\u{BB}):", 'skip' => true],
             ['type' => 'text',  'key' => 'release_date', 'prompt' => "\u{1F4C5} \u{414}\u{430}\u{442}\u{430} \u{432}\u{44B}\u{445}\u{43E}\u{434}\u{430} \u{413}\u{413}\u{413}\u{413}-\u{41C}\u{41C}-\u{414}\u{414} (\u{438}\u{43B}\u{438} \u{AB}-\u{BB}):", 'skip' => true],
@@ -150,6 +150,38 @@ final class AdminFlow
                     $this->api->sendMessage($chatId, "\u{26A0}\u{FE0F} \u{41D}\u{435} \u{443}\u{434}\u{430}\u{43B}\u{43E}\u{441}\u{44C} \u{441}\u{43E}\u{445}\u{440}\u{430}\u{43D}\u{438}\u{442}\u{44C} \u{444}\u{430}\u{439}\u{43B}, \u{43F}\u{43E}\u{43F}\u{440}\u{43E}\u{431}\u{443}\u{439}\u{442}\u{435} \u{435}\u{449}\u{451} \u{440}\u{430}\u{437}.");
                     return true;
                 }
+            }
+        } elseif ($field['type'] === 'video') {
+            // A Telegram file id cannot be played in a browser, so the clip is
+            // downloaded to uploads/trailers and the hero plays it from there.
+            $videoId = $message['video']['file_id'] ?? null;
+            if (!$videoId
+                && !empty($message['document']['file_id'])
+                && str_starts_with((string) ($message['document']['mime_type'] ?? ''), 'video/')) {
+                $videoId = $message['document']['file_id'];
+            }
+            if (!empty($message['animation']['file_id'])) {
+                $videoId = $message['animation']['file_id'];
+            }
+
+            if ($videoId) {
+                $this->api->sendMessage($chatId, "\u{23F3} \u{417}\u{430}\u{433}\u{440}\u{443}\u{436}\u{430}\u{44E} \u{432}\u{438}\u{434}\u{435}\u{43E} \u{43D}\u{430} \u{441}\u{435}\u{440}\u{432}\u{435}\u{440}\u{2026}");
+                $value = $this->media->save($videoId, 'trailers', 'mp4');
+                if ($value === null) {
+                    $this->api->sendMessage(
+                        $chatId,
+                        "\u{26A0}\u{FE0F} \u{41D}\u{435} \u{443}\u{434}\u{430}\u{43B}\u{43E}\u{441}\u{44C} \u{437}\u{430}\u{433}\u{440}\u{443}\u{437}\u{438}\u{442}\u{44C} \u{432}\u{438}\u{434}\u{435}\u{43E} (Telegram \u{43E}\u{442}\u{434}\u{430}\u{451}\u{442} \u{444}\u{430}\u{439}\u{43B}\u{44B} \u{434}\u{43E} 20 \u{41C}\u{411}).\n"
+                        . "\u{41F}\u{440}\u{438}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{440}\u{43E}\u{43B}\u{438}\u{43A} \u{43F}\u{43E}\u{43A}\u{43E}\u{440}\u{43E}\u{447}\u{435} \u{438}\u{43B}\u{438} \u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{443} \u{43D}\u{430} .mp4 \u{2014} \u{43B}\u{438}\u{431}\u{43E} \u{AB}-\u{BB}, \u{447}\u{442}\u{43E}\u{431}\u{44B} \u{43F}\u{440}\u{43E}\u{43F}\u{443}\u{441}\u{442}\u{438}\u{442}\u{44C}."
+                    );
+                    return true;
+                }
+            } elseif (preg_match('#^https?://#i', $text)) {
+                $value = $text;
+            } elseif (!empty($field['skip']) && $this->isSkip($text)) {
+                $value = null;
+            } else {
+                $this->api->sendMessage($chatId, "\u{26A0}\u{FE0F} \u{41F}\u{440}\u{438}\u{448}\u{43B}\u{438}\u{442}\u{435} \u{432}\u{438}\u{434}\u{435}\u{43E} \u{444}\u{430}\u{439}\u{43B}\u{43E}\u{43C}, \u{441}\u{441}\u{44B}\u{43B}\u{43A}\u{443} \u{43D}\u{430} .mp4 \u{438}\u{43B}\u{438} \u{AB}-\u{BB}, \u{447}\u{442}\u{43E}\u{431}\u{44B} \u{43F}\u{440}\u{43E}\u{43F}\u{443}\u{441}\u{442}\u{438}\u{442}\u{44C}.");
+                return true;
             }
         } elseif ($field['type'] === 'choice') {
             $map = $field['choices'];

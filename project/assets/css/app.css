@@ -1,5 +1,5 @@
 /* =============================================================
-   CineWave — Telegram Mini App
+   CineWave ? Telegram Mini App
    Premium dark / glassmorphism theme, mobile-first
    ============================================================= */
 
@@ -163,7 +163,7 @@ img{display:block;max-width:100%}
 .card__progress{height:3px;border-radius:3px;background:rgba(255,255,255,.15);margin-top:7px;overflow:hidden}
 .card__progress i{display:block;height:100%;background:var(--accent);border-radius:3px}
 
-/* Big poster variant for "Новинки" */
+/* Big poster variant for "???????" */
 .card--wide{width:260px}
 .card--wide .card__poster{aspect-ratio:16/10}
 
@@ -307,3 +307,15 @@ img{display:block;max-width:100%}
 .ep__label{flex:1;min-width:0;font-size:14px;font-weight:600;color:var(--text);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ep__play{width:20px;height:20px;flex:0 0 20px;fill:var(--text);stroke:none;opacity:.7}
+
+/* ---------- Inline video (hero banner + title preview) ---------- */
+.hero__video,
+.detail__video{
+  width:100%;height:100%;object-fit:cover;display:block;
+  background:var(--card-2);
+}
+.hero__video{transform:scale(1.02)}
+.trailer-video{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;background:#000;border:0;
+}

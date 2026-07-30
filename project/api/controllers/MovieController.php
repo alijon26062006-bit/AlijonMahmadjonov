@@ -82,6 +82,7 @@ final class MovieController extends Controller
                     'title'        => $a['title'],
                     'subtitle'     => $a['genre'] ?? null,
                     'image'        => $a['backdrop'] ?: $a['poster'],
+                    'video'        => \Models\Banner::playableVideo($a['trailer'] ?? null),
                     'description'  => $a['description'],
                     'rating'       => $a['rating'],
                     'genre'        => $a['genre'] ?? null,
