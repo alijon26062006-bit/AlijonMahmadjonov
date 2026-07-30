@@ -115,16 +115,48 @@ final class EpisodeFlow
         $total = $this->repo->episodeCount($movieId);
         $this->store->clear($tid);
 
+        // Auto-publish the episode into the private archive channel.
+        $archiveNote = $this->postEpisodeToArchive($message, $movieId, $season, $episode, $fileId);
+
         $kb = ['inline_keyboard' => [
             [['text' => "\u{2795} \u{415}\u{449}\u{451} \u{441}\u{435}\u{440}\u{438}\u{44F}", 'callback_data' => 'ep:add:' . $movieId]],
             [['text' => "\u{2705} \u{413}\u{43E}\u{442}\u{43E}\u{432}\u{43E}", 'callback_data' => 'ep:done']],
         ]];
         $this->api->sendMessage(
             $chatId,
-            "\u{2705} \u{421}\u{43E}\u{445}\u{440}\u{430}\u{43D}\u{435}\u{43D}\u{43E}: \u{421}\u{435}\u{437}\u{43E}\u{43D} {$season}, \u{441}\u{435}\u{440}\u{438}\u{44F} {$episode}.\n\u{412}\u{441}\u{435}\u{433}\u{43E} \u{441}\u{435}\u{440}\u{438}\u{439} \u{443} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{430}: <b>{$total}</b>.",
+            "\u{2705} \u{421}\u{43E}\u{445}\u{440}\u{430}\u{43D}\u{435}\u{43D}\u{43E}: \u{421}\u{435}\u{437}\u{43E}\u{43D} {$season}, \u{441}\u{435}\u{440}\u{438}\u{44F} {$episode}.\n\u{412}\u{441}\u{435}\u{433}\u{43E} \u{441}\u{435}\u{440}\u{438}\u{439} \u{443} \u{441}\u{435}\u{440}\u{438}\u{430}\u{43B}\u{430}: <b>{$total}</b>.{$archiveNote}",
             ['reply_markup' => json_encode($kb)]
         );
         return true;
+    }
+
+    /**
+     * Send the saved episode to the archive channel. Skips the repost when the
+     * admin forwarded the video from that very channel (it is already there).
+     * Returns a short status line for the admin confirmation message.
+     */
+    private function postEpisodeToArchive(array $message, int $movieId, int $season, int $episode, ?string $fileId): string
+    {
+        $channel = $this->repo->getSetting('archive_channel_id');
+        if (!$channel || !$fileId) {
+            return '';
+        }
+
+        // Forwarded from the archive channel itself -> already stored there.
+        $originId = $message['forward_origin']['chat']['id']
+            ?? ($message['forward_from_chat']['id'] ?? null);
+        if ($originId !== null && (string) $originId === (string) $channel) {
+            return "\n\u{1F4E1} \u{412}\u{438}\u{434}\u{435}\u{43E} \u{443}\u{436}\u{435} \u{432} \u{43A}\u{430}\u{43D}\u{430}\u{43B}\u{435}-\u{430}\u{440}\u{445}\u{438}\u{432}\u{435}.";
+        }
+
+        $play  = $this->repo->playable($movieId);
+        $title = htmlspecialchars((string) ($play['title'] ?? ''), ENT_QUOTES);
+        $cap   = "\u{1F4FA} <b>{$title}</b> \u{2014} \u{421}\u{435}\u{437}\u{43E}\u{43D} {$season}, \u{441}\u{435}\u{440}\u{438}\u{44F} {$episode} (#{$movieId})";
+
+        $res = $this->api->sendVideo($channel, $fileId, $cap);
+        return !empty($res['ok'])
+            ? "\n\u{1F4E1} \u{421}\u{435}\u{440}\u{438}\u{44F} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{43B}\u{435}\u{43D}\u{430} \u{432} \u{43A}\u{430}\u{43D}\u{430}\u{43B}-\u{430}\u{440}\u{445}\u{438}\u{432}."
+            : "\n\u{26A0}\u{FE0F} \u{41D}\u{435} \u{443}\u{434}\u{430}\u{43B}\u{43E}\u{441}\u{44C} \u{43E}\u{442}\u{43F}\u{440}\u{430}\u{432}\u{438}\u{442}\u{44C} \u{432} \u{43A}\u{430}\u{43D}\u{430}\u{43B}-\u{430}\u{440}\u{445}\u{438}\u{432} (\u{431}\u{43E}\u{442} \u{434}\u{43E}\u{43B}\u{436}\u{435}\u{43D} \u{431}\u{44B}\u{442}\u{44C} \u{430}\u{434}\u{43C}\u{438}\u{43D}\u{43E}\u{43C} \u{43A}\u{430}\u{43D}\u{430}\u{43B}\u{430}).";
     }
 
     /** @return bool true if the callback belonged to this dialog. */
