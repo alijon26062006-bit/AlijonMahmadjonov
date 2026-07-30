@@ -26,6 +26,7 @@ use Controllers\FavoriteController;
 use Controllers\HistoryController;
 use Controllers\WatchController;
 use Controllers\ProfileController;
+use Controllers\EpisodeController;
 use Models\Banner;
 
 require __DIR__ . '/autoload.php';
@@ -80,6 +81,7 @@ $router->get('/genres',        fn () => (new GenreController($config))->index())
 $router->get('/search',        fn () => (new SearchController($config))->index());
 $router->get('/announcements', fn () => (new AnnouncementController($config))->index());
 $router->get('/announcement',  fn () => (new AnnouncementController($config))->show());
+$router->get('/episodes',      fn () => (new EpisodeController($config))->index());
 $router->get('/banners',       fn () => Response::ok((new Banner())->active(8)));
 
 $router->get('/favorites',     fn () => (new FavoriteController($config))->index());

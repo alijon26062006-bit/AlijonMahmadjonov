@@ -274,3 +274,36 @@ img{display:block;max-width:100%}
 .empty .em{font-size:52px;opacity:.5}
 .empty h3{color:var(--text);font-size:18px;font-weight:800}
 .empty p{font-size:14px;max-width:280px}
+
+/* ---------- Profile ---------- */
+.profile{display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px 20px 10px}
+.profile__avatar{width:96px;height:96px;border-radius:50%;overflow:hidden;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--accent),#7c3aed);font-size:38px;font-weight:800;color:#fff;
+  border:2px solid var(--stroke);box-shadow:var(--shadow)}
+.profile__avatar img{width:100%;height:100%;object-fit:cover}
+.profile__name{font-size:22px;font-weight:800;margin-top:14px}
+.profile__username{color:var(--muted);font-size:14px;margin-top:2px}
+.profile__badge{margin-top:10px;background:rgba(245,197,24,.14);color:var(--gold);border:1px solid rgba(245,197,24,.3);
+  font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px}
+.profile__stats{display:flex;gap:12px;margin:22px 0 6px;width:100%;max-width:360px}
+.pstat{flex:1;background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:16px 10px;
+  display:flex;flex-direction:column;gap:4px;transition:transform .2s var(--ease),background .2s}
+.pstat:active{transform:scale(.95);background:var(--card-2)}
+.pstat b{font-size:24px;font-weight:800;color:var(--text)}
+.pstat span{font-size:12px;color:var(--muted)}
+.profile__admin{margin-top:16px;background:var(--card);border:1px solid var(--stroke);border-radius:14px;
+  padding:14px 16px;font-size:13px;color:var(--muted);line-height:1.5;max-width:360px}
+.profile__admin b{color:var(--text)}
+
+/* ---------- Episodes ---------- */
+.season{margin-bottom:18px}
+.season__title{font-size:14px;font-weight:700;color:var(--muted);margin-bottom:10px}
+.ep-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.ep{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--stroke);
+  border-radius:12px;padding:12px 14px;text-align:left;transition:transform .18s var(--ease),background .2s}
+.ep:active{transform:scale(.98);background:var(--card-2)}
+.ep__num{flex:0 0 34px;height:34px;border-radius:9px;background:rgba(225,29,72,.16);color:var(--accent);
+  display:grid;place-items:center;font-weight:800;font-size:15px}
+.ep__label{flex:1;min-width:0;font-size:14px;font-weight:600;color:var(--text);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ep__play{width:20px;height:20px;flex:0 0 20px;fill:var(--text);stroke:none;opacity:.7}

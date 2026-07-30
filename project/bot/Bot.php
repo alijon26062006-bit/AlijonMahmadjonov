@@ -16,6 +16,7 @@ final class Bot
     private TelegramApi $api;
     private AdminFlow $flow;
     private AiFlow $aiFlow;
+    private EpisodeFlow $episodeFlow;
     private ContentRepo $repo;
     private StateStore $store;
     private array $cfg;
@@ -41,6 +42,7 @@ final class Bot
             $config['app']['uploads_dir'],
             $config['telegram']['miniapp_url']
         );
+        $this->episodeFlow = new EpisodeFlow($this->api, $this->repo, $this->store);
     }
 
     public function handleUpdate(array $update): void
@@ -79,6 +81,9 @@ final class Bot
         // Active admin dialog takes priority (unless a global command was sent)
         if (!$isCommand && $this->isAdmin($tid)) {
             if ($this->aiFlow->handle($chatId, $tid, $msg)) {
+                return;
+            }
+            if ($this->episodeFlow->handle($chatId, $tid, $msg)) {
                 return;
             }
             if ($this->flow->handle($chatId, $tid, $msg)) {
@@ -198,6 +203,7 @@ final class Bot
             [['text' => '➕ Фильм', 'callback_data' => 'add:movie'], ['text' => '➕ Сериал', 'callback_data' => 'add:series']],
             [['text' => '➕ Мультфильм', 'callback_data' => 'add:cartoon'], ['text' => '➕ Аниме', 'callback_data' => 'add:anime']],
             [['text' => '📣 Добавить анонс', 'callback_data' => 'add:announcement']],
+            [['text' => '📺 Серии сериала (сезоны/серии)', 'callback_data' => 'adm:series']],
             [['text' => '🗑 Удалить', 'callback_data' => 'adm:list'], ['text' => '📊 Статистика', 'callback_data' => 'adm:stats']],
             [['text' => '📢 Рассылка', 'callback_data' => 'adm:broadcast'], ['text' => '⚙ Настройки', 'callback_data' => 'adm:settings']],
         ]];
@@ -218,6 +224,10 @@ final class Bot
 
         // AI wizard callbacks (each answers its own callback query)
         if ($this->aiFlow->handleCallback($chatId, $tid, $msgId, $data, $cbId)) {
+            return;
+        }
+        // Episode wizard callbacks
+        if ($this->episodeFlow->handleCallback($chatId, $tid, $data, $cbId)) {
             return;
         }
 
@@ -266,6 +276,10 @@ final class Bot
                 $this->sendDeleteList($chatId, $msgId);
                 return;
 
+            case 'adm:series':
+                $this->sendSeriesList($chatId, $msgId);
+                return;
+
             case 'adm:home':
                 $this->api->editMessageText($chatId, $msgId, "🛠 <b>Панель администратора</b>\nВыберите действие:", [
                     'reply_markup' => json_encode($this->adminMenu()),
@@ -298,6 +312,34 @@ final class Bot
         $this->api->editMessageText($chatId, $msgId, "🗑 <b>Удаление контента</b>\nНажмите на элемент, чтобы удалить:", [
             'reply_markup' => json_encode(['inline_keyboard' => $rows]),
         ]);
+    }
+
+    private function sendSeriesList(int $chatId, int $msgId): void
+    {
+        $series = $this->repo->recentSeries(15);
+        if (!$series) {
+            $this->api->editMessageText(
+                $chatId,
+                $msgId,
+                'Сначала добавьте сериал или аниме (🤖 AI или ➕ Сериал), затем сюда — добавлять серии.',
+                ['reply_markup' => json_encode($this->backMenu())]
+            );
+            return;
+        }
+        $rows = [];
+        foreach ($series as $s) {
+            $rows[] = [[
+                'text' => '📺 ' . mb_strimwidth($s['title'], 0, 40, '…'),
+                'callback_data' => 'ep:add:' . $s['id'],
+            ]];
+        }
+        $rows[] = [['text' => '⬅️ Назад', 'callback_data' => 'adm:home']];
+        $this->api->editMessageText(
+            $chatId,
+            $msgId,
+            "📺 <b>Серии сериала</b>\nВыберите сериал/аниме, чтобы добавить сезоны и серии:",
+            ['reply_markup' => json_encode(['inline_keyboard' => $rows])]
+        );
     }
 
     private function backMenu(): array

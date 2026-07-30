@@ -8,6 +8,7 @@ use Core\Controller;
 use Core\Response;
 use Models\Movie;
 use Models\History;
+use Models\Episode;
 
 /**
  * Handles the ▶ Смотреть action.
@@ -18,10 +19,18 @@ use Models\History;
  */
 final class WatchController extends Controller
 {
-    /** POST /watch — {movie_id}. */
+    /** POST /watch — {movie_id} or {episode_id}. */
     public function store(): void
     {
-        $user    = $this->authenticate(false); // delivery needs the user's chat id
+        $user      = $this->authenticate(false); // delivery needs the user's chat id
+        $episodeId = (int) $this->input('episode_id', 0);
+
+        // Episode delivery (series / anime).
+        if ($episodeId > 0) {
+            $this->deliverEpisode($episodeId, $user['id'] ?? null);
+            return;
+        }
+
         $movieId = (int) $this->input('movie_id', 0);
         if ($movieId <= 0) {
             Response::error('Missing movie_id', 422);
@@ -68,5 +77,32 @@ final class WatchController extends Controller
         }
 
         Response::error('Источник просмотра пока не добавлен', 404);
+    }
+
+    /** Deliver one series/anime episode via the bot, or return its link. */
+    private function deliverEpisode(int $episodeId, $chatId): void
+    {
+        $ep = (new Episode())->playable($episodeId);
+        if (!$ep) {
+            Response::error('Episode not found', 404);
+        }
+
+        $caption = '🎬 <b>' . htmlspecialchars((string) $ep['movie_title'], ENT_QUOTES) . '</b> — '
+            . 'S' . (int) $ep['season'] . 'E' . (int) $ep['episode'];
+
+        if (!empty($ep['telegram_file_id']) && $chatId) {
+            require_once __DIR__ . '/../../bot/TelegramApi.php';
+            $api = new \Bot\TelegramApi($this->config['telegram']['bot_token']);
+            $res = $api->sendVideo((int) $chatId, (string) $ep['telegram_file_id'], $caption);
+            if (!empty($res['ok'])) {
+                Response::ok(['via' => 'telegram', 'delivered' => true, 'message' => 'Серия отправлена в чат с ботом']);
+            }
+        }
+
+        if (!empty($ep['watch_url'])) {
+            Response::ok(['via' => 'link', 'watch_url' => $ep['watch_url']]);
+        }
+
+        Response::error('Источник серии пока не добавлен', 404);
     }
 }

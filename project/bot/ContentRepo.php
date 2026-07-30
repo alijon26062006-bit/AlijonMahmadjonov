@@ -104,6 +104,40 @@ final class ContentRepo
         return $movieId;
     }
 
+    /** Insert or update one episode of a series/anime. */
+    public function createEpisode(int $movieId, int $season, int $episode, ?string $fileId, ?string $url, ?string $title = null): int
+    {
+        $sql = "INSERT INTO episodes (movie_id, season, episode, title, telegram_file_id, watch_url)
+                VALUES (:m, :s, :e, :t, :fid, :url)
+                ON DUPLICATE KEY UPDATE
+                    title = VALUES(title),
+                    telegram_file_id = VALUES(telegram_file_id),
+                    watch_url = VALUES(watch_url)";
+        $this->db->prepare($sql)->execute([
+            ':m' => $movieId, ':s' => $season, ':e' => $episode,
+            ':t' => $title, ':fid' => $fileId, ':url' => $url,
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function episodeCount(int $movieId): int
+    {
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM episodes WHERE movie_id = ?");
+        $stmt->execute([$movieId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /** Recent series / anime titles (for the "add episodes" picker). */
+    public function recentSeries(int $limit = 15): array
+    {
+        $limit = max(1, min(50, $limit));
+        return $this->db->query(
+            "SELECT id, title, category FROM movies
+             WHERE category IN ('series','anime')
+             ORDER BY id DESC LIMIT $limit"
+        )->fetchAll();
+    }
+
     /** Playable source for a movie (server-side use in video delivery). */
     public function playable(int $id): ?array
     {

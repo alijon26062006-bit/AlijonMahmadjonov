@@ -295,9 +295,9 @@
           </div>
         </div>
         <div class="detail__cta">
-          <button class="btn btn--primary" data-watch="${m.id}">
-            <svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg> Смотреть
-          </button>
+          ${['series', 'anime'].includes(m.category)
+            ? `<button class="btn btn--primary" data-scroll="episodesSection"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg> Смотреть серии</button>`
+            : `<button class="btn btn--primary" data-watch="${m.id}"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg> Смотреть</button>`}
           <button class="btn btn--glass" data-fav="${m.id}">
             ${fav ? '❤️ В избранном' : '＋ Избранное'}
           </button>
@@ -305,9 +305,53 @@
       </div>
       ${m.description ? `<div class="section"><h3>Описание</h3><p>${esc(m.description)}</p></div>` : ''}
       <div class="section"><h3>О тайтле</h3><dl class="meta-grid">${meta}</dl></div>
-      ${actors}${trailer}${shots}${similar}
+      ${actors}${trailer}${shots}
+      <div id="episodesSection"></div>
+      ${similar}
     `;
     bindLazy($('#detailContent'));
+    if (['series', 'anime'].includes(m.category)) {
+      loadEpisodes(m.id);
+    }
+  }
+
+  // ---- Episodes (series / anime) ----
+  async function loadEpisodes(movieId) {
+    const host = $('#episodesSection');
+    if (!host) return;
+    try {
+      const { data } = await api('episodes', { params: { movie_id: movieId } });
+      if (!data || !data.length) { host.innerHTML = ''; return; }
+      host.innerHTML = `<div class="section"><h3>Серии</h3>${data.map(s => `
+        <div class="season">
+          <div class="season__title">Сезон ${s.season}</div>
+          <div class="ep-grid">${s.episodes.map(e => `
+            <button class="ep" data-episode="${e.id}">
+              <span class="ep__num">${e.episode}</span>
+              <span class="ep__label">${e.title ? esc(e.title) : 'Серия ' + e.episode}</span>
+              <svg class="ep__play" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>
+            </button>`).join('')}</div>
+        </div>`).join('')}</div>`;
+    } catch (e) { host.innerHTML = ''; }
+  }
+
+  async function watchEpisode(id) {
+    haptic('medium');
+    try {
+      const { data } = await api('watch', { method: 'POST', body: { episode_id: Number(id) } });
+      if (data.via === 'telegram' && data.delivered) {
+        toast(data.message || 'Серия отправлена в чат с ботом ✅');
+        setTimeout(() => { try { tg?.close(); } catch (e) {} }, 1400);
+        return;
+      }
+      const link = data.watch_url;
+      if (link) {
+        if (tg?.openLink) tg.openLink(link, { try_instant_view: false });
+        else window.open(link, '_blank');
+      } else {
+        toast('Источник появится позже');
+      }
+    } catch (e) { toast('Не удалось открыть'); }
   }
 
   function embedTrailer(url) {
@@ -468,7 +512,7 @@
   function switchView(name) {
     $$('.view').forEach(v => v.classList.remove('view--active'));
     $(`#view-${name}`)?.classList.add('view--active');
-    if (name !== 'detail' && name !== 'catalog') {
+    if (!['detail', 'catalog', 'profile'].includes(name)) {
       $$('.nav-item').forEach(n => n.classList.toggle('is-active', n.dataset.nav === name));
     }
     window.scrollTo(0, 0);
@@ -497,6 +541,41 @@
     } catch (e) {}
   }
 
+  async function openProfile() {
+    haptic('light');
+    switchView('profile');
+    const el = $('#profileContent');
+    el.innerHTML = `<div class="skeleton" style="height:220px;margin:16px;border-radius:18px"></div>`;
+    try {
+      const { data } = await api('profile', { method: 'POST' });
+      const name = [data.first_name, data.last_name].filter(Boolean).map(esc).join(' ') || 'Пользователь';
+      const avatar = data.photo_url
+        ? `<img src="${esc(data.photo_url)}" alt="">`
+        : `<span>${(data.first_name || 'U').charAt(0).toUpperCase()}</span>`;
+      el.innerHTML = `
+        <div class="profile">
+          <div class="profile__avatar">${avatar}</div>
+          <div class="profile__name">${name}</div>
+          ${data.username ? `<div class="profile__username">@${esc(data.username)}</div>` : ''}
+          ${data.is_premium ? `<div class="profile__badge">⭐ Telegram Premium</div>` : ''}
+          <div class="profile__stats">
+            <button class="pstat" data-nav-section="favorites">
+              <b>${data.favorites_count || 0}</b><span>❤️ Избранное</span>
+            </button>
+            <button class="pstat" data-nav-section="history">
+              <b>${data.history_count || 0}</b><span>🕒 История</span>
+            </button>
+          </div>
+          ${data.is_admin
+            ? `<div class="profile__admin">🛠 Вы администратор.<br>Добавление фильмов и серий — в боте: <b>/admin</b></div>`
+            : ''}
+        </div>`;
+      bindLazy(el);
+    } catch (e) {
+      el.innerHTML = emptyState('👤', 'Профиль недоступен', 'Откройте приложение из Telegram, чтобы увидеть профиль.');
+    }
+  }
+
   // ---- Global events (delegation) ----
   document.addEventListener('click', (ev) => {
     const t = ev.target;
@@ -509,6 +588,15 @@
 
     const watchBtn = t.closest('[data-watch]');
     if (watchBtn) { watch(watchBtn.dataset.watch); return; }
+
+    const epBtn = t.closest('[data-episode]');
+    if (epBtn) { watchEpisode(epBtn.dataset.episode); return; }
+
+    const scrollBtn = t.closest('[data-scroll]');
+    if (scrollBtn) { $('#' + scrollBtn.dataset.scroll)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+
+    const pstat = t.closest('[data-nav-section]');
+    if (pstat) { switchView('catalog'); openSection(pstat.dataset.navSection); return; }
 
     const heroPlay = t.closest('[data-hero-play]');
     if (heroPlay) { const id = heroPlay.dataset.heroPlay; if (id) openDetail(id); else toast('Скоро в каталоге'); return; }
@@ -537,7 +625,7 @@
   $('#btnSearchClose').addEventListener('click', closeSearch);
   $('#searchInput').addEventListener('input', runSearch);
   ['#fCategory','#fGenre','#fYear','#fRating'].forEach(s => $(s).addEventListener('change', runSearch));
-  $('#btnProfile').addEventListener('click', () => { switchView('catalog'); openSection('favorites'); });
+  $('#btnProfile').addEventListener('click', openProfile);
 
   // Top bar blur on scroll
   window.addEventListener('scroll', () => {

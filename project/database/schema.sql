@@ -245,6 +245,25 @@ CREATE TABLE `bot_states` (
     PRIMARY KEY (`telegram_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- -------------------------------------------------------------
+--  episodes — seasons & episodes for series / anime
+-- -------------------------------------------------------------
+DROP TABLE IF EXISTS `episodes`;
+CREATE TABLE `episodes` (
+    `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `movie_id`         BIGINT UNSIGNED NOT NULL,
+    `season`           SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    `episode`          SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    `title`            VARCHAR(255) DEFAULT NULL,
+    `telegram_file_id` VARCHAR(255) DEFAULT NULL,
+    `watch_url`        VARCHAR(512) DEFAULT NULL,
+    `duration`         INT UNSIGNED DEFAULT NULL,
+    `created_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_ep` (`movie_id`, `season`, `episode`),
+    KEY `idx_ep_movie` (`movie_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =============================================================

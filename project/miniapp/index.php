@@ -67,6 +67,15 @@ $jsSrc   = $asset('js/app.min.js', 'js/app.js');
   <div class="loader-sentinel" id="catalogSentinel"></div>
 </main>
 
+<!-- ============ PROFILE VIEW ============ -->
+<main class="view" id="view-profile">
+  <div class="catalog__head">
+    <button class="back-btn" data-back aria-label="Назад">‹</button>
+    <h2>Профиль</h2>
+  </div>
+  <div id="profileContent"></div>
+</main>
+
 <!-- ============ SEARCH OVERLAY ============ -->
 <div class="search-overlay" id="searchOverlay">
   <div class="search-bar">

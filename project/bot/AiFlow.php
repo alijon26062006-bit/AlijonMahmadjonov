@@ -462,13 +462,23 @@ final class AiFlow
         $this->store->clear($tid);
 
         $label = self::CAT_LABELS[$movie['category']] ?? 'Контент';
+
+        $rows = [];
+        // For series / anime offer to add seasons & episodes right away.
+        if (in_array($movie['category'], ['series', 'anime'], true)) {
+            $rows[] = [['text' => '➕ Добавить серии', 'callback_data' => 'ep:add:' . $id]];
+        }
+        $rows[] = [['text' => '🎬 Открыть кино', 'web_app' => ['url' => $this->miniappUrl]]];
+
+        $extra = in_array($movie['category'], ['series', 'anime'], true)
+            ? "\n\nТеперь добавьте сезоны и серии кнопкой ниже."
+            : '';
+
         $this->api->sendMessage(
             $chatId,
             "✅ {$label} <b>«{$movie['title']}»</b> (#{$id}) опубликован!\n"
-            . "Уже виден на главной Mini App: Hero-баннер, Новинки, Категории, Поиск.",
-            ['reply_markup' => json_encode(['inline_keyboard' => [[
-                ['text' => '🎬 Открыть кино', 'web_app' => ['url' => $this->miniappUrl]],
-            ]]])]
+            . "Уже виден на главной Mini App: Hero-баннер, Новинки, Категории, Поиск.{$extra}",
+            ['reply_markup' => json_encode(['inline_keyboard' => $rows])]
         );
     }
 
