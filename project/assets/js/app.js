@@ -82,7 +82,9 @@
     const progress = opts.progress != null
       ? `<div class="card__progress"><i style="width:${opts.progress}%"></i></div>` : '';
     const cls = 'card' + (opts.wide ? ' card--wide' : '');
-    const poster = opts.wide ? (m.backdrop || m.poster) : m.poster;
+    const poster = opts.wide
+      ? (m.banner || m.backdrop || m.poster)
+      : (m.thumbnail || m.poster);
     return `
       <article class="${cls}" data-id="${m.id}">
         <div class="card__poster">
@@ -319,12 +321,20 @@
     haptic('medium');
     try {
       const { data } = await api('watch', { method: 'POST', body: { movie_id: Number(id) } });
+
+      // Film delivered straight into the Telegram chat with the bot.
+      if (data.via === 'telegram' && data.delivered) {
+        toast(data.message || 'Фильм отправлен в чат с ботом ✅');
+        setTimeout(() => { try { tg?.close(); } catch (e) {} }, 1400);
+        return;
+      }
+
       const link = data.watch_url || data.trailer;
       if (link) {
         if (tg?.openLink) tg.openLink(link, { try_instant_view: false });
         else window.open(link, '_blank');
       } else {
-        toast('Ссылка появится позже');
+        toast('Источник появится позже');
       }
     } catch (e) { toast('Не удалось открыть'); }
   }

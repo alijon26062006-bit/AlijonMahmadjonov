@@ -1,11 +1,14 @@
 # Logs
 logs/*.log
 
-# Uploaded media (keep the folder structure, ignore user content)
+# Uploaded / generated media (keep the folder structure, ignore content)
 uploads/posters/*
 uploads/banners/*
 uploads/trailers/*
 uploads/screenshots/*
+uploads/thumbnails/*
+uploads/backgrounds/*
+uploads/tmp/*
 !uploads/**/.gitkeep
 
 # Local secrets override (optional). The committed config.php uses safe

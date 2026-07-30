@@ -66,12 +66,16 @@ DROP TABLE IF EXISTS `movies`;
 CREATE TABLE `movies` (
     `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `title`          VARCHAR(255) NOT NULL,
+    `original_title` VARCHAR(255) DEFAULT NULL,
     `slug`           VARCHAR(280) DEFAULT NULL,
     `description`    TEXT,
     `poster`         VARCHAR(512) DEFAULT NULL,
-    `backdrop`       VARCHAR(512) DEFAULT NULL,
+    `thumbnail`      VARCHAR(512) DEFAULT NULL,  -- small WebP for cards
+    `backdrop`       VARCHAR(512) DEFAULT NULL,  -- background image
+    `banner`         VARCHAR(512) DEFAULT NULL,  -- wide hero banner
     `trailer`        VARCHAR(512) DEFAULT NULL,
     `watch_url`      VARCHAR(512) DEFAULT NULL,
+    `telegram_file_id` VARCHAR(255) DEFAULT NULL, -- video delivered via bot
     `category`       ENUM('movie','series','cartoon','anime') NOT NULL DEFAULT 'movie',
     `country`        VARCHAR(128) DEFAULT NULL,
     `release_date`   DATE DEFAULT NULL,
@@ -82,7 +86,9 @@ CREATE TABLE `movies` (
     `language`       VARCHAR(64) DEFAULT NULL,
     `director`       VARCHAR(255) DEFAULT NULL,
     `actors`         TEXT,                       -- comma separated
+    `keywords`       TEXT,                       -- AI keywords, comma separated
     `screenshots`    JSON DEFAULT NULL,          -- array of image URLs
+    `similar_titles` JSON DEFAULT NULL,          -- AI-suggested similar titles
     `status`         ENUM('published','draft','coming_soon','in_cinema') NOT NULL DEFAULT 'published',
     `is_new`         TINYINT(1) NOT NULL DEFAULT 0,
     `is_popular`     TINYINT(1) NOT NULL DEFAULT 0,

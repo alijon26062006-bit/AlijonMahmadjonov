@@ -22,42 +22,63 @@ final class ContentRepo
     public function createMovie(array $d): int
     {
         $sql = "INSERT INTO movies
-                    (title, slug, description, poster, backdrop, trailer, watch_url,
+                    (title, original_title, slug, description, poster, thumbnail, backdrop,
+                     banner, trailer, watch_url, telegram_file_id,
                      category, country, release_date, year, age_rating, duration,
-                     rating, language, director, actors, status,
+                     rating, language, director, actors, keywords, similar_titles, status,
                      is_new, is_popular, is_recommended)
                 VALUES
-                    (:title, :slug, :description, :poster, :backdrop, :trailer, :watch_url,
+                    (:title, :original_title, :slug, :description, :poster, :thumbnail, :backdrop,
+                     :banner, :trailer, :watch_url, :telegram_file_id,
                      :category, :country, :release_date, :year, :age_rating, :duration,
-                     :rating, :language, :director, :actors, :status,
+                     :rating, :language, :director, :actors, :keywords, :similar_titles, :status,
                      :is_new, :is_popular, :is_recommended)";
 
         $release = $d['release_date'] ?? null;
         $year    = $release ? (int) substr($release, 0, 4) : ($d['year'] ?? null);
 
+        $similar = $d['similar_titles'] ?? null;
+        if (is_array($similar)) {
+            $similar = $similar ? json_encode(array_values($similar), JSON_UNESCAPED_UNICODE) : null;
+        }
+
+        // Reflect the requested status onto the home-page flags.
+        $status = $d['status'] ?? 'published';
+        $flags  = [
+            'is_new'         => array_key_exists('is_new', $d) ? (int) $d['is_new'] : 1,
+            'is_popular'     => !empty($d['is_popular']) ? 1 : 0,
+            'is_recommended' => !empty($d['is_recommended']) ? 1 : 0,
+        ];
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
-            ':title'        => $d['title'],
-            ':slug'         => $this->slugify($d['title']),
-            ':description'  => $d['description'] ?? null,
-            ':poster'       => $d['poster'] ?? null,
-            ':backdrop'     => $d['backdrop'] ?? null,
-            ':trailer'      => $d['trailer'] ?? null,
-            ':watch_url'    => $d['watch_url'] ?? null,
-            ':category'     => $d['category'] ?? 'movie',
-            ':country'      => $d['country'] ?? null,
-            ':release_date' => $release ?: null,
-            ':year'         => $year,
-            ':age_rating'   => $d['age_rating'] ?? null,
-            ':duration'     => isset($d['duration']) ? (int) $d['duration'] : null,
-            ':rating'       => isset($d['rating']) ? (float) $d['rating'] : 0,
-            ':language'     => $d['language'] ?? null,
-            ':director'     => $d['director'] ?? null,
-            ':actors'       => $d['actors'] ?? null,
-            ':status'       => $d['status'] ?? 'published',
-            ':is_new'       => 1,   // freshly added -> show in "Новинки"
-            ':is_popular'   => 0,
-            ':is_recommended' => !empty($d['is_recommended']) ? 1 : 0,
+            ':title'          => $d['title'],
+            ':original_title' => $d['original_title'] ?? null,
+            ':slug'           => $this->slugify($d['title']),
+            ':description'    => $d['description'] ?? null,
+            ':poster'         => $d['poster'] ?? null,
+            ':thumbnail'      => $d['thumbnail'] ?? null,
+            ':backdrop'       => $d['backdrop'] ?? null,
+            ':banner'         => $d['banner'] ?? null,
+            ':trailer'        => $d['trailer'] ?? null,
+            ':watch_url'      => $d['watch_url'] ?? null,
+            ':telegram_file_id' => $d['telegram_file_id'] ?? null,
+            ':category'       => $d['category'] ?? 'movie',
+            ':country'        => $d['country'] ?? null,
+            ':release_date'   => $release ?: null,
+            ':year'           => $year,
+            ':age_rating'     => $d['age_rating'] ?? null,
+            ':duration'       => isset($d['duration']) ? (int) $d['duration'] : null,
+            ':rating'         => isset($d['rating']) ? (float) $d['rating'] : 0,
+            ':language'       => $d['language'] ?? null,
+            ':director'       => $d['director'] ?? null,
+            ':actors'         => $d['actors'] ?? null,
+            ':keywords'       => $d['keywords'] ?? null,
+            ':similar_titles' => $similar,
+            ':status'         => $status,
+            ':is_new'         => $flags['is_new'],
+            ':is_popular'     => $flags['is_popular'],
+            ':is_recommended' => $flags['is_recommended'],
         ]);
 
         $movieId = (int) $this->db->lastInsertId();
@@ -65,7 +86,32 @@ final class ContentRepo
         if (!empty($d['genres'])) {
             $this->attachGenres($movieId, (array) $d['genres']);
         }
+
+        // If a wide banner was produced, register it as an active hero banner.
+        if (!empty($d['banner'])) {
+            $this->db->prepare(
+                "INSERT INTO banners (title, subtitle, image, movie_id, priority, is_active)
+                 VALUES (?, ?, ?, ?, ?, 1)"
+            )->execute([
+                $d['title'],
+                $d['country'] ?? null,
+                $d['banner'],
+                $movieId,
+                20,
+            ]);
+        }
+
         return $movieId;
+    }
+
+    /** Playable source for a movie (server-side use in video delivery). */
+    public function playable(int $id): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT id, title, telegram_file_id, watch_url, trailer FROM movies WHERE id = ?"
+        );
+        $stmt->execute([$id]);
+        return $stmt->fetch() ?: null;
     }
 
     public function createAnnouncement(array $d): int

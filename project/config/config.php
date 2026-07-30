@@ -42,4 +42,13 @@ return [
         'debug'       => filter_var($env('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOL),
         'auth_ttl'    => (int) $env('AUTH_TTL', 86400),
     ],
+
+    // ---- OpenAI (server-side only — never sent to JS / Mini App) ----
+    'openai' => [
+        'api_key'      => $env('OPENAI_API_KEY', 'PUT_YOUR_OPENAI_KEY_HERE'),
+        'endpoint'     => $env('OPENAI_ENDPOINT', 'https://api.openai.com/v1'),
+        'model_vision' => $env('OPENAI_MODEL_VISION', 'gpt-4o-mini'),
+        'model_text'   => $env('OPENAI_MODEL_TEXT', 'gpt-4o-mini'),
+        'timeout'      => (int) $env('OPENAI_TIMEOUT', 45),
+    ],
 ];

@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Bot;
 
+use Core\ImageProcessor;
+use Core\OpenAiClient;
 use Models\User;
 
 /**
@@ -13,6 +15,7 @@ final class Bot
 {
     private TelegramApi $api;
     private AdminFlow $flow;
+    private AiFlow $aiFlow;
     private ContentRepo $repo;
     private StateStore $store;
     private array $cfg;
@@ -26,6 +29,16 @@ final class Bot
         $media       = new Media($this->api, $config['app']['uploads_dir']);
         $this->flow  = new AdminFlow(
             $this->api, $media, $this->repo, $this->store,
+            $config['telegram']['miniapp_url']
+        );
+        $this->aiFlow = new AiFlow(
+            $this->api,
+            $media,
+            $this->repo,
+            $this->store,
+            new ImageProcessor($config['app']['uploads_dir']),
+            new OpenAiClient($config['openai'] ?? []),
+            $config['app']['uploads_dir'],
             $config['telegram']['miniapp_url']
         );
     }
@@ -55,9 +68,14 @@ final class Bot
             (new User())->upsertFromTelegram($from);
         }
 
-        // Active admin dialog takes priority
-        if ($this->isAdmin($tid) && $this->flow->handle($chatId, $tid, $msg)) {
-            return;
+        // Active admin dialog takes priority (AI wizard first, then manual)
+        if ($this->isAdmin($tid)) {
+            if ($this->aiFlow->handle($chatId, $tid, $msg)) {
+                return;
+            }
+            if ($this->flow->handle($chatId, $tid, $msg)) {
+                return;
+            }
         }
 
         if ($text === '/start' || str_starts_with($text, '/start ')) {
@@ -161,6 +179,7 @@ final class Bot
     private function adminMenu(): array
     {
         return ['inline_keyboard' => [
+            [['text' => '🤖 AI: добавить фильм по постеру', 'callback_data' => 'ai:add']],
             [['text' => '➕ Фильм', 'callback_data' => 'add:movie'], ['text' => '➕ Сериал', 'callback_data' => 'add:series']],
             [['text' => '➕ Мультфильм', 'callback_data' => 'add:cartoon'], ['text' => '➕ Аниме', 'callback_data' => 'add:anime']],
             [['text' => '📣 Добавить анонс', 'callback_data' => 'add:announcement']],
@@ -181,6 +200,12 @@ final class Bot
             $this->api->answerCallbackQuery($cbId, '⛔ Только для админов', true);
             return;
         }
+
+        // AI wizard callbacks (each answers its own callback query)
+        if ($this->aiFlow->handleCallback($chatId, $tid, $msgId, $data, $cbId)) {
+            return;
+        }
+
         $this->api->answerCallbackQuery($cbId);
 
         // Add wizards

@@ -41,4 +41,15 @@ return [
         // How long (seconds) a Telegram initData signature stays valid
         'auth_ttl'    => 86400,
     ],
+
+    // ---- OpenAI (AI assistant for the admin bot) ----
+    // The key is used ONLY on the server (PHP). It is never exposed to
+    // JavaScript, the Mini App, or Telegram clients.
+    'openai' => [
+        'api_key'      => 'PUT_YOUR_OPENAI_KEY_HERE',
+        'endpoint'     => 'https://api.openai.com/v1',
+        'model_vision' => 'gpt-4o-mini', // vision-capable model for poster recognition
+        'model_text'   => 'gpt-4o-mini', // text model for card enrichment
+        'timeout'      => 45,
+    ],
 ];

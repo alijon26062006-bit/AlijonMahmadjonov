@@ -63,6 +63,27 @@ final class TelegramApi
         ], $extra));
     }
 
+    public function sendVideo(int|string $chatId, string $video, string $caption = '', array $extra = []): array
+    {
+        return $this->call('sendVideo', array_merge([
+            'chat_id'    => $chatId,
+            'video'      => $video,
+            'caption'    => $caption,
+            'parse_mode' => 'HTML',
+            'supports_streaming' => true,
+        ], $extra));
+    }
+
+    public function sendDocument(int|string $chatId, string $document, string $caption = '', array $extra = []): array
+    {
+        return $this->call('sendDocument', array_merge([
+            'chat_id'    => $chatId,
+            'document'   => $document,
+            'caption'    => $caption,
+            'parse_mode' => 'HTML',
+        ], $extra));
+    }
+
     public function editMessageText(int|string $chatId, int $messageId, string $text, array $extra = []): array
     {
         return $this->call('editMessageText', array_merge([

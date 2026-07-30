@@ -7,7 +7,7 @@ final class Movie extends Model
 {
     /** Columns returned in list views (lightweight). */
     private const LIST_COLS =
-        'id, title, slug, poster, backdrop, category, country, year, release_date,
+        'id, title, slug, poster, thumbnail, backdrop, banner, category, country, year, release_date,
          age_rating, duration, rating, status, is_new, is_popular, is_recommended, views_count';
 
     /**
@@ -114,6 +114,16 @@ final class Movie extends Model
         return array_map(fn ($r) => $this->hydrate($r, false), $stmt->fetchAll());
     }
 
+    /** Server-side playback source (Telegram file id / link). Never sent as-is to clients. */
+    public function playable(int $id): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT id, title, telegram_file_id, watch_url, trailer FROM movies WHERE id = ?"
+        );
+        $stmt->execute([$id]);
+        return $stmt->fetch() ?: null;
+    }
+
     public function incrementViews(int $id, ?int $userId = null): void
     {
         $this->db->prepare("UPDATE movies SET views_count = views_count + 1 WHERE id = ?")->execute([$id]);
@@ -169,8 +179,10 @@ final class Movie extends Model
             return preg_match('#^https?://#', $v) ? $v : rtrim($base, '/') . '/' . ltrim($v, '/');
         };
 
-        $row['poster']   = $media($row['poster']   ?? null);
-        $row['backdrop'] = $media($row['backdrop'] ?? null);
+        $row['poster']    = $media($row['poster']    ?? null);
+        $row['thumbnail'] = $media($row['thumbnail'] ?? null) ?? $row['poster'];
+        $row['backdrop']  = $media($row['backdrop']  ?? null);
+        $row['banner']    = $media($row['banner']    ?? null) ?? $row['backdrop'];
 
         if (array_key_exists('rating', $row)) {
             $row['rating'] = (float) $row['rating'];
@@ -188,6 +200,10 @@ final class Movie extends Model
             $shots = json_decode($row['screenshots'] ?? '[]', true) ?: [];
             $row['screenshots'] = array_map($media, is_array($shots) ? $shots : []);
             $row['actors'] = array_values(array_filter(array_map('trim', explode(',', (string) ($row['actors'] ?? '')))));
+            $sim = json_decode($row['similar_titles'] ?? '[]', true);
+            $row['similar_titles'] = is_array($sim) ? $sim : [];
+            // Never expose the Telegram file id to the client.
+            unset($row['telegram_file_id']);
         }
 
         return $row;

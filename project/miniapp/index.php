@@ -2,6 +2,16 @@
 $config = require __DIR__ . '/../config/config.php';
 $appName = htmlspecialchars($config['app']['name'], ENT_QUOTES);
 // API base is resolved relative to this file; ?route= keeps it host-agnostic.
+
+// Prefer minified assets (built via `php assets/build.php`) and cache-bust by mtime.
+$asset = static function (string $min, string $src): string {
+    $base = __DIR__ . '/../assets/';
+    $rel  = is_file($base . $min) ? $min : $src;
+    $ver  = @filemtime($base . $rel) ?: time();
+    return '../assets/' . $rel . '?v=' . $ver;
+};
+$cssHref = $asset('css/app.min.css', 'css/app.css');
+$jsSrc   = $asset('js/app.min.js', 'js/app.js');
 ?><!doctype html>
 <html lang="ru">
 <head>
@@ -9,7 +19,7 @@ $appName = htmlspecialchars($config['app']['name'], ENT_QUOTES);
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a0c">
 <title><?= $appName ?> — Кино и анонсы</title>
-<link rel="stylesheet" href="../assets/css/app.css">
+<link rel="stylesheet" href="<?= $cssHref ?>">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
@@ -108,6 +118,6 @@ $appName = htmlspecialchars($config['app']['name'], ENT_QUOTES);
 <script>
   window.APP = { name: <?= json_encode($appName) ?>, api: '../api/index.php' };
 </script>
-<script src="../assets/js/app.js"></script>
+<script src="<?= $jsSrc ?>"></script>
 </body>
 </html>
