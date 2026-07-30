@@ -326,7 +326,7 @@
         <div class="season">
           <div class="season__title">Сезон ${s.season}</div>
           <div class="ep-grid">${s.episodes.map(e => `
-            <button class="ep" data-episode="${e.id}">
+            <button class="ep" data-episode="${e.id}" data-deep="ep_${movieId}_${s.season}_${e.episode}">
               <span class="ep__num">${e.episode}</span>
               <span class="ep__label">${e.title ? esc(e.title) : 'Серия ' + e.episode}</span>
               <svg class="ep__play" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>
@@ -361,8 +361,25 @@
   }
 
   // ---- Watch ----
+  // Open a t.me deep link: the Mini App closes and the bot delivers the film.
+  function openDeepLink(payload) {
+    const link = `https://t.me/${window.APP.bot}?start=${payload}`;
+    if (tg?.openTelegramLink) tg.openTelegramLink(link);
+    else window.open(link, '_blank');
+    setTimeout(() => { try { tg?.close(); } catch (e) {} }, 300);
+  }
+
   async function watch(id) {
     haptic('medium');
+
+    // Preferred: auto-generated per-movie link -> app closes, film arrives in the bot.
+    if (window.APP.bot) {
+      api('history', { method: 'POST', body: { movie_id: Number(id), progress: 0 } }).catch(() => {});
+      openDeepLink(`movie_${id}`);
+      return;
+    }
+
+    // Fallback (bot username not configured): server-side delivery.
     try {
       const { data } = await api('watch', { method: 'POST', body: { movie_id: Number(id) } });
 
@@ -590,7 +607,12 @@
     if (watchBtn) { watch(watchBtn.dataset.watch); return; }
 
     const epBtn = t.closest('[data-episode]');
-    if (epBtn) { watchEpisode(epBtn.dataset.episode); return; }
+    if (epBtn) {
+      haptic('medium');
+      if (window.APP.bot && epBtn.dataset.deep) { openDeepLink(epBtn.dataset.deep); return; }
+      watchEpisode(epBtn.dataset.episode);
+      return;
+    }
 
     const scrollBtn = t.closest('[data-scroll]');
     if (scrollBtn) { $('#' + scrollBtn.dataset.scroll)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }

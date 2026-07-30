@@ -12,6 +12,9 @@ $asset = static function (string $min, string $src): string {
 };
 $cssHref = $asset('css/app.min.css', 'css/app.css');
 $jsSrc   = $asset('js/app.min.js', 'js/app.js');
+// Bot username (without @) enables watch-via-deep-link: the app closes and the
+// film is delivered in the bot chat.
+$botUser = ltrim((string) ($config['telegram']['bot_username'] ?? ''), '@');
 ?><!doctype html>
 <html lang="ru">
 <head>
@@ -125,7 +128,7 @@ $jsSrc   = $asset('js/app.min.js', 'js/app.js');
 <div class="toast" id="toast"></div>
 
 <script>
-  window.APP = { name: <?= json_encode($appName) ?>, api: '../api/index.php' };
+  window.APP = { name: <?= json_encode($appName) ?>, api: '../api/index.php', bot: <?= json_encode($botUser) ?> };
 </script>
 <script src="<?= $jsSrc ?>"></script>
 </body>

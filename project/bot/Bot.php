@@ -387,6 +387,7 @@ final class Bot
             if (!empty($play['telegram_file_id'])) {
                 $res = $this->api->sendVideo($chatId, (string) $play['telegram_file_id'], "\u{1F3AC} <b>{$title}</b>", $this->openAppInline());
                 if (!empty($res['ok'])) {
+                    (new \Models\Movie())->incrementViews((int) $m[1], null);
                     return true;
                 }
             }
