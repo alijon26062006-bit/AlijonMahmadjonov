@@ -53,6 +53,15 @@ $runSqlFile = static function (PDO $pdo, string $file): int {
         if (preg_match('/^(CREATE\s+DATABASE|USE)\b/i', $stmt)) {
             continue;
         }
+        // Убираем внешние ключи (некоторые хостинги запрещают привилегию REFERENCES).
+        $lines = preg_split('/\n/', $stmt) ?: [];
+        $lines = array_filter($lines, static function ($l) {
+            return !preg_match('/^\s*CONSTRAINT\b/i', $l) && stripos($l, 'FOREIGN KEY') === false;
+        });
+        $stmt = implode("\n", $lines);
+        // Чиним «висячую» запятую перед закрывающей скобкой.
+        $stmt = preg_replace('/,(\s*)\)/', '$1)', $stmt) ?? $stmt;
+
         $pdo->exec($stmt);
         $count++;
     }
