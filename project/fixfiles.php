@@ -69,13 +69,10 @@ foreach ($files as $path) {
 
     // 4. Ubiraem declare(strict_types=1): eta stroka daet fatalnuyu oshibku
     //    pri lyubom lishnem bayte pered <?php. Bez nee kod rabotaet tak zhe.
-    if (preg_match('/^[ \t]*declare[ \t]*\([ \t]*strict_types[ \t]*=[ \t]*1[ \t]*\)[ \t]*;[ \t]*$/m', $src)) {
-        $src = preg_replace(
-            '/^[ \t]*declare[ \t]*\([ \t]*strict_types[ \t]*=[ \t]*1[ \t]*\)[ \t]*;[ \t]*\R/m',
-            '',
-            $src,
-            1
-        );
+    //    \R v konce lovit i Unix (\n), i Windows (\r\n) perevody stroki.
+    $declareRe = '/^[ \t]*declare[ \t]*\([ \t]*strict_types[ \t]*=[ \t]*1[ \t]*\)[ \t]*;[ \t]*\R/m';
+    if (preg_match($declareRe, $src)) {
+        $src = preg_replace($declareRe, '', $src, 1);
         $note[] = 'ubran strict_types';
     }
 
