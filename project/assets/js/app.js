@@ -573,9 +573,35 @@
     haptic('light');
     switchView('profile');
     const el = $('#profileContent');
-    el.innerHTML = `<div class="skeleton" style="height:220px;margin:16px;border-radius:18px"></div>`;
+
+    // Telegram already gives us the user \u2014 render immediately, then enrich
+    // with server stats. The profile therefore opens even if the API is down.
+    const tgUser = tg?.initDataUnsafe?.user || null;
+    if (tgUser) {
+      renderProfile({
+        first_name: tgUser.first_name,
+        last_name: tgUser.last_name,
+        username: tgUser.username,
+        photo_url: tgUser.photo_url,
+        is_premium: tgUser.is_premium,
+      });
+    } else {
+      el.innerHTML = `<div class="skeleton" style="height:220px;margin:16px;border-radius:18px"></div>`;
+    }
+
     try {
       const { data } = await api('profile', { method: 'POST' });
+      renderProfile(data);
+    } catch (e) {
+      if (!tgUser) {
+        el.innerHTML = emptyState('\uD83D\uDC64', '\u041F\u0440\u043E\u0444\u0438\u043B\u044C \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D', '\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0438\u0437 Telegram, \u0447\u0442\u043E\u0431\u044B \u0443\u0432\u0438\u0434\u0435\u0442\u044C \u043F\u0440\u043E\u0444\u0438\u043B\u044C.');
+      }
+    }
+  }
+
+  function renderProfile(data) {
+    const el = $('#profileContent');
+    {
       const name = [data.first_name, data.last_name].filter(Boolean).map(esc).join(' ') || '\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C';
       const avatar = data.photo_url
         ? `<img src="${esc(data.photo_url)}" alt="">`
@@ -599,8 +625,6 @@
             : ''}
         </div>`;
       bindLazy(el);
-    } catch (e) {
-      el.innerHTML = emptyState('\uD83D\uDC64', '\u041F\u0440\u043E\u0444\u0438\u043B\u044C \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D', '\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0438\u0437 Telegram, \u0447\u0442\u043E\u0431\u044B \u0443\u0432\u0438\u0434\u0435\u0442\u044C \u043F\u0440\u043E\u0444\u0438\u043B\u044C.');
     }
   }
 
