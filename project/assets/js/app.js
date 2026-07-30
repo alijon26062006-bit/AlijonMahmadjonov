@@ -1,5 +1,5 @@
 /* =============================================================
-   CineWave — Mini App front-end controller
+   CineWave \u2014 Mini App front-end controller
    Vanilla ES6, Telegram WebApp SDK
    ============================================================= */
 (() => {
@@ -76,9 +76,9 @@
   // ---- Card template ----
   function card(m, opts = {}) {
     const fav = S.favIds.has(Number(m.id)) ? 'active' : '';
-    const rating = m.rating ? `<div class="card__rating">★ ${Number(m.rating).toFixed(1)}</div>` : '';
+    const rating = m.rating ? `<div class="card__rating">\u2605 ${Number(m.rating).toFixed(1)}</div>` : '';
     const age = m.age_rating ? `<div class="card__age">${esc(m.age_rating)}</div>` : '';
-    const sub = [m.year, catLabel(m.category)].filter(Boolean).map(esc).join(' • ');
+    const sub = [m.year, catLabel(m.category)].filter(Boolean).map(esc).join(' \u2022 ');
     const progress = opts.progress != null
       ? `<div class="card__progress"><i style="width:${opts.progress}%"></i></div>` : '';
     const cls = 'card' + (opts.wide ? ' card--wide' : '');
@@ -90,7 +90,7 @@
         <div class="card__poster">
           ${lazy(poster, m.title)}
           ${rating}${age}
-          <button class="card__fav ${fav}" data-fav="${m.id}" aria-label="В избранное">
+          <button class="card__fav ${fav}" data-fav="${m.id}" aria-label="\u0412 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435">
             <svg viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9.5-9A5 5 0 0112 5a5 5 0 019.5 7c-2.5 4.5-9.5 9-9.5 9z"/></svg>
           </button>
         </div>
@@ -102,7 +102,7 @@
       </article>`;
   }
 
-  const catLabel = (c) => ({ movie:'Фильм', series:'Сериал', anime:'Аниме', cartoon:'Мультфильм' }[c] || '');
+  const catLabel = (c) => ({ movie:'\u0424\u0438\u043B\u044C\u043C', series:'\u0421\u0435\u0440\u0438\u0430\u043B', anime:'\u0410\u043D\u0438\u043C\u0435', cartoon:'\u041C\u0443\u043B\u044C\u0442\u0444\u0438\u043B\u044C\u043C' }[c] || '');
 
   function skeletonRail(wide) {
     const w = wide ? ' style="width:260px"' : '';
@@ -128,7 +128,7 @@
       <section class="rail" data-rail="${id}">
         <div class="rail__head">
           <h2 class="rail__title">${title}</h2>
-          ${opts.section ? `<button class="rail__more" data-section="${opts.section}">Все ›</button>` : ''}
+          ${opts.section ? `<button class="rail__more" data-section="${opts.section}">\u0412\u0441\u0435 \u203A</button>` : ''}
         </div>
         <div class="rail__scroller">${cards}</div>
       </section>`;
@@ -158,23 +158,23 @@
       history.forEach(h => progressMap[h.id] = h.progress);
 
       const html = [
-        history.length ? railHTML('history', '🕒 Продолжить просмотр', history, { progressMap }) : '',
-        railHTML('new', '🔥 Новинки', data.new, { wide: true, section: 'new' }),
-        railHTML('popular', '🎬 Популярное', data.popular, { section: 'popular' }),
-        railHTML('recommended', '⭐ Рекомендуем', data.recommended, { section: 'recommended' }),
-        railHTML('coming', '🎞 Скоро выйдет', data.coming_soon, { section: 'coming_soon' }),
-        railHTML('cinema', '🍿 Сейчас в кино', data.in_cinema, { section: 'in_cinema' }),
-        railHTML('series', '📺 Сериалы', data.series, { section: 'series' }),
-        railHTML('movies', '🎥 Фильмы', data.movies, { section: 'movies' }),
-        railHTML('anime', '🎌 Аниме', data.anime, { section: 'anime' }),
-        railHTML('cartoons', '👶 Мультфильмы', data.cartoons, { section: 'cartoons' }),
-        favorites.length ? railHTML('fav', '❤️ Избранное', favorites, { section: 'favorites' }) : '',
+        history.length ? railHTML('history', '\uD83D\uDD52 \u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440', history, { progressMap }) : '',
+        railHTML('new', '\uD83D\uDD25 \u041D\u043E\u0432\u0438\u043D\u043A\u0438', data.new, { wide: true, section: 'new' }),
+        railHTML('popular', '\uD83C\uDFAC \u041F\u043E\u043F\u0443\u043B\u044F\u0440\u043D\u043E\u0435', data.popular, { section: 'popular' }),
+        railHTML('recommended', '\u2B50 \u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u043C', data.recommended, { section: 'recommended' }),
+        railHTML('coming', '\uD83C\uDF9E \u0421\u043A\u043E\u0440\u043E \u0432\u044B\u0439\u0434\u0435\u0442', data.coming_soon, { section: 'coming_soon' }),
+        railHTML('cinema', '\uD83C\uDF7F \u0421\u0435\u0439\u0447\u0430\u0441 \u0432 \u043A\u0438\u043D\u043E', data.in_cinema, { section: 'in_cinema' }),
+        railHTML('series', '\uD83D\uDCFA \u0421\u0435\u0440\u0438\u0430\u043B\u044B', data.series, { section: 'series' }),
+        railHTML('movies', '\uD83C\uDFA5 \u0424\u0438\u043B\u044C\u043C\u044B', data.movies, { section: 'movies' }),
+        railHTML('anime', '\uD83C\uDF8C \u0410\u043D\u0438\u043C\u0435', data.anime, { section: 'anime' }),
+        railHTML('cartoons', '\uD83D\uDC76 \u041C\u0443\u043B\u044C\u0442\u0444\u0438\u043B\u044C\u043C\u044B', data.cartoons, { section: 'cartoons' }),
+        favorites.length ? railHTML('fav', '\u2764\uFE0F \u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435', favorites, { section: 'favorites' }) : '',
       ].join('');
 
-      railsEl.innerHTML = html || emptyState('🎬', 'Каталог пуст', 'Контент появится, как только администратор добавит фильмы через бота.');
+      railsEl.innerHTML = html || emptyState('\uD83C\uDFAC', '\u041A\u0430\u0442\u0430\u043B\u043E\u0433 \u043F\u0443\u0441\u0442', '\u041A\u043E\u043D\u0442\u0435\u043D\u0442 \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F, \u043A\u0430\u043A \u0442\u043E\u043B\u044C\u043A\u043E \u0430\u0434\u043C\u0438\u043D\u0438\u0441\u0442\u0440\u0430\u0442\u043E\u0440 \u0434\u043E\u0431\u0430\u0432\u0438\u0442 \u0444\u0438\u043B\u044C\u043C\u044B \u0447\u0435\u0440\u0435\u0437 \u0431\u043E\u0442\u0430.');
       bindLazy(railsEl);
     } catch (e) {
-      railsEl.innerHTML = emptyState('⚠️', 'Не удалось загрузить', e.message);
+      railsEl.innerHTML = emptyState('\u26A0\uFE0F', '\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C', e.message);
     }
   }
 
@@ -195,22 +195,22 @@
 
     track.innerHTML = banners.map((b, i) => {
       const meta = [
-        b.rating ? `<span class="star">★ ${Number(b.rating).toFixed(1)}</span>` : '',
+        b.rating ? `<span class="star">\u2605 ${Number(b.rating).toFixed(1)}</span>` : '',
         b.genre ? esc(b.genre) : '',
         b.year || (b.release_date ? String(b.release_date).slice(0,4) : ''),
-      ].filter(Boolean).join(' • ');
+      ].filter(Boolean).join(' \u2022 ');
       return `
         <div class="hero__slide ${i===0?'active':''}" data-hero="${i}" data-movie="${b.movie_id||''}">
           <div class="hero__bg">${lazy(b.image, b.title)}</div>
-          <span class="hero__badge">Премьера</span>
+          <span class="hero__badge">\u041F\u0440\u0435\u043C\u044C\u0435\u0440\u0430</span>
           <h1 class="hero__title">${esc(b.title)}</h1>
           <div class="hero__meta">${meta}</div>
           <p class="hero__desc">${esc(b.description || '')}</p>
           <div class="hero__cta">
             <button class="btn btn--primary" data-hero-play="${b.movie_id||''}">
-              <svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg> Подробнее
+              <svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg> \u041F\u043E\u0434\u0440\u043E\u0431\u043D\u0435\u0435
             </button>
-            <button class="btn btn--glass" data-hero-fav="${b.movie_id||''}">＋ Избранное</button>
+            <button class="btn btn--glass" data-hero-fav="${b.movie_id||''}">\uFF0B \u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435</button>
           </div>
         </div>`;
     }).join('');
@@ -236,45 +236,45 @@
       const { data: m } = await api('movie', { params: { id } });
       renderDetail(m);
     } catch (e) {
-      el.innerHTML = emptyState('⚠️', 'Ошибка', e.message);
+      el.innerHTML = emptyState('\u26A0\uFE0F', '\u041E\u0448\u0438\u0431\u043A\u0430', e.message);
     }
   }
 
   function renderDetail(m) {
     const fav = S.favIds.has(Number(m.id)) ? 'active' : '';
     const tags = [
-      m.rating ? `<span class="tag tag--rating">★ ${Number(m.rating).toFixed(1)}</span>` : '',
+      m.rating ? `<span class="tag tag--rating">\u2605 ${Number(m.rating).toFixed(1)}</span>` : '',
       m.year ? `<span class="tag">${esc(m.year)}</span>` : '',
       m.age_rating ? `<span class="tag">${esc(m.age_rating)}</span>` : '',
-      m.duration ? `<span class="tag">${esc(m.duration)} мин</span>` : '',
+      m.duration ? `<span class="tag">${esc(m.duration)} \u043C\u0438\u043D</span>` : '',
       ...(m.genres || []).map(g => `<span class="tag">${esc(g.name)}</span>`),
     ].filter(Boolean).join('');
 
     const meta = [
-      ['Категория', catLabel(m.category)],
-      ['Страна', m.country],
-      ['Год', m.year],
-      ['Язык', m.language],
-      ['Режиссёр', m.director],
-      ['Длительность', m.duration ? m.duration + ' мин' : null],
+      ['\u041A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044F', catLabel(m.category)],
+      ['\u0421\u0442\u0440\u0430\u043D\u0430', m.country],
+      ['\u0413\u043E\u0434', m.year],
+      ['\u042F\u0437\u044B\u043A', m.language],
+      ['\u0420\u0435\u0436\u0438\u0441\u0441\u0451\u0440', m.director],
+      ['\u0414\u043B\u0438\u0442\u0435\u043B\u044C\u043D\u043E\u0441\u0442\u044C', m.duration ? m.duration + ' \u043C\u0438\u043D' : null],
     ].filter(([, v]) => v).map(([k, v]) =>
       `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
 
     const actors = (m.actors && m.actors.length)
-      ? `<div class="section"><h3>В ролях</h3><p>${m.actors.map(esc).join(', ')}</p></div>` : '';
+      ? `<div class="section"><h3>\u0412 \u0440\u043E\u043B\u044F\u0445</h3><p>${m.actors.map(esc).join(', ')}</p></div>` : '';
 
     const trailer = m.trailer ? `
-      <div class="section"><h3>Трейлер</h3>
+      <div class="section"><h3>\u0422\u0440\u0435\u0439\u043B\u0435\u0440</h3>
         <div class="trailer-wrap">${embedTrailer(m.trailer)}</div>
       </div>` : '';
 
     const shots = (m.screenshots && m.screenshots.length) ? `
-      <div class="section"><h3>Кадры</h3>
+      <div class="section"><h3>\u041A\u0430\u0434\u0440\u044B</h3>
         <div class="shots">${m.screenshots.map(s => lazy(s)).join('')}</div>
       </div>` : '';
 
     const similar = (m.similar && m.similar.length) ? `
-      <section class="rail"><div class="rail__head"><h2 class="rail__title">Похожие</h2></div>
+      <section class="rail"><div class="rail__head"><h2 class="rail__title">\u041F\u043E\u0445\u043E\u0436\u0438\u0435</h2></div>
         <div class="rail__scroller">${m.similar.map(x => card(x)).join('')}</div>
       </section>` : '';
 
@@ -282,7 +282,7 @@
       <div class="detail__hero">
         <div class="detail__bg">${lazy(m.backdrop || m.poster, m.title)}</div>
         <div class="detail__floatbar">
-          <button class="back-btn" data-back>‹</button>
+          <button class="back-btn" data-back>\u2039</button>
           <button class="icon-btn ${fav}" data-fav="${m.id}" style="width:38px;height:38px">
             <svg viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9.5-9A5 5 0 0112 5a5 5 0 019.5 7c-2.5 4.5-9.5 9-9.5 9z"/></svg>
           </button>
@@ -296,15 +296,15 @@
         </div>
         <div class="detail__cta">
           ${['series', 'anime'].includes(m.category)
-            ? `<button class="btn btn--primary" data-scroll="episodesSection"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg> Смотреть серии</button>`
-            : `<button class="btn btn--primary" data-watch="${m.id}"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg> Смотреть</button>`}
+            ? `<button class="btn btn--primary" data-scroll="episodesSection"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg> \u0421\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u0441\u0435\u0440\u0438\u0438</button>`
+            : `<button class="btn btn--primary" data-watch="${m.id}"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg> \u0421\u043C\u043E\u0442\u0440\u0435\u0442\u044C</button>`}
           <button class="btn btn--glass" data-fav="${m.id}">
-            ${fav ? '❤️ В избранном' : '＋ Избранное'}
+            ${fav ? '\u2764\uFE0F \u0412 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u043C' : '\uFF0B \u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435'}
           </button>
         </div>
       </div>
-      ${m.description ? `<div class="section"><h3>Описание</h3><p>${esc(m.description)}</p></div>` : ''}
-      <div class="section"><h3>О тайтле</h3><dl class="meta-grid">${meta}</dl></div>
+      ${m.description ? `<div class="section"><h3>\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435</h3><p>${esc(m.description)}</p></div>` : ''}
+      <div class="section"><h3>\u041E \u0442\u0430\u0439\u0442\u043B\u0435</h3><dl class="meta-grid">${meta}</dl></div>
       ${actors}${trailer}${shots}
       <div id="episodesSection"></div>
       ${similar}
@@ -322,13 +322,13 @@
     try {
       const { data } = await api('episodes', { params: { movie_id: movieId } });
       if (!data || !data.length) { host.innerHTML = ''; return; }
-      host.innerHTML = `<div class="section"><h3>Серии</h3>${data.map(s => `
+      host.innerHTML = `<div class="section"><h3>\u0421\u0435\u0440\u0438\u0438</h3>${data.map(s => `
         <div class="season">
-          <div class="season__title">Сезон ${s.season}</div>
+          <div class="season__title">\u0421\u0435\u0437\u043E\u043D ${s.season}</div>
           <div class="ep-grid">${s.episodes.map(e => `
             <button class="ep" data-episode="${e.id}" data-deep="ep_${movieId}_${s.season}_${e.episode}">
               <span class="ep__num">${e.episode}</span>
-              <span class="ep__label">${e.title ? esc(e.title) : 'Серия ' + e.episode}</span>
+              <span class="ep__label">${e.title ? esc(e.title) : '\u0421\u0435\u0440\u0438\u044F ' + e.episode}</span>
               <svg class="ep__play" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>
             </button>`).join('')}</div>
         </div>`).join('')}</div>`;
@@ -340,7 +340,7 @@
     try {
       const { data } = await api('watch', { method: 'POST', body: { episode_id: Number(id) } });
       if (data.via === 'telegram' && data.delivered) {
-        toast(data.message || 'Серия отправлена в чат с ботом ✅');
+        toast(data.message || '\u0421\u0435\u0440\u0438\u044F \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430 \u0432 \u0447\u0430\u0442 \u0441 \u0431\u043E\u0442\u043E\u043C \u2705');
         setTimeout(() => { try { tg?.close(); } catch (e) {} }, 1400);
         return;
       }
@@ -349,9 +349,9 @@
         if (tg?.openLink) tg.openLink(link, { try_instant_view: false });
         else window.open(link, '_blank');
       } else {
-        toast('Источник появится позже');
+        toast('\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u043F\u043E\u0437\u0436\u0435');
       }
-    } catch (e) { toast('Не удалось открыть'); }
+    } catch (e) { toast('\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043A\u0440\u044B\u0442\u044C'); }
   }
 
   function embedTrailer(url) {
@@ -385,7 +385,7 @@
 
       // Film delivered straight into the Telegram chat with the bot.
       if (data.via === 'telegram' && data.delivered) {
-        toast(data.message || 'Фильм отправлен в чат с ботом ✅');
+        toast(data.message || '\u0424\u0438\u043B\u044C\u043C \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D \u0432 \u0447\u0430\u0442 \u0441 \u0431\u043E\u0442\u043E\u043C \u2705');
         setTimeout(() => { try { tg?.close(); } catch (e) {} }, 1400);
         return;
       }
@@ -395,9 +395,9 @@
         if (tg?.openLink) tg.openLink(link, { try_instant_view: false });
         else window.open(link, '_blank');
       } else {
-        toast('Источник появится позже');
+        toast('\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u043F\u043E\u0437\u0436\u0435');
       }
-    } catch (e) { toast('Не удалось открыть'); }
+    } catch (e) { toast('\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043A\u0440\u044B\u0442\u044C'); }
   }
 
   // ---- Favorites ----
@@ -406,25 +406,25 @@
     haptic('light');
     try {
       const { data } = await api('favorites', { method: 'POST', body: { movie_id: id } });
-      if (data.favorited) { S.favIds.add(id); toast('Добавлено в избранное'); }
-      else { S.favIds.delete(id); toast('Удалено из избранного'); }
+      if (data.favorited) { S.favIds.add(id); toast('\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435'); }
+      else { S.favIds.delete(id); toast('\u0423\u0434\u0430\u043B\u0435\u043D\u043E \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E'); }
       syncFavUI(id);
-    } catch (e) { toast('Войдите через Telegram'); }
+    } catch (e) { toast('\u0412\u043E\u0439\u0434\u0438\u0442\u0435 \u0447\u0435\u0440\u0435\u0437 Telegram'); }
   }
   function syncFavUI(id) {
     const active = S.favIds.has(Number(id));
     $$(`[data-fav="${id}"]`).forEach(b => {
       b.classList.toggle('active', active);
-      if (b.classList.contains('btn')) b.innerHTML = active ? '❤️ В избранном' : '＋ Избранное';
+      if (b.classList.contains('btn')) b.innerHTML = active ? '\u2764\uFE0F \u0412 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u043C' : '\uFF0B \u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435';
     });
   }
 
   // ---- Catalog / section view (infinite scroll) ----
   const SECTION_TITLES = {
-    new:'🔥 Новинки', popular:'🎬 Популярное', recommended:'⭐ Рекомендуем',
-    coming_soon:'🎞 Скоро выйдет', in_cinema:'🍿 Сейчас в кино',
-    series:'📺 Сериалы', movies:'🎥 Фильмы', anime:'🎌 Аниме',
-    cartoons:'👶 Мультфильмы', favorites:'❤️ Избранное', history:'🕒 История',
+    new:'\uD83D\uDD25 \u041D\u043E\u0432\u0438\u043D\u043A\u0438', popular:'\uD83C\uDFAC \u041F\u043E\u043F\u0443\u043B\u044F\u0440\u043D\u043E\u0435', recommended:'\u2B50 \u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u043C',
+    coming_soon:'\uD83C\uDF9E \u0421\u043A\u043E\u0440\u043E \u0432\u044B\u0439\u0434\u0435\u0442', in_cinema:'\uD83C\uDF7F \u0421\u0435\u0439\u0447\u0430\u0441 \u0432 \u043A\u0438\u043D\u043E',
+    series:'\uD83D\uDCFA \u0421\u0435\u0440\u0438\u0430\u043B\u044B', movies:'\uD83C\uDFA5 \u0424\u0438\u043B\u044C\u043C\u044B', anime:'\uD83C\uDF8C \u0410\u043D\u0438\u043C\u0435',
+    cartoons:'\uD83D\uDC76 \u041C\u0443\u043B\u044C\u0442\u0444\u0438\u043B\u044C\u043C\u044B', favorites:'\u2764\uFE0F \u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435', history:'\uD83D\uDD52 \u0418\u0441\u0442\u043E\u0440\u0438\u044F',
   };
   const SECTION_PARAMS = {
     new:{ flag:'new', sort:'newest' }, popular:{ flag:'popular', sort:'popular' },
@@ -436,7 +436,7 @@
 
   async function openSection(key) {
     switchView('catalog');
-    $('#catalogTitle').textContent = SECTION_TITLES[key] || 'Каталог';
+    $('#catalogTitle').textContent = SECTION_TITLES[key] || '\u041A\u0430\u0442\u0430\u043B\u043E\u0433';
     const grid = $('#catalogGrid');
     grid.innerHTML = `<div class="rail__scroller" style="flex-wrap:wrap">${skeletonRail()}</div>`;
     S.catalog = { key, offset: 0, loading: false, done: false, params: SECTION_PARAMS[key] || {} };
@@ -447,10 +447,10 @@
         const { data } = await api(key);
         grid.innerHTML = data.length
           ? data.map(m => card(m, { progress: key==='history' ? m.progress : null })).join('')
-          : emptyState(key==='favorites'?'❤️':'🕒', 'Пусто', 'Здесь появится сохранённое.');
+          : emptyState(key==='favorites'?'\u2764\uFE0F':'\uD83D\uDD52', '\u041F\u0443\u0441\u0442\u043E', '\u0417\u0434\u0435\u0441\u044C \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D\u043D\u043E\u0435.');
         bindLazy(grid);
         S.catalog.done = true;
-      } catch (e) { grid.innerHTML = emptyState('⚠️','Ошибка', e.message); }
+      } catch (e) { grid.innerHTML = emptyState('\u26A0\uFE0F','\u041E\u0448\u0438\u0431\u043A\u0430', e.message); }
       return;
     }
     grid.innerHTML = '';
@@ -463,7 +463,7 @@
     c.loading = true;
     try {
       const { data } = await api('movies', { params: { ...c.params, limit: 18, offset: c.offset } });
-      if (!data.length) { c.done = true; if (!c.offset) $('#catalogGrid').innerHTML = emptyState('🎬','Пусто','Контент скоро появится.'); }
+      if (!data.length) { c.done = true; if (!c.offset) $('#catalogGrid').innerHTML = emptyState('\uD83C\uDFAC','\u041F\u0443\u0441\u0442\u043E','\u041A\u043E\u043D\u0442\u0435\u043D\u0442 \u0441\u043A\u043E\u0440\u043E \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F.'); }
       else {
         $('#catalogGrid').insertAdjacentHTML('beforeend', data.map(m => card(m)).join(''));
         bindLazy($('#catalogGrid'));
@@ -541,7 +541,7 @@
     return `<div class="empty"><div class="em">${em}</div><h3>${esc(title)}</h3><p>${esc(text)}</p></div>`;
   }
 
-  // ---- Hash deep links (from bot buttons: #series, #anime, …) ----
+  // ---- Hash deep links (from bot buttons: #series, #anime, \u2026) ----
   function handleHash() {
     const h = location.hash.replace('#', '');
     if (!h) return;
@@ -567,7 +567,7 @@
     el.innerHTML = `<div class="skeleton" style="height:220px;margin:16px;border-radius:18px"></div>`;
     try {
       const { data } = await api('profile', { method: 'POST' });
-      const name = [data.first_name, data.last_name].filter(Boolean).map(esc).join(' ') || 'Пользователь';
+      const name = [data.first_name, data.last_name].filter(Boolean).map(esc).join(' ') || '\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C';
       const avatar = data.photo_url
         ? `<img src="${esc(data.photo_url)}" alt="">`
         : `<span>${(data.first_name || 'U').charAt(0).toUpperCase()}</span>`;
@@ -576,22 +576,22 @@
           <div class="profile__avatar">${avatar}</div>
           <div class="profile__name">${name}</div>
           ${data.username ? `<div class="profile__username">@${esc(data.username)}</div>` : ''}
-          ${data.is_premium ? `<div class="profile__badge">⭐ Telegram Premium</div>` : ''}
+          ${data.is_premium ? `<div class="profile__badge">\u2B50 Telegram Premium</div>` : ''}
           <div class="profile__stats">
             <button class="pstat" data-nav-section="favorites">
-              <b>${data.favorites_count || 0}</b><span>❤️ Избранное</span>
+              <b>${data.favorites_count || 0}</b><span>\u2764\uFE0F \u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435</span>
             </button>
             <button class="pstat" data-nav-section="history">
-              <b>${data.history_count || 0}</b><span>🕒 История</span>
+              <b>${data.history_count || 0}</b><span>\uD83D\uDD52 \u0418\u0441\u0442\u043E\u0440\u0438\u044F</span>
             </button>
           </div>
           ${data.is_admin
-            ? `<div class="profile__admin">🛠 Вы администратор.<br>Добавление фильмов и серий — в боте: <b>/admin</b></div>`
+            ? `<div class="profile__admin">\uD83D\uDEE0 \u0412\u044B \u0430\u0434\u043C\u0438\u043D\u0438\u0441\u0442\u0440\u0430\u0442\u043E\u0440.<br>\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0444\u0438\u043B\u044C\u043C\u043E\u0432 \u0438 \u0441\u0435\u0440\u0438\u0439 \u2014 \u0432 \u0431\u043E\u0442\u0435: <b>/admin</b></div>`
             : ''}
         </div>`;
       bindLazy(el);
     } catch (e) {
-      el.innerHTML = emptyState('👤', 'Профиль недоступен', 'Откройте приложение из Telegram, чтобы увидеть профиль.');
+      el.innerHTML = emptyState('\uD83D\uDC64', '\u041F\u0440\u043E\u0444\u0438\u043B\u044C \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D', '\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0438\u0437 Telegram, \u0447\u0442\u043E\u0431\u044B \u0443\u0432\u0438\u0434\u0435\u0442\u044C \u043F\u0440\u043E\u0444\u0438\u043B\u044C.');
     }
   }
 
@@ -623,7 +623,7 @@
     if (pstat) { switchView('catalog'); openSection(pstat.dataset.navSection); return; }
 
     const heroPlay = t.closest('[data-hero-play]');
-    if (heroPlay) { const id = heroPlay.dataset.heroPlay; if (id) openDetail(id); else toast('Скоро в каталоге'); return; }
+    if (heroPlay) { const id = heroPlay.dataset.heroPlay; if (id) openDetail(id); else toast('\u0421\u043A\u043E\u0440\u043E \u0432 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0435'); return; }
     const heroFav = t.closest('[data-hero-fav]');
     if (heroFav) { const id = heroFav.dataset.heroFav; if (id) toggleFav(id); return; }
 
