@@ -172,7 +172,24 @@ if (file_exists(__DIR__ . '/db.php')) {
     }
 }
 
-/* ---- 8. Иловагӣ ---- */
+/* ---- 8. Роҳҳо: кадом папкаро сервер мебинад ---- */
+$here = __DIR__;
+$docroot = isset($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : '';
+add_row($rows, $fatal, $warn, 'Ин файл дар куҷост', 'ok', htmlspecialchars($here));
+add_row($rows, $fatal, $warn, 'Папкаи сайт (DOCUMENT_ROOT)', 'ok',
+    $docroot === '' ? 'номаълум' : htmlspecialchars($docroot));
+if ($docroot !== '' && rtrim($docroot, '/') !== rtrim($here, '/')) {
+    add_row($rows, $fatal, $warn, 'Мувофиқати папкаҳо', 'warn',
+        'файл дар папкаи дигар аст. Сервер папкаи болоиро мебинад — '
+        . 'файлҳоро маҳз ба он ҷо гузоред.');
+} else {
+    add_row($rows, $fatal, $warn, 'Мувофиқати папкаҳо', 'ok', 'файлҳо дар ҳамон ҷое, ки сервер мебинад');
+}
+add_row($rows, $fatal, $warn, 'Суроғаи ҷорӣ', 'ok',
+    htmlspecialchars((isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '?')
+    . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '')));
+
+/* ---- 9. Иловагӣ ---- */
 add_row($rows, $fatal, $warn, 'Сервер', 'ok',
     htmlspecialchars(isset($_SERVER['SERVER_SOFTWARE']) ? $_SERVER['SERVER_SOFTWARE'] : 'номаълум'));
 add_row($rows, $fatal, $warn, 'Хотира (memory_limit)', 'ok', ini_get('memory_limit'));
