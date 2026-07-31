@@ -2,77 +2,85 @@
 /**
  * CodeTJ — барнома (аз index.php даъват мешавад).
  * Роутинг: ?p=...  Синтаксис: PHP 7.1+ мутобиқ.
+ *
+ * Воридшавӣ бо рақами телефон, дарсҳо қадам ба қадам,
+ * дарси навбатӣ танҳо баъд аз супоридани дарси пешина кушода мешавад.
  */
 
 require __DIR__ . '/db.php';
 codetj_session_start();
 
 /* ============================================================
- *  ЗАБОНҲО — тамоми навиштаҷоти интерфейс дар як ҷо.
+ *  ЗАБОНҲО
  * ============================================================ */
 $LANG = array(
 'tj' => array(
     'tagline'        => 'Барномасозиро бо забони тоҷикӣ омӯз',
-    'hero_text'      => 'HTML, CSS ва JavaScript — бо забони модарӣ, бо мисолҳои зинда. Кодро дар браузер менависӣ ва дарҳол натиҷаро мебинӣ.',
+    'hero_text'      => 'HTML, CSS ва JavaScript — бо забони модарӣ. Кодро дар браузер менависӣ ва дарҳол натиҷаро мебинӣ.',
     'start_free'     => 'Оғоз кун — ройгон',
-    'have_account'   => 'Аллакай ҳисоб дорӣ? Ворид шав',
     'nav_home'       => 'Асосӣ',
     'nav_profile'    => 'Профил',
-    'login'          => 'Воридшавӣ',
-    'register'       => 'Бақайдгирӣ',
+    'nav_rating'     => 'Рейтинг',
+    'enter'          => 'Даромадан',
     'logout'         => 'Баромадан',
-    'username'       => 'Логин',
-    'password'       => 'Парол',
-    'password2'      => 'Парол (такрор)',
-    'name'           => 'Ном',
+    'phone'          => 'Рақами телефон',
+    'phone_hint'     => 'Рақами худро нависед — ҳамин бас. Пароли ба хотир гирифтан лозим нест.',
+    'phone_ph'       => '90 123 45 67',
+    'phone_next'     => 'Идома',
+    'phone_bad'      => 'Рақам нодуруст аст. Мисол: 901234567',
+    'name_title'     => 'Шинос шавем!',
+    'name_hint'      => 'Ин рақам аввалин бор ин ҷо. Номатро нависед — ҳамин бас.',
+    'name'           => 'Номи ту',
+    'name_ph'        => 'Масалан: Алиҷон',
     'city'           => 'Шаҳр ё ноҳия',
-    'city_ph'        => 'Масалан: Душанбе, Хуҷанд, Кӯлоб…',
-    'login_ph'       => 'ҳарфҳои лотинӣ, рақам, _',
-    'do_login'       => 'Ворид шудан',
-    'do_register'    => 'Сабти ном кардан',
-    'no_account'     => 'Ҳисоб надорӣ? Сабти ном кун',
-    'setup_title'    => 'Насбкунии CodeTJ',
-    'setup_note'     => 'Ин аввалин воридшавӣ ба сайт аст. Ҳисоби администраторро соз — баъд ҳамаи танзимот дар дасти ту.',
-    'create_admin'   => 'Сохтани администратор',
-    'welcome'        => 'Хуш омадӣ',
+    'city_ph'        => 'Душанбе, Хуҷанд, Кӯлоб…',
+    'city_opt'       => 'ихтиёрӣ',
+    'start_learn'    => 'Оғози омӯзиш',
+    'name_empty'     => 'Номатро нависед.',
+    'welcome_back'   => 'Хуш омадӣ',
+    'pin_title'      => 'Рамзи админ',
+    'pin_hint'       => 'Ту аввалин корбарӣ, барои ҳамин администратор мешавӣ. Рамзи 4–6 рақама соз, то ҳисобатро касе нагирад.',
+    'pin_ask'        => 'Рамзи худро нависед',
+    'pin'            => 'Рамз (4–6 рақам)',
+    'pin_bad'        => 'Рамз нодуруст аст.',
+    'pin_short'      => 'Рамз бояд 4–6 рақам бошад.',
     'points'         => 'балл',
     'streak'         => 'рӯз пай дар пай',
     'of'             => 'аз',
     'done_word'      => 'супорида шуд',
     'continue'       => 'Давом додан',
-    'open_course'    => 'Кушодан',
-    'full_locked_hint' => 'Ин курс кушода мешавад, вақте ки дар HTML, CSS ва JavaScript ҳар кадомашро на кам аз 60% мегузаронӣ. Ту метавонӣ!',
+    'open_course'    => 'Оғоз кардан',
+    'full_locked_hint' => 'Ин курс кушода мешавад, вақте дар HTML, CSS ва JS ҳар кадомашро 60% мегузаронӣ.',
     'level'          => 'Сатҳ',
-    'level_locked_hint' => 'Ин сатҳ пӯшида аст. Аввал ҳамаи 10 дарси сатҳи пешинаро супор.',
     'lesson'         => 'Дарс',
-    'lesson_not_ready' => 'Ин дарс ҳанӯз тайёр мешавад. Ба зудӣ пайдо мешавад!',
-    'soon'           => 'Ба зудӣ',
+    'lesson_locked'  => 'Аввал дарси пешинаро супор',
+    'lesson_soon'    => 'Ин дарс ҳанӯз тайёр мешавад',
     'back'           => 'Бозгашт',
-    'theory'         => 'Назария',
-    'example'        => 'Намуна',
+    'step'           => 'Қадам',
+    'step_next'      => 'Оянда',
+    'step_prev'      => 'Қафо',
+    'step_done'      => 'Назария тамом! Акнун худат нависем',
+    'to_practice'    => 'Ба амалия гузаштан',
     'practice'       => 'Амалия',
     'test'           => 'Тест',
+    'example'        => 'Намуна',
     'open_in_editor' => 'Дар муҳаррир кушодан',
     'run'            => 'Иҷро',
-    'clear'          => 'Тоза кардан',
     'save'           => 'Захира',
     'reset'          => 'Аз нав',
-    'fullscreen'     => 'Экрани пурра',
     'preview'        => 'Натиҷа',
     'code'           => 'Код',
     'saved'          => 'Захира шуд',
     'saving'         => 'Захира мешавад…',
     'save_err'       => 'Захира нашуд',
     'task'           => 'Супориш',
-    'test_intro'     => 'Ба 5 савол ҷавоб деҳ. Ҷавоби дуруст аз кӯшиши аввал — 10 балл, аз дуюм — 5 балл.',
+    'test_intro'     => 'Ба 5 савол ҷавоб деҳ. Ҷавоби дуруст аз кӯшиши аввал — 10 балл, аз дуюм — 5.',
     'test_send'      => 'Ҷавобҳоро фиристодан',
     'test_again'     => 'Аз нав кӯшиш кардан',
-    'test_result'    => 'Натиҷаи тест',
     'test_correct'   => 'Дуруст',
-    'test_wrong'     => 'Нодуруст',
     'test_need_all'  => 'Ба ҳамаи саволҳо ҷавоб деҳ.',
     'test_passed'    => 'Офарин! Тест супорида шуд.',
-    'test_failed'    => 'Ҳанӯз кам аст. Назарияро боз як бор хон ва кӯшиш кун.',
+    'test_failed'    => 'Ҳанӯз кам аст. Назарияро боз як бор хон.',
     'try_once_more'  => 'Нодуруст. Боз як бор фикр кун — ҷавоб дар назария ҳаст.',
     'lesson_done'    => 'Дарс супорида шуд!',
     'lesson_done_txt'=> 'Дарси навбатӣ кушода шуд. Давом деҳ!',
@@ -83,102 +91,98 @@ $LANG = array(
     'no_students'    => 'Ҳанӯз касе нест — аввалин шав!',
     'rank'           => 'Ҷой дар рейтинг',
     'home_title'     => 'Курсҳои ту',
-    'lessons_50'     => '50 дарс',
-    'levels_5'       => '5 сатҳ',
-    'footer_note'    => 'CodeTJ — барои ҳамаи онҳое, ки мехоҳанд барномасоз шаванд.',
-    'theme_toggle'   => 'Мавзӯъ: торик/равшан',
-    'err_csrf'       => 'Форма кӯҳна шудааст. Саҳифаро нав кун ва боз кӯшиш кун.',
+    'keep_going'     => 'Давом деҳ',
+    'lesson_of'      => 'Дарси',
+    'footer_note'    => 'Барои ҳамаи онҳое, ки мехоҳанд барномасоз шаванд',
+    'err_csrf'       => 'Форма кӯҳна шудааст. Саҳифаро нав кун.',
     'err_rate'       => 'Хеле зуд-зуд кӯшиш кардӣ. Якчанд дақиқа сабр кун.',
-    'err_login_taken'=> 'Ин логин банд аст. Дигарашро интихоб кун.',
-    'err_login_format' => 'Логин аз 3 то 32 аломат: ҳарфҳои лотинӣ, рақамҳо ва _.',
-    'err_name_empty' => 'Номатро нависед.',
-    'err_pass_short' => 'Парол на кам аз 6 аломат бошад.',
-    'err_pass_mismatch' => 'Паролҳо якхела набаромаданд.',
-    'err_wrong_creds'=> 'Логин ё парол нодуруст аст.',
-    'err_banned'     => 'Ҳисоби ту баста шудааст. Бо администратор дар тамос шав.',
-    'err_reg_off'    => 'Ҳоло бақайдгирии нав пӯшида аст.',
+    'err_banned'     => 'Ҳисоби ту баста шудааст.',
     'err_not_found'  => 'Чунин саҳифа ёфт нашуд.',
-    'err_need_login' => 'Барои ин амал аввал ворид шав.',
-    'ok_registered'  => 'Табрик! Ҳисобат сохта шуд. Акнун омӯзишро сар кун!',
-    'ok_admin_created' => 'Администратор сохта шуд. Хуш омадӣ ба CodeTJ!',
+    'err_need_login' => 'Барои ин амал аввал даро.',
+    'ok_registered'  => 'Табрик! Акнун омӯзишро сар кун!',
     'lang_tj'        => 'ТҶ',
     'lang_ru'        => 'РУ',
-    'stat_lessons'   => 'дарс',
-    'stat_free'      => 'ройгон',
-    'stat_lang'      => 'бо тоҷикӣ',
     'why_title'      => 'Чаро CodeTJ?',
     'why_1_t'        => 'Бо забони худат',
-    'why_1_d'        => 'Ҳамаи дарсҳо бо тоҷикии зинда навишта шудаанд — фаҳмо, бе тарҷумаи хушк.',
-    'why_2_t'        => 'Код дар браузер',
-    'why_2_d'        => 'Ҳеҷ чиз насб кардан лозим нест: менависӣ ва дарҳол натиҷаро мебинӣ.',
-    'why_3_t'        => 'Қадам ба қадам',
-    'why_3_d'        => 'Аз тегҳои оддӣ то лоиҳаҳои воқеӣ — бе ҷаҳиш, бе холигоҳ.',
-    'why_4_t'        => 'Бозӣ барин',
-    'why_4_d'        => 'Балл, сатҳ ва рейтинг — омӯзиш мисли бозии шавқовар.',
+    'why_1_d'        => 'Дарсҳо бо тоҷикии зинда — фаҳмо, бе тарҷумаи хушк.',
+    'why_2_t'        => 'Қадам ба қадам',
+    'why_2_d'        => 'Ҳар дарс ба қадамҳои хурд тақсим шудааст. Гум намешавӣ.',
+    'why_3_t'        => 'Код дар браузер',
+    'why_3_d'        => 'Менависӣ — дарҳол натиҷаро мебинӣ. Ҳеҷ чиз насб кардан лозим нест.',
+    'why_4_t'        => 'Бе парол',
+    'why_4_d'        => 'Танҳо рақами телефон. Даромадан — 5 сония.',
+    'stat_lessons'   => 'дарс',
+    'stat_free'      => 'ройгон',
+    'stat_lang'      => 'тоҷикӣ',
 ),
 'ru' => array(
     'tagline'        => 'Учи программирование на таджикском',
-    'hero_text'      => 'HTML, CSS и JavaScript — на родном языке, с живыми примерами. Пишешь код в браузере и сразу видишь результат.',
+    'hero_text'      => 'HTML, CSS и JavaScript — на родном языке. Пишешь код в браузере и сразу видишь результат.',
     'start_free'     => 'Начать — бесплатно',
-    'have_account'   => 'Уже есть аккаунт? Войти',
     'nav_home'       => 'Главная',
     'nav_profile'    => 'Профиль',
-    'login'          => 'Вход',
-    'register'       => 'Регистрация',
+    'nav_rating'     => 'Рейтинг',
+    'enter'          => 'Войти',
     'logout'         => 'Выйти',
-    'username'       => 'Логин',
-    'password'       => 'Пароль',
-    'password2'      => 'Пароль (ещё раз)',
-    'name'           => 'Имя',
+    'phone'          => 'Номер телефона',
+    'phone_hint'     => 'Просто напиши свой номер. Пароль запоминать не нужно.',
+    'phone_ph'       => '90 123 45 67',
+    'phone_next'     => 'Далее',
+    'phone_bad'      => 'Неверный номер. Пример: 901234567',
+    'name_title'     => 'Давай познакомимся!',
+    'name_hint'      => 'Этот номер здесь впервые. Напиши своё имя — этого достаточно.',
+    'name'           => 'Твоё имя',
+    'name_ph'        => 'Например: Алиджон',
     'city'           => 'Город или район',
-    'city_ph'        => 'Например: Душанбе, Худжанд, Куляб…',
-    'login_ph'       => 'латинские буквы, цифры, _',
-    'do_login'       => 'Войти',
-    'do_register'    => 'Зарегистрироваться',
-    'no_account'     => 'Нет аккаунта? Зарегистрируйся',
-    'setup_title'    => 'Установка CodeTJ',
-    'setup_note'     => 'Это первый запуск сайта. Создай аккаунт администратора — дальше все настройки будут в твоих руках.',
-    'create_admin'   => 'Создать администратора',
-    'welcome'        => 'С возвращением',
+    'city_ph'        => 'Душанбе, Худжанд, Куляб…',
+    'city_opt'       => 'необязательно',
+    'start_learn'    => 'Начать учиться',
+    'name_empty'     => 'Напиши своё имя.',
+    'welcome_back'   => 'С возвращением',
+    'pin_title'      => 'Код администратора',
+    'pin_hint'       => 'Ты первый пользователь, поэтому становишься администратором. Придумай код из 4–6 цифр, чтобы аккаунт не занял кто-то другой.',
+    'pin_ask'        => 'Введи свой код',
+    'pin'            => 'Код (4–6 цифр)',
+    'pin_bad'        => 'Неверный код.',
+    'pin_short'      => 'Код должен быть из 4–6 цифр.',
     'points'         => 'баллов',
     'streak'         => 'дней подряд',
     'of'             => 'из',
     'done_word'      => 'пройдено',
     'continue'       => 'Продолжить',
-    'open_course'    => 'Открыть',
-    'full_locked_hint' => 'Этот курс откроется, когда в HTML, CSS и JavaScript будет пройдено не меньше 60% уроков. У тебя получится!',
+    'open_course'    => 'Начать',
+    'full_locked_hint' => 'Этот курс откроется, когда в HTML, CSS и JS будет пройдено по 60%.',
     'level'          => 'Уровень',
-    'level_locked_hint' => 'Этот уровень закрыт. Сначала пройди все 10 уроков предыдущего уровня.',
     'lesson'         => 'Урок',
-    'lesson_not_ready' => 'Этот урок ещё готовится. Скоро появится!',
-    'soon'           => 'Скоро',
+    'lesson_locked'  => 'Сначала пройди предыдущий урок',
+    'lesson_soon'    => 'Этот урок ещё готовится',
     'back'           => 'Назад',
-    'theory'         => 'Теория',
-    'example'        => 'Пример',
+    'step'           => 'Шаг',
+    'step_next'      => 'Дальше',
+    'step_prev'      => 'Назад',
+    'step_done'      => 'Теория пройдена! Теперь пишем сами',
+    'to_practice'    => 'Перейти к практике',
     'practice'       => 'Практика',
     'test'           => 'Тест',
+    'example'        => 'Пример',
     'open_in_editor' => 'Открыть в редакторе',
     'run'            => 'Запустить',
-    'clear'          => 'Очистить',
     'save'           => 'Сохранить',
     'reset'          => 'Сбросить',
-    'fullscreen'     => 'Во весь экран',
     'preview'        => 'Результат',
     'code'           => 'Код',
     'saved'          => 'Сохранено',
     'saving'         => 'Сохраняем…',
     'save_err'       => 'Не сохранилось',
     'task'           => 'Задание',
-    'test_intro'     => 'Ответь на 5 вопросов. Правильный ответ с первой попытки — 10 баллов, со второй — 5.',
+    'test_intro'     => 'Ответь на 5 вопросов. Верный ответ с первой попытки — 10 баллов, со второй — 5.',
     'test_send'      => 'Отправить ответы',
     'test_again'     => 'Попробовать снова',
-    'test_result'    => 'Результат теста',
     'test_correct'   => 'Верно',
-    'test_wrong'     => 'Неверно',
     'test_need_all'  => 'Ответь на все вопросы.',
     'test_passed'    => 'Молодец! Тест сдан.',
-    'test_failed'    => 'Пока маловато. Перечитай теорию и попробуй ещё раз.',
-    'try_once_more'  => 'Неверно. Подумай ещё раз — ответ есть в теории.',
+    'test_failed'    => 'Пока маловато. Перечитай теорию.',
+    'try_once_more'  => 'Неверно. Подумай ещё — ответ есть в теории.',
     'lesson_done'    => 'Урок пройден!',
     'lesson_done_txt'=> 'Следующий урок открыт. Продолжай!',
     'next_lesson'    => 'Следующий урок',
@@ -188,38 +192,29 @@ $LANG = array(
     'no_students'    => 'Пока никого нет — стань первым!',
     'rank'           => 'Место в рейтинге',
     'home_title'     => 'Твои курсы',
-    'lessons_50'     => '50 уроков',
-    'levels_5'       => '5 уровней',
-    'footer_note'    => 'CodeTJ — для всех, кто хочет стать программистом.',
-    'theme_toggle'   => 'Тема: тёмная/светлая',
-    'err_csrf'       => 'Форма устарела. Обнови страницу и попробуй ещё раз.',
+    'keep_going'     => 'Продолжай',
+    'lesson_of'      => 'Урок',
+    'footer_note'    => 'Для всех, кто хочет стать программистом',
+    'err_csrf'       => 'Форма устарела. Обнови страницу.',
     'err_rate'       => 'Слишком много попыток. Подожди несколько минут.',
-    'err_login_taken'=> 'Этот логин занят. Выбери другой.',
-    'err_login_format' => 'Логин от 3 до 32 символов: латинские буквы, цифры и _.',
-    'err_name_empty' => 'Напиши своё имя.',
-    'err_pass_short' => 'Пароль — минимум 6 символов.',
-    'err_pass_mismatch' => 'Пароли не совпали.',
-    'err_wrong_creds'=> 'Неверный логин или пароль.',
-    'err_banned'     => 'Твой аккаунт заблокирован. Свяжись с администратором.',
-    'err_reg_off'    => 'Регистрация сейчас закрыта.',
+    'err_banned'     => 'Твой аккаунт заблокирован.',
     'err_not_found'  => 'Такая страница не найдена.',
-    'err_need_login' => 'Сначала войди в аккаунт.',
-    'ok_registered'  => 'Поздравляем! Аккаунт создан. Начинай учиться!',
-    'ok_admin_created' => 'Администратор создан. Добро пожаловать в CodeTJ!',
+    'err_need_login' => 'Сначала войди.',
+    'ok_registered'  => 'Поздравляем! Начинай учиться!',
     'lang_tj'        => 'ТҶ',
     'lang_ru'        => 'РУ',
-    'stat_lessons'   => 'уроков',
-    'stat_free'      => 'бесплатно',
-    'stat_lang'      => 'на таджикском',
     'why_title'      => 'Почему CodeTJ?',
     'why_1_t'        => 'На твоём языке',
-    'why_1_d'        => 'Все уроки написаны живым таджикским — понятно, без сухого перевода.',
-    'why_2_t'        => 'Код в браузере',
-    'why_2_d'        => 'Ничего не нужно устанавливать: пишешь и сразу видишь результат.',
-    'why_3_t'        => 'Шаг за шагом',
-    'why_3_d'        => 'От простых тегов до реальных проектов — без скачков и пробелов.',
-    'why_4_t'        => 'Как игра',
-    'why_4_d'        => 'Баллы, уровни и рейтинг — учёба превращается в увлекательную игру.',
+    'why_1_d'        => 'Уроки на живом таджикском — понятно, без сухого перевода.',
+    'why_2_t'        => 'Шаг за шагом',
+    'why_2_d'        => 'Каждый урок разбит на маленькие шаги. Не запутаешься.',
+    'why_3_t'        => 'Код в браузере',
+    'why_3_d'        => 'Пишешь — сразу видишь результат. Ничего не нужно устанавливать.',
+    'why_4_t'        => 'Без пароля',
+    'why_4_d'        => 'Только номер телефона. Вход за 5 секунд.',
+    'stat_lessons'   => 'уроков',
+    'stat_free'      => 'бесплатно',
+    'stat_lang'      => 'таджикский',
 ),
 );
 
@@ -230,16 +225,6 @@ $LANG = array(
 db();
 
 $p = isset($_GET['p']) && is_string($_GET['p']) ? $_GET['p'] : 'home';
-
-$userCount = (int)db()->query('SELECT COUNT(*) FROM cj_users')->fetchColumn();
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    if ($userCount === 0 && $p !== 'setup') {
-        redirect('?p=setup');
-    }
-    if ($userCount > 0 && $p === 'setup') {
-        redirect('?p=home');
-    }
-}
 
 $user = current_user();
 if ($user !== null) {
@@ -261,7 +246,6 @@ if ($user !== null && in_array($user['theme'], array('dark', 'light'), true)) {
     $theme = $_COOKIE['codetj_theme'];
 }
 
-/** Навиштаҷоти интерфейс. */
 function t($key)
 {
     global $LANG, $lang;
@@ -271,7 +255,6 @@ function t($key)
     return isset($LANG['tj'][$key]) ? $LANG['tj'][$key] : $key;
 }
 
-/** Майдони дузабона: fld('title', $row) → title_tj ё title_ru. */
 function fld($base, $row)
 {
     global $lang;
@@ -297,7 +280,6 @@ function flash_get()
     return $f;
 }
 
-/** Суроғаи бозгашти бехатар (танҳо дохилӣ). */
 function safe_back()
 {
     $b = isset($_POST['back']) ? $_POST['back'] : '';
@@ -307,29 +289,96 @@ function safe_back()
     return '?p=home';
 }
 
-/** null = ҳама дуруст, вагарна калиди хато. */
-function validate_credentials($login, $name, $p1, $p2, $checkTaken)
+/* ---------- Телефон ---------- */
+
+/**
+ * Рақамро ба шакли ягона меорад: танҳо рақамҳо, бо коди кишвар 992.
+ * '' — агар рақам нодуруст бошад.
+ */
+function normalize_phone($raw)
 {
-    if (!preg_match('/^[a-zA-Z0-9_]{3,32}$/', $login)) {
-        return 'err_login_format';
+    $d = preg_replace('/\D+/', '', (string)$raw);
+    if ($d === '') {
+        return '';
     }
-    if ($name === '' || mb_strlen($name) > 64) {
-        return 'err_name_empty';
+    if (substr($d, 0, 3) === '992') {
+        $d = substr($d, 3);
+    } elseif (substr($d, 0, 4) === '0992') {
+        $d = substr($d, 4);
     }
-    if (strlen($p1) < 6) {
-        return 'err_pass_short';
+    $d = ltrim($d, '0');
+    if (strlen($d) !== 9) {
+        return '';   // дар Тоҷикистон рақами мобилӣ 9 рақам аст
     }
-    if ($p1 !== $p2) {
-        return 'err_pass_mismatch';
+    return '992' . $d;
+}
+
+/** Барои нишон додан: 992901234567 → +992 90 123 45 67 */
+function pretty_phone($p)
+{
+    if (strlen($p) !== 12) {
+        return $p;
     }
-    if ($checkTaken) {
-        $st = db()->prepare('SELECT COUNT(*) FROM cj_users WHERE login = ?');
-        $st->execute(array($login));
-        if ((int)$st->fetchColumn() > 0) {
-            return 'err_login_taken';
+    return '+992 ' . substr($p, 3, 2) . ' ' . substr($p, 5, 3) . ' ' . substr($p, 8, 2) . ' ' . substr($p, 10, 2);
+}
+
+/* ---------- Кушода будани дарс ---------- */
+
+/**
+ * Дарс кушода аст, агар дарси пешина супорида шуда бошад.
+ * Дарси 1 ҳамеша кушода. Ҷаҳидан ба дарси 5 ё 10 мумкин нест.
+ */
+function lesson_unlocked($userId, $course, $num)
+{
+    if ($num <= 1) {
+        return true;
+    }
+    $st = db()->prepare(
+        'SELECT COUNT(*) FROM cj_progress p JOIN cj_lessons l ON l.id = p.lesson_id
+         WHERE p.user_id = ? AND l.course = ? AND l.num = ? AND p.completed = 1'
+    );
+    $st->execute(array($userId, $course, $num - 1));
+    return (int)$st->fetchColumn() > 0;
+}
+
+/** Дарси ҷорӣ — аввалин дарси насупоридашуда. */
+function next_lesson_num($userId, $course)
+{
+    $done = course_done_map($userId, $course);
+    for ($n = 1; $n <= LESSONS_PER_COURSE; $n++) {
+        if (!isset($done[$n])) {
+            return $n;
         }
     }
-    return null;
+    return LESSONS_PER_COURSE;
+}
+
+/* ---------- Назария → қадамҳо ---------- */
+
+/**
+ * Назарияро аз рӯи сарлавҳаҳои <h3> ба қадамҳо тақсим мекунад.
+ * Ҳамин тавр ҳар дарс худ ба худ қадам ба қадам мешавад.
+ */
+function theory_steps($html)
+{
+    $html = trim((string)$html);
+    if ($html === '') {
+        return array();
+    }
+    $parts = preg_split('/(?=<h3[\s>])/i', $html);
+    $steps = array();
+    foreach ($parts as $part) {
+        $part = trim($part);
+        if ($part === '') {
+            continue;
+        }
+        if (preg_match('/^<h3[^>]*>(.*?)<\/h3>(.*)$/is', $part, $m)) {
+            $steps[] = array('title' => trim(strip_tags($m[1])), 'body' => trim($m[2]));
+        } else {
+            $steps[] = array('title' => '', 'body' => $part);
+        }
+    }
+    return $steps;
 }
 
 /* ============================================================
@@ -350,78 +399,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     switch ($action) {
 
-        case 'setup':
-            if ($userCount > 0) {
-                redirect('?p=home');
-            }
-            $loginV = trim((string)(isset($_POST['login']) ? $_POST['login'] : ''));
-            $nameV  = trim((string)(isset($_POST['name']) ? $_POST['name'] : ''));
-            $pass1  = (string)(isset($_POST['password']) ? $_POST['password'] : '');
-            $pass2  = (string)(isset($_POST['password2']) ? $_POST['password2'] : '');
-            $err = validate_credentials($loginV, $nameV, $pass1, $pass2, false);
-            if ($err !== null) {
-                flash_set('err', $err);
-                redirect('?p=setup');
-            }
-            $st = db()->prepare("INSERT INTO cj_users (login, pass_hash, name, role, lang) VALUES (?, ?, ?, 'admin', ?)");
-            $st->execute(array($loginV, password_hash($pass1, PASSWORD_DEFAULT), $nameV, $lang));
-            session_regenerate_id(true);
-            $_SESSION['uid'] = (int)db()->lastInsertId();
-            flash_set('ok', 'ok_admin_created');
-            redirect('?p=home');
-            break;
-
-        case 'register':
+        /* --- Қадами 1: рақами телефон --- */
+        case 'phone':
             if ($user !== null) {
                 redirect('?p=home');
             }
-            if (setting_get('reg_enabled', '1') !== '1') {
-                flash_set('err', 'err_reg_off');
-                redirect('?p=register');
-            }
-            if (!rate_limit('register', 5, 3600)) {
+            if (!rate_limit('login', 15, 600)) {
                 flash_set('err', 'err_rate');
-                redirect('?p=register');
+                redirect('?p=enter');
             }
-            $loginV = trim((string)(isset($_POST['login']) ? $_POST['login'] : ''));
-            $nameV  = trim((string)(isset($_POST['name']) ? $_POST['name'] : ''));
-            $cityV  = mb_substr(trim((string)(isset($_POST['city']) ? $_POST['city'] : '')), 0, 64);
-            $pass1  = (string)(isset($_POST['password']) ? $_POST['password'] : '');
-            $pass2  = (string)(isset($_POST['password2']) ? $_POST['password2'] : '');
-            $err = validate_credentials($loginV, $nameV, $pass1, $pass2, true);
-            if ($err !== null) {
-                flash_set('err', $err);
-                redirect('?p=register');
+            $phone = normalize_phone(isset($_POST['phone']) ? $_POST['phone'] : '');
+            if ($phone === '') {
+                $_SESSION['auth_err'] = 'phone_bad';
+                redirect('?p=enter');
             }
-            $st = db()->prepare('INSERT INTO cj_users (login, pass_hash, name, city, lang) VALUES (?, ?, ?, ?, ?)');
-            $st->execute(array($loginV, password_hash($pass1, PASSWORD_DEFAULT), $nameV, $cityV, $lang));
+            $st = db()->prepare('SELECT * FROM cj_users WHERE phone = ?');
+            $st->execute(array($phone));
+            $u = $st->fetch();
+            if ($u) {
+                if ((int)$u['banned'] === 1) {
+                    flash_set('err', 'err_banned');
+                    redirect('?p=enter');
+                }
+                if ((string)$u['pin'] !== '') {
+                    $_SESSION['pin_uid'] = (int)$u['id'];
+                    redirect('?p=pin');
+                }
+                session_regenerate_id(true);
+                $_SESSION['uid'] = (int)$u['id'];
+                redirect('?p=home');
+            }
+            $_SESSION['reg_phone'] = $phone;
+            redirect('?p=name');
+            break;
+
+        /* --- Қадами 2: ном (танҳо барои рақами нав) --- */
+        case 'signup':
+            if ($user !== null || empty($_SESSION['reg_phone'])) {
+                redirect('?p=enter');
+            }
+            $nameV = trim((string)(isset($_POST['name']) ? $_POST['name'] : ''));
+            $cityV = mb_substr(trim((string)(isset($_POST['city']) ? $_POST['city'] : '')), 0, 64);
+            if ($nameV === '' || mb_strlen($nameV) > 64) {
+                $_SESSION['auth_err'] = 'name_empty';
+                redirect('?p=name');
+            }
+            $phone = $_SESSION['reg_phone'];
+            $isFirst = ((int)db()->query('SELECT COUNT(*) FROM cj_users')->fetchColumn() === 0);
+
+            $pinHash = null;
+            if ($isFirst) {
+                $pinV = preg_replace('/\D+/', '', (string)(isset($_POST['pin']) ? $_POST['pin'] : ''));
+                if (strlen($pinV) < 4 || strlen($pinV) > 6) {
+                    $_SESSION['auth_err'] = 'pin_short';
+                    redirect('?p=name');
+                }
+                $pinHash = password_hash($pinV, PASSWORD_DEFAULT);
+            }
+
+            $st = db()->prepare(
+                'INSERT INTO cj_users (phone, pin, name, city, role, lang) VALUES (?, ?, ?, ?, ?, ?)'
+            );
+            $st->execute(array($phone, $pinHash, $nameV, $cityV, $isFirst ? 'admin' : 'student', $lang));
+            unset($_SESSION['reg_phone']);
             session_regenerate_id(true);
             $_SESSION['uid'] = (int)db()->lastInsertId();
             flash_set('ok', 'ok_registered');
             redirect('?p=home');
             break;
 
-        case 'login':
-            if ($user !== null) {
-                redirect('?p=home');
+        /* --- Рамзи админ --- */
+        case 'pin':
+            if (empty($_SESSION['pin_uid'])) {
+                redirect('?p=enter');
             }
-            if (!rate_limit('login', 10, 600)) {
+            if (!rate_limit('pin', 10, 600)) {
                 flash_set('err', 'err_rate');
-                redirect('?p=login');
+                redirect('?p=enter');
             }
-            $loginV = trim((string)(isset($_POST['login']) ? $_POST['login'] : ''));
-            $pass1  = (string)(isset($_POST['password']) ? $_POST['password'] : '');
-            $st = db()->prepare('SELECT * FROM cj_users WHERE login = ?');
-            $st->execute(array($loginV));
+            $st = db()->prepare('SELECT * FROM cj_users WHERE id = ?');
+            $st->execute(array((int)$_SESSION['pin_uid']));
             $u = $st->fetch();
-            if (!$u || !password_verify($pass1, $u['pass_hash'])) {
-                flash_set('err', 'err_wrong_creds');
-                redirect('?p=login');
+            $pinV = preg_replace('/\D+/', '', (string)(isset($_POST['pin']) ? $_POST['pin'] : ''));
+            if (!$u || !password_verify($pinV, (string)$u['pin'])) {
+                $_SESSION['auth_err'] = 'pin_bad';
+                redirect('?p=pin');
             }
-            if ((int)$u['banned'] === 1) {
-                flash_set('err', 'err_banned');
-                redirect('?p=login');
-            }
+            unset($_SESSION['pin_uid']);
             session_regenerate_id(true);
             $_SESSION['uid'] = (int)$u['id'];
             redirect('?p=home');
@@ -464,13 +528,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cut = function ($v) {
                 return mb_substr((string)$v, 0, 60000);
             };
-            $st = db()->prepare(
+            db()->prepare(
                 'INSERT INTO cj_drafts (user_id, lesson_id, html_code, css_code, js_code, pasted)
                  VALUES (?,?,?,?,?,?)
                  ON DUPLICATE KEY UPDATE html_code=VALUES(html_code), css_code=VALUES(css_code),
                  js_code=VALUES(js_code), pasted=GREATEST(pasted, VALUES(pasted))'
-            );
-            $st->execute(array(
+            )->execute(array(
                 (int)$user['id'], $lid,
                 $cut(isset($_POST['html']) ? $_POST['html'] : ''),
                 $cut(isset($_POST['css']) ? $_POST['css'] : ''),
@@ -482,7 +545,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         case 'test':
             if ($user === null) {
-                redirect('?p=login');
+                redirect('?p=enter');
             }
             handle_test_submit((int)$user['id']);
             break;
@@ -492,10 +555,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-/**
- * Тестро дар сервер месанҷад. Ҷавобҳои дуруст ҳеҷ гоҳ ба браузер намераванд.
- * 10 балл аз кӯшиши аввал, 5 балл аз дуюм, баъдтар — 0.
- */
+/** Тестро дар сервер месанҷад. Ҷавобҳои дуруст ба браузер намераванд. */
 function handle_test_submit($uid)
 {
     $lid = (int)(isset($_POST['lesson_id']) ? $_POST['lesson_id'] : 0);
@@ -505,7 +565,6 @@ function handle_test_submit($uid)
     if (!$L) {
         redirect('?p=home');
     }
-
     $st = db()->prepare('SELECT * FROM cj_questions WHERE lesson_id = ? ORDER BY num ASC, id ASC');
     $st->execute(array($lid));
     $questions = $st->fetchAll();
@@ -529,7 +588,7 @@ function handle_test_submit($uid)
         $given = isset($answers[$qid]) ? (int)$answers[$qid] : -1;
         $isRight = ($given === (int)$q['correct']);
 
-        $st = $pdo->prepare('SELECT attempts, correct, points FROM cj_test_answers WHERE user_id = ? AND question_id = ?');
+        $st = $pdo->prepare('SELECT attempts, correct FROM cj_test_answers WHERE user_id = ? AND question_id = ?');
         $st->execute(array($uid, $qid));
         $prev = $st->fetch();
         $attempts = $prev ? (int)$prev['attempts'] : 0;
@@ -556,9 +615,7 @@ function handle_test_submit($uid)
              correct=GREATEST(correct, VALUES(correct)), points=points+VALUES(points)'
         )->execute(array($uid, $qid, $attempts, $isRight ? 1 : 0, $award));
 
-        // Ҷавоби дурустро танҳо он вақт нишон медиҳем, ки шогирд ё дуруст
-        // ҷавоб додааст, ё ҳар ду кӯшишро сарф кардааст. Вагарна кӯшиши
-        // дуюм ройгон мешуд: як бор нодуруст фиристодан ва ҷавобро дидан.
+        // Ҷавоби дурустро танҳо баъд аз ҷавоби дуруст ё ду кӯшиш нишон медиҳем.
         $reveal = $isRight || $attempts >= 2;
         $detail[] = array(
             'id'      => $qid,
@@ -572,12 +629,10 @@ function handle_test_submit($uid)
     $total = count($questions);
     $score = $total > 0 ? (int)round($correctCnt / $total * 100) : 0;
     $passed = $score >= 60;
-
     if ($gained > 0) {
         add_points($uid, $gained, 'test');
     }
 
-    // Пешрафти дарс
     $st = $pdo->prepare('SELECT * FROM cj_progress WHERE user_id = ? AND lesson_id = ?');
     $st->execute(array($uid, $lid));
     $pr = $st->fetch();
@@ -585,17 +640,15 @@ function handle_test_submit($uid)
     $prevAttempts = $pr ? (int)$pr['test_attempts'] : 0;
     $bestScore = $pr ? max((int)$pr['test_score'], $score) : $score;
 
-    // Санҷиши AI ҳанӯз фаъол нест (Қисми 3). То он вақт дарс бо тест ҳисоб мешавад.
+    // Санҷиши AI ҳанӯз фаъол нест — то он вақт дарс бо тест ҳисоб мешавад.
     $aiReady = trim((string)setting_get('openai_key', '')) !== '' || OPENAI_KEY !== '';
     $aiPassed = $pr ? (int)$pr['ai_passed'] === 1 : false;
     $completed = $passed && (!$aiReady || $aiPassed);
 
     $bonus = 0;
-    if ($completed && !$wasCompleted) {
-        if ($prevAttempts === 0 && $score === 100) {
-            $bonus = 50;   // аз кӯшиши аввал бе хато
-            add_points($uid, $bonus, 'first_try');
-        }
+    if ($completed && !$wasCompleted && $prevAttempts === 0 && $score === 100) {
+        $bonus = 50;
+        add_points($uid, $bonus, 'first_try');
     }
 
     $pdo->prepare(
@@ -628,18 +681,19 @@ function handle_test_submit($uid)
 }
 
 /* ============================================================
- *  РОУТИНГИ GET
+ *  РОУТИНГ
  * ============================================================ */
 
 switch ($p) {
-    case 'home':     page_home(); break;
-    case 'login':    $user === null ? page_login() : redirect('?p=home'); break;
-    case 'register': $user === null ? page_register() : redirect('?p=home'); break;
-    case 'setup':    page_setup(); break;
-    case 'course':   page_course(); break;
-    case 'lesson':   page_lesson(); break;
-    case 'profile':  $user !== null ? page_profile() : redirect('?p=login'); break;
-    default:         page_404();
+    case 'home':    page_home(); break;
+    case 'enter':   $user === null ? page_enter() : redirect('?p=home'); break;
+    case 'name':    $user === null ? page_name() : redirect('?p=home'); break;
+    case 'pin':     $user === null ? page_pin() : redirect('?p=home'); break;
+    case 'course':  page_course(); break;
+    case 'lesson':  page_lesson(); break;
+    case 'rating':  page_rating(); break;
+    case 'profile': $user !== null ? page_profile() : redirect('?p=enter'); break;
+    default:        page_404();
 }
 exit;
 
@@ -656,7 +710,6 @@ function page_home()
     } else {
         render_dashboard();
     }
-    render_top3();
     render_footer();
 }
 
@@ -665,48 +718,82 @@ function render_hero_guest()
     $ready = (int)db()->query('SELECT COUNT(*) FROM cj_lessons WHERE published = 1')->fetchColumn();
     ?>
     <section class="hero">
+      <div class="hero-badge">&#127993; <?= e(t('stat_lang')) ?></div>
       <h1><?= e(t('tagline')) ?></h1>
       <p class="hero-sub"><?= e(t('hero_text')) ?></p>
-      <div class="hero-actions">
-        <a class="btn btn-primary btn-lg" href="?p=register"><?= e(t('start_free')) ?></a>
-        <a class="btn btn-ghost" href="?p=login"><?= e(t('have_account')) ?></a>
-      </div>
+      <a class="btn btn-primary btn-lg" href="?p=enter"><?= e(t('start_free')) ?> &rarr;</a>
       <div class="hero-stats">
         <div class="hstat"><b><?= $ready ?></b><span><?= e(t('stat_lessons')) ?></span></div>
         <div class="hstat"><b>100%</b><span><?= e(t('stat_free')) ?></span></div>
-        <div class="hstat"><b>ТҶ</b><span><?= e(t('stat_lang')) ?></span></div>
+        <div class="hstat"><b>4</b><span><?= e(t('nav_home') === 'Главная' ? 'курса' : 'курс') ?></span></div>
       </div>
     </section>
+
     <section class="why">
-      <h2><?= e(t('why_title')) ?></h2>
+      <h2 class="sec-title center"><?= e(t('why_title')) ?></h2>
       <div class="why-grid">
         <div class="why-card"><div class="why-ic">&#128483;</div><h3><?= e(t('why_1_t')) ?></h3><p><?= e(t('why_1_d')) ?></p></div>
-        <div class="why-card"><div class="why-ic">&#128187;</div><h3><?= e(t('why_2_t')) ?></h3><p><?= e(t('why_2_d')) ?></p></div>
-        <div class="why-card"><div class="why-ic">&#129517;</div><h3><?= e(t('why_3_t')) ?></h3><p><?= e(t('why_3_d')) ?></p></div>
-        <div class="why-card"><div class="why-ic">&#127942;</div><h3><?= e(t('why_4_t')) ?></h3><p><?= e(t('why_4_d')) ?></p></div>
+        <div class="why-card"><div class="why-ic">&#129517;</div><h3><?= e(t('why_2_t')) ?></h3><p><?= e(t('why_2_d')) ?></p></div>
+        <div class="why-card"><div class="why-ic">&#128187;</div><h3><?= e(t('why_3_t')) ?></h3><p><?= e(t('why_3_d')) ?></p></div>
+        <div class="why-card"><div class="why-ic">&#128241;</div><h3><?= e(t('why_4_t')) ?></h3><p><?= e(t('why_4_d')) ?></p></div>
       </div>
     </section>
     <?php
     render_course_cards(null);
+    render_top3();
 }
 
 function render_dashboard()
 {
     global $user;
+    $uid = (int)$user['id'];
     ?>
-    <section class="dash-head">
-      <h1><?= e(t('welcome')) ?>, <?= e($user['name']) ?>! &#128075;</h1>
-      <div class="dash-stats">
-        <span class="chip">&#11088; <?= (int)$user['points'] ?> <?= e(t('points')) ?></span>
-        <span class="chip">&#128293; <?= (int)$user['streak_days'] ?> <?= e(t('streak')) ?></span>
+    <section class="dash">
+      <div class="dash-hi">
+        <div class="dash-av"><?= e(mb_strtoupper(mb_substr($user['name'], 0, 1))) ?></div>
+        <div>
+          <h1><?= e(t('welcome_back')) ?>, <?= e($user['name']) ?>!</h1>
+          <div class="dash-stats">
+            <span class="chip chip-star">&#11088; <?= (int)$user['points'] ?></span>
+            <span class="chip chip-fire">&#128293; <?= (int)$user['streak_days'] ?></span>
+          </div>
+        </div>
       </div>
     </section>
-    <h2 class="sec-title"><?= e(t('home_title')) ?></h2>
     <?php
-    render_course_cards((int)$user['id']);
+    // Тавсияи дарси навбатӣ
+    $best = null;
+    foreach (courses() as $slug => $c) {
+        if ($slug === 'full' && !full_course_unlocked($uid)) {
+            continue;
+        }
+        $n = next_lesson_num($uid, $slug);
+        $st = db()->prepare('SELECT id, num, title_tj, title_ru FROM cj_lessons WHERE course = ? AND num = ? AND published = 1');
+        $st->execute(array($slug, $n));
+        $L = $st->fetch();
+        if ($L) {
+            $done = course_done_count($uid, $slug);
+            if ($best === null || $done > $best['done']) {
+                $best = array('c' => $c, 'slug' => $slug, 'L' => $L, 'done' => $done);
+            }
+        }
+    }
+    if ($best !== null): ?>
+      <a class="resume" href="?p=lesson&id=<?= (int)$best['L']['id'] ?>" style="--cc:<?= e($best['c']['color']) ?>">
+        <div class="resume-ic"><?= $best['c']['icon'] ?></div>
+        <div class="resume-txt">
+          <span class="resume-label"><?= e(t('keep_going')) ?></span>
+          <b><?= e(t('lesson_of')) ?> <?= (int)$best['L']['num'] ?> &middot; <?= e(fld('title', $best['L'])) ?></b>
+        </div>
+        <div class="resume-go">&rarr;</div>
+      </a>
+    <?php endif;
+
+    echo '<h2 class="sec-title">' . e(t('home_title')) . '</h2>';
+    render_course_cards($uid);
+    render_top3();
 }
 
-/** Кортҳои 4 курс. */
 function render_course_cards($userId)
 {
     $fullOpen = $userId !== null ? full_course_unlocked($userId) : false;
@@ -715,36 +802,35 @@ function render_course_cards($userId)
         $counts[$r['course']] = (int)$r['c'];
     }
     ?>
-    <section class="courses-grid">
+    <section class="courses">
     <?php foreach (courses() as $slug => $c):
         $locked = ($slug === 'full') && ($userId === null || !$fullOpen);
         $done = $userId !== null ? course_done_count($userId, $slug) : 0;
         $ready = isset($counts[$slug]) ? $counts[$slug] : 0;
         $pct = (int)round($done / LESSONS_PER_COURSE * 100);
         ?>
-        <div class="course-card <?= $locked ? 'is-locked' : '' ?>" style="--cc:<?= e($c['color']) ?>">
-          <div class="cc-top">
-            <span class="cc-icon"><?= $c['icon'] ?></span>
-            <span class="cc-name"><?= e(fld('name', $c)) ?></span>
-            <?php if ($locked): ?><span class="cc-lock">&#128274;</span><?php endif; ?>
+        <div class="ccard <?= $locked ? 'locked' : '' ?>" style="--cc:<?= e($c['color']) ?>">
+          <div class="ccard-head">
+            <span class="ccard-ic"><?= $c['icon'] ?></span>
+            <div>
+              <div class="ccard-name"><?= e(fld('name', $c)) ?></div>
+              <div class="ccard-meta"><?= $ready ?> <?= e(t('stat_lessons')) ?></div>
+            </div>
+            <?php if ($locked): ?><span class="ccard-lock">&#128274;</span><?php endif; ?>
           </div>
-          <p class="cc-desc"><?= e(fld('desc', $c)) ?></p>
-          <div class="cc-meta">
-            <?= e(t('lessons_50')) ?> &middot; <?= e(t('levels_5')) ?>
-            <?php if ($ready > 0 && $ready < LESSONS_PER_COURSE): ?>
-              &middot; <?= $ready ?> <?= e(t('done_word') === 'пройдено' ? 'готово' : 'тайёр') ?>
-            <?php endif; ?>
-          </div>
+          <p class="ccard-desc"><?= e(fld('desc', $c)) ?></p>
           <?php if ($userId !== null && !$locked): ?>
-            <div class="cc-bar"><div class="cc-bar-in" style="width:<?= $pct ?>%"></div></div>
-            <div class="cc-progress"><?= $done ?> <?= e(t('of')) ?> <?= LESSONS_PER_COURSE ?> <?= e(t('done_word')) ?></div>
+            <div class="bar"><div class="bar-in" style="width:<?= $pct ?>%"></div></div>
+            <div class="ccard-prog"><?= $done ?>/<?= LESSONS_PER_COURSE ?> <?= e(t('done_word')) ?></div>
           <?php endif; ?>
           <?php if ($locked): ?>
-            <p class="cc-hint"><?= e(t('full_locked_hint')) ?></p>
-          <?php else: ?>
-            <a class="btn btn-course" href="?p=course&c=<?= e($slug) ?>">
-              <?= e(($userId !== null && $done > 0) ? t('continue') : t('open_course')) ?> &rarr;
+            <p class="ccard-hint"><?= e(t('full_locked_hint')) ?></p>
+          <?php elseif ($ready > 0): ?>
+            <a class="btn btn-cc" href="?p=course&c=<?= e($slug) ?>">
+              <?= e(($userId !== null && $done > 0) ? t('continue') : t('open_course')) ?>
             </a>
+          <?php else: ?>
+            <span class="ccard-hint"><?= e(t('lesson_soon')) ?></span>
           <?php endif; ?>
         </div>
     <?php endforeach; ?>
@@ -758,91 +844,131 @@ function render_top3()
         "SELECT name, city, points FROM cj_users WHERE banned = 0 AND points > 0
          ORDER BY points DESC, id ASC LIMIT 3"
     )->fetchAll();
+    if (!$rows) {
+        return;
+    }
     $medals = array('&#129351;', '&#129352;', '&#129353;');
     ?>
     <section class="top3">
       <h2 class="sec-title"><?= e(t('top_students')) ?></h2>
-      <?php if (!$rows): ?>
-        <p class="muted"><?= e(t('no_students')) ?></p>
-      <?php else: ?>
-        <div class="top3-grid">
-        <?php foreach ($rows as $i => $r): ?>
-          <div class="top3-card">
-            <div class="top3-medal"><?= $medals[$i] ?></div>
-            <div class="top3-name"><?= e($r['name']) ?></div>
-            <?php if ($r['city'] !== ''): ?><div class="top3-city"><?= e($r['city']) ?></div><?php endif; ?>
-            <div class="top3-pts">&#11088; <?= (int)$r['points'] ?></div>
-          </div>
-        <?php endforeach; ?>
+      <div class="top3-list">
+      <?php foreach ($rows as $i => $r): ?>
+        <div class="top3-row">
+          <span class="top3-medal"><?= $medals[$i] ?></span>
+          <span class="top3-name"><?= e($r['name']) ?><?php if ($r['city'] !== ''): ?>
+            <small><?= e($r['city']) ?></small><?php endif; ?></span>
+          <span class="top3-pts"><?= (int)$r['points'] ?></span>
         </div>
-      <?php endif; ?>
+      <?php endforeach; ?>
+      </div>
     </section>
     <?php
 }
 
-function page_login()
+/* ---------- Воридшавӣ ---------- */
+
+function auth_err()
 {
-    render_header(t('login'));
-    ?>
-    <section class="auth-box">
-      <h1><?= e(t('login')) ?></h1>
-      <form method="post" action="index.php">
-        <?= csrf_field() ?>
-        <input type="hidden" name="action" value="login">
-        <label><?= e(t('username')) ?><input type="text" name="login" required maxlength="32" autocomplete="username"></label>
-        <label><?= e(t('password')) ?><input type="password" name="password" required autocomplete="current-password"></label>
-        <button class="btn btn-primary btn-block" type="submit"><?= e(t('do_login')) ?></button>
-      </form>
-      <p class="auth-alt"><a href="?p=register"><?= e(t('no_account')) ?></a></p>
-    </section>
-    <?php
-    render_footer();
+    if (empty($_SESSION['auth_err'])) {
+        return null;
+    }
+    $k = $_SESSION['auth_err'];
+    unset($_SESSION['auth_err']);
+    return $k;
 }
 
-function page_register()
+function page_enter()
 {
-    render_header(t('register'));
+    $err = auth_err();
+    render_header(t('enter'), true);
     ?>
-    <section class="auth-box">
-      <h1><?= e(t('register')) ?></h1>
+    <section class="auth">
+      <div class="auth-ic">&#128241;</div>
+      <h1><?= e(t('enter')) ?></h1>
+      <p class="muted"><?= e(t('phone_hint')) ?></p>
+      <?php if ($err !== null): ?><div class="alert alert-err"><?= e(t($err)) ?></div><?php endif; ?>
       <form method="post" action="index.php">
         <?= csrf_field() ?>
-        <input type="hidden" name="action" value="register">
-        <label><?= e(t('name')) ?><input type="text" name="name" required maxlength="64"></label>
-        <label><?= e(t('city')) ?><input type="text" name="city" maxlength="64" placeholder="<?= e(t('city_ph')) ?>"></label>
-        <label><?= e(t('username')) ?><input type="text" name="login" required maxlength="32" pattern="[a-zA-Z0-9_]{3,32}" placeholder="<?= e(t('login_ph')) ?>" autocomplete="username"></label>
-        <label><?= e(t('password')) ?><input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
-        <label><?= e(t('password2')) ?><input type="password" name="password2" required minlength="6" autocomplete="new-password"></label>
-        <button class="btn btn-primary btn-block" type="submit"><?= e(t('do_register')) ?></button>
-      </form>
-      <p class="auth-alt"><a href="?p=login"><?= e(t('have_account')) ?></a></p>
-    </section>
-    <?php
-    render_footer();
-}
-
-function page_setup()
-{
-    render_header(t('setup_title'));
-    ?>
-    <section class="auth-box">
-      <h1>&#128736; <?= e(t('setup_title')) ?></h1>
-      <p class="muted"><?= e(t('setup_note')) ?></p>
-      <form method="post" action="index.php">
-        <?= csrf_field() ?>
-        <input type="hidden" name="action" value="setup">
-        <label><?= e(t('name')) ?><input type="text" name="name" required maxlength="64"></label>
-        <label><?= e(t('username')) ?><input type="text" name="login" required maxlength="32" pattern="[a-zA-Z0-9_]{3,32}" placeholder="<?= e(t('login_ph')) ?>" autocomplete="username"></label>
-        <label><?= e(t('password')) ?><input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
-        <label><?= e(t('password2')) ?><input type="password" name="password2" required minlength="6" autocomplete="new-password"></label>
-        <button class="btn btn-primary btn-block" type="submit"><?= e(t('create_admin')) ?></button>
+        <input type="hidden" name="action" value="phone">
+        <label><?= e(t('phone')) ?>
+          <div class="phone-row">
+            <span class="phone-code">+992</span>
+            <input type="tel" name="phone" inputmode="numeric" autocomplete="tel"
+                   placeholder="<?= e(t('phone_ph')) ?>" required autofocus>
+          </div>
+        </label>
+        <button class="btn btn-primary btn-block" type="submit"><?= e(t('phone_next')) ?> &rarr;</button>
       </form>
     </section>
     <?php
     render_footer();
 }
 
-/** Харитаи дарсҳои курс. */
+function page_name()
+{
+    if (empty($_SESSION['reg_phone'])) {
+        redirect('?p=enter');
+    }
+    $isFirst = ((int)db()->query('SELECT COUNT(*) FROM cj_users')->fetchColumn() === 0);
+    $err = auth_err();
+    render_header(t('name_title'), true);
+    ?>
+    <section class="auth">
+      <div class="auth-ic">&#128075;</div>
+      <h1><?= e(t('name_title')) ?></h1>
+      <p class="muted"><?= e(t('name_hint')) ?></p>
+      <div class="phone-shown"><?= e(pretty_phone($_SESSION['reg_phone'])) ?></div>
+      <?php if ($err !== null): ?><div class="alert alert-err"><?= e(t($err)) ?></div><?php endif; ?>
+      <form method="post" action="index.php">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="signup">
+        <label><?= e(t('name')) ?>
+          <input type="text" name="name" required maxlength="64" placeholder="<?= e(t('name_ph')) ?>" autofocus>
+        </label>
+        <label><?= e(t('city')) ?> <small>(<?= e(t('city_opt')) ?>)</small>
+          <input type="text" name="city" maxlength="64" placeholder="<?= e(t('city_ph')) ?>">
+        </label>
+        <?php if ($isFirst): ?>
+          <div class="alert alert-info"><?= e(t('pin_hint')) ?></div>
+          <label><?= e(t('pin')) ?>
+            <input type="text" name="pin" inputmode="numeric" pattern="[0-9]{4,6}" maxlength="6" required>
+          </label>
+        <?php endif; ?>
+        <button class="btn btn-primary btn-block" type="submit"><?= e(t('start_learn')) ?> &rarr;</button>
+      </form>
+    </section>
+    <?php
+    render_footer();
+}
+
+function page_pin()
+{
+    if (empty($_SESSION['pin_uid'])) {
+        redirect('?p=enter');
+    }
+    $err = auth_err();
+    render_header(t('pin_title'), true);
+    ?>
+    <section class="auth">
+      <div class="auth-ic">&#128274;</div>
+      <h1><?= e(t('pin_title')) ?></h1>
+      <p class="muted"><?= e(t('pin_ask')) ?></p>
+      <?php if ($err !== null): ?><div class="alert alert-err"><?= e(t($err)) ?></div><?php endif; ?>
+      <form method="post" action="index.php">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="pin">
+        <label><?= e(t('pin')) ?>
+          <input type="password" name="pin" inputmode="numeric" maxlength="6" required autofocus>
+        </label>
+        <button class="btn btn-primary btn-block" type="submit"><?= e(t('enter')) ?></button>
+      </form>
+    </section>
+    <?php
+    render_footer();
+}
+
+/* ---------- Курс ---------- */
+
 function page_course()
 {
     global $user, $lang;
@@ -854,7 +980,7 @@ function page_course()
     }
     if ($user === null) {
         flash_set('err', 'err_need_login');
-        redirect('?p=login');
+        redirect('?p=enter');
     }
     if ($slug === 'full' && !full_course_unlocked((int)$user['id'])) {
         redirect('?p=home');
@@ -862,7 +988,7 @@ function page_course()
     $c = $all[$slug];
     $uid = (int)$user['id'];
 
-    $st = db()->prepare('SELECT id, num, title_tj, title_ru FROM cj_lessons WHERE course = ? AND published = 1');
+    $st = db()->prepare('SELECT id, num, title_tj, title_ru FROM cj_lessons WHERE course = ? AND published = 1 ORDER BY num');
     $st->execute(array($slug));
     $lessons = array();
     foreach ($st->fetchAll() as $row) {
@@ -874,40 +1000,56 @@ function page_course()
 
     render_header(fld('name', $c));
     ?>
-    <section class="course-head" style="--cc:<?= e($c['color']) ?>">
-      <a class="back-link" href="?p=home">&larr; <?= e(t('back')) ?></a>
-      <h1><span class="ch-icon"><?= $c['icon'] ?></span> <?= e(fld('name', $c)) ?></h1>
-      <p class="muted"><?= e(fld('desc', $c)) ?></p>
-      <div class="cc-bar big"><div class="cc-bar-in" style="width:<?= $pct ?>%"></div></div>
-      <div class="cc-progress"><?= $doneCnt ?> <?= e(t('of')) ?> <?= LESSONS_PER_COURSE ?> <?= e(t('done_word')) ?> (<?= $pct ?>%)</div>
+    <section class="chead" style="--cc:<?= e($c['color']) ?>">
+      <a class="back" href="?p=home">&larr; <?= e(t('back')) ?></a>
+      <div class="chead-in">
+        <span class="chead-ic"><?= $c['icon'] ?></span>
+        <div>
+          <h1><?= e(fld('name', $c)) ?></h1>
+          <p class="muted"><?= e(fld('desc', $c)) ?></p>
+        </div>
+      </div>
+      <div class="bar big"><div class="bar-in" style="width:<?= $pct ?>%"></div></div>
+      <div class="chead-prog"><?= $doneCnt ?> <?= e(t('of')) ?> <?= LESSONS_PER_COURSE ?> <?= e(t('done_word')) ?> &middot; <?= $pct ?>%</div>
     </section>
 
     <?php foreach (levels() as $lvl => $lname):
-        $unlocked = level_unlocked($uid, $slug, $lvl);
         $from = ($lvl - 1) * LESSONS_PER_LEVEL + 1;
         $to = $lvl * LESSONS_PER_LEVEL;
+        $hasAny = false;
+        for ($n = $from; $n <= $to; $n++) {
+            if (isset($lessons[$n])) { $hasAny = true; break; }
+        }
+        if (!$hasAny && $lvl > 1) {
+            continue;   // сатҳҳои холиро нишон намедиҳем
+        }
         ?>
-        <section class="level-block <?= $unlocked ? '' : 'is-locked' ?>" style="--cc:<?= e($c['color']) ?>">
-          <div class="level-head">
-            <h2><?= $unlocked ? '&#128215;' : '&#128274;' ?> <?= e(t('level')) ?> <?= $lvl ?> &mdash; <?= e(isset($lname[$lang]) ? $lname[$lang] : $lname['tj']) ?></h2>
-            <span class="level-range"><?= e(t('lesson')) ?> <?= $from ?>&ndash;<?= $to ?></span>
+        <section class="lvl" style="--cc:<?= e($c['color']) ?>">
+          <div class="lvl-head">
+            <h2><?= e(t('level')) ?> <?= $lvl ?> &mdash; <?= e(isset($lname[$lang]) ? $lname[$lang] : $lname['tj']) ?></h2>
           </div>
-          <?php if (!$unlocked): ?>
-            <p class="muted"><?= e(t('level_locked_hint')) ?></p>
-          <?php endif; ?>
-          <div class="lesson-map">
+          <div class="lessons">
             <?php for ($n = $from; $n <= $to; $n++):
                 $L = isset($lessons[$n]) ? $lessons[$n] : null;
                 $isDone = isset($doneMap[$n]);
-                $title = $L !== null ? fld('title', $L) : t('lesson_not_ready');
-                if ($unlocked && $L !== null): ?>
-                  <a class="lcell <?= $isDone ? 'done' : 'open' ?>" href="?p=lesson&id=<?= (int)$L['id'] ?>" title="<?= e($title) ?>">
-                    <span class="lnum"><?= $isDone ? '&check;' : $n ?></span>
+                $open = $L !== null && lesson_unlocked($uid, $slug, $n);
+                if ($L === null): ?>
+                  <div class="lrow soon">
+                    <span class="lrow-n">&middot;&middot;&middot;</span>
+                    <span class="lrow-t"><?= e(t('lesson_soon')) ?></span>
+                  </div>
+                <?php elseif ($open): ?>
+                  <a class="lrow <?= $isDone ? 'done' : 'open' ?>" href="?p=lesson&id=<?= (int)$L['id'] ?>">
+                    <span class="lrow-n"><?= $isDone ? '&check;' : $n ?></span>
+                    <span class="lrow-t"><?= e(fld('title', $L)) ?></span>
+                    <span class="lrow-go">&rarr;</span>
                   </a>
                 <?php else: ?>
-                  <span class="lcell <?= $unlocked ? 'soon' : 'lock' ?>" title="<?= e($title) ?>">
-                    <span class="lnum"><?= $unlocked ? $n : '&#128274;' ?></span>
-                  </span>
+                  <div class="lrow lock">
+                    <span class="lrow-n">&#128274;</span>
+                    <span class="lrow-t"><?= e(fld('title', $L)) ?>
+                      <small><?= e(t('lesson_locked')) ?></small></span>
+                  </div>
                 <?php endif;
             endfor; ?>
           </div>
@@ -917,13 +1059,14 @@ function page_course()
     render_footer();
 }
 
-/** Саҳифаи дарс: назария → амалия (муҳаррир) → тест. */
+/* ---------- Дарс: қадам ба қадам ---------- */
+
 function page_lesson()
 {
     global $user;
     if ($user === null) {
         flash_set('err', 'err_need_login');
-        redirect('?p=login');
+        redirect('?p=enter');
     }
     $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
     $st = db()->prepare('SELECT * FROM cj_lessons WHERE id = ? AND published = 1');
@@ -936,14 +1079,15 @@ function page_lesson()
     $uid = (int)$user['id'];
     $slug = (string)$L['course'];
     $num = (int)$L['num'];
-    $lvl = (int)ceil($num / LESSONS_PER_LEVEL);
-    if (($slug === 'full' && !full_course_unlocked($uid)) || !level_unlocked($uid, $slug, $lvl)) {
+
+    if ($slug === 'full' && !full_course_unlocked($uid)) {
+        redirect('?p=home');
+    }
+    if (!lesson_unlocked($uid, $slug, $num)) {
         redirect('?p=course&c=' . $slug);
     }
-    $courseList = courses();
-    $c = $courseList[$slug];
+    $c = courses()[$slug];
 
-    // сиёҳнавис
     $st = db()->prepare('SELECT * FROM cj_drafts WHERE user_id = ? AND lesson_id = ?');
     $st->execute(array($uid, $id));
     $draft = $st->fetch();
@@ -956,7 +1100,6 @@ function page_lesson()
         $htmlCode = (string)$L['example_code'];
     }
 
-    // саволҳо (бе ҷавоби дуруст!)
     $st = db()->prepare('SELECT id, num, q_tj, q_ru, options_tj, options_ru, explain_tj, explain_ru FROM cj_questions WHERE lesson_id = ? ORDER BY num ASC, id ASC');
     $st->execute(array($id));
     $questions = $st->fetchAll();
@@ -972,90 +1115,138 @@ function page_lesson()
         unset($_SESSION['test_err']);
     }
 
-    // дарси навбатӣ
     $st = db()->prepare('SELECT id FROM cj_lessons WHERE course = ? AND num = ? AND published = 1');
     $st->execute(array($slug, $num + 1));
     $nextId = (int)$st->fetchColumn();
 
+    $steps = theory_steps(fld('theory', $L));
+
     render_header(fld('title', $L));
     ?>
-    <section class="lesson-page" style="--cc:<?= e($c['color']) ?>">
-      <a class="back-link" href="?p=course&c=<?= e($slug) ?>">&larr; <?= e(t('back')) ?></a>
-      <h1><span class="lesson-tag"><?= e(fld('name', $c)) ?> &middot; <?= e(t('lesson')) ?> <?= $num ?></span><br><?= e(fld('title', $L)) ?></h1>
-
-      <div class="lesson-block">
-        <h2>&#128214; <?= e(t('theory')) ?></h2>
-        <div class="theory-body">
-          <?= fld('theory', $L) !== '' ? fld('theory', $L) : '<p class="muted">' . e(t('lesson_not_ready')) . '</p>' ?>
-        </div>
+    <section class="lesson" style="--cc:<?= e($c['color']) ?>">
+      <a class="back" href="?p=course&c=<?= e($slug) ?>">&larr; <?= e(fld('name', $c)) ?></a>
+      <div class="lesson-title">
+        <span class="lesson-num"><?= $num ?></span>
+        <h1><?= e(fld('title', $L)) ?></h1>
       </div>
 
+      <?php if ($steps): ?>
+      <div class="card steps-card" id="steps">
+        <div class="steps-top">
+          <span class="steps-count"><?= e(t('step')) ?> <b id="stepNow">1</b> / <?= count($steps) ?></span>
+          <div class="steps-dots" id="stepDots">
+            <?php for ($i = 0; $i < count($steps); $i++): ?>
+              <span class="dot <?= $i === 0 ? 'act' : '' ?>"></span>
+            <?php endfor; ?>
+          </div>
+        </div>
+        <?php foreach ($steps as $i => $s): ?>
+          <div class="step <?= $i === 0 ? '' : 'hidden' ?>" data-step="<?= $i ?>">
+            <?php if ($s['title'] !== ''): ?><h2 class="step-h"><?= e($s['title']) ?></h2><?php endif; ?>
+            <div class="prose"><?= $s['body'] ?></div>
+          </div>
+        <?php endforeach; ?>
+        <div class="steps-nav">
+          <button class="btn btn-ghost" id="stepPrev" disabled>&larr; <?= e(t('step_prev')) ?></button>
+          <button class="btn btn-primary" id="stepNext"><?= e(t('step_next')) ?> &rarr;</button>
+        </div>
+        <div class="steps-end hidden" id="stepsEnd">
+          <b>&#127881; <?= e(t('step_done')) ?></b>
+          <a class="btn btn-primary" href="#practice"><?= e(t('to_practice')) ?> &darr;</a>
+        </div>
+      </div>
+      <?php endif; ?>
+
       <?php if ((string)$L['example_code'] !== ''): ?>
-      <div class="lesson-block">
-        <h2>&#128161; <?= e(t('example')) ?></h2>
-        <pre class="code-view"><code id="exampleCode"><?= e((string)$L['example_code']) ?></code></pre>
+      <div class="card">
+        <h2 class="card-h">&#128161; <?= e(t('example')) ?></h2>
+        <pre class="code"><code id="exampleCode"><?= e((string)$L['example_code']) ?></code></pre>
         <button class="btn btn-ghost btn-sm" id="loadExample"><?= e(t('open_in_editor')) ?></button>
       </div>
       <?php endif; ?>
 
       <?php if (fld('task_text', $L) !== ''): ?>
-      <div class="lesson-block">
-        <h2>&#9997;&#65039; <?= e(t('task')) ?></h2>
-        <div class="theory-body"><?= fld('task_text', $L) ?></div>
+      <div class="card task-card">
+        <h2 class="card-h">&#9997;&#65039; <?= e(t('task')) ?></h2>
+        <div class="prose"><?= fld('task_text', $L) ?></div>
       </div>
       <?php endif; ?>
 
-      <div class="lesson-block" id="practice">
-        <h2>&#128187; <?= e(t('practice')) ?></h2>
+      <div class="card" id="practice">
+        <h2 class="card-h">&#128187; <?= e(t('practice')) ?></h2>
         <?php render_editor($id, $htmlCode, $cssCode, $jsCode, $startCode); ?>
       </div>
 
       <?php if ($questions): ?>
-        <div class="lesson-block" id="test">
-          <h2>&#128221; <?= e(t('test')) ?></h2>
+        <div class="card" id="test">
+          <h2 class="card-h">&#128221; <?= e(t('test')) ?></h2>
           <?php render_test($id, $questions, $result, $testErr, $nextId); ?>
         </div>
       <?php endif; ?>
     </section>
+
+    <script>
+    (function () {
+      var steps = document.querySelectorAll('.step');
+      if (!steps.length) { return; }
+      var dots = document.querySelectorAll('#stepDots .dot');
+      var now = document.getElementById('stepNow');
+      var prev = document.getElementById('stepPrev');
+      var next = document.getElementById('stepNext');
+      var end = document.getElementById('stepsEnd');
+      var i = 0;
+      function show(k) {
+        i = Math.max(0, Math.min(steps.length - 1, k));
+        for (var j = 0; j < steps.length; j++) {
+          steps[j].classList.toggle('hidden', j !== i);
+          if (dots[j]) { dots[j].classList.toggle('act', j <= i); }
+        }
+        now.textContent = i + 1;
+        prev.disabled = (i === 0);
+        next.classList.toggle('hidden', i === steps.length - 1);
+        end.classList.toggle('hidden', i !== steps.length - 1);
+        document.getElementById('steps').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      prev.addEventListener('click', function () { show(i - 1); });
+      next.addEventListener('click', function () { show(i + 1); });
+    })();
+    </script>
     <?php
     render_footer();
 }
 
-/** Муҳаррири код бо се ҷадвалак ва пешнамоиши зинда. */
 function render_editor($lessonId, $html, $css, $js, $startCode)
 {
     ?>
-    <div class="editor-wrap" id="edWrap">
-      <div class="ed-toolbar">
+    <div class="ed" id="edWrap" data-view="code">
+      <div class="ed-bar">
         <div class="ed-tabs">
           <button class="ed-tab act" data-pane="html">HTML</button>
           <button class="ed-tab" data-pane="css">CSS</button>
           <button class="ed-tab" data-pane="js">JS</button>
         </div>
-        <div class="ed-actions">
-          <button class="ed-btn" id="btnRun">&#9654; <?= e(t('run')) ?></button>
-          <button class="ed-btn" id="btnSave"><?= e(t('save')) ?></button>
-          <button class="ed-btn" id="btnReset"><?= e(t('reset')) ?></button>
+        <div class="ed-acts">
+          <button class="ed-btn" id="btnRun">&#9654;</button>
+          <button class="ed-btn" id="btnSave">&#128190;</button>
+          <button class="ed-btn" id="btnReset">&#8635;</button>
           <button class="ed-btn" id="btnFull">&#9974;</button>
         </div>
       </div>
-
-      <div class="ed-mobile-switch">
-        <button class="ms-btn act" data-view="code"><?= e(t('code')) ?></button>
-        <button class="ms-btn" data-view="preview"><?= e(t('preview')) ?></button>
+      <div class="ed-switch">
+        <button class="sw act" data-view="code"><?= e(t('code')) ?></button>
+        <button class="sw" data-view="preview"><?= e(t('preview')) ?></button>
       </div>
-
       <div class="ed-body">
-        <div class="ed-code" id="edCode">
-          <textarea id="ta_html" class="ed-area" spellcheck="false"><?= e($html) ?></textarea>
-          <textarea id="ta_css" class="ed-area hidden" spellcheck="false"><?= e($css) ?></textarea>
-          <textarea id="ta_js" class="ed-area hidden" spellcheck="false"><?= e($js) ?></textarea>
+        <div class="ed-code">
+          <textarea id="ta_html" class="ta" spellcheck="false"><?= e($html) ?></textarea>
+          <textarea id="ta_css" class="ta hidden" spellcheck="false"><?= e($css) ?></textarea>
+          <textarea id="ta_js" class="ta hidden" spellcheck="false"><?= e($js) ?></textarea>
         </div>
-        <div class="ed-preview" id="edPreview">
+        <div class="ed-prev">
+          <div class="ed-prev-bar"><span></span><span></span><span></span><i><?= e(t('preview')) ?></i></div>
           <iframe id="edFrame" sandbox="allow-scripts allow-modals" title="preview"></iframe>
         </div>
       </div>
-
       <div class="ed-status">
         <span id="edSaveState" class="muted"></span>
         <span id="edErr" class="ed-err"></span>
@@ -1073,65 +1264,48 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
       };
       var csrfEl = document.querySelector('input[name="csrf"]');
       var CSRF = csrfEl ? csrfEl.value : '';
-
-      var areas = {
-        html: document.getElementById('ta_html'),
-        css: document.getElementById('ta_css'),
-        js: document.getElementById('ta_js')
-      };
+      var areas = { html: document.getElementById('ta_html'), css: document.getElementById('ta_css'), js: document.getElementById('ta_js') };
       var frame = document.getElementById('edFrame');
       var errBox = document.getElementById('edErr');
       var saveState = document.getElementById('edSaveState');
-      var pasted = false;
-      var timer = null;
+      var wrap = document.getElementById('edWrap');
+      var pasted = false, timer = null;
 
       function val(k) { return areas[k] ? areas[k].value : ''; }
 
       function build() {
         var h = val('html'), c = val('css'), j = val('js');
-        // агар ученик саҳифаи пурра нанавишта бошад — худамон печонем
         var doc = h;
         if (h.toLowerCase().indexOf('<html') === -1) {
           doc = '<!doctype html><html><head><meta charset="utf-8">'
               + '<meta name="viewport" content="width=device-width,initial-scale=1">'
-              + '<style>body{font-family:system-ui,sans-serif;padding:12px;line-height:1.6}</style>'
+              + '<style>body{font-family:system-ui,sans-serif;padding:14px;line-height:1.6;color:#111}</style>'
               + '<style>' + c + '</style></head><body>' + h + '</body></html>';
         } else if (c) {
           doc = doc.replace(/<\/head>/i, '<style>' + c + '</style></head>');
         }
         if (j) {
-          var script = '<script>window.onerror=function(m,s,l){parent.postMessage({codetjErr:m,line:l},"*");return true;};try{'
-                     + j + '\n}catch(e){parent.postMessage({codetjErr:e.message},"*");}<\/script>';
+          var s = '<' + 'script>window.onerror=function(m,src,l){parent.postMessage({codetjErr:m,line:l},"*");return true;};try{'
+                + j + '\n}catch(e){parent.postMessage({codetjErr:e.message},"*");}<' + '/script>';
           if (doc.toLowerCase().indexOf('</body>') !== -1) {
-            doc = doc.replace(/<\/body>/i, script + '</body>');
-          } else {
-            doc += script;
-          }
+            doc = doc.replace(/<\/body>/i, s + '</body>');
+          } else { doc += s; }
         }
         return doc;
       }
-
-      function run() {
-        errBox.textContent = '';
-        frame.srcdoc = build();
-      }
+      function run() { errBox.textContent = ''; frame.srcdoc = build(); }
 
       window.addEventListener('message', function (ev) {
         if (ev.data && ev.data.codetjErr) {
-          errBox.textContent = 'JS: ' + ev.data.codetjErr + (ev.data.line ? ' (сатри ' + ev.data.line + ')' : '');
+          errBox.textContent = 'JS: ' + ev.data.codetjErr + (ev.data.line ? ' (' + ev.data.line + ')' : '');
         }
       });
-
-      function schedule() {
-        if (timer) { clearTimeout(timer); }
-        timer = setTimeout(run, 600);
-      }
+      function schedule() { if (timer) { clearTimeout(timer); } timer = setTimeout(run, 600); }
 
       Object.keys(areas).forEach(function (k) {
         if (!areas[k]) { return; }
         areas[k].addEventListener('input', schedule);
         areas[k].addEventListener('paste', function () { pasted = true; });
-        // Tab дар textarea — фосила, на гузариш ба тугмаи дигар
         areas[k].addEventListener('keydown', function (ev) {
           if (ev.key === 'Tab') {
             ev.preventDefault();
@@ -1143,11 +1317,10 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
         });
       });
 
-      // ҷадвалакҳои HTML / CSS / JS
       var tabs = document.querySelectorAll('.ed-tab');
       for (var i = 0; i < tabs.length; i++) {
         tabs[i].addEventListener('click', function () {
-          for (var j2 = 0; j2 < tabs.length; j2++) { tabs[j2].classList.remove('act'); }
+          for (var j = 0; j < tabs.length; j++) { tabs[j].classList.remove('act'); }
           this.classList.add('act');
           var pane = this.getAttribute('data-pane');
           Object.keys(areas).forEach(function (k) {
@@ -1155,23 +1328,23 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
           });
         });
       }
-
-      // дар телефон: код ё натиҷа
-      var msBtns = document.querySelectorAll('.ms-btn');
-      var wrap = document.getElementById('edWrap');
-      for (var m = 0; m < msBtns.length; m++) {
-        msBtns[m].addEventListener('click', function () {
-          for (var n = 0; n < msBtns.length; n++) { msBtns[n].classList.remove('act'); }
+      var sw = document.querySelectorAll('.sw');
+      for (var m = 0; m < sw.length; m++) {
+        sw[m].addEventListener('click', function () {
+          for (var n = 0; n < sw.length; n++) { sw[n].classList.remove('act'); }
           this.classList.add('act');
           wrap.setAttribute('data-view', this.getAttribute('data-view'));
-          if (this.getAttribute('data-view') === 'preview') { run(); }
+          run();
         });
       }
-
-      document.getElementById('btnRun').addEventListener('click', run);
+      document.getElementById('btnRun').addEventListener('click', function () {
+        wrap.setAttribute('data-view', 'preview');
+        for (var n = 0; n < sw.length; n++) { sw[n].classList.toggle('act', sw[n].getAttribute('data-view') === 'preview'); }
+        run();
+      });
       document.getElementById('btnFull').addEventListener('click', function () {
-        wrap.classList.toggle('is-full');
-        document.body.classList.toggle('no-scroll', wrap.classList.contains('is-full'));
+        wrap.classList.toggle('full');
+        document.body.classList.toggle('noscroll', wrap.classList.contains('full'));
         run();
       });
       document.getElementById('btnReset').addEventListener('click', function () {
@@ -1180,17 +1353,13 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
         if (areas.js) { areas.js.value = ''; }
         run();
       });
-
       function save(silent) {
         if (!CSRF) { return; }
         if (!silent) { saveState.textContent = TXT.saving; }
         var fd = new FormData();
-        fd.append('action', 'savedraft');
-        fd.append('csrf', CSRF);
+        fd.append('action', 'savedraft'); fd.append('csrf', CSRF);
         fd.append('lesson_id', LESSON_ID);
-        fd.append('html', val('html'));
-        fd.append('css', val('css'));
-        fd.append('js', val('js'));
+        fd.append('html', val('html')); fd.append('css', val('css')); fd.append('js', val('js'));
         fd.append('pasted', pasted ? '1' : '0');
         fetch('index.php', { method: 'POST', body: fd, credentials: 'same-origin' })
           .then(function (r) { return r.json(); })
@@ -1198,7 +1367,7 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
           .catch(function () { saveState.textContent = TXT.saveErr; });
       }
       document.getElementById('btnSave').addEventListener('click', function () { save(false); });
-      setInterval(function () { save(true); }, 20000);   // автозахира ҳар 20 сония
+      setInterval(function () { save(true); }, 20000);
 
       var loadEx = document.getElementById('loadExample');
       if (loadEx) {
@@ -1211,14 +1380,12 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
           }
         });
       }
-
       run();
     })();
     </script>
     <?php
 }
 
-/** Тест: 5 савол. Ҷавобҳои дуруст дар сервер мемонанд. */
 function render_test($lessonId, $questions, $result, $testErr, $nextId)
 {
     global $lang;
@@ -1230,17 +1397,18 @@ function render_test($lessonId, $questions, $result, $testErr, $nextId)
     }
     ?>
     <?php if ($result !== null): ?>
-      <div class="test-result <?= $result['passed'] ? 'ok' : 'bad' ?>">
-        <div class="tr-score"><?= (int)$result['score'] ?>%</div>
+      <div class="tres <?= $result['passed'] ? 'ok' : 'bad' ?>">
+        <div class="tres-score"><?= (int)$result['score'] ?>%</div>
         <div>
           <b><?= e($result['passed'] ? t('test_passed') : t('test_failed')) ?></b>
           <div class="muted"><?= (int)$result['correct'] ?>/<?= (int)$result['total'] ?> &middot;
-            <?= e(t('you_got')) ?> +<?= (int)$result['gained'] ?> <?= e(t('points')) ?></div>
+            <?= e(t('you_got')) ?> +<?= (int)$result['gained'] ?></div>
         </div>
       </div>
       <?php if (!empty($result['newly'])): ?>
-        <div class="lesson-done">
-          <b>&#127881; <?= e(t('lesson_done')) ?></b>
+        <div class="done-box">
+          <div class="done-emoji">&#127881;</div>
+          <b><?= e(t('lesson_done')) ?></b>
           <p class="muted"><?= e(t('lesson_done_txt')) ?></p>
           <?php if ($nextId > 0): ?>
             <a class="btn btn-primary" href="?p=lesson&id=<?= (int)$nextId ?>"><?= e(t('next_lesson')) ?> &rarr;</a>
@@ -1251,35 +1419,29 @@ function render_test($lessonId, $questions, $result, $testErr, $nextId)
       <p class="muted"><?= e(t('test_intro')) ?></p>
     <?php endif; ?>
 
-    <?php if ($testErr !== null): ?>
-      <div class="flash flash-err"><?= e(t($testErr)) ?></div>
-    <?php endif; ?>
+    <?php if ($testErr !== null): ?><div class="alert alert-err"><?= e(t($testErr)) ?></div><?php endif; ?>
 
-    <form method="post" action="index.php" class="test-form">
+    <form method="post" action="index.php" class="tform">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="test">
       <input type="hidden" name="lesson_id" value="<?= (int)$lessonId ?>">
-
       <?php foreach ($questions as $qi => $q):
           $qid = (int)$q['id'];
           $optRaw = $lang === 'ru' ? $q['options_ru'] : $q['options_tj'];
           $opts = json_decode((string)$optRaw, true);
-          if (!is_array($opts)) {
-              $opts = array();
-          }
-          // тартиби вариантҳо омехта мешавад, вале қиммати аслӣ нигоҳ дошта мешавад
+          if (!is_array($opts)) { $opts = array(); }
           $order = array_keys($opts);
           shuffle($order);
           $d = isset($detail[$qid]) ? $detail[$qid] : null;
           ?>
-          <div class="q-block <?= $d ? ($d['right'] ? 'q-ok' : 'q-bad') : '' ?>">
-            <div class="q-title"><span class="q-num"><?= $qi + 1 ?></span> <?= e($lang === 'ru' ? $q['q_ru'] : $q['q_tj']) ?></div>
+          <div class="q <?= $d ? ($d['right'] ? 'q-ok' : 'q-bad') : '' ?>">
+            <div class="q-t"><span class="q-n"><?= $qi + 1 ?></span> <?= e($lang === 'ru' ? $q['q_ru'] : $q['q_tj']) ?></div>
             <div class="q-opts">
               <?php foreach ($order as $oi):
                   $checked = ($d !== null && (int)$d['given'] === (int)$oi);
                   $isCorrect = ($d !== null && (int)$d['correct'] === (int)$oi);
                   ?>
-                  <label class="q-opt <?= $isCorrect ? 'is-correct' : '' ?> <?= ($checked && !$isCorrect) ? 'is-wrong' : '' ?>">
+                  <label class="opt <?= $isCorrect ? 'good' : '' ?> <?= ($checked && !$isCorrect) ? 'wrong' : '' ?>">
                     <input type="radio" name="a[<?= $qid ?>]" value="<?= (int)$oi ?>" <?= $checked ? 'checked' : '' ?> required>
                     <span><?= e((string)$opts[$oi]) ?></span>
                   </label>
@@ -1288,19 +1450,48 @@ function render_test($lessonId, $questions, $result, $testErr, $nextId)
             <?php if ($d !== null):
                 $ex = $lang === 'ru' ? $q['explain_ru'] : $q['explain_tj'];
                 if (!empty($d['reveal']) && (string)$ex !== ''): ?>
-                  <div class="q-explain"><?= $d['right'] ? '&#9989; ' : '&#128161; ' ?><?= e((string)$ex) ?></div>
+                  <div class="q-ex"><?= $d['right'] ? '&#9989; ' : '&#128161; ' ?><?= e((string)$ex) ?></div>
                 <?php elseif (!$d['right']): ?>
-                  <div class="q-explain">&#128260; <?= e(t('try_once_more')) ?></div>
+                  <div class="q-ex">&#128260; <?= e(t('try_once_more')) ?></div>
                 <?php endif;
             endif; ?>
           </div>
       <?php endforeach; ?>
-
       <button class="btn btn-primary btn-block" type="submit">
         <?= e($result !== null ? t('test_again') : t('test_send')) ?>
       </button>
     </form>
     <?php
+}
+
+function page_rating()
+{
+    global $user;
+    $rows = db()->query(
+        "SELECT name, city, points, streak_days FROM cj_users WHERE banned = 0 AND points > 0
+         ORDER BY points DESC, id ASC LIMIT 50"
+    )->fetchAll();
+    render_header(t('nav_rating'));
+    ?>
+    <h1 class="page-h">&#127942; <?= e(t('top_students')) ?></h1>
+    <?php if (!$rows): ?>
+      <p class="muted"><?= e(t('no_students')) ?></p>
+    <?php else: ?>
+      <div class="rank-list">
+        <?php foreach ($rows as $i => $r):
+            $me = ($user !== null && $r['name'] === $user['name']);
+            $medal = $i === 0 ? '&#129351;' : ($i === 1 ? '&#129352;' : ($i === 2 ? '&#129353;' : (string)($i + 1)));
+            ?>
+            <div class="rank <?= $me ? 'me' : '' ?>">
+              <span class="rank-n"><?= $medal ?></span>
+              <span class="rank-name"><?= e($r['name']) ?>
+                <?php if ($r['city'] !== ''): ?><small><?= e($r['city']) ?></small><?php endif; ?></span>
+              <span class="rank-pts">&#11088; <?= (int)$r['points'] ?></span>
+            </div>
+        <?php endforeach; ?>
+      </div>
+    <?php endif;
+    render_footer();
 }
 
 function page_profile()
@@ -1313,28 +1504,29 @@ function page_profile()
 
     render_header(t('nav_profile'));
     ?>
-    <section class="profile-head">
-      <div class="avatar"><?= e(mb_strtoupper(mb_substr($user['name'], 0, 1))) ?></div>
-      <div>
-        <h1><?= e($user['name']) ?></h1>
-        <?php if ($user['city'] !== ''): ?><p class="muted">&#128205; <?= e($user['city']) ?></p><?php endif; ?>
-        <div class="dash-stats">
-          <span class="chip">&#11088; <?= (int)$user['points'] ?> <?= e(t('points')) ?></span>
-          <span class="chip">&#128293; <?= (int)$user['streak_days'] ?> <?= e(t('streak')) ?></span>
-          <span class="chip">&#127941; <?= e(t('rank')) ?>: <?= $rank ?></span>
-        </div>
+    <section class="prof">
+      <div class="prof-av"><?= e(mb_strtoupper(mb_substr($user['name'], 0, 1))) ?></div>
+      <h1><?= e($user['name']) ?></h1>
+      <?php if ($user['city'] !== ''): ?><p class="muted">&#128205; <?= e($user['city']) ?></p><?php endif; ?>
+      <?php if ((string)$user['phone'] !== ''): ?>
+        <p class="muted small"><?= e(pretty_phone($user['phone'])) ?></p>
+      <?php endif; ?>
+      <div class="prof-stats">
+        <div class="pstat"><b><?= (int)$user['points'] ?></b><span><?= e(t('points')) ?></span></div>
+        <div class="pstat"><b><?= (int)$user['streak_days'] ?></b><span><?= e(t('streak')) ?></span></div>
+        <div class="pstat"><b><?= $rank ?></b><span><?= e(t('rank')) ?></span></div>
       </div>
     </section>
     <h2 class="sec-title"><?= e(t('my_progress')) ?></h2>
-    <section class="prof-progress">
+    <section class="prof-prog">
       <?php foreach (courses() as $slug => $c):
           $done = course_done_count($uid, $slug);
           $pct = (int)round($done / LESSONS_PER_COURSE * 100);
           ?>
-          <div class="prof-row" style="--cc:<?= e($c['color']) ?>">
-            <span class="prof-course"><?= $c['icon'] ?> <?= e(fld('name', $c)) ?></span>
-            <div class="cc-bar"><div class="cc-bar-in" style="width:<?= $pct ?>%"></div></div>
-            <span class="prof-pct"><?= $done ?>/<?= LESSONS_PER_COURSE ?></span>
+          <div class="prow" style="--cc:<?= e($c['color']) ?>">
+            <span class="prow-name"><?= $c['icon'] ?> <?= e(fld('name', $c)) ?></span>
+            <div class="bar"><div class="bar-in" style="width:<?= $pct ?>%"></div></div>
+            <span class="prow-n"><?= $done ?>/<?= LESSONS_PER_COURSE ?></span>
           </div>
       <?php endforeach; ?>
     </section>
@@ -1349,8 +1541,8 @@ function page_404()
     }
     render_header('404');
     ?>
-    <section class="auth-box" style="text-align:center">
-      <h1 style="font-size:3rem">&#129335;</h1>
+    <section class="auth" style="text-align:center">
+      <div class="auth-ic">&#129335;</div>
       <p><?= e(t('err_not_found')) ?></p>
       <a class="btn btn-primary" href="?p=home"><?= e(t('nav_home')) ?></a>
     </section>
@@ -1362,7 +1554,7 @@ function page_404()
  *  ҚОЛИБ
  * ============================================================ */
 
-function render_header($title)
+function render_header($title, $bare = false)
 {
     global $user, $lang, $theme, $p;
     $backUrl = '?p=' . preg_replace('/[^a-z_]/', '', $p);
@@ -1377,68 +1569,67 @@ function render_header($title)
 <html lang="<?= $lang === 'ru' ? 'ru' : 'tg' ?>" class="<?= $theme === 'light' ? 'light' : '' ?>">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1a">
 <title><?= e($title) ?> — CodeTJ</title>
 <meta name="description" content="<?= e(t('tagline')) ?>">
 <style><?php render_css(); ?></style>
 </head>
 <body>
-<header class="topbar">
-  <a class="logo" href="?p=home">Code<span>TJ</span></a>
-  <nav class="topnav">
-    <a href="?p=home" class="<?= $p === 'home' ? 'act' : '' ?>"><?= e(t('nav_home')) ?></a>
-    <?php if ($user !== null): ?>
-      <a href="?p=profile" class="<?= $p === 'profile' ? 'act' : '' ?>"><?= e(t('nav_profile')) ?></a>
-    <?php endif; ?>
-  </nav>
-  <div class="topbar-right">
-    <form method="post" action="index.php" class="lang-form">
+<header class="top">
+  <a class="logo" href="?p=home"><span class="logo-d">&lt;/&gt;</span> Code<b>TJ</b></a>
+  <div class="top-right">
+    <form method="post" action="index.php" class="lang">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="setlang">
       <input type="hidden" name="back" value="<?= e($backUrl) ?>">
-      <button type="submit" name="lang" value="tj" class="lang-btn <?= $lang === 'tj' ? 'act' : '' ?>"><?= e(t('lang_tj')) ?></button>
-      <button type="submit" name="lang" value="ru" class="lang-btn <?= $lang === 'ru' ? 'act' : '' ?>"><?= e(t('lang_ru')) ?></button>
+      <button type="submit" name="lang" value="tj" class="lang-b <?= $lang === 'tj' ? 'act' : '' ?>"><?= e(t('lang_tj')) ?></button>
+      <button type="submit" name="lang" value="ru" class="lang-b <?= $lang === 'ru' ? 'act' : '' ?>"><?= e(t('lang_ru')) ?></button>
     </form>
-    <button id="themeBtn" class="icon-btn" title="<?= e(t('theme_toggle')) ?>"><?= $theme === 'light' ? '&#127769;' : '&#9728;&#65039;' ?></button>
+    <button id="themeBtn" class="ibtn"><?= $theme === 'light' ? '&#127769;' : '&#9728;&#65039;' ?></button>
     <?php if ($user !== null): ?>
-      <form method="post" action="index.php" class="inline-form">
+      <form method="post" action="index.php" style="display:inline">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="logout">
-        <button type="submit" class="btn btn-sm btn-ghost"><?= e(t('logout')) ?></button>
+        <button type="submit" class="ibtn">&#8617;</button>
       </form>
-    <?php else: ?>
-      <a class="btn btn-sm btn-primary" href="?p=login"><?= e(t('login')) ?></a>
+    <?php elseif (!$bare): ?>
+      <a class="btn btn-primary btn-sm" href="?p=enter"><?= e(t('enter')) ?></a>
     <?php endif; ?>
   </div>
 </header>
 <main class="wrap">
 <?php if ($flash !== null): ?>
-  <div class="flash <?= $flash['type'] === 'ok' ? 'flash-ok' : 'flash-err' ?>"><?= e(t($flash['key'])) ?></div>
+  <div class="alert <?= $flash['type'] === 'ok' ? 'alert-ok' : 'alert-err' ?>"><?= e(t($flash['key'])) ?></div>
 <?php endif; ?>
     <?php
 }
 
 function render_footer()
 {
+    global $user, $p;
     ?>
 </main>
-<footer class="footer">
-  <p><b>CodeTJ</b> &copy; <?= date('Y') ?> &middot; <?= e(t('footer_note')) ?></p>
-</footer>
+<?php if ($user !== null): ?>
+<nav class="tabbar">
+  <a href="?p=home" class="<?= $p === 'home' ? 'act' : '' ?>"><span>&#127968;</span><i><?= e(t('nav_home')) ?></i></a>
+  <a href="?p=rating" class="<?= $p === 'rating' ? 'act' : '' ?>"><span>&#127942;</span><i><?= e(t('nav_rating')) ?></i></a>
+  <a href="?p=profile" class="<?= $p === 'profile' ? 'act' : '' ?>"><span>&#128100;</span><i><?= e(t('nav_profile')) ?></i></a>
+</nav>
+<?php endif; ?>
+<footer class="foot"><b>CodeTJ</b> &middot; <?= e(t('footer_note')) ?></footer>
 <script>
 (function () {
-  var btn = document.getElementById('themeBtn');
-  if (!btn) { return; }
-  btn.addEventListener('click', function () {
+  var b = document.getElementById('themeBtn');
+  if (!b) { return; }
+  b.addEventListener('click', function () {
     var light = document.documentElement.classList.toggle('light');
-    btn.innerHTML = light ? '&#127769;' : '&#9728;&#65039;';
+    b.innerHTML = light ? '&#127769;' : '&#9728;&#65039;';
     document.cookie = 'codetj_theme=' + (light ? 'light' : 'dark') + ';path=/;max-age=31536000;samesite=Lax';
-    var csrf = document.querySelector('input[name="csrf"]');
-    if (csrf) {
+    var c = document.querySelector('input[name="csrf"]');
+    if (c) {
       var fd = new FormData();
-      fd.append('action', 'settheme');
-      fd.append('theme', light ? 'light' : 'dark');
-      fd.append('csrf', csrf.value);
+      fd.append('action', 'settheme'); fd.append('theme', light ? 'light' : 'dark'); fd.append('csrf', c.value);
       fetch('index.php', { method: 'POST', body: fd, credentials: 'same-origin' }).catch(function () {});
     }
   });
@@ -1453,216 +1644,312 @@ function render_css()
 {
     ?>
 :root{
-  --bg:#0b1120;--bg2:#111a2e;--card:#16223a;--line:#243350;
-  --txt:#e7edf7;--muted:#8fa0bd;--accent:#38bdf8;--accent2:#818cf8;
-  --ok:#22c55e;--err:#ef4444;--radius:16px;--shadow:0 10px 30px rgba(0,0,0,.35);
+  --bg:#0a0e1a;--bg2:#111729;--card:#151d33;--card2:#1b2542;--line:#26304d;
+  --txt:#eef2fb;--mut:#8b9ac0;--acc:#5b8cff;--acc2:#a855f7;
+  --ok:#22c55e;--err:#f43f5e;--warn:#f59e0b;
+  --r:20px;--sh:0 8px 32px rgba(0,0,0,.4);
 }
 html.light{
-  --bg:#f2f5fa;--bg2:#e8edf5;--card:#fff;--line:#dbe3ef;
-  --txt:#17233b;--muted:#5b6b88;--shadow:0 8px 24px rgba(23,35,59,.10);
+  --bg:#f6f8fd;--bg2:#eef2fa;--card:#fff;--card2:#f7f9fd;--line:#e2e8f4;
+  --txt:#0f172a;--mut:#5a6b8c;--sh:0 6px 24px rgba(15,23,42,.08);
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Noto Sans',system-ui,-apple-system,'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--txt);
- min-height:100vh;display:flex;flex-direction:column;line-height:1.65;-webkit-font-smoothing:antialiased}
-body.no-scroll{overflow:hidden}
-a{color:var(--accent);text-decoration:none}
-h1,h2,h3{line-height:1.3;font-weight:800}
-.wrap{width:100%;max-width:1080px;margin:0 auto;padding:24px 16px;flex:1}
-.hidden{display:none !important}
+body{font-family:'Noto Sans',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+ background:var(--bg);color:var(--txt);line-height:1.65;min-height:100vh;
+ display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;
+ -webkit-tap-highlight-color:transparent}
+body.noscroll{overflow:hidden}
+a{color:var(--acc);text-decoration:none}
+h1,h2,h3{line-height:1.25;font-weight:800;letter-spacing:-.02em}
+.hidden{display:none!important}
+.muted{color:var(--mut)}
+.small{font-size:.85rem}
+.center{text-align:center}
+.wrap{width:100%;max-width:900px;margin:0 auto;padding:16px 14px 90px;flex:1}
 
-.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:16px;padding:10px 16px;
- background:var(--bg);border-bottom:1px solid var(--line)}
-.logo{font-size:1.35rem;font-weight:800;color:var(--txt)}
-.logo span{color:var(--accent)}
-.topnav{display:flex;gap:4px;flex:1}
-.topnav a{color:var(--muted);padding:6px 12px;border-radius:10px;font-weight:600;font-size:.95rem}
-.topnav a.act,.topnav a:hover{color:var(--txt);background:var(--card)}
-.topbar-right{display:flex;align-items:center;gap:8px}
-.lang-form{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.lang-btn{background:transparent;border:0;color:var(--muted);padding:6px 10px;font-weight:700;cursor:pointer;font-size:.85rem}
-.lang-btn.act{background:var(--accent);color:#04121f}
-.icon-btn{background:transparent;border:1px solid var(--line);border-radius:10px;padding:5px 9px;cursor:pointer;font-size:1rem;color:var(--txt)}
-.inline-form{display:inline}
+/* ---- шапка ---- */
+.top{position:sticky;top:0;z-index:60;display:flex;align-items:center;justify-content:space-between;
+ gap:10px;padding:10px 14px;background:rgba(10,14,26,.85);backdrop-filter:blur(14px);
+ border-bottom:1px solid var(--line)}
+html.light .top{background:rgba(246,248,253,.85)}
+.logo{font-size:1.15rem;font-weight:800;color:var(--txt);display:flex;align-items:center;gap:7px}
+.logo b{background:linear-gradient(135deg,var(--acc),var(--acc2));-webkit-background-clip:text;
+ background-clip:text;-webkit-text-fill-color:transparent}
+.logo-d{font-family:ui-monospace,monospace;color:var(--acc);font-size:.9rem;opacity:.7}
+.top-right{display:flex;align-items:center;gap:7px}
+.lang{display:flex;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.lang-b{background:none;border:0;color:var(--mut);padding:6px 9px;font:700 .78rem inherit;cursor:pointer}
+.lang-b.act{background:var(--acc);color:#fff}
+.ibtn{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 10px;
+ cursor:pointer;font-size:.95rem;color:var(--txt);line-height:1}
 
-.btn{display:inline-block;border:0;border-radius:12px;cursor:pointer;font-weight:700;font-family:inherit;
- font-size:1rem;padding:12px 22px;color:var(--txt);text-align:center}
-.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04121f}
-html.light .btn-primary{color:#fff}
-.btn-ghost{background:var(--card);border:1px solid var(--line)}
-.btn-sm{padding:7px 14px;font-size:.9rem}
-.btn-lg{padding:15px 30px;font-size:1.1rem}
+/* ---- кнопки ---- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;cursor:pointer;
+ font:700 1rem inherit;padding:13px 24px;border-radius:14px;color:var(--txt);transition:transform .12s,filter .12s}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;
+ box-shadow:0 6px 20px rgba(91,140,255,.32)}
+.btn-ghost{background:var(--card2);border:1px solid var(--line)}
+.btn-ghost:disabled{opacity:.4}
+.btn-sm{padding:8px 14px;font-size:.88rem;border-radius:11px}
+.btn-lg{padding:16px 32px;font-size:1.05rem}
 .btn-block{width:100%}
-.btn-course{background:var(--cc);color:#fff;padding:10px 18px;font-size:.95rem}
+.btn-cc{background:var(--cc);color:#fff;width:100%;padding:12px}
 
-.flash{padding:13px 18px;border-radius:12px;margin-bottom:18px;font-weight:600}
-.flash-ok{background:rgba(34,197,94,.18);border:1px solid var(--ok)}
-.flash-err{background:rgba(239,68,68,.18);border:1px solid var(--err)}
+/* ---- уведомления ---- */
+.alert{padding:12px 16px;border-radius:14px;margin-bottom:14px;font-weight:600;font-size:.92rem}
+.alert-ok{background:rgba(34,197,94,.14);border:1px solid var(--ok);color:var(--ok)}
+.alert-err{background:rgba(244,63,94,.14);border:1px solid var(--err);color:var(--err)}
+.alert-info{background:rgba(91,140,255,.12);border:1px solid var(--acc);color:var(--txt);font-weight:400}
 
-.hero{text-align:center;padding:56px 8px 40px}
-.hero h1{font-size:clamp(1.8rem,5.5vw,3.2rem);color:var(--accent)}
-.hero-sub{max-width:620px;margin:16px auto 0;color:var(--muted);font-size:1.08rem}
-.hero-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px}
-.hero-stats{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:40px}
-.hstat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 26px;min-width:120px}
-.hstat b{display:block;font-size:1.5rem;color:var(--accent)}
-.hstat span{color:var(--muted);font-size:.85rem}
+/* ---- главная ---- */
+.hero{text-align:center;padding:38px 6px 30px}
+.hero-badge{display:inline-block;background:var(--card);border:1px solid var(--line);
+ border-radius:99px;padding:6px 16px;font-size:.82rem;font-weight:700;color:var(--mut);margin-bottom:16px}
+.hero h1{font-size:clamp(1.75rem,7vw,2.9rem);
+ background:linear-gradient(135deg,var(--txt) 30%,var(--acc));-webkit-background-clip:text;
+ background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{color:var(--mut);max-width:520px;margin:14px auto 24px;font-size:1.02rem}
+.hero-stats{display:flex;gap:10px;justify-content:center;margin-top:32px;flex-wrap:wrap}
+.hstat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 22px;min-width:98px}
+.hstat b{display:block;font-size:1.4rem;color:var(--acc)}
+.hstat span{color:var(--mut);font-size:.78rem}
 
-.why{padding:24px 0}
-.why h2{text-align:center;margin-bottom:24px;font-size:1.6rem}
-.why-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-.why-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
-.why-ic{font-size:1.9rem;margin-bottom:8px}
-.why-card h3{font-size:1.05rem;margin-bottom:6px}
-.why-card p{color:var(--muted);font-size:.92rem}
+.sec-title{font-size:1.2rem;margin:26px 0 14px}
+.page-h{font-size:1.5rem;margin:8px 0 18px}
+.why-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.why-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+.why-ic{font-size:1.7rem;margin-bottom:8px}
+.why-card h3{font-size:1rem;margin-bottom:5px}
+.why-card p{color:var(--mut);font-size:.9rem}
 
-.dash-head{padding:16px 0 4px}
-.dash-head h1{font-size:clamp(1.4rem,4vw,2rem)}
-.dash-stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:.9rem;font-weight:600}
-.sec-title{margin:28px 0 16px;font-size:1.35rem}
+/* ---- дашборд ---- */
+.dash-hi{display:flex;align-items:center;gap:14px;padding:14px 0 4px}
+.dash-av{width:56px;height:56px;border-radius:18px;flex-shrink:0;font-size:1.5rem;font-weight:800;
+ background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;
+ display:flex;align-items:center;justify-content:center}
+.dash-hi h1{font-size:1.25rem}
+.dash-stats{display:flex;gap:6px;margin-top:6px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:99px;padding:4px 12px;
+ font-size:.85rem;font-weight:700}
+.chip-star{color:var(--warn)}
+.chip-fire{color:#fb7185}
 
-.courses-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;padding:8px 0 24px}
-.course-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px;
- display:flex;flex-direction:column;gap:10px;border-top:3px solid var(--cc);box-shadow:var(--shadow)}
-.course-card.is-locked{opacity:.75}
-.cc-top{display:flex;align-items:center;gap:10px}
-.cc-icon{font-size:1.6rem}
-.cc-name{font-size:1.25rem;font-weight:800;flex:1}
-.cc-desc{color:var(--muted);font-size:.92rem;flex:1}
-.cc-meta{color:var(--muted);font-size:.8rem;font-weight:600;letter-spacing:.3px}
-.cc-bar{height:8px;background:var(--bg2);border-radius:99px;overflow:hidden}
-.cc-bar.big{height:12px;margin-top:14px}
-.cc-bar-in{height:100%;background:var(--cc);border-radius:99px}
-.cc-progress{color:var(--muted);font-size:.85rem}
-.cc-hint{color:var(--muted);font-size:.85rem;background:var(--bg2);border-radius:10px;padding:10px 12px}
+.resume{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);
+ border-left:4px solid var(--cc);border-radius:var(--r);padding:16px;margin-top:16px;color:var(--txt);
+ box-shadow:var(--sh)}
+.resume-ic{font-size:1.8rem}
+.resume-txt{flex:1;min-width:0}
+.resume-label{display:block;font-size:.75rem;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.resume-txt b{display:block;font-size:.98rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.resume-go{font-size:1.3rem;color:var(--cc)}
 
-.top3{padding-bottom:24px}
-.top3-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;max-width:640px}
-.top3-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;text-align:center}
-.top3-medal{font-size:2rem}
-.top3-name{font-weight:800;margin-top:6px}
-.top3-city{color:var(--muted);font-size:.85rem}
-.top3-pts{margin-top:6px;font-weight:700;color:var(--accent)}
+/* ---- курсы ---- */
+.courses{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.ccard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;
+ display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
+.ccard::before{content:'';position:absolute;inset:0 0 auto 0;height:4px;background:var(--cc)}
+.ccard.locked{opacity:.6}
+.ccard-head{display:flex;align-items:center;gap:11px}
+.ccard-ic{font-size:1.7rem}
+.ccard-name{font-size:1.15rem;font-weight:800}
+.ccard-meta{font-size:.78rem;color:var(--mut)}
+.ccard-lock{margin-left:auto}
+.ccard-desc{color:var(--mut);font-size:.89rem;flex:1}
+.ccard-prog{font-size:.8rem;color:var(--mut)}
+.ccard-hint{font-size:.83rem;color:var(--mut);background:var(--bg2);border-radius:12px;padding:10px 12px}
+.bar{height:8px;background:var(--bg2);border-radius:99px;overflow:hidden}
+.bar.big{height:11px;margin-top:14px}
+.bar-in{height:100%;background:var(--cc,var(--acc));border-radius:99px;transition:width .5s}
 
-.course-head{padding:12px 0 8px}
-.course-head h1{font-size:clamp(1.5rem,4.5vw,2.2rem);margin-top:10px}
-.ch-icon{font-size:1.8rem}
-.back-link{color:var(--muted);font-weight:600;font-size:.9rem}
-.level-block{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-top:18px}
-.level-block.is-locked{opacity:.6}
-.level-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-.level-head h2{font-size:1.15rem}
-.level-range{color:var(--muted);font-size:.85rem;font-weight:600}
-.lesson-map{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px}
-.lcell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:12px;
- background:var(--bg2);border:1px solid var(--line);font-weight:800;font-size:1rem;color:var(--muted)}
-.lcell.open{color:var(--txt);border-color:var(--cc)}
-.lcell.done{background:var(--cc);border-color:var(--cc);color:#fff}
-.lcell.lock{opacity:.55;font-size:.8rem}
-.lcell.soon{opacity:.45}
+/* ---- топ-3 ---- */
+.top3-list{display:flex;flex-direction:column;gap:8px}
+.top3-row,.rank{display:flex;align-items:center;gap:12px;background:var(--card);
+ border:1px solid var(--line);border-radius:15px;padding:11px 15px}
+.top3-medal,.rank-n{font-size:1.15rem;width:30px;text-align:center;font-weight:800;color:var(--mut)}
+.top3-name,.rank-name{flex:1;font-weight:700;min-width:0}
+.top3-name small,.rank-name small{display:block;font-weight:400;color:var(--mut);font-size:.78rem}
+.top3-pts,.rank-pts{font-weight:800;color:var(--warn)}
+.rank-list{display:flex;flex-direction:column;gap:7px}
+.rank.me{border-color:var(--acc);background:rgba(91,140,255,.1)}
 
-.lesson-page h1{font-size:clamp(1.3rem,4vw,1.9rem);margin:12px 0 6px}
-.lesson-tag{display:inline-block;font-size:.78rem;font-weight:700;color:var(--cc);text-transform:uppercase}
-.lesson-block{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-top:16px}
-.lesson-block h2{font-size:1.1rem;margin-bottom:12px}
-.theory-body p{margin:10px 0}
-.theory-body h3{margin:18px 0 8px;font-size:1.02rem;color:var(--accent)}
-.theory-body ul,.theory-body ol{padding-left:22px;margin:10px 0}
-.theory-body li{margin:5px 0}
-.theory-body code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.88em;background:var(--bg2);
- padding:2px 6px;border-radius:6px;color:var(--accent);word-break:break-word}
-.theory-body pre{background:#0d1526;border:1px solid var(--line);border-radius:10px;padding:14px;
+/* ---- вход ---- */
+.auth{max-width:400px;margin:26px auto;background:var(--card);border:1px solid var(--line);
+ border-radius:24px;padding:30px 24px;box-shadow:var(--sh);text-align:center}
+.auth-ic{font-size:2.6rem;margin-bottom:10px}
+.auth h1{font-size:1.4rem;margin-bottom:8px}
+.auth form{display:flex;flex-direction:column;gap:14px;margin-top:20px;text-align:left}
+.auth label{display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:.88rem}
+.auth label small{font-weight:400;color:var(--mut)}
+.auth input{background:var(--bg2);border:2px solid var(--line);border-radius:14px;padding:14px;
+ color:var(--txt);font:1.05rem inherit;width:100%}
+.auth input:focus{outline:0;border-color:var(--acc)}
+.phone-row{display:flex;align-items:center;gap:8px;background:var(--bg2);border:2px solid var(--line);
+ border-radius:14px;padding-left:14px}
+.phone-row:focus-within{border-color:var(--acc)}
+.phone-row input{border:0;background:none;padding-left:0;letter-spacing:.06em}
+.phone-code{font-weight:800;color:var(--mut)}
+.phone-shown{background:var(--bg2);border-radius:12px;padding:9px;font-weight:800;
+ letter-spacing:.04em;margin-top:12px}
+
+/* ---- курс ---- */
+.back{color:var(--mut);font-weight:700;font-size:.88rem;display:inline-block;padding:6px 0}
+.chead{padding:4px 0 10px}
+.chead-in{display:flex;gap:13px;align-items:center;margin:8px 0}
+.chead-ic{font-size:2.1rem}
+.chead h1{font-size:1.6rem}
+.chead p{font-size:.88rem}
+.chead-prog{font-size:.83rem;color:var(--mut);margin-top:7px}
+.lvl{margin-top:22px}
+.lvl-head h2{font-size:1rem;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+.lessons{display:flex;flex-direction:column;gap:8px}
+.lrow{display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--line);
+ border-radius:15px;padding:13px 15px;color:var(--txt)}
+.lrow-n{width:32px;height:32px;flex-shrink:0;border-radius:11px;background:var(--bg2);
+ display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;color:var(--mut)}
+.lrow-t{flex:1;font-weight:600;font-size:.94rem;min-width:0}
+.lrow-t small{display:block;font-size:.76rem;color:var(--mut);font-weight:400}
+.lrow-go{color:var(--cc);font-size:1.1rem}
+.lrow.open{border-color:var(--cc)}
+.lrow.open .lrow-n{background:var(--cc);color:#fff}
+.lrow.done .lrow-n{background:var(--ok);color:#fff}
+.lrow.lock,.lrow.soon{opacity:.5}
+
+/* ---- урок ---- */
+.lesson-title{display:flex;align-items:flex-start;gap:12px;margin:10px 0 6px}
+.lesson-num{width:38px;height:38px;flex-shrink:0;border-radius:13px;background:var(--cc);color:#fff;
+ display:flex;align-items:center;justify-content:center;font-weight:800}
+.lesson-title h1{font-size:1.35rem;padding-top:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-top:14px}
+.card-h{font-size:1.02rem;margin-bottom:12px}
+.task-card{border-left:4px solid var(--cc)}
+
+/* шаги */
+.steps-card{padding-top:14px}
+.steps-top{display:flex;align-items:center;justify-content:space-between;gap:10px;
+ padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.steps-count{font-size:.8rem;color:var(--mut);font-weight:700}
+.steps-count b{color:var(--cc);font-size:1rem}
+.steps-dots{display:flex;gap:5px}
+.dot{width:7px;height:7px;border-radius:99px;background:var(--line);transition:background .3s}
+.dot.act{background:var(--cc)}
+.step-h{font-size:1.15rem;margin-bottom:10px;color:var(--cc)}
+.steps-nav{display:flex;gap:10px;margin-top:18px}
+.steps-nav .btn{flex:1}
+.steps-end{text-align:center;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.steps-end b{display:block;margin-bottom:12px}
+
+/* текст теории */
+.prose p{margin:9px 0}
+.prose ul,.prose ol{padding-left:20px;margin:9px 0}
+.prose li{margin:5px 0}
+.prose b{color:var(--txt)}
+.prose code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.87em;background:var(--bg2);
+ padding:2px 7px;border-radius:7px;color:var(--acc);word-break:break-word}
+.prose pre{background:#0b1020;border:1px solid var(--line);border-radius:13px;padding:14px;
  overflow-x:auto;margin:12px 0}
-.theory-body pre code{background:none;color:#c9d8f0;padding:0;white-space:pre}
-.code-view{background:#0d1526;border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto;margin-bottom:12px}
-.code-view code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.86rem;color:#c9d8f0;white-space:pre}
+.prose pre code{background:none;color:#c5d5f5;padding:0;white-space:pre}
+.code{background:#0b1020;border:1px solid var(--line);border-radius:13px;padding:15px;
+ overflow-x:auto;margin-bottom:12px}
+.code code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.83rem;color:#c5d5f5;white-space:pre}
 
-/* ---- муҳаррири код ---- */
-.editor-wrap{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0d1526}
-.editor-wrap.is-full{position:fixed;inset:0;z-index:200;border-radius:0}
-.ed-toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;
- background:#111a2e;border-bottom:1px solid var(--line);padding:6px 8px;flex-wrap:wrap}
-.ed-tabs{display:flex;gap:4px}
-.ed-tab{background:transparent;border:0;color:#8fa0bd;padding:7px 14px;border-radius:8px;
- cursor:pointer;font-weight:700;font-size:.86rem;font-family:inherit}
-.ed-tab.act{background:#243350;color:#e7edf7}
-.ed-actions{display:flex;gap:4px;flex-wrap:wrap}
-.ed-btn{background:#1c2a45;border:1px solid #243350;color:#c9d8f0;border-radius:8px;
- padding:7px 12px;cursor:pointer;font-size:.82rem;font-family:inherit;font-weight:600}
-.ed-mobile-switch{display:none;background:#111a2e;border-bottom:1px solid var(--line);padding:6px 8px;gap:4px}
-.ms-btn{flex:1;background:transparent;border:0;color:#8fa0bd;padding:8px;border-radius:8px;
- cursor:pointer;font-weight:700;font-family:inherit;font-size:.86rem}
-.ms-btn.act{background:#243350;color:#e7edf7}
-.ed-body{display:grid;grid-template-columns:1fr 1fr;height:420px}
-.editor-wrap.is-full .ed-body{height:calc(100vh - 96px)}
-.ed-code{position:relative;border-right:1px solid var(--line)}
-.ed-area{width:100%;height:100%;border:0;outline:0;resize:none;background:#0d1526;color:#c9d8f0;
- font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;padding:12px;display:block}
-.ed-preview{background:#fff}
-.ed-preview iframe{width:100%;height:100%;border:0;display:block;background:#fff}
-.ed-status{display:flex;justify-content:space-between;gap:10px;padding:7px 12px;background:#111a2e;
- border-top:1px solid var(--line);font-size:.8rem;flex-wrap:wrap}
-.ed-err{color:#f87171;font-family:ui-monospace,monospace;word-break:break-word}
+/* ---- редактор ---- */
+.ed{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:#0b1020}
+.ed.full{position:fixed;inset:0;z-index:200;border-radius:0}
+.ed-bar{display:flex;justify-content:space-between;gap:8px;background:#111729;
+ border-bottom:1px solid var(--line);padding:6px}
+.ed-tabs{display:flex;gap:3px}
+.ed-tab{background:none;border:0;color:#8b9ac0;padding:7px 13px;border-radius:9px;cursor:pointer;
+ font:700 .82rem inherit}
+.ed-tab.act{background:#26304d;color:#eef2fb}
+.ed-acts{display:flex;gap:3px}
+.ed-btn{background:#1b2542;border:1px solid #26304d;color:#c5d5f5;border-radius:9px;
+ padding:7px 11px;cursor:pointer;font-size:.85rem;line-height:1}
+.ed-switch{display:flex;gap:4px;background:#111729;border-bottom:1px solid var(--line);padding:6px}
+.sw{flex:1;background:none;border:0;color:#8b9ac0;padding:9px;border-radius:9px;cursor:pointer;
+ font:700 .85rem inherit}
+.sw.act{background:#26304d;color:#eef2fb}
+.ed-body{display:block;height:400px}
+.ed.full .ed-body{height:calc(100vh - 108px)}
+.ed-code,.ed-prev{height:100%}
+.ed[data-view="preview"] .ed-code{display:none}
+.ed[data-view="code"] .ed-prev{display:none}
+.ta{width:100%;height:100%;border:0;outline:0;resize:none;background:#0b1020;color:#c5d5f5;
+ font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.65;padding:13px;display:block}
+.ed-prev{background:#fff;display:flex;flex-direction:column}
+.ed-prev-bar{display:flex;align-items:center;gap:5px;padding:7px 11px;background:#e8ecf5;flex-shrink:0}
+.ed-prev-bar span{width:9px;height:9px;border-radius:99px;background:#c3ccdd}
+.ed-prev-bar span:first-child{background:#ff5f57}
+.ed-prev-bar span:nth-child(2){background:#febc2e}
+.ed-prev-bar span:nth-child(3){background:#28c840}
+.ed-prev-bar i{margin-left:8px;font-style:normal;font-size:.74rem;color:#7a879e}
+.ed-prev iframe{flex:1;width:100%;border:0;background:#fff}
+.ed-status{display:flex;justify-content:space-between;gap:10px;padding:7px 12px;background:#111729;
+ border-top:1px solid var(--line);font-size:.78rem;flex-wrap:wrap;min-height:31px}
+.ed-err{color:#fb7185;font-family:ui-monospace,monospace;word-break:break-word}
 
 /* ---- тест ---- */
-.test-form{margin-top:14px}
-.q-block{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
-.q-block.q-ok{border-color:var(--ok)}
-.q-block.q-bad{border-color:var(--err)}
-.q-title{font-weight:700;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start}
-.q-num{background:var(--accent);color:#04121f;width:24px;height:24px;border-radius:50%;flex-shrink:0;
- display:flex;align-items:center;justify-content:center;font-size:.82rem}
-.q-opts{display:flex;flex-direction:column;gap:8px}
-.q-opt{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);
- border-radius:10px;padding:11px 14px;cursor:pointer;font-size:.95rem}
-.q-opt input{margin-top:4px;flex-shrink:0}
-.q-opt.is-correct{border-color:var(--ok);background:rgba(34,197,94,.12)}
-.q-opt.is-wrong{border-color:var(--err);background:rgba(239,68,68,.12)}
-.q-explain{margin-top:10px;font-size:.88rem;color:var(--muted);background:var(--card);
- border-radius:8px;padding:10px 12px}
-.test-result{display:flex;gap:16px;align-items:center;border-radius:12px;padding:16px;margin-bottom:14px;
- border:1px solid var(--line);background:var(--bg2)}
-.test-result.ok{border-color:var(--ok)}
-.test-result.bad{border-color:var(--err)}
-.tr-score{font-size:2rem;font-weight:800;color:var(--accent)}
-.lesson-done{background:rgba(34,197,94,.12);border:1px solid var(--ok);border-radius:12px;
- padding:16px;margin-bottom:14px;text-align:center}
-.lesson-done .btn{margin-top:10px}
+.tform{margin-top:12px}
+.q{background:var(--bg2);border:1px solid var(--line);border-radius:15px;padding:15px;margin-bottom:10px}
+.q-ok{border-color:var(--ok)}
+.q-bad{border-color:var(--err)}
+.q-t{font-weight:700;margin-bottom:11px;display:flex;gap:9px;align-items:flex-start;font-size:.96rem}
+.q-n{background:var(--acc);color:#fff;width:23px;height:23px;border-radius:99px;flex-shrink:0;
+ display:flex;align-items:center;justify-content:center;font-size:.78rem}
+.q-opts{display:flex;flex-direction:column;gap:7px}
+.opt{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:2px solid var(--line);
+ border-radius:12px;padding:11px 13px;cursor:pointer;font-size:.93rem}
+.opt input{margin-top:4px;flex-shrink:0;accent-color:var(--acc)}
+.opt:has(input:checked){border-color:var(--acc)}
+.opt.good{border-color:var(--ok);background:rgba(34,197,94,.1)}
+.opt.wrong{border-color:var(--err);background:rgba(244,63,94,.1)}
+.q-ex{margin-top:10px;font-size:.86rem;color:var(--mut);background:var(--card);border-radius:10px;padding:10px 12px}
+.tres{display:flex;gap:15px;align-items:center;border:1px solid var(--line);border-radius:15px;
+ padding:15px;margin-bottom:12px;background:var(--bg2)}
+.tres.ok{border-color:var(--ok)}
+.tres.bad{border-color:var(--err)}
+.tres-score{font-size:1.9rem;font-weight:800;color:var(--acc)}
+.done-box{background:rgba(34,197,94,.1);border:1px solid var(--ok);border-radius:16px;
+ padding:20px;margin-bottom:12px;text-align:center}
+.done-emoji{font-size:2.2rem}
+.done-box .btn{margin-top:12px}
 
-.profile-head{display:flex;gap:18px;align-items:center;padding:16px 0;flex-wrap:wrap}
-.avatar{width:84px;height:84px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,var(--accent),var(--accent2));
- display:flex;align-items:center;justify-content:center;font-size:2.2rem;font-weight:800;color:#04121f}
-.prof-progress{display:flex;flex-direction:column;gap:12px}
-.prof-row{display:grid;grid-template-columns:150px 1fr 60px;gap:12px;align-items:center}
-.prof-course{font-weight:700;font-size:.95rem}
-.prof-pct{color:var(--muted);font-size:.85rem;text-align:right}
+/* ---- профиль ---- */
+.prof{text-align:center;padding:16px 0}
+.prof-av{width:88px;height:88px;border-radius:28px;margin:0 auto 12px;font-size:2.2rem;font-weight:800;
+ background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;
+ display:flex;align-items:center;justify-content:center}
+.prof h1{font-size:1.4rem}
+.prof-stats{display:flex;gap:9px;justify-content:center;margin-top:18px}
+.pstat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px 18px;min-width:88px}
+.pstat b{display:block;font-size:1.35rem;color:var(--acc)}
+.pstat span{font-size:.74rem;color:var(--mut)}
+.prof-prog{display:flex;flex-direction:column;gap:11px}
+.prow{display:grid;grid-template-columns:120px 1fr 52px;gap:10px;align-items:center}
+.prow-name{font-weight:700;font-size:.9rem}
+.prow-n{font-size:.8rem;color:var(--mut);text-align:right}
 
-.auth-box{max-width:420px;margin:32px auto;background:var(--card);border:1px solid var(--line);
- border-radius:var(--radius);padding:30px;box-shadow:var(--shadow)}
-.auth-box h1{font-size:1.5rem;margin-bottom:14px}
-.auth-box form{display:flex;flex-direction:column;gap:14px;margin-top:12px}
-.auth-box label{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:.92rem}
-.auth-box input{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
- color:var(--txt);font-family:inherit;font-size:1rem}
-.auth-alt{margin-top:16px;text-align:center;font-size:.92rem}
+/* ---- нижняя панель ---- */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:70;display:flex;
+ background:rgba(10,14,26,.94);backdrop-filter:blur(14px);border-top:1px solid var(--line);
+ padding-bottom:env(safe-area-inset-bottom)}
+html.light .tabbar{background:rgba(246,248,253,.94)}
+.tabbar a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 0 7px;color:var(--mut)}
+.tabbar a span{font-size:1.2rem;line-height:1}
+.tabbar a i{font-style:normal;font-size:.68rem;font-weight:700}
+.tabbar a.act{color:var(--acc)}
+.foot{text-align:center;color:var(--mut);font-size:.8rem;padding:18px 14px 100px}
 
-.muted{color:var(--muted)}
-.footer{border-top:1px solid var(--line);padding:22px 16px;text-align:center;color:var(--muted);font-size:.88rem}
-
-@media (max-width:760px){
-  .topbar{flex-wrap:wrap;gap:8px}
-  .topnav{order:3;width:100%;justify-content:center}
-  .prof-row{grid-template-columns:110px 1fr 52px}
-  .lesson-map{grid-template-columns:repeat(5,1fr)}
-  .hero{padding-top:32px}
-  .lesson-block{padding:16px}
-  /* дар телефон: код ва натиҷа иваз мешаванд, на ним-ним */
-  .ed-mobile-switch{display:flex}
-  .ed-body{grid-template-columns:1fr;height:380px}
-  .ed-code{border-right:0}
-  .editor-wrap[data-view="preview"] .ed-code{display:none}
-  .editor-wrap:not([data-view="preview"]) .ed-preview{display:none}
-  .editor-wrap.is-full .ed-body{height:calc(100vh - 130px)}
+@media (min-width:760px){
+  .ed-body{display:grid;grid-template-columns:1fr 1fr;height:440px}
+  .ed-switch{display:none}
+  .ed[data-view="preview"] .ed-code,.ed[data-view="code"] .ed-prev{display:block}
+  .ed[data-view="code"] .ed-prev{display:flex}
+  .ed-code{border-right:1px solid var(--line)}
+  .tabbar{position:static;background:none;border:0;max-width:900px;margin:0 auto;
+    border-top:1px solid var(--line)}
+  .wrap{padding-bottom:20px}
+  .foot{padding-bottom:24px}
 }
     <?php
 }

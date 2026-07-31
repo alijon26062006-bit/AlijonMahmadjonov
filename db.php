@@ -18,7 +18,7 @@ define('DB_PASS', '');          // пароли база
 define('OPENAI_KEY', '');       // калиди API (метавон баъдан дар админка гузошт)
 define('SITE_URL', '');         // холӣ монед — худаш муайян мекунад. Ё: https://codetj.tj
 
-define('CODETJ_SCHEMA_VERSION', 2);   // версияи схемаи база (миграцияҳо худкор)
+define('CODETJ_SCHEMA_VERSION', 3);   // версияи схемаи база (миграцияҳо худкор)
 
 /* ============================================================
  *  ПАЙВАСТШАВӢ БА БАЗА
@@ -131,6 +131,9 @@ function migrate(PDO $pdo)
     if ($cur < 2) {
         migrate_to_v2($pdo);
     }
+    if ($cur < 3) {
+        migrate_to_v3($pdo);
+    }
 
     if ($cur < CODETJ_SCHEMA_VERSION) {
         $st = $pdo->prepare('REPLACE INTO cj_settings (k, v) VALUES (?, ?)');
@@ -147,8 +150,10 @@ function migrate_to_v1(PDO $pdo)
 
         "CREATE TABLE IF NOT EXISTS cj_users (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            login VARCHAR(32) NOT NULL,
-            pass_hash VARCHAR(255) NOT NULL,
+            phone VARCHAR(20) NOT NULL DEFAULT '',
+            pin VARCHAR(255) NULL,
+            login VARCHAR(32) NULL,
+            pass_hash VARCHAR(255) NULL,
             name VARCHAR(64) NOT NULL DEFAULT '',
             city VARCHAR(64) NOT NULL DEFAULT '',
             avatar VARCHAR(128) NOT NULL DEFAULT '',
@@ -161,6 +166,7 @@ function migrate_to_v1(PDO $pdo)
             last_active_date DATE NULL,
             banned TINYINT(1) NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_phone (phone),
             UNIQUE KEY uq_login (login),
             KEY idx_points (points),
             KEY idx_week (week_points)
@@ -316,6 +322,26 @@ function migrate_to_v2(PDO $pdo)
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uq_user_question (user_id, question_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+/** v3: воридшавӣ бо рақами телефон. */
+function migrate_to_v3(PDO $pdo)
+{
+    // Дар нусхаҳои кӯҳна майдонҳо набуданд — бехато илова мекунем.
+    $add = array(
+        "ALTER TABLE cj_users ADD COLUMN phone VARCHAR(20) NOT NULL DEFAULT ''",
+        "ALTER TABLE cj_users ADD COLUMN pin VARCHAR(255) NULL",
+        "ALTER TABLE cj_users ADD UNIQUE KEY uq_phone (phone)",
+        "ALTER TABLE cj_users MODIFY login VARCHAR(32) NULL",
+        "ALTER TABLE cj_users MODIFY pass_hash VARCHAR(255) NULL",
+    );
+    foreach ($add as $sql) {
+        try {
+            $pdo->exec($sql);
+        } catch (PDOException $e) {
+            // майдон аллакай ҳаст — мегузарем
+        }
+    }
 }
 
 /* ============================================================
