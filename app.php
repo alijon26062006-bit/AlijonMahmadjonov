@@ -100,6 +100,12 @@ $LANG = array(
     'test_need_all'  => 'Ба ҳамаи саволҳо ҷавоб деҳ.',
     'test_passed'    => 'Офарин! Тест супорида шуд.',
     'test_failed'    => 'Ҳанӯз кам аст. Назарияро боз як бор хон.',
+    'grade_1'        => 'Бояд такрор кунӣ',
+    'grade_2'        => 'Хуб',
+    'grade_3'        => 'Хеле хуб',
+    'grade_4'        => 'Аъло',
+    'grade_word'     => 'Баҳо',
+    'answers_right'  => 'ҷавоби дуруст',
     'try_once_more'  => 'Нодуруст. Боз як бор фикр кун — ҷавоб дар назария ҳаст.',
     'lesson_done'    => 'Дарс супорида шуд!',
     'lesson_done_txt'=> 'Дарси навбатӣ кушода шуд. Давом деҳ!',
@@ -220,6 +226,12 @@ $LANG = array(
     'test_need_all'  => 'Ответь на все вопросы.',
     'test_passed'    => 'Молодец! Тест сдан.',
     'test_failed'    => 'Пока маловато. Перечитай теорию.',
+    'grade_1'        => 'Нужно повторить',
+    'grade_2'        => 'Хорошо',
+    'grade_3'        => 'Очень хорошо',
+    'grade_4'        => 'Отлично',
+    'grade_word'     => 'Оценка',
+    'answers_right'  => 'верных ответа',
     'try_once_more'  => 'Неверно. Подумай ещё — ответ есть в теории.',
     'lesson_done'    => 'Урок пройден!',
     'lesson_done_txt'=> 'Следующий урок открыт. Продолжай!',
@@ -1899,11 +1911,20 @@ function render_test($lessonId, $questions, $result, $testErr, $nextId)
     }
     ?>
     <?php if ($result !== null): ?>
+      <?php
+      // Баҳо аз рӯи шумораи ҷавобҳои дуруст (аз 10): 0–3, 4–6, 7–8, 9–10
+      $ratio = $result['total'] > 0 ? $result['correct'] / $result['total'] : 0;
+      if ($ratio >= 0.9)      { $gk = 'grade_4'; $ge = '&#127942;'; }
+      elseif ($ratio >= 0.7)  { $gk = 'grade_3'; $ge = '&#128077;'; }
+      elseif ($ratio >= 0.4)  { $gk = 'grade_2'; $ge = '&#128076;'; }
+      else                    { $gk = 'grade_1'; $ge = '&#128218;'; }
+      ?>
       <div class="tres <?= $result['passed'] ? 'ok' : 'bad' ?>">
-        <div class="tres-score"><?= (int)$result['score'] ?>%</div>
+        <div class="tres-score"><?= (int)$result['correct'] ?><small>/<?= (int)$result['total'] ?></small></div>
         <div>
           <b><?= e($result['passed'] ? t('test_passed') : t('test_failed')) ?></b>
-          <div class="muted"><?= (int)$result['correct'] ?>/<?= (int)$result['total'] ?> &middot;
+          <div class="tres-grade"><?= $ge ?> <?= e(t('grade_word')) ?>: <b><?= e(t($gk)) ?></b></div>
+          <div class="muted"><?= (int)$result['correct'] ?> <?= e(t('answers_right')) ?> &middot;
             <?= e(t('you_got')) ?> +<?= (int)$result['gained'] ?></div>
         </div>
       </div>
@@ -1929,15 +1950,21 @@ function render_test($lessonId, $questions, $result, $testErr, $nextId)
       <input type="hidden" name="lesson_id" value="<?= (int)$lessonId ?>">
       <?php foreach ($questions as $qi => $q):
           $qid = (int)$q['id'];
-          $optRaw = $lang === 'ru' ? $q['options_ru'] : $q['options_tj'];
+          // Агар тарҷумаи русӣ набошад — тоҷикиро нишон медиҳем.
+          $optRaw = ($lang === 'ru' && trim((string)$q['options_ru']) !== '') ? $q['options_ru'] : $q['options_tj'];
           $opts = json_decode((string)$optRaw, true);
+          if (!is_array($opts) || !$opts) {
+              $opts = json_decode((string)$q['options_tj'], true);
+          }
           if (!is_array($opts)) { $opts = array(); }
+          $qText = ($lang === 'ru' && trim((string)$q['q_ru']) !== '') ? $q['q_ru'] : $q['q_tj'];
+          $exText = ($lang === 'ru' && trim((string)$q['explain_ru']) !== '') ? $q['explain_ru'] : $q['explain_tj'];
           $order = array_keys($opts);
           shuffle($order);
           $d = isset($detail[$qid]) ? $detail[$qid] : null;
           ?>
           <div class="q <?= $d ? ($d['right'] ? 'q-ok' : 'q-bad') : '' ?>">
-            <div class="q-t"><span class="q-n"><?= $qi + 1 ?></span> <?= e($lang === 'ru' ? $q['q_ru'] : $q['q_tj']) ?></div>
+            <div class="q-t"><span class="q-n"><?= $qi + 1 ?></span> <?= e($qText) ?></div>
             <div class="q-opts">
               <?php foreach ($order as $oi):
                   $checked = ($d !== null && (int)$d['given'] === (int)$oi);
@@ -1950,7 +1977,7 @@ function render_test($lessonId, $questions, $result, $testErr, $nextId)
               <?php endforeach; ?>
             </div>
             <?php if ($d !== null):
-                $ex = $lang === 'ru' ? $q['explain_ru'] : $q['explain_tj'];
+                $ex = $exText;
                 if (!empty($d['reveal']) && (string)$ex !== ''): ?>
                   <div class="q-ex"><?= $d['right'] ? '&#9989; ' : '&#128161; ' ?><?= e((string)$ex) ?></div>
                 <?php elseif (!$d['right']): ?>
@@ -2459,7 +2486,9 @@ html.light .top{background:rgba(246,248,253,.85)}
  padding:15px;margin-bottom:12px;background:var(--bg2)}
 .tres.ok{border-color:var(--ok)}
 .tres.bad{border-color:var(--err)}
-.tres-score{font-size:1.9rem;font-weight:800;color:var(--acc)}
+.tres-score{font-size:2rem;font-weight:800;color:var(--acc);line-height:1;flex-shrink:0}
+.tres-score small{font-size:1rem;color:var(--mut);font-weight:700}
+.tres-grade{font-weight:700;font-size:.92rem;margin:3px 0}
 .done-box{background:rgba(34,197,94,.1);border:1px solid var(--ok);border-radius:16px;
  padding:20px;margin-bottom:12px;text-align:center}
 .done-emoji{font-size:2.2rem}
