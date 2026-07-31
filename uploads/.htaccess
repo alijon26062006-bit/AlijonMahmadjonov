@@ -1,6 +1,16 @@
-# Дар папкаи uploads иҷрои PHP манъ аст — танҳо файлҳои статикӣ
-<FilesMatch "\.(php|phtml|php3|php4|php5|php7|phps|pht|phar)$">
-  Require all denied
+# Дар папкаи uploads иҷрои PHP манъ аст — танҳо файлҳои статикӣ.
+# php_flag дидаву дониста истифода намешавад: дар ҳостингҳои PHP-FPM
+# он хатои 500 медиҳад.
+<FilesMatch "\.(php|phtml|php3|php4|php5|php7|php8|phps|pht|phar|cgi|pl)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
 </FilesMatch>
-RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phps .pht .phar
-php_flag engine off
+
+<IfModule mod_mime.c>
+  RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .php8 .phps .pht .phar
+</IfModule>

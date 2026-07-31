@@ -3,7 +3,8 @@
  * CodeTJ — платформаи омӯзиши HTML, CSS ва JavaScript бо забони тоҷикӣ
  * db.php — пайвастшавӣ ба база, автомиграцияи схема, функсияҳои ёрирасон.
  *
- * Талабот: PHP 8.1+, MySQL (pdo_mysql). Бе Composer, бе китобхонаҳои беруна.
+ * Талабот: PHP 7.1+ (беҳтараш 8.0+), MySQL (pdo_mysql).
+ * Бе Composer, бе китобхонаҳои беруна.
  */
 
 /* ============================================================
@@ -17,74 +18,89 @@ define('DB_PASS', '');          // пароли база
 define('OPENAI_KEY', '');       // калиди API (метавон баъдан дар админка гузошт)
 define('SITE_URL', '');         // холӣ монед — худаш муайян мекунад. Ё: https://codetj.tj
 
-define('CODETJ_SCHEMA_VERSION', 1);   // версияи схемаи база (миграцияҳо худкор)
+define('CODETJ_SCHEMA_VERSION', 2);   // версияи схемаи база (миграцияҳо худкор)
 
 /* ============================================================
  *  ПАЙВАСТШАВӢ БА БАЗА
  * ============================================================ */
 
-/** PDO-и ягона барои тамоми дархост. */
-function db(): PDO
+/**
+ * PDO-и ягона барои тамоми дархост.
+ * @return PDO
+ */
+function db()
 {
     static $pdo = null;
     if ($pdo instanceof PDO) {
         return $pdo;
     }
+    if (!extension_loaded('pdo_mysql')) {
+        codetj_fatal_page(
+            'Васеъкунии pdo_mysql фаъол нест',
+            'Дар панели ҳостинг версияи PHP-ро ба 8.0 ё болотар гузоред ва васеъкунии <b>pdo_mysql</b>-ро фаъол кунед.',
+            'Расширение pdo_mysql не включено. В панели хостинга выберите PHP 8.0+ и включите pdo_mysql.'
+        );
+    }
     if (DB_NAME === '' || DB_USER === '') {
-        codetj_config_needed_page();
+        codetj_fatal_page(
+            'Базаи маълумот ҳанӯз пайваст нашудааст',
+            'Файли <b>db.php</b>-ро кушоед ва дар боло <b>DB_NAME</b>, <b>DB_USER</b>, <b>DB_PASS</b>-ро пур кунед.',
+            'Откройте файл db.php и заполните вверху DB_NAME, DB_USER, DB_PASS.'
+        );
     }
     try {
         $pdo = new PDO(
             'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=utf8mb4',
             DB_USER,
             DB_PASS,
-            [
+            array(
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
-            ]
+            )
         );
     } catch (PDOException $e) {
-        codetj_db_error_page($e->getMessage());
+        codetj_fatal_page(
+            'Ба база пайваст шуда натавонистем',
+            'Ном, корбар ё пароли базаро дар <b>db.php</b> тафтиш кунед. Дар ҳостинг ном одатан префикс дорад.',
+            'Проверьте имя базы, пользователя и пароль в db.php. На хостинге имя обычно с префиксом.',
+            $e->getMessage()
+        );
     }
     migrate($pdo);
     return $pdo;
 }
 
-/** Саҳифаи дӯстона, вақте конфигурация ҳанӯз пур нашудааст. */
-function codetj_config_needed_page(): never
+/**
+ * Саҳифаи хатои фаҳмо — ба ҷои экрани сафед.
+ * Ҳамеша ду забон, то ҳар кас фаҳмад.
+ */
+function codetj_fatal_page($titleTj, $helpTj, $helpRu, $detail = '')
 {
-    http_response_code(503);
-    header('Content-Type: text/html; charset=utf-8');
-    echo '<!doctype html><html lang="tj"><head><meta charset="utf-8">'
+    if (!headers_sent()) {
+        http_response_code(503);
+        header('Content-Type: text/html; charset=utf-8');
+    }
+    echo '<!doctype html><html lang="tg"><head><meta charset="utf-8">'
        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
-       . '<title>CodeTJ — насбкунӣ</title>'
-       . '<style>body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}'
-       . '.box{max-width:640px;background:#1e293b;border-radius:16px;padding:32px;line-height:1.7}'
-       . 'code{background:#0f172a;padding:2px 8px;border-radius:6px;color:#fbbf24}h1{font-size:1.5rem}ol{padding-left:20px}</style></head><body><div class="box">'
-       . '<h1>🛠 CodeTJ: базаи маълумот ҳанӯз пайваст нашудааст</h1>'
-       . '<p>Барои оғоз кардан:</p><ol>'
-       . '<li>Дар cPanel → <b>MySQL Databases</b> база ва корбар созед, корбарро ба база бо ҳамаи ҳуқуқҳо пайваст кунед.</li>'
-       . '<li>Файли <code>db.php</code>-ро кушоед ва дар боло <code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASS</code>-ро пур кунед.</li>'
-       . '<li>Ин саҳифаро аз нав кушоед — ҷадвалҳо худкор сохта мешаванд.</li>'
-       . '</ol><p style="color:#94a3b8">Ҳамин саҳифа бо русӣ: заполните <code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASS</code> в начале файла <code>db.php</code> и обновите страницу — таблицы создадутся автоматически.</p>'
-       . '</div></body></html>';
-    exit;
-}
-
-/** Хатои пайвастшавӣ — бе экрани сафед. */
-function codetj_db_error_page(string $detail): never
-{
-    http_response_code(503);
-    header('Content-Type: text/html; charset=utf-8');
-    echo '<!doctype html><html lang="tj"><head><meta charset="utf-8">'
-       . '<meta name="viewport" content="width=device-width,initial-scale=1">'
-       . '<title>CodeTJ — хато</title>'
-       . '<style>body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}'
-       . '.box{max-width:640px;background:#1e293b;border-radius:16px;padding:32px;line-height:1.7}pre{background:#0f172a;padding:12px;border-radius:8px;white-space:pre-wrap;color:#f87171;font-size:.85rem}</style></head><body><div class="box">'
-       . '<h1>⚠️ Ба база пайваст шуда натавонистем</h1>'
-       . '<p>Маълумоти <code>db.php</code>-ро тафтиш кунед (ном, корбар, парол). / Проверьте данные подключения в <code>db.php</code>.</p>'
-       . '<pre>' . htmlspecialchars($detail, ENT_QUOTES, 'UTF-8') . '</pre>'
+       . '<title>CodeTJ — хато</title><style>'
+       . 'body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#0b1120;color:#e7edf7;'
+       . 'display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;line-height:1.7}'
+       . '.box{max-width:680px;width:100%;background:#16223a;border:1px solid #243350;border-radius:16px;padding:28px}'
+       . 'h1{font-size:1.35rem;margin:0 0 14px}b{color:#38bdf8}'
+       . '.ru{color:#8fa0bd;font-size:.92rem;margin-top:14px;padding-top:14px;border-top:1px solid #243350}'
+       . 'pre{background:#0b1120;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-word;'
+       . 'color:#f87171;font-size:.8rem;margin-top:14px}'
+       . '.hint{background:#0b1120;border-radius:10px;padding:12px 14px;margin-top:14px;font-size:.9rem;color:#8fa0bd}'
+       . '</style></head><body><div class="box">'
+       . '<h1>&#9888;&#65039; ' . htmlspecialchars($titleTj, ENT_QUOTES, 'UTF-8') . '</h1>'
+       . '<p>' . $helpTj . '</p>'
+       . '<div class="ru">' . htmlspecialchars($helpRu, ENT_QUOTES, 'UTF-8') . '</div>';
+    if ($detail !== '') {
+        echo '<pre>' . htmlspecialchars($detail, ENT_QUOTES, 'UTF-8') . '</pre>';
+    }
+    echo '<div class="hint">Барои санҷиши пурраи ҳостинг файли <b>check.php</b>-ро кушоед: '
+       . '<b>сайт.tj/check.php</b><br>Для полной диагностики хостинга откройте check.php</div>'
        . '</div></body></html>';
     exit;
 }
@@ -93,9 +109,8 @@ function codetj_db_error_page(string $detail): never
  *  АВТОМИГРАЦИЯИ СХЕМА
  * ============================================================ */
 
-function migrate(PDO $pdo): void
+function migrate(PDO $pdo)
 {
-    // Ҷадвали settings ҳамеша аввал — версияи схема дар ҳамин ҷо меистад.
     $pdo->exec("CREATE TABLE IF NOT EXISTS settings (
         k VARCHAR(64) NOT NULL PRIMARY KEY,
         v TEXT NULL
@@ -104,29 +119,32 @@ function migrate(PDO $pdo): void
     $cur = 0;
     try {
         $st = $pdo->prepare('SELECT v FROM settings WHERE k = ?');
-        $st->execute(['schema_version']);
-        $cur = (int)($st->fetchColumn() ?: 0);
+        $st->execute(array('schema_version'));
+        $cur = (int)$st->fetchColumn();
     } catch (PDOException $e) {
         $cur = 0;
-    }
-    if ($cur >= CODETJ_SCHEMA_VERSION) {
-        return;
     }
 
     if ($cur < 1) {
         migrate_to_v1($pdo);
     }
-    // Дар қисмҳои оянда: if ($cur < 2) { migrate_to_v2($pdo); } ва ғ.
+    if ($cur < 2) {
+        migrate_to_v2($pdo);
+    }
 
-    $st = $pdo->prepare('REPLACE INTO settings (k, v) VALUES (?, ?)');
-    $st->execute(['schema_version', (string)CODETJ_SCHEMA_VERSION]);
+    if ($cur < CODETJ_SCHEMA_VERSION) {
+        $st = $pdo->prepare('REPLACE INTO settings (k, v) VALUES (?, ?)');
+        $st->execute(array('schema_version', (string)CODETJ_SCHEMA_VERSION));
+    }
+
+    // Дарсҳо «попутно» ворид мешаванд — cron лозим нест.
+    seed_lessons($pdo);
 }
 
-function migrate_to_v1(PDO $pdo): void
+function migrate_to_v1(PDO $pdo)
 {
-    $tables = [
+    $tables = array(
 
-        // Корбарон
         "CREATE TABLE IF NOT EXISTS users (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             login VARCHAR(32) NOT NULL,
@@ -148,7 +166,6 @@ function migrate_to_v1(PDO $pdo): void
             KEY idx_week (week_points)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        // Дарсҳо: 4 курс × 50 дарс, ду забон
         "CREATE TABLE IF NOT EXISTS lessons (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             course VARCHAR(8) NOT NULL,
@@ -167,7 +184,6 @@ function migrate_to_v1(PDO $pdo): void
             UNIQUE KEY uq_course_num (course, num)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        // Саволҳои тест (5 барои ҳар дарс). Ҷавоби дуруст ҲЕҶ ГОҲ ба браузер намеравад.
         "CREATE TABLE IF NOT EXISTS questions (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             lesson_id INT UNSIGNED NOT NULL,
@@ -182,7 +198,6 @@ function migrate_to_v1(PDO $pdo): void
             KEY idx_lesson (lesson_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        // Пешрафти корбар аз рӯи дарс
         "CREATE TABLE IF NOT EXISTS progress (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
@@ -199,7 +214,6 @@ function migrate_to_v1(PDO $pdo): void
             KEY idx_user (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        // Натиҷаҳои имтиҳони сатҳ (5 сатҳ дар ҳар курс)
         "CREATE TABLE IF NOT EXISTS exam_results (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
@@ -211,7 +225,6 @@ function migrate_to_v1(PDO $pdo): void
             KEY idx_user_course (user_id, course, level)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        // Сиёҳнависи код (автозахира аз муҳаррир)
         "CREATE TABLE IF NOT EXISTS drafts (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
@@ -224,7 +237,6 @@ function migrate_to_v1(PDO $pdo): void
             UNIQUE KEY uq_user_lesson (user_id, lesson_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        // Кэши ҷавобҳои ИИ аз рӯи SHA-256-и код
         "CREATE TABLE IF NOT EXISTS ai_cache (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             lesson_id INT UNSIGNED NOT NULL,
@@ -235,7 +247,6 @@ function migrate_to_v1(PDO $pdo): void
             UNIQUE KEY uq_hash (lesson_id, code_hash, lang)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        // Ҳисоби истифодаи ИИ (лимитҳо + омори хароҷот)
         "CREATE TABLE IF NOT EXISTS ai_usage (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
@@ -248,7 +259,6 @@ function migrate_to_v1(PDO $pdo): void
             KEY idx_user_day (user_id, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        // Маҳдудияти суръат (login, register, ai)
         "CREATE TABLE IF NOT EXISTS rate_limit (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             ip VARCHAR(45) NOT NULL,
@@ -257,7 +267,6 @@ function migrate_to_v1(PDO $pdo): void
             KEY idx_ip_action (ip, action, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        // Таърихи баллҳо
         "CREATE TABLE IF NOT EXISTS points_log (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
@@ -267,7 +276,6 @@ function migrate_to_v1(PDO $pdo): void
             KEY idx_user (user_id, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        // Значокҳо (badges) — рӯйхат ва гирифташуда
         "CREATE TABLE IF NOT EXISTS user_badges (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
@@ -275,24 +283,183 @@ function migrate_to_v1(PDO $pdo): void
             got_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uq_user_badge (user_id, badge)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-    ];
+    );
 
     foreach ($tables as $sql) {
         $pdo->exec($sql);
     }
 
-    // Танзимоти пешфарз (агар набошанд)
-    $defaults = [
-        'reg_enabled'        => '1',
-        'ai_daily_limit'     => '10',   // санҷиши ИИ барои як дарс дар як рӯз
-        'ai_help_daily'      => '5',    // саволҳо ба ИИ дар як рӯз
-        'ai_cooldown_sec'    => '15',
-        'openai_key'         => '',
-        'week_reset_date'    => '',     // барои рейтинги ҳафтаина
-    ];
+    $defaults = array(
+        'reg_enabled'     => '1',
+        'ai_daily_limit'  => '10',
+        'ai_help_daily'   => '5',
+        'ai_cooldown_sec' => '15',
+        'openai_key'      => '',
+        'week_reset_date' => '',
+    );
     $st = $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)');
     foreach ($defaults as $k => $v) {
-        $st->execute([$k, $v]);
+        $st->execute(array($k, $v));
+    }
+}
+
+/** v2: ҷадвали кӯшишҳои тест (кадом савол дуруст ҷавоб дода шуд). */
+function migrate_to_v2(PDO $pdo)
+{
+    $pdo->exec("CREATE TABLE IF NOT EXISTS test_answers (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id INT UNSIGNED NOT NULL,
+        question_id INT UNSIGNED NOT NULL,
+        attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+        correct TINYINT(1) NOT NULL DEFAULT 0,
+        points INT NOT NULL DEFAULT 0,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_user_question (user_id, question_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+/* ============================================================
+ *  ВОРИДКУНИИ ДАРСҲО АЗ ФАЙЛҲОИ JSON (папкаи seed/)
+ * ============================================================ */
+
+/**
+ * Файлҳои seed/*.json-ро мехонад ва дарсҳоро ба база меорад.
+ * Такрор ворид намекунад: ҳар файл аз рӯи хэш як бор кор мекунад.
+ * Агар папка ё файл набошад — бе хато мегузарад.
+ */
+function seed_lessons(PDO $pdo)
+{
+    $dir = __DIR__ . '/seed';
+    if (!is_dir($dir)) {
+        return;
+    }
+    $files = glob($dir . '/*.json');
+    if (!$files) {
+        return;
+    }
+    sort($files);
+
+    // кадом файлҳо аллакай ворид шудаанд
+    $doneRaw = '';
+    try {
+        $st = $pdo->prepare('SELECT v FROM settings WHERE k = ?');
+        $st->execute(array('seeded_files'));
+        $doneRaw = (string)$st->fetchColumn();
+    } catch (PDOException $e) {
+        $doneRaw = '';
+    }
+    $done = $doneRaw !== '' ? json_decode($doneRaw, true) : array();
+    if (!is_array($done)) {
+        $done = array();
+    }
+
+    $changed = false;
+    foreach ($files as $file) {
+        $key = basename($file);
+        $raw = @file_get_contents($file);
+        if ($raw === false || $raw === '') {
+            continue;
+        }
+        $sig = md5($raw);
+        if (isset($done[$key]) && $done[$key] === $sig) {
+            continue;   // ҳамин нусха аллакай ворид шудааст
+        }
+        $data = json_decode($raw, true);
+        if (!is_array($data)) {
+            continue;   // JSON вайрон — беэътино мегузарем, сайт кор мекунад
+        }
+        foreach ($data as $lesson) {
+            if (is_array($lesson)) {
+                import_lesson($pdo, $lesson);
+            }
+        }
+        $done[$key] = $sig;
+        $changed = true;
+    }
+
+    if ($changed) {
+        $st = $pdo->prepare('REPLACE INTO settings (k, v) VALUES (?, ?)');
+        $st->execute(array('seeded_files', json_encode($done)));
+    }
+}
+
+/**
+ * Як дарсро ворид ё нав мекунад (аз рӯи course + num).
+ * Саволҳо ҳамеша аз нав навишта мешаванд, то такрор нашаванд.
+ */
+function import_lesson(PDO $pdo, array $L)
+{
+    $course = isset($L['course']) ? (string)$L['course'] : '';
+    $num    = isset($L['num']) ? (int)$L['num'] : 0;
+    if (!in_array($course, array('html', 'css', 'js', 'full'), true) || $num < 1 || $num > 50) {
+        return;
+    }
+    $g = function ($k) use ($L) {
+        return isset($L[$k]) ? (string)$L[$k] : '';
+    };
+
+    $st = $pdo->prepare('SELECT id FROM lessons WHERE course = ? AND num = ?');
+    $st->execute(array($course, $num));
+    $id = (int)$st->fetchColumn();
+
+    $fields = array(
+        $g('title_tj'), $g('title_ru'), $g('theory_tj'), $g('theory_ru'),
+        $g('example_code'), $g('task_text_tj'), $g('task_text_ru'),
+        $g('task_start_code'), $g('task_criteria'),
+    );
+
+    if ($id > 0) {
+        $sql = 'UPDATE lessons SET title_tj=?, title_ru=?, theory_tj=?, theory_ru=?, example_code=?,
+                task_text_tj=?, task_text_ru=?, task_start_code=?, task_criteria=?, published=1 WHERE id=?';
+        $params = $fields;
+        $params[] = $id;
+        $pdo->prepare($sql)->execute($params);
+    } else {
+        $sql = 'INSERT INTO lessons (title_tj, title_ru, theory_tj, theory_ru, example_code,
+                task_text_tj, task_text_ru, task_start_code, task_criteria, course, num, published)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,1)';
+        $params = $fields;
+        $params[] = $course;
+        $params[] = $num;
+        $pdo->prepare($sql)->execute($params);
+        $id = (int)$pdo->lastInsertId();
+    }
+
+    if ($id < 1 || empty($L['questions']) || !is_array($L['questions'])) {
+        return;
+    }
+    $pdo->prepare('DELETE FROM questions WHERE lesson_id = ?')->execute(array($id));
+    $ins = $pdo->prepare('INSERT INTO questions
+        (lesson_id, num, q_tj, q_ru, options_tj, options_ru, correct, explain_tj, explain_ru)
+        VALUES (?,?,?,?,?,?,?,?,?)');
+    $n = 0;
+    foreach ($L['questions'] as $q) {
+        if (!is_array($q)) {
+            continue;
+        }
+        $optTj = isset($q['options_tj']) && is_array($q['options_tj']) ? array_values($q['options_tj']) : array();
+        $optRu = isset($q['options_ru']) && is_array($q['options_ru']) ? array_values($q['options_ru']) : $optTj;
+        if (count($optTj) < 2) {
+            continue;
+        }
+        if (count($optRu) !== count($optTj)) {
+            $optRu = $optTj;
+        }
+        $correct = isset($q['correct']) ? (int)$q['correct'] : 0;
+        if ($correct < 0 || $correct >= count($optTj)) {
+            $correct = 0;
+        }
+        $n++;
+        $ins->execute(array(
+            $id, $n,
+            isset($q['q_tj']) ? (string)$q['q_tj'] : '',
+            isset($q['q_ru']) ? (string)$q['q_ru'] : '',
+            json_encode($optTj, JSON_UNESCAPED_UNICODE),
+            json_encode($optRu, JSON_UNESCAPED_UNICODE),
+            $correct,
+            isset($q['explain_tj']) ? (string)$q['explain_tj'] : '',
+            isset($q['explain_ru']) ? (string)$q['explain_ru'] : '',
+        ));
     }
 }
 
@@ -300,113 +467,127 @@ function migrate_to_v1(PDO $pdo): void
  *  SETTINGS
  * ============================================================ */
 
-function setting_get(string $k, ?string $default = null): ?string
+function setting_get($k, $default = null)
 {
-    static $cache = [];
+    static $cache = array();
     if (array_key_exists($k, $cache)) {
         return $cache[$k];
     }
     $st = db()->prepare('SELECT v FROM settings WHERE k = ?');
-    $st->execute([$k]);
+    $st->execute(array($k));
     $v = $st->fetchColumn();
     $cache[$k] = ($v === false) ? $default : $v;
     return $cache[$k];
 }
 
-function setting_set(string $k, string $v): void
+function setting_set($k, $v)
 {
     $st = db()->prepare('REPLACE INTO settings (k, v) VALUES (?, ?)');
-    $st->execute([$k, $v]);
+    $st->execute(array($k, $v));
 }
 
 /* ============================================================
  *  КУРСҲО ВА САТҲҲО
  * ============================================================ */
 
-/** Мета-маълумоти 4 курс. Рангҳо: HTML — норанҷӣ, CSS — кабуд, JS — зард, Ҳамагӣ — сабз. */
-function courses(): array
+/** Мета-маълумоти 4 курс. HTML — норанҷӣ, CSS — кабуд, JS — зард, Ҳамагӣ — сабз. */
+function courses()
 {
-    return [
-        'html' => ['icon' => '🧱', 'color' => '#f97316', 'name_tj' => 'HTML',   'name_ru' => 'HTML',
-                   'desc_tj' => 'Скелети саҳифа: тегҳо, матн, расм, ҷадвал, форма.',
-                   'desc_ru' => 'Скелет страницы: теги, текст, картинки, таблицы, формы.'],
-        'css'  => ['icon' => '🎨', 'color' => '#3b82f6', 'name_tj' => 'CSS',    'name_ru' => 'CSS',
-                   'desc_tj' => 'Ороиши сайт: ранг, шрифт, ҷобаҷогузорӣ, анимация.',
-                   'desc_ru' => 'Оформление сайта: цвета, шрифты, раскладка, анимации.'],
-        'js'   => ['icon' => '⚡', 'color' => '#eab308', 'name_tj' => 'JavaScript', 'name_ru' => 'JavaScript',
-                   'desc_tj' => 'Ҷони сайт: тугмаҳо, ҳисобкунӣ, бозиҳо, кор бо маълумот.',
-                   'desc_ru' => 'Жизнь сайта: кнопки, вычисления, игры, работа с данными.'],
-        'full' => ['icon' => '🚀', 'color' => '#22c55e', 'name_tj' => 'Ҳамагӣ', 'name_ru' => 'Всё вместе',
-                   'desc_tj' => 'Лоиҳаҳои воқеӣ: HTML + CSS + JS дар як ҷо. Аз компонент то лоиҳаи дипломӣ.',
-                   'desc_ru' => 'Реальные проекты: HTML + CSS + JS вместе. От компонентов до дипломного проекта.'],
-    ];
+    return array(
+        'html' => array('icon' => '&#129521;', 'color' => '#f97316', 'name_tj' => 'HTML', 'name_ru' => 'HTML',
+            'desc_tj' => 'Скелети саҳифа: тегҳо, матн, расм, ҷадвал, форма.',
+            'desc_ru' => 'Скелет страницы: теги, текст, картинки, таблицы, формы.'),
+        'css' => array('icon' => '&#127912;', 'color' => '#3b82f6', 'name_tj' => 'CSS', 'name_ru' => 'CSS',
+            'desc_tj' => 'Ороиши сайт: ранг, шрифт, ҷобаҷогузорӣ, анимация.',
+            'desc_ru' => 'Оформление сайта: цвета, шрифты, раскладка, анимации.'),
+        'js' => array('icon' => '&#9889;', 'color' => '#eab308', 'name_tj' => 'JavaScript', 'name_ru' => 'JavaScript',
+            'desc_tj' => 'Ҷони сайт: тугмаҳо, ҳисобкунӣ, бозиҳо, кор бо маълумот.',
+            'desc_ru' => 'Жизнь сайта: кнопки, вычисления, игры, работа с данными.'),
+        'full' => array('icon' => '&#128640;', 'color' => '#22c55e', 'name_tj' => 'Ҳамагӣ', 'name_ru' => 'Всё вместе',
+            'desc_tj' => 'Лоиҳаҳои воқеӣ: HTML + CSS + JS дар як ҷо. Аз компонент то лоиҳаи дипломӣ.',
+            'desc_ru' => 'Реальные проекты: HTML + CSS + JS вместе. От компонентов до дипломного проекта.'),
+    );
 }
 
 /** Номҳои 5 сатҳ (10 дарс дар ҳар кадом). */
-function levels(): array
+function levels()
 {
-    return [
-        1 => ['tj' => 'Навомӯз',    'ru' => 'Новичок'],
-        2 => ['tj' => 'Кӯшокор',    'ru' => 'Старательный'],
-        3 => ['tj' => 'Барномасоз', 'ru' => 'Программист'],
-        4 => ['tj' => 'Устод',      'ru' => 'Мастер'],
-        5 => ['tj' => 'Эксперт',    'ru' => 'Эксперт'],
-    ];
+    return array(
+        1 => array('tj' => 'Навомӯз',    'ru' => 'Новичок'),
+        2 => array('tj' => 'Кӯшокор',    'ru' => 'Старательный'),
+        3 => array('tj' => 'Барномасоз', 'ru' => 'Программист'),
+        4 => array('tj' => 'Устод',      'ru' => 'Мастер'),
+        5 => array('tj' => 'Эксперт',    'ru' => 'Эксперт'),
+    );
 }
 
-const LESSONS_PER_COURSE = 50;
-const LESSONS_PER_LEVEL  = 10;
+define('LESSONS_PER_COURSE', 50);
+define('LESSONS_PER_LEVEL', 10);
 
-/** Чанд дарси курс аз тарафи корбар супорида шудааст. */
-function course_done_count(int $userId, string $course): int
+function course_done_count($userId, $course)
 {
     $st = db()->prepare(
         'SELECT COUNT(*) FROM progress p JOIN lessons l ON l.id = p.lesson_id
          WHERE p.user_id = ? AND l.course = ? AND p.completed = 1'
     );
-    $st->execute([$userId, $course]);
+    $st->execute(array($userId, $course));
     return (int)$st->fetchColumn();
 }
 
-/** Рӯйхати рақамҳои дарсҳои супоридашудаи курс: [num => true]. */
-function course_done_map(int $userId, string $course): array
+/** Рақамҳои дарсҳои супоридашуда: [num => true]. */
+function course_done_map($userId, $course)
 {
     $st = db()->prepare(
         'SELECT l.num FROM progress p JOIN lessons l ON l.id = p.lesson_id
          WHERE p.user_id = ? AND l.course = ? AND p.completed = 1'
     );
-    $st->execute([$userId, $course]);
-    $map = [];
+    $st->execute(array($userId, $course));
+    $map = array();
     foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $n) {
         $map[(int)$n] = true;
     }
     return $map;
 }
 
-/** Оё имтиҳони сатҳ супорида шудааст? */
-function exam_passed(int $userId, string $course, int $level): bool
+function exam_passed($userId, $course, $level)
 {
     $st = db()->prepare(
         'SELECT COUNT(*) FROM exam_results WHERE user_id = ? AND course = ? AND level = ? AND passed = 1'
     );
-    $st->execute([$userId, $course, $level]);
+    $st->execute(array($userId, $course, $level));
     return (int)$st->fetchColumn() > 0;
 }
 
-/** Сатҳ кушода аст? Сатҳи 1 ҳамеша кушода; N кушода, агар имтиҳони N-1 супорида шуда бошад. */
-function level_unlocked(int $userId, string $course, int $level): bool
+/**
+ * Сатҳ кушода аст?
+ * Сатҳи 1 ҳамеша кушода. Сатҳи N кушода, агар имтиҳони N-1 супорида шуда бошад,
+ * ЁКИ ҳамаи 10 дарси сатҳи N-1 супорида шуда бошанд (то имтиҳонҳо тайёр шаванд —
+ * шогирд дар ҷои холӣ намемонад).
+ */
+function level_unlocked($userId, $course, $level)
 {
     if ($level <= 1) {
         return true;
     }
-    return exam_passed($userId, $course, $level - 1);
+    if (exam_passed($userId, $course, $level - 1)) {
+        return true;
+    }
+    $from = ($level - 2) * LESSONS_PER_LEVEL + 1;
+    $to = ($level - 1) * LESSONS_PER_LEVEL;
+    $st = db()->prepare(
+        'SELECT COUNT(*) FROM progress p JOIN lessons l ON l.id = p.lesson_id
+         WHERE p.user_id = ? AND l.course = ? AND p.completed = 1 AND l.num BETWEEN ? AND ?'
+    );
+    $st->execute(array($userId, $course, $from, $to));
+    return (int)$st->fetchColumn() >= LESSONS_PER_LEVEL;
 }
 
-/** Курси «Ҳамагӣ» кушода мешавад, вақте дар html, css, js ҳар кадом ≥ 60% супорида шуд. */
-function full_course_unlocked(int $userId): bool
+/** Курси «Ҳамагӣ» — вақте дар html, css, js ҳар кадом ≥ 60%. */
+function full_course_unlocked($userId)
 {
-    foreach (['html', 'css', 'js'] as $c) {
-        if (course_done_count($userId, $c) < (int)ceil(LESSONS_PER_COURSE * 0.6)) {
+    $need = (int)ceil(LESSONS_PER_COURSE * 0.6);
+    foreach (array('html', 'css', 'js') as $c) {
+        if (course_done_count($userId, $c) < $need) {
             return false;
         }
     }
@@ -417,24 +598,45 @@ function full_course_unlocked(int $userId): bool
  *  КОРБАРОН, СЕССИЯ, АМНИЯТ
  * ============================================================ */
 
-function codetj_session_start(): void
+/** Cookie бо SameSite — дар PHP-и кӯҳна ҳам кор мекунад. */
+function codetj_setcookie($name, $value, $expires)
+{
+    if (PHP_VERSION_ID >= 70300) {
+        setcookie($name, $value, array(
+            'expires'  => $expires,
+            'path'     => '/',
+            'samesite' => 'Lax',
+        ));
+    } else {
+        setcookie($name, $value, $expires, '/; samesite=Lax');
+    }
+}
+
+function codetj_session_start()
 {
     if (session_status() === PHP_SESSION_ACTIVE) {
         return;
     }
-    session_set_cookie_params([
-        'lifetime' => 60 * 60 * 24 * 30,
-        'path'     => '/',
-        'httponly' => true,
-        'samesite' => 'Lax',
-        'secure'   => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
-    ]);
+    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+           || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+    $life = 60 * 60 * 24 * 30;
+    if (PHP_VERSION_ID >= 70300) {
+        session_set_cookie_params(array(
+            'lifetime' => $life,
+            'path'     => '/',
+            'httponly' => true,
+            'samesite' => 'Lax',
+            'secure'   => $secure,
+        ));
+    } else {
+        session_set_cookie_params($life, '/; samesite=Lax', '', $secure, true);
+    }
     session_name('codetj_sid');
-    session_start();
+    @session_start();
 }
 
-/** Корбари ҷорӣ ё null. Натиҷа дар дархост кэш мешавад. */
-function current_user(): ?array
+/** Корбари ҷорӣ ё null. */
+function current_user()
 {
     static $user = false;
     if ($user !== false) {
@@ -443,7 +645,7 @@ function current_user(): ?array
     $user = null;
     if (!empty($_SESSION['uid'])) {
         $st = db()->prepare('SELECT * FROM users WHERE id = ? AND banned = 0');
-        $st->execute([(int)$_SESSION['uid']]);
+        $st->execute(array((int)$_SESSION['uid']));
         $u = $st->fetch();
         if ($u) {
             $user = $u;
@@ -454,14 +656,14 @@ function current_user(): ?array
     return $user;
 }
 
-function is_admin(): bool
+function is_admin()
 {
     $u = current_user();
     return $u !== null && $u['role'] === 'admin';
 }
 
-/** Ҳисоби серия (streak) — «попутно», ҳар дафъае ки корбар ворид шуд. */
-function update_streak(array &$user): void
+/** Серия (streak) — «попутно» ҳангоми ҳар воридшавӣ. */
+function update_streak(&$user)
 {
     $today = date('Y-m-d');
     if ($user['last_active_date'] === $today) {
@@ -470,13 +672,13 @@ function update_streak(array &$user): void
     $yesterday = date('Y-m-d', strtotime('-1 day'));
     $streak = ($user['last_active_date'] === $yesterday) ? ((int)$user['streak_days'] + 1) : 1;
     $st = db()->prepare('UPDATE users SET streak_days = ?, last_active_date = ? WHERE id = ?');
-    $st->execute([$streak, $today, (int)$user['id']]);
+    $st->execute(array($streak, $today, (int)$user['id']));
     $user['streak_days'] = $streak;
     $user['last_active_date'] = $today;
 }
 
 /** Рейтинги ҳафтаина ҳар душанбе «попутно» нул мешавад. */
-function maybe_reset_week(): void
+function maybe_reset_week()
 {
     $monday = date('Y-m-d', strtotime('monday this week'));
     if (setting_get('week_reset_date', '') !== $monday) {
@@ -487,68 +689,68 @@ function maybe_reset_week(): void
 
 /* ---------- CSRF ---------- */
 
-function csrf_token(): string
+function csrf_token()
 {
     if (empty($_SESSION['csrf'])) {
-        $_SESSION['csrf'] = bin2hex(random_bytes(32));
+        if (function_exists('random_bytes')) {
+            $_SESSION['csrf'] = bin2hex(random_bytes(32));
+        } else {
+            $_SESSION['csrf'] = md5(uniqid('', true) . mt_rand());
+        }
     }
     return $_SESSION['csrf'];
 }
 
-function csrf_field(): string
+function csrf_field()
 {
     return '<input type="hidden" name="csrf" value="' . csrf_token() . '">';
 }
 
-/** Тафтиши токен барои ҳар POST. Дар хато — false (даъваткунанда паём медиҳад). */
-function csrf_ok(): bool
+function csrf_ok()
 {
-    $sent = $_POST['csrf'] ?? ($_SERVER['HTTP_X_CSRF'] ?? '');
-    return is_string($sent) && $sent !== '' && hash_equals($_SESSION['csrf'] ?? '', $sent);
+    $sent = isset($_POST['csrf']) ? $_POST['csrf'] : (isset($_SERVER['HTTP_X_CSRF']) ? $_SERVER['HTTP_X_CSRF'] : '');
+    $have = isset($_SESSION['csrf']) ? $_SESSION['csrf'] : '';
+    return is_string($sent) && $sent !== '' && $have !== '' && hash_equals($have, $sent);
 }
 
 /* ---------- Rate limit ---------- */
 
-function client_ip(): string
+function client_ip()
 {
-    return substr($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', 0, 45);
+    return substr(isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '0.0.0.0', 0, 45);
 }
 
-/**
- * true — иҷозат ҳаст; false — лимит пур шуд.
- * Сабтҳои кӯҳна «попутно» тоза мешаванд (cron лозим нест).
- */
-function rate_limit(string $action, int $maxHits, int $windowSec): bool
+/** true — иҷозат ҳаст; false — лимит пур шуд. Сабтҳои кӯҳна «попутно» тоза мешаванд. */
+function rate_limit($action, $maxHits, $windowSec)
 {
     $pdo = db();
-    // тозакунии тасодуфӣ (~2% дархостҳо), то ҷадвал калон нашавад
-    if (random_int(1, 50) === 1) {
+    if (mt_rand(1, 50) === 1) {
         $pdo->prepare('DELETE FROM rate_limit WHERE created_at < DATE_SUB(NOW(), INTERVAL 2 DAY)')->execute();
     }
     $ip = client_ip();
     $st = $pdo->prepare(
         'SELECT COUNT(*) FROM rate_limit WHERE ip = ? AND action = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)'
     );
-    $st->execute([$ip, $action, $windowSec]);
+    $st->execute(array($ip, $action, $windowSec));
     if ((int)$st->fetchColumn() >= $maxHits) {
         return false;
     }
-    $pdo->prepare('INSERT INTO rate_limit (ip, action) VALUES (?, ?)')->execute([$ip, $action]);
+    $pdo->prepare('INSERT INTO rate_limit (ip, action) VALUES (?, ?)')->execute(array($ip, $action));
     return true;
 }
 
 /* ---------- Баллҳо ---------- */
 
-function add_points(int $userId, int $points, string $reason): void
+function add_points($userId, $points, $reason)
 {
     if ($points === 0) {
         return;
     }
     $pdo = db();
     $pdo->prepare('UPDATE users SET points = points + ?, week_points = week_points + ? WHERE id = ?')
-        ->execute([$points, $points, $userId]);
+        ->execute(array($points, $points, $userId));
     $pdo->prepare('INSERT INTO points_log (user_id, points, reason) VALUES (?, ?, ?)')
-        ->execute([$userId, $points, $reason]);
+        ->execute(array($userId, $points, $reason));
 }
 
 /* ============================================================
@@ -556,39 +758,41 @@ function add_points(int $userId, int $points, string $reason): void
  * ============================================================ */
 
 /** Экранкунии HTML — ҳамеша барои маълумоти корбар. */
-function e(?string $s): string
+function e($s)
 {
     return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 }
 
-/** Redirect ва тамом. */
-function redirect(string $url): never
+function redirect($url)
 {
-    header('Location: ' . $url);
+    if (!headers_sent()) {
+        header('Location: ' . $url);
+    } else {
+        echo '<script>location.href=' . json_encode($url) . ';</script>';
+    }
     exit;
 }
 
-/**
- * Суроғаи сайт. Агар SITE_URL холӣ бошад — худаш аз дархост муайян мекунад,
- * то дар ҳостинги нав ҳам бе танзими иловагӣ кор кунад.
- */
-function site_url(): string
+function json_out(array $data, $code = 200)
+{
+    if (!headers_sent()) {
+        http_response_code($code);
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+/** Суроғаи сайт. Агар SITE_URL холӣ бошад — худаш аз дархост муайян мекунад. */
+function site_url()
 {
     if (SITE_URL !== '') {
         return rtrim(SITE_URL, '/');
     }
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-          || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $dir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
+          || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+    $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
+    $script = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '/';
+    $dir = rtrim(str_replace('\\', '/', dirname($script)), '/');
     return ($https ? 'https://' : 'http://') . $host . $dir;
-}
-
-/** Ҷавоби JSON ва тамом. */
-function json_out(array $data, int $code = 200): never
-{
-    http_response_code($code);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
-    exit;
 }

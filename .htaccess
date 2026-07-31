@@ -1,7 +1,25 @@
-# CodeTJ — index.php саҳифаи асосӣ аст (на index.html-и кӯҳна)
+# CodeTJ — саҳифаи асосӣ index.php аст (на index.html-и кӯҳна)
 DirectoryIndex index.php index.html
 
-# db.php-ро мустақим кушодан мумкин нест (он танҳо тавассути index.php кор мекунад)
-<Files "db.php">
-  Require all denied
-</Files>
+# Файлҳои дохилиро мустақим кушодан мумкин нест.
+# Ҳар ду синтаксис — Apache 2.4 ва 2.2 — то дар ҳар ҳостинг кор кунад.
+<FilesMatch "^(db|app)\.php$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Файлҳои JSON-и дарсҳо низ пӯшида
+<FilesMatch "\.json$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
