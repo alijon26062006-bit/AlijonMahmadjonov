@@ -1,0 +1,7 @@
+# CodeTJ — index.php саҳифаи асосӣ аст (на index.html-и кӯҳна)
+DirectoryIndex index.php index.html
+
+# db.php-ро мустақим кушодан мумкин нест (он танҳо тавассути index.php кор мекунад)
+<Files "db.php">
+  Require all denied
+</Files>
