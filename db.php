@@ -7,6 +7,12 @@
  * Бе Composer, бе китобхонаҳои беруна.
  */
 
+// Муҳофизат аз дубора ворид шудани ҳамин файл.
+if (defined('CODETJ_DB_LOADED')) {
+    return;
+}
+define('CODETJ_DB_LOADED', 1);
+
 /* ============================================================
  *  КОНФИГУРАЦИЯ — инро пеш аз боркунӣ ба ҳостинг пур кунед
  * ============================================================ */
@@ -360,9 +366,17 @@ function seed_lessons(PDO $pdo)
     // Ду роҳ: файлҳои lessons*.php дар ҳамин папка (осонтар — папка сохтан лозим нест)
     // ва файлҳои seed/*.json (агар папкаи seed бошад).
     $files = array();
-    $php = glob(__DIR__ . '/lessons*.php');
+    // Танҳо lessons1.php, lessons2.php … — файлҳои дигар ба ин ҷо намеафтанд.
+    $php = glob(__DIR__ . '/lessons[0-9]*.php');
     if ($php) {
-        $files = array_merge($files, $php);
+        foreach ($php as $f) {
+            // Файли дарс бояд массив баргардонад ва код надошта бошад.
+            $head = (string)@file_get_contents($f, false, null, 0, 4096);
+            if (strpos($head, 'return ') === false || preg_match('/^\s*function\s+\w+\s*\(/m', $head)) {
+                continue;
+            }
+            $files[] = $f;
+        }
     }
     if (is_dir(__DIR__ . '/seed')) {
         $json = glob(__DIR__ . '/seed/*.json');

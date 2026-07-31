@@ -7,7 +7,34 @@
  * дарси навбатӣ танҳо баъд аз супоридани дарси пешина кушода мешавад.
  */
 
-require __DIR__ . '/db.php';
+// Муҳофизат аз дубора ворид шудани ҳамин файл.
+if (defined('CODETJ_APP_LOADED')) {
+    return;
+}
+define('CODETJ_APP_LOADED', 1);
+
+// db.php-ро ПЕШ АЗ ворид кардан тафтиш мекунем.
+// PHP функсияҳоро ҳангоми компиляция эълон мекунад, барои ҳамин
+// «return»-и дохили файл аз хатои «Cannot redeclare» наҷот намедиҳад.
+$codetj_db = __DIR__ . '/db.php';
+$codetj_src = file_exists($codetj_db) ? (string)file_get_contents($codetj_db) : '';
+if ($codetj_src === '' || strpos($codetj_src, 'function db(') === false
+    || strpos($codetj_src, 'function t(') !== false) {
+    if (function_exists('codetj_boot_page')) {
+        codetj_boot_page(
+            'Файли db.php нодуруст аст',
+            'Дар папка ба ҷои <b>db.php</b> файли дигар хобидааст — аз афташ нусхаи <b>app.php</b>. '
+            . 'Файли дурусти <b>db.php</b>-ро аз нав бор кунед: дар он бояд танзимоти база бошад, на коди сайт.',
+            'Вместо db.php лежит другой файл — похоже, копия app.php. Загрузите правильный db.php заново: '
+            . 'в нём должны быть настройки базы, а не код сайта.'
+        );
+    }
+    exit('db.php нодуруст аст / неверный db.php');
+}
+unset($codetj_db, $codetj_src);
+
+require_once __DIR__ . '/db.php';
+
 codetj_session_start();
 
 /* ============================================================

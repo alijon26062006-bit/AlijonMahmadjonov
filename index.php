@@ -39,6 +39,16 @@ if (!file_exists($codetj_app)) {
         'Файл app.php не загружен. Загрузите его в ту же папку, где лежит index.php.'
     );
 }
+// Тафтиш мекунем, ки маҳз app.php аст, на файли дигар бо ҳамин ном.
+$codetj_src = (string)file_get_contents($codetj_app);
+if (strpos($codetj_src, 'function t(') === false) {
+    codetj_boot_page(
+        'Файли app.php нодуруст аст',
+        'Дар папка ба ҷои <b>app.php</b> файли дигар хобидааст. Файли дурусти <b>app.php</b>-ро аз нав бор кунед.',
+        'Вместо app.php лежит другой файл. Загрузите правильный app.php заново.'
+    );
+}
+unset($codetj_src);
 require $codetj_app;
 
 /* ============================================================

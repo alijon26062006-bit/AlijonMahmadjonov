@@ -56,14 +56,39 @@ foreach ($need as $ext => $why) {
     }
 }
 
-/* ---- 3. Файлҳо ---- */
-$files = array('index.php', 'app.php', 'db.php');
-foreach ($files as $f) {
-    if (file_exists(__DIR__ . '/' . $f)) {
-        add_row($rows, $fatal, $warn, 'Файли ' . $f, 'ok', 'ҳаст (' . number_format(filesize(__DIR__ . '/' . $f)) . ' байт)');
-    } else {
+/* ---- 3. Файлҳо: мавҷуданд ва маҳз ҳамонанд? ---- */
+// Ҳар файл аломати худро дорад. Агар аломат набошад — файли иштибоҳӣ бор шудааст.
+$files = array(
+    'index.php' => 'codetj_boot_page',
+    'app.php'   => 'function t(',
+    'db.php'    => 'function db(',
+);
+foreach ($files as $f => $mark) {
+    $path = __DIR__ . '/' . $f;
+    if (!file_exists($path)) {
         add_row($rows, $fatal, $warn, 'Файли ' . $f, 'bad', 'НЕСТ — онро ҳам бор кунед');
+        continue;
     }
+    $src = (string)file_get_contents($path);
+    if (strpos($src, $mark) === false) {
+        add_row($rows, $fatal, $warn, 'Файли ' . $f, 'bad',
+            'ҳаст, вале ин файли ДИГАР аст! Файли дурусти ' . $f . '-ро аз нав бор кунед.');
+        continue;
+    }
+    // Ду файл набояд якхела бошанд
+    $dup = '';
+    foreach ($files as $f2 => $m2) {
+        if ($f2 !== $f && file_exists(__DIR__ . '/' . $f2)
+            && md5_file(__DIR__ . '/' . $f2) === md5_file($path)) {
+            $dup = $f2;
+        }
+    }
+    if ($dup !== '') {
+        add_row($rows, $fatal, $warn, 'Файли ' . $f, 'bad',
+            'айнан бо ' . $dup . ' як хел аст — иштибоҳ шудааст, аз нав бор кунед');
+        continue;
+    }
+    add_row($rows, $fatal, $warn, 'Файли ' . $f, 'ok', 'ҳаст (' . number_format(filesize($path)) . ' байт)');
 }
 
 /* ---- 4. .htaccess ---- */
