@@ -111,14 +111,14 @@ function codetj_fatal_page($titleTj, $helpTj, $helpRu, $detail = '')
 
 function migrate(PDO $pdo)
 {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS settings (
+    $pdo->exec("CREATE TABLE IF NOT EXISTS cj_settings (
         k VARCHAR(64) NOT NULL PRIMARY KEY,
         v TEXT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     $cur = 0;
     try {
-        $st = $pdo->prepare('SELECT v FROM settings WHERE k = ?');
+        $st = $pdo->prepare('SELECT v FROM cj_settings WHERE k = ?');
         $st->execute(array('schema_version'));
         $cur = (int)$st->fetchColumn();
     } catch (PDOException $e) {
@@ -133,7 +133,7 @@ function migrate(PDO $pdo)
     }
 
     if ($cur < CODETJ_SCHEMA_VERSION) {
-        $st = $pdo->prepare('REPLACE INTO settings (k, v) VALUES (?, ?)');
+        $st = $pdo->prepare('REPLACE INTO cj_settings (k, v) VALUES (?, ?)');
         $st->execute(array('schema_version', (string)CODETJ_SCHEMA_VERSION));
     }
 
@@ -145,7 +145,7 @@ function migrate_to_v1(PDO $pdo)
 {
     $tables = array(
 
-        "CREATE TABLE IF NOT EXISTS users (
+        "CREATE TABLE IF NOT EXISTS cj_users (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             login VARCHAR(32) NOT NULL,
             pass_hash VARCHAR(255) NOT NULL,
@@ -166,7 +166,7 @@ function migrate_to_v1(PDO $pdo)
             KEY idx_week (week_points)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        "CREATE TABLE IF NOT EXISTS lessons (
+        "CREATE TABLE IF NOT EXISTS cj_lessons (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             course VARCHAR(8) NOT NULL,
             num TINYINT UNSIGNED NOT NULL,
@@ -184,7 +184,7 @@ function migrate_to_v1(PDO $pdo)
             UNIQUE KEY uq_course_num (course, num)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        "CREATE TABLE IF NOT EXISTS questions (
+        "CREATE TABLE IF NOT EXISTS cj_questions (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             lesson_id INT UNSIGNED NOT NULL,
             num TINYINT UNSIGNED NOT NULL DEFAULT 1,
@@ -198,7 +198,7 @@ function migrate_to_v1(PDO $pdo)
             KEY idx_lesson (lesson_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        "CREATE TABLE IF NOT EXISTS progress (
+        "CREATE TABLE IF NOT EXISTS cj_progress (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
             lesson_id INT UNSIGNED NOT NULL,
@@ -214,7 +214,7 @@ function migrate_to_v1(PDO $pdo)
             KEY idx_user (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        "CREATE TABLE IF NOT EXISTS exam_results (
+        "CREATE TABLE IF NOT EXISTS cj_exam_results (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
             course VARCHAR(8) NOT NULL,
@@ -225,7 +225,7 @@ function migrate_to_v1(PDO $pdo)
             KEY idx_user_course (user_id, course, level)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        "CREATE TABLE IF NOT EXISTS drafts (
+        "CREATE TABLE IF NOT EXISTS cj_drafts (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
             lesson_id INT UNSIGNED NOT NULL,
@@ -237,7 +237,7 @@ function migrate_to_v1(PDO $pdo)
             UNIQUE KEY uq_user_lesson (user_id, lesson_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        "CREATE TABLE IF NOT EXISTS ai_cache (
+        "CREATE TABLE IF NOT EXISTS cj_ai_cache (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             lesson_id INT UNSIGNED NOT NULL,
             code_hash CHAR(64) NOT NULL,
@@ -247,7 +247,7 @@ function migrate_to_v1(PDO $pdo)
             UNIQUE KEY uq_hash (lesson_id, code_hash, lang)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        "CREATE TABLE IF NOT EXISTS ai_usage (
+        "CREATE TABLE IF NOT EXISTS cj_ai_usage (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
             lesson_id INT UNSIGNED NOT NULL DEFAULT 0,
@@ -259,7 +259,7 @@ function migrate_to_v1(PDO $pdo)
             KEY idx_user_day (user_id, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        "CREATE TABLE IF NOT EXISTS rate_limit (
+        "CREATE TABLE IF NOT EXISTS cj_rate_limit (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             ip VARCHAR(45) NOT NULL,
             action VARCHAR(24) NOT NULL,
@@ -267,7 +267,7 @@ function migrate_to_v1(PDO $pdo)
             KEY idx_ip_action (ip, action, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        "CREATE TABLE IF NOT EXISTS points_log (
+        "CREATE TABLE IF NOT EXISTS cj_points_log (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
             points INT NOT NULL,
@@ -276,7 +276,7 @@ function migrate_to_v1(PDO $pdo)
             KEY idx_user (user_id, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-        "CREATE TABLE IF NOT EXISTS user_badges (
+        "CREATE TABLE IF NOT EXISTS cj_user_badges (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
             badge VARCHAR(32) NOT NULL,
@@ -297,7 +297,7 @@ function migrate_to_v1(PDO $pdo)
         'openai_key'      => '',
         'week_reset_date' => '',
     );
-    $st = $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)');
+    $st = $pdo->prepare('INSERT IGNORE INTO cj_settings (k, v) VALUES (?, ?)');
     foreach ($defaults as $k => $v) {
         $st->execute(array($k, $v));
     }
@@ -306,7 +306,7 @@ function migrate_to_v1(PDO $pdo)
 /** v2: ҷадвали кӯшишҳои тест (кадом савол дуруст ҷавоб дода шуд). */
 function migrate_to_v2(PDO $pdo)
 {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS test_answers (
+    $pdo->exec("CREATE TABLE IF NOT EXISTS cj_test_answers (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
         user_id INT UNSIGNED NOT NULL,
         question_id INT UNSIGNED NOT NULL,
@@ -350,7 +350,7 @@ function seed_lessons(PDO $pdo)
     // кадом файлҳо аллакай ворид шудаанд
     $doneRaw = '';
     try {
-        $st = $pdo->prepare('SELECT v FROM settings WHERE k = ?');
+        $st = $pdo->prepare('SELECT v FROM cj_settings WHERE k = ?');
         $st->execute(array('seeded_files'));
         $doneRaw = (string)$st->fetchColumn();
     } catch (PDOException $e) {
@@ -390,7 +390,7 @@ function seed_lessons(PDO $pdo)
     }
 
     if ($changed) {
-        $st = $pdo->prepare('REPLACE INTO settings (k, v) VALUES (?, ?)');
+        $st = $pdo->prepare('REPLACE INTO cj_settings (k, v) VALUES (?, ?)');
         $st->execute(array('seeded_files', json_encode($done)));
     }
 }
@@ -410,7 +410,7 @@ function import_lesson(PDO $pdo, array $L)
         return isset($L[$k]) ? (string)$L[$k] : '';
     };
 
-    $st = $pdo->prepare('SELECT id FROM lessons WHERE course = ? AND num = ?');
+    $st = $pdo->prepare('SELECT id FROM cj_lessons WHERE course = ? AND num = ?');
     $st->execute(array($course, $num));
     $id = (int)$st->fetchColumn();
 
@@ -421,13 +421,13 @@ function import_lesson(PDO $pdo, array $L)
     );
 
     if ($id > 0) {
-        $sql = 'UPDATE lessons SET title_tj=?, title_ru=?, theory_tj=?, theory_ru=?, example_code=?,
+        $sql = 'UPDATE cj_lessons SET title_tj=?, title_ru=?, theory_tj=?, theory_ru=?, example_code=?,
                 task_text_tj=?, task_text_ru=?, task_start_code=?, task_criteria=?, published=1 WHERE id=?';
         $params = $fields;
         $params[] = $id;
         $pdo->prepare($sql)->execute($params);
     } else {
-        $sql = 'INSERT INTO lessons (title_tj, title_ru, theory_tj, theory_ru, example_code,
+        $sql = 'INSERT INTO cj_lessons (title_tj, title_ru, theory_tj, theory_ru, example_code,
                 task_text_tj, task_text_ru, task_start_code, task_criteria, course, num, published)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,1)';
         $params = $fields;
@@ -440,8 +440,8 @@ function import_lesson(PDO $pdo, array $L)
     if ($id < 1 || empty($L['questions']) || !is_array($L['questions'])) {
         return;
     }
-    $pdo->prepare('DELETE FROM questions WHERE lesson_id = ?')->execute(array($id));
-    $ins = $pdo->prepare('INSERT INTO questions
+    $pdo->prepare('DELETE FROM cj_questions WHERE lesson_id = ?')->execute(array($id));
+    $ins = $pdo->prepare('INSERT INTO cj_questions
         (lesson_id, num, q_tj, q_ru, options_tj, options_ru, correct, explain_tj, explain_ru)
         VALUES (?,?,?,?,?,?,?,?,?)');
     $n = 0;
@@ -485,7 +485,7 @@ function setting_get($k, $default = null)
     if (array_key_exists($k, $cache)) {
         return $cache[$k];
     }
-    $st = db()->prepare('SELECT v FROM settings WHERE k = ?');
+    $st = db()->prepare('SELECT v FROM cj_settings WHERE k = ?');
     $st->execute(array($k));
     $v = $st->fetchColumn();
     $cache[$k] = ($v === false) ? $default : $v;
@@ -494,7 +494,7 @@ function setting_get($k, $default = null)
 
 function setting_set($k, $v)
 {
-    $st = db()->prepare('REPLACE INTO settings (k, v) VALUES (?, ?)');
+    $st = db()->prepare('REPLACE INTO cj_settings (k, v) VALUES (?, ?)');
     $st->execute(array($k, $v));
 }
 
@@ -539,7 +539,7 @@ define('LESSONS_PER_LEVEL', 10);
 function course_done_count($userId, $course)
 {
     $st = db()->prepare(
-        'SELECT COUNT(*) FROM progress p JOIN lessons l ON l.id = p.lesson_id
+        'SELECT COUNT(*) FROM cj_progress p JOIN cj_lessons l ON l.id = p.lesson_id
          WHERE p.user_id = ? AND l.course = ? AND p.completed = 1'
     );
     $st->execute(array($userId, $course));
@@ -550,7 +550,7 @@ function course_done_count($userId, $course)
 function course_done_map($userId, $course)
 {
     $st = db()->prepare(
-        'SELECT l.num FROM progress p JOIN lessons l ON l.id = p.lesson_id
+        'SELECT l.num FROM cj_progress p JOIN cj_lessons l ON l.id = p.lesson_id
          WHERE p.user_id = ? AND l.course = ? AND p.completed = 1'
     );
     $st->execute(array($userId, $course));
@@ -564,7 +564,7 @@ function course_done_map($userId, $course)
 function exam_passed($userId, $course, $level)
 {
     $st = db()->prepare(
-        'SELECT COUNT(*) FROM exam_results WHERE user_id = ? AND course = ? AND level = ? AND passed = 1'
+        'SELECT COUNT(*) FROM cj_exam_results WHERE user_id = ? AND course = ? AND level = ? AND passed = 1'
     );
     $st->execute(array($userId, $course, $level));
     return (int)$st->fetchColumn() > 0;
@@ -587,7 +587,7 @@ function level_unlocked($userId, $course, $level)
     $from = ($level - 2) * LESSONS_PER_LEVEL + 1;
     $to = ($level - 1) * LESSONS_PER_LEVEL;
     $st = db()->prepare(
-        'SELECT COUNT(*) FROM progress p JOIN lessons l ON l.id = p.lesson_id
+        'SELECT COUNT(*) FROM cj_progress p JOIN cj_lessons l ON l.id = p.lesson_id
          WHERE p.user_id = ? AND l.course = ? AND p.completed = 1 AND l.num BETWEEN ? AND ?'
     );
     $st->execute(array($userId, $course, $from, $to));
@@ -656,7 +656,7 @@ function current_user()
     }
     $user = null;
     if (!empty($_SESSION['uid'])) {
-        $st = db()->prepare('SELECT * FROM users WHERE id = ? AND banned = 0');
+        $st = db()->prepare('SELECT * FROM cj_users WHERE id = ? AND banned = 0');
         $st->execute(array((int)$_SESSION['uid']));
         $u = $st->fetch();
         if ($u) {
@@ -683,7 +683,7 @@ function update_streak(&$user)
     }
     $yesterday = date('Y-m-d', strtotime('-1 day'));
     $streak = ($user['last_active_date'] === $yesterday) ? ((int)$user['streak_days'] + 1) : 1;
-    $st = db()->prepare('UPDATE users SET streak_days = ?, last_active_date = ? WHERE id = ?');
+    $st = db()->prepare('UPDATE cj_users SET streak_days = ?, last_active_date = ? WHERE id = ?');
     $st->execute(array($streak, $today, (int)$user['id']));
     $user['streak_days'] = $streak;
     $user['last_active_date'] = $today;
@@ -694,7 +694,7 @@ function maybe_reset_week()
 {
     $monday = date('Y-m-d', strtotime('monday this week'));
     if (setting_get('week_reset_date', '') !== $monday) {
-        db()->exec('UPDATE users SET week_points = 0');
+        db()->exec('UPDATE cj_users SET week_points = 0');
         setting_set('week_reset_date', $monday);
     }
 }
@@ -737,17 +737,17 @@ function rate_limit($action, $maxHits, $windowSec)
 {
     $pdo = db();
     if (mt_rand(1, 50) === 1) {
-        $pdo->prepare('DELETE FROM rate_limit WHERE created_at < DATE_SUB(NOW(), INTERVAL 2 DAY)')->execute();
+        $pdo->prepare('DELETE FROM cj_rate_limit WHERE created_at < DATE_SUB(NOW(), INTERVAL 2 DAY)')->execute();
     }
     $ip = client_ip();
     $st = $pdo->prepare(
-        'SELECT COUNT(*) FROM rate_limit WHERE ip = ? AND action = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)'
+        'SELECT COUNT(*) FROM cj_rate_limit WHERE ip = ? AND action = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)'
     );
     $st->execute(array($ip, $action, $windowSec));
     if ((int)$st->fetchColumn() >= $maxHits) {
         return false;
     }
-    $pdo->prepare('INSERT INTO rate_limit (ip, action) VALUES (?, ?)')->execute(array($ip, $action));
+    $pdo->prepare('INSERT INTO cj_rate_limit (ip, action) VALUES (?, ?)')->execute(array($ip, $action));
     return true;
 }
 
@@ -759,9 +759,9 @@ function add_points($userId, $points, $reason)
         return;
     }
     $pdo = db();
-    $pdo->prepare('UPDATE users SET points = points + ?, week_points = week_points + ? WHERE id = ?')
+    $pdo->prepare('UPDATE cj_users SET points = points + ?, week_points = week_points + ? WHERE id = ?')
         ->execute(array($points, $points, $userId));
-    $pdo->prepare('INSERT INTO points_log (user_id, points, reason) VALUES (?, ?, ?)')
+    $pdo->prepare('INSERT INTO cj_points_log (user_id, points, reason) VALUES (?, ?, ?)')
         ->execute(array($userId, $points, $reason));
 }
 

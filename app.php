@@ -231,7 +231,7 @@ db();
 
 $p = isset($_GET['p']) && is_string($_GET['p']) ? $_GET['p'] : 'home';
 
-$userCount = (int)db()->query('SELECT COUNT(*) FROM users')->fetchColumn();
+$userCount = (int)db()->query('SELECT COUNT(*) FROM cj_users')->fetchColumn();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     if ($userCount === 0 && $p !== 'setup') {
         redirect('?p=setup');
@@ -323,7 +323,7 @@ function validate_credentials($login, $name, $p1, $p2, $checkTaken)
         return 'err_pass_mismatch';
     }
     if ($checkTaken) {
-        $st = db()->prepare('SELECT COUNT(*) FROM users WHERE login = ?');
+        $st = db()->prepare('SELECT COUNT(*) FROM cj_users WHERE login = ?');
         $st->execute(array($login));
         if ((int)$st->fetchColumn() > 0) {
             return 'err_login_taken';
@@ -363,7 +363,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash_set('err', $err);
                 redirect('?p=setup');
             }
-            $st = db()->prepare("INSERT INTO users (login, pass_hash, name, role, lang) VALUES (?, ?, ?, 'admin', ?)");
+            $st = db()->prepare("INSERT INTO cj_users (login, pass_hash, name, role, lang) VALUES (?, ?, ?, 'admin', ?)");
             $st->execute(array($loginV, password_hash($pass1, PASSWORD_DEFAULT), $nameV, $lang));
             session_regenerate_id(true);
             $_SESSION['uid'] = (int)db()->lastInsertId();
@@ -393,7 +393,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash_set('err', $err);
                 redirect('?p=register');
             }
-            $st = db()->prepare('INSERT INTO users (login, pass_hash, name, city, lang) VALUES (?, ?, ?, ?, ?)');
+            $st = db()->prepare('INSERT INTO cj_users (login, pass_hash, name, city, lang) VALUES (?, ?, ?, ?, ?)');
             $st->execute(array($loginV, password_hash($pass1, PASSWORD_DEFAULT), $nameV, $cityV, $lang));
             session_regenerate_id(true);
             $_SESSION['uid'] = (int)db()->lastInsertId();
@@ -411,7 +411,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $loginV = trim((string)(isset($_POST['login']) ? $_POST['login'] : ''));
             $pass1  = (string)(isset($_POST['password']) ? $_POST['password'] : '');
-            $st = db()->prepare('SELECT * FROM users WHERE login = ?');
+            $st = db()->prepare('SELECT * FROM cj_users WHERE login = ?');
             $st->execute(array($loginV));
             $u = $st->fetch();
             if (!$u || !password_verify($pass1, $u['pass_hash'])) {
@@ -440,7 +440,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newLang = (isset($_POST['lang']) && $_POST['lang'] === 'ru') ? 'ru' : 'tj';
             codetj_setcookie('codetj_lang', $newLang, time() + 31536000);
             if ($user !== null) {
-                db()->prepare('UPDATE users SET lang = ? WHERE id = ?')->execute(array($newLang, (int)$user['id']));
+                db()->prepare('UPDATE cj_users SET lang = ? WHERE id = ?')->execute(array($newLang, (int)$user['id']));
             }
             redirect(safe_back());
             break;
@@ -448,7 +448,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'settheme':
             $newTheme = (isset($_POST['theme']) && $_POST['theme'] === 'light') ? 'light' : 'dark';
             if ($user !== null) {
-                db()->prepare('UPDATE users SET theme = ? WHERE id = ?')->execute(array($newTheme, (int)$user['id']));
+                db()->prepare('UPDATE cj_users SET theme = ? WHERE id = ?')->execute(array($newTheme, (int)$user['id']));
             }
             json_out(array('ok' => true));
             break;
@@ -465,7 +465,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 return mb_substr((string)$v, 0, 60000);
             };
             $st = db()->prepare(
-                'INSERT INTO drafts (user_id, lesson_id, html_code, css_code, js_code, pasted)
+                'INSERT INTO cj_drafts (user_id, lesson_id, html_code, css_code, js_code, pasted)
                  VALUES (?,?,?,?,?,?)
                  ON DUPLICATE KEY UPDATE html_code=VALUES(html_code), css_code=VALUES(css_code),
                  js_code=VALUES(js_code), pasted=GREATEST(pasted, VALUES(pasted))'
@@ -499,14 +499,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 function handle_test_submit($uid)
 {
     $lid = (int)(isset($_POST['lesson_id']) ? $_POST['lesson_id'] : 0);
-    $st = db()->prepare('SELECT * FROM lessons WHERE id = ? AND published = 1');
+    $st = db()->prepare('SELECT * FROM cj_lessons WHERE id = ? AND published = 1');
     $st->execute(array($lid));
     $L = $st->fetch();
     if (!$L) {
         redirect('?p=home');
     }
 
-    $st = db()->prepare('SELECT * FROM questions WHERE lesson_id = ? ORDER BY num ASC, id ASC');
+    $st = db()->prepare('SELECT * FROM cj_questions WHERE lesson_id = ? ORDER BY num ASC, id ASC');
     $st->execute(array($lid));
     $questions = $st->fetchAll();
     if (!$questions) {
@@ -529,7 +529,7 @@ function handle_test_submit($uid)
         $given = isset($answers[$qid]) ? (int)$answers[$qid] : -1;
         $isRight = ($given === (int)$q['correct']);
 
-        $st = $pdo->prepare('SELECT attempts, correct, points FROM test_answers WHERE user_id = ? AND question_id = ?');
+        $st = $pdo->prepare('SELECT attempts, correct, points FROM cj_test_answers WHERE user_id = ? AND question_id = ?');
         $st->execute(array($uid, $qid));
         $prev = $st->fetch();
         $attempts = $prev ? (int)$prev['attempts'] : 0;
@@ -550,7 +550,7 @@ function handle_test_submit($uid)
         $gained += $award;
 
         $pdo->prepare(
-            'INSERT INTO test_answers (user_id, question_id, attempts, correct, points)
+            'INSERT INTO cj_test_answers (user_id, question_id, attempts, correct, points)
              VALUES (?,?,?,?,?)
              ON DUPLICATE KEY UPDATE attempts=VALUES(attempts),
              correct=GREATEST(correct, VALUES(correct)), points=points+VALUES(points)'
@@ -578,7 +578,7 @@ function handle_test_submit($uid)
     }
 
     // Пешрафти дарс
-    $st = $pdo->prepare('SELECT * FROM progress WHERE user_id = ? AND lesson_id = ?');
+    $st = $pdo->prepare('SELECT * FROM cj_progress WHERE user_id = ? AND lesson_id = ?');
     $st->execute(array($uid, $lid));
     $pr = $st->fetch();
     $wasCompleted = $pr ? (int)$pr['completed'] === 1 : false;
@@ -599,7 +599,7 @@ function handle_test_submit($uid)
     }
 
     $pdo->prepare(
-        'INSERT INTO progress (user_id, lesson_id, test_score, test_attempts, completed, completed_at, points_earned, first_try)
+        'INSERT INTO cj_progress (user_id, lesson_id, test_score, test_attempts, completed, completed_at, points_earned, first_try)
          VALUES (?,?,?,?,?,?,?,?)
          ON DUPLICATE KEY UPDATE test_score=GREATEST(test_score, VALUES(test_score)),
          test_attempts=test_attempts+1,
@@ -662,7 +662,7 @@ function page_home()
 
 function render_hero_guest()
 {
-    $ready = (int)db()->query('SELECT COUNT(*) FROM lessons WHERE published = 1')->fetchColumn();
+    $ready = (int)db()->query('SELECT COUNT(*) FROM cj_lessons WHERE published = 1')->fetchColumn();
     ?>
     <section class="hero">
       <h1><?= e(t('tagline')) ?></h1>
@@ -711,7 +711,7 @@ function render_course_cards($userId)
 {
     $fullOpen = $userId !== null ? full_course_unlocked($userId) : false;
     $counts = array();
-    foreach (db()->query('SELECT course, COUNT(*) c FROM lessons WHERE published = 1 GROUP BY course') as $r) {
+    foreach (db()->query('SELECT course, COUNT(*) c FROM cj_lessons WHERE published = 1 GROUP BY course') as $r) {
         $counts[$r['course']] = (int)$r['c'];
     }
     ?>
@@ -755,7 +755,7 @@ function render_course_cards($userId)
 function render_top3()
 {
     $rows = db()->query(
-        "SELECT name, city, points FROM users WHERE banned = 0 AND points > 0
+        "SELECT name, city, points FROM cj_users WHERE banned = 0 AND points > 0
          ORDER BY points DESC, id ASC LIMIT 3"
     )->fetchAll();
     $medals = array('&#129351;', '&#129352;', '&#129353;');
@@ -862,7 +862,7 @@ function page_course()
     $c = $all[$slug];
     $uid = (int)$user['id'];
 
-    $st = db()->prepare('SELECT id, num, title_tj, title_ru FROM lessons WHERE course = ? AND published = 1');
+    $st = db()->prepare('SELECT id, num, title_tj, title_ru FROM cj_lessons WHERE course = ? AND published = 1');
     $st->execute(array($slug));
     $lessons = array();
     foreach ($st->fetchAll() as $row) {
@@ -926,7 +926,7 @@ function page_lesson()
         redirect('?p=login');
     }
     $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
-    $st = db()->prepare('SELECT * FROM lessons WHERE id = ? AND published = 1');
+    $st = db()->prepare('SELECT * FROM cj_lessons WHERE id = ? AND published = 1');
     $st->execute(array($id));
     $L = $st->fetch();
     if (!$L) {
@@ -944,7 +944,7 @@ function page_lesson()
     $c = $courseList[$slug];
 
     // сиёҳнавис
-    $st = db()->prepare('SELECT * FROM drafts WHERE user_id = ? AND lesson_id = ?');
+    $st = db()->prepare('SELECT * FROM cj_drafts WHERE user_id = ? AND lesson_id = ?');
     $st->execute(array($uid, $id));
     $draft = $st->fetch();
 
@@ -957,7 +957,7 @@ function page_lesson()
     }
 
     // саволҳо (бе ҷавоби дуруст!)
-    $st = db()->prepare('SELECT id, num, q_tj, q_ru, options_tj, options_ru, explain_tj, explain_ru FROM questions WHERE lesson_id = ? ORDER BY num ASC, id ASC');
+    $st = db()->prepare('SELECT id, num, q_tj, q_ru, options_tj, options_ru, explain_tj, explain_ru FROM cj_questions WHERE lesson_id = ? ORDER BY num ASC, id ASC');
     $st->execute(array($id));
     $questions = $st->fetchAll();
 
@@ -973,7 +973,7 @@ function page_lesson()
     }
 
     // дарси навбатӣ
-    $st = db()->prepare('SELECT id FROM lessons WHERE course = ? AND num = ? AND published = 1');
+    $st = db()->prepare('SELECT id FROM cj_lessons WHERE course = ? AND num = ? AND published = 1');
     $st->execute(array($slug, $num + 1));
     $nextId = (int)$st->fetchColumn();
 
@@ -1307,7 +1307,7 @@ function page_profile()
 {
     global $user;
     $uid = (int)$user['id'];
-    $st = db()->prepare('SELECT COUNT(*) + 1 FROM users WHERE banned = 0 AND points > ?');
+    $st = db()->prepare('SELECT COUNT(*) + 1 FROM cj_users WHERE banned = 0 AND points > ?');
     $st->execute(array((int)$user['points']));
     $rank = (int)$st->fetchColumn();
 

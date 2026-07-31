@@ -70,21 +70,35 @@ foreach ($files as $f) {
 if (file_exists(__DIR__ . '/.htaccess')) {
     add_row($rows, $fatal, $warn, 'Файли .htaccess', 'ok', 'ҳаст');
 } else {
-    add_row($rows, $fatal, $warn, 'Файли .htaccess', 'warn',
-        'нест. Агар сайт саҳифаи кӯҳнаро кушояд — index.html-ро ба portfolio.html иваз кунед.');
+    add_row($rows, $fatal, $warn, 'Файли .htaccess', 'ok',
+        'нест — дар nginx он лозим ҳам нест');
 }
 
 /* ---- 5. Папкаи uploads ---- */
 $up = __DIR__ . '/uploads';
 if (!is_dir($up)) {
-    add_row($rows, $fatal, $warn, 'Папкаи uploads', 'warn', 'нест — созед (барои аватарҳо лозим мешавад)');
+    add_row($rows, $fatal, $warn, 'Папкаи uploads', 'ok', 'нест — ҳоло лозим нест (барои аватарҳо дар Қисми 4)');
 } elseif (!is_writable($up)) {
     add_row($rows, $fatal, $warn, 'Папкаи uploads', 'warn', 'ҳаст, вале навиштан мумкин нест. Ҳуқуқро 755 гузоред.');
 } else {
     add_row($rows, $fatal, $warn, 'Папкаи uploads', 'ok', 'ҳаст ва навиштан мумкин');
 }
 
-/* ---- 6. Папкаи seed (дарсҳо) ---- */
+/* ---- 6. Файлҳои дарс ---- */
+$lessonPhp = glob(__DIR__ . '/lessons*.php');
+if ($lessonPhp) {
+    $cntPhp = 0;
+    foreach ($lessonPhp as $lf) {
+        $d = @include $lf;
+        if (is_array($d)) { $cntPhp += count($d); }
+    }
+    add_row($rows, $fatal, $warn, 'Файлҳои дарс (lessons*.php)', $cntPhp > 0 ? 'ok' : 'warn',
+        count($lessonPhp) . ' файл, ' . $cntPhp . ' дарс');
+} else {
+    add_row($rows, $fatal, $warn, 'Файлҳои дарс (lessons*.php)', 'warn',
+        'нестанд — lessons1.php ва lessons2.php-ро бор кунед');
+}
+
 $seed = __DIR__ . '/seed';
 if (is_dir($seed)) {
     $js = glob($seed . '/*.json');
@@ -104,8 +118,6 @@ if (is_dir($seed)) {
     } else {
         add_row($rows, $fatal, $warn, 'Дарсҳо (seed/)', 'ok', $cnt . ' дарс барои воридкунӣ тайёр');
     }
-} else {
-    add_row($rows, $fatal, $warn, 'Дарсҳо (seed/)', 'warn', 'папкаи seed нест — сайт бе дарс кор мекунад');
 }
 
 /* ---- 7. База ---- */
@@ -152,15 +164,25 @@ if (file_exists(__DIR__ . '/db.php')) {
                     add_row($rows, $fatal, $warn, 'Ҷадвалҳо', 'warn',
                         'ҳанӯз нестанд — саҳифаи асосиро кушоед, онҳо худкор сохта мешаванд');
                 } else {
-                    add_row($rows, $fatal, $warn, 'Ҷадвалҳо', 'ok', count($tables) . ' ҷадвал: ' . htmlspecialchars(implode(', ', $tables)));
+                    $mine = array();
+                    foreach ($tables as $tn) {
+                        if (strpos($tn, 'cj_') === 0) { $mine[] = $tn; }
+                    }
+                    if (count($mine) === 0) {
+                        add_row($rows, $fatal, $warn, 'Ҷадвалҳои CodeTJ', 'warn',
+                            'ҳанӯз нестанд — саҳифаи асосиро кушоед, худашон сохта мешаванд');
+                    } else {
+                        add_row($rows, $fatal, $warn, 'Ҷадвалҳои CodeTJ', 'ok',
+                            count($mine) . ' ҷадвали cj_ (дар база ҳамагӣ ' . count($tables) . ' ҷадвал, боқимонда аз лоиҳаҳои дигар)');
+                    }
                 }
-                if (in_array('users', $tables)) {
-                    $u = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
+                if (in_array('cj_users', $tables)) {
+                    $u = (int)$pdo->query('SELECT COUNT(*) FROM cj_users')->fetchColumn();
                     add_row($rows, $fatal, $warn, 'Корбарон', 'ok',
                         $u . ' нафар' . ($u === 0 ? ' — саҳифаро кушоед ва администратор созед' : ''));
                 }
-                if (in_array('lessons', $tables)) {
-                    $l = (int)$pdo->query('SELECT COUNT(*) FROM lessons')->fetchColumn();
+                if (in_array('cj_lessons', $tables)) {
+                    $l = (int)$pdo->query('SELECT COUNT(*) FROM cj_lessons')->fetchColumn();
                     add_row($rows, $fatal, $warn, 'Дарсҳо дар база', $l > 0 ? 'ok' : 'warn', $l . ' дарс');
                 }
             } catch (Exception $ex) {
