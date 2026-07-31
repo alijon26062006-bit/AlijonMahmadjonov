@@ -10,11 +10,12 @@
  *  КОНФИГУРАЦИЯ — инро пеш аз боркунӣ ба ҳостинг пур кунед
  * ============================================================ */
 define('DB_HOST', 'localhost');
-define('DB_NAME', '');          // номи базаи MySQL аз cPanel
+define('DB_PORT', '3306');      // порти MySQL (одатан 3306)
+define('DB_NAME', '');          // номи базаи MySQL аз панели ҳостинг
 define('DB_USER', '');          // корбари база
 define('DB_PASS', '');          // пароли база
 define('OPENAI_KEY', '');       // калиди API (метавон баъдан дар админка гузошт)
-define('SITE_URL', '');         // масалан: https://codetj.example.com (бе / дар охир)
+define('SITE_URL', '');         // холӣ монед — худаш муайян мекунад. Ё: https://codetj.tj
 
 define('CODETJ_SCHEMA_VERSION', 1);   // версияи схемаи база (миграцияҳо худкор)
 
@@ -34,7 +35,7 @@ function db(): PDO
     }
     try {
         $pdo = new PDO(
-            'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
+            'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=utf8mb4',
             DB_USER,
             DB_PASS,
             [
@@ -565,6 +566,22 @@ function redirect(string $url): never
 {
     header('Location: ' . $url);
     exit;
+}
+
+/**
+ * Суроғаи сайт. Агар SITE_URL холӣ бошад — худаш аз дархост муайян мекунад,
+ * то дар ҳостинги нав ҳам бе танзими иловагӣ кор кунад.
+ */
+function site_url(): string
+{
+    if (SITE_URL !== '') {
+        return rtrim(SITE_URL, '/');
+    }
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+          || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $dir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
+    return ($https ? 'https://' : 'http://') . $host . $dir;
 }
 
 /** Ҷавоби JSON ва тамом. */
