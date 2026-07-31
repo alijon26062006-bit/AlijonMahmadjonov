@@ -329,11 +329,19 @@ function migrate_to_v2(PDO $pdo)
  */
 function seed_lessons(PDO $pdo)
 {
-    $dir = __DIR__ . '/seed';
-    if (!is_dir($dir)) {
-        return;
+    // Ду роҳ: файлҳои lessons*.php дар ҳамин папка (осонтар — папка сохтан лозим нест)
+    // ва файлҳои seed/*.json (агар папкаи seed бошад).
+    $files = array();
+    $php = glob(__DIR__ . '/lessons*.php');
+    if ($php) {
+        $files = array_merge($files, $php);
     }
-    $files = glob($dir . '/*.json');
+    if (is_dir(__DIR__ . '/seed')) {
+        $json = glob(__DIR__ . '/seed/*.json');
+        if ($json) {
+            $files = array_merge($files, $json);
+        }
+    }
     if (!$files) {
         return;
     }
@@ -364,9 +372,13 @@ function seed_lessons(PDO $pdo)
         if (isset($done[$key]) && $done[$key] === $sig) {
             continue;   // ҳамин нусха аллакай ворид шудааст
         }
-        $data = json_decode($raw, true);
+        if (substr($file, -4) === '.php') {
+            $data = @include $file;   // файл массиви дарсҳоро бармегардонад
+        } else {
+            $data = json_decode($raw, true);
+        }
         if (!is_array($data)) {
-            continue;   // JSON вайрон — беэътино мегузарем, сайт кор мекунад
+            continue;   // файл вайрон — беэътино мегузарем, сайт кор мекунад
         }
         foreach ($data as $lesson) {
             if (is_array($lesson)) {
