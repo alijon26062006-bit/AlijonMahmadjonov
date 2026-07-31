@@ -17,6 +17,8 @@ define('DB_USER', '');          // корбари база
 define('DB_PASS', '');          // пароли база
 define('OPENAI_KEY', '');       // калиди API (метавон баъдан дар админка гузошт)
 define('SITE_URL', '');         // холӣ монед — худаш муайян мекунад. Ё: https://codetj.tj
+define('OPENAI_MODEL', 'gpt-4o-mini');
+define('OPENAI_URL', 'https://api.openai.com/v1/chat/completions');
 
 define('CODETJ_SCHEMA_VERSION', 3);   // версияи схемаи база (миграцияҳо худкор)
 

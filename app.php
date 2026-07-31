@@ -74,6 +74,25 @@ $LANG = array(
     'saving'         => 'Захира мешавад…',
     'save_err'       => 'Захира нашуд',
     'task'           => 'Супориш',
+    'console'        => 'Терминал',
+    'con_clear'      => 'Тоза',
+    'con_empty'      => 'Ин ҷо натиҷаи console.log ва хатоҳо пайдо мешаванд.',
+    'ai_check'       => 'Санҷиши AI',
+    'ai_checking'    => 'Устод коратро мехонад…',
+    'ai_wait'        => 'Каме сабр кун',
+    'ai_sec'         => 'сония',
+    'ai_limit'       => 'Имрӯз барои ин дарс лимит тамом шуд. Пагоҳ боз кӯшиш кун.',
+    'ai_empty'       => 'Аввал кодро нависед, баъд месанҷем.',
+    'ai_off'         => 'Санҷиши AI ҳанӯз фаъол нест.',
+    'ai_err'         => 'Ҳозир устод ҷавоб дода наметавонад. Каме баъдтар кӯшиш кун.',
+    'ai_passed'      => 'Кор қабул шуд!',
+    'ai_failed'      => 'Ҳанӯз тайёр нест',
+    'ai_errors'      => 'Чиро дуруст кардан лозим',
+    'ai_advice'      => 'Маслиҳат',
+    'ai_line'        => 'сатри',
+    'ai_cached'      => 'аз хотира',
+    'ai_left'        => 'Имрӯз боқӣ мондааст',
+    'ai_need'        => 'Барои супоридани дарс: санҷиши AI + тест аз 60%',
     'test_intro'     => 'Ба 5 савол ҷавоб деҳ. Ҷавоби дуруст аз кӯшиши аввал — 10 балл, аз дуюм — 5.',
     'test_send'      => 'Ҷавобҳоро фиристодан',
     'test_again'     => 'Аз нав кӯшиш кардан',
@@ -175,6 +194,25 @@ $LANG = array(
     'saving'         => 'Сохраняем…',
     'save_err'       => 'Не сохранилось',
     'task'           => 'Задание',
+    'console'        => 'Терминал',
+    'con_clear'      => 'Очистить',
+    'con_empty'      => 'Здесь появятся console.log и ошибки.',
+    'ai_check'       => 'Проверка AI',
+    'ai_checking'    => 'Наставник читает твой код…',
+    'ai_wait'        => 'Немного подожди',
+    'ai_sec'         => 'сек',
+    'ai_limit'       => 'На сегодня лимит для этого урока исчерпан. Попробуй завтра.',
+    'ai_empty'       => 'Сначала напиши код, потом проверим.',
+    'ai_off'         => 'Проверка AI пока не включена.',
+    'ai_err'         => 'Наставник сейчас не отвечает. Попробуй чуть позже.',
+    'ai_passed'      => 'Работа принята!',
+    'ai_failed'      => 'Пока не готово',
+    'ai_errors'      => 'Что нужно исправить',
+    'ai_advice'      => 'Совет',
+    'ai_line'        => 'строка',
+    'ai_cached'      => 'из памяти',
+    'ai_left'        => 'Осталось сегодня',
+    'ai_need'        => 'Чтобы сдать урок: проверка AI + тест от 60%',
     'test_intro'     => 'Ответь на 5 вопросов. Верный ответ с первой попытки — 10 баллов, со второй — 5.',
     'test_send'      => 'Отправить ответы',
     'test_again'     => 'Попробовать снова',
@@ -543,6 +581,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             json_out(array('ok' => true));
             break;
 
+        case 'ai_check':
+            if ($user === null) {
+                json_out(array('ok' => false, 'msg' => t('err_need_login')), 403);
+            }
+            handle_ai_check((int)$user['id']);
+            break;
+
         case 'test':
             if ($user === null) {
                 redirect('?p=enter');
@@ -553,6 +598,305 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         default:
             redirect('?p=home');
     }
+}
+
+/* ============================================================
+ *  САНҶИШИ КОД БО ЗЕҲНИ СУНЪӢ
+ * ============================================================ */
+
+/** Калиди API: аввал аз танзимот, баъд аз db.php. Ҳеҷ гоҳ ба браузер намеравад. */
+function ai_key()
+{
+    $k = trim((string)setting_get('openai_key', ''));
+    if ($k !== '') {
+        return $k;
+    }
+    return trim(OPENAI_KEY);
+}
+
+/**
+ * Дархост ба OpenAI. Танҳо аз сервер, бо cURL.
+ * Бармегардонад: array('ok'=>bool, 'text'=>..., 'in'=>..., 'out'=>..., 'err'=>...)
+ */
+function openai_chat($messages, $maxTokens = 600)
+{
+    $key = ai_key();
+    if ($key === '') {
+        return array('ok' => false, 'err' => 'no_key');
+    }
+    if (!function_exists('curl_init')) {
+        return array('ok' => false, 'err' => 'no_curl');
+    }
+    $payload = json_encode(array(
+        'model'       => OPENAI_MODEL,
+        'messages'    => $messages,
+        'temperature' => 0.2,
+        'max_tokens'  => $maxTokens,
+    ), JSON_UNESCAPED_UNICODE);
+
+    $ch = curl_init(OPENAI_URL);
+    curl_setopt_array($ch, array(
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_HTTPHEADER     => array(
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $key,
+        ),
+        CURLOPT_TIMEOUT        => 45,
+        CURLOPT_CONNECTTIMEOUT => 12,
+    ));
+    $raw = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $cerr = curl_error($ch);
+    curl_close($ch);
+
+    if ($raw === false || $code === 0) {
+        return array('ok' => false, 'err' => 'net:' . $cerr);
+    }
+    $data = json_decode($raw, true);
+    if (!is_array($data)) {
+        return array('ok' => false, 'err' => 'bad_json');
+    }
+    if ($code !== 200 || isset($data['error'])) {
+        $m = isset($data['error']['message']) ? $data['error']['message'] : ('http ' . $code);
+        return array('ok' => false, 'err' => $m);
+    }
+    if (!isset($data['choices'][0]['message']['content'])) {
+        return array('ok' => false, 'err' => 'no_content');
+    }
+    return array(
+        'ok'   => true,
+        'text' => (string)$data['choices'][0]['message']['content'],
+        'in'   => isset($data['usage']['prompt_tokens']) ? (int)$data['usage']['prompt_tokens'] : 0,
+        'out'  => isset($data['usage']['completion_tokens']) ? (int)$data['usage']['completion_tokens'] : 0,
+    );
+}
+
+/** JSON-и ҷавобро бехатар мехонад (ҳатто агар дар ```json печонида шуда бошад). */
+function parse_ai_json($text)
+{
+    $t = trim($text);
+    $t = preg_replace('/^```[a-z]*\s*/i', '', $t);
+    $t = preg_replace('/\s*```$/', '', $t);
+    $d = json_decode($t, true);
+    if (!is_array($d)) {
+        // баъзан модел матни иловагӣ менависад — аввалин { … }-ро мегирем
+        if (preg_match('/\{.*\}/s', $t, $m)) {
+            $d = json_decode($m[0], true);
+        }
+    }
+    if (!is_array($d)) {
+        return null;
+    }
+    $errors = array();
+    if (isset($d['errors']) && is_array($d['errors'])) {
+        foreach ($d['errors'] as $er) {
+            if (!is_array($er)) {
+                continue;
+            }
+            $errors[] = array(
+                'line' => isset($er['line']) ? (int)$er['line'] : 0,
+                'text' => isset($er['text']) ? mb_substr((string)$er['text'], 0, 400) : '',
+            );
+            if (count($errors) >= 8) {
+                break;
+            }
+        }
+    }
+    $score = isset($d['score']) ? (int)$d['score'] : 0;
+    if ($score < 0) { $score = 0; }
+    if ($score > 100) { $score = 100; }
+    return array(
+        'passed' => !empty($d['passed']),
+        'score'  => $score,
+        'errors' => $errors,
+        'advice' => isset($d['advice']) ? mb_substr((string)$d['advice'], 0, 700) : '',
+        'praise' => isset($d['praise']) ? mb_substr((string)$d['praise'], 0, 400) : '',
+    );
+}
+
+/** Санҷиши арзон дар сервер, то коди холӣ ба API нафиристем. */
+function local_precheck($code)
+{
+    if (trim($code) === '') {
+        return 'ai_empty';
+    }
+    return null;
+}
+
+function handle_ai_check($uid)
+{
+    global $lang;
+
+    $lid = (int)(isset($_POST['lesson_id']) ? $_POST['lesson_id'] : 0);
+    $st = db()->prepare('SELECT * FROM cj_lessons WHERE id = ? AND published = 1');
+    $st->execute(array($lid));
+    $L = $st->fetch();
+    if (!$L) {
+        json_out(array('ok' => false, 'msg' => t('err_not_found')), 404);
+    }
+    if (ai_key() === '') {
+        json_out(array('ok' => false, 'msg' => t('ai_off')));
+    }
+
+    $html = (string)(isset($_POST['html']) ? $_POST['html'] : '');
+    $css  = (string)(isset($_POST['css']) ? $_POST['css'] : '');
+    $js   = (string)(isset($_POST['js']) ? $_POST['js'] : '');
+    $code = trim($html);
+    if (trim($css) !== '') {
+        $code .= "\n\n/* CSS */\n" . $css;
+    }
+    if (trim($js) !== '') {
+        $code .= "\n\n// JS\n" . $js;
+    }
+    $code = mb_substr($code, 0, 12000);
+
+    $pre = local_precheck($code);
+    if ($pre !== null) {
+        json_out(array('ok' => false, 'msg' => t($pre)));
+    }
+
+    $pdo = db();
+
+    // Кулдаун
+    $cool = (int)setting_get('ai_cooldown_sec', '15');
+    $st = $pdo->prepare(
+        'SELECT TIMESTAMPDIFF(SECOND, created_at, NOW()) FROM cj_ai_usage
+         WHERE user_id = ? ORDER BY id DESC LIMIT 1'
+    );
+    $st->execute(array($uid));
+    $since = $st->fetchColumn();
+    if ($since !== false && (int)$since < $cool) {
+        json_out(array('ok' => false, 'wait' => $cool - (int)$since, 'msg' => t('ai_wait')));
+    }
+
+    // Лимити рӯзона барои ин дарс
+    $limit = (int)setting_get('ai_daily_limit', '10');
+    $st = $pdo->prepare(
+        'SELECT COUNT(*) FROM cj_ai_usage WHERE user_id = ? AND lesson_id = ?
+         AND kind = ? AND DATE(created_at) = CURDATE()'
+    );
+    $st->execute(array($uid, $lid, 'check'));
+    $used = (int)$st->fetchColumn();
+    if ($used >= $limit) {
+        json_out(array('ok' => false, 'msg' => t('ai_limit')));
+    }
+
+    // Кэш аз рӯи хэши код
+    $hash = hash('sha256', $code);
+    $st = $pdo->prepare('SELECT response FROM cj_ai_cache WHERE lesson_id = ? AND code_hash = ? AND lang = ?');
+    $st->execute(array($lid, $hash, $lang));
+    $cached = $st->fetchColumn();
+    if ($cached !== false) {
+        $res = json_decode((string)$cached, true);
+        if (is_array($res)) {
+            $pdo->prepare('INSERT INTO cj_ai_usage (user_id, lesson_id, kind, cached) VALUES (?,?,?,1)')
+                ->execute(array($uid, $lid, 'check'));
+            save_ai_progress($uid, $lid, $res);
+            $res['cached'] = true;
+            $res['left'] = max(0, $limit - $used - 1);
+            json_out(array('ok' => true, 'res' => $res));
+        }
+    }
+
+    $langName = ($lang === 'ru') ? 'русском' : 'таджикском (кириллица)';
+    $sys = "Ты — добрый, но требовательный учитель веб-разработки для подростков из Таджикистана.\n"
+         . "ОТВЕЧАЙ СТРОГО на {$langName} языке. Ни одного слова на другом языке.\n"
+         . "Обращайся на «ты», пиши короткими простыми предложениями, как школьнику 14 лет.\n\n"
+         . "Оценивай код ТОЛЬКО по критериям задания, которые тебе дали.\n\n"
+         . "ЕСЛИ ЕСТЬ ОШИБКИ:\n"
+         . "- НИКОГДА не давай готовый правильный код и не пиши готовый ответ.\n"
+         . "- Для каждой ошибки укажи номер строки и объясни ПРИЧИНУ: что именно не так и почему это неправильно.\n"
+         . "- Дай наводящую подсказку, чтобы ученик сам догадался.\n\n"
+         . "ЕСЛИ ВСЁ ПРАВИЛЬНО:\n"
+         . "- Похвали конкретно за то, что он сделал хорошо.\n"
+         . "- В поле advice объясни, ЗАЧЕМ нужны те теги и приёмы, которые он применил — для чего они служат.\n"
+         . "- Добавь один совет, как сделать код ещё лучше.\n\n"
+         . "Верни ТОЛЬКО валидный JSON, без markdown и без ```:\n"
+         . '{"passed":true,"score":85,"errors":[{"line":7,"text":"..."}],"advice":"...","praise":"..."}' . "\n"
+         . "passed = true только если выполнены все критерии. score от 0 до 100.";
+
+    $usr = "ЗАДАНИЕ (что должен был сделать ученик):\n" . (string)$L['task_criteria']
+         . "\n\nКОД УЧЕНИКА (номера строк указаны слева):\n" . number_lines($code);
+
+    $ans = openai_chat(array(
+        array('role' => 'system', 'content' => $sys),
+        array('role' => 'user',   'content' => $usr),
+    ), 700);
+
+    if (empty($ans['ok'])) {
+        error_log('CodeTJ AI: ' . (isset($ans['err']) ? $ans['err'] : '?'));
+        json_out(array('ok' => false, 'msg' => t('ai_err')));
+    }
+    $res = parse_ai_json($ans['text']);
+    if ($res === null) {
+        error_log('CodeTJ AI: bad json from model');
+        json_out(array('ok' => false, 'msg' => t('ai_err')));
+    }
+
+    $pdo->prepare(
+        'INSERT IGNORE INTO cj_ai_cache (lesson_id, code_hash, lang, response) VALUES (?,?,?,?)'
+    )->execute(array($lid, $hash, $lang, json_encode($res, JSON_UNESCAPED_UNICODE)));
+
+    $pdo->prepare(
+        'INSERT INTO cj_ai_usage (user_id, lesson_id, kind, tokens_in, tokens_out, cached) VALUES (?,?,?,?,?,0)'
+    )->execute(array($uid, $lid, 'check', (int)$ans['in'], (int)$ans['out']));
+
+    save_ai_progress($uid, $lid, $res);
+    $res['cached'] = false;
+    $res['left'] = max(0, $limit - $used - 1);
+    json_out(array('ok' => true, 'res' => $res));
+}
+
+/** Рақами сатрҳоро мегузорад, то ИИ дақиқ гӯяд, ки хато дар куҷост. */
+function number_lines($code)
+{
+    $lines = explode("\n", $code);
+    $out = array();
+    foreach ($lines as $i => $l) {
+        $out[] = ($i + 1) . ': ' . $l;
+    }
+    return implode("\n", $out);
+}
+
+/** Натиҷаи ИИ-ро дар пешрафт сабт мекунад ва дарсро месупорад, агар тест ҳам тайёр бошад. */
+function save_ai_progress($uid, $lid, $res)
+{
+    $pdo = db();
+    $passed = !empty($res['passed']) ? 1 : 0;
+    $score = (int)$res['score'];
+
+    $st = $pdo->prepare('SELECT * FROM cj_progress WHERE user_id = ? AND lesson_id = ?');
+    $st->execute(array($uid, $lid));
+    $pr = $st->fetch();
+    $wasPassed = $pr ? (int)$pr['ai_passed'] === 1 : false;
+    $testOk = $pr ? (int)$pr['test_score'] >= 60 : false;
+    $wasCompleted = $pr ? (int)$pr['completed'] === 1 : false;
+    $completed = ($passed === 1 && $testOk) ? 1 : 0;
+
+    // Баллҳо барои коди қабулшуда — танҳо як бор: score × 2
+    $gain = 0;
+    if ($passed === 1 && !$wasPassed) {
+        $gain = $score * 2;
+        add_points($uid, $gain, 'ai_task');
+    }
+
+    $pdo->prepare(
+        'INSERT INTO cj_progress (user_id, lesson_id, ai_passed, ai_score, completed, completed_at, points_earned)
+         VALUES (?,?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE ai_passed=GREATEST(ai_passed, VALUES(ai_passed)),
+         ai_score=GREATEST(ai_score, VALUES(ai_score)),
+         completed=GREATEST(completed, VALUES(completed)),
+         completed_at=IF(completed_at IS NULL AND VALUES(completed)=1, NOW(), completed_at),
+         points_earned=points_earned+VALUES(points_earned)'
+    )->execute(array(
+        $uid, $lid, $passed, $score, $completed,
+        $completed === 1 ? date('Y-m-d H:i:s') : null,
+        $gain,
+    ));
+
+    return array('completed' => $completed === 1, 'newly' => $completed === 1 && !$wasCompleted, 'gain' => $gain);
 }
 
 /** Тестро дар сервер месанҷад. Ҷавобҳои дуруст ба браузер намераванд. */
@@ -1235,9 +1579,11 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
       <div class="ed-switch">
         <button class="sw act" data-view="code"><?= e(t('code')) ?></button>
         <button class="sw" data-view="preview"><?= e(t('preview')) ?></button>
+        <button class="sw" data-view="console"><?= e(t('console')) ?> <b id="conBadge" class="hidden">0</b></button>
       </div>
       <div class="ed-body">
         <div class="ed-code">
+          <div class="gutter" id="gutter">1</div>
           <textarea id="ta_html" class="ta" spellcheck="false"><?= e($html) ?></textarea>
           <textarea id="ta_css" class="ta hidden" spellcheck="false"><?= e($css) ?></textarea>
           <textarea id="ta_js" class="ta hidden" spellcheck="false"><?= e($js) ?></textarea>
@@ -1246,11 +1592,24 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
           <div class="ed-prev-bar"><span></span><span></span><span></span><i><?= e(t('preview')) ?></i></div>
           <iframe id="edFrame" sandbox="allow-scripts allow-modals" title="preview"></iframe>
         </div>
+        <div class="ed-con">
+          <div class="con-bar">
+            <b>&gt;_ <?= e(t('console')) ?></b>
+            <button class="ed-btn" id="conClear"><?= e(t('con_clear')) ?></button>
+          </div>
+          <div class="con-out" id="conOut"><div class="con-empty"><?= e(t('con_empty')) ?></div></div>
+        </div>
       </div>
       <div class="ed-status">
         <span id="edSaveState" class="muted"></span>
         <span id="edErr" class="ed-err"></span>
       </div>
+    </div>
+
+    <div class="ai-box">
+      <button class="btn btn-ai btn-block" id="aiBtn">&#129302; <?= e(t('ai_check')) ?></button>
+      <p class="ai-note muted"><?= e(t('ai_need')) ?></p>
+      <div id="aiOut"></div>
     </div>
 
     <script>
@@ -1260,7 +1619,18 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
       var TXT = {
         saved: <?= json_encode(t('saved'), JSON_UNESCAPED_UNICODE) ?>,
         saving: <?= json_encode(t('saving'), JSON_UNESCAPED_UNICODE) ?>,
-        saveErr: <?= json_encode(t('save_err'), JSON_UNESCAPED_UNICODE) ?>
+        saveErr: <?= json_encode(t('save_err'), JSON_UNESCAPED_UNICODE) ?>,
+        checking: <?= json_encode(t('ai_checking'), JSON_UNESCAPED_UNICODE) ?>,
+        aiErr: <?= json_encode(t('ai_err'), JSON_UNESCAPED_UNICODE) ?>,
+        passed: <?= json_encode(t('ai_passed'), JSON_UNESCAPED_UNICODE) ?>,
+        failed: <?= json_encode(t('ai_failed'), JSON_UNESCAPED_UNICODE) ?>,
+        errs: <?= json_encode(t('ai_errors'), JSON_UNESCAPED_UNICODE) ?>,
+        advice: <?= json_encode(t('ai_advice'), JSON_UNESCAPED_UNICODE) ?>,
+        line: <?= json_encode(t('ai_line'), JSON_UNESCAPED_UNICODE) ?>,
+        left: <?= json_encode(t('ai_left'), JSON_UNESCAPED_UNICODE) ?>,
+        sec: <?= json_encode(t('ai_sec'), JSON_UNESCAPED_UNICODE) ?>,
+        check: <?= json_encode(t('ai_check'), JSON_UNESCAPED_UNICODE) ?>,
+        conEmpty: <?= json_encode(t('con_empty'), JSON_UNESCAPED_UNICODE) ?>
       };
       var csrfEl = document.querySelector('input[name="csrf"]');
       var CSRF = csrfEl ? csrfEl.value : '';
@@ -1284,27 +1654,93 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
         } else if (c) {
           doc = doc.replace(/<\/head>/i, '<style>' + c + '</style></head>');
         }
+        // Пули терминал: console.log-и дохили iframe-ро ба мо мефиристад
+        var bridge = '<' + 'script>(function(){'
+          + 'function send(t,a){try{parent.postMessage({cjLog:1,type:t,args:Array.prototype.slice.call(a).map(function(x){'
+          + 'try{return (typeof x==="object"&&x!==null)?JSON.stringify(x):String(x)}catch(e){return String(x)}})},"*")}catch(e){}}'
+          + 'var c=window.console||{};["log","info","warn","error"].forEach(function(m){'
+          + 'var o=c[m];c[m]=function(){send(m,arguments);if(o){try{o.apply(c,arguments)}catch(e){}}}});window.console=c;'
+          + 'window.onerror=function(m,s,l){send("error",[m+" ("+TXTLINE+" "+l+")"]);parent.postMessage({codetjErr:m,line:l},"*");return true};'
+          + 'window.addEventListener("unhandledrejection",function(e){send("error",[String(e.reason)])});'
+          + '})();<' + '/script>';
+        bridge = bridge.replace('TXTLINE', JSON.stringify(TXT.line));
+        if (doc.toLowerCase().indexOf('<head') !== -1) {
+          doc = doc.replace(/<head([^>]*)>/i, '<head$1>' + bridge);
+        } else {
+          doc = bridge + doc;
+        }
+
         if (j) {
-          var s = '<' + 'script>window.onerror=function(m,src,l){parent.postMessage({codetjErr:m,line:l},"*");return true;};try{'
-                + j + '\n}catch(e){parent.postMessage({codetjErr:e.message},"*");}<' + '/script>';
+          var s = '<' + 'script>try{' + j + '\n}catch(e){console.error(e.message)}<' + '/script>';
           if (doc.toLowerCase().indexOf('</body>') !== -1) {
             doc = doc.replace(/<\/body>/i, s + '</body>');
           } else { doc += s; }
         }
         return doc;
       }
-      function run() { errBox.textContent = ''; frame.srcdoc = build(); }
+
+      /* ---- терминал ---- */
+      var conOut = document.getElementById('conOut');
+      var conBadge = document.getElementById('conBadge');
+      var conCount = 0;
+      function conAdd(type, text) {
+        var empty = conOut.querySelector('.con-empty');
+        if (empty) { empty.remove(); }
+        var row = document.createElement('div');
+        row.className = 'con-row con-' + type;
+        var t = new Date();
+        var hh = ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2) + ':' + ('0' + t.getSeconds()).slice(-2);
+        row.innerHTML = '<span class="con-time">' + hh + '</span><span class="con-txt"></span>';
+        row.querySelector('.con-txt').textContent = text;
+        conOut.appendChild(row);
+        conOut.scrollTop = conOut.scrollHeight;
+        conCount++;
+        if (conBadge) {
+          conBadge.textContent = conCount;
+          conBadge.classList.remove('hidden');
+        }
+      }
+      function conReset() {
+        conOut.innerHTML = '<div class="con-empty"></div>';
+        conOut.firstChild.textContent = TXT.conEmpty;
+        conCount = 0;
+        if (conBadge) { conBadge.classList.add('hidden'); }
+      }
+      document.getElementById('conClear').addEventListener('click', conReset);
+
+      function run() { errBox.textContent = ''; conReset(); frame.srcdoc = build(); }
 
       window.addEventListener('message', function (ev) {
-        if (ev.data && ev.data.codetjErr) {
+        if (!ev.data) { return; }
+        if (ev.data.cjLog) {
+          conAdd(ev.data.type, (ev.data.args || []).join(' '));
+          return;
+        }
+        if (ev.data.codetjErr) {
           errBox.textContent = 'JS: ' + ev.data.codetjErr + (ev.data.line ? ' (' + ev.data.line + ')' : '');
         }
       });
-      function schedule() { if (timer) { clearTimeout(timer); } timer = setTimeout(run, 600); }
+
+      /* ---- рақами сатрҳо ---- */
+      var gutter = document.getElementById('gutter');
+      function syncGutter() {
+        var a = null;
+        Object.keys(areas).forEach(function (k) {
+          if (areas[k] && !areas[k].classList.contains('hidden')) { a = areas[k]; }
+        });
+        if (!a || !gutter) { return; }
+        var n = a.value.split('\n').length;
+        var s = '';
+        for (var i = 1; i <= n; i++) { s += i + '\n'; }
+        gutter.textContent = s;
+        gutter.scrollTop = a.scrollTop;
+      }
+      function schedule() { syncGutter(); if (timer) { clearTimeout(timer); } timer = setTimeout(run, 600); }
 
       Object.keys(areas).forEach(function (k) {
         if (!areas[k]) { return; }
         areas[k].addEventListener('input', schedule);
+        areas[k].addEventListener('scroll', function () { if (gutter) { gutter.scrollTop = this.scrollTop; } });
         areas[k].addEventListener('paste', function () { pasted = true; });
         areas[k].addEventListener('keydown', function (ev) {
           if (ev.key === 'Tab') {
@@ -1326,6 +1762,7 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
           Object.keys(areas).forEach(function (k) {
             if (areas[k]) { areas[k].classList.toggle('hidden', k !== pane); }
           });
+          syncGutter();
         });
       }
       var sw = document.querySelectorAll('.sw');
@@ -1375,11 +1812,76 @@ function render_editor($lessonId, $html, $css, $js, $startCode)
           var ex = document.getElementById('exampleCode');
           if (ex && areas.html) {
             areas.html.value = ex.textContent;
+            syncGutter();
             run();
             document.getElementById('practice').scrollIntoView({ behavior: 'smooth' });
           }
         });
       }
+
+      /* ---- санҷиши AI ---- */
+      var aiBtn = document.getElementById('aiBtn');
+      var aiOut = document.getElementById('aiOut');
+      var busy = false;
+
+      function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = String(s == null ? '' : s);
+        return d.innerHTML;
+      }
+      function aiMsg(cls, html) { aiOut.innerHTML = '<div class="ai-res ' + cls + '">' + html + '</div>'; }
+
+      aiBtn.addEventListener('click', function () {
+        if (busy) { return; }
+        busy = true;
+        aiBtn.disabled = true;
+        aiMsg('wait', '<div class="ai-spin"></div><b>' + esc(TXT.checking) + '</b>');
+
+        var fd = new FormData();
+        fd.append('action', 'ai_check'); fd.append('csrf', CSRF);
+        fd.append('lesson_id', LESSON_ID);
+        fd.append('html', val('html')); fd.append('css', val('css')); fd.append('js', val('js'));
+
+        fetch('index.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d || !d.ok) {
+              var m = (d && d.msg) ? d.msg : TXT.aiErr;
+              if (d && d.wait) { m += ' — ' + d.wait + ' ' + TXT.sec; }
+              aiMsg('bad', esc(m));
+              return;
+            }
+            var r = d.res, h = '';
+            h += '<div class="ai-top"><span class="ai-badge ' + (r.passed ? 'ok' : 'no') + '">'
+               + (r.passed ? '&#9989; ' + esc(TXT.passed) : '&#128260; ' + esc(TXT.failed))
+               + '</span><span class="ai-score">' + (r.score | 0) + '/100</span></div>';
+            if (r.praise) { h += '<p class="ai-praise">' + esc(r.praise) + '</p>'; }
+            if (r.errors && r.errors.length) {
+              h += '<div class="ai-sec"><b>' + esc(TXT.errs) + '</b><ul class="ai-errs">';
+              for (var i = 0; i < r.errors.length; i++) {
+                var er = r.errors[i];
+                h += '<li>' + (er.line ? '<code>' + esc(TXT.line) + ' ' + (er.line | 0) + '</code> ' : '')
+                   + esc(er.text) + '</li>';
+              }
+              h += '</ul></div>';
+            }
+            if (r.advice) {
+              h += '<div class="ai-sec"><b>&#128161; ' + esc(TXT.advice) + '</b><p>' + esc(r.advice) + '</p></div>';
+            }
+            h += '<div class="ai-foot">' + esc(TXT.left) + ': ' + (r.left | 0) + '</div>';
+            aiMsg(r.passed ? 'good' : 'bad', h);
+            if (r.passed) {
+              setTimeout(function () {
+                var tst = document.getElementById('test');
+                if (tst) { tst.scrollIntoView({ behavior: 'smooth' }); }
+              }, 1200);
+            }
+          })
+          .catch(function () { aiMsg('bad', esc(TXT.aiErr)); })
+          .then(function () { busy = false; aiBtn.disabled = false; });
+      });
+
+      syncGutter();
       run();
     })();
     </script>
@@ -1871,11 +2373,60 @@ html.light .top{background:rgba(246,248,253,.85)}
 .sw.act{background:#26304d;color:#eef2fb}
 .ed-body{display:block;height:400px}
 .ed.full .ed-body{height:calc(100vh - 108px)}
-.ed-code,.ed-prev{height:100%}
-.ed[data-view="preview"] .ed-code{display:none}
-.ed[data-view="code"] .ed-prev{display:none}
-.ta{width:100%;height:100%;border:0;outline:0;resize:none;background:#0b1020;color:#c5d5f5;
- font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.65;padding:13px;display:block}
+.ed-code,.ed-prev,.ed-con{height:100%}
+.ed-code{display:flex}
+.ed[data-view="preview"] .ed-code,.ed[data-view="console"] .ed-code{display:none}
+.ed[data-view="code"] .ed-prev,.ed[data-view="console"] .ed-prev{display:none}
+.ed[data-view="code"] .ed-con,.ed[data-view="preview"] .ed-con{display:none}
+.gutter{flex-shrink:0;width:38px;padding:13px 6px 13px 0;text-align:right;overflow:hidden;
+ background:#0b1020;color:#3f4d70;font-family:ui-monospace,Menlo,Consolas,monospace;
+ font-size:13px;line-height:1.65;white-space:pre;user-select:none;border-right:1px solid #1b2542}
+.ta{flex:1;width:100%;height:100%;border:0;outline:0;resize:none;background:#0b1020;color:#c5d5f5;
+ font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.65;padding:13px 13px 13px 8px;display:block}
+
+/* ---- терминал ---- */
+.ed-con{background:#080c18;display:flex;flex-direction:column}
+.con-bar{display:flex;align-items:center;justify-content:space-between;padding:7px 11px;
+ background:#111729;border-bottom:1px solid var(--line);flex-shrink:0}
+.con-bar b{font-family:ui-monospace,monospace;font-size:.8rem;color:#6ee7b7}
+.con-out{flex:1;overflow-y:auto;padding:8px 0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+.con-empty{color:#4a5878;padding:10px 13px;font-size:12px}
+.con-row{display:flex;gap:9px;padding:4px 13px;border-bottom:1px solid rgba(255,255,255,.03);
+ word-break:break-word}
+.con-time{color:#3f4d70;flex-shrink:0}
+.con-txt{white-space:pre-wrap}
+.con-log .con-txt{color:#c5d5f5}
+.con-info .con-txt{color:#7dd3fc}
+.con-warn .con-txt{color:#fbbf24}
+.con-error .con-txt{color:#fb7185}
+.sw b{background:var(--err);color:#fff;border-radius:99px;padding:0 6px;font-size:.7rem;margin-left:3px}
+
+/* ---- проверка AI ---- */
+.ai-box{margin-top:14px}
+.btn-ai{background:linear-gradient(135deg,#10b981,#0ea5e9);color:#fff;box-shadow:0 6px 20px rgba(16,185,129,.28)}
+.btn-ai:disabled{opacity:.6}
+.ai-note{font-size:.78rem;text-align:center;margin-top:7px}
+.ai-res{margin-top:12px;border-radius:15px;padding:16px;border:1px solid var(--line);background:var(--bg2)}
+.ai-res.good{border-color:var(--ok);background:rgba(34,197,94,.09)}
+.ai-res.bad{border-color:var(--warn);background:rgba(245,158,11,.09)}
+.ai-res.wait{text-align:center;color:var(--mut)}
+.ai-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.ai-badge{font-weight:800;font-size:.95rem}
+.ai-badge.ok{color:var(--ok)}
+.ai-badge.no{color:var(--warn)}
+.ai-score{font-weight:800;color:var(--mut)}
+.ai-praise{font-size:.94rem;margin-bottom:10px}
+.ai-sec{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.ai-sec b{display:block;margin-bottom:7px;font-size:.88rem}
+.ai-sec p{font-size:.9rem;color:var(--mut)}
+.ai-errs{list-style:none;display:flex;flex-direction:column;gap:8px}
+.ai-errs li{background:var(--card);border-radius:11px;padding:10px 12px;font-size:.89rem}
+.ai-errs code{background:var(--bg2);color:var(--err);padding:1px 7px;border-radius:6px;
+ font-size:.8rem;font-weight:700;margin-right:5px}
+.ai-foot{margin-top:12px;font-size:.76rem;color:var(--mut);text-align:right}
+.ai-spin{width:26px;height:26px;margin:0 auto 10px;border:3px solid var(--line);
+ border-top-color:var(--acc);border-radius:99px;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
 .ed-prev{background:#fff;display:flex;flex-direction:column}
 .ed-prev-bar{display:flex;align-items:center;gap:5px;padding:7px 11px;background:#e8ecf5;flex-shrink:0}
 .ed-prev-bar span{width:9px;height:9px;border-radius:99px;background:#c3ccdd}
@@ -1941,10 +2492,13 @@ html.light .tabbar{background:rgba(246,248,253,.94)}
 .foot{text-align:center;color:var(--mut);font-size:.8rem;padding:18px 14px 100px}
 
 @media (min-width:760px){
-  .ed-body{display:grid;grid-template-columns:1fr 1fr;height:440px}
+  .ed-body{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr auto;height:480px}
   .ed-switch{display:none}
-  .ed[data-view="preview"] .ed-code,.ed[data-view="code"] .ed-prev{display:block}
-  .ed[data-view="code"] .ed-prev{display:flex}
+  /* дар экрани калон: код ва натиҷа паҳлӯи ҳам, терминал дар поён */
+  .ed[data-view="preview"] .ed-code,.ed[data-view="console"] .ed-code{display:flex}
+  .ed[data-view="code"] .ed-prev,.ed[data-view="console"] .ed-prev{display:flex}
+  .ed[data-view="code"] .ed-con,.ed[data-view="preview"] .ed-con{display:flex}
+  .ed-con{grid-column:1/-1;height:140px;border-top:1px solid var(--line)}
   .ed-code{border-right:1px solid var(--line)}
   .tabbar{position:static;background:none;border:0;max-width:900px;margin:0 auto;
     border-top:1px solid var(--line)}
