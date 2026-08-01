@@ -1,0 +1,10 @@
+# Все запросы обрабатывает index.php
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^webhook\.php$ index.php [L]
+</IfModule>
+
+# Прямой доступ к служебным файлам запрещён
+<FilesMatch "\.(sqlite|log|csv)$">
+    Require all denied
+</FilesMatch>

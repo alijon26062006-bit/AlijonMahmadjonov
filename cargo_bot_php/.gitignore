@@ -1,0 +1,5 @@
+config.php
+data/
+*.sqlite
+*.log
+*.csv

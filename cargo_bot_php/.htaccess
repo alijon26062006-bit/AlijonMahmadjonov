@@ -1,0 +1,18 @@
+# Защита служебных файлов, если проект залит целиком в корень сайта
+# (public_html). Скрывает настройки, код и базу от посторонних.
+
+# Настройки с токеном и паролем базы
+<FilesMatch "^config\.php$">
+    Require all denied
+</FilesMatch>
+
+# База SQLite, логи, выгрузки
+<FilesMatch "\.(sqlite|sqlite3|db|log|csv)$">
+    Require all denied
+</FilesMatch>
+
+# Каталоги с кодом и данными
+RedirectMatch 403 ^/?(src|data)(/|$)
+
+# Листинг каталогов выключен
+Options -Indexes
