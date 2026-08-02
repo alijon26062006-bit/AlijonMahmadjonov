@@ -86,6 +86,43 @@ $LANG = array(
     'step'           => 'Қадам',
     'step_next'      => 'Оянда',
     'step_prev'      => 'Қафо',
+    'ex_check'       => 'Санҷидан',
+    'ex_continue'    => 'Идома',
+    'ex_reset'       => 'Аз нав',
+    'ex_right'       => 'Офарин!',
+    'ex_right2'      => 'Аҷоиб!',
+    'ex_right3'      => 'Ҳамин тавр!',
+    'ex_wrong'       => 'Ин дуруст нест. Боз кӯшиш кун.',
+    'ex_fill'        => 'Ҷойҳои холиро пур кун',
+    'ex_hearts'      => 'Дил',
+    'ex_nohearts'    => 'Дилҳо тамом шуданд, вале давом дода метавонӣ.',
+    'ex_match'       => 'Ҷуфт кун',
+    'nav_admin'      => 'Админка',
+    'adm_title'      => 'Идоракунӣ',
+    'adm_lessons'    => 'Дарсҳо дар база',
+    'adm_new'        => 'Дарси нав аз расмҳо',
+    'adm_new_hint'   => 'Скриншотҳои дарсро бор кун — ИИ мавзӯъро мефаҳмад ва дарси пурраро бо тоҷикӣ менависад.',
+    'adm_course'     => 'Курс',
+    'adm_num'        => 'Рақами дарс',
+    'adm_topic'      => 'Мавзӯъ (ихтиёрӣ)',
+    'adm_topic_ph'   => 'Масалан: теги p ва матн',
+    'adm_files'      => 'Расмҳо (то 6 дона)',
+    'adm_make'       => 'Дарс сохтан',
+    'adm_making'     => 'ИИ дарсро менависад… ин 1–2 дақиқа мегирад',
+    'adm_json'       => 'Ё JSON-и тайёр',
+    'adm_json_hint'  => 'Агар дарс аллакай ба шакли JSON бошад — ин ҷо гузор.',
+    'adm_import'     => 'Ворид кардан',
+    'adm_saved'      => 'Дарс захира шуд',
+    'adm_no_files'   => 'Ҳеҷ расм интихоб нашуд.',
+    'adm_bad_file'   => 'Файл расм нест ё хеле калон аст.',
+    'adm_bad_json'   => 'JSON нодуруст аст.',
+    'adm_preview'    => 'Пешнамоиш',
+    'adm_save'       => 'Захира кардан',
+    'adm_del'        => 'Нест кардан',
+    'adm_del_ok'     => 'Дарс нест карда шуд',
+    'adm_students'   => 'Шогирдон',
+    'adm_ai_spent'   => 'Дархостҳо ба ИИ',
+    'adm_err'        => 'ИИ ҷавоб дода натавонист. Боз кӯшиш кун.',
     'step_done'      => 'Назария тамом! Акнун худат нависем',
     'to_practice'    => 'Ба амалия гузаштан',
     'practice'       => 'Амалия',
@@ -212,6 +249,43 @@ $LANG = array(
     'step'           => 'Шаг',
     'step_next'      => 'Дальше',
     'step_prev'      => 'Назад',
+    'ex_check'       => 'Проверить',
+    'ex_continue'    => 'Продолжить',
+    'ex_reset'       => 'Заново',
+    'ex_right'       => 'Молодец!',
+    'ex_right2'      => 'Отлично!',
+    'ex_right3'      => 'Именно так!',
+    'ex_wrong'       => 'Это неверно. Попробуй ещё раз.',
+    'ex_fill'        => 'Заполни пропуски',
+    'ex_hearts'      => 'Сердце',
+    'ex_nohearts'    => 'Сердца закончились, но продолжать можно.',
+    'ex_match'       => 'Соедини',
+    'nav_admin'      => 'Админка',
+    'adm_title'      => 'Управление',
+    'adm_lessons'    => 'Уроки в базе',
+    'adm_new'        => 'Новый урок из скриншотов',
+    'adm_new_hint'   => 'Загрузи скриншоты урока — ИИ поймёт тему и напишет полный урок на таджикском.',
+    'adm_course'     => 'Курс',
+    'adm_num'        => 'Номер урока',
+    'adm_topic'      => 'Тема (необязательно)',
+    'adm_topic_ph'   => 'Например: тег p и текст',
+    'adm_files'      => 'Картинки (до 6 штук)',
+    'adm_make'       => 'Создать урок',
+    'adm_making'     => 'ИИ пишет урок… это займёт 1–2 минуты',
+    'adm_json'       => 'Или готовый JSON',
+    'adm_json_hint'  => 'Если урок уже в виде JSON — вставь сюда.',
+    'adm_import'     => 'Импортировать',
+    'adm_saved'      => 'Урок сохранён',
+    'adm_no_files'   => 'Ни одной картинки не выбрано.',
+    'adm_bad_file'   => 'Файл не картинка или слишком большой.',
+    'adm_bad_json'   => 'Неверный JSON.',
+    'adm_preview'    => 'Предпросмотр',
+    'adm_save'       => 'Сохранить',
+    'adm_del'        => 'Удалить',
+    'adm_del_ok'     => 'Урок удалён',
+    'adm_students'   => 'Ученики',
+    'adm_ai_spent'   => 'Запросов к ИИ',
+    'adm_err'        => 'ИИ не смог ответить. Попробуй ещё раз.',
     'step_done'      => 'Теория пройдена! Теперь пишем сами',
     'to_practice'    => 'Перейти к практике',
     'practice'       => 'Практика',
@@ -627,6 +701,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             handle_ai_check((int)$user['id']);
             break;
 
+        case 'ai_lesson':
+            if (!is_admin()) {
+                redirect('?p=home');
+            }
+            handle_ai_lesson();
+            break;
+
+        case 'save_lesson':
+            if (!is_admin()) {
+                redirect('?p=home');
+            }
+            $raw = (string)(isset($_POST['json']) ? $_POST['json'] : '');
+            $data = json_decode($raw, true);
+            if (!is_array($data)) {
+                $_SESSION['adm_err'] = 'adm_bad_json';
+                redirect('?p=admin');
+            }
+            if (isset($data['course'])) {
+                $data = array($data);   // як дарс
+            }
+            $n = 0;
+            foreach ($data as $one) {
+                if (is_array($one)) {
+                    import_lesson(db(), $one);
+                    $n++;
+                }
+            }
+            $_SESSION['adm_ok'] = 'adm_saved';
+            redirect('?p=admin');
+            break;
+
+        case 'del_lesson':
+            if (!is_admin()) {
+                redirect('?p=home');
+            }
+            $lid = (int)(isset($_POST['id']) ? $_POST['id'] : 0);
+            db()->prepare('DELETE FROM cj_questions WHERE lesson_id = ?')->execute(array($lid));
+            db()->prepare('DELETE FROM cj_lessons WHERE id = ?')->execute(array($lid));
+            $_SESSION['adm_ok'] = 'adm_del_ok';
+            redirect('?p=admin');
+            break;
+
         case 'test':
             if ($user === null) {
                 redirect('?p=enter');
@@ -888,6 +1004,156 @@ function handle_ai_check($uid)
     json_out(array('ok' => true, 'res' => $res));
 }
 
+/* ============================================================
+ *  АДМИН: сохтани дарс аз расмҳо тавассути ИИ
+ * ============================================================ */
+
+/** Расмро хурд мекунад ва ба data-URL табдил медиҳад (то дархост вазнин нашавад). */
+function image_to_data_url($tmp, $maxW = 900)
+{
+    $info = @getimagesize($tmp);
+    if (!$info) {
+        return null;
+    }
+    $mime = $info['mime'];
+    if (!in_array($mime, array('image/jpeg', 'image/png', 'image/webp'), true)) {
+        return null;
+    }
+    if (!function_exists('imagecreatefromstring')) {
+        // бе GD — ҳамон тавр мефиристем
+        $raw = @file_get_contents($tmp);
+        return $raw === false ? null : 'data:' . $mime . ';base64,' . base64_encode($raw);
+    }
+    $src = @imagecreatefromstring((string)file_get_contents($tmp));
+    if (!$src) {
+        return null;
+    }
+    $w = imagesx($src);
+    $h = imagesy($src);
+    if ($w > $maxW) {
+        $nh = (int)round($h * ($maxW / $w));
+        $dst = imagecreatetruecolor($maxW, $nh);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $maxW, $nh, $w, $h);
+        imagedestroy($src);
+        $src = $dst;
+    }
+    ob_start();
+    imagejpeg($src, null, 82);
+    $bin = ob_get_clean();
+    imagedestroy($src);
+    return 'data:image/jpeg;base64,' . base64_encode($bin);
+}
+
+function handle_ai_lesson()
+{
+    if (ai_key() === '') {
+        $_SESSION['adm_err'] = 'ai_off';
+        redirect('?p=admin');
+    }
+    $course = isset($_POST['course']) && in_array($_POST['course'], array('html', 'css', 'js', 'full'), true)
+        ? $_POST['course'] : 'html';
+    $num = (int)(isset($_POST['num']) ? $_POST['num'] : 0);
+    if ($num < 1 || $num > 50) {
+        $num = 1;
+    }
+    $topic = mb_substr(trim((string)(isset($_POST['topic']) ? $_POST['topic'] : '')), 0, 200);
+
+    $images = array();
+    if (!empty($_FILES['pics']['tmp_name']) && is_array($_FILES['pics']['tmp_name'])) {
+        foreach ($_FILES['pics']['tmp_name'] as $k => $tmp) {
+            if (!is_uploaded_file($tmp)) {
+                continue;
+            }
+            if ((int)$_FILES['pics']['size'][$k] > 8 * 1024 * 1024) {
+                continue;
+            }
+            $url = image_to_data_url($tmp);
+            if ($url !== null) {
+                $images[] = $url;
+            }
+            if (count($images) >= 6) {
+                break;
+            }
+        }
+    }
+    if (!$images) {
+        $_SESSION['adm_err'] = 'adm_no_files';
+        redirect('?p=admin');
+    }
+
+    $sys = "Ты — методист и преподаватель HTML с 20-летним опытом. Пишешь урок для платформы CodeTJ "
+         . "для подростков из Таджикистана, у которых нет никакого опыта программирования.\n\n"
+         . "ТЕБЕ ДАЮТ СКРИНШОТЫ чужого обучающего приложения. Определи по ним ТЕМУ и порядок подачи.\n"
+         . "НЕ переписывай и НЕ переводи их текст. Напиши СВОЙ урок на эту же тему, своими словами.\n\n"
+         . "ЯЗЫК: только таджикский (кириллица). Живой таджикский, как говорят в Душанбе, НЕ дословный "
+         . "перевод с русского. Обращение «ту». Короткие предложения, как школьнику 14 лет. "
+         . "Буквы ӣ ӯ ҳ қ ғ ҷ. Каждое новое слово объясняй одним предложением. "
+         . "Сравнения бытовые: хона, бозор, чойхона, сохтмон, мактаб, дӯкон.\n\n"
+         . "Верни ТОЛЬКО валидный JSON без markdown и без ```:\n"
+         . '{"course":"COURSE","num":NUM,"title_tj":"","title_ru":"","theory_tj":"","theory_ru":"",'
+         . '"example_code":"","task_text_tj":"","task_text_ru":"","task_start_code":"","task_criteria":"",'
+         . '"exercises":[],"questions":[]}' . "\n\n"
+         . "theory_tj — HTML-фрагмент, РОВНО 7 разделов, каждый начинается с <h3>:\n"
+         . "<h3>Ҳадафи дарс</h3>, <h3>Шарҳи назариявӣ</h3>, <h3>Мисоли воқеӣ</h3>, "
+         . "<h3>Шарҳи пурраи код</h3>, <h3>Хатогиҳои маъмул</h3>, <h3>Маслиҳатҳои омӯзгор</h3>, "
+         . "<h3>Хулосаи дарс</h3>. Разрешены только теги h3 p ul ol li b code pre. "
+         . "Внутри pre/code символы < и > пиши как &lt; и &gt;. Никаких script, style, img, ссылок, on...=\n\n"
+         . "exercises — 2-4 интерактивных задания. Два типа:\n"
+         . '{"type":"blank","after":2,"text":"задание по-таджикски","template":"<button ?>","answers":[">"],"options":[">","<","/","{"]}' . "\n"
+         . '{"type":"match","after":4,"text":"задание","pairs":[["Тугма","<button>"],["Расм","<img>"]]}' . "\n"
+         . "В template знак ? — это пропуск. answers идут в порядке пропусков. "
+         . "options — 3-5 вариантов, среди них обязательно правильные. "
+         . "after — номер раздела теории (1-7), после которого показать задание.\n\n"
+         . "questions — РОВНО 10 вопросов: "
+         . '{"q_tj":"","q_ru":"","options_tj":["","","",""],"options_ru":[],"correct":0,"explain_tj":"","explain_ru":""}' . "\n"
+         . "correct — индекс 0-3, обязательно РАЗНЫЕ у разных вопросов.\n"
+         . "Поля _ru оставь пустыми (\"\" или []), кроме task_criteria — он ТОЛЬКО по-русски, "
+         . "конкретный список того, что должно быть в коде ученика.\n"
+         . "example_code и task_start_code — рабочий HTML.";
+
+    $userContent = array(array(
+        'type' => 'text',
+        'text' => "Курс: {$course}. Номер урока: {$num}."
+                . ($topic !== '' ? " Тема: {$topic}." : '')
+                . " Определи тему по скриншотам и напиши урок в описанном формате.",
+    ));
+    foreach ($images as $img) {
+        $userContent[] = array('type' => 'image_url', 'image_url' => array('url' => $img, 'detail' => 'high'));
+    }
+
+    $ans = openai_chat(array(
+        array('role' => 'system', 'content' => $sys),
+        array('role' => 'user',   'content' => $userContent),
+    ), 8000);
+
+    if (empty($ans['ok'])) {
+        error_log('CodeTJ admin AI: ' . (isset($ans['err']) ? $ans['err'] : '?'));
+        $_SESSION['adm_err'] = 'adm_err';
+        redirect('?p=admin');
+    }
+
+    $txt = trim($ans['text']);
+    $txt = preg_replace('/^```[a-z]*\s*/i', '', $txt);
+    $txt = preg_replace('/\s*```$/', '', $txt);
+    $data = json_decode($txt, true);
+    if (!is_array($data) && preg_match('/\{.*\}/s', $txt, $m)) {
+        $data = json_decode($m[0], true);
+    }
+    if (!is_array($data)) {
+        error_log('CodeTJ admin AI: bad json');
+        $_SESSION['adm_err'] = 'adm_err';
+        redirect('?p=admin');
+    }
+    $data['course'] = $course;
+    $data['num'] = $num;
+
+    db()->prepare('INSERT INTO cj_ai_usage (user_id, lesson_id, kind, tokens_in, tokens_out) VALUES (?,?,?,?,?)')
+        ->execute(array((int)current_user()['id'], 0, 'help', (int)$ans['in'], (int)$ans['out']));
+
+    $_SESSION['adm_draft'] = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    redirect('?p=admin');
+}
+
 /** Рақами сатрҳоро мегузорад, то ИИ дақиқ гӯяд, ки хато дар куҷост. */
 function number_lines($code)
 {
@@ -1076,6 +1342,7 @@ switch ($p) {
     case 'lesson':  page_lesson(); break;
     case 'rating':  page_rating(); break;
     case 'profile': $user !== null ? page_profile() : redirect('?p=enter'); break;
+    case 'admin':   is_admin() ? page_admin() : redirect('?p=home'); break;
     default:        page_404();
 }
 exit;
@@ -1504,6 +1771,37 @@ function page_lesson()
 
     $steps = theory_steps(fld('theory', $L));
 
+    // Хулосаи дарс — экрани охирин мешавад, аз рӯйхати қадамҳо ҷудо мешавад.
+    $summary = '';
+    foreach ($steps as $k => $s) {
+        if (mb_stripos($s['title'], 'Хулоса') !== false || mb_stripos($s['title'], 'Вывод') !== false) {
+            $summary = $s['body'];
+            unset($steps[$k]);
+        }
+    }
+    $steps = array_values($steps);
+
+    // Машқҳо байни қадамҳои назария ҷойгир мешаванд.
+    $exList = json_decode((string)(isset($L['exercises']) ? $L['exercises'] : ''), true);
+    if (!is_array($exList)) {
+        $exList = array();
+    }
+    $flow = array();
+    foreach ($steps as $k => $s) {
+        $flow[] = array('kind' => 'theory', 'title' => $s['title'], 'body' => $s['body']);
+        foreach ($exList as $ex) {
+            if (is_array($ex) && isset($ex['after']) && (int)$ex['after'] === $k + 1) {
+                $flow[] = array('kind' => 'ex', 'ex' => $ex);
+            }
+        }
+    }
+    // Машқҳои бе «after» — дар охир
+    foreach ($exList as $ex) {
+        if (is_array($ex) && !isset($ex['after'])) {
+            $flow[] = array('kind' => 'ex', 'ex' => $ex);
+        }
+    }
+
     render_header(fld('title', $L));
     ?>
     <section class="lesson" style="--cc:<?= e($c['color']) ?>">
@@ -1513,29 +1811,84 @@ function page_lesson()
         <h1><?= e(fld('title', $L)) ?></h1>
       </div>
 
-      <?php if ($steps): ?>
-      <div class="card steps-card" id="steps">
-        <div class="steps-top">
-          <span class="steps-count"><?= e(t('step')) ?> <b id="stepNow">1</b> / <?= count($steps) ?></span>
-          <div class="steps-dots" id="stepDots">
-            <?php for ($i = 0; $i < count($steps); $i++): ?>
-              <span class="dot <?= $i === 0 ? 'act' : '' ?>"></span>
-            <?php endfor; ?>
+      <?php if ($flow): ?>
+      <div class="lesson-flow" id="flow">
+        <div class="flow-top">
+          <div class="flow-bar"><div class="flow-bar-in" id="flowBar"></div></div>
+          <div class="hearts" id="hearts" title="<?= e(t('ex_hearts')) ?>">
+            <?php for ($i = 0; $i < 5; $i++): ?><span class="heart">&#10084;&#65039;</span><?php endfor; ?>
           </div>
         </div>
-        <?php foreach ($steps as $i => $s): ?>
-          <div class="step <?= $i === 0 ? '' : 'hidden' ?>" data-step="<?= $i ?>">
-            <?php if ($s['title'] !== ''): ?><h2 class="step-h"><?= e($s['title']) ?></h2><?php endif; ?>
-            <div class="prose"><?= $s['body'] ?></div>
+
+        <?php foreach ($flow as $i => $s): ?>
+          <div class="fstep <?= $i === 0 ? '' : 'hidden' ?>" data-i="<?= $i ?>" data-kind="<?= e($s['kind']) ?>">
+            <?php if ($s['kind'] === 'theory'): ?>
+              <?php if ($s['title'] !== ''): ?><h2 class="fstep-h"><?= e($s['title']) ?></h2><?php endif; ?>
+              <div class="prose"><?= $s['body'] ?></div>
+
+            <?php else:
+              $ex = $s['ex'];
+              $type = isset($ex['type']) ? $ex['type'] : 'blank';
+              ?>
+              <p class="ex-text"><?= e(isset($ex['text']) ? $ex['text'] : t('ex_fill')) ?></p>
+
+              <?php if ($type === 'match'):
+                $pairs = isset($ex['pairs']) && is_array($ex['pairs']) ? $ex['pairs'] : array();
+                $right = array();
+                foreach ($pairs as $pi => $pr) { $right[] = array('i' => $pi, 'v' => (string)$pr[1]); }
+                shuffle($right);
+                ?>
+                <div class="ex-match" data-answers="<?= e(json_encode(array_map(function ($p) { return (string)$p[1]; }, $pairs), JSON_UNESCAPED_UNICODE)) ?>">
+                  <?php foreach ($pairs as $pi => $pr): ?>
+                    <div class="mrow">
+                      <span class="mlabel"><?= e((string)$pr[0]) ?></span>
+                      <span class="slot" data-slot="<?= $pi ?>"></span>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+                <div class="chips">
+                  <?php foreach ($right as $r): ?>
+                    <button type="button" class="chip-b"><?= e($r['v']) ?></button>
+                  <?php endforeach; ?>
+                </div>
+
+              <?php else:
+                // blank: дар template аломати ? ҷои холӣ аст
+                $tpl = isset($ex['template']) ? (string)$ex['template'] : '';
+                $ans = isset($ex['answers']) && is_array($ex['answers']) ? $ex['answers'] : array();
+                $parts = explode('?', $tpl);
+                $opts = isset($ex['options']) && is_array($ex['options']) ? $ex['options'] : $ans;
+                shuffle($opts);
+                ?>
+                <div class="ex-code" data-answers="<?= e(json_encode(array_values($ans), JSON_UNESCAPED_UNICODE)) ?>">
+                  <?php foreach ($parts as $k => $piece): ?>
+                    <?php if ($piece !== ''): ?><span class="cpart"><?= e($piece) ?></span><?php endif; ?>
+                    <?php if ($k < count($parts) - 1): ?><span class="slot" data-slot="<?= $k ?>"></span><?php endif; ?>
+                  <?php endforeach; ?>
+                </div>
+                <div class="chips">
+                  <?php foreach ($opts as $o): ?>
+                    <button type="button" class="chip-b"><?= e((string)$o) ?></button>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
+            <?php endif; ?>
           </div>
         <?php endforeach; ?>
-        <div class="steps-nav">
-          <button class="btn btn-ghost" id="stepPrev" disabled>&larr; <?= e(t('step_prev')) ?></button>
-          <button class="btn btn-primary" id="stepNext"><?= e(t('step_next')) ?> &rarr;</button>
+
+        <div class="fstep hidden" data-i="<?= count($flow) ?>" data-kind="end">
+          <h2 class="fstep-h">&#11088; <?= e(t('step_done')) ?></h2>
+          <div class="prose"><?= $summary !== '' ? $summary : '' ?></div>
+          <a class="btn btn-primary btn-block" href="#practice"><?= e(t('to_practice')) ?> &darr;</a>
         </div>
-        <div class="steps-end hidden" id="stepsEnd">
-          <b>&#127881; <?= e(t('step_done')) ?></b>
-          <a class="btn btn-primary" href="#practice"><?= e(t('to_practice')) ?> &darr;</a>
+
+        <div class="flow-foot">
+          <div class="fb" id="fb"></div>
+          <div class="flow-nav">
+            <button class="btn btn-ghost btn-sm" id="fPrev">&larr;</button>
+            <button class="btn btn-ghost btn-sm hidden" id="fReset"><?= e(t('ex_reset')) ?></button>
+            <button class="btn btn-primary" id="fNext"><?= e(t('step_next')) ?></button>
+          </div>
         </div>
       </div>
       <?php endif; ?>
@@ -1570,28 +1923,142 @@ function page_lesson()
 
     <script>
     (function () {
-      var steps = document.querySelectorAll('.step');
+      var steps = document.querySelectorAll('.fstep');
       if (!steps.length) { return; }
-      var dots = document.querySelectorAll('#stepDots .dot');
-      var now = document.getElementById('stepNow');
-      var prev = document.getElementById('stepPrev');
-      var next = document.getElementById('stepNext');
-      var end = document.getElementById('stepsEnd');
-      var i = 0;
-      function show(k) {
-        i = Math.max(0, Math.min(steps.length - 1, k));
-        for (var j = 0; j < steps.length; j++) {
-          steps[j].classList.toggle('hidden', j !== i);
-          if (dots[j]) { dots[j].classList.toggle('act', j <= i); }
-        }
-        now.textContent = i + 1;
-        prev.disabled = (i === 0);
-        next.classList.toggle('hidden', i === steps.length - 1);
-        end.classList.toggle('hidden', i !== steps.length - 1);
-        document.getElementById('steps').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var bar = document.getElementById('flowBar');
+      var hearts = document.getElementById('hearts');
+      var fb = document.getElementById('fb');
+      var bPrev = document.getElementById('fPrev');
+      var bNext = document.getElementById('fNext');
+      var bReset = document.getElementById('fReset');
+      var TXT = {
+        check: <?= json_encode(t('ex_check'), JSON_UNESCAPED_UNICODE) ?>,
+        cont: <?= json_encode(t('ex_continue'), JSON_UNESCAPED_UNICODE) ?>,
+        next: <?= json_encode(t('step_next'), JSON_UNESCAPED_UNICODE) ?>,
+        wrong: <?= json_encode(t('ex_wrong'), JSON_UNESCAPED_UNICODE) ?>,
+        noh: <?= json_encode(t('ex_nohearts'), JSON_UNESCAPED_UNICODE) ?>,
+        ok: [<?= json_encode(t('ex_right'), JSON_UNESCAPED_UNICODE) ?>,
+             <?= json_encode(t('ex_right2'), JSON_UNESCAPED_UNICODE) ?>,
+             <?= json_encode(t('ex_right3'), JSON_UNESCAPED_UNICODE) ?>]
+      };
+      var i = 0, lives = 5, solved = {};
+
+      function cur() { return steps[i]; }
+      function isEx() { return cur().getAttribute('data-kind') === 'ex'; }
+
+      function slots(st) { return st.querySelectorAll('.slot'); }
+      function chips(st) { return st.querySelectorAll('.chip-b'); }
+      function answers(st) {
+        var holder = st.querySelector('[data-answers]');
+        if (!holder) { return []; }
+        try { return JSON.parse(holder.getAttribute('data-answers')); } catch (e) { return []; }
       }
-      prev.addEventListener('click', function () { show(i - 1); });
-      next.addEventListener('click', function () { show(i + 1); });
+      function filled(st) {
+        var s = slots(st), n = 0;
+        for (var k = 0; k < s.length; k++) { if (s[k].textContent !== '') { n++; } }
+        return n === s.length && s.length > 0;
+      }
+
+      function drawHearts() {
+        var hs = hearts.querySelectorAll('.heart');
+        for (var k = 0; k < hs.length; k++) { hs[k].classList.toggle('off', k >= lives); }
+      }
+
+      function setFb(kind, text) {
+        fb.className = 'fb' + (kind ? ' fb-' + kind : '');
+        fb.textContent = text || '';
+      }
+
+      function refresh() {
+        for (var j = 0; j < steps.length; j++) { steps[j].classList.toggle('hidden', j !== i); }
+        bar.style.width = Math.round((i / (steps.length - 1)) * 100) + '%';
+        bPrev.disabled = (i === 0);
+        setFb('', '');
+        var last = (i === steps.length - 1);
+        bNext.classList.toggle('hidden', last);
+        bReset.classList.toggle('hidden', !isEx() || !!solved[i]);
+        if (isEx() && !solved[i]) {
+          bNext.textContent = TXT.check;
+          bNext.disabled = !filled(cur());
+        } else {
+          bNext.textContent = solved[i] ? TXT.cont : TXT.next;
+          bNext.disabled = false;
+        }
+        document.getElementById('flow').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      function wireStep(st) {
+        var cs = chips(st);
+        for (var k = 0; k < cs.length; k++) {
+          cs[k].addEventListener('click', function () {
+            if (solved[i]) { return; }
+            if (this.classList.contains('used')) { return; }
+            var s = slots(st), free = null;
+            for (var m = 0; m < s.length; m++) { if (s[m].textContent === '') { free = s[m]; break; } }
+            if (!free) { return; }
+            free.textContent = this.textContent;
+            free.classList.add('has');
+            free.setAttribute('data-from', Array.prototype.indexOf.call(cs, this));
+            this.classList.add('used');
+            bNext.disabled = !filled(st);
+          });
+        }
+        var s2 = slots(st);
+        for (var n = 0; n < s2.length; n++) {
+          s2[n].addEventListener('click', function () {
+            if (solved[i] || this.textContent === '') { return; }
+            var from = this.getAttribute('data-from');
+            if (from !== null && cs[from]) { cs[from].classList.remove('used'); }
+            this.textContent = '';
+            this.classList.remove('has');
+            bNext.disabled = true;
+          });
+        }
+      }
+      for (var q = 0; q < steps.length; q++) {
+        if (steps[q].getAttribute('data-kind') === 'ex') { wireStep(steps[q]); }
+      }
+
+      function resetStep() {
+        var st = cur();
+        var s = slots(st), cs = chips(st);
+        for (var k = 0; k < s.length; k++) { s[k].textContent = ''; s[k].classList.remove('has', 'bad'); }
+        for (var m = 0; m < cs.length; m++) { cs[m].classList.remove('used'); }
+        setFb('', '');
+        bNext.disabled = true;
+      }
+      bReset.addEventListener('click', resetStep);
+
+      function check() {
+        var st = cur(), s = slots(st), want = answers(st), okAll = true;
+        for (var k = 0; k < s.length; k++) {
+          var good = (s[k].textContent === String(want[k]));
+          s[k].classList.toggle('bad', !good);
+          s[k].classList.toggle('good', good);
+          if (!good) { okAll = false; }
+        }
+        if (okAll) {
+          solved[i] = true;
+          setFb('ok', TXT.ok[Math.min(2, Object.keys(solved).length % 3)]);
+          bNext.textContent = TXT.cont;
+          bNext.disabled = false;
+          bReset.classList.add('hidden');
+        } else {
+          if (lives > 0) { lives--; drawHearts(); }
+          setFb('bad', lives > 0 ? TXT.wrong : TXT.noh);
+          st.classList.add('shake');
+          setTimeout(function () { st.classList.remove('shake'); }, 400);
+        }
+      }
+
+      bNext.addEventListener('click', function () {
+        if (isEx() && !solved[i]) { check(); return; }
+        if (i < steps.length - 1) { i++; refresh(); }
+      });
+      bPrev.addEventListener('click', function () { if (i > 0) { i--; refresh(); } });
+
+      drawHearts();
+      refresh();
     })();
     </script>
     <?php
@@ -2090,6 +2557,109 @@ function page_profile()
     render_footer();
 }
 
+/* ---------- Админка ---------- */
+
+function page_admin()
+{
+    $pdo = db();
+    $ok = null;
+    $err = null;
+    if (!empty($_SESSION['adm_ok'])) { $ok = $_SESSION['adm_ok']; unset($_SESSION['adm_ok']); }
+    if (!empty($_SESSION['adm_err'])) { $err = $_SESSION['adm_err']; unset($_SESSION['adm_err']); }
+    $draft = '';
+    if (!empty($_SESSION['adm_draft'])) { $draft = $_SESSION['adm_draft']; unset($_SESSION['adm_draft']); }
+
+    $students = (int)$pdo->query('SELECT COUNT(*) FROM cj_users')->fetchColumn();
+    $aiCalls = (int)$pdo->query('SELECT COUNT(*) FROM cj_ai_usage WHERE cached = 0')->fetchColumn();
+    $lessons = $pdo->query('SELECT id, course, num, title_tj FROM cj_lessons ORDER BY course, num')->fetchAll();
+
+    render_header(t('adm_title'));
+    ?>
+    <h1 class="page-h">&#9881;&#65039; <?= e(t('adm_title')) ?></h1>
+
+    <?php if ($ok !== null): ?><div class="alert alert-ok"><?= e(t($ok)) ?></div><?php endif; ?>
+    <?php if ($err !== null): ?><div class="alert alert-err"><?= e(t($err)) ?></div><?php endif; ?>
+
+    <div class="adm-stats">
+      <div class="pstat"><b><?= count($lessons) ?></b><span><?= e(t('adm_lessons')) ?></span></div>
+      <div class="pstat"><b><?= $students ?></b><span><?= e(t('adm_students')) ?></span></div>
+      <div class="pstat"><b><?= $aiCalls ?></b><span><?= e(t('adm_ai_spent')) ?></span></div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-h">&#128248; <?= e(t('adm_new')) ?></h2>
+      <p class="muted small"><?= e(t('adm_new_hint')) ?></p>
+      <form method="post" action="index.php" enctype="multipart/form-data" class="adm-form" id="aiForm">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="ai_lesson">
+        <div class="adm-row">
+          <label><?= e(t('adm_course')) ?>
+            <select name="course">
+              <?php foreach (courses() as $slug => $c): ?>
+                <option value="<?= e($slug) ?>"><?= e(fld('name', $c)) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <label><?= e(t('adm_num')) ?>
+            <input type="number" name="num" min="1" max="50" value="11" required>
+          </label>
+        </div>
+        <label><?= e(t('adm_topic')) ?>
+          <input type="text" name="topic" maxlength="200" placeholder="<?= e(t('adm_topic_ph')) ?>">
+        </label>
+        <label><?= e(t('adm_files')) ?>
+          <input type="file" name="pics[]" accept="image/*" multiple required>
+        </label>
+        <button class="btn btn-ai btn-block" type="submit" id="aiGo">&#129302; <?= e(t('adm_make')) ?></button>
+        <p class="muted small hidden" id="aiWait"><?= e(t('adm_making')) ?></p>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="card-h">&#128196; <?= $draft !== '' ? e(t('adm_preview')) : e(t('adm_json')) ?></h2>
+      <p class="muted small"><?= e(t('adm_json_hint')) ?></p>
+      <form method="post" action="index.php" class="adm-form">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="save_lesson">
+        <textarea name="json" class="adm-json" rows="14" spellcheck="false"
+          placeholder='[{"course":"html","num":11, ...}]'><?= e($draft) ?></textarea>
+        <button class="btn btn-primary btn-block" type="submit"><?= e($draft !== '' ? t('adm_save') : t('adm_import')) ?></button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="card-h">&#128218; <?= e(t('adm_lessons')) ?></h2>
+      <div class="adm-list">
+        <?php foreach ($lessons as $L): ?>
+          <div class="adm-row-l">
+            <span class="adm-c"><?= e($L['course']) ?></span>
+            <span class="adm-n"><?= (int)$L['num'] ?></span>
+            <span class="adm-t"><?= e($L['title_tj']) ?></span>
+            <form method="post" action="index.php" onsubmit="return confirm('?')">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="del_lesson">
+              <input type="hidden" name="id" value="<?= (int)$L['id'] ?>">
+              <button class="adm-del" type="submit" title="<?= e(t('adm_del')) ?>">&#128465;</button>
+            </form>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+
+    <script>
+    (function () {
+      var f = document.getElementById('aiForm');
+      if (!f) { return; }
+      f.addEventListener('submit', function () {
+        document.getElementById('aiGo').disabled = true;
+        document.getElementById('aiWait').classList.remove('hidden');
+      });
+    })();
+    </script>
+    <?php
+    render_footer();
+}
+
 function page_404()
 {
     if (!headers_sent()) {
@@ -2171,6 +2741,9 @@ function render_footer()
   <a href="?p=home" class="<?= $p === 'home' ? 'act' : '' ?>"><span>&#127968;</span><i><?= e(t('nav_home')) ?></i></a>
   <a href="?p=rating" class="<?= $p === 'rating' ? 'act' : '' ?>"><span>&#127942;</span><i><?= e(t('nav_rating')) ?></i></a>
   <a href="?p=profile" class="<?= $p === 'profile' ? 'act' : '' ?>"><span>&#128100;</span><i><?= e(t('nav_profile')) ?></i></a>
+  <?php if (is_admin()): ?>
+    <a href="?p=admin" class="<?= $p === 'admin' ? 'act' : '' ?>"><span>&#9881;&#65039;</span><i><?= e(t('nav_admin')) ?></i></a>
+  <?php endif; ?>
 </nav>
 <?php endif; ?>
 <footer class="foot"><b>CodeTJ</b> &middot; <?= e(t('footer_note')) ?></footer>
@@ -2380,20 +2953,58 @@ html.light .top{background:rgba(246,248,253,.85)}
 .card-h{font-size:1.02rem;margin-bottom:12px}
 .task-card{border-left:4px solid var(--cc)}
 
-/* шаги */
-.steps-card{padding-top:14px}
-.steps-top{display:flex;align-items:center;justify-content:space-between;gap:10px;
- padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:16px}
-.steps-count{font-size:.8rem;color:var(--mut);font-weight:700}
-.steps-count b{color:var(--cc);font-size:1rem}
-.steps-dots{display:flex;gap:5px}
-.dot{width:7px;height:7px;border-radius:99px;background:var(--line);transition:background .3s}
-.dot.act{background:var(--cc)}
-.step-h{font-size:1.15rem;margin-bottom:10px;color:var(--cc)}
-.steps-nav{display:flex;gap:10px;margin-top:18px}
-.steps-nav .btn{flex:1}
-.steps-end{text-align:center;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
-.steps-end b{display:block;margin-bottom:12px}
+/* ---- поток урока: шаги + задания ---- */
+.lesson-flow{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+ padding:16px;margin-top:14px}
+.flow-top{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.flow-bar{flex:1;height:10px;background:var(--bg2);border-radius:99px;overflow:hidden}
+.flow-bar-in{height:100%;width:0;background:linear-gradient(90deg,#22c55e,#4ade80);
+ border-radius:99px;transition:width .4s}
+.hearts{display:flex;gap:2px;font-size:.86rem;flex-shrink:0}
+.heart{transition:opacity .3s,transform .3s}
+.heart.off{opacity:.2;transform:scale(.85);filter:grayscale(1)}
+.fstep{min-height:150px;animation:fadein .25s}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.fstep.shake{animation:shk .35s}
+@keyframes shk{0%,100%{transform:none}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.fstep-h{font-size:1.2rem;margin-bottom:10px;color:var(--cc)}
+.ex-text{font-size:1.02rem;margin-bottom:16px}
+
+/* код с пропусками */
+.ex-code{background:#0b1020;border-radius:13px;padding:16px;display:flex;flex-wrap:wrap;
+ align-items:center;gap:5px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:1.05rem;
+ color:#c5d5f5;margin-bottom:16px;min-height:58px}
+.cpart{white-space:pre}
+.slot{display:inline-flex;align-items:center;justify-content:center;min-width:52px;height:36px;
+ padding:0 10px;border:2px dashed #3f4d70;border-radius:9px;cursor:pointer;
+ font-family:ui-monospace,monospace;color:#c5d5f5;background:rgba(255,255,255,.03)}
+.slot.has{border-style:solid;border-color:var(--acc);background:rgba(91,140,255,.14)}
+.slot.good{border-color:var(--ok);background:rgba(34,197,94,.16);color:#86efac}
+.slot.bad{border-color:var(--err);background:rgba(244,63,94,.16);color:#fda4af}
+
+/* сопоставление */
+.ex-match{display:flex;flex-direction:column;gap:11px;margin-bottom:16px}
+.mrow{display:flex;align-items:center;gap:10px}
+.mlabel{font-size:.97rem;min-width:96px}
+.mrow .slot{min-width:106px;font-size:.95rem}
+
+/* кнопки-подсказки */
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:14px 0;
+ border-top:1px solid var(--line)}
+.chip-b{background:var(--card2);border:2px solid var(--line);border-radius:11px;
+ padding:11px 18px;cursor:pointer;font-family:ui-monospace,Menlo,Consolas,monospace;
+ font-size:1rem;color:var(--txt);transition:opacity .2s,transform .1s}
+.chip-b:active{transform:scale(.94)}
+.chip-b.used{opacity:.22;pointer-events:none}
+
+/* низ: отклик и навигация */
+.flow-foot{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.fb{text-align:center;font-weight:800;font-size:1.05rem;min-height:26px;margin-bottom:10px}
+.fb-ok{color:var(--ok)}
+.fb-bad{color:var(--err);font-size:.94rem;font-weight:600}
+.flow-nav{display:flex;gap:9px;align-items:center}
+.flow-nav #fNext{flex:1}
+.flow-nav .btn:disabled{opacity:.45}
 
 /* текст теории */
 .prose p{margin:9px 0}
@@ -2535,6 +3146,23 @@ html.light .top{background:rgba(246,248,253,.85)}
 .prow{display:grid;grid-template-columns:120px 1fr 52px;gap:10px;align-items:center}
 .prow-name{font-weight:700;font-size:.9rem}
 .prow-n{font-size:.8rem;color:var(--mut);text-align:right}
+
+/* ---- админка ---- */
+.adm-stats{display:flex;gap:9px;margin-bottom:6px;flex-wrap:wrap}
+.adm-form{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.adm-form label{display:flex;flex-direction:column;gap:5px;font-weight:700;font-size:.86rem}
+.adm-form input,.adm-form select,.adm-json{background:var(--bg2);border:2px solid var(--line);
+ border-radius:12px;padding:11px;color:var(--txt);font:.95rem inherit;width:100%}
+.adm-form input:focus,.adm-json:focus{outline:0;border-color:var(--acc)}
+.adm-row{display:grid;grid-template-columns:1fr 110px;gap:10px}
+.adm-json{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;resize:vertical}
+.adm-list{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto}
+.adm-row-l{display:flex;align-items:center;gap:9px;background:var(--bg2);border-radius:11px;padding:9px 12px}
+.adm-c{font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--mut);width:34px}
+.adm-n{width:26px;font-weight:800;color:var(--acc)}
+.adm-t{flex:1;font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm-del{background:none;border:0;cursor:pointer;font-size:1rem;opacity:.6}
+.adm-del:hover{opacity:1}
 
 /* ---- нижняя панель ---- */
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:70;display:flex;

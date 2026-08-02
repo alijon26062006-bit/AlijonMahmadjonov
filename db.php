@@ -26,7 +26,7 @@ define('SITE_URL', '');         // холӣ монед — худаш муайя
 define('OPENAI_MODEL', 'gpt-4o-mini');
 define('OPENAI_URL', 'https://api.openai.com/v1/chat/completions');
 
-define('CODETJ_SCHEMA_VERSION', 3);   // версияи схемаи база (миграцияҳо худкор)
+define('CODETJ_SCHEMA_VERSION', 4);   // версияи схемаи база (миграцияҳо худкор)
 
 /* ============================================================
  *  ПАЙВАСТШАВӢ БА БАЗА
@@ -142,6 +142,9 @@ function migrate(PDO $pdo)
     if ($cur < 3) {
         migrate_to_v3($pdo);
     }
+    if ($cur < 4) {
+        migrate_to_v4($pdo);
+    }
 
     if ($cur < CODETJ_SCHEMA_VERSION) {
         $st = $pdo->prepare('REPLACE INTO cj_settings (k, v) VALUES (?, ?)');
@@ -193,6 +196,7 @@ function migrate_to_v1(PDO $pdo)
             task_text_ru TEXT NULL,
             task_start_code MEDIUMTEXT NULL,
             task_criteria TEXT NULL,
+            exercises MEDIUMTEXT NULL,
             published TINYINT(1) NOT NULL DEFAULT 1,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_course_num (course, num)
@@ -352,6 +356,16 @@ function migrate_to_v3(PDO $pdo)
     }
 }
 
+/** v4: машқҳои интерактивӣ дар дохили дарс. */
+function migrate_to_v4(PDO $pdo)
+{
+    try {
+        $pdo->exec("ALTER TABLE cj_lessons ADD COLUMN exercises MEDIUMTEXT NULL");
+    } catch (PDOException $e) {
+        // аллакай ҳаст
+    }
+}
+
 /* ============================================================
  *  ВОРИДКУНИИ ДАРСҲО АЗ ФАЙЛҲОИ JSON (папкаи seed/)
  * ============================================================ */
@@ -456,22 +470,24 @@ function import_lesson(PDO $pdo, array $L)
     $st->execute(array($course, $num));
     $id = (int)$st->fetchColumn();
 
+    $ex = (isset($L['exercises']) && is_array($L['exercises']))
+        ? json_encode($L['exercises'], JSON_UNESCAPED_UNICODE) : '';
     $fields = array(
         $g('title_tj'), $g('title_ru'), $g('theory_tj'), $g('theory_ru'),
         $g('example_code'), $g('task_text_tj'), $g('task_text_ru'),
-        $g('task_start_code'), $g('task_criteria'),
+        $g('task_start_code'), $g('task_criteria'), $ex,
     );
 
     if ($id > 0) {
         $sql = 'UPDATE cj_lessons SET title_tj=?, title_ru=?, theory_tj=?, theory_ru=?, example_code=?,
-                task_text_tj=?, task_text_ru=?, task_start_code=?, task_criteria=?, published=1 WHERE id=?';
+                task_text_tj=?, task_text_ru=?, task_start_code=?, task_criteria=?, exercises=?, published=1 WHERE id=?';
         $params = $fields;
         $params[] = $id;
         $pdo->prepare($sql)->execute($params);
     } else {
         $sql = 'INSERT INTO cj_lessons (title_tj, title_ru, theory_tj, theory_ru, example_code,
-                task_text_tj, task_text_ru, task_start_code, task_criteria, course, num, published)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,1)';
+                task_text_tj, task_text_ru, task_start_code, task_criteria, exercises, course, num, published)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)';
         $params = $fields;
         $params[] = $course;
         $params[] = $num;
