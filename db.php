@@ -23,6 +23,9 @@ define('DB_USER', '');          // корбари база
 define('DB_PASS', '');          // пароли база
 define('OPENAI_KEY', '');       // калиди API (метавон баъдан дар админка гузошт)
 define('SITE_URL', '');         // холӣ монед — худаш муайян мекунад. Ё: https://codetj.tj
+// Рақами администратор. Ҳар кас бо ин рақам дарояд — худкор админ мешавад.
+// Номер администратора: кто войдёт с этим номером — автоматически станет админом.
+define('ADMIN_PHONE', '');      // масалан: 901234567
 define('OPENAI_MODEL', 'gpt-4o-mini');
 define('OPENAI_URL', 'https://api.openai.com/v1/chat/completions');
 
@@ -718,6 +721,16 @@ function current_user()
         $st->execute(array((int)$_SESSION['uid']));
         $u = $st->fetch();
         if ($u) {
+            // Соҳиби ADMIN_PHONE худкор администратор мешавад — ҳамин ҳозир,
+            // на дар дархости оянда, то ҷадвали админка дарҳол пайдо шавад.
+            if (ADMIN_PHONE !== '' && $u['role'] !== 'admin' && function_exists('normalize_phone')) {
+                $want = normalize_phone(ADMIN_PHONE);
+                if ($want !== '' && $want === (string)$u['phone']) {
+                    db()->prepare("UPDATE cj_users SET role = 'admin' WHERE id = ?")
+                        ->execute(array((int)$u['id']));
+                    $u['role'] = 'admin';
+                }
+            }
             $user = $u;
         } else {
             unset($_SESSION['uid']);

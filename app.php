@@ -377,6 +377,7 @@ db();
 
 $p = isset($_GET['p']) && is_string($_GET['p']) ? $_GET['p'] : 'home';
 
+// Ҳуқуқи админ дар current_user() дода мешавад (аз рӯи ADMIN_PHONE).
 $user = current_user();
 if ($user !== null) {
     update_streak($user);
