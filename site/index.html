@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+<title>Alijon — Web, Telegram-боты и AI-решения</title>
+<meta name="description" content="Создаю современные веб-сайты, Telegram-ботов, Mini Apps и AI-решения. Full Stack разработка.">
+<meta name="theme-color" content="#05070D">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Alijon — Web, Telegram-боты и AI-решения">
+<meta property="og:description" content="Современные веб-сайты, Telegram-боты, Mini Apps и AI-решения.">
+
+<link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/exo-2-cyrillic-700-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/golos-text-cyrillic-400-normal.woff2">
+<link rel="stylesheet" href="style.css">
+
+<!-- Карта импортов: по ней вендорные модули three находят друг друга.
+     Без неё их пришлось бы собирать сборщиком. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "./js/three.module.min.js",
+    "three/addons/": "./js/"
+  }
+}
+</script>
+</head>
+
+<body>
+
+<a href="#about" class="skip-link">Перейти к содержанию</a>
+
+<!-- ===== 3D-СЦЕНА ===== -->
+<div class="scene-root" aria-hidden="true">
+  <canvas id="gl"></canvas>
+  <div class="scene-vignette"></div>
+</div>
+
+<!-- ===== ШАПКА ===== -->
+<header class="nav">
+  <div class="u-wrap nav-inner">
+    <a href="#top" class="nav-brand">Alijon<span>.</span></a>
+
+    <nav class="nav-links" id="nav-links" aria-label="Основное меню">
+      <a href="#about"    data-t="nav.about">Обо мне</a>
+      <a href="#skills"   data-t="nav.skills">Навыки</a>
+      <a href="#projects" data-t="nav.projects">Проекты</a>
+      <a href="#process"  data-t="nav.process">Процесс</a>
+      <a href="#contact"  data-t="nav.contact">Контакты</a>
+      <a href="#order" class="nav-cta" data-t="nav.order">Заказать проект</a>
+    </nav>
+
+    <div class="nav-tools">
+      <button type="button" id="sound" class="icon-btn" aria-label="Звук"></button>
+      <div class="lang" id="lang" role="group" aria-label="Язык сайта"></div>
+      <button type="button" id="burger" class="burger" aria-expanded="false" aria-label="Меню"></button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ===== ПЕРВЫЙ ЭКРАН ===== -->
+<section class="hero" id="top">
+  <div class="u-wrap hero-inner">
+    <p class="u-eyebrow"><span id="hero-eyebrow">Uways · Душанбе → Казахстан</span></p>
+
+    <h1 class="hero-title"><span class="u-grad">Alijon</span></h1>
+
+    <ul class="hero-roles" id="hero-roles">
+      <li>Web Developer</li>
+      <li>Telegram Bot Developer</li>
+      <li>AI Enthusiast</li>
+    </ul>
+
+    <p class="hero-tagline" data-t="hero.tagline">
+      Создаю современные веб-сайты, Telegram-ботов, Mini Apps и AI-решения.
+    </p>
+
+    <div class="hero-actions">
+      <a href="#order" class="btn btn-solid" data-t="hero.ctaOrder">Заказать проект</a>
+      <a href="#projects" class="btn btn-glass" data-t="hero.ctaProjects">Мои проекты</a>
+    </div>
+
+    <ul class="hero-socials" id="hero-socials"></ul>
+  </div>
+
+  <a href="#about" class="hero-scroll">
+    <span data-t="hero.scroll">Листай вниз</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 4v16M6 14l6 6 6-6"/>
+    </svg>
+  </a>
+</section>
+
+<!-- Ниже читается текст, поэтому сцена приглушается вуалью -->
+<div class="content-veil">
+
+  <!-- ===== ОБО МНЕ ===== -->
+  <section class="section" id="about">
+    <div class="u-wrap">
+      <span class="u-eyebrow reveal" data-t="about.eyebrow">Обо мне</span>
+      <div class="about-grid">
+        <h2 class="section-title reveal" data-t="about.title">Начинаю путь — но делаю это всерьёз.</h2>
+        <div class="about-text reveal" id="about-text" style="--delay:80ms"></div>
+      </div>
+      <ul class="facts u-glass reveal" id="about-facts" style="--delay:160ms"></ul>
+    </div>
+  </section>
+
+  <!-- ===== НАВЫКИ ===== -->
+  <section class="section" id="skills">
+    <div class="u-wrap">
+      <span class="u-eyebrow reveal" data-t="skills.eyebrow">Стек</span>
+      <h2 class="section-title reveal" data-t="skills.title">Инструменты, которыми работаю.</h2>
+      <p class="section-lead reveal" data-t="skills.lead">Не список ради списка — то, на чём реально собираю проекты.</p>
+      <div id="skills-groups"></div>
+    </div>
+  </section>
+
+  <!-- ===== ПРОЕКТЫ ===== -->
+  <section class="section" id="projects">
+    <div class="u-wrap">
+      <span class="u-eyebrow reveal" data-t="projects.eyebrow">Работы</span>
+      <h2 class="section-title reveal" data-t="projects.title">Проекты, которые я собрал.</h2>
+      <p class="section-lead reveal" data-t="projects.lead">От мессенджера и маркетплейса до Telegram-ботов и AI.</p>
+      <ul class="projects-grid" id="projects-grid"></ul>
+    </div>
+  </section>
+
+  <!-- ===== ПРОЦЕСС ===== -->
+  <section class="section" id="process">
+    <div class="u-wrap">
+      <span class="u-eyebrow reveal" data-t="process.eyebrow">Как я работаю</span>
+      <h2 class="section-title reveal" data-t="process.title">Путь от идеи до запуска.</h2>
+      <p class="section-lead reveal" data-t="process.lead">Прозрачный процесс: ты всегда знаешь, на каком этапе проект.</p>
+      <ol class="process" id="process-list"></ol>
+    </div>
+  </section>
+
+  <!-- ===== ЗАЯВКА ===== -->
+  <section class="section" id="order">
+    <div class="u-wrap">
+      <span class="u-eyebrow reveal" data-t="order.eyebrow">Заявка</span>
+      <h2 class="section-title reveal" data-t="order.title">Расскажи о проекте.</h2>
+      <p class="section-lead reveal" data-t="order.lead">Отвечу в Telegram. Обычно в течение дня.</p>
+
+      <form class="order u-glass reveal" id="order-form" novalidate style="--delay:100ms">
+        <div class="order-row">
+          <p class="field">
+            <label for="f-name" data-t="order.name">Имя</label>
+            <input id="f-name" name="name" type="text" autocomplete="name"
+                   data-t-ph="order.namePlaceholder" placeholder="Как к тебе обращаться">
+            <span class="field-error"></span>
+          </p>
+          <p class="field">
+            <label for="f-telegram" data-t="order.telegram">Telegram</label>
+            <input id="f-telegram" name="telegram" type="text"
+                   data-t-ph="order.telegramPlaceholder" placeholder="@username">
+            <span class="field-error"></span>
+          </p>
+        </div>
+
+        <p class="field">
+          <label for="f-project" data-t="order.project">Описание проекта</label>
+          <textarea id="f-project" name="project" rows="4"
+                    data-t-ph="order.projectPlaceholder" placeholder="Что нужно сделать и для кого"></textarea>
+          <span class="field-error"></span>
+        </p>
+
+        <div class="order-row">
+          <p class="field">
+            <label for="f-budget" data-t="order.budget">Бюджет</label>
+            <input id="f-budget" name="budget" type="text"
+                   data-t-ph="order.budgetPlaceholder" placeholder="Например, 300–500 $">
+            <span class="field-error"></span>
+          </p>
+          <p class="field">
+            <label for="f-deadline" data-t="order.deadline">Срок</label>
+            <input id="f-deadline" name="deadline" type="text"
+                   data-t-ph="order.deadlinePlaceholder" placeholder="Например, 3 недели">
+            <span class="field-error"></span>
+          </p>
+        </div>
+
+        <div class="order-foot">
+          <button type="submit" class="btn btn-solid" data-t="order.submit">Отправить заявку</button>
+          <!-- aria-live: диктор сообщит об отправке, не забирая фокус -->
+          <p class="order-status" id="order-status" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===== КОНТАКТЫ ===== -->
+  <section class="section" id="contact">
+    <div class="u-wrap">
+      <span class="u-eyebrow reveal" data-t="contact.eyebrow">Контакты</span>
+      <h2 class="section-title reveal" data-t="contact.title">Давай построим что-то стоящее.</h2>
+      <p class="section-lead reveal" data-t="contact.lead">Пиши в любой удобный канал — отвечаю быстро.</p>
+
+      <ul class="contacts" id="contacts-list"></ul>
+
+      <footer class="footer">
+        <span>© <span id="year"></span> <span id="footer-name"></span>. <span data-t="footer.rights">Все права защищены</span>.</span>
+        <span data-t="footer.built">Собрано на Three.js</span>
+      </footer>
+    </div>
+  </section>
+
+</div>
+</main>
+
+<noscript>
+  <div class="noscript">Для 3D-сцены нужен JavaScript. Текст сайта читается и без него.</div>
+</noscript>
+
+<script type="module">
+  import { initScene } from './js/scene.js';
+  import { initApp } from './js/app.js';
+
+  initApp();
+  initScene(document.getElementById('gl'));
+</script>
+
+</body>
+</html>
