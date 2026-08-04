@@ -416,25 +416,41 @@ function initOrderForm() {
       data.deadline ? `Срок: ${data.deadline}` : null,
     ].filter(Boolean).join('\n');
 
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    status.textContent = t('order.sending');
+
+    // Режим PHP: заявка уходит на сервер и оттуда в Telegram-бота.
+    // Открывать чат не нужно — сообщение уже доставлено.
     if (orderTarget.mode === 'php') {
       try {
-        await fetch(orderTarget.phpEndpoint, {
+        const response = await fetch(orderTarget.phpEndpoint || window.location.href, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         });
+        const result = await response.json();
+
+        if (response.ok && result.ok) {
+          form.reset();
+          status.textContent = t('order.sentToBot');
+          button.disabled = false;
+          setTimeout(() => { status.textContent = ''; }, 6000);
+          return;
+        }
       } catch {
-        // Сеть отвалилась — ниже всё равно откроем Telegram
+        // Сервер недоступен — ниже сработает запасной путь через Telegram
       }
     }
 
-    // Telegram не умеет подставлять текст в личный чат по ссылке,
-    // поэтому кладём заявку в буфер: останется вставить одним движением
+    // Запасной путь. Telegram не умеет подставлять текст в личный чат
+    // по ссылке, поэтому кладём заявку в буфер: останется вставить одним движением
     try { await navigator.clipboard.writeText(message); } catch { /* нет буфера */ }
 
     status.textContent = t('order.success');
+    button.disabled = false;
     window.open(`https://t.me/${orderTarget.telegramUser}`, '_blank', 'noopener');
-    setTimeout(() => { status.textContent = ''; }, 5000);
+    setTimeout(() => { status.textContent = ''; }, 6000);
   });
 }
 

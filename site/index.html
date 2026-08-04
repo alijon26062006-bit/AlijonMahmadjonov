@@ -185,6 +185,13 @@
           </p>
         </div>
 
+        <!-- Ловушка для спам-ботов: человек этого поля не видит.
+             Если оно заполнено — заявка молча отбрасывается. -->
+        <p class="u-sr" aria-hidden="true">
+          <label for="f-website">Оставь это поле пустым</label>
+          <input id="f-website" name="website" type="text" tabindex="-1" autocomplete="off">
+        </p>
+
         <div class="order-foot">
           <button type="submit" class="btn btn-solid" data-t="order.submit">Отправить заявку</button>
           <!-- aria-live: диктор сообщит об отправке, не забирая фокус -->

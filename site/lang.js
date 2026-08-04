@@ -138,6 +138,7 @@ export const ru = {
     submit: 'Отправить заявку',
     sending: 'Отправляю…',
     success: 'Заявка собрана — открываю Telegram.',
+    sentToBot: 'Заявка отправлена. Отвечу в Telegram.',
     optional: 'необязательно',
     errors: {
       nameShort: 'Введи имя — минимум 2 символа',
@@ -297,6 +298,7 @@ export const tg = {
     submit: 'Фиристодани дархост',
     sending: 'Фиристода истодаам…',
     success: 'Дархост тайёр — Telegram кушода мешавад.',
+    sentToBot: 'Дархост фиристода шуд. Дар Telegram ҷавоб медиҳам.',
     optional: 'ихтиёрӣ',
     errors: {
       nameShort: 'Номро ворид кунед — камаш 2 аломат',
@@ -456,6 +458,7 @@ export const en = {
     submit: 'Send request',
     sending: 'Sending…',
     success: 'Request ready — opening Telegram.',
+    sentToBot: 'Request sent. I will reply on Telegram.',
     optional: 'optional',
     errors: {
       nameShort: 'Enter your name — at least 2 characters',
