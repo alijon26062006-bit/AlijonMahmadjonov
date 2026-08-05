@@ -1,0 +1,11 @@
+# real secrets - never commit
+/config.local.php
+
+# runtime data: sqlite db, uploaded receipts
+/data/*.sqlite
+/data/uploads/receipts/*
+!/data/uploads/receipts/.gitkeep
+
+# local dev / editor
+.DS_Store
+*.log
