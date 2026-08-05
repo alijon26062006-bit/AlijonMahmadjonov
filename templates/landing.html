@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- ✏️ МЕНЯЙ: заголовок вкладки и описание для поиска -->
+<title>Название компании — коротко о том, что вы делаете</title>
+<meta name="description" content="Одно предложение о вашей услуге. Именно этот текст люди видят в Google, поэтому пишите по делу.">
+<meta name="theme-color" content="#0E1B2E">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Название компании">
+<meta property="og:description" content="Одно предложение о вашей услуге.">
+
+<!-- Шрифт. Если интернета нет, подставится системный — сайт не сломается. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet">
+
+<style>
+/* =========================================================
+   ✏️ ФИРМЕННЫЕ ЦВЕТА — поменяйте 3 строки, и сайт перекрасится
+   =========================================================
+   Всё оформление построено на этих переменных, так что искать
+   цвета по всему файлу не придётся. */
+:root {
+  --brand:  #0E1B2E;   /* основной тёмный: шапка, заголовки, кнопки */
+  --accent: #FF6B4A;   /* акцент: призывы к действию, цифры, ссылки */
+  --tint:   #FFF1ED;   /* светлый оттенок акцента для подложек */
+
+  /* Нейтральные. Не серые «из коробки», а с лёгким уходом в синий —
+     на глаз это читается как выбранный цвет, а не как значение по умолчанию. */
+  --bg:      #FFFFFF;
+  --surface: #F5F7FA;
+  --text:    #0F1723;
+  --muted:   #5A6675;
+  --line:    #E3E8EF;
+
+  --radius: 18px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --wrap: 1160px;
+  --nav-h: 76px;
+
+  --font: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Тёмная тема — подхватывается из настроек телефона или компьютера */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:      #0B111B;
+    --surface: #121A26;
+    --text:    #EAF0F8;
+    --muted:   #94A2B5;
+    --line:    #1E2939;
+    --brand:   #EAF0F8;
+    --tint:    #2A1710;
+  }
+}
+
+/* ---------- база ---------- */
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { margin: 0; line-height: 1.1; letter-spacing: -0.025em; font-weight: 800; text-wrap: balance; }
+p { margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+a { color: inherit; text-decoration: none; }
+img { display: block; max-width: 100%; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+::selection { background: var(--accent); color: #fff; }
+
+.wrap { width: 100%; max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
+
+.eyebrow {
+  display: inline-block;
+  font-size: 12.5px; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 18px;
+}
+
+.section { padding: 110px 0; }
+.section-title { font-size: clamp(30px, 4.4vw, 48px); max-width: 20ch; }
+.section-lead { margin-top: 18px; max-width: 56ch; color: var(--muted); font-size: clamp(16px, 1.8vw, 18px); }
+
+/* Скрыто визуально, но доступно скринридеру */
+.sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- кнопки ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  min-height: 52px; padding: 14px 28px;
+  border-radius: 100px;
+  font-size: 15.5px; font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.25s var(--ease), background 0.25s var(--ease),
+              box-shadow 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: translateY(0); }
+
+.btn-accent {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 12px 30px -12px color-mix(in srgb, var(--accent) 85%, transparent);
+}
+.btn-accent:hover { box-shadow: 0 18px 40px -12px color-mix(in srgb, var(--accent) 95%, transparent); }
+
+.btn-ghost { border: 1px solid var(--line); color: var(--text); background: var(--bg); }
+.btn-ghost:hover { border-color: var(--text); }
+
+/* ---------- шапка ---------- */
+.header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  height: var(--nav-h);
+  display: flex; align-items: center;
+  border-bottom: 1px solid transparent;
+  transition: background 0.3s var(--ease), border-color 0.3s var(--ease),
+              backdrop-filter 0.3s var(--ease);
+}
+.header.is-stuck {
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom-color: var(--line);
+}
+.header-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+
+.logo { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; letter-spacing: -0.02em; }
+.logo-mark {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: var(--accent); color: #fff;
+  display: grid; place-items: center;
+  font-size: 15px; font-weight: 800;
+}
+
+.nav { display: flex; align-items: center; gap: 32px; }
+.nav a { font-size: 15px; font-weight: 500; color: var(--muted); transition: color 0.2s var(--ease); }
+.nav a:hover { color: var(--text); }
+
+/* Кнопка внутри меню нужна только на телефоне: на широком экране
+   она стоит отдельно справа, и без этого правила показались бы обе */
+.nav .btn { display: none; }
+
+.header .btn { min-height: 44px; padding: 11px 22px; font-size: 14.5px; }
+
+.burger { display: none; width: 44px; height: 44px; align-items: center; justify-content: center; }
+.burger span { display: block; width: 22px; height: 2px; background: var(--text); position: relative; transition: background 0.2s var(--ease); }
+.burger span::before, .burger span::after {
+  content: ''; position: absolute; left: 0; width: 22px; height: 2px; background: var(--text);
+  transition: transform 0.28s var(--ease);
+}
+.burger span::before { top: -7px; }
+.burger span::after { top: 7px; }
+.burger[aria-expanded="true"] span { background: transparent; }
+.burger[aria-expanded="true"] span::before { transform: translateY(7px) rotate(45deg); }
+.burger[aria-expanded="true"] span::after { transform: translateY(-7px) rotate(-45deg); }
+
+/* ---------- первый экран ---------- */
+.hero {
+  position: relative;
+  padding: calc(var(--nav-h) + 90px) 0 100px;
+  overflow: hidden;
+}
+/* Мягкое цветное пятно за текстом: даёт глубину без единой картинки */
+.hero::before {
+  content: ''; position: absolute; z-index: -1;
+  top: -240px; right: -180px; width: 720px; height: 720px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 68%);
+  filter: blur(20px);
+  pointer-events: none;
+}
+.hero-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 60px; align-items: center; }
+
+.hero h1 { font-size: clamp(38px, 6.2vw, 68px); }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero-lead { margin-top: 24px; max-width: 46ch; font-size: clamp(16px, 2vw, 19px); color: var(--muted); }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 36px; }
+.hero-note { margin-top: 20px; font-size: 14px; color: var(--muted); }
+
+/* Цифры-доказательства рядом с заголовком */
+.stats { display: grid; gap: 2px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.stats li { background: var(--bg); padding: 26px 28px; }
+.stats-num { display: block; font-size: clamp(30px, 4vw, 42px); font-weight: 800; letter-spacing: -0.03em; color: var(--accent); font-variant-numeric: tabular-nums; }
+.stats-label { display: block; margin-top: 6px; font-size: 14.5px; color: var(--muted); }
+
+/* ---------- услуги ---------- */
+.services { background: var(--surface); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 56px; }
+.card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 32px 30px 30px;
+  display: flex; flex-direction: column; gap: 12px;
+  transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+.card:hover { transform: translateY(-5px); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); box-shadow: 0 22px 50px -28px rgba(15, 23, 35, 0.5); }
+.card-num {
+  width: 42px; height: 42px; border-radius: 12px;
+  background: var(--tint); color: var(--accent);
+  display: grid; place-items: center;
+  font-size: 14px; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.card h3 { font-size: 21px; }
+.card p { font-size: 15.5px; color: var(--muted); }
+
+/* ---------- о нас ---------- */
+.about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
+.about-text { display: flex; flex-direction: column; gap: 16px; color: var(--muted); font-size: 16.5px; }
+.about-text strong { color: var(--text); font-weight: 600; }
+.checks { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
+.checks li { display: flex; gap: 13px; align-items: flex-start; font-size: 16px; }
+.check-mark {
+  flex: 0 0 24px; width: 24px; height: 24px; margin-top: 1px;
+  border-radius: 50%; background: var(--tint); color: var(--accent);
+  display: grid; place-items: center;
+}
+.check-mark svg { width: 13px; height: 13px; }
+
+/* ---------- форма ---------- */
+.contact-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 56px; align-items: start; }
+
+.form { display: flex; flex-direction: column; gap: 18px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field label { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.field input, .field textarea {
+  width: 100%; min-height: 52px; padding: 14px 16px;
+  font: inherit; font-size: 16px; color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  resize: vertical;
+}
+.field input::placeholder, .field textarea::placeholder { color: var(--muted); opacity: 0.75; }
+.field input:focus, .field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.field.invalid input, .field.invalid textarea { border-color: #E5484D; }
+.field-error { font-size: 13px; color: #E5484D; min-height: 0; }
+
+.form-note { font-size: 13.5px; color: var(--muted); }
+.form-status { font-size: 15px; font-weight: 500; color: var(--accent); min-height: 24px; }
+
+/* ---------- подвал ---------- */
+.footer { background: var(--brand); color: #fff; padding: 72px 0 40px; }
+@media (prefers-color-scheme: dark) { .footer { color: var(--bg); } }
+
+.footer-top { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 40px; padding-bottom: 44px; border-bottom: 1px solid rgba(255,255,255,0.14); }
+@media (prefers-color-scheme: dark) { .footer-top { border-bottom-color: rgba(0,0,0,0.2); } }
+
+.footer h4 { font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.6; margin: 0 0 18px; }
+.footer-list { display: flex; flex-direction: column; gap: 11px; }
+.footer-list a, .footer-list span { font-size: 15.5px; opacity: 0.85; transition: opacity 0.2s var(--ease); }
+.footer-list a:hover { opacity: 1; }
+.footer-about { font-size: 15.5px; opacity: 0.75; max-width: 38ch; margin-top: 14px; }
+.footer-bottom { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; padding-top: 28px; font-size: 14px; opacity: 0.6; }
+
+/* ---------- появление при прокрутке ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.75s var(--ease) var(--delay, 0ms),
+              transform 0.75s var(--ease) var(--delay, 0ms);
+}
+.reveal.visible { opacity: 1; transform: none; }
+
+/* ---------- адаптив ---------- */
+@media (max-width: 900px) {
+  .hero-grid, .about-grid, .contact-grid { grid-template-columns: 1fr; gap: 40px; }
+  .stats { grid-template-columns: repeat(3, 1fr); }
+  .stats li { padding: 20px; }
+
+  .burger { display: inline-flex; }
+  .header .btn { display: none; }
+  .nav {
+    position: fixed; inset: var(--nav-h) 0 auto;
+    flex-direction: column; align-items: flex-start; gap: 4px;
+    padding: 22px 24px 30px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    transform: translateY(-120%);
+    transition: transform 0.35s var(--ease);
+  }
+  .nav.open { transform: none; }
+  /* При открытом меню шапка обязана быть непрозрачной, иначе сквозь неё
+     просвечивает содержимое страницы и логотип теряется */
+  .header:has(.nav.open) { background: var(--bg); border-bottom-color: var(--line); }
+  .nav a { font-size: 19px; font-weight: 600; color: var(--text); padding: 12px 0; width: 100%; }
+  .nav .btn { display: inline-flex; margin-top: 12px; width: 100%; }
+}
+
+@media (max-width: 620px) {
+  .section { padding: 78px 0; }
+  .form-row { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr; }
+  .footer-top { grid-template-columns: 1fr; gap: 34px; }
+  .hero-actions .btn { width: 100%; }
+}
+
+/* Уважаем просьбу системы уменьшить анимацию */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  .reveal { opacity: 1; transform: none; }
+}
+</style>
+</head>
+
+<body>
+
+<a href="#main" class="sr">Перейти к содержанию</a>
+
+<!-- ==================== ШАПКА ==================== -->
+<header class="header" id="header">
+  <div class="wrap header-inner">
+    <!-- ✏️ МЕНЯЙ: логотип. Буква в квадрате — первая буква названия -->
+    <a href="#" class="logo">
+      <span class="logo-mark" aria-hidden="true">К</span>
+      <span>Компания</span>
+    </a>
+
+    <nav class="nav" id="nav" aria-label="Основное меню">
+      <a href="#services">Услуги</a>
+      <a href="#about">О нас</a>
+      <a href="#contact">Контакты</a>
+      <a href="#contact" class="btn btn-accent">Оставить заявку</a>
+    </nav>
+
+    <a href="#contact" class="btn btn-accent">Оставить заявку</a>
+
+    <button class="burger" id="burger" aria-expanded="false" aria-controls="nav" aria-label="Меню">
+      <span></span>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ==================== ГЛАВНЫЙ ЭКРАН ==================== -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow reveal">Город · с 2015 года</span>
+
+      <!-- ✏️ МЕНЯЙ: главный заголовок. Пишите про выгоду клиента,
+           а не про себя. Слово в <em> подсветится акцентом. -->
+      <h1 class="reveal" style="--delay:60ms">
+        Решаем задачу клиента<br>за <em>7 дней</em>
+      </h1>
+
+      <p class="hero-lead reveal" style="--delay:130ms">
+        Один абзац о том, что вы делаете и почему к вам стоит обратиться.
+        Без общих слов: конкретный результат, срок и понятная цена.
+      </p>
+
+      <div class="hero-actions reveal" style="--delay:200ms">
+        <a href="#contact" class="btn btn-accent">Оставить заявку</a>
+        <a href="#services" class="btn btn-ghost">Что мы делаем</a>
+      </div>
+
+      <p class="hero-note reveal" style="--delay:260ms">
+        Ответим в течение часа · Консультация бесплатно
+      </p>
+    </div>
+
+    <!-- ✏️ МЕНЯЙ: три цифры, которые доказывают ваш опыт -->
+    <ul class="stats reveal" style="--delay:300ms">
+      <li>
+        <span class="stats-num">10</span>
+        <span class="stats-label">лет на рынке</span>
+      </li>
+      <li>
+        <span class="stats-num">450+</span>
+        <span class="stats-label">выполненных заказов</span>
+      </li>
+      <li>
+        <span class="stats-num">98%</span>
+        <span class="stats-label">клиентов возвращаются</span>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ==================== УСЛУГИ ==================== -->
+<section class="section services" id="services">
+  <div class="wrap">
+    <span class="eyebrow reveal">Услуги</span>
+    <h2 class="section-title reveal" style="--delay:60ms">Что мы делаем</h2>
+    <p class="section-lead reveal" style="--delay:120ms">
+      Коротко объясните, из чего складывается работа. Четыре карточки —
+      оптимально: больше уже не читают.
+    </p>
+
+    <!-- ✏️ МЕНЯЙ: карточки услуг. Нужна ещё одна — скопируйте блок <li> -->
+    <ul class="cards">
+      <li class="card reveal">
+        <span class="card-num" aria-hidden="true">01</span>
+        <h3>Первая услуга</h3>
+        <p>Одно-два предложения: что входит и какой результат получит клиент. Пишите просто, без терминов.</p>
+      </li>
+      <li class="card reveal" style="--delay:80ms">
+        <span class="card-num" aria-hidden="true">02</span>
+        <h3>Вторая услуга</h3>
+        <p>Опишите выгоду, а не процесс. Клиенту важно, что он получит, а не как вы это сделаете.</p>
+      </li>
+      <li class="card reveal" style="--delay:160ms">
+        <span class="card-num" aria-hidden="true">03</span>
+        <h3>Третья услуга</h3>
+        <p>Если есть цена или срок — укажите. Конкретика вызывает больше доверия, чем обещания.</p>
+      </li>
+      <li class="card reveal" style="--delay:240ms">
+        <span class="card-num" aria-hidden="true">04</span>
+        <h3>Четвёртая услуга</h3>
+        <p>Последняя карточка — самая необычная услуга. Она запоминается лучше остальных.</p>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ==================== О НАС ==================== -->
+<section class="section" id="about">
+  <div class="wrap about-grid">
+    <div>
+      <span class="eyebrow reveal">О нас</span>
+      <h2 class="section-title reveal" style="--delay:60ms">Почему выбирают нас</h2>
+      <div class="about-text reveal" style="--delay:120ms; margin-top:22px">
+        <p>
+          Расскажите свою историю: когда начали, сколько вас, что умеете лучше других.
+          Люди покупают у людей — <strong>живой текст работает лучше</strong> сухого описания.
+        </p>
+        <p>
+          Второй абзац — о подходе к работе. Чем вы отличаетесь от тех,
+          кто делает то же самое дешевле.
+        </p>
+      </div>
+    </div>
+
+    <!-- ✏️ МЕНЯЙ: список преимуществ -->
+    <ul class="checks reveal" style="--delay:180ms">
+      <li>
+        <span class="check-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 5 5 9-11"/></svg>
+        </span>
+        <span>Фиксированная цена в договоре — итог не вырастет по ходу работы</span>
+      </li>
+      <li>
+        <span class="check-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 5 5 9-11"/></svg>
+        </span>
+        <span>Работаем по договору и выдаём все документы</span>
+      </li>
+      <li>
+        <span class="check-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 5 5 9-11"/></svg>
+        </span>
+        <span>Гарантия 12 месяцев на выполненные работы</span>
+      </li>
+      <li>
+        <span class="check-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 5 5 9-11"/></svg>
+        </span>
+        <span>Один ответственный менеджер на весь проект</span>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ==================== ФОРМА ==================== -->
+<section class="section services" id="contact">
+  <div class="wrap contact-grid">
+    <div>
+      <span class="eyebrow reveal">Связаться</span>
+      <h2 class="section-title reveal" style="--delay:60ms">Оставьте заявку</h2>
+      <p class="section-lead reveal" style="--delay:120ms">
+        Ответим в течение часа в рабочее время. Расскажем, сколько это стоит
+        и сколько займёт, — без обязательств.
+      </p>
+    </div>
+
+    <form class="form reveal" id="form" style="--delay:180ms" novalidate>
+      <div class="form-row">
+        <p class="field">
+          <label for="name">Имя</label>
+          <input id="name" name="name" type="text" autocomplete="name" placeholder="Как к вам обращаться">
+          <span class="field-error"></span>
+        </p>
+        <p class="field">
+          <label for="phone">Телефон</label>
+          <!-- type="tel" открывает на телефоне цифровую клавиатуру -->
+          <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="+992 00 000 00 00">
+          <span class="field-error"></span>
+        </p>
+      </div>
+
+      <p class="field">
+        <label for="message">Что нужно сделать</label>
+        <textarea id="message" name="message" rows="4" placeholder="Опишите задачу в двух словах"></textarea>
+        <span class="field-error"></span>
+      </p>
+
+      <!-- Ловушка для спам-ботов: человек её не видит и не заполняет -->
+      <p class="sr" aria-hidden="true">
+        <label for="website">Оставьте поле пустым</label>
+        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+      </p>
+
+      <button type="submit" class="btn btn-accent" id="submit">Отправить заявку</button>
+
+      <p class="form-status" id="status" role="status" aria-live="polite"></p>
+      <p class="form-note">Нажимая кнопку, вы соглашаетесь на обработку персональных данных.</p>
+    </form>
+  </div>
+</section>
+
+</main>
+
+<!-- ==================== ПОДВАЛ ==================== -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-top">
+      <div>
+        <a href="#" class="logo" style="color:inherit">
+          <span class="logo-mark" aria-hidden="true">К</span>
+          <span>Компания</span>
+        </a>
+        <p class="footer-about">
+          Одно предложение о компании. Здесь же уместен слоган.
+        </p>
+      </div>
+
+      <!-- ✏️ МЕНЯЙ: контакты -->
+      <div>
+        <h4>Контакты</h4>
+        <div class="footer-list">
+          <a href="tel:+992000000000">+992 00 000 00 00</a>
+          <a href="mailto:mail@example.com">mail@example.com</a>
+          <span>Душанбе, ул. Примерная, 1</span>
+        </div>
+      </div>
+
+      <div>
+        <h4>Мы в сети</h4>
+        <div class="footer-list">
+          <a href="https://t.me/username" target="_blank" rel="noopener">Telegram</a>
+          <a href="https://instagram.com/username" target="_blank" rel="noopener">Instagram</a>
+          <a href="https://wa.me/992000000000" target="_blank" rel="noopener">WhatsApp</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> Компания. Все права защищены.</span>
+      <span>Работаем ежедневно с 9:00 до 20:00</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* =========================================================
+   СКРИПТЫ САЙТА
+   Обычный JavaScript, без библиотек.
+   ========================================================= */
+
+/* ---------- год в подвале обновляется сам ---------- */
+document.getElementById('year').textContent = new Date().getFullYear();
+
+/* ---------- шапка «прилипает» при прокрутке ---------- */
+const header = document.getElementById('header');
+const onScroll = () => header.classList.toggle('is-stuck', window.scrollY > 20);
+onScroll();
+window.addEventListener('scroll', onScroll, { passive: true });
+
+/* ---------- меню на телефоне ---------- */
+const burger = document.getElementById('burger');
+const nav = document.getElementById('nav');
+
+burger.addEventListener('click', () => {
+  const open = nav.classList.toggle('open');
+  burger.setAttribute('aria-expanded', String(open));
+});
+
+// Закрываем меню после перехода по ссылке
+nav.querySelectorAll('a').forEach((link) => {
+  link.addEventListener('click', () => {
+    nav.classList.remove('open');
+    burger.setAttribute('aria-expanded', 'false');
+  });
+});
+
+/* ---------- появление блоков при прокрутке ----------
+   IntersectionObserver вместо слушателя scroll: браузер сам
+   решает, когда элемент попал в кадр, и не считает это на
+   каждый пиксель прокрутки. */
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    entry.target.classList.add('visible');
+    observer.unobserve(entry.target);   // одного раза достаточно
+  });
+}, { threshold: 0.12, rootMargin: '-30px' });
+
+document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+
+/* ---------- форма ---------- */
+const form = document.getElementById('form');
+const status = document.getElementById('status');
+const submit = document.getElementById('submit');
+
+const rules = {
+  name: (v) => (v.trim().length >= 2 ? '' : 'Введите имя — минимум 2 символа'),
+  // Считаем только цифры: человек может написать номер как угодно
+  phone: (v) => ((v.replace(/\D/g, '').length >= 9) ? '' : 'Введите номер телефона полностью'),
+  message: (v) => (v.trim().length >= 5 ? '' : 'Опишите задачу хотя бы в двух словах'),
+};
+
+function validate(field) {
+  const rule = rules[field.name];
+  if (!rule) return true;
+
+  const error = rule(field.value);
+  const wrap = field.closest('.field');
+  wrap.classList.toggle('invalid', !!error);
+  field.setAttribute('aria-invalid', String(!!error));
+  wrap.querySelector('.field-error').textContent = error;
+  return !error;
+}
+
+// Проверяем при уходе из поля, а не на каждую букву:
+// иначе ошибка загорается, когда человек ещё печатает
+form.querySelectorAll('input, textarea').forEach((field) => {
+  field.addEventListener('blur', () => validate(field));
+});
+
+form.addEventListener('submit', (event) => {
+  event.preventDefault();
+
+  const fields = [...form.querySelectorAll('input, textarea')];
+  const ok = fields.map(validate).every(Boolean);
+
+  if (!ok) {
+    // Ставим курсор в первое поле с ошибкой — не заставляем искать глазами
+    form.querySelector('.field.invalid input, .field.invalid textarea')?.focus();
+    return;
+  }
+
+  // Заполненная ловушка — это бот. Делаем вид, что всё хорошо.
+  if (form.website.value) { form.reset(); return; }
+
+  submit.disabled = true;
+  status.textContent = 'Отправляем…';
+
+  /* ✏️ ЗДЕСЬ ПОДКЛЮЧАЕТСЯ ОТПРАВКА.
+     Пока форма просто показывает успех. Чтобы заявки реально приходили,
+     раскомментируйте блок ниже и создайте на хостинге файл send.php.
+
+    fetch('send.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.fromEntries(new FormData(form)))
+    })
+      .then((r) => r.json())
+      .then((res) => {
+        status.textContent = res.ok ? 'Заявка отправлена. Скоро свяжемся.' : 'Не отправилось. Позвоните нам.';
+        if (res.ok) form.reset();
+      })
+      .catch(() => { status.textContent = 'Нет связи с сервером. Позвоните нам.'; })
+      .finally(() => { submit.disabled = false; });
+    return;
+  */
+
+  setTimeout(() => {
+    form.reset();
+    submit.disabled = false;
+    status.textContent = 'Заявка отправлена. Скоро свяжемся.';
+    setTimeout(() => { status.textContent = ''; }, 6000);
+  }, 600);
+});
+</script>
+
+</body>
+</html>
