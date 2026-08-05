@@ -1,0 +1,67 @@
+{% load static %}<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="icon" href="data:,">
+</head>
+<body>
+<header class="site-header">
+    <div class="container header-inner">
+        <a class="logo" href="{% url 'home' %}"><span class="logo-mark">◍</span> {{ SITE_NAME }}</a>
+        <nav class="main-nav">
+            <a href="{% url 'destinations' %}">Каталог</a>
+            <a href="{% url 'home' %}#how-it-works">Как это работает</a>
+        </nav>
+        <a class="cart-link" href="{% url 'cart' %}">
+            Корзина
+            {% if cart_count > 0 %}<span class="cart-badge">{{ cart_count }}</span>{% endif %}
+        </a>
+    </div>
+</header>
+
+{% if messages %}
+    <div class="container">
+        {% for message in messages %}
+            <div class="flash flash-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<main>
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+    <div class="container footer-inner">
+        <div>
+            <strong>{{ SITE_NAME }}</strong>
+            <p class="muted">Виртуальные eSIM для путешествий — мгновенная активация, без физической SIM-карты.</p>
+        </div>
+        <div>
+            <div class="muted">Поддержка</div>
+            {% if SUPPORT_PHONE %}<div>{{ SUPPORT_PHONE }}</div>{% endif %}
+            <div>{{ SUPPORT_EMAIL }}</div>
+        </div>
+        <div>
+            <a href="/admin/" class="muted admin-link">Вход для администратора</a>
+        </div>
+    </div>
+</footer>
+
+{% if ZADARMA_WIDGET_KEY %}
+<!-- Zadarma WebRTC support widget. Uses the public widget key only (not the API secret). -->
+<script>
+    (function (w, d) {
+        w.zadarmaWidgetKey = "{{ ZADARMA_WIDGET_KEY|escapejs }}";
+        var s = d.createElement('script');
+        s.async = true;
+        s.src = 'https://webtel.zadarma.com/widget/widget.js';
+        d.body.appendChild(s);
+    })(window, document);
+</script>
+{% endif %}
+</body>
+</html>

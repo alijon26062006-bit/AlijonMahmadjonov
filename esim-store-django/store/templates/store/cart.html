@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Корзина — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="container">
+    <h1>Корзина</h1>
+
+    {% if not items %}
+        <p class="muted">Корзина пуста.</p>
+        <a class="btn btn-primary" href="{% url 'destinations' %}">Выбрать тариф</a>
+    {% else %}
+        <div class="cart-list">
+            {% for item in items %}
+                <div class="card cart-row">
+                    <div class="cart-row-info">
+                        <div class="dest-flag-inline">{{ item.plan.country_flag }}</div>
+                        <div>
+                            <div class="cart-row-title">{{ item.plan.country_name }} — {{ item.plan.title }}</div>
+                            <div class="muted">${{ item.plan.price_usd|floatformat:2 }} за шт.</div>
+                        </div>
+                    </div>
+                    <form method="post" action="{% url 'cart' %}" class="cart-row-qty">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="plan_id" value="{{ item.plan.id }}">
+                        <input class="input" type="number" name="quantity" min="0" max="10" value="{{ item.quantity }}">
+                        <button class="btn btn-secondary" type="submit">Обновить</button>
+                    </form>
+                    <div class="cart-row-subtotal">${{ item.subtotal|floatformat:2 }}</div>
+                    <form method="post" action="{% url 'cart' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="remove">
+                        <input type="hidden" name="plan_id" value="{{ item.plan.id }}">
+                        <button class="btn btn-secondary" type="submit">Удалить</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="cart-total card">
+            <div>Итого</div>
+            <div class="cart-total-amount">${{ total|floatformat:2 }}</div>
+        </div>
+
+        <a class="btn btn-primary" href="{% url 'checkout' %}">Оформить заказ</a>
+    {% endif %}
+</section>
+{% endblock %}

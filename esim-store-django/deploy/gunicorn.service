@@ -1,0 +1,19 @@
+[Unit]
+Description=EasySIM Django app (gunicorn)
+After=network.target
+
+[Service]
+# Adjust User/Group and paths to match your VPS setup.
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/esim-store-django
+# .env in WorkingDirectory is loaded by settings.py itself (python-dotenv) -
+# no need to also declare it as a systemd EnvironmentFile.
+ExecStart=/var/www/esim-store-django/.venv/bin/gunicorn \
+    --workers 3 \
+    --bind unix:/var/www/esim-store-django/gunicorn.sock \
+    esim_store.wsgi:application
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

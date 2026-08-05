@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Заказ {{ orders.0.public_id }} — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="container order-page">
+    <h1>Спасибо за заказ!</h1>
+    <p class="muted">Сохраните эту страницу — по ней можно проверить статус заказа и получить eSIM.</p>
+
+    {% for order in orders %}
+        <div class="card order-card">
+            <div class="order-card-head">
+                <div>
+                    <div class="order-id">Заказ #{{ order.public_id }}</div>
+                    <div class="muted">{{ order.country_flag }} {{ order.country_name }} — {{ order.plan_title }} × {{ order.quantity }}</div>
+                </div>
+                <span class="badge {{ order.status_badge_class }}">{{ order.get_status_display }}</span>
+            </div>
+
+            {% if order.status == "pending_review" %}
+                <p>Мы проверяем ваш чек об оплате. Обычно это занимает не больше нескольких часов — обновите страницу позже, чтобы увидеть новый статус.</p>
+            {% elif order.status == "rejected" %}
+                <p>Оплату подтвердить не удалось{% if order.admin_note %}: {{ order.admin_note }}{% else %}.{% endif %} Свяжитесь с поддержкой: {{ SUPPORT_EMAIL }}.</p>
+            {% elif order.status == "failed" %}
+                <p>При выдаче eSIM произошла ошибка. Мы уже разбираемся — напишите нам, если долго нет ответа: {{ SUPPORT_EMAIL }}.</p>
+            {% elif order.status == "issued" %}
+                {% if order.esim_demo %}
+                    <div class="flash flash-success">Демо-режим: реальный поставщик Airalo ещё не подключён, поэтому это тестовый eSIM.</div>
+                {% endif %}
+                <div class="esim-box">
+                    {% if order.esim_qr_url %}
+                        <img class="esim-qr" src="{{ order.esim_qr_url }}" alt="QR-код eSIM">
+                    {% endif %}
+                    <div>
+                        {% if order.esim_iccid %}<div><span class="muted">ICCID:</span> <code>{{ order.esim_iccid }}</code></div>{% endif %}
+                        {% if order.esim_qr_url %}
+                            <p>Отсканируйте QR-код камерой в настройках eSIM на телефоне.</p>
+                        {% elif order.esim_iccid %}
+                            <p class="muted">QR-изображение недоступно — используйте ручную активацию eSIM в настройках телефона с этим кодом активации.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+
+    <a class="btn btn-secondary" href="{% url 'destinations' %}">Купить ещё один тариф</a>
+</section>
+{% endblock %}

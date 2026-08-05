@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Все направления — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="container">
+    <h1>Все направления</h1>
+    <form class="search-form" method="get" action="{% url 'destinations' %}">
+        <input class="input" type="text" name="q" placeholder="Поиск по стране…" value="{{ q }}">
+        <button class="btn btn-secondary" type="submit">Найти</button>
+    </form>
+
+    {% if not destinations %}<p class="muted">Ничего не найдено.</p>{% endif %}
+
+    <div class="grid grid-4">
+        {% for d in destinations %}
+            <a class="card dest-card" href="{% url 'destination_detail' d.slug %}">
+                <div class="dest-flag">{{ d.flag }}</div>
+                <div class="dest-name">{{ d.name }}</div>
+                <div class="dest-price">от ${{ d.plans_from|floatformat:2 }}</div>
+            </a>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

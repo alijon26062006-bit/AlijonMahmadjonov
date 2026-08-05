@@ -1,0 +1,9 @@
+Django>=5.0,<5.3
+python-dotenv>=1.0
+requests>=2.31
+Pillow>=10.0
+gunicorn>=22.0
+
+# Uncomment the driver that matches DB_ENGINE in your .env on the VPS:
+# psycopg2-binary>=2.9   # DB_ENGINE=postgresql
+# mysqlclient>=2.2       # DB_ENGINE=mysql

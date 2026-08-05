@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Оформление заказа — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="container checkout">
+    <h1>Оформление заказа</h1>
+
+    <div class="checkout-grid">
+        <div class="checkout-main">
+            {% if not co.phone_verified %}
+                {% if not co.code_sent %}
+                    <div class="card">
+                        <h2>1. Контактные данные</h2>
+                        <p class="muted">Email нужен для связи по заказу, телефон — для подтверждения по SMS.</p>
+                        <form method="post" action="{% url 'checkout' %}" class="form-stack">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="send_code">
+                            <label>Email
+                                <input class="input" type="email" name="email" required value="{{ co.email }}">
+                            </label>
+                            <label>Телефон (с кодом страны)
+                                <input class="input" type="tel" name="phone" required placeholder="+992900000000" value="{{ co.phone }}">
+                            </label>
+                            <button class="btn btn-primary" type="submit">Получить код по SMS</button>
+                        </form>
+                    </div>
+                {% else %}
+                    <div class="card">
+                        <h2>2. Подтверждение номера</h2>
+                        <p class="muted">Код отправлен на <strong>{{ co.phone }}</strong>.</p>
+                        {% if co.demo_code %}
+                            <div class="flash flash-success">Демо-режим (Zadarma не настроен): ваш код — <strong>{{ co.demo_code }}</strong></div>
+                        {% endif %}
+                        <form method="post" action="{% url 'checkout' %}" class="form-stack">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="verify_code">
+                            <label>Код из SMS
+                                <input class="input" type="text" name="code" inputmode="numeric" maxlength="6" required autofocus>
+                            </label>
+                            <button class="btn btn-primary" type="submit">Подтвердить</button>
+                        </form>
+                        <div class="checkout-links">
+                            <form method="post" action="{% url 'checkout' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="resend_code">
+                                <button class="link-btn" type="submit">Отправить код ещё раз</button>
+                            </form>
+                            <form method="post" action="{% url 'checkout' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="change_contact">
+                                <button class="link-btn" type="submit">Изменить номер / email</button>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="card">
+                    <h2>Контакты</h2>
+                    <p>{{ co.email }} · {{ co.phone }} <span class="badge badge-success">подтверждён</span></p>
+                </div>
+
+                <div class="card">
+                    <h2>3. Оплата</h2>
+                    <p class="payment-instructions">{{ PAYMENT_INSTRUCTIONS|linebreaksbr }}</p>
+                    <p class="checkout-total-line">К оплате: <strong>${{ total|floatformat:2 }}</strong></p>
+                    <form method="post" action="{% url 'checkout' %}" enctype="multipart/form-data" class="form-stack">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="submit_order">
+                        <label>Скриншот чека об оплате (JPG/PNG/WEBP/PDF, до {{ MAX_RECEIPT_SIZE_MB }} МБ)
+                            <input class="input" type="file" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf" required>
+                        </label>
+                        <button class="btn btn-primary" type="submit">Отправить заказ на проверку</button>
+                    </form>
+                </div>
+            {% endif %}
+        </div>
+
+        <aside class="checkout-summary card">
+            <h2>Ваш заказ</h2>
+            {% for item in items %}
+                <div class="summary-row">
+                    <span>{{ item.plan.country_flag }} {{ item.plan.country_name }} — {{ item.plan.title }} × {{ item.quantity }}</span>
+                    <span>${{ item.subtotal|floatformat:2 }}</span>
+                </div>
+            {% endfor %}
+            <div class="summary-row summary-total">
+                <span>Итого</span>
+                <span>${{ total|floatformat:2 }}</span>
+            </div>
+        </aside>
+    </div>
+</section>
+{% endblock %}

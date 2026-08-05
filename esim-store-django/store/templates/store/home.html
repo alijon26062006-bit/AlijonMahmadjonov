@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ SITE_NAME }} — eSIM для путешествий{% endblock %}
+{% block content %}
+<section class="hero">
+    <div class="container hero-inner">
+        <div>
+            <h1>Интернет в поездке за минуту</h1>
+            <p class="hero-sub">Купите eSIM онлайн, оплатите переводом и получите QR-код для активации — без физической SIM-карты и роуминга.</p>
+            <a class="btn btn-primary" href="{% url 'destinations' %}">Выбрать страну</a>
+        </div>
+        <div class="hero-card card">
+            <div class="hero-card-row"><span>1</span> Выберите тариф и страну</div>
+            <div class="hero-card-row"><span>2</span> Подтвердите номер телефона по SMS</div>
+            <div class="hero-card-row"><span>3</span> Оплатите и загрузите чек</div>
+            <div class="hero-card-row"><span>4</span> Получите QR-код eSIM</div>
+        </div>
+    </div>
+</section>
+
+<section class="container">
+    <div class="section-heading">
+        <h2>Популярные направления</h2>
+        <a href="{% url 'destinations' %}">Все направления →</a>
+    </div>
+    <div class="grid grid-4">
+        {% for d in destinations %}
+            <a class="card dest-card" href="{% url 'destination_detail' d.slug %}">
+                <div class="dest-flag">{{ d.flag }}</div>
+                <div class="dest-name">{{ d.name }}</div>
+                <div class="dest-price">от ${{ d.plans_from|floatformat:2 }}</div>
+            </a>
+        {% endfor %}
+    </div>
+</section>
+
+<section id="how-it-works" class="container">
+    <h2>Как это работает</h2>
+    <div class="grid grid-4">
+        <div class="card step-card"><div class="step-num">1</div><h3>Выбираете тариф</h3><p class="muted">Страна или регион, объём трафика и срок действия.</p></div>
+        <div class="card step-card"><div class="step-num">2</div><h3>Подтверждаете номер</h3><p class="muted">Код по SMS присылаем через Zadarma.</p></div>
+        <div class="card step-card"><div class="step-num">3</div><h3>Оплачиваете переводом</h3><p class="muted">Переводите сумму на карту и прикладываете скриншот чека.</p></div>
+        <div class="card step-card"><div class="step-num">4</div><h3>Получаете eSIM</h3><p class="muted">После проверки чека администратором придёт QR-код для установки.</p></div>
+    </div>
+</section>
+{% endblock %}
