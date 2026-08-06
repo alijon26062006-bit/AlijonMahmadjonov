@@ -38,7 +38,30 @@ python manage.py runserver
 Откройте http://127.0.0.1:8000 — база данных (SQLite) уже готова после
 `migrate`, ключи Zadarma/Airalo не нужны. Админка — http://127.0.0.1:8000/admin/.
 
-## Деплой на VPS (Ubuntu + nginx + gunicorn + systemd)
+## Деплой на VPS одной командой
+
+На чистом Ubuntu VPS, под root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/esim-purchase-website-dcpuy3/esim-store-django/deploy/deploy.sh -o deploy.sh
+sudo bash deploy.sh your-domain.tj
+```
+
+Скрипт `deploy/deploy.sh` сам: поставит системные пакеты, склонирует проект в
+`/var/www/esim-store-django`, создаст venv, сгенерирует `.env` со случайным
+`SECRET_KEY` (ключи Zadarma/Airalo туда всё равно нужно вписать вручную —
+скрипт их не знает), применит миграции, предложит создать администратора и
+настроит gunicorn (systemd) + nginx. Безопасно перезапускать повторно —
+уже сделанные шаги пропускаются. После первого запуска:
+
+```bash
+nano /var/www/esim-store-django/.env      # впишите реальные ключи
+sudo systemctl restart esim-store
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain.tj    # HTTPS
+```
+
+### Деплой вручную (если нужен полный контроль)
 
 1. Установите системные пакеты:
    ```bash
@@ -130,7 +153,10 @@ esim-store-django/
 │   └── migrations/
 ├── templates/base.html
 ├── static/css/style.css
-└── deploy/                     # примеры systemd + nginx конфигов
+└── deploy/
+    ├── deploy.sh                # автодеплой на VPS одной командой
+    ├── gunicorn.service         # шаблон systemd-сервиса
+    └── nginx.conf.example       # шаблон конфига nginx
 ```
 
 ## Известные упрощения (что доделать при желании)
