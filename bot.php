@@ -26,7 +26,7 @@ date_default_timezone_set('Asia/Dushanbe');
 /* Заполните перед загрузкой на хостинг. Больше НИЧЕГО менять не нужно. */
 
 define('BOT_TOKEN', '8530264507:AAG4UorWpm3GdBQTxMuhpeb0-aZmFAOTco0'); // токен от @BotFather
-define('BOT_USERNAME', 'ЗАПОЛНИТЕ_ЮЗЕРНЕЙМ_БОТА');             // TODO: username бота без @ (см. у @BotFather)
+define('BOT_USERNAME', 'instasave26bot');                      // username бота без @
 
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'u59_65ca5928');
@@ -51,7 +51,7 @@ define('SUB_CHECK_CACHE_MINUTES', 10);
 define('RAPIDAPI_KEY', 'PASTE_YOUR_RAPIDAPI_KEY_HERE');       // TODO: ключ RapidAPI для Instagram-провайдеров (rapidapi.com)
 define('SCHEMA_VERSION', 1);
 
-define('SELF_URL', 'https://ЗАПОЛНИТЕ-ВАШ-ДОМЕН.tj/bot.php'); // TODO: полный URL до этого файла на вашем хостинге
+define('SELF_URL', 'https://codetj.somonhost.com/test/bot/bot.php'); // полный URL до этого файла на вашем хостинге
 
 /* ============================ ИСКЛЮЧЕНИЯ ============================ */
 
