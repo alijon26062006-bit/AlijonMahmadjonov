@@ -25,22 +25,22 @@ date_default_timezone_set('Asia/Dushanbe');
 /* ============================ КОНСТАНТЫ ============================ */
 /* Заполните перед загрузкой на хостинг. Больше НИЧЕГО менять не нужно. */
 
-define('BOT_TOKEN', 'PASTE_YOUR_BOT_TOKEN_HERE');            // токен от @BotFather
-define('BOT_USERNAME', 'your_bot_username');                  // username бота без @
+define('BOT_TOKEN', '8530264507:AAG4UorWpm3GdBQTxMuhpeb0-aZmFAOTco0'); // токен от @BotFather
+define('BOT_USERNAME', 'ЗАПОЛНИТЕ_ЮЗЕРНЕЙМ_БОТА');             // TODO: username бота без @ (см. у @BotFather)
 
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'database_name');
-define('DB_USER', 'database_user');
-define('DB_PASS', 'database_password');
+define('DB_NAME', 'u59_65ca5928');
+define('DB_USER', 'u59_551cfd');
+define('DB_PASS', '95eea88824de221ced5d');
 define('DB_CHARSET', 'utf8mb4');
 
-define('WEBHOOK_SECRET', 'change_me_webhook_secret_123');     // проверяется в заголовке Telegram
-define('CRON_SECRET', 'change_me_cron_secret_456');           // ?cron=...
-define('SETUP_SECRET', 'change_me_setup_secret_789');         // ?setup=...
+define('WEBHOOK_SECRET', 'a64ff491e116c872afa396e32e225add3784ee59375d7216'); // проверяется в заголовке Telegram
+define('CRON_SECRET', '2dee9518cb1c92df129ad80c05364d84a20bb314adebd714');    // ?cron=...
+define('SETUP_SECRET', '5105305027dd905ba5bf31c5ae27a5ed1c3c30ec7f41c94b');   // ?setup=...
 
 define('ADMIN_LOGIN', 'admin');
-define('ADMIN_PASSWORD_HASH', '$2y$10$REPLACE.WITH.password_hash.RESULT.FOR.YOUR.PASSWORD'); // php -r "echo password_hash('пароль', PASSWORD_DEFAULT);"
-define('ADMIN_TG_ID', 0);                                     // ваш Telegram ID (для алертов об ошибках)
+define('ADMIN_PASSWORD_HASH', '$2y$12$wy4wuf9YBPGgbpHD7dhig.oEm3VMZDKtYH5kg0ZBGrl1LCXZ7zlHi'); // пароль: WvwJY2BcGPH7Fn (смените после первого входа)
+define('ADMIN_TG_ID', 7664430907);                             // ваш Telegram ID (для алертов об ошибках)
 
 define('MAX_FILE_MB', 50);
 define('FLOOD_SECONDS', 5);
@@ -48,10 +48,10 @@ define('DEFAULT_DAILY_LIMIT', 10);
 define('REF_BONUS', 3);
 define('SUB_CHECK_CACHE_MINUTES', 10);
 
-define('RAPIDAPI_KEY', 'PASTE_YOUR_RAPIDAPI_KEY_HERE');       // ключ RapidAPI для Instagram-провайдеров
+define('RAPIDAPI_KEY', 'PASTE_YOUR_RAPIDAPI_KEY_HERE');       // TODO: ключ RapidAPI для Instagram-провайдеров (rapidapi.com)
 define('SCHEMA_VERSION', 1);
 
-define('SELF_URL', 'https://your-domain.com/bot.php');        // полный URL до этого файла на хостинге
+define('SELF_URL', 'https://ЗАПОЛНИТЕ-ВАШ-ДОМЕН.tj/bot.php'); // TODO: полный URL до этого файла на вашем хостинге
 
 /* ============================ ИСКЛЮЧЕНИЯ ============================ */
 
