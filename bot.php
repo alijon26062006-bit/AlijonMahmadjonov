@@ -1409,6 +1409,15 @@ function run_setup(): void
 {
     header('Content-Type: text/html; charset=utf-8');
     echo "<h2>Установка бота</h2><pre>";
+    if (isset($_GET['reset']) && $_GET['reset'] === '1') {
+        try {
+            db()->exec("DROP TABLE IF EXISTS dl_cache, dl_channels, dl_downloads, dl_logs, dl_meta, dl_queue, dl_settings, dl_users");
+            echo "🗑 Старые таблицы dl_* удалены (сброс структуры).\n";
+        } catch (Throwable $e) {
+            echo "❌ Ошибка при удалении старых таблиц: " . h($e->getMessage()) . "\n</pre>";
+            return;
+        }
+    }
     try {
         migrate();
         echo "✅ Таблицы базы данных созданы/обновлены.\n";
