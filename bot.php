@@ -390,9 +390,9 @@ function tg_get_chat_member(int|string $chatId, int $userId): ?array
     }
 }
 
-function tg_set_webhook(): array
+function tg_set_webhook(): bool
 {
-    return tg_api('setWebhook', [
+    return (bool)tg_api('setWebhook', [
         'url' => SELF_URL,
         'secret_token' => WEBHOOK_SECRET,
         'allowed_updates' => json_encode(['message', 'callback_query']),
@@ -400,9 +400,9 @@ function tg_set_webhook(): array
     ]);
 }
 
-function tg_delete_webhook(): array
+function tg_delete_webhook(): bool
 {
-    return tg_api('deleteWebhook', []);
+    return (bool)tg_api('deleteWebhook', []);
 }
 
 /* ============================ НАСТРОЙКИ (dl_settings) ============================ */
