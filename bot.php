@@ -51,7 +51,7 @@ define('SUB_CHECK_CACHE_MINUTES', 10);
 define('RAPIDAPI_KEY', 'PASTE_YOUR_RAPIDAPI_KEY_HERE');       // TODO: ключ RapidAPI для Instagram-провайдеров (rapidapi.com)
 define('SCHEMA_VERSION', 1);
 
-define('SELF_URL', 'https://codetj.somonhost.com/test/bot/bot.php'); // полный URL до этого файла на вашем хостинге
+define('SELF_URL', 'https://codetj.somonhost.com/test/bot.php'); // полный URL до этого файла на вашем хостинге
 
 /* ============================ ИСКЛЮЧЕНИЯ ============================ */
 
@@ -73,8 +73,11 @@ exit;
 function route_request(): void
 {
     $secretHeader = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
+    $secretQuery = $_GET['wh'] ?? '';
+    $webhookAuthOk = ($secretHeader !== '' && hash_equals(WEBHOOK_SECRET, (string)$secretHeader))
+        || ($secretQuery !== '' && hash_equals(WEBHOOK_SECRET, (string)$secretQuery));
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && $secretHeader !== '' && hash_equals(WEBHOOK_SECRET, (string)$secretHeader)) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && $webhookAuthOk) {
         run_webhook();
         return;
     }
@@ -392,8 +395,10 @@ function tg_get_chat_member(int|string $chatId, int $userId): ?array
 
 function tg_set_webhook(): bool
 {
+    // Секрет продублирован в URL параметром ?wh=, т.к. некоторые shared-хостинги
+    // не пробрасывают заголовок X-Telegram-Bot-Api-Secret-Token в $_SERVER.
     return (bool)tg_api('setWebhook', [
-        'url' => SELF_URL,
+        'url' => SELF_URL . '?wh=' . urlencode(WEBHOOK_SECRET),
         'secret_token' => WEBHOOK_SECRET,
         'allowed_updates' => json_encode(['message', 'callback_query']),
         'drop_pending_updates' => false,
