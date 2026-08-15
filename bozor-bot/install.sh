@@ -8,8 +8,32 @@ ok()   { echo -e "${GREEN}✓${NC} $*"; }
 warn() { echo -e "${YELLOW}!${NC} $*"; }
 err()  { echo -e "${RED}✗${NC} $*" >&2; }
 
-[ "$(id -u)" -eq 0 ] || { err "Запустите через sudo: sudo bash install.sh"; exit 1; }
+[ "$(id -u)" -eq 0 ] || { err "Нужны права root. Запустите: sudo bash install.sh (или войдите как root)"; exit 1; }
 [ -f docker-compose.yml ] || { err "Запускайте из папки проекта (где docker-compose.yml)"; exit 1; }
+
+# ─────────────── 0. Базовые утилиты ───────────────
+# На минимальном Debian может не быть curl и openssl
+MISSING=""
+for tool in curl openssl ca-certificates; do
+  case "$tool" in
+    ca-certificates) [ -d /etc/ssl/certs ] || MISSING="$MISSING $tool" ;;
+    *) command -v "$tool" >/dev/null 2>&1 || MISSING="$MISSING $tool" ;;
+  esac
+done
+if [ -n "$MISSING" ]; then
+  echo "Доустанавливаю:$MISSING"
+  apt-get update -qq && apt-get install -y -qq $MISSING >/dev/null
+  ok "Утилиты установлены"
+fi
+
+# Генератор секретов: openssl, а если его нет — /dev/urandom
+rand_hex() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex "$1"
+  else
+    head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'
+  fi
+}
 
 echo
 echo "══════════════════════════════════════════════"
@@ -60,8 +84,8 @@ else
   fi
 
   # Секреты генерируются сами — руками их придумывать не нужно
-  JWT_SECRET=$(openssl rand -hex 32)
-  POSTGRES_PASSWORD=$(openssl rand -hex 16)
+  JWT_SECRET=$(rand_hex 32)
+  POSTGRES_PASSWORD=$(rand_hex 16)
 
   cat > .env <<EOF
 ENV=prod
