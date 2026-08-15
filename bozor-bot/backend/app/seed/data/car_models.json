@@ -1,0 +1,3166 @@
+{
+  "meta": {
+    "description": "Модели автомобилей",
+    "region": "Таджикистан",
+    "total_models": 526,
+    "brands_covered": 60
+  },
+  "models": [
+    {
+      "brand": "Toyota",
+      "name": "Camry",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Toyota",
+      "name": "Corolla",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Toyota",
+      "name": "Yaris",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Toyota",
+      "name": "Avalon",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Toyota",
+      "name": "Crown",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Toyota",
+      "name": "Mark II",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Toyota",
+      "name": "Vitz",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Toyota",
+      "name": "Premio",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Toyota",
+      "name": "Allion",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Toyota",
+      "name": "Avensis",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Toyota",
+      "name": "RAV4",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Toyota",
+      "name": "C-HR",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Toyota",
+      "name": "Venza",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "Toyota",
+      "name": "Highlander",
+      "area": "cars",
+      "sort_order": 13
+    },
+    {
+      "brand": "Toyota",
+      "name": "Land Cruiser 100",
+      "area": "cars",
+      "sort_order": 14
+    },
+    {
+      "brand": "Toyota",
+      "name": "Land Cruiser 200",
+      "area": "cars",
+      "sort_order": 15
+    },
+    {
+      "brand": "Toyota",
+      "name": "Land Cruiser 300",
+      "area": "cars",
+      "sort_order": 16
+    },
+    {
+      "brand": "Toyota",
+      "name": "Land Cruiser Prado",
+      "area": "cars",
+      "sort_order": 17
+    },
+    {
+      "brand": "Toyota",
+      "name": "4Runner",
+      "area": "cars",
+      "sort_order": 18
+    },
+    {
+      "brand": "Toyota",
+      "name": "Sequoia",
+      "area": "cars",
+      "sort_order": 19
+    },
+    {
+      "brand": "Toyota",
+      "name": "Fortuner",
+      "area": "cars",
+      "sort_order": 20
+    },
+    {
+      "brand": "Toyota",
+      "name": "Hilux",
+      "area": "cars",
+      "sort_order": 21
+    },
+    {
+      "brand": "Toyota",
+      "name": "Sienna",
+      "area": "cars",
+      "sort_order": 22
+    },
+    {
+      "brand": "Toyota",
+      "name": "Alphard",
+      "area": "cars",
+      "sort_order": 23
+    },
+    {
+      "brand": "Toyota",
+      "name": "Vellfire",
+      "area": "cars",
+      "sort_order": 24
+    },
+    {
+      "brand": "Toyota",
+      "name": "Estima",
+      "area": "cars",
+      "sort_order": 25
+    },
+    {
+      "brand": "Toyota",
+      "name": "Ipsum",
+      "area": "cars",
+      "sort_order": 26
+    },
+    {
+      "brand": "Toyota",
+      "name": "Carina",
+      "area": "cars",
+      "sort_order": 27
+    },
+    {
+      "brand": "Opel",
+      "name": "Astra",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Opel",
+      "name": "Vectra",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Opel",
+      "name": "Corsa",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Opel",
+      "name": "Omega",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Opel",
+      "name": "Zafira",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Opel",
+      "name": "Insignia",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Opel",
+      "name": "Meriva",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Opel",
+      "name": "Antara",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Opel",
+      "name": "Mokka",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Opel",
+      "name": "Combo",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Opel",
+      "name": "Frontera",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Opel",
+      "name": "Kadett",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Opel",
+      "name": "Vita",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "Opel",
+      "name": "Signum",
+      "area": "cars",
+      "sort_order": 13
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "A-Class",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "B-Class",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "C-Class",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "E-Class",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "S-Class",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "CLA",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "CLS",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "GLA",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "GLB",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "GLC",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "GLE",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "GLS",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "ML",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "GL",
+      "area": "cars",
+      "sort_order": 13
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "G-Class",
+      "area": "cars",
+      "sort_order": 14
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "V-Class",
+      "area": "cars",
+      "sort_order": 15
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "Vito",
+      "area": "cars",
+      "sort_order": 16
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "Sprinter",
+      "area": "cars",
+      "sort_order": 17
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "190 (W201)",
+      "area": "cars",
+      "sort_order": 18
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "name": "124 (W124)",
+      "area": "cars",
+      "sort_order": 19
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2101",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2102",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2103",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2104",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2105",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2106",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2107",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2108",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2109",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "21099",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2110",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2111",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2112",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2113",
+      "area": "cars",
+      "sort_order": 13
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2114",
+      "area": "cars",
+      "sort_order": 14
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "2115",
+      "area": "cars",
+      "sort_order": 15
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "Niva",
+      "area": "cars",
+      "sort_order": 16
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "Niva Travel",
+      "area": "cars",
+      "sort_order": 17
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "Granta",
+      "area": "cars",
+      "sort_order": 18
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "Vesta",
+      "area": "cars",
+      "sort_order": 19
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "Kalina",
+      "area": "cars",
+      "sort_order": 20
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "Priora",
+      "area": "cars",
+      "sort_order": 21
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "Largus",
+      "area": "cars",
+      "sort_order": 22
+    },
+    {
+      "brand": "Lada (ВАЗ)",
+      "name": "XRAY",
+      "area": "cars",
+      "sort_order": 23
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Spark",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Matiz",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Nexia",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Nexia 3",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Cobalt",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Lacetti",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Gentra",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Aveo",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Malibu",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Epica",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Captiva",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Tracker",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Onix",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Equinox",
+      "area": "cars",
+      "sort_order": 13
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Traverse",
+      "area": "cars",
+      "sort_order": 14
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Tahoe",
+      "area": "cars",
+      "sort_order": 15
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Trailblazer",
+      "area": "cars",
+      "sort_order": 16
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Orlando",
+      "area": "cars",
+      "sort_order": 17
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Damas",
+      "area": "cars",
+      "sort_order": 18
+    },
+    {
+      "brand": "Chevrolet",
+      "name": "Labo",
+      "area": "cars",
+      "sort_order": 19
+    },
+    {
+      "brand": "Daewoo",
+      "name": "Matiz",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Daewoo",
+      "name": "Tico",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Daewoo",
+      "name": "Nexia",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Daewoo",
+      "name": "Damas",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Daewoo",
+      "name": "Labo",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Daewoo",
+      "name": "Lacetti",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Daewoo",
+      "name": "Gentra",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Daewoo",
+      "name": "Espero",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Daewoo",
+      "name": "Leganza",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Daewoo",
+      "name": "Magnus",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Daewoo",
+      "name": "Nubira",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Accent",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Solaris",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Elantra",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Sonata",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Grandeur",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Getz",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Hyundai",
+      "name": "i30",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Hyundai",
+      "name": "i40",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Tucson",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Santa Fe",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Creta",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Palisade",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Kona",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Venue",
+      "area": "cars",
+      "sort_order": 13
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Starex",
+      "area": "cars",
+      "sort_order": 14
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Staria",
+      "area": "cars",
+      "sort_order": 15
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Porter",
+      "area": "cars",
+      "sort_order": 16
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Avante",
+      "area": "cars",
+      "sort_order": 17
+    },
+    {
+      "brand": "Hyundai",
+      "name": "Verna",
+      "area": "cars",
+      "sort_order": 18
+    },
+    {
+      "brand": "Kia",
+      "name": "Rio",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Kia",
+      "name": "Picanto",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Kia",
+      "name": "Cerato",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Kia",
+      "name": "Optima",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Kia",
+      "name": "K5",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Kia",
+      "name": "Soul",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Kia",
+      "name": "Sportage",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Kia",
+      "name": "Sorento",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Kia",
+      "name": "Seltos",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Kia",
+      "name": "Carnival",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Kia",
+      "name": "Mohave",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Kia",
+      "name": "Telluride",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Kia",
+      "name": "Stinger",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "Kia",
+      "name": "Cee'd",
+      "area": "cars",
+      "sort_order": 13
+    },
+    {
+      "brand": "Kia",
+      "name": "Spectra",
+      "area": "cars",
+      "sort_order": 14
+    },
+    {
+      "brand": "Kia",
+      "name": "Morning",
+      "area": "cars",
+      "sort_order": 15
+    },
+    {
+      "brand": "BMW",
+      "name": "1 Series",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "BMW",
+      "name": "2 Series",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "BMW",
+      "name": "3 Series",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "BMW",
+      "name": "4 Series",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "BMW",
+      "name": "5 Series",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "BMW",
+      "name": "6 Series",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "BMW",
+      "name": "7 Series",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "BMW",
+      "name": "8 Series",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "BMW",
+      "name": "X1",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "BMW",
+      "name": "X2",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "BMW",
+      "name": "X3",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "BMW",
+      "name": "X4",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "BMW",
+      "name": "X5",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "BMW",
+      "name": "X6",
+      "area": "cars",
+      "sort_order": 13
+    },
+    {
+      "brand": "BMW",
+      "name": "X7",
+      "area": "cars",
+      "sort_order": 14
+    },
+    {
+      "brand": "BMW",
+      "name": "Z4",
+      "area": "cars",
+      "sort_order": 15
+    },
+    {
+      "brand": "BMW",
+      "name": "M3",
+      "area": "cars",
+      "sort_order": 16
+    },
+    {
+      "brand": "BMW",
+      "name": "M5",
+      "area": "cars",
+      "sort_order": 17
+    },
+    {
+      "brand": "BMW",
+      "name": "i3",
+      "area": "cars",
+      "sort_order": 18
+    },
+    {
+      "brand": "BMW",
+      "name": "i4",
+      "area": "cars",
+      "sort_order": 19
+    },
+    {
+      "brand": "BMW",
+      "name": "iX",
+      "area": "cars",
+      "sort_order": 20
+    },
+    {
+      "brand": "BMW",
+      "name": "E34",
+      "area": "cars",
+      "sort_order": 21
+    },
+    {
+      "brand": "BMW",
+      "name": "E39",
+      "area": "cars",
+      "sort_order": 22
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Golf",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Passat",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Polo",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Jetta",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Tiguan",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Touareg",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Touran",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Sharan",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Caddy",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Transporter",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Bora",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Vento",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Amarok",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "Volkswagen",
+      "name": "Teramont",
+      "area": "cars",
+      "sort_order": 13
+    },
+    {
+      "brand": "Nissan",
+      "name": "Almera",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Nissan",
+      "name": "Sunny",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Nissan",
+      "name": "Note",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Nissan",
+      "name": "Tiida",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Nissan",
+      "name": "Sentra",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Nissan",
+      "name": "Teana",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Nissan",
+      "name": "Altima",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Nissan",
+      "name": "Maxima",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Nissan",
+      "name": "Juke",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Nissan",
+      "name": "Qashqai",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Nissan",
+      "name": "X-Trail",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Nissan",
+      "name": "Murano",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Nissan",
+      "name": "Pathfinder",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "Nissan",
+      "name": "Patrol",
+      "area": "cars",
+      "sort_order": 13
+    },
+    {
+      "brand": "Nissan",
+      "name": "Leaf",
+      "area": "cars",
+      "sort_order": 14
+    },
+    {
+      "brand": "Nissan",
+      "name": "Primera",
+      "area": "cars",
+      "sort_order": 15
+    },
+    {
+      "brand": "Nissan",
+      "name": "Bluebird",
+      "area": "cars",
+      "sort_order": 16
+    },
+    {
+      "brand": "Honda",
+      "name": "Civic",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Honda",
+      "name": "Accord",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Honda",
+      "name": "CR-V",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Honda",
+      "name": "HR-V",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Honda",
+      "name": "Pilot",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Honda",
+      "name": "Fit",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Honda",
+      "name": "Jazz",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Honda",
+      "name": "Odyssey",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Honda",
+      "name": "Stepwgn",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Honda",
+      "name": "Insight",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Honda",
+      "name": "Legend",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Honda",
+      "name": "Element",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "Lancer",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "Galant",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "Outlander",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "Pajero",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "Pajero Sport",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "ASX",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "Montero",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "Colt",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "Space Wagon",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "L200",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "Eclipse Cross",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Mitsubishi",
+      "name": "Delica",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Audi",
+      "name": "A3",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Audi",
+      "name": "A4",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Audi",
+      "name": "A5",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Audi",
+      "name": "A6",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Audi",
+      "name": "A7",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Audi",
+      "name": "A8",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Audi",
+      "name": "Q3",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Audi",
+      "name": "Q5",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Audi",
+      "name": "Q7",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Audi",
+      "name": "Q8",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Audi",
+      "name": "TT",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Audi",
+      "name": "80",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Audi",
+      "name": "100",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "Audi",
+      "name": "e-tron",
+      "area": "cars",
+      "sort_order": 13
+    },
+    {
+      "brand": "Ford",
+      "name": "Focus",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Ford",
+      "name": "Mondeo",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Ford",
+      "name": "Fiesta",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Ford",
+      "name": "Fusion",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Ford",
+      "name": "Escape",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Ford",
+      "name": "Explorer",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Ford",
+      "name": "Kuga",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Ford",
+      "name": "Transit",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Ford",
+      "name": "Ranger",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Ford",
+      "name": "Edge",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Ford",
+      "name": "Escort",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Ford",
+      "name": "Sierra",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Mazda",
+      "name": "Mazda 3",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Mazda",
+      "name": "Mazda 6",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Mazda",
+      "name": "Mazda 2",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Mazda",
+      "name": "CX-3",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Mazda",
+      "name": "CX-5",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Mazda",
+      "name": "CX-7",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Mazda",
+      "name": "CX-9",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Mazda",
+      "name": "Demio",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Mazda",
+      "name": "Axela",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Mazda",
+      "name": "Atenza",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Mazda",
+      "name": "MPV",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Mazda",
+      "name": "323",
+      "area": "cars",
+      "sort_order": 11
+    },
+    {
+      "brand": "Mazda",
+      "name": "626",
+      "area": "cars",
+      "sort_order": 12
+    },
+    {
+      "brand": "Subaru",
+      "name": "Impreza",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Subaru",
+      "name": "Legacy",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Subaru",
+      "name": "Forester",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Subaru",
+      "name": "Outback",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Subaru",
+      "name": "XV",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Subaru",
+      "name": "Tribeca",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Subaru",
+      "name": "WRX",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Subaru",
+      "name": "BRZ",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Subaru",
+      "name": "Levorg",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Lexus",
+      "name": "ES",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Lexus",
+      "name": "IS",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Lexus",
+      "name": "GS",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Lexus",
+      "name": "LS",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Lexus",
+      "name": "NX",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Lexus",
+      "name": "RX",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Lexus",
+      "name": "GX",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Lexus",
+      "name": "LX",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Lexus",
+      "name": "UX",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Lexus",
+      "name": "RC",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Lexus",
+      "name": "CT",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Suzuki",
+      "name": "Swift",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Suzuki",
+      "name": "Vitara",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Suzuki",
+      "name": "Grand Vitara",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Suzuki",
+      "name": "SX4",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Suzuki",
+      "name": "Jimny",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Suzuki",
+      "name": "Alto",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Suzuki",
+      "name": "Baleno",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Suzuki",
+      "name": "Wagon R",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Suzuki",
+      "name": "Escudo",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Renault",
+      "name": "Logan",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Renault",
+      "name": "Sandero",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Renault",
+      "name": "Duster",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Renault",
+      "name": "Megane",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Renault",
+      "name": "Clio",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Renault",
+      "name": "Symbol",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Renault",
+      "name": "Fluence",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Renault",
+      "name": "Kaptur",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Renault",
+      "name": "Laguna",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Renault",
+      "name": "Scenic",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Renault",
+      "name": "Kangoo",
+      "area": "cars",
+      "sort_order": 10
+    },
+    {
+      "brand": "Škoda",
+      "name": "Octavia",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Škoda",
+      "name": "Rapid",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Škoda",
+      "name": "Fabia",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Škoda",
+      "name": "Superb",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Škoda",
+      "name": "Kodiaq",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Škoda",
+      "name": "Karoq",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Škoda",
+      "name": "Yeti",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Škoda",
+      "name": "Felicia",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Peugeot",
+      "name": "206",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Peugeot",
+      "name": "207",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Peugeot",
+      "name": "301",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Peugeot",
+      "name": "307",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Peugeot",
+      "name": "308",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Peugeot",
+      "name": "406",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Peugeot",
+      "name": "407",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Peugeot",
+      "name": "508",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Peugeot",
+      "name": "3008",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Peugeot",
+      "name": "Partner",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Chery",
+      "name": "Tiggo 2",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Chery",
+      "name": "Tiggo 3",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Chery",
+      "name": "Tiggo 4",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Chery",
+      "name": "Tiggo 7 Pro",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Chery",
+      "name": "Tiggo 8 Pro",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Chery",
+      "name": "Arrizo 5",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Chery",
+      "name": "Arrizo 6",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Chery",
+      "name": "Arrizo 8",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Chery",
+      "name": "QQ",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Chery",
+      "name": "Amulet",
+      "area": "cars",
+      "sort_order": 9
+    },
+    {
+      "brand": "Haval",
+      "name": "Jolion",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Haval",
+      "name": "F7",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Haval",
+      "name": "F7x",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Haval",
+      "name": "H6",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Haval",
+      "name": "H9",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Haval",
+      "name": "Dargo",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Haval",
+      "name": "M6",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "BYD",
+      "name": "Song Plus",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "BYD",
+      "name": "Han",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "BYD",
+      "name": "Qin Plus",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "BYD",
+      "name": "Tang",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "BYD",
+      "name": "Seal",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "BYD",
+      "name": "Atto 3",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "BYD",
+      "name": "Dolphin",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "BYD",
+      "name": "Seagull",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "BYD",
+      "name": "F3",
+      "area": "cars",
+      "sort_order": 8
+    },
+    {
+      "brand": "Geely",
+      "name": "Coolray",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Geely",
+      "name": "Atlas",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Geely",
+      "name": "Atlas Pro",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Geely",
+      "name": "Emgrand",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Geely",
+      "name": "Tugella",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Geely",
+      "name": "Monjaro",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Geely",
+      "name": "Okavango",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Geely",
+      "name": "MK",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Changan",
+      "name": "CS35 Plus",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Changan",
+      "name": "CS55 Plus",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Changan",
+      "name": "CS75 Plus",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Changan",
+      "name": "CS85",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Changan",
+      "name": "Eado",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Changan",
+      "name": "UNI-K",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Changan",
+      "name": "UNI-T",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Changan",
+      "name": "Alsvin",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "ГАЗ",
+      "name": "Волга 24",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "ГАЗ",
+      "name": "Волга 3110",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "ГАЗ",
+      "name": "Волга 31105",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "ГАЗ",
+      "name": "Газель",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "ГАЗ",
+      "name": "Газель Next",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "ГАЗ",
+      "name": "Соболь",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "ГАЗ",
+      "name": "66",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "ГАЗ",
+      "name": "53",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "УАЗ",
+      "name": "469",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "УАЗ",
+      "name": "Хантер",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "УАЗ",
+      "name": "Патриот",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "УАЗ",
+      "name": "Буханка",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "УАЗ",
+      "name": "Пикап",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "УАЗ",
+      "name": "Профи",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Москвич",
+      "name": "412",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Москвич",
+      "name": "2140",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Москвич",
+      "name": "2141",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Москвич",
+      "name": "Святогор",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Москвич",
+      "name": "3",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Daihatsu",
+      "name": "Terios",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Daihatsu",
+      "name": "Mira",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Daihatsu",
+      "name": "Move",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Daihatsu",
+      "name": "Charade",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Daihatsu",
+      "name": "Sirion",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Isuzu",
+      "name": "Trooper",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Isuzu",
+      "name": "Bighorn",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Isuzu",
+      "name": "D-Max",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Isuzu",
+      "name": "NPR",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Isuzu",
+      "name": "Elf",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Ravon",
+      "name": "R2",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Ravon",
+      "name": "R3 Nexia",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Ravon",
+      "name": "R4",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Ravon",
+      "name": "Gentra",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Ravon",
+      "name": "Matiz",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Ravon",
+      "name": "Nexia 3",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Volvo",
+      "name": "S40",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Volvo",
+      "name": "S60",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Volvo",
+      "name": "S80",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Volvo",
+      "name": "XC60",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Volvo",
+      "name": "XC70",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Volvo",
+      "name": "XC90",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Volvo",
+      "name": "V40",
+      "area": "cars",
+      "sort_order": 6
+    },
+    {
+      "brand": "Volvo",
+      "name": "940",
+      "area": "cars",
+      "sort_order": 7
+    },
+    {
+      "brand": "Land Rover",
+      "name": "Range Rover",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Land Rover",
+      "name": "Range Rover Sport",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Land Rover",
+      "name": "Range Rover Evoque",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Land Rover",
+      "name": "Discovery",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Land Rover",
+      "name": "Defender",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Land Rover",
+      "name": "Freelander",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "Tesla",
+      "name": "Model 3",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Tesla",
+      "name": "Model S",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Tesla",
+      "name": "Model X",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Tesla",
+      "name": "Model Y",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Fiat",
+      "name": "Albea",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Fiat",
+      "name": "Punto",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Fiat",
+      "name": "Doblo",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Fiat",
+      "name": "Ducato",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Fiat",
+      "name": "Tipo",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Citroën",
+      "name": "C3",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Citroën",
+      "name": "C4",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Citroën",
+      "name": "C5",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Citroën",
+      "name": "Berlingo",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Citroën",
+      "name": "Jumper",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Mini",
+      "name": "Cooper",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Mini",
+      "name": "Countryman",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Mini",
+      "name": "Clubman",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Porsche",
+      "name": "Cayenne",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Porsche",
+      "name": "Macan",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Porsche",
+      "name": "Panamera",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Porsche",
+      "name": "911",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Porsche",
+      "name": "Taycan",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Jaguar",
+      "name": "XF",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Jaguar",
+      "name": "XE",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Jaguar",
+      "name": "XJ",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Jaguar",
+      "name": "F-Pace",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Infiniti",
+      "name": "FX35",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Infiniti",
+      "name": "QX56",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Infiniti",
+      "name": "QX60",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Infiniti",
+      "name": "QX80",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Infiniti",
+      "name": "G25",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Infiniti",
+      "name": "M37",
+      "area": "cars",
+      "sort_order": 5
+    },
+    {
+      "brand": "SsangYong",
+      "name": "Rexton",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "SsangYong",
+      "name": "Actyon",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "SsangYong",
+      "name": "Kyron",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "SsangYong",
+      "name": "Musso",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "SsangYong",
+      "name": "Korando",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Genesis",
+      "name": "G70",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Genesis",
+      "name": "G80",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Genesis",
+      "name": "G90",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Genesis",
+      "name": "GV70",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Genesis",
+      "name": "GV80",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Acura",
+      "name": "MDX",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Acura",
+      "name": "RDX",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Acura",
+      "name": "TL",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Acura",
+      "name": "TSX",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Acura",
+      "name": "ZDX",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "JAC",
+      "name": "S3",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "JAC",
+      "name": "S5",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "JAC",
+      "name": "S7",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "JAC",
+      "name": "T6",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "JAC",
+      "name": "J7",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Exeed",
+      "name": "TXL",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Exeed",
+      "name": "VX",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Exeed",
+      "name": "LX",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Exeed",
+      "name": "RX",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Jetour",
+      "name": "X70",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Jetour",
+      "name": "X90",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Jetour",
+      "name": "Dashing",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Jetour",
+      "name": "T2",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Omoda",
+      "name": "C5",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Omoda",
+      "name": "S5",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Omoda",
+      "name": "C7",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Lifan",
+      "name": "X60",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Lifan",
+      "name": "X50",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Lifan",
+      "name": "Solano",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Lifan",
+      "name": "Smily",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Lifan",
+      "name": "Breez",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Great Wall",
+      "name": "Hover",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Great Wall",
+      "name": "Wingle",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Great Wall",
+      "name": "Poer",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Great Wall",
+      "name": "Deer",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Dongfeng",
+      "name": "AX7",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Dongfeng",
+      "name": "S30",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Dongfeng",
+      "name": "H30",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Dongfeng",
+      "name": "580",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "FAW",
+      "name": "Besturn X80",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "FAW",
+      "name": "V5",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "FAW",
+      "name": "Vita",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "FAW",
+      "name": "Oley",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "ЗАЗ",
+      "name": "968",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "ЗАЗ",
+      "name": "1102 Таврия",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "ЗАЗ",
+      "name": "Sens",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "ЗАЗ",
+      "name": "Chance",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "ЗАЗ",
+      "name": "Vida",
+      "area": "cars",
+      "sort_order": 4
+    },
+    {
+      "brand": "Seat",
+      "name": "Ibiza",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Seat",
+      "name": "Leon",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Seat",
+      "name": "Toledo",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Seat",
+      "name": "Ateca",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Cadillac",
+      "name": "Escalade",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Cadillac",
+      "name": "SRX",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Cadillac",
+      "name": "CTS",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Cadillac",
+      "name": "XT5",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Jeep",
+      "name": "Grand Cherokee",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Jeep",
+      "name": "Cherokee",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Jeep",
+      "name": "Wrangler",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Jeep",
+      "name": "Compass",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Dodge",
+      "name": "Caravan",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Dodge",
+      "name": "Journey",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Dodge",
+      "name": "Charger",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Dodge",
+      "name": "Durango",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Zeekr",
+      "name": "001",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Zeekr",
+      "name": "007",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Zeekr",
+      "name": "X",
+      "area": "cars",
+      "sort_order": 2
+    },
+    {
+      "brand": "Zeekr",
+      "name": "009",
+      "area": "cars",
+      "sort_order": 3
+    },
+    {
+      "brand": "Li Auto",
+      "name": "L7",
+      "area": "cars",
+      "sort_order": 0
+    },
+    {
+      "brand": "Li Auto",
+      "name": "L8",
+      "area": "cars",
+      "sort_order": 1
+    },
+    {
+      "brand": "Li Auto",
+      "name": "L9",
+      "area": "cars",
+      "sort_order": 2
+    }
+  ]
+}

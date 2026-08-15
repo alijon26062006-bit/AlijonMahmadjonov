@@ -1,0 +1,2192 @@
+{
+  "meta": {
+    "description": "Справочник брендов по областям применения",
+    "region": "Таджикистан",
+    "note": "Порядок отражает распространённость на рынке. Список редактируется администратором без обновления системы.",
+    "areas": {
+      "cars": "Автомобили",
+      "phones": "Телефоны и планшеты",
+      "computers": "Компьютеры и ноутбуки",
+      "components": "Комплектующие",
+      "appliances": "Бытовая техника",
+      "tv_audio": "Телевизоры и аудио",
+      "tools": "Инструмент и садовая техника",
+      "moto_bike": "Мото и велотехника",
+      "electronics": "Прочая электроника"
+    },
+    "total_brands": 265
+  },
+  "brands": [
+    {
+      "name": "Toyota",
+      "areas": [
+        "cars"
+      ],
+      "popular": true,
+      "sort_order": 0
+    },
+    {
+      "name": "Opel",
+      "areas": [
+        "cars"
+      ],
+      "popular": true,
+      "sort_order": 1
+    },
+    {
+      "name": "Mercedes-Benz",
+      "areas": [
+        "cars"
+      ],
+      "popular": true,
+      "sort_order": 2
+    },
+    {
+      "name": "Lada (ВАЗ)",
+      "areas": [
+        "cars"
+      ],
+      "popular": true,
+      "sort_order": 3
+    },
+    {
+      "name": "Chevrolet",
+      "areas": [
+        "cars"
+      ],
+      "popular": true,
+      "sort_order": 4
+    },
+    {
+      "name": "Daewoo",
+      "areas": [
+        "cars"
+      ],
+      "popular": true,
+      "sort_order": 5
+    },
+    {
+      "name": "Hyundai",
+      "areas": [
+        "cars"
+      ],
+      "popular": true,
+      "sort_order": 6
+    },
+    {
+      "name": "Kia",
+      "areas": [
+        "cars"
+      ],
+      "popular": true,
+      "sort_order": 7
+    },
+    {
+      "name": "BMW",
+      "areas": [
+        "cars"
+      ],
+      "popular": true,
+      "sort_order": 8
+    },
+    {
+      "name": "Volkswagen",
+      "areas": [
+        "cars"
+      ],
+      "popular": true,
+      "sort_order": 9
+    },
+    {
+      "name": "Nissan",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 10
+    },
+    {
+      "name": "Honda",
+      "areas": [
+        "cars",
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 11
+    },
+    {
+      "name": "Mitsubishi",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 12
+    },
+    {
+      "name": "Audi",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 13
+    },
+    {
+      "name": "Ford",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 14
+    },
+    {
+      "name": "Mazda",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 15
+    },
+    {
+      "name": "Subaru",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 16
+    },
+    {
+      "name": "Lexus",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 17
+    },
+    {
+      "name": "Suzuki",
+      "areas": [
+        "cars",
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 18
+    },
+    {
+      "name": "Renault",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 19
+    },
+    {
+      "name": "Škoda",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 20
+    },
+    {
+      "name": "Peugeot",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 21
+    },
+    {
+      "name": "Daihatsu",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 22
+    },
+    {
+      "name": "Chery",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 23
+    },
+    {
+      "name": "Haval",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 24
+    },
+    {
+      "name": "BYD",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 25
+    },
+    {
+      "name": "Geely",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 26
+    },
+    {
+      "name": "Changan",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 27
+    },
+    {
+      "name": "JAC",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 28
+    },
+    {
+      "name": "Exeed",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 29
+    },
+    {
+      "name": "Jetour",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 30
+    },
+    {
+      "name": "Omoda",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 31
+    },
+    {
+      "name": "Lifan",
+      "areas": [
+        "cars",
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 32
+    },
+    {
+      "name": "Great Wall",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 33
+    },
+    {
+      "name": "Dongfeng",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 34
+    },
+    {
+      "name": "FAW",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 35
+    },
+    {
+      "name": "ГАЗ",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 36
+    },
+    {
+      "name": "УАЗ",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 37
+    },
+    {
+      "name": "Москвич",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 38
+    },
+    {
+      "name": "ЗАЗ",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 39
+    },
+    {
+      "name": "Isuzu",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 40
+    },
+    {
+      "name": "Land Rover",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 41
+    },
+    {
+      "name": "Volvo",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 42
+    },
+    {
+      "name": "Porsche",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 43
+    },
+    {
+      "name": "Jaguar",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 44
+    },
+    {
+      "name": "Mini",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 45
+    },
+    {
+      "name": "Infiniti",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 46
+    },
+    {
+      "name": "SsangYong",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 47
+    },
+    {
+      "name": "Fiat",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 48
+    },
+    {
+      "name": "Citroën",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 49
+    },
+    {
+      "name": "Tesla",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 50
+    },
+    {
+      "name": "Genesis",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 51
+    },
+    {
+      "name": "Acura",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 52
+    },
+    {
+      "name": "Ravon",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 53
+    },
+    {
+      "name": "Seat",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 54
+    },
+    {
+      "name": "Cadillac",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 55
+    },
+    {
+      "name": "Jeep",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 56
+    },
+    {
+      "name": "Dodge",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 57
+    },
+    {
+      "name": "Zeekr",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 58
+    },
+    {
+      "name": "Li Auto",
+      "areas": [
+        "cars"
+      ],
+      "popular": false,
+      "sort_order": 59
+    },
+    {
+      "name": "Samsung",
+      "areas": [
+        "phones",
+        "computers",
+        "components",
+        "appliances",
+        "tv_audio",
+        "electronics"
+      ],
+      "popular": true,
+      "sort_order": 0
+    },
+    {
+      "name": "Apple",
+      "areas": [
+        "phones",
+        "computers",
+        "electronics"
+      ],
+      "popular": true,
+      "sort_order": 1
+    },
+    {
+      "name": "Xiaomi",
+      "areas": [
+        "phones",
+        "computers",
+        "appliances",
+        "tv_audio",
+        "electronics"
+      ],
+      "popular": true,
+      "sort_order": 2
+    },
+    {
+      "name": "Redmi",
+      "areas": [
+        "phones"
+      ],
+      "popular": true,
+      "sort_order": 3
+    },
+    {
+      "name": "POCO",
+      "areas": [
+        "phones"
+      ],
+      "popular": true,
+      "sort_order": 4
+    },
+    {
+      "name": "Infinix",
+      "areas": [
+        "phones"
+      ],
+      "popular": true,
+      "sort_order": 5
+    },
+    {
+      "name": "Tecno",
+      "areas": [
+        "phones"
+      ],
+      "popular": true,
+      "sort_order": 6
+    },
+    {
+      "name": "itel",
+      "areas": [
+        "phones"
+      ],
+      "popular": true,
+      "sort_order": 7
+    },
+    {
+      "name": "Realme",
+      "areas": [
+        "phones"
+      ],
+      "popular": true,
+      "sort_order": 8
+    },
+    {
+      "name": "Huawei",
+      "areas": [
+        "phones",
+        "computers",
+        "electronics"
+      ],
+      "popular": true,
+      "sort_order": 9
+    },
+    {
+      "name": "Honor",
+      "areas": [
+        "phones",
+        "computers",
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 10
+    },
+    {
+      "name": "OPPO",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 11
+    },
+    {
+      "name": "vivo",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 12
+    },
+    {
+      "name": "Nokia",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 13
+    },
+    {
+      "name": "Motorola",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 14
+    },
+    {
+      "name": "OnePlus",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 15
+    },
+    {
+      "name": "Google Pixel",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 16
+    },
+    {
+      "name": "ZTE",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 17
+    },
+    {
+      "name": "Nubia",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 18
+    },
+    {
+      "name": "Meizu",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 19
+    },
+    {
+      "name": "Asus",
+      "areas": [
+        "phones",
+        "computers",
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 20
+    },
+    {
+      "name": "Sony",
+      "areas": [
+        "phones",
+        "computers",
+        "tv_audio",
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 21
+    },
+    {
+      "name": "LG",
+      "areas": [
+        "phones",
+        "computers",
+        "appliances",
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 22
+    },
+    {
+      "name": "HTC",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 23
+    },
+    {
+      "name": "Lenovo",
+      "areas": [
+        "phones",
+        "computers"
+      ],
+      "popular": false,
+      "sort_order": 24
+    },
+    {
+      "name": "Alcatel",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 25
+    },
+    {
+      "name": "TCL",
+      "areas": [
+        "phones",
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 26
+    },
+    {
+      "name": "Nothing",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 27
+    },
+    {
+      "name": "Blackview",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 28
+    },
+    {
+      "name": "Doogee",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 29
+    },
+    {
+      "name": "Ulefone",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 30
+    },
+    {
+      "name": "Oukitel",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 31
+    },
+    {
+      "name": "Sharp",
+      "areas": [
+        "phones",
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 32
+    },
+    {
+      "name": "Micromax",
+      "areas": [
+        "phones"
+      ],
+      "popular": false,
+      "sort_order": 33
+    },
+    {
+      "name": "HP",
+      "areas": [
+        "computers"
+      ],
+      "popular": true,
+      "sort_order": 0
+    },
+    {
+      "name": "Dell",
+      "areas": [
+        "computers"
+      ],
+      "popular": true,
+      "sort_order": 2
+    },
+    {
+      "name": "Acer",
+      "areas": [
+        "computers"
+      ],
+      "popular": true,
+      "sort_order": 4
+    },
+    {
+      "name": "MSI",
+      "areas": [
+        "computers",
+        "components"
+      ],
+      "popular": true,
+      "sort_order": 6
+    },
+    {
+      "name": "Toshiba",
+      "areas": [
+        "computers",
+        "components",
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 11
+    },
+    {
+      "name": "Fujitsu",
+      "areas": [
+        "computers"
+      ],
+      "popular": false,
+      "sort_order": 13
+    },
+    {
+      "name": "Microsoft",
+      "areas": [
+        "computers"
+      ],
+      "popular": false,
+      "sort_order": 15
+    },
+    {
+      "name": "Gigabyte",
+      "areas": [
+        "computers",
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 16
+    },
+    {
+      "name": "Razer",
+      "areas": [
+        "computers",
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 17
+    },
+    {
+      "name": "Chuwi",
+      "areas": [
+        "computers"
+      ],
+      "popular": false,
+      "sort_order": 18
+    },
+    {
+      "name": "Digma",
+      "areas": [
+        "computers"
+      ],
+      "popular": false,
+      "sort_order": 19
+    },
+    {
+      "name": "Packard Bell",
+      "areas": [
+        "computers"
+      ],
+      "popular": false,
+      "sort_order": 20
+    },
+    {
+      "name": "Intel",
+      "areas": [
+        "components"
+      ],
+      "popular": true,
+      "sort_order": 0
+    },
+    {
+      "name": "AMD",
+      "areas": [
+        "components"
+      ],
+      "popular": true,
+      "sort_order": 1
+    },
+    {
+      "name": "NVIDIA",
+      "areas": [
+        "components"
+      ],
+      "popular": true,
+      "sort_order": 2
+    },
+    {
+      "name": "Kingston",
+      "areas": [
+        "components"
+      ],
+      "popular": true,
+      "sort_order": 3
+    },
+    {
+      "name": "Western Digital",
+      "areas": [
+        "components"
+      ],
+      "popular": true,
+      "sort_order": 5
+    },
+    {
+      "name": "Seagate",
+      "areas": [
+        "components"
+      ],
+      "popular": true,
+      "sort_order": 6
+    },
+    {
+      "name": "Crucial",
+      "areas": [
+        "components"
+      ],
+      "popular": true,
+      "sort_order": 7
+    },
+    {
+      "name": "ADATA",
+      "areas": [
+        "components"
+      ],
+      "popular": true,
+      "sort_order": 8
+    },
+    {
+      "name": "Corsair",
+      "areas": [
+        "components"
+      ],
+      "popular": true,
+      "sort_order": 9
+    },
+    {
+      "name": "G.Skill",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 10
+    },
+    {
+      "name": "Patriot",
+      "areas": [
+        "components",
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 11
+    },
+    {
+      "name": "Transcend",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 12
+    },
+    {
+      "name": "Netac",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 13
+    },
+    {
+      "name": "ASRock",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 16
+    },
+    {
+      "name": "Zotac",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 18
+    },
+    {
+      "name": "Palit",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 19
+    },
+    {
+      "name": "Deepcool",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 20
+    },
+    {
+      "name": "Cooler Master",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 21
+    },
+    {
+      "name": "Thermaltake",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 22
+    },
+    {
+      "name": "be quiet!",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 23
+    },
+    {
+      "name": "Noctua",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 24
+    },
+    {
+      "name": "Arctic",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 25
+    },
+    {
+      "name": "Hikvision",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 26
+    },
+    {
+      "name": "SanDisk",
+      "areas": [
+        "components"
+      ],
+      "popular": false,
+      "sort_order": 28
+    },
+    {
+      "name": "Artel",
+      "areas": [
+        "appliances",
+        "tv_audio"
+      ],
+      "popular": true,
+      "sort_order": 2
+    },
+    {
+      "name": "Bosch",
+      "areas": [
+        "appliances",
+        "tools"
+      ],
+      "popular": true,
+      "sort_order": 3
+    },
+    {
+      "name": "Beko",
+      "areas": [
+        "appliances"
+      ],
+      "popular": true,
+      "sort_order": 4
+    },
+    {
+      "name": "Indesit",
+      "areas": [
+        "appliances"
+      ],
+      "popular": true,
+      "sort_order": 5
+    },
+    {
+      "name": "Ariston",
+      "areas": [
+        "appliances"
+      ],
+      "popular": true,
+      "sort_order": 6
+    },
+    {
+      "name": "Midea",
+      "areas": [
+        "appliances"
+      ],
+      "popular": true,
+      "sort_order": 7
+    },
+    {
+      "name": "Haier",
+      "areas": [
+        "appliances",
+        "tv_audio"
+      ],
+      "popular": true,
+      "sort_order": 8
+    },
+    {
+      "name": "Hisense",
+      "areas": [
+        "appliances",
+        "tv_audio"
+      ],
+      "popular": true,
+      "sort_order": 9
+    },
+    {
+      "name": "Siemens",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 10
+    },
+    {
+      "name": "Whirlpool",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 11
+    },
+    {
+      "name": "Electrolux",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 12
+    },
+    {
+      "name": "Zanussi",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 13
+    },
+    {
+      "name": "Candy",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 14
+    },
+    {
+      "name": "Gorenje",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 15
+    },
+    {
+      "name": "Vestel",
+      "areas": [
+        "appliances",
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 16
+    },
+    {
+      "name": "Panasonic",
+      "areas": [
+        "appliances",
+        "tv_audio",
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 17
+    },
+    {
+      "name": "Philips",
+      "areas": [
+        "appliances",
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 18
+    },
+    {
+      "name": "Shivaki",
+      "areas": [
+        "appliances",
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 19
+    },
+    {
+      "name": "Avalon",
+      "areas": [
+        "appliances",
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 20
+    },
+    {
+      "name": "Roison",
+      "areas": [
+        "appliances",
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 21
+    },
+    {
+      "name": "Атлант",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 22
+    },
+    {
+      "name": "Бирюса",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 23
+    },
+    {
+      "name": "Норд",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 24
+    },
+    {
+      "name": "Redmond",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 25
+    },
+    {
+      "name": "Polaris",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 26
+    },
+    {
+      "name": "Scarlett",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 27
+    },
+    {
+      "name": "Vitek",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 28
+    },
+    {
+      "name": "Tefal",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 29
+    },
+    {
+      "name": "Moulinex",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 30
+    },
+    {
+      "name": "Braun",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 31
+    },
+    {
+      "name": "Dyson",
+      "areas": [
+        "appliances"
+      ],
+      "popular": false,
+      "sort_order": 32
+    },
+    {
+      "name": "Ergo",
+      "areas": [
+        "appliances",
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 34
+    },
+    {
+      "name": "Premier",
+      "areas": [
+        "appliances",
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 35
+    },
+    {
+      "name": "Skyworth",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 12
+    },
+    {
+      "name": "Yasin",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 15
+    },
+    {
+      "name": "JVC",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 20
+    },
+    {
+      "name": "Grundig",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 21
+    },
+    {
+      "name": "JBL",
+      "areas": [
+        "tv_audio",
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 22
+    },
+    {
+      "name": "Bose",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 23
+    },
+    {
+      "name": "Marshall",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 24
+    },
+    {
+      "name": "Harman Kardon",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 25
+    },
+    {
+      "name": "Sven",
+      "areas": [
+        "tv_audio",
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 26
+    },
+    {
+      "name": "Edifier",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 27
+    },
+    {
+      "name": "Yamaha",
+      "areas": [
+        "tv_audio",
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 28
+    },
+    {
+      "name": "Pioneer",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 29
+    },
+    {
+      "name": "Kenwood",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 30
+    },
+    {
+      "name": "Denon",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 31
+    },
+    {
+      "name": "Sonos",
+      "areas": [
+        "tv_audio"
+      ],
+      "popular": false,
+      "sort_order": 32
+    },
+    {
+      "name": "Makita",
+      "areas": [
+        "tools"
+      ],
+      "popular": true,
+      "sort_order": 1
+    },
+    {
+      "name": "DeWalt",
+      "areas": [
+        "tools"
+      ],
+      "popular": true,
+      "sort_order": 2
+    },
+    {
+      "name": "Total",
+      "areas": [
+        "tools"
+      ],
+      "popular": true,
+      "sort_order": 3
+    },
+    {
+      "name": "Ingco",
+      "areas": [
+        "tools"
+      ],
+      "popular": true,
+      "sort_order": 4
+    },
+    {
+      "name": "Metabo",
+      "areas": [
+        "tools"
+      ],
+      "popular": true,
+      "sort_order": 5
+    },
+    {
+      "name": "HiKOKI",
+      "areas": [
+        "tools"
+      ],
+      "popular": true,
+      "sort_order": 6
+    },
+    {
+      "name": "Milwaukee",
+      "areas": [
+        "tools"
+      ],
+      "popular": true,
+      "sort_order": 7
+    },
+    {
+      "name": "Ryobi",
+      "areas": [
+        "tools"
+      ],
+      "popular": true,
+      "sort_order": 8
+    },
+    {
+      "name": "Black+Decker",
+      "areas": [
+        "tools"
+      ],
+      "popular": true,
+      "sort_order": 9
+    },
+    {
+      "name": "Stanley",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 10
+    },
+    {
+      "name": "Einhell",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 11
+    },
+    {
+      "name": "Интерскол",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 12
+    },
+    {
+      "name": "Зубр",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 13
+    },
+    {
+      "name": "Вихрь",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 14
+    },
+    {
+      "name": "Калибр",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 15
+    },
+    {
+      "name": "Ресанта",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 16
+    },
+    {
+      "name": "Sturm",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 17
+    },
+    {
+      "name": "Elitech",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 18
+    },
+    {
+      "name": "Deko",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 19
+    },
+    {
+      "name": "Wortex",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 20
+    },
+    {
+      "name": "Кратон",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 21
+    },
+    {
+      "name": "Энкор",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 22
+    },
+    {
+      "name": "Фиолент",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 23
+    },
+    {
+      "name": "Stihl",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 24
+    },
+    {
+      "name": "Husqvarna",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 25
+    },
+    {
+      "name": "Champion",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 26
+    },
+    {
+      "name": "Carver",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 28
+    },
+    {
+      "name": "Huter",
+      "areas": [
+        "tools"
+      ],
+      "popular": false,
+      "sort_order": 29
+    },
+    {
+      "name": "Kawasaki",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": true,
+      "sort_order": 3
+    },
+    {
+      "name": "Zongshen",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": true,
+      "sort_order": 5
+    },
+    {
+      "name": "Loncin",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": true,
+      "sort_order": 6
+    },
+    {
+      "name": "Bajaj",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": true,
+      "sort_order": 7
+    },
+    {
+      "name": "TVS",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": true,
+      "sort_order": 8
+    },
+    {
+      "name": "Hero",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": true,
+      "sort_order": 9
+    },
+    {
+      "name": "Racer",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 10
+    },
+    {
+      "name": "Regulmoto",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 11
+    },
+    {
+      "name": "Motoland",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 12
+    },
+    {
+      "name": "CFMoto",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 13
+    },
+    {
+      "name": "Voge",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 14
+    },
+    {
+      "name": "Benelli",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 15
+    },
+    {
+      "name": "KTM",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 16
+    },
+    {
+      "name": "BMW Motorrad",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 17
+    },
+    {
+      "name": "Ducati",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 18
+    },
+    {
+      "name": "Harley-Davidson",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 19
+    },
+    {
+      "name": "Минск",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 20
+    },
+    {
+      "name": "Урал",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 21
+    },
+    {
+      "name": "ИЖ",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 22
+    },
+    {
+      "name": "Stels",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 23
+    },
+    {
+      "name": "Forward",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 24
+    },
+    {
+      "name": "Stern",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 25
+    },
+    {
+      "name": "Merida",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 26
+    },
+    {
+      "name": "Trek",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 27
+    },
+    {
+      "name": "Giant",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 28
+    },
+    {
+      "name": "Author",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 29
+    },
+    {
+      "name": "Cube",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 30
+    },
+    {
+      "name": "Scott",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 31
+    },
+    {
+      "name": "Specialized",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 32
+    },
+    {
+      "name": "Cannondale",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 33
+    },
+    {
+      "name": "Format",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 34
+    },
+    {
+      "name": "Altair",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 35
+    },
+    {
+      "name": "Десна",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 36
+    },
+    {
+      "name": "Аист",
+      "areas": [
+        "moto_bike"
+      ],
+      "popular": false,
+      "sort_order": 37
+    },
+    {
+      "name": "Anker",
+      "areas": [
+        "electronics"
+      ],
+      "popular": true,
+      "sort_order": 6
+    },
+    {
+      "name": "Baseus",
+      "areas": [
+        "electronics"
+      ],
+      "popular": true,
+      "sort_order": 7
+    },
+    {
+      "name": "Hoco",
+      "areas": [
+        "electronics"
+      ],
+      "popular": true,
+      "sort_order": 8
+    },
+    {
+      "name": "Borofone",
+      "areas": [
+        "electronics"
+      ],
+      "popular": true,
+      "sort_order": 9
+    },
+    {
+      "name": "Remax",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 10
+    },
+    {
+      "name": "Ugreen",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 11
+    },
+    {
+      "name": "Amazfit",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 12
+    },
+    {
+      "name": "Garmin",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 13
+    },
+    {
+      "name": "Fitbit",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 14
+    },
+    {
+      "name": "DJI",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 16
+    },
+    {
+      "name": "GoPro",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 17
+    },
+    {
+      "name": "Insta360",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 18
+    },
+    {
+      "name": "Canon",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 19
+    },
+    {
+      "name": "Nikon",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 20
+    },
+    {
+      "name": "Fujifilm",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 21
+    },
+    {
+      "name": "Nintendo",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 23
+    },
+    {
+      "name": "PlayStation",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 24
+    },
+    {
+      "name": "Xbox",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 25
+    },
+    {
+      "name": "Valve",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 26
+    },
+    {
+      "name": "Logitech",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 27
+    },
+    {
+      "name": "HyperX",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 29
+    },
+    {
+      "name": "SteelSeries",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 30
+    },
+    {
+      "name": "A4Tech",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 31
+    },
+    {
+      "name": "Defender",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 32
+    },
+    {
+      "name": "Genius",
+      "areas": [
+        "electronics"
+      ],
+      "popular": false,
+      "sort_order": 34
+    }
+  ]
+}

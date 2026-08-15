@@ -1,0 +1,92 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bozor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bozor}
+      POSTGRES_DB: ${POSTGRES_DB:-bozor}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bozor}"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  migrate:
+    build: ./backend
+    command: sh -c "python -m app.db.create"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-bozor}:${POSTGRES_PASSWORD:-bozor}@db:5432/${POSTGRES_DB:-bozor}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-bozor}:${POSTGRES_PASSWORD:-bozor}@db:5432/${POSTGRES_DB:-bozor}
+      REDIS_URL: redis://redis:6379/0
+      MEDIA_CACHE_DIR: /data/media_cache
+    volumes:
+      - media_cache:/data/media_cache
+    ports:
+      - "8000:8000"
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  bot:
+    build: ./backend
+    command: python -m app.bot
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-bozor}:${POSTGRES_PASSWORD:-bozor}@db:5432/${POSTGRES_DB:-bozor}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    command: arq app.workers.worker.WorkerSettings
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-bozor}:${POSTGRES_PASSWORD:-bozor}@db:5432/${POSTGRES_DB:-bozor}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  miniapp:
+    build:
+      context: ./miniapp
+      args:
+        VITE_API_URL: ${API_PUBLIC_URL:-}
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  media_cache:

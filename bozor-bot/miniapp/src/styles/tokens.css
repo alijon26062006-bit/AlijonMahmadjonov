@@ -1,0 +1,93 @@
+/* ============================================================
+   Дизайн-токены «Бозор»
+   Светлая тема — по умолчанию; тёмная — data-theme="dark";
+   внутри Telegram поверх ложатся переменные темы Telegram.
+   ============================================================ */
+
+:root {
+  /* Бренд: изумруд — доверие и «сделка состоялась» */
+  --brand: #109d63;
+  --brand-strong: #0c8252;
+  --brand-soft: rgba(16, 157, 99, 0.12);
+  --brand-contrast: #ffffff;
+
+  --accent-amber: #e8960c;
+  --accent-amber-soft: rgba(232, 150, 12, 0.14);
+  --danger: #de3d43;
+  --danger-soft: rgba(222, 61, 67, 0.12);
+
+  /* Поверхности */
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --surface-2: #eaedf1;
+  --overlay: rgba(16, 20, 26, 0.5);
+
+  /* Текст */
+  --text: #14181f;
+  --text-2: #5a6472;
+  --text-3: #8b95a3;
+  --text-inverse: #ffffff;
+
+  --border: #e2e6ec;
+  --border-strong: #cbd2db;
+
+  /* Геометрия и тени */
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-xs: 8px;
+  --shadow-card: 0 1px 2px rgba(16, 20, 26, 0.05), 0 6px 20px rgba(16, 20, 26, 0.06);
+  --shadow-float: 0 8px 32px rgba(16, 20, 26, 0.18);
+
+  /* Типографика */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto,
+          "Segoe UI", system-ui, sans-serif;
+  --fs-xs: 12px;
+  --fs-sm: 13.5px;
+  --fs-md: 15px;
+  --fs-lg: 17px;
+  --fs-xl: 21px;
+  --fs-title: 26px;
+
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-h: 58px;
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --brand: #22b876;
+  --brand-strong: #1ca267;
+  --brand-soft: rgba(34, 184, 118, 0.16);
+
+  --accent-amber: #f0a62a;
+  --accent-amber-soft: rgba(240, 166, 42, 0.16);
+  --danger: #ef5b60;
+  --danger-soft: rgba(239, 91, 96, 0.16);
+
+  --bg: #0e1218;
+  --surface: #171c24;
+  --surface-2: #202733;
+  --overlay: rgba(0, 0, 0, 0.6);
+
+  --text: #eef1f5;
+  --text-2: #9aa4b2;
+  --text-3: #6b7684;
+
+  --border: #262e3a;
+  --border-strong: #333d4b;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.25);
+  --shadow-float: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark;
+}
+
+/* Внутри Telegram наследуем тему клиента */
+body.in-telegram {
+  --bg: var(--tg-theme-secondary-bg-color, var(--bg));
+  --surface: var(--tg-theme-bg-color, var(--surface));
+  --surface-2: var(--tg-theme-secondary-bg-color, var(--surface-2));
+  --text: var(--tg-theme-text-color, var(--text));
+  --text-2: var(--tg-theme-hint-color, var(--text-2));
+  --text-3: var(--tg-theme-hint-color, var(--text-3));
+}
