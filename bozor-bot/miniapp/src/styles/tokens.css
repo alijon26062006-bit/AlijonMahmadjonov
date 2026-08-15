@@ -51,6 +51,13 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --nav-h: 58px;
 
+  /* Слои. Leaflet рисует панели на 400–700, элементы управления на 800,
+     поэтому вся плавающая обвязка приложения должна быть выше 800. */
+  --z-header: 810;
+  --z-contact: 820;
+  --z-nav: 830;
+  --z-sheet: 900;
+
   color-scheme: light;
 }
 

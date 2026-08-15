@@ -122,7 +122,7 @@ export default function ListingPage() {
           </button>
         </div>
       </div>
-      <div style={{ height: 76 }} />
+      <div className="contact-spacer" />
     </div>
   );
 }
