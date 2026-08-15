@@ -104,6 +104,41 @@ Telegram открывает Mini App только по валидному HTTPS.
 Порты 80 и 443 должны быть открыты. Аналогично работают No-IP и FreeDNS;
 при желании обычный домен (~2–10 $ в год) подключается заменой `DOMAIN`.
 
+### Если на сервере уже работает nginx
+
+Частый случай: порт 80 занят другим сервисом (панель, чужой сайт). Тогда
+Caddy не нужен — наш проект прячется за существующий nginx.
+
+1. Запустить без Caddy, подобрав свободные порты:
+   ```bash
+   for p in $(seq 8001 8099); do ss -ltn | grep -q ":$p " || { echo "API_PORT=$p"; break; }; done
+   for p in $(seq 8090 8199); do ss -ltn | grep -q ":$p " || { echo "MINIAPP_PORT=$p"; break; }; done
+   # вписать полученные значения в .env, затем:
+   docker compose up -d --build
+   ```
+2. Добавить сайт в существующий nginx (`/etc/nginx/sites-enabled/bozor`):
+   ```nginx
+   server {
+       listen 80;
+       server_name ВАШ-ДОМЕН;
+       client_max_body_size 12m;
+       location / {
+           proxy_pass http://127.0.0.1:8090;   # = MINIAPP_PORT
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
+   ```
+3. `nginx -t && systemctl reload nginx`
+4. Сертификат: `certbot --nginx -d ВАШ-ДОМЕН` (редирект на HTTPS — вариант 2)
+
+**Проверьте, что домен ведёт на ваш сервер**, прежде чем выпускать сертификат:
+`dig +short ВАШ-ДОМЕН` и `curl -s ifconfig.me` должны совпасть. Занятое кем-то
+имя на DuckDNS резолвится на чужой IP — Let's Encrypt тогда падает с таймаутом,
+а токен не подходит к домену.
+
 ### Быстрая проверка без сервера
 
 Для разовой демонстрации подойдёт временный туннель — домен не нужен совсем:
