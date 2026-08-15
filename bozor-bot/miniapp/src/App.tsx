@@ -1,4 +1,4 @@
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { BottomNav, Header } from './components/ui';
 import CatalogPage from './pages/CatalogPage';
@@ -13,6 +13,7 @@ import { parseStartParam } from './telegram/tg';
 
 export default function App() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   useEffect(() => {
     (async () => {
@@ -27,6 +28,8 @@ export default function App() {
   return (
     <div className="app">
       <Header />
+      {/* key по маршруту — каждый экран въезжает с анимацией, как в Telegram */}
+      <div key={pathname} className="app-view">
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/catalog" element={<CatalogPage />} />
@@ -36,6 +39,7 @@ export default function App() {
         <Route path="/post" element={<PostPage />} />
         <Route path="/login" element={<LoginPage />} />
       </Routes>
+      </div>
       <BottomNav />
     </div>
   );

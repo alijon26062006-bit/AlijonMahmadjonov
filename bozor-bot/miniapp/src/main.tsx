@@ -21,3 +21,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+// Сплэш уходит после первой отрисовки
+requestAnimationFrame(() => {
+  setTimeout(() => {
+    const splash = document.getElementById('splash');
+    splash?.classList.add('hide');
+    setTimeout(() => splash?.remove(), 500);
+  }, 350);
+});

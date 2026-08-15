@@ -17,6 +17,7 @@ export function ListingCard({ item, isFav, onFav }: {
         {photo && (
           <img src={photoUrl(photo.thumb)} alt="" loading="lazy"
                style={{ position: 'relative' }}
+               onLoad={(e) => e.currentTarget.classList.add('loaded')}
                onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
         )}
         {onFav && (

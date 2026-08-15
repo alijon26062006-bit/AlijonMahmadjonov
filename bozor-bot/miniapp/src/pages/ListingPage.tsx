@@ -52,6 +52,7 @@ export default function ListingPage() {
         {item.photos.length
           ? item.photos.map((p, i) => (
               <img key={i} src={photoUrl(p.full)} alt="" loading={i > 0 ? 'lazy' : undefined}
+                   onLoad={(e) => e.currentTarget.classList.add('loaded')}
                    onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
             ))
           : <div className="skeleton" style={{ width: '100%', aspectRatio: '4/3' }} />}
