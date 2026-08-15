@@ -50,3 +50,11 @@ export type CategoryNode = { slug: string; title: string; emoji: string; is_rent
 export type Direction = { slug: string; title: string; emoji: string; categories: CategoryNode[] };
 
 export type UserOut = { id: number; tg_id: number; username?: string | null; first_name: string; is_admin: boolean };
+
+export type PublicConfig = {
+  bot_username: string;
+  bot_link: string | null;
+  uploads_enabled: boolean;
+  max_photos: number;
+  currencies: string[];
+};

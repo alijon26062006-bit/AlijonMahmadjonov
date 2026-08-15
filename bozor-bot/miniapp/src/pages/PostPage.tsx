@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import type { Direction, FieldOut } from '../api/types';
+import type { Direction, FieldOut, PublicConfig } from '../api/types';
 import { useSchema } from '../components/Filters';
 import { PickMap } from '../components/MapView';
 import { Empty, useAuth, useTgBackButton } from '../components/ui';
@@ -182,6 +182,10 @@ export default function PostPage() {
   const { data: cats } = useQuery<{ directions: Direction[] }>({
     queryKey: ['categories'], queryFn: () => api('/api/categories'),
   });
+  const { data: cfg } = useQuery<PublicConfig>({
+    queryKey: ['config'], queryFn: () => api('/api/config'), staleTime: 5 * 60_000,
+  });
+  const uploadsOff = cfg && !cfg.uploads_enabled;
   const { data: schema } = useSchema(category || undefined);
 
   const set = (k: string, v: unknown) => setValues((prev) => ({ ...prev, [k]: v }));
@@ -303,6 +307,24 @@ export default function PostPage() {
 
       {schema && visibleFields.map((f) => {
         if (f.type === 'photos') {
+          if (uploadsOff) {
+            return (
+              <div className="field" key="photos">
+                <span className="field-label">Фотографии</span>
+                <div className="notice">
+                  <b>Загрузка фото с сайта пока недоступна.</b>
+                  <p>Объявление с фотографиями можно подать в чате с ботом —
+                     он проведёт по шагам и примет снимки прямо из галереи.</p>
+                  {cfg?.bot_link && (
+                    <a className="btn btn-primary" href={cfg.bot_link}
+                       target="_blank" rel="noreferrer" style={{ marginTop: 10 }}>
+                      Открыть бота
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          }
           return (
             <div className="field" key="photos">
               <span className="field-label">Фотографии * <span className="subtitle">({photos.length}/10)</span></span>
@@ -345,7 +367,8 @@ export default function PostPage() {
       {schema && (
         <>
           {errors._global && <div className="field-error" style={{ marginBottom: 10 }}>{errors._global}</div>}
-          <button className="btn btn-primary btn-block" disabled={busy} onClick={submit}>
+          <button className="btn btn-primary btn-block"
+                  disabled={busy || Boolean(uploadsOff)} onClick={submit}>
             {busy ? 'Отправляем…' : 'Отправить на модерацию'}
           </button>
           <p className="field-hint" style={{ textAlign: 'center', marginTop: 10 }}>

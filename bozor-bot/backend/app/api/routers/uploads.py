@@ -23,9 +23,10 @@ _sem = asyncio.Semaphore(3)
 async def upload_photo(file: UploadFile, user: CurrentUser):
     s = get_settings()
     if not s.storage_chat_id:
-        raise HTTPException(503, "Загрузка фото с сайта не настроена: "
-                                 "в настройках не указан STORAGE_CHAT_ID. "
-                                 "Пока подавайте объявления через бота.")
+        # Пользователю — по-человечески, без имён переменных из конфигурации
+        raise HTTPException(503, "Загрузка фото с сайта временно недоступна. "
+                                 "Подайте объявление через бота — там фото "
+                                 "принимаются как обычно.")
 
     data = await file.read()
     if len(data) > MAX_SIZE:
@@ -40,11 +41,12 @@ async def upload_photo(file: UploadFile, user: CurrentUser):
             msg = await bot.send_photo(
                 chat_id=s.storage_chat_id,
                 photo=BufferedInputFile(data, filename="upload.jpg"))
-        except Exception as e:
-            # чаще всего: бот не добавлен в чат-хранилище или указан неверный ID
+        except Exception:
+            # чаще всего: бот не добавлен в чат-хранилище или неверный ID —
+            # это забота администратора, пользователю показываем простой текст
             raise HTTPException(
-                502, f"Не удалось сохранить фото в Telegram. Проверьте, что бот "
-                     f"добавлен в чат-хранилище и ID указан верно. ({type(e).__name__})"
+                502, "Не удалось сохранить фото. Попробуйте ещё раз или "
+                     "подайте объявление через бота."
             ) from None
         finally:
             await bot.session.close()
