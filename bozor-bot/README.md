@@ -26,7 +26,14 @@ Telegram-бот (подача объявлений диалогом), Mini App �
 
 ## Быстрый старт
 
-Нужны: Docker + Docker Compose, токен бота от @BotFather.
+На чистом VPS (Ubuntu/Debian) — один скрипт. Он поставит Docker, спросит
+данные из Telegram, сгенерирует пароли и всё запустит:
+
+```bash
+sudo bash install.sh
+```
+
+Вручную, если предпочитаете контроль:
 
 ```bash
 cp .env.example .env      # заполнить BOT_TOKEN и остальное
