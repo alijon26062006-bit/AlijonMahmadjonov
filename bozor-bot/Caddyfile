@@ -1,0 +1,6 @@
+# Автоматический HTTPS от Let's Encrypt.
+# DOMAIN задаётся в .env — подойдёт и бесплатный поддомен (например DuckDNS).
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy miniapp:80
+}

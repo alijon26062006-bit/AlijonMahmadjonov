@@ -1,0 +1,25 @@
+# Публичный HTTPS:
+#   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+#
+# Caddy сам получает и продлевает сертификат Let's Encrypt — бесплатно.
+# Нужны: домен (подойдёт бесплатный поддомен, см. README), A-запись на IP
+# сервера и открытые порты 80 и 443.
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - miniapp
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
