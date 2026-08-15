@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api, fmtPrice, photoUrl } from '../api/client';
 import type { Card } from '../api/types';
+import { Icon } from '../components/icons';
 import { Empty, STATUS_BADGE, useAuth, useTgBackButton } from '../components/ui';
 import { logout } from '../api/client';
 import { inTelegram } from '../telegram/tg';
@@ -17,7 +18,7 @@ export default function MyListingsPage() {
   });
 
   if (!user) {
-    return <Empty emoji="🔐" title="Нужен вход"
+    return <Empty icon="lock" title="Нужен вход"
                   note="Войдите, чтобы управлять своими объявлениями" />;
   }
 
@@ -43,7 +44,7 @@ export default function MyListingsPage() {
 
       {isLoading && <div className="skeleton" style={{ height: 90 }} />}
       {!isLoading && !items.length && (
-        <Empty emoji="📭" title="Объявлений пока нет"
+        <Empty icon="archive" title="Объявлений пока нет"
                note="Подайте первое — через бота или кнопкой «Подать»" />
       )}
 
@@ -69,19 +70,19 @@ export default function MyListingsPage() {
                 {item.status === 'approved' && (
                   <>
                     {item.is_rent
-                      ? <button className="btn" onClick={() => patch(item.public_id, 'occupied')}>🔒 Занято</button>
-                      : <button className="btn" onClick={() => patch(item.public_id, 'sold')}>🤝 Продано</button>}
-                    <button className="btn" onClick={() => patch(item.public_id, 'archived')}>📦 Снять</button>
+                      ? <button className="btn" onClick={() => patch(item.public_id, 'occupied')}><Icon name="lock" size={14} /> Занято</button>
+                      : <button className="btn" onClick={() => patch(item.public_id, 'sold')}><Icon name="handshake" size={14} /> Продано</button>}
+                    <button className="btn" onClick={() => patch(item.public_id, 'archived')}><Icon name="archive" size={14} /> Снять</button>
                   </>
                 )}
                 {item.status === 'occupied' && (
                   <button className="btn btn-primary" onClick={() => patch(item.public_id, 'approved')}>
-                    🔓 Снова свободно
+                    <Icon name="lock-open" size={14} /> Снова свободно
                   </button>
                 )}
                 {(item.status === 'sold' || item.status === 'archived') && (
                   <button className="btn" onClick={() => patch(item.public_id, 'approved')}>
-                    ↩️ Вернуть в каталог
+                    <Icon name="rotate-ccw" size={14} /> Вернуть в каталог
                   </button>
                 )}
               </div>

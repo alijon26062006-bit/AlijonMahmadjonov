@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { pollLoginCode, requestLoginCode } from '../api/client';
+import { Icon } from '../components/icons';
 import { useAuth } from '../components/ui';
 
 export default function LoginPage() {
@@ -48,7 +49,7 @@ export default function LoginPage() {
 
         {status === 'idle' && (
           <button className="btn btn-primary btn-block" onClick={start}>
-            ✈️ Войти через Telegram
+            <Icon name="send" size={17} /> Войти через Telegram
           </button>
         )}
         {status === 'waiting' && (

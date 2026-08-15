@@ -95,7 +95,7 @@ function Field({ f, values, set, error }: {
                     onClick={() => set(f.key, v)}>{l}</button>
           ))}
           {f.allow_other && (
-            <button type="button" className="chip" onClick={() => setOther(true)}>✍️ Другое</button>
+            <button type="button" className="chip" onClick={() => setOther(true)}>Другое</button>
           )}
         </div>
       ) : (
@@ -106,7 +106,7 @@ function Field({ f, values, set, error }: {
                 }}>
           <option value="">— выберите —</option>
           {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          {f.allow_other && <option value="__other__">✍️ Другое</option>}
+          {f.allow_other && <option value="__other__">Другое</option>}
         </select>
       );
       break;
@@ -198,7 +198,7 @@ export default function PostPage() {
   if (inTelegram) {
     return (
       <div className="section">
-        <Empty emoji="🤖" title="Подача — в чате с ботом"
+        <Empty icon="message-circle" title="Подача — в чате с ботом"
                note="Закройте приложение и нажмите «➕ Подать объявление» в меню бота: мастер задаст вопросы по шагам" />
         <button className="btn btn-primary btn-block" onClick={() => tg?.close()}>
           Перейти в чат с ботом
@@ -210,7 +210,7 @@ export default function PostPage() {
   if (!user) {
     return (
       <div className="section">
-        <Empty emoji="🔐" title="Сначала войдите"
+        <Empty icon="lock" title="Сначала войдите"
                note="Подача объявлений доступна после входа через Telegram" />
         <Link to="/login" className="btn btn-primary btn-block">Войти</Link>
       </div>
@@ -220,7 +220,7 @@ export default function PostPage() {
   if (done) {
     return (
       <div className="section">
-        <Empty emoji="🎉" title="Отправлено на модерацию"
+        <Empty icon="check" title="Отправлено на модерацию"
                note="Мы пришлём уведомление в Telegram, когда объявление проверят" />
         <Link to="/my" className="btn btn-primary btn-block">К моим объявлениям</Link>
       </div>
@@ -289,9 +289,9 @@ export default function PostPage() {
                 onChange={(e) => { setCategory(e.target.value); setValues({}); setErrors({}); }}>
           <option value="">— выберите —</option>
           {cats?.directions.map((d) => (
-            <optgroup key={d.slug} label={`${d.emoji} ${d.title}`}>
+            <optgroup key={d.slug} label={d.title}>
               {d.categories.map((c) => (
-                <option key={c.slug} value={c.slug}>{c.emoji} {c.title}</option>
+                <option key={c.slug} value={c.slug}>{c.title}</option>
               ))}
             </optgroup>
           ))}
@@ -343,7 +343,7 @@ export default function PostPage() {
         <>
           {errors._global && <div className="field-error" style={{ marginBottom: 10 }}>{errors._global}</div>}
           <button className="btn btn-primary btn-block" disabled={busy} onClick={submit}>
-            {busy ? 'Отправляем…' : '🚀 Отправить на модерацию'}
+            {busy ? 'Отправляем…' : 'Отправить на модерацию'}
           </button>
           <p className="field-hint" style={{ textAlign: 'center', marginTop: 10 }}>
             Объявление появится в каталоге после проверки модератором

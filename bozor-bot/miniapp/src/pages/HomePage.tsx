@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Direction } from '../api/types';
+import { CATEGORY_ICON, DIRECTION_ICON, Icon } from '../components/icons';
 import { CardSkeletons } from '../components/ui';
 
 export default function HomePage() {
@@ -30,19 +31,29 @@ export default function HomePage() {
 
       {isLoading && <div className="section"><CardSkeletons n={4} /></div>}
 
-      {data?.directions.map((d) => (
-        <section key={d.slug} className="dir-block">
-          <div className="dir-head"><span>{d.emoji}</span>{d.title}</div>
-          <div className="cat-grid">
-            {d.categories.map((c) => (
-              <Link key={c.slug} to={`/catalog?category=${c.slug}`} className="cat-tile">
-                <span className="emoji">{c.emoji}</span>
-                {c.title}
-              </Link>
-            ))}
-          </div>
-        </section>
-      ))}
+      {data?.directions.map((d) => {
+        const dir = DIRECTION_ICON[d.slug] ?? DIRECTION_ICON.parts;
+        return (
+          <section key={d.slug} className="dir-block">
+            <div className="dir-head">
+              <span className={`dir-ico ${dir.tone}`}>
+                <Icon name={dir.icon} size={17} strokeWidth={2.2} />
+              </span>
+              {d.title}
+            </div>
+            <div className="cat-grid">
+              {d.categories.map((c) => (
+                <Link key={c.slug} to={`/catalog?category=${c.slug}`} className="cat-tile">
+                  <span className={`icon-wrap ${dir.tone}`}>
+                    <Icon name={CATEGORY_ICON[c.slug] ?? dir.icon} size={21} />
+                  </span>
+                  {c.title}
+                </Link>
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }

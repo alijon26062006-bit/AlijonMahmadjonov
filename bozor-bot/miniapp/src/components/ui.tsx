@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useSyncExternalStore } from 'react';
 import { getUser, isAuthed, onAuthChange } from '../api/client';
 import { inTelegram, tg, toggleTheme } from '../telegram/tg';
+import { Icon } from './icons';
 
 export function useAuth() {
   return useSyncExternalStore(
@@ -20,8 +21,12 @@ export function Header() {
         <span className="logo-mark">Б</span> Бозор
       </Link>
       <div className="header-actions">
-        <button className="btn btn-ghost" onClick={toggleTheme} title="Тема">◐</button>
-        <Link to="/post" className="btn btn-primary">+ Подать</Link>
+        <button className="btn btn-ghost" onClick={toggleTheme} title="Тема">
+          <Icon name="sun-moon" size={19} />
+        </button>
+        <Link to="/post" className="btn btn-primary">
+          <Icon name="circle-plus" size={17} /> Подать
+        </Link>
         {user
           ? <Link to="/my" className="btn">{user.first_name || 'Профиль'}</Link>
           : <Link to="/login" className="btn">Войти</Link>}
@@ -31,11 +36,11 @@ export function Header() {
 }
 
 const NAV = [
-  { to: '/', ico: '🏠', label: 'Главная' },
-  { to: '/catalog', ico: '🔍', label: 'Каталог' },
-  { to: '/post', ico: '➕', label: 'Подать' },
-  { to: '/favorites', ico: '❤️', label: 'Избранное' },
-  { to: '/my', ico: '👤', label: 'Мои' },
+  { to: '/', icon: 'house', label: 'Главная' },
+  { to: '/catalog', icon: 'search', label: 'Каталог' },
+  { to: '/post', icon: 'circle-plus', label: 'Подать' },
+  { to: '/favorites', icon: 'heart', label: 'Избранное' },
+  { to: '/my', icon: 'user', label: 'Мои' },
 ];
 
 export function BottomNav() {
@@ -45,7 +50,7 @@ export function BottomNav() {
       {NAV.map((n) => (
         <Link key={n.to} to={n.to}
               className={pathname === n.to ? 'active' : ''}>
-          <span className="ico">{n.ico}</span>
+          <span className="ico"><Icon name={n.icon} size={22} strokeWidth={pathname === n.to ? 2.4 : 1.9} /></span>
           {n.label}
         </Link>
       ))}
@@ -67,10 +72,10 @@ export function useTgBackButton(show: boolean) {
   }, [show, navigate]);
 }
 
-export function Empty({ emoji, title, note }: { emoji: string; title: string; note?: string }) {
+export function Empty({ icon, title, note }: { icon: string; title: string; note?: string }) {
   return (
     <div className="empty fade-in">
-      <div className="emoji">{emoji}</div>
+      <div className="empty-icon"><Icon name={icon} size={34} strokeWidth={1.6} /></div>
       <h3>{title}</h3>
       {note && <p className="subtitle">{note}</p>}
     </div>
@@ -88,10 +93,10 @@ export function CardSkeletons({ n = 6 }: { n?: number }) {
 }
 
 export const STATUS_BADGE: Record<string, { cls: string; label: string }> = {
-  pending: { cls: 'badge-amber', label: '⏳ На модерации' },
-  approved: { cls: 'badge-green', label: '✅ Опубликовано' },
-  rejected: { cls: 'badge-red', label: '❌ Отклонено' },
-  archived: { cls: 'badge-gray', label: '📦 Архив' },
-  sold: { cls: 'badge-gray', label: '🤝 Продано' },
-  occupied: { cls: 'badge-amber', label: '🔒 Занято' },
+  pending: { cls: 'badge-amber', label: 'На модерации' },
+  approved: { cls: 'badge-green', label: 'Опубликовано' },
+  rejected: { cls: 'badge-red', label: 'Отклонено' },
+  archived: { cls: 'badge-gray', label: 'Архив' },
+  sold: { cls: 'badge-gray', label: 'Продано' },
+  occupied: { cls: 'badge-amber', label: 'Занято' },
 };

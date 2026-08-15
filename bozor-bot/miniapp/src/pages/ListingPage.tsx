@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, fmtDate, fmtPrice, photoUrl } from '../api/client';
 import type { ListingDetail } from '../api/types';
+import { Icon } from '../components/icons';
 import { MiniMap } from '../components/MapView';
 import { Empty, useAuth, useTgBackButton } from '../components/ui';
 import { hapticSuccess, openTgLink } from '../telegram/tg';
@@ -21,7 +22,7 @@ export default function ListingPage() {
   });
 
   if (isLoading) return <div className="skeleton" style={{ height: 400, marginTop: 12 }} />;
-  if (error || !item) return <Empty emoji="🤷" title="Объявление не найдено"
+  if (error || !item) return <Empty icon="search" title="Объявление не найдено"
                                     note="Возможно, оно снято с публикации" />;
 
   const askContact = async () => {
@@ -62,10 +63,14 @@ export default function ListingPage() {
           {item.is_negotiable && <span className="badge badge-green" style={{ marginLeft: 10 }}>торг</span>}
         </div>
         <h1 style={{ fontSize: 'var(--fs-lg)', marginTop: 4 }}>{item.title}</h1>
-        <p className="subtitle" style={{ marginTop: 4 }}>
+        <p className="subtitle" style={{ marginTop: 4, display: 'flex',
+                                         alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+          <Icon name="map-pin" size={13} />
           {[item.city, item.district, item.address].filter(Boolean).join(', ')}
-          {item.published_at && ` · ${fmtDate(item.published_at)}`}
-          {` · 👁 ${item.views_count}`}
+          {item.published_at && <span>· {fmtDate(item.published_at)}</span>}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            · <Icon name="eye" size={13} /> {item.views_count}
+          </span>
         </p>
       </div>
 
@@ -96,23 +101,23 @@ export default function ListingPage() {
               {contact.telegram && (
                 <button className="btn btn-primary btn-block"
                         onClick={() => openTgLink(contact.telegram!)}>
-                  ✈️ Написать в Telegram
+                  <Icon name="send" size={17} /> Написать в Telegram
                 </button>
               )}
               {contact.phone && (
                 <a className="btn btn-primary btn-block" href={`tel:${contact.phone}`}>
-                  📞 {contact.phone}
+                  <Icon name="phone" size={17} /> {contact.phone}
                 </a>
               )}
             </>
           ) : (
             <button className="btn btn-primary btn-block" onClick={askContact}
                     disabled={!user && false}>
-              💬 Связаться с продавцом
+              <Icon name="message-circle" size={17} /> Связаться с продавцом
             </button>
           )}
           <button className="btn" title="Пожаловаться" onClick={report}>
-            {reported ? '✔️' : '🚩'}
+            <Icon name={reported ? 'check' : 'flag'} size={17} />
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Card } from '../api/types';
 import { FilterFields, FilterSheet, countActive, useSchema } from '../components/Filters';
+import { CATEGORY_ICON, Icon } from '../components/icons';
 import { ListingCard } from '../components/ListingCard';
 import { CatalogMap } from '../components/MapView';
 import { CardSkeletons, Empty, useAuth, useTgBackButton } from '../components/ui';
@@ -93,18 +94,21 @@ export default function CatalogPage() {
                }} />
         {schema && (
           <button className="btn filter-btn" onClick={() => setSheetOpen(true)}>
-            ⚙️ Фильтры
+            <Icon name="sliders-horizontal" size={17} /> Фильтры
             {activeCount > 0 && <span className="count">{activeCount}</span>}
           </button>
         )}
-        <button className="btn" onClick={() => setView(view === 'list' ? 'map' : 'list')}>
-          {view === 'list' ? '🗺' : '📃'}
+        <button className="btn" onClick={() => setView(view === 'list' ? 'map' : 'list')}
+                title={view === 'list' ? 'Карта' : 'Список'}>
+          <Icon name={view === 'list' ? 'map' : 'list'} size={18} />
         </button>
       </div>
 
       {schema && (
-        <p className="subtitle" style={{ marginTop: 8 }}>
-          {schema.emoji} {schema.title}
+        <p className="subtitle" style={{ marginTop: 8, display: 'flex',
+                                         alignItems: 'center', gap: 6 }}>
+          <Icon name={CATEGORY_ICON[schema.slug] ?? 'search'} size={15} />
+          {schema.title}
         </p>
       )}
 
@@ -130,7 +134,7 @@ export default function CatalogPage() {
           ) : feed.isLoading ? (
             <CardSkeletons />
           ) : items.length === 0 ? (
-            <Empty emoji="🔍" title="Ничего не найдено"
+            <Empty icon="search" title="Ничего не найдено"
                    note="Попробуйте смягчить фильтры" />
           ) : (
             <>

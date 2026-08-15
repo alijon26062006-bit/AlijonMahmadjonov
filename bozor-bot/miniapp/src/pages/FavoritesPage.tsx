@@ -16,7 +16,7 @@ export default function FavoritesPage() {
 
   if (!user) {
     return (
-      <Empty emoji="🔐" title="Нужен вход"
+      <Empty icon="lock" title="Нужен вход"
              note="Избранное привязано к вашему Telegram-аккаунту">
       </Empty>
     );
@@ -24,7 +24,7 @@ export default function FavoritesPage() {
   if (isLoading) return <div className="section"><CardSkeletons /></div>;
   const items = data?.items ?? [];
   if (!items.length) {
-    return <Empty emoji="🤍" title="Пока пусто"
+    return <Empty icon="heart" title="Пока пусто"
                   note="Нажимайте на сердечко в каталоге — объявления появятся здесь" />;
   }
   return (
