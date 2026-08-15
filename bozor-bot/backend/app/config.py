@@ -1,6 +1,7 @@
 """Настройки приложения. Все значения берутся из окружения / .env."""
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +41,15 @@ class Settings(BaseSettings):
     active_listing_limit: int = 10
     listing_ttl_days: int = 30
     max_photos: int = 10
+
+    @field_validator("channel_id", "admin_chat_id", "storage_chat_id", mode="before")
+    @classmethod
+    def _chat_id(cls, v):
+        """Нечисловое значение (например имя канала) не должно ронять запуск."""
+        try:
+            return int(str(v).strip())
+        except (TypeError, ValueError):
+            return 0
 
     @property
     def admin_id_list(self) -> list[int]:

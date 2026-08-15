@@ -45,7 +45,7 @@ services:
     volumes:
       - media_cache:/data/media_cache
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -83,7 +83,7 @@ services:
       args:
         VITE_API_URL: ${API_PUBLIC_URL:-}
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:${MINIAPP_PORT:-8080}:80"
     restart: unless-stopped
 
 volumes:

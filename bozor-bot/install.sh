@@ -64,16 +64,56 @@ else
   [[ "$BOT_TOKEN" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]] || { err "Токен выглядит неверно"; exit 1; }
 
   read -rp "Имя бота без @ (например bozor_bot): " BOT_USERNAME
-  read -rp "ID канала публикаций (-100…): " CHANNEL_ID
+  BOT_USERNAME="${BOT_USERNAME#@}"
+
+  # Числовой ID: только цифры, возможен минус. Имя канала здесь не подойдёт.
+  ask_id() {
+    local prompt="$1" allow_empty="$2" value
+    while true; do
+      read -rp "$prompt" value
+      value="${value// /}"
+      if [ -z "$value" ] && [ "$allow_empty" = "yes" ]; then echo ""; return; fi
+      if [[ "$value" =~ ^-?[0-9]+$ ]]; then echo "$value"; return; fi
+      err "Нужен числовой ID (например -1001234567890), а не имя."
+      err "Перешлите сообщение оттуда боту @userinfobot — он покажет ID."
+    done
+  }
+
+  CHANNEL_ID=$(ask_id "ID канала публикаций (-100…): " no)
   read -rp "Имя канала без @ (для ссылок, можно пусто): " CHANNEL_USERNAME
-  read -rp "ID группы модерации (-100…): " ADMIN_CHAT_ID
-  read -rp "ID группы-хранилища фото (-100…, можно пусто): " STORAGE_CHAT_ID
-  read -rp "Ваш Telegram ID (админ): " ADMIN_IDS
+  CHANNEL_USERNAME="${CHANNEL_USERNAME#@}"
+  ADMIN_CHAT_ID=$(ask_id "ID группы модерации (-100…): " no)
+  STORAGE_CHAT_ID=$(ask_id "ID группы-хранилища фото (-100…, можно пусто): " yes)
+  ADMIN_IDS=$(ask_id "Ваш Telegram ID (админ): " no)
 
   echo
   echo "── Адрес сайта ───────────────────────────────"
+  echo "Нужен полный домен с точкой, например bozor.duckdns.org"
+  echo "(бесплатный поддомен — на duckdns.org, укажите там IP этого сервера)."
   echo "Оставьте пустым, если пока запускаете только бота."
-  read -rp "Домен для Mini App (например bozor.duckdns.org): " DOMAIN
+  while true; do
+    read -rp "Домен для Mini App: " DOMAIN
+    DOMAIN="${DOMAIN// /}"
+    DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN%%/*}"
+    [ -z "$DOMAIN" ] && break
+    if [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then break; fi
+    err "Это не похоже на домен. Нужен вид bozor.duckdns.org — или оставьте пустым."
+  done
+
+  # Свободный порт для локальной публикации miniapp
+  MINIAPP_PORT=8080
+  while ss -ltn 2>/dev/null | grep -q ":$MINIAPP_PORT " || \
+        netstat -ltn 2>/dev/null | grep -q ":$MINIAPP_PORT "; do
+    MINIAPP_PORT=$((MINIAPP_PORT + 1))
+  done
+  [ "$MINIAPP_PORT" != "8080" ] && warn "Порт 8080 занят — использую $MINIAPP_PORT"
+
+  API_PORT=8000
+  while ss -ltn 2>/dev/null | grep -q ":$API_PORT " || \
+        netstat -ltn 2>/dev/null | grep -q ":$API_PORT "; do
+    API_PORT=$((API_PORT + 1))
+  done
+  [ "$API_PORT" != "8000" ] && warn "Порт 8000 занят — использую $API_PORT"
 
   if [ -n "$DOMAIN" ]; then
     WEBAPP_URL="https://$DOMAIN"
@@ -110,6 +150,9 @@ JWT_SECRET=$JWT_SECRET
 POSTGRES_USER=bozor
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 POSTGRES_DB=bozor
+
+API_PORT=$API_PORT
+MINIAPP_PORT=$MINIAPP_PORT
 
 TJS_PER_USD=10.9
 DAILY_LISTING_LIMIT=3
