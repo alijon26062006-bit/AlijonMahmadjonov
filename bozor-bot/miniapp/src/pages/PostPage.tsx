@@ -236,8 +236,11 @@ export default function PostPage() {
         const p = await api<Omit<UploadedPhoto, 'preview'>>(
           '/api/uploads/photo', { method: 'POST', body: fd });
         setPhotos((prev) => [...prev, { ...p, preview: URL.createObjectURL(file) }]);
+        setErrors((prev) => ({ ...prev, photos: '' }));
       } catch (e) {
-        setErrors((prev) => ({ ...prev, photos: 'Не удалось загрузить фото' }));
+        // показываем причину с сервера, а не общее «не удалось»
+        const msg = (e as Error).message || 'Не удалось загрузить фото';
+        setErrors((prev) => ({ ...prev, photos: msg }));
       }
     }
   };
