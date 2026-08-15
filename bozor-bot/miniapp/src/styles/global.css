@@ -439,6 +439,51 @@ body.in-telegram .contact-bar { bottom: 0; }
 .my-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .my-actions .btn { padding: 7px 12px; font-size: var(--fs-xs); }
 
+/* ─────────── Админ-панель ─────────── */
+.stat-row {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+.stat {
+  background: var(--surface); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  padding: 10px 12px; text-align: center;
+}
+.stat-value { font-size: var(--fs-xl); font-weight: 800; line-height: 1.1; }
+.stat-label { font-size: var(--fs-xs); color: var(--text-3); margin-top: 2px; }
+.stat-amber .stat-value { color: var(--accent-amber); }
+.stat-green .stat-value { color: var(--brand); }
+.stat-red   .stat-value { color: var(--danger); }
+
+.mod-card {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow-card); overflow: hidden; margin-bottom: 14px;
+}
+.mod-photos {
+  display: flex; gap: 4px; overflow-x: auto; background: var(--surface-2);
+}
+.mod-photos img {
+  height: 130px; width: auto; flex: none; object-fit: cover; cursor: zoom-in;
+}
+.mod-nophoto {
+  height: 90px; width: 100%; display: grid; place-items: center;
+  color: var(--text-3);
+}
+.mod-body { padding: 12px 14px 14px; }
+.mod-desc {
+  margin-top: 8px; font-size: var(--fs-sm); color: var(--text-2);
+  max-height: 5.6em; overflow: hidden;
+}
+.mod-flag {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 10px; padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  background: var(--accent-amber-soft); color: var(--accent-amber);
+  font-size: var(--fs-sm); font-weight: 600;
+  white-space: pre-line;
+}
+.mod-reject { margin-top: 10px; }
+
 .fade-in { animation: fade .25s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } }
 

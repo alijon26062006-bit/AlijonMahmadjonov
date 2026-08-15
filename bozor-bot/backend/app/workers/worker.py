@@ -56,6 +56,26 @@ async def publish_listing(ctx: dict, listing_id: int) -> None:
                 await session.commit()
 
 
+async def notify_rejected(ctx: dict, listing_id: int) -> None:
+    """Сообщает автору об отклонении — одинаково для бота и админ-панели."""
+    bot = ctx["bot"]
+    async with SessionMaker() as session:
+        listing = await session.get(Listing, listing_id)
+        if not listing:
+            return
+        author = await session.get(User, listing.author_id)
+        if not author:
+            return
+        try:
+            await bot.send_message(
+                author.tg_id,
+                texts.REJECTED_AUTHOR.format(
+                    reason=html.escape(listing.reject_reason or "не указана")))
+        except Exception:
+            author.bot_blocked = True
+            await session.commit()
+
+
 async def archive_expired(ctx: dict) -> None:
     async with SessionMaker() as session:
         await session.execute(
@@ -75,7 +95,7 @@ async def shutdown(ctx: dict) -> None:
 
 
 class WorkerSettings:
-    functions = [publish_listing]
+    functions = [publish_listing, notify_rejected]
     cron_jobs = [cron(archive_expired, hour=3, minute=0)]   # автоархив в 03:00 UTC
     on_startup = startup
     on_shutdown = shutdown

@@ -17,3 +17,8 @@ async def _get_pool():
 async def enqueue_publish(listing_id: int) -> None:
     pool = await _get_pool()
     await pool.enqueue_job("publish_listing", listing_id)
+
+
+async def enqueue_notify_rejected(listing_id: int) -> None:
+    pool = await _get_pool()
+    await pool.enqueue_job("notify_rejected", listing_id)

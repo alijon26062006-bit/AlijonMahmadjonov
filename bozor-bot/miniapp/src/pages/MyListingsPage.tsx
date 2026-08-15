@@ -34,9 +34,16 @@ export default function MyListingsPage() {
     <div className="section fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="section-title" style={{ marginBottom: 0 }}>Мои объявления</h1>
-        {!inTelegram && (
-          <button className="btn btn-ghost" onClick={logout}>Выйти</button>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {user.is_admin && (
+            <Link to="/admin" className="btn">
+              <Icon name="sliders-horizontal" size={15} /> Админка
+            </Link>
+          )}
+          {!inTelegram && (
+            <button className="btn btn-ghost" onClick={logout}>Выйти</button>
+          )}
+        </div>
       </div>
       <p className="subtitle" style={{ margin: '6px 0 14px' }}>
         {user.first_name}{user.username ? ` · @${user.username}` : ''}

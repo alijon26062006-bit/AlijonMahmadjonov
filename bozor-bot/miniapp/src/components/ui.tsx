@@ -27,6 +27,11 @@ export function Header() {
         <Link to="/post" className="btn btn-primary">
           <Icon name="circle-plus" size={17} /> Подать
         </Link>
+        {user?.is_admin && (
+          <Link to="/admin" className="btn" title="Администрирование">
+            <Icon name="sliders-horizontal" size={17} />
+          </Link>
+        )}
         {user
           ? <Link to="/my" className="btn">{user.first_name || 'Профиль'}</Link>
           : <Link to="/login" className="btn">Войти</Link>}

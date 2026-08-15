@@ -200,7 +200,9 @@ class ModerationLog(Base):
     __tablename__ = "moderation_log"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"))
+    # NULL — для действий над пользователем, не связанных с объявлением
+    listing_id: Mapped[int | None] = mapped_column(
+        ForeignKey("listings.id", ondelete="CASCADE"))
     admin_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     action: Mapped[str] = mapped_column(String(16))
     reason: Mapped[str | None] = mapped_column(String(500))

@@ -23,6 +23,7 @@ from app.db.models import (
     ModerationLog, User,
 )
 from app.schemas_engine.registry import get_schema
+from app.services import moderation_service
 from app.services.publisher import build_caption
 
 router = Router()
@@ -87,14 +88,11 @@ async def approve(cb: CallbackQuery, session: AsyncSession, bot: Bot,
         await cb.answer("Только для админов", show_alert=True)
         return
     listing_id = int(cb.data.split(":")[2])
-    listing = await _lock_pending(session, listing_id)
-    if not listing or listing.status != ST_PENDING:
-        await cb.answer(texts.MOD_ALREADY.format(
-            status=listing.status if listing else "удалено"), show_alert=True)
+    try:
+        await moderation_service.approve(session, listing_id, user)
+    except moderation_service.AlreadyHandled as e:
+        await cb.answer(texts.MOD_ALREADY.format(status=e.status), show_alert=True)
         return
-    listing.status = ST_APPROVED
-    session.add(ModerationLog(listing_id=listing.id, admin_id=user.id, action="approve"))
-    await session.commit()
     await cb.answer("Одобрено")
     try:
         await cb.message.edit_text(
@@ -102,10 +100,6 @@ async def approve(cb: CallbackQuery, session: AsyncSession, bot: Bot,
                 admin=f"@{user.username}" if user.username else user.first_name))
     except Exception:
         pass
-
-    # публикация в фоне через arq — не блокируем ответ на callback
-    from app.workers.queue import enqueue_publish
-    await enqueue_publish(listing.id)
 
 
 @router.callback_query(F.data.startswith("mod:no:"))
@@ -159,14 +153,12 @@ async def custom_reason(message: Message, session: AsyncSession, bot: Bot,
                         user: User, state: FSMContext) -> None:
     data = await state.get_data()
     await state.clear()
-    listing_id = data["listing_id"]
     reason = message.text.strip()[:500]
-    listing = await _lock_pending(session, listing_id)
-    if not listing or listing.status != ST_PENDING:
-        await message.answer(texts.MOD_ALREADY.format(
-            status=listing.status if listing else "удалено"))
+    try:
+        await moderation_service.reject(session, data["listing_id"], user, reason)
+    except moderation_service.AlreadyHandled as e:
+        await message.answer(texts.MOD_ALREADY.format(status=e.status))
         return
-    await _finalize_reject(session, bot, user, listing, reason)
     await message.answer(texts.MOD_REJECTED.format(
         admin=f"@{user.username}" if user.username else user.first_name,
         reason=reason))
@@ -174,12 +166,11 @@ async def custom_reason(message: Message, session: AsyncSession, bot: Bot,
 
 async def _do_reject(cb: CallbackQuery, session: AsyncSession, bot: Bot,
                      user: User, listing_id: int, reason: str) -> None:
-    listing = await _lock_pending(session, listing_id)
-    if not listing or listing.status != ST_PENDING:
-        await cb.answer(texts.MOD_ALREADY.format(
-            status=listing.status if listing else "удалено"), show_alert=True)
+    try:
+        await moderation_service.reject(session, listing_id, user, reason)
+    except moderation_service.AlreadyHandled as e:
+        await cb.answer(texts.MOD_ALREADY.format(status=e.status), show_alert=True)
         return
-    await _finalize_reject(session, bot, user, listing, reason)
     await cb.answer("Отклонено")
     try:
         await cb.message.edit_text(
@@ -188,23 +179,6 @@ async def _do_reject(cb: CallbackQuery, session: AsyncSession, bot: Bot,
                 reason=reason))
     except Exception:
         pass
-
-
-async def _finalize_reject(session: AsyncSession, bot: Bot, user: User,
-                           listing: Listing, reason: str) -> None:
-    listing.status = ST_REJECTED
-    listing.reject_reason = reason
-    session.add(ModerationLog(listing_id=listing.id, admin_id=user.id,
-                              action="reject", reason=reason))
-    await session.commit()
-    author = await session.get(User, listing.author_id)
-    if author:
-        try:
-            await bot.send_message(
-                author.tg_id, texts.REJECTED_AUTHOR.format(reason=html.escape(reason)))
-        except Exception:
-            author.bot_blocked = True
-            await session.commit()
 
 
 @router.callback_query(F.data.startswith("mod:ban:"))

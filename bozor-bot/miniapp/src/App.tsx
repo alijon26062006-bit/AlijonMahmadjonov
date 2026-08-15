@@ -1,6 +1,7 @@
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { BottomNav, Header } from './components/ui';
+import AdminPage from './pages/AdminPage';
 import CatalogPage from './pages/CatalogPage';
 import FavoritesPage from './pages/FavoritesPage';
 import HomePage from './pages/HomePage';
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/my" element={<MyListingsPage />} />
         <Route path="/post" element={<PostPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
       </div>
       <BottomNav />
