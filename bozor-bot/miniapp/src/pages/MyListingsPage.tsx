@@ -19,7 +19,8 @@ export default function MyListingsPage() {
 
   if (!user) {
     return <Empty icon="lock" title="Нужен вход"
-                  note="Войдите, чтобы управлять своими объявлениями" />;
+                  note="Войдите, чтобы управлять своими объявлениями"
+                  action={{ label: 'Войти', to: '/login' }} />;
   }
 
   const patch = async (id: string, status: string) => {
@@ -52,7 +53,8 @@ export default function MyListingsPage() {
       {isLoading && <div className="skeleton" style={{ height: 90 }} />}
       {!isLoading && !items.length && (
         <Empty icon="archive" title="Объявлений пока нет"
-               note="Подайте первое — через бота или кнопкой «Подать»" />
+               note="Подайте первое — через бота или кнопкой «Подать»"
+               action={{ label: 'Подать объявление', to: '/post' }} />
       )}
 
       {items.map((item) => {

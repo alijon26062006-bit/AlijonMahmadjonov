@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Card } from '../api/types';
 import { ListingCard } from '../components/ListingCard';
@@ -15,17 +14,16 @@ export default function FavoritesPage() {
   });
 
   if (!user) {
-    return (
-      <Empty icon="lock" title="Нужен вход"
-             note="Избранное привязано к вашему Telegram-аккаунту">
-      </Empty>
-    );
+    return <Empty icon="lock" title="Нужен вход"
+                  note="Избранное привязано к вашему Telegram-аккаунту"
+                  action={{ label: 'Войти', to: '/login' }} />;
   }
   if (isLoading) return <div className="section"><CardSkeletons /></div>;
   const items = data?.items ?? [];
   if (!items.length) {
     return <Empty icon="heart" title="Пока пусто"
-                  note="Нажимайте на сердечко в каталоге — объявления появятся здесь" />;
+                  note="Нажимайте на сердечко в каталоге — объявления появятся здесь"
+                  action={{ label: 'В каталог', to: '/catalog' }} />;
   }
   return (
     <div className="section fade-in">

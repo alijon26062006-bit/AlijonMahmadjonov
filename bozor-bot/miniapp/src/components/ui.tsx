@@ -77,12 +77,21 @@ export function useTgBackButton(show: boolean) {
   }, [show, navigate]);
 }
 
-export function Empty({ icon, title, note }: { icon: string; title: string; note?: string }) {
+export function Empty({ icon, title, note, action }: {
+  icon: string; title: string; note?: string;
+  /** кнопка действия — чтобы из пустого экрана был выход */
+  action?: { label: string; to: string };
+}) {
   return (
     <div className="empty fade-in">
       <div className="empty-icon"><Icon name={icon} size={34} strokeWidth={1.6} /></div>
       <h3>{title}</h3>
       {note && <p className="subtitle">{note}</p>}
+      {action && (
+        <Link to={action.to} className="btn btn-primary" style={{ marginTop: 18 }}>
+          {action.label}
+        </Link>
+      )}
     </div>
   );
 }

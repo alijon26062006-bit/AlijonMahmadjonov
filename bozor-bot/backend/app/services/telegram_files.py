@@ -45,10 +45,29 @@ async def get_photo_bytes(redis: Redis, file_id: str, file_unique_id: str) -> by
         s = get_settings()
         api = f"https://api.telegram.org/bot{s.bot_token}"
 
-        file_path = await redis.get(f"tgfile:{file_id}")
-        if file_path:
-            file_path = file_path.decode() if isinstance(file_path, bytes) else file_path
-        else:
+        # Redis здесь — только ускорение. Если он недоступен, фотографии
+        # должны продолжать отдаваться, просто с лишним вызовом getFile.
+        async def cache_get(key: str) -> str | None:
+            try:
+                v = await redis.get(key)
+            except Exception:
+                return None
+            return v.decode() if isinstance(v, bytes) else v
+
+        async def cache_set(key: str, value: str, ex: int) -> None:
+            try:
+                await redis.set(key, value, ex=ex)
+            except Exception:
+                pass
+
+        async def cache_del(key: str) -> None:
+            try:
+                await redis.delete(key)
+            except Exception:
+                pass
+
+        file_path = await cache_get(f"tgfile:{file_id}")
+        if not file_path:
             r = await _http().get(f"{api}/getFile", params={"file_id": file_id})
             data = r.json()
             if not data.get("ok"):
@@ -56,12 +75,12 @@ async def get_photo_bytes(redis: Redis, file_id: str, file_unique_id: str) -> by
             if (data["result"].get("file_size") or 0) > 20 * 1024 * 1024:
                 return None                      # лимит скачивания Bot API
             file_path = data["result"]["file_path"]
-            await redis.set(f"tgfile:{file_id}", file_path, ex=3000)
+            await cache_set(f"tgfile:{file_id}", file_path, 3000)
 
         r = await _http().get(
             f"https://api.telegram.org/file/bot{s.bot_token}/{file_path}")
         if r.status_code != 200:
-            await redis.delete(f"tgfile:{file_id}")
+            await cache_del(f"tgfile:{file_id}")
             return None
 
         path.parent.mkdir(parents=True, exist_ok=True)

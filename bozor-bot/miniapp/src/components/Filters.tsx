@@ -116,11 +116,13 @@ export function FilterFields({ schema, values, set }: {
   );
 }
 
-export function FilterSheet({ schema, values, set, onClose, onReset, total }: {
+export function FilterSheet({ schema, values, set, onClose, onReset, total, hasMore }: {
   schema: SchemaOut; values: Values;
   set: (k: string, v: string) => void;
   onClose: () => void; onReset: () => void;
   total?: number;
+  /** есть ли ещё страницы — тогда показываем «N+», а не точное число */
+  hasMore?: boolean;
 }) {
   return (
     <div className="sheet-overlay" onClick={onClose}>
@@ -132,7 +134,9 @@ export function FilterSheet({ schema, values, set, onClose, onReset, total }: {
         </div>
         <FilterFields schema={schema} values={values} set={set} />
         <button className="btn btn-primary btn-block" onClick={onClose}>
-          {typeof total === 'number' ? `Показать ${total}${total === 50 ? '+' : ''}` : 'Показать'}
+          {typeof total === 'number'
+            ? (total === 0 ? 'Ничего не найдено' : `Показать ${total}${hasMore ? '+' : ''}`)
+            : 'Показать'}
         </button>
       </div>
     </div>

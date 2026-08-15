@@ -32,7 +32,12 @@ async def photo(public_id: uuid_mod.UUID, request: Request,
 
     file_id = p.thumb_file_id if (size == "thumb" and p.thumb_file_id) else p.file_id
     fu = f"{p.file_unique_id}_{size}" if size == "thumb" else p.file_unique_id
-    data = await get_photo_bytes(redis, file_id, fu)
+    try:
+        data = await get_photo_bytes(redis, file_id, fu)
+    except Exception:
+        # Ни один сбой не должен превращаться в 500 — иначе на сайте
+        # пропадают все изображения разом
+        raise HTTPException(404) from None
     if data is None:
         raise HTTPException(404)
     return Response(content=data, media_type="image/jpeg",

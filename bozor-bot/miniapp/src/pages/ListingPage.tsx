@@ -1,7 +1,7 @@
 /** Карточка объявления: галерея, спеки из схемы, карта, связь с автором. */
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, fmtDate, fmtPrice, photoUrl } from '../api/client';
 import type { ListingDetail } from '../api/types';
 import { Icon } from '../components/icons';
@@ -12,6 +12,7 @@ import { hapticSuccess, openTgLink } from '../telegram/tg';
 export default function ListingPage() {
   useTgBackButton(true);
   const { id } = useParams();
+  const navigate = useNavigate();
   const user = useAuth();
   const [contact, setContact] = useState<{ telegram?: string; phone?: string } | null>(null);
   const [reported, setReported] = useState(false);
@@ -33,7 +34,7 @@ export default function ListingPage() {
       hapticSuccess();
     } catch (e) {
       const err = e as { status?: number };
-      if (err.status === 401) window.location.hash = '#login';
+      if (err.status === 401) navigate('/login');
     }
   };
 
@@ -112,8 +113,7 @@ export default function ListingPage() {
               )}
             </>
           ) : (
-            <button className="btn btn-primary btn-block" onClick={askContact}
-                    disabled={!user && false}>
+            <button className="btn btn-primary btn-block" onClick={askContact}>
               <Icon name="message-circle" size={17} /> Связаться с продавцом
             </button>
           )}

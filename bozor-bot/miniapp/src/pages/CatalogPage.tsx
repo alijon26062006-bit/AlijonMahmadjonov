@@ -11,6 +11,7 @@ import { CatalogMap } from '../components/MapView';
 import { CardSkeletons, Empty, useAuth, useTgBackButton } from '../components/ui';
 
 type Page = { items: Card[]; next_cursor: string | null };
+type Bounds = { min_lon: number; min_lat: number; max_lon: number; max_lat: number };
 
 export default function CatalogPage() {
   useTgBackButton(true);
@@ -42,6 +43,23 @@ export default function CatalogPage() {
   });
 
   const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
+
+  // Границы карты держим в состоянии, а не в адресе: иначе после возврата
+  // к списку он молча оставался бы отфильтрованным по последнему виду карты.
+  const [bounds, setBounds] = useState<Bounds | null>(null);
+  const mapFeed = useQuery<Page>({
+    queryKey: ['catalog-map', queryString, bounds],
+    queryFn: () => {
+      const qs = new URLSearchParams(queryString);
+      if (bounds) {
+        for (const [k, v] of Object.entries(bounds)) qs.set(k, v.toFixed(5));
+      }
+      qs.set('limit', '50');          // на карте точек нужно больше, чем в ленте
+      return api(`/api/listings?${qs}`);
+    },
+    enabled: view === 'map',
+  });
+  const mapItems = mapFeed.data?.items ?? items;
 
   // избранное
   const favQuery = useQuery<{ ids: string[] }>({
@@ -114,28 +132,22 @@ export default function CatalogPage() {
 
       <div className="section catalog-layout">
         {schema && (
-          <aside className="filters-desktop" style={{ display: undefined }}>
-            <div className="only-desktop">
-              <b style={{ display: 'block', marginBottom: 12 }}>Фильтры</b>
-              <FilterFields schema={schema} values={values} set={set} />
-              <button className="btn btn-ghost btn-block" onClick={reset}>Сбросить</button>
-            </div>
+          <aside className="filters-desktop">
+            <b style={{ display: 'block', marginBottom: 12 }}>Фильтры</b>
+            <FilterFields schema={schema} values={values} set={set} />
+            <button className="btn btn-ghost btn-block" onClick={reset}>Сбросить</button>
           </aside>
         )}
 
         <div>
           {view === 'map' ? (
-            <CatalogMap items={items}
-                        onBounds={(b) => {
-                          const next = new URLSearchParams(params);
-                          for (const [k, v] of Object.entries(b)) next.set(k, v.toFixed(5));
-                          setParams(next, { replace: true });
-                        }} />
+            <CatalogMap items={mapItems} onBounds={setBounds} />
           ) : feed.isLoading ? (
             <CardSkeletons />
           ) : items.length === 0 ? (
             <Empty icon="search" title="Ничего не найдено"
-                   note="Попробуйте смягчить фильтры" />
+                   note="Попробуйте смягчить фильтры или выбрать другую категорию"
+                   action={{ label: 'Все категории', to: '/' }} />
           ) : (
             <>
               <div className="grid">
@@ -154,7 +166,7 @@ export default function CatalogPage() {
 
       {sheetOpen && schema && (
         <FilterSheet schema={schema} values={values} set={set}
-                     total={items.length}
+                     total={items.length} hasMore={Boolean(feed.hasNextPage)}
                      onReset={reset}
                      onClose={() => setSheetOpen(false)} />
       )}

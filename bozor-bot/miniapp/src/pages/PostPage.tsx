@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { API, api, photoUrl } from '../api/client';
+import { api } from '../api/client';
 import type { Direction, FieldOut } from '../api/types';
 import { useSchema } from '../components/Filters';
 import { PickMap } from '../components/MapView';
