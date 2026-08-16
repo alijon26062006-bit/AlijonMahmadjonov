@@ -16,7 +16,7 @@ from app.db.models import (
 )
 from app.repositories.listings import catalog_page
 from app.schemas_engine.registry import get_schema, option_label
-from app.services import listing_service
+from app.services import feed_service, listing_service
 
 router = APIRouter(prefix="/api/listings", tags=["listings"])
 
@@ -115,6 +115,10 @@ async def detail(public_id: uuid_mod.UUID, session: Db, viewer: OptionalUser):
     await session.execute(update(Listing).where(Listing.id == listing.id)
                           .values(views_count=Listing.views_count + 1))
     await session.commit()
+    # Событие для алгоритма ленты — собираем с первого дня
+    if listing.status == ST_APPROVED:
+        await feed_service.log_event(session, listing.id,
+                                     viewer.id if viewer else None, "view")
 
     card = _card(listing, cities, districts)
     card.update({
@@ -138,6 +142,7 @@ async def contact(public_id: uuid_mod.UUID, session: Db, user: CurrentUser):
     await session.execute(update(Listing).where(Listing.id == listing.id)
                           .values(contacts_count=Listing.contacts_count + 1))
     await session.commit()
+    await feed_service.log_event(session, listing.id, user.id, "contact_click")
     out = {"contact_mode": listing.contact_mode}
     if listing.contact_mode in ("telegram", "both") and listing.contact_username:
         out["telegram"] = f"https://t.me/{listing.contact_username}"

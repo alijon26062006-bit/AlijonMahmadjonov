@@ -1,18 +1,72 @@
-/** Главная: направления и категории. */
-import { useQuery } from '@tanstack/react-query';
+/** Главная: категории + перемешанная лента с меткой категории у карточек. */
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import type { Direction } from '../api/types';
+import type { Card, Direction } from '../api/types';
 import { CATEGORY_ICON, DIRECTION_ICON, Icon } from '../components/icons';
-import { CardSkeletons } from '../components/ui';
+import { ListingCard } from '../components/ListingCard';
+import { CardSkeletons, Empty, useAuth } from '../components/ui';
+
+type FeedPage = { items: Card[]; has_more: boolean };
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { data, isLoading } = useQuery<{ directions: Direction[] }>({
+  const user = useAuth();
+  const [showAllCats, setShowAllCats] = useState(false);
+
+  const { data: cats } = useQuery<{ directions: Direction[] }>({
     queryKey: ['categories'],
     queryFn: () => api('/api/categories'),
     staleTime: 10 * 60_000,
   });
+
+  const feed = useInfiniteQuery<FeedPage>({
+    queryKey: ['feed'],
+    queryFn: ({ pageParam }) => api(`/api/feed?limit=20&offset=${pageParam}`),
+    initialPageParam: 0,
+    getNextPageParam: (last, all) =>
+      last.has_more ? all.reduce((n, p) => n + p.items.length, 0) : undefined,
+    staleTime: 60_000,
+  });
+  const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
+
+  // избранное
+  const favQuery = useQuery<{ ids: string[] }>({
+    queryKey: ['fav-ids'], queryFn: () => api('/api/favorites/ids'),
+    enabled: Boolean(user),
+  });
+  const [favs, setFavs] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (favQuery.data) setFavs(new Set(favQuery.data.ids));
+  }, [favQuery.data]);
+  const toggleFav = async (id: string, next: boolean) => {
+    setFavs((prev) => {
+      const s = new Set(prev);
+      next ? s.add(id) : s.delete(id);
+      return s;
+    });
+    try {
+      await api(`/api/favorites/${id}`, { method: next ? 'PUT' : 'DELETE' });
+    } catch { /* оптимистично */ }
+  };
+
+  // догрузка при прокрутке
+  const sentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el) return;
+    const io = new IntersectionObserver((e) => {
+      if (e[0].isIntersecting && feed.hasNextPage && !feed.isFetchingNextPage) {
+        feed.fetchNextPage();
+      }
+    }, { rootMargin: '400px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [feed]);
+
+  const directions = cats?.directions ?? [];
+  const visible = showAllCats ? directions : directions.slice(0, 2);
 
   return (
     <div className="fade-in">
@@ -29,9 +83,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {isLoading && <div className="section"><CardSkeletons n={4} /></div>}
-
-      {data?.directions.map((d) => {
+      {visible.map((d) => {
         const dir = DIRECTION_ICON[d.slug] ?? DIRECTION_ICON.parts;
         return (
           <section key={d.slug} className="dir-block">
@@ -54,6 +106,36 @@ export default function HomePage() {
           </section>
         );
       })}
+
+      {directions.length > 2 && (
+        <button className="btn btn-ghost btn-block" style={{ marginTop: 12 }}
+                onClick={() => setShowAllCats(!showAllCats)}>
+          {showAllCats ? 'Свернуть категории' : 'Показать все категории'}
+        </button>
+      )}
+
+      <section className="section">
+        <h2 className="section-title">Свежие объявления</h2>
+        {feed.isLoading ? (
+          <CardSkeletons />
+        ) : items.length === 0 ? (
+          <Empty icon="archive" title="Объявлений пока нет"
+                 note="Будьте первым — подайте объявление"
+                 action={{ label: 'Подать объявление', to: '/post' }} />
+        ) : (
+          <>
+            <div className="grid">
+              {items.map((item) => (
+                <ListingCard key={item.public_id} item={item}
+                             isFav={favs.has(item.public_id)}
+                             onFav={user ? toggleFav : undefined} />
+              ))}
+            </div>
+            <div ref={sentinel} />
+            {feed.isFetchingNextPage && <CardSkeletons n={2} />}
+          </>
+        )}
+      </section>
     </div>
   );
 }

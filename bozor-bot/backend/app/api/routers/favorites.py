@@ -49,6 +49,8 @@ async def add(public_id: uuid_mod.UUID, session: Db, user: CurrentUser):
     await session.execute(update(Listing).where(Listing.id == listing.id)
                           .values(favorites_count=Listing.favorites_count + 1))
     await session.commit()
+    from app.services import feed_service
+    await feed_service.log_event(session, listing.id, user.id, "favorite")
     return {"ok": True}
 
 

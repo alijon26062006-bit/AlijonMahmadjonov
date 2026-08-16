@@ -16,6 +16,9 @@ export type Card = {
   lon?: number | null;
   reject_reason?: string | null;
   is_rent?: boolean;
+  /** метка категории — показывается на карточке в ленте */
+  category_title?: string | null;
+  direction?: string | null;
 };
 
 export type Spec = { key: string; label: string; value: string; unit?: string | null; verified?: boolean };

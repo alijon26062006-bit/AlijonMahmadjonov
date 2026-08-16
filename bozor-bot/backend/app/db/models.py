@@ -196,6 +196,30 @@ class Report(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class ListingEvent(Base):
+    """Поведение пользователей — основа алгоритма ленты.
+
+    Собирается с первого дня работы: задним числом эти данные получить неоткуда.
+    """
+    __tablename__ = "listing_events"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    listing_id: Mapped[int] = mapped_column(
+        ForeignKey("listings.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    # view | favorite | contact_click | share
+    kind: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        # Профиль интересов строится по последним событиям человека
+        Index("ix_events_user_time", "user_id", "created_at"),
+        Index("ix_events_listing_kind", "listing_id", "kind"),
+    )
+
+
 class ModerationLog(Base):
     __tablename__ = "moderation_log"
 

@@ -20,6 +20,9 @@ export function ListingCard({ item, isFav, onFav }: {
                onLoad={(e) => e.currentTarget.classList.add('loaded')}
                onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
         )}
+        {item.category_title && (
+          <span className="card-cat">{item.category_title}</span>
+        )}
         {onFav && (
           <button
             className={`card-fav ${isFav ? 'on' : ''}`}
