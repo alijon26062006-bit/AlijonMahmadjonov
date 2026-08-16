@@ -42,6 +42,11 @@ async def _get_or_create(session, tg_user: dict) -> User:
         user.username, changed = tg_user.get("username"), True
     if tg_user.get("first_name") and tg_user["first_name"] != user.first_name:
         user.first_name, changed = tg_user["first_name"], True
+    # Права сверяем с ADMIN_IDS при каждом входе: список — источник правды,
+    # а не отметка, поставленная когда-то при регистрации.
+    should_be_admin = tg_user["id"] in get_settings().admin_id_list
+    if user.is_admin != should_be_admin:
+        user.is_admin, changed = should_be_admin, True
     if changed:
         await session.commit()
     return user

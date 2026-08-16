@@ -17,9 +17,8 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db.models import TacModel
-
-MIN_CONFIRMATIONS = 2       # одна опечатка не должна становиться справочником
 
 
 def tac_of(imei: str | None) -> str | None:
@@ -41,7 +40,8 @@ async def lookup(session: AsyncSession, imei: str | None) -> dict | None:
     if not row:
         return None
     # Импортированному списку верим сразу, своим наблюдениям — с двух совпадений
-    if row.source == "learned" and row.confirmations < MIN_CONFIRMATIONS:
+    if row.source == "learned" and \
+            row.confirmations < get_settings().tac_min_confirmations:
         return None
     return {"brand": row.brand, "model": row.model,
             "source": row.source, "confirmations": row.confirmations}
@@ -99,5 +99,6 @@ async def stats(session: AsyncSession) -> dict:
         "total": len(rows),
         "imported": sum(1 for s, _ in rows if s == "import"),
         "learned_active": sum(1 for s, c in rows
-                              if s == "learned" and c >= MIN_CONFIRMATIONS),
+                              if s == "learned"
+                              and c >= get_settings().tac_min_confirmations),
     }

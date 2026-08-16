@@ -28,16 +28,28 @@ class UserMiddleware(BaseMiddleware):
         if not tg_user or session is None:
             return await handler(event, data)
 
+        should_be_admin = tg_user.id in get_settings().admin_id_list
         user = await session.scalar(select(User).where(User.tg_id == tg_user.id))
         if user is None:
             user = User(tg_id=tg_user.id, username=tg_user.username,
                         first_name=tg_user.first_name or "",
-                        is_admin=tg_user.id in get_settings().admin_id_list)
+                        is_admin=should_be_admin)
             session.add(user)
             await session.commit()
-        elif user.username != tg_user.username:
-            user.username = tg_user.username
-            await session.commit()
+        else:
+            changed = False
+            if user.username != tg_user.username:
+                user.username, changed = tg_user.username, True
+            if tg_user.first_name and user.first_name != tg_user.first_name:
+                user.first_name, changed = tg_user.first_name, True
+            # ADMIN_IDS — единственный источник правды о правах. Убрали из
+            # списка — права снимаются при первом же действии, добавили —
+            # выдаются. Раньше они ставились только при регистрации, и смена
+            # списка ни на что не влияла.
+            if user.is_admin != should_be_admin:
+                user.is_admin, changed = should_be_admin, True
+            if changed:
+                await session.commit()
 
         if user.is_banned:
             return None

@@ -14,14 +14,18 @@ from app.db.models import User
 router = Router()
 
 
-def main_menu_kb() -> ReplyKeyboardMarkup:
+def main_menu_kb(is_admin: bool = False) -> ReplyKeyboardMarkup:
     s = get_settings()
-    return ReplyKeyboardMarkup(keyboard=[
+    rows = [
         [KeyboardButton(text=texts.MENU_POST)],
         [KeyboardButton(text=texts.MENU_CATALOG,
                         web_app=WebAppInfo(url=s.webapp_url))],
         [KeyboardButton(text=texts.MENU_MY), KeyboardButton(text=texts.MENU_HELP)],
-    ], resize_keyboard=True)
+    ]
+    if is_admin:
+        # разбор заявок — прямо в боте, отдельной кнопкой
+        rows.append([KeyboardButton(text=texts.MENU_MOD)])
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
 def open_app_kb() -> InlineKeyboardMarkup:
@@ -35,8 +39,9 @@ def open_app_kb() -> InlineKeyboardMarkup:
     ]])
 
 
-async def greet(message: Message) -> None:
-    await message.answer(texts.START, reply_markup=main_menu_kb())
+async def greet(message: Message, user: User | None = None) -> None:
+    await message.answer(texts.START,
+                         reply_markup=main_menu_kb(bool(user and user.is_admin)))
     await message.answer(texts.OPEN_APP, reply_markup=open_app_kb())
 
 
@@ -60,7 +65,7 @@ async def start_deeplink(message: Message, command: CommandObject,
             "Кто-то (надеемся, вы) входит на сайт через этот Telegram-аккаунт.\n"
             "Если это вы — подтвердите:", reply_markup=kb)
         return
-    await greet(message)
+    await greet(message, user)
 
 
 @router.callback_query(F.data.startswith("login:"))
@@ -76,8 +81,8 @@ async def confirm_login(cb: CallbackQuery, redis: Redis, user: User) -> None:
 
 
 @router.message(CommandStart())
-async def start(message: Message) -> None:
-    await greet(message)
+async def start(message: Message, user: User) -> None:
+    await greet(message, user)
 
 
 @router.message(Command("help"))

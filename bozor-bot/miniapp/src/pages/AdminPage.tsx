@@ -412,6 +412,97 @@ function Dicts() {
           Добавить модель
         </button>
       </div>
+
+      <TacDict />
+    </div>
+  );
+}
+
+/** Справочник моделей по IMEI: что площадка узнаёт по первым восьми цифрам. */
+function TacDict() {
+  const qc = useQueryClient();
+  const [imei, setImei] = useState('');
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
+  const [q, setQ] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const { data } = useQuery<any>({
+    queryKey: ['tac', q],
+    queryFn: () => api(`/api/admin/tac?q=${encodeURIComponent(q)}`),
+  });
+
+  const add = async () => {
+    try {
+      await api('/api/admin/tac', {
+        method: 'POST',
+        body: JSON.stringify({ imei_or_tac: imei, brand, model }),
+      });
+      setMsg('Модель добавлена'); setImei(''); setModel('');
+      qc.invalidateQueries({ queryKey: ['tac'] });
+    } catch {
+      setMsg('Не удалось добавить — проверьте номер');
+    }
+  };
+
+  const remove = async (tac: string) => {
+    await api(`/api/admin/tac/${tac}`, { method: 'DELETE' }).catch(() => null);
+    qc.invalidateQueries({ queryKey: ['tac'] });
+  };
+
+  const st = data?.stats;
+  return (
+    <div className="field" style={{ marginTop: 20 }}>
+      <b>Модели по IMEI</b>
+      <p className="subtitle" style={{ marginTop: 4 }}>
+        Первые восемь цифр IMEI одинаковы у всей партии одной модели. Записи
+        появляются сами, когда вы одобряете объявление с IMEI и моделью рядом,
+        — здесь их можно поправить или внести заранее.
+        {st && ` Всего: ${st.total}, из них внесено вручную: ${st.imported}.`}
+      </p>
+
+      <div className="range-row" style={{ marginTop: 10 }}>
+        <input placeholder="IMEI или первые 8 цифр" value={imei}
+               onChange={(e) => setImei(e.target.value)} />
+        <input placeholder="Марка" value={brand}
+               onChange={(e) => setBrand(e.target.value)} />
+      </div>
+      <input placeholder="Модель — например Galaxy A54" value={model}
+             style={{ marginTop: 8 }}
+             onChange={(e) => setModel(e.target.value)} />
+      <button className="btn btn-primary btn-block" style={{ marginTop: 8 }}
+              disabled={imei.replace(/\D/g, '').length < 8
+                        || !brand.trim() || !model.trim()}
+              onClick={add}>
+        Добавить модель по IMEI
+      </button>
+      {msg && <p className="subtitle" style={{ marginTop: 8 }}>{msg}</p>}
+
+      <input placeholder="Поиск по марке, модели или номеру" value={q}
+             style={{ marginTop: 12 }}
+             onChange={(e) => setQ(e.target.value)} />
+      <div style={{ marginTop: 8 }}>
+        {(data?.items ?? []).map((r: any) => (
+          <div key={r.tac} className="my-item" style={{ padding: '8px 0' }}>
+            <div>
+              <b>{r.brand} {r.model}</b>
+              <div className="subtitle">
+                {r.tac} · {r.source === 'import' ? 'внесено вручную'
+                                                 : `из объявлений (${r.confirmations})`}
+              </div>
+            </div>
+            <button className="btn btn-ghost" onClick={() => remove(r.tac)}>
+              Удалить
+            </button>
+          </div>
+        ))}
+        {data && data.items.length === 0 && (
+          <p className="subtitle">
+            Пока пусто. Записи появятся, как только вы одобрите первое
+            объявление телефона с указанным IMEI.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

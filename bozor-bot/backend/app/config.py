@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     vin_decode_enabled: bool = True
     vin_api_url: str = "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues"
     vin_api_timeout: float = 6.0      # мастер не должен ждать сеть дольше
+    # Сколько одобренных объявлений должны сойтись, чтобы связка TAC → модель
+    # начала подсказывать. Единица — площадка учится с первого же одобрения:
+    # пару уже посмотрел живой модератор. Больше — строже, но дольше копится.
+    tac_min_confirmations: int = 1
 
     # --- Бизнес ---
     tjs_per_usd: float = 10.9     # стартовый курс, обновляется в currency_rates

@@ -423,12 +423,12 @@ async def skip_step(cb: CallbackQuery, state: FSMContext,
 
 @router.callback_query(Wiz.flow, F.data == "w:b")
 async def go_back(cb: CallbackQuery, state: FSMContext,
-                  session: AsyncSession, bot: Bot) -> None:
+                  session: AsyncSession, bot: Bot, user: User) -> None:
     data = await state.get_data()
     hist = data.get("hist", [])
     await cb.answer()
     if not hist:
-        await cancel_flow(cb.message, state, edit=True)
+        await cancel_flow(cb.message, state, edit=True, user=user)
         return
     idx = hist.pop()
     await state.update_data(hist=hist, idx=idx, edit_return=False)
@@ -436,31 +436,33 @@ async def go_back(cb: CallbackQuery, state: FSMContext,
 
 
 @router.callback_query(F.data == "w:x")
-async def cancel_cb(cb: CallbackQuery, state: FSMContext) -> None:
+async def cancel_cb(cb: CallbackQuery, state: FSMContext, user: User) -> None:
     await cb.answer()
-    await cancel_flow(cb.message, state, edit=True)
+    await cancel_flow(cb.message, state, edit=True, user=user)
 
 
 @router.message(Command("cancel"))
 @router.message(F.text == texts.BTN_CANCEL)
-async def cancel_cmd(message: Message, state: FSMContext) -> None:
+async def cancel_cmd(message: Message, state: FSMContext, user: User) -> None:
     if await state.get_state() is None:
         await message.answer(texts.NOT_IN_WIZARD)
         return
-    await cancel_flow(message, state, edit=False)
+    await cancel_flow(message, state, edit=False, user=user)
 
 
-async def cancel_flow(message: Message, state: FSMContext, edit: bool) -> None:
+async def cancel_flow(message: Message, state: FSMContext, edit: bool,
+                      user: User | None = None) -> None:
     await state.clear()
     from app.bot.handlers.start import main_menu_kb
+    kb = main_menu_kb(bool(user and user.is_admin))
     if edit:
         try:
             await message.edit_text(texts.CANCELLED)
         except Exception:
             pass
-        await message.answer("Главное меню:", reply_markup=main_menu_kb())
+        await message.answer("Главное меню:", reply_markup=kb)
     else:
-        await message.answer(texts.CANCELLED, reply_markup=main_menu_kb())
+        await message.answer(texts.CANCELLED, reply_markup=kb)
 
 
 # ─────────────────────── Ввод: текст, фото, гео, контакт ───────────────────────
@@ -689,12 +691,18 @@ async def on_text(message: Message, state: FSMContext, session: AsyncSession,
                     v=f'{found["brand"]} {found["model"]}'))
                 auto["brand_hint"] = auto["brand"] = found["brand"]
                 auto["model"] = found["model"]
+            else:
+                # Молчание читается как поломка. Говорим прямо: номер верный,
+                # аппарат пока незнаком — справочник наполняется публикациями.
+                lines.append(texts.IMEI_UNKNOWN)
 
         if not lines:
             if auto.get("brand_hint"):
                 lines.append(texts.VALUE_SAVED_AUTO.format(v=auto["brand_hint"]))
             if auto.get("year"):
                 lines.append(texts.VALUE_SAVED_AUTO.format(v=f"год {auto['year']}"))
+        if not lines:
+            lines.append(texts.ID_OK_NO_DATA)      # ответ есть всегда
 
         merged = values.get("_auto", {})
         # brand_hint и tac — служебные: первое уходит в текст сообщения,
@@ -831,7 +839,8 @@ async def submit(cb: CallbackQuery, state: FSMContext, session: AsyncSession,
     await state.clear()
     from app.bot.handlers.start import main_menu_kb
     await cb.message.edit_text(texts.SUBMITTED)
-    await cb.message.answer("Что дальше?", reply_markup=main_menu_kb())
+    await cb.message.answer("Что дальше?",
+                            reply_markup=main_menu_kb(user.is_admin))
 
     from app.bot.handlers.moderation import send_to_moderation
     await send_to_moderation(bot, session, listing)

@@ -12,9 +12,12 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, Db
+from sqlalchemy import or_
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
 from app.db.models import (
     ST_APPROVED, ST_ARCHIVED, ST_PENDING, ST_REJECTED, Brand, City, District,
-    Listing, ModerationLog, Report, User, VehicleModel,
+    Listing, ModerationLog, Report, TacModel, User, VehicleModel,
 )
 from app.schemas_engine.registry import get_schema
 from app.services import moderation_service, tac_service
@@ -343,3 +346,60 @@ async def moderation_log(session: Db, admin: Admin, limit: int = 50):
          "created_at": m.created_at.isoformat() if m.created_at else None}
         for m, name, username in rows
     ]}
+
+
+# ─────────── Справочник моделей по IMEI (TAC) ───────────
+
+class TacIn(BaseModel):
+    imei_or_tac: str          # можно вставить весь IMEI — возьмём первые 8 цифр
+    brand: str
+    model: str
+
+
+@router.get("/tac")
+async def tac_list(session: Db, admin: Admin, q: str = "", limit: int = 100):
+    """Что площадка уже умеет узнавать по IMEI."""
+    query = select(TacModel).order_by(TacModel.updated_at.desc())
+    if q.strip():
+        needle = f"%{q.strip()}%"
+        query = query.where(or_(TacModel.tac.ilike(needle),
+                                TacModel.brand.ilike(needle),
+                                TacModel.model.ilike(needle)))
+    rows = (await session.scalars(query.limit(min(limit, 500)))).all()
+    return {"items": [{"tac": r.tac, "brand": r.brand, "model": r.model,
+                       "source": r.source, "confirmations": r.confirmations}
+                      for r in rows],
+            "stats": await tac_service.stats(session)}
+
+
+@router.post("/tac")
+async def tac_add(body: TacIn, session: Db, admin: Admin):
+    """Внести связку вручную. Ручная запись приравнивается к импорту:
+    её не перебьёт одно объявление случайного продавца."""
+    tac = tac_service.tac_of(body.imei_or_tac)
+    brand = body.brand.strip()[:60]
+    model = body.model.strip()[:120]
+    if not tac or not brand or not model:
+        raise HTTPException(400, "tac_brand_model_required")
+
+    stmt = pg_insert(TacModel).values(tac=tac, brand=brand, model=model,
+                                      source="import", confirmations=1)
+    await session.execute(stmt.on_conflict_do_update(
+        index_elements=[TacModel.tac],
+        set_={"brand": brand, "model": model, "source": "import"}))
+    session.add(ModerationLog(listing_id=None, admin_id=admin.id,
+                              action="tac_add", reason=f"{tac} {brand} {model}"))
+    await session.commit()
+    return {"tac": tac, "brand": brand, "model": model}
+
+
+@router.delete("/tac/{tac}")
+async def tac_delete(tac: str, session: Db, admin: Admin):
+    row = await session.get(TacModel, tac[:8])
+    if not row:
+        raise HTTPException(404, "not_found")
+    await session.delete(row)
+    session.add(ModerationLog(listing_id=None, admin_id=admin.id,
+                              action="tac_delete", reason=tac[:8]))
+    await session.commit()
+    return {"ok": True}
