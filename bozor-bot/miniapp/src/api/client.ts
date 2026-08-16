@@ -1,5 +1,5 @@
 /** API-клиент: авторизация (Mini App / браузер), запросы с Bearer, фото-URL. */
-import { inTelegram, tg } from '../telegram/tg';
+import { inTelegram, tg, tgUserId } from '../telegram/tg';
 import type { UserOut } from './types';
 
 export const API = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
@@ -16,21 +16,34 @@ export function onAuthChange(cb: () => void): () => void {
 }
 function notify() { listeners.forEach((cb) => cb()); }
 
+/** Ключ кэша сессии: в Telegram — свой на каждый аккаунт, чтобы при смене
+ *  аккаунта не подхватить чужую. */
+const SESSION_KEY = inTelegram ? `session:tg:${tgUserId}` : 'session';
+
 function setSession(t: string, u: UserOut) {
   token = t; currentUser = u;
-  if (!inTelegram) localStorage.setItem('session', JSON.stringify({ t, u }));
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ t, u }));
   notify();
 }
 
 export function logout() {
   token = null; currentUser = null;
-  localStorage.removeItem('session');
+  localStorage.removeItem(SESSION_KEY);
   notify();
 }
 
 /** Вход: в Telegram — по initData автоматически; в браузере — из localStorage. */
 export async function bootstrapAuth(): Promise<string | null> {
   if (inTelegram && tg) {
+    // Сначала поднимаем прошлую сессию — профиль виден сразу, без ожидания
+    // сети. Подпись всё равно проверяется ниже, просто уже фоном.
+    const cached = localStorage.getItem(SESSION_KEY);
+    if (cached) {
+      try {
+        const { t, u } = JSON.parse(cached);
+        if (u?.tg_id === tgUserId) { token = t; currentUser = u; notify(); }
+      } catch { localStorage.removeItem(SESSION_KEY); }
+    }
     try {
       const r = await fetch(`${API}/api/auth/telegram`, {
         method: 'POST',
@@ -42,17 +55,22 @@ export async function bootstrapAuth(): Promise<string | null> {
         setSession(js.access_token, js.user);
         return js.start_param ?? null;
       }
-    } catch { /* оффлайн — работаем как гость */ }
+      if (r.status === 401 || r.status === 403) logout();   // бан или чужая подпись
+    } catch { /* оффлайн — живём на кэше */ }
     return null;
   }
-  const saved = localStorage.getItem('session');
+  const saved = localStorage.getItem(SESSION_KEY);
   if (saved) {
     try {
       const { t, u } = JSON.parse(saved);
       token = t; currentUser = u; notify();
-      // проверим, что токен ещё жив
-      const r = await fetch(`${API}/api/auth/me`, { headers: { Authorization: `Bearer ${t}` } });
-      if (!r.ok) logout();
+      // Проверяем, что токен ещё жив. Сеть могла отвалиться — это не повод
+      // выкидывать человека, выходим только при явном отказе сервера.
+      try {
+        const r = await fetch(`${API}/api/auth/me`,
+                              { headers: { Authorization: `Bearer ${t}` } });
+        if (!r.ok) logout();
+      } catch { /* оффлайн — оставляем сессию */ }
     } catch { logout(); }
   }
   return null;

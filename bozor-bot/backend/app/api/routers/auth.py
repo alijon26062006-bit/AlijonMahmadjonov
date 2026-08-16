@@ -24,6 +24,8 @@ def _user_out(user: User) -> dict:
 
 
 async def _get_or_create(session, tg_user: dict) -> User:
+    """Первый вход из Mini App = регистрация. Отдельного шага нет и не нужно:
+    Telegram уже подтвердил, кто это."""
     user = await session.scalar(select(User).where(User.tg_id == tg_user["id"]))
     if user is None:
         user = User(tg_id=tg_user["id"], username=tg_user.get("username"),
@@ -32,6 +34,16 @@ async def _get_or_create(session, tg_user: dict) -> User:
         session.add(user)
         await session.commit()
         await session.refresh(user)
+        return user
+    # Человек мог сменить имя или @username — подтягиваем при каждом входе,
+    # иначе в профиле и в контактах останется то, что было при регистрации.
+    changed = False
+    if tg_user.get("username") != user.username:
+        user.username, changed = tg_user.get("username"), True
+    if tg_user.get("first_name") and tg_user["first_name"] != user.first_name:
+        user.first_name, changed = tg_user["first_name"], True
+    if changed:
+        await session.commit()
     return user
 
 

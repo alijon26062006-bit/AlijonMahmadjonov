@@ -108,6 +108,8 @@ async def create_listing(session: AsyncSession, user: User, schema: CategorySche
         session.add(ListingPhoto(
             listing_id=listing.id, file_id=p["file_id"],
             thumb_file_id=p.get("thumb_file_id"),
+            # с сайта приходит вместе с фото — берём только целое число
+            thumb_w=p["thumb_w"] if isinstance(p.get("thumb_w"), int) else None,
             file_unique_id=p["file_unique_id"],
             width=p.get("width"), height=p.get("height"), position=i))
     await session.commit()

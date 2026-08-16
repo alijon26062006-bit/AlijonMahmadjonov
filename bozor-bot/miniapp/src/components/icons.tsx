@@ -87,3 +87,23 @@ export const CATEGORY_ICON: Record<string, string> = {
   moto_parts: 'bike',
   electronics_parts: 'headphones',
 };
+
+/** Короткая метка для карточки: полное название в уголок фото не влезает
+ *  и обрывается многоточием. */
+export const CATEGORY_SHORT: Record<string, string> = {
+  rent_flat: 'Аренда',
+  sale_flat: 'Квартира',
+  car_sale: 'Авто',
+  car_rent: 'Авто в аренду',
+  auto_service: 'Автоуслуги',
+  device_sale: 'Техника',
+  device_repair: 'Ремонт',
+  auto_parts: 'Автозапчасти',
+  phone_parts: 'Для телефона',
+  computer_parts: 'Для компьютера',
+  appliance_parts: 'Для техники',
+  tv_parts: 'Для ТВ',
+  tool_parts: 'Инструмент',
+  moto_parts: 'Мото и вело',
+  electronics_parts: 'Электроника',
+};

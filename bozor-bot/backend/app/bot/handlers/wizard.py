@@ -402,6 +402,19 @@ async def cancel_flow(message: Message, state: FSMContext, edit: bool) -> None:
 URL_RE = re.compile(r"(https?://\S+|t\.me/\S+|@\w{4,})", re.I)
 
 
+def pick_thumb(sizes):
+    """Размер для карточки в ленте.
+
+    Telegram присылает размеры по возрастанию: примерно 90, 320, 800, 1280.
+    Самый первый — крохотный квадратик, в сетке он выглядит мутным пятном.
+    Берём первый, у которого ширина не меньше 400 точек.
+    """
+    for size in sizes:
+        if (size.width or 0) >= 400:
+            return size
+    return sizes[-1]
+
+
 def parse_text(spec: FieldSpec, raw: str) -> tuple[bool, object | str]:
     """(ok, значение) либо (False, текст ошибки)."""
     raw = raw.strip()
@@ -466,13 +479,14 @@ async def on_photos(message: Message, state: FSMContext, session: AsyncSession,
     for m in (album or [message]):
         if not m.photo:
             continue
-        best, thumb = m.photo[-1], m.photo[0]
+        best, thumb = m.photo[-1], pick_thumb(m.photo)
         if best.file_unique_id in seen:
             continue
         if len(photos) >= 10:
             overflow = True
             break
         photos.append({"file_id": best.file_id, "thumb_file_id": thumb.file_id,
+                       "thumb_w": thumb.width,
                        "file_unique_id": best.file_unique_id,
                        "width": best.width, "height": best.height})
         seen.add(best.file_unique_id)

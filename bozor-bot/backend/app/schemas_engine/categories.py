@@ -31,7 +31,7 @@ _flat_core = [
 rent_flat = make_schema(
     "rent_flat", "realty", "Аренда квартиры", "🔑", order=1,
     title_template="{property_type}, {rooms}, {area} м²",
-    hashtags=["аренда", "недвижимость"], is_rent=True,
+    hashtags=["аренда", "недвижимость"], is_rent=True, geo=True,
     price_label="Цена аренды", negotiable=True,
     specific=_flat_core + [
         FieldSpec(key="rent_period", label="Срок аренды", type="enum_one", required=True,
@@ -56,7 +56,7 @@ rent_flat = make_schema(
 sale_flat = make_schema(
     "sale_flat", "realty", "Продажа квартиры", "🏢", order=2,
     title_template="{property_type}, {rooms}, {area} м²",
-    hashtags=["продажа", "недвижимость"], negotiable=True,
+    hashtags=["продажа", "недвижимость"], negotiable=True, geo=True,
     specific=_flat_core + [
         FieldSpec(key="market", label="Новостройка или вторичка", type="enum_one",
                   required=True,
@@ -165,7 +165,7 @@ car_rent = make_schema(
 auto_service = make_schema(
     "auto_service", "auto", "Автоуслуги", "🛠", order=3,
     title_template="{name}",
-    hashtags=["автоуслуги"], price_label="Цена от", geo_required=True,
+    hashtags=["автоуслуги"], price_label="Цена от",
     specific=[
         FieldSpec(key="service_type", label="Тип услуги", type="enum_one", required=True,
                   options=opts(("sto", "СТО и ремонт"), ("tire", "Шиномонтаж"),
@@ -247,7 +247,7 @@ device_sale = make_schema(
 device_repair = make_schema(
     "device_repair", "tech", "Услуги ремонта", "🔩", order=2,
     title_template="{name}",
-    hashtags=["ремонт"], price_label="Цена от", geo_required=True,
+    hashtags=["ремонт"], price_label="Цена от",
     specific=[
         FieldSpec(key="service_type", label="Тип услуги", type="enum_one", required=True,
                   options=opts(("phone", "Ремонт телефонов"),

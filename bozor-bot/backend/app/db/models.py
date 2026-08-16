@@ -165,6 +165,9 @@ class ListingPhoto(Base):
         ForeignKey("listings.id", ondelete="CASCADE"), index=True)
     file_id: Mapped[str] = mapped_column(Text)
     thumb_file_id: Mapped[str | None] = mapped_column(Text)
+    # ширина превью: Telegram отдаёт размеры от ~90 px, такой в сетке мутный.
+    # Заодно метка «превью выбрано новым правилом» для разовой чистки старых.
+    thumb_w: Mapped[int | None]
     file_unique_id: Mapped[str] = mapped_column(String(64))
     width: Mapped[int | None]
     height: Mapped[int | None]

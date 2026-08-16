@@ -24,6 +24,22 @@ def main_menu_kb() -> ReplyKeyboardMarkup:
     ], resize_keyboard=True)
 
 
+def open_app_kb() -> InlineKeyboardMarkup:
+    """Кнопка прямо под приветствием. Именно web_app: Telegram передаёт
+    приложению подписанные данные, и человек оказывается внутри уже под своим
+    аккаунтом — регистрироваться и входить повторно не нужно."""
+    s = get_settings()
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🏠 Открыть приложение",
+                             web_app=WebAppInfo(url=s.webapp_url)),
+    ]])
+
+
+async def greet(message: Message) -> None:
+    await message.answer(texts.START, reply_markup=main_menu_kb())
+    await message.answer(texts.OPEN_APP, reply_markup=open_app_kb())
+
+
 @router.message(CommandStart(deep_link=True))
 async def start_deeplink(message: Message, command: CommandObject,
                          redis: Redis, user: User) -> None:
@@ -44,7 +60,7 @@ async def start_deeplink(message: Message, command: CommandObject,
             "Кто-то (надеемся, вы) входит на сайт через этот Telegram-аккаунт.\n"
             "Если это вы — подтвердите:", reply_markup=kb)
         return
-    await message.answer(texts.START, reply_markup=main_menu_kb())
+    await greet(message)
 
 
 @router.callback_query(F.data.startswith("login:"))
@@ -61,7 +77,7 @@ async def confirm_login(cb: CallbackQuery, redis: Redis, user: User) -> None:
 
 @router.message(CommandStart())
 async def start(message: Message) -> None:
-    await message.answer(texts.START, reply_markup=main_menu_kb())
+    await greet(message)
 
 
 @router.message(Command("help"))

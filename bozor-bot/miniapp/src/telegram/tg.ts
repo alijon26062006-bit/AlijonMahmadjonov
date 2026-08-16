@@ -2,7 +2,7 @@
 
 type TgWebApp = {
   initData: string;
-  initDataUnsafe: { start_param?: string };
+  initDataUnsafe: { start_param?: string; user?: { id: number } };
   colorScheme: 'light' | 'dark';
   themeParams: Record<string, string>;
   expand(): void;
@@ -28,7 +28,14 @@ declare global {
 }
 
 export const tg: TgWebApp | undefined = window.Telegram?.WebApp;
-export const inTelegram = Boolean(tg && tg.initData);
+
+/** Настоящий Mini App: есть подписанные данные и в них — пользователь.
+ *  Внутренний браузер Telegram тоже подключает telegram-web-app.js, но
+ *  initData там пустая — это обычный сайт, вход по коду. */
+export const inTelegram = Boolean(tg && tg.initData && tg.initDataUnsafe?.user?.id);
+
+/** Идентификатор владельца сессии — чтобы не подставить чужую из кэша. */
+export const tgUserId: number | null = tg?.initDataUnsafe?.user?.id ?? null;
 
 export function initTelegram(): void {
   document.body.classList.toggle('in-telegram', inTelegram);

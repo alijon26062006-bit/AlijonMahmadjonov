@@ -16,6 +16,13 @@ from app.seed.seed import seed
 MIGRATIONS: list[str] = [
     # Действия над пользователями (бан) не привязаны к объявлению
     "ALTER TABLE moderation_log ALTER COLUMN listing_id DROP NOT NULL",
+    # Превью карточки: раньше брался самый мелкий размер Telegram (~90 px) —
+    # в сетке он выглядел мутным пятном. У старых фото превью сбрасываем,
+    # прокси отдаст полный файл. Условие по thumb_w делает шаг повторяемым:
+    # новые снимки помечены шириной и не затрагиваются.
+    "ALTER TABLE listing_photos ADD COLUMN IF NOT EXISTS thumb_w INTEGER",
+    "UPDATE listing_photos SET thumb_file_id = NULL "
+    "WHERE thumb_w IS NULL AND thumb_file_id IS NOT NULL",
 ]
 
 

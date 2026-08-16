@@ -44,6 +44,11 @@ export default function CatalogPage() {
 
   const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
 
+  // Карта — только у категорий, где в схеме есть точка (квартиры). У телефона
+  // или запчасти карта пустая и только мешает.
+  const hasMap = Boolean(schema?.fields.some((f) => f.type === 'geo'));
+  useEffect(() => { if (!hasMap && view === 'map') setView('list'); }, [hasMap, view]);
+
   // Границы карты держим в состоянии, а не в адресе: иначе после возврата
   // к списку он молча оставался бы отфильтрованным по последнему виду карты.
   const [bounds, setBounds] = useState<Bounds | null>(null);
@@ -116,10 +121,12 @@ export default function CatalogPage() {
             {activeCount > 0 && <span className="count">{activeCount}</span>}
           </button>
         )}
-        <button className="btn" onClick={() => setView(view === 'list' ? 'map' : 'list')}
-                title={view === 'list' ? 'Карта' : 'Список'}>
-          <Icon name={view === 'list' ? 'map' : 'list'} size={18} />
-        </button>
+        {hasMap && (
+          <button className="btn" onClick={() => setView(view === 'list' ? 'map' : 'list')}
+                  title={view === 'list' ? 'Карта' : 'Список'}>
+            <Icon name={view === 'list' ? 'map' : 'list'} size={18} />
+          </button>
+        )}
       </div>
 
       {schema && (
@@ -140,7 +147,7 @@ export default function CatalogPage() {
         )}
 
         <div>
-          {view === 'map' ? (
+          {view === 'map' && hasMap ? (
             <CatalogMap items={mapItems} onBounds={setBounds} />
           ) : feed.isLoading ? (
             <CardSkeletons />

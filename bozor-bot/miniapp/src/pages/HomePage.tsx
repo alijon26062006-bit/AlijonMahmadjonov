@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Card, Direction } from '../api/types';
-import { CATEGORY_ICON, DIRECTION_ICON, Icon } from '../components/icons';
+import { CATEGORY_ICON, CATEGORY_SHORT, DIRECTION_ICON, Icon } from '../components/icons';
 import { ListingCard } from '../components/ListingCard';
 import { CardSkeletons, Empty, useAuth } from '../components/ui';
 
@@ -66,7 +66,6 @@ export default function HomePage() {
   }, [feed]);
 
   const directions = cats?.directions ?? [];
-  const visible = showAllCats ? directions : directions.slice(0, 2);
 
   return (
     <div className="fade-in">
@@ -83,35 +82,62 @@ export default function HomePage() {
         </div>
       </div>
 
-      {visible.map((d) => {
-        const dir = DIRECTION_ICON[d.slug] ?? DIRECTION_ICON.parts;
-        return (
-          <section key={d.slug} className="dir-block">
-            <div className="dir-head">
-              <span className={`dir-ico ${dir.tone}`}>
-                <Icon name={dir.icon} size={17} strokeWidth={2.2} />
-              </span>
-              {d.title}
-            </div>
-            <div className="cat-grid">
-              {d.categories.map((c) => (
-                <Link key={c.slug} to={`/catalog?category=${c.slug}`} className="cat-tile">
-                  <span className={`icon-wrap ${dir.tone}`}>
-                    <Icon name={CATEGORY_ICON[c.slug] ?? dir.icon} size={21} />
-                  </span>
-                  {c.title}
-                </Link>
-              ))}
-            </div>
-          </section>
-        );
-      })}
+      {/* Полоса категорий: все пятнадцать в один жест вбок. Раньше они
+          занимали целый экран плитками, и лента начиналась ниже сгиба. */}
+      {!showAllCats && directions.length > 0 && (
+        <div className="cat-strip">
+          {directions.flatMap((d) => {
+            const dir = DIRECTION_ICON[d.slug] ?? DIRECTION_ICON.parts;
+            return d.categories.map((c) => (
+              <Link key={c.slug} to={`/catalog?category=${c.slug}`} className="cat-pill">
+                <span className={`icon-wrap ${dir.tone}`}>
+                  <Icon name={CATEGORY_ICON[c.slug] ?? dir.icon} size={20} />
+                </span>
+                <span className="cat-pill-label">
+                  {CATEGORY_SHORT[c.slug] ?? c.title}
+                </span>
+              </Link>
+            ));
+          })}
+          <button className="cat-pill" onClick={() => setShowAllCats(true)}>
+            <span className="icon-wrap tone-gray">
+              <Icon name="sliders-horizontal" size={20} />
+            </span>
+            <span className="cat-pill-label">Все</span>
+          </button>
+        </div>
+      )}
 
-      {directions.length > 2 && (
-        <button className="btn btn-ghost btn-block" style={{ marginTop: 12 }}
-                onClick={() => setShowAllCats(!showAllCats)}>
-          {showAllCats ? 'Свернуть категории' : 'Показать все категории'}
-        </button>
+      {showAllCats && (
+        <>
+          {directions.map((d) => {
+            const dir = DIRECTION_ICON[d.slug] ?? DIRECTION_ICON.parts;
+            return (
+              <section key={d.slug} className="dir-block">
+                <div className="dir-head">
+                  <span className={`dir-ico ${dir.tone}`}>
+                    <Icon name={dir.icon} size={17} strokeWidth={2.2} />
+                  </span>
+                  {d.title}
+                </div>
+                <div className="cat-grid">
+                  {d.categories.map((c) => (
+                    <Link key={c.slug} to={`/catalog?category=${c.slug}`} className="cat-tile">
+                      <span className={`icon-wrap ${dir.tone}`}>
+                        <Icon name={CATEGORY_ICON[c.slug] ?? dir.icon} size={21} />
+                      </span>
+                      {c.title}
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+          <button className="btn btn-ghost btn-block" style={{ marginTop: 12 }}
+                  onClick={() => setShowAllCats(false)}>
+            Свернуть категории
+          </button>
+        </>
       )}
 
       <section className="section">

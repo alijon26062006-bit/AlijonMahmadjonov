@@ -15,7 +15,8 @@ DELIVERY = opts(("pickup", "Самовывоз"), ("city", "По городу"),
 
 
 def common_tail(*, price_label: str = "Цена", price_unit: str | None = None,
-                negotiable: bool = False, geo_required: bool = False) -> list[FieldSpec]:
+                negotiable: bool = False, geo: bool = False,
+                geo_required: bool = False) -> list[FieldSpec]:
     """Поля, завершающие любую категорию: цена, место, описание, фото, контакт."""
     tail: list[FieldSpec] = [
         FieldSpec(key="price", label=price_label, type="money", required=True,
@@ -34,9 +35,15 @@ def common_tail(*, price_label: str = "Цена", price_unit: str | None = None,
         FieldSpec(key="address", label="Адрес или ориентир", type="string",
                   stored="address", max_len=255,
                   hint="Например: рядом с рынком Корвон"),
-        FieldSpec(key="geo", label="Точка на карте", type="geo",
-                  required=geo_required, stored="geo",
-                  hint="Отправьте геолокацию — объявление появится на карте"),
+    ]
+    # Карта нужна только там, где место решает: квартира. Для телефона или
+    # запчасти точка на карте ничего не добавляет, а шаг мастера удлиняет.
+    if geo or geo_required:
+        tail.append(
+            FieldSpec(key="geo", label="Точка на карте", type="geo",
+                      required=geo_required, stored="geo",
+                      hint="Отправьте геолокацию — объявление появится на карте"))
+    tail += [
         FieldSpec(key="description", label="Описание", type="text", required=True,
                   stored="description", max_len=1000, searchable=True,
                   hint="До 1000 символов. Без ссылок и телефонов — контакт укажете отдельно"),
@@ -57,12 +64,13 @@ def make_schema(slug: str, parent: str, title: str, emoji: str, *,
                 specific: list[FieldSpec], order: int = 100,
                 price_label: str = "Цена", price_unit: str | None = None,
                 negotiable: bool = False, is_rent: bool = False,
-                geo_required: bool = False) -> CategorySchema:
+                geo: bool = False, geo_required: bool = False) -> CategorySchema:
     return CategorySchema(
         slug=slug, parent=parent, title=title, emoji=emoji, order=order,
         title_template=title_template, hashtags=hashtags, is_rent=is_rent,
         fields=specific + common_tail(price_label=price_label, price_unit=price_unit,
-                                      negotiable=negotiable, geo_required=geo_required),
+                                      negotiable=negotiable, geo=geo,
+                                      geo_required=geo_required),
     )
 
 

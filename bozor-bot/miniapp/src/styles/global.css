@@ -628,3 +628,78 @@ body { transition: background-color .25s ease, color .25s ease; }
   max-width: calc(100% - 56px);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* ============================================================
+   Отделка: качество карточки и плавность на телефоне
+   ============================================================ */
+
+/* Пока фото грузится — мягкое мерцание вместо серого прямоугольника */
+.card-photo { background: var(--surface-2); }
+.card-photo::before {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--surface) 60%, transparent) 40%,
+    transparent 60%);
+  background-size: 220% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+.card-photo.ready::before { animation: none; opacity: 0; }
+@keyframes shimmer { to { background-position: -220% 0; } }
+
+/* Метки поверх фото читаются и на светлом снимке */
+.card-photo::after {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 56px;
+  background: linear-gradient(rgba(0, 0, 0, .18), transparent);
+  pointer-events: none;
+}
+.card-cat, .card-fav { z-index: 1; }
+
+/* Тонкий контур: в тёмной теме карточка не сливается с фоном */
+.card { border: 1px solid var(--border); }
+.card-price { font-variant-numeric: tabular-nums; }
+.card-title { color: var(--text-2); line-height: 1.3; }
+
+/* На касании hover «залипает» — оставляем подъём только там, где есть мышь */
+@media (hover: none) {
+  .card:hover { transform: none; box-shadow: var(--shadow-card); }
+}
+
+/* Инерция и отсутствие «резинки» у краёв — как в родном приложении */
+html, body {
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+/* Прокрутка страницы мгновенная: плавную оставляем только явным якорям */
+html { scroll-behavior: auto; }
+
+/* Ничего не выделяется при долгом нажатии по интерфейсу */
+.card, .cat-tile, .chip, .bottomnav, .btn { -webkit-touch-callout: none; }
+
+/* Полоса категорий на главной: прокрутка вбок с прилипанием, без полосы
+   прокрутки — жест как в сторис Telegram */
+.cat-strip {
+  display: flex; gap: 10px;
+  margin: 16px -12px 4px;
+  padding: 2px 12px 6px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.cat-strip::-webkit-scrollbar { display: none; }
+.cat-pill {
+  flex: none; width: 84px;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  scroll-snap-align: start;
+  font-size: 11.5px; font-weight: 600; line-height: 1.25;
+  text-align: center; color: var(--text-2);
+}
+.cat-pill .icon-wrap { width: 54px; height: 54px; border-radius: 18px; }
+/* Подпись занимает ровно две строки — полоса не «прыгает» по высоте */
+.cat-pill-label {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; min-height: 2.5em;
+}
+.cat-pill:active .icon-wrap { transform: scale(.9); }
+.cat-pill .icon-wrap { transition: transform .18s var(--spring); }
+.tone-gray { background: var(--surface-2); color: var(--text-2); }

@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fmtDate, fmtPrice, photoUrl } from '../api/client';
 import type { Card } from '../api/types';
 import { haptic } from '../telegram/tg';
-import { Icon } from './icons';
+import { CATEGORY_SHORT, Icon } from './icons';
 
 export function ListingCard({ item, isFav, onFav }: {
   item: Card;
@@ -10,18 +11,24 @@ export function ListingCard({ item, isFav, onFav }: {
   onFav?: (id: string, next: boolean) => void;
 }) {
   const photo = item.photos[0];
+  // Мерцание держим ровно до появления снимка — и снимаем, даже если он не
+  // загрузился: бесконечно мерцающая заглушка выглядит как поломка.
+  const [shown, setShown] = useState(!photo);
+
   return (
     <Link to={`/listing/${item.public_id}`} className="card fade-in">
-      <div className="card-photo">
+      <div className={`card-photo${shown ? ' ready' : ''}`}>
         <div className="noimg"><Icon name="image" size={30} strokeWidth={1.5} /></div>
         {photo && (
-          <img src={photoUrl(photo.thumb)} alt="" loading="lazy"
+          <img src={photoUrl(photo.thumb)} alt="" loading="lazy" decoding="async"
                style={{ position: 'relative' }}
-               onLoad={(e) => e.currentTarget.classList.add('loaded')}
-               onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+               onLoad={(e) => { e.currentTarget.classList.add('loaded'); setShown(true); }}
+               onError={(e) => { e.currentTarget.style.visibility = 'hidden'; setShown(true); }} />
         )}
         {item.category_title && (
-          <span className="card-cat">{item.category_title}</span>
+          <span className="card-cat">
+            {CATEGORY_SHORT[item.category] ?? item.category_title}
+          </span>
         )}
         {onFav && (
           <button

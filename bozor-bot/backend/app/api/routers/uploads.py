@@ -51,8 +51,11 @@ async def upload_photo(file: UploadFile, user: CurrentUser):
         finally:
             await bot.session.close()
 
-    best, thumb = msg.photo[-1], msg.photo[0]
+    best = msg.photo[-1]
+    # первый размер у Telegram ~90px — для карточки нужен покрупнее
+    thumb = next((x for x in msg.photo if (x.width or 0) >= 400), best)
     photo = {"file_id": best.file_id, "thumb_file_id": thumb.file_id,
+             "thumb_w": thumb.width,
              "file_unique_id": best.file_unique_id,
              "width": best.width, "height": best.height}
     from app.api.routers.listings import sign_photo

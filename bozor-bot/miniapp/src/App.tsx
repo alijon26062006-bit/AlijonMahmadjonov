@@ -1,5 +1,5 @@
-import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
 import { BottomNav, Header } from './components/ui';
 import AdminPage from './pages/AdminPage';
 import CatalogPage from './pages/CatalogPage';
@@ -15,6 +15,20 @@ import { parseStartParam } from './telegram/tg';
 export default function App() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const navType = useNavigationType();
+
+  // Новый экран открывается сверху, возврат — на том месте, где человек был.
+  // Так ведут себя нативные экраны Telegram.
+  const scrollTop = useRef<Record<string, number>>({});
+  useEffect(() => {
+    const key = pathname;
+    if (navType === 'POP') {
+      window.scrollTo({ top: scrollTop.current[key] ?? 0, behavior: 'auto' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+    return () => { scrollTop.current[key] = window.scrollY; };
+  }, [pathname, navType]);
 
   useEffect(() => {
     (async () => {

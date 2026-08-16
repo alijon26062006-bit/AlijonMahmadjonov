@@ -38,7 +38,16 @@ def _photo_urls(listing: Listing) -> list[dict]:
             for p in listing.photos]
 
 
+def _has_geo(category_slug: str) -> bool:
+    """Карта показывается только у категорий, где место решает (квартиры).
+    Проверяем схему, а не наличие координат: у старых объявлений они могли
+    остаться с тех пор, когда точку спрашивали у всех."""
+    schema = get_schema(category_slug)
+    return bool(schema and any(f.type == "geo" for f in schema.fields))
+
+
 def _card(listing: Listing, cities: dict, districts: dict) -> dict:
+    geo = _has_geo(listing.category_slug)
     return {
         "public_id": str(listing.public_id),
         "category": listing.category_slug,
@@ -51,7 +60,8 @@ def _card(listing: Listing, cities: dict, districts: dict) -> dict:
         "status": listing.status,
         "published_at": listing.published_at.isoformat() if listing.published_at else None,
         "photos": _photo_urls(listing)[:1],
-        "lat": listing.lat, "lon": listing.lon,
+        "lat": listing.lat if geo else None,
+        "lon": listing.lon if geo else None,
     }
 
 
@@ -238,6 +248,14 @@ async def create_from_web(body: WebSubmission, session: Db, user: CurrentUser):
             if not ok:
                 raise HTTPException(400, f"invalid:{spec.key}")
             values[spec.key] = normalized
+        # В боте варианты выбираются кнопками, с сайта приходит что угодно.
+        # Чужое значение осело бы в заголовке и в посте канала как есть.
+        if spec.options and not spec.allow_other and values.get(spec.key):
+            allowed = {o.value for o in spec.options}
+            got = values[spec.key]
+            got = got if isinstance(got, list) else [got]
+            if any(str(v) not in allowed for v in got):
+                raise HTTPException(400, f"invalid:{spec.key}")
 
     try:
         listing = await listing_service.create_listing(
