@@ -38,6 +38,14 @@ async def approve(session: AsyncSession, listing_id: int, admin: User) -> Listin
                               action="approve"))
     await session.commit()
 
+    # Модератор подтвердил, что IMEI и модель в объявлении сходятся —
+    # значит паре можно верить. Так справочник моделей растёт сам.
+    attrs = listing.attrs or {}
+    if attrs.get("imei"):
+        from app.services import tac_service
+        brand = await tac_service.resolve_brand(session, attrs.get("brand"))
+        await tac_service.learn(session, attrs.get("imei"), brand, attrs.get("model"))
+
     from app.workers.queue import enqueue_publish
     await enqueue_publish(listing.id)
     return listing

@@ -17,7 +17,7 @@ from app.db.models import (
     Listing, ModerationLog, Report, User, VehicleModel,
 )
 from app.schemas_engine.registry import get_schema
-from app.services import moderation_service
+from app.services import moderation_service, tac_service
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -64,6 +64,8 @@ async def stats(session: Db, admin: Admin):
         "reports_new": await session.scalar(
             select(func.count()).select_from(Report)
             .where(Report.status == "new")) or 0,
+        # справочник моделей по IMEI: сколько знаем и сколько накопили сами
+        "tac": await tac_service.stats(session),
         "by_category": [
             {"slug": slug,
              "title": (s.title if (s := get_schema(slug)) else slug),

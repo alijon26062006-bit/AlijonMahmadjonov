@@ -1,7 +1,7 @@
 /** Подача с сайта: форма строится из той же схемы, что и мастер в боте.
     В Telegram подача идёт через диалог с ботом — здесь только подсказка. */
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Direction, FieldOut, PublicConfig } from '../api/types';
@@ -54,6 +54,43 @@ function useFieldOptions(f: FieldOut, values: Record<string, unknown>) {
   });
 }
 
+type IdCheck = { ok: boolean; error?: string; known?: boolean; summary?: string;
+                 fill?: Record<string, string | number> };
+
+/** Проверка номера: контрольная сумма считается на сервере, следом — попытка
+ *  узнать вещь (VIN — по открытой базе, IMEI — по справочнику моделей).
+ *  Ответ приходит с задержкой, поэтому ждём паузу в наборе. */
+function useIdentify(f: FieldOut, raw: string,
+                     apply: (fill: Record<string, string | number>) => void) {
+  const [state, setState] = useState<IdCheck | null>(null);
+  const applied = useRef<string>('');
+
+  useEffect(() => {
+    const kind = f.identifier === 'imei' ? 'imei'
+               : String(f.identifier ?? '').includes('vin') ? 'vin' : null;
+    const value = raw.trim();
+    if (!kind || value.length < 8) { setState(null); return; }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const r = await api<IdCheck>(`/api/identify/${kind}/${encodeURIComponent(value)}`);
+        if (cancelled) return;
+        setState(r);
+        // Заполняем соседние поля один раз на номер — иначе правка вручную
+        // затиралась бы при каждой перерисовке
+        if (r.ok && r.fill && applied.current !== value) {
+          applied.current = value;
+          apply(r.fill);
+        }
+      } catch { if (!cancelled) setState(null); }
+    }, 600);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [f.identifier, raw, apply]);
+
+  return state;
+}
+
 function Field({ f, values, set, error }: {
   f: FieldOut; values: Record<string, unknown>;
   set: (k: string, v: unknown) => void; error?: string;
@@ -61,6 +98,15 @@ function Field({ f, values, set, error }: {
   const dynamic = useFieldOptions(f, values);
   const options = f.options ?? dynamic.data ?? [];
   const [other, setOther] = useState(false);
+
+  // Подстановка по номеру: VIN даёт марку, модель и год, IMEI — марку и модель
+  const applyFill = useCallback((fill: Record<string, string | number>) => {
+    if (fill.make) set('brand', String(fill.make));
+    if (fill.brand) set('brand', String(fill.brand));
+    if (fill.model) set('model', String(fill.model));
+    if (fill.year) set('year', fill.year);
+  }, [set]);
+  const idCheck = useIdentify(f, String(values[f.key] ?? ''), applyFill);
 
   const label = (
     <span className="field-label">
@@ -162,7 +208,17 @@ function Field({ f, values, set, error }: {
     <div className="field">
       {label}
       {control}
-      {f.hint && !error && <div className="field-hint">{f.hint}</div>}
+      {idCheck && !idCheck.ok && (
+        <div className="field-error">{idCheck.error}</div>
+      )}
+      {idCheck?.ok && idCheck.known && (
+        <div className="field-ok">✓ Определено по номеру: {idCheck.summary}</div>
+      )}
+      {idCheck?.ok && !idCheck.known && (
+        <div className="field-hint">Номер прошёл проверку. Модель по нему пока
+          не определяется — заполните поля вручную.</div>
+      )}
+      {f.hint && !error && !idCheck && <div className="field-hint">{f.hint}</div>}
       {error && <div className="field-error">{error}</div>}
     </div>
   );
@@ -188,7 +244,10 @@ export default function PostPage() {
   const uploadsOff = cfg && !cfg.uploads_enabled;
   const { data: schema } = useSchema(category || undefined);
 
-  const set = (k: string, v: unknown) => setValues((prev) => ({ ...prev, [k]: v }));
+  // Ссылка на функцию должна быть постоянной: от неё зависит проверка
+  // номера, иначе запрос уходил бы при каждой перерисовке формы.
+  const set = useCallback(
+    (k: string, v: unknown) => setValues((prev) => ({ ...prev, [k]: v })), []);
 
   const visibleFields = useMemo(() => {
     if (!schema) return [];

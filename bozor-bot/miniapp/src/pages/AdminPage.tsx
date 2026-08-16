@@ -49,6 +49,8 @@ export default function AdminPage() {
           <Stat label="Жалобы" value={stats.reports_new} tone={stats.reports_new ? 'red' : 'gray'} />
           <Stat label="За сутки" value={stats.today} tone="gray" />
           <Stat label="Людей" value={stats.users} tone="gray" />
+          {/* сколько моделей телефонов площадка уже узнаёт по IMEI */}
+          <Stat label="Моделей по IMEI" value={stats.tac?.total} tone="gray" />
         </div>
       )}
 

@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     feed_w_affinity: float = 0.25     # интересы; без истории — нейтрально
     feed_w_jitter: float = 0.10       # случайность, чтобы витрина жила
 
+    # --- Проверка номеров ---
+    # Расшифровка VIN по открытой базе NHTSA: бесплатно, без ключа.
+    # Выключается одной строкой — тогда остаются локальные проверки.
+    vin_decode_enabled: bool = True
+    vin_api_url: str = "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues"
+    vin_api_timeout: float = 6.0      # мастер не должен ждать сеть дольше
+
     # --- Бизнес ---
     tjs_per_usd: float = 10.9     # стартовый курс, обновляется в currency_rates
     daily_listing_limit: int = 3

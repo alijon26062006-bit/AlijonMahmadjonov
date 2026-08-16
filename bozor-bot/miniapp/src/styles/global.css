@@ -703,3 +703,10 @@ html { scroll-behavior: auto; }
 .cat-pill:active .icon-wrap { transform: scale(.9); }
 .cat-pill .icon-wrap { transition: transform .18s var(--spring); }
 .tone-gray { background: var(--surface-2); color: var(--text-2); }
+
+/* Подтверждение по номеру: VIN или IMEI узнан */
+.field-ok {
+  margin-top: 6px;
+  font-size: var(--fs-xs); font-weight: 600;
+  color: var(--brand);
+}

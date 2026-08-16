@@ -12,7 +12,7 @@ from app.db.models import (
 )
 from app.schemas_engine.fields import CategorySchema
 from app.schemas_engine.registry import option_label, render_title
-from app.services import identifiers
+from app.services import identifiers, tac_service, vin_decoder
 
 COLUMN_KEYS = {"price", "city_id", "district_id", "address", "description",
                "contact_mode", "is_negotiable"}
@@ -65,6 +65,21 @@ async def _flag_checks(session: AsyncSession, schema: CategorySchema,
                 Listing.status.in_((ST_PENDING, ST_APPROVED))).limit(1))
         if dup:
             notes.append(f"⚠️ {spec.label} уже встречается в объявлении #{dup}")
+
+        # Номер знает о вещи больше, чем написал продавец. Расходятся —
+        # решает модератор: бывает и честная ошибка, и подмена.
+        if kind == "vin":
+            info = await vin_decoder.decode(val)
+            declared_brand = await tac_service.resolve_brand(session, values.get("brand"))
+            for diff in vin_decoder.mismatch(info, declared_brand, values.get("year")):
+                notes.append(f"⚠️ Не сходится с базой по VIN — {diff}")
+        elif kind == "imei":
+            known = await tac_service.lookup(session, val)
+            declared = str(values.get("model") or "").strip().lower()
+            if known and declared and known["model"].lower() not in declared \
+                    and declared not in known["model"].lower():
+                notes.append(f'⚠️ По IMEI это «{known["brand"]} {known["model"]}», '
+                             f'а указана модель «{values.get("model")}»')
     return "\n".join(notes) or None
 
 

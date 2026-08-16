@@ -245,6 +245,27 @@ class CurrencyRate(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class TacModel(Base):
+    """TAC → модель устройства. Первые 8 цифр IMEI одинаковы у всей партии
+    одной модели, поэтому по ним аппарат узнаётся без единого запроса в сеть.
+
+    Наполняется двумя путями: разовым импортом открытого списка
+    (`python -m app.seed.import_tac файл.csv`) и самой площадкой — когда
+    модератор одобряет объявление, где IMEI и модель указаны вместе.
+    `confirmations` — сколько одобренных объявлений сошлись на этой паре;
+    показываем подсказку начиная с двух, чтобы одна опечатка не стала правдой.
+    """
+    __tablename__ = "tac_models"
+
+    tac: Mapped[str] = mapped_column(String(8), primary_key=True)
+    brand: Mapped[str] = mapped_column(String(60))
+    model: Mapped[str] = mapped_column(String(120))
+    source: Mapped[str] = mapped_column(String(12), default="learned")  # import | learned
+    confirmations: Mapped[int] = mapped_column(default=1)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class BlacklistEntry(Base):
     """Чёрный список площадки: IMEI/VIN украденных вещей от пользователей."""
     __tablename__ = "blacklist"

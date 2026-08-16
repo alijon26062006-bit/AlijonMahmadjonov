@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.routers import (
-    admin, auth, categories, config, dicts, favorites, feed, listings,
-    photos, uploads,
+    admin, auth, categories, config, dicts, favorites, feed, identify,
+    listings, photos, uploads,
 )
 from app.config import get_settings
 from app.db.base import SessionMaker
@@ -39,6 +39,7 @@ app.include_router(uploads.router)
 app.include_router(admin.router)
 app.include_router(config.router)
 app.include_router(feed.router)
+app.include_router(identify.router)
 
 
 @app.get("/health")

@@ -15,6 +15,7 @@ from aiogram.types import (
     Message, ReplyKeyboardMarkup, ReplyKeyboardRemove,
 )
 from aiogram.utils.media_group import MediaGroupBuilder
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot import texts
@@ -23,7 +24,7 @@ from app.schemas_engine.fields import DIRECTIONS, CategorySchema, FieldSpec
 from app.schemas_engine.registry import (
     OTHER, get_schema, option_label, categories_tree, render_title, resolve_options,
 )
-from app.services import identifiers, listing_service
+from app.services import identifiers, listing_service, tac_service, vin_decoder
 from app.services.publisher import build_caption
 
 router = Router()
@@ -551,7 +552,7 @@ async def on_contact(message: Message, state: FSMContext, session: AsyncSession,
 
 @router.message(Wiz.flow, F.text)
 async def on_text(message: Message, state: FSMContext, session: AsyncSession,
-                  bot: Bot) -> None:
+                  bot: Bot, redis: Redis | None = None) -> None:
     if message.text == texts.BTN_SKIP:
         data = await state.get_data()
         schema = get_schema(data["slug"])
@@ -595,18 +596,47 @@ async def on_text(message: Message, state: FSMContext, session: AsyncSession,
         await save_and_next(bot, message.chat.id, state, session, result["amount"])
         return
     if spec.type == "identifier":
-        auto = result["auto"]
+        auto = dict(result["auto"])
+        lines: list[str] = []
+
+        # Номер принят — теперь пробуем узнать по нему саму вещь
+        if spec.identifier in ("vin", "vin_or_frame") and len(result["value"]) == 17:
+            waiting = await message.answer("🔎 Проверяю номер по базе…")
+            info = await vin_decoder.decode(result["value"], redis)
+            try:
+                await waiting.delete()
+            except Exception:
+                pass                       # сообщение уже убрали — не важно
+            if (line := vin_decoder.summary(info)):
+                lines.append(texts.VALUE_SAVED_AUTO.format(v=line))
+                values["_vin_info"] = info
+                if info.get("year"):
+                    auto["year"] = info["year"]
+                if info.get("make"):
+                    auto["brand_hint"] = info["make"]
+                if info.get("model"):
+                    auto["model"] = info["model"]
+
+        if spec.identifier == "imei":
+            found = await tac_service.lookup(session, result["value"])
+            if found:
+                lines.append(texts.VALUE_SAVED_AUTO.format(
+                    v=f'{found["brand"]} {found["model"]}'))
+                auto["brand_hint"] = found["brand"]
+                auto["model"] = found["model"]
+
+        if not lines:
+            if auto.get("brand_hint"):
+                lines.append(texts.VALUE_SAVED_AUTO.format(v=auto["brand_hint"]))
+            if auto.get("year"):
+                lines.append(texts.VALUE_SAVED_AUTO.format(v=f"год {auto['year']}"))
+
         merged = values.get("_auto", {})
         merged.update({k: v for k, v in auto.items() if k not in ("tac", "brand_hint")})
         values["_auto"] = merged
         await state.update_data(values=values)
-        note = ""
-        if auto.get("brand_hint"):
-            note = "\n" + texts.VALUE_SAVED_AUTO.format(v=auto["brand_hint"])
-        if auto.get("year"):
-            note += "\n" + texts.VALUE_SAVED_AUTO.format(v=f"год {auto['year']}")
-        if note:
-            await message.answer("✅ Номер принят" + note)
+        if lines:
+            await message.answer("✅ Номер принят\n" + "\n".join(lines))
         await save_and_next(bot, message.chat.id, state, session, result["value"])
         return
     await save_and_next(bot, message.chat.id, state, session, result)
