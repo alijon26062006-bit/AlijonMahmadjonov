@@ -24,7 +24,8 @@ def main_menu_kb(is_admin: bool = False) -> ReplyKeyboardMarkup:
     ]
     if is_admin:
         # разбор заявок — прямо в боте, отдельной кнопкой
-        rows.append([KeyboardButton(text=texts.MENU_MOD)])
+        rows.append([KeyboardButton(text=texts.MENU_MOD),
+                     KeyboardButton(text=texts.MENU_PANEL)])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 

@@ -245,6 +245,40 @@ class CurrencyRate(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+DEAL_OPEN = "open"          # покупатель написал продавцу, ждём ответа
+DEAL_WAIT_SELLER = "wait_seller"   # покупатель сказал «договорились»
+DEAL_DONE = "done"          # обе стороны подтвердили — объявление снято
+DEAL_FAILED = "failed"      # не сошлись, объявление остаётся в каталоге
+
+
+class Deal(Base):
+    """Разговор покупателя с продавцом по конкретному объявлению.
+
+    Заводится в момент, когда человек нажимает «Связаться». Дальше площадка
+    спрашивает обе стороны, чем всё кончилось: сошлись оба — объявление
+    снимается само, а сделка попадает в счётчик.
+    """
+    __tablename__ = "deals"
+    __table_args__ = (UniqueConstraint("listing_id", "buyer_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    listing_id: Mapped[int] = mapped_column(
+        ForeignKey("listings.id", ondelete="CASCADE"), index=True)
+    buyer_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    seller_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(12), default=DEAL_OPEN, index=True)
+    buyer_answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    seller_answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # сколько раз спрашивали покупателя — чтобы не надоедать без конца
+    asked_count: Mapped[int] = mapped_column(SmallInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class TacModel(Base):
     """TAC → модель устройства. Первые 8 цифр IMEI одинаковы у всей партии
     одной модели, поэтому по ним аппарат узнаётся без единого запроса в сеть.

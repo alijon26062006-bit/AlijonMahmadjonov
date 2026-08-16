@@ -22,3 +22,9 @@ async def enqueue_publish(listing_id: int) -> None:
 async def enqueue_notify_rejected(listing_id: int) -> None:
     pool = await _get_pool()
     await pool.enqueue_job("notify_rejected", listing_id)
+
+
+async def enqueue_ask_seller(deal_id: int) -> None:
+    """Покупатель сказал «договорились» — спрашиваем продавца."""
+    pool = await _get_pool()
+    await pool.enqueue_job("ask_seller", deal_id)

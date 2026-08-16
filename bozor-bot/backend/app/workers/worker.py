@@ -76,6 +76,46 @@ async def notify_rejected(ctx: dict, listing_id: int) -> None:
             await session.commit()
 
 
+async def ask_seller(ctx: dict, deal_id: int) -> None:
+    """Спрашивает продавца, подтверждает ли он сделку.
+
+    Двух «да» достаточно, чтобы снять объявление, — поэтому вопрос задаётся
+    именно продавцу, а не берётся на веру со слов покупателя.
+    """
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+    from app.db.models import DEAL_WAIT_SELLER, Deal
+
+    bot = ctx["bot"]
+    async with SessionMaker() as session:
+        deal = await session.get(Deal, deal_id)
+        if not deal or deal.status != DEAL_WAIT_SELLER:
+            return
+        listing = await session.get(Listing, deal.listing_id)
+        seller = await session.get(User, deal.seller_id)
+        buyer = await session.get(User, deal.buyer_id)
+        if not (listing and seller):
+            return
+
+        who = f"@{buyer.username}" if buyer and buyer.username else \
+              html.escape(buyer.first_name if buyer else "Покупатель")
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Да, договорились",
+                                 callback_data=f"deal:yes:{deal.id}"),
+            InlineKeyboardButton(text="❌ Нет",
+                                 callback_data=f"deal:no:{deal.id}"),
+        ]])
+        try:
+            await bot.send_message(
+                seller.tg_id,
+                texts.DEAL_ASK_SELLER.format(
+                    who=who, title=html.escape(listing.title)),
+                reply_markup=kb)
+        except Exception:
+            seller.bot_blocked = True
+            await session.commit()
+
+
 async def archive_expired(ctx: dict) -> None:
     async with SessionMaker() as session:
         await session.execute(
@@ -95,7 +135,7 @@ async def shutdown(ctx: dict) -> None:
 
 
 class WorkerSettings:
-    functions = [publish_listing, notify_rejected]
+    functions = [publish_listing, notify_rejected, ask_seller]
     cron_jobs = [cron(archive_expired, hour=3, minute=0)]   # автоархив в 03:00 UTC
     on_startup = startup
     on_shutdown = shutdown

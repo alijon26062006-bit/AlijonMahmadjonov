@@ -1,5 +1,5 @@
 """«Мои объявления»: статусы и управление, включая цикл аренды занято/свободно."""
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,3 +75,36 @@ async def my_action(cb: CallbackQuery, session: AsyncSession, user: User) -> Non
                                    reply_markup=item_kb(listing))
     except Exception:
         pass
+
+
+# ─────────────────── Подтверждение сделки продавцом ───────────────────
+
+@router.callback_query(F.data.startswith("deal:"))
+async def deal_answer(cb: CallbackQuery, session: AsyncSession, bot: Bot,
+                      user: User) -> None:
+    """Кнопки из вопроса «сделка состоялась?». Второе «да» снимает объявление."""
+    _, verdict, raw_id = cb.data.split(":")
+    from app.services import deal_service
+
+    result = await deal_service.seller_answer(session, int(raw_id), user,
+                                              verdict == "yes")
+    if result is None:
+        await cb.answer("Этот вопрос уже закрыт", show_alert=True)
+        return
+    deal, listing = result
+    await cb.answer("Спасибо!")
+    try:
+        await cb.message.edit_text(
+            cb.message.html_text + "\n\n"
+            + (texts.DEAL_DONE_SELLER if verdict == "yes"
+               else texts.DEAL_FAILED_SELLER))
+    except Exception:
+        pass
+
+    if verdict == "yes":
+        buyer = await session.get(User, deal.buyer_id)
+        if buyer and not buyer.bot_blocked:
+            try:
+                await bot.send_message(buyer.tg_id, texts.DEAL_DONE_BUYER)
+            except Exception:
+                pass

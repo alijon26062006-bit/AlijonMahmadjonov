@@ -16,7 +16,7 @@ from app.db.models import (
 )
 from app.repositories.listings import catalog_page
 from app.schemas_engine.registry import get_schema, option_label
-from app.services import feed_service, listing_service
+from app.services import deal_service, feed_service, listing_service
 
 router = APIRouter(prefix="/api/listings", tags=["listings"])
 
@@ -139,6 +139,8 @@ async def detail(public_id: uuid_mod.UUID, session: Db, viewer: OptionalUser):
         "address": listing.address,
         "is_owner": bool(is_owner),
     })
+    # Человек уже писал продавцу и вернулся — самое время спросить о результате
+    card["deal_ask"] = await deal_service.question_for_buyer(session, listing, viewer)
     return card
 
 
@@ -153,6 +155,8 @@ async def contact(public_id: uuid_mod.UUID, session: Db, user: CurrentUser):
                           .values(contacts_count=Listing.contacts_count + 1))
     await session.commit()
     await feed_service.log_event(session, listing.id, user.id, "contact_click")
+    # Разговор начался — через пару часов спросим обе стороны, чем кончилось
+    await deal_service.open_deal(session, listing, user)
     out = {"contact_mode": listing.contact_mode}
     if listing.contact_mode in ("telegram", "both") and listing.contact_username:
         out["telegram"] = f"https://t.me/{listing.contact_username}"

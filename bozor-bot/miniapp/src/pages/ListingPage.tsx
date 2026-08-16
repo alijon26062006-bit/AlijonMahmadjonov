@@ -16,6 +16,9 @@ export default function ListingPage() {
   const user = useAuth();
   const [contact, setContact] = useState<{ telegram?: string; phone?: string } | null>(null);
   const [reported, setReported] = useState(false);
+  // Вопрос «вы договорились?» — приходит с сервера, когда человек уже писал
+  // продавцу и вернулся к объявлению
+  const [dealAnswered, setDealAnswered] = useState<'yes' | 'no' | null>(null);
 
   const { data: item, isLoading, error } = useQuery<ListingDetail>({
     queryKey: ['listing', id],
@@ -47,8 +50,44 @@ export default function ListingPage() {
     setReported(true);
   };
 
+  const answerDeal = async (agreed: boolean) => {
+    setDealAnswered(agreed ? 'yes' : 'no');
+    try {
+      await api(`/api/deals/${item.deal_ask!.deal_id}/buyer`, {
+        method: 'POST', body: JSON.stringify({ agreed }),
+      });
+      if (agreed) hapticSuccess();
+    } catch { /* ответ не критичен — спросим в следующий раз */ }
+  };
+
   return (
     <div className="fade-in section">
+      {item.deal_ask && (
+        <div className="deal-ask">
+          {dealAnswered === null ? (
+            <>
+              <b>Вы договорились с {item.deal_ask.seller_name}?</b>
+              <p className="subtitle">
+                Если сделка состоялась, подтвердит и продавец — тогда
+                объявление снимется с публикации.
+              </p>
+              <div className="range-row" style={{ marginTop: 10 }}>
+                <button className="btn btn-primary" onClick={() => answerDeal(true)}>
+                  Да, договорились
+                </button>
+                <button className="btn" onClick={() => answerDeal(false)}>
+                  Ещё нет
+                </button>
+              </div>
+            </>
+          ) : (
+            <b>{dealAnswered === 'yes'
+              ? 'Спасибо! Ждём подтверждения продавца.'
+              : 'Понятно — объявление остаётся в каталоге.'}</b>
+          )}
+        </div>
+      )}
+
       <div className="gallery">
         {item.photos.length
           ? item.photos.map((p, i) => (

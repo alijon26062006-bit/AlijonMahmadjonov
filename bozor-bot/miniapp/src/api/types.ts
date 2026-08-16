@@ -29,6 +29,7 @@ export type ListingDetail = Card & {
   views_count: number;
   address?: string | null;
   is_owner: boolean;
+  deal_ask?: { deal_id: number; seller_name: string } | null;
 };
 
 export type FieldOut = {

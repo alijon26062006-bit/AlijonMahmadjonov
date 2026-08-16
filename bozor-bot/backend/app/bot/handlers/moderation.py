@@ -420,3 +420,64 @@ async def queue_reject_reason(cb: CallbackQuery, session: AsyncSession, bot: Bot
         await cb.answer("❌ Отклонено")
     await show_next(bot, cb.message.chat.id, session, state,
                     skip_ids=(await state.get_data()).get("mod_skipped"))
+
+
+# ─────────────────────── Панель админа прямо в боте ───────────────────────
+
+@router.message(Command("panel"))
+@router.message(Command("stats"))
+@router.message(F.text == texts.MENU_PANEL)
+async def panel(message: Message, session: AsyncSession, user: User) -> None:
+    """Всё хозяйство одним экраном: объявления, люди, сделки, справочники."""
+    if not user.is_admin:
+        return
+    from datetime import datetime, timedelta
+
+    from app.db.models import ST_ARCHIVED, ST_REJECTED, ST_SOLD, Report
+    from app.services import deal_service, tac_service
+
+    week = datetime.utcnow() - timedelta(days=7)
+    day = datetime.utcnow() - timedelta(days=1)
+
+    async def listings(*conds) -> int:
+        return await session.scalar(
+            select(func.count()).select_from(Listing).where(*conds)) or 0
+
+    async def users(*conds) -> int:
+        return await session.scalar(
+            select(func.count()).select_from(User).where(*conds)) or 0
+
+    deals = await deal_service.stats(session)
+    tac = await tac_service.stats(session)
+
+    top = (await session.execute(
+        select(Listing.category_slug, func.count())
+        .where(Listing.status == ST_APPROVED)
+        .group_by(Listing.category_slug)
+        .order_by(func.count().desc()).limit(5))).all()
+    top_lines = "\n".join(
+        f"   {(s.title if (s := get_schema(slug)) else slug)} — {n}"
+        for slug, n in top) or "   пока пусто"
+
+    await message.answer(texts.PANEL.format(
+        pending=await listings(Listing.status == ST_PENDING),
+        approved=await listings(Listing.status == ST_APPROVED),
+        rejected=await listings(Listing.status == ST_REJECTED),
+        sold=await listings(Listing.status == ST_SOLD),
+        archived=await listings(Listing.status == ST_ARCHIVED),
+        day=await listings(Listing.created_at > day),
+        week=await listings(Listing.created_at > week),
+        users=await users(),
+        users_week=await users(User.created_at > week),
+        banned=await users(User.is_banned),
+        deals_started=deals["started"],
+        deals_done=deals["done"],
+        deals_week=deals["done_week"],
+        deals_waiting=deals["waiting_seller"],
+        conversion=deals["conversion"],
+        tac_total=tac["total"],
+        tac_manual=tac["imported"],
+        reports=await session.scalar(
+            select(func.count()).select_from(Report)
+            .where(Report.status == "new")) or 0,
+        top=top_lines))
