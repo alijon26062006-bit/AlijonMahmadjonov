@@ -86,17 +86,74 @@ def text_kb(spec: FieldSpec, first: bool,
 
 # ─────────────────────────── Показ шага ───────────────────────────
 
+async def auto_value(session: AsyncSession, spec: FieldSpec, values: dict,
+                     auto: dict) -> tuple[object, str] | None:
+    """Значение поля, известное из номера: (что сохранить, что показать).
+
+    None — заполнить нечем: сведений нет либо они не сходятся со справочником.
+    Тогда шаг задаётся как обычно. Списки сверяем без учёта регистра: база
+    пишет «TOYOTA», а в справочнике марок стоит «Toyota».
+    """
+    raw = auto.get(spec.key)
+    if raw in (None, "", []):
+        return None
+
+    if spec.type == "enum_one":
+        target = str(raw).strip().lower()
+        for value, label in await resolve_options(session, spec, values):
+            if target in (value.strip().lower(), label.strip().lower()):
+                return value, label
+        return None                      # чужое название — пусть выберет сам
+    if spec.type == "int":
+        try:
+            n = int(raw)
+        except (TypeError, ValueError):
+            return None
+        if (spec.min is not None and n < spec.min) or \
+                (spec.max is not None and n > spec.max):
+            return None
+        return n, str(n)
+    if spec.type in ("string", "text"):
+        text = str(raw).strip()[: spec.max_len or 120]
+        return (text, text) if text else None
+    return None                          # флажки, цену и фото не угадываем
+
+
 async def show_step(bot: Bot, chat_id: int, state: FSMContext,
-                    session: AsyncSession) -> None:
+                    session: AsyncSession, use_auto: bool = True) -> None:
     data = await state.get_data()
     schema = get_schema(data["slug"])
     idx: int = data["idx"]
     fields = schema.fields
     values: dict = data["values"]
 
-    # пропускаем поля, скрытые условной видимостью
-    while idx < len(fields) and not schema.visible(fields[idx], values):
+    # Пропускаем поля, скрытые условной видимостью, и те, что уже известны
+    # из номера: переспрашивать марку и год, только что прочитанные из VIN, —
+    # ровно то, ради чего номер и вводили.
+    auto = values.get("_auto") or {} if use_auto else {}
+    prefilled: list[str] = []
+    while idx < len(fields):
+        spec = fields[idx]
+        if not schema.visible(spec, values):
+            idx += 1
+            continue
+        if values.get(spec.key) not in (None, "", []):
+            idx += 1                     # уже отвечено — при возврате не трогаем
+            continue
+        found = await auto_value(session, spec, values, auto)
+        if found is None:
+            break
+        values[spec.key] = found[0]
+        prefilled.append(f"{spec.label} — <b>{found[1]}</b>")
         idx += 1
+
+    if prefilled:
+        # новое сообщение идёт ниже якоря мастера — якорь сбрасываем,
+        # иначе следующий шаг отредактировал бы сообщение выше этого
+        await state.update_data(values=values, anchor=None)
+        await bot.send_message(
+            chat_id, texts.AUTO_FILLED.format(lines="\n".join(prefilled)))
+
     if idx >= len(fields):
         await state.update_data(idx=idx)
         await show_preview(bot, chat_id, state, session)
@@ -118,7 +175,14 @@ async def show_step(bot: Bot, chat_id: int, state: FSMContext,
             await state.update_data(idx=idx + 1)
             await show_step(bot, chat_id, state, session)
             return
-        kb = options_kb(options, spec, 0, list(values.get(spec.key) or []), first)
+        suggest = None
+        if spec.type == "enum_one" and auto_val:
+            found = await auto_value(session, spec, values,
+                                     values.get("_auto") or {})
+            if found:
+                suggest = found[1]
+        kb = options_kb(options, spec, 0, list(values.get(spec.key) or []), first,
+                        suggest)
         await _render(bot, chat_id, state, f"{step_no}\n{title}{hint}", kb)
     elif spec.type == "bool":
         options = [("true", "Да"), ("false", "Нет")]
@@ -336,11 +400,12 @@ async def accept_auto(cb: CallbackQuery, state: FSMContext,
     data = await state.get_data()
     schema = get_schema(data["slug"])
     spec = schema.fields[data["idx"]]
-    value = data["values"].get("_auto", {}).get(spec.key)
+    found = await auto_value(session, spec, data["values"],
+                             data["values"].get("_auto") or {})
     await cb.answer()
-    if value is None:
+    if found is None:
         return
-    await save_and_next(bot, cb.message.chat.id, state, session, value)
+    await save_and_next(bot, cb.message.chat.id, state, session, found[0])
 
 
 @router.callback_query(Wiz.flow, F.data == "w:s")
@@ -367,7 +432,7 @@ async def go_back(cb: CallbackQuery, state: FSMContext,
         return
     idx = hist.pop()
     await state.update_data(hist=hist, idx=idx, edit_return=False)
-    await show_step(bot, cb.message.chat.id, state, session)
+    await show_step(bot, cb.message.chat.id, state, session, use_auto=False)
 
 
 @router.callback_query(F.data == "w:x")
@@ -613,7 +678,7 @@ async def on_text(message: Message, state: FSMContext, session: AsyncSession,
                 if info.get("year"):
                     auto["year"] = info["year"]
                 if info.get("make"):
-                    auto["brand_hint"] = info["make"]
+                    auto["brand_hint"] = auto["brand"] = info["make"]
                 if info.get("model"):
                     auto["model"] = info["model"]
 
@@ -622,7 +687,7 @@ async def on_text(message: Message, state: FSMContext, session: AsyncSession,
             if found:
                 lines.append(texts.VALUE_SAVED_AUTO.format(
                     v=f'{found["brand"]} {found["model"]}'))
-                auto["brand_hint"] = found["brand"]
+                auto["brand_hint"] = auto["brand"] = found["brand"]
                 auto["model"] = found["model"]
 
         if not lines:
@@ -632,6 +697,8 @@ async def on_text(message: Message, state: FSMContext, session: AsyncSession,
                 lines.append(texts.VALUE_SAVED_AUTO.format(v=f"год {auto['year']}"))
 
         merged = values.get("_auto", {})
+        # brand_hint и tac — служебные: первое уходит в текст сообщения,
+        # второе в подсказку никогда не превращается
         merged.update({k: v for k, v in auto.items() if k not in ("tac", "brand_hint")})
         values["_auto"] = merged
         await state.update_data(values=values)
@@ -743,7 +810,7 @@ async def edit_field(cb: CallbackQuery, state: FSMContext,
     idx = int(cb.data.split(":")[2])
     await state.update_data(idx=idx, edit_return=True)
     await cb.answer()
-    await show_step(bot, cb.message.chat.id, state, session)
+    await show_step(bot, cb.message.chat.id, state, session, use_auto=False)
 
 
 @router.callback_query(Wiz.flow, F.data == "w:sub")
