@@ -86,6 +86,17 @@ async def start(message: Message, user: User) -> None:
     await greet(message, user)
 
 
+@router.message(Command("id"))
+@router.message(Command("whoami"))
+async def whoami(message: Message, user: User) -> None:
+    """Свой Telegram-id и права — первое, что нужно при настройке админа."""
+    await message.answer(texts.WHOAMI.format(
+        tg_id=user.tg_id,
+        name=user.first_name or "—",
+        username=f"@{user.username}" if user.username else "не задан",
+        role="администратор" if user.is_admin else "обычный пользователь"))
+
+
 @router.message(Command("help"))
 @router.message(F.text == texts.MENU_HELP)
 async def help_cmd(message: Message) -> None:

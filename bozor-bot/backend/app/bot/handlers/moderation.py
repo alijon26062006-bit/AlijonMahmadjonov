@@ -11,6 +11,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message,
+    WebAppInfo,
 )
 from aiogram.utils.media_group import MediaGroupBuilder
 from sqlalchemy import func, select
@@ -318,7 +319,8 @@ async def show_next(bot: Bot, chat_id: int, session: AsyncSession,
 async def open_queue(message: Message, session: AsyncSession, bot: Bot,
                      user: User, state: FSMContext) -> None:
     if not user.is_admin:
-        return                        # для остальных такой команды словно нет
+        await message.answer(texts.NOT_ADMIN.format(tg_id=user.tg_id))
+        return
     await state.clear()               # выходим из мастера, если админ был в нём
     await show_next(bot, message.chat.id, session, state)
 
@@ -430,6 +432,7 @@ async def queue_reject_reason(cb: CallbackQuery, session: AsyncSession, bot: Bot
 async def panel(message: Message, session: AsyncSession, user: User) -> None:
     """Всё хозяйство одним экраном: объявления, люди, сделки, справочники."""
     if not user.is_admin:
+        await message.answer(texts.NOT_ADMIN.format(tg_id=user.tg_id))
         return
     from datetime import datetime, timedelta
 
@@ -459,6 +462,12 @@ async def panel(message: Message, session: AsyncSession, user: User) -> None:
         f"   {(s.title if (s := get_schema(slug)) else slug)} — {n}"
         for slug, n in top) or "   пока пусто"
 
+    s = get_settings()
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🛠 Открыть админ-панель",
+                             web_app=WebAppInfo(url=f"{s.webapp_url.rstrip('/')}/admin")),
+    ]]) if s.webapp_url.startswith("https://") else None
+
     await message.answer(texts.PANEL.format(
         pending=await listings(Listing.status == ST_PENDING),
         approved=await listings(Listing.status == ST_APPROVED),
@@ -480,4 +489,4 @@ async def panel(message: Message, session: AsyncSession, user: User) -> None:
         reports=await session.scalar(
             select(func.count()).select_from(Report)
             .where(Report.status == "new")) or 0,
-        top=top_lines))
+        top=top_lines), reply_markup=kb)

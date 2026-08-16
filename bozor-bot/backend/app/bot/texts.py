@@ -105,6 +105,21 @@ MOD_REJECTED = "❌ Отклонил {admin}: {reason}"
 MOD_ALREADY = "Уже обработано: {status}"
 MOD_REASON_ASK = "Напишите причину отклонения одним сообщением (до 500 символов):"
 
+NOT_ADMIN = (
+    "Этот раздел только для администраторов.\n\n"
+    "Ваш Telegram-id: <code>{tg_id}</code>\n"
+    "Чтобы выдать права, впишите его в ADMIN_IDS в файле .env на сервере "
+    "и перезапустите бота."
+)
+
+WHOAMI = (
+    "<b>Ваш профиль</b>\n\n"
+    "Telegram-id: <code>{tg_id}</code>\n"
+    "Имя: {name}\n"
+    "Username: {username}\n"
+    "Права: {role}"
+)
+
 PANEL = (
     "📊 <b>Панель Бозор</b>\n\n"
     "<b>Объявления</b>\n"

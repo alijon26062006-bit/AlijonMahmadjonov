@@ -48,11 +48,17 @@ const NAV = [
   { to: '/my', icon: 'user', label: 'Мои' },
 ];
 
+const ADMIN_NAV = { to: '/admin', icon: 'sliders-horizontal', label: 'Админка' };
+
 export function BottomNav() {
   const { pathname } = useLocation();
+  const user = useAuth();
+  // Внутри Telegram своей шапки нет, а значит и ссылки на админку — без этого
+  // пункта администратор просто не мог попасть в панель с телефона.
+  const items = user?.is_admin ? [...NAV, ADMIN_NAV] : NAV;
   return (
     <nav className="bottomnav">
-      {NAV.map((n) => (
+      {items.map((n) => (
         <Link key={n.to} to={n.to}
               className={pathname === n.to ? 'active' : ''}>
           <span className="ico"><Icon name={n.icon} size={22} strokeWidth={pathname === n.to ? 2.4 : 1.9} /></span>
