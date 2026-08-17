@@ -7,6 +7,7 @@ import type { Card } from '../api/types';
 import { FilterFields, FilterSheet, countActive, useSchema } from '../components/Filters';
 import { CATEGORY_ICON, Icon } from '../components/icons';
 import { ListingCard } from '../components/ListingCard';
+import { SearchBox } from '../components/SearchBox';
 import { CatalogMap } from '../components/MapView';
 import { CardSkeletons, Empty, useAuth, useTgBackButton } from '../components/ui';
 
@@ -110,11 +111,9 @@ export default function CatalogPage() {
 
   return (
     <div className="fade-in">
-      <div className="searchbar">
-        <input placeholder="Поиск…" defaultValue={params.get('q') ?? ''}
-               onKeyDown={(e) => {
-                 if (e.key === 'Enter') set('q', (e.target as HTMLInputElement).value.trim());
-               }} />
+      <div className="searchbar sticky-search">
+        <SearchBox value={params.get('q') ?? ''} placeholder="Поиск"
+                   onSearch={(q) => set('q', q)}>
         {schema && (
           <button className="btn filter-btn" onClick={() => setSheetOpen(true)}>
             <Icon name="sliders-horizontal" size={17} /> Фильтры
@@ -127,6 +126,7 @@ export default function CatalogPage() {
             <Icon name={view === 'list' ? 'map' : 'list'} size={18} />
           </button>
         )}
+        </SearchBox>
       </div>
 
       {schema && (

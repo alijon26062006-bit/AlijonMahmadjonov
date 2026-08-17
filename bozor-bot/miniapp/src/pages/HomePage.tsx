@@ -6,6 +6,7 @@ import { api } from '../api/client';
 import type { Card, Direction } from '../api/types';
 import { CATEGORY_ICON, CATEGORY_SHORT, DIRECTION_ICON, Icon } from '../components/icons';
 import { ListingCard } from '../components/ListingCard';
+import { SearchBox } from '../components/SearchBox';
 import { CardSkeletons, Empty, useAuth } from '../components/ui';
 
 type FeedPage = { items: Card[]; has_more: boolean };
@@ -71,15 +72,9 @@ export default function HomePage() {
     <div className="fade-in">
       <div className="section">
         <h1 className="section-title">Что ищете?</h1>
-        <div className="searchbar">
-          <input placeholder="Поиск: Camry, квартира, дисплей…"
-                 onKeyDown={(e) => {
-                   if (e.key === 'Enter') {
-                     const q = (e.target as HTMLInputElement).value.trim();
-                     navigate(q ? `/catalog?q=${encodeURIComponent(q)}` : '/catalog');
-                   }
-                 }} />
-        </div>
+        <SearchBox
+          placeholder="Camry, квартира, дисплей…"
+          onSearch={(q) => navigate(q ? `/catalog?q=${encodeURIComponent(q)}` : '/catalog')} />
       </div>
 
       {/* Полоса категорий: все пятнадцать в один жест вбок. Раньше они
