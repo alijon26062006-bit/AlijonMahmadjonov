@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
+    <title>Stambul Shop — магазин</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+      /* Сплэш: рисуется до загрузки приложения, как у Telegram */
+      #splash {
+        position: fixed; inset: 0; z-index: 999;
+        display: grid; place-items: center;
+        background: #109d63;
+        transition: opacity .4s ease, visibility .4s;
+      }
+      #splash.hide { opacity: 0; visibility: hidden; }
+      #splash .mark {
+        width: 92px; height: 92px; border-radius: 26px;
+        background: #ffffff; color: #109d63;
+        display: grid; place-items: center;
+        font: 800 46px -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+        animation: splash-pop .6s cubic-bezier(.34, 1.56, .64, 1);
+        box-shadow: 0 18px 50px rgba(0, 0, 0, .25);
+      }
+      @keyframes splash-pop {
+        from { transform: scale(.6); opacity: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="splash"><div class="mark">Б</div></div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

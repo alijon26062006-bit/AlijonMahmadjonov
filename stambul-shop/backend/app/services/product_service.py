@@ -88,8 +88,9 @@ async def create(session: AsyncSession, *, category_slug: str, title: str,
         status=P_DRAFT)
     session.add(product)
     await session.commit()
-    await session.refresh(product)
-    return product
+    # возвращаем с загруженными связями: иначе следующий вызов полезет за
+    # вариантами лениво, а в асинхронной сессии это падает
+    return await load(session, product.id)
 
 
 def clean_attrs(category_slug: str, raw: dict) -> dict:
@@ -143,6 +144,7 @@ async def set_variants(session: AsyncSession, product: Product,
     «размер — цвет — цена — остаток» и сохраняет её как есть. Варианты,
     которые уже лежат в чьих-то заказах, остаются в истории заказа снимком.
     """
+    product = await load(session, product.id) or product
     seen: set[tuple[str, str]] = set()
     prepared: list[dict] = []
     for i, row in enumerate(rows):
@@ -192,6 +194,7 @@ async def set_variants(session: AsyncSession, product: Product,
 
 async def set_photos(session: AsyncSession, product: Product,
                      photos: list[dict], max_photos: int) -> Product:
+    product = await load(session, product.id) or product
     for photo in product.photos:
         await session.delete(photo)
     await session.flush()
