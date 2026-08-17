@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Установка Stambul Shop на чистый сервер (Ubuntu/Debian).
+# Установка Stambul Shop на чистый сервер.
 #
 #   bash install.sh
 #
-# Скрипт ставит Docker, спрашивает данные Telegram и домен, поднимает магазин
-# и выпускает сертификат. Повторный запуск безопасен: уже сделанное
-# пропускается, введённые значения предлагаются как есть.
+# Работает и на Debian/Ubuntu (apt), и на RHEL-семействе — AlmaLinux, Rocky,
+# CentOS (dnf). Ставит Docker, спрашивает данные Telegram и домен, поднимает
+# магазин, настраивает nginx и выпускает сертификат.
+#
+# Повторный запуск безопасен: уже сделанное пропускается, введённые значения
+# предлагаются как есть.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -18,22 +21,56 @@ die()  { warn "$*"; exit 1; }
 
 [ "$(id -u)" = "0" ] || die "Запустите от root: bash install.sh"
 
-# ─────────────────────────── Системные пакеты ───────────────────────────
+# ─────────────────────── Какой это дистрибутив ───────────────────────
+
+if command -v apt-get >/dev/null; then
+    FAMILY=debian
+    PKG_INSTALL() { DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@" >/dev/null; }
+    PKG_REFRESH() { DEBIAN_FRONTEND=noninteractive apt-get update -qq; }
+    NGINX_CONF_DIR=/etc/nginx/sites-enabled
+elif command -v dnf >/dev/null || command -v yum >/dev/null; then
+    FAMILY=rhel
+    DNF=$(command -v dnf || command -v yum)
+    PKG_INSTALL() { "$DNF" install -y -q "$@" >/dev/null; }
+    PKG_REFRESH() { :; }
+    # у RHEL нет sites-available: nginx сам подключает /etc/nginx/conf.d/*.conf
+    NGINX_CONF_DIR=/etc/nginx/conf.d
+else
+    die "Не понял, какой это дистрибутив: нет ни apt-get, ни dnf"
+fi
+say "Система: $FAMILY"
+
+# ─────────────────────────── Пакеты ───────────────────────────
 
 say "Проверяю системные пакеты"
-export DEBIAN_FRONTEND=noninteractive
-MISSING=()
-for cmd in curl openssl dig; do command -v "$cmd" >/dev/null || MISSING+=("$cmd"); done
-if [ ${#MISSING[@]} -gt 0 ]; then
-    apt-get update -qq
-    apt-get install -y -qq curl openssl dnsutils ca-certificates >/dev/null
+NEED=()
+command -v curl >/dev/null    || NEED+=(curl)
+command -v openssl >/dev/null || NEED+=(openssl)
+command -v dig >/dev/null     || NEED+=("$([ "$FAMILY" = debian ] && echo dnsutils || echo bind-utils)")
+command -v ss >/dev/null      || NEED+=("$([ "$FAMILY" = debian ] && echo iproute2 || echo iproute)")
+if [ ${#NEED[@]} -gt 0 ]; then
+    PKG_REFRESH
+    PKG_INSTALL "${NEED[@]}" ca-certificates
 fi
 
 if ! command -v docker >/dev/null; then
     say "Ставлю Docker (пара минут)"
     curl -fsSL https://get.docker.com | sh >/dev/null
+    systemctl enable --now docker >/dev/null 2>&1 || true
 fi
+systemctl is-active docker >/dev/null 2>&1 || systemctl start docker
 docker compose version >/dev/null 2>&1 || die "Не нашёл «docker compose». Обновите Docker."
+
+# Сборка витрины требует памяти. На машине с 1 ГБ npm падает без объяснений —
+# добавляем файл подкачки заранее, это дешевле, чем потом искать причину.
+RAM_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}' || echo 2048)
+SWAP_MB=$(free -m 2>/dev/null | awk '/^Swap:/{print $2}' || echo 0)
+if [ "${RAM_MB:-2048}" -lt 1800 ] && [ "${SWAP_MB:-0}" -lt 512 ] && [ ! -f /swapfile ]; then
+    say "Мало памяти (${RAM_MB} МБ) — добавляю файл подкачки на 2 ГБ"
+    fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+    chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
+    grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
 
 # ─────────────────────────── Настройки ───────────────────────────
 
@@ -43,7 +80,6 @@ get() { grep -E "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2- || true; }
 set_env() {
     local key="$1" value="$2"
     if grep -qE "^$key=" "$ENV_FILE"; then
-        # значение может содержать / и & — разделитель |, экранируем его
         value="${value//|/\\|}"
         sed -i "s|^$key=.*|$key=$value|" "$ENV_FILE"
     else
@@ -102,13 +138,11 @@ ask KASPI_PHONE 'Номер Kaspi для переводов' >/dev/null
 ask KASPI_NAME  'Имя получателя, как в переводе' >/dev/null
 ask PICKUP_ADDRESS 'Адрес самовывоза (пусто — самовывоза нет)' >/dev/null
 
-# Секреты — только если их ещё нет
 [ -n "$(get JWT_SECRET)" ] || set_env JWT_SECRET "$(rand_hex 32)"
 case "$(get POSTGRES_PASSWORD)" in
     ""|"поменяйте-пароль") set_env POSTGRES_PASSWORD "$(rand_hex 16)" ;;
 esac
 
-# Свободные порты: на сервере может стоять что-то ещё
 free_port() {
     local start="$1" p
     for p in $(seq "$start" $((start + 60))); do
@@ -126,18 +160,18 @@ echo
 say "Проверяю, что домен ведёт сюда"
 SERVER_IP="$(curl -s --max-time 10 ifconfig.me || true)"
 DOMAIN_IP="$(dig +short "$DOMAIN" A | tail -1 || true)"
-if [ -n "$SERVER_IP" ] && [ -n "$DOMAIN_IP" ] && [ "$SERVER_IP" != "$DOMAIN_IP" ]; then
-    warn "Домен $DOMAIN сейчас указывает на $DOMAIN_IP, а сервер — $SERVER_IP."
+SKIP_TLS=0
+if [ -z "$DOMAIN_IP" ]; then
+    warn "Домен $DOMAIN пока не резолвится — сертификат отложим"
+    SKIP_TLS=1
+elif [ -n "$SERVER_IP" ] && [ "$SERVER_IP" != "$DOMAIN_IP" ]; then
+    warn "Домен $DOMAIN указывает на $DOMAIN_IP, а сервер — $SERVER_IP."
     warn "Сертификат не выпустится, пока A-запись не будет указывать сюда."
     read -rp "Продолжить без HTTPS и выпустить сертификат позже? [y/N]: " go
     [[ "${go,,}" == y* ]] || die "Поправьте A-запись домена и запустите снова"
     SKIP_TLS=1
-elif [ -z "$DOMAIN_IP" ]; then
-    warn "Домен $DOMAIN пока не резолвится — сертификат отложим"
-    SKIP_TLS=1
 else
     say "Домен указывает на этот сервер ($SERVER_IP)"
-    SKIP_TLS=0
 fi
 
 # ─────────────────────────── Запуск ───────────────────────────
@@ -148,7 +182,7 @@ docker compose run --rm migrate
 docker compose up -d --build
 
 say "Жду, пока поднимется API"
-for _ in $(seq 1 30); do
+for _ in $(seq 1 40); do
     curl -sf "http://127.0.0.1:$API_PORT/health" >/dev/null && break
     sleep 2
 done
@@ -156,12 +190,11 @@ curl -sf "http://127.0.0.1:$API_PORT/health" >/dev/null \
     || die "API не отвечает. Посмотрите: docker compose logs --tail=40 api"
 say "API отвечает"
 
-# ─────────────────────────── nginx и HTTPS ───────────────────────────
+# ─────────────────────────── nginx ───────────────────────────
 
-command -v nginx >/dev/null || { say "Ставлю nginx"; apt-get install -y -qq nginx >/dev/null; }
+command -v nginx >/dev/null || { say "Ставлю nginx"; PKG_INSTALL nginx; }
 
-SITE="/etc/nginx/sites-available/stambul-shop"
-cat > "$SITE" <<NGINX
+cat > "$NGINX_CONF_DIR/stambul-shop.conf" <<NGINX
 server {
     listen 80;
     server_name $DOMAIN;
@@ -177,20 +210,63 @@ server {
     }
 }
 NGINX
-ln -sfn "$SITE" /etc/nginx/sites-enabled/stambul-shop
-rm -f /etc/nginx/sites-enabled/default
-nginx -t >/dev/null 2>&1 || die "nginx не принял настройки: nginx -t"
-systemctl reload nginx 2>/dev/null || systemctl start nginx
+
+if [ "$FAMILY" = debian ]; then
+    rm -f /etc/nginx/sites-enabled/default
+else
+    # у RHEL в nginx.conf лежит свой server на 80 — он перехватит запросы
+    if grep -q "server_name  _;" /etc/nginx/nginx.conf 2>/dev/null; then
+        sed -i 's|^\( *\)server_name  _;|\1server_name  _;\n\1return 444;|' \
+            /etc/nginx/nginx.conf 2>/dev/null || true
+    fi
+fi
+
+# SELinux запрещает nginx ходить по сети — из-за этого 502 на пустом месте
+if command -v getenforce >/dev/null && [ "$(getenforce)" != "Disabled" ]; then
+    say "Разрешаю nginx подключаться к контейнерам (SELinux)"
+    setsebool -P httpd_can_network_connect 1 2>/dev/null || true
+fi
+
+nginx -t >/dev/null 2>&1 || { nginx -t; die "nginx не принял настройки"; }
+systemctl enable nginx >/dev/null 2>&1 || true
+systemctl reload nginx 2>/dev/null || systemctl restart nginx
 say "nginx настроен на $DOMAIN"
 
-if [ "${SKIP_TLS:-0}" = "0" ]; then
-    command -v certbot >/dev/null || { say "Ставлю certbot"; apt-get install -y -qq certbot python3-certbot-nginx >/dev/null; }
-    say "Выпускаю сертификат"
-    if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos \
-               --register-unsafely-without-email --redirect >/dev/null 2>&1; then
-        say "HTTPS работает"
+# Порты наружу
+if command -v firewall-cmd >/dev/null && systemctl is-active firewalld >/dev/null 2>&1; then
+    say "Открываю порты 80 и 443 в firewalld"
+    firewall-cmd --permanent --add-service=http >/dev/null 2>&1 || true
+    firewall-cmd --permanent --add-service=https >/dev/null 2>&1 || true
+    firewall-cmd --reload >/dev/null 2>&1 || true
+elif command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+    say "Открываю порты 80 и 443 в ufw"
+    ufw allow 80/tcp >/dev/null 2>&1 || true
+    ufw allow 443/tcp >/dev/null 2>&1 || true
+fi
+
+# ─────────────────────────── HTTPS ───────────────────────────
+
+if [ "$SKIP_TLS" = "0" ]; then
+    if ! command -v certbot >/dev/null; then
+        say "Ставлю certbot"
+        if [ "$FAMILY" = debian ]; then
+            PKG_INSTALL certbot python3-certbot-nginx
+        else
+            PKG_INSTALL epel-release || true
+            PKG_INSTALL certbot python3-certbot-nginx || true
+        fi
+    fi
+    if command -v certbot >/dev/null; then
+        say "Выпускаю сертификат"
+        if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos \
+                   --register-unsafely-without-email --redirect >/dev/null 2>&1; then
+            say "HTTPS работает"
+        else
+            warn "Сертификат не выпустился. Повторить вручную: certbot --nginx -d $DOMAIN"
+        fi
     else
-        warn "Сертификат не выпустился. Повторить вручную: certbot --nginx -d $DOMAIN"
+        warn "Не удалось поставить certbot. Магазин работает по http://$DOMAIN"
+        warn "Telegram откроет Mini App только по HTTPS — сертификат нужен."
     fi
 fi
 
