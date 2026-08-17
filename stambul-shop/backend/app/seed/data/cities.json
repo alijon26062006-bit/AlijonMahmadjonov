@@ -1,0 +1,30 @@
+{
+  "_note": "Города Казахстана. delivery_days — ориентир по срокам доставки почтой из Алматы; правится в панели.",
+  "cities": [
+    {"name": "Алматы", "delivery_days": 1},
+    {"name": "Астана", "delivery_days": 2},
+    {"name": "Шымкент", "delivery_days": 2},
+    {"name": "Караганда", "delivery_days": 2},
+    {"name": "Актобе", "delivery_days": 3},
+    {"name": "Тараз", "delivery_days": 2},
+    {"name": "Павлодар", "delivery_days": 3},
+    {"name": "Усть-Каменогорск", "delivery_days": 3},
+    {"name": "Семей", "delivery_days": 3},
+    {"name": "Атырау", "delivery_days": 4},
+    {"name": "Костанай", "delivery_days": 3},
+    {"name": "Кызылорда", "delivery_days": 3},
+    {"name": "Уральск", "delivery_days": 4},
+    {"name": "Петропавловск", "delivery_days": 4},
+    {"name": "Актау", "delivery_days": 4},
+    {"name": "Темиртау", "delivery_days": 2},
+    {"name": "Туркестан", "delivery_days": 3},
+    {"name": "Кокшетау", "delivery_days": 3},
+    {"name": "Талдыкорган", "delivery_days": 2},
+    {"name": "Экибастуз", "delivery_days": 3},
+    {"name": "Рудный", "delivery_days": 3},
+    {"name": "Жезказган", "delivery_days": 4},
+    {"name": "Каскелен", "delivery_days": 1},
+    {"name": "Капшагай (Конаев)", "delivery_days": 1},
+    {"name": "Другой город", "delivery_days": 5}
+  ]
+}
