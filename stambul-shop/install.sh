@@ -54,12 +54,33 @@ if [ ${#NEED[@]} -gt 0 ]; then
 fi
 
 if ! command -v docker >/dev/null; then
-    say "Ставлю Docker (пара минут)"
-    curl -fsSL https://get.docker.com | sh >/dev/null
-    systemctl enable --now docker >/dev/null 2>&1 || true
+    say "Ставлю Docker (пара минут). Вывод показываю: молчаливый выход отсюда"
+    say "выглядит как «скрипт просто закончился», и причину потом не найти."
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh \
+        || die "Не скачался установщик Docker. Проверьте сеть: curl -I https://get.docker.com"
+    sh /tmp/get-docker.sh || warn "Установщик завершился с ошибкой — пробую через пакеты"
+
+    if ! command -v docker >/dev/null && [ "$FAMILY" = rhel ]; then
+        say "Ставлю Docker из репозитория Docker CE"
+        PKG_INSTALL dnf-plugins-core || true
+        "$DNF" config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null \
+            || "$DNF" config-manager addrepo --from-repofile=https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null \
+            || true
+        PKG_INSTALL docker-ce docker-ce-cli containerd.io docker-compose-plugin || true
+    fi
+    command -v docker >/dev/null \
+        || die "Docker поставить не удалось. Покажите вывод выше — разберёмся."
 fi
-systemctl is-active docker >/dev/null 2>&1 || systemctl start docker
-docker compose version >/dev/null 2>&1 || die "Не нашёл «docker compose». Обновите Docker."
+
+systemctl enable docker >/dev/null 2>&1 || true
+systemctl is-active docker >/dev/null 2>&1 || systemctl start docker \
+    || die "Docker установлен, но не запускается: systemctl status docker"
+
+if ! docker compose version >/dev/null 2>&1; then
+    say "Доставляю плагин docker compose"
+    PKG_INSTALL docker-compose-plugin || true
+fi
+docker compose version >/dev/null 2>&1 || die "Нет «docker compose». Поставьте плагин вручную."
 
 # Сборка витрины требует памяти. На машине с 1 ГБ npm падает без объяснений —
 # добавляем файл подкачки заранее, это дешевле, чем потом искать причину.
