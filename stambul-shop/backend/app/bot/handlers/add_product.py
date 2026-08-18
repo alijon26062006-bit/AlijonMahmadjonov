@@ -270,6 +270,66 @@ async def skip_field(cb: CallbackQuery, state: FSMContext,
         await _prepare(cb.message, state, session)
 
 
+
+
+# ─────────────────────────── Полоса выполнения ───────────────────────────
+
+BAR_CELLS = 12
+
+
+class Progress:
+    """Живая полоса в одном сообщении.
+
+    Проценты честные: они привязаны к шагам, которые действительно
+    завершились, а не к таймеру. Но между шагами бывает по десять-двадцать
+    секунд тишины, и человеку в этот момент кажется, что всё зависло —
+    поэтому рядом тикают секунды, и сообщение обновляется само.
+    """
+
+    def __init__(self, message: Message) -> None:
+        self._message = message
+        self._percent = 0
+        self._label = "Начинаю"
+        self._started = 0.0
+        self._beat: asyncio.Task | None = None
+
+    async def start(self) -> None:
+        self._started = asyncio.get_running_loop().time()
+        await self._draw()
+        self._beat = asyncio.create_task(self._tick())
+
+    async def set(self, percent: int, label: str) -> None:
+        self._percent = max(self._percent, min(100, percent))
+        self._label = label
+        await self._draw()
+
+    async def finish(self) -> None:
+        if self._beat:
+            self._beat.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._beat
+        with contextlib.suppress(Exception):
+            await self._message.delete()
+
+    async def _tick(self) -> None:
+        # раз в четыре секунды: чаще Telegram начинает придерживать правки
+        while True:
+            await asyncio.sleep(4)
+            await self._draw()
+
+    def _seconds(self) -> int:
+        return int(asyncio.get_running_loop().time() - self._started)
+
+    async def _draw(self) -> None:
+        filled = round(BAR_CELLS * self._percent / 100)
+        bar = "▰" * filled + "▱" * (BAR_CELLS - filled)
+        text = (f"<b>Готовлю карточку</b>\n\n"
+                f"{bar}  {self._percent}%\n"
+                f"{self._label} · {self._seconds()} с")
+        with contextlib.suppress(Exception):
+            await self._message.edit_text(text)
+
+
 # ─────────────────────── Подготовка: фон и разбор ───────────────────────
 
 async def _prepare(message: Message, state: FSMContext,
@@ -279,18 +339,41 @@ async def _prepare(message: Message, state: FSMContext,
     Обе части необязательные: не настроен ключ или отвалилась сеть — товар
     всё равно можно опубликовать, просто без подсказок и с исходным снимком.
     """
-    from app.api.deps import get_redis
-    from app.imaging.pipeline import ImagingError, compose
-    from app.services.telegram_files import get_photo_bytes
-
     data = await state.get_data()
     photos = data.get("photos", [])
-    note = await message.answer("Готовлю карточку: обрабатываю фото и "
-                                "смотрю, что на нём…")
+    note = await message.answer("Готовлю карточку…")
+    bar = Progress(note)
+    await bar.start()
+    try:
+        await _run(bar, message, state, session, photos, data)
+    except Exception as error:                       # сеть, Telegram, что угодно
+        await bar.finish()
+        await message.answer(
+            f"Не получилось подготовить карточку: {error}\n\n"
+            "Товар не потерян — нажмите «Дальше», и попробуем ещё раз.",
+            reply_markup=_kb([[InlineKeyboardButton(
+                text="Попробовать ещё раз", callback_data="add:retry")],
+                _cancel_row()]))
+
+
+@router.callback_query(F.data == "add:retry")
+async def retry_prepare(cb: CallbackQuery, state: FSMContext,
+                        session: AsyncSession) -> None:
+    await cb.answer()
+    await _prepare(cb.message, state, session)
+
+
+async def _run(bar, message: Message, state: FSMContext,
+               session: AsyncSession, photos: list, data: dict) -> None:
+    from app.api.deps import get_redis
+    from app.imaging.pipeline import compose
+    from app.services.telegram_files import get_photo_bytes
 
     redis = get_redis()
     originals: list[bytes] = []
-    for photo in photos:
+    for index, photo in enumerate(photos, 1):
+        await bar.set(5 + int(10 * index / max(len(photos), 1)),
+                      f"Забираю фотографию {index} из {len(photos)}")
         raw = await get_photo_bytes(redis, photo["file_id"],
                                     photo["file_unique_id"])
         originals.append(raw or b"")
@@ -300,16 +383,20 @@ async def _prepare(message: Message, state: FSMContext,
     processed: list[dict | None] = []
     background = data.get("background") or None
     problems: list[str] = []
+    total = max(len(originals), 1)
     for index, raw in enumerate(originals):
+        share = 15 + int(60 * index / total)
+        await bar.set(share, f"Убираю фон · фото {index + 1} из {total}")
         if not raw:
             processed.append(None)
             continue
         try:
             result = await asyncio.to_thread(compose, raw, background=background)
             background = background or result.background
+            await bar.set(share + int(30 / total), "Сохраняю обработанное фото")
             stored = await _upload(result.data)
             processed.append(stored)
-        except (ImagingError, Exception) as error:      # noqa: B014
+        except Exception as error:
             processed.append(None)
             problems.append(f"фото {index + 1}: {error}")
 
@@ -317,6 +404,7 @@ async def _prepare(message: Message, state: FSMContext,
     ai_error = ""
     key, model = await settings_store.openai(session)
     if key and originals and originals[0]:
+        await bar.set(80, "Смотрю, что на фотографии")
         try:
             draft = await ai_vision.analyze(originals[0], key, model)
         except ai_vision.VisionError as error:
@@ -324,10 +412,10 @@ async def _prepare(message: Message, state: FSMContext,
     elif not key:
         ai_error = "ключ OpenAI не задан в настройках"
 
+    await bar.set(100, "Готово")
     await state.update_data(processed=processed, background=background,
                             draft=draft, ai_error=ai_error, problems=problems)
-    with contextlib.suppress(Exception):
-        await note.delete()
+    await bar.finish()
     await _show_card(message, state, session)
 
 

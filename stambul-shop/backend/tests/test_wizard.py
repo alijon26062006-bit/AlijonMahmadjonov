@@ -108,6 +108,35 @@ async def main():
         check(r.status_code == 200 and js["title"] == "Спорттовары",
               "Схема своего раздела отдаётся", r.text[:80])
 
+    # ── полоса выполнения ──
+    from app.bot.handlers.add_product import Progress
+
+    class FakeMessage:
+        def __init__(self):
+            self.texts = []
+
+        async def edit_text(self, text, **kw):
+            self.texts.append(text)
+
+        async def delete(self):
+            self.texts.append("<удалено>")
+
+    note = FakeMessage()
+    bar = Progress(note)
+    await bar.start()
+    await bar.set(30, "Убираю фон")
+    await bar.set(10, "Шаг назад")          # проценты не должны падать
+    await bar.set(100, "Готово")
+    await bar.finish()
+
+    check(any("30%" in t for t in note.texts), "Полоса показывает проценты")
+    check(not any("10%" in t for t in note.texts),
+          "Проценты не откатываются назад")
+    check(any("100%" in t for t in note.texts), "Доходит до ста")
+    check(note.texts[-1] == "<удалено>", "В конце сообщение убирается")
+    check(all(" с" in t for t in note.texts if t != "<удалено>"),
+          "Рядом тикают секунды — видно, что не зависло")
+
     return report()
 
 
