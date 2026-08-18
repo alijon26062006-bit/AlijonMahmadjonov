@@ -11,6 +11,7 @@ OPEN_SHOP = "🛍 Открыть магазин"
 MENU_ORDERS = "📦 Мои заказы"
 MENU_HELP = "ℹ️ Помощь"
 MENU_PANEL = "📊 Панель"
+MENU_ADD = "➕ Добавить товар"
 
 SHARE_PHONE = "📱 Отправить мой номер"
 

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Setting
 
 # Ключи, которые считаются секретами: их значение не покидает сервер
-SECRETS = {"ai_api_key"}
+SECRETS = {"ai_api_key", "openai_api_key"}
 
 
 async def get(session: AsyncSession, key: str, default: str = "") -> str:
@@ -35,11 +35,24 @@ def masked(value: str) -> str:
     return "••••" + value[-4:] if len(value) > 4 else "••••"
 
 
+DEFAULT_MODEL = "gpt-4o-mini"
+
+
+async def openai(session: AsyncSession) -> tuple[str, str]:
+    """Ключ и модель для разбора фотографий."""
+    return (await get(session, "openai_api_key"),
+            await get(session, "openai_model", DEFAULT_MODEL))
+
+
 async def public(session: AsyncSession) -> dict:
     provider = await get(session, "ai_provider", "local")
     key = await get(session, "ai_api_key")
+    openai_key = await get(session, "openai_api_key")
     return {
         "ai_provider": provider,
         "ai_key_set": bool(key),
         "ai_key_hint": masked(key),
+        "openai_key_set": bool(openai_key),
+        "openai_key_hint": masked(openai_key),
+        "openai_model": await get(session, "openai_model", DEFAULT_MODEL),
     }

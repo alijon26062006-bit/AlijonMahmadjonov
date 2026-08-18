@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import Db, Viewer
 from app.catalog.schemas import get_category, groups, serialize
+from app.services import categories as categories_service
 from app.db.models import P_ACTIVE, P_OUT, Product, ProductEvent, Variant
 
 router = APIRouter(prefix="/api", tags=["catalog"])
@@ -40,12 +41,14 @@ def card(product: Product) -> dict:
 
 
 @router.get("/categories")
-async def categories():
+async def categories(session: Db):
+    await categories_service.sync(session)
     return {"groups": groups()}
 
 
 @router.get("/categories/{slug}")
-async def category_schema(slug: str):
+async def category_schema(slug: str, session: Db):
+    await categories_service.sync(session)
     category = get_category(slug)
     if category is None:
         raise HTTPException(404, "not_found")
@@ -55,6 +58,7 @@ async def category_schema(slug: str):
 @router.get("/products")
 async def list_products(request: Request, session: Db,
                         viewer: Viewer):
+    await categories_service.sync(session)
     params = dict(request.query_params)
     query = select(Product).where(Product.status.in_((P_ACTIVE, P_OUT)))
 

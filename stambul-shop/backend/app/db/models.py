@@ -121,6 +121,22 @@ class Setting(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class CustomCategory(Base):
+    """Раздел, заведённый владельцем из бота.
+
+    Поля у него общие: угадать, какие характеристики важны для нового вида
+    товара, программа не может, а спрашивать их у владельца в момент, когда
+    он торопится завести товар, — верный способ его отпугнуть.
+    """
+    __tablename__ = "custom_categories"
+
+    slug: Mapped[str] = mapped_column(String(40), primary_key=True)
+    title: Mapped[str] = mapped_column(String(80), unique=True)
+    sort_order: Mapped[int] = mapped_column(SmallInteger, default=100)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+
+
 class City(Base):
     __tablename__ = "cities"
 

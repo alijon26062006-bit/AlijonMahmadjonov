@@ -11,7 +11,7 @@ docker compose run --rm migrate
 cd backend/tests
 DATABASE_URL=postgresql+asyncpg://shop:shop@localhost:5432/shop \
 REDIS_URL=redis://localhost:6379/1 \
-python3 test_auth.py && python3 test_shop.py && python3 test_studio.py
+for t in test_auth test_shop test_studio test_wizard; do python3 $t.py; done
 ```
 
 - `test_auth.py` — вход по номеру с кодом от бота, вход через Google,
@@ -20,3 +20,5 @@ python3 test_auth.py && python3 test_shop.py && python3 test_studio.py
   двух покупателей за последней вещью, цепочка статусов, возврат склада.
 - `test_studio.py` — стиль каталога, выбор фона под яркость товара, хранение
   ключа стороннего сервиса, переключение «оригинал / обработанная».
+- `test_wizard.py` — свои разделы из бота и чистка черновика от модели:
+  выдуманный раздел отбрасывается, цвет приводится к списку каталога.

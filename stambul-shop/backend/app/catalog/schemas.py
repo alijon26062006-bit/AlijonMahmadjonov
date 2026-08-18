@@ -74,8 +74,8 @@ MATERIAL = Field(key="material", label="Состав, материал", type="s
                  hint="Например: 95% хлопок, 5% эластан")
 MADE_IN = Field(key="made_in", label="Страна", type="enum_one",
                 filter="multiselect",
-                options=opts("Турция", "Китай", "Казахстан", "Узбекистан",
-                             "Россия", "Италия", "Другая"))
+                options=opts("Китай", "Казахстан", "Узбекистан", "Россия",
+                             "Италия", "Бангладеш", "Другая"))
 STYLE = Field(key="style", label="Стиль", type="enum_one", filter="multiselect",
               options=opts("Повседневный", "Классический", "Спортивный",
                            "Вечерний", "Домашний"))
@@ -243,15 +243,47 @@ BY_SLUG = {c.slug: c for c in CATEGORIES}
 GROUP_ORDER = ["Одежда", "Обувь и аксессуары", "Детям", "Для дома"]
 
 
+# ─────────────────────── Разделы, заведённые владельцем ───────────────────
+#
+# Разделы из этого файла — костяк магазина: у каждого свои поля и свои
+# размерные линейки. Но товар не всегда в них помещается, и заставлять
+# владельца ждать программиста ради нового раздела неправильно. Поэтому
+# он может завести свой прямо из бота: такой раздел получает общий набор
+# полей и попадает в группу «Разное».
+
+CUSTOM_GROUP = "Разное"
+_CUSTOM: dict[str, Category] = {}
+
+
+def custom_category(slug: str, title: str, order: int = 100) -> Category:
+    return Category(
+        slug=slug, title=title, group=CUSTOM_GROUP, icon="package", order=order,
+        size_scales=[("Размер", SIZES_LETTER), ("Без размера", SIZES_ONE)],
+        fields=[SEASON, MATERIAL, STYLE, MADE_IN])
+
+
+def register_custom(rows: list[tuple[str, str, int]]) -> None:
+    """Обновляет список своих разделов. Вызывается там, где он нужен."""
+    _CUSTOM.clear()
+    for slug, title, order in rows:
+        if slug not in BY_SLUG:
+            _CUSTOM[slug] = custom_category(slug, title, order)
+
+
+def all_categories() -> list[Category]:
+    return [*CATEGORIES, *_CUSTOM.values()]
+
+
 def get_category(slug: str) -> Category | None:
-    return BY_SLUG.get(slug)
+    return BY_SLUG.get(slug) or _CUSTOM.get(slug)
 
 
 def groups() -> list[dict]:
     """Витрина: разделы с категориями внутри."""
     out = []
-    for name in GROUP_ORDER:
-        items = sorted((c for c in CATEGORIES if c.group == name),
+    everything = all_categories()
+    for name in [*GROUP_ORDER, CUSTOM_GROUP]:
+        items = sorted((c for c in everything if c.group == name),
                        key=lambda c: c.order)
         if items:
             out.append({"title": name,

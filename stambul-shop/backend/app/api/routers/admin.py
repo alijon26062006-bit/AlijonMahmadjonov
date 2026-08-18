@@ -11,14 +11,17 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, Db
-from app.catalog.schemas import CATEGORIES, get_category
+from app.catalog.schemas import all_categories, get_category
 from app.config import get_settings
 from app.db.models import (
     P_ACTIVE, P_HIDDEN, AdminLog, Brand, City, Order, Product, ProductPhoto, User,
 )
 from app.imaging.style import BACKGROUNDS, STYLE_VERSION
 from app.workers import queue
-from app.services import order_service, product_service, settings_store
+from app.services import (
+    categories as categories_service, order_service, product_service,
+    settings_store,
+)
 from app.services.product_service import ShopError
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -114,6 +117,7 @@ async def products(session: Db, admin: Admin, q: str = "", status: str = "",
 
 @router.post("/products")
 async def create_product(body: ProductIn, session: Db, admin: Admin):
+    await categories_service.sync(session)
     try:
         product = await product_service.create(
             session, category_slug=body.category, title=body.title,
@@ -286,12 +290,14 @@ async def add_brand(body: BrandIn, session: Db, admin: Admin):
 
 @router.get("/summary")
 async def summary(session: Db, admin: Admin):
+    await categories_service.sync(session)
     return {
         "products": await product_service.counters(session),
         "orders": await order_service.stats(session),
         "low_stock": [{"title": t, "size": s, "color": c, "stock": n}
                       for t, s, c, n in await product_service.low_stock(session)],
-        "categories": [{"slug": c.slug, "title": c.title} for c in CATEGORIES],
+        "categories": [{"slug": c.slug, "title": c.title}
+                       for c in all_categories()],
     }
 
 
@@ -320,6 +326,8 @@ class VersionIn(BaseModel):
 class SettingsIn(BaseModel):
     ai_provider: str | None = Field(default=None, max_length=16)
     ai_api_key: str | None = Field(default=None, max_length=200)
+    openai_api_key: str | None = Field(default=None, max_length=300)
+    openai_model: str | None = Field(default=None, max_length=60)
 
 
 def _photo_out(p: ProductPhoto) -> dict:
@@ -406,6 +414,13 @@ async def write_settings(body: SettingsIn, session: Db, admin: Admin):
     if body.ai_api_key is not None:
         await settings_store.set_value(session, "ai_api_key",
                                        body.ai_api_key.strip())
+    if body.openai_api_key is not None:
+        await settings_store.set_value(session, "openai_api_key",
+                                       body.openai_api_key.strip())
+    if body.openai_model is not None:
+        await settings_store.set_value(session, "openai_model",
+                                       body.openai_model.strip()
+                                       or settings_store.DEFAULT_MODEL)
     _log(session, admin, "settings", "ai", "")
     await session.commit()
     return await settings_store.public(session)

@@ -575,8 +575,11 @@ function Settings() {
   const [key, setKey] = useState('');
   const [msg, setMsg] = useState('');
 
+  const [openaiKey, setOpenaiKey] = useState('');
+
   const { data } = useQuery<{
     ai_provider: string; ai_key_set: boolean; ai_key_hint: string;
+    openai_key_set: boolean; openai_key_hint: string; openai_model: string;
   }>({ queryKey: ['admin-settings'], queryFn: () => api('/api/admin/settings') });
 
   const save = async (patch: Record<string, unknown>) => {
@@ -586,6 +589,7 @@ function Settings() {
       qc.invalidateQueries({ queryKey: ['admin-settings'] });
       setMsg('Сохранено');
       setKey('');
+      setOpenaiKey('');
     } catch (e) { setMsg((e as Error).message || 'Не сохранилось'); }
   };
 
@@ -636,6 +640,44 @@ function Settings() {
               onClick={() => save({ ai_api_key: key.trim() })}>
         Сохранить ключ
       </button>
+
+      <h2 style={{ marginTop: 32 }}>Разбор фотографий</h2>
+      <p className="subtitle">
+        По снимку предлагает название, раздел, цвет и описание. Ничего не
+        публикуется само — черновик приходит вам в бот, вы правите и
+        подтверждаете.
+      </p>
+
+      <div className="field">
+        <label>Ключ OpenAI</label>
+        <input className="input" type="password" autoComplete="off"
+               placeholder={data?.openai_key_set
+                 ? `Задан: ${data.openai_key_hint}` : 'Ключ ещё не задан'}
+               value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} />
+        <span className="caption">
+          Берётся на platform.openai.com. Хранится на сервере, в браузер не
+          возвращается. Разбор одного снимка стоит около цента.
+        </span>
+      </div>
+
+      <div className="field">
+        <label>Модель</label>
+        <input className="input" defaultValue={data?.openai_model ?? ''}
+               placeholder="gpt-4o-mini"
+               onBlur={(e) => e.target.value !== data?.openai_model
+                 && save({ openai_model: e.target.value })} />
+      </div>
+
+      <button className="btn btn-primary" disabled={!openaiKey.trim()}
+              onClick={() => save({ openai_api_key: openaiKey.trim() })}>
+        Сохранить ключ OpenAI
+      </button>
+
+      <div className="notice" style={{ marginTop: 24 }}>
+        <b>Товар удобнее заводить в боте.</b> Команда <code>/add</code> или
+        кнопка «Добавить товар»: прислали фотографии, ответили на пять
+        вопросов — и карточка готова.
+      </div>
 
       {msg && <div className="notice">{msg}</div>}
     </div>

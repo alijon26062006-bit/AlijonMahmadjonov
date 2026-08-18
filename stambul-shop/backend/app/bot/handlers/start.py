@@ -41,7 +41,8 @@ def menu_kb(is_admin: bool = False) -> ReplyKeyboardMarkup:
     rows = [[KeyboardButton(text=texts.MENU_ORDERS),
              KeyboardButton(text=texts.MENU_HELP)]]
     if is_admin:
-        rows.append([KeyboardButton(text=texts.MENU_PANEL)])
+        rows.append([KeyboardButton(text=texts.MENU_ADD),
+                     KeyboardButton(text=texts.MENU_PANEL)])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
