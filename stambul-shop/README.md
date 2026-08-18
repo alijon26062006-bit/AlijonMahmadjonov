@@ -134,8 +134,18 @@ SELinux на исходящие соединения nginx — без него �
 
 ```bash
 cp .env.example .env      # заполнить BOT_TOKEN, ADMIN_IDS, SITE_URL
+docker compose build
 docker compose run --rm migrate
-docker compose up -d --build
+docker compose up -d
+```
+
+Обновление на работающем сервере:
+
+```bash
+git pull
+docker compose build          # собирает и migrate: у него профиль tools,
+docker compose run --rm migrate   # и «up --build» его не трогает
+docker compose up -d --remove-orphans
 ```
 
 Проверка: `curl localhost:8010/health` → `{"db":"ok"}`; открыть сайт в браузере.
