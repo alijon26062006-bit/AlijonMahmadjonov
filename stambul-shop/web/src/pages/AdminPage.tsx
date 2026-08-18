@@ -8,7 +8,7 @@ import type {
 import { Icon } from '../components/icons';
 import { Empty, ORDER_BADGE, useAuth } from '../components/ui';
 
-type Tab = 'orders' | 'products' | 'new';
+type Tab = 'orders' | 'products' | 'new' | 'settings';
 
 const STATUS_LABEL: Record<string, string> = {
   new: 'Новый', confirmed: 'Подтвердить', paid: 'Оплачен',
@@ -54,7 +54,8 @@ export default function AdminPage({ cfg }: { cfg?: ShopConfig }) {
 
       <div className="chips" style={{ margin: '16px 0' }}>
         {([['orders', 'Заказы'], ['products', 'Товары'],
-           ['new', 'Добавить товар']] as [Tab, string][]).map(([id, label]) => (
+           ['new', 'Добавить товар'],
+           ['settings', 'Настройки']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={`chip ${tab === id ? 'active' : ''}`}
                   onClick={() => setTab(id)}>{label}</button>
         ))}
@@ -63,6 +64,7 @@ export default function AdminPage({ cfg }: { cfg?: ShopConfig }) {
       {tab === 'orders' && <Orders />}
       {tab === 'products' && <Products />}
       {tab === 'new' && <NewProduct cfg={cfg} onDone={() => setTab('products')} />}
+      {tab === 'settings' && <Settings />}
     </div>
   );
 }
@@ -285,6 +287,133 @@ function VariantEditor({ product }: { product: AdminProduct }) {
         {save.isPending ? 'Сохраняем…' : 'Сохранить размеры'}
       </button>
       <PhotoUploader product={product} />
+      <PhotoStudio product={product} />
+    </div>
+  );
+}
+
+type PhotoOut = {
+  id: number; position: number; url: string; original: string;
+  has_processed: boolean; use_processed: boolean;
+  background: string | null; processing: string; error: string | null;
+};
+
+const PROCESSING_LABEL: Record<string, string> = {
+  queued: 'В очереди', working: 'Обрабатываю', ready: 'Готово',
+  failed: 'Не получилось',
+};
+
+/** Подготовка фотографий для каталога.
+
+    Кнопка «AI обработка» не трогает оригинал: обработанная версия ложится
+    рядом, и переключатель возвращает исходный снимок в любой момент. */
+function PhotoStudio({ product }: { product: AdminProduct }) {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [bg, setBg] = useState<string>('');
+  const [msg, setMsg] = useState('');
+
+  const { data } = useQuery<{
+    items: PhotoOut[]; backgrounds: { key: string; title: string }[];
+  }>({
+    queryKey: ['photos', product.id],
+    queryFn: () => api(`/api/admin/products/${product.id}/photos`),
+    // пока что-то в работе — переспрашиваем, чтобы счётчик был живым
+    refetchInterval: (q) => {
+      const items = (q.state.data as { items?: PhotoOut[] } | undefined)?.items;
+      return items?.some((p) => p.processing === 'queued'
+                             || p.processing === 'working') ? 2000 : false;
+    },
+  });
+
+  const items = data?.items ?? [];
+  const backgrounds = data?.backgrounds ?? [];
+  const ready = items.filter((p) => p.processing === 'ready').length;
+  const working = items.filter((p) => p.processing === 'queued'
+                                   || p.processing === 'working').length;
+
+  const run = async (path: string) => {
+    setBusy(true); setMsg('');
+    try {
+      await api(path, { method: 'POST',
+                        body: JSON.stringify({ background: bg || null }) });
+      qc.invalidateQueries({ queryKey: ['photos', product.id] });
+    } catch (e) {
+      setMsg((e as Error).message || 'Не получилось');
+    } finally { setBusy(false); }
+  };
+
+  const switchVersion = async (photo: PhotoOut, useProcessed: boolean) => {
+    try {
+      await api(`/api/admin/photos/${photo.id}/version`, {
+        method: 'POST', body: JSON.stringify({ use_processed: useProcessed }),
+      });
+      qc.invalidateQueries({ queryKey: ['photos', product.id] });
+      qc.invalidateQueries({ queryKey: ['admin-products'] });
+    } catch (e) { setMsg((e as Error).message); }
+  };
+
+  if (!items.length) return null;
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div className="row-between" style={{ marginBottom: 8 }}>
+        <b style={{ fontSize: 14 }}>Фотографии каталога</b>
+        {working > 0
+          ? <span className="caption">Обработано {ready} из {items.length}</span>
+          : ready > 0 && <span className="caption">Обработано {ready}</span>}
+      </div>
+
+      <div className="chips" style={{ marginBottom: 8 }}>
+        <button className={`chip ${bg === '' ? 'active' : ''}`}
+                onClick={() => setBg('')}>Фон автоматически</button>
+        {backgrounds.map((b) => (
+          <button key={b.key} className={`chip ${bg === b.key ? 'active' : ''}`}
+                  onClick={() => setBg(b.key)}>{b.title}</button>
+        ))}
+      </div>
+
+      <button className="btn btn-block" disabled={busy || working > 0}
+              onClick={() => run(`/api/admin/products/${product.id}/photos/studio`)}>
+        <Icon name="sparkles" size={16} />
+        {working > 0 ? 'Обрабатываю…' : 'Обработать все фото'}
+      </button>
+
+      <div className="stack" style={{ marginTop: 10 }}>
+        {items.map((photo) => (
+          <div key={photo.id} className="row" style={{ alignItems: 'flex-start' }}>
+            <img src={photoUrl(photo.url)} alt="" width={56} height={70}
+                 style={{ objectFit: 'cover', borderRadius: 8,
+                          background: 'var(--surface-2)' }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {photo.has_processed ? (
+                <div className="chips">
+                  <button className={`chip ${!photo.use_processed ? 'active' : ''}`}
+                          onClick={() => switchVersion(photo, false)}>Оригинал</button>
+                  <button className={`chip ${photo.use_processed ? 'active' : ''}`}
+                          onClick={() => switchVersion(photo, true)}>AI</button>
+                  <button className="chip" disabled={busy}
+                          onClick={() => run(`/api/admin/photos/${photo.id}/studio`)}>
+                    <Icon name="rotate-ccw" size={14} /> Переделать
+                  </button>
+                </div>
+              ) : (
+                <button className="btn" disabled={busy}
+                        onClick={() => run(`/api/admin/photos/${photo.id}/studio`)}>
+                  <Icon name="sparkles" size={15} /> AI обработка
+                </button>
+              )}
+              {photo.processing !== 'none' && photo.processing !== 'ready' && (
+                <p className="caption" style={{ marginTop: 4 }}>
+                  {PROCESSING_LABEL[photo.processing] ?? photo.processing}
+                  {photo.error ? `: ${photo.error}` : ''}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {msg && <p className="caption" style={{ marginTop: 6 }}>{msg}</p>}
     </div>
   );
 }
@@ -433,6 +562,82 @@ function NewProduct({ cfg, onDone }: { cfg?: ShopConfig; onDone: () => void }) {
       <p className="subtitle" style={{ marginTop: 8 }}>
         После создания откройте товар в списке и задайте размеры, цены и фотографии.
       </p>
+    </div>
+  );
+}
+
+/* ─────────────────────── Настройки ─────────────────────── */
+
+/** Ключ стороннего сервиса. Сюда он вводится один раз, наружу больше не
+    возвращается — только признак «задан» и последние четыре знака. */
+function Settings() {
+  const qc = useQueryClient();
+  const [key, setKey] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const { data } = useQuery<{
+    ai_provider: string; ai_key_set: boolean; ai_key_hint: string;
+  }>({ queryKey: ['admin-settings'], queryFn: () => api('/api/admin/settings') });
+
+  const save = async (patch: Record<string, unknown>) => {
+    try {
+      await api('/api/admin/settings', { method: 'PATCH',
+                                         body: JSON.stringify(patch) });
+      qc.invalidateQueries({ queryKey: ['admin-settings'] });
+      setMsg('Сохранено');
+      setKey('');
+    } catch (e) { setMsg((e as Error).message || 'Не сохранилось'); }
+  };
+
+  const provider = data?.ai_provider ?? 'local';
+
+  return (
+    <div className="stack fade-in">
+      <h2>Обработка фотографий</h2>
+      <p className="subtitle">
+        Готовит из снимка с телефона карточку в стиле каталога: убирает стол,
+        руку и стену, ставит товар по центру на нейтральный фон. Сам товар
+        не меняется — это те же пиксели, что и на оригинале.
+      </p>
+
+      <div className="field">
+        <label>Чем отделять товар от фона</label>
+        <div className="chips">
+          <button className={`chip ${provider === 'local' ? 'active' : ''}`}
+                  onClick={() => save({ ai_provider: 'local' })}>
+            На своём сервере
+          </button>
+          <button className={`chip ${provider === 'removebg' ? 'active' : ''}`}
+                  onClick={() => save({ ai_provider: 'removebg' })}>
+            Сторонний сервис
+          </button>
+        </div>
+        <span className="caption">
+          {provider === 'local'
+            ? 'Работает без ключа и без оплаты за кадр. Первая обработка после '
+              + 'перезапуска идёт дольше — сервер подгружает модель.'
+            : 'Нужен ключ remove.bg. Качество на сложном фоне выше, каждый '
+              + 'кадр платный.'}
+        </span>
+      </div>
+
+      <div className="field">
+        <label>Ключ сервиса</label>
+        <input className="input" type="password" autoComplete="off"
+               placeholder={data?.ai_key_set ? `Задан: ${data.ai_key_hint}`
+                                             : 'Ключ ещё не задан'}
+               value={key} onChange={(e) => setKey(e.target.value)} />
+        <span className="caption">
+          Хранится на сервере и в браузер не возвращается никогда.
+        </span>
+      </div>
+
+      <button className="btn btn-primary" disabled={!key.trim()}
+              onClick={() => save({ ai_api_key: key.trim() })}>
+        Сохранить ключ
+      </button>
+
+      {msg && <div className="notice">{msg}</div>}
     </div>
   );
 }

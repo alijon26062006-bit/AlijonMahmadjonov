@@ -37,6 +37,21 @@ MIGRATIONS: list[str] = [
     "ALTER TABLE auth_codes ADD COLUMN IF NOT EXISTS user_id BIGINT "
     "REFERENCES users(id) ON DELETE CASCADE",
     "ALTER TABLE auth_codes ALTER COLUMN phone SET DEFAULT ''",
+    # Подготовка фотографий для каталога: обработанная версия лежит рядом
+    # с оригиналом, в той же строке.
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS proc_file_id TEXT",
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS proc_thumb_file_id TEXT",
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS proc_thumb_w INTEGER",
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS proc_file_unique_id "
+    "VARCHAR(64)",
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS use_processed BOOLEAN "
+    "NOT NULL DEFAULT FALSE",
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS background VARCHAR(16)",
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS style_version SMALLINT",
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS processing VARCHAR(12) "
+    "NOT NULL DEFAULT 'none'",
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS processing_error "
+    "VARCHAR(300)",
 ]
 
 

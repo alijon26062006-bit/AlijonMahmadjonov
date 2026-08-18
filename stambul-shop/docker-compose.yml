@@ -73,6 +73,10 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-shop}:${POSTGRES_PASSWORD:-shop}@db:5432/${POSTGRES_DB:-shop}
       REDIS_URL: redis://redis:6379/0
+      # модель отделения фона скачивается один раз и живёт в томе
+      U2NET_HOME: /data/models
+      NUMBA_CACHE_DIR: /tmp
+    volumes: [shop_models:/data/models]
     depends_on:
       db: {condition: service_healthy}
     restart: unless-stopped
@@ -90,3 +94,4 @@ volumes:
   shop_pg:
   shop_redis:
   shop_media:
+  shop_models:

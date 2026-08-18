@@ -21,12 +21,21 @@ async def photo(public_id: uuid_mod.UUID, request: Request,
     if not p:
         raise HTTPException(404)
 
-    etag = f'"{p.file_unique_id}-{size}"'
+    # Какую версию показывать — решает один флаг. Оригинал при этом никуда
+    # не девается: переключатель в панели возвращает его мгновенно.
+    if p.use_processed and p.proc_file_id:
+        full_id, thumb_id = p.proc_file_id, p.proc_thumb_file_id
+        unique = p.proc_file_unique_id or p.file_unique_id
+    else:
+        full_id, thumb_id = p.file_id, p.thumb_file_id
+        unique = p.file_unique_id
+
+    etag = f'"{unique}-{size}"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={**CACHE_HEADERS, "ETag": etag})
 
-    file_id = p.thumb_file_id if (size == "thumb" and p.thumb_file_id) else p.file_id
-    fu = f"{p.file_unique_id}_{size}" if size == "thumb" else p.file_unique_id
+    file_id = thumb_id if (size == "thumb" and thumb_id) else full_id
+    fu = f"{unique}_{size}" if size == "thumb" else unique
     try:
         data = await get_photo_bytes(redis, file_id, fu)
     except Exception:

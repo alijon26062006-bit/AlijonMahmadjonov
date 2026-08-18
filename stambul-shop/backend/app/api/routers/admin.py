@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
@@ -14,9 +14,11 @@ from app.api.deps import CurrentUser, Db
 from app.catalog.schemas import CATEGORIES, get_category
 from app.config import get_settings
 from app.db.models import (
-    P_ACTIVE, P_HIDDEN, AdminLog, Brand, City, Order, Product, User,
+    P_ACTIVE, P_HIDDEN, AdminLog, Brand, City, Order, Product, ProductPhoto, User,
 )
-from app.services import order_service, product_service
+from app.imaging.style import BACKGROUNDS, STYLE_VERSION
+from app.workers import queue
+from app.services import order_service, product_service, settings_store
 from app.services.product_service import ShopError
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -303,3 +305,107 @@ async def log(session: Db, admin: Admin, limit: int = 50):
                        "admin": name or "?",
                        "created_at": a.created_at.isoformat() if a.created_at else None}
                       for a, name in rows]}
+
+# ─────────────────────────── Фотографии каталога ───────────────────────────
+
+
+class StudioIn(BaseModel):
+    background: str | None = Field(default=None, max_length=16)
+
+
+class VersionIn(BaseModel):
+    use_processed: bool
+
+
+class SettingsIn(BaseModel):
+    ai_provider: str | None = Field(default=None, max_length=16)
+    ai_api_key: str | None = Field(default=None, max_length=200)
+
+
+def _photo_out(p: ProductPhoto) -> dict:
+    return {
+        "id": p.id,
+        "position": p.position,
+        "original": f"/api/photos/{p.public_id}?size=thumb&v=orig",
+        "url": f"/api/photos/{p.public_id}?size=thumb",
+        "has_processed": bool(p.proc_file_id),
+        "use_processed": p.use_processed,
+        "background": p.background,
+        "style_version": p.style_version,
+        "processing": p.processing,
+        "error": p.processing_error,
+    }
+
+
+@router.get("/products/{public_id}/photos")
+async def product_photos(public_id: uuid_mod.UUID, session: Db, admin: Admin):
+    product = await product_service.load_public(session, public_id)
+    if product is None:
+        raise HTTPException(404, "not_found")
+    return {"items": [_photo_out(p) for p in product.photos],
+            "backgrounds": [{"key": b.key, "title": b.title}
+                            for b in BACKGROUNDS.values()],
+            "style_version": STYLE_VERSION}
+
+
+@router.post("/photos/{photo_id}/studio")
+async def studio_one(photo_id: int, body: StudioIn, session: Db, admin: Admin):
+    """Подготовить одну фотографию. Оригинал сохраняется в любом случае."""
+    photo = await session.get(ProductPhoto, photo_id)
+    if photo is None:
+        raise HTTPException(404, "not_found")
+    photo.processing = "queued"
+    photo.processing_error = None
+    await session.commit()
+    job = await queue.enqueue_photo(photo_id, body.background)
+    _log(session, admin, "photo_studio", str(photo_id), body.background or "auto")
+    await session.commit()
+    return {"job_id": job, "photo": _photo_out(photo)}
+
+
+@router.post("/products/{public_id}/photos/studio")
+async def studio_all(public_id: uuid_mod.UUID, body: StudioIn, session: Db,
+                     admin: Admin):
+    """Все фотографии товара — одной очередью и с одним фоном."""
+    product = await product_service.load_public(session, public_id)
+    if product is None:
+        raise HTTPException(404, "not_found")
+    for photo in product.photos:
+        photo.processing = "queued"
+        photo.processing_error = None
+    await session.commit()
+    job = await queue.enqueue_product_photos(product.id, body.background)
+    return {"job_id": job, "queued": len(product.photos)}
+
+
+@router.post("/photos/{photo_id}/version")
+async def photo_version(photo_id: int, body: VersionIn, session: Db, admin: Admin):
+    """Переключение «оригинал / обработанная». Ничего не удаляет."""
+    photo = await session.get(ProductPhoto, photo_id)
+    if photo is None:
+        raise HTTPException(404, "not_found")
+    if body.use_processed and not photo.proc_file_id:
+        raise HTTPException(400, "Обработанной версии ещё нет")
+    photo.use_processed = body.use_processed
+    await session.commit()
+    return _photo_out(photo)
+
+
+@router.get("/settings")
+async def read_settings(session: Db, admin: Admin):
+    """Ключ наружу не отдаём — только признак, что он задан, и хвост."""
+    return await settings_store.public(session)
+
+
+@router.patch("/settings")
+async def write_settings(body: SettingsIn, session: Db, admin: Admin):
+    if body.ai_provider is not None:
+        if body.ai_provider not in ("local", "removebg"):
+            raise HTTPException(400, "Неизвестный способ обработки")
+        await settings_store.set_value(session, "ai_provider", body.ai_provider)
+    if body.ai_api_key is not None:
+        await settings_store.set_value(session, "ai_api_key",
+                                       body.ai_api_key.strip())
+    _log(session, admin, "settings", "ai", "")
+    await session.commit()
+    return await settings_store.public(session)
