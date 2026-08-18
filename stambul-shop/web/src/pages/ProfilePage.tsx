@@ -74,14 +74,14 @@ export default function ProfilePage({ cfg }: { cfg?: ShopConfig }) {
       </p>
 
       <div className="stack" style={{ marginTop: 16 }}>
-        <label className="row-between notice" style={{ cursor: 'pointer' }}>
+        <label className="notice btn-row" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
           <span><Icon name="mail" size={16} /> Письма на почту</span>
           <input type="checkbox" checked={user.notify_email}
                  onChange={(e) => save({ notify_email: e.target.checked },
                                         'Сохранено')} />
         </label>
 
-        <label className="row-between notice" style={{ cursor: 'pointer' }}>
+        <label className="notice btn-row" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
           <span><Icon name="send" size={16} /> Сообщения в Telegram</span>
           <input type="checkbox" checked={user.notify_telegram}
                  disabled={!user.tg_linked}
@@ -98,27 +98,27 @@ export default function ProfilePage({ cfg }: { cfg?: ShopConfig }) {
 
       <h2 style={{ marginTop: 40 }}>Разделы</h2>
       <div className="stack" style={{ marginTop: 16 }}>
-        <Link className="btn btn-block row-between" to="/orders">
+        <Link className="btn btn-block btn-row" to="/orders">
           <span><Icon name="package" size={17} /> Мои заказы</span>
           <Icon name="chevron-right" size={17} />
         </Link>
-        <Link className="btn btn-block row-between" to="/favorites">
+        <Link className="btn btn-block btn-row" to="/favorites">
           <span><Icon name="heart" size={17} /> Избранное</span>
           <Icon name="chevron-right" size={17} />
         </Link>
-        <Link className="btn btn-block row-between" to="/delivery">
+        <Link className="btn btn-block btn-row" to="/delivery">
           <span><Icon name="truck" size={17} /> Доставка и оплата</span>
           <Icon name="chevron-right" size={17} />
         </Link>
         {cfg?.support && (
-          <a className="btn btn-block row-between" href={cfg.support}
+          <a className="btn btn-block btn-row" href={cfg.support}
              target="_blank" rel="noreferrer">
             <span><Icon name="message-circle" size={17} /> Написать нам</span>
             <Icon name="chevron-right" size={17} />
           </a>
         )}
         {user.is_admin && (
-          <button className="btn btn-primary btn-block row-between"
+          <button className="btn btn-primary btn-block btn-row"
                   onClick={() => navigate('/admin')}>
             <span><Icon name="sliders-horizontal" size={17} /> Управление магазином</span>
             <Icon name="chevron-right" size={17} />

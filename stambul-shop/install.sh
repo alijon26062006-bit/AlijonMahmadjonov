@@ -200,7 +200,7 @@ fi
 echo
 say "Собираю и запускаю магазин (первый раз это несколько минут)"
 docker compose run --rm migrate
-docker compose up -d --build
+docker compose up -d --build --remove-orphans
 
 say "Жду, пока поднимется API"
 for _ in $(seq 1 40); do
@@ -312,4 +312,4 @@ echo
 echo "Полезное:"
 echo "  docker compose ps                 состояние"
 echo "  docker compose logs --tail=40 bot логи бота"
-echo "  docker compose up -d --build      обновиться после git pull"
+echo "  docker compose up -d --build --remove-orphans   обновиться после git pull"
