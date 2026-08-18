@@ -130,6 +130,21 @@ sudo bash install.sh
 SELinux на исходящие соединения nginx — без него магазин отвечает 502 на
 пустом месте.
 
+## Обновление
+
+Одной командой — код, сборка, схема, перезапуск, перенос ключей из `.env`
+и проверка, что новое действительно доехало до контейнеров:
+
+```bash
+cd ~/AlijonMahmadjonov/stambul-shop
+bash update.sh
+```
+
+Скрипт сам ловит случай «образ собрался, а файлы в нём старые» — тогда
+пересобирает начисто. Ключи `OPENAI_API_KEY`, `OPENAI_MODEL`,
+`AI_PROVIDER` и `AI_API_KEY` из `.env` переносятся в настройки магазина;
+пустые значения игнорируются, затереть работающий ключ нельзя.
+
 Вручную, если предпочитаете контроль:
 
 ```bash
@@ -137,15 +152,6 @@ cp .env.example .env      # заполнить BOT_TOKEN, ADMIN_IDS, SITE_URL
 docker compose build
 docker compose run --rm migrate
 docker compose up -d
-```
-
-Обновление на работающем сервере:
-
-```bash
-git pull
-docker compose build          # собирает и migrate: у него профиль tools,
-docker compose run --rm migrate   # и «up --build» его не трогает
-docker compose up -d --remove-orphans
 ```
 
 Проверка: `curl localhost:8010/health` → `{"db":"ok"}`; открыть сайт в браузере.
