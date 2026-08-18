@@ -24,14 +24,20 @@ async def enqueue_order_status(order_id: int) -> None:
     await pool.enqueue_job("order_status", order_id)
 
 
-async def enqueue_photo(photo_id: int, background: str | None = None) -> str:
+async def enqueue_photo(photo_id: int, background: str | None = None,
+                        mode: str = "standard", note: str = "",
+                        category_slug: str = "") -> str:
     pool = await _get_pool()
-    job = await pool.enqueue_job("process_photo", photo_id, background)
+    job = await pool.enqueue_job("process_photo", photo_id, background,
+                                 mode, note, category_slug)
     return job.job_id if job else ""
 
 
 async def enqueue_product_photos(product_id: int,
-                                 background: str | None = None) -> str:
+                                 background: str | None = None,
+                                 mode: str = "standard", note: str = "",
+                                 category_slug: str = "") -> str:
     pool = await _get_pool()
-    job = await pool.enqueue_job("process_product_photos", product_id, background)
+    job = await pool.enqueue_job("process_product_photos", product_id,
+                                 background, mode, note, category_slug)
     return job.job_id if job else ""

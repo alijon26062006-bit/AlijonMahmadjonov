@@ -222,8 +222,15 @@ class ProductPhoto(Base):
     background: Mapped[str | None] = mapped_column(String(16))
     style_version: Mapped[int | None] = mapped_column(SmallInteger)
     processing: Mapped[str] = mapped_column(String(12), default="none")
-    # none | queued | working | ready | failed
+    # none | queued | working | ready | review | failed
     processing_error: Mapped[str | None] = mapped_column(String(300))
+    # standard — только фон и свет, пиксели товара не трогаются;
+    # reshape — ретушь с исправлением подачи, требует сверки с оригиналом
+    mode: Mapped[str | None] = mapped_column(String(12))
+    prompt_version: Mapped[str | None] = mapped_column(String(40))
+    check_status: Mapped[str | None] = mapped_column(String(10))
+    # skipped | ok | review
+    check_note: Mapped[str | None] = mapped_column(String(500))
 
     product: Mapped[Product] = relationship(back_populates="photos")
 

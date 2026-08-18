@@ -52,6 +52,14 @@ MIGRATIONS: list[str] = [
     "NOT NULL DEFAULT 'none'",
     "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS processing_error "
     "VARCHAR(300)",
+    # Ретушь одежды: чем обработали и что показала сверка с оригиналом
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS mode VARCHAR(12)",
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS prompt_version "
+    "VARCHAR(40)",
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS check_status "
+    "VARCHAR(10)",
+    "ALTER TABLE product_photos ADD COLUMN IF NOT EXISTS check_note "
+    "VARCHAR(500)",
 ]
 
 

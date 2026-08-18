@@ -296,11 +296,12 @@ type PhotoOut = {
   id: number; position: number; url: string; original: string;
   has_processed: boolean; use_processed: boolean;
   background: string | null; processing: string; error: string | null;
+  mode: string | null; check_status: string | null; check_note: string | null;
 };
 
 const PROCESSING_LABEL: Record<string, string> = {
   queued: 'В очереди', working: 'Обрабатываю', ready: 'Готово',
-  failed: 'Не получилось',
+  review: 'Нужна проверка', failed: 'Не получилось',
 };
 
 /** Подготовка фотографий для каталога.
@@ -311,6 +312,7 @@ function PhotoStudio({ product }: { product: AdminProduct }) {
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [bg, setBg] = useState<string>('');
+  const [note, setNote] = useState('');
   const [msg, setMsg] = useState('');
 
   const { data } = useQuery<{
@@ -332,11 +334,12 @@ function PhotoStudio({ product }: { product: AdminProduct }) {
   const working = items.filter((p) => p.processing === 'queued'
                                    || p.processing === 'working').length;
 
-  const run = async (path: string) => {
+  const run = async (path: string, mode = 'standard') => {
     setBusy(true); setMsg('');
     try {
       await api(path, { method: 'POST',
-                        body: JSON.stringify({ background: bg || null }) });
+                        body: JSON.stringify({ background: bg || null,
+                                               mode, note }) });
       qc.invalidateQueries({ queryKey: ['photos', product.id] });
     } catch (e) {
       setMsg((e as Error).message || 'Не получилось');
@@ -373,11 +376,26 @@ function PhotoStudio({ product }: { product: AdminProduct }) {
         ))}
       </div>
 
-      <button className="btn btn-block" disabled={busy || working > 0}
-              onClick={() => run(`/api/admin/products/${product.id}/photos/studio`)}>
-        <Icon name="sparkles" size={16} />
-        {working > 0 ? 'Обрабатываю…' : 'Обработать все фото'}
-      </button>
+      <div className="field" style={{ marginBottom: 8 }}>
+        <label>Что исправить? Необязательно</label>
+        <input className="input" value={note} placeholder="рукав справа загнулся"
+               onChange={(e) => setNote(e.target.value)} />
+      </div>
+
+      <div className="stack">
+        <button className="btn btn-block" disabled={busy || working > 0}
+                onClick={() => run(`/api/admin/products/${product.id}/photos/studio`)}>
+          <Icon name="sparkles" size={16} />
+          {working > 0 ? 'Обрабатываю…' : 'Сделать карточки'}
+        </button>
+        {/* Ретушь перерисовывает кадр, поэтому результат обязательно
+            сверяется с оригиналом и сам на витрину не встаёт */}
+        <button className="btn btn-block" disabled={busy || working > 0}
+                onClick={() => run(`/api/admin/products/${product.id}/photos/studio`,
+                                   'reshape')}>
+          <Icon name="ruler" size={16} /> Исправить форму
+        </button>
+      </div>
 
       <div className="stack" style={{ marginTop: 10 }}>
         {items.map((photo) => (
@@ -393,7 +411,8 @@ function PhotoStudio({ product }: { product: AdminProduct }) {
                   <button className={`chip ${photo.use_processed ? 'active' : ''}`}
                           onClick={() => switchVersion(photo, true)}>AI</button>
                   <button className="chip" disabled={busy}
-                          onClick={() => run(`/api/admin/photos/${photo.id}/studio`)}>
+                          onClick={() => run(`/api/admin/photos/${photo.id}/studio`,
+                                             photo.mode ?? 'standard')}>
                     <Icon name="rotate-ccw" size={14} /> Переделать
                   </button>
                 </div>
@@ -407,6 +426,12 @@ function PhotoStudio({ product }: { product: AdminProduct }) {
                 <p className="caption" style={{ marginTop: 4 }}>
                   {PROCESSING_LABEL[photo.processing] ?? photo.processing}
                   {photo.error ? `: ${photo.error}` : ''}
+                </p>
+              )}
+              {photo.check_status === 'review' && (
+                <p className="caption" style={{ marginTop: 4,
+                                                color: 'var(--danger)' }}>
+                  ⚠ {photo.check_note || 'сверка с оригиналом нашла отличия'}
                 </p>
               )}
             </div>

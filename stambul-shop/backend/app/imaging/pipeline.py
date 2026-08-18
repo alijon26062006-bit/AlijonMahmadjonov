@@ -199,3 +199,51 @@ def compose(original: bytes, *, background: str | None = None,
                   subject_luma=round(subject_luma or 0, 1),
                   style_version=STYLE_VERSION,
                   width=canvas_w, height=canvas_h)
+
+
+def fit_canvas(data: bytes, background: str | None = None) -> Result:
+    """Приводит уже готовую картинку к формату карточки.
+
+    Нужна после генеративной ретуши: модель отдаёт свой размер, а в
+    каталоге у всех товаров кадр одинаковый. Пиксели не растягиваем —
+    вписываем и добираем полями того же цвета, что и края изображения,
+    поэтому стык незаметен.
+    """
+    image = _open(data).convert("RGB")
+    canvas_w, canvas_h = CANVAS
+
+    scale = min(canvas_w / image.width, canvas_h / image.height)
+    size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
+    fitted = image.resize(size, Image.LANCZOS)
+
+    chosen = BACKGROUNDS.get(background or "") if background else None
+    if chosen is None:
+        # цвет полей берём с краёв самой картинки: так поле не спорит с
+        # фоном, который нарисовала модель
+        edge = fitted.crop((0, 0, fitted.width, max(1, fitted.height // 40)))
+        fill = tuple(round(v) for v in _average(edge))
+    else:
+        fill = chosen.rgb
+
+    canvas = Image.new("RGB", CANVAS, fill)
+    canvas.paste(fitted, ((canvas_w - fitted.width) // 2,
+                          (canvas_h - fitted.height) // 2))
+
+    buffer = io.BytesIO()
+    canvas.save(buffer, "JPEG", quality=JPEG_QUALITY, optimize=True,
+                progressive=True)
+    return Result(data=buffer.getvalue(),
+                  background=chosen.key if chosen else "generated",
+                  subject_luma=0.0, style_version=STYLE_VERSION,
+                  width=canvas_w, height=canvas_h)
+
+
+def _average(image: Image.Image) -> tuple[float, float, float]:
+    pixels = image.getdata()
+    n = max(1, len(pixels))
+    totals = [0, 0, 0]
+    for r, g, b in pixels:
+        totals[0] += r
+        totals[1] += g
+        totals[2] += b
+    return (totals[0] / n, totals[1] / n, totals[2] / n)

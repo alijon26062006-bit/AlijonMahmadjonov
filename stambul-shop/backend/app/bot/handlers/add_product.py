@@ -48,6 +48,7 @@ class Add(StatesGroup):
     qty = State()
     description = State()
     confirm = State()
+    fix_note = State()
 
 
 def _kb(rows: list[list[InlineKeyboardButton]]) -> InlineKeyboardMarkup:
@@ -383,21 +384,35 @@ async def _run(bar, message: Message, state: FSMContext,
     processed: list[dict | None] = []
     background = data.get("background") or None
     problems: list[str] = []
+    mode = data.get("mode", "standard")
+    verdicts: list[dict | None] = []
     total = max(len(originals), 1)
     for index, raw in enumerate(originals):
-        share = 15 + int(60 * index / total)
-        await bar.set(share, f"Убираю фон · фото {index + 1} из {total}")
+        share = 15 + int(55 * index / total)
+        step = ("Исправляю подачу" if mode == "reshape" else "Убираю фон")
+        await bar.set(share, f"{step} · фото {index + 1} из {total}")
         if not raw:
             processed.append(None)
+            verdicts.append(None)
             continue
         try:
-            result = await asyncio.to_thread(compose, raw, background=background)
+            if mode == "reshape":
+                ready, verdict = await _retouch_one(
+                    session, raw, background, data.get("note", ""),
+                    data.get("category", ""), bar, share, total)
+                verdicts.append(verdict)
+                result = ready
+            else:
+                result = await asyncio.to_thread(compose, raw,
+                                                 background=background)
+                verdicts.append(None)
             background = background or result.background
-            await bar.set(share + int(30 / total), "Сохраняю обработанное фото")
+            await bar.set(share + int(25 / total), "Сохраняю обработанное фото")
             stored = await _upload(result.data)
             processed.append(stored)
         except Exception as error:
             processed.append(None)
+            verdicts.append(None)
             problems.append(f"фото {index + 1}: {error}")
 
     draft = {}
@@ -413,10 +428,42 @@ async def _run(bar, message: Message, state: FSMContext,
         ai_error = "ключ OpenAI не задан в настройках"
 
     await bar.set(100, "Готово")
+    flagged = [v for v in verdicts if v and v["severity"] != "none"]
     await state.update_data(processed=processed, background=background,
-                            draft=draft, ai_error=ai_error, problems=problems)
+                            draft=draft, ai_error=ai_error, problems=problems,
+                            verdicts=verdicts,
+                            # спорную ретушь сами не подставляем
+                            use_ai=not flagged)
     await bar.finish()
     await _show_card(message, state, session)
+
+
+async def _retouch_one(session: AsyncSession, raw: bytes,
+                       background: str | None, note: str, category: str,
+                       bar, share: int, total: int):
+    """Съёмочная ретушь одной фотографии со сверкой результата."""
+    from app.imaging import fashion
+    from app.imaging.pipeline import fit_canvas
+    from app.services import ai_check
+
+    key, model = await settings_store.openai(session)
+    if not key:
+        raise RuntimeError("для исправления формы нужен ключ OpenAI")
+
+    edited = await fashion.retouch(
+        raw, api_key=key, kind=fashion.kind_for(category), reshape=True,
+        background=background or "very_light", note=note)
+    result = await asyncio.to_thread(fit_canvas, edited, background)
+
+    await bar.set(share + int(15 / total), "Сверяю с оригиналом")
+    try:
+        verdict = await ai_check.compare(raw, edited, api_key=key, model=model)
+    except ai_check.CheckError:
+        # техническая неудача сверки — повод показать человеку, а не
+        # молча считать, что всё хорошо
+        verdict = {"same_product": False, "severity": "minor",
+                   "differences": [], "note": "сверка не выполнилась"}
+    return result, verdict
 
 
 async def _upload(data: bytes) -> dict:
@@ -482,6 +529,17 @@ async def _show_card(message: Message, state: FSMContext,
         lines += ["", "<i>Фон не сделан — " + "; ".join(data["problems"])[:200]
                   + "</i>"]
 
+    flagged = [v for v in (data.get("verdicts") or []) if v
+               and v["severity"] != "none"]
+    if flagged:
+        what = "; ".join(flagged[0]["differences"]) or flagged[0]["note"]
+        lines += ["", "⚠️ <b>Сверка с оригиналом: " + (what or "есть сомнения")
+                  + "</b>",
+                  "<i>Показываю оригинал. Посмотрите обе версии и решите "
+                  "сами — кнопка «Оригинал / AI-карточка».</i>"]
+    elif data.get("mode") == "reshape" and data.get("verdicts"):
+        lines += ["", "<i>Сверка с оригиналом: расхождений нет</i>"]
+
     rows = []
     take = []
     if draft.get("title") and draft["title"] != data.get("title"):
@@ -496,17 +554,31 @@ async def _show_card(message: Message, state: FSMContext,
     for i in range(0, len(take), 2):
         rows.append(take[i:i + 2])
 
-    rows.append([InlineKeyboardButton(
-        text=f"🖼 Фон: {BACKGROUNDS[data['background']].title}"
-             if data.get("background") in BACKGROUNDS else "🖼 Фон: исходный",
-        callback_data="add:bg")])
+    rows.append([
+        InlineKeyboardButton(
+            text=f"🖼 Фон: {BACKGROUNDS[data['background']].title}"
+                 if data.get("background") in BACKGROUNDS else "🖼 Фон: исходный",
+            callback_data="add:bg"),
+        InlineKeyboardButton(
+            text="🖼 Оригинал" if data.get("use_ai", True) else "🖼 AI-карточка",
+            callback_data="add:usephoto"),
+    ])
+    rows.append([InlineKeyboardButton(text="🪄 Исправить форму",
+                                      callback_data="add:reshape"),
+                 InlineKeyboardButton(text="✏️ Что исправить?",
+                                      callback_data="add:fixnote")])
     rows.append([InlineKeyboardButton(text="✅ Опубликовать",
                                       callback_data="add:publish")])
     rows.append(_cancel_row())
 
     await state.set_state(Add.confirm)
     caption = "\n".join(lines)[:1024]
-    shot = next((p for p in (data.get("processed") or []) if p), None)
+    shot = None
+    if data.get("use_ai", True):
+        shot = next((p for p in (data.get("processed") or []) if p), None)
+    if shot is None:
+        shot = next(({"file_id": p["file_id"]} for p in data.get("photos", [])),
+                    None)
     if shot:
         await message.answer_photo(shot["file_id"], caption=caption,
                                    reply_markup=_kb(rows))
@@ -544,6 +616,56 @@ async def cycle_background(cb: CallbackQuery, state: FSMContext,
     await _prepare(cb.message, state, session)
 
 
+@router.callback_query(F.data == "add:usephoto", Add.confirm)
+async def toggle_photo(cb: CallbackQuery, state: FSMContext,
+                       session: AsyncSession) -> None:
+    """Переключение «оригинал / обработанная». Оригинал никуда не девается."""
+    data = await state.get_data()
+    if not any(data.get("processed") or []):
+        await cb.answer("Обработанной версии пока нет", show_alert=True)
+        return
+    await state.update_data(use_ai=not data.get("use_ai", True))
+    await cb.answer()
+    with contextlib.suppress(Exception):
+        await cb.message.delete()
+    await _show_card(cb.message, state, session)
+
+
+@router.callback_query(F.data == "add:reshape", Add.confirm)
+async def reshape(cb: CallbackQuery, state: FSMContext,
+                  session: AsyncSession) -> None:
+    key, _ = await settings_store.openai(session)
+    if not key:
+        await cb.answer("Нужен ключ OpenAI: панель → Настройки",
+                        show_alert=True)
+        return
+    await state.update_data(mode="reshape")
+    await cb.answer("Исправляю подачу, это дольше обычного")
+    with contextlib.suppress(Exception):
+        await cb.message.delete()
+    await _prepare(cb.message, state, session)
+
+
+@router.callback_query(F.data == "add:fixnote", Add.confirm)
+async def ask_fix_note(cb: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Add.fix_note)
+    await cb.answer()
+    await cb.message.answer(
+        "Что поправить? Напишите словами, например:\n"
+        "• рукав справа загнулся\n"
+        "• убрать вешалку\n"
+        "• выровнять кофту\n"
+        "• только фон, вещь не трогать",
+        reply_markup=_kb([_cancel_row()]))
+
+
+@router.message(Add.fix_note, F.text)
+async def take_fix_note(message: Message, state: FSMContext,
+                        session: AsyncSession) -> None:
+    await state.update_data(note=message.text.strip()[:300], mode="reshape")
+    await _prepare(message, state, session)
+
+
 @router.callback_query(F.data == "add:publish", Add.confirm)
 async def publish(cb: CallbackQuery, state: FSMContext,
                   session: AsyncSession, user: User) -> None:
@@ -579,8 +701,11 @@ async def publish(cb: CallbackQuery, state: FSMContext,
         await cb.message.answer(f"Не вышло: {error}")
         return
 
+    use_ai = data.get("use_ai", True)
     for position, (photo, done) in enumerate(
             zip(data.get("photos", []), data.get("processed", []))):
+        if not use_ai:
+            done = None
         session.add(ProductPhoto(
             product_id=product.id, position=position,
             file_id=photo["file_id"], thumb_file_id=photo.get("thumb_file_id"),
@@ -593,6 +718,7 @@ async def publish(cb: CallbackQuery, state: FSMContext,
             proc_file_unique_id=(done or {}).get("file_unique_id"),
             use_processed=bool(done),
             background=data.get("background") if done else None,
+            mode=data.get("mode", "standard") if done else None,
             processing="ready" if done else "none"))
     await session.commit()
 

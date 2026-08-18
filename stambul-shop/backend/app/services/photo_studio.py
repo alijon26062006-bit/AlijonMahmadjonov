@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.models import ProductPhoto
-from app.services import settings_store
+from app.services import ai_check, settings_store
 from app.services.telegram_files import get_photo_bytes
 
 REMOVEBG_URL = "https://api.remove.bg/v1.0/removebg"
@@ -69,8 +69,21 @@ def _compose_from_cutout(cutout_png: bytes, background: str | None):
 # ─────────────────────────── Обработка одной фотографии ───────────────────
 
 async def process(session: AsyncSession, photo_id: int,
-                  background: str | None = None) -> ProductPhoto:
-    """Готовит карточную версию фотографии и сохраняет её рядом с оригиналом."""
+                  background: str | None = None, *,
+                  mode: str = "standard", note: str = "",
+                  category_slug: str = "") -> ProductPhoto:
+    """Готовит карточную версию фотографии и сохраняет её рядом с оригиналом.
+
+    Два режима, и разница между ними принципиальная.
+
+    `standard` — фон, свет и кадр. Пиксели товара переносятся как есть,
+    поэтому изменить его физически невозможно и сверять нечего.
+
+    `reshape` — съёмочная ретушь: вешалка из-под воротника, завернувшийся
+    рукав, перекос, объём плеч. Здесь картинку перерисовывает модель, и
+    результат обязательно сверяется с оригиналом. Не сошлось — карточка
+    не встаёт на витрину сама, а ждёт человека.
+    """
     photo = await session.get(ProductPhoto, photo_id)
     if photo is None:
         raise StudioError("Фотография не найдена")
@@ -90,16 +103,11 @@ async def process(session: AsyncSession, photo_id: int,
         if not data:
             raise StudioError("Не удалось получить исходную фотографию")
 
-        provider = await settings_store.get(session, "ai_provider", "local")
-        api_key = await settings_store.get(session, "ai_api_key")
-
-        if provider == "removebg" and api_key:
-            cutout = await _cutout_remote(data, api_key)
-            result = await asyncio.to_thread(_compose_from_cutout, cutout,
-                                             background)
+        if mode == "reshape":
+            result, verdict = await _reshape(session, data, background,
+                                             note, category_slug)
         else:
-            # локально: модель строит маску прямо на сервере, ключ не нужен
-            result = await asyncio.to_thread(_compose_local, data, background)
+            result, verdict = await _standard(session, data, background), None
 
         stored = await _store(result.data)
         photo.proc_file_id = stored["file_id"]
@@ -108,8 +116,24 @@ async def process(session: AsyncSession, photo_id: int,
         photo.proc_file_unique_id = stored["file_unique_id"]
         photo.background = result.background
         photo.style_version = result.style_version
-        photo.processing = "ready"
-        photo.use_processed = True
+        photo.mode = mode
+
+        if mode == "reshape":
+            from app.imaging.fashion import PROMPT_VERSION
+            photo.prompt_version = PROMPT_VERSION
+            photo.check_status = ai_check.status_of(verdict)
+            photo.check_note = _verdict_text(verdict)
+            ok = photo.check_status == "ok"
+            photo.processing = "ready" if ok else "review"
+            # спорную ретушь на витрину сами не ставим
+            photo.use_processed = ok
+        else:
+            photo.prompt_version = None
+            photo.check_status = "ok"
+            photo.check_note = "пиксели товара не менялись"
+            photo.processing = "ready"
+            photo.use_processed = True
+
         await session.commit()
         return photo
     except StudioError as error:
@@ -122,6 +146,62 @@ async def process(session: AsyncSession, photo_id: int,
         photo.processing_error = f"{type(error).__name__}: {error}"[:300]
         await session.commit()
         raise StudioError("Обработка не удалась, попробуйте ещё раз") from None
+
+
+async def _standard(session: AsyncSession, data: bytes,
+                    background: str | None):
+    """Фон, свет, кадр. Товар переносится пиксель в пиксель."""
+    provider = await settings_store.get(session, "ai_provider", "local")
+    api_key = await settings_store.get(session, "ai_api_key")
+    if provider == "removebg" and api_key:
+        cutout = await _cutout_remote(data, api_key)
+        return await asyncio.to_thread(_compose_from_cutout, cutout, background)
+    # локально: модель строит маску прямо на сервере, ключ не нужен
+    return await asyncio.to_thread(_compose_local, data, background)
+
+
+async def _reshape(session: AsyncSession, data: bytes, background: str | None,
+                   note: str, category_slug: str):
+    """Съёмочная ретушь с обязательной сверкой результата."""
+    from app.imaging import fashion
+    from app.imaging.pipeline import ImagingError, fit_canvas
+
+    key, model = await settings_store.openai(session)
+    if not key:
+        raise StudioError("Для исправления формы нужен ключ OpenAI "
+                          "в настройках")
+
+    try:
+        raw = await fashion.retouch(
+            data, api_key=key, kind=fashion.kind_for(category_slug),
+            reshape=True, background=background or "very_light", note=note)
+    except fashion.FashionError as error:
+        raise StudioError(str(error)) from None
+
+    try:
+        result = await asyncio.to_thread(fit_canvas, raw, background)
+    except ImagingError as error:
+        raise StudioError(str(error)) from None
+
+    try:
+        verdict = await ai_check.compare(data, raw, api_key=key, model=model)
+    except ai_check.CheckError:
+        # Сверка не прошла по техническим причинам — это не повод считать
+        # результат хорошим. Отправляем на проверку человеку.
+        verdict = {"same_product": False, "severity": "minor",
+                   "differences": [], "note": "сверка не выполнилась"}
+    return result, verdict
+
+
+def _verdict_text(verdict: dict | None) -> str:
+    if not verdict:
+        return ""
+    if verdict["severity"] == "none":
+        return "сверка с оригиналом: расхождений нет"
+    parts = verdict["differences"] or ([verdict["note"]] if verdict["note"]
+                                       else ["есть сомнения"])
+    head = "товар изменился" if verdict["severity"] == "major" else "возможны отличия"
+    return f"{head}: " + "; ".join(parts)[:400]
 
 
 async def _store(data: bytes) -> dict:

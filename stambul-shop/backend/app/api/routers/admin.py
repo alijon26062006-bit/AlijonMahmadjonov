@@ -317,6 +317,9 @@ async def log(session: Db, admin: Admin, limit: int = 50):
 
 class StudioIn(BaseModel):
     background: str | None = Field(default=None, max_length=16)
+    # standard — только фон и свет; reshape — ретушь с исправлением подачи
+    mode: str = Field(default="standard", max_length=12)
+    note: str = Field(default="", max_length=300)
 
 
 class VersionIn(BaseModel):
@@ -342,6 +345,9 @@ def _photo_out(p: ProductPhoto) -> dict:
         "style_version": p.style_version,
         "processing": p.processing,
         "error": p.processing_error,
+        "mode": p.mode,
+        "check_status": p.check_status,
+        "check_note": p.check_note,
     }
 
 
@@ -365,8 +371,12 @@ async def studio_one(photo_id: int, body: StudioIn, session: Db, admin: Admin):
     photo.processing = "queued"
     photo.processing_error = None
     await session.commit()
-    job = await queue.enqueue_photo(photo_id, body.background)
-    _log(session, admin, "photo_studio", str(photo_id), body.background or "auto")
+    product = await session.get(Product, photo.product_id)
+    job = await queue.enqueue_photo(
+        photo_id, body.background, body.mode, body.note,
+        product.category_slug if product else "")
+    _log(session, admin, "photo_studio", str(photo_id),
+         f"{body.mode} {body.background or 'auto'}")
     await session.commit()
     return {"job_id": job, "photo": _photo_out(photo)}
 
@@ -382,7 +392,9 @@ async def studio_all(public_id: uuid_mod.UUID, body: StudioIn, session: Db,
         photo.processing = "queued"
         photo.processing_error = None
     await session.commit()
-    job = await queue.enqueue_product_photos(product.id, body.background)
+    job = await queue.enqueue_product_photos(
+        product.id, body.background, body.mode, body.note,
+        product.category_slug)
     return {"job_id": job, "queued": len(product.photos)}
 
 

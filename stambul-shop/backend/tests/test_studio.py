@@ -144,6 +144,44 @@ async def main():
         check(p.file_id == "demo" and p.proc_file_id == "demo-proc",
               "Оригинал на месте после всех переключений")
 
+        # ── ретушь: задание и приёмка результата ──
+        from app.imaging import fashion
+        from app.services import ai_check
+
+        prompt = fashion.build_prompt(kind="clothes", reshape=True,
+                                      background="soft_gray",
+                                      note="рукав справа загнулся")
+        check("источник истины" in prompt,
+              "В задании сказано, что оригинал — источник истины")
+        check("не придумывай" in prompt, "Прямо запрещено выдумывать невидимое")
+        check("плиссе" in prompt, "Складки-часть-модели названы отдельно")
+        check("рукав справа загнулся" in prompt,
+              "Пожелание владельца попадает в задание")
+        check("229" in prompt, "Цвет фона задан числами", "soft_gray")
+
+        plain = fashion.build_prompt(kind="shoes", reshape=True,
+                                     background="light")
+        check("манекен" in plain.lower(),
+              "Обуви объясняют, что манекен не нужен")
+        check("плиссе" not in plain, "Обуви не рассказывают про плиссе одежды")
+
+        check(fashion.kind_for("women_clothes") == "clothes", "Платье — одежда")
+        check(fashion.kind_for("shoes") == "shoes", "Обувь опознана")
+        check(fashion.kind_for("accessories") == "bag", "Сумка опознана")
+        check(fashion.kind_for("dishes") == "home", "Посуда — для дома")
+
+        strict = ai_check.clean({"severity": "major", "same_product": True,
+                                 "differences": ["пропал логотип"]})
+        check(strict["same_product"] is False,
+              "При серьёзном расхождении «тот же товар» не проходит")
+        check(ai_check.status_of(strict) == "review",
+              "Серьёзное расхождение уводит карточку на проверку")
+        check(ai_check.status_of(ai_check.clean({"severity": "none"})) == "ok",
+              "Без расхождений карточку можно показывать")
+        check(ai_check.status_of(ai_check.clean({"severity": "чепуха"}))
+              == "review",
+              "Непонятный ответ сверки трактуется в пользу осторожности")
+
         buyer = await login(c, "+77010000202", 810777, "Покупатель")
         r = await c.get("/api/admin/settings",
                         headers={"Authorization": f"Bearer {buyer}"})
