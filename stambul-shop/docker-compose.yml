@@ -68,12 +68,12 @@ services:
       db: {condition: service_healthy}
     restart: unless-stopped
 
-  miniapp:
+  web:
     build:
-      context: ./miniapp
+      context: ./web
       args:
         VITE_API_URL: ${API_PUBLIC_URL:-}
-    ports: ["127.0.0.1:${MINIAPP_PORT:-8100}:80"]
+    ports: ["127.0.0.1:${WEB_PORT:-8100}:80"]
     depends_on: [api]
     restart: unless-stopped
 

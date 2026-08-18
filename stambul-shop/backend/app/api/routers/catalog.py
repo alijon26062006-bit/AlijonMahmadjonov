@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import Db, OptionalUser
+from app.api.deps import Db, Viewer
 from app.catalog.schemas import get_category, groups, serialize
 from app.db.models import P_ACTIVE, P_OUT, Product, ProductEvent, Variant
 
@@ -53,7 +53,8 @@ async def category_schema(slug: str):
 
 
 @router.get("/products")
-async def list_products(request: Request, session: Db):
+async def list_products(request: Request, session: Db,
+                        viewer: Viewer):
     params = dict(request.query_params)
     query = select(Product).where(Product.status.in_((P_ACTIVE, P_OUT)))
 
@@ -117,7 +118,7 @@ async def list_products(request: Request, session: Db):
 
 @router.get("/products/{public_id}")
 async def product_detail(public_id: uuid_mod.UUID, session: Db,
-                         viewer: OptionalUser):
+                         viewer: Viewer):
     product = (await session.scalars(
         select(Product).where(Product.public_id == public_id)
         .options(selectinload(Product.photos),

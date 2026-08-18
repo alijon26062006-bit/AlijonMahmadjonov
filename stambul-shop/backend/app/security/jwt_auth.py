@@ -7,7 +7,7 @@ import jwt
 from app.config import get_settings
 
 
-def issue_token(user_id: int, tg_id: int, is_admin: bool) -> str:
+def issue_token(user_id: int, tg_id: int | None, is_admin: bool) -> str:
     s = get_settings()
     now = int(time.time())
     return jwt.encode(

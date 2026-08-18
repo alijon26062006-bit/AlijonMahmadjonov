@@ -41,23 +41,72 @@ ORDER_FLOW = {
 
 
 class User(Base):
+    """Покупатель.
+
+    Магазин живёт на сайте, поэтому у человека может не быть Telegram вовсе:
+    он войдёт через Google. И наоборот — вошедший по номеру может не иметь
+    почты. Поэтому все три опознавательных поля необязательны, но хотя бы
+    одно у любого пользователя есть, и каждое уникально: совпал телефон,
+    почта или Telegram — это тот же человек, а не новый.
+    """
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    tg_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    tg_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, index=True)
     username: Mapped[str | None] = mapped_column(String(32))
     first_name: Mapped[str] = mapped_column(String(128), default="")
-    phone: Mapped[str | None] = mapped_column(String(20))
+    avatar_url: Mapped[str | None] = mapped_column(String(400))
+
+    phone: Mapped[str | None] = mapped_column(String(20), unique=True, index=True)
+    phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    email: Mapped[str | None] = mapped_column(String(160), unique=True, index=True)
+    google_sub: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
+
     # адрес запоминается с прошлого заказа — второй раз вводить не нужно
     city_id: Mapped[int | None] = mapped_column(
         ForeignKey("cities.id", ondelete="SET NULL"))
     address: Mapped[str | None] = mapped_column(String(255))
+
+    # куда слать про заказ. Если человек выключил оба — письмо всё равно
+    # уйдёт: иначе он не узнает, куда платить.
+    notify_email: Mapped[bool] = mapped_column(Boolean, default=True)
+    notify_telegram: Mapped[bool] = mapped_column(Boolean, default=True)
+    onboarding_done: Mapped[bool] = mapped_column(Boolean, default=False)
+
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
     bot_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now())
     last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+
+
+class AuthCode(Base):
+    """Заявка на вход по номеру телефона.
+
+    Живёт от нажатия «Получить код» до входа и не дольше нескольких минут.
+    `key` уходит в ссылку на бота, `code_hash` хранит код — сам код в базе
+    не лежит нигде. `confirmed_at` ставится, когда бот сверил номер: с этого
+    момента вкладка на сайте может впустить человека, не дожидаясь цифр.
+    """
+    __tablename__ = "auth_codes"
+    __table_args__ = (Index("ix_auth_codes_phone_time", "phone", "created_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    key: Mapped[str] = mapped_column(String(48), unique=True, index=True)
+    # login — вход по номеру; link — привязка бота к уже открытому аккаунту
+    purpose: Mapped[str] = mapped_column(String(8), default="login")
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"))
+    phone: Mapped[str] = mapped_column(String(20), index=True, default="")
+    code_hash: Mapped[str | None] = mapped_column(String(64))
+    tg_id: Mapped[int | None] = mapped_column(BigInteger)
+    attempts: Mapped[int] = mapped_column(SmallInteger, default=0)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now())
 
 

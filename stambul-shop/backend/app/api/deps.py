@@ -51,3 +51,18 @@ async def get_optional_user(session: Db,
 
 
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
+
+
+async def allow_browse(user: OptionalUser) -> User | None:
+    """Пускать ли смотреть каталог без входа.
+
+    По умолчанию пускаем: закрытый каталог не индексируется поисковиками,
+    и присланная другу ссылка открывается стеной входа. Владелец может
+    закрыть витрину одной настройкой, не трогая код.
+    """
+    if get_settings().require_auth_to_browse and user is None:
+        raise HTTPException(401, "Войдите, чтобы смотреть каталог")
+    return user
+
+
+Viewer = Annotated[User | None, Depends(allow_browse)]

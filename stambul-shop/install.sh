@@ -149,7 +149,7 @@ DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN%%/*}"
 [[ "$DOMAIN" =~ ^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$ ]] \
     || die "«$DOMAIN» не похоже на домен"
 set_env DOMAIN "$DOMAIN"
-set_env WEBAPP_URL "https://$DOMAIN"
+set_env SITE_URL "https://$DOMAIN"
 set_env CORS_ORIGINS "https://$DOMAIN"
 set_env API_PUBLIC_URL ""
 
@@ -172,8 +172,8 @@ free_port() {
     echo "$start"
 }
 [ -n "$(get API_PORT)" ]     || set_env API_PORT "$(free_port 8010)"
-[ -n "$(get MINIAPP_PORT)" ] || set_env MINIAPP_PORT "$(free_port 8100)"
-API_PORT="$(get API_PORT)"; MINIAPP_PORT="$(get MINIAPP_PORT)"
+[ -n "$(get WEB_PORT)" ] || set_env WEB_PORT "$(free_port 8100)"
+API_PORT="$(get API_PORT)"; WEB_PORT="$(get WEB_PORT)"
 
 # ─────────────────────────── Проверка домена ───────────────────────────
 
@@ -222,7 +222,7 @@ server {
     client_max_body_size 12m;
 
     location / {
-        proxy_pass http://127.0.0.1:$MINIAPP_PORT;
+        proxy_pass http://127.0.0.1:$WEB_PORT;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -287,7 +287,7 @@ if [ "$SKIP_TLS" = "0" ]; then
         fi
     else
         warn "Не удалось поставить certbot. Магазин работает по http://$DOMAIN"
-        warn "Telegram откроет Mini App только по HTTPS — сертификат нужен."
+        warn "Без HTTPS браузеры ругаются на сайт — сертификат нужен."
     fi
 fi
 
@@ -296,14 +296,18 @@ fi
 echo
 say "Готово. Магазин: https://$DOMAIN"
 echo
-echo "Осталось два шага в Telegram:"
-echo "  1. @BotFather → /newapp → выбрать @$BOT_USERNAME"
-echo "     URL: https://$DOMAIN"
-echo "     short name: $(get MINIAPP_SHORT_NAME)"
-echo "  2. @BotFather → /setmenubutton → тот же адрес"
+echo "Магазин — обычный сайт: открывается по ссылке, ничего ставить не нужно."
+echo "Бот при нём служебный: присылает коды входа и сообщения о заказах."
 echo
-echo "Потом напишите боту /start, затем /id — должно быть «владелец магазина»."
-echo "Товары добавляются в панели: нижняя навигация → Товары."
+echo "Напишите боту /start, затем /id — должно быть «владелец магазина»."
+echo "Товары добавляются на сайте: профиль → Управление."
+echo
+echo "Что стоит дозаполнить в .env:"
+echo "  STORAGE_CHAT_ID   приватная группа для фотографий товаров"
+echo "  KASPI_PHONE       реквизиты, которые увидит покупатель"
+echo "  SMTP_HOST и т.д.  письма о заказах"
+echo "  GOOGLE_CLIENT_ID  вход через Google"
+echo "После правки: docker compose up -d --force-recreate api bot worker"
 echo
 echo "Полезное:"
 echo "  docker compose ps                 состояние"

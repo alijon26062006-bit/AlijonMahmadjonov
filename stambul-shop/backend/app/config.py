@@ -12,14 +12,15 @@ class Settings(BaseSettings):
 
     # --- Магазин ---
     shop_name: str = "Stambul Shop"
-    shop_tagline: str = "Товары из Турции с доставкой по Казахстану"
+    shop_tagline: str = "Одежда, обувь и всё для дома. Доставка по Казахстану"
     # Куда писать, если человек хочет спросить до заказа
     support_username: str = ""            # без @
 
     # --- Telegram ---
+    # Бот служебный: присылает код подтверждения и уведомления о заказах.
+    # Ничего не продаёт и никаких мастеров не ведёт.
     bot_token: str = ""
     bot_username: str = "stambul_shop_bot"
-    miniapp_short_name: str = "shop"
     channel_id: int = 0                   # витрина-канал с новинками
     channel_username: str = ""
     admin_chat_id: int = 0                # группа, куда падают заказы
@@ -27,8 +28,8 @@ class Settings(BaseSettings):
     admin_ids: str = ""
 
     # --- Адреса ---
-    webapp_url: str = "http://localhost:5173"
-    api_public_url: str = "http://localhost:8000"
+    site_url: str = "http://localhost:5173"
+    api_public_url: str = ""
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
 
     # --- Хранилища ---
@@ -36,10 +37,25 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     media_cache_dir: str = "/data/media_cache"
 
-    # --- Безопасность ---
+    # --- Вход ---
     jwt_secret: str = "change-me"
-    jwt_ttl: int = 43200
-    init_data_ttl: int = 86400
+    jwt_ttl: int = 2592000                # 30 дней: сайт не должен разлогинивать
+    google_client_id: str = ""
+    code_ttl: int = 300                   # сколько живёт код подтверждения
+    code_len: int = 6
+    code_max_attempts: int = 5
+    code_per_hour: int = 5                # запросов кода на один номер в час
+    # Закрытый каталог не индексируется поисковиками, поэтому по умолчанию
+    # смотреть можно без входа, а он требуется в корзине и при оформлении.
+    require_auth_to_browse: bool = False
+
+    # --- Почта ---
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_pass: str = ""
+    smtp_tls: bool = True                 # STARTTLS; для 465 поставьте False
+    mail_from: str = ""
 
     # --- Деньги ---
     currency: str = "KZT"
@@ -90,8 +106,12 @@ class Settings(BaseSettings):
         return [x.strip() for x in self.cors_origins.split(",") if x.strip()]
 
     @property
-    def miniapp_link(self) -> str:
-        return f"https://t.me/{self.bot_username}/{self.miniapp_short_name}"
+    def bot_link(self) -> str:
+        return f"https://t.me/{self.bot_username}"
+
+    @property
+    def mail_ready(self) -> bool:
+        return bool(self.smtp_host and self.mail_from)
 
     @property
     def payment_ready(self) -> bool:
