@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.routers import (
-    admin, auth, cart, catalog, config, favorites, orders, photos, uploads,
+    admin, auth, cart, catalog, config, favorites, orders, photos, seo, uploads,
 )
 from app.config import get_settings
 from app.db.base import engine
@@ -28,6 +28,7 @@ app.include_router(favorites.router)
 app.include_router(photos.router)
 app.include_router(uploads.router)
 app.include_router(admin.router)
+app.include_router(seo.router)
 
 
 @app.get("/health")
