@@ -3,12 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api, fmtPrice, photoUrl } from '../api/client';
 import type {
-  AdminProduct, CategorySchema, Group, OrderOut, ShopConfig,
+  AdminProduct, BannerOut, CategorySchema, Group, OrderOut, ShopConfig,
 } from '../api/types';
 import { Icon } from '../components/icons';
 import { Empty, ORDER_BADGE, useAuth } from '../components/ui';
 
-type Tab = 'orders' | 'products' | 'new' | 'settings';
+type Tab = 'orders' | 'products' | 'new' | 'banners' | 'settings';
 
 const STATUS_LABEL: Record<string, string> = {
   new: 'Новый', confirmed: 'Подтвердить', paid: 'Оплачен',
@@ -55,6 +55,7 @@ export default function AdminPage({ cfg }: { cfg?: ShopConfig }) {
       <div className="chips" style={{ margin: '16px 0' }}>
         {([['orders', 'Заказы'], ['products', 'Товары'],
            ['new', 'Добавить товар'],
+           ['banners', 'Баннеры'],
            ['settings', 'Настройки']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={`chip ${tab === id ? 'active' : ''}`}
                   onClick={() => setTab(id)}>{label}</button>
@@ -64,6 +65,7 @@ export default function AdminPage({ cfg }: { cfg?: ShopConfig }) {
       {tab === 'orders' && <Orders />}
       {tab === 'products' && <Products />}
       {tab === 'new' && <NewProduct cfg={cfg} onDone={() => setTab('products')} />}
+      {tab === 'banners' && <Banners />}
       {tab === 'settings' && <Settings />}
     </div>
   );
@@ -705,6 +707,171 @@ function Settings() {
       </div>
 
       {msg && <div className="notice">{msg}</div>}
+    </div>
+  );
+}
+
+/* ─────────────────────── Баннеры ─────────────────────── */
+
+const DAY_CHOICES = [3, 7, 14, 30, 0];
+
+/** Баннеры на главной: своя фотография, срок показа, очередь, удаление. */
+function Banners() {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const { data } = useQuery<{ items: BannerOut[] }>({
+    queryKey: ['admin-banners'], queryFn: () => api('/api/admin/banners'),
+  });
+  const items = data?.items ?? [];
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['admin-banners'] });
+    qc.invalidateQueries({ queryKey: ['banners'] });
+  };
+
+  const call = async (path: string, init: RequestInit) => {
+    setBusy(true); setMsg('');
+    try { await api(path, init); refresh(); }
+    catch (e) { setMsg((e as Error).message || 'Не получилось'); }
+    finally { setBusy(false); }
+  };
+
+  const add = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setBusy(true); setMsg('');
+    try {
+      const fd = new FormData();
+      fd.append('file', files[0]);
+      const photo = await api('/api/uploads/photo', { method: 'POST', body: fd });
+      await api('/api/admin/banners', {
+        method: 'POST',
+        body: JSON.stringify({ photo, days: 14, link: '/catalog',
+                               button_text: 'Смотреть' }),
+      });
+      refresh();
+    } catch (e) {
+      setMsg((e as Error).message || 'Не загрузилось');
+    } finally { setBusy(false); }
+  };
+
+  const patch = (id: string, body: Record<string, unknown>) =>
+    call(`/api/admin/banners/${id}`, { method: 'PATCH',
+                                       body: JSON.stringify(body) });
+
+  return (
+    <div className="stack fade-in">
+      <h2>Баннеры на главной</h2>
+      <p className="subtitle">
+        Показываются по очереди, листаются пальцем. Срок задаётся днями —
+        баннер уходит с витрины сам, снимать руками не нужно.
+      </p>
+
+      <label className="btn btn-primary btn-block">
+        <Icon name="image" size={16} />
+        {busy ? 'Загружаю…' : 'Добавить баннер'}
+        <input type="file" accept="image/*" hidden disabled={busy}
+               onChange={(e) => add(e.target.files)} />
+      </label>
+
+      {items.length === 0 && (
+        <div className="notice">
+          Баннеров нет — главная начинается сразу с товаров. Так и надо,
+          пока нет хорошей фотографии и повода.
+        </div>
+      )}
+
+      {items.map((b, i) => (
+        <div key={b.id} className="order-card">
+          <div className="row" style={{ alignItems: 'flex-start' }}>
+            <img src={photoUrl(b.photo)} alt="" width={96} height={72}
+                 style={{ objectFit: 'cover', borderRadius: 8,
+                          background: 'var(--surface-2)' }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="row-between">
+                <b>{b.title || 'Без заголовка'}</b>
+                <span className="caption">
+                  {b.expired ? 'срок вышел'
+                    : b.days_left === null ? 'без срока'
+                    : `осталось ${b.days_left} дн.`}
+                </span>
+              </div>
+              <div className="row" style={{ marginTop: 8, gap: 4 }}>
+                <button className="btn btn-ghost btn-icon" disabled={busy || i === 0}
+                        aria-label="Выше"
+                        onClick={() => call(`/api/admin/banners/${b.id}/move?direction=up`,
+                                            { method: 'POST' })}>↑</button>
+                <button className="btn btn-ghost btn-icon"
+                        disabled={busy || i === items.length - 1}
+                        aria-label="Ниже"
+                        onClick={() => call(`/api/admin/banners/${b.id}/move?direction=down`,
+                                            { method: 'POST' })}>↓</button>
+                <button className="btn" disabled={busy}
+                        onClick={() => patch(b.id, { is_active: !b.is_active })}>
+                  {b.is_active ? 'Скрыть' : 'Показать'}
+                </button>
+                <button className="btn btn-ghost btn-icon" disabled={busy}
+                        aria-label="Удалить"
+                        onClick={() => {
+                          if (confirm('Удалить баннер?')) {
+                            call(`/api/admin/banners/${b.id}`, { method: 'DELETE' });
+                          }
+                        }}>
+                  <Icon name="trash" size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="stack" style={{ marginTop: 12 }}>
+            <div className="field">
+              <label className="field-label">Надпись сверху</label>
+              <input className="input" defaultValue={b.eyebrow ?? ''}
+                     placeholder="Новая партия"
+                     onBlur={(e) => e.target.value !== (b.eyebrow ?? '')
+                       && patch(b.id, { eyebrow: e.target.value })} />
+            </div>
+            <div className="field">
+              <label className="field-label">Заголовок</label>
+              <input className="input" defaultValue={b.title ?? ''}
+                     placeholder="Зимние куртки"
+                     onBlur={(e) => e.target.value !== (b.title ?? '')
+                       && patch(b.id, { title: e.target.value })} />
+            </div>
+            <div className="field">
+              <label className="field-label">Подпись</label>
+              <input className="input" defaultValue={b.subtitle ?? ''}
+                     placeholder="от 24 900 ₸"
+                     onBlur={(e) => e.target.value !== (b.subtitle ?? '')
+                       && patch(b.id, { subtitle: e.target.value })} />
+            </div>
+            <div className="field">
+              <label className="field-label">Куда ведёт</label>
+              <input className="input" defaultValue={b.link ?? ''}
+                     placeholder="/catalog?category=women_clothes"
+                     onBlur={(e) => e.target.value !== (b.link ?? '')
+                       && patch(b.id, { link: e.target.value })} />
+              <span className="caption">
+                Ссылка на подборку, а не на главную — иначе баннер бесполезен.
+              </span>
+            </div>
+            <div className="field">
+              <label className="field-label">Сколько дней показывать</label>
+              <div className="chips">
+                {DAY_CHOICES.map((d) => (
+                  <button key={d} className="chip" disabled={busy}
+                          onClick={() => patch(b.id, { days: d })}>
+                    {d === 0 ? 'Без срока' : `${d} дн.`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {msg && <div className="notice notice-error">{msg}</div>}
     </div>
   );
 }

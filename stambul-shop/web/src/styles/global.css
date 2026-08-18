@@ -364,6 +364,53 @@ input[type='checkbox'], input[type='radio'] {
    первый экран телефона */
 .section-tight { margin-top: var(--s5); }
 
+/* ─────────────────────────── Баннеры ─────────────────────────── */
+
+.banners { position: relative; margin-bottom: var(--s4); }
+
+.banner-track {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 100%;
+  overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+  border-radius: var(--r-card);
+}
+.banner-track::-webkit-scrollbar { display: none; }
+
+.banner {
+  position: relative; display: block; scroll-snap-align: center;
+  /* 4:3 на телефоне и 3:2 на широком: в 16:9 на вертикальном экране не
+     помещается ни товар, ни текст */
+  aspect-ratio: 4 / 3;
+  overflow: hidden; background: var(--surface-2);
+}
+@media (min-width: 700px) { .banner { aspect-ratio: 3 / 2; } }
+
+.banner img { width: 100%; height: 100%; object-fit: cover; }
+
+.banner-text {
+  position: absolute; inset: auto 0 0 0;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  padding: var(--s5) var(--s4) var(--s4);
+  /* затемнение снизу: текст должен читаться на любой фотографии */
+  background: linear-gradient(to top, rgba(0, 0, 0, .62), rgba(0, 0, 0, 0));
+  color: #ffffff;
+}
+.banner-eyebrow {
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  opacity: .85;
+}
+.banner-title { font-size: 24px; line-height: 28px; font-weight: 700; letter-spacing: -.02em; }
+.banner-sub { font-size: 14px; opacity: .9; }
+.banner-cta {
+  margin-top: 6px; padding: 9px 18px; border-radius: var(--r-control);
+  background: #ffffff; color: #0a0a0a; font-size: 14px; font-weight: 600;
+}
+@media (min-width: 700px) {
+  .banner-text { padding: var(--s6) var(--s6) var(--s5); }
+  .banner-title { font-size: 34px; line-height: 40px; }
+}
+
+.banners .dots { bottom: 12px; }
+
 /* Строка условий вместо баннера */
 .terms {
   display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5);

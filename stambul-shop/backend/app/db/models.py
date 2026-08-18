@@ -121,6 +121,39 @@ class Setting(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class Banner(Base):
+    """Баннер на главной.
+
+    Живёт по времени: владелец ставит, на сколько дней, и баннер сам
+    уходит с витрины. Иначе на главной месяцами висит «зимняя распродажа»
+    в июле — это происходит в каждом магазине, где снимать баннер надо
+    руками.
+    """
+    __tablename__ = "banners"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    public_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), unique=True, default=uuid.uuid4, index=True)
+
+    file_id: Mapped[str] = mapped_column(Text)
+    thumb_file_id: Mapped[str | None] = mapped_column(Text)
+    thumb_w: Mapped[int | None]
+    file_unique_id: Mapped[str] = mapped_column(String(64))
+
+    eyebrow: Mapped[str | None] = mapped_column(String(60))
+    title: Mapped[str | None] = mapped_column(String(120))
+    subtitle: Mapped[str | None] = mapped_column(String(200))
+    button_text: Mapped[str | None] = mapped_column(String(40))
+    link: Mapped[str | None] = mapped_column(String(300))
+
+    sort_order: Mapped[int] = mapped_column(SmallInteger, default=100)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # пусто — висит без срока
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+
+
 class CustomCategory(Base):
     """Раздел, заведённый владельцем из бота.
 

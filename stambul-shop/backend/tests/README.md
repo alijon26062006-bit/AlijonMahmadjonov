@@ -11,7 +11,9 @@ docker compose run --rm migrate
 cd backend/tests
 DATABASE_URL=postgresql+asyncpg://shop:shop@localhost:5432/shop \
 REDIS_URL=redis://localhost:6379/1 \
-for t in test_auth test_shop test_studio test_wizard; do python3 $t.py; done
+for t in test_auth test_shop test_studio test_wizard test_banners; do
+  python3 $t.py
+done
 ```
 
 - `test_auth.py` — вход по номеру с кодом от бота, вход через Google,
@@ -23,3 +25,5 @@ for t in test_auth test_shop test_studio test_wizard; do python3 $t.py; done
   задание для ретуши одежды и приёмка результата сверкой.
 - `test_wizard.py` — свои разделы из бота и чистка черновика от модели:
   выдуманный раздел отбрасывается, цвет приводится к списку каталога.
+- `test_banners.py` — срок показа, очередь, скрытие, продление, права и то,
+  что просроченный баннер уходит с витрины сам.

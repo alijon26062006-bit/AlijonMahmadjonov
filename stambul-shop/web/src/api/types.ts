@@ -107,3 +107,17 @@ export type UserOut = {
   onboarding_done: boolean;
   is_admin: boolean;
 };
+
+export type BannerOut = {
+  id: string;
+  photo: string;
+  eyebrow: string | null;
+  title: string | null;
+  subtitle: string | null;
+  button_text: string | null;
+  link: string | null;
+  sort_order: number;
+  is_active: boolean;
+  days_left: number | null;
+  expired: boolean;
+};

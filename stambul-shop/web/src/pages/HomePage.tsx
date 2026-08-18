@@ -6,6 +6,7 @@ import { api, fmtPrice } from '../api/client';
 import type { Card, Group, ShopConfig } from '../api/types';
 import { Icon } from '../components/icons';
 import { ProductCard } from '../components/ProductCard';
+import Banners from '../components/Banners';
 import SearchBox from '../components/SearchBox';
 import { CardSkeletons, Empty, useAuth } from '../components/ui';
 import { useFavorites } from '../hooks/useFavorites';
@@ -57,7 +58,9 @@ export default function HomePage({ cfg }: { cfg?: ShopConfig }) {
       {/* Поиск на телефоне живёт здесь: в шапке для него нет места */}
       <div style={{ marginBottom: 20 }} className="only-sm"><SearchBox /></div>
 
-      {/* Вместо баннера — строка условий. Первый экран телефона стоит
+      <Banners />
+
+      {/* Под баннером — строка условий. Первый экран телефона стоит
           дорого: слоган на нём человек уже прочитал в шапке, а вот
           доставку, оплату и возврат он ищет и обычно не находит. Товары
           при этом поднимаются выше и попадают в первый экран. */}
