@@ -62,6 +62,9 @@ export type ShopConfig = {
     free_from: number; pickup_address: string;
   };
   payment_ready: boolean;
+  google_client_id: string;
+  require_auth_to_browse: boolean;
+  site_url: string;
   cities: { id: number; name: string; days: number }[];
 };
 
@@ -91,7 +94,16 @@ export type AdminProduct = Card & {
 };
 
 export type UserOut = {
-  id: number; tg_id: number; username: string | null;
-  first_name: string; is_admin: boolean;
-  phone: string | null; city_id: number | null; address: string | null;
+  id: number;
+  name: string;
+  avatar_url: string | null;
+  phone: string | null;
+  email: string | null;
+  tg_linked: boolean;
+  city_id: number | null;
+  address: string | null;
+  notify_email: boolean;
+  notify_telegram: boolean;
+  onboarding_done: boolean;
+  is_admin: boolean;
 };

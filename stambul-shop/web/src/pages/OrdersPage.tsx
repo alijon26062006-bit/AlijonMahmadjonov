@@ -1,12 +1,10 @@
 /** Мои заказы. */
 import { useQuery } from '@tanstack/react-query';
-import { api, fmtDate, fmtPrice, logout } from '../api/client';
+import { api, fmtDate, fmtPrice } from '../api/client';
 import type { OrderOut } from '../api/types';
-import { Empty, ORDER_BADGE, useAuth, useTgBackButton } from '../components/ui';
-import { inTelegram } from '../telegram/tg';
+import { Empty, ORDER_BADGE, useAuth } from '../components/ui';
 
 export default function OrdersPage() {
-  useTgBackButton(true);
   const user = useAuth();
   const { data, isLoading } = useQuery<{ items: OrderOut[] }>({
     queryKey: ['orders'], queryFn: () => api('/api/orders/mine'),
@@ -14,31 +12,26 @@ export default function OrdersPage() {
   });
 
   if (!user) {
-    return <Empty icon="package" title="Войдите, чтобы видеть заказы"
-                  action={{ label: 'Войти', to: '/login' }} />;
+    return (
+      <div className="page">
+        <Empty icon="package" title="Войдите, чтобы видеть заказы"
+               action={{ label: 'Войти', to: '/login?back=/orders' }} />
+      </div>
+    );
   }
   if (isLoading) return <div className="skeleton" style={{ height: 200, marginTop: 12 }} />;
   const items = data?.items ?? [];
 
   return (
-    <div className="section fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between',
-                    alignItems: 'center' }}>
-        <h1 className="section-title" style={{ marginBottom: 0 }}>Мои заказы</h1>
-        {!inTelegram && (
-          <button className="btn btn-ghost" onClick={logout}>Выйти</button>
-        )}
-      </div>
-      <p className="subtitle" style={{ margin: '6px 0 14px' }}>
-        {user.first_name}{user.username ? ` · @${user.username}` : ''}
-      </p>
+    <div className="page fade-in">
+      <h1>Мои заказы</h1>
 
       {items.length === 0 ? (
         <Empty icon="package" title="Заказов пока нет"
                note="Загляните в каталог — там много хорошего"
                action={{ label: 'В каталог', to: '/catalog' }} />
       ) : items.map((o) => (
-        <div key={o.public_id} className="my-item">
+        <div key={o.public_id} className="line" style={{ gridTemplateColumns: "1fr auto" }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <b>Заказ №{o.number}</b>

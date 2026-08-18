@@ -1,28 +1,38 @@
-/** Каталог раздела: поиск, сортировка, фильтры по полям схемы. */
+/** Каталог: сетка, фильтры и сортировка.
+
+    Всё состояние живёт в адресе страницы — подборку можно переслать
+    ссылкой, а «назад» возвращает ровно то, что человек видел.
+*/
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
-import type { Card, CategorySchema } from '../api/types';
+import type { Card, CategorySchema, Group } from '../api/types';
 import { Icon } from '../components/icons';
 import { ProductCard } from '../components/ProductCard';
-import { SearchBox } from '../components/SearchBox';
-import { CardSkeletons, Empty, useAuth, useTgBackButton } from '../components/ui';
+import SearchBox from '../components/SearchBox';
+import { CardSkeletons, Empty, Sheet, useAuth } from '../components/ui';
+import { useFavorites } from '../hooks/useFavorites';
 
 type Page = { items: Card[]; has_more: boolean; page: number };
 
-const SORTS = [
-  ['new', 'Новинки'], ['cheap', 'Сначала дешёвые'],
-  ['expensive', 'Сначала дорогие'], ['popular', 'Популярные'],
+const SORTS: [string, string][] = [
+  ['new', 'Новинки'], ['popular', 'Популярные'],
+  ['cheap', 'Сначала дешёвые'], ['expensive', 'Сначала дорогие'],
 ];
 
 export default function CatalogPage() {
-  useTgBackButton(true);
   const [params, setParams] = useSearchParams();
   const [sheet, setSheet] = useState(false);
   const user = useAuth();
+  const { ids: favs, toggle } = useFavorites(Boolean(user));
 
   const category = params.get('category') ?? '';
+
+  const { data: cats } = useQuery<{ groups: Group[] }>({
+    queryKey: ['categories'], queryFn: () => api('/api/categories'),
+    staleTime: 10 * 60_000,
+  });
   const { data: schema } = useQuery<CategorySchema>({
     queryKey: ['schema', category],
     queryFn: () => api(`/api/categories/${category}`),
@@ -31,7 +41,8 @@ export default function CatalogPage() {
 
   const set = (k: string, v: string) => {
     const next = new URLSearchParams(params);
-    v ? next.set(k, v) : next.delete(k);
+    if (v) next.set(k, v); else next.delete(k);
+    next.delete('page');
     setParams(next, { replace: true });
   };
 
@@ -47,24 +58,6 @@ export default function CatalogPage() {
     getNextPageParam: (last) => (last.has_more ? last.page + 1 : undefined),
   });
   const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
-
-  const favQuery = useQuery<{ ids: string[] }>({
-    queryKey: ['fav-ids'], queryFn: () => api('/api/favorites/ids'),
-    enabled: Boolean(user),
-  });
-  const [favs, setFavs] = useState<Set<string>>(new Set());
-  useEffect(() => { if (favQuery.data) setFavs(new Set(favQuery.data.ids)); },
-    [favQuery.data]);
-  const toggleFav = async (id: string, next: boolean) => {
-    setFavs((prev) => {
-      const s = new Set(prev);
-      next ? s.add(id) : s.delete(id);
-      return s;
-    });
-    try {
-      await api(`/api/favorites/${id}`, { method: next ? 'PUT' : 'DELETE' });
-    } catch { /* оптимистично */ }
-  };
 
   const sentinel = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -82,131 +75,153 @@ export default function CatalogPage() {
   const activeCount = useMemo(() => {
     let n = 0;
     for (const f of schema?.fields ?? []) if (params.get(f.key)) n += 1;
-    if (params.get('in_stock')) n += 1;
-    if (params.get('size')) n += 1;
+    for (const k of ['in_stock', 'size', 'price_min', 'price_max']) {
+      if (params.get(k)) n += 1;
+    }
     return n;
   }, [schema, params]);
 
   const sizes = useMemo(
     () => (schema?.size_scales ?? []).flatMap((s) => s.sizes), [schema]);
+  const categories = (cats?.groups ?? []).flatMap((g) => g.categories);
 
-  return (
-    <div className="fade-in">
-      <div className="searchbar sticky-search">
-        <SearchBox value={params.get('q') ?? ''} placeholder="Поиск"
-                   onSearch={(q) => set('q', q)}>
-          {schema && (
-            <button className="btn filter-btn" onClick={() => setSheet(true)}>
-              <Icon name="sliders-horizontal" size={17} />
-              {activeCount > 0 && <span className="count">{activeCount}</span>}
-            </button>
-          )}
-        </SearchBox>
+  const reset = () => {
+    const next = new URLSearchParams();
+    if (category) next.set('category', category);
+    if (params.get('q')) next.set('q', params.get('q')!);
+    setParams(next, { replace: true });
+  };
+
+  const filters = (
+    <>
+      <div className="field">
+        <label>Наличие</label>
+        <div className="chips">
+          <button className={`chip ${params.get('in_stock') ? 'active' : ''}`}
+                  onClick={() => set('in_stock', params.get('in_stock') ? '' : '1')}>
+            Только в наличии
+          </button>
+        </div>
       </div>
 
-      <div className="chips" style={{ marginTop: 10 }}>
-        {SORTS.map(([v, l]) => (
-          <button key={v}
-                  className={`chip ${(params.get('sort') ?? 'new') === v ? 'on' : ''}`}
-                  onClick={() => set('sort', v)}>{l}</button>
+      {sizes.length > 0 && (
+        <div className="field">
+          <label>Размер</label>
+          <div className="chips" style={{ flexWrap: 'wrap' }}>
+            {sizes.map((s) => (
+              <button key={s}
+                      className={`chip ${params.get('size') === s ? 'active' : ''}`}
+                      onClick={() => set('size', params.get('size') === s ? '' : s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(schema?.fields ?? [])
+        .filter((f) => f.filter === 'multiselect' && f.options)
+        .map((f) => (
+          <div key={f.key} className="field">
+            <label>{f.label}</label>
+            <div className="chips" style={{ flexWrap: 'wrap' }}>
+              {f.options!.map((o) => (
+                <button key={o}
+                        className={`chip ${params.get(f.key) === o ? 'active' : ''}`}
+                        onClick={() => set(f.key, params.get(f.key) === o ? '' : o)}>
+                  {o}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+
+      <div className="field">
+        <label>Цена</label>
+        <div className="row">
+          <input className="input" inputMode="numeric" placeholder="от"
+                 defaultValue={params.get('price_min') ?? ''}
+                 onBlur={(e) => set('price_min', e.target.value.trim())} />
+          <input className="input" inputMode="numeric" placeholder="до"
+                 defaultValue={params.get('price_max') ?? ''}
+                 onBlur={(e) => set('price_max', e.target.value.trim())} />
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="page fade-in">
+      <div className="only-sm" style={{ marginBottom: 16 }}>
+        <SearchBox initial={params.get('q') ?? ''} />
+      </div>
+
+      <div className="row-between" style={{ flexWrap: 'wrap', gap: 12 }}>
+        <h1>{schema?.title ?? (params.get('q') ? `«${params.get('q')}»` : 'Каталог')}</h1>
+        <div className="row">
+          <select className="select" style={{ width: 'auto' }}
+                  aria-label="Сортировка"
+                  value={params.get('sort') ?? 'new'}
+                  onChange={(e) => set('sort', e.target.value)}>
+            {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          <button className="btn" onClick={() => setSheet(true)}>
+            <Icon name="sliders-horizontal" size={17} />
+            Фильтры
+            {activeCount > 0 && <span className="count">{activeCount}</span>}
+          </button>
+        </div>
+      </div>
+
+      <div className="chips" style={{ marginTop: 16 }}>
+        <button className={`chip ${!category ? 'active' : ''}`}
+                onClick={() => set('category', '')}>Все</button>
+        {categories.map((c) => (
+          <button key={c.slug}
+                  className={`chip ${category === c.slug ? 'active' : ''}`}
+                  onClick={() => set('category', c.slug)}>
+            <Icon name={c.icon} size={15} /> {c.title}
+          </button>
         ))}
       </div>
 
-      {schema && (
-        <p className="subtitle" style={{ marginTop: 10, display: 'flex',
-                                         alignItems: 'center', gap: 6 }}>
-          <Icon name={schema.icon} size={15} /> {schema.title}
-        </p>
-      )}
-
-      <div className="section">
+      <div style={{ marginTop: 24 }}>
         {feed.isLoading ? <CardSkeletons />
           : items.length === 0 ? (
-            <Empty icon="search" title="Ничего не найдено"
-                   note="Попробуйте убрать фильтры или другой запрос"
-                   action={{ label: 'Все разделы', to: '/' }} />
+            <Empty icon="search" title="Ничего не нашлось"
+                   note={activeCount > 0
+                     ? 'Попробуйте убрать часть фильтров'
+                     : 'Попробуйте другой запрос'}
+                   action={{ label: 'Весь каталог', to: '/catalog' }} />
           ) : (
             <>
               <div className="grid">
                 {items.map((p) => (
                   <ProductCard key={p.id} item={p} isFav={favs.has(p.id)}
-                               onFav={user ? toggleFav : undefined} />
+                               onFav={user ? toggle : undefined} />
                 ))}
               </div>
               <div ref={sentinel} />
-              {feed.isFetchingNextPage && <CardSkeletons n={2} />}
+              {feed.isFetchingNextPage && (
+                <div style={{ marginTop: 16 }}><CardSkeletons n={4} /></div>
+              )}
             </>
           )}
       </div>
 
-      {sheet && schema && (
-        <div className="sheet-overlay" onClick={() => setSheet(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <h2 className="section-title">Фильтры</h2>
-
-            <div className="field">
-              <span className="field-label">Наличие</span>
-              <div className="chips">
-                <button className={`chip ${params.get('in_stock') ? 'on' : ''}`}
-                        onClick={() => set('in_stock', params.get('in_stock') ? '' : '1')}>
-                  Только в наличии
-                </button>
-              </div>
-            </div>
-
-            {sizes.length > 0 && (
-              <div className="field">
-                <span className="field-label">Размер</span>
-                <div className="chips">
-                  {sizes.map((s) => (
-                    <button key={s}
-                            className={`chip ${params.get('size') === s ? 'on' : ''}`}
-                            onClick={() => set('size', params.get('size') === s ? '' : s)}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {schema.fields.filter((f) => f.filter === 'multiselect' && f.options)
-              .map((f) => (
-                <div key={f.key} className="field">
-                  <span className="field-label">{f.label}</span>
-                  <div className="chips">
-                    {f.options!.map((o) => (
-                      <button key={o}
-                              className={`chip ${params.get(f.key) === o ? 'on' : ''}`}
-                              onClick={() => set(f.key, params.get(f.key) === o ? '' : o)}>
-                        {o}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-
-            <div className="field">
-              <span className="field-label">Цена, ₸</span>
-              <div className="range-row">
-                <input inputMode="numeric" placeholder="от"
-                       defaultValue={params.get('price_min') ?? ''}
-                       onBlur={(e) => set('price_min', e.target.value.trim())} />
-                <input inputMode="numeric" placeholder="до"
-                       defaultValue={params.get('price_max') ?? ''}
-                       onBlur={(e) => set('price_max', e.target.value.trim())} />
-              </div>
-            </div>
-
-            <button className="btn btn-primary btn-block"
-                    onClick={() => setSheet(false)}>Показать</button>
-            <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }}
-                    onClick={() => {
-                      const next = new URLSearchParams();
-                      if (category) next.set('category', category);
-                      setParams(next, { replace: true });
-                    }}>Сбросить</button>
-          </div>
-        </div>
+      {sheet && (
+        <Sheet title="Фильтры" onClose={() => setSheet(false)}
+               actions={(
+                 <>
+                   <button className="btn btn-block" onClick={reset}>Сбросить</button>
+                   <button className="btn btn-primary btn-block"
+                           onClick={() => setSheet(false)}>
+                     Показать{items.length ? ` (${items.length}${feed.hasNextPage ? '+' : ''})` : ''}
+                   </button>
+                 </>
+               )}>
+          <div className="stack">{filters}</div>
+        </Sheet>
       )}
     </div>
   );

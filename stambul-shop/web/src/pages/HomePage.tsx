@@ -1,19 +1,20 @@
-/** Витрина: поиск, разделы полосой, новинки. */
+/** Главная: баннер, разделы, ленты новинок и того, что заканчивается. */
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
+import { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { api, fmtPrice } from '../api/client';
 import type { Card, Group, ShopConfig } from '../api/types';
 import { Icon } from '../components/icons';
 import { ProductCard } from '../components/ProductCard';
-import { SearchBox } from '../components/SearchBox';
+import SearchBox from '../components/SearchBox';
 import { CardSkeletons, Empty, useAuth } from '../components/ui';
+import { useFavorites } from '../hooks/useFavorites';
 
 type Page = { items: Card[]; has_more: boolean; page: number };
 
 export default function HomePage({ cfg }: { cfg?: ShopConfig }) {
-  const navigate = useNavigate();
   const user = useAuth();
+  const { ids: favs, toggle } = useFavorites(Boolean(user));
 
   const { data: cats } = useQuery<{ groups: Group[] }>({
     queryKey: ['categories'], queryFn: () => api('/api/categories'),
@@ -29,24 +30,6 @@ export default function HomePage({ cfg }: { cfg?: ShopConfig }) {
   });
   const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
 
-  const favQuery = useQuery<{ ids: string[] }>({
-    queryKey: ['fav-ids'], queryFn: () => api('/api/favorites/ids'),
-    enabled: Boolean(user),
-  });
-  const [favs, setFavs] = useState<Set<string>>(new Set());
-  useEffect(() => { if (favQuery.data) setFavs(new Set(favQuery.data.ids)); },
-    [favQuery.data]);
-  const toggleFav = async (id: string, next: boolean) => {
-    setFavs((prev) => {
-      const s = new Set(prev);
-      next ? s.add(id) : s.delete(id);
-      return s;
-    });
-    try {
-      await api(`/api/favorites/${id}`, { method: next ? 'PUT' : 'DELETE' });
-    } catch { /* оптимистично */ }
-  };
-
   const sentinel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = sentinel.current;
@@ -60,64 +43,88 @@ export default function HomePage({ cfg }: { cfg?: ShopConfig }) {
     return () => io.disconnect();
   }, [feed]);
 
-  const groups = cats?.groups ?? [];
+  const categories = (cats?.groups ?? []).flatMap((g) => g.categories);
+  const sale = items
+    .filter((p) => p.old_price && p.old_price > p.price && p.in_stock > 0)
+    .slice(0, 10);
   const free = cfg?.delivery.free_from ?? 0;
 
   return (
-    <div className="fade-in">
-      <div className="section">
-        <h1 className="section-title">{cfg?.shop_name ?? 'Магазин'}</h1>
-        {cfg?.tagline && <p className="subtitle" style={{ marginBottom: 10 }}>
-          {cfg.tagline}</p>}
-        <SearchBox placeholder="Платье, кроссовки, сервиз…"
-                   onSearch={(q) => navigate(
-                     q ? `/catalog?q=${encodeURIComponent(q)}` : '/catalog')} />
-      </div>
+    <div className="page fade-in">
+      {/* Поиск на телефоне живёт здесь: в шапке для него нет места */}
+      <div style={{ marginBottom: 20 }} className="only-sm"><SearchBox /></div>
 
-      {free > 0 && (
-        <div className="promo">
-          <Icon name="truck" size={18} />
-          Доставка бесплатно при заказе от {free.toLocaleString('ru-RU')} ₸
+      <section style={{
+        border: '1px solid var(--border)', borderRadius: 18,
+        padding: '40px var(--pad)', background: 'var(--surface)',
+      }}>
+        <div className="eyebrow">{cfg?.shop_name ?? 'Stambul Shop'}</div>
+        <h1 style={{ marginTop: 10, maxWidth: '14ch' }}>
+          {cfg?.tagline ?? 'Одежда, обувь и всё для дома'}
+        </h1>
+        <div className="row" style={{ marginTop: 24, flexWrap: 'wrap' }}>
+          <Link to="/catalog" className="btn btn-primary btn-lg">
+            Смотреть каталог
+          </Link>
+          {free > 0 && (
+            <span className="subtitle">
+              <Icon name="truck" size={15} /> Доставка бесплатно
+              от {fmtPrice(free)}
+            </span>
+          )}
+        </div>
+      </section>
+
+      {categories.length > 0 && (
+        <div className="chips" style={{ marginTop: 24 }}>
+          {categories.map((c) => (
+            <Link key={c.slug} to={`/catalog?category=${c.slug}`} className="chip">
+              <Icon name={c.icon} size={16} /> {c.title}
+            </Link>
+          ))}
         </div>
       )}
 
-      {groups.map((g) => (
-        <section key={g.title} className="dir-block">
-          <div className="dir-head">{g.title}</div>
-          <div className="cat-strip">
-            {g.categories.map((c) => (
-              <Link key={c.slug} to={`/catalog?category=${c.slug}`}
-                    className="cat-pill">
-                <span className="icon-wrap tone-green">
-                  <Icon name={c.icon} size={20} />
-                </span>
-                <span className="cat-pill-label">{c.title}</span>
-              </Link>
+      {/* Лента скидок собирается из уже загруженной ленты: отдельный запрос
+          ради тех же товаров был бы лишним */}
+      {sale.length >= 3 && (
+        <section className="section">
+          <div className="section-head">
+            <h2>Со скидкой</h2>
+            <Link to="/catalog">Весь каталог →</Link>
+          </div>
+          <div className="rail">
+            {sale.map((p) => (
+              <ProductCard key={p.id} item={p} isFav={favs.has(p.id)}
+                           onFav={user ? toggle : undefined} />
             ))}
           </div>
         </section>
-      ))}
+      )}
 
       <section className="section">
-        <h2 className="section-title">Новинки</h2>
-        {feed.isLoading ? (
-          <CardSkeletons />
-        ) : items.length === 0 ? (
-          <Empty icon="store" title="Товаров пока нет"
-                 note="Загляните позже — витрина скоро наполнится" />
-        ) : (
-          <>
-            <div className="grid">
-              {items.map((item) => (
-                <ProductCard key={item.id} item={item}
-                             isFav={favs.has(item.id)}
-                             onFav={user ? toggleFav : undefined} />
-              ))}
-            </div>
-            <div ref={sentinel} />
-            {feed.isFetchingNextPage && <CardSkeletons n={2} />}
-          </>
-        )}
+        <div className="section-head">
+          <h2>Новинки</h2>
+          <Link to="/catalog?sort=new">Все →</Link>
+        </div>
+        {feed.isLoading ? <CardSkeletons />
+          : items.length === 0 ? (
+            <Empty icon="store" title="Товаров пока нет"
+                   note="Загляните позже — витрина скоро наполнится" />
+          ) : (
+            <>
+              <div className="grid">
+                {items.map((item) => (
+                  <ProductCard key={item.id} item={item} isFav={favs.has(item.id)}
+                               onFav={user ? toggle : undefined} />
+                ))}
+              </div>
+              <div ref={sentinel} />
+              {feed.isFetchingNextPage && (
+                <div style={{ marginTop: 16 }}><CardSkeletons n={4} /></div>
+              )}
+            </>
+          )}
       </section>
     </div>
   );

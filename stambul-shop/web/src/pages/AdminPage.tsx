@@ -6,7 +6,7 @@ import type {
   AdminProduct, CategorySchema, Group, OrderOut, ShopConfig,
 } from '../api/types';
 import { Icon } from '../components/icons';
-import { Empty, ORDER_BADGE, useAuth, useTgBackButton } from '../components/ui';
+import { Empty, ORDER_BADGE, useAuth } from '../components/ui';
 
 type Tab = 'orders' | 'products' | 'new';
 
@@ -16,8 +16,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function AdminPage({ cfg }: { cfg?: ShopConfig }) {
-  useTgBackButton(true);
-  const user = useAuth();
+    const user = useAuth();
   const [tab, setTab] = useState<Tab>('orders');
 
   const { data: summary } = useQuery<any>({
@@ -31,8 +30,8 @@ export default function AdminPage({ cfg }: { cfg?: ShopConfig }) {
                                     note="Управление доступно владельцу магазина" />;
 
   return (
-    <div className="section fade-in">
-      <h1 className="section-title">Управление</h1>
+    <div className="page fade-in">
+      <h1 >Управление</h1>
 
       {summary && (
         <div className="stat-row">
@@ -56,7 +55,7 @@ export default function AdminPage({ cfg }: { cfg?: ShopConfig }) {
       <div className="chips" style={{ margin: '16px 0' }}>
         {([['orders', 'Заказы'], ['products', 'Товары'],
            ['new', 'Добавить товар']] as [Tab, string][]).map(([id, label]) => (
-          <button key={id} className={`chip ${tab === id ? 'on' : ''}`}
+          <button key={id} className={`chip ${tab === id ? 'active' : ''}`}
                   onClick={() => setTab(id)}>{label}</button>
         ))}
       </div>
@@ -128,7 +127,7 @@ function Orders() {
           {o.comment && <div className="subtitle">💬 {o.comment}</div>}
 
           {o.next_statuses.includes('shipped') && (
-            <input placeholder="Трек-номер" style={{ marginTop: 8 }}
+            <input className="input" placeholder="Трек-номер" style={{ marginTop: 8 }}
                    value={tracking[o.id] ?? ''}
                    onChange={(e) => setTracking({ ...tracking, [o.id]: e.target.value })} />
           )}
@@ -136,7 +135,7 @@ function Orders() {
             <div className="chips" style={{ marginTop: 10 }}>
               {o.next_statuses.map((s) => (
                 <button key={s}
-                        className={`chip ${s === 'canceled' ? '' : 'on'}`}
+                        className={`chip ${s === 'canceled' ? '' : 'active'}`}
                         onClick={() => move.mutate({ id: o.id, status: s,
                                                      track: tracking[o.id] })}>
                   {STATUS_LABEL[s] ?? s}
@@ -176,16 +175,16 @@ function Products() {
 
   return (
     <div>
-      <input placeholder="Поиск по названию или бренду" value={q}
+      <input className="input" placeholder="Поиск по названию или бренду" value={q}
              onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 12 }} />
       {items.length === 0 && <Empty icon="store" title="Товаров нет"
                                     note="Добавьте первый на вкладке рядом" />}
       {items.map((p) => (
         <div key={p.id} className="order-card">
           <div style={{ display: 'flex', gap: 10 }}>
-            <div className="cart-photo">
+            <div className="line-photo">
               {p.photo ? <img src={photoUrl(p.photo)} alt="" />
-                : <div className="noimg"><Icon name="image" size={20} /></div>}
+                : <div className="line-noimg"><Icon name="image" size={20} /></div>}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <b>{p.title}</b>
@@ -260,15 +259,15 @@ function VariantEditor({ product }: { product: AdminProduct }) {
       </div>
       {rows.map((r, i) => (
         <div key={i} className="variant-row">
-          <input value={r.size} placeholder="M"
+          <input className="input" value={r.size} placeholder="M"
                  onChange={(e) => change(i, 'size', e.target.value)} />
-          <input value={r.color} placeholder="Чёрный"
+          <input className="input" value={r.color} placeholder="Чёрный"
                  onChange={(e) => change(i, 'color', e.target.value)} />
-          <input inputMode="numeric" value={String(r.price)}
+          <input className="input" inputMode="numeric" value={String(r.price)}
                  onChange={(e) => change(i, 'price', e.target.value)} />
-          <input inputMode="numeric" value={String(r.stock)}
+          <input className="input" inputMode="numeric" value={String(r.stock)}
                  onChange={(e) => change(i, 'stock', e.target.value)} />
-          <button className="cart-drop"
+          <button className="line-drop"
                   onClick={() => setRows(rows.filter((_, n) => n !== i))}>
             <Icon name="trash" size={14} />
           </button>
@@ -327,7 +326,7 @@ function PhotoUploader({ product }: { product: AdminProduct }) {
       <label className="btn btn-block">
         <Icon name="camera" size={16} />
         {busy ? 'Загружаем…' : `Фотографии (${product.photos_count})`}
-        <input type="file" accept="image/*" multiple hidden disabled={busy}
+        <input className="input" type="file" accept="image/*" multiple hidden disabled={busy}
                onChange={(e) => upload(e.target.files)} />
       </label>
       {msg && <p className="subtitle" style={{ marginTop: 6 }}>{msg}</p>}
@@ -381,7 +380,7 @@ function NewProduct({ cfg, onDone }: { cfg?: ShopConfig; onDone: () => void }) {
     <div>
       <div className="field">
         <span className="field-label">Раздел</span>
-        <select value={category} onChange={(e) => { setCategory(e.target.value); setAttrs({}); }}>
+        <select className="select" value={category} onChange={(e) => { setCategory(e.target.value); setAttrs({}); }}>
           <option value="">Выберите раздел</option>
           {(groups?.groups ?? []).map((g) => (
             <optgroup key={g.title} label={g.title}>
@@ -395,17 +394,17 @@ function NewProduct({ cfg, onDone }: { cfg?: ShopConfig; onDone: () => void }) {
 
       <div className="field">
         <span className="field-label">Название <span style={{ color: 'var(--danger)' }}>*</span></span>
-        <input value={form.title} placeholder="Платье летнее в цветочек"
+        <input className="input" value={form.title} placeholder="Платье летнее в цветочек"
                onChange={(e) => setForm({ ...form, title: e.target.value })} />
       </div>
       <div className="field">
         <span className="field-label">Бренд</span>
-        <input value={form.brand} placeholder="Koton"
+        <input className="input" value={form.brand} placeholder="Koton"
                onChange={(e) => setForm({ ...form, brand: e.target.value })} />
       </div>
       <div className="field">
         <span className="field-label">Описание</span>
-        <textarea rows={3} value={form.description}
+        <textarea className="textarea" rows={3} value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })} />
       </div>
 
@@ -417,7 +416,7 @@ function NewProduct({ cfg, onDone }: { cfg?: ShopConfig; onDone: () => void }) {
           {f.options ? (
             <div className="chips">
               {f.options.map((o) => (
-                <button key={o} className={`chip ${attrs[f.key] === o ? 'on' : ''}`}
+                <button key={o} className={`chip ${attrs[f.key] === o ? 'active' : ''}`}
                         onClick={() => setAttrs({ ...attrs,
                           [f.key]: attrs[f.key] === o ? '' : o })}>
                   {o}
@@ -425,7 +424,7 @@ function NewProduct({ cfg, onDone }: { cfg?: ShopConfig; onDone: () => void }) {
               ))}
             </div>
           ) : (
-            <input inputMode={f.type === 'int' ? 'numeric' : undefined}
+            <input className="input" inputMode={f.type === 'int' ? 'numeric' : undefined}
                    value={attrs[f.key] ?? ''} placeholder={f.hint ?? ''}
                    onChange={(e) => setAttrs({ ...attrs, [f.key]: e.target.value })} />
           )}

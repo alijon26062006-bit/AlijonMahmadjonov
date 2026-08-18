@@ -3,13 +3,15 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
+import { applySavedTheme } from './components/ui';
 import './styles/global.css';
-import { initTelegram } from './telegram/tg';
 
-initTelegram();
+applySavedTheme();
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
+  defaultOptions: {
+    queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false },
+  },
 });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -21,12 +23,3 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
-
-// Сплэш уходит после первой отрисовки
-requestAnimationFrame(() => {
-  setTimeout(() => {
-    const splash = document.getElementById('splash');
-    splash?.classList.add('hide');
-    setTimeout(() => splash?.remove(), 500);
-  }, 350);
-});
