@@ -48,35 +48,27 @@ export default function HomePage({ cfg }: { cfg?: ShopConfig }) {
     .filter((p) => p.old_price && p.old_price > p.price && p.in_stock > 0)
     .slice(0, 10);
   const free = cfg?.delivery.free_from ?? 0;
+  const deliveryLine = free > 0
+    ? `Доставка по Казахстану, бесплатно от ${fmtPrice(free)}`
+    : 'Доставка по Казахстану';
 
   return (
     <div className="page fade-in">
       {/* Поиск на телефоне живёт здесь: в шапке для него нет места */}
       <div style={{ marginBottom: 20 }} className="only-sm"><SearchBox /></div>
 
-      <section style={{
-        border: '1px solid var(--border)', borderRadius: 18,
-        padding: '40px var(--pad)', background: 'var(--surface)',
-      }}>
-        <div className="eyebrow">{cfg?.shop_name ?? 'Stambul Shop'}</div>
-        <h1 style={{ marginTop: 10, maxWidth: '14ch' }}>
-          {cfg?.tagline ?? 'Одежда, обувь и всё для дома'}
-        </h1>
-        <div className="row" style={{ marginTop: 24, flexWrap: 'wrap' }}>
-          <Link to="/catalog" className="btn btn-primary btn-lg">
-            Смотреть каталог
-          </Link>
-          {free > 0 && (
-            <span className="subtitle">
-              <Icon name="truck" size={15} /> Доставка бесплатно
-              от {fmtPrice(free)}
-            </span>
-          )}
-        </div>
-      </section>
+      {/* Вместо баннера — строка условий. Первый экран телефона стоит
+          дорого: слоган на нём человек уже прочитал в шапке, а вот
+          доставку, оплату и возврат он ищет и обычно не находит. Товары
+          при этом поднимаются выше и попадают в первый экран. */}
+      <div className="terms">
+        <span><Icon name="truck" size={15} /> {deliveryLine}</span>
+        <span><Icon name="wallet" size={15} /> Оплата после подтверждения заказа</span>
+        <span><Icon name="rotate-ccw" size={15} /> Не подошло — обменяем</span>
+      </div>
 
       {categories.length > 0 && (
-        <div className="chips" style={{ marginTop: 24 }}>
+        <div className="chips" style={{ marginTop: 20 }}>
           {categories.map((c) => (
             <Link key={c.slug} to={`/catalog?category=${c.slug}`} className="chip">
               <Icon name={c.icon} size={16} /> {c.title}
@@ -88,7 +80,7 @@ export default function HomePage({ cfg }: { cfg?: ShopConfig }) {
       {/* Лента скидок собирается из уже загруженной ленты: отдельный запрос
           ради тех же товаров был бы лишним */}
       {sale.length >= 3 && (
-        <section className="section">
+        <section className="section section-tight">
           <div className="section-head">
             <h2>Со скидкой</h2>
             <Link to="/catalog">Весь каталог →</Link>
@@ -102,7 +94,7 @@ export default function HomePage({ cfg }: { cfg?: ShopConfig }) {
         </section>
       )}
 
-      <section className="section">
+      <section className={sale.length >= 3 ? 'section' : 'section section-tight'}>
         <div className="section-head">
           <h2>Новинки</h2>
           <Link to="/catalog?sort=new">Все →</Link>

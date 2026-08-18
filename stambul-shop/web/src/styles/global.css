@@ -360,6 +360,24 @@ input[type='checkbox'], input[type='radio'] {
 @media (min-width: 1024px) { .rail { grid-auto-columns: 23%; } }
 
 .section { margin-top: var(--s7); }
+/* Первая секция после условий и разделов — ближе, чтобы товар попал в
+   первый экран телефона */
+.section-tight { margin-top: var(--s5); }
+
+/* Строка условий вместо баннера */
+.terms {
+  display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border); border-radius: var(--r-control);
+  background: var(--surface);
+  font-size: 13px; color: var(--text-2);
+}
+.terms span { display: inline-flex; align-items: center; gap: 7px; }
+@media (max-width: 520px) {
+  /* на узком экране условия идут столбиком: перенос по одному слову
+     читается хуже, чем три коротких строки */
+  .terms { flex-direction: column; gap: 6px; }
+}
 .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--s3); }
 .section-head a { font-size: 14px; color: var(--text-2); }
 .section-head a:hover { color: var(--text); }
