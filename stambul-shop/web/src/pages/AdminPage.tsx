@@ -1,7 +1,7 @@
 /** Управление магазином: товары, размеры, фотографии, заказы, сводка. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { api, fmtPrice, photoUrl, API } from '../api/client';
+import { api, fmtPrice, photoUrl } from '../api/client';
 import type {
   AdminProduct, CategorySchema, Group, OrderOut, ShopConfig,
 } from '../api/types';
@@ -302,12 +302,9 @@ function PhotoUploader({ product }: { product: AdminProduct }) {
       for (const file of Array.from(files).slice(0, 10)) {
         const fd = new FormData();
         fd.append('file', file);
-        const r = await fetch(`${API}/api/uploads/photo`, {
-          method: 'POST', body: fd,
-          headers: authHeader(),
-        });
-        if (!r.ok) throw new Error((await r.json()).detail ?? 'Ошибка загрузки');
-        photos.push(await r.json());
+        // через api(): токен живёт в одном месте, и собственная копия
+        // заголовка авторизации здесь уже однажды разошлась с клиентом
+        photos.push(await api('/api/uploads/photo', { method: 'POST', body: fd }));
       }
       await api(`/api/admin/products/${product.id}/photos`, {
         method: 'PUT', body: JSON.stringify({ photos }),
@@ -332,17 +329,6 @@ function PhotoUploader({ product }: { product: AdminProduct }) {
       {msg && <p className="subtitle" style={{ marginTop: 6 }}>{msg}</p>}
     </div>
   );
-}
-
-function authHeader(): Record<string, string> {
-  // токен держится в модуле клиента; здесь нужен только заголовок
-  const raw = localStorage.getItem('session');
-  try {
-    const saved = raw ? JSON.parse(raw) : null;
-    return saved?.t ? { Authorization: `Bearer ${saved.t}` } : {};
-  } catch {
-    return {};
-  }
 }
 
 /* ─────────────────────── Новый товар ─────────────────────── */
