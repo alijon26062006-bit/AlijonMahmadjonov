@@ -30,6 +30,13 @@ MIGRATIONS: list[str] = [
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email)",
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_sub ON users (google_sub)",
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_phone ON users (phone)",
+    # Заявки на вход: purpose и user_id появились после первой версии
+    # таблицы, а create_all существующую таблицу не трогает.
+    "ALTER TABLE auth_codes ADD COLUMN IF NOT EXISTS purpose VARCHAR(8) "
+    "NOT NULL DEFAULT 'login'",
+    "ALTER TABLE auth_codes ADD COLUMN IF NOT EXISTS user_id BIGINT "
+    "REFERENCES users(id) ON DELETE CASCADE",
+    "ALTER TABLE auth_codes ALTER COLUMN phone SET DEFAULT ''",
 ]
 
 
