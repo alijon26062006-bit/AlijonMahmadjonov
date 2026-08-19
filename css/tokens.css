@@ -1,0 +1,78 @@
+/* ===========================================================
+   Дизайн-токены. Одно место, где живут цвета, шрифты и ритм.
+   Меняешь здесь — меняется весь сайт и админка.
+   =========================================================== */
+
+:root {
+  /* --- Цвет: тёмная кинематографичная база + тёплое золото --- */
+  --bg:            #0A0A0B;
+  --bg-elev:       #121214;
+  --bg-elev-2:     #17171A;
+  --bg-scrim:      rgba(10, 10, 11, .72);
+
+  --fg:            #F5F3EF;   /* 18:1 на --bg */
+  --fg-muted:      #A1A1A6;   /* 8.2:1 — вторичный текст */
+  --fg-dim:        #6E6E76;   /* 3.4:1 — только крупный или декоративный */
+
+  --accent:        #E8B24C;   /* 9.5:1 */
+  --accent-hover:  #F2C46B;
+  --accent-soft:   rgba(232, 178, 76, .12);
+  --accent-line:   rgba(232, 178, 76, .35);
+
+  --ok:            #5FC98C;
+  --danger:        #F0625D;
+
+  --border:        rgba(245, 243, 239, .10);
+  --border-strong: rgba(245, 243, 239, .22);
+
+  /* --- Типографика --- */
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --fs-display: clamp(2.75rem, 11vw, 8.5rem);
+  --fs-h1:      clamp(2rem, 5.5vw, 4rem);
+  --fs-h2:      clamp(1.6rem, 3.6vw, 2.75rem);
+  --fs-h3:      clamp(1.15rem, 2vw, 1.5rem);
+  --fs-lead:    clamp(1.05rem, 1.5vw, 1.3rem);
+  --fs-body:    1rem;      /* 16px — минимум для мобильных */
+  --fs-sm:      .875rem;
+  --fs-xs:      .75rem;
+
+  --lh-tight: 1.04;
+  --lh-snug:  1.25;
+  --lh-body:  1.65;
+
+  --tracking-display: -.04em;
+  --tracking-eyebrow: .18em;
+
+  /* --- Ритм: шаг 4px --- */
+  --sp-1: .25rem;  --sp-2: .5rem;   --sp-3: .75rem;  --sp-4: 1rem;
+  --sp-5: 1.25rem; --sp-6: 1.5rem;  --sp-8: 2rem;    --sp-10: 2.5rem;
+  --sp-12: 3rem;   --sp-16: 4rem;   --sp-20: 5rem;   --sp-24: 6rem;
+
+  --section-y: clamp(4rem, 10vw, 8rem);
+  --gutter:    clamp(1.25rem, 5vw, 4rem);
+  --measure:   68ch;          /* длина строки для чтения */
+  --container:  1200px;
+
+  /* --- Форма --- */
+  --r-sm: 8px;  --r-md: 14px;  --r-lg: 22px;  --r-full: 999px;
+
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-2: 0 12px 32px rgba(0,0,0,.45);
+  --shadow-3: 0 24px 64px rgba(0,0,0,.55);
+
+  /* --- Движение --- */
+  --dur-fast: 150ms;
+  --dur:      240ms;
+  --dur-slow: 420ms;
+  --ease:     cubic-bezier(.22, .61, .36, 1);
+
+  /* --- Слои --- */
+  --z-base: 0; --z-raised: 10; --z-sticky: 40; --z-overlay: 100; --z-toast: 1000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 1ms; --dur: 1ms; --dur-slow: 1ms; }
+}

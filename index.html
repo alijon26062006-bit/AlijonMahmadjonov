@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="tg" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alijon Mahmadjonov — Python ва Telegram-ботҳо</title>
+<meta name="description" content="Alijon Mahmadjonov — барномасози backend аз Ғарм, Рашт. Python, Telegram-ботҳо ва роҳи софдилонаи омӯзиш.">
+<meta name="theme-color" content="#0A0A0B">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Alijon Mahmadjonov">
+<meta property="og:description" content="Барномасози backend аз Ғарм, Рашт. Python ва Telegram-ботҳо.">
+<meta property="og:image" content="assets/alijon.jpg">
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230A0A0B'/><text x='16' y='23' font-family='sans-serif' font-size='19' font-weight='700' fill='%23E8B24C' text-anchor='middle'>A</text></svg>">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+<script>document.documentElement.classList.remove('no-js');</script>
+</head>
+
+<body>
+<a class="skip-link" href="#main" data-i18n="skip">К содержанию</a>
+
+<header class="nav" id="nav">
+  <a href="#top" class="brand">Alijon<span>.</span></a>
+
+  <nav class="nav-links" id="menu" aria-label="Основная навигация">
+    <a href="#about"    data-nav="about">Обо мне</a>
+    <a href="#path"     data-nav="path">Мой путь</a>
+    <a href="#projects" data-nav="projects">Проекты</a>
+    <a href="#diary"    data-nav="diary">Дневник</a>
+    <a href="#contacts" data-nav="contacts">Контакты</a>
+  </nav>
+
+  <div class="lang" role="group" aria-label="Забон / Язык">
+    <button type="button" data-lang="tj" aria-pressed="true">TJ</button>
+    <button type="button" data-lang="ru" aria-pressed="false">RU</button>
+  </div>
+
+  <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="menu" aria-label="Меню">
+    <svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg>
+  </button>
+</header>
+
+<main id="main">
+
+  <!-- ГЛАВНЫЙ ЭКРАН -->
+  <section class="hero" id="top">
+    <div class="hero-media" id="heroMedia" aria-hidden="true"></div>
+    <div class="wrap">
+      <p class="hero-location reveal" data-bind="hero.location"></p>
+      <h1 class="hero-name reveal" data-bind="meta.name"></h1>
+      <p class="hero-role reveal" data-bind="hero.role"></p>
+      <p class="hero-tagline reveal" data-bind="hero.tagline"></p>
+      <div class="hero-actions reveal">
+        <a class="btn btn-solid" id="heroCta1" href="#" target="_blank" rel="noopener">
+          <svg class="icon" aria-hidden="true"><use href="#i-telegram"></use></svg>
+          <span data-bind="hero.ctaPrimary"></span>
+        </a>
+        <a class="btn btn-line" href="#projects"><span data-bind="hero.ctaSecondary"></span></a>
+      </div>
+      <a class="scroll-hint reveal" href="#about">
+        <svg class="icon" aria-hidden="true"><use href="#i-arrow-down"></use></svg>
+        <span data-bind="hero.scroll"></span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ОБО МНЕ -->
+  <section class="section" id="about">
+    <div class="wrap about-grid">
+      <div class="about-lead reveal">
+        <p class="eyebrow"><span data-num>01</span> — <span data-bind="about.title"></span></p>
+        <h2 data-bind="about.lead"></h2>
+        <ul class="facts" id="facts"></ul>
+      </div>
+      <div class="about-body reveal" id="aboutBody"></div>
+    </div>
+  </section>
+
+  <!-- МОЙ ПУТЬ -->
+  <section class="section" id="path">
+    <div class="wrap">
+      <p class="eyebrow reveal"><span data-num>02</span> — <span data-bind="sections.timeline"></span></p>
+      <ul class="timeline" id="timeline"></ul>
+    </div>
+  </section>
+
+  <!-- КАК Я РАБОТАЮ -->
+  <section class="section" id="work">
+    <div class="wrap about-grid">
+      <div class="about-lead reveal">
+        <p class="eyebrow"><span data-num>03</span> — <span data-bind="work.title"></span></p>
+        <div class="card-icon"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"></use></svg></div>
+      </div>
+      <div class="about-body reveal" id="workBody"></div>
+    </div>
+  </section>
+
+  <!-- ЧТО УМЕЮ -->
+  <section class="section" id="skills">
+    <div class="wrap">
+      <p class="eyebrow reveal"><span data-num>04</span> — <span data-bind="skills.title"></span></p>
+      <h2 class="reveal" data-bind="skills.note"></h2>
+      <ul class="skills reveal" id="skillsList"></ul>
+      <ul class="langs reveal" id="langs"></ul>
+    </div>
+  </section>
+
+  <!-- ПРИНЦИПЫ -->
+  <section class="section" id="principles">
+    <div class="wrap">
+      <p class="eyebrow reveal"><span data-num>05</span> — <span data-bind="principles.title"></span></p>
+      <div class="cards" id="principlesGrid"></div>
+    </div>
+  </section>
+
+  <!-- ЦЕЛИ -->
+  <section class="section" id="goals">
+    <div class="wrap">
+      <p class="eyebrow reveal"><span data-num>06</span> — <span data-bind="goals.title"></span></p>
+      <div class="cards" id="goalsGrid"></div>
+    </div>
+  </section>
+
+  <!-- ПРОЕКТЫ -->
+  <section class="section" id="projects">
+    <div class="wrap">
+      <p class="eyebrow reveal"><span data-num>07</span> — <span data-bind="sections.projects"></span></p>
+      <div id="projectsWrap"></div>
+    </div>
+  </section>
+
+  <!-- ДНЕВНИК -->
+  <section class="section" id="diary">
+    <div class="wrap">
+      <p class="eyebrow reveal"><span data-num>08</span> — <span data-bind="sections.diary"></span></p>
+      <h2 class="reveal" data-bind="sections.diaryLead"></h2>
+      <ul class="diary" id="diaryList"></ul>
+    </div>
+  </section>
+
+  <!-- ЗАКАЗАТЬ РАБОТУ -->
+  <section class="section" id="services">
+    <div class="wrap">
+      <p class="eyebrow reveal"><span data-num>09</span> — <span data-bind="services.title"></span></p>
+      <h2 class="reveal" data-bind="services.lead"></h2>
+      <div class="cards" id="servicesGrid"></div>
+      <div class="services-cta reveal">
+        <a class="btn btn-solid" id="servicesCta" href="#" target="_blank" rel="noopener">
+          <svg class="icon" aria-hidden="true"><use href="#i-telegram"></use></svg>
+          <span data-bind="services.cta"></span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- КОНТАКТЫ -->
+  <section class="section" id="contacts">
+    <div class="wrap">
+      <p class="eyebrow reveal"><span data-num>10</span> — <span data-bind="contacts.title"></span></p>
+      <h2 class="reveal" data-bind="contacts.lead"></h2>
+      <ul class="contact-list reveal" id="contactsList"></ul>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <span data-bind="footer.note"></span>
+    <span>© <span id="year"></span> Alijon Mahmadjonov</span>
+  </div>
+</footer>
+
+<script src="js/i18n.js"></script>
+<script src="js/render.js"></script>
+<script src="js/motion.js"></script>
+</body>
+</html>

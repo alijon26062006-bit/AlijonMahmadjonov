@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="tg" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Лоиҳа — Alijon Mahmadjonov</title>
+<meta name="theme-color" content="#0A0A0B">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230A0A0B'/><text x='16' y='23' font-family='sans-serif' font-size='19' font-weight='700' fill='%23E8B24C' text-anchor='middle'>A</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+<script>document.documentElement.classList.remove('no-js');</script>
+</head>
+
+<body>
+<a class="skip-link" href="#main">К содержанию</a>
+
+<header class="nav scrolled" id="nav">
+  <a href="index.html" class="brand">Alijon<span>.</span></a>
+  <nav class="nav-links" id="menu" aria-label="Основная навигация">
+    <a href="index.html#projects" data-nav="projects">Проекты</a>
+    <a href="index.html#contacts" data-nav="contacts">Контакты</a>
+  </nav>
+  <div class="lang" role="group" aria-label="Забон / Язык">
+    <button type="button" data-lang="tj" aria-pressed="true">TJ</button>
+    <button type="button" data-lang="ru" aria-pressed="false">RU</button>
+  </div>
+  <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="menu" aria-label="Меню">
+    <svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg>
+  </button>
+</header>
+
+<main id="main" class="project-page">
+  <div class="wrap">
+    <a class="back-link" href="index.html#projects">
+      <svg class="icon" aria-hidden="true" style="transform:rotate(180deg)"><use href="#i-arrow-right"></use></svg>
+      <span id="backLabel"></span>
+    </a>
+    <article id="projectView"></article>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap"><span>© <span id="year"></span> Alijon Mahmadjonov</span></div>
+</footer>
+
+<script src="js/i18n.js"></script>
+<script src="js/render.js" data-page="project"></script>
+<script src="js/project.js"></script>
+<script src="js/motion.js"></script>
+</body>
+</html>
