@@ -1,0 +1,83 @@
+/* ===========================================================
+   Космический фон: держится за всей страницей.
+   Туманности — из CSS-градиентов, звёзды — на canvas,
+   поэтому ни одной лишней картинки не грузится.
+   =========================================================== */
+
+.cosmos {
+  position: fixed; inset: 0; z-index: var(--z-bg);
+  pointer-events: none; overflow: hidden;
+  background: var(--bg);
+}
+
+/* Туманности: несколько мягких пятен фирменных цветов */
+.cosmos::before {
+  content: ""; position: absolute; inset: -20%;
+  background:
+    radial-gradient(38vw 38vw at 12% 8%,  rgba(192, 92, 255, .20), transparent 62%),
+    radial-gradient(46vw 46vw at 88% 22%, rgba(255, 106, 77, .16), transparent 64%),
+    radial-gradient(52vw 52vw at 70% 78%, rgba(95, 217, 255, .10), transparent 66%),
+    radial-gradient(40vw 40vw at 22% 92%, rgba(255, 196, 107, .12), transparent 62%);
+  filter: blur(30px);
+}
+
+/* Виньетка — прижимает свет к центру, как в кино */
+.cosmos::after {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(120% 90% at 50% 40%, transparent 40%, rgba(6, 6, 12, .85) 100%);
+}
+
+#stars { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* --- Стекло ---------------------------------------------------- */
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+}
+
+/* Тонкий цветной кант поверху — так карточка «ловит свет» */
+.glass-lit { position: relative; overflow: hidden; }
+.glass-lit::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: var(--grad-line);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  opacity: .5; pointer-events: none;
+}
+
+/* --- Градиентный текст ------------------------------------------ */
+
+.grad-text {
+  background: var(--grad);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  /* если браузер не умеет clip — текст останется янтарным, а не исчезнет */
+  -webkit-text-fill-color: transparent;
+}
+@supports not (background-clip: text) {
+  .grad-text { color: var(--c-amber); -webkit-text-fill-color: currentColor; }
+}
+
+/* --- Метка-пилюля ------------------------------------------------ */
+
+.badge {
+  display: inline-flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-5); min-height: 34px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: var(--r-full);
+  backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
+  font-size: var(--fs-xs); font-weight: 600;
+  letter-spacing: var(--tracking-badge); text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.badge::before {
+  content: ""; width: 22px; height: 1px; background: var(--grad-line); flex: none;
+}
+.badge-dot::before {
+  width: 8px; height: 8px; border-radius: var(--r-full);
+  background: var(--ok); box-shadow: 0 0 12px var(--ok);
+}

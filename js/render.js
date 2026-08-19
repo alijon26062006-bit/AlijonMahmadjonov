@@ -13,10 +13,10 @@ function el(tag, opts = {}, children = []) {
   const node = document.createElement(tag);
   if (opts.class) node.className = opts.class;
   if (opts.text != null) node.textContent = opts.text;
-  if (opts.html != null) node.innerHTML = opts.html;   // только для собственных иконок
   for (const [k, v] of Object.entries(opts.attrs || {})) {
-    if (v != null && v !== false) node.setAttribute(k, v);
+    if (v != null && v !== false) node.setAttribute(k, v === true ? '' : v);
   }
+  for (const [k, v] of Object.entries(opts.style || {})) node.style.setProperty(k, v);
   for (const child of [].concat(children)) if (child) node.appendChild(child);
   return node;
 }
@@ -33,12 +33,22 @@ function icon(name, cls = 'icon') {
 
 function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
+/** Заголовок, где одно слово залито градиентом: {before, accent, after}. */
+function gradHeadline(node, parts) {
+  clear(node);
+  if (!parts) return;
+  if (parts.before) node.append(parts.before + ' ');
+  if (parts.accent) node.appendChild(el('span', { class: 'grad-text', text: parts.accent }));
+  if (parts.after) node.append(' ' + parts.after);
+}
+
 /** Иконки лежат одним файлом; браузеры надёжно видят их только внутри документа. */
 async function injectSprite() {
   try {
     const res = await fetch('icons/sprite.svg', { cache: 'force-cache' });
     if (!res.ok) return;
-    const holder = el('div', { attrs: { 'aria-hidden': 'true' }, html: await res.text() });
+    const holder = el('div', { attrs: { 'aria-hidden': 'true' } });
+    holder.innerHTML = await res.text();   // собственный файл, не пользовательские данные
     holder.style.display = 'none';
     document.body.prepend(holder);
   } catch (_) { /* без иконок сайт остаётся читаемым */ }
@@ -50,54 +60,84 @@ async function loadJSON(path) {
   return res.json();
 }
 
-/* --- секции --------------------------------------------------- */
+/* --- Первый экран ---------------------------------------------- */
 
 function renderHero(p) {
   const media = document.getElementById('heroMedia');
   clear(media);
 
   const poster = p.meta.videoPoster || p.meta.photo;
-  if (p.meta.video) {
-    // Видео тяжёлое: постер показывается сразу, файл подтягивается следом.
+  const wantsMotion = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // На узких экранах и при выключенном движении показываем кадр вместо видео —
+  // мобильный интернет не должен тянуть мегабайты ради фона.
+  const bigScreen = window.matchMedia('(min-width: 760px)').matches;
+
+  if (p.meta.video && wantsMotion && bigScreen) {
     const video = el('video', { attrs: {
-      autoplay: '', muted: '', loop: '', playsinline: '',
-      preload: 'none', poster
+      autoplay: true, muted: true, loop: true, playsinline: true, preload: 'none', poster
     }});
     video.muted = true;
     video.appendChild(el('source', { attrs: { src: p.meta.video, type: 'video/mp4' } }));
     media.appendChild(video);
     video.play().catch(() => {});
-  } else if (p.meta.photo) {
-    media.appendChild(el('img', { attrs: {
-      src: p.meta.photo, alt: '', decoding: 'async', fetchpriority: 'high'
-    }}));
+  } else if (poster) {
+    media.appendChild(el('img', { attrs: { src: poster, alt: '', decoding: 'async', fetchpriority: 'high' } }));
   }
 
-  const tg = p.contacts.items.find(c => c.icon === 'telegram');
-  if (tg) {
-    document.getElementById('heroCta1').href = tg.url;
-    document.getElementById('servicesCta').href = tg.url;
-  }
-}
+  gradHeadline(document.getElementById('heroTitle'), t(p.hero.headline, lang));
 
-function renderAbout(p) {
-  const facts = document.getElementById('facts');
-  clear(facts);
-  for (const f of p.about.facts) {
-    facts.appendChild(el('li', {}, [
-      el('span', { class: 'k', text: t(f.k, lang) }),
-      el('span', { class: 'v', text: t(f.v, lang) })
+  const stats = document.getElementById('stats');
+  clear(stats);
+  for (const s of p.hero.stats || []) {
+    stats.appendChild(el('li', {}, [
+      el('span', { class: 'v grad-text', text: s.v }),
+      el('span', { class: 'k', text: t(s.k, lang) })
     ]));
   }
+
+  // Лента дублируется, чтобы прокрутка на -50% выглядела бесшовной
+  const ticker = document.getElementById('ticker');
+  clear(ticker);
+  const words = p.hero.ticker || [];
+  for (const word of [...words, ...words]) ticker.appendChild(el('span', { text: word }));
+
+  const tg = p.contacts.items.find(c => c.icon === 'telegram');
+  if (tg) document.getElementById('heroCta1').href = tg.url;
+}
+
+/* --- Кто я ------------------------------------------------------ */
+
+function renderAbout(p) {
+  const portrait = document.getElementById('portrait');
+  clear(portrait);
+  if (p.meta.photo) {
+    portrait.append(
+      el('img', { attrs: { src: p.meta.photo, alt: p.meta.name, loading: 'lazy', decoding: 'async' } }),
+      el('figcaption', { class: 'badge badge-dot', text: t(p.about.statusBadge, lang) })
+    );
+  }
+
+  gradHeadline(document.getElementById('greeting'), t(p.about.greeting, lang));
 
   const body = document.getElementById('aboutBody');
   clear(body);
   for (const par of p.about.paragraphs) body.appendChild(el('p', { text: t(par, lang) }));
 
+  const stack = document.getElementById('stack');
+  clear(stack);
+  for (const item of p.about.stack || []) {
+    stack.appendChild(el('li', {}, [
+      el('span', { class: 'dot', style: { background: item.color || 'var(--c-ice)' } }),
+      el('span', { text: item.name })
+    ]));
+  }
+
   const work = document.getElementById('workBody');
   clear(work);
   for (const par of p.work.paragraphs) work.appendChild(el('p', { text: t(par, lang) }));
 }
+
+/* --- Путь, навыки, карточки -------------------------------------- */
 
 function renderTimeline(items) {
   const list = document.getElementById('timeline');
@@ -119,11 +159,8 @@ function renderSkills(p) {
   clear(list);
   for (const s of p.skills.items) {
     list.appendChild(el('li', { class: 'skill' }, [
-      el('span', { class: 'skill-name', text: s.name }),
-      el('span', {
-        class: 'level', text: t(p.skills.levels[s.level], lang),
-        attrs: { 'data-level': s.level }
-      })
+      el('span', { text: s.name }),
+      el('span', { class: 'level', text: t(p.skills.levels[s.level], lang), attrs: { 'data-level': s.level } })
     ]));
   }
 
@@ -139,9 +176,12 @@ function renderSkills(p) {
 
 function renderCards(containerId, items, build) {
   const box = document.getElementById(containerId);
+  if (!box) return;
   clear(box);
   for (const item of items) box.appendChild(build(item));
 }
+
+/* --- Проекты и дневник -------------------------------------------- */
 
 function renderProjects(p, projects) {
   const box = document.getElementById('projectsWrap');
@@ -150,34 +190,27 @@ function renderProjects(p, projects) {
   const visible = projects.filter(x => x.visible !== false);
   if (!visible.length) {
     box.appendChild(el('div', { class: 'empty reveal' }, [
-      icon('folder'),
-      el('p', { text: t(p.sections.projectsEmpty, lang) })
+      icon('folder'), el('p', { text: t(p.sections.projectsEmpty, lang) })
     ]));
     return;
   }
 
   const grid = el('div', { class: 'projects' });
   for (const pr of visible) {
-    const cover = pr.cover
-      ? el('div', { class: 'project-cover' }, [
-          el('img', { attrs: { src: pr.cover, alt: '', loading: 'lazy', decoding: 'async' } })
-        ])
-      : null;
-
     const tags = el('div', { class: 'project-tags' });
     if (pr.status) {
       tags.appendChild(el('span', {
-        class: 'status', text: t(p.sections.status[pr.status], lang),
-        attrs: { 'data-status': pr.status }
+        class: 'status', text: t(p.sections.status[pr.status], lang), attrs: { 'data-status': pr.status }
       }));
     }
     for (const tag of pr.tags || []) tags.appendChild(el('span', { class: 'tag', text: tag }));
 
     grid.appendChild(el('a', {
-      class: 'project reveal',
-      attrs: { href: 'project.html?slug=' + encodeURIComponent(pr.slug) }
+      class: 'project reveal', attrs: { href: 'project.html?slug=' + encodeURIComponent(pr.slug) }
     }, [
-      cover,
+      pr.cover ? el('div', { class: 'project-cover' }, [
+        el('img', { attrs: { src: pr.cover, alt: '', loading: 'lazy', decoding: 'async' } })
+      ]) : null,
       el('div', { class: 'project-body' }, [
         el('h3', { text: t(pr.title, lang) }),
         el('p', { text: t(pr.summary, lang) }),
@@ -205,24 +238,19 @@ function renderDiary(p, entries) {
 
   const sorted = [...entries].sort((a, b) => String(b.date).localeCompare(String(a.date)));
   if (!sorted.length) {
-    list.appendChild(el('li', { class: 'diary-item' }, [
-      el('p', { text: t(p.sections.diaryEmpty, lang) })
-    ]));
+    list.appendChild(el('li', { class: 'diary-item' }, [el('p', { text: t(p.sections.diaryEmpty, lang) })]));
     return;
   }
-
   for (const e of sorted) {
     list.appendChild(el('li', { class: 'diary-item reveal' }, [
-      el('time', { class: 'diary-date', attrs: { datetime: e.date } }, [
-        icon('calendar'), el('span', { text: formatDate(e.date, lang) })
-      ]),
-      el('div', {}, [
-        el('h3', { text: t(e.t, lang) }),
-        el('p', { text: t(e.d, lang) })
-      ])
+      el('time', { class: 'diary-date', attrs: { datetime: e.date } },
+        [icon('calendar'), el('span', { text: formatDate(e.date, lang) })]),
+      el('div', {}, [el('h3', { text: t(e.t, lang) }), el('p', { text: t(e.d, lang) })])
     ]));
   }
 }
+
+/* --- Контакты и форма заказа ---------------------------------------- */
 
 function renderContacts(p) {
   const list = document.getElementById('contactsList');
@@ -231,30 +259,49 @@ function renderContacts(p) {
     list.appendChild(el('li', {}, [
       el('a', { attrs: { href: c.url, target: '_blank', rel: 'noopener' } }, [
         icon(c.icon),
-        el('span', { class: 'contact-label', text: c.label }),
-        el('span', { class: 'contact-value', text: c.value }),
-        icon('arrow-right', 'icon go')
+        el('span', { class: 'contact-value', text: c.value })
       ])
     ]));
   }
+  gradHeadline(document.getElementById('formTitle'), t(p.contacts.formTitle, lang));
 }
 
-/* --- сборка страницы ------------------------------------------- */
+/**
+ * Сервера у сайта нет — GitHub Pages отдаёт только статику.
+ * Поэтому форма не «отправляет письмо», а открывает Telegram с готовым текстом.
+ */
+function wireOrderForm(p) {
+  const form = document.getElementById('orderForm');
+  if (!form || form.dataset.wired) return;
+  form.dataset.wired = '1';
+
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    const tg = DATA.profile.contacts.items.find(c => c.icon === 'telegram');
+    if (!tg) return;
+
+    const greeting = t(DATA.profile.contacts.form.greeting, lang);
+    const name = form.elements.name.value.trim();
+    const task = form.elements.task.value.trim();
+    const text = `${greeting} ${name}.\n\n${task}`;
+
+    window.open(`${tg.url}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+  });
+}
+
+/* --- Сборка страницы -------------------------------------------------- */
 
 /** Общее для всех страниц: подписи, навигация, год, кнопки языка. */
 function renderCommon() {
   const p = DATA.profile;
   document.documentElement.lang = HTML_LANG[lang];
 
-  // Простые подписи: элементы с data-bind="путь.в.профиле"
   for (const node of document.querySelectorAll('[data-bind]')) {
     node.textContent = t(pick(p, node.dataset.bind), lang);
   }
   for (const node of document.querySelectorAll('[data-nav]')) {
     node.textContent = t(p.nav[node.dataset.nav], lang);
   }
-  const skip = document.querySelector('.skip-link');
-  if (skip) skip.textContent = t(p.a11y.skip, lang);
 
   const year = document.getElementById('year');
   if (year) year.textContent = new Date().getFullYear();
@@ -264,7 +311,6 @@ function renderCommon() {
   }
 }
 
-/** Главная страница целиком. */
 function renderHome() {
   const p = DATA.profile;
   renderCommon();
@@ -273,31 +319,31 @@ function renderHome() {
   renderAbout(p);
   renderTimeline(DATA.timeline.items);
   renderSkills(p);
-  renderCards('principlesGrid', p.principles.items, item =>
+
+  gradHeadline(document.getElementById('advTitle'), t(p.advantages.title, lang));
+  renderCards('advantages', p.advantages.items, item =>
     el('div', { class: 'card reveal' }, [
+      el('div', { class: 'card-icon' }, [icon(item.icon)]),
       el('h3', { text: t(item.t, lang) }),
       el('p', { text: t(item.d, lang) })
     ]));
-  renderCards('goalsGrid', p.goals.items, item =>
-    el('div', { class: 'card reveal' }, [
-      el('span', { class: 'when', text: t(item.when, lang) }),
-      el('h3', { text: t(item.t, lang) }),
-      el('p', { text: t(item.d, lang) })
-    ]));
+
   renderCards('servicesGrid', p.services.items, item =>
     el('div', { class: 'card reveal' }, [
       el('div', { class: 'card-icon' }, [icon(item.icon)]),
       el('h3', { text: t(item.t, lang) }),
       el('p', { text: t(item.d, lang) })
     ]));
+
   renderProjects(p, DATA.projects.items);
   renderDiary(p, DATA.diary.items);
   renderContacts(p);
+  wireOrderForm(p);
 
   document.dispatchEvent(new CustomEvent('site:rendered'));
 }
 
-/** Главная знает себя по блоку с фото; остальные страницы рисуют себя сами. */
+/** Главная знает себя по блоку с фоном; остальные страницы рисуют себя сами. */
 function renderPage() {
   if (document.getElementById('heroMedia')) {
     renderHome();
@@ -320,9 +366,8 @@ async function boot() {
   } catch (err) {
     const main = document.getElementById('main');
     if (main) {
-      main.prepend(el('div', { class: 'wrap', attrs: { style: 'padding-top:6rem' } }, [
-        el('p', { text: 'Не удалось загрузить данные сайта: ' + err.message })
-      ]));
+      main.prepend(el('div', { class: 'wrap', style: { 'padding-top': '8rem' } },
+        [el('p', { text: 'Не удалось загрузить данные сайта: ' + err.message })]));
     }
     return;
   }
