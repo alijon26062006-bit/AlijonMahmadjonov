@@ -93,9 +93,8 @@ body {
 }
 .side-brand {
   font-weight: 700; letter-spacing: -.02em; padding: 0 var(--sp-3) var(--sp-5);
-  display: flex; align-items: center; gap: var(--sp-2);
 }
-.side-brand span { color: var(--accent); }
+.side-brand .accent { color: var(--accent); }
 
 .side nav { display: grid; gap: 2px; }
 .side nav button {

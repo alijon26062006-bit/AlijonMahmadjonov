@@ -11,6 +11,7 @@ let lang = 'tj';
 /** Создаёт элемент. Текст ставится через textContent — разметка из данных не исполняется. */
 function el(tag, opts = {}, children = []) {
   const node = document.createElement(tag);
+  if (opts.id) node.id = opts.id;
   if (opts.class) node.className = opts.class;
   if (opts.text != null) node.textContent = opts.text;
   for (const [k, v] of Object.entries(opts.attrs || {})) {
@@ -324,6 +325,13 @@ function renderHome() {
   renderCards('advantages', p.advantages.items, item =>
     el('div', { class: 'card reveal' }, [
       el('div', { class: 'card-icon' }, [icon(item.icon)]),
+      el('h3', { text: t(item.t, lang) }),
+      el('p', { text: t(item.d, lang) })
+    ]));
+
+  renderCards('goalsGrid', p.goals.items, item =>
+    el('div', { class: 'card reveal' }, [
+      el('span', { class: 'when', text: t(item.when, lang) }),
       el('h3', { text: t(item.t, lang) }),
       el('p', { text: t(item.d, lang) })
     ]));

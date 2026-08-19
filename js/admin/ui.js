@@ -8,6 +8,7 @@ const UI = (() => {
   /** Создаёт элемент. Текст всегда через textContent — разметка из данных не исполняется. */
   function h(tag, opts = {}, children = []) {
     const node = document.createElement(tag);
+    if (opts.id) node.id = opts.id;
     if (opts.class) node.className = opts.class;
     if (opts.text != null) node.textContent = opts.text;
     for (const [k, v] of Object.entries(opts.attrs || {})) {
@@ -101,13 +102,18 @@ const UI = (() => {
 
   /** Двуязычное поле: таджикский и русский рядом. */
   function bilingual({ label, value, onInput, multiline, hint }) {
-    const safe = value && typeof value === 'object' ? value : { tj: '', ru: '' };
+    // Копим значение здесь: если брать снимок при отрисовке, ввод во второе
+    // поле затирал бы то, что уже набрано в первом.
+    const current = { tj: '', ru: '', ...(value && typeof value === 'object' ? value : {}) };
     const make = (lang, caption) => {
       const control = h(multiline ? 'textarea' : 'input', {
         class: 'input',
-        props: { value: safe[lang] ?? '' },
+        props: { value: current[lang] ?? '' },
         attrs: { rows: multiline ? 4 : null, type: multiline ? null : 'text' },
-        on: { input: e => onInput({ ...safe, [lang]: e.target.value }, lang, e.target.value) }
+        on: { input: e => {
+          current[lang] = e.target.value;
+          onInput({ ...current }, lang, e.target.value);
+        }}
       });
       const id = control.id = nextId();
       return h('div', { class: 'bi-col' }, [
