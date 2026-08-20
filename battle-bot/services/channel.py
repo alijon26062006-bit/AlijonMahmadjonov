@@ -11,16 +11,22 @@ from aiogram.exceptions import TelegramAPIError, TelegramRetryAfter
 from config import Config
 from core.models import Slot
 from services import links, texts
+from services.emoji import is_emoji_rejection
 from storage.repo import Repo
 
 log = logging.getLogger(__name__)
 
 
 class ChannelPublisher:
-    def __init__(self, bot: Bot, repo: Repo, config: Config) -> None:
+    def __init__(
+        self, bot: Bot, repo: Repo, config: Config, emoji_skip: set[int] | None = None
+    ) -> None:
         self.bot = bot
         self.repo = repo
         self.config = config
+        # общий с middleware набор чатов, где премиум-эмодзи не подставляются:
+        # добавив сюда канал, мы разом выключаем их для всех будущих постов
+        self.emoji_skip = emoji_skip if emoji_skip is not None else set()
 
     async def publish_match(self, match_id: int) -> int | None:
         """Опубликовать пост матча и запомнить message_id."""
@@ -63,8 +69,8 @@ class ChannelPublisher:
         await self._send(text)
 
     async def _send(self, text: str, reply_to: int | None = None):
-        """Отправка с уважением к лимитам Telegram: пауза между постами и
-        повтор после 429."""
+        """Отправка с уважением к лимитам Telegram: пауза между постами,
+        повтор после 429 и откат на обычные эмодзи, если премиум не приняли."""
         for attempt in range(3):
             try:
                 message = await self.bot.send_message(
@@ -79,6 +85,30 @@ class ChannelPublisher:
                 log.warning("Лимит канала, ждём %s c", error.retry_after)
                 await asyncio.sleep(error.retry_after + 1)
             except TelegramAPIError as error:
+                if self._disable_channel_emoji(error):
+                    continue  # тот же текст, но уже без премиум-эмодзи
                 log.error("Не удалось отправить пост в канал (попытка %s): %s", attempt + 1, error)
-                await asyncio.sleep(2 * (attempt + 1))
+                # выдержка растёт с каждой попыткой и опирается на ту же
+                # настройку, что и пауза между постами
+                await asyncio.sleep(self.config.publish_delay * 2 * (attempt + 1))
         return None
+
+    def _disable_channel_emoji(self, error: TelegramAPIError) -> bool:
+        """Отключить премиум-эмодзи для канала, если Telegram отказал из-за них.
+
+        Купленного на Fragment username у бота может не быть, а проверить это
+        заранее нечем. Поэтому первый отказ считаем ответом и дальше постим
+        обычными эмодзи — батл важнее оформления.
+        """
+        channel = self.config.channel_id
+        if channel in self.emoji_skip or not is_emoji_rejection(error):
+            return False
+
+        self.emoji_skip.add(channel)
+        log.warning(
+            "Telegram не принял премиум-эмодзи в канале (%s). "
+            "Для постов канала они отключены — нужен купленный на Fragment "
+            "username. Повторяю обычными.",
+            error,
+        )
+        return True

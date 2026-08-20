@@ -15,7 +15,10 @@ Telegram показывает премиум-эмодзи через HTML-тег
 * отправлять custom emoji может бот, купивший дополнительный username на
   Fragment, либо — в личных чатах, группах и супергруппах — бот, у владельца
   которого есть Telegram Premium. На посты в канал второе правило НЕ
-  распространяется: там нужен именно Fragment-username;
+  распространяется: там нужен именно Fragment-username. Заранее это не
+  проверить, поэтому по умолчанию бот пробует отправить премиум-эмодзи в
+  канал и при отказе Telegram один раз повторяет обычными — и дальше в канал
+  их уже не шлёт (см. ChannelPublisher);
 * на кнопках премиум-эмодзи показывается через отдельное поле
   ``icon_custom_emoji_id`` — одна иконка перед подписью, внутрь текста кнопки
   её не вставить.
@@ -36,6 +39,15 @@ log = logging.getLogger(__name__)
 PROTECTED = re.compile(r"<tg-emoji\b[^>]*>.*?</tg-emoji>|<[^>]+>", re.DOTALL)
 
 TEXT_FIELDS = ("text", "caption")
+
+# по этим словам узнаём отказ Telegram именно из-за премиум-эмодзи
+REJECTION_MARKERS = ("custom_emoji", "custom emoji", "emoji")
+
+
+def is_emoji_rejection(error: object) -> bool:
+    """Telegram отказал из-за премиум-эмодзи, а не по другой причине?"""
+    text = str(error).lower()
+    return any(marker in text for marker in REJECTION_MARKERS)
 
 
 def load_table(path: str | Path) -> dict[str, str]:

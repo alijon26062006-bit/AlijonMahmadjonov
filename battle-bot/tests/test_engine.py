@@ -53,7 +53,7 @@ def make_config(**overrides) -> Config:
         paid_votes_enabled=True,
         vote_packs=[VotePack(1, 15)],
         premium_emoji_file="",
-        premium_emoji_in_channel=False,
+        premium_emoji_in_channel="auto",
         prizes=[1000, 500, 250],
         publish_delay=0.0,
         dm_delay=0.0,

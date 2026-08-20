@@ -21,11 +21,13 @@ log = logging.getLogger(__name__)
 
 
 class BattleEngine:
-    def __init__(self, bot: Bot, repo: Repo, config: Config) -> None:
+    def __init__(
+        self, bot: Bot, repo: Repo, config: Config, emoji_skip: set[int] | None = None
+    ) -> None:
         self.bot = bot
         self.repo = repo
         self.config = config
-        self.publisher = ChannelPublisher(bot, repo, config)
+        self.publisher = ChannelPublisher(bot, repo, config, emoji_skip)
         self.rng = random.Random()
         self._lock = asyncio.Lock()  # заявки приходят пачками — пары режем по одной
 

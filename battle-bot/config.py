@@ -70,7 +70,7 @@ class Config:
     vote_packs: list[VotePack]
 
     premium_emoji_file: str  # JSON «символ -> emoji_id», пусто -> обычные эмодзи
-    premium_emoji_in_channel: bool  # см. комментарий в services/emoji.py
+    premium_emoji_in_channel: str   # "auto" | "1" | "0", см. services/emoji.py
     prizes: list[int]        # звёзды за 1/2/3 место
     publish_delay: float     # пауза между постами, чтобы не ловить лимиты Telegram
     dm_delay: float          # пауза между личными сообщениями при рассылке
@@ -110,7 +110,7 @@ def load_config() -> Config:
         paid_votes_enabled=os.getenv("PAID_VOTES", "1") == "1",
         vote_packs=packs,
         premium_emoji_file=os.getenv("PREMIUM_EMOJI_FILE", "premium_emoji.json"),
-        premium_emoji_in_channel=os.getenv("PREMIUM_EMOJI_IN_CHANNEL", "0") == "1",
+        premium_emoji_in_channel=os.getenv("PREMIUM_EMOJI_IN_CHANNEL", "auto").lower(),
         prizes=prizes,
         publish_delay=float(os.getenv("PUBLISH_DELAY", "1.0")),
         dm_delay=float(os.getenv("DM_DELAY", "0.05")),

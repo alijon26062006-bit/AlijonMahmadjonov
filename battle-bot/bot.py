@@ -46,10 +46,13 @@ async def main() -> None:
     )
     # таблица одна на всех: middleware подменяет по ней, /emojiset её пополняет
     config.premium_emoji = load_table(config.premium_emoji_file)
-    skip = set() if config.premium_emoji_in_channel else {config.channel_id}
-    bot.session.middleware(PremiumEmojiMiddleware(config.premium_emoji, skip))
+    # "0" — никогда, "1" — всегда, "auto" — пробуем и отключаем при отказе
+    emoji_skip: set[int] = set()
+    if config.premium_emoji_in_channel == "0":
+        emoji_skip.add(config.channel_id)
+    bot.session.middleware(PremiumEmojiMiddleware(config.premium_emoji, emoji_skip))
 
-    engine = BattleEngine(bot, repo, config)
+    engine = BattleEngine(bot, repo, config, emoji_skip)
 
     dispatcher = Dispatcher()
     # общие зависимости — прилетают в обработчики как аргументы
