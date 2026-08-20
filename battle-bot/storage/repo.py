@@ -67,6 +67,17 @@ class Repo:
         )
         self.conn.commit()
 
+    def extend_deadlines(self, battle_id: int, deadline: datetime) -> None:
+        """Сдвинуть дедлайн батла и всех ещё открытых матчей."""
+        self.conn.execute(
+            "UPDATE battles SET deadline = ? WHERE id = ?", (deadline.isoformat(), battle_id)
+        )
+        self.conn.execute(
+            "UPDATE matches SET deadline = ? WHERE battle_id = ? AND status = ?",
+            (deadline.isoformat(), battle_id, MatchStatus.VOTING.value),
+        )
+        self.conn.commit()
+
     def set_round(self, battle_id: int, round_no: int, deadline: datetime) -> None:
         self.conn.execute(
             "UPDATE battles SET round_no = ?, deadline = ? WHERE id = ?",

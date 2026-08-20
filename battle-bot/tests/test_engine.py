@@ -192,7 +192,7 @@ async def test_a_single_applicant_keeps_registration_open(env):
     assert battle is not None
     assert battle["status"] == BattleStatus.REGISTRATION.value
     assert battle["round_no"] == 1
-    assert bot.channel_posts == []
+    assert "переносится" in "".join(bot.channel_posts)
     # дедлайн всегда впереди, иначе фоновая задача крутила бы итоги без остановки
     assert datetime.fromisoformat(battle["deadline"]) > engine.now()
 
@@ -242,3 +242,47 @@ async def test_large_battle_runs_to_a_champion(env):
         for row in repo.conn.execute("SELECT user_id FROM participants WHERE place = 1")
     ]
     assert len(champions) == 1
+
+
+@pytest.mark.asyncio
+async def test_too_few_applications_postpone_the_battle_and_keep_the_votes(tmp_path):
+    """Батл с призами не должен стартовать на паре человек."""
+    repo = Repo(connect(str(tmp_path / "few.db")))
+    bot = FakeBot()
+    config = make_config(db_path=str(tmp_path / "few.db"), min_participants=6)
+    engine = BattleEngine(bot, repo, config)
+
+    await join_users(engine, repo, 4)
+    vote_for(repo, 1, target_id=1, voters=range(1000, 1003))
+
+    await engine.close_round()
+
+    battle = repo.current_battle()
+    assert battle["status"] == BattleStatus.REGISTRATION.value
+    assert battle["round_no"] == 1
+    assert "переносится" in "".join(bot.channel_posts)
+    # новый дедлайн всегда в будущем (в бою это следующий день — см. test_scheduler)
+    assert datetime.fromisoformat(battle["deadline"]) > engine.now()
+
+    # матчи остались открытыми, голоса на месте, дедлайн у них тоже сдвинут
+    open_matches = repo.open_matches(1, 1)
+    assert len(open_matches) == 2
+    assert open_matches[0]["deadline"] == battle["deadline"]
+    assert {s.user_id: s.votes for s in repo.match_slots(1)} == {1: 3, 2: 0}
+
+
+@pytest.mark.asyncio
+async def test_battle_starts_once_enough_people_applied(tmp_path):
+    repo = Repo(connect(str(tmp_path / "enough.db")))
+    bot = FakeBot()
+    config = make_config(db_path=str(tmp_path / "enough.db"), min_participants=6)
+    engine = BattleEngine(bot, repo, config)
+
+    await join_users(engine, repo, 6)
+    for match_id, winner in ((1, 1), (2, 3), (3, 5)):
+        vote_for(repo, match_id, winner, range(match_id * 100, match_id * 100 + 3))
+
+    await engine.close_round()
+
+    assert repo.current_battle()["round_no"] == 2
+    assert {p.user_id for p in repo.alive_players(1)} == {1, 3, 5}

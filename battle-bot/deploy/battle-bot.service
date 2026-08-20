@@ -1,0 +1,26 @@
+[Unit]
+Description=Битва ников — Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=battlebot
+WorkingDirectory=/opt/battle-bot
+EnvironmentFile=/opt/battle-bot/.env
+ExecStart=/opt/battle-bot/.venv/bin/python /opt/battle-bot/bot.py
+Restart=always
+RestartSec=5
+
+# бот пишет только в свой каталог
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/battle-bot
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

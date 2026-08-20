@@ -135,10 +135,15 @@ class BattleEngine:
         round_no = int(battle["round_no"])
         matches = self.repo.open_matches(battle_id, round_no)
 
+        if round_no == 1:
+            applied = self.repo.participant_count(battle_id)
+            if applied < self.config.min_participants:
+                # заявок слишком мало — играть батл с призами нет смысла,
+                # продлеваем приём и переносим итоги на следующий слот
+                await self._reschedule_registration(battle_id, applied)
+                return
+
         if not matches:
-            # ни одной пары не набралось — переносим приём заявок
-            if round_no == 1:
-                await self._reschedule_registration(battle_id)
             return
 
         advanced: list[int] = []
@@ -219,10 +224,17 @@ class BattleEngine:
                 f"<code>{links.vote_link(self.config.bot_username, match_id)}</code>",
             )
 
-    async def _reschedule_registration(self, battle_id: int) -> None:
+    async def _reschedule_registration(self, battle_id: int, applied: int) -> None:
+        """Мало заявок: сдвигаем дедлайн, уже отданные голоса сохраняются."""
         deadline = deadline_for_round(1, self.now(), self.config.round_times)
-        self.repo.set_round(battle_id, 1, deadline)
-        log.info("Пар не набралось, приём заявок продлён до %s", deadline)
+        self.repo.extend_deadlines(battle_id, deadline)
+        log.info("Заявок %s из %s — приём продлён до %s",
+                 applied, self.config.min_participants, deadline)
+        await self.publisher.announce(
+            f"⏳ <b>Батл переносится</b>\n\n"
+            f"Набралось заявок: {applied} из {self.config.min_participants}.\n"
+            f"Приём продолжается, {texts.deadline_line(deadline).lstrip('🗓 ')}"
+        )
 
     async def _finish_battle(self, battle_id: int, ranking: list[Slot]) -> None:
         for slot in ranking:

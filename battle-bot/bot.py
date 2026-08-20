@@ -13,6 +13,7 @@ from config import load_config
 from core.engine import BattleEngine
 from core.scheduler import DeadlineWatcher
 from handlers import admin, payments, start, voting
+from services.startup import SetupError, prepare
 from storage.db import connect
 from storage.repo import Repo
 
@@ -60,9 +61,16 @@ async def main() -> None:
         on_due=engine.close_round,
     )
 
+    try:
+        username = await prepare(bot, config)
+    except SetupError as error:
+        log.error("Бот не запущен.\n%s", error)
+        await bot.session.close()
+        conn.close()
+        return
+
     await bot.set_my_commands(COMMANDS)
-    me = await bot.get_me()
-    log.info("Запущен как @%s, канал %s", me.username, config.channel_id)
+    log.info("Запущен как @%s", username)
 
     watcher.start()
     try:

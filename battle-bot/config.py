@@ -51,12 +51,12 @@ class VotePack:
         return f"{self.votes} голосов"
 
 
-@dataclass(frozen=True)
+@dataclass
 class Config:
     bot_token: str
-    bot_username: str
+    bot_username: str        # пусто -> спросим у Telegram при запуске
     channel_id: int          # -100... — куда постим пары
-    channel_url: str         # https://t.me/... — на что подписываться
+    channel_url: str         # пусто -> возьмём из данных канала
     admin_ids: list[int]
 
     db_path: str
@@ -91,9 +91,9 @@ def load_config() -> Config:
 
     return Config(
         bot_token=_env("BOT_TOKEN"),
-        bot_username=_env("BOT_USERNAME").lstrip("@"),
+        bot_username=os.getenv("BOT_USERNAME", "").lstrip("@"),
         channel_id=int(_env("CHANNEL_ID")),
-        channel_url=_env("CHANNEL_URL"),
+        channel_url=os.getenv("CHANNEL_URL", ""),
         admin_ids=_env_ids("ADMIN_IDS"),
         db_path=os.getenv("DB_PATH", "battle.db"),
         round_times=_parse_times(os.getenv("ROUND_TIMES", "18:00,19:30,21:00,22:15,23:30")),

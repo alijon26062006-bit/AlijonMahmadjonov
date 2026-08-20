@@ -34,26 +34,44 @@
 257 участников → 257 → 129 → 32 → 8 → 4 → чемпион
 ```
 
-## Запуск
+## Что нужно подготовить
+
+* бот от [@BotFather](https://t.me/BotFather) — токен в `BOT_TOKEN`;
+* канал, где **бот назначен админом** с правом публикации — его ID в `CHANNEL_ID`
+  (вид `-100...`);
+* свой Telegram ID в `ADMIN_IDS`.
+
+`BOT_USERNAME` и `CHANNEL_URL` можно оставить пустыми — бот спросит их у Telegram
+при запуске. Тогда же он проверит, что видит канал и действительно в нём админ:
+если нет — напишет, что именно не так, и не стартует.
+
+Бот работает на long polling — домен и HTTPS не нужны.
+
+## Запуск локально
 
 ```bash
 cd battle-bot
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-cp .env.example .env      # заполнить BOT_TOKEN, BOT_USERNAME, CHANNEL_ID, ADMIN_IDS
+cp .env.example .env      # заполнить BOT_TOKEN, CHANNEL_ID, ADMIN_IDS
 set -a && source .env && set +a
 python bot.py
 ```
 
-Что нужно подготовить:
+## Запуск на сервере
 
-* бот от [@BotFather](https://t.me/BotFather) — токен в `BOT_TOKEN`;
-* канал, где **бот назначен админом** с правом публикации — его ID в `CHANNEL_ID`
-  (вид `-100...`), публичная ссылка в `CHANNEL_URL`;
-* свой Telegram ID в `ADMIN_IDS`.
+```bash
+git clone <репозиторий> battle-bot && cd battle-bot
+bash deploy/install.sh          # от root
+nano /opt/battle-bot/.env       # заполнить настройки
+systemctl start battle-bot
+journalctl -u battle-bot -f     # логи
+```
 
-Бот работает на long polling — домен и HTTPS не нужны.
+`deploy/install.sh` ставит зависимости, заводит отдельного системного
+пользователя `battlebot` и службу systemd с автоперезапуском. `.env` кладётся
+с правами `600` и не попадает в git.
 
 ## Команды
 
@@ -79,6 +97,10 @@ python bot.py
   в БД, поэтому ограничение переживает перезапуск бота;
 * полный лог голосов (`/votelog`) — можно разобрать спорный финал;
 * бан аккаунтов (`/ban`).
+
+Если к дедлайну заявок меньше `MIN_PARTICIPANTS`, батл не стартует: приём
+продлевается до следующего слота, уже отданные голоса сохраняются. Иначе приз
+в 1000⭐ разыгрывался бы между двумя случайными людьми.
 
 ## Покупка голосов
 
