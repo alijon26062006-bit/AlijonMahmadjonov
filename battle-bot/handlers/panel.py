@@ -700,7 +700,13 @@ async def person_action(callback: CallbackQuery, repo: Repo, config: Config) -> 
 
 # ---------------------------------------------------------- страховка
 
-@router.callback_query(F.data.startswith("p:"))
+# Отдельный роутер: он подключается последним, после всех остальных. Иначе
+# страховка перехватывала бы кнопки соседних разделов — например «Рассылку»,
+# которая живёт в своём мастере, — и они переставали бы работать.
+fallback_router = Router(name="panel-fallback")
+
+
+@fallback_router.callback_query(F.data.startswith("p:"))
 async def unknown_button(
     callback: CallbackQuery, repo: Repo, config: Config, engine: BattleEngine,
     state: FSMContext
@@ -709,8 +715,7 @@ async def unknown_button(
 
     Так бывает у старого сообщения панели, оставшегося от прошлой версии бота.
     Молчащая кнопка выглядит как поломка, поэтому отвечаем и открываем панель
-    заново вместо тишины. Регистрируется последней, поэтому обычные кнопки
-    забирают своё раньше.
+    заново вместо тишины.
     """
     if not is_admin(callback.from_user.id, config):
         await callback.answer("Панель доступна только администраторам.", show_alert=True)

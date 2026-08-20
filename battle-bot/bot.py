@@ -41,6 +41,27 @@ COMMANDS = [
 ]
 
 
+# Порядок важен: первый подходящий обработчик забирает событие.
+# Страховка панели идёт последней, иначе она перехватывала бы чужие кнопки.
+ROUTERS = (
+    errors.router,
+    panel.router,
+    broadcast.router,
+    admin.router,
+    emoji.router,
+    payments.router,
+    referral.router,
+    start.router,
+    voting.router,
+    panel.fallback_router,
+)
+
+
+def include_routers(dispatcher: Dispatcher) -> None:
+    for router in ROUTERS:
+        dispatcher.include_router(router)
+
+
 async def main() -> None:
     config = load_config()
     conn = connect(config.db_path)
@@ -75,15 +96,7 @@ async def main() -> None:
     dispatcher["emoji_table"] = config.premium_emoji
     dispatcher["settings"] = settings
 
-    dispatcher.include_router(errors.router)
-    dispatcher.include_router(panel.router)
-    dispatcher.include_router(broadcast.router)
-    dispatcher.include_router(admin.router)
-    dispatcher.include_router(emoji.router)
-    dispatcher.include_router(payments.router)
-    dispatcher.include_router(referral.router)
-    dispatcher.include_router(start.router)
-    dispatcher.include_router(voting.router)
+    include_routers(dispatcher)
 
     watcher = DeadlineWatcher(
         due_deadline=engine.current_deadline,

@@ -510,13 +510,35 @@ def test_navigation_clears_the_input_mode():
     assert "leave_input_mode" in middlewares
 
 
-@pytest.mark.asyncio
-async def test_an_unknown_button_is_answered_instead_of_ignored():
-    from handlers import panel as panel_module
+def first_handler(data: str) -> str:
+    """Кто на самом деле обработает кнопку с учётом порядка роутеров."""
+    import bot as bot_module
 
-    names = [h.callback.__name__ for h in panel_module.router.callback_query.handlers]
-    assert names[-1] == "unknown_button", "страховка обязана стоять последней"
-    assert handlers_for("p:home") == ["go_home"], "обычные кнопки не должны попадать в неё"
+    for router in bot_module.ROUTERS:
+        for handler in router.callback_query.handlers:
+            if all(f.callback(CallbackStub(data)) for f in handler.filters or []):
+                return handler.callback.__name__
+    return ""
+
+
+def test_the_fallback_is_registered_last():
+    """Страховка должна стоять после всех, иначе она съедает чужие кнопки."""
+    import bot as bot_module
+
+    assert bot_module.ROUTERS[-1].name == "panel-fallback"
+    assert bot_module.ROUTERS[-1] is not bot_module.ROUTERS[1], "это отдельный роутер"
+
+
+def test_the_fallback_does_not_steal_buttons_of_other_sections():
+    """Ровно эта ошибка ломала «Рассылку»: страховка панели забирала её кнопку."""
+    assert first_handler("p:broadcast") == "start_cast"
+    assert first_handler("p:home") == "go_home"
+    assert first_handler("p:battle") == "show_battle"
+    assert first_handler("p:referrals") == "show_referrals"
+
+
+def test_a_truly_unknown_button_still_reaches_the_fallback():
+    assert first_handler("p:такого-нет") == "unknown_button"
 
 
 # ------------------------------------- сценарий «задать главный канал»
