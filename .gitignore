@@ -7,4 +7,3 @@ __pycache__/
 *.db-shm
 .env
 .pytest_cache/
-premium_emoji.json

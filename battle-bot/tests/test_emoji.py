@@ -179,3 +179,28 @@ def test_saved_table_can_be_read_back(tmp_path):
     path = tmp_path / "sub" / "table.json"
     save_table(path, {"🏆": "555", "⭐": "666"})
     assert load_table(path) == {"🏆": "555", "⭐": "666"}
+
+
+def test_shipped_table_matches_the_template():
+    """premium_emoji.json не должен разъезжаться с шаблоном и со списком мест."""
+    root = Path(__file__).resolve().parents[1]
+    table = json.loads((root / "premium_emoji.json").read_text(encoding="utf-8"))
+    template = json.loads((root / "premium_emoji.example.json").read_text(encoding="utf-8"))
+
+    assert set(table) == set(template), "набор символов разошёлся с шаблоном"
+
+    filled = {char: value for char, value in table.items() if value}
+    assert len(filled) == 21
+    assert all(value.isdigit() for value in filled.values()), "ID должны быть числовыми"
+    assert len(set(filled.values())) == len(filled), "один ID не должен стоять дважды"
+
+
+def test_preview_covers_every_symbol_in_the_table():
+    from handlers.emoji import PLACES
+
+    root = Path(__file__).resolve().parents[1]
+    table = json.loads((root / "premium_emoji.json").read_text(encoding="utf-8"))
+    places = dict(PLACES)
+
+    assert set(places) == set(table), "предпросмотр и таблица должны совпадать"
+    assert len(PLACES) == len(places), "в предпросмотре есть дубли"

@@ -27,6 +27,8 @@ HOWTO = (
     "/emojiid — показать ID (ответом на сообщение или в одном сообщении с ним)\n"
     "/emojiset — то же, но сразу сохранить в таблицу\n"
     "/emojilist — что сейчас в таблице\n"
+    "/emojipreview — увидеть, как это выглядит в боте\n"
+    "/emojimap 🏆 5188344996356448758 — задать ID вручную\n"
     "/emojidel 🏆 — убрать символ из таблицы\n\n"
     "<i>Ставить премиум-эмодзи в сообщение может аккаунт с Telegram Premium. "
     "Если его нет — перешлите боту любой пост, где такие эмодзи уже стоят.</i>"
@@ -114,3 +116,81 @@ async def delete_from_table(message: Message, config: Config, emoji_table: dict)
 
     save_table(config.premium_emoji_file, emoji_table)
     await message.answer(f"Убрано: {' '.join(removed)}. В таблице осталось {len(emoji_table)}.")
+
+
+# где какой символ показывается — для предпросмотра
+PLACES = [
+    ("🍋", "«Призы за финал» в посте"),
+    ("📊", "ПРОГОЛОСОВАТЬ в посте"),
+    ("🎫", "Принять участие в посте"),
+    ("🗓", "Итоги в 18:00 МСК"),
+    ("⭐", "звёзды: призы и баланс"),
+    ("🏆", "итоги финала, титулы"),
+    ("🥇", "первое место"),
+    ("🥈", "второе место"),
+    ("🥉", "третье место"),
+    ("🏅", "таблица лидеров"),
+    ("✅", "заявка принята, прошёл дальше"),
+    ("❌", "вы проиграли"),
+    ("⚔", "ваш пост опубликован"),
+    ("🎟", "проход без боя"),
+    ("🔥", "вы прошли дальше"),
+    ("🎲", "победитель по жребию"),
+    ("🚀", "заголовок ГОЛОСОВАНИЕ"),
+    ("🎁", "выбор голоса, покупка"),
+    ("👤", "профиль"),
+    ("🧾", "история покупок"),
+    ("⚠", "нужна подписка"),
+    ("👋", "приветствие"),
+    ("🛠", "админка"),
+    ("👑", "корона лидера (кнопка)"),
+    ("⚡", "кнопка «Участвовать снова»"),
+]
+
+
+@router.message(Command("emojipreview"))
+async def preview(message: Message, config: Config, emoji_table: dict) -> None:
+    """Показать все символы разом — так видно, что куда встало."""
+    if message.from_user.id not in config.admin_ids:
+        return
+
+    lines = []
+    for char, where in PLACES:
+        mark = "" if emoji_table.get(char) else "  ← без ID"
+        lines.append(f"{char} — {escape(where)}{mark}")
+
+    filled = sum(1 for char, _ in PLACES if emoji_table.get(char))
+    await message.answer(
+        f"🎨 <b>Предпросмотр</b> — {filled} из {len(PLACES)} с премиум-эмодзи\n\n"
+        + "\n".join(lines)
+        + "\n\n<i>Не тот символ? Поправьте: /emojimap ❌ &lt;ID нужного&gt;</i>"
+    )
+
+
+@router.message(Command("emojimap"))
+async def map_by_id(message: Message, config: Config, emoji_table: dict) -> None:
+    """Задать ID вручную — удобно, когда список ID уже на руках."""
+    if message.from_user.id not in config.admin_ids:
+        return
+
+    parts = (message.text or "").split()
+    if len(parts) != 3 or not parts[2].isdigit():
+        await message.answer(
+            "Формат: <code>/emojimap 🏆 5188344996356448758</code>\n\n"
+            "Символ — обычный, ID — числовой."
+        )
+        return
+
+    char, emoji_id = parts[1], parts[2]
+    if len(char) > 4:  # эмодзи может быть составным, но не строкой текста
+        await message.answer("Первым аргументом нужен один символ.")
+        return
+
+    previous = emoji_table.get(char)
+    emoji_table[char] = emoji_id
+    save_table(config.premium_emoji_file, emoji_table)
+
+    was = f"\nБыло: <code>{previous}</code>" if previous else ""
+    await message.answer(
+        f"✅ {char} → <code>{emoji_id}</code>{was}\n\nПрименилось сразу."
+    )
