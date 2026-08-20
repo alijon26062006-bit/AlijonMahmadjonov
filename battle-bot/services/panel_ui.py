@@ -5,7 +5,6 @@
 """
 from __future__ import annotations
 
-from datetime import datetime
 from html import escape
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup

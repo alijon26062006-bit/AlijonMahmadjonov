@@ -308,18 +308,6 @@ async def ask_value(
     field = FIELDS.get(key)
     current = settings.get(key) if field else ""
     shown = field.dump(current) if field else str(current)
-    if key == "main_channel_id":
-        # ID искать не надо: достаточно переслать в бота любой пост из канала
-        channel_id = _channel_from_forward(message)
-        if channel_id is None:
-            channel_id = validation.as_int(message.text or "", example="-1001234567890")
-        settings.set("main_channel_id", channel_id)
-        settings.set("main_post_message_id", 0)  # новый канал — новый пост
-        await state.clear()
-        await message.answer(f"✅ Главный канал: <code>{channel_id}</code>")
-        await render(message, panel_ui.channel(main_post.state(repo, config, settings)))
-        return
-
     if key == "main_post_photo":
         shown = "загружено" if shown else "нет"
 

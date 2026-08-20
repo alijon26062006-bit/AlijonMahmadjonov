@@ -509,3 +509,121 @@ async def test_an_unknown_button_is_answered_instead_of_ignored():
     names = [h.callback.__name__ for h in panel_module.router.callback_query.handlers]
     assert names[-1] == "unknown_button", "страховка обязана стоять последней"
     assert handlers_for("p:home") == ["go_home"], "обычные кнопки не должны попадать в неё"
+
+
+# ------------------------------------- сценарий «задать главный канал»
+
+class FakeUser:
+    def __init__(self, user_id: int = 1) -> None:
+        self.id = user_id
+        self.username = "admin"
+        self.first_name = "Admin"
+
+
+class FakeMessage:
+    """Сообщение от админа: текст или пересылка."""
+
+    def __init__(self, text: str = "", forward_origin=None, user_id: int = 1) -> None:
+        self.text = text
+        self.forward_origin = forward_origin
+        self.photo = None
+        self.from_user = FakeUser(user_id)
+        self.replies: list[str] = []
+
+    async def answer(self, text, reply_markup=None, **kwargs):
+        self.replies.append(text)
+        return self
+
+
+class FakeState:
+    def __init__(self, data: dict) -> None:
+        self.data = data
+        self.cleared = False
+
+    async def get_data(self):
+        return self.data
+
+    async def clear(self):
+        self.cleared = True
+
+    async def set_state(self, *args, **kwargs):
+        pass
+
+    async def update_data(self, **kwargs):
+        self.data.update(kwargs)
+
+
+@pytest.mark.asyncio
+async def test_setting_the_main_channel_by_id(env):
+    repo, config, settings, engine = env
+    message = FakeMessage(text="-1003775036903")
+    state = FakeState({"key": "main_channel_id", "back": "channel"})
+
+    await panel.receive_value(message, repo, config, engine, settings, state)
+
+    assert settings.get("main_channel_id") == -1003775036903
+    assert state.cleared, "после сохранения ожидание ввода должно сняться"
+    assert any("Главный канал" in reply for reply in message.replies)
+
+
+@pytest.mark.asyncio
+async def test_setting_the_main_channel_by_forwarding_a_post(env):
+    """Ровно тот сценарий, который падал с NameError."""
+    from datetime import datetime
+
+    from aiogram.types import Chat, MessageOriginChannel
+
+    repo, config, settings, engine = env
+    message = FakeMessage(
+        forward_origin=MessageOriginChannel(
+            type="channel",
+            date=datetime(2026, 8, 20),
+            chat=Chat(id=-1003775036903, type="channel", title="Батлы"),
+            message_id=7,
+        )
+    )
+    state = FakeState({"key": "main_channel_id", "back": "channel"})
+
+    await panel.receive_value(message, repo, config, engine, settings, state)
+
+    assert settings.get("main_channel_id") == -1003775036903
+    assert state.cleared
+
+
+@pytest.mark.asyncio
+async def test_a_wrong_channel_value_is_explained_and_input_stays_open(env):
+    repo, config, settings, engine = env
+    message = FakeMessage(text="мой канал")
+    state = FakeState({"key": "main_channel_id", "back": "channel"})
+
+    await panel.receive_value(message, repo, config, engine, settings, state)
+
+    assert settings.get("main_channel_id") == 0, "мусор не должен сохраняться"
+    assert not state.cleared, "человек остаётся в вводе и может попробовать снова"
+    assert any("Нужно число" in reply for reply in message.replies)
+
+
+@pytest.mark.asyncio
+async def test_changing_the_channel_forgets_the_old_post(env):
+    """Новый канал — старый message_id больше ни на что не указывает."""
+    repo, config, settings, engine = env
+    settings.set("main_post_message_id", 555)
+
+    message = FakeMessage(text="-1004444444444")
+    state = FakeState({"key": "main_channel_id", "back": "channel"})
+    await panel.receive_value(message, repo, config, engine, settings, state)
+
+    assert settings.get("main_post_message_id") == 0
+
+
+@pytest.mark.asyncio
+async def test_saving_prizes_from_the_panel(env):
+    repo, config, settings, engine = env
+    message = FakeMessage(text="3000, 2000, 1000")
+    state = FakeState({"key": "prizes", "back": "prizes"})
+
+    await panel.receive_value(message, repo, config, engine, settings, state)
+
+    assert settings.get("prizes") == [3000, 2000, 1000]
+    assert config.prizes == [3000, 2000, 1000], "должно примениться без перезапуска"
+    assert state.cleared

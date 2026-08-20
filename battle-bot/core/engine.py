@@ -11,7 +11,7 @@ from aiogram.exceptions import TelegramAPIError
 
 from config import Config, MSK
 from core import bracket
-from core.models import BattleStatus, ParticipantStatus, Player, Slot
+from core.models import BattleStatus, Player, Slot
 from core.scheduler import deadline_for_round
 from services import links, texts
 from services.channel import ChannelPublisher
