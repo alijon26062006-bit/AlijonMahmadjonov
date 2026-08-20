@@ -11,6 +11,7 @@ from datetime import datetime
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
@@ -277,6 +278,18 @@ async def ask_value(
     field = FIELDS.get(key)
     current = settings.get(key) if field else ""
     shown = field.dump(current) if field else str(current)
+    if key == "main_channel_id":
+        # ID искать не надо: достаточно переслать в бота любой пост из канала
+        channel_id = _channel_from_forward(message)
+        if channel_id is None:
+            channel_id = validation.as_int(message.text or "", example="-1001234567890")
+        settings.set("main_channel_id", channel_id)
+        settings.set("main_post_message_id", 0)  # новый канал — новый пост
+        await state.clear()
+        await message.answer(f"✅ Главный канал: <code>{channel_id}</code>")
+        await render(message, panel_ui.channel(main_post.state(repo, config, settings)))
+        return
+
     if key == "main_post_photo":
         shown = "загружено" if shown else "нет"
 
@@ -292,6 +305,17 @@ async def ask_value(
         ),
     )
     await callback.answer()
+
+
+@router.message(Panel.waiting_value, F.text.startswith("/"))
+async def command_escapes_input(message: Message, state: FSMContext) -> None:
+    """Из режима ввода всегда можно выйти командой.
+
+    Без этого /start и /panel попадали в проверку значения, человек получал
+    «нужно число» и оставался заперт в экране ввода.
+    """
+    await state.clear()
+    raise SkipHandler()  # пусть команду обработает тот, кому она адресована
 
 
 @router.message(Panel.waiting_value)
@@ -353,6 +377,18 @@ async def _apply(
         )
         return
 
+    if key == "main_channel_id":
+        # ID искать не надо: достаточно переслать в бота любой пост из канала
+        channel_id = _channel_from_forward(message)
+        if channel_id is None:
+            channel_id = validation.as_int(message.text or "", example="-1001234567890")
+        settings.set("main_channel_id", channel_id)
+        settings.set("main_post_message_id", 0)  # новый канал — новый пост
+        await state.clear()
+        await message.answer(f"✅ Главный канал: <code>{channel_id}</code>")
+        await render(message, panel_ui.channel(main_post.state(repo, config, settings)))
+        return
+
     if key == "main_post_photo":
         if not message.photo:
             raise InputError("Нужно прислать фото картинкой, а не текстом или файлом.")
@@ -371,6 +407,13 @@ async def _apply(
     field = FIELDS[key]
     await message.answer(f"✅ <b>{field.title}</b> — сохранено: <b>{field.dump(value)}</b>")
     await _back_to(message, editor["back"], repo, config, engine, settings)
+
+
+def _channel_from_forward(message: Message) -> int | None:
+    """Достать ID канала из пересланного сообщения, если это оно."""
+    origin = getattr(message, "forward_origin", None)
+    chat = getattr(origin, "chat", None)
+    return chat.id if chat is not None else None
 
 
 async def _back_to(

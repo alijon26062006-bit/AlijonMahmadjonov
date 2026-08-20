@@ -147,7 +147,7 @@ def votes(price: int, enabled: bool, sold: tuple[int, int]) -> tuple[str, Inline
 def channel(state: dict) -> tuple[str, InlineKeyboardMarkup]:
     main_id = state["main_channel_id"]
     where = f"<code>{main_id}</code>" if main_id else "<i>не задан</i>"
-    photo = "есть ✅" if state["photo"] else "нет ❌"
+    photo = "есть ✅" if state["photo"] else "без фото — обычный пост"
     published = "опубликован ✅" if state["message_id"] else "не опубликован ❌"
 
     text = (
@@ -163,7 +163,7 @@ def channel(state: dict) -> tuple[str, InlineKeyboardMarkup]:
 
     rows = [
         [button("🆔 Задать главный канал", "edit:main_channel_id", BLUE)],
-        [button("🖼 Загрузить фото", "edit:main_post_photo")],
+        [button("🖼 Фото (необязательно)", "edit:main_post_photo")],
         [button("✏️ Изменить текст", "edit:main_post_text")],
     ]
     if main_id:

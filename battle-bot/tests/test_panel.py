@@ -148,23 +148,22 @@ def test_editing_prizes_reaches_the_running_battle(env):
 
 # ------------------------------------------------------------ главный пост
 
-def test_main_post_needs_a_channel_and_a_photo(env):
+def test_main_post_needs_a_channel_first(env):
     repo, config, settings, _ = env
     state = main_post.state(repo, config, settings)
 
     assert state["main_channel_id"] == 0
-    assert not state["photo"]
     text, markup = panel_ui.channel(state)
     labels = [b.text for row in markup.inline_keyboard for b in row]
     assert not any("Опубликовать" in label for label in labels), (
-        "без канала и фото публиковать нечего"
+        "без канала публиковать некуда"
     )
 
 
 def test_publish_button_appears_once_the_channel_is_set(env):
+    """Фото необязательно — без него выходит обычный пост с кнопкой."""
     repo, config, settings, _ = env
     settings.set("main_channel_id", -1001111111111)
-    settings.set("main_post_photo", "file-id")
 
     _, markup = panel_ui.channel(main_post.state(repo, config, settings))
     labels = [b.text for row in markup.inline_keyboard for b in row]
@@ -179,11 +178,38 @@ async def test_publishing_without_a_channel_says_why(env):
 
 
 @pytest.mark.asyncio
-async def test_publishing_without_a_photo_says_why(env):
+async def test_publishing_without_a_photo_sends_a_text_post(env):
     repo, config, settings, _ = env
     settings.set("main_channel_id", -1001111111111)
-    with pytest.raises(main_post.MainPostError, match="фото"):
-        await main_post.publish(FakeBot(), repo, config, settings)
+
+    bot = FakeBot()
+    message_id = await main_post.publish(bot, repo, config, settings)
+
+    assert message_id, "пост должен выйти и без фото"
+    assert bot.channel_posts, "текстовый пост ушёл в канал"
+    assert "НАБОР НА БИТВУ НИКОВ" in bot.channel_posts[0]
+    assert settings.get("main_post_message_id") == message_id
+
+
+def test_main_post_looks_like_a_recruitment_card(env):
+    _, _, settings, _ = env
+    body = main_post.default_text([1000, 500, 250])
+
+    assert "НАБОР НА БИТВУ НИКОВ" in body
+    assert "<blockquote>" in body, "призы в цитате, как в образце"
+    assert "1 место — <b>1000</b>⭐" in body
+    assert "Участвовать по кнопке" in body
+
+
+def test_join_button_can_carry_a_premium_icon(env):
+    _, config, _, _ = env
+    plain = main_post.keyboard(config.bot_username).inline_keyboard[0][0]
+    assert plain.text == "⚡ Участвовать"
+    assert plain.icon_custom_emoji_id is None
+
+    fancy = main_post.keyboard(config.bot_username, {"⚡": "555"}).inline_keyboard[0][0]
+    assert fancy.text == "Участвовать"
+    assert fancy.icon_custom_emoji_id == "555"
 
 
 def test_main_post_caption_shows_the_participant_count(env):
@@ -266,3 +292,63 @@ async def test_posts_older_than_two_days_are_counted_but_not_lost(env):
 
     assert deleted == 0 and failed == 2
     assert repo.posts(chat_id=config.channel_id) == []
+
+
+# ------------------------------------------------- выход из режима ввода
+
+@pytest.mark.asyncio
+async def test_a_command_always_escapes_the_input_screen():
+    """Из ожидания значения нужно уметь выйти командой, а не застрять в нём."""
+    from aiogram.dispatcher.event.bases import SkipHandler
+
+    from handlers.panel import command_escapes_input
+
+    class FakeState:
+        def __init__(self):
+            self.cleared = False
+
+        async def clear(self):
+            self.cleared = True
+
+    state = FakeState()
+    with pytest.raises(SkipHandler):
+        await command_escapes_input(message=None, state=state)
+
+    assert state.cleared, "состояние должно сброситься, иначе человек заперт"
+
+
+def test_the_input_handler_lets_commands_through_first():
+    """Обработчик команд обязан стоять раньше приёма значения."""
+    from handlers import panel as panel_module
+
+    handlers = [h.callback.__name__ for h in panel_module.router.message.handlers]
+    assert handlers.index("command_escapes_input") < handlers.index("receive_value")
+
+
+def test_channel_id_is_read_from_a_forwarded_post():
+    """Искать ID руками не нужно — достаточно переслать пост из канала."""
+    from datetime import datetime
+
+    from aiogram.types import Chat, MessageOriginChannel
+
+    from handlers.panel import _channel_from_forward
+
+    class Forwarded:
+        forward_origin = MessageOriginChannel(
+            type="channel",
+            date=datetime(2026, 8, 20),
+            chat=Chat(id=-1003775036903, type="channel", title="Батлы"),
+            message_id=42,
+        )
+
+    assert _channel_from_forward(Forwarded()) == -1003775036903
+
+
+def test_a_plain_message_has_no_channel_to_read():
+    from handlers.panel import _channel_from_forward
+
+    class Plain:
+        forward_origin = None
+
+    assert _channel_from_forward(Plain()) is None
+    assert _channel_from_forward(object()) is None

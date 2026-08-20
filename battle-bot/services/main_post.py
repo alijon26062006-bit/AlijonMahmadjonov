@@ -13,23 +13,27 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from config import Config
 from services import links, texts
+from services.emoji import leading_emoji
 from services.keyboards import GREEN
 from storage.repo import Repo
 from storage.settings import Settings
 
 log = logging.getLogger(__name__)
 
-JOIN_BUTTON = "⚡ Участвую"
+JOIN_BUTTON = "⚡ Участвовать"
 
 
 def default_text(prizes: list[int]) -> str:
+    """Витрина набора: заголовок, призы в цитате и указание на кнопку."""
+    places = "\n".join(
+        f"{index} место — <b>{amount}</b>⭐"
+        for index, amount in enumerate(prizes, start=1)
+    )
     return (
-        f"⚔️ <b>{texts.spaced('БИТВА НИКОВ')}</b>\n"
-        f"{texts.RULE}\n\n"
-        "Подай заявку, позови своих голосовать — и забирай звёзды.\n\n"
-        f"{texts.prizes_block(prizes)}\n\n"
-        "<blockquote>1 раунд — 1vs1. Дальше группы по 4 ника. "
-        "Финал забирает призы.</blockquote>"
+        "⚔️ <b>НАБОР НА БИТВУ НИКОВ</b>\n\n"
+        "🎁 <b>Призы:</b>\n"
+        f"<blockquote>{places}</blockquote>\n\n"
+        "↓ <b>Участвовать по кнопке</b>"
     )
 
 
@@ -41,14 +45,16 @@ def caption(settings: Settings, participants: int) -> str:
     return body
 
 
-def keyboard(bot_username: str) -> InlineKeyboardMarkup:
+def keyboard(bot_username: str, emoji_table: dict[str, str] | None = None) -> InlineKeyboardMarkup:
+    text, emoji_id = leading_emoji(JOIN_BUTTON, emoji_table or {})
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=JOIN_BUTTON,
+                    text=text,
                     url=links.join_link(bot_username),
                     style=GREEN,
+                    icon_custom_emoji_id=emoji_id,
                 )
             ]
         ]
@@ -78,21 +84,19 @@ async def publish(bot: Bot, repo: Repo, config: Config, settings: Settings) -> i
     if not channel_id:
         raise MainPostError("Сначала задайте ID главного канала.")
 
-    photo = settings.get("main_post_photo")
-    if not photo:
-        raise MainPostError("Сначала загрузите фото для главного поста.")
-
+    photo = settings.get("main_post_photo")  # необязательно: без фото выйдет текстовый пост
     battle = repo.current_battle()
     participants = repo.participant_count(int(battle["id"])) if battle else 0
     text = caption(settings, participants)
-    markup = keyboard(config.bot_username)
+    markup = keyboard(config.bot_username, config.premium_emoji)
     existing = settings.get("main_post_message_id")
 
     if existing:
         try:
-            await bot.edit_message_caption(
-                chat_id=channel_id, message_id=existing,
-                caption=text, reply_markup=markup,
+            edit = bot.edit_message_caption if photo else bot.edit_message_text
+            field = {"caption": text} if photo else {"text": text}
+            await edit(
+                chat_id=channel_id, message_id=existing, reply_markup=markup, **field
             )
             return existing
         except TelegramAPIError as error:
@@ -101,9 +105,15 @@ async def publish(bot: Bot, repo: Repo, config: Config, settings: Settings) -> i
             log.info("Не удалось обновить главный пост, публикую заново: %s", error)
 
     try:
-        message = await bot.send_photo(
-            chat_id=channel_id, photo=photo, caption=text, reply_markup=markup
-        )
+        if photo:
+            message = await bot.send_photo(
+                chat_id=channel_id, photo=photo, caption=text, reply_markup=markup
+            )
+        else:
+            message = await bot.send_message(
+                chat_id=channel_id, text=text, reply_markup=markup,
+                disable_web_page_preview=True,
+            )
     except TelegramAPIError as error:
         raise MainPostError(
             f"Telegram не принял пост: {error}\n\n"
