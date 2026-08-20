@@ -12,11 +12,16 @@ import logging
 
 from aiogram import Bot
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
-from aiogram.exceptions import TelegramNetworkError, TelegramServerError
+from aiogram.exceptions import (
+    TelegramNetworkError,
+    TelegramRetryAfter,
+    TelegramServerError,
+)
 
 log = logging.getLogger(__name__)
 
 TRANSIENT = (TelegramNetworkError, TelegramServerError)
+MAX_FLOOD_WAIT = 60.0  # дольше ждать бессмысленно, лучше отдать ошибку наверх
 
 
 class RetryMiddleware(BaseRequestMiddleware):
@@ -31,6 +36,14 @@ class RetryMiddleware(BaseRequestMiddleware):
         for attempt in range(1, self.attempts + 1):
             try:
                 return await make_request(bot, method)
+            except TelegramRetryAfter as error:
+                # Telegram сам говорит, сколько ждать. На тысячах пользователей
+                # это норма, а не сбой: пережидаем и повторяем.
+                last = error
+                if attempt == self.attempts or error.retry_after > MAX_FLOOD_WAIT:
+                    break
+                log.warning("Флуд-контроль: ждём %s c", error.retry_after)
+                await asyncio.sleep(error.retry_after + 0.5)
             except TRANSIENT as error:
                 last = error
                 if attempt == self.attempts:

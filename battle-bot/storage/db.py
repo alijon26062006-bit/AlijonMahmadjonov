@@ -4,9 +4,17 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+MIGRATIONS = (
+    # добавляем колонку отдельно: у уже работающих ботов таблица создана раньше
+    "ALTER TABLE users ADD COLUMN is_blocked INTEGER NOT NULL DEFAULT 0",
+)
+
 SCHEMA = """
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
+-- под нагрузкой запись может ждать: лучше подождать, чем упасть с «database is locked»
+PRAGMA busy_timeout = 5000;
+PRAGMA synchronous = NORMAL;
 
 CREATE TABLE IF NOT EXISTS users (
     user_id     INTEGER PRIMARY KEY,
@@ -14,7 +22,8 @@ CREATE TABLE IF NOT EXISTS users (
     first_name  TEXT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     vote_balance INTEGER NOT NULL DEFAULT 0,
-    is_banned   INTEGER NOT NULL DEFAULT 0
+    is_banned   INTEGER NOT NULL DEFAULT 0,
+    is_blocked  INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS battles (
@@ -152,4 +161,15 @@ def connect(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    _migrate(conn)
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Досоздать то, чего нет в старых базах. Уже существующее молча пропускаем."""
+    for statement in MIGRATIONS:
+        try:
+            conn.execute(statement)
+        except sqlite3.OperationalError:
+            pass  # колонка уже есть — обычное дело при обновлении
+    conn.commit()

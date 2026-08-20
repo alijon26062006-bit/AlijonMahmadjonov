@@ -290,7 +290,8 @@ def people(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         f"👥 <b>{texts.spaced('ЛЮДИ')}</b>\n{RULE}\n\n"
         f"Всего: <b>{stats['users']}</b>\n"
         f"Новых за сутки: <b>{stats['new_users']}</b>\n"
-        f"Заблокировано: <b>{stats['banned']}</b>\n\n"
+        f"Заблокировано админом: <b>{stats['banned']}</b>\n"
+        f"Закрыли бота: <b>{stats['blocked']}</b>\n\n"
         "<i>Найдите участника по нику или ID, чтобы посмотреть карточку, "
         "выдать голоса или заблокировать.</i>"
     )

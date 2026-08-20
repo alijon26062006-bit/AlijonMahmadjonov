@@ -159,6 +159,7 @@ async def run(
     delay: float = 0.05,
     on_progress=None,
     every: int = 25,
+    repo=None,
 ) -> Report:
     """Разослать черновик списку людей.
 
@@ -171,6 +172,8 @@ async def run(
             report.sent += 1
         except TelegramForbiddenError:
             report.blocked += 1
+            if repo is not None:
+                repo.mark_blocked(user_id)  # в следующий раз его уже не будет в списке
         except TelegramRetryAfter as error:
             log.warning("Лимит рассылки, ждём %s c", error.retry_after)
             await asyncio.sleep(error.retry_after + 1)

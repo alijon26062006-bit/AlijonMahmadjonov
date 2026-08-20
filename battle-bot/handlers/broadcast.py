@@ -356,7 +356,7 @@ async def _send_to_users(
             pass
 
     report = await broadcast.run(
-        bot, draft, recipients, delay=config.dm_delay, on_progress=progress
+        bot, draft, recipients, delay=config.dm_delay, on_progress=progress, repo=repo
     )
     log.info("Рассылка: доставлено %s, заблокировали %s, ошибок %s",
              report.sent, report.blocked, report.failed)

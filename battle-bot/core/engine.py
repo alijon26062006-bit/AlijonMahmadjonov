@@ -15,6 +15,7 @@ from core.models import BattleStatus, Player, Slot
 from core.scheduler import deadline_for_round
 from services import keyboards, links, texts
 from services.channel import ChannelPublisher
+from services.tg import is_blocked
 from storage.repo import Repo
 
 log = logging.getLogger(__name__)
@@ -337,5 +338,8 @@ class BattleEngine:
                 user_id, text, reply_markup=markup, disable_web_page_preview=True
             )
         except TelegramAPIError as error:
+            if is_blocked(error):
+                # больше не тратим на него запросы, пока сам не напишет
+                self.repo.mark_blocked(user_id)
             log.info("Не доставлено пользователю %s: %s", user_id, error)
         await asyncio.sleep(self.config.dm_delay)  # мягкий рейт-лимит на рассылку

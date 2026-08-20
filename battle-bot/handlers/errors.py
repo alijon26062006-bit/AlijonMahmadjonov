@@ -17,6 +17,7 @@ from aiogram.types import CallbackQuery, ErrorEvent, Message
 
 from config import Config
 from services.retry import TRANSIENT
+from services.tg import is_blocked, is_expected
 from services.validation import InputError
 
 log = logging.getLogger(__name__)
@@ -75,7 +76,7 @@ def _who(event: ErrorEvent) -> str:
 
 
 @router.errors()
-async def catch_everything(event: ErrorEvent, bot: Bot, config: Config) -> bool:
+async def catch_everything(event: ErrorEvent, bot: Bot, config: Config, repo=None) -> bool:
     """Вернуть True — значит ошибка обработана и бот продолжает работу."""
     message, callback = _extract(event)
     error = event.exception
@@ -91,11 +92,27 @@ async def catch_everything(event: ErrorEvent, bot: Bot, config: Config) -> bool:
         await _reply(message, callback, TO_USER_NETWORK)
         return True
 
+    # обычная жизнь бота: человек заблокировал, кнопка устарела, чат удалён.
+    # Чинить нечего, отчёт админу только зашумил бы почту.
+    if is_expected(error):
+        if is_blocked(error) and repo is not None:
+            _remember_blocked(event, repo)
+        log.info("Ожидаемый ответ Telegram: %s", error)
+        return True
+
     log.exception("Необработанная ошибка при обработке апдейта", exc_info=error)
     await _reply(message, callback, TO_USER)
     if _should_report(error):
         await _tell_admins(bot, config, event, error)
     return True
+
+
+def _remember_blocked(event: ErrorEvent, repo) -> None:
+    """Запомнить, что человек закрыл дверь: больше ему не пишем."""
+    message, callback = _extract(event)
+    user = (callback or message).from_user if (callback or message) else None
+    if user is not None:
+        repo.mark_blocked(user.id)
 
 
 async def _reply(message: Message | None, callback: CallbackQuery | None, text: str) -> None:
@@ -106,7 +123,8 @@ async def _reply(message: Message | None, callback: CallbackQuery | None, text: 
         elif message:
             await message.answer(text)
     except TelegramAPIError as send_error:
-        log.warning("Не смог сообщить пользователю об ошибке: %s", send_error)
+        # не смогли сообщить об ошибке — тем более не о чем тревожиться
+        log.info("Не смог сообщить пользователю об ошибке: %s", send_error)
 
 
 async def _tell_admins(bot: Bot, config: Config, event: ErrorEvent, error: BaseException) -> None:

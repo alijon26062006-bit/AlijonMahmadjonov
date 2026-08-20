@@ -129,6 +129,7 @@ def collect(repo: Repo, engine: BattleEngine) -> dict:
         "users": repo.user_count(),
         "new_users": repo.new_users(),
         "banned": repo.banned_count(),
+        "blocked": repo.blocked_count(),
         "votes": repo.total_votes_cast(),
         "sold_votes": sold_votes,
         "sold_stars": sold_stars,

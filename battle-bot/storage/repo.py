@@ -29,6 +29,10 @@ class Repo:
                                                   first_name = excluded.first_name""",
             (user_id, username, first_name),
         )
+        # человек написал — значит бот не заблокирован
+        self.conn.execute(
+            "UPDATE users SET is_blocked = 0 WHERE user_id = ? AND is_blocked = 1", (user_id,)
+        )
         self.conn.execute("INSERT OR IGNORE INTO stats(user_id) VALUES(?)", (user_id,))
         self.conn.commit()
 
@@ -38,6 +42,22 @@ class Repo:
     def is_banned(self, user_id: int) -> bool:
         row = self.get_user(user_id)
         return bool(row and row["is_banned"])
+
+    def mark_blocked(self, user_id: int, blocked: bool = True) -> None:
+        """Отметить, что человек заблокировал бота.
+
+        Без этого на тысячах пользователей рассылка каждый раз ломилась бы
+        в тех, кто давно ушёл, — впустую тратя лимиты Telegram.
+        """
+        self.conn.execute(
+            "UPDATE users SET is_blocked = ? WHERE user_id = ?", (int(blocked), user_id)
+        )
+        self.conn.commit()
+
+    def blocked_count(self) -> int:
+        return int(
+            self.conn.execute("SELECT COUNT(*) FROM users WHERE is_blocked = 1").fetchone()[0]
+        )
 
     def set_banned(self, user_id: int, banned: bool) -> None:
         self.conn.execute("UPDATE users SET is_banned = ? WHERE user_id = ?", (int(banned), user_id))
@@ -661,7 +681,10 @@ class Repo:
         ).fetchall()
 
     def all_user_ids(self) -> list[int]:
+        """Кому вообще имеет смысл писать: без забаненных и заблокировавших бота."""
         return [
             row[0]
-            for row in self.conn.execute("SELECT user_id FROM users WHERE is_banned = 0")
+            for row in self.conn.execute(
+                "SELECT user_id FROM users WHERE is_banned = 0 AND is_blocked = 0"
+            )
         ]
