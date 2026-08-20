@@ -23,12 +23,13 @@ def _is_admin(message: Message, config: Config) -> bool:
     return message.from_user.id in config.admin_ids
 
 
-@router.message(Command("admin"))
+@router.message(Command("cmds"))
 async def admin_help(message: Message, config: Config) -> None:
     if not _is_admin(message, config):
         return
     await message.answer(
-        "🛠 <b>Админка</b>\n\n"
+        "🛠 <b>Команды администратора</b>\n\n"
+        "Всё то же самое удобнее делать в /panel.\n\n"
         "/state — что сейчас происходит\n"
         "/close — подвести итоги раунда прямо сейчас\n"
         "/cancel — отменить текущий батл\n"

@@ -330,6 +330,77 @@ class Repo:
         self.conn.commit()
         return True
 
+    # ------------------------------------------------- опубликованные посты
+
+    def record_post(self, chat_id: int, message_id: int, battle_id: int | None,
+                    kind: str = "match") -> None:
+        self.conn.execute(
+            """INSERT OR IGNORE INTO channel_posts(battle_id, chat_id, message_id, kind)
+               VALUES(?, ?, ?, ?)""",
+            (battle_id, chat_id, message_id, kind),
+        )
+        self.conn.commit()
+
+    def posts(self, chat_id: int | None = None, kind: str | None = None) -> list[sqlite3.Row]:
+        query = "SELECT * FROM channel_posts WHERE 1=1"
+        params: list = []
+        if chat_id is not None:
+            query += " AND chat_id = ?"
+            params.append(chat_id)
+        if kind is not None:
+            query += " AND kind = ?"
+            params.append(kind)
+        return self.conn.execute(query + " ORDER BY id", params).fetchall()
+
+    def forget_post(self, chat_id: int, message_id: int) -> None:
+        self.conn.execute(
+            "DELETE FROM channel_posts WHERE chat_id = ? AND message_id = ?",
+            (chat_id, message_id),
+        )
+        self.conn.commit()
+
+    # ---------------------------------------------------- сводка для панели
+
+    def user_count(self) -> int:
+        return int(self.conn.execute("SELECT COUNT(*) FROM users").fetchone()[0])
+
+    def new_users(self, days: int = 1) -> int:
+        return int(
+            self.conn.execute(
+                "SELECT COUNT(*) FROM users WHERE created_at >= datetime('now', ?)",
+                (f"-{days} day",),
+            ).fetchone()[0]
+        )
+
+    def banned_count(self) -> int:
+        return int(
+            self.conn.execute("SELECT COUNT(*) FROM users WHERE is_banned = 1").fetchone()[0]
+        )
+
+    def sold_votes(self) -> tuple[int, int]:
+        """Сколько голосов продано и на сколько звёзд."""
+        row = self.conn.execute(
+            """SELECT COALESCE(SUM(votes), 0), COALESCE(SUM(stars), 0)
+               FROM payments WHERE status = 'paid'"""
+        ).fetchone()
+        return int(row[0]), int(row[1])
+
+    def total_votes_cast(self) -> int:
+        return int(self.conn.execute("SELECT COUNT(*) FROM votes").fetchone()[0])
+
+    def find_users(self, needle: str, limit: int = 10) -> list[sqlite3.Row]:
+        """Поиск по нику или ID — для карточки участника в панели."""
+        if needle.isdigit():
+            rows = self.conn.execute(
+                "SELECT * FROM users WHERE user_id = ?", (int(needle),)
+            ).fetchall()
+            if rows:
+                return rows
+        return self.conn.execute(
+            "SELECT * FROM users WHERE username LIKE ? COLLATE NOCASE ORDER BY user_id LIMIT ?",
+            (f"%{needle.lstrip('@')}%", limit),
+        ).fetchall()
+
     # ------------------------------------------------------------------ stats
 
     def bump_wins(self, user_ids: list[int]) -> None:

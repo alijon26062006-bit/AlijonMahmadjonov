@@ -50,6 +50,9 @@ class ChannelPublisher:
         if message is None:
             return None
         self.repo.set_match_message(match_id, message.message_id)
+        self.repo.record_post(
+            self.config.channel_id, message.message_id, match["battle_id"], kind="match"
+        )
         return message.message_id
 
     async def publish_results(self, match_id: int, ranking: list[Slot], tie_broken: bool) -> None:
@@ -63,10 +66,18 @@ class ChannelPublisher:
             ranking=ranking,
             tie_broken=tie_broken,
         )
-        await self._send(text, reply_to=match["message_id"])
+        result = await self._send(text, reply_to=match["message_id"])
+        if result is not None:
+            self.repo.record_post(
+                self.config.channel_id, result.message_id, match["battle_id"], kind="result"
+            )
 
-    async def announce(self, text: str) -> None:
-        await self._send(text)
+    async def announce(self, text: str, battle_id: int | None = None) -> None:
+        message = await self._send(text)
+        if message is not None:
+            self.repo.record_post(
+                self.config.channel_id, message.message_id, battle_id, kind="announce"
+            )
 
     async def _send(self, text: str, reply_to: int | None = None):
         """Отправка с уважением к лимитам Telegram: пауза между постами,

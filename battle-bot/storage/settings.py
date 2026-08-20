@@ -68,6 +68,11 @@ FIELDS: dict[str, Field] = {
               lambda raw: raw == "1"),
         Field("premium_emoji_in_channel", "Премиум-эмодзи в канале", str, str,
               "auto, 1 или 0"),
+        Field("main_channel_id", "Главный канал", str, int,
+              "ID вида -100..., 0 — не задан"),
+        Field("main_post_photo", "Фото главного поста", str, str, "file_id из Telegram"),
+        Field("main_post_text", "Текст главного поста", str, str, "любой текст"),
+        Field("main_post_message_id", "ID опубликованного главного поста", str, int, ""),
     )
 }
 
@@ -91,7 +96,17 @@ class Settings:
             log.debug("Настройка %s перенесена из .env: %s", key, current)
         self.apply()
 
+    # значения, которых нет в .env — только в базе
+    OWN_DEFAULTS = {
+        "main_channel_id": 0,
+        "main_post_photo": "",
+        "main_post_text": "",
+        "main_post_message_id": 0,
+    }
+
     def _from_config(self, key: str) -> Any:
+        if key in self.OWN_DEFAULTS:
+            return self.OWN_DEFAULTS[key]
         if key == "vote_price":
             # раньше цена жила в пакетах; берём стоимость одного голоса
             single = next((p for p in self.config.vote_packs if p.votes == 1), None)
@@ -137,10 +152,9 @@ class Settings:
     def apply(self) -> None:
         """Перелить настройки в рабочий Config, чтобы код читал их как раньше."""
         for key in FIELDS:
-            value = self.get(key)
-            if key == "vote_price":
+            if key == "vote_price" or key in self.OWN_DEFAULTS:
                 continue
-            setattr(self.config, key, value)
+            setattr(self.config, key, self.get(key))
         self.config.vote_packs = [VotePack(1, self.get("vote_price"))]
 
     @property

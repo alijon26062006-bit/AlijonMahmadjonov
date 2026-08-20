@@ -84,6 +84,19 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Всё, что бот опубликовал в каналах: нужно, чтобы панель могла
+-- удалить посты батла, включая анонсы, а не только пары.
+CREATE TABLE IF NOT EXISTS channel_posts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id   INTEGER,
+    chat_id     INTEGER NOT NULL,
+    message_id  INTEGER NOT NULL,
+    kind        TEXT NOT NULL DEFAULT 'match',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (chat_id, message_id)
+);
+CREATE INDEX IF NOT EXISTS idx_posts_battle ON channel_posts(battle_id);
+
 -- Всё, что админ меняет из панели. .env даёт только начальные значения:
 -- при первом запуске они переносятся сюда, дальше правит панель.
 CREATE TABLE IF NOT EXISTS settings (
