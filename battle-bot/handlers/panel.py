@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.fsm.context import FSMContext
@@ -21,6 +22,7 @@ from core import bracket
 from core.engine import BattleEngine
 from core.models import BattleStatus
 from services import main_post, panel_ui, texts, validation
+from services.tg import is_not_modified
 from services.validation import InputError
 from storage.repo import Repo
 from storage.settings import FIELDS, Settings
@@ -105,13 +107,27 @@ def collect(repo: Repo, engine: BattleEngine) -> dict:
 async def render(target: Message | CallbackQuery, screen: tuple) -> None:
     """Перерисовать панель на месте, не плодя сообщения."""
     text, markup = screen
-    if isinstance(target, CallbackQuery):
-        if target.message.photo:  # экран после загрузки фото — заменяем сообщением
-            await target.message.answer(text, reply_markup=markup)
-            return
-        await target.message.edit_text(text, reply_markup=markup)
-    else:
+    if not isinstance(target, CallbackQuery):
         await target.answer(text, reply_markup=markup)
+        return
+
+    if target.message.photo:  # экран после загрузки фото — заменяем сообщением
+        await target.message.answer(text, reply_markup=markup)
+        return
+
+    await edit_in_place(target.message, text, markup)
+
+
+async def edit_in_place(message: Message, text: str, markup) -> None:
+    """Перерисовать сообщение, стерпев «ничего не изменилось».
+
+    Так бывает от кнопки «Обновить», когда данные те же — это не поломка.
+    """
+    try:
+        await message.edit_text(text, reply_markup=markup)
+    except TelegramBadRequest as error:
+        if not is_not_modified(error):
+            raise
 
 
 # ------------------------------------------------------------------- вход

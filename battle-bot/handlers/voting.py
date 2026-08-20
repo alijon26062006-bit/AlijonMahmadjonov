@@ -11,6 +11,7 @@ from aiogram.types import CallbackQuery, Message
 from config import Config
 from core.models import MatchStatus, VoteSource
 from services import keyboards, links, texts
+from services.tg import is_not_modified
 from services.subscription import is_subscribed
 from storage.repo import Repo
 
@@ -119,6 +120,6 @@ async def _refresh(callback: CallbackQuery, match_id: int, repo: Repo, config: C
             reply_markup=keyboards.voting(match_id, slots, config, _post_url(config, match))
         )
     except TelegramBadRequest as error:
-        # «message is not modified» — счёт не изменился, это не ошибка
-        if "not modified" not in str(error):
+        # счёт не изменился — Telegram отказывается перерисовывать, это не ошибка
+        if not is_not_modified(error):
             log.warning("Не удалось обновить экран голосования: %s", error)

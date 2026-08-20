@@ -352,3 +352,60 @@ def test_a_plain_message_has_no_channel_to_read():
 
     assert _channel_from_forward(Plain()) is None
     assert _channel_from_forward(object()) is None
+
+
+# --------------------------------------------- «Обновить» без изменений
+
+def test_unchanged_refresh_is_not_treated_as_a_failure():
+    """Telegram отказывается перерисовывать одинаковый текст — это норма."""
+    from aiogram.exceptions import TelegramBadRequest
+    from aiogram.methods import SendMessage
+
+    from services.tg import is_not_modified
+
+    same = TelegramBadRequest(
+        method=SendMessage(chat_id=1, text="t"),
+        message=(
+            "Bad Request: message is not modified: specified new message content "
+            "and reply markup are exactly the same as a current content and reply "
+            "markup of the message"
+        ),
+    )
+    other = TelegramBadRequest(
+        method=SendMessage(chat_id=1, text="t"), message="Bad Request: chat not found"
+    )
+
+    assert is_not_modified(same) is True
+    assert is_not_modified(other) is False
+
+
+@pytest.mark.asyncio
+async def test_editing_survives_an_unchanged_screen_but_not_real_errors():
+    from aiogram.exceptions import TelegramBadRequest
+    from aiogram.methods import SendMessage
+
+    from handlers.panel import edit_in_place
+
+    class Screen:
+        def __init__(self, error=None):
+            self.error = error
+            self.edits = 0
+
+        async def edit_text(self, text, reply_markup=None):
+            self.edits += 1
+            if self.error:
+                raise self.error
+
+    def failure(text: str) -> TelegramBadRequest:
+        return TelegramBadRequest(method=SendMessage(chat_id=1, text="t"), message=text)
+
+    ok = Screen()
+    await edit_in_place(ok, "текст", None)
+    assert ok.edits == 1
+
+    unchanged = Screen(failure("Bad Request: message is not modified"))
+    await edit_in_place(unchanged, "текст", None)  # тихо проглатываем
+
+    broken = Screen(failure("Bad Request: chat not found"))
+    with pytest.raises(TelegramBadRequest):
+        await edit_in_place(broken, "текст", None)
