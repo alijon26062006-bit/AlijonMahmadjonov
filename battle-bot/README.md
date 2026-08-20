@@ -62,16 +62,29 @@ python bot.py
 ## Запуск на сервере
 
 ```bash
-git clone <репозиторий> battle-bot && cd battle-bot
+git clone <репозиторий> && cd <репозиторий>/battle-bot
 bash deploy/install.sh          # от root
-nano /opt/battle-bot/.env       # заполнить настройки
-systemctl start battle-bot
-journalctl -u battle-bot -f     # логи
 ```
 
-`deploy/install.sh` ставит зависимости, заводит отдельного системного
-пользователя `battlebot` и службу systemd с автоперезапуском. `.env` кладётся
-с правами `600` и не попадает в git.
+Скрипт спросит токен, ID канала и ID админа — редактировать файлы руками не
+нужно. Он ставит зависимости, заводит системного пользователя `battlebot`,
+поднимает службу systemd с автоперезапуском, запускает бота и показывает первые
+строки лога: там будет либо `Запущен как @…`, либо конкретная причина отказа.
+
+`.env` кладётся с правами `600` и не попадает в git. Повторный запуск скрипта
+обновляет код, сохраняя настройки и базу — удобно для выкатки изменений:
+
+```bash
+git pull && bash deploy/install.sh
+```
+
+Дальше:
+
+```bash
+systemctl status battle-bot
+journalctl -u battle-bot -f     # логи в реальном времени
+systemctl restart battle-bot
+```
 
 ## Команды
 
