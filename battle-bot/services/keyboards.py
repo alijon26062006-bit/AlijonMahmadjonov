@@ -12,6 +12,7 @@ from aiogram.types import (
 from config import Config, VotePack
 from core.models import Slot
 from services import links, texts
+from services.emoji import leading_emoji
 
 BTN_JOIN = "🚀 Принять участие"
 BTN_BUY = "🎁 Купить голоса"
@@ -19,11 +20,18 @@ BTN_PROFILE = "👤 Профиль"
 BTN_HELP = "✅ Помощь"
 
 
-def main_menu(paid_votes: bool) -> ReplyKeyboardMarkup:
-    rows = [[KeyboardButton(text=BTN_JOIN)]]
-    if paid_votes:
-        rows.append([KeyboardButton(text=BTN_BUY)])
-    rows.append([KeyboardButton(text=BTN_PROFILE), KeyboardButton(text=BTN_HELP)])
+def _reply_button(label: str, table: dict[str, str]) -> KeyboardButton:
+    """Эмодзи в начале подписи становится премиум-иконкой, если она есть в таблице."""
+    text, emoji_id = leading_emoji(label, table)
+    return KeyboardButton(text=text, icon_custom_emoji_id=emoji_id)
+
+
+def main_menu(config: Config) -> ReplyKeyboardMarkup:
+    table = config.premium_emoji
+    rows = [[_reply_button(BTN_JOIN, table)]]
+    if config.paid_votes_enabled:
+        rows.append([_reply_button(BTN_BUY, table)])
+    rows.append([_reply_button(BTN_PROFILE, table), _reply_button(BTN_HELP, table)])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
@@ -35,15 +43,23 @@ def voting(
 ) -> InlineKeyboardMarkup:
     """Кнопки участников со счётом + служебный ряд."""
     best = max((s.votes for s in slots), default=0)
-    rows = [
-        [
-            InlineKeyboardButton(
-                text=texts.vote_button(slot, index, leader=slot.votes == best),
-                callback_data=f"vote:{match_id}:{slot.user_id}",
-            )
-        ]
-        for index, slot in enumerate(slots, start=1)
-    ]
+    crown_id = config.premium_emoji.get(texts.CROWN)
+    rows = []
+    for index, slot in enumerate(slots, start=1):
+        leader = slot.votes == best and slot.votes > 0
+        label = texts.vote_button(slot, index)
+        # премиум-корона показывается отдельной иконкой, обычная — в конце подписи
+        if leader and not crown_id:
+            label = f"{label} {texts.CROWN}"
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=label,
+                    callback_data=f"vote:{match_id}:{slot.user_id}",
+                    icon_custom_emoji_id=crown_id if leader else None,
+                )
+            ]
+        )
 
     rows.append(
         [
@@ -72,10 +88,15 @@ def subscribe(channel_url: str, match_id: int) -> InlineKeyboardMarkup:
     )
 
 
-def join_again() -> InlineKeyboardMarkup:
+def join_again(config: Config) -> InlineKeyboardMarkup:
+    text, emoji_id = leading_emoji("⚡ Участвовать снова", config.premium_emoji)
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="⚡ Участвовать снова", callback_data="join")]
+            [
+                InlineKeyboardButton(
+                    text=text, callback_data="join", icon_custom_emoji_id=emoji_id
+                )
+            ]
         ]
     )
 

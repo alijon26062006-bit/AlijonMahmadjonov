@@ -47,7 +47,7 @@ async def _greet(message: Message, config: Config) -> None:
         "👋 <b>Битва ников</b>\n\n"
         "Подавайте заявку, зовите своих голосовать — и забирайте звёзды.\n\n"
         f"{texts.HELP}",
-        reply_markup=keyboards.main_menu(config.paid_votes_enabled),
+        reply_markup=keyboards.main_menu(config),
         disable_web_page_preview=True,
     )
 
@@ -88,7 +88,7 @@ async def _do_join(
     accepted, response = await engine.join(user.id, nickname)
     await message.answer(
         response,
-        reply_markup=None if accepted else keyboards.join_again(),
+        reply_markup=None if accepted else keyboards.join_again(config),
         disable_web_page_preview=True,
     )
 

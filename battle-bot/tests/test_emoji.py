@@ -64,15 +64,15 @@ def test_broken_file_does_not_crash_the_bot(tmp_path):
 
 
 def test_template_covers_only_emoji_that_can_be_premium():
-    """👑 и 👍 живут на кнопке и во всплывашке — Telegram их не заменит."""
+    """👍 живёт во всплывающем уведомлении — там Telegram премиум не рисует.
+    👑 и ⚡ стоят на кнопках, но их можно отдать через icon_custom_emoji_id."""
     template = json.loads(
         (Path(__file__).resolve().parents[1] / "premium_emoji.example.json").read_text(
             encoding="utf-8"
         )
     )
-    assert "👑" not in template
     assert "👍" not in template
-    assert "⚡" not in template
+    assert "👑" in template and "⚡" in template
     assert "🏆" in template and "⭐" in template
     assert all(value == "" for value in template.values())
 
@@ -105,3 +105,77 @@ async def test_middleware_is_a_noop_without_a_table():
         return sent.text
 
     assert await middleware(make_request, None, method) == "🏆 итоги"
+
+
+class FakeSend:
+    def __init__(self, chat_id: int, text: str) -> None:
+        self.chat_id = chat_id
+        self.text = text
+
+
+@pytest.mark.asyncio
+async def test_channel_messages_keep_plain_emoji_by_default():
+    """Без Fragment-username Telegram отклонил бы пост с tg-emoji — батл встал бы."""
+    middleware = PremiumEmojiMiddleware(TABLE, skip_chats={-1001234567890})
+    method = FakeSend(-1001234567890, "🏆 итоги раунда")
+
+    async def make_request(bot, sent):
+        return sent.text
+
+    assert await middleware(make_request, None, method) == "🏆 итоги раунда"
+
+
+@pytest.mark.asyncio
+async def test_private_messages_still_get_premium_emoji():
+    middleware = PremiumEmojiMiddleware(TABLE, skip_chats={-1001234567890})
+    method = FakeSend(12345, "🏆 вы прошли")
+
+    async def make_request(bot, sent):
+        return sent.text
+
+    assert "<tg-emoji" in await make_request_result(middleware, make_request, method)
+
+
+async def make_request_result(middleware, make_request, method):
+    return await middleware(make_request, None, method)
+
+
+def test_leading_emoji_moves_to_the_button_icon():
+    from services.emoji import leading_emoji
+
+    assert leading_emoji("🏆 Победа", TABLE) == ("Победа", TABLE["🏆"])
+
+
+def test_leading_emoji_leaves_unknown_symbols_in_place():
+    from services.emoji import leading_emoji
+
+    assert leading_emoji("🍋 Призы", TABLE) == ("🍋 Призы", None)
+    assert leading_emoji("Обновить", TABLE) == ("Обновить", None)
+
+
+def test_collect_ids_reads_custom_emoji_from_a_message():
+    from aiogram.types import MessageEntity
+    from services.emoji import collect_ids
+
+    # смещения Telegram считает в единицах UTF-16: 🏆 занимает две, ⭐ — одну
+    entities = [
+        MessageEntity(type="custom_emoji", offset=0, length=2, custom_emoji_id="555"),
+        MessageEntity(type="bold", offset=3, length=6),
+        MessageEntity(type="custom_emoji", offset=10, length=1, custom_emoji_id="666"),
+    ]
+    assert collect_ids("🏆 жирный ⭐", entities) == {"🏆": "555", "⭐": "666"}
+
+
+def test_collect_ids_on_a_message_without_premium_emoji():
+    from services.emoji import collect_ids
+
+    assert collect_ids("обычный текст 🏆", None) == {}
+    assert collect_ids(None, []) == {}
+
+
+def test_saved_table_can_be_read_back(tmp_path):
+    from services.emoji import load_table, save_table
+
+    path = tmp_path / "sub" / "table.json"
+    save_table(path, {"🏆": "555", "⭐": "666"})
+    assert load_table(path) == {"🏆": "555", "⭐": "666"}

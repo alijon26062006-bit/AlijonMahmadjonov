@@ -80,9 +80,11 @@ def voting_screen(round_no: int, is_final: bool, deadline: datetime) -> str:
     )
 
 
-def vote_button(slot: Slot, index: int, leader: bool) -> str:
-    crown = " 👑" if leader and slot.votes > 0 else ""
-    return f"{index}) {slot.nickname} — {slot.votes} голосов{crown}"
+CROWN = "👑"
+
+
+def vote_button(slot: Slot, index: int) -> str:
+    return f"{index}) {slot.nickname} — {slot.votes} голосов"
 
 
 APPLICATION_ACCEPTED = (

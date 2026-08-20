@@ -12,7 +12,7 @@ from aiogram.types import BotCommand
 from config import load_config
 from core.engine import BattleEngine
 from core.scheduler import DeadlineWatcher
-from handlers import admin, payments, start, voting
+from handlers import admin, emoji, payments, start, voting
 from services.emoji import PremiumEmojiMiddleware, load_table
 from services.startup import SetupError, prepare
 from storage.db import connect
@@ -44,9 +44,10 @@ async def main() -> None:
         token=config.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    emoji_table = load_table(config.premium_emoji_file)
-    if emoji_table:
-        bot.session.middleware(PremiumEmojiMiddleware(emoji_table))
+    # таблица одна на всех: middleware подменяет по ней, /emojiset её пополняет
+    config.premium_emoji = load_table(config.premium_emoji_file)
+    skip = set() if config.premium_emoji_in_channel else {config.channel_id}
+    bot.session.middleware(PremiumEmojiMiddleware(config.premium_emoji, skip))
 
     engine = BattleEngine(bot, repo, config)
 
@@ -55,8 +56,10 @@ async def main() -> None:
     dispatcher["repo"] = repo
     dispatcher["config"] = config
     dispatcher["engine"] = engine
+    dispatcher["emoji_table"] = config.premium_emoji
 
     dispatcher.include_router(admin.router)
+    dispatcher.include_router(emoji.router)
     dispatcher.include_router(payments.router)
     dispatcher.include_router(start.router)
     dispatcher.include_router(voting.router)

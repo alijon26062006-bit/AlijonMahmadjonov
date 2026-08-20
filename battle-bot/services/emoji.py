@@ -12,9 +12,13 @@ Telegram показывает премиум-эмодзи через HTML-тег
 
 * подписи кнопок премиум-эмодзи не поддерживают — там всегда обычные символы,
   поэтому middleware трогает только текст сообщений;
-* отправлять custom emoji может лишь бот, купивший дополнительный username
-  на Fragment. Без этого Telegram вернёт ошибку, поэтому при пустой таблице
-  подмена просто не включается.
+* отправлять custom emoji может бот, купивший дополнительный username на
+  Fragment, либо — в личных чатах, группах и супергруппах — бот, у владельца
+  которого есть Telegram Premium. На посты в канал второе правило НЕ
+  распространяется: там нужен именно Fragment-username;
+* на кнопках премиум-эмодзи показывается через отдельное поле
+  ``icon_custom_emoji_id`` — одна иконка перед подписью, внутрь текста кнопки
+  её не вставить.
 """
 from __future__ import annotations
 
@@ -81,14 +85,60 @@ def render(text: str, table: dict[str, str]) -> str:
     return "".join(result)
 
 
+def leading_emoji(text: str, table: dict[str, str]) -> tuple[str, str | None]:
+    """Отделить эмодзи в начале подписи кнопки от текста.
+
+    Telegram показывает премиум-эмодзи на кнопке отдельным полем
+    ``icon_custom_emoji_id``, поэтому символ убираем из подписи и возвращаем
+    его id. Если эмодзи нет в таблице, подпись остаётся как была.
+    """
+    if not table or not text:
+        return text, None
+    first = text[0]
+    emoji_id = table.get(first)
+    if not emoji_id:
+        return text, None
+    return text[1:].lstrip(), emoji_id
+
+
+def save_table(path: str | Path, table: dict[str, str]) -> None:
+    """Записать таблицу на диск, сохранив порядок символов."""
+    file = Path(path)
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text(
+        json.dumps(dict(sorted(table.items())), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def collect_ids(text: str | None, entities) -> dict[str, str]:
+    """Вытащить из сообщения пары «символ -> custom_emoji_id».
+
+    Так владелец бота узнаёт id: присылает боту сообщение с премиум-эмодзи
+    (или пересылает чужое), Telegram отдаёт их в entities.
+    """
+    if not text or not entities:
+        return {}
+    found: dict[str, str] = {}
+    for entity in entities:
+        if entity.type == "custom_emoji" and entity.custom_emoji_id:
+            char = entity.extract_from(text)
+            if char:
+                found[char] = entity.custom_emoji_id
+    return found
+
+
 class PremiumEmojiMiddleware(BaseRequestMiddleware):
     """Подменяет эмодзи в тексте любого исходящего сообщения."""
 
-    def __init__(self, table: dict[str, str]) -> None:
+    def __init__(self, table: dict[str, str], skip_chats: set[int] | None = None) -> None:
         self.table = table
+        # Telegram отклоняет custom emoji в канале, если у бота нет
+        # Fragment-username. Пропускать такой чат безопаснее, чем сорвать батл.
+        self.skip_chats = skip_chats or set()
 
     async def __call__(self, make_request, bot: Bot, method):
-        if self.table:
+        if self.table and getattr(method, "chat_id", None) not in self.skip_chats:
             for field in TEXT_FIELDS:
                 value = getattr(method, field, None)
                 if isinstance(value, str):
