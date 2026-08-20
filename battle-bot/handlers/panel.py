@@ -42,9 +42,10 @@ EDITORS: dict[str, dict] = {
         "back": "prizes",
     },
     "vote_price": {
-        "check": lambda raw: validation.as_int(raw, minimum=1, maximum=10_000, example="5"),
+        "check": lambda raw: validation.as_int(raw, minimum=1, maximum=2500, example="5"),
         "back": "votes",
     },
+    "stars_link": {"check": lambda raw: raw.strip(), "back": "votes"},
     "referral_reward": {
         "check": lambda raw: validation.as_int(raw, minimum=0, maximum=100, example="1"),
         "back": "referrals",
@@ -295,7 +296,10 @@ async def toggle_votes(callback: CallbackQuery, repo: Repo, config: Config,
     await render(
         callback,
         panel_ui.votes(
-            settings.vote_price, settings.get("paid_votes_enabled"), repo.sold_votes()
+            settings.vote_price,
+            settings.get("paid_votes_enabled"),
+            repo.sold_votes(),
+            settings.get("stars_link"),
         ),
     )
     await callback.answer("Сохранено")
@@ -484,8 +488,12 @@ async def _back_to(
     elif section == "votes":
         await render(
             message,
-            panel_ui.votes(settings.vote_price, settings.get("paid_votes_enabled"),
-                           repo.sold_votes()),
+            panel_ui.votes(
+                settings.vote_price,
+                settings.get("paid_votes_enabled"),
+                repo.sold_votes(),
+                settings.get("stars_link"),
+            ),
         )
     elif section == "referrals":
         await render(

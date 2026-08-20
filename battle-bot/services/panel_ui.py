@@ -135,12 +135,16 @@ def prizes(values: list[int]) -> tuple[str, InlineKeyboardMarkup]:
 
 # ------------------------------------------------------------------ голоса
 
-def votes(price: int, enabled: bool, sold: tuple[int, int]) -> tuple[str, InlineKeyboardMarkup]:
+def votes(
+    price: int, enabled: bool, sold: tuple[int, int], stars_link: str = ""
+) -> tuple[str, InlineKeyboardMarkup]:
     count, stars = sold
+    link = f"<code>{escape(stars_link)}</code>" if stars_link else "<i>не задана</i>"
     text = (
         f"⭐ <b>{texts.spaced('ГОЛОСА')}</b>\n{RULE}\n\n"
         f"Цена одного голоса: <b>{price}⭐</b>\n"
-        f"Продажа: <b>{onoff(enabled)}</b>\n\n"
+        f"Продажа: <b>{onoff(enabled)}</b>\n"
+        f"Ссылка «звёзды дешевле»: {link}\n\n"
         f"Продано всего: <b>{count}</b> голосов на <b>{stars}⭐</b>\n\n"
         "<i>Первый голос в матче всегда бесплатный. "
         "Купленные добавляются сверх него.</i>"
@@ -148,6 +152,7 @@ def votes(price: int, enabled: bool, sold: tuple[int, int]) -> tuple[str, Inline
     toggle = "Выключить продажу" if enabled else "Включить продажу"
     return text, keyboard(
         [button("✏️ Изменить цену", "edit:vote_price", BLUE)],
+        [button("🧱 Ссылка на звёзды", "edit:stars_link")],
         [button(toggle, "votes:toggle", RED if enabled else GREEN)],
         back_row(),
     )

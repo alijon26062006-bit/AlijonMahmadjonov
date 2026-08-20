@@ -15,16 +15,20 @@ router = Router(name="referral")
 
 @router.message(F.text.in_(keyboards.variants(keyboards.BTN_INVITE)))
 @router.message(Command("invite"))
-async def show_invite(message: Message, repo: Repo, config: Config, settings: Settings) -> None:
+async def show_invite(
+    message: Message, repo: Repo, config: Config, settings: Settings, user=None
+) -> None:
+    """Экран приглашений. user передаётся, когда экран открыт кнопкой."""
     if not settings.get("referral_enabled"):
         await message.answer("Приглашения сейчас отключены.")
         return
 
-    repo.upsert_user(message.from_user.id, message.from_user.username, message.from_user.first_name)
-    invited, rewarded = repo.referral_stats(message.from_user.id)
+    user = user or message.from_user
+    repo.upsert_user(user.id, user.username, user.first_name)
+    invited, rewarded = repo.referral_stats(user.id)
     await message.answer(
         texts.invite_screen(
-            link=links.invite_link(config.bot_username, message.from_user.id),
+            link=links.invite_link(config.bot_username, user.id),
             invited=invited,
             rewarded=rewarded,
             reward=settings.get("referral_reward"),

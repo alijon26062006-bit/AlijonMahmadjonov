@@ -9,7 +9,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
 )
 
-from config import Config, VotePack
+from config import Config
 from core.models import Slot
 from services import links, texts
 from services.emoji import leading_emoji
@@ -50,10 +50,8 @@ def main_menu(config: Config) -> ReplyKeyboardMarkup:
     table = config.premium_emoji
     # главное действие — синим, остальное обычным цветом, чтобы не пестрило
     rows = [[_reply_button(BTN_JOIN, table, BLUE)]]
-    if config.referral_enabled:
-        rows.append([_reply_button(BTN_INVITE, table, GREEN)])
     if config.paid_votes_enabled:
-        rows.append([_reply_button(BTN_BUY, table)])
+        rows.append([_reply_button(BTN_BUY, table, GREEN)])
     rows.append([_reply_button(BTN_PROFILE, table), _reply_button(BTN_HELP, table)])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
@@ -147,16 +145,42 @@ def join_again(config: Config) -> InlineKeyboardMarkup:
     )
 
 
-def vote_packs(packs: list[VotePack]) -> InlineKeyboardMarkup:
+QUICK_AMOUNTS = (1, 5, 10)
+
+
+def buy(price: int, referrals_on: bool, max_votes: int) -> InlineKeyboardMarkup:
+    """Быстрые количества плюс второй способ — позвать друзей."""
+    quick = [
+        InlineKeyboardButton(
+            text=f"{amount} — {amount * price}⭐",
+            callback_data=f"buy:{amount}",
+            style=BLUE,
+        )
+        for amount in QUICK_AMOUNTS
+        if amount <= max_votes
+    ]
+    rows = [quick] if quick else []
+    if referrals_on:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🤝 Или позвать друзей — бесплатно",
+                    callback_data="buy:invite",
+                    style=GREEN,
+                )
+            ]
+        )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def pay(votes: int, total: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=f"{texts.votes_word(pack.votes)} — {pack.stars}⭐",
-                    callback_data=f"buy:{pack.votes}",
-                    style=BLUE,
+                    text=f"Оплатить {total}⭐", callback_data=f"buy:{votes}", style=GREEN
                 )
-            ]
-            for pack in packs
+            ],
+            [InlineKeyboardButton(text="Отмена", callback_data="buy:cancel")],
         ]
     )

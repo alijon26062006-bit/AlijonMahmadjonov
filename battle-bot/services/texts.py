@@ -278,6 +278,40 @@ HELP = (
 )
 
 
+MAX_STARS_PER_INVOICE = 2500  # предел одного счёта в Telegram
+
+
+def buy_screen(price: int, balance: int, stars_link: str, max_votes: int) -> str:
+    link_line = (
+        f'🧱 <b>Звёзды по низкой цене:</b> <a href="{stars_link}">тут</a>\n'
+        if stars_link
+        else ""
+    )
+    return (
+        f"⚡️ <b>Покупка дополнительных голосов за звёзды</b>\n"
+        f"{RULE}\n\n"
+        f"📊 <b>Стоимость:</b> <code>1 голос = {price}⭐</code>\n"
+        f"{link_line}"
+        f"🎁 <b>Ваш баланс:</b> {balance} "
+        f"{plural(balance, 'голос', 'голоса', 'голосов')}\n\n"
+        "<blockquote>Чтобы использовать дополнительные голоса, "
+        "просто проголосуйте за участника ещё раз.</blockquote>\n\n"
+        f"📝 <b>Введите количество голосов для покупки:</b>\n"
+        f"<i>от 1 до {max_votes}</i>"
+    )
+
+
+def buy_confirm(votes: int, price: int) -> str:
+    total = votes * price
+    return (
+        f"🧾 <b>К оплате</b>\n"
+        f"{RULE}\n\n"
+        f"Голосов: <b>{votes}</b>\n"
+        f"Цена: <b>{price}⭐</b> за голос\n\n"
+        f"Итого: <b>{total}⭐</b>"
+    )
+
+
 def invite_screen(link: str, invited: int, rewarded: int, reward: int, channel_url: str) -> str:
     word = plural(reward, "голос", "голоса", "голосов")
     return (
