@@ -71,7 +71,7 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         [button("⚔️ Батл", "battle"), button("🏆 Призы", "prizes")],
         [button("⭐ Голоса", "votes"), button("🤝 Друзья", "referrals")],
         [button("📣 Канал", "channel"), button("👥 Люди", "people")],
-        [button("⚙️ Настройки", "settings")],
+        [button("📨 Рассылка", "broadcast"), button("⚙️ Настройки", "settings")],
         [button("🔄 Обновить", "home", BLUE)],
     )
 

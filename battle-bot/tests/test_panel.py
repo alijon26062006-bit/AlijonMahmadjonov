@@ -420,15 +420,21 @@ class CallbackStub:
 
 
 def handlers_for(data: str) -> list[str]:
-    """Кто из панели возьмётся обработать такую кнопку."""
+    """Кто возьмётся обработать такую кнопку.
+
+    Смотрим все роутеры, а не только панель: часть её кнопок обслуживают
+    соседние — например, «Рассылка» живёт в своём мастере.
+    """
+    from handlers import broadcast as broadcast_module
     from handlers import panel as panel_module
 
     found = []
-    for handler in panel_module.router.callback_query.handlers:
-        if handler.callback.__name__ == "unknown_button":
-            continue  # страховка ловит всё, для проверки она не считается
-        if all(f.callback(CallbackStub(data)) for f in handler.filters or []):
-            found.append(handler.callback.__name__)
+    for module in (panel_module, broadcast_module):
+        for handler in module.router.callback_query.handlers:
+            if handler.callback.__name__ == "unknown_button":
+                continue  # страховка ловит всё, для проверки она не считается
+            if all(f.callback(CallbackStub(data)) for f in handler.filters or []):
+                found.append(handler.callback.__name__)
     return found
 
 

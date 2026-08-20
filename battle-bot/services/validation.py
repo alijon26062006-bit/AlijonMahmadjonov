@@ -112,6 +112,38 @@ def as_username(raw: str) -> str:
     return text
 
 
+ALLOWED_SCHEMES = ("https://", "http://", "tg://")
+
+
+def as_url(raw: str) -> str:
+    """Ссылка для кнопки."""
+    text = _clean(raw)
+    if not text:
+        raise InputError("Пустая ссылка. Пример: <code>https://t.me/realed</code>.")
+
+    if text.startswith("@") and len(text) > 1:
+        return f"https://t.me/{text.lstrip('@')}"
+    if text.startswith("t.me/"):
+        return f"https://{text}"
+    if not text.startswith(ALLOWED_SCHEMES):
+        raise InputError(
+            f"«{text}» не похоже на ссылку. "
+            "Нужен адрес вида <code>https://t.me/realed</code> или <code>@канал</code>."
+        )
+    if " " in text:
+        raise InputError("В ссылке не должно быть пробелов.")
+    return text
+
+
+def as_text(raw: str, *, limit: int = 4096) -> str:
+    text = (raw or "").strip()
+    if not text:
+        raise InputError("Пустой текст.")
+    if len(text) > limit:
+        raise InputError(f"Слишком длинно: {len(text)} символов при пределе {limit}.")
+    return text
+
+
 def as_user_id(raw: str) -> int:
     text = _clean(raw).lstrip("@")
     if not text.isdigit():

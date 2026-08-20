@@ -1,11 +1,9 @@
 """Админские команды. Доступны только ID из ADMIN_IDS."""
 from __future__ import annotations
 
-import asyncio
 import logging
 
-from aiogram import Bot, Router
-from aiogram.exceptions import TelegramAPIError
+from aiogram import Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 
@@ -36,7 +34,7 @@ async def admin_help(message: Message, config: Config) -> None:
         "/ban &lt;id&gt; — исключить аккаунт\n"
         "/unban &lt;id&gt;\n"
         "/votelog &lt;match_id&gt; — лог голосов матча\n"
-        "/broadcast &lt;текст&gt; — рассылка всем"
+        "/broadcast — мастер рассылки"
     )
 
 
@@ -125,24 +123,3 @@ async def votelog(message: Message, command: CommandObject, repo: Repo, config: 
         for row in rows[-50:]
     ]
     await message.answer(f"Голосов: {len(rows)}\n\n<code>" + "\n".join(lines) + "</code>")
-
-
-@router.message(Command("broadcast"))
-async def broadcast(
-    message: Message, command: CommandObject, repo: Repo, config: Config, bot: Bot
-) -> None:
-    if not _is_admin(message, config):
-        return
-    if not command.args:
-        await message.answer("Формат: /broadcast текст сообщения")
-        return
-
-    sent = failed = 0
-    for user_id in repo.all_user_ids():
-        try:
-            await bot.send_message(user_id, command.args, disable_web_page_preview=True)
-            sent += 1
-        except TelegramAPIError:
-            failed += 1
-        await asyncio.sleep(config.dm_delay)  # держимся в лимитах Telegram
-    await message.answer(f"Разослано: {sent}, не доставлено: {failed}")

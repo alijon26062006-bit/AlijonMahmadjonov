@@ -12,7 +12,9 @@ from aiogram.types import BotCommand
 from config import load_config
 from core.engine import BattleEngine
 from core.scheduler import DeadlineWatcher
-from handlers import admin, emoji, errors, panel, payments, referral, start, voting
+from handlers import (
+    admin, broadcast, emoji, errors, panel, payments, referral, start, voting,
+)
 from services.emoji import PremiumEmojiMiddleware, load_table
 from services.retry import RetryMiddleware
 from services.startup import SetupError, prepare
@@ -75,6 +77,7 @@ async def main() -> None:
 
     dispatcher.include_router(errors.router)
     dispatcher.include_router(panel.router)
+    dispatcher.include_router(broadcast.router)
     dispatcher.include_router(admin.router)
     dispatcher.include_router(emoji.router)
     dispatcher.include_router(payments.router)
