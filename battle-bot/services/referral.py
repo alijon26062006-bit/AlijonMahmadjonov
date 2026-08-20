@@ -17,8 +17,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 
 from config import Config
-from services import texts
-from services.subscription import is_subscribed
+from services import sponsors, texts
 from storage.repo import Repo
 from storage.settings import Settings
 
@@ -54,9 +53,8 @@ async def try_reward(
     if repo.pending_referral(invited_id) is None:
         return None
 
-    if config.require_subscription and not await is_subscribed(
-        bot, config.channel_id, invited_id
-    ):
+    # подписка проверяется по тем же каналам, что и для голосования
+    if await sponsors.missing(bot, config, settings, invited_id):
         return None
 
     reward = settings.get("referral_reward")

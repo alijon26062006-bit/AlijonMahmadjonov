@@ -77,7 +77,7 @@ async def test_every_screen_builds_with_real_data(env):
         panel_ui.votes(settings.vote_price, True, repo.sold_votes()),
         panel_ui.channel(main_post.state(repo, config, settings)),
         panel_ui.people(stats),
-        panel_ui.settings_screen(settings.all()),
+        panel_ui.settings_screen(settings.all(), [-1001111111111]),
         panel_ui.referrals(1, True, repo.referral_totals(), repo.top_inviters(5)),
         panel_ui.confirm("Точно?", "battle:cancel:do", "battle"),
         panel_ui.ask("Призы", "1000,500,250", "числа через запятую", "p:prizes"),
@@ -458,7 +458,7 @@ async def test_every_button_on_every_screen_has_a_handler(env):
         panel_ui.votes(settings.vote_price, True, repo.sold_votes()),
         panel_ui.channel(main_post.state(repo, config, settings)),
         panel_ui.people(stats),
-        panel_ui.settings_screen(settings.all()),
+        panel_ui.settings_screen(settings.all(), [-1001111111111]),
         panel_ui.referrals(1, True, repo.referral_totals(), repo.top_inviters(5)),
         panel_ui.person(repo.get_user(77), repo.stats_for(77), 0),
         panel_ui.confirm("Точно?", "battle:cancel:do", "battle"),
@@ -629,3 +629,71 @@ async def test_saving_prizes_from_the_panel(env):
     assert settings.get("prizes") == [3000, 2000, 1000]
     assert config.prizes == [3000, 2000, 1000], "должно примениться без перезапуска"
     assert state.cleared
+
+
+# --------------------------------------- выход из ввода кнопкой меню
+
+@pytest.mark.asyncio
+async def test_a_menu_button_escapes_the_input_screen():
+    """Кнопка меню — не значение, а желание уйти: она не должна застревать.
+
+    Именно так человек запирался: искал участника, нажал «Принять участие» и
+    получал «это не похоже на ник» на каждое нажатие.
+    """
+    from aiogram.dispatcher.event.bases import SkipHandler
+
+    from handlers.panel import command_escapes_input
+
+    class FakeState:
+        def __init__(self):
+            self.cleared = False
+
+        async def clear(self):
+            self.cleared = True
+
+    state = FakeState()
+    with pytest.raises(SkipHandler):
+        await command_escapes_input(message=None, state=state)
+    assert state.cleared
+
+
+def test_the_escape_filter_covers_commands_and_every_menu_button():
+    from services import keyboards
+    from handlers import panel as panel_module
+
+    handler = next(
+        h for h in panel_module.router.message.handlers
+        if h.callback.__name__ == "command_escapes_input"
+    )
+
+    class Stub:
+        def __init__(self, text):
+            self.text = text
+
+    def caught(text: str) -> bool:
+        magic = handler.filters[-1].callback
+        return bool(magic(Stub(text)))
+
+    assert caught("/start") and caught("/panel")
+    for label in keyboards.menu_labels():
+        assert caught(label), f"кнопка «{label}» не выпускает из ввода"
+    assert not caught("Satoorov"), "обычный ввод должен доходить до проверки"
+
+
+def test_buying_also_releases_on_a_menu_button():
+    from services import keyboards
+    from handlers import payments as payments_module
+
+    handler = next(
+        h for h in payments_module.router.message.handlers
+        if h.callback.__name__ == "command_leaves_buying"
+    )
+
+    class Stub:
+        def __init__(self, text):
+            self.text = text
+
+    magic = handler.filters[-1].callback
+    assert magic(Stub("👤 Профиль"))
+    assert magic(Stub("/start"))
+    assert not magic(Stub("15"))

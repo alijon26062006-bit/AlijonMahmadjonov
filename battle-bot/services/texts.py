@@ -373,14 +373,6 @@ def referral_pending(channel_url: str) -> str:
     )
 
 
-def subscribe_required(channel_url: str) -> str:
-    return (
-        "⚠️ <b>Нужна подписка</b>\n\n"
-        "<b>Голосовать могут только подписчики канала:</b>\n"
-        f'<a href="{channel_url}">{escape(channel_url)}</a>'
-    )
-
-
 def profile(username: str | None, stats, balance: int) -> str:
     battles = stats["battles"] if stats else 0
     wins = stats["wins"] if stats else 0

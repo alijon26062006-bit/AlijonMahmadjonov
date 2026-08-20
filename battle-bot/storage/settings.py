@@ -68,6 +68,8 @@ FIELDS: dict[str, Field] = {
         Field("premium_emoji_in_channel", "Премиум-эмодзи в канале", str, str,
               "auto, 1 или 0"),
         Field("referral_reward", "Голосов за приглашение", str, int, "целое число"),
+        Field("sponsor_channels", "Каналы обязательной подписки", str, str,
+              "ID через запятую; пусто — берётся главный канал"),
         Field("stars_link", "Ссылка «звёзды дешевле»", str, str,
               "ссылка вида https://t.me/... или пусто, чтобы убрать строку"),
         Field("referral_enabled", "Приглашения", lambda v: "1" if v else "0",
@@ -103,6 +105,7 @@ class Settings:
 
     # значения, которых нет в .env — только в базе
     OWN_DEFAULTS = {
+        "sponsor_channels": "",
         "stars_link": "",
         "main_channel_id": 0,
         "main_post_photo": "",

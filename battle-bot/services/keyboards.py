@@ -106,19 +106,6 @@ def voting(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def subscribe(channel_url: str, match_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Подписаться ↗", url=channel_url, style=GREEN)],
-            [
-                InlineKeyboardButton(
-                    text="Я подписался", callback_data=f"refresh:{match_id}", style=BLUE
-                )
-            ],
-        ]
-    )
-
-
 def invited_check(channel_url: str) -> InlineKeyboardMarkup:
     """Приглашённому: подписаться и проверить."""
     return InlineKeyboardMarkup(
@@ -184,3 +171,15 @@ def pay(votes: int, total: int) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Отмена", callback_data="buy:cancel")],
         ]
     )
+
+
+def menu_labels() -> set[str]:
+    """Все подписи кнопок нижнего меню, в обоих видах.
+
+    Нужны, чтобы режим ввода значения отпускал человека при нажатии кнопки
+    меню: это не значение, а желание уйти. Команды ловятся отдельно по «/».
+    """
+    labels: set[str] = set()
+    for label in (BTN_JOIN, BTN_INVITE, BTN_BUY, BTN_PROFILE, BTN_HELP):
+        labels |= variants(label)
+    return labels

@@ -264,22 +264,29 @@ def person(row, stats_row, balance: int) -> tuple[str, InlineKeyboardMarkup]:
 
 # --------------------------------------------------------------- настройки
 
-def settings_screen(values: dict) -> tuple[str, InlineKeyboardMarkup]:
+def settings_screen(values: dict, sponsors: list[int]) -> tuple[str, InlineKeyboardMarkup]:
     times = ", ".join(t.strftime("%H:%M") for t in values["round_times"])
+    listing = ", ".join(f"<code>{cid}</code>" for cid in sponsors) or "<i>нет</i>"
+    source = "" if values["sponsor_channels"] else " <i>(главный канал)</i>"
     text = (
         f"⚙️ <b>{texts.spaced('НАСТРОЙКИ')}</b>\n{RULE}\n\n"
         f"🗓 Время итогов: <b>{times}</b>\n"
         f"👥 Участников: от <b>{values['min_participants']}</b> "
         f"до <b>{values['max_participants']}</b>\n"
-        f"📣 Подписка на канал: <b>{onoff(values['require_subscription'])}</b>\n"
         f"🔖 Требовать @username: <b>{onoff(values['require_username'])}</b>\n"
-        f"🎨 Премиум-эмодзи в канале: <b>{values['premium_emoji_in_channel']}</b>"
+        f"🎨 Премиум-эмодзи в канале: <b>{values['premium_emoji_in_channel']}</b>\n\n"
+        f"<b>Обязательная подписка</b>\n"
+        f"Проверка: <b>{onoff(values['require_subscription'])}</b>\n"
+        f"Каналы: {listing}{source}\n\n"
+        "<i>Подписка нужна, чтобы участвовать, голосовать и приводить друзей. "
+        "Канал с парами сюда обычно не входит — в него заходят по ссылке из поста.</i>"
     )
     return text, keyboard(
         [button("🗓 Время итогов", "edit:round_times", BLUE)],
         [button("👥 Минимум", "edit:min_participants"),
          button("Максимум", "edit:max_participants")],
         [button("📣 Подписка", "settings:toggle:require_subscription")],
+        [button("🆔 Каналы подписки", "edit:sponsor_channels")],
         [button("🔖 @username", "settings:toggle:require_username")],
         back_row(),
     )

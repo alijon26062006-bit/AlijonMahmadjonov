@@ -126,10 +126,10 @@ async def test_without_a_subscription_the_reward_waits(tmp_path, monkeypatch):
 
     subscribed = {"value": False}
 
-    async def fake_check(bot, channel_id, user_id):
-        return subscribed["value"]
+    async def fake_missing(bot, cfg, sets, user_id):
+        return [] if subscribed["value"] else [("Батлы", "https://t.me/realed")]
 
-    monkeypatch.setattr(referral, "is_subscribed", fake_check)
+    monkeypatch.setattr(referral.sponsors, "missing", fake_missing)
 
     referral.remember(repo, FRIEND, INVITER, settings)
     repo.upsert_user(FRIEND, "friend", "F")

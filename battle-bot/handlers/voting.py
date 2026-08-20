@@ -10,10 +10,10 @@ from aiogram.types import CallbackQuery, Message
 
 from config import Config
 from core.models import MatchStatus, VoteResult, VoteSource
-from services import keyboards, links, texts
+from services import keyboards, links, sponsors, texts
 from services.tg import is_not_modified
-from services.subscription import is_subscribed
 from storage.repo import Repo
+from storage.settings import Settings
 
 log = logging.getLogger(__name__)
 router = Router(name="voting")
@@ -56,7 +56,9 @@ async def show_voting(message: Message, match_id: int, repo: Repo, config: Confi
 
 
 @router.callback_query(F.data.startswith("vote:"))
-async def cast_vote(callback: CallbackQuery, repo: Repo, config: Config) -> None:
+async def cast_vote(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
     _, raw_match, raw_target = callback.data.split(":")
     match_id, target_id = int(raw_match), int(raw_target)
 
@@ -69,12 +71,11 @@ async def cast_vote(callback: CallbackQuery, repo: Repo, config: Config) -> None
         await callback.answer("Ваш аккаунт исключён из голосований.", show_alert=True)
         return
 
-    if config.require_subscription and not await is_subscribed(
-        callback.bot, config.channel_id, callback.from_user.id
-    ):
+    unsubscribed = await sponsors.missing(callback.bot, config, settings, callback.from_user.id)
+    if unsubscribed:
         await callback.message.answer(
-            texts.subscribe_required(config.channel_url),
-            reply_markup=keyboards.subscribe(config.channel_url, match_id),
+            sponsors.text(unsubscribed),
+            reply_markup=sponsors.keyboard(unsubscribed, f"refresh:{match_id}"),
             disable_web_page_preview=True,
         )
         await callback.answer("Нужна подписка на канал.", show_alert=True)

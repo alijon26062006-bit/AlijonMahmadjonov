@@ -66,9 +66,12 @@ async def open_buy(
     await _screen(message, repo, settings, state)
 
 
-@router.message(Buy.waiting_amount, F.text.startswith("/"))
+@router.message(
+    Buy.waiting_amount,
+    F.text.startswith("/") | F.text.in_(keyboards.menu_labels()),
+)
 async def command_leaves_buying(message: Message, state: FSMContext) -> None:
-    """Из ввода количества всегда можно выйти командой."""
+    """Из ввода количества выходим командой или кнопкой меню."""
     await state.clear()
     raise SkipHandler()
 

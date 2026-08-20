@@ -231,7 +231,6 @@ def all_messages() -> list[str]:
         texts.pair_published("rival", "https://t.me/b?start=v1"),
         texts.advanced("https://t.me/b?start=v1"),
         texts.took_place(1, 1000),
-        texts.subscribe_required("https://t.me/test"),
         texts.profile("nick", stats, 4),
         texts.profile(None, None, 0),
         texts.leaderboard([row]),

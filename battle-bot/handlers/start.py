@@ -11,7 +11,7 @@ from config import Config
 from core.engine import BattleEngine
 from handlers.referral import welcome_invited
 from handlers.voting import show_voting
-from services import keyboards, links, referral, texts
+from services import keyboards, links, referral, sponsors, texts
 from storage.repo import Repo
 from storage.settings import Settings
 
@@ -42,7 +42,7 @@ async def start_with_payload(
         return
 
     if kind == "join":
-        await _do_join(message, repo, config, engine)
+        await _do_join(message, repo, config, engine, settings)
         return
 
     await _greet(message, config)
@@ -67,16 +67,17 @@ async def _greet(message: Message, config: Config) -> None:
 @router.message(F.text.in_(keyboards.variants(keyboards.BTN_JOIN)))
 @router.message(Command("join", "battle"))
 async def join_button(
-    message: Message, repo: Repo, config: Config, engine: BattleEngine
+    message: Message, repo: Repo, config: Config, engine: BattleEngine, settings: Settings
 ) -> None:
-    await _do_join(message, repo, config, engine)
+    await _do_join(message, repo, config, engine, settings)
 
 
-@router.callback_query(F.data == "join")
+@router.callback_query(F.data.in_({"join", "join:retry"}))
 async def join_again(
-    callback: CallbackQuery, repo: Repo, config: Config, engine: BattleEngine
+    callback: CallbackQuery, repo: Repo, config: Config, engine: BattleEngine,
+    settings: Settings
 ) -> None:
-    await _do_join(callback.message, repo, config, engine, user=callback.from_user)
+    await _do_join(callback.message, repo, config, engine, settings, user=callback.from_user)
     await callback.answer()
 
 
@@ -85,10 +86,20 @@ async def _do_join(
     repo: Repo,
     config: Config,
     engine: BattleEngine,
+    settings: Settings,
     user=None,
 ) -> None:
     user = user or message.from_user
     repo.upsert_user(user.id, user.username, user.first_name)
+
+    unsubscribed = await sponsors.missing(message.bot, config, settings, user.id)
+    if unsubscribed:
+        await message.answer(
+            sponsors.text(unsubscribed),
+            reply_markup=sponsors.keyboard(unsubscribed, "join:retry"),
+            disable_web_page_preview=True,
+        )
+        return
 
     nickname = user.username
     if not nickname:

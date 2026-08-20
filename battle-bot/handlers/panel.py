@@ -20,7 +20,7 @@ from aiogram.types import CallbackQuery, Message
 from config import Config
 from core import bracket
 from core.engine import BattleEngine
-from services import main_post, panel_ui, texts, validation
+from services import keyboards, main_post, panel_ui, sponsors, texts, validation
 from services.tg import is_not_modified
 from services.validation import InputError
 from storage.repo import Repo
@@ -45,6 +45,10 @@ EDITORS: dict[str, dict] = {
         "back": "votes",
     },
     "stars_link": {"check": lambda raw: raw.strip(), "back": "votes"},
+    "sponsor_channels": {
+        "check": lambda raw: _channel_list(raw),
+        "back": "settings",
+    },
     "referral_reward": {
         "check": lambda raw: validation.as_int(raw, minimum=0, maximum=100, example="1"),
         "back": "referrals",
@@ -65,6 +69,15 @@ EDITORS: dict[str, dict] = {
     "main_post_text": {"check": lambda raw: raw.strip(), "back": "channel"},
     "main_post_photo": {"check": lambda raw: raw.strip(), "back": "channel"},
 }
+
+
+def _channel_list(raw: str) -> str:
+    """Список ID каналов через запятую. Пусто — вернуться к главному каналу."""
+    text = (raw or "").strip()
+    if not text or text in {"-", "—"}:
+        return ""
+    ids = validation.as_int_list(text.replace(" ", ","), example="-1001234567890")
+    return ",".join(str(value) for value in ids)
 
 
 def is_admin(user_id: int, config: Config) -> bool:
@@ -268,7 +281,10 @@ async def show_people(
 async def show_settings(callback: CallbackQuery, config: Config, settings: Settings) -> None:
     if not is_admin(callback.from_user.id, config):
         return
-    await render(callback, panel_ui.settings_screen(settings.all()))
+    await render(
+        callback,
+        panel_ui.settings_screen(settings.all(), sponsors.required(config, settings)),
+    )
     await callback.answer()
 
 
@@ -313,7 +329,10 @@ async def toggle_setting(callback: CallbackQuery, config: Config, settings: Sett
         await callback.answer("Нет такой настройки.", show_alert=True)
         return
     settings.set(key, not settings.get(key))
-    await render(callback, panel_ui.settings_screen(settings.all()))
+    await render(
+        callback,
+        panel_ui.settings_screen(settings.all(), sponsors.required(config, settings)),
+    )
     await callback.answer("Сохранено")
 
 
@@ -369,15 +388,18 @@ async def ask_value(
     await callback.answer()
 
 
-@router.message(Panel.waiting_value, F.text.startswith("/"))
+@router.message(
+    Panel.waiting_value,
+    F.text.startswith("/") | F.text.in_(keyboards.menu_labels()),
+)
 async def command_escapes_input(message: Message, state: FSMContext) -> None:
-    """Из режима ввода всегда можно выйти командой.
+    """Из режима ввода всегда можно выйти командой или кнопкой меню.
 
-    Без этого /start и /panel попадали в проверку значения, человек получал
-    «нужно число» и оставался заперт в экране ввода.
+    Иначе /start и «Принять участие» попадали в проверку значения, человек
+    получал «это не похоже на ник» и оставался заперт в экране ввода.
     """
     await state.clear()
-    raise SkipHandler()  # пусть команду обработает тот, кому она адресована
+    raise SkipHandler()  # пусть обработает тот, кому это адресовано
 
 
 @router.message(Panel.waiting_value)
@@ -507,7 +529,10 @@ async def _back_to(
     elif section == "channel":
         await render(message, panel_ui.channel(main_post.state(repo, config, settings)))
     elif section == "settings":
-        await render(message, panel_ui.settings_screen(settings.all()))
+        await render(
+            message,
+            panel_ui.settings_screen(settings.all(), sponsors.required(config, settings)),
+        )
     else:
         await render(message, panel_ui.home(collect(repo, engine)))
 
