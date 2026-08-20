@@ -63,6 +63,14 @@ fi
 chmod 600 "$APP_DIR/.env"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
+echo "==> Команда обновления"
+# battle-update — подтянуть код и перезапустить бота одной командой
+BRANCH="$(git -C "$SRC_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+REPO_DIR="$(git -C "$SRC_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SRC_DIR")"
+sed -e "s|__REPO_DIR__|${REPO_DIR}|" -e "s|__BRANCH__|${BRANCH}|" \
+    "$SRC_DIR/deploy/update.sh" > /usr/local/bin/battle-update
+chmod +x /usr/local/bin/battle-update
+
 echo "==> Служба systemd"
 cp "$SRC_DIR/deploy/battle-bot.service" /etc/systemd/system/battle-bot.service
 systemctl daemon-reload
@@ -77,6 +85,7 @@ if systemctl is-active --quiet battle-bot; then
     journalctl -u battle-bot -n 15 --no-pager | sed 's/^/   /'
     echo
     echo "Логи в реальном времени:  journalctl -u battle-bot -f"
+    echo "Обновить бота одной командой:  battle-update"
 else
     echo
     echo "❌ Бот не поднялся. Причина в логе:"
