@@ -15,6 +15,7 @@ from config import Config
 from services import links, texts
 from services.emoji import leading_emoji
 from services.keyboards import GREEN
+from services.tg import is_not_modified
 from storage.repo import Repo
 from storage.settings import Settings
 
@@ -100,7 +101,7 @@ async def publish(bot: Bot, repo: Repo, config: Config, settings: Settings) -> i
             )
             return existing
         except TelegramAPIError as error:
-            if "not modified" in str(error):
+            if is_not_modified(error):
                 return existing
             log.info("Не удалось обновить главный пост, публикую заново: %s", error)
 
