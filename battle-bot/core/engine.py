@@ -163,6 +163,8 @@ class BattleEngine:
             else:
                 advanced.extend(result.winners)
                 eliminated.extend(result.losers)
+                # каждому участнику матча — его личный итог с соперниками и счётом
+                await self._send_match_results(result, int(row["round_no"]), is_final=False)
 
         if final_ranking:
             await self._finish_battle(battle_id, final_ranking)
@@ -173,10 +175,25 @@ class BattleEngine:
         self.repo.eliminate(battle_id, eliminated)
         self.repo.bump_wins(advanced)
 
-        await self._notify_many(eliminated, texts.YOU_LOST)
         await self._notify_many(byes, texts.BYE_ROUND)
 
         await self._start_round(battle_id, round_no + 1)
+
+    async def _send_match_results(self, result, round_no: int, is_final: bool) -> None:
+        """Разослать участникам матча честный итог: вся таблица, а не «вы проиграли»."""
+        winners = set(result.winners)
+        for slot in result.ranking:
+            await self._dm(
+                slot.user_id,
+                texts.match_result_dm(
+                    ranking=result.ranking,
+                    you_id=slot.user_id,
+                    round_no=round_no,
+                    is_final=is_final,
+                    advanced=slot.user_id in winners,
+                    tie_broken=result.tie_broken,
+                ),
+            )
 
     async def _start_round(self, battle_id: int, round_no: int) -> None:
         alive = self.repo.alive_players(battle_id)
@@ -278,13 +295,24 @@ class BattleEngine:
         self.repo.close_battle(battle_id, BattleStatus.FINISHED)
         await self.publisher.announce(texts.final_announcement(ranking, self.config.prizes))
 
+        # финалистам — та же честная таблица, что и в раундах
         for slot in ranking:
+            await self._dm(
+                slot.user_id,
+                texts.match_result_dm(
+                    ranking=ranking,
+                    you_id=slot.user_id,
+                    round_no=0,
+                    is_final=True,
+                    advanced=slot.position == 1,
+                    tie_broken=False,
+                ),
+            )
             place = slot.position or 1
             if place <= len(self.config.prizes):
-                prize = self.config.prizes[place - 1]
-                await self._dm(slot.user_id, texts.took_place(place, prize))
-            else:
-                await self._dm(slot.user_id, texts.YOU_LOST)
+                await self._dm(
+                    slot.user_id, texts.took_place(place, self.config.prizes[place - 1])
+                )
         log.info("Батл #%s завершён", battle_id)
 
         # батл кончился — сразу собираем людей на следующий

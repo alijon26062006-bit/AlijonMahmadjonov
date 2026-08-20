@@ -203,6 +203,54 @@ def final_announcement(ranking: list[Slot], prizes: list[int]) -> str:
 
 # ------------------------------------------------------------ экраны в боте
 
+def match_result_dm(
+    ranking: list[Slot],
+    you_id: int,
+    round_no: int,
+    is_final: bool,
+    advanced: bool,
+    tie_broken: bool,
+) -> str:
+    """Личный итог матча: соперники, счёт и место — без утаивания.
+
+    Одинаковая таблица и победителю, и проигравшему: каждый видит, кто сколько
+    набрал, и может проверить результат сам.
+    """
+    total = sum(slot.votes for slot in ranking)
+    you = next((slot for slot in ranking if slot.user_id == you_id), None)
+    place = you.position if you else 0
+
+    if is_final:
+        head = f"{MEDAL.get(place, '🏁')} <b>Финал · {place} место</b>"
+    elif advanced:
+        head = "🔥 <b>Вы прошли дальше!</b>"
+    else:
+        head = "❌ <b>Вы выбываете</b>"
+
+    lines = []
+    for slot in ranking:
+        if is_final:
+            mark = MEDAL.get(slot.position, f"{slot.position}.")
+        else:
+            mark = "✅" if slot.position == 1 else "❌"
+        mine = " ← <b>вы</b>" if slot.user_id == you_id else ""
+        lines.append(
+            f"{mark} <b>{nick(slot.nickname)}</b>{mine}\n"
+            f"<code>{bar(slot.votes, total)}</code> <b>{votes_word(slot.votes)}</b>"
+            f" · <b>{percent(slot.votes, total)}%</b>"
+        )
+
+    stage = "Финал" if is_final else f"{round_no} раунд"
+    body = f"{head}\n{RULE}\n\n<b>{stage}</b> · итог\n\n" + "\n\n".join(lines)
+    body += f"\n\n{RULE}\nВсего голосов: <b>{total}</b>"
+
+    if tie_broken:
+        body += "\n\n🎲 <i>Голоса сравнялись — победитель определён жребием.</i>"
+    if not advanced and not is_final:
+        body += "\n\n<b>Не расстраивайтесь</b> — в следующем батле всё сначала."
+    return body
+
+
 def voting_screen(round_no: int, is_final: bool, slots: list[Slot], deadline: datetime) -> str:
     title = spaced("ФИНАЛ") if is_final else f"{round_no} раунд"
     total = sum(slot.votes for slot in slots)
@@ -270,11 +318,6 @@ IN_QUEUE = (
     "✅ <b>Вы в очереди</b>\n\n"
     "<blockquote>Как только подойдёт соперник, <b>ваш пост выйдет в канале</b>, "
     "а вы получите личную ссылку для голосующих.</blockquote>"
-)
-
-YOU_LOST = (
-    "❌ <b>Вы проиграли</b>\n\n"
-    "<b>Не расстраивайтесь</b> — в следующем батле всё сначала."
 )
 
 BYE_ROUND = (

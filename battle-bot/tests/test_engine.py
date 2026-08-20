@@ -138,7 +138,10 @@ async def test_round_closes_and_the_leftover_gets_a_bye(env):
     alive = {p.user_id for p in repo.alive_players(1)}
     assert alive == {1, 3, 5}  # два победителя + пятый без боя
     assert "без боя" in "".join(bot.direct[5])
-    assert "проиграли" in "".join(bot.direct[2])
+    # проигравший получает разбор своего матча, а не безликое «вы проиграли»
+    loser = "".join(bot.direct[2])
+    assert "Вы выбываете" in loser
+    assert "@nick1" in loser and "@nick2" in loser, "видны оба соперника"
 
 
 @pytest.mark.asyncio
