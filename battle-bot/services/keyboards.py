@@ -77,7 +77,9 @@ def voting(
                     text=label,
                     callback_data=f"vote:{match_id}:{slot.user_id}",
                     icon_custom_emoji_id=crown_id if leader else None,
-                    style=GREEN,  # зелёный — по нему голосуют
+                    # зелёным горит только лидер — цвет сразу показывает,
+                    # кто впереди. Пока голосов нет, лидера нет тоже.
+                    style=GREEN if leader else None,
                 )
             ]
         )

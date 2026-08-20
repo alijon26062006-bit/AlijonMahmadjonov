@@ -122,7 +122,51 @@ def test_button_colors_use_only_values_telegram_accepts():
     assert {keyboards.BLUE, keyboards.GREEN, keyboards.RED} == allowed
 
 
-def test_voting_keyboard_is_coloured():
+def vote_buttons(markup):
+    return [
+        b
+        for row in markup.inline_keyboard
+        for b in row
+        if b.callback_data and b.callback_data.startswith("vote:")
+    ]
+
+
+def test_only_the_leader_button_is_green():
+    from services import keyboards
+    from tests.test_engine import make_config
+
+    slots = [Slot(1, "a", votes=3), Slot(2, "b", votes=1), Slot(3, "c", votes=0)]
+    markup = keyboards.voting(7, slots, make_config(), post_url=None)
+
+    leader, second, third = vote_buttons(markup)
+    assert leader.style == keyboards.GREEN, "у кого больше голосов — тот зелёный"
+    assert second.style is None
+    assert third.style is None
+
+
+def test_nobody_is_green_before_the_first_vote():
+    from services import keyboards
+    from tests.test_engine import make_config
+
+    slots = [Slot(1, "a", votes=0), Slot(2, "b", votes=0)]
+    markup = keyboards.voting(7, slots, make_config(), post_url=None)
+
+    assert all(b.style is None for b in vote_buttons(markup))
+
+
+def test_a_tie_lights_up_both_leaders():
+    from services import keyboards
+    from tests.test_engine import make_config
+
+    slots = [Slot(1, "a", votes=2), Slot(2, "b", votes=2), Slot(3, "c", votes=1)]
+    markup = keyboards.voting(7, slots, make_config(), post_url=None)
+
+    first, second, third = vote_buttons(markup)
+    assert first.style == second.style == keyboards.GREEN
+    assert third.style is None
+
+
+def test_service_buttons_stay_blue():
     from services import keyboards
     from tests.test_engine import make_config
 
@@ -131,11 +175,9 @@ def test_voting_keyboard_is_coloured():
     markup = keyboards.voting(7, slots, config, post_url="https://t.me/c/1/2")
 
     buttons = [b for row in markup.inline_keyboard for b in row]
-    votes = [b for b in buttons if b.callback_data and b.callback_data.startswith("vote:")]
-    service = [b for b in buttons if b not in votes]
+    service = [b for b in buttons if b not in vote_buttons(markup)]
 
-    assert votes and all(b.style == keyboards.GREEN for b in votes), "кнопки участников зелёные"
-    assert service and all(b.style == keyboards.BLUE for b in service), "служебные синие"
+    assert service and all(b.style == keyboards.BLUE for b in service)
 
 
 def test_main_menu_highlights_the_primary_action():
