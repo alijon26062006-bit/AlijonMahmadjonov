@@ -52,6 +52,7 @@ def make_config(**overrides) -> Config:
         require_username=True,
         paid_votes_enabled=True,
         vote_packs=[VotePack(1, 15)],
+        premium_emoji_file="",
         prizes=[1000, 500, 250],
         publish_delay=0.0,
         dm_delay=0.0,

@@ -13,6 +13,7 @@ from config import load_config
 from core.engine import BattleEngine
 from core.scheduler import DeadlineWatcher
 from handlers import admin, payments, start, voting
+from services.emoji import PremiumEmojiMiddleware, load_table
 from services.startup import SetupError, prepare
 from storage.db import connect
 from storage.repo import Repo
@@ -43,6 +44,10 @@ async def main() -> None:
         token=config.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    emoji_table = load_table(config.premium_emoji_file)
+    if emoji_table:
+        bot.session.middleware(PremiumEmojiMiddleware(emoji_table))
+
     engine = BattleEngine(bot, repo, config)
 
     dispatcher = Dispatcher()
