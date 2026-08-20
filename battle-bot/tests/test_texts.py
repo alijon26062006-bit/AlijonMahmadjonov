@@ -190,3 +190,84 @@ def test_main_menu_highlights_the_primary_action():
 
     assert join.style == keyboards.BLUE
     assert [b for b in buttons if b.style is None], "остальные кнопки обычного цвета"
+
+
+# --- HTML собирается вручную, поэтому проверяем его целостность автоматически
+
+SELF_CLOSING: set[str] = set()
+
+
+def assert_html_is_valid(html: str) -> None:
+    """Теги должны быть парными и правильно вложенными — иначе Telegram
+    отклонит сообщение целиком."""
+    stack: list[str] = []
+    for raw in re.findall(r"<[^>]+>", html):
+        name = re.sub(r"[<>/]", "", raw).split()[0].lower()
+        if name in SELF_CLOSING:
+            continue
+        if raw.startswith("</"):
+            assert stack, f"закрывающий </{name}> без открывающего в: {html[:120]}"
+            opened = stack.pop()
+            assert opened == name, f"</{name}> закрывает <{opened}> в: {html[:120]}"
+        else:
+            stack.append(name)
+    assert not stack, f"не закрыты теги {stack} в: {html[:120]}"
+
+
+def all_messages() -> list[str]:
+    slots = [Slot(1, "mishzzxx", 12, 1), Slot(2, "enriiqws", 7, 2)]
+    row = {"user_id": 1, "username": "a", "titles": 2, "wins": 5, "battles": 3}
+    stats = {"battles": 3, "wins": 5, "titles": 2, "best_place": 1}
+    return [
+        texts.channel_post(1, False, slots, [1000, 500, 250], DEADLINE, "u1", "u2"),
+        texts.channel_result(1, False, slots, tie_broken=False),
+        texts.channel_result(3, True, slots, tie_broken=True),
+        texts.round_announcement(2, False, 8, 2, DEADLINE),
+        texts.round_announcement(3, True, 4, 1, DEADLINE),
+        texts.postponed(2, 4, DEADLINE),
+        texts.final_announcement(slots, [1000, 500]),
+        texts.voting_screen(1, False, slots, DEADLINE),
+        texts.welcome("https://t.me/test"),
+        texts.pair_published("rival", "https://t.me/b?start=v1"),
+        texts.advanced("https://t.me/b?start=v1"),
+        texts.took_place(1, 1000),
+        texts.subscribe_required("https://t.me/test"),
+        texts.profile("nick", stats, 4),
+        texts.profile(None, None, 0),
+        texts.leaderboard([row]),
+        texts.leaderboard([]),
+        texts.scoreboard(slots),
+        texts.HELP,
+        texts.APPLICATION_ACCEPTED,
+        texts.IN_QUEUE,
+        texts.YOU_LOST,
+        texts.BYE_ROUND,
+        texts.NEED_USERNAME,
+        texts.ALREADY_IN_BATTLE,
+        texts.NO_ACTIVE_BATTLE,
+    ]
+
+
+@pytest.mark.parametrize("message", all_messages())
+def test_every_message_has_valid_html(message):
+    assert_html_is_valid(message)
+
+
+@pytest.mark.parametrize("message", all_messages())
+def test_no_message_is_empty_or_too_long(message):
+    assert message.strip(), "пустое сообщение Telegram не примет"
+    assert len(message) <= 4096, "предел одного сообщения Telegram"
+
+
+def test_the_bar_is_never_wrapped_in_bold():
+    """Шкала идёт моноширинной — жирный ломает выравнивание символов."""
+    slots = [Slot(1, "a", 3), Slot(2, "b", 1)]
+    board = texts.scoreboard(slots)
+    assert "<b><code>" not in board and "<code><b>" not in board
+
+
+def test_key_numbers_are_highlighted():
+    slots = [Slot(1, "a", 3), Slot(2, "b", 1)]
+    board = texts.scoreboard(slots)
+    assert "<b>3 голоса</b>" in board
+    assert "<b>75%</b>" in board
