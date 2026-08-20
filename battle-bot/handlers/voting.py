@@ -9,7 +9,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 
 from config import Config
-from core.models import MatchStatus, VoteSource
+from core.models import MatchStatus, VoteResult, VoteSource
 from services import keyboards, links, texts
 from services.tg import is_not_modified
 from services.subscription import is_subscribed
@@ -17,6 +17,12 @@ from storage.repo import Repo
 
 log = logging.getLogger(__name__)
 router = Router(name="voting")
+
+REFUSALS = {
+    VoteResult.CLOSED: "Голосование по этому матчу уже завершено.",
+    VoteResult.DUPLICATE: "Ваш голос в этом матче уже учтён.",
+    VoteResult.UNKNOWN_TARGET: "Такого участника в этом матче нет.",
+}
 
 
 def _post_url(config: Config, match) -> str | None:
@@ -79,8 +85,13 @@ async def cast_vote(callback: CallbackQuery, repo: Repo, config: Config) -> None
         await callback.answer(note, show_alert=True)
         return
 
-    if not repo.add_vote(match_id, callback.from_user.id, target_id, source):
-        await callback.answer("Ваш голос в этом матче уже учтён.", show_alert=True)
+    result = repo.add_vote(match_id, callback.from_user.id, target_id, source)
+    if result is not VoteResult.ACCEPTED:
+        # купленный голос списан заранее — при отказе возвращаем его обратно
+        if source is VoteSource.PAID:
+            repo.add_votes(callback.from_user.id, 1)
+        await callback.answer(REFUSALS[result], show_alert=True)
+        await _refresh(callback, match_id, repo, config)
         return
 
     await callback.answer(note)

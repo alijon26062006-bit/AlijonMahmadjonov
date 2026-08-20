@@ -4,12 +4,14 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime
 
+from config import MSK
 from core.models import (
     BattleStatus,
     MatchStatus,
     ParticipantStatus,
     Player,
     Slot,
+    VoteResult,
     VoteSource,
 )
 
@@ -245,22 +247,61 @@ class Repo:
         return row is not None
 
     def add_vote(
-        self, match_id: int, voter_id: int, target_id: int, source: VoteSource
-    ) -> bool:
-        """Записать голос. False — если бесплатный голос уже был отдан."""
+        self,
+        match_id: int,
+        voter_id: int,
+        target_id: int,
+        source: VoteSource,
+        now: datetime | None = None,
+    ) -> VoteResult:
+        """Записать голос.
+
+        Все условия проверяются внутри одного INSERT: матч ещё идёт, дедлайн не
+        прошёл, участник действительно в этом матче. Проверять их заранее в
+        Python нельзя — между проверкой и записью стоит сетевой вызов (подписка
+        на канал), за время которого раунд успевает закрыться.
+
+        Время сравнивается через datetime() самой SQLite: она приводит смещение
+        часового пояса к UTC, поэтому сравнение верно и для «наивных» дат.
+        """
+        moment = (now or datetime.now(MSK)).isoformat()
         try:
-            self.conn.execute(
-                "INSERT INTO votes(match_id, voter_id, target_id, source) VALUES(?, ?, ?, ?)",
-                (match_id, voter_id, target_id, source.value),
+            cursor = self.conn.execute(
+                """INSERT INTO votes(match_id, voter_id, target_id, source)
+                   SELECT ?, ?, ?, ?
+                   WHERE EXISTS (
+                       SELECT 1 FROM matches m
+                       JOIN match_slots s ON s.match_id = m.id AND s.user_id = ?
+                       WHERE m.id = ?
+                         AND m.status = ?
+                         AND (m.deadline IS NULL
+                              OR datetime(m.deadline) > datetime(?))
+                   )""",
+                (
+                    match_id, voter_id, target_id, source.value,
+                    target_id, match_id, MatchStatus.VOTING.value, moment,
+                ),
             )
         except sqlite3.IntegrityError:
-            return False
+            return VoteResult.DUPLICATE
+
+        if cursor.rowcount == 0:
+            return self._why_refused(match_id, target_id, moment)
+
         self.conn.execute(
             "UPDATE match_slots SET votes = votes + 1 WHERE match_id = ? AND user_id = ?",
             (match_id, target_id),
         )
         self.conn.commit()
-        return True
+        return VoteResult.ACCEPTED
+
+    def _why_refused(self, match_id: int, target_id: int, moment: str) -> VoteResult:
+        """Голос не записался — объяснить человеку, почему именно."""
+        row = self.conn.execute(
+            """SELECT 1 FROM match_slots WHERE match_id = ? AND user_id = ?""",
+            (match_id, target_id),
+        ).fetchone()
+        return VoteResult.CLOSED if row else VoteResult.UNKNOWN_TARGET
 
     def vote_log(self, match_id: int) -> list[sqlite3.Row]:
         return self.conn.execute(
@@ -329,6 +370,83 @@ class Repo:
         )
         self.conn.commit()
         return True
+
+    # ------------------------------------------------------- приглашения
+
+    def record_referral(self, invited_id: int, inviter_id: int) -> bool:
+        """Запомнить, кто кого привёл. False — если приглашённый уже учтён.
+
+        Первичный ключ по invited_id гарантирует, что один и тот же человек не
+        принесёт награду дважды, даже если откроет десяток разных ссылок.
+        """
+        if invited_id == inviter_id:
+            return False
+        try:
+            self.conn.execute(
+                "INSERT INTO referrals(invited_id, inviter_id) VALUES(?, ?)",
+                (invited_id, inviter_id),
+            )
+        except sqlite3.IntegrityError:
+            return False
+        self.conn.commit()
+        return True
+
+    def pending_referral(self, invited_id: int) -> sqlite3.Row | None:
+        """Приглашение, за которое ещё не выдана награда."""
+        return self.conn.execute(
+            "SELECT * FROM referrals WHERE invited_id = ? AND rewarded = 0",
+            (invited_id,),
+        ).fetchone()
+
+    def reward_referral(self, invited_id: int, votes: int) -> int | None:
+        """Выдать награду пригласившему. Возвращает его id или None.
+
+        Отметка о награде ставится тем же запросом, что и её проверка, поэтому
+        повторный вызов ничего не начислит.
+        """
+        cursor = self.conn.execute(
+            """UPDATE referrals SET rewarded = 1, rewarded_at = datetime('now')
+               WHERE invited_id = ? AND rewarded = 0""",
+            (invited_id,),
+        )
+        if cursor.rowcount == 0:
+            self.conn.commit()
+            return None
+
+        row = self.conn.execute(
+            "SELECT inviter_id FROM referrals WHERE invited_id = ?", (invited_id,)
+        ).fetchone()
+        inviter_id = int(row["inviter_id"])
+        self.conn.execute(
+            "UPDATE users SET vote_balance = vote_balance + ? WHERE user_id = ?",
+            (votes, inviter_id),
+        )
+        self.conn.commit()
+        return inviter_id
+
+    def referral_stats(self, inviter_id: int) -> tuple[int, int]:
+        """Сколько человек привёл и за скольких получил награду."""
+        row = self.conn.execute(
+            """SELECT COUNT(*), COALESCE(SUM(rewarded), 0)
+               FROM referrals WHERE inviter_id = ?""",
+            (inviter_id,),
+        ).fetchone()
+        return int(row[0]), int(row[1])
+
+    def referral_totals(self) -> tuple[int, int]:
+        row = self.conn.execute(
+            "SELECT COUNT(*), COALESCE(SUM(rewarded), 0) FROM referrals"
+        ).fetchone()
+        return int(row[0]), int(row[1])
+
+    def top_inviters(self, limit: int = 10) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            """SELECT r.inviter_id, u.username, COUNT(*) AS invited,
+                      COALESCE(SUM(r.rewarded), 0) AS rewarded
+               FROM referrals r LEFT JOIN users u ON u.user_id = r.inviter_id
+               GROUP BY r.inviter_id ORDER BY rewarded DESC, invited DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
 
     # ------------------------------------------------- опубликованные посты
 

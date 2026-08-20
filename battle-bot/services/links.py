@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 VOTE_PREFIX = "v"
+REF_PREFIX = "r"
 JOIN_PAYLOAD = "join"
 
 
@@ -15,6 +16,11 @@ def vote_link(bot_username: str, match_id: int) -> str:
 
 def join_link(bot_username: str) -> str:
     return f"https://t.me/{bot_username}?start={JOIN_PAYLOAD}"
+
+
+def invite_link(bot_username: str, user_id: int) -> str:
+    """Личная ссылка-приглашение: за друга по ней начисляется голос."""
+    return f"https://t.me/{bot_username}?start={REF_PREFIX}{user_id}"
 
 
 def post_link(channel_id: int, message_id: int) -> str:
@@ -31,7 +37,8 @@ def public_post_link(channel_url: str, message_id: int) -> str:
 def parse_start_payload(payload: str | None) -> tuple[str, int | None]:
     """Разобрать аргумент /start.
 
-    Возвращает ('vote', match_id) | ('join', None) | ('plain', None).
+    Возвращает ('vote', match_id) | ('ref', inviter_id) | ('join', None)
+    | ('plain', None).
     """
     if not payload:
         return "plain", None
@@ -40,4 +47,6 @@ def parse_start_payload(payload: str | None) -> tuple[str, int | None]:
         return "join", None
     if payload.startswith(VOTE_PREFIX) and payload[1:].isdigit():
         return "vote", int(payload[1:])
+    if payload.startswith(REF_PREFIX) and payload[1:].isdigit():
+        return "ref", int(payload[1:])
     return "plain", None

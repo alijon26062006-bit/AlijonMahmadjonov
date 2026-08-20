@@ -69,6 +69,8 @@ class Config:
     paid_votes_enabled: bool
     vote_packs: list[VotePack]
 
+    referral_enabled: bool
+    referral_reward: int      # голосов за одного приглашённого
     premium_emoji_file: str  # JSON «символ -> emoji_id», пусто -> обычные эмодзи
     premium_emoji_in_channel: str   # "auto" | "1" | "0", см. services/emoji.py
     prizes: list[int]        # звёзды за 1/2/3 место
@@ -109,6 +111,8 @@ def load_config() -> Config:
         require_username=os.getenv("REQUIRE_USERNAME", "1") == "1",
         paid_votes_enabled=os.getenv("PAID_VOTES", "1") == "1",
         vote_packs=packs,
+        referral_enabled=os.getenv("REFERRALS", "1") == "1",
+        referral_reward=_env_int("REFERRAL_REWARD", 1),
         premium_emoji_file=os.getenv("PREMIUM_EMOJI_FILE", "premium_emoji.json"),
         premium_emoji_in_channel=os.getenv("PREMIUM_EMOJI_IN_CHANNEL", "auto").lower(),
         prizes=prizes,

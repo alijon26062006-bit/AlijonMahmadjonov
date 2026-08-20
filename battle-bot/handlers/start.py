@@ -5,11 +5,15 @@ from aiogram import F, Router
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import CallbackQuery, Message
 
+from aiogram import Bot
+
 from config import Config
 from core.engine import BattleEngine
+from handlers.referral import welcome_invited
 from handlers.voting import show_voting
-from services import keyboards, links, texts
+from services import keyboards, links, referral, texts
 from storage.repo import Repo
+from storage.settings import Settings
 
 router = Router(name="start")
 
@@ -18,15 +22,23 @@ router = Router(name="start")
 async def start_with_payload(
     message: Message,
     command: CommandObject,
+    bot: Bot,
     repo: Repo,
     config: Config,
     engine: BattleEngine,
+    settings: Settings,
 ) -> None:
-    repo.upsert_user(message.from_user.id, message.from_user.username, message.from_user.first_name)
-    kind, match_id = links.parse_start_payload(command.args)
+    kind, value = links.parse_start_payload(command.args)
 
-    if kind == "vote" and match_id is not None:
-        await show_voting(message, match_id, repo, config)
+    # приглашение запоминаем до создания пользователя: засчитываем только новичков
+    invited = kind == "ref" and value is not None and referral.remember(
+        repo, message.from_user.id, value, settings
+    )
+
+    repo.upsert_user(message.from_user.id, message.from_user.username, message.from_user.first_name)
+
+    if kind == "vote" and value is not None:
+        await show_voting(message, value, repo, config)
         return
 
     if kind == "join":
@@ -34,6 +46,8 @@ async def start_with_payload(
         return
 
     await _greet(message, config)
+    if invited:
+        await welcome_invited(message, bot, repo, config, settings)
 
 
 @router.message(CommandStart())

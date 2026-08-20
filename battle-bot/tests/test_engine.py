@@ -52,6 +52,8 @@ def make_config(**overrides) -> Config:
         require_username=True,
         paid_votes_enabled=True,
         vote_packs=[VotePack(1, 15)],
+        referral_enabled=True,
+        referral_reward=1,
         premium_emoji_file="",
         premium_emoji_in_channel="auto",
         prizes=[1000, 500, 250],

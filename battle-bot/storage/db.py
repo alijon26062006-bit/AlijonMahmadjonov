@@ -84,6 +84,17 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Приглашения. invited_id первичный ключ: один приглашённый приносит награду
+-- ровно один раз, сколько бы ссылок он ни открывал.
+CREATE TABLE IF NOT EXISTS referrals (
+    invited_id  INTEGER PRIMARY KEY,
+    inviter_id  INTEGER NOT NULL,
+    rewarded    INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    rewarded_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_referrals_inviter ON referrals(inviter_id);
+
 -- Всё, что бот опубликовал в каналах: нужно, чтобы панель могла
 -- удалить посты батла, включая анонсы, а не только пары.
 CREATE TABLE IF NOT EXISTS channel_posts (

@@ -278,6 +278,40 @@ HELP = (
 )
 
 
+def invite_screen(link: str, invited: int, rewarded: int, reward: int, channel_url: str) -> str:
+    word = plural(reward, "голос", "голоса", "голосов")
+    return (
+        f"🤝 <b>{spaced('ПРИГЛАШАЙ ДРУЗЕЙ')}</b>\n"
+        f"{RULE}\n\n"
+        f"За каждого друга — <b>{reward} {word}</b> сверх бесплатного.\n\n"
+        "<blockquote>Друг переходит по вашей ссылке, "
+        f"<b>подписывается на канал</b> и запускает бота — голос ваш.</blockquote>\n\n"
+        f"👥 Пришло по ссылке: <b>{invited}</b>\n"
+        f"✅ Засчитано: <b>{rewarded}</b>\n\n"
+        "Ваша ссылка:\n"
+        f"<code>{link}</code>"
+    )
+
+
+def referral_rewarded(reward: int, balance: int) -> str:
+    word = plural(reward, "голос", "голоса", "голосов")
+    return (
+        f"🤝 <b>Друг присоединился!</b>\n"
+        f"{RULE}\n\n"
+        f"Вам начислено <b>{reward} {word}</b>.\n"
+        f"Баланс: <b>{balance}</b>"
+    )
+
+
+def referral_pending(channel_url: str) -> str:
+    return (
+        "🤝 <b>Почти готово</b>\n\n"
+        "<blockquote>Подпишитесь на канал — и тот, кто вас пригласил, "
+        "получит свой голос.</blockquote>\n"
+        f'<a href="{channel_url}">{escape(channel_url)}</a>'
+    )
+
+
 def subscribe_required(channel_url: str) -> str:
     return (
         "⚠️ <b>Нужна подписка</b>\n\n"

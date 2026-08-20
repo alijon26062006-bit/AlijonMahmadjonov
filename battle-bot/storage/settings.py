@@ -67,6 +67,9 @@ FIELDS: dict[str, Field] = {
               lambda raw: raw == "1"),
         Field("premium_emoji_in_channel", "Премиум-эмодзи в канале", str, str,
               "auto, 1 или 0"),
+        Field("referral_reward", "Голосов за приглашение", str, int, "целое число"),
+        Field("referral_enabled", "Приглашения", lambda v: "1" if v else "0",
+              lambda raw: raw == "1"),
         Field("main_channel_id", "Главный канал", str, int,
               "перешлите сюда любой пост из канала — ID определится сам, "
               "либо пришлите ID вида -100..."),

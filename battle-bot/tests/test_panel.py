@@ -78,6 +78,7 @@ async def test_every_screen_builds_with_real_data(env):
         panel_ui.channel(main_post.state(repo, config, settings)),
         panel_ui.people(stats),
         panel_ui.settings_screen(settings.all()),
+        panel_ui.referrals(1, True, repo.referral_totals(), repo.top_inviters(5)),
         panel_ui.confirm("Точно?", "battle:cancel:do", "battle"),
         panel_ui.ask("Призы", "1000,500,250", "числа через запятую", "p:prizes"),
     ]
@@ -458,6 +459,7 @@ async def test_every_button_on_every_screen_has_a_handler(env):
         panel_ui.channel(main_post.state(repo, config, settings)),
         panel_ui.people(stats),
         panel_ui.settings_screen(settings.all()),
+        panel_ui.referrals(1, True, repo.referral_totals(), repo.top_inviters(5)),
         panel_ui.person(repo.get_user(77), repo.stats_for(77), 0),
         panel_ui.confirm("Точно?", "battle:cancel:do", "battle"),
         panel_ui.ask("Призы", "1000,500,250", "подсказка", "prizes"),
@@ -469,7 +471,7 @@ async def test_every_button_on_every_screen_has_a_handler(env):
 
 def test_cancel_button_returns_to_its_section():
     """Отмена должна вести в раздел, а не в никуда."""
-    for section in ("prizes", "votes", "channel", "settings", "people"):
+    for section in ("prizes", "votes", "channel", "settings", "people", "referrals"):
         _, markup = panel_ui.ask("Поле", "—", "", section)
         cancel = markup.inline_keyboard[0][0]
 

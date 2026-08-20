@@ -45,6 +45,10 @@ EDITORS: dict[str, dict] = {
         "check": lambda raw: validation.as_int(raw, minimum=1, maximum=10_000, example="5"),
         "back": "votes",
     },
+    "referral_reward": {
+        "check": lambda raw: validation.as_int(raw, minimum=0, maximum=100, example="1"),
+        "back": "referrals",
+    },
     "round_times": {"check": validation.as_times, "back": "settings"},
     "min_participants": {
         "check": lambda raw: validation.as_int(raw, minimum=2, maximum=1000, example="4"),
@@ -201,6 +205,43 @@ async def show_votes(
         ),
     )
     await callback.answer()
+
+
+@router.callback_query(F.data == "p:referrals")
+async def show_referrals(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(
+        callback,
+        panel_ui.referrals(
+            settings.get("referral_reward"),
+            settings.get("referral_enabled"),
+            repo.referral_totals(),
+            repo.top_inviters(5),
+        ),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "p:referrals:toggle")
+async def toggle_referrals(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    settings.set("referral_enabled", not settings.get("referral_enabled"))
+    await render(
+        callback,
+        panel_ui.referrals(
+            settings.get("referral_reward"),
+            settings.get("referral_enabled"),
+            repo.referral_totals(),
+            repo.top_inviters(5),
+        ),
+    )
+    await callback.answer("Сохранено")
 
 
 @router.callback_query(F.data == "p:channel")
@@ -445,6 +486,16 @@ async def _back_to(
             message,
             panel_ui.votes(settings.vote_price, settings.get("paid_votes_enabled"),
                            repo.sold_votes()),
+        )
+    elif section == "referrals":
+        await render(
+            message,
+            panel_ui.referrals(
+                settings.get("referral_reward"),
+                settings.get("referral_enabled"),
+                repo.referral_totals(),
+                repo.top_inviters(5),
+            ),
         )
     elif section == "channel":
         await render(message, panel_ui.channel(main_post.state(repo, config, settings)))

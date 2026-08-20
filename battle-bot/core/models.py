@@ -27,6 +27,15 @@ class VoteSource(str, Enum):
     PAID = "paid"
 
 
+class VoteResult(str, Enum):
+    """Чем закончилась попытка проголосовать."""
+
+    ACCEPTED = "accepted"
+    DUPLICATE = "duplicate"    # этот человек уже голосовал в матче
+    CLOSED = "closed"          # раунд подведён или дедлайн прошёл
+    UNKNOWN_TARGET = "target"  # такого участника в матче нет
+
+
 @dataclass(frozen=True)
 class Player:
     """Участник батла в терминах логики сетки."""

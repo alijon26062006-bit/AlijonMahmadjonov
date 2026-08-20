@@ -12,7 +12,7 @@ from aiogram.types import BotCommand
 from config import load_config
 from core.engine import BattleEngine
 from core.scheduler import DeadlineWatcher
-from handlers import admin, emoji, errors, panel, payments, start, voting
+from handlers import admin, emoji, errors, panel, payments, referral, start, voting
 from services.emoji import PremiumEmojiMiddleware, load_table
 from services.startup import SetupError, prepare
 from storage.db import connect
@@ -32,6 +32,7 @@ COMMANDS = [
     BotCommand(command="me", description="Профиль"),
     BotCommand(command="top", description="Таблица лидеров"),
     BotCommand(command="buy", description="Купить голоса"),
+    BotCommand(command="invite", description="Пригласить друзей"),
     BotCommand(command="help", description="Как это работает"),
     BotCommand(command="panel", description="Панель управления (админ)"),
 ]
@@ -73,6 +74,7 @@ async def main() -> None:
     dispatcher.include_router(admin.router)
     dispatcher.include_router(emoji.router)
     dispatcher.include_router(payments.router)
+    dispatcher.include_router(referral.router)
     dispatcher.include_router(start.router)
     dispatcher.include_router(voting.router)
 

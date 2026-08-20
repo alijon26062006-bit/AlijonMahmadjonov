@@ -212,6 +212,7 @@ def test_menu_buttons_answer_with_and_without_the_premium_icon():
 
     for label in (
         keyboards.BTN_JOIN,
+        keyboards.BTN_INVITE,
         keyboards.BTN_BUY,
         keyboards.BTN_PROFILE,
         keyboards.BTN_HELP,
@@ -242,6 +243,7 @@ def test_menu_button_labels_lose_the_emoji_when_the_table_has_it(monkeypatch):
             label in keyboards.variants(known)
             for known in (
                 keyboards.BTN_JOIN,
+                keyboards.BTN_INVITE,
                 keyboards.BTN_BUY,
                 keyboards.BTN_PROFILE,
                 keyboards.BTN_HELP,

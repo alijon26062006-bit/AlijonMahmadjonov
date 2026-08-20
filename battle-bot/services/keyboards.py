@@ -22,6 +22,7 @@ RED = "danger"
 
 BTN_JOIN = "🚀 Принять участие"
 BTN_BUY = "🎁 Купить голоса"
+BTN_INVITE = "🤝 Пригласить друзей"
 BTN_PROFILE = "👤 Профиль"
 BTN_HELP = "✅ Помощь"
 
@@ -49,6 +50,8 @@ def main_menu(config: Config) -> ReplyKeyboardMarkup:
     table = config.premium_emoji
     # главное действие — синим, остальное обычным цветом, чтобы не пестрило
     rows = [[_reply_button(BTN_JOIN, table, BLUE)]]
+    if config.referral_enabled:
+        rows.append([_reply_button(BTN_INVITE, table, GREEN)])
     if config.paid_votes_enabled:
         rows.append([_reply_button(BTN_BUY, table)])
     rows.append([_reply_button(BTN_PROFILE, table), _reply_button(BTN_HELP, table)])
@@ -114,6 +117,16 @@ def subscribe(channel_url: str, match_id: int) -> InlineKeyboardMarkup:
                     text="Я подписался", callback_data=f"refresh:{match_id}", style=BLUE
                 )
             ],
+        ]
+    )
+
+
+def invited_check(channel_url: str) -> InlineKeyboardMarkup:
+    """Приглашённому: подписаться и проверить."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Подписаться ↗", url=channel_url, style=GREEN)],
+            [InlineKeyboardButton(text="Я подписался", callback_data="ref:check", style=BLUE)],
         ]
     )
 

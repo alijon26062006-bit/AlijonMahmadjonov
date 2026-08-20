@@ -1,12 +1,14 @@
 import sys
 from datetime import datetime, timedelta
+
+from config import MSK
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from core.models import BattleStatus, Player, Slot, VoteSource
+from core.models import BattleStatus, Player, Slot, VoteResult, VoteSource
 from storage.db import connect
 from storage.repo import Repo
 
@@ -25,7 +27,7 @@ def make_users(repo: Repo, count: int) -> list[Player]:
 
 
 def test_battle_lifecycle(repo: Repo):
-    deadline = datetime.now() + timedelta(hours=1)
+    deadline = datetime.now(MSK) + timedelta(hours=1)
     assert repo.current_battle() is None
     battle_id = repo.create_battle(deadline)
     assert repo.current_battle()["id"] == battle_id
@@ -35,7 +37,7 @@ def test_battle_lifecycle(repo: Repo):
 
 def test_participant_cannot_join_twice(repo: Repo):
     make_users(repo, 1)
-    battle_id = repo.create_battle(datetime.now())
+    battle_id = repo.create_battle(datetime.now(MSK))
     assert repo.add_participant(battle_id, 1, "nick1") is True
     assert repo.add_participant(battle_id, 1, "nick1") is False
     assert repo.participant_count(battle_id) == 1
@@ -43,26 +45,26 @@ def test_participant_cannot_join_twice(repo: Repo):
 
 def test_unassigned_players_only_lists_those_without_a_match(repo: Repo):
     players = make_users(repo, 3)
-    battle_id = repo.create_battle(datetime.now())
+    battle_id = repo.create_battle(datetime.now(MSK))
     for player in players:
         repo.add_participant(battle_id, player.user_id, player.nickname)
 
     assert [p.user_id for p in repo.unassigned_players(battle_id)] == [1, 2, 3]
     repo.create_match(battle_id, 1, 1, players[:2], advance=1, is_final=False,
-                      deadline=datetime.now())
+                      deadline=datetime.now(MSK) + timedelta(hours=1))
     assert [p.user_id for p in repo.unassigned_players(battle_id)] == [3]
 
 
 def test_one_free_vote_per_match(repo: Repo):
     players = make_users(repo, 2)
-    battle_id = repo.create_battle(datetime.now())
+    battle_id = repo.create_battle(datetime.now(MSK))
     match_id = repo.create_match(battle_id, 1, 1, players, advance=1, is_final=False,
-                                 deadline=datetime.now())
+                                 deadline=datetime.now(MSK) + timedelta(hours=1))
 
-    assert repo.add_vote(match_id, voter_id=99, target_id=1, source=VoteSource.FREE) is True
+    assert repo.add_vote(match_id, 99, 1, VoteSource.FREE) is VoteResult.ACCEPTED
     assert repo.has_free_vote(match_id, 99) is True
     # второй бесплатный голос того же человека в этот матч не проходит
-    assert repo.add_vote(match_id, voter_id=99, target_id=2, source=VoteSource.FREE) is False
+    assert repo.add_vote(match_id, 99, 2, VoteSource.FREE) is VoteResult.DUPLICATE
 
     slots = {s.user_id: s.votes for s in repo.match_slots(match_id)}
     assert slots == {1: 1, 2: 0}
@@ -70,13 +72,13 @@ def test_one_free_vote_per_match(repo: Repo):
 
 def test_paid_votes_stack_on_top_of_the_free_one(repo: Repo):
     players = make_users(repo, 2)
-    battle_id = repo.create_battle(datetime.now())
+    battle_id = repo.create_battle(datetime.now(MSK))
     match_id = repo.create_match(battle_id, 1, 1, players, advance=1, is_final=False,
-                                 deadline=datetime.now())
+                                 deadline=datetime.now(MSK) + timedelta(hours=1))
 
     repo.add_vote(match_id, 99, 1, VoteSource.FREE)
-    assert repo.add_vote(match_id, 99, 1, VoteSource.PAID) is True
-    assert repo.add_vote(match_id, 99, 1, VoteSource.PAID) is True
+    assert repo.add_vote(match_id, 99, 1, VoteSource.PAID) is VoteResult.ACCEPTED
+    assert repo.add_vote(match_id, 99, 1, VoteSource.PAID) is VoteResult.ACCEPTED
 
     slots = {s.user_id: s.votes for s in repo.match_slots(match_id)}
     assert slots[1] == 3
@@ -102,7 +104,7 @@ def test_payment_is_recorded_once(repo: Repo):
 
 def test_eliminating_participants_shrinks_the_alive_list(repo: Repo):
     players = make_users(repo, 4)
-    battle_id = repo.create_battle(datetime.now())
+    battle_id = repo.create_battle(datetime.now(MSK))
     for player in players:
         repo.add_participant(battle_id, player.user_id, player.nickname)
 
@@ -112,9 +114,9 @@ def test_eliminating_participants_shrinks_the_alive_list(repo: Repo):
 
 def test_close_match_writes_positions(repo: Repo):
     players = make_users(repo, 2)
-    battle_id = repo.create_battle(datetime.now())
+    battle_id = repo.create_battle(datetime.now(MSK))
     match_id = repo.create_match(battle_id, 1, 1, players, advance=1, is_final=False,
-                                 deadline=datetime.now())
+                                 deadline=datetime.now(MSK) + timedelta(hours=1))
 
     ranking = [Slot(2, "nick2", 5, 1), Slot(1, "nick1", 3, 2)]
     repo.close_match(match_id, ranking)
@@ -127,7 +129,7 @@ def test_close_match_writes_positions(repo: Repo):
 
 def test_leaderboard_ranks_champions_first(repo: Repo):
     make_users(repo, 3)
-    battle_id = repo.create_battle(datetime.now())
+    battle_id = repo.create_battle(datetime.now(MSK))
     for uid in (1, 2, 3):
         repo.add_participant(battle_id, uid, f"nick{uid}")
     repo.bump_wins([1, 2, 2])

@@ -69,8 +69,9 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
     )
     return text, keyboard(
         [button("⚔️ Батл", "battle"), button("🏆 Призы", "prizes")],
-        [button("⭐ Голоса", "votes"), button("📣 Канал", "channel")],
-        [button("👥 Люди", "people"), button("⚙️ Настройки", "settings")],
+        [button("⭐ Голоса", "votes"), button("🤝 Друзья", "referrals")],
+        [button("📣 Канал", "channel"), button("👥 Люди", "people")],
+        [button("⚙️ Настройки", "settings")],
         [button("🔄 Обновить", "home", BLUE)],
     )
 
@@ -148,6 +149,35 @@ def votes(price: int, enabled: bool, sold: tuple[int, int]) -> tuple[str, Inline
     return text, keyboard(
         [button("✏️ Изменить цену", "edit:vote_price", BLUE)],
         [button(toggle, "votes:toggle", RED if enabled else GREEN)],
+        back_row(),
+    )
+
+
+# ---------------------------------------------------------------- друзья
+
+def referrals(reward: int, enabled: bool, totals: tuple[int, int], top) -> tuple[str, InlineKeyboardMarkup]:
+    invited, rewarded = totals
+    lines = [
+        f"{index}. {escape('@' + (row['username'] or str(row['inviter_id'])))} — "
+        f"<b>{row['rewarded']}</b> из {row['invited']}"
+        for index, row in enumerate(top, start=1)
+    ]
+    top_block = "\n".join(lines) if lines else "<i>пока никто никого не привёл</i>"
+
+    text = (
+        f"🤝 <b>{texts.spaced('ДРУЗЬЯ')}</b>\n{RULE}\n\n"
+        f"Награда за друга: <b>{reward}</b> "
+        f"{texts.plural(reward, 'голос', 'голоса', 'голосов')}\n"
+        f"Приглашения: <b>{onoff(enabled)}</b>\n\n"
+        f"👥 Пришло по ссылкам: <b>{invited}</b>\n"
+        f"✅ Засчитано: <b>{rewarded}</b>\n\n"
+        f"<b>Кто приводит больше всех</b>\n{top_block}\n\n"
+        "<i>Голос засчитывается, только когда друг новый и подписался на канал.</i>"
+    )
+    toggle = "Выключить приглашения" if enabled else "Включить приглашения"
+    return text, keyboard(
+        [button("✏️ Изменить награду", "edit:referral_reward", BLUE)],
+        [button(toggle, "referrals:toggle", RED if enabled else GREEN)],
         back_row(),
     )
 
