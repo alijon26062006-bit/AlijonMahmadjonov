@@ -11,7 +11,8 @@ from aiogram.types import BotCommand
 
 from config import load_config
 from core.engine import BattleEngine
-from core.scheduler import DeadlineWatcher
+from core.autopilot import Autopilot
+from core.scheduler import DeadlineWatcher, Ticker
 from handlers import (
     admin, broadcast, emoji, errors, panel, payments, referral, start, voting,
 )
@@ -102,6 +103,8 @@ async def main() -> None:
         due_deadline=engine.current_deadline,
         on_due=engine.close_round,
     )
+    # автопилот: напоминания, ежедневный анонс и реклама без участия админа
+    autopilot = Ticker(Autopilot(bot, repo, config, settings, engine).tick, every=60.0)
 
     try:
         username = await prepare(bot, config)
@@ -115,10 +118,12 @@ async def main() -> None:
     log.info("Запущен как @%s", username)
 
     watcher.start()
+    autopilot.start("autopilot")
     try:
         await dispatcher.start_polling(bot, allowed_updates=dispatcher.resolve_used_update_types())
     finally:
         await watcher.stop()
+        await autopilot.stop()
         await bot.session.close()
         conn.close()
 

@@ -68,6 +68,11 @@ FIELDS: dict[str, Field] = {
         Field("premium_emoji_in_channel", "Премиум-эмодзи в канале", str, str,
               "auto, 1 или 0"),
         Field("referral_reward", "Голосов за приглашение", str, int, "целое число"),
+        Field("autopilot_enabled", "Автопилот", lambda v: "1" if v else "0",
+              lambda raw: raw == "1"),
+        Field("reminder_hours", "Напоминать за (часов)", str, str,
+              "часы через запятую, например 3,1"),
+        Field("promo_interval_hours", "Реклама раз в (часов)", str, int, "целое число"),
         Field("sponsor_channels", "Каналы обязательной подписки", str, str,
               "ID через запятую; пусто — берётся главный канал"),
         Field("stars_link", "Ссылка «звёзды дешевле»", str, str,
@@ -105,6 +110,9 @@ class Settings:
 
     # значения, которых нет в .env — только в базе
     OWN_DEFAULTS = {
+        "autopilot_enabled": True,
+        "reminder_hours": "3,1",
+        "promo_interval_hours": 6,
         "sponsor_channels": "",
         "stars_link": "",
         "main_channel_id": 0,

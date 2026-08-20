@@ -32,6 +32,9 @@ router = Router(name="panel")
 
 class Panel(StatesGroup):
     waiting_value = State()
+    promo_text = State()
+    promo_label = State()
+    promo_url = State()
 
 
 # какой проверкой встречать каждое поле и куда возвращаться после ввода
@@ -48,6 +51,14 @@ EDITORS: dict[str, dict] = {
     "sponsor_channels": {
         "check": lambda raw: _channel_list(raw),
         "back": "settings",
+    },
+    "reminder_hours": {
+        "check": lambda raw: _hours_list(raw),
+        "back": "auto",
+    },
+    "promo_interval_hours": {
+        "check": lambda raw: validation.as_int(raw, minimum=0, maximum=168, example="6"),
+        "back": "auto",
     },
     "referral_reward": {
         "check": lambda raw: validation.as_int(raw, minimum=0, maximum=100, example="1"),
@@ -69,6 +80,17 @@ EDITORS: dict[str, dict] = {
     "main_post_text": {"check": lambda raw: raw.strip(), "back": "channel"},
     "main_post_photo": {"check": lambda raw: raw.strip(), "back": "channel"},
 }
+
+
+def _hours_list(raw: str) -> str:
+    """«3,1» — за сколько часов до итогов напоминать."""
+    text = (raw or "").strip()
+    if not text or text in {"-", "—"}:
+        return ""
+    hours = validation.as_int_list(
+        text.replace(" ", ","), minimum=1, maximum=48, max_items=6, example="3,1"
+    )
+    return ",".join(str(value) for value in sorted(set(hours), reverse=True))
 
 
 def _channel_list(raw: str) -> str:
@@ -255,6 +277,171 @@ async def toggle_referrals(
         ),
     )
     await callback.answer("Сохранено")
+
+
+def _auto_screen(repo: Repo, settings: Settings):
+    return panel_ui.autopilot(settings.all(), repo.promos())
+
+
+@router.callback_query(F.data == "p:auto")
+async def show_autopilot(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, _auto_screen(repo, settings))
+    await callback.answer()
+
+
+@router.callback_query(F.data == "p:auto:toggle")
+async def toggle_autopilot(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    settings.set("autopilot_enabled", not settings.get("autopilot_enabled"))
+    await render(callback, _auto_screen(repo, settings))
+    await callback.answer("Сохранено")
+
+
+@router.callback_query(F.data == "p:auto:promo:add")
+async def add_promo(callback: CallbackQuery, config: Config, state: FSMContext) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await state.set_state(Panel.promo_text)
+    await render(
+        callback,
+        panel_ui.ask(
+            "Текст рекламного поста", "—",
+            "бот будет публиковать его в оба канала по очереди", "auto",
+        ),
+    )
+    await callback.answer()
+
+
+@router.message(
+    Panel.promo_text,
+    F.text.startswith("/") | F.text.in_(keyboards.menu_labels()),
+)
+@router.message(
+    Panel.promo_label,
+    F.text.startswith("/") | F.text.in_(keyboards.menu_labels()),
+)
+@router.message(
+    Panel.promo_url,
+    F.text.startswith("/") | F.text.in_(keyboards.menu_labels()),
+)
+async def leave_promo(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    raise SkipHandler()
+
+
+@router.message(Panel.promo_text)
+async def promo_text(message: Message, config: Config, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id, config):
+        return
+    try:
+        text = validation.as_text(message.html_text or message.text or "", limit=3000)
+    except InputError as error:
+        await message.answer(f"⚠️ {error}")
+        return
+
+    await state.update_data(promo_text=text)
+    await state.set_state(Panel.promo_label)
+    await message.answer(
+        "✏️ <b>Название кнопки</b> под постом.\n<i>Например: Участвовать</i>",
+        reply_markup=panel_ui.keyboard(
+            [panel_ui.button("Без кнопки →", "auto:promo:nobutton")],
+            [panel_ui.button("Отмена", "auto")],
+        ),
+    )
+
+
+@router.callback_query(F.data == "p:auto:promo:nobutton")
+async def promo_without_button(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings, state: FSMContext
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    data = await state.get_data()
+    repo.add_promo(data.get("promo_text", ""), None, None)
+    await state.clear()
+    await render(callback, _auto_screen(repo, settings))
+    await callback.answer("Пост добавлен")
+
+
+@router.message(Panel.promo_label)
+async def promo_label(message: Message, config: Config, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id, config):
+        return
+    try:
+        label = validation.as_text(message.text or "", limit=64)
+    except InputError as error:
+        await message.answer(f"⚠️ {error}")
+        return
+
+    await state.update_data(promo_label=label)
+    await state.set_state(Panel.promo_url)
+    await message.answer(
+        f"🔗 <b>Ссылка</b> для кнопки «{label}».\n"
+        "<i>Например: https://t.me/realed или @realed</i>",
+        reply_markup=panel_ui.keyboard([panel_ui.button("Отмена", "auto")]),
+    )
+
+
+@router.message(Panel.promo_url)
+async def promo_url(
+    message: Message, repo: Repo, config: Config, settings: Settings, state: FSMContext
+) -> None:
+    if not is_admin(message.from_user.id, config):
+        return
+    try:
+        url = validation.as_url(message.text or "")
+    except InputError as error:
+        await message.answer(f"⚠️ {error}")
+        return
+
+    data = await state.get_data()
+    repo.add_promo(data.get("promo_text", ""), data.get("promo_label"), url)
+    await state.clear()
+    await message.answer("✅ Рекламный пост добавлен.")
+    await render(message, _auto_screen(repo, settings))
+
+
+@router.callback_query(F.data == "p:auto:promos")
+async def show_promos(
+    callback: CallbackQuery, repo: Repo, config: Config
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, panel_ui.promo_list(repo.promos()))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("p:auto:promo:toggle:"))
+async def switch_promo(
+    callback: CallbackQuery, repo: Repo, config: Config
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    repo.toggle_promo(int(callback.data.split(":")[-1]))
+    await render(callback, panel_ui.promo_list(repo.promos()))
+    await callback.answer("Сохранено")
+
+
+@router.callback_query(F.data.startswith("p:auto:promo:del:"))
+async def drop_promo(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    repo.delete_promo(int(callback.data.split(":")[-1]))
+    remaining = repo.promos()
+    await render(
+        callback,
+        panel_ui.promo_list(remaining) if remaining else _auto_screen(repo, settings),
+    )
+    await callback.answer("Удалено")
 
 
 @router.callback_query(F.data == "p:channel")
@@ -516,6 +703,8 @@ async def _back_to(
                 settings.get("stars_link"),
             ),
         )
+    elif section == "auto":
+        await render(message, _auto_screen(repo, settings))
     elif section == "referrals":
         await render(
             message,

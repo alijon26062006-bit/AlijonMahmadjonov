@@ -84,6 +84,27 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Что автопилот уже отправил. Ключ первичный, поэтому одно и то же
+-- напоминание не уйдёт дважды даже после перезапуска бота.
+CREATE TABLE IF NOT EXISTS auto_log (
+    kind    TEXT NOT NULL,
+    key     TEXT NOT NULL,
+    sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (kind, key)
+);
+
+-- Рекламные посты автопилота: крутятся по кругу с заданным интервалом.
+CREATE TABLE IF NOT EXISTS promos (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    text         TEXT NOT NULL,
+    button_label TEXT,
+    button_url   TEXT,
+    enabled      INTEGER NOT NULL DEFAULT 1,
+    sent_count   INTEGER NOT NULL DEFAULT 0,
+    last_sent    TEXT,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Приглашения. invited_id первичный ключ: один приглашённый приносит награду
 -- ровно один раз, сколько бы ссылок он ни открывал.
 CREATE TABLE IF NOT EXISTS referrals (

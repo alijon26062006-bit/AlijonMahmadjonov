@@ -391,6 +391,63 @@ class Repo:
         self.conn.commit()
         return True
 
+    # --------------------------------------------------------- автопилот
+
+    def mark_done(self, kind: str, key: str) -> bool:
+        """Отметить разовое действие автопилота. False — если уже было.
+
+        Проверка и отметка — один запрос, поэтому повтор невозможен даже при
+        двух тиках подряд.
+        """
+        try:
+            self.conn.execute(
+                "INSERT INTO auto_log(kind, key) VALUES(?, ?)", (kind, key)
+            )
+        except sqlite3.IntegrityError:
+            return False
+        self.conn.commit()
+        return True
+
+    def add_promo(self, text: str, label: str | None, url: str | None) -> int:
+        cursor = self.conn.execute(
+            "INSERT INTO promos(text, button_label, button_url) VALUES(?, ?, ?)",
+            (text, label, url),
+        )
+        self.conn.commit()
+        return int(cursor.lastrowid)
+
+    def promos(self, only_enabled: bool = False) -> list[sqlite3.Row]:
+        query = "SELECT * FROM promos"
+        if only_enabled:
+            query += " WHERE enabled = 1"
+        return self.conn.execute(query + " ORDER BY id").fetchall()
+
+    def next_promo(self) -> sqlite3.Row | None:
+        """Наименее показанный пост — так очередь идёт по кругу честно."""
+        return self.conn.execute(
+            """SELECT * FROM promos WHERE enabled = 1
+               ORDER BY sent_count, COALESCE(last_sent, ''), id LIMIT 1"""
+        ).fetchone()
+
+    def mark_promo_sent(self, promo_id: int) -> None:
+        self.conn.execute(
+            """UPDATE promos SET sent_count = sent_count + 1,
+                                 last_sent = datetime('now')
+               WHERE id = ?""",
+            (promo_id,),
+        )
+        self.conn.commit()
+
+    def toggle_promo(self, promo_id: int) -> None:
+        self.conn.execute(
+            "UPDATE promos SET enabled = 1 - enabled WHERE id = ?", (promo_id,)
+        )
+        self.conn.commit()
+
+    def delete_promo(self, promo_id: int) -> None:
+        self.conn.execute("DELETE FROM promos WHERE id = ?", (promo_id,))
+        self.conn.commit()
+
     # ------------------------------------------------------- приглашения
 
     def record_referral(self, invited_id: int, inviter_id: int) -> bool:

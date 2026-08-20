@@ -71,7 +71,8 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         [button("⚔️ Батл", "battle"), button("🏆 Призы", "prizes")],
         [button("⭐ Голоса", "votes"), button("🤝 Друзья", "referrals")],
         [button("📣 Канал", "channel"), button("👥 Люди", "people")],
-        [button("📨 Рассылка", "broadcast"), button("⚙️ Настройки", "settings")],
+        [button("📨 Рассылка", "broadcast"), button("🤖 Автопилот", "auto")],
+        [button("⚙️ Настройки", "settings")],
         [button("🔄 Обновить", "home", BLUE)],
     )
 
@@ -155,6 +156,58 @@ def votes(
         [button("🧱 Ссылка на звёзды", "edit:stars_link")],
         [button(toggle, "votes:toggle", RED if enabled else GREEN)],
         back_row(),
+    )
+
+
+# -------------------------------------------------------------- автопилот
+
+def autopilot(values: dict, promos: list) -> tuple[str, InlineKeyboardMarkup]:
+    hours = values["reminder_hours"] or "—"
+    interval = values["promo_interval_hours"]
+    active = sum(1 for row in promos if row["enabled"])
+
+    lines = []
+    for row in promos:
+        mark = "✅" if row["enabled"] else "⏸"
+        preview = escape(row["text"][:40]) + ("…" if len(row["text"]) > 40 else "")
+        lines.append(f"{mark} <code>#{row['id']}</code> {preview} · показов: {row['sent_count']}")
+    listing = "\n".join(lines) if lines else "<i>пока пусто</i>"
+
+    text = (
+        f"🤖 <b>{texts.spaced('АВТОПИЛОТ')}</b>\n{RULE}\n\n"
+        f"Состояние: <b>{onoff(values['autopilot_enabled'])}</b>\n"
+        f"⏰ Напоминать за: <b>{hours}</b> ч до итогов\n"
+        f"📣 Реклама раз в: <b>{interval}</b> ч\n\n"
+        f"<b>Рекламные посты</b> ({active} активных)\n{listing}\n\n"
+        "<i>Бот сам напоминает перед итогами, зовёт в батл каждый день "
+        "в полдень и крутит рекламу по очереди в оба канала.</i>"
+    )
+    toggle = "Выключить автопилот" if values["autopilot_enabled"] else "Включить автопилот"
+    rows = [
+        [button("⏰ Напоминания", "edit:reminder_hours", BLUE),
+         button("📣 Интервал", "edit:promo_interval_hours")],
+        [button("➕ Добавить рекламу", "auto:promo:add", GREEN)],
+    ]
+    if promos:
+        rows.append([button("🗂 Управление постами", "auto:promos")])
+    rows.append([button(toggle, "auto:toggle", RED if values["autopilot_enabled"] else GREEN)])
+    return text, keyboard(*rows, back_row())
+
+
+def promo_list(promos: list) -> tuple[str, InlineKeyboardMarkup]:
+    rows = []
+    for row in promos:
+        mark = "✅" if row["enabled"] else "⏸"
+        title = escape(row["text"][:24]) + ("…" if len(row["text"]) > 24 else "")
+        rows.append([
+            button(f"{mark} #{row['id']} {title}", f"auto:promo:toggle:{row['id']}"),
+            button("🗑", f"auto:promo:del:{row['id']}", RED),
+        ])
+    return (
+        f"🗂 <b>Рекламные посты</b>\n{RULE}\n\n"
+        "<i>Нажмите на пост, чтобы включить или выключить. "
+        "Корзина удаляет его насовсем.</i>",
+        keyboard(*rows, back_row("auto")),
     )
 
 

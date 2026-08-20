@@ -42,6 +42,37 @@ def deadline_for_round(
     return now + FALLBACK_INTERVAL
 
 
+class Ticker:
+    """Фоновая задача, которая просто зовёт callback раз в N секунд."""
+
+    def __init__(self, callback: Callable[[], Awaitable[None]], every: float = 60.0) -> None:
+        self._callback = callback
+        self._every = every
+        self._task: asyncio.Task | None = None
+
+    def start(self, name: str = "ticker") -> None:
+        self._task = asyncio.create_task(self._run(), name=name)
+
+    async def stop(self) -> None:
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            self._task = None
+
+    async def _run(self) -> None:
+        while True:
+            try:
+                await self._callback()
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # фоновая задача не должна умирать от одной ошибки
+                log.exception("Ошибка в фоновой задаче")
+            await asyncio.sleep(self._every)
+
+
 class DeadlineWatcher:
     """Фоновая задача: раз в минуту проверяет, не пора ли подводить итоги."""
 

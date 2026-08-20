@@ -174,6 +174,51 @@ def registration_open(deadline: datetime, prizes: list[int]) -> str:
     )
 
 
+def _hours_word(hours: int) -> str:
+    return plural(hours, "час", "часа", "часов")
+
+
+def reminder_post(hours: int, deadline: datetime, registration: bool) -> str:
+    """Напоминание в канал перед закрытием раунда."""
+    head = "⏰ <b>Остался последний час</b>" if hours == 1 else (
+        f"⏰ <b>Осталось {hours} {_hours_word(hours)}</b>"
+    )
+    tail = (
+        "🎫 <b>Успей подать заявку</b> — пара публикуется сразу, "
+        "как только найдётся соперник."
+        if registration
+        else "🗳 <b>Успей позвать своих проголосовать</b> — после итогов голоса не считаются."
+    )
+    return f"{head}\n{RULE}\n\n{tail}\n\n{deadline_line(deadline)}"
+
+
+def reminder_dm(hours: int, link: str) -> str:
+    """Личное напоминание участнику: зови голосовать, пока идёт время."""
+    when = "последний час" if hours == 1 else f"{hours} {_hours_word(hours)}"
+    return (
+        f"⏰ <b>До итогов {when}</b>\n"
+        f"{RULE}\n\n"
+        "<b>Самое время позвать своих.</b> Отправьте им вашу ссылку:\n"
+        f"<code>{link}</code>"
+    )
+
+
+def daily_call(applied: int, deadline: datetime, prizes: list[int]) -> str:
+    """Ежедневный зов в канал, пока идёт приём заявок."""
+    who = (
+        f"👥 Уже подали заявку: <b>{applied}</b>"
+        if applied
+        else "👥 <b>Ты можешь стать первым</b>"
+    )
+    return (
+        f"⚔️ <b>{spaced('СЕГОДНЯ БАТЛ')}</b>\n"
+        f"{RULE}\n\n"
+        f"{prizes_block(prizes)}\n\n"
+        f"{who}\n\n"
+        f"{deadline_line(deadline)}"
+    )
+
+
 def battle_cancelled() -> str:
     return (
         f"🛑 <b>{spaced('БАТЛ ОТМЕНЁН')}</b>\n"
