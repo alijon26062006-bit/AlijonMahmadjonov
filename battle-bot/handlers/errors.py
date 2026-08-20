@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import traceback
+from datetime import datetime, timedelta, timezone
 from html import escape
 
 from aiogram import Bot, Router
@@ -15,6 +16,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery, ErrorEvent, Message
 
 from config import Config
+from services.retry import TRANSIENT
 from services.validation import InputError
 
 log = logging.getLogger(__name__)
@@ -26,6 +28,26 @@ TO_USER = (
 )
 
 TRACEBACK_LIMIT = 2500  # запас до предела сообщения Telegram
+
+TO_USER_NETWORK = (
+    "📡 <b>Сеть подвела</b>\n\n"
+    "Telegram не ответил вовремя. Повторите — обычно со второго раза проходит."
+)
+
+# одинаковые ошибки не должны заваливать админа: одна весточка в такой период
+REPORT_COOLDOWN = timedelta(minutes=15)
+_reported: dict[str, datetime] = {}
+
+
+def _should_report(error: BaseException) -> bool:
+    """Не повторять админу один и тот же отчёт чаще, чем раз в четверть часа."""
+    signature = f"{type(error).__name__}:{str(error)[:120]}"
+    now = datetime.now(timezone.utc)
+    last = _reported.get(signature)
+    if last is not None and now - last < REPORT_COOLDOWN:
+        return False
+    _reported[signature] = now
+    return True
 
 
 def _extract(event: ErrorEvent) -> tuple[Message | None, CallbackQuery | None]:
@@ -63,9 +85,16 @@ async def catch_everything(event: ErrorEvent, bot: Bot, config: Config) -> bool:
         await _reply(message, callback, f"⚠️ {error}")
         return True
 
+    # сетевой сбой Telegram: повтор уже пробовали, кода это не касается
+    if isinstance(error, TRANSIENT):
+        log.warning("Сетевой сбой Telegram: %s", error)
+        await _reply(message, callback, TO_USER_NETWORK)
+        return True
+
     log.exception("Необработанная ошибка при обработке апдейта", exc_info=error)
     await _reply(message, callback, TO_USER)
-    await _tell_admins(bot, config, event, error)
+    if _should_report(error):
+        await _tell_admins(bot, config, event, error)
     return True
 
 

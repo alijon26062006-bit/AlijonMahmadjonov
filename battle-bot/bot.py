@@ -14,6 +14,7 @@ from core.engine import BattleEngine
 from core.scheduler import DeadlineWatcher
 from handlers import admin, emoji, errors, panel, payments, referral, start, voting
 from services.emoji import PremiumEmojiMiddleware, load_table
+from services.retry import RetryMiddleware
 from services.startup import SetupError, prepare
 from storage.db import connect
 from storage.repo import Repo
@@ -51,6 +52,9 @@ async def main() -> None:
         token=config.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    # повтор ставим первым, чтобы он обнимал весь запрос целиком
+    bot.session.middleware(RetryMiddleware())
+
     # таблица одна на всех: middleware подменяет по ней, /emojiset её пополняет
     config.premium_emoji = load_table(config.premium_emoji_file)
     # "0" — никогда, "1" — всегда, "auto" — пробуем и отключаем при отказе
