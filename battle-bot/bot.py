@@ -12,11 +12,12 @@ from aiogram.types import BotCommand
 from config import load_config
 from core.engine import BattleEngine
 from core.scheduler import DeadlineWatcher
-from handlers import admin, emoji, payments, start, voting
+from handlers import admin, emoji, errors, payments, start, voting
 from services.emoji import PremiumEmojiMiddleware, load_table
 from services.startup import SetupError, prepare
 from storage.db import connect
 from storage.repo import Repo
+from storage.settings import Settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +41,10 @@ async def main() -> None:
     conn = connect(config.db_path)
     repo = Repo(conn)
 
+    # настройки из базы перекрывают .env и правятся из панели без перезапуска
+    settings = Settings(conn, config)
+    settings.bootstrap()
+
     bot = Bot(
         token=config.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -60,7 +65,9 @@ async def main() -> None:
     dispatcher["config"] = config
     dispatcher["engine"] = engine
     dispatcher["emoji_table"] = config.premium_emoji
+    dispatcher["settings"] = settings
 
+    dispatcher.include_router(errors.router)
     dispatcher.include_router(admin.router)
     dispatcher.include_router(emoji.router)
     dispatcher.include_router(payments.router)
