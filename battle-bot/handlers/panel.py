@@ -132,6 +132,7 @@ def collect(repo: Repo, engine: BattleEngine) -> dict:
         "votes": repo.total_votes_cast(),
         "sold_votes": sold_votes,
         "sold_stars": sold_stars,
+        "referrals": repo.referral_totals()[1],
         "battle": battle,
         "queue": 0,
         "participants": 0,
@@ -253,8 +254,8 @@ async def show_referrals(
         panel_ui.referrals(
             settings.get("referral_reward"),
             settings.get("referral_enabled"),
-            repo.referral_totals(),
-            repo.top_inviters(5),
+            repo.referral_report(),
+            repo.top_inviters(10),
         ),
     )
     await callback.answer()
@@ -272,8 +273,8 @@ async def toggle_referrals(
         panel_ui.referrals(
             settings.get("referral_reward"),
             settings.get("referral_enabled"),
-            repo.referral_totals(),
-            repo.top_inviters(5),
+            repo.referral_report(),
+            repo.top_inviters(10),
         ),
     )
     await callback.answer("Сохранено")
@@ -632,7 +633,12 @@ async def _apply(
         await state.clear()
         await render(
             message,
-            panel_ui.person(row, repo.stats_for(row["user_id"]), repo.vote_balance(row["user_id"])),
+            panel_ui.person(
+                row,
+                repo.stats_for(row["user_id"]),
+                repo.vote_balance(row["user_id"]),
+                repo.referral_stats(row["user_id"]),
+            ),
         )
         return
 
@@ -644,7 +650,13 @@ async def _apply(
         await message.answer(f"✅ Начислено <b>{amount}</b> голосов.")
         row = repo.get_user(target)
         await render(
-            message, panel_ui.person(row, repo.stats_for(target), repo.vote_balance(target))
+            message,
+            panel_ui.person(
+                row,
+                repo.stats_for(target),
+                repo.vote_balance(target),
+                repo.referral_stats(target),
+            ),
         )
         return
 
@@ -711,8 +723,8 @@ async def _back_to(
             panel_ui.referrals(
                 settings.get("referral_reward"),
                 settings.get("referral_enabled"),
-                repo.referral_totals(),
-                repo.top_inviters(5),
+                repo.referral_report(),
+                repo.top_inviters(10),
             ),
         )
     elif section == "channel":
@@ -882,7 +894,12 @@ async def person_action(callback: CallbackQuery, repo: Repo, config: Config) -> 
     row = repo.get_user(user_id)
     await render(
         callback,
-        panel_ui.person(row, repo.stats_for(user_id), repo.vote_balance(user_id)),
+        panel_ui.person(
+            row,
+            repo.stats_for(user_id),
+            repo.vote_balance(user_id),
+            repo.referral_stats(user_id),
+        ),
     )
     await callback.answer("Заблокирован" if action == "ban" else "Разблокирован")
 

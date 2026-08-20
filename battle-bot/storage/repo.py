@@ -516,6 +516,34 @@ class Repo:
         ).fetchone()
         return int(row[0]), int(row[1])
 
+    def referral_report(self) -> dict:
+        """Полная картина по приглашениям — для панели."""
+        total, rewarded = self.referral_totals()
+
+        def since(days: int) -> int:
+            return int(
+                self.conn.execute(
+                    "SELECT COUNT(*) FROM referrals WHERE created_at >= datetime('now', ?)",
+                    (f"-{days} day",),
+                ).fetchone()[0]
+            )
+
+        inviters = int(
+            self.conn.execute(
+                "SELECT COUNT(DISTINCT inviter_id) FROM referrals"
+            ).fetchone()[0]
+        )
+        return {
+            "total": total,
+            "rewarded": rewarded,
+            "pending": total - rewarded,
+            "today": since(1),
+            "week": since(7),
+            "inviters": inviters,
+            # обычное округление, а не «к чётному»: 62.5% должно стать 63%
+            "share": int(rewarded / total * 100 + 0.5) if total else 0,
+        }
+
     def top_inviters(self, limit: int = 10) -> list[sqlite3.Row]:
         return self.conn.execute(
             """SELECT r.inviter_id, u.username, COUNT(*) AS invited,

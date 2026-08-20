@@ -63,6 +63,7 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         f"   <i>(+{stats['new_users']} за сутки)</i>\n"
         f"📝 Заявок в очереди: <b>{stats['queue']}</b>\n"
         f"🗳 Голосов отдано: <b>{stats['votes']}</b>\n"
+        f"🤝 Пришло по приглашениям: <b>{stats['referrals']}</b>\n"
         f"⭐ Продано: <b>{stats['sold_votes']}</b> голосов "
         f"на <b>{stats['sold_stars']}⭐</b>\n\n"
         f"{state}"
@@ -213,10 +214,10 @@ def promo_list(promos: list) -> tuple[str, InlineKeyboardMarkup]:
 
 # ---------------------------------------------------------------- друзья
 
-def referrals(reward: int, enabled: bool, totals: tuple[int, int], top) -> tuple[str, InlineKeyboardMarkup]:
-    invited, rewarded = totals
+def referrals(reward: int, enabled: bool, report: dict, top) -> tuple[str, InlineKeyboardMarkup]:
     lines = [
-        f"{index}. {escape('@' + (row['username'] or str(row['inviter_id'])))} — "
+        f"{texts.MEDAL.get(index, f'{index}.')} "
+        f"{escape('@' + (row['username'] or str(row['inviter_id'])))} — "
         f"<b>{row['rewarded']}</b> из {row['invited']}"
         for index, row in enumerate(top, start=1)
     ]
@@ -224,13 +225,21 @@ def referrals(reward: int, enabled: bool, totals: tuple[int, int], top) -> tuple
 
     text = (
         f"🤝 <b>{texts.spaced('ДРУЗЬЯ')}</b>\n{RULE}\n\n"
+        f"<b>Всего пришло по ссылкам: {report['total']}</b>\n"
+        f"✅ Засчитано: <b>{report['rewarded']}</b> "
+        f"<i>({report['share']}%)</i>\n"
+        f"⏳ Ждут подписки: <b>{report['pending']}</b>\n\n"
+        f"📅 За сутки: <b>{report['today']}</b>\n"
+        f"🗓 За неделю: <b>{report['week']}</b>\n"
+        f"👤 Приглашали: <b>{report['inviters']}</b> "
+        f"{texts.plural(report['inviters'], 'человек', 'человека', 'человек')}\n\n"
+        f"{RULE}\n"
         f"Награда за друга: <b>{reward}</b> "
         f"{texts.plural(reward, 'голос', 'голоса', 'голосов')}\n"
         f"Приглашения: <b>{onoff(enabled)}</b>\n\n"
-        f"👥 Пришло по ссылкам: <b>{invited}</b>\n"
-        f"✅ Засчитано: <b>{rewarded}</b>\n\n"
         f"<b>Кто приводит больше всех</b>\n{top_block}\n\n"
-        "<i>Голос засчитывается, только когда друг новый и подписался на канал.</i>"
+        "<i>Засчитывается только новый друг, который подписался на канал. "
+        "«Ждут подписки» — пришли по ссылке, но ещё не подписались.</i>"
     )
     toggle = "Выключить приглашения" if enabled else "Включить приглашения"
     return text, keyboard(
@@ -292,7 +301,7 @@ def people(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
     )
 
 
-def person(row, stats_row, balance: int) -> tuple[str, InlineKeyboardMarkup]:
+def person(row, stats_row, balance: int, invited: tuple[int, int] = (0, 0)) -> tuple[str, InlineKeyboardMarkup]:
     handle = f"@{row['username']}" if row["username"] else escape(row["first_name"] or "—")
     banned = bool(row["is_banned"])
     text = (
@@ -303,7 +312,8 @@ def person(row, stats_row, balance: int) -> tuple[str, InlineKeyboardMarkup]:
         f"🏆 Титулов: <b>{stats_row['titles'] if stats_row else 0}</b>\n"
         f"✅ Побед: <b>{stats_row['wins'] if stats_row else 0}</b>\n"
         f"⚔️ Батлов: <b>{stats_row['battles'] if stats_row else 0}</b>\n"
-        f"🎁 Голосов на балансе: <b>{balance}</b>"
+        f"🎁 Голосов на балансе: <b>{balance}</b>\n"
+        f"🤝 Привёл друзей: <b>{invited[1]}</b> из {invited[0]}"
     )
     unban = button("Разблокировать", f"person:unban:{row['user_id']}", GREEN)
     ban = button("Заблокировать", f"person:ban:{row['user_id']}", RED)

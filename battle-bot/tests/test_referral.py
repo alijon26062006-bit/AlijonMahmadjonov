@@ -169,3 +169,92 @@ def test_a_broken_payload_is_ignored_not_crashed():
         assert kind in {"plain", "ref", "vote", "join"}
         if kind == "ref":
             assert isinstance(value, int)
+
+
+# ------------------------------------------------------------- отчёт
+
+def test_the_report_counts_everything_the_admin_needs(env):
+    repo, _, settings, _ = env
+    for friend in range(200, 207):
+        repo.record_referral(friend, INVITER)
+    for friend in range(200, 205):
+        repo.reward_referral(friend, 1)
+
+    repo.upsert_user(300, "second", "S")
+    repo.record_referral(400, 300)
+
+    report = repo.referral_report()
+
+    assert report["total"] == 8, "все, кто пришёл по ссылкам"
+    assert report["rewarded"] == 5, "из них засчитано"
+    assert report["pending"] == 3, "остальные ещё не подписались"
+    assert report["share"] == 63, "доля дошедших до подписки"
+    assert report["inviters"] == 2, "сколько людей вообще приглашали"
+    assert report["today"] == 8 and report["week"] == 8
+
+
+def test_an_empty_report_does_not_divide_by_zero(env):
+    repo, _, _, _ = env
+    report = repo.referral_report()
+
+    assert report == {
+        "total": 0, "rewarded": 0, "pending": 0,
+        "today": 0, "week": 0, "inviters": 0, "share": 0,
+    }
+
+
+def test_the_top_shows_who_brings_the_most(env):
+    repo, _, _, _ = env
+    repo.upsert_user(300, "second", "S")
+
+    for friend in range(200, 205):
+        repo.record_referral(friend, INVITER)
+        repo.reward_referral(friend, 1)
+    for friend in range(400, 402):
+        repo.record_referral(friend, 300)
+        repo.reward_referral(friend, 1)
+
+    top = repo.top_inviters(10)
+    assert top[0]["inviter_id"] == INVITER and top[0]["rewarded"] == 5
+    assert top[1]["inviter_id"] == 300 and top[1]["rewarded"] == 2
+
+
+def test_the_panel_screen_shows_the_totals(env):
+    from services import panel_ui
+
+    repo, _, _, _ = env
+    for friend in range(200, 204):
+        repo.record_referral(friend, INVITER)
+    repo.reward_referral(200, 1)
+
+    text, _ = panel_ui.referrals(1, True, repo.referral_report(), repo.top_inviters(10))
+
+    assert "Всего пришло по ссылкам: 4" in text
+    assert "<b>1</b>" in text and "25%" in text
+    assert "Ждут подписки: <b>3</b>" in text
+
+
+def test_a_person_card_shows_how_many_they_brought(env):
+    from services import panel_ui
+
+    repo, _, _, _ = env
+    for friend in range(200, 203):
+        repo.record_referral(friend, INVITER)
+    repo.reward_referral(200, 1)
+
+    text, _ = panel_ui.person(
+        repo.get_user(INVITER), repo.stats_for(INVITER), 0, repo.referral_stats(INVITER)
+    )
+
+    assert "Привёл друзей: <b>1</b> из 3" in text
+
+
+def test_the_share_rounds_the_way_people_expect(env):
+    """62,5% должно показываться как 63%, а не как 62% из-за округления к чётному."""
+    repo, _, _, _ = env
+    for friend in range(200, 208):
+        repo.record_referral(friend, INVITER)
+    for friend in range(200, 205):
+        repo.reward_referral(friend, 1)
+
+    assert repo.referral_report()["share"] == 63
