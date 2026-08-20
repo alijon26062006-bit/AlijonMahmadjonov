@@ -26,15 +26,27 @@ class FakeBot:
     def __init__(self) -> None:
         self.channel_posts: list[str] = []
         self.direct: dict[int, list[str]] = {}
+        self.markups: dict[int, list] = {}
         self._next_id = 100
 
-    async def send_message(self, chat_id, text, **kwargs):
+    async def send_message(self, chat_id, text, reply_markup=None, **kwargs):
         self._next_id += 1
         if chat_id < 0:  # канал
             self.channel_posts.append(text)
         else:
             self.direct.setdefault(chat_id, []).append(text)
+            self.markups.setdefault(chat_id, []).append(reply_markup)
         return FakeMessage(self._next_id)
+
+    def buttons(self, user_id: int) -> list:
+        """Все кнопки, что бот прислал этому человеку."""
+        return [
+            button
+            for markup in self.markups.get(user_id, [])
+            if markup is not None
+            for row in markup.inline_keyboard
+            for button in row
+        ]
 
 
 def make_config(**overrides) -> Config:
@@ -100,11 +112,39 @@ async def test_a_pair_is_published_as_soon_as_two_apply(env):
 
 
 @pytest.mark.asyncio
-async def test_both_opponents_get_their_voting_link(env):
+async def test_both_opponents_get_their_voting_link_on_a_button(env):
+    """Голая ссылка в тексте выглядит бедно — её несут кнопки."""
     bot, repo, engine = env
     await join_users(engine, repo, 2)
-    assert "TestBot?start=v1" in "".join(bot.direct[1])
-    assert "TestBot?start=v1" in "".join(bot.direct[2])
+
+    for user_id in (1, 2):
+        links_on_buttons = [
+            b.url or (b.copy_text.text if b.copy_text else None) or b.switch_inline_query
+            for b in bot.buttons(user_id)
+        ]
+        assert any(
+            link and "TestBot?start=v1" in link for link in links_on_buttons
+        ), f"участник {user_id} остался без ссылки на кнопке"
+
+
+@pytest.mark.asyncio
+async def test_the_pair_message_offers_the_useful_actions(env):
+    bot, repo, engine = env
+    await join_users(engine, repo, 2)
+
+    labels = [b.text for b in bot.buttons(1)]
+    assert any("соперник" in label.lower() for label in labels)
+    assert any("друзей" in label.lower() for label in labels)
+    assert any("копировать" in label.lower() for label in labels)
+
+
+@pytest.mark.asyncio
+async def test_the_rival_is_named_in_the_message(env):
+    bot, repo, engine = env
+    await join_users(engine, repo, 2)
+
+    assert "@nick2" in "".join(bot.direct[1])
+    assert "@nick1" in "".join(bot.direct[2])
 
 
 @pytest.mark.asyncio

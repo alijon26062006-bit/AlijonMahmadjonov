@@ -324,23 +324,24 @@ def welcome(channel_url: str) -> str:
     )
 
 
-def pair_published(rival: str, link: str) -> str:
+def pair_published(rival: str) -> str:
     return (
-        f"⚔️ <b>Ваш пост опубликован!</b>\n"
+        f"⚔️ <b>Соперник найден!</b>\n"
         f"{RULE}\n\n"
-        f"Соперник: <b>{nick(rival)}</b>\n\n"
-        "<b>Ссылка для ваших голосующих</b> — отправьте её друзьям:\n"
-        f"<code>{link}</code>"
+        f"Против вас: <b>{nick(rival)}</b>\n\n"
+        "Ваш пост уже в канале. <b>Кто позовёт больше голосов — тот и пройдёт.</b>\n\n"
+        "<i>Кнопки ниже: посмотреть счёт, позвать друзей, скопировать ссылку.</i>"
     )
 
 
-def advanced(link: str) -> str:
+def advanced(rivals: list[str]) -> str:
+    against = ", ".join(nick(name) for name in rivals)
     return (
         f"🔥 <b>Вы прошли дальше!</b>\n"
         f"{RULE}\n\n"
-        "<b>Следующий раунд уже опубликован.</b>\n\n"
-        "Ваша ссылка для голосующих:\n"
-        f"<code>{link}</code>"
+        f"<b>Следующий раунд уже опубликован.</b>\n\n"
+        f"Против вас: <b>{against}</b>\n\n"
+        "<i>Кнопки ниже: посмотреть счёт, позвать друзей, скопировать ссылку.</i>"
     )
 
 

@@ -13,7 +13,7 @@ from config import Config, MSK
 from core import bracket
 from core.models import BattleStatus, Player, Slot
 from core.scheduler import deadline_for_round
-from services import links, texts
+from services import keyboards, links, texts
 from services.channel import ChannelPublisher
 from storage.repo import Repo
 
@@ -107,10 +107,17 @@ class BattleEngine:
         return match_id, pair
 
     async def _notify_pair(self, match_id: int, pair: list[Player], message_id: int | None) -> None:
-        link = links.vote_link(self.config.bot_username, match_id)
+        markup = keyboards.my_match(match_id, self.config, self._post_url(message_id))
         for player in pair:
             rival = next(p.nickname for p in pair if p.user_id != player.user_id)
-            await self._dm(player.user_id, texts.pair_published(rival, link))
+            await self._dm(player.user_id, texts.pair_published(rival), markup)
+
+    def _post_url(self, message_id: int | None) -> str | None:
+        if not message_id:
+            return None
+        if self.config.channel_url.startswith("https://t.me/") and "/c/" not in self.config.channel_url:
+            return links.public_post_link(self.config.channel_url, message_id)
+        return links.post_link(self.config.channel_id, message_id)
 
     # ------------------------------------------------------------ ход раундов
 
@@ -231,11 +238,11 @@ class BattleEngine:
                 is_final=plan.is_final,
                 deadline=deadline,
             )
-            await self.publisher.publish_match(match_id)
-            await self._notify_many(
-                [p.user_id for p in group],
-                texts.advanced(links.vote_link(self.config.bot_username, match_id)),
-            )
+            message_id = await self.publisher.publish_match(match_id)
+            markup = keyboards.my_match(match_id, self.config, self._post_url(message_id))
+            for player in group:
+                rivals = [p.nickname for p in group if p.user_id != player.user_id]
+                await self._dm(player.user_id, texts.advanced(rivals), markup)
 
     async def cancel(self, battle_id: int) -> int:
         """Отменить батл: голосование встаёт, участники узнают, набор открывается заново.
@@ -324,9 +331,11 @@ class BattleEngine:
         for user_id in user_ids:
             await self._dm(user_id, text)
 
-    async def _dm(self, user_id: int, text: str) -> None:
+    async def _dm(self, user_id: int, text: str, markup=None) -> None:
         try:
-            await self.bot.send_message(user_id, text, disable_web_page_preview=True)
+            await self.bot.send_message(
+                user_id, text, reply_markup=markup, disable_web_page_preview=True
+            )
         except TelegramAPIError as error:
             log.info("Не доставлено пользователю %s: %s", user_id, error)
         await asyncio.sleep(self.config.dm_delay)  # мягкий рейт-лимит на рассылку

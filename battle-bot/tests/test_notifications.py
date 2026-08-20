@@ -191,3 +191,38 @@ async def test_the_one_left_without_a_rival_is_told_so(env):
 
     assert "без боя" in inbox(bot, 3)
     assert "Вы выбываете" not in inbox(bot, 3)
+
+
+# ------------------------------------------- кнопки следующего раунда
+
+@pytest.mark.asyncio
+async def test_advancing_players_get_buttons_for_the_new_match(env):
+    """Перейдя в следующий раунд, человек сразу видит новых соперников и кнопки."""
+    bot, repo, engine = env
+    await join_users(engine, repo, 4)
+    repo.add_vote(1, 900, 1, VoteSource.FREE)
+    repo.add_vote(2, 901, 3, VoteSource.FREE)
+
+    await engine.close_round()
+
+    letters = "".join(bot.direct[1])
+    assert "Вы прошли дальше" in plain(letters)
+    assert "@nick3" in letters, "новый соперник назван"
+
+    links_on_buttons = [b.url for b in bot.buttons(1) if b.url]
+    assert any("start=v3" in (link or "") for link in links_on_buttons), (
+        "должна быть кнопка на новый матч, а не на прошлый"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_group_round_lists_all_the_new_rivals(env):
+    bot, repo, engine = env
+    await join_users(engine, repo, 4)
+    repo.add_vote(1, 900, 1, VoteSource.FREE)
+    repo.add_vote(2, 901, 3, VoteSource.FREE)
+
+    await engine.close_round()
+
+    letters = plain("".join(bot.direct[1]))
+    assert "Против вас" in letters

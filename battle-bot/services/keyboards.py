@@ -173,6 +173,38 @@ def pay(votes: int, total: int) -> InlineKeyboardMarkup:
     )
 
 
+def my_match(match_id: int, config: Config, post_url: str | None = None) -> InlineKeyboardMarkup:
+    """Кнопки под сообщением «нашлась пара» и «вы прошли дальше».
+
+    Голая ссылка в тексте выглядит бедно и её неудобно отправлять друзьям,
+    поэтому даём кнопки: посмотреть соперника и счёт, скопировать ссылку и
+    переслать её в один тап.
+    """
+    link = links.vote_link(config.bot_username, match_id)
+    rows = [
+        [
+            InlineKeyboardButton(
+                text="🗳 Мой соперник и счёт", url=link, style=GREEN
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="📢 Позвать друзей голосовать",
+                switch_inline_query=link,
+                style=BLUE,
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="📋 Копировать ссылку", copy_text=CopyTextButton(text=link)
+            )
+        ],
+    ]
+    if post_url:
+        rows.append([InlineKeyboardButton(text="📄 Пост в канале ↗", url=post_url)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def menu_labels() -> set[str]:
     """Все подписи кнопок нижнего меню, в обоих видах.
 
