@@ -27,7 +27,7 @@ router = Router(name="payments")
 CURRENCY = "XTR"
 
 
-@router.message(F.text == keyboards.BTN_BUY)
+@router.message(F.text.in_(keyboards.variants(keyboards.BTN_BUY)))
 @router.message(Command("buy"))
 async def show_packs(message: Message, repo: Repo, config: Config) -> None:
     if not config.paid_votes_enabled:

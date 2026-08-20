@@ -44,15 +44,13 @@ async def start(message: Message, repo: Repo, config: Config) -> None:
 
 async def _greet(message: Message, config: Config) -> None:
     await message.answer(
-        "👋 <b>Битва ников</b>\n\n"
-        "Подавайте заявку, зовите своих голосовать — и забирайте звёзды.\n\n"
-        f"{texts.HELP}",
+        texts.welcome(config.channel_url),
         reply_markup=keyboards.main_menu(config),
         disable_web_page_preview=True,
     )
 
 
-@router.message(F.text == keyboards.BTN_JOIN)
+@router.message(F.text.in_(keyboards.variants(keyboards.BTN_JOIN)))
 @router.message(Command("join", "battle"))
 async def join_button(
     message: Message, repo: Repo, config: Config, engine: BattleEngine
@@ -93,13 +91,13 @@ async def _do_join(
     )
 
 
-@router.message(F.text == keyboards.BTN_HELP)
+@router.message(F.text.in_(keyboards.variants(keyboards.BTN_HELP)))
 @router.message(Command("help"))
 async def help_command(message: Message) -> None:
     await message.answer(texts.HELP, disable_web_page_preview=True)
 
 
-@router.message(F.text == keyboards.BTN_PROFILE)
+@router.message(F.text.in_(keyboards.variants(keyboards.BTN_PROFILE)))
 @router.message(Command("me"))
 async def profile(message: Message, repo: Repo) -> None:
     repo.upsert_user(message.from_user.id, message.from_user.username, message.from_user.first_name)

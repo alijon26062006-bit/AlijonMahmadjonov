@@ -43,7 +43,7 @@ async def show_voting(message: Message, match_id: int, repo: Repo, config: Confi
 
     deadline = datetime.fromisoformat(match["deadline"])
     await message.answer(
-        texts.voting_screen(match["round_no"], bool(match["is_final"]), deadline),
+        texts.voting_screen(match["round_no"], bool(match["is_final"]), slots, deadline),
         reply_markup=keyboards.voting(match_id, slots, config, _post_url(config, match)),
     )
 

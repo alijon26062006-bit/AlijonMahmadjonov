@@ -108,13 +108,7 @@ class BattleEngine:
         link = links.vote_link(self.config.bot_username, match_id)
         for player in pair:
             rival = next(p.nickname for p in pair if p.user_id != player.user_id)
-            text = (
-                "⚔️ <b>Ваш пост опубликован!</b>\n\n"
-                f"Соперник: {texts.nick(rival)}\n\n"
-                "Ссылка для ваших голосующих:\n"
-                f"<code>{link}</code>"
-            )
-            await self._dm(player.user_id, text)
+            await self._dm(player.user_id, texts.pair_published(rival, link))
 
     # ------------------------------------------------------------ ход раундов
 
@@ -178,7 +172,7 @@ class BattleEngine:
         self.repo.bump_wins(advanced)
 
         await self._notify_many(eliminated, texts.YOU_LOST)
-        await self._notify_many(byes, "🎟 Соперник не нашёлся — вы проходите в следующий раунд без боя.")
+        await self._notify_many(byes, texts.BYE_ROUND)
 
         await self._start_round(battle_id, round_no + 1)
 
@@ -202,9 +196,9 @@ class BattleEngine:
         advance = bracket.base_advance(plan)
 
         await self.publisher.announce(
-            f"<b>{texts.round_title(round_no, plan.is_final)}</b>\n\n"
-            f"В игре: {len(alive)} ников · матчей: {plan.match_count}\n"
-            f"{texts.deadline_line(deadline)}"
+            texts.round_announcement(
+                round_no, plan.is_final, len(alive), plan.match_count, deadline
+            )
         )
 
         for number, group in enumerate(plan.groups, start=1):
@@ -220,8 +214,7 @@ class BattleEngine:
             await self.publisher.publish_match(match_id)
             await self._notify_many(
                 [p.user_id for p in group],
-                f"{texts.YOU_ADVANCED}\n\nВаша ссылка: "
-                f"<code>{links.vote_link(self.config.bot_username, match_id)}</code>",
+                texts.advanced(links.vote_link(self.config.bot_username, match_id)),
             )
 
     async def _reschedule_registration(self, battle_id: int, applied: int) -> None:
@@ -231,9 +224,7 @@ class BattleEngine:
         log.info("Заявок %s из %s — приём продлён до %s",
                  applied, self.config.min_participants, deadline)
         await self.publisher.announce(
-            f"⏳ <b>Батл переносится</b>\n\n"
-            f"Набралось заявок: {applied} из {self.config.min_participants}.\n"
-            f"Приём продолжается, {texts.deadline_line(deadline).lstrip('🗓 ')}"
+            texts.postponed(applied, self.config.min_participants, deadline)
         )
 
     async def _finish_battle(self, battle_id: int, ranking: list[Slot]) -> None:
@@ -248,10 +239,7 @@ class BattleEngine:
             place = slot.position or 1
             if place <= len(self.config.prizes):
                 prize = self.config.prizes[place - 1]
-                await self._dm(
-                    slot.user_id,
-                    f"{texts.MEDAL.get(place, '')} <b>{place} место!</b>\n\nПриз: {prize}⭐",
-                )
+                await self._dm(slot.user_id, texts.took_place(place, prize))
             else:
                 await self._dm(slot.user_id, texts.YOU_LOST)
         log.info("Батл #%s завершён", battle_id)

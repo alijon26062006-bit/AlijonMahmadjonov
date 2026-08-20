@@ -204,3 +204,46 @@ def test_preview_covers_every_symbol_in_the_table():
 
     assert set(places) == set(table), "предпросмотр и таблица должны совпадать"
     assert len(PLACES) == len(places), "в предпросмотре есть дубли"
+
+
+def test_menu_buttons_answer_with_and_without_the_premium_icon():
+    """С премиум-иконкой эмодзи уезжает из подписи — фильтр должен ловить оба вида."""
+    from services import keyboards
+
+    for label in (
+        keyboards.BTN_JOIN,
+        keyboards.BTN_BUY,
+        keyboards.BTN_PROFILE,
+        keyboards.BTN_HELP,
+    ):
+        accepted = keyboards.variants(label)
+        assert label in accepted, "подпись без премиума"
+        assert label[2:] in accepted, "подпись с премиум-иконкой"
+        assert len(accepted) == 2
+
+
+def test_menu_button_labels_lose_the_emoji_when_the_table_has_it(monkeypatch):
+    from dataclasses import replace
+    from services import keyboards
+    from tests.test_engine import make_config
+
+    config = make_config()
+    config.premium_emoji = {"🚀": "111", "👤": "222"}
+    menu = keyboards.main_menu(config)
+    labels = [button.text for row in menu.keyboard for button in row]
+
+    assert "Принять участие" in labels
+    assert "Профиль" in labels
+    # у символов без ID подпись остаётся прежней
+    assert keyboards.BTN_HELP in labels
+    # и всё это ловится фильтрами
+    for label in labels:
+        assert any(
+            label in keyboards.variants(known)
+            for known in (
+                keyboards.BTN_JOIN,
+                keyboards.BTN_BUY,
+                keyboards.BTN_PROFILE,
+                keyboards.BTN_HELP,
+            )
+        ), f"кнопка «{label}» не ловится ни одним фильтром"

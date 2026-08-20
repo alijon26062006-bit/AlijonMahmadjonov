@@ -20,6 +20,17 @@ BTN_PROFILE = "👤 Профиль"
 BTN_HELP = "✅ Помощь"
 
 
+def variants(label: str) -> set[str]:
+    """Как подпись кнопки может прийти обратно от Telegram.
+
+    С премиум-иконкой эмодзи уезжает в icon_custom_emoji_id и в тексте его нет,
+    без неё — остаётся в подписи. Обработчик должен принимать оба варианта,
+    иначе кнопки перестают отвечать при включённых премиум-эмодзи.
+    """
+    stripped, _ = leading_emoji(label, {label[0]: "1"})
+    return {label, stripped}
+
+
 def _reply_button(label: str, table: dict[str, str]) -> KeyboardButton:
     """Эмодзи в начале подписи становится премиум-иконкой, если она есть в таблице."""
     text, emoji_id = leading_emoji(label, table)

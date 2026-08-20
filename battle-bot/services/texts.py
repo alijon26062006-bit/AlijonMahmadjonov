@@ -1,5 +1,10 @@
-"""Тексты сообщений. Собраны в одном месте, чтобы правки формулировок
-не растекались по обработчикам."""
+"""Тексты сообщений.
+
+Собраны в одном месте, чтобы правки формулировок и оформления не растекались
+по обработчикам. Оформление держится на трёх приёмах: разрядка заголовков,
+тонкий разделитель между блоками и шкала голосов — так экран читается сразу,
+без вчитывания в цифры.
+"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -8,7 +13,15 @@ from html import escape
 from core.models import Slot
 
 MEDAL = {1: "🥇", 2: "🥈", 3: "🥉"}
+CROWN = "👑"
+RULE = "─────────────────"
 
+BAR_FULL = "▰"
+BAR_EMPTY = "▱"
+BAR_WIDTH = 10
+
+
+# ----------------------------------------------------------------- оформление
 
 def spaced(text: str) -> str:
     """«РАУНД» -> «Р А У Н Д» — заголовки как в канале."""
@@ -20,18 +33,63 @@ def nick(value: str) -> str:
     return value if value.startswith("@") else f"@{value}"
 
 
+def plural(count: int, one: str, few: str, many: str) -> str:
+    """«1 голос», «2 голоса», «5 голосов»."""
+    if count % 10 == 1 and count % 100 != 11:
+        return one
+    if 2 <= count % 10 <= 4 and not 12 <= count % 100 <= 14:
+        return few
+    return many
+
+
+def votes_word(count: int) -> str:
+    return f"{count} {plural(count, 'голос', 'голоса', 'голосов')}"
+
+
+def bar(value: int, total: int, width: int = BAR_WIDTH) -> str:
+    """Шкала голосов: доля участника от всех голосов матча."""
+    if total <= 0:
+        return BAR_EMPTY * width
+    filled = round(value / total * width)
+    filled = max(1, filled) if value else 0
+    return BAR_FULL * filled + BAR_EMPTY * (width - filled)
+
+
+def percent(value: int, total: int) -> int:
+    return round(value / total * 100) if total else 0
+
+
+def scoreboard(slots: list[Slot], show_place: bool = False) -> str:
+    """Список участников со шкалами — сердце и голосования, и итогов."""
+    total = sum(slot.votes for slot in slots) or 0
+    best = max((slot.votes for slot in slots), default=0)
+
+    lines = []
+    for index, slot in enumerate(slots, start=1):
+        mark = MEDAL.get(slot.position, f"{slot.position}.") if show_place else f"{index}."
+        crown = f" {CROWN}" if not show_place and slot.votes == best and best else ""
+        lines.append(
+            f"{mark} <b>{nick(slot.nickname)}</b>{crown}\n"
+            f"<code>{bar(slot.votes, total)}</code> "
+            f"{votes_word(slot.votes)} · {percent(slot.votes, total)}%"
+        )
+    return "\n\n".join(lines)
+
+
 def round_title(round_no: int, is_final: bool) -> str:
     return spaced("ФИНАЛ") if is_final else f"{round_no} {spaced('РАУНД')}"
 
 
 def prizes_block(prizes: list[int]) -> str:
-    lines = [f"{i} место — {amount}⭐" for i, amount in enumerate(prizes, start=1)]
-    return "🍋 <b>Призы за финал:</b>\n" + "\n".join(lines)
+    lines = [f"{MEDAL.get(i, f'{i}.')} {amount}⭐" for i, amount in enumerate(prizes, start=1)]
+    return "🍋 <b>Призы за финал</b>\n" + "  ·  ".join(lines)
 
 
 def deadline_line(deadline: datetime) -> str:
     return f"🗓 <b>Итоги в {deadline.strftime('%H:%M')} МСК</b>"
 
+
+# --------------------------------------------------------------------- канал
 
 def channel_post(
     round_no: int,
@@ -42,91 +100,186 @@ def channel_post(
     vote_url: str,
     join_url: str,
 ) -> str:
-    """Пост в канале: одна пара (или группа) первого/любого раунда."""
-    participants = "\n".join(f"{i}. {nick(s.nickname)}" for i, s in enumerate(slots, start=1))
+    """Пост в канале: одна пара или группа."""
+    participants = "\n".join(
+        f"{index}.  {nick(slot.nickname)}" for index, slot in enumerate(slots, start=1)
+    )
     return (
-        f"<b>{round_title(round_no, is_final)}</b>\n\n"
+        f"<b>{round_title(round_no, is_final)}</b>\n"
+        f"{RULE}\n\n"
         f"{prizes_block(prizes)}\n\n"
         f'📊 <a href="{vote_url}"><b>ПРОГОЛОСОВАТЬ</b></a>\n'
         f'🎫 <a href="{join_url}"><b>Принять участие</b></a>\n\n'
         f"<b>{spaced('УЧАСТНИКИ')}</b>\n"
         f"{participants}\n\n"
+        f"{RULE}\n"
         f"{deadline_line(deadline)}"
     )
 
 
 def channel_result(round_no: int, is_final: bool, ranking: list[Slot], tie_broken: bool) -> str:
-    """Чем пост становится после закрытия голосования."""
+    """Чем пост дополняется после закрытия голосования."""
+    header = (
+        f"🏆 <b>{spaced('ИТОГИ ФИНАЛА')}</b>"
+        if is_final
+        else f"✅ <b>ИТОГИ · {round_no} раунд</b>"
+    )
     lines = []
+    total = sum(slot.votes for slot in ranking)
     for slot in ranking:
-        mark = MEDAL.get(slot.position, f"{slot.position}.") if is_final else (
-            "✅" if slot.position == 1 else "❌"
+        if is_final:
+            mark = MEDAL.get(slot.position, f"{slot.position}.")
+        else:
+            mark = "✅" if slot.position == 1 else "❌"
+        lines.append(
+            f"{mark} <b>{nick(slot.nickname)}</b>\n"
+            f"<code>{bar(slot.votes, total)}</code> {votes_word(slot.votes)}"
         )
-        lines.append(f"{mark} {nick(slot.nickname)} — {slot.votes} голос(ов)")
 
-    header = "🏆 <b>ИТОГИ ФИНАЛА</b>" if is_final else f"✅ <b>ИТОГИ · {round_no} раунд</b>"
-    tail = "\n\n🎲 Голоса сравнялись — победитель определён жребием." if tie_broken else ""
-    return f"{header}\n\n" + "\n".join(lines) + tail
+    tail = "\n\n🎲 <i>Голоса сравнялись — победитель определён жребием.</i>" if tie_broken else ""
+    return f"{header}\n{RULE}\n\n" + "\n\n".join(lines) + tail
 
 
-def voting_screen(round_no: int, is_final: bool, deadline: datetime) -> str:
-    """Шапка экрана голосования в боте."""
-    title = "ФИНАЛ" if is_final else f"{round_no} раунд"
+def round_announcement(round_no: int, is_final: bool, alive: int, matches: int, deadline: datetime) -> str:
+    what = "Финалисты" if is_final else "В игре"
     return (
-        f"🚀 <b>ГОЛОСОВАНИЕ | {title}</b>\n\n"
-        f"<blockquote>Условия: нужно опередить соперника по голосам.</blockquote>\n\n"
-        f"🎁 <b>Выберите, за кого голосуете:</b>\n"
-        f"<i>Итоги в {deadline.strftime('%H:%M')} МСК</i>"
+        f"<b>{round_title(round_no, is_final)}</b>\n"
+        f"{RULE}\n\n"
+        f"{what}: <b>{alive}</b>\n"
+        f"Матчей: <b>{matches}</b>\n\n"
+        f"{deadline_line(deadline)}"
     )
 
 
-CROWN = "👑"
+def postponed(applied: int, needed: int, deadline: datetime) -> str:
+    return (
+        f"⏳ <b>{spaced('БАТЛ ПЕРЕНОСИТСЯ')}</b>\n"
+        f"{RULE}\n\n"
+        f"Набралось заявок: <b>{applied}</b> из <b>{needed}</b>.\n"
+        f"Приём продолжается.\n\n"
+        f"{deadline_line(deadline)}"
+    )
+
+
+def final_announcement(ranking: list[Slot], prizes: list[int]) -> str:
+    lines = []
+    for slot in ranking[: len(prizes)]:
+        prize = prizes[slot.position - 1]
+        lines.append(f"{MEDAL.get(slot.position, '')} <b>{nick(slot.nickname)}</b> — {prize}⭐")
+    return (
+        f"🏆 <b>{spaced('БАТЛ ЗАВЕРШЁН')}</b>\n"
+        f"{RULE}\n\n" + "\n".join(lines)
+    )
+
+
+# ------------------------------------------------------------ экраны в боте
+
+def voting_screen(round_no: int, is_final: bool, slots: list[Slot], deadline: datetime) -> str:
+    title = spaced("ФИНАЛ") if is_final else f"{round_no} раунд"
+    total = sum(slot.votes for slot in slots)
+    return (
+        f"🚀 <b>ГОЛОСОВАНИЕ · {title}</b>\n"
+        f"{RULE}\n\n"
+        f"{scoreboard(slots)}\n\n"
+        f"{RULE}\n"
+        f"Всего: <b>{votes_word(total)}</b>\n"
+        f"{deadline_line(deadline)}\n\n"
+        f"🎁 <i>Выберите, за кого голосуете — кнопки ниже.</i>"
+    )
 
 
 def vote_button(slot: Slot, index: int) -> str:
-    return f"{index}) {slot.nickname} — {slot.votes} голосов"
+    return f"{index}) {slot.nickname} — {votes_word(slot.votes)}"
+
+
+def welcome(channel_url: str) -> str:
+    return (
+        f"👋 <b>{spaced('БИТВА НИКОВ')}</b>\n"
+        f"{RULE}\n\n"
+        "Подавайте заявку, зовите своих голосовать — и забирайте звёзды.\n\n"
+        f"{HELP}\n\n"
+        f'📣 Все батлы: <a href="{channel_url}">{escape(channel_url)}</a>'
+    )
+
+
+def pair_published(rival: str, link: str) -> str:
+    return (
+        f"⚔️ <b>Ваш пост опубликован!</b>\n"
+        f"{RULE}\n\n"
+        f"Соперник: <b>{nick(rival)}</b>\n\n"
+        "Ссылка для ваших голосующих — отправьте её друзьям:\n"
+        f"<code>{link}</code>"
+    )
+
+
+def advanced(link: str) -> str:
+    return (
+        f"🔥 <b>Вы прошли дальше!</b>\n"
+        f"{RULE}\n\n"
+        "Следующий раунд уже опубликован.\n\n"
+        "Ваша ссылка для голосующих:\n"
+        f"<code>{link}</code>"
+    )
+
+
+def took_place(place: int, prize: int) -> str:
+    return (
+        f"{MEDAL.get(place, '🏆')} <b>{place} место!</b>\n"
+        f"{RULE}\n\n"
+        f"Ваш приз: <b>{prize}⭐</b>\n\n"
+        "<i>Спасибо за игру — ждём вас в следующем батле.</i>"
+    )
 
 
 APPLICATION_ACCEPTED = (
     "✅ <b>Заявка принята</b>\n\n"
-    "<blockquote>Ожидайте старта батла</blockquote>"
+    "<blockquote>Пара набралась — ваш пост уже в канале. "
+    "Ссылку для голосующих пришлю следующим сообщением.</blockquote>"
 )
 
 IN_QUEUE = (
     "✅ <b>Вы в очереди</b>\n\n"
-    "<blockquote>Как только подойдёт соперник, вы получите ссылку на свой пост.</blockquote>"
+    "<blockquote>Как только подойдёт соперник, ваш пост выйдет в канале, "
+    "а вы получите личную ссылку для голосующих.</blockquote>"
 )
 
 YOU_LOST = (
     "❌ <b>Вы проиграли</b>\n\n"
-    "<i>Попробуйте снова в следующем батле</i>"
+    "<i>Не расстраивайтесь — в следующем батле всё сначала.</i>"
 )
 
-YOU_ADVANCED = "🔥 <b>Вы прошли дальше!</b>\n\nСледующий раунд уже опубликован."
+BYE_ROUND = (
+    "🎟 <b>Проход без боя</b>\n\n"
+    "<blockquote>Соперник не нашёлся — вы автоматически "
+    "в следующем раунде.</blockquote>"
+)
 
 NEED_USERNAME = (
-    "⚠️ Чтобы участвовать, задайте себе @username в настройках Telegram — "
-    "ник показывается в посте канала."
+    "⚠️ <b>Нужен @username</b>\n\n"
+    "Задайте его в настройках Telegram — ник показывается в посте канала."
 )
 
-ALREADY_IN_BATTLE = "Вы уже участвуете в текущем батле."
+ALREADY_IN_BATTLE = "✅ Вы уже участвуете в текущем батле."
 
-NO_ACTIVE_BATTLE = "Сейчас батл не идёт. Ждите анонса в канале."
+NO_ACTIVE_BATTLE = "🗓 Сейчас батл не идёт. Ждите анонса в канале."
 
 HELP = (
-    "ℹ️ <b>Как это работает</b>\n\n"
+    "<blockquote expandable><b>Как это работает</b>\n\n"
     "1. Жмёте «Принять участие» — заявка попадает в очередь.\n"
-    "2. Как только набирается пара, ваш пост выходит в канале.\n"
-    "3. Зовёте голосующих по своей ссылке — счёт виден в реальном времени.\n"
-    "4. В час подведения итогов бот считает голоса: кто впереди — идёт дальше.\n"
-    "5. 1 раунд — 1vs1, дальше группы по 4 ника, финал забирает призы.\n\n"
-    "Голосовать может любой подписчик канала: один бесплатный голос на матч."
+    "2. Набирается пара — ваш пост выходит в канале.\n"
+    "3. Зовёте голосующих по своей ссылке, счёт виден сразу.\n"
+    "4. В час итогов бот считает голоса: кто впереди — идёт дальше.\n"
+    "5. 1 раунд — 1vs1, дальше группы по 4 ника.\n"
+    "6. Финал забирает призы за 1, 2 и 3 место.\n\n"
+    "Голосовать может любой подписчик канала: "
+    "один бесплатный голос на матч.</blockquote>"
 )
 
 
 def subscribe_required(channel_url: str) -> str:
     return (
-        "⚠️ Чтобы проголосовать, необходимо подписаться на канал: "
+        "⚠️ <b>Нужна подписка</b>\n\n"
+        "Голосовать могут только подписчики канала:\n"
         f'<a href="{channel_url}">{escape(channel_url)}</a>'
     )
 
@@ -136,33 +289,30 @@ def profile(username: str | None, stats, balance: int) -> str:
     wins = stats["wins"] if stats else 0
     titles = stats["titles"] if stats else 0
     best = stats["best_place"] if stats and stats["best_place"] else "—"
+    place = MEDAL.get(best, "") if isinstance(best, int) else ""
     return (
-        f"👤 <b>Профиль</b>\n\n"
-        f"Ник: {nick(username or 'без username')}\n"
-        f"Батлов: {battles}\n"
-        f"Побед в матчах: {wins}\n"
-        f"Титулов: {titles}\n"
-        f"Лучшее место: {best}\n"
-        f"Купленных голосов: {balance}"
+        f"👤 <b>{spaced('ПРОФИЛЬ')}</b>\n"
+        f"{RULE}\n\n"
+        f"Ник:  <b>{nick(username or 'без username')}</b>\n\n"
+        f"🏆 Титулов:  <b>{titles}</b>\n"
+        f"✅ Побед в матчах:  <b>{wins}</b>\n"
+        f"⚔️ Батлов сыграно:  <b>{battles}</b>\n"
+        f"🏅 Лучшее место:  <b>{best}</b> {place}\n"
+        f"🎁 Купленных голосов:  <b>{balance}</b>"
     )
 
 
 def leaderboard(rows) -> str:
     if not rows:
-        return "Таблица лидеров пока пуста."
+        return "🏅 <b>Таблица лидеров</b>\n\n<i>Пока пусто — всё впереди.</i>"
     lines = []
     for index, row in enumerate(rows, start=1):
         mark = MEDAL.get(index, f"{index}.")
         lines.append(
-            f"{mark} {nick(row['username'] or str(row['user_id']))} — "
-            f"{row['titles']} 🏆 / {row['wins']} побед"
+            f"{mark} <b>{nick(row['username'] or str(row['user_id']))}</b>\n"
+            f"     🏆 {row['titles']}  ·  ✅ {row['wins']}  ·  ⚔️ {row['battles']}"
         )
-    return "🏅 <b>Таблица лидеров</b>\n\n" + "\n".join(lines)
-
-
-def final_announcement(ranking: list[Slot], prizes: list[int]) -> str:
-    lines = []
-    for slot in ranking[: len(prizes)]:
-        prize = prizes[slot.position - 1]
-        lines.append(f"{MEDAL.get(slot.position, '')} {nick(slot.nickname)} — {prize}⭐")
-    return "🏆 <b>Батл завершён!</b>\n\n" + "\n".join(lines)
+    return (
+        f"🏅 <b>{spaced('ТАБЛИЦА ЛИДЕРОВ')}</b>\n"
+        f"{RULE}\n\n" + "\n\n".join(lines)
+    )

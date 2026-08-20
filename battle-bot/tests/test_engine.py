@@ -178,7 +178,7 @@ async def test_the_final_awards_three_places_and_ends_the_battle(env):
     assert places == {1: 1, 3: 2, 5: 3}
     assert repo.stats_for(1)["titles"] == 1
     assert "1000⭐" in "".join(bot.direct[1])
-    assert "Батл завершён" in "".join(bot.channel_posts)
+    assert "1000⭐" in "".join(bot.channel_posts)  # объявление призов
 
 
 @pytest.mark.asyncio
@@ -194,7 +194,7 @@ async def test_a_single_applicant_keeps_registration_open(env):
     assert battle is not None
     assert battle["status"] == BattleStatus.REGISTRATION.value
     assert battle["round_no"] == 1
-    assert "переносится" in "".join(bot.channel_posts)
+    assert "Набралось заявок" in "".join(bot.channel_posts)
     # дедлайн всегда впереди, иначе фоновая задача крутила бы итоги без остановки
     assert datetime.fromisoformat(battle["deadline"]) > engine.now()
 
@@ -262,7 +262,7 @@ async def test_too_few_applications_postpone_the_battle_and_keep_the_votes(tmp_p
     battle = repo.current_battle()
     assert battle["status"] == BattleStatus.REGISTRATION.value
     assert battle["round_no"] == 1
-    assert "переносится" in "".join(bot.channel_posts)
+    assert "Набралось заявок" in "".join(bot.channel_posts)
     # новый дедлайн всегда в будущем (в бою это следующий день — см. test_scheduler)
     assert datetime.fromisoformat(battle["deadline"]) > engine.now()
 
