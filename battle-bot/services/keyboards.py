@@ -14,6 +14,12 @@ from core.models import Slot
 from services import links, texts
 from services.emoji import leading_emoji
 
+# Цвета кнопок (поле style в Bot API). Telegram принимает только эти три
+# значения; всё остальное он отклонит, поэтому держим их в одном месте.
+BLUE = "primary"
+GREEN = "success"
+RED = "danger"
+
 BTN_JOIN = "🚀 Принять участие"
 BTN_BUY = "🎁 Купить голоса"
 BTN_PROFILE = "👤 Профиль"
@@ -31,15 +37,18 @@ def variants(label: str) -> set[str]:
     return {label, stripped}
 
 
-def _reply_button(label: str, table: dict[str, str]) -> KeyboardButton:
+def _reply_button(
+    label: str, table: dict[str, str], style: str | None = None
+) -> KeyboardButton:
     """Эмодзи в начале подписи становится премиум-иконкой, если она есть в таблице."""
     text, emoji_id = leading_emoji(label, table)
-    return KeyboardButton(text=text, icon_custom_emoji_id=emoji_id)
+    return KeyboardButton(text=text, icon_custom_emoji_id=emoji_id, style=style)
 
 
 def main_menu(config: Config) -> ReplyKeyboardMarkup:
     table = config.premium_emoji
-    rows = [[_reply_button(BTN_JOIN, table)]]
+    # главное действие — синим, остальное обычным цветом, чтобы не пестрило
+    rows = [[_reply_button(BTN_JOIN, table, BLUE)]]
     if config.paid_votes_enabled:
         rows.append([_reply_button(BTN_BUY, table)])
     rows.append([_reply_button(BTN_PROFILE, table), _reply_button(BTN_HELP, table)])
@@ -68,6 +77,7 @@ def voting(
                     text=label,
                     callback_data=f"vote:{match_id}:{slot.user_id}",
                     icon_custom_emoji_id=crown_id if leader else None,
+                    style=GREEN,  # зелёный — по нему голосуют
                 )
             ]
         )
@@ -79,13 +89,16 @@ def voting(
                 copy_text=CopyTextButton(
                     text=links.vote_link(config.bot_username, match_id)
                 ),
+                style=BLUE,
             )
         ]
     )
 
-    service = [InlineKeyboardButton(text="Обновить", callback_data=f"refresh:{match_id}")]
+    service = [
+        InlineKeyboardButton(text="Обновить", callback_data=f"refresh:{match_id}", style=BLUE)
+    ]
     if post_url:
-        service.append(InlineKeyboardButton(text="Пост ↗", url=post_url))
+        service.append(InlineKeyboardButton(text="Пост ↗", url=post_url, style=BLUE))
     rows.append(service)
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -93,8 +106,12 @@ def voting(
 def subscribe(channel_url: str, match_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Подписаться ↗", url=channel_url)],
-            [InlineKeyboardButton(text="Я подписался", callback_data=f"refresh:{match_id}")],
+            [InlineKeyboardButton(text="Подписаться ↗", url=channel_url, style=GREEN)],
+            [
+                InlineKeyboardButton(
+                    text="Я подписался", callback_data=f"refresh:{match_id}", style=BLUE
+                )
+            ],
         ]
     )
 
@@ -105,7 +122,10 @@ def join_again(config: Config) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=text, callback_data="join", icon_custom_emoji_id=emoji_id
+                    text=text,
+                    callback_data="join",
+                    icon_custom_emoji_id=emoji_id,
+                    style=GREEN,
                 )
             ]
         ]
@@ -117,8 +137,9 @@ def vote_packs(packs: list[VotePack]) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=f"{pack.votes} голосов — {pack.stars}⭐",
+                    text=f"{texts.votes_word(pack.votes)} — {pack.stars}⭐",
                     callback_data=f"buy:{pack.votes}",
+                    style=BLUE,
                 )
             ]
             for pack in packs

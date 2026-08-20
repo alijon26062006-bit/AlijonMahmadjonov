@@ -112,3 +112,39 @@ def test_profile_of_a_newcomer_has_no_empty_holes():
 
 def test_empty_leaderboard_is_not_an_error():
     assert "Пока пусто" in plain(texts.leaderboard([]))
+
+
+def test_button_colors_use_only_values_telegram_accepts():
+    """Bot API принимает лишь primary / success / danger — иначе отклонит запрос."""
+    from services import keyboards
+
+    allowed = {"primary", "success", "danger"}
+    assert {keyboards.BLUE, keyboards.GREEN, keyboards.RED} == allowed
+
+
+def test_voting_keyboard_is_coloured():
+    from services import keyboards
+    from tests.test_engine import make_config
+
+    config = make_config()
+    slots = [Slot(1, "a", votes=3), Slot(2, "b", votes=1)]
+    markup = keyboards.voting(7, slots, config, post_url="https://t.me/c/1/2")
+
+    buttons = [b for row in markup.inline_keyboard for b in row]
+    votes = [b for b in buttons if b.callback_data and b.callback_data.startswith("vote:")]
+    service = [b for b in buttons if b not in votes]
+
+    assert votes and all(b.style == keyboards.GREEN for b in votes), "кнопки участников зелёные"
+    assert service and all(b.style == keyboards.BLUE for b in service), "служебные синие"
+
+
+def test_main_menu_highlights_the_primary_action():
+    from services import keyboards
+    from tests.test_engine import make_config
+
+    menu = keyboards.main_menu(make_config())
+    buttons = [b for row in menu.keyboard for b in row]
+    join = next(b for b in buttons if "Принять участие" in b.text)
+
+    assert join.style == keyboards.BLUE
+    assert [b for b in buttons if b.style is None], "остальные кнопки обычного цвета"
