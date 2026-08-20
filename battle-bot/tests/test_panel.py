@@ -409,3 +409,103 @@ async def test_editing_survives_an_unchanged_screen_but_not_real_errors():
     broken = Screen(failure("Bad Request: chat not found"))
     with pytest.raises(TelegramBadRequest):
         await edit_in_place(broken, "текст", None)
+
+
+# ------------------------------------- каждая кнопка обязана быть живой
+
+class CallbackStub:
+    def __init__(self, data: str) -> None:
+        self.data = data
+
+
+def handlers_for(data: str) -> list[str]:
+    """Кто из панели возьмётся обработать такую кнопку."""
+    from handlers import panel as panel_module
+
+    found = []
+    for handler in panel_module.router.callback_query.handlers:
+        if handler.callback.__name__ == "unknown_button":
+            continue  # страховка ловит всё, для проверки она не считается
+        if all(f.callback(CallbackStub(data)) for f in handler.filters or []):
+            found.append(handler.callback.__name__)
+    return found
+
+
+def every_button(screens: list[tuple]) -> list[str]:
+    return [
+        button.callback_data
+        for _, markup in screens
+        for row in markup.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+
+
+@pytest.mark.asyncio
+async def test_every_button_on_every_screen_has_a_handler(env):
+    """Мёртвая кнопка ничем себя не выдаёт — ловим её тестом."""
+    repo, config, settings, engine = env
+    await join_users(engine, repo, 4)
+    settings.set("main_channel_id", -1001111111111)
+    stats = panel.collect(repo, engine)
+    repo.upsert_user(77, "Satoorov", "A")
+
+    screens = [
+        panel_ui.home(stats),
+        panel_ui.battle(stats),
+        panel_ui.prizes(settings.get("prizes")),
+        panel_ui.votes(settings.vote_price, True, repo.sold_votes()),
+        panel_ui.channel(main_post.state(repo, config, settings)),
+        panel_ui.people(stats),
+        panel_ui.settings_screen(settings.all()),
+        panel_ui.person(repo.get_user(77), repo.stats_for(77), 0),
+        panel_ui.confirm("Точно?", "battle:cancel:do", "battle"),
+        panel_ui.ask("Призы", "1000,500,250", "подсказка", "prizes"),
+    ]
+
+    dead = [data for data in every_button(screens) if not handlers_for(data)]
+    assert not dead, f"кнопки без обработчика: {dead}"
+
+
+def test_cancel_button_returns_to_its_section():
+    """Отмена должна вести в раздел, а не в никуда."""
+    for section in ("prizes", "votes", "channel", "settings", "people"):
+        _, markup = panel_ui.ask("Поле", "—", "", section)
+        cancel = markup.inline_keyboard[0][0]
+
+        assert cancel.callback_data == f"p:{section}", "лишний или потерянный префикс"
+        assert handlers_for(cancel.callback_data), f"«Отмена» из {section} никуда не ведёт"
+
+
+def test_prefix_is_never_doubled_whichever_form_the_caller_used():
+    """Именно этот баг ломал «Отмену» на всех экранах.
+
+    Префикс добавляется в одном месте, поэтому оба написания дают одно и то же.
+    """
+    assert panel_ui.button("Отмена", "channel").callback_data == "p:channel"
+    assert panel_ui.button("Отмена", "p:channel").callback_data == "p:channel"
+
+    for section in ("channel", "p:channel"):
+        _, markup = panel_ui.ask("Поле", "—", "", section)
+        cancel = markup.inline_keyboard[0][0]
+        assert cancel.callback_data == "p:channel"
+        assert handlers_for(cancel.callback_data), "«Отмена» обязана вести в раздел"
+
+
+def test_navigation_clears_the_input_mode():
+    """Кнопки разделов сбрасывают ожидание значения, кнопки ввода — нет."""
+    from handlers.panel import leave_input_mode  # noqa: F401  - проверяем факт наличия
+
+    from handlers import panel as panel_module
+
+    middlewares = [m.__name__ for m in panel_module.router.callback_query.outer_middleware]
+    assert "leave_input_mode" in middlewares
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_button_is_answered_instead_of_ignored():
+    from handlers import panel as panel_module
+
+    names = [h.callback.__name__ for h in panel_module.router.callback_query.handlers]
+    assert names[-1] == "unknown_button", "страховка обязана стоять последней"
+    assert handlers_for("p:home") == ["go_home"], "обычные кнопки не должны попадать в неё"

@@ -17,8 +17,19 @@ RULE = texts.RULE
 BACK = "◀️ Назад"
 
 
+PREFIX = "p:"
+
+
 def button(text: str, action: str, style: str | None = None) -> InlineKeyboardButton:
-    return InlineKeyboardButton(text=text, callback_data=f"p:{action}", style=style)
+    """Кнопка панели.
+
+    Префикс добавляется здесь и только здесь. Если вызывающий код уже передал
+    его — не дублируем: иначе получалось «p:p:channel», и кнопка молча
+    переставала работать.
+    """
+    if not action.startswith(PREFIX):
+        action = PREFIX + action
+    return InlineKeyboardButton(text=text, callback_data=action, style=style)
 
 
 def keyboard(*rows: list[InlineKeyboardButton]) -> InlineKeyboardMarkup:

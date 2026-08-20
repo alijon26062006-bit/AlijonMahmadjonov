@@ -67,6 +67,20 @@ def is_admin(user_id: int, config: Config) -> bool:
     return user_id in config.admin_ids
 
 
+@router.callback_query.outer_middleware()
+async def leave_input_mode(handler, event: CallbackQuery, data: dict):
+    """Нажали любую кнопку панели — значит ввод значения больше не ждём.
+
+    Без этого «Отмена» и переходы по разделам оставляли включённым режим
+    ожидания, и следующее сообщение человека уходило в проверку значения.
+    """
+    if (event.data or "").startswith("p:") and not event.data.startswith("p:edit:"):
+        state: FSMContext | None = data.get("state")
+        if state is not None:
+            await state.clear()
+    return await handler(event, data)
+
+
 # ------------------------------------------------------------------ сводка
 
 def collect(repo: Repo, engine: BattleEngine) -> dict:
@@ -275,14 +289,14 @@ async def ask_value(
     if key == "find_user":
         await state.set_state(Panel.waiting_value)
         await state.update_data(key="find_user", back="people")
-        await render(callback, panel_ui.ask("Поиск участника", "—", "ник или ID", "p:people"))
+        await render(callback, panel_ui.ask("Поиск участника", "—", "ник или ID", "people"))
         await callback.answer()
         return
 
     if key == "grant":
         await state.set_state(Panel.waiting_value)
         await state.update_data(key="grant", back="people", target=int(extra))
-        await render(callback, panel_ui.ask("Сколько голосов начислить", "0", "число", "p:people"))
+        await render(callback, panel_ui.ask("Сколько голосов начислить", "0", "число", "people"))
         await callback.answer()
         return
 
@@ -317,7 +331,7 @@ async def ask_value(
             field.title if field else key,
             shown or "—",
             "пришлите фото" if key == "main_post_photo" else (field.hint if field else ""),
-            f"p:{editor['back']}",
+            editor["back"],
         ),
     )
     await callback.answer()
@@ -607,3 +621,27 @@ async def person_action(callback: CallbackQuery, repo: Repo, config: Config) -> 
         panel_ui.person(row, repo.stats_for(user_id), repo.vote_balance(user_id)),
     )
     await callback.answer("Заблокирован" if action == "ban" else "Разблокирован")
+
+
+# ---------------------------------------------------------- страховка
+
+@router.callback_query(F.data.startswith("p:"))
+async def unknown_button(
+    callback: CallbackQuery, repo: Repo, config: Config, engine: BattleEngine,
+    state: FSMContext
+) -> None:
+    """Кнопка панели, для которой не нашлось обработчика.
+
+    Так бывает у старого сообщения панели, оставшегося от прошлой версии бота.
+    Молчащая кнопка выглядит как поломка, поэтому отвечаем и открываем панель
+    заново вместо тишины. Регистрируется последней, поэтому обычные кнопки
+    забирают своё раньше.
+    """
+    if not is_admin(callback.from_user.id, config):
+        await callback.answer("Панель доступна только администраторам.", show_alert=True)
+        return
+
+    log.warning("Панель: неизвестная кнопка %s", callback.data)
+    await state.clear()
+    await callback.answer("Эта кнопка из старой версии — открываю панель заново.")
+    await render(callback, panel_ui.home(collect(repo, engine)))
