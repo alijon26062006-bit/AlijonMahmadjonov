@@ -219,12 +219,16 @@ def daily_call(applied: int, deadline: datetime, prizes: list[int]) -> str:
     )
 
 
-def battle_cancelled() -> str:
+def battle_cancelled(queue_size: int = 0) -> str:
+    tail = (
+        f"\n\n🎫 <b>Запись на следующий открыта</b> — в очереди уже {queue_size}."
+        if queue_size
+        else "\n\n🎫 <b>Записывайтесь на следующий</b> — кнопка «Принять участие»."
+    )
     return (
         f"🛑 <b>{spaced('БАТЛ ОТМЕНЁН')}</b>\n"
         f"{RULE}\n\n"
-        "Голосование остановлено, призы не разыгрываются.\n"
-        "<b>Набор в новый батл уже открыт.</b>"
+        f"Голосование остановлено, призы не разыгрываются.{tail}"
     )
 
 
@@ -373,6 +377,26 @@ def took_place(place: int, prize: int) -> str:
         f"{RULE}\n\n"
         f"Ваш приз: <b>{prize}⭐</b>\n\n"
         "<b>Спасибо за игру</b> — ждём вас в следующем батле."
+    )
+
+
+def queued(size: int) -> str:
+    word = plural(size, "человек", "человека", "человек")
+    return (
+        f"✅ <b>Вы в очереди</b>\n"
+        f"{RULE}\n\n"
+        f"Сейчас ждут батла: <b>{size}</b> {word}.\n\n"
+        "<blockquote>Как только админ соберёт батл, бот подберёт вам соперника "
+        "и пришлёт ссылку для голосующих.</blockquote>"
+    )
+
+
+def already_queued(size: int) -> str:
+    word = plural(size, "человек", "человека", "человек")
+    return (
+        f"✅ <b>Вы уже в очереди</b>\n\n"
+        f"<blockquote>Ждут вместе с вами: <b>{size}</b> {word}. "
+        "Ждите старта батла.</blockquote>"
     )
 
 

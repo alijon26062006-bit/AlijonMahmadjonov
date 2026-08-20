@@ -61,7 +61,7 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         f"{RULE}\n\n"
         f"👥 Пользователей: <b>{stats['users']}</b>"
         f"   <i>(+{stats['new_users']} за сутки)</i>\n"
-        f"📝 Заявок в очереди: <b>{stats['queue']}</b>\n"
+        f"🎫 В очереди на батл: <b>{stats['queue']}</b>\n"
         f"🗳 Голосов отдано: <b>{stats['votes']}</b>\n"
         f"🤝 Пришло по приглашениям: <b>{stats['referrals']}</b>\n"
         f"⭐ Продано: <b>{stats['sold_votes']}</b> голосов "
@@ -100,12 +100,30 @@ def battle(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
             [button("🛑 Отменить батл", "battle:cancel:ask", RED)],
         ]
     else:
+        waiting = stats["queue"]
+        enough = waiting >= stats["min_participants"]
         body = (
             "<i>Сейчас батл не идёт.</i>\n\n"
-            "Он откроется сам от первой заявки, но можно открыть приём вручную — "
-            "тогда бот сразу начнёт собирать пары."
+            f"🎫 В очереди: <b>{waiting}</b> "
+            f"{texts.plural(waiting, 'человек', 'человека', 'человек')}\n"
+            f"Нужно минимум: <b>{stats['min_participants']}</b>\n\n"
+            + (
+                "Бот разобьёт их на пары и опубликует все посты сразу."
+                if enough
+                else "<b>Людей пока не хватает.</b> Ждём новые заявки."
+            )
         )
-        rows = [[button("▶️ Открыть приём заявок", "battle:start", GREEN)]]
+        rows = [
+            [
+                button(
+                    f"▶️ Создать батл ({waiting})",
+                    "battle:create",
+                    GREEN if enough else None,
+                )
+            ]
+        ]
+        if waiting:
+            rows.append([button("🗑 Очистить очередь", "battle:clear:ask", RED)])
 
     return f"⚔️ <b>{texts.spaced('БАТЛ')}</b>\n{RULE}\n\n{body}", keyboard(*rows, back_row())
 

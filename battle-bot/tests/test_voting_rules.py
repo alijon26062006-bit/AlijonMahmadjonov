@@ -202,17 +202,15 @@ async def test_a_cancelled_battle_cannot_be_voted_in_even_if_a_match_stayed_open
 
 
 @pytest.mark.asyncio
-async def test_cancelling_opens_registration_for_a_new_battle(env):
+async def test_cancelling_leaves_it_to_the_admin_to_start_the_next(env):
+    """Новый батл больше не открывается сам — его создаёт админ."""
     repo, config, engine = env
     await join_users(engine, repo, 4)
     old_id = int(repo.current_battle()["id"])
 
     await engine.cancel(old_id)
 
-    fresh = repo.current_battle()
-    assert fresh is not None and int(fresh["id"]) != old_id
-    assert fresh["status"] == BattleStatus.REGISTRATION.value
-    assert repo.participant_count(int(fresh["id"])) == 0, "новый батл пустой"
+    assert repo.current_battle() is None, "автоматически ничего не открылось"
 
 
 @pytest.mark.asyncio
@@ -226,7 +224,8 @@ async def test_participants_of_a_cancelled_battle_are_told(env):
 
 
 @pytest.mark.asyncio
-async def test_people_can_join_the_new_battle_right_after_a_cancel(env):
+async def test_people_keep_queueing_after_a_cancel(env):
+    """Запись продолжается всегда — очередь ждёт следующего батла."""
     repo, config, engine = env
     await join_users(engine, repo, 4)
     await engine.cancel(int(repo.current_battle()["id"]))
@@ -234,13 +233,14 @@ async def test_people_can_join_the_new_battle_right_after_a_cancel(env):
     repo.upsert_user(50, "newcomer", "N")
     accepted, _ = await engine.join(50, "newcomer")
 
-    assert accepted, "новый батл должен принимать заявки"
-    assert repo.participant_count(int(repo.current_battle()["id"])) == 1
+    assert accepted
+    assert repo.queue_size() == 1
+    assert repo.current_battle() is None, "батл всё ещё создаёт админ"
 
 
 @pytest.mark.asyncio
-async def test_a_finished_battle_also_opens_the_next_one(env):
-    """После финала бот не должен выглядеть мёртвым до первой заявки."""
+async def test_a_finished_battle_does_not_start_the_next_one(env):
+    """Следующий батл создаёт админ, а не бот."""
     repo, config, engine = env
     await join_users(engine, repo, 4)
     repo.add_vote(1, 900, 1, VoteSource.FREE)
@@ -251,7 +251,5 @@ async def test_a_finished_battle_also_opens_the_next_one(env):
     repo.add_vote(final_id, 902, 1, VoteSource.FREE)
     await engine.close_round()
 
-    fresh = repo.current_battle()
-    assert fresh is not None and int(fresh["id"]) == 2
-    assert fresh["status"] == BattleStatus.REGISTRATION.value
+    assert repo.current_battle() is None
     assert repo.add_vote(final_id, 903, 1, VoteSource.FREE) is VoteResult.CLOSED

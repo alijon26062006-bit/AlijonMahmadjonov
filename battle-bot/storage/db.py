@@ -26,6 +26,14 @@ CREATE TABLE IF NOT EXISTS users (
     is_blocked  INTEGER NOT NULL DEFAULT 0
 );
 
+-- Очередь на следующий батл. Живёт отдельно от батлов: люди записываются
+-- в любой момент, даже когда батл идёт, и ждут, пока админ создаст новый.
+CREATE TABLE IF NOT EXISTS queue (
+    user_id   INTEGER PRIMARY KEY,
+    nickname  TEXT NOT NULL,
+    joined_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS battles (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     status      TEXT NOT NULL,

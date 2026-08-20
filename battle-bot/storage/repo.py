@@ -63,6 +63,51 @@ class Repo:
         self.conn.execute("UPDATE users SET is_banned = ? WHERE user_id = ?", (int(banned), user_id))
         self.conn.commit()
 
+    # ----------------------------------------------------------- очередь
+
+    def enqueue(self, user_id: int, nickname: str) -> bool:
+        """Записать в очередь на следующий батл. False — если уже записан."""
+        try:
+            self.conn.execute(
+                "INSERT INTO queue(user_id, nickname) VALUES(?, ?)", (user_id, nickname)
+            )
+        except sqlite3.IntegrityError:
+            return False
+        self.conn.commit()
+        return True
+
+    def in_queue(self, user_id: int) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM queue WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        return row is not None
+
+    def queue_size(self) -> int:
+        return int(self.conn.execute("SELECT COUNT(*) FROM queue").fetchone()[0])
+
+    def queue_players(self, limit: int | None = None) -> list[Player]:
+        query = "SELECT user_id, nickname FROM queue ORDER BY joined_at, user_id"
+        if limit:
+            query += f" LIMIT {int(limit)}"
+        return [Player(row["user_id"], row["nickname"]) for row in self.conn.execute(query)]
+
+    def leave_queue(self, user_id: int) -> None:
+        self.conn.execute("DELETE FROM queue WHERE user_id = ?", (user_id,))
+        self.conn.commit()
+
+    def take_from_queue(self, user_ids: list[int]) -> None:
+        """Убрать из очереди тех, кто попал в созданный батл."""
+        if not user_ids:
+            return
+        placeholders = ",".join("?" * len(user_ids))
+        self.conn.execute(f"DELETE FROM queue WHERE user_id IN ({placeholders})", user_ids)
+        self.conn.commit()
+
+    def clear_queue(self) -> int:
+        cursor = self.conn.execute("DELETE FROM queue")
+        self.conn.commit()
+        return cursor.rowcount
+
     # ---------------------------------------------------------------- battles
 
     def current_battle(self) -> sqlite3.Row | None:

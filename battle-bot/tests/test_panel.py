@@ -236,9 +236,10 @@ async def test_published_posts_are_remembered_so_they_can_be_deleted(env):
     repo, config, settings, engine = env
     await join_users(engine, repo, 4)
 
-    posts = repo.posts(chat_id=config.channel_id)
-    assert len(posts) == 2, "две пары — два поста"
-    assert all(row["kind"] == "match" for row in posts)
+    matches = [row for row in repo.posts(chat_id=config.channel_id) if row["kind"] == "match"]
+    assert len(matches) == 2, "две пары — два поста"
+    announces = [row for row in repo.posts(chat_id=config.channel_id) if row["kind"] == "announce"]
+    assert announces, "плюс анонс раунда"
 
 
 @pytest.mark.asyncio
@@ -267,9 +268,10 @@ async def test_wipe_deletes_posts_and_forgets_them(env):
             self.deleted.append(message_id)
 
     bot = DeletingBot()
+    before = len(repo.posts(chat_id=config.channel_id))
     deleted, failed = await main_post.wipe_battle_posts(bot, repo, config)
 
-    assert deleted == 2 and failed == 0
+    assert deleted == before and failed == 0
     assert repo.posts(chat_id=config.channel_id) == [], "записи должны исчезнуть"
 
 
@@ -289,9 +291,10 @@ async def test_posts_older_than_two_days_are_counted_but_not_lost(env):
                 message="Bad Request: message can't be deleted",
             )
 
+    before = len(repo.posts(chat_id=config.channel_id))
     deleted, failed = await main_post.wipe_battle_posts(StubbornBot(), repo, config)
 
-    assert deleted == 0 and failed == 2
+    assert deleted == 0 and failed == before
     assert repo.posts(chat_id=config.channel_id) == []
 
 

@@ -18,27 +18,19 @@ FALLBACK_INTERVAL = timedelta(minutes=45)
 MIN_ROUND_LENGTH = timedelta(minutes=10)
 
 
-def deadline_for_round(
-    round_no: int,
-    now: datetime,
-    times: Sequence[time],
-) -> datetime:
-    """Когда закрывать голосование этого раунда."""
-    if round_no <= len(times):
+def next_deadline(now: datetime, times: Sequence[time]) -> datetime:
+    """Ближайшее время подведения итогов после «сейчас».
+
+    Батл создаёт админ в любой момент, поэтому привязка к номеру раунда не
+    работает: берём ближайший слот, до которого осталось хотя бы немного
+    времени. Слотов на сегодня не осталось — считаем от текущего момента.
+    """
+    for slot in sorted(times):
         candidate = now.replace(
-            hour=times[round_no - 1].hour,
-            minute=times[round_no - 1].minute,
-            second=0,
-            microsecond=0,
+            hour=slot.hour, minute=slot.minute, second=0, microsecond=0
         )
-        if round_no == 1:
-            # приём заявок: если сегодняшнее время уже прошло — набираем на завтра
-            if candidate <= now:
-                candidate += timedelta(days=1)
-            return candidate
         if candidate - now >= MIN_ROUND_LENGTH:
             return candidate
-    # времён не хватило или следующее слишком близко — берём интервал от «сейчас»
     return now + FALLBACK_INTERVAL
 
 

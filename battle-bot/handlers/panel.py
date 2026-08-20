@@ -123,6 +123,7 @@ async def leave_input_mode(handler, event: CallbackQuery, data: dict):
 # ------------------------------------------------------------------ сводка
 
 def collect(repo: Repo, engine: BattleEngine) -> dict:
+    settings_min = engine.config.min_participants
     battle = repo.current_battle()
     sold_votes, sold_stars = repo.sold_votes()
     data = {
@@ -135,7 +136,8 @@ def collect(repo: Repo, engine: BattleEngine) -> dict:
         "sold_stars": sold_stars,
         "referrals": repo.referral_totals()[1],
         "battle": battle,
-        "queue": 0,
+        "queue": repo.queue_size(),
+        "min_participants": settings_min,
         "participants": 0,
         "alive": 0,
         "open_matches": 0,
@@ -148,7 +150,6 @@ def collect(repo: Repo, engine: BattleEngine) -> dict:
         alive = repo.alive_players(battle_id)
         matches = repo.open_matches(battle_id, int(battle["round_no"]))
         data.update(
-            queue=len(repo.unassigned_players(battle_id)),
             participants=repo.participant_count(battle_id),
             alive=len(alive),
             open_matches=len(matches),
@@ -758,15 +759,44 @@ async def _back_to(
 
 # ------------------------------------------------------------ действия: батл
 
-@router.callback_query(F.data == "p:battle:start")
-async def start_battle(
+@router.callback_query(F.data == "p:battle:create")
+async def create_battle(
     callback: CallbackQuery, repo: Repo, config: Config, engine: BattleEngine
 ) -> None:
     if not is_admin(callback.from_user.id, config):
         return
-    opened = await engine.open_registration()
+
+    await callback.answer("Собираю батл…")
+    started, note = await engine.create_from_queue()
     await render(callback, panel_ui.battle(collect(repo, engine)))
-    await callback.answer("Приём заявок открыт" if opened else "Батл уже идёт")
+    await callback.message.answer(("✅ " if started else "⚠️ ") + note)
+
+
+@router.callback_query(F.data == "p:battle:clear:ask")
+async def ask_clear_queue(callback: CallbackQuery, repo: Repo, config: Config) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(
+        callback,
+        panel_ui.confirm(
+            f"Очистить очередь из <b>{repo.queue_size()}</b> человек?\n\n"
+            "<i>Они смогут записаться заново.</i>",
+            "battle:clear:do",
+            "battle",
+        ),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "p:battle:clear:do")
+async def clear_queue(
+    callback: CallbackQuery, repo: Repo, config: Config, engine: BattleEngine
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    removed = repo.clear_queue()
+    await render(callback, panel_ui.battle(collect(repo, engine)))
+    await callback.answer(f"Очередь очищена: {removed}")
 
 
 @router.callback_query(F.data == "p:battle:close")
@@ -791,11 +821,9 @@ async def postpone(
         await callback.answer("Батл не идёт.", show_alert=True)
         return
 
-    from core.scheduler import deadline_for_round
+    from core.scheduler import next_deadline
 
-    deadline = deadline_for_round(
-        int(battle["round_no"]) + 1, engine.now(), config.round_times
-    )
+    deadline = next_deadline(engine.now(), config.round_times)
     repo.extend_deadlines(int(battle["id"]), deadline)
     await render(callback, panel_ui.battle(collect(repo, engine)))
     await callback.answer(f"Дедлайн перенесён на {deadline.strftime('%H:%M')}")

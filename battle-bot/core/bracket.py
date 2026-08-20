@@ -65,12 +65,14 @@ def plan_round(
     players = list(alive)
     rng.shuffle(players)
 
-    if len(players) <= FINAL_MAX:
-        return RoundPlan(round_no=round_no, groups=[players], is_final=True)
-
+    # первый раунд всегда 1vs1, сколько бы человек ни пришло: иначе на малом
+    # числе участников батл сразу превращался бы в финал из всех сразу
     if round_no == 1:
         groups, leftover = rolling_pairs(players)
         return RoundPlan(round_no=round_no, groups=groups, byes=leftover)
+
+    if len(players) <= FINAL_MAX:
+        return RoundPlan(round_no=round_no, groups=[players], is_final=True)
 
     return RoundPlan(round_no=round_no, groups=split_groups(players))
 
@@ -123,7 +125,7 @@ def project_rounds(count: int) -> list[int]:
     stages = [count]
     alive = count
     round_no = 1
-    while alive > FINAL_MAX:
+    while alive > FINAL_MAX or round_no == 1:
         if round_no == 1:
             alive = (alive + 1) // 2  # нечётный получает bye
         else:
@@ -132,5 +134,6 @@ def project_rounds(count: int) -> list[int]:
             alive = sum(advance_count(len(g), base) for g in groups)
         stages.append(alive)
         round_no += 1
-    stages.append(1)  # финал
+    if alive > 1:
+        stages.append(1)  # финал
     return stages

@@ -1,35 +1,40 @@
+"""Расписание: когда подводить итоги раунда."""
 import sys
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from core.scheduler import FALLBACK_INTERVAL, deadline_for_round
+from core.scheduler import FALLBACK_INTERVAL, next_deadline
 
 TIMES = [time(18, 0), time(19, 30), time(21, 0)]
 
 
-def test_first_round_closes_today_when_there_is_still_time():
-    now = datetime(2026, 8, 20, 9, 39)
-    assert deadline_for_round(1, now, TIMES) == datetime(2026, 8, 20, 18, 0)
+def test_the_nearest_slot_is_taken():
+    assert next_deadline(datetime(2026, 8, 20, 9, 39), TIMES) == datetime(2026, 8, 20, 18, 0)
 
 
-def test_first_round_rolls_over_to_tomorrow_after_the_deadline():
-    now = datetime(2026, 8, 20, 18, 30)
-    assert deadline_for_round(1, now, TIMES) == datetime(2026, 8, 21, 18, 0)
+def test_a_passed_slot_is_skipped():
+    """Батл создаёт админ в любой момент — берём следующий подходящий слот."""
+    assert next_deadline(datetime(2026, 8, 20, 18, 30), TIMES) == datetime(2026, 8, 20, 19, 30)
+    assert next_deadline(datetime(2026, 8, 20, 20, 0), TIMES) == datetime(2026, 8, 20, 21, 0)
 
 
-def test_later_rounds_run_the_same_evening():
-    now = datetime(2026, 8, 20, 18, 0)
-    assert deadline_for_round(2, now, TIMES) == datetime(2026, 8, 20, 19, 30)
-    assert deadline_for_round(3, now, TIMES) == datetime(2026, 8, 20, 21, 0)
+def test_a_slot_too_close_is_skipped():
+    """До 19:30 пять минут — голосовать некогда, берём следующий."""
+    assert next_deadline(datetime(2026, 8, 20, 19, 26), TIMES) == datetime(2026, 8, 20, 21, 0)
 
 
-def test_a_round_never_gets_less_than_ten_minutes():
-    now = datetime(2026, 8, 20, 19, 25)  # до 19:30 всего пять минут
-    assert deadline_for_round(2, now, TIMES) == now + FALLBACK_INTERVAL
+def test_when_the_day_is_over_a_fixed_interval_is_used():
+    now = datetime(2026, 8, 20, 23, 50)
+    assert next_deadline(now, TIMES) == now + FALLBACK_INTERVAL
 
 
-def test_extra_rounds_fall_back_to_a_fixed_interval():
-    now = datetime(2026, 8, 20, 21, 0)
-    assert deadline_for_round(4, now, TIMES) == now + FALLBACK_INTERVAL
+def test_an_empty_schedule_falls_back_too():
+    now = datetime(2026, 8, 20, 12, 0)
+    assert next_deadline(now, []) == now + FALLBACK_INTERVAL
+
+
+def test_the_order_of_times_does_not_matter():
+    messy = [time(21, 0), time(18, 0), time(19, 30)]
+    assert next_deadline(datetime(2026, 8, 20, 9, 0), messy) == datetime(2026, 8, 20, 18, 0)

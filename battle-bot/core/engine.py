@@ -12,7 +12,7 @@ from aiogram.exceptions import TelegramAPIError
 from config import Config, MSK
 from core import bracket
 from core.models import BattleStatus, Player, Slot
-from core.scheduler import deadline_for_round
+from core.scheduler import next_deadline
 from services import keyboards, links, texts
 from services.channel import ChannelPublisher
 from services.tg import is_blocked
@@ -43,53 +43,26 @@ class BattleEngine:
             return None
         return datetime.fromisoformat(battle["deadline"])
 
-    def ensure_battle(self) -> int:
-        """Вернуть текущий батл, при необходимости открыв новый приём заявок."""
-        battle = self.repo.current_battle()
-        if battle is not None:
-            return int(battle["id"])
-        deadline = deadline_for_round(1, self.now(), self.config.round_times)
-        battle_id = self.repo.create_battle(deadline)
-        log.info("Открыт батл #%s, приём заявок до %s", battle_id, deadline)
-        return battle_id
-
     # ------------------------------------------------------------------ заявки
 
     async def join(self, user_id: int, nickname: str) -> tuple[bool, str]:
-        """Принять заявку и, если набралась пара, сразу опубликовать пост.
+        """Записать в очередь на следующий батл.
 
-        Возвращает (принято, текст ответа).
+        Очередь копится всегда — и пока батла нет, и пока идёт текущий.
+        Пары составляются в момент, когда админ создаёт батл.
         """
-        pending: tuple[int, list[Player]] | None = None
-
         async with self._lock:
             if self.repo.is_banned(user_id):
                 return False, "Вы не можете участвовать в батлах."
 
             battle = self.repo.current_battle()
-            if battle is not None and battle["status"] == BattleStatus.RUNNING.value:
-                return False, "Батл уже идёт — заявки на следующий откроются после финала."
-
-            battle_id = self.ensure_battle()
-            if self.repo.participant_count(battle_id) >= self.config.max_participants:
-                return False, "Мест в этом батле больше нет, ждите следующий."
-
-            if not self.repo.add_participant(battle_id, user_id, nickname):
+            if battle is not None and self.repo.is_participant(int(battle["id"]), user_id):
                 return False, texts.ALREADY_IN_BATTLE
 
-            waiting = self.repo.unassigned_players(battle_id)
-            if len(waiting) >= 2:
-                # матч создаём под локом, иначе две одновременные заявки
-                # успеют увидеть одну и ту же очередь и создать дубль пары
-                pending = self._create_pair_match(battle_id, waiting[:2])
+            if not self.repo.enqueue(user_id, nickname):
+                return False, texts.already_queued(self.repo.queue_size())
 
-        # публикацию выносим из-под лока — сеть может тормозить
-        if pending is not None:
-            match_id, pair = pending
-            message_id = await self.publisher.publish_match(match_id)
-            await self._notify_pair(match_id, pair, message_id)
-            return True, texts.APPLICATION_ACCEPTED
-        return True, texts.IN_QUEUE
+            return True, texts.queued(self.repo.queue_size())
 
     def _create_pair_match(self, battle_id: int, pair: list[Player]) -> tuple[int, list[Player]]:
         """Завести матч первого раунда для двух заявок."""
@@ -138,14 +111,6 @@ class BattleEngine:
         battle_id = int(battle["id"])
         round_no = int(battle["round_no"])
         matches = self.repo.open_matches(battle_id, round_no)
-
-        if round_no == 1:
-            applied = self.repo.participant_count(battle_id)
-            if applied < self.config.min_participants:
-                # заявок слишком мало — играть батл с призами нет смысла,
-                # продлеваем приём и переносим итоги на следующий слот
-                await self._reschedule_registration(battle_id, applied)
-                return
 
         if not matches:
             return
@@ -213,10 +178,9 @@ class BattleEngine:
                 )
             else:
                 self.repo.close_battle(battle_id, BattleStatus.CANCELLED)
-                await self._open_registration_locked()
             return
 
-        deadline = deadline_for_round(round_no, self.now(), self.config.round_times)
+        deadline = next_deadline(self.now(), self.config.round_times)
         self.repo.set_round(battle_id, round_no, deadline)
         self.repo.set_battle_status(battle_id, BattleStatus.RUNNING)
 
@@ -245,6 +209,29 @@ class BattleEngine:
                 rivals = [p.nickname for p in group if p.user_id != player.user_id]
                 await self._dm(player.user_id, texts.advanced(rivals), markup)
 
+    async def create_from_queue(self) -> tuple[bool, str]:
+        """Собрать батл из очереди. Вызывается админом из панели."""
+        async with self._lock:
+            if self.repo.current_battle() is not None:
+                return False, "Батл уже идёт. Сначала подведите итоги или отмените его."
+
+            waiting = self.repo.queue_players(self.config.max_participants)
+            if len(waiting) < self.config.min_participants:
+                return False, (
+                    f"В очереди {len(waiting)} из "
+                    f"{self.config.min_participants} нужных. Батл не начат."
+                )
+
+            deadline = next_deadline(self.now(), self.config.round_times)
+            battle_id = self.repo.create_battle(deadline)
+            for player in waiting:
+                self.repo.add_participant(battle_id, player.user_id, player.nickname)
+            self.repo.take_from_queue([p.user_id for p in waiting])
+            log.info("Батл #%s создан из очереди: %s участников", battle_id, len(waiting))
+
+            await self._start_round(battle_id, 1)
+            return True, f"Батл #{battle_id} начат: {len(waiting)} участников."
+
     async def cancel(self, battle_id: int) -> int:
         """Отменить батл: голосование встаёт, участники узнают, набор открывается заново.
 
@@ -255,45 +242,9 @@ class BattleEngine:
             closed = self.repo.close_battle(battle_id, BattleStatus.CANCELLED)
             log.info("Батл #%s отменён, закрыто матчей: %s", battle_id, closed)
 
-        await self.publisher.announce(texts.battle_cancelled())
+        await self.publisher.announce(texts.battle_cancelled(self.repo.queue_size()))
         await self._notify_many(participants, texts.BATTLE_CANCELLED_DM)
-        await self.open_registration()
         return closed
-
-    async def open_registration(self) -> int | None:
-        """Открыть приём заявок в новый батл и объявить об этом.
-
-        Вызывается после финала и после отмены: батл кончился — сразу собираем
-        людей на следующий, иначе бот выглядит мёртвым до первой заявки.
-        """
-        async with self._lock:
-            return await self._open_registration_locked()
-
-    async def _open_registration_locked(self) -> int | None:
-        """То же, но для кода, который уже держит лок.
-
-        asyncio.Lock не реентерабельный: подведение итогов держит его целиком,
-        и повторный захват из финала остановил бы бота намертво.
-        """
-        if self.repo.current_battle() is not None:
-            return None
-
-        battle_id = self.ensure_battle()
-        deadline = datetime.fromisoformat(self.repo.current_battle()["deadline"])
-        await self.publisher.announce(
-            texts.registration_open(deadline, self.config.prizes), battle_id
-        )
-        return battle_id
-
-    async def _reschedule_registration(self, battle_id: int, applied: int) -> None:
-        """Мало заявок: сдвигаем дедлайн, уже отданные голоса сохраняются."""
-        deadline = deadline_for_round(1, self.now(), self.config.round_times)
-        self.repo.extend_deadlines(battle_id, deadline)
-        log.info("Заявок %s из %s — приём продлён до %s",
-                 applied, self.config.min_participants, deadline)
-        await self.publisher.announce(
-            texts.postponed(applied, self.config.min_participants, deadline)
-        )
 
     async def _finish_battle(self, battle_id: int, ranking: list[Slot]) -> None:
         for slot in ranking:
@@ -323,8 +274,7 @@ class BattleEngine:
                 )
         log.info("Батл #%s завершён", battle_id)
 
-        # батл кончился — сразу собираем людей на следующий
-        await self._open_registration_locked()
+        log.info("Очередь на следующий батл: %s", self.repo.queue_size())
 
     # ---------------------------------------------------------------- рассылка
 
