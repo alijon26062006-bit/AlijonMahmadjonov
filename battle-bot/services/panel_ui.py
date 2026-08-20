@@ -73,6 +73,7 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         [button("⭐ Голоса", "votes"), button("🤝 Друзья", "referrals")],
         [button("📣 Канал", "channel"), button("👥 Люди", "people")],
         [button("📨 Рассылка", "broadcast"), button("🤖 Автопилот", "auto")],
+        [button("🔍 Проверка", "fraud")],
         [button("⚙️ Настройки", "settings")],
         [button("🔄 Обновить", "home", BLUE)],
     )
@@ -156,6 +157,68 @@ def votes(
         [button("✏️ Изменить цену", "edit:vote_price", BLUE)],
         [button("🧱 Ссылка на звёзды", "edit:stars_link")],
         [button(toggle, "votes:toggle", RED if enabled else GREEN)],
+        back_row(),
+    )
+
+
+# ------------------------------------------------------ проверка накрутки
+
+def _who(row, field: str = "username") -> str:
+    name = row[field] if field in row.keys() and row[field] else None
+    return escape("@" + name) if name else f"<code>{row['target_id']}</code>"
+
+
+def fraud(signals: dict) -> tuple[str, InlineKeyboardMarkup]:
+    """Что выглядит подозрительно. Бот не банит сам — решает админ."""
+    blocks = []
+
+    own = signals["own_referrals"]
+    if own:
+        lines = [
+            f"• {_who(row, 'username')} — <b>{row['own_votes']}</b> из "
+            f"{row['all_votes']} голосов от им же приглашённых"
+            for row in own
+        ]
+        blocks.append("<b>🚩 Голосуют свои приглашённые</b>\n" + "\n".join(lines))
+
+    bursts = signals["bursts"]
+    if bursts:
+        lines = [
+            f"• {_who(row)} — <b>{row['burst']}</b> голосов за минуту "
+            f"<i>({row['started'][11:16]})</i>"
+            for row in bursts
+        ]
+        blocks.append("<b>⚡ Всплески голосов</b>\n" + "\n".join(lines))
+
+    loyal = signals["loyal"]
+    if loyal:
+        lines = [
+            f"• <code>{row['voter_id']}</code> — <b>{row['votes']}</b> голосов "
+            f"и все за одного"
+            for row in loyal
+        ]
+        blocks.append("<b>👥 Голосуют всегда за одного</b>\n" + "\n".join(lines))
+
+    fresh = signals["fresh"]
+    if fresh:
+        lines = [
+            f"• {_who(row)} — <b>{row['votes']}</b> голосов от новых аккаунтов"
+            for row in fresh
+        ]
+        blocks.append("<b>🆕 Голоса свежих аккаунтов</b>\n" + "\n".join(lines))
+
+    body = "\n\n".join(blocks) if blocks else "✅ <i>Ничего подозрительного не вижу.</i>"
+
+    text = (
+        f"🔍 <b>{texts.spaced('ПРОВЕРКА')}</b>\n{RULE}\n\n"
+        f"{body}\n\n{RULE}\n"
+        "<i>Это подсказки, а не приговор: у популярного участника всплеск "
+        "голосов бывает и честным. Смотрите сами — заблокировать можно "
+        "в разделе «Люди».</i>"
+    )
+    return text, keyboard(
+        [button("🔄 Пересчитать", "fraud", BLUE)],
+        [button("👥 К людям", "people")],
         back_row(),
     )
 

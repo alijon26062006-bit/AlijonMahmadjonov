@@ -93,6 +93,15 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Когда участнику в последний раз сообщали, что его обошли. Пара ключей
+-- не даёт слать это на каждый голос при перестрелке за первое место.
+CREATE TABLE IF NOT EXISTS nudges (
+    match_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    sent_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (match_id, user_id)
+);
+
 -- Что автопилот уже отправил. Ключ первичный, поэтому одно и то же
 -- напоминание не уйдёт дважды даже после перезапуска бота.
 CREATE TABLE IF NOT EXISTS auto_log (

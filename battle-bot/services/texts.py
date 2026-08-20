@@ -248,6 +248,28 @@ def final_announcement(ranking: list[Slot], prizes: list[int]) -> str:
 
 # ------------------------------------------------------------ экраны в боте
 
+def overtaken(rival: str, rival_votes: int, your_votes: int) -> str:
+    """Соперник вышел вперёд — самый подходящий момент позвать своих."""
+    gap = rival_votes - your_votes
+    return (
+        f"⚠️ <b>Вас обошли!</b>\n"
+        f"{RULE}\n\n"
+        f"<b>{nick(rival)}</b> впереди: "
+        f"<b>{rival_votes}</b> против <b>{your_votes}</b>.\n"
+        f"Разрыв — <b>{gap}</b> {plural(gap, 'голос', 'голоса', 'голосов')}.\n\n"
+        "<b>Ещё не поздно.</b> Позовите своих — кнопка ниже."
+    )
+
+
+def took_the_lead(rival: str, your_votes: int, rival_votes: int) -> str:
+    return (
+        f"🔥 <b>Вы вырвались вперёд!</b>\n"
+        f"{RULE}\n\n"
+        f"<b>{your_votes}</b> против <b>{rival_votes}</b> у {nick(rival)}.\n\n"
+        "<i>Не расслабляйтесь — до итогов ещё есть время.</i>"
+    )
+
+
 def match_result_dm(
     ranking: list[Slot],
     you_id: int,

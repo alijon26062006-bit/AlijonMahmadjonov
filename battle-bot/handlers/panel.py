@@ -285,6 +285,23 @@ def _auto_screen(repo: Repo, settings: Settings):
     return panel_ui.autopilot(settings.all(), repo.promos())
 
 
+@router.callback_query(F.data == "p:fraud")
+async def show_fraud(callback: CallbackQuery, repo: Repo, config: Config) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, panel_ui.fraud(_fraud_signals(repo)))
+    await callback.answer("Пересчитано")
+
+
+def _fraud_signals(repo: Repo) -> dict:
+    return {
+        "own_referrals": repo.self_referral_votes(),
+        "bursts": repo.vote_bursts(),
+        "loyal": repo.loyal_voters(),
+        "fresh": repo.fresh_account_votes(),
+    }
+
+
 @router.callback_query(F.data == "p:auto")
 async def show_autopilot(
     callback: CallbackQuery, repo: Repo, config: Config, settings: Settings

@@ -343,6 +343,21 @@ class Repo:
         ).fetchone()
         return VoteResult.CLOSED if row else VoteResult.UNKNOWN_TARGET
 
+    def can_nudge(self, match_id: int, user_id: int, cooldown_minutes: int = 10) -> bool:
+        """Можно ли сейчас сказать участнику, что его обошли.
+
+        Проверка и отметка — один запрос, поэтому при перестрелке за первое
+        место человек не получит десяток сообщений подряд.
+        """
+        cursor = self.conn.execute(
+            """INSERT INTO nudges(match_id, user_id) VALUES(?, ?)
+               ON CONFLICT(match_id, user_id) DO UPDATE SET sent_at = datetime('now')
+               WHERE datetime(sent_at) <= datetime('now', ?)""",
+            (match_id, user_id, f"-{cooldown_minutes} minutes"),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
     def vote_log(self, match_id: int) -> list[sqlite3.Row]:
         return self.conn.execute(
             "SELECT * FROM votes WHERE match_id = ? ORDER BY id", (match_id,)
@@ -410,6 +425,75 @@ class Repo:
         )
         self.conn.commit()
         return True
+
+    # ------------------------------------------------- проверка накрутки
+
+    def self_referral_votes(self, limit: int = 10) -> list[sqlite3.Row]:
+        """Голоса от людей, которых сам участник и пригласил.
+
+        Самый весомый признак: человек нагнал знакомых по своей ссылке и они
+        голосуют только за него.
+        """
+        return self.conn.execute(
+            """SELECT s.user_id, u.username, COUNT(*) AS own_votes,
+                      (SELECT COUNT(*) FROM votes v2
+                       WHERE v2.match_id = v.match_id AND v2.target_id = s.user_id)
+                      AS all_votes
+               FROM votes v
+               JOIN referrals r ON r.invited_id = v.voter_id
+                                AND r.inviter_id = v.target_id
+               JOIN match_slots s ON s.match_id = v.match_id AND s.user_id = v.target_id
+               LEFT JOIN users u ON u.user_id = s.user_id
+               GROUP BY s.user_id
+               HAVING own_votes >= 3
+               ORDER BY own_votes DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+
+    def vote_bursts(self, within_seconds: int = 60, threshold: int = 8,
+                    limit: int = 10) -> list[sqlite3.Row]:
+        """Всплески: много голосов за одного участника за короткое время."""
+        return self.conn.execute(
+            """SELECT v.match_id, v.target_id, u.username, COUNT(*) AS burst,
+                      MIN(v.created_at) AS started
+               FROM votes v
+               LEFT JOIN users u ON u.user_id = v.target_id
+               GROUP BY v.match_id, v.target_id,
+                        CAST(strftime('%s', v.created_at) / ? AS INTEGER)
+               HAVING burst >= ?
+               ORDER BY burst DESC LIMIT ?""",
+            (within_seconds, threshold, limit),
+        ).fetchall()
+
+    def loyal_voters(self, min_votes: int = 4, limit: int = 10) -> list[sqlite3.Row]:
+        """Люди, которые голосуют всегда за одного и того же.
+
+        Может быть настоящей дружбой, а может — фермой аккаунтов. Решает админ.
+        """
+        return self.conn.execute(
+            """SELECT voter_id, COUNT(*) AS votes,
+                      COUNT(DISTINCT target_id) AS targets,
+                      MIN(target_id) AS target
+               FROM votes
+               GROUP BY voter_id
+               HAVING targets = 1 AND votes >= ?
+               ORDER BY votes DESC LIMIT ?""",
+            (min_votes, limit),
+        ).fetchall()
+
+    def fresh_account_votes(self, minutes: int = 10, limit: int = 10) -> list[sqlite3.Row]:
+        """Голоса от аккаунтов, заведённых прямо перед голосованием."""
+        return self.conn.execute(
+            """SELECT v.target_id, u2.username, COUNT(*) AS votes
+               FROM votes v
+               JOIN users u ON u.user_id = v.voter_id
+               LEFT JOIN users u2 ON u2.user_id = v.target_id
+               WHERE datetime(v.created_at) <= datetime(u.created_at, ?)
+               GROUP BY v.target_id
+               HAVING votes >= 3
+               ORDER BY votes DESC LIMIT ?""",
+            (f"+{minutes} minutes", limit),
+        ).fetchall()
 
     # --------------------------------------------------------- автопилот
 

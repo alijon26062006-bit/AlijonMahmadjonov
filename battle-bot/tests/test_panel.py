@@ -468,6 +468,7 @@ async def test_every_button_on_every_screen_has_a_handler(env):
         panel_ui.settings_screen(settings.all(), [-1001111111111]),
         panel_ui.referrals(1, True, repo.referral_report(), repo.top_inviters(10)),
         panel_ui.autopilot(settings.all(), repo.promos()),
+        panel_ui.fraud(panel._fraud_signals(repo)),
         panel_ui.promo_list(repo.promos()),
         panel_ui.person(repo.get_user(77), repo.stats_for(77), 0),
         panel_ui.confirm("Точно?", "battle:cancel:do", "battle"),

@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import Config
 from core.models import MatchStatus, VoteResult, VoteSource
-from services import keyboards, links, sponsors, texts
+from services import keyboards, links, nudges, sponsors, texts
 from services.tg import is_not_modified
 from storage.repo import Repo
 from storage.settings import Settings
@@ -86,6 +86,7 @@ async def cast_vote(
         await callback.answer(note, show_alert=True)
         return
 
+    before = repo.match_slots(match_id)
     result = repo.add_vote(match_id, callback.from_user.id, target_id, source)
     if result is not VoteResult.ACCEPTED:
         # купленный голос списан заранее — при отказе возвращаем его обратно
@@ -97,6 +98,12 @@ async def cast_vote(
 
     await callback.answer(note)
     await _refresh(callback, match_id, repo, config)
+
+    # сменился лидер — самый подходящий момент позвать своих
+    await nudges.notify_lead_change(
+        callback.bot, repo, config, match_id,
+        before, repo.match_slots(match_id), _post_url(config, match),
+    )
 
 
 def _pick_vote_source(
