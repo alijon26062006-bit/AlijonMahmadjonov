@@ -172,7 +172,17 @@ async def test_the_final_awards_three_places_and_ends_the_battle(env):
 
     await engine.close_round()
 
-    assert repo.current_battle() is None  # батл закрыт
+    # прежний батл закрыт, а набор в следующий открыт сразу
+    finished = repo.conn.execute(
+        "SELECT status FROM battles WHERE id = 1"
+    ).fetchone()["status"]
+    assert finished == "finished"
+
+    fresh = repo.current_battle()
+    assert fresh is not None and fresh["id"] == 2
+    assert fresh["status"] == BattleStatus.REGISTRATION.value
+    assert repo.participant_count(2) == 0, "новый батл собирает новых людей"
+
     places = {
         row["user_id"]: row["place"]
         for row in repo.conn.execute("SELECT user_id, place FROM participants WHERE place IS NOT NULL")
@@ -230,10 +240,13 @@ async def test_large_battle_runs_to_a_champion(env):
     await join_users(engine, repo, 20)
 
     guard = 0
-    while repo.current_battle() is not None:
+    while True:
         guard += 1
         assert guard < 10, "батл должен сходиться за несколько раундов"
         battle = repo.current_battle()
+        assert battle is not None
+        if int(battle["id"]) != 1:
+            break  # первый батл доигран, открылся набор в следующий
         for match in repo.open_matches(int(battle["id"]), int(battle["round_no"])):
             match_id = int(match["id"])
             for offset, slot in enumerate(repo.match_slots(match_id)):

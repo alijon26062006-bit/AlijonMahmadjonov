@@ -187,7 +187,8 @@ class BattleEngine:
                     battle_id, [Slot(alive[0].user_id, alive[0].nickname, 0, 1)]
                 )
             else:
-                self.repo.set_battle_status(battle_id, BattleStatus.CANCELLED)
+                self.repo.close_battle(battle_id, BattleStatus.CANCELLED)
+                await self._open_registration_locked()
             return
 
         deadline = deadline_for_round(round_no, self.now(), self.config.round_times)
@@ -219,6 +220,46 @@ class BattleEngine:
                 texts.advanced(links.vote_link(self.config.bot_username, match_id)),
             )
 
+    async def cancel(self, battle_id: int) -> int:
+        """Отменить батл: голосование встаёт, участники узнают, набор открывается заново.
+
+        Возвращает число закрытых матчей.
+        """
+        async with self._lock:
+            participants = [p.user_id for p in self.repo.alive_players(battle_id)]
+            closed = self.repo.close_battle(battle_id, BattleStatus.CANCELLED)
+            log.info("Батл #%s отменён, закрыто матчей: %s", battle_id, closed)
+
+        await self.publisher.announce(texts.battle_cancelled())
+        await self._notify_many(participants, texts.BATTLE_CANCELLED_DM)
+        await self.open_registration()
+        return closed
+
+    async def open_registration(self) -> int | None:
+        """Открыть приём заявок в новый батл и объявить об этом.
+
+        Вызывается после финала и после отмены: батл кончился — сразу собираем
+        людей на следующий, иначе бот выглядит мёртвым до первой заявки.
+        """
+        async with self._lock:
+            return await self._open_registration_locked()
+
+    async def _open_registration_locked(self) -> int | None:
+        """То же, но для кода, который уже держит лок.
+
+        asyncio.Lock не реентерабельный: подведение итогов держит его целиком,
+        и повторный захват из финала остановил бы бота намертво.
+        """
+        if self.repo.current_battle() is not None:
+            return None
+
+        battle_id = self.ensure_battle()
+        deadline = datetime.fromisoformat(self.repo.current_battle()["deadline"])
+        await self.publisher.announce(
+            texts.registration_open(deadline, self.config.prizes), battle_id
+        )
+        return battle_id
+
     async def _reschedule_registration(self, battle_id: int, applied: int) -> None:
         """Мало заявок: сдвигаем дедлайн, уже отданные голоса сохраняются."""
         deadline = deadline_for_round(1, self.now(), self.config.round_times)
@@ -234,7 +275,7 @@ class BattleEngine:
             self.repo.set_place(battle_id, slot.user_id, slot.position or 1)
             self.repo.record_place(slot.user_id, slot.position or 1)
 
-        self.repo.set_battle_status(battle_id, BattleStatus.FINISHED)
+        self.repo.close_battle(battle_id, BattleStatus.FINISHED)
         await self.publisher.announce(texts.final_announcement(ranking, self.config.prizes))
 
         for slot in ranking:
@@ -245,6 +286,9 @@ class BattleEngine:
             else:
                 await self._dm(slot.user_id, texts.YOU_LOST)
         log.info("Батл #%s завершён", battle_id)
+
+        # батл кончился — сразу собираем людей на следующий
+        await self._open_registration_locked()
 
     # ---------------------------------------------------------------- рассылка
 

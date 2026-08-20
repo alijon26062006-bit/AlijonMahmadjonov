@@ -20,7 +20,6 @@ from aiogram.types import CallbackQuery, Message
 from config import Config
 from core import bracket
 from core.engine import BattleEngine
-from core.models import BattleStatus
 from services import main_post, panel_ui, texts, validation
 from services.tg import is_not_modified
 from services.validation import InputError
@@ -521,9 +520,9 @@ async def start_battle(
 ) -> None:
     if not is_admin(callback.from_user.id, config):
         return
-    engine.ensure_battle()
+    opened = await engine.open_registration()
     await render(callback, panel_ui.battle(collect(repo, engine)))
-    await callback.answer("Приём заявок открыт")
+    await callback.answer("Приём заявок открыт" if opened else "Батл уже идёт")
 
 
 @router.callback_query(F.data == "p:battle:close")
@@ -584,8 +583,12 @@ async def do_cancel(
     if battle is None:
         await callback.answer("Уже нечего отменять.", show_alert=True)
     else:
-        repo.set_battle_status(int(battle["id"]), BattleStatus.CANCELLED)
-        await callback.answer(f"Батл #{battle['id']} отменён")
+        await callback.answer("Отменяю…")
+        closed = await engine.cancel(int(battle["id"]))
+        await callback.message.answer(
+            f"🛑 Батл #{battle['id']} отменён. Закрыто матчей: <b>{closed}</b>.\n"
+            "Набор в новый батл открыт."
+        )
     await render(callback, panel_ui.battle(collect(repo, engine)))
 
 

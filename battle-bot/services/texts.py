@@ -163,6 +163,33 @@ def postponed(applied: int, needed: int, deadline: datetime) -> str:
     )
 
 
+def registration_open(deadline: datetime, prizes: list[int]) -> str:
+    return (
+        f"⚔️ <b>{spaced('НАБОР ОТКРЫТ')}</b>\n"
+        f"{RULE}\n\n"
+        f"{prizes_block(prizes)}\n\n"
+        "🎫 <b>Подавайте заявки — пары публикуются сразу, как только "
+        "наберётся двое.</b>\n\n"
+        f"{deadline_line(deadline)}"
+    )
+
+
+def battle_cancelled() -> str:
+    return (
+        f"🛑 <b>{spaced('БАТЛ ОТМЕНЁН')}</b>\n"
+        f"{RULE}\n\n"
+        "Голосование остановлено, призы не разыгрываются.\n"
+        "<b>Набор в новый батл уже открыт.</b>"
+    )
+
+
+BATTLE_CANCELLED_DM = (
+    "🛑 <b>Батл отменён</b>\n\n"
+    "<blockquote>Голосование остановлено. "
+    "Набор в новый батл уже открыт — подайте заявку снова.</blockquote>"
+)
+
+
 def final_announcement(ranking: list[Slot], prizes: list[int]) -> str:
     lines = []
     for slot in ranking[: len(prizes)]:

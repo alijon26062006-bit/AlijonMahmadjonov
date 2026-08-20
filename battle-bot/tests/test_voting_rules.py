@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from config import MSK
 from core.engine import BattleEngine
-from core.models import Player, Slot, VoteResult, VoteSource
+from core.models import BattleStatus, Player, Slot, VoteResult, VoteSource
 from storage.db import connect
 from storage.repo import Repo
 from tests.test_engine import FakeBot, join_users, make_config
@@ -170,3 +170,88 @@ def test_paid_votes_stack_but_only_while_the_match_is_open(env):
     repo.close_match(match_id, [Slot(1, "nick1", 3, 1), Slot(2, "nick2", 0, 2)])
     assert repo.add_vote(match_id, 500, 1, VoteSource.PAID) is VoteResult.CLOSED
     assert repo.match_slots(match_id)[0].votes == 3
+
+
+# ------------------------------------------- отмена батла из панели
+
+@pytest.mark.asyncio
+async def test_cancelling_a_battle_stops_all_voting(env):
+    """Отменили батл — проголосовать нельзя ни в одном его матче."""
+    repo, config, engine = env
+    await join_users(engine, repo, 4)
+    battle_id = int(repo.current_battle()["id"])
+
+    closed = await engine.cancel(battle_id)
+
+    assert closed == 2, "оба матча должны закрыться"
+    assert repo.add_vote(1, 900, 1, VoteSource.FREE) is VoteResult.CLOSED
+    assert repo.add_vote(2, 901, 3, VoteSource.FREE) is VoteResult.CLOSED
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_battle_cannot_be_voted_in_even_if_a_match_stayed_open(env):
+    """Страховка: голос смотрит и на статус батла, не только матча."""
+    repo, config, engine = env
+    await join_users(engine, repo, 4)
+    battle_id = int(repo.current_battle()["id"])
+
+    repo.set_battle_status(battle_id, BattleStatus.CANCELLED)  # матчи намеренно не трогаем
+    assert repo.get_match(1)["status"] == "voting"
+
+    assert repo.add_vote(1, 900, 1, VoteSource.FREE) is VoteResult.CLOSED
+
+
+@pytest.mark.asyncio
+async def test_cancelling_opens_registration_for_a_new_battle(env):
+    repo, config, engine = env
+    await join_users(engine, repo, 4)
+    old_id = int(repo.current_battle()["id"])
+
+    await engine.cancel(old_id)
+
+    fresh = repo.current_battle()
+    assert fresh is not None and int(fresh["id"]) != old_id
+    assert fresh["status"] == BattleStatus.REGISTRATION.value
+    assert repo.participant_count(int(fresh["id"])) == 0, "новый батл пустой"
+
+
+@pytest.mark.asyncio
+async def test_participants_of_a_cancelled_battle_are_told(env):
+    repo, config, engine = env
+    await join_users(engine, repo, 4)
+
+    await engine.cancel(int(repo.current_battle()["id"]))
+
+    assert any("отменён" in text for text in engine.bot.direct[1])
+
+
+@pytest.mark.asyncio
+async def test_people_can_join_the_new_battle_right_after_a_cancel(env):
+    repo, config, engine = env
+    await join_users(engine, repo, 4)
+    await engine.cancel(int(repo.current_battle()["id"]))
+
+    repo.upsert_user(50, "newcomer", "N")
+    accepted, _ = await engine.join(50, "newcomer")
+
+    assert accepted, "новый батл должен принимать заявки"
+    assert repo.participant_count(int(repo.current_battle()["id"])) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_finished_battle_also_opens_the_next_one(env):
+    """После финала бот не должен выглядеть мёртвым до первой заявки."""
+    repo, config, engine = env
+    await join_users(engine, repo, 4)
+    repo.add_vote(1, 900, 1, VoteSource.FREE)
+    repo.add_vote(2, 901, 3, VoteSource.FREE)
+    await engine.close_round()          # финал из двоих
+
+    final_id = int(repo.open_matches(1, 2)[0]["id"])
+    repo.add_vote(final_id, 902, 1, VoteSource.FREE)
+    await engine.close_round()
+
+    fresh = repo.current_battle()
+    assert fresh is not None and int(fresh["id"]) == 2
+    assert fresh["status"] == BattleStatus.REGISTRATION.value
+    assert repo.add_vote(final_id, 903, 1, VoteSource.FREE) is VoteResult.CLOSED

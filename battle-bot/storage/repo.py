@@ -59,6 +59,21 @@ class Repo:
         self.conn.commit()
         return int(cur.lastrowid)
 
+    def close_battle(self, battle_id: int, status: BattleStatus) -> int:
+        """Завершить или отменить батл, закрыв все его открытые матчи.
+
+        Без закрытия матчей голосование по ним продолжалось бы: у голоса своя
+        проверка, и она смотрит в том числе на статус матча.
+        """
+        cursor = self.conn.execute(
+            """UPDATE matches SET status = ?, closed_at = datetime('now')
+               WHERE battle_id = ? AND status = ?""",
+            (MatchStatus.CLOSED.value, battle_id, MatchStatus.VOTING.value),
+        )
+        closed = cursor.rowcount
+        self.set_battle_status(battle_id, status)
+        return closed
+
     def set_battle_status(self, battle_id: int, status: BattleStatus) -> None:
         finished = status in (BattleStatus.FINISHED, BattleStatus.CANCELLED)
         self.conn.execute(
@@ -261,6 +276,9 @@ class Repo:
         Python нельзя — между проверкой и записью стоит сетевой вызов (подписка
         на канал), за время которого раунд успевает закрыться.
 
+        Проверяется и статус батла: отменённый или завершённый батл закрывает
+        голосование целиком, даже если отдельный матч почему-то остался открыт.
+
         Время сравнивается через datetime() самой SQLite: она приводит смещение
         часового пояса к UTC, поэтому сравнение верно и для «наивных» дат.
         """
@@ -272,8 +290,10 @@ class Repo:
                    WHERE EXISTS (
                        SELECT 1 FROM matches m
                        JOIN match_slots s ON s.match_id = m.id AND s.user_id = ?
+                       JOIN battles b ON b.id = m.battle_id
                        WHERE m.id = ?
                          AND m.status = ?
+                         AND b.status IN ('registration', 'running')
                          AND (m.deadline IS NULL
                               OR datetime(m.deadline) > datetime(?))
                    )""",
