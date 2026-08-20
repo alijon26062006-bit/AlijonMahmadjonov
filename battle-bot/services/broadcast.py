@@ -115,8 +115,8 @@ class Report:
         return self.sent + self.blocked + self.failed
 
 
-async def deliver(bot: Bot, draft: Draft, chat_id: int) -> None:
-    """Отправить черновик одному человеку.
+async def deliver(bot: Bot, draft: Draft, chat_id: int):
+    """Отправить черновик в один чат и вернуть первое отправленное сообщение.
 
     Медиа с подписью уходит одним сообщением. Стикер и кружок подпись не несут,
     поэтому текст к ним отправляется следом отдельным сообщением.
@@ -133,7 +133,7 @@ async def deliver(bot: Bot, draft: Draft, chat_id: int) -> None:
             payload["reply_markup"] = markup
         elif not draft.text:
             payload["reply_markup"] = markup
-        await send(**payload)
+        first = await send(**payload)
 
         if draft.text and not with_caption:
             await bot.send_message(
@@ -142,9 +142,9 @@ async def deliver(bot: Bot, draft: Draft, chat_id: int) -> None:
                 reply_markup=markup,
                 disable_web_page_preview=True,
             )
-        return
+        return first
 
-    await bot.send_message(
+    return await bot.send_message(
         chat_id=chat_id,
         text=draft.text or "",
         reply_markup=markup,

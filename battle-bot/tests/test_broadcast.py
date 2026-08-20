@@ -283,3 +283,46 @@ def test_a_bad_button_link_is_refused(raw):
 
     with pytest.raises(InputError):
         as_url(raw)
+
+
+# ------------------------------------------------- адресат рассылки
+
+@pytest.mark.asyncio
+async def test_deliver_returns_the_sent_message_so_it_can_be_tracked():
+    """Пост в канал надо запомнить, иначе панель не сможет его удалить."""
+    class Returning(Recorder):
+        def __getattr__(self, name):
+            call = super().__getattr__(name)
+
+            async def wrapped(**kwargs):
+                await call(**kwargs)
+                return type("M", (), {"message_id": 777})()
+
+            return wrapped
+
+    sent = await broadcast.deliver(Returning(), broadcast.Draft(text="t"), -1001111111111)
+    assert sent.message_id == 777
+
+
+@pytest.mark.asyncio
+async def test_the_same_draft_works_for_a_channel_and_for_a_person():
+    """Один черновик — любой адресат: канал ничем не отличается от чата."""
+    bot = Recorder()
+    draft = broadcast.Draft(media_type="photo", file_id="f", text="привет")
+
+    await broadcast.deliver(bot, draft, 500)
+    await broadcast.deliver(bot, draft, -1003775036903)
+
+    assert bot.methods() == ["send_photo", "send_photo"]
+    assert bot.calls[0][1]["chat_id"] == 500
+    assert bot.calls[1][1]["chat_id"] == -1003775036903
+    assert bot.calls[0][1]["caption"] == bot.calls[1][1]["caption"]
+
+
+def test_the_preview_offers_a_channel_when_one_is_configured():
+    """Кнопки адресатов должны быть живыми — иначе рассылка в канал недоступна."""
+    from tests.test_panel import first_handler
+
+    assert first_handler("cast:send:users") == "send_somewhere"
+    assert first_handler("cast:send:main") == "send_somewhere"
+    assert first_handler("cast:send:battles") == "send_somewhere"

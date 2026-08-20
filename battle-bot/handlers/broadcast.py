@@ -5,6 +5,7 @@ import logging
 
 from aiogram import Bot, F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
+from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -15,6 +16,7 @@ from handlers.panel import is_admin
 from services import broadcast, keyboards, panel_ui, validation
 from services.validation import InputError
 from storage.repo import Repo
+from storage.settings import Settings
 
 log = logging.getLogger(__name__)
 router = Router(name="broadcast")
@@ -242,7 +244,12 @@ async def got_url(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "cast:preview")
 async def preview(
-    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config, state: FSMContext
+    callback: CallbackQuery,
+    bot: Bot,
+    repo: Repo,
+    config: Config,
+    settings: Settings,
+    state: FSMContext,
 ) -> None:
     if not is_admin(callback.from_user.id, config):
         return
@@ -257,23 +264,33 @@ async def preview(
     await broadcast.deliver(bot, draft, callback.from_user.id)
 
     recipients = len(repo.all_user_ids())
+    rows = [[_btn(f"👥 Всем в личку ({recipients})", "send:users", keyboards.GREEN)]]
+
+    main_channel = settings.get("main_channel_id")
+    if main_channel:
+        rows.append([_btn("📣 В главный канал", "send:main", keyboards.BLUE)])
+    rows.append([_btn("⚔️ В канал батлов", "send:battles", keyboards.BLUE)])
+    rows.append([_btn("➕ Ещё кнопку", "button:add")])
+    rows.append([_btn("Отмена", "cancel")])
+
     await callback.message.answer(
         f"{panel_ui.RULE}\n"
-        f"Получателей: <b>{recipients}</b>\n"
-        f"Содержимое: <b>{draft.describe()}</b>",
-        reply_markup=_kb(
-            [_btn(f"📤 Отправить всем ({recipients})", "send", keyboards.GREEN)],
-            [_btn("➕ Ещё кнопку", "button:add")],
-            [_btn("Отмена", "cancel")],
-        ),
+        f"Содержимое: <b>{draft.describe()}</b>\n\n"
+        "<b>Куда отправить?</b>",
+        reply_markup=_kb(*rows),
     )
 
 
 # ------------------------------------------------------------------ отправка
 
-@router.callback_query(F.data == "cast:send")
-async def send_all(
-    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config, state: FSMContext
+@router.callback_query(F.data.startswith("cast:send:"))
+async def send_somewhere(
+    callback: CallbackQuery,
+    bot: Bot,
+    repo: Repo,
+    config: Config,
+    settings: Settings,
+    state: FSMContext,
 ) -> None:
     if not is_admin(callback.from_user.id, config):
         return
@@ -283,6 +300,46 @@ async def send_all(
         await callback.answer("Рассылка пустая.", show_alert=True)
         return
 
+    target = callback.data.split(":")[-1]
+    if target == "users":
+        await _send_to_users(callback, bot, repo, config, state, draft)
+        return
+
+    channel_id = (
+        settings.get("main_channel_id") if target == "main" else config.channel_id
+    )
+    if not channel_id:
+        await callback.answer("Главный канал не задан.", show_alert=True)
+        return
+
+    await state.clear()
+    await callback.answer("Публикую…")
+    try:
+        posted = await broadcast.deliver(bot, draft, channel_id)
+    except TelegramAPIError as error:
+        await callback.message.answer(
+            f"⚠️ <b>Не опубликовалось</b>\n\n{error}\n\n"
+            "<i>Проверьте, что бот — администратор этого канала "
+            "с правом публикации.</i>"
+        )
+        return
+
+    # запоминаем пост, чтобы панель могла удалить его вместе с остальными
+    if posted is not None:
+        repo.record_post(channel_id, posted.message_id, None, kind="broadcast")
+
+    where = "главный канал" if target == "main" else "канал батлов"
+    await callback.message.answer(f"✅ Опубликовано в <b>{where}</b>.")
+
+
+async def _send_to_users(
+    callback: CallbackQuery,
+    bot: Bot,
+    repo: Repo,
+    config: Config,
+    state: FSMContext,
+    draft: broadcast.Draft,
+) -> None:
     await state.clear()
     await callback.answer("Начинаю рассылку")
     status = await callback.message.answer("📤 Рассылка началась…")
