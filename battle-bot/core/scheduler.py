@@ -12,6 +12,8 @@ import logging
 from datetime import datetime, time, timedelta
 from typing import Awaitable, Callable, Sequence
 
+from core import background
+
 log = logging.getLogger(__name__)
 
 FALLBACK_INTERVAL = timedelta(minutes=45)
@@ -41,9 +43,12 @@ class Ticker:
         self._callback = callback
         self._every = every
         self._task: asyncio.Task | None = None
+        self._label = "ticker"
 
     def start(self, name: str = "ticker") -> None:
+        self._label = name
         self._task = asyncio.create_task(self._run(), name=name)
+        background.register(name, self._task)
 
     async def stop(self) -> None:
         if self._task:
@@ -52,6 +57,7 @@ class Ticker:
                 await self._task
             except asyncio.CancelledError:
                 pass
+            background.forget(self._label)
             self._task = None
 
     async def _run(self) -> None:
@@ -78,9 +84,11 @@ class DeadlineWatcher:
         self._on_due = on_due
         self._tick = tick
         self._task: asyncio.Task | None = None
+        self._label = "итоги раундов"
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run(), name="deadline-watcher")
+        background.register(self._label, self._task)
 
     async def stop(self) -> None:
         if self._task:
@@ -89,6 +97,7 @@ class DeadlineWatcher:
                 await self._task
             except asyncio.CancelledError:
                 pass
+            background.forget(self._label)
             self._task = None
 
     async def _run(self) -> None:

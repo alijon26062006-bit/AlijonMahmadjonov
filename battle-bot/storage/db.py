@@ -176,6 +176,19 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Журнал сбоев. Нужен, чтобы «бот работает нестабильно» превращалось в
+-- конкретный список: что именно, у кого и как часто. Хранится в базе, а не
+-- только в логах сервера, — чтобы админ видел его прямо в панели.
+CREATE TABLE IF NOT EXISTS errors (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind       TEXT NOT NULL,
+    message    TEXT NOT NULL,
+    action     TEXT,
+    user_id    INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_errors_time ON errors(created_at);
+
 CREATE TABLE IF NOT EXISTS stats (
     user_id     INTEGER PRIMARY KEY REFERENCES users(user_id),
     battles     INTEGER NOT NULL DEFAULT 0,

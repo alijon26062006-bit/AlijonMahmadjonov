@@ -74,6 +74,7 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         [button("📣 Канал", "channel"), button("👥 Люди", "people")],
         [button("📨 Рассылка", "broadcast"), button("🤖 Автопилот", "auto")],
         [button("🔍 Проверка", "fraud"), button("📡 Каналы", "mych")],
+        [button("🩺 Диагностика", "health")],
         [button("⚙️ Настройки", "settings")],
         [button("🔄 Обновить", "home", BLUE)],
     )
@@ -326,6 +327,45 @@ def referrals(reward: int, enabled: bool, report: dict, top) -> tuple[str, Inlin
     return text, keyboard(
         [button("✏️ Изменить награду", "edit:referral_reward", BLUE)],
         [button(toggle, "referrals:toggle", RED if enabled else GREEN)],
+        back_row(),
+    )
+
+
+# ------------------------------------------------------------ диагностика
+
+def health(summary, recent, tasks: dict) -> tuple[str, InlineKeyboardMarkup]:
+    """Что и как часто ломалось. Отсюда становится видно причину «нестабильности»."""
+    if summary:
+        counts = "\n".join(
+            f"• <b>{escape(row['kind'])}</b> — {row['times']} "
+            f"{texts.plural(row['times'], 'раз', 'раза', 'раз')}"
+            for row in summary
+        )
+    else:
+        counts = "✅ <i>за сутки ни одного сбоя</i>"
+
+    lines = []
+    for row in recent:
+        when = str(row["created_at"])[5:16]
+        what = escape(str(row["message"])[:110])
+        where = escape(str(row["action"])[:40]) if row["action"] else "—"
+        lines.append(f"<b>{when}</b> · <code>{escape(row['kind'])}</code>\n"
+                     f"   {what}\n   <i>на: {where}</i>")
+    journal = "\n\n".join(lines) if lines else "<i>журнал пуст</i>"
+
+    alive = "\n".join(
+        f"{'✅' if ok else '❌'} {escape(name)}" for name, ok in tasks.items()
+    )
+
+    text = (
+        f"🩺 <b>{texts.spaced('ДИАГНОСТИКА')}</b>\n{RULE}\n\n"
+        f"<b>Фоновые задачи</b>\n{alive}\n\n"
+        f"<b>Сбои за сутки</b>\n{counts}\n\n"
+        f"{RULE}\n<b>Последние записи</b>\n\n{journal}"
+    )
+    return text, keyboard(
+        [button("🔄 Обновить", "health", BLUE)],
+        [button("🧹 Очистить журнал", "health:clear", RED)],
         back_row(),
     )
 

@@ -103,7 +103,7 @@ async def test_everyone_in_a_pair_gets_their_result(env):
     repo.add_vote(1, 901, 1, VoteSource.FREE)
     repo.add_vote(2, 902, 3, VoteSource.FREE)
 
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     assert "Вы прошли дальше" in inbox(bot, 1)
     assert "Вы выбываете" in inbox(bot, 2)
@@ -118,7 +118,7 @@ async def test_the_loser_learns_who_beat_them_and_by_how_much(env):
     repo.add_vote(1, 900, 1, VoteSource.FREE)
     repo.add_vote(1, 901, 1, VoteSource.FREE)
 
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     letter = inbox(bot, 2)
     assert "@nick1" in letter, "имя победителя"
@@ -135,7 +135,7 @@ async def test_nobody_is_left_without_a_result(env):
     for match_id in (1, 2, 3, 4):
         repo.add_vote(match_id, 900 + match_id, match_id * 2 - 1, VoteSource.FREE)
 
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     for user_id in range(1, 9):
         letter = inbox(bot, user_id)
@@ -151,7 +151,7 @@ async def test_a_result_arrives_once_per_match(env):
     await join_users(engine, repo, 2)
     repo.add_vote(1, 900, 1, VoteSource.FREE)
 
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     letters = bot.direct[2]
     outcomes = [text for text in letters if "Вы выбываете" in plain(text)]
@@ -164,13 +164,13 @@ async def test_finalists_get_the_board_and_the_winner_gets_the_prize(env):
     await join_users(engine, repo, 4)
     repo.add_vote(1, 900, 1, VoteSource.FREE)
     repo.add_vote(2, 901, 3, VoteSource.FREE)
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     final_id = int(repo.open_matches(1, 2)[0]["id"])
     repo.add_vote(final_id, 902, 1, VoteSource.FREE)
     repo.add_vote(final_id, 903, 1, VoteSource.FREE)
     repo.add_vote(final_id, 904, 3, VoteSource.FREE)
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     champion, runner_up = inbox(bot, 1), inbox(bot, 3)
 
@@ -187,7 +187,7 @@ async def test_the_one_left_without_a_rival_is_told_so(env):
     await join_users(engine, repo, 3)
     repo.add_vote(1, 900, 1, VoteSource.FREE)
 
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     assert "без боя" in inbox(bot, 3)
     assert "Вы выбываете" not in inbox(bot, 3)
@@ -203,7 +203,7 @@ async def test_advancing_players_get_buttons_for_the_new_match(env):
     repo.add_vote(1, 900, 1, VoteSource.FREE)
     repo.add_vote(2, 901, 3, VoteSource.FREE)
 
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     letters = "".join(bot.direct[1])
     assert "Вы прошли дальше" in plain(letters)
@@ -222,7 +222,7 @@ async def test_a_group_round_lists_all_the_new_rivals(env):
     repo.add_vote(1, 900, 1, VoteSource.FREE)
     repo.add_vote(2, 901, 3, VoteSource.FREE)
 
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     letters = plain("".join(bot.direct[1]))
     assert "Против вас" in letters

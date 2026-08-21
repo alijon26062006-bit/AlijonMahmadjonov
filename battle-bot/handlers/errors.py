@@ -16,6 +16,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery, ErrorEvent, Message
 
 from config import Config
+from services import ui
 from services.retry import TRANSIENT
 from services.tg import is_blocked, is_expected
 from services.validation import InputError
@@ -89,6 +90,7 @@ async def catch_everything(event: ErrorEvent, bot: Bot, config: Config, repo=Non
     # сетевой сбой Telegram: повтор уже пробовали, кода это не касается
     if isinstance(error, TRANSIENT):
         log.warning("Сетевой сбой Telegram: %s", error)
+        _record(event, repo, "Сеть", error)
         await _reply(message, callback, TO_USER_NETWORK)
         return True
 
@@ -101,10 +103,24 @@ async def catch_everything(event: ErrorEvent, bot: Bot, config: Config, repo=Non
         return True
 
     log.exception("Необработанная ошибка при обработке апдейта", exc_info=error)
+    _record(event, repo, type(error).__name__, error)
     await _reply(message, callback, TO_USER)
     if _should_report(error):
         await _tell_admins(bot, config, event, error)
     return True
+
+
+def _record(event: ErrorEvent, repo, kind: str, error: BaseException) -> None:
+    """Сложить сбой в журнал — панель покажет его админу без чтения логов."""
+    if repo is None:
+        return
+    message, callback = _extract(event)
+    user = (callback or message).from_user if (callback or message) else None
+    action = str(callback.data) if callback else (message.text if message else None)
+    try:
+        repo.record_error(kind, str(error), action, user.id if user else None)
+    except Exception:  # noqa: BLE001 - журнал не важнее работы бота
+        log.warning("Не смог записать сбой в журнал", exc_info=True)
 
 
 def _remember_blocked(event: ErrorEvent, repo) -> None:
@@ -116,14 +132,18 @@ def _remember_blocked(event: ErrorEvent, repo) -> None:
 
 
 async def _reply(message: Message | None, callback: CallbackQuery | None, text: str) -> None:
+    """Сообщить человеку о сбое.
+
+    Ловим здесь всё подряд, а не только ошибки Telegram: это последний рубеж,
+    и если он сам упадёт, человек не получит вообще ничего.
+    """
     try:
         if callback:
             await callback.answer()
-            await callback.message.answer(text)
+            await ui.send(callback, text)
         elif message:
             await message.answer(text)
-    except TelegramAPIError as send_error:
-        # не смогли сообщить об ошибке — тем более не о чем тревожиться
+    except Exception as send_error:  # noqa: BLE001 - падать тут уже некуда
         log.info("Не смог сообщить пользователю об ошибке: %s", send_error)
 
 

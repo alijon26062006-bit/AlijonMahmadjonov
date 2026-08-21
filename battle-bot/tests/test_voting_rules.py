@@ -103,7 +103,7 @@ async def test_closing_a_round_freezes_the_score(env):
     repo.add_vote(1, 900, 1, VoteSource.FREE)
     repo.add_vote(2, 901, 3, VoteSource.FREE)
 
-    await engine.close_round()
+    await engine.close_round(force=True)
     before = {s.user_id: s.votes for s in repo.match_slots(1)}
 
     assert repo.add_vote(1, 902, 1, VoteSource.FREE) is VoteResult.CLOSED
@@ -122,7 +122,7 @@ async def test_a_vote_cast_during_the_subscription_check_cannot_slip_through(env
     match = repo.get_match(1)
     assert match["status"] == "voting"  # человек видит открытый матч
 
-    await engine.close_round()  # пока он проходил проверку подписки, раунд закрыли
+    await engine.close_round(force=True)  # пока он проходил проверку подписки, раунд закрыли
 
     assert repo.add_vote(1, 903, 1, VoteSource.FREE) is VoteResult.CLOSED
 
@@ -245,11 +245,11 @@ async def test_a_finished_battle_does_not_start_the_next_one(env):
     await join_users(engine, repo, 4)
     repo.add_vote(1, 900, 1, VoteSource.FREE)
     repo.add_vote(2, 901, 3, VoteSource.FREE)
-    await engine.close_round()          # финал из двоих
+    await engine.close_round(force=True)          # финал из двоих
 
     final_id = int(repo.open_matches(1, 2)[0]["id"])
     repo.add_vote(final_id, 902, 1, VoteSource.FREE)
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     assert repo.current_battle() is None
     assert repo.add_vote(final_id, 903, 1, VoteSource.FREE) is VoteResult.CLOSED

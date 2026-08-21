@@ -54,19 +54,25 @@ class BattleEngine:
 
         Очередь копится всегда — и пока батла нет, и пока идёт текущий.
         Пары составляются в момент, когда админ создаёт батл.
+
+        Лок здесь сознательно не берётся. Подведение итогов держит его
+        минутами: там сотни сообщений в канал и в личку. Если бы заявка ждала
+        его, человек в это время видел бы зависшую кнопку. А ждать нечего:
+        заявка трогает только очередь, и запись ровно одна — `enqueue`
+        отдаёт False, если человек уже в ней. Худшее, что может случиться при
+        совпадении с созданием батла, — заявка достанется следующему батлу.
         """
-        async with self._lock:
-            if self.repo.is_banned(user_id):
-                return False, "Вы не можете участвовать в батлах."
+        if self.repo.is_banned(user_id):
+            return False, "Вы не можете участвовать в батлах."
 
-            battle = self.repo.current_battle()
-            if battle is not None and self.repo.is_participant(int(battle["id"]), user_id):
-                return False, texts.ALREADY_IN_BATTLE
+        battle = self.repo.current_battle()
+        if battle is not None and self.repo.is_participant(int(battle["id"]), user_id):
+            return False, texts.ALREADY_IN_BATTLE
 
-            if not self.repo.enqueue(user_id, nickname):
-                return False, texts.already_queued(self.repo.queue_size())
+        if not self.repo.enqueue(user_id, nickname):
+            return False, texts.already_queued(self.repo.queue_size())
 
-            return True, texts.queued(self.repo.queue_size())
+        return True, texts.queued(self.repo.queue_size())
 
     def _create_pair_match(self, battle_id: int, pair: list[Player]) -> tuple[int, list[Player]]:
         """Завести матч первого раунда для двух заявок."""
@@ -102,14 +108,28 @@ class BattleEngine:
 
     # ------------------------------------------------------------ ход раундов
 
-    async def close_round(self) -> None:
+    async def close_round(self, force: bool = False) -> None:
         """Подвести итоги текущего раунда и запустить следующий.
 
-        Лок держим на весь подсчёт: пока идут итоги, новые заявки не должны
-        подмешиваться в закрываемый раунд.
+        Лок держим на весь подсчёт: пока идут итоги, ничто не должно
+        вмешиваться в закрываемый раунд.
+
+        ``force`` — итоги по кнопке админа. Без него дедлайн проверяется
+        второй раз, уже под локом. Это важно: подсчёт большого раунда идёт
+        минутами, и за это время в очереди на лок мог оказаться ещё один
+        вызов. Он дождался бы своей очереди и закрыл уже следующий раунд —
+        на полтора часа раньше срока, вместе со всеми голосами, которые в нём
+        не успели отдать.
         """
         async with self._lock:
+            if not force and not self._deadline_passed():
+                log.info("Итоги не подводим: дедлайн раунда ещё не наступил")
+                return
             await self._close_round_locked()
+
+    def _deadline_passed(self) -> bool:
+        deadline = self.current_deadline()
+        return deadline is not None and self.now() >= deadline
 
     async def _close_round_locked(self) -> None:
         battle = self.repo.current_battle()

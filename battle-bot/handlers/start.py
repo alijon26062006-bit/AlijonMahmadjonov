@@ -12,7 +12,7 @@ from core.engine import BattleEngine
 from handlers.referral import welcome_invited
 from handlers import voting
 from handlers.voting import show_voting
-from services import keyboards, links, referral, sponsors, texts
+from services import keyboards, links, referral, sponsors, texts, ui
 from storage.repo import Repo
 from storage.settings import Settings
 
@@ -40,13 +40,13 @@ async def start_with_payload(
 
     if kind == "vote" and value is not None:
         # экран голосования открываем только подписчику — голос без подписки невозможен
-        if await voting.gate(message, value, config, settings, message.from_user.id):
+        if await voting.gate(bot, message, value, config, settings, message.from_user.id):
             return
         await show_voting(message, value, repo, config, links.vote_target(command.args))
         return
 
     if kind == "join":
-        await _do_join(message, repo, config, engine, settings)
+        await _do_join(message, repo, config, engine, settings, bot=bot)
         return
 
     await _greet(message, config)
@@ -71,9 +71,10 @@ async def _greet(message: Message, config: Config) -> None:
 @router.message(F.text.in_(keyboards.variants(keyboards.BTN_JOIN)))
 @router.message(Command("join", "battle"))
 async def join_button(
-    message: Message, repo: Repo, config: Config, engine: BattleEngine, settings: Settings
+    message: Message, bot: Bot, repo: Repo, config: Config, engine: BattleEngine,
+    settings: Settings,
 ) -> None:
-    await _do_join(message, repo, config, engine, settings)
+    await _do_join(message, repo, config, engine, settings, bot=bot)
 
 
 @router.callback_query(F.data.in_({"join", "join:retry"}))
@@ -81,24 +82,31 @@ async def join_again(
     callback: CallbackQuery, repo: Repo, config: Config, engine: BattleEngine,
     settings: Settings
 ) -> None:
-    await _do_join(callback.message, repo, config, engine, settings, user=callback.from_user)
+    await _do_join(
+        callback, repo, config, engine, settings,
+        user=callback.from_user, bot=callback.bot,
+    )
     await callback.answer()
 
 
 async def _do_join(
-    message: Message,
+    target,
     repo: Repo,
     config: Config,
     engine: BattleEngine,
     settings: Settings,
     user=None,
+    bot: Bot | None = None,
 ) -> None:
-    user = user or message.from_user
+    user = user or ui.message_of(target).from_user
     repo.upsert_user(user.id, user.username, user.first_name)
 
-    unsubscribed = await sponsors.missing(message.bot, config, settings, user.id)
+    # бот берётся явно: у сообщения под кнопкой его может не оказаться
+    bot = bot or getattr(ui.message_of(target), "bot", None)
+    unsubscribed = await sponsors.missing(bot, config, settings, user.id)
     if unsubscribed:
-        await message.answer(
+        await ui.send(
+            target,
             sponsors.text(unsubscribed),
             reply_markup=sponsors.keyboard(unsubscribed, "join:retry"),
             disable_web_page_preview=True,
@@ -108,7 +116,7 @@ async def _do_join(
     nickname = user.username
     if not nickname:
         if config.require_username:
-            await message.answer(texts.NEED_USERNAME)
+            await ui.send(target, texts.NEED_USERNAME)
             return
         nickname = user.first_name or f"id{user.id}"
 
@@ -120,7 +128,7 @@ async def _do_join(
         markup = None
     else:
         markup = keyboards.join_again(config)
-    await message.answer(response, reply_markup=markup, disable_web_page_preview=True)
+    await ui.send(target, response, reply_markup=markup, disable_web_page_preview=True)
 
 
 @router.message(F.text.in_(keyboards.variants(keyboards.BTN_HELP)))

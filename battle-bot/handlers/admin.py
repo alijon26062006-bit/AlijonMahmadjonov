@@ -66,7 +66,7 @@ async def close_now(message: Message, config: Config, engine: BattleEngine) -> N
     if not _is_admin(message, config):
         return
     await message.answer("Подвожу итоги…")
-    await engine.close_round()
+    await engine.close_round(force=True)  # команда админа — итоги досрочно
     await message.answer("Готово.")
 
 

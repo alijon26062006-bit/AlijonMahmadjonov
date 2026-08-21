@@ -120,22 +120,41 @@ class Autopilot:
     # -------------------------------------------------- ежедневный анонс
 
     async def _daily_call(self) -> None:
+        """Раз в день позвать людей записаться.
+
+        Батлы теперь запускает админ, и между ними активного батла попросту
+        нет. Раньше зов был привязан к открытому приёму заявок — и после
+        перехода на ручной запуск он замолчал совсем. Поэтому зовём и в
+        очередь: именно из неё собирается следующий батл.
+        """
         moment = self.now()
         if moment.hour != DAILY_ANNOUNCE_HOUR or moment.minute > 5:
             return
 
         battle = self.repo.current_battle()
-        if battle is None or battle["status"] != BattleStatus.REGISTRATION.value:
-            return
+        registration = (
+            battle is not None
+            and battle["status"] == BattleStatus.REGISTRATION.value
+            and battle["deadline"]
+        )
+        if battle is not None and not registration:
+            return  # батл уже идёт: звать некуда, люди голосуют
 
         if not self.repo.mark_done("daily", moment.strftime("%Y-%m-%d")):
             return
 
-        applied = self.repo.participant_count(int(battle["id"]))
-        deadline = datetime.fromisoformat(battle["deadline"])
-        text = texts.daily_call(applied, deadline, self.settings.get("prizes"))
+        prizes = self.settings.get("prizes")
+        if registration:
+            text = texts.daily_call(
+                self.repo.participant_count(int(battle["id"])),
+                datetime.fromisoformat(battle["deadline"]),
+                prizes,
+            )
+        else:
+            text = texts.queue_call(self.repo.queue_size(), prizes)
 
-        await self.engine.publisher.announce(text, int(battle["id"]))
+        battle_id = int(battle["id"]) if battle is not None else None
+        await self.engine.publisher.announce(text, battle_id)
         main_channel = self.settings.get("main_channel_id")
         if main_channel and main_channel != self.config.channel_id:
             await self._post(main_channel, text, join=True)

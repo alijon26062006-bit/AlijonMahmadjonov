@@ -10,7 +10,6 @@ import logging
 from datetime import datetime
 
 from aiogram import Bot, F, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.fsm.context import FSMContext
@@ -18,12 +17,11 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from config import Config
-from core import bracket
+from core import background, bracket
 from core.engine import BattleEngine
 from services import (
-    keyboards, main_post, panel_ui, sponsors, subscription, texts, validation,
+    keyboards, ui, main_post, panel_ui, sponsors, subscription, texts, validation,
 )
-from services.tg import is_not_modified
 from services.validation import InputError
 from storage.repo import Repo
 from storage.settings import FIELDS, Settings
@@ -166,26 +164,24 @@ async def render(target: Message | CallbackQuery, screen: tuple) -> None:
     """Перерисовать панель на месте, не плодя сообщения."""
     text, markup = screen
     if not isinstance(target, CallbackQuery):
-        await target.answer(text, reply_markup=markup)
+        await ui.send(target, text, reply_markup=markup)
         return
 
-    if target.message.photo:  # экран после загрузки фото — заменяем сообщением
-        await target.message.answer(text, reply_markup=markup)
+    if ui.photo_of(target.message):  # экран после загрузки фото — заменяем сообщением
+        await ui.send(target, text, reply_markup=markup)
         return
 
-    await edit_in_place(target.message, text, markup)
+    await ui.edit_or_send(target, text, reply_markup=markup)
 
 
-async def edit_in_place(message: Message, text: str, markup) -> None:
-    """Перерисовать сообщение, стерпев «ничего не изменилось».
+async def edit_in_place(message, text: str, markup) -> None:
+    """Перерисовать сообщение; не вышло — прислать новое.
 
-    Так бывает от кнопки «Обновить», когда данные те же — это не поломка.
+    Панель живёт одним сообщением, и оно может устареть или быть удалено.
+    Раньше в этом случае падал AttributeError, и вся панель переставала
+    отвечать на кнопки.
     """
-    try:
-        await message.edit_text(text, reply_markup=markup)
-    except TelegramBadRequest as error:
-        if not is_not_modified(error):
-            raise
+    await ui.edit_or_send(message, text, reply_markup=markup)
 
 
 # ------------------------------------------------------------------- вход
@@ -529,6 +525,29 @@ async def toggle_votes(callback: CallbackQuery, repo: Repo, config: Config,
     await callback.answer("Сохранено")
 
 
+@router.callback_query(F.data == "p:health")
+async def show_health(callback: CallbackQuery, repo: Repo, config: Config) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, _health_screen(repo))
+    await callback.answer()
+
+
+@router.callback_query(F.data == "p:health:clear")
+async def clear_health(callback: CallbackQuery, repo: Repo, config: Config) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    removed = repo.clear_errors()
+    await render(callback, _health_screen(repo))
+    await callback.answer(f"Удалено записей: {removed}")
+
+
+def _health_screen(repo: Repo):
+    return panel_ui.health(
+        repo.error_summary(), repo.recent_errors(limit=8), background.report()
+    )
+
+
 @router.callback_query(F.data == "p:mych")
 async def show_member_channels(
     callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
@@ -852,7 +871,7 @@ async def close_round(
     if not is_admin(callback.from_user.id, config):
         return
     await callback.answer("Подвожу итоги…")
-    await engine.close_round()
+    await engine.close_round(force=True)  # админ подводит итоги досрочно осознанно
     await render(callback, panel_ui.battle(collect(repo, engine)))
 
 

@@ -234,7 +234,7 @@ async def test_round_closes_and_the_leftover_gets_a_bye(env):
     vote_for(repo, 1, target_id=1, voters=range(1000, 1005))  # nick1 обходит nick2
     vote_for(repo, 2, target_id=3, voters=range(2000, 2003))  # nick3 обходит nick4
 
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     alive = {p.user_id for p in repo.alive_players(1)}
     assert alive == {1, 3, 5}  # два победителя + пятый без боя
@@ -251,7 +251,7 @@ async def test_three_survivors_go_straight_to_the_final(env):
     await join_users(engine, repo, 5)
     vote_for(repo, 1, 1, range(1000, 1005))
     vote_for(repo, 2, 3, range(2000, 2003))
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     battle = repo.current_battle()
     assert battle["round_no"] == 2
@@ -267,14 +267,14 @@ async def test_the_final_awards_three_places_and_ends_the_battle(env):
     await join_users(engine, repo, 5)
     vote_for(repo, 1, 1, range(1000, 1005))
     vote_for(repo, 2, 3, range(2000, 2003))
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     final_id = int(repo.open_matches(1, 2)[0]["id"])
     vote_for(repo, final_id, 1, range(3000, 3010))
     vote_for(repo, final_id, 3, range(4000, 4005))
     vote_for(repo, final_id, 5, range(5000, 5001))
 
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     finished = repo.conn.execute(
         "SELECT status FROM battles WHERE id = 1"
@@ -299,7 +299,7 @@ async def test_closing_without_a_battle_does_nothing(env):
     repo.upsert_user(1, "nick1", "A")
     await engine.join(1, "nick1")
 
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     assert repo.current_battle() is None
     assert bot.channel_posts == []
@@ -343,7 +343,7 @@ async def test_large_battle_runs_to_a_champion(env):
             for offset, slot in enumerate(repo.match_slots(match_id)):
                 base = match_id * 1000 + offset * 100
                 vote_for(repo, match_id, slot.user_id, range(base, base + 5 - offset))
-        await engine.close_round()
+        await engine.close_round(force=True)
 
     champions = [
         row["user_id"]
@@ -386,10 +386,10 @@ async def test_the_queue_survives_a_whole_battle(env):
 
     vote_for(repo, 1, 1, range(1000, 1003))
     vote_for(repo, 2, 3, range(2000, 2003))
-    await engine.close_round()          # финал из двоих
+    await engine.close_round(force=True)          # финал из двоих
     final_id = int(repo.open_matches(1, 2)[0]["id"])
     vote_for(repo, final_id, 1, range(3000, 3003))
-    await engine.close_round()          # батл завершён
+    await engine.close_round(force=True)          # батл завершён
 
     assert repo.current_battle() is None
     assert repo.queue_size() == 3, "очередь дождалась своего часа"

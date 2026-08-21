@@ -18,7 +18,7 @@ from aiogram.types import CallbackQuery, LabeledPrice, Message, PreCheckoutQuery
 
 from config import Config
 from handlers.referral import show_invite
-from services import keyboards, texts
+from services import keyboards, texts, ui
 from services.validation import InputError, as_int
 from storage.repo import Repo
 from storage.settings import Settings
@@ -108,7 +108,7 @@ async def invite_instead(
 @router.callback_query(F.data == "buy:cancel")
 async def cancel_buy(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await callback.message.edit_text("Покупка отменена.")
+    await ui.edit_or_send(callback, "Покупка отменена.")
     await callback.answer()
 
 

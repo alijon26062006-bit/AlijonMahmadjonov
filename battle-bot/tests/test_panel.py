@@ -249,7 +249,7 @@ async def test_results_and_announcements_are_remembered_too(env):
     await join_users(engine, repo, 4)
     repo.add_vote(1, 900, 1, VoteSource.FREE)
     repo.add_vote(2, 901, 3, VoteSource.FREE)
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     kinds = {row["kind"] for row in repo.posts(chat_id=config.channel_id)}
     assert "result" in kinds, "итоги раунда тоже надо уметь удалять"
@@ -385,7 +385,8 @@ def test_unchanged_refresh_is_not_treated_as_a_failure():
 
 
 @pytest.mark.asyncio
-async def test_editing_survives_an_unchanged_screen_but_not_real_errors():
+async def test_editing_survives_an_unchanged_screen_and_a_dead_one():
+    """Панель живёт одним сообщением — и не должна умирать вместе с ним."""
     from aiogram.exceptions import TelegramBadRequest
     from aiogram.methods import SendMessage
 
@@ -395,25 +396,56 @@ async def test_editing_survives_an_unchanged_screen_but_not_real_errors():
         def __init__(self, error=None):
             self.error = error
             self.edits = 0
+            self.answers = 0
 
         async def edit_text(self, text, reply_markup=None):
             self.edits += 1
             if self.error:
                 raise self.error
 
+        async def answer(self, text, reply_markup=None, **kwargs):
+            self.answers += 1
+
     def failure(text: str) -> TelegramBadRequest:
         return TelegramBadRequest(method=SendMessage(chat_id=1, text="t"), message=text)
 
     ok = Screen()
     await edit_in_place(ok, "текст", None)
-    assert ok.edits == 1
+    assert ok.edits == 1 and ok.answers == 0
 
     unchanged = Screen(failure("Bad Request: message is not modified"))
-    await edit_in_place(unchanged, "текст", None)  # тихо проглатываем
+    await edit_in_place(unchanged, "текст", None)
+    assert unchanged.answers == 0, "тот же экран перерисовывать нечем и незачем"
 
-    broken = Screen(failure("Bad Request: chat not found"))
-    with pytest.raises(TelegramBadRequest):
-        await edit_in_place(broken, "текст", None)
+    # сообщение удалили: раньше здесь падало и панель переставала отвечать
+    dead = Screen(failure("Bad Request: message to edit not found"))
+    await edit_in_place(dead, "текст", None)
+    assert dead.answers == 1, "экран должен прийти новым сообщением"
+
+
+@pytest.mark.asyncio
+async def test_a_button_on_an_inaccessible_message_still_answers():
+    """Кнопка на слишком старом сообщении — не повод падать."""
+    from aiogram.types import Chat, InaccessibleMessage
+
+    from services import ui
+
+    stale = InaccessibleMessage(chat=Chat(id=7, type="private"), message_id=1, date=0)
+    assert not ui.editable(stale), "у недоступного сообщения нет edit_text"
+    assert ui.photo_of(stale) is None
+
+    class Stale:
+        """То же, что присылает Telegram: есть answer, нет edit_text."""
+
+        def __init__(self) -> None:
+            self.sent: list[str] = []
+
+        async def answer(self, text, reply_markup=None, **kwargs):
+            self.sent.append(text)
+
+    target = Stale()
+    await ui.edit_or_send(target, "экран", None)
+    assert target.sent == ["экран"], "вместо падения приходит новое сообщение"
 
 
 # ------------------------------------- каждая кнопка обязана быть живой
@@ -476,6 +508,7 @@ async def test_every_button_on_every_screen_has_a_handler(env):
         panel_ui.fraud(panel._fraud_signals(repo)),
         panel_ui.promo_list(repo.promos()),
         panel_ui.member_channels(True, 1, 1, 3, repo.member_channels()),
+        panel_ui.health(repo.error_summary(), repo.recent_errors(), {"итоги раундов": True}),
         panel_ui.person(repo.get_user(77), repo.stats_for(77), 0),
         panel_ui.confirm("Точно?", "battle:cancel:do", "battle"),
         panel_ui.ask("Призы", "1000,500,250", "подсказка", "prizes"),

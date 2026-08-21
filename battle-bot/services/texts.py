@@ -219,6 +219,24 @@ def daily_call(applied: int, deadline: datetime, prizes: list[int]) -> str:
     )
 
 
+def queue_call(waiting: int, prizes: list[int]) -> str:
+    """Ежедневный зов, когда батла нет: собираем очередь на следующий."""
+    who = (
+        f"🎫 Уже в очереди: <b>{waiting}</b> "
+        f"{plural(waiting, 'человек', 'человека', 'человек')}"
+        if waiting
+        else "🎫 <b>Ты можешь стать первым</b>"
+    )
+    return (
+        f"⚔️ <b>{spaced('ЗАПИСЬ НА БАТЛ')}</b>\n"
+        f"{RULE}\n\n"
+        f"{prizes_block(prizes)}\n\n"
+        f"{who}\n\n"
+        "<b>Жми «Принять участие»</b> — как только наберётся народ, "
+        "бот подберёт соперника и начнётся батл."
+    )
+
+
 def battle_cancelled(queue_size: int = 0) -> str:
     tail = (
         f"\n\n🎫 <b>Запись на следующий открыта</b> — в очереди уже {queue_size}."

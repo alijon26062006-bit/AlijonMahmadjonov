@@ -6,7 +6,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from config import Config
-from services import keyboards, links, referral, texts
+from services import keyboards, links, referral, texts, ui
 from storage.repo import Repo
 from storage.settings import Settings
 
@@ -60,7 +60,7 @@ async def check_subscription(
 ) -> None:
     inviter = await referral.try_reward(bot, repo, config, settings, callback.from_user.id)
     if inviter:
-        await callback.message.edit_text("✅ <b>Спасибо!</b> Приглашение засчитано.")
+        await ui.edit_or_send(callback, "✅ <b>Спасибо!</b> Приглашение засчитано.")
         await callback.answer("Готово")
         return
 

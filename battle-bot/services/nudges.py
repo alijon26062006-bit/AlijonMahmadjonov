@@ -45,6 +45,7 @@ async def notify_lead_change(
     before: list[Slot],
     after: list[Slot],
     post_url: str | None = None,
+    own_channel: bool = True,
 ) -> int | None:
     """Сообщить тому, кого только что обошли. Возвращает его id.
 
@@ -54,7 +55,7 @@ async def notify_lead_change(
     if now is None or was is None or was.user_id == now.user_id:
         return None
 
-    markup = keyboards.my_match(match_id, config, post_url)
+    markup = keyboards.my_match(match_id, config, post_url, own_channel)
     loser = next((s for s in after if s.user_id == was.user_id), was)
     notified: int | None = None
 

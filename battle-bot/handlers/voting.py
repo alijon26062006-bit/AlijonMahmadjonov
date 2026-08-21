@@ -4,14 +4,12 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from aiogram import F, Router
-from aiogram.exceptions import TelegramBadRequest
+from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery, Message
 
 from config import Config
 from core.models import MatchStatus, VoteResult, VoteSource
-from services import keyboards, links, nudges, sponsors, texts
-from services.tg import is_not_modified
+from services import keyboards, links, nudges, sponsors, texts, ui
 from storage.repo import Repo
 from storage.settings import Settings
 
@@ -34,15 +32,18 @@ def _post_url(config: Config, match) -> str | None:
 
 
 async def gate(
-    message: Message, match_id: int, config: Config, settings: Settings, user_id: int
+    bot: Bot, target, match_id: int, config: Config, settings: Settings, user_id: int
 ) -> bool:
-    """Показать экран подписки, если её нет. True — проход закрыт."""
-    unsubscribed = await sponsors.missing(
-        message.bot, config, settings, user_id, force=True
-    )
+    """Показать экран подписки, если её нет. True — проход закрыт.
+
+    Бот передаётся явно: у сообщения, на котором нажали кнопку, его может и
+    не оказаться — например, если сообщение уже недоступно.
+    """
+    unsubscribed = await sponsors.missing(bot, config, settings, user_id, force=True)
     if not unsubscribed:
         return False
-    await message.answer(
+    await ui.send(
+        target,
         sponsors.text(unsubscribed),
         reply_markup=sponsors.keyboard(unsubscribed, f"open:{match_id}"),
         disable_web_page_preview=True,
@@ -85,12 +86,27 @@ async def show_voting(
     )
 
 
+def _ids(data: str, count: int) -> list[int] | None:
+    """Числа из callback_data. None — данные не те, что мы отправляли.
+
+    Кнопки живут в переписке годами, а формат кнопок со временем меняется.
+    Разбор старой кнопки не должен превращаться в отчёт об ошибке.
+    """
+    parts = data.split(":")[1:]
+    if len(parts) != count or not all(p.lstrip("-").isdigit() for p in parts):
+        return None
+    return [int(p) for p in parts]
+
+
 @router.callback_query(F.data.startswith("vote:"))
 async def cast_vote(
     callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
 ) -> None:
-    _, raw_match, raw_target = callback.data.split(":")
-    match_id, target_id = int(raw_match), int(raw_target)
+    ids = _ids(callback.data, 2)
+    if ids is None:
+        await callback.answer("Кнопка устарела. Откройте матч заново.", show_alert=True)
+        return
+    match_id, target_id = ids
 
     match = repo.get_match(match_id)
     if match is None or match["status"] != MatchStatus.VOTING.value:
@@ -102,7 +118,7 @@ async def cast_vote(
         return
 
     # подписка обязательна всегда: без неё голос не принимается ни при каких настройках
-    if await gate(callback.message, match_id, config, settings, callback.from_user.id):
+    if await gate(callback.bot, callback, match_id, config, settings, callback.from_user.id):
         await callback.answer("Голосовать могут только подписчики канала.", show_alert=True)
         return
 
@@ -128,6 +144,7 @@ async def cast_vote(
     await nudges.notify_lead_change(
         callback.bot, repo, config, match_id,
         before, repo.match_slots(match_id), _post_url(config, match),
+        settings.get("member_channels_enabled"),
     )
 
 
@@ -152,8 +169,12 @@ async def open_voting(
     callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
 ) -> None:
     """«Я подписался» на экране гейта: перепроверяем и открываем голосование."""
-    match_id = int(callback.data.split(":")[1])
-    if await gate(callback.message, match_id, config, settings, callback.from_user.id):
+    ids = _ids(callback.data, 1)
+    if ids is None:
+        await callback.answer("Кнопка устарела.", show_alert=True)
+        return
+    match_id = ids[0]
+    if await gate(callback.bot, callback, match_id, config, settings, callback.from_user.id):
         await callback.answer("Подписки всё ещё нет.", show_alert=True)
         return
     await show_voting(callback.message, match_id, repo, config)
@@ -162,21 +183,25 @@ async def open_voting(
 
 @router.callback_query(F.data.startswith("refresh:"))
 async def refresh_votes(callback: CallbackQuery, repo: Repo, config: Config) -> None:
-    match_id = int(callback.data.split(":")[1])
-    await _refresh(callback, match_id, repo, config)
+    ids = _ids(callback.data, 1)
+    if ids is None:
+        await callback.answer("Кнопка устарела.", show_alert=True)
+        return
+    await _refresh(callback, ids[0], repo, config)
     await callback.answer("Обновлено")
 
 
 async def _refresh(callback: CallbackQuery, match_id: int, repo: Repo, config: Config) -> None:
+    """Обновить кнопки со счётом.
+
+    Экран голосования живёт в личке днями, и Telegram присылает нажатие на
+    старом сообщении без права его править. Это не повод падать: голос уже
+    учтён, а счёт человек увидит по кнопке «Обновить» на свежем экране.
+    """
     match = repo.get_match(match_id)
     if match is None:
         return
     slots = repo.match_slots(match_id)
-    try:
-        await callback.message.edit_reply_markup(
-            reply_markup=keyboards.voting(match_id, slots, config, _post_url(config, match))
-        )
-    except TelegramBadRequest as error:
-        # счёт не изменился — Telegram отказывается перерисовывать, это не ошибка
-        if not is_not_modified(error):
-            log.warning("Не удалось обновить экран голосования: %s", error)
+    await ui.edit_markup(
+        callback, keyboards.voting(match_id, slots, config, _post_url(config, match))
+    )

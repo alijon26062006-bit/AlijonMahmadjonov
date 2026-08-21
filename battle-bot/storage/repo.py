@@ -1,6 +1,7 @@
 """Запросы к базе. Единственное место, где живёт SQL."""
 from __future__ import annotations
 
+import logging
 import sqlite3
 from datetime import datetime
 
@@ -14,6 +15,8 @@ from core.models import (
     VoteResult,
     VoteSource,
 )
+
+log = logging.getLogger(__name__)
 
 
 class Repo:
@@ -72,6 +75,7 @@ class Repo:
                 "INSERT INTO queue(user_id, nickname) VALUES(?, ?)", (user_id, nickname)
             )
         except sqlite3.IntegrityError:
+            self.conn.rollback()  # иначе неудачная запись держит транзакцию открытой
             return False
         self.conn.commit()
         return True
@@ -177,6 +181,7 @@ class Repo:
                 (battle_id, user_id, nickname),
             )
         except sqlite3.IntegrityError:
+            self.conn.rollback()  # иначе неудачная запись держит транзакцию открытой
             return False
         self.conn.execute("UPDATE stats SET battles = battles + 1 WHERE user_id = ?", (user_id,))
         self.conn.commit()
@@ -368,9 +373,12 @@ class Repo:
                 ),
             )
         except sqlite3.IntegrityError:
+            self.conn.rollback()
             return VoteResult.DUPLICATE
 
         if cursor.rowcount == 0:
+            # голос не подошёл по условиям — записи нет, но транзакция открыта
+            self.conn.rollback()
             return self._why_refused(match_id, target_id, moment)
 
         self.conn.execute(
@@ -438,6 +446,7 @@ class Repo:
                 (user_id, charge_id, stars, votes),
             )
         except sqlite3.IntegrityError:
+            self.conn.rollback()  # иначе неудачная запись держит транзакцию открытой
             return False
         self.conn.commit()
         return True
@@ -553,6 +562,7 @@ class Repo:
                 "INSERT INTO auto_log(kind, key) VALUES(?, ?)", (kind, key)
             )
         except sqlite3.IntegrityError:
+            self.conn.rollback()  # иначе неудачная запись держит транзакцию открытой
             return False
         self.conn.commit()
         return True
@@ -613,6 +623,7 @@ class Repo:
                 (invited_id, inviter_id),
             )
         except sqlite3.IntegrityError:
+            self.conn.rollback()  # иначе неудачная запись держит транзакцию открытой
             return False
         self.conn.commit()
         return True
@@ -802,6 +813,50 @@ class Repo:
                FROM member_channels"""
         ).fetchone()
         return int(row["total"]), int(row["live"]), int(row["posts"])
+
+    # ------------------------------------------------------- журнал сбоев
+
+    KEEP_ERRORS = 200  # хранить только последние: журнал не должен расти вечно
+
+    def record_error(
+        self, kind: str, message: str, action: str | None = None,
+        user_id: int | None = None,
+    ) -> None:
+        """Записать сбой. Сама запись не должна ронять обработчик ошибок."""
+        try:
+            self.conn.execute(
+                "INSERT INTO errors(kind, message, action, user_id) VALUES(?, ?, ?, ?)",
+                (kind[:64], message[:500], (action or "")[:120] or None, user_id),
+            )
+            self.conn.execute(
+                """DELETE FROM errors WHERE id NOT IN (
+                       SELECT id FROM errors ORDER BY id DESC LIMIT ?
+                   )""",
+                (self.KEEP_ERRORS,),
+            )
+            self.conn.commit()
+        except sqlite3.Error as failure:  # журнал важен, но не важнее бота
+            log.warning("Не удалось записать сбой в журнал: %s", failure)
+
+    def recent_errors(self, limit: int = 10) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM errors ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+
+    def error_summary(self, hours: int = 24) -> list[sqlite3.Row]:
+        """Что и сколько раз ломалось за последнее время."""
+        return self.conn.execute(
+            """SELECT kind, COUNT(*) AS times, MAX(created_at) AS last_at
+               FROM errors
+               WHERE datetime(created_at) > datetime('now', ?)
+               GROUP BY kind ORDER BY times DESC""",
+            (f"-{int(hours)} hours",),
+        ).fetchall()
+
+    def clear_errors(self) -> int:
+        cursor = self.conn.execute("DELETE FROM errors")
+        self.conn.commit()
+        return cursor.rowcount
 
     # ---------------------------------------------------- сводка для панели
 

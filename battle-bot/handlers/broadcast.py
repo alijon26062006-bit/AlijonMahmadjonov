@@ -13,7 +13,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 from config import Config
 from handlers.panel import is_admin
-from services import broadcast, keyboards, panel_ui, validation
+from services import broadcast, keyboards, panel_ui, ui, validation
 from services.validation import InputError
 from storage.repo import Repo
 from storage.settings import Settings
@@ -144,8 +144,8 @@ async def skip_media(callback: CallbackQuery, config: Config, state: FSMContext)
     if not is_admin(callback.from_user.id, config):
         return
     await state.set_state(Cast.text)
-    await callback.message.edit_text(
-        STEP_TEXT, reply_markup=_kb([_btn("Отмена", "cancel")])
+    await ui.edit_or_send(
+        callback, STEP_TEXT, reply_markup=_kb([_btn("Отмена", "cancel")])
     )
     await callback.answer()
 
@@ -375,5 +375,5 @@ async def cancel(callback: CallbackQuery, config: Config, state: FSMContext) -> 
     if not is_admin(callback.from_user.id, config):
         return
     await state.clear()
-    await callback.message.edit_text("Рассылка отменена.")
+    await ui.edit_or_send(callback, "Рассылка отменена.")
     await callback.answer()

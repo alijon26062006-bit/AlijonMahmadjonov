@@ -476,7 +476,7 @@ async def test_the_round_result_reaches_the_participants_channel(tmp_path):
     await engine.create_from_queue()
     before = len(bot.sent[CHANNEL])
 
-    await engine.close_round()
+    await engine.close_round(force=True)
 
     assert len(bot.sent[CHANNEL]) > before, "итог тоже должен уйти в канал"
 
