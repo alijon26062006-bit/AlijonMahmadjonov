@@ -57,6 +57,30 @@ def is_blocked(error: BaseException) -> bool:
     return any(marker in text for marker in BLOCKED_MARKERS)
 
 
+# доступ в чат потерян: выгнали, разжаловали, чат удалён
+ACCESS_MARKERS = BLOCKED_MARKERS + (
+    "bot is not a member",
+    "not enough rights",
+    "have no rights to send",
+    "chat_write_forbidden",
+    "need administrator rights",
+    "chat_admin_required",
+)
+
+
+def is_access_lost(error: BaseException) -> bool:
+    """Писать в этот чат больше нельзя, пока права не вернут.
+
+    Отличать это важно: только по такой ошибке имеет смысл гасить привязку
+    канала. Отказ по оформлению (например, премиум-эмодзи) правами не лечится
+    и привязку трогать не должен.
+    """
+    if isinstance(error, TelegramForbiddenError):
+        return True
+    text = str(error).lower()
+    return any(marker in text for marker in ACCESS_MARKERS)
+
+
 def is_transient(error: BaseException) -> bool:
     """Сбой сети или сервера — помогает повтор."""
     return isinstance(error, (TelegramNetworkError, TelegramServerError, TelegramRetryAfter))

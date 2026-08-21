@@ -42,7 +42,7 @@ async def start_with_payload(
         # экран голосования открываем только подписчику — голос без подписки невозможен
         if await voting.gate(message, value, config, settings, message.from_user.id):
             return
-        await show_voting(message, value, repo, config)
+        await show_voting(message, value, repo, config, links.vote_target(command.args))
         return
 
     if kind == "join":
@@ -113,11 +113,14 @@ async def _do_join(
         nickname = user.first_name or f"id{user.id}"
 
     accepted, response = await engine.join(user.id, nickname)
-    await message.answer(
-        response,
-        reply_markup=None if accepted else keyboards.join_again(config),
-        disable_web_page_preview=True,
-    )
+    if accepted and settings.get("member_channels_enabled"):
+        # записался — самое время предложить рекламировать себя в своём канале
+        markup = keyboards.after_join()
+    elif accepted:
+        markup = None
+    else:
+        markup = keyboards.join_again(config)
+    await message.answer(response, reply_markup=markup, disable_web_page_preview=True)
 
 
 @router.message(F.text.in_(keyboards.variants(keyboards.BTN_HELP)))

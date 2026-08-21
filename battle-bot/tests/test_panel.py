@@ -475,6 +475,7 @@ async def test_every_button_on_every_screen_has_a_handler(env):
         panel_ui.autopilot(settings.all(), repo.promos()),
         panel_ui.fraud(panel._fraud_signals(repo)),
         panel_ui.promo_list(repo.promos()),
+        panel_ui.member_channels(True, 1, 1, 3, repo.member_channels()),
         panel_ui.person(repo.get_user(77), repo.stats_for(77), 0),
         panel_ui.confirm("Точно?", "battle:cancel:do", "battle"),
         panel_ui.ask("Призы", "1000,500,250", "подсказка", "prizes"),

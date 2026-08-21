@@ -371,6 +371,155 @@ def advanced(rivals: list[str]) -> str:
     )
 
 
+# ------------------------------------------------ личный канал участника
+
+def my_channel_screen(channel, bot_username: str) -> str:
+    """Экран «Мой канал»: как привязать и что бот будет туда публиковать."""
+    if channel is None:
+        return (
+            f"📡 <b>{spaced('МОЙ КАНАЛ')}</b>\n"
+            f"{RULE}\n\n"
+            "<b>Пусть за вас голосуют ваши подписчики.</b>\n"
+            "Бот сам опубликует вашу пару у вас в канале — с кнопкой, "
+            "которая ведёт голосовать <b>именно за вас</b>.\n\n"
+            f"<b>{spaced('КАК ПОДКЛЮЧИТЬ')}</b>\n"
+            f"<b>1.</b> Откройте свой канал → <i>Управление</i> → "
+            f"<i>Администраторы</i> → добавьте @{escape(bot_username)}\n"
+            "<b>2.</b> Оставьте право <b>«Публикация сообщений»</b>\n"
+            "<b>3.</b> Перешлите сюда любой пост из этого канала\n\n"
+            "<blockquote>Публикуется только ваша пара и ваш итог. "
+            "Ничего лишнего бот в канал не пишет.</blockquote>"
+        )
+
+    name = escape(channel["title"] or "канал")
+    state = "✅ подключён" if channel["active"] else "⚠️ бот потерял доступ"
+    posts = int(channel["posts"])
+    word = plural(posts, "пост", "поста", "постов")
+    tail = (
+        ""
+        if channel["active"]
+        else "\n\n<b>Верните бота администратором</b> и нажмите «Проверить»."
+    )
+    return (
+        f"📡 <b>{spaced('МОЙ КАНАЛ')}</b>\n"
+        f"{RULE}\n\n"
+        f"Канал: <b>{name}</b>\n"
+        f"Статус: <b>{state}</b>\n"
+        f"Опубликовано: <b>{posts}</b> {word}\n\n"
+        "<blockquote>Как только начнётся ваш раунд, пост с кнопкой "
+        "«Голосовать за меня» появится в канале сам.</blockquote>"
+        f"{tail}"
+    )
+
+
+def my_channel_linked(title: str | None) -> str:
+    return (
+        f"✅ <b>Канал подключён</b>\n"
+        f"{RULE}\n\n"
+        f"<b>{escape(title or 'Ваш канал')}</b>\n\n"
+        "Ваши пары бот будет публиковать туда сам — с кнопкой "
+        "<b>«Голосовать за меня»</b>."
+    )
+
+
+def my_channel_post(
+    round_no: int, is_final: bool, nickname: str, rivals: list[str],
+    deadline: datetime, vote_url: str
+) -> str:
+    """Пост, который бот публикует в личном канале участника."""
+    against = ", ".join(nick(name) for name in rivals) or "соперник"
+    return (
+        f"⚔️ <b>Я в батле · {round_title(round_no, is_final)}</b>\n"
+        f"{RULE}\n\n"
+        f"Мой ник: <b>{nick(nickname)}</b>\n"
+        f"Против меня: <b>{against}</b>\n\n"
+        f"<b>Голос бесплатный</b> — жмите кнопку ниже.\n"
+        f'📊 <a href="{vote_url}"><b>ГОЛОСОВАТЬ ЗА МЕНЯ</b></a>\n\n'
+        f"{RULE}\n"
+        f"{deadline_line(deadline)}"
+    )
+
+
+def my_channel_result(round_no: int, is_final: bool, ranking, you_id: int) -> str:
+    """Итог раунда в личном канале — честно, со всем счётом."""
+    you = next((slot for slot in ranking if slot.user_id == you_id), None)
+    won = you is not None and you.position == 1
+    if is_final:
+        place = you.position if you else 0
+        header = f"{MEDAL.get(place, '🏆')} <b>{place} место в финале</b>"
+    else:
+        header = (
+            f"✅ <b>Прошёл дальше · {round_no} раунд</b>"
+            if won
+            else f"❌ <b>Вылетел · {round_no} раунд</b>"
+        )
+    thanks = (
+        "<b>Спасибо всем, кто голосовал!</b>"
+        if won or is_final
+        else "<b>Спасибо всем, кто поддержал.</b>"
+    )
+    return f"{header}\n{RULE}\n\n{scoreboard(ranking, show_place=is_final)}\n\n{thanks}"
+
+
+def called_to_support(nickname: str) -> str:
+    return (
+        f"📣 Вас позвали поддержать <b>{nick(nickname)}</b>.\n"
+        "<i>Голос всё равно ваш — выбирайте кого хотите.</i>\n\n"
+    )
+
+
+MY_CHANNEL_FORWARD = (
+    "📡 <b>Перешлите пост из канала</b>\n\n"
+    "<blockquote>Откройте свой канал, выберите любой пост → «Переслать» → "
+    "выберите этого бота.</blockquote>\n\n"
+    "<i>Так бот узнает, какой канал ваш.</i>"
+)
+
+MY_CHANNEL_NOT_A_CHANNEL = (
+    "⚠️ <b>Это не пост из канала</b>\n\n"
+    "Перешлите сообщение <b>из канала</b>, а не из чата или личной переписки."
+)
+
+MY_CHANNEL_HIDDEN = (
+    "⚠️ <b>Автор поста скрыт</b>\n\n"
+    "В настройках канала включена скрытая пересылка, и бот не видит, "
+    "откуда пост.\n\n"
+    "<blockquote>Отключите её в настройках канала или добавьте бота "
+    "администратором и перешлите пост ещё раз.</blockquote>"
+)
+
+MY_CHANNEL_NOT_ADMIN = (
+    "⚠️ <b>Бот не администратор этого канала</b>\n\n"
+    "Добавьте его в администраторы с правом <b>«Публикация сообщений»</b> "
+    "и перешлите пост ещё раз."
+)
+
+MY_CHANNEL_NOT_YOURS = (
+    "⚠️ <b>Это не ваш канал</b>\n\n"
+    "Подключить можно только тот канал, где вы владелец или администратор."
+)
+
+MY_CHANNEL_TAKEN = (
+    "⚠️ <b>Канал уже подключён другому участнику</b>\n\n"
+    "Один канал — один участник."
+)
+
+MY_CHANNEL_LOST = (
+    "⚠️ <b>Не смог опубликовать в вашем канале</b>\n"
+    f"{RULE}\n\n"
+    "Похоже, бота убрали из администраторов или отобрали право публикации.\n\n"
+    "<b>Верните права</b> и снова нажмите «📡 Мой канал» → «Проверить»."
+)
+
+MY_CHANNEL_UNLINKED = "✅ Канал отключён. Публиковать туда бот больше не будет."
+
+MY_CHANNEL_NO_MATCH = "🗓 Сейчас у вас нет активного матча — публиковать нечего."
+
+MY_CHANNEL_OFF = (
+    "📡 Публикация в личные каналы сейчас выключена администратором."
+)
+
+
 def took_place(place: int, prize: int) -> str:
     return (
         f"{MEDAL.get(place, '🏆')} <b>{place} место!</b>\n"
@@ -436,7 +585,9 @@ HELP = (
     "<b>5.</b> 1 раунд — <b>1vs1</b>, дальше <b>группы по 4 ника</b>.\n"
     "<b>6.</b> Финал забирает <b>призы за 1, 2 и 3 место</b>.\n\n"
     "Голосовать может любой подписчик канала: "
-    "<b>один бесплатный голос на матч</b>.</blockquote>"
+    "<b>один бесплатный голос на матч</b>.\n\n"
+    "📡 Есть свой канал? Подключите его в «<b>Мой канал</b>» — бот сам "
+    "опубликует там вашу пару с кнопкой «Голосовать за меня».</blockquote>"
 )
 
 

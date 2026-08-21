@@ -13,21 +13,25 @@ from config import Config, MSK
 from core import bracket
 from core.models import BattleStatus, Player, Slot
 from core.scheduler import next_deadline
-from services import keyboards, links, texts
+from services import keyboards, links, member_channel, texts
 from services.channel import ChannelPublisher
 from services.tg import is_blocked
 from storage.repo import Repo
+from storage.settings import Settings
 
 log = logging.getLogger(__name__)
 
 
 class BattleEngine:
     def __init__(
-        self, bot: Bot, repo: Repo, config: Config, emoji_skip: set[int] | None = None
+        self, bot: Bot, repo: Repo, config: Config, emoji_skip: set[int] | None = None,
+        settings: Settings | None = None,
     ) -> None:
         self.bot = bot
         self.repo = repo
         self.config = config
+        # настройки нужны, чтобы знать, включены ли личные каналы участников
+        self.settings = settings or Settings(repo.conn, config)
         self.publisher = ChannelPublisher(bot, repo, config, emoji_skip)
         self.rng = random.Random()
         self._lock = asyncio.Lock()  # заявки приходят пачками — пары режем по одной
@@ -81,7 +85,10 @@ class BattleEngine:
         return match_id, pair
 
     async def _notify_pair(self, match_id: int, pair: list[Player], message_id: int | None) -> None:
-        markup = keyboards.my_match(match_id, self.config, self._post_url(message_id))
+        markup = keyboards.my_match(
+            match_id, self.config, self._post_url(message_id),
+            member_channel.enabled(self.settings),
+        )
         for player in pair:
             rival = next(p.nickname for p in pair if p.user_id != player.user_id)
             await self._dm(player.user_id, texts.pair_published(rival), markup)
@@ -167,6 +174,30 @@ class BattleEngine:
                     tie_broken=result.tie_broken,
                 ),
             )
+            await self._publish_result_to_own_channel(
+                slot.user_id, round_no, is_final, result.ranking
+            )
+
+    async def _publish_to_own_channel(self, user_id: int, match_id: int) -> None:
+        """Пара участника уходит в его собственный канал, если он его подключил."""
+        try:
+            await member_channel.publish_match(
+                self.bot, self.repo, self.config, self.settings, user_id, match_id,
+                self.publisher.emoji_skip,
+            )
+        except Exception:  # публикация к себе не должна ронять ход батла
+            log.exception("Не удалось опубликовать пару в канале участника %s", user_id)
+
+    async def _publish_result_to_own_channel(
+        self, user_id: int, round_no: int, is_final: bool, ranking: list[Slot]
+    ) -> None:
+        try:
+            await member_channel.publish_result(
+                self.bot, self.repo, self.settings, user_id, round_no, is_final, ranking,
+                self.publisher.emoji_skip,
+            )
+        except Exception:
+            log.exception("Не удалось опубликовать итог в канале участника %s", user_id)
 
     async def _start_round(self, battle_id: int, round_no: int) -> None:
         alive = self.repo.alive_players(battle_id)
@@ -204,10 +235,14 @@ class BattleEngine:
                 deadline=deadline,
             )
             message_id = await self.publisher.publish_match(match_id)
-            markup = keyboards.my_match(match_id, self.config, self._post_url(message_id))
+            markup = keyboards.my_match(
+                match_id, self.config, self._post_url(message_id),
+                member_channel.enabled(self.settings),
+            )
             for player in group:
                 rivals = [p.nickname for p in group if p.user_id != player.user_id]
                 await self._dm(player.user_id, texts.advanced(rivals), markup)
+                await self._publish_to_own_channel(player.user_id, match_id)
 
     async def create_from_queue(self) -> tuple[bool, str]:
         """Собрать батл из очереди. Вызывается админом из панели."""
@@ -272,6 +307,7 @@ class BattleEngine:
                 await self._dm(
                     slot.user_id, texts.took_place(place, self.config.prizes[place - 1])
                 )
+            await self._publish_result_to_own_channel(slot.user_id, 0, True, ranking)
         log.info("Батл #%s завершён", battle_id)
 
         log.info("Очередь на следующий батл: %s", self.repo.queue_size())

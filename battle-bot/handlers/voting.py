@@ -50,8 +50,15 @@ async def gate(
     return True
 
 
-async def show_voting(message: Message, match_id: int, repo: Repo, config: Config) -> None:
-    """Отрисовать экран голосования по матчу."""
+async def show_voting(
+    message: Message, match_id: int, repo: Repo, config: Config,
+    called_for: int | None = None,
+) -> None:
+    """Отрисовать экран голосования по матчу.
+
+    ``called_for`` приходит по ссылке из личного канала участника: человека
+    позвали поддержать конкретное имя, и об этом честно говорится на экране.
+    """
     match = repo.get_match(match_id)
     if match is None:
         await message.answer("Такого матча нет.")
@@ -66,9 +73,15 @@ async def show_voting(message: Message, match_id: int, repo: Repo, config: Confi
         return
 
     deadline = datetime.fromisoformat(match["deadline"])
+    called = next((s for s in slots if s.user_id == called_for), None)
+    intro = texts.called_to_support(called.nickname) if called else ""
     await message.answer(
-        texts.voting_screen(match["round_no"], bool(match["is_final"]), slots, deadline),
-        reply_markup=keyboards.voting(match_id, slots, config, _post_url(config, match)),
+        intro + texts.voting_screen(
+            match["round_no"], bool(match["is_final"]), slots, deadline
+        ),
+        reply_markup=keyboards.voting(
+            match_id, slots, config, _post_url(config, match), called_for
+        ),
     )
 
 

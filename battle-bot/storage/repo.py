@@ -731,6 +731,78 @@ class Repo:
         )
         self.conn.commit()
 
+    # ------------------------------------------------- личные каналы участников
+
+    def link_channel(
+        self, user_id: int, chat_id: int, title: str | None, username: str | None
+    ) -> bool:
+        """Привязать канал к участнику.
+
+        Один канал — один владелец: если его уже занял другой человек, отказываем.
+        Свой же канал можно привязывать сколько угодно раз, это просто обновление.
+        """
+        owner = self.conn.execute(
+            "SELECT user_id FROM member_channels WHERE chat_id = ?", (chat_id,)
+        ).fetchone()
+        if owner is not None and int(owner["user_id"]) != user_id:
+            return False
+
+        self.conn.execute(
+            """INSERT INTO member_channels(user_id, chat_id, title, username, active)
+               VALUES(?, ?, ?, ?, 1)
+               ON CONFLICT(user_id) DO UPDATE SET
+                   chat_id = excluded.chat_id,
+                   title = excluded.title,
+                   username = excluded.username,
+                   active = 1""",
+            (user_id, chat_id, title, username),
+        )
+        self.conn.commit()
+        return True
+
+    def member_channel(self, user_id: int) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM member_channels WHERE user_id = ?", (user_id,)
+        ).fetchone()
+
+    def unlink_channel(self, user_id: int) -> bool:
+        cursor = self.conn.execute(
+            "DELETE FROM member_channels WHERE user_id = ?", (user_id,)
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def disable_channel(self, user_id: int) -> None:
+        """Публиковать больше не можем: бота выгнали или лишили прав."""
+        self.conn.execute(
+            "UPDATE member_channels SET active = 0 WHERE user_id = ?", (user_id,)
+        )
+        self.conn.commit()
+
+    def bump_channel_posts(self, user_id: int) -> None:
+        self.conn.execute(
+            "UPDATE member_channels SET posts = posts + 1 WHERE user_id = ?", (user_id,)
+        )
+        self.conn.commit()
+
+    def member_channels(self, limit: int = 20) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            """SELECT c.*, u.username AS owner_username, u.first_name AS owner_name
+               FROM member_channels c LEFT JOIN users u ON u.user_id = c.user_id
+               ORDER BY c.active DESC, c.posts DESC, c.linked_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+
+    def member_channel_stats(self) -> tuple[int, int, int]:
+        """Сколько каналов привязано, сколько живых и сколько постов ушло."""
+        row = self.conn.execute(
+            """SELECT COUNT(*) AS total,
+                      COALESCE(SUM(active), 0) AS live,
+                      COALESCE(SUM(posts), 0) AS posts
+               FROM member_channels"""
+        ).fetchone()
+        return int(row["total"]), int(row["live"]), int(row["posts"])
+
     # ---------------------------------------------------- сводка для панели
 
     def user_count(self) -> int:

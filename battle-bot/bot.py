@@ -14,7 +14,8 @@ from core.engine import BattleEngine
 from core.autopilot import Autopilot
 from core.scheduler import DeadlineWatcher, Ticker
 from handlers import (
-    admin, broadcast, emoji, errors, panel, payments, referral, start, voting,
+    admin, broadcast, emoji, errors, mychannel, panel, payments, referral,
+    start, voting,
 )
 from services.emoji import PremiumEmojiMiddleware, load_table
 from services.retry import RetryMiddleware
@@ -37,6 +38,7 @@ COMMANDS = [
     BotCommand(command="top", description="Таблица лидеров"),
     BotCommand(command="buy", description="Купить голоса"),
     BotCommand(command="invite", description="Пригласить друзей"),
+    BotCommand(command="mychannel", description="Мой канал"),
     BotCommand(command="help", description="Как это работает"),
     BotCommand(command="panel", description="Панель управления (админ)"),
 ]
@@ -52,6 +54,7 @@ ROUTERS = (
     emoji.router,
     payments.router,
     referral.router,
+    mychannel.router,
     start.router,
     voting.router,
     panel.fallback_router,
@@ -87,7 +90,7 @@ async def main() -> None:
         emoji_skip.add(config.channel_id)
     bot.session.middleware(PremiumEmojiMiddleware(config.premium_emoji, emoji_skip))
 
-    engine = BattleEngine(bot, repo, config, emoji_skip)
+    engine = BattleEngine(bot, repo, config, emoji_skip, settings)
 
     dispatcher = Dispatcher()
     # общие зависимости — прилетают в обработчики как аргументы
@@ -95,6 +98,8 @@ async def main() -> None:
     dispatcher["config"] = config
     dispatcher["engine"] = engine
     dispatcher["emoji_table"] = config.premium_emoji
+    # общий набор чатов без премиум-эмодзи: пополняется при первом отказе
+    dispatcher["emoji_skip"] = emoji_skip
     dispatcher["settings"] = settings
 
     include_routers(dispatcher)

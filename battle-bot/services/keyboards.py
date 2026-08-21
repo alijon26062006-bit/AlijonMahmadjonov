@@ -23,6 +23,7 @@ RED = "danger"
 BTN_JOIN = "🚀 Принять участие"
 BTN_BUY = "🎁 Купить голоса"
 BTN_INVITE = "🤝 Пригласить друзей"
+BTN_CHANNEL = "📡 Мой канал"
 BTN_PROFILE = "👤 Профиль"
 BTN_HELP = "✅ Помощь"
 
@@ -52,7 +53,8 @@ def main_menu(config: Config) -> ReplyKeyboardMarkup:
     rows = [[_reply_button(BTN_JOIN, table, BLUE)]]
     if config.paid_votes_enabled:
         rows.append([_reply_button(BTN_BUY, table, GREEN)])
-    rows.append([_reply_button(BTN_PROFILE, table), _reply_button(BTN_HELP, table)])
+    rows.append([_reply_button(BTN_CHANNEL, table), _reply_button(BTN_PROFILE, table)])
+    rows.append([_reply_button(BTN_HELP, table)])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
@@ -61,14 +63,23 @@ def voting(
     slots: list[Slot],
     config: Config,
     post_url: str | None,
+    called_for: int | None = None,
 ) -> InlineKeyboardMarkup:
-    """Кнопки участников со счётом + служебный ряд."""
+    """Кнопки участников со счётом + служебный ряд.
+
+    ``called_for`` — кого человека звали поддержать (пришёл по ссылке из его
+    канала). Такая кнопка помечается огоньком, чтобы её было видно сразу.
+    Второй такой же кнопки сверху не делаем: выбор всё равно остаётся за
+    голосующим, а дублировать одно действие двумя кнопками — путать.
+    """
     best = max((s.votes for s in slots), default=0)
     crown_id = config.premium_emoji.get(texts.CROWN)
     rows = []
     for index, slot in enumerate(slots, start=1):
         leader = slot.votes == best and slot.votes > 0
         label = texts.vote_button(slot, index)
+        if slot.user_id == called_for:
+            label = f"🔥 {label}"
         # премиум-корона показывается отдельной иконкой, обычная — в конце подписи
         if leader and not crown_id:
             label = f"{label} {texts.CROWN}"
@@ -173,7 +184,9 @@ def pay(votes: int, total: int) -> InlineKeyboardMarkup:
     )
 
 
-def my_match(match_id: int, config: Config, post_url: str | None = None) -> InlineKeyboardMarkup:
+def my_match(
+    match_id: int, config: Config, post_url: str | None = None, own_channel: bool = True
+) -> InlineKeyboardMarkup:
     """Кнопки под сообщением «нашлась пара» и «вы прошли дальше».
 
     Голая ссылка в тексте выглядит бедно и её неудобно отправлять друзьям,
@@ -200,9 +213,37 @@ def my_match(match_id: int, config: Config, post_url: str | None = None) -> Inli
             )
         ],
     ]
+    if own_channel:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="📡 Опубликовать в моём канале",
+                    callback_data=f"mych:post:{match_id}",
+                )
+            ]
+        )
     if post_url:
         rows.append([InlineKeyboardButton(text="📄 Пост в канале ↗", url=post_url)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def after_join() -> InlineKeyboardMarkup:
+    """Что предложить сразу после принятой заявки.
+
+    Про личный канал человек сам не догадается, поэтому кнопка появляется
+    ровно тогда, когда он записался в батл и ему есть что рекламировать.
+    """
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📡 Публиковать в моём канале",
+                    callback_data="mych:open",
+                    style=BLUE,
+                )
+            ]
+        ]
+    )
 
 
 def menu_labels() -> set[str]:
@@ -212,6 +253,6 @@ def menu_labels() -> set[str]:
     меню: это не значение, а желание уйти. Команды ловятся отдельно по «/».
     """
     labels: set[str] = set()
-    for label in (BTN_JOIN, BTN_INVITE, BTN_BUY, BTN_PROFILE, BTN_HELP):
+    for label in (BTN_JOIN, BTN_INVITE, BTN_BUY, BTN_CHANNEL, BTN_PROFILE, BTN_HELP):
         labels |= variants(label)
     return labels

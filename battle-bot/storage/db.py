@@ -34,6 +34,19 @@ CREATE TABLE IF NOT EXISTS queue (
     joined_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Личный канал участника. Он добавляет бота администратором в свой канал,
+-- и бот сам публикует туда его пары: подписчики идут голосовать за него.
+-- chat_id уникален, чтобы один канал нельзя было забрать себе дважды.
+CREATE TABLE IF NOT EXISTS member_channels (
+    user_id   INTEGER PRIMARY KEY REFERENCES users(user_id),
+    chat_id   INTEGER NOT NULL UNIQUE,
+    title     TEXT,
+    username  TEXT,
+    active    INTEGER NOT NULL DEFAULT 1,
+    posts     INTEGER NOT NULL DEFAULT 0,
+    linked_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS battles (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     status      TEXT NOT NULL,

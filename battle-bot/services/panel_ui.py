@@ -73,7 +73,7 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         [button("⭐ Голоса", "votes"), button("🤝 Друзья", "referrals")],
         [button("📣 Канал", "channel"), button("👥 Люди", "people")],
         [button("📨 Рассылка", "broadcast"), button("🤖 Автопилот", "auto")],
-        [button("🔍 Проверка", "fraud")],
+        [button("🔍 Проверка", "fraud"), button("📡 Каналы", "mych")],
         [button("⚙️ Настройки", "settings")],
         [button("🔄 Обновить", "home", BLUE)],
     )
@@ -326,6 +326,37 @@ def referrals(reward: int, enabled: bool, report: dict, top) -> tuple[str, Inlin
     return text, keyboard(
         [button("✏️ Изменить награду", "edit:referral_reward", BLUE)],
         [button(toggle, "referrals:toggle", RED if enabled else GREEN)],
+        back_row(),
+    )
+
+
+# -------------------------------------------------- каналы участников
+
+def member_channels(
+    enabled: bool, total: int, live: int, posts: int, rows
+) -> tuple[str, InlineKeyboardMarkup]:
+    """Кто из участников подключил свой канал и сколько постов туда ушло."""
+    lines = []
+    for row in rows:
+        owner = escape("@" + (row["owner_username"] or str(row["user_id"])))
+        title = escape(row["title"] or str(row["chat_id"]))
+        mark = "✅" if row["active"] else "⚠️"
+        lines.append(f"{mark} <b>{title}</b> — {owner}, постов: <b>{row['posts']}</b>")
+    listing = "\n".join(lines) if lines else "<i>пока никто не подключил</i>"
+
+    text = (
+        f"📡 <b>{texts.spaced('КАНАЛЫ УЧАСТНИКОВ')}</b>\n{RULE}\n\n"
+        f"Публикация: <b>{onoff(enabled)}</b>\n"
+        f"Подключено: <b>{total}</b>, из них живых: <b>{live}</b>\n"
+        f"Постов опубликовано: <b>{posts}</b>\n\n"
+        f"{listing}\n\n"
+        "<i>Участник добавляет бота администратором в свой канал, и бот сам "
+        "публикует туда его пару с кнопкой «Голосовать за меня». "
+        "⚠️ — бота лишили прав, публикация в этот канал выключена.</i>"
+    )
+    toggle = "Выключить публикацию" if enabled else "Включить публикацию"
+    return text, keyboard(
+        [button(toggle, "mych:toggle", RED if enabled else GREEN)],
         back_row(),
     )
 

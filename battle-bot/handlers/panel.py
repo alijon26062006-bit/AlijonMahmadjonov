@@ -529,6 +529,35 @@ async def toggle_votes(callback: CallbackQuery, repo: Repo, config: Config,
     await callback.answer("Сохранено")
 
 
+@router.callback_query(F.data == "p:mych")
+async def show_member_channels(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, _member_channels_screen(repo, settings))
+    await callback.answer()
+
+
+@router.callback_query(F.data == "p:mych:toggle")
+async def toggle_member_channels(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    settings.set("member_channels_enabled", not settings.get("member_channels_enabled"))
+    await render(callback, _member_channels_screen(repo, settings))
+    await callback.answer("Сохранено")
+
+
+def _member_channels_screen(repo: Repo, settings: Settings):
+    total, live, posts = repo.member_channel_stats()
+    return panel_ui.member_channels(
+        settings.get("member_channels_enabled"), total, live, posts,
+        repo.member_channels(limit=15),
+    )
+
+
 @router.callback_query(F.data == "p:settings:check")
 async def check_subscription(
     callback: CallbackQuery, config: Config, settings: Settings

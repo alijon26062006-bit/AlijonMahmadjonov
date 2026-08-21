@@ -245,6 +245,7 @@ def test_menu_button_labels_lose_the_emoji_when_the_table_has_it(monkeypatch):
                 keyboards.BTN_JOIN,
                 keyboards.BTN_INVITE,
                 keyboards.BTN_BUY,
+                keyboards.BTN_CHANNEL,
                 keyboards.BTN_PROFILE,
                 keyboards.BTN_HELP,
             )

@@ -6,12 +6,24 @@ REF_PREFIX = "r"
 JOIN_PAYLOAD = "join"
 
 
-def vote_link(bot_username: str, match_id: int) -> str:
+def vote_link(bot_username: str, match_id: int, target_id: int | None = None) -> str:
     """Ссылка, которая открывает бота сразу на экране голосования этого матча.
 
     Её участник рассылает своим — по ней приходят голосовать именно за его пару.
+    С ``target_id`` ссылка ещё и знает, кого звали поддержать: экран покажет
+    отдельную кнопку «Голосовать за него». Так работает пост в личном канале
+    участника — его подписчики попадают сразу на нужное имя.
     """
-    return f"https://t.me/{bot_username}?start={VOTE_PREFIX}{match_id}"
+    tail = f"_{target_id}" if target_id else ""
+    return f"https://t.me/{bot_username}?start={VOTE_PREFIX}{match_id}{tail}"
+
+
+def vote_target(payload: str | None) -> int | None:
+    """Кого звали поддержать в ссылке вида ``v12_345``. Нет хвоста — None."""
+    if not payload or not payload.startswith(VOTE_PREFIX) or "_" not in payload:
+        return None
+    tail = payload.strip().split("_", 1)[1]
+    return int(tail) if tail.isdigit() else None
 
 
 def join_link(bot_username: str) -> str:
@@ -45,8 +57,11 @@ def parse_start_payload(payload: str | None) -> tuple[str, int | None]:
     payload = payload.strip()
     if payload == JOIN_PAYLOAD:
         return "join", None
-    if payload.startswith(VOTE_PREFIX) and payload[1:].isdigit():
-        return "vote", int(payload[1:])
+    if payload.startswith(VOTE_PREFIX):
+        # хвост после «_» — кого звали поддержать, сам матч идёт до него
+        head = payload[1:].split("_", 1)[0]
+        if head.isdigit():
+            return "vote", int(head)
     if payload.startswith(REF_PREFIX) and payload[1:].isdigit():
         return "ref", int(payload[1:])
     return "plain", None

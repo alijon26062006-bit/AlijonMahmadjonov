@@ -85,6 +85,8 @@ FIELDS: dict[str, Field] = {
         Field("main_post_photo", "Фото главного поста", str, str, "file_id из Telegram"),
         Field("main_post_text", "Текст главного поста", str, str, "любой текст"),
         Field("main_post_message_id", "ID опубликованного главного поста", str, int, ""),
+        Field("member_channels_enabled", "Каналы участников",
+              lambda v: "1" if v else "0", lambda raw: raw == "1"),
     )
 }
 
@@ -119,6 +121,7 @@ class Settings:
         "main_post_photo": "",
         "main_post_text": "",
         "main_post_message_id": 0,
+        "member_channels_enabled": True,
     }
 
     def _from_config(self, key: str) -> Any:
