@@ -10,6 +10,7 @@ from aiogram import Bot
 from config import Config
 from core.engine import BattleEngine
 from handlers.referral import welcome_invited
+from handlers import voting
 from handlers.voting import show_voting
 from services import keyboards, links, referral, sponsors, texts
 from storage.repo import Repo
@@ -38,6 +39,9 @@ async def start_with_payload(
     repo.upsert_user(message.from_user.id, message.from_user.username, message.from_user.first_name)
 
     if kind == "vote" and value is not None:
+        # экран голосования открываем только подписчику — голос без подписки невозможен
+        if await voting.gate(message, value, config, settings, message.from_user.id):
+            return
         await show_voting(message, value, repo, config)
         return
 

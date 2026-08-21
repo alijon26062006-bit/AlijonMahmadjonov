@@ -421,20 +421,41 @@ def settings_screen(values: dict, sponsors: list[int]) -> tuple[str, InlineKeybo
         f"🔖 Требовать @username: <b>{onoff(values['require_username'])}</b>\n"
         f"🎨 Премиум-эмодзи в канале: <b>{values['premium_emoji_in_channel']}</b>\n\n"
         f"<b>Обязательная подписка</b>\n"
-        f"Проверка: <b>{onoff(values['require_subscription'])}</b>\n"
+        f"Голосование: <b>всегда</b>\n"
+        f"Заявки и рефералы: <b>{onoff(values['require_subscription'])}</b>\n"
         f"Каналы: {listing}{source}\n\n"
-        "<i>Подписка нужна, чтобы участвовать, голосовать и приводить друзей. "
-        "Канал с парами сюда обычно не входит — в него заходят по ссылке из поста.</i>"
+        "<i>Проголосовать без подписки нельзя ни при каких настройках — "
+        "переключатель влияет только на заявки и приглашения. "
+        "Канал с парами сюда обычно не входит: в него заходят по ссылке из поста.</i>"
     )
     return text, keyboard(
         [button("🗓 Время итогов", "edit:round_times", BLUE)],
         [button("👥 Минимум", "edit:min_participants"),
          button("Максимум", "edit:max_participants")],
-        [button("📣 Подписка", "settings:toggle:require_subscription")],
+        [button("📣 Подписка для заявок", "settings:toggle:require_subscription")],
         [button("🆔 Каналы подписки", "edit:sponsor_channels")],
+        [button("🩺 Проверить каналы", "settings:check", BLUE)],
         [button("🔖 @username", "settings:toggle:require_username")],
         back_row(),
     )
+
+
+def subscription_check(rows: list[tuple[int, str]]) -> tuple[str, InlineKeyboardMarkup]:
+    """Отчёт: может ли бот спрашивать статус подписчика в каждом канале."""
+    lines = []
+    for channel_id, problem in rows:
+        if problem:
+            lines.append(f"❌ <code>{channel_id}</code>\n    <i>{escape(problem)}</i>")
+        else:
+            lines.append(f"✅ <code>{channel_id}</code> — проверка работает")
+    body = "\n".join(lines) or "<i>Каналы не заданы.</i>"
+    hint = (
+        "\n\n<i>Если стоит ❌, добавьте бота в этот канал администратором — "
+        "иначе он не видит подписчиков и никто не сможет проголосовать.</i>"
+        if any(problem for _, problem in rows) else ""
+    )
+    text = f"🩺 <b>{texts.spaced('ПРОВЕРКА ПОДПИСКИ')}</b>\n{RULE}\n\n{body}{hint}"
+    return text, keyboard(back_row("settings"))
 
 
 def ask(field_title: str, current: str, hint: str, back: str) -> tuple[str, InlineKeyboardMarkup]:

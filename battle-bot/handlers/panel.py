@@ -20,7 +20,9 @@ from aiogram.types import CallbackQuery, Message
 from config import Config
 from core import bracket
 from core.engine import BattleEngine
-from services import keyboards, main_post, panel_ui, sponsors, texts, validation
+from services import (
+    keyboards, main_post, panel_ui, sponsors, subscription, texts, validation,
+)
 from services.tg import is_not_modified
 from services.validation import InputError
 from storage.repo import Repo
@@ -525,6 +527,21 @@ async def toggle_votes(callback: CallbackQuery, repo: Repo, config: Config,
         ),
     )
     await callback.answer("Сохранено")
+
+
+@router.callback_query(F.data == "p:settings:check")
+async def check_subscription(
+    callback: CallbackQuery, config: Config, settings: Settings
+) -> None:
+    """Проверить, что бот действительно видит подписчиков каждого канала."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    rows = [
+        (channel_id, await subscription.diagnose(callback.bot, channel_id, callback.from_user.id))
+        for channel_id in sponsors.required(config, settings)
+    ]
+    await render(callback, panel_ui.subscription_check(rows))
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("p:settings:toggle:"))

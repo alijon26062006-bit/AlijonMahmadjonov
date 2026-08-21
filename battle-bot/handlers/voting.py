@@ -33,6 +33,23 @@ def _post_url(config: Config, match) -> str | None:
     return links.post_link(config.channel_id, match["message_id"])
 
 
+async def gate(
+    message: Message, match_id: int, config: Config, settings: Settings, user_id: int
+) -> bool:
+    """Показать экран подписки, если её нет. True — проход закрыт."""
+    unsubscribed = await sponsors.missing(
+        message.bot, config, settings, user_id, force=True
+    )
+    if not unsubscribed:
+        return False
+    await message.answer(
+        sponsors.text(unsubscribed),
+        reply_markup=sponsors.keyboard(unsubscribed, f"open:{match_id}"),
+        disable_web_page_preview=True,
+    )
+    return True
+
+
 async def show_voting(message: Message, match_id: int, repo: Repo, config: Config) -> None:
     """Отрисовать экран голосования по матчу."""
     match = repo.get_match(match_id)
@@ -71,14 +88,9 @@ async def cast_vote(
         await callback.answer("Ваш аккаунт исключён из голосований.", show_alert=True)
         return
 
-    unsubscribed = await sponsors.missing(callback.bot, config, settings, callback.from_user.id)
-    if unsubscribed:
-        await callback.message.answer(
-            sponsors.text(unsubscribed),
-            reply_markup=sponsors.keyboard(unsubscribed, f"refresh:{match_id}"),
-            disable_web_page_preview=True,
-        )
-        await callback.answer("Нужна подписка на канал.", show_alert=True)
+    # подписка обязательна всегда: без неё голос не принимается ни при каких настройках
+    if await gate(callback.message, match_id, config, settings, callback.from_user.id):
+        await callback.answer("Голосовать могут только подписчики канала.", show_alert=True)
         return
 
     source, note = _pick_vote_source(repo, match_id, callback.from_user.id, config)
@@ -120,6 +132,19 @@ def _pick_vote_source(
         return VoteSource.PAID, "Списан 1 купленный голос ⭐"
 
     return None, "Вы уже голосовали. Докупить голоса можно в меню «Купить голоса»."
+
+
+@router.callback_query(F.data.startswith("open:"))
+async def open_voting(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """«Я подписался» на экране гейта: перепроверяем и открываем голосование."""
+    match_id = int(callback.data.split(":")[1])
+    if await gate(callback.message, match_id, config, settings, callback.from_user.id):
+        await callback.answer("Подписки всё ещё нет.", show_alert=True)
+        return
+    await show_voting(callback.message, match_id, repo, config)
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("refresh:"))

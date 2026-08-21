@@ -60,10 +60,14 @@ async def describe(bot: Bot, channel_id: int) -> tuple[str, str]:
 
 
 async def missing(
-    bot: Bot, config: Config, settings: Settings, user_id: int
+    bot: Bot, config: Config, settings: Settings, user_id: int, *, force: bool = False
 ) -> list[tuple[str, str]]:
-    """На какие обязательные каналы человек ещё не подписан."""
-    if not settings.get("require_subscription"):
+    """На какие обязательные каналы человек ещё не подписан.
+
+    ``force=True`` игнорирует переключатель в панели. Так ходит голосование:
+    голос без подписки невозможен, что бы ни было в настройках.
+    """
+    if not force and not settings.get("require_subscription"):
         return []
 
     result = []
@@ -91,10 +95,18 @@ def text(channels: list[tuple[str, str]]) -> str:
 
     listing = "\n".join(f"• <b>{title}</b>" for title, _ in channels)
     word = texts.plural(len(channels), "канал", "канала", "каналов")
+    tail = "<i>После подписки нажмите «Я подписался».</i>"
+    if not any(url for _, url in channels):
+        # ссылку узнать не удалось — обычно бота забыли добавить в канал
+        tail = (
+            "<i>Ссылка не подгрузилась. Подпишитесь на канал и нажмите "
+            "«Я подписался», а если кнопки нет — напишите администратору.</i>"
+        )
     return (
         f"⚠️ <b>Нужна подписка</b>\n"
         f"{texts.RULE}\n\n"
-        f"Чтобы участвовать и голосовать, подпишитесь на {len(channels)} {word}:\n\n"
+        f"Голосовать и участвовать могут только подписчики. "
+        f"Подпишитесь на {len(channels)} {word}:\n\n"
         f"{listing}\n\n"
-        "<i>После подписки нажмите «Я подписался».</i>"
+        f"{tail}"
     )
