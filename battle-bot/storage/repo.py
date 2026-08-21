@@ -209,8 +209,22 @@ class Repo:
             ).fetchone()[0]
         )
 
+    def match_count(self, battle_id: int, round_no: int) -> int:
+        """Сколько матчей уже заведено в этом раунде — для нумерации пар."""
+        return int(
+            self.conn.execute(
+                "SELECT COUNT(*) FROM matches WHERE battle_id = ? AND round_no = ?",
+                (battle_id, round_no),
+            ).fetchone()[0]
+        )
+
     def unassigned_players(self, battle_id: int) -> list[Player]:
-        """Заявки, которым ещё не досталась пара в первом раунде."""
+        """Заявки, которым ещё не досталась пара.
+
+        Это либо новички, подсевшие в идущий батл и ждущие соперника, либо
+        нечётный участник первого раунда. Порядок — по времени заявки: кто
+        ждёт дольше, тот и получает соперника первым.
+        """
         rows = self.conn.execute(
             """SELECT p.user_id, p.nickname FROM participants p
                WHERE p.battle_id = ? AND p.status = ?

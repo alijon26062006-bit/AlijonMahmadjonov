@@ -85,13 +85,25 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
 def battle(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
     current = stats["battle"]
     if current:
+        limit = stats.get("late_join_until", 0)
+        round_no = int(current["round_no"])
+        if round_no <= limit:
+            intake = f"🎫 Приём заявок: <b>идёт</b> <i>(до конца {limit} раунда)</i>"
+        else:
+            intake = "🎫 Приём заявок: <b>закрыт</b> <i>(копятся на следующий батл)</i>"
+
+        waiting = stats.get("waiting_rival", 0)
+        rival_line = (
+            f"\n⏳ Ждут соперника: <b>{waiting}</b>" if waiting else ""
+        )
         body = (
             f"Батл <b>#{current['id']}</b>\n"
             f"Состояние: <b>{current['status']}</b>\n"
-            f"Раунд: <b>{current['round_no']}</b>\n"
+            f"Раунд: <b>{round_no}</b>\n"
             f"Заявок: <b>{stats['participants']}</b>\n"
             f"В игре: <b>{stats['alive']}</b>\n"
-            f"Открытых матчей: <b>{stats['open_matches']}</b>\n"
+            f"Открытых матчей: <b>{stats['open_matches']}</b>{rival_line}\n"
+            f"{intake}\n"
             f"🗓 Итоги в <b>{stats['deadline']}</b>\n\n"
             f"Прогноз сетки: <code>{stats['projection']}</code>"
         )
@@ -489,6 +501,7 @@ def settings_screen(values: dict, sponsors: list[int]) -> tuple[str, InlineKeybo
         f"🗓 Время итогов: <b>{times}</b>\n"
         f"👥 Участников: от <b>{values['min_participants']}</b> "
         f"до <b>{values['max_participants']}</b>\n"
+        f"🎫 Приём заявок в идущий батл: <b>до {values['late_join_until_round']} раунда</b>\n"
         f"🔖 Требовать @username: <b>{onoff(values['require_username'])}</b>\n"
         f"🎨 Премиум-эмодзи в канале: <b>{values['premium_emoji_in_channel']}</b>\n\n"
         f"<b>Обязательная подписка</b>\n"
@@ -503,6 +516,7 @@ def settings_screen(values: dict, sponsors: list[int]) -> tuple[str, InlineKeybo
         [button("🗓 Время итогов", "edit:round_times", BLUE)],
         [button("👥 Минимум", "edit:min_participants"),
          button("Максимум", "edit:max_participants")],
+        [button("🎫 Приём заявок до раунда", "edit:late_join_until_round")],
         [button("📣 Подписка для заявок", "settings:toggle:require_subscription")],
         [button("🆔 Каналы подписки", "edit:sponsor_channels")],
         [button("🩺 Проверить каналы", "settings:check", BLUE)],

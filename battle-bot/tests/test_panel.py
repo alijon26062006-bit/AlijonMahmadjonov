@@ -104,6 +104,7 @@ def test_person_card_builds(env):
     ("vote_price", "7", 7),
     ("min_participants", "6", 6),
     ("max_participants", "128", 128),
+    ("late_join_until_round", "3", 3),
 ])
 def test_valid_input_is_saved(env, key, raw, expected):
     _, _, settings, _ = env

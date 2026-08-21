@@ -65,6 +65,11 @@ EDITORS: dict[str, dict] = {
         "back": "referrals",
     },
     "round_times": {"check": validation.as_times, "back": "settings"},
+    "late_join_until_round": {
+        # 0 — подсадки нет; больше пяти раундов батл почти не живёт
+        "check": lambda raw: validation.as_int(raw, minimum=0, maximum=10, example="2"),
+        "back": "settings",
+    },
     "min_participants": {
         "check": lambda raw: validation.as_int(raw, minimum=2, maximum=1000, example="4"),
         "back": "settings",
@@ -144,6 +149,8 @@ def collect(repo: Repo, engine: BattleEngine) -> dict:
         "is_final": False,
         "deadline": "—",
         "projection": "—",
+        "waiting_rival": 0,
+        "late_join_until": engine.late_join_limit(),
     }
     if battle:
         battle_id = int(battle["id"])
@@ -153,6 +160,7 @@ def collect(repo: Repo, engine: BattleEngine) -> dict:
             participants=repo.participant_count(battle_id),
             alive=len(alive),
             open_matches=len(matches),
+            waiting_rival=len(repo.unassigned_players(battle_id)),
             is_final=bool(matches and matches[0]["is_final"]),
             deadline=datetime.fromisoformat(battle["deadline"]).strftime("%H:%M %d.%m"),
             projection=" → ".join(map(str, bracket.project_rounds(len(alive)))) if alive else "—",

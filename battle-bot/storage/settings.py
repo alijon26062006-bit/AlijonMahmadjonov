@@ -87,6 +87,8 @@ FIELDS: dict[str, Field] = {
         Field("main_post_message_id", "ID опубликованного главного поста", str, int, ""),
         Field("member_channels_enabled", "Каналы участников",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("late_join_until_round", "Приём заявок до раунда", str, int,
+              "номер раунда; 0 — подсадки нет, только очередь"),
     )
 }
 
@@ -122,6 +124,8 @@ class Settings:
         "main_post_text": "",
         "main_post_message_id": 0,
         "member_channels_enabled": True,
+        # до конца какого раунда новичок попадает в идущий батл, а не в очередь
+        "late_join_until_round": 2,
     }
 
     def _from_config(self, key: str) -> Any:

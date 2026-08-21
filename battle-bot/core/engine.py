@@ -50,17 +50,18 @@ class BattleEngine:
     # ------------------------------------------------------------------ заявки
 
     async def join(self, user_id: int, nickname: str) -> tuple[bool, str]:
-        """Записать в очередь на следующий батл.
+        """Принять заявку.
 
-        Очередь копится всегда — и пока батла нет, и пока идёт текущий.
-        Пары составляются в момент, когда админ создаёт батл.
+        Пока батл в начальных раундах, новичок попадает **в него**: как только
+        наберётся пара, её пост сразу выходит в канале. Так канал живёт всё
+        время батла, а не только в момент старта.
 
-        Лок здесь сознательно не берётся. Подведение итогов держит его
-        минутами: там сотни сообщений в канал и в личку. Если бы заявка ждала
-        его, человек в это время видел бы зависшую кнопку. А ждать нечего:
-        заявка трогает только очередь, и запись ровно одна — `enqueue`
-        отдаёт False, если человек уже в ней. Худшее, что может случиться при
-        совпадении с созданием батла, — заявка достанется следующему батлу.
+        Позже подсаживать нельзя — сетка уже сошлась к финалу, и свежий
+        участник получил бы преимущество перед теми, кто прошёл два раунда.
+        С этого момента заявки просто копятся в очереди на следующий батл.
+
+        До какого раунда пускать — настройка «Приём заявок до раунда»
+        (по умолчанию 2).
         """
         if self.repo.is_banned(user_id):
             return False, "Вы не можете участвовать в батлах."
@@ -69,28 +70,81 @@ class BattleEngine:
         if battle is not None and self.repo.is_participant(int(battle["id"]), user_id):
             return False, texts.ALREADY_IN_BATTLE
 
+        if self._accepts_latecomers(battle):
+            joined = await self._join_running(user_id, nickname)
+            if joined is not None:
+                return joined
+
+        # очередь трогает только саму себя, поэтому лок ей не нужен: заявка
+        # не должна ждать подведения итогов, которое идёт минутами
         if not self.repo.enqueue(user_id, nickname):
             return False, texts.already_queued(self.repo.queue_size())
 
         return True, texts.queued(self.repo.queue_size())
 
-    def _create_pair_match(self, battle_id: int, pair: list[Player]) -> tuple[int, list[Player]]:
-        """Завести матч первого раунда для двух заявок."""
-        battle = self.repo.current_battle()
+    def late_join_limit(self) -> int:
+        try:
+            return int(self.settings.get("late_join_until_round"))
+        except (TypeError, ValueError):
+            return 0
+
+    def _accepts_latecomers(self, battle) -> bool:
+        """Можно ли ещё подсадить новичка в этот батл."""
+        if battle is None:
+            return False
+        return int(battle["round_no"]) <= self.late_join_limit()
+
+    async def _join_running(self, user_id: int, nickname: str) -> tuple[bool, str] | None:
+        """Подсадить в идущий батл. None — не получилось, пусть идёт в очередь.
+
+        Лок нужен: заявка заводит матч, а подведение итогов в это же время
+        закрывает раунд. Без него пара могла бы родиться в раунде, который
+        уже закрывают, и умереть с нулём голосов.
+        """
+        async with self._lock:
+            battle = self.repo.current_battle()
+            if not self._accepts_latecomers(battle):
+                return None  # пока ждали лок, раунд сменился или батл кончился
+
+            battle_id = int(battle["id"])
+            round_no = int(battle["round_no"])
+            if self.repo.participant_count(battle_id) >= self.config.max_participants:
+                return None  # батл переполнен — такому место в очереди
+
+            # В маленьком батле финал наступает уже во втором раунде. Подсадить
+            # туда нельзя: финал разыгрывает призовые места, и пара, заведённая
+            # рядом с ним, просто сгорела бы вместе с концом батла.
+            if any(row["is_final"] for row in self.repo.open_matches(battle_id, round_no)):
+                return None
+
+            if not self.repo.add_participant(battle_id, user_id, nickname):
+                return False, texts.ALREADY_IN_BATTLE
+            self.repo.leave_queue(user_id)  # он уже в батле, в очереди ему делать нечего
+
+            waiting = self.repo.unassigned_players(battle_id)
+            if len(waiting) < 2:
+                return True, texts.joined_running(round_no)
+
+            await self._pair_latecomers(battle, waiting[:2])
+            rival = next(p.nickname for p in waiting[:2] if p.user_id != user_id)
+            return True, texts.pair_published(rival)
+
+    async def _pair_latecomers(self, battle, pair: list[Player]) -> None:
+        """Завести и опубликовать пару из двух подсевших."""
+        battle_id = int(battle["id"])
+        round_no = int(battle["round_no"])
         deadline = datetime.fromisoformat(battle["deadline"])
-        number = len(self.repo.open_matches(battle_id, 1)) + 1
+
         match_id = self.repo.create_match(
             battle_id=battle_id,
-            round_no=1,
-            number=number,
+            round_no=round_no,
+            number=self.repo.match_count(battle_id, round_no) + 1,
             players=pair,
             advance=1,
             is_final=False,
             deadline=deadline,
         )
-        return match_id, pair
-
-    async def _notify_pair(self, match_id: int, pair: list[Player], message_id: int | None) -> None:
+        message_id = await self.publisher.publish_match(match_id)
         markup = keyboards.my_match(
             match_id, self.config, self._post_url(message_id),
             member_channel.enabled(self.settings),
@@ -98,6 +152,8 @@ class BattleEngine:
         for player in pair:
             rival = next(p.nickname for p in pair if p.user_id != player.user_id)
             await self._dm(player.user_id, texts.pair_published(rival), markup)
+            await self._publish_to_own_channel(player.user_id, match_id)
+        log.info("Подсадил пару в батл #%s, раунд %s: матч %s", battle_id, round_no, match_id)
 
     def _post_url(self, message_id: int | None) -> str | None:
         if not message_id:
@@ -170,8 +226,9 @@ class BattleEngine:
             await self._finish_battle(battle_id, final_ranking)
             return
 
-        # тот, кто в первом раунде остался без пары, проходит без боя
-        byes = [p.user_id for p in self.repo.unassigned_players(battle_id)] if round_no == 1 else []
+        # кому не досталось пары — проходит без боя. Это и нечётный участник
+        # первого раунда, и новичок, подсевший под конец раунда
+        byes = [p.user_id for p in self.repo.unassigned_players(battle_id)]
         self.repo.eliminate(battle_id, eliminated)
         self.repo.bump_wins(advanced)
 

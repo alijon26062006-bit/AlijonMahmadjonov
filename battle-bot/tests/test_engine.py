@@ -2,7 +2,7 @@
 import random
 import sys
 from dataclasses import replace
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from pathlib import Path
 
 import pytest
@@ -306,17 +306,96 @@ async def test_closing_without_a_battle_does_nothing(env):
 
 
 @pytest.mark.asyncio
-async def test_newcomers_queue_up_while_a_battle_is_running(env):
-    """Пришёл посреди батла — попадает в очередь на следующий, а не за борт."""
-    bot, repo, engine = env
+async def test_a_newcomer_joins_the_running_battle(env):
+    """Пришёл посреди первого раунда — попадает в этот же батл, а не в очередь."""
+    _, repo, engine = env
     await join_users(engine, repo, 4)
 
     repo.upsert_user(99, "late", "Late")
     accepted, text = await engine.join(99, "late")
 
+    assert accepted and "в батле" in text.lower()
+    assert repo.is_participant(1, 99), "новичок должен попасть в идущий батл"
+    assert repo.queue_size() == 0, "в очереди ему делать нечего"
+
+
+@pytest.mark.asyncio
+async def test_two_newcomers_get_a_published_pair(env):
+    """Набралась пара из подсевших — её пост сразу выходит в канале."""
+    bot, repo, engine = env
+    await join_users(engine, repo, 4)
+    posts_before = len(bot.channel_posts)
+
+    for user_id in (98, 99):
+        repo.upsert_user(user_id, f"late{user_id}", "L")
+        await engine.join(user_id, f"late{user_id}")
+
+    assert len(bot.channel_posts) > posts_before, "пара должна выйти в канале"
+    assert len(repo.open_matches(1, 1)) == 3, "два исходных матча плюс подсаженный"
+    assert "late99" in bot.direct[98][-1], "каждому назвали соперника"
+
+
+@pytest.mark.asyncio
+async def test_a_lonely_newcomer_waits_and_passes_without_a_fight(env):
+    """Соперник не подошёл до итогов — проход без боя, а не вылет."""
+    _, repo, engine = env
+    await join_users(engine, repo, 4)
+    repo.upsert_user(99, "late", "Late")
+    await engine.join(99, "late")
+
+    vote_for(repo, 1, 1, range(1000, 1003))
+    vote_for(repo, 2, 3, range(2000, 2003))
+    await engine.close_round(force=True)
+
+    assert 99 in [p.user_id for p in repo.alive_players(1)], "должен пройти дальше"
+
+
+@pytest.mark.asyncio
+async def test_after_the_window_newcomers_go_to_the_queue(env):
+    """Сетка сошлась — свежих участников в неё уже не подсаживаем."""
+    _, repo, engine = env
+    await join_users(engine, repo, 4)
+    engine.settings.set("late_join_until_round", 1)
+    repo.set_round(1, 2, engine.now() + timedelta(hours=1))
+
+    repo.upsert_user(99, "late", "Late")
+    accepted, text = await engine.join(99, "late")
+
     assert accepted and "очереди" in text
+    assert not repo.is_participant(1, 99)
     assert repo.queue_size() == 1
-    assert not repo.is_participant(1, 99), "в текущий батл он не попал"
+
+
+@pytest.mark.asyncio
+async def test_nobody_is_seated_next_to_a_final(env):
+    """В маленьком батле финал наступает во 2 раунде — подсадка туда запрещена."""
+    _, repo, engine = env
+    await join_users(engine, repo, 4)
+    vote_for(repo, 1, 1, range(1000, 1003))
+    vote_for(repo, 2, 3, range(2000, 2003))
+    await engine.close_round(force=True)
+
+    assert repo.open_matches(1, 2)[0]["is_final"], "второй раунд — уже финал"
+
+    repo.upsert_user(99, "late", "Late")
+    accepted, text = await engine.join(99, "late")
+
+    assert accepted and "очереди" in text
+    assert not repo.is_participant(1, 99), "рядом с финалом пар не заводим"
+
+
+@pytest.mark.asyncio
+async def test_the_window_can_be_switched_off(env):
+    """Ноль в настройке — подсадки нет вовсе, всё копится в очереди."""
+    _, repo, engine = env
+    await join_users(engine, repo, 4)
+    engine.settings.set("late_join_until_round", 0)
+
+    repo.upsert_user(99, "late", "Late")
+    accepted, text = await engine.join(99, "late")
+
+    assert accepted and "очереди" in text
+    assert not repo.is_participant(1, 99)
 
 
 @pytest.mark.asyncio
@@ -379,6 +458,7 @@ async def test_the_queue_survives_a_whole_battle(env):
     """Записавшиеся во время батла ждут следующего, а не теряются."""
     bot, repo, engine = env
     await join_users(engine, repo, 4)
+    engine.settings.set("late_join_until_round", 0)  # проверяем именно очередь
 
     for user_id in (10, 11, 12):
         repo.upsert_user(user_id, f"new{user_id}", "N")
