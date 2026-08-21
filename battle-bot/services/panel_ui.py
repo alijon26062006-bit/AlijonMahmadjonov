@@ -153,16 +153,21 @@ def confirm(question: str, yes_action: str, back: str) -> tuple[str, InlineKeybo
 
 # ------------------------------------------------------------------- призы
 
-def prizes(values: list[int]) -> tuple[str, InlineKeyboardMarkup]:
+def prizes(values: list[str]) -> tuple[str, InlineKeyboardMarkup]:
+    from services import prizes as prize_list
+
     lines = [
-        f"{texts.MEDAL.get(i, f'{i}.')} <b>{amount}⭐</b>"
-        for i, amount in enumerate(values, start=1)
-    ]
+        f"{texts.MEDAL.get(i, f'{i}.')} <b>{prize_list.label(value)}</b>"
+        for i, value in enumerate(values, start=1)
+    ] or ["<i>призы не заданы</i>"]
     text = (
         f"🏆 <b>{texts.spaced('ПРИЗЫ')}</b>\n{RULE}\n\n"
         + "\n".join(lines)
         + "\n\n<i>Призы получают первые места финала. "
-        "Сколько мест — столько и призов.</i>"
+        "Сколько мест — столько и призов.</i>\n\n"
+        "<blockquote>Приз можно писать текстом: <b>число</b> бот покажет "
+        "как звёзды, а любой другой текст — как есть. "
+        "Например «Telegram Premium на 3 месяца» или «Реклама в канале».</blockquote>"
     )
     return text, keyboard([button("✏️ Изменить", "edit:prizes", BLUE)], back_row())
 
@@ -544,10 +549,18 @@ def subscription_check(rows: list[tuple[int, str]]) -> tuple[str, InlineKeyboard
 
 
 def ask(field_title: str, current: str, hint: str, back: str) -> tuple[str, InlineKeyboardMarkup]:
-    """Экран ожидания ввода."""
+    """Экран ожидания ввода.
+
+    Многострочное значение (список призов) показываем блоком — в строку
+    «Сейчас: …» оно не помещается и читается как каша.
+    """
+    if "\n" in current:
+        now = f"Сейчас:\n<blockquote>{escape(current)}</blockquote>\n"
+    else:
+        now = f"Сейчас: <b>{escape(current)}</b>\n\n"
     text = (
         f"✏️ <b>{escape(field_title)}</b>\n{RULE}\n\n"
-        f"Сейчас: <b>{escape(current)}</b>\n\n"
+        f"{now}"
         f"Пришлите новое значение сообщением."
     )
     if hint:

@@ -69,7 +69,7 @@ def make_config(**overrides) -> Config:
         referral_reward=1,
         premium_emoji_file="",
         premium_emoji_in_channel="auto",
-        prizes=[1000, 500, 250],
+        prizes=["1000", "500", "250"],
         publish_delay=0.0,
         dm_delay=0.0,
     )

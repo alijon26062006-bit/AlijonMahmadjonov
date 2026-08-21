@@ -23,17 +23,17 @@ def env(tmp_path):
 
 def test_initial_values_come_from_env(env):
     settings, config = env
-    assert settings.get("prizes") == [1000, 500, 250]
+    assert settings.get("prizes") == ["1000", "500", "250"]
     assert settings.get("min_participants") == config.min_participants
 
 
 def test_changing_a_setting_reaches_the_running_config(env):
     """Правка из панели должна работать без перезапуска бота."""
     settings, config = env
-    settings.set("prizes", [2000, 1000, 500])
+    settings.set("prizes", ["2000", "1000", "500"])
 
-    assert settings.get("prizes") == [2000, 1000, 500]
-    assert config.prizes == [2000, 1000, 500], "рабочий конфиг обязан обновиться"
+    assert settings.get("prizes") == ["2000", "1000", "500"]
+    assert config.prizes == ["2000", "1000", "500"], "рабочий конфиг обязан обновиться"
 
 
 def test_vote_price_drives_the_pack(env):

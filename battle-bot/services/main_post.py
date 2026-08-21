@@ -24,11 +24,13 @@ log = logging.getLogger(__name__)
 JOIN_BUTTON = "⚡ Участвовать"
 
 
-def default_text(prizes: list[int]) -> str:
+def default_text(prizes: list[str]) -> str:
     """Витрина набора: заголовок, призы в цитате и указание на кнопку."""
+    from services import prizes as prize_list
+
     places = "\n".join(
-        f"{index} место — <b>{amount}</b>⭐"
-        for index, amount in enumerate(prizes, start=1)
+        f"{index} место — <b>{prize_list.label(value)}</b>"
+        for index, value in enumerate(prizes, start=1)
     )
     return (
         "⚔️ <b>НАБОР НА БИТВУ НИКОВ</b>\n\n"

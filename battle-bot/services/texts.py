@@ -80,11 +80,18 @@ def round_title(round_no: int, is_final: bool) -> str:
     return spaced("ФИНАЛ") if is_final else f"{round_no} {spaced('РАУНД')}"
 
 
-def prizes_block(prizes: list[int]) -> str:
+def prizes_block(prizes: list[str]) -> str:
+    """Призы за финал. Длинные текстовые призы идут столбиком, а не в строку."""
+    from services import prizes as prize_list
+
     lines = [
-        f"{MEDAL.get(i, f'{i}.')} <b>{amount}⭐</b>" for i, amount in enumerate(prizes, start=1)
+        f"{MEDAL.get(i, f'{i}.')} <b>{prize_list.label(value)}</b>"
+        for i, value in enumerate(prizes, start=1)
     ]
-    return "🍋 <b>Призы за финал</b>\n" + "  ·  ".join(lines)
+    if not lines:
+        return ""
+    separator = "\n" if any(len(str(v)) > 16 for v in prizes) else "  ·  "
+    return "🍋 <b>Призы за финал</b>\n" + separator.join(lines)
 
 
 def deadline_line(deadline: datetime) -> str:
@@ -97,7 +104,7 @@ def channel_post(
     round_no: int,
     is_final: bool,
     slots: list[Slot],
-    prizes: list[int],
+    prizes: list[str],
     deadline: datetime,
     vote_url: str,
     join_url: str,
@@ -163,7 +170,7 @@ def postponed(applied: int, needed: int, deadline: datetime) -> str:
     )
 
 
-def registration_open(deadline: datetime, prizes: list[int]) -> str:
+def registration_open(deadline: datetime, prizes: list[str]) -> str:
     return (
         f"⚔️ <b>{spaced('НАБОР ОТКРЫТ')}</b>\n"
         f"{RULE}\n\n"
@@ -203,7 +210,7 @@ def reminder_dm(hours: int, link: str) -> str:
     )
 
 
-def daily_call(applied: int, deadline: datetime, prizes: list[int]) -> str:
+def daily_call(applied: int, deadline: datetime, prizes: list[str]) -> str:
     """Ежедневный зов в канал, пока идёт приём заявок."""
     who = (
         f"👥 Уже подали заявку: <b>{applied}</b>"
@@ -219,7 +226,7 @@ def daily_call(applied: int, deadline: datetime, prizes: list[int]) -> str:
     )
 
 
-def queue_call(waiting: int, prizes: list[int]) -> str:
+def queue_call(waiting: int, prizes: list[str]) -> str:
     """Ежедневный зов, когда батла нет: собираем очередь на следующий."""
     who = (
         f"🎫 Уже в очереди: <b>{waiting}</b> "
@@ -257,11 +264,13 @@ BATTLE_CANCELLED_DM = (
 )
 
 
-def final_announcement(ranking: list[Slot], prizes: list[int]) -> str:
+def final_announcement(ranking: list[Slot], prizes: list[str]) -> str:
+    from services import prizes as prize_list
+
     lines = []
     for slot in ranking[: len(prizes)]:
-        prize = prizes[slot.position - 1]
-        lines.append(f"{MEDAL.get(slot.position, '')} <b>{nick(slot.nickname)}</b> — {prize}⭐")
+        prize = prize_list.label(prizes[slot.position - 1])
+        lines.append(f"{MEDAL.get(slot.position, '')} <b>{nick(slot.nickname)}</b> — {prize}")
     return (
         f"🏆 <b>{spaced('БАТЛ ЗАВЕРШЁН')}</b>\n"
         f"{RULE}\n\n" + "\n".join(lines)
@@ -538,11 +547,13 @@ MY_CHANNEL_OFF = (
 )
 
 
-def took_place(place: int, prize: int) -> str:
+def took_place(place: int, prize: str) -> str:
+    from services import prizes as prize_list
+
     return (
         f"{MEDAL.get(place, '🏆')} <b>{place} место!</b>\n"
         f"{RULE}\n\n"
-        f"Ваш приз: <b>{prize}⭐</b>\n\n"
+        f"Ваш приз: <b>{prize_list.label(prize)}</b>\n\n"
         "<b>Спасибо за игру</b> — ждём вас в следующем батле."
     )
 

@@ -20,7 +20,8 @@ from config import Config
 from core import background, bracket
 from core.engine import BattleEngine
 from services import (
-    keyboards, ui, main_post, panel_ui, sponsors, subscription, texts, validation,
+    keyboards, main_post, panel_ui, prizes, sponsors, subscription, texts, ui,
+    validation,
 )
 from services.validation import InputError
 from storage.repo import Repo
@@ -39,10 +40,7 @@ class Panel(StatesGroup):
 
 # какой проверкой встречать каждое поле и куда возвращаться после ввода
 EDITORS: dict[str, dict] = {
-    "prizes": {
-        "check": lambda raw: validation.as_int_list(raw, minimum=0, max_items=10),
-        "back": "prizes",
-    },
+    "prizes": {"check": prizes.check, "back": "prizes"},
     "vote_price": {
         "check": lambda raw: validation.as_int(raw, minimum=1, maximum=2500, example="5"),
         "back": "votes",

@@ -100,7 +100,7 @@ def test_person_card_builds(env):
 # -------------------------------------------------------- правка настроек
 
 @pytest.mark.parametrize("key,raw,expected", [
-    ("prizes", "2000, 1000, 500", [2000, 1000, 500]),
+    ("prizes", "2000, 1000, 500", ["2000", "1000", "500"]),
     ("vote_price", "7", 7),
     ("min_participants", "6", 6),
     ("max_participants", "128", 128),
@@ -114,7 +114,6 @@ def test_valid_input_is_saved(env, key, raw, expected):
 
 
 @pytest.mark.parametrize("key,raw", [
-    ("prizes", "тысяча, 500"),
     ("vote_price", "бесплатно"),
     ("vote_price", "0"),
     ("vote_price", "-5"),
@@ -146,7 +145,7 @@ def test_editing_prizes_reaches_the_running_battle(env):
     """Смена призов должна работать без перезапуска."""
     _, config, settings, _ = env
     settings.set("prizes", panel.EDITORS["prizes"]["check"]("3000,2000,1000"))
-    assert config.prizes == [3000, 2000, 1000]
+    assert config.prizes == ["3000", "2000", "1000"]
 
 
 # ------------------------------------------------------------ главный пост
@@ -200,7 +199,7 @@ def test_main_post_looks_like_a_recruitment_card(env):
 
     assert "НАБОР НА БИТВУ НИКОВ" in body
     assert "<blockquote>" in body, "призы в цитате, как в образце"
-    assert "1 место — <b>1000</b>⭐" in body
+    assert "1 место — <b>1000⭐</b>" in body
     assert "Участвовать по кнопке" in body
 
 
@@ -698,8 +697,8 @@ async def test_saving_prizes_from_the_panel(env):
 
     await panel.receive_value(message, repo, config, engine, settings, state)
 
-    assert settings.get("prizes") == [3000, 2000, 1000]
-    assert config.prizes == [3000, 2000, 1000], "должно примениться без перезапуска"
+    assert settings.get("prizes") == ["3000", "2000", "1000"]
+    assert config.prizes == ["3000", "2000", "1000"], "должно примениться без перезапуска"
     assert state.cleared
 
 

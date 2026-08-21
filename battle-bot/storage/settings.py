@@ -16,6 +16,7 @@ from datetime import time
 from typing import Any, Callable
 
 from config import Config, VotePack, _parse_times
+from services import prizes
 
 log = logging.getLogger(__name__)
 
@@ -52,8 +53,9 @@ def _text_to_ints(raw: str) -> list[int]:
 FIELDS: dict[str, Field] = {
     field.key: field
     for field in (
-        Field("prizes", "Призы за 1/2/3 место", _ints_to_text, _text_to_ints,
-              "числа через запятую, например 1000,500,250"),
+        Field("prizes", "Призы за места", prizes.dump, prizes.parse,
+              "каждый приз с новой строки; число — это звёзды, "
+              "текст показывается как есть"),
         Field("vote_price", "Цена одного голоса в звёздах", str, int, "целое число"),
         Field("paid_votes_enabled", "Продажа голосов", lambda v: "1" if v else "0",
               lambda raw: raw == "1"),

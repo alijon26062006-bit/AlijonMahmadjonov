@@ -73,7 +73,7 @@ class Config:
     referral_reward: int      # голосов за одного приглашённого
     premium_emoji_file: str  # JSON «символ -> emoji_id», пусто -> обычные эмодзи
     premium_emoji_in_channel: str   # "auto" | "1" | "0", см. services/emoji.py
-    prizes: list[int]        # звёзды за 1/2/3 место
+    prizes: list[str]        # призы за 1/2/3 место: число — звёзды, текст — как есть
     publish_delay: float     # пауза между постами, чтобы не ловить лимиты Telegram
     dm_delay: float          # пауза между личными сообщениями при рассылке
 
@@ -94,8 +94,9 @@ def load_config() -> Config:
         if votes:
             packs.append(VotePack(int(votes), int(stars)))
 
-    prizes_raw = os.getenv("PRIZES", "1000,500,250")
-    prizes = [int(x) for x in prizes_raw.split(",") if x.strip()]
+    from services.prizes import parse as parse_prizes
+
+    prizes = parse_prizes(os.getenv("PRIZES", "1000,500,250"))
 
     return Config(
         bot_token=_env("BOT_TOKEN"),
