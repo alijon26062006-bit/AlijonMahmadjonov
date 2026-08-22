@@ -95,6 +95,21 @@ async def amount_entered(
     )
 
 
+@router.callback_query(F.data == "buy:open")
+async def open_buy_from_button(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings,
+    state: FSMContext,
+) -> None:
+    """«Купить голоса» с экрана «голоса закончились»."""
+    if not settings.get("paid_votes_enabled"):
+        await callback.answer("Покупка голосов сейчас отключена.", show_alert=True)
+        return
+    repo.upsert_user(callback.from_user.id, callback.from_user.username,
+                     callback.from_user.first_name)
+    await _screen(callback.message, repo, settings, state)
+    await callback.answer()
+
+
 @router.callback_query(F.data == "buy:invite")
 async def invite_instead(
     callback: CallbackQuery, repo: Repo, config: Config, settings: Settings, state: FSMContext

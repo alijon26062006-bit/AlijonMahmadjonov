@@ -53,7 +53,7 @@ async def gate(
 
 async def show_voting(
     message: Message, match_id: int, repo: Repo, config: Config,
-    called_for: int | None = None,
+    called_for: int | None = None, scope: str | None = None,
 ) -> None:
     """Отрисовать экран голосования по матчу.
 
@@ -76,10 +76,11 @@ async def show_voting(
     deadline = datetime.fromisoformat(match["deadline"])
     called = next((s for s in slots if s.user_id == called_for), None)
     intro = texts.called_to_support(called.nickname) if called else ""
+    rules = f"\n{texts.voting_rules(scope)}" if scope else ""
     await message.answer(
         intro + texts.voting_screen(
             match["round_no"], bool(match["is_final"]), slots, deadline
-        ),
+        ) + rules,
         reply_markup=keyboards.voting(
             match_id, slots, config, _post_url(config, match), called_for
         ),
@@ -122,9 +123,19 @@ async def cast_vote(
         await callback.answer("Голосовать могут только подписчики канала.", show_alert=True)
         return
 
-    source, note = _pick_vote_source(repo, match_id, callback.from_user.id, config)
+    # повтор в этой же паре ловим до списания: иначе купленный голос
+    # списался бы и тут же вернулся, а человек увидел бы странный отказ
+    if repo.already_voted(match_id, callback.from_user.id):
+        await callback.answer(REFUSALS[VoteResult.DUPLICATE], show_alert=True)
+        await _refresh(callback, match_id, repo, config)
+        return
+
+    source, note = _pick_vote_source(
+        repo, match_id, callback.from_user.id, config, settings
+    )
     if source is None:
         await callback.answer(note, show_alert=True)
+        await _offer_votes(callback, config, settings)
         return
 
     before = repo.match_slots(match_id)
@@ -149,19 +160,37 @@ async def cast_vote(
 
 
 def _pick_vote_source(
-    repo: Repo, match_id: int, voter_id: int, config: Config
+    repo: Repo, match_id: int, voter_id: int, config: Config, settings: Settings
 ) -> tuple[VoteSource | None, str]:
-    """Первый голос — бесплатный, дальше списываем купленные."""
-    if not repo.has_free_vote(match_id, voter_id):
+    """Первый голос — бесплатный, дальше списываем купленные.
+
+    Насколько широко действует бесплатный голос, решает настройка
+    «Бесплатный голос»: по умолчанию он один на весь батл, а не на каждую
+    пару. Захотел поддержать ещё кого-то — нужны купленные голоса.
+    """
+    scope = settings.get("free_vote_scope")
+    if not repo.free_vote_used(match_id, voter_id, scope):
         return VoteSource.FREE, "Голос учтён 👍"
 
+    spent = texts.free_vote_spent(scope)
     if not config.paid_votes_enabled:
-        return None, "Вы уже голосовали в этом матче."
+        return None, spent
 
     if repo.spend_vote(voter_id):
         return VoteSource.PAID, "Списан 1 купленный голос ⭐"
 
-    return None, "Вы уже голосовали. Докупить голоса можно в меню «Купить голоса»."
+    return None, f"{spent} Докупить их можно кнопкой ниже."
+
+
+async def _offer_votes(callback: CallbackQuery, config: Config, settings: Settings) -> None:
+    """Отказали из-за нехватки голосов — сразу показать, где их взять."""
+    if not settings.get("paid_votes_enabled"):
+        return
+    await ui.send(
+        callback,
+        texts.out_of_votes(settings.vote_price),
+        reply_markup=keyboards.out_of_votes(),
+    )
 
 
 @router.callback_query(F.data.startswith("open:"))
@@ -177,7 +206,10 @@ async def open_voting(
     if await gate(callback.bot, callback, match_id, config, settings, callback.from_user.id):
         await callback.answer("Подписки всё ещё нет.", show_alert=True)
         return
-    await show_voting(callback.message, match_id, repo, config)
+    await show_voting(
+        callback.message, match_id, repo, config,
+        scope=settings.get("free_vote_scope"),
+    )
     await callback.answer()
 
 

@@ -91,6 +91,9 @@ FIELDS: dict[str, Field] = {
         Field("main_post_message_id", "ID опубликованного главного поста", str, int, ""),
         Field("member_channels_enabled", "Каналы участников",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("free_vote_scope", "Бесплатный голос", str, str,
+              "battle — один на весь батл, round — один на раунд, "
+              "match — один на каждую пару"),
         Field("late_join_until_round", "Приём заявок до раунда", str, int,
               "номер раунда; 0 — подсадки нет, только очередь"),
         # кнопки-ссылки под экраном «Помощь»; пусто — кнопки нет
@@ -156,6 +159,8 @@ class Settings:
         # до конца какого раунда новичок попадает в идущий батл, а не в очередь.
         # 1 — приём идёт весь первый раунд и закрывается, когда начинается второй
         "late_join_until_round": 1,
+        # один бесплатный голос на весь батл: за остальные пары — купленными
+        "free_vote_scope": "battle",
         "link_main_channel": "",
         "link_battles": "",
         "link_payouts": "",

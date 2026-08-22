@@ -252,12 +252,7 @@ async def show_votes(
 ) -> None:
     if not is_admin(callback.from_user.id, config):
         return
-    await render(
-        callback,
-        panel_ui.votes(
-            settings.vote_price, settings.get("paid_votes_enabled"), repo.sold_votes()
-        ),
-    )
+    await render(callback, _votes_screen(repo, settings))
     await callback.answer()
 
 
@@ -525,6 +520,29 @@ async def show_top(callback: CallbackQuery, repo: Repo, config: Config) -> None:
 
 # --------------------------------------------------------- переключатели
 
+def _votes_screen(repo: Repo, settings: Settings):
+    return panel_ui.votes(
+        settings.vote_price,
+        settings.get("paid_votes_enabled"),
+        repo.sold_votes(),
+        settings.get("stars_link"),
+        settings.get("free_vote_scope"),
+    )
+
+
+@router.callback_query(F.data == "p:votes:scope")
+async def cycle_free_scope(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """Переключить, насколько широко действует бесплатный голос."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    current = settings.get("free_vote_scope")
+    settings.set("free_vote_scope", panel_ui.SCOPE_NEXT.get(current, "battle"))
+    await render(callback, _votes_screen(repo, settings))
+    await callback.answer("Сохранено")
+
+
 @router.callback_query(F.data == "p:votes:toggle")
 async def toggle_votes(callback: CallbackQuery, repo: Repo, config: Config,
                        settings: Settings) -> None:
@@ -533,12 +551,7 @@ async def toggle_votes(callback: CallbackQuery, repo: Repo, config: Config,
     settings.set("paid_votes_enabled", not settings.get("paid_votes_enabled"))
     await render(
         callback,
-        panel_ui.votes(
-            settings.vote_price,
-            settings.get("paid_votes_enabled"),
-            repo.sold_votes(),
-            settings.get("stars_link"),
-        ),
+        _votes_screen(repo, settings),
     )
     await callback.answer("Сохранено")
 
@@ -818,12 +831,7 @@ async def _back_to(
     elif section == "votes":
         await render(
             message,
-            panel_ui.votes(
-                settings.vote_price,
-                settings.get("paid_votes_enabled"),
-                repo.sold_votes(),
-                settings.get("stars_link"),
-            ),
+            _votes_screen(repo, settings),
         )
     elif section == "auto":
         await render(message, _auto_screen(repo, settings))

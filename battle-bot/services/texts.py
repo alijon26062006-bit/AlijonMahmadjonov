@@ -447,6 +447,43 @@ def voting_screen(round_no: int, is_final: bool, slots: list[Slot], deadline: da
     )
 
 
+def voting_rules(scope: str) -> str:
+    return f"<i>{free_scope_line(scope)}.</i>"
+
+
+FREE_SCOPE_WORDS = {
+    "battle": "в этом батле",
+    "round": "в этом раунде",
+    "match": "в этом матче",
+}
+
+
+def free_scope_line(scope: str) -> str:
+    """Как объяснить правило бесплатного голоса на экране."""
+    return {
+        "battle": "Один бесплатный голос <b>на весь батл</b>",
+        "round": "Один бесплатный голос <b>на раунд</b>",
+        "match": "Один бесплатный голос <b>на каждую пару</b>",
+    }.get(scope, "Один бесплатный голос")
+
+
+def free_vote_spent(scope: str) -> str:
+    where = FREE_SCOPE_WORDS.get(scope, "здесь")
+    return f"Бесплатный голос {where} уже потрачен."
+
+
+def out_of_votes(price: int) -> str:
+    return (
+        f"🎁 <b>Голоса закончились</b>\n"
+        f"{RULE}\n\n"
+        "Бесплатный голос вы уже отдали. Чтобы поддержать <b>ещё кого-то</b>, "
+        "нужны купленные голоса.\n\n"
+        f"Один голос — <b>{price}</b>⭐\n\n"
+        "<blockquote>Голоса можно и не покупать: позовите друга по своей "
+        "ссылке — за него начисляется голос.</blockquote>"
+    )
+
+
 def vote_button(slot: Slot, index: int) -> str:
     return f"{index}) {slot.nickname} — {votes_word(slot.votes)}"
 
@@ -720,7 +757,7 @@ HELP = (
     "<b>5.</b> 1 раунд — <b>1vs1</b>, дальше <b>группы по 4 ника</b>.\n"
     "<b>6.</b> Финал забирает <b>призы за 1, 2 и 3 место</b>.\n\n"
     "Голосовать может любой подписчик канала: "
-    "<b>один бесплатный голос на матч</b>.\n\n"
+    "<b>один бесплатный голос на весь батл</b> — поддержать ещё кого-то можно купленными.\n\n"
     "📡 Есть свой канал? Подключите его в «<b>Мой канал</b>» — бот сам "
     "опубликует там вашу пару с кнопкой «Голосовать за меня».</blockquote>"
 )

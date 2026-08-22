@@ -337,11 +337,48 @@ class Repo:
 
     # ------------------------------------------------------------------ votes
 
-    def has_free_vote(self, match_id: int, voter_id: int) -> bool:
+    # насколько широко действует бесплатный голос
+    FREE_SCOPES = ("battle", "round", "match")
+
+    def free_vote_used(self, match_id: int, voter_id: int, scope: str = "battle") -> bool:
+        """Потрачен ли уже бесплатный голос.
+
+        ``battle`` — один бесплатный голос на весь батл: поддержал одну пару,
+        за остальные голосуй купленными. ``round`` — один на раунд,
+        ``match`` — один на каждую пару (как было раньше).
+        """
+        if scope == "match":
+            row = self.conn.execute(
+                """SELECT 1 FROM votes
+                   WHERE match_id = ? AND voter_id = ? AND source = ?""",
+                (match_id, voter_id, VoteSource.FREE.value),
+            ).fetchone()
+            return row is not None
+
+        same_round = " AND m.round_no = here.round_no" if scope == "round" else ""
         row = self.conn.execute(
-            """SELECT 1 FROM votes
-               WHERE match_id = ? AND voter_id = ? AND source = ?""",
+            f"""SELECT 1 FROM votes v
+                JOIN matches m ON m.id = v.match_id
+                JOIN matches here ON here.id = ?
+                WHERE v.voter_id = ? AND v.source = ?
+                  AND m.battle_id = here.battle_id{same_round}""",
             (match_id, voter_id, VoteSource.FREE.value),
+        ).fetchone()
+        return row is not None
+
+    def has_free_vote(self, match_id: int, voter_id: int) -> bool:
+        """Оставлено для совместимости: бесплатный голос в этом матче."""
+        return self.free_vote_used(match_id, voter_id, scope="match")
+
+    def already_voted(self, match_id: int, voter_id: int) -> bool:
+        """Голосовал ли человек в этом матче — любым голосом.
+
+        Проверяем до списания купленного: иначе он списывался бы и тут же
+        возвращался, а человек видел бы непонятный отказ.
+        """
+        row = self.conn.execute(
+            "SELECT 1 FROM votes WHERE match_id = ? AND voter_id = ?",
+            (match_id, voter_id),
         ).fetchone()
         return row is not None
 

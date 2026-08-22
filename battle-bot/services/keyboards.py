@@ -280,6 +280,16 @@ def help_links(links: dict[str, str], table: dict[str, str] | None = None) -> In
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
+def out_of_votes() -> InlineKeyboardMarkup:
+    """Голоса кончились — куда идти дальше."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🎁 Купить голоса", callback_data="buy:open", style=GREEN)],
+            [InlineKeyboardButton(text="🤝 Позвать друга", callback_data="buy:invite", style=BLUE)],
+        ]
+    )
+
+
 def menu_labels() -> set[str]:
     """Все подписи кнопок нижнего меню, в обоих видах.
 

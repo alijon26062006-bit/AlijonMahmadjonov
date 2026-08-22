@@ -42,7 +42,10 @@ async def start_with_payload(
         # экран голосования открываем только подписчику — голос без подписки невозможен
         if await voting.gate(bot, message, value, config, settings, message.from_user.id):
             return
-        await show_voting(message, value, repo, config, links.vote_target(command.args))
+        await show_voting(
+            message, value, repo, config, links.vote_target(command.args),
+            scope=settings.get("free_vote_scope"),
+        )
         return
 
     if kind == "join":
@@ -179,7 +182,9 @@ async def leaderboard(message: Message, repo: Repo) -> None:
 
 
 @router.message(Command("vote"))
-async def my_match(message: Message, repo: Repo, config: Config) -> None:
+async def my_match(
+    message: Message, repo: Repo, config: Config, settings: Settings
+) -> None:
     """Открыть экран голосования своего текущего матча."""
     match = repo.active_match_for(message.from_user.id)
     if match is None:
@@ -188,4 +193,7 @@ async def my_match(message: Message, repo: Repo, config: Config) -> None:
     if match is None:
         await message.answer(texts.NO_ACTIVE_BATTLE)
         return
-    await show_voting(message, int(match["id"]), repo, config)
+    await show_voting(
+        message, int(match["id"]), repo, config,
+        scope=settings.get("free_vote_scope"),
+    )
