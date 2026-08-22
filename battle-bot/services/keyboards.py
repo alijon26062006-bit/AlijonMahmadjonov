@@ -246,6 +246,40 @@ def after_join() -> InlineKeyboardMarkup:
     )
 
 
+# кнопки-ссылки под экраном «Помощь»: подпись, ключ настройки и ряд
+HELP_LINKS = (
+    ("📣 Основной канал", "link_main_channel", 0),
+    ("⚔️ Канал с батлами", "link_battles", 1),
+    ("⭐ Выплаты", "link_payouts", 1),
+    ("✉️ Связаться", "link_contact", 2),
+    ("📄 Правила", "link_rules", 2),
+)
+
+
+def help_links(links: dict[str, str], table: dict[str, str] | None = None) -> InlineKeyboardMarkup:
+    """Ряды кнопок-ссылок. Пустая ссылка — кнопки просто нет.
+
+    Ряды собираются из непустых кнопок, поэтому не заданная ссылка не
+    оставляет после себя дырку в клавиатуре.
+    """
+    table = table or {}
+    rows: dict[int, list[InlineKeyboardButton]] = {}
+    for label, key, row in HELP_LINKS:
+        url = (links.get(key) or "").strip()
+        if not url:
+            continue
+        text, emoji_id = leading_emoji(label, table)
+        rows.setdefault(row, []).append(
+            InlineKeyboardButton(text=text, url=url, icon_custom_emoji_id=emoji_id)
+        )
+
+    keyboard = [rows[index] for index in sorted(rows)]
+    keyboard.append(
+        [InlineKeyboardButton(text="📖 Как это работает", callback_data="help:how", style=BLUE)]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
 def menu_labels() -> set[str]:
     """Все подписи кнопок нижнего меню, в обоих видах.
 

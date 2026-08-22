@@ -38,6 +38,14 @@ class Panel(StatesGroup):
     promo_url = State()
 
 
+def _link_or_none(raw: str) -> str:
+    """Ссылка для кнопки. Дефис или «нет» убирают кнопку совсем."""
+    text = (raw or "").strip()
+    if text in {"-", "—", "нет", "убрать"}:
+        return ""
+    return validation.as_url(text)
+
+
 # какой проверкой встречать каждое поле и куда возвращаться после ввода
 EDITORS: dict[str, dict] = {
     "prizes": {"check": prizes.check, "back": "prizes"},
@@ -63,6 +71,10 @@ EDITORS: dict[str, dict] = {
         "back": "referrals",
     },
     "round_times": {"check": validation.as_times, "back": "settings"},
+    **{
+        key: {"check": _link_or_none, "back": "links"}
+        for _, key, _ in keyboards.HELP_LINKS
+    },
     "late_join_until_round": {
         # 0 — подсадки нет; больше пяти раундов батл почти не живёт
         "check": lambda raw: validation.as_int(raw, minimum=0, maximum=10, example="2"),
@@ -531,6 +543,14 @@ async def toggle_votes(callback: CallbackQuery, repo: Repo, config: Config,
     await callback.answer("Сохранено")
 
 
+@router.callback_query(F.data == "p:links")
+async def show_links(callback: CallbackQuery, config: Config, settings: Settings) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, panel_ui.links(settings.all(), config.channel_url))
+    await callback.answer()
+
+
 @router.callback_query(F.data == "p:health")
 async def show_health(callback: CallbackQuery, repo: Repo, config: Config) -> None:
     if not is_admin(callback.from_user.id, config):
@@ -819,6 +839,8 @@ async def _back_to(
         )
     elif section == "channel":
         await render(message, panel_ui.channel(main_post.state(repo, config, settings)))
+    elif section == "links":
+        await render(message, panel_ui.links(settings.all(), config.channel_url))
     elif section == "settings":
         await render(
             message,

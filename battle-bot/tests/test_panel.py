@@ -509,6 +509,7 @@ async def test_every_button_on_every_screen_has_a_handler(env):
         panel_ui.promo_list(repo.promos()),
         panel_ui.member_channels(True, 1, 1, 3, repo.member_channels()),
         panel_ui.health(repo.error_summary(), repo.recent_errors(), {"итоги раундов": True}),
+        panel_ui.links(settings.all(), "https://t.me/testchannel"),
         panel_ui.person(repo.get_user(77), repo.stats_for(77), 0),
         panel_ui.confirm("Точно?", "battle:cancel:do", "battle"),
         panel_ui.ask("Призы", "1000,500,250", "подсказка", "prizes"),
@@ -520,7 +521,8 @@ async def test_every_button_on_every_screen_has_a_handler(env):
 
 def test_cancel_button_returns_to_its_section():
     """Отмена должна вести в раздел, а не в никуда."""
-    for section in ("prizes", "votes", "channel", "settings", "people", "referrals", "auto"):
+    for section in ("prizes", "votes", "channel", "settings", "people", "referrals",
+                    "auto", "links"):
         _, markup = panel_ui.ask("Поле", "—", "", section)
         cancel = markup.inline_keyboard[0][0]
 

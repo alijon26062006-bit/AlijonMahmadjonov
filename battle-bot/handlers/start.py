@@ -133,8 +133,31 @@ async def _do_join(
 
 @router.message(F.text.in_(keyboards.variants(keyboards.BTN_HELP)))
 @router.message(Command("help"))
-async def help_command(message: Message) -> None:
-    await message.answer(texts.HELP, disable_web_page_preview=True)
+async def help_command(message: Message, config: Config, settings: Settings) -> None:
+    await message.answer(
+        texts.help_screen(),
+        reply_markup=keyboards.help_links(_help_links(config, settings), config.premium_emoji),
+        disable_web_page_preview=True,
+    )
+
+
+def _help_links(config: Config, settings: Settings) -> dict[str, str]:
+    """Ссылки для кнопок «Помощи».
+
+    Канал с батлами бот знает сам, поэтому его кнопка работает сразу — но
+    админ может задать свою ссылку и перекрыть её.
+    """
+    links = {label_key: settings.get(label_key) for _, label_key, _ in keyboards.HELP_LINKS}
+    if not links.get("link_battles"):
+        links["link_battles"] = config.channel_url
+    return links
+
+
+@router.callback_query(F.data == "help:how")
+async def how_it_works(callback: CallbackQuery) -> None:
+    """Подробные правила — отдельной кнопкой, чтобы экран остался коротким."""
+    await ui.send(callback, texts.HELP, disable_web_page_preview=True)
+    await callback.answer()
 
 
 @router.message(F.text.in_(keyboards.variants(keyboards.BTN_PROFILE)))

@@ -74,7 +74,7 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         [button("📣 Канал", "channel"), button("👥 Люди", "people")],
         [button("📨 Рассылка", "broadcast"), button("🤖 Автопилот", "auto")],
         [button("🔍 Проверка", "fraud"), button("📡 Каналы", "mych")],
-        [button("🩺 Диагностика", "health")],
+        [button("🩺 Диагностика", "health"), button("🔗 Ссылки", "links")],
         [button("⚙️ Настройки", "settings")],
         [button("🔄 Обновить", "home", BLUE)],
     )
@@ -346,6 +346,33 @@ def referrals(reward: int, enabled: bool, report: dict, top) -> tuple[str, Inlin
         [button(toggle, "referrals:toggle", RED if enabled else GREEN)],
         back_row(),
     )
+
+
+# ---------------------------------------------------------------- ссылки
+
+def links(values: dict, battles_url: str) -> tuple[str, InlineKeyboardMarkup]:
+    """Кнопки-ссылки под экраном «Помощь»."""
+    from services import keyboards as kb
+
+    lines, rows = [], []
+    for label, key, _ in kb.HELP_LINKS:
+        url = (values.get(key) or "").strip()
+        if not url and key == "link_battles":
+            shown = f"<i>{escape(battles_url)} (сам канал)</i>" if battles_url else "<i>нет</i>"
+        elif url:
+            shown = escape(url)
+        else:
+            shown = "<i>кнопки нет</i>"
+        lines.append(f"{label} — {shown}")
+        rows.append([button(f"✏️ {label}", f"edit:{key}")])
+
+    text = (
+        f"🔗 <b>{texts.spaced('ССЫЛКИ')}</b>\n{RULE}\n\n"
+        + "\n".join(lines)
+        + "\n\n<i>Это кнопки под экраном «Помощь». Пустая ссылка — кнопки нет. "
+        "Чтобы убрать заданную, пришлите дефис.</i>"
+    )
+    return text, keyboard(*rows, back_row())
 
 
 # ------------------------------------------------------------ диагностика

@@ -50,6 +50,8 @@ def _text_to_ints(raw: str) -> list[int]:
     return [int(part.strip()) for part in raw.split(",") if part.strip()]
 
 
+LINK_HINT = "ссылка вида https://t.me/... или @канал; «-» убирает кнопку"
+
 FIELDS: dict[str, Field] = {
     field.key: field
     for field in (
@@ -91,6 +93,12 @@ FIELDS: dict[str, Field] = {
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
         Field("late_join_until_round", "Приём заявок до раунда", str, int,
               "номер раунда; 0 — подсадки нет, только очередь"),
+        # кнопки-ссылки под экраном «Помощь»; пусто — кнопки нет
+        Field("link_main_channel", "Ссылка «Основной канал»", str, str, LINK_HINT),
+        Field("link_battles", "Ссылка «Канал с батлами»", str, str, LINK_HINT),
+        Field("link_payouts", "Ссылка «Выплаты»", str, str, LINK_HINT),
+        Field("link_contact", "Ссылка «Связаться»", str, str, LINK_HINT),
+        Field("link_rules", "Ссылка «Правила»", str, str, LINK_HINT),
     )
 }
 
@@ -128,6 +136,11 @@ class Settings:
         "member_channels_enabled": True,
         # до конца какого раунда новичок попадает в идущий батл, а не в очередь
         "late_join_until_round": 2,
+        "link_main_channel": "",
+        "link_battles": "",
+        "link_payouts": "",
+        "link_contact": "",
+        "link_rules": "",
     }
 
     def _from_config(self, key: str) -> Any:
