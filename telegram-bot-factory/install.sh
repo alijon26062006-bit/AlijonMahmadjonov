@@ -107,11 +107,16 @@ else
     info "токен бота уже записан"
 fi
 
-if [ -z "$(get_env ANTHROPIC_API_KEY)" ]; then
-    info "Ключ Anthropic. Получить: platform.claude.com -> API Keys"
-    ask_secret ANTHROPIC_API_KEY "Вставьте ключ Anthropic:"
+OWN_KEY="$(get_env REQUIRE_OWN_KEY)"
+if [ "$OWN_KEY" = "0" ]; then
+    if [ -z "$(get_env ANTHROPIC_API_KEY)" ]; then
+        info "REQUIRE_OWN_KEY=0 — за ботов платите вы, нужен ваш ключ Anthropic."
+        ask_secret ANTHROPIC_API_KEY "Вставьте ключ Anthropic:"
+    else
+        info "ключ Anthropic владельца записан"
+    fi
 else
-    info "ключ Anthropic уже записан"
+    info "каждый пользователь приносит свой ключ ИИ — ваш ключ не нужен"
 fi
 
 if [ -z "$(get_env FERNET_KEY)" ]; then

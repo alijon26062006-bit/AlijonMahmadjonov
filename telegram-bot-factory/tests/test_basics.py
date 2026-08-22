@@ -8,9 +8,13 @@ import unittest
 from pathlib import Path
 
 from botfactory.childbot import ChildBotEngine, _chunks, _menu_keyboard
+from botfactory import providers
+from botfactory.config import Settings
 from botfactory.crypto import TokenCipher, generate_key
+from botfactory.generator import AIHub, NoKey
 from botfactory.spec import BotSpec, lint, normalize, strict_json_schema, summary
-from botfactory.storage import STATUS_RUNNING, Storage, token_fingerprint
+from botfactory.providers import ANTHROPIC, OPENAI, guess_provider
+from botfactory.storage import STATUS_RUNNING, BotRecord, Storage, token_fingerprint
 
 RAW_SPEC = {
     "name": "Пиццерия",
@@ -35,13 +39,44 @@ RAW_SPEC = {
         {"keywords": ["Доставка", "везёте"], "reply_text": "Доставка бесплатно от 100"},
         {"keywords": [], "reply_text": "пустой триггер"},
     ],
-    "ai": {"enabled": True, "persona": "дружелюбный", "system_prompt": "Ты бот пиццерии"},
+    "ai": {
+        "enabled": True,
+        "persona": "дружелюбный",
+        "system_prompt": "Ты бот пиццерии",
+        "image_generation": False,
+    },
     "fallback_text": "Уточню у владельца",
 }
 
 
-def make_spec() -> BotSpec:
-    return normalize(BotSpec.model_validate(RAW_SPEC))
+def make_spec(**overrides) -> BotSpec:
+    return normalize(BotSpec.model_validate({**RAW_SPEC, **overrides}))
+
+
+def make_record(spec: BotSpec) -> BotRecord:
+    return BotRecord(
+        id=1,
+        owner_id=42,
+        tg_bot_id=None,
+        username="pizza_bot",
+        token_enc="",
+        prompt="",
+        spec=spec,
+        status="running",
+        last_error=None,
+        ai_calls=0,
+        ai_period="",
+    )
+
+
+def make_engine(spec: BotSpec) -> ChildBotEngine:
+    return ChildBotEngine(
+        record=make_record(spec),
+        hub=None,  # type: ignore[arg-type]
+        take_quota=lambda: asyncio.sleep(0, result=True),
+        history_limit=5,
+        metered=False,
+    )
 
 
 class SpecTests(unittest.TestCase):
@@ -87,13 +122,7 @@ class SpecTests(unittest.TestCase):
 
 class RoutingTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.engine = ChildBotEngine(
-            bot_id=1,
-            spec=make_spec(),
-            generator=None,  # type: ignore[arg-type]
-            take_quota=lambda: asyncio.sleep(0, result=True),
-            history_limit=5,
-        )
+        self.engine = make_engine(make_spec())
 
     def test_command_lookup(self) -> None:
         self.assertIsNotNone(self.engine._find_command("menu"))
@@ -120,6 +149,44 @@ class RoutingTests(unittest.TestCase):
         keyboard = _menu_keyboard(make_spec())
         self.assertEqual(len(keyboard.keyboard), 1)
         self.assertEqual(len(keyboard.keyboard[0]), 2)
+
+
+class ImageTests(unittest.TestCase):
+    def setUp(self) -> None:
+        drawing = {
+            "enabled": True,
+            "persona": "дружелюбный",
+            "system_prompt": "рисует",
+            "image_generation": True,
+        }
+        self.on = make_engine(make_spec(ai=drawing))
+        self.off = make_engine(make_spec())
+
+    def test_disabled_bot_ignores_image_requests(self) -> None:
+        self.assertIsNone(self.off._image_prompt("/image кот"))
+        self.assertIsNone(self.off._image_prompt("нарисуй кота"))
+
+    def test_command_gives_prompt(self) -> None:
+        self.assertEqual(self.on._image_prompt("/image кот в скафандре"), "кот в скафандре")
+
+    def test_command_without_text_gives_empty_prompt(self) -> None:
+        self.assertEqual(self.on._image_prompt("/image"), "")
+
+    def test_plain_request_recognised(self) -> None:
+        self.assertEqual(self.on._image_prompt("нарисуй кота"), "нарисуй кота")
+
+    def test_ordinary_message_is_not_a_drawing_request(self) -> None:
+        self.assertIsNone(self.on._image_prompt("а доставка есть?"))
+
+    def test_other_command_is_not_a_drawing_request(self) -> None:
+        self.assertIsNone(self.on._image_prompt("/menu"))
+
+
+class ProviderTests(unittest.TestCase):
+    def test_key_prefix_decides_provider(self) -> None:
+        self.assertEqual(guess_provider("sk-ant-abc123"), ANTHROPIC)
+        self.assertEqual(guess_provider("sk-proj-abc123"), OPENAI)
+        self.assertIsNone(guess_provider("просто текст"))
 
 
 class CryptoTests(unittest.TestCase):
@@ -187,6 +254,23 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
         for _ in range(5):
             self.assertTrue(await self.storage.take_ai_quota(self.record.id, 0))
 
+    async def test_keys_saved_and_removed(self) -> None:
+        await self.storage.save_key(42, OPENAI, "enc-openai")
+        await self.storage.save_key(42, ANTHROPIC, "enc-anthropic")
+        self.assertEqual(await self.storage.key_providers(42), [ANTHROPIC, OPENAI])
+        self.assertEqual(await self.storage.get_key(42, OPENAI), "enc-openai")
+
+        await self.storage.save_key(42, OPENAI, "enc-new")
+        self.assertEqual(await self.storage.get_key(42, OPENAI), "enc-new")
+
+        await self.storage.delete_key(42, OPENAI)
+        self.assertEqual(await self.storage.key_providers(42), [ANTHROPIC])
+        self.assertIsNone(await self.storage.get_key(42, OPENAI))
+
+    async def test_keys_are_personal(self) -> None:
+        await self.storage.save_key(42, OPENAI, "enc")
+        self.assertEqual(await self.storage.key_providers(99), [])
+
     async def test_stats_counts_everything(self) -> None:
         await self.storage.remember_user(42, "owner", "Владелец")
         await self.storage.set_status(self.record.id, STATUS_RUNNING)
@@ -205,6 +289,90 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(await self.storage.list_by_status(STATUS_RUNNING)), 1)
         await self.storage.delete_bot(self.record.id)
         self.assertEqual(await self.storage.count_bots(42), 0)
+
+
+class FakeProvider:
+    def __init__(self, code: str, api_key: str) -> None:
+        self.code = code
+        self.api_key = api_key
+        self.closed = False
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class HubTests(unittest.IsolatedAsyncioTestCase):
+    """Чей ключ берётся для работы — проверка без обращений в сеть."""
+
+    async def asyncSetUp(self) -> None:
+        self._dir = tempfile.TemporaryDirectory()
+        self.storage = Storage(str(Path(self._dir.name) / "hub.db"))
+        await self.storage.open()
+        self.cipher = TokenCipher(generate_key())
+        self._real_build = providers.build
+        providers.build = lambda code, api_key, models: FakeProvider(code, api_key)
+
+    async def asyncTearDown(self) -> None:
+        providers.build = self._real_build
+        await self.storage.close()
+        self._dir.cleanup()
+
+    def hub(self, *, require_own_key: bool, platform_key: str = "") -> AIHub:
+        settings = Settings(
+            mother_bot_token="1:x",
+            anthropic_api_key=platform_key,
+            model="m",
+            chat_model="m",
+            openai_model="m",
+            openai_chat_model="m",
+            openai_image_model="m",
+            require_own_key=require_own_key,
+            fernet_key="x",
+            db_path=":memory:",
+            brand_name="Test",
+            max_bots_per_user=3,
+            ai_monthly_limit=0,
+            ai_history_limit=5,
+            admin_ids=(),
+        )
+        return AIHub(settings=settings, storage=self.storage, cipher=self.cipher)
+
+    async def test_own_key_is_used(self) -> None:
+        await self.storage.save_key(42, OPENAI, self.cipher.encrypt("sk-mine"))
+        provider = await self.hub(require_own_key=True).provider_for(42)
+        self.assertEqual(provider.code, OPENAI)
+        self.assertEqual(provider.api_key, "sk-mine")
+
+    async def test_without_key_factory_refuses(self) -> None:
+        hub = self.hub(require_own_key=True, platform_key="sk-ant-owner")
+        with self.assertRaises(NoKey):
+            await hub.provider_for(42)
+        self.assertFalse(await hub.has_key(42))
+
+    async def test_factory_key_used_when_allowed(self) -> None:
+        provider = await self.hub(
+            require_own_key=False, platform_key="sk-ant-owner"
+        ).provider_for(42)
+        self.assertEqual(provider.api_key, "sk-ant-owner")
+
+    async def test_drawing_needs_openai(self) -> None:
+        await self.storage.save_key(42, ANTHROPIC, self.cipher.encrypt("sk-ant-mine"))
+        hub = self.hub(require_own_key=True)
+        with self.assertRaises(NoKey):
+            await hub.drawing_provider_for(42)
+
+        await self.storage.save_key(42, OPENAI, self.cipher.encrypt("sk-mine"))
+        provider = await hub.drawing_provider_for(42)
+        self.assertEqual(provider.code, OPENAI)
+
+    async def test_same_key_reuses_one_client(self) -> None:
+        await self.storage.save_key(42, OPENAI, self.cipher.encrypt("sk-mine"))
+        hub = self.hub(require_own_key=True)
+        first = await hub.provider_for(42)
+        second = await hub.provider_for(42)
+        self.assertIs(first, second)
+        await hub.close()
+        self.assertTrue(first.closed)
 
 
 if __name__ == "__main__":

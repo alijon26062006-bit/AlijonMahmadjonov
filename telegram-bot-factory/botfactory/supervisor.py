@@ -13,7 +13,7 @@ from aiogram.exceptions import TelegramConflictError, TelegramUnauthorizedError
 from .childbot import ChildBotEngine
 from .config import Settings
 from .crypto import DecryptError, TokenCipher
-from .generator import Generator
+from .generator import AIHub
 from .spec import BotSpec
 from .storage import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED, BotRecord, Storage
 
@@ -40,13 +40,13 @@ class Supervisor:
         *,
         storage: Storage,
         cipher: TokenCipher,
-        generator: Generator,
+        hub: AIHub,
         settings: Settings,
         notify: Notify,
     ) -> None:
         self._storage = storage
         self._cipher = cipher
-        self._generator = generator
+        self._hub = hub
         self._settings = settings
         self._notify = notify
         self._running: dict[int, RunningBot] = {}
@@ -85,14 +85,13 @@ class Supervisor:
             await self._storage.set_status(record.id, STATUS_ERROR, message)
             raise StartError(message) from exc
 
+        metered = not self._settings.require_own_key
         engine = ChildBotEngine(
-            bot_id=record.id,
-            spec=record.spec,
-            generator=self._generator,
-            take_quota=lambda: self._storage.take_ai_quota(
-                record.id, self._settings.ai_monthly_limit
-            ),
+            record=record,
+            hub=self._hub,
+            take_quota=lambda: self._quota(record.id, metered),
             history_limit=self._settings.ai_history_limit,
+            metered=metered,
         )
         dispatcher = engine.build_dispatcher()
         await engine.apply_commands(bot)
@@ -104,6 +103,12 @@ class Supervisor:
         self._running[record.id] = RunningBot(bot=bot, dispatcher=dispatcher, engine=engine, task=task)
         await self._storage.set_status(record.id, STATUS_RUNNING, None)
         log.info("Бот %s запущен (@%s)", record.id, record.username)
+
+    async def _quota(self, bot_id: int, metered: bool) -> bool:
+        """Со своим ключом человек платит сам — считать нечего."""
+        if not metered:
+            return True
+        return await self._storage.take_ai_quota(bot_id, self._settings.ai_monthly_limit)
 
     async def _poll(self, bot_id: int, owner_id: int, bot: Bot, dispatcher: Dispatcher) -> None:
         try:

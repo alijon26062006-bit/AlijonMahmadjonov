@@ -28,6 +28,13 @@ def _str(name: str, default: str) -> str:
     return os.getenv(name, "").strip() or default
 
 
+def _bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in ("1", "true", "yes", "да", "on")
+
+
 def _ids(name: str) -> tuple[int, ...]:
     raw = os.getenv(name, "").strip()
     if not raw:
@@ -42,6 +49,10 @@ class Settings:
     anthropic_api_key: str
     model: str
     chat_model: str
+    openai_model: str
+    openai_chat_model: str
+    openai_image_model: str
+    require_own_key: bool
     fernet_key: str
     db_path: str
     brand_name: str
@@ -59,11 +70,13 @@ def load_settings() -> Settings:
             "и впишите его в файл .env"
         )
 
+    require_own_key = _bool("REQUIRE_OWN_KEY", True)
     api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
-    if not api_key:
+    if not api_key and not require_own_key:
         raise ConfigError(
-            "ANTHROPIC_API_KEY не задан. Получите ключ на platform.claude.com "
-            "и впишите его в файл .env"
+            "REQUIRE_OWN_KEY=0 означает, что фабрика платит за ботов сама, "
+            "но ANTHROPIC_API_KEY не задан. Впишите ключ в .env или верните REQUIRE_OWN_KEY=1, "
+            "чтобы каждый приносил свой ключ."
         )
 
     fernet_key = os.getenv("FERNET_KEY", "").strip()
@@ -78,6 +91,10 @@ def load_settings() -> Settings:
         anthropic_api_key=api_key,
         model=_str("ANTHROPIC_MODEL", "claude-opus-5"),
         chat_model=_str("ANTHROPIC_CHAT_MODEL", "claude-sonnet-5"),
+        openai_model=_str("OPENAI_MODEL", "gpt-4o"),
+        openai_chat_model=_str("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+        openai_image_model=_str("OPENAI_IMAGE_MODEL", "dall-e-3"),
+        require_own_key=require_own_key,
         fernet_key=fernet_key,
         db_path=_str("DB_PATH", "data/factory.db"),
         brand_name=_str("BRAND_NAME", "Bot Factory"),

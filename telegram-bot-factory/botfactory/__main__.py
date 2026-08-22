@@ -14,7 +14,7 @@ from aiogram.types import BotCommand
 
 from .config import ConfigError, load_settings
 from .crypto import TokenCipher
-from .generator import Generator
+from .generator import AIHub
 from .mother import Factory, build_router
 from .storage import Storage
 from .supervisor import Supervisor
@@ -25,6 +25,7 @@ MOTHER_COMMANDS = [
     BotCommand(command="start", description="Начать"),
     BotCommand(command="new", description="Создать бота"),
     BotCommand(command="mybots", description="Мои боты"),
+    BotCommand(command="keys", description="Мои ключи ИИ"),
     BotCommand(command="help", description="Помощь"),
     BotCommand(command="cancel", description="Отменить действие"),
 ]
@@ -46,11 +47,7 @@ async def run() -> None:
     await storage.open()
 
     cipher = TokenCipher(settings.fernet_key)
-    generator = Generator(
-        api_key=settings.anthropic_api_key,
-        model=settings.model,
-        chat_model=settings.chat_model,
-    )
+    hub = AIHub(settings=settings, storage=storage, cipher=cipher)
 
     bot = Bot(
         token=settings.mother_bot_token,
@@ -63,7 +60,7 @@ async def run() -> None:
     supervisor = Supervisor(
         storage=storage,
         cipher=cipher,
-        generator=generator,
+        hub=hub,
         settings=settings,
         notify=notify,
     )
@@ -71,7 +68,7 @@ async def run() -> None:
         settings=settings,
         storage=storage,
         cipher=cipher,
-        generator=generator,
+        hub=hub,
         supervisor=supervisor,
     )
 
@@ -91,7 +88,7 @@ async def run() -> None:
     finally:
         log.info("Останавливаюсь…")
         await supervisor.shutdown()
-        await generator.close()
+        await hub.close()
         await storage.close()
         await bot.session.close()
 

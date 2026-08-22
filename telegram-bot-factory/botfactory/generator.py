@@ -1,18 +1,23 @@
-"""Обращения к Claude: собрать бота, поправить бота, ответить от лица бота."""
+"""Сборка и правка ботов через ИИ. Ключ берётся у владельца бота."""
 
 from __future__ import annotations
 
+import hashlib
 import logging
-from typing import Any, Iterable
 
-from anthropic import AsyncAnthropic
-
-from .spec import BotSpec, normalize, strict_json_schema
+from . import providers
+from .config import Settings
+from .crypto import DecryptError, TokenCipher
+from .providers import PROVIDERS, Provider, ProviderError, Unsupported
+from .spec import BotSpec
+from .storage import BotRecord, Storage
 
 log = logging.getLogger(__name__)
 
-MAX_SPEC_TOKENS = 8000
-MAX_CHAT_TOKENS = 800
+
+class NoKey(ProviderError):
+    """У человека нет подходящего ключа."""
+
 
 BUILDER_SYSTEM = """\
 Ты — конструктор Telegram-ботов. Человек описывает своими словами, какой бот ему нужен,
@@ -32,6 +37,8 @@ BUILDER_SYSTEM = """\
   ai.system_prompt — подробная инструкция для ИИ: кем он работает, что знает о бизнесе,
   чего не знает и не должен выдумывать (цены, адреса, сроки — только те, что дал владелец),
   как себя вести, когда вопрос вне его компетенции.
+- ai.image_generation ставь true только если человек прямо просит, чтобы бот рисовал
+  или генерировал картинки и фотографии. В остальных случаях false.
 - Не выдумывай факты, которых человек не давал: телефоны, адреса, цены, часы работы.
   Если их нет — напиши в тексте, что владелец уточнит, и укажи это в ai.system_prompt.
 - action у кнопки: message — прислать текст, url — открыть ссылку (только реальные ссылки,
@@ -68,76 +75,95 @@ CHAT_SYSTEM_TEMPLATE = """\
 - Если просьба выходит за рамки твоей работы — вежливо верни разговор к делу."""
 
 
-def _first_text(response: Any) -> str:
-    for block in response.content:
-        if getattr(block, "type", None) == "text":
-            return block.text
-    raise ValueError("Модель не вернула текст")
+class AIHub:
+    """Один вход ко всем поставщикам. Помнит, чей ключ для чего использовать."""
 
+    def __init__(self, *, settings: Settings, storage: Storage, cipher: TokenCipher) -> None:
+        self._settings = settings
+        self._storage = storage
+        self._cipher = cipher
+        self._cache: dict[str, Provider] = {}
+        self._models = {
+            "anthropic_model": settings.model,
+            "anthropic_chat_model": settings.chat_model,
+            "openai_model": settings.openai_model,
+            "openai_chat_model": settings.openai_chat_model,
+            "openai_image_model": settings.openai_image_model,
+        }
 
-class GenerationError(RuntimeError):
-    """Не удалось получить структуру бота."""
+    # --- получение поставщика --------------------------------------------
 
+    def _get(self, code: str, api_key: str) -> Provider:
+        token = hashlib.sha256(f"{code}:{api_key}".encode()).hexdigest()
+        provider = self._cache.get(token)
+        if provider is None:
+            provider = providers.build(code, api_key, self._models)
+            self._cache[token] = provider
+        return provider
 
-class Generator:
-    def __init__(self, api_key: str, model: str, chat_model: str) -> None:
-        self._client = AsyncAnthropic(api_key=api_key)
-        self._model = model
-        self._chat_model = chat_model
+    def build_probe(self, code: str, api_key: str) -> Provider:
+        """Поставщик для разовой проверки ключа — в кэш не попадает."""
+        return providers.build(code, api_key, self._models)
 
-    async def close(self) -> None:
-        await self._client.close()
-
-    # --- структура бота ------------------------------------------------
-
-    async def _structured(self, system: str, user_text: str) -> BotSpec:
-        messages = [{"role": "user", "content": user_text}]
-        parse = getattr(self._client.messages, "parse", None)
-
+    async def _user_key(self, user_id: int, code: str) -> str | None:
+        encrypted = await self._storage.get_key(user_id, code)
+        if encrypted is None:
+            return None
         try:
-            if parse is not None:
-                response = await parse(
-                    model=self._model,
-                    max_tokens=MAX_SPEC_TOKENS,
-                    system=system,
-                    messages=messages,
-                    output_format=BotSpec,
-                )
-                parsed = getattr(response, "parsed_output", None)
-                if parsed is not None:
-                    return normalize(parsed)
-                return normalize(BotSpec.model_validate_json(_first_text(response)))
+            return self._cipher.decrypt(encrypted)
+        except DecryptError:
+            log.warning("Ключ %s пользователя %s не расшифровывается", code, user_id)
+            return None
 
-            response = await self._client.messages.create(
-                model=self._model,
-                max_tokens=MAX_SPEC_TOKENS,
-                system=system,
-                messages=messages,
-                output_config={
-                    "format": {"type": "json_schema", "schema": strict_json_schema()}
-                },
-            )
-            return normalize(BotSpec.model_validate_json(_first_text(response)))
-        except Exception as exc:  # noqa: BLE001 — наверх уходит понятное сообщение
-            log.exception("Не удалось сгенерировать структуру бота")
-            raise GenerationError(str(exc)) from exc
+    async def provider_for(self, user_id: int) -> Provider:
+        """Любой поставщик, которым владеет человек. Иначе — общий, если разрешён."""
+        for code in await self._storage.key_providers(user_id):
+            key = await self._user_key(user_id, code)
+            if key:
+                return self._get(code, key)
 
-    async def create_spec(self, prompt: str) -> BotSpec:
-        return await self._structured(BUILDER_SYSTEM, f"Нужен такой бот:\n\n{prompt}")
+        if not self._settings.require_own_key and self._settings.anthropic_api_key:
+            return self._get(providers.ANTHROPIC, self._settings.anthropic_api_key)
 
-    async def edit_spec(self, spec: BotSpec, instruction: str) -> BotSpec:
+        raise NoKey("нужен свой ключ ИИ")
+
+    async def drawing_provider_for(self, user_id: int) -> Provider:
+        """Поставщик, который умеет рисовать."""
+        for code in await self._storage.key_providers(user_id):
+            if not PROVIDERS[code].draws:
+                continue
+            key = await self._user_key(user_id, code)
+            if key:
+                return self._get(code, key)
+        raise NoKey("для картинок нужен ключ OpenAI")
+
+    async def has_key(self, user_id: int) -> bool:
+        try:
+            await self.provider_for(user_id)
+            return True
+        except NoKey:
+            return False
+
+    # --- работа ------------------------------------------------------------
+
+    async def create_spec(self, user_id: int, prompt: str) -> BotSpec:
+        provider = await self.provider_for(user_id)
+        return await provider.structured(BUILDER_SYSTEM, f"Нужен такой бот:\n\n{prompt}")
+
+    async def edit_spec(self, user_id: int, spec: BotSpec, instruction: str) -> BotSpec:
+        provider = await self.provider_for(user_id)
         user_text = (
             "Текущая структура бота:\n\n"
             f"{spec.model_dump_json(indent=2)}\n\n"
             f"Пожелание владельца:\n\n{instruction}"
         )
-        return await self._structured(EDITOR_SYSTEM, user_text)
-
-    # --- живой ответ от лица бота ---------------------------------------
+        return await provider.structured(EDITOR_SYSTEM, user_text)
 
     async def answer_as_bot(
-        self, spec: BotSpec, history: Iterable[dict[str, str]], question: str
+        self, record: BotRecord, history: list[dict[str, str]], question: str
     ) -> str:
+        spec = record.spec
+        provider = await self.provider_for(record.owner_id)
         persona_prompt = spec.ai.system_prompt.strip() or spec.description
         system = CHAT_SYSTEM_TEMPLATE.format(
             persona_prompt=(
@@ -145,11 +171,19 @@ class Generator:
                 f"Характер общения: {spec.ai.persona}.\n\n{persona_prompt}"
             )
         )
-        messages = [*history, {"role": "user", "content": question}]
-        response = await self._client.messages.create(
-            model=self._chat_model,
-            max_tokens=MAX_CHAT_TOKENS,
-            system=system,
-            messages=messages,
-        )
-        return _first_text(response).strip()
+        return await provider.chat(system, [*history, {"role": "user", "content": question}])
+
+    async def draw(self, owner_id: int, prompt: str) -> bytes:
+        provider = await self.drawing_provider_for(owner_id)
+        return await provider.draw(prompt)
+
+    async def close(self) -> None:
+        for provider in self._cache.values():
+            try:
+                await provider.close()
+            except Exception:  # noqa: BLE001 — на выходе это неважно
+                log.debug("Поставщик закрылся с ошибкой", exc_info=True)
+        self._cache.clear()
+
+
+__all__ = ["AIHub", "NoKey", "ProviderError", "Unsupported"]

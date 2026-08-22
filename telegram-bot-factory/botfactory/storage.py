@@ -53,6 +53,14 @@ CREATE TABLE IF NOT EXISTS versions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_versions_bot ON versions(bot_id);
+
+CREATE TABLE IF NOT EXISTS user_keys (
+    user_id     INTEGER NOT NULL,
+    provider    TEXT NOT NULL,
+    key_enc     TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (user_id, provider)
+);
 """
 
 
@@ -260,6 +268,38 @@ class Storage:
             "DELETE FROM versions WHERE id = (SELECT id FROM versions WHERE bot_id = ? "
             "ORDER BY id DESC LIMIT 1)",
             (bot_id,),
+        )
+        await self.db.commit()
+
+    # --- ключи пользователей -------------------------------------------
+
+    async def save_key(self, user_id: int, provider: str, key_enc: str) -> None:
+        await self.db.execute(
+            "INSERT INTO user_keys (user_id, provider, key_enc, created_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(user_id, provider) DO UPDATE SET key_enc=excluded.key_enc, "
+            "created_at=excluded.created_at",
+            (user_id, provider, key_enc, now()),
+        )
+        await self.db.commit()
+
+    async def get_key(self, user_id: int, provider: str) -> str | None:
+        async with self.db.execute(
+            "SELECT key_enc FROM user_keys WHERE user_id = ? AND provider = ?",
+            (user_id, provider),
+        ) as cur:
+            row = await cur.fetchone()
+        return row["key_enc"] if row else None
+
+    async def key_providers(self, user_id: int) -> list[str]:
+        async with self.db.execute(
+            "SELECT provider FROM user_keys WHERE user_id = ? ORDER BY provider", (user_id,)
+        ) as cur:
+            rows = await cur.fetchall()
+        return [str(row["provider"]) for row in rows]
+
+    async def delete_key(self, user_id: int, provider: str) -> None:
+        await self.db.execute(
+            "DELETE FROM user_keys WHERE user_id = ? AND provider = ?", (user_id, provider)
         )
         await self.db.commit()
 

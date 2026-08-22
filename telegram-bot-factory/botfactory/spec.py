@@ -52,6 +52,10 @@ class AISettings(BaseModel):
     system_prompt: str = Field(
         description="Инструкция для ИИ: кто он, что знает о бизнесе, что можно и нельзя говорить"
     )
+    image_generation: bool = Field(
+        default=False,
+        description="Умеет ли бот рисовать картинки по описанию. Требует ключ OpenAI",
+    )
 
 
 class BotSpec(BaseModel):
@@ -141,6 +145,7 @@ def normalize(spec: BotSpec) -> BotSpec:
         "enabled": bool(ai.get("enabled", True)),
         "persona": _clip(ai.get("persona", ""), 100) or "дружелюбный",
         "system_prompt": _clip(ai.get("system_prompt", ""), 4000) or data["description"],
+        "image_generation": bool(ai.get("image_generation", False)),
     }
 
     return BotSpec.model_validate(data)
@@ -191,6 +196,9 @@ def summary(spec: BotSpec) -> str:
     else:
         lines.append("<b>Свободное общение</b>: выключено")
 
+    if spec.ai.image_generation:
+        lines.append("<b>Генерация картинок</b>: включена, команда /image")
+
     return "\n".join(lines).strip()
 
 
@@ -202,7 +210,11 @@ def strict_json_schema() -> dict[str, Any]:
         if isinstance(node, dict):
             if node.get("type") == "object" and "properties" in node:
                 node["additionalProperties"] = False
-                node.setdefault("required", list(node["properties"].keys()))
+                # строгий режим требует, чтобы все поля были обязательными
+                node["required"] = list(node["properties"].keys())
+            # "default" и "title" строгий режим не принимает
+            node.pop("default", None)
+            node.pop("title", None)
             for value in node.values():
                 tighten(value)
         elif isinstance(node, list):

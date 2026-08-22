@@ -22,7 +22,8 @@ from aiogram.types import (
 from . import texts
 from .config import Settings
 from .crypto import TokenCipher
-from .generator import GenerationError, Generator
+from .generator import AIHub, NoKey
+from .providers import PROVIDERS, ProviderError, guess_provider
 from .spec import lint, summary
 from .storage import STATUS_RUNNING, BotRecord, Storage, token_fingerprint
 from .supervisor import StartError, Supervisor
@@ -42,11 +43,16 @@ class Edit(StatesGroup):
     instruction = State()
 
 
+class Keys(StatesGroup):
+    value = State()
+
+
 def main_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=texts.BTN_NEW)],
-            [KeyboardButton(text=texts.BTN_MY_BOTS), KeyboardButton(text=texts.BTN_HELP)],
+            [KeyboardButton(text=texts.BTN_MY_BOTS), KeyboardButton(text=texts.BTN_KEYS)],
+            [KeyboardButton(text=texts.BTN_HELP)],
         ],
         resize_keyboard=True,
     )
@@ -86,13 +92,13 @@ class Factory:
         settings: Settings,
         storage: Storage,
         cipher: TokenCipher,
-        generator: Generator,
+        hub: AIHub,
         supervisor: Supervisor,
     ) -> None:
         self.settings = settings
         self.storage = storage
         self.cipher = cipher
-        self.generator = generator
+        self.hub = hub
         self.supervisor = supervisor
 
     # --- вспомогательное -------------------------------------------------
@@ -124,6 +130,14 @@ class Factory:
             self.card_text(record, used),
             reply_markup=bot_keyboard(record, self.supervisor.is_running(record.id)),
             disable_web_page_preview=True,
+        )
+
+    async def can_draw(self, user_id: int) -> bool:
+        """Есть ли у человека ключ поставщика, который рисует."""
+        return any(
+            PROVIDERS[code].draws
+            for code in await self.storage.key_providers(user_id)
+            if code in PROVIDERS
         )
 
     async def owned(self, callback: CallbackQuery) -> BotRecord | None:
@@ -189,19 +203,116 @@ def build_router(factory: Factory) -> Router:  # noqa: C901 — это карт�
             )
         )
 
+    # --- ключи ИИ ---------------------------------------------------------
+
+    def keys_keyboard(saved: list[str]) -> InlineKeyboardMarkup:
+        rows: list[list[InlineKeyboardButton]] = [
+            [InlineKeyboardButton(text=texts.BTN_ADD_KEY, callback_data="addkey")]
+        ]
+        for code in saved:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text=texts.BTN_DEL_KEY.format(title=PROVIDERS[code].title),
+                        callback_data=f"delkey:{code}",
+                    )
+                ]
+            )
+        return InlineKeyboardMarkup(inline_keyboard=rows)
+
+    async def show_keys(message: Message, user_id: int) -> None:
+        saved = await storage.key_providers(user_id)
+        if saved:
+            items = "\n".join(f"• {PROVIDERS[code].title}" for code in saved if code in PROVIDERS)
+            text = texts.MY_KEYS.format(items=items)
+        else:
+            text = texts.NO_KEYS
+        await message.answer(text, reply_markup=keys_keyboard(saved))
+
+    async def ask_key(message: Message, state: FSMContext, after: str = "") -> None:
+        await state.set_state(Keys.value)
+        await state.update_data(after=after)
+        await message.answer(texts.ASK_KEY)
+
+    @router.message(Command("keys"))
+    @router.message(F.text == texts.BTN_KEYS)
+    async def on_keys(message: Message, state: FSMContext) -> None:
+        await state.clear()
+        if message.from_user is None:
+            return
+        await show_keys(message, message.from_user.id)
+
+    @router.callback_query(F.data == "addkey")
+    async def on_add_key(callback: CallbackQuery, state: FSMContext) -> None:
+        await callback.answer()
+        if callback.message is None:
+            return
+        await ask_key(callback.message, state)
+
+    @router.callback_query(F.data.startswith("delkey:"))
+    async def on_del_key(callback: CallbackQuery) -> None:
+        await callback.answer()
+        if callback.message is None or callback.from_user is None:
+            return
+        code = (callback.data or "").split(":", 1)[1]
+        await storage.delete_key(callback.from_user.id, code)
+        await callback.message.answer(texts.KEY_DELETED)
+        await show_keys(callback.message, callback.from_user.id)
+
+    @router.message(Keys.value)
+    async def on_key_value(message: Message, state: FSMContext) -> None:
+        if message.from_user is None:
+            return
+        key = "".join(ch for ch in (message.text or "") if ch.isprintable()).strip()
+        code = guess_provider(key)
+        if code is None:
+            await message.answer(texts.KEY_UNKNOWN)
+            return
+
+        try:
+            await message.delete()
+        except Exception:  # noqa: BLE001 — не критично
+            log.debug("Не удалось удалить сообщение с ключом", exc_info=True)
+
+        note = await message.answer(texts.KEY_CHECKING)
+        probe = factory.hub.build_probe(code, key)
+        try:
+            await probe.check()
+        except ProviderError as exc:
+            await note.edit_text(texts.KEY_BAD.format(error=html.escape(str(exc))))
+            return
+        finally:
+            await probe.close()
+
+        await storage.save_key(message.from_user.id, code, factory.cipher.encrypt(key))
+        data = await state.get_data()
+        await state.clear()
+        await note.edit_text(texts.KEY_SAVED.format(title=PROVIDERS[code].title))
+
+        if data.get("after") == "new":
+            await begin_new(message, state)
+        else:
+            await show_keys(message, message.from_user.id)
+
     # --- создание бота ---------------------------------------------------
 
-    @router.message(Command("new"))
-    @router.message(F.text == texts.BTN_NEW)
-    async def on_new(message: Message, state: FSMContext) -> None:
+    async def begin_new(message: Message, state: FSMContext) -> None:
         if message.from_user is None:
             return
         count = await storage.count_bots(message.from_user.id)
         if count >= settings.max_bots_per_user:
             await message.answer(texts.LIMIT_REACHED.format(count=count))
             return
+        if not await factory.hub.has_key(message.from_user.id):
+            await ask_key(message, state, after="new")
+            return
         await state.set_state(New.token)
         await message.answer(texts.ASK_TOKEN)
+
+    @router.message(Command("new"))
+    @router.message(F.text == texts.BTN_NEW)
+    async def on_new(message: Message, state: FSMContext) -> None:
+        await begin_new(message, state)
 
     @router.message(New.token)
     async def on_token(message: Message, state: FSMContext) -> None:
@@ -257,8 +368,8 @@ def build_router(factory: Factory) -> Router:  # noqa: C901 — это карт�
 
         note = await message.answer(texts.BUILDING)
         try:
-            spec = await factory.generator.create_spec(prompt)
-        except GenerationError as exc:
+            spec = await factory.hub.create_spec(message.from_user.id, prompt)
+        except ProviderError as exc:
             await note.edit_text(texts.GENERATION_FAILED.format(error=html.escape(str(exc)[:300])))
             return
 
@@ -274,6 +385,8 @@ def build_router(factory: Factory) -> Router:  # noqa: C901 — это карт�
         await state.clear()
         await note.delete()
         await message.answer(factory.preview_text(record), disable_web_page_preview=True)
+        if spec.ai.image_generation and not await factory.can_draw(message.from_user.id):
+            await message.answer(texts.KEY_NEEDED_TO_DRAW)
         await factory.show_card(message, record)
 
     # --- список ботов ------------------------------------------------------
@@ -392,8 +505,8 @@ def build_router(factory: Factory) -> Router:  # noqa: C901 — это карт�
 
         note = await message.answer(texts.UPDATING)
         try:
-            spec = await factory.generator.edit_spec(record.spec, instruction)
-        except GenerationError as exc:
+            spec = await factory.hub.edit_spec(record.owner_id, record.spec, instruction)
+        except ProviderError as exc:
             await note.edit_text(texts.GENERATION_FAILED.format(error=html.escape(str(exc)[:300])))
             return
 
