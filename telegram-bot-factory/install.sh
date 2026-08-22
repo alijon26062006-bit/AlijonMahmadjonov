@@ -11,6 +11,9 @@ PY="$VENV/bin/python"
 SERVICE_NAME="botfactory"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
+RESET=0
+[ "${1:-}" = "--reset" ] && RESET=1
+
 say()  { printf '\n\033[1m%s\033[0m\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
 die()  { printf '\n\033[31mОшибка: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -90,6 +93,12 @@ ask_secret() {  # имя_переменной подсказка
     set_env "$name" "$value"
 }
 
+if [ "$RESET" = "1" ]; then
+    set_env MOTHER_BOT_TOKEN ""
+    set_env ANTHROPIC_API_KEY ""
+    info "режим --reset: спрошу токен и ключ заново"
+fi
+
 if [ -z "$(get_env MOTHER_BOT_TOKEN)" ]; then
     info "Токен главного бота. Получить: @BotFather -> /newbot"
     info "Ввод не отображается — это нормально. Вставьте и нажмите Enter."
@@ -124,15 +133,17 @@ fi
 
 say "4. Проверяю токен в Telegram"
 
-BOT_USERNAME="$(cd "$HERE" && "$PY" - << 'PYEOF'
+check_token() {
+    cd "$HERE" && "$PY" - << 'PYEOF'
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 
 from dotenv import load_dotenv
 
-load_dotenv(".env")
+load_dotenv(".env", override=True)
 token = os.getenv("MOTHER_BOT_TOKEN", "").strip()
 try:
     with urllib.request.urlopen(
@@ -155,25 +166,40 @@ if data.get("ok"):
 else:
     print(f"BADTOKEN:{data.get('description', 'токен не принят')}")
 PYEOF
-)"
+}
 
-case "$BOT_USERNAME" in
-    BADTOKEN:*)
-        printf '\n\033[31mTelegram не принял токен: %s\033[0m\n' "${BOT_USERNAME#BADTOKEN:}"
-        info "Скорее всего токен скопирован не полностью или сброшен в @BotFather."
-        info "Исправьте строку MOTHER_BOT_TOKEN в файле $ENV_FILE и запустите скрипт снова."
-        exit 1
-        ;;
-    NET:*)
-        printf '\n\033[31mНе получилось связаться с Telegram: %s\033[0m\n' "${BOT_USERNAME#NET:}"
-        info "Это похоже на проблему сети или блокировку, а не на токен."
-        info "Проверьте связь:  curl -s https://api.telegram.org"
-        exit 1
-        ;;
-    "")
-        die "не удалось проверить токен"
-        ;;
-esac
+attempt=0
+while : ; do
+    BOT_USERNAME="$(check_token)"
+    case "$BOT_USERNAME" in
+        BADTOKEN:*)
+            printf '\n\033[31mTelegram не принял токен: %s\033[0m\n' "${BOT_USERNAME#BADTOKEN:}"
+            attempt=$((attempt + 1))
+            if have_tty && [ "$attempt" -lt 3 ]; then
+                info "Токен недействителен. Так бывает, если его сбросили командой /revoke."
+                info "Возьмите действующий: @BotFather -> /mybots -> ваш бот -> API Token"
+                ask_secret MOTHER_BOT_TOKEN "Вставьте токен:"
+                say "Проверяю ещё раз"
+                continue
+            fi
+            info "Впишите действующий токен в строку MOTHER_BOT_TOKEN файла $ENV_FILE"
+            info "и запустите скрипт снова."
+            exit 1
+            ;;
+        NET:*)
+            printf '\n\033[31mНе получилось связаться с Telegram: %s\033[0m\n' "${BOT_USERNAME#NET:}"
+            info "Это похоже на проблему сети или блокировку, а не на токен."
+            info "Проверьте связь:  curl -s https://api.telegram.org"
+            exit 1
+            ;;
+        "")
+            die "не удалось проверить токен"
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 
 info "бот найден: @$BOT_USERNAME"
 
