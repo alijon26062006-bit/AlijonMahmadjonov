@@ -380,10 +380,18 @@ class HubTests(unittest.IsolatedAsyncioTestCase):
         await self.storage.close()
         self._dir.cleanup()
 
-    def hub(self, *, require_own_key: bool, platform_key: str = "") -> AIHub:
+    def hub(
+        self,
+        *,
+        require_own_key: bool,
+        platform_key: str = "",
+        platform_openai: str = "",
+        admins: tuple[int, ...] = (),
+    ) -> AIHub:
         settings = Settings(
             mother_bot_token="1:x",
             anthropic_api_key=platform_key,
+            openai_api_key=platform_openai,
             model="m",
             chat_model="m",
             openai_model="m",
@@ -396,7 +404,7 @@ class HubTests(unittest.IsolatedAsyncioTestCase):
             max_bots_per_user=3,
             ai_monthly_limit=0,
             ai_history_limit=5,
-            admin_ids=(),
+            admin_ids=admins,
         )
         return AIHub(settings=settings, storage=self.storage, cipher=self.cipher)
 
@@ -427,6 +435,43 @@ class HubTests(unittest.IsolatedAsyncioTestCase):
         await self.storage.save_key(42, OPENAI, self.cipher.encrypt("sk-mine"))
         provider = await hub.drawing_provider_for(42)
         self.assertEqual(provider.code, OPENAI)
+
+    async def test_admin_uses_factory_key(self) -> None:
+        hub = self.hub(require_own_key=True, platform_key="sk-ant-owner", admins=(42,))
+        provider = await hub.provider_for(42)
+        self.assertEqual(provider.api_key, "sk-ant-owner")
+        self.assertTrue(await hub.has_key(42))
+
+    async def test_admin_key_not_shared_with_others(self) -> None:
+        hub = self.hub(require_own_key=True, platform_key="sk-ant-owner", admins=(42,))
+        with self.assertRaises(NoKey):
+            await hub.provider_for(99)
+
+    async def test_own_key_wins_over_factory_key(self) -> None:
+        await self.storage.save_key(42, OPENAI, self.cipher.encrypt("sk-mine"))
+        hub = self.hub(require_own_key=True, platform_key="sk-ant-owner", admins=(42,))
+        provider = await hub.provider_for(42)
+        self.assertEqual(provider.api_key, "sk-mine")
+
+    async def test_admin_draws_with_factory_openai_key(self) -> None:
+        hub = self.hub(
+            require_own_key=True,
+            platform_key="sk-ant-owner",
+            platform_openai="sk-owner-openai",
+            admins=(42,),
+        )
+        self.assertTrue(await hub.can_draw(42))
+        self.assertFalse(await hub.can_draw(99))
+
+    async def test_admin_cannot_draw_without_factory_openai_key(self) -> None:
+        hub = self.hub(require_own_key=True, platform_key="sk-ant-owner", admins=(42,))
+        self.assertFalse(await hub.can_draw(42))
+
+    async def test_has_provider_checks_exact_provider(self) -> None:
+        await self.storage.save_key(42, ANTHROPIC, self.cipher.encrypt("sk-ant-mine"))
+        hub = self.hub(require_own_key=True)
+        self.assertTrue(await hub.has_provider(42, ANTHROPIC))
+        self.assertFalse(await hub.has_provider(42, OPENAI))
 
     async def test_same_key_reuses_one_client(self) -> None:
         await self.storage.save_key(42, OPENAI, self.cipher.encrypt("sk-mine"))

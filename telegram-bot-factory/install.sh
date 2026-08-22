@@ -51,6 +51,42 @@ say "3. Настройки"
 [ -f "$ENV_FILE" ] || cp "$HERE/.env.example" "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 
+# в старый .env дописываем настройки, появившиеся в новых версиях
+ADDED="$("$PY" - "$ENV_FILE" "$HERE/.env.example" << 'PYEOF'
+import pathlib
+import sys
+
+env_path, example_path = (pathlib.Path(arg) for arg in sys.argv[1:3])
+env_text = env_path.read_text()
+present = {
+    line.split("=", 1)[0].strip()
+    for line in env_text.splitlines()
+    if "=" in line and not line.lstrip().startswith("#")
+}
+
+added: list[str] = []
+names: list[str] = []
+comment: list[str] = []
+for line in example_path.read_text().splitlines():
+    if not line.strip():
+        comment = []
+        continue
+    if line.lstrip().startswith("#"):
+        comment.append(line)
+        continue
+    name = line.split("=", 1)[0].strip()
+    if name not in present:
+        added.extend(["", *comment, line])
+        names.append(name)
+    comment = []
+
+if added:
+    env_path.write_text(env_text.rstrip("\n") + "\n" + "\n".join(added) + "\n")
+print(" ".join(names))
+PYEOF
+)"
+[ -n "$ADDED" ] && info "добавил новые настройки: $ADDED"
+
 get_env() {
     grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- || true
 }
@@ -78,6 +114,21 @@ if not replaced:
 
 path.write_text("\n".join(lines) + "\n")
 PYEOF
+}
+
+ask_optional_secret() {  # имя_переменной подсказка
+    local name="$1" hint="$2" value=""
+    have_tty || return 0
+    printf '  %s\n  > ' "$hint"
+    read -rs value < /dev/tty || return 0
+    printf '\n'
+    value="$(printf '%s' "$value" | tr -d '[:space:]')"
+    if [ -n "$value" ]; then
+        set_env "$name" "$value"
+        info "записал"
+    else
+        info "пропустили"
+    fi
 }
 
 ask_secret() {  # имя_переменной подсказка
@@ -110,13 +161,24 @@ fi
 OWN_KEY="$(get_env REQUIRE_OWN_KEY)"
 if [ "$OWN_KEY" = "0" ]; then
     if [ -z "$(get_env ANTHROPIC_API_KEY)" ]; then
-        info "REQUIRE_OWN_KEY=0 — за ботов платите вы, нужен ваш ключ Anthropic."
+        info "REQUIRE_OWN_KEY=0 — за ботов всех пользователей платите вы."
         ask_secret ANTHROPIC_API_KEY "Вставьте ключ Anthropic:"
     else
-        info "ключ Anthropic владельца записан"
+        info "ключ Anthropic фабрики записан"
     fi
+elif [ -z "$(get_env ANTHROPIC_API_KEY)" ]; then
+    info "Свой ключ Anthropic — чтобы вам как администратору не вводить его в боте."
+    info "Обычные пользователи им не пользуются. Можно пропустить: просто Enter."
+    ask_optional_secret ANTHROPIC_API_KEY "Ключ Anthropic (Enter — пропустить):"
 else
-    info "каждый пользователь приносит свой ключ ИИ — ваш ключ не нужен"
+    info "ключ Anthropic фабрики записан"
+fi
+
+if [ -z "$(get_env OPENAI_API_KEY)" ]; then
+    info "Ключ OpenAI нужен, только если хотите сами рисовать картинки ботами."
+    ask_optional_secret OPENAI_API_KEY "Ключ OpenAI (Enter — пропустить):"
+else
+    info "ключ OpenAI фабрики записан"
 fi
 
 if [ -z "$(get_env FERNET_KEY)" ]; then
@@ -127,7 +189,7 @@ else
 fi
 
 if [ -z "$(get_env ADMIN_IDS)" ] && have_tty; then
-    printf '  Ваш Telegram ID для команды /stats (можно пропустить, Enter)\n  > '
+    printf '  Ваш Telegram ID: даёт доступ к ключам фабрики и команде /stats\n  > '
     read -r admin_ids < /dev/tty || admin_ids=""
     if [ -n "$admin_ids" ]; then
         set_env ADMIN_IDS "$(printf '%s' "$admin_ids" | tr -d '[:space:]')"

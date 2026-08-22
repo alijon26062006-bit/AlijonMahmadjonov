@@ -132,27 +132,55 @@ class AIHub:
             log.warning("Ключ %s пользователя %s не расшифровывается", code, user_id)
             return None
 
+    def _may_use_factory_keys(self, user_id: int) -> bool:
+        """Ключами из .env пользуются администраторы, а также все, если так настроено."""
+        return user_id in self._settings.admin_ids or not self._settings.require_own_key
+
+    def _factory_key(self, code: str) -> str:
+        if code == providers.OPENAI:
+            return self._settings.openai_api_key
+        return self._settings.anthropic_api_key
+
     async def provider_for(self, user_id: int) -> Provider:
-        """Любой поставщик, которым владеет человек. Иначе — общий, если разрешён."""
+        """Ключ человека, а если его нет — ключ фабрики, когда это разрешено."""
         for code in await self._storage.key_providers(user_id):
             key = await self._user_key(user_id, code)
             if key:
                 return self._get(code, key)
 
-        if not self._settings.require_own_key and self._settings.anthropic_api_key:
-            return self._get(providers.ANTHROPIC, self._settings.anthropic_api_key)
+        if self._may_use_factory_keys(user_id):
+            for code in (providers.ANTHROPIC, providers.OPENAI):
+                key = self._factory_key(code)
+                if key:
+                    return self._get(code, key)
 
         raise NoKey("нужен свой ключ ИИ")
 
     async def drawing_provider_for(self, user_id: int) -> Provider:
         """Поставщик, который умеет рисовать."""
         for code in await self._storage.key_providers(user_id):
-            if not PROVIDERS[code].draws:
-                continue
-            key = await self._user_key(user_id, code)
-            if key:
-                return self._get(code, key)
+            if PROVIDERS[code].draws:
+                key = await self._user_key(user_id, code)
+                if key:
+                    return self._get(code, key)
+
+        if self._may_use_factory_keys(user_id) and self._settings.openai_api_key:
+            return self._get(providers.OPENAI, self._settings.openai_api_key)
+
         raise NoKey("для картинок нужен ключ OpenAI")
+
+    async def has_provider(self, user_id: int, code: str) -> bool:
+        """Есть ли у человека доступ к конкретному поставщику."""
+        if await self._user_key(user_id, code):
+            return True
+        return bool(self._may_use_factory_keys(user_id) and self._factory_key(code))
+
+    async def can_draw(self, user_id: int) -> bool:
+        try:
+            await self.drawing_provider_for(user_id)
+            return True
+        except NoKey:
+            return False
 
     async def has_key(self, user_id: int) -> bool:
         try:

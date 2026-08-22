@@ -47,6 +47,7 @@ def _ids(name: str) -> tuple[int, ...]:
 class Settings:
     mother_bot_token: str
     anthropic_api_key: str
+    openai_api_key: str
     model: str
     chat_model: str
     openai_model: str
@@ -89,6 +90,7 @@ def load_settings() -> Settings:
     return Settings(
         mother_bot_token=token,
         anthropic_api_key=api_key,
+        openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         model=_str("ANTHROPIC_MODEL", "claude-opus-5"),
         chat_model=_str("ANTHROPIC_CHAT_MODEL", "claude-sonnet-5"),
         openai_model=_str("OPENAI_MODEL", "gpt-4o"),

@@ -134,12 +134,8 @@ class Factory:
         )
 
     async def can_draw(self, user_id: int) -> bool:
-        """Есть ли у человека ключ поставщика, который рисует."""
-        return any(
-            PROVIDERS[code].draws
-            for code in await self.storage.key_providers(user_id)
-            if code in PROVIDERS
-        )
+        """Может ли этот человек рисовать — своим ключом или ключом фабрики."""
+        return await self.hub.can_draw(user_id)
 
     async def owned(self, callback: CallbackQuery) -> BotRecord | None:
         """Достать бота из callback_data и убедиться, что он принадлежит нажавшему."""
@@ -317,17 +313,16 @@ def build_router(factory: Factory) -> Router:  # noqa: C901 — это карт�
 
     async def offer_missing_keys(message: Message, spec: BotSpec, user_id: int) -> None:
         """Если ИИ попросил ключ, которого у человека нет — предложить добавить."""
-        saved = set(await storage.key_providers(user_id))
-        wanted: list[str] = [
+        wanted = [
             code
             for item in spec.requirements
-            if (code := KEY_REQUIREMENTS.get(item.code)) and code not in saved
+            if (code := KEY_REQUIREMENTS.get(item.code)) is not None
         ]
         if spec.ai.image_generation and not await factory.can_draw(user_id):
             wanted.append("openai")
 
         for code in dict.fromkeys(wanted):
-            if code not in PROVIDERS:
+            if code not in PROVIDERS or await factory.hub.has_provider(user_id, code):
                 continue
             info = PROVIDERS[code]
             await message.answer(
