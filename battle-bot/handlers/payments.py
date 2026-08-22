@@ -26,6 +26,7 @@ from storage.settings import Settings
 log = logging.getLogger(__name__)
 router = Router(name="payments")
 
+COOLDOWN_PAYLOAD = "cooldown"
 CURRENCY = "XTR"
 
 
@@ -127,6 +128,36 @@ async def cancel_buy(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "cool:buy")
+async def buy_cooldown(
+    callback: CallbackQuery, bot: Bot, repo: Repo, settings: Settings
+) -> None:
+    """Выкупить паузу призёра и вернуться в батлы прямо сейчас."""
+    price = int(settings.get("cooldown_skip_price") or 0)
+    if not price:
+        await callback.answer("Выкуп сейчас недоступен.", show_alert=True)
+        return
+
+    if repo.cooldown_for(callback.from_user.id) is None:
+        await callback.answer("Паузы нет — можно подавать заявку.", show_alert=True)
+        return
+
+    try:
+        await bot.send_invoice(
+            chat_id=callback.from_user.id,
+            title="Возвращение в батлы",
+            description="Снимает паузу после призового места — можно подать заявку сразу.",
+            payload=COOLDOWN_PAYLOAD,
+            currency=CURRENCY,
+            prices=[LabeledPrice(label="Снятие паузы", amount=price)],
+        )
+    except TelegramAPIError as error:
+        log.error("Не удалось выставить счёт на выкуп паузы: %s", error)
+        await callback.answer("Не получилось выставить счёт, попробуйте позже.", show_alert=True)
+        return
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("buy:"))
 async def send_invoice(
     callback: CallbackQuery, bot: Bot, config: Config, settings: Settings, state: FSMContext
@@ -166,13 +197,22 @@ async def send_invoice(
 
 @router.pre_checkout_query()
 async def pre_checkout(query: PreCheckoutQuery, settings: Settings) -> None:
-    ok = settings.get("paid_votes_enabled") and query.invoice_payload.startswith("votes:")
+    payload = query.invoice_payload or ""
+    if payload == COOLDOWN_PAYLOAD:
+        ok = bool(settings.get("cooldown_skip_price"))
+    else:
+        ok = bool(settings.get("paid_votes_enabled")) and payload.startswith("votes:")
     await query.answer(ok=ok, error_message=None if ok else "Покупка недоступна.")
 
 
 @router.message(F.successful_payment)
 async def payment_done(message: Message, repo: Repo) -> None:
     payment = message.successful_payment
+
+    if payment.invoice_payload == COOLDOWN_PAYLOAD:
+        await _cooldown_paid(message, repo, payment)
+        return
+
     votes = int(payment.invoice_payload.split(":")[1])
 
     # charge_id уникален в БД — повторная доставка апдейта не начислит голоса дважды
@@ -191,6 +231,24 @@ async def payment_done(message: Message, repo: Repo) -> None:
         f"{texts.plural(votes, 'голос', 'голоса', 'голосов')}.\n"
         f"Баланс: <b>{repo.vote_balance(message.from_user.id)}</b>\n\n"
         f"<code>{payment.telegram_payment_charge_id}</code>"
+    )
+
+
+async def _cooldown_paid(message: Message, repo: Repo, payment) -> None:
+    """Оплата выкупа: снимаем паузу ровно один раз на платёж."""
+    if not repo.record_payment(
+        user_id=message.from_user.id,
+        charge_id=payment.telegram_payment_charge_id,
+        stars=payment.total_amount,
+        votes=0,
+    ):
+        log.info("Повторный апдейт об оплате %s пропущен", payment.telegram_payment_charge_id)
+        return
+
+    repo.clear_cooldown(message.from_user.id)
+    await message.answer(
+        texts.cooldown_lifted()
+        + f"\n\n<code>{payment.telegram_payment_charge_id}</code>"
     )
 
 

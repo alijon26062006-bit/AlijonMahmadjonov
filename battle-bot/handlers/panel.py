@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command
 from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.fsm.context import FSMContext
@@ -71,6 +72,18 @@ EDITORS: dict[str, dict] = {
         "back": "referrals",
     },
     "round_times": {"check": validation.as_times, "back": "settings"},
+    "cooldown_days": {
+        "check": lambda raw: validation.as_int(raw, minimum=0, maximum=90, example="3"),
+        "back": "people:rest",
+    },
+    "cooldown_places": {
+        "check": lambda raw: validation.as_int(raw, minimum=0, maximum=10, example="3"),
+        "back": "people:rest",
+    },
+    "cooldown_skip_price": {
+        "check": lambda raw: validation.as_int(raw, minimum=0, maximum=2500, example="50"),
+        "back": "people:rest",
+    },
     **{
         key: {"check": _link_or_none, "back": "links"}
         for _, key, _ in keyboards.HELP_LINKS
@@ -145,6 +158,7 @@ def collect(repo: Repo, engine: BattleEngine) -> dict:
         "users": repo.user_count(),
         "new_users": repo.new_users(),
         "banned": repo.banned_count(),
+        "resting": repo.cooldown_count(),
         "blocked": repo.blocked_count(),
         "votes": repo.total_votes_cast(),
         "sold_votes": sold_votes,
@@ -506,6 +520,54 @@ async def show_settings(callback: CallbackQuery, config: Config, settings: Setti
     await callback.answer()
 
 
+def _person_screen(repo: Repo, user_id: int):
+    """Карточка участника — вместе с действующей паузой, если она есть."""
+    return panel_ui.person(
+        repo.get_user(user_id),
+        repo.stats_for(user_id),
+        repo.vote_balance(user_id),
+        repo.referral_stats(user_id),
+        repo.cooldown_for(user_id),
+    )
+
+
+@router.callback_query(F.data == "p:people:rest")
+async def show_cooldowns(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, _cooldowns_screen(repo, settings))
+    await callback.answer()
+
+
+def _cooldowns_screen(repo: Repo, settings: Settings):
+    return panel_ui.cooldowns(
+        repo.active_cooldowns(limit=15),
+        settings.get("cooldown_days"),
+        settings.get("cooldown_places"),
+        settings.get("cooldown_skip_price"),
+    )
+
+
+@router.callback_query(F.data.startswith("p:person:rest:"))
+async def lift_cooldown(
+    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config
+) -> None:
+    """Снять паузу человеку вручную — например, если это была ошибка."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    user_id = int(callback.data.split(":")[-1])
+    lifted = repo.clear_cooldown(user_id)
+    if lifted:
+        try:
+            await bot.send_message(user_id, texts.cooldown_lifted(paid=False))
+        except TelegramAPIError as error:
+            log.info("Не смог сказать %s о снятии паузы: %s", user_id, error)
+    await render(callback, _person_screen(repo, user_id))
+    await callback.answer("Пауза снята" if lifted else "Паузы и не было")
+
+
 @router.callback_query(F.data == "p:people:top")
 async def show_top(callback: CallbackQuery, repo: Repo, config: Config) -> None:
     if not is_admin(callback.from_user.id, config):
@@ -756,12 +818,7 @@ async def _apply(
         await state.clear()
         await render(
             message,
-            panel_ui.person(
-                row,
-                repo.stats_for(row["user_id"]),
-                repo.vote_balance(row["user_id"]),
-                repo.referral_stats(row["user_id"]),
-            ),
+            _person_screen(repo, int(row["user_id"])),
         )
         return
 
@@ -774,12 +831,7 @@ async def _apply(
         row = repo.get_user(target)
         await render(
             message,
-            panel_ui.person(
-                row,
-                repo.stats_for(target),
-                repo.vote_balance(target),
-                repo.referral_stats(target),
-            ),
+            _person_screen(repo, target),
         )
         return
 
@@ -847,6 +899,8 @@ async def _back_to(
         )
     elif section == "channel":
         await render(message, panel_ui.channel(main_post.state(repo, config, settings)))
+    elif section == "people:rest":
+        await render(message, _cooldowns_screen(repo, settings))
     elif section == "links":
         await render(message, panel_ui.links(settings.all(), config.channel_url))
     elif section == "settings":
@@ -1038,15 +1092,9 @@ async def person_action(callback: CallbackQuery, repo: Repo, config: Config) -> 
     user_id = int(raw_id)
 
     repo.set_banned(user_id, action == "ban")
-    row = repo.get_user(user_id)
     await render(
         callback,
-        panel_ui.person(
-            row,
-            repo.stats_for(user_id),
-            repo.vote_balance(user_id),
-            repo.referral_stats(user_id),
-        ),
+        _person_screen(repo, user_id),
     )
     await callback.answer("Заблокирован" if action == "ban" else "Разблокирован")
 

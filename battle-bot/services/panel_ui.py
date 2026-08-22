@@ -499,18 +499,21 @@ def people(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         f"Всего: <b>{stats['users']}</b>\n"
         f"Новых за сутки: <b>{stats['new_users']}</b>\n"
         f"Заблокировано админом: <b>{stats['banned']}</b>\n"
-        f"Закрыли бота: <b>{stats['blocked']}</b>\n\n"
+        f"Закрыли бота: <b>{stats['blocked']}</b>\n"
+        f"⏳ Отдыхают после призов: <b>{stats.get('resting', 0)}</b>\n\n"
         "<i>Найдите участника по нику или ID, чтобы посмотреть карточку, "
         "выдать голоса или заблокировать.</i>"
     )
     return text, keyboard(
         [button("🔎 Найти участника", "edit:find_user", BLUE)],
-        [button("🏅 Таблица лидеров", "people:top")],
+        [button("🏅 Таблица лидеров", "people:top"),
+         button("⏳ Паузы", "people:rest")],
         back_row(),
     )
 
 
-def person(row, stats_row, balance: int, invited: tuple[int, int] = (0, 0)) -> tuple[str, InlineKeyboardMarkup]:
+def person(row, stats_row, balance: int, invited: tuple[int, int] = (0, 0),
+           rest=None) -> tuple[str, InlineKeyboardMarkup]:
     handle = f"@{row['username']}" if row["username"] else escape(row["first_name"] or "—")
     banned = bool(row["is_banned"])
     text = (
@@ -524,12 +527,47 @@ def person(row, stats_row, balance: int, invited: tuple[int, int] = (0, 0)) -> t
         f"🎁 Голосов на балансе: <b>{balance}</b>\n"
         f"🤝 Привёл друзей: <b>{invited[1]}</b> из {invited[0]}"
     )
+    rows = [[button("🎁 Начислить голоса", f"edit:grant:{row['user_id']}", BLUE)]]
+    if rest is not None:
+        text += (
+            f"\n\n⏳ <b>Отдыхает после {rest['place']} места</b>\n"
+            f"до {escape(str(rest['until'])[:16].replace('T', ' '))}"
+        )
+        rows.append([button("⏳ Снять паузу", f"person:rest:{row['user_id']}", GREEN)])
+
     unban = button("Разблокировать", f"person:unban:{row['user_id']}", GREEN)
     ban = button("Заблокировать", f"person:ban:{row['user_id']}", RED)
-    return text, keyboard(
-        [button("🎁 Начислить голоса", f"edit:grant:{row['user_id']}", BLUE)],
+    rows += [
         [unban if banned else ban],
         [button("🔎 Найти другого", "edit:find_user")],
+        back_row("people"),
+    ]
+    return text, keyboard(*rows)
+
+
+def cooldowns(rows, days: int, places: int, price: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Кто сейчас отдыхает после призовых мест."""
+    lines = []
+    for row in rows:
+        who = escape("@" + (row["username"] or str(row["user_id"])))
+        until = escape(str(row["until"])[:16].replace("T", " "))
+        lines.append(f"{texts.MEDAL.get(row['place'], '🏆')} {who} — до {until}")
+    listing = "\n".join(lines) if lines else "<i>сейчас никто не отдыхает</i>"
+
+    state = f"<b>{days}</b> дн. за места <b>1–{places}</b>" if days else "<b>выключена</b>"
+    buy = f"Выкуп: <b>{price}⭐</b>" if price else "Выкуп: <i>отключён</i>"
+    text = (
+        f"⏳ <b>{texts.spaced('ПАУЗА ПРИЗЁРАМ')}</b>\n{RULE}\n\n"
+        f"Пауза: {state}\n{buy}\n\n"
+        f"{listing}\n\n"
+        "<i>Призёры пропускают несколько батлов, чтобы призы доставались не "
+        "одним и тем же. Голосовать это не мешает — закрыта только заявка. "
+        "Снять паузу конкретному человеку можно в его карточке.</i>"
+    )
+    return text, keyboard(
+        [button("✏️ Дней паузы", "edit:cooldown_days", BLUE)],
+        [button("🏅 Мест под паузой", "edit:cooldown_places")],
+        [button("⭐ Цена выкупа", "edit:cooldown_skip_price")],
         back_row("people"),
     )
 

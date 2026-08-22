@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
@@ -65,6 +65,15 @@ class BattleEngine:
         """
         if self.repo.is_banned(user_id):
             return False, "Вы не можете участвовать в батлах."
+
+        rest = self.repo.cooldown_for(user_id, self.now())
+        if rest is not None:
+            return False, texts.on_cooldown(
+                int(rest["place"]),
+                datetime.fromisoformat(rest["until"]),
+                self.now(),
+                int(self.settings.get("cooldown_skip_price") or 0),
+            )
 
         battle = self.repo.current_battle()
         if battle is not None and self.repo.is_participant(int(battle["id"]), user_id):
@@ -477,10 +486,27 @@ class BattleEngine:
                 await self._dm(
                     slot.user_id, texts.took_place(place, self.config.prizes[place - 1])
                 )
+            await self._rest_after_prize(slot.user_id, place, battle_id)
             await self._publish_result_to_own_channel(slot.user_id, 0, True, ranking)
         log.info("Батл #%s завершён", battle_id)
 
         log.info("Очередь на следующий батл: %s", self.repo.queue_size())
+
+    async def _rest_after_prize(self, user_id: int, place: int, battle_id: int) -> None:
+        """Отправить призёра на паузу: пусть призы достаются не одним и тем же."""
+        days = int(self.settings.get("cooldown_days") or 0)
+        places = int(self.settings.get("cooldown_places") or 0)
+        if days <= 0 or place > places:
+            return
+
+        until = self.now() + timedelta(days=days)
+        self.repo.set_cooldown(user_id, place, battle_id, until)
+        price = int(self.settings.get("cooldown_skip_price") or 0)
+        await self._dm(
+            user_id,
+            texts.cooldown_started(place, until, price),
+            keyboards.buy_cooldown(price) if price else None,
+        )
 
     # ---------------------------------------------------------------- рассылка
 

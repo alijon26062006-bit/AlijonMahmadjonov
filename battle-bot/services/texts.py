@@ -316,6 +316,74 @@ def battle_empty_admin(returned: int) -> str:
     )
 
 
+# ------------------------------------------------------- пауза призёрам
+
+def until_line(until: datetime) -> str:
+    return f"🗓 До <b>{until.strftime('%d.%m в %H:%M')}</b> МСК"
+
+
+def rest_days(until: datetime, now: datetime) -> int:
+    """Сколько суток осталось, округляя вверх: «меньше дня» — это ещё день."""
+    left = until - now
+    if left.total_seconds() <= 0:
+        return 0
+    return max(1, -(-int(left.total_seconds()) // 86400))
+
+
+def cooldown_started(place: int, until: datetime, price: int) -> str:
+    """Сообщение призёру сразу после финала."""
+    buy = (
+        f"\n\n<blockquote>Не хотите ждать? <b>Вернуться сразу</b> можно "
+        f"за <b>{price}</b>⭐ — кнопка ниже.</blockquote>"
+        if price
+        else ""
+    )
+    return (
+        f"{MEDAL.get(place, '🏆')} <b>{place} место — и заслуженный отдых</b>\n"
+        f"{RULE}\n\n"
+        "Призёры пропускают несколько батлов: так призы достаются не одним и "
+        "тем же. Голосовать и звать друзей это не мешает.\n\n"
+        f"{until_line(until)}{buy}"
+    )
+
+
+def on_cooldown(place: int, until: datetime, now: datetime, price: int) -> str:
+    """Отказ на заявке, пока идёт пауза."""
+    days = rest_days(until, now)
+    word = plural(days, "день", "дня", "дней")
+    buy = (
+        f"\n\n<b>Вернуться сейчас</b> — {price}⭐, кнопка ниже."
+        if price
+        else ""
+    )
+    return (
+        f"⏳ <b>Вы отдыхаете после {place} места</b>\n"
+        f"{RULE}\n\n"
+        f"Осталось: <b>{days}</b> {word}\n"
+        f"{until_line(until)}\n\n"
+        "<i>Голосовать, звать друзей и покупать голоса можно как обычно — "
+        "закрыта только подача заявки.</i>"
+        f"{buy}"
+    )
+
+
+def profile_rest(place: int, until: datetime) -> str:
+    return (
+        f"⏳ <b>Отдых после {place} места</b>\n"
+        f"{until_line(until)}\n"
+        "<i>Заявку пока подать нельзя. Голосовать — можно.</i>"
+    )
+
+
+def cooldown_lifted(paid: bool = True) -> str:
+    how = "Пауза выкуплена" if paid else "Паузу снял администратор"
+    return (
+        f"✅ <b>{how}</b>\n"
+        f"{RULE}\n\n"
+        "<b>Можно подавать заявку</b> — жмите «🚀 Принять участие»."
+    )
+
+
 def queue_ready(waiting: int, minimum: int) -> str:
     """Админу: людей набралось, можно запускать."""
     word = plural(waiting, "человек", "человека", "человек")

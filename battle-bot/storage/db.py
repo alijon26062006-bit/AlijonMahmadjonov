@@ -189,6 +189,17 @@ CREATE TABLE IF NOT EXISTS errors (
 );
 CREATE INDEX IF NOT EXISTS idx_errors_time ON errors(created_at);
 
+-- Пауза призёрам: занял призовое место — отдыхаешь несколько дней,
+-- чтобы одни и те же люди не забирали призы каждый батл. Паузу можно
+-- выкупить за звёзды или снять из панели.
+CREATE TABLE IF NOT EXISTS cooldowns (
+    user_id    INTEGER PRIMARY KEY REFERENCES users(user_id),
+    place      INTEGER NOT NULL,
+    battle_id  INTEGER,
+    until      TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS stats (
     user_id     INTEGER PRIMARY KEY REFERENCES users(user_id),
     battles     INTEGER NOT NULL DEFAULT 0,

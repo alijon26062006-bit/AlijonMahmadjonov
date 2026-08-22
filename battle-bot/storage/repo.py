@@ -865,6 +865,58 @@ class Repo:
         ).fetchone()
         return int(row["total"]), int(row["live"]), int(row["posts"])
 
+    # ---------------------------------------------------- пауза призёрам
+
+    def set_cooldown(self, user_id: int, place: int, battle_id: int | None,
+                     until: datetime) -> None:
+        """Поставить паузу. Новая победа перекрывает старую паузу."""
+        self.conn.execute(
+            """INSERT INTO cooldowns(user_id, place, battle_id, until)
+               VALUES(?, ?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET
+                   place = excluded.place,
+                   battle_id = excluded.battle_id,
+                   until = excluded.until,
+                   created_at = datetime('now')""",
+            (user_id, place, battle_id, until.isoformat()),
+        )
+        # в очереди на следующий батл ему теперь не место
+        self.conn.execute("DELETE FROM queue WHERE user_id = ?", (user_id,))
+        self.conn.commit()
+
+    def cooldown_for(self, user_id: int, now: datetime | None = None) -> sqlite3.Row | None:
+        """Действующая пауза или None. Истёкшая считается снятой."""
+        moment = (now or datetime.now(MSK)).isoformat()
+        return self.conn.execute(
+            """SELECT * FROM cooldowns
+               WHERE user_id = ? AND datetime(until) > datetime(?)""",
+            (user_id, moment),
+        ).fetchone()
+
+    def clear_cooldown(self, user_id: int) -> bool:
+        cursor = self.conn.execute("DELETE FROM cooldowns WHERE user_id = ?", (user_id,))
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def active_cooldowns(self, limit: int = 20, now: datetime | None = None) -> list[sqlite3.Row]:
+        moment = (now or datetime.now(MSK)).isoformat()
+        return self.conn.execute(
+            """SELECT c.*, u.username, u.first_name
+               FROM cooldowns c LEFT JOIN users u ON u.user_id = c.user_id
+               WHERE datetime(c.until) > datetime(?)
+               ORDER BY c.until LIMIT ?""",
+            (moment, limit),
+        ).fetchall()
+
+    def cooldown_count(self, now: datetime | None = None) -> int:
+        moment = (now or datetime.now(MSK)).isoformat()
+        return int(
+            self.conn.execute(
+                "SELECT COUNT(*) FROM cooldowns WHERE datetime(until) > datetime(?)",
+                (moment,),
+            ).fetchone()[0]
+        )
+
     # ------------------------------------------------------- журнал сбоев
 
     KEEP_ERRORS = 200  # хранить только последние: журнал не должен расти вечно

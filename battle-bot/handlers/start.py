@@ -1,6 +1,8 @@
 """/start, deep-links и главное меню."""
 from __future__ import annotations
 
+from datetime import datetime
+
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import CallbackQuery, Message
@@ -123,6 +125,17 @@ async def _do_join(
             return
         nickname = user.first_name or f"id{user.id}"
 
+    # отдыхающему показываем не голый отказ, а кнопку выкупа
+    rest = repo.cooldown_for(user.id)
+    price = int(settings.get("cooldown_skip_price") or 0)
+    if rest is not None and price:
+        _, response = await engine.join(user.id, nickname)
+        await ui.send(
+            target, response, reply_markup=keyboards.buy_cooldown(price),
+            disable_web_page_preview=True,
+        )
+        return
+
     accepted, response = await engine.join(user.id, nickname)
     if accepted and settings.get("member_channels_enabled"):
         # записался — самое время предложить рекламировать себя в своём канале
@@ -165,15 +178,24 @@ async def how_it_works(callback: CallbackQuery) -> None:
 
 @router.message(F.text.in_(keyboards.variants(keyboards.BTN_PROFILE)))
 @router.message(Command("me"))
-async def profile(message: Message, repo: Repo) -> None:
-    repo.upsert_user(message.from_user.id, message.from_user.username, message.from_user.first_name)
-    await message.answer(
-        texts.profile(
-            message.from_user.username,
-            repo.stats_for(message.from_user.id),
-            repo.vote_balance(message.from_user.id),
-        )
+async def profile(message: Message, repo: Repo, settings: Settings) -> None:
+    user_id = message.from_user.id
+    repo.upsert_user(user_id, message.from_user.username, message.from_user.first_name)
+
+    body = texts.profile(
+        message.from_user.username, repo.stats_for(user_id), repo.vote_balance(user_id)
     )
+    # если человек отдыхает после приза — он должен видеть это в профиле
+    rest = repo.cooldown_for(user_id)
+    markup = None
+    if rest is not None:
+        price = int(settings.get("cooldown_skip_price") or 0)
+        body += "\n\n" + texts.profile_rest(
+            int(rest["place"]), datetime.fromisoformat(rest["until"])
+        )
+        markup = keyboards.buy_cooldown(price) if price else None
+
+    await message.answer(body, reply_markup=markup)
 
 
 @router.message(Command("top"))

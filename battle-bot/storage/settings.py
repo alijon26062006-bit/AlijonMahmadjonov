@@ -91,6 +91,12 @@ FIELDS: dict[str, Field] = {
         Field("main_post_message_id", "ID опубликованного главного поста", str, int, ""),
         Field("member_channels_enabled", "Каналы участников",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("cooldown_days", "Пауза призёрам, дней", str, int,
+              "сколько дней призёр не участвует; 0 — паузы нет"),
+        Field("cooldown_places", "Мест под паузой", str, int,
+              "сколько верхних мест уходит на паузу, например 3"),
+        Field("cooldown_skip_price", "Выкуп паузы, звёзд", str, int,
+              "сколько стоит вернуться раньше; 0 — выкупить нельзя"),
         Field("free_vote_scope", "Бесплатный голос", str, str,
               "battle — один на весь батл, round — один на раунд, "
               "match — один на каждую пару"),
@@ -161,6 +167,10 @@ class Settings:
         "late_join_until_round": 1,
         # один бесплатный голос на весь батл: за остальные пары — купленными
         "free_vote_scope": "battle",
+        # призёр отдыхает три дня — или выкупает возвращение за 50⭐
+        "cooldown_days": 3,
+        "cooldown_places": 3,
+        "cooldown_skip_price": 50,
         "link_main_channel": "",
         "link_battles": "",
         "link_payouts": "",

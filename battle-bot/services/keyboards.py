@@ -280,6 +280,21 @@ def help_links(links: dict[str, str], table: dict[str, str] | None = None) -> In
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
+def buy_cooldown(price: int) -> InlineKeyboardMarkup:
+    """Выкупить паузу и вернуться в батлы прямо сейчас."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=f"⚡ Вернуться сейчас — {price}⭐",
+                    callback_data="cool:buy",
+                    style=GREEN,
+                )
+            ]
+        ]
+    )
+
+
 def out_of_votes() -> InlineKeyboardMarkup:
     """Голоса кончились — куда идти дальше."""
     return InlineKeyboardMarkup(
