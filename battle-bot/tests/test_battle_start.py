@@ -242,3 +242,47 @@ async def test_nobody_is_bothered_while_a_battle_runs(tmp_path):
         await engine.join(user_id, f"n{user_id}")
 
     assert not any("Очередь набралась" in text for text in bot.texts(1))
+
+
+# ------------------------------- батл, созданный вечером, играется завтра
+
+@pytest.mark.asyncio
+async def test_a_battle_created_after_the_final_runs_until_tomorrow(tmp_path):
+    """Финал закончился вечером, сразу создали новый — он не должен сгореть."""
+    repo, config, settings, bot, engine = build(tmp_path, "evening.db")
+    evening = datetime.now(MSK).replace(hour=21, minute=5, second=0, microsecond=0)
+    engine.now = lambda: evening
+
+    await enqueue_users(engine, repo, 4)
+    await engine.create_from_queue()
+
+    deadline = datetime.fromisoformat(repo.current_battle()["deadline"])
+    assert deadline > evening + timedelta(hours=12), "первый раунд должен дожить до завтра"
+    assert deadline.hour == 18, "и закончиться в первое время из списка"
+
+
+@pytest.mark.asyncio
+async def test_the_call_shows_the_real_deadline(tmp_path):
+    """В посте главного канала должно стоять то же время, что у батла."""
+    repo, config, settings, bot, engine = build(tmp_path, "calltime.db")
+    evening = datetime.now(MSK).replace(hour=21, minute=5, second=0, microsecond=0)
+    engine.now = lambda: evening
+
+    await enqueue_users(engine, repo, 4)
+    await engine.create_from_queue()
+
+    deadline = datetime.fromisoformat(repo.current_battle()["deadline"])
+    assert deadline.strftime("%H:%M") in bot.texts(MAIN)[0]
+
+
+@pytest.mark.asyncio
+async def test_a_daytime_battle_still_finishes_the_same_evening(tmp_path):
+    repo, config, settings, bot, engine = build(tmp_path, "daytime.db")
+    noon = datetime.now(MSK).replace(hour=12, minute=0, second=0, microsecond=0)
+    engine.now = lambda: noon
+
+    await enqueue_users(engine, repo, 4)
+    await engine.create_from_queue()
+
+    deadline = datetime.fromisoformat(repo.current_battle()["deadline"])
+    assert deadline.date() == noon.date() and deadline.hour == 18

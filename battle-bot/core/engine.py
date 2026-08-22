@@ -12,7 +12,7 @@ from aiogram.exceptions import TelegramAPIError
 from config import Config, MSK
 from core import bracket
 from core.models import BattleStatus, Player, Slot
-from core.scheduler import next_deadline
+from core.scheduler import first_deadline, next_deadline
 from services import keyboards, links, main_post, member_channel, texts
 from services.channel import ChannelPublisher
 from services.tg import is_blocked
@@ -304,7 +304,13 @@ class BattleEngine:
                 self.repo.close_battle(battle_id, BattleStatus.CANCELLED)
             return
 
-        deadline = next_deadline(self.now(), self.config.round_times)
+        # первый раунд идёт до первого времени из списка (при необходимости —
+        # завтрашнего), дальше раунды берут ближайшие оставшиеся слоты
+        deadline = (
+            first_deadline(self.now(), self.config.round_times)
+            if round_no == 1
+            else next_deadline(self.now(), self.config.round_times)
+        )
         self.repo.set_round(battle_id, round_no, deadline)
         self.repo.set_battle_status(battle_id, BattleStatus.RUNNING)
 
@@ -350,7 +356,7 @@ class BattleEngine:
                     f"{self.config.min_participants} нужных. Батл не начат."
                 )
 
-            deadline = next_deadline(self.now(), self.config.round_times)
+            deadline = first_deadline(self.now(), self.config.round_times)
             battle_id = self.repo.create_battle(deadline)
             for player in waiting:
                 self.repo.add_participant(battle_id, player.user_id, player.nickname)
@@ -358,7 +364,9 @@ class BattleEngine:
             log.info("Батл #%s создан из очереди: %s участников", battle_id, len(waiting))
 
             await self._start_round(battle_id, 1)
-            await self._call_main_channel(battle_id, deadline, len(waiting))
+            await self._call_main_channel(
+                battle_id, self.current_deadline() or deadline, len(waiting)
+            )
             return True, f"Батл #{battle_id} начат: {len(waiting)} участников."
 
     async def _call_main_channel(self, battle_id: int, deadline, participants: int) -> None:

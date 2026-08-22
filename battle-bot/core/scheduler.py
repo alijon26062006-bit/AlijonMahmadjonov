@@ -36,6 +36,27 @@ def next_deadline(now: datetime, times: Sequence[time]) -> datetime:
     return now + FALLBACK_INTERVAL
 
 
+def first_deadline(now: datetime, times: Sequence[time]) -> datetime:
+    """Когда заканчивается первый раунд.
+
+    Первый раунд — это ещё и приём заявок, поэтому он всегда идёт до
+    **первого** времени из списка итогов, а не до ближайшего оставшегося.
+    Если сегодня оно уже прошло, берём завтрашнее.
+
+    Иначе батл, созданный сразу после вечернего финала, получал бы час до
+    ближайшего слота и сгорал бы за тот же вечер: люди не успели бы ни
+    подать заявку, ни позвать голосующих.
+    """
+    if not times:
+        return now + FALLBACK_INTERVAL
+
+    slot = sorted(times)[0]
+    today = now.replace(hour=slot.hour, minute=slot.minute, second=0, microsecond=0)
+    if today - now >= MIN_ROUND_LENGTH:
+        return today
+    return today + timedelta(days=1)
+
+
 class Ticker:
     """Фоновая задача, которая просто зовёт callback раз в N секунд."""
 
