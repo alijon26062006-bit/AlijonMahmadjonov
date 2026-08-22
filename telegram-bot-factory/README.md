@@ -20,44 +20,46 @@ Telegram-бот, который делает других Telegram-ботов.
 - Восстановление работавших ботов после перезапуска фабрики
 - Команда `/stats` для администраторов из `ADMIN_IDS`: люди, боты, ответы ИИ за месяц
 
-## Установка
+## Установка одной командой
+
+На сервере:
+
+```bash
+cd ~/AlijonMahmadjonov && git pull && bash telegram-bot-factory/install.sh
+```
+
+Скрипт сам проверит Python, поставит зависимости, создаст `.env`, сгенерирует
+ключ шифрования, спросит токен бота и ключ Anthropic, проверит токен в Telegram,
+настроит автозапуск через systemd и запустит фабрику. Ввод секретов на экране не показывается.
+
+Запускать скрипт можно сколько угодно раз — он доделывает то, чего не хватает,
+и ничего не ломает. Обновление после изменений в репозитории — та же команда.
+
+Если что-то нужно поправить руками, всё лежит в файле `.env` рядом со скриптом.
+Ключ шифрования менять нельзя: после смены сохранённые токены перестанут
+расшифровываться и всех ботов придётся добавлять заново.
+
+## Установка вручную
 
 Нужен Python 3.11 или новее.
 
 ```bash
-git clone <адрес репозитория>
-cd telegram-bot-factory
-
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-```
-
-## Настройка
-
-```bash
 cp .env.example .env
 ```
 
-Открыть `.env` и заполнить три обязательных поля.
-
-**MOTHER_BOT_TOKEN** — токен главного бота. Получить у @BotFather командой `/newbot`.
-
-**ANTHROPIC_API_KEY** — ключ с platform.claude.com, раздел API Keys.
-
-**FERNET_KEY** — ключ шифрования чужих токенов. Сгенерировать:
+Сгенерировать ключ шифрования и вписать его в `.env`:
 
 ```bash
 .venv/bin/python -m botfactory.crypto
 ```
 
-Вывод скопировать в `.env`.
+Заполнить в `.env` три обязательных поля: `MOTHER_BOT_TOKEN` (токен главного бота
+от @BotFather), `ANTHROPIC_API_KEY` (ключ с platform.claude.com) и `FERNET_KEY`.
+Остальные поля можно оставить как есть, что они значат — написано в `.env.example`.
 
-Ключ шифрования менять нельзя: после смены сохранённые токены перестанут
-расшифровываться и всех ботов придётся добавлять заново.
-
-Остальные поля можно оставить как есть. Что они значат — написано в `.env.example`.
-
-## Запуск
+Запуск:
 
 ```bash
 .venv/bin/python -m botfactory
@@ -65,7 +67,9 @@ cp .env.example .env
 
 В Telegram открыть своего главного бота и отправить `/start`.
 
-## Автозапуск на сервере
+## Автозапуск вручную
+
+Это делает `install.sh`. Если нужно настроить самому:
 
 Файл `/etc/systemd/system/botfactory.service`:
 
@@ -98,9 +102,7 @@ journalctl -u botfactory -f
 ## Обновление
 
 ```bash
-git pull
-.venv/bin/pip install -r requirements.txt
-sudo systemctl restart botfactory
+cd ~/AlijonMahmadjonov && git pull && bash telegram-bot-factory/install.sh
 ```
 
 ## Тесты
@@ -125,6 +127,7 @@ sudo systemctl restart botfactory
 | `botfactory/mother.py` | интерфейс фабрики |
 | `botfactory/texts.py` | все тексты интерфейса, здесь же меняется язык |
 | `botfactory/__main__.py` | точка входа |
+| `install.sh` | установка и запуск одной командой |
 
 ## Как устроено внутри
 
