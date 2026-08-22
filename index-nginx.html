@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="tg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CodeTJ</title>
+<!--
+  Ин файл барои серверҳои nginx лозим аст.
+  nginx одатан танҳо index.html-ро мекушояд ва index.php-ро намебинад.
+  Ҳамин файл корбарро фавран ба index.php мебарад.
+
+  Этот файл нужен для nginx: он по умолчанию открывает только index.html
+  и не знает про index.php. Файл сразу перенаправляет на index.php.
+-->
+<meta http-equiv="refresh" content="0; url=index.php">
+<link rel="canonical" href="index.php">
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#0b1120;color:#e7edf7;
+ display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;
+ text-align:center;line-height:1.7}
+.box{max-width:420px}
+h1{font-size:1.6rem;margin:0 0 10px}
+h1 span{color:#38bdf8}
+p{color:#8fa0bd;margin:0 0 18px}
+a{display:inline-block;background:linear-gradient(135deg,#38bdf8,#818cf8);color:#04121f;
+ text-decoration:none;font-weight:700;padding:13px 26px;border-radius:12px}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>Code<span>TJ</span></h1>
+  <p>Саҳифа кушода мешавад&hellip;<br>Страница открывается&hellip;</p>
+  <a href="index.php">Кушодан / Открыть</a>
+</div>
+<script>location.replace('index.php');</script>
+</body>
+</html>
