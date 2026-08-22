@@ -12,7 +12,16 @@ from botfactory import providers
 from botfactory.config import Settings
 from botfactory.crypto import TokenCipher, generate_key
 from botfactory.generator import AIHub, NoKey
-from botfactory.spec import BotSpec, lint, normalize, strict_json_schema, summary
+from botfactory.spec import (
+    KEY_REQUIREMENTS,
+    MAX_QUESTIONS,
+    MAX_REQUIREMENTS,
+    BotSpec,
+    lint,
+    normalize,
+    strict_json_schema,
+    summary,
+)
 from botfactory.providers import ANTHROPIC, OPENAI, guess_provider
 from botfactory.storage import STATUS_RUNNING, BotRecord, Storage, token_fingerprint
 
@@ -149,6 +158,60 @@ class RoutingTests(unittest.TestCase):
         keyboard = _menu_keyboard(make_spec())
         self.assertEqual(len(keyboard.keyboard), 1)
         self.assertEqual(len(keyboard.keyboard[0]), 2)
+
+
+class RequirementTests(unittest.TestCase):
+    def test_missing_lists_default_to_empty(self) -> None:
+        spec = make_spec()
+        self.assertEqual(spec.requirements, [])
+        self.assertEqual(spec.questions, [])
+
+    def test_requirements_cleaned_and_deduplicated(self) -> None:
+        spec = make_spec(
+            requirements=[
+                {
+                    "code": "OpenAI_Key",
+                    "title": "Ключ OpenAI",
+                    "why": "чтобы рисовать",
+                    "where": "platform.openai.com",
+                },
+                {"code": "openai_key", "title": "Он же второй раз", "why": "", "where": ""},
+                {"code": "data", "title": "", "why": "без названия", "where": ""},
+                {"code": "data", "title": "Прайс-лист", "why": "нет цен", "where": "у вас"},
+            ]
+        )
+        codes = [item.code for item in spec.requirements]
+        self.assertEqual(codes, ["openai_key", "data"])
+        self.assertEqual(spec.requirements[0].title, "Ключ OpenAI")
+
+    def test_lists_are_capped(self) -> None:
+        spec = make_spec(
+            requirements=[
+                {"code": f"c{i}", "title": f"t{i}", "why": "", "where": ""} for i in range(20)
+            ],
+            questions=[f"вопрос {i}" for i in range(20)],
+        )
+        self.assertEqual(len(spec.requirements), MAX_REQUIREMENTS)
+        self.assertEqual(len(spec.questions), MAX_QUESTIONS)
+
+    def test_key_requirements_map_to_providers(self) -> None:
+        self.assertEqual(KEY_REQUIREMENTS["openai_key"], OPENAI)
+        self.assertEqual(KEY_REQUIREMENTS["anthropic_key"], ANTHROPIC)
+
+    def test_requirements_shown_in_summary(self) -> None:
+        spec = make_spec(
+            requirements=[
+                {
+                    "code": "payment_token",
+                    "title": "Токен оплаты",
+                    "why": "бот принимает деньги",
+                    "where": "@BotFather -> Payments",
+                }
+            ]
+        )
+        text = summary(spec)
+        self.assertIn("Токен оплаты", text)
+        self.assertIn("бот принимает деньги", text)
 
 
 class ImageTests(unittest.TestCase):

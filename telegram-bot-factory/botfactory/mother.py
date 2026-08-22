@@ -24,7 +24,7 @@ from .config import Settings
 from .crypto import TokenCipher
 from .generator import AIHub, NoKey
 from .providers import PROVIDERS, ProviderError, guess_provider
-from .spec import lint, summary
+from .spec import KEY_REQUIREMENTS, BotSpec, lint, summary
 from .storage import STATUS_RUNNING, BotRecord, Storage, token_fingerprint
 from .supervisor import StartError, Supervisor
 
@@ -35,8 +35,9 @@ MIN_PROMPT_LENGTH = 15
 
 
 class New(StatesGroup):
-    token = State()
     prompt = State()
+    answers = State()
+    token = State()
 
 
 class Edit(StatesGroup):
@@ -116,9 +117,9 @@ class Factory:
             text += texts.BOT_CARD_ERROR.format(error=html.escape(record.last_error))
         return f"{text}\n\n{summary(record.spec)}"
 
-    def preview_text(self, record: BotRecord) -> str:
-        text = texts.PREVIEW_HEADER.format(summary=summary(record.spec))
-        problems = lint(record.spec)
+    def preview_text(self, spec: BotSpec) -> str:
+        text = texts.PREVIEW_HEADER.format(summary=summary(spec))
+        problems = lint(spec)
         if problems:
             items = "\n".join(f"• {html.escape(item)}" for item in problems)
             text += texts.PREVIEW_WARNINGS.format(items=items)
@@ -306,19 +307,99 @@ def build_router(factory: Factory) -> Router:  # noqa: C901 — это карт�
         if not await factory.hub.has_key(message.from_user.id):
             await ask_key(message, state, after="new")
             return
-        await state.set_state(New.token)
-        await message.answer(texts.ASK_TOKEN)
+        await state.set_state(New.prompt)
+        await message.answer(texts.ASK_PROMPT)
 
     @router.message(Command("new"))
     @router.message(F.text == texts.BTN_NEW)
     async def on_new(message: Message, state: FSMContext) -> None:
         await begin_new(message, state)
 
+    async def offer_missing_keys(message: Message, spec: BotSpec, user_id: int) -> None:
+        """Если ИИ попросил ключ, которого у человека нет — предложить добавить."""
+        saved = set(await storage.key_providers(user_id))
+        wanted: list[str] = [
+            code
+            for item in spec.requirements
+            if (code := KEY_REQUIREMENTS.get(item.code)) and code not in saved
+        ]
+        if spec.ai.image_generation and not await factory.can_draw(user_id):
+            wanted.append("openai")
+
+        for code in dict.fromkeys(wanted):
+            if code not in PROVIDERS:
+                continue
+            info = PROVIDERS[code]
+            await message.answer(
+                texts.REQUIREMENT_KEY.format(
+                    title=html.escape(info.title), where=html.escape(info.where)
+                ),
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [InlineKeyboardButton(text=texts.BTN_ADD_KEY, callback_data="addkey")]
+                    ]
+                ),
+            )
+
+    async def build_bot(
+        message: Message, state: FSMContext, prompt: str, answers: str = ""
+    ) -> None:
+        """Собрать структуру, задать вопросы ИИ, показать результат и попросить токен."""
+        if message.from_user is None:
+            return
+
+        note = await message.answer(texts.BUILDING)
+        try:
+            spec = await factory.hub.create_spec(message.from_user.id, prompt, answers)
+        except ProviderError as exc:
+            await state.clear()
+            await note.edit_text(texts.GENERATION_FAILED.format(error=html.escape(str(exc)[:300])))
+            return
+        await note.delete()
+
+        if spec.questions and not answers:
+            await state.set_state(New.answers)
+            await state.update_data(prompt=prompt)
+            items = "\n".join(
+                f"{number}. {html.escape(question)}"
+                for number, question in enumerate(spec.questions, 1)
+            )
+            await message.answer(texts.ASK_ANSWERS.format(items=items))
+            return
+
+        await state.set_state(New.token)
+        await state.update_data(prompt=prompt, spec=spec.model_dump_json())
+        await message.answer(factory.preview_text(spec), disable_web_page_preview=True)
+        await offer_missing_keys(message, spec, message.from_user.id)
+        await message.answer(texts.ASK_TOKEN)
+
+    @router.message(New.prompt)
+    async def on_prompt(message: Message, state: FSMContext) -> None:
+        prompt = (message.text or "").strip()
+        if len(prompt) < MIN_PROMPT_LENGTH:
+            await message.answer(texts.PROMPT_TOO_SHORT)
+            return
+        await build_bot(message, state, prompt)
+
+    @router.message(New.answers)
+    async def on_answers(message: Message, state: FSMContext) -> None:
+        data = await state.get_data()
+        prompt = data.get("prompt", "")
+        if not prompt:
+            await state.clear()
+            await message.answer(texts.CANCELLED)
+            return
+
+        answers = (message.text or "").strip()
+        if answers.lower() in ("пропустить", "/skip", "skip", "-"):
+            answers = "Владелец не ответил. Реши сам, разумными значениями по умолчанию."
+        await build_bot(message, state, prompt, answers)
+
     @router.message(New.token)
     async def on_token(message: Message, state: FSMContext) -> None:
         if message.from_user is None:
             return
-        token = (message.text or "").strip()
+        token = "".join(ch for ch in (message.text or "") if ch.isprintable()).strip()
 
         if not TOKEN_RE.match(token):
             await message.answer(texts.BAD_TOKEN_FORMAT)
@@ -337,56 +418,31 @@ def build_router(factory: Factory) -> Router:  # noqa: C901 — это карт�
         probe = Bot(token=token)
         try:
             info = await probe.get_me()
-        except Exception:  # noqa: BLE001 — любая причина = ключ не подошёл
+        except Exception:  # noqa: BLE001 — любая причина = токен не подошёл
             await message.answer(texts.TOKEN_REJECTED)
             return
         finally:
             await probe.session.close()
 
-        await state.update_data(
-            token=token, tg_bot_id=info.id, username=info.username, title=info.first_name
-        )
-        await state.set_state(New.prompt)
-        await message.answer(texts.TOKEN_SAVED.format(handle=html.escape(f"@{info.username}")))
-        await message.answer(texts.ASK_PROMPT)
-
-    @router.message(New.prompt)
-    async def on_prompt(message: Message, state: FSMContext) -> None:
-        if message.from_user is None:
-            return
-        prompt = (message.text or "").strip()
-        if len(prompt) < MIN_PROMPT_LENGTH:
-            await message.answer(texts.PROMPT_TOO_SHORT)
-            return
-
         data = await state.get_data()
-        token = data.get("token")
-        if not token:
+        raw_spec = data.get("spec")
+        if not raw_spec:
             await state.clear()
             await message.answer(texts.CANCELLED)
-            return
-
-        note = await message.answer(texts.BUILDING)
-        try:
-            spec = await factory.hub.create_spec(message.from_user.id, prompt)
-        except ProviderError as exc:
-            await note.edit_text(texts.GENERATION_FAILED.format(error=html.escape(str(exc)[:300])))
             return
 
         record = await storage.create_bot(
             owner_id=message.from_user.id,
             token_enc=factory.cipher.encrypt(token),
             token_hash=token_fingerprint(token),
-            tg_bot_id=data.get("tg_bot_id"),
-            username=data.get("username"),
-            prompt=prompt,
-            spec=spec,
+            tg_bot_id=info.id,
+            username=info.username,
+            prompt=data.get("prompt", ""),
+            spec=BotSpec.model_validate_json(raw_spec),
         )
         await state.clear()
-        await note.delete()
-        await message.answer(factory.preview_text(record), disable_web_page_preview=True)
-        if spec.ai.image_generation and not await factory.can_draw(message.from_user.id):
-            await message.answer(texts.KEY_NEEDED_TO_DRAW)
+        await message.answer(texts.TOKEN_SAVED.format(handle=html.escape(f"@{info.username}")))
+        await message.answer(texts.BOT_READY_TO_START)
         await factory.show_card(message, record)
 
     # --- список ботов ------------------------------------------------------

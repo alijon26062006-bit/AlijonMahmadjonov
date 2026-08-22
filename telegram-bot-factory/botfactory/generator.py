@@ -44,6 +44,21 @@ BUILDER_SYSTEM = """\
 - action у кнопки: message — прислать текст, url — открыть ссылку (только реальные ссылки,
   которые дал человек; выдуманных ссылок быть не должно).
 
+Сам разберись, чего боту не хватает, и попроси это у владельца через requirements.
+Складывай туда только то, чего у фабрики нет и что может дать только он:
+- openai_key — бот должен рисовать картинки. Где: platform.openai.com -> API keys
+- payment_token — бот принимает оплату. Где: @BotFather -> Payments
+- channel_admin — бот пишет в канал или группу. Где: добавить бота администратором
+- data — тебе не хватило фактов: прайс, адрес, часы работы, телефон, условия доставки.
+  Перечисли в title, чего именно не хватает
+- other — всё остальное, чего требует задача
+Ключ ИИ для обычных ответов в requirements не пиши — он уже есть у фабрики.
+Если ничего не нужно, оставь requirements пустым.
+
+Если описание слишком общее и бот получится пустым, задай до трёх коротких вопросов
+через questions. Спрашивай только то, без чего бот будет бесполезным, и всё равно
+собери рабочий вариант из того, что уже известно. Если всё понятно — questions пустой.
+
 Возвращай только структуру, без пояснений."""
 
 EDITOR_SYSTEM = """\
@@ -58,6 +73,8 @@ EDITOR_SYSTEM = """\
 - Просят добавить — добавляй так, чтобы это сочеталось с остальным по тону и языку.
 - Не выдумывай фактов, которых нет ни в структуре, ни в пожелании.
 - Язык текстов не меняй, если об этом не просят.
+- questions оставляй пустым: правку не переспрашивают.
+- requirements пересчитай заново под новую структуру.
 
 Возвращай только структуру, без пояснений."""
 
@@ -146,9 +163,15 @@ class AIHub:
 
     # --- работа ------------------------------------------------------------
 
-    async def create_spec(self, user_id: int, prompt: str) -> BotSpec:
+    async def create_spec(self, user_id: int, prompt: str, answers: str = "") -> BotSpec:
         provider = await self.provider_for(user_id)
-        return await provider.structured(BUILDER_SYSTEM, f"Нужен такой бот:\n\n{prompt}")
+        user_text = f"Нужен такой бот:\n\n{prompt}"
+        if answers:
+            user_text += (
+                f"\n\nОтветы владельца на твои уточняющие вопросы:\n\n{answers}\n\n"
+                "Теперь вопросов не задавай, questions оставь пустым."
+            )
+        return await provider.structured(BUILDER_SYSTEM, user_text)
 
     async def edit_spec(self, user_id: int, spec: BotSpec, instruction: str) -> BotSpec:
         provider = await self.provider_for(user_id)

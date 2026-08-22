@@ -14,6 +14,11 @@ MAX_MENU_BUTTONS = 8
 MAX_INLINE_BUTTONS = 6
 MAX_TEXT = 3000
 MAX_BUTTON_TEXT = 40
+MAX_REQUIREMENTS = 6
+MAX_QUESTIONS = 3
+
+# Требования, которые фабрика умеет закрыть сама, спросив ключ
+KEY_REQUIREMENTS = {"openai_key": "openai", "anthropic_key": "anthropic"}
 
 _COMMAND_RE = re.compile(r"[^a-z0-9_]")
 
@@ -58,6 +63,20 @@ class AISettings(BaseModel):
     )
 
 
+class Requirement(BaseModel):
+    """Что владельцу нужно принести, чтобы бот заработал по-настоящему."""
+
+    code: str = Field(
+        description=(
+            "Кодовое имя: openai_key, anthropic_key, payment_token, channel_admin, "
+            "data или other"
+        )
+    )
+    title: str = Field(description="Коротко, что именно нужно")
+    why: str = Field(description="Зачем это боту, одно предложение")
+    where: str = Field(description="Где это взять, коротко и по делу")
+
+
 class BotSpec(BaseModel):
     """Полное описание поведения бота."""
 
@@ -71,6 +90,14 @@ class BotSpec(BaseModel):
     triggers: List[Trigger] = Field(description="Ответы на ключевые слова")
     ai: AISettings
     fallback_text: str = Field(description="Ответ, когда ничего не подошло и ИИ выключен")
+    requirements: List[Requirement] = Field(
+        default_factory=list,
+        description="Чего не хватает от владельца, чтобы бот работал полностью. Можно пустым",
+    )
+    questions: List[str] = Field(
+        default_factory=list,
+        description="До трёх уточняющих вопросов владельцу, если описание слишком общее",
+    )
 
 
 def _clip(text: str, limit: int = MAX_TEXT) -> str:
@@ -148,6 +175,31 @@ def normalize(spec: BotSpec) -> BotSpec:
         "image_generation": bool(ai.get("image_generation", False)),
     }
 
+    requirements: list[dict[str, Any]] = []
+    seen_codes: set[str] = set()
+    for item in data.get("requirements") or []:
+        code = _clip(str(item.get("code", "")), 40).lower() or "other"
+        title = _clip(item.get("title", ""), 100)
+        if not title or code in seen_codes:
+            continue
+        seen_codes.add(code)
+        requirements.append(
+            {
+                "code": code,
+                "title": title,
+                "why": _clip(item.get("why", ""), 200),
+                "where": _clip(item.get("where", ""), 200),
+            }
+        )
+    data["requirements"] = requirements[:MAX_REQUIREMENTS]
+
+    questions: list[str] = []
+    for item in data.get("questions") or []:
+        question = _clip(str(item), 200)
+        if question:
+            questions.append(question)
+    data["questions"] = questions[:MAX_QUESTIONS]
+
     return BotSpec.model_validate(data)
 
 
@@ -198,6 +250,17 @@ def summary(spec: BotSpec) -> str:
 
     if spec.ai.image_generation:
         lines.append("<b>Генерация картинок</b>: включена, команда /image")
+
+    if spec.requirements:
+        lines.append("")
+        lines.append("<b>Чтобы заработало полностью, нужно</b>")
+        for item in spec.requirements:
+            line = f"• {esc(item.title)}"
+            if item.why:
+                line += f" — {esc(item.why)}"
+            lines.append(line)
+            if item.where:
+                lines.append(f"  где взять: {esc(item.where)}")
 
     return "\n".join(lines).strip()
 
