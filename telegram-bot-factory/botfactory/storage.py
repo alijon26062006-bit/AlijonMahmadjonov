@@ -263,6 +263,29 @@ class Storage:
         )
         await self.db.commit()
 
+    # --- сводка -------------------------------------------------------
+
+    async def stats(self) -> dict[str, int]:
+        """Общие числа по всей фабрике — для администратора."""
+        result: dict[str, int] = {}
+        async with self.db.execute("SELECT COUNT(*) AS n FROM users") as cur:
+            row = await cur.fetchone()
+            result["users"] = int(row["n"]) if row else 0
+        async with self.db.execute("SELECT COUNT(*) AS n FROM bots") as cur:
+            row = await cur.fetchone()
+            result["bots"] = int(row["n"]) if row else 0
+        async with self.db.execute(
+            "SELECT status, COUNT(*) AS n FROM bots GROUP BY status"
+        ) as cur:
+            for row in await cur.fetchall():
+                result[str(row["status"])] = int(row["n"])
+        async with self.db.execute(
+            "SELECT COALESCE(SUM(ai_calls), 0) AS n FROM bots WHERE ai_period = ?", (period(),)
+        ) as cur:
+            row = await cur.fetchone()
+            result["ai_calls"] = int(row["n"]) if row else 0
+        return result
+
     # --- лимит ИИ -----------------------------------------------------
 
     async def take_ai_quota(self, bot_id: int, limit: int) -> bool:

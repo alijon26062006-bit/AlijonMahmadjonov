@@ -172,6 +172,23 @@ def build_router(factory: Factory) -> Router:  # noqa: C901 — это карт�
         await state.clear()
         await message.answer(texts.CANCELLED, reply_markup=main_keyboard())
 
+    @router.message(Command("stats"))
+    async def on_stats(message: Message) -> None:
+        if message.from_user is None or message.from_user.id not in settings.admin_ids:
+            await message.answer(texts.UNKNOWN)
+            return
+        numbers = await storage.stats()
+        await message.answer(
+            texts.STATS.format(
+                users=numbers.get("users", 0),
+                bots=numbers.get("bots", 0),
+                running=numbers.get("running", 0),
+                stopped=numbers.get("stopped", 0),
+                error=numbers.get("error", 0),
+                ai_calls=numbers.get("ai_calls", 0),
+            )
+        )
+
     # --- создание бота ---------------------------------------------------
 
     @router.message(Command("new"))

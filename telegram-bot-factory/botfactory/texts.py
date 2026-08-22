@@ -113,6 +113,16 @@ CONFIRM_DELETE = (
 )
 DELETED = "Бот удалён."
 
+STATS = (
+    "<b>Фабрика</b>\n"
+    "Людей: {users}\n"
+    "Ботов создано: {bots}\n"
+    "Сейчас работает: {running}\n"
+    "Остановлено: {stopped}\n"
+    "С ошибкой: {error}\n"
+    "Ответов ИИ в этом месяце: {ai_calls}"
+)
+
 CANCELLED = "Отменил."
 NOTHING_TO_CANCEL = "Сейчас нечего отменять."
 UNKNOWN = "Не понял. Посмотрите /help"

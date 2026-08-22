@@ -187,6 +187,19 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
         for _ in range(5):
             self.assertTrue(await self.storage.take_ai_quota(self.record.id, 0))
 
+    async def test_stats_counts_everything(self) -> None:
+        await self.storage.remember_user(42, "owner", "Владелец")
+        await self.storage.set_status(self.record.id, STATUS_RUNNING)
+        await self.storage.take_ai_quota(self.record.id, 100)
+        await self.storage.take_ai_quota(self.record.id, 100)
+
+        numbers = await self.storage.stats()
+        self.assertEqual(numbers["users"], 1)
+        self.assertEqual(numbers["bots"], 1)
+        self.assertEqual(numbers["running"], 1)
+        self.assertEqual(numbers["ai_calls"], 2)
+        self.assertEqual(numbers.get("stopped", 0), 0)
+
     async def test_status_and_delete(self) -> None:
         await self.storage.set_status(self.record.id, STATUS_RUNNING)
         self.assertEqual(len(await self.storage.list_by_status(STATUS_RUNNING)), 1)
