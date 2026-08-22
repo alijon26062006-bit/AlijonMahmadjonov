@@ -115,26 +115,23 @@ def battle(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
     else:
         waiting = stats["queue"]
         enough = waiting >= stats["min_participants"]
+        hint = (
+            "Бот разобьёт их на пары и опубликует все посты сразу.\n"
+            "Кто придёт позже — попадёт в этот же батл."
+            if enough
+            else "Создавайте смело: <b>батл заводится первым</b>, а люди "
+                 "подтянутся из главного канала по кнопке «Участвовать» — "
+                 "весь первый раунд идёт на набор."
+        )
         body = (
             "<i>Сейчас батл не идёт.</i>\n\n"
             f"🎫 В очереди: <b>{waiting}</b> "
             f"{texts.plural(waiting, 'человек', 'человека', 'человек')}\n"
-            f"Нужно минимум: <b>{stats['min_participants']}</b>\n\n"
-            + (
-                "Бот разобьёт их на пары и опубликует все посты сразу."
-                if enough
-                else "<b>Людей пока не хватает.</b> Ждём новые заявки."
-            )
+            f"<i>Удобный минимум: {stats['min_participants']} — "
+            f"это подсказка, а не запрет</i>\n\n"
+            f"{hint}"
         )
-        rows = [
-            [
-                button(
-                    f"▶️ Создать батл ({waiting})",
-                    "battle:create",
-                    GREEN if enough else None,
-                )
-            ]
-        ]
+        rows = [[button(f"▶️ Создать батл ({waiting})", "battle:create", GREEN)]]
         if waiting:
             rows.append([button("🗑 Очистить очередь", "battle:clear:ask", RED)])
 

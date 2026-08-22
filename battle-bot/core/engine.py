@@ -212,6 +212,9 @@ class BattleEngine:
         matches = self.repo.open_matches(battle_id, round_no)
 
         if not matches:
+            # первый раунд закончился, а пар так и не набралось: батл пустой
+            if round_no == 1:
+                await self._give_up_empty_battle(battle_id)
             return
 
         advanced: list[int] = []
@@ -251,6 +254,23 @@ class BattleEngine:
         await self._notify_many(byes, texts.BYE_ROUND)
 
         await self._start_round(battle_id, round_no + 1)
+
+    async def _give_up_empty_battle(self, battle_id: int) -> None:
+        """Время вышло, а пар не набралось — закрываем и никого не теряем.
+
+        Тот единственный, кто успел заявиться, возвращается в очередь: он
+        подал заявку и не виноват, что соперника не нашлось.
+        """
+        left = self.repo.alive_players(battle_id)
+        self.repo.close_battle(battle_id, BattleStatus.CANCELLED)
+        for player in left:
+            self.repo.enqueue(player.user_id, player.nickname)
+
+        log.info("Батл #%s закрыт: заявок не набралось", battle_id)
+        await self.publisher.announce(texts.battle_empty())
+        await self._notify_many([p.user_id for p in left], texts.BATTLE_EMPTY_DM)
+        for admin_id in self.config.admin_ids:
+            await self._dm(admin_id, texts.battle_empty_admin(len(left)))
 
     async def _send_match_results(self, result, round_no: int, is_final: bool) -> None:
         """Разослать участникам матча честный итог: вся таблица, а не «вы проиграли»."""
@@ -296,6 +316,12 @@ class BattleEngine:
         alive = self.repo.alive_players(battle_id)
 
         if len(alive) < 2:
+            if round_no == 1:
+                # Батл только что создан и пока пустой — это нормально.
+                # Люди придут из главного канала по кнопке «Участвовать»,
+                # и каждая пара будет опубликована по мере набора.
+                await self._open_empty_first_round(battle_id, len(alive))
+                return
             if alive:
                 await self._finish_battle(
                     battle_id, [Slot(alive[0].user_id, alive[0].nickname, 0, 1)]
@@ -343,19 +369,24 @@ class BattleEngine:
                 await self._dm(player.user_id, texts.advanced(rivals), markup)
                 await self._publish_to_own_channel(player.user_id, match_id)
 
+    async def _open_empty_first_round(self, battle_id: int, waiting: int) -> None:
+        """Открыть первый раунд, когда участников ещё нет или всего один."""
+        deadline = first_deadline(self.now(), self.config.round_times)
+        self.repo.set_round(battle_id, 1, deadline)
+        self.repo.set_battle_status(battle_id, BattleStatus.RUNNING)
+        await self.publisher.announce(texts.battle_opened(deadline, waiting))
+        log.info("Батл #%s открыт без пар: ждём заявок", battle_id)
+
     async def create_from_queue(self) -> tuple[bool, str]:
         """Собрать батл из очереди. Вызывается админом из панели."""
         async with self._lock:
             if self.repo.current_battle() is not None:
                 return False, "Батл уже идёт. Сначала подведите итоги или отмените его."
 
+            # минимума на создание нет и быть не должно: батл заводится
+            # первым, а люди подтягиваются из главного канала по кнопке
+            # «Участвовать» — весь первый раунд идёт именно на это
             waiting = self.repo.queue_players(self.config.max_participants)
-            if len(waiting) < self.config.min_participants:
-                return False, (
-                    f"В очереди {len(waiting)} из "
-                    f"{self.config.min_participants} нужных. Батл не начат."
-                )
-
             deadline = first_deadline(self.now(), self.config.round_times)
             battle_id = self.repo.create_battle(deadline)
             for player in waiting:
@@ -367,7 +398,14 @@ class BattleEngine:
             await self._call_main_channel(
                 battle_id, self.current_deadline() or deadline, len(waiting)
             )
-            return True, f"Батл #{battle_id} начат: {len(waiting)} участников."
+            if waiting:
+                note = f"Батл #{battle_id} начат: {len(waiting)} участников."
+            else:
+                note = (
+                    f"Батл #{battle_id} открыт. Пока никого — "
+                    "зов ушёл в главный канал, ждём заявок."
+                )
+            return True, note
 
     async def _call_main_channel(self, battle_id: int, deadline, participants: int) -> None:
         """Позвать людей в главный канал: батл начался, заявку ещё можно подать.

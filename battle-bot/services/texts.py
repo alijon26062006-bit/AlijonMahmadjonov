@@ -251,16 +251,68 @@ def battle_started_post(participants: int, deadline: datetime, prizes: list[str]
     бот подберёт соперника любому, кто нажмёт кнопку.
     """
     word = plural(participants, "участник", "участника", "участников")
+    who = (
+        f"👥 Уже в игре: <b>{participants}</b> {word}"
+        if participants
+        else "👥 <b>Пока никого — станьте первым</b>"
+    )
     return (
         f"⚔️ <b>{spaced('БАТЛ НАЧАЛСЯ')}</b>\n"
         f"{RULE}\n\n"
         f"{prizes_block(prizes)}\n\n"
-        f"👥 Уже в игре: <b>{participants}</b> {word}\n"
+        f"{who}\n"
         f"{deadline_line(deadline)}\n\n"
         "<blockquote><b>Ещё можно успеть.</b> Пока идёт первый раунд, "
         "бот подберёт соперника каждому, кто подаст заявку — "
         "и сразу опубликует вашу пару здесь.</blockquote>\n\n"
         "↓ <b>Жми кнопку</b>"
+    )
+
+
+def battle_opened(deadline: datetime, waiting: int = 0) -> str:
+    """Батл создан, но пар пока нет — зовём в канал батлов."""
+    who = (
+        f"🎫 Уже заявился: <b>{waiting}</b>"
+        if waiting
+        else "🎫 <b>Пока никого — станьте первым</b>"
+    )
+    return (
+        f"⚔️ <b>{spaced('НАБОР ОТКРЫТ')}</b>\n"
+        f"{RULE}\n\n"
+        f"{who}\n"
+        f"{deadline_line(deadline)}\n\n"
+        "<blockquote>Подавайте заявку — как только наберётся пара, "
+        "её пост выйдет здесь же.</blockquote>"
+    )
+
+
+def battle_empty() -> str:
+    return (
+        f"🛑 <b>{spaced('БАТЛ НЕ СОСТОЯЛСЯ')}</b>\n"
+        f"{RULE}\n\n"
+        "Заявок не набралось. <b>Ждём следующего набора.</b>"
+    )
+
+
+BATTLE_EMPTY_DM = (
+    "🛑 <b>Батл не состоялся</b>\n\n"
+    "<blockquote>Соперников так и не нашлось. "
+    "Ваша заявка <b>вернулась в очередь</b> — участвовать заново не нужно, "
+    "вы попадёте в следующий батл.</blockquote>"
+)
+
+
+def battle_empty_admin(returned: int) -> str:
+    tail = (
+        f"\n\nЗаявок вернулось в очередь: <b>{returned}</b>."
+        if returned
+        else ""
+    )
+    return (
+        f"🛑 <b>Батл не состоялся</b>\n"
+        f"{RULE}\n\n"
+        f"К моменту итогов не набралось ни одной пары.{tail}\n\n"
+        "<i>Стоит дать больше времени на набор или позвать людей рекламой.</i>"
     )
 
 

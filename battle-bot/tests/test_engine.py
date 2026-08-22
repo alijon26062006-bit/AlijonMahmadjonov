@@ -145,16 +145,31 @@ async def test_the_admin_builds_the_battle_out_of_the_queue(env):
 
 
 @pytest.mark.asyncio
-async def test_a_battle_is_not_built_from_too_few_people(env):
+async def test_an_empty_battle_opens_and_waits_for_people(env):
+    """Батл заводится первым, люди подтягиваются по кнопке из канала."""
     bot, repo, engine = env
-    await enqueue_users(engine, repo, 1)
 
     started, note = await engine.create_from_queue()
 
-    assert not started
-    assert "1 из 2" in note
-    assert repo.current_battle() is None
-    assert repo.queue_size() == 1, "очередь не тронута"
+    assert started, "создание батла ничем не ограничено"
+    assert "Пока никого" in note
+    battle = repo.current_battle()
+    assert battle is not None and int(battle["round_no"]) == 1
+    assert battle["deadline"], "время итогов должно быть задано сразу"
+
+
+@pytest.mark.asyncio
+async def test_a_lone_applicant_does_not_win_by_default(env):
+    """Один в очереди — это не победа, это ожидание соперника."""
+    bot, repo, engine = env
+    await enqueue_users(engine, repo, 1)
+
+    started, _ = await engine.create_from_queue()
+
+    assert started
+    assert repo.current_battle() is not None, "батл не должен сразу закрыться"
+    assert repo.is_participant(1, 1)
+    assert not repo.open_matches(1, 1), "пары нет — соперник ещё не пришёл"
 
 
 @pytest.mark.asyncio
@@ -432,23 +447,18 @@ async def test_large_battle_runs_to_a_champion(env):
 
 
 @pytest.mark.asyncio
-async def test_the_minimum_is_respected(tmp_path):
-    """Пока в очереди меньше минимума, батл не собирается."""
+async def test_the_minimum_does_not_block_the_start(tmp_path):
+    """Минимум — это подсказка админу, а не запрет на создание батла."""
     path = str(tmp_path / "enough.db")
     repo = Repo(connect(path))
     engine = BattleEngine(FakeBot(), repo, make_config(db_path=path, min_participants=6))
 
     await enqueue_users(engine, repo, 5)
-    started, _ = await engine.create_from_queue()
-    assert not started
-
-    repo.upsert_user(6, "nick6", "N")
-    await engine.join(6, "nick6")
     engine.rng = NoShuffle()
     started, _ = await engine.create_from_queue()
 
-    assert started
-    assert repo.participant_count(1) == 6
+    assert started, "меньше минимума — всё равно запускаем"
+    assert repo.participant_count(1) == 5
 
 
 # ------------------------------------------------- очередь между батлами

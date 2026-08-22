@@ -286,3 +286,106 @@ async def test_a_daytime_battle_still_finishes_the_same_evening(tmp_path):
 
     deadline = datetime.fromisoformat(repo.current_battle()["deadline"])
     assert deadline.date() == noon.date() and deadline.hour == 18
+
+
+# ------------------------------ батл создаётся первым, люди приходят потом
+
+@pytest.mark.asyncio
+async def test_an_empty_battle_can_be_created(tmp_path):
+    """Главное: кнопка «Создать батл» работает при нуле в очереди."""
+    repo, config, settings, bot, engine = build(tmp_path, "empty.db")
+
+    started, note = await engine.create_from_queue()
+
+    assert started and "Пока никого" in note
+    assert repo.current_battle() is not None
+
+
+@pytest.mark.asyncio
+async def test_an_empty_battle_still_calls_the_channels(tmp_path):
+    repo, config, settings, bot, engine = build(tmp_path, "emptycall.db")
+
+    await engine.create_from_queue()
+
+    assert "Пока никого" in bot.texts(MAIN)[0], "зов ушёл в главный канал"
+    assert any("НАБОР ОТКРЫТ" in text.replace(" ", "") or "Н А Б О Р" in text
+               for text in bot.channel_posts), "и в канал батлов"
+
+
+@pytest.mark.asyncio
+async def test_people_arriving_after_the_start_get_paired(tmp_path):
+    """Ровно сценарий админа: создал пустой батл, люди пришли по кнопке."""
+    repo, config, settings, bot, engine = build(tmp_path, "arrive.db")
+    await engine.create_from_queue()
+
+    for user_id in (10, 11, 12):
+        repo.upsert_user(user_id, f"nick{user_id}", "N")
+        await engine.join(user_id, f"nick{user_id}")
+
+    assert len(repo.open_matches(1, 1)) == 1, "первые двое встали в пару"
+    assert len(repo.unassigned_players(1)) == 1, "третий ждёт соперника"
+    assert repo.participant_count(1) == 3
+
+
+@pytest.mark.asyncio
+async def test_the_lonely_one_is_not_declared_a_winner(tmp_path):
+    repo, config, settings, bot, engine = build(tmp_path, "lonely.db")
+    await enqueue_users(engine, repo, 1)
+
+    await engine.create_from_queue()
+
+    assert repo.current_battle() is not None, "батл не должен схлопнуться"
+    assert not repo.open_matches(1, 1)
+
+
+# --------------------------------------- если так никто и не пришёл
+
+@pytest.mark.asyncio
+async def test_a_battle_nobody_joined_is_closed_at_the_deadline(tmp_path):
+    repo, config, settings, bot, engine = build(tmp_path, "nobody.db")
+    await engine.create_from_queue()
+
+    await engine.close_round(force=True)
+
+    assert repo.current_battle() is None, "пустой батл закрывается"
+    assert any("НЕ СОСТОЯЛСЯ" in t.replace(" ", "") or "Н Е   С О" in t
+               for t in bot.channel_posts)
+
+
+@pytest.mark.asyncio
+async def test_the_single_applicant_gets_his_place_back(tmp_path):
+    """Он подал заявку и не виноват, что соперника не нашлось."""
+    repo, config, settings, bot, engine = build(tmp_path, "giveback.db")
+    await enqueue_users(engine, repo, 1)
+    await engine.create_from_queue()
+    assert repo.queue_size() == 0
+
+    await engine.close_round(force=True)
+
+    assert repo.queue_size() == 1, "заявка вернулась в очередь"
+    assert any("вернулась в очередь" in text for text in bot.texts(1) + bot.texts(2))
+
+
+@pytest.mark.asyncio
+async def test_the_admin_learns_the_battle_did_not_happen(tmp_path):
+    repo, config, settings, bot, engine = build(tmp_path, "tellme.db")
+    await engine.create_from_queue()
+
+    await engine.close_round(force=True)
+
+    assert any("не состоялся" in text.lower() for text in bot.texts(1))
+
+
+@pytest.mark.asyncio
+async def test_a_battle_with_one_pair_is_not_given_up(tmp_path):
+    """Пара есть — значит батл состоялся, закрывать нечего."""
+    repo, config, settings, bot, engine = build(tmp_path, "onepair.db")
+    await enqueue_users(engine, repo, 2)
+    await engine.create_from_queue()
+
+    match_id = int(repo.open_matches(1, 1)[0]["id"])
+    slots = repo.match_slots(match_id)
+    vote_for(repo, match_id, slots[0].user_id, range(700, 703))
+    await engine.close_round(force=True)
+
+    assert not any("не состоялся" in text.lower() for text in bot.texts(1))
