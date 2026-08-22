@@ -244,6 +244,38 @@ def queue_call(waiting: int, prizes: list[str]) -> str:
     )
 
 
+def battle_started_post(participants: int, deadline: datetime, prizes: list[str]) -> str:
+    """Пост в главный канал в момент запуска батла.
+
+    Главное в нём — что заявку ещё можно подать: пока идёт первый раунд,
+    бот подберёт соперника любому, кто нажмёт кнопку.
+    """
+    word = plural(participants, "участник", "участника", "участников")
+    return (
+        f"⚔️ <b>{spaced('БАТЛ НАЧАЛСЯ')}</b>\n"
+        f"{RULE}\n\n"
+        f"{prizes_block(prizes)}\n\n"
+        f"👥 Уже в игре: <b>{participants}</b> {word}\n"
+        f"{deadline_line(deadline)}\n\n"
+        "<blockquote><b>Ещё можно успеть.</b> Пока идёт первый раунд, "
+        "бот подберёт соперника каждому, кто подаст заявку — "
+        "и сразу опубликует вашу пару здесь.</blockquote>\n\n"
+        "↓ <b>Жми кнопку</b>"
+    )
+
+
+def queue_ready(waiting: int, minimum: int) -> str:
+    """Админу: людей набралось, можно запускать."""
+    word = plural(waiting, "человек", "человека", "человек")
+    return (
+        f"🎫 <b>Очередь набралась</b>\n"
+        f"{RULE}\n\n"
+        f"В очереди: <b>{waiting}</b> {word} "
+        f"<i>(нужно было {minimum})</i>\n\n"
+        "Батл можно запускать: <b>/panel → ⚔️ Батл → Создать батл</b>."
+    )
+
+
 def battle_cancelled(queue_size: int = 0) -> str:
     tail = (
         f"\n\n🎫 <b>Запись на следующий открыта</b> — в очереди уже {queue_size}."

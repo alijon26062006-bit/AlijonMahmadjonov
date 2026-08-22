@@ -120,7 +120,26 @@ class Settings:
             current = self._from_config(key)
             self._write(key, field.dump(current))
             log.debug("Настройка %s перенесена из .env: %s", key, current)
+        self._one_time_fixes()
         self.apply()
+
+    # Разовые правки уже сохранённых значений. Новое значение по умолчанию
+    # не помогает: в базе настройка уже лежит, и bootstrap её не трогает.
+    # Каждая правка отмечается своим ключом, поэтому выполняется один раз и
+    # не откатывает то, что админ поменял потом сам.
+    FIXES = (
+        # приём заявок сузили до первого раунда: со второго сетка уже сошлась
+        ("fix:late_join_1", "late_join_until_round", "2", "1"),
+    )
+
+    def _one_time_fixes(self) -> None:
+        for marker, key, was, becomes in self.FIXES:
+            if self._raw(marker) is not None:
+                continue
+            if self._raw(key) == was:
+                self._write(key, becomes)
+                log.info("Настройка %s обновлена: %s -> %s", key, was, becomes)
+            self._write(marker, "done")
 
     # значения, которых нет в .env — только в базе
     OWN_DEFAULTS = {
@@ -134,8 +153,9 @@ class Settings:
         "main_post_text": "",
         "main_post_message_id": 0,
         "member_channels_enabled": True,
-        # до конца какого раунда новичок попадает в идущий батл, а не в очередь
-        "late_join_until_round": 2,
+        # до конца какого раунда новичок попадает в идущий батл, а не в очередь.
+        # 1 — приём идёт весь первый раунд и закрывается, когда начинается второй
+        "late_join_until_round": 1,
         "link_main_channel": "",
         "link_battles": "",
         "link_payouts": "",

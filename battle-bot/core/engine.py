@@ -13,7 +13,7 @@ from config import Config, MSK
 from core import bracket
 from core.models import BattleStatus, Player, Slot
 from core.scheduler import next_deadline
-from services import keyboards, links, member_channel, texts
+from services import keyboards, links, main_post, member_channel, texts
 from services.channel import ChannelPublisher
 from services.tg import is_blocked
 from storage.repo import Repo
@@ -80,7 +80,23 @@ class BattleEngine:
         if not self.repo.enqueue(user_id, nickname):
             return False, texts.already_queued(self.repo.queue_size())
 
-        return True, texts.queued(self.repo.queue_size())
+        waiting = self.repo.queue_size()
+        await self._tell_admins_queue_is_ready(waiting)
+        return True, texts.queued(waiting)
+
+    async def _tell_admins_queue_is_ready(self, waiting: int) -> None:
+        """Сказать админу ровно один раз: людей хватает, можно запускать.
+
+        Момент ловим по точному совпадению с минимумом — так сообщение уходит
+        один раз за набор, а не на каждую следующую заявку.
+        """
+        if waiting != self.config.min_participants:
+            return
+        if self.repo.current_battle() is not None:
+            return  # батл уже идёт, запускать всё равно нечего
+
+        for admin_id in self.config.admin_ids:
+            await self._dm(admin_id, texts.queue_ready(waiting, self.config.min_participants))
 
     def late_join_limit(self) -> int:
         try:
@@ -342,7 +358,38 @@ class BattleEngine:
             log.info("Батл #%s создан из очереди: %s участников", battle_id, len(waiting))
 
             await self._start_round(battle_id, 1)
+            await self._call_main_channel(battle_id, deadline, len(waiting))
             return True, f"Батл #{battle_id} начат: {len(waiting)} участников."
+
+    async def _call_main_channel(self, battle_id: int, deadline, participants: int) -> None:
+        """Позвать людей в главный канал: батл начался, заявку ещё можно подать.
+
+        Пост уходит именно в момент запуска — пока идёт первый раунд, бот
+        подберёт соперника любому, кто нажмёт кнопку. Сбой публикации не
+        должен рушить уже начатый батл, поэтому ошибку только пишем в лог.
+        """
+        channel_id = self.settings.get("main_channel_id")
+        if not channel_id:
+            log.info("Главный канал не задан — зов о начале батла не отправлен")
+            return
+
+        try:
+            message = await self.bot.send_message(
+                channel_id,
+                texts.battle_started_post(
+                    participants, deadline, self.settings.get("prizes")
+                ),
+                reply_markup=main_post.keyboard(
+                    self.config.bot_username, self.config.premium_emoji
+                ),
+                disable_web_page_preview=True,
+            )
+        except TelegramAPIError as error:
+            log.warning("Не удалось позвать в главный канал: %s", error)
+            return
+
+        # запоминаем пост, чтобы панель могла убрать его вместе с остальными
+        self.repo.record_post(channel_id, message.message_id, battle_id, kind="call")
 
     async def cancel(self, battle_id: int) -> int:
         """Отменить батл: голосование встаёт, участники узнают, набор открывается заново.
