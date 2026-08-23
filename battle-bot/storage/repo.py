@@ -873,6 +873,29 @@ class Repo:
         ).fetchone()
         return int(row["times"]) if row else 1
 
+    def known_subscribers(self, limit: int = 2000) -> list[int]:
+        """Кто **точно** был подписан на канал.
+
+        Список подписчиков Telegram не отдаёт, но это и не нужно: подписку
+        проверяет сам бот при каждой заявке и при каждом голосе. Значит все,
+        кто хоть раз участвовал или голосовал, гейт проходили — а больше
+        никто и не может подавать заявку.
+
+        Тех, кто просто нажал /start и не подписывался, сюда не берём: они
+        не выходили, им просто нечего было покидать.
+        """
+        rows = self.conn.execute(
+            """SELECT user_id FROM (
+                   SELECT user_id FROM participants
+                   UNION
+                   SELECT voter_id AS user_id FROM votes
+               )
+               WHERE user_id NOT IN (SELECT user_id FROM leavers)
+               ORDER BY user_id LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [int(row["user_id"]) for row in rows]
+
     def leaver(self, user_id: int) -> sqlite3.Row | None:
         return self.conn.execute(
             "SELECT * FROM leavers WHERE user_id = ?", (user_id,)

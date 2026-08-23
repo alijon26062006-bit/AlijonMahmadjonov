@@ -577,14 +577,18 @@ def leavers(rows, enabled: bool, price: int, total: int) -> tuple[str, InlineKey
         f"Штраф: <b>{onoff(enabled)}</b>\n{money}\n"
         f"Всего в списке: <b>{total}</b>\n\n"
         f"{listing}\n\n"
-        "<i>Отметка ставится в момент выхода из обязательного канала. "
+        "<i>Отметка ставится сама, в момент выхода из обязательного канала. "
+        "Кнопка «Проверить всех» нужна на случай, если бот в этот момент "
+        "лежал: она заново проверяет каждого, кто участвовал или голосовал, "
+        "и отмечает тех, кого уже нет в канале.\n\n"
         "Заявки от таких людей не принимаются, пока они не вернут доступ "
         "звёздами. Подписаться обратно недостаточно. "
         "Простить конкретного человека можно в его карточке.</i>"
     )
     toggle = "Выключить штраф" if enabled else "Включить штраф"
     return text, keyboard(
-        [button("⭐ Цена возврата", "edit:rejoin_price", BLUE)],
+        [button("🔍 Проверить всех сейчас", "people:sweep", BLUE)],
+        [button("⭐ Цена возврата", "edit:rejoin_price")],
         [button(toggle, "settings:toggle:leave_penalty_enabled",
                 RED if enabled else GREEN)],
         back_row("people"),

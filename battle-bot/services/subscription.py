@@ -72,6 +72,22 @@ async def is_subscribed(
     return subscribed
 
 
+async def check(bot: Bot, channel_id: int, user_id: int) -> bool | None:
+    """Точный ответ о подписке. ``None`` — Telegram не ответил.
+
+    Отличать «точно нет» от «неизвестно» важно там, где решение необратимо.
+    Гейт голосования может считать сбой отказом: человек просто повторит.
+    А отметка о выходе из канала снимается только за звёзды — ставить её
+    из-за моргнувшей сети нельзя.
+    """
+    try:
+        member = await bot.get_chat_member(chat_id=channel_id, user_id=user_id)
+    except TelegramAPIError as error:
+        log.warning("Не удалось проверить подписку %s на %s: %s", user_id, channel_id, error)
+        return None
+    return member.status in SUBSCRIBED
+
+
 async def diagnose(bot: Bot, channel_id: int, user_id: int) -> str:
     """Почему проверка не работает — для панели администратора.
 

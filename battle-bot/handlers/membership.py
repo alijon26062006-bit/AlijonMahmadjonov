@@ -11,6 +11,7 @@ Telegram присылает боту событие о входе и выход�
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from aiogram import Bot, Router
@@ -18,7 +19,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import ChatMemberUpdated
 
 from config import Config
-from services import keyboards, sponsors, texts
+from services import keyboards, sponsors, subscription, texts
 from storage.repo import Repo
 from storage.settings import Settings
 
@@ -37,6 +38,41 @@ def has_left(event: ChatMemberUpdated) -> bool:
     if was == "restricted" and not getattr(event.old_chat_member, "is_member", False):
         was = "left"
     return was in INSIDE and now in OUTSIDE
+
+
+async def sweep(
+    bot: Bot, repo: Repo, config: Config, settings: Settings,
+    limit: int = 2000, delay: float = 0.05,
+) -> tuple[int, int]:
+    """Проверить всех, кто точно был подписан, и отметить вышедших.
+
+    Событие о выходе Telegram присылает мгновенно, но хранит его не вечно:
+    если бот в этот момент лежал, выход можно пропустить. Эта проверка
+    догоняет пропущенное — по кнопке в панели.
+
+    Возвращает (проверено, отмечено).
+    """
+    channels = sponsors.required(config, settings)
+    if not channels:
+        return 0, 0
+
+    checked = marked = 0
+    for user_id in repo.known_subscribers(limit):
+        if user_id in config.admin_ids:
+            continue
+        checked += 1
+        for channel_id in channels:
+            # Здесь нужен точный ответ, а не «на всякий случай нет»: отметка
+            # снимается только за звёзды, и ставить её из-за сбоя сети нельзя.
+            # Поэтому «неизвестно» пропускаем — догоним при следующей проверке.
+            inside = await subscription.check(bot, channel_id, user_id)
+            if inside is None or inside:
+                continue
+            repo.mark_left(user_id, channel_id)
+            marked += 1
+            break
+        await asyncio.sleep(delay)  # мягко к лимитам Telegram
+    return checked, marked
 
 
 @router.chat_member()

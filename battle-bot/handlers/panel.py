@@ -19,6 +19,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import Config
 from core import background, bracket
+from handlers import membership
 from core.engine import BattleEngine
 from services import (
     keyboards, main_post, panel_ui, prizes, sponsors, subscription, texts, ui,
@@ -553,6 +554,25 @@ def _leavers_screen(repo: Repo, settings: Settings):
         settings.get("leave_penalty_enabled"),
         settings.get("rejoin_price"),
         repo.leaver_count(),
+    )
+
+
+@router.callback_query(F.data == "p:people:sweep")
+async def sweep_leavers(
+    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """Догнать выходы, которые бот мог пропустить, пока лежал."""
+    if not is_admin(callback.from_user.id, config):
+        return
+
+    await callback.answer("Проверяю…")
+    checked, marked = await membership.sweep(bot, repo, config, settings)
+    await render(callback, _leavers_screen(repo, settings))
+    await ui.send(
+        callback,
+        f"🔍 <b>Проверка закончена</b>\n{panel_ui.RULE}\n\n"
+        f"Проверено: <b>{checked}</b>\n"
+        f"Отмечено вышедших: <b>{marked}</b>",
     )
 
 

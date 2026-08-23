@@ -306,3 +306,157 @@ def test_the_message_says_what_the_problem_is():
 
     assert "нужен приз" in body, "человеку надо объяснить причину"
     assert "50⭐" in body
+
+
+# ------------------------------------ кнопка «Проверить всех» в панели
+
+class SweepBot:
+    """Телеграм, который знает, кто сейчас в канале."""
+
+    def __init__(self, inside: set[int]) -> None:
+        self.inside = inside
+        self.sent: dict[int, list[str]] = {}
+        self.checks = 0
+
+    async def get_chat_member(self, chat_id, user_id):
+        self.checks += 1
+        status = "member" if user_id in self.inside else "left"
+        return type("M", (), {"status": status})()
+
+    async def send_message(self, chat_id, text, reply_markup=None, **kwargs):
+        self.sent.setdefault(chat_id, []).append(text)
+        return None
+
+
+def played(repo, user_id: int, battle_id: int = 1) -> None:
+    """Человек прошёл гейт подписки: участвовал в батле."""
+    repo.upsert_user(user_id, f"u{user_id}", "U")
+    repo.add_participant(battle_id, user_id, f"u{user_id}")
+
+
+@pytest.mark.asyncio
+async def test_the_sweep_marks_those_who_are_gone(env):
+    """Кнопка догоняет выходы, пропущенные пока бот лежал."""
+    repo, config, settings, _, _ = env
+    from datetime import datetime
+
+    repo.create_battle(datetime.now())
+    for user_id in (10, 11, 12):
+        played(repo, user_id)
+    bot = SweepBot(inside={10, 11})  # двенадцатый уже вышел
+
+    checked, marked = await membership.sweep(bot, repo, config, settings, delay=0)
+
+    assert (checked, marked) == (3, 1)
+    assert repo.leaver(12) is not None
+    assert repo.leaver(10) is None and repo.leaver(11) is None
+
+
+@pytest.mark.asyncio
+async def test_the_sweep_ignores_those_who_never_subscribed(env):
+    """Нажал /start и ушёл, не подписавшись — он ничего не покидал."""
+    repo, config, settings, _, _ = env
+    repo.upsert_user(50, "curious", "C")  # только /start, без участия
+    bot = SweepBot(inside=set())
+
+    checked, marked = await membership.sweep(bot, repo, config, settings, delay=0)
+
+    assert (checked, marked) == (0, 0)
+    assert repo.leaver(50) is None
+
+
+@pytest.mark.asyncio
+async def test_a_voter_counts_as_a_verified_subscriber(env):
+    """Голосовать без подписки нельзя — значит голосовавший точно был в канале."""
+    repo, config, settings, _, _ = env
+    from datetime import datetime, timedelta
+
+    from config import MSK
+    from core.models import Player, VoteSource
+
+    repo.upsert_user(1, "a", "A")
+    repo.upsert_user(2, "b", "B")
+    repo.upsert_user(60, "voter", "V")
+    deadline = datetime.now(MSK) + timedelta(hours=1)
+    battle_id = repo.create_battle(deadline)
+    match_id = repo.create_match(
+        battle_id, 1, 1, [Player(1, "a"), Player(2, "b")],
+        advance=1, is_final=False, deadline=deadline,
+    )
+    repo.add_vote(match_id, 60, 1, VoteSource.FREE)
+
+    bot = SweepBot(inside=set())
+    _, marked = await membership.sweep(bot, repo, config, settings, delay=0)
+
+    assert repo.leaver(60) is not None, "голосовавший проходил гейт"
+    assert marked >= 1
+
+
+@pytest.mark.asyncio
+async def test_the_sweep_does_not_recheck_the_already_marked(env):
+    """Кто уже в списке, того второй раз дёргать незачем."""
+    repo, config, settings, _, _ = env
+    from datetime import datetime
+
+    repo.create_battle(datetime.now())
+    played(repo, 10)
+    repo.mark_left(10, MAIN)
+    bot = SweepBot(inside=set())
+
+    checked, _ = await membership.sweep(bot, repo, config, settings, delay=0)
+
+    assert checked == 0 and bot.checks == 0
+
+
+@pytest.mark.asyncio
+async def test_the_sweep_never_marks_the_admin(env):
+    repo, config, settings, _, _ = env
+    from datetime import datetime
+
+    repo.create_battle(datetime.now())
+    played(repo, 99)  # 99 — админ из конфига
+    bot = SweepBot(inside=set())
+
+    _, marked = await membership.sweep(bot, repo, config, settings, delay=0)
+
+    assert marked == 0 and repo.leaver(99) is None
+
+
+@pytest.mark.asyncio
+async def test_a_broken_check_never_punishes(env):
+    """Сеть моргнула — отметку не ставим.
+
+    Отметка снимается только за 50⭐, поэтому ошибиться тут дороже, чем
+    пропустить: пропущенного догоним следующей проверкой.
+    """
+    repo, config, settings, _, _ = env
+    from datetime import datetime
+
+    from aiogram.exceptions import TelegramBadRequest
+
+    repo.create_battle(datetime.now())
+    played(repo, 10)
+
+    class Broken(SweepBot):
+        async def get_chat_member(self, chat_id, user_id):
+            raise TelegramBadRequest(method=None, message="Bad Gateway")
+
+    checked, marked = await membership.sweep(Broken(set()), repo, config, settings, delay=0)
+
+    assert checked == 1 and marked == 0
+    assert repo.leaver(10) is None, "невиновный не должен платить за сбой сети"
+
+
+@pytest.mark.asyncio
+async def test_the_gate_still_fails_closed(env):
+    """А вот голосование при сбое по-прежнему закрывается: там отказ обратим."""
+    from services import subscription
+
+    class Broken:
+        async def get_chat_member(self, chat_id, user_id):
+            from aiogram.exceptions import TelegramBadRequest
+
+            raise TelegramBadRequest(method=None, message="Bad Gateway")
+
+    assert await subscription.is_subscribed(Broken(), MAIN, 7) is False
+    assert await subscription.check(Broken(), MAIN, 7) is None
