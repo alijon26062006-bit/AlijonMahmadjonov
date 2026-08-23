@@ -507,7 +507,8 @@ def people(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         f"Новых за сутки: <b>{stats['new_users']}</b>\n"
         f"Заблокировано админом: <b>{stats['banned']}</b>\n"
         f"Закрыли бота: <b>{stats['blocked']}</b>\n"
-        f"⏳ Отдыхают после призов: <b>{stats.get('resting', 0)}</b>\n\n"
+        f"⏳ Отдыхают после призов: <b>{stats.get('resting', 0)}</b>\n"
+        f"🚪 Вышли из канала: <b>{stats.get('leavers', 0)}</b>\n\n"
         "<i>Найдите участника по нику или ID, чтобы посмотреть карточку, "
         "выдать голоса или заблокировать.</i>"
     )
@@ -515,12 +516,13 @@ def people(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         [button("🔎 Найти участника", "edit:find_user", BLUE)],
         [button("🏅 Таблица лидеров", "people:top"),
          button("⏳ Паузы", "people:rest")],
+        [button("🚪 Вышли из канала", "people:left")],
         back_row(),
     )
 
 
 def person(row, stats_row, balance: int, invited: tuple[int, int] = (0, 0),
-           rest=None) -> tuple[str, InlineKeyboardMarkup]:
+           rest=None, left=None) -> tuple[str, InlineKeyboardMarkup]:
     handle = f"@{row['username']}" if row["username"] else escape(row["first_name"] or "—")
     banned = bool(row["is_banned"])
     text = (
@@ -541,6 +543,13 @@ def person(row, stats_row, balance: int, invited: tuple[int, int] = (0, 0),
             f"до {escape(str(rest['until'])[:16].replace('T', ' '))}"
         )
         rows.append([button("⏳ Снять паузу", f"person:rest:{row['user_id']}", GREEN)])
+    if left is not None:
+        text += (
+            f"\n\n🚪 <b>Выходил из канала</b>\n"
+            f"раз: <b>{left['times']}</b>, последний "
+            f"{escape(str(left['left_at'])[:16].replace('T', ' '))}"
+        )
+        rows.append([button("🔓 Вернуть доступ", f"person:left:{row['user_id']}", GREEN)])
 
     unban = button("Разблокировать", f"person:unban:{row['user_id']}", GREEN)
     ban = button("Заблокировать", f"person:ban:{row['user_id']}", RED)
@@ -550,6 +559,36 @@ def person(row, stats_row, balance: int, invited: tuple[int, int] = (0, 0),
         back_row("people"),
     ]
     return text, keyboard(*rows)
+
+
+def leavers(rows, enabled: bool, price: int, total: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Кто вышел из обязательного канала."""
+    lines = []
+    for row in rows:
+        who = escape("@" + (row["username"] or str(row["user_id"])))
+        when = escape(str(row["left_at"])[:16].replace("T", " "))
+        again = f" · выходов: {row['times']}" if int(row["times"]) > 1 else ""
+        lines.append(f"🚪 {who} — {when}{again}")
+    listing = "\n".join(lines) if lines else "<i>никто не выходил</i>"
+
+    money = f"Возврат доступа: <b>{price}⭐</b>" if price else "Возврат: <i>отключён</i>"
+    text = (
+        f"🚪 <b>{texts.spaced('ВЫШЛИ ИЗ КАНАЛА')}</b>\n{RULE}\n\n"
+        f"Штраф: <b>{onoff(enabled)}</b>\n{money}\n"
+        f"Всего в списке: <b>{total}</b>\n\n"
+        f"{listing}\n\n"
+        "<i>Отметка ставится в момент выхода из обязательного канала. "
+        "Заявки от таких людей не принимаются, пока они не вернут доступ "
+        "звёздами. Подписаться обратно недостаточно. "
+        "Простить конкретного человека можно в его карточке.</i>"
+    )
+    toggle = "Выключить штраф" if enabled else "Включить штраф"
+    return text, keyboard(
+        [button("⭐ Цена возврата", "edit:rejoin_price", BLUE)],
+        [button(toggle, "settings:toggle:leave_penalty_enabled",
+                RED if enabled else GREEN)],
+        back_row("people"),
+    )
 
 
 def cooldowns(rows, days: int, places: int, price: int) -> tuple[str, InlineKeyboardMarkup]:

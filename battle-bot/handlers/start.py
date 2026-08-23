@@ -126,6 +126,17 @@ async def _do_join(
             return
         nickname = user.first_name or f"id{user.id}"
 
+    # вышедшему из канала показываем не голый отказ, а кнопку возврата
+    left = repo.leaver(user.id) if settings.get("leave_penalty_enabled") else None
+    rejoin_price = int(settings.get("rejoin_price") or 0)
+    if left is not None and rejoin_price:
+        _, response = await engine.join(user.id, nickname)
+        await ui.send(
+            target, response, reply_markup=keyboards.buy_rejoin(rejoin_price),
+            disable_web_page_preview=True,
+        )
+        return
+
     # отдыхающему показываем не голый отказ, а кнопку выкупа
     rest = repo.cooldown_for(user.id)
     price = int(settings.get("cooldown_skip_price") or 0)

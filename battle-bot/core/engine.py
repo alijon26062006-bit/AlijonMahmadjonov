@@ -66,6 +66,16 @@ class BattleEngine:
         if self.repo.is_banned(user_id):
             return False, "Вы не можете участвовать в батлах."
 
+        # вышел из обязательного канала — заявки не принимаем, пока не вернёт
+        # доступ. Подписаться обратно недостаточно: отметка снимается оплатой
+        # или админом
+        if self.settings.get("leave_penalty_enabled"):
+            left = self.repo.leaver(user_id)
+            if left is not None:
+                return False, texts.leaver_refused(
+                    int(left["times"]), int(self.settings.get("rejoin_price") or 0)
+                )
+
         rest = self.repo.cooldown_for(user_id, self.now())
         if rest is not None:
             return False, texts.on_cooldown(

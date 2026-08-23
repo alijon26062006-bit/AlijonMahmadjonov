@@ -200,6 +200,17 @@ CREATE TABLE IF NOT EXISTS cooldowns (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Кто вышел из канала. Забрал приз и отписался — вернуться в батлы можно
+-- только за звёзды. Список пополняется с момента, когда бот увидел выход:
+-- перечислить подписчиков канала Telegram не даёт, да это и не нужно —
+-- все, кто просто остаётся подписанным, сюда не попадают никогда.
+CREATE TABLE IF NOT EXISTS leavers (
+    user_id    INTEGER PRIMARY KEY REFERENCES users(user_id),
+    chat_id    INTEGER NOT NULL,
+    times      INTEGER NOT NULL DEFAULT 1,
+    left_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS stats (
     user_id     INTEGER PRIMARY KEY REFERENCES users(user_id),
     battles     INTEGER NOT NULL DEFAULT 0,

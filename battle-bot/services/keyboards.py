@@ -318,6 +318,21 @@ def buy_cooldown(price: int) -> InlineKeyboardMarkup:
     )
 
 
+def buy_rejoin(price: int) -> InlineKeyboardMarkup:
+    """Вернуть доступ к батлам после выхода из канала."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=f"🔓 Вернуть доступ — {price}⭐",
+                    callback_data="rejoin:buy",
+                    style=GREEN,
+                )
+            ]
+        ]
+    )
+
+
 def out_of_votes() -> InlineKeyboardMarkup:
     """Голоса кончились — куда идти дальше."""
     return InlineKeyboardMarkup(

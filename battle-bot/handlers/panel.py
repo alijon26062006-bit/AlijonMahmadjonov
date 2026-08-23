@@ -72,6 +72,10 @@ EDITORS: dict[str, dict] = {
         "back": "referrals",
     },
     "round_times": {"check": validation.as_times, "back": "settings"},
+    "rejoin_price": {
+        "check": lambda raw: validation.as_int(raw, minimum=0, maximum=2500, example="50"),
+        "back": "people:left",
+    },
     "cooldown_days": {
         "check": lambda raw: validation.as_int(raw, minimum=0, maximum=90, example="3"),
         "back": "people:rest",
@@ -159,6 +163,7 @@ def collect(repo: Repo, engine: BattleEngine) -> dict:
         "new_users": repo.new_users(),
         "banned": repo.banned_count(),
         "resting": repo.cooldown_count(),
+        "leavers": repo.leaver_count(),
         "blocked": repo.blocked_count(),
         "votes": repo.total_votes_cast(),
         "sold_votes": sold_votes,
@@ -528,7 +533,45 @@ def _person_screen(repo: Repo, user_id: int):
         repo.vote_balance(user_id),
         repo.referral_stats(user_id),
         repo.cooldown_for(user_id),
+        repo.leaver(user_id),
     )
+
+
+@router.callback_query(F.data == "p:people:left")
+async def show_leavers(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, _leavers_screen(repo, settings))
+    await callback.answer()
+
+
+def _leavers_screen(repo: Repo, settings: Settings):
+    return panel_ui.leavers(
+        repo.leavers(limit=15),
+        settings.get("leave_penalty_enabled"),
+        settings.get("rejoin_price"),
+        repo.leaver_count(),
+    )
+
+
+@router.callback_query(F.data.startswith("p:person:left:"))
+async def forgive_leaver(
+    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config
+) -> None:
+    """Вернуть доступ вручную — например, если человек вышел по ошибке."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    user_id = int(callback.data.split(":")[-1])
+    forgiven = repo.forgive_leaver(user_id)
+    if forgiven:
+        try:
+            await bot.send_message(user_id, texts.leaver_forgiven())
+        except TelegramAPIError as error:
+            log.info("Не смог сказать %s о возврате доступа: %s", user_id, error)
+    await render(callback, _person_screen(repo, user_id))
+    await callback.answer("Доступ возвращён" if forgiven else "Отметки и не было")
 
 
 @router.callback_query(F.data == "p:people:rest")
@@ -915,6 +958,8 @@ async def _back_to(
         )
     elif section == "channel":
         await render(message, panel_ui.channel(main_post.state(repo, config, settings)))
+    elif section == "people:left":
+        await render(message, _leavers_screen(repo, settings))
     elif section == "people:rest":
         await render(message, _cooldowns_screen(repo, settings))
     elif section == "links":

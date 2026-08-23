@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 router = Router(name="payments")
 
 COOLDOWN_PAYLOAD = "cooldown"
+REJOIN_PAYLOAD = "rejoin"
 CURRENCY = "XTR"
 
 
@@ -128,6 +129,36 @@ async def cancel_buy(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "rejoin:buy")
+async def buy_rejoin(
+    callback: CallbackQuery, bot: Bot, repo: Repo, settings: Settings
+) -> None:
+    """Вернуть доступ к батлам после выхода из канала."""
+    price = int(settings.get("rejoin_price") or 0)
+    if not price:
+        await callback.answer("Возврат сейчас недоступен.", show_alert=True)
+        return
+
+    if repo.leaver(callback.from_user.id) is None:
+        await callback.answer("Доступ и так открыт.", show_alert=True)
+        return
+
+    try:
+        await bot.send_invoice(
+            chat_id=callback.from_user.id,
+            title="Возврат доступа к батлам",
+            description="Снимает отметку о выходе из канала — заявки снова принимаются.",
+            payload=REJOIN_PAYLOAD,
+            currency=CURRENCY,
+            prices=[LabeledPrice(label="Возврат доступа", amount=price)],
+        )
+    except TelegramAPIError as error:
+        log.error("Не удалось выставить счёт на возврат доступа: %s", error)
+        await callback.answer("Не получилось выставить счёт, попробуйте позже.", show_alert=True)
+        return
+    await callback.answer()
+
+
 @router.callback_query(F.data == "cool:buy")
 async def buy_cooldown(
     callback: CallbackQuery, bot: Bot, repo: Repo, settings: Settings
@@ -200,6 +231,8 @@ async def pre_checkout(query: PreCheckoutQuery, settings: Settings) -> None:
     payload = query.invoice_payload or ""
     if payload == COOLDOWN_PAYLOAD:
         ok = bool(settings.get("cooldown_skip_price"))
+    elif payload == REJOIN_PAYLOAD:
+        ok = bool(settings.get("rejoin_price"))
     else:
         ok = bool(settings.get("paid_votes_enabled")) and payload.startswith("votes:")
     await query.answer(ok=ok, error_message=None if ok else "Покупка недоступна.")
@@ -211,6 +244,10 @@ async def payment_done(message: Message, repo: Repo) -> None:
 
     if payment.invoice_payload == COOLDOWN_PAYLOAD:
         await _cooldown_paid(message, repo, payment)
+        return
+
+    if payment.invoice_payload == REJOIN_PAYLOAD:
+        await _rejoin_paid(message, repo, payment)
         return
 
     votes = int(payment.invoice_payload.split(":")[1])
@@ -231,6 +268,23 @@ async def payment_done(message: Message, repo: Repo) -> None:
         f"{texts.plural(votes, 'голос', 'голоса', 'голосов')}.\n"
         f"Баланс: <b>{repo.vote_balance(message.from_user.id)}</b>\n\n"
         f"<code>{payment.telegram_payment_charge_id}</code>"
+    )
+
+
+async def _rejoin_paid(message: Message, repo: Repo, payment) -> None:
+    """Оплата возврата: снимаем отметку о выходе ровно один раз на платёж."""
+    if not repo.record_payment(
+        user_id=message.from_user.id,
+        charge_id=payment.telegram_payment_charge_id,
+        stars=payment.total_amount,
+        votes=0,
+    ):
+        log.info("Повторный апдейт об оплате %s пропущен", payment.telegram_payment_charge_id)
+        return
+
+    repo.forgive_leaver(message.from_user.id)
+    await message.answer(
+        texts.rejoin_allowed() + f"\n\n<code>{payment.telegram_payment_charge_id}</code>"
     )
 
 

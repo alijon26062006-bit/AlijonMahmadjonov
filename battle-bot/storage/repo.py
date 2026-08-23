@@ -853,6 +853,47 @@ class Repo:
         ).fetchone()
         return int(row["total"]), int(row["live"]), int(row["posts"])
 
+    # ------------------------------------------------- вышедшие из канала
+
+    def mark_left(self, user_id: int, chat_id: int) -> int:
+        """Запомнить выход из канала. Возвращает, какой это раз по счёту."""
+        self.conn.execute(
+            """INSERT INTO leavers(user_id, chat_id) VALUES(?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET
+                   chat_id = excluded.chat_id,
+                   times = leavers.times + 1,
+                   left_at = datetime('now')""",
+            (user_id, chat_id),
+        )
+        # в очереди ему делать нечего, пока не вернётся честно
+        self.conn.execute("DELETE FROM queue WHERE user_id = ?", (user_id,))
+        self.conn.commit()
+        row = self.conn.execute(
+            "SELECT times FROM leavers WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        return int(row["times"]) if row else 1
+
+    def leaver(self, user_id: int) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM leavers WHERE user_id = ?", (user_id,)
+        ).fetchone()
+
+    def forgive_leaver(self, user_id: int) -> bool:
+        cursor = self.conn.execute("DELETE FROM leavers WHERE user_id = ?", (user_id,))
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def leavers(self, limit: int = 20) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            """SELECT l.*, u.username, u.first_name
+               FROM leavers l LEFT JOIN users u ON u.user_id = l.user_id
+               ORDER BY l.left_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+
+    def leaver_count(self) -> int:
+        return int(self.conn.execute("SELECT COUNT(*) FROM leavers").fetchone()[0])
+
     # ------------------------------------------------------- сила участника
 
     def player_strength(self, battle_id: int) -> dict[int, float]:

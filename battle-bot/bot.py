@@ -14,8 +14,8 @@ from core.engine import BattleEngine
 from core.autopilot import Autopilot
 from core.scheduler import DeadlineWatcher, Ticker
 from handlers import (
-    admin, broadcast, emoji, errors, mychannel, panel, payments, referral,
-    start, voting,
+    admin, broadcast, emoji, errors, membership, mychannel, panel, payments,
+    referral, start, voting,
 )
 from services.emoji import PremiumEmojiMiddleware, load_table
 from services.retry import RetryMiddleware
@@ -54,6 +54,7 @@ ROUTERS = (
     emoji.router,
     payments.router,
     referral.router,
+    membership.router,
     mychannel.router,
     start.router,
     voting.router,

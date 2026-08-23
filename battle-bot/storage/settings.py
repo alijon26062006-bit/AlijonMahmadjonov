@@ -91,6 +91,10 @@ FIELDS: dict[str, Field] = {
         Field("main_post_message_id", "ID опубликованного главного поста", str, int, ""),
         Field("member_channels_enabled", "Каналы участников",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("leave_penalty_enabled", "Штраф за выход из канала",
+              lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("rejoin_price", "Возврат доступа, звёзд", str, int,
+              "сколько стоит вернуться после выхода; 0 — вернуть нельзя"),
         Field("cooldown_days", "Пауза призёрам, дней", str, int,
               "сколько дней призёр не участвует; 0 — паузы нет"),
         Field("cooldown_places", "Мест под паузой", str, int,
@@ -172,6 +176,9 @@ class Settings:
         # со второго раунда соперников подбирает посев по силе, а не жребий
         "seeding": "snake",
         # призёр отдыхает три дня — или выкупает возвращение за 50⭐
+        # вышел из канала — заявки не принимаются, пока не вернёт доступ
+        "leave_penalty_enabled": True,
+        "rejoin_price": 50,
         "cooldown_days": 3,
         "cooldown_places": 3,
         "cooldown_skip_price": 50,
