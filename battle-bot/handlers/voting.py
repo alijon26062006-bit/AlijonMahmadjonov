@@ -54,6 +54,7 @@ async def gate(
 async def show_voting(
     message: Message, match_id: int, repo: Repo, config: Config,
     called_for: int | None = None, scope: str | None = None,
+    balance: int = 0,
 ) -> None:
     """Отрисовать экран голосования по матчу.
 
@@ -76,7 +77,7 @@ async def show_voting(
     deadline = datetime.fromisoformat(match["deadline"])
     called = next((s for s in slots if s.user_id == called_for), None)
     intro = texts.called_to_support(called.nickname) if called else ""
-    rules = f"\n{texts.voting_rules(scope)}" if scope else ""
+    rules = f"\n{texts.voting_rules(scope, balance)}" if scope else ""
     await message.answer(
         intro + texts.voting_screen(
             match["round_no"], bool(match["is_final"]), slots, deadline
@@ -121,13 +122,6 @@ async def cast_vote(
     # подписка обязательна всегда: без неё голос не принимается ни при каких настройках
     if await gate(callback.bot, callback, match_id, config, settings, callback.from_user.id):
         await callback.answer("Голосовать могут только подписчики канала.", show_alert=True)
-        return
-
-    # повтор в этой же паре ловим до списания: иначе купленный голос
-    # списался бы и тут же вернулся, а человек увидел бы странный отказ
-    if repo.already_voted(match_id, callback.from_user.id):
-        await callback.answer(REFUSALS[VoteResult.DUPLICATE], show_alert=True)
-        await _refresh(callback, match_id, repo, config)
         return
 
     source, note = _pick_vote_source(
@@ -177,7 +171,9 @@ def _pick_vote_source(
         return None, spent
 
     if repo.spend_vote(voter_id):
-        return VoteSource.PAID, "Списан 1 купленный голос ⭐"
+        # купленные не ограничены ничем: хоть все в одну пару
+        left = repo.vote_balance(voter_id)
+        return VoteSource.PAID, f"Голос отдан ⭐ Осталось: {left}"
 
     return None, f"{spent} Докупить их можно кнопкой ниже."
 
@@ -209,6 +205,7 @@ async def open_voting(
     await show_voting(
         callback.message, match_id, repo, config,
         scope=settings.get("free_vote_scope"),
+        balance=repo.vote_balance(callback.from_user.id),
     )
     await callback.answer()
 

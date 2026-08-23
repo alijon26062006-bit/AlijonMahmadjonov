@@ -47,6 +47,7 @@ async def start_with_payload(
         await show_voting(
             message, value, repo, config, links.vote_target(command.args),
             scope=settings.get("free_vote_scope"),
+            balance=repo.vote_balance(message.from_user.id),
         )
         return
 
@@ -218,4 +219,5 @@ async def my_match(
     await show_voting(
         message, int(match["id"]), repo, config,
         scope=settings.get("free_vote_scope"),
+        balance=repo.vote_balance(message.from_user.id),
     )

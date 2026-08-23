@@ -370,18 +370,6 @@ class Repo:
         """Оставлено для совместимости: бесплатный голос в этом матче."""
         return self.free_vote_used(match_id, voter_id, scope="match")
 
-    def already_voted(self, match_id: int, voter_id: int) -> bool:
-        """Голосовал ли человек в этом матче — любым голосом.
-
-        Проверяем до списания купленного: иначе он списывался бы и тут же
-        возвращался, а человек видел бы непонятный отказ.
-        """
-        row = self.conn.execute(
-            "SELECT 1 FROM votes WHERE match_id = ? AND voter_id = ?",
-            (match_id, voter_id),
-        ).fetchone()
-        return row is not None
-
     def add_vote(
         self,
         match_id: int,

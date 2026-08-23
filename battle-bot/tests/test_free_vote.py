@@ -170,19 +170,68 @@ async def test_the_refusal_says_where_to_get_votes(env):
 
 
 @pytest.mark.asyncio
-async def test_voting_twice_in_the_same_pair_costs_nothing(env):
-    """Повтор в той же паре не должен списывать купленный голос."""
+async def test_bought_votes_stack_in_the_same_pair(env):
+    """Купил голоса — трать сколько хочешь, хоть все в одну пару."""
     repo, config, settings, first, _ = env
     bot = Bot()
     await voting.cast_vote(Callback(first, 1, 500, bot), repo, config, settings)
     repo.add_votes(500, 3)
 
-    callback = Callback(first, 2, 500, bot)
+    for _ in range(3):
+        await voting.cast_vote(Callback(first, 1, 500, bot), repo, config, settings)
+
+    assert votes_in(repo, first) == 4, "бесплатный плюс три купленных"
+    assert repo.vote_balance(500) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_big_balance_is_spent_to_the_last_vote(env):
+    """У человека 188 голосов — все должны уйти в дело."""
+    repo, config, settings, first, _ = env
+    bot = Bot()
+    repo.add_votes(500, 188)
+
+    for _ in range(190):  # два лишних нажатия сверх баланса
+        await voting.cast_vote(Callback(first, 1, 500, bot), repo, config, settings)
+
+    assert votes_in(repo, first) == 189, "бесплатный плюс 188 купленных"
+    assert repo.vote_balance(500) == 0
+
+
+@pytest.mark.asyncio
+async def test_bought_votes_can_go_to_both_sides(env):
+    """Ограничения «за кого» нет — только сам факт наличия голосов."""
+    repo, config, settings, first, _ = env
+    bot = Bot()
+    repo.add_votes(500, 2)
+    await voting.cast_vote(Callback(first, 1, 500, bot), repo, config, settings)
+    await voting.cast_vote(Callback(first, 2, 500, bot), repo, config, settings)
+
+    counts = {slot.user_id: slot.votes for slot in repo.match_slots(first)}
+    assert counts == {1: 1, 2: 1}
+
+
+@pytest.mark.asyncio
+async def test_without_a_balance_the_second_vote_is_refused(env):
+    """А вот без купленных второй голос в паре по-прежнему нельзя."""
+    repo, config, settings, first, _ = env
+    bot = Bot()
+    await voting.cast_vote(Callback(first, 1, 500, bot), repo, config, settings)
+
+    callback = Callback(first, 1, 500, bot)
     await voting.cast_vote(callback, repo, config, settings)
 
-    assert repo.vote_balance(500) == 3, "баланс не должен трогаться"
     assert votes_in(repo, first) == 1
-    assert callback.alerts[-1] == voting.REFUSALS[VoteResult.DUPLICATE]
+    assert "уже потрачен" in callback.alerts[-1]
+
+
+def test_the_free_vote_cannot_be_doubled_even_by_a_race(env):
+    """Второй бесплатный в тот же матч не пропустит сама база."""
+    repo, _, _, first, _ = env
+
+    assert repo.add_vote(first, 500, 1, VoteSource.FREE) is VoteResult.ACCEPTED
+    assert repo.add_vote(first, 500, 2, VoteSource.FREE) is VoteResult.DUPLICATE
+    assert votes_in(repo, first) == 1
 
 
 @pytest.mark.asyncio
