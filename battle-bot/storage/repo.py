@@ -853,6 +853,42 @@ class Repo:
         ).fetchone()
         return int(row["total"]), int(row["live"]), int(row["posts"])
 
+    # ------------------------------------------------------- сила участника
+
+    def player_strength(self, battle_id: int) -> dict[int, float]:
+        """Насколько уверенно человек проходил прошлые раунды.
+
+        Считаем **долю** голосов в своём матче, а не их количество. Так честнее:
+        победа 3:0 — это полное превосходство, а 20:19 — почти ничья, хотя
+        голосов там втрое больше. Количество голосов говорит о популярности
+        пары, доля — о самом участнике.
+
+        Итог — средняя доля по сыгранным матчам. Прошедшему без боя ставим
+        нейтральные 0.5: он ничего не доказал, но и не проиграл.
+        """
+        rows = self.conn.execute(
+            """SELECT s.user_id,
+                      s.votes AS mine,
+                      (SELECT SUM(s2.votes) FROM match_slots s2
+                       WHERE s2.match_id = s.match_id) AS total
+               FROM match_slots s
+               JOIN matches m ON m.id = s.match_id
+               WHERE m.battle_id = ? AND m.status = ?""",
+            (battle_id, MatchStatus.CLOSED.value),
+        ).fetchall()
+
+        played: dict[int, list[float]] = {}
+        for row in rows:
+            total = int(row["total"] or 0)
+            # матч без единого голоса ничего о силе не говорит
+            share = (int(row["mine"]) / total) if total else 0.5
+            played.setdefault(int(row["user_id"]), []).append(share)
+
+        strength = {uid: sum(shares) / len(shares) for uid, shares in played.items()}
+        for player in self.alive_players(battle_id):
+            strength.setdefault(player.user_id, 0.5)  # прошёл без боя
+        return strength
+
     # ---------------------------------------------------- пауза призёрам
 
     def set_cooldown(self, user_id: int, place: int, battle_id: int | None,

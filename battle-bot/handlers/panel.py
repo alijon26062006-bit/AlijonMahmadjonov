@@ -693,6 +693,22 @@ async def check_subscription(
     await callback.answer()
 
 
+@router.callback_query(F.data == "p:settings:seeding")
+async def toggle_seeding(
+    callback: CallbackQuery, config: Config, settings: Settings
+) -> None:
+    """Переключить, как подбираются соперники со второго раунда."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    current = settings.get("seeding")
+    settings.set("seeding", panel_ui.SEEDING_NEXT.get(current, "snake"))
+    await render(
+        callback,
+        panel_ui.settings_screen(settings.all(), sponsors.required(config, settings)),
+    )
+    await callback.answer("Сохранено")
+
+
 @router.callback_query(F.data.startswith("p:settings:toggle:"))
 async def toggle_setting(callback: CallbackQuery, config: Config, settings: Settings) -> None:
     if not is_admin(callback.from_user.id, config):

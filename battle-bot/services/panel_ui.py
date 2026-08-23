@@ -171,6 +171,13 @@ def prizes(values: list[str]) -> tuple[str, InlineKeyboardMarkup]:
 
 # ------------------------------------------------------------------ голоса
 
+SEEDING_TITLES = {
+    "snake": "посев по силе",
+    "random": "жеребьёвка",
+}
+SEEDING_NEXT = {"snake": "random", "random": "snake"}
+
+
 SCOPE_TITLES = {
     "battle": "один на весь батл",
     "round": "один на раунд",
@@ -584,6 +591,7 @@ def settings_screen(values: dict, sponsors: list[int]) -> tuple[str, InlineKeybo
         f"👥 Участников: от <b>{values['min_participants']}</b> "
         f"до <b>{values['max_participants']}</b>\n"
         f"🎫 Приём заявок в идущий батл: <b>до {values['late_join_until_round']} раунда</b>\n"
+        f"🎲 Подбор соперников: <b>{SEEDING_TITLES.get(values['seeding'], values['seeding'])}</b>\n"
         f"🔖 Требовать @username: <b>{onoff(values['require_username'])}</b>\n"
         f"🎨 Премиум-эмодзи в канале: <b>{values['premium_emoji_in_channel']}</b>\n\n"
         f"<b>Обязательная подписка</b>\n"
@@ -599,6 +607,7 @@ def settings_screen(values: dict, sponsors: list[int]) -> tuple[str, InlineKeybo
         [button("👥 Минимум", "edit:min_participants"),
          button("Максимум", "edit:max_participants")],
         [button("🎫 Приём заявок до раунда", "edit:late_join_until_round")],
+        [button("🎲 Подбор соперников", "settings:seeding")],
         [button("📣 Подписка для заявок", "settings:toggle:require_subscription")],
         [button("🆔 Каналы подписки", "edit:sponsor_channels")],
         [button("🩺 Проверить каналы", "settings:check", BLUE)],

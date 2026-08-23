@@ -349,7 +349,14 @@ class BattleEngine:
         self.repo.set_round(battle_id, round_no, deadline)
         self.repo.set_battle_status(battle_id, BattleStatus.RUNNING)
 
-        plan = bracket.plan_round(alive, round_no, self.rng)
+        # со второго раунда соперников подбирает посев: сильные разводятся
+        # по разным группам и встречаются только в финале
+        strength = (
+            self.repo.player_strength(battle_id)
+            if self.settings.get("seeding") == "snake"
+            else None
+        )
+        plan = bracket.plan_round(alive, round_no, self.rng, strength)
         advance = bracket.base_advance(plan)
 
         await self.publisher.announce(

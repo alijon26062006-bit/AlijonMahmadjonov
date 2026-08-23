@@ -47,6 +47,41 @@ def split_groups(players: Sequence[Player], size: int = GROUP_SIZE) -> list[list
     return groups
 
 
+def snake_groups(players: Sequence[Player], size: int = GROUP_SIZE) -> list[list[Player]]:
+    """Разложить список, отсортированный по силе, «змейкой».
+
+    1, 8, 9, 16 / 2, 7, 10, 15 / … — в каждой группе оказывается один сильный
+    и один слабый. Смысл в том, что сильнейшие не выбивают друг друга в
+    середине сетки и доходят до финала: именно там призы и там же больше
+    всего голосов. Если разложить подряд (1,2,3,4 в одну группу), трое из
+    четырёх сильнейших вылетели бы во втором раунде, а финал собрался бы из
+    середняков.
+    """
+    if len(players) <= size:
+        return [list(players)]
+
+    count = max(1, -(-len(players) // size))  # округление вверх
+    groups: list[list[Player]] = [[] for _ in range(count)]
+    for index, player in enumerate(players):
+        row, position = divmod(index, count)
+        # каждый второй проход идёт в обратную сторону — это и есть змейка
+        groups[position if row % 2 == 0 else count - 1 - position].append(player)
+    return [group for group in groups if group]
+
+
+def by_strength(
+    players: Sequence[Player],
+    strength: dict[int, float] | None,
+    rng: random.Random,
+) -> list[Player]:
+    """Отсортировать от сильного к слабому. Равные идут в случайном порядке."""
+    shuffled = list(players)
+    rng.shuffle(shuffled)  # чтобы равная сила не давала преимущества по порядку
+    if not strength:
+        return shuffled
+    return sorted(shuffled, key=lambda p: strength.get(p.user_id, 0.0), reverse=True)
+
+
 def advance_count(group_size: int, base: int) -> int:
     """Сколько человек проходит из группы. Хотя бы один всегда выбывает."""
     return max(1, min(base, group_size - 1))
@@ -56,24 +91,34 @@ def plan_round(
     alive: Sequence[Player],
     round_no: int,
     rng: random.Random | None = None,
+    strength: dict[int, float] | None = None,
 ) -> RoundPlan:
-    """Составить раунд из списка выживших."""
+    """Составить раунд из списка выживших.
+
+    ``strength`` — насколько уверенно человек прошёл прошлые раунды. Есть она
+    или нет, решает вызывающий: в первом раунде сила ещё никому не известна,
+    поэтому там всегда жеребьёвка.
+    """
     if len(alive) < 2:
         raise ValueError("Для раунда нужно минимум два участника")
 
     rng = rng or random.Random()
-    players = list(alive)
-    rng.shuffle(players)
 
     # первый раунд всегда 1vs1, сколько бы человек ни пришло: иначе на малом
     # числе участников батл сразу превращался бы в финал из всех сразу
     if round_no == 1:
+        players = list(alive)
+        rng.shuffle(players)
         groups, leftover = rolling_pairs(players)
         return RoundPlan(round_no=round_no, groups=groups, byes=leftover)
+
+    players = by_strength(alive, strength, rng)
 
     if len(players) <= FINAL_MAX:
         return RoundPlan(round_no=round_no, groups=[players], is_final=True)
 
+    if strength:
+        return RoundPlan(round_no=round_no, groups=snake_groups(players))
     return RoundPlan(round_no=round_no, groups=split_groups(players))
 
 
