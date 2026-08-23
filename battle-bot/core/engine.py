@@ -284,7 +284,9 @@ class BattleEngine:
     async def _send_match_results(self, result, round_no: int, is_final: bool) -> None:
         """Разослать участникам матча честный итог: вся таблица, а не «вы проиграли»."""
         winners = set(result.winners)
+        invite = self.settings.get("referral_enabled")
         for slot in result.ranking:
+            advanced = slot.user_id in winners
             await self._dm(
                 slot.user_id,
                 texts.match_result_dm(
@@ -292,9 +294,11 @@ class BattleEngine:
                     you_id=slot.user_id,
                     round_no=round_no,
                     is_final=is_final,
-                    advanced=slot.user_id in winners,
+                    advanced=advanced,
                     tie_broken=result.tie_broken,
                 ),
+                # вылетевшему — сразу кнопку реванша, пока обида свежая
+                None if advanced else keyboards.next_battle(self.config, invite),
             )
             await self._publish_result_to_own_channel(
                 slot.user_id, round_no, is_final, result.ranking
@@ -474,9 +478,17 @@ class BattleEngine:
 
         self.repo.close_battle(battle_id, BattleStatus.FINISHED)
         await self.publisher.announce(texts.final_announcement(ranking, self.config.prizes))
+        await self._show_off_in_main_channel(battle_id, ranking)
 
         # финалистам — та же честная таблица, что и в раундах
+        invite = self.settings.get("referral_enabled")
         for slot in ranking:
+            place = slot.position or 1
+            # кто уйдёт на паузу призёра, тому кнопка «в следующий батл» ни к
+            # чему: он на неё нажмёт и получит отказ. Ему придёт выкуп паузы
+            resting = place <= int(self.settings.get("cooldown_places") or 0) and int(
+                self.settings.get("cooldown_days") or 0
+            ) > 0
             await self._dm(
                 slot.user_id,
                 texts.match_result_dm(
@@ -487,8 +499,8 @@ class BattleEngine:
                     advanced=slot.position == 1,
                     tie_broken=False,
                 ),
+                None if resting else keyboards.next_battle(self.config, invite),
             )
-            place = slot.position or 1
             if place <= len(self.config.prizes):
                 await self._dm(
                     slot.user_id, texts.took_place(place, self.config.prizes[place - 1])
@@ -498,6 +510,32 @@ class BattleEngine:
         log.info("Батл #%s завершён", battle_id)
 
         log.info("Очередь на следующий батл: %s", self.repo.queue_size())
+
+    async def _show_off_in_main_channel(self, battle_id: int, ranking: list[Slot]) -> None:
+        """Итоги батла — в главный канал, с кнопкой на следующий.
+
+        Финал это пик внимания за весь батл: призы названы, победитель
+        известен. Раньше этот момент видел только канал батлов, а главный —
+        витрина с самой большой аудиторией — не получал ничего.
+        """
+        channel_id = self.settings.get("main_channel_id")
+        if not channel_id:
+            return
+
+        try:
+            message = await self.bot.send_message(
+                channel_id,
+                texts.battle_finished_post(ranking, self.settings.get("prizes")),
+                reply_markup=main_post.keyboard(
+                    self.config.bot_username, self.config.premium_emoji
+                ),
+                disable_web_page_preview=True,
+            )
+        except TelegramAPIError as error:
+            log.warning("Не удалось показать итоги в главном канале: %s", error)
+            return
+
+        self.repo.record_post(channel_id, message.message_id, battle_id, kind="final")
 
     async def _rest_after_prize(self, user_id: int, place: int, battle_id: int) -> None:
         """Отправить призёра на паузу: пусть призы достаются не одним и тем же."""

@@ -226,6 +226,30 @@ def daily_call(applied: int, deadline: datetime, prizes: list[str]) -> str:
     )
 
 
+def battle_finished_post(ranking: list[Slot], prizes: list[str]) -> str:
+    """Итоги батла для главного канала — с призывом на следующий."""
+    from services import prizes as prize_list
+
+    lines = []
+    for slot in ranking[:3]:
+        place = slot.position or 1
+        prize = (
+            f" — <b>{prize_list.label(prizes[place - 1])}</b>"
+            if place <= len(prizes)
+            else ""
+        )
+        lines.append(f"{MEDAL.get(place, '🏅')} <b>{nick(slot.nickname)}</b>{prize}")
+
+    return (
+        f"🏆 <b>{spaced('БАТЛ ЗАВЕРШЁН')}</b>\n"
+        f"{RULE}\n\n"
+        + "\n".join(lines)
+        + "\n\n<blockquote>Призы разыграны. <b>Следующий батл собирается "
+        "прямо сейчас</b> — заявку можно подать по кнопке ниже.</blockquote>\n\n"
+        "↓ <b>Успей записаться</b>"
+    )
+
+
 def queue_call(waiting: int, prizes: list[str]) -> str:
     """Ежедневный зов, когда батла нет: собираем очередь на следующий."""
     who = (

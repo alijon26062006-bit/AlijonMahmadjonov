@@ -143,6 +143,29 @@ def join_again(config: Config) -> InlineKeyboardMarkup:
     )
 
 
+def next_battle(config: Config, referrals: bool = True) -> InlineKeyboardMarkup:
+    """Что предложить человеку сразу после вылета.
+
+    Момент вылета — самый горячий: обида свежая, реванша хочется прямо
+    сейчас. Если в этот момент не дать кнопку, человек просто закроет бота.
+    """
+    text, emoji_id = leading_emoji("⚡ Записаться в следующий батл", config.premium_emoji)
+    rows = [[
+        InlineKeyboardButton(
+            text=text, callback_data="join", icon_custom_emoji_id=emoji_id, style=GREEN
+        )
+    ]]
+    if referrals:
+        rows.append([
+            InlineKeyboardButton(
+                text="🤝 Позвать друзей — голос в подарок",
+                callback_data="buy:invite",
+                style=BLUE,
+            )
+        ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 QUICK_AMOUNTS = (1, 5, 10)
 
 
