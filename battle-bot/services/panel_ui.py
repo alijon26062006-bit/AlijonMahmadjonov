@@ -75,6 +75,7 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         [button("📨 Рассылка", "broadcast"), button("🤖 Автопилот", "auto")],
         [button("🔍 Проверка", "fraud"), button("📡 Каналы", "mych")],
         [button("🩺 Диагностика", "health"), button("🔗 Ссылки", "links")],
+        [button("🛡 Группы", "groups")],
         [button("⚙️ Настройки", "settings")],
         [button("🔄 Обновить", "home", BLUE)],
     )
@@ -365,6 +366,49 @@ def referrals(reward: int, enabled: bool, report: dict, top) -> tuple[str, Inlin
         [button(toggle, "referrals:toggle", RED if enabled else GREEN)],
         back_row(),
     )
+
+
+# --------------------------------------------------------------- группы
+
+def groups(rows, values: dict) -> tuple[str, InlineKeyboardMarkup]:
+    """Чистка спама в группах. Каналов это не касается."""
+    lines, buttons = [], []
+    for row in rows:
+        mark = "✅" if row["moderation"] else "⏸"
+        title = escape(row["title"] or str(row["chat_id"]))
+        lines.append(f"{mark} <b>{title}</b> — удалено: {row['deleted']}")
+        buttons.append([button(f"{mark} {title}", f"groups:toggle:{row['chat_id']}")])
+    listing = "\n".join(lines) if lines else (
+        "<i>бот пока не добавлен ни в одну группу</i>"
+    )
+
+    words = len([w for w in (values["spam_words"] or "").split(",") if w.strip()])
+    text = (
+        f"🛡 <b>{texts.spaced('ГРУППЫ')}</b>\n{RULE}\n\n"
+        f"{listing}\n\n"
+        f"{RULE}\n"
+        f"🔗 Удалять ссылки: <b>{onoff(values['spam_delete_links'])}</b>\n"
+        f"📄 Удалять пересылки из каналов: "
+        f"<b>{onoff(values['spam_delete_forwards'])}</b>\n"
+        f"👥 Упоминаний в сообщении: <b>{values['spam_mention_limit']}</b>\n"
+        f"🚫 Запрещённых слов: <b>{words}</b>\n"
+        f"⛔️ Нарушений до бана: <b>{values['spam_strike_limit']}</b>\n\n"
+        "<i>Работает только в группах, куда бот добавлен администратором. "
+        "Главный канал и канал батлов это не затрагивает. Админов группы и "
+        "администраторов бота чистка не трогает.</i>\n\n"
+        "<blockquote>⚠️ Чтобы бот видел все сообщения группы, в @BotFather "
+        "нужно выключить <b>Group Privacy</b>: /mybots → бот → Bot Settings → "
+        "Group Privacy → Turn off. Иначе он видит только команды.</blockquote>"
+    )
+    rows_kb = buttons + [
+        [button("🚫 Запрещённые слова", "edit:spam_words", BLUE)],
+        [button("🔗 Ссылки", "settings:toggle:spam_delete_links"),
+         button("📄 Пересылки", "settings:toggle:spam_delete_forwards")],
+        [button("👥 Упоминания", "edit:spam_mention_limit"),
+         button("⛔️ До бана", "edit:spam_strike_limit")],
+        back_row(),
+    ]
+    return text, keyboard(*rows_kb)
 
 
 # ---------------------------------------------------------------- ссылки

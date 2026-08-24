@@ -853,6 +853,68 @@ class Repo:
         ).fetchone()
         return int(row["total"]), int(row["live"]), int(row["posts"])
 
+    # ------------------------------------------------------ группы и спам
+
+    def add_group(self, chat_id: int, title: str | None) -> None:
+        self.conn.execute(
+            """INSERT INTO groups(chat_id, title) VALUES(?, ?)
+               ON CONFLICT(chat_id) DO UPDATE SET title = excluded.title""",
+            (chat_id, title),
+        )
+        self.conn.commit()
+
+    def group(self, chat_id: int) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM groups WHERE chat_id = ?", (chat_id,)
+        ).fetchone()
+
+    def groups(self) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM groups ORDER BY added_at"
+        ).fetchall()
+
+    def toggle_group(self, chat_id: int) -> bool:
+        """Включить или выключить чистку в группе. Возвращает новое состояние."""
+        self.conn.execute(
+            "UPDATE groups SET moderation = 1 - moderation WHERE chat_id = ?", (chat_id,)
+        )
+        self.conn.commit()
+        row = self.group(chat_id)
+        return bool(row and row["moderation"])
+
+    def forget_group(self, chat_id: int) -> None:
+        self.conn.execute("DELETE FROM groups WHERE chat_id = ?", (chat_id,))
+        self.conn.execute("DELETE FROM strikes WHERE chat_id = ?", (chat_id,))
+        self.conn.commit()
+
+    def count_deleted(self, chat_id: int) -> None:
+        self.conn.execute(
+            "UPDATE groups SET deleted = deleted + 1 WHERE chat_id = ?", (chat_id,)
+        )
+        self.conn.commit()
+
+    def add_strike(self, chat_id: int, user_id: int) -> int:
+        """Записать нарушение. Возвращает, какое оно по счёту."""
+        self.conn.execute(
+            """INSERT INTO strikes(chat_id, user_id, count) VALUES(?, ?, 1)
+               ON CONFLICT(chat_id, user_id) DO UPDATE SET
+                   count = strikes.count + 1,
+                   last_at = datetime('now')""",
+            (chat_id, user_id),
+        )
+        self.conn.commit()
+        row = self.conn.execute(
+            "SELECT count FROM strikes WHERE chat_id = ? AND user_id = ?",
+            (chat_id, user_id),
+        ).fetchone()
+        return int(row["count"]) if row else 1
+
+    def clear_strikes(self, chat_id: int, user_id: int) -> None:
+        self.conn.execute(
+            "DELETE FROM strikes WHERE chat_id = ? AND user_id = ?", (chat_id, user_id)
+        )
+        self.conn.commit()
+
     # ------------------------------------------------- вышедшие из канала
 
     def mark_left(self, user_id: int, chat_id: int) -> int:

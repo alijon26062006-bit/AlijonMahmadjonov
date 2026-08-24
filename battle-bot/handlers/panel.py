@@ -73,6 +73,15 @@ EDITORS: dict[str, dict] = {
         "back": "referrals",
     },
     "round_times": {"check": validation.as_times, "back": "settings"},
+    "spam_words": {"check": lambda raw: validation.as_text(raw, limit=2000), "back": "groups"},
+    "spam_mention_limit": {
+        "check": lambda raw: validation.as_int(raw, minimum=0, maximum=50, example="3"),
+        "back": "groups",
+    },
+    "spam_strike_limit": {
+        "check": lambda raw: validation.as_int(raw, minimum=0, maximum=50, example="3"),
+        "back": "groups",
+    },
     "rejoin_price": {
         "check": lambda raw: validation.as_int(raw, minimum=0, maximum=2500, example="50"),
         "back": "people:left",
@@ -681,6 +690,29 @@ async def toggle_votes(callback: CallbackQuery, repo: Repo, config: Config,
     await callback.answer("Сохранено")
 
 
+@router.callback_query(F.data == "p:groups")
+async def show_groups(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, panel_ui.groups(repo.groups(), settings.all()))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("p:groups:toggle:"))
+async def toggle_group(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """Включить или выключить чистку в конкретной группе."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    chat_id = int(callback.data.split(":")[-1])
+    on = repo.toggle_group(chat_id)
+    await render(callback, panel_ui.groups(repo.groups(), settings.all()))
+    await callback.answer("Чистка включена" if on else "Чистка выключена")
+
+
 @router.callback_query(F.data == "p:links")
 async def show_links(callback: CallbackQuery, config: Config, settings: Settings) -> None:
     if not is_admin(callback.from_user.id, config):
@@ -978,6 +1010,8 @@ async def _back_to(
         )
     elif section == "channel":
         await render(message, panel_ui.channel(main_post.state(repo, config, settings)))
+    elif section == "groups":
+        await render(message, panel_ui.groups(repo.groups(), settings.all()))
     elif section == "people:left":
         await render(message, _leavers_screen(repo, settings))
     elif section == "people:rest":

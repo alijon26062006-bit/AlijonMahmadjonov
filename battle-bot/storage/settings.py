@@ -16,7 +16,7 @@ from datetime import time
 from typing import Any, Callable
 
 from config import Config, VotePack, _parse_times
-from services import prizes
+from services import moderation, prizes
 
 log = logging.getLogger(__name__)
 
@@ -91,6 +91,16 @@ FIELDS: dict[str, Field] = {
         Field("main_post_message_id", "ID опубликованного главного поста", str, int, ""),
         Field("member_channels_enabled", "Каналы участников",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("spam_words", "Запрещённые слова", str, str,
+              "слова через запятую; ищутся по вхождению"),
+        Field("spam_delete_links", "Удалять ссылки",
+              lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("spam_delete_forwards", "Удалять пересылки из каналов",
+              lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("spam_mention_limit", "Упоминаний в сообщении", str, int,
+              "больше этого числа @упоминаний — удалять; 0 — не проверять"),
+        Field("spam_strike_limit", "Нарушений до бана", str, int,
+              "сколько удалений терпеть, потом убрать из группы; 0 — не банить"),
         Field("leave_penalty_enabled", "Штраф за выход из канала",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
         Field("rejoin_price", "Возврат доступа, звёзд", str, int,
@@ -176,6 +186,12 @@ class Settings:
         # со второго раунда соперников подбирает посев по силе, а не жребий
         "seeding": "snake",
         # призёр отдыхает три дня — или выкупает возвращение за 50⭐
+        # чистка спама в группах: каналы это не затрагивает
+        "spam_words": moderation.DEFAULT_WORDS,
+        "spam_delete_links": True,
+        "spam_delete_forwards": True,
+        "spam_mention_limit": 3,
+        "spam_strike_limit": 3,
         # вышел из канала — заявки не принимаются, пока не вернёт доступ
         "leave_penalty_enabled": True,
         "rejoin_price": 50,

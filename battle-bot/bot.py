@@ -14,8 +14,8 @@ from core.engine import BattleEngine
 from core.autopilot import Autopilot
 from core.scheduler import DeadlineWatcher, Ticker
 from handlers import (
-    admin, broadcast, emoji, errors, membership, mychannel, panel, payments,
-    referral, start, voting,
+    admin, broadcast, emoji, errors, groups, membership, mychannel, panel,
+    payments, referral, start, voting,
 )
 from services.emoji import PremiumEmojiMiddleware, load_table
 from services.retry import RetryMiddleware
@@ -48,6 +48,7 @@ COMMANDS = [
 # Страховка панели идёт последней, иначе она перехватывала бы чужие кнопки.
 ROUTERS = (
     errors.router,
+    groups.router,
     panel.router,
     broadcast.router,
     admin.router,

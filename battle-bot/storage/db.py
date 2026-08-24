@@ -211,6 +211,25 @@ CREATE TABLE IF NOT EXISTS leavers (
     left_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Группы, где бот чистит спам. Каналы сюда не попадают: там пишет сам бот.
+-- Запись появляется, когда бота добавляют в группу администратором.
+CREATE TABLE IF NOT EXISTS groups (
+    chat_id    INTEGER PRIMARY KEY,
+    title      TEXT,
+    moderation INTEGER NOT NULL DEFAULT 1,
+    deleted    INTEGER NOT NULL DEFAULT 0,
+    added_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Нарушения по людям: набрал предупреждений — вылетел из группы.
+CREATE TABLE IF NOT EXISTS strikes (
+    chat_id  INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    count    INTEGER NOT NULL DEFAULT 0,
+    last_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (chat_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS stats (
     user_id     INTEGER PRIMARY KEY REFERENCES users(user_id),
     battles     INTEGER NOT NULL DEFAULT 0,
