@@ -22,7 +22,8 @@ from core import background, bracket
 from handlers import membership
 from core.engine import BattleEngine
 from services import (
-    keyboards, main_post, panel_ui, prizes, sponsors, subscription, texts, ui,
+    group_info, keyboards, main_post, panel_ui, prizes, sponsors, subscription,
+    texts, ui,
     validation,
 )
 from services.validation import InputError
@@ -700,17 +701,53 @@ async def show_groups(
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("p:groups:card:"))
+async def show_group_card(
+    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config
+) -> None:
+    """Карточка группы: права бота, участники, ссылка."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    chat_id = int(callback.data.split(":")[-1])
+    await callback.answer("Спрашиваю Telegram…")
+    await render(callback, await _group_card(bot, repo, chat_id))
+
+
+async def _group_card(bot: Bot, repo: Repo, chat_id: int):
+    row = repo.group(chat_id)
+    added_by = repo.get_user(int(row["added_by"])) if row and row["added_by"] else None
+    return panel_ui.group_card(await group_info.describe(bot, chat_id), row, added_by)
+
+
 @router.callback_query(F.data.startswith("p:groups:toggle:"))
 async def toggle_group(
-    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config
 ) -> None:
     """Включить или выключить чистку в конкретной группе."""
     if not is_admin(callback.from_user.id, config):
         return
     chat_id = int(callback.data.split(":")[-1])
     on = repo.toggle_group(chat_id)
-    await render(callback, panel_ui.groups(repo.groups(), settings.all()))
+    await render(callback, await _group_card(bot, repo, chat_id))
     await callback.answer("Чистка включена" if on else "Чистка выключена")
+
+
+@router.callback_query(F.data.startswith("p:groups:leave:"))
+async def leave_group(
+    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """Уйти из группы — например, если бота добавили без спроса."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    chat_id = int(callback.data.split(":")[-1])
+    try:
+        await bot.leave_chat(chat_id)
+    except TelegramAPIError as error:
+        await callback.answer(f"Не вышло: {error}", show_alert=True)
+        return
+    repo.forget_group(chat_id)
+    await render(callback, panel_ui.groups(repo.groups(), settings.all()))
+    await callback.answer("Бот вышел из группы")
 
 
 @router.callback_query(F.data == "p:links")

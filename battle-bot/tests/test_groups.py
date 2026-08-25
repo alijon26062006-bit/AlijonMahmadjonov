@@ -262,9 +262,12 @@ async def test_a_failed_delete_does_not_count_a_strike(env):
 # --------------------------------------------------- добавление в группу
 
 class Joined:
-    def __init__(self, status="administrator", chat_id=GROUP) -> None:
+    def __init__(self, status="administrator", chat_id=GROUP, by=42) -> None:
         self.chat = type("C", (), {"id": chat_id, "type": "supergroup", "title": "Новый чат"})()
         self.new_chat_member = type("M", (), {"status": status})()
+        self.from_user = type(
+            "U", (), {"id": by, "username": "adder", "first_name": "A", "full_name": "A"}
+        )() if by else None
 
 
 @pytest.mark.asyncio
@@ -273,8 +276,11 @@ async def test_being_added_registers_the_group(env):
 
     await groups.added_to_group(Joined(chat_id=-1002777777777), bot, repo, config)
 
-    assert repo.group(-1002777777777) is not None
-    assert any("добавлен в группу" in text for text in bot.sent)
+    group = repo.group(-1002777777777)
+    assert group is not None
+    assert int(group["added_by"]) == 42, "должно быть видно, кто добавил"
+    assert any("добавили в группу" in text for text in bot.sent)
+    assert any("@adder" in text for text in bot.sent)
 
 
 @pytest.mark.asyncio
@@ -312,3 +318,146 @@ def test_the_panel_survives_an_empty_list(env):
     text, markup = panel_ui.groups([], settings.all())
 
     assert text.strip() and markup.inline_keyboard
+
+
+# ------------------------------------------------------- карточка группы
+
+class InfoBot:
+    """Телеграм, который рассказывает про группу."""
+
+    def __init__(self, title="Чат батлов", username=None, invite=None,
+                 members=128, status="administrator", can_delete=True,
+                 can_restrict=True, fail=None) -> None:
+        self.data = dict(
+            title=title, username=username, invite_link=invite, members=members,
+            status=status, can_delete=can_delete, can_restrict=can_restrict,
+        )
+        self.fail = fail
+
+    async def me(self):
+        return type("M", (), {"id": 4242})()
+
+    async def get_chat(self, chat_id):
+        if self.fail:
+            from aiogram.exceptions import TelegramBadRequest
+
+            raise TelegramBadRequest(method=None, message=self.fail)
+        d = self.data
+        return type("C", (), {
+            "title": d["title"], "username": d["username"], "invite_link": d["invite_link"],
+        })()
+
+    async def get_chat_member_count(self, chat_id):
+        return self.data["members"]
+
+    async def get_chat_member(self, chat_id, user_id):
+        d = self.data
+        return type("M", (), {
+            "status": d["status"],
+            "can_delete_messages": d["can_delete"],
+            "can_restrict_members": d["can_restrict"],
+        })()
+
+
+@pytest.mark.asyncio
+async def test_the_card_shows_size_and_rights(env):
+    from services import group_info
+
+    card = await group_info.describe(InfoBot(members=128), GROUP)
+
+    assert card["members"] == 128
+    assert card["rights"] == {"удалять сообщения": True, "banить участников": True}
+    assert card["missing"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_card_names_missing_rights(env):
+    from services import group_info
+
+    card = await group_info.describe(InfoBot(can_delete=False), GROUP)
+
+    assert "удалять сообщения" in card["missing"]
+
+
+@pytest.mark.asyncio
+async def test_a_public_group_gives_a_link(env):
+    from services import group_info
+
+    card = await group_info.describe(InfoBot(username="battlechat"), GROUP)
+    assert card["link"] == "https://t.me/battlechat"
+
+
+@pytest.mark.asyncio
+async def test_a_private_group_falls_back_to_the_invite(env):
+    from services import group_info
+
+    card = await group_info.describe(InfoBot(invite="https://t.me/+abc"), GROUP)
+    assert card["link"] == "https://t.me/+abc"
+
+
+@pytest.mark.asyncio
+async def test_a_lost_group_says_so_instead_of_crashing(env):
+    from services import group_info
+
+    card = await group_info.describe(InfoBot(fail="chat not found"), GROUP)
+
+    assert card["error"] and card["members"] is None
+
+
+@pytest.mark.asyncio
+async def test_the_card_screen_reads_well(env):
+    repo, _, _, _ = env
+    from services import group_info
+
+    repo.count_deleted(GROUP)
+    card = await group_info.describe(InfoBot(username="battlechat"), GROUP)
+    text, markup = panel_ui.group_card(card, repo.group(GROUP), None)
+
+    assert "128" in text and "Удалено сообщений: <b>1</b>" in text
+    labels = [b.text for row in markup.inline_keyboard for b in row]
+    assert any("Открыть группу" in label for label in labels)
+    assert any("Выйти из группы" in label for label in labels)
+
+
+@pytest.mark.asyncio
+async def test_the_card_warns_about_missing_delete_right(env):
+    repo, _, _, _ = env
+    from services import group_info
+
+    card = await group_info.describe(InfoBot(can_delete=False), GROUP)
+    text, _ = panel_ui.group_card(card, repo.group(GROUP), None)
+
+    assert "чистка не работает" in text
+
+
+@pytest.mark.asyncio
+async def test_the_card_shows_who_added_the_bot(env):
+    repo, _, _, _ = env
+    from services import group_info
+
+    repo.upsert_user(42, "adder", "A")
+    card = await group_info.describe(InfoBot(), GROUP)
+    text, _ = panel_ui.group_card(card, repo.group(GROUP), repo.get_user(42))
+
+    assert "@adder" in text
+
+
+@pytest.mark.asyncio
+async def test_a_lost_group_card_still_offers_to_leave(env):
+    repo, _, _, _ = env
+    from services import group_info
+
+    card = await group_info.describe(InfoBot(fail="chat not found"), GROUP)
+    text, markup = panel_ui.group_card(card, repo.group(GROUP), None)
+
+    assert "не видит эту группу" in text
+    assert markup.inline_keyboard, "кнопки должны остаться"
+
+
+def test_the_list_opens_the_card_not_the_toggle(env):
+    """Нажатие на группу открывает карточку — переключатель уже внутри неё."""
+    repo, _, settings, _ = env
+    _, markup = panel_ui.groups(repo.groups(), settings.all())
+    actions = [b.callback_data for row in markup.inline_keyboard for b in row]
+
+    assert f"p:groups:card:{GROUP}" in actions

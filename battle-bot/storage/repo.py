@@ -855,11 +855,14 @@ class Repo:
 
     # ------------------------------------------------------ группы и спам
 
-    def add_group(self, chat_id: int, title: str | None) -> None:
+    def add_group(self, chat_id: int, title: str | None, added_by: int | None = None) -> None:
+        """Запомнить группу. Кто добавил — не перетираем, если уже знаем."""
         self.conn.execute(
-            """INSERT INTO groups(chat_id, title) VALUES(?, ?)
-               ON CONFLICT(chat_id) DO UPDATE SET title = excluded.title""",
-            (chat_id, title),
+            """INSERT INTO groups(chat_id, title, added_by) VALUES(?, ?, ?)
+               ON CONFLICT(chat_id) DO UPDATE SET
+                   title = excluded.title,
+                   added_by = COALESCE(groups.added_by, excluded.added_by)""",
+            (chat_id, title, added_by),
         )
         self.conn.commit()
 

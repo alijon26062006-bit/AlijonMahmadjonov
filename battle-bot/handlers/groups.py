@@ -13,10 +13,12 @@ import logging
 from aiogram import Bot, F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.exceptions import TelegramAPIError
-from aiogram.types import ChatMemberUpdated, Message
+from aiogram.types import (
+    ChatMemberUpdated, InlineKeyboardButton, InlineKeyboardMarkup, Message,
+)
 
 from config import Config
-from services import moderation
+from services import moderation, texts
 from storage.repo import Repo
 from storage.settings import Settings
 
@@ -33,20 +35,40 @@ async def added_to_group(
     """Бота добавили или убрали из группы — запоминаем её сами."""
     status = event.new_chat_member.status
     if status in {"administrator", "member"}:
-        repo.add_group(event.chat.id, event.chat.title)
+        who = getattr(event, "from_user", None)
+        if who is not None:
+            repo.upsert_user(who.id, who.username, who.first_name)
+        repo.add_group(event.chat.id, event.chat.title, who.id if who else None)
         log.info("Бот добавлен в группу %s (%s)", event.chat.title, event.chat.id)
+
+        added_by = f"@{who.username}" if who and who.username else (
+            who.full_name if who else "неизвестно"
+        )
+        note = (
+            "Чистка спама включена."
+            if status == "administrator"
+            else "⚠️ <b>Дайте права администратора</b> с правом удалять "
+                 "сообщения — без них чистить нечем."
+        )
+        markup = InlineKeyboardMarkup(
+            inline_keyboard=[[
+                InlineKeyboardButton(
+                    text="🛡 Открыть карточку группы",
+                    callback_data=f"p:groups:card:{event.chat.id}",
+                    style="primary",
+                )
+            ]]
+        )
         for admin_id in config.admin_ids:
             try:
                 await bot.send_message(
                     admin_id,
-                    f"🛡 Бот добавлен в группу <b>{event.chat.title}</b>\n"
-                    f"<code>{event.chat.id}</code>\n\n"
-                    + (
-                        "Чистка спама включена."
-                        if status == "administrator"
-                        else "⚠️ <b>Дайте права администратора</b> с правом удалять "
-                             "сообщения — без них чистить нечем."
-                    ),
+                    f"🛡 <b>Бота добавили в группу</b>\n"
+                    f"{texts.RULE}\n\n"
+                    f"Группа: <b>{event.chat.title}</b>\n"
+                    f"<code>{event.chat.id}</code>\n"
+                    f"Добавил: {added_by}\n\n{note}",
+                    reply_markup=markup,
                 )
             except TelegramAPIError:
                 pass

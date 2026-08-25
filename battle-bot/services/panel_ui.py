@@ -377,7 +377,7 @@ def groups(rows, values: dict) -> tuple[str, InlineKeyboardMarkup]:
         mark = "✅" if row["moderation"] else "⏸"
         title = escape(row["title"] or str(row["chat_id"]))
         lines.append(f"{mark} <b>{title}</b> — удалено: {row['deleted']}")
-        buttons.append([button(f"{mark} {title}", f"groups:toggle:{row['chat_id']}")])
+        buttons.append([button(f"{mark} {title}", f"groups:card:{row['chat_id']}")])
     listing = "\n".join(lines) if lines else (
         "<i>бот пока не добавлен ни в одну группу</i>"
     )
@@ -393,7 +393,8 @@ def groups(rows, values: dict) -> tuple[str, InlineKeyboardMarkup]:
         f"👥 Упоминаний в сообщении: <b>{values['spam_mention_limit']}</b>\n"
         f"🚫 Запрещённых слов: <b>{words}</b>\n"
         f"⛔️ Нарушений до бана: <b>{values['spam_strike_limit']}</b>\n\n"
-        "<i>Работает только в группах, куда бот добавлен администратором. "
+        "<i>Нажмите на группу, чтобы посмотреть права, число участников и ссылку.\n\n"
+        "Работает только в группах, куда бот добавлен администратором. "
         "Главный канал и канал батлов это не затрагивает. Админов группы и "
         "администраторов бота чистка не трогает.</i>\n\n"
         "<blockquote>⚠️ Чтобы бот видел все сообщения группы, в @BotFather "
@@ -409,6 +410,62 @@ def groups(rows, values: dict) -> tuple[str, InlineKeyboardMarkup]:
         back_row(),
     ]
     return text, keyboard(*rows_kb)
+
+
+def group_card(card: dict, row, added_by) -> tuple[str, InlineKeyboardMarkup]:
+    """Карточка группы: права бота, размер, ссылка и кто добавил."""
+    chat_id = card["chat_id"]
+    title = escape(card["title"] or (row["title"] if row else str(chat_id)))
+
+    if card["error"]:
+        body = (
+            f"⚠️ <b>Бот не видит эту группу</b>\n\n"
+            f"<i>{escape(card['error'])}</i>\n\n"
+            "Скорее всего, его оттуда убрали."
+        )
+    else:
+        members = card["members"]
+        rights = "\n".join(
+            f"{'✅' if ok else '❌'} {escape(name)}"
+            for name, ok in card["rights"].items()
+        ) or "<i>прав нет — бот не администратор</i>"
+        warn = (
+            "\n\n⚠️ <b>Без права удалять сообщения чистка не работает.</b>"
+            if "удалять сообщения" in card["missing"]
+            else ""
+        )
+        body = (
+            f"👥 Участников: <b>{members if members is not None else '—'}</b>\n"
+            f"🛡 Статус бота: <b>{escape(card['status'] or '—')}</b>\n\n"
+            f"<b>Права</b>\n{rights}{warn}"
+        )
+
+    who = ""
+    if added_by is not None:
+        handle = added_by["username"] or added_by["first_name"] or added_by["user_id"]
+        who = f"\n➕ Добавил: {escape('@' + str(handle))}"
+
+    deleted = row["deleted"] if row else 0
+    on = bool(row and row["moderation"])
+    text = (
+        f"🛡 <b>{escape(title)}</b>\n{RULE}\n\n"
+        f"<code>{chat_id}</code>{who}\n"
+        f"🧹 Удалено сообщений: <b>{deleted}</b>\n"
+        f"Чистка: <b>{onoff(on)}</b>\n\n"
+        f"{body}"
+    )
+
+    rows = []
+    if card["link"]:
+        rows.append([InlineKeyboardButton(text="↗ Открыть группу", url=card["link"])])
+    rows += [
+        [button("⏸ Выключить чистку" if on else "▶️ Включить чистку",
+                f"groups:toggle:{chat_id}", RED if on else GREEN)],
+        [button("🔄 Обновить", f"groups:card:{chat_id}", BLUE)],
+        [button("🚪 Выйти из группы", f"groups:leave:{chat_id}", RED)],
+        back_row("groups"),
+    ]
+    return text, keyboard(*rows)
 
 
 # ---------------------------------------------------------------- ссылки

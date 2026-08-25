@@ -7,6 +7,7 @@ from pathlib import Path
 MIGRATIONS = (
     # добавляем колонку отдельно: у уже работающих ботов таблица создана раньше
     "ALTER TABLE users ADD COLUMN is_blocked INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE groups ADD COLUMN added_by INTEGER",
 )
 
 SCHEMA = """
@@ -216,6 +217,7 @@ CREATE TABLE IF NOT EXISTS leavers (
 CREATE TABLE IF NOT EXISTS groups (
     chat_id    INTEGER PRIMARY KEY,
     title      TEXT,
+    added_by   INTEGER,
     moderation INTEGER NOT NULL DEFAULT 1,
     deleted    INTEGER NOT NULL DEFAULT 0,
     added_at   TEXT NOT NULL DEFAULT (datetime('now'))
