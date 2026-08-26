@@ -10,6 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
+from app import runtime
 from app.config import settings
 from app.money import fmt, parse
 from app.states import Deposit
@@ -36,7 +37,7 @@ async def cb_soon(call: CallbackQuery) -> None:
 async def cb_card(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Deposit.amount)
     await call.message.edit_text(
-        texts.DEPOSIT_ASK_AMOUNT.format(min_amount=fmt(settings.min_deposit_diram)),
+        texts.DEPOSIT_ASK_AMOUNT.format(min_amount=fmt(runtime.min_deposit())),
         reply_markup=keyboards.cancel(),
     )
     await call.answer()
@@ -48,26 +49,29 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     if amount is None or amount <= 0:
         await message.answer(texts.DEPOSIT_BAD_AMOUNT)
         return
-    if amount < settings.min_deposit_diram:
+    if amount < runtime.min_deposit():
         await message.answer(
-            texts.DEPOSIT_TOO_SMALL.format(min_amount=fmt(settings.min_deposit_diram))
+            texts.DEPOSIT_TOO_SMALL.format(min_amount=fmt(runtime.min_deposit()))
         )
         return
 
     await state.update_data(amount=amount)
     await state.set_state(Deposit.receipt)
 
-    holder = f"👤 Получатель: <b>{settings.pay_card_holder}</b>\n" if settings.pay_card_holder else ""
-    bank = f"🏦 Банк: <b>{settings.pay_card_bank}</b>\n" if settings.pay_card_bank else ""
-    extra = f"\n{settings.pay_extra}\n" if settings.pay_extra else ""
+    card_holder = runtime.get("pay_card_holder")
+    card_bank = runtime.get("pay_card_bank")
+    note = runtime.get("pay_extra")
+    holder = f"👤 Получатель: <b>{card_holder}</b>\n" if card_holder else ""
+    bank = f"🏦 Банк: <b>{card_bank}</b>\n" if card_bank else ""
+    extra = f"\n{note}\n" if note else ""
 
     await message.answer(
         texts.DEPOSIT_REQUISITES.format(
             amount=fmt(amount),
-            card=settings.pay_card_number or "— реквизиты не заданы —",
+            card=runtime.get("pay_card_number") or "— реквизиты не заданы —",
             holder=holder,
             bank=bank,
-            city=settings.pay_city,
+            city=runtime.get("pay_city"),
             extra=extra,
         ),
         reply_markup=keyboards.cancel(),

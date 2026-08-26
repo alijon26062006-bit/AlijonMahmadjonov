@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
+from app import runtime
 from app.config import settings
 from app.money import fmt
 from app.services.delivery import notify_admins
@@ -14,21 +15,9 @@ from app.states import Support
 
 router = Router(name="support")
 
-NOTICE_FILE = settings.db_file.parent / "support_notice.txt"
-
-
 def read_notice() -> str:
-    """Объявление в разделе поддержки. Меняется командой /notice без перезапуска."""
-    if NOTICE_FILE.exists():
-        text = NOTICE_FILE.read_text(encoding="utf-8").strip()
-        if text:
-            return text
-    return texts.SUPPORT_NOTICE_DEFAULT
-
-
-def write_notice(text: str) -> None:
-    NOTICE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    NOTICE_FILE.write_text(text, encoding="utf-8")
+    """Объявление в разделе поддержки. Меняется из админ-панели."""
+    return runtime.get("support_notice") or texts.SUPPORT_NOTICE_DEFAULT
 
 
 @router.callback_query(F.data == "m:support")

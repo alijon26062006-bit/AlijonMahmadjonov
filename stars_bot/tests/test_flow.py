@@ -17,7 +17,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.base import StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from app import db
+from app import db, runtime
 from app.handlers import deposit as dep_h
 from app.handlers import menu as menu_h
 from app.handlers import profile as prof_h
@@ -137,6 +137,7 @@ async def main() -> None:
     conn = await db.connect()
     try:
         await db.init(conn)
+        await runtime.load(conn)
         await run_scenario(conn)
     finally:
         await conn.close()

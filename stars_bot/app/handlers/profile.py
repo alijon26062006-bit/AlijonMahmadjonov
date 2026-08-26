@@ -9,6 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
+from app import runtime
 from app.config import settings
 from app.money import fmt
 from app.states import Promo
@@ -85,7 +86,7 @@ async def cb_referral(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     bot_username = settings.bot_username or (await call.bot.me()).username
     await call.message.edit_text(
         texts.REFERRAL.format(
-            percent=settings.referral_percent,
+            percent=runtime.referral_percent(),
             ref_count=user.ref_count,
             ref_earned=fmt(user.ref_earned),
             link=f"https://t.me/{bot_username}?start=ref{user.id}",

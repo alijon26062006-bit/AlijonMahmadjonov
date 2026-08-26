@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 
+from app import runtime
 from app.config import settings
 
 _AMOUNT_RE = re.compile(r"^\d{1,9}([.,]\d{1,2})?$")
@@ -30,12 +31,11 @@ def fmt(diram: int) -> str:
 
 
 def stars_cost(quantity: int) -> int:
-    """Стоимость quantity звёзд в дирамах."""
-    return quantity * settings.star_price_diram
+    """Стоимость quantity звёзд в дирамах по текущей цене."""
+    return quantity * runtime.star_price()
 
 
 def affordable_stars(balance: int) -> int:
     """Сколько звёзд можно купить на данный баланс."""
-    if settings.star_price_diram <= 0:
-        return 0
-    return balance // settings.star_price_diram
+    price = runtime.star_price()
+    return balance // price if price > 0 else 0

@@ -114,6 +114,11 @@ CREATE TABLE IF NOT EXISTS promo_uses (
     PRIMARY KEY (code, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_orders_user    ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_deposits_user  ON deposits(user_id);
 CREATE INDEX IF NOT EXISTS idx_deposits_stat  ON deposits(status);

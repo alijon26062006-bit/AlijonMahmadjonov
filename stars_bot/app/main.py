@@ -8,11 +8,13 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramAPIError, TelegramNetworkError, TelegramUnauthorizedError
-from aiogram.types import BotCommand
+from aiogram.types import BotCommand, BotCommandScopeChat
 
-from app import db
+from app import db, runtime
 from app.config import settings
-from app.handlers import admin, deposit, menu, profile, shop, support
+from app.handlers import (
+    admin, broadcast, deposit, menu, panel, profile, shop, support,
+)
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.fragment import build_provider
 
@@ -21,6 +23,10 @@ log = logging.getLogger(__name__)
 USER_COMMANDS = [
     BotCommand(command="start", description="Главное меню"),
     BotCommand(command="menu", description="Главное меню"),
+]
+
+ADMIN_COMMANDS = USER_COMMANDS + [
+    BotCommand(command="panel", description="Админ-панель"),
 ]
 
 
@@ -33,12 +39,13 @@ def readiness() -> tuple[list[str], list[str]]:
             "ADMIN_IDS пуст — некому подтверждать пополнения, "
             "деньги будут зависать. Свой ID узнайте у @userinfobot."
         )
-    if not settings.pay_card_number:
+    if not runtime.get("pay_card_number"):
         blockers.append(
-            "PAY_CARD_NUMBER пуст — покупателям некуда переводить деньги."
+            "Не заданы реквизиты карты — покупателям некуда переводить деньги. "
+            "Задайте их в /panel → Реквизиты или в .env."
         )
-    if settings.star_price_diram <= 0:
-        blockers.append("STAR_PRICE_DIRAM должен быть больше нуля.")
+    if runtime.star_price() <= 0:
+        blockers.append("Цена звезды должна быть больше нуля (/panel → Цены).")
 
     if settings.fragment_mode.lower() != "api":
         warnings.append(
@@ -73,19 +80,28 @@ async def main() -> None:
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     )
 
-    if not print_readiness():
-        raise SystemExit(1)
-
     bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     conn = await db.connect()
     await db.init(conn)
+    # Настройки из панели грузим до проверки готовности: реквизиты могли
+    # быть заданы через бота, а не в .env.
+    await runtime.load(conn)
+
+    if not print_readiness():
+        await conn.close()
+        await bot.session.close()
+        raise SystemExit(1)
+
     provider = build_provider()
 
     dp = Dispatcher(conn=conn, provider=provider)
     dp.message.middleware(UserGuardMiddleware())
     dp.callback_query.middleware(UserGuardMiddleware())
 
-    # admin первым: его фильтр отсекает чужие апдейты и пропускает их дальше.
+    # Админские роутеры первыми: их фильтр отсекает чужие апдейты
+    # и пропускает их дальше по цепочке.
+    dp.include_router(panel.router)
+    dp.include_router(broadcast.router)
     dp.include_router(admin.router)
     dp.include_router(menu.router)
     dp.include_router(shop.router)
@@ -96,6 +112,14 @@ async def main() -> None:
     try:
         me = await bot.me()
         await bot.set_my_commands(USER_COMMANDS)
+        # У админов в меню команд появляется /panel.
+        for admin_id in settings.admin_ids:
+            try:
+                await bot.set_my_commands(
+                    ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id)
+                )
+            except TelegramAPIError:
+                log.debug("Не смог поставить команды админу %s", admin_id)
     except TelegramUnauthorizedError:
         log.error(
             "❌ Telegram отверг токен. Проверьте BOT_TOKEN в .env — возможно, "

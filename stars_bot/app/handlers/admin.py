@@ -11,8 +11,8 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
+from app import runtime
 from app.config import settings
-from app.handlers.support import write_notice
 from app.money import fmt, parse
 from app.services import delivery
 from app.services.fragment import DeliveryProvider
@@ -84,9 +84,9 @@ async def _pay_referral(
     conn: aiosqlite.Connection, bot: Bot, user: db.User | None, amount: int
 ) -> None:
     """Начислить пригласившему процент с пополнения."""
-    if user is None or not user.referrer_id or settings.referral_percent <= 0:
+    if user is None or not user.referrer_id or runtime.referral_percent() <= 0:
         return
-    bonus = amount * settings.referral_percent // 100
+    bonus = amount * runtime.referral_percent() // 100
     if bonus <= 0:
         return
     await db.add_ref_earning(conn, user.referrer_id, bonus)
@@ -286,14 +286,16 @@ async def cmd_close(
 
 
 @router.message(Command("notice"))
-async def cmd_notice(message: Message, command: CommandObject) -> None:
+async def cmd_notice(
+    message: Message, command: CommandObject, conn: aiosqlite.Connection
+) -> None:
     if not command.args:
         await message.answer(
             "Использование: <code>/notice текст объявления</code>\n"
             "Показывается в разделе «Поддержка»."
         )
         return
-    write_notice(command.args.strip())
+    await runtime.set_value(conn, "support_notice", command.args.strip())
     await message.answer("✅ Объявление в поддержке обновлено.")
 
 

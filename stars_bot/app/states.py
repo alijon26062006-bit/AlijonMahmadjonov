@@ -24,3 +24,17 @@ class Calc(StatesGroup):
 class Support(StatesGroup):
     subject = State()     # первое сообщение тикета
     reply = State()       # дописка в открытый тикет
+
+
+class Panel(StatesGroup):
+    value = State()       # ждём новое значение настройки
+
+
+class Cast(StatesGroup):
+    content = State()     # ждём сообщение для рассылки
+    buttons = State()     # ждём список кнопок
+    confirm = State()     # готово к отправке
+
+
+class PromoNew(StatesGroup):
+    data = State()        # ждём «КОД сумма лимит»

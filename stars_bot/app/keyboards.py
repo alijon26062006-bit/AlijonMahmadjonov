@@ -1,36 +1,26 @@
 """Клавиатуры. Раскладка повторяет макет из ТЗ."""
 from __future__ import annotations
 
-import json
-
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.config import BASE_DIR, settings
+from app import runtime
+from app.config import settings
 from app.money import fmt
-
-PRICES_FILE = BASE_DIR / "prices.json"
-
-
-def premium_plans() -> list[dict]:
-    """Тарифы Premium из prices.json. Файл читается каждый раз —
-    цены можно менять без перезапуска бота."""
-    with PRICES_FILE.open(encoding="utf-8") as fh:
-        return json.load(fh)["premium"]
-
-
-def find_premium(months: int) -> dict | None:
-    return next((plan for plan in premium_plans() if plan["months"] == months), None)
 
 
 def main_menu() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text="⭐️ Купить звезды", callback_data="m:stars"))
-    kb.row(InlineKeyboardButton(text="👑 Telegram Premium", callback_data="m:premium"))
-    kb.row(
-        InlineKeyboardButton(text="💲 Пополнить баланс", callback_data="m:deposit"),
-        InlineKeyboardButton(text="👤 Профиль", callback_data="m:profile"),
-    )
+    if runtime.get_bool("stars_enabled"):
+        kb.row(InlineKeyboardButton(text="⭐️ Купить звезды", callback_data="m:stars"))
+    if runtime.get_bool("premium_enabled"):
+        kb.row(InlineKeyboardButton(text="👑 Telegram Premium", callback_data="m:premium"))
+    deposit_button = InlineKeyboardButton(text="💲 Пополнить баланс", callback_data="m:deposit")
+    profile_button = InlineKeyboardButton(text="👤 Профиль", callback_data="m:profile")
+    if runtime.get_bool("deposit_enabled"):
+        kb.row(deposit_button, profile_button)
+    else:
+        kb.row(profile_button)
     kb.row(
         InlineKeyboardButton(text="📞 Поддержка", callback_data="m:support"),
         InlineKeyboardButton(text="🖩 Калькулятор", callback_data="m:calc"),
@@ -63,7 +53,7 @@ def cancel(text: str = "❌ Отмена") -> InlineKeyboardMarkup:
 
 def premium_menu() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    for plan in premium_plans():
+    for plan in runtime.premium_plans():
         kb.row(InlineKeyboardButton(
             text=f"{plan['months']} месяцев — {fmt(plan['price'])}",
             callback_data=f"premium:{plan['months']}",

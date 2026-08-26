@@ -10,7 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
-from app.config import settings
+from app import runtime
 from app.handlers.menu import menu_text
 from app.money import affordable_stars, fmt, stars_cost
 from app.services import delivery
@@ -41,7 +41,7 @@ def title_of(product_type: str, quantity: int) -> str:
 async def cb_stars(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await call.message.edit_text(
-        texts.STARS_ENTRY.format(rate=fmt(settings.star_price_diram)),
+        texts.STARS_ENTRY.format(rate=fmt(runtime.star_price())),
         reply_markup=keyboards.stars_entry(),
     )
     await call.answer()
@@ -57,9 +57,9 @@ async def cb_stars_buy(
     await state.update_data(product_type="stars")
     await call.message.edit_text(
         texts.STARS_ASK_QUANTITY.format(
-            rate=fmt(settings.star_price_diram),
-            min_stars=settings.min_stars,
-            max_stars=f"{settings.max_stars:,}".replace(",", " "),
+            rate=fmt(runtime.star_price()),
+            min_stars=runtime.min_stars(),
+            max_stars=f"{runtime.max_stars():,}".replace(",", " "),
             affordable=affordable_stars(balance),
             balance=fmt(balance),
         ),
@@ -73,14 +73,14 @@ async def on_quantity(message: Message, state: FSMContext, conn: aiosqlite.Conne
     raw = (message.text or "").strip().replace(" ", "")
     if not raw.isdigit():
         await message.answer(texts.STARS_BAD_QUANTITY.format(
-            min_stars=settings.min_stars, max_stars=settings.max_stars
+            min_stars=runtime.min_stars(), max_stars=runtime.max_stars()
         ))
         return
 
     quantity = int(raw)
-    if not settings.min_stars <= quantity <= settings.max_stars:
+    if not runtime.min_stars() <= quantity <= runtime.max_stars():
         await message.answer(texts.STARS_BAD_QUANTITY.format(
-            min_stars=settings.min_stars, max_stars=settings.max_stars
+            min_stars=runtime.min_stars(), max_stars=runtime.max_stars()
         ))
         return
 
@@ -116,7 +116,7 @@ async def cb_premium_plan(
     call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
 ) -> None:
     months = int(call.data.split(":")[1])
-    plan = keyboards.find_premium(months)
+    plan = runtime.find_premium(months)
     if plan is None:
         await call.answer("Этого тарифа больше нет.", show_alert=True)
         return
