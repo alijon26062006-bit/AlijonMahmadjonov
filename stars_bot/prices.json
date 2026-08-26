@@ -1,0 +1,15 @@
+{
+  "stars": [
+    { "amount": 50,   "price": 12000 },
+    { "amount": 100,  "price": 23000 },
+    { "amount": 250,  "price": 56000 },
+    { "amount": 500,  "price": 110000 },
+    { "amount": 1000, "price": 215000 },
+    { "amount": 2500, "price": 530000 }
+  ],
+  "premium": [
+    { "months": 3,  "price": 190000 },
+    { "months": 6,  "price": 260000 },
+    { "months": 12, "price": 450000 }
+  ]
+}
