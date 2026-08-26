@@ -11,7 +11,7 @@ for suite in tests/test_money.py tests/test_texts.py tests/test_wiring.py \
              tests/test_reports.py tests/test_dcpay.py \
              tests/test_clients.py tests/test_escape.py tests/test_top.py \
              tests/test_links.py tests/test_promo.py \
-             tests/test_packs.py \
+             tests/test_packs.py tests/test_rates.py \
              tests/test_flow.py; do
     echo ""
     echo "═══ $suite ═══"

@@ -185,6 +185,15 @@ def prices_kb() -> InlineKeyboardMarkup:
         text=f"⭐️ Наборы звёзд ({len(runtime.star_packs())})",
         callback_data="pn:set:star_packs",
     ))
+    kb.row(btn("💱 Обновить курс сейчас", "pn:rate", style=PRIMARY))
+    kb.row(
+        InlineKeyboardButton(
+            text=("🔄 Курс: авто" if runtime.get_bool("usd_auto") else "✋ Курс: вручную"),
+            callback_data="pn:rate_auto",
+        ),
+        InlineKeyboardButton(text="➕ Надбавка к курсу",
+                             callback_data="pn:set:usd_rate_spread"),
+    )
     for plan in runtime.premium_plans():
         kb.row(InlineKeyboardButton(
             text=f"👑 Premium {plan['months']} мес — {fmt(plan['price'])}",
@@ -243,10 +252,74 @@ def prices_text() -> str:
         + f"📏 Заказ: от <b>{runtime.min_stars()}</b> до <b>{runtime.max_stars()}</b> звёзд\n"
         f"💵 Мин. пополнение: <b>{fmt(runtime.min_deposit())}</b>\n"
         f"👥 Реферальный процент: <b>{runtime.referral_percent()}%</b>\n"
-        + (f"💱 Курс доллара: <b>{fmt(runtime.usd_rate())}</b>"
-           if runtime.usd_rate() > 0 else
-           "💱 Курс доллара не задан — бот не сможет сам узнать себестоимость")
+        + rate_line()
     )
+
+
+def rate_line() -> str:
+    """Курс доллара: сколько, откуда и когда."""
+    if runtime.usd_rate() <= 0:
+        return "💱 Курс доллара не задан — бот не сможет сам узнать себестоимость"
+
+    line = f"💱 Курс доллара: <b>{fmt(runtime.usd_rate())}</b>"
+    spread = runtime.get_int("usd_rate_spread")
+    if spread:
+        line += f" (с надбавкой {spread}%)"
+    source, when = runtime.get("usd_rate_source"), runtime.get("usd_rate_at")
+    if source and when:
+        line += f"\n└ {source}, обновлён {when[:16].replace('T', ' ')} UTC"
+    elif runtime.get_bool("usd_auto"):
+        line += "\n└ автообновление включено, но курс ещё не приходил"
+    return line
+
+
+@router.callback_query(F.data == "pn:rate")
+async def cb_rate(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    """Спросить курс у бесплатных источников прямо сейчас."""
+    await safe_edit(call, "💱 Спрашиваю курс…", back_kb("pn:prices", "‹ К ценам"))
+    await call.answer()
+
+    old = runtime.usd_rate()
+    try:
+        rate = await pricing.refresh_rate(conn)
+    except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
+        log.info("Курс не пришёл: %s", exc)
+        await safe_edit(
+            call,
+            "💱 <b>Курс не пришёл</b>\n\n"
+            f"<blockquote expandable>{exc}</blockquote>\n\n"
+            "Задайте курс вручную — бот продолжит работать по нему.",
+            back_kb("pn:set:usd_rate_diram", "💱 Задать вручную"),
+        )
+        return
+
+    spread = runtime.get_int("usd_rate_spread")
+    change = ""
+    if old > 0 and old != rate.diram:
+        arrow = "📈" if rate.diram > old else "📉"
+        change = f"\n\n{arrow} Было <b>{fmt(old)}</b> → стало <b>{fmt(rate.diram)}</b>"
+
+    await safe_edit(
+        call,
+        "💱 <b>Курс обновлён</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"├ Источник: <b>{rate.source}</b>\n"
+        f"├ Биржевой курс: <b>{rate.value}</b> сомони за доллар\n"
+        + (f"├ Надбавка: <b>{spread}%</b>\n" if spread else "")
+        + f"└ В работе: <b>{fmt(rate.diram)}</b> за доллар"
+        + change
+        + "\n\n<blockquote>Проверьте по обменнику. Если ваш доллар дороже — "
+          "поставьте надбавку к курсу.</blockquote>",
+        back_kb("pn:prices", "‹ К ценам"),
+    )
+
+
+@router.callback_query(F.data == "pn:rate_auto")
+async def cb_rate_auto(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    on = runtime.get_bool("usd_auto")
+    await runtime.set_value(conn, "usd_auto", "0" if on else "1")
+    await call.answer("Курс вручную" if on else "Курс будет обновляться сам")
+    await safe_edit(call, prices_text(), prices_kb())
 
 
 @router.callback_query(F.data == "pn:prices")
@@ -388,6 +461,12 @@ FIELDS: dict[str, tuple[str, str, str]] = {
                          "Например <code>0.1629</code>:", "price4"),
     "usd_rate_diram": ("💱 Курс доллара",
                        "Сколько сомони стоит 1 доллар. Например <code>10.90</code>:", "money"),
+    "usd_rate_spread": ("➕ Надбавка к курсу",
+                        "На сколько процентов курс в обменнике выше биржевого.\n"
+                        "Источники дают биржевой курс, а доллары вы покупаете "
+                        "дороже — эта надбавка выравнивает разницу.\n"
+                        "Например <code>3</code>. Не уверены — оставьте 0:",
+                        "percent"),
     "margin_percent": ("📈 Наценка",
                        "Процент наценки к себестоимости. Например <code>30</code>:", "percent"),
     "star_packs": ("⭐️ Наборы звёзд",
@@ -419,7 +498,7 @@ FIELD_PARENT.update({
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "star_packs": "pn:prices",
-    "usd_rate_diram": "pn:prices",
+    "usd_rate_diram": "pn:prices", "usd_rate_spread": "pn:prices",
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
     "referral_percent": "pn:prices", "support_notice": "pn:home",
     "autostop_after": "pn:wallet",

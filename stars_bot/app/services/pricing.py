@@ -16,6 +16,7 @@ from aiogram import Bot
 
 from app import db, runtime
 from app.money import fmt, fmt4
+from app.services import rates
 
 log = logging.getLogger(__name__)
 
@@ -23,10 +24,36 @@ log = logging.getLogger(__name__)
 ALERT_PERCENT = 20
 
 
+async def refresh_rate(conn: aiosqlite.Connection) -> rates.Rate:
+    """Забрать свежий курс доллара и сохранить его.
+
+    Резкий скачок не проглатываем молча: курс задаёт все цены сразу, и
+    ошибка источника уехала бы в магазин без единого следа.
+    """
+    from datetime import datetime, timezone
+
+    rate = await rates.fetch(runtime.get_int("usd_rate_spread"))
+    old = runtime.usd_rate()
+    await runtime.set_value(conn, "usd_rate_diram", str(rate.diram))
+    await runtime.set_value(conn, "usd_rate_source", rate.source)
+    await runtime.set_value(
+        conn, "usd_rate_at",
+        datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    )
+    if old > 0 and abs(rate.diram - old) * 100 / old >= ALERT_PERCENT:
+        log.warning("Курс скакнул: %s -> %s (%s)", fmt(old), fmt(rate.diram), rate.source)
+    return rate
+
+
 async def refresh_once(
     conn: aiosqlite.Connection, provider, bot: Bot | None = None
 ) -> dict:
     """Обновить себестоимость и продажные цены. Возвращает отчёт."""
+    if runtime.get_bool("usd_auto"):
+        try:
+            await refresh_rate(conn)
+        except Exception as exc:  # noqa: BLE001 — без курса просто идём дальше
+            log.info("Курс не обновился: %s", exc)
     estimate_fn = getattr(provider, "cost_estimate", None)
     if estimate_fn is None:
         return {"ok": False, "reason": "сервис выдачи не отдаёт цены"}
