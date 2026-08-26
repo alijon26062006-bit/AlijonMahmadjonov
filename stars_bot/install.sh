@@ -15,6 +15,7 @@ BRANCH="${BRANCH:-claude/telegram-stars-sales-bot-caqst0}"
 DIR="${DIR:-/opt/stars-bot}"
 SERVICE="${SERVICE:-stars-bot}"
 RUN_USER="${RUN_USER:-starsbot}"
+RAW_INSTALLER="${RAW_INSTALLER:-https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/telegram-stars-sales-bot-caqst0/stars_bot/install.sh}"
 
 # Ввод читаем из терминала, а не из stdin: скрипт мог прийти по конвейеру
 # из curl, и тогда stdin занят самим скриптом. Если терминала нет
@@ -144,6 +145,66 @@ RestrictSUIDSGID=true
 WantedBy=multi-user.target
 UNIT
 
+# Короткая команда управления, чтобы не помнить длинные пути.
+$SUDO tee /usr/local/bin/stars-bot >/dev/null <<HELPER
+#!/usr/bin/env bash
+# Управление ботом. Создан установщиком, правится там же.
+set -euo pipefail
+APP="$APP"
+SERVICE="$SERVICE"
+RUN_USER="$RUN_USER"
+INSTALLER="\$APP/install.sh"
+RAW_URL="$RAW_INSTALLER"
+
+case "\${1:-help}" in
+    update)
+        echo "Обновляю бота…"
+        # Берём установщик из репозитория: он мог измениться вместе с ботом,
+        # а локальная копия — это версия с прошлого обновления.
+        FRESH=\$(mktemp)
+        if curl -sSL "\$RAW_URL" -o "\$FRESH" 2>/dev/null && [ -s "\$FRESH" ]; then
+            exec bash "\$FRESH"
+        fi
+        echo "Не скачался свежий установщик, беру локальный."
+        rm -f "\$FRESH"
+        exec bash "\$INSTALLER"
+        ;;
+    restart) systemctl restart "\$SERVICE" && echo "✅ Перезапущен" ;;
+    stop)    systemctl stop "\$SERVICE"    && echo "⏹  Остановлен"  ;;
+    start)   systemctl start "\$SERVICE"   && echo "▶️  Запущен"     ;;
+    status)  systemctl status "\$SERVICE" --no-pager ;;
+    logs)    journalctl -u "\$SERVICE" -f ;;
+    errors)  journalctl -u "\$SERVICE" -p err -n 50 --no-pager ;;
+    setup)
+        sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py"
+        systemctl restart "\$SERVICE" && echo "✅ Настройки применены"
+        ;;
+    backup)
+        DEST="/root/stars-bot-backup-\$(date +%Y%m%d-%H%M%S).sqlite3"
+        cp "\$APP/data/bot.sqlite3" "\$DEST"
+        echo "✅ Копия базы: \$DEST"
+        ;;
+    *)
+        cat <<TXT
+Управление ботом:
+
+  stars-bot update    обновить код и перезапустить
+  stars-bot restart   перезапустить
+  stars-bot stop      остановить
+  stars-bot start     запустить
+  stars-bot status    работает ли
+  stars-bot logs      смотреть логи живьём (Ctrl+C — выйти)
+  stars-bot errors    последние ошибки
+  stars-bot setup     изменить настройки и перезапустить
+  stars-bot backup    сохранить копию базы
+
+Все команды запускать через sudo.
+TXT
+        ;;
+esac
+HELPER
+$SUDO chmod +x /usr/local/bin/stars-bot
+
 $SUDO systemctl daemon-reload
 $SUDO systemctl enable --quiet "$SERVICE"
 $SUDO systemctl restart "$SERVICE"
@@ -164,17 +225,16 @@ if $SUDO systemctl is-active --quiet "$SERVICE"; then
     printf "\033[1;32m═══════════════════════════════════════════\033[0m\n\n"
     echo "  Откройте своего бота в Telegram и нажмите /start"
     echo ""
-    echo "  Команды:"
-    echo "    sudo systemctl status $SERVICE      — как дела"
-    echo "    sudo journalctl -u $SERVICE -f      — смотреть логи живьём"
-    echo "    sudo systemctl restart $SERVICE     — перезапустить"
-    echo "    sudo systemctl stop $SERVICE        — остановить"
+    echo "  Управление — команда stars-bot:"
     echo ""
-    echo "  Поменять настройки (цены, карту, ключ Fragment):"
-    echo "    sudo -u $RUN_USER $APP/.venv/bin/python $APP/setup.py"
-    echo "    sudo systemctl restart $SERVICE"
+    echo "    sudo stars-bot update     обновить и перезапустить"
+    echo "    sudo stars-bot logs       смотреть логи живьём"
+    echo "    sudo stars-bot status     работает ли"
+    echo "    sudo stars-bot restart    перезапустить"
+    echo "    sudo stars-bot setup      изменить настройки"
+    echo "    sudo stars-bot backup     копия базы"
     echo ""
-    echo "  Обновить бота — просто запустите эту же команду ещё раз."
+    echo "  Цены, реквизиты и рассылка — прямо в боте: /panel"
     echo ""
 else
     printf "\n\033[1;31m❌ Бот не запустился. Последние строки лога:\033[0m\n\n"

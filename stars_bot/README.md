@@ -41,16 +41,24 @@ bash <(curl -sSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahm
 автозапуск через systemd и проверит, что бот поднялся. Работает на
 Ubuntu / Debian / CentOS с systemd.
 
-**Обновление** — та же самая команда. Код обновится, `.env` и база останутся.
-
-После установки:
+После установки появляется команда **`stars-bot`**:
 
 | Команда | Что делает |
 |---|---|
-| `sudo systemctl status stars-bot` | работает ли бот |
-| `sudo journalctl -u stars-bot -f` | смотреть логи живьём |
-| `sudo systemctl restart stars-bot` | перезапустить |
-| `sudo -u starsbot /opt/stars-bot/stars_bot/.venv/bin/python /opt/stars-bot/stars_bot/setup.py` | поменять цены, карту, ключ Fragment |
+| `sudo stars-bot update` | **обновить код и перезапустить** |
+| `sudo stars-bot logs` | смотреть логи живьём (Ctrl+C — выйти) |
+| `sudo stars-bot status` | работает ли бот |
+| `sudo stars-bot restart` | перезапустить |
+| `sudo stars-bot errors` | последние ошибки |
+| `sudo stars-bot setup` | изменить токен или ключ Fragment |
+| `sudo stars-bot backup` | сохранить копию базы |
+
+Цены, реквизиты, рассылка и промокоды меняются прямо в боте через `/panel` —
+на сервер для этого заходить не нужно.
+
+`update` скачивает свежий установщик из репозитория, поэтому обновление
+применяется целиком, даже если изменился сам установщик. `.env` и база с
+заказами при обновлении не трогаются.
 
 Бот работает от отдельного пользователя `starsbot`, а не от root, и systemd
 ограничивает ему доступ к файловой системе — писать он может только в свою
