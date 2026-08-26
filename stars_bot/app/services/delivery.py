@@ -21,7 +21,7 @@ import aiosqlite
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 
-from app import db, keyboards, texts
+from app import db, keyboards, runtime, texts
 from app.config import settings
 from app.money import fmt
 from app.services.fragment import DeliveryError, DeliveryProvider, DeliveryUncertain
@@ -86,8 +86,9 @@ async def _run_delivery(
             result = await provider.deliver_premium(order.recipient, order.quantity)
 
     except DeliveryError as exc:
-        # Fragment ответил отказом — выдачи точно не было, возвращаем деньги.
+        # Шлюз ответил отказом — выдачи точно не было, возвращаем деньги.
         await _refund(bot, conn, order, str(exc))
+        await _watch_failures(bot, conn, str(exc))
 
     except DeliveryUncertain as exc:
         # Ответа нет. Деньги придерживаем, зовём админа разобраться вручную.
@@ -122,6 +123,7 @@ async def _run_delivery(
             conn, order.id, expected=db.ORDER_DELIVERING, new=db.ORDER_DELIVERED,
             fragment_order_id=result.order_id, error=None,
         )
+        await runtime.note_delivery_ok(conn, order.product_type, order.quantity)
         await notify(
             bot, order.user_id,
             texts.DELIVERED.format(
@@ -213,3 +215,31 @@ async def manual_complete(bot: Bot, conn: aiosqlite.Connection, order: db.Order)
         ),
     )
     return True
+
+
+async def _watch_failures(bot: Bot, conn: aiosqlite.Connection, reason: str) -> None:
+    """Считать неудачи подряд и гасить продажу, если выдача сломалась.
+
+    Без этого при пустом кошельке бот продолжал бы принимать заказы: клиенты
+    платили бы и получали возврат, а владелец узнавал бы об этом от них.
+    """
+    streak = await runtime.note_delivery_fail(conn)
+    limit = runtime.autostop_after()
+    if streak < limit:
+        return
+
+    already_off = runtime.get_bool("autostopped")
+    await runtime.autostop(conn)
+    if already_off:
+        return  # не повторяем тревогу на каждый следующий заказ
+
+    await notify_admins(
+        bot,
+        "🛑 <b>Продажа выключена автоматически</b>\n\n"
+        f"Подряд не прошло заказов: <b>{streak}</b>.\n"
+        "Скорее всего кончились деньги на кошельке Fragment "
+        "или сломался шлюз.\n\n"
+        f"Последняя ошибка:\n<code>{reason[:300]}</code>\n\n"
+        "Деньги клиентам возвращены. Пополните кошелёк и отметьте это "
+        "в /panel → 💼 Кошелёк — продажа включится обратно.",
+    )

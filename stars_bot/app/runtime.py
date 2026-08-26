@@ -57,6 +57,13 @@ def _build_defaults() -> dict[str, str]:
         "pay_extra": settings.pay_extra,
         # тексты
         "support_notice": "",
+        # кошелёк и присмотр за выдачей
+        "topup_at": "",                  # когда последний раз пополняли
+        "stars_since_topup": "0",        # выдано звёзд с тех пор
+        "premium_since_topup": "0",      # выдано месяцев Premium
+        "fail_streak": "0",              # подряд неудавшихся выдач
+        "autostop_after": "3",           # после скольких подряд гасить продажу
+        "autostopped": "0",              # продажу выключил сам бот
         # доступность
         "stars_enabled": "1",
         "premium_enabled": "1",
@@ -183,3 +190,47 @@ def min_deposit() -> int:
 
 def referral_percent() -> int:
     return get_int("referral_percent", settings.referral_percent)
+
+
+# --------------------------------------------------- присмотр за кошельком
+
+
+def autostop_after() -> int:
+    return max(get_int("autostop_after", 3), 1)
+
+
+async def note_delivery_ok(
+    conn: aiosqlite.Connection, product_type: str, quantity: int
+) -> None:
+    """Учесть удачную выдачу: обнулить серию неудач и записать расход."""
+    if get_int("fail_streak"):
+        await set_value(conn, "fail_streak", "0")
+    key = "stars_since_topup" if product_type == "stars" else "premium_since_topup"
+    await set_value(conn, key, str(get_int(key) + quantity))
+
+
+async def note_delivery_fail(conn: aiosqlite.Connection) -> int:
+    """Учесть неудачу. Возвращает длину серии подряд идущих неудач."""
+    streak = get_int("fail_streak") + 1
+    await set_value(conn, "fail_streak", str(streak))
+    return streak
+
+
+async def autostop(conn: aiosqlite.Connection) -> None:
+    """Погасить продажу: дальше клиенты платили бы и получали возврат."""
+    await set_value(conn, "stars_enabled", "0")
+    await set_value(conn, "premium_enabled", "0")
+    await set_value(conn, "autostopped", "1")
+    log.error("Продажа выключена автоматически: выдача не проходит подряд")
+
+
+async def mark_topup(conn: aiosqlite.Connection, when: str) -> None:
+    """Отметить пополнение кошелька и обнулить счётчики расхода."""
+    await set_value(conn, "topup_at", when)
+    await set_value(conn, "stars_since_topup", "0")
+    await set_value(conn, "premium_since_topup", "0")
+    await set_value(conn, "fail_streak", "0")
+    if get_bool("autostopped"):
+        await set_value(conn, "stars_enabled", "1")
+        await set_value(conn, "premium_enabled", "1")
+        await set_value(conn, "autostopped", "0")

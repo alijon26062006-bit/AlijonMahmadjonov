@@ -63,7 +63,10 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📊 Статистика", callback_data="pn:stats"),
         InlineKeyboardButton(text="🔀 Разделы", callback_data="pn:toggles"),
     )
-    kb.row(InlineKeyboardButton(text="🔌 Проверить Fragment", callback_data="pn:fragment"))
+    kb.row(
+        InlineKeyboardButton(text="💼 Кошелёк", callback_data="pn:wallet"),
+        InlineKeyboardButton(text="🔌 Проверить связь", callback_data="pn:fragment"),
+    )
     kb.row(InlineKeyboardButton(text="📝 Объявление в поддержке", callback_data="pn:notice"))
     kb.row(InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"))
     return kb.as_markup()
@@ -86,6 +89,15 @@ async def home_text(conn: aiosqlite.Connection) -> str:
         alerts.append(f"⚠️ Заказов зависло: <b>{data['failed_orders']}</b>")
     if not runtime.get("pay_card_number"):
         alerts.append("❗️ <b>Не заданы реквизиты</b> — деньги принять нельзя")
+    if runtime.get_bool("autostopped"):
+        alerts.append(
+            "🛑 <b>Продажа выключена ботом</b> — выдача не проходит. "
+            "Проверьте кошелёк."
+        )
+    elif runtime.get_int("fail_streak"):
+        alerts.append(
+            f"⚠️ Подряд не прошло заказов: <b>{runtime.get_int('fail_streak')}</b>"
+        )
 
     block = ("\n".join(alerts) + "\n\n") if alerts else ""
     return (
@@ -330,6 +342,9 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "referral_percent": ("👥 Реферальный процент",
                          "Сколько процентов получает пригласивший "
                          "с каждого пополнения:", "percent"),
+    "autostop_after": ("🔢 Порог автостопа",
+                       "После скольких неудачных заказов подряд бот гасит "
+                       "продажу. Обычно 3:", "int"),
     "support_notice": ("📝 Объявление в поддержке",
                        "Текст, который увидят клиенты в разделе «Поддержка» "
                        "(или <code>-</code>, чтобы убрать):", "text"),
@@ -345,6 +360,7 @@ FIELD_PARENT.update({
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
     "referral_percent": "pn:prices", "support_notice": "pn:home",
+    "autostop_after": "pn:wallet",
 })
 
 
@@ -706,3 +722,58 @@ async def cb_fragment(call: CallbackQuery, provider) -> None:
         "🔌 <b>Проверка Fragment</b>\n\n" + "\n".join(lines) + "\n\n" + verdict,
         back_kb(),
     )
+
+
+# ============================================================== кошелёк
+
+
+def wallet_text() -> str:
+    stars = runtime.get_int("stars_since_topup")
+    months = runtime.get_int("premium_since_topup")
+    topup = runtime.get("topup_at") or "не отмечалось"
+    cost = runtime.star_cost()
+
+    spent = f"~{fmt(stars * cost)}" if cost > 0 else "неизвестно (не задана себестоимость)"
+    status = (
+        "🛑 <b>Продажа выключена ботом</b> — выдача не проходила подряд."
+        if runtime.get_bool("autostopped")
+        else f"✅ Продажа работает. Неудач подряд: <b>{runtime.get_int('fail_streak')}</b>."
+    )
+
+    return (
+        "💼 <b>Кошелёк Fragment</b>\n\n"
+        f"{status}\n\n"
+        f"📅 Последнее пополнение: <b>{topup}</b>\n\n"
+        "<b>Выдано с тех пор:</b>\n"
+        f"├ Звёзд: <b>{stars}</b> (себестоимость {spent})\n"
+        f"└ Premium: <b>{months} мес.</b>\n\n"
+        f"🛑 Бот гасит продажу после <b>{runtime.autostop_after()}</b> неудач подряд — "
+        "чтобы клиенты не платили в пустоту, пока вас нет.\n\n"
+        "💡 Пополнили кошелёк — нажмите кнопку ниже: счётчики обнулятся, "
+        "продажа включится обратно."
+    )
+
+
+def wallet_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text="✅ Я пополнил кошелёк", callback_data="pn:topup"))
+    kb.row(InlineKeyboardButton(text="🔢 Порог автостопа", callback_data="pn:set:autostop_after"))
+    kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
+    return kb.as_markup()
+
+
+@router.callback_query(F.data == "pn:wallet")
+async def cb_wallet(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await safe_edit(call, wallet_text(), wallet_kb())
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:topup")
+async def cb_topup(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    was_stopped = runtime.get_bool("autostopped")
+    # Дату берём из сообщения Telegram, а не из системных часов сервера:
+    # так она совпадает с тем, что видит владелец в переписке.
+    await runtime.mark_topup(conn, call.message.date.strftime("%d.%m.%Y %H:%M UTC"))
+    await call.answer("Счётчики обнулены" + (", продажа включена" if was_stopped else ""))
+    await safe_edit(call, wallet_text(), wallet_kb())

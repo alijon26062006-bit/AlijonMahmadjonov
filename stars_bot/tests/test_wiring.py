@@ -36,7 +36,7 @@ def declared_callbacks() -> set[str]:
         keyboards.admin_deposit(1), keyboards.admin_retry(1),
         # админ-панель
         panel.home_kb(), panel.prices_kb(), panel.pay_kb(), panel.toggles_kb(),
-        panel.back_kb(), broadcast.audience_kb(), broadcast.compose_kb(),
+        panel.back_kb(), panel.wallet_kb(), broadcast.audience_kb(), broadcast.compose_kb(),
         broadcast.buttons_kb(True), broadcast.buttons_kb(False),
     ]
     for markup in markups:
