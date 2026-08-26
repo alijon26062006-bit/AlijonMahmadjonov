@@ -31,7 +31,34 @@ Float для денег не используется нигде.
 `failed`, деньги придерживаются, а админу приходит уведомление с двумя
 командами: `/done <id>` (заказ дошёл) или `/refund <id>` (не дошёл).
 
-## Запуск
+## Установка на сервер — одна команда
+
+```bash
+bash <(curl -sSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/telegram-stars-sales-bot-caqst0/stars_bot/install.sh)
+```
+
+Скрипт поставит зависимости, скачает бота, спросит настройки, заведёт
+автозапуск через systemd и проверит, что бот поднялся. Работает на
+Ubuntu / Debian / CentOS с systemd.
+
+**Обновление** — та же самая команда. Код обновится, `.env` и база останутся.
+
+После установки:
+
+| Команда | Что делает |
+|---|---|
+| `sudo systemctl status stars-bot` | работает ли бот |
+| `sudo journalctl -u stars-bot -f` | смотреть логи живьём |
+| `sudo systemctl restart stars-bot` | перезапустить |
+| `sudo -u starsbot /opt/stars-bot/stars_bot/.venv/bin/python /opt/stars-bot/stars_bot/setup.py` | поменять цены, карту, ключ Fragment |
+
+Бот работает от отдельного пользователя `starsbot`, а не от root, и systemd
+ограничивает ему доступ к файловой системе — писать он может только в свою
+папку с базой.
+
+Пути меняются переменными: `DIR=/srv/bot bash install.sh`.
+
+## Запуск на своём компьютере
 
 **Windows** — двойной клик по `start.bat`.
 **Linux / macOS** — `bash start.sh`.

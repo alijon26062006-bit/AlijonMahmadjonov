@@ -16,11 +16,35 @@ EXAMPLE = BASE / ".env.example"
 TOKEN_RE = re.compile(r"^\d{6,}:[A-Za-z0-9_-]{30,}$")
 
 
+def _open_input():
+    """Ввод с терминала. Если stdin занят (скрипт пришёл по конвейеру
+    из curl), читаем напрямую из /dev/tty."""
+    if sys.stdin is not None and sys.stdin.isatty():
+        return None
+    try:
+        return open("/dev/tty", encoding="utf-8")
+    except OSError:
+        return None
+
+
+_TTY = _open_input()
+
+
+def _read(prompt: str) -> str:
+    if _TTY is None:
+        return input(prompt)
+    print(prompt, end="", flush=True)
+    line = _TTY.readline()
+    if not line:
+        raise EOFError
+    return line
+
+
 def ask(prompt: str, *, current: str = "", validate=None, allow_empty: bool = False) -> str:
     """Спросить значение. Enter — оставить текущее."""
     while True:
         hint = f" [{current}]" if current else ""
-        answer = input(f"{prompt}{hint}: ").strip()
+        answer = _read(f"{prompt}{hint}: ").strip()
         if not answer:
             if current:
                 return current
