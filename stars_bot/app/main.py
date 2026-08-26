@@ -17,6 +17,7 @@ from app.handlers import (
     admin, broadcast, deposit, menu, panel, profile, shop, support,
 )
 from app.middlewares.emoji_guard import CustomEmojiGuard
+from app.middlewares.escape import CommandEscapeMiddleware
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.billing import make_sender
 from app.services.fragment import build_provider
@@ -108,6 +109,9 @@ async def main() -> None:
     provider = build_provider(payer)
 
     dp = Dispatcher(conn=conn, provider=provider)
+    # Внешняя мидлварь — до фильтров: команда должна пробиваться
+    # сквозь любой незакрытый шаг диалога.
+    dp.message.outer_middleware(CommandEscapeMiddleware())
     dp.message.middleware(UserGuardMiddleware())
     dp.callback_query.middleware(UserGuardMiddleware())
 

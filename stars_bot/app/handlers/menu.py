@@ -35,6 +35,12 @@ async def cmd_start(message: Message, state: FSMContext, conn: aiosqlite.Connect
     await render_menu(message, conn)
 
 
+@router.message(Command("cancel"))
+async def cmd_cancel(message: Message, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    await state.clear()
+    await render_menu(message, conn)
+
+
 @router.message(Command("menu"))
 async def cmd_menu(message: Message, state: FSMContext, conn: aiosqlite.Connection) -> None:
     await state.clear()
