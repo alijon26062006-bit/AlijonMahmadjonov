@@ -128,18 +128,60 @@ def read_existing() -> dict[str, str]:
 def write_env(values: dict[str, str]) -> None:
     """Пишем поверх .env.example, сохраняя комментарии."""
     lines = []
+    written = set()
     for line in EXAMPLE.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if stripped and not stripped.startswith("#") and "=" in stripped:
             key = stripped.split("=", 1)[0].strip()
             if key in values:
                 lines.append(f"{key}={values[key]}")
+                written.add(key)
                 continue
         lines.append(line)
+
+    # Ключи, которых нет в шаблоне, дописываем в конец — иначе они
+    # молча потерялись бы при следующей записи.
+    extra = [key for key in values if key not in written]
+    if extra:
+        lines.append("")
+        for key in extra:
+            lines.append(f"{key}={values[key]}")
     ENV.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def apply_values(pairs: list[str]) -> None:
+    """Неинтерактивная правка .env: setup.py --set КЛЮЧ=значение ...
+
+    Нужна, чтобы настройку можно было сделать одной командой, без диалога.
+    """
+    values = read_existing()
+    changed = []
+    for pair in pairs:
+        if "=" not in pair:
+            print(f"❌ Непонятный аргумент: {pair}. Нужно КЛЮЧ=значение.")
+            sys.exit(1)
+        key, _, value = pair.partition("=")
+        key = key.strip().upper()
+        values[key] = value.strip()
+        changed.append(key)
+
+    problem = check_base_url(values["MYSTARS_BASE_URL"]) if values.get("MYSTARS_BASE_URL") else None
+    if problem:
+        print(f"❌ MYSTARS_BASE_URL: {problem}")
+        sys.exit(1)
+
+    write_env(values)
+    print(f"✅ Записано в {ENV}: " + ", ".join(changed))
+
+
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "--set":
+        if not EXAMPLE.exists():
+            print("❌ Запускайте из папки stars_bot.")
+            sys.exit(1)
+        apply_values(sys.argv[2:])
+        return
+
     if not EXAMPLE.exists():
         print("❌ Не найден .env.example — запускайте скрипт из папки stars_bot.")
         sys.exit(1)

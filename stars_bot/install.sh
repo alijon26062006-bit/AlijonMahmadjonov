@@ -179,6 +179,35 @@ case "\${1:-help}" in
         sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py"
         systemctl restart "\$SERVICE" && echo "✅ Настройки применены"
         ;;
+    mystars)
+        if [ -z "\${2:-}" ]; then
+            echo "Использование: stars-bot mystars ВАШ_КЛЮЧ"
+            echo "Ключ берётся в @my_stars_tg_bot -> API access"
+            exit 1
+        fi
+        sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set \
+            FRAGMENT_MODE=mystars \
+            MYSTARS_API_KEY="\$2" \
+            MYSTARS_BASE_URL=https://api.mystars.tg/v1 \
+            MYSTARS_CURRENCY="\${3:-ton}"
+        systemctl restart "\$SERVICE"
+        echo "✅ MyStars подключён, бот перезапущен"
+        echo "   Проверьте: /panel -> Проверить связь"
+        ;;
+    apifragment)
+        if [ -z "\${2:-}" ]; then
+            echo "Использование: stars-bot apifragment ВАШ_ТОКЕН"
+            exit 1
+        fi
+        sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set \
+            FRAGMENT_MODE=api FRAGMENT_API_KEY="\$2"
+        systemctl restart "\$SERVICE"
+        echo "✅ ApiFragment подключён (сид-фразу задайте через stars-bot setup)"
+        ;;
+    mock)
+        sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set FRAGMENT_MODE=mock
+        systemctl restart "\$SERVICE" && echo "✅ Режим проверки: звёзды не отправляются"
+        ;;
     backup)
         DEST="/root/stars-bot-backup-\$(date +%Y%m%d-%H%M%S).sqlite3"
         cp "\$APP/data/bot.sqlite3" "\$DEST"
@@ -197,6 +226,11 @@ case "\${1:-help}" in
   stars-bot errors    последние ошибки
   stars-bot setup     изменить настройки и перезапустить
   stars-bot backup    сохранить копию базы
+
+Подключение выдачи одной командой:
+  stars-bot mystars КЛЮЧ       выдача через MyStars (ключ из @my_stars_tg_bot)
+  stars-bot apifragment ТОКЕН  выдача через apifragment.online
+  stars-bot mock               режим проверки, звёзды не отправляются
 
 Все команды запускать через sudo.
 TXT
