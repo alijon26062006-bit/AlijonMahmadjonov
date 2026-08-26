@@ -5,7 +5,8 @@ cd "$(dirname "$0")/.."
 PY="${PY:-.venv/bin/python}"
 status=0
 for suite in tests/test_money.py tests/test_texts.py tests/test_wiring.py \
-             tests/test_panel.py tests/test_recipient.py tests/test_flow.py; do
+             tests/test_panel.py tests/test_recipient.py \
+             tests/test_apifrag.py tests/test_flow.py; do
     echo ""
     echo "═══ $suite ═══"
     "$PY" "$suite" || status=1

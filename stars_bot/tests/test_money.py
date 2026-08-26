@@ -42,7 +42,7 @@ class OkProvider(DeliveryProvider):
         return DeliveryResult(order_id="ok-2", raw={})
 
     async def resolve_recipient(self, username):
-        return Recipient(username=username, name=f"{username} Test")
+        return Recipient(username=username, name=f"{username} Test", verified=True)
 
 
 class RejectProvider(DeliveryProvider):

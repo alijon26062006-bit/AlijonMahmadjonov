@@ -73,6 +73,15 @@ def check_id(value: str) -> str | None:
     return None
 
 
+def check_seed(value: str) -> str | None:
+    words = value.split()
+    if len(words) != 24:
+        return f"Нужно ровно 24 слова, а получено {len(words)}."
+    if not all(word.isalpha() for word in words):
+        return "Сид-фраза состоит только из слов латиницей, без цифр и знаков."
+    return None
+
+
 def check_price(value: str) -> str | None:
     try:
         if float(value.replace(",", ".")) <= 0:
@@ -148,21 +157,39 @@ def main() -> None:
                   current=shown_min, validate=check_price)
     new["MIN_DEPOSIT_DIRAM"] = str(to_diram(minimum))
 
-    print("\n── Fragment ──")
+    print("\n── Выдача звёзд (ApiFragment) ──")
     print("mock — бот работает, но звёзды не отправляет (для проверки).")
-    print("api  — реальная выдача. Нужны ключ, телефон и мнемоника кошелька.")
+    print("api  — реальная выдача через apifragment.online.")
     mode = ask("Режим (mock/api)", current=old.get("FRAGMENT_MODE", "") or "mock",
                validate=lambda v: None if v in ("mock", "api") else "Только mock или api")
     new["FRAGMENT_MODE"] = mode
 
     if mode == "api":
-        print("\n⚠️  Мнемонику из 24 слов никому не пересылайте — это доступ")
-        print("    ко всем деньгам на кошельке.")
-        new["FRAGMENT_API_KEY"] = ask("API-ключ Fragment", current=old.get("FRAGMENT_API_KEY", ""))
-        new["FRAGMENT_PHONE_NUMBER"] = ask("Телефон аккаунта Fragment",
-                                           current=old.get("FRAGMENT_PHONE_NUMBER", ""))
-        new["FRAGMENT_MNEMONICS"] = ask("24 слова через пробел",
-                                        current=old.get("FRAGMENT_MNEMONICS", ""))
+        print()
+        print("  " + "!" * 54)
+        print("  ВАЖНО ПРО СИД-ФРАЗУ")
+        print()
+        print("  Сервис требует 24 слова вашего TON-кошелька и хранит их")
+        print("  у себя, чтобы входить на Fragment от вашего имени.")
+        print("  Это значит: владельцы сервиса технически могут вывести")
+        print("  все деньги с этого кошелька в любой момент.")
+        print()
+        print("  Заведите ОТДЕЛЬНЫЙ кошелёк только для бота и держите на нём")
+        print("  оборотную сумму на пару дней, а не все сбережения.")
+        print("  " + "!" * 54)
+        print()
+        new["FRAGMENT_API_KEY"] = ask("API-токен ApiFragment",
+                                      current=old.get("FRAGMENT_API_KEY", ""))
+        new["FRAGMENT_WALLET_SEED"] = ask(
+            "Сид-фраза кошелька (24 слова через пробел)",
+            current=old.get("FRAGMENT_WALLET_SEED", ""),
+            validate=check_seed,
+        )
+        new["FRAGMENT_PAYMENT_METHOD"] = ask(
+            "Чем платить на Fragment (ton / usdt_ton)",
+            current=old.get("FRAGMENT_PAYMENT_METHOD", "") or "ton",
+            validate=lambda v: None if v in ("ton", "usdt_ton") else "Только ton или usdt_ton",
+        )
 
     print("\n── Необязательное ──")
     new["SUPPORT_USERNAME"] = ask("Юзернейм поддержки без @",

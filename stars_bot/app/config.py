@@ -40,12 +40,16 @@ class Settings(BaseSettings):
     pay_city: str = "Душанбе"
     pay_extra: str = ""
 
-    # ---- Fragment ----
+    # ---- шлюз выдачи (apifragment.online) ----
     fragment_mode: str = "mock"
-    fragment_base_url: str = "https://api.fragment.com"
+    fragment_base_url: str = "https://apifragment.online"
     fragment_api_key: str = ""
-    fragment_phone_number: str = ""
-    fragment_mnemonics: str = ""
+    # Сид-фраза кошелька: шлюз логинится ею на Fragment и хранит сессию у себя.
+    fragment_wallet_seed: str = ""
+    fragment_payment_method: str = "ton"   # ton | usdt_ton
+    # Заказ выполняется асинхронно: ждём результат опросом задачи.
+    task_poll_interval: int = 3
+    task_poll_timeout: int = 300
 
     # ---- ссылки ----
     support_username: str = ""
@@ -72,10 +76,6 @@ class Settings(BaseSettings):
     def db_file(self) -> Path:
         path = Path(self.db_path)
         return path if path.is_absolute() else BASE_DIR / path
-
-    @property
-    def mnemonics_list(self) -> list[str]:
-        return self.fragment_mnemonics.split()
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_ids

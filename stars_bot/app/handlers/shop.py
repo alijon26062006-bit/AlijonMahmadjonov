@@ -225,15 +225,19 @@ async def _check_and_confirm(
     await state.update_data(recipient=username, recipient_name=recipient.display)
     await state.set_state(Buy.check_recipient)
 
-    await show(
-        texts.CONFIRM_RECIPIENT.format(
-            name=recipient.display,
-            username=username,
-            who=texts.RECIPIENT_IS_YOU if is_self else texts.RECIPIENT_IS_OTHER,
-            title=title_of(data["product_type"], data["quantity"]),
-        ),
-        keyboards.confirm_recipient(),
-    )
+    who = texts.RECIPIENT_IS_YOU if is_self else texts.RECIPIENT_IS_OTHER
+    title = title_of(data["product_type"], data["quantity"])
+
+    if recipient.verified:
+        text = texts.CONFIRM_RECIPIENT.format(
+            name=recipient.display, username=username, who=who, title=title,
+        )
+    else:
+        # Сервис выдачи не подтверждает имя — не делаем вид, что подтвердил.
+        text = texts.CONFIRM_RECIPIENT_UNVERIFIED.format(
+            username=username, who=who, title=title,
+        )
+    await show(text, keyboards.confirm_recipient())
 
 
 @router.callback_query(Buy.check_recipient, F.data == "order:recipient_ok")

@@ -122,7 +122,7 @@ class OkProvider(DeliveryProvider):
     async def resolve_recipient(self, username):
         if username == "notfound":
             return None
-        return Recipient(username=username, name=f"{username.capitalize()} Test")
+        return Recipient(username=username, name=f"{username.capitalize()} Test", verified=True)
 
 
 def make_state(storage: MemoryStorage, bot) -> FSMContext:

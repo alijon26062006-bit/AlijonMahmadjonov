@@ -1,13 +1,15 @@
-"""Доставка звёзд и Premium через Fragment.
+"""Выдача звёзд и Premium через шлюз ApiFragment (apifragment.online).
 
-Провайдер выбирается переменной FRAGMENT_MODE в .env:
+Особенность этого API: он асинхронный. POST /stars возвращает не «выдано»,
+а только task_id и статус accepted — «задача поставлена в очередь». Реальный
+результат узнаётся опросом GET /task/{task_id}. Поэтому успешный ответ на
+POST здесь НЕ означает доставку, и считать его доставкой нельзя: клиент
+получил бы «заказ выполнен» без звёзд.
 
-* ``mock`` — ничего не отправляет, только пишет в лог. Для разработки и тестов.
-* ``api``  — реальные запросы к Fragment.
-
-ВАЖНО: конкретные пути эндпоинтов Fragment вынесены в константы ниже. Перед
-боевым запуском сверь их со своей документацией/личным кабинетом Fragment
-и поправь при необходимости — трогать остальной код не придётся.
+Авторизация двухслойная:
+  • Bearer-токен в заголовке — на каждый запрос;
+  • один раз POST /cookies/login с сид-фразой кошелька — шлюз логинится
+    на Fragment и хранит сессию у себя.
 """
 from __future__ import annotations
 
@@ -21,28 +23,43 @@ from app.config import settings
 
 log = logging.getLogger(__name__)
 
-AUTH_PATH = "/v1/auth/authenticate/"
-STARS_PATH = "/v1/order/stars/"
-PREMIUM_PATH = "/v1/order/premium/"
-WALLET_PATH = "/v1/misc/wallet/"
-USER_PATH = "/v1/misc/user/{username}/"
+LOGIN_PATH = "/cookies/login"
+STARS_PATH = "/stars"
+PREMIUM_PATH = "/premium"
+TON_PATH = "/ton"
+TASK_PATH = "/task/{task_id}"
 
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=60)
 
+# Словари статусов задачи. Формулировки у сервиса могут отличаться, поэтому
+# распознаём широкий набор, а всё незнакомое считаем «ещё в работе» и в
+# конце — неопределённым исходом: лучше позвать админа, чем соврать клиенту.
+DONE_STATUSES = {
+    "completed", "complete", "success", "successful", "succeeded",
+    "done", "ok", "finished", "delivered", "sent", "paid",
+}
+FAILED_STATUSES = {
+    "failed", "fail", "error", "cancelled", "canceled",
+    "rejected", "declined", "expired", "insufficient_funds",
+}
+PENDING_STATUSES = {
+    "pending", "processing", "in_progress", "inprogress", "queued",
+    "accepted", "new", "running", "waiting", "created", "started",
+}
+
 
 class DeliveryError(Exception):
-    """Fragment явно отказал: не хватило баланса, нет получателя, плохой запрос.
+    """Шлюз явно отказал: нет средств, нет получателя, плохой запрос.
 
     Точно известно, что выдачи НЕ было, поэтому деньги можно вернуть сразу.
     """
 
 
 class DeliveryUncertain(Exception):
-    """Ответа нет: таймаут, обрыв сети, 5xx.
+    """Исход неизвестен: таймаут, обрыв связи, 5xx, задача так и не завершилась.
 
-    Неизвестно, прошла выдача или нет. Автовозврат тут опасен — можно вернуть
-    деньги за реально отправленные звёзды, — поэтому такой заказ уходит
-    админу на ручную проверку.
+    Автовозврат тут опасен — можно вернуть деньги за реально отправленные
+    звёзды, — поэтому такой заказ уходит админу на ручную проверку.
     """
 
 
@@ -54,13 +71,10 @@ class DeliveryResult:
 
 @dataclass
 class Recipient:
-    """Получатель, каким его видит Fragment.
-
-    name показывается покупателю на подтверждении: без него человек
-    отправляет звёзды вслепую и опечатка в юзернейме стоит ему денег.
-    """
+    """Получатель. name заполняется, только если провайдер умеет его узнать."""
     username: str
     name: str = ""
+    verified: bool = False
 
     @property
     def display(self) -> str:
@@ -68,6 +82,9 @@ class Recipient:
 
 
 class DeliveryProvider:
+    #: Умеет ли провайдер показывать имя аккаунта до оплаты.
+    supports_name_lookup: bool = False
+
     async def deliver_stars(self, username: str, amount: int) -> DeliveryResult:
         raise NotImplementedError
 
@@ -78,19 +95,22 @@ class DeliveryProvider:
         raise NotImplementedError
 
     async def resolve_recipient(self, username: str) -> Recipient | None:
-        """Найти получателя. None — Fragment такого не знает."""
         raise NotImplementedError
 
     async def healthcheck(self) -> dict:
-        """Проверка связи для админ-панели: {ok, steps, error}."""
         raise NotImplementedError
 
     async def close(self) -> None:
         return None
 
 
+# =============================================================== заглушка
+
+
 class MockProvider(DeliveryProvider):
-    """Заглушка: имитирует успешную выдачу, ничего не отправляя."""
+    """Ничего не отправляет. Для проверки бота без денег."""
+
+    supports_name_lookup = True
 
     def __init__(self) -> None:
         self._counter = 0
@@ -98,24 +118,23 @@ class MockProvider(DeliveryProvider):
     async def deliver_stars(self, username: str, amount: int) -> DeliveryResult:
         await asyncio.sleep(0.5)
         self._counter += 1
-        log.warning("MOCK: выдано %s звёзд пользователю @%s", amount, username)
+        log.warning("MOCK: «выдано» %s звёзд для @%s", amount, username)
         return DeliveryResult(order_id=f"mock-{self._counter}", raw={"mock": True})
 
     async def deliver_premium(self, username: str, months: int) -> DeliveryResult:
         await asyncio.sleep(0.5)
         self._counter += 1
-        log.warning("MOCK: выдан Premium на %s мес. пользователю @%s", months, username)
+        log.warning("MOCK: «выдан» Premium на %s мес. для @%s", months, username)
         return DeliveryResult(order_id=f"mock-{self._counter}", raw={"mock": True})
 
     async def get_balance(self) -> str:
         return "MOCK — реальный баланс недоступен"
 
     async def resolve_recipient(self, username: str) -> Recipient | None:
-        # В mock-режиме «находим» кого угодно, кроме заведомо несуществующего
-        # имени — так тестируется и ветка с ошибкой.
         if username.lower() in ("notfound", "unknown"):
             return None
-        return Recipient(username=username, name=f"{username.capitalize()} (MOCK)")
+        return Recipient(username=username, name=f"{username.capitalize()} (MOCK)",
+                         verified=True)
 
     async def healthcheck(self) -> dict:
         return {
@@ -126,174 +145,232 @@ class MockProvider(DeliveryProvider):
         }
 
 
-class FragmentProvider(DeliveryProvider):
-    """Клиент Fragment с JWT-авторизацией и авто-переполучением токена."""
+# =============================================================== ApiFragment
+
+
+class ApiFragProvider(DeliveryProvider):
+    """Клиент apifragment.online.
+
+    Имя аккаунта получателя шлюз не отдаёт — у него нет такого метода,
+    поэтому supports_name_lookup остаётся False и бот честно говорит
+    покупателю, что имя не проверено.
+    """
+
+    supports_name_lookup = False
 
     def __init__(self) -> None:
-        missing = [
-            name
-            for name, value in (
-                ("FRAGMENT_API_KEY", settings.fragment_api_key),
-                ("FRAGMENT_PHONE_NUMBER", settings.fragment_phone_number),
-                ("FRAGMENT_MNEMONICS", settings.fragment_mnemonics),
-            )
-            if not value
-        ]
-        if missing:
-            raise RuntimeError(
-                "FRAGMENT_MODE=api, но не заполнены: " + ", ".join(missing)
-            )
+        if not settings.fragment_api_key:
+            raise RuntimeError("FRAGMENT_MODE=api, но не задан FRAGMENT_API_KEY")
         self._base = settings.fragment_base_url.rstrip("/")
-        self._token: str | None = None
-        self._lock = asyncio.Lock()
         self._session: aiohttp.ClientSession | None = None
+        self._logged_in = False
+        self._login_lock = asyncio.Lock()
+
+    # ------------------------------------------------------------ транспорт
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(timeout=REQUEST_TIMEOUT)
+            self._session = aiohttp.ClientSession(
+                timeout=REQUEST_TIMEOUT,
+                headers={"Authorization": f"Bearer {settings.fragment_api_key}"},
+            )
         return self._session
 
     async def close(self) -> None:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    async def _authenticate(self) -> str:
-        session = await self._get_session()
-        payload = {
-            "api_key": settings.fragment_api_key,
-            "phone_number": settings.fragment_phone_number,
-            "mnemonics": settings.mnemonics_list,
-        }
-        try:
-            async with session.post(self._base + AUTH_PATH, json=payload) as resp:
-                data = await self._read_json(resp)
-                if resp.status >= 400:
-                    raise DeliveryError(
-                        f"Авторизация Fragment не прошла ({resp.status}): {data}"
-                    )
-        except (TimeoutError, aiohttp.ClientError) as exc:
-            # Авторизация идёт до выдачи, поэтому её провал безопасен:
-            # заказ точно не отправлен и деньги можно вернуть.
-            raise DeliveryError(f"Fragment недоступен: {exc}") from exc
-        token = data.get("token") or data.get("access_token")
-        if not token:
-            raise DeliveryError(f"Fragment не вернул токен: {data}")
-        log.info("Fragment: получен новый токен")
-        return token
-
-    async def _token_value(self, *, force: bool = False) -> str:
-        async with self._lock:
-            if force or not self._token:
-                self._token = await self._authenticate()
-            return self._token
-
     @staticmethod
     async def _read_json(resp: aiohttp.ClientResponse) -> dict:
         try:
             data = await resp.json(content_type=None)
-        except Exception:  # noqa: BLE001 — Fragment иногда отдаёт HTML при ошибке
+        except Exception:  # noqa: BLE001 — при ошибке может прийти HTML
             data = {}
         if not isinstance(data, dict):
             data = {"response": data}
         if not data:
-            text = (await resp.text())[:300]
-            data = {"raw": text}
+            data = {"raw": (await resp.text())[:300]}
         return data
 
-    async def _request(self, method: str, path: str, payload: dict | None = None) -> dict:
-        session = await self._get_session()
-        url = self._base + path
-        for attempt in (1, 2):
-            token = await self._token_value(force=attempt == 2)
-            headers = {"Authorization": f"JWT {token}"}
-            try:
-                async with session.request(
-                    method, url, json=payload, headers=headers
-                ) as resp:
-                    data = await self._read_json(resp)
-                    if resp.status == 401 and attempt == 1:
-                        log.info("Fragment: токен протух, повторяю авторизацию")
-                        continue
-                    if resp.status >= 500:
-                        raise DeliveryUncertain(
-                            f"Fragment вернул {resp.status}: {data.get('error') or data}"
-                        )
-                    if resp.status >= 400:
-                        raise DeliveryError(
-                            f"Fragment вернул {resp.status}: {data.get('error') or data}"
-                        )
-                    return data
-            except (TimeoutError, aiohttp.ClientError) as exc:
-                # Запрос мог дойти до Fragment и выполниться — считать его
-                # неудачей и возвращать деньги нельзя.
-                raise DeliveryUncertain(f"Нет ответа от Fragment: {exc}") from exc
-        raise DeliveryError("Fragment: не удалось авторизоваться")
-
-    async def deliver_stars(self, username: str, amount: int) -> DeliveryResult:
-        data = await self._request(
-            "POST", STARS_PATH,
-            {"username": username, "quantity": amount, "show_sender": False},
-        )
-        return DeliveryResult(order_id=str(data.get("id") or data.get("order_id") or ""), raw=data)
-
-    async def deliver_premium(self, username: str, months: int) -> DeliveryResult:
-        data = await self._request(
-            "POST", PREMIUM_PATH,
-            {"username": username, "duration": months, "show_sender": False},
-        )
-        return DeliveryResult(order_id=str(data.get("id") or data.get("order_id") or ""), raw=data)
-
-    async def get_balance(self) -> str:
-        data = await self._request("GET", WALLET_PATH)
-        balance = data.get("balance") or data.get("available") or data
-        return str(balance)
-
-    async def resolve_recipient(self, username: str) -> Recipient | None:
-        try:
-            data = await self._request("GET", USER_PATH.format(username=username))
-        except DeliveryError as exc:
-            log.info("Fragment: получатель @%s не найден (%s)", username, exc)
-            return None
-        except DeliveryUncertain as exc:
-            # Проверка получателя ничего не меняет, поэтому недоступность
-            # Fragment здесь безопасно трактовать как «не подтвердили».
-            log.warning("Fragment недоступен при проверке @%s: %s", username, exc)
-            return None
-
-        # Формат ответа у разных версий API отличается — берём первое подходящее.
-        name = ""
-        for key in ("name", "display_name", "first_name", "title", "full_name"):
+    @staticmethod
+    def _error_text(data: dict) -> str:
+        for key in ("error", "message", "detail", "reason", "description"):
             value = data.get(key)
             if isinstance(value, str) and value.strip():
-                name = value.strip()
-                break
-        if not name and isinstance(data.get("recipient"), dict):
-            name = str(data["recipient"].get("name") or "").strip()
-        return Recipient(username=username, name=name)
+                return value.strip()
+        return str(data)[:300]
+
+    async def _request(
+        self, method: str, path: str, payload: dict | None = None, *, safe: bool = False
+    ) -> dict:
+        """safe=True — запрос ничего не меняет, сетевой сбой можно считать
+        обычной ошибкой, а не неопределённым исходом."""
+        session = await self._get_session()
+        url = self._base + path
+        try:
+            async with session.request(method, url, json=payload) as resp:
+                data = await self._read_json(resp)
+                if resp.status >= 500:
+                    raise DeliveryUncertain(
+                        f"Шлюз вернул {resp.status}: {self._error_text(data)}"
+                    )
+                if resp.status >= 400:
+                    raise DeliveryError(
+                        f"Шлюз вернул {resp.status}: {self._error_text(data)}"
+                    )
+                return data
+        except (TimeoutError, aiohttp.ClientError) as exc:
+            message = f"Нет ответа от шлюза: {exc}"
+            raise (DeliveryError if safe else DeliveryUncertain)(message) from exc
+
+    # -------------------------------------------------------- авторизация
+
+    async def login(self, *, force: bool = False) -> dict:
+        """Отдать шлюзу сид-фразу: он логинится на Fragment и хранит сессию.
+
+        По документации повторять не нужно, поэтому делаем один раз за запуск.
+        """
+        async with self._login_lock:
+            if self._logged_in and not force:
+                return {"status": "ok", "cached": True}
+            if not settings.fragment_wallet_seed.strip():
+                raise DeliveryError(
+                    "Не задана сид-фраза кошелька (FRAGMENT_WALLET_SEED) — "
+                    "шлюз не сможет войти на Fragment."
+                )
+            data = await self._request(
+                "POST", LOGIN_PATH,
+                {"wallet_seed": settings.fragment_wallet_seed.strip()},
+                safe=True,
+            )
+            self._logged_in = True
+            log.info("ApiFragment: сессия Fragment установлена (%s)",
+                     data.get("method") or "—")
+            return data
+
+    async def _ensure_login(self) -> None:
+        if not self._logged_in:
+            await self.login()
+
+    # ------------------------------------------------------------ выдача
+
+    async def deliver_stars(self, username: str, amount: int) -> DeliveryResult:
+        return await self._order(STARS_PATH, {
+            "username": username,
+            "quantity": amount,
+            "payment_method": settings.fragment_payment_method,
+        })
+
+    async def deliver_premium(self, username: str, months: int) -> DeliveryResult:
+        return await self._order(PREMIUM_PATH, {
+            "username": username,
+            "months": months,
+            "payment_method": settings.fragment_payment_method,
+        })
+
+    async def _order(self, path: str, payload: dict) -> DeliveryResult:
+        await self._ensure_login()
+        data = await self._request("POST", path, payload)
+
+        status = str(data.get("status", "")).lower()
+        if status in FAILED_STATUSES:
+            raise DeliveryError(f"Шлюз отклонил заказ: {self._error_text(data)}")
+
+        task_id = data.get("task_id") or data.get("id")
+        if task_id is None:
+            # Без task_id проверить исход нечем — считать доставкой нельзя.
+            raise DeliveryUncertain(
+                f"Шлюз не вернул task_id, исход неизвестен: {str(data)[:200]}"
+            )
+
+        log.info("ApiFragment: задача %s поставлена в очередь", task_id)
+        final = await self._await_task(task_id)
+        return DeliveryResult(order_id=str(task_id), raw=final)
+
+    async def _await_task(self, task_id: object) -> dict:
+        """Опрашивать задачу, пока она не завершится.
+
+        Бросает DeliveryError, если задача провалилась (деньги вернутся),
+        и DeliveryUncertain, если не дождались — тогда решает админ.
+        """
+        deadline = settings.task_poll_timeout
+        interval = max(settings.task_poll_interval, 1)
+        waited = 0
+        last: dict = {}
+        unknown_seen: set[str] = set()
+
+        while waited < deadline:
+            await asyncio.sleep(interval)
+            waited += interval
+            try:
+                last = await self._request(
+                    "GET", TASK_PATH.format(task_id=task_id), safe=True
+                )
+            except DeliveryError as exc:
+                # Сетевой сбой при опросе — задача может всё ещё выполняться.
+                log.warning("Задача %s: опрос не удался (%s)", task_id, exc)
+                continue
+
+            status = str(
+                last.get("status") or last.get("state") or last.get("result") or ""
+            ).lower().strip()
+
+            if status in DONE_STATUSES:
+                log.info("Задача %s выполнена за ~%s сек", task_id, waited)
+                return last
+            if status in FAILED_STATUSES:
+                raise DeliveryError(
+                    f"Задача {task_id} провалилась: {self._error_text(last)}"
+                )
+            if status and status not in PENDING_STATUSES and status not in unknown_seen:
+                unknown_seen.add(status)
+                log.warning(
+                    "Задача %s: незнакомый статус %r — жду дальше. Ответ: %s",
+                    task_id, status, str(last)[:300],
+                )
+
+        raise DeliveryUncertain(
+            f"Задача {task_id} не завершилась за {deadline} сек. "
+            f"Последний ответ: {str(last)[:200]}"
+        )
+
+    # ------------------------------------------------------------ прочее
+
+    async def resolve_recipient(self, username: str) -> Recipient | None:
+        """У шлюза нет метода проверки юзернейма, поэтому имя неизвестно.
+
+        Возвращаем непроверенного получателя: бот покажет это покупателю
+        честно, вместо того чтобы делать вид, что аккаунт подтверждён.
+        """
+        return Recipient(username=username, name="", verified=False)
+
+    async def get_balance(self) -> str:
+        # Отдельного метода баланса в документации нет: он лежит на самом
+        # кошельке Fragment, а не у шлюза.
+        return "смотрите на кошельке Fragment"
 
     async def healthcheck(self) -> dict:
-        """Пошагово проверяет, что выдача вообще возможна."""
         steps: list[tuple[str, str]] = []
         try:
-            token = await self._token_value(force=True)
-            steps.append(("Авторизация", f"✅ токен получен ({len(token)} симв.)"))
+            data = await self.login(force=True)
         except (DeliveryError, DeliveryUncertain) as exc:
-            steps.append(("Авторизация", f"❌ {exc}"))
+            steps.append(("Вход на Fragment", f"❌ {exc}"))
             return {"ok": False, "mode": "api", "steps": steps, "error": str(exc)}
 
-        try:
-            balance = await self.get_balance()
-            steps.append(("Баланс кошелька", f"✅ {balance}"))
-        except (DeliveryError, DeliveryUncertain) as exc:
-            steps.append(("Баланс кошелька", f"⚠️ не прочитался: {exc}"))
-
+        method = data.get("method") or "—"
+        cookies = data.get("cookies_refreshed") or []
+        steps.append(("Токен шлюза", "✅ принят"))
+        steps.append(("Вход на Fragment", f"✅ сессия активна ({method})"))
+        if cookies:
+            steps.append(("Обновлены cookies", "✅ " + ", ".join(map(str, cookies))))
+        steps.append(("Валюта оплаты", settings.fragment_payment_method))
         return {"ok": True, "mode": "api", "steps": steps, "error": ""}
 
 
 def build_provider() -> DeliveryProvider:
     mode = settings.fragment_mode.strip().lower()
-    if mode == "api":
-        return FragmentProvider()
+    if mode in ("api", "apifrag", "apifragment"):
+        return ApiFragProvider()
     if mode != "mock":
         log.warning("Неизвестный FRAGMENT_MODE=%r, использую mock", settings.fragment_mode)
     log.warning("Fragment работает в режиме MOCK — реальной выдачи не будет")

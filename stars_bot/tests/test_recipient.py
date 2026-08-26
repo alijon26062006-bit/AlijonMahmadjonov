@@ -75,14 +75,14 @@ class NamedProvider(DeliveryProvider):
         known = {"alijon": "Алиджон Махмаджонов", "friend": "Дилшод"}
         if username not in known:
             return None
-        return Recipient(username=username, name=known[username])
+        return Recipient(username=username, name=known[username], verified=True)
 
 
 class NamelessProvider(DeliveryProvider):
     """Fragment нашёл аккаунт, но имени не отдал."""
 
     async def resolve_recipient(self, username):
-        return Recipient(username=username, name="")
+        return Recipient(username=username, name="", verified=True)
 
 
 def state_for(storage, uid=BUYER):
@@ -167,6 +167,23 @@ async def run(conn) -> None:
     await shop_h.on_recipient(msg, state, conn, provider)
     check("несуществующий аккаунт отклоняется", "не найден" in msg.last)
     check("к оплате не переходим", await state.get_state() == "Buy:recipient")
+
+    # ------------------ шлюз не умеет проверять имя — говорим честно
+    class UnverifiedProvider(DeliveryProvider):
+        supports_name_lookup = False
+
+        async def resolve_recipient(self, username):
+            return Recipient(username=username, name="", verified=False)
+
+    await state.set_state(shop_h.Buy.recipient)
+    await state.update_data(product_type="stars", quantity=100, price=2000)
+    msg = FakeMessage("@unchecked")
+    await shop_h.on_recipient(msg, state, conn, UnverifiedProvider())
+    check("непроверенный аккаунт помечается честно",
+          "проверить нельзя" in msg.last, msg.last.replace("\n", " ")[:100])
+    check("предлагается открыть t.me для сверки", "t.me/unchecked" in msg.last)
+    check("к оплате всё равно можно перейти",
+          await state.get_state() == "Buy:check_recipient")
 
     # -------------------------------------- Fragment не отдал имя
     await state.set_state(shop_h.Buy.recipient)
