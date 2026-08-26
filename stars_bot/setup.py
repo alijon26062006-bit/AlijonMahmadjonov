@@ -73,6 +73,24 @@ def check_id(value: str) -> str | None:
     return None
 
 
+PRIVATE_HOST_RE = re.compile(
+    r"^https?://(?:10\.|127\.|0\.|169\.254\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|localhost)"
+)
+
+
+def check_base_url(value: str) -> str | None:
+    """Отсечь внутренние адреса: бот MyStars иногда выдаёт их по ошибке,
+    а с чужого сервера такой адрес недостижим."""
+    if not value.startswith(("http://", "https://")):
+        return "Адрес должен начинаться с https://"
+    if PRIVATE_HOST_RE.match(value):
+        return ("Это адрес внутренней сети — с вашего сервера он недоступен. "
+                "Используйте https://api.mystars.tg/v1")
+    if value.startswith("http://"):
+        return "Нужен https:// — по http ключ уйдёт открытым текстом."
+    return None
+
+
 def check_seed(value: str) -> str | None:
     words = value.split()
     if len(words) != 24:
@@ -175,6 +193,11 @@ def main() -> None:
         print()
         new["MYSTARS_API_KEY"] = ask("Ключ MyStars (X-Api-Key)",
                                      current=old.get("MYSTARS_API_KEY", ""))
+        new["MYSTARS_BASE_URL"] = ask(
+            "Адрес API",
+            current=old.get("MYSTARS_BASE_URL", "") or "https://api.mystars.tg/v1",
+            validate=check_base_url,
+        )
         new["MYSTARS_CURRENCY"] = ask(
             "Чем платить (ton / usdt_ton)",
             current=old.get("MYSTARS_CURRENCY", "") or "ton",

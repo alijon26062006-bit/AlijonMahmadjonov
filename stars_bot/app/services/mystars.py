@@ -261,6 +261,9 @@ class MyStarsProvider(DeliveryProvider):
             steps.append(("Доступные товары", names))
         except MyStarsError as exc:
             steps.append(("Ключ MyStars", f"❌ {exc}"))
+            hint = _diagnose(exc)
+            if hint:
+                steps.append(("Что делать", hint))
             return {"ok": False, "mode": "mystars", "steps": steps, "error": str(exc)}
 
         try:
@@ -282,3 +285,29 @@ def _as_dict(order: Order) -> dict:
         "purchase_tx": order.purchase_tx,
         "payment_tx": order.payment_tx,
     }
+
+
+def _diagnose(exc: Exception) -> str:
+    """Подсказать по тексту ошибки, что именно не так с настройками."""
+    message = str(exc).lower()
+    url = settings.mystars_base_url
+
+    if any(part in url for part in ("10.", "127.", "192.168.", "localhost", "172.16.")):
+        return (
+            f"В настройках указан внутренний адрес <code>{url}</code> — "
+            "он доступен только внутри сети MyStars. "
+            "Поставьте <code>https://api.mystars.tg/v1</code> "
+            "командой <code>stars-bot setup</code>."
+        )
+    if any(word in message for word in ("connect", "timeout", "resolve", "network")):
+        return (
+            f"Сервер не отвечает по адресу <code>{url}</code>. "
+            "Проверьте адрес и интернет на сервере."
+        )
+    if any(word in message for word in ("401", "unauthorized", "authentication", "api key")):
+        return (
+            "Ключ не принят. Возьмите новый в @my_stars_tg_bot "
+            "(<code>/api_rotate</code>) и введите через "
+            "<code>stars-bot setup</code>."
+        )
+    return ""
