@@ -8,7 +8,7 @@ from aiogram.dispatcher.event.bases import SkipHandler
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from handlers import payments, topup
-from services import panel_ui, texts
+from services import keyboards, panel_ui, texts
 from storage.db import connect
 from storage.repo import Repo
 from storage.settings import Settings
@@ -124,6 +124,60 @@ def test_the_amount_follows_the_price():
 def test_a_broken_price_does_not_break_the_screen():
     """Админ вписал ерунду — экран всё равно показывается."""
     assert "сомони" in texts.manual_amount(5, "дорого", "сомони")
+
+
+# ------------------------------------------------------------- два шага
+
+@pytest.mark.asyncio
+async def test_the_first_screen_asks_how_many(env):
+    """Сначала количество — реквизиты показываем уже с точной суммой."""
+    _, _, settings, _ = env
+    callback = Callback("manual:pick")
+
+    await payments.manual_pick(callback, settings, State())
+
+    shown = callback.message.answers[0]
+    assert "Сколько голосов" in shown
+    assert "1.5 сомони" in shown, "цена одного голоса берётся из панели"
+    assert "8888" not in shown, "реквизиты — на следующем шаге"
+
+
+@pytest.mark.asyncio
+async def test_the_second_screen_shows_details_and_total(env):
+    _, _, settings, _ = env
+    callback = Callback("manual:5")
+
+    await payments.manual_details(callback, settings, State())
+
+    shown = callback.message.answers[0]
+    assert "8888 1111 2222 3333" in shown
+    assert "7.5 сомони" in shown, "5 голосов по 1.5"
+
+
+@pytest.mark.asyncio
+async def test_the_amount_can_be_changed_back(env):
+    """С экрана реквизитов должен быть путь назад к выбору количества."""
+    _, _, settings, _ = env
+    markup = keyboards.manual_details("8888", 5)
+
+    actions = [button.callback_data for row in markup.inline_keyboard for button in row]
+    assert "manual:pick" in actions
+
+
+def test_the_button_carries_the_premium_icon():
+    """ID иконки живёт отдельным полем, а символ уходит из подписи."""
+    button = keyboards.manual_pay("Душанбе Сити", {"🏦": "5330540737777914038"})
+
+    assert button.icon_custom_emoji_id == "5330540737777914038"
+    assert button.text == "Душанбе Сити"
+    assert button.callback_data == "manual:pick"
+
+
+def test_the_button_survives_without_the_icon():
+    button = keyboards.manual_pay("Душанбе Сити", {})
+
+    assert button.text == "🏦 Душанбе Сити"
+    assert button.icon_custom_emoji_id is None
 
 
 # --------------------------------------------------- одна заявка на человека

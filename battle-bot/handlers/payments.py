@@ -40,7 +40,8 @@ def max_votes(price: int) -> int:
     return max(1, texts.MAX_STARS_PER_INVOICE // max(1, price))
 
 
-async def _screen(message: Message, repo: Repo, settings: Settings, state: FSMContext) -> None:
+async def _screen(message: Message, repo: Repo, config: Config, settings: Settings,
+                  state: FSMContext) -> None:
     price = settings.vote_price
     limit = max_votes(price)
     await state.set_state(Buy.waiting_amount)
@@ -54,6 +55,7 @@ async def _screen(message: Message, repo: Repo, settings: Settings, state: FSMCo
         reply_markup=keyboards.buy(
             price, settings.get("referral_enabled"), limit,
             settings.get("manual_pay_title") if _manual_on(settings) else "",
+            config.premium_emoji,
         ),
         disable_web_page_preview=True,
     )
@@ -63,6 +65,37 @@ def _manual_on(settings: Settings) -> bool:
     return bool(settings.get("manual_pay_enabled")) and bool(
         settings.get("manual_pay_details")
     )
+
+
+def _amounts(settings: Settings) -> list[tuple[int, str]]:
+    price = settings.get("manual_pay_price")
+    currency = settings.get("manual_pay_currency")
+    return [
+        (count, f"{count} — {texts.manual_amount(count, price, currency)}")
+        for count in keyboards.MANUAL_AMOUNTS
+    ]
+
+
+@router.callback_query(F.data == "manual:pick")
+async def manual_pick(
+    callback: CallbackQuery, settings: Settings, state: FSMContext
+) -> None:
+    """Первый шаг оплаты переводом: сколько голосов покупаем."""
+    if not _manual_on(settings):
+        await callback.answer("Этот способ сейчас недоступен.", show_alert=True)
+        return
+
+    await state.clear()
+    await ui.edit_or_send(
+        callback,
+        texts.manual_pick_screen(
+            settings.get("manual_pay_title"),
+            settings.get("manual_pay_price"),
+            settings.get("manual_pay_currency"),
+        ),
+        reply_markup=keyboards.manual_pick(_amounts(settings)),
+    )
+    await callback.answer()
 
 
 @router.callback_query(F.data.regexp(r"^manual:\d+$"))
@@ -79,11 +112,8 @@ async def manual_details(
         await callback.answer("Такое количество не подходит.", show_alert=True)
         return
 
-    price = settings.get("manual_pay_price")
-    currency = settings.get("manual_pay_currency")
     await state.clear()
-    # экран перерисовывается на месте: человек щёлкает количество и сразу
-    # видит новую сумму, а не получает пять сообщений подряд
+    # экран перерисовывается на месте, а не сыплет новыми сообщениями
     await ui.edit_or_send(
         callback,
         texts.manual_screen(
@@ -91,14 +121,10 @@ async def manual_details(
             settings.get("manual_pay_details"),
             settings.get("manual_pay_note"),
             votes,
-            price,
-            currency,
+            settings.get("manual_pay_price"),
+            settings.get("manual_pay_currency"),
         ),
-        reply_markup=keyboards.manual_details(
-            settings.get("manual_pay_details"), votes,
-            [(count, f"{count} — {texts.manual_amount(count, price, currency)}")
-             for count in keyboards.MANUAL_AMOUNTS],
-        ),
+        reply_markup=keyboards.manual_details(settings.get("manual_pay_details"), votes),
     )
     await callback.answer()
 
@@ -112,7 +138,7 @@ async def open_buy(
         await message.answer("Покупка голосов сейчас отключена.")
         return
     repo.upsert_user(message.from_user.id, message.from_user.username, message.from_user.first_name)
-    await _screen(message, repo, settings, state)
+    await _screen(message, repo, config, settings, state)
 
 
 @router.message(
@@ -155,7 +181,7 @@ async def open_buy_from_button(
         return
     repo.upsert_user(callback.from_user.id, callback.from_user.username,
                      callback.from_user.first_name)
-    await _screen(callback.message, repo, settings, state)
+    await _screen(callback.message, repo, config, settings, state)
     await callback.answer()
 
 

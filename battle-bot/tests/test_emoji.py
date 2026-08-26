@@ -190,7 +190,7 @@ def test_shipped_table_matches_the_template():
     assert set(table) == set(template), "набор символов разошёлся с шаблоном"
 
     filled = {char: value for char, value in table.items() if value}
-    assert len(filled) == 21
+    assert len(filled) == 22
     assert all(value.isdigit() for value in filled.values()), "ID должны быть числовыми"
     assert len(set(filled.values())) == len(filled), "один ID не должен стоять дважды"
 

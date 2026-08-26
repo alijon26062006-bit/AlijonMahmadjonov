@@ -962,6 +962,18 @@ def manual_amount(votes: int, price: str, currency: str) -> str:
     return f"{shown} {currency}"
 
 
+def manual_pick_screen(title: str, price: str, currency: str) -> str:
+    """Первый шаг: сколько голосов покупаем."""
+    return (
+        f"🏦 <b>{escape(title)}</b>\n"
+        f"{RULE}\n\n"
+        f"Оплата переводом — без звёзд.\n"
+        f"Один голос: <b>{manual_amount(1, price, currency)}</b>\n\n"
+        "<b>Сколько голосов берёте?</b>\n"
+        "<i>Выберите количество — покажу реквизиты и точную сумму.</i>"
+    )
+
+
 def manual_screen(title: str, details: str, note: str, votes: int,
                   price: str, currency: str) -> str:
     """Экран с реквизитами: сколько платить и куда."""
