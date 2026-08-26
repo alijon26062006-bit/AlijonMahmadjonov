@@ -69,15 +69,14 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     bank = f"🏦 Банк: <b>{card_bank}</b>\n" if card_bank else ""
     extra = f"\n{note}\n" if note else ""
 
-    account = runtime.get("dc_account")
     dc_block = ""
     markup = keyboards.cancel()
 
-    if dcpay.is_ready(account):
+    if dcpay.is_ready():
         link = dcpay.build_link(
-            account, amount,
-            dcpay.build_comment(runtime.get("dc_comment"), reference),
-            runtime.get("dc_service") or "133",
+            dcpay.account(), amount,
+            dcpay.build_comment(dcpay.comment_prefix(), reference),
+            dcpay.service(),
         )
         dc_block = texts.DEPOSIT_DC_BLOCK.format(reference=reference)
         markup = keyboards.deposit_pay(link)

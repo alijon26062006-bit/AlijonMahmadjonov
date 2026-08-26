@@ -279,9 +279,9 @@ async def cb_premium_edit(call: CallbackQuery, state: FSMContext) -> None:
 PAY_FIELDS = {
     "pay_card_number": ("💳 Номер карты", "Введите номер карты:"),
     "dc_account": ("🏙 Счёт «Душанбе Сити»",
-                   "Номер счёта для кнопки быстрой оплаты — 16 цифр из вашей "
-                   "ссылки pay.dc.tj (параметр <code>a</code>). "
-                   "Или <code>-</code>, чтобы убрать кнопку:"),
+                   "По умолчанию берётся карта из реквизитов. Заполняйте, "
+                   "только если деньги приходят на другой счёт "
+                   "(параметр <code>a</code> из ссылки pay.dc.tj):"),
     "dc_comment": ("📝 Подпись в платеже",
                    "Что писать в комментарии к переводу перед кодом платежа — "
                    "например <code>@uwayscoder</code>:"),
@@ -313,9 +313,10 @@ def pay_text() -> str:
     if not runtime.get("pay_card_number"):
         warning = "\n❗️ <b>Без номера карты клиенты не смогут пополнить баланс.</b>\n"
 
-    dc_state = (
-        "✅ <b>работает</b>" if dcpay.is_ready(runtime.get("dc_account"))
-        else "⚪️ <i>не настроена</i>"
+    dc_state = "✅ <b>работает</b>" if dcpay.is_ready() else "⚪️ <i>не настроена</i>"
+    dc_source = (
+        "<i>та же, что в реквизитах</i>" if not runtime.get("dc_account")
+        else f"<b>{runtime.get('dc_account')}</b>"
     )
     return (
         "💳 <b>Реквизиты для приёма оплаты</b>\n"
@@ -326,8 +327,8 @@ def pay_text() -> str:
         f"├ Город: {show('pay_city')}\n"
         f"└ Примечание: {show('pay_extra')}\n\n"
         f"🏙 <b>Кнопка «Душанбе Сити»</b> — {dc_state}\n"
-        f"├ Счёт: {show('dc_account')}\n"
-        f"├ Подпись: {show('dc_comment')}\n"
+        f"├ Счёт: {dc_source}\n"
+        f"├ Подпись: <b>{dcpay.comment_prefix() or '—'}</b>\n"
         f"└ Код услуги: {show('dc_service')}\n\n"
         "<blockquote>Кнопка открывает приложение с уже вписанными счётом "
         "и суммой — покупателю не нужно переписывать их вручную, а значит "
@@ -1442,8 +1443,7 @@ async def cb_autoprice(
 @router.callback_query(F.data == "pn:dctest")
 async def cb_dc_test(call: CallbackQuery) -> None:
     """Показать готовую ссылку на пробную сумму — проверить, что открывается."""
-    account = runtime.get("dc_account")
-    if not dcpay.is_ready(account):
+    if not dcpay.is_ready():
         await safe_edit(
             call,
             "🏙 <b>Кнопка оплаты не настроена</b>\n\n"
@@ -1458,9 +1458,9 @@ async def cb_dc_test(call: CallbackQuery) -> None:
 
     reference = dcpay.make_reference()
     link = dcpay.build_link(
-        account, 5000,
-        dcpay.build_comment(runtime.get("dc_comment"), reference),
-        runtime.get("dc_service") or "133",
+        dcpay.account(), 5000,
+        dcpay.build_comment(dcpay.comment_prefix(), reference),
+        dcpay.service(),
     )
     kb = InlineKeyboardBuilder()
     kb.row(btn("🏙 Открыть (проба на 50 с.)", url=link, style=SUCCESS))

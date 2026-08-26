@@ -150,7 +150,6 @@ async def run(conn) -> None:
     check("коды платежей разные",
           len({dcpay.make_reference() for _ in range(20)}) > 10)
 
-    check("без счёта кнопка не собирается", not dcpay.is_ready(""))
     check("короткий номер не считается счётом", not dcpay.is_ready("123"))
     check("нормальный счёт принимается", dcpay.is_ready("9762000123726019"))
 
@@ -191,19 +190,39 @@ async def run(conn) -> None:
           str(deposits[0].reference))
     check("сумма заявки верная", deposits[0].amount == 12000, str(deposits[0].amount))
 
-    # ---------------------------- без счёта кнопки нет, реквизиты остаются
+    # -------------- счёт берётся из реквизитов, если отдельно не задан
     await runtime.set_value(conn, "dc_account", "")
+    check("без отдельной настройки счёт берётся из карты",
+          dcpay.account() == "8888777766665555", dcpay.account())
+    check("кнопка работает без отдельной настройки", dcpay.is_ready())
+
+    state = FakeState()
+    msg = FakeMessage("120")
+    await dep_h.on_amount(msg, state)
+    pay = next((b for row in msg.last_markup.inline_keyboard for b in row if b.url), None)
+    check("кнопка появляется сразу после заполнения реквизитов", pay is not None)
+    check("в ссылке карта из реквизитов",
+          "a=8888777766665555" in (pay.url if pay else ""), pay.url if pay else "—")
+
+    await runtime.set_value(conn, "dc_account", "9762000123726019")
+    check("отдельный счёт перекрывает карту",
+          dcpay.account() == "9762000123726019")
+
+    # ---------------------------- без реквизитов вовсе кнопки нет
+    await runtime.set_value(conn, "dc_account", "")
+    await runtime.set_value(conn, "pay_card_number", "")
     state = FakeState()
     msg = FakeMessage("120")
     await dep_h.on_amount(msg, state)
     check("без счёта быстрой оплаты не предлагаем",
           "Душанбе Сити" not in msg.last)
-    check("реквизиты карты показываются всё равно",
-          "8888 7777 6666 5555" in msg.last)
+    check("реквизиты показываются даже без кнопки",
+          "реквизиты не заданы" in msg.last or "8888" in msg.last)
     check("кнопки со ссылкой нет",
           not any(b.url for row in msg.last_markup.inline_keyboard for b in row))
 
     # ------------------------------------------------ проверка в панели
+    await runtime.set_value(conn, "pay_card_number", "8888 7777 6666 5555")
     await runtime.set_value(conn, "dc_account", "9762000123726019")
     call = FakeCallback("pn:dctest")
     await panel.cb_dc_test(call)
@@ -211,10 +230,12 @@ async def run(conn) -> None:
     check("проба на 50 сомони", "s=50" in call.last, call.last[-90:])
 
     await runtime.set_value(conn, "dc_account", "")
+    await runtime.set_value(conn, "pay_card_number", "")
     call = FakeCallback("pn:dctest")
     await panel.cb_dc_test(call)
-    check("без счёта панель объясняет, что вписать",
-          "параметр" in call.last and "a" in call.last)
+    check("без реквизитов панель объясняет, что вписать",
+          "параметр" in call.last or "счёт" in call.last.lower())
+    await runtime.set_value(conn, "pay_card_number", "8888 7777 6666 5555")
 
     check("экран реквизитов показывает состояние кнопки",
           "Душанбе Сити" in panel.pay_text())

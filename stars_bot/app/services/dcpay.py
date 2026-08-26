@@ -49,7 +49,42 @@ def build_comment(prefix: str, reference: str) -> str:
     return f"{prefix} {reference}".strip()
 
 
-def is_ready(account: str) -> bool:
+def digits_of(value: str) -> str:
+    return "".join(ch for ch in (value or "") if ch.isdigit())
+
+
+def account() -> str:
+    """Счёт для ссылки.
+
+    Отдельная настройка нужна редко: обычно принимают на ту же карту, что
+    уже указана в реквизитах. Поэтому по умолчанию берём её — кнопка
+    появляется сама, без лишней настройки.
+    """
+    from app import runtime
+
+    return digits_of(runtime.get("dc_account")) or digits_of(
+        runtime.get("pay_card_number")
+    )
+
+
+def comment_prefix() -> str:
+    """Подпись в комментарии. По умолчанию — юзернейм поддержки."""
+    from app import runtime
+    from app.config import settings
+
+    custom = (runtime.get("dc_comment") or "").strip()
+    if custom:
+        return custom
+    return f"@{settings.support_username}" if settings.support_username else ""
+
+
+def service() -> str:
+    from app import runtime
+
+    return runtime.get("dc_service") or "133"
+
+
+def is_ready(account_value: str | None = None) -> bool:
     """Хватает ли данных, чтобы собрать ссылку."""
-    digits = "".join(ch for ch in (account or "") if ch.isdigit())
-    return len(digits) >= 10
+    value = account() if account_value is None else digits_of(account_value)
+    return len(value) >= 10
