@@ -91,6 +91,17 @@ FIELDS: dict[str, Field] = {
         Field("main_post_message_id", "ID опубликованного главного поста", str, int, ""),
         Field("member_channels_enabled", "Каналы участников",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("manual_pay_enabled", "Оплата вручную",
+              lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("manual_pay_title", "Название способа оплаты", str, str,
+              "например: Душанбе Сити"),
+        Field("manual_pay_details", "Реквизиты", str, str,
+              "номер карты или кошелька; можно несколько строк"),
+        Field("manual_pay_price", "Цена голоса в местной валюте", str, str,
+              "например: 1.5"),
+        Field("manual_pay_currency", "Валюта", str, str, "например: сомони"),
+        Field("manual_pay_note", "Подсказка к оплате", str, str,
+              "что написать в комментарии к переводу и т.п."),
         Field("spam_words", "Запрещённые слова", str, str,
               "слова через запятую; ищутся по вхождению"),
         Field("spam_delete_links", "Удалять ссылки",
@@ -185,7 +196,13 @@ class Settings:
         "free_vote_scope": "battle",
         # со второго раунда соперников подбирает посев по силе, а не жребий
         "seeding": "snake",
-        # призёр отдыхает три дня — или выкупает возвращение за 50⭐
+        # пополнение вручную: реквизиты админ вписывает сам
+        "manual_pay_enabled": False,
+        "manual_pay_title": "Душанбе Сити",
+        "manual_pay_details": "",
+        "manual_pay_price": "1.5",
+        "manual_pay_currency": "сомони",
+        "manual_pay_note": "",
         # чистка спама в группах: каналы это не затрагивает
         "spam_words": moderation.DEFAULT_WORDS,
         "spam_delete_links": True,
@@ -195,6 +212,7 @@ class Settings:
         # вышел из канала — заявки не принимаются, пока не вернёт доступ
         "leave_penalty_enabled": True,
         "rejoin_price": 50,
+        # призёр отдыхает три дня — или выкупает возвращение за 50⭐
         "cooldown_days": 3,
         "cooldown_places": 3,
         "cooldown_skip_price": 50,

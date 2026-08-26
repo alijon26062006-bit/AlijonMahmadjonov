@@ -169,8 +169,9 @@ def next_battle(config: Config, referrals: bool = True) -> InlineKeyboardMarkup:
 QUICK_AMOUNTS = (1, 5, 10)
 
 
-def buy(price: int, referrals_on: bool, max_votes: int) -> InlineKeyboardMarkup:
-    """Быстрые количества плюс второй способ — позвать друзей."""
+def buy(price: int, referrals_on: bool, max_votes: int,
+        manual_title: str = "") -> InlineKeyboardMarkup:
+    """Быстрые количества плюс другие способы получить голоса."""
     quick = [
         InlineKeyboardButton(
             text=f"{amount} — {amount * price}⭐",
@@ -181,6 +182,8 @@ def buy(price: int, referrals_on: bool, max_votes: int) -> InlineKeyboardMarkup:
         if amount <= max_votes
     ]
     rows = [quick] if quick else []
+    if manual_title:
+        rows.append([manual_pay(manual_title, 5)])
     if referrals_on:
         rows.append(
             [
@@ -192,6 +195,75 @@ def buy(price: int, referrals_on: bool, max_votes: int) -> InlineKeyboardMarkup:
             ]
         )
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+# за звёзды берут по одному-два голоса, а переводом — сразу пачку,
+# поэтому здесь суммы крупнее
+MANUAL_AMOUNTS = (1, 5, 10, 25, 50)
+
+
+def manual_pay(title: str, votes: int, table: dict[str, str] | None = None
+               ) -> InlineKeyboardButton:
+    """Кнопка второго способа оплаты на экране покупки."""
+    text, emoji_id = leading_emoji(f"🏦 {title}", table or {})
+    return InlineKeyboardButton(
+        text=text, callback_data=f"manual:{votes}", icon_custom_emoji_id=emoji_id,
+        style=BLUE,
+    )
+
+
+def manual_details(details: str, votes: int,
+                   amounts: list[tuple[int, str]] | None = None
+                   ) -> InlineKeyboardMarkup:
+    """Экран реквизитов: количество, копировать номер, отправить чек, отмена."""
+    rows = []
+    picks = [
+        InlineKeyboardButton(
+            text=f"{'• ' if count == votes else ''}{label}",
+            callback_data=f"manual:{count}",
+            style=GREEN if count == votes else None,
+        )
+        for count, label in (amounts or [])
+    ]
+    # по три в ряд: длинные подписи вроде «10 — 15 сомони» в два не помещаются
+    rows += [picks[at:at + 3] for at in range(0, len(picks), 3)]
+    if details:
+        rows.append([
+            InlineKeyboardButton(
+                text="📋 Копировать номер", copy_text=CopyTextButton(text=details)
+            )
+        ])
+    rows += [
+        [InlineKeyboardButton(
+            text="✅ Я оплатил — отправить чек",
+            callback_data=f"manual:receipt:{votes}", style=GREEN,
+        )],
+        [InlineKeyboardButton(text="Отмена", callback_data="buy:cancel")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def manual_wait() -> InlineKeyboardMarkup:
+    """Пока ждём чек — единственный выход, чтобы человек не застрял."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[
+            InlineKeyboardButton(text="Отмена", callback_data="manual:cancel", style=RED)
+        ]]
+    )
+
+
+def topup_decision(topup_id: int) -> InlineKeyboardMarkup:
+    """Кнопки админа под чеком."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[
+            InlineKeyboardButton(
+                text="✅ Принять", callback_data=f"topup:ok:{topup_id}", style=GREEN
+            ),
+            InlineKeyboardButton(
+                text="❌ Отклонить", callback_data=f"topup:no:{topup_id}", style=RED
+            ),
+        ]]
+    )
 
 
 def pay(votes: int, total: int) -> InlineKeyboardMarkup:

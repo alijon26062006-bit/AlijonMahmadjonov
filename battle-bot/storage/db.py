@@ -232,6 +232,24 @@ CREATE TABLE IF NOT EXISTS strikes (
     PRIMARY KEY (chat_id, user_id)
 );
 
+-- Пополнение вручную: человек платит по реквизитам и присылает чек,
+-- админ принимает или отклоняет. Открытая заявка у человека может быть
+-- только одна — на это стоит частичный уникальный индекс ниже.
+CREATE TABLE IF NOT EXISTS topups (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(user_id),
+    votes      INTEGER NOT NULL,
+    amount     TEXT NOT NULL,
+    photo_id   TEXT,
+    status     TEXT NOT NULL DEFAULT 'pending',
+    note       TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    decided_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_topup
+    ON topups(user_id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_topups_status ON topups(status, id);
+
 CREATE TABLE IF NOT EXISTS stats (
     user_id     INTEGER PRIMARY KEY REFERENCES users(user_id),
     battles     INTEGER NOT NULL DEFAULT 0,

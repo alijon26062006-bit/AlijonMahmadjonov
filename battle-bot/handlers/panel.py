@@ -49,6 +49,26 @@ def _link_or_none(raw: str) -> str:
     return validation.as_url(text)
 
 
+def _text_or_empty(raw: str, limit: int) -> str:
+    """Текст, который можно и стереть: дефис очищает поле."""
+    text = (raw or "").strip()
+    if text in {"-", "—", "нет", "убрать"}:
+        return ""
+    return validation.as_text(text, limit=limit)
+
+
+def _money(raw: str) -> str:
+    """Цена голоса в местной валюте. Дробная — «1.5» или «1,5»."""
+    text = (raw or "").strip().replace(",", ".")
+    try:
+        value = float(text)
+    except ValueError:
+        raise InputError("Нужно число, например 1.5") from None
+    if not 0 < value <= 100_000:
+        raise InputError("Цена должна быть больше нуля")
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
 # какой проверкой встречать каждое поле и куда возвращаться после ввода
 EDITORS: dict[str, dict] = {
     "prizes": {"check": prizes.check, "back": "prizes"},
@@ -57,6 +77,15 @@ EDITORS: dict[str, dict] = {
         "back": "votes",
     },
     "stars_link": {"check": lambda raw: raw.strip(), "back": "votes"},
+    "manual_pay_title": {
+        "check": lambda raw: validation.as_text(raw, limit=40), "back": "pay",
+    },
+    "manual_pay_details": {"check": lambda raw: _text_or_empty(raw, 300), "back": "pay"},
+    "manual_pay_price": {"check": _money, "back": "pay"},
+    "manual_pay_currency": {
+        "check": lambda raw: validation.as_text(raw, limit=20), "back": "pay",
+    },
+    "manual_pay_note": {"check": lambda raw: _text_or_empty(raw, 300), "back": "pay"},
     "sponsor_channels": {
         "check": lambda raw: _channel_list(raw),
         "back": "settings",
@@ -283,6 +312,68 @@ async def show_votes(
     if not is_admin(callback.from_user.id, config):
         return
     await render(callback, _votes_screen(repo, settings))
+    await callback.answer()
+
+
+@router.callback_query(F.data == "p:pay")
+async def show_manual_pay(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """Второй способ оплаты: реквизиты и заявки на проверке."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, _manual_pay_screen(repo, settings))
+    await callback.answer()
+
+
+def _manual_pay_screen(repo: Repo, settings: Settings):
+    return panel_ui.manual_pay(
+        settings.all(), repo.topup_stats(), repo.topups("pending", 10)
+    )
+
+
+@router.callback_query(F.data == "p:pay:toggle")
+async def toggle_manual_pay(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    on = not settings.get("manual_pay_enabled")
+    settings.set("manual_pay_enabled", on)
+    await render(callback, _manual_pay_screen(repo, settings))
+    if on and not settings.get("manual_pay_details"):
+        await callback.answer("Включено, но реквизиты пустые — впишите номер.", show_alert=True)
+        return
+    await callback.answer("Способ включён" if on else "Способ выключен")
+
+
+@router.callback_query(F.data.startswith("p:pay:show:"))
+async def show_topup(
+    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config
+) -> None:
+    """Показать чек заново — например, если сообщение с ним потерялось."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    topup = repo.topup(int(callback.data.split(":")[-1]))
+    if topup is None:
+        await callback.answer("Заявки нет.", show_alert=True)
+        return
+
+    caption = texts.manual_for_admin(
+        repo.get_user(int(topup["user_id"])), int(topup["votes"]),
+        str(topup["amount"]), int(topup["id"]),
+    )
+    markup = keyboards.topup_decision(int(topup["id"]))
+    if not topup["photo_id"]:
+        await callback.answer("Чек ещё не прислали.", show_alert=True)
+        return
+    try:
+        await bot.send_photo(
+            callback.from_user.id, topup["photo_id"], caption=caption, reply_markup=markup
+        )
+    except TelegramAPIError as error:
+        await callback.answer(f"Не показать: {error}", show_alert=True)
+        return
     await callback.answer()
 
 
@@ -1033,6 +1124,8 @@ async def _back_to(
             message,
             _votes_screen(repo, settings),
         )
+    elif section == "pay":
+        await render(message, _manual_pay_screen(repo, settings))
     elif section == "auto":
         await render(message, _auto_screen(repo, settings))
     elif section == "referrals":

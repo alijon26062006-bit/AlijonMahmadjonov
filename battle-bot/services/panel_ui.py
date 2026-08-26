@@ -211,10 +211,70 @@ def votes(
     return text, keyboard(
         [button("✏️ Изменить цену", "edit:vote_price", BLUE)],
         [button(f"🎁 Бесплатный: {scope_title}", "votes:scope")],
+        [button("🏦 Оплата вручную", "pay")],
         [button("🧱 Ссылка на звёзды", "edit:stars_link")],
         [button(toggle, "votes:toggle", RED if enabled else GREEN)],
         back_row(),
     )
+
+
+# --------------------------------------------------- оплата вручную
+
+def _short(value: str, limit: int = 60) -> str:
+    text = " ".join((value or "").split())
+    return escape(text[:limit] + "…") if len(text) > limit else escape(text)
+
+
+def manual_pay(values: dict, stats: tuple[int, int, int], rows) -> tuple[str, InlineKeyboardMarkup]:
+    """Второй способ оплаты: реквизиты, цена и заявки на проверке."""
+    on = bool(values.get("manual_pay_enabled"))
+    details = values.get("manual_pay_details") or ""
+    price = values.get("manual_pay_price") or "—"
+    currency = values.get("manual_pay_currency") or ""
+    note = values.get("manual_pay_note") or ""
+    pending, accepted, declined = stats
+
+    warn = ""
+    if on and not details:
+        warn = (
+            "\n\n⚠️ <i>Реквизиты не заполнены — кнопка людям не показывается. "
+            "Впишите номер, и способ включится.</i>"
+        )
+
+    text = (
+        f"🏦 <b>{texts.spaced('ОПЛАТА ВРУЧНУЮ')}</b>\n{RULE}\n\n"
+        f"Состояние: <b>{onoff(on)}</b>\n"
+        f"Название: <b>{_short(values.get('manual_pay_title') or '—')}</b>\n"
+        f"Реквизиты: <code>{_short(details) or '—'}</code>\n"
+        f"Цена голоса: <b>{escape(str(price))} {escape(currency)}</b>\n"
+        f"Подсказка: {_short(note) or '<i>нет</i>'}\n\n"
+        f"🧾 На проверке: <b>{pending}</b>\n"
+        f"✅ Принято: <b>{accepted}</b>   ❌ Отклонено: <b>{declined}</b>{warn}\n\n"
+        "<i>Человек платит по реквизитам и присылает чек. "
+        "Пока чек не рассмотрен, второй он отправить не может.</i>"
+    )
+
+    buttons = [
+        [button(f"{mark_topup(row)} #{row['id']} · {row['votes']} гол. · {row['amount']}",
+                f"pay:show:{row['id']}")]
+        for row in rows
+    ]
+    toggle = "Выключить способ" if on else "Включить способ"
+    return text, keyboard(
+        *buttons,
+        [button("✏️ Название", "edit:manual_pay_title"),
+         button("💳 Реквизиты", "edit:manual_pay_details")],
+        [button("💰 Цена", "edit:manual_pay_price"),
+         button("💱 Валюта", "edit:manual_pay_currency")],
+        [button("📝 Подсказка", "edit:manual_pay_note")],
+        [button(toggle, "pay:toggle", RED if on else GREEN)],
+        [button("🔄 Обновить", "pay", BLUE)],
+        back_row("votes"),
+    )
+
+
+def mark_topup(row) -> str:
+    return "🧾" if row["photo_id"] else "⏳"
 
 
 # ------------------------------------------------------ проверка накрутки

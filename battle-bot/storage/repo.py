@@ -853,6 +853,102 @@ class Repo:
         ).fetchone()
         return int(row["total"]), int(row["live"]), int(row["posts"])
 
+    # ------------------------------------------------ пополнение вручную
+
+    def open_topup(self, user_id: int, votes: int, amount: str) -> int | None:
+        """Завести заявку на пополнение. None — открытая заявка уже есть.
+
+        Единственность держит сама база частичным уникальным индексом,
+        поэтому десять чеков подряд не создадут десять заявок даже при
+        одновременных нажатиях.
+        """
+        try:
+            cursor = self.conn.execute(
+                "INSERT INTO topups(user_id, votes, amount) VALUES(?, ?, ?)",
+                (user_id, votes, amount),
+            )
+        except sqlite3.IntegrityError:
+            self.conn.rollback()
+            return None
+        self.conn.commit()
+        return int(cursor.lastrowid)
+
+    def attach_receipt(self, topup_id: int, photo_id: str) -> None:
+        self.conn.execute(
+            "UPDATE topups SET photo_id = ? WHERE id = ?", (photo_id, topup_id)
+        )
+        self.conn.commit()
+
+    def retarget_topup(self, topup_id: int, votes: int, amount: str) -> None:
+        """Поменять количество в незакрытой заявке, пока чек не пришёл.
+
+        Человек нажал «Я оплатил», передумал и вернулся с другой суммой —
+        это та же заявка, а не новая.
+        """
+        self.conn.execute(
+            """UPDATE topups SET votes = ?, amount = ?
+               WHERE id = ? AND status = 'pending' AND photo_id IS NULL""",
+            (votes, amount, topup_id),
+        )
+        self.conn.commit()
+
+    def cancel_topup(self, user_id: int) -> bool:
+        """Снять свою заявку, пока чек не отправлен.
+
+        Уже отправленный чек так не отзовёшь: иначе можно было бы слать
+        десять чеков подряд, отменяя предыдущий.
+        """
+        cursor = self.conn.execute(
+            """UPDATE topups SET status = 'cancelled', decided_at = datetime('now')
+               WHERE user_id = ? AND status = 'pending' AND photo_id IS NULL""",
+            (user_id,),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def pending_topup(self, user_id: int) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM topups WHERE user_id = ? AND status = 'pending'", (user_id,)
+        ).fetchone()
+
+    def topup(self, topup_id: int) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM topups WHERE id = ?", (topup_id,)
+        ).fetchone()
+
+    def decide_topup(self, topup_id: int, accepted: bool, note: str = "") -> bool:
+        """Принять или отклонить заявку. False — её уже рассмотрели.
+
+        Проверка статуса внутри самого UPDATE: два админа могут нажать
+        одновременно, и голоса должны начислиться ровно один раз.
+        """
+        cursor = self.conn.execute(
+            """UPDATE topups SET status = ?, note = ?, decided_at = datetime('now')
+               WHERE id = ? AND status = 'pending'""",
+            ("accepted" if accepted else "declined", note or None, topup_id),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def topups(self, status: str = "pending", limit: int = 20) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            """SELECT t.*, u.username, u.first_name
+               FROM topups t LEFT JOIN users u ON u.user_id = t.user_id
+               WHERE t.status = ? ORDER BY t.id DESC LIMIT ?""",
+            (status, limit),
+        ).fetchall()
+
+    def topup_stats(self) -> tuple[int, int, int]:
+        """Сколько заявок ждёт, принято и отклонено."""
+        row = self.conn.execute(
+            """SELECT
+                   SUM(status = 'pending') AS pending,
+                   SUM(status = 'accepted') AS accepted,
+                   SUM(status = 'declined') AS declined
+               FROM topups"""
+        ).fetchone()
+        return int(row["pending"] or 0), int(row["accepted"] or 0), int(row["declined"] or 0)
+
     # ------------------------------------------------------ группы и спам
 
     def add_group(self, chat_id: int, title: str | None, added_by: int | None = None) -> None:

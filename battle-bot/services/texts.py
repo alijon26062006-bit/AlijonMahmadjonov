@@ -950,6 +950,101 @@ def buy_screen(price: int, balance: int, stars_link: str, max_votes: int) -> str
     )
 
 
+# --------------------------------------------- пополнение вручную
+
+def manual_amount(votes: int, price: str, currency: str) -> str:
+    """Сколько платить за столько голосов. Цена может быть дробной."""
+    try:
+        total = float(str(price).replace(",", ".")) * votes
+    except ValueError:
+        return f"{votes} × {price} {currency}"
+    shown = f"{total:.2f}".rstrip("0").rstrip(".")
+    return f"{shown} {currency}"
+
+
+def manual_screen(title: str, details: str, note: str, votes: int,
+                  price: str, currency: str) -> str:
+    """Экран с реквизитами: сколько платить и куда."""
+    tail = f"\n\n<blockquote>{escape(note)}</blockquote>" if note else ""
+    return (
+        f"🏦 <b>{escape(title)}</b>\n"
+        f"{RULE}\n\n"
+        f"Голосов: <b>{votes}</b>\n"
+        f"К оплате: <b>{manual_amount(votes, price, currency)}</b>\n\n"
+        f"<b>Реквизиты</b>\n<code>{escape(details)}</code>\n"
+        f"<i>Нажмите на номер, чтобы скопировать.</i>{tail}\n\n"
+        "После оплаты нажмите «Я оплатил» и пришлите скриншот чека. "
+        "Голоса начислим после проверки."
+    )
+
+
+MANUAL_ASK_RECEIPT = (
+    "🧾 <b>Пришлите чек</b>\n\n"
+    "Скриншот или фото перевода — одним сообщением.\n\n"
+    "<i>Если передумали, нажмите «Отмена».</i>"
+)
+
+MANUAL_NEED_PHOTO = (
+    "⚠️ Нужен <b>скриншот или фото</b> чека. "
+    "Пришлите картинку, а не текст."
+)
+
+
+def manual_sent(votes: int, amount: str) -> str:
+    return (
+        f"✅ <b>Чек отправлен</b>\n"
+        f"{RULE}\n\n"
+        f"Голосов: <b>{votes}</b>\nСумма: <b>{amount}</b>\n\n"
+        "<blockquote>Заявка ушла администратору. Как только он проверит "
+        "чек, голоса появятся на балансе — придёт сообщение.</blockquote>"
+    )
+
+
+def manual_already_pending(votes: int, amount: str) -> str:
+    return (
+        f"⏳ <b>Заявка уже на проверке</b>\n"
+        f"{RULE}\n\n"
+        f"Голосов: <b>{votes}</b>\nСумма: <b>{amount}</b>\n\n"
+        "<blockquote>Дождитесь ответа — вторую заявку отправить нельзя. "
+        "Так сделано, чтобы один чек не засчитали дважды.</blockquote>"
+    )
+
+
+def manual_accepted(votes: int, balance: int) -> str:
+    return (
+        f"✅ <b>Оплата принята</b>\n"
+        f"{RULE}\n\n"
+        f"Начислено: <b>{votes}</b> "
+        f"{plural(votes, 'голос', 'голоса', 'голосов')}\n"
+        f"Баланс: <b>{balance}</b>"
+    )
+
+
+def manual_declined(note: str = "") -> str:
+    why = f"\n\n<b>Причина:</b> {escape(note)}" if note else ""
+    return (
+        f"❌ <b>Оплата не принята</b>\n"
+        f"{RULE}\n\n"
+        f"Администратор не подтвердил чек.{why}\n\n"
+        "<i>Можно отправить заявку заново или написать администратору.</i>"
+    )
+
+
+def manual_for_admin(user, votes: int, amount: str, topup_id: int) -> str:
+    handle = f"@{user['username']}" if user and user["username"] else (
+        escape(str(user["first_name"])) if user else "—"
+    )
+    return (
+        f"🧾 <b>Новая оплата вручную</b>\n"
+        f"{RULE}\n\n"
+        f"Заявка <b>#{topup_id}</b>\n"
+        f"От: {escape(handle)} (<code>{user['user_id'] if user else '?'}</code>)\n"
+        f"Голосов: <b>{votes}</b>\n"
+        f"Сумма: <b>{amount}</b>\n\n"
+        "<i>Проверьте чек и решите.</i>"
+    )
+
+
 def buy_confirm(votes: int, price: int) -> str:
     total = votes * price
     return (

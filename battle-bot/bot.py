@@ -15,7 +15,7 @@ from core.autopilot import Autopilot
 from core.scheduler import DeadlineWatcher, Ticker
 from handlers import (
     admin, broadcast, emoji, errors, groups, membership, mychannel, panel,
-    payments, referral, start, voting,
+    payments, referral, start, topup, voting,
 )
 from services.emoji import PremiumEmojiMiddleware, load_table
 from services.retry import RetryMiddleware
@@ -53,6 +53,7 @@ ROUTERS = (
     broadcast.router,
     admin.router,
     emoji.router,
+    topup.router,
     payments.router,
     referral.router,
     membership.router,

@@ -51,9 +51,56 @@ async def _screen(message: Message, repo: Repo, settings: Settings, state: FSMCo
             stars_link=settings.get("stars_link"),
             max_votes=limit,
         ),
-        reply_markup=keyboards.buy(price, settings.get("referral_enabled"), limit),
+        reply_markup=keyboards.buy(
+            price, settings.get("referral_enabled"), limit,
+            settings.get("manual_pay_title") if _manual_on(settings) else "",
+        ),
         disable_web_page_preview=True,
     )
+
+
+def _manual_on(settings: Settings) -> bool:
+    return bool(settings.get("manual_pay_enabled")) and bool(
+        settings.get("manual_pay_details")
+    )
+
+
+@router.callback_query(F.data.regexp(r"^manual:\d+$"))
+async def manual_details(
+    callback: CallbackQuery, settings: Settings, state: FSMContext
+) -> None:
+    """Показать реквизиты второго способа оплаты."""
+    if not _manual_on(settings):
+        await callback.answer("Этот способ сейчас недоступен.", show_alert=True)
+        return
+
+    votes = int(callback.data.split(":")[1])
+    if votes not in keyboards.MANUAL_AMOUNTS:
+        await callback.answer("Такое количество не подходит.", show_alert=True)
+        return
+
+    price = settings.get("manual_pay_price")
+    currency = settings.get("manual_pay_currency")
+    await state.clear()
+    # экран перерисовывается на месте: человек щёлкает количество и сразу
+    # видит новую сумму, а не получает пять сообщений подряд
+    await ui.edit_or_send(
+        callback,
+        texts.manual_screen(
+            settings.get("manual_pay_title"),
+            settings.get("manual_pay_details"),
+            settings.get("manual_pay_note"),
+            votes,
+            price,
+            currency,
+        ),
+        reply_markup=keyboards.manual_details(
+            settings.get("manual_pay_details"), votes,
+            [(count, f"{count} — {texts.manual_amount(count, price, currency)}")
+             for count in keyboards.MANUAL_AMOUNTS],
+        ),
+    )
+    await callback.answer()
 
 
 @router.message(F.text.in_(keyboards.variants(keyboards.BTN_BUY)))
