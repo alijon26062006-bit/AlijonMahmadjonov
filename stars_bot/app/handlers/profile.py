@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
 from app import runtime
+from app.emoji import em
 from app.config import settings
 from app.money import fmt
 from app.states import Promo
@@ -57,21 +58,41 @@ async def cb_profile(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Con
 @router.callback_query(F.data == "p:history")
 async def cb_history(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     orders = await db.list_orders(conn, user_id=call.from_user.id, limit=10)
+    back = keyboards.back("m:profile", f"{em('back')} Назад")
+
     if not orders:
-        await call.message.edit_text(
-            texts.HISTORY_EMPTY, reply_markup=keyboards.back("m:profile", "‹ Назад")
-        )
+        await call.message.edit_text(texts.HISTORY_EMPTY, reply_markup=back)
         await call.answer()
         return
 
-    lines = [
-        f"<b>№{order.id}</b> · {order.title} → @{order.recipient}\n"
-        f"{fmt(order.price)} · {order.status_title} · {_human_date(order.created_at)}"
-        for order in orders
-    ]
+    all_orders = await db.list_orders(conn, user_id=call.from_user.id, limit=500)
+    done = sum(1 for o in all_orders if o.status == db.ORDER_DELIVERED)
+    refunded = sum(1 for o in all_orders if o.is_refunded)
+    spent = sum(o.price for o in all_orders if o.status == db.ORDER_DELIVERED)
+
+    summary = texts.HISTORY_SUMMARY.format(
+        done=done, refunded=refunded, spent=fmt(spent)
+    )
+
+    lines = []
+    for order in orders:
+        # Возврат показываем отдельной строкой: человеку важно видеть,
+        # что деньги за неудачный заказ вернулись, а не пропали.
+        tail = (
+            f"\n└ {em('money')} <b>{fmt(order.price)}</b> вернулись на баланс"
+            if order.is_refunded else
+            f"\n└ Списано: <b>{fmt(order.price)}</b>"
+        )
+        lines.append(
+            f"<b>№{order.id}</b> · {order.status_title}\n"
+            f"├ {order.title} → <code>@{order.recipient}</code>\n"
+            f"├ {_human_date(order.created_at)}"
+            + tail
+        )
+
     await call.message.edit_text(
-        texts.HISTORY.format(items="\n\n".join(lines)),
-        reply_markup=keyboards.back("m:profile", "‹ Назад"),
+        texts.HISTORY.format(summary=summary, items="\n\n".join(lines)),
+        reply_markup=back,
     )
     await call.answer()
 

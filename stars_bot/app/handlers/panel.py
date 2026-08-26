@@ -21,7 +21,7 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app import db, runtime, texts
+from app import db, emoji, runtime, texts
 from app.config import settings
 from app.money import fmt, parse
 from app.states import Panel, PromoNew
@@ -67,7 +67,10 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="💼 Кошелёк", callback_data="pn:wallet"),
         InlineKeyboardButton(text="🔌 Проверить связь", callback_data="pn:fragment"),
     )
-    kb.row(InlineKeyboardButton(text="📝 Объявление в поддержке", callback_data="pn:notice"))
+    kb.row(
+        InlineKeyboardButton(text="🎨 Оформление", callback_data="pn:look"),
+        InlineKeyboardButton(text="📝 Объявление", callback_data="pn:notice"),
+    )
     kb.row(InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"))
     return kb.as_markup()
 
@@ -944,3 +947,155 @@ async def cb_cost_save(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     else:
         await call.answer(f"Себестоимость {fmt(cost)} записана")
     await safe_edit(call, prices_text(), prices_kb())
+
+
+# ============================================================= оформление
+
+
+@router.callback_query(F.data == "pn:look")
+async def cb_look(call: CallbackQuery, state: FSMContext) -> None:
+    """Список групп значков. Меняются по одному, видно сразу."""
+    await state.clear()
+    kb = InlineKeyboardBuilder()
+    for group in emoji.GROUPS:
+        kb.row(InlineKeyboardButton(text=group, callback_data=f"pn:emg:{group}"))
+    kb.row(InlineKeyboardButton(text="♻️ Вернуть все по умолчанию",
+                                callback_data="pn:emreset"))
+    kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
+
+    preview = "  ".join(emoji.em(key) for key in list(emoji.DEFAULTS)[:12])
+    await safe_edit(
+        call,
+        "🎨 <b>Оформление</b>\n\n"
+        "<blockquote>Каждый значок в боте можно заменить своим. "
+        "Изменения видны клиентам сразу, перезапуск не нужен.</blockquote>\n\n"
+        f"Сейчас: {preview}\n\n"
+        "<i>Выберите группу</i> 👇",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+async def render_emoji_group(call: CallbackQuery, group: str) -> bool:
+    """Показать значки одной группы. False — такой группы нет."""
+    items = emoji.GROUPS.get(group)
+    if not items:
+        return False
+
+    kb = InlineKeyboardBuilder()
+    lines = []
+    for key, (default, title) in items.items():
+        current = emoji.em(key)
+        changed = " <i>(изменено)</i>" if current != default else ""
+        lines.append(f"{current} — {title}{changed}")
+        kb.row(InlineKeyboardButton(
+            text=f"{current} {title}", callback_data=f"pn:emset:{key}",
+        ))
+    kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:look"))
+
+    await safe_edit(
+        call,
+        f"🎨 <b>{group}</b>\n\n" + "\n".join(lines)
+        + "\n\n<i>Нажмите на значок, чтобы заменить.</i>",
+        kb.as_markup(),
+    )
+    return True
+
+
+@router.callback_query(F.data.startswith("pn:emg:"))
+async def cb_emoji_group(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    if not await render_emoji_group(call, call.data.split(":", 2)[2]):
+        await call.answer("Группа не найдена.", show_alert=True)
+        return
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:emset:"))
+async def cb_emoji_set(call: CallbackQuery, state: FSMContext) -> None:
+    key = call.data.rsplit(":", 1)[1]
+    if key not in emoji.DEFAULTS:
+        await call.answer("Такого значка нет.", show_alert=True)
+        return
+    await state.set_state(Panel.emoji)
+    await state.update_data(emoji_key=key)
+
+    group = next(g for g, items in emoji.GROUPS.items() if key in items)
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text=f"♻️ Вернуть {emoji.DEFAULTS[key]}",
+                                callback_data=f"pn:emdef:{key}"))
+    kb.row(InlineKeyboardButton(text="‹ Назад", callback_data=f"pn:emg:{group}"))
+
+    await safe_edit(
+        call,
+        f"🎨 <b>{emoji.TITLES[key]}</b>\n\n"
+        f"├ Сейчас: {emoji.em(key)}\n"
+        f"└ По умолчанию: {emoji.DEFAULTS[key]}\n\n"
+        "<blockquote>Пришлите новый значок одним сообщением — "
+        "любой эмодзи или символ.</blockquote>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.message(Panel.emoji, F.text)
+async def on_emoji_value(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    data = await state.get_data()
+    key = data.get("emoji_key")
+    if key not in emoji.DEFAULTS:
+        await state.clear()
+        await message.answer("Не понял, что менять. Откройте /panel заново.")
+        return
+
+    value = (message.text or "").strip()
+    if not emoji.is_emoji_like(value):
+        await message.answer(
+            "❌ Нужен один значок — эмодзи или символ вроде <code>•</code>.\n"
+            "Слова и длинный текст не подойдут."
+        )
+        return
+
+    await runtime.set_value(conn, f"emoji_{key}", value)
+    await state.clear()
+    group = next(g for g, items in emoji.GROUPS.items() if key in items)
+    await message.answer(
+        f"✅ <b>{emoji.TITLES[key]}</b> теперь {value}\n\n"
+        "<i>Клиенты увидят изменение сразу.</i>",
+        reply_markup=back_kb(f"pn:emg:{group}", "‹ К группе"),
+    )
+
+
+@router.callback_query(F.data.startswith("pn:emdef:"))
+async def cb_emoji_default(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    key = call.data.rsplit(":", 1)[1]
+    await runtime.reset(conn, f"emoji_{key}")
+    await call.answer(f"Вернул {emoji.DEFAULTS.get(key, '')}")
+    group = next((g for g, items in emoji.GROUPS.items() if key in items), None)
+    if group:
+        await render_emoji_group(call, group)
+
+
+@router.callback_query(F.data == "pn:emreset")
+async def cb_emoji_reset_all(call: CallbackQuery, state: FSMContext) -> None:
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text="♻️ Да, вернуть всё", callback_data="pn:emreset2"))
+    kb.row(InlineKeyboardButton(text="‹ Отмена", callback_data="pn:look"))
+    await safe_edit(
+        call,
+        "♻️ <b>Вернуть значки по умолчанию?</b>\n\n"
+        "<blockquote>Все ваши замены будут сброшены.</blockquote>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:emreset2")
+async def cb_emoji_reset_confirm(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    for key in emoji.DEFAULTS:
+        await runtime.reset(conn, f"emoji_{key}")
+    await call.answer("Значки возвращены")
+    await cb_look(call, state)

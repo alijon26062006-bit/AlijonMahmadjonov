@@ -19,10 +19,18 @@ ORDER_FAILED = "failed"
 ORDER_REFUNDED = "refunded"
 
 ORDER_TITLES = {
-    ORDER_DELIVERING: "🚚 Выдаётся",
-    ORDER_DELIVERED: "✅ Выполнен",
-    ORDER_FAILED: "⚠️ Ошибка",
-    ORDER_REFUNDED: "↩️ Возвращён",
+    ORDER_DELIVERING: "Выдаётся",
+    ORDER_DELIVERED: "Выполнен",
+    ORDER_FAILED: "Проверяется",
+    ORDER_REFUNDED: "Деньги возвращены",
+}
+
+#: Ключ значка для каждого статуса — сами значки настраиваются в панели.
+ORDER_ICONS = {
+    ORDER_DELIVERING: "wait",
+    ORDER_DELIVERED: "ok",
+    ORDER_FAILED: "search",
+    ORDER_REFUNDED: "refund",
 }
 
 # ---- статусы пополнения ----
@@ -189,7 +197,14 @@ class Order:
 
     @property
     def status_title(self) -> str:
-        return ORDER_TITLES.get(self.status, self.status)
+        from app.emoji import em
+
+        icon = em(ORDER_ICONS.get(self.status, "receipt"))
+        return f"{icon} {ORDER_TITLES.get(self.status, self.status)}"
+
+    @property
+    def is_refunded(self) -> bool:
+        return self.status == ORDER_REFUNDED
 
 
 @dataclass

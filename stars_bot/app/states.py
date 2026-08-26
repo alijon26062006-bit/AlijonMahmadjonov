@@ -29,6 +29,7 @@ class Support(StatesGroup):
 
 class Panel(StatesGroup):
     value = State()       # ждём новое значение настройки
+    emoji = State()       # ждём новый значок
 
 
 class Cast(StatesGroup):

@@ -204,7 +204,7 @@ async def run_scenario(conn) -> None:
     call = FakeCallback("stars:buy", bot=bot)
     await shop_h.cb_stars_buy(call, state, conn)
     check("показан курс и доступное количество",
-          "Введите количество" in call.last and "500 звёзд" in call.last)
+          "Введите количество" in call.last and "500</b> ⭐" in call.last)
 
     msg = FakeMessage("10", bot=bot)
     await shop_h.on_quantity(msg, state, conn)
@@ -221,7 +221,7 @@ async def run_scenario(conn) -> None:
 
     msg = FakeMessage("не юзернейм!", bot=bot)
     await shop_h.on_recipient(msg, state, conn, provider)
-    check("кривой юзернейм отклоняется", "Не похоже на юзернейм" in msg.last)
+    check("кривой юзернейм отклоняется", "не похоже на юзернейм" in msg.last)
 
     msg = FakeMessage("@notfound", bot=bot)
     await shop_h.on_recipient(msg, state, conn, provider)
@@ -262,13 +262,13 @@ async def run_scenario(conn) -> None:
     msg = FakeMessage("10000", bot=bot)
     await shop_h.on_quantity(msg, state, conn)
     check("покупка сверх баланса блокируется до списания",
-          "Недостаточно средств" in msg.last)
+          "Не хватает средств" in msg.last)
 
     # ------------------------------------------------------------ профиль
     call = FakeCallback("m:profile", bot=bot)
     await prof_h.cb_profile(call, state, conn)
     check("профиль показывает баланс и статистику",
-          "80.00" in call.last and "Всего куплено звёзд" in call.last
+          "80.00" in call.last and "Звёзд куплено" in call.last
           and "100" in call.last)
 
     call = FakeCallback("p:history", bot=bot)
@@ -291,19 +291,19 @@ async def run_scenario(conn) -> None:
     # ------------------------------------------------------------ поддержка
     call = FakeCallback("m:support", bot=bot)
     await sup_h.cb_support(call, state, conn)
-    check("раздел поддержки открывается", "Техническая поддержка" in call.last)
+    check("раздел поддержки открывается", "Поддержка" in call.last)
 
     call = FakeCallback("t:new", bot=bot)
     await sup_h.cb_new_ticket(call, state, conn)
     msg = FakeMessage("Не пришли звёзды по заказу 1", bot=bot)
     await sup_h.on_subject(msg, state, conn, bot)
     tickets = await db.list_tickets(conn, status=db.TICKET_OPEN)
-    check("тикет создан", len(tickets) == 1 and "Тикет №" in msg.last)
+    check("тикет создан", len(tickets) == 1 and "Обращение №" in msg.last)
 
     call = FakeCallback("t:new", bot=bot)
     await sup_h.cb_new_ticket(call, state, conn)
     check("второй тикет при открытом первом не создаётся",
-          any("уже есть открытый" in alert for alert in call.alerts))
+          any("уже есть открытое" in alert for alert in call.alerts))
 
 
 asyncio.run(main())

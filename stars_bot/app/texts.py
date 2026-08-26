@@ -1,403 +1,517 @@
-"""Все тексты бота. Стиль и формулировки меняются только здесь."""
+"""Все тексты бота.
+
+Значки не пишутся напрямую, а вставляются токеном [[stars]] — подстановка
+идёт при обращении к тексту, поэтому смена значка в панели видна сразу.
+
+Доступ через texts.ИМЯ работает как обычно: модульный __getattr__ отдаёт
+шаблон уже с подставленными значками.
+"""
 from __future__ import annotations
 
 from app.config import settings
+from app.emoji import substitute
 from app.money import fmt
+
+LINE = "━━━━━━━━━━━━━━━━━━━━"
 
 
 def support() -> str:
     return f"@{settings.support_username}" if settings.support_username else "поддержку"
 
 
-MENU = (
-    "<b>Добро пожаловать!</b> У нас Вы можете приобрести Telegram Stars "
-    "и Telegram Premium.\n\n"
-    "💰 Текущий баланс: <b>{balance}</b>\n\n"
-    "Выберите действие 👇"
+_RAW: dict[str, str] = {}
+
+# ═══════════════════════════════════════════════════════ главное меню
+
+_RAW["MENU"] = (
+    "<b>Добро пожаловать!</b>\n"
+    "<blockquote>Здесь можно купить Telegram Stars и Telegram Premium "
+    "на любой аккаунт — быстро и без входа в него.</blockquote>\n\n"
+    "[[money]] Ваш баланс: <b>{balance}</b>\n\n"
+    "<i>Выберите раздел ниже</i> 👇"
 )
 
-# ------------------------------------------------------------------ звёзды
+# ═════════════════════════════════════════════════════════════ звёзды
 
-STARS_ENTRY = (
-    "⭐️ <b>Покупка Telegram Stars</b>\n\n"
-    "• Цена Telegram Stars: <b>{rate}/шт.</b>\n\n"
-    "Нажмите кнопку ниже для покупки 👇"
+_RAW["STARS_ENTRY"] = (
+    "[[stars]] <b>Telegram Stars</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "[[price]] Цена: <b>{rate}</b> за звезду\n\n"
+    "<blockquote>Звёзды придут на любой аккаунт с публичным юзернеймом. "
+    "Пароль и код из SMS не нужны никогда.</blockquote>\n\n"
+    "<i>Нажмите кнопку ниже</i> 👇"
 )
 
-STARS_ASK_QUANTITY = (
-    "⭐️ <b>Покупка звёзд</b>\n\n"
-    "• Цена за 1 звезду: <b>{rate}/шт.</b>;\n\n"
-    "• Минимум: {min_stars} звёзд;\n"
-    "• Максимум (за один заказ): {max_stars} звёзд.\n\n"
-    "• Баланса хватает на покупку: <b>~{affordable} звёзд</b> ({balance}).\n\n"
-    "🔍 Введите количество звёзд для покупки:"
+_RAW["STARS_ASK_QUANTITY"] = (
+    "[[stars]] <b>Сколько звёзд?</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "[[price]] Цена: <b>{rate}</b> за штуку\n"
+    "[[money]] Баланс: <b>{balance}</b> — хватит на <b>{affordable}</b> ⭐\n\n"
+    "<blockquote>Минимум — <b>{min_stars}</b>, максимум — <b>{max_stars}</b> "
+    "за один заказ.</blockquote>\n\n"
+    "[[search]] <i>Введите количество числом:</i>"
 )
 
-STARS_BAD_QUANTITY = (
-    "❌ Введите <b>целое число</b> от {min_stars} до {max_stars}."
+_RAW["STARS_BAD_QUANTITY"] = (
+    "[[fail]] Введите <b>целое число</b> от <code>{min_stars}</code> "
+    "до <code>{max_stars}</code>."
 )
 
-STARS_NOT_ENOUGH = (
-    "❌ <b>Недостаточно средств.</b>\n\n"
-    "Нужно: <b>{need}</b>\n"
-    "На балансе: <b>{balance}</b>\n"
-    "Не хватает: <b>{missing}</b>\n\n"
-    "Пополните баланс и попробуйте снова."
+_RAW["STARS_NOT_ENOUGH"] = (
+    "[[fail]] <b>Не хватает средств</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Нужно: <b>{need}</b>\n"
+    "├ Есть: <b>{balance}</b>\n"
+    "└ Не хватает: <b>{missing}</b>\n\n"
+    "<blockquote>Пополните баланс — и заказ пройдёт сразу.</blockquote>"
 )
 
-# ----------------------------------------------------------------- premium
+# ════════════════════════════════════════════════════════════ premium
 
-PREMIUM_ENTRY = (
-    "👑 <b>Покупка Telegram Premium</b>\n\n"
-    "Выберите период подписки:"
+_RAW["PREMIUM_ENTRY"] = (
+    "[[premium]] <b>Telegram Premium</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Подписка оформляется на аккаунт с публичным юзернеймом. "
+    "Доступ к аккаунту не нужен.</blockquote>\n\n"
+    "<i>Выберите срок</i> 👇"
 )
 
-# --------------------------------------------------------------- получатель
+# ══════════════════════════════════════════════════════════ получатель
 
-ASK_RECIPIENT = (
-    "{title} — <b>{price}</b>\n\n"
-    "👤 <b>Кому отправляем?</b>\n\n"
-    "Нажмите «Себе», если покупаете для своего аккаунта, "
-    "или отправьте <b>@username</b> получателя.\n\n"
-    "❗️ У аккаунта должен быть публичный юзернейм."
+_RAW["ASK_RECIPIENT"] = (
+    "<b>{title}</b> — <b>{price}</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "[[profile]] <b>Кому отправляем?</b>\n\n"
+    "<blockquote>Нажмите «Себе», если покупаете для своего аккаунта — "
+    "юзернейм подставится сам и ошибиться будет невозможно.</blockquote>\n\n"
+    "<i>Или пришлите</i> <code>@username</code> <i>получателя.</i>"
 )
 
-NO_OWN_USERNAME = (
-    "❌ <b>У вас не установлен юзернейм.</b>\n\n"
-    "Fragment отправляет звёзды только на аккаунты с публичным "
-    "юзернеймом.\n\n"
-    "Как включить:\n"
-    "Настройки Telegram → Мой профиль → <b>Имя пользователя</b> → "
-    "придумайте любое свободное.\n\n"
-    "После этого вернитесь и нажмите «Себе» ещё раз."
+_RAW["NO_OWN_USERNAME"] = (
+    "[[fail]] <b>У вас не установлен юзернейм</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Звёзды отправляются только на аккаунты с публичным "
+    "юзернеймом — без него аккаунт не найти.</blockquote>\n\n"
+    "<b>Как включить:</b>\n"
+    "├ Настройки Telegram\n"
+    "├ Мой профиль\n"
+    "└ <b>Имя пользователя</b> → придумайте свободное\n\n"
+    "<i>Потом вернитесь и нажмите «Себе» ещё раз.</i>"
 )
 
-CONFIRM_RECIPIENT = (
-    "🔍 <b>Проверьте получателя</b>\n\n"
-    "👤 Аккаунт: <b>{name}</b>\n"
-    "🔗 Юзернейм: <b>@{username}</b>\n\n"
+_RAW["CHECKING_RECIPIENT"] = "[[search]] <i>Проверяю аккаунт</i> <code>@{username}</code>…"
+
+_RAW["BAD_USERNAME"] = (
+    "[[fail]] <b>Это не похоже на юзернейм</b>\n\n"
+    "<blockquote>Нужен формат <code>@username</code>: от 5 до 32 символов, "
+    "латиница, цифры и подчёркивание.</blockquote>"
+)
+
+_RAW["UNKNOWN_RECIPIENT"] = (
+    "[[fail]] <b>Аккаунт @{username} не найден</b>\n\n"
+    "<blockquote>Проверьте, что юзернейм публичный и написан без опечаток.</blockquote>"
+)
+
+_RAW["CONFIRM_RECIPIENT"] = (
+    "[[search]] <b>Проверьте получателя</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Аккаунт: <b>{name}</b>\n"
+    "└ Юзернейм: <code>@{username}</code>\n\n"
     "{who}\n\n"
-    "⚠️ <b>{title}</b> уйдут именно на этот аккаунт. "
-    "После отправки вернуть их нельзя.\n\n"
-    "Это верный аккаунт?"
+    "<blockquote>[[warn]] <b>{title}</b> уйдут именно на этот аккаунт. "
+    "После отправки вернуть их нельзя.</blockquote>\n\n"
+    "<i>Всё верно?</i>"
 )
 
-CONFIRM_RECIPIENT_UNVERIFIED = (
-    "🔍 <b>Проверьте получателя</b>\n\n"
-    "🔗 Юзернейм: <b>@{username}</b>\n\n"
+_RAW["CONFIRM_RECIPIENT_UNVERIFIED"] = (
+    "[[search]] <b>Проверьте получателя</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "└ Юзернейм: <code>@{username}</code>\n\n"
     "{who}\n\n"
-    "⚠️ <b>Имя аккаунта проверить нельзя</b> — сервис выдачи не отдаёт "
-    "такую информацию. Откройте <code>t.me/{username}</code> и убедитесь, "
+    "<blockquote>[[warn]] Имя аккаунта проверить нельзя — сервис выдачи "
+    "его не сообщает. Откройте <code>t.me/{username}</code> и убедитесь, "
     "что это нужный человек.\n\n"
-    "❗️ <b>{title}</b> уйдут именно на этот юзернейм. "
-    "После отправки вернуть их нельзя.\n\n"
-    "Юзернейм верный?"
+    "<b>{title}</b> уйдут именно на этот юзернейм, вернуть их нельзя."
+    "</blockquote>\n\n"
+    "<i>Юзернейм верный?</i>"
 )
 
-RECIPIENT_IS_YOU = "✅ Это ваш аккаунт."
-RECIPIENT_IS_OTHER = (
-    "❗️ Это <b>чужой</b> аккаунт. Убедитесь, что не ошиблись в юзернейме."
+_RAW["RECIPIENT_IS_YOU"] = "[[ok]] <b>Это ваш аккаунт.</b>"
+_RAW["RECIPIENT_IS_OTHER"] = "[[warn]] Это <b>чужой</b> аккаунт — проверьте внимательно."
+
+_RAW["CONFIRM"] = (
+    "[[receipt]] <b>Подтверждение заказа</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Товар: <b>{title}</b>\n"
+    "├ Получатель: <b>{name}</b> (<code>@{recipient}</code>)\n"
+    "├ К списанию: <b>{price}</b>\n"
+    "└ Останется: <b>{rest}</b>\n\n"
+    "<blockquote>Нажимая «Оплатить», вы подтверждаете, что аккаунт указан "
+    "верно.</blockquote>"
 )
 
-CHECKING_RECIPIENT = "🔍 Проверяю аккаунт @{username}…"
+_RAW["PROCESSING"] = "[[wait]] <i>Оплачено. Отправляю {title} на</i> <code>@{recipient}</code>…"
 
-BAD_USERNAME = (
-    "❌ Не похоже на юзернейм.\n\n"
-    "Формат: <code>@username</code> — от 5 до 32 символов, латиница, "
-    "цифры и подчёркивание."
+_RAW["PROCESSING_SLOW"] = (
+    "[[ok]] <b>Заказ принят и оплачен</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Товар: <b>{title}</b>\n"
+    "└ Получатель: <code>@{recipient}</code>\n\n"
+    "<blockquote>[[wait]] Выдача занимает несколько минут. Я напишу, как "
+    "только всё придёт — чат можно закрыть.</blockquote>"
 )
 
-UNKNOWN_RECIPIENT = (
-    "❌ Получатель <b>@{username}</b> не найден.\n\n"
-    "Убедитесь, что юзернейм публичный и написан без опечаток."
+_RAW["DELIVERED"] = (
+    "[[party]] <b>Заказ №{order_id} выполнен!</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Товар: <b>{title}</b>\n"
+    "├ Получатель: <code>@{recipient}</code>\n"
+    "└ Списано: <b>{price}</b>\n\n"
+    "<blockquote>Спасибо за покупку! Если что-то не пришло — "
+    "напишите в поддержку.</blockquote>"
 )
 
-CONFIRM = (
-    "🧾 <b>Подтверждение заказа</b>\n\n"
-    "├ Товар: <b>{title}</b>;\n"
-    "├ Получатель: <b>{name}</b> (@{recipient});\n"
-    "├ К списанию: <b>{price}</b>;\n"
-    "└ Останется на балансе: <b>{rest}</b>.\n\n"
-    "Нажимая «Оплатить», вы подтверждаете, что аккаунт указан верно."
+_RAW["REFUNDED"] = (
+    "[[refund]] <b>Заказ №{order_id} не выполнен</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>[[money]] <b>{price}</b> уже вернулись на ваш баланс — "
+    "деньги не потеряны.</blockquote>\n\n"
+    "<i>Попробуйте ещё раз чуть позже или напишите в {support}.</i>"
 )
 
-PROCESSING = "⏳ Оплачено. Отправляю {title} на @{recipient}…"
+# ═══════════════════════════════════════════════════════════ пополнение
 
-PROCESSING_SLOW = (
-    "✅ <b>Заказ принят и оплачен.</b>\n\n"
-    "├ Товар: <b>{title}</b>;\n"
-    "└ Получатель: <b>@{recipient}</b>.\n\n"
-    "⏳ Выдача занимает несколько минут — я напишу, как только всё придёт. "
-    "Можно закрыть чат."
+_RAW["DEPOSIT_METHODS"] = (
+    "[[deposit]] <b>Пополнение баланса</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Переведите нужную сумму по реквизитам и пришлите чек — "
+    "баланс пополнится после проверки.</blockquote>\n\n"
+    "<i>Выберите способ</i> 👇"
 )
 
-DELIVERED = (
-    "✅ <b>Заказ №{order_id} выполнен!</b>\n\n"
-    "├ Товар: <b>{title}</b>;\n"
-    "├ Получатель: <b>@{recipient}</b>;\n"
-    "└ Списано: <b>{price}</b>.\n\n"
-    "Спасибо за покупку! ⭐️"
-)
-
-REFUNDED = (
-    "↩️ <b>Заказ №{order_id} не удалось выполнить.</b>\n\n"
-    "<b>{price}</b> возвращены на ваш баланс — деньги не потеряны.\n\n"
-    "Попробуйте ещё раз чуть позже или напишите в {support}."
-)
-
-# -------------------------------------------------------------- пополнение
-
-DEPOSIT_METHODS = (
-    "💳 <b>Пополнение баланса</b>\n\n"
-    "Выберите удобный способ пополнения:"
-)
-
-DEPOSIT_ASK_AMOUNT = (
-    "💳 <b>Пополнение — перевод на карту</b>\n\n"
+_RAW["DEPOSIT_ASK_AMOUNT"] = (
+    "[[deposit]] <b>Перевод на карту</b>\n"
+    f"<code>{LINE}</code>\n\n"
     "Минимальная сумма: <b>{min_amount}</b>\n\n"
-    "🔍 Введите сумму пополнения в сомони (например <code>150</code> "
-    "или <code>150.50</code>):"
+    "[[search]] <i>Введите сумму в сомони — например</i> "
+    "<code>150</code> <i>или</i> <code>150.50</code>:"
 )
 
-DEPOSIT_BAD_AMOUNT = "❌ Введите сумму числом, например <code>150</code> или <code>150.50</code>."
+_RAW["DEPOSIT_BAD_AMOUNT"] = (
+    "[[fail]] Введите сумму числом: <code>150</code> или <code>150.50</code>."
+)
 
-DEPOSIT_TOO_SMALL = "❌ Минимальная сумма пополнения — <b>{min_amount}</b>."
+_RAW["DEPOSIT_TOO_SMALL"] = "[[fail]] Минимальная сумма пополнения — <b>{min_amount}</b>."
 
-DEPOSIT_REQUISITES = (
-    "💳 <b>Пополнение на {amount}</b>\n\n"
+_RAW["DEPOSIT_REQUISITES"] = (
+    "[[deposit]] <b>Пополнение на {amount}</b>\n"
+    f"<code>{LINE}</code>\n\n"
     "Переведите <b>ровно {amount}</b> по реквизитам:\n\n"
-    "💳 Карта: <code>{card}</code>\n"
+    "<b>Карта</b>\n<code>{card}</code>\n\n"
     "{holder}{bank}"
     "🏙 Город: <b>{city}</b>\n"
     "{extra}\n"
-    "После перевода пришлите <b>скриншот чека</b> прямо в этот чат.\n"
-    "Как только проверю оплату — баланс пополнится автоматически."
+    "<blockquote>[[warn]] Сумма должна совпадать до копейки — иначе "
+    "заявку придётся проверять вручную.</blockquote>\n\n"
+    "📸 <i>После перевода пришлите скриншот чека сюда.</i>"
 )
 
-DEPOSIT_NEED_PHOTO = "📸 Пришлите <b>фото или файл</b> чека — по тексту оплату не проверить."
-
-DEPOSIT_SENT = (
-    "✅ <b>Заявка №{deposit_id} на {amount} отправлена на проверку.</b>\n\n"
-    "Обычно это занимает несколько минут. Я напишу, как только баланс пополнится."
+_RAW["DEPOSIT_NEED_PHOTO"] = (
+    "📸 Пришлите <b>фото или файл</b> чека — по тексту оплату не проверить."
 )
 
-DEPOSIT_APPROVED = (
-    "✅ <b>Баланс пополнен на {amount}!</b>\n\n"
-    "💰 Текущий баланс: <b>{balance}</b>"
+_RAW["DEPOSIT_SENT"] = (
+    "[[ok]] <b>Заявка №{deposit_id} отправлена</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "└ Сумма: <b>{amount}</b>\n\n"
+    "<blockquote>[[wait]] Проверка занимает несколько минут. Я напишу, "
+    "как только баланс пополнится.</blockquote>"
 )
 
-DEPOSIT_REJECTED = (
-    "❌ <b>Пополнение №{deposit_id} отклонено.</b>\n\n"
-    "Оплата на {amount} не найдена. Если это ошибка — напишите в {support} "
-    "и приложите чек."
+_RAW["DEPOSIT_APPROVED"] = (
+    "[[party]] <b>Баланс пополнен на {amount}!</b>\n\n"
+    "[[money]] Текущий баланс: <b>{balance}</b>"
 )
 
-DEPOSIT_SOON = (
-    "🔧 Этот способ пополнения пока не подключён.\n\n"
-    "Сейчас доступен перевод на карту — вернитесь назад и выберите его."
+_RAW["DEPOSIT_REJECTED"] = (
+    "[[fail]] <b>Пополнение №{deposit_id} отклонено</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Оплата на {amount} не найдена. Если это ошибка — "
+    "напишите в {support} и приложите чек.</blockquote>"
 )
 
-# ----------------------------------------------------------------- профиль
-
-PROFILE = (
-    "🎩 <b>Профиль</b>\n\n"
-    "🆔 ID: <code>{user_id}</code>;\n"
-    "📝 Username: {username}.\n\n"
-    "💰 Баланс: <b>{balance}</b>;\n"
-    "└ Общий депозит: <b>{total_deposit}</b>.\n\n"
-    "📦 Заказы:\n"
-    "├ Всего заказов: <b>{total}</b>;\n"
-    "├ Выполнено: <b>{done}</b>;\n"
-    "├ В обработке: <b>{active}</b>;\n"
-    "├ Куплено Premium: <b>{premium} шт.</b> (~{premium_spent});\n"
-    "└ Всего куплено звёзд: <b>{stars} шт.</b> (~{stars_spent}).\n\n"
-    "📅 Регистрация: {created}."
+_RAW["DEPOSIT_SOON"] = (
+    "🔧 Этот способ пока не подключён.\n\nСейчас доступен перевод на карту."
 )
 
-HISTORY_EMPTY = "📜 <b>История покупок</b>\n\nЗаказов пока нет."
-HISTORY = "📜 <b>История покупок</b>\n\n{items}"
+# ══════════════════════════════════════════════════════════════ профиль
 
-# --------------------------------------------------------------- промокоды
-
-PROMO_ASK = "🎟 Введите промокод:"
-PROMO_OK = (
-    "✅ <b>Промокод активирован!</b>\n\n"
-    "Начислено: <b>{amount}</b>\n"
-    "💰 Баланс: <b>{balance}</b>"
-)
-PROMO_ERRORS = {
-    "not_found": "❌ Такого промокода не существует.",
-    "already_used": "❌ Вы уже активировали этот промокод.",
-    "exhausted": "❌ Лимит активаций этого промокода исчерпан.",
-}
-
-# ------------------------------------------------------------- рефералка
-
-REFERRAL = (
-    "👥 <b>Реферальная система</b>\n\n"
-    "Приглашайте друзей и получайте <b>{percent}%</b> от каждого их "
-    "пополнения — навсегда.\n\n"
-    "├ Приглашено: <b>{ref_count} чел.</b>;\n"
-    "└ Заработано: <b>{ref_earned}</b>.\n\n"
-    "🔗 Ваша ссылка:\n<code>{link}</code>"
+_RAW["PROFILE"] = (
+    "[[profile]] <b>Профиль</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ ID: <code>{user_id}</code>\n"
+    "└ Username: {username}\n\n"
+    "[[money]] <b>Финансы</b>\n"
+    "├ Баланс: <b>{balance}</b>\n"
+    "└ Всего пополнено: <b>{total_deposit}</b>\n\n"
+    "📦 <b>Заказы</b>\n"
+    "├ Всего: <b>{total}</b>\n"
+    "├ Выполнено: <b>{done}</b>\n"
+    "├ В обработке: <b>{active}</b>\n"
+    "├ Premium: <b>{premium}</b> мес. <i>(~{premium_spent})</i>\n"
+    "└ Звёзд куплено: <b>{stars}</b> <i>(~{stars_spent})</i>\n\n"
+    "📅 <i>С нами с {created}</i>"
 )
 
-REFERRAL_BONUS = (
-    "👥 <b>+{amount}</b> за пополнение вашего реферала!\n\n"
-    "💰 Баланс: <b>{balance}</b>"
+_RAW["HISTORY_EMPTY"] = (
+    "[[history]] <b>История покупок</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Здесь появятся ваши заказы: что купили, кому и чем "
+    "закончилось.</blockquote>\n\n"
+    "<i>Пока пусто.</i>"
 )
 
-# ------------------------------------------------------------- поддержка
+_RAW["HISTORY"] = (
+    "[[history]] <b>История покупок</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "{summary}\n\n"
+    "{items}"
+)
 
-SUPPORT = (
-    "📞 <b>Техническая поддержка</b>\n\n"
-    "В этом разделе Вы можете создать тикет для связи с поддержкой.\n\n"
-    "📊 <b>Статистика:</b>\n"
-    "• Активных тикетов: <b>{open_tickets}</b>\n\n"
-    "<b>Актуальная информация:</b>\n"
+_RAW["HISTORY_SUMMARY"] = (
+    "<blockquote>[[ok]] Выполнено: <b>{done}</b>   "
+    "[[refund]] Возвращено: <b>{refunded}</b>\n"
+    "[[money]] Потрачено всего: <b>{spent}</b></blockquote>"
+)
+
+# ═══════════════════════════════════════════════════════════ промокоды
+
+_RAW["PROMO_ASK"] = (
+    "[[promo]] <b>Промокод</b>\n\n"
+    "<blockquote>Введите код — сумма зачислится на баланс сразу.</blockquote>"
+)
+
+_RAW["PROMO_OK"] = (
+    "[[party]] <b>Промокод активирован!</b>\n\n"
+    "├ Начислено: <b>{amount}</b>\n"
+    "└ Баланс: <b>{balance}</b>"
+)
+
+# ════════════════════════════════════════════════════════════ рефералы
+
+_RAW["REFERRAL"] = (
+    "[[referral]] <b>Реферальная система</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Приглашайте друзей и получайте <b>{percent}%</b> "
+    "с каждого их пополнения — навсегда.</blockquote>\n\n"
+    "├ Приглашено: <b>{ref_count}</b> чел.\n"
+    "└ Заработано: <b>{ref_earned}</b>\n\n"
+    "🔗 <b>Ваша ссылка</b>\n<code>{link}</code>\n\n"
+    "<i>Нажмите на ссылку, чтобы скопировать.</i>"
+)
+
+_RAW["REFERRAL_BONUS"] = (
+    "[[referral]] <b>+{amount}</b> за пополнение вашего реферала!\n\n"
+    "[[money]] Баланс: <b>{balance}</b>"
+)
+
+# ═══════════════════════════════════════════════════════════ поддержка
+
+_RAW["SUPPORT"] = (
+    "[[support]] <b>Поддержка</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "📊 Активных обращений: <b>{open_tickets}</b>\n\n"
     "<blockquote>{notice}</blockquote>\n\n"
-    "✅ <b>Вы можете создать новый тикет для обращения в поддержку.</b>"
+    "<i>Опишите проблему — отвечу в этом чате.</i>"
 )
 
-SUPPORT_NOTICE_DEFAULT = (
-    "Среднее время ответа — до 30 минут. Перед созданием тикета проверьте "
-    "раздел «Информация» — там ответы на частые вопросы."
+_RAW["SUPPORT_NOTICE_DEFAULT"] = (
+    "Среднее время ответа — до 30 минут. Перед обращением загляните "
+    "в раздел «Информация»: там ответы на частые вопросы."
 )
 
-TICKET_ASK_SUBJECT = (
-    "📝 <b>Новый тикет</b>\n\n"
-    "Опишите проблему одним сообщением. Если вопрос по заказу — "
-    "укажите его номер."
+_RAW["TICKET_ASK_SUBJECT"] = (
+    "📝 <b>Новое обращение</b>\n\n"
+    "<blockquote>Опишите проблему одним сообщением. Если вопрос по "
+    "заказу — укажите его номер.</blockquote>"
 )
 
-TICKET_CREATED = (
-    "✅ <b>Тикет №{ticket_id} создан.</b>\n\n"
-    "Ответ придёт в этот чат. Чтобы дописать — откройте тикет в разделе "
-    "«Поддержка»."
+_RAW["TICKET_CREATED"] = (
+    "[[ok]] <b>Обращение №{ticket_id} создано</b>\n\n"
+    "<blockquote>Ответ придёт в этот чат. Чтобы дописать — откройте "
+    "раздел «Поддержка».</blockquote>"
 )
 
-TICKET_ASK_REPLY = "✍️ Напишите сообщение в тикет №{ticket_id}:"
-TICKET_USER_REPLY_SENT = "✅ Сообщение отправлено в тикет №{ticket_id}."
-TICKET_ADMIN_ANSWER = (
-    "📞 <b>Ответ поддержки по тикету №{ticket_id}</b>\n\n{text}"
+_RAW["TICKET_ASK_REPLY"] = "✍️ <i>Напишите сообщение в обращение №{ticket_id}:</i>"
+_RAW["TICKET_USER_REPLY_SENT"] = "[[ok]] Сообщение отправлено в обращение №{ticket_id}."
+_RAW["TICKET_ADMIN_ANSWER"] = (
+    "[[support]] <b>Ответ поддержки</b> <i>(обращение №{ticket_id})</i>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>{text}</blockquote>"
 )
-TICKET_CLOSED_USER = "✅ Тикет №{ticket_id} закрыт. Если вопрос остался — создайте новый."
-TICKET_LIMIT = "❗️ У вас уже есть открытый тикет. Дождитесь ответа по нему."
+_RAW["TICKET_CLOSED_USER"] = (
+    "[[ok]] Обращение №{ticket_id} закрыто.\n\n"
+    "<i>Если вопрос остался — создайте новое.</i>"
+)
+_RAW["TICKET_LIMIT"] = "У вас уже есть открытое обращение. Дождитесь ответа по нему."
 
-# ------------------------------------------------------------ калькулятор
+# ═════════════════════════════════════════════════════════ калькулятор
 
-CALC_ASK = (
-    "🖩 <b>Калькулятор</b>\n\n"
-    "• Курс: <b>{rate}</b> за 1 звезду.\n\n"
-    "Отправьте:\n"
-    "• <b>число звёзд</b> — посчитаю стоимость (например <code>500</code>);\n"
-    "• <b>сумму с буквой с</b> — посчитаю, сколько звёзд выйдет "
-    "(например <code>100с</code>)."
+_RAW["CALC_ASK"] = (
+    "[[calc]] <b>Калькулятор</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "[[price]] Курс: <b>{rate}</b> за звезду\n\n"
+    "<blockquote>Отправьте <b>число</b> — посчитаю стоимость.\n"
+    "Отправьте <b>сумму с буквой с</b> — посчитаю, сколько выйдет звёзд."
+    "</blockquote>\n\n"
+    "<i>Например:</i> <code>500</code> <i>или</i> <code>100с</code>"
 )
 
-CALC_STARS = "⭐️ <b>{stars} звёзд</b> = <b>{price}</b>"
-CALC_MONEY = "💰 На <b>{money}</b> можно купить <b>~{stars} звёзд</b>"
-CALC_BAD = "❌ Не понял. Отправьте число звёзд или сумму, например <code>100с</code>."
+_RAW["CALC_STARS"] = "[[stars]] <b>{stars}</b> звёзд = <b>{price}</b>"
+_RAW["CALC_MONEY"] = "[[money]] На <b>{money}</b> можно купить <b>~{stars}</b> звёзд"
+_RAW["CALC_BAD"] = (
+    "[[fail]] Не понял. Отправьте число звёзд или сумму: <code>100с</code>"
+)
 
-# ------------------------------------------------------------ информация
+# ══════════════════════════════════════════════════════════ информация
 
-INFO = (
-    "ℹ️ <b>Информация</b>\n\n"
-    "<b>Как купить звёзды:</b>\n"
-    "1️⃣ Пополните баланс переводом на карту\n"
-    "2️⃣ Нажмите «Купить звезды» и введите количество\n"
-    "3️⃣ Укажите @username получателя\n"
-    "4️⃣ Звёзды придут в течение минуты\n\n"
-    "<b>Частые вопросы:</b>\n\n"
-    "• <i>Нужен ли доступ к аккаунту?</i>\n"
+_RAW["INFO"] = (
+    "[[info]] <b>Как это работает</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<b>1️⃣</b> Пополняете баланс переводом на карту\n"
+    "<b>2️⃣</b> Выбираете количество звёзд\n"
+    "<b>3️⃣</b> Указываете <code>@username</code> получателя\n"
+    "<b>4️⃣</b> Звёзды приходят\n\n"
+    "<blockquote expandable><b>Частые вопросы</b>\n\n"
+    "<b>Нужен ли доступ к аккаунту?</b>\n"
     "Нет. Пароль, код из SMS и вход в аккаунт не нужны <b>никогда</b>. "
     "Если кто-то их просит — это мошенник.\n\n"
-    "• <i>Можно ли на чужой аккаунт?</i>\n"
-    "Да, достаточно публичного @username получателя.\n\n"
-    "• <i>Что если заказ не прошёл?</i>\n"
-    "Деньги автоматически возвращаются на баланс.\n\n"
-    "• <i>Сколько ждать пополнение?</i>\n"
+    "<b>Можно на чужой аккаунт?</b>\n"
+    "Да, достаточно публичного юзернейма.\n\n"
+    "<b>Что если заказ не прошёл?</b>\n"
+    "Деньги возвращаются на баланс автоматически.\n\n"
+    "<b>Сколько ждать пополнение?</b>\n"
     "Обычно несколько минут после отправки чека.\n\n"
-    "📞 Поддержка: {support}"
+    "<b>Можно вернуть звёзды?</b>\n"
+    "Нет. После отправки операция необратима — проверяйте получателя."
+    "</blockquote>\n\n"
+    "[[support]] Поддержка: {support}"
 )
 
-TOP_CLIENTS = "🏆 <b>Топ клиентов</b>\n\n{items}"
-TOP_EMPTY = "🏆 <b>Топ клиентов</b>\n\nПока пусто — станьте первым!"
+_RAW["TOP_CLIENTS"] = (
+    "[[top]] <b>Топ клиентов</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "{items}\n\n"
+    "<blockquote>Рейтинг по сумме пополнений за всё время.</blockquote>"
+)
+_RAW["TOP_EMPTY"] = (
+    "[[top]] <b>Топ клиентов</b>\n\n"
+    "<blockquote>Пока пусто — станьте первым!</blockquote>"
+)
 
-BANNED = "🚫 Доступ к боту закрыт."
-SOON = "🔧 Раздел в разработке — скоро будет доступен."
+_RAW["BANNED"] = "[[block]] <b>Доступ к боту закрыт.</b>"
+_RAW["SOON"] = "🔧 Раздел в разработке."
 
-# ------------------------------------------------------------------ админ
+# ═════════════════════════════════════════════════════════════ админка
 
-ADMIN_HELP = (
-    "🛠 <b>Админ-панель</b>\n\n"
+_RAW["ADMIN_NEW_DEPOSIT"] = (
+    "🔔 <b>Пополнение №{deposit_id}</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Сумма: <b>{amount}</b>\n"
+    "├ Способ: {method}\n"
+    "├ Покупатель: {buyer}\n"
+    "└ ID: <code>{user_id}</code>"
+)
+
+_RAW["ADMIN_NEW_TICKET"] = (
+    "[[support]] <b>Обращение №{ticket_id}</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ От: {buyer} (<code>{user_id}</code>)\n"
+    "└ Баланс: <b>{balance}</b>\n\n"
+    "<blockquote>{subject}</blockquote>\n\n"
+    "<i>Ответить:</i> <code>/answer {ticket_id} текст</code>"
+)
+
+_RAW["ADMIN_TICKET_REPLY"] = (
+    "💬 <b>Ответ в обращении №{ticket_id}</b>\n"
+    "От {buyer} (<code>{user_id}</code>)\n\n"
+    "<blockquote>{text}</blockquote>"
+)
+
+_RAW["ADMIN_ORDER_DONE"] = (
+    "[[ok]] <b>Заказ №{order_id}</b>\n"
+    "{title} → <code>@{recipient}</code>\n"
+    "<b>{price}</b> · покупатель <code>{user_id}</code>"
+)
+
+_RAW["ADMIN_ORDER_FAILED"] = (
+    "[[warn]] <b>Заказ №{order_id} не прошёл</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ {title} → <code>@{recipient}</code>\n"
+    "└ Покупатель: <code>{user_id}</code>\n\n"
+    "<blockquote expandable>{error}</blockquote>"
+)
+
+_RAW["ADMIN_ALREADY_HANDLED"] = "Эта заявка уже обработана."
+_RAW["ADMIN_DEPOSIT_OK"] = "[[ok]] Пополнение №{deposit_id} на {amount} зачислено."
+_RAW["ADMIN_DEPOSIT_NO"] = "[[fail]] Пополнение №{deposit_id} отклонено."
+
+_RAW["ADMIN_HELP"] = (
+    "🛠 <b>Команды администратора</b>\n"
+    f"<code>{LINE}</code>\n\n"
     "<b>Заявки</b>\n"
-    "/pending — пополнения на проверке\n"
-    "/tickets — открытые тикеты\n"
-    "/answer &lt;id&gt; &lt;текст&gt; — ответить в тикет\n"
-    "/close &lt;id&gt; — закрыть тикет\n\n"
+    "├ /pending — пополнения на проверке\n"
+    "├ /tickets — открытые обращения\n"
+    "├ /answer &lt;id&gt; &lt;текст&gt; — ответить\n"
+    "└ /close &lt;id&gt; — закрыть обращение\n\n"
     "<b>Заказы и деньги</b>\n"
-    "/stats — общая статистика\n"
-    "/orders — последние заказы\n"
-    "/retry &lt;id&gt; — повторить упавшую выдачу\n"
-    "/give &lt;user_id&gt; &lt;сумма&gt; — начислить на баланс\n"
-    "/take &lt;user_id&gt; &lt;сумма&gt; — списать с баланса\n"
-    "/balance — баланс Fragment\n\n"
+    "├ /stats — статистика\n"
+    "├ /orders — последние заказы\n"
+    "├ /retry &lt;id&gt; — повторить выдачу\n"
+    "├ /done &lt;id&gt; · /refund &lt;id&gt; — закрыть или вернуть\n"
+    "├ /give &lt;id&gt; &lt;сумма&gt; — начислить\n"
+    "└ /take &lt;id&gt; &lt;сумма&gt; — списать\n\n"
     "<b>Прочее</b>\n"
-    "/promo &lt;код&gt; &lt;сумма&gt; &lt;лимит&gt; — создать промокод\n"
-    "/promos — список промокодов\n"
-    "/broadcast &lt;текст&gt; — рассылка\n"
-    "/ban &lt;user_id&gt; · /unban &lt;user_id&gt;\n"
-    "/user &lt;user_id&gt; — карточка пользователя"
+    "├ /promo &lt;код&gt; &lt;сумма&gt; &lt;лимит&gt;\n"
+    "├ /broadcast &lt;текст&gt; — рассылка\n"
+    "├ /user &lt;id&gt; — карточка\n"
+    "└ /ban &lt;id&gt; · /unban &lt;id&gt;"
 )
-
-ADMIN_NEW_DEPOSIT = (
-    "🔔 <b>Пополнение №{deposit_id}</b>\n\n"
-    "├ Сумма: <b>{amount}</b>;\n"
-    "├ Способ: {method};\n"
-    "├ Покупатель: {buyer};\n"
-    "└ ID: <code>{user_id}</code>."
-)
-
-ADMIN_NEW_TICKET = (
-    "📞 <b>Тикет №{ticket_id}</b>\n\n"
-    "├ От: {buyer} (<code>{user_id}</code>);\n"
-    "└ Баланс: <b>{balance}</b>.\n\n"
-    "<b>Сообщение:</b>\n{subject}\n\n"
-    "Ответить: <code>/answer {ticket_id} текст</code>"
-)
-
-ADMIN_TICKET_REPLY = (
-    "💬 <b>Новое сообщение в тикете №{ticket_id}</b>\n"
-    "От {buyer} (<code>{user_id}</code>)\n\n{text}"
-)
-
-ADMIN_ORDER_DONE = (
-    "✅ <b>Заказ №{order_id}</b>\n"
-    "{title} → @{recipient}\n"
-    "{price} · покупатель <code>{user_id}</code>"
-)
-
-ADMIN_ORDER_FAILED = (
-    "⚠️ <b>Заказ №{order_id} упал, деньги возвращены</b>\n"
-    "{title} → @{recipient}\n"
-    "Покупатель: <code>{user_id}</code>\n\n"
-    "<code>{error}</code>"
-)
-
-ADMIN_ALREADY_HANDLED = "Эта заявка уже обработана."
-ADMIN_DEPOSIT_OK = "✅ Пополнение №{deposit_id} на {amount} зачислено."
-ADMIN_DEPOSIT_NO = "❌ Пополнение №{deposit_id} отклонено."
 
 
 def money_stats(data: dict) -> str:
-    return (
-        "📊 <b>Статистика</b>\n\n"
-        f"👥 Пользователей: <b>{data['users']}</b>\n"
-        f"💰 Всего пополнений: <b>{fmt(data['deposits'])}</b>\n"
-        f"🛒 Выполнено заказов: <b>{data['orders']}</b> на <b>{fmt(data['revenue'])}</b>\n"
-        f"👛 Денег на балансах: <b>{fmt(data['held_balance'])}</b>\n\n"
-        f"🔍 Пополнений на проверке: <b>{data['pending_deposits']}</b>\n"
-        f"📞 Открытых тикетов: <b>{data['open_tickets']}</b>\n"
-        f"⚠️ Упавших заказов: <b>{data['failed_orders']}</b>"
+    return substitute(
+        "📊 <b>Статистика</b>\n"
+        f"<code>{LINE}</code>\n\n"
+        f"[[referral]] Пользователей: <b>{data['users']}</b>\n"
+        f"[[money]] Пополнений: <b>{fmt(data['deposits'])}</b>\n"
+        f"🛒 Продано: <b>{fmt(data['revenue'])}</b> "
+        f"<i>({data['orders']} заказов)</i>\n"
+        f"👛 На балансах: <b>{fmt(data['held_balance'])}</b>\n\n"
+        "<blockquote>"
+        f"[[search]] На проверке: <b>{data['pending_deposits']}</b>\n"
+        f"[[support]] Обращений: <b>{data['open_tickets']}</b>\n"
+        f"[[warn]] Упавших заказов: <b>{data['failed_orders']}</b>"
+        "</blockquote>"
     )
+
+
+def __getattr__(name: str) -> str:
+    """Отдать шаблон с уже подставленными значками."""
+    try:
+        return substitute(_RAW[name])
+    except KeyError:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
+
+
+def __dir__() -> list[str]:
+    return sorted(list(globals()) + list(_RAW))
+
+
+# Ошибки промокода — словарь, а не шаблон, поэтому собирается отдельно.
+PROMO_ERRORS = {
+    "not_found": "[[fail]] Такого промокода не существует.",
+    "already_used": "[[fail]] Вы уже использовали этот промокод.",
+    "exhausted": "[[fail]] Лимит активаций этого промокода исчерпан.",
+}
+PROMO_ERRORS = {key: substitute(value) for key, value in PROMO_ERRORS.items()}
