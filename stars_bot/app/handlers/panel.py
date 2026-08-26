@@ -688,38 +688,199 @@ async def cb_orders(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     await call.answer()
 
 
+def promo_line(row) -> str:
+    """Одна строка списка: что за код, сколько потрачено и жив ли он."""
+    left = max(row["max_uses"] - row["used_count"], 0)
+    alive = left > 0
+    value = (f"−{row['percent']}%" if row["kind"] == "discount"
+             else f"+{fmt(row['amount'])}")
+    return (
+        f"{'🟢' if alive else '🔴'} <code>{row['code']}</code> — <b>{value}</b>\n"
+        f"├ Использован: <b>{row['used_count']}</b> из <b>{row['max_uses']}</b>\n"
+        f"├ Осталось: <b>{left}</b>\n"
+        f"└ Статус: <b>{'Активен' if alive else 'Закончился'}</b>"
+    )
+
+
+def promos_text(rows: list) -> str:
+    if not rows:
+        body = (
+            "<blockquote>Пока ни одного. Нажмите «Создать промокод» — "
+            "спрошу код, процент скидки и число активаций.</blockquote>"
+        )
+    else:
+        body = "\n\n".join(promo_line(row) for row in rows)
+    return (
+        "🎟 <b>Промокоды</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"{body}\n\n"
+        "<blockquote>Скидка действует на все товары бота. Активация "
+        "списывается только после успешно выданного заказа.</blockquote>"
+    )
+
+
+def promos_kb(rows: list) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("➕ Создать промокод", "pn:promo_new", style=SUCCESS))
+    for row in rows[:15]:
+        kb.row(InlineKeyboardButton(
+            text=f"🗑 {row['code']}", callback_data=f"pn:promo_del:{row['code']}",
+        ))
+    kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
+    return kb.as_markup()
+
+
 @router.callback_query(F.data == "pn:promos")
 async def cb_promos(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
     await state.clear()
-    promos = await db.list_promos(conn, limit=15)
-    if promos:
-        lines = "\n".join(
-            f"<code>{p['code']}</code> — {fmt(p['amount'])} · "
-            f"использован {p['used_count']}/{p['max_uses']}"
-            for p in promos
-        )
-        body = f"🎟 <b>Промокоды</b>\n\n{lines}"
-    else:
-        body = "🎟 <b>Промокоды</b>\n\nПока ни одного."
-    kb = InlineKeyboardBuilder()
-    kb.row(btn("➕ Создать промокод", "pn:promo_new", style=SUCCESS))
-    kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
-    await safe_edit(call, body, kb.as_markup())
+    rows = await db.list_promos(conn, limit=15)
+    await safe_edit(call, promos_text(rows), promos_kb(rows))
     await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:promo_del:"))
+async def cb_promo_delete(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    code = call.data.split(":", 2)[2]
+    await db.delete_promo(conn, code)
+    await call.answer(f"{code} удалён")
+    rows = await db.list_promos(conn, limit=15)
+    await safe_edit(call, promos_text(rows), promos_kb(rows))
+
+
+# ------------------------------------------- пошаговое создание промокода
 
 
 @router.callback_query(F.data == "pn:promo_new")
 async def cb_promo_new(call: CallbackQuery, state: FSMContext) -> None:
-    await state.set_state(PromoNew.data)
+    await state.set_state(PromoNew.code)
+    await state.update_data(promo={})
     await safe_edit(
         call,
-        "🎟 <b>Новый промокод</b>\n\n"
-        "Пришлите одной строкой: <b>код сумма лимит</b>\n\n"
-        "Например:\n<code>SALE10 10 100</code>\n"
-        "— код SALE10 на 10 сомони, 100 активаций.",
+        "🎟 <b>Новый промокод</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        "<b>Шаг 1 из 3 — Промокод</b>\n\n"
+        "<blockquote>Введите промокод.\n\nНапример: <code>ALI10</code></blockquote>",
         back_kb("pn:promos", "❌ Отмена"),
     )
     await call.answer()
+
+
+@router.message(PromoNew.code, F.text)
+async def on_promo_code(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    code = (message.text or "").strip().upper()
+    if not code.isalnum() or len(code) > 32:
+        await message.answer(
+            "❌ Код — латинские буквы и цифры, до 32 символов.\n\n"
+            "<i>Например: <code>ALI10</code></i>"
+        )
+        return
+    if await db.get_promo(conn, code):
+        await message.answer(f"❌ Промокод <code>{code}</code> уже есть.")
+        return
+
+    await state.update_data(promo={"code": code})
+    await state.set_state(PromoNew.percent)
+    await message.answer(
+        f"🎟 <b>Промокод {code}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        "<b>Шаг 2 из 3 — Скидка</b>\n\n"
+        "<blockquote>Сколько процентов скидка?\n\nНапример: <code>10</code></blockquote>",
+        reply_markup=back_kb("pn:promos", "❌ Отмена"),
+    )
+
+
+@router.message(PromoNew.percent, F.text)
+async def on_promo_percent(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip().rstrip("%").replace(",", ".").strip()
+    if not raw.isdigit() or not 1 <= int(raw) <= 100:
+        await message.answer("❌ Введите целое число от 1 до 100.")
+        return
+
+    data = await state.get_data()
+    promo = dict(data.get("promo") or {})
+    promo["percent"] = int(raw)
+    await state.update_data(promo=promo)
+    await state.set_state(PromoNew.limit)
+    await message.answer(
+        f"🎟 <b>Промокод {promo['code']}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        "<b>Шаг 3 из 3 — Количество активаций</b>\n\n"
+        "<blockquote>Сколько раз можно активировать этот промокод?\n\n"
+        "Например: <code>100</code></blockquote>",
+        reply_markup=back_kb("pn:promos", "❌ Отмена"),
+    )
+
+
+@router.message(PromoNew.limit, F.text)
+async def on_promo_limit(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if not raw.isdigit() or not 1 <= int(raw) <= 1_000_000:
+        await message.answer("❌ Введите целое число активаций, например <code>100</code>.")
+        return
+
+    data = await state.get_data()
+    promo = dict(data.get("promo") or {})
+    promo["limit"] = int(raw)
+    await state.update_data(promo=promo)
+    await state.set_state(PromoNew.confirm)
+
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("💾 Сохранить", "pn:promo_save", style=SUCCESS))
+    kb.row(btn("❌ Отмена", "pn:promos", style=DANGER))
+    await message.answer(promo_preview(promo), reply_markup=kb.as_markup())
+
+
+def promo_preview(promo: dict) -> str:
+    return (
+        "🎟 <b>Проверьте промокод</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"├ Промокод: <code>{promo.get('code')}</code>\n"
+        f"├ Скидка: <b>{promo.get('percent')}%</b>\n"
+        f"└ Лимит активаций: <b>{promo.get('limit')}</b>\n\n"
+        "<blockquote>После сохранения код сразу заработает: клиенты смогут "
+        "ввести его при покупке любого товара.</blockquote>"
+    )
+
+
+@router.callback_query(PromoNew.confirm, F.data == "pn:promo_save")
+async def cb_promo_save(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    data = await state.get_data()
+    promo = data.get("promo") or {}
+    await state.clear()
+
+    if not promo.get("code") or not promo.get("percent") or not promo.get("limit"):
+        await call.answer("Данные потерялись — начните заново.", show_alert=True)
+        rows = await db.list_promos(conn, limit=15)
+        await safe_edit(call, promos_text(rows), promos_kb(rows))
+        return
+
+    saved = await db.create_promo(
+        conn, promo["code"], amount=0, max_uses=promo["limit"],
+        kind="discount", percent=promo["percent"],
+    )
+    if not saved:
+        await call.answer("Такой промокод уже есть.", show_alert=True)
+        rows = await db.list_promos(conn, limit=15)
+        await safe_edit(call, promos_text(rows), promos_kb(rows))
+        return
+
+    await call.answer("Сохранён")
+    await safe_edit(
+        call,
+        f"✅ <b>Промокод {promo['code']} создан</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"├ Скидка: <b>{promo['percent']}%</b>\n"
+        f"└ Активаций: <b>{promo['limit']}</b>\n\n"
+        "<blockquote>Код уже активен.</blockquote>",
+        back_kb("pn:promos", "‹ К промокодам"),
+    )
+
+
+# ----------------------------- старый однострочный ввод (код на баланс)
 
 
 @router.message(PromoNew.data, F.text)

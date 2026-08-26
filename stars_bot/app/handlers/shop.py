@@ -6,13 +6,14 @@ import re
 
 import aiosqlite
 from aiogram import Bot, F, Router
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
 from app import runtime
 from app.handlers.menu import menu_text
-from app.money import fmt4, affordable_stars, fmt, stars_cost
+from app.money import fmt4, affordable_stars, discount_of, fmt, stars_cost
 from app.services import delivery
 from app.services.fragment import DeliveryProvider, Recipient
 from app.states import Buy
@@ -240,28 +241,92 @@ async def _check_and_confirm(
     await show(text, keyboards.confirm_recipient())
 
 
+def totals(data: dict) -> tuple[int, int, int]:
+    """(полная цена, скидка, к списанию) для текущего заказа."""
+    price = int(data.get("price") or 0)
+    discount = discount_of(price, int(data.get("promo_percent") or 0))
+    return price, discount, price - discount
+
+
+async def show_confirm(
+    target: Message, state: FSMContext, conn: aiosqlite.Connection, user_id: int
+) -> None:
+    """Итоговая сводка заказа — с учётом промокода, если он введён."""
+    data = await state.get_data()
+    user = await db.get_user(conn, user_id)
+    balance = user.balance if user else 0
+    price, discount, total = totals(data)
+
+    block = ""
+    if discount:
+        block = texts.CONFIRM_DISCOUNT.format(
+            full=fmt(price), code=data["promo"],
+            percent=data["promo_percent"], saved=fmt(discount),
+        )
+
+    await state.set_state(Buy.confirm)
+    await target.edit_text(
+        texts.CONFIRM.format(
+            title=title_of(data["product_type"], data["quantity"]),
+            name=data.get("recipient_name") or f"@{data['recipient']}",
+            recipient=data["recipient"],
+            discount=block,
+            price=fmt(total),
+            rest=fmt(max(balance - total, 0)),
+        ),
+        reply_markup=keyboards.confirm(has_promo=bool(discount)),
+    )
+
+
 @router.callback_query(Buy.check_recipient, F.data == "order:recipient_ok")
 async def cb_recipient_ok(
     call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
 ) -> None:
     """Получатель подтверждён — показываем итоговую сводку заказа."""
-    data = await state.get_data()
-    user = await db.get_user(conn, call.from_user.id)
-    balance = user.balance if user else 0
-    price = data["price"]
+    await show_confirm(call.message, state, conn, call.from_user.id)
+    await call.answer()
 
-    await state.set_state(Buy.confirm)
+
+# ------------------------------------------------------------- промокод
+
+
+@router.callback_query(Buy.confirm, F.data == "order:promo")
+async def cb_order_promo(call: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Buy.promo)
     await call.message.edit_text(
-        texts.CONFIRM.format(
-            title=title_of(data["product_type"], data["quantity"]),
-            name=data.get("recipient_name") or f"@{data['recipient']}",
-            recipient=data["recipient"],
-            price=fmt(price),
-            rest=fmt(max(balance - price, 0)),
-        ),
-        reply_markup=keyboards.confirm(),
+        texts.ORDER_PROMO_ASK,
+        reply_markup=keyboards.back("order:promo_off", "‹ Назад к заказу"),
     )
     await call.answer()
+
+
+@router.message(Buy.promo, F.text)
+async def on_order_promo(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    promo = await db.check_discount(conn, message.text or "", message.from_user.id)
+    if isinstance(promo, str):
+        await message.answer(texts.PROMO_ERRORS.get(promo, "❌ Промокод не принят."))
+        return
+
+    await state.update_data(promo=promo["code"], promo_percent=promo["percent"])
+    data = await state.get_data()
+    _, discount, _ = totals(data)
+    notice = await message.answer(texts.ORDER_PROMO_OK.format(
+        code=promo["code"], percent=promo["percent"], saved=fmt(discount),
+    ))
+    await show_confirm(notice, state, conn, message.from_user.id)
+
+
+@router.callback_query(StateFilter(Buy.confirm, Buy.promo),
+                       F.data == "order:promo_off")
+async def cb_order_promo_off(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    had = bool((await state.get_data()).get("promo_percent"))
+    await state.update_data(promo=None, promo_percent=0)
+    await show_confirm(call.message, state, conn, call.from_user.id)
+    await call.answer("Промокод убран" if had else "")
 
 
 # ------------------------------------------------------------------ оплата
@@ -282,6 +347,7 @@ async def cb_pay(
     )
     await call.answer()
 
+    price, discount, total = totals(data)
     try:
         await delivery.purchase(
             bot, conn, provider,
@@ -289,15 +355,17 @@ async def cb_pay(
             product_type=data["product_type"],
             quantity=data["quantity"],
             recipient=data["recipient"],
-            price=data["price"],
+            price=total,
+            promo=data.get("promo") if discount else None,
+            discount=discount,
         )
     except delivery.NotEnoughFunds:
         user = await db.get_user(conn, call.from_user.id)
         balance = user.balance if user else 0
         await call.message.answer(
             texts.STARS_NOT_ENOUGH.format(
-                need=fmt(data["price"]), balance=fmt(balance),
-                missing=fmt(data["price"] - balance),
+                need=fmt(total), balance=fmt(balance),
+                missing=fmt(total - balance),
             ),
             reply_markup=keyboards.deposit_methods(),
         )

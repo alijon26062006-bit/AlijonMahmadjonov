@@ -144,10 +144,28 @@ _RAW["CONFIRM"] = (
     f"<code>{LINE}</code>\n\n"
     "├ Товар: <b>{title}</b>\n"
     "├ Получатель: <b>{name}</b> (<code>@{recipient}</code>)\n"
+    "{discount}"
     "├ К списанию: <b>{price}</b>\n"
     "└ Останется: <b>{rest}</b>\n\n"
     "<blockquote>Нажимая «Оплатить», вы подтверждаете, что аккаунт указан "
     "верно.</blockquote>"
+)
+
+_RAW["CONFIRM_DISCOUNT"] = (
+    "├ Цена: <s>{full}</s>\n"
+    "├ Промокод <code>{code}</code>: <b>−{percent}%</b> (−{saved})\n"
+)
+
+_RAW["ORDER_PROMO_ASK"] = (
+    "[[promo]] <b>Промокод на скидку</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Введите код — пересчитаю стоимость заказа.</blockquote>"
+)
+
+_RAW["ORDER_PROMO_OK"] = (
+    "[[party]] <b>Промокод {code} применён</b>\n\n"
+    "├ Скидка: <b>{percent}%</b>\n"
+    "└ Экономия: <b>{saved}</b>"
 )
 
 _RAW["PROCESSING"] = "[[wait]] <i>Оплачено. Отправляю {title} на</i> <code>@{recipient}</code>…"
@@ -524,5 +542,15 @@ PROMO_ERRORS = {
     "not_found": "[[fail]] Такого промокода не существует.",
     "already_used": "[[fail]] Вы уже использовали этот промокод.",
     "exhausted": "[[fail]] Лимит активаций этого промокода исчерпан.",
+    "not_for_balance": (
+        "[[fail]] Это код на <b>скидку</b>, а не на пополнение.\n\n"
+        "<blockquote>Введите его при покупке — на шаге подтверждения "
+        "заказа есть кнопка «Промокод».</blockquote>"
+    ),
+    "not_for_order": (
+        "[[fail]] Это код на <b>пополнение баланса</b>, а не на скидку.\n\n"
+        "<blockquote>Активируйте его в профиле — там он зачислит деньги "
+        "на счёт.</blockquote>"
+    ),
 }
 PROMO_ERRORS = {key: substitute(value) for key, value in PROMO_ERRORS.items()}

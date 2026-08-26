@@ -195,7 +195,9 @@ async def cmd_order(
         f"└ На платформе: {external}\n\n"
         f"[[money]] <b>Деньги</b>\n"
         f"├ Заплатил клиент: <b>{fmt(order.price)}</b>\n"
-        f"├ Себестоимость: <b>{fmt(order.cost)}</b>{profit}\n\n"
+        + (f"├ Промокод <code>{order.promo}</code>: <b>−{fmt(order.discount)}</b>\n"
+           if order.promo else "")
+        + f"├ Себестоимость: <b>{fmt(order.cost)}</b>{profit}\n\n"
         f"👤 Покупатель: {buyer} (<code>{order.user_id}</code>)"
         + (f"\n\n<blockquote expandable>{order.error}</blockquote>"
            if order.error else "")
@@ -490,8 +492,9 @@ async def cmd_promos(message: Message, conn: aiosqlite.Connection) -> None:
         await message.answer("Промокодов нет.")
         return
     lines = [
-        f"<code>{p['code']}</code> — {fmt(p['amount'])} · "
-        f"{p['used_count']}/{p['max_uses']}"
+        f"<code>{p['code']}</code> — "
+        + (f"скидка {p['percent']}%" if p["kind"] == "discount" else fmt(p["amount"]))
+        + f" · {p['used_count']}/{p['max_uses']}"
         for p in promos
     ]
     await message.answer("🎟 <b>Промокоды</b>\n\n" + "\n".join(lines))

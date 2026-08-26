@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS orders (
     price             INTEGER NOT NULL,     -- дирамы, сколько заплатил клиент
     cost              INTEGER NOT NULL DEFAULT 0,  -- дирамы, во сколько обошлось нам
     status            TEXT NOT NULL,
+    promo             TEXT,                        -- применённый промокод
+    discount          INTEGER NOT NULL DEFAULT 0,  -- дирамы, размер скидки
     fragment_order_id TEXT,
     error             TEXT,
     created_at        TEXT NOT NULL,
@@ -117,7 +119,9 @@ CREATE TABLE IF NOT EXISTS ticket_messages (
 
 CREATE TABLE IF NOT EXISTS promocodes (
     code       TEXT PRIMARY KEY,
-    amount     INTEGER NOT NULL,
+    kind       TEXT NOT NULL DEFAULT 'bonus',  -- 'bonus' на баланс | 'discount' скидка
+    amount     INTEGER NOT NULL,               -- дирамы, для bonus
+    percent    INTEGER NOT NULL DEFAULT 0,     -- проценты, для discount
     max_uses   INTEGER NOT NULL,
     used_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
@@ -237,6 +241,8 @@ class Order:
     error: str | None
     created_at: str
     updated_at: str
+    promo: str | None = None       # применённый промокод
+    discount: int = 0              # дирамы, на сколько сбили цену
 
     @property
     def title(self) -> str:
@@ -282,7 +288,15 @@ async def connect() -> aiosqlite.Connection:
 
 #: Колонки, добавленные после первого выпуска. Ключ — таблица.
 MIGRATIONS: dict[str, dict[str, str]] = {
-    "orders": {"cost": "INTEGER NOT NULL DEFAULT 0"},
+    "orders": {
+        "cost": "INTEGER NOT NULL DEFAULT 0",
+        "promo": "TEXT",
+        "discount": "INTEGER NOT NULL DEFAULT 0",
+    },
+    "promocodes": {
+        "kind": "TEXT NOT NULL DEFAULT 'bonus'",
+        "percent": "INTEGER NOT NULL DEFAULT 0",
+    },
     "deposits": {"reference": "TEXT"},
     "users": {"source": "TEXT"},
 }
@@ -662,14 +676,15 @@ async def resolve_deposit(
 async def create_order(
     conn: aiosqlite.Connection, *, user_id: int, product_type: str, quantity: int,
     recipient: str, price: int, cost: int = 0,
+    promo: str | None = None, discount: int = 0,
 ) -> Order:
     now = _now()
     cur = await conn.execute(
         """INSERT INTO orders (user_id, product_type, quantity, recipient, price,
-                               cost, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                               cost, status, promo, discount, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (user_id, product_type, quantity, recipient, price, cost,
-         ORDER_DELIVERING, now, now),
+         ORDER_DELIVERING, promo, discount, now, now),
     )
     await conn.commit()
     order = await get_order(conn, cur.lastrowid)
@@ -723,7 +738,18 @@ async def transition_order(
         (*fields_.values(), order_id, expected),
     )
     await conn.commit()
-    return cur.rowcount > 0
+    if cur.rowcount == 0:
+        return False
+
+    # Активацию промокода списываем здесь, а не при вводе кода: заказ мог
+    # сорваться и деньги вернуться — тогда активация не потрачена. Условие
+    # `status = expected` выше пропускает только один переход, поэтому
+    # дважды один и тот же заказ активацию не съест.
+    if new == ORDER_DELIVERED:
+        order = await get_order(conn, order_id)
+        if order and order.promo:
+            await use_promo(conn, order.promo, order.user_id)
+    return True
 
 
 async def user_order_stats(conn: aiosqlite.Connection, user_id: int) -> dict[str, int]:
@@ -822,17 +848,90 @@ async def count_open_tickets(conn: aiosqlite.Connection, user_id: int) -> int:
 
 
 async def create_promo(
-    conn: aiosqlite.Connection, code: str, amount: int, max_uses: int
+    conn: aiosqlite.Connection, code: str, amount: int, max_uses: int,
+    kind: str = "bonus", percent: int = 0,
 ) -> bool:
+    """Завести промокод. kind='bonus' — деньги на баланс, 'discount' — скидка."""
     try:
         await conn.execute(
-            "INSERT INTO promocodes (code, amount, max_uses, created_at) VALUES (?, ?, ?, ?)",
-            (code.upper(), amount, max_uses, _now()),
+            """INSERT INTO promocodes (code, kind, amount, percent, max_uses, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (code.upper(), kind, amount, percent, max_uses, _now()),
         )
     except aiosqlite.IntegrityError:
         return False
     await conn.commit()
     return True
+
+
+async def get_promo(conn: aiosqlite.Connection, code: str) -> aiosqlite.Row | None:
+    async with conn.execute(
+        "SELECT * FROM promocodes WHERE code = ?", (code.upper().strip(),)
+    ) as cur:
+        return await cur.fetchone()
+
+
+async def promo_reserved(conn: aiosqlite.Connection, code: str) -> int:
+    """Сколько активаций держат незавершённые заказы с этим кодом.
+
+    Активация списывается только после выдачи, поэтому без такого резерва
+    сотню заказов можно было бы оформить одновременно на код со лимитом 10.
+    """
+    async with conn.execute(
+        "SELECT COUNT(*) AS n FROM orders WHERE promo = ? AND status IN (?, ?)",
+        (code.upper().strip(), ORDER_DELIVERING, ORDER_FAILED),
+    ) as cur:
+        row = await cur.fetchone()
+    return row["n"] or 0
+
+
+async def check_discount(
+    conn: aiosqlite.Connection, code: str, user_id: int
+) -> aiosqlite.Row | str:
+    """Можно ли применить код к заказу. Строка — причина отказа."""
+    promo = await get_promo(conn, code)
+    if promo is None:
+        return "not_found"
+    if promo["kind"] != "discount" or promo["percent"] <= 0:
+        return "not_for_order"
+
+    async with conn.execute(
+        "SELECT 1 FROM promo_uses WHERE code = ? AND user_id = ?",
+        (promo["code"], user_id),
+    ) as cur:
+        if await cur.fetchone():
+            return "already_used"
+
+    left = promo["max_uses"] - promo["used_count"] - await promo_reserved(conn, promo["code"])
+    if left <= 0:
+        return "exhausted"
+    return promo
+
+
+async def use_promo(conn: aiosqlite.Connection, code: str, user_id: int) -> bool:
+    """Списать одну активацию. False — если этот клиент код уже отмечал."""
+    code = code.upper().strip()
+    cur = await conn.execute(
+        "INSERT OR IGNORE INTO promo_uses (code, user_id, created_at) VALUES (?, ?, ?)",
+        (code, user_id, _now()),
+    )
+    if cur.rowcount == 0:
+        await conn.commit()
+        return False
+    # Счётчик не должен перевалить за лимит, даже если заказы шли внахлёст.
+    await conn.execute(
+        "UPDATE promocodes SET used_count = used_count + 1 "
+        "WHERE code = ? AND used_count < max_uses",
+        (code,),
+    )
+    await conn.commit()
+    return True
+
+
+async def delete_promo(conn: aiosqlite.Connection, code: str) -> bool:
+    cur = await conn.execute("DELETE FROM promocodes WHERE code = ?", (code.upper(),))
+    await conn.commit()
+    return cur.rowcount > 0
 
 
 async def redeem_promo(conn: aiosqlite.Connection, code: str, user_id: int) -> int | str:
@@ -842,6 +941,9 @@ async def redeem_promo(conn: aiosqlite.Connection, code: str, user_id: int) -> i
         promo = await cur.fetchone()
     if promo is None:
         return "not_found"
+    if promo["kind"] == "discount":
+        # Код на скидку вводят при покупке, на баланс он ничего не кладёт.
+        return "not_for_balance"
 
     async with conn.execute(
         "SELECT 1 FROM promo_uses WHERE code = ? AND user_id = ?", (code, user_id)

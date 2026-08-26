@@ -58,8 +58,13 @@ async def purchase(
     quantity: int,
     recipient: str,
     price: int,
+    promo: str | None = None,
+    discount: int = 0,
 ) -> db.Order:
     """Списать деньги, создать заказ и выдать товар.
+
+    price — уже со скидкой; promo и discount едут в заказ, чтобы активация
+    промокода списалась при выдаче, а в отчётах была видна причина скидки.
 
     Бросает NotEnoughFunds, если баланса не хватило (деньги не тронуты).
     """
@@ -72,6 +77,7 @@ async def purchase(
         conn, user_id=user_id, product_type=product_type, quantity=quantity,
         recipient=recipient, price=price,
         cost=runtime.cost_of(product_type, quantity),
+        promo=promo, discount=discount,
     )
     log.info("Заказ %s: списано %s с пользователя %s", order.id, fmt(price), user_id)
     await _run_delivery(bot, conn, provider, order)

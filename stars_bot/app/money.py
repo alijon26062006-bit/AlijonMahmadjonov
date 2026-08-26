@@ -64,3 +64,10 @@ def affordable_stars(balance: int) -> int:
     """Сколько звёзд можно купить на данный баланс."""
     price_e4 = runtime.star_price_e4()
     return balance * 100 // price_e4 if price_e4 > 0 else 0
+
+
+def discount_of(price: int, percent: int) -> int:
+    """Размер скидки в дирамах. Округляем к ближайшему дираму."""
+    if percent <= 0 or price <= 0:
+        return 0
+    return min((price * percent + 50) // 100, price)

@@ -7,6 +7,7 @@ class Buy(StatesGroup):
     recipient = State()         # ждём @username получателя
     check_recipient = State()   # показали имя аккаунта, ждём «да, это он»
     confirm = State()           # показали сводку, ждём подтверждения
+    promo = State()             # ждём промокод на скидку
 
 
 class Deposit(StatesGroup):
@@ -43,4 +44,9 @@ class Cast(StatesGroup):
 
 
 class PromoNew(StatesGroup):
-    data = State()        # ждём «КОД сумма лимит»
+    data = State()        # ждём «КОД сумма лимит» (старый однострочный ввод)
+    # Пошаговое создание промокода на скидку
+    code = State()        # ждём сам код
+    percent = State()     # ждём процент скидки
+    limit = State()       # ждём число активаций
+    confirm = State()     # показали сводку, ждём «Сохранить»

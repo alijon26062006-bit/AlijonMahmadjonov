@@ -140,9 +140,13 @@ def confirm_recipient() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def confirm() -> InlineKeyboardMarkup:
+def confirm(has_promo: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn(labeled("confirm", "Оплатить"), "order:go", style=SUCCESS))
+    if has_promo:
+        kb.row(btn("✖️ Убрать промокод", "order:promo_off"))
+    else:
+        kb.row(btn(labeled("promo", "Промокод"), "order:promo"))
     kb.row(btn(labeled("edit", "Другой получатель"), "order:again"))
     kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
     return kb.as_markup()
