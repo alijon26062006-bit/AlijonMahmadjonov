@@ -209,6 +209,61 @@ async def main() -> None:
     check("получатель возвращается непроверенным",
           who is not None and not who.verified)
 
+    # --------------------------------- перебор адресов API
+    class ProbeFazer(FakeFazer):
+        """Отвечает только на два адреса из списка кандидатов."""
+
+        WORKING = {
+            "/api/v2/account/balance": {"ok": True, "balance": "42.50", "currency": "USD"},
+            "/api/v2/orders": {"ok": True, "orders": [{"id": 1, "status": "completed"}]},
+        }
+
+        async def _get_session(self):
+            provider = self
+
+            class Resp:
+                def __init__(self, path):
+                    self.path = path
+                    self.status = 200 if path in provider.WORKING else 404
+
+                async def json(self, **kw):
+                    return provider.WORKING.get(self.path, {"ok": False, "error": "Not Found"})
+
+                async def __aenter__(self): return self
+                async def __aexit__(self, *a): return False
+
+            class Session:
+                def get(self, url):
+                    return Resp(url.replace(provider._base, ""))
+
+            return Session()
+
+    found = await ProbeFazer().probe_paths()
+    check("перебор нашёл адрес баланса",
+          [p for p, _ in found["balance"]] == ["/api/v2/account/balance"],
+          str(found["balance"]))
+    check("перебор нашёл адрес заказов",
+          [p for p, _ in found["orders"]] == ["/api/v2/orders"], str(found["orders"]))
+    check("в выжимке видно содержимое ответа",
+          "42.50" in found["balance"][0][1], found["balance"][0][1])
+    check("несуществующие адреса отсеяны",
+          len(found["balance"]) == 1 and len(found["orders"]) == 1)
+
+    # ------------------- путь заказов из панели перекрывает настройку
+    from app import runtime as rt
+    rt._cache["fazer_order_path"] = "/api/v2/my-orders/{order_id}"
+    check("путь из панели перекрывает .env",
+          fz.FazerProvider.order_path() == "/api/v2/my-orders/{order_id}")
+    rt._cache["fazer_order_path"] = ""
+    check("без настройки берётся значение из .env",
+          fz.FazerProvider.order_path() == fz.settings.fazer_order_path)
+
+    # ------------------- проверка связи не врёт про непроверенный путь
+    report = await FakeFazer(balance={"ok": True, "balance": "1"}).healthcheck()
+    orders_line = next(v for k, v in report["steps"] if "заказ" in k.lower())
+    check("бот не ставит галочку непроверенному пути заказов",
+          "не проверен" in orders_line and "✅" not in orders_line, orders_line)
+
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")
     if FAIL:
         print("ПРОВАЛЫ:", ", ".join(FAIL))

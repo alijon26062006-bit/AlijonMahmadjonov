@@ -46,6 +46,20 @@ PENDING = {"pending", "processing", "in_progress", "inprogress", "queued",
            "new", "created", "accepted", "waiting", "running", "fulfilling"}
 
 
+# Вероятные пути к балансу и заказам. Документация в руках владельца, но
+# перебрать варианты ключом быстрее, чем сверять скриншоты вручную.
+BALANCE_CANDIDATES = [
+    "/api/v2/account", "/api/v2/account/balance", "/api/v2/balance",
+    "/api/v2/me", "/api/v2/user", "/api/v2/profile", "/api/v2/account/me",
+    "/api/v2/reseller", "/api/v2/reseller/balance", "/api/v2/account/info",
+    "/api/v2/wallet", "/api/v2/subscription",
+]
+ORDER_LIST_CANDIDATES = [
+    "/api/v2/orders", "/api/v2/order", "/api/v2/orders/list",
+    "/api/v2/account/orders",
+]
+
+
 @dataclass
 class CostEstimate:
     """Во что заказ обходится владельцу. Цены FazerCards уже в долларах."""
@@ -214,7 +228,7 @@ class FazerProvider(DeliveryProvider):
         Путь к статусу задаётся в настройках: раздел Orders в документации
         сервиса ещё не сверялся, и угадывать молча нельзя.
         """
-        path_template = settings.fazer_order_path
+        path_template = self.order_path()
         if not path_template:
             raise DeliveryUncertain(
                 f"Заказ {order_id} принят, но проверять его статус нечем: "
@@ -263,8 +277,53 @@ class FazerProvider(DeliveryProvider):
         и бот честно скажет об этом покупателю."""
         return Recipient(username=username, name="", verified=False)
 
+    @staticmethod
+    def balance_path() -> str:
+        from app import runtime
+
+        return runtime.get("fazer_balance_path") or settings.fazer_balance_path
+
+    @staticmethod
+    def order_path() -> str:
+        from app import runtime
+
+        return runtime.get("fazer_order_path") or settings.fazer_order_path
+
+    async def probe_paths(self) -> dict:
+        """Перебрать вероятные адреса и вернуть те, что отвечают.
+
+        Запросы только читающие, ничего не меняют и денег не тратят.
+        """
+        found: dict[str, list[tuple[str, str]]] = {"balance": [], "orders": []}
+        session = await self._get_session()
+
+        async def try_path(path: str) -> tuple[int, dict]:
+            try:
+                async with session.get(self._base + path) as resp:
+                    try:
+                        data = await resp.json(content_type=None)
+                    except Exception:  # noqa: BLE001
+                        data = {}
+                    return resp.status, data if isinstance(data, dict) else {"data": data}
+            except (TimeoutError, aiohttp.ClientError) as exc:
+                return 0, {"error": str(exc)}
+
+        for path in BALANCE_CANDIDATES:
+            status, data = await try_path(path)
+            if status == 200 and data.get("ok") is not False:
+                found["balance"].append((path, _preview(data)))
+            await asyncio.sleep(0.2)   # не долбим сервис пачкой запросов
+
+        for path in ORDER_LIST_CANDIDATES:
+            status, data = await try_path(path)
+            if status == 200 and data.get("ok") is not False:
+                found["orders"].append((path, _preview(data)))
+            await asyncio.sleep(0.2)
+
+        return found
+
     async def get_balance(self) -> str:
-        path = settings.fazer_balance_path
+        path = self.balance_path()
         if not path:
             return "путь к балансу не задан (FAZER_BALANCE_PATH)"
         data = await self._request("GET", path, safe=True)
@@ -298,17 +357,23 @@ class FazerProvider(DeliveryProvider):
         except Exception as exc:  # noqa: BLE001
             steps.append(("Баланс реселлера", f"⚠️ не прочитался: {exc}"))
 
-        if not settings.fazer_order_path:
+        order_path = self.order_path()
+        if not order_path:
             steps.append((
                 "Проверка заказов",
-                "❌ не настроена — бот не сможет подтвердить выдачу. "
-                "Задайте FAZER_ORDER_PATH из раздела Orders документации.",
+                "❌ не настроена — бот не подтвердит выдачу и отдаст каждый "
+                "заказ вам на разбор.",
             ))
             return {
                 "ok": False, "mode": "fazer", "steps": steps,
                 "error": "Не задан путь проверки статуса заказа",
             }
-        steps.append(("Проверка заказов", f"✅ {settings.fazer_order_path}"))
+        # Галочку тут ставить нельзя: путь можно проверить только на реальном
+        # заказе, а до первой покупки он остаётся предположением.
+        steps.append((
+            "Проверка заказов",
+            f"⏳ {order_path} — задан, но ещё не проверен на живом заказе",
+        ))
         return {"ok": True, "mode": "fazer", "steps": steps, "error": ""}
 
 
@@ -336,3 +401,16 @@ def _reason(order: dict) -> str:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return _status(order) or "причина не указана"
+
+
+def _preview(data: dict) -> str:
+    """Короткая выжимка ответа — чтобы владелец узнал нужный путь по виду."""
+    interesting = {}
+    for key in ("balance", "amount", "available", "funds", "currency",
+                "orders", "items", "data", "total", "count"):
+        if key in data:
+            interesting[key] = data[key]
+    if not interesting and isinstance(data.get("account"), dict):
+        interesting = data["account"]
+    text = str(interesting or data)
+    return text[:160]

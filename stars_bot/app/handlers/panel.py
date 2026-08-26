@@ -724,11 +724,75 @@ async def cb_fragment(call: CallbackQuery, provider) -> None:
             "в разделе «Разделы»."
         )
 
+    kb = InlineKeyboardBuilder()
+    if getattr(provider, "probe_paths", None) is not None:
+        kb.row(InlineKeyboardButton(text="🔍 Найти адреса API", callback_data="pn:probe"))
+    kb.row(InlineKeyboardButton(text="🔄 Проверить снова", callback_data="pn:fragment"))
+    kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
+
     await safe_edit(
         call,
-        "🔌 <b>Проверка Fragment</b>\n\n" + "\n".join(lines) + "\n\n" + verdict,
-        back_kb(),
+        "🔌 <b>Проверка связи</b>\n\n" + "\n".join(lines) + "\n\n" + verdict,
+        kb.as_markup(),
     )
+
+
+@router.callback_query(F.data == "pn:probe")
+async def cb_probe(call: CallbackQuery, provider) -> None:
+    """Найти рабочие адреса перебором — быстрее, чем сверять документацию."""
+    probe = getattr(provider, "probe_paths", None)
+    if probe is None:
+        await call.answer("Этот сервис не умеет искать адреса.", show_alert=True)
+        return
+
+    await safe_edit(call, "🔍 Перебираю адреса, это займёт секунд десять…",
+                    back_kb("pn:fragment"))
+    await call.answer()
+
+    try:
+        found = await probe()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Перебор адресов не удался: %s", exc)
+        await safe_edit(call, f"❌ Не получилось: <code>{exc}</code>",
+                        back_kb("pn:fragment"))
+        return
+
+    kb = InlineKeyboardBuilder()
+    blocks = []
+
+    for kind, title, prefix in (
+        ("balance", "💰 Баланс", "pn:usepath:balance:"),
+        ("orders", "📦 Заказы", "pn:usepath:orders:"),
+    ):
+        hits = found.get(kind) or []
+        if not hits:
+            blocks.append(f"{title}\n└ ничего не нашлось")
+            continue
+        lines = [f"├ <code>{path}</code>\n│  <i>{sample}</i>" for path, sample in hits]
+        blocks.append(f"{title}\n" + "\n".join(lines))
+        for path, _ in hits[:3]:
+            kb.row(InlineKeyboardButton(
+                text=f"✅ Взять {path}", callback_data=prefix + path,
+            ))
+
+    kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:fragment"))
+    await safe_edit(
+        call,
+        "🔍 <b>Что ответило сервисом</b>\n\n" + "\n\n".join(blocks)
+        + "\n\nВыберите подходящий адрес — бот запомнит его.",
+        kb.as_markup(),
+    )
+
+
+@router.callback_query(F.data.startswith("pn:usepath:"))
+async def cb_use_path(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    _, _, kind, path = call.data.split(":", 3)
+    if kind == "balance":
+        await runtime.set_value(conn, "fazer_balance_path", path)
+    else:
+        # Одиночный заказ обычно лежит рядом со списком.
+        await runtime.set_value(conn, "fazer_order_path", path.rstrip("/") + "/{order_id}")
+    await call.answer("Адрес сохранён — нажмите «Проверить связь»")
 
 
 # ============================================================== кошелёк

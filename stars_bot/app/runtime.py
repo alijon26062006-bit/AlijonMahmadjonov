@@ -58,6 +58,9 @@ def _build_defaults() -> dict[str, str]:
         "pay_extra": settings.pay_extra,
         # тексты
         "support_notice": "",
+        # пути API сервиса выдачи, найденные перебором
+        "fazer_balance_path": "",
+        "fazer_order_path": "",
         # кошелёк и присмотр за выдачей
         "topup_at": "",                  # когда последний раз пополняли
         "stars_since_topup": "0",        # выдано звёзд с тех пор
