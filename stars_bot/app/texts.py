@@ -206,6 +206,7 @@ _RAW["DEPOSIT_TOO_SMALL"] = "[[fail]] Минимальная сумма попо
 _RAW["DEPOSIT_REQUISITES"] = (
     "[[deposit]] <b>Пополнение на {amount}</b>\n"
     f"<code>{LINE}</code>\n\n"
+    "{dc_block}"
     "Переведите <b>ровно {amount}</b> по реквизитам:\n\n"
     "<b>Карта</b>\n<code>{card}</code>\n\n"
     "{holder}{bank}"
@@ -214,6 +215,14 @@ _RAW["DEPOSIT_REQUISITES"] = (
     "<blockquote>[[warn]] Сумма должна совпадать до копейки — иначе "
     "заявку придётся проверять вручную.</blockquote>\n\n"
     "📸 <i>После перевода пришлите скриншот чека сюда.</i>"
+)
+
+_RAW["DEPOSIT_DC_BLOCK"] = (
+    "<blockquote>[[ok]] <b>Проще всего — кнопкой ниже.</b>\n"
+    "Откроется «Душанбе Сити» с уже вписанными счётом и суммой: "
+    "останется подтвердить перевод.\n\n"
+    "Код платежа: <code>{reference}</code></blockquote>\n\n"
+    "<i>Или вручную:</i>\n\n"
 )
 
 _RAW["DEPOSIT_NEED_PHOTO"] = (
@@ -419,6 +428,7 @@ _RAW["ADMIN_NEW_DEPOSIT"] = (
     f"<code>{LINE}</code>\n\n"
     "├ Сумма: <b>{amount}</b>\n"
     "├ Способ: {method}\n"
+    "├ Код платежа: <code>{reference}</code>\n"
     "├ Покупатель: {buyer}\n"
     "└ ID: <code>{user_id}</code>"
 )

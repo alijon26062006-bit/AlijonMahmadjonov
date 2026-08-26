@@ -1,0 +1,223 @@
+"""Кнопка оплаты «Душанбе Сити»: сборка ссылки и код платежа."""
+from __future__ import annotations
+
+import asyncio
+import sys
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import env_fixture  # noqa: F401
+
+from app import db, keyboards, runtime, texts
+from app.handlers import deposit as dep_h
+from app.handlers import panel
+from app.services import dcpay
+
+PASS, FAIL = [], []
+
+
+def check(name: str, cond: bool, detail: str = "") -> None:
+    (PASS if cond else FAIL).append(name)
+    print(f"{'✅' if cond else '❌'} {name}" + (f"  — {detail}" if detail else ""))
+
+
+class FakeUser:
+    def __init__(self, uid=555, username="buyer", first_name="Покупатель"):
+        self.id, self.username, self.first_name = uid, username, first_name
+
+
+class FakeMessage:
+    def __init__(self, text=None, user=None, photo=False):
+        self.text = text
+        self.from_user = user or FakeUser()
+        self.photo = [type("P", (), {"file_id": "f1"})()] if photo else None
+        self.document = None
+        self.chat = type("C", (), {"id": self.from_user.id})()
+        self.message_id = 1
+        self.replies: list[str] = []
+        self.markups: list = []
+
+    async def answer(self, text, **kw):
+        self.replies.append(text)
+        self.markups.append(kw.get("reply_markup"))
+        return self
+
+    async def edit_text(self, text, **kw):
+        return await self.answer(text, **kw)
+
+    async def copy_to(self, chat_id, **kw):
+        return None
+
+    @property
+    def last(self):
+        return self.replies[-1] if self.replies else ""
+
+    @property
+    def last_markup(self):
+        return self.markups[-1] if self.markups else None
+
+
+class FakeCallback:
+    def __init__(self, data, user=None):
+        self.data = data
+        self.from_user = user or FakeUser()
+        self.message = FakeMessage(user=self.from_user)
+        self.alerts: list[str] = []
+
+    async def answer(self, text="", **kw):
+        if text:
+            self.alerts.append(text)
+
+    @property
+    def last(self):
+        return self.message.last
+
+
+class FakeState:
+    def __init__(self):
+        self.data = {}
+        self.state = None
+
+    async def set_state(self, value):
+        self.state = getattr(value, "state", value)
+
+    async def update_data(self, **kw):
+        self.data.update(kw)
+
+    async def get_data(self):
+        return dict(self.data)
+
+    async def get_state(self):
+        return self.state
+
+    async def clear(self):
+        self.data.clear()
+        self.state = None
+
+
+class FakeBot:
+    async def send_message(self, *a, **kw):
+        return None
+
+
+async def main() -> None:
+    for sfx in ("", "-wal", "-shm"):
+        Path(str(db.settings.db_file) + sfx).unlink(missing_ok=True)
+    conn = await db.connect()
+    try:
+        await db.init(conn)
+        await runtime.load(conn)
+        await run(conn)
+    finally:
+        await conn.close()
+    print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")
+    if FAIL:
+        print("ПРОВАЛЫ:", ", ".join(FAIL))
+    sys.exit(1 if FAIL else 0)
+
+
+async def run(conn) -> None:
+    # ------------------------------------------------ ссылка собирается верно
+    sample = "https://pay.dc.tj/?a=9762000123726019&c=%40uwayscoder%20TOP2248&f1=133&s=50"
+    built = dcpay.build_link("9762000123726019", 5000, "@uwayscoder TOP2248")
+    check("ссылка совпадает с образцом", built == sample, built)
+
+    check("пробелы в номере счёта не мешают",
+          dcpay.build_link("9762 0001 2372 6019", 5000, "x") ==
+          dcpay.build_link("9762000123726019", 5000, "x"))
+
+    q = parse_qs(urlparse(built).query)
+    check("счёт попадает в параметр a", q["a"] == ["9762000123726019"])
+    check("сумма попадает в параметр s", q["s"] == ["50"])
+    check("код услуги по умолчанию 133", q["f1"] == ["133"])
+
+    for diram, expected in ((5000, "50"), (5050, "50.50"), (12345, "123.45"),
+                            (150000, "1500"), (0, "0")):
+        check(f"сумма {diram} дирам -> {expected}",
+              dcpay.amount_text(diram) == expected, dcpay.amount_text(diram))
+
+    link = dcpay.build_link("9762000123726019", 5050, "@shop TOP1234", "200")
+    q = parse_qs(urlparse(link).query)
+    check("копейки передаются", q["s"] == ["50.50"], str(q["s"]))
+    check("свой код услуги подставляется", q["f1"] == ["200"])
+    check("комментарий кодируется", q["c"] == ["@shop TOP1234"], str(q["c"]))
+
+    ref = dcpay.make_reference()
+    check("код платежа короткий и опознаваемый",
+          ref.startswith("TOP") and len(ref) == 7 and ref[3:].isdigit(), ref)
+    check("коды платежей разные",
+          len({dcpay.make_reference() for _ in range(20)}) > 10)
+
+    check("без счёта кнопка не собирается", not dcpay.is_ready(""))
+    check("короткий номер не считается счётом", not dcpay.is_ready("123"))
+    check("нормальный счёт принимается", dcpay.is_ready("9762000123726019"))
+
+    # ------------------------------------------ кнопка появляется в пополнении
+    await db.upsert_user(conn, 555, "buyer", "Покупатель")
+    await runtime.set_value(conn, "pay_card_number", "8888 7777 6666 5555")
+    await runtime.set_value(conn, "dc_account", "9762000123726019")
+    await runtime.set_value(conn, "dc_comment", "@uwayscoder")
+
+    state = FakeState()
+    await state.set_state("Deposit:amount")
+    msg = FakeMessage("120")
+    await dep_h.on_amount(msg, state)
+
+    check("сумма принята и показаны реквизиты", "120.00" in msg.last)
+    check("предложена быстрая оплата", "Душанбе Сити" in msg.last, msg.last[:120])
+    check("код платежа показан клиенту",
+          state.data.get("reference", "") in msg.last, str(state.data))
+
+    buttons = [b for row in msg.last_markup.inline_keyboard for b in row]
+    pay = next((b for b in buttons if b.url), None)
+    check("кнопка с ссылкой есть", pay is not None)
+    check("кнопка зелёная", pay.style == "success", str(pay.style))
+
+    q = parse_qs(urlparse(pay.url).query)
+    check("в ссылке счёт из настроек", q["a"] == ["9762000123726019"], str(q["a"]))
+    check("в ссылке сумма, которую выбрал клиент", q["s"] == ["120"], str(q["s"]))
+    check("в комментарии подпись и код платежа",
+          q["c"][0].startswith("@uwayscoder TOP"), str(q["c"]))
+
+    # -------------------------------- код платежа сохраняется в заявке
+    receipt = FakeMessage(photo=True)
+    await dep_h.on_receipt(receipt, state, conn, FakeBot())
+    deposits = await db.list_deposits(conn, status=db.DEP_PENDING)
+    check("заявка создана", len(deposits) == 1)
+    check("код платежа сохранён в заявке",
+          deposits[0].reference and deposits[0].reference.startswith("TOP"),
+          str(deposits[0].reference))
+    check("сумма заявки верная", deposits[0].amount == 12000, str(deposits[0].amount))
+
+    # ---------------------------- без счёта кнопки нет, реквизиты остаются
+    await runtime.set_value(conn, "dc_account", "")
+    state = FakeState()
+    msg = FakeMessage("120")
+    await dep_h.on_amount(msg, state)
+    check("без счёта быстрой оплаты не предлагаем",
+          "Душанбе Сити" not in msg.last)
+    check("реквизиты карты показываются всё равно",
+          "8888 7777 6666 5555" in msg.last)
+    check("кнопки со ссылкой нет",
+          not any(b.url for row in msg.last_markup.inline_keyboard for b in row))
+
+    # ------------------------------------------------ проверка в панели
+    await runtime.set_value(conn, "dc_account", "9762000123726019")
+    call = FakeCallback("pn:dctest")
+    await panel.cb_dc_test(call)
+    check("панель показывает пробную ссылку", "pay.dc.tj" in call.last)
+    check("проба на 50 сомони", "s=50" in call.last, call.last[-90:])
+
+    await runtime.set_value(conn, "dc_account", "")
+    call = FakeCallback("pn:dctest")
+    await panel.cb_dc_test(call)
+    check("без счёта панель объясняет, что вписать",
+          "параметр" in call.last and "a" in call.last)
+
+    check("экран реквизитов показывает состояние кнопки",
+          "Душанбе Сити" in panel.pay_text())
+
+
+asyncio.run(main())

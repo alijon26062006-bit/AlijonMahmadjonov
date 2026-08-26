@@ -10,6 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
+from app.services import dcpay
 from app import runtime
 from app.config import settings
 from app.money import fmt, parse
@@ -55,7 +56,10 @@ async def on_amount(message: Message, state: FSMContext) -> None:
         )
         return
 
-    await state.update_data(amount=amount)
+    # Код платежа нужен, чтобы найти перевод в выписке, даже если чек
+    # придёт позже или не придёт вовсе.
+    reference = dcpay.make_reference()
+    await state.update_data(amount=amount, reference=reference)
     await state.set_state(Deposit.receipt)
 
     card_holder = runtime.get("pay_card_holder")
@@ -65,16 +69,30 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     bank = f"🏦 Банк: <b>{card_bank}</b>\n" if card_bank else ""
     extra = f"\n{note}\n" if note else ""
 
+    account = runtime.get("dc_account")
+    dc_block = ""
+    markup = keyboards.cancel()
+
+    if dcpay.is_ready(account):
+        link = dcpay.build_link(
+            account, amount,
+            dcpay.build_comment(runtime.get("dc_comment"), reference),
+            runtime.get("dc_service") or "133",
+        )
+        dc_block = texts.DEPOSIT_DC_BLOCK.format(reference=reference)
+        markup = keyboards.deposit_pay(link)
+
     await message.answer(
         texts.DEPOSIT_REQUISITES.format(
             amount=fmt(amount),
+            dc_block=dc_block,
             card=runtime.get("pay_card_number") or "— реквизиты не заданы —",
             holder=holder,
             bank=bank,
             city=runtime.get("pay_city"),
             extra=extra,
         ),
-        reply_markup=keyboards.cancel(),
+        reply_markup=markup,
     )
 
 
@@ -93,6 +111,7 @@ async def on_receipt(
     deposit = await db.create_deposit(
         conn, user_id=message.from_user.id, amount=amount,
         method="Перевод на карту", receipt_file_id=file_id,
+        reference=data.get("reference"),
     )
     await state.clear()
     await message.answer(
@@ -106,6 +125,7 @@ async def on_receipt(
     caption = texts.ADMIN_NEW_DEPOSIT.format(
         deposit_id=deposit.id, amount=fmt(amount), method=deposit.method,
         buyer=buyer, user_id=message.from_user.id,
+        reference=deposit.reference or "—",
     )
     targets = list(settings.admin_ids)
     if settings.orders_chat_id:

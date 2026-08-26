@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS deposits (
     amount          INTEGER NOT NULL,
     method          TEXT NOT NULL,
     receipt_file_id TEXT,
+    reference       TEXT,
     status          TEXT NOT NULL,
     reviewed_by     INTEGER,
     created_at      TEXT NOT NULL,
@@ -172,6 +173,7 @@ class Deposit:
     amount: int
     method: str
     receipt_file_id: str | None
+    reference: str | None
     status: str
     reviewed_by: int | None
     created_at: str
@@ -242,6 +244,7 @@ async def connect() -> aiosqlite.Connection:
 #: Колонки, добавленные после первого выпуска. Ключ — таблица.
 MIGRATIONS: dict[str, dict[str, str]] = {
     "orders": {"cost": "INTEGER NOT NULL DEFAULT 0"},
+    "deposits": {"reference": "TEXT"},
 }
 
 
@@ -379,14 +382,15 @@ async def add_ref_earning(conn: aiosqlite.Connection, user_id: int, amount: int)
 
 
 async def create_deposit(
-    conn: aiosqlite.Connection, *, user_id: int, amount: int, method: str, receipt_file_id: str
+    conn: aiosqlite.Connection, *, user_id: int, amount: int, method: str,
+    receipt_file_id: str, reference: str | None = None,
 ) -> Deposit:
     now = _now()
     cur = await conn.execute(
-        """INSERT INTO deposits (user_id, amount, method, receipt_file_id, status,
-                                 created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (user_id, amount, method, receipt_file_id, DEP_PENDING, now, now),
+        """INSERT INTO deposits (user_id, amount, method, receipt_file_id,
+                                 reference, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (user_id, amount, method, receipt_file_id, reference, DEP_PENDING, now, now),
     )
     await conn.commit()
     deposit = await get_deposit(conn, cur.lastrowid)

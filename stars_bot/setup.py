@@ -193,6 +193,11 @@ def section_pay(old: dict, new: dict) -> None:
     new["PAY_CARD_HOLDER"] = ask("Имя владельца", current=old.get("PAY_CARD_HOLDER", ""))
     new["PAY_CARD_BANK"] = ask("Банк", current=old.get("PAY_CARD_BANK", ""))
     new["PAY_CITY"] = ask("Город", current=old.get("PAY_CITY", "") or "Душанбе")
+    print()
+    print("Кнопка быстрой оплаты «Душанбе Сити» (можно пропустить):")
+    print("возьмите номер счёта из своей ссылки pay.dc.tj — параметр a=")
+    new["DC_ACCOUNT"] = ask("Счёт для pay.dc.tj", current=old.get("DC_ACCOUNT", ""),
+                            allow_empty=True)
 
 
 def section_prices(old: dict, new: dict) -> None:

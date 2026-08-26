@@ -63,6 +63,10 @@ def _build_defaults() -> dict[str, str]:
         "pay_card_bank": settings.pay_card_bank,
         "pay_city": settings.pay_city,
         "pay_extra": settings.pay_extra,
+        # Оплата через приложение «Душанбе Сити»
+        "dc_account": settings.dc_account,
+        "dc_service": settings.dc_service or "133",
+        "dc_comment": settings.dc_comment,
         # тексты
         "support_notice": "",
         # пути API сервиса выдачи, найденные перебором

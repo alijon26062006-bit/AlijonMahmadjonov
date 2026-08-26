@@ -170,6 +170,14 @@ def deposit_methods() -> InlineKeyboardMarkup:
 # ════════════════════════════════════════════════════════════ профиль
 
 
+def deposit_pay(link: str) -> InlineKeyboardMarkup:
+    """Кнопка открывает приложение с готовыми счётом и суммой."""
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🏙 Оплатить в Душанбе Сити", url=link, style=SUCCESS))
+    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    return kb.as_markup()
+
+
 def profile() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn(labeled("history", "История покупок"), "p:history", icon="history"))

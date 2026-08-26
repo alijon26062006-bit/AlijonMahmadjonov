@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     pay_card_bank: str = ""
     pay_city: str = "Душанбе"
     pay_extra: str = ""
+    dc_account: str = ""
+    dc_comment: str = ""
+    dc_service: str = "133"
 
     # ---- шлюз выдачи (apifragment.online) ----
     fragment_mode: str = "mock"

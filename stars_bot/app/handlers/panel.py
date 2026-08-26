@@ -28,7 +28,7 @@ from app.config import settings
 from app.emoji import substitute
 from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
 from app.money import fmt, fmt4, parse, parse4
-from app.services import pricing
+from app.services import dcpay, pricing
 from app.states import Panel, PromoNew
 
 log = logging.getLogger(__name__)
@@ -278,6 +278,14 @@ async def cb_premium_edit(call: CallbackQuery, state: FSMContext) -> None:
 
 PAY_FIELDS = {
     "pay_card_number": ("💳 Номер карты", "Введите номер карты:"),
+    "dc_account": ("🏙 Счёт «Душанбе Сити»",
+                   "Номер счёта для кнопки быстрой оплаты — 16 цифр из вашей "
+                   "ссылки pay.dc.tj (параметр <code>a</code>). "
+                   "Или <code>-</code>, чтобы убрать кнопку:"),
+    "dc_comment": ("📝 Подпись в платеже",
+                   "Что писать в комментарии к переводу перед кодом платежа — "
+                   "например <code>@uwayscoder</code>:"),
+    "dc_service": ("🔢 Код услуги", "Параметр <code>f1</code> из ссылки. Обычно 133:"),
     "pay_card_holder": ("👤 Владелец", "Введите имя владельца карты:"),
     "pay_card_bank": ("🏦 Банк", "Введите название банка:"),
     "pay_city": ("🏙 Город", "Введите город:"),
@@ -290,7 +298,8 @@ def pay_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for key, (label, _) in PAY_FIELDS.items():
         kb.row(InlineKeyboardButton(text=label, callback_data=f"pn:set:{key}"))
-    kb.row(InlineKeyboardButton(text="👁 Как видит клиент", callback_data="pn:preview_pay"))
+    kb.row(btn("👁 Как видит клиент", "pn:preview_pay", style=PRIMARY))
+    kb.row(btn("🏙 Проверить кнопку оплаты", "pn:dctest"))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
     return kb.as_markup()
 
@@ -303,6 +312,11 @@ def pay_text() -> str:
     warning = ""
     if not runtime.get("pay_card_number"):
         warning = "\n❗️ <b>Без номера карты клиенты не смогут пополнить баланс.</b>\n"
+
+    dc_state = (
+        "✅ <b>работает</b>" if dcpay.is_ready(runtime.get("dc_account"))
+        else "⚪️ <i>не настроена</i>"
+    )
     return (
         "💳 <b>Реквизиты для приёма оплаты</b>\n"
         f"{warning}\n"
@@ -310,7 +324,14 @@ def pay_text() -> str:
         f"├ Владелец: {show('pay_card_holder')}\n"
         f"├ Банк: {show('pay_card_bank')}\n"
         f"├ Город: {show('pay_city')}\n"
-        f"└ Примечание: {show('pay_extra')}"
+        f"└ Примечание: {show('pay_extra')}\n\n"
+        f"🏙 <b>Кнопка «Душанбе Сити»</b> — {dc_state}\n"
+        f"├ Счёт: {show('dc_account')}\n"
+        f"├ Подпись: {show('dc_comment')}\n"
+        f"└ Код услуги: {show('dc_service')}\n\n"
+        "<blockquote>Кнопка открывает приложение с уже вписанными счётом "
+        "и суммой — покупателю не нужно переписывать их вручную, а значит "
+        "негде ошибиться.</blockquote>"
     )
 
 
@@ -1416,3 +1437,41 @@ async def cb_autoprice(
         "</blockquote>",
         prices_kb(),
     )
+
+
+@router.callback_query(F.data == "pn:dctest")
+async def cb_dc_test(call: CallbackQuery) -> None:
+    """Показать готовую ссылку на пробную сумму — проверить, что открывается."""
+    account = runtime.get("dc_account")
+    if not dcpay.is_ready(account):
+        await safe_edit(
+            call,
+            "🏙 <b>Кнопка оплаты не настроена</b>\n\n"
+            "<blockquote>Возьмите свою ссылку вида\n"
+            "<code>pay.dc.tj/?a=9762...&amp;c=...&amp;f1=133&amp;s=50</code>\n\n"
+            "и впишите из неё номер счёта — это параметр <code>a</code>."
+            "</blockquote>",
+            back_kb("pn:set:dc_account", "🏙 Вписать счёт"),
+        )
+        await call.answer()
+        return
+
+    reference = dcpay.make_reference()
+    link = dcpay.build_link(
+        account, 5000,
+        dcpay.build_comment(runtime.get("dc_comment"), reference),
+        runtime.get("dc_service") or "133",
+    )
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🏙 Открыть (проба на 50 с.)", url=link, style=SUCCESS))
+    kb.row(btn("‹ Назад", "pn:pay"))
+    await safe_edit(
+        call,
+        "🏙 <b>Проверка кнопки оплаты</b>\n\n"
+        "<blockquote>Нажмите кнопку ниже: должно открыться приложение "
+        "со счётом и суммой 50 сомони. Платить не нужно — просто "
+        "убедитесь, что данные подставились.</blockquote>\n\n"
+        f"Ссылка:\n<code>{link}</code>",
+        kb.as_markup(),
+    )
+    await call.answer()
