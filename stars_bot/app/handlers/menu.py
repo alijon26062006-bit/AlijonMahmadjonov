@@ -62,21 +62,33 @@ async def cb_info(call: CallbackQuery) -> None:
     await call.answer()
 
 
+MEDALS = ["🥇", "🥈", "🥉"]
+
+
+def top_basis(by: str) -> str:
+    return "покупок" if by != "deposits" else "пополнений"
+
+
+def top_lines(clients: list[tuple]) -> str:
+    lines = []
+    for index, (client, amount) in enumerate(clients):
+        badge = MEDALS[index] if index < len(MEDALS) else f"{index + 1}."
+        name = f"@{client.username}" if client.username else (client.first_name or "Аноним")
+        lines.append(f"{badge} {name} — <b>{fmt(amount)}</b>")
+    return "\n".join(lines)
+
+
 @router.callback_query(F.data == "m:top")
 async def cb_top(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
-    clients = await db.top_clients(conn, limit=10)
+    by = runtime.get("top_by") or "purchases"
+    clients = await db.top_clients(conn, limit=10, by=by)
     if not clients:
         await call.message.edit_text(texts.TOP_EMPTY, reply_markup=keyboards.back())
         await call.answer()
         return
-    medals = ["🥇", "🥈", "🥉"]
-    lines = []
-    for index, client in enumerate(clients):
-        badge = medals[index] if index < len(medals) else f"{index + 1}."
-        name = f"@{client.username}" if client.username else (client.first_name or "Аноним")
-        lines.append(f"{badge} {name} — <b>{fmt(client.total_deposit)}</b>")
     await call.message.edit_text(
-        texts.TOP_CLIENTS.format(items="\n".join(lines)), reply_markup=keyboards.back()
+        texts.TOP_CLIENTS.format(items=top_lines(clients), basis=top_basis(by)),
+        reply_markup=keyboards.back(),
     )
     await call.answer()
 

@@ -408,12 +408,29 @@ async def all_user_ids(conn: aiosqlite.Connection) -> list[int]:
         return [row["id"] for row in await cur.fetchall()]
 
 
-async def top_clients(conn: aiosqlite.Connection, limit: int = 10) -> list[User]:
-    async with conn.execute(
-        "SELECT * FROM users WHERE total_deposit > 0 ORDER BY total_deposit DESC LIMIT ?",
-        (limit,),
-    ) as cur:
-        return [_from_row(User, row) for row in await cur.fetchall()]
+async def top_clients(
+    conn: aiosqlite.Connection, limit: int = 10, by: str = "purchases",
+) -> list[tuple[User, int]]:
+    """Топ клиентов: пары (клиент, сумма) по убыванию суммы.
+
+    by="purchases" — сумма выданных заказов: отменённые и возвращённые
+    в неё не попадают, поэтому рейтинг показывает реальных покупателей.
+    by="deposits"  — сумма пополнений за всё время.
+    """
+    if by == "deposits":
+        query = """SELECT *, total_deposit AS amount FROM users
+                   WHERE total_deposit > 0
+                   ORDER BY amount DESC, id LIMIT ?"""
+        params: tuple = (limit,)
+    else:
+        query = """SELECT u.*, SUM(o.price) AS amount
+                   FROM users u JOIN orders o ON o.user_id = u.id
+                   WHERE o.status = ?
+                   GROUP BY u.id
+                   ORDER BY amount DESC, u.id LIMIT ?"""
+        params = (ORDER_DELIVERED, limit)
+    async with conn.execute(query, params) as cur:
+        return [(_from_row(User, row), row["amount"]) for row in await cur.fetchall()]
 
 
 # ---------------------------------------------------------------- деньги

@@ -24,6 +24,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from contextlib import suppress
 
 from app import db, emoji, reports, runtime, texts
+from app.handlers.menu import top_basis
 from app.config import settings
 from app.emoji import substitute
 from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
@@ -551,7 +552,8 @@ def toggles_text() -> str:
         "закончились звёзды на Fragment или меняете реквизиты.\n\n"
         f"{'✅' if runtime.get_bool('stars_enabled') else '🚫'} Продажа звёзд\n"
         f"{'✅' if runtime.get_bool('premium_enabled') else '🚫'} Продажа Premium\n"
-        f"{'✅' if runtime.get_bool('deposit_enabled') else '🚫'} Пополнение баланса"
+        f"{'✅' if runtime.get_bool('deposit_enabled') else '🚫'} Пополнение баланса\n\n"
+        f"🏆 Топ клиентов считается по сумме {top_basis(runtime.get('top_by'))}."
     )
 
 
@@ -567,8 +569,22 @@ def toggles_kb() -> InlineKeyboardMarkup:
             ("🚫 Выключить " if state else "✅ Включить ") + label,
             f"pn:toggle:{key}", style=DANGER if state else SUCCESS,
         ))
+    by_deposits = runtime.get("top_by") == "deposits"
+    kb.row(btn(
+        "🏆 Топ по " + ("покупкам" if by_deposits else "пополнениям"),
+        "pn:topby", style=PRIMARY,
+    ))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
     return kb.as_markup()
+
+
+@router.callback_query(F.data == "pn:topby")
+async def cb_topby(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    """Переключить, по чему строится топ клиентов."""
+    value = "purchases" if runtime.get("top_by") == "deposits" else "deposits"
+    await runtime.set_value(conn, "top_by", value)
+    await call.answer("Готово")
+    await safe_edit(call, toggles_text(), toggles_kb())
 
 
 @router.callback_query(F.data.startswith("pn:toggle:"))

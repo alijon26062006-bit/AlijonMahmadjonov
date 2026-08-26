@@ -79,6 +79,8 @@ def _build_defaults() -> dict[str, str]:
         "fail_streak": "0",              # подряд неудавшихся выдач
         "autostop_after": "3",           # после скольких подряд гасить продажу
         "autostopped": "0",              # продажу выключил сам бот
+        # по чему считаем топ клиентов: purchases | deposits
+        "top_by": "purchases",
         # доступность
         "stars_enabled": "1",
         "premium_enabled": "1",

@@ -411,7 +411,7 @@ _RAW["TOP_CLIENTS"] = (
     "[[top]] <b>Топ клиентов</b>\n"
     f"<code>{LINE}</code>\n\n"
     "{items}\n\n"
-    "<blockquote>Рейтинг по сумме пополнений за всё время.</blockquote>"
+    "<blockquote>Рейтинг по сумме {basis} за всё время.</blockquote>"
 )
 _RAW["TOP_EMPTY"] = (
     "[[top]] <b>Топ клиентов</b>\n\n"
