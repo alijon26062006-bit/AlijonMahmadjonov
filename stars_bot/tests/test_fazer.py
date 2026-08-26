@@ -1,0 +1,218 @@
+"""Проверка FazerCards: асинхронная выдача, статусы, цены в долларах."""
+from __future__ import annotations
+
+import asyncio
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import env_fixture  # noqa: F401
+
+os.environ["FRAGMENT_MODE"] = "fazer"
+os.environ["FAZER_API_KEY"] = "fc_test"
+os.environ["TASK_POLL_INTERVAL"] = "1"
+os.environ["TASK_POLL_TIMEOUT"] = "4"
+
+from decimal import Decimal
+
+from app.services import fazer as fz
+from app.services.fragment import DeliveryError, DeliveryUncertain
+
+PASS, FAIL = [], []
+
+
+def check(name: str, cond: bool, detail: str = "") -> None:
+    (PASS if cond else FAIL).append(name)
+    print(f"{'✅' if cond else '❌'} {name}" + (f"  — {detail}" if detail else ""))
+
+
+STARS_PRICE = {
+    "ok": True, "kind": "telegram_stars", "price_per_star": "0.0154000",
+    "min_amount": 50, "max_amount": 10000, "rates_updated_at": "2026-08-26T10:00:00Z",
+}
+PREMIUM_PRICE = {
+    "ok": True, "kind": "telegram_premium",
+    "plans": [{"months": 3, "price_usd": "13.9000"},
+              {"months": 6, "price_usd": "18.5000"},
+              {"months": 12, "price_usd": "32.9000"}],
+    "rates_updated_at": "2026-08-26T10:00:00Z",
+}
+
+
+class FakeFazer(fz.FazerProvider):
+    """Провайдер с подменённым транспортом."""
+
+    def __init__(self, *, buy=None, statuses=None, raise_on=None, balance=None):
+        super().__init__()
+        self.buy_response = buy if buy is not None else {
+            "ok": True, "order": {"id": 555, "status": "pending"}}
+        self.statuses = list(statuses or [])
+        self.raise_on = raise_on or {}
+        self.balance = balance
+        self.calls: list[str] = []
+
+    async def _request(self, method, path, payload=None, *, safe=False):
+        self.calls.append(f"{method} {path}")
+        for key, exc in self.raise_on.items():
+            if key in path:
+                raise exc
+        if path == fz.STARS_QUOTE:
+            return STARS_PRICE
+        if path == fz.PREMIUM_QUOTE:
+            return PREMIUM_PRICE
+        if path in (fz.STARS_BUY, fz.PREMIUM_BUY):
+            return self.buy_response
+        if path.startswith("/api/v2/orders/"):
+            return self.statuses.pop(0) if self.statuses else {"ok": True, "order": {"status": "pending"}}
+        if self.balance is not None:
+            return self.balance
+        raise AssertionError(f"неожиданный путь {path}")
+
+    async def close(self):
+        return None
+
+
+async def expect(coro, kind):
+    try:
+        await coro
+    except kind as exc:
+        return exc
+    except Exception as exc:  # noqa: BLE001
+        return exc
+    return None
+
+
+def order(status, **extra):
+    return {"ok": True, "order": {"id": 555, "status": status, **extra}}
+
+
+async def main() -> None:
+    # ---------------------------------------------------- цены в долларах
+    prov = FakeFazer()
+    est = await prov.cost_estimate("stars", 1000)
+    check("себестоимость звёзд считается из цены сервиса",
+          est.usd_total == Decimal("0.0154000") * 1000, str(est.usd_total))
+    check("цена за штуку верная", est.usd_per_unit == Decimal("0.0154000"))
+    check("валюта — доллары", est.currency == "usd")
+
+    est = await prov.cost_estimate("premium", 6)
+    check("себестоимость Premium берётся из тарифа",
+          est.usd_total == Decimal("18.5000"), str(est.usd_total))
+
+    exc = await expect(prov.cost_estimate("premium", 9), DeliveryError)
+    check("несуществующий тариф Premium отклоняется",
+          isinstance(exc, DeliveryError) and "3, 6, 12" in str(exc), str(exc)[:80])
+
+    check("лимиты берутся у сервиса", await prov.limits() == (50, 10000))
+
+    # -------------------------- принят ≠ выдан (главная проверка)
+    prov = FakeFazer(buy=order("pending"), statuses=[order("pending")] * 10)
+    exc = await expect(prov.deliver_stars("durov", 100), DeliveryUncertain)
+    check("вечно висящий заказ НЕ считается выданным",
+          isinstance(exc, DeliveryUncertain), type(exc).__name__)
+
+    prov = FakeFazer(buy=order("pending"),
+                     statuses=[order("pending"), order("completed")])
+    result = await prov.deliver_stars("durov", 100)
+    check("заказ подтверждается опросом статуса", result.order_id == "555")
+    check("статус реально опрашивался",
+          sum(1 for c in prov.calls if "/orders/" in c) == 2, str(prov.calls))
+
+    # ------------------------------- сразу финальный статус — без опроса
+    prov = FakeFazer(buy=order("completed"))
+    result = await prov.deliver_stars("durov", 100)
+    check("готовый заказ не опрашивается зря",
+          result.order_id == "555" and not any("/orders/" in c for c in prov.calls),
+          str(prov.calls))
+
+    # -------------------------------------------------- отказы
+    prov = FakeFazer(buy=order("failed", error="Insufficient balance"))
+    exc = await expect(prov.deliver_stars("durov", 100), DeliveryError)
+    check("отказ сразу при покупке — деньги вернутся клиенту",
+          isinstance(exc, DeliveryError) and "Insufficient balance" in str(exc),
+          str(exc)[:70])
+
+    prov = FakeFazer(buy=order("pending"),
+                     statuses=[order("failed", reason="username not found")])
+    exc = await expect(prov.deliver_stars("durov", 100), DeliveryError)
+    check("отказ при опросе — тоже возврат",
+          isinstance(exc, DeliveryError) and "username not found" in str(exc))
+
+    # --------------------------- ответ без данных заказа
+    prov = FakeFazer(buy={"ok": True})
+    exc = await expect(prov.deliver_stars("durov", 100), DeliveryUncertain)
+    check("ответ без заказа не считается выдачей",
+          isinstance(exc, DeliveryUncertain), type(exc).__name__)
+
+    prov = FakeFazer(buy={"ok": True, "order": {"status": "pending"}})
+    exc = await expect(prov.deliver_stars("durov", 100), DeliveryUncertain)
+    check("заказ без номера не считается выдачей",
+          isinstance(exc, DeliveryUncertain), type(exc).__name__)
+
+    # ------------------- незнакомый статус не принимается за успех
+    prov = FakeFazer(buy=order("pending"), statuses=[order("странное")] * 10)
+    exc = await expect(prov.deliver_stars("durov", 100), DeliveryUncertain)
+    check("незнакомый статус не считается успехом",
+          isinstance(exc, DeliveryUncertain), type(exc).__name__)
+
+    # ------------------------ разные написания успеха
+    for word in ("completed", "done", "delivered", "success", "fulfilled"):
+        prov = FakeFazer(buy=order("pending"), statuses=[order(word)])
+        res = await prov.deliver_stars("durov", 100)
+        check(f"статус «{word}» = выдано", res.order_id == "555")
+
+    # ---------------------- сбой опроса переживается
+    class Flaky(FakeFazer):
+        def __init__(self):
+            super().__init__(buy=order("pending"), statuses=[order("completed")])
+            self.first = True
+
+        async def _request(self, method, path, payload=None, *, safe=False):
+            if "/orders/" in path and self.first:
+                self.first = False
+                raise DeliveryError("сеть моргнула")
+            return await super()._request(method, path, payload, safe=safe)
+
+    check("сбой одного опроса не роняет выдачу",
+          (await Flaky().deliver_stars("durov", 100)).order_id == "555")
+
+    # ---------------- без пути проверки заказов выдача не подтверждается
+    saved = fz.settings.fazer_order_path
+    fz.settings.fazer_order_path = ""
+    prov = FakeFazer(buy=order("pending"))
+    exc = await expect(prov.deliver_stars("durov", 100), DeliveryUncertain)
+    check("без настроенной проверки заказов бот не врёт об успехе",
+          isinstance(exc, DeliveryUncertain) and "FAZER_ORDER_PATH" in str(exc),
+          str(exc)[:90])
+
+    report = await FakeFazer().healthcheck()
+    check("проверка связи ругается на ненастроенные заказы",
+          not report["ok"] and "Проверка заказов" in str(report["steps"]))
+    fz.settings.fazer_order_path = saved
+
+    # ------------------------------------------------- проверка связи
+    report = await FakeFazer(balance={"ok": True, "balance": "42.50", "currency": "USD"}).healthcheck()
+    check("проверка связи проходит", report["ok"], str(report["steps"])[:120])
+    check("в отчёте видна цена звезды",
+          any("0.0154" in v for _, v in report["steps"]))
+    check("в отчёте виден баланс",
+          any("42.50" in v for _, v in report["steps"]), str(report["steps"]))
+
+    report = await FakeFazer(raise_on={"telegram/stars": DeliveryError("Invalid API key")}).healthcheck()
+    check("плохой ключ виден в проверке",
+          not report["ok"] and "Invalid API key" in str(report["steps"]))
+
+    # ----------------------------------------- получатель не проверяется
+    who = await FakeFazer().resolve_recipient("someone")
+    check("получатель возвращается непроверенным",
+          who is not None and not who.verified)
+
+    print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")
+    if FAIL:
+        print("ПРОВАЛЫ:", ", ".join(FAIL))
+    sys.exit(1 if FAIL else 0)
+
+
+asyncio.run(main())

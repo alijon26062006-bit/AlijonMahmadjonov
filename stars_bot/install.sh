@@ -179,10 +179,14 @@ case "\${1:-help}" in
         sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py"
         systemctl restart "\$SERVICE" && echo "✅ Настройки применены"
         ;;
-    mystars|apifragment|delivery|pay|prices|telegram|links)
+    fazer|mystars|apifragment|delivery|pay|prices|telegram|links)
         # Без второго аргумента — обычный диалог: спрашивает по одному.
         # С ключом — сразу применяет, ничего не спрашивая.
-        if [ -n "\${2:-}" ] && [ "\$1" = "mystars" ]; then
+        if [ -n "\${2:-}" ] && [ "\$1" = "fazer" ]; then
+            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set \
+                FRAGMENT_MODE=fazer FAZER_API_KEY="\$2" \
+                FAZER_BASE_URL=https://api.fzr.cards
+        elif [ -n "\${2:-}" ] && [ "\$1" = "mystars" ]; then
             sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set \
                 FRAGMENT_MODE=mystars MYSTARS_API_KEY="\$2" \
                 MYSTARS_BASE_URL=https://api.mystars.tg/v1 \
@@ -222,6 +226,7 @@ case "\${1:-help}" in
   stars-bot backup    сохранить копию базы
 
 Настройка по частям (спрашивает по одному вопросу):
+  stars-bot fazer         подключить FazerCards (баланс, без сид-фразы)
   stars-bot mystars       подключить MyStars
   stars-bot apifragment   подключить apifragment.online
   stars-bot delivery      выбрать способ выдачи
@@ -232,6 +237,7 @@ case "\${1:-help}" in
   stars-bot mock          режим проверки, звёзды не отправляются
 
 Быстро, без вопросов:
+  stars-bot fazer КЛЮЧ         подключить FazerCards одной строкой
   stars-bot mystars КЛЮЧ       подключить MyStars одной строкой
 
 Все команды запускать через sudo.

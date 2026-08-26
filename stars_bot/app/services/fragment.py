@@ -373,11 +373,17 @@ class ApiFragProvider(DeliveryProvider):
 def build_provider(payer=None) -> DeliveryProvider:
     """Выбрать способ выдачи по FRAGMENT_MODE.
 
-    mystars — apifragment.online не нужен и сид-фраза никому не передаётся;
+    fazer   — api.fzr.cards: баланс реселлера, сид-фраза не нужна;
+    mystars — api.mystars.tg: оплата каждого заказа переводом из кошелька;
     api     — прежний шлюз apifragment.online (хранит сид-фразу у себя);
     mock    — ничего не отправляет.
     """
     mode = settings.fragment_mode.strip().lower()
+
+    if mode in ("fazer", "fazercards", "fzr"):
+        from app.services.fazer import FazerProvider
+
+        return FazerProvider()
 
     if mode in ("mystars", "faas"):
         # Импорт внутри: SDK нужен только в этом режиме.

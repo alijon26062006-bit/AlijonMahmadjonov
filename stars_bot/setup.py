@@ -211,6 +211,21 @@ def section_prices(old: dict, new: dict) -> None:
     new["MIN_DEPOSIT_DIRAM"] = str(to_diram(minimum))
 
 
+def section_fazer(old: dict, new: dict) -> None:
+    print("\n── Выдача через FazerCards ──")
+    print("Пополняете баланс реселлера один раз — дальше бот списывает сам.")
+    print("Сид-фраза не нужна. Ключ начинается с fc_")
+    print()
+    new["FRAGMENT_MODE"] = "fazer"
+    new["FAZER_API_KEY"] = ask("Ключ FazerCards (X-API-Key)",
+                               current=old.get("FAZER_API_KEY", ""))
+    new["FAZER_BASE_URL"] = ask(
+        "Адрес API",
+        current=old.get("FAZER_BASE_URL", "") or "https://api.fzr.cards",
+        validate=check_base_url,
+    )
+
+
 def section_mystars(old: dict, new: dict) -> None:
     print("\n── Выдача через MyStars ──")
     print("Сид-фразу этот сервис не спрашивает: счёт на оплату придёт")
@@ -257,14 +272,17 @@ def section_apifragment(old: dict, new: dict) -> None:
 def section_delivery(old: dict, new: dict) -> None:
     print("\n── Как выдавать звёзды ──")
     print("mock    — бот работает, но ничего не отправляет (для проверки).")
-    print("mystars — api.mystars.tg, сид-фразу НЕ спрашивает.")
-    print("api     — apifragment.online, хранит вашу сид-фразу у себя.")
-    mode = ask("Режим (mock/mystars/api)",
+    print("fazer   — api.fzr.cards: баланс реселлера, сид-фраза не нужна.")
+    print("mystars — api.mystars.tg: платите за каждый заказ из кошелька.")
+    print("api     — apifragment.online: хранит вашу сид-фразу у себя.")
+    mode = ask("Режим (mock/fazer/mystars/api)",
                current=old.get("FRAGMENT_MODE", "") or "mock",
-               validate=lambda v: None if v in ("mock", "mystars", "api")
-               else "Только mock, mystars или api")
+               validate=lambda v: None if v in ("mock", "fazer", "mystars", "api")
+               else "Только mock, fazer, mystars или api")
     new["FRAGMENT_MODE"] = mode
-    if mode == "mystars":
+    if mode == "fazer":
+        section_fazer(old, new)
+    elif mode == "mystars":
         section_mystars(old, new)
     elif mode == "api":
         section_apifragment(old, new)
@@ -283,6 +301,7 @@ SECTIONS = {
     "pay": ("Реквизиты карты", section_pay),
     "prices": ("Цены", section_prices),
     "delivery": ("Способ выдачи", section_delivery),
+    "fazer": ("FazerCards", section_fazer),
     "mystars": ("MyStars", section_mystars),
     "apifragment": ("ApiFragment", section_apifragment),
     "links": ("Ссылки", section_links),
