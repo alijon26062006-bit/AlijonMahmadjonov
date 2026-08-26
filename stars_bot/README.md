@@ -50,11 +50,20 @@ Ubuntu / Debian / CentOS с systemd.
 | `sudo stars-bot status` | работает ли бот |
 | `sudo stars-bot restart` | перезапустить |
 | `sudo stars-bot errors` | последние ошибки |
-| `sudo stars-bot setup` | изменить токен или ключ Fragment |
+| `sudo stars-bot setup` | пройти всю настройку заново |
+| `sudo stars-bot mystars` | подключить MyStars — спросит ключ, адрес, валюту |
+| `sudo stars-bot delivery` | выбрать способ выдачи |
+| `sudo stars-bot pay` | реквизиты карты |
+| `sudo stars-bot prices` | цены |
+| `sudo stars-bot telegram` | токен бота и ваш ID |
 | `sudo stars-bot backup` | сохранить копию базы |
 
 Цены, реквизиты, рассылка и промокоды меняются прямо в боте через `/panel` —
 на сервер для этого заходить не нужно.
+
+Каждая команда настройки спрашивает по одному вопросу за раз и сама
+перезапускает бота. Если хочется без вопросов —
+`sudo stars-bot mystars ВАШ_КЛЮЧ` применит всё одной строкой.
 
 `update` скачивает свежий установщик из репозитория, поэтому обновление
 применяется целиком, даже если изменился сам установщик. `.env` и база с

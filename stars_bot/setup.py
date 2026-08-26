@@ -174,37 +174,30 @@ def apply_values(pairs: list[str]) -> None:
     print(f"✅ Записано в {ENV}: " + ", ".join(changed))
 
 
-def main() -> None:
-    if len(sys.argv) > 1 and sys.argv[1] == "--set":
-        if not EXAMPLE.exists():
-            print("❌ Запускайте из папки stars_bot.")
-            sys.exit(1)
-        apply_values(sys.argv[2:])
-        return
 
-    if not EXAMPLE.exists():
-        print("❌ Не найден .env.example — запускайте скрипт из папки stars_bot.")
-        sys.exit(1)
+# ------------------------------------------------------ разделы настройки
 
-    print("=" * 58)
-    print("  Настройка бота. Enter — оставить значение в скобках.")
-    print("=" * 58)
 
-    old = read_existing()
-    new = dict(old)
-
+def section_telegram(old: dict, new: dict) -> None:
     print("\n── Telegram ──")
     print("Токен берётся у @BotFather, ID — у @userinfobot.")
-    new["BOT_TOKEN"] = ask("Токен бота", current=old.get("BOT_TOKEN", ""), validate=check_token)
-    new["ADMIN_IDS"] = ask("Твой Telegram ID", current=old.get("ADMIN_IDS", ""), validate=check_id)
+    new["BOT_TOKEN"] = ask("Токен бота", current=old.get("BOT_TOKEN", ""),
+                           validate=check_token)
+    new["ADMIN_IDS"] = ask("Ваш Telegram ID", current=old.get("ADMIN_IDS", ""),
+                           validate=check_id)
 
+
+def section_pay(old: dict, new: dict) -> None:
     print("\n── Реквизиты для приёма переводов ──")
     new["PAY_CARD_NUMBER"] = ask("Номер карты", current=old.get("PAY_CARD_NUMBER", ""))
     new["PAY_CARD_HOLDER"] = ask("Имя владельца", current=old.get("PAY_CARD_HOLDER", ""))
     new["PAY_CARD_BANK"] = ask("Банк", current=old.get("PAY_CARD_BANK", ""))
     new["PAY_CITY"] = ask("Город", current=old.get("PAY_CITY", "") or "Душанбе")
 
+
+def section_prices(old: dict, new: dict) -> None:
     print("\n── Цены ──")
+    print("Их же можно менять потом прямо в боте: /panel -> Цены.")
     current_price = old.get("STAR_PRICE_DIRAM", "")
     shown = f"{int(current_price) / 100:.2f}" if current_price.isdigit() else ""
     price = ask("Цена одной звезды в сомони (напр. 0.25)",
@@ -217,67 +210,114 @@ def main() -> None:
                   current=shown_min, validate=check_price)
     new["MIN_DEPOSIT_DIRAM"] = str(to_diram(minimum))
 
+
+def section_mystars(old: dict, new: dict) -> None:
+    print("\n── Выдача через MyStars ──")
+    print("Сид-фразу этот сервис не спрашивает: счёт на оплату придёт")
+    print("вам в Telegram, оплатите в один тап через Tonkeeper.")
+    print("Ключ выдают в @my_stars_tg_bot -> API access.")
+    print()
+    new["FRAGMENT_MODE"] = "mystars"
+    new["MYSTARS_API_KEY"] = ask("Ключ MyStars (X-Api-Key)",
+                                 current=old.get("MYSTARS_API_KEY", ""))
+    new["MYSTARS_BASE_URL"] = ask(
+        "Адрес API",
+        current=old.get("MYSTARS_BASE_URL", "") or "https://api.mystars.tg/v1",
+        validate=check_base_url,
+    )
+    new["MYSTARS_CURRENCY"] = ask(
+        "Чем платить (ton / usdt_ton)",
+        current=old.get("MYSTARS_CURRENCY", "") or "ton",
+        validate=lambda v: None if v in ("ton", "usdt_ton") else "Только ton или usdt_ton",
+    )
+
+
+def section_apifragment(old: dict, new: dict) -> None:
+    print("\n── Выдача через ApiFragment ──")
+    print("  " + "!" * 54)
+    print("  Этот сервис требует 24 слова вашего TON-кошелька и хранит их")
+    print("  у себя. Владельцы сервиса технически могут вывести с этого")
+    print("  кошелька всё. Заведите ОТДЕЛЬНЫЙ кошелёк с оборотной суммой.")
+    print("  " + "!" * 54)
+    print()
+    new["FRAGMENT_MODE"] = "api"
+    new["FRAGMENT_API_KEY"] = ask("API-токен ApiFragment",
+                                  current=old.get("FRAGMENT_API_KEY", ""))
+    new["FRAGMENT_WALLET_SEED"] = ask(
+        "Сид-фраза кошелька (24 слова через пробел)",
+        current=old.get("FRAGMENT_WALLET_SEED", ""), validate=check_seed,
+    )
+    new["FRAGMENT_PAYMENT_METHOD"] = ask(
+        "Чем платить (ton / usdt_ton)",
+        current=old.get("FRAGMENT_PAYMENT_METHOD", "") or "ton",
+        validate=lambda v: None if v in ("ton", "usdt_ton") else "Только ton или usdt_ton",
+    )
+
+
+def section_delivery(old: dict, new: dict) -> None:
     print("\n── Как выдавать звёзды ──")
     print("mock    — бот работает, но ничего не отправляет (для проверки).")
-    print("mystars — api.mystars.tg. Сид-фразу НЕ спрашивает: счёт на оплату")
-    print("          приходит вам в Telegram, платите в один тап Tonkeeper.")
-    print("api     — apifragment.online. Работает без вашего участия, но")
-    print("          хранит вашу сид-фразу у себя.")
+    print("mystars — api.mystars.tg, сид-фразу НЕ спрашивает.")
+    print("api     — apifragment.online, хранит вашу сид-фразу у себя.")
     mode = ask("Режим (mock/mystars/api)",
                current=old.get("FRAGMENT_MODE", "") or "mock",
                validate=lambda v: None if v in ("mock", "mystars", "api")
                else "Только mock, mystars или api")
     new["FRAGMENT_MODE"] = mode
-
     if mode == "mystars":
-        print()
-        print("  Ключ выдают в @my_stars_tg_bot — раздел «API access».")
-        print()
-        new["MYSTARS_API_KEY"] = ask("Ключ MyStars (X-Api-Key)",
-                                     current=old.get("MYSTARS_API_KEY", ""))
-        new["MYSTARS_BASE_URL"] = ask(
-            "Адрес API",
-            current=old.get("MYSTARS_BASE_URL", "") or "https://api.mystars.tg/v1",
-            validate=check_base_url,
-        )
-        new["MYSTARS_CURRENCY"] = ask(
-            "Чем платить (ton / usdt_ton)",
-            current=old.get("MYSTARS_CURRENCY", "") or "ton",
-            validate=lambda v: None if v in ("ton", "usdt_ton") else "Только ton или usdt_ton",
-        )
+        section_mystars(old, new)
+    elif mode == "api":
+        section_apifragment(old, new)
 
-    if mode == "api":
-        print()
-        print("  " + "!" * 54)
-        print("  ВАЖНО ПРО СИД-ФРАЗУ")
-        print()
-        print("  Сервис требует 24 слова вашего TON-кошелька и хранит их")
-        print("  у себя, чтобы входить на Fragment от вашего имени.")
-        print("  Это значит: владельцы сервиса технически могут вывести")
-        print("  все деньги с этого кошелька в любой момент.")
-        print()
-        print("  Заведите ОТДЕЛЬНЫЙ кошелёк только для бота и держите на нём")
-        print("  оборотную сумму на пару дней, а не все сбережения.")
-        print("  " + "!" * 54)
-        print()
-        new["FRAGMENT_API_KEY"] = ask("API-токен ApiFragment",
-                                      current=old.get("FRAGMENT_API_KEY", ""))
-        new["FRAGMENT_WALLET_SEED"] = ask(
-            "Сид-фраза кошелька (24 слова через пробел)",
-            current=old.get("FRAGMENT_WALLET_SEED", ""),
-            validate=check_seed,
-        )
-        new["FRAGMENT_PAYMENT_METHOD"] = ask(
-            "Чем платить на Fragment (ton / usdt_ton)",
-            current=old.get("FRAGMENT_PAYMENT_METHOD", "") or "ton",
-            validate=lambda v: None if v in ("ton", "usdt_ton") else "Только ton или usdt_ton",
-        )
 
+def section_links(old: dict, new: dict) -> None:
     print("\n── Необязательное ──")
     new["SUPPORT_USERNAME"] = ask("Юзернейм поддержки без @",
                                   current=old.get("SUPPORT_USERNAME", ""), allow_empty=True)
     new["REVIEWS_URL"] = ask("Ссылка на канал с отзывами",
                              current=old.get("REVIEWS_URL", ""), allow_empty=True)
+
+
+SECTIONS = {
+    "telegram": ("Токен и админ", section_telegram),
+    "pay": ("Реквизиты карты", section_pay),
+    "prices": ("Цены", section_prices),
+    "delivery": ("Способ выдачи", section_delivery),
+    "mystars": ("MyStars", section_mystars),
+    "apifragment": ("ApiFragment", section_apifragment),
+    "links": ("Ссылки", section_links),
+}
+
+ALL_SECTIONS = ("telegram", "pay", "prices", "delivery", "links")
+
+
+def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "--set":
+        if not EXAMPLE.exists():
+            print("❌ Запускайте из папки stars_bot.")
+            sys.exit(1)
+        apply_values(sys.argv[2:])
+        return
+
+    if not EXAMPLE.exists():
+        print("❌ Не найден .env.example — запускайте скрипт из папки stars_bot.")
+        sys.exit(1)
+
+    chosen = ALL_SECTIONS
+    if len(sys.argv) > 2 and sys.argv[1] == "--only":
+        chosen = tuple(part for part in sys.argv[2].split(",") if part in SECTIONS)
+        if not chosen:
+            print("Доступные разделы: " + ", ".join(SECTIONS))
+            sys.exit(1)
+
+    print("=" * 58)
+    print("  Настройка бота. Enter — оставить значение в скобках.")
+    print("=" * 58)
+
+    old = read_existing()
+    new = dict(old)
+    for name in chosen:
+        SECTIONS[name][1](old, new)
 
     write_env(new)
 
@@ -285,9 +325,9 @@ def main() -> None:
     print(f"  ✅ Настройки сохранены в {ENV}")
     print("=" * 58)
     print("\nЗапуск бота:\n    python -m app.main\n")
-    if mode == "mock":
+    if new.get("FRAGMENT_MODE", "mock") == "mock":
         print("Сейчас режим mock — звёзды НЕ отправляются.")
-        print("Проверьте бота, потом запустите setup.py снова и включите api.\n")
+        print("Включить выдачу: python setup.py --only delivery\n")
 
 
 if __name__ == "__main__":

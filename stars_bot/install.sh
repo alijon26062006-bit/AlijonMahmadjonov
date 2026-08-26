@@ -179,30 +179,24 @@ case "\${1:-help}" in
         sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py"
         systemctl restart "\$SERVICE" && echo "✅ Настройки применены"
         ;;
-    mystars)
-        if [ -z "\${2:-}" ]; then
-            echo "Использование: stars-bot mystars ВАШ_КЛЮЧ"
-            echo "Ключ берётся в @my_stars_tg_bot -> API access"
-            exit 1
+    mystars|apifragment|delivery|pay|prices|telegram|links)
+        # Без второго аргумента — обычный диалог: спрашивает по одному.
+        # С ключом — сразу применяет, ничего не спрашивая.
+        if [ -n "\${2:-}" ] && [ "\$1" = "mystars" ]; then
+            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set \
+                FRAGMENT_MODE=mystars MYSTARS_API_KEY="\$2" \
+                MYSTARS_BASE_URL=https://api.mystars.tg/v1 \
+                MYSTARS_CURRENCY="\${3:-ton}"
+        elif [ -n "\${2:-}" ] && [ "\$1" = "apifragment" ]; then
+            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set \
+                FRAGMENT_MODE=api FRAGMENT_API_KEY="\$2"
+        else
+            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --only "\$1"
         fi
-        sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set \
-            FRAGMENT_MODE=mystars \
-            MYSTARS_API_KEY="\$2" \
-            MYSTARS_BASE_URL=https://api.mystars.tg/v1 \
-            MYSTARS_CURRENCY="\${3:-ton}"
         systemctl restart "\$SERVICE"
-        echo "✅ MyStars подключён, бот перезапущен"
-        echo "   Проверьте: /panel -> Проверить связь"
-        ;;
-    apifragment)
-        if [ -z "\${2:-}" ]; then
-            echo "Использование: stars-bot apifragment ВАШ_ТОКЕН"
-            exit 1
-        fi
-        sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set \
-            FRAGMENT_MODE=api FRAGMENT_API_KEY="\$2"
-        systemctl restart "\$SERVICE"
-        echo "✅ ApiFragment подключён (сид-фразу задайте через stars-bot setup)"
+        echo "✅ Готово, бот перезапущен"
+        [ "\$1" = "mystars" ] || [ "\$1" = "delivery" ] && \
+            echo "   Проверьте: /panel -> Проверить связь"
         ;;
     mock)
         sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set FRAGMENT_MODE=mock
@@ -227,10 +221,18 @@ case "\${1:-help}" in
   stars-bot setup     изменить настройки и перезапустить
   stars-bot backup    сохранить копию базы
 
-Подключение выдачи одной командой:
-  stars-bot mystars КЛЮЧ       выдача через MyStars (ключ из @my_stars_tg_bot)
-  stars-bot apifragment ТОКЕН  выдача через apifragment.online
-  stars-bot mock               режим проверки, звёзды не отправляются
+Настройка по частям (спрашивает по одному вопросу):
+  stars-bot mystars       подключить MyStars
+  stars-bot apifragment   подключить apifragment.online
+  stars-bot delivery      выбрать способ выдачи
+  stars-bot telegram      токен бота и ваш ID
+  stars-bot pay           реквизиты карты
+  stars-bot prices        цены
+  stars-bot links         поддержка и отзывы
+  stars-bot mock          режим проверки, звёзды не отправляются
+
+Быстро, без вопросов:
+  stars-bot mystars КЛЮЧ       подключить MyStars одной строкой
 
 Все команды запускать через sudo.
 TXT
