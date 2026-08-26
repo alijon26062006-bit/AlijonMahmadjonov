@@ -1,6 +1,7 @@
-"""Мидлварь: регистрация пользователя и отсечение забаненных."""
+"""Регистрация пользователя (в т.ч. по реферальной ссылке) и бан-лист."""
 from __future__ import annotations
 
+import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -10,6 +11,8 @@ from aiogram.types import CallbackQuery, Message, TelegramObject, User
 
 from app import db, texts
 from app.config import settings
+
+REF_RE = re.compile(r"^/start\s+ref(\d+)")
 
 
 class UserGuardMiddleware(BaseMiddleware):
@@ -24,9 +27,16 @@ class UserGuardMiddleware(BaseMiddleware):
         if user is None or conn is None:
             return await handler(event, data)
 
-        await db.upsert_user(conn, user.id, user.username, user.first_name)
+        referrer_id = None
+        if isinstance(event, Message) and event.text:
+            match = REF_RE.match(event.text)
+            if match:
+                referrer_id = int(match.group(1))
 
-        if not settings.is_admin(user.id) and await db.is_banned(conn, user.id):
+        await db.upsert_user(conn, user.id, user.username, user.first_name, referrer_id)
+
+        # Админа не банит собственный бан-лист — иначе можно потерять доступ.
+        if not settings.is_admin(user.id) and await _banned(conn, user.id):
             if isinstance(event, Message):
                 await event.answer(texts.BANNED)
             elif isinstance(event, CallbackQuery):
@@ -34,3 +44,8 @@ class UserGuardMiddleware(BaseMiddleware):
             return None
 
         return await handler(event, data)
+
+
+async def _banned(conn: aiosqlite.Connection, user_id: int) -> bool:
+    record = await db.get_user(conn, user_id)
+    return bool(record and record.is_banned)

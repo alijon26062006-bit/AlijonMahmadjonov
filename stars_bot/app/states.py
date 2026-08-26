@@ -1,8 +1,26 @@
-"""FSM-состояния оформления заказа."""
+"""FSM-состояния диалогов."""
 from aiogram.fsm.state import State, StatesGroup
 
 
-class Purchase(StatesGroup):
+class Buy(StatesGroup):
+    quantity = State()    # ждём количество звёзд
     recipient = State()   # ждём @username получателя
     confirm = State()     # показали сводку, ждём подтверждения
-    receipt = State()     # заказ создан, ждём скриншот чека
+
+
+class Deposit(StatesGroup):
+    amount = State()      # ждём сумму пополнения
+    receipt = State()     # ждём скриншот чека
+
+
+class Promo(StatesGroup):
+    code = State()
+
+
+class Calc(StatesGroup):
+    query = State()
+
+
+class Support(StatesGroup):
+    subject = State()     # первое сообщение тикета
+    reply = State()       # дописка в открытый тикет

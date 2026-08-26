@@ -1,4 +1,18 @@
-"""Оркестрация выдачи: подтверждение оплаты → Fragment → уведомления."""
+"""Оплата с баланса, выдача через Fragment и возврат при неудаче.
+
+Порядок операций выбран так, чтобы при любом сбое пользователь не остался
+без денег и без товара:
+
+  1. списываем деньги (атомарно, с проверкой баланса в том же UPDATE);
+  2. создаём заказ в статусе delivering — он фиксирует, что деньги списаны;
+  3. зовём Fragment;
+  4. успех  → delivered;
+     явный отказ Fragment → возвращаем деньги, refunded;
+     нет ответа (таймаут/5xx) → failed, деньги held, разбирается админ.
+
+Шаг 4 разделён намеренно: при таймауте неизвестно, ушли звёзды или нет, и
+автовозврат означал бы раздачу товара бесплатно.
+"""
 from __future__ import annotations
 
 import logging
@@ -7,66 +21,195 @@ import aiosqlite
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 
-from app import db, texts
-from app.services.fragment import DeliveryError, DeliveryProvider
+from app import db, keyboards, texts
+from app.config import settings
+from app.money import fmt
+from app.services.fragment import DeliveryError, DeliveryProvider, DeliveryUncertain
 
 log = logging.getLogger(__name__)
 
 
-async def notify_user(bot: Bot, user_id: int, text: str) -> None:
-    """Уведомить покупателя. Заблокированный бот не должен ронять выдачу."""
+async def notify(bot: Bot, chat_id: int, text: str, **kwargs) -> None:
+    """Отправить сообщение, не роняя вызывающий код, если чат недоступен."""
     try:
-        await bot.send_message(user_id, text)
+        await bot.send_message(chat_id, text, **kwargs)
     except TelegramAPIError as exc:
-        log.warning("Не смог написать пользователю %s: %s", user_id, exc)
+        log.warning("Не смог написать в чат %s: %s", chat_id, exc)
 
 
-async def deliver(
+async def notify_admins(bot: Bot, text: str, **kwargs) -> None:
+    for admin_id in settings.admin_ids:
+        await notify(bot, admin_id, text, **kwargs)
+    if settings.orders_chat_id:
+        await notify(bot, settings.orders_chat_id, text, **kwargs)
+
+
+class NotEnoughFunds(Exception):
+    pass
+
+
+async def purchase(
     bot: Bot,
     conn: aiosqlite.Connection,
     provider: DeliveryProvider,
-    order: db.Order,
-) -> tuple[bool, str]:
-    """Выдать оплаченный заказ.
+    *,
+    user_id: int,
+    product_type: str,
+    quantity: int,
+    recipient: str,
+    price: int,
+) -> db.Order:
+    """Списать деньги, создать заказ и выдать товар.
 
-    Заказ уже должен быть переведён в статус ``delivering`` вызывающей стороной —
-    это защищает от двойной выдачи при одновременном клике двух админов.
-
-    Возвращает (успех, текст для админа).
+    Бросает NotEnoughFunds, если баланса не хватило (деньги не тронуты).
     """
+    if not await db.charge(conn, user_id, price):
+        raise NotEnoughFunds
+
+    order = await db.create_order(
+        conn, user_id=user_id, product_type=product_type, quantity=quantity,
+        recipient=recipient, price=price,
+    )
+    log.info("Заказ %s: списано %s с пользователя %s", order.id, fmt(price), user_id)
+    await _run_delivery(bot, conn, provider, order)
+    refreshed = await db.get_order(conn, order.id)
+    return refreshed or order
+
+
+async def _run_delivery(
+    bot: Bot, conn: aiosqlite.Connection, provider: DeliveryProvider, order: db.Order
+) -> None:
     try:
         if order.product_type == "stars":
             result = await provider.deliver_stars(order.recipient, order.quantity)
         else:
             result = await provider.deliver_premium(order.recipient, order.quantity)
+
     except DeliveryError as exc:
-        message = str(exc)
-    except Exception as exc:  # noqa: BLE001 — сеть/парсинг: заказ не должен зависнуть
-        log.exception("Неожиданная ошибка выдачи заказа %s", order.id)
-        message = f"{type(exc).__name__}: {exc}"
-    else:
-        await db.update_order(
-            conn, order.id,
-            status=db.STATUS_DELIVERED,
-            fragment_order_id=result.order_id,
-            error=None,
+        # Fragment ответил отказом — выдачи точно не было, возвращаем деньги.
+        await _refund(bot, conn, order, str(exc))
+
+    except DeliveryUncertain as exc:
+        # Ответа нет. Деньги придерживаем, зовём админа разобраться вручную.
+        await db.transition_order(
+            conn, order.id, expected=db.ORDER_DELIVERING, new=db.ORDER_FAILED,
+            error=str(exc)[:1000],
         )
-        await notify_user(
+        await notify(
             bot, order.user_id,
-            texts.ORDER_DELIVERED.format(
+            f"⏳ <b>Заказ №{order.id} проверяется.</b>\n\n"
+            f"Fragment не ответил вовремя. Проверяю вручную — напишу в течение "
+            f"нескольких минут. Деньги в безопасности.",
+        )
+        await notify_admins(
+            bot,
+            texts.ADMIN_ORDER_FAILED.format(
+                order_id=order.id, title=order.title, recipient=order.recipient,
+                user_id=order.user_id, error=str(exc)[:400],
+            )
+            + "\n\n❗️ Проверьте в кабинете Fragment, дошёл ли заказ:\n"
+            f"• дошёл → <code>/done {order.id}</code>\n"
+            f"• не дошёл → <code>/refund {order.id}</code>",
+        )
+        log.error("Заказ %s: неопределённый исход — %s", order.id, exc)
+
+    except Exception as exc:  # noqa: BLE001 — баг в коде не должен съесть деньги
+        log.exception("Заказ %s: непредвиденная ошибка", order.id)
+        await _refund(bot, conn, order, f"{type(exc).__name__}: {exc}")
+
+    else:
+        await db.transition_order(
+            conn, order.id, expected=db.ORDER_DELIVERING, new=db.ORDER_DELIVERED,
+            fragment_order_id=result.order_id, error=None,
+        )
+        await notify(
+            bot, order.user_id,
+            texts.DELIVERED.format(
                 order_id=order.id, title=order.title,
-                recipient=order.recipient, support=texts.support(),
+                recipient=order.recipient, price=fmt(order.price),
+            ),
+            reply_markup=keyboards.back(),
+        )
+        await notify_admins(
+            bot,
+            texts.ADMIN_ORDER_DONE.format(
+                order_id=order.id, title=order.title, recipient=order.recipient,
+                price=fmt(order.price), user_id=order.user_id,
             ),
         )
         log.info("Заказ %s выдан, fragment_id=%s", order.id, result.order_id)
-        return True, texts.ADMIN_DELIVERED.format(
-            order_id=order.id, fragment_id=result.order_id or "—"
-        )
 
-    await db.update_order(conn, order.id, status=db.STATUS_FAILED, error=message[:1000])
-    await notify_user(
-        bot, order.user_id,
-        texts.ORDER_FAILED_USER.format(order_id=order.id, support=texts.support()),
+
+async def _refund(
+    bot: Bot, conn: aiosqlite.Connection, order: db.Order, reason: str
+) -> None:
+    """Вернуть деньги за заказ. Переход статуса делается первым, поэтому
+    повторный вызов по тому же заказу не начислит деньги дважды."""
+    moved = await db.transition_order(
+        conn, order.id, expected=db.ORDER_DELIVERING, new=db.ORDER_REFUNDED,
+        error=reason[:1000],
     )
-    log.error("Заказ %s: выдача не удалась — %s", order.id, message)
-    return False, texts.ADMIN_FAILED.format(order_id=order.id, error=message[:500])
+    if not moved:
+        log.warning("Заказ %s: возврат пропущен, статус уже изменён", order.id)
+        return
+
+    await db.credit(conn, order.user_id, order.price)
+    await notify(
+        bot, order.user_id,
+        texts.REFUNDED.format(
+            order_id=order.id, price=fmt(order.price), support=texts.support()
+        ),
+        reply_markup=keyboards.back(),
+    )
+    await notify_admins(
+        bot,
+        texts.ADMIN_ORDER_FAILED.format(
+            order_id=order.id, title=order.title, recipient=order.recipient,
+            user_id=order.user_id, error=reason[:400],
+        ),
+    )
+    log.warning("Заказ %s: возвращено %s — %s", order.id, fmt(order.price), reason)
+
+
+async def retry_failed(
+    bot: Bot, conn: aiosqlite.Connection, provider: DeliveryProvider, order: db.Order
+) -> bool:
+    """Повторить выдачу зависшего заказа. Деньги уже списаны, повторно не берём."""
+    if not await db.transition_order(
+        conn, order.id, expected=db.ORDER_FAILED, new=db.ORDER_DELIVERING
+    ):
+        return False
+    await _run_delivery(bot, conn, provider, order)
+    return True
+
+
+async def manual_refund(bot: Bot, conn: aiosqlite.Connection, order: db.Order) -> bool:
+    """Возврат по решению админа для заказа, зависшего в failed."""
+    if not await db.transition_order(
+        conn, order.id, expected=db.ORDER_FAILED, new=db.ORDER_REFUNDED
+    ):
+        return False
+    await db.credit(conn, order.user_id, order.price)
+    await notify(
+        bot, order.user_id,
+        texts.REFUNDED.format(
+            order_id=order.id, price=fmt(order.price), support=texts.support()
+        ),
+    )
+    return True
+
+
+async def manual_complete(bot: Bot, conn: aiosqlite.Connection, order: db.Order) -> bool:
+    """Админ подтвердил, что заказ всё-таки дошёл."""
+    if not await db.transition_order(
+        conn, order.id, expected=db.ORDER_FAILED, new=db.ORDER_DELIVERED
+    ):
+        return False
+    await notify(
+        bot, order.user_id,
+        texts.DELIVERED.format(
+            order_id=order.id, title=order.title,
+            recipient=order.recipient, price=fmt(order.price),
+        ),
+    )
+    return True

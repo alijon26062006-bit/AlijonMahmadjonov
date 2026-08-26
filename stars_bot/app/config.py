@@ -24,19 +24,36 @@ class Settings(BaseSettings):
     admin_ids_raw: str = Field(default="", validation_alias=AliasChoices("ADMIN_IDS", "admin_ids"))
     orders_chat_id: int | None = None
 
-    payment_card_number: str = ""
-    payment_card_holder: str = ""
-    payment_bank: str = ""
-    currency: str = "UZS"
+    # ---- деньги ----
+    currency: str = "с."
+    # Цена одной звезды в дирамах (1 сомони = 100 дирам). 20 = 0.20 сомони.
+    star_price_diram: int = 20
+    min_stars: int = 50
+    max_stars: int = 10_000
+    min_deposit_diram: int = 1000
+    referral_percent: int = 5
 
+    # ---- реквизиты для пополнения ----
+    pay_card_number: str = ""
+    pay_card_holder: str = ""
+    pay_card_bank: str = ""
+    pay_city: str = "Душанбе"
+    pay_extra: str = ""
+
+    # ---- Fragment ----
     fragment_mode: str = "mock"
     fragment_base_url: str = "https://api.fragment.com"
     fragment_api_key: str = ""
     fragment_phone_number: str = ""
     fragment_mnemonics: str = ""
 
-    db_path: str = "data/bot.sqlite3"
+    # ---- ссылки ----
     support_username: str = ""
+    reviews_url: str = ""
+    news_url: str = ""
+    bot_username: str = ""
+
+    db_path: str = "data/bot.sqlite3"
     log_level: str = "INFO"
 
     @cached_property

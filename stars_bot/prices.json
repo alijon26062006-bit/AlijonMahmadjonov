@@ -1,15 +1,8 @@
 {
-  "stars": [
-    { "amount": 50,   "price": 12000 },
-    { "amount": 100,  "price": 23000 },
-    { "amount": 250,  "price": 56000 },
-    { "amount": 500,  "price": 110000 },
-    { "amount": 1000, "price": 215000 },
-    { "amount": 2500, "price": 530000 }
-  ],
+  "_comment": "Цены в дирамах: 1 сомони = 100 дирам. 11400 = 114.00 сомони.",
   "premium": [
-    { "months": 3,  "price": 190000 },
-    { "months": 6,  "price": 260000 },
-    { "months": 12, "price": 450000 }
+    { "months": 3,  "price": 13000 },
+    { "months": 6,  "price": 17500 },
+    { "months": 12, "price": 31500 }
   ]
 }

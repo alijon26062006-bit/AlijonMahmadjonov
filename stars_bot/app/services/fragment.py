@@ -31,7 +31,19 @@ REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=60)
 
 
 class DeliveryError(Exception):
-    """Выдача не удалась. Текст пригоден для показа админу."""
+    """Fragment явно отказал: не хватило баланса, нет получателя, плохой запрос.
+
+    Точно известно, что выдачи НЕ было, поэтому деньги можно вернуть сразу.
+    """
+
+
+class DeliveryUncertain(Exception):
+    """Ответа нет: таймаут, обрыв сети, 5xx.
+
+    Неизвестно, прошла выдача или нет. Автовозврат тут опасен — можно вернуть
+    деньги за реально отправленные звёзды, — поэтому такой заказ уходит
+    админу на ручную проверку.
+    """
 
 
 @dataclass
@@ -121,10 +133,17 @@ class FragmentProvider(DeliveryProvider):
             "phone_number": settings.fragment_phone_number,
             "mnemonics": settings.mnemonics_list,
         }
-        async with session.post(self._base + AUTH_PATH, json=payload) as resp:
-            data = await self._read_json(resp)
-            if resp.status >= 400:
-                raise DeliveryError(f"Авторизация Fragment не прошла ({resp.status}): {data}")
+        try:
+            async with session.post(self._base + AUTH_PATH, json=payload) as resp:
+                data = await self._read_json(resp)
+                if resp.status >= 400:
+                    raise DeliveryError(
+                        f"Авторизация Fragment не прошла ({resp.status}): {data}"
+                    )
+        except (TimeoutError, aiohttp.ClientError) as exc:
+            # Авторизация идёт до выдачи, поэтому её провал безопасен:
+            # заказ точно не отправлен и деньги можно вернуть.
+            raise DeliveryError(f"Fragment недоступен: {exc}") from exc
         token = data.get("token") or data.get("access_token")
         if not token:
             raise DeliveryError(f"Fragment не вернул токен: {data}")
@@ -156,16 +175,27 @@ class FragmentProvider(DeliveryProvider):
         for attempt in (1, 2):
             token = await self._token_value(force=attempt == 2)
             headers = {"Authorization": f"JWT {token}"}
-            async with session.request(method, url, json=payload, headers=headers) as resp:
-                data = await self._read_json(resp)
-                if resp.status == 401 and attempt == 1:
-                    log.info("Fragment: токен протух, повторяю авторизацию")
-                    continue
-                if resp.status >= 400:
-                    raise DeliveryError(
-                        f"Fragment вернул {resp.status}: {data.get('error') or data}"
-                    )
-                return data
+            try:
+                async with session.request(
+                    method, url, json=payload, headers=headers
+                ) as resp:
+                    data = await self._read_json(resp)
+                    if resp.status == 401 and attempt == 1:
+                        log.info("Fragment: токен протух, повторяю авторизацию")
+                        continue
+                    if resp.status >= 500:
+                        raise DeliveryUncertain(
+                            f"Fragment вернул {resp.status}: {data.get('error') or data}"
+                        )
+                    if resp.status >= 400:
+                        raise DeliveryError(
+                            f"Fragment вернул {resp.status}: {data.get('error') or data}"
+                        )
+                    return data
+            except (TimeoutError, aiohttp.ClientError) as exc:
+                # Запрос мог дойти до Fragment и выполниться — считать его
+                # неудачей и возвращать деньги нельзя.
+                raise DeliveryUncertain(f"Нет ответа от Fragment: {exc}") from exc
         raise DeliveryError("Fragment: не удалось авторизоваться")
 
     async def deliver_stars(self, username: str, amount: int) -> DeliveryResult:
