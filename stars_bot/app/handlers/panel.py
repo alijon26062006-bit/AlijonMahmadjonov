@@ -161,7 +161,8 @@ def prices_kb() -> InlineKeyboardMarkup:
     )
     kb.row(InlineKeyboardButton(text="🏷 Цена продажи вручную",
                                 callback_data="pn:set:star_price_diram"))
-    kb.row(InlineKeyboardButton(text="🧮 Пересчитать по наценке", callback_data="pn:recalc"))
+    kb.row(InlineKeyboardButton(text="📡 Узнать себестоимость", callback_data="pn:cost"))
+    kb.row(InlineKeyboardButton(text="🧮 Применить наценку", callback_data="pn:recalc"))
     for plan in runtime.premium_plans():
         kb.row(InlineKeyboardButton(
             text=f"👑 Premium {plan['months']} мес — {fmt(plan['price'])}",
@@ -214,7 +215,10 @@ def prices_text() -> str:
         f"👑 <b>Premium</b>\n{plans}\n\n"
         f"📏 Заказ: от <b>{runtime.min_stars()}</b> до <b>{runtime.max_stars()}</b> звёзд\n"
         f"💵 Мин. пополнение: <b>{fmt(runtime.min_deposit())}</b>\n"
-        f"👥 Реферальный процент: <b>{runtime.referral_percent()}%</b>"
+        f"👥 Реферальный процент: <b>{runtime.referral_percent()}%</b>\n"
+        + (f"💱 Курс доллара: <b>{fmt(runtime.usd_rate())}</b>"
+           if runtime.usd_rate() > 0 else
+           "💱 Курс доллара не задан — бот не сможет сам узнать себестоимость")
     )
 
 
@@ -333,6 +337,8 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "star_price_diram": ("🏷 Цена продажи звезды",
                          "За сколько продаёте ОДНУ звезду, в сомони.\n"
                          "Например <code>0.25</code>:", "money"),
+    "usd_rate_diram": ("💱 Курс доллара",
+                       "Сколько сомони стоит 1 доллар. Например <code>10.90</code>:", "money"),
     "margin_percent": ("📈 Наценка",
                        "Процент наценки к себестоимости. Например <code>30</code>:", "percent"),
     "min_stars": ("⬇️ Минимум звёзд", "Минимум звёзд в одном заказе:", "int"),
@@ -358,6 +364,7 @@ FIELD_PARENT = {key: "pn:pay" for key in PAY_FIELDS}
 FIELD_PARENT.update({
     "star_cost_diram": "pn:prices", "star_price_diram": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
+    "usd_rate_diram": "pn:prices",
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
     "referral_percent": "pn:prices", "support_notice": "pn:home",
     "autostop_after": "pn:wallet",
@@ -777,3 +784,99 @@ async def cb_topup(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     await runtime.mark_topup(conn, call.message.date.strftime("%d.%m.%Y %H:%M UTC"))
     await call.answer("Счётчики обнулены" + (", продажа включена" if was_stopped else ""))
     await safe_edit(call, wallet_text(), wallet_kb())
+
+
+# ================================================= себестоимость из API
+
+
+@router.callback_query(F.data == "pn:cost")
+async def cb_cost(call: CallbackQuery, provider) -> None:
+    """Спросить у сервиса выдачи, во что заказ обходится владельцу."""
+    estimate_fn = getattr(provider, "cost_estimate", None)
+    if estimate_fn is None:
+        await call.answer(
+            "Этот способ выдачи не умеет отдавать цену. "
+            "Себестоимость придётся вписать вручную.",
+            show_alert=True,
+        )
+        return
+
+    rate = runtime.usd_rate()
+    if rate <= 0:
+        await safe_edit(
+            call,
+            "💱 <b>Сначала задайте курс доллара</b>\n\n"
+            "Сервис выдачи считает в TON и долларах, а вы продаёте за сомони. "
+            "Чтобы перевести одно в другое, боту нужен курс.\n\n"
+            "Посмотрите курс доллара к сомони и нажмите кнопку ниже.",
+            back_kb("pn:set:usd_rate_diram", "💱 Задать курс"),
+        )
+        await call.answer()
+        return
+
+    await safe_edit(call, "📡 Спрашиваю цену у сервиса выдачи…", back_kb("pn:prices"))
+    await call.answer()
+
+    try:
+        # Считаем на 1000 звёзд: так точнее, чем на 50, и меньше округления.
+        estimate = await estimate_fn("stars", 1000)
+    except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
+        log.warning("Не удалось узнать себестоимость: %s", exc)
+        await safe_edit(
+            call,
+            f"❌ <b>Цена не пришла</b>\n\n<code>{exc}</code>\n\n"
+            "Проверьте связь: /panel → 🔌 Проверить связь.",
+            back_kb("pn:prices"),
+        )
+        return
+
+    # Себестоимость одной звезды в дирамах.
+    cost = int((estimate.usd_per_unit * rate).to_integral_value(rounding="ROUND_HALF_UP"))
+    margin = runtime.margin_percent()
+    suggested = round(cost * (100 + margin) / 100) if margin else cost
+
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(
+        text=f"✅ Записать {fmt(cost)} как себестоимость",
+        callback_data=f"pn:cost_save:{cost}",
+    ))
+    kb.row(InlineKeyboardButton(text="📈 Изменить наценку", callback_data="pn:set:margin_percent"))
+    kb.row(InlineKeyboardButton(text="💱 Изменить курс", callback_data="pn:set:usd_rate_diram"))
+    kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:prices"))
+
+    margin_line = (
+        f"\n📈 С вашей наценкой <b>{margin}%</b> продавать по "
+        f"<b>{fmt(suggested)}</b> за звезду\n"
+        f"   (прибыль <b>{fmt(suggested - cost)}</b> со звезды, "
+        f"<b>{fmt((suggested - cost) * 1000)}</b> с 1000)"
+        if margin else
+        "\n📈 Наценка не задана — поставьте её, и бот посчитает цену продажи."
+    )
+
+    await safe_edit(
+        call,
+        "📡 <b>Себестоимость от сервиса выдачи</b>\n\n"
+        f"За <b>{estimate.quantity} звёзд</b> вы платите "
+        f"<b>{estimate.amount} {estimate.currency.upper()}</b>\n"
+        f"Это <b>${estimate.usd_total:.2f}</b>"
+        + (f" (курс TON: ${estimate.usdt_per_ton})" if estimate.usdt_per_ton else "")
+        + f"\n\n💱 По вашему курсу <b>{fmt(rate)}</b> за доллар:\n"
+        f"└ одна звезда обходится в <b>{fmt(cost)}</b>\n"
+        f"{margin_line}\n\n"
+        "⚠️ Курс TON меняется — проверяйте себестоимость раз в несколько дней.",
+        kb.as_markup(),
+    )
+
+
+@router.callback_query(F.data.startswith("pn:cost_save:"))
+async def cb_cost_save(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    cost = int(call.data.rsplit(":", 1)[1])
+    await runtime.set_value(conn, "star_cost_diram", str(cost))
+
+    margin = runtime.margin_percent()
+    if margin > 0:
+        await runtime.set_value(conn, "star_price_diram", str(runtime.price_from_margin()))
+        await call.answer(f"Себестоимость {fmt(cost)}, цена продажи пересчитана")
+    else:
+        await call.answer(f"Себестоимость {fmt(cost)} записана")
+    await safe_edit(call, prices_text(), prices_kb())

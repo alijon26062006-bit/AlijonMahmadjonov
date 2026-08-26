@@ -42,6 +42,7 @@ def _build_defaults() -> dict[str, str]:
         # цены
         "star_price_diram": str(settings.star_price_diram),
         "star_cost_diram": "0",          # себестоимость, 0 = не задана
+        "usd_rate_diram": "0",           # сколько дирам в одном долларе
         "margin_percent": "0",           # наценка к себестоимости
         "premium_plans": _premium_from_file(),
         "min_stars": str(settings.min_stars),
@@ -142,6 +143,11 @@ def star_cost() -> int:
 
 def margin_percent() -> int:
     return get_int("margin_percent")
+
+
+def usd_rate() -> int:
+    """Сколько дирам в 1 долларе. 0 — курс не задан."""
+    return get_int("usd_rate_diram")
 
 
 def price_from_margin() -> int:

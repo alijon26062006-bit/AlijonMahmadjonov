@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 
 from mystars_faas import (
     AsyncMyStarsClient, MyStarsError, Order, OrderWaitTimeout,
@@ -40,6 +41,17 @@ FAILURE_REASONS = {
     "expired": "оплата не пришла вовремя, заказ закрыт",
     "already_subscribed": "у получателя уже есть активный Premium",
 }
+
+
+@dataclass
+class CostEstimate:
+    """Во что заказ обходится ВАМ — то, что MyStars спишет с кошелька."""
+    quantity: int
+    amount: str            # сумма к оплате, строкой
+    currency: str          # ton или usdt_ton
+    usd_total: Decimal     # та же сумма в долларах
+    usd_per_unit: Decimal  # доллары за одну звезду / один месяц
+    usdt_per_ton: str
 
 
 @dataclass
@@ -113,6 +125,50 @@ class MyStarsProvider(DeliveryProvider):
             safe=True,
         )
         return str(quote.amount)
+
+    async def cost_estimate(self, product_type: str, amount: int) -> CostEstimate:
+        """Себестоимость заказа с пересчётом в доллары.
+
+        MyStars считает в TON или USDT. Чтобы получить цену в сомони, сумму
+        сначала приводим к долларам — курс TON отдаёт сам сервис в
+        usdt_per_ton, а доллар в сомони владелец задаёт в панели.
+        """
+        kwargs = {"quantity": amount} if product_type == "stars" else {"months": amount}
+        quote = await self._call(
+            self.api.get_pricing(
+                type=product_type, payment_currency=settings.mystars_currency, **kwargs
+            ),
+            safe=True,
+        )
+
+        try:
+            total = Decimal(str(quote.amount))
+        except (InvalidOperation, TypeError) as exc:
+            raise DeliveryError(f"MyStars вернул нечисловую цену: {quote.amount!r}") from exc
+
+        currency = str(quote.currency or settings.mystars_currency).lower()
+        rate = str(quote.usdt_per_ton or "")
+
+        if currency.startswith("usdt"):
+            usd_total = total          # уже в долларах
+        else:
+            if not rate:
+                raise DeliveryError(
+                    "MyStars не отдал курс TON — попробуйте ещё раз через минуту."
+                )
+            usd_total = total * Decimal(rate)
+
+        if amount <= 0:
+            raise DeliveryError("Количество должно быть больше нуля.")
+
+        return CostEstimate(
+            quantity=amount,
+            amount=str(quote.amount),
+            currency=currency,
+            usd_total=usd_total,
+            usd_per_unit=usd_total / Decimal(amount),
+            usdt_per_ton=rate,
+        )
 
     async def quote_many(self, quantities: list[int]) -> dict[int, str]:
         if not quantities:

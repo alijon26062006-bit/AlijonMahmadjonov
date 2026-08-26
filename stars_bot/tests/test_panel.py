@@ -39,13 +39,16 @@ class FakeMessage:
         self.chat = type("C", (), {"id": self.from_user.id})()
         self.message_id = 1
         self.replies: list[str] = []
+        self.markups: list = []
 
     async def answer(self, text, **kw):
         self.replies.append(text)
+        self.markups.append(kw.get("reply_markup"))
         return self
 
     async def edit_text(self, text, **kw):
         self.replies.append(text)
+        self.markups.append(kw.get("reply_markup"))
         return self
 
     @property
@@ -67,6 +70,11 @@ class FakeCallback:
     @property
     def last(self):
         return self.message.last
+
+
+async def _last_markup(call):
+    """Разметка последнего показанного экрана."""
+    return call.message.markups[-1]
 
 
 def state_for(storage):
@@ -226,6 +234,67 @@ async def run(conn) -> None:
 
     ids = await bc.audience_ids(conn, "funded")
     check("список получателей корректен", ids == [901], str(ids))
+
+    # ------------------------------------------ себестоимость из API
+    from decimal import Decimal
+
+    class FakeEstimate:
+        quantity, amount, currency = 1000, "11.50", "ton"
+        usd_total = Decimal("32.775")
+        usd_per_unit = Decimal("0.032775")
+        usdt_per_ton = "2.85"
+
+    class CostProvider:
+        async def cost_estimate(self, product_type, amount):
+            return FakeEstimate()
+
+    # Без курса доллара бот должен просить его, а не считать наугад
+    await runtime.set_value(conn, "usd_rate_diram", "0")
+    call = FakeCallback("pn:cost")
+    await panel.cb_cost(call, CostProvider())
+    check("без курса доллара бот просит его задать",
+          "курс доллара" in call.last.lower(), call.last[:70])
+
+    await runtime.set_value(conn, "usd_rate_diram", "1090")   # 10.90 сомони
+    await runtime.set_value(conn, "margin_percent", "10")
+    call = FakeCallback("pn:cost")
+    await panel.cb_cost(call, CostProvider())
+    check("себестоимость посчитана из цены сервиса",
+          "0.36" in call.last, call.last.replace("\n", " ")[:150])
+    check("показана цена в долларах", "$32.77" in call.last or "32.78" in call.last)
+    # 0.36 × 1.10 = 0.396 -> округляется до 0.40
+    check("предложена цена с наценкой 10%",
+          "0.40" in call.last, call.last.replace("\n", " ")[-160:])
+
+    # Кнопка сохранения несёт посчитанное значение
+    buttons = [b.callback_data for row in
+               (await _last_markup(call)).inline_keyboard for b in row]
+    save = next((b for b in buttons if b and b.startswith("pn:cost_save:")), None)
+    check("кнопка сохранения содержит себестоимость", save == "pn:cost_save:36", str(save))
+
+    await panel.cb_cost_save(FakeCallback(save), conn)
+    check("себестоимость сохранилась", runtime.star_cost() == 36, str(runtime.star_cost()))
+    check("цена продажи пересчитана по наценке 10%",
+          runtime.star_price() == 40, str(runtime.star_price()))
+
+    # Провайдер без цен не должен ронять панель
+    class NoCostProvider:
+        pass
+
+    call = FakeCallback("pn:cost")
+    await panel.cb_cost(call, NoCostProvider())
+    check("провайдер без цен объясняется, а не падает",
+          any("вручную" in a for a in call.alerts), str(call.alerts))
+
+    # Ошибка сервиса тоже не роняет
+    class BrokenCost:
+        async def cost_estimate(self, *a):
+            raise RuntimeError("сеть недоступна")
+
+    call = FakeCallback("pn:cost")
+    await panel.cb_cost(call, BrokenCost())
+    check("ошибка сервиса показывается понятно",
+          "Цена не пришла" in call.last, call.last[:60])
 
     # ------------------------------------------------------ главный экран
     home = await panel.home_text(conn)
