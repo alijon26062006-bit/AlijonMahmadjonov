@@ -15,6 +15,7 @@ from app.config import settings
 from app.handlers import (
     admin, broadcast, deposit, menu, panel, profile, shop, support,
 )
+from app.middlewares.emoji_guard import CustomEmojiGuard
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.billing import make_sender
 from app.services.fragment import build_provider
@@ -82,6 +83,8 @@ async def main() -> None:
     )
 
     bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    # Если премиум-эмодзи перестанут приниматься, бот не должен замолчать.
+    bot.session.middleware(CustomEmojiGuard())
     conn = await db.connect()
     await db.init(conn)
     # Настройки из панели грузим до проверки готовности: реквизиты могли

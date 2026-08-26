@@ -167,6 +167,85 @@ async def run(conn) -> None:
     check("пустая история объясняет, что появится",
           "Пока пусто" in call.last and "<blockquote>" in call.last)
 
+    # ------------------------------------------- премиум-эмодзи
+    from app.middlewares.emoji_guard import CustomEmojiGuard, strip_custom
+
+    await runtime.reset(conn, "custom_emoji_on")
+    await runtime.set_value(conn, "emoji_id_premium", "5368324170671202286")
+
+    check("пока не проверено — премиум-эмодзи не подставляется",
+          emoji.em_html("premium") == emoji.em("premium"), emoji.em_html("premium"))
+
+    await runtime.set_value(conn, "custom_emoji_on", "1")
+    html = emoji.em_html("premium")
+    check("после включения подставляется тег",
+          html.startswith("<tg-emoji emoji-id=\"5368324170671202286\">"), html)
+    check("внутри тега остаётся запасной значок",
+          emoji.em("premium") in html, html)
+    check("в кнопках премиум-эмодзи не появляется",
+          "<tg-emoji" not in " ".join(
+              b.text for row in keyboards.main_menu().inline_keyboard for b in row))
+    check("в текстах премиум-эмодзи появляется",
+          "<tg-emoji" in texts.PREMIUM_ENTRY)
+
+    # Присланный премиум-эмодзи распознаётся без ручного ввода ID
+    class Ent:
+        type = "custom_emoji"
+        custom_emoji_id = "999888777"
+        offset, length = 0, 2
+
+    class Msg:
+        text = "👑 вот такой"
+        entities = [Ent()]
+
+    got = emoji.extract_custom(Msg())
+    check("ID премиум-эмодзи достаётся из сообщения",
+          got == ("999888777", "👑"), str(got))
+
+    class Plain:
+        text = "👑"
+        entities = []
+
+    check("обычный эмодзи не путается с премиум",
+          emoji.extract_custom(Plain()) is None)
+
+    # Страховка: отказ Telegram убирает теги и выключает премиум-эмодзи
+    check("страховка вырезает теги, оставляя значки",
+          strip_custom('a <tg-emoji emoji-id="1">👑</tg-emoji> b') == "a 👑 b")
+
+    class Method:
+        text = 'Привет <tg-emoji emoji-id="1">👑</tg-emoji>'
+
+    method = Method()
+    calls = []
+
+    async def make_request(bot, m):
+        calls.append(m.text)
+        if "<tg-emoji" in m.text:
+            from aiogram.exceptions import TelegramBadRequest
+            raise TelegramBadRequest(method=None, message="Bad Request: custom_emoji is not allowed")
+        return "ok"
+
+    result = await CustomEmojiGuard()(make_request, None, method)
+    check("после отказа сообщение уходит без премиум-эмодзи",
+          result == "ok" and calls[-1] == "Привет 👑", str(calls))
+    check("после отказа премиум-эмодзи выключаются",
+          not runtime.get_bool("custom_emoji_on"))
+
+    # Чужие ошибки страховка не глотает
+    async def other_error(bot, m):
+        from aiogram.exceptions import TelegramBadRequest
+        raise TelegramBadRequest(method=None, message="Bad Request: chat not found")
+
+    try:
+        await CustomEmojiGuard()(other_error, None, Method())
+        passed = False
+    except Exception as exc:
+        passed = "chat not found" in str(exc)
+    check("посторонние ошибки не проглатываются", passed)
+
+    await runtime.reset(conn, "emoji_id_premium")
+
     # ------------------------------------------- заголовки и разделители
     with_rule = [n for n, t in templates.items() if texts.LINE in t]
     check("на экранах есть разделители", len(with_rule) >= 15, f"{len(with_rule)}")

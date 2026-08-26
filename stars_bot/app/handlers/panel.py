@@ -21,8 +21,11 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from contextlib import suppress
+
 from app import db, emoji, runtime, texts
 from app.config import settings
+from app.emoji import substitute
 from app.money import fmt, parse
 from app.states import Panel, PromoNew
 
@@ -959,17 +962,25 @@ async def cb_look(call: CallbackQuery, state: FSMContext) -> None:
     kb = InlineKeyboardBuilder()
     for group in emoji.GROUPS:
         kb.row(InlineKeyboardButton(text=group, callback_data=f"pn:emg:{group}"))
+    kb.row(InlineKeyboardButton(
+        text=("🚫 Выключить премиум-эмодзи" if emoji.premium_on()
+              else "💎 Проверить премиум-эмодзи"),
+        callback_data="pn:emtest",
+    ))
     kb.row(InlineKeyboardButton(text="♻️ Вернуть все по умолчанию",
                                 callback_data="pn:emreset"))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
 
     preview = "  ".join(emoji.em(key) for key in list(emoji.DEFAULTS)[:12])
+    custom_count = sum(1 for key in emoji.DEFAULTS if emoji.custom_id(key))
     await safe_edit(
         call,
         "🎨 <b>Оформление</b>\n\n"
         "<blockquote>Каждый значок в боте можно заменить своим. "
         "Изменения видны клиентам сразу, перезапуск не нужен.</blockquote>\n\n"
         f"Сейчас: {preview}\n\n"
+        f"💎 Премиум-эмодзи: <b>{'включены' if emoji.premium_on() else 'выключены'}</b> "
+        f"<i>({custom_count} шт. задано)</i>\n\n"
         "<i>Выберите группу</i> 👇",
         kb.as_markup(),
     )
@@ -1022,17 +1033,32 @@ async def cb_emoji_set(call: CallbackQuery, state: FSMContext) -> None:
 
     group = next(g for g, items in emoji.GROUPS.items() if key in items)
     kb = InlineKeyboardBuilder()
+    if emoji.custom_id(key):
+        kb.row(InlineKeyboardButton(text="🚫 Убрать премиум-эмодзи",
+                                    callback_data=f"pn:emcustdel:{key}"))
     kb.row(InlineKeyboardButton(text=f"♻️ Вернуть {emoji.DEFAULTS[key]}",
                                 callback_data=f"pn:emdef:{key}"))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data=f"pn:emg:{group}"))
+
+    premium_line = ""
+    if emoji.custom_id(key):
+        state_note = "работает" if emoji.premium_on() else "выключен — включите проверку"
+        premium_line = (
+            f"├ Премиум-эмодзи: <code>{emoji.custom_id(key)}</code> "
+            f"<i>({state_note})</i>\n"
+        )
 
     await safe_edit(
         call,
         f"🎨 <b>{emoji.TITLES[key]}</b>\n\n"
         f"├ Сейчас: {emoji.em(key)}\n"
+        f"{premium_line}"
         f"└ По умолчанию: {emoji.DEFAULTS[key]}\n\n"
-        "<blockquote>Пришлите новый значок одним сообщением — "
-        "любой эмодзи или символ.</blockquote>",
+        "<blockquote>Пришлите новый значок одним сообщением.\n\n"
+        "Обычный эмодзи — заменит везде, включая кнопки.\n"
+        "<b>Премиум-эмодзи</b> — бот сам возьмёт его ID. В кнопках он "
+        "не отображается (Telegram не поддерживает), поэтому там "
+        "останется обычный.</blockquote>",
         kb.as_markup(),
     )
     await call.answer()
@@ -1049,6 +1075,33 @@ async def on_emoji_value(
         await message.answer("Не понял, что менять. Откройте /panel заново.")
         return
 
+    group = next(g for g, items in emoji.GROUPS.items() if key in items)
+
+    # Премиум-эмодзи приходит обычным символом плюс сущность с его ID —
+    # владельцу не надо искать ID руками, достаточно прислать сам эмодзи.
+    custom = emoji.extract_custom(message)
+    if custom is not None:
+        emoji_id, fallback = custom
+        await runtime.set_value(conn, f"emoji_id_{key}", emoji_id)
+        await runtime.set_value(conn, f"emoji_{key}", fallback)
+        await state.clear()
+
+        note = (
+            "" if emoji.premium_on() else
+            "\n\n<blockquote>[[warn]] Премиум-эмодзи пока выключены. "
+            "Нажмите «Проверить премиум-эмодзи» в разделе «Оформление» — "
+            "бот убедится, что Telegram их принимает, и включит.</blockquote>"
+        )
+        await message.answer(
+            f"✅ <b>{emoji.TITLES[key]}</b> — премиум-эмодзи принят\n\n"
+            f"├ ID: <code>{emoji_id}</code>\n"
+            f"└ Запасной значок: {fallback}\n\n"
+            "<i>Запасной увидят там, где премиум-эмодзи не отображается "
+            "(в кнопках и у части клиентов).</i>" + substitute(note),
+            reply_markup=back_kb(f"pn:emg:{group}", "‹ К группе"),
+        )
+        return
+
     value = (message.text or "").strip()
     if not emoji.is_emoji_like(value):
         await message.answer(
@@ -1058,8 +1111,8 @@ async def on_emoji_value(
         return
 
     await runtime.set_value(conn, f"emoji_{key}", value)
+    await runtime.reset(conn, f"emoji_id_{key}")   # обычный значок отменяет премиум
     await state.clear()
-    group = next(g for g, items in emoji.GROUPS.items() if key in items)
     await message.answer(
         f"✅ <b>{emoji.TITLES[key]}</b> теперь {value}\n\n"
         "<i>Клиенты увидят изменение сразу.</i>",
@@ -1098,4 +1151,64 @@ async def cb_emoji_reset_confirm(
     for key in emoji.DEFAULTS:
         await runtime.reset(conn, f"emoji_{key}")
     await call.answer("Значки возвращены")
+    await cb_look(call, state)
+
+
+@router.callback_query(F.data.startswith("pn:emcustdel:"))
+async def cb_custom_delete(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    key = call.data.rsplit(":", 1)[1]
+    await runtime.reset(conn, f"emoji_id_{key}")
+    await call.answer("Премиум-эмодзи убран")
+    group = next((g for g, items in emoji.GROUPS.items() if key in items), None)
+    if group:
+        await render_emoji_group(call, group)
+
+
+@router.callback_query(F.data == "pn:emtest")
+async def cb_emoji_test(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection, bot: Bot
+) -> None:
+    """Проверить, принимает ли Telegram премиум-эмодзи от этого бота.
+
+    Без проверки включать нельзя: если у владельца нет Premium, Telegram
+    отвергает каждое такое сообщение, и бот перестаёт отвечать вообще.
+    """
+    if emoji.premium_on():
+        await runtime.set_value(conn, "custom_emoji_on", "0")
+        await call.answer("Премиум-эмодзи выключены")
+        await cb_look(call, state)
+        return
+
+    sample = next((key for key in emoji.DEFAULTS if emoji.custom_id(key)), None)
+    if sample is None:
+        await call.answer(
+            "Сначала пришлите хотя бы один премиум-эмодзи — "
+            "выберите значок в любой группе.",
+            show_alert=True,
+        )
+        return
+
+    probe = (
+        f'<tg-emoji emoji-id="{emoji.custom_id(sample)}">{emoji.em(sample)}</tg-emoji>'
+        " проверка премиум-эмодзи"
+    )
+    try:
+        sent = await bot.send_message(call.from_user.id, probe)
+    except TelegramAPIError as exc:
+        await safe_edit(
+            call,
+            "💎 <b>Премиум-эмодзи не работают</b>\n\n"
+            f"<blockquote>Telegram ответил:\n<code>{exc}</code></blockquote>\n\n"
+            "Такое бывает, если у владельца бота нет Telegram Premium. "
+            "Обычные значки продолжают работать.",
+            back_kb("pn:look", "‹ К оформлению"),
+        )
+        await call.answer()
+        return
+
+    with suppress(TelegramAPIError):
+        await bot.delete_message(sent.chat.id, sent.message_id)
+
+    await runtime.set_value(conn, "custom_emoji_on", "1")
+    await call.answer("Работает — включил")
     await cb_look(call, state)
