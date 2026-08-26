@@ -49,14 +49,20 @@ PENDING = {"pending", "processing", "in_progress", "inprogress", "queued",
 # Вероятные пути к балансу и заказам. Документация в руках владельца, но
 # перебрать варианты ключом быстрее, чем сверять скриншоты вручную.
 BALANCE_CANDIDATES = [
-    "/api/v2/account", "/api/v2/account/balance", "/api/v2/balance",
-    "/api/v2/me", "/api/v2/user", "/api/v2/profile", "/api/v2/account/me",
-    "/api/v2/reseller", "/api/v2/reseller/balance", "/api/v2/account/info",
-    "/api/v2/wallet", "/api/v2/subscription",
+    "/api/v2/account", "/api/v2/account/balance", "/api/v2/account/me",
+    "/api/v2/account/info", "/api/v2/balance", "/api/v2/me",
+    "/api/v2/user", "/api/v2/user/balance", "/api/v2/profile",
+    "/api/v2/reseller", "/api/v2/reseller/balance", "/api/v2/wallet",
+    "/api/v2/payment/balance", "/api/v2/subscription",
 ]
 ORDER_LIST_CANDIDATES = [
     "/api/v2/orders", "/api/v2/order", "/api/v2/orders/list",
-    "/api/v2/account/orders",
+    "/api/v2/account/orders", "/api/v2/my/orders",
+]
+# Шаблоны одиночного заказа. Пробуются по очереди, рабочий запоминается.
+ORDER_ONE_CANDIDATES = [
+    "/api/v2/orders/{order_id}", "/api/v2/order/{order_id}",
+    "/api/v2/orders/{order_id}/status", "/api/v2/account/orders/{order_id}",
 ]
 
 
@@ -228,13 +234,6 @@ class FazerProvider(DeliveryProvider):
         Путь к статусу задаётся в настройках: раздел Orders в документации
         сервиса ещё не сверялся, и угадывать молча нельзя.
         """
-        path_template = self.order_path()
-        if not path_template:
-            raise DeliveryUncertain(
-                f"Заказ {order_id} принят, но проверять его статус нечем: "
-                "не задан FAZER_ORDER_PATH."
-            )
-
         interval = max(settings.task_poll_interval, 2)
         deadline = settings.task_poll_timeout
         waited = 0
@@ -244,15 +243,11 @@ class FazerProvider(DeliveryProvider):
         while waited < deadline:
             await asyncio.sleep(interval)
             waited += interval
-            try:
-                last = await self._request(
-                    "GET", path_template.format(order_id=order_id), safe=True
-                )
-            except DeliveryError as exc:
-                log.warning("Заказ %s: статус не прочитался (%s)", order_id, exc)
+            order = await self._read_order(order_id)
+            if order is None:
+                log.warning("Заказ %s: статус не прочитался", order_id)
                 continue
-
-            order = last.get("order") if isinstance(last.get("order"), dict) else last
+            last = order
             status = _status(order)
 
             if status in DONE:
@@ -269,6 +264,36 @@ class FazerProvider(DeliveryProvider):
             f"Заказ {order_id} не завершился за {deadline} сек "
             f"(последний статус: {_status(last) or '—'})"
         )
+
+    async def _read_order(self, order_id: str) -> dict | None:
+        """Прочитать заказ: сперва известным адресом, потом перебором,
+        а если одиночного адреса нет — поиском в списке заказов."""
+        known = self.order_path()
+        templates = ([known] if known else []) + [
+            t for t in ORDER_ONE_CANDIDATES if t != known
+        ]
+
+        for template in templates:
+            status, data = await self._get_raw(template.format(order_id=order_id))
+            if not self._looks_ok(status, data):
+                continue
+            order = data.get("order") if isinstance(data.get("order"), dict) else data
+            if _order_id(order) or _status(order):
+                if template != known:
+                    await self._remember("fazer_order_path", template)
+                    log.info("FazerCards: адрес заказа найден — %s", template)
+                return order
+
+        # Одиночного адреса нет — ищем свой заказ в общем списке.
+        for path in ORDER_LIST_CANDIDATES:
+            status, data = await self._get_raw(path)
+            if not self._looks_ok(status, data):
+                continue
+            found = _find_in_list(data, order_id)
+            if found is not None:
+                log.info("Заказ %s найден в списке %s", order_id, path)
+                return found
+        return None
 
     # ------------------------------------------------------------- прочее
 
@@ -288,6 +313,55 @@ class FazerProvider(DeliveryProvider):
         from app import runtime
 
         return runtime.get("fazer_order_path") or settings.fazer_order_path
+
+    async def _get_raw(self, path: str) -> tuple[int, dict]:
+        """GET без исключений: нужен для перебора адресов."""
+        session = await self._get_session()
+        try:
+            async with session.get(self._base + path) as resp:
+                try:
+                    data = await resp.json(content_type=None)
+                except Exception:  # noqa: BLE001
+                    data = {}
+                if not isinstance(data, dict):
+                    data = {"data": data}
+                return resp.status, data
+        except (TimeoutError, aiohttp.ClientError) as exc:
+            return 0, {"error": str(exc)}
+
+    @staticmethod
+    def _looks_ok(status: int, data: dict) -> bool:
+        return status == 200 and data.get("ok") is not False
+
+    async def _remember(self, key: str, value: str) -> None:
+        """Запомнить найденный адрес, чтобы больше не перебирать."""
+        from app import runtime
+
+        try:
+            from app import db
+
+            conn = await db.connect()
+            try:
+                await runtime.set_value(conn, key, value)
+            finally:
+                await conn.close()
+        except Exception as exc:  # noqa: BLE001 — не смогли сохранить, не беда
+            log.warning("Адрес %s не сохранился: %s", key, exc)
+            runtime._cache[key] = value
+
+    async def find_balance(self) -> tuple[str, dict] | None:
+        """Найти рабочий адрес баланса, начиная с уже известного."""
+        known = self.balance_path()
+        for path in ([known] if known else []) + [
+            p for p in BALANCE_CANDIDATES if p != known
+        ]:
+            status, data = await self._get_raw(path)
+            if self._looks_ok(status, data) and _balance_of(data) is not None:
+                if path != known:
+                    await self._remember("fazer_balance_path", path)
+                    log.info("FazerCards: адрес баланса найден — %s", path)
+                return path, data
+        return None
 
     async def probe_paths(self) -> dict:
         """Перебрать вероятные адреса и вернуть те, что отвечают.
@@ -323,15 +397,16 @@ class FazerProvider(DeliveryProvider):
         return found
 
     async def get_balance(self) -> str:
-        path = self.balance_path()
-        if not path:
-            return "путь к балансу не задан (FAZER_BALANCE_PATH)"
-        data = await self._request("GET", path, safe=True)
-        for key in ("balance", "amount", "available", "funds"):
-            value = data.get(key) or (data.get("account") or {}).get(key)
-            if value is not None:
-                return f"{value} {data.get('currency', 'USD')}"
-        return str(data)[:200]
+        found = await self.find_balance()
+        if found is None:
+            raise DeliveryError(
+                "Не нашёл адрес баланса. Нажмите «🔍 Найти адреса API» "
+                "или пришлите раздел Account документации."
+            )
+        _, data = found
+        value = _balance_of(data)
+        currency = data.get("currency") or (data.get("account") or {}).get("currency") or "USD"
+        return f"{value} {currency}"
 
     async def healthcheck(self) -> dict:
         steps: list[tuple[str, str]] = []
@@ -352,29 +427,43 @@ class FazerProvider(DeliveryProvider):
         except (DeliveryError, DeliveryUncertain) as exc:
             steps.append(("Premium", f"⚠️ {exc}"))
 
-        try:
-            steps.append(("Баланс реселлера", "✅ " + await self.get_balance()))
-        except Exception as exc:  # noqa: BLE001
-            steps.append(("Баланс реселлера", f"⚠️ не прочитался: {exc}"))
-
-        order_path = self.order_path()
-        if not order_path:
+        found = await self.find_balance()
+        if found is None:
+            steps.append(("Баланс реселлера", "⚠️ адрес не найден — нажмите «Найти адреса API»"))
+        else:
+            path, data = found
             steps.append((
-                "Проверка заказов",
-                "❌ не настроена — бот не подтвердит выдачу и отдаст каждый "
-                "заказ вам на разбор.",
+                "Баланс реселлера",
+                f"✅ {_balance_of(data)} {data.get('currency', 'USD')}  ({path})",
             ))
-            return {
-                "ok": False, "mode": "fazer", "steps": steps,
-                "error": "Не задан путь проверки статуса заказа",
-            }
-        # Галочку тут ставить нельзя: путь можно проверить только на реальном
-        # заказе, а до первой покупки он остаётся предположением.
-        steps.append((
-            "Проверка заказов",
-            f"⏳ {order_path} — задан, но ещё не проверен на живом заказе",
-        ))
-        return {"ok": True, "mode": "fazer", "steps": steps, "error": ""}
+
+        # Проверяем не «записан ли путь», а можем ли мы вообще читать заказы:
+        # без этого бот не подтвердит выдачу и будет дёргать владельца.
+        reachable = await self._orders_reachable()
+        if reachable:
+            steps.append(("Чтение заказов", f"✅ {reachable}"))
+            ok = True
+        else:
+            steps.append((
+                "Чтение заказов",
+                "❌ ни один адрес не отвечает — бот не сможет подтвердить "
+                "выдачу и отдаст каждый заказ вам на проверку",
+            ))
+            ok = False
+        return {
+            "ok": ok, "mode": "fazer", "steps": steps,
+            "error": "" if ok else "Не удалось найти адрес заказов",
+        }
+
+    async def _orders_reachable(self) -> str:
+        """Есть ли вообще способ прочитать заказы. Возвращает рабочий адрес."""
+        for path in ORDER_LIST_CANDIDATES:
+            status, data = await self._get_raw(path)
+            if self._looks_ok(status, data):
+                return path
+        # Списка нет — возможно, доступен только одиночный заказ. Проверить
+        # его без настоящего номера нельзя, поэтому честно говорим «не знаем».
+        return ""
 
 
 def _order_id(order: dict) -> str | None:
@@ -414,3 +503,30 @@ def _preview(data: dict) -> str:
         interesting = data["account"]
     text = str(interesting or data)
     return text[:160]
+
+
+def _balance_of(data: dict):
+    """Достать сумму баланса из ответа любой формы."""
+    for source in (data, data.get("account"), data.get("data"), data.get("user")):
+        if not isinstance(source, dict):
+            continue
+        for key in ("balance", "amount", "available", "funds", "credit"):
+            value = source.get(key)
+            if isinstance(value, (int, float, str)) and str(value).strip():
+                return value
+            if isinstance(value, dict):
+                for inner in ("amount", "value", "total"):
+                    if value.get(inner) is not None:
+                        return value[inner]
+    return None
+
+
+def _find_in_list(data: dict, order_id: str) -> dict | None:
+    """Найти заказ по номеру в списке заказов."""
+    for key in ("orders", "items", "data", "results", "list"):
+        rows = data.get(key)
+        if isinstance(rows, list):
+            for row in rows:
+                if isinstance(row, dict) and str(_order_id(row) or "") == str(order_id):
+                    return row
+    return None

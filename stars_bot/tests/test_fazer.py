@@ -64,11 +64,29 @@ class FakeFazer(fz.FazerProvider):
             return PREMIUM_PRICE
         if path in (fz.STARS_BUY, fz.PREMIUM_BUY):
             return self.buy_response
-        if path.startswith("/api/v2/orders/"):
-            return self.statuses.pop(0) if self.statuses else {"ok": True, "order": {"status": "pending"}}
         if self.balance is not None:
             return self.balance
         raise AssertionError(f"неожиданный путь {path}")
+
+    async def _get_raw(self, path):
+        """Опрос заказа и поиск баланса идут через этот метод — подменяем
+        и его, иначе тесты полезут в настоящую сеть."""
+        self.calls.append(f"GET {path}")
+        for key, exc in self.raise_on.items():
+            if key in path:
+                raise exc
+        if "/orders/" in path or "/order/" in path:
+            if self.statuses:
+                return 200, self.statuses.pop(0)
+            return 200, {"ok": True, "order": {"id": 555, "status": "pending"}}
+        if self.balance is not None and any(
+            w in path for w in ("account", "balance", "me", "wallet")
+        ):
+            return 200, self.balance
+        return 404, {"ok": False, "error": "Not Found"}
+
+    async def _remember(self, key, value):
+        self.remembered = (key, value)
 
     async def close(self):
         return None
@@ -178,23 +196,11 @@ async def main() -> None:
     check("сбой одного опроса не роняет выдачу",
           (await Flaky().deliver_stars("durov", 100)).order_id == "555")
 
-    # ---------------- без пути проверки заказов выдача не подтверждается
-    saved = fz.settings.fazer_order_path
-    fz.settings.fazer_order_path = ""
-    prov = FakeFazer(buy=order("pending"))
-    exc = await expect(prov.deliver_stars("durov", 100), DeliveryUncertain)
-    check("без настроенной проверки заказов бот не врёт об успехе",
-          isinstance(exc, DeliveryUncertain) and "FAZER_ORDER_PATH" in str(exc),
-          str(exc)[:90])
-
-    report = await FakeFazer().healthcheck()
-    check("проверка связи ругается на ненастроенные заказы",
-          not report["ok"] and "Проверка заказов" in str(report["steps"]))
-    fz.settings.fazer_order_path = saved
-
     # ------------------------------------------------- проверка связи
-    report = await FakeFazer(balance={"ok": True, "balance": "42.50", "currency": "USD"}).healthcheck()
-    check("проверка связи проходит", report["ok"], str(report["steps"])[:120])
+    prov = FakeFazer(balance={"ok": True, "balance": "42.50", "currency": "USD"})
+    prov.statuses = []
+    report = await prov.healthcheck()
+    check("проверка связи проходит", report["ok"], str(report["steps"])[:150])
     check("в отчёте видна цена звезды",
           any("0.0154" in v for _, v in report["steps"]))
     check("в отчёте виден баланс",
@@ -208,6 +214,65 @@ async def main() -> None:
     who = await FakeFazer().resolve_recipient("someone")
     check("получатель возвращается непроверенным",
           who is not None and not who.verified)
+
+    # ------------- заказ находится при разных формах API
+    class ShapedApi(FakeFazer):
+        """Отвечает только на один заданный набор адресов."""
+
+        def __init__(self, working: dict, buy=None):
+            super().__init__(buy=buy or order("pending"))
+            self.working = working
+            self.seen: list[str] = []
+
+        async def _get_raw(self, path):
+            self.seen.append(path)
+            if path in self.working:
+                return 200, self.working[path]
+            return 404, {"ok": False, "error": "Not Found"}
+
+    # а) одиночный заказ по нестандартному адресу
+    api = ShapedApi({"/api/v2/order/555": {"ok": True, "order": {"id": 555, "status": "completed"}}})
+    res = await api.deliver_stars("durov", 100)
+    check("заказ найден по запасному адресу", res.order_id == "555", str(api.seen))
+
+    # б) одиночного адреса нет — ищем в списке
+    api = ShapedApi({"/api/v2/orders": {"ok": True, "orders": [
+        {"id": 999, "status": "pending"}, {"id": 555, "status": "delivered"}]}})
+    res = await api.deliver_stars("durov", 100)
+    check("заказ найден в общем списке", res.order_id == "555", str(api.seen[-3:]))
+
+    # в) заказ нигде не читается — выдача не объявляется успешной
+    api = ShapedApi({})
+    exc = await expect(api.deliver_stars("durov", 100), DeliveryUncertain)
+    check("нечитаемый заказ не считается выданным",
+          isinstance(exc, DeliveryUncertain), type(exc).__name__)
+
+    # ---------------------------- баланс находится сам
+    class BalanceApi(FakeFazer):
+        def __init__(self, working):
+            super().__init__()
+            self.working = working
+
+        async def _get_raw(self, path):
+            return (200, self.working[path]) if path in self.working else (404, {"ok": False})
+
+        async def _remember(self, key, value):
+            self.remembered = (key, value)
+
+    api = BalanceApi({"/api/v2/account/balance": {"ok": True, "balance": "42.50", "currency": "USD"}})
+    check("баланс найден перебором", await api.get_balance() == "42.50 USD")
+    check("найденный адрес запоминается",
+          api.remembered == ("fazer_balance_path", "/api/v2/account/balance"),
+          str(getattr(api, "remembered", None)))
+
+    api = BalanceApi({"/api/v2/me": {"ok": True, "account": {"balance": "7.00", "currency": "EUR"}}})
+    check("баланс достаётся из вложенного объекта",
+          await api.get_balance() == "7.00 EUR")
+
+    api = BalanceApi({})
+    exc = await expect(api.get_balance(), DeliveryError)
+    check("ненайденный баланс объясняется понятно",
+          isinstance(exc, DeliveryError) and "Найти адреса" in str(exc), str(exc)[:60])
 
     # --------------------------------- перебор адресов API
     class ProbeFazer(FakeFazer):
@@ -258,11 +323,21 @@ async def main() -> None:
     check("без настройки берётся значение из .env",
           fz.FazerProvider.order_path() == fz.settings.fazer_order_path)
 
-    # ------------------- проверка связи не врёт про непроверенный путь
-    report = await FakeFazer(balance={"ok": True, "balance": "1"}).healthcheck()
-    orders_line = next(v for k, v in report["steps"] if "заказ" in k.lower())
-    check("бот не ставит галочку непроверенному пути заказов",
-          "не проверен" in orders_line and "✅" not in orders_line, orders_line)
+    # ------------------- проверка связи реально проверяет чтение заказов
+    class HealthApi(ShapedApi):
+        async def _request(self, method, path, payload=None, *, safe=False):
+            if path == fz.STARS_QUOTE: return STARS_PRICE
+            if path == fz.PREMIUM_QUOTE: return PREMIUM_PRICE
+            raise AssertionError(path)
+
+    report = await HealthApi({"/api/v2/orders": {"ok": True, "orders": []},
+                              "/api/v2/account": {"ok": True, "balance": "5.00"}}).healthcheck()
+    check("проверка связи подтверждает чтение заказов",
+          report["ok"] and any("✅" in v for k, v in report["steps"] if "заказ" in k.lower()),
+          str(report["steps"]))
+
+    report = await HealthApi({"/api/v2/account": {"ok": True, "balance": "5.00"}}).healthcheck()
+    check("без доступа к заказам проверка не даёт добро", not report["ok"])
 
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")
     if FAIL:
