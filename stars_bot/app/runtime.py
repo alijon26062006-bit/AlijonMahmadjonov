@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import re
 import logging
 
 import aiosqlite
@@ -52,6 +53,9 @@ def _build_defaults() -> dict[str, str]:
         "usd_rate_diram": "0",           # сколько дирам в одном долларе
         "margin_percent": "0",           # наценка к себестоимости
         "premium_plans": _premium_from_file(),
+        # Готовые наборы звёзд — кнопки в магазине. Цена каждого считается
+        # из текущей цены звезды, поэтому наценку правишь в одном месте.
+        "star_packs": "50,100,250,500,1000,2500",
         "min_stars": str(settings.min_stars),
         "max_stars": str(settings.max_stars),
         # деньги
@@ -188,6 +192,14 @@ def profit_per_star_e4() -> int:
     это как раз то, что владельцу важно увидеть сразу."""
     cost = star_cost_e4()
     return star_price_e4() - cost if cost > 0 else 0
+
+
+def star_packs() -> list[int]:
+    """Наборы звёзд для кнопок: без повторов, по возрастанию, в пределах лимитов."""
+    packs = {
+        int(chunk) for chunk in re.split(r"\D+", get("star_packs") or "") if chunk
+    }
+    return sorted(q for q in packs if min_stars() <= q <= max_stars())
 
 
 def premium_plans() -> list[dict]:

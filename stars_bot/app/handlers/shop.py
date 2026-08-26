@@ -85,21 +85,55 @@ async def on_quantity(message: Message, state: FSMContext, conn: aiosqlite.Conne
         ))
         return
 
-    price = stars_cost(quantity)
-    user = await db.get_user(conn, message.from_user.id)
-    balance = user.balance if user else 0
-    if balance < price:
-        await message.answer(
-            texts.STARS_NOT_ENOUGH.format(
-                need=fmt(price), balance=fmt(balance), missing=fmt(price - balance)
-            ),
-            reply_markup=keyboards.deposit_methods(),
-        )
-        await state.clear()
-        return
+    await _start_stars_order(message, state, conn, quantity)
 
-    await state.update_data(quantity=quantity, price=price)
-    await _ask_recipient(message, state, "stars", quantity, price)
+
+async def _start_stars_order(
+    target: Message | CallbackQuery, state: FSMContext,
+    conn: aiosqlite.Connection, quantity: int,
+) -> bool:
+    """Посчитать цену, проверить баланс и спросить получателя.
+
+    Одна дорога и для кнопки-набора, и для введённого вручную числа —
+    иначе проверка баланса разъехалась бы между ними.
+    """
+    price = stars_cost(quantity)
+    user = await db.get_user(conn, target.from_user.id)
+    balance = user.balance if user else 0
+
+    if balance < price:
+        text = texts.STARS_NOT_ENOUGH.format(
+            need=fmt(price), balance=fmt(balance), missing=fmt(price - balance),
+        )
+        markup = keyboards.deposit_methods()
+        if isinstance(target, CallbackQuery):
+            await target.message.edit_text(text, reply_markup=markup)
+        else:
+            await target.answer(text, reply_markup=markup)
+        await state.clear()
+        return False
+
+    await state.update_data(product_type="stars", quantity=quantity, price=price)
+    await _ask_recipient(target, state, "stars", quantity, price)
+    return True
+
+
+@router.callback_query(F.data.startswith("stars:pack:"))
+async def cb_stars_pack(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    """Готовый набор: количество уже известно, спрашивать нечего."""
+    quantity = int(call.data.rsplit(":", 1)[1])
+    if quantity not in runtime.star_packs():
+        await call.answer("Этого набора больше нет.", show_alert=True)
+        await call.message.edit_text(
+            texts.STARS_ENTRY.format(rate=fmt4(runtime.star_price_e4())),
+            reply_markup=keyboards.stars_entry(),
+        )
+        return
+    await state.clear()
+    await _start_stars_order(call, state, conn, quantity)
+    await call.answer()
 
 
 # ----------------------------------------------------------------- premium

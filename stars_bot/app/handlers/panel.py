@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 
 import aiosqlite
 from aiogram import Bot, F, Router
@@ -180,6 +181,10 @@ def prices_kb() -> InlineKeyboardMarkup:
                                 callback_data="pn:set:star_price_e4"))
     kb.row(btn("📡 Узнать себестоимость", "pn:cost", style=PRIMARY))
     kb.row(btn("🧮 Применить наценку", "pn:recalc", style=SUCCESS))
+    kb.row(InlineKeyboardButton(
+        text=f"⭐️ Наборы звёзд ({len(runtime.star_packs())})",
+        callback_data="pn:set:star_packs",
+    ))
     for plan in runtime.premium_plans():
         kb.row(InlineKeyboardButton(
             text=f"👑 Premium {plan['months']} мес — {fmt(plan['price'])}",
@@ -385,6 +390,11 @@ FIELDS: dict[str, tuple[str, str, str]] = {
                        "Сколько сомони стоит 1 доллар. Например <code>10.90</code>:", "money"),
     "margin_percent": ("📈 Наценка",
                        "Процент наценки к себестоимости. Например <code>30</code>:", "percent"),
+    "star_packs": ("⭐️ Наборы звёзд",
+                   "Через запятую — какие кнопки показывать в магазине.\n"
+                   "Например <code>50, 100, 250, 500, 1000, 2500</code>\n\n"
+                   "Цена каждой кнопки считается сама по текущей цене звезды.",
+                   "packs"),
     "min_stars": ("⬇️ Минимум звёзд", "Минимум звёзд в одном заказе:", "int"),
     "max_stars": ("⬆️ Максимум звёзд", "Максимум звёзд в одном заказе:", "int"),
     "min_deposit_diram": ("💵 Минимальное пополнение",
@@ -408,6 +418,7 @@ FIELD_PARENT = {key: "pn:pay" for key in PAY_FIELDS}
 FIELD_PARENT.update({
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
+    "star_packs": "pn:prices",
     "usd_rate_diram": "pn:prices",
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
     "referral_percent": "pn:prices", "support_notice": "pn:home",
@@ -424,6 +435,9 @@ def current_display(key: str) -> str:
         return fmt(runtime.get_int(key))
     if kind == "percent":
         return f"{raw or 0}%"
+    if kind == "packs":
+        packs = runtime.star_packs()
+        return ", ".join(str(quantity) for quantity in packs) or "не заданы"
     return raw or "не задано"
 
 
@@ -484,6 +498,7 @@ async def on_field_value(
         return
 
     kind = FIELDS[field][2]
+    note = ""     # приписка к ответу: что-то приняли не целиком
     if kind == "price4":
         amount = parse4(raw)
         if amount is None or amount < 0:
@@ -513,6 +528,29 @@ async def on_field_value(
             return
         value = str(number)
         shown = f"{number}%" if kind == "percent" else str(number)
+    elif kind == "packs":
+        # Разделителем считаем что угодно, кроме цифр: и запятые, и пробелы.
+        packs = sorted({int(chunk) for chunk in re.split(r"\D+", raw) if chunk})
+        if not packs:
+            await message.answer(
+                "❌ Пришлите количества через запятую, например "
+                "<code>50, 100, 250, 500</code>."
+            )
+            return
+        skipped = [q for q in packs
+                   if not runtime.min_stars() <= q <= runtime.max_stars()]
+        packs = [q for q in packs if q not in skipped]
+        if not packs:
+            await message.answer(
+                f"❌ Все числа вне лимитов заказа "
+                f"({runtime.min_stars()}–{runtime.max_stars()} звёзд)."
+            )
+            return
+        value = ",".join(str(q) for q in packs)
+        shown = ", ".join(str(q) for q in packs)
+        if skipped:
+            note = ("\n\n⚠️ Не влезли в лимиты заказа и пропущены: "
+                    + ", ".join(str(q) for q in skipped))
     else:
         value = "" if raw == "-" else raw
         shown = value or "убрано"
@@ -520,7 +558,7 @@ async def on_field_value(
     await runtime.set_value(conn, field, value)
     await state.clear()
 
-    extra = ""
+    extra = note
     if field == "star_cost_diram" and runtime.margin_percent() > 0:
         extra = (f"\n\nПо наценке {runtime.margin_percent()}% цена продажи должна быть "
                  f"<b>{fmt(runtime.price_from_margin())}</b> — нажмите «Пересчитать по наценке».")

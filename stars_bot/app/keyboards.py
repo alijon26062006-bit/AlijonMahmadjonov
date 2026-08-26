@@ -17,7 +17,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app import runtime
 from app.config import settings
 from app.emoji import custom_id, em, premium_on
-from app.money import fmt
+from app.money import fmt, stars_cost
 
 #: Значения поля style из Bot API 9.4
 PRIMARY = "primary"    # синий — главное действие экрана
@@ -106,9 +106,16 @@ def cancel(text: str = "") -> InlineKeyboardMarkup:
 
 
 def stars_entry() -> InlineKeyboardMarkup:
+    """Готовые наборы по два в ряд плюс ввод своего количества."""
     kb = InlineKeyboardBuilder()
-    kb.row(btn(labeled("stars", "Купить звёзды"), "stars:buy",
-               style=PRIMARY, icon="stars"))
+    packs = runtime.star_packs()
+    for left in range(0, len(packs), 2):
+        kb.row(*[
+            btn(f"{em('stars')} {quantity} — {fmt(stars_cost(quantity))}",
+                f"stars:pack:{quantity}", style=PRIMARY)
+            for quantity in packs[left:left + 2]
+        ])
+    kb.row(btn(labeled("edit", "Другое количество"), "stars:buy"))
     kb.row(btn(labeled("back", "Назад"), "m:main"))
     return kb.as_markup()
 
