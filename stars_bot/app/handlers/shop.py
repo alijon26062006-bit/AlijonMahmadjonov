@@ -276,8 +276,9 @@ async def cb_pay(
     await state.clear()
 
     title = title_of(data["product_type"], data["quantity"])
+    waiting = texts.PROCESSING if provider.instant else texts.PROCESSING_SLOW
     await call.message.edit_text(
-        texts.PROCESSING.format(title=title, recipient=data["recipient"])
+        waiting.format(title=title, recipient=data["recipient"])
     )
     await call.answer()
 

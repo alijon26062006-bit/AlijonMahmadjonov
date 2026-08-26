@@ -271,9 +271,7 @@ python -m app.main
 
 ## Fragment
 
-Выдача идёт через шлюз [apifragment.online](https://apifragment.online).
-`FRAGMENT_MODE=mock` — бот работает полностью, но ничего не отправляет;
-`FRAGMENT_MODE=api` — реальная выдача.
+Работает без вашего участия, но требует сид-фразу.
 
 ### Почему «accepted» — это ещё не выдача
 

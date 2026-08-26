@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     task_poll_interval: int = 3
     task_poll_timeout: int = 300
 
+    # ---- MyStars FaaS (api.mystars.tg) ----
+    # Ключ выдаётся в @my_stars_tg_bot. Сид-фраза сервису НЕ передаётся.
+    mystars_api_key: str = ""
+    mystars_base_url: str = "https://api.mystars.tg/v1"
+    mystars_currency: str = "ton"          # ton | usdt_ton
+    # Сколько ждать оплату и доставку (окно оплаты у MyStars — 2 часа)
+    mystars_wait_timeout: int = 1800
+
     # ---- ссылки ----
     support_username: str = ""
     reviews_url: str = ""

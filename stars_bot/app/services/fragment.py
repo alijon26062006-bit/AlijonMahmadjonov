@@ -84,6 +84,9 @@ class Recipient:
 class DeliveryProvider:
     #: Умеет ли провайдер показывать имя аккаунта до оплаты.
     supports_name_lookup: bool = False
+    #: Уходит ли товар сразу. False — выдача занимает минуты, и покупателю
+    #: нужно сказать об этом честно, а не показывать «отправляю…».
+    instant: bool = True
 
     async def deliver_stars(self, username: str, amount: int) -> DeliveryResult:
         raise NotImplementedError
@@ -367,11 +370,27 @@ class ApiFragProvider(DeliveryProvider):
         return {"ok": True, "mode": "api", "steps": steps, "error": ""}
 
 
-def build_provider() -> DeliveryProvider:
+def build_provider(payer=None) -> DeliveryProvider:
+    """Выбрать способ выдачи по FRAGMENT_MODE.
+
+    mystars — apifragment.online не нужен и сид-фраза никому не передаётся;
+    api     — прежний шлюз apifragment.online (хранит сид-фразу у себя);
+    mock    — ничего не отправляет.
+    """
     mode = settings.fragment_mode.strip().lower()
+
+    if mode in ("mystars", "faas"):
+        # Импорт внутри: SDK нужен только в этом режиме.
+        from app.services.mystars import MyStarsProvider
+
+        if payer is None:
+            raise RuntimeError("Для режима mystars нужен способ оплаты заказов")
+        return MyStarsProvider(payer)
+
     if mode in ("api", "apifrag", "apifragment"):
         return ApiFragProvider()
+
     if mode != "mock":
         log.warning("Неизвестный FRAGMENT_MODE=%r, использую mock", settings.fragment_mode)
-    log.warning("Fragment работает в режиме MOCK — реальной выдачи не будет")
+    log.warning("Выдача работает в режиме MOCK — звёзды не отправляются")
     return MockProvider()

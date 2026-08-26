@@ -157,12 +157,29 @@ def main() -> None:
                   current=shown_min, validate=check_price)
     new["MIN_DEPOSIT_DIRAM"] = str(to_diram(minimum))
 
-    print("\n── Выдача звёзд (ApiFragment) ──")
-    print("mock — бот работает, но звёзды не отправляет (для проверки).")
-    print("api  — реальная выдача через apifragment.online.")
-    mode = ask("Режим (mock/api)", current=old.get("FRAGMENT_MODE", "") or "mock",
-               validate=lambda v: None if v in ("mock", "api") else "Только mock или api")
+    print("\n── Как выдавать звёзды ──")
+    print("mock    — бот работает, но ничего не отправляет (для проверки).")
+    print("mystars — api.mystars.tg. Сид-фразу НЕ спрашивает: счёт на оплату")
+    print("          приходит вам в Telegram, платите в один тап Tonkeeper.")
+    print("api     — apifragment.online. Работает без вашего участия, но")
+    print("          хранит вашу сид-фразу у себя.")
+    mode = ask("Режим (mock/mystars/api)",
+               current=old.get("FRAGMENT_MODE", "") or "mock",
+               validate=lambda v: None if v in ("mock", "mystars", "api")
+               else "Только mock, mystars или api")
     new["FRAGMENT_MODE"] = mode
+
+    if mode == "mystars":
+        print()
+        print("  Ключ выдают в @my_stars_tg_bot — раздел «API access».")
+        print()
+        new["MYSTARS_API_KEY"] = ask("Ключ MyStars (X-Api-Key)",
+                                     current=old.get("MYSTARS_API_KEY", ""))
+        new["MYSTARS_CURRENCY"] = ask(
+            "Чем платить (ton / usdt_ton)",
+            current=old.get("MYSTARS_CURRENCY", "") or "ton",
+            validate=lambda v: None if v in ("ton", "usdt_ton") else "Только ton или usdt_ton",
+        )
 
     if mode == "api":
         print()

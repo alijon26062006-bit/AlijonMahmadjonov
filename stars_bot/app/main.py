@@ -16,6 +16,7 @@ from app.handlers import (
     admin, broadcast, deposit, menu, panel, profile, shop, support,
 )
 from app.middlewares.guard import UserGuardMiddleware
+from app.services.billing import make_sender
 from app.services.fragment import build_provider
 
 log = logging.getLogger(__name__)
@@ -92,7 +93,14 @@ async def main() -> None:
         await bot.session.close()
         raise SystemExit(1)
 
-    provider = build_provider()
+    # ManualPayer нужен только режиму mystars: он присылает владельцу
+    # ссылку на оплату вместо того, чтобы подписывать перевод самому.
+    payer = None
+    if settings.fragment_mode.strip().lower() in ("mystars", "faas"):
+        from app.services.mystars import ManualPayer
+
+        payer = ManualPayer(make_sender(bot))
+    provider = build_provider(payer)
 
     dp = Dispatcher(conn=conn, provider=provider)
     dp.message.middleware(UserGuardMiddleware())
