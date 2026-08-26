@@ -8,9 +8,13 @@ from dataclasses import dataclass, fields
 from datetime import datetime, timezone
 from typing import Any
 
+import logging
+
 import aiosqlite
 
 from app.config import settings
+
+log = logging.getLogger(__name__)
 
 # ---- статусы заказа ----
 ORDER_DELIVERING = "delivering"
@@ -80,7 +84,8 @@ CREATE TABLE IF NOT EXISTS orders (
     product_type      TEXT NOT NULL,        -- 'stars' | 'premium'
     quantity          INTEGER NOT NULL,     -- звёзд или месяцев
     recipient         TEXT NOT NULL,
-    price             INTEGER NOT NULL,     -- дирамы
+    price             INTEGER NOT NULL,     -- дирамы, сколько заплатил клиент
+    cost              INTEGER NOT NULL DEFAULT 0,  -- дирамы, во сколько обошлось нам
     status            TEXT NOT NULL,
     fragment_order_id TEXT,
     error             TEXT,
@@ -128,6 +133,8 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_orders_user    ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_deposits_created ON deposits(created_at);
 CREATE INDEX IF NOT EXISTS idx_deposits_user  ON deposits(user_id);
 CREATE INDEX IF NOT EXISTS idx_deposits_stat  ON deposits(status);
 CREATE INDEX IF NOT EXISTS idx_tickets_user   ON tickets(user_id);
@@ -183,6 +190,7 @@ class Order:
     quantity: int
     recipient: str
     price: int
+    cost: int
     status: str
     fragment_order_id: str | None
     error: str | None
@@ -206,6 +214,11 @@ class Order:
     def is_refunded(self) -> bool:
         return self.status == ORDER_REFUNDED
 
+    @property
+    def profit(self) -> int:
+        """Прибыль по заказу. 0, если себестоимость не была известна."""
+        return self.price - self.cost if self.cost else 0
+
 
 @dataclass
 class Ticket:
@@ -226,9 +239,31 @@ async def connect() -> aiosqlite.Connection:
     return conn
 
 
+#: Колонки, добавленные после первого выпуска. Ключ — таблица.
+MIGRATIONS: dict[str, dict[str, str]] = {
+    "orders": {"cost": "INTEGER NOT NULL DEFAULT 0"},
+}
+
+
 async def init(conn: aiosqlite.Connection) -> None:
     await conn.executescript(SCHEMA)
+    await _migrate(conn)
     await conn.commit()
+
+
+async def _migrate(conn: aiosqlite.Connection) -> None:
+    """Дописать недостающие колонки в уже существующую базу.
+
+    Без этого обновление бота на работающем сервере падало бы: таблица
+    создана по старой схеме, а код ждёт новых полей.
+    """
+    for table, columns in MIGRATIONS.items():
+        async with conn.execute(f"PRAGMA table_info({table})") as cur:
+            existing = {row["name"] for row in await cur.fetchall()}
+        for name, definition in columns.items():
+            if name not in existing:
+                await conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+                log.info("База: в таблицу %s добавлена колонка %s", table, name)
 
 
 # ------------------------------------------------------------------ users
@@ -404,14 +439,15 @@ async def resolve_deposit(
 
 async def create_order(
     conn: aiosqlite.Connection, *, user_id: int, product_type: str, quantity: int,
-    recipient: str, price: int,
+    recipient: str, price: int, cost: int = 0,
 ) -> Order:
     now = _now()
     cur = await conn.execute(
         """INSERT INTO orders (user_id, product_type, quantity, recipient, price,
-                               status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (user_id, product_type, quantity, recipient, price, ORDER_DELIVERING, now, now),
+                               cost, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (user_id, product_type, quantity, recipient, price, cost,
+         ORDER_DELIVERING, now, now),
     )
     await conn.commit()
     order = await get_order(conn, cur.lastrowid)
@@ -661,3 +697,99 @@ async def global_stats(conn: aiosqlite.Connection) -> dict[str, Any]:
         "pending_deposits": pending, "open_tickets": open_tickets,
         "failed_orders": failed, "held_balance": held,
     }
+
+
+# ══════════════════════════════════════════════════════════════ отчёты
+
+
+async def report(
+    conn: aiosqlite.Connection, since: str, until: str
+) -> dict[str, Any]:
+    """Сводка за период [since, until) по времени UTC в ISO-формате.
+
+    Границы сравниваются строками: ISO-даты сортируются так же, как время,
+    поэтому индекс по created_at работает и без разбора дат.
+    """
+    async with conn.execute(
+        """SELECT
+             COUNT(*)                                              AS orders,
+             COALESCE(SUM(status = ?), 0)                          AS done,
+             COALESCE(SUM(status = ?), 0)                          AS refunded,
+             COALESCE(SUM(status = ?), 0)                          AS failed,
+             COALESCE(SUM(CASE WHEN status = ? THEN price END), 0) AS revenue,
+             COALESCE(SUM(CASE WHEN status = ? THEN cost  END), 0) AS cost,
+             COALESCE(SUM(CASE WHEN status = ? AND product_type = 'stars'
+                               THEN quantity END), 0)              AS stars,
+             COALESCE(SUM(CASE WHEN status = ? AND product_type = 'premium'
+                               THEN quantity END), 0)              AS premium_months,
+             COALESCE(SUM(CASE WHEN status = ? THEN price END), 0) AS refunded_sum
+           FROM orders WHERE created_at >= ? AND created_at < ?""",
+        (ORDER_DELIVERED, ORDER_REFUNDED, ORDER_FAILED, ORDER_DELIVERED,
+         ORDER_DELIVERED, ORDER_DELIVERED, ORDER_DELIVERED, ORDER_REFUNDED,
+         since, until),
+    ) as cur:
+        row = await cur.fetchone()
+    data = {key: (row[key] or 0) for key in row.keys()}
+
+    async with conn.execute(
+        """SELECT COUNT(*) AS cnt, COALESCE(SUM(amount), 0) AS total
+           FROM deposits
+           WHERE status = ? AND created_at >= ? AND created_at < ?""",
+        (DEP_APPROVED, since, until),
+    ) as cur:
+        dep = await cur.fetchone()
+    data["deposits"] = dep["cnt"]
+    data["deposits_sum"] = dep["total"]
+
+    async with conn.execute(
+        "SELECT COUNT(*) AS cnt FROM users WHERE created_at >= ? AND created_at < ?",
+        (since, until),
+    ) as cur:
+        data["new_users"] = (await cur.fetchone())["cnt"]
+
+    async with conn.execute(
+        """SELECT COUNT(DISTINCT user_id) AS cnt FROM orders
+           WHERE status = ? AND created_at >= ? AND created_at < ?""",
+        (ORDER_DELIVERED, since, until),
+    ) as cur:
+        data["buyers"] = (await cur.fetchone())["cnt"]
+
+    data["profit"] = data["revenue"] - data["cost"]
+    return data
+
+
+async def daily_series(
+    conn: aiosqlite.Connection, since: str, until: str, tz_hours: int
+) -> list[tuple[str, int, int, int]]:
+    """По дням: дата, выполнено, выручка, прибыль.
+
+    Дата берётся с поправкой на часовой пояс владельца, иначе вечерние
+    заказы попадали бы во «вчера».
+    """
+    shift = f"{tz_hours:+d} hours"
+    async with conn.execute(
+        f"""SELECT date(created_at, '{shift}') AS day,
+                   COUNT(*) AS done,
+                   COALESCE(SUM(price), 0) AS revenue,
+                   COALESCE(SUM(price - cost), 0) AS profit
+            FROM orders
+            WHERE status = ? AND created_at >= ? AND created_at < ?
+            GROUP BY day ORDER BY day""",
+        (ORDER_DELIVERED, since, until),
+    ) as cur:
+        return [
+            (row["day"], row["done"], row["revenue"], row["profit"])
+            for row in await cur.fetchall()
+        ]
+
+
+async def find_order_by_external(
+    conn: aiosqlite.Connection, external_id: str
+) -> Order | None:
+    """Найти заказ по номеру на стороне сервиса выдачи."""
+    async with conn.execute(
+        "SELECT * FROM orders WHERE fragment_order_id = ? ORDER BY id DESC LIMIT 1",
+        (str(external_id),),
+    ) as cur:
+        row = await cur.fetchone()
+    return _from_row(Order, row) if row else None

@@ -41,7 +41,11 @@ def _build_defaults() -> dict[str, str]:
     return {
         # цены
         "star_price_diram": str(settings.star_price_diram),
-        "star_cost_diram": "0",          # себестоимость, 0 = не задана
+        "star_cost_diram": "0",          # себестоимость звезды, 0 = не задана
+        "premium_costs": "{}",           # себестоимость Premium по срокам
+        "auto_price": "0",               # обновлять цены самому
+        "auto_price_every": "60",        # как часто, минуты
+        "tz_hours": "5",                 # часовой пояс владельца
         "usd_rate_diram": "0",           # сколько дирам в одном долларе
         "margin_percent": "0",           # наценка к себестоимости
         "premium_plans": _premium_from_file(),
@@ -243,3 +247,28 @@ async def mark_topup(conn: aiosqlite.Connection, when: str) -> None:
         await set_value(conn, "stars_enabled", "1")
         await set_value(conn, "premium_enabled", "1")
         await set_value(conn, "autostopped", "0")
+
+
+def premium_costs() -> dict[int, int]:
+    """Себестоимость Premium по срокам, в дирамах."""
+    try:
+        return {int(k): int(v) for k, v in json.loads(get("premium_costs")).items()}
+    except (ValueError, TypeError, AttributeError):
+        return {}
+
+
+async def save_premium_costs(conn: aiosqlite.Connection, costs: dict[int, int]) -> None:
+    await set_value(conn, "premium_costs", json.dumps(
+        {str(k): int(v) for k, v in costs.items()}
+    ))
+
+
+def cost_of(product_type: str, quantity: int) -> int:
+    """Во сколько нам обходится заказ. 0 — себестоимость неизвестна."""
+    if product_type == "stars":
+        return star_cost() * quantity
+    return premium_costs().get(quantity, 0)
+
+
+def auto_price_on() -> bool:
+    return get_bool("auto_price")

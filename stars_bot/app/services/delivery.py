@@ -66,9 +66,12 @@ async def purchase(
     if not await db.charge(conn, user_id, price):
         raise NotEnoughFunds
 
+    # Себестоимость фиксируем в заказе: курс меняется, и без этого прибыль
+    # за прошлые дни пересчитывалась бы задним числом.
     order = await db.create_order(
         conn, user_id=user_id, product_type=product_type, quantity=quantity,
         recipient=recipient, price=price,
+        cost=runtime.cost_of(product_type, quantity),
     )
     log.info("Заказ %s: списано %s с пользователя %s", order.id, fmt(price), user_id)
     await _run_delivery(bot, conn, provider, order)
@@ -137,6 +140,7 @@ async def _run_delivery(
             texts.ADMIN_ORDER_DONE.format(
                 order_id=order.id, title=order.title, recipient=order.recipient,
                 price=fmt(order.price), user_id=order.user_id,
+                external=result.order_id or "—",
             ),
         )
         log.info("Заказ %s выдан, fragment_id=%s", order.id, result.order_id)

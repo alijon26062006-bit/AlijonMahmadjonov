@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import suppress
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -19,6 +20,7 @@ from app.middlewares.emoji_guard import CustomEmojiGuard
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.billing import make_sender
 from app.services.fragment import build_provider
+from app.services.pricing import auto_price_loop
 
 log = logging.getLogger(__name__)
 
@@ -154,9 +156,15 @@ async def main() -> None:
     log.info("✅ Запущен @%s. Режим Fragment: %s", me.username, settings.fragment_mode)
     log.info("   Админы: %s", ", ".join(map(str, settings.admin_ids)))
 
+    # Автоцены держат наценку постоянной, пока курс гуляет.
+    pricing_task = asyncio.create_task(auto_price_loop(provider, bot))
+
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
+        pricing_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await pricing_task
         await _shutdown(bot, conn, provider)
 
 

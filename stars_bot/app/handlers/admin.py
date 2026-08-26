@@ -13,6 +13,7 @@ from aiogram.types import CallbackQuery, Message
 from app import db, keyboards, texts
 from app import runtime
 from app.config import settings
+from app.emoji import substitute
 from app.money import fmt, parse
 from app.services import delivery
 from app.services.fragment import DeliveryProvider
@@ -145,18 +146,80 @@ async def cmd_dep_no(
 # ----------------------------------------------------------------- заказы
 
 
+@router.message(Command("order"))
+async def cmd_order(
+    message: Message, command: CommandObject, conn: aiosqlite.Connection
+) -> None:
+    """Карточка заказа с обоими номерами — своим и на стороне сервиса.
+
+    Ищем и по нашему номеру, и по номеру платформы: когда что-то пошло не
+    так, под рукой обычно только один из них.
+    """
+    query = (command.args or "").strip()
+    if not query:
+        await message.answer(
+            "Использование: <code>/order 109</code>\n"
+            "Работает и с номером на стороне сервиса выдачи."
+        )
+        return
+
+    order = None
+    if query.isdigit():
+        order = await db.get_order(conn, int(query))
+    if order is None:
+        order = await db.find_order_by_external(conn, query)
+    if order is None:
+        await message.answer(f"Заказ <code>{query}</code> не найден ни по одному номеру.")
+        return
+
+    user = await db.get_user(conn, order.user_id)
+    buyer = f"@{user.username}" if user and user.username else (
+        user.first_name if user else "—"
+    )
+    external = (
+        f"<code>{order.fragment_order_id}</code>"
+        if order.fragment_order_id else "<i>не присвоен</i>"
+    )
+    profit = (f"\n└ Прибыль: <b>{fmt(order.profit)}</b>"
+              if order.cost else "\n└ <i>себестоимость не сохранялась</i>")
+
+    await message.answer(substitute(
+        f"🧾 <b>Заказ №{order.id}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"├ Статус: {order.status_title}\n"
+        f"├ Товар: <b>{order.title}</b>\n"
+        f"├ Получатель: <code>@{order.recipient}</code>\n"
+        f"└ Создан: {order.created_at}\n\n"
+        f"🔗 <b>Номера</b>\n"
+        f"├ У нас: <code>{order.id}</code>\n"
+        f"└ На платформе: {external}\n\n"
+        f"[[money]] <b>Деньги</b>\n"
+        f"├ Заплатил клиент: <b>{fmt(order.price)}</b>\n"
+        f"├ Себестоимость: <b>{fmt(order.cost)}</b>{profit}\n\n"
+        f"👤 Покупатель: {buyer} (<code>{order.user_id}</code>)"
+        + (f"\n\n<blockquote expandable>{order.error}</blockquote>"
+           if order.error else "")
+    ))
+
+
 @router.message(Command("orders"))
 async def cmd_orders(message: Message, conn: aiosqlite.Connection) -> None:
     orders = await db.list_orders(conn, limit=15)
     if not orders:
         await message.answer("Заказов ещё нет.")
         return
-    lines = [
-        f"<b>№{o.id}</b> · {o.title} → @{o.recipient}\n"
-        f"{fmt(o.price)} · {o.status_title} · <code>{o.user_id}</code>"
-        for o in orders
-    ]
-    await message.answer("📦 <b>Последние заказы</b>\n\n" + "\n\n".join(lines))
+    lines = []
+    for o in orders:
+        external = f" · платформа <code>{o.fragment_order_id}</code>" if o.fragment_order_id else ""
+        lines.append(
+            f"<b>№{o.id}</b> · {o.status_title}\n"
+            f"{o.title} → <code>@{o.recipient}</code>\n"
+            f"{fmt(o.price)}{external}"
+        )
+    await message.answer(
+        "📦 <b>Последние заказы</b>\n\n" + "\n\n".join(lines)
+        + "\n\n<i>Подробнее:</i> <code>/order 109</code>"
+    )
 
 
 @router.message(Command("retry"))

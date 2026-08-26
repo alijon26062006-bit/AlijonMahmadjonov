@@ -441,7 +441,8 @@ _RAW["ADMIN_TICKET_REPLY"] = (
 _RAW["ADMIN_ORDER_DONE"] = (
     "[[ok]] <b>Заказ №{order_id}</b>\n"
     "{title} → <code>@{recipient}</code>\n"
-    "<b>{price}</b> · покупатель <code>{user_id}</code>"
+    "<b>{price}</b> · покупатель <code>{user_id}</code>\n"
+    "🔗 На платформе: <code>{external}</code>"
 )
 
 _RAW["ADMIN_ORDER_FAILED"] = (

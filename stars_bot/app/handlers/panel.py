@@ -23,11 +23,12 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from contextlib import suppress
 
-from app import db, emoji, runtime, texts
+from app import db, emoji, reports, runtime, texts
 from app.config import settings
 from app.emoji import substitute
 from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
 from app.money import fmt, parse
+from app.services import pricing
 from app.states import Panel, PromoNew
 
 log = logging.getLogger(__name__)
@@ -64,9 +65,10 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🎟 Промокоды", callback_data="pn:promos"),
     )
     kb.row(
-        InlineKeyboardButton(text="📊 Статистика", callback_data="pn:stats"),
+        InlineKeyboardButton(text="📈 Отчёты", callback_data="pn:rep"),
         InlineKeyboardButton(text="🔀 Разделы", callback_data="pn:toggles"),
     )
+    kb.row(InlineKeyboardButton(text="📊 Общая статистика", callback_data="pn:stats"))
     kb.row(
         InlineKeyboardButton(text="💼 Кошелёк", callback_data="pn:wallet"),
         InlineKeyboardButton(text="🔌 Проверить связь", callback_data="pn:fragment"),
@@ -220,7 +222,11 @@ def prices_text() -> str:
         "💵 <b>Цены и наценка</b>\n\n"
         f"⭐️ <b>Звёзды</b>\n{economics}\n\n"
         f"👑 <b>Premium</b>\n{plans}\n\n"
-        f"📏 Заказ: от <b>{runtime.min_stars()}</b> до <b>{runtime.max_stars()}</b> звёзд\n"
+        + ("🟢 <b>Автоцены включены</b> — себестоимость и наценка "
+           f"обновляются каждые {runtime.get_int('auto_price_every', 60)} мин.\n\n"
+           if runtime.auto_price_on() else
+           "⚪️ Автоцены выключены — цена держится, пока не поменяете вручную.\n\n")
+        + f"📏 Заказ: от <b>{runtime.min_stars()}</b> до <b>{runtime.max_stars()}</b> звёзд\n"
         f"💵 Мин. пополнение: <b>{fmt(runtime.min_deposit())}</b>\n"
         f"👥 Реферальный процент: <b>{runtime.referral_percent()}%</b>\n"
         + (f"💱 Курс доллара: <b>{fmt(runtime.usd_rate())}</b>"
@@ -1212,3 +1218,187 @@ async def cb_emoji_test(
     await runtime.set_value(conn, "custom_emoji_on", "1")
     await call.answer("Работает — включил")
     await cb_look(call, state)
+
+
+# ══════════════════════════════════════════════════════════════ отчёты
+
+
+def report_kb(active: str = "") -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    row = []
+    for key, (label, _) in reports.PRESETS.items():
+        mark = "• " if key == active else ""
+        row.append(btn(mark + label, f"pn:rep:{key}"))
+        if len(row) == 3:
+            kb.row(*row)
+            row = []
+    if row:
+        kb.row(*row)
+    kb.row(btn("📅 Свой период", "pn:repcustom", style=PRIMARY))
+    kb.row(btn("‹ Назад", "pn:home"))
+    return kb.as_markup()
+
+
+def format_report(title: str, data: dict, days: list, hint: str = "") -> str:
+    """Отчёт за период. Прибыль показываем, только если знаем себестоимость."""
+    revenue, cost, profit = data["revenue"], data["cost"], data["profit"]
+    margin = round(profit * 100 / cost) if cost else 0
+
+    money_block = (
+        f"├ Продано на: <b>{fmt(revenue)}</b>\n"
+        f"├ Себестоимость: <b>{fmt(cost)}</b>\n"
+        f"└ <b>Прибыль: {fmt(profit)}</b> <i>({margin}%)</i>"
+        if cost else
+        f"├ Продано на: <b>{fmt(revenue)}</b>\n"
+        "└ <i>Прибыль не посчитать — себестоимость по этим заказам "
+        "не сохранялась</i>"
+    )
+
+    chart = ""
+    if len(days) > 1:
+        rows = days[-7:]
+        peak = max((r[2] for r in rows), default=0) or 1
+        bars = []
+        for day, done, day_revenue, day_profit in rows:
+            filled = round(day_revenue * 10 / peak)
+            bars.append(
+                f"<code>{day[5:]}</code> {'█' * filled}{'░' * (10 - filled)} "
+                f"{fmt(day_revenue)}"
+            )
+        chart = "\n\n<b>По дням</b>\n" + "\n".join(bars)
+
+    return (
+        f"📈 <b>{title}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"[[money]] <b>Деньги</b>\n{money_block}\n\n"
+        f"📦 <b>Заказы</b>\n"
+        f"├ Выполнено: <b>{data['done']}</b>\n"
+        f"├ Возвращено: <b>{data['refunded']}</b> "
+        f"<i>({fmt(data['refunded_sum'])})</i>\n"
+        f"├ На разборе: <b>{data['failed']}</b>\n"
+        f"├ Звёзд продано: <b>{data['stars']}</b>\n"
+        f"└ Premium: <b>{data['premium_months']}</b> мес.\n\n"
+        f"[[referral]] <b>Клиенты</b>\n"
+        f"├ Новых: <b>{data['new_users']}</b>\n"
+        f"├ Покупали: <b>{data['buyers']}</b>\n"
+        f"└ Пополнений: <b>{data['deposits']}</b> "
+        f"<i>({fmt(data['deposits_sum'])})</i>"
+        + chart + (f"\n\n<i>{hint}</i>" if hint else "")
+    )
+
+
+async def show_report(
+    call: CallbackQuery, conn: aiosqlite.Connection,
+    start, end, title: str, active: str = "",
+) -> None:
+    since, until = reports.bounds(start, end)
+    data = await db.report(conn, since, until)
+    days = await db.daily_series(conn, since, until, reports.tz_hours())
+    await safe_edit(
+        call,
+        substitute(format_report(title, data, days)),
+        report_kb(active),
+    )
+
+
+@router.callback_query(F.data == "pn:rep")
+async def cb_report(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    await state.clear()
+    start, end, title = reports.preset_range("today")
+    await show_report(call, conn, start, end, title, "today")
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:rep:"))
+async def cb_report_preset(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    await state.clear()
+    key = call.data.rsplit(":", 1)[1]
+    start, end, title = reports.preset_range(key)
+    await show_report(call, conn, start, end, title, key)
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:repcustom")
+async def cb_report_custom(call: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Panel.period)
+    await safe_edit(
+        call,
+        "📅 <b>Свой период</b>\n\n"
+        "<blockquote>Пришлите две даты через пробел:\n"
+        "<code>01.08 15.08</code>\n\n"
+        "Год можно не писать. Одна дата — отчёт за этот день."
+        "</blockquote>",
+        back_kb("pn:rep", "‹ Назад"),
+    )
+    await call.answer()
+
+
+@router.message(Panel.period, F.text)
+async def on_report_period(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    parsed = reports.parse_range(message.text or "")
+    if parsed is None:
+        await message.answer(
+            "❌ Не разобрал даты. Формат: <code>01.08 15.08</code>"
+        )
+        return
+
+    start, end = parsed
+    await state.clear()
+    since, until = reports.bounds(start, end)
+    data = await db.report(conn, since, until)
+    days = await db.daily_series(conn, since, until, reports.tz_hours())
+    title = (f"{start.strftime('%d.%m.%Y')} — {end.strftime('%d.%m.%Y')}"
+             if start != end else start.strftime("%d.%m.%Y"))
+    await message.answer(
+        substitute(format_report(title, data, days)),
+        reply_markup=report_kb(),
+    )
+
+
+@router.callback_query(F.data == "pn:autoprice")
+async def cb_autoprice(
+    call: CallbackQuery, conn: aiosqlite.Connection, provider
+) -> None:
+    """Включить или выключить автоматическое обновление цен."""
+    if runtime.auto_price_on():
+        await runtime.set_value(conn, "auto_price", "0")
+        await call.answer("Автоцены выключены")
+        await safe_edit(call, prices_text(), prices_kb())
+        return
+
+    # Включаем только после успешного пробного обновления: иначе владелец
+    # решит, что цены обновляются, а они молча стоят.
+    await safe_edit(call, "📡 Проверяю, получится ли обновить цены…",
+                    back_kb("pn:prices"))
+    await call.answer()
+
+    result = await pricing.refresh_once(conn, provider)
+    if not result["ok"]:
+        await safe_edit(
+            call,
+            f"❌ <b>Автоцены не включить</b>\n\n"
+            f"<blockquote>{result['reason']}</blockquote>\n\n"
+            "Задайте курс доллара и наценку, потом попробуйте снова.",
+            back_kb("pn:prices"),
+        )
+        return
+
+    await runtime.set_value(conn, "auto_price", "1")
+    changed = "\n".join(
+        f"├ {name}: {fmt(old)} → <b>{fmt(new)}</b>"
+        for name, old, new, _ in result["changed"]
+    ) or "├ цены уже верные"
+    await safe_edit(
+        call,
+        "🟢 <b>Автоцены включены</b>\n\n"
+        f"{changed}\n\n"
+        f"<blockquote>Бот будет спрашивать цену каждые "
+        f"{runtime.get_int('auto_price_every', 60)} мин. и держать вашу "
+        f"наценку {runtime.margin_percent()}%. О заметных скачках предупредит."
+        "</blockquote>",
+        prices_kb(),
+    )
