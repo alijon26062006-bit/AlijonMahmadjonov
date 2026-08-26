@@ -26,6 +26,7 @@ from contextlib import suppress
 from app import db, emoji, runtime, texts
 from app.config import settings
 from app.emoji import substitute
+from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
 from app.money import fmt, parse
 from app.states import Panel, PromoNew
 
@@ -49,7 +50,7 @@ AUDIENCES = {
 
 def home_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text="📣 Рассылка", callback_data="pn:cast"))
+    kb.row(btn("📣 Рассылка", "pn:cast", style=PRIMARY))
     kb.row(
         InlineKeyboardButton(text="💵 Цены и наценка", callback_data="pn:prices"),
         InlineKeyboardButton(text="💳 Реквизиты", callback_data="pn:pay"),
@@ -167,8 +168,8 @@ def prices_kb() -> InlineKeyboardMarkup:
     )
     kb.row(InlineKeyboardButton(text="🏷 Цена продажи вручную",
                                 callback_data="pn:set:star_price_diram"))
-    kb.row(InlineKeyboardButton(text="📡 Узнать себестоимость", callback_data="pn:cost"))
-    kb.row(InlineKeyboardButton(text="🧮 Применить наценку", callback_data="pn:recalc"))
+    kb.row(btn("📡 Узнать себестоимость", "pn:cost", style=PRIMARY))
+    kb.row(btn("🧮 Применить наценку", "pn:recalc", style=SUCCESS))
     for plan in runtime.premium_plans():
         kb.row(InlineKeyboardButton(
             text=f"👑 Premium {plan['months']} мес — {fmt(plan['price'])}",
@@ -518,9 +519,9 @@ def toggles_kb() -> InlineKeyboardMarkup:
         ("deposit_enabled", "пополнение"),
     ):
         state = runtime.get_bool(key)
-        kb.row(InlineKeyboardButton(
-            text=("🚫 Выключить " if state else "✅ Включить ") + label,
-            callback_data=f"pn:toggle:{key}",
+        kb.row(btn(
+            ("🚫 Выключить " if state else "✅ Включить ") + label,
+            f"pn:toggle:{key}", style=DANGER if state else SUCCESS,
         ))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
     return kb.as_markup()
@@ -638,7 +639,7 @@ async def cb_promos(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Conn
     else:
         body = "🎟 <b>Промокоды</b>\n\nПока ни одного."
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text="➕ Создать промокод", callback_data="pn:promo_new"))
+    kb.row(btn("➕ Создать промокод", "pn:promo_new", style=SUCCESS))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
     await safe_edit(call, body, kb.as_markup())
     await call.answer()
@@ -732,7 +733,7 @@ async def cb_fragment(call: CallbackQuery, provider) -> None:
 
     kb = InlineKeyboardBuilder()
     if getattr(provider, "probe_paths", None) is not None:
-        kb.row(InlineKeyboardButton(text="🔍 Найти адреса API", callback_data="pn:probe"))
+        kb.row(btn("🔍 Найти адреса API", "pn:probe", style=PRIMARY))
     kb.row(InlineKeyboardButton(text="🔄 Проверить снова", callback_data="pn:fragment"))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
 
@@ -833,7 +834,7 @@ def wallet_text() -> str:
 
 def wallet_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text="✅ Я пополнил кошелёк", callback_data="pn:topup"))
+    kb.row(btn("✅ Я пополнил кошелёк", "pn:topup", style=SUCCESS))
     kb.row(InlineKeyboardButton(text="🔢 Порог автостопа", callback_data="pn:set:autostop_after"))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
     return kb.as_markup()
@@ -962,13 +963,13 @@ async def cb_look(call: CallbackQuery, state: FSMContext) -> None:
     kb = InlineKeyboardBuilder()
     for group in emoji.GROUPS:
         kb.row(InlineKeyboardButton(text=group, callback_data=f"pn:emg:{group}"))
-    kb.row(InlineKeyboardButton(
-        text=("🚫 Выключить премиум-эмодзи" if emoji.premium_on()
-              else "💎 Проверить премиум-эмодзи"),
-        callback_data="pn:emtest",
+    kb.row(btn(
+        "🚫 Выключить премиум-эмодзи" if emoji.premium_on()
+        else "💎 Проверить премиум-эмодзи",
+        "pn:emtest",
+        style=DANGER if emoji.premium_on() else PRIMARY,
     ))
-    kb.row(InlineKeyboardButton(text="♻️ Вернуть все по умолчанию",
-                                callback_data="pn:emreset"))
+    kb.row(btn("♻️ Вернуть все по умолчанию", "pn:emreset", style=DANGER))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
 
     preview = "  ".join(emoji.em(key) for key in list(emoji.DEFAULTS)[:12])
@@ -1034,8 +1035,7 @@ async def cb_emoji_set(call: CallbackQuery, state: FSMContext) -> None:
     group = next(g for g, items in emoji.GROUPS.items() if key in items)
     kb = InlineKeyboardBuilder()
     if emoji.custom_id(key):
-        kb.row(InlineKeyboardButton(text="🚫 Убрать премиум-эмодзи",
-                                    callback_data=f"pn:emcustdel:{key}"))
+        kb.row(btn("🚫 Убрать премиум-эмодзи", f"pn:emcustdel:{key}", style=DANGER))
     kb.row(InlineKeyboardButton(text=f"♻️ Вернуть {emoji.DEFAULTS[key]}",
                                 callback_data=f"pn:emdef:{key}"))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data=f"pn:emg:{group}"))
@@ -1133,7 +1133,7 @@ async def cb_emoji_default(call: CallbackQuery, conn: aiosqlite.Connection) -> N
 @router.callback_query(F.data == "pn:emreset")
 async def cb_emoji_reset_all(call: CallbackQuery, state: FSMContext) -> None:
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text="♻️ Да, вернуть всё", callback_data="pn:emreset2"))
+    kb.row(btn("♻️ Да, вернуть всё", "pn:emreset2", style=DANGER))
     kb.row(InlineKeyboardButton(text="‹ Отмена", callback_data="pn:look"))
     await safe_edit(
         call,

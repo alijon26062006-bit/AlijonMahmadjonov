@@ -246,6 +246,87 @@ async def run(conn) -> None:
 
     await runtime.reset(conn, "emoji_id_premium")
 
+    # ---------------------------------------------- цвета кнопок
+    from app import keyboards as kb_mod
+
+    def styles_of(markup):
+        return [(b.style, b.text) for row in markup.inline_keyboard for b in row]
+
+    menu = styles_of(kb_mod.main_menu())
+    check("главные действия синие",
+          any(st == "primary" and "звёзды" in t for st, t in menu), str(menu))
+    check("пополнение зелёное",
+          any(st == "success" and "Пополнить" in t for st, t in menu), str(menu))
+    check("навигация без цвета",
+          any(st is None and "Профиль" in t for st, t in menu), str(menu))
+
+    pay = styles_of(kb_mod.confirm())
+    check("оплата зелёная", ("success", f"{emoji.em('confirm')} Оплатить") in pay, str(pay))
+    check("отмена красная",
+          any(st == "danger" for st, _ in pay), str(pay))
+
+    admin = styles_of(kb_mod.admin_deposit(1))
+    check("зачислить зелёное, отклонить красное",
+          {st for st, _ in admin} == {"success", "danger"}, str(admin))
+
+    allowed = {None, "primary", "success", "danger"}
+    every = []
+    for markup in (kb_mod.main_menu(), kb_mod.confirm(), kb_mod.confirm_recipient(),
+                   kb_mod.premium_menu(), kb_mod.profile(), kb_mod.deposit_methods(),
+                   kb_mod.support_menu(True), kb_mod.support_menu(False),
+                   kb_mod.ask_recipient(True), kb_mod.cancel(), kb_mod.back(),
+                   kb_mod.admin_deposit(1), kb_mod.admin_retry(1),
+                   kb_mod.stars_entry(), kb_mod.cancel_order(1)):
+        every += styles_of(markup)
+    bad = {st for st, _ in every} - allowed
+    check("используются только допустимые цвета", not bad, str(bad))
+
+    coloured = sum(1 for st, _ in every if st)
+    check("цветом выделено не всё подряд",
+          0 < coloured < len(every), f"{coloured} из {len(every)}")
+
+    # ------------------------------------- премиум-значок на кнопке
+    await runtime.set_value(conn, "emoji_id_stars", "111222333")
+    await runtime.set_value(conn, "custom_emoji_on", "1")
+    stars_btn = kb_mod.main_menu().inline_keyboard[0][0]
+    check("премиум-значок ставится на кнопку",
+          stars_btn.icon_custom_emoji_id == "111222333")
+    check("обычный значок убран из текста, чтобы не дублировался",
+          not stars_btn.text.startswith(emoji.em("stars")), stars_btn.text)
+
+    await runtime.set_value(conn, "custom_emoji_on", "0")
+    stars_btn = kb_mod.main_menu().inline_keyboard[0][0]
+    check("при выключенных премиум-значках кнопка обычная",
+          stars_btn.icon_custom_emoji_id is None
+          and stars_btn.text.startswith(emoji.em("stars")), stars_btn.text)
+
+    # Страховка снимает значок и с кнопки
+    class Btn:
+        icon_custom_emoji_id = "111222333"
+
+    class Markup:
+        inline_keyboard = [[Btn()]]
+
+    class M2:
+        text = "привет"
+        reply_markup = Markup()
+
+    m2 = M2()
+    tries = []
+
+    async def send(bot, m):
+        tries.append(m.reply_markup.inline_keyboard[0][0].icon_custom_emoji_id)
+        if tries[-1]:
+            from aiogram.exceptions import TelegramBadRequest
+            raise TelegramBadRequest(method=None, message="Bad Request: custom emoji not allowed")
+        return "ok"
+
+    check("страховка снимает премиум-значок с кнопок",
+          await CustomEmojiGuard()(send, None, m2) == "ok" and tries == ["111222333", None],
+          str(tries))
+
+    await runtime.reset(conn, "emoji_id_stars")
+
     # ------------------------------------------- заголовки и разделители
     with_rule = [n for n, t in templates.items() if texts.LINE in t]
     check("на экранах есть разделители", len(with_rule) >= 15, f"{len(with_rule)}")

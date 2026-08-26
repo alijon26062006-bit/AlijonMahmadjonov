@@ -35,7 +35,8 @@ INVOICE = (
 def invoice_keyboard(links) -> "InlineKeyboardBuilder":
     kb = InlineKeyboardBuilder()
     if links.tonkeeper:
-        kb.row(InlineKeyboardButton(text="💎 Оплатить в Tonkeeper", url=links.tonkeeper))
+        kb.row(InlineKeyboardButton(text="💎 Оплатить в Tonkeeper",
+                                    url=links.tonkeeper, style="success"))
     return kb.as_markup() if links.tonkeeper else None
 
 

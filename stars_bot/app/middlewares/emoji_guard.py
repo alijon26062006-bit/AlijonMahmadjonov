@@ -45,6 +45,17 @@ class CustomEmojiGuard(BaseRequestMiddleware):
                 if isinstance(value, str) and "<tg-emoji" in value:
                     object.__setattr__(method, field, strip_custom(value))
                     changed = True
+
+            # Премиум-значок бывает и на кнопках — его тоже надо снять,
+            # иначе повтор упрётся в тот же отказ.
+            markup = getattr(method, "reply_markup", None)
+            rows = getattr(markup, "inline_keyboard", None)
+            for row in rows or []:
+                for button in row:
+                    if getattr(button, "icon_custom_emoji_id", None):
+                        object.__setattr__(button, "icon_custom_emoji_id", None)
+                        changed = True
+
             if not changed:
                 raise
 

@@ -21,6 +21,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.config import settings
 from app.handlers.panel import AUDIENCES, back_kb, safe_edit, show_home
+from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
 from app.states import Cast
 
 log = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ def audience_kb() -> InlineKeyboardMarkup:
 
 def compose_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text="❌ Отмена", callback_data="pn:home"))
+    kb.row(btn("❌ Отмена", "pn:home", style=DANGER))
     return kb.as_markup()
 
 
@@ -57,10 +58,10 @@ def buttons_kb(has_buttons: bool) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(InlineKeyboardButton(text="➕ Добавить кнопки", callback_data="bc:buttons"))
     if has_buttons:
-        kb.row(InlineKeyboardButton(text="🗑 Убрать кнопки", callback_data="bc:clear"))
-    kb.row(InlineKeyboardButton(text="👁 Предпросмотр", callback_data="bc:preview"))
-    kb.row(InlineKeyboardButton(text="🚀 Отправить", callback_data="bc:send"))
-    kb.row(InlineKeyboardButton(text="❌ Отмена", callback_data="pn:home"))
+        kb.row(btn("🗑 Убрать кнопки", "bc:clear", style=DANGER))
+    kb.row(btn("👁 Предпросмотр", "bc:preview", style=PRIMARY))
+    kb.row(btn("🚀 Отправить", "bc:send", style=SUCCESS))
+    kb.row(btn("❌ Отмена", "pn:home", style=DANGER))
     return kb.as_markup()
 
 

@@ -1,128 +1,207 @@
-"""Клавиатуры. Раскладка повторяет макет из ТЗ."""
+"""Клавиатуры бота.
+
+Цвет кнопок доступен с Bot API 9.4: поле style принимает primary (синий),
+success (зелёный) и danger (красный). Цвет здесь не украшение, а подсказка:
+зелёным помечено подтверждение и приход денег, красным — отмена и всё, что
+что-то ломает, синим — главное действие экрана. Навигация остаётся без
+цвета, иначе выделенным окажется всё сразу и цвет перестанет что-то значить.
+
+Оттуда же icon_custom_emoji_id — премиум-эмодзи прямо на кнопке. Ставится
+только если владелец задал его для этого значка и проверка прошла.
+"""
 from __future__ import annotations
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app import runtime
-from app.emoji import em
 from app.config import settings
+from app.emoji import custom_id, em, premium_on
 from app.money import fmt
+
+#: Значения поля style из Bot API 9.4
+PRIMARY = "primary"    # синий — главное действие экрана
+SUCCESS = "success"    # зелёный — подтвердить, оплатить, зачислить
+DANGER = "danger"      # красный — отменить, отклонить, выключить
+
+
+def btn(
+    text: str,
+    callback_data: str | None = None,
+    *,
+    url: str | None = None,
+    style: str | None = None,
+    icon: str | None = None,
+) -> InlineKeyboardButton:
+    """Кнопка с цветом и, если задан, премиум-значком.
+
+    icon — ключ значка. Когда для него задан премиум-эмодзи, он ставится
+    отдельным полем кнопки, а из текста обычный значок убирается: иначе
+    рядом оказались бы два одинаковых.
+    """
+    fields: dict = {"text": text}
+    if callback_data is not None:
+        fields["callback_data"] = callback_data
+    if url is not None:
+        fields["url"] = url
+    if style is not None:
+        fields["style"] = style
+
+    if icon:
+        emoji_id = custom_id(icon)
+        if emoji_id and premium_on():
+            fields["icon_custom_emoji_id"] = emoji_id
+            plain = em(icon)
+            if plain and fields["text"].startswith(plain):
+                fields["text"] = fields["text"][len(plain):].lstrip()
+    return InlineKeyboardButton(**fields)
+
+
+def labeled(icon: str, text: str) -> str:
+    """Подпись со значком — значок берётся из настроек оформления."""
+    return f"{em(icon)} {text}"
+
+
+# ════════════════════════════════════════════════════════ главное меню
 
 
 def main_menu() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if runtime.get_bool("stars_enabled"):
-        kb.row(InlineKeyboardButton(text=f"{em('stars')} Купить звёзды", callback_data="m:stars"))
+        kb.row(btn(labeled("stars", "Купить звёзды"), "m:stars",
+                   style=PRIMARY, icon="stars"))
     if runtime.get_bool("premium_enabled"):
-        kb.row(InlineKeyboardButton(text=f"{em('premium')} Telegram Premium", callback_data="m:premium"))
-    deposit_button = InlineKeyboardButton(text=f"{em('deposit')} Пополнить баланс", callback_data="m:deposit")
-    profile_button = InlineKeyboardButton(text=f"{em('profile')} Профиль", callback_data="m:profile")
-    if runtime.get_bool("deposit_enabled"):
-        kb.row(deposit_button, profile_button)
-    else:
-        kb.row(profile_button)
+        kb.row(btn(labeled("premium", "Telegram Premium"), "m:premium",
+                   style=PRIMARY, icon="premium"))
+
+    deposit = btn(labeled("deposit", "Пополнить"), "m:deposit",
+                  style=SUCCESS, icon="deposit")
+    profile = btn(labeled("profile", "Профиль"), "m:profile", icon="profile")
+    kb.row(deposit, profile) if runtime.get_bool("deposit_enabled") else kb.row(profile)
+
     kb.row(
-        InlineKeyboardButton(text=f"{em('support')} Поддержка", callback_data="m:support"),
-        InlineKeyboardButton(text=f"{em('calc')} Калькулятор", callback_data="m:calc"),
+        btn(labeled("support", "Поддержка"), "m:support", icon="support"),
+        btn(labeled("calc", "Калькулятор"), "m:calc", icon="calc"),
     )
-    kb.row(InlineKeyboardButton(text=f"{em('info')} Информация", callback_data="m:info"))
+    kb.row(btn(labeled("info", "Информация"), "m:info", icon="info"))
     if settings.reviews_url:
-        kb.row(InlineKeyboardButton(text=f"{em('reviews')} Отзывы", url=settings.reviews_url))
-    kb.row(InlineKeyboardButton(text=f"{em('top')} Топ клиентов", callback_data="m:top"))
+        kb.row(btn(labeled("reviews", "Отзывы"), url=settings.reviews_url, icon="reviews"))
+    kb.row(btn(labeled("top", "Топ клиентов"), "m:top", icon="top"))
     return kb.as_markup()
 
 
 def back(target: str = "m:main", text: str = "") -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text=text or f"{em('back')} В меню", callback_data=target)
-    return kb.as_markup()
-
-
-def stars_entry() -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text=f"{em('stars')} Купить звёзды", callback_data="stars:buy"))
-    kb.row(InlineKeyboardButton(text=f"{em('back')} Назад", callback_data="m:main"))
+    kb.row(btn(text or labeled("back", "В меню"), target))
     return kb.as_markup()
 
 
 def cancel(text: str = "") -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text=text or f"{em('cancel')} Отмена", callback_data="m:main")
+    kb.row(btn(text or labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    return kb.as_markup()
+
+
+# ═════════════════════════════════════════════════════════════ покупка
+
+
+def stars_entry() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(btn(labeled("stars", "Купить звёзды"), "stars:buy",
+               style=PRIMARY, icon="stars"))
+    kb.row(btn(labeled("back", "Назад"), "m:main"))
     return kb.as_markup()
 
 
 def premium_menu() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for plan in runtime.premium_plans():
-        kb.row(InlineKeyboardButton(
-            text=f"{em('premium')} {plan['months']} мес. — {fmt(plan['price'])}",
-            callback_data=f"premium:{plan['months']}",
+        kb.row(btn(
+            f"{em('premium')} {plan['months']} мес. — {fmt(plan['price'])}",
+            f"premium:{plan['months']}", style=PRIMARY, icon="premium",
         ))
-    kb.row(InlineKeyboardButton(text=f"{em('back')} Назад", callback_data="m:main"))
+    kb.row(btn(labeled("back", "Назад"), "m:main"))
     return kb.as_markup()
 
 
 def ask_recipient(has_username: bool) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if has_username:
-        kb.row(InlineKeyboardButton(text=f"{em('stars')} Себе", callback_data="order:self"))
-    kb.row(InlineKeyboardButton(text=f"{em('cancel')} Отмена", callback_data="m:main"))
+        kb.row(btn(labeled("stars", "Себе"), "order:self", style=SUCCESS, icon="stars"))
+    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
     return kb.as_markup()
 
 
 def confirm_recipient() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text=f"{em('confirm')} Да, всё верно",
-                                callback_data="order:recipient_ok"))
-    kb.row(InlineKeyboardButton(text=f"{em('edit')} Другой юзернейм", callback_data="order:again"))
-    kb.row(InlineKeyboardButton(text=f"{em('cancel')} Отмена", callback_data="m:main"))
+    kb.row(btn(labeled("confirm", "Да, всё верно"), "order:recipient_ok", style=SUCCESS))
+    kb.row(btn(labeled("edit", "Другой юзернейм"), "order:again"))
+    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
     return kb.as_markup()
 
 
 def confirm() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text=f"{em('confirm')} Оплатить", callback_data="order:go"))
-    kb.row(InlineKeyboardButton(text=f"{em('edit')} Другой получатель", callback_data="order:again"))
-    kb.row(InlineKeyboardButton(text=f"{em('cancel')} Отмена", callback_data="m:main"))
+    kb.row(btn(labeled("confirm", "Оплатить"), "order:go", style=SUCCESS))
+    kb.row(btn(labeled("edit", "Другой получатель"), "order:again"))
+    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
     return kb.as_markup()
+
+
+def cancel_order(order_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(btn(labeled("cancel", "Отменить заказ"), f"order:cancel:{order_id}",
+               style=DANGER))
+    return kb.as_markup()
+
+
+# ══════════════════════════════════════════════════════════ пополнение
 
 
 def deposit_methods() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text=f"{em('deposit')} Перевод на карту", callback_data="dep:card"))
-    kb.row(InlineKeyboardButton(text="🏦 Другой способ", callback_data="dep:soon"))
-    kb.row(InlineKeyboardButton(text=f"{em('back')} Назад", callback_data="m:main"))
+    kb.row(btn(labeled("deposit", "Перевод на карту"), "dep:card",
+               style=SUCCESS, icon="deposit"))
+    kb.row(btn("🏦 Другой способ", "dep:soon"))
+    kb.row(btn(labeled("back", "Назад"), "m:main"))
     return kb.as_markup()
+
+
+# ════════════════════════════════════════════════════════════ профиль
 
 
 def profile() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text=f"{em('history')} История покупок", callback_data="p:history"))
-    kb.row(InlineKeyboardButton(text=f"{em('promo')} Промокод", callback_data="p:promo"))
-    kb.row(InlineKeyboardButton(text=f"{em('referral')} Рефералы", callback_data="p:ref"))
-    kb.row(InlineKeyboardButton(text=f"{em('back')} В меню", callback_data="m:main"))
+    kb.row(btn(labeled("history", "История покупок"), "p:history", icon="history"))
+    kb.row(btn(labeled("promo", "Промокод"), "p:promo", style=SUCCESS, icon="promo"))
+    kb.row(btn(labeled("referral", "Рефералы"), "p:ref", icon="referral"))
+    kb.row(btn(labeled("back", "В меню"), "m:main"))
     return kb.as_markup()
 
 
 def support_menu(has_open: bool) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if has_open:
-        kb.row(InlineKeyboardButton(text=f"{em('edit')} Дописать в обращение", callback_data="t:reply"))
+        kb.row(btn(labeled("edit", "Дописать в обращение"), "t:reply", style=PRIMARY))
     else:
-        kb.row(InlineKeyboardButton(text=f"{em('support')} Написать в поддержку", callback_data="t:new"))
-    kb.row(InlineKeyboardButton(text=f"{em('back')} В меню", callback_data="m:main"))
+        kb.row(btn(labeled("support", "Написать в поддержку"), "t:new",
+                   style=PRIMARY, icon="support"))
+    kb.row(btn(labeled("back", "В меню"), "m:main"))
     return kb.as_markup()
+
+
+# ══════════════════════════════════════════════════════════════ админ
 
 
 def admin_deposit(deposit_id: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text=f"{em('ok')} Зачислить", callback_data=f"a:dep_ok:{deposit_id}"))
-    kb.row(InlineKeyboardButton(text=f"{em('fail')} Отклонить", callback_data=f"a:dep_no:{deposit_id}"))
+    kb.row(btn(labeled("ok", "Зачислить"), f"a:dep_ok:{deposit_id}", style=SUCCESS))
+    kb.row(btn(labeled("fail", "Отклонить"), f"a:dep_no:{deposit_id}", style=DANGER))
     return kb.as_markup()
 
 
 def admin_retry(order_id: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text=f"{em('refresh')} Повторить выдачу", callback_data=f"a:retry:{order_id}")
+    kb.row(btn(labeled("refresh", "Повторить выдачу"), f"a:retry:{order_id}",
+               style=PRIMARY))
     return kb.as_markup()
