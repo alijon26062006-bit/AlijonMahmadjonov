@@ -63,6 +63,7 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📊 Статистика", callback_data="pn:stats"),
         InlineKeyboardButton(text="🔀 Разделы", callback_data="pn:toggles"),
     )
+    kb.row(InlineKeyboardButton(text="🔌 Проверить Fragment", callback_data="pn:fragment"))
     kb.row(InlineKeyboardButton(text="📝 Объявление в поддержке", callback_data="pn:notice"))
     kb.row(InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"))
     return kb.as_markup()
@@ -649,4 +650,59 @@ async def on_promo_new(
         f"✅ Промокод <code>{parts[0].upper()}</code> на <b>{fmt(amount)}</b>, "
         f"активаций: <b>{parts[2]}</b>",
         reply_markup=back_kb("pn:promos", "‹ К промокодам"),
+    )
+
+
+# =========================================================== проверка связи
+
+
+@router.callback_query(F.data == "pn:fragment")
+async def cb_fragment(call: CallbackQuery, provider) -> None:
+    """Пошаговая проверка: можно ли вообще выдавать товар."""
+    await safe_edit(call, "🔌 Проверяю связь с Fragment…", back_kb())
+    await call.answer()
+
+    try:
+        report = await provider.healthcheck()
+    except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
+        log.exception("Проверка Fragment упала")
+        await safe_edit(
+            call,
+            f"🔌 <b>Проверка Fragment</b>\n\n❌ Сорвалась с ошибкой:\n"
+            f"<code>{type(exc).__name__}: {exc}</code>",
+            back_kb(),
+        )
+        return
+
+    lines = [f"├ {name}: {result}" for name, result in report["steps"]]
+    if lines:
+        lines[-1] = "└" + lines[-1][1:]
+
+    if report["mode"] == "mock":
+        verdict = (
+            "⚠️ <b>Режим MOCK.</b>\n\n"
+            "Бот работает целиком, но звёзды <b>никуда не отправляются</b> — "
+            "это режим для проверки. Клиенты будут получать «заказ выполнен», "
+            "не получая звёзд.\n\n"
+            "Для реальных продаж поставьте <code>FRAGMENT_MODE=api</code> "
+            "в .env и перезапустите бота."
+        )
+    elif report["ok"]:
+        verdict = (
+            "✅ <b>Связь есть, выдача возможна.</b>\n\n"
+            "Проверьте, что на кошельке хватает средств: при нехватке "
+            "заказ упадёт, а деньги вернутся клиенту на баланс."
+        )
+    else:
+        verdict = (
+            "❌ <b>Выдача невозможна.</b>\n\n"
+            "Пока не починить — не включайте продажу звёзд, иначе клиенты "
+            "будут платить и получать возврат. Выключить можно "
+            "в разделе «Разделы»."
+        )
+
+    await safe_edit(
+        call,
+        "🔌 <b>Проверка Fragment</b>\n\n" + "\n".join(lines) + "\n\n" + verdict,
+        back_kb(),
     )

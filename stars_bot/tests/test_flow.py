@@ -24,7 +24,7 @@ from app.handlers import profile as prof_h
 from app.handlers import shop as shop_h
 from app.handlers import support as sup_h
 from app.money import fmt
-from app.services.fragment import DeliveryProvider, DeliveryResult
+from app.services.fragment import DeliveryProvider, DeliveryResult, Recipient
 
 USER_ID = 777
 PASS, FAIL = [], []
@@ -119,8 +119,10 @@ class OkProvider(DeliveryProvider):
         self.delivered.append((username, months))
         return DeliveryResult(order_id="frg-2", raw={})
 
-    async def check_username(self, username):
-        return username != "notfound"
+    async def resolve_recipient(self, username):
+        if username == "notfound":
+            return None
+        return Recipient(username=username, name=f"{username.capitalize()} Test")
 
 
 def make_state(storage: MemoryStorage, bot) -> FSMContext:
@@ -228,9 +230,20 @@ async def run_scenario(conn) -> None:
     msg = FakeMessage("https://t.me/target_user", bot=bot)
     await shop_h.on_recipient(msg, state, conn, provider)
     check("ссылка t.me распознаётся как юзернейм",
-          "Подтверждение заказа" in msg.last and "@target_user" in msg.last)
+          "Проверьте получателя" in msg.last and "@target_user" in msg.last)
+    check("показывается ИМЯ аккаунта, а не только юзернейм",
+          "Target_user Test" in msg.last, msg.last.replace("\n", " ")[:110])
+    check("чужой аккаунт помечен предупреждением", "чужой" in msg.last)
+    check("состояние ждёт подтверждения получателя",
+          await state.get_state() == "Buy:check_recipient")
+
+    call = FakeCallback("order:recipient_ok", bot=bot)
+    await shop_h.cb_recipient_ok(call, state, conn)
+    check("после подтверждения показывается сводка заказа",
+          "Подтверждение заказа" in call.last)
     check("в сводке верная сумма и остаток",
-          "20.00" in msg.last and "80.00" in msg.last, msg.last.replace("\n", " ")[:90])
+          "20.00" in call.last and "80.00" in call.last,
+          call.last.replace("\n", " ")[:100])
 
     call = FakeCallback("order:go", bot=bot)
     await shop_h.cb_pay(call, state, conn, provider, bot)

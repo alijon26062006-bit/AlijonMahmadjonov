@@ -62,6 +62,23 @@ def premium_menu() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def ask_recipient(has_username: bool) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    if has_username:
+        kb.row(InlineKeyboardButton(text="⭐️ Себе", callback_data="order:self"))
+    kb.row(InlineKeyboardButton(text="❌ Отмена", callback_data="m:main"))
+    return kb.as_markup()
+
+
+def confirm_recipient() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text="✅ Да, это верный аккаунт",
+                                callback_data="order:recipient_ok"))
+    kb.row(InlineKeyboardButton(text="✏️ Другой юзернейм", callback_data="order:again"))
+    kb.row(InlineKeyboardButton(text="❌ Отмена", callback_data="m:main"))
+    return kb.as_markup()
+
+
 def confirm() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(InlineKeyboardButton(text="✅ Подтвердить и оплатить", callback_data="order:go"))

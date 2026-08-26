@@ -14,7 +14,7 @@ from app import runtime
 from app.handlers.menu import menu_text
 from app.money import affordable_stars, fmt, stars_cost
 from app.services import delivery
-from app.services.fragment import DeliveryProvider
+from app.services.fragment import DeliveryProvider, Recipient
 from app.states import Buy
 
 log = logging.getLogger(__name__)
@@ -150,19 +150,40 @@ async def _ask_recipient(
     text = texts.ASK_RECIPIENT.format(
         title=title_of(product_type, quantity), price=fmt(price)
     )
+    markup = keyboards.ask_recipient(has_username=bool(target.from_user.username))
     if isinstance(target, CallbackQuery):
-        await target.message.edit_text(text, reply_markup=keyboards.cancel())
+        await target.message.edit_text(text, reply_markup=markup)
     else:
-        await target.answer(text, reply_markup=keyboards.cancel())
+        await target.answer(text, reply_markup=markup)
 
 
-@router.callback_query(Buy.confirm, F.data == "order:again")
+@router.callback_query(F.data == "order:again")
 async def cb_change_recipient(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
+    if not data.get("product_type"):
+        await call.answer("Начните заказ заново: /menu", show_alert=True)
+        return
     await _ask_recipient(
         call, state, data["product_type"], data["quantity"], data["price"]
     )
     await call.answer()
+
+
+@router.callback_query(Buy.recipient, F.data == "order:self")
+async def cb_buy_for_self(
+    call: CallbackQuery, state: FSMContext, provider: DeliveryProvider
+) -> None:
+    """Покупка себе: юзернейм берём из аккаунта, вручную вводить не надо."""
+    username = call.from_user.username
+    if not username:
+        await call.message.edit_text(
+            texts.NO_OWN_USERNAME, reply_markup=keyboards.back()
+        )
+        await call.answer()
+        return
+    await call.answer("Проверяю ваш аккаунт…")
+    await _check_and_confirm(call.message, state, provider, username,
+                             buyer_username=username, edit=True)
 
 
 @router.message(Buy.recipient, F.text)
@@ -174,27 +195,69 @@ async def on_recipient(
     if not username:
         await message.answer(texts.BAD_USERNAME)
         return
+    notice = await message.answer(texts.CHECKING_RECIPIENT.format(username=username))
+    await _check_and_confirm(
+        notice, state, provider, username,
+        buyer_username=message.from_user.username, edit=True,
+    )
 
-    if not await provider.check_username(username):
-        await message.answer(texts.UNKNOWN_RECIPIENT.format(username=username))
+
+async def _check_and_confirm(
+    target: Message, state: FSMContext, provider: DeliveryProvider,
+    username: str, *, buyer_username: str | None, edit: bool = False,
+) -> None:
+    """Спросить Fragment об аккаунте и показать его имя на подтверждение."""
+    recipient: Recipient | None = await provider.resolve_recipient(username)
+
+    async def show(text: str, markup) -> None:
+        if edit:
+            await target.edit_text(text, reply_markup=markup)
+        else:
+            await target.answer(text, reply_markup=markup)
+
+    if recipient is None:
+        await show(texts.UNKNOWN_RECIPIENT.format(username=username),
+                   keyboards.cancel("‹ В меню"))
         return
 
+    is_self = bool(buyer_username) and buyer_username.lower() == username.lower()
     data = await state.get_data()
-    price = data["price"]
-    user = await db.get_user(conn, message.from_user.id)
-    balance = user.balance if user else 0
+    await state.update_data(recipient=username, recipient_name=recipient.display)
+    await state.set_state(Buy.check_recipient)
 
-    await state.update_data(recipient=username)
+    await show(
+        texts.CONFIRM_RECIPIENT.format(
+            name=recipient.display,
+            username=username,
+            who=texts.RECIPIENT_IS_YOU if is_self else texts.RECIPIENT_IS_OTHER,
+            title=title_of(data["product_type"], data["quantity"]),
+        ),
+        keyboards.confirm_recipient(),
+    )
+
+
+@router.callback_query(Buy.check_recipient, F.data == "order:recipient_ok")
+async def cb_recipient_ok(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    """Получатель подтверждён — показываем итоговую сводку заказа."""
+    data = await state.get_data()
+    user = await db.get_user(conn, call.from_user.id)
+    balance = user.balance if user else 0
+    price = data["price"]
+
     await state.set_state(Buy.confirm)
-    await message.answer(
+    await call.message.edit_text(
         texts.CONFIRM.format(
             title=title_of(data["product_type"], data["quantity"]),
-            recipient=username,
+            name=data.get("recipient_name") or f"@{data['recipient']}",
+            recipient=data["recipient"],
             price=fmt(price),
             rest=fmt(max(balance - price, 0)),
         ),
         reply_markup=keyboards.confirm(),
     )
+    await call.answer()
 
 
 # ------------------------------------------------------------------ оплата

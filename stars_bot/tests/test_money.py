@@ -13,7 +13,7 @@ from app import db
 from app.money import fmt
 from app.services import delivery
 from app.services.fragment import (
-    DeliveryError, DeliveryProvider, DeliveryResult, DeliveryUncertain,
+    DeliveryError, DeliveryProvider, DeliveryResult, DeliveryUncertain, Recipient,
 )
 
 PASS, FAIL = [], []
@@ -41,8 +41,8 @@ class OkProvider(DeliveryProvider):
     async def deliver_premium(self, username, months):
         return DeliveryResult(order_id="ok-2", raw={})
 
-    async def check_username(self, username):
-        return True
+    async def resolve_recipient(self, username):
+        return Recipient(username=username, name=f"{username} Test")
 
 
 class RejectProvider(DeliveryProvider):

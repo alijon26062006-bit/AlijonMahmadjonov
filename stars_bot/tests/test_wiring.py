@@ -12,13 +12,15 @@ import env_fixture  # noqa: F401  — фиксирует настройки до
 
 from aiogram import Dispatcher
 
-from app import db, keyboards
-from app.handlers import admin, deposit, menu, profile, shop, support
+from app import db, keyboards, runtime
+from app.handlers import (
+    admin, broadcast, deposit, menu, panel, profile, shop, support,
+)
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.fragment import build_provider
 
-ROUTERS = [admin.router, menu.router, shop.router, deposit.router,
-           profile.router, support.router]
+ROUTERS = [panel.router, broadcast.router, admin.router, menu.router,
+           shop.router, deposit.router, profile.router, support.router]
 
 
 def declared_callbacks() -> set[str]:
@@ -29,7 +31,13 @@ def declared_callbacks() -> set[str]:
         keyboards.confirm(), keyboards.deposit_methods(), keyboards.profile(),
         keyboards.support_menu(True), keyboards.support_menu(False),
         keyboards.back(), keyboards.cancel(),
+        keyboards.ask_recipient(True), keyboards.ask_recipient(False),
+        keyboards.confirm_recipient(),
         keyboards.admin_deposit(1), keyboards.admin_retry(1),
+        # админ-панель
+        panel.home_kb(), panel.prices_kb(), panel.pay_kb(), panel.toggles_kb(),
+        panel.back_kb(), broadcast.audience_kb(), broadcast.compose_kb(),
+        broadcast.buttons_kb(True), broadcast.buttons_kb(False),
     ]
     for markup in markups:
         for row in markup.inline_keyboard:
@@ -55,6 +63,7 @@ async def main() -> None:
 
     conn = await db.connect()
     await db.init(conn)
+    await runtime.load(conn)
     dp = Dispatcher(conn=conn, provider=build_provider())
     dp.message.middleware(UserGuardMiddleware())
     dp.callback_query.middleware(UserGuardMiddleware())

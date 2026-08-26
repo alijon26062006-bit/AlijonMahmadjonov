@@ -52,6 +52,21 @@ class DeliveryResult:
     raw: dict
 
 
+@dataclass
+class Recipient:
+    """Получатель, каким его видит Fragment.
+
+    name показывается покупателю на подтверждении: без него человек
+    отправляет звёзды вслепую и опечатка в юзернейме стоит ему денег.
+    """
+    username: str
+    name: str = ""
+
+    @property
+    def display(self) -> str:
+        return self.name or f"@{self.username}"
+
+
 class DeliveryProvider:
     async def deliver_stars(self, username: str, amount: int) -> DeliveryResult:
         raise NotImplementedError
@@ -62,8 +77,12 @@ class DeliveryProvider:
     async def get_balance(self) -> str:
         raise NotImplementedError
 
-    async def check_username(self, username: str) -> bool:
-        """True — получателю можно отправить. False — Fragment такого не знает."""
+    async def resolve_recipient(self, username: str) -> Recipient | None:
+        """Найти получателя. None — Fragment такого не знает."""
+        raise NotImplementedError
+
+    async def healthcheck(self) -> dict:
+        """Проверка связи для админ-панели: {ok, steps, error}."""
         raise NotImplementedError
 
     async def close(self) -> None:
@@ -91,8 +110,20 @@ class MockProvider(DeliveryProvider):
     async def get_balance(self) -> str:
         return "MOCK — реальный баланс недоступен"
 
-    async def check_username(self, username: str) -> bool:
-        return True
+    async def resolve_recipient(self, username: str) -> Recipient | None:
+        # В mock-режиме «находим» кого угодно, кроме заведомо несуществующего
+        # имени — так тестируется и ветка с ошибкой.
+        if username.lower() in ("notfound", "unknown"):
+            return None
+        return Recipient(username=username, name=f"{username.capitalize()} (MOCK)")
+
+    async def healthcheck(self) -> dict:
+        return {
+            "ok": True,
+            "mode": "mock",
+            "steps": [("Режим", "MOCK — реальной выдачи нет")],
+            "error": "",
+        }
 
 
 class FragmentProvider(DeliveryProvider):
@@ -217,13 +248,46 @@ class FragmentProvider(DeliveryProvider):
         balance = data.get("balance") or data.get("available") or data
         return str(balance)
 
-    async def check_username(self, username: str) -> bool:
+    async def resolve_recipient(self, username: str) -> Recipient | None:
         try:
-            await self._request("GET", USER_PATH.format(username=username))
-            return True
+            data = await self._request("GET", USER_PATH.format(username=username))
         except DeliveryError as exc:
-            log.info("Fragment: получатель @%s не подтверждён (%s)", username, exc)
-            return False
+            log.info("Fragment: получатель @%s не найден (%s)", username, exc)
+            return None
+        except DeliveryUncertain as exc:
+            # Проверка получателя ничего не меняет, поэтому недоступность
+            # Fragment здесь безопасно трактовать как «не подтвердили».
+            log.warning("Fragment недоступен при проверке @%s: %s", username, exc)
+            return None
+
+        # Формат ответа у разных версий API отличается — берём первое подходящее.
+        name = ""
+        for key in ("name", "display_name", "first_name", "title", "full_name"):
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                name = value.strip()
+                break
+        if not name and isinstance(data.get("recipient"), dict):
+            name = str(data["recipient"].get("name") or "").strip()
+        return Recipient(username=username, name=name)
+
+    async def healthcheck(self) -> dict:
+        """Пошагово проверяет, что выдача вообще возможна."""
+        steps: list[tuple[str, str]] = []
+        try:
+            token = await self._token_value(force=True)
+            steps.append(("Авторизация", f"✅ токен получен ({len(token)} симв.)"))
+        except (DeliveryError, DeliveryUncertain) as exc:
+            steps.append(("Авторизация", f"❌ {exc}"))
+            return {"ok": False, "mode": "api", "steps": steps, "error": str(exc)}
+
+        try:
+            balance = await self.get_balance()
+            steps.append(("Баланс кошелька", f"✅ {balance}"))
+        except (DeliveryError, DeliveryUncertain) as exc:
+            steps.append(("Баланс кошелька", f"⚠️ не прочитался: {exc}"))
+
+        return {"ok": True, "mode": "api", "steps": steps, "error": ""}
 
 
 def build_provider() -> DeliveryProvider:

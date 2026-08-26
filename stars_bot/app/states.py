@@ -3,9 +3,10 @@ from aiogram.fsm.state import State, StatesGroup
 
 
 class Buy(StatesGroup):
-    quantity = State()    # ждём количество звёзд
-    recipient = State()   # ждём @username получателя
-    confirm = State()     # показали сводку, ждём подтверждения
+    quantity = State()          # ждём количество звёзд
+    recipient = State()         # ждём @username получателя
+    check_recipient = State()   # показали имя аккаунта, ждём «да, это он»
+    confirm = State()           # показали сводку, ждём подтверждения
 
 
 class Deposit(StatesGroup):
