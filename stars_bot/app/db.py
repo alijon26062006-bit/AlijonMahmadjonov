@@ -128,6 +128,15 @@ CREATE TABLE IF NOT EXISTS promo_uses (
     PRIMARY KEY (code, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS adjustments (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    admin_id   INTEGER NOT NULL,
+    amount     INTEGER NOT NULL,        -- дирамы, со знаком: минус = списание
+    reason     TEXT,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -141,6 +150,8 @@ CREATE INDEX IF NOT EXISTS idx_deposits_stat  ON deposits(status);
 CREATE INDEX IF NOT EXISTS idx_tickets_user   ON tickets(user_id);
 CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
 CREATE INDEX IF NOT EXISTS idx_tmsg_ticket    ON ticket_messages(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_adj_user      ON adjustments(user_id);
+CREATE INDEX IF NOT EXISTS idx_adj_created   ON adjustments(created_at);
 """
 
 
@@ -321,6 +332,75 @@ async def get_user(conn: aiosqlite.Connection, user_id: int) -> User | None:
 async def set_banned(conn: aiosqlite.Connection, user_id: int, banned: bool) -> None:
     await conn.execute("UPDATE users SET is_banned = ? WHERE id = ?", (int(banned), user_id))
     await conn.commit()
+
+
+async def find_user(conn: aiosqlite.Connection, query: str) -> User | None:
+    """Найти клиента по ID или юзернейму — под рукой бывает любое из двух."""
+    query = query.strip().lstrip("@")
+    if query.isdigit():
+        found = await get_user(conn, int(query))
+        if found:
+            return found
+    async with conn.execute(
+        "SELECT * FROM users WHERE lower(username) = lower(?) LIMIT 1", (query,)
+    ) as cur:
+        row = await cur.fetchone()
+    return _from_row(User, row) if row else None
+
+
+@dataclass
+class Adjustment:
+    id: int
+    user_id: int
+    admin_id: int
+    amount: int
+    reason: str | None
+    created_at: str
+
+
+async def add_adjustment(
+    conn: aiosqlite.Connection, *, user_id: int, admin_id: int,
+    amount: int, reason: str = "",
+) -> None:
+    """Записать ручную правку баланса.
+
+    Без записи такие деньги появлялись бы из ниоткуда, и сойти отчёты
+    уже не могли бы.
+    """
+    await conn.execute(
+        """INSERT INTO adjustments (user_id, admin_id, amount, reason, created_at)
+           VALUES (?, ?, ?, ?, ?)""",
+        (user_id, admin_id, amount, reason or None, _now()),
+    )
+    await conn.commit()
+
+
+async def list_adjustments(
+    conn: aiosqlite.Connection, *, user_id: int | None = None, limit: int = 10
+) -> list[Adjustment]:
+    sql = "SELECT * FROM adjustments"
+    params: list[Any] = []
+    if user_id is not None:
+        sql += " WHERE user_id = ?"
+        params.append(user_id)
+    sql += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+    async with conn.execute(sql, params) as cur:
+        return [_from_row(Adjustment, row) for row in await cur.fetchall()]
+
+
+async def adjustments_total(
+    conn: aiosqlite.Connection, since: str, until: str
+) -> tuple[int, int]:
+    """Сколько начислено и списано вручную за период."""
+    async with conn.execute(
+        """SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount END), 0) AS added,
+                  COALESCE(SUM(CASE WHEN amount < 0 THEN -amount END), 0) AS taken
+           FROM adjustments WHERE created_at >= ? AND created_at < ?""",
+        (since, until),
+    ) as cur:
+        row = await cur.fetchone()
+    return row["added"], row["taken"]
 
 
 async def all_user_ids(conn: aiosqlite.Connection) -> list[int]:
@@ -757,6 +837,10 @@ async def report(
         (ORDER_DELIVERED, since, until),
     ) as cur:
         data["buyers"] = (await cur.fetchone())["cnt"]
+
+    added, taken = await adjustments_total(conn, since, until)
+    data["adjust_added"] = added
+    data["adjust_taken"] = taken
 
     data["profit"] = data["revenue"] - data["cost"]
     return data

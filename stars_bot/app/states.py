@@ -31,6 +31,8 @@ class Panel(StatesGroup):
     value = State()       # ждём новое значение настройки
     emoji = State()       # ждём новый значок
     period = State()      # ждём даты для отчёта
+    user_search = State() # ждём ID или юзернейм клиента
+    adjust = State()      # ждём сумму правки баланса
 
 
 class Cast(StatesGroup):

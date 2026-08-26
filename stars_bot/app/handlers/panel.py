@@ -29,6 +29,7 @@ from app.emoji import substitute
 from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
 from app.money import fmt, fmt4, parse, parse4
 from app.services import dcpay, pricing
+from app.services import delivery
 from app.states import Panel, PromoNew
 
 log = logging.getLogger(__name__)
@@ -68,7 +69,10 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📈 Отчёты", callback_data="pn:rep"),
         InlineKeyboardButton(text="🔀 Разделы", callback_data="pn:toggles"),
     )
-    kb.row(InlineKeyboardButton(text="📊 Общая статистика", callback_data="pn:stats"))
+    kb.row(
+        InlineKeyboardButton(text="👥 Клиенты", callback_data="pn:users"),
+        InlineKeyboardButton(text="📊 Статистика", callback_data="pn:stats"),
+    )
     kb.row(
         InlineKeyboardButton(text="💼 Кошелёк", callback_data="pn:wallet"),
         InlineKeyboardButton(text="🔌 Проверить связь", callback_data="pn:fragment"),
@@ -1276,6 +1280,8 @@ def report_kb(active: str = "") -> InlineKeyboardMarkup:
 
 
 def format_report(title: str, data: dict, days: list, hint: str = "") -> str:
+    """Отчёт за период. Ручные правки показываем отдельной строкой:
+    без этого деньги на балансах не сходились бы с пополнениями."""
     """Отчёт за период. Прибыль показываем, только если знаем себестоимость."""
     revenue, cost, profit = data["revenue"], data["cost"], data["profit"]
     margin = round(profit * 100 / cost) if cost else 0
@@ -1319,6 +1325,10 @@ def format_report(title: str, data: dict, days: list, hint: str = "") -> str:
         f"├ Покупали: <b>{data['buyers']}</b>\n"
         f"└ Пополнений: <b>{data['deposits']}</b> "
         f"<i>({fmt(data['deposits_sum'])})</i>"
+        + (f"\n\n✍️ <b>Правки вручную</b>\n"
+           f"├ Начислено: <b>{fmt(data['adjust_added'])}</b>\n"
+           f"└ Списано: <b>{fmt(data['adjust_taken'])}</b>"
+           if data.get("adjust_added") or data.get("adjust_taken") else "")
         + chart + (f"\n\n<i>{hint}</i>" if hint else "")
     )
 
@@ -1475,3 +1485,226 @@ async def cb_dc_test(call: CallbackQuery) -> None:
         kb.as_markup(),
     )
     await call.answer()
+
+
+# ═════════════════════════════════════════════════════════════ клиенты
+
+
+def user_card(user: db.User, stats: dict, history: list) -> str:
+    name = f"@{user.username}" if user.username else (user.first_name or "без имени")
+    lines = "\n".join(
+        f"├ {'+' if adj.amount > 0 else '−'}{fmt(abs(adj.amount))}"
+        + (f" — <i>{adj.reason}</i>" if adj.reason else "")
+        for adj in history[:5]
+    )
+    manual = f"\n\n✍️ <b>Правки баланса</b>\n{lines}" if history else ""
+
+    return (
+        f"👤 <b>{name}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"├ ID: <code>{user.id}</code>\n"
+        f"└ С нами с {user.created_at[:10]}\n\n"
+        f"[[money]] <b>Финансы</b>\n"
+        f"├ Баланс: <b>{fmt(user.balance)}</b>\n"
+        f"└ Пополнено всего: <b>{fmt(user.total_deposit)}</b>\n\n"
+        f"📦 <b>Заказы</b>\n"
+        f"├ Всего: <b>{stats['total']}</b>, выполнено: <b>{stats['done']}</b>\n"
+        f"└ Звёзд куплено: <b>{stats['stars']}</b>\n\n"
+        + (f"[[block]] <b>Заблокирован</b>" if user.is_banned else "")
+        + manual
+    )
+
+
+def user_kb(user: db.User) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(
+        btn("➕ Начислить", f"pn:give:{user.id}", style=SUCCESS),
+        btn("➖ Списать", f"pn:take:{user.id}", style=DANGER),
+    )
+    kb.row(btn(
+        "✅ Разблокировать" if user.is_banned else "🚫 Заблокировать",
+        f"pn:ban:{user.id}",
+        style=SUCCESS if user.is_banned else DANGER,
+    ))
+    kb.row(btn("🔍 Другой клиент", "pn:users"))
+    kb.row(btn("‹ В панель", "pn:home"))
+    return kb.as_markup()
+
+
+async def show_user(call: CallbackQuery, conn: aiosqlite.Connection, user_id: int) -> None:
+    user = await db.get_user(conn, user_id)
+    if user is None:
+        await safe_edit(call, "Клиент не найден.", back_kb("pn:users", "🔍 Искать"))
+        return
+    stats = await db.user_order_stats(conn, user_id)
+    history = await db.list_adjustments(conn, user_id=user_id)
+    await safe_edit(call, substitute(user_card(user, stats, history)), user_kb(user))
+
+
+@router.callback_query(F.data == "pn:users")
+async def cb_users(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    await state.set_state(Panel.user_search)
+    recent = await db.list_adjustments(conn, limit=5)
+    tail = ""
+    if recent:
+        rows = "\n".join(
+            f"├ <code>{a.user_id}</code>: "
+            f"{'+' if a.amount > 0 else '−'}{fmt(abs(a.amount))}"
+            + (f" — <i>{a.reason}</i>" if a.reason else "")
+            for a in recent
+        )
+        tail = f"\n\n✍️ <b>Последние правки</b>\n{rows}"
+
+    await safe_edit(
+        call,
+        "👥 <b>Клиенты</b>\n\n"
+        "<blockquote>Пришлите <b>ID</b> или <b>@username</b> — покажу карточку "
+        "с балансом и кнопками начисления и списания.</blockquote>" + tail,
+        back_kb("pn:home", "‹ В панель"),
+    )
+    await call.answer()
+
+
+@router.message(Panel.user_search, F.text)
+async def on_user_search(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    user = await db.find_user(conn, message.text or "")
+    if user is None:
+        await message.answer(
+            "❌ Такого клиента нет.\n\n"
+            "<blockquote>Он появится в базе только после того, как хотя бы "
+            "раз напишет боту.</blockquote>"
+        )
+        return
+
+    await state.clear()
+    stats = await db.user_order_stats(conn, user.id)
+    history = await db.list_adjustments(conn, user_id=user.id)
+    await message.answer(
+        substitute(user_card(user, stats, history)), reply_markup=user_kb(user)
+    )
+
+
+@router.callback_query(F.data.startswith(("pn:give:", "pn:take:")))
+async def cb_adjust_start(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    kind, user_id = call.data.split(":")[1], int(call.data.rsplit(":", 1)[1])
+    user = await db.get_user(conn, user_id)
+    if user is None:
+        await call.answer("Клиент не найден.", show_alert=True)
+        return
+
+    await state.set_state(Panel.adjust)
+    await state.update_data(adjust_user=user_id, adjust_kind=kind)
+
+    if kind == "give":
+        head = "➕ <b>Начислить на баланс</b>"
+        note = "Деньги появятся у клиента сразу, он получит уведомление."
+    else:
+        head = "➖ <b>Списать с баланса</b>"
+        note = ("Списать больше, чем есть, нельзя — баланс не уйдёт в минус.")
+
+    await safe_edit(
+        call,
+        f"{head}\n\n"
+        f"├ Клиент: <code>{user_id}</code>\n"
+        f"└ Сейчас на балансе: <b>{fmt(user.balance)}</b>\n\n"
+        f"<blockquote>{note}</blockquote>\n\n"
+        "Пришлите сумму в сомони. Можно с причиной через пробел:\n"
+        "<code>50</code>  или  <code>50 бонус за отзыв</code>",
+        back_kb(f"pn:user:{user_id}", "✖️ Отмена"),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:user:"))
+async def cb_user_card(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    await state.clear()
+    await show_user(call, conn, int(call.data.rsplit(":", 1)[1]))
+    await call.answer()
+
+
+@router.message(Panel.adjust, F.text)
+async def on_adjust_amount(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection, bot: Bot
+) -> None:
+    data = await state.get_data()
+    user_id, kind = data.get("adjust_user"), data.get("adjust_kind")
+    if not user_id:
+        await state.clear()
+        await message.answer("Не понял, кому. Откройте /panel заново.")
+        return
+
+    parts = (message.text or "").strip().split(maxsplit=1)
+    amount = parse(parts[0]) if parts else None
+    reason = parts[1].strip() if len(parts) > 1 else ""
+
+    if amount is None or amount <= 0:
+        await message.answer(
+            "❌ Введите сумму числом: <code>50</code> или <code>50.50</code>.\n"
+            "Причину можно дописать через пробел."
+        )
+        return
+
+    user = await db.get_user(conn, user_id)
+    if user is None:
+        await state.clear()
+        await message.answer("Клиент пропал из базы.")
+        return
+
+    if kind == "give":
+        await db.credit(conn, user_id, amount)
+        signed = amount
+        await delivery.notify(
+            bot, user_id,
+            substitute(
+                f"[[money]] <b>Вам начислено {fmt(amount)}</b>"
+                + (f"\n\n<blockquote>{reason}</blockquote>" if reason else "")
+            ),
+        )
+    else:
+        if not await db.charge(conn, user_id, amount):
+            await message.answer(
+                f"❌ Не хватает средств: на балансе <b>{fmt(user.balance)}</b>.\n\n"
+                "<blockquote>Баланс не уводится в минус — иначе клиент ушёл бы "
+                "в долг, которого он не брал.</blockquote>"
+            )
+            return
+        signed = -amount
+        await delivery.notify(
+            bot, user_id,
+            substitute(
+                f"[[refund]] <b>С баланса списано {fmt(amount)}</b>"
+                + (f"\n\n<blockquote>{reason}</blockquote>" if reason else "")
+            ),
+        )
+
+    await db.add_adjustment(
+        conn, user_id=user_id, admin_id=message.from_user.id,
+        amount=signed, reason=reason,
+    )
+    await state.clear()
+
+    fresh = await db.get_user(conn, user_id)
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("👤 Карточка клиента", f"pn:user:{user_id}"))
+    kb.row(btn("‹ В панель", "pn:home"))
+    await message.answer(
+        f"✅ <b>{'Начислено' if kind == 'give' else 'Списано'} {fmt(amount)}</b>\n\n"
+        f"├ Клиент: <code>{user_id}</code>\n"
+        f"└ Баланс теперь: <b>{fmt(fresh.balance if fresh else 0)}</b>"
+        + (f"\n\n<i>Причина: {reason}</i>" if reason else ""),
+        reply_markup=kb.as_markup(),
+    )
+
+
+@router.callback_query(F.data.startswith("pn:ban:"))
+async def cb_ban_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    user_id = int(call.data.rsplit(":", 1)[1])
+    user = await db.get_user(conn, user_id)
+    if user is None:
+        await call.answer("Клиент не найден.", show_alert=True)
+        return
+    await db.set_banned(conn, user_id, not user.is_banned)
+    await call.answer("Разблокирован" if user.is_banned else "Заблокирован")
+    await show_user(call, conn, user_id)
