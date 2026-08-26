@@ -167,10 +167,14 @@ async def run(conn) -> None:
     await runtime.set_value(conn, "margin_percent", "15")
     result = await pricing.refresh_once(conn, Provider())
     check("автоцены отработали", result["ok"], str(result))
-    # 0.0154 × 10.90 = 0.16786 -> 17 дирам; +15% = 19.55 -> 20
-    check("себестоимость посчитана", runtime.star_cost() == 17, str(runtime.star_cost()))
+    # 0.0154 × 10.90 = 0.16786 сомони -> 1679 в десятитысячных; +15% = 1931
+    check("себестоимость посчитана с четырьмя знаками",
+          runtime.star_cost_e4() == 1679, str(runtime.star_cost_e4()))
     check("цена продажи держит наценку 15%",
-          runtime.star_price() == 20, str(runtime.star_price()))
+          runtime.star_price_e4() == 1931, str(runtime.star_price_e4()))
+    real = (runtime.star_price_e4() - runtime.star_cost_e4()) / runtime.star_cost_e4() * 100
+    check("фактическая наценка совпадает с заданной",
+          abs(real - 15) < 0.1, f"{real:.2f}%")
     check("себестоимость Premium сохранена",
           runtime.premium_costs().get(3) == 13298, str(runtime.premium_costs()))
     check("цена Premium пересчитана с наценкой",
@@ -178,7 +182,7 @@ async def run(conn) -> None:
           str(runtime.find_premium(3)))
 
     check("себестоимость заказа берётся из настроек",
-          runtime.cost_of("stars", 100) == 1700, str(runtime.cost_of("stars", 100)))
+          runtime.cost_of("stars", 100) == 1679, str(runtime.cost_of("stars", 100)))
     check("себестоимость Premium берётся по сроку",
           runtime.cost_of("premium", 3) == 13298)
     check("неизвестный срок Premium даёт ноль",

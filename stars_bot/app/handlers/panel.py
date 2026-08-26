@@ -27,7 +27,7 @@ from app import db, emoji, reports, runtime, texts
 from app.config import settings
 from app.emoji import substitute
 from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
-from app.money import fmt, parse
+from app.money import fmt, fmt4, parse, parse4
 from app.services import pricing
 from app.states import Panel, PromoNew
 
@@ -116,9 +116,9 @@ async def home_text(conn: aiosqlite.Connection) -> str:
         f"💰 Пополнено всего: <b>{fmt(data['deposits'])}</b>\n"
         f"🛒 Продано на: <b>{fmt(data['revenue'])}</b> ({data['orders']} заказов)\n"
         f"👛 На балансах клиентов: <b>{fmt(data['held_balance'])}</b>\n\n"
-        f"⭐️ Цена звезды: <b>{fmt(runtime.star_price())}</b>"
-        + (f" · прибыль <b>{fmt(runtime.profit_per_star())}</b>"
-           if runtime.star_cost() > 0 else " · себестоимость не задана")
+        f"⭐️ Цена звезды: <b>{fmt4(runtime.star_price_e4())}</b>"
+        + (f" · прибыль <b>{fmt4(runtime.profit_per_star_e4())}</b>"
+           if runtime.star_cost_e4() > 0 else " · себестоимость не задана")
     )
 
 
@@ -165,11 +165,11 @@ async def cb_help(call: CallbackQuery) -> None:
 def prices_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(
-        InlineKeyboardButton(text="💲 Себестоимость", callback_data="pn:set:star_cost_diram"),
+        InlineKeyboardButton(text="💲 Себестоимость", callback_data="pn:set:star_cost_e4"),
         InlineKeyboardButton(text="📈 Наценка %", callback_data="pn:set:margin_percent"),
     )
     kb.row(InlineKeyboardButton(text="🏷 Цена продажи вручную",
-                                callback_data="pn:set:star_price_diram"))
+                                callback_data="pn:set:star_price_e4"))
     kb.row(btn("📡 Узнать себестоимость", "pn:cost", style=PRIMARY))
     kb.row(btn("🧮 Применить наценку", "pn:recalc", style=SUCCESS))
     for plan in runtime.premium_plans():
@@ -190,25 +190,26 @@ def prices_kb() -> InlineKeyboardMarkup:
 
 
 def prices_text() -> str:
-    cost, price = runtime.star_cost(), runtime.star_price()
+    cost, price = runtime.star_cost_e4(), runtime.star_price_e4()
     margin = runtime.margin_percent()
 
     if cost > 0:
         profit = price - cost
         real_margin = round((price - cost) / cost * 100) if cost else 0
         economics = (
-            f"├ Себестоимость: <b>{fmt(cost)}</b>\n"
+            f"├ Себестоимость: <b>{fmt4(cost)}</b>\n"
             f"├ Наценка задана: <b>{margin}%</b>\n"
-            f"├ Цена продажи: <b>{fmt(price)}</b>\n"
+            f"├ Цена продажи: <b>{fmt4(price)}</b>\n"
             f"├ Фактическая наценка: <b>{real_margin}%</b>\n"
-            f"└ Прибыль с 1 звезды: <b>{fmt(profit)}</b>\n\n"
-            f"💡 С заказа в 1000 звёзд заработок: <b>{fmt(profit * 1000)}</b>"
+            f"└ Прибыль с 1 звезды: <b>{fmt4(profit)}</b>\n\n"
+            f"💡 С заказа в 1000 звёзд заработок: "
+            f"<b>{fmt((profit * 1000 + 50) // 100)}</b>"
         )
         if profit < 0:
             economics += "\n\n❗️ <b>Продаёте ниже себестоимости — это убыток.</b>"
     else:
         economics = (
-            f"├ Цена продажи: <b>{fmt(price)}</b>\n"
+            f"├ Цена продажи: <b>{fmt4(price)}</b>\n"
             f"└ Себестоимость: <b>не задана</b>\n\n"
             "💡 Укажите себестоимость — и панель будет показывать вашу прибыль "
             "с каждого заказа."
@@ -244,12 +245,12 @@ async def cb_prices(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "pn:recalc")
 async def cb_recalc(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
-    if runtime.star_cost() <= 0:
+    if runtime.star_cost_e4() <= 0:
         await call.answer("Сначала задайте себестоимость.", show_alert=True)
         return
-    new_price = runtime.price_from_margin()
-    await runtime.set_value(conn, "star_price_diram", str(new_price))
-    await call.answer(f"Цена продажи: {fmt(new_price)}")
+    new_price = runtime.price_from_margin_e4()
+    await runtime.set_value(conn, "star_price_e4", str(new_price))
+    await call.answer(f"Цена продажи: {fmt4(new_price)}")
     await safe_edit(call, prices_text(), prices_kb())
 
 
@@ -344,12 +345,12 @@ async def cb_preview_pay(call: CallbackQuery) -> None:
 
 # Поле -> (заголовок, подсказка, тип). Тип: money | int | percent | text
 FIELDS: dict[str, tuple[str, str, str]] = {
-    "star_cost_diram": ("💲 Себестоимость звезды",
+    "star_cost_e4": ("💲 Себестоимость звезды",
                         "Сколько ОДНА звезда стоит вам на Fragment, в сомони.\n"
-                        "Например <code>0.18</code>:", "money"),
-    "star_price_diram": ("🏷 Цена продажи звезды",
+                        "Например <code>0.1416</code>:", "price4"),
+    "star_price_e4": ("🏷 Цена продажи звезды",
                          "За сколько продаёте ОДНУ звезду, в сомони.\n"
-                         "Например <code>0.25</code>:", "money"),
+                         "Например <code>0.1629</code>:", "price4"),
     "usd_rate_diram": ("💱 Курс доллара",
                        "Сколько сомони стоит 1 доллар. Например <code>10.90</code>:", "money"),
     "margin_percent": ("📈 Наценка",
@@ -375,7 +376,7 @@ FIELDS.update({
 # Куда возвращаться после сохранения
 FIELD_PARENT = {key: "pn:pay" for key in PAY_FIELDS}
 FIELD_PARENT.update({
-    "star_cost_diram": "pn:prices", "star_price_diram": "pn:prices",
+    "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "usd_rate_diram": "pn:prices",
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
@@ -387,6 +388,8 @@ FIELD_PARENT.update({
 def current_display(key: str) -> str:
     kind = FIELDS[key][2]
     raw = runtime.get(key)
+    if kind == "price4":
+        return fmt4(runtime.get_int(key))
     if kind == "money":
         return fmt(runtime.get_int(key))
     if kind == "percent":
@@ -451,7 +454,16 @@ async def on_field_value(
         return
 
     kind = FIELDS[field][2]
-    if kind == "money":
+    if kind == "price4":
+        amount = parse4(raw)
+        if amount is None or amount < 0:
+            await message.answer(
+                "❌ Введите цену числом, например <code>0.1629</code>. "
+                "Можно до четырёх знаков после точки."
+            )
+            return
+        value, shown = str(amount), fmt4(amount)
+    elif kind == "money":
         amount = parse(raw)
         if amount is None or amount < 0:
             await message.answer("❌ Введите сумму числом, например <code>0.25</code> или <code>150</code>.")
@@ -908,13 +920,14 @@ async def cb_cost(call: CallbackQuery, provider) -> None:
         return
 
     # Себестоимость одной звезды в дирамах.
-    cost = int((estimate.usd_per_unit * rate).to_integral_value(rounding="ROUND_HALF_UP"))
+    cost = int((estimate.usd_per_unit * rate * 100).to_integral_value(
+        rounding="ROUND_HALF_UP"))
     margin = runtime.margin_percent()
     suggested = round(cost * (100 + margin) / 100) if margin else cost
 
     kb = InlineKeyboardBuilder()
     kb.row(InlineKeyboardButton(
-        text=f"✅ Записать {fmt(cost)} как себестоимость",
+        text=f"✅ Записать {fmt4(cost)} как себестоимость",
         callback_data=f"pn:cost_save:{cost}",
     ))
     kb.row(InlineKeyboardButton(text="📈 Изменить наценку", callback_data="pn:set:margin_percent"))
@@ -923,9 +936,9 @@ async def cb_cost(call: CallbackQuery, provider) -> None:
 
     margin_line = (
         f"\n📈 С вашей наценкой <b>{margin}%</b> продавать по "
-        f"<b>{fmt(suggested)}</b> за звезду\n"
-        f"   (прибыль <b>{fmt(suggested - cost)}</b> со звезды, "
-        f"<b>{fmt((suggested - cost) * 1000)}</b> с 1000)"
+        f"<b>{fmt4(suggested)}</b> за звезду\n"
+        f"   (прибыль <b>{fmt4(suggested - cost)}</b> со звезды, "
+        f"<b>{fmt(((suggested - cost) * 1000 + 50) // 100)}</b> с 1000)"
         if margin else
         "\n📈 Наценка не задана — поставьте её, и бот посчитает цену продажи."
     )
@@ -938,7 +951,7 @@ async def cb_cost(call: CallbackQuery, provider) -> None:
         f"Это <b>${estimate.usd_total:.2f}</b>"
         + (f" (курс TON: ${estimate.usdt_per_ton})" if estimate.usdt_per_ton else "")
         + f"\n\n💱 По вашему курсу <b>{fmt(rate)}</b> за доллар:\n"
-        f"└ одна звезда обходится в <b>{fmt(cost)}</b>\n"
+        f"└ одна звезда обходится в <b>{fmt4(cost)}</b>\n"
         f"{margin_line}\n\n"
         "⚠️ Курс TON меняется — проверяйте себестоимость раз в несколько дней.",
         kb.as_markup(),
@@ -948,14 +961,15 @@ async def cb_cost(call: CallbackQuery, provider) -> None:
 @router.callback_query(F.data.startswith("pn:cost_save:"))
 async def cb_cost_save(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     cost = int(call.data.rsplit(":", 1)[1])
-    await runtime.set_value(conn, "star_cost_diram", str(cost))
+    await runtime.set_value(conn, "star_cost_e4", str(cost))
 
     margin = runtime.margin_percent()
     if margin > 0:
-        await runtime.set_value(conn, "star_price_diram", str(runtime.price_from_margin()))
-        await call.answer(f"Себестоимость {fmt(cost)}, цена продажи пересчитана")
+        await runtime.set_value(conn, "star_price_e4",
+                                str(runtime.price_from_margin_e4()))
+        await call.answer(f"Себестоимость {fmt4(cost)}, цена пересчитана")
     else:
-        await call.answer(f"Себестоимость {fmt(cost)} записана")
+        await call.answer(f"Себестоимость {fmt4(cost)} записана")
     await safe_edit(call, prices_text(), prices_kb())
 
 

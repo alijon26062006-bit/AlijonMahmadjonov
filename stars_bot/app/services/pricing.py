@@ -15,7 +15,7 @@ import aiosqlite
 from aiogram import Bot
 
 from app import db, runtime
-from app.money import fmt
+from app.money import fmt, fmt4
 
 log = logging.getLogger(__name__)
 
@@ -47,15 +47,18 @@ async def refresh_once(
     except Exception as exc:  # noqa: BLE001 — фон не должен падать
         return {"ok": False, "reason": f"цена не пришла: {exc}"}
 
-    cost = _to_diram(estimate.usd_per_unit, rate)
-    old_price = runtime.star_price()
-    new_price = _with_margin(cost, margin)
+    # Звезда стоит доли дирама, поэтому считаем в десятитысячных сомони:
+    # округление до дирама съедало бы разницу между 10% и 15% наценки.
+    cost_e4 = _to_e4(estimate.usd_per_unit, rate)
+    old_price = runtime.star_price_e4()
+    new_price = _with_margin(cost_e4, margin)
 
-    if cost != runtime.star_cost():
-        await runtime.set_value(conn, "star_cost_diram", str(cost))
+    if cost_e4 != runtime.star_cost_e4():
+        await runtime.set_value(conn, "star_cost_e4", str(cost_e4))
     if new_price != old_price:
-        await runtime.set_value(conn, "star_price_diram", str(new_price))
-        report["changed"].append(("Звезда", old_price, new_price, cost))
+        await runtime.set_value(conn, "star_price_e4", str(new_price))
+        report["changed"].append(("Звезда", old_price, new_price, cost_e4))
+        report["star_e4"] = True
 
     # ---- premium ----
     costs = dict(runtime.premium_costs())
@@ -89,6 +92,11 @@ def _to_diram(usd: Decimal, rate_diram: int) -> int:
     return int((usd * rate_diram).to_integral_value(rounding=ROUND_HALF_UP))
 
 
+def _to_e4(usd: Decimal, rate_diram: int) -> int:
+    """Доллары -> десятитысячные сомони. rate_diram — курс в дирамах."""
+    return int((usd * rate_diram * 100).to_integral_value(rounding=ROUND_HALF_UP))
+
+
 def _with_margin(cost: int, margin: int) -> int:
     return int((Decimal(cost) * (100 + margin) / 100).to_integral_value(
         rounding=ROUND_HALF_UP
@@ -113,7 +121,9 @@ async def _maybe_alert(bot: Bot, changed: list) -> None:
         return
 
     lines = "\n".join(
-        f"├ {name}: <b>{fmt(old)}</b> → <b>{fmt(new)}</b>" for name, old, new in big
+        f"├ {name}: <b>{fmt4(old) if name == 'Звезда' else fmt(old)}</b> → "
+        f"<b>{fmt4(new) if name == 'Звезда' else fmt(new)}</b>"
+        for name, old, new in big
     )
     await notify_admins(
         bot,

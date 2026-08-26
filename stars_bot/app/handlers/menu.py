@@ -9,7 +9,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
 from app import runtime
-from app.money import affordable_stars, fmt, parse, stars_cost
+from app.money import fmt4, affordable_stars, fmt, parse, stars_cost
 from app.states import Calc
 
 router = Router(name="menu")
@@ -79,7 +79,7 @@ async def cb_top(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
 async def cb_calc(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Calc.query)
     await call.message.edit_text(
-        texts.CALC_ASK.format(rate=fmt(runtime.star_price())),
+        texts.CALC_ASK.format(rate=fmt4(runtime.star_price_e4())),
         reply_markup=keyboards.cancel("‹ В меню"),
     )
     await call.answer()

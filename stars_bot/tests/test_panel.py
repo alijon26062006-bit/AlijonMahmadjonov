@@ -16,7 +16,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from app import db, runtime
 from app.handlers import broadcast as bc
 from app.handlers import panel
-from app.money import fmt
+from app.money import fmt, fmt4
 
 ADMIN_ID = 111
 PASS, FAIL = [], []
@@ -106,9 +106,9 @@ async def run(conn) -> None:
 
     # ------------------------------------------------ настройки сохраняются
     check("по умолчанию цена берётся из .env",
-          runtime.star_price() == 20, fmt(runtime.star_price()))
+          runtime.star_price_e4() == 2000, fmt4(runtime.star_price_e4()))
 
-    call = FakeCallback("pn:set:star_price_diram")
+    call = FakeCallback("pn:set:star_price_e4")
     await panel.cb_set_field(call, state)
     check("экран ввода цены открывается", "Цена продажи звезды" in call.last)
 
@@ -116,42 +116,53 @@ async def run(conn) -> None:
     await panel.on_field_value(msg, state, conn)
     check("нечисловая цена отклоняется", "числом" in msg.last)
 
-    msg = FakeMessage("0.25")
+    msg = FakeMessage("0.2500")
     await panel.on_field_value(msg, state, conn)
-    check("цена сохранилась", runtime.star_price() == 25, fmt(runtime.star_price()))
+    check("цена сохранилась с четырьмя знаками",
+          runtime.star_price_e4() == 2500, fmt4(runtime.star_price_e4()))
+
+    # Четыре знака нужны, чтобы 10% и 15% наценки не сливались в одну цену
+    call = FakeCallback("pn:set:star_price_e4")
+    await panel.cb_set_field(call, state)
+    await panel.on_field_value(FakeMessage("0.1629"), state, conn)
+    check("дробная цена сохраняется точно",
+          runtime.star_price_e4() == 1629, fmt4(runtime.star_price_e4()))
+    await runtime.set_value(conn, "star_price_e4", "2500")
 
     # Главная проверка: значение должно пережить перезапуск бота
     runtime._cache.clear()
     await runtime.load(conn)
-    check("цена пережила перезапуск", runtime.star_price() == 25, fmt(runtime.star_price()))
+    check("цена пережила перезапуск",
+          runtime.star_price_e4() == 2500, fmt4(runtime.star_price_e4()))
 
     # ---------------------------------------------------------- наценка
-    for field, value in (("star_cost_diram", "0.18"), ("margin_percent", "30")):
+    for field, value in (("star_cost_e4", "0.18"), ("margin_percent", "30")):
         call = FakeCallback(f"pn:set:{field}")
         await panel.cb_set_field(call, state)
         await panel.on_field_value(FakeMessage(value), state, conn)
 
-    check("себестоимость сохранилась", runtime.star_cost() == 18, fmt(runtime.star_cost()))
+    check("себестоимость сохранилась",
+          runtime.star_cost_e4() == 1800, fmt4(runtime.star_cost_e4()))
     check("наценка сохранилась", runtime.margin_percent() == 30)
     check("цена по наценке считается верно",
-          runtime.price_from_margin() == 23, fmt(runtime.price_from_margin()))
+          runtime.price_from_margin_e4() == 2340, fmt4(runtime.price_from_margin_e4()))
 
     call = FakeCallback("pn:recalc")
     await panel.cb_recalc(call, conn)
     check("«пересчитать» применяет цену",
-          runtime.star_price() == 23, fmt(runtime.star_price()))
+          runtime.star_price_e4() == 2340, fmt4(runtime.star_price_e4()))
     check("прибыль с звезды считается",
-          runtime.profit_per_star() == 5, fmt(runtime.profit_per_star()))
+          runtime.profit_per_star_e4() == 540, fmt4(runtime.profit_per_star_e4()))
 
     text = panel.prices_text()
     check("экран цен показывает прибыль и заработок с 1000 звёзд",
-          "Прибыль с 1 звезды" in text and fmt(5000) in text)
+          "Прибыль с 1 звезды" in text and fmt(5400) in text, text[:200])
 
     # Продажа ниже себестоимости должна бросаться в глаза
-    await runtime.set_value(conn, "star_price_diram", "10")
+    await runtime.set_value(conn, "star_price_e4", "1000")
     check("убыточная цена помечается предупреждением",
           "убыток" in panel.prices_text().lower())
-    await runtime.set_value(conn, "star_price_diram", "23")
+    await runtime.set_value(conn, "star_price_e4", "2340")
 
     # ------------------------------------------------ процент и границы
     call = FakeCallback("pn:set:referral_percent")
@@ -260,22 +271,24 @@ async def run(conn) -> None:
     call = FakeCallback("pn:cost")
     await panel.cb_cost(call, CostProvider())
     check("себестоимость посчитана из цены сервиса",
-          "0.36" in call.last, call.last.replace("\n", " ")[:150])
+          "0.3572" in call.last, call.last.replace("\n", " ")[:170])
     check("показана цена в долларах", "$32.77" in call.last or "32.78" in call.last)
     # 0.36 × 1.10 = 0.396 -> округляется до 0.40
     check("предложена цена с наценкой 10%",
-          "0.40" in call.last, call.last.replace("\n", " ")[-160:])
+          "0.3929" in call.last, call.last.replace("\n", " ")[-170:])
 
     # Кнопка сохранения несёт посчитанное значение
     buttons = [b.callback_data for row in
                (await _last_markup(call)).inline_keyboard for b in row]
     save = next((b for b in buttons if b and b.startswith("pn:cost_save:")), None)
-    check("кнопка сохранения содержит себестоимость", save == "pn:cost_save:36", str(save))
+    check("кнопка сохранения содержит себестоимость",
+          save == "pn:cost_save:3572", str(save))
 
     await panel.cb_cost_save(FakeCallback(save), conn)
-    check("себестоимость сохранилась", runtime.star_cost() == 36, str(runtime.star_cost()))
+    check("себестоимость сохранилась",
+          runtime.star_cost_e4() == 3572, str(runtime.star_cost_e4()))
     check("цена продажи пересчитана по наценке 10%",
-          runtime.star_price() == 40, str(runtime.star_price()))
+          runtime.star_price_e4() == 3929, str(runtime.star_price_e4()))
 
     # Провайдер без цен не должен ронять панель
     class NoCostProvider:
@@ -299,7 +312,7 @@ async def run(conn) -> None:
     # ------------------------------------------------------ главный экран
     home = await panel.home_text(conn)
     check("главный экран собирается и показывает цену", "Админ-панель" in home
-          and fmt(runtime.star_price()) in home)
+          and fmt4(runtime.star_price_e4()) in home, home[-120:])
 
 
 asyncio.run(main())

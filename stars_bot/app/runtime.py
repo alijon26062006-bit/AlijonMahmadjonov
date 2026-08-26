@@ -41,7 +41,10 @@ def _build_defaults() -> dict[str, str]:
     return {
         # цены
         "star_price_diram": str(settings.star_price_diram),
-        "star_cost_diram": "0",          # себестоимость звезды, 0 = не задана
+        # Цена и себестоимость звезды — в десятитысячных сомони (e4).
+        # 1629 = 0.1629 сомони. Дирама тут мало: он ~7% цены звезды.
+        "star_price_e4": str(settings.star_price_diram * 100),
+        "star_cost_e4": "0",
         "premium_costs": "{}",           # себестоимость Premium по срокам
         "auto_price": "0",               # обновлять цены самому
         "auto_price_every": "60",        # как часто, минуты
@@ -138,14 +141,23 @@ def get_bool(key: str) -> bool:
 # ------------------------------------------------------- удобные обёртки
 
 
+def star_price_e4() -> int:
+    """Цена продажи звезды в десятитысячных сомони."""
+    return get_int("star_price_e4", settings.star_price_diram * 100)
+
+
+def star_cost_e4() -> int:
+    """Себестоимость звезды в десятитысячных сомони. 0 — не задана."""
+    return get_int("star_cost_e4")
+
+
 def star_price() -> int:
-    """Цена продажи одной звезды в дирамах."""
-    return get_int("star_price_diram", settings.star_price_diram)
+    """Цена звезды в дирамах — для мест, где четыре знака не нужны."""
+    return (star_price_e4() + 50) // 100
 
 
 def star_cost() -> int:
-    """Себестоимость звезды в дирамах. 0 — не задана."""
-    return get_int("star_cost_diram")
+    return (star_cost_e4() + 50) // 100
 
 
 def margin_percent() -> int:
@@ -157,19 +169,19 @@ def usd_rate() -> int:
     return get_int("usd_rate_diram")
 
 
-def price_from_margin() -> int:
-    """Цена продажи, посчитанная из себестоимости и наценки."""
-    cost = star_cost()
+def price_from_margin_e4() -> int:
+    """Цена продажи в e4, посчитанная из себестоимости и наценки."""
+    cost = star_cost_e4()
     if cost <= 0:
-        return star_price()
+        return star_price_e4()
     return round(cost * (100 + margin_percent()) / 100)
 
 
-def profit_per_star() -> int:
-    """Сколько остаётся с одной звезды. Может быть отрицательным —
+def profit_per_star_e4() -> int:
+    """Сколько остаётся с одной звезды, в e4. Может быть отрицательным —
     это как раз то, что владельцу важно увидеть сразу."""
-    cost = star_cost()
-    return star_price() - cost if cost > 0 else 0
+    cost = star_cost_e4()
+    return star_price_e4() - cost if cost > 0 else 0
 
 
 def premium_plans() -> list[dict]:
@@ -266,7 +278,8 @@ async def save_premium_costs(conn: aiosqlite.Connection, costs: dict[int, int]) 
 def cost_of(product_type: str, quantity: int) -> int:
     """Во сколько нам обходится заказ. 0 — себестоимость неизвестна."""
     if product_type == "stars":
-        return star_cost() * quantity
+        cost_e4 = star_cost_e4()
+        return (cost_e4 * quantity + 50) // 100 if cost_e4 else 0
     return premium_costs().get(quantity, 0)
 
 

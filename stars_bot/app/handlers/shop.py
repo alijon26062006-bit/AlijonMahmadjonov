@@ -12,7 +12,7 @@ from aiogram.types import CallbackQuery, Message
 from app import db, keyboards, texts
 from app import runtime
 from app.handlers.menu import menu_text
-from app.money import affordable_stars, fmt, stars_cost
+from app.money import fmt4, affordable_stars, fmt, stars_cost
 from app.services import delivery
 from app.services.fragment import DeliveryProvider, Recipient
 from app.states import Buy
@@ -41,7 +41,7 @@ def title_of(product_type: str, quantity: int) -> str:
 async def cb_stars(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await call.message.edit_text(
-        texts.STARS_ENTRY.format(rate=fmt(runtime.star_price())),
+        texts.STARS_ENTRY.format(rate=fmt4(runtime.star_price_e4())),
         reply_markup=keyboards.stars_entry(),
     )
     await call.answer()
@@ -57,7 +57,7 @@ async def cb_stars_buy(
     await state.update_data(product_type="stars")
     await call.message.edit_text(
         texts.STARS_ASK_QUANTITY.format(
-            rate=fmt(runtime.star_price()),
+            rate=fmt4(runtime.star_price_e4()),
             min_stars=runtime.min_stars(),
             max_stars=f"{runtime.max_stars():,}".replace(",", " "),
             affordable=affordable_stars(balance),
