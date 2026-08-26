@@ -5,7 +5,9 @@ import asyncio
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import env_fixture  # noqa: F401  — фиксирует настройки до импорта app
 
 from app import db
 from app.money import fmt

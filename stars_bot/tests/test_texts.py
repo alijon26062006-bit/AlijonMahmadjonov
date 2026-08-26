@@ -5,9 +5,11 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from string import Formatter
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import env_fixture  # noqa: F401  — фиксирует настройки до импорта app
 
 from app import texts
 

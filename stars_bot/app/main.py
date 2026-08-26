@@ -7,6 +7,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramAPIError, TelegramNetworkError, TelegramUnauthorizedError
 from aiogram.types import BotCommand
 
 from app import db
@@ -23,16 +24,57 @@ USER_COMMANDS = [
 ]
 
 
+def readiness() -> tuple[list[str], list[str]]:
+    """Что мешает работать (blockers) и что стоит доделать (warnings)."""
+    blockers, warnings = [], []
+
+    if not settings.admin_ids:
+        blockers.append(
+            "ADMIN_IDS пуст — некому подтверждать пополнения, "
+            "деньги будут зависать. Свой ID узнайте у @userinfobot."
+        )
+    if not settings.pay_card_number:
+        blockers.append(
+            "PAY_CARD_NUMBER пуст — покупателям некуда переводить деньги."
+        )
+    if settings.star_price_diram <= 0:
+        blockers.append("STAR_PRICE_DIRAM должен быть больше нуля.")
+
+    if settings.fragment_mode.lower() != "api":
+        warnings.append(
+            "FRAGMENT_MODE=mock — бот работает, но звёзды НЕ отправляются. "
+            "Для реальных продаж поставьте api."
+        )
+    if not settings.support_username:
+        warnings.append("SUPPORT_USERNAME пуст — покупателям некуда писать при проблеме.")
+
+    return blockers, warnings
+
+
+def print_readiness() -> bool:
+    """Печатает отчёт о готовности. False — запускаться нельзя."""
+    blockers, warnings = readiness()
+    for item in warnings:
+        log.warning("⚠️  %s", item)
+    for item in blockers:
+        log.error("❌ %s", item)
+    if blockers:
+        log.error(
+            "Бот не запущен: сначала исправьте пункты выше. "
+            "Проще всего — запустить `python setup.py`."
+        )
+        return False
+    return True
+
+
 async def main() -> None:
     logging.basicConfig(
         level=settings.log_level.upper(),
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     )
 
-    if not settings.admin_ids:
-        log.warning("ADMIN_IDS пуст — подтверждать пополнения будет некому!")
-    if not settings.pay_card_number:
-        log.warning("PAY_CARD_NUMBER не задан — пользователям некуда переводить деньги!")
+    if not print_readiness():
+        raise SystemExit(1)
 
     bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     conn = await db.connect()
@@ -51,20 +93,51 @@ async def main() -> None:
     dp.include_router(profile.router)
     dp.include_router(support.router)
 
-    await bot.set_my_commands(USER_COMMANDS)
-    me = await bot.me()
-    log.info("Запущен @%s. Fragment: %s", me.username, settings.fragment_mode)
+    try:
+        me = await bot.me()
+        await bot.set_my_commands(USER_COMMANDS)
+    except TelegramUnauthorizedError:
+        log.error(
+            "❌ Telegram отверг токен. Проверьте BOT_TOKEN в .env — возможно, "
+            "он отозван. Новый берётся у @BotFather: /mybots → бот → API Token."
+        )
+        await _shutdown(bot, conn, provider)
+        raise SystemExit(1) from None
+    except TelegramNetworkError as exc:
+        log.error(
+            "❌ Нет связи с Telegram: %s\n"
+            "Проверьте интернет. Если Telegram блокируется провайдером — "
+            "запускайте бота на сервере за границей.", exc,
+        )
+        await _shutdown(bot, conn, provider)
+        raise SystemExit(1) from None
+    except TelegramAPIError as exc:
+        log.error("❌ Telegram вернул ошибку при старте: %s", exc)
+        await _shutdown(bot, conn, provider)
+        raise SystemExit(1) from None
+
+    log.info("✅ Запущен @%s. Режим Fragment: %s", me.username, settings.fragment_mode)
+    log.info("   Админы: %s", ", ".join(map(str, settings.admin_ids)))
 
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
-        await provider.close()
-        await conn.close()
-        await bot.session.close()
+        await _shutdown(bot, conn, provider)
+
+
+async def _shutdown(bot: Bot, conn, provider) -> None:
+    """Аккуратно закрыть всё: незакрытое соединение с базой держит процесс."""
+    await provider.close()
+    await conn.close()
+    await bot.session.close()
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
+    except KeyboardInterrupt:
         log.info("Остановлено")
+    except SystemExit as exc:
+        # Код выхода должен дойти до systemd, иначе упавший бот
+        # будет выглядеть как штатно завершённый и не перезапустится.
+        raise SystemExit(exc.code) from None
