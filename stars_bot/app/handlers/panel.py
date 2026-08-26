@@ -5,6 +5,7 @@
   • Цены — себестоимость, наценка, цена продажи, тарифы Premium
   • Реквизиты — карта, владелец, банк, город, примечание
   • Заявки, тикеты, пользователи, промокоды, статистика
+  • Рекламные ссылки — Deep Links и статистика источников
 """
 from __future__ import annotations
 
@@ -17,13 +18,14 @@ from aiogram.exceptions import TelegramAPIError, TelegramRetryAfter
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
-    CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message,
+    CallbackQuery, CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup,
+    Message,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from contextlib import suppress
 
-from app import db, emoji, reports, runtime, texts
+from app import db, emoji, links, reports, runtime, texts
 from app.handlers.menu import top_basis
 from app.config import settings
 from app.emoji import substitute
@@ -82,6 +84,7 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🎨 Оформление", callback_data="pn:look"),
         InlineKeyboardButton(text="📝 Объявление", callback_data="pn:notice"),
     )
+    kb.row(InlineKeyboardButton(text="🔗 Рекламные ссылки", callback_data="pn:links"))
     kb.row(InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"))
     return kb.as_markup()
 
@@ -1519,7 +1522,8 @@ def user_card(user: db.User, stats: dict, history: list) -> str:
         f"👤 <b>{name}</b>\n"
         f"<code>{texts.LINE}</code>\n\n"
         f"├ ID: <code>{user.id}</code>\n"
-        f"└ С нами с {user.created_at[:10]}\n\n"
+        f"├ С нами с {user.created_at[:10]}\n"
+        f"└ Пришёл: <b>{user.source or 'сам'}</b>\n\n"
         f"[[money]] <b>Финансы</b>\n"
         f"├ Баланс: <b>{fmt(user.balance)}</b>\n"
         f"└ Пополнено всего: <b>{fmt(user.total_deposit)}</b>\n\n"
@@ -1724,3 +1728,186 @@ async def cb_ban_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None
     await db.set_banned(conn, user_id, not user.is_banned)
     await call.answer("Разблокирован" if user.is_banned else "Заблокирован")
     await show_user(call, conn, user_id)
+
+
+# ═════════════════════════════════════════════════════════ Deep Links
+
+
+def links_text(rows: list[tuple[db.Link, dict]]) -> str:
+    if not rows:
+        body = (
+            "<blockquote>Пока ни одной. Нажмите «Создать ссылку» и придумайте "
+            "название — например <code>instagram</code>, <code>reklama1</code> "
+            "или <code>partner_1</code>.</blockquote>"
+        )
+    else:
+        body = "\n".join(
+            f"├ <code>{link.code}</code> — переходов <b>{stats['hits']}</b>, "
+            f"новых <b>{stats['fresh']}</b>"
+            for link, stats in rows
+        )
+    return (
+        "🔗 <b>Рекламные ссылки</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"{body}\n\n"
+        "<blockquote>Каждой площадке — своя ссылка. Бот сам запомнит, откуда "
+        "пришёл клиент, и покажет, какая реклама приносит покупателей.</blockquote>"
+    )
+
+
+def links_kb(rows: list[tuple[db.Link, dict]]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("➕ Создать ссылку", "pn:link:new", style=SUCCESS))
+    for link, _ in rows[:20]:
+        kb.row(InlineKeyboardButton(
+            text=f"🔗 {link.code}", callback_data=f"pn:link:{link.id}",
+        ))
+    kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
+    return kb.as_markup()
+
+
+def link_card(link: db.Link, stats: dict, url: str) -> str:
+    conversion = ""
+    if stats["people"]:
+        share = round(stats["buyers"] * 100 / stats["people"])
+        conversion = f"\n└ Из перешедших купили: <b>{share}%</b>"
+
+    return (
+        f"🔗 <b>{link.code}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"<code>{url}</code>\n\n"
+        "📊 <b>Переходы</b>\n"
+        f"├ Всего запусков: <b>{stats['hits']}</b>\n"
+        f"├ Уникальных людей: <b>{stats['people']}</b>\n"
+        f"└ Новых пользователей: <b>{stats['fresh']}</b>\n\n"
+        "[[money]] <b>Отдача</b>\n"
+        f"├ Покупателей: <b>{stats['buyers']}</b>\n"
+        f"├ Куплено на: <b>{fmt(stats['revenue'])}</b>"
+        f"{conversion}\n\n"
+        f"📅 Создана {link.created_at[:10]}\n\n"
+        "<blockquote>Telegram сообщает боту не о самом клике, а о запуске: "
+        "человек открыл ссылку и нажал «Запустить».</blockquote>"
+    )
+
+
+def link_kb(link: db.Link, url: str) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(
+        text="📋 Копировать ссылку", copy_text=CopyTextButton(text=url),
+    ))
+    kb.row(btn("🗑 Удалить", f"pn:link:del:{link.id}", style=DANGER))
+    kb.row(InlineKeyboardButton(text="‹ К ссылкам", callback_data="pn:links"))
+    return kb.as_markup()
+
+
+async def show_links(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    rows = await db.list_links(conn)
+    await safe_edit(call, links_text(rows), links_kb(rows))
+
+
+async def show_link(call: CallbackQuery, conn: aiosqlite.Connection, link_id: int) -> bool:
+    link = await db.get_link(conn, link_id)
+    if link is None:
+        await call.answer("Ссылка удалена.", show_alert=True)
+        await show_links(call, conn)
+        return False
+    stats = await db.link_stats(conn, link.id)
+    url = links.build(await links.bot_username(call.bot), link.code)
+    await safe_edit(call, substitute(link_card(link, stats, url)), link_kb(link, url))
+    return True
+
+
+@router.callback_query(F.data == "pn:links")
+async def cb_links(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    await state.clear()
+    await show_links(call, conn)
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:link:new")
+async def cb_link_new(call: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Panel.link)
+    await safe_edit(
+        call,
+        "➕ <b>Новая ссылка</b>\n\n"
+        "<blockquote>Пришлите название — оно встанет в конец ссылки.\n\n"
+        "Например <code>instagram</code>, <code>reklama1</code>, "
+        "<code>partner_1</code>.\n\n"
+        "Только латиница, цифры, дефис и подчёркивание.</blockquote>",
+        back_kb("pn:links", "‹ Отмена"),
+    )
+    await call.answer()
+
+
+@router.message(Panel.link, F.text)
+async def on_link_name(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    code = (message.text or "").strip().lstrip("@")
+    problem = links.check(code)
+    if problem:
+        await message.answer(f"❌ {problem}\n\n<i>Попробуйте другое название.</i>")
+        return
+
+    link = await db.create_link(conn, code)
+    if link is None:
+        await message.answer(
+            f"❌ Ссылка <code>{code}</code> уже есть.\n\n"
+            "<i>Придумайте другое название.</i>"
+        )
+        return
+
+    await state.clear()
+    url = links.build(await links.bot_username(message.bot), code)
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(
+        text="📋 Копировать ссылку", copy_text=CopyTextButton(text=url),
+    ))
+    kb.row(InlineKeyboardButton(text="📊 Статистика", callback_data=f"pn:link:{link.id}"))
+    kb.row(InlineKeyboardButton(text="‹ К ссылкам", callback_data="pn:links"))
+    await message.answer(
+        f"✅ <b>Ссылка готова</b>\n\n"
+        f"<code>{url}</code>\n\n"
+        "<blockquote>Ставьте её в рекламу. Каждый, кто запустит бота по этой "
+        "ссылке, попадёт в её статистику.</blockquote>",
+        reply_markup=kb.as_markup(),
+    )
+
+
+@router.callback_query(F.data.startswith("pn:link:del:"))
+async def cb_link_delete(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    """Первое нажатие — предупреждение, второе — удаление."""
+    link_id = int(call.data.rsplit(":", 1)[1])
+    link = await db.get_link(conn, link_id)
+    if link is None:
+        await call.answer("Уже удалена.", show_alert=True)
+        await show_links(call, conn)
+        return
+
+    stats = await db.link_stats(conn, link_id)
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🗑 Да, удалить", f"pn:link:kill:{link_id}", style=DANGER))
+    kb.row(InlineKeyboardButton(text="‹ Отмена", callback_data=f"pn:link:{link_id}"))
+    await safe_edit(
+        call,
+        f"🗑 <b>Удалить ссылку {link.code}?</b>\n\n"
+        f"<blockquote>Пропадёт её статистика: <b>{stats['hits']}</b> переходов "
+        f"и <b>{stats['fresh']}</b> новых пользователей. Сами клиенты и их "
+        "заказы останутся на месте.</blockquote>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:link:kill:"))
+async def cb_link_kill(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    link_id = int(call.data.rsplit(":", 1)[1])
+    await db.delete_link(conn, link_id)
+    await call.answer("Удалена")
+    await show_links(call, conn)
+
+
+@router.callback_query(F.data.startswith("pn:link:"))
+async def cb_link_card(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    await show_link(call, conn, int(call.data.rsplit(":", 1)[1]))
+    await call.answer()

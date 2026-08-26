@@ -9,10 +9,10 @@ import aiosqlite
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject, User
 
-from app import db, texts
+from app import db, links, texts
 from app.config import settings
 
-REF_RE = re.compile(r"^/start\s+ref(\d+)")
+REF_RE = re.compile(r"^ref(\d+)$")
 
 
 class UserGuardMiddleware(BaseMiddleware):
@@ -27,13 +27,16 @@ class UserGuardMiddleware(BaseMiddleware):
         if user is None or conn is None:
             return await handler(event, data)
 
-        referrer_id = None
-        if isinstance(event, Message) and event.text:
-            match = REF_RE.match(event.text)
-            if match:
-                referrer_id = int(match.group(1))
+        # `/start ref42` — пришёл по приглашению, `/start instagram` — по рекламе.
+        payload = links.payload_of(event.text) if isinstance(event, Message) else ""
+        match = REF_RE.match(payload)
+        referrer_id = int(match.group(1)) if match else None
 
-        await db.upsert_user(conn, user.id, user.username, user.first_name, referrer_id)
+        is_new = await db.upsert_user(
+            conn, user.id, user.username, user.first_name, referrer_id
+        )
+        if payload and not match:
+            await db.record_link_hit(conn, payload, user.id, is_new)
 
         # Админа не банит собственный бан-лист — иначе можно потерять доступ.
         if not settings.is_admin(user.id) and await _banned(conn, user.id):

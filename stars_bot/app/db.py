@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass, fields
 from datetime import datetime, timezone
 from typing import Any
@@ -63,6 +64,7 @@ CREATE TABLE IF NOT EXISTS users (
     ref_earned    INTEGER NOT NULL DEFAULT 0,
     ref_count     INTEGER NOT NULL DEFAULT 0,
     is_banned     INTEGER NOT NULL DEFAULT 0,
+    source        TEXT,                          -- код Deep Link, приведшей клиента
     created_at    TEXT NOT NULL
 );
 
@@ -137,6 +139,22 @@ CREATE TABLE IF NOT EXISTS adjustments (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS links (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    code       TEXT NOT NULL UNIQUE,     -- то, что стоит после ?start=
+    created_at TEXT NOT NULL
+);
+
+-- Один запуск бота по ссылке. Отсюда все три числа: переходы (все строки),
+-- уникальные (разные user_id), новые (is_new = 1).
+CREATE TABLE IF NOT EXISTS link_hits (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    link_id    INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,
+    is_new     INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -152,6 +170,8 @@ CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
 CREATE INDEX IF NOT EXISTS idx_tmsg_ticket    ON ticket_messages(ticket_id);
 CREATE INDEX IF NOT EXISTS idx_adj_user      ON adjustments(user_id);
 CREATE INDEX IF NOT EXISTS idx_adj_created   ON adjustments(created_at);
+CREATE INDEX IF NOT EXISTS idx_hits_link     ON link_hits(link_id);
+CREATE INDEX IF NOT EXISTS idx_hits_user     ON link_hits(user_id);
 """
 
 
@@ -174,6 +194,14 @@ class User:
     ref_earned: int
     ref_count: int
     is_banned: int
+    created_at: str
+    source: str | None = None      # код Deep Link, по которой пришёл
+
+
+@dataclass
+class Link:
+    id: int
+    code: str
     created_at: str
 
 
@@ -256,6 +284,7 @@ async def connect() -> aiosqlite.Connection:
 MIGRATIONS: dict[str, dict[str, str]] = {
     "orders": {"cost": "INTEGER NOT NULL DEFAULT 0"},
     "deposits": {"reference": "TEXT"},
+    "users": {"source": "TEXT"},
 }
 
 
@@ -431,6 +460,98 @@ async def top_clients(
         params = (ORDER_DELIVERED, limit)
     async with conn.execute(query, params) as cur:
         return [(_from_row(User, row), row["amount"]) for row in await cur.fetchall()]
+
+
+# ------------------------------------------------------------ Deep Links
+
+
+async def create_link(conn: aiosqlite.Connection, code: str) -> Link | None:
+    """Завести рекламную ссылку. None — если такая уже есть."""
+    try:
+        cur = await conn.execute(
+            "INSERT INTO links (code, created_at) VALUES (?, ?)", (code, _now()),
+        )
+    except sqlite3.IntegrityError:
+        return None
+    await conn.commit()
+    return await get_link(conn, cur.lastrowid)
+
+
+async def get_link(conn: aiosqlite.Connection, link_id: int) -> Link | None:
+    async with conn.execute("SELECT * FROM links WHERE id = ?", (link_id,)) as cur:
+        row = await cur.fetchone()
+    return _from_row(Link, row) if row else None
+
+
+async def get_link_by_code(conn: aiosqlite.Connection, code: str) -> Link | None:
+    async with conn.execute("SELECT * FROM links WHERE code = ?", (code,)) as cur:
+        row = await cur.fetchone()
+    return _from_row(Link, row) if row else None
+
+
+async def delete_link(conn: aiosqlite.Connection, link_id: int) -> bool:
+    """Убрать ссылку вместе с её переходами. Метка source у клиентов остаётся."""
+    cur = await conn.execute("DELETE FROM links WHERE id = ?", (link_id,))
+    await conn.execute("DELETE FROM link_hits WHERE link_id = ?", (link_id,))
+    await conn.commit()
+    return cur.rowcount > 0
+
+
+async def record_link_hit(
+    conn: aiosqlite.Connection, code: str, user_id: int, is_new: bool,
+) -> bool:
+    """Отметить запуск бота по ссылке.
+
+    Считаем только заведённые в панели коды: чужой ?start=что-угодно не должен
+    плодить ссылки. Метку source ставим один раз — засчитываем первый источник,
+    иначе последняя реклама воровала бы себе чужого клиента.
+    """
+    link = await get_link_by_code(conn, code)
+    if link is None:
+        return False
+    await conn.execute(
+        "INSERT INTO link_hits (link_id, user_id, is_new, created_at) VALUES (?, ?, ?, ?)",
+        (link.id, user_id, int(is_new), _now()),
+    )
+    await conn.execute(
+        "UPDATE users SET source = ? WHERE id = ? AND (source IS NULL OR source = '')",
+        (code, user_id),
+    )
+    await conn.commit()
+    return True
+
+
+async def link_stats(conn: aiosqlite.Connection, link_id: int) -> dict[str, int]:
+    """Переходы, уникальные, новые, а также покупатели и выручка с этой ссылки."""
+    async with conn.execute(
+        """SELECT COUNT(*)                 AS hits,
+                  COUNT(DISTINCT user_id)  AS people,
+                  COALESCE(SUM(is_new), 0) AS fresh
+           FROM link_hits WHERE link_id = ?""",
+        (link_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    stats = {key: (row[key] or 0) for key in row.keys()}
+
+    async with conn.execute(
+        """SELECT COUNT(DISTINCT o.user_id)   AS buyers,
+                  COALESCE(SUM(o.price), 0)   AS revenue
+           FROM orders o
+           JOIN users u ON u.id = o.user_id
+           JOIN links l ON l.code = u.source
+           WHERE l.id = ? AND o.status = ?""",
+        (link_id, ORDER_DELIVERED),
+    ) as cur:
+        row = await cur.fetchone()
+    stats.update({key: (row[key] or 0) for key in row.keys()})
+    return stats
+
+
+async def list_links(conn: aiosqlite.Connection) -> list[tuple[Link, dict[str, int]]]:
+    """Все ссылки, свежие сверху, каждая со своей статистикой."""
+    async with conn.execute("SELECT * FROM links ORDER BY id DESC") as cur:
+        links = [_from_row(Link, row) for row in await cur.fetchall()]
+    return [(link, await link_stats(conn, link.id)) for link in links]
 
 
 # ---------------------------------------------------------------- деньги

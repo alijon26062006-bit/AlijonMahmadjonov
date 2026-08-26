@@ -33,6 +33,7 @@ class Panel(StatesGroup):
     period = State()      # ждём даты для отчёта
     user_search = State() # ждём ID или юзернейм клиента
     adjust = State()      # ждём сумму правки баланса
+    link = State()        # ждём название рекламной ссылки
 
 
 class Cast(StatesGroup):
