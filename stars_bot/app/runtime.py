@@ -47,6 +47,7 @@ def _build_defaults() -> dict[str, str]:
         # 1629 = 0.1629 сомони. Дирама тут мало: он ~7% цены звезды.
         "star_price_e4": str(settings.star_price_diram * 100),
         "star_cost_e4": "0",
+        "round_prices": "up1",           # приглаживание сумм: off|up1|near1|up5
         "premium_costs": "{}",           # себестоимость Premium по срокам
         "auto_price": "0",               # обновлять цены самому
         "auto_price_every": "60",        # как часто, минуты

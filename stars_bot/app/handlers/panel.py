@@ -31,7 +31,7 @@ from app.handlers.menu import top_basis
 from app.config import settings
 from app.emoji import substitute
 from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
-from app.money import fmt, fmt4, parse, parse4
+from app.money import exact_stars_cost, fmt, fmt4, parse, parse4, round_price
 from app.services import dcpay, pricing
 from app.services import delivery
 from app.states import Panel, PromoNew
@@ -185,6 +185,10 @@ def prices_kb() -> InlineKeyboardMarkup:
         text=f"⭐️ Наборы звёзд ({len(runtime.star_packs())})",
         callback_data="pn:set:star_packs",
     ))
+    kb.row(InlineKeyboardButton(
+        text=f"🧿 Округление цен: {ROUND_TITLES[round_mode()]}",
+        callback_data="pn:round",
+    ))
     kb.row(btn("💱 Обновить курс сейчас", "pn:rate", style=PRIMARY))
     kb.row(
         InlineKeyboardButton(
@@ -271,6 +275,64 @@ def rate_line() -> str:
     elif runtime.get_bool("usd_auto"):
         line += "\n└ автообновление включено, но курс ещё не приходил"
     return line
+
+
+ROUND_TITLES = {
+    "off": "без округления",
+    "up1": "вверх до сомони",
+    "near1": "до сомони",
+    "up5": "вверх до 5 сомони",
+}
+
+
+def round_mode() -> str:
+    mode = runtime.get("round_prices") or "off"
+    return mode if mode in ROUND_TITLES else "off"
+
+
+def round_text() -> str:
+    """Экран выбора с живым примером на настоящей цене звезды."""
+    current, exact = round_mode(), exact_stars_cost(100)
+    lines = [
+        f"{'🔘' if mode == current else '⚪️'} <b>{title}</b> — "
+        f"100 звёзд за {fmt(round_price(exact, mode))}"
+        for mode, title in ROUND_TITLES.items()
+    ]
+    return (
+        "🧿 <b>Округление цен</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        + "\n".join(lines)
+        + "\n\n<blockquote>Округление всегда считается от точной цены, "
+          "поэтому при пересчёте она не ползёт вверх. Тарифы Premium это "
+          "не трогает — там суммы вы задаёте сами.</blockquote>"
+    )
+
+
+def round_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    current = round_mode()
+    for mode, title in ROUND_TITLES.items():
+        kb.row(btn(("✅ " if mode == current else "") + title.capitalize(),
+                   f"pn:round:{mode}", style=SUCCESS if mode == current else None))
+    kb.row(InlineKeyboardButton(text="‹ К ценам", callback_data="pn:prices"))
+    return kb.as_markup()
+
+
+@router.callback_query(F.data == "pn:round")
+async def cb_round(call: CallbackQuery) -> None:
+    await safe_edit(call, round_text(), round_kb())
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:round:"))
+async def cb_round_set(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    mode = call.data.rsplit(":", 1)[1]
+    if mode not in ROUND_TITLES:
+        await call.answer("Такого способа нет.", show_alert=True)
+        return
+    await runtime.set_value(conn, "round_prices", mode)
+    await call.answer(ROUND_TITLES[mode].capitalize())
+    await safe_edit(call, round_text(), round_kb())
 
 
 @router.callback_query(F.data == "pn:rate")
