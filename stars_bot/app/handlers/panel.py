@@ -1325,7 +1325,7 @@ async def cb_look(call: CallbackQuery, state: FSMContext) -> None:
         f"Сейчас: {preview}\n\n"
         f"💎 Премиум-эмодзи: <b>{'включены' if emoji.premium_on() else 'выключены'}</b> "
         f"<i>({custom_count} шт. задано)</i>\n\n"
-        "<i>Выберите группу</i> 👇",
+        "<i>Выберите группу</i> " + emoji.em("point"),
         kb.as_markup(),
     )
     await call.answer()
@@ -1399,6 +1399,7 @@ async def cb_emoji_set(call: CallbackQuery, state: FSMContext) -> None:
         f"└ По умолчанию: {emoji.DEFAULTS[key]}\n\n"
         "<blockquote>Пришлите новый значок одним сообщением.\n\n"
         "Обычный эмодзи — заменит везде, включая кнопки.\n"
+        "Можно прислать и <b>ID премиум-эмодзи</b> числом.\n"
         "<b>Премиум-эмодзи</b> — бот сам возьмёт его ID. В кнопках он "
         "не отображается (Telegram не поддерживает), поэтому там "
         "останется обычный.</blockquote>",
@@ -1446,6 +1447,27 @@ async def on_emoji_value(
         return
 
     value = (message.text or "").strip()
+
+    # ID премиум-эмодзи можно прислать и числом — так удобнее, когда ID
+    # уже выписан, а сам эмодзи под рукой не вставить.
+    if value.isdigit() and 15 <= len(value) <= 25:
+        await runtime.set_value(conn, f"emoji_id_{key}", value)
+        await state.clear()
+        note = (
+            "" if emoji.premium_on() else
+            "\n\n<blockquote>[[warn]] Премиум-эмодзи пока выключены. "
+            "Нажмите «Проверить премиум-эмодзи» в разделе «Оформление».</blockquote>"
+        )
+        await message.answer(
+            f"✅ <b>{emoji.TITLES[key]}</b> — ID принят\n\n"
+            f"├ ID: <code>{value}</code>\n"
+            f"└ Запасной значок: {emoji.em(key)}\n\n"
+            "<i>Проверьте, как он выглядит: если Telegram этот ID не знает, "
+            "клиенты увидят запасной значок.</i>" + substitute(note),
+            reply_markup=back_kb(f"pn:emg:{group}", "‹ К группе"),
+        )
+        return
+
     if not emoji.is_emoji_like(value):
         await message.answer(
             "❌ Нужен один значок — эмодзи или символ вроде <code>•</code>.\n"

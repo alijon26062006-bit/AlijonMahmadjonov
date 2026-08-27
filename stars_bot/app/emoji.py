@@ -48,6 +48,7 @@ GROUPS: dict[str, dict[str, tuple[str, str]]] = {
         "confirm": ("✅", "Подтвердить"),
         "edit": ("✏️", "Изменить"),
         "refresh": ("🔄", "Обновить"),
+        "point": ("👇", "Указатель вниз"),
     },
 }
 
