@@ -335,5 +335,51 @@ async def run(conn) -> None:
     check("в информации свёрнутый блок с вопросами",
           "<blockquote expandable>" in texts.INFO)
 
+    await premium_ids(conn)
+
+
+async def premium_ids(conn) -> None:
+    """Премиум-эмодзи владельца прописаны заранее и снимаются насовсем."""
+    from app.handlers import panel
+
+    check("ID прописаны для всех значков главного экрана",
+          len(emoji.PREMIUM_IDS) == 10, str(len(emoji.PREMIUM_IDS)))
+    check("все ключи существуют",
+          all(key in emoji.DEFAULTS for key in emoji.PREMIUM_IDS),
+          str([k for k in emoji.PREMIUM_IDS if k not in emoji.DEFAULTS]))
+    check("все ID — числа нужной длины",
+          all(v.isdigit() and 15 <= len(v) <= 25 for v in emoji.PREMIUM_IDS.values()))
+    check("ID не повторяются",
+          len(set(emoji.PREMIUM_IDS.values())) == len(emoji.PREMIUM_IDS))
+    check("ID подхватились из умолчаний",
+          emoji.custom_id("stars") == "5258165702707125574", emoji.custom_id("stars"))
+
+    # пока проверка не пройдена, премиум-эмодзи в текст не лезут
+    await runtime.set_value(conn, "custom_emoji_on", "0")
+    check("выключенный премиум не подставляется",
+          "tg-emoji" not in texts.MENU, texts.MENU[:80])
+
+    await runtime.set_value(conn, "custom_emoji_on", "1")
+    check("включённый премиум подставляется в текст",
+          'tg-emoji emoji-id="5258204546391351475"' in texts.MENU, texts.MENU[:120])
+    check("указатель тоже премиум",
+          'emoji-id="5231102735817918643"' in texts.MENU, texts.MENU[-120:])
+    check("запасной значок остался внутри тега",
+          "💰</tg-emoji>" in texts.MENU, texts.MENU[:120])
+
+    # снятие должно держаться, а не откатываться к прописанному ID
+    call = FakeCallback("pn:emcustdel:stars")
+    await panel.cb_custom_delete(call, conn)
+    check("премиум-эмодзи снимается", emoji.custom_id("stars") == "",
+          repr(emoji.custom_id("stars")))
+    await runtime.load(conn)
+    check("снятие переживает перезапуск", emoji.custom_id("stars") == "",
+          repr(emoji.custom_id("stars")))
+    check("остальные значки не тронуты",
+          emoji.custom_id("premium") == "5805553606635559688")
+
+    await runtime.set_value(conn, "emoji_id_stars", emoji.PREMIUM_IDS["stars"])
+    await runtime.set_value(conn, "custom_emoji_on", "0")
+
 
 asyncio.run(main())

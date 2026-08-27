@@ -1476,7 +1476,7 @@ async def on_emoji_value(
         return
 
     await runtime.set_value(conn, f"emoji_{key}", value)
-    await runtime.reset(conn, f"emoji_id_{key}")   # обычный значок отменяет премиум
+    await runtime.set_value(conn, f"emoji_id_{key}", "")  # обычный значок отменяет премиум
     await state.clear()
     await message.answer(
         f"✅ <b>{emoji.TITLES[key]}</b> теперь {value}\n\n"
@@ -1522,7 +1522,9 @@ async def cb_emoji_reset_confirm(
 @router.callback_query(F.data.startswith("pn:emcustdel:"))
 async def cb_custom_delete(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     key = call.data.rsplit(":", 1)[1]
-    await runtime.reset(conn, f"emoji_id_{key}")
+    # Именно пустое значение, а не сброс: у части значков ID прописан
+    # по умолчанию, и сброс вернул бы его обратно.
+    await runtime.set_value(conn, f"emoji_id_{key}", "")
     await call.answer("Премиум-эмодзи убран")
     group = next((g for g, items in emoji.GROUPS.items() if key in items), None)
     if group:

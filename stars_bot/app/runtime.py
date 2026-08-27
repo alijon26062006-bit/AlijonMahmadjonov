@@ -15,6 +15,7 @@ import logging
 
 import aiosqlite
 
+from app import emoji
 from app.config import BASE_DIR, settings
 
 log = logging.getLogger(__name__)
@@ -93,6 +94,9 @@ def _build_defaults() -> dict[str, str]:
         "stars_enabled": "1",
         "premium_enabled": "1",
         "deposit_enabled": "1",
+        # Премиум-эмодзи владельца — уже прописаны, включаются проверкой
+        # в разделе «Оформление».
+        **{f"emoji_id_{key}": value for key, value in emoji.PREMIUM_IDS.items()},
     }
 
 
