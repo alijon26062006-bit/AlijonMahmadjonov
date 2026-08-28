@@ -93,6 +93,7 @@ def _build_defaults() -> dict[str, str]:
         "top_by": "purchases",
         # TelegaPAY — приём рублей и USDT
         "tpay_on": "0",                  # включён ли способ
+        "tpay_base": "",                 # адрес API (пусто — боевой)
         "tpay_currency": "RUB",          # в какой валюте выставляем счёт
         "tpay_rate_diram": "0",          # сколько дирам в единице валюты
         "tpay_spread": "0",              # надбавка к курсу, %

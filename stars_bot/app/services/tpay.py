@@ -31,7 +31,12 @@ POLL_MINUTES = 30        # сколько всего ждём оплату
 
 
 def client() -> TelegaPay:
-    return TelegaPay(runtime.get("tpay_key") or settings.telegapay_key)
+    from app.services.telegapay import BASE_URL
+
+    return TelegaPay(
+        runtime.get("tpay_key") or settings.telegapay_key,
+        base_url=runtime.get("tpay_base") or BASE_URL,
+    )
 
 
 def enabled() -> bool:

@@ -24,13 +24,20 @@ log = logging.getLogger(__name__)
 BASE_URL = "https://secure.telegapay.link/api/v1"
 TIMEOUT = aiohttp.ClientTimeout(total=30)
 
-# Как шлюз ждёт ключ. Проверяется один раз, рабочий вариант запоминается.
-AUTH_HEADERS = [
-    ("API-KEY", "{key}"),
-    ("X-API-Key", "{key}"),
-    ("Authorization", "Bearer {key}"),
-    ("Authorization", "{key}"),
-    ("api-key", "{key}"),
+# Как шлюз ждёт ключ: в заголовке или прямо в теле запроса. Оба способа
+# встречаются одинаково часто, поэтому перебираем и те, и другие, а рабочий
+# вариант запоминаем.
+AUTH_VARIANTS: list[tuple[str, str, str]] = [
+    ("header", "API-KEY", "{key}"),
+    ("header", "X-API-Key", "{key}"),
+    ("header", "Authorization", "Bearer {key}"),
+    ("header", "Authorization", "{key}"),
+    ("header", "api-key", "{key}"),
+    ("header", "X-Api-Token", "{key}"),
+    ("body", "api_key", "{key}"),
+    ("body", "token", "{key}"),
+    ("body", "key", "{key}"),
+    ("body", "apiKey", "{key}"),
 ]
 
 PAID = {"paid", "success", "successful", "completed", "complete", "done",
@@ -92,28 +99,37 @@ class TelegaPay:
     def __init__(self, api_key: str, base_url: str = BASE_URL):
         self.api_key = (api_key or "").strip()
         self.base_url = base_url.rstrip("/")
-        self._auth: tuple[str, str] | None = None
+        self._auth: tuple[str, str, str] | None = None
+        self.tried: list[str] = []      # что перебрали — видно в проверке связи
 
     # ------------------------------------------------------------ запросы
 
-    def _headers(self, auth: tuple[str, str]) -> dict:
-        name, template = auth
-        return {name: template.format(key=self.api_key),
-                "Content-Type": "application/json"}
+    def _apply(self, auth: tuple[str, str, str], payload: dict) -> tuple[dict, dict]:
+        """Разложить ключ по заголовкам и телу так, как ждёт этот вариант."""
+        kind, name, template = auth
+        headers = {"Content-Type": "application/json"}
+        body = dict(payload)
+        if kind == "header":
+            headers[name] = template.format(key=self.api_key)
+        else:
+            body[name] = template.format(key=self.api_key)
+        return headers, body
 
     async def _post(self, path: str, payload: dict) -> dict:
         """POST с ключом. Первый раз перебирает способы авторизации."""
         if not self.api_key:
             raise PaymentError("не задан ключ TelegaPAY")
 
-        variants = [self._auth] if self._auth else AUTH_HEADERS
+        variants = [self._auth] if self._auth else AUTH_VARIANTS
         last = "шлюз не ответил"
+        self.tried = []
         async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
             for auth in variants:
+                headers, body_payload = self._apply(auth, payload)
+                self.tried.append(f"{auth[0]} {auth[1]}")
                 try:
                     async with session.post(
-                        f"{self.base_url}{path}", json=payload,
-                        headers=self._headers(auth),
+                        f"{self.base_url}{path}", json=body_payload, headers=headers,
                     ) as response:
                         body = await response.json(content_type=None)
                         if response.status in (401, 403):
@@ -190,9 +206,12 @@ class TelegaPay:
             body = await self.get_methods(currency)
         except PaymentError as exc:
             steps.append(("Способы оплаты", f"❌ {exc}"))
+            if self.tried:
+                steps.append(("Перебрано способов", f"{len(self.tried)}: "
+                                                    + ", ".join(self.tried)))
             return {"ok": False, "steps": steps, "raw": {}}
 
-        header = self._auth[0] if self._auth else "?"
-        steps.append(("Авторизация", f"✅ заголовок {header}"))
+        where = f"{self._auth[0]} {self._auth[1]}" if self._auth else "?"
+        steps.append(("Авторизация", f"✅ {where}"))
         steps.append(("Способы оплаты", f"✅ ответ получен ({len(str(body))} симв.)"))
         return {"ok": True, "steps": steps, "raw": body}

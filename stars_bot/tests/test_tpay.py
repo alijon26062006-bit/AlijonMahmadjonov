@@ -171,6 +171,24 @@ async def client_tests() -> None:
     check("рабочий заголовок запоминается",
           len(session.calls) == used + 1, str(len(session.calls)))
 
+    # ключ в теле запроса — второй распространённый способ
+    class BodySession(FakeSession):
+        def post(self, url, json=None, headers=None):
+            path = url.rsplit("/api/v1", 1)[-1]
+            self.calls.append((path, json or {}, headers or {}))
+            if (json or {}).get("api_key") != "kluch":
+                return FakeResponse({"error": "unauthorized"}, status=401)
+            return FakeResponse(self.replies.get(path, {}))
+
+    session = BodySession({"/get_methods": {"ok": True}}, need_header=None)
+    with_session(session)
+    api = TelegaPay("kluch")
+    await api.get_methods()
+    check("ключ в теле запроса тоже подбирается",
+          session.calls[-1][1].get("api_key") == "kluch", str(session.calls[-1][1]))
+    check("тело запроса при этом не потеряно",
+          "currency" in session.calls[-1][1], str(session.calls[-1][1]))
+
     session = FakeSession({"/get_methods": {"ok": True}}, need_header="НЕТ-ТАКОГО")
     with_session(session)
     try:
@@ -178,6 +196,9 @@ async def client_tests() -> None:
         check("неверный ключ — ошибка", False)
     except PaymentError as exc:
         check("неверный ключ — ошибка", "не принят" in str(exc), str(exc))
+        check("перебраны все способы авторизации",
+              len(session.calls) == len(telegapay.AUTH_VARIANTS),
+              f"{len(session.calls)} из {len(telegapay.AUTH_VARIANTS)}")
 
     try:
         await TelegaPay("").get_methods()
@@ -377,6 +398,8 @@ async def panel_screens(conn) -> None:
     call = call_of("pn:tpay_check")
     await panel.cb_tpay_check(call)
     check("отказ показан честно", "❌" in call.last, call.last[:200])
+    check("видно, что перебрали все способы",
+          "Перебрано способов" in call.last, call.last[:400])
     check("подсказано про одобрение магазина",
           "TelegaPaySalesBot" in call.last, call.last[-200:])
 

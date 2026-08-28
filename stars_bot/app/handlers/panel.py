@@ -539,6 +539,10 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "tpay_key": ("🔑 Ключ TelegaPAY",
                  "Ключ из кабинета app.telegapay.pro. "
                  "Пришлите <code>-</code>, чтобы убрать:", "text"),
+    "tpay_base": ("🌐 Адрес API TelegaPAY",
+                  "Обычно менять не нужно. Для тестового сервера пришлите его "
+                  "адрес вида <code>https://.../api/v1</code>, "
+                  "<code>-</code> — вернуться на боевой:", "text"),
     "tpay_currency": ("💱 Валюта TelegaPAY",
                       "В какой валюте выставлять счёт: <code>RUB</code>, "
                       "<code>USDT</code>, <code>TON</code>, <code>USD</code> "
@@ -584,7 +588,7 @@ FIELD_PARENT.update({
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "star_packs": "pn:prices", "reviews_channel": "pn:reviews",
-    "tpay_key": "pn:tpay", "tpay_currency": "pn:tpay",
+    "tpay_key": "pn:tpay", "tpay_currency": "pn:tpay", "tpay_base": "pn:tpay",
     "tpay_rate_diram": "pn:tpay", "tpay_spread": "pn:tpay",
     "usd_rate_diram": "pn:prices", "usd_rate_spread": "pn:prices",
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
@@ -2413,6 +2417,7 @@ def tpay_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🔑 Ключ", callback_data="pn:set:tpay_key"),
         InlineKeyboardButton(text="💱 Валюта", callback_data="pn:set:tpay_currency"),
     )
+    kb.row(InlineKeyboardButton(text="🌐 Адрес API", callback_data="pn:set:tpay_base"))
     kb.row(
         InlineKeyboardButton(text="📈 Курс вручную",
                              callback_data="pn:set:tpay_rate_diram"),
