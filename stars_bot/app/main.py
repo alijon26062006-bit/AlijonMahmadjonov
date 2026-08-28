@@ -14,6 +14,7 @@ from aiogram.types import BotCommand, BotCommandScopeChat
 from app import db, runtime
 from app.config import settings
 from app.handlers import (
+    reviews,
     admin, broadcast, deposit, menu, panel, profile, shop, support,
 )
 from app.middlewares.emoji_guard import CustomEmojiGuard
@@ -125,6 +126,7 @@ async def main() -> None:
     dp.include_router(deposit.router)
     dp.include_router(profile.router)
     dp.include_router(support.router)
+    dp.include_router(reviews.router)
 
     try:
         me = await bot.me()

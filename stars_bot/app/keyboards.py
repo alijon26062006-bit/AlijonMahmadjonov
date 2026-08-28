@@ -65,6 +65,15 @@ def labeled(icon: str, text: str) -> str:
 # ════════════════════════════════════════════════════════ главное меню
 
 
+def reviews_link() -> str:
+    """Ссылка на канал отзывов. Канал из панели важнее ссылки из .env —
+    иначе владельцу пришлось бы задавать одно и то же дважды."""
+    channel = (runtime.get("reviews_channel") or "").strip()
+    if channel and not channel.lstrip("-").isdigit():
+        return f"https://t.me/{channel.lstrip('@')}"
+    return settings.reviews_url
+
+
 def main_menu() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if runtime.get_bool("stars_enabled"):
@@ -84,8 +93,9 @@ def main_menu() -> InlineKeyboardMarkup:
         btn(labeled("calc", "Калькулятор"), "m:calc", icon="calc"),
     )
     kb.row(btn(labeled("info", "Информация"), "m:info", icon="info"))
-    if settings.reviews_url:
-        kb.row(btn(labeled("reviews", "Отзывы"), url=settings.reviews_url, icon="reviews"))
+    link = reviews_link()
+    if link:
+        kb.row(btn(labeled("reviews", "Отзывы"), url=link, icon="reviews"))
     kb.row(btn(labeled("top", "Топ клиентов"), "m:top", icon="top"))
     return kb.as_markup()
 

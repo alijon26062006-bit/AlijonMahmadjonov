@@ -91,6 +91,9 @@ def _build_defaults() -> dict[str, str]:
         "autostopped": "0",              # продажу выключил сам бот
         # по чему считаем топ клиентов: purchases | deposits
         "top_by": "purchases",
+        # отзывы
+        "reviews_on": "1",               # спрашивать отзыв после заказа
+        "reviews_channel": "",           # @канал или id, куда публиковать
         # доступность
         "stars_enabled": "1",
         "premium_enabled": "1",

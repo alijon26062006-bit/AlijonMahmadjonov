@@ -37,6 +37,10 @@ class Panel(StatesGroup):
     link = State()        # ждём название рекламной ссылки
 
 
+class Review(StatesGroup):
+    text = State()        # ждём текст отзыва после оценки
+
+
 class Cast(StatesGroup):
     content = State()     # ждём сообщение для рассылки
     buttons = State()     # ждём список кнопок

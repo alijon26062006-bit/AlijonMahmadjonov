@@ -33,6 +33,7 @@ from app.emoji import substitute
 from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
 from app.money import exact_stars_cost, fmt, fmt4, parse, parse4, round_price
 from app.services import dcpay, pricing
+from app.services import reviews as reviews_service
 from app.services import delivery
 from app.states import Panel, PromoNew
 
@@ -85,7 +86,10 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🎨 Оформление", callback_data="pn:look"),
         InlineKeyboardButton(text="📝 Объявление", callback_data="pn:notice"),
     )
-    kb.row(InlineKeyboardButton(text="🔗 Рекламные ссылки", callback_data="pn:links"))
+    kb.row(
+        InlineKeyboardButton(text="🔗 Рекламные ссылки", callback_data="pn:links"),
+        InlineKeyboardButton(text="⭐️ Отзывы", callback_data="pn:reviews"),
+    )
     kb.row(InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"))
     return kb.as_markup()
 
@@ -531,6 +535,12 @@ FIELDS: dict[str, tuple[str, str, str]] = {
                         "percent"),
     "margin_percent": ("📈 Наценка",
                        "Процент наценки к себестоимости. Например <code>30</code>:", "percent"),
+    "reviews_channel": ("📣 Канал отзывов",
+                        "Куда публиковать одобренные отзывы: <code>@kanal</code> "
+                        "или числовой ID.\n\n"
+                        "Бот должен быть в канале администратором с правом "
+                        "публиковать. Пришлите <code>-</code>, чтобы убрать:",
+                        "text"),
     "star_packs": ("⭐️ Наборы звёзд",
                    "Через запятую — какие кнопки показывать в магазине.\n"
                    "Например <code>50, 100, 250, 500, 1000, 2500</code>\n\n"
@@ -559,7 +569,7 @@ FIELD_PARENT = {key: "pn:pay" for key in PAY_FIELDS}
 FIELD_PARENT.update({
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
-    "star_packs": "pn:prices",
+    "star_packs": "pn:prices", "reviews_channel": "pn:reviews",
     "usd_rate_diram": "pn:prices", "usd_rate_spread": "pn:prices",
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
     "referral_percent": "pn:prices", "support_notice": "pn:home",
@@ -2275,3 +2285,79 @@ async def cb_link_kill(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
 async def cb_link_card(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     await show_link(call, conn, int(call.data.rsplit(":", 1)[1]))
     await call.answer()
+
+
+# ═════════════════════════════════════════════════════════════ отзывы
+
+
+def reviews_text(stats: dict, pending: list) -> str:
+    channel = reviews_service.channel() or "не задан"
+    average = (stats["rating_sum"] / stats["total"]) if stats["total"] else 0
+
+    body = ""
+    if pending:
+        rows = "\n".join(
+            f"├ {review.stars} — <i>{(review.text or 'без текста')[:60]}</i>"
+            for review in pending[:5]
+        )
+        body = f"\n\n⏳ <b>Ждут проверки: {len(pending)}</b>\n{rows}"
+
+    return (
+        "⭐️ <b>Отзывы</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"{'✅' if runtime.get_bool('reviews_on') else '🚫'} Спрашивать после заказа\n"
+        f"📣 Канал: <b>{channel}</b>\n\n"
+        f"├ Опубликовано: <b>{stats['published']}</b>\n"
+        + (f"└ Средняя оценка: <b>{average:.1f}</b> из 5"
+           if stats["total"] else "└ Оценок пока нет")
+        + body
+        + "\n\n<blockquote>Отзыв приходит вам на проверку и попадает в канал "
+          "только после кнопки «Опубликовать».</blockquote>"
+    )
+
+
+def reviews_kb(pending: list) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    on = runtime.get_bool("reviews_on")
+    kb.row(btn("🚫 Не спрашивать отзывы" if on else "✅ Спрашивать отзывы",
+               "pn:rev_toggle", style=DANGER if on else SUCCESS))
+    kb.row(InlineKeyboardButton(text="📣 Канал отзывов",
+                                callback_data="pn:set:reviews_channel"))
+    if pending:
+        kb.row(btn(f"⏳ Показать на проверке ({len(pending)})",
+                   "pn:rev_pending", style=PRIMARY))
+    kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
+    return kb.as_markup()
+
+
+async def show_reviews(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    stats = await db.review_stats(conn)
+    pending = await db.list_reviews(conn, status=db.REVIEW_PENDING)
+    await safe_edit(call, reviews_text(stats, pending), reviews_kb(pending))
+
+
+@router.callback_query(F.data == "pn:reviews")
+async def cb_reviews(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    await state.clear()
+    await show_reviews(call, conn)
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:rev_toggle")
+async def cb_reviews_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    on = runtime.get_bool("reviews_on")
+    await runtime.set_value(conn, "reviews_on", "0" if on else "1")
+    await call.answer("Не спрашиваем" if on else "Спрашиваем")
+    await show_reviews(call, conn)
+
+
+@router.callback_query(F.data == "pn:rev_pending")
+async def cb_reviews_pending(call: CallbackQuery, conn: aiosqlite.Connection, bot: Bot) -> None:
+    """Переслать себе всё, что ждёт проверки, — с кнопками решения."""
+    pending = await db.list_reviews(conn, status=db.REVIEW_PENDING)
+    if not pending:
+        await call.answer("Всё разобрано.", show_alert=True)
+        return
+    for review in pending[:10]:
+        await reviews_service.to_moderation(bot, conn, review)
+    await call.answer(f"Прислал {min(len(pending), 10)} шт.")

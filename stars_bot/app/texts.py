@@ -189,6 +189,57 @@ _RAW["DELIVERED"] = (
     "напишите в поддержку.</blockquote>"
 )
 
+_RAW["REVIEW_ASK"] = (
+    "[[reviews]] <b>Как всё прошло?</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Поставьте оценку заказу <b>№{order_id}</b> — это займёт "
+    "секунду и поможет другим покупателям.</blockquote>"
+)
+
+_RAW["REVIEW_ASK_TEXT"] = (
+    "[[reviews]] <b>Оценка {stars}</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Напишите пару слов о покупке — отзыв попадёт в наш канал "
+    "после проверки.\n\nВаше имя будет видно под отзывом.</blockquote>"
+)
+
+_RAW["REVIEW_SENT"] = (
+    "[[ok]] <b>Спасибо за отзыв!</b>\n\n"
+    "<blockquote>Он появится в канале после проверки.</blockquote>"
+)
+
+_RAW["REVIEW_ALREADY"] = (
+    "[[warn]] <b>Отзыв на этот заказ уже есть.</b>\n\n"
+    "<blockquote>Один заказ — один отзыв.</blockquote>"
+)
+
+#: Как отзыв выглядит в канале.
+_RAW["REVIEW_POST"] = (
+    "{stars}\n"
+    "<b>Отзыв о покупке</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>{text}</blockquote>\n\n"
+    "├ Товар: <b>{title}</b>\n"
+    "└ Покупатель: <b>{author}</b>"
+)
+
+_RAW["REVIEW_POST_SHORT"] = (
+    "{stars}\n"
+    "<b>Отзыв о покупке</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Товар: <b>{title}</b>\n"
+    "└ Покупатель: <b>{author}</b>"
+)
+
+_RAW["ADMIN_REVIEW"] = (
+    "[[reviews]] <b>Новый отзыв на проверку</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Оценка: {stars} <b>({rating}/5)</b>\n"
+    "├ Заказ: <b>№{order_id}</b> — {title}\n"
+    "└ Покупатель: {author} (<code>{user_id}</code>)\n\n"
+    "<blockquote>{text}</blockquote>"
+)
+
 _RAW["REFUNDED"] = (
     "[[refund]] <b>Заказ №{order_id} не выполнен</b>\n"
     f"<code>{LINE}</code>\n\n"

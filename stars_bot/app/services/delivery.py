@@ -150,6 +150,7 @@ async def _run_delivery(
             ),
         )
         log.info("Заказ %s выдан, fragment_id=%s", order.id, result.order_id)
+        await _ask_review(bot, conn, order)
 
 
 async def _refund(
@@ -224,7 +225,19 @@ async def manual_complete(bot: Bot, conn: aiosqlite.Connection, order: db.Order)
             recipient=order.recipient, price=fmt(order.price),
         ),
     )
+    await _ask_review(bot, conn, order)
     return True
+
+
+async def _ask_review(bot: Bot, conn: aiosqlite.Connection, order: db.Order) -> None:
+    """Спросить отзыв. Импорт внутри: сервис отзывов сам зовёт базу и тексты,
+    а на верхнем уровне это замкнуло бы модули друг на друга."""
+    from app.services import reviews
+
+    try:
+        await reviews.offer(bot, conn, order)
+    except Exception as exc:  # noqa: BLE001 — отзыв не должен ломать выдачу
+        log.info("Заказ %s: не спросил отзыв — %s", order.id, exc)
 
 
 async def _watch_failures(bot: Bot, conn: aiosqlite.Connection, reason: str) -> None:

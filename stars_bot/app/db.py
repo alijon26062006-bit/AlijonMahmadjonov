@@ -143,6 +143,21 @@ CREATE TABLE IF NOT EXISTS adjustments (
     created_at TEXT NOT NULL
 );
 
+-- Отзывы: один завершённый заказ = один отзыв (UNIQUE на order_id).
+-- Проверять это в коде мало: две кнопки, нажатые подряд, успели бы
+-- проскочить обе.
+CREATE TABLE IF NOT EXISTS reviews (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id    INTEGER NOT NULL UNIQUE,
+    user_id     INTEGER NOT NULL,
+    rating      INTEGER NOT NULL,          -- 1..5
+    text        TEXT,
+    status      TEXT NOT NULL,             -- pending | published | deleted
+    channel_msg INTEGER,                   -- id сообщения в канале
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS links (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     code       TEXT NOT NULL UNIQUE,     -- то, что стоит после ?start=
@@ -174,6 +189,8 @@ CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
 CREATE INDEX IF NOT EXISTS idx_tmsg_ticket    ON ticket_messages(ticket_id);
 CREATE INDEX IF NOT EXISTS idx_adj_user      ON adjustments(user_id);
 CREATE INDEX IF NOT EXISTS idx_adj_created   ON adjustments(created_at);
+CREATE INDEX IF NOT EXISTS idx_rev_status    ON reviews(status);
+CREATE INDEX IF NOT EXISTS idx_rev_user      ON reviews(user_id);
 CREATE INDEX IF NOT EXISTS idx_hits_link     ON link_hits(link_id);
 CREATE INDEX IF NOT EXISTS idx_hits_user     ON link_hits(user_id);
 """
@@ -200,6 +217,28 @@ class User:
     is_banned: int
     created_at: str
     source: str | None = None      # код Deep Link, по которой пришёл
+
+
+REVIEW_PENDING = "pending"
+REVIEW_PUBLISHED = "published"
+REVIEW_DELETED = "deleted"
+
+
+@dataclass
+class Review:
+    id: int
+    order_id: int
+    user_id: int
+    rating: int
+    text: str | None
+    status: str
+    channel_msg: int | None
+    created_at: str
+    updated_at: str
+
+    @property
+    def stars(self) -> str:
+        return "⭐️" * self.rating
 
 
 @dataclass
@@ -474,6 +513,93 @@ async def top_clients(
         params = (ORDER_DELIVERED, limit)
     async with conn.execute(query, params) as cur:
         return [(_from_row(User, row), row["amount"]) for row in await cur.fetchall()]
+
+
+# ---------------------------------------------------------------- отзывы
+
+
+async def create_review(
+    conn: aiosqlite.Connection, *, order_id: int, user_id: int, rating: int,
+) -> Review | None:
+    """Завести отзыв на заказ. None — если отзыв на него уже есть."""
+    now = _now()
+    try:
+        cur = await conn.execute(
+            """INSERT INTO reviews (order_id, user_id, rating, status,
+                                    created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (order_id, user_id, rating, REVIEW_PENDING, now, now),
+        )
+    except sqlite3.IntegrityError:
+        return None
+    await conn.commit()
+    return await get_review(conn, cur.lastrowid)
+
+
+async def get_review(conn: aiosqlite.Connection, review_id: int) -> Review | None:
+    async with conn.execute("SELECT * FROM reviews WHERE id = ?", (review_id,)) as cur:
+        row = await cur.fetchone()
+    return _from_row(Review, row) if row else None
+
+
+async def review_of_order(conn: aiosqlite.Connection, order_id: int) -> Review | None:
+    async with conn.execute(
+        "SELECT * FROM reviews WHERE order_id = ?", (order_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    return _from_row(Review, row) if row else None
+
+
+async def set_review_text(conn: aiosqlite.Connection, review_id: int, text: str) -> None:
+    await conn.execute(
+        "UPDATE reviews SET text = ?, updated_at = ? WHERE id = ?",
+        (text, _now(), review_id),
+    )
+    await conn.commit()
+
+
+async def moderate_review(
+    conn: aiosqlite.Connection, review_id: int, new: str, channel_msg: int | None = None,
+) -> bool:
+    """Опубликовать или удалить отзыв. False — если его уже разобрали.
+
+    Условие `status = pending` не даёт двум нажатиям подряд опубликовать
+    отзыв дважды.
+    """
+    cur = await conn.execute(
+        """UPDATE reviews SET status = ?, channel_msg = ?, updated_at = ?
+           WHERE id = ? AND status = ?""",
+        (new, channel_msg, _now(), review_id, REVIEW_PENDING),
+    )
+    await conn.commit()
+    return cur.rowcount > 0
+
+
+async def list_reviews(
+    conn: aiosqlite.Connection, status: str | None = None, limit: int = 20,
+) -> list[Review]:
+    sql = "SELECT * FROM reviews"
+    params: list = []
+    if status:
+        sql += " WHERE status = ?"
+        params.append(status)
+    sql += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+    async with conn.execute(sql, params) as cur:
+        return [_from_row(Review, row) for row in await cur.fetchall()]
+
+
+async def review_stats(conn: aiosqlite.Connection) -> dict[str, int]:
+    async with conn.execute(
+        """SELECT COUNT(*)                        AS total,
+                  SUM(status = ?)                 AS pending,
+                  SUM(status = ?)                 AS published,
+                  COALESCE(SUM(rating), 0)        AS rating_sum
+           FROM reviews WHERE status != ?""",
+        (REVIEW_PENDING, REVIEW_PUBLISHED, REVIEW_DELETED),
+    ) as cur:
+        row = await cur.fetchone()
+    return {key: (row[key] or 0) for key in row.keys()}
 
 
 # ------------------------------------------------------------ Deep Links
