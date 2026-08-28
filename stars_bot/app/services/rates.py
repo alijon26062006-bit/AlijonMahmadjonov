@@ -47,7 +47,7 @@ def _dig(data, path: list[str]):
     return data
 
 
-#: (имя, url, путь до числа внутри JSON)
+#: (имя, url, путь до числа внутри JSON) — сколько сомони в долларе
 SOURCES: list[tuple[str, str, list[str]]] = [
     ("open.er-api.com",
      "https://open.er-api.com/v6/latest/USD", ["rates", "TJS"]),
@@ -58,6 +58,22 @@ SOURCES: list[tuple[str, str, list[str]]] = [
      "https://latest.currency-api.pages.dev/v1/currencies/usd.json",
      ["usd", "tjs"]),
 ]
+
+#: Сколько сомони в одном рубле. Нужен для приёма рублей через TelegaPAY.
+RUB_SOURCES: list[tuple[str, str, list[str]]] = [
+    ("open.er-api.com",
+     "https://open.er-api.com/v6/latest/RUB", ["rates", "TJS"]),
+    ("currency-api (jsDelivr)",
+     "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/rub.json",
+     ["rub", "tjs"]),
+    ("currency-api (зеркало)",
+     "https://latest.currency-api.pages.dev/v1/currencies/rub.json",
+     ["rub", "tjs"]),
+]
+
+#: Рубль дешевле сомони, поэтому границы разумного здесь свои.
+MIN_RUB = Decimal("0.02")
+MAX_RUB = Decimal("2")
 
 
 async def _read(session: aiohttp.ClientSession, url: str, path: list[str]) -> Decimal | None:
@@ -76,10 +92,21 @@ async def _read(session: aiohttp.ClientSession, url: str, path: list[str]) -> De
 
 
 async def fetch(spread_percent: int = 0) -> Rate:
-    """Спросить курс у источников по очереди. Бросает RuntimeError, если все молчат."""
+    """Курс доллара к сомони. Бросает RuntimeError, если все молчат."""
+    return await _fetch(SOURCES, MIN_RATE, MAX_RATE, spread_percent)
+
+
+async def fetch_rub(spread_percent: int = 0) -> Rate:
+    """Курс рубля к сомони — по тем же источникам."""
+    return await _fetch(RUB_SOURCES, MIN_RUB, MAX_RUB, spread_percent)
+
+
+async def _fetch(
+    sources: list, low: Decimal, high: Decimal, spread_percent: int,
+) -> Rate:
     problems = []
     async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
-        for name, url, path in SOURCES:
+        for name, url, path in sources:
             try:
                 value = await _read(session, url, path)
             except Exception as exc:  # noqa: BLE001 — пробуем следующий источник
@@ -87,7 +114,7 @@ async def fetch(spread_percent: int = 0) -> Rate:
                 log.info("Курс от %s не пришёл: %s", name, exc)
                 continue
 
-            if not MIN_RATE <= value <= MAX_RATE:
+            if not low <= value <= high:
                 problems.append(f"{name}: {value} — вне разумных границ")
                 continue
 

@@ -10,11 +10,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
-from app.services import dcpay
+from app.services import dcpay, tpay
+from app.services.telegapay import PaymentError
 from app import runtime
 from app.config import settings
 from app.money import fmt, parse
 from app.states import Deposit
+from decimal import Decimal
+import asyncio
 
 log = logging.getLogger(__name__)
 router = Router(name="deposit")
@@ -141,3 +144,91 @@ async def on_receipt(
 @router.message(Deposit.receipt)
 async def on_receipt_wrong(message: Message) -> None:
     await message.answer(texts.DEPOSIT_NEED_PHOTO)
+
+
+# ═══════════════════════════════════════════ оплата картой РФ / криптой
+
+
+@router.callback_query(F.data == "dep:tpay")
+async def cb_tpay(call: CallbackQuery, state: FSMContext) -> None:
+    if not tpay.enabled():
+        await call.answer(texts.DEPOSIT_SOON, show_alert=True)
+        return
+    if tpay.rate_diram() <= 0:
+        await call.answer("Способ временно недоступен: не задан курс.", show_alert=True)
+        return
+
+    await state.set_state(Deposit.tpay_amount)
+    await call.message.edit_text(
+        texts.TPAY_ASK_AMOUNT.format(
+            currency=tpay.currency(),
+            rate=fmt(tpay.rate_diram()),
+            min_amount=fmt(runtime.min_deposit()),
+        ),
+        reply_markup=keyboards.cancel(),
+    )
+    await call.answer()
+
+
+@router.message(Deposit.tpay_amount, F.text)
+async def on_tpay_amount(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection, bot: Bot
+) -> None:
+    amount = parse(message.text or "")
+    if amount is None or amount <= 0:
+        await message.answer(texts.DEPOSIT_BAD_AMOUNT)
+        return
+    if amount < runtime.min_deposit():
+        await message.answer(
+            texts.DEPOSIT_TOO_SMALL.format(min_amount=fmt(runtime.min_deposit()))
+        )
+        return
+
+    try:
+        deposit, link = await tpay.start_payment(conn, message.from_user.id, amount)
+    except PaymentError as exc:
+        log.warning("TelegaPAY: счёт не создался: %s", exc)
+        await state.clear()
+        await message.answer(texts.TPAY_ERROR, reply_markup=keyboards.back())
+        return
+
+    await state.clear()
+    await message.answer(
+        texts.TPAY_LINK.format(
+            amount=fmt(amount),
+            charge=tpay.to_currency(amount),
+            currency=tpay.currency(),
+            deposit_id=deposit.id,
+        ),
+        reply_markup=keyboards.tpay_pay(link, deposit.id),
+    )
+    # Ждём оплату в фоне: клиент может ничего не нажимать.
+    asyncio.create_task(tpay.watch(bot, deposit.id))
+
+
+@router.callback_query(F.data.startswith("dep:tcheck:"))
+async def cb_tpay_check(
+    call: CallbackQuery, conn: aiosqlite.Connection, bot: Bot
+) -> None:
+    deposit = await db.get_deposit(conn, int(call.data.rsplit(":", 1)[1]))
+    if deposit is None or deposit.user_id != call.from_user.id:
+        await call.answer("Заявка не найдена.", show_alert=True)
+        return
+    if deposit.status == db.DEP_APPROVED:
+        await call.answer("Уже зачислено")
+        return
+
+    await call.answer("Проверяю…")
+    try:
+        result = await tpay.check_once(bot, conn, deposit)
+    except PaymentError as exc:
+        log.info("TelegaPAY: проверка заявки %s не прошла: %s", deposit.id, exc)
+        await call.message.answer(texts.TPAY_PENDING)
+        return
+
+    if result == "paid":
+        return          # сообщение о зачислении отправляет сам сервис
+    if result == "failed":
+        await call.message.answer(texts.TPAY_FAILED, reply_markup=keyboards.back())
+        return
+    await call.message.answer(texts.TPAY_PENDING)

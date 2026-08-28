@@ -756,6 +756,16 @@ async def create_deposit(
     return deposit
 
 
+async def set_deposit_reference(
+    conn: aiosqlite.Connection, deposit_id: int, reference: str,
+) -> None:
+    await conn.execute(
+        "UPDATE deposits SET reference = ?, updated_at = ? WHERE id = ?",
+        (reference, _now(), deposit_id),
+    )
+    await conn.commit()
+
+
 async def get_deposit(conn: aiosqlite.Connection, deposit_id: int) -> Deposit | None:
     async with conn.execute("SELECT * FROM deposits WHERE id = ?", (deposit_id,)) as cur:
         row = await cur.fetchone()

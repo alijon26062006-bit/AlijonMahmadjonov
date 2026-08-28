@@ -183,12 +183,24 @@ def deposit_methods() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn(labeled("deposit", "Перевод на карту"), "dep:card",
                style=SUCCESS, icon="deposit"))
-    kb.row(btn("🏦 Другой способ", "dep:soon"))
+    from app.services import tpay
+    if tpay.enabled():
+        kb.row(btn("🏦 Карта РФ · USDT · TON", "dep:tpay", style=PRIMARY))
+    else:
+        kb.row(btn("🏦 Другой способ", "dep:soon"))
     kb.row(btn(labeled("back", "Назад"), "m:main"))
     return kb.as_markup()
 
 
 # ════════════════════════════════════════════════════════════ профиль
+
+
+def tpay_pay(link: str, deposit_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("💳 Оплатить", url=link, style=SUCCESS))
+    kb.row(btn("🔄 Я оплатил — проверить", f"dep:tcheck:{deposit_id}"))
+    kb.row(btn(labeled("back", "В меню"), "m:main"))
+    return kb.as_markup()
 
 
 def deposit_pay(link: str) -> InlineKeyboardMarkup:
