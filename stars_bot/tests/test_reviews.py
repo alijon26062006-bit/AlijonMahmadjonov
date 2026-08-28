@@ -210,7 +210,12 @@ async def run(conn) -> None:
     check("в карточке оценка", "⭐️⭐️⭐️⭐️⭐️" in card.text and "(5/5)" in card.text)
     check("в карточке текст отзыва", "Всё пришло за минуту" in card.text)
     check("в карточке номер заказа", f"№{order.id}" in card.text)
-    check("в карточке покупатель", "@buyer" in card.text)
+    check("в карточке виден никнейм", "Никнейм: @buyer" in card.text, card.text)
+    check("в карточке видно имя", "Имя: <b>Покупатель</b>" in card.text, card.text)
+    check("в карточке есть ссылка на переписку",
+          'tg://user?id=777' in card.text, card.text)
+    check("в карточке показано, как подпишут в канале",
+          "подпишут в канале: @buyer" in card.text, card.text[-120:])
     check("две кнопки решения",
           buttons(card.markup) == ["✅ Опубликовать", "🗑 Удалить"], str(buttons(card.markup)))
     check("в канал пока ничего не ушло", bot.to("@moi_otzyvy") == [])
@@ -377,6 +382,18 @@ async def past_buyers(conn, storage) -> None:
     # заблокировавшего бота больше не дёргаем
     check("заблокировавший помечен и не вернётся в список",
           603 not in {o.user_id for o in await db.review_targets(conn)})
+
+    # у клиента без юзернейма это должно быть сказано прямо, а не пусто
+    from app.services import reviews as svc
+    await db.upsert_user(conn, 605, None, "Безымянный")
+    order = await make_order(conn, user_id=605)
+    plain = await db.create_review(conn, order_id=order.id, user_id=605, rating=5)
+    bot = FakeBot()
+    await svc.to_moderation(bot, conn, plain)
+    card = bot.to(ADMIN)[0].text
+    check("отсутствие никнейма показано словами",
+          "Никнейм: <i>не установлен</i>" in card, card)
+    check("вместо него в подписи имя", "подпишут в канале: Безымянный" in card, card)
 
 
 async def main() -> None:

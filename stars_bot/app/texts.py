@@ -245,8 +245,11 @@ _RAW["ADMIN_REVIEW"] = (
     f"<code>{LINE}</code>\n\n"
     "├ Оценка: {stars} <b>({rating}/5)</b>\n"
     "├ Заказ: <b>№{order_id}</b> — {title}\n"
-    "└ Покупатель: {author} (<code>{user_id}</code>)\n\n"
-    "<blockquote>{text}</blockquote>"
+    "├ Никнейм: {username}\n"
+    "├ Имя: <b>{name}</b>\n"
+    "└ ID: <code>{user_id}</code> · <a href=\"tg://user?id={user_id}\">написать</a>\n\n"
+    "<blockquote>{text}</blockquote>\n\n"
+    "<i>Так отзыв подпишут в канале: {author}</i>"
 )
 
 _RAW["REFUNDED"] = (

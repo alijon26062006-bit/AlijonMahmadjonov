@@ -45,12 +45,21 @@ def channel_target() -> str | int | None:
 
 
 def author_of(user: db.User | None) -> str:
-    """Как подписать отзыв. Юзернейм лучше — по нему видно живого человека."""
+    """Как подписать отзыв в канале. Юзернейм лучше — по нему видно живого
+    человека, а не безымянную строчку."""
     if user is None:
         return "клиент"
     if user.username:
         return f"@{user.username}"
     return user.first_name or "клиент"
+
+
+def username_of(user: db.User | None) -> str:
+    """Никнейм для карточки проверки. Прямо говорим, когда его нет: у части
+    аккаунтов юзернейма нет вовсе, и это не ошибка бота."""
+    if user is not None and user.username:
+        return f"@{user.username}"
+    return "<i>не установлен</i>"
 
 
 def rate_kb(order_id: int) -> "InlineKeyboardBuilder":
@@ -135,6 +144,8 @@ async def to_moderation(bot: Bot, conn: aiosqlite.Connection, review: db.Review)
         stars=review.stars, rating=review.rating,
         order_id=review.order_id,
         title=order.title if order else "—",
+        username=username_of(user),
+        name=(user.first_name if user and user.first_name else "—"),
         author=author_of(user), user_id=review.user_id,
         text=review.text or "<i>без текста</i>",
     )
