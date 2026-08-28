@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telegram-боты на заказ — Алиджон, Душанбе</title>
+<meta name="description" content="Пишу Telegram-ботов для кафе, магазинов и салонов в Душанбе. Бот принимает заказы и записывает клиентов, пока вы заняты. Первый разговор бесплатный.">
+<meta name="theme-color" content="#E9EBE6">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Telegram-боты на заказ — Алиджон, Душанбе">
+<meta property="og:description" content="Бот принимает заказы и записывает клиентов, пока вы заняты. Попробуйте демо прямо на странице.">
+<meta property="og:locale" content="ru_RU">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;600;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   ТОКЕНЫ
+   ============================================================ */
+:root{
+  --ink:#16202E;
+  --ink-2:#232F40;
+  --ink-3:#2E3C50;
+  --paper:#E9EBE6;
+  --paper-2:#F2F3EF;
+  --card:#FCFCFB;
+  --saffron:#DE9B2F;
+  --sage:#2F6B5A;
+  --muted:#4A5561;
+  --muted-dark:#9AA5B2;
+  --line:#CDD1C9;
+  --line-dark:#33415A;
+
+  --f-display:"Bitter",Georgia,"Times New Roman",serif;
+  --f-body:"Golos Text","Segoe UI",Roboto,Arial,sans-serif;
+  --f-mono:"JetBrains Mono","SF Mono",Consolas,monospace;
+
+  --s-1:.8125rem;
+  --s0:1.0625rem;
+  --s1:1.25rem;
+  --s2:1.6rem;
+  --s3:clamp(1.8rem,3.4vw,2.5rem);
+  --s4:clamp(1.95rem,4.3vw,3.3rem);
+
+  --sp-1:4px;  --sp-2:8px;  --sp-3:12px; --sp-4:16px;
+  --sp-5:24px; --sp-6:32px; --sp-7:48px; --sp-8:72px; --sp-9:104px;
+
+  --radius:14px;
+  --radius-sm:9px;
+  --wrap:1180px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-size:var(--s0);
+  line-height:1.6;
+  overflow-x:hidden;
+  font-synthesis-weight:none;
+}
+img,svg{max-width:100%;display:block}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--saffron);outline-offset:3px;border-radius:3px}
+
+.wrap{width:min(100% - 40px,var(--wrap));margin-inline:auto}
+@media (max-width:640px){.wrap{width:min(100% - 32px,var(--wrap))}}
+
+.mono{font-family:var(--f-mono);font-size:var(--s-1);letter-spacing:.06em;text-transform:uppercase}
+.skip{position:absolute;left:-9999px;top:0;background:var(--ink);color:var(--paper);padding:12px 18px;z-index:99}
+.skip:focus{left:12px;top:12px}
+
+/* ============================================================
+   ШАПКА
+   ============================================================ */
+.top{border-bottom:1px solid var(--line);background:var(--paper)}
+.top-in{display:flex;align-items:center;gap:var(--sp-5);min-height:68px}
+.brand{font-family:var(--f-display);font-weight:700;font-size:1.05rem;text-decoration:none;letter-spacing:-.01em;white-space:nowrap}
+.brand-dot{color:var(--saffron)}
+.top-nav{display:flex;gap:var(--sp-5);margin-left:auto}
+.top-nav a{
+  text-decoration:none;color:var(--muted);font-size:.95rem;
+  padding:6px 2px;border-bottom:1px solid transparent;transition:color .18s var(--ease),border-color .18s var(--ease);
+}
+.top-nav a:hover{color:var(--ink);border-bottom-color:var(--saffron)}
+@media (max-width:860px){.top-nav{display:none}}
+
+/* ============================================================
+   КНОПКИ
+   ============================================================ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  min-height:48px;padding:0 22px;border-radius:var(--radius-sm);
+  font-family:var(--f-body);font-size:1rem;font-weight:600;
+  text-decoration:none;cursor:pointer;border:1px solid transparent;
+  transition:background-color .18s var(--ease),transform .18s var(--ease),border-color .18s var(--ease);
+}
+.btn-main{background:var(--saffron);color:var(--ink);border-color:#C9862180}
+.btn-main:hover{background:#EBA940;transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--ink);border-color:var(--ink)}
+.btn-ghost:hover{background:var(--ink);color:var(--paper)}
+.btn-sm{min-height:44px;padding:0 16px;font-size:.95rem}
+@media (max-width:860px){.btn-top{display:none}}
+
+/* ============================================================
+   ГЕРОЙ
+   ============================================================ */
+.hero{padding:var(--sp-8) 0 var(--sp-9)}
+.hero-grid{display:grid;grid-template-columns:1.02fr .98fr;gap:var(--sp-8);align-items:start}
+@media (max-width:960px){
+  .hero{padding:var(--sp-7) 0 var(--sp-8)}
+  .hero-grid{grid-template-columns:1fr;gap:var(--sp-7)}
+}
+
+.eyebrow{color:var(--muted);margin:0 0 var(--sp-5)}
+.eyebrow-mark{color:var(--sage)}
+
+.headline{
+  font-family:var(--f-display);font-weight:600;
+  font-size:var(--s4);line-height:1.06;letter-spacing:-.025em;
+  margin:0 0 var(--sp-5);
+}
+.headline span{display:block}
+.headline-2{padding-left:.9em}
+.headline-3{padding-left:1.8em;position:relative;color:var(--sage)}
+.headline-3::after{
+  content:"";position:absolute;left:1.85em;bottom:-.14em;width:2.1em;height:3px;background:var(--saffron);
+}
+@media (max-width:560px){
+  .headline-2{padding-left:.5em}
+  .headline-3{padding-left:1em}
+  .headline-3::after{left:1.05em}
+}
+
+.lede{font-size:1.12rem;max-width:46ch;margin:0 0 var(--sp-5);color:var(--ink)}
+.lede-soft{color:var(--muted)}
+.hero-cta{display:flex;flex-wrap:wrap;gap:var(--sp-3);margin-bottom:var(--sp-5)}
+.status{color:var(--muted);margin:0;display:flex;align-items:flex-start;gap:8px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--sage);flex:none;margin-top:7px}
+
+/* ============================================================
+   ДЕМО-ЧАТ  (сигнатурный элемент)
+   ============================================================ */
+.demo-tag{
+  display:inline-flex;align-items:center;margin:0 0 10px;
+  background:var(--saffron);color:var(--ink);padding:5px 12px;border-radius:20px;
+  font-family:var(--f-mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:500;
+}
+.phone{
+  background:var(--ink);border-radius:var(--radius);overflow:hidden;
+  box-shadow:0 1px 0 var(--line),0 24px 48px -28px rgba(22,32,46,.55);
+}
+.phone-bar{
+  display:flex;align-items:center;gap:12px;padding:14px 18px;
+  background:var(--ink-2);border-bottom:1px solid var(--line-dark);
+}
+.avatar{
+  width:36px;height:36px;border-radius:50%;flex:none;background:var(--sage);
+  display:grid;place-items:center;color:#F2F6F3;font-family:var(--f-display);font-weight:700;font-size:.9rem;
+}
+.phone-name{color:var(--paper);font-weight:600;font-size:.95rem;line-height:1.25}
+.phone-sub{color:var(--muted-dark);font-family:var(--f-mono);font-size:.72rem}
+
+.log{
+  height:340px;overflow-y:auto;padding:var(--sp-4) var(--sp-4) var(--sp-2);
+  display:flex;flex-direction:column;justify-content:flex-end;gap:10px;scrollbar-width:thin;
+}
+@media (max-width:960px){.log{height:320px}}
+
+.msg{max-width:82%;padding:10px 13px;border-radius:14px;font-size:.96rem;line-height:1.5;animation:pop .3s var(--ease) both}
+.msg-bot{background:var(--ink-2);color:var(--paper);border-bottom-left-radius:5px;align-self:flex-start}
+.msg-me{background:var(--sage);color:#F2F6F3;border-bottom-right-radius:5px;align-self:flex-end}
+.msg strong{font-weight:600}
+.msg-time{
+  display:flex;align-items:center;justify-content:flex-end;gap:4px;
+  font-family:var(--f-mono);font-size:.66rem;color:var(--muted-dark);margin-top:4px;
+}
+.msg-me .msg-time{color:#CBE0D6}
+.tick{width:13px;height:13px;flex:none}
+
+@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.typing{align-self:flex-start;background:var(--ink-2);border-radius:14px;border-bottom-left-radius:5px;padding:13px 15px;display:flex;gap:5px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--muted-dark);animation:blink 1.1s infinite}
+.typing i:nth-child(2){animation-delay:.18s}
+.typing i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,60%,100%{opacity:.3}30%{opacity:1}}
+
+.keys{
+  display:flex;flex-wrap:wrap;gap:8px;padding:var(--sp-3) var(--sp-4) var(--sp-4);
+  border-top:1px solid var(--line-dark);background:var(--ink);
+}
+.key{
+  flex:1 1 auto;min-width:0;min-height:44px;padding:0 14px;
+  background:var(--ink-2);color:var(--paper);border:1px solid var(--line-dark);
+  border-radius:var(--radius-sm);font-family:var(--f-body);font-size:.92rem;font-weight:500;cursor:pointer;
+  transition:background-color .16s var(--ease),border-color .16s var(--ease);
+}
+.key:hover{background:var(--ink-3);border-color:var(--sage)}
+.key-go{background:var(--saffron);color:var(--ink);border-color:var(--saffron);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.key-go:hover{background:#EBA940;border-color:#EBA940}
+.demo-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:10px;color:var(--muted);flex-wrap:wrap}
+.reset{background:none;border:0;padding:4px;cursor:pointer;color:var(--muted);font-family:var(--f-mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;text-decoration:underline;text-underline-offset:3px}
+.reset:hover{color:var(--ink)}
+
+/* ============================================================
+   СЕКЦИИ
+   ============================================================ */
+.band{padding:var(--sp-8) 0;border-top:1px solid var(--line)}
+.band-alt{background:var(--paper-2)}
+.band-ink{background:var(--ink);color:var(--paper);border-top:0}
+
+.head{max-width:56ch;margin:0 0 var(--sp-7)}
+.head-label{color:var(--sage);margin:0 0 var(--sp-3)}
+.band-ink .head-label{color:var(--saffron)}
+.head-title{font-family:var(--f-display);font-weight:600;font-size:var(--s3);line-height:1.15;letter-spacing:-.02em;margin:0 0 var(--sp-3)}
+.head-note{margin:0;color:var(--muted);font-size:1.05rem}
+.band-ink .head-note{color:var(--muted-dark)}
+
+/* --- что берёт на себя --- */
+.jobs{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}
+.job{background:var(--paper);padding:var(--sp-5)}
+.job-key{color:var(--sage);margin:0 0 var(--sp-3)}
+.job-title{font-family:var(--f-display);font-weight:600;font-size:1.12rem;line-height:1.3;margin:0 0 var(--sp-2)}
+.job-text{margin:0;color:var(--muted);font-size:.97rem}
+@media (max-width:900px){.jobs{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:520px){.jobs{grid-template-columns:1fr}}
+
+/* --- как проходит работа (реальная последовательность → нумерация оправдана) --- */
+.steps{display:grid;gap:0;counter-reset:s}
+.step{
+  display:grid;grid-template-columns:76px 1fr 196px;gap:var(--sp-5);
+  padding:var(--sp-5) 0;border-top:1px solid var(--line);align-items:baseline;
+}
+.step:last-child{border-bottom:1px solid var(--line)}
+.step-n{font-family:var(--f-mono);font-size:1.5rem;color:var(--saffron);font-weight:500}
+.step-title{font-family:var(--f-display);font-weight:600;font-size:1.22rem;margin:0 0 var(--sp-2)}
+.step-text{margin:0;color:var(--muted);max-width:58ch}
+.step-when{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);text-align:right;letter-spacing:.03em}
+@media (max-width:820px){
+  .step{grid-template-columns:56px 1fr;gap:var(--sp-4)}
+  .step-when{grid-column:2;text-align:left;margin-top:var(--sp-2)}
+}
+
+/* --- цены --- */
+.tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-4)}
+.tier{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:var(--sp-5);display:flex;flex-direction:column}
+.tier-pick{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.tier-key{color:var(--sage);margin:0 0 var(--sp-3)}
+.tier-pick .tier-key{color:var(--saffron)}
+.tier-name{font-family:var(--f-display);font-weight:600;font-size:1.2rem;margin:0 0 var(--sp-2)}
+.tier-price{font-family:var(--f-mono);font-size:1.45rem;font-weight:500;margin:0 0 var(--sp-1)}
+.tier-term{font-family:var(--f-mono);font-size:.75rem;color:var(--muted);margin:0 0 var(--sp-4);letter-spacing:.04em}
+.tier-list{list-style:none;margin:0 0 var(--sp-5);padding:0;display:grid;gap:9px;font-size:.97rem}
+.tier-list li{display:grid;grid-template-columns:20px 1fr;gap:8px;color:var(--muted)}
+.tier-list svg{margin-top:5px;color:var(--sage)}
+.tier .btn{margin-top:auto}
+@media (max-width:900px){.tiers{grid-template-columns:1fr}}
+
+/* --- обо мне --- */
+.me-grid{display:grid;grid-template-columns:1fr 340px;gap:var(--sp-8);align-items:start}
+.me-text p{margin:0 0 var(--sp-4);max-width:60ch;font-size:1.06rem}
+.me-text p:last-child{margin-bottom:0}
+.band-ink .me-text p{color:#D6DBE2}
+.facts{border:1px solid var(--line-dark);border-radius:var(--radius);padding:var(--sp-5);display:grid;gap:var(--sp-4)}
+.fact-k{color:var(--muted-dark);margin:0 0 3px}
+.fact-v{margin:0;font-weight:500}
+@media (max-width:900px){.me-grid{grid-template-columns:1fr;gap:var(--sp-6)}}
+
+/* --- вопросы --- */
+.faq{max-width:760px}
+.q{border-top:1px solid var(--line)}
+.q:last-of-type{border-bottom:1px solid var(--line)}
+.q summary{
+  cursor:pointer;list-style:none;padding:var(--sp-4) 40px var(--sp-4) 0;position:relative;
+  font-family:var(--f-display);font-weight:600;font-size:1.08rem;
+}
+.q summary::-webkit-details-marker{display:none}
+.q summary::after{
+  content:"";position:absolute;right:8px;top:50%;width:10px;height:10px;
+  border-right:2px solid var(--saffron);border-bottom:2px solid var(--saffron);
+  transform:translateY(-70%) rotate(45deg);transition:transform .2s var(--ease);
+}
+.q[open] summary::after{transform:translateY(-30%) rotate(-135deg)}
+.q-body{margin:0 0 var(--sp-5);color:var(--muted);max-width:62ch}
+
+/* --- финал --- */
+.final{text-align:center;padding:var(--sp-9) 0}
+.final-title{font-family:var(--f-display);font-weight:600;font-size:var(--s3);line-height:1.15;letter-spacing:-.02em;margin:0 auto var(--sp-4);max-width:22ch}
+.final-note{margin:0 auto var(--sp-6);color:var(--muted);max-width:44ch}
+.final-cta{display:flex;justify-content:center;gap:var(--sp-3);flex-wrap:wrap}
+
+.foot{border-top:1px solid var(--line);padding:var(--sp-5) 0;background:var(--paper)}
+.foot-in{display:flex;justify-content:space-between;gap:var(--sp-4);flex-wrap:wrap;color:var(--muted)}
+.foot a{color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.foot a:hover{color:var(--ink)}
+
+/* ============================================================
+   ДОСТУПНОСТЬ: меньше движения
+   ============================================================ */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important}
+  .msg{animation:none}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">К содержанию</a>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#top" id="top">Алиджон<span class="brand-dot">.</span>боты</a>
+    <nav class="top-nav" aria-label="Разделы">
+      <a href="#chto">Что умеет</a>
+      <a href="#kak">Как работаю</a>
+      <a href="#ceny">Цены</a>
+      <a href="#kto">Кто я</a>
+    </nav>
+    <a class="btn btn-ghost btn-sm btn-top" href="https://t.me/rutsiyax" target="_blank" rel="noopener">Написать в Telegram</a>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ================= ГЕРОЙ ================= -->
+<section class="hero">
+  <div class="wrap hero-grid">
+
+    <div>
+      <p class="mono eyebrow">Душанбе <span class="eyebrow-mark">·</span> Telegram-боты для малого бизнеса</p>
+
+      <h1 class="headline">
+        <span>Клиент пишет.</span>
+        <span class="headline-2">Бот отвечает сразу.</span>
+        <span class="headline-3">Заказ уже у вас.</span>
+      </h1>
+
+      <p class="lede">
+        Меня зовут Алиджон. Я пишу ботов на Python для кафе, магазинов и салонов —
+        чтобы человек не ждал ответа сорок минут и не уходил к соседям.
+        <span class="lede-soft">Первый разговор бесплатный, и я честно скажу, нужен вам бот или нет.</span>
+      </p>
+
+      <div class="hero-cta">
+        <a class="btn btn-main" href="https://t.me/rutsiyax" target="_blank" rel="noopener">
+          <svg class="tick" style="width:18px;height:18px" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.9 4.3 18.9 19c-.2 1-.8 1.3-1.7.8l-4.6-3.4-2.2 2.1c-.2.2-.5.5-.9.5l.3-4.7 8.5-7.7c.4-.3-.1-.5-.6-.2L7.2 13 2.6 11.5c-1-.3-1-1 .2-1.5l18-6.9c.8-.3 1.5.2 1.1 1.2Z"/></svg>
+          Обсудить задачу
+        </a>
+        <a class="btn btn-ghost" href="#ceny">Посмотреть цены</a>
+      </div>
+
+      <p class="mono status"><span class="dot"></span> Отвечаю в течение часа, до 23:00 по Душанбе</p>
+    </div>
+
+    <!-- СИГНАТУРА: живое демо бота -->
+    <div class="demo">
+      <p class="demo-tag">Живое демо · нажимайте кнопки</p>
+      <div class="phone">
+        <div class="phone-bar">
+          <div class="avatar" aria-hidden="true">С</div>
+          <div>
+            <div class="phone-name">Барбершоп «Сартарош»</div>
+            <div class="phone-sub">бот · онлайн</div>
+          </div>
+        </div>
+        <div class="log" id="log" role="log" aria-live="polite" aria-label="Переписка с ботом"></div>
+        <div class="keys" id="keys"></div>
+      </div>
+      <div class="demo-foot">
+        <p class="mono" style="margin:0">Один из ботов, которых я собрал</p>
+        <button class="reset" id="reset" type="button">Начать заново</button>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================= ЧТО УМЕЕТ ================= -->
+<section class="band band-alt" id="chto">
+  <div class="wrap">
+    <div class="head">
+      <p class="mono head-label">Что бот снимает с вас</p>
+      <h2 class="head-title">Четыре вещи, на которые у вас каждый день уходит время</h2>
+      <p class="head-note">Не «искусственный интеллект» и не «цифровая трансформация». Просто эти четыре штуки перестают быть вашей заботой.</p>
+    </div>
+
+    <div class="jobs">
+      <article class="job">
+        <p class="mono job-key">Заказы</p>
+        <h3 class="job-title">Принимает, пока вы заняты</h3>
+        <p class="job-text">Ночью, в выходной, в час пик. Клиент оформляет заказ сам, вы видите его утром в списке.</p>
+      </article>
+      <article class="job">
+        <p class="mono job-key">Запись</p>
+        <h3 class="job-title">Показывает свободное время</h3>
+        <p class="job-text">Человек выбирает день и час из реальных окон. Бот напоминает ему за час — и он приходит.</p>
+      </article>
+      <article class="job">
+        <p class="mono job-key">Вопросы</p>
+        <h3 class="job-title">Отвечает «сколько» и «где»</h3>
+        <p class="job-text">Это примерно семь сообщений из десяти. Бот закрывает их мгновенно, вы отвечаете только на живое.</p>
+      </article>
+      <article class="job">
+        <p class="mono job-key">Учёт</p>
+        <h3 class="job-title">Складывает всё в одно место</h3>
+        <p class="job-text">Заявки падают в Google-таблицу или вам в личку. Ничего не теряется в переписке.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= КАК ПРОХОДИТ РАБОТА ================= -->
+<section class="band" id="kak">
+  <div class="wrap">
+    <div class="head">
+      <p class="mono head-label">Как проходит работа</p>
+      <h2 class="head-title">Четыре шага, и вы всё время видите, что происходит</h2>
+      <p class="head-note">Никаких «мы вам перезвоним через месяц». На каждом шаге вы получаете что-то, что можно посмотреть и потрогать.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">01</div>
+        <div>
+          <h3 class="step-title">Разговор</h3>
+          <p class="step-text">Вы рассказываете, как сейчас приходят клиенты и что раздражает больше всего. Я задаю вопросы. Если бот вам не нужен — так и скажу, это бывает.</p>
+        </div>
+        <div class="step-when">20 минут · бесплатно</div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">02</div>
+        <div>
+          <h3 class="step-title">Схема диалога</h3>
+          <p class="step-text">Рисую, что бот спросит и что ответит, шаг за шагом. Вы читаете обычным текстом и правите формулировки — это ваш голос, не мой.</p>
+        </div>
+        <div class="step-when">1–2 дня</div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">03</div>
+        <div>
+          <h3 class="step-title">Сборка</h3>
+          <p class="step-text">Пишу бота на Python. Показываю не картинки, а живого бота в Telegram — открываете и жмёте кнопки сами.</p>
+        </div>
+        <div class="step-when">3–7 дней</div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">04</div>
+        <div>
+          <h3 class="step-title">Запуск и поддержка</h3>
+          <p class="step-text">Ставлю бота на сервер, отдаю доступы — они ваши. Первый месяц правлю тексты и мелочи бесплатно, потому что после старта всегда что-то вылезает.</p>
+        </div>
+        <div class="step-when">1 день · +месяц правок</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ЦЕНЫ =================
+     ВНИМАНИЕ: суммы и сроки — черновик. Поставьте свои реальные цифры. -->
+<section class="band band-alt" id="ceny">
+  <div class="wrap">
+    <div class="head">
+      <p class="mono head-label">Сколько стоит</p>
+      <h2 class="head-title">Цена зависит от того, сколько бот умеет</h2>
+      <p class="head-note">Точную сумму называю после разговора и не меняю её потом. Оплата пополам: половина в начале, половина на запуске.</p>
+    </div>
+
+    <div class="tiers">
+      <article class="tier">
+        <p class="mono tier-key">Простой</p>
+        <h3 class="tier-name">Бот-справочная</h3>
+        <p class="tier-price">от 500 сомони</p>
+        <p class="tier-term">Готов за 3 дня</p>
+        <ul class="tier-list">
+          <li><svg class="tick" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5 8 14.5 16 5.5"/></svg><span>Меню, цены, адрес, часы работы</span></li>
+          <li><svg class="tick" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5 8 14.5 16 5.5"/></svg><span>Кнопки вместо переписки</span></li>
+          <li><svg class="tick" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5 8 14.5 16 5.5"/></svg><span>Кнопка «позвонить» и карта</span></li>
+        </ul>
+        <a class="btn btn-ghost" href="https://t.me/rutsiyax" target="_blank" rel="noopener">Обсудить</a>
+      </article>
+
+      <article class="tier tier-pick">
+        <p class="mono tier-key">Чаще всего берут</p>
+        <h3 class="tier-name">Бот с заказами</h3>
+        <p class="tier-price">от 1200 сомони</p>
+        <p class="tier-term">Готов за 5–7 дней</p>
+        <ul class="tier-list">
+          <li><svg class="tick" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5 8 14.5 16 5.5"/></svg><span>Всё из «Справочной»</span></li>
+          <li><svg class="tick" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5 8 14.5 16 5.5"/></svg><span>Заказ или запись на время</span></li>
+          <li><svg class="tick" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5 8 14.5 16 5.5"/></svg><span>Заявки в Google-таблицу</span></li>
+          <li><svg class="tick" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5 8 14.5 16 5.5"/></svg><span>Напоминания клиенту</span></li>
+        </ul>
+        <a class="btn btn-main" href="https://t.me/rutsiyax" target="_blank" rel="noopener">Обсудить</a>
+      </article>
+
+      <article class="tier">
+        <p class="mono tier-key">Под задачу</p>
+        <h3 class="tier-name">Своя логика</h3>
+        <p class="tier-price">Считаем вместе</p>
+        <p class="tier-term">Срок зависит от объёма</p>
+        <ul class="tier-list">
+          <li><svg class="tick" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5 8 14.5 16 5.5"/></svg><span>Оплата прямо в боте</span></li>
+          <li><svg class="tick" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5 8 14.5 16 5.5"/></svg><span>Связь с вашей базой или CRM</span></li>
+          <li><svg class="tick" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5 8 14.5 16 5.5"/></svg><span>Панель для сотрудников</span></li>
+        </ul>
+        <a class="btn btn-ghost" href="https://t.me/rutsiyax" target="_blank" rel="noopener">Обсудить</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= КТО Я ================= -->
+<section class="band band-ink" id="kto">
+  <div class="wrap me-grid">
+    <div class="me-text">
+      <p class="mono head-label">Кто это делает</p>
+      <h2 class="head-title" style="color:var(--paper)">Мне 19, я из Душанбе, и это не агентство</h2>
+      <p>Я учусь программировать на Python и параллельно беру заказы на ботов. Поэтому у меня дешевле, чем в студии, — и поэтому же я не берусь за десять проектов сразу.</p>
+      <p>Код пишу сам, от начала до конца. Вы общаетесь со мной напрямую, без менеджера, который пересказывает ваши слова разработчику своими.</p>
+      <p>Если задача выходит за пределы того, что я умею, я скажу об этом на первом разговоре, а не через три недели молчания.</p>
+    </div>
+
+    <div class="facts">
+      <div>
+        <p class="mono fact-k">Беру в работу</p>
+        <p class="fact-v">2–3 проекта в месяц</p>
+      </div>
+      <div>
+        <p class="mono fact-k">Отвечаю</p>
+        <p class="fact-v">В течение часа, до 23:00</p>
+      </div>
+      <div>
+        <p class="mono fact-k">Пишу на</p>
+        <p class="fact-v">Python · aiogram · SQLite</p>
+      </div>
+      <div>
+        <p class="mono fact-k">Языки общения</p>
+        <p class="fact-v">Тоҷикӣ · Русский · English</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ВОПРОСЫ ================= -->
+<section class="band">
+  <div class="wrap">
+    <div class="head">
+      <p class="mono head-label">Частые вопросы</p>
+      <h2 class="head-title">То, что спрашивают до начала работы</h2>
+    </div>
+
+    <div class="faq">
+      <details class="q">
+        <summary>А если я вообще не разбираюсь в технике?</summary>
+        <p class="q-body">Так и должно быть — это моя часть работы, а не ваша. От вас нужны только ответы про бизнес: что продаёте, как принимаете заказы сейчас, что бесит. Всё остальное я настрою и покажу на пальцах, куда нажимать.</p>
+      </details>
+
+      <details class="q">
+        <summary>Бот останется у меня, если мы перестанем работать?</summary>
+        <p class="q-body">Да. Токен бота, сервер и код — ваши, я передаю доступы на запуске. Никакой ежемесячной привязки ко мне: захотите передать другому человеку — передадите.</p>
+      </details>
+
+      <details class="q">
+        <summary>Сколько стоит содержать его каждый месяц?</summary>
+        <p class="q-body">Сам Telegram бесплатный. Платить нужно только за сервер — это примерно 50–80 сомони в месяц. Если бот простой, его можно поднять и на бесплатном хостинге, покажу как.</p>
+      </details>
+
+      <details class="q">
+        <summary>Что если после запуска что-то сломается?</summary>
+        <p class="q-body">Первый месяц я чиню и правлю бесплатно — пишите в Telegram. Дальше по мелочи обычно тоже помогаю, а большие доработки считаем отдельно, заранее и по фиксированной цене.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ФИНАЛ ================= -->
+<section class="band band-alt">
+  <div class="wrap final">
+    <h2 class="final-title">Расскажите, как к вам приходят клиенты</h2>
+    <p class="final-note">Двадцать минут разговора — и вы поймёте, стоит ли вообще это затевать. Без счёта и без «подумайте до пятницы».</p>
+    <div class="final-cta">
+      <a class="btn btn-main" href="https://t.me/rutsiyax" target="_blank" rel="noopener">
+        <svg class="tick" style="width:18px;height:18px" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.9 4.3 18.9 19c-.2 1-.8 1.3-1.7.8l-4.6-3.4-2.2 2.1c-.2.2-.5.5-.9.5l.3-4.7 8.5-7.7c.4-.3-.1-.5-.6-.2L7.2 13 2.6 11.5c-1-.3-1-1 .2-1.5l18-6.9c.8-.3 1.5.2 1.1 1.2Z"/></svg>
+        Написать в Telegram
+      </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <p class="mono" style="margin:0">Алиджон Махмаджонов · Душанбе</p>
+    <p class="mono" style="margin:0"><a href="https://t.me/rutsiyax" target="_blank" rel="noopener">@rutsiyax</a></p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  var log   = document.getElementById("log");
+  var keys  = document.getElementById("keys");
+  var reset = document.getElementById("reset");
+  if(!log || !keys) return;
+
+  var calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var TG   = "https://t.me/rutsiyax";
+  var busy = false;
+
+  /* Сценарий бота. Каждый узел: что говорит бот + какие кнопки под ним. */
+  var script = {
+    start:{
+      say:["Салом! Это бот барбершопа «Сартарош». Чем помочь?"],
+      keys:[
+        {t:"Записаться",     go:"day"},
+        {t:"Сколько стоит",  go:"price"},
+        {t:"Где вы",         go:"where"}
+      ]
+    },
+    day:{
+      say:["На какой день вас записать?"],
+      keys:[
+        {t:"Сегодня",     go:"slots"},
+        {t:"Завтра",      go:"slots"},
+        {t:"Другой день", go:"slots"}
+      ]
+    },
+    slots:{
+      say:["Свободное время у мастера Фаррух:"],
+      keys:[
+        {t:"14:30", go:"done"},
+        {t:"16:00", go:"done"},
+        {t:"18:30", go:"done"}
+      ]
+    },
+    price:{
+      say:[
+        "Стрижка — <strong>60 сомони</strong><br>Стрижка + борода — <strong>90 сомони</strong><br>Детская — <strong>40 сомони</strong>",
+        "Записать вас?"
+      ],
+      keys:[
+        {t:"Да, записаться", go:"day"},
+        {t:"Назад",          go:"start"}
+      ]
+    },
+    where:{
+      say:[
+        "Мы на <strong>Рудаки 84</strong>, второй этаж, вход со двора.",
+        "Работаем каждый день с 09:00 до 21:00."
+      ],
+      keys:[
+        {t:"Записаться", go:"day"},
+        {t:"Назад",      go:"start"}
+      ]
+    },
+    done:{
+      say:[
+        "Готово, записал вас ✓ Напомню за час до визита.",
+        "Кстати — этого бота собрал Алиджон. Хотите такого же для своего дела?"
+      ],
+      keys:[
+        {t:"Написать Алиджону", href:TG},
+        {t:"Пройти заново",     go:"start"}
+      ]
+    }
+  };
+
+  function now(){
+    var d = new Date();
+    return ("0"+d.getHours()).slice(-2) + ":" + ("0"+d.getMinutes()).slice(-2);
+  }
+
+  function scrollDown(){ log.scrollTop = log.scrollHeight; }
+
+  function bubble(html, mine){
+    var el = document.createElement("div");
+    el.className = "msg " + (mine ? "msg-me" : "msg-bot");
+    el.innerHTML = html +
+      '<span class="msg-time">' + now() +
+      (mine ? '<svg class="tick" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 11l3.5 3.5L12 7"/><path d="M8.5 11.5 10 13l6.5-7"/></svg>' : '') +
+      '</span>';
+    log.appendChild(el);
+    scrollDown();
+  }
+
+  function typing(){
+    var el = document.createElement("div");
+    el.className = "typing";
+    el.setAttribute("aria-hidden","true");
+    el.innerHTML = "<i></i><i></i><i></i>";
+    log.appendChild(el);
+    scrollDown();
+    return el;
+  }
+
+  function drawKeys(list){
+    keys.innerHTML = "";
+    list.forEach(function(k){
+      var el;
+      if(k.href){
+        el = document.createElement("a");
+        el.className = "key key-go";
+        el.href = k.href;
+        el.target = "_blank";
+        el.rel = "noopener";
+        el.textContent = k.t;
+      }else{
+        el = document.createElement("button");
+        el.className = "key";
+        el.type = "button";
+        el.textContent = k.t;
+        el.addEventListener("click", function(){ pick(k); });
+      }
+      keys.appendChild(el);
+    });
+  }
+
+  /* Показать реплики узла по очереди, потом кнопки. */
+  function speak(nodeName){
+    var node = script[nodeName];
+    if(!node) return;
+    busy = true;
+    keys.innerHTML = "";
+
+    var i = 0;
+    (function next(){
+      if(i >= node.say.length){
+        busy = false;
+        drawKeys(node.keys);
+        return;
+      }
+      var line = node.say[i++];
+      if(calm){
+        bubble(line, false);
+        next();
+        return;
+      }
+      var dots = typing();
+      setTimeout(function(){
+        dots.remove();
+        bubble(line, false);
+        setTimeout(next, 260);
+      }, 620);
+    })();
+  }
+
+  function pick(k){
+    if(busy) return;
+    bubble(k.t, true);
+    if(calm){ speak(k.go); }
+    else { setTimeout(function(){ speak(k.go); }, 300); }
+  }
+
+  function restart(){
+    log.innerHTML = "";
+    keys.innerHTML = "";
+    busy = false;
+    speak("start");
+  }
+
+  if(reset) reset.addEventListener("click", restart);
+  restart();
+})();
+</script>
+</body>
+</html>
