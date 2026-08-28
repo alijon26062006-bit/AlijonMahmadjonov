@@ -39,11 +39,15 @@ class SentMessage:
 
 
 class FakeBot:
-    def __init__(self, fail_for=None):
+    def __init__(self, fail_for=None, blocked_by=()):
         self.sent: list[SentMessage] = []
         self.fail_for = fail_for      # куда отправка не проходит
+        self.blocked_by = set(blocked_by)   # кто заблокировал бота
 
     async def send_message(self, chat_id, text, reply_markup=None, **kw):
+        if chat_id in self.blocked_by:
+            from aiogram.exceptions import TelegramForbiddenError
+            raise TelegramForbiddenError(method=None, message="bot was blocked")
         if self.fail_for is not None and chat_id == self.fail_for:
             from aiogram.exceptions import TelegramBadRequest
             raise TelegramBadRequest(method=None, message="chat not found")
@@ -114,7 +118,7 @@ def buttons(markup) -> list[str]:
     return [b.text for row in markup.inline_keyboard for b in row]
 
 
-async def make_order(conn, status=db.ORDER_DELIVERED, user_id=BUYER) -> db.Order:
+async def make_order(conn, status=db.ORDER_DELIVERED, *, user_id=BUYER) -> db.Order:
     order = await db.create_order(
         conn, user_id=user_id, product_type="stars", quantity=100,
         recipient="kto", price=17_00,
@@ -309,6 +313,70 @@ async def run(conn) -> None:
           any("Отзывы" in b.text for r in keyboards.main_menu().inline_keyboard for b in r))
     await runtime.set_value(conn, "reviews_channel", "")
     check("без канала ссылки нет", keyboards.reviews_link() == "")
+
+    await past_buyers(conn, storage)
+
+
+async def past_buyers(conn, storage) -> None:
+    """Кнопка «спросить у тех, кто покупал раньше»."""
+    from app.services import reviews as service
+
+    # три старых покупателя: обычный, с двумя заказами и заблокировавший бота
+    for uid in (601, 602, 603):
+        await db.upsert_user(conn, uid, f"stary{uid}", "Старый")
+    old_one = await make_order(conn, user_id=601)
+    await make_order(conn, user_id=602)
+    newest = await make_order(conn, user_id=602)      # у второго два заказа
+    await make_order(conn, user_id=603)
+    # четвёртый только оформил, но заказ не выдан — спрашивать не о чем
+    await db.upsert_user(conn, 604, "vrabote", "В работе")
+    await make_order(conn, db.ORDER_DELIVERING, user_id=604)
+
+    targets = await db.review_targets(conn)
+    ids = {order.user_id for order in targets}
+    check("в список попали прошлые покупатели", {601, 602, 603} <= ids, str(ids))
+    check("незавершённый заказ не попал", 604 not in ids, str(ids))
+    check("у клиента с двумя заказами берётся свежий",
+          any(o.id == newest.id for o in targets)
+          and not any(o.user_id == 602 and o.id != newest.id for o in targets))
+
+    bot = FakeBot(blocked_by={603})
+    report = await service.ask_past_buyers(bot, conn)
+    check("написали всем, кроме заблокировавшего", report["sent"] == len(targets) - 1,
+          str(report))
+    check("блокировка посчитана отдельно", report["blocked"] == 1, str(report))
+    check("просьба ушла первому", bot.to(601), str(len(bot.to(601))))
+    body = bot.to(601)[0].text
+    check("в просьбе сказано, что человек уже покупал",
+          "Вы покупали у нас" in body, body[:60])
+    check("в просьбе виден заказ", f"№{old_one.id}" in body, body)
+    check("к просьбе приложены оценки",
+          len(buttons(bot.to(601)[0].markup)) == 6)
+
+    check("повторное нажатие никого не трогает",
+          await db.review_targets(conn) == [])
+    again = await service.ask_past_buyers(FakeBot(), conn)
+    check("вторая рассылка никому не пишет", again["sent"] == 0, str(again))
+
+    # оценка из такой рассылки работает как обычная
+    state = state_for(601, storage)
+    call = call_of(f"rv:rate:{old_one.id}:4", uid=601)
+    await rv.cb_rate(call, state, conn)
+    review = await db.review_of_order(conn, old_one.id)
+    check("отзыв из рассылки создаётся", review is not None and review.rating == 4)
+    check("и просит текст", "Напишите пару слов" in call.last, call.last[:60])
+
+    bot = FakeBot()
+    message = msg("Брал год назад, всё дошло", uid=601)
+    await state.set_state(rv.Review.text)
+    await state.update_data(review_id=review.id)
+    await rv.on_review_text(message, state, conn, bot)
+    check("отзыв из рассылки уходит на модерацию",
+          any("проверку" in m.text for m in bot.to(ADMIN)), str(bot.to(ADMIN)))
+
+    # заблокировавшего бота больше не дёргаем
+    check("заблокировавший помечен и не вернётся в список",
+          603 not in {o.user_id for o in await db.review_targets(conn)})
 
 
 async def main() -> None:

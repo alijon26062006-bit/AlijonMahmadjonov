@@ -32,7 +32,7 @@ from app.config import settings
 from app.emoji import substitute
 from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
 from app.money import exact_stars_cost, fmt, fmt4, parse, parse4, round_price
-from app.services import dcpay, pricing, rates, tpay
+from app.services import dcpay, pricing, rates
 from app.services import reviews as reviews_service
 from app.services import delivery
 from app.states import Panel, PromoNew
@@ -90,7 +90,6 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🔗 Рекламные ссылки", callback_data="pn:links"),
         InlineKeyboardButton(text="⭐️ Отзывы", callback_data="pn:reviews"),
     )
-    kb.row(InlineKeyboardButton(text="🏦 TelegaPAY", callback_data="pn:tpay"))
     kb.row(InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"))
     return kb.as_markup()
 
@@ -536,23 +535,6 @@ FIELDS: dict[str, tuple[str, str, str]] = {
                         "percent"),
     "margin_percent": ("📈 Наценка",
                        "Процент наценки к себестоимости. Например <code>30</code>:", "percent"),
-    "tpay_key": ("🔑 Ключ TelegaPAY",
-                 "Ключ из кабинета app.telegapay.pro. "
-                 "Пришлите <code>-</code>, чтобы убрать:", "text"),
-    "tpay_base": ("🌐 Адрес API TelegaPAY",
-                  "Обычно менять не нужно. Для тестового сервера пришлите его "
-                  "адрес вида <code>https://.../api/v1</code>, "
-                  "<code>-</code> — вернуться на боевой:", "text"),
-    "tpay_currency": ("💱 Валюта TelegaPAY",
-                      "В какой валюте выставлять счёт: <code>RUB</code>, "
-                      "<code>USDT</code>, <code>TON</code>, <code>USD</code> "
-                      "или <code>EUR</code>:", "text"),
-    "tpay_rate_diram": ("📈 Курс валюты TelegaPAY",
-                        "Сколько сомони стоит одна единица валюты. "
-                        "Например <code>0.12</code> за рубль:", "money"),
-    "tpay_spread": ("➕ Надбавка к курсу TelegaPAY",
-                    "Процент поверх биржевого курса. Например <code>5</code>:",
-                    "percent"),
     "reviews_channel": ("📣 Канал отзывов",
                         "Куда публиковать одобренные отзывы: <code>@kanal</code> "
                         "или числовой ID.\n\n"
@@ -588,8 +570,6 @@ FIELD_PARENT.update({
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "star_packs": "pn:prices", "reviews_channel": "pn:reviews",
-    "tpay_key": "pn:tpay", "tpay_currency": "pn:tpay", "tpay_base": "pn:tpay",
-    "tpay_rate_diram": "pn:tpay", "tpay_spread": "pn:tpay",
     "usd_rate_diram": "pn:prices", "usd_rate_spread": "pn:prices",
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
     "referral_percent": "pn:prices", "support_notice": "pn:home",
@@ -2310,9 +2290,14 @@ async def cb_link_card(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
 # ═════════════════════════════════════════════════════════════ отзывы
 
 
-def reviews_text(stats: dict, pending: list) -> str:
+def reviews_text(stats: dict, pending: list, waiting: int = 0) -> str:
     channel = reviews_service.channel() or "не задан"
     average = (stats["rating_sum"] / stats["total"]) if stats["total"] else 0
+
+    tail = ""
+    if waiting:
+        tail = (f"\n\n📣 <b>Ещё не спрашивали: {waiting}</b>\n"
+                "└ <i>Это те, кто покупал до появления отзывов</i>")
 
     body = ""
     if pending:
@@ -2331,12 +2316,13 @@ def reviews_text(stats: dict, pending: list) -> str:
         + (f"└ Средняя оценка: <b>{average:.1f}</b> из 5"
            if stats["total"] else "└ Оценок пока нет")
         + body
+        + tail
         + "\n\n<blockquote>Отзыв приходит вам на проверку и попадает в канал "
           "только после кнопки «Опубликовать».</blockquote>"
     )
 
 
-def reviews_kb(pending: list) -> InlineKeyboardMarkup:
+def reviews_kb(pending: list, waiting: int = 0) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     on = runtime.get_bool("reviews_on")
     kb.row(btn("🚫 Не спрашивать отзывы" if on else "✅ Спрашивать отзывы",
@@ -2346,6 +2332,9 @@ def reviews_kb(pending: list) -> InlineKeyboardMarkup:
     if pending:
         kb.row(btn(f"⏳ Показать на проверке ({len(pending)})",
                    "pn:rev_pending", style=PRIMARY))
+    if waiting:
+        kb.row(btn(f"📣 Спросить у прошлых покупателей ({waiting})",
+                   "pn:rev_ask", style=PRIMARY))
     kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
     return kb.as_markup()
 
@@ -2353,7 +2342,9 @@ def reviews_kb(pending: list) -> InlineKeyboardMarkup:
 async def show_reviews(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     stats = await db.review_stats(conn)
     pending = await db.list_reviews(conn, status=db.REVIEW_PENDING)
-    await safe_edit(call, reviews_text(stats, pending), reviews_kb(pending))
+    waiting = len(await db.review_targets(conn))
+    await safe_edit(call, reviews_text(stats, pending, waiting),
+                    reviews_kb(pending, waiting))
 
 
 @router.callback_query(F.data == "pn:reviews")
@@ -2383,109 +2374,33 @@ async def cb_reviews_pending(call: CallbackQuery, conn: aiosqlite.Connection, bo
     await call.answer(f"Прислал {min(len(pending), 10)} шт.")
 
 
-# ═════════════════════════════════════════════════════════════ TelegaPAY
 
-
-def tpay_text() -> str:
-    key = runtime.get("tpay_key") or settings.telegapay_key
-    shown = f"{key[:6]}…{key[-4:]}" if len(key) > 12 else ("задан" if key else "не задан")
-    rate = tpay.rate_diram()
-
-    return (
-        "🏦 <b>TelegaPAY</b>\n"
-        f"<code>{texts.LINE}</code>\n\n"
-        f"{'✅' if runtime.get_bool('tpay_on') else '🚫'} Способ в меню клиента\n"
-        f"🔑 Ключ: <b>{shown}</b>\n"
-        f"💱 Валюта: <b>{tpay.currency()}</b>\n"
-        + (f"📈 Курс: <b>1 {tpay.currency()} = {fmt(rate)}</b>"
-           if rate > 0 else "❗️ <b>Курс не задан</b> — способ работать не будет")
-        + (f" (надбавка {runtime.get_int('tpay_spread')}%)"
-           if runtime.get_int("tpay_spread") else "")
-        + "\n\n<blockquote>Клиент называет сумму в сомони, счёт выставляется "
-          "в выбранной валюте, а на баланс приходит ровно запрошенное. "
-          "Вебхук не нужен: бот сам спрашивает статус платежа.</blockquote>"
-    )
-
-
-def tpay_kb() -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    on = runtime.get_bool("tpay_on")
-    kb.row(btn("🚫 Выключить способ" if on else "✅ Включить способ",
-               "pn:tpay_toggle", style=DANGER if on else SUCCESS))
-    kb.row(btn("🔌 Проверить связь", "pn:tpay_check", style=PRIMARY))
-    kb.row(
-        InlineKeyboardButton(text="🔑 Ключ", callback_data="pn:set:tpay_key"),
-        InlineKeyboardButton(text="💱 Валюта", callback_data="pn:set:tpay_currency"),
-    )
-    kb.row(InlineKeyboardButton(text="🌐 Адрес API", callback_data="pn:set:tpay_base"))
-    kb.row(
-        InlineKeyboardButton(text="📈 Курс вручную",
-                             callback_data="pn:set:tpay_rate_diram"),
-        InlineKeyboardButton(text="➕ Надбавка", callback_data="pn:set:tpay_spread"),
-    )
-    if tpay.currency() == "RUB":
-        kb.row(btn("🔄 Узнать курс рубля", "pn:tpay_rate"))
-    kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
-    return kb.as_markup()
-
-
-@router.callback_query(F.data == "pn:tpay")
-async def cb_tpay(call: CallbackQuery, state: FSMContext) -> None:
-    await state.clear()
-    await safe_edit(call, tpay_text(), tpay_kb())
-    await call.answer()
-
-
-@router.callback_query(F.data == "pn:tpay_toggle")
-async def cb_tpay_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
-    on = runtime.get_bool("tpay_on")
-    if not on and tpay.rate_diram() <= 0:
-        await call.answer("Сначала задайте курс валюты.", show_alert=True)
-        return
-    await runtime.set_value(conn, "tpay_on", "0" if on else "1")
-    await call.answer("Выключен" if on else "Включён")
-    await safe_edit(call, tpay_text(), tpay_kb())
-
-
-@router.callback_query(F.data == "pn:tpay_rate")
-async def cb_tpay_rate(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
-    """Курс рубля к сомони из тех же бесплатных источников."""
-    await call.answer("Спрашиваю курс…")
-    try:
-        rate = await rates.fetch_rub(runtime.get_int("tpay_spread"))
-    except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
-        await safe_edit(
-            call,
-            "💱 <b>Курс рубля не пришёл</b>\n\n"
-            f"<blockquote expandable>{exc}</blockquote>\n\n"
-            "Задайте его вручную.",
-            back_kb("pn:tpay", "‹ Назад"),
-        )
+@router.callback_query(F.data == "pn:rev_ask")
+async def cb_reviews_ask(call: CallbackQuery, conn: aiosqlite.Connection, bot: Bot) -> None:
+    """Разослать просьбу об отзыве тем, кто покупал раньше."""
+    waiting = await db.review_targets(conn)
+    if not waiting:
+        await call.answer("Спрашивать некого — всех уже спросили.", show_alert=True)
         return
 
-    await runtime.set_value(conn, "tpay_rate_diram", str(rate.diram))
-    await safe_edit(call, tpay_text(), tpay_kb())
-
-
-@router.callback_query(F.data == "pn:tpay_check")
-async def cb_tpay_check(call: CallbackQuery) -> None:
-    """Что именно отвечает шлюз — без догадок по документации."""
-    await safe_edit(call, "🔌 Проверяю связь с TelegaPAY…", back_kb("pn:tpay", "‹ Назад"))
-    await call.answer()
-
-    report = await tpay.client().healthcheck(tpay.currency())
-    lines = "\n".join(f"├ {name}: {result}" for name, result in report["steps"])
-    raw = str(report.get("raw") or "")[:600]
-
+    await call.answer("Рассылаю…")
     await safe_edit(
         call,
-        "🔌 <b>Проверка TelegaPAY</b>\n"
+        f"📣 <b>Спрашиваю отзывы</b>\n\n"
+        f"<blockquote>Пишу <b>{len(waiting)}</b> покупателям. "
+        "Займёт около минуты.</blockquote>",
+        back_kb("pn:reviews", "‹ К отзывам"),
+    )
+
+    report = await reviews_service.ask_past_buyers(bot, conn)
+    await safe_edit(
+        call,
+        "📣 <b>Просьбы разосланы</b>\n"
         f"<code>{texts.LINE}</code>\n\n"
-        f"{lines}\n\n"
-        + (f"<blockquote expandable>{raw}</blockquote>" if raw else "")
-        + ("\n\n<blockquote>Связь есть. Если в ответе видны способы оплаты — "
-           "можно включать способ.</blockquote>" if report["ok"] else
-           "\n\n<blockquote>Проверьте ключ и то, что магазин одобрен "
-           "менеджером в @TelegaPaySalesBot.</blockquote>"),
-        back_kb("pn:tpay", "‹ Назад"),
+        f"├ Написали: <b>{report['sent']}</b>\n"
+        f"├ Заблокировали бота: <b>{report['blocked']}</b>\n"
+        f"└ Не доставлено: <b>{report['failed']}</b>\n\n"
+        "<blockquote>Отзывы будут приходить сюда на проверку по мере того, "
+        "как люди их оставят. Повторно этих же людей бот не побеспокоит.</blockquote>",
+        back_kb("pn:reviews", "‹ К отзывам"),
     )

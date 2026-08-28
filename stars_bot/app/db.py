@@ -158,6 +158,14 @@ CREATE TABLE IF NOT EXISTS reviews (
     updated_at  TEXT NOT NULL
 );
 
+-- Кому уже предлагали оставить отзыв. Без этой отметки повторное нажатие
+-- кнопки в панели дёргало бы одних и тех же людей снова и снова.
+CREATE TABLE IF NOT EXISTS review_asks (
+    order_id   INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS links (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     code       TEXT NOT NULL UNIQUE,     -- то, что стоит после ?start=
@@ -587,6 +595,41 @@ async def list_reviews(
     params.append(limit)
     async with conn.execute(sql, params) as cur:
         return [_from_row(Review, row) for row in await cur.fetchall()]
+
+
+async def review_targets(
+    conn: aiosqlite.Connection, limit: int = 500,
+) -> list[Order]:
+    """Кого ещё можно попросить об отзыве.
+
+    По одному заказу на человека — самому свежему выданному. Пропускаем тех,
+    кто уже оставил отзыв, кого уже спрашивали и кто в бане: рассылка не
+    должна выглядеть навязчивой.
+    """
+    async with conn.execute(
+        """SELECT o.* FROM orders o
+           JOIN users u ON u.id = o.user_id
+           WHERE o.status = ?
+             AND u.is_banned = 0
+             AND o.id NOT IN (SELECT order_id FROM reviews)
+             AND o.id NOT IN (SELECT order_id FROM review_asks)
+             AND o.id = (SELECT MAX(id) FROM orders x
+                         WHERE x.user_id = o.user_id AND x.status = ?)
+           ORDER BY o.id DESC LIMIT ?""",
+        (ORDER_DELIVERED, ORDER_DELIVERED, limit),
+    ) as cur:
+        return [_from_row(Order, row) for row in await cur.fetchall()]
+
+
+async def mark_review_asked(
+    conn: aiosqlite.Connection, order_id: int, user_id: int,
+) -> None:
+    await conn.execute(
+        """INSERT OR IGNORE INTO review_asks (order_id, user_id, created_at)
+           VALUES (?, ?, ?)""",
+        (order_id, user_id, _now()),
+    )
+    await conn.commit()
 
 
 async def review_stats(conn: aiosqlite.Connection) -> dict[str, int]:

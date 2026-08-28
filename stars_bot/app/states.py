@@ -13,7 +13,6 @@ class Buy(StatesGroup):
 class Deposit(StatesGroup):
     amount = State()      # ждём сумму пополнения
     receipt = State()     # ждём скриншот чека
-    tpay_amount = State() # ждём сумму для оплаты через шлюз
 
 
 class Promo(StatesGroup):

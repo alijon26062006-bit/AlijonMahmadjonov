@@ -196,6 +196,15 @@ _RAW["REVIEW_ASK"] = (
     "секунду и поможет другим покупателям.</blockquote>"
 )
 
+_RAW["REVIEW_ASK_OLD"] = (
+    "[[reviews]] <b>Вы покупали у нас — как всё прошло?</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Заказ: <b>№{order_id}</b>\n"
+    "└ Товар: <b>{title}</b>\n\n"
+    "<blockquote>Поставьте оценку — это займёт секунду и поможет другим "
+    "покупателям выбрать нас.</blockquote>"
+)
+
 _RAW["REVIEW_ASK_TEXT"] = (
     "[[reviews]] <b>Оценка {stars}</b>\n"
     f"<code>{LINE}</code>\n\n"
@@ -316,41 +325,6 @@ _RAW["DEPOSIT_REJECTED"] = (
     f"<code>{LINE}</code>\n\n"
     "<blockquote>Оплата на {amount} не найдена. Если это ошибка — "
     "напишите в {support} и приложите чек.</blockquote>"
-)
-
-_RAW["TPAY_ASK_AMOUNT"] = (
-    "[[deposit]] <b>Оплата картой или криптой</b>\n"
-    f"<code>{LINE}</code>\n\n"
-    "[[price]] Курс: <b>1 {currency} = {rate}</b>\n\n"
-    "<blockquote>Введите сумму пополнения <b>в сомони</b> — счёт выставим "
-    "в {currency} по курсу выше.\n\nМинимум: {min_amount}</blockquote>"
-)
-
-_RAW["TPAY_LINK"] = (
-    "[[deposit]] <b>Счёт на оплату</b>\n"
-    f"<code>{LINE}</code>\n\n"
-    "├ К зачислению: <b>{amount}</b>\n"
-    "├ К оплате: <b>{charge} {currency}</b>\n"
-    "└ Заявка: <b>№{deposit_id}</b>\n\n"
-    "<blockquote>Нажмите «Оплатить», заплатите на странице шлюза и "
-    "возвращайтесь. Баланс пополнится сам — обычно за минуту.</blockquote>"
-)
-
-_RAW["TPAY_PENDING"] = (
-    "[[wait]] <b>Оплата пока не найдена</b>\n\n"
-    "<blockquote>Если вы только что заплатили — подождите минуту и нажмите "
-    "проверку ещё раз. Баланс пополнится сам.</blockquote>"
-)
-
-_RAW["TPAY_FAILED"] = (
-    "[[fail]] <b>Платёж не прошёл</b>\n\n"
-    "<blockquote>Счёт отменён или просрочен. Создайте новый — деньги, если "
-    "они списались, вернёт платёжная система.</blockquote>"
-)
-
-_RAW["TPAY_ERROR"] = (
-    "[[fail]] <b>Платёж не создался</b>\n\n"
-    "<blockquote>Попробуйте позже или пополните переводом на карту.</blockquote>"
 )
 
 _RAW["DEPOSIT_SOON"] = (

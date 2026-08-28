@@ -74,7 +74,6 @@ class Settings(BaseSettings):
     # ---- ссылки ----
     support_username: str = ""
     reviews_url: str = ""
-    telegapay_key: str = ""
     news_url: str = ""
     bot_username: str = ""
 

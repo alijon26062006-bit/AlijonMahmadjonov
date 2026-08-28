@@ -14,8 +14,10 @@ import logging
 
 import aiosqlite
 from aiogram import Bot
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import TelegramAPIError, TelegramForbiddenError
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+import asyncio
 
 from app import db, runtime, texts
 from app.config import settings
@@ -86,6 +88,43 @@ async def offer(bot: Bot, conn: aiosqlite.Connection, order: db.Order) -> bool:
         log.info("Не смог предложить отзыв по заказу %s: %s", order.id, exc)
         return False
     return True
+
+
+SEND_DELAY = 0.05        # ~20 сообщений в секунду — предел Telegram
+
+
+async def ask_past_buyers(
+    bot: Bot, conn: aiosqlite.Connection, limit: int = 500,
+) -> dict[str, int]:
+    """Попросить отзыв у тех, кто покупал раньше.
+
+    Отметку «спрашивали» ставим только на реально отправленное сообщение:
+    кто не получил из-за блокировки бота, останется в списке на потом.
+    """
+    targets = await db.review_targets(conn, limit)
+    report = {"total": len(targets), "sent": 0, "blocked": 0, "failed": 0}
+
+    for order in targets:
+        try:
+            await bot.send_message(
+                order.user_id,
+                texts.REVIEW_ASK_OLD.format(order_id=order.id, title=order.title),
+                reply_markup=rate_kb(order.id),
+            )
+        except TelegramForbiddenError:
+            report["blocked"] += 1
+            await db.mark_review_asked(conn, order.id, order.user_id)
+            continue
+        except TelegramAPIError as exc:
+            report["failed"] += 1
+            log.debug("Просьба об отзыве не дошла до %s: %s", order.user_id, exc)
+            continue
+
+        report["sent"] += 1
+        await db.mark_review_asked(conn, order.id, order.user_id)
+        await asyncio.sleep(SEND_DELAY)
+
+    return report
 
 
 async def to_moderation(bot: Bot, conn: aiosqlite.Connection, review: db.Review) -> None:

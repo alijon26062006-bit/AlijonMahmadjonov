@@ -59,21 +59,6 @@ SOURCES: list[tuple[str, str, list[str]]] = [
      ["usd", "tjs"]),
 ]
 
-#: Сколько сомони в одном рубле. Нужен для приёма рублей через TelegaPAY.
-RUB_SOURCES: list[tuple[str, str, list[str]]] = [
-    ("open.er-api.com",
-     "https://open.er-api.com/v6/latest/RUB", ["rates", "TJS"]),
-    ("currency-api (jsDelivr)",
-     "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/rub.json",
-     ["rub", "tjs"]),
-    ("currency-api (зеркало)",
-     "https://latest.currency-api.pages.dev/v1/currencies/rub.json",
-     ["rub", "tjs"]),
-]
-
-#: Рубль дешевле сомони, поэтому границы разумного здесь свои.
-MIN_RUB = Decimal("0.02")
-MAX_RUB = Decimal("2")
 
 
 async def _read(session: aiohttp.ClientSession, url: str, path: list[str]) -> Decimal | None:
@@ -94,11 +79,6 @@ async def _read(session: aiohttp.ClientSession, url: str, path: list[str]) -> De
 async def fetch(spread_percent: int = 0) -> Rate:
     """Курс доллара к сомони. Бросает RuntimeError, если все молчат."""
     return await _fetch(SOURCES, MIN_RATE, MAX_RATE, spread_percent)
-
-
-async def fetch_rub(spread_percent: int = 0) -> Rate:
-    """Курс рубля к сомони — по тем же источникам."""
-    return await _fetch(RUB_SOURCES, MIN_RUB, MAX_RUB, spread_percent)
 
 
 async def _fetch(
