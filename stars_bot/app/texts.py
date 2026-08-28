@@ -208,13 +208,13 @@ _RAW["REVIEW_ASK_OLD"] = (
 _RAW["REVIEW_ASK_TEXT"] = (
     "[[reviews]] <b>Оценка {stars}</b>\n"
     f"<code>{LINE}</code>\n\n"
-    "<blockquote>Напишите пару слов о покупке — отзыв попадёт в наш канал "
-    "после проверки.\n\nВаше имя будет видно под отзывом.</blockquote>"
+    "<blockquote>Напишите пару слов о покупке — мы публикуем отзывы в нашем "
+    "канале.\n\nВаше имя будет видно под отзывом.</blockquote>"
 )
 
 _RAW["REVIEW_SENT"] = (
-    "[[ok]] <b>Спасибо за отзыв!</b>\n\n"
-    "<blockquote>Он появится в канале после проверки.</blockquote>"
+    "[[party]] <b>Спасибо за отзыв!</b>\n\n"
+    "<blockquote>Скоро он появится в нашем канале.</blockquote>"
 )
 
 _RAW["REVIEW_ALREADY"] = (
