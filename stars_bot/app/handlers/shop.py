@@ -13,10 +13,12 @@ from aiogram.types import CallbackQuery, Message
 from app import db, keyboards, texts
 from app import runtime
 from app.handlers.menu import menu_text
-from app.money import fmt4, affordable_stars, discount_of, fmt, stars_cost
+from app.money import (
+    affordable_stars, discount_of, fmt, fmt4, stars_cost, steam_cost,
+)
 from app.services import delivery
 from app.services.fragment import DeliveryProvider, Recipient
-from app.states import Buy
+from app.states import Buy, Steam
 
 log = logging.getLogger(__name__)
 router = Router(name="shop")
@@ -408,6 +410,163 @@ async def cb_pay(
     # Итоговое сообщение (успех, возврат или «проверяю») отправляет
     # delivery-сервис — он единственный знает, чем всё кончилось.
     # Здесь только возвращаем пользователя в меню со свежим балансом.
+    await call.message.answer(
+        await menu_text(conn, call.from_user.id), reply_markup=keyboards.main_menu()
+    )
+
+
+# ------------------------------------------------------------------ Steam
+
+
+@router.callback_query(F.data == "m:steam")
+async def cb_steam(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    if not runtime.steam_on():
+        await call.answer("Раздел временно закрыт.", show_alert=True)
+        return
+    await call.message.edit_text(
+        texts.STEAM_ENTRY, reply_markup=keyboards.steam_menu()
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("steam:"), F.data.regexp(r"^steam:\d+$"))
+async def cb_steam_amount(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    amount = int(call.data.split(":")[1])
+    if amount not in runtime.steam_packs():
+        await call.answer("Этой суммы больше нет.", show_alert=True)
+        await call.message.edit_text(
+            texts.STEAM_ENTRY, reply_markup=keyboards.steam_menu()
+        )
+        return
+
+    price = steam_cost(amount)
+    user = await db.get_user(conn, call.from_user.id)
+    balance = user.balance if user else 0
+    if balance < price:
+        await call.message.edit_text(
+            texts.STARS_NOT_ENOUGH.format(
+                need=fmt(price), balance=fmt(balance), missing=fmt(price - balance)
+            ),
+            reply_markup=keyboards.deposit_methods(),
+        )
+        await call.answer()
+        return
+
+    await state.set_state(Steam.login)
+    await state.update_data(product_type="steam", quantity=amount, price=price)
+    await call.message.edit_text(
+        texts.STEAM_ASK_LOGIN.format(
+            amount=amount, currency=runtime.steam_currency(), price=fmt(price),
+        ),
+        reply_markup=keyboards.cancel(),
+    )
+    await call.answer()
+
+
+@router.message(Steam.login, F.text)
+async def on_steam_login(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection,
+    provider: DeliveryProvider,
+) -> None:
+    login = (message.text or "").strip().lstrip("@")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{3,64}", login):
+        await message.answer(texts.STEAM_BAD_LOGIN.format(login=login[:64] or "—"))
+        return
+
+    notice = await message.answer(texts.STEAM_CHECKING.format(login=login))
+    await _confirm_steam(notice, state, conn, provider, login, message.from_user.id)
+
+
+@router.callback_query(Steam.confirm, F.data == "steam:again")
+async def cb_steam_again(call: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    await state.set_state(Steam.login)
+    await call.message.edit_text(
+        texts.STEAM_ASK_LOGIN.format(
+            amount=data.get("quantity", 0), currency=runtime.steam_currency(),
+            price=fmt(data.get("price", 0)),
+        ),
+        reply_markup=keyboards.cancel(),
+    )
+    await call.answer()
+
+
+async def _confirm_steam(
+    target: Message, state: FSMContext, conn: aiosqlite.Connection,
+    provider: DeliveryProvider, login: str, user_id: int,
+) -> None:
+    """Проверить логин у сервиса и показать аккаунт на подтверждение.
+
+    Без подтверждённого логина заказ не создаётся: деньги на чужой аккаунт
+    Steam не вернуть, и предупреждение тут не спасёт.
+    """
+    account = await provider.check_steam_login(login)
+    if account is None:
+        await target.edit_text(texts.STEAM_NO_CHECK, reply_markup=keyboards.back())
+        await state.clear()
+        return
+    if not account.exists:
+        await target.edit_text(texts.STEAM_BAD_LOGIN.format(login=login))
+        await state.set_state(Steam.login)
+        return
+
+    data = await state.get_data()
+    user = await db.get_user(conn, user_id)
+    balance = user.balance if user else 0
+    price = data["price"]
+
+    await state.update_data(recipient=login, recipient_name=account.display)
+    await state.set_state(Steam.confirm)
+    await target.edit_text(
+        texts.STEAM_CONFIRM.format(
+            name=account.display, login=login,
+            amount=data["quantity"], currency=runtime.steam_currency(),
+            price=fmt(price), rest=fmt(max(balance - price, 0)),
+        ),
+        reply_markup=keyboards.confirm_steam(),
+    )
+
+
+@router.callback_query(Steam.confirm, F.data == "steam:ok")
+async def cb_steam_pay(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection,
+    provider: DeliveryProvider, bot: Bot,
+) -> None:
+    data = await state.get_data()
+    await state.clear()
+
+    await call.message.edit_text(
+        texts.PROCESSING_SLOW.format(
+            title=f"{data['quantity']} {runtime.steam_currency()} на Steam",
+            recipient=data["recipient"],
+        )
+    )
+    await call.answer()
+
+    try:
+        await delivery.purchase(
+            bot, conn, provider,
+            user_id=call.from_user.id,
+            product_type="steam",
+            quantity=data["quantity"],
+            recipient=data["recipient"],
+            price=data["price"],
+        )
+    except delivery.NotEnoughFunds:
+        user = await db.get_user(conn, call.from_user.id)
+        balance = user.balance if user else 0
+        await call.message.answer(
+            texts.STARS_NOT_ENOUGH.format(
+                need=fmt(data["price"]), balance=fmt(balance),
+                missing=fmt(data["price"] - balance),
+            ),
+            reply_markup=keyboards.deposit_methods(),
+        )
+        return
+
     await call.message.answer(
         await menu_text(conn, call.from_user.id), reply_markup=keyboards.main_menu()
     )

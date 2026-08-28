@@ -94,6 +94,12 @@ def _build_defaults() -> dict[str, str]:
         # отзывы
         "reviews_on": "1",               # спрашивать отзыв после заказа
         "reviews_channel": "",           # @канал или id, куда публиковать
+        # Steam: пополнение кошелька
+        "steam_enabled": "0",            # выключен, пока не сверены поля API
+        "steam_currency": "RUB",         # валюта кошелька Steam
+        "steam_price_e4": "0",           # цена продажи 1 единицы, в e4 сомони
+        "steam_cost_e4": "0",            # себестоимость 1 единицы, в e4
+        "steam_packs": "100,250,500,1000",
         # доступность
         "stars_enabled": "1",
         "premium_enabled": "1",
@@ -214,6 +220,28 @@ def star_packs() -> list[int]:
     return sorted(q for q in packs if min_stars() <= q <= max_stars())
 
 
+def steam_packs() -> list[int]:
+    """Готовые суммы пополнения Steam."""
+    packs = {int(chunk) for chunk in re.split(r"\D+", get("steam_packs") or "") if chunk}
+    return sorted(q for q in packs if q > 0)
+
+
+def steam_price_e4() -> int:
+    return get_int("steam_price_e4")
+
+
+def steam_cost_e4() -> int:
+    return get_int("steam_cost_e4")
+
+
+def steam_currency() -> str:
+    return (get("steam_currency") or "RUB").upper()
+
+
+def steam_on() -> bool:
+    return get_bool("steam_enabled") and steam_price_e4() > 0
+
+
 def premium_plans() -> list[dict]:
     try:
         plans = json.loads(get("premium_plans"))
@@ -309,6 +337,9 @@ def cost_of(product_type: str, quantity: int) -> int:
     """Во сколько нам обходится заказ. 0 — себестоимость неизвестна."""
     if product_type == "stars":
         cost_e4 = star_cost_e4()
+        return (cost_e4 * quantity + 50) // 100 if cost_e4 else 0
+    if product_type == "steam":
+        cost_e4 = steam_cost_e4()
         return (cost_e4 * quantity + 50) // 100 if cost_e4 else 0
     return premium_costs().get(quantity, 0)
 

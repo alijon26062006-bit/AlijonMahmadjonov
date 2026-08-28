@@ -81,6 +81,19 @@ class Recipient:
         return self.name or f"@{self.username}"
 
 
+@dataclass
+class SteamAccount:
+    """Ответ проверки логина Steam."""
+    login: str
+    exists: bool
+    name: str = ""          # отображаемое имя, если сервис его отдал
+    raw: dict | None = None
+
+    @property
+    def display(self) -> str:
+        return self.name or self.login
+
+
 class DeliveryProvider:
     #: Умеет ли провайдер показывать имя аккаунта до оплаты.
     supports_name_lookup: bool = False
@@ -92,6 +105,13 @@ class DeliveryProvider:
         raise NotImplementedError
 
     async def deliver_premium(self, username: str, months: int) -> DeliveryResult:
+        raise NotImplementedError
+
+    async def deliver_steam(self, login: str, amount: int) -> DeliveryResult:
+        raise NotImplementedError
+
+    async def check_steam_login(self, login: str) -> "SteamAccount | None":
+        """Существует ли такой аккаунт Steam. None — сервис не смог проверить."""
         raise NotImplementedError
 
     async def get_balance(self) -> str:
@@ -117,6 +137,17 @@ class MockProvider(DeliveryProvider):
 
     def __init__(self) -> None:
         self._counter = 0
+
+    async def check_steam_login(self, login: str) -> "SteamAccount | None":
+        await asyncio.sleep(0.2)
+        return SteamAccount(login=login, exists=login != "notfound",
+                            name=login.capitalize())
+
+    async def deliver_steam(self, login: str, amount: int) -> DeliveryResult:
+        await asyncio.sleep(0.5)
+        self._counter += 1
+        log.warning("MOCK: «пополнено» %s на Steam %s", amount, login)
+        return DeliveryResult(order_id=f"mock-steam-{self._counter}", raw={})
 
     async def deliver_stars(self, username: str, amount: int) -> DeliveryResult:
         await asyncio.sleep(0.5)

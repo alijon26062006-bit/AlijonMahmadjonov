@@ -295,6 +295,10 @@ class Order:
     def title(self) -> str:
         if self.product_type == "stars":
             return f"⭐ {self.quantity} звёзд"
+        if self.product_type == "steam":
+            from app import runtime
+
+            return f"🎮 Steam {self.quantity} {runtime.steam_currency()}"
         return f"👑 Premium {self.quantity} мес."
 
     @property

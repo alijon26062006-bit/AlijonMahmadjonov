@@ -25,6 +25,7 @@ import aiohttp
 from app.config import settings
 from app.services.fragment import (
     DeliveryError, DeliveryProvider, DeliveryResult, DeliveryUncertain, Recipient,
+    SteamAccount,
 )
 
 log = logging.getLogger(__name__)
@@ -33,6 +34,22 @@ STARS_QUOTE = "/api/v2/telegram/stars"
 PREMIUM_QUOTE = "/api/v2/telegram/premium"
 STARS_BUY = "/api/v2/telegram/stars/buy"
 PREMIUM_BUY = "/api/v2/telegram/premium/buy"
+
+# Пополнение кошелька Steam
+STEAM_RATES = "/api/v2/steam-topup/rates"
+STEAM_CHECK = "/api/v2/steam-topup/check-login"
+STEAM_ORDER = "/api/v2/steam-topup/order"
+
+#: Где в ответе может лежать курс/цена единицы пополнения Steam.
+STEAM_RATE_KEYS = ["rate", "price", "price_usd", "usd", "usd_rate",
+                   "price_per_unit", "value"]
+#: Где — валюта кошелька.
+STEAM_CURRENCY_KEYS = ["currency", "wallet_currency", "code", "name"]
+#: Где — признак «такой логин существует».
+STEAM_OK_KEYS = ["exists", "valid", "found", "ok", "success", "is_valid"]
+#: Где — отображаемое имя аккаунта.
+STEAM_NAME_KEYS = ["name", "nickname", "persona", "persona_name", "display_name",
+                   "account_name", "steam_name"]
 
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=45)
 
@@ -75,6 +92,17 @@ class CostEstimate:
     usd_total: Decimal
     usd_per_unit: Decimal
     usdt_per_ton: str = ""
+
+
+def _first(holder, keys: list[str]):
+    """Первое непустое значение из набора ключей."""
+    if not isinstance(holder, dict):
+        return None
+    for key in keys:
+        value = holder.get(key)
+        if value not in (None, ""):
+            return value
+    return None
 
 
 def _decimal(value, field: str) -> Decimal:
@@ -185,6 +213,61 @@ class FazerProvider(DeliveryProvider):
             quantity=amount, amount=f"{total:.4f}", currency="usd",
             usd_total=total, usd_per_unit=per_unit,
         )
+
+    # --------------------------------------------------------------- Steam
+
+    async def steam_rates(self) -> dict:
+        return await self._request("GET", STEAM_RATES, safe=True)
+
+    async def steam_rate(self) -> tuple[Decimal, str]:
+        """Во что обходится единица пополнения Steam и в какой она валюте.
+
+        Имена полей в документации не сверялись, поэтому берём первое
+        подходящее из набора — как это уже сделано с адресами заказов.
+        """
+        data = await self.steam_rates()
+        holder = data
+        for key in ("rate", "rates", "data", "result"):
+            value = data.get(key)
+            if isinstance(value, dict):
+                holder = value
+                break
+            if isinstance(value, list) and value and isinstance(value[0], dict):
+                holder = value[0]
+                break
+
+        raw = _first(holder, STEAM_RATE_KEYS)
+        if raw is None:
+            raise DeliveryError(
+                f"FazerCards не вернул курс Steam: {str(data)[:200]}"
+            )
+        currency = str(_first(holder, STEAM_CURRENCY_KEYS) or "RUB").upper()
+        return _decimal(raw, "steam rate"), currency
+
+    async def check_steam_login(self, login: str) -> SteamAccount | None:
+        """Проверить логин до оплаты. None — сервис ответить не смог."""
+        try:
+            data = await self._request(
+                "POST", STEAM_CHECK, {"login": login}, safe=True,
+            )
+        except DeliveryError as exc:
+            log.info("Steam: логин %s не проверился — %s", login, exc)
+            return None
+
+        holder = data.get("account") if isinstance(data.get("account"), dict) else data
+        flag = _first(holder, STEAM_OK_KEYS)
+        if flag is None:
+            # Ответ есть, но признака нет — не выдаём его за проверку.
+            return None
+        return SteamAccount(
+            login=login,
+            exists=bool(flag) and str(flag).lower() not in ("0", "false", "no"),
+            name=str(_first(holder, STEAM_NAME_KEYS) or ""),
+            raw=data,
+        )
+
+    async def deliver_steam(self, login: str, amount: int) -> DeliveryResult:
+        return await self._buy(STEAM_ORDER, {"login": login, "amount": amount})
 
     async def limits(self) -> tuple[int, int]:
         """Разрешённый диапазон количества звёзд у сервиса."""

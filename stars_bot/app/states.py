@@ -10,6 +10,11 @@ class Buy(StatesGroup):
     promo = State()             # ждём промокод на скидку
 
 
+class Steam(StatesGroup):
+    login = State()         # ждём логин Steam
+    confirm = State()       # показали аккаунт, ждём подтверждения
+
+
 class Deposit(StatesGroup):
     amount = State()      # ждём сумму пополнения
     receipt = State()     # ждём скриншот чека

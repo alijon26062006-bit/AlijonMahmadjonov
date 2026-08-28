@@ -31,7 +31,9 @@ from app.handlers.menu import top_basis
 from app.config import settings
 from app.emoji import substitute
 from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
-from app.money import exact_stars_cost, fmt, fmt4, parse, parse4, round_price
+from app.money import (
+    exact_stars_cost, fmt, fmt4, parse, parse4, round_price, steam_cost,
+)
 from app.services import dcpay, pricing, rates
 from app.services import reviews as reviews_service
 from app.services import delivery
@@ -90,6 +92,7 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🔗 Рекламные ссылки", callback_data="pn:links"),
         InlineKeyboardButton(text="⭐️ Отзывы", callback_data="pn:reviews"),
     )
+    kb.row(InlineKeyboardButton(text="🎮 Steam", callback_data="pn:steam"))
     kb.row(InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"))
     return kb.as_markup()
 
@@ -541,6 +544,18 @@ FIELDS: dict[str, tuple[str, str, str]] = {
                         "Бот должен быть в канале администратором с правом "
                         "публиковать. Пришлите <code>-</code>, чтобы убрать:",
                         "text"),
+    "steam_price_e4": ("🎮 Цена единицы Steam",
+                       "За сколько сомони продаёте 1 единицу валюты Steam.\n"
+                       "Например <code>0.14</code> за рубль:", "price4"),
+    "steam_cost_e4": ("🎮 Себестоимость Steam",
+                      "Во сколько 1 единица обходится вам, в сомони.\n"
+                      "Например <code>0.12</code>:", "price4"),
+    "steam_currency": ("🎮 Валюта Steam",
+                       "Валюта кошелька: <code>RUB</code>, <code>KZT</code>, "
+                       "<code>USD</code>:", "text"),
+    "steam_packs": ("🎮 Суммы Steam",
+                    "Через запятую — какие суммы показывать кнопками.\n"
+                    "Например <code>100, 250, 500, 1000</code>:", "packs"),
     "star_packs": ("⭐️ Наборы звёзд",
                    "Через запятую — какие кнопки показывать в магазине.\n"
                    "Например <code>50, 100, 250, 500, 1000, 2500</code>\n\n"
@@ -570,6 +585,8 @@ FIELD_PARENT.update({
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "star_packs": "pn:prices", "reviews_channel": "pn:reviews",
+    "steam_price_e4": "pn:steam", "steam_cost_e4": "pn:steam",
+    "steam_currency": "pn:steam", "steam_packs": "pn:steam",
     "usd_rate_diram": "pn:prices", "usd_rate_spread": "pn:prices",
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
     "referral_percent": "pn:prices", "support_notice": "pn:home",
@@ -2403,4 +2420,127 @@ async def cb_reviews_ask(call: CallbackQuery, conn: aiosqlite.Connection, bot: B
         "<blockquote>Отзывы будут приходить сюда на проверку по мере того, "
         "как люди их оставят. Повторно этих же людей бот не побеспокоит.</blockquote>",
         back_kb("pn:reviews", "‹ К отзывам"),
+    )
+
+
+# ═════════════════════════════════════════════════════════════════ Steam
+
+
+def steam_text() -> str:
+    price, cost = runtime.steam_price_e4(), runtime.steam_cost_e4()
+    currency = runtime.steam_currency()
+    packs = runtime.steam_packs()
+
+    profit = ""
+    if price > 0 and cost > 0:
+        profit = (f"\n└ Прибыль с единицы: <b>{fmt4(price - cost)}</b>"
+                  f" ({round((price - cost) * 100 / cost)}%)")
+
+    rows = "\n".join(
+        f"├ {amount} {currency} — <b>{fmt(steam_cost(amount))}</b>"
+        for amount in packs
+    ) or "<i>суммы не заданы</i>"
+
+    return (
+        "🎮 <b>Пополнение Steam</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"{'✅' if runtime.steam_on() else '🚫'} Раздел в меню клиента\n"
+        f"💱 Валюта кошелька: <b>{currency}</b>\n"
+        f"├ Цена продажи: <b>{fmt4(price)}</b> за 1 {currency}\n"
+        + (f"├ Себестоимость: <b>{fmt4(cost)}</b>" if cost else
+           "├ <i>себестоимость не задана</i>")
+        + profit
+        + f"\n\n<b>Суммы кнопками</b>\n{rows}\n\n"
+        "<blockquote>Логин Steam бот проверяет до оплаты и без "
+        "подтверждения заказ не создаёт: вернуть деньги с чужого "
+        "аккаунта нельзя.</blockquote>"
+    )
+
+
+def steam_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    on = runtime.get_bool("steam_enabled")
+    kb.row(btn("🚫 Выключить раздел" if on else "✅ Включить раздел",
+               "pn:steam_toggle", style=DANGER if on else SUCCESS))
+    kb.row(btn("📡 Узнать курс Steam", "pn:steam_rate", style=PRIMARY))
+    kb.row(
+        InlineKeyboardButton(text="🏷 Цена продажи",
+                             callback_data="pn:set:steam_price_e4"),
+        InlineKeyboardButton(text="💲 Себестоимость",
+                             callback_data="pn:set:steam_cost_e4"),
+    )
+    kb.row(
+        InlineKeyboardButton(text="💱 Валюта", callback_data="pn:set:steam_currency"),
+        InlineKeyboardButton(text="🔢 Суммы", callback_data="pn:set:steam_packs"),
+    )
+    kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
+    return kb.as_markup()
+
+
+@router.callback_query(F.data == "pn:steam")
+async def cb_steam(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await safe_edit(call, steam_text(), steam_kb())
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:steam_toggle")
+async def cb_steam_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    on = runtime.get_bool("steam_enabled")
+    if not on and runtime.steam_price_e4() <= 0:
+        await call.answer("Сначала задайте цену продажи.", show_alert=True)
+        return
+    await runtime.set_value(conn, "steam_enabled", "0" if on else "1")
+    await call.answer("Выключен" if on else "Включён")
+    await safe_edit(call, steam_text(), steam_kb())
+
+
+@router.callback_query(F.data == "pn:steam_rate")
+async def cb_steam_rate(call: CallbackQuery, conn: aiosqlite.Connection, provider) -> None:
+    """Спросить у сервиса, во что обходится единица пополнения Steam."""
+    await safe_edit(call, "📡 Спрашиваю курс Steam…", back_kb("pn:steam", "‹ Назад"))
+    await call.answer()
+
+    getter = getattr(provider, "steam_rate", None)
+    if getter is None:
+        await safe_edit(
+            call,
+            "📡 <b>Курс Steam недоступен</b>\n\n"
+            "<blockquote>Текущий режим выдачи не отдаёт цены Steam. "
+            "Задайте себестоимость вручную.</blockquote>",
+            back_kb("pn:steam", "‹ Назад"),
+        )
+        return
+
+    try:
+        rate, currency = await getter()
+    except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
+        await safe_edit(
+            call,
+            "📡 <b>Курс Steam не пришёл</b>\n\n"
+            f"<blockquote expandable>{exc}</blockquote>\n\n"
+            "<blockquote>Задайте себестоимость вручную — раздел будет "
+            "работать и так.</blockquote>",
+            back_kb("pn:steam", "‹ Назад"),
+        )
+        return
+
+    usd = runtime.usd_rate()
+    saved = ""
+    if usd > 0:
+        cost_e4 = int(rate * usd * 100)
+        await runtime.set_value(conn, "steam_cost_e4", str(cost_e4))
+        await runtime.set_value(conn, "steam_currency", currency)
+        saved = f"\n\n✅ Себестоимость сохранена: <b>{fmt4(cost_e4)}</b> за 1 {currency}"
+
+    await safe_edit(
+        call,
+        "📡 <b>Курс Steam</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"├ Валюта кошелька: <b>{currency}</b>\n"
+        f"└ Цена сервиса: <b>{rate}</b> USD за 1 {currency}"
+        + (saved if saved else
+           "\n\n<blockquote>Курс доллара не задан — пересчитать в сомони "
+           "не могу. Задайте его в разделе «Цены».</blockquote>"),
+        back_kb("pn:steam", "‹ Назад"),
     )

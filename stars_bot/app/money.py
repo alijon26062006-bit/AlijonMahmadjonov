@@ -89,6 +89,11 @@ def exact_stars_cost(quantity: int) -> int:
     return (total_e4 + 50) // 100          # e4 -> дирамы, с округлением
 
 
+def steam_cost(amount: int) -> int:
+    """Сколько сомони стоит пополнение Steam на amount единиц его валюты."""
+    return round_price((amount * runtime.steam_price_e4() + 50) // 100)
+
+
 def affordable_stars(balance: int) -> int:
     """Сколько звёзд можно купить на данный баланс.
 

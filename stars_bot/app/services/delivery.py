@@ -91,6 +91,8 @@ async def _run_delivery(
     try:
         if order.product_type == "stars":
             result = await provider.deliver_stars(order.recipient, order.quantity)
+        elif order.product_type == "steam":
+            result = await provider.deliver_steam(order.recipient, order.quantity)
         else:
             result = await provider.deliver_premium(order.recipient, order.quantity)
 
@@ -134,12 +136,7 @@ async def _run_delivery(
         )
         await runtime.note_delivery_ok(conn, order.product_type, order.quantity)
         await notify(
-            bot, order.user_id,
-            texts.DELIVERED.format(
-                order_id=order.id, title=order.title,
-                recipient=order.recipient, price=fmt(order.price),
-            ),
-            reply_markup=keyboards.back(),
+            bot, order.user_id, _done_text(order), reply_markup=keyboards.back()
         )
         await notify_admins(
             bot,
@@ -218,15 +215,24 @@ async def manual_complete(bot: Bot, conn: aiosqlite.Connection, order: db.Order)
         conn, order.id, expected=db.ORDER_FAILED, new=db.ORDER_DELIVERED
     ):
         return False
-    await notify(
-        bot, order.user_id,
-        texts.DELIVERED.format(
-            order_id=order.id, title=order.title,
-            recipient=order.recipient, price=fmt(order.price),
-        ),
-    )
+    await notify(bot, order.user_id, _done_text(order))
     await _ask_review(bot, conn, order)
     return True
+
+
+def _done_text(order: db.Order) -> str:
+    """Сообщение о выполненном заказе. У Steam свой текст: получатель там —
+    логин, а не юзернейм Telegram, и путать их нельзя."""
+    if order.product_type == "steam":
+        return texts.STEAM_DELIVERED.format(
+            order_id=order.id, login=order.recipient,
+            amount=order.quantity, currency=runtime.steam_currency(),
+            price=fmt(order.price),
+        )
+    return texts.DELIVERED.format(
+        order_id=order.id, title=order.title,
+        recipient=order.recipient, price=fmt(order.price),
+    )
 
 
 async def _ask_review(bot: Bot, conn: aiosqlite.Connection, order: db.Order) -> None:

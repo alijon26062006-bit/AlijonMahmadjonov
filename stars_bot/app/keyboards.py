@@ -17,7 +17,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app import runtime
 from app.config import settings
 from app.emoji import custom_id, em, premium_on
-from app.money import fmt, stars_cost
+from app.money import fmt, stars_cost, steam_cost
 
 #: Значения поля style из Bot API 9.4
 PRIMARY = "primary"    # синий — главное действие экрана
@@ -83,6 +83,10 @@ def main_menu() -> InlineKeyboardMarkup:
         kb.row(btn(labeled("premium", "Telegram Premium"), "m:premium",
                    style=PRIMARY, icon="premium"))
 
+    if runtime.steam_on():
+        kb.row(btn(labeled("steam", "Пополнить Steam"), "m:steam",
+                   style=PRIMARY, icon="steam"))
+
     deposit = btn(labeled("deposit", "Пополнить"), "m:deposit",
                   style=SUCCESS, icon="deposit")
     profile = btn(labeled("profile", "Профиль"), "m:profile", icon="profile")
@@ -127,6 +131,29 @@ def stars_entry() -> InlineKeyboardMarkup:
         ])
     kb.row(btn(labeled("edit", "Другое количество"), "stars:buy"))
     kb.row(btn(labeled("back", "Назад"), "m:main"))
+    return kb.as_markup()
+
+
+def steam_menu() -> InlineKeyboardMarkup:
+    """Готовые суммы пополнения Steam по две в ряд."""
+    kb = InlineKeyboardBuilder()
+    packs = runtime.steam_packs()
+    currency = runtime.steam_currency()
+    for left in range(0, len(packs), 2):
+        kb.row(*[
+            btn(f"{em('steam')} {amount} {currency} — {fmt(steam_cost(amount))}",
+                f"steam:{amount}", style=PRIMARY)
+            for amount in packs[left:left + 2]
+        ])
+    kb.row(btn(labeled("back", "Назад"), "m:main"))
+    return kb.as_markup()
+
+
+def confirm_steam() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(btn(labeled("confirm", "Да, это мой аккаунт"), "steam:ok", style=SUCCESS))
+    kb.row(btn(labeled("edit", "Другой логин"), "steam:again"))
+    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
     return kb.as_markup()
 
 

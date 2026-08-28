@@ -66,6 +66,61 @@ _RAW["STARS_NOT_ENOUGH"] = (
     "<blockquote>Пополните баланс — и заказ пройдёт сразу.</blockquote>"
 )
 
+# ══════════════════════════════════════════════════════════════ steam
+
+_RAW["STEAM_ENTRY"] = (
+    "[[steam]] <b>Пополнение Steam</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Деньги придут на кошелёк Steam. Нужен только <b>логин</b> — "
+    "пароль и код Steam Guard не спрашиваем никогда.</blockquote>\n\n"
+    "<i>Выберите сумму</i> [[point]]"
+)
+
+_RAW["STEAM_ASK_LOGIN"] = (
+    "[[steam]] <b>{amount} {currency}</b> — <b>{price}</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "[[profile]] <b>Логин Steam</b>\n\n"
+    "<blockquote>Пришлите <b>логин аккаунта</b> — тот, которым вы входите "
+    "в Steam. Это не ник в профиле и не почта.</blockquote>"
+)
+
+_RAW["STEAM_CHECKING"] = "[[search]] <i>Проверяю аккаунт</i> <code>{login}</code>…"
+
+_RAW["STEAM_CONFIRM"] = (
+    "[[search]] <b>Проверьте аккаунт</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Аккаунт: <b>{name}</b>\n"
+    "├ Логин: <code>{login}</code>\n"
+    "├ Сумма: <b>{amount} {currency}</b>\n"
+    "├ К списанию: <b>{price}</b>\n"
+    "└ Останется: <b>{rest}</b>\n\n"
+    "<blockquote>[[warn]] Деньги уйдут на этот аккаунт и вернуть их будет "
+    "нельзя. Убедитесь, что логин верный.</blockquote>"
+)
+
+_RAW["STEAM_BAD_LOGIN"] = (
+    "[[fail]] <b>Такого аккаунта нет</b>\n\n"
+    "<blockquote>Steam не знает логин <code>{login}</code>. Проверьте "
+    "написание и пришлите ещё раз.\n\nНужен именно логин для входа, "
+    "а не ник в профиле.</blockquote>"
+)
+
+_RAW["STEAM_NO_CHECK"] = (
+    "[[warn]] <b>Не удалось проверить аккаунт</b>\n\n"
+    "<blockquote>Steam сейчас не отвечает. Попробуйте через пару минут — "
+    "лучше подождать, чем отправить деньги не туда.</blockquote>"
+)
+
+_RAW["STEAM_DELIVERED"] = (
+    "[[party]] <b>Заказ №{order_id} выполнен!</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Steam: <code>{login}</code>\n"
+    "├ Зачислено: <b>{amount} {currency}</b>\n"
+    "└ Списано: <b>{price}</b>\n\n"
+    "<blockquote>Проверьте кошелёк Steam. Если денег нет — напишите "
+    "в поддержку.</blockquote>"
+)
+
 # ════════════════════════════════════════════════════════════ premium
 
 _RAW["PREMIUM_ENTRY"] = (
