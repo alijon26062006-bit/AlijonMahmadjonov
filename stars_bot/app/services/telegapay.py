@@ -101,6 +101,7 @@ class TelegaPay:
         self.base_url = base_url.rstrip("/")
         self._auth: tuple[str, str, str] | None = None
         self.tried: list[str] = []      # что перебрали — видно в проверке связи
+        self.refusal = ""               # что шлюз написал в отказе
 
     # ------------------------------------------------------------ запросы
 
@@ -133,7 +134,11 @@ class TelegaPay:
                     ) as response:
                         body = await response.json(content_type=None)
                         if response.status in (401, 403):
-                            last = f"HTTP {response.status}: ключ не принят"
+                            # Текст отказа сохраняем: шлюз обычно объясняет
+                            # в нём, что не так — ключ, магазин или доступ.
+                            self.refusal = str(body)[:500]
+                            last = (f"HTTP {response.status}: ключ не принят. "
+                                    f"Ответ шлюза: {self.refusal}")
                             continue
                         if response.status >= 400:
                             raise PaymentError(
@@ -209,7 +214,7 @@ class TelegaPay:
             if self.tried:
                 steps.append(("Перебрано способов", f"{len(self.tried)}: "
                                                     + ", ".join(self.tried)))
-            return {"ok": False, "steps": steps, "raw": {}}
+            return {"ok": False, "steps": steps, "raw": self.refusal}
 
         where = f"{self._auth[0]} {self._auth[1]}" if self._auth else "?"
         steps.append(("Авторизация", f"✅ {where}"))

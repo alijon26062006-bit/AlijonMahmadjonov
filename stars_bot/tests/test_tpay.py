@@ -400,6 +400,18 @@ async def panel_screens(conn) -> None:
     check("отказ показан честно", "❌" in call.last, call.last[:200])
     check("видно, что перебрали все способы",
           "Перебрано способов" in call.last, call.last[:400])
+
+    # текст отказа должен доходить до владельца целиком
+    class RefusingSession(FakeSession):
+        def post(self, url, json=None, headers=None):
+            self.calls.append((url, json or {}, headers or {}))
+            return FakeResponse({"error": "shop is not activated"}, status=401)
+
+    with_session(RefusingSession({}, need_header=None))
+    call = call_of("pn:tpay_check")
+    await panel.cb_tpay_check(call)
+    check("причина отказа видна владельцу",
+          "shop is not activated" in call.last, call.last[:400])
     check("подсказано про одобрение магазина",
           "TelegaPaySalesBot" in call.last, call.last[-200:])
 
