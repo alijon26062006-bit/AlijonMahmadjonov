@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AVERIX — сайты и лендинги для бизнеса | IT-студия, Душанбе</title>
 <meta name="description" content="AVERIX — IT-студия из Душанбе. Делаем быстрые сайты и лендинги под задачу бизнеса: от одностраничника до корпоративного сайта.">
-<meta name="theme-color" content="#7021C1">
+<meta name="theme-color" content="#07060D">
 <link rel="canonical" href="https://averix.tj/">
 
 <meta property="og:type" content="website">
@@ -16,9 +16,9 @@
 <meta name="twitter:card" content="summary_large_image">
 
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&family=Manrope:wght@400;500;600;700&display=swap">
+<link rel="preload" href="fonts/Manrope-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/Unbounded-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="fonts.css">
 <script>document.documentElement.className+=" js";</script>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -26,31 +26,36 @@
 
 <a class="skip" href="#main">Перейти к содержанию</a>
 
+<canvas id="sky" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
 <!-- ============ NAV ============ -->
 <header class="nav" id="nav">
-  <div class="shell nav-in">
-    <a class="brand" href="#top" aria-label="AVERIX — на главную">
-      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-        <polygon points="55,6 69,6 59,27 45,27" fill="var(--violet)"/>
-        <polygon points="42,35 75,35 79,55 38,55" fill="var(--violet)"/>
-        <polygon points="34,63 82,63 86,83 30,83" fill="var(--emerald)"/>
-      </svg>
-      <span class="brand-text">AVERI<span>X</span></span>
-    </a>
+  <div class="shell">
+    <div class="nav-in">
+      <a class="brand" href="#top" aria-label="AVERIX — на главную">
+        <svg class="mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+          <polygon points="55,6 69,6 59,27 45,27" fill="#A472E8"/>
+          <polygon points="42,35 75,35 79,55 38,55" fill="#A472E8"/>
+          <polygon points="34,63 82,63 86,83 30,83" fill="#34C97D"/>
+        </svg>
+        <span class="brand-text">AVERI<span>X</span></span>
+      </a>
 
-    <nav class="nav-links" id="menu" aria-label="Основная навигация">
-      <a href="#services">Услуги</a>
-      <a href="#process">Как работаем</a>
-      <a href="#stack">Технологии</a>
-      <a href="#cost">Стоимость</a>
-      <a href="#faq">Вопросы</a>
-    </nav>
+      <nav class="nav-links" id="menu" aria-label="Основная навигация">
+        <a href="#services">Услуги</a>
+        <a href="#who">Кто делает</a>
+        <a href="#process">Процесс</a>
+        <a href="#cost">Стоимость</a>
+        <a href="#faq">Вопросы</a>
+      </nav>
 
-    <a class="btn btn-primary nav-cta" href="#contact">Обсудить задачу</a>
+      <a class="btn btn-grad btn-sm nav-cta" href="#contact">Обсудить проект</a>
 
-    <button class="burger" id="burger" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="menu">
-      <span></span><span></span><span></span>
-    </button>
+      <button class="burger" id="burger" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </div>
 </header>
 
@@ -58,40 +63,49 @@
 
 <!-- ============ HERO ============ -->
 <section class="hero" id="top">
-  <div class="shell hero-in">
-    <p class="eyebrow r">IT-студия · Душанбе</p>
-    <h1 class="r d1">Сайты и лендинги, которые приводят клиентов</h1>
+  <div class="shell">
+    <span class="chip r">IT-студия · Душанбе</span>
+    <h1 class="r d1">Сайты, которые<br><span class="grad-text">приводят клиентов</span></h1>
     <p class="hero-sub r d2">
-      AVERIX — молодая студия. Делаем быстрые сайты под конкретную задачу бизнеса:
-      от одностраничника до корпоративного сайта. Без шаблонов и без лишнего.
+      AVERIX — молодая студия из Душанбе. Собираем быстрые сайты под конкретную
+      задачу бизнеса: от одностраничника до корпоративного сайта. Вручную, без конструкторов.
     </p>
     <div class="hero-cta r d3">
-      <a class="btn btn-primary btn-lg" href="#contact">Обсудить задачу</a>
-      <a class="link-arrow" href="#process">Как идёт работа
-        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"/></svg>
-      </a>
+      <a class="btn btn-grad" href="#contact">Обсудить проект</a>
+      <a class="btn btn-ghost" href="#process">Как идёт работа</a>
     </div>
+
     <ul class="hero-facts r d4">
-      <li><b>Отвечаем в течение дня</b><span>Telegram — самый быстрый способ</span></li>
+      <li><b>Отвечаем в течение дня</b><span>Telegram — самый быстрый способ связаться</span></li>
       <li><b>Работаем по этапам</b><span>Видите результат до оплаты следующего шага</span></li>
       <li><b>Код остаётся у вас</b><span>Исходники и доступы передаём полностью</span></li>
     </ul>
   </div>
 </section>
 
+<!-- ============ MARQUEE ============ -->
+<div class="marquee" aria-hidden="true">
+  <ul class="marquee-track">
+    <li>HTML</li><li>CSS</li><li>JavaScript</li><li>TypeScript</li><li>React</li><li>Next.js</li>
+    <li>Astro</li><li>Tailwind</li><li>Python</li><li>PostgreSQL</li><li>Nginx</li><li>Git</li>
+    <li>HTML</li><li>CSS</li><li>JavaScript</li><li>TypeScript</li><li>React</li><li>Next.js</li>
+    <li>Astro</li><li>Tailwind</li><li>Python</li><li>PostgreSQL</li><li>Nginx</li><li>Git</li>
+  </ul>
+</div>
+
 <!-- ============ SERVICES ============ -->
 <section class="section" id="services">
   <div class="shell">
     <div class="head">
-      <p class="eyebrow r"><b>01</b> Услуги</p>
-      <h2 class="r">Что мы делаем</h2>
-      <p class="lede r d1">Начинаем с веба — здесь мы сильнее всего. Каждый проект собирается под задачу, а не натягивается на готовый шаблон.</p>
+      <span class="chip r">Услуги</span>
+      <h2 class="r d1">Что мы <span class="grad-text">делаем</span></h2>
+      <p class="lede r d2">Начинаем с веба — здесь мы сильнее всего. Каждый проект собирается под задачу, а не натягивается на готовый шаблон.</p>
     </div>
 
     <div class="cards">
       <article class="card r d1">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M7 13h7M7 16h10"/>
+          <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 13h7M7 16.5h10"/>
         </svg>
         <h3>Лендинг под задачу</h3>
         <p>Одна страница с одной целью: заявка, звонок, запись. Структура строится под ваш продукт и возражения клиентов.</p>
@@ -105,7 +119,7 @@
 
       <article class="card r d2">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M8 9v11"/>
+          <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8.5 9v11"/>
         </svg>
         <h3>Сайт под ключ</h3>
         <p>Многостраничный сайт компании: услуги, о нас, контакты, блог. Понятная структура и нормальная навигация.</p>
@@ -119,7 +133,7 @@
 
       <article class="card r d3">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3.2"/>
+          <path d="M12 3.2v2.6M12 18.2v2.6M3.2 12h2.6M18.2 12h2.6M5.8 5.8l1.9 1.9M16.3 16.3l1.9 1.9M18.2 5.8l-1.9 1.9M7.7 16.3l-1.9 1.9"/><circle cx="12" cy="12" r="3.4"/>
         </svg>
         <h3>Поддержка и доработка</h3>
         <p>Есть сайт, но он медленный, ломается на телефоне или его некому обновлять — берём на обслуживание.</p>
@@ -133,89 +147,107 @@
     </div>
 
     <p class="note-line r">
-      AVERIX — IT-студия, и мы растём. Задачи за рамками веба обсуждаем отдельно: напишите, и скажем честно, беремся или нет.
+      AVERIX — IT-студия, и мы растём. Задачи за рамками веба обсуждаем отдельно:
+      напишите, и мы честно скажем, беремся или нет.
     </p>
   </div>
 </section>
 
+<!-- ============ WHO ============ -->
+<section class="section" id="who">
+  <div class="shell">
+    <div class="who">
+      <div class="photo-wrap r">
+        <div class="photo-frame">
+          <picture>
+            <source srcset="img/alijon.webp" type="image/webp">
+            <img src="img/alijon.jpg" width="760" height="912"
+                 alt="Алиджон Махмаджонов, основатель студии AVERIX" loading="lazy" decoding="async">
+          </picture>
+        </div>
+        <span class="photo-badge"><span class="dot" aria-hidden="true"></span>Открыт для проектов</span>
+      </div>
+
+      <div class="who-copy">
+        <span class="chip r">Кто делает</span>
+        <h2 class="r d1">Привет, я <span class="grad-text">Алиджон</span></h2>
+        <p class="who-role r d1">Основатель AVERIX · веб-разработчик</p>
+        <p class="body r d2">
+          Мне 19, я из Душанбе. Пишу код каждый день и собираю сайты руками — без конструкторов
+          и без готовых тем, из которых потом невозможно ничего вытащить.
+        </p>
+        <p class="body r d2">
+          AVERIX я делаю не для того, чтобы красиво называться студией. Мне важно, чтобы у бизнеса
+          в Таджикистане была нормальная альтернатива шаблонам за три копейки и агентствам за космос.
+          Работаю честно: если задача мне не по силам — скажу сразу, а не после предоплаты.
+        </p>
+        <ul class="tags r d3">
+          <li>HTML · CSS</li><li>JavaScript</li><li>TypeScript</li><li>React</li>
+          <li>Next.js</li><li>Python</li><li>Nginx</li><li>Git</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ PROCESS ============ -->
-<section class="section section-alt" id="process">
+<section class="section" id="process">
   <div class="shell">
     <div class="head">
-      <p class="eyebrow r"><b>02</b> Процесс</p>
-      <h2 class="r">Как идёт работа</h2>
-      <p class="lede r d1">Четыре шага. После каждого вы видите результат и решаете, идём дальше или нет.</p>
+      <span class="chip r">Процесс</span>
+      <h2 class="r d1">Как идёт <span class="grad-text">работа</span></h2>
+      <p class="lede r d2">Четыре шага. После каждого вы видите результат и решаете, идём дальше или нет.</p>
     </div>
 
     <ol class="steps">
       <li class="r d1">
-        <span class="step-n">Шаг 1</span>
+        <span class="step-n"><i></i>Шаг 1</span>
         <h3>Разбираем задачу</h3>
         <p>Созваниваемся или переписываемся в Telegram. Выясняем, кто ваш клиент, что он должен сделать на сайте и что мешает ему это сделать сейчас.</p>
-        <span class="step-out">На выходе: список страниц и блоков</span>
+        <span class="step-out">Итог: список страниц и блоков</span>
       </li>
       <li class="r d2">
-        <span class="step-n">Шаг 2</span>
+        <span class="step-n"><i></i>Шаг 2</span>
         <h3>Прототип и текст</h3>
-        <p>Собираем схему страницы: что за чем идёт и какую работу делает каждый блок. Текст пишем вместе с вами — вы знаете продукт, мы знаем, как его подать.</p>
-        <span class="step-out">На выходе: структура, согласованная до дизайна</span>
+        <p>Собираем схему страницы: что за чем идёт и какую работу делает каждый блок. Текст пишем вместе — вы знаете продукт, мы знаем, как его подать.</p>
+        <span class="step-out">Итог: структура, согласованная до дизайна</span>
       </li>
       <li class="r d3">
-        <span class="step-n">Шаг 3</span>
+        <span class="step-n"><i></i>Шаг 3</span>
         <h3>Дизайн и сборка</h3>
         <p>Рисуем макет под ваш бренд, показываем, правим. Дальше верстаем: сначала телефон, потом десктоп. Проверяем на реальных устройствах, а не только в браузере.</p>
-        <span class="step-out">На выходе: рабочий сайт на тестовом адресе</span>
+        <span class="step-out">Итог: рабочий сайт на тестовом адресе</span>
       </li>
       <li class="r d4">
-        <span class="step-n">Шаг 4</span>
+        <span class="step-n"><i></i>Шаг 4</span>
         <h3>Запуск и передача</h3>
         <p>Подключаем домен и SSL, ставим аналитику, проверяем формы. Отдаём все доступы и исходники — сайт ваш целиком, без привязки к нам.</p>
-        <span class="step-out">На выходе: сайт в работе + все доступы у вас</span>
+        <span class="step-out">Итог: сайт в работе, доступы у вас</span>
       </li>
     </ol>
-  </div>
-</section>
-
-<!-- ============ STACK ============ -->
-<section class="section" id="stack">
-  <div class="shell">
-    <div class="head">
-      <p class="eyebrow r"><b>03</b> Технологии</p>
-      <h2 class="r">На чём собираем</h2>
-      <p class="lede r d1">Никаких конструкторов и тяжёлых тем. Сайт собирается вручную — поэтому грузится быстро и стоит дешевле в поддержке.</p>
-    </div>
-
-    <div class="stack-grid">
-      <div class="tech r d1"><b>HTML · CSS · JavaScript</b><span>Основа. Без лишних библиотек — значит быстро</span></div>
-      <div class="tech r d1"><b>Next.js · Astro</b><span>Когда нужны блог, каталог или много страниц</span></div>
-      <div class="tech r d2"><b>Python</b><span>Обработка форм, интеграции, автоматизация</span></div>
-      <div class="tech r d2"><b>PostgreSQL · MySQL</b><span>Если сайту нужна база данных</span></div>
-      <div class="tech r d3"><b>Nginx · VPS</b><span>Настраиваем сервер, домен и SSL сами</span></div>
-      <div class="tech r d3"><b>Git · GitHub</b><span>История изменений — всегда можно откатить</span></div>
-    </div>
 
     <div class="perf r">
       <div class="perf-copy">
-        <h3>Скорость — не бонус, а требование</h3>
-        <p>Каждый сайт мы проверяем по одним и тем же цифрам перед сдачей. Не «вроде летает», а измеренный результат.</p>
+        <h3>Скорость — не бонус,<br>а требование</h3>
+        <p>Каждый сайт проверяем по одним и тем же цифрам перед сдачей. Не «вроде летает», а измеренный результат.</p>
       </div>
       <ul class="perf-nums">
-        <li><b>&lt; 500 КБ</b><span>вес страницы</span></li>
-        <li><b>4.5:1</b><span>контраст текста</span></li>
-        <li><b>375 px</b><span>проверка на узком экране</span></li>
-        <li><b>0</b><span>горизонтальных прокруток</span></li>
+        <li><b class="grad-text">&lt; 500 КБ</b><span>вес страницы</span></li>
+        <li><b class="grad-text">4.5:1</b><span>контраст текста</span></li>
+        <li><b class="grad-text">375 px</b><span>проверка на узком экране</span></li>
+        <li><b class="grad-text">0</b><span>горизонтальных прокруток</span></li>
       </ul>
     </div>
   </div>
 </section>
 
 <!-- ============ COST ============ -->
-<section class="section section-alt" id="cost">
+<section class="section" id="cost">
   <div class="shell">
     <div class="head">
-      <p class="eyebrow r"><b>04</b> Стоимость</p>
-      <h2 class="r">Из чего складывается цена</h2>
-      <p class="lede r d1">Единого прайса нет: лендинг на 5 блоков и сайт с каталогом — разная работа. Но считаем мы всегда по одним и тем же вещам, и вы видите расчёт до старта.</p>
+      <span class="chip r">Стоимость</span>
+      <h2 class="r d1">Из чего складывается <span class="grad-text">цена</span></h2>
+      <p class="lede r d2">Единого прайса нет: лендинг на пять блоков и сайт с каталогом — разная работа. Но считаем мы всегда по одним и тем же вещам, и расчёт вы видите до старта.</p>
     </div>
 
     <div class="cost-grid">
@@ -238,7 +270,7 @@
 
     <div class="cost-cta r">
       <p><b>Как узнать свою цифру:</b> напишите в Telegram, что нужно. В течение дня пришлём расчёт по этим трём пунктам и срок. Расчёт бесплатный и ни к чему не обязывает.</p>
-      <a class="btn btn-primary" href="#contact">Получить расчёт</a>
+      <a class="btn btn-grad" href="#contact">Получить расчёт</a>
     </div>
   </div>
 </section>
@@ -247,13 +279,13 @@
 <section class="section" id="faq">
   <div class="shell">
     <div class="head">
-      <p class="eyebrow r"><b>05</b> Вопросы</p>
-      <h2 class="r">Что обычно спрашивают</h2>
+      <span class="chip r">Вопросы</span>
+      <h2 class="r d1">Что обычно <span class="grad-text">спрашивают</span></h2>
     </div>
 
     <div class="faq r d1">
       <details>
-        <summary>Вы новая студия. Почему я должен вам доверить сайт?<span class="chev" aria-hidden="true"></span></summary>
+        <summary>Вы новая студия. Почему я должен доверить вам сайт?<span class="chev" aria-hidden="true"></span></summary>
         <div class="faq-body"><p>Мы не будем убеждать вас списком клиентов, которого пока нет. Вместо этого работаем по этапам: вы платите за следующий шаг только после того, как приняли предыдущий. Если на этапе прототипа станет понятно, что не сходимся, — расходимся без потерь для вас.</p></div>
       </details>
       <details>
@@ -281,19 +313,19 @@
 </section>
 
 <!-- ============ CONTACT ============ -->
-<section class="section contact" id="contact">
+<section class="section" id="contact">
   <div class="shell contact-in">
-    <div class="contact-copy">
-      <p class="eyebrow r"><b>06</b> Заявка</p>
-      <h2 class="r">Расскажите, что нужно</h2>
-      <p class="lede r d1">Три поля — этого хватит, чтобы понять задачу и посчитать. Ответим в течение дня.</p>
-      <ul class="contact-alt r d2">
+    <div>
+      <span class="chip r">Заявка</span>
+      <h2 class="r d1">Расскажите, <span class="grad-text">что нужно</span></h2>
+      <p class="lede r d2">Три поля — этого хватит, чтобы понять задачу и посчитать. Ответим в течение дня.</p>
+      <ul class="contact-alt r d3">
         <li>
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 4L2.5 11.2l6 2.1 2.1 6L21 4zM8.5 13.3L21 4l-8.4 10.9"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 4L2.5 11.2l6 2.1 2.1 6L21 4zM8.5 13.3L21 4"/></svg>
           <a href="https://t.me/rutsiyax" target="_blank" rel="noopener">Telegram — @rutsiyax</a>
         </li>
         <li>
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="19" height="14" rx="1"/><path d="M2.5 6.5L12 13l9.5-6.5"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 6.5L12 13l9.5-6.5"/></svg>
           <a href="mailto:alijon26.06.2006@gmail.com">alijon26.06.2006@gmail.com</a>
         </li>
       </ul>
@@ -319,8 +351,8 @@
         <p class="err" id="e-task" role="alert" hidden></p>
       </div>
 
-      <button class="btn btn-primary btn-lg btn-block" type="submit">Отправить в Telegram</button>
-      <p class="form-note">Заявка откроется готовым сообщением в Telegram — останется только нажать «Отправить».</p>
+      <button class="btn btn-grad btn-block" type="submit">Отправить в Telegram</button>
+      <p class="form-note">Заявка откроется готовым сообщением в Telegram — останется нажать «Отправить».</p>
       <p class="form-status" id="status" role="status" aria-live="polite"></p>
     </form>
   </div>
@@ -332,22 +364,26 @@
   <div class="shell foot-in">
     <div class="foot-brand">
       <svg class="mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-        <polygon points="55,6 69,6 59,27 45,27" fill="var(--violet)"/>
-        <polygon points="42,35 75,35 79,55 38,55" fill="var(--violet)"/>
-        <polygon points="34,63 82,63 86,83 30,83" fill="var(--emerald)"/>
+        <polygon points="55,6 69,6 59,27 45,27" fill="#A472E8"/>
+        <polygon points="42,35 75,35 79,55 38,55" fill="#A472E8"/>
+        <polygon points="34,63 82,63 86,83 30,83" fill="#34C97D"/>
       </svg>
       <span class="brand-text">AVERI<span>X</span></span>
     </div>
-    <p class="foot-line">IT-студия · Душанбе, Таджикистан</p>
     <nav class="foot-links" aria-label="Навигация в подвале">
       <a href="#services">Услуги</a>
-      <a href="#process">Как работаем</a>
+      <a href="#process">Процесс</a>
       <a href="#cost">Стоимость</a>
       <a href="https://t.me/rutsiyax" target="_blank" rel="noopener">Telegram</a>
     </nav>
+    <p class="foot-line">IT-студия · Душанбе, Таджикистан</p>
     <p class="foot-copy">© <span id="year">2026</span> AVERIX</p>
   </div>
 </footer>
+
+<button class="top" id="top-btn" type="button" aria-label="Наверх">
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</button>
 
 <script src="app.js" defer></script>
 </body>
