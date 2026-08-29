@@ -1,39 +1,54 @@
 /* ============================================================
    AVERIX
-   Тема одна — тёмная, светлой версии нет намеренно.
-   Приём: страница выглядит как техническая спецификация самой
-   себя. Данные набраны моноширинным, разделители — волосяные
-   линии, всё выровнено по левому краю. Это рифмуется с тем,
-   что студия продаёт: собранное руками и измеренное.
+   Тёмная тема, стеклянные слои поверх живого фона.
+
+   Стекло видно только тогда, когда за ним есть что размывать,
+   поэтому фон — три медленно плывущих цветовых пятна, а не
+   плоский чёрный. Яркость пятен подобрана так, чтобы в самой
+   светлой точке фона весь текст держал норму контраста:
+   основной 12.2:1, вторичный 6.8:1, приглушённый 4.6:1,
+   акценты 5.6:1 и 7.9:1.
    ============================================================ */
 :root{
   color-scheme:dark;
 
-  --void:#0A090F;
+  --void:#07060D;
   --panel:#11101A;
-  --panel-hi:#171622;
-  --line:rgba(255,255,255,.07);
-  --line-hi:rgba(255,255,255,.15);
 
-  --violet:#A472E8;        /* 5.7:1 на фоне  */
-  --violet-deep:#7021C1;   /* из логотипа, только для свечения */
-  --emerald:#34C97D;       /* 9.1:1 — знак «измерено, подтверждено» */
+  /* стеклянный материал */
+  --glass:rgba(255,255,255,.055);
+  --glass-hi:rgba(255,255,255,.085);
+  --glass-brd:rgba(255,255,255,.11);
+  --glass-brd-hi:rgba(255,255,255,.2);
+  --blur:blur(22px) saturate(170%);
+  --blur-lite:blur(14px) saturate(150%);
+  /* верхняя светлая кромка и нижняя тёмная — как на стекле под светом */
+  --bevel:inset 0 1px 0 rgba(255,255,255,.16), inset 0 -1px 0 rgba(0,0,0,.25);
+  --lift:0 24px 60px -34px rgba(0,0,0,.9);
+
+  --violet:#B98CF2;
+  --violet-deep:#7021C1;
+  --emerald:#3FD98A;
+  --emerald-deep:#038D47;
 
   --text:#EDEBF5;
-  --muted:#A9A3BE;
-  --faint:#7C7591;
+  --muted:#B4AECA;
+  --faint:#948DA8;
   --on-accent:#0A0713;
-  --danger:#FF8A80;
+  --danger:#FF9A93;
 
   --shell:1220px;
   --s1:.5rem; --s2:1rem; --s3:1.5rem; --s4:2.5rem; --s5:4rem; --s6:7rem;
-  --r:6px; --pill:999px;
+  --r-lg:26px; --r:18px; --r-sm:12px; --pill:999px;
 
   --display:"Geologica","Golos Text",system-ui,sans-serif;
   --body:"Golos Text",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
 
-  --t:170ms cubic-bezier(.22,.7,.28,1);
+  /* пружина с лёгким перелётом — движение как в iOS, а не линейное */
+  --spring:cubic-bezier(.34,1.4,.5,1);
+  --ease:cubic-bezier(.22,.7,.28,1);
+  --t:200ms var(--ease);
 }
 
 *,*::before,*::after{box-sizing:border-box}
@@ -51,174 +66,227 @@ a{color:var(--violet)}
 
 .shell{max-width:var(--shell); margin:0 auto; padding:0 var(--s3)}
 
-.skip{position:absolute; left:-9999px; top:0; z-index:300; background:var(--violet); color:var(--on-accent); padding:.7rem 1.1rem; font-weight:700; text-decoration:none}
+.skip{position:absolute; left:-9999px; top:0; z-index:300; background:var(--violet); color:var(--on-accent); padding:.7rem 1.1rem; font-weight:700; text-decoration:none; border-radius:var(--r-sm)}
 .skip:focus{left:var(--s3); top:var(--s1)}
-:focus-visible{outline:2px solid var(--emerald); outline-offset:3px; border-radius:3px}
+:focus-visible{outline:2px solid var(--emerald); outline-offset:3px; border-radius:6px}
 
-/* одно свечение за первым экраном — весь декор страницы */
-.bloom{
-  position:absolute; top:-320px; right:-260px; width:900px; height:900px;
-  z-index:-1; pointer-events:none;
-  background:radial-gradient(circle,rgba(112,33,193,.30) 0%,rgba(112,33,193,.10) 38%,transparent 68%);
+/* ============================================================
+   Живой фон
+   Три пятна, каждое движется своим циклом и своей амплитудой,
+   поэтому рисунок не повторяется на глаз. Двигается только
+   transform — это работа композитора, а не пересчёт вёрстки.
+   ============================================================ */
+.aurora{position:fixed; inset:0; z-index:-2; overflow:hidden; pointer-events:none}
+.aurora i{position:absolute; display:block; border-radius:50%; will-change:transform}
+.aurora i:nth-child(1){
+  width:72vmax; height:72vmax; left:-22vmax; top:-28vmax;
+  background:radial-gradient(circle closest-side, rgba(112,33,193,.34), transparent 70%);
+  animation:drift-a 42s var(--ease) infinite alternate;
+}
+.aurora i:nth-child(2){
+  width:64vmax; height:64vmax; right:-24vmax; top:8vmax;
+  background:radial-gradient(circle closest-side, rgba(70,60,150,.26), transparent 70%);
+  animation:drift-b 55s var(--ease) infinite alternate;
+}
+.aurora i:nth-child(3){
+  width:58vmax; height:58vmax; left:18vmax; bottom:-30vmax;
+  background:radial-gradient(circle closest-side, rgba(3,141,71,.20), transparent 70%);
+  animation:drift-c 48s var(--ease) infinite alternate;
+}
+@keyframes drift-a{ to{ transform:translate3d(14vmax,10vmax,0) scale(1.15) } }
+@keyframes drift-b{ to{ transform:translate3d(-12vmax,16vmax,0) scale(.9) } }
+@keyframes drift-c{ to{ transform:translate3d(10vmax,-14vmax,0) scale(1.2) } }
+
+/* зерно поверх пятен — убирает полосы на градиентах */
+.grain{
+  position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.045;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* ============================================================
-   Моноширинные метки — сквозной приём всей страницы
+   Стеклянный материал
    ============================================================ */
-.mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
-.label{
-  font-family:var(--mono); font-size:.72rem; font-weight:500;
-  letter-spacing:.14em; text-transform:uppercase; color:var(--faint);
+.glass{
+  background:var(--glass);
+  backdrop-filter:var(--blur);
+  -webkit-backdrop-filter:var(--blur);
+  border:1px solid var(--glass-brd);
+  box-shadow:var(--bevel), var(--lift);
 }
+
+.mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.label{font-family:var(--mono); font-size:.72rem; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
 .tag-n{font-family:var(--mono); font-size:.75rem; color:var(--violet); letter-spacing:.05em}
 
 /* ============================================================
-   Кнопки
+   Кнопки — с откликом на нажатие
    ============================================================ */
 .btn{
   display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
-  min-height:48px; padding:.8rem 1.5rem; border:1px solid transparent; border-radius:var(--r);
-  font-family:var(--body); font-size:.95rem; font-weight:700; line-height:1.2;
+  min-height:48px; padding:.8rem 1.6rem; border:1px solid transparent; border-radius:var(--pill);
+  font-family:var(--body); font-size:.95rem; font-weight:600; line-height:1.2;
   text-decoration:none; cursor:pointer; white-space:nowrap;
-  transition:background var(--t), border-color var(--t), color var(--t);
+  transition:transform 140ms var(--spring), background var(--t), border-color var(--t), box-shadow var(--t);
 }
-.btn-solid{background:var(--violet); color:var(--on-accent)}
-.btn-solid:hover{background:#B98CF2}
-.btn-line{background:transparent; color:var(--text); border-color:var(--line-hi)}
-.btn-line:hover{border-color:var(--violet); color:var(--violet)}
-.btn-sm{min-height:44px; padding:.5rem 1.05rem; font-size:.88rem}
+.btn:active{transform:scale(.96)}
+.btn-solid{
+  background:linear-gradient(180deg, #C9A5F5, var(--violet));
+  color:var(--on-accent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 12px 30px -14px rgba(148,86,232,.9);
+}
+.btn-solid:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 16px 40px -14px rgba(148,86,232,1)}
+.btn-line{
+  background:var(--glass); color:var(--text); border-color:var(--glass-brd);
+  backdrop-filter:var(--blur-lite); -webkit-backdrop-filter:var(--blur-lite);
+  box-shadow:var(--bevel);
+}
+.btn-line:hover{background:var(--glass-hi); border-color:var(--glass-brd-hi)}
+.btn-sm{min-height:44px; padding:.55rem 1.15rem; font-size:.88rem}
 .btn-block{width:100%}
 
 /* ============================================================
    Шапка
-   ============================================================ */
-/* Размытие живёт на псевдоэлементе, а не на самой шапке.
+   Размытие — на псевдоэлементе, а не на самой шапке:
    backdrop-filter на элементе делает его containing block для
-   position:fixed — выдвижная панель внутри тогда зажимается
-   в габариты шапки вместо всего экрана. */
-.nav{position:sticky; top:0; z-index:100; border-bottom:1px solid transparent; transition:border-color var(--t)}
+   position:fixed, и выдвижная панель внутри зажимается
+   в габариты шапки вместо всего экрана.
+   ============================================================ */
+.nav{position:sticky; top:0; z-index:100}
 .nav::before{
   content:""; position:absolute; inset:0; z-index:-1;
-  background:rgba(10,9,15,.82); backdrop-filter:blur(14px);
+  background:rgba(10,9,15,.4);
+  backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur);
+  border-bottom:1px solid transparent;
+  opacity:0; transition:opacity 260ms var(--ease), border-color 260ms var(--ease);
 }
-.nav.stuck{border-bottom-color:var(--line)}
+.nav.stuck::before{opacity:1; border-bottom-color:var(--glass-brd)}
 .nav-in{display:flex; align-items:center; gap:var(--s3); min-height:72px}
 
-.brand{display:flex; align-items:center; gap:.65rem; min-height:44px; text-decoration:none; color:var(--text)}
+.brand{display:flex; align-items:center; gap:.65rem; min-height:44px; text-decoration:none; color:var(--text); transition:transform 140ms var(--spring)}
+.brand:active{transform:scale(.96)}
 .mark{width:24px; height:24px; flex:none}
 .brand-text{font-family:var(--display); font-weight:600; font-size:.86rem; letter-spacing:.26em; text-transform:uppercase; line-height:1}
 .brand-text span{color:var(--violet)}
 
-.nav-links{display:flex; gap:var(--s3); margin-left:auto}
+.nav-links{display:flex; gap:.2rem; margin-left:auto}
 .nav-links a{
-  display:inline-flex; align-items:center; min-height:44px;
+  display:inline-flex; align-items:center; min-height:44px; padding:0 .85rem;
+  border-radius:var(--pill);
   font-family:var(--mono); font-size:.82rem; color:var(--muted);
-  text-decoration:none; transition:color var(--t);
+  text-decoration:none; transition:color var(--t), background var(--t);
 }
-.nav-links a:hover{color:var(--text)}
+.nav-links a:hover{color:var(--text); background:var(--glass)}
 
-/* переключатель языка */
-.lang{display:flex; gap:2px; border:1px solid var(--line); border-radius:var(--r)}
+/* переключатель языка: подложка едет за выбором, а не перекрашивается */
+.lang{
+  position:relative; display:flex; padding:3px;
+  background:var(--glass); border:1px solid var(--glass-brd); border-radius:var(--pill);
+  backdrop-filter:var(--blur-lite); -webkit-backdrop-filter:var(--blur-lite);
+  box-shadow:var(--bevel);
+}
+.lang-pill{
+  position:absolute; top:3px; left:3px; width:46px; height:calc(100% - 6px);
+  background:linear-gradient(180deg,#C9A5F5,var(--violet)); border-radius:var(--pill);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5);
+  transition:transform 340ms var(--spring);
+}
 .lang button{
+  position:relative; z-index:1;
   min-width:46px; min-height:44px; padding:0 .5rem;
-  background:transparent; border:0; border-radius:3px; cursor:pointer;
+  background:none; border:0; cursor:pointer;
   font-family:var(--mono); font-size:.78rem; color:var(--faint);
-  transition:background var(--t), color var(--t);
+  transition:color 220ms var(--ease);
 }
 .lang button:hover{color:var(--text)}
-.lang button[aria-pressed="true"]{background:var(--violet); color:var(--on-accent); font-weight:500}
+.lang button[aria-pressed="true"]{color:var(--on-accent); font-weight:500}
 
-.burger{display:none; width:44px; height:44px; padding:0; background:transparent; border:1px solid var(--line); border-radius:var(--r); cursor:pointer; flex-direction:column; justify-content:center; align-items:center; gap:5px}
-.burger span{display:block; width:16px; height:1px; background:var(--text); transition:transform var(--t), opacity var(--t)}
-.burger[aria-expanded="true"] span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.burger{
+  display:none; width:44px; height:44px; padding:0;
+  background:var(--glass); border:1px solid var(--glass-brd); border-radius:var(--pill);
+  backdrop-filter:var(--blur-lite); -webkit-backdrop-filter:var(--blur-lite);
+  cursor:pointer; flex-direction:column; justify-content:center; align-items:center; gap:5px;
+  transition:transform 140ms var(--spring);
+}
+.burger:active{transform:scale(.94)}
+.burger span{display:block; width:16px; height:1.5px; background:var(--text); border-radius:2px; transition:transform 300ms var(--spring), opacity 200ms var(--ease)}
+.burger[aria-expanded="true"] span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
 .burger[aria-expanded="true"] span:nth-child(2){opacity:0}
-.burger[aria-expanded="true"] span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.burger[aria-expanded="true"] span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
 
-/* кнопка в панели — только на мобильных.
-   Селектор с двумя классами: правило .nav-links a иначе
-   перебивает одиночный .drawer-cta по специфичности. */
 .nav-links .drawer-cta{display:none}
-/* Затемнение ниже шапки (z-index 100), а не выше: панель — это
-   position:fixed внутри .nav, поэтому она заперта в его контексте
-   наложения и своим z-index затемнение не перебьёт. Заодно верхняя
-   строка с логотипом и языком остаётся видимой поверх панели. */
+
 .backdrop{
   position:fixed; inset:0; z-index:90;
-  background:rgba(10,9,15,.72); backdrop-filter:blur(3px);
-  opacity:0; transition:opacity var(--t);
+  background:rgba(7,6,13,.6); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  opacity:0; transition:opacity 300ms var(--ease);
 }
 .backdrop.open{opacity:1}
 
 @media (max-width:900px){
-  /* выдвижная панель справа: закрытая убрана за край и недоступна
-     ни мышью, ни клавиатурой (visibility), а не просто сдвинута */
   .nav-links{
-    /* начинается под шапкой: верхняя строка с логотипом и языком
-       остаётся видимой и рабочей при открытой панели */
     position:fixed; top:72px; right:0; bottom:0; left:auto; z-index:120; margin:0;
     width:min(340px,86vw); padding:var(--s3);
-    border-top:1px solid var(--line);
     flex-direction:column; gap:0; align-items:stretch;
-    background:var(--panel); border-left:1px solid var(--line);
+    background:rgba(17,16,26,.7);
+    backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur);
+    border-left:1px solid var(--glass-brd); border-top:1px solid var(--glass-brd);
     overflow-y:auto; overscroll-behavior:contain;
     transform:translateX(100%); visibility:hidden;
-    transition:transform 220ms cubic-bezier(.22,.7,.28,1), visibility 220ms;
+    transition:transform 420ms var(--spring), visibility 420ms;
   }
   .nav-links.open{transform:none; visibility:visible}
   .nav-links a{
-    min-height:58px; font-family:var(--display); font-size:1.15rem;
-    font-weight:500; color:var(--text); border-bottom:1px solid var(--line);
+    min-height:58px; padding:0 .5rem; border-radius:var(--r-sm);
+    font-family:var(--display); font-size:1.15rem; font-weight:500; color:var(--text);
+    border-bottom:1px solid var(--glass-brd);
   }
+  .nav-links a:last-of-type{border-bottom:0}
   .nav-links .drawer-cta{display:flex; margin-top:var(--s4)}
-  .burger{display:flex; margin-left:auto; position:relative; z-index:130}
+  .burger{display:flex; margin-left:auto}
 }
-
-/* ============================================================
-   Первый экран
-   ============================================================ */
-.hero{position:relative; padding:var(--s6) 0 var(--s5); overflow:hidden}
-.hero h1{margin-top:var(--s3); font-size:clamp(2.1rem,6.4vw,3.9rem); line-height:1.08; max-width:16ch}
-.hero h1 em{font-style:normal; color:var(--violet)}
-.hero-sub{margin-top:var(--s3); max-width:52ch; font-size:clamp(1rem,2.1vw,1.16rem); color:var(--muted)}
-.hero-cta{display:flex; flex-wrap:wrap; gap:var(--s2); margin-top:var(--s4)}
-
-/* три цифры — набраны как показания приборов, а не как рекламный баннер */
-.stats{
-  display:grid; gap:var(--s3) var(--s5); margin-top:var(--s5);
-  grid-template-columns:repeat(auto-fit,minmax(150px,max-content));
-  padding-top:var(--s3); border-top:1px solid var(--line);
-}
-.stats b{
-  display:block; font-family:var(--display); font-weight:600;
-  font-size:clamp(1.7rem,4vw,2.3rem); line-height:1; font-variant-numeric:tabular-nums;
-}
-/* единица измерения внутри цифры — та же строка, но тише и мельче */
-.stats b span{font-size:.5em; color:var(--muted); font-weight:600}
-/* подпись под цифрой: прямой потомок, чтобы не задеть span внутри b */
-.stats > div > span{display:block; margin-top:.6rem; font-family:var(--mono); font-size:.75rem; color:var(--faint); line-height:1.5; max-width:22ch}
-
-/* ============================================================
-   Живой замер этой же страницы
-   Значения читаются из Performance API в браузере посетителя.
-   ============================================================ */
-.measure{border-block:1px solid var(--line); background:var(--panel)}
-.measure-in{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s4); padding:var(--s3) 0}
-.measure-head{display:flex; align-items:center; gap:.6rem; margin-right:auto}
-.measure-head .dot{width:7px; height:7px; border-radius:50%; background:var(--emerald); flex:none}
-.measure dl{display:flex; flex-wrap:wrap; gap:var(--s2) var(--s4); margin:0}
-.measure div{display:flex; align-items:baseline; gap:.5rem}
-.measure dt{font-family:var(--mono); font-size:.74rem; color:var(--faint)}
-.measure dd{margin:0; font-family:var(--mono); font-size:.92rem; font-weight:500; color:var(--emerald); font-variant-numeric:tabular-nums}
 
 /* ============================================================
    Секции
    ============================================================ */
-.section{padding:var(--s6) 0; border-top:1px solid var(--line)}
+.section{padding:var(--s6) 0}
 .head{display:flex; flex-direction:column; gap:var(--s2); max-width:64ch; margin-bottom:var(--s5)}
 .head-row{display:flex; align-items:baseline; gap:var(--s2)}
 .head h2{font-size:clamp(1.6rem,4.2vw,2.4rem); line-height:1.18}
-.head h2 em{font-style:normal; color:var(--violet)}
+.head h2 em, .hero h1 em, .who-copy h2 em{font-style:normal; color:var(--violet)}
 .lede{color:var(--muted); font-size:1.04rem; max-width:58ch}
+
+/* ============================================================
+   Первый экран
+   ============================================================ */
+.hero{position:relative; padding:var(--s6) 0 var(--s5)}
+.hero h1{margin-top:var(--s3); font-size:clamp(2.1rem,6.4vw,3.9rem); line-height:1.08; max-width:16ch}
+.hero-sub{margin-top:var(--s3); max-width:52ch; font-size:clamp(1rem,2.1vw,1.16rem); color:var(--muted)}
+.hero-cta{display:flex; flex-wrap:wrap; gap:var(--s2); margin-top:var(--s4)}
+
+.stats{
+  display:grid; gap:var(--s3); margin-top:var(--s5); padding:var(--s4) var(--s3);
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  border-radius:var(--r-lg);
+}
+@media (min-width:560px){ .stats{padding:var(--s4)} }
+.stats b{display:block; font-family:var(--display); font-weight:600; font-size:clamp(1.7rem,4vw,2.3rem); line-height:1; font-variant-numeric:tabular-nums}
+/* единица измерения тише самой цифры; .num — это сама цифра */
+.stats b span:not(.num){font-size:.5em; color:var(--muted); font-weight:600}
+.stats > div > span{display:block; margin-top:.6rem; font-family:var(--mono); font-size:.75rem; color:var(--faint); line-height:1.5; max-width:24ch}
+
+/* ============================================================
+   Живой замер страницы
+   ============================================================ */
+.measure{margin-top:var(--s3); border-radius:var(--r)}
+.measure-in{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s4); padding:var(--s2) var(--s3)}
+.measure-head{display:flex; align-items:center; gap:.6rem; margin-right:auto}
+.dot{width:8px; height:8px; border-radius:50%; background:var(--emerald); flex:none; position:relative}
+.dot::after{content:""; position:absolute; inset:-5px; border-radius:50%; border:1px solid var(--emerald); opacity:.5; animation:pulse 2.6s ease-out infinite}
+@keyframes pulse{0%{transform:scale(.55); opacity:.75} 70%,100%{transform:scale(1.7); opacity:0}}
+.measure dl{display:flex; flex-wrap:wrap; gap:var(--s2) var(--s4); margin:0}
+.measure div{display:flex; align-items:baseline; gap:.5rem}
+.measure dt{font-family:var(--mono); font-size:.74rem; color:var(--faint)}
+.measure dd{margin:0; font-family:var(--mono); font-size:.92rem; font-weight:500; color:var(--emerald); font-variant-numeric:tabular-nums}
 
 /* ============================================================
    [01] Кто я
@@ -226,46 +294,56 @@ a{color:var(--violet)}
 .who{display:grid; gap:var(--s5)}
 @media (min-width:920px){ .who{grid-template-columns:340px 1fr; gap:var(--s6); align-items:start} }
 .photo{position:relative}
-.photo img{width:100%; height:auto; aspect-ratio:5/6; object-fit:cover; object-position:50% 20%; border-radius:var(--r); border:1px solid var(--line-hi)}
+.photo img{width:100%; height:auto; aspect-ratio:5/6; object-fit:cover; object-position:50% 20%; border-radius:var(--r-lg); border:1px solid var(--glass-brd-hi)}
 .photo-meta{
-  display:flex; align-items:center; gap:.55rem; margin-top:var(--s2);
-  font-family:var(--mono); font-size:.76rem; color:var(--muted);
+  position:absolute; left:50%; bottom:-18px; transform:translateX(-50%);
+  display:flex; align-items:center; gap:.6rem; white-space:nowrap;
+  padding:.6rem 1.1rem; border-radius:var(--pill);
+  font-family:var(--mono); font-size:.76rem; color:var(--text);
 }
-.photo-meta .dot{width:7px; height:7px; border-radius:50%; background:var(--emerald); flex:none; position:relative}
-.photo-meta .dot::after{content:""; position:absolute; inset:-4px; border-radius:50%; border:1px solid var(--emerald); opacity:.5; animation:pulse 2.6s ease-out infinite}
-@keyframes pulse{0%{transform:scale(.6); opacity:.7} 70%,100%{transform:scale(1.6); opacity:0}}
-
 .who-copy h2{margin-top:var(--s3); font-size:clamp(1.7rem,4.6vw,2.6rem); line-height:1.14}
-.who-copy h2 em{font-style:normal; color:var(--violet)}
 .who-role{margin-top:.6rem; font-family:var(--mono); font-size:.85rem; color:var(--faint)}
 .who-copy p.body{margin-top:var(--s3); color:var(--muted); max-width:56ch}
-.tags{display:flex; flex-wrap:wrap; gap:.4rem; margin-top:var(--s4)}
+.tags{display:flex; flex-wrap:wrap; gap:.45rem; margin-top:var(--s4)}
 .tags li{
-  padding:.35rem .8rem; border:1px solid var(--line); border-radius:var(--r);
+  padding:.4rem .9rem; border-radius:var(--pill);
+  background:var(--glass); border:1px solid var(--glass-brd);
   font-family:var(--mono); font-size:.78rem; color:var(--muted);
-  transition:border-color var(--t), color var(--t);
+  transition:border-color var(--t), color var(--t), transform 200ms var(--spring);
 }
-.tags li:hover{border-color:var(--violet); color:var(--text)}
+.tags li:hover{border-color:var(--violet); color:var(--text); transform:translateY(-2px)}
 
 /* ============================================================
    [02] Услуги
    ============================================================ */
-.cards{display:grid; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--r); overflow:hidden}
-@media (min-width:760px){ .cards{grid-template-columns:repeat(3,1fr)} }
-.card{background:var(--panel); padding:var(--s4) var(--s3); transition:background var(--t)}
-.card:hover{background:var(--panel-hi)}
-.card-n{display:block; font-family:var(--mono); font-size:.75rem; color:var(--violet); margin-bottom:var(--s3)}
+.cards{display:grid; gap:var(--s2); grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
+.card{
+  position:relative; overflow:hidden; border-radius:var(--r-lg);
+  padding:var(--s4) var(--s3);
+  transition:transform 320ms var(--spring), border-color var(--t);
+}
+/* блик идёт за курсором — стекло под источником света */
+.card::after{
+  content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:radial-gradient(320px circle at var(--mx,50%) var(--my,0%), rgba(255,255,255,.09), transparent 60%);
+  opacity:0; transition:opacity 260ms var(--ease);
+}
+.card:hover{transform:translateY(-4px); border-color:var(--glass-brd-hi)}
+.card:hover::after{opacity:1}
+.card-ico{
+  display:grid; place-items:center; width:46px; height:46px; margin-bottom:var(--s3);
+  border-radius:14px; background:var(--glass-hi); border:1px solid var(--glass-brd);
+  box-shadow:var(--bevel);
+}
+.card-ico svg{width:22px; height:22px; fill:none; stroke:var(--violet); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round}
+.card-n{display:block; font-family:var(--mono); font-size:.75rem; color:var(--violet); margin-bottom:.6rem}
 .card h3{font-size:1.15rem; margin-bottom:.6rem}
 .card p{color:var(--muted); font-size:.94rem}
 .ticks{margin-top:var(--s3); display:flex; flex-direction:column; gap:.5rem}
 .ticks li{position:relative; padding-left:1.5rem; font-size:.88rem; color:var(--muted); line-height:1.5}
 .ticks li::before{content:""; position:absolute; left:2px; top:.4em; width:8px; height:5px; border-left:1.6px solid var(--emerald); border-bottom:1.6px solid var(--emerald); transform:rotate(-45deg)}
 
-/* цена внутри услуг — отдельной секции не заслуживает */
-.price{
-  margin-top:var(--s4); padding:var(--s4) var(--s3);
-  border:1px solid var(--line); border-radius:var(--r); background:var(--panel);
-}
+.price{margin-top:var(--s2); padding:var(--s4) var(--s3); border-radius:var(--r-lg)}
 @media (min-width:560px){ .price{padding:var(--s4)} }
 .price h3{font-size:1.15rem; margin-bottom:var(--s2)}
 .price > p{color:var(--muted); font-size:.94rem; max-width:60ch}
@@ -273,69 +351,68 @@ a{color:var(--violet)}
 .price-list dt{font-family:var(--mono); font-size:.75rem; color:var(--violet); margin-bottom:.4rem}
 .price-list dd{margin:0; font-size:.9rem; color:var(--muted)}
 .price-list strong{display:block; color:var(--text); font-size:.98rem; margin-bottom:.25rem}
-.price-foot{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s3); margin-top:var(--s4); padding-top:var(--s3); border-top:1px solid var(--line)}
+.price-foot{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s3); margin-top:var(--s4); padding-top:var(--s3); border-top:1px solid var(--glass-brd)}
 .price-foot p{color:var(--muted); font-size:.92rem; max-width:52ch}
 
 /* ============================================================
    [03] Процесс
    ============================================================ */
-.steps{display:grid; gap:0}
+.steps{display:grid; gap:var(--s2)}
 .steps li{
-  display:grid; gap:var(--s2) var(--s4); padding:var(--s4) 0;
-  border-top:1px solid var(--line);
+  display:grid; gap:var(--s2) var(--s4); padding:var(--s4) var(--s3);
+  border-radius:var(--r-lg);
+  transition:transform 320ms var(--spring), border-color var(--t);
 }
-.steps li:last-child{border-bottom:1px solid var(--line)}
+@media (min-width:560px){ .steps li{padding:var(--s4)} }
 @media (min-width:820px){ .steps li{grid-template-columns:110px 1fr 260px; align-items:start} }
+.steps li:hover{transform:translateY(-3px); border-color:var(--glass-brd-hi)}
 .step-n{font-family:var(--mono); font-size:.78rem; color:var(--violet); padding-top:.2rem}
 .steps h3{font-size:1.12rem; margin-bottom:.5rem}
 .steps p{color:var(--muted); font-size:.93rem; max-width:56ch}
-.step-out{
-  font-family:var(--mono); font-size:.78rem; color:var(--emerald); line-height:1.6;
-  padding-top:.2rem;
-}
+.step-out{font-family:var(--mono); font-size:.78rem; color:var(--emerald); line-height:1.6; padding-top:.2rem}
 
 /* ============================================================
    [04] Вопросы и заявка
    ============================================================ */
 .final{display:grid; gap:var(--s5)}
-@media (min-width:980px){ .final{grid-template-columns:1fr 1fr; gap:var(--s6); align-items:start} }
+@media (min-width:980px){ .final{grid-template-columns:1fr 1fr; gap:var(--s4); align-items:start} }
 
-.faq{display:flex; flex-direction:column}
-.faq details{border-bottom:1px solid var(--line)}
-.faq details:first-child{border-top:1px solid var(--line)}
+.faq{display:flex; flex-direction:column; gap:.5rem}
+.faq details{border-radius:var(--r); overflow:hidden; transition:border-color var(--t)}
+.faq details[open]{border-color:var(--glass-brd-hi)}
 .faq summary{
   display:flex; align-items:center; justify-content:space-between; gap:var(--s3);
-  min-height:62px; padding:var(--s2) 0; font-size:.98rem; font-weight:600;
+  min-height:64px; padding:var(--s2) var(--s3); font-size:.98rem; font-weight:600;
   cursor:pointer; list-style:none; transition:color var(--t);
 }
 .faq summary::-webkit-details-marker{display:none}
 .faq summary:hover{color:var(--violet)}
-.chev{flex:none; width:9px; height:9px; border-right:1.6px solid var(--violet); border-bottom:1.6px solid var(--violet); transform:rotate(45deg) translate(-2px,-2px); transition:transform var(--t)}
+.chev{flex:none; width:9px; height:9px; border-right:1.8px solid var(--violet); border-bottom:1.8px solid var(--violet); transform:rotate(45deg) translate(-2px,-2px); transition:transform 320ms var(--spring)}
 .faq details[open] .chev{transform:rotate(-135deg) translate(-2px,-2px)}
-.faq-body{padding:0 0 var(--s3)}
-.faq-body p{color:var(--muted); font-size:.93rem; max-width:60ch}
+.faq-body{overflow:hidden}
+.faq-body p{padding:0 var(--s3) var(--s3); color:var(--muted); font-size:.93rem; max-width:60ch}
 
-.contact-alt{display:flex; flex-direction:column; gap:.2rem; margin-bottom:var(--s4)}
+.contact-alt{display:flex; flex-direction:column; gap:.2rem; margin-bottom:var(--s3)}
 .contact-alt li{display:flex; align-items:center; gap:.7rem}
 .contact-alt svg{width:18px; height:18px; flex:none; fill:none; stroke:var(--violet); stroke-width:1.5; stroke-linejoin:round}
 .contact-alt a{display:inline-flex; align-items:center; min-height:44px; font-family:var(--mono); font-size:.88rem; color:var(--text); text-decoration:none; transition:color var(--t)}
 .contact-alt a:hover{color:var(--violet)}
 
-.form{border:1px solid var(--line); border-radius:var(--r); background:var(--panel); padding:var(--s4) var(--s3); display:flex; flex-direction:column; gap:var(--s3)}
+.form{border-radius:var(--r-lg); padding:var(--s4) var(--s3); display:flex; flex-direction:column; gap:var(--s3)}
 @media (min-width:560px){ .form{padding:var(--s4)} }
 .field{display:flex; flex-direction:column; gap:.4rem}
 .field label{font-family:var(--mono); font-size:.78rem; color:var(--muted)}
 .req{color:var(--violet)}
 .field input,.field textarea{
-  width:100%; min-height:50px; padding:.75rem .9rem;
-  background:var(--void); color:var(--text);
-  border:1px solid var(--line-hi); border-radius:var(--r);
+  width:100%; min-height:52px; padding:.8rem 1rem;
+  background:rgba(7,6,13,.5); color:var(--text);
+  border:1px solid var(--glass-brd); border-radius:var(--r-sm);
   font-family:var(--body); font-size:16px; line-height:1.5;
-  transition:border-color var(--t);
+  transition:border-color var(--t), background var(--t), box-shadow var(--t);
 }
-.field textarea{min-height:116px; resize:vertical}
+.field textarea{min-height:118px; resize:vertical}
 .field input::placeholder,.field textarea::placeholder{color:var(--faint)}
-.field input:focus,.field textarea:focus{border-color:var(--violet)}
+.field input:focus,.field textarea:focus{border-color:var(--violet); box-shadow:0 0 0 3px rgba(185,140,242,.16)}
 .field input[aria-invalid="true"],.field textarea[aria-invalid="true"]{border-color:var(--danger)}
 .hint{font-family:var(--mono); font-size:.74rem; color:var(--faint)}
 .err{font-size:.84rem; font-weight:600; color:var(--danger)}
@@ -346,25 +423,22 @@ a{color:var(--violet)}
 /* ============================================================
    Подвал
    ============================================================ */
-.foot{border-top:1px solid var(--line); padding:var(--s5) 0 var(--s3)}
+.foot{margin-top:var(--s5); padding:var(--s5) 0 var(--s3); border-top:1px solid var(--glass-brd)}
 .foot-top{display:grid; gap:var(--s5); margin-bottom:var(--s5)}
 @media (min-width:820px){ .foot-top{grid-template-columns:1.3fr 1fr 1fr 1.2fr; gap:var(--s4)} }
-
 .foot-brand{display:flex; align-items:center; gap:.6rem; margin-bottom:var(--s2)}
 .foot-about{color:var(--muted); font-size:.9rem; max-width:34ch}
 .foot-social{display:flex; gap:.5rem; margin-top:var(--s3)}
 .foot-social a{
-  display:grid; place-items:center; width:44px; height:44px;
-  border:1px solid var(--line); border-radius:var(--r); color:var(--muted);
-  transition:border-color var(--t), color var(--t);
+  display:grid; place-items:center; width:44px; height:44px; border-radius:14px;
+  background:var(--glass); border:1px solid var(--glass-brd);
+  box-shadow:var(--bevel); color:var(--muted);
+  transition:border-color var(--t), color var(--t), transform 200ms var(--spring);
 }
-.foot-social a:hover{border-color:var(--violet); color:var(--violet)}
+.foot-social a:hover{border-color:var(--violet); color:var(--violet); transform:translateY(-3px)}
+.foot-social a:active{transform:scale(.94)}
 .foot-social svg{width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linejoin:round}
-
-.foot-col h3{
-  font-family:var(--mono); font-size:.72rem; font-weight:500; letter-spacing:.14em;
-  text-transform:uppercase; color:var(--faint); margin-bottom:.4rem;
-}
+.foot-col h3{font-family:var(--mono); font-size:.72rem; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin-bottom:.4rem}
 .foot-col li a,
 .foot-col li span{
   display:inline-flex; align-items:center; min-height:44px;
@@ -372,19 +446,19 @@ a{color:var(--violet)}
 }
 .foot-col li a:hover{color:var(--violet)}
 .foot-col li span{color:var(--faint)}
-
-.foot-bottom{display:flex; flex-wrap:wrap; gap:var(--s2) var(--s3); padding-top:var(--s3); border-top:1px solid var(--line)}
+.foot-bottom{display:flex; flex-wrap:wrap; gap:var(--s2) var(--s3); padding-top:var(--s3); border-top:1px solid var(--glass-brd)}
 .foot-copy{font-family:var(--mono); font-size:.76rem; color:var(--faint)}
 
 /* ============================================================
-   Появление при скролле
+   Появление при скролле — с пружиной
    ============================================================ */
-.js .r{opacity:0; transform:translateY(10px); transition:opacity 420ms ease-out, transform 420ms ease-out}
+.js .r{opacity:0; transform:translateY(18px); transition:opacity 520ms var(--ease), transform 620ms var(--spring)}
 .js .r.in{opacity:1; transform:none}
-.d1{transition-delay:60ms} .d2{transition-delay:120ms} .d3{transition-delay:180ms}
+.d1{transition-delay:80ms} .d2{transition-delay:160ms} .d3{transition-delay:240ms}
 
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{transition-duration:1ms !important; animation:none !important}
   .js .r{opacity:1; transform:none}
+  .aurora i{transform:none}
 }

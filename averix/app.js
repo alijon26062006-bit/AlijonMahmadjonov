@@ -217,6 +217,7 @@
     langButtons.forEach(function (b) {
       b.setAttribute('aria-pressed', String(b.dataset.lang === code));
     });
+    movePill(code);
     try { localStorage.setItem('averix-lang', code); } catch (e) {}
   }
 
@@ -228,6 +229,12 @@
     var saved = localStorage.getItem('averix-lang');
     if (saved === 'tg') setLang('tg');
   } catch (e) {}
+
+  /* стартовое положение бегунка и пересчёт при смене размера шрифта/окна */
+  movePill(document.documentElement.lang === 'tg' ? 'tg' : 'ru');
+  window.addEventListener('resize', function () {
+    movePill(document.documentElement.lang === 'tg' ? 'tg' : 'ru');
+  });
 
   /* ============================================================
      Шапка и меню
@@ -298,17 +305,122 @@
 
   if (reduced || !('IntersectionObserver' in window)) {
     Array.prototype.forEach.call(items, function (el) { el.classList.add('in'); });
+    document.querySelectorAll('[data-count]').forEach(countUp);
   } else {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (entry.isIntersecting) {
           entry.target.classList.add('in');
+          entry.target.querySelectorAll('[data-count]').forEach(countUp);
           io.unobserve(entry.target);
         }
       });
     }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
     Array.prototype.forEach.call(items, function (el) { io.observe(el); });
   }
+
+
+  /* ============================================================
+     Бегунок переключателя языка
+     ============================================================ */
+  function movePill(code) {
+    /* элемент ищем внутри функции: setLang вызывается раньше,
+       чем выполнится присваивание на верхнем уровне */
+    var pill = document.getElementById('lang-pill');
+    if (!pill) return;
+    var btn = document.querySelector('.lang button[data-lang="' + code + '"]');
+    var first = document.querySelector('.lang button');
+    if (!btn || !first) return;
+    pill.style.width = btn.offsetWidth + 'px';
+    pill.style.transform = 'translateX(' + (btn.offsetLeft - first.offsetLeft) + 'px)';
+  }
+
+  /* ============================================================
+     Цифры набегают, когда блок появляется на экране
+     ============================================================ */
+  function countUp(el) {
+    var target = parseInt(el.dataset.count, 10);
+    if (reduced || !target) { el.textContent = target; return; }
+    var start = null;
+    var dur = 900;
+    el.textContent = '0';
+    function tick(now) {
+      if (start === null) start = now;
+      var p = Math.min((now - start) / dur, 1);
+      /* замедление к концу — цифра «приезжает», а не щёлкает */
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * eased);
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  /* ============================================================
+     Блик под курсором на стеклянных карточках
+     ============================================================ */
+  if (window.matchMedia('(hover: hover)').matches && !reduced) {
+    document.querySelectorAll('.card').forEach(function (card) {
+      var pending = false, mx = 0, my = 0;
+      card.addEventListener('mousemove', function (e) {
+        var rect = card.getBoundingClientRect();
+        mx = e.clientX - rect.left;
+        my = e.clientY - rect.top;
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(function () {
+          card.style.setProperty('--mx', mx + 'px');
+          card.style.setProperty('--my', my + 'px');
+          pending = false;
+        });
+      });
+    });
+  }
+
+  /* ============================================================
+     Вопросы раскрываются плавно
+     Анимируем сам <details>, а не его содержимое: у закрытого
+     <details> тело остаётся выложенным на полную высоту и просто
+     обрезается, поэтому анимация по телу шла бы вхолостую.
+     Движение прерываемое: повторный клик разворачивает его,
+     а не ждёт окончания.
+     ============================================================ */
+  document.querySelectorAll('.faq details').forEach(function (d) {
+    var summary = d.querySelector('summary');
+    var body = d.querySelector('.faq-body');
+    var closedH = d.getBoundingClientRect().height;   /* меряем до первого клика */
+    var running = null;
+
+    summary.addEventListener('click', function (e) {
+      if (reduced) return;                 /* оставляем родное поведение */
+      e.preventDefault();
+      if (running) running.cancel();
+
+      var startH = d.getBoundingClientRect().height;
+      var opening = !d.open;
+
+      if (opening) d.open = true;
+      d.style.height = 'auto';
+      var openH = d.getBoundingClientRect().height;
+      d.style.height = startH + 'px';
+
+      var endH = opening ? openH : closedH;
+
+      running = d.animate(
+        [{ height: startH + 'px' }, { height: endH + 'px' }],
+        { duration: opening ? 340 : 250, easing: 'cubic-bezier(.22,.7,.28,1)' }
+      );
+      body.animate(
+        [{ opacity: opening ? 0 : 1 }, { opacity: opening ? 1 : 0 }],
+        { duration: opening ? 280 : 180, easing: 'ease-out', fill: 'none' }
+      );
+
+      running.onfinish = function () {
+        running = null;
+        d.style.height = '';
+        if (!opening) d.open = false;
+      };
+    });
+  });
 
   /* ============================================================
      Форма → Telegram
