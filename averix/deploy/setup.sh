@@ -117,9 +117,23 @@ else
 fi
 
 say "Настраиваю сайт в nginx"
+NGINX_SITE=/etc/nginx/sites-available/averix
+NGINX_BAK=/etc/nginx/sites-available/averix.bak
+
+# Шаблон не содержит блока HTTPS — его дописывает certbot. Поэтому
+# повторный запуск скрипта временно снимает шифрование, и если certbot
+# затем упадёт, сайт останется на голом http. Сохраняем рабочий конфиг,
+# чтобы было куда вернуться.
+HAD_SSL=0
+if [ -f "$NGINX_SITE" ] && grep -q "ssl_certificate" "$NGINX_SITE"; then
+  cp -f "$NGINX_SITE" "$NGINX_BAK"
+  HAD_SSL=1
+  echo "    прежний конфиг с HTTPS сохранён в $NGINX_BAK"
+fi
+
 sed -e "s|__DOMAIN__|$DOMAIN|g" -e "s|__ROOT__|$SITE_DIR|g" \
     -e "s|__DATA_DIR__|$DATA_DIR|g" \
-    "$SITE_DIR/deploy/nginx.conf" > /etc/nginx/sites-available/averix
+    "$SITE_DIR/deploy/nginx.conf" > "$NGINX_SITE"
 ln -sf /etc/nginx/sites-available/averix /etc/nginx/sites-enabled/averix
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
@@ -141,8 +155,10 @@ else
   echo "    www.$DOMAIN не резолвится — сертификат только на $DOMAIN"
 fi
 
+# keep-until-expiring: если сертификат ещё жив, certbot просто
+# вставит его в конфиг, а не выпустит новый и не потратит лимит
 if certbot --nginx "${CERT_ARGS[@]}" \
-     --non-interactive --agree-tos --redirect \
+     --non-interactive --agree-tos --redirect --keep-until-expiring \
      -m "alijon26.06.2006@gmail.com"; then
   echo "    HTTPS включён, продление настроено автоматически"
 else
@@ -160,6 +176,14 @@ else
   echo "    Обычно причина — A-запись ещё не разошлась. Проверьте и повторите:"
   echo "      getent hosts $DOMAIN"
   echo "      certbot --nginx ${CERT_ARGS[*]}"
+
+  if [ "$HAD_SSL" = "1" ]; then
+    cp -f "$NGINX_BAK" "$NGINX_SITE"
+    nginx -t >/dev/null 2>&1 && systemctl reload nginx
+    echo
+    echo "    Прежний конфиг с HTTPS возвращён — сайт продолжает работать"
+    echo "    на старом домене. Без этого он остался бы на голом http."
+  fi
   exit 1
 fi
 
