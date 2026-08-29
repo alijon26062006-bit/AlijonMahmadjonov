@@ -30,7 +30,7 @@
           <span class="badge draft">закрыта</span>
         {% endif %}
         <form method="post" action="/admin/vacancies/{{ v.id }}/delete"
-              onsubmit="return confirm('Удалить вакансию «{{ v.title_ru }}»? Отклики на неё останутся, но потеряют привязку.')">
+              data-confirm="Удалить вакансию «{{ v.title_ru }}»? Отклики на неё останутся, но потеряют привязку.">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button class="mini danger" type="submit">Удалить</button>
         </form>

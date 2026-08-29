@@ -58,7 +58,7 @@
       </form>
 
       <form method="post" action="/admin/applications/{{ it.id }}/hire"
-            onsubmit="return confirm('Создать карточку «{{ it.name }}» в команде? Она будет скрыта от сайта, пока вы её не заполните.')">
+            data-confirm="Создать карточку «{{ it.name }}» в команде? Она будет скрыта от сайта, пока вы её не заполните.">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <button class="mini" type="submit">Добавить в команду</button>
       </form>

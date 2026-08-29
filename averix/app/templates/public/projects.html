@@ -35,7 +35,7 @@
     <div class="grid-cases">
       {% for p in projects %}
       <article class="tile glass r">
-        <a class="tile-shot" href="/projects/{{ p.slug }}" tabindex="-1" aria-hidden="true">
+        <a class="tile-shot{% if not p.cover %} none{% endif %}" href="/projects/{{ p.slug }}" tabindex="-1" aria-hidden="true">
           {% if p.cover %}
           <img src="/uploads/{{ p.cover }}" alt="" loading="lazy" decoding="async"
                width="{{ p.cover_w or 1200 }}" height="{{ p.cover_h or 800 }}">

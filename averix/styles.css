@@ -115,7 +115,7 @@ a{color:var(--violet)}
 }
 
 .mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
-.label{font-family:var(--mono); font-size:.72rem; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
+.label{font-family:var(--mono); font-size:.76rem; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
 .tag-n{font-family:var(--mono); font-size:.75rem; color:var(--violet); letter-spacing:.05em}
 
 /* ============================================================
@@ -176,6 +176,7 @@ a{color:var(--violet)}
   text-decoration:none; transition:color var(--t), background var(--t);
 }
 .nav-links a:hover{color:var(--text); background:var(--glass)}
+.nav-links a[aria-current]{color:var(--text); background:var(--glass); box-shadow:var(--bevel)}
 
 /* переключатель языка: подложка едет за выбором, а не перекрашивается */
 .lang{
@@ -396,7 +397,7 @@ a{color:var(--violet)}
 .field{display:flex; flex-direction:column; gap:.4rem}
 .field label{font-family:var(--mono); font-size:.78rem; color:var(--muted)}
 .req{color:var(--violet)}
-.field input,.field textarea{
+.field input,.field textarea,.field select{
   width:100%; min-height:52px; padding:.8rem 1rem;
   background:rgba(7,6,13,.5); color:var(--text);
   border:1px solid var(--glass-brd); border-radius:var(--r-sm);
@@ -404,12 +405,21 @@ a{color:var(--violet)}
   transition:border-color var(--t), background var(--t), box-shadow var(--t);
 }
 .field textarea{min-height:118px; resize:vertical}
+.field select{
+  /* без сброса браузер рисует свой список высотой 19px — по нему
+     невозможно попасть пальцем, и он выпадает из стиля формы */
+  appearance:none; -webkit-appearance:none;
+  padding-right:2.6rem; cursor:pointer;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23B4AECA' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 1rem center; background-size:12px 8px;
+}
+.field select option{background:#12111C; color:var(--text)}
 .field input::placeholder,.field textarea::placeholder{color:var(--faint)}
-.field input:focus,.field textarea:focus{border-color:var(--violet); box-shadow:0 0 0 3px rgba(185,140,242,.16)}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--violet); box-shadow:0 0 0 3px rgba(185,140,242,.16)}
 .field input[aria-invalid="true"],.field textarea[aria-invalid="true"]{border-color:var(--danger)}
-.hint{font-family:var(--mono); font-size:.74rem; color:var(--faint)}
+.hint{font-family:var(--mono); font-size:.76rem; color:var(--faint)}
 .err{font-size:.84rem; font-weight:600; color:var(--danger)}
-.form-note{font-family:var(--mono); font-size:.74rem; color:var(--faint); text-align:center; line-height:1.6}
+.form-note{font-family:var(--mono); font-size:.76rem; color:var(--faint); text-align:center; line-height:1.6}
 .form-status{font-family:var(--mono); font-size:.82rem; color:var(--emerald); text-align:center}
 .form-status:empty{display:none}
 
@@ -431,7 +441,7 @@ a{color:var(--violet)}
 .foot-social a:hover{border-color:var(--violet); color:var(--violet); transform:translateY(-3px)}
 .foot-social a:active{transform:scale(.94)}
 .foot-social svg{width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linejoin:round}
-.foot-col h3{font-family:var(--mono); font-size:.72rem; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin-bottom:.4rem}
+.foot-col h3{font-family:var(--mono); font-size:.76rem; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin-bottom:.4rem}
 .foot-col li a,
 .foot-col li span{
   display:inline-flex; align-items:center; min-height:44px;
@@ -456,7 +466,8 @@ a{color:var(--violet)}
 .hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
 
 .note-line{font-size:.94rem; color:var(--faint)}
-.note-line a{color:var(--violet); text-decoration:none}
+.note-line a{display:inline-flex; align-items:center; min-height:44px;
+  color:var(--violet); text-decoration:none}
 .note-line a:hover{text-decoration:underline}
 
 /* ============================================================
@@ -464,7 +475,7 @@ a{color:var(--violet)}
    ============================================================ */
 .cases{display:grid; gap:var(--s3)}
 .case{
-  display:grid; gap:0; overflow:hidden; border-radius:var(--r-lg);
+  position:relative; display:grid; gap:0; overflow:hidden; border-radius:var(--r-lg);
 }
 @media (min-width:860px){
   .case{grid-template-columns:1.15fr 1fr; align-items:stretch}
@@ -485,11 +496,21 @@ a{color:var(--violet)}
 @media (min-width:560px){ .case-body{padding:var(--s4)} }
 .case-body h2,
 .case-body h3{font-size:clamp(1.25rem,3vw,1.6rem); line-height:1.18}
+/* Заголовок — ссылка на весь блок: одной строки текста мало,
+   чтобы уверенно попасть пальцем, поэтому она накрывает карточку. */
 .case-body h2 a,
-.case-body h3 a{color:inherit; text-decoration:none}
+.case-body h3 a{
+  display:inline-flex; align-items:center; min-height:44px;
+  color:inherit; text-decoration:none;
+}
+.case-body h2 a::after,
+.case-body h3 a::after{content:""; position:absolute; inset:0}
 .case-body h2 a:hover,
 .case-body h3 a:hover{color:var(--violet)}
-.case-meta{font-family:var(--mono); font-size:.74rem; letter-spacing:.1em; text-transform:uppercase; color:var(--faint)}
+/* остальное внутри карточки должно оставаться нажимаемым */
+.case-body .link-more,
+.case-body .tags{position:relative; z-index:1}
+.case-meta{font-family:var(--mono); font-size:.76rem; letter-spacing:.1em; text-transform:uppercase; color:var(--faint)}
 .case-text{color:var(--muted); font-size:.98rem; max-width:52ch}
 .link-more{
   display:inline-flex; align-items:center; gap:.4rem; min-height:44px; margin-top:auto;
@@ -520,13 +541,15 @@ a{color:var(--violet)}
    Внутренние страницы: шапка, крошки, фильтры
    ============================================================ */
 .page-head{padding:calc(var(--s6) + 20px) 0 0}
+.page-head .head{margin-bottom:0}
 .section-tight{padding:var(--s5) 0}
 .crumbs{
   display:flex; flex-wrap:wrap; align-items:center; gap:.5rem;
-  font-family:var(--mono); font-size:.74rem; letter-spacing:.08em;
-  text-transform:uppercase; color:var(--faint); margin-bottom:var(--s4);
+  font-family:var(--mono); font-size:.76rem; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--faint); margin-bottom:var(--s3);
 }
-.crumbs a{color:var(--faint); text-decoration:none}
+.crumbs a{display:inline-flex; align-items:center; min-height:44px;
+  color:var(--faint); text-decoration:none}
 .crumbs a:hover{color:var(--violet)}
 .page-head h1{font-size:clamp(2rem,5.6vw,3.2rem); line-height:1.1}
 
@@ -544,22 +567,35 @@ a{color:var(--violet)}
 /* ============================================================
    Сетка проектов
    ============================================================ */
-.grid-cases{display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.tile{display:flex; flex-direction:column; overflow:hidden; border-radius:var(--r-lg)}
+.grid-cases{display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+@media (min-width:900px){
+  /* auto-fit растянул бы единственную карточку во весь экран —
+     с одним проектом это выглядит как ошибка вёрстки */
+  .grid-cases{grid-template-columns:repeat(auto-fill,minmax(320px,440px))}
+}
+.tile{position:relative; display:flex; flex-direction:column; overflow:hidden; border-radius:var(--r-lg)}
 .tile-shot{position:relative; display:block; aspect-ratio:16/10; background:rgba(255,255,255,.03); overflow:hidden}
+.tile-shot.none,
+.case-shot.none{aspect-ratio:auto; min-height:0; height:132px}
 .tile-shot img{width:100%; height:100%; object-fit:cover; transition:transform 700ms var(--ease)}
 .tile:hover .tile-shot img{transform:scale(1.035)}
 .tile-body{display:flex; flex-direction:column; gap:var(--s2); padding:var(--s3); flex:1}
 .tile-body h2{font-size:1.2rem; line-height:1.22}
-.tile-body h2 a{color:inherit; text-decoration:none}
+.tile-body h2 a{
+  display:inline-flex; align-items:center; min-height:44px;
+  color:inherit; text-decoration:none;
+}
+.tile-body h2 a::after{content:""; position:absolute; inset:0}
 .tile-body h2 a:hover{color:var(--violet)}
+.tile-body .link-more,
+.tile-body .tags{position:relative; z-index:1}
 
 .empty{
   display:flex; flex-direction:column; align-items:flex-start; gap:var(--s2);
   padding:var(--s5) var(--s3); border-radius:var(--r-lg); max-width:56ch;
 }
 @media (min-width:560px){ .empty{padding:var(--s5)} }
-.empty .mono{font-size:.76rem; letter-spacing:.16em; color:var(--violet)}
+.empty .mono{font-size:.78rem; letter-spacing:.16em; color:var(--violet)}
 .empty p:not(.mono){color:var(--muted)}
 .empty .btn{margin-top:var(--s2)}
 
@@ -572,11 +608,11 @@ a{color:var(--violet)}
 }
 @media (min-width:720px){ .case-facts{grid-template-columns:2fr 1fr 1fr; align-items:start; padding:var(--s4)} }
 .fact{display:flex; flex-direction:column; gap:.35rem}
-.fact-k{font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
+.fact-k{font-family:var(--mono); font-size:.76rem; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
 .fact .tags{margin-top:0}
 .case-hero{margin-top:var(--s5); border-radius:var(--r-lg); overflow:hidden}
 .case-hero img{width:100%; height:auto}
-.case-text-col{max-width:74ch}
+.case-text-col > *{max-width:74ch}
 .case-block{margin-top:var(--s5)}
 .case-block:first-child{margin-top:0}
 .case-block h2{
@@ -588,14 +624,19 @@ a{color:var(--violet)}
 .case-gallery{display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
 .case-gallery figure{margin:0; border-radius:var(--r-lg); overflow:hidden}
 .case-gallery figcaption{padding:var(--s2) var(--s3); font-size:.86rem; color:var(--faint)}
+.job-body .fact-k{margin-bottom:.4rem}
 .case-foot{display:grid; gap:var(--s3)}
-@media (min-width:860px){ .case-foot{grid-template-columns:1fr 1fr; align-items:stretch} }
+/* без следующего проекта колонка одна: половина пустого экрана
+   читается как недогруженный блок */
+@media (min-width:860px){
+  .case-foot:has(.next-case){grid-template-columns:1fr 1fr; align-items:stretch}
+}
 .next-case{
   display:flex; flex-direction:column; justify-content:center; gap:.4rem;
   padding:var(--s4) var(--s3); border-radius:var(--r-lg); text-decoration:none; color:var(--text);
   transition:border-color var(--t);
 }
-.next-case .mono{font-size:.72rem; letter-spacing:.16em; color:var(--faint)}
+.next-case .mono{font-size:.76rem; letter-spacing:.16em; color:var(--faint)}
 .next-case strong{font-family:var(--display); font-size:1.2rem; font-weight:600}
 .next-case i{font-style:normal; display:inline-block; transition:transform var(--t)}
 .next-case:hover i{transform:translateX(4px)}
@@ -608,9 +649,15 @@ a{color:var(--violet)}
 /* ============================================================
    Команда
    ============================================================ */
-.people{display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.people{display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+@media (min-width:900px){
+  /* пока в студии один человек, карточка не должна растягиваться
+     на весь экран — иначе это читается как сломанная вёрстка */
+  .people{grid-template-columns:repeat(auto-fill,minmax(280px,360px))}
+}
 .person{display:flex; flex-direction:column; overflow:hidden; border-radius:var(--r-lg)}
 .person-shot{position:relative; aspect-ratio:5/6; background:rgba(255,255,255,.03); overflow:hidden}
+.person-shot:not(:has(img)){aspect-ratio:auto; height:132px}
 .person-shot img{width:100%; height:100%; object-fit:cover}
 .person-ini{
   position:absolute; inset:0; display:grid; place-items:center;

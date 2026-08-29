@@ -78,7 +78,7 @@ fi
 
 git -C "$CLONE_DIR" checkout --quiet -B "$BRANCH" "origin/$BRANCH"
 git -C "$CLONE_DIR" reset --hard --quiet "origin/$BRANCH"
-[ -f "$SITE_DIR/index.html" ] || die "не нашёл $SITE_DIR/index.html в ветке $BRANCH"
+[ -f "$SITE_DIR/app/main.py" ] || die "не нашёл $SITE_DIR/app/main.py в ветке $BRANCH"
 
 # Код принадлежит root, www-data только читает: приложение работает
 # от www-data и не должно иметь права переписывать собственные исходники.

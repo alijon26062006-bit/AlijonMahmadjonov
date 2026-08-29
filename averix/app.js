@@ -6,7 +6,6 @@
 (function () {
   'use strict';
 
-  var TELEGRAM_USER = 'rutsiyax';
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ============================================================
@@ -140,7 +139,6 @@
     'form.task.ph': 'Ду ҷумла: бо чӣ машғулед ва сомона чӣ бояд кунад',
     'form.submit': 'Ба Telegram фиристодан',
     'form.note': 'дархост ҳамчун паёми тайёр кушода мешавад — танҳо «Фиристодан»-ро пахш кунед',
-    'form.sent': 'Telegram кушода шуд — «Фиристодан»-ро пахш кунед.',
 
     'foot.about': 'Студия аз Душанбе. Сомонаҳо ва лендингҳо, ки бо даст барои вазифаи тиҷорат сохта мешаванд.',
     'foot.services': 'Хизматрасонӣ',
@@ -510,79 +508,93 @@
   });
 
   /* ============================================================
-     Форма → Telegram
-     Статике не нужен бэкенд: заявка открывается готовым сообщением.
+     Отклик на конкретную вакансию
+     Кнопка у вакансии ведёт к форме — заодно подставляем вакансию,
+     чтобы человек не искал её в списке заново.
      ============================================================ */
-  var form = document.getElementById('form');
-  if (!form) return;
-
-  var status = document.getElementById('status');
-
-  var FIELDS = [
-    { id: 'f-name',    err: 'e-name',    empty: 'Напишите, как к вам обращаться' },
-    { id: 'f-contact', err: 'e-contact', empty: 'Оставьте Telegram или телефон — иначе мы не сможем ответить' },
-    { id: 'f-task',    err: 'e-task',    empty: 'Опишите задачу хотя бы в двух предложениях' }
-  ];
-
-  function showError(field, message) {
-    var input = document.getElementById(field.id);
-    var box = document.getElementById(field.err);
-    input.setAttribute('aria-invalid', 'true');
-    input.setAttribute('aria-describedby', field.err);
-    box.textContent = message;
-    box.hidden = false;
-  }
-
-  function clearError(field) {
-    var input = document.getElementById(field.id);
-    var box = document.getElementById(field.err);
-    input.removeAttribute('aria-invalid');
-    input.removeAttribute('aria-describedby');
-    box.textContent = '';
-    box.hidden = true;
-  }
-
-  /* проверяем при уходе из поля, а не на каждом нажатии */
-  FIELDS.forEach(function (field) {
-    document.getElementById(field.id).addEventListener('blur', function (e) {
-      if (e.target.value.trim()) clearError(field);
+  var vacancySelect = document.getElementById('j-vacancy');
+  if (vacancySelect) {
+    document.querySelectorAll('[data-vacancy]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        vacancySelect.value = btn.dataset.vacancy;
+      });
     });
-  });
+  }
 
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    if (status) status.textContent = '';
+  /* ============================================================
+     Проверка форм до отправки
+     Форма уходит на сервер обычным POST — без JS она тоже работает.
+     Здесь мы только подсказываем раньше, чем перезагрузится страница.
+     ============================================================ */
+  var MESSAGES = {
+    ru: {
+      empty: 'Заполните это поле',
+      short: 'Напишите чуть подробнее — хотя бы пару фраз'
+    },
+    tg: {
+      empty: 'Ин майдонро пур кунед',
+      short: 'Каме муфассалтар нависед — ақаллан ду ҷумла'
+    }
+  };
 
-    var firstInvalid = null;
+  function fieldError(input, message) {
+    var box = input.parentNode.querySelector('.err.js-err');
+    if (!box) {
+      box = document.createElement('p');
+      box.className = 'err js-err';
+      box.setAttribute('role', 'alert');
+      input.parentNode.appendChild(box);
+    }
+    box.textContent = message;
+    input.setAttribute('aria-invalid', 'true');
+  }
 
-    FIELDS.forEach(function (field) {
-      var input = document.getElementById(field.id);
-      if (!input.value.trim()) {
-        showError(field, field.empty);
-        if (!firstInvalid) firstInvalid = input;
-      } else {
-        clearError(field);
+  function fieldOk(input) {
+    var box = input.parentNode.querySelector('.err.js-err');
+    if (box) box.remove();
+    input.removeAttribute('aria-invalid');
+  }
+
+  document.querySelectorAll('form.form').forEach(function (form) {
+    var required = form.querySelectorAll('[required]');
+
+    required.forEach(function (input) {
+      input.addEventListener('blur', function () {
+        if (input.value.trim()) fieldOk(input);
+      });
+    });
+
+    form.addEventListener('submit', function (e) {
+      var texts = MESSAGES[document.documentElement.lang === 'tg' ? 'tg' : 'ru'];
+      var firstBad = null;
+
+      required.forEach(function (input) {
+        var value = input.value.trim();
+        /* у длинных полей минимум осмысленной длины совпадает с серверным */
+        var tooShort = input.tagName === 'TEXTAREA' && value.length < 10;
+        if (!value) {
+          fieldError(input, texts.empty);
+          if (!firstBad) firstBad = input;
+        } else if (tooShort) {
+          fieldError(input, texts.short);
+          if (!firstBad) firstBad = input;
+        } else {
+          fieldOk(input);
+        }
+      });
+
+      if (firstBad) {
+        e.preventDefault();
+        firstBad.focus();
+        return;
+      }
+
+      /* повторное нажатие создало бы вторую такую же заявку */
+      var submit = form.querySelector('button[type="submit"]');
+      if (submit) {
+        submit.disabled = true;
+        setTimeout(function () { submit.disabled = false; }, 6000);
       }
     });
-
-    if (firstInvalid) {
-      firstInvalid.focus();
-      return;
-    }
-
-    var text =
-      'Заявка с сайта AVERIX\n\n' +
-      'Имя: ' + document.getElementById('f-name').value.trim() + '\n' +
-      'Контакт: ' + document.getElementById('f-contact').value.trim() + '\n' +
-      'Задача: ' + document.getElementById('f-task').value.trim();
-
-    window.open('https://t.me/' + TELEGRAM_USER + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
-
-    if (status) {
-      status.textContent = document.documentElement.lang === 'tg'
-        ? TG['form.sent']
-        : 'Открыли Telegram — осталось нажать «Отправить».';
-    }
-    form.reset();
   });
 })();

@@ -188,7 +188,7 @@
           </form>
         {% endif %}
         <form method="post" action="/admin/projects/{{ project.id }}/images/{{ im.id }}/delete"
-              onsubmit="return confirm('Удалить картинку?')">
+              data-confirm="Удалить картинку?">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button class="mini danger" type="submit" aria-label="Удалить картинку">×</button>
         </form>

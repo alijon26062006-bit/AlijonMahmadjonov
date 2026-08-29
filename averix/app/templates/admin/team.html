@@ -34,7 +34,7 @@
           <span class="badge draft">скрыт</span>
         {% endif %}
         <form method="post" action="/admin/team/{{ m.id }}/delete"
-              onsubmit="return confirm('Удалить «{{ m.name }}»? Отменить будет нельзя.')">
+              data-confirm="Удалить «{{ m.name }}»? Отменить будет нельзя.">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button class="mini danger" type="submit">Удалить</button>
         </form>
