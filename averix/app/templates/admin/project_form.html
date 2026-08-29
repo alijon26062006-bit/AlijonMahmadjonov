@@ -182,9 +182,12 @@
   <form class="drop" method="post" enctype="multipart/form-data"
         action="/admin/projects/{{ project.id }}/images">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
-    <input type="text" name="alt_ru" placeholder="Что на картинке" maxlength="200"
-           style="flex:1;min-width:180px">
+    <label class="vh" for="image-file">Файл картинки</label>
+    <input id="image-file" type="file" name="image"
+           accept="image/jpeg,image/png,image/webp" required>
+    <label class="vh" for="image-alt">Что на картинке</label>
+    <input id="image-alt" type="text" name="alt_ru" placeholder="Что на картинке"
+           maxlength="200" style="flex:1;min-width:180px">
     <button type="submit">Загрузить</button>
   </form>
   <p class="hint" style="margin-top:.5rem">
