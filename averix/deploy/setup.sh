@@ -44,8 +44,13 @@ fi
 say "Ставлю пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
+# build-essential и заголовки картинок нужны не всегда: если под здешний
+# Python есть готовый пакет Pillow, они не понадобятся. Но когда Python
+# новее, чем последний выпуск Pillow, установка иначе падает на сборке
+# из исходников с невнятной ошибкой «could not find jpeg».
 apt-get install -y -qq nginx git curl certbot python3-certbot-nginx ufw \
-  python3 python3-venv python3-pip
+  python3 python3-venv python3-pip \
+  build-essential libjpeg-dev zlib1g-dev libwebp-dev
 
 say "Забираю сайт из репозитория"
 # git отказывается работать с репозиторием, который принадлежит другому
@@ -97,7 +102,15 @@ if [ ! -x "$VENV_DIR/bin/python" ]; then
   python3 -m venv "$VENV_DIR"
 fi
 "$VENV_DIR/bin/pip" install --quiet --upgrade pip
-"$VENV_DIR/bin/pip" install --quiet -r "$SITE_DIR/requirements.txt"
+if ! "$VENV_DIR/bin/pip" install --quiet -r "$SITE_DIR/requirements.txt"; then
+  echo
+  echo "    !! Не удалось поставить зависимости."
+  echo "       Версия Python здесь: $("$VENV_DIR/bin/python" -V)"
+  echo "       Чаще всего дело в том, что под этот Python ещё нет готового"
+  echo "       пакета и pip пробует собрать его из исходников."
+  echo "       Полный вывод — выше; повторите запуск после исправления."
+  exit 1
+fi
 chown -R root:root "$VENV_DIR"
 chmod -R a+rX "$VENV_DIR"
 
