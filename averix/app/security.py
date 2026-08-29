@@ -104,7 +104,12 @@ def purge_expired(conn: sqlite3.Connection) -> None:
 def check_csrf(session: sqlite3.Row | None, sent: str | None) -> bool:
     if session is None or not sent:
         return False
-    return hmac.compare_digest(session["csrf_token"], sent)
+    # compare_digest на строках падает, если внутри есть не-ASCII: подделанный
+    # токен с кириллицей ронял бы запрос вместо честного «не совпало».
+    # Сравниваем байты — сравнение остаётся постоянным по времени.
+    return hmac.compare_digest(
+        str(session["csrf_token"]).encode("utf-8"), str(sent).encode("utf-8")
+    )
 
 
 # ---------- защита от перебора ----------

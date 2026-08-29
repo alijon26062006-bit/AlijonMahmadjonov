@@ -1,0 +1,63 @@
+{% extends "admin/base.html" %}
+{% block title %}Заявки{% endblock %}
+{% block body %}
+{% with page = 'requests' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>Заявки с сайта</h1>
+  </div>
+
+  {% if items %}
+  <div class="list">
+    {% for it in items %}
+    <article class="card lead">
+      <div class="lead-head">
+        <div>
+          <div class="name">{{ it.name }}</div>
+          <div class="meta">
+            {{ types.get(it.project_type, it.project_type or 'без типа') }}
+            {% if it.budget %} · бюджет: {{ it.budget }}{% endif %}
+            · {{ it.created_at }}
+          </div>
+        </div>
+        <span class="badge {{ 'pub' if it.status == 'won' else ('draft' if it.status == 'closed' else 'star') }}">
+          {{ statuses.get(it.status, it.status) }}
+        </span>
+      </div>
+
+      <ul class="lead-contacts">
+        {% if it.telegram %}
+        <li><a href="https://t.me/{{ it.telegram|replace('@','') }}" target="_blank" rel="noopener">{{ it.telegram }}</a></li>
+        {% endif %}
+        {% if it.email %}<li><a href="mailto:{{ it.email }}">{{ it.email }}</a></li>{% endif %}
+      </ul>
+
+      {% if it.message %}<p class="lead-msg">{{ it.message }}</p>{% endif %}
+
+      <form class="lead-form" method="post" action="/admin/requests/client_requests/{{ it.id }}/status">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="field">
+          <label for="st-{{ it.id }}">Статус</label>
+          <select id="st-{{ it.id }}" name="status">
+            {% for key, label in statuses.items() %}
+            <option value="{{ key }}"{% if it.status == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="nt-{{ it.id }}">Заметка для себя</label>
+          <input id="nt-{{ it.id }}" name="note" type="text" maxlength="2000" value="{{ it.admin_note or '' }}">
+        </div>
+        <button class="mini" type="submit">Сохранить</button>
+      </form>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>Заявок пока нет. Они появятся здесь сразу после отправки формы на сайте.</p>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

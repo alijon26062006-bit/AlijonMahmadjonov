@@ -1,0 +1,106 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ 'Правка' if member else 'Новый человек' }}{% endblock %}
+{% block body %}
+{% with page = 'team' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>{{ member.name if member else 'Новый человек' }}</h1>
+    <a href="/admin/team"><button class="ghost" type="button">К списку</button></a>
+  </div>
+
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+  <form method="post" action="/admin/team/save" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if member %}<input type="hidden" name="id" value="{{ member.id }}">{% endif %}
+
+    <fieldset>
+      <legend>Основное</legend>
+      <div class="field">
+        <label for="name">Имя <span style="color:var(--violet)">*</span></label>
+        <input id="name" name="name" type="text" required maxlength="100"
+               value="{{ member.name if member else '' }}">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="position_ru">Должность · русский</label>
+          <input id="position_ru" name="position_ru" type="text" maxlength="120"
+                 value="{{ member.position_ru or '' if member else '' }}">
+        </div>
+        <div class="field">
+          <label for="position_tj">Должность · таджикский</label>
+          <input id="position_tj" name="position_tj" type="text" maxlength="120"
+                 value="{{ member.position_tj or '' if member else '' }}">
+          <p class="hint">пусто — покажется русское</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="bio_ru">О человеке · русский</label>
+          <textarea id="bio_ru" name="bio_ru" rows="4" maxlength="2000">{{ member.bio_ru or '' if member else '' }}</textarea>
+        </div>
+        <div class="field">
+          <label for="bio_tj">О человеке · таджикский</label>
+          <textarea id="bio_tj" name="bio_tj" rows="4" maxlength="2000">{{ member.bio_tj or '' if member else '' }}</textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Фото</legend>
+      {% if member and member.photo %}
+      <img class="thumb" src="/uploads/{{ member.photo }}" alt="" style="width:120px;height:150px">
+      <p class="hint">Новый файл заменит текущий, старый удалится.</p>
+      {% endif %}
+      <div class="field">
+        <label for="photo">Файл</label>
+        <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp">
+        <p class="hint">JPEG, PNG или WebP до 8 МБ. Сжимается и обрезается автоматически.</p>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Ссылки</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="telegram">Telegram (без @)</label>
+          <input id="telegram" name="telegram" type="text" maxlength="80"
+                 value="{{ member.telegram or '' if member else '' }}">
+        </div>
+        <div class="field">
+          <label for="github">GitHub (логин)</label>
+          <input id="github" name="github" type="text" maxlength="80"
+                 value="{{ member.github or '' if member else '' }}">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="linkedin">LinkedIn (полная ссылка)</label>
+          <input id="linkedin" name="linkedin" type="url" maxlength="300"
+                 value="{{ member.linkedin or '' if member else '' }}">
+        </div>
+        <div class="field">
+          <label for="website">Сайт (полная ссылка)</label>
+          <input id="website" name="website" type="url" maxlength="300"
+                 value="{{ member.website or '' if member else '' }}">
+        </div>
+      </div>
+      <div class="field">
+        <label for="sort_order">Порядок</label>
+        <input id="sort_order" name="sort_order" type="number" value="{{ member.sort_order if member else 0 }}">
+        <p class="hint">меньше — выше в списке</p>
+      </div>
+    </fieldset>
+
+    <div class="sticky">
+      <label class="check">
+        <input type="checkbox" name="visible" value="1"
+               {% if not member or member.visible %}checked{% endif %}>
+        <span>Показывать на сайте</span>
+      </label>
+      <button type="submit">Сохранить</button>
+    </div>
+  </form>
+</main>
+{% endblock %}

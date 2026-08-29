@@ -170,6 +170,25 @@ select{width:100%;min-height:48px;padding:.6rem .9rem;background:var(--void);
 .err-card p{color:var(--muted);font-size:.95rem;margin-bottom:1.5rem}
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* заявки и отклики */
+.alert.ok{border-left-color:var(--emerald);background:rgba(63,217,138,.1)}
+.lead{max-width:none;display:flex;flex-direction:column;gap:.9rem;padding:1.15rem;
+  border-radius:0;border:0}
+@media(min-width:560px){.lead{padding:1.4rem}}
+.lead-head{display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-start}
+.lead-head > div:first-child{margin-right:auto}
+.lead .name{font-weight:600;font-size:1rem}
+.lead-contacts{display:flex;flex-wrap:wrap;gap:.4rem 1.1rem;list-style:none;padding:0;margin:0}
+.lead-contacts a{display:inline-flex;align-items:center;min-height:44px;
+  font-size:.88rem;color:var(--violet);text-decoration:none}
+.lead-contacts a:hover{text-decoration:underline}
+.lead-msg{white-space:pre-wrap;font-size:.93rem;color:var(--muted);
+  padding:.85rem 1rem;border-radius:10px;background:rgba(255,255,255,.03)}
+.lead-form{display:grid;gap:.75rem;align-items:end;padding-top:.9rem;
+  border-top:1px solid var(--line)}
+@media(min-width:760px){.lead-form{grid-template-columns:200px 1fr auto}}
+.lead-form .field{margin:0}
 </style>
 </head>
 <body>

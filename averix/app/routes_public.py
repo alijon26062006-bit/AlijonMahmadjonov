@@ -106,6 +106,13 @@ def _not_found(request: Request, ctx: dict) -> Response:
     )
 
 
+def public_notfound(request: Request) -> Response:
+    """404 в оформлении сайта — для любого адреса вне админки."""
+    with connect() as conn:
+        ctx = public_context(request, conn, page="404")
+    return _not_found(request, ctx)
+
+
 # ============================================================
 # Формы
 # ============================================================

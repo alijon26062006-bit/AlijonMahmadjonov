@@ -13,6 +13,19 @@
     <div><b>{{ counts.total }}</b><span>всего проектов</span></div>
   </div>
 
+  <div class="stats" style="margin-top:1rem">
+    <div><b>{{ counts.requests_new }}</b><span>новых заявок</span></div>
+    <div><b>{{ counts.jobs_new }}</b><span>новых откликов</span></div>
+    <div><b>{{ counts.team }}</b><span>человек на сайте</span></div>
+    <div><b>{{ counts.vacancies }}</b><span>открытых вакансий</span></div>
+  </div>
+
+  <div class="bar" style="margin-top:2rem">
+    <a href="/admin/projects/new"><button type="button">Новый проект</button></a>
+    <a href="/admin/requests"><button class="ghost" type="button">Заявки</button></a>
+    <a href="/admin/settings"><button class="ghost" type="button">Настройки сайта</button></a>
+  </div>
+
   <h2>Последние проекты</h2>
   {% if latest %}
   <ul style="list-style:none;padding:0;margin:0">

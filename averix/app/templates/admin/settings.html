@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+{% block title %}Настройки сайта{% endblock %}
+{% block body %}
+{% with page = 'settings' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>Настройки сайта</h1>
+  </div>
+
+  <p class="hint" style="margin-bottom:1.5rem">
+    Контакты, цифры и тексты на главной берутся отсюда. Правки видны на сайте
+    сразу после сохранения — переустанавливать ничего не нужно.
+  </p>
+
+  {% if saved %}<p class="alert ok" role="status">Сохранено.</p>{% endif %}
+
+  <form method="post" action="/admin/settings">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    {% for row in rows %}
+    <fieldset>
+      <legend>{{ labels.get(row.key, row.key) }}</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="ru__{{ row.key }}">Русский</label>
+          {% if row.key in long %}
+          <textarea id="ru__{{ row.key }}" name="ru__{{ row.key }}" rows="3" maxlength="4000">{{ row.value_ru or '' }}</textarea>
+          {% else %}
+          <input id="ru__{{ row.key }}" name="ru__{{ row.key }}" type="text" maxlength="4000"
+                 value="{{ row.value_ru or '' }}">
+          {% endif %}
+        </div>
+        <div class="field">
+          <label for="tj__{{ row.key }}">Таджикский</label>
+          {% if row.key in long %}
+          <textarea id="tj__{{ row.key }}" name="tj__{{ row.key }}" rows="3" maxlength="4000">{{ row.value_tj or '' }}</textarea>
+          {% else %}
+          <input id="tj__{{ row.key }}" name="tj__{{ row.key }}" type="text" maxlength="4000"
+                 value="{{ row.value_tj or '' }}">
+          {% endif %}
+          <p class="hint">пусто — покажется русское</p>
+        </div>
+      </div>
+    </fieldset>
+    {% endfor %}
+
+    <div class="sticky">
+      <button type="submit">Сохранить настройки</button>
+    </div>
+  </form>
+</main>
+{% endblock %}

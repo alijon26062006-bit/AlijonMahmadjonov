@@ -1,0 +1,48 @@
+{% extends "admin/base.html" %}
+{% block title %}Вакансии{% endblock %}
+{% block body %}
+{% with page = 'vacancies' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>Вакансии</h1>
+    <a href="/admin/vacancies/new"><button type="button">Добавить вакансию</button></a>
+  </div>
+
+  {% if vacancies %}
+  <div class="list">
+    {% for v in vacancies %}
+    <article class="row">
+      <div>
+        <div class="name"><a href="/admin/vacancies/{{ v.id }}">{{ v.title_ru }}</a></div>
+        <div class="meta">
+          {{ work_types.get(v.work_type, v.work_type) }} ·
+          {{ employment.get(v.employment, v.employment) }}
+          {% if v.location %} · {{ v.location }}{% endif %}
+          {% if not v.title_tj %} · <span style="color:var(--danger)">нет перевода</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="acts">
+        {% if v.status == 'open' %}
+          <span class="badge pub">открыта</span>
+        {% else %}
+          <span class="badge draft">закрыта</span>
+        {% endif %}
+        <form method="post" action="/admin/vacancies/{{ v.id }}/delete"
+              onsubmit="return confirm('Удалить вакансию «{{ v.title_ru }}»? Отклики на неё останутся, но потеряют привязку.')">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="mini danger" type="submit">Удалить</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>Вакансий пока нет. Пока список пуст, на странице «Вакансии» посетитель
+       видит честное «сейчас никого не ищем» и может всё равно оставить отклик.</p>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

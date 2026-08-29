@@ -11,6 +11,11 @@
     <nav>
       <a href="/admin"{% if page == 'dash' %} aria-current="page"{% endif %}>Панель</a>
       <a href="/admin/projects"{% if page == 'projects' %} aria-current="page"{% endif %}>Проекты</a>
+      <a href="/admin/requests"{% if page == 'requests' %} aria-current="page"{% endif %}>Заявки</a>
+      <a href="/admin/applications"{% if page == 'applications' %} aria-current="page"{% endif %}>Отклики</a>
+      <a href="/admin/team"{% if page == 'team' %} aria-current="page"{% endif %}>Команда</a>
+      <a href="/admin/vacancies"{% if page == 'vacancies' %} aria-current="page"{% endif %}>Вакансии</a>
+      <a href="/admin/settings"{% if page == 'settings' %} aria-current="page"{% endif %}>Настройки</a>
       <a href="/" target="_blank" rel="noopener">Сайт ↗</a>
     </nav>
     <form method="post" action="/admin/logout">

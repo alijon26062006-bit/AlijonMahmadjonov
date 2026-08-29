@@ -1,0 +1,74 @@
+{% extends "admin/base.html" %}
+{% block title %}Отклики{% endblock %}
+{% block body %}
+{% with page = 'applications' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>Отклики на вакансии</h1>
+  </div>
+
+  {% if items %}
+  <div class="list">
+    {% for it in items %}
+    <article class="card lead">
+      <div class="lead-head">
+        <div>
+          <div class="name">{{ it.name }}</div>
+          <div class="meta">
+            {{ vacancies.get(it.vacancy_id, 'без вакансии') }}
+            {% if it.direction %} · {{ it.direction }}{% endif %}
+            {% if it.country %} · {{ it.country }}{% endif %}
+            · {{ it.created_at }}
+          </div>
+        </div>
+        <span class="badge {{ 'pub' if it.status == 'accepted' else ('draft' if it.status == 'rejected' else 'star') }}">
+          {{ statuses.get(it.status, it.status) }}
+        </span>
+      </div>
+
+      <ul class="lead-contacts">
+        {% if it.telegram %}
+        <li><a href="https://t.me/{{ it.telegram|replace('@','') }}" target="_blank" rel="noopener">{{ it.telegram }}</a></li>
+        {% endif %}
+        {% if it.email %}<li><a href="mailto:{{ it.email }}">{{ it.email }}</a></li>{% endif %}
+        {% if it.portfolio_url %}<li><a href="{{ it.portfolio_url }}" target="_blank" rel="noopener nofollow">портфолио</a></li>{% endif %}
+        {% if it.github_url %}<li><a href="{{ it.github_url }}" target="_blank" rel="noopener nofollow">github</a></li>{% endif %}
+      </ul>
+
+      {% if it.experience %}<p class="meta">Опыт: {{ it.experience }}</p>{% endif %}
+      {% if it.skills %}<p class="meta">Технологии: {{ it.skills }}</p>{% endif %}
+      {% if it.message %}<p class="lead-msg">{{ it.message }}</p>{% endif %}
+
+      <form class="lead-form" method="post" action="/admin/requests/job_applications/{{ it.id }}/status">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="field">
+          <label for="st-{{ it.id }}">Статус</label>
+          <select id="st-{{ it.id }}" name="status">
+            {% for key, label in statuses.items() %}
+            <option value="{{ key }}"{% if it.status == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="nt-{{ it.id }}">Заметка для себя</label>
+          <input id="nt-{{ it.id }}" name="note" type="text" maxlength="2000" value="{{ it.admin_note or '' }}">
+        </div>
+        <button class="mini" type="submit">Сохранить</button>
+      </form>
+
+      <form method="post" action="/admin/applications/{{ it.id }}/hire"
+            onsubmit="return confirm('Создать карточку «{{ it.name }}» в команде? Она будет скрыта от сайта, пока вы её не заполните.')">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="mini" type="submit">Добавить в команду</button>
+      </form>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>Откликов пока нет. Они появятся здесь сразу после отправки формы на странице «Вакансии».</p>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

@@ -1,8 +1,8 @@
 """
 AVERIX — серверная часть.
 
-Пока обслуживает только админку: публичный сайт продолжает отдаваться
-nginx как статика и этими маршрутами не затрагивается.
+Страницы отдаёт приложение, статику (стили, скрипты, шрифты,
+загруженные картинки) — nginx напрямую.
 """
 import asyncio
 import secrets
@@ -13,6 +13,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import journal, models, security
+from .adminkit import (_ERRORS, back, current_session, error_page, guard,
+                       insecure_page, page)
 from .render import client_ip, is_secure, no_store, templates
 from .uploads import UploadError, delete_image_file, save_image
 from .config import (
@@ -43,7 +45,10 @@ async def lifespan(_: FastAPI):
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 from .routes_public import router as public_router  # noqa: E402  (после создания app)
+from .routes_public import public_notfound  # noqa: E402
+from .routes_admin_studio import router as studio_router  # noqa: E402
 app.include_router(public_router)
+app.include_router(studio_router)
 
 
 # ---------- вспомогательное ----------
@@ -54,52 +59,6 @@ def set_cookie(resp: Response, name: str, value: str, max_age: int) -> None:
         max_age=max_age, path="/",
         httponly=True, secure=SECURE_COOKIES, samesite="lax",
     )
-
-
-def safe_host(request: Request) -> str:
-    """Заголовок Host приходит от клиента: чистим его перед показом."""
-    raw = (request.headers.get("host") or "").split(":")[0].lower()
-    allowed = set("abcdefghijklmnopqrstuvwxyz0123456789.-")
-    if raw and 3 <= len(raw) <= 253 and set(raw) <= allowed and "." in raw:
-        return raw
-    return "ваш-домен"
-
-
-def insecure_page(request: Request) -> Response:
-    """
-    По http cookie с флагом Secure браузер не сохраняет, и вход тихо
-    ломался бы с невнятным «форма устарела». Говорим прямо: дело
-    не в форме, а в том, что пароль по http идёт открытым текстом.
-    """
-    resp = templates.TemplateResponse(
-        request, "admin/insecure.html",
-        {"host": safe_host(request)},
-        status_code=421,
-    )
-    return no_store(resp)
-
-
-def current_session(request: Request):
-    with connect() as conn:
-        return security.get_session(conn, request.cookies.get(SESSION_COOKIE))
-
-
-_ERRORS = {
-    403: ("Доступ закрыт", "У вас нет прав на эту страницу.", "/admin", "К входу"),
-    404: ("Страница не найдена", "Такой страницы нет. Возможно, её удалили "
-          "или в адресе опечатка.", "/", "На главную"),
-    500: ("Что-то сломалось", "Ошибка на нашей стороне. Мы уже видим её в журнале — "
-          "попробуйте ещё раз через минуту.", "/", "На главную"),
-}
-
-
-def error_page(request: Request, code: int) -> Response:
-    title, text, back_url, back_label = _ERRORS.get(code, _ERRORS[500])
-    return no_store(templates.TemplateResponse(request, "error.html", {
-        "code": code, "title": title, "text": text,
-        "back_url": back_url, "back_label": back_label,
-    }, status_code=code))
-
 
 
 # ---------- вход ----------
@@ -202,7 +161,7 @@ async def dashboard(request: Request) -> Response:
         return no_store(RedirectResponse("/admin", status_code=303))
 
     with connect() as conn:
-        stats = models.counts(conn)
+        stats = models.dashboard_counts(conn)
         latest = conn.execute(
             "SELECT id, title_ru, status, created_at FROM projects"
             " ORDER BY created_at DESC LIMIT 5"
@@ -222,20 +181,6 @@ async def dashboard(request: Request) -> Response:
 
 
 # ---------- проекты ----------
-
-def guard(request: Request):
-    """Один вход для всех защищённых страниц: (сессия, None) или (None, ответ)."""
-    if SECURE_COOKIES and not ALLOW_INSECURE and not is_secure(request):
-        return None, insecure_page(request)
-    session = current_session(request)
-    if session is None:
-        return None, no_store(RedirectResponse("/admin", status_code=303))
-    return session, None
-
-
-def back(path: str = "/admin/projects") -> Response:
-    return no_store(RedirectResponse(path, status_code=303))
-
 
 @app.get("/admin/projects", response_class=HTMLResponse)
 async def projects_list(request: Request):
@@ -481,6 +426,10 @@ async def health():
 
 @app.exception_handler(StarletteHTTPException)
 async def http_error(request: Request, exc: StarletteHTTPException):
+    # На сайте и в админке ошибка выглядит по-разному: посетителю нужна
+    # страница в стиле сайта со ссылками на проекты, а не служебная плашка
+    if exc.status_code == 404 and not request.url.path.startswith("/admin"):
+        return public_notfound(request)
     if exc.status_code in _ERRORS:
         return error_page(request, exc.status_code)
     return HTMLResponse(f"Ошибка {exc.status_code}", status_code=exc.status_code)

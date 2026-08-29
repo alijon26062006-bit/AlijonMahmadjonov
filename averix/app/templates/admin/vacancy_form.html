@@ -1,0 +1,106 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ 'Правка вакансии' if vacancy else 'Новая вакансия' }}{% endblock %}
+{% block body %}
+{% with page = 'vacancies' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>{{ vacancy.title_ru if vacancy else 'Новая вакансия' }}</h1>
+    <a href="/admin/vacancies"><button class="ghost" type="button">К списку</button></a>
+  </div>
+
+  <form method="post" action="/admin/vacancies/save">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if vacancy %}<input type="hidden" name="id" value="{{ vacancy.id }}">{% endif %}
+
+    <fieldset>
+      <legend>Название</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="title_ru">Русский <span style="color:var(--violet)">*</span></label>
+          <input id="title_ru" name="title_ru" type="text" required maxlength="200"
+                 value="{{ vacancy.title_ru if vacancy else '' }}">
+        </div>
+        <div class="field">
+          <label for="title_tj">Таджикский</label>
+          <input id="title_tj" name="title_tj" type="text" maxlength="200"
+                 value="{{ vacancy.title_tj or '' if vacancy else '' }}">
+          <p class="hint">пусто — покажется русское</p>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Описание</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="description_ru">Русский</label>
+          <textarea id="description_ru" name="description_ru" rows="5" maxlength="4000">{{ vacancy.description_ru or '' if vacancy else '' }}</textarea>
+        </div>
+        <div class="field">
+          <label for="description_tj">Таджикский</label>
+          <textarea id="description_tj" name="description_tj" rows="5" maxlength="4000">{{ vacancy.description_tj or '' if vacancy else '' }}</textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Требования</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="requirements_ru">Русский</label>
+          <textarea id="requirements_ru" name="requirements_ru" rows="5" maxlength="4000">{{ vacancy.requirements_ru or '' if vacancy else '' }}</textarea>
+          <p class="hint">каждый пункт с новой строки</p>
+        </div>
+        <div class="field">
+          <label for="requirements_tj">Таджикский</label>
+          <textarea id="requirements_tj" name="requirements_tj" rows="5" maxlength="4000">{{ vacancy.requirements_tj or '' if vacancy else '' }}</textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Условия</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="work_type">Формат</label>
+          <select id="work_type" name="work_type">
+            {% for key, label in work_types.items() %}
+            <option value="{{ key }}"{% if vacancy and vacancy.work_type == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="employment">Занятость</label>
+          <select id="employment" name="employment">
+            {% for key, label in employment.items() %}
+            <option value="{{ key }}"{% if vacancy and vacancy.employment == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="location">Город</label>
+          <input id="location" name="location" type="text" maxlength="120"
+                 value="{{ vacancy.location or '' if vacancy else '' }}">
+        </div>
+        <div class="field">
+          <label for="sort_order">Порядок</label>
+          <input id="sort_order" name="sort_order" type="number" value="{{ vacancy.sort_order if vacancy else 0 }}">
+          <p class="hint">меньше — выше в списке</p>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="sticky">
+      <label class="check">
+        <input type="checkbox" name="status" value="open"
+               {% if not vacancy or vacancy.status == 'open' %}checked{% endif %}>
+        <span>Открыта — показывать на сайте</span>
+      </label>
+      <button type="submit">Сохранить</button>
+    </div>
+  </form>
+</main>
+{% endblock %}

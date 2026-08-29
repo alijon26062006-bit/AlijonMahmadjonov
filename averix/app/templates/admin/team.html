@@ -1,0 +1,52 @@
+{% extends "admin/base.html" %}
+{% block title %}Команда{% endblock %}
+{% block body %}
+{% with page = 'team' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>Команда</h1>
+    <a href="/admin/team/new"><button type="button">Добавить человека</button></a>
+  </div>
+
+  {% if people %}
+  <div class="list">
+    {% for m in people %}
+    <article class="row">
+      {% if m.photo %}
+        <img class="thumb" src="/uploads/{{ m.photo }}" alt="" loading="lazy">
+      {% else %}
+        <div class="thumb none">нет фото</div>
+      {% endif %}
+
+      <div>
+        <div class="name"><a href="/admin/team/{{ m.id }}">{{ m.name }}</a></div>
+        <div class="meta">
+          {{ m.position_ru or 'должность не указана' }}
+          {% if not m.position_tj %} · <span style="color:var(--danger)">нет перевода</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="acts">
+        {% if m.visible %}
+          <span class="badge pub">на сайте</span>
+        {% else %}
+          <span class="badge draft">скрыт</span>
+        {% endif %}
+        <form method="post" action="/admin/team/{{ m.id }}/delete"
+              onsubmit="return confirm('Удалить «{{ m.name }}»? Отменить будет нельзя.')">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="mini danger" type="submit">Удалить</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>В команде пока никого нет. Пока список пуст, на странице «Студия»
+       честно показывается только основатель.</p>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}
