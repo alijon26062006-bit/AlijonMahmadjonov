@@ -21,6 +21,16 @@
     {% for title, rows in groups %}
     <h2 class="group">{{ title }}</h2>
     {% for row in rows %}
+    {% if row.key.endswith('_on') %}
+    {# Переключатель: языка у него нет, значение одно на оба #}
+    <fieldset>
+      <label class="check">
+        <input type="checkbox" name="ru__{{ row.key }}" value="1"
+               {% if row.value_ru == '1' %}checked{% endif %}>
+        <span>{{ labels.get(row.key, row.key) }}</span>
+      </label>
+    </fieldset>
+    {% else %}
     <fieldset>
       <legend>{{ labels.get(row.key, row.key) }}</legend>
       <div class="grid2">
@@ -45,6 +55,7 @@
         </div>
       </div>
     </fieldset>
+    {% endif %}
     {% endfor %}
     {% endfor %}
 

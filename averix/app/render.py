@@ -48,6 +48,8 @@ def public_context(request: Request, conn, page: str = "", **extra) -> dict:
     ctx = {
         "lang": lang,
         "s": s,
+        # Показатели считаем один раз здесь: они нужны и главной, и студии
+        "stats": models.visible_stats(s),
         "page": page,
         "site_url": SITE_URL,
         "canonical": request.url.path,

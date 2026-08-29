@@ -26,20 +26,16 @@
 
 <section class="section section-tight">
   <div class="shell">
+    {% if stats %}
     <div class="stats glass r">
+      {% for stat in stats %}
       <div>
-        <b><span class="num" data-count="{{ s.stat_years or 3 }}">{{ s.stat_years or 3 }}</span><span>+</span></b>
-        <span data-i18n="stat.years">года в разработке</span>
+        <b><span class="num" data-count="{{ stat.value }}">{{ stat.value }}</span>{% if stat.unit %}<span>{{ stat.unit }}</span>{% endif %}</b>
+        <span>{{ stat.label }}</span>
       </div>
-      <div>
-        <b><span class="num" data-count="{{ s.stat_active or 4 }}">{{ s.stat_active or 4 }}</span></b>
-        <span data-i18n="stat.active">активных проекта</span>
-      </div>
-      <div>
-        <b><span class="num" data-count="{{ s.stat_accepted or 100 }}">{{ s.stat_accepted or 100 }}</span><span>%</span></b>
-        <span data-i18n="stat.accepted">работ принято заказчиком</span>
-      </div>
+      {% endfor %}
     </div>
+    {% endif %}
   </div>
 </section>
 

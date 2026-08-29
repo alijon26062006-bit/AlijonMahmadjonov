@@ -215,6 +215,28 @@ def settings(conn: sqlite3.Connection, lang: str = "ru") -> dict:
     return out
 
 
+# Показатели на главной. Ключ задаёт четвёрку настроек:
+# <ключ> — число, <ключ>_on — показывать ли, _unit — знак после числа,
+# _label — подпись. Цифру, которую нечем подтвердить, админ выключает.
+STAT_KEYS = ("stat_years", "stat_active", "stat_accepted")
+
+
+def visible_stats(settings_map: dict) -> list[dict]:
+    out = []
+    for key in STAT_KEYS:
+        if settings_map.get(f"{key}_on") != "1":
+            continue
+        value = (settings_map.get(key) or "").strip()
+        if not value:
+            continue
+        out.append({
+            "value": value,
+            "unit": settings_map.get(f"{key}_unit") or "",
+            "label": settings_map.get(f"{key}_label") or "",
+        })
+    return out
+
+
 def all_settings(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute("SELECT * FROM site_settings ORDER BY key").fetchall()
 
@@ -423,8 +445,13 @@ REQUEST_TYPES = {
     "other": "Другое",
 }
 REQUEST_STATUSES = {
-    "new": "Новая", "contacted": "Связались", "in_progress": "В работе",
-    "won": "Взяли", "closed": "Закрыта",
+    "new": "Новая",
+    "contacted": "Связались",
+    "estimate_sent": "Отправили расчёт",
+    "in_progress": "В работе",
+    "won": "Взяли",
+    "closed": "Закрыта",
+    "spam": "Спам",
 }
 JOB_STATUSES = {
     "new": "Новая", "viewed": "Просмотрена", "interview": "Собеседование",

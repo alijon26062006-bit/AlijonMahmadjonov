@@ -53,6 +53,7 @@
         <a href="/#process" data-i18n="nav.process">Процесс</a>
         <a href="/team"{% if page == 'team' %} aria-current="page"{% endif %} data-i18n="nav.team">Студия</a>
         <a href="/careers"{% if page == 'careers' %} aria-current="page"{% endif %} data-i18n="nav.careers">Вакансии</a>
+        <a href="/freelance"{% if page == 'freelance' %} aria-current="page"{% endif %} data-i18n="nav.freelance">Freelance</a>
         <a class="btn btn-solid drawer-cta" href="/#final" data-i18n="cta.discuss">Обсудить проект</a>
       </nav>
 
@@ -82,7 +83,8 @@
           </svg>
           <span class="brand-text">AVERI<span>X</span></span>
         </div>
-        <p class="foot-about" data-i18n="foot.about">Студия из Душанбе. Сайты и лендинги, собранные вручную под задачу бизнеса.</p>
+        <p class="foot-role" data-i18n="foot.role">Digital Development Studio</p>
+        <p class="foot-about" data-i18n="foot.about">Создаём сайты, Telegram-ботов, backend-системы, автоматизацию и AI-интеграции.</p>
         <div class="foot-social">
           <a href="{{ tg_url }}" target="_blank" rel="noopener" aria-label="Telegram">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 4L2.5 11.2l6 2.1 2.1 6L21 4zM8.5 13.3L21 4"/></svg>
@@ -97,11 +99,11 @@
       </div>
 
       <div class="foot-col">
-        <h3 data-i18n="foot.services">Услуги</h3>
+        <h3 data-i18n="foot.work">Работы</h3>
         <ul>
-          <li><a href="/#services" data-i18n="svc1.h">Лендинг под задачу</a></li>
-          <li><a href="/#services" data-i18n="svc2.h">Сайт под ключ</a></li>
-          <li><a href="/#services" data-i18n="svc3.h">Поддержка и доработка</a></li>
+          <li><a href="/projects" data-i18n="nav.projects">Проекты</a></li>
+          <li><a href="/#services" data-i18n="nav.services">Услуги</a></li>
+          <li><a href="/#process" data-i18n="nav.process">Процесс</a></li>
         </ul>
       </div>
 
@@ -109,13 +111,13 @@
         <h3 data-i18n="foot.studio">Студия</h3>
         <ul>
           <li><a href="/team" data-i18n="nav.team">Студия</a></li>
-          <li><a href="/#process" data-i18n="nav.process">Процесс</a></li>
-          <li><a href="/#final" data-i18n="foot.faq">Вопросы</a></li>
+          <li><a href="/careers" data-i18n="nav.careers">Вакансии</a></li>
+          <li><a href="/freelance" data-i18n="nav.freelance">Freelance</a></li>
         </ul>
       </div>
 
       <div class="foot-col">
-        <h3 data-i18n="foot.contact">Контакт</h3>
+        <h3 data-i18n="foot.contact">Контакты</h3>
         <ul>
           <li><a href="{{ tg_url }}" target="_blank" rel="noopener">@{{ s.contact_telegram }}</a></li>
           <li><a href="mailto:{{ s.contact_email }}">{{ s.contact_email }}</a></li>

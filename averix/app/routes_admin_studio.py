@@ -32,6 +32,19 @@ SETTING_LABELS = {
     "about_text": "О студии: описание",
     "cta_title": "Призыв в конце страницы",
     "careers_intro": "Вакансии: вступление",
+
+    "stat_years_on": "Показывать первый показатель",
+    "stat_years": "Первый показатель: число",
+    "stat_years_unit": "Первый показатель: знак после числа",
+    "stat_years_label": "Первый показатель: подпись",
+    "stat_active_on": "Показывать второй показатель",
+    "stat_active": "Второй показатель: число",
+    "stat_active_unit": "Второй показатель: знак после числа",
+    "stat_active_label": "Второй показатель: подпись",
+    "stat_accepted_on": "Показывать третий показатель",
+    "stat_accepted": "Третий показатель: число",
+    "stat_accepted_unit": "Третий показатель: знак после числа",
+    "stat_accepted_label": "Третий показатель: подпись",
 }
 # Порядок и группировка на странице настроек. По алфавиту из базы
 # получалась каша, в которой контакты стояли вперемешку с текстами.
@@ -39,7 +52,9 @@ SETTING_GROUPS = [
     ("Контакты", ["contact_telegram", "contact_email", "contact_instagram",
                   "contact_github", "city"]),
     ("Первый экран", ["hero_eyebrow", "hero_title", "hero_subtitle"]),
-    ("Цифры", ["stat_years", "stat_active", "stat_accepted"]),
+    ("Показатель 1", ["stat_years_on", "stat_years", "stat_years_unit", "stat_years_label"]),
+    ("Показатель 2", ["stat_active_on", "stat_active", "stat_active_unit", "stat_active_label"]),
+    ("Показатель 3", ["stat_accepted_on", "stat_accepted", "stat_accepted_unit", "stat_accepted_label"]),
     ("Тексты страниц", ["about_text", "cta_title", "careers_intro"]),
 ]
 
@@ -96,8 +111,11 @@ async def settings_save(request: Request):
         # добавило бы в настройки что угодно
         for row in models.all_settings(conn):
             key = row["key"]
-            models.save_setting(conn, key,
-                                _val(form, f"ru__{key}"), _val(form, f"tj__{key}"))
+            ru = _val(form, f"ru__{key}")
+            # У переключателей нет второго языка: снятая галочка вообще
+            # не приходит в форме, поэтому пустое значение и есть «выключено»
+            tj = ru if key.endswith("_on") else _val(form, f"tj__{key}")
+            models.save_setting(conn, key, ru, tj)
     journal.event("настройки.сохранены", кто=session["username"])
     return back("/admin/settings?saved=1")
 

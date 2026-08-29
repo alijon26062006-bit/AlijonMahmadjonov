@@ -431,6 +431,10 @@ a{color:var(--violet)}
 @media (min-width:820px){ .foot-top{grid-template-columns:1.3fr 1fr 1fr 1.2fr; gap:var(--s4)} }
 .foot-brand{display:flex; align-items:center; gap:.6rem; margin-bottom:var(--s2)}
 .foot-about{color:var(--muted); font-size:.9rem; max-width:34ch}
+.foot-role{
+  margin-top:var(--s3); font-family:var(--mono); font-size:.76rem;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--violet);
+}
 .foot-social{display:flex; gap:.5rem; margin-top:var(--s3)}
 .foot-social a{
   display:grid; place-items:center; width:44px; height:44px; border-radius:14px;

@@ -141,7 +141,7 @@ async def client_request(request: Request):
         if len(name) < 2:
             errors["name"] = "Напишите, как к вам обращаться."
         if len(contact) < 3:
-            errors["contact"] = "Оставьте Telegram или телефон — иначе я не смогу ответить."
+            errors["contact"] = "Оставьте Telegram или телефон — иначе мы не сможем ответить."
         if len(message) < 10:
             errors["message"] = "Опишите задачу хотя бы в двух предложениях."
 

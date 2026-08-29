@@ -16,20 +16,16 @@
       <a class="btn btn-line" href="/projects" data-i18n="cta.projects">Смотреть проекты</a>
     </div>
 
+    {% if stats %}
     <dl class="stats glass r d3">
+      {% for stat in stats %}
       <div>
-        <b><span class="num" data-count="{{ s.stat_years }}">{{ s.stat_years }}</span> <span data-i18n="stats.years">года</span></b>
-        <span data-i18n="stats.years.note">пишу код каждый день</span>
+        <b><span class="num" data-count="{{ stat.value }}">{{ stat.value }}</span>{% if stat.unit %} <span>{{ stat.unit }}</span>{% endif %}</b>
+        <span>{{ stat.label }}</span>
       </div>
-      <div>
-        <b><span class="num" data-count="{{ s.stat_active }}">{{ s.stat_active }}</span></b>
-        <span data-i18n="stats.active">проекта в работе прямо сейчас</span>
-      </div>
-      <div>
-        <b><span class="num" data-count="{{ s.stat_accepted }}">{{ s.stat_accepted }}</span> %</b>
-        <span data-i18n="stats.happy">клиентов приняли работу</span>
-      </div>
+      {% endfor %}
     </dl>
+    {% endif %}
   </div>
 </section>
 
@@ -134,8 +130,8 @@
       </div>
       <h2 class="r" data-i18n="services.h2">Что мы делаем</h2>
       <p class="lede r d1" data-i18n="services.lede">
-        Три направления. Всё остальное обсуждаем отдельно — и честно говорим,
-        беремся или нет.
+        От сайта до автоматизации и AI. Задачу за рамками этих направлений
+        тоже обсуждаем — и честно говорим, беремся или нет.
       </p>
     </div>
 
@@ -207,8 +203,8 @@
     </div>
 
     <p class="note-line r" data-i18n="services.note">
-      Задачи за рамками этих направлений тоже обсуждаю — напишите,
-      и я честно скажу, берусь или нет.
+      Не нашли своё в списке — напишите. Мы посмотрим задачу
+      и честно скажем, беремся или нет.
     </p>
 
     <div class="price glass r">
@@ -259,7 +255,7 @@
         <span class="step-n">01 / 06</span>
         <div>
           <h3 data-i18n="step1.h">Знакомство</h3>
-          <p data-i18n="step1.p">Разбираем задачу, цели и ограничения. Выясняю, кто ваш клиент и что он должен сделать на сайте.</p>
+          <p data-i18n="step1.p">Разбираем задачу, цели и ограничения. Выясняем, кто ваш клиент и что он должен сделать на сайте.</p>
         </div>
         <span class="step-out" data-i18n="step1.out">→ список страниц и блоков</span>
       </li>
@@ -267,7 +263,7 @@
         <span class="step-n">02 / 06</span>
         <div>
           <h3 data-i18n="step2.h">Проектирование</h3>
-          <p data-i18n="step2.p">Продумываю структуру, экраны и техническое решение. Текст пишем вместе.</p>
+          <p data-i18n="step2.p">Продумываем структуру, экраны и техническое решение. Текст пишем вместе.</p>
         </div>
         <span class="step-out" data-i18n="step2.out">→ структура, согласованная до дизайна</span>
       </li>
@@ -275,7 +271,7 @@
         <span class="step-n">03 / 06</span>
         <div>
           <h3 data-i18n="step3.h">Разработка</h3>
-          <p data-i18n="step3.p">Собираю интерфейс и серверную часть, подключаю нужные интеграции.</p>
+          <p data-i18n="step3.p">Собираем интерфейс и серверную часть, подключаем нужные интеграции.</p>
         </div>
         <span class="step-out" data-i18n="step3.out">→ рабочая версия на тестовом адресе</span>
       </li>
@@ -283,7 +279,7 @@
         <span class="step-n">04 / 06</span>
         <div>
           <h3 data-i18n="step4.h">Тестирование</h3>
-          <p data-i18n="step4.p">Проверяю функции, адаптив, скорость и сценарии на реальных устройствах.</p>
+          <p data-i18n="step4.p">Проверяем функции, адаптив, скорость и сценарии на реальных устройствах.</p>
         </div>
         <span class="step-out" data-i18n="step4.out">→ список правок и их закрытие</span>
       </li>
@@ -291,7 +287,7 @@
         <span class="step-n">05 / 06</span>
         <div>
           <h3 data-i18n="step5.h">Запуск</h3>
-          <p data-i18n="step5.p">Подключаю домен и SSL, ставлю аналитику, проверяю формы в бою.</p>
+          <p data-i18n="step5.p">Подключаем домен и SSL, ставим аналитику, проверяем формы в бою.</p>
         </div>
         <span class="step-out" data-i18n="step5.out">→ продукт в работе, доступы у вас</span>
       </li>
@@ -299,7 +295,7 @@
         <span class="step-n">06 / 06</span>
         <div>
           <h3 data-i18n="step6.h">Развитие</h3>
-          <p data-i18n="step6.p">При необходимости продолжаю улучшать и масштабировать.</p>
+          <p data-i18n="step6.p">При необходимости продолжаем улучшать и масштабировать.</p>
         </div>
         <span class="step-out" data-i18n="step6.out">→ поддержка по договорённости</span>
       </li>
@@ -435,7 +431,7 @@
 
           <button class="btn btn-solid btn-block" type="submit" data-i18n="form.submit">Отправить заявку</button>
           {% if errors.form %}<p class="err" role="alert" style="text-align:center">{{ errors.form }}</p>{% endif %}
-          <p class="form-note" data-i18n="form.note">отвечу в течение дня в Telegram или на почту</p>
+          <p class="form-note" data-i18n="form.note">ответим в течение дня в Telegram или на почту</p>
         </form>
       </div>
     </div>
