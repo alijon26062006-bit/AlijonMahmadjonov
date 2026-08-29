@@ -589,10 +589,12 @@
         return;
       }
 
-      /* повторное нажатие создало бы вторую такую же заявку */
+      /* Повторное нажатие создало бы вторую такую же заявку. Гасим
+         кнопку не сразу: если отключить её прямо в обработчике, Chrome
+         считает отправителя недоступным и вовсе не отправляет форму. */
       var submit = form.querySelector('button[type="submit"]');
       if (submit) {
-        submit.disabled = true;
+        setTimeout(function () { submit.disabled = true; }, 0);
         setTimeout(function () { submit.disabled = false; }, 6000);
       }
     });
