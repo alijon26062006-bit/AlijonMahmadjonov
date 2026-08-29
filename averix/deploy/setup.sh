@@ -85,7 +85,16 @@ ufw --force enable >/dev/null
 echo "    22, 80 и 443 открыты, остальное закрыто"
 
 say "Выпускаю сертификат"
-if certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" \
+# www берём в сертификат только если он резолвится: certbot падает
+# целиком, если хотя бы одно из имён не проходит проверку.
+CERT_ARGS=(-d "$DOMAIN")
+if getent hosts "www.$DOMAIN" >/dev/null 2>&1; then
+  CERT_ARGS+=(-d "www.$DOMAIN")
+else
+  echo "    www.$DOMAIN не резолвится — сертификат только на $DOMAIN"
+fi
+
+if certbot --nginx "${CERT_ARGS[@]}" \
      --non-interactive --agree-tos --redirect \
      -m "alijon26.06.2006@gmail.com"; then
   echo "    HTTPS включён, продление настроено автоматически"
@@ -103,7 +112,7 @@ else
   esac
   echo "    Обычно причина — A-запись ещё не разошлась. Проверьте и повторите:"
   echo "      getent hosts $DOMAIN"
-  echo "      certbot --nginx -d $DOMAIN -d www.$DOMAIN"
+  echo "      certbot --nginx ${CERT_ARGS[*]}"
   exit 1
 fi
 
