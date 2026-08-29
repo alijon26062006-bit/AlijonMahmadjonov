@@ -96,40 +96,39 @@ favicon.svg         иконка вкладки
 
 ## Деплой на VPS
 
-```bash
-rsync -av --delete ./ user@SERVER:/var/www/averix/
-```
-
-```nginx
-server {
-  listen 80;
-  server_name averix.tj www.averix.tj;
-  root /var/www/averix;
-  index index.html;
-
-  gzip on;
-  gzip_types text/css application/javascript image/svg+xml;
-
-  # шрифты и картинки не меняются — кешируем надолго
-  location ~* \.(woff2|webp|jpg|svg)$ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
-  }
-  location ~* \.(css|js)$ {
-    expires 7d;
-    add_header Cache-Control "public";
-  }
-  location / {
-    try_files $uri $uri/ =404;
-  }
-}
-```
+Всё нужное лежит в `deploy/`. Первичная установка — один раз:
 
 ```bash
-ln -s /etc/nginx/sites-available/averix /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
-certbot --nginx -d averix.tj -d www.averix.tj
+ssh root@IP-СЕРВЕРА
+curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/main/averix/deploy/setup.sh -o setup.sh
+less setup.sh          # прочитать перед запуском
+bash setup.sh averix.tj
 ```
+
+Скрипт ставит nginx, git и certbot, клонирует репозиторий
+в `/var/www/averix-repo`, настраивает сайт, открывает 22/80/443
+и выпускает сертификат. Запускать можно повторно — уже настроенное
+он не ломает.
+
+Сайт лежит в подпапке репозитория, поэтому корень nginx —
+`/var/www/averix-repo/averix`.
+
+Обновление после каждого push:
+
+```bash
+bash /var/www/averix-repo/averix/deploy/update.sh
+```
+
+Скрипт делает `git reset --hard`, поэтому **править файлы прямо
+на сервере нельзя** — изменения будут стёрты. Правьте в репозитории.
+
+### Про кеш
+
+Имена файлов не содержат хеша, поэтому `css` и `js` отдаются
+с `Cache-Control: no-cache`: иначе после обновления вернувшийся
+посетитель неделю видел бы старую версию. Это не отключает кеш,
+а требует проверки — при неизменном файле сервер отвечает 304
+в несколько байт. Шрифты закешированы на год, картинки на 30 дней.
 
 При 202 КБ на страницу 10 000 посетителей дают около 2 ГБ трафика —
 это выдержит самый дешёвый VPS. Cloudflare перед сервером снимет и это.
