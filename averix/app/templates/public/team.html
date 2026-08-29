@@ -1,0 +1,152 @@
+{% extends "public/base.html" %}
+{% block title %}Студия — AVERIX{% endblock %}
+{% block description %}{{ s.about_text }}{% endblock %}
+{% block body %}
+
+<main id="main">
+
+<section class="page-head">
+  <div class="shell">
+    <nav class="crumbs" aria-label="Хлебные крошки">
+      <a href="/" data-i18n="crumb.home">Главная</a>
+      <span aria-hidden="true">/</span>
+      <span data-i18n="nav.team">Студия</span>
+    </nav>
+
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[01]</span>
+        <span class="label" data-i18n="team.label">О студии</span>
+      </div>
+      <h1 class="r" data-i18n="team.h1">AVERIX — это студия, а не биржа фрилансеров</h1>
+      <p class="lede r d1">{{ s.about_text }}</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight">
+  <div class="shell">
+    <div class="stats glass r">
+      <div>
+        <b><span class="num" data-count="{{ s.stat_years or 3 }}">{{ s.stat_years or 3 }}</span><span>+</span></b>
+        <span data-i18n="stat.years">года в разработке</span>
+      </div>
+      <div>
+        <b><span class="num" data-count="{{ s.stat_active or 4 }}">{{ s.stat_active or 4 }}</span></b>
+        <span data-i18n="stat.active">активных проекта</span>
+      </div>
+      <div>
+        <b><span class="num" data-count="{{ s.stat_accepted or 100 }}">{{ s.stat_accepted or 100 }}</span><span>%</span></b>
+        <span data-i18n="stat.accepted">работ принято заказчиком</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight">
+  <div class="shell">
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[02]</span>
+        <span class="label" data-i18n="team.people.label">Кто работает</span>
+      </div>
+      <h2 class="r" data-i18n="team.people.h2">Люди</h2>
+    </div>
+
+    {% if team %}
+    <div class="people">
+      {% for m in team %}
+      <article class="person glass r">
+        <div class="person-shot">
+          {% if m.photo %}
+          <img src="/uploads/{{ m.photo }}" alt="{{ m.name }}" loading="lazy" decoding="async"
+               width="600" height="720">
+          {% else %}
+          <span class="person-ini" aria-hidden="true">{{ m.name[:1] }}</span>
+          {% endif %}
+        </div>
+        <div class="person-body">
+          <h3>{{ m.name }}</h3>
+          {% if m.position %}<p class="who-role">{{ m.position }}</p>{% endif %}
+          {% if m.bio %}<p class="case-text">{{ m.bio }}</p>{% endif %}
+          <div class="person-links">
+            {% if m.telegram %}<a href="https://t.me/{{ m.telegram|replace('@','') }}" target="_blank" rel="noopener">Telegram</a>{% endif %}
+            {% if m.github %}<a href="https://github.com/{{ m.github }}" target="_blank" rel="noopener">GitHub</a>{% endif %}
+            {% if m.linkedin %}<a href="{{ m.linkedin }}" target="_blank" rel="noopener nofollow">LinkedIn</a>{% endif %}
+            {% if m.website %}<a href="{{ m.website }}" target="_blank" rel="noopener nofollow">Сайт</a>{% endif %}
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="people">
+      <article class="person glass r">
+        <div class="person-shot">
+          <picture>
+            <source srcset="/img/alijon.webp" type="image/webp">
+            <img src="/img/alijon.jpg" width="760" height="912" loading="lazy" decoding="async"
+                 alt="Алиджон Махмаджонов, основатель студии AVERIX">
+          </picture>
+        </div>
+        <div class="person-body">
+          <h3 data-i18n="team.founder.name">Алиджон Махмаджонов</h3>
+          <p class="who-role" data-i18n="team.founder.role">основатель · веб-разработчик</p>
+          <p class="case-text" data-i18n="team.founder.bio">
+            Сейчас всю работу делаю сам: дизайн, вёрстку, backend и запуск на сервере.
+            Это честнее, чем показывать выдуманный отдел из десяти человек, — вы
+            всегда знаете, кто именно отвечает за ваш проект.
+          </p>
+          <div class="person-links">
+            <a href="{{ tg_url }}" target="_blank" rel="noopener">Telegram</a>
+            {% if gh_url %}<a href="{{ gh_url }}" target="_blank" rel="noopener">GitHub</a>{% endif %}
+          </div>
+        </div>
+      </article>
+    </div>
+    <p class="note-line r d1" data-i18n="team.grow">
+      Студия растёт — открытые вакансии на странице <a href="/careers">Вакансии</a>.
+    </p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section section-tight">
+  <div class="shell">
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[03]</span>
+        <span class="label" data-i18n="team.rules.label">Как мы работаем</span>
+      </div>
+      <h2 class="r" data-i18n="team.rules.h2">Три правила, от которых не отступаем</h2>
+    </div>
+
+    <div class="cards">
+      <article class="card glass r">
+        <span class="card-n">01</span>
+        <h3 data-i18n="team.rule1.h">Говорим до, а не после</h3>
+        <p data-i18n="team.rule1.p">Если задача не по силам или срок нереальный — скажем на первом созвоне, а не после предоплаты.</p>
+      </article>
+      <article class="card glass r d1">
+        <span class="card-n">02</span>
+        <h3 data-i18n="team.rule2.h">Код остаётся у вас</h3>
+        <p data-i18n="team.rule2.p">Репозиторий, домен и сервер оформляются на вас. Никакой привязки к нам «навсегда».</p>
+      </article>
+      <article class="card glass r d2">
+        <span class="card-n">03</span>
+        <h3 data-i18n="team.rule3.h">Без шаблонов</h3>
+        <p data-i18n="team.rule3.p">Каждый проект собирается с нуля: дольше, зато быстро грузится и переживает доработки.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight">
+  <div class="shell case-cta r">
+    <p>{{ s.cta_title }}</p>
+    <a class="btn btn-solid" href="/#final" data-i18n="cta.discuss">Обсудить проект</a>
+  </div>
+</section>
+
+</main>
+{% endblock %}

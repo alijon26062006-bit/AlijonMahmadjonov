@@ -197,3 +197,298 @@ def move_project(conn: sqlite3.Connection, project_id: int, direction: int) -> N
         "UPDATE projects SET sort_order = ? WHERE id = ?",
         [(pos, pid) for pos, pid in enumerate(order)],
     )
+
+
+# ============================================================
+# Настройки сайта
+# ============================================================
+
+def settings(conn: sqlite3.Connection, lang: str = "ru") -> dict:
+    """Плоский словарь ключ → значение на нужном языке.
+
+    Таджикский пустой — отдаём русский. Машинного перевода нет.
+    """
+    out: dict[str, str] = {}
+    for row in conn.execute("SELECT key, value_ru, value_tj FROM site_settings"):
+        value = row["value_tj"] if lang == "tg" and row["value_tj"] else row["value_ru"]
+        out[row["key"]] = value or ""
+    return out
+
+
+def all_settings(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute("SELECT * FROM site_settings ORDER BY key").fetchall()
+
+
+def save_setting(conn: sqlite3.Connection, key: str, ru: str, tj: str) -> None:
+    conn.execute(
+        "UPDATE site_settings SET value_ru = ?, value_tj = ?, updated_at = datetime('now')"
+        " WHERE key = ?",
+        (ru, tj, key),
+    )
+
+
+# ============================================================
+# Публичная часть: проекты
+# ============================================================
+
+def _localize(row: sqlite3.Row, lang: str, fields: tuple[str, ...]) -> dict:
+    """Собирает запись на нужном языке с откатом на русский."""
+    out = dict(row)
+    for f in fields:
+        tj = row[f"{f}_tj"] if f"{f}_tj" in row.keys() else None
+        out[f] = (tj if lang == "tg" and tj else row[f"{f}_ru"]) or ""
+    return out
+
+
+PUBLIC_FIELDS = ("title", "excerpt", "body", "task", "solution", "features", "result",
+                 "seo_title", "seo_description")
+
+
+def public_projects(conn: sqlite3.Connection, lang: str = "ru",
+                    category: str | None = None, featured_only: bool = False,
+                    limit: int | None = None) -> list[dict]:
+    sql = ("SELECT p.*, i.filename AS cover, i.width AS cover_w, i.height AS cover_h"
+           " FROM projects p LEFT JOIN project_images i ON i.id = p.cover_image_id"
+           " WHERE p.status = 'published'")
+    args: list = []
+    if category:
+        sql += " AND p.category = ?"
+        args.append(category)
+    if featured_only:
+        sql += " AND p.featured = 1"
+    sql += " ORDER BY p.sort_order, p.created_at DESC"
+    if limit:
+        sql += " LIMIT ?"
+        args.append(limit)
+
+    out = []
+    for row in conn.execute(sql, tuple(args)):
+        item = _localize(row, lang, PUBLIC_FIELDS)
+        item["category_label"] = CATEGORIES.get(row["category"], row["category"])
+        item["tech"] = tech(conn, row["id"])
+        out.append(item)
+    return out
+
+
+def public_project(conn: sqlite3.Connection, slug: str, lang: str = "ru") -> dict | None:
+    row = conn.execute(
+        "SELECT p.*, i.filename AS cover, i.width AS cover_w, i.height AS cover_h"
+        " FROM projects p LEFT JOIN project_images i ON i.id = p.cover_image_id"
+        " WHERE p.slug = ? AND p.status = 'published'",
+        (slug,),
+    ).fetchone()
+    if row is None:
+        return None
+    item = _localize(row, lang, PUBLIC_FIELDS)
+    item["category_label"] = CATEGORIES.get(row["category"], row["category"])
+    item["tech"] = tech(conn, row["id"])
+    item["gallery"] = [
+        dict(r, alt=(r["alt_tj"] if lang == "tg" and r["alt_tj"] else r["alt_ru"]) or "")
+        for r in images(conn, row["id"])
+    ]
+    return item
+
+
+def neighbour_project(conn: sqlite3.Connection, current: dict, lang: str = "ru") -> dict | None:
+    """Следующий опубликованный проект по порядку, по кругу."""
+    rows = conn.execute(
+        "SELECT slug, title_ru, title_tj FROM projects WHERE status = 'published'"
+        " ORDER BY sort_order, created_at DESC"
+    ).fetchall()
+    if len(rows) < 2:
+        return None
+    slugs = [r["slug"] for r in rows]
+    try:
+        i = slugs.index(current["slug"])
+    except ValueError:
+        return None
+    nxt = rows[(i + 1) % len(rows)]
+    title = (nxt["title_tj"] if lang == "tg" and nxt["title_tj"] else nxt["title_ru"])
+    return {"slug": nxt["slug"], "title": title}
+
+
+def used_categories(conn: sqlite3.Connection) -> list[str]:
+    return [r["category"] for r in conn.execute(
+        "SELECT DISTINCT category FROM projects WHERE status = 'published'"
+    )]
+
+
+# ============================================================
+# Команда
+# ============================================================
+
+TEAM_FIELDS = ("position", "bio")
+
+
+def public_team(conn: sqlite3.Connection, lang: str = "ru") -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM team_members WHERE visible = 1 ORDER BY sort_order, id"
+    ).fetchall()
+    return [_localize(r, lang, TEAM_FIELDS) for r in rows]
+
+
+def all_team(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute("SELECT * FROM team_members ORDER BY sort_order, id").fetchall()
+
+
+def get_member(conn: sqlite3.Connection, member_id: int) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM team_members WHERE id = ?", (member_id,)).fetchone()
+
+
+TEAM_COLUMNS = ["name", "position_ru", "position_tj", "bio_ru", "bio_tj", "photo",
+                "telegram", "github", "linkedin", "website", "visible", "sort_order"]
+
+
+def save_member(conn: sqlite3.Connection, member_id: int | None, data: dict) -> int:
+    if member_id is None:
+        marks = ",".join("?" * len(TEAM_COLUMNS))
+        cur = conn.execute(
+            f"INSERT INTO team_members ({','.join(TEAM_COLUMNS)}) VALUES ({marks})",
+            tuple(data.get(c) for c in TEAM_COLUMNS),
+        )
+        return int(cur.lastrowid)
+    sets = ",".join(f"{c} = ?" for c in TEAM_COLUMNS)
+    conn.execute(
+        f"UPDATE team_members SET {sets}, updated_at = datetime('now') WHERE id = ?",
+        tuple(data.get(c) for c in TEAM_COLUMNS) + (member_id,),
+    )
+    return member_id
+
+
+def delete_member(conn: sqlite3.Connection, member_id: int) -> str | None:
+    row = conn.execute("SELECT photo FROM team_members WHERE id = ?", (member_id,)).fetchone()
+    conn.execute("DELETE FROM team_members WHERE id = ?", (member_id,))
+    return row["photo"] if row else None
+
+
+# ============================================================
+# Вакансии
+# ============================================================
+
+WORK_TYPES = {"remote": "Удалённо", "office": "В офисе", "hybrid": "Гибрид"}
+EMPLOYMENT = {"full": "Полная занятость", "part": "Частичная", "project": "Проектно"}
+VACANCY_FIELDS = ("title", "description", "requirements")
+VACANCY_COLUMNS = ["title_ru", "title_tj", "description_ru", "description_tj",
+                   "requirements_ru", "requirements_tj", "location", "work_type",
+                   "employment", "status", "sort_order"]
+
+
+def open_vacancies(conn: sqlite3.Connection, lang: str = "ru") -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM vacancies WHERE status = 'open' ORDER BY sort_order, id"
+    ).fetchall()
+    out = []
+    for r in rows:
+        item = _localize(r, lang, VACANCY_FIELDS)
+        item["work_label"] = WORK_TYPES.get(r["work_type"], r["work_type"])
+        item["employment_label"] = EMPLOYMENT.get(r["employment"], r["employment"])
+        out.append(item)
+    return out
+
+
+def all_vacancies(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute("SELECT * FROM vacancies ORDER BY sort_order, id").fetchall()
+
+
+def get_vacancy(conn: sqlite3.Connection, vacancy_id: int) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM vacancies WHERE id = ?", (vacancy_id,)).fetchone()
+
+
+def save_vacancy(conn: sqlite3.Connection, vacancy_id: int | None, data: dict) -> int:
+    if vacancy_id is None:
+        marks = ",".join("?" * len(VACANCY_COLUMNS))
+        cur = conn.execute(
+            f"INSERT INTO vacancies ({','.join(VACANCY_COLUMNS)}) VALUES ({marks})",
+            tuple(data.get(c) for c in VACANCY_COLUMNS),
+        )
+        return int(cur.lastrowid)
+    sets = ",".join(f"{c} = ?" for c in VACANCY_COLUMNS)
+    conn.execute(
+        f"UPDATE vacancies SET {sets}, updated_at = datetime('now') WHERE id = ?",
+        tuple(data.get(c) for c in VACANCY_COLUMNS) + (vacancy_id,),
+    )
+    return vacancy_id
+
+
+# ============================================================
+# Заявки
+# ============================================================
+
+REQUEST_TYPES = {
+    "website": "Сайт или лендинг",
+    "bot": "Telegram-бот",
+    "backend": "Backend или API",
+    "automation": "Автоматизация",
+    "ai": "AI-функции",
+    "other": "Другое",
+}
+REQUEST_STATUSES = {
+    "new": "Новая", "contacted": "Связались", "in_progress": "В работе",
+    "won": "Взяли", "closed": "Закрыта",
+}
+JOB_STATUSES = {
+    "new": "Новая", "viewed": "Просмотрена", "interview": "Собеседование",
+    "accepted": "Принят", "rejected": "Отказ",
+}
+
+
+def add_client_request(conn: sqlite3.Connection, data: dict) -> int:
+    cols = ["name", "telegram", "email", "project_type", "budget", "message", "ip"]
+    cur = conn.execute(
+        f"INSERT INTO client_requests ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+        tuple(data.get(c) for c in cols),
+    )
+    return int(cur.lastrowid)
+
+
+def add_job_application(conn: sqlite3.Connection, data: dict) -> int:
+    cols = ["vacancy_id", "name", "telegram", "email", "country", "direction",
+            "experience", "skills", "portfolio_url", "github_url", "message", "ip"]
+    cur = conn.execute(
+        f"INSERT INTO job_applications ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+        tuple(data.get(c) for c in cols),
+    )
+    return int(cur.lastrowid)
+
+
+def recent_from_ip(conn: sqlite3.Connection, table: str, ip: str, minutes: int = 10) -> int:
+    """Сколько заявок пришло с этого адреса за последние минуты."""
+    if table not in ("client_requests", "job_applications"):
+        raise ValueError("неизвестная таблица")
+    row = conn.execute(
+        f"SELECT COUNT(*) AS n FROM {table}"
+        f" WHERE ip = ? AND created_at > datetime('now', ?)",
+        (ip, f"-{int(minutes)} minutes"),
+    ).fetchone()
+    return int(row["n"])
+
+
+def list_requests(conn: sqlite3.Connection, table: str) -> list[sqlite3.Row]:
+    if table not in ("client_requests", "job_applications"):
+        raise ValueError("неизвестная таблица")
+    return conn.execute(f"SELECT * FROM {table} ORDER BY created_at DESC").fetchall()
+
+
+def set_request_status(conn: sqlite3.Connection, table: str, item_id: int,
+                       status: str, note: str) -> bool:
+    allowed = REQUEST_STATUSES if table == "client_requests" else JOB_STATUSES
+    if table not in ("client_requests", "job_applications") or status not in allowed:
+        return False
+    conn.execute(
+        f"UPDATE {table} SET status = ?, admin_note = ?, updated_at = datetime('now')"
+        " WHERE id = ?",
+        (status, note[:2000], item_id),
+    )
+    return True
+
+
+def dashboard_counts(conn: sqlite3.Connection) -> dict:
+    def one(sql: str) -> int:
+        return int(conn.execute(sql).fetchone()[0])
+    return {
+        **counts(conn),
+        "team": one("SELECT COUNT(*) FROM team_members WHERE visible = 1"),
+        "vacancies": one("SELECT COUNT(*) FROM vacancies WHERE status = 'open'"),
+        "jobs_new": one("SELECT COUNT(*) FROM job_applications WHERE status = 'new'"),
+        "requests_new": one("SELECT COUNT(*) FROM client_requests WHERE status = 'new'"),
+    }

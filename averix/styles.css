@@ -443,6 +443,217 @@ a{color:var(--violet)}
 .foot-copy{font-family:var(--mono); font-size:.76rem; color:var(--faint)}
 
 /* ============================================================
+   Сияние за первым экраном
+   ============================================================ */
+.bloom{
+  position:absolute; inset:-20% -10% auto -10%; height:70%;
+  background:radial-gradient(60% 60% at 50% 0%, rgba(185,140,242,.16), transparent 70%);
+  pointer-events:none; z-index:-1;
+}
+
+/* Скрытое поле-ловушка для роботов. display:none некоторые боты
+   распознают, поэтому уводим за экран, но убираем из потока и озвучки. */
+.hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
+
+.note-line{font-size:.94rem; color:var(--faint)}
+.note-line a{color:var(--violet); text-decoration:none}
+.note-line a:hover{text-decoration:underline}
+
+/* ============================================================
+   Избранные проекты — крупные карточки
+   ============================================================ */
+.cases{display:grid; gap:var(--s3)}
+.case{
+  display:grid; gap:0; overflow:hidden; border-radius:var(--r-lg);
+}
+@media (min-width:860px){
+  .case{grid-template-columns:1.15fr 1fr; align-items:stretch}
+  .case.flip .case-shot{order:2}
+}
+.case-shot{
+  position:relative; display:block; min-height:220px; background:rgba(255,255,255,.03);
+  overflow:hidden; text-decoration:none;
+}
+.case-shot img{width:100%; height:100%; object-fit:cover; transition:transform 700ms var(--ease)}
+.case:hover .case-shot img{transform:scale(1.035)}
+.case-none{
+  position:absolute; inset:0; display:grid; place-items:center; padding:var(--s3);
+  font-family:var(--mono); font-size:.8rem; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--faint); text-align:center;
+}
+.case-body{display:flex; flex-direction:column; gap:var(--s2); padding:var(--s4) var(--s3)}
+@media (min-width:560px){ .case-body{padding:var(--s4)} }
+.case-body h2,
+.case-body h3{font-size:clamp(1.25rem,3vw,1.6rem); line-height:1.18}
+.case-body h2 a,
+.case-body h3 a{color:inherit; text-decoration:none}
+.case-body h2 a:hover,
+.case-body h3 a:hover{color:var(--violet)}
+.case-meta{font-family:var(--mono); font-size:.74rem; letter-spacing:.1em; text-transform:uppercase; color:var(--faint)}
+.case-text{color:var(--muted); font-size:.98rem; max-width:52ch}
+.link-more{
+  display:inline-flex; align-items:center; gap:.4rem; min-height:44px; margin-top:auto;
+  font-size:.92rem; color:var(--violet); text-decoration:none;
+}
+.link-more i{font-style:normal; transition:transform var(--t)}
+.link-more:hover i{transform:translate(2px,-2px)}
+
+/* ============================================================
+   О студии — три полосы знака
+   ============================================================ */
+.about{display:grid; gap:var(--s5)}
+@media (min-width:920px){ .about{grid-template-columns:1fr 1fr; gap:var(--s6); align-items:center} }
+.about-copy h2{margin-top:var(--s3); font-size:clamp(1.7rem,4.6vw,2.6rem)}
+.about-idea{margin-top:var(--s3); color:var(--muted)}
+.about-idea em{font-style:normal; color:var(--text)}
+.about-mark{display:flex; flex-direction:column; gap:var(--s3)}
+.about-mark li{display:grid; grid-template-columns:auto 1fr; column-gap:var(--s3); align-items:center}
+.about-mark b{font-family:var(--mono); font-size:.8rem; letter-spacing:.16em; color:var(--text)}
+.about-mark span[data-part]{grid-row:span 2}
+.about-mark li > span:last-child{font-size:.92rem; color:var(--faint)}
+.about-bar{display:block; height:14px; border-radius:4px}
+.about-bar[data-part="idea"]{width:54px; background:linear-gradient(90deg,var(--violet),var(--violet-deep))}
+.about-bar[data-part="dev"]{width:84px; background:linear-gradient(90deg,var(--violet),var(--violet-deep))}
+.about-bar[data-part="result"]{width:110px; background:linear-gradient(90deg,var(--emerald),var(--emerald-deep))}
+
+/* ============================================================
+   Внутренние страницы: шапка, крошки, фильтры
+   ============================================================ */
+.page-head{padding:calc(var(--s6) + 20px) 0 0}
+.section-tight{padding:var(--s5) 0}
+.crumbs{
+  display:flex; flex-wrap:wrap; align-items:center; gap:.5rem;
+  font-family:var(--mono); font-size:.74rem; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--faint); margin-bottom:var(--s4);
+}
+.crumbs a{color:var(--faint); text-decoration:none}
+.crumbs a:hover{color:var(--violet)}
+.page-head h1{font-size:clamp(2rem,5.6vw,3.2rem); line-height:1.1}
+
+.filters{display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:var(--s4)}
+.chip{
+  display:inline-flex; align-items:center; min-height:44px; padding:0 var(--s3);
+  border:1px solid var(--glass-brd); border-radius:var(--pill);
+  background:var(--glass); backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur);
+  font-size:.88rem; color:var(--muted); text-decoration:none;
+  transition:color var(--t), border-color var(--t), background var(--t);
+}
+.chip:hover{color:var(--text); border-color:rgba(255,255,255,.2)}
+.chip.on{color:var(--on-accent); background:linear-gradient(120deg,var(--violet),#8FE3B8); border-color:transparent}
+
+/* ============================================================
+   Сетка проектов
+   ============================================================ */
+.grid-cases{display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.tile{display:flex; flex-direction:column; overflow:hidden; border-radius:var(--r-lg)}
+.tile-shot{position:relative; display:block; aspect-ratio:16/10; background:rgba(255,255,255,.03); overflow:hidden}
+.tile-shot img{width:100%; height:100%; object-fit:cover; transition:transform 700ms var(--ease)}
+.tile:hover .tile-shot img{transform:scale(1.035)}
+.tile-body{display:flex; flex-direction:column; gap:var(--s2); padding:var(--s3); flex:1}
+.tile-body h2{font-size:1.2rem; line-height:1.22}
+.tile-body h2 a{color:inherit; text-decoration:none}
+.tile-body h2 a:hover{color:var(--violet)}
+
+.empty{
+  display:flex; flex-direction:column; align-items:flex-start; gap:var(--s2);
+  padding:var(--s5) var(--s3); border-radius:var(--r-lg); max-width:56ch;
+}
+@media (min-width:560px){ .empty{padding:var(--s5)} }
+.empty .mono{font-size:.76rem; letter-spacing:.16em; color:var(--violet)}
+.empty p:not(.mono){color:var(--muted)}
+.empty .btn{margin-top:var(--s2)}
+
+/* ============================================================
+   Страница кейса
+   ============================================================ */
+.case-facts{
+  display:grid; gap:var(--s3); margin-top:var(--s4);
+  padding:var(--s3); border-radius:var(--r-lg);
+}
+@media (min-width:720px){ .case-facts{grid-template-columns:2fr 1fr 1fr; align-items:start; padding:var(--s4)} }
+.fact{display:flex; flex-direction:column; gap:.35rem}
+.fact-k{font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
+.fact .tags{margin-top:0}
+.case-hero{margin-top:var(--s5); border-radius:var(--r-lg); overflow:hidden}
+.case-hero img{width:100%; height:auto}
+.case-text-col{max-width:74ch}
+.case-block{margin-top:var(--s5)}
+.case-block:first-child{margin-top:0}
+.case-block h2{
+  display:flex; align-items:baseline; gap:.6rem; margin-bottom:var(--s3);
+  font-size:clamp(1.3rem,3.4vw,1.75rem);
+}
+.case-block p{margin-top:var(--s2); color:var(--muted)}
+.case-block p:first-of-type{margin-top:0}
+.case-gallery{display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.case-gallery figure{margin:0; border-radius:var(--r-lg); overflow:hidden}
+.case-gallery figcaption{padding:var(--s2) var(--s3); font-size:.86rem; color:var(--faint)}
+.case-foot{display:grid; gap:var(--s3)}
+@media (min-width:860px){ .case-foot{grid-template-columns:1fr 1fr; align-items:stretch} }
+.next-case{
+  display:flex; flex-direction:column; justify-content:center; gap:.4rem;
+  padding:var(--s4) var(--s3); border-radius:var(--r-lg); text-decoration:none; color:var(--text);
+  transition:border-color var(--t);
+}
+.next-case .mono{font-size:.72rem; letter-spacing:.16em; color:var(--faint)}
+.next-case strong{font-family:var(--display); font-size:1.2rem; font-weight:600}
+.next-case i{font-style:normal; display:inline-block; transition:transform var(--t)}
+.next-case:hover i{transform:translateX(4px)}
+.case-cta{
+  display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
+  gap:var(--s3);
+}
+.case-cta p{font-family:var(--display); font-size:clamp(1.2rem,3vw,1.6rem); line-height:1.2; max-width:26ch}
+
+/* ============================================================
+   Команда
+   ============================================================ */
+.people{display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.person{display:flex; flex-direction:column; overflow:hidden; border-radius:var(--r-lg)}
+.person-shot{position:relative; aspect-ratio:5/6; background:rgba(255,255,255,.03); overflow:hidden}
+.person-shot img{width:100%; height:100%; object-fit:cover}
+.person-ini{
+  position:absolute; inset:0; display:grid; place-items:center;
+  font-family:var(--display); font-size:3rem; color:var(--faint);
+}
+.person-body{display:flex; flex-direction:column; gap:.5rem; padding:var(--s3)}
+.person-body h3{font-size:1.15rem}
+.person-links{display:flex; flex-wrap:wrap; gap:var(--s3); margin-top:auto}
+.person-links a{
+  display:inline-flex; align-items:center; min-height:44px;
+  font-size:.88rem; color:var(--violet); text-decoration:none;
+}
+.person-links a:hover{text-decoration:underline}
+
+/* ============================================================
+   Вакансии
+   ============================================================ */
+.jobs{display:grid; gap:var(--s3)}
+.job{display:flex; flex-direction:column; gap:var(--s3); padding:var(--s4) var(--s3); border-radius:var(--r-lg)}
+@media (min-width:560px){ .job{padding:var(--s4)} }
+.job-head h2{font-size:clamp(1.25rem,3vw,1.6rem)}
+.job-head .tags{margin-top:var(--s2)}
+.job-body p{color:var(--muted)}
+.job-body p + p{margin-top:var(--s2)}
+.job-body .ticks{margin-top:var(--s2)}
+.job .btn{align-self:flex-start}
+
+/* ============================================================
+   Служебные страницы: спасибо, 404
+   ============================================================ */
+.stage{min-height:70vh; display:grid; align-items:center; padding:var(--s6) 0 var(--s5)}
+.stage-in{max-width:56ch}
+.stage h1{margin-top:var(--s2); font-size:clamp(1.9rem,5.4vw,3rem); line-height:1.12}
+.stage .lede{margin-top:var(--s3)}
+.stage .hero-cta{margin-top:var(--s4)}
+.stage .note-line{margin-top:var(--s4)}
+.ok-mark{
+  display:grid; place-items:center; width:56px; height:56px;
+  border-radius:var(--pill); margin-bottom:var(--s3);
+}
+.ok-mark svg{width:26px; height:26px; fill:none; stroke:var(--emerald); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round}
+
+/* ============================================================
    Появление при скролле — с пружиной
    ============================================================ */
 .js .r{opacity:0; transform:translateY(18px); transition:opacity 520ms var(--ease), transform 620ms var(--spring)}

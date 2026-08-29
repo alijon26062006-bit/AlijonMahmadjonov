@@ -10,14 +10,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import journal, models, security
+from .render import client_ip, is_secure, no_store, templates
 from .uploads import UploadError, delete_image_file, save_image
 from .config import (
     ALLOW_INSECURE,
-    BASE_DIR,
     DEBUG,
     SECURE_COOKIES,
     SESSION_COOKIE,
@@ -26,7 +25,6 @@ from .config import (
 from .db import connect, migrate
 
 LOGIN_COOKIE = "averix_lc"          # одноразовый токен формы входа
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
 @asynccontextmanager
@@ -44,20 +42,11 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
+from .routes_public import router as public_router  # noqa: E402  (после создания app)
+app.include_router(public_router)
+
 
 # ---------- вспомогательное ----------
-
-def client_ip(request: Request) -> str:
-    """
-    За nginx настоящий адрес приходит в X-Forwarded-For. Берём последний
-    элемент — его подставляет наш собственный прокси, и подделать его
-    клиент не может, в отличие от первого.
-    """
-    fwd = request.headers.get("x-forwarded-for")
-    if fwd:
-        return fwd.split(",")[-1].strip()[:64]
-    return (request.client.host if request.client else "?")[:64]
-
 
 def set_cookie(resp: Response, name: str, value: str, max_age: int) -> None:
     resp.set_cookie(
@@ -65,12 +54,6 @@ def set_cookie(resp: Response, name: str, value: str, max_age: int) -> None:
         max_age=max_age, path="/",
         httponly=True, secure=SECURE_COOKIES, samesite="lax",
     )
-
-
-def is_secure(request: Request) -> bool:
-    """Схема запроса до nginx: сам прокси ходит к нам по http."""
-    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
-    return proto == "https"
 
 
 def safe_host(request: Request) -> str:
@@ -99,11 +82,6 @@ def insecure_page(request: Request) -> Response:
 def current_session(request: Request):
     with connect() as conn:
         return security.get_session(conn, request.cookies.get(SESSION_COOKIE))
-
-
-def no_store(resp: Response) -> Response:
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
 
 
 _ERRORS = {

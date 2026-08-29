@@ -1,0 +1,31 @@
+{% extends "public/base.html" %}
+{% block title %}{% if kind == 'job' %}Отклик отправлен{% else %}Заявка отправлена{% endif %} — AVERIX{% endblock %}
+{% block description %}Сообщение получено. Ответим в течение дня.{% endblock %}
+{% block robots %}<meta name="robots" content="noindex, follow">{% endblock %}
+{% block body %}
+
+<main id="main" class="stage">
+  <div class="shell stage-in">
+    <span class="ok-mark glass" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false"><path d="M4 12.5l5.5 5.5L20 7"/></svg>
+    </span>
+
+    {% if kind == 'job' %}
+    <p class="mono tag-n" data-i18n="thanks.job.k">ОТКЛИК ПРИНЯТ</p>
+    <h1 data-i18n="thanks.job.h">Спасибо, отклик у нас</h1>
+    <p class="lede" data-i18n="thanks.job.p">Посмотрим внимательно и напишем в Telegram или на почту. Если ответа нет несколько дней — это не «мимо», просто разбираем по очереди.</p>
+    {% else %}
+    <p class="mono tag-n" data-i18n="thanks.req.k">ЗАЯВКА ПРИНЯТА</p>
+    <h1 data-i18n="thanks.req.h">Спасибо, заявка у нас</h1>
+    <p class="lede" data-i18n="thanks.req.p">Отвечу в течение дня. Если нужно срочно — напишите напрямую в Telegram, так быстрее всего.</p>
+    {% endif %}
+
+    <div class="hero-cta">
+      <a class="btn btn-solid" href="{{ tg_url }}" target="_blank" rel="noopener">@{{ s.contact_telegram }}</a>
+      <a class="btn btn-line" href="/" data-i18n="thanks.home">На главную</a>
+    </div>
+
+    <p class="note-line"><a href="/projects" data-i18n="work.all">Все проекты →</a></p>
+  </div>
+</main>
+{% endblock %}

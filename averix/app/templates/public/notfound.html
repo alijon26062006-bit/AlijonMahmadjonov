@@ -1,0 +1,19 @@
+{% extends "public/base.html" %}
+{% block title %}Страница не найдена — AVERIX{% endblock %}
+{% block description %}Такой страницы на сайте AVERIX нет.{% endblock %}
+{% block robots %}<meta name="robots" content="noindex, follow">{% endblock %}
+{% block body %}
+
+<main id="main" class="stage">
+  <div class="shell stage-in">
+    <p class="mono tag-n" data-i18n="nf.code">ОШИБКА 404</p>
+    <h1 data-i18n="nf.h">Такой страницы нет</h1>
+    <p class="lede" data-i18n="nf.p">Возможно, её удалили или в адресе опечатка. Проверьте ссылку — или посмотрите проекты.</p>
+
+    <div class="hero-cta">
+      <a class="btn btn-solid" href="/" data-i18n="thanks.home">На главную</a>
+      <a class="btn btn-line" href="/projects" data-i18n="nav.projects">Проекты</a>
+    </div>
+  </div>
+</main>
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends "public/base.html" %}
+{% block title %}Вакансии — AVERIX{% endblock %}
+{% block description %}{{ s.careers_intro }}{% endblock %}
+{% block body %}
+
+<main id="main">
+
+<section class="page-head">
+  <div class="shell">
+    <nav class="crumbs" aria-label="Хлебные крошки">
+      <a href="/" data-i18n="crumb.home">Главная</a>
+      <span aria-hidden="true">/</span>
+      <span data-i18n="nav.careers">Вакансии</span>
+    </nav>
+
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[01]</span>
+        <span class="label" data-i18n="jobs.label">Работа в студии</span>
+      </div>
+      <h1 class="r" data-i18n="jobs.h1">Вакансии</h1>
+      <p class="lede r d1">{{ s.careers_intro }}</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight">
+  <div class="shell">
+    {% if vacancies %}
+    <div class="jobs">
+      {% for v in vacancies %}
+      <article class="job glass r" id="v{{ v.id }}">
+        <div class="job-head">
+          <h2>{{ v.title }}</h2>
+          <ul class="tags">
+            <li>{{ v.work_label }}</li>
+            <li>{{ v.employment_label }}</li>
+            {% if v.location %}<li>{{ v.location }}</li>{% endif %}
+          </ul>
+        </div>
+        {% if v.description %}
+        <div class="job-body">
+          {% for para in v.description.split('\n') %}{% if para.strip() %}<p>{{ para }}</p>{% endif %}{% endfor %}
+        </div>
+        {% endif %}
+        {% if v.requirements %}
+        <div class="job-body">
+          <p class="fact-k" data-i18n="jobs.req">Что важно</p>
+          <ul class="ticks">
+            {% for line in v.requirements.split('\n') %}{% if line.strip() %}<li>{{ line.strip() }}</li>{% endif %}{% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <a class="btn btn-line btn-sm" href="#apply" data-vacancy="{{ v.id }}" data-i18n="jobs.apply">Откликнуться</a>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty glass r">
+      <p class="mono" data-i18n="jobs.empty.t">ОТКРЫТЫХ ВАКАНСИЙ НЕТ</p>
+      <p data-i18n="jobs.empty.p">Прямо сейчас мы никого не ищем. Но если вы сильны в том, что делаем мы, — присылайте отклик: свяжемся, когда появится задача.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section" id="apply">
+  <div class="shell final">
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[02]</span>
+        <span class="label" data-i18n="jobs.form.label">Отклик</span>
+      </div>
+      <h2 class="r" data-i18n="jobs.form.h2">Расскажите о себе</h2>
+      <p class="lede r d1" data-i18n="jobs.form.lede">Отвечаем всем, кто написал по делу. Резюме не обязательно — важнее ссылки на то, что вы сделали.</p>
+    </div>
+
+    <form class="form glass r d1" method="post" action="/apply" novalidate>
+      <div class="hp" aria-hidden="true">
+        <label for="j-site">Не заполняйте это поле</label>
+        <input id="j-site" name="website" type="text" tabindex="-1" autocomplete="off">
+      </div>
+
+      {% if vacancies %}
+      <div class="field">
+        <label for="j-vacancy" data-i18n="jobs.f.vacancy">Вакансия</label>
+        <select id="j-vacancy" name="vacancy_id">
+          <option value="" data-i18n="jobs.f.any">Без привязки к вакансии</option>
+          {% for v in vacancies %}
+          <option value="{{ v.id }}"{% if old.vacancy_id == v.id|string %} selected{% endif %}>{{ v.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <div class="field">
+        <label for="j-name"><span data-i18n="jobs.f.name">Имя</span> <span class="req" aria-hidden="true">*</span></label>
+        <input id="j-name" name="name" type="text" autocomplete="name" required maxlength="100"
+               value="{{ old.name or '' }}">
+        {% if errors.name %}<p class="err" role="alert">{{ errors.name }}</p>{% endif %}
+      </div>
+
+      <div class="field">
+        <label for="j-tg"><span data-i18n="jobs.f.tg">Telegram или почта</span> <span class="req" aria-hidden="true">*</span></label>
+        <input id="j-tg" name="telegram" type="text" required maxlength="120"
+               value="{{ old.telegram or '' }}" placeholder="@username">
+        {% if errors.telegram %}<p class="err" role="alert">{{ errors.telegram }}</p>{% endif %}
+      </div>
+
+      <div class="field">
+        <label for="j-email" data-i18n="jobs.f.email">Почта</label>
+        <input id="j-email" name="email" type="email" autocomplete="email" maxlength="120"
+               value="{{ old.email or '' }}">
+      </div>
+
+      <div class="field">
+        <label for="j-country" data-i18n="jobs.f.country">Город или страна</label>
+        <input id="j-country" name="country" type="text" maxlength="80" value="{{ old.country or '' }}">
+      </div>
+
+      <div class="field">
+        <label for="j-direction" data-i18n="jobs.f.direction">Направление</label>
+        <input id="j-direction" name="direction" type="text" maxlength="80"
+               value="{{ old.direction or '' }}" data-i18n-ph="jobs.f.direction.ph"
+               placeholder="frontend, backend, дизайн…">
+      </div>
+
+      <div class="field">
+        <label for="j-exp" data-i18n="jobs.f.exp">Опыт</label>
+        <input id="j-exp" name="experience" type="text" maxlength="200"
+               value="{{ old.experience or '' }}" data-i18n-ph="jobs.f.exp.ph"
+               placeholder="например, 2 года коммерческой разработки">
+      </div>
+
+      <div class="field">
+        <label for="j-skills" data-i18n="jobs.f.skills">Технологии</label>
+        <input id="j-skills" name="skills" type="text" maxlength="500"
+               value="{{ old.skills or '' }}" placeholder="React, Python, PostgreSQL…">
+      </div>
+
+      <div class="field">
+        <label for="j-portfolio" data-i18n="jobs.f.portfolio">Портфолио</label>
+        <input id="j-portfolio" name="portfolio_url" type="url" maxlength="300"
+               value="{{ old.portfolio_url or '' }}" placeholder="https://">
+      </div>
+
+      <div class="field">
+        <label for="j-github" data-i18n="jobs.f.github">GitHub</label>
+        <input id="j-github" name="github_url" type="url" maxlength="300"
+               value="{{ old.github_url or '' }}" placeholder="https://github.com/">
+      </div>
+
+      <div class="field">
+        <label for="j-msg"><span data-i18n="jobs.f.msg">О себе</span> <span class="req" aria-hidden="true">*</span></label>
+        <textarea id="j-msg" name="message" rows="5" required maxlength="3000"
+                  data-i18n-ph="jobs.f.msg.ph"
+                  placeholder="Что уже делали, чем хотите заниматься, сколько времени готовы уделять">{{ old.message or '' }}</textarea>
+        {% if errors.message %}<p class="err" role="alert">{{ errors.message }}</p>{% endif %}
+      </div>
+
+      <button class="btn btn-solid btn-block" type="submit" data-i18n="jobs.f.submit">Отправить отклик</button>
+      <p class="form-note" data-i18n="jobs.f.note">Данные видит только студия. Никому не передаём и не публикуем.</p>
+    </form>
+  </div>
+</section>
+
+</main>
+{% endblock %}

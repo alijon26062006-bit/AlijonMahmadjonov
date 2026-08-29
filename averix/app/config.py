@@ -29,6 +29,10 @@ SECURE_COOKIES = _flag("AVERIX_SECURE_COOKIES", True)
 ALLOW_INSECURE = _flag("AVERIX_ALLOW_INSECURE", False)
 DEBUG = _flag("AVERIX_DEBUG", False)
 
+# Адрес сайта нужен для canonical и og-тегов. На сервере задаётся
+# в systemd, чтобы смена домена не требовала правки кода.
+SITE_URL = os.environ.get("AVERIX_SITE_URL", "https://averix.dev").rstrip("/")
+
 SESSION_COOKIE = "averix_session"
 SESSION_HOURS = 12
 

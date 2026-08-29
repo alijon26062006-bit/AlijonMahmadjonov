@@ -1,0 +1,69 @@
+{% extends "public/base.html" %}
+{% block title %}Проекты — AVERIX{% endblock %}
+{% block description %}Работы студии AVERIX: сайты, лендинги, Telegram-боты и сервисы. Каждый кейс — задача, решение и результат.{% endblock %}
+{% block body %}
+
+<main id="main">
+
+<section class="page-head">
+  <div class="shell">
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[01]</span>
+        <span class="label" data-i18n="work.label">Избранные проекты</span>
+      </div>
+      <h1 class="r" data-i18n="projects.h1">Проекты</h1>
+      <p class="lede r d1" data-i18n="projects.lede">Здесь только то, что действительно сделано и запущено. Каждый кейс — с задачей, решением и результатом.</p>
+    </div>
+
+    {% if filters %}
+    <nav class="filters r d1" aria-label="Фильтр по типу проекта">
+      <a class="chip{% if not active %} on{% endif %}" href="/projects"
+         {% if not active %}aria-current="true"{% endif %} data-i18n="projects.all">Все</a>
+      {% for key, label in filters.items() %}
+      <a class="chip{% if active == key %} on{% endif %}" href="/projects?category={{ key }}"
+         {% if active == key %}aria-current="true"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section section-tight">
+  <div class="shell">
+    {% if projects %}
+    <div class="grid-cases">
+      {% for p in projects %}
+      <article class="tile glass r">
+        <a class="tile-shot" href="/projects/{{ p.slug }}" tabindex="-1" aria-hidden="true">
+          {% if p.cover %}
+          <img src="/uploads/{{ p.cover }}" alt="" loading="lazy" decoding="async"
+               width="{{ p.cover_w or 1200 }}" height="{{ p.cover_h or 800 }}">
+          {% else %}<span class="case-none">{{ p.title }}</span>{% endif %}
+        </a>
+        <div class="tile-body">
+          <p class="case-meta">{{ p.category_label }}{% if p.year %} · {{ p.year }}{% endif %}</p>
+          <h2><a href="/projects/{{ p.slug }}">{{ p.title }}</a></h2>
+          {% if p.excerpt %}<p class="case-text">{{ p.excerpt }}</p>{% endif %}
+          {% if p.tech %}
+          <ul class="tags">{% for t in p.tech[:5] %}<li>{{ t }}</li>{% endfor %}</ul>
+          {% endif %}
+          <a class="link-more" href="/projects/{{ p.slug }}">
+            <span data-i18n="work.more">Смотреть кейс</span> <i aria-hidden="true">↗</i>
+          </a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty glass r">
+      <p class="mono" data-i18n="projects.empty.t">ПОКА ПУСТО</p>
+      <p data-i18n="projects.empty.p">В этом разделе ещё нет опубликованных работ. Загляните позже — или напишите, и обсудим ваш проект.</p>
+      <a class="btn btn-solid" href="/#final" data-i18n="cta.discuss">Обсудить проект</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+</main>
+{% endblock %}

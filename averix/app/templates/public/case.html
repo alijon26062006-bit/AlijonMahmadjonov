@@ -1,0 +1,159 @@
+{% extends "public/base.html" %}
+{% block title %}{{ p.seo_title or p.title }} — AVERIX{% endblock %}
+{% block description %}{{ p.seo_description or p.excerpt or p.title }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_image %}{% if p.og_image %}{{ site_url }}/uploads/{{ p.og_image }}{% elif p.cover %}{{ site_url }}/uploads/{{ p.cover }}{% else %}{{ site_url }}/og.png{% endif %}{% endblock %}
+{% block robots %}{% if not p.allow_indexing %}<meta name="robots" content="noindex, follow">{% endif %}{% endblock %}
+{% block head_extra %}
+<script type="application/ld+json">
+{{ {
+  "@context": "https://schema.org",
+  "@type": "CreativeWork",
+  "name": p.title,
+  "description": p.excerpt or p.title,
+  "url": site_url ~ "/projects/" ~ p.slug,
+  "inLanguage": lang,
+  "creator": {"@type": "Organization", "name": "AVERIX", "url": site_url}
+} | tojson }}
+</script>
+{% endblock %}
+{% block body %}
+
+<main id="main">
+
+<article class="case-page">
+
+  <header class="page-head">
+    <div class="shell">
+      <nav class="crumbs" aria-label="Хлебные крошки">
+        <a href="/" data-i18n="crumb.home">Главная</a>
+        <span aria-hidden="true">/</span>
+        <a href="/projects" data-i18n="nav.projects">Проекты</a>
+      </nav>
+
+      <div class="head">
+        <div class="head-row">
+          <span class="tag-n">{{ p.category_label }}</span>
+          {% if p.year %}<span class="label">{{ p.year }}</span>{% endif %}
+        </div>
+        <h1 class="r">{{ p.title }}</h1>
+        {% if p.excerpt %}<p class="lede r d1">{{ p.excerpt }}</p>{% endif %}
+      </div>
+
+      {% if p.project_url or p.github_url or p.tech %}
+      <div class="case-facts glass r d1">
+        {% if p.tech %}
+        <div class="fact">
+          <span class="fact-k" data-i18n="case.stack">Стек</span>
+          <ul class="tags">{% for t in p.tech %}<li>{{ t }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        {% if p.project_url %}
+        <div class="fact">
+          <span class="fact-k" data-i18n="case.live">Сайт</span>
+          <a class="link-more" href="{{ p.project_url }}" target="_blank" rel="noopener nofollow">
+            <span data-i18n="case.open">Открыть</span> <i aria-hidden="true">↗</i>
+          </a>
+        </div>
+        {% endif %}
+        {% if p.github_url %}
+        <div class="fact">
+          <span class="fact-k">GitHub</span>
+          <a class="link-more" href="{{ p.github_url }}" target="_blank" rel="noopener nofollow">
+            <span data-i18n="case.code">Исходники</span> <i aria-hidden="true">↗</i>
+          </a>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </header>
+
+  {% if p.cover %}
+  <div class="shell">
+    <figure class="case-hero glass r">
+      <img src="/uploads/{{ p.cover }}" alt="{{ p.title }}" decoding="async"
+           width="{{ p.cover_w or 1600 }}" height="{{ p.cover_h or 1000 }}">
+    </figure>
+  </div>
+  {% endif %}
+
+  <section class="section section-tight">
+    <div class="shell case-text-col">
+
+      {% if p.task %}
+      <div class="case-block r">
+        <h2><span class="tag-n">01</span> <span data-i18n="case.task">Задача</span></h2>
+        {% for para in p.task.split('\n') %}{% if para.strip() %}<p>{{ para }}</p>{% endif %}{% endfor %}
+      </div>
+      {% endif %}
+
+      {% if p.solution %}
+      <div class="case-block r">
+        <h2><span class="tag-n">02</span> <span data-i18n="case.solution">Решение</span></h2>
+        {% for para in p.solution.split('\n') %}{% if para.strip() %}<p>{{ para }}</p>{% endif %}{% endfor %}
+      </div>
+      {% endif %}
+
+      {% if p.features %}
+      <div class="case-block r">
+        <h2><span class="tag-n">03</span> <span data-i18n="case.features">Что внутри</span></h2>
+        <ul class="ticks">
+          {% for line in p.features.split('\n') %}{% if line.strip() %}<li>{{ line.strip() }}</li>{% endif %}{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if p.result %}
+      <div class="case-block r">
+        <h2><span class="tag-n">04</span> <span data-i18n="case.result">Результат</span></h2>
+        {% for para in p.result.split('\n') %}{% if para.strip() %}<p>{{ para }}</p>{% endif %}{% endfor %}
+      </div>
+      {% endif %}
+
+      {% if p.body %}
+      <div class="case-block r">
+        {% for para in p.body.split('\n') %}{% if para.strip() %}<p>{{ para }}</p>{% endif %}{% endfor %}
+      </div>
+      {% endif %}
+
+    </div>
+  </section>
+
+  {% if p.gallery|length > 1 %}
+  <section class="section section-tight">
+    <div class="shell">
+      <div class="case-gallery">
+        {% for img in p.gallery %}
+        {% if img.filename != p.cover %}
+        <figure class="glass r">
+          <img src="/uploads/{{ img.filename }}" alt="{{ img.alt }}" loading="lazy" decoding="async"
+               width="{{ img.width or 1200 }}" height="{{ img.height or 800 }}">
+          {% if img.alt %}<figcaption>{{ img.alt }}</figcaption>{% endif %}
+        </figure>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="section section-tight">
+    <div class="shell case-foot">
+      {% if next_project %}
+      <a class="next-case glass r" href="/projects/{{ next_project.slug }}">
+        <span class="mono" data-i18n="case.next">СЛЕДУЮЩИЙ ПРОЕКТ</span>
+        <strong>{{ next_project.title }} <i aria-hidden="true">→</i></strong>
+      </a>
+      {% endif %}
+      <div class="case-cta r d1">
+        <p>{{ s.cta_title }}</p>
+        <a class="btn btn-solid" href="/#final" data-i18n="cta.discuss">Обсудить проект</a>
+      </div>
+    </div>
+  </section>
+
+</article>
+
+</main>
+{% endblock %}

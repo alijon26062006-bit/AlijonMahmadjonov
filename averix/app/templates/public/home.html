@@ -1,0 +1,446 @@
+{% extends "public/base.html" %}
+{% block title %}AVERIX — цифровые продукты, созданные под задачу{% endblock %}
+{% block description %}{{ s.hero_subtitle }}{% endblock %}
+{% block body %}
+<main id="main">
+
+<!-- ============ ПЕРВЫЙ ЭКРАН ============ -->
+<section class="hero" id="top">
+  <div class="bloom" aria-hidden="true"></div>
+  <div class="shell">
+    <p class="label r">{{ s.hero_eyebrow }}</p>
+    <h1 class="r d1">{{ s.hero_title | safe }}</h1>
+    <p class="hero-sub r d2">{{ s.hero_subtitle }}</p>
+    <div class="hero-cta r d3">
+      <a class="btn btn-solid" href="#final" data-i18n="cta.discuss">Обсудить проект</a>
+      <a class="btn btn-line" href="/projects" data-i18n="cta.projects">Смотреть проекты</a>
+    </div>
+
+    <dl class="stats glass r d3">
+      <div>
+        <b><span class="num" data-count="{{ s.stat_years }}">{{ s.stat_years }}</span> <span data-i18n="stats.years">года</span></b>
+        <span data-i18n="stats.years.note">пишу код каждый день</span>
+      </div>
+      <div>
+        <b><span class="num" data-count="{{ s.stat_active }}">{{ s.stat_active }}</span></b>
+        <span data-i18n="stats.active">проекта в работе прямо сейчас</span>
+      </div>
+      <div>
+        <b><span class="num" data-count="{{ s.stat_accepted }}">{{ s.stat_accepted }}</span> %</b>
+        <span data-i18n="stats.happy">клиентов приняли работу</span>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<!-- ============ [01] ИЗБРАННЫЕ ПРОЕКТЫ ============ -->
+{% if featured %}
+<section class="section" id="work">
+  <div class="shell">
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[01]</span>
+        <span class="label" data-i18n="work.label">Избранные проекты</span>
+      </div>
+      <h2 class="r" data-i18n="work.h2">Работы, которые лучше всего показывают подход</h2>
+    </div>
+
+    <div class="cases">
+      {% for p in featured %}
+      <article class="case glass r{% if loop.index is even %} flip{% endif %}">
+        <a class="case-shot" href="/projects/{{ p.slug }}" tabindex="-1" aria-hidden="true">
+          {% if p.cover %}
+          <img src="/uploads/{{ p.cover }}" alt="" loading="lazy" decoding="async"
+               width="{{ p.cover_w or 1200 }}" height="{{ p.cover_h or 800 }}">
+          {% else %}<span class="case-none">{{ p.title }}</span>{% endif %}
+        </a>
+        <div class="case-body">
+          <p class="case-meta">{{ p.category_label }}{% if p.year %} · {{ p.year }}{% endif %}</p>
+          <h3><a href="/projects/{{ p.slug }}">{{ p.title }}</a></h3>
+          {% if p.excerpt %}<p class="case-text">{{ p.excerpt }}</p>{% endif %}
+          {% if p.tech %}
+          <ul class="tags">{% for t in p.tech %}<li>{{ t }}</li>{% endfor %}</ul>
+          {% endif %}
+          <a class="link-more" href="/projects/{{ p.slug }}">
+            <span data-i18n="work.more">Смотреть кейс</span> <i aria-hidden="true">↗</i>
+          </a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+
+    <p class="note-line r" style="margin-top:var(--s4)">
+      <a href="/projects" data-i18n="work.all">Все проекты →</a>
+    </p>
+  </div>
+</section>
+{% endif %}
+
+<!-- ============ [02] КТО Я ============ -->
+<section class="section" id="who">
+  <div class="shell">
+    <div class="who">
+      <div class="photo r">
+        <picture>
+          <source srcset="/img/alijon.webp" type="image/webp">
+          <img src="/img/alijon.jpg" width="760" height="912"
+               alt="Алиджон Махмаджонов, основатель студии AVERIX" loading="lazy" decoding="async">
+        </picture>
+        <p class="photo-meta glass">
+          <span class="dot" aria-hidden="true"></span>
+          <span data-i18n="who.open">Открыт для новых проектов</span>
+        </p>
+      </div>
+
+      <div class="who-copy">
+        <div class="head-row">
+          <span class="tag-n">[01]</span>
+          <span class="label" data-i18n="who.label">Кто делает</span>
+        </div>
+        <h2 class="r" data-i18n="who.h2">Меня зовут <em>Алиджон</em></h2>
+        <p class="who-role r" data-i18n="who.role">основатель AVERIX · веб-разработчик · Душанбе</p>
+
+        <p class="body r d1" data-i18n="who.p1">
+          Мне 19, и три года из них я пишу код каждый день. Начинал с Python и ботов,
+          сейчас делаю сайты: от одностраничника до корпоративного.
+        </p>
+        <p class="body r d1" data-i18n="who.p2">
+          Я не беру шаблон и не натягиваю на него ваш логотип. Каждый проект собирается
+          с нуля — так дольше, зато сайт грузится быстро, его можно развивать, и он
+          не разваливается при первой же правке.
+        </p>
+        <p class="body r d2" data-i18n="who.p3">
+          Работаю прямо: если задача мне не по силам или сроки нереальные — скажу
+          на первом созвоне, а не после предоплаты.
+        </p>
+
+        <ul class="tags r d2" aria-label="Технологии">
+          <li>HTML</li><li>CSS</li><li>JavaScript</li><li>TypeScript</li>
+          <li>React</li><li>Next.js</li><li>Python</li><li>PostgreSQL</li>
+          <li>Nginx</li><li>Git</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ [03] УСЛУГИ ============ -->
+<section class="section" id="services">
+  <div class="shell">
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[03]</span>
+        <span class="label" data-i18n="services.label">Услуги</span>
+      </div>
+      <h2 class="r" data-i18n="services.h2">Что мы делаем</h2>
+      <p class="lede r d1" data-i18n="services.lede">
+        Три направления. Всё остальное обсуждаем отдельно — и честно говорим,
+        беремся или нет.
+      </p>
+    </div>
+
+    <div class="cards">
+      <article class="card glass r">
+        <div class="card-ico"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9.5h18M7 13.5h7M7 16.5h10"/></svg></div>
+        <span class="card-n">01</span>
+        <h3 data-i18n="svc1.h">Web Development</h3>
+        <p data-i18n="svc1.p">Лендинги, корпоративные сайты, веб-сервисы и индивидуальные веб-приложения.</p>
+        <ul class="ticks">
+          <li data-i18n="svc1.l1">Прототип, текст и дизайн</li>
+          <li data-i18n="svc1.l2">Вёрстка под все экраны</li>
+          <li data-i18n="svc1.l3">Подключение домена и SSL</li>
+          <li data-i18n="svc1.l4">Панель для правок текста</li>
+        </ul>
+      </article>
+
+      <article class="card glass r">
+        <div class="card-ico"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 4L2.5 11.2l6 2.1 2.1 6L21 4zM8.5 13.3L21 4"/></svg></div>
+        <span class="card-n">02</span>
+        <h3 data-i18n="svc2.h">Telegram Bots</h3>
+        <p data-i18n="svc2.p">Боты с оплатой, автоматизацией, админ-панелями и интеграциями через API.</p>
+        <ul class="ticks">
+          <li data-i18n="svc2.l1">Приём заказов и запись</li>
+          <li data-i18n="svc2.l2">Оплата и уведомления</li>
+          <li data-i18n="svc2.l3">Админка для управления</li>
+          <li data-i18n="svc2.l4">Рассылки и статистика</li>
+        </ul>
+      </article>
+
+      <article class="card glass r">
+        <div class="card-ico"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
+        <span class="card-n">03</span>
+        <h3 data-i18n="svc3.h">Backend и API</h3>
+        <p data-i18n="svc3.p">Серверная часть, базы данных, REST API и интеграции сторонних сервисов.</p>
+        <ul class="ticks">
+          <li data-i18n="svc3.l1">Проектирование базы</li>
+          <li data-i18n="svc3.l2">REST API и документация</li>
+          <li data-i18n="svc3.l3">Интеграции с чужими сервисами</li>
+          <li data-i18n="svc3.l4">Перенос и миграции данных</li>
+        </ul>
+      </article>
+
+      <article class="card glass r">
+        <div class="card-ico"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.4v2.4M12 18.2v2.4M3.4 12h2.4M18.2 12h2.4M5.9 5.9l1.7 1.7M16.4 16.4l1.7 1.7M18.1 5.9l-1.7 1.7M7.6 16.4l-1.7 1.7"/><circle cx="12" cy="12" r="3.3"/></svg></div>
+        <span class="card-n">04</span>
+        <h3 data-i18n="svc4.h">Automation</h3>
+        <p data-i18n="svc4.p">Автоматизация повторяющихся процессов и внутренних задач бизнеса.</p>
+        <ul class="ticks">
+          <li data-i18n="svc4.l1">Сбор и разбор данных</li>
+          <li data-i18n="svc4.l2">Отчёты по расписанию</li>
+          <li data-i18n="svc4.l3">Связка сервисов между собой</li>
+          <li data-i18n="svc4.l4">Уведомления в мессенджеры</li>
+        </ul>
+      </article>
+
+      <article class="card glass r">
+        <div class="card-ico"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v3M12 18v3M5.6 5.6l2 2M16.4 16.4l2 2M3 12h3M18 12h3"/><rect x="8.5" y="8.5" width="7" height="7" rx="2"/></svg></div>
+        <span class="card-n">05</span>
+        <h3 data-i18n="svc5.h">AI Integration</h3>
+        <p data-i18n="svc5.p">Встраивание AI в сайты, сервисы и Telegram-боты — там, где это решает задачу.</p>
+        <ul class="ticks">
+          <li data-i18n="svc5.l1">Обработка текста и заявок</li>
+          <li data-i18n="svc5.l2">Поиск по своим данным</li>
+          <li data-i18n="svc5.l3">Помощник в боте</li>
+          <li data-i18n="svc5.l4">Разбор документов</li>
+        </ul>
+      </article>
+    </div>
+
+    <p class="note-line r" data-i18n="services.note">
+      Задачи за рамками этих направлений тоже обсуждаю — напишите,
+      и я честно скажу, берусь или нет.
+    </p>
+
+    <div class="price glass r">
+      <h3 data-i18n="price.h">Из чего складывается цена</h3>
+      <p data-i18n="price.p">
+        Единого прайса нет: лендинг на пять блоков и сайт с каталогом — разная работа.
+        Но считаем всегда по одним и тем же вещам, и расчёт вы видите до старта.
+      </p>
+      <dl class="price-list">
+        <div>
+          <dt>A</dt>
+          <dd><strong data-i18n="price.a.h">Объём</strong><span data-i18n="price.a.p">Сколько страниц и уникальных блоков. Главный множитель.</span></dd>
+        </div>
+        <div>
+          <dt>B</dt>
+          <dd><strong data-i18n="price.b.h">Функции</strong><span data-i18n="price.b.p">Форма — просто. Каталог, кабинет, оплата — отдельная работа.</span></dd>
+        </div>
+        <div>
+          <dt>C</dt>
+          <dd><strong data-i18n="price.c.h">Контент</strong><span data-i18n="price.c.p">Есть тексты и фото — быстрее. Пишем мы — дольше.</span></dd>
+        </div>
+      </dl>
+      <div class="price-foot">
+        <p data-i18n="price.foot">Напишите, что нужно, — в течение дня пришлём расчёт по этим трём пунктам и срок. Бесплатно и ни к чему не обязывает.</p>
+        <a class="btn btn-solid btn-sm" href="#final" data-i18n="cta.calc">Получить расчёт</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ [04] ПРОЦЕСС ============ -->
+<section class="section" id="process">
+  <div class="shell">
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[04]</span>
+        <span class="label" data-i18n="process.label">Процесс</span>
+      </div>
+      <h2 class="r" data-i18n="process.h2">Как идёт работа</h2>
+      <p class="lede r d1" data-i18n="process.lede">
+        Шесть шагов. После каждого вы видите результат и решаете, идём дальше или нет.
+        Оплата — по этапам, а не вперёд за всё.
+      </p>
+    </div>
+
+    <ol class="steps">
+      <li class="glass r">
+        <span class="step-n">01 / 06</span>
+        <div>
+          <h3 data-i18n="step1.h">Знакомство</h3>
+          <p data-i18n="step1.p">Разбираем задачу, цели и ограничения. Выясняю, кто ваш клиент и что он должен сделать на сайте.</p>
+        </div>
+        <span class="step-out" data-i18n="step1.out">→ список страниц и блоков</span>
+      </li>
+      <li class="glass r">
+        <span class="step-n">02 / 06</span>
+        <div>
+          <h3 data-i18n="step2.h">Проектирование</h3>
+          <p data-i18n="step2.p">Продумываю структуру, экраны и техническое решение. Текст пишем вместе.</p>
+        </div>
+        <span class="step-out" data-i18n="step2.out">→ структура, согласованная до дизайна</span>
+      </li>
+      <li class="glass r">
+        <span class="step-n">03 / 06</span>
+        <div>
+          <h3 data-i18n="step3.h">Разработка</h3>
+          <p data-i18n="step3.p">Собираю интерфейс и серверную часть, подключаю нужные интеграции.</p>
+        </div>
+        <span class="step-out" data-i18n="step3.out">→ рабочая версия на тестовом адресе</span>
+      </li>
+      <li class="glass r">
+        <span class="step-n">04 / 06</span>
+        <div>
+          <h3 data-i18n="step4.h">Тестирование</h3>
+          <p data-i18n="step4.p">Проверяю функции, адаптив, скорость и сценарии на реальных устройствах.</p>
+        </div>
+        <span class="step-out" data-i18n="step4.out">→ список правок и их закрытие</span>
+      </li>
+      <li class="glass r">
+        <span class="step-n">05 / 06</span>
+        <div>
+          <h3 data-i18n="step5.h">Запуск</h3>
+          <p data-i18n="step5.p">Подключаю домен и SSL, ставлю аналитику, проверяю формы в бою.</p>
+        </div>
+        <span class="step-out" data-i18n="step5.out">→ продукт в работе, доступы у вас</span>
+      </li>
+      <li class="glass r">
+        <span class="step-n">06 / 06</span>
+        <div>
+          <h3 data-i18n="step6.h">Развитие</h3>
+          <p data-i18n="step6.p">При необходимости продолжаю улучшать и масштабировать.</p>
+        </div>
+        <span class="step-out" data-i18n="step6.out">→ поддержка по договорённости</span>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ [05] О СТУДИИ ============ -->
+<section class="section" id="about">
+  <div class="shell">
+    <div class="about">
+      <div class="about-copy">
+        <div class="head-row">
+          <span class="tag-n">[05]</span>
+          <span class="label" data-i18n="about.label">О студии</span>
+        </div>
+        <h2 class="r">AVERIX</h2>
+        <p class="lede r d1">{{ s.about_text }}</p>
+        <p class="about-idea r d1" data-i18n="about.idea">
+          В основе простой принцип: <em>идея → разработка → результат</em>.
+        </p>
+      </div>
+
+      <ul class="about-mark r d1" aria-label="Три части знака AVERIX">
+        <li>
+          <span class="about-bar" data-part="idea" aria-hidden="true"></span>
+          <b>IDEA</b><span data-i18n="about.idea.t">Разбираем задачу и решаем, что вообще нужно строить</span>
+        </li>
+        <li>
+          <span class="about-bar" data-part="dev" aria-hidden="true"></span>
+          <b>DEVELOPMENT</b><span data-i18n="about.dev.t">Проектируем, собираем и проверяем на реальных устройствах</span>
+        </li>
+        <li>
+          <span class="about-bar" data-part="result" aria-hidden="true"></span>
+          <b>RESULT</b><span data-i18n="about.res.t">Запускаем и передаём все доступы и исходники</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ [06] ВОПРОСЫ И ЗАЯВКА ============ -->
+<section class="section" id="final">
+  <div class="shell">
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[06]</span>
+        <span class="label" data-i18n="final.label">Вопросы и заявка</span>
+      </div>
+      <h2 class="r" data-i18n="final.h2">Расскажите, что нужно</h2>
+    </div>
+
+    <div class="final">
+      <div class="faq r">
+        <details class="glass">
+          <summary><span data-i18n="faq1.q">Сколько правок входит в работу?</span><span class="chev" aria-hidden="true"></span></summary>
+          <div class="faq-body"><p data-i18n="faq1.a">Правки внутри согласованной структуры — сколько нужно, пока не устроит. Отдельно считается только смена самой задачи: например, вместо лендинга решили делать магазин. Об этом предупредим сразу, а не в счёте.</p></div>
+        </details>
+        <details class="glass">
+          <summary><span data-i18n="faq2.q">Что нужно от меня, чтобы начать?</span><span class="chev" aria-hidden="true"></span></summary>
+          <div class="faq-body"><p data-i18n="faq2.a">Минимум: чем занимаетесь и что должен сделать посетитель на сайте. Всё остальное — тексты, фото, структуру — вытащим из вас вопросами на первом этапе. Логотипа и брендбука для старта не требуется.</p></div>
+        </details>
+        <details class="glass">
+          <summary><span data-i18n="faq3.q">Сколько это занимает по времени?</span><span class="chev" aria-hidden="true"></span></summary>
+          <div class="faq-body"><p data-i18n="faq3.a">Срок называем после разбора задачи, вместе с расчётом. Он зависит от объёма и от того, как быстро приходят ответы и материалы с вашей стороны — обычно это и есть главная задержка, а не сборка.</p></div>
+        </details>
+        <details class="glass">
+          <summary><span data-i18n="faq4.q">Сайт останется у меня, если мы перестанем работать?</span><span class="chev" aria-hidden="true"></span></summary>
+          <div class="faq-body"><p data-i18n="faq4.a">Да. Домен регистрируется на вас, исходный код и все доступы передаём после запуска. Никакой привязки к нашему хостингу или аккаунтам — сайт можно забрать и вести самому или с кем угодно.</p></div>
+        </details>
+        <details class="glass">
+          <summary><span data-i18n="faq5.q">Работаете только по Душанбе?</span><span class="chev" aria-hidden="true"></span></summary>
+          <div class="faq-body"><p data-i18n="faq5.a">Нет. Вся работа идёт в переписке и созвонах, поэтому город не важен. Просто мы отсюда, и по Душанбе можем встретиться лично, если так удобнее.</p></div>
+        </details>
+      </div>
+
+      <div>
+        <ul class="contact-alt r">
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 4L2.5 11.2l6 2.1 2.1 6L21 4zM8.5 13.3L21 4"/></svg>
+            <a href="{{ tg_url }}" target="_blank" rel="noopener">@{{ s.contact_telegram }}</a>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 6.5L12 13l9.5-6.5"/></svg>
+            <a href="mailto:{{ s.contact_email }}">{{ s.contact_email }}</a>
+          </li>
+        </ul>
+
+        <form class="form glass r d1" id="request-form" method="post" action="/request" novalidate>
+          <input type="hidden" name="lang" value="{{ lang }}">
+          <div class="hp" aria-hidden="true">
+            <label for="f-site">Не заполняйте это поле</label>
+            <input id="f-site" name="website" type="text" tabindex="-1" autocomplete="off">
+          </div>
+
+          <div class="field">
+            <label for="f-name"><span data-i18n="form.name">Как к вам обращаться</span> <span class="req" aria-hidden="true">*</span></label>
+            <input id="f-name" name="name" type="text" autocomplete="name" required maxlength="100"
+                   value="{{ old.name or '' }}" data-i18n-ph="form.name.ph" placeholder="Например, Фаррух">
+            {% if errors.name %}<p class="err" role="alert">{{ errors.name }}</p>{% endif %}
+          </div>
+
+          <div class="field">
+            <label for="f-contact"><span data-i18n="form.contact">Telegram или телефон</span> <span class="req" aria-hidden="true">*</span></label>
+            <input id="f-contact" name="contact" type="text" autocomplete="tel" required maxlength="120"
+                   value="{{ old.contact or '' }}" placeholder="@username / +992 …">
+            <p class="hint" data-i18n="form.contact.hint">куда прислать расчёт</p>
+            {% if errors.contact %}<p class="err" role="alert">{{ errors.contact }}</p>{% endif %}
+          </div>
+
+          <div class="field">
+            <label for="f-type" data-i18n="form.type">Что нужно</label>
+            <select id="f-type" name="project_type">
+              {% for key, label in request_types.items() %}
+              <option value="{{ key }}"{% if old.project_type == key %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="f-budget" data-i18n="form.budget">Бюджет</label>
+            <input id="f-budget" name="budget" type="text" maxlength="80"
+                   value="{{ old.budget or '' }}" data-i18n-ph="form.budget.ph" placeholder="не обязательно">
+          </div>
+
+          <div class="field">
+            <label for="f-task"><span data-i18n="form.task">Что нужно сделать</span> <span class="req" aria-hidden="true">*</span></label>
+            <textarea id="f-task" name="message" rows="4" required maxlength="3000"
+                      data-i18n-ph="form.task.ph"
+                      placeholder="Пара предложений: чем занимаетесь и что должен делать сайт">{{ old.message or '' }}</textarea>
+            {% if errors.message %}<p class="err" role="alert">{{ errors.message }}</p>{% endif %}
+          </div>
+
+          <button class="btn btn-solid btn-block" type="submit" data-i18n="form.submit">Отправить заявку</button>
+          {% if errors.form %}<p class="err" role="alert" style="text-align:center">{{ errors.form }}</p>{% endif %}
+          <p class="form-note" data-i18n="form.note">отвечу в течение дня в Telegram или на почту</p>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+{% endblock %}
