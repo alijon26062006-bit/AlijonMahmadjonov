@@ -274,7 +274,17 @@ a{color:var(--violet)}
    Первый экран
    ============================================================ */
 .hero{position:relative; padding:var(--s6) 0 var(--s5)}
-.hero h1{margin-top:var(--s3); font-size:clamp(2.1rem,6.4vw,3.9rem); line-height:1.08; max-width:16ch}
+@media (max-width:699px){
+  /* Меньше воздуха там, где его негде взять: под шапкой и перед цифрами */
+  .hero{padding-top:var(--s5)}
+  .hero .stats{margin-top:var(--s4)}
+  .hero-cta{margin-top:var(--s3)}
+}
+/* Ограничение в 16 знаков нужно широкому экрану, чтобы строка
+   не растянулась через весь монитор. На телефоне оно только режет
+   заголовок на пять строк вместо трёх — там ширины и так в обрез. */
+.hero h1{margin-top:var(--s3); font-size:clamp(2.1rem,6.4vw,3.9rem); line-height:1.08}
+@media (min-width:700px){ .hero h1{max-width:16ch} }
 .hero-sub{margin-top:var(--s3); max-width:52ch; font-size:clamp(1rem,2.1vw,1.16rem); color:var(--muted)}
 .hero-cta{display:flex; flex-wrap:wrap; gap:var(--s2); margin-top:var(--s4)}
 
@@ -801,14 +811,37 @@ a{color:var(--violet)}
 }
 .case-cta p{font-family:var(--display); font-size:clamp(1.2rem,3vw,1.6rem); line-height:1.2; max-width:26ch}
 
+/* Три правила — три коротких утверждения в ряд. Стекло и рамка тут
+   ничего не добавляли: содержание короткое, и коробка вокруг него
+   только утяжеляла. Верхняя черта делит колонки не хуже. */
+.rule{padding-top:var(--s3); border-top:1px solid var(--glass-brd)}
+.rule-n{
+  font-family:var(--mono); font-size:.76rem; color:var(--violet);
+  letter-spacing:.1em; font-variant-numeric:tabular-nums;
+}
+.rule h3{margin-top:.6rem; font-size:1.05rem; line-height:1.25}
+.rule p{margin-top:.5rem; color:var(--muted); font-size:.94rem}
+
 /* ============================================================
    Команда
    ============================================================ */
+/* Пока в студии один человек, сетка выглядела сломанной: карточка
+   в 280px висела одна слева, а справа оставалось 900px пустоты.
+   Один человек — это не «неполная сетка», а отдельная композиция:
+   фотография и рассказ рядом, как разворот. Двое и больше — сетка. */
 .people{display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
 @media (min-width:900px){
-  /* пока в студии один человек, карточка не должна растягиваться
-     на весь экран — иначе это читается как сломанная вёрстка */
-  .people{grid-template-columns:repeat(auto-fill,minmax(280px,360px))}
+  .people{grid-template-columns:repeat(auto-fill,minmax(280px,340px))}
+  .people:has(.person:only-child){grid-template-columns:1fr}
+  .people:has(.person:only-child) .person{
+    grid-template-columns:minmax(0,320px) 1fr;
+    display:grid; gap:0 var(--s5); align-items:center;
+    background:none; border:0; box-shadow:none; backdrop-filter:none;
+  }
+  .people:has(.person:only-child) .person-shot{border-radius:var(--r-lg)}
+  .people:has(.person:only-child) .person-body{padding:0}
+  .people:has(.person:only-child) .person-body h3{font-size:clamp(1.5rem,3.4vw,2.1rem)}
+  .people:has(.person:only-child) .person-body .case-text{font-size:1.02rem; max-width:52ch}
 }
 .person{display:flex; flex-direction:column; overflow:hidden; border-radius:var(--r-lg)}
 .person-shot{position:relative; aspect-ratio:5/6; background:rgba(255,255,255,.03); overflow:hidden}
