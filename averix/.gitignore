@@ -5,3 +5,8 @@ __pycache__/
 data/
 *.db
 config.env
+
+# Куки-файлы от curl при отладке входа: внутри лежит живой токен сессии
+*.cookies
+cookies.txt
+k.txt

@@ -51,6 +51,59 @@ else
   git -C "$CLONE_DIR" log --oneline "$BEFORE..$AFTER" | sed 's/^/  /'
 fi
 
-# статика отдаётся напрямую, перезагрузка нужна только если менялся конфиг
-nginx -t >/dev/null 2>&1 && systemctl reload nginx
+# ------------------------------------------------------------
+# Конфиг nginx лежит в репозитории, а работает его копия в /etc.
+# Если в этом обновлении шаблон изменился, копию нужно пересобрать:
+# иначе сайт останется на старых правилах и, например, перестанет
+# открываться главная.
+# ------------------------------------------------------------
+NGINX_SITE="/etc/nginx/sites-available/averix"
+TEMPLATE="$CLONE_DIR/averix/deploy/nginx.conf"
+
+nginx_needs_update() {
+  [ -f "$NGINX_SITE" ] || return 1
+  # правила, которых нет в старой версии, — признак устаревшей копии
+  grep -q "location @app" "$NGINX_SITE" || return 0
+  [ "$BEFORE" != "$AFTER" ] \
+    && git -C "$CLONE_DIR" diff --name-only "$BEFORE" "$AFTER" \
+       | grep -q "deploy/nginx.conf"
+}
+
+if [ -f "$TEMPLATE" ] && nginx_needs_update; then
+  DOMAIN="$(awk '/server_name/ {print $2; exit}' "$NGINX_SITE" | tr -d ';')"
+  SITE_DIR="$CLONE_DIR/averix"
+  BACKUP="/etc/nginx/sites-available/averix.before-update"
+
+  if [ -z "$DOMAIN" ]; then
+    echo "!! Не смог определить домен из $NGINX_SITE — конфиг не трогаю."
+    echo "   Запустите deploy/setup.sh ваш-домен вручную."
+  else
+    echo "Обновляю конфиг nginx для $DOMAIN..."
+    cp -f "$NGINX_SITE" "$BACKUP"
+    sed -e "s|__DOMAIN__|$DOMAIN|g" -e "s|__ROOT__|$SITE_DIR|g" \
+        -e "s|__DATA_DIR__|$DATA_DIR|g" "$TEMPLATE" > "$NGINX_SITE"
+
+    # Строки с сертификатом добавляет certbot прямо в этот файл,
+    # и пересборка их стирает. Возвращаем их тем же certbot —
+    # новый сертификат при этом не выпускается.
+    if [ -d "/etc/letsencrypt/live/$DOMAIN" ] && command -v certbot >/dev/null; then
+      certbot install --nginx --cert-name "$DOMAIN" --redirect \
+        --non-interactive >/dev/null 2>&1 \
+        || echo "   !! certbot не вернул HTTPS в конфиг — проверьте вручную"
+    fi
+
+    if nginx -t >/dev/null 2>&1; then
+      systemctl reload nginx
+      echo "   конфиг обновлён, прежний сохранён в $BACKUP"
+    else
+      cp -f "$BACKUP" "$NGINX_SITE"
+      systemctl reload nginx || true
+      echo "   !! Новый конфиг не прошёл проверку — вернул прежний."
+      nginx -t || true
+    fi
+  fi
+else
+  nginx -t >/dev/null 2>&1 && systemctl reload nginx
+fi
+
 echo "Готово."

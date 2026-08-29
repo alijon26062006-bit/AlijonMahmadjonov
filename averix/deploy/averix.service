@@ -1,4 +1,4 @@
-# AVERIX — приложение админки
+# AVERIX — серверная часть сайта
 # Ставится скриптом setup.sh в /etc/systemd/system/averix.service
 
 [Unit]
@@ -12,10 +12,18 @@ Group=www-data
 WorkingDirectory=__SITE_DIR__
 Environment="AVERIX_DATA_DIR=__DATA_DIR__"
 Environment="AVERIX_SECURE_COOKIES=1"
+Environment="AVERIX_SITE_URL=__SITE_URL__"
 Environment="AVERIX_DEBUG=0"
 Environment="PYTHONUNBUFFERED=1"
+# Миграции — отдельным шагом до запуска рабочих процессов: если бы их
+# применяли сами рабочие, два процесса взялись бы за одну миграцию разом.
+ExecStartPre=__VENV__/bin/python -m app.cli migrate
+
+# Два процесса: приложение теперь отдаёт весь сайт, а не только админку,
+# и один рабочий стал бы узким местом. Записей в базу мало, чтения идут
+# параллельно — SQLite в режиме WAL это выдерживает.
 ExecStart=__VENV__/bin/uvicorn app.main:app \
-    --host 127.0.0.1 --port 8001 \
+    --host 127.0.0.1 --port 8001 --workers 2 \
     --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=always
 RestartSec=3

@@ -104,6 +104,7 @@ chmod -R a+rX "$VENV_DIR"
 sed -e "s|__SITE_DIR__|$SITE_DIR|g" \
     -e "s|__DATA_DIR__|$DATA_DIR|g" \
     -e "s|__VENV__|$VENV_DIR|g" \
+    -e "s|__SITE_URL__|https://$DOMAIN|g" \
     "$SITE_DIR/deploy/averix.service" > /etc/systemd/system/averix.service
 systemctl daemon-reload
 systemctl enable --quiet averix
