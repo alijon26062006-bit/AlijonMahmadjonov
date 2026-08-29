@@ -23,8 +23,26 @@ git -C "$CLONE_DIR" fetch --quiet origin "$BRANCH"
 git -C "$CLONE_DIR" reset --hard --quiet "origin/$BRANCH"
 AFTER="$(git -C "$CLONE_DIR" rev-parse --short HEAD)"
 
-chown -R www-data:www-data "$CLONE_DIR/averix"
+# Код принадлежит root, www-data только читает
+chown -R root:root "$CLONE_DIR/averix"
 chmod -R a+rX "$CLONE_DIR/averix"
+
+# Зависимости и миграции — только если что-то изменилось
+VENV_DIR="${VENV_DIR:-/var/www/averix-venv}"
+DATA_DIR="${DATA_DIR:-/var/www/averix-data}"
+if [ -x "$VENV_DIR/bin/pip" ] && [ "$BEFORE" != "$AFTER" ]; then
+  if git -C "$CLONE_DIR" diff --name-only "$BEFORE" "$AFTER" | grep -q "requirements.txt"; then
+    echo "Обновляю зависимости..."
+    "$VENV_DIR/bin/pip" install --quiet -r "$CLONE_DIR/averix/requirements.txt"
+  fi
+fi
+if systemctl list-unit-files averix.service >/dev/null 2>&1; then
+  systemctl restart averix
+  sleep 1
+  systemctl is-active --quiet averix \
+    && echo "Приложение перезапущено." \
+    || echo "!! Приложение не поднялось: journalctl -u averix -n 40"
+fi
 
 if [ "$BEFORE" = "$AFTER" ]; then
   echo "Обновлений нет, версия $AFTER"

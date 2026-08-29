@@ -1,0 +1,36 @@
+{% extends "admin/base.html" %}
+{% block title %}Вход{% endblock %}
+{% block body %}
+<div class="center">
+  <div class="card">
+    <a class="brand" href="/">
+      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+        <polygon points="55,6 69,6 59,27 45,27" fill="#B98CF2"/>
+        <polygon points="42,35 75,35 79,55 38,55" fill="#B98CF2"/>
+        <polygon points="34,63 82,63 86,83 30,83" fill="#3FD98A"/>
+      </svg>
+      <b>AVERI<span>X</span></b>
+    </a>
+
+    <h1>Вход в админку</h1>
+    <p class="sub">Раздел закрыт. Доступ только по паролю.</p>
+
+    {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+    <form method="post" action="/admin/login" autocomplete="on">
+      <input type="hidden" name="lc" value="{{ lc }}">
+      <div class="field">
+        <label for="u">Логин</label>
+        <input id="u" name="username" type="text" autocomplete="username"
+               required autofocus maxlength="100">
+      </div>
+      <div class="field">
+        <label for="p">Пароль</label>
+        <input id="p" name="password" type="password" autocomplete="current-password"
+               required maxlength="200">
+      </div>
+      <button class="block" type="submit">Войти</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

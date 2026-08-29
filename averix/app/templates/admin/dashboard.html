@@ -1,0 +1,52 @@
+{% extends "admin/base.html" %}
+{% block title %}Панель{% endblock %}
+{% block body %}
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="/admin">
+      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+        <polygon points="55,6 69,6 59,27 45,27" fill="#B98CF2"/>
+        <polygon points="42,35 75,35 79,55 38,55" fill="#B98CF2"/>
+        <polygon points="34,63 82,63 86,83 30,83" fill="#3FD98A"/>
+      </svg>
+      <b>AVERI<span>X</span></b>
+    </a>
+    <nav>
+      <a href="/admin" aria-current="page">Панель</a>
+      <a href="/" target="_blank" rel="noopener">Сайт ↗</a>
+    </nav>
+    <form method="post" action="/admin/logout">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="ghost" type="submit">Выйти</button>
+    </form>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1 style="font-size:1.5rem">Панель</h1>
+  <p class="mono" style="margin:.5rem 0 2rem">вход как {{ username }}</p>
+
+  <div class="stats">
+    <div><b>{{ counts.published }}</b><span>опубликовано</span></div>
+    <div><b>{{ counts.draft }}</b><span>черновиков</span></div>
+    <div><b>{{ counts.total }}</b><span>всего проектов</span></div>
+  </div>
+
+  <h2>Последние проекты</h2>
+  {% if latest %}
+  <ul style="list-style:none;padding:0;margin:0">
+    {% for p in latest %}
+    <li style="padding:.9rem 0;border-bottom:1px solid var(--line)">
+      <b>{{ p.title_ru }}</b>
+      <span class="mono"> · {{ p.status }} · {{ p.created_at }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty">
+    <p>Проектов пока нет. Управление проектами появится на следующем этапе —
+       сейчас готовы база данных и вход в панель.</p>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

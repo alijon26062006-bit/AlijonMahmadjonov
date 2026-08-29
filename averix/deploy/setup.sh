@@ -18,6 +18,10 @@ BRANCH="${BRANCH:-}"
 FALLBACK_BRANCH="claude/ui-ux-pro-max-landing-n9y2jh"
 CLONE_DIR="/var/www/averix-repo"
 SITE_DIR="$CLONE_DIR/averix"      # сайт лежит в подпапке репозитория
+# База и загрузки — вне репозитория. Внутри клона они попадали бы под
+# git clean, засоряли git status и рисковали уехать в коммит.
+DATA_DIR="/var/www/averix-data"
+VENV_DIR="/var/www/averix-venv"
 
 die() { echo "Ошибка: $*" >&2; exit 1; }
 say() { echo; echo "==> $*"; }
@@ -40,7 +44,8 @@ fi
 say "Ставлю пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq nginx git curl certbot python3-certbot-nginx ufw
+apt-get install -y -qq nginx git curl certbot python3-certbot-nginx ufw \
+  python3 python3-venv python3-pip
 
 say "Забираю сайт из репозитория"
 # git отказывается работать с репозиторием, который принадлежит другому
@@ -75,13 +80,45 @@ git -C "$CLONE_DIR" checkout --quiet -B "$BRANCH" "origin/$BRANCH"
 git -C "$CLONE_DIR" reset --hard --quiet "origin/$BRANCH"
 [ -f "$SITE_DIR/index.html" ] || die "не нашёл $SITE_DIR/index.html в ветке $BRANCH"
 
-# nginx читает файлы от имени www-data — только папку сайта, не весь клон
-chown -R www-data:www-data "$SITE_DIR"
+# Код принадлежит root, www-data только читает: приложение работает
+# от www-data и не должно иметь права переписывать собственные исходники.
+chown -R root:root "$SITE_DIR"
 chmod -R a+rX "$SITE_DIR"
 chmod 755 "$CLONE_DIR"
 
+say "Готовлю папку данных"
+mkdir -p "$DATA_DIR/uploads"
+chown -R www-data:www-data "$DATA_DIR"
+chmod 750 "$DATA_DIR"
+echo "    $DATA_DIR — единственное место, куда приложение пишет"
+
+say "Ставлю приложение"
+if [ ! -x "$VENV_DIR/bin/python" ]; then
+  python3 -m venv "$VENV_DIR"
+fi
+"$VENV_DIR/bin/pip" install --quiet --upgrade pip
+"$VENV_DIR/bin/pip" install --quiet -r "$SITE_DIR/requirements.txt"
+chown -R root:root "$VENV_DIR"
+chmod -R a+rX "$VENV_DIR"
+
+sed -e "s|__SITE_DIR__|$SITE_DIR|g" \
+    -e "s|__DATA_DIR__|$DATA_DIR|g" \
+    -e "s|__VENV__|$VENV_DIR|g" \
+    "$SITE_DIR/deploy/averix.service" > /etc/systemd/system/averix.service
+systemctl daemon-reload
+systemctl enable --quiet averix
+systemctl restart averix
+
+sleep 2
+if systemctl is-active --quiet averix; then
+  echo "    приложение запущено на 127.0.0.1:8001"
+else
+  echo "    !! приложение не поднялось. Журнал: journalctl -u averix -n 40"
+fi
+
 say "Настраиваю сайт в nginx"
 sed -e "s|__DOMAIN__|$DOMAIN|g" -e "s|__ROOT__|$SITE_DIR|g" \
+    -e "s|__DATA_DIR__|$DATA_DIR|g" \
     "$SITE_DIR/deploy/nginx.conf" > /etc/nginx/sites-available/averix
 ln -sf /etc/nginx/sites-available/averix /etc/nginx/sites-enabled/averix
 rm -f /etc/nginx/sites-enabled/default
@@ -130,3 +167,8 @@ say "Готово"
 echo "    Сайт:        https://$DOMAIN"
 echo "    Файлы:       $SITE_DIR"
 echo "    Обновление:  bash $SITE_DIR/deploy/update.sh"
+echo
+echo "    Админка ещё без пользователя. Создайте его:"
+echo "      cd $SITE_DIR && sudo -u www-data AVERIX_DATA_DIR=$DATA_DIR \\"
+echo "        $VENV_DIR/bin/python -m app.cli create-admin <логин>"
+echo "    Затем откройте https://$DOMAIN/admin"

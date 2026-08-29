@@ -1,0 +1,35 @@
+# AVERIX — приложение админки
+# Ставится скриптом setup.sh в /etc/systemd/system/averix.service
+
+[Unit]
+Description=AVERIX backend
+After=network.target
+
+[Service]
+Type=exec
+User=www-data
+Group=www-data
+WorkingDirectory=__SITE_DIR__
+Environment="AVERIX_DATA_DIR=__DATA_DIR__"
+Environment="AVERIX_SECURE_COOKIES=1"
+Environment="AVERIX_DEBUG=0"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=__VENV__/bin/uvicorn app.main:app \
+    --host 127.0.0.1 --port 8001 \
+    --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=always
+RestartSec=3
+
+# Закалка: процессу доступна на запись ровно одна папка — с данными
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=__DATA_DIR__
+
+[Install]
+WantedBy=multi-user.target
