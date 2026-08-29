@@ -137,8 +137,29 @@
         <div class="field">
           <label for="seo_description_tj">Описание · таджикский</label>
           <textarea id="seo_description_tj" name="seo_description_tj" maxlength="300">{{ project.seo_description_tj or '' if project else '' }}</textarea>
+          <p class="hint">пусто — возьму короткое описание</p>
         </div>
       </div>
+
+      <div class="field">
+        <label for="og_image">Картинка для соцсетей</label>
+        <select id="og_image" name="og_image">
+          <option value="">обложка проекта</option>
+          {% for img in images %}
+          <option value="{{ img.filename }}"{% if project and project.og_image == img.filename %} selected{% endif %}>
+            {{ img.alt_ru or img.filename }}
+          </option>
+          {% endfor %}
+        </select>
+        <p class="hint">так выглядит ссылка в Telegram и соцсетях; пусто — обложка</p>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" name="allow_indexing" value="1"
+               {% if not project or project.allow_indexing %}checked{% endif %}>
+        <span>Разрешить поисковикам показывать этот кейс</span>
+      </label>
+      <p class="hint">снимите галочку, если заказчик не хочет попадать в поиск</p>
     </fieldset>
 
     <div class="sticky">

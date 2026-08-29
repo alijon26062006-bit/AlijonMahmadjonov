@@ -8,6 +8,18 @@
 <script type="application/ld+json">
 {{ {
   "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Главная", "item": site_url ~ "/"},
+    {"@type": "ListItem", "position": 2, "name": "Проекты", "item": site_url ~ "/projects"},
+    {"@type": "ListItem", "position": 3, "name": p.title,
+     "item": site_url ~ "/projects/" ~ p.slug}
+  ]
+} | tojson }}
+</script>
+<script type="application/ld+json">
+{{ {
+  "@context": "https://schema.org",
   "@type": "CreativeWork",
   "name": p.title,
   "description": p.excerpt or p.title,

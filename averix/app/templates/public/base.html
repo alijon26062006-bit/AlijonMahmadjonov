@@ -24,6 +24,22 @@
 <script>document.documentElement.className+=" js";</script>
 <link rel="stylesheet" href="/fonts.css">
 <link rel="stylesheet" href="/styles.css">
+<script type="application/ld+json">
+{# Только подтверждаемые данные: название, адрес, контакты, город.
+   Ни рейтингов, ни отзывов, ни наград, ни выдуманных сотрудников. #}
+{{ {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "AVERIX",
+  "url": site_url,
+  "logo": site_url ~ "/favicon.svg",
+  "image": site_url ~ "/og.png",
+  "description": s.about_text,
+  "address": {"@type": "PostalAddress", "addressLocality": s.city},
+  "sameAs": ([tg_url] if tg_url != "#" else []) + ([gh_url] if gh_url else []),
+  "email": s.contact_email,
+} | tojson }}
+</script>
 {% block head_extra %}{% endblock %}
 </head>
 <body{% if server_i18n %} data-server-i18n{% endif %}>

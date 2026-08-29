@@ -32,6 +32,8 @@ SETTING_LABELS = {
     "about_text": "О студии: описание",
     "cta_title": "Призыв в конце страницы",
     "careers_intro": "Вакансии: вступление",
+    "freelance_intro": "Freelance: вступление",
+    "privacy_note": "Что пишем под формами про личные данные",
 
     "stat_years_on": "Показывать первый показатель",
     "stat_years": "Первый показатель: число",
@@ -55,7 +57,8 @@ SETTING_GROUPS = [
     ("Показатель 1", ["stat_years_on", "stat_years", "stat_years_unit", "stat_years_label"]),
     ("Показатель 2", ["stat_active_on", "stat_active", "stat_active_unit", "stat_active_label"]),
     ("Показатель 3", ["stat_accepted_on", "stat_accepted", "stat_accepted_unit", "stat_accepted_label"]),
-    ("Тексты страниц", ["about_text", "cta_title", "careers_intro"]),
+    ("Тексты страниц", ["about_text", "cta_title", "careers_intro",
+                        "freelance_intro", "privacy_note"]),
 ]
 
 

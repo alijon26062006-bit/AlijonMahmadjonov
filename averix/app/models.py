@@ -88,8 +88,12 @@ def tech(conn: sqlite3.Connection, project_id: int) -> list[str]:
 
 # ---------- запись ----------
 
+# Колонки, которые задаются не текстом: числа и переключатели
+FLAG_FIELDS = ["featured", "status", "sort_order", "allow_indexing", "og_image"]
+
+
 def create_project(conn: sqlite3.Connection, data: dict) -> int:
-    cols = ["slug", "category", "year", "featured", "status", "sort_order"] + TEXT_FIELDS
+    cols = ["slug", "category", "year"] + FLAG_FIELDS + TEXT_FIELDS
     marks = ",".join("?" * len(cols))
     cur = conn.execute(
         f"INSERT INTO projects ({','.join(cols)}) VALUES ({marks})",
@@ -99,7 +103,7 @@ def create_project(conn: sqlite3.Connection, data: dict) -> int:
 
 
 def update_project(conn: sqlite3.Connection, project_id: int, data: dict) -> None:
-    cols = ["slug", "category", "year", "featured", "status", "sort_order"] + TEXT_FIELDS
+    cols = ["slug", "category", "year"] + FLAG_FIELDS + TEXT_FIELDS
     sets = ",".join(f"{c} = ?" for c in cols)
     conn.execute(
         f"UPDATE projects SET {sets}, updated_at = datetime('now') WHERE id = ?",

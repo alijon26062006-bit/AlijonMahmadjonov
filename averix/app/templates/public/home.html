@@ -432,6 +432,7 @@
           <button class="btn btn-solid btn-block" type="submit" data-i18n="form.submit">Отправить заявку</button>
           {% if errors.form %}<p class="err" role="alert" style="text-align:center">{{ errors.form }}</p>{% endif %}
           <p class="form-note" data-i18n="form.note">ответим в течение дня в Telegram или на почту</p>
+          <p class="form-note">{{ s.privacy_note }}</p>
         </form>
       </div>
     </div>

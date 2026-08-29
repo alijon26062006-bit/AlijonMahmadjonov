@@ -314,9 +314,13 @@ async def freelancer_apply(request: Request):
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
 async def robots():
+    # robots.txt — просьба, а не защита: закрытые разделы всё равно
+    # проверяют авторизацию на сервере. Здесь мы лишь не пускаем туда
+    # поисковики, чтобы они не индексировали служебные страницы.
     return PlainTextResponse(
         "User-agent: *\n"
         "Disallow: /admin\n"
+        "Disallow: /freelancer\n"
         "Disallow: /thanks\n"
         "Disallow: /uploads/\n"
         f"\nSitemap: {SITE_URL}/sitemap.xml\n"
@@ -325,18 +329,26 @@ async def robots():
 
 @router.get("/sitemap.xml")
 async def sitemap():
-    urls = [("/", "1.0"), ("/projects", "0.9"), ("/team", "0.6"), ("/careers", "0.6")]
+    # Только страницы, которые видит посетитель. Админки, кабинета
+    # и черновиков здесь нет и быть не должно.
+    urls = [("/", "1.0", None), ("/projects", "0.9", None),
+            ("/team", "0.6", None), ("/careers", "0.6", None),
+            ("/freelance", "0.6", None)]
     with connect() as conn:
         for p in conn.execute(
             "SELECT slug, updated_at FROM projects"
             " WHERE status = 'published' AND allow_indexing = 1"
+            " ORDER BY sort_order, created_at DESC"
         ):
-            urls.append((f"/projects/{p['slug']}", "0.8"))
+            urls.append((f"/projects/{p['slug']}", "0.8",
+                         (p["updated_at"] or "")[:10] or None))
 
     body = ['<?xml version="1.0" encoding="UTF-8"?>',
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    for path, priority in urls:
-        body.append(f"  <url><loc>{SITE_URL}{path}</loc>"
-                    f"<priority>{priority}</priority></url>")
+    for path, priority, changed in urls:
+        line = f"  <url><loc>{SITE_URL}{path}</loc>"
+        if changed:
+            line += f"<lastmod>{changed}</lastmod>"
+        body.append(line + f"<priority>{priority}</priority></url>")
     body.append("</urlset>")
     return Response("\n".join(body), media_type="application/xml")

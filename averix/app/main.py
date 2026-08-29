@@ -268,6 +268,10 @@ async def project_save(request: Request):
     data["featured"] = 1 if form.get("featured") else 0
     data["status"] = "published" if form.get("status") == "published" else "draft"
     data["sort_order"] = 0
+    # Снятая галочка вообще не приходит в форме, поэтому её отсутствие
+    # и означает «закрыть от поисковиков»
+    data["allow_indexing"] = 1 if form.get("allow_indexing") else 0
+    data["og_image"] = val("og_image", 200) or None
 
     raw_id = str(form.get("id", "")).strip()
     project_id = int(raw_id) if raw_id.isdigit() else None
@@ -280,6 +284,10 @@ async def project_save(request: Request):
                 return back()
             existing = models.get_project(conn, project_id)
             data["sort_order"] = existing["sort_order"]
+            if data["og_image"]:
+                own = {img["filename"] for img in models.images(conn, project_id)}
+                if data["og_image"] not in own:
+                    data["og_image"] = None
             models.update_project(conn, project_id, data)
         else:
             project_id = models.create_project(conn, data)
