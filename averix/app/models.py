@@ -478,9 +478,14 @@ def add_job_application(conn: sqlite3.Connection, data: dict) -> int:
     return int(cur.lastrowid)
 
 
+# Список закрытый намеренно: имя таблицы подставляется в запрос
+# как текст, и без него сюда можно было бы передать что угодно.
+RATE_LIMITED = ("client_requests", "job_applications", "freelancers")
+
+
 def recent_from_ip(conn: sqlite3.Connection, table: str, ip: str, minutes: int = 10) -> int:
     """Сколько заявок пришло с этого адреса за последние минуты."""
-    if table not in ("client_requests", "job_applications"):
+    if table not in RATE_LIMITED:
         raise ValueError("неизвестная таблица")
     row = conn.execute(
         f"SELECT COUNT(*) AS n FROM {table}"

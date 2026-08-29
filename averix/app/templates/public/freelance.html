@@ -1,0 +1,201 @@
+{% extends "public/base.html" %}
+{% block title %}Freelance — работай с AVERIX{% endblock %}
+{% block description %}{{ s.freelance_intro }}{% endblock %}
+{% block body %}
+
+<main id="main">
+
+<section class="page-head">
+  <div class="shell">
+    <nav class="crumbs" aria-label="Хлебные крошки">
+      <a href="/" data-i18n="crumb.home">Главная</a>
+      <span aria-hidden="true">/</span>
+      <span data-i18n="nav.freelance">Freelance</span>
+    </nav>
+
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[01]</span>
+        <span class="label" data-i18n="fl.label">База специалистов</span>
+      </div>
+      <h1 class="r" data-i18n="fl.h1">Работай с AVERIX</h1>
+      <p class="lede r d1">{{ s.freelance_intro }}</p>
+      <div class="hero-cta r d1">
+        <a class="btn btn-solid" href="#form" data-i18n="fl.cta">Стать специалистом</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight">
+  <div class="shell">
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[02]</span>
+        <span class="label" data-i18n="fl.how.label">Как это работает</span>
+      </div>
+      <h2 class="r" data-i18n="fl.how.h2">Не вакансия, а база под задачи</h2>
+      <p class="lede r d1" data-i18n="fl.how.lede">
+        Команда и фриланс — разные вещи. В команде работают постоянно,
+        а специалистов из базы мы зовём на конкретные задачи, когда они появляются.
+      </p>
+    </div>
+
+    <div class="cards">
+      <article class="card glass r">
+        <span class="card-n">01</span>
+        <h3 data-i18n="fl.s1.h">Вы оставляете анкету</h3>
+        <p data-i18n="fl.s1.p">Специализация, технологии, ссылки на работы. Чем конкретнее — тем выше шанс, что вспомним про вас в нужный момент.</p>
+      </article>
+      <article class="card glass r d1">
+        <span class="card-n">02</span>
+        <h3 data-i18n="fl.s2.h">Мы смотрим и отвечаем</h3>
+        <p data-i18n="fl.s2.p">Анкета попадает в базу студии, а не на сайт: мы никого не публикуем без спроса. Ответ приходит в Telegram или на почту.</p>
+      </article>
+      <article class="card glass r d2">
+        <span class="card-n">03</span>
+        <h3 data-i18n="fl.s3.h">Появляется задача — пишем</h3>
+        <p data-i18n="fl.s3.p">Задача, срок и оплата обсуждаются до старта. Взявшись, вы работаете в личном кабинете: там же сдаёте результат и видите правки.</p>
+      </article>
+    </div>
+
+    <p class="note-line r d1" data-i18n="fl.honest">
+      Честно: поток задач у студии пока небольшой, и мы не обещаем работу сразу
+      после анкеты. Обещаем только то, что анкету посмотрит человек.
+    </p>
+  </div>
+</section>
+
+<section class="section" id="form">
+  <div class="shell final">
+    <div class="head">
+      <div class="head-row">
+        <span class="tag-n">[03]</span>
+        <span class="label" data-i18n="fl.form.label">Анкета</span>
+      </div>
+      <h2 class="r" data-i18n="fl.form.h2">Стать специалистом</h2>
+      <p class="lede r d1" data-i18n="fl.form.lede">
+        Обязательны только имя, контакт, технологии и пара слов о себе.
+        Остальное заполняйте, если это про вас.
+      </p>
+    </div>
+
+    <form class="form glass r d1" method="post" action="/freelance/apply" novalidate>
+      <div class="hp" aria-hidden="true">
+        <label for="fl-site">Не заполняйте это поле</label>
+        <input id="fl-site" name="website" type="text" tabindex="-1" autocomplete="off">
+      </div>
+
+      <div class="field">
+        <label for="fl-name"><span data-i18n="fl.f.name">Имя</span> <span class="req" aria-hidden="true">*</span></label>
+        <input id="fl-name" name="name" type="text" autocomplete="name" required maxlength="100"
+               value="{{ old.name or '' }}">
+        {% if errors.name %}<p class="err" role="alert">{{ errors.name }}</p>{% endif %}
+      </div>
+
+      <div class="field">
+        <label for="fl-tg"><span data-i18n="fl.f.tg">Telegram или почта</span> <span class="req" aria-hidden="true">*</span></label>
+        <input id="fl-tg" name="telegram" type="text" required maxlength="120"
+               value="{{ old.telegram or '' }}" placeholder="@username">
+        {% if errors.telegram %}<p class="err" role="alert">{{ errors.telegram }}</p>{% endif %}
+      </div>
+
+      <div class="field">
+        <label for="fl-email" data-i18n="fl.f.email">Почта</label>
+        <input id="fl-email" name="email" type="email" autocomplete="email" maxlength="120"
+               value="{{ old.email or '' }}">
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="fl-country" data-i18n="fl.f.country">Страна</label>
+          <input id="fl-country" name="country" type="text" maxlength="80" value="{{ old.country or '' }}">
+        </div>
+        <div class="field">
+          <label for="fl-city" data-i18n="fl.f.city">Город</label>
+          <input id="fl-city" name="city" type="text" maxlength="80" value="{{ old.city or '' }}">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fl-spec" data-i18n="fl.f.spec">Специализация</label>
+        <select id="fl-spec" name="specialization">
+          {% for key, label in specializations.items() %}
+          <option value="{{ key }}"{% if old.specialization == key %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="fl-skills"><span data-i18n="fl.f.skills">Технологии</span> <span class="req" aria-hidden="true">*</span></label>
+        <input id="fl-skills" name="skills" type="text" required maxlength="500"
+               value="{{ old.skills or '' }}" placeholder="React, TypeScript, PostgreSQL…">
+        {% if errors.skills %}<p class="err" role="alert">{{ errors.skills }}</p>{% endif %}
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="fl-years" data-i18n="fl.f.years">Лет опыта</label>
+          <input id="fl-years" name="years" type="text" maxlength="40" value="{{ old.years or '' }}"
+                 inputmode="numeric" placeholder="2">
+        </div>
+        <div class="field">
+          <label for="fl-exp" data-i18n="fl.f.exp">Где работали</label>
+          <input id="fl-exp" name="experience" type="text" maxlength="500" value="{{ old.experience or '' }}">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fl-about"><span data-i18n="fl.f.about">О себе</span> <span class="req" aria-hidden="true">*</span></label>
+        <textarea id="fl-about" name="about" rows="5" required maxlength="3000"
+                  data-i18n-ph="fl.f.about.ph"
+                  placeholder="Что делали, какие задачи нравятся, сколько времени готовы уделять">{{ old.about or '' }}</textarea>
+        {% if errors.about %}<p class="err" role="alert">{{ errors.about }}</p>{% endif %}
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="fl-portfolio" data-i18n="fl.f.portfolio">Портфолио</label>
+          <input id="fl-portfolio" name="portfolio_url" type="url" maxlength="300"
+                 value="{{ old.portfolio_url or '' }}" placeholder="https://">
+        </div>
+        <div class="field">
+          <label for="fl-github" data-i18n="fl.f.github">GitHub</label>
+          <input id="fl-github" name="github_url" type="url" maxlength="300"
+                 value="{{ old.github_url or '' }}" placeholder="https://github.com/">
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="fl-rate" data-i18n="fl.f.rate">Ставка</label>
+          <input id="fl-rate" name="rate" type="text" maxlength="80"
+                 value="{{ old.rate or '' }}" data-i18n-ph="fl.f.rate.ph" placeholder="не обязательно">
+        </div>
+        <div class="field">
+          <label for="fl-rate-type" data-i18n="fl.f.rate.type">Тип ставки</label>
+          <select id="fl-rate-type" name="rate_type">
+            {% for key, label in rate_types.items() %}
+            <option value="{{ key }}"{% if old.rate_type == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fl-avail" data-i18n="fl.f.avail">Занятость сейчас</label>
+        <select id="fl-avail" name="availability">
+          {% for key, label in availability.items() %}
+          <option value="{{ key }}"{% if old.availability == key %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="btn btn-solid btn-block" type="submit" data-i18n="fl.f.submit">Отправить анкету</button>
+      <p class="form-note">{{ s.privacy_note }}</p>
+    </form>
+  </div>
+</section>
+
+</main>
+{% endblock %}

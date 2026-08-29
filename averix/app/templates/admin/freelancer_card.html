@@ -1,0 +1,223 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ person.name }}{% endblock %}
+{% block body %}
+{% with page = 'freelancers' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>{{ person.name }}</h1>
+    <a href="/admin/freelancers"><button class="ghost" type="button">К списку</button></a>
+  </div>
+
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+  <div class="lead-head" style="margin-bottom:1.5rem">
+    <div>
+      <div class="meta">
+        {{ specializations.get(person.specialization, person.specialization) }}
+        {% if person.years %} · {{ person.years }} лет опыта{% endif %}
+        {% if person.city %} · {{ person.city }}{% endif %}
+        {% if person.country %}, {{ person.country }}{% endif %}
+        · анкета от {{ person.created_at }}
+      </div>
+    </div>
+    <span class="badge {{ 'pub' if person.status in ('approved','active') else ('draft' if person.status in ('rejected','archived') else 'star') }}">
+      {{ statuses.get(person.status, person.status) }}
+    </span>
+  </div>
+
+  <ul class="lead-contacts" style="margin-bottom:1.5rem">
+    {% if person.telegram %}
+    <li><a href="https://t.me/{{ person.telegram|replace('@','') }}" target="_blank" rel="noopener">{{ person.telegram }}</a></li>
+    {% endif %}
+    {% if person.email %}<li><a href="mailto:{{ person.email }}">{{ person.email }}</a></li>{% endif %}
+    {% if person.portfolio_url %}<li><a href="{{ person.portfolio_url }}" target="_blank" rel="noopener nofollow">портфолио</a></li>{% endif %}
+    {% if person.github_url %}<li><a href="{{ person.github_url }}" target="_blank" rel="noopener nofollow">github</a></li>{% endif %}
+  </ul>
+
+  {% if person.about %}<p class="lead-msg" style="margin-bottom:1.5rem">{{ person.about }}</p>{% endif %}
+
+  <!-- ---------- решение по анкете ---------- -->
+  <form method="post" action="/admin/freelancers/{{ person.id }}/status">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <fieldset>
+      <legend>Решение</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="status">Статус</label>
+          <select id="status" name="status">
+            {% for key, label in statuses.items() %}
+            <option value="{{ key }}"{% if person.status == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="admin_note">Заметка для себя</label>
+          <input id="admin_note" name="admin_note" type="text" maxlength="2000"
+                 value="{{ person.admin_note or '' }}">
+          <p class="hint">человек её не видит</p>
+        </div>
+      </div>
+      <button class="mini" type="submit">Сохранить решение</button>
+    </fieldset>
+  </form>
+
+  <!-- ---------- доступ в кабинет ---------- -->
+  <form method="post" action="/admin/freelancers/{{ person.id }}/access">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <fieldset>
+      <legend>Доступ в кабинет</legend>
+      {% if person.status not in can_log_in %}
+      <p class="hint">Сначала одобрите анкету — только потом можно выдать доступ.</p>
+      {% endif %}
+      {% if person.login %}
+      <p class="hint">Текущий логин: <b>{{ person.login }}</b>. Новый пароль заменит прежний.</p>
+      {% endif %}
+      <div class="grid2">
+        <div class="field">
+          <label for="login">Логин</label>
+          <input id="login" name="login" type="text" maxlength="60"
+                 value="{{ person.login or '' }}" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="password">Пароль</label>
+          <input id="password" name="password" type="text" maxlength="200"
+                 autocomplete="new-password" placeholder="не короче 10 символов">
+          <p class="hint">передайте лично: здесь он больше не покажется</p>
+        </div>
+      </div>
+      <button class="mini" type="submit"{% if person.status not in can_log_in %} disabled{% endif %}>
+        {{ 'Обновить доступ' if person.login else 'Выдать доступ' }}
+      </button>
+    </fieldset>
+  </form>
+
+  <!-- ---------- анкета ---------- -->
+  <form method="post" action="/admin/freelancers/{{ person.id }}/save">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="status" value="{{ person.status }}">
+    <input type="hidden" name="admin_note" value="{{ person.admin_note or '' }}">
+
+    <fieldset>
+      <legend>Анкета</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="name">Имя</label>
+          <input id="name" name="name" type="text" maxlength="100" value="{{ person.name }}">
+        </div>
+        <div class="field">
+          <label for="specialization">Специализация</label>
+          <select id="specialization" name="specialization">
+            {% for key, label in specializations.items() %}
+            <option value="{{ key }}"{% if person.specialization == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="telegram">Telegram</label>
+          <input id="telegram" name="telegram" type="text" maxlength="120" value="{{ person.telegram or '' }}">
+        </div>
+        <div class="field">
+          <label for="email">Почта</label>
+          <input id="email" name="email" type="email" maxlength="120" value="{{ person.email or '' }}">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="country">Страна</label>
+          <input id="country" name="country" type="text" maxlength="80" value="{{ person.country or '' }}">
+        </div>
+        <div class="field">
+          <label for="city">Город</label>
+          <input id="city" name="city" type="text" maxlength="80" value="{{ person.city or '' }}">
+        </div>
+      </div>
+      <div class="field">
+        <label for="skills">Технологии</label>
+        <input id="skills" name="skills" type="text" maxlength="500" value="{{ person.skills or '' }}">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="years">Лет опыта</label>
+          <input id="years" name="years" type="text" maxlength="40" value="{{ person.years or '' }}">
+        </div>
+        <div class="field">
+          <label for="experience">Где работали</label>
+          <input id="experience" name="experience" type="text" maxlength="500" value="{{ person.experience or '' }}">
+        </div>
+      </div>
+      <div class="field">
+        <label for="about">О себе</label>
+        <textarea id="about" name="about" rows="4" maxlength="3000">{{ person.about or '' }}</textarea>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="portfolio_url">Портфолио</label>
+          <input id="portfolio_url" name="portfolio_url" type="url" maxlength="300" value="{{ person.portfolio_url or '' }}">
+        </div>
+        <div class="field">
+          <label for="github_url">GitHub</label>
+          <input id="github_url" name="github_url" type="url" maxlength="300" value="{{ person.github_url or '' }}">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="rate">Ставка</label>
+          <input id="rate" name="rate" type="text" maxlength="80" value="{{ person.rate or '' }}">
+        </div>
+        <div class="field">
+          <label for="rate_type">Тип ставки</label>
+          <select id="rate_type" name="rate_type">
+            {% for key, label in rate_types.items() %}
+            <option value="{{ key }}"{% if person.rate_type == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="availability">Занятость</label>
+        <select id="availability" name="availability">
+          {% for key, label in availability.items() %}
+          <option value="{{ key }}"{% if person.availability == key %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </fieldset>
+
+    <div class="sticky">
+      <button type="submit">Сохранить анкету</button>
+    </div>
+  </form>
+
+  <!-- ---------- задачи ---------- -->
+  <h2 class="group">Задачи</h2>
+  {% if tasks %}
+  <div class="list">
+    {% for t in tasks %}
+    <article class="row">
+      <div>
+        <div class="name"><a href="/admin/tasks/{{ t.id }}">{{ t.title }}</a></div>
+        <div class="meta">{{ t.project_title }} · {{ t.updated_at }}</div>
+      </div>
+      <div class="acts">
+        <span class="badge {{ 'pub' if t.status == 'completed' else ('star' if t.status == 'review' else 'draft') }}">
+          {{ task_statuses.get(t.status, t.status) }}
+        </span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><p>Задач на этого человека пока не назначали.</p></div>
+  {% endif %}
+
+  <form method="post" action="/admin/freelancers/{{ person.id }}/delete"
+        data-confirm="Удалить анкету «{{ person.name }}»? Задачи останутся, но потеряют исполнителя."
+        style="margin-top:2rem">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="mini danger" type="submit">Удалить анкету</button>
+  </form>
+</main>
+{% endblock %}

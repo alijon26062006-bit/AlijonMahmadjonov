@@ -1,0 +1,44 @@
+{% extends "admin/base.html" %}
+{% block title %}Проекты с клиентами{% endblock %}
+{% block body %}
+{% with page = 'client_projects' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>Проекты с клиентами</h1>
+    <a href="/admin/client-projects/new"><button type="button">Новый проект</button></a>
+  </div>
+
+  <p class="hint" style="margin-bottom:1.25rem">
+    Это внутренняя работа: бюджет, сроки, задачи. На сайт отсюда ничего
+    не попадает — публичные кейсы живут в разделе «Проекты».
+  </p>
+
+  {% if projects %}
+  <div class="list">
+    {% for p in projects %}
+    <article class="row">
+      <div>
+        <div class="name"><a href="/admin/client-projects/{{ p.id }}">{{ p.title }}</a></div>
+        <div class="meta">
+          {% if p.client %}{{ p.client }} · {% endif %}
+          задач {{ p.tasks_done }} из {{ p.tasks_total }}
+          {% if p.deadline %} · срок {{ p.deadline }}{% endif %}
+        </div>
+      </div>
+      <div class="acts">
+        <span class="badge {{ 'pub' if p.status == 'completed' else ('draft' if p.status == 'cancelled' else 'star') }}">
+          {{ statuses.get(p.status, p.status) }}
+        </span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>Проектов пока нет. Заведите первый, когда договоритесь с заказчиком —
+       и внутри него появятся задачи, которые можно раздать специалистам.</p>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

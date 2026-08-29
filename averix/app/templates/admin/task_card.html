@@ -1,0 +1,151 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ task.title }}{% endblock %}
+{% block body %}
+{% with page = 'client_projects' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>{{ task.title }}</h1>
+    <a href="/admin/client-projects/{{ task.project_id }}"><button class="ghost" type="button">К проекту</button></a>
+  </div>
+
+  <div class="lead-head" style="margin-bottom:1.5rem">
+    <div>
+      <div class="meta">
+        {{ task.project_title }}
+        · {{ task.freelancer_name or 'исполнитель не назначен' }}
+        {% if task.deadline %} · срок {{ task.deadline }}{% endif %}
+        {% if task.price %} · {{ task.price }}{% endif %}
+      </div>
+    </div>
+    <span class="badge {{ 'pub' if task.status == 'completed' else ('star' if task.status in ('review','revision') else 'draft') }}">
+      {{ statuses.get(task.status, task.status) }}
+    </span>
+  </div>
+
+  {% if task.description %}<p class="lead-msg">{{ task.description }}</p>{% endif %}
+
+  {% if task.result_text or task.result_url %}
+  <h2 class="group">Присланный результат</h2>
+  {% if task.result_text %}<p class="lead-msg">{{ task.result_text }}</p>{% endif %}
+  {% if task.result_url %}
+  <p style="margin-top:.6rem">
+    <a href="{{ task.result_url }}" target="_blank" rel="noopener nofollow">{{ task.result_url }}</a>
+  </p>
+  {% endif %}
+  {% endif %}
+
+  <!-- ---------- перевод состояния ---------- -->
+  <h2 class="group">Состояние</h2>
+  {% if moves %}
+  <form method="post" action="/admin/tasks/{{ task.id }}/move">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <fieldset>
+      <legend>Куда двигаем</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="status">Новое состояние</label>
+          <select id="status" name="status">
+            {% for key in moves %}
+            <option value="{{ key }}">{{ statuses.get(key, key) }}</option>
+            {% endfor %}
+          </select>
+          <p class="hint">завершить задачу может только админ</p>
+        </div>
+        <div class="field">
+          <label for="comment">Комментарий</label>
+          <input id="comment" name="comment" type="text" maxlength="500"
+                 placeholder="например, что именно поправить">
+          <p class="hint">попадёт в историю и будет виден исполнителю</p>
+        </div>
+      </div>
+      <button class="mini" type="submit">Перевести</button>
+    </fieldset>
+  </form>
+  {% else %}
+  <p class="hint">Из этого состояния переходов нет.</p>
+  {% endif %}
+
+  <!-- ---------- правка задачи ---------- -->
+  <form method="post" action="/admin/tasks/save">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="id" value="{{ task.id }}">
+    <input type="hidden" name="project_id" value="{{ task.project_id }}">
+    <fieldset>
+      <legend>Задача</legend>
+      <div class="field">
+        <label for="title">Что нужно сделать</label>
+        <input id="title" name="title" type="text" maxlength="200" value="{{ task.title }}">
+      </div>
+      <div class="field">
+        <label for="description">Подробности</label>
+        <textarea id="description" name="description" rows="4" maxlength="4000">{{ task.description or '' }}</textarea>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="specialization">Специализация</label>
+          <select id="specialization" name="specialization">
+            <option value="">не важно</option>
+            {% for key, label in specializations.items() %}
+            <option value="{{ key }}"{% if task.specialization == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="skills">Технологии</label>
+          <input id="skills" name="skills" type="text" maxlength="500" value="{{ task.skills or '' }}">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="deadline">Срок</label>
+          <input id="deadline" name="deadline" type="date" value="{{ task.deadline or '' }}">
+        </div>
+        <div class="field">
+          <label for="price">Оплата</label>
+          <input id="price" name="price" type="text" maxlength="80" value="{{ task.price or '' }}">
+        </div>
+      </div>
+      <div class="field">
+        <label for="freelancer_id">Исполнитель</label>
+        <select id="freelancer_id" name="freelancer_id">
+          <option value="">пока никто</option>
+          {% for f in people %}
+          <option value="{{ f.id }}"{% if task.freelancer_id == f.id %} selected{% endif %}>{{ f.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="admin_note">Заметка для себя</label>
+        <input id="admin_note" name="admin_note" type="text" maxlength="2000" value="{{ task.admin_note or '' }}">
+      </div>
+    </fieldset>
+
+    <div class="sticky">
+      <button type="submit">Сохранить задачу</button>
+    </div>
+  </form>
+
+  <!-- ---------- история ---------- -->
+  <h2 class="group">История</h2>
+  {% if history %}
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Когда</th><th>Кто</th><th>Переход</th><th>Комментарий</th></tr></thead>
+      <tbody>
+        {% for h in history %}
+        <tr>
+          <td class="num">{{ h.created_at }}</td>
+          <td>{{ h.actor }}</td>
+          <td class="num">{{ statuses.get(h.from_status, h.from_status or '—') }} → {{ statuses.get(h.to_status, h.to_status) }}</td>
+          <td>{{ h.comment or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>Переходов пока не было.</p></div>
+  {% endif %}
+</main>
+{% endblock %}

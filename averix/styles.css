@@ -417,6 +417,9 @@ a{color:var(--violet)}
 .field input::placeholder,.field textarea::placeholder{color:var(--faint)}
 .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--violet); box-shadow:0 0 0 3px rgba(185,140,242,.16)}
 .field input[aria-invalid="true"],.field textarea[aria-invalid="true"]{border-color:var(--danger)}
+/* два поля в ряд, если экран позволяет */
+.grid-2{display:grid; gap:var(--s3)}
+@media (min-width:560px){ .grid-2{grid-template-columns:1fr 1fr} }
 .hint{font-family:var(--mono); font-size:.76rem; color:var(--faint)}
 .err{font-size:.84rem; font-weight:600; color:var(--danger)}
 .form-note{font-family:var(--mono); font-size:.76rem; color:var(--faint); text-align:center; line-height:1.6}

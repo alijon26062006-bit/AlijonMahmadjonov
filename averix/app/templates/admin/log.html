@@ -1,0 +1,35 @@
+{% extends "admin/base.html" %}
+{% block title %}Журнал действий{% endblock %}
+{% block body %}
+{% with page = 'log' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar"><h1>Журнал действий</h1></div>
+  <p class="hint" style="margin-bottom:1.25rem">
+    Кто и когда что менял. Паролей и токенов здесь нет — только действие,
+    сущность и её номер.
+  </p>
+
+  {% if items %}
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Когда</th><th>Кто</th><th>Что</th><th>Где</th></tr>
+      </thead>
+      <tbody>
+        {% for row in items %}
+        <tr>
+          <td class="num">{{ row.created_at }}</td>
+          <td>{{ row.username or '—' }}</td>
+          <td>{{ row.action_label }}{% if row.details %} <span class="meta">· {{ row.details }}</span>{% endif %}</td>
+          <td class="num">{{ row.entity or '' }}{% if row.entity_id %} #{{ row.entity_id }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>Записей пока нет.</p></div>
+  {% endif %}
+</main>
+{% endblock %}

@@ -12,7 +12,7 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import journal, models, security
+from . import audit, journal, models, security
 from .adminkit import (_ERRORS, back, current_session, error_page, guard,
                        insecure_page, page)
 from .render import client_ip, is_secure, no_store, templates
@@ -47,8 +47,10 @@ app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
 from .routes_public import router as public_router  # noqa: E402  (после создания app)
 from .routes_public import public_notfound  # noqa: E402
 from .routes_admin_studio import router as studio_router  # noqa: E402
+from .routes_admin_work import router as work_router  # noqa: E402
 app.include_router(public_router)
 app.include_router(studio_router)
+app.include_router(work_router)
 
 
 # ---------- вспомогательное ----------
@@ -130,6 +132,10 @@ async def admin_login(
             return login_page(request, "Неверный логин или пароль.", 401)
 
         journal.event("вход.успех", ip=ip, login=username)
+        conn.execute(
+            "INSERT INTO admin_log (admin_id, username, action) VALUES (?, ?, 'LOGIN')",
+            (row["id"], username),
+        )
         token = security.create_session(
             conn, row["id"], ip, request.headers.get("user-agent", "")
         )
@@ -145,6 +151,8 @@ async def admin_logout(request: Request, csrf: str = Form("")):
     session = current_session(request)
     if not security.check_csrf(session, csrf):
         return no_store(RedirectResponse("/admin", status_code=303))
+    with connect() as conn:
+        audit.record(conn, session, "LOGOUT")
     journal.event("выход", login=session["username"])
     with connect() as conn:
         security.destroy_session(conn, request.cookies.get(SESSION_COOKIE))
@@ -272,6 +280,9 @@ async def project_save(request: Request):
         else:
             project_id = models.create_project(conn, data)
         models.set_tech(conn, project_id, val("tech", 500))
+        audit.record(conn, session,
+                     "PROJECT_UPDATED" if form.get("id") else "PROJECT_CREATED",
+                     "projects", project_id, data["slug"])
 
     journal.event("проект.сохранён", id=project_id, slug=data["slug"],
                   статус=data["status"], кем=session["username"])
@@ -287,6 +298,7 @@ async def project_delete(request: Request, project_id: int, csrf: str = Form("")
         return back()
     with connect() as conn:
         files = models.delete_project(conn, project_id)
+        audit.record(conn, session, "PROJECT_DELETED", "projects", project_id)
     for name in files:
         delete_image_file(name)
     journal.warn("проект.удалён", id=project_id, картинок=len(files),
@@ -313,6 +325,8 @@ async def project_toggle(
         elif field == "status":
             new = "draft" if project["status"] == "published" else "published"
             conn.execute("UPDATE projects SET status = ? WHERE id = ?", (new, project_id))
+            audit.record(conn, session, "PROJECT_UPDATED", "projects", project_id,
+                         f"статус: {new}")
             journal.event("проект.статус", id=project_id, стал=new, кем=session["username"])
     return back()
 

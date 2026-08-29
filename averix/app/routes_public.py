@@ -9,7 +9,8 @@ import re
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
-from . import journal, models
+from . import journal, models, work
+from .notify import notify
 from .config import SITE_URL
 from .db import connect
 from .render import client_ip, no_store, public_context, templates
@@ -92,11 +93,21 @@ async def careers(request: Request):
     return templates.TemplateResponse(request, "public/careers.html", ctx)
 
 
+@router.get("/freelance", response_class=HTMLResponse)
+async def freelance(request: Request):
+    with connect() as conn:
+        ctx = public_context(request, conn, page="freelance")
+        ctx["specializations"] = work.SPECIALIZATIONS
+        ctx["availability"] = work.AVAILABILITY
+        ctx["rate_types"] = work.RATE_TYPES
+    return templates.TemplateResponse(request, "public/freelance.html", ctx)
+
+
 @router.get("/thanks", response_class=HTMLResponse)
 async def thanks(request: Request, kind: str = "request"):
     with connect() as conn:
         ctx = public_context(request, conn, page="thanks")
-    ctx["kind"] = "job" if kind == "job" else "request"
+    ctx["kind"] = kind if kind in ("job", "freelance") else "request"
     return no_store(templates.TemplateResponse(request, "public/thanks.html", ctx))
 
 
@@ -164,6 +175,7 @@ async def client_request(request: Request):
             "message": message,
             "ip": ip,
         })
+        notify(conn, "request", f"Новая заявка: {name}", "client_requests", new_id)
     journal.event("заявка.клиент", id=new_id, тип=project_type, ip=ip)
     return RedirectResponse("/thanks?kind=request", status_code=303)
 
@@ -225,8 +237,75 @@ async def job_apply(request: Request):
             "message": message,
             "ip": ip,
         })
+        notify(conn, "job", f"Новый отклик на вакансию: {name}",
+               "job_applications", new_id)
     journal.event("отклик.вакансия", id=new_id, вакансия=vacancy_id, ip=ip)
     return RedirectResponse("/thanks?kind=job", status_code=303)
+
+
+@router.post("/freelance/apply")
+async def freelancer_apply(request: Request):
+    form = await request.form()
+    ip = client_ip(request)
+
+    with connect() as conn:
+        ctx = public_context(request, conn, page="freelance")
+        ctx["specializations"] = work.SPECIALIZATIONS
+        ctx["availability"] = work.AVAILABILITY
+        ctx["rate_types"] = work.RATE_TYPES
+
+        reason = _looks_like_spam(form, ip, "freelancers", conn)
+        if reason:
+            journal.warn("анкета.отклонена", причина=reason, ip=ip)
+            return RedirectResponse("/thanks?kind=freelance", status_code=303)
+
+        name = _val(form, "name", 100)
+        contact = _val(form, "telegram", 120)
+        about = _val(form, "about", 3000)
+        skills = _val(form, "skills", 500)
+
+        errors = {}
+        if len(name) < 2:
+            errors["name"] = "Напишите, как вас зовут."
+        if len(contact) < 3:
+            errors["telegram"] = "Оставьте Telegram или почту — иначе мы не сможем написать."
+        if len(skills) < 2:
+            errors["skills"] = "Перечислите технологии, с которыми работаете."
+        if len(about) < 20:
+            errors["about"] = "Расскажите о себе хотя бы парой фраз."
+
+        if errors:
+            ctx["errors"] = errors
+            ctx["old"] = {k: _val(form, k, 500) for k in (
+                "name", "telegram", "email", "country", "city", "specialization",
+                "skills", "experience", "years", "about", "portfolio_url",
+                "github_url", "rate", "rate_type", "availability")}
+            return templates.TemplateResponse(
+                request, "public/freelance.html", ctx, status_code=400
+            )
+
+        new_id = work.add_freelancer(conn, {
+            "name": name,
+            "telegram": contact,
+            "email": _val(form, "email", 120),
+            "country": _val(form, "country", 80),
+            "city": _val(form, "city", 80),
+            "specialization": _val(form, "specialization", 40),
+            "skills": skills,
+            "experience": _val(form, "experience", 500),
+            "years": _val(form, "years", 40),
+            "about": about,
+            "portfolio_url": _val(form, "portfolio_url", 300),
+            "github_url": _val(form, "github_url", 300),
+            "rate": _val(form, "rate", 80),
+            "rate_type": _val(form, "rate_type", 20),
+            "availability": _val(form, "availability", 20),
+            "ip": ip,
+        })
+        notify(conn, "freelancer", f"Новая анкета специалиста: {name}",
+               "freelancers", new_id)
+    journal.event("анкета.специалист", id=new_id, ip=ip)
+    return RedirectResponse("/thanks?kind=freelance", status_code=303)
 
 
 # ============================================================

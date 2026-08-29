@@ -7,7 +7,7 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 
-from . import journal, models, security
+from . import audit, journal, models, security
 from .adminkit import back, error_page, guard, page
 from .db import connect
 from .uploads import UploadError, delete_image_file, save_image
@@ -116,6 +116,7 @@ async def settings_save(request: Request):
             # не приходит в форме, поэтому пустое значение и есть «выключено»
             tj = ru if key.endswith("_on") else _val(form, f"tj__{key}")
             models.save_setting(conn, key, ru, tj)
+        audit.record(conn, session, "SETTINGS_CHANGED")
     journal.event("настройки.сохранены", кто=session["username"])
     return back("/admin/settings?saved=1")
 
@@ -205,6 +206,7 @@ async def team_save(request: Request):
 
     if old_photo:
         delete_image_file(old_photo)
+        audit.record(conn, session, "TEAM_CHANGED", "team_members", member_id)
     journal.event("команда.сохранена", id=member_id, кто=session["username"])
     return back("/admin/team")
 
@@ -220,6 +222,7 @@ async def team_delete(request: Request, member_id: int, csrf: str = Form("")):
         photo = models.delete_member(conn, member_id)
     if photo:
         delete_image_file(photo)
+        audit.record(conn, session, "TEAM_CHANGED", "team_members", member_id, "удалён")
     journal.event("команда.удалена", id=member_id, кто=session["username"])
     return back("/admin/team")
 
@@ -295,6 +298,7 @@ async def vacancy_save(request: Request):
     }
     with connect() as conn:
         vacancy_id = models.save_vacancy(conn, vacancy_id, data)
+        audit.record(conn, session, "VACANCY_CHANGED", "vacancies", vacancy_id)
     journal.event("вакансия.сохранена", id=vacancy_id, кто=session["username"])
     return back("/admin/vacancies")
 
@@ -308,6 +312,7 @@ async def vacancy_delete(request: Request, vacancy_id: int, csrf: str = Form("")
         return back("/admin/vacancies")
     with connect() as conn:
         conn.execute("DELETE FROM vacancies WHERE id = ?", (vacancy_id,))
+        audit.record(conn, session, "VACANCY_CHANGED", "vacancies", vacancy_id, "удалена")
     journal.event("вакансия.удалена", id=vacancy_id, кто=session["username"])
     return back("/admin/vacancies")
 
@@ -353,6 +358,8 @@ async def request_status(request: Request, table: str, item_id: int):
                                        _val(form, "status", 20), _val(form, "note", 2000))
     if not ok:
         return error_page(request, 404)
+        audit.record(conn, session, "APPLICATION_STATUS_CHANGED", table, item_id,
+                     _val(form, "status", 20))
     journal.event("заявка.статус", таблица=table, id=item_id, кто=session["username"])
     return back(where)
 
@@ -383,5 +390,7 @@ async def application_hire(request: Request, item_id: int, csrf: str = Form(""))
         })
         models.set_request_status(conn, "job_applications", item_id, "accepted",
                                   row["admin_note"] or "")
+        audit.record(conn, session, "TEAM_CHANGED", "job_applications", item_id,
+                     "принят в команду")
     journal.event("отклик.в_команду", id=item_id, кто=session["username"])
     return back("/admin/team")

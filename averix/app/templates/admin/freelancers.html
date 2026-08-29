@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+{% block title %}Специалисты{% endblock %}
+{% block body %}
+{% with page = 'freelancers' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>Специалисты</h1>
+  </div>
+
+  <p class="hint" style="margin-bottom:1.25rem">
+    База специалистов студии. На сайт эти карточки не попадают: команда
+    и фриланс — разные вещи.
+  </p>
+
+  <nav class="filters" aria-label="Фильтр по статусу">
+    <a class="chip{% if not active %} on{% endif %}" href="/admin/freelancers">Все</a>
+    {% for key, label in statuses.items() %}
+    <a class="chip{% if active == key %} on{% endif %}" href="/admin/freelancers?status={{ key }}">
+      {{ label }}{% if counts.get(key) %} · {{ counts[key] }}{% endif %}
+    </a>
+    {% endfor %}
+  </nav>
+
+  {% if people %}
+  <div class="list">
+    {% for f in people %}
+    <article class="row">
+      <div>
+        <div class="name"><a href="/admin/freelancers/{{ f.id }}">{{ f.name }}</a></div>
+        <div class="meta">
+          {{ specializations.get(f.specialization, f.specialization) }}
+          {% if f.skills %} · {{ f.skills[:60] }}{% endif %}
+          {% if f.city %} · {{ f.city }}{% endif %}
+          · {{ f.created_at }}
+        </div>
+      </div>
+      <div class="acts">
+        {% if f.login %}<span class="badge pub">есть доступ</span>{% endif %}
+        <span class="badge {{ 'pub' if f.status in ('approved','active') else ('draft' if f.status in ('rejected','archived') else 'star') }}">
+          {{ statuses.get(f.status, f.status) }}
+        </span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>{% if active %}С этим статусом никого нет.{% else %}Анкет пока нет. Они появятся здесь после отправки формы на странице «Freelance».{% endif %}</p>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

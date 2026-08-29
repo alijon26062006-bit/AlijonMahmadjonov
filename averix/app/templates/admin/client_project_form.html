@@ -1,0 +1,158 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ project.title if project else 'Новый проект' }}{% endblock %}
+{% block body %}
+{% with page = 'client_projects' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>{{ project.title if project else 'Новый проект с клиентом' }}</h1>
+    <a href="/admin/client-projects"><button class="ghost" type="button">К списку</button></a>
+  </div>
+
+  <form method="post" action="/admin/client-projects/save">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if project %}<input type="hidden" name="id" value="{{ project.id }}">{% endif %}
+
+    <fieldset>
+      <legend>Проект</legend>
+      <div class="field">
+        <label for="title">Название <span style="color:var(--violet)">*</span></label>
+        <input id="title" name="title" type="text" required maxlength="200"
+               value="{{ project.title if project else '' }}">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="client">Заказчик</label>
+          <input id="client" name="client" type="text" maxlength="200"
+                 value="{{ project.client or '' if project else '' }}">
+        </div>
+        <div class="field">
+          <label for="status">Статус</label>
+          <select id="status" name="status">
+            {% for key, label in statuses.items() %}
+            <option value="{{ key }}"{% if project and project.status == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="description">Описание</label>
+        <textarea id="description" name="description" rows="4" maxlength="4000">{{ project.description or '' if project else '' }}</textarea>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="budget">Бюджет</label>
+          <input id="budget" name="budget" type="text" maxlength="120"
+                 value="{{ project.budget or '' if project else '' }}">
+          <p class="hint">не обязательно, наружу не уходит</p>
+        </div>
+        <div class="field">
+          <label for="deadline">Срок</label>
+          <input id="deadline" name="deadline" type="date"
+                 value="{{ project.deadline or '' if project else '' }}">
+        </div>
+      </div>
+      <div class="field">
+        <label for="admin_note">Заметка для себя</label>
+        <textarea id="admin_note" name="admin_note" rows="2" maxlength="2000">{{ project.admin_note or '' if project else '' }}</textarea>
+      </div>
+    </fieldset>
+
+    <div class="sticky">
+      <button type="submit">Сохранить проект</button>
+    </div>
+  </form>
+
+  {% if project %}
+  <h2 class="group">Задачи</h2>
+
+  {% if tasks %}
+  <div class="list">
+    {% for t in tasks %}
+    <article class="row">
+      <div>
+        <div class="name"><a href="/admin/tasks/{{ t.id }}">{{ t.title }}</a></div>
+        <div class="meta">
+          {{ t.freelancer_name or 'исполнитель не назначен' }}
+          {% if t.deadline %} · срок {{ t.deadline }}{% endif %}
+          {% if t.price %} · {{ t.price }}{% endif %}
+        </div>
+      </div>
+      <div class="acts">
+        <span class="badge {{ 'pub' if t.status == 'completed' else ('star' if t.status in ('review','revision') else 'draft') }}">
+          {{ task_statuses.get(t.status, t.status) }}
+        </span>
+        <form method="post" action="/admin/tasks/{{ t.id }}/delete"
+              data-confirm="Удалить задачу «{{ t.title }}»? Отменить будет нельзя.">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="mini danger" type="submit">Удалить</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><p>Задач пока нет. Добавьте первую — её можно сразу назначить специалисту.</p></div>
+  {% endif %}
+
+  <form method="post" action="/admin/tasks/save" style="margin-top:1.5rem">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="project_id" value="{{ project.id }}">
+    <fieldset>
+      <legend>Новая задача</legend>
+      <div class="field">
+        <label for="t-title">Что нужно сделать <span style="color:var(--violet)">*</span></label>
+        <input id="t-title" name="title" type="text" required maxlength="200">
+      </div>
+      <div class="field">
+        <label for="t-desc">Подробности</label>
+        <textarea id="t-desc" name="description" rows="3" maxlength="4000"></textarea>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="t-spec">Специализация</label>
+          <select id="t-spec" name="specialization">
+            <option value="">не важно</option>
+            {% for key, label in specializations.items() %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="t-skills">Технологии</label>
+          <input id="t-skills" name="skills" type="text" maxlength="500">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="t-deadline">Срок</label>
+          <input id="t-deadline" name="deadline" type="date">
+        </div>
+        <div class="field">
+          <label for="t-price">Оплата</label>
+          <input id="t-price" name="price" type="text" maxlength="80">
+        </div>
+      </div>
+      <div class="field">
+        <label for="t-assignee">Исполнитель</label>
+        <select id="t-assignee" name="freelancer_id">
+          <option value="">пока никто</option>
+          {% for f in people %}
+          <option value="{{ f.id }}">{{ f.name }}{% if f.skills %} — {{ f.skills[:40] }}{% endif %}</option>
+          {% endfor %}
+        </select>
+        <p class="hint">в списке только одобренные специалисты</p>
+      </div>
+      <button class="mini" type="submit">Добавить задачу</button>
+    </fieldset>
+  </form>
+
+  <form method="post" action="/admin/client-projects/{{ project.id }}/delete"
+        data-confirm="Удалить проект «{{ project.title }}» вместе со всеми задачами? Отменить будет нельзя."
+        style="margin-top:2rem">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="mini danger" type="submit">Удалить проект</button>
+  </form>
+  {% endif %}
+</main>
+{% endblock %}

@@ -10,7 +10,11 @@
       <svg viewBox="0 0 24 24" focusable="false"><path d="M4 12.5l5.5 5.5L20 7"/></svg>
     </span>
 
-    {% if kind == 'job' %}
+    {% if kind == 'freelance' %}
+    <p class="mono tag-n" data-i18n="thanks.fl.k">АНКЕТА ПРИНЯТА</p>
+    <h1 data-i18n="thanks.fl.h">Спасибо, анкета у нас</h1>
+    <p class="lede" data-i18n="thanks.fl.p">Она попала в базу студии, а не на сайт — публиковать вас без спроса мы не будем. Напишем, когда появится подходящая задача.</p>
+    {% elif kind == 'job' %}
     <p class="mono tag-n" data-i18n="thanks.job.k">ОТКЛИК ПРИНЯТ</p>
     <h1 data-i18n="thanks.job.h">Спасибо, отклик у нас</h1>
     <p class="lede" data-i18n="thanks.job.p">Посмотрим внимательно и напишем в Telegram или на почту. Если ответа нет несколько дней — это не «мимо», просто разбираем по очереди.</p>

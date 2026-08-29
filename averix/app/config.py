@@ -33,6 +33,12 @@ DEBUG = _flag("AVERIX_DEBUG", False)
 # в systemd, чтобы смена домена не требовала правки кода.
 SITE_URL = os.environ.get("AVERIX_SITE_URL", "https://averix.dev").rstrip("/")
 
+# Уведомления в Telegram. Токен живёт только здесь, на сервере:
+# во фронтенд он не попадает никогда. Если переменных нет, формы
+# работают как обычно — просто без сообщения владельцу.
+TELEGRAM_TOKEN = os.environ.get("AVERIX_TELEGRAM_TOKEN", "").strip()
+TELEGRAM_CHAT = os.environ.get("AVERIX_TELEGRAM_CHAT", "").strip()
+
 SESSION_COOKIE = "averix_session"
 SESSION_HOURS = 12
 
