@@ -61,7 +61,11 @@ body{
 h1,h2,h3{margin:0; font-family:var(--display); font-weight:600; letter-spacing:-.02em; text-wrap:balance}
 p{margin:0}
 ul,ol{margin:0; padding:0; list-style:none}
-img{max-width:100%; display:block}
+/* height:auto обязателен. Без него браузер применяет атрибут height
+   буквально: скриншот 1600×1000 в колонке шириной 373 рисовался
+   ростом 1000px — галерея кейса превращалась в столбики. Контейнеры
+   с object-fit задают высоту явно и это правило перебивают. */
+img{max-width:100%; height:auto; display:block}
 a{color:var(--violet)}
 
 .shell{max-width:var(--shell); margin:0 auto; padding:0 var(--s3)}
