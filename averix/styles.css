@@ -509,7 +509,7 @@ a{color:var(--violet)}
 .foot-social a:hover{border-color:var(--violet); color:var(--violet); transform:translateY(-3px)}
 .foot-social a:active{transform:scale(.94)}
 .foot-social svg{width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linejoin:round}
-.foot-col h3{font-family:var(--mono); font-size:.76rem; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin-bottom:.4rem}
+.foot-col h2{font-family:var(--mono); font-size:.76rem; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin-bottom:.4rem}
 .foot-col li a,
 .foot-col li span{
   display:inline-flex; align-items:center; min-height:44px;
