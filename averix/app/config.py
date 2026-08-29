@@ -24,6 +24,9 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 # В разработке сайт открывается по http, и cookie с флагом Secure не долетит.
 # На сервере флаг обязателен — иначе сессию можно перехватить.
 SECURE_COOKIES = _flag("AVERIX_SECURE_COOKIES", True)
+# Разрешить вход по http. Только для разработки: по http пароль
+# передаётся открытым текстом. На сервере включать нельзя.
+ALLOW_INSECURE = _flag("AVERIX_ALLOW_INSECURE", False)
 DEBUG = _flag("AVERIX_DEBUG", False)
 
 SESSION_COOKIE = "averix_session"

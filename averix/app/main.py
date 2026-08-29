@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import security
 from .config import (
+    ALLOW_INSECURE,
     BASE_DIR,
     DEBUG,
     SECURE_COOKIES,
@@ -61,6 +62,35 @@ def set_cookie(resp: Response, name: str, value: str, max_age: int) -> None:
     )
 
 
+def is_secure(request: Request) -> bool:
+    """Схема запроса до nginx: сам прокси ходит к нам по http."""
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    return proto == "https"
+
+
+def safe_host(request: Request) -> str:
+    """Заголовок Host приходит от клиента: чистим его перед показом."""
+    raw = (request.headers.get("host") or "").split(":")[0].lower()
+    allowed = set("abcdefghijklmnopqrstuvwxyz0123456789.-")
+    if raw and 3 <= len(raw) <= 253 and set(raw) <= allowed and "." in raw:
+        return raw
+    return "ваш-домен"
+
+
+def insecure_page(request: Request) -> Response:
+    """
+    По http cookie с флагом Secure браузер не сохраняет, и вход тихо
+    ломался бы с невнятным «форма устарела». Говорим прямо: дело
+    не в форме, а в том, что пароль по http идёт открытым текстом.
+    """
+    resp = templates.TemplateResponse(
+        request, "admin/insecure.html",
+        {"host": safe_host(request)},
+        status_code=421,
+    )
+    return no_store(resp)
+
+
 def current_session(request: Request):
     with connect() as conn:
         return security.get_session(conn, request.cookies.get(SESSION_COOKIE))
@@ -76,6 +106,8 @@ def no_store(resp: Response) -> Response:
 @app.get("/admin", response_class=HTMLResponse)
 @app.get("/admin/", response_class=HTMLResponse)
 async def admin_root(request: Request):
+    if SECURE_COOKIES and not ALLOW_INSECURE and not is_secure(request):
+        return insecure_page(request)
     session = current_session(request)
     if session is not None:
         return await dashboard(request)
@@ -98,10 +130,17 @@ async def admin_login(
     password: str = Form(""),
     lc: str = Form(""),
 ):
+    if SECURE_COOKIES and not ALLOW_INSECURE and not is_secure(request):
+        return insecure_page(request)
+
     # Двойная отправка токена: форма и cookie должны совпасть.
     # Защищает от чужой формы, отправляющей вход на наш адрес.
     if not lc or lc != request.cookies.get(LOGIN_COOKIE, ""):
-        return login_page(request, "Форма устарела. Попробуйте ещё раз.", 400)
+        return login_page(
+            request,
+            "Форма устарела или браузер не сохранил cookie. Обновите страницу.",
+            400,
+        )
 
     ip = client_ip(request)
     with connect() as conn:
