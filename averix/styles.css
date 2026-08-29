@@ -38,7 +38,17 @@
   --danger:#FF9A93;
 
   --shell:1220px;
-  --s1:.5rem; --s2:1rem; --s3:1.5rem; --s4:2.5rem; --s5:4rem; --s6:7rem;
+  /* Мелкие отступы фиксированные — они держат внутреннюю плотность.
+     Крупные подвижные: раньше секции отбивались одинаковыми 112px
+     и на 1440, и на 390, из-за чего телефонная страница вытягивалась
+     до пятнадцати тысяч пикселей. */
+  --s1:.5rem; --s2:1rem; --s3:1.5rem;
+  --s4:clamp(1.75rem, 4vw, 2.5rem);
+  --s5:clamp(2.5rem, 6vw, 4rem);
+  --s6:clamp(3.5rem, 9vw, 7rem);
+
+  /* Три радиуса, и каждый со своей ролью: крупные блоки, элементы
+     внутри них, мелочь вроде полей ввода. Плюс пилюля для кнопок. */
   --r-lg:26px; --r:18px; --r-sm:12px; --pill:999px;
 
   --display:"Geologica","Golos Text",system-ui,sans-serif;
@@ -61,14 +71,18 @@ body{
 h1,h2,h3{margin:0; font-family:var(--display); font-weight:600; letter-spacing:-.02em; text-wrap:balance}
 p{margin:0}
 ul,ol{margin:0; padding:0; list-style:none}
-img{max-width:100%; display:block}
+/* height:auto обязателен. Без него браузер применяет атрибут height
+   буквально: скриншот 1600×1000 в колонке шириной 373 рисовался
+   ростом 1000px — галерея кейса превращалась в столбики. Контейнеры
+   с object-fit задают высоту явно и это правило перебивают. */
+img{max-width:100%; height:auto; display:block}
 a{color:var(--violet)}
 
 .shell{max-width:var(--shell); margin:0 auto; padding:0 var(--s3)}
 
 .skip{position:absolute; left:-9999px; top:0; z-index:300; background:var(--violet); color:var(--on-accent); padding:.7rem 1.1rem; font-weight:700; text-decoration:none; border-radius:var(--r-sm)}
 .skip:focus{left:var(--s3); top:var(--s1)}
-:focus-visible{outline:2px solid var(--emerald); outline-offset:3px; border-radius:6px}
+:focus-visible{outline:2px solid var(--emerald); outline-offset:3px; border-radius:var(--r-sm)}
 
 /* ============================================================
    Живой фон
@@ -260,7 +274,17 @@ a{color:var(--violet)}
    Первый экран
    ============================================================ */
 .hero{position:relative; padding:var(--s6) 0 var(--s5)}
-.hero h1{margin-top:var(--s3); font-size:clamp(2.1rem,6.4vw,3.9rem); line-height:1.08; max-width:16ch}
+@media (max-width:699px){
+  /* Меньше воздуха там, где его негде взять: под шапкой и перед цифрами */
+  .hero{padding-top:var(--s5)}
+  .hero .stats{margin-top:var(--s4)}
+  .hero-cta{margin-top:var(--s3)}
+}
+/* Ограничение в 16 знаков нужно широкому экрану, чтобы строка
+   не растянулась через весь монитор. На телефоне оно только режет
+   заголовок на пять строк вместо трёх — там ширины и так в обрез. */
+.hero h1{margin-top:var(--s3); font-size:clamp(2.1rem,6.4vw,3.9rem); line-height:1.08}
+@media (min-width:700px){ .hero h1{max-width:16ch} }
 .hero-sub{margin-top:var(--s3); max-width:52ch; font-size:clamp(1rem,2.1vw,1.16rem); color:var(--muted)}
 .hero-cta{display:flex; flex-wrap:wrap; gap:var(--s2); margin-top:var(--s4)}
 
@@ -326,7 +350,7 @@ a{color:var(--violet)}
 .card:hover::after{opacity:1}
 .card-ico{
   display:grid; place-items:center; width:46px; height:46px; margin-bottom:var(--s3);
-  border-radius:14px; background:var(--glass-hi); border:1px solid var(--glass-brd);
+  border-radius:var(--r-sm); background:var(--glass-hi); border:1px solid var(--glass-brd);
   box-shadow:var(--bevel);
 }
 .card-ico svg{width:22px; height:22px; fill:none; stroke:var(--violet); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round}
@@ -351,19 +375,56 @@ a{color:var(--violet)}
 /* ============================================================
    [03] Процесс
    ============================================================ */
-.steps{display:grid; gap:var(--s2)}
-.steps li{
-  display:grid; gap:var(--s2) var(--s4); padding:var(--s4) var(--s3);
-  border-radius:var(--r-lg);
-  transition:transform 320ms var(--spring), border-color var(--t);
+/* Процесс — линия, а не шесть одинаковых плашек.
+
+   Шаги идут один за другим, и вёрстка должна это показывать. Раньше
+   они лежали шестью равными стеклянными карточками — по такой картинке
+   не видно ни порядка, ни движения. Теперь их связывает вертикальная
+   линия, а цвет точки идёт от фиолетового к зелёному: те же два цвета,
+   что в знаке студии, от замысла к результату. */
+.steps{position:relative; display:grid; gap:0}
+.steps::before{
+  content:""; position:absolute; left:5px; top:.9rem; bottom:1.4rem; width:1px;
+  background:linear-gradient(180deg, var(--violet) 0%, rgba(185,140,242,.25) 45%,
+                             rgba(63,217,138,.3) 80%, var(--emerald) 100%);
+  opacity:.5;
 }
-@media (min-width:560px){ .steps li{padding:var(--s4)} }
-@media (min-width:820px){ .steps li{grid-template-columns:110px 1fr 260px; align-items:start} }
-.steps li:hover{transform:translateY(-3px); border-color:var(--glass-brd-hi)}
-.step-n{font-family:var(--mono); font-size:.78rem; color:var(--violet); padding-top:.2rem}
-.steps h3{font-size:1.12rem; margin-bottom:.5rem}
-.steps p{color:var(--muted); font-size:.93rem; max-width:56ch}
-.step-out{font-family:var(--mono); font-size:.78rem; color:var(--emerald); line-height:1.6; padding-top:.2rem}
+.steps li{
+  position:relative; display:grid; gap:.35rem var(--s4);
+  padding:0 0 var(--s4) var(--s4);
+  grid-template-columns:1fr;
+}
+@media (min-width:900px){
+  /* Читается поперёк: номер, шаг с пояснением, что получаете на выходе */
+  .steps li{grid-template-columns:6ch minmax(0,34ch) 1fr; align-items:baseline}
+}
+/* точка на линии */
+.steps li::before{
+  content:""; position:absolute; left:0; top:.55rem; width:11px; height:11px;
+  border-radius:50%; background:var(--void);
+  border:1px solid var(--violet); transition:background var(--t), border-color var(--t);
+}
+.steps li:last-child::before{border-color:var(--emerald)}
+.steps li:last-child{padding-bottom:0}
+@media (hover:hover){
+  .steps li:hover::before{background:var(--violet)}
+  .steps li:last-child:hover::before{background:var(--emerald)}
+}
+.step-n{
+  font-family:var(--mono); font-size:.76rem; color:var(--faint);
+  letter-spacing:.08em; grid-column:1/-1;
+}
+@media (min-width:900px){ .step-n{grid-column:1} }
+.steps h3{font-size:1.1rem; line-height:1.25}
+.steps p{margin-top:.4rem; color:var(--muted); font-size:.94rem; max-width:52ch}
+.step-out{
+  font-family:var(--mono); font-size:.8rem; color:var(--emerald);
+  line-height:1.6; margin-top:.5rem;
+}
+@media (min-width:900px){
+  .step-out{margin-top:0; grid-column:3; justify-self:start}
+  .steps li > div{grid-column:2}
+}
 
 /* ============================================================
    [04] Вопросы и заявка
@@ -440,7 +501,7 @@ a{color:var(--violet)}
 }
 .foot-social{display:flex; gap:.5rem; margin-top:var(--s3)}
 .foot-social a{
-  display:grid; place-items:center; width:44px; height:44px; border-radius:14px;
+  display:grid; place-items:center; width:44px; height:44px; border-radius:var(--r-sm);
   background:var(--glass); border:1px solid var(--glass-brd);
   box-shadow:var(--bevel); color:var(--muted);
   transition:border-color var(--t), color var(--t), transform 200ms var(--spring);
@@ -448,7 +509,7 @@ a{color:var(--violet)}
 .foot-social a:hover{border-color:var(--violet); color:var(--violet); transform:translateY(-3px)}
 .foot-social a:active{transform:scale(.94)}
 .foot-social svg{width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linejoin:round}
-.foot-col h3{font-family:var(--mono); font-size:.76rem; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin-bottom:.4rem}
+.foot-col h2{font-family:var(--mono); font-size:.76rem; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin-bottom:.4rem}
 .foot-col li a,
 .foot-col li span{
   display:inline-flex; align-items:center; min-height:44px;
@@ -458,6 +519,50 @@ a{color:var(--violet)}
 .foot-col li span{color:var(--faint)}
 .foot-bottom{display:flex; flex-wrap:wrap; gap:var(--s2) var(--s3); padding-top:var(--s3); border-top:1px solid var(--glass-brd)}
 .foot-copy{font-family:var(--mono); font-size:.76rem; color:var(--faint)}
+
+/* ============================================================
+   Услуги — список, а не сетка карточек
+
+   Пять направлений в сетке 3+2 давали дыру в последнем ряду и делали
+   вид, будто все они одинаковой величины. Список читается сверху вниз,
+   как оглавление, и держит любое количество строк. Подробности живут
+   в раскрывающейся части: на десктопе они появляются при наведении
+   и фокусе, на телефоне и без мыши — видны сразу.
+   ============================================================ */
+.svc-list{border-top:1px solid var(--glass-brd)}
+.svc{
+  display:grid; gap:.35rem 1.25rem; padding:var(--s3) 0;
+  border-bottom:1px solid var(--glass-brd);
+  grid-template-columns:auto 1fr;
+  transition:border-color var(--t);
+}
+@media (min-width:860px){
+  .svc{grid-template-columns:3.5rem minmax(0,22ch) 1fr; align-items:baseline; gap:0 var(--s4)}
+}
+.svc-n{
+  font-family:var(--mono); font-size:.86rem; color:var(--violet);
+  font-variant-numeric:tabular-nums; letter-spacing:.06em;
+}
+.svc h3{font-size:clamp(1.15rem,2.6vw,1.5rem); line-height:1.2}
+.svc-main p{margin-top:.5rem; color:var(--muted); font-size:.96rem; max-width:44ch}
+@media (min-width:860px){ .svc-main p{display:none} }
+
+.svc-more{grid-column:2/-1}
+@media (min-width:860px){ .svc-more{grid-column:3} }
+/* Не «пилюли»: двадцать обведённых овалов на секцию читаются как
+   двадцать кнопок, хотя нажимать нечего. Это подпись к строке —
+   значит и выглядеть должна как подпись. */
+.svc-more ul{display:flex; flex-wrap:wrap; margin-top:.6rem; column-gap:.1rem}
+@media (min-width:860px){ .svc-more ul{margin-top:0} }
+.svc-more li{font-size:.9rem; color:var(--faint); transition:color var(--t)}
+.svc-more li + li::before{content:"·"; margin:0 .5rem; color:var(--glass-brd)}
+
+/* Наведение подсвечивает строку целиком, а не отдельный кусочек */
+@media (hover:hover){
+  .svc:hover{border-bottom-color:rgba(185,140,242,.4)}
+  .svc:hover .svc-n{color:var(--emerald)}
+  .svc:hover .svc-more li{color:var(--muted)}
+}
 
 /* ============================================================
    Сияние за первым экраном
@@ -574,6 +679,59 @@ a{color:var(--violet)}
 /* ============================================================
    Сетка проектов
    ============================================================ */
+/* ============================================================
+   Портфолио — список работ, а не сетка плиток
+
+   Сетка карточек упиралась в 440px и занимала половину экрана на 1440:
+   вторая половина оставалась пустой. И главное — одинаковые плитки
+   говорят, что все работы одинаковой величины, а это неправда.
+
+   Здесь у каждой работы своя строка: крупный скриншот и текст рядом.
+   Стороны чередуются, но не механически — чередование даёт ритм,
+   а не фокус.
+   ============================================================ */
+.work-list{display:flex; flex-direction:column; gap:var(--s6)}
+.work{display:grid; gap:var(--s3)}
+@media (min-width:900px){
+  .work{grid-template-columns:1.35fr 1fr; gap:var(--s5); align-items:center}
+  .work:nth-child(even) .work-shot{order:2}
+}
+.work-shot{
+  position:relative; display:block; overflow:hidden;
+  border-radius:var(--r-lg); border:1px solid var(--glass-brd);
+  background:rgba(255,255,255,.03); aspect-ratio:16/10;
+}
+.work-shot.none{aspect-ratio:16/7}
+.work-shot img{width:100%; height:100%; object-fit:cover; transition:transform 700ms var(--ease)}
+@media (hover:hover){ .work:hover .work-shot img{transform:scale(1.02)} }
+
+.work-body{display:flex; flex-direction:column; gap:.55rem}
+.work-n{
+  font-family:var(--mono); font-size:.78rem; color:var(--violet);
+  letter-spacing:.1em; font-variant-numeric:tabular-nums;
+}
+.work-body h2,
+.work-body h3{font-size:clamp(1.4rem,3.4vw,2rem); line-height:1.14}
+.work-body h2 a,
+.work-body h3 a{
+  display:inline-flex; align-items:center; min-height:44px;
+  color:inherit; text-decoration:none;
+}
+/* Ссылка накрывает всю строку, включая скриншот: заголовок в одну
+   строку — слишком маленькая цель. Растягиваем от .work, а не
+   отрицательными отступами — те вылезали за правый край и растягивали
+   документ до 1778px при окне 1440. */
+.work{position:relative}
+.work-body h2 a::after,
+.work-body h3 a::after{content:""; position:absolute; inset:0}
+.work-body h2 a:hover,
+.work-body h3 a:hover{color:var(--violet)}
+.work-body .case-text{max-width:46ch}
+.work-tech{display:flex; flex-wrap:wrap; column-gap:.1rem; margin-top:.3rem; position:relative; z-index:1}
+.work-tech li{font-family:var(--mono); font-size:.78rem; color:var(--faint)}
+.work-tech li + li::before{content:"·"; margin:0 .45rem; color:var(--glass-brd)}
+.work-body .link-more{position:relative; z-index:1; margin-top:.3rem}
+
 .grid-cases{display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
 @media (min-width:900px){
   /* auto-fit растянул бы единственную карточку во весь экран —
@@ -653,14 +811,37 @@ a{color:var(--violet)}
 }
 .case-cta p{font-family:var(--display); font-size:clamp(1.2rem,3vw,1.6rem); line-height:1.2; max-width:26ch}
 
+/* Три правила — три коротких утверждения в ряд. Стекло и рамка тут
+   ничего не добавляли: содержание короткое, и коробка вокруг него
+   только утяжеляла. Верхняя черта делит колонки не хуже. */
+.rule{padding-top:var(--s3); border-top:1px solid var(--glass-brd)}
+.rule-n{
+  font-family:var(--mono); font-size:.76rem; color:var(--violet);
+  letter-spacing:.1em; font-variant-numeric:tabular-nums;
+}
+.rule h3{margin-top:.6rem; font-size:1.05rem; line-height:1.25}
+.rule p{margin-top:.5rem; color:var(--muted); font-size:.94rem}
+
 /* ============================================================
    Команда
    ============================================================ */
+/* Пока в студии один человек, сетка выглядела сломанной: карточка
+   в 280px висела одна слева, а справа оставалось 900px пустоты.
+   Один человек — это не «неполная сетка», а отдельная композиция:
+   фотография и рассказ рядом, как разворот. Двое и больше — сетка. */
 .people{display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
 @media (min-width:900px){
-  /* пока в студии один человек, карточка не должна растягиваться
-     на весь экран — иначе это читается как сломанная вёрстка */
-  .people{grid-template-columns:repeat(auto-fill,minmax(280px,360px))}
+  .people{grid-template-columns:repeat(auto-fill,minmax(280px,340px))}
+  .people:has(.person:only-child){grid-template-columns:1fr}
+  .people:has(.person:only-child) .person{
+    grid-template-columns:minmax(0,320px) 1fr;
+    display:grid; gap:0 var(--s5); align-items:center;
+    background:none; border:0; box-shadow:none; backdrop-filter:none;
+  }
+  .people:has(.person:only-child) .person-shot{border-radius:var(--r-lg)}
+  .people:has(.person:only-child) .person-body{padding:0}
+  .people:has(.person:only-child) .person-body h3{font-size:clamp(1.5rem,3.4vw,2.1rem)}
+  .people:has(.person:only-child) .person-body .case-text{font-size:1.02rem; max-width:52ch}
 }
 .person{display:flex; flex-direction:column; overflow:hidden; border-radius:var(--r-lg)}
 .person-shot{position:relative; aspect-ratio:5/6; background:rgba(255,255,255,.03); overflow:hidden}
