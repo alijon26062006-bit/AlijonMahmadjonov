@@ -10,6 +10,11 @@ CLONE_DIR="${CLONE_DIR:-/var/www/averix-repo}"
 
 [ -d "$CLONE_DIR/.git" ] || { echo "Не нашёл репозиторий в $CLONE_DIR" >&2; exit 1; }
 
+# .git должна принадлежать root, иначе git ругается на чужого владельца
+chown -R root:root "$CLONE_DIR/.git"
+git config --global --get-all safe.directory 2>/dev/null | grep -qx "$CLONE_DIR" \
+  || git config --global --add safe.directory "$CLONE_DIR"
+
 # Берём ту ветку, что уже развёрнута, — не нужно помнить её название
 BRANCH="${BRANCH:-$(git -C "$CLONE_DIR" rev-parse --abbrev-ref HEAD)}"
 
@@ -18,8 +23,8 @@ git -C "$CLONE_DIR" fetch --quiet origin "$BRANCH"
 git -C "$CLONE_DIR" reset --hard --quiet "origin/$BRANCH"
 AFTER="$(git -C "$CLONE_DIR" rev-parse --short HEAD)"
 
-chown -R www-data:www-data "$CLONE_DIR"
-chmod -R a+rX "$CLONE_DIR"
+chown -R www-data:www-data "$CLONE_DIR/averix"
+chmod -R a+rX "$CLONE_DIR/averix"
 
 if [ "$BEFORE" = "$AFTER" ]; then
   echo "Обновлений нет, версия $AFTER"

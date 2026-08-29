@@ -43,6 +43,15 @@ apt-get update -qq
 apt-get install -y -qq nginx git curl certbot python3-certbot-nginx ufw
 
 say "Забираю сайт из репозитория"
+# git отказывается работать с репозиторием, который принадлежит другому
+# пользователю. Служебная папка .git остаётся у root — веб-серверу она
+# не нужна, ему отдаём только сам сайт.
+if [ -d "$CLONE_DIR/.git" ]; then
+  chown -R root:root "$CLONE_DIR/.git"
+fi
+git config --global --get-all safe.directory 2>/dev/null | grep -qx "$CLONE_DIR" \
+  || git config --global --add safe.directory "$CLONE_DIR"
+
 if [ ! -d "$CLONE_DIR/.git" ]; then
   mkdir -p "$(dirname "$CLONE_DIR")"
   git clone --quiet "$REPO" "$CLONE_DIR"
@@ -66,9 +75,10 @@ git -C "$CLONE_DIR" checkout --quiet -B "$BRANCH" "origin/$BRANCH"
 git -C "$CLONE_DIR" reset --hard --quiet "origin/$BRANCH"
 [ -f "$SITE_DIR/index.html" ] || die "не нашёл $SITE_DIR/index.html в ветке $BRANCH"
 
-# nginx читает файлы от имени www-data
-chown -R www-data:www-data "$CLONE_DIR"
-chmod -R a+rX "$CLONE_DIR"
+# nginx читает файлы от имени www-data — только папку сайта, не весь клон
+chown -R www-data:www-data "$SITE_DIR"
+chmod -R a+rX "$SITE_DIR"
+chmod 755 "$CLONE_DIR"
 
 say "Настраиваю сайт в nginx"
 sed -e "s|__DOMAIN__|$DOMAIN|g" -e "s|__ROOT__|$SITE_DIR|g" \
