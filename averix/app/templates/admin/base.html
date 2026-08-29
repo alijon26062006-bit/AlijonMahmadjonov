@@ -80,6 +80,67 @@ button.ghost:hover{background:rgba(255,255,255,.05)}
 .empty p{margin:0;max-width:44ch;margin-inline:auto;font-size:.94rem}
 h2{font-size:1.1rem;margin:2.5rem 0 1rem}
 .mono{font-family:var(--mono);font-size:.85rem;color:var(--faint)}
+
+/* список проектов */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:1rem;margin-bottom:1.5rem}
+.bar h1{font-size:1.5rem;margin-right:auto}
+.list{display:flex;flex-direction:column;gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.row{background:var(--panel);padding:1rem 1.15rem;display:grid;gap:.75rem;align-items:center}
+@media(min-width:760px){.row{grid-template-columns:64px 1fr auto}}
+.row:hover{background:var(--panel-hi)}
+.thumb{width:64px;height:48px;border-radius:8px;object-fit:cover;
+  background:var(--void);border:1px solid var(--line)}
+.thumb.none{display:grid;place-items:center;font-size:.65rem;color:var(--faint);
+  font-family:var(--mono)}
+.row .name{font-weight:600;font-size:.98rem}
+.row .meta{margin-top:.3rem;font-family:var(--mono);font-size:.76rem;color:var(--faint)}
+.acts{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.acts form{display:inline}
+.badge{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .55rem;
+  border-radius:6px;font-family:var(--mono);font-size:.7rem;letter-spacing:.04em}
+.badge.pub{background:rgba(63,217,138,.14);color:var(--emerald)}
+.badge.draft{background:rgba(255,255,255,.07);color:var(--faint)}
+.badge.star{background:rgba(185,140,242,.16);color:var(--violet)}
+.mini{min-height:38px;padding:.3rem .75rem;font-size:.8rem;border-radius:8px;
+  background:transparent;color:var(--muted);border:1px solid var(--line-hi)}
+.mini:hover{background:rgba(255,255,255,.06);color:var(--text)}
+.mini.danger{color:var(--danger);border-color:rgba(255,154,147,.35)}
+.mini.danger:hover{background:rgba(255,154,147,.12)}
+
+/* форма проекта */
+fieldset{border:1px solid var(--line);border-radius:var(--r);padding:1.25rem;
+  margin:0 0 1.25rem;background:var(--panel)}
+legend{padding:0 .5rem;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--violet)}
+.grid2{display:grid;gap:1rem}
+@media(min-width:720px){.grid2{grid-template-columns:1fr 1fr}}
+textarea{width:100%;min-height:100px;padding:.7rem .9rem;background:var(--void);
+  color:var(--text);border:1px solid var(--line-hi);border-radius:10px;
+  font-family:var(--body);font-size:16px;line-height:1.55;resize:vertical}
+textarea:focus{border-color:var(--violet)}
+select{width:100%;min-height:48px;padding:.6rem .9rem;background:var(--void);
+  color:var(--text);border:1px solid var(--line-hi);border-radius:10px;
+  font-family:var(--body);font-size:16px}
+.hint{margin-top:.35rem;font-family:var(--mono);font-size:.72rem;color:var(--faint)}
+.check{display:flex;align-items:center;gap:.6rem;min-height:44px;cursor:pointer}
+.check input{width:18px;height:18px;accent-color:var(--violet);cursor:pointer}
+.check span{font-size:.94rem;color:var(--text)}
+.sticky{position:sticky;bottom:0;background:rgba(10,9,15,.94);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);padding:1rem 0;margin-top:2rem;display:flex;
+  gap:.75rem;flex-wrap:wrap;align-items:center}
+
+/* картинки */
+.shots{display:grid;gap:.75rem;grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+.shot{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--void)}
+.shot img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+.shot.is-cover{border-color:var(--violet)}
+.shot-b{padding:.5rem;display:flex;gap:.4rem;align-items:center;justify-content:space-between}
+.shot-b .tag{font-family:var(--mono);font-size:.66rem;color:var(--violet)}
+.drop{border:1px dashed var(--line-hi);border-radius:10px;padding:1.25rem;
+  display:flex;flex-wrap:wrap;gap:.75rem;align-items:center}
+.drop input[type=file]{flex:1;min-width:200px;color:var(--muted);font-size:.9rem}
+
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>

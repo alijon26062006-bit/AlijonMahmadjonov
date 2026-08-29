@@ -12,7 +12,8 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from . import security
+from . import models, security
+from .uploads import UploadError, delete_image_file, save_image
 from .config import (
     ALLOW_INSECURE,
     BASE_DIR,
@@ -197,15 +198,9 @@ async def dashboard(request: Request) -> Response:
         return no_store(RedirectResponse("/admin", status_code=303))
 
     with connect() as conn:
-        counts = conn.execute(
-            "SELECT"
-            " COUNT(*) AS total,"
-            " SUM(status = 'published') AS published,"
-            " SUM(status = 'draft') AS draft"
-            " FROM projects"
-        ).fetchone()
+        stats = models.counts(conn)
         latest = conn.execute(
-            "SELECT title_ru, status, created_at FROM projects"
+            "SELECT id, title_ru, status, created_at FROM projects"
             " ORDER BY created_at DESC LIMIT 5"
         ).fetchall()
 
@@ -215,15 +210,248 @@ async def dashboard(request: Request) -> Response:
         {
             "username": session["username"],
             "csrf": session["csrf_token"],
-            "counts": {
-                "total": counts["total"] or 0,
-                "published": counts["published"] or 0,
-                "draft": counts["draft"] or 0,
-            },
+            "counts": stats,
             "latest": latest,
         },
     )
     return no_store(resp)
+
+
+# ---------- проекты ----------
+
+def guard(request: Request):
+    """Один вход для всех защищённых страниц: (сессия, None) или (None, ответ)."""
+    if SECURE_COOKIES and not ALLOW_INSECURE and not is_secure(request):
+        return None, insecure_page(request)
+    session = current_session(request)
+    if session is None:
+        return None, no_store(RedirectResponse("/admin", status_code=303))
+    return session, None
+
+
+def back(path: str = "/admin/projects") -> Response:
+    return no_store(RedirectResponse(path, status_code=303))
+
+
+@app.get("/admin/projects", response_class=HTMLResponse)
+async def projects_list(request: Request):
+    session, stop = guard(request)
+    if stop:
+        return stop
+    with connect() as conn:
+        rows = models.list_projects(conn)
+    return no_store(templates.TemplateResponse(request, "admin/projects.html", {
+        "username": session["username"], "csrf": session["csrf_token"],
+        "projects": rows, "categories": models.CATEGORIES,
+    }))
+
+
+@app.get("/admin/projects/new", response_class=HTMLResponse)
+async def project_new(request: Request):
+    session, stop = guard(request)
+    if stop:
+        return stop
+    return no_store(templates.TemplateResponse(request, "admin/project_form.html", {
+        "username": session["username"], "csrf": session["csrf_token"],
+        "project": None, "images": [], "tech": "",
+        "categories": models.CATEGORIES, "error": None,
+    }))
+
+
+@app.get("/admin/projects/{project_id}", response_class=HTMLResponse)
+async def project_edit(request: Request, project_id: int):
+    session, stop = guard(request)
+    if stop:
+        return stop
+    with connect() as conn:
+        project = models.get_project(conn, project_id)
+        if project is None:
+            return back()
+        imgs = models.images(conn, project_id)
+        stack = ", ".join(models.tech(conn, project_id))
+    return no_store(templates.TemplateResponse(request, "admin/project_form.html", {
+        "username": session["username"], "csrf": session["csrf_token"],
+        "project": project, "images": imgs, "tech": stack,
+        "categories": models.CATEGORIES, "error": None,
+    }))
+
+
+@app.post("/admin/projects/save")
+async def project_save(request: Request):
+    session, stop = guard(request)
+    if stop:
+        return stop
+    form = await request.form()
+    if not security.check_csrf(session, form.get("csrf")):
+        return back()
+
+    def val(name: str, limit: int = 4000) -> str:
+        return (str(form.get(name, "")).strip())[:limit]
+
+    title = val("title_ru", 200)
+    if not title:
+        return back("/admin/projects/new")
+
+    category = val("category", 40)
+    if category not in models.CATEGORIES:
+        category = "web"
+
+    year_raw = val("year", 4)
+    year = int(year_raw) if year_raw.isdigit() and 2000 <= int(year_raw) <= 2100 else None
+
+    data = {f: val(f) for f in models.TEXT_FIELDS}
+    data["title_ru"] = title
+    data["category"] = category
+    data["year"] = year
+    data["featured"] = 1 if form.get("featured") else 0
+    data["status"] = "published" if form.get("status") == "published" else "draft"
+    data["sort_order"] = 0
+
+    raw_id = str(form.get("id", "")).strip()
+    project_id = int(raw_id) if raw_id.isdigit() else None
+
+    with connect() as conn:
+        base = models.slugify(val("slug", 100) or title)
+        data["slug"] = models.unique_slug(conn, base, project_id)
+        if project_id is not None:
+            if models.get_project(conn, project_id) is None:
+                return back()
+            existing = models.get_project(conn, project_id)
+            data["sort_order"] = existing["sort_order"]
+            models.update_project(conn, project_id, data)
+        else:
+            project_id = models.create_project(conn, data)
+        models.set_tech(conn, project_id, val("tech", 500))
+
+    return back(f"/admin/projects/{project_id}")
+
+
+@app.post("/admin/projects/{project_id}/delete")
+async def project_delete(request: Request, project_id: int, csrf: str = Form("")):
+    session, stop = guard(request)
+    if stop:
+        return stop
+    if not security.check_csrf(session, csrf):
+        return back()
+    with connect() as conn:
+        files = models.delete_project(conn, project_id)
+    for name in files:
+        delete_image_file(name)
+    return back()
+
+
+@app.post("/admin/projects/{project_id}/toggle")
+async def project_toggle(
+    request: Request, project_id: int, field: str = Form(""), csrf: str = Form("")
+):
+    session, stop = guard(request)
+    if stop:
+        return stop
+    if not security.check_csrf(session, csrf):
+        return back()
+    with connect() as conn:
+        project = models.get_project(conn, project_id)
+        if project is None:
+            return back()
+        if field == "featured":
+            conn.execute("UPDATE projects SET featured = ? WHERE id = ?",
+                         (0 if project["featured"] else 1, project_id))
+        elif field == "status":
+            new = "draft" if project["status"] == "published" else "published"
+            conn.execute("UPDATE projects SET status = ? WHERE id = ?", (new, project_id))
+    return back()
+
+
+@app.post("/admin/projects/{project_id}/move")
+async def project_move(
+    request: Request, project_id: int, direction: str = Form("up"), csrf: str = Form("")
+):
+    session, stop = guard(request)
+    if stop:
+        return stop
+    if not security.check_csrf(session, csrf):
+        return back()
+    with connect() as conn:
+        models.move_project(conn, project_id, -1 if direction == "up" else 1)
+    return back()
+
+
+# ---------- картинки ----------
+
+@app.post("/admin/projects/{project_id}/images")
+async def image_upload(request: Request, project_id: int):
+    session, stop = guard(request)
+    if stop:
+        return stop
+    form = await request.form()
+    if not security.check_csrf(session, form.get("csrf")):
+        return back()
+
+    upload = form.get("image")
+    if upload is None or not hasattr(upload, "read"):
+        return back(f"/admin/projects/{project_id}")
+
+    raw = await upload.read()
+    try:
+        saved = save_image(raw, getattr(upload, "filename", ""))
+    except UploadError as exc:
+        with connect() as conn:
+            project = models.get_project(conn, project_id)
+            imgs = models.images(conn, project_id)
+            stack = ", ".join(models.tech(conn, project_id))
+        if project is None:
+            return back()
+        return no_store(templates.TemplateResponse(request, "admin/project_form.html", {
+            "username": session["username"], "csrf": session["csrf_token"],
+            "project": project, "images": imgs, "tech": stack,
+            "categories": models.CATEGORIES, "error": str(exc),
+        }, status_code=400))
+
+    with connect() as conn:
+        if models.get_project(conn, project_id) is None:
+            delete_image_file(saved.filename)
+            return back()
+        models.add_image(conn, project_id, saved,
+                         str(form.get("alt_ru", ""))[:200])
+    return back(f"/admin/projects/{project_id}")
+
+
+@app.post("/admin/projects/{project_id}/cover")
+async def image_cover(
+    request: Request, project_id: int, image_id: int = Form(0), csrf: str = Form("")
+):
+    session, stop = guard(request)
+    if stop:
+        return stop
+    if not security.check_csrf(session, csrf):
+        return back()
+    with connect() as conn:
+        models.set_cover(conn, project_id, image_id)
+    return back(f"/admin/projects/{project_id}")
+
+
+@app.post("/admin/projects/{project_id}/images/{image_id}/delete")
+async def image_delete(
+    request: Request, project_id: int, image_id: int, csrf: str = Form("")
+):
+    session, stop = guard(request)
+    if stop:
+        return stop
+    if not security.check_csrf(session, csrf):
+        return back()
+    with connect() as conn:
+        # картинка обязана принадлежать этому проекту: иначе по чужому id
+        # можно было бы удалить снимок из другого кейса
+        row = conn.execute(
+            "SELECT id FROM project_images WHERE id = ? AND project_id = ?",
+            (image_id, project_id),
+        ).fetchone()
+        if row is None:
+            return back(f"/admin/projects/{project_id}")
+        filename = models.delete_image(conn, image_id)
+    if filename:
+        delete_image_file(filename)
+    return back(f"/admin/projects/{project_id}")
 
 
 # ---------- служебное ----------

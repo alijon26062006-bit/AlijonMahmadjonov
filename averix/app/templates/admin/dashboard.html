@@ -1,26 +1,7 @@
 {% extends "admin/base.html" %}
 {% block title %}Панель{% endblock %}
 {% block body %}
-<header class="top">
-  <div class="top-in">
-    <a class="brand" href="/admin">
-      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
-        <polygon points="55,6 69,6 59,27 45,27" fill="#B98CF2"/>
-        <polygon points="42,35 75,35 79,55 38,55" fill="#B98CF2"/>
-        <polygon points="34,63 82,63 86,83 30,83" fill="#3FD98A"/>
-      </svg>
-      <b>AVERI<span>X</span></b>
-    </a>
-    <nav>
-      <a href="/admin" aria-current="page">Панель</a>
-      <a href="/" target="_blank" rel="noopener">Сайт ↗</a>
-    </nav>
-    <form method="post" action="/admin/logout">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="ghost" type="submit">Выйти</button>
-    </form>
-  </div>
-</header>
+{% with page = 'dash' %}{% include "admin/_top.html" %}{% endwith %}
 
 <main class="wrap">
   <h1 style="font-size:1.5rem">Панель</h1>
@@ -44,8 +25,8 @@
   </ul>
   {% else %}
   <div class="empty">
-    <p>Проектов пока нет. Управление проектами появится на следующем этапе —
-       сейчас готовы база данных и вход в панель.</p>
+    <p>Проектов пока нет.</p>
+    <p style="margin-top:1rem"><a href="/admin/projects/new"><button type="button">Добавить первый</button></a></p>
   </div>
   {% endif %}
 </main>

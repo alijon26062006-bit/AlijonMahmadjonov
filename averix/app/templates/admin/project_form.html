@@ -1,0 +1,204 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ 'Правка проекта' if project else 'Новый проект' }}{% endblock %}
+{% block body %}
+{% with page = 'projects' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>{{ project.title_ru if project else 'Новый проект' }}</h1>
+    <a href="/admin/projects"><button class="ghost" type="button">К списку</button></a>
+  </div>
+
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+  <form method="post" action="/admin/projects/save">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if project %}<input type="hidden" name="id" value="{{ project.id }}">{% endif %}
+
+    <fieldset>
+      <legend>Основное</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="title_ru">Название · русский <span style="color:var(--violet)">*</span></label>
+          <input id="title_ru" name="title_ru" type="text" required maxlength="200"
+                 value="{{ project.title_ru if project else '' }}">
+        </div>
+        <div class="field">
+          <label for="title_tj">Название · таджикский</label>
+          <input id="title_tj" name="title_tj" type="text" maxlength="200"
+                 value="{{ project.title_tj or '' if project else '' }}">
+          <p class="hint">пусто — покажется русское</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="category">Категория</label>
+          <select id="category" name="category">
+            {% for key, label in categories.items() %}
+            <option value="{{ key }}"{% if project and project.category == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="year">Год</label>
+          <input id="year" name="year" type="text" inputmode="numeric" maxlength="4"
+                 value="{{ project.year or '' if project else '' }}" placeholder="2026">
+        </div>
+      </div>
+      <div class="field">
+        <label for="slug">Адрес страницы</label>
+        <input id="slug" name="slug" type="text" maxlength="100"
+               value="{{ project.slug if project else '' }}" placeholder="оставьте пустым — создам из названия">
+        <p class="hint">/projects/<b>{{ project.slug if project else 'адрес' }}</b> · латиница, менять после публикации нежелательно</p>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Короткое описание</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="excerpt_ru">Русский</label>
+          <textarea id="excerpt_ru" name="excerpt_ru" maxlength="400">{{ project.excerpt_ru or '' if project else '' }}</textarea>
+          <p class="hint">одна-две фразы для карточки в списке</p>
+        </div>
+        <div class="field">
+          <label for="excerpt_tj">Таджикский</label>
+          <textarea id="excerpt_tj" name="excerpt_tj" maxlength="400">{{ project.excerpt_tj or '' if project else '' }}</textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    {% set blocks = [
+      ('task', 'Задача', 'что требовалось сделать'),
+      ('solution', 'Решение', 'как вы её решили'),
+      ('features', 'Функционал', 'ключевые возможности, по одной на строку'),
+      ('result', 'Результат', 'что получилось в итоге')
+    ] %}
+    {% for name, label, hint in blocks %}
+    <fieldset>
+      <legend>{{ label }}</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="{{ name }}_ru">Русский</label>
+          <textarea id="{{ name }}_ru" name="{{ name }}_ru">{{ project[name ~ '_ru'] or '' if project else '' }}</textarea>
+          <p class="hint">{{ hint }}</p>
+        </div>
+        <div class="field">
+          <label for="{{ name }}_tj">Таджикский</label>
+          <textarea id="{{ name }}_tj" name="{{ name }}_tj">{{ project[name ~ '_tj'] or '' if project else '' }}</textarea>
+        </div>
+      </div>
+    </fieldset>
+    {% endfor %}
+
+    <fieldset>
+      <legend>Технологии и ссылки</legend>
+      <div class="field">
+        <label for="tech">Стек</label>
+        <input id="tech" name="tech" type="text" maxlength="500" value="{{ tech }}"
+               placeholder="Python, aiogram, PostgreSQL">
+        <p class="hint">через запятую</p>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="project_url">Ссылка на проект</label>
+          <input id="project_url" name="project_url" type="text" maxlength="300"
+                 value="{{ project.project_url or '' if project else '' }}" placeholder="https://…">
+          <p class="hint">пусто — кнопка не появится</p>
+        </div>
+        <div class="field">
+          <label for="github_url">GitHub</label>
+          <input id="github_url" name="github_url" type="text" maxlength="300"
+                 value="{{ project.github_url or '' if project else '' }}" placeholder="https://github.com/…">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Поисковики</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="seo_title_ru">Заголовок вкладки · русский</label>
+          <input id="seo_title_ru" name="seo_title_ru" type="text" maxlength="200"
+                 value="{{ project.seo_title_ru or '' if project else '' }}">
+          <p class="hint">пусто — возьму название проекта</p>
+        </div>
+        <div class="field">
+          <label for="seo_title_tj">Заголовок вкладки · таджикский</label>
+          <input id="seo_title_tj" name="seo_title_tj" type="text" maxlength="200"
+                 value="{{ project.seo_title_tj or '' if project else '' }}">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="seo_description_ru">Описание · русский</label>
+          <textarea id="seo_description_ru" name="seo_description_ru" maxlength="300">{{ project.seo_description_ru or '' if project else '' }}</textarea>
+        </div>
+        <div class="field">
+          <label for="seo_description_tj">Описание · таджикский</label>
+          <textarea id="seo_description_tj" name="seo_description_tj" maxlength="300">{{ project.seo_description_tj or '' if project else '' }}</textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="sticky">
+      <label class="check">
+        <input type="checkbox" name="status" value="published"
+               {% if project and project.status == 'published' %}checked{% endif %}>
+        <span>Опубликовать на сайте</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" name="featured" value="1"
+               {% if project and project.featured %}checked{% endif %}>
+        <span>Показать в избранных</span>
+      </label>
+      <button type="submit" style="margin-left:auto">Сохранить</button>
+    </div>
+  </form>
+
+  {% if project %}
+  <h2>Картинки</h2>
+  <form class="drop" method="post" enctype="multipart/form-data"
+        action="/admin/projects/{{ project.id }}/images">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
+    <input type="text" name="alt_ru" placeholder="Что на картинке" maxlength="200"
+           style="flex:1;min-width:180px">
+    <button type="submit">Загрузить</button>
+  </form>
+  <p class="hint" style="margin-top:.5rem">
+    JPEG, PNG или WebP до 8 МБ. Большие уменьшаются до 1920px и пересохраняются
+    в WebP. Данные съёмки, включая координаты, вырезаются.
+  </p>
+
+  {% if images %}
+  <div class="shots" style="margin-top:1.25rem">
+    {% for im in images %}
+    <figure class="shot{% if project.cover_image_id == im.id %} is-cover{% endif %}" style="margin:0">
+      <img src="/uploads/{{ im.filename }}" alt="{{ im.alt_ru or '' }}" loading="lazy"
+           width="{{ im.width }}" height="{{ im.height }}">
+      <figcaption class="shot-b">
+        {% if project.cover_image_id == im.id %}
+          <span class="tag">обложка</span>
+        {% else %}
+          <form method="post" action="/admin/projects/{{ project.id }}/cover">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="image_id" value="{{ im.id }}">
+            <button class="mini" type="submit">Сделать обложкой</button>
+          </form>
+        {% endif %}
+        <form method="post" action="/admin/projects/{{ project.id }}/images/{{ im.id }}/delete"
+              onsubmit="return confirm('Удалить картинку?')">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="mini danger" type="submit" aria-label="Удалить картинку">×</button>
+        </form>
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% else %}
+  <p class="hint" style="margin-top:2rem">Картинки можно будет загрузить после сохранения.</p>
+  {% endif %}
+</main>
+{% endblock %}

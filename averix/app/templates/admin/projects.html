@@ -1,0 +1,76 @@
+{% extends "admin/base.html" %}
+{% block title %}Проекты{% endblock %}
+{% block body %}
+{% with page = 'projects' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>Проекты</h1>
+    <a href="/admin/projects/new"><button type="button">Добавить проект</button></a>
+  </div>
+
+  {% if projects %}
+  <div class="list">
+    {% for p in projects %}
+    <article class="row">
+      {% if p.cover %}
+        <img class="thumb" src="/uploads/{{ p.cover }}" alt="" loading="lazy">
+      {% else %}
+        <div class="thumb none">нет фото</div>
+      {% endif %}
+
+      <div>
+        <div class="name">
+          <a href="/admin/projects/{{ p.id }}" style="color:inherit;text-decoration:none">{{ p.title_ru }}</a>
+        </div>
+        <div class="meta">
+          {{ categories.get(p.category, p.category) }}{% if p.year %} · {{ p.year }}{% endif %} · /{{ p.slug }}
+          {% if not p.title_tj %} · <span style="color:var(--danger)">нет перевода</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="acts">
+        {% if p.featured %}<span class="badge star">избранный</span>{% endif %}
+        {% if p.status == 'published' %}
+          <span class="badge pub">опубликован</span>
+        {% else %}
+          <span class="badge draft">черновик</span>
+        {% endif %}
+
+        <form method="post" action="/admin/projects/{{ p.id }}/toggle">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="field" value="status">
+          <button class="mini" type="submit">{{ 'Скрыть' if p.status == 'published' else 'Опубликовать' }}</button>
+        </form>
+        <form method="post" action="/admin/projects/{{ p.id }}/toggle">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="field" value="featured">
+          <button class="mini" type="submit">{{ 'Убрать из избранных' if p.featured else 'В избранные' }}</button>
+        </form>
+        <form method="post" action="/admin/projects/{{ p.id }}/move">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="direction" value="up">
+          <button class="mini" type="submit" aria-label="Выше">↑</button>
+        </form>
+        <form method="post" action="/admin/projects/{{ p.id }}/move">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="direction" value="down">
+          <button class="mini" type="submit" aria-label="Ниже">↓</button>
+        </form>
+        <form method="post" action="/admin/projects/{{ p.id }}/delete"
+              onsubmit="return confirm('Удалить «{{ p.title_ru }}» вместе со всеми картинками? Отменить будет нельзя.')">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="mini danger" type="submit">Удалить</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>Проектов пока нет. Добавьте первый — он появится на сайте только
+       после того, как вы его опубликуете.</p>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}
