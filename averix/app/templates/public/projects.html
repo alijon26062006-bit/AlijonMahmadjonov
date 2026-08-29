@@ -9,8 +9,7 @@
   <div class="shell">
     <div class="head">
       <div class="head-row">
-        <span class="tag-n">[01]</span>
-        <span class="label" data-i18n="work.label">Избранные проекты</span>
+        <span class="label" data-i18n="projects.label">Портфолио</span>
       </div>
       <h1 class="r" data-i18n="projects.h1">Проекты</h1>
       <p class="lede r d1" data-i18n="projects.lede">Здесь только то, что действительно сделано и запущено. Каждый кейс — с задачей, решением и результатом.</p>
@@ -32,21 +31,26 @@
 <section class="section section-tight">
   <div class="shell">
     {% if projects %}
-    <div class="grid-cases">
+    <div class="work-list">
       {% for p in projects %}
-      <article class="tile glass r">
-        <a class="tile-shot{% if not p.cover %} none{% endif %}" href="/projects/{{ p.slug }}" tabindex="-1" aria-hidden="true">
+      {# Номер не украшение: показывает, сколько всего работ
+         и какая по счёту перед вами. #}
+      <article class="work r">
+        <a class="work-shot{% if not p.cover %} none{% endif %}" href="/projects/{{ p.slug }}"
+           tabindex="-1" aria-hidden="true">
           {% if p.cover %}
           <img src="/uploads/{{ p.cover }}" alt="" loading="lazy" decoding="async"
                width="{{ p.cover_w or 1200 }}" height="{{ p.cover_h or 800 }}">
           {% else %}<span class="case-none">{{ p.title }}</span>{% endif %}
         </a>
-        <div class="tile-body">
+
+        <div class="work-body">
+          <p class="work-n" aria-hidden="true">{{ '%02d' % loop.index }}</p>
           <p class="case-meta">{{ p.category_label }}{% if p.year %} · {{ p.year }}{% endif %}</p>
           <h2><a href="/projects/{{ p.slug }}">{{ p.title }}</a></h2>
           {% if p.excerpt %}<p class="case-text">{{ p.excerpt }}</p>{% endif %}
           {% if p.tech %}
-          <ul class="tags">{% for t in p.tech[:5] %}<li>{{ t }}</li>{% endfor %}</ul>
+          <ul class="work-tech">{% for t in p.tech %}<li>{{ t }}</li>{% endfor %}</ul>
           {% endif %}
           <a class="link-more" href="/projects/{{ p.slug }}">
             <span data-i18n="work.more">Смотреть кейс</span> <i aria-hidden="true">↗</i>

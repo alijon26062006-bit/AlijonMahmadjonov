@@ -41,21 +41,24 @@
       <h2 class="r" data-i18n="work.h2">Работы, которые лучше всего показывают подход</h2>
     </div>
 
-    <div class="cases">
+    {# Тот же приём, что на странице проектов: одинаковый язык
+       в двух местах вместо двух разных наборов карточек. #}
+    <div class="work-list">
       {% for p in featured %}
-      <article class="case glass r{% if loop.index is even %} flip{% endif %}">
-        <a class="case-shot{% if not p.cover %} none{% endif %}" href="/projects/{{ p.slug }}" tabindex="-1" aria-hidden="true">
+      <article class="work r">
+        <a class="work-shot{% if not p.cover %} none{% endif %}" href="/projects/{{ p.slug }}"
+           tabindex="-1" aria-hidden="true">
           {% if p.cover %}
           <img src="/uploads/{{ p.cover }}" alt="" loading="lazy" decoding="async"
                width="{{ p.cover_w or 1200 }}" height="{{ p.cover_h or 800 }}">
           {% else %}<span class="case-none">{{ p.title }}</span>{% endif %}
         </a>
-        <div class="case-body">
+        <div class="work-body">
           <p class="case-meta">{{ p.category_label }}{% if p.year %} · {{ p.year }}{% endif %}</p>
           <h3><a href="/projects/{{ p.slug }}">{{ p.title }}</a></h3>
           {% if p.excerpt %}<p class="case-text">{{ p.excerpt }}</p>{% endif %}
           {% if p.tech %}
-          <ul class="tags">{% for t in p.tech %}<li>{{ t }}</li>{% endfor %}</ul>
+          <ul class="work-tech">{% for t in p.tech %}<li>{{ t }}</li>{% endfor %}</ul>
           {% endif %}
           <a class="link-more" href="/projects/{{ p.slug }}">
             <span data-i18n="work.more">Смотреть кейс</span> <i aria-hidden="true">↗</i>
