@@ -29,15 +29,15 @@
   --s1:.5rem; --s2:1rem; --s3:1.5rem; --s4:2.5rem; --s5:4rem; --s6:7rem;
   --r:6px; --pill:999px;
 
-  --display:"Unbounded","Manrope",system-ui,sans-serif;
-  --body:"Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --display:"Geologica","Golos Text",system-ui,sans-serif;
+  --body:"Golos Text",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
 
   --t:170ms cubic-bezier(.22,.7,.28,1);
 }
 
 *,*::before,*::after{box-sizing:border-box}
-html{scroll-behavior:smooth; scroll-padding-top:100px}
+html{scroll-behavior:smooth; scroll-padding-top:100px; overflow-x:hidden}
 body{
   margin:0; background:var(--void); color:var(--text);
   font-family:var(--body); font-size:16px; line-height:1.65;
@@ -92,7 +92,15 @@ a{color:var(--violet)}
 /* ============================================================
    Шапка
    ============================================================ */
-.nav{position:sticky; top:0; z-index:100; background:rgba(10,9,15,.82); backdrop-filter:blur(14px); border-bottom:1px solid transparent; transition:border-color var(--t)}
+/* Размытие живёт на псевдоэлементе, а не на самой шапке.
+   backdrop-filter на элементе делает его containing block для
+   position:fixed — выдвижная панель внутри тогда зажимается
+   в габариты шапки вместо всего экрана. */
+.nav{position:sticky; top:0; z-index:100; border-bottom:1px solid transparent; transition:border-color var(--t)}
+.nav::before{
+  content:""; position:absolute; inset:0; z-index:-1;
+  background:rgba(10,9,15,.82); backdrop-filter:blur(14px);
+}
 .nav.stuck{border-bottom-color:var(--line)}
 .nav-in{display:flex; align-items:center; gap:var(--s3); min-height:72px}
 
@@ -126,20 +134,43 @@ a{color:var(--violet)}
 .burger[aria-expanded="true"] span:nth-child(2){opacity:0}
 .burger[aria-expanded="true"] span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
 
+/* кнопка в панели — только на мобильных.
+   Селектор с двумя классами: правило .nav-links a иначе
+   перебивает одиночный .drawer-cta по специфичности. */
+.nav-links .drawer-cta{display:none}
+/* Затемнение ниже шапки (z-index 100), а не выше: панель — это
+   position:fixed внутри .nav, поэтому она заперта в его контексте
+   наложения и своим z-index затемнение не перебьёт. Заодно верхняя
+   строка с логотипом и языком остаётся видимой поверх панели. */
+.backdrop{
+  position:fixed; inset:0; z-index:90;
+  background:rgba(10,9,15,.72); backdrop-filter:blur(3px);
+  opacity:0; transition:opacity var(--t);
+}
+.backdrop.open{opacity:1}
+
 @media (max-width:900px){
-  /* закрытое меню убираем через visibility, а не только сдвигом:
-     сдвинутая панель иначе выглядывает над шапкой */
+  /* выдвижная панель справа: закрытая убрана за край и недоступна
+     ни мышью, ни клавиатурой (visibility), а не просто сдвинута */
   .nav-links{
-    position:absolute; top:100%; left:0; right:0; z-index:10; margin:0;
-    flex-direction:column; gap:0; padding:0 var(--s3) var(--s2);
-    background:var(--void); border-bottom:1px solid var(--line);
-    opacity:0; visibility:hidden; transform:translateY(-8px);
-    transition:opacity var(--t), transform var(--t), visibility var(--t);
+    /* начинается под шапкой: верхняя строка с логотипом и языком
+       остаётся видимой и рабочей при открытой панели */
+    position:fixed; top:72px; right:0; bottom:0; left:auto; z-index:120; margin:0;
+    width:min(340px,86vw); padding:var(--s3);
+    border-top:1px solid var(--line);
+    flex-direction:column; gap:0; align-items:stretch;
+    background:var(--panel); border-left:1px solid var(--line);
+    overflow-y:auto; overscroll-behavior:contain;
+    transform:translateX(100%); visibility:hidden;
+    transition:transform 220ms cubic-bezier(.22,.7,.28,1), visibility 220ms;
   }
-  .nav-links.open{opacity:1; visibility:visible; transform:none}
-  .nav-links a{min-height:52px; font-size:.95rem; border-bottom:1px solid var(--line)}
-  .nav-links a:last-child{border-bottom:0}
-  .burger{display:flex; margin-left:auto}
+  .nav-links.open{transform:none; visibility:visible}
+  .nav-links a{
+    min-height:58px; font-family:var(--display); font-size:1.15rem;
+    font-weight:500; color:var(--text); border-bottom:1px solid var(--line);
+  }
+  .nav-links .drawer-cta{display:flex; margin-top:var(--s4)}
+  .burger{display:flex; margin-left:auto; position:relative; z-index:130}
 }
 
 /* ============================================================
@@ -315,13 +346,35 @@ a{color:var(--violet)}
 /* ============================================================
    Подвал
    ============================================================ */
-.foot{border-top:1px solid var(--line); padding:var(--s4) 0}
-.foot-in{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s3)}
-.foot-brand{display:flex; align-items:center; gap:.6rem; margin-right:auto}
-.foot-links{display:flex; flex-wrap:wrap; gap:var(--s3)}
-.foot-links a{display:inline-flex; align-items:center; min-height:44px; font-family:var(--mono); font-size:.8rem; color:var(--muted); text-decoration:none; transition:color var(--t)}
-.foot-links a:hover{color:var(--violet)}
-.foot-copy{font-family:var(--mono); font-size:.76rem; color:var(--faint); width:100%}
+.foot{border-top:1px solid var(--line); padding:var(--s5) 0 var(--s3)}
+.foot-top{display:grid; gap:var(--s5); margin-bottom:var(--s5)}
+@media (min-width:820px){ .foot-top{grid-template-columns:1.3fr 1fr 1fr 1.2fr; gap:var(--s4)} }
+
+.foot-brand{display:flex; align-items:center; gap:.6rem; margin-bottom:var(--s2)}
+.foot-about{color:var(--muted); font-size:.9rem; max-width:34ch}
+.foot-social{display:flex; gap:.5rem; margin-top:var(--s3)}
+.foot-social a{
+  display:grid; place-items:center; width:44px; height:44px;
+  border:1px solid var(--line); border-radius:var(--r); color:var(--muted);
+  transition:border-color var(--t), color var(--t);
+}
+.foot-social a:hover{border-color:var(--violet); color:var(--violet)}
+.foot-social svg{width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linejoin:round}
+
+.foot-col h3{
+  font-family:var(--mono); font-size:.72rem; font-weight:500; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--faint); margin-bottom:.4rem;
+}
+.foot-col li a,
+.foot-col li span{
+  display:inline-flex; align-items:center; min-height:44px;
+  font-size:.9rem; color:var(--muted); text-decoration:none; transition:color var(--t);
+}
+.foot-col li a:hover{color:var(--violet)}
+.foot-col li span{color:var(--faint)}
+
+.foot-bottom{display:flex; flex-wrap:wrap; gap:var(--s2) var(--s3); padding-top:var(--s3); border-top:1px solid var(--line)}
+.foot-copy{font-family:var(--mono); font-size:.76rem; color:var(--faint)}
 
 /* ============================================================
    Появление при скролле

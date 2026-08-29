@@ -183,6 +183,11 @@
     'form.note': 'дархост ҳамчун паёми тайёр кушода мешавад — танҳо «Фиристодан»-ро пахш кунед',
     'form.sent': 'Telegram кушода шуд — «Фиристодан»-ро пахш кунед.',
 
+    'foot.about': 'Студия аз Душанбе. Сомонаҳо ва лендингҳо, ки бо даст барои вазифаи тиҷорат сохта мешаванд.',
+    'foot.services': 'Хизматрасонӣ',
+    'foot.studio': 'Студия',
+    'foot.contact': 'Тамос',
+    'foot.faq': 'Саволҳо',
     'foot.city': 'Душанбе, Тоҷикистон'
   };
 
@@ -241,27 +246,45 @@
 
   var burger = document.getElementById('burger');
   var menu = document.getElementById('menu');
+  var backdrop = document.getElementById('backdrop');
 
-  function closeMenu() {
-    menu.classList.remove('open');
-    burger.setAttribute('aria-expanded', 'false');
-    burger.setAttribute('aria-label', 'Открыть меню');
+  function openMenu() {
+    menu.classList.add('open');
+    backdrop.hidden = false;
+    /* следующий кадр — иначе переход прозрачности не проиграется */
+    requestAnimationFrame(function () { backdrop.classList.add('open'); });
+    burger.setAttribute('aria-expanded', 'true');
+    burger.setAttribute('aria-label', 'Закрыть меню');
+    document.body.style.overflow = 'hidden';
+    var first = menu.querySelector('a');
+    if (first) first.focus();
   }
 
-  if (burger && menu) {
+  function closeMenu(returnFocus) {
+    menu.classList.remove('open');
+    backdrop.classList.remove('open');
+    backdrop.hidden = true;
+    burger.setAttribute('aria-expanded', 'false');
+    burger.setAttribute('aria-label', 'Открыть меню');
+    document.body.style.overflow = '';
+    if (returnFocus) burger.focus();
+  }
+
+  if (burger && menu && backdrop) {
     burger.addEventListener('click', function () {
-      var open = menu.classList.toggle('open');
-      burger.setAttribute('aria-expanded', String(open));
-      burger.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
+      if (menu.classList.contains('open')) closeMenu(true);
+      else openMenu();
     });
+    backdrop.addEventListener('click', function () { closeMenu(true); });
     menu.addEventListener('click', function (e) {
-      if (e.target.tagName === 'A') closeMenu();
+      if (e.target.closest('a')) closeMenu(false);
     });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && menu.classList.contains('open')) {
-        closeMenu();
-        burger.focus();
-      }
+      if (e.key === 'Escape' && menu.classList.contains('open')) closeMenu(true);
+    });
+    /* панель живёт только на узких экранах — на широких закрываем принудительно */
+    window.addEventListener('resize', function () {
+      if (window.innerWidth > 900 && menu.classList.contains('open')) closeMenu(false);
     });
   }
 
