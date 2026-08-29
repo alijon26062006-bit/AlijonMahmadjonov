@@ -1,0 +1,13 @@
+{% extends "freelancer/base.html" %}
+{% block title %}Задача не найдена{% endblock %}
+{% block body %}
+{% with page = 'tasks' %}{% include "freelancer/_top.html" %}{% endwith %}
+<main class="wrap">
+  <div class="bar"><h1>Задача не найдена</h1></div>
+  <div class="empty">
+    <p>Такой задачи нет или она назначена не на вас. В кабинете видны только
+       ваши задачи — это не ошибка, а как задумано.</p>
+    <p style="margin-top:1rem"><a href="/freelancer/dashboard"><button type="button">К моим задачам</button></a></p>
+  </div>
+</main>
+{% endblock %}

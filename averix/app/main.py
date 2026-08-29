@@ -37,6 +37,8 @@ async def lifespan(_: FastAPI):
         journal.event("миграции.применены", files=", ".join(applied))
     with connect() as conn:
         security.purge_expired(conn)
+        from . import work as _work
+        _work.purge_freelancer_sessions(conn)
     journal.event("приложение.запущено")
     yield
     journal.event("приложение.остановлено")
@@ -48,9 +50,11 @@ from .routes_public import router as public_router  # noqa: E402  (после с
 from .routes_public import public_notfound  # noqa: E402
 from .routes_admin_studio import router as studio_router  # noqa: E402
 from .routes_admin_work import router as work_router  # noqa: E402
+from .routes_freelancer import router as freelancer_router  # noqa: E402
 app.include_router(public_router)
 app.include_router(studio_router)
 app.include_router(work_router)
+app.include_router(freelancer_router)
 
 
 # ---------- вспомогательное ----------

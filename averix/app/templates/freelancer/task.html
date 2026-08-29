@@ -1,0 +1,86 @@
+{% extends "freelancer/base.html" %}
+{% block title %}{{ task.title }}{% endblock %}
+{% block body %}
+{% with page = 'tasks' %}{% include "freelancer/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>{{ task.title }}</h1>
+    <a href="/freelancer/dashboard"><button class="ghost" type="button">К списку</button></a>
+  </div>
+
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+  <p class="meta" style="margin-bottom:1.25rem">
+    {{ task.project_title }}
+    {% if task.deadline %} · срок {{ task.deadline }}{% endif %}
+    {% if task.price %} · оплата {{ task.price }}{% endif %}
+    · <span class="badge {{ 'done' if task.status == 'completed' else ('wait' if task.status in ('revision','assigned') else 'idle') }}">{{ statuses.get(task.status, task.status) }}</span>
+  </p>
+
+  {% if task.description %}<p class="msg">{{ task.description }}</p>{% endif %}
+
+  {% if task.skills %}<p class="meta" style="margin-top:.9rem">Технологии: {{ task.skills }}</p>{% endif %}
+
+  {% if moves %}
+  <h2 class="group">Что можно сделать</h2>
+  <form method="post" action="/freelancer/tasks/{{ task.id }}/move">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% for key in moves %}
+    <button class="mini" type="submit" name="status" value="{{ key }}">
+      {% if key == 'in_progress' %}Взять в работу{% elif key == 'review' %}Отправить на проверку{% else %}{{ statuses.get(key, key) }}{% endif %}
+    </button>
+    {% endfor %}
+  </form>
+  {% endif %}
+
+  {% if task.status in ('in_progress', 'revision') %}
+  <h2 class="group">Сдать работу</h2>
+  <form method="post" action="/freelancer/tasks/{{ task.id }}/submit">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <fieldset>
+      <legend>Результат</legend>
+      <div class="field">
+        <label for="result_text">Что сделано</label>
+        <textarea id="result_text" name="result_text" rows="4" maxlength="4000"
+                  placeholder="Коротко: что готово и на что обратить внимание">{{ task.result_text or '' }}</textarea>
+      </div>
+      <div class="field">
+        <label for="result_url">Ссылка</label>
+        <input id="result_url" name="result_url" type="url" maxlength="500"
+               value="{{ task.result_url or '' }}" placeholder="https://">
+        <p class="hint">репозиторий, макет, тестовый адрес — что подходит</p>
+      </div>
+      <button type="submit">Отправить на проверку</button>
+    </fieldset>
+  </form>
+  {% elif task.result_text or task.result_url %}
+  <h2 class="group">Отправленный результат</h2>
+  {% if task.result_text %}<p class="msg">{{ task.result_text }}</p>{% endif %}
+  {% if task.result_url %}
+  <p style="margin-top:.6rem"><a href="{{ task.result_url }}" target="_blank" rel="noopener">{{ task.result_url }}</a></p>
+  {% endif %}
+  {% endif %}
+
+  <h2 class="group">История</h2>
+  {% if history %}
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Когда</th><th>Кто</th><th>Переход</th><th>Комментарий</th></tr></thead>
+      <tbody>
+        {% for h in history %}
+        <tr>
+          <td class="num">{{ h.created_at }}</td>
+          <td>{{ h.actor }}</td>
+          <td class="num">{{ statuses.get(h.from_status, h.from_status or '—') }} → {{ statuses.get(h.to_status, h.to_status) }}</td>
+          <td>{{ h.comment or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>Переходов пока не было.</p></div>
+  {% endif %}
+</main>
+{% endblock %}

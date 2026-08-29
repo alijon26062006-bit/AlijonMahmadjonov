@@ -1,0 +1,39 @@
+{% extends "freelancer/base.html" %}
+{% block title %}Вход в кабинет{% endblock %}
+{% block body %}
+<main class="center">
+  <div class="card">
+    <a class="brand" href="/" style="margin-bottom:1.5rem">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <polygon points="55,6 69,6 59,27 45,27" fill="#B98CF2"/>
+        <polygon points="42,35 75,35 79,55 38,55" fill="#B98CF2"/>
+        <polygon points="34,63 82,63 86,83 30,83" fill="#3FD98A"/>
+      </svg>
+      <b>AVERI<span>X</span></b>
+    </a>
+
+    <h1 style="font-size:1.25rem;margin-bottom:.4rem">Кабинет специалиста</h1>
+    <p class="hint" style="margin-bottom:1.5rem">
+      Доступ выдаёт студия после одобрения анкеты. Если анкету ещё не смотрели —
+      входа пока нет.
+    </p>
+
+    {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+    <form method="post" action="/freelancer/login">
+      <input type="hidden" name="lc" value="{{ lc }}">
+      <div class="field">
+        <label for="login">Логин</label>
+        <input id="login" name="login" type="text" required autocomplete="username"
+               autocapitalize="none" spellcheck="false" maxlength="60">
+      </div>
+      <div class="field">
+        <label for="password">Пароль</label>
+        <input id="password" name="password" type="password" required
+               autocomplete="current-password" maxlength="200">
+      </div>
+      <button type="submit" style="width:100%">Войти</button>
+    </form>
+  </div>
+</main>
+{% endblock %}

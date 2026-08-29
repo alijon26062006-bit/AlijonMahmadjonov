@@ -20,6 +20,12 @@ def _val(form, name: str, limit: int = 4000) -> str:
     return str(form.get(name, "")).strip()[:limit]
 
 
+# В истории задачи админ подписан студией, а не своим логином: эту
+# историю видит и фрилансер, а логин админа — половина доступа к панели.
+# Кто именно нажал кнопку, остаётся в журнале действий.
+ADMIN_ACTOR = "AVERIX"
+
+
 def _int(form, name: str) -> int | None:
     raw = _val(form, name, 12)
     return int(raw) if raw.lstrip("-").isdigit() else None
@@ -306,15 +312,15 @@ async def task_save(request: Request):
             "freelancer_id": assignee,
             "admin_note": _val(form, "admin_note", 2000),
             "sort_order": _int(form, "sort_order") or 0,
-            "actor": session["username"],
+            "actor": ADMIN_ACTOR,
         })
         if current is not None and current["freelancer_id"] != assignee:
             work.log_task(conn, task_id, current["status"], current["status"],
-                          session["username"],
+                          ADMIN_ACTOR,
                           "исполнитель назначен" if assignee else "исполнитель снят")
             if assignee and current["status"] == "todo":
                 work.move_task(conn, task_id, "assigned", by_admin=True,
-                               actor=session["username"])
+                               actor=ADMIN_ACTOR)
         audit.record(conn, session, "TASK_CHANGED", "tasks", task_id)
     return back(f"/admin/client-projects/{project_id}")
 
@@ -332,7 +338,7 @@ async def task_move(request: Request, task_id: int):
         if row is None:
             return error_page(request, 404)
         problem = work.move_task(conn, task_id, _val(form, "status", 20),
-                                 by_admin=True, actor=session["username"],
+                                 by_admin=True, actor=ADMIN_ACTOR,
                                  comment=_val(form, "comment", 500))
         if problem is None:
             audit.record(conn, session, "TASK_CHANGED", "tasks", task_id,

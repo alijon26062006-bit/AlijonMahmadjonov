@@ -1,0 +1,121 @@
+{% extends "freelancer/base.html" %}
+{% block title %}Профиль{% endblock %}
+{% block body %}
+{% with page = 'profile' %}{% include "freelancer/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar"><h1>Профиль</h1></div>
+  <p class="hint" style="margin-bottom:1.5rem">
+    Это ваша анкета в базе студии. На сайт она не выводится.
+  </p>
+
+  {% if saved %}<p class="alert ok" role="status">Сохранено.</p>{% endif %}
+
+  <form method="post" action="/freelancer/profile">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <fieldset>
+      <legend>Кто вы</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="name">Имя</label>
+          <input id="name" name="name" type="text" maxlength="100" value="{{ me.name }}">
+        </div>
+        <div class="field">
+          <label for="specialization">Специализация</label>
+          <select id="specialization" name="specialization">
+            {% for key, label in specializations.items() %}
+            <option value="{{ key }}"{% if me.specialization == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="skills">Технологии</label>
+        <input id="skills" name="skills" type="text" maxlength="500" value="{{ me.skills or '' }}">
+      </div>
+      <div class="field">
+        <label for="about">О себе</label>
+        <textarea id="about" name="about" rows="4" maxlength="3000">{{ me.about or '' }}</textarea>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Связь</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="telegram">Telegram</label>
+          <input id="telegram" name="telegram" type="text" maxlength="120" value="{{ me.telegram or '' }}">
+        </div>
+        <div class="field">
+          <label for="email">Почта</label>
+          <input id="email" name="email" type="email" maxlength="120" value="{{ me.email or '' }}">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="country">Страна</label>
+          <input id="country" name="country" type="text" maxlength="80" value="{{ me.country or '' }}">
+        </div>
+        <div class="field">
+          <label for="city">Город</label>
+          <input id="city" name="city" type="text" maxlength="80" value="{{ me.city or '' }}">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Работы и опыт</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="portfolio_url">Портфолио</label>
+          <input id="portfolio_url" name="portfolio_url" type="url" maxlength="300" value="{{ me.portfolio_url or '' }}">
+        </div>
+        <div class="field">
+          <label for="github_url">GitHub</label>
+          <input id="github_url" name="github_url" type="url" maxlength="300" value="{{ me.github_url or '' }}">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="years">Лет опыта</label>
+          <input id="years" name="years" type="text" maxlength="40" value="{{ me.years or '' }}">
+        </div>
+        <div class="field">
+          <label for="experience">Где работали</label>
+          <input id="experience" name="experience" type="text" maxlength="500" value="{{ me.experience or '' }}">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Условия</legend>
+      <div class="grid2">
+        <div class="field">
+          <label for="rate">Ставка</label>
+          <input id="rate" name="rate" type="text" maxlength="80" value="{{ me.rate or '' }}">
+        </div>
+        <div class="field">
+          <label for="rate_type">Тип ставки</label>
+          <select id="rate_type" name="rate_type">
+            {% for key, label in rate_types.items() %}
+            <option value="{{ key }}"{% if me.rate_type == key %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="availability">Занятость сейчас</label>
+        <select id="availability" name="availability">
+          {% for key, label in availability.items() %}
+          <option value="{{ key }}"{% if me.availability == key %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <p class="hint">по ней студия понимает, звать ли вас на новую задачу</p>
+      </div>
+    </fieldset>
+
+    <button type="submit">Сохранить</button>
+  </form>
+</main>
+{% endblock %}

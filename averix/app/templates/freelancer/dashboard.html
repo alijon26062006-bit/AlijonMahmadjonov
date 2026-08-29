@@ -1,0 +1,47 @@
+{% extends "freelancer/base.html" %}
+{% block title %}Мои задачи{% endblock %}
+{% block body %}
+{% with page = 'tasks' %}{% include "freelancer/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar">
+    <h1>Мои задачи</h1>
+  </div>
+  <p class="hint" style="margin-bottom:1.5rem">Здравствуйте, {{ me.name }}. Здесь только ваши задачи.</p>
+
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+  <div class="stats">
+    <div><b>{{ counts.active }}</b><span>в работе</span></div>
+    <div><b>{{ counts.review }}</b><span>на проверке</span></div>
+    <div><b>{{ counts.done }}</b><span>завершено</span></div>
+  </div>
+
+  {% if tasks %}
+  <div class="list">
+    {% for t in tasks %}
+    <article class="row">
+      <div>
+        <div class="name"><a href="/freelancer/tasks/{{ t.id }}">{{ t.title }}</a></div>
+        <div class="meta">
+          {{ t.project_title }}
+          {% if t.deadline %} · срок {{ t.deadline }}{% endif %}
+          {% if t.price %} · {{ t.price }}{% endif %}
+        </div>
+      </div>
+      <div class="acts">
+        <span class="badge {{ 'done' if t.status == 'completed' else ('wait' if t.status in ('revision','assigned') else 'idle') }}">
+          {{ statuses.get(t.status, t.status) }}
+        </span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>Задач пока нет. Когда студия назначит вам работу, она появится здесь —
+       и мы напишем в Telegram.</p>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

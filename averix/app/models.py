@@ -523,4 +523,13 @@ def dashboard_counts(conn: sqlite3.Connection) -> dict:
         "vacancies": one("SELECT COUNT(*) FROM vacancies WHERE status = 'open'"),
         "jobs_new": one("SELECT COUNT(*) FROM job_applications WHERE status = 'new'"),
         "requests_new": one("SELECT COUNT(*) FROM client_requests WHERE status = 'new'"),
+        "requests_total": one("SELECT COUNT(*) FROM client_requests"),
+        "freelancers": one(
+            "SELECT COUNT(*) FROM freelancers WHERE status IN ('approved','active','busy')"),
+        "freelancers_new": one("SELECT COUNT(*) FROM freelancers WHERE status = 'new'"),
+        "client_projects": one(
+            "SELECT COUNT(*) FROM client_projects"
+            " WHERE status IN ('new','planning','in_progress','review')"),
+        "tasks_review": one("SELECT COUNT(*) FROM tasks WHERE status = 'review'"),
+        "notifications_new": one("SELECT COUNT(*) FROM notifications WHERE seen = 0"),
     }
