@@ -33,6 +33,29 @@ SETTING_LABELS = {
     "cta_title": "Призыв в конце страницы",
     "careers_intro": "Вакансии: вступление",
 }
+# Порядок и группировка на странице настроек. По алфавиту из базы
+# получалась каша, в которой контакты стояли вперемешку с текстами.
+SETTING_GROUPS = [
+    ("Контакты", ["contact_telegram", "contact_email", "contact_instagram",
+                  "contact_github", "city"]),
+    ("Первый экран", ["hero_eyebrow", "hero_title", "hero_subtitle"]),
+    ("Цифры", ["stat_years", "stat_active", "stat_accepted"]),
+    ("Тексты страниц", ["about_text", "cta_title", "careers_intro"]),
+]
+
+
+def _grouped(rows) -> list[tuple[str, list]]:
+    by_key = {row["key"]: row for row in rows}
+    out = []
+    for title, keys in SETTING_GROUPS:
+        block = [by_key.pop(key) for key in keys if key in by_key]
+        if block:
+            out.append((title, block))
+    # Настройка, добавленная позже и не попавшая в список, не должна
+    # молча исчезать со страницы
+    if by_key:
+        out.append(("Прочее", list(by_key.values())))
+    return out
 
 
 def _val(form, name: str, limit: int = 4000) -> str:
@@ -55,7 +78,7 @@ async def settings_page(request: Request, saved: str = ""):
     with connect() as conn:
         rows = models.all_settings(conn)
     return page(request, session, "admin/settings.html",
-                rows=rows, labels=SETTING_LABELS, long=LONG_SETTINGS,
+                groups=_grouped(rows), labels=SETTING_LABELS, long=LONG_SETTINGS,
                 saved=saved == "1")
 
 
