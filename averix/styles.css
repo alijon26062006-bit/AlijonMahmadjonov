@@ -38,7 +38,17 @@
   --danger:#FF9A93;
 
   --shell:1220px;
-  --s1:.5rem; --s2:1rem; --s3:1.5rem; --s4:2.5rem; --s5:4rem; --s6:7rem;
+  /* Мелкие отступы фиксированные — они держат внутреннюю плотность.
+     Крупные подвижные: раньше секции отбивались одинаковыми 112px
+     и на 1440, и на 390, из-за чего телефонная страница вытягивалась
+     до пятнадцати тысяч пикселей. */
+  --s1:.5rem; --s2:1rem; --s3:1.5rem;
+  --s4:clamp(1.75rem, 4vw, 2.5rem);
+  --s5:clamp(2.5rem, 6vw, 4rem);
+  --s6:clamp(3.5rem, 9vw, 7rem);
+
+  /* Три радиуса, и каждый со своей ролью: крупные блоки, элементы
+     внутри них, мелочь вроде полей ввода. Плюс пилюля для кнопок. */
   --r-lg:26px; --r:18px; --r-sm:12px; --pill:999px;
 
   --display:"Geologica","Golos Text",system-ui,sans-serif;
@@ -72,7 +82,7 @@ a{color:var(--violet)}
 
 .skip{position:absolute; left:-9999px; top:0; z-index:300; background:var(--violet); color:var(--on-accent); padding:.7rem 1.1rem; font-weight:700; text-decoration:none; border-radius:var(--r-sm)}
 .skip:focus{left:var(--s3); top:var(--s1)}
-:focus-visible{outline:2px solid var(--emerald); outline-offset:3px; border-radius:6px}
+:focus-visible{outline:2px solid var(--emerald); outline-offset:3px; border-radius:var(--r-sm)}
 
 /* ============================================================
    Живой фон
@@ -330,7 +340,7 @@ a{color:var(--violet)}
 .card:hover::after{opacity:1}
 .card-ico{
   display:grid; place-items:center; width:46px; height:46px; margin-bottom:var(--s3);
-  border-radius:14px; background:var(--glass-hi); border:1px solid var(--glass-brd);
+  border-radius:var(--r-sm); background:var(--glass-hi); border:1px solid var(--glass-brd);
   box-shadow:var(--bevel);
 }
 .card-ico svg{width:22px; height:22px; fill:none; stroke:var(--violet); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round}
@@ -355,19 +365,56 @@ a{color:var(--violet)}
 /* ============================================================
    [03] Процесс
    ============================================================ */
-.steps{display:grid; gap:var(--s2)}
-.steps li{
-  display:grid; gap:var(--s2) var(--s4); padding:var(--s4) var(--s3);
-  border-radius:var(--r-lg);
-  transition:transform 320ms var(--spring), border-color var(--t);
+/* Процесс — линия, а не шесть одинаковых плашек.
+
+   Шаги идут один за другим, и вёрстка должна это показывать. Раньше
+   они лежали шестью равными стеклянными карточками — по такой картинке
+   не видно ни порядка, ни движения. Теперь их связывает вертикальная
+   линия, а цвет точки идёт от фиолетового к зелёному: те же два цвета,
+   что в знаке студии, от замысла к результату. */
+.steps{position:relative; display:grid; gap:0}
+.steps::before{
+  content:""; position:absolute; left:5px; top:.9rem; bottom:1.4rem; width:1px;
+  background:linear-gradient(180deg, var(--violet) 0%, rgba(185,140,242,.25) 45%,
+                             rgba(63,217,138,.3) 80%, var(--emerald) 100%);
+  opacity:.5;
 }
-@media (min-width:560px){ .steps li{padding:var(--s4)} }
-@media (min-width:820px){ .steps li{grid-template-columns:110px 1fr 260px; align-items:start} }
-.steps li:hover{transform:translateY(-3px); border-color:var(--glass-brd-hi)}
-.step-n{font-family:var(--mono); font-size:.78rem; color:var(--violet); padding-top:.2rem}
-.steps h3{font-size:1.12rem; margin-bottom:.5rem}
-.steps p{color:var(--muted); font-size:.93rem; max-width:56ch}
-.step-out{font-family:var(--mono); font-size:.78rem; color:var(--emerald); line-height:1.6; padding-top:.2rem}
+.steps li{
+  position:relative; display:grid; gap:.35rem var(--s4);
+  padding:0 0 var(--s4) var(--s4);
+  grid-template-columns:1fr;
+}
+@media (min-width:900px){
+  /* Читается поперёк: номер, шаг с пояснением, что получаете на выходе */
+  .steps li{grid-template-columns:6ch minmax(0,34ch) 1fr; align-items:baseline}
+}
+/* точка на линии */
+.steps li::before{
+  content:""; position:absolute; left:0; top:.55rem; width:11px; height:11px;
+  border-radius:50%; background:var(--void);
+  border:1px solid var(--violet); transition:background var(--t), border-color var(--t);
+}
+.steps li:last-child::before{border-color:var(--emerald)}
+.steps li:last-child{padding-bottom:0}
+@media (hover:hover){
+  .steps li:hover::before{background:var(--violet)}
+  .steps li:last-child:hover::before{background:var(--emerald)}
+}
+.step-n{
+  font-family:var(--mono); font-size:.76rem; color:var(--faint);
+  letter-spacing:.08em; grid-column:1/-1;
+}
+@media (min-width:900px){ .step-n{grid-column:1} }
+.steps h3{font-size:1.1rem; line-height:1.25}
+.steps p{margin-top:.4rem; color:var(--muted); font-size:.94rem; max-width:52ch}
+.step-out{
+  font-family:var(--mono); font-size:.8rem; color:var(--emerald);
+  line-height:1.6; margin-top:.5rem;
+}
+@media (min-width:900px){
+  .step-out{margin-top:0; grid-column:3; justify-self:start}
+  .steps li > div{grid-column:2}
+}
 
 /* ============================================================
    [04] Вопросы и заявка
@@ -444,7 +491,7 @@ a{color:var(--violet)}
 }
 .foot-social{display:flex; gap:.5rem; margin-top:var(--s3)}
 .foot-social a{
-  display:grid; place-items:center; width:44px; height:44px; border-radius:14px;
+  display:grid; place-items:center; width:44px; height:44px; border-radius:var(--r-sm);
   background:var(--glass); border:1px solid var(--glass-brd);
   box-shadow:var(--bevel); color:var(--muted);
   transition:border-color var(--t), color var(--t), transform 200ms var(--spring);
@@ -462,6 +509,50 @@ a{color:var(--violet)}
 .foot-col li span{color:var(--faint)}
 .foot-bottom{display:flex; flex-wrap:wrap; gap:var(--s2) var(--s3); padding-top:var(--s3); border-top:1px solid var(--glass-brd)}
 .foot-copy{font-family:var(--mono); font-size:.76rem; color:var(--faint)}
+
+/* ============================================================
+   Услуги — список, а не сетка карточек
+
+   Пять направлений в сетке 3+2 давали дыру в последнем ряду и делали
+   вид, будто все они одинаковой величины. Список читается сверху вниз,
+   как оглавление, и держит любое количество строк. Подробности живут
+   в раскрывающейся части: на десктопе они появляются при наведении
+   и фокусе, на телефоне и без мыши — видны сразу.
+   ============================================================ */
+.svc-list{border-top:1px solid var(--glass-brd)}
+.svc{
+  display:grid; gap:.35rem 1.25rem; padding:var(--s3) 0;
+  border-bottom:1px solid var(--glass-brd);
+  grid-template-columns:auto 1fr;
+  transition:border-color var(--t);
+}
+@media (min-width:860px){
+  .svc{grid-template-columns:3.5rem minmax(0,22ch) 1fr; align-items:baseline; gap:0 var(--s4)}
+}
+.svc-n{
+  font-family:var(--mono); font-size:.86rem; color:var(--violet);
+  font-variant-numeric:tabular-nums; letter-spacing:.06em;
+}
+.svc h3{font-size:clamp(1.15rem,2.6vw,1.5rem); line-height:1.2}
+.svc-main p{margin-top:.5rem; color:var(--muted); font-size:.96rem; max-width:44ch}
+@media (min-width:860px){ .svc-main p{display:none} }
+
+.svc-more{grid-column:2/-1}
+@media (min-width:860px){ .svc-more{grid-column:3} }
+/* Не «пилюли»: двадцать обведённых овалов на секцию читаются как
+   двадцать кнопок, хотя нажимать нечего. Это подпись к строке —
+   значит и выглядеть должна как подпись. */
+.svc-more ul{display:flex; flex-wrap:wrap; margin-top:.6rem; column-gap:.1rem}
+@media (min-width:860px){ .svc-more ul{margin-top:0} }
+.svc-more li{font-size:.9rem; color:var(--faint); transition:color var(--t)}
+.svc-more li + li::before{content:"·"; margin:0 .5rem; color:var(--glass-brd)}
+
+/* Наведение подсвечивает строку целиком, а не отдельный кусочек */
+@media (hover:hover){
+  .svc:hover{border-bottom-color:rgba(185,140,242,.4)}
+  .svc:hover .svc-n{color:var(--emerald)}
+  .svc:hover .svc-more li{color:var(--muted)}
+}
 
 /* ============================================================
    Сияние за первым экраном

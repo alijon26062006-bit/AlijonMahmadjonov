@@ -135,70 +135,87 @@
       </p>
     </div>
 
-    <div class="cards">
-      <article class="card glass r">
-        <div class="card-ico"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9.5h18M7 13.5h7M7 16.5h10"/></svg></div>
-        <span class="card-n">01</span>
-        <h3 data-i18n="svc1.h">Web Development</h3>
-        <p data-i18n="svc1.p">Лендинги, корпоративные сайты, веб-сервисы и индивидуальные веб-приложения.</p>
-        <ul class="ticks">
-          <li data-i18n="svc1.l1">Прототип, текст и дизайн</li>
-          <li data-i18n="svc1.l2">Вёрстка под все экраны</li>
-          <li data-i18n="svc1.l3">Подключение домена и SSL</li>
-          <li data-i18n="svc1.l4">Панель для правок текста</li>
-        </ul>
+    <!-- Крупный список вместо пяти одинаковых карточек: направления
+         разной величины, и сетка из равных плиток это скрывала. -->
+    <div class="svc-list">
+      <article class="svc r">
+        <span class="svc-n" aria-hidden="true">01</span>
+        <div class="svc-main">
+          <h3 data-i18n="svc1.h">Web Development</h3>
+          <p data-i18n="svc1.p">Лендинги, корпоративные сайты, веб-сервисы и индивидуальные веб-приложения.</p>
+        </div>
+        <div class="svc-more">
+          <ul>
+            <li data-i18n="svc1.l1">Прототип, текст и дизайн</li>
+            <li data-i18n="svc1.l2">Вёрстка под все экраны</li>
+            <li data-i18n="svc1.l3">Подключение домена и SSL</li>
+            <li data-i18n="svc1.l4">Панель для правок текста</li>
+          </ul>
+        </div>
       </article>
 
-      <article class="card glass r">
-        <div class="card-ico"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 4L2.5 11.2l6 2.1 2.1 6L21 4zM8.5 13.3L21 4"/></svg></div>
-        <span class="card-n">02</span>
-        <h3 data-i18n="svc2.h">Telegram Bots</h3>
-        <p data-i18n="svc2.p">Боты с оплатой, автоматизацией, админ-панелями и интеграциями через API.</p>
-        <ul class="ticks">
-          <li data-i18n="svc2.l1">Приём заказов и запись</li>
-          <li data-i18n="svc2.l2">Оплата и уведомления</li>
-          <li data-i18n="svc2.l3">Админка для управления</li>
-          <li data-i18n="svc2.l4">Рассылки и статистика</li>
-        </ul>
+      <article class="svc r">
+        <span class="svc-n" aria-hidden="true">02</span>
+        <div class="svc-main">
+          <h3 data-i18n="svc2.h">Telegram Bots</h3>
+          <p data-i18n="svc2.p">Боты с оплатой, автоматизацией, админ-панелями и интеграциями через API.</p>
+        </div>
+        <div class="svc-more">
+          <ul>
+            <li data-i18n="svc2.l1">Приём заказов и запись</li>
+            <li data-i18n="svc2.l2">Оплата и уведомления</li>
+            <li data-i18n="svc2.l3">Админка для управления</li>
+            <li data-i18n="svc2.l4">Рассылки и статистика</li>
+          </ul>
+        </div>
       </article>
 
-      <article class="card glass r">
-        <div class="card-ico"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
-        <span class="card-n">03</span>
-        <h3 data-i18n="svc3.h">Backend и API</h3>
-        <p data-i18n="svc3.p">Серверная часть, базы данных, REST API и интеграции сторонних сервисов.</p>
-        <ul class="ticks">
-          <li data-i18n="svc3.l1">Проектирование базы</li>
-          <li data-i18n="svc3.l2">REST API и документация</li>
-          <li data-i18n="svc3.l3">Интеграции с чужими сервисами</li>
-          <li data-i18n="svc3.l4">Перенос и миграции данных</li>
-        </ul>
+      <article class="svc r">
+        <span class="svc-n" aria-hidden="true">03</span>
+        <div class="svc-main">
+          <h3 data-i18n="svc3.h">Backend и API</h3>
+          <p data-i18n="svc3.p">Серверная часть, базы данных, REST API и интеграции сторонних сервисов.</p>
+        </div>
+        <div class="svc-more">
+          <ul>
+            <li data-i18n="svc3.l1">Проектирование базы</li>
+            <li data-i18n="svc3.l2">REST API и документация</li>
+            <li data-i18n="svc3.l3">Интеграции с чужими сервисами</li>
+            <li data-i18n="svc3.l4">Перенос и миграции данных</li>
+          </ul>
+        </div>
       </article>
 
-      <article class="card glass r">
-        <div class="card-ico"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.4v2.4M12 18.2v2.4M3.4 12h2.4M18.2 12h2.4M5.9 5.9l1.7 1.7M16.4 16.4l1.7 1.7M18.1 5.9l-1.7 1.7M7.6 16.4l-1.7 1.7"/><circle cx="12" cy="12" r="3.3"/></svg></div>
-        <span class="card-n">04</span>
-        <h3 data-i18n="svc4.h">Automation</h3>
-        <p data-i18n="svc4.p">Автоматизация повторяющихся процессов и внутренних задач бизнеса.</p>
-        <ul class="ticks">
-          <li data-i18n="svc4.l1">Сбор и разбор данных</li>
-          <li data-i18n="svc4.l2">Отчёты по расписанию</li>
-          <li data-i18n="svc4.l3">Связка сервисов между собой</li>
-          <li data-i18n="svc4.l4">Уведомления в мессенджеры</li>
-        </ul>
+      <article class="svc r">
+        <span class="svc-n" aria-hidden="true">04</span>
+        <div class="svc-main">
+          <h3 data-i18n="svc4.h">Automation</h3>
+          <p data-i18n="svc4.p">Автоматизация повторяющихся процессов и внутренних задач бизнеса.</p>
+        </div>
+        <div class="svc-more">
+          <ul>
+            <li data-i18n="svc4.l1">Сбор и разбор данных</li>
+            <li data-i18n="svc4.l2">Отчёты по расписанию</li>
+            <li data-i18n="svc4.l3">Связка сервисов между собой</li>
+            <li data-i18n="svc4.l4">Уведомления в мессенджеры</li>
+          </ul>
+        </div>
       </article>
 
-      <article class="card glass r">
-        <div class="card-ico"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v3M12 18v3M5.6 5.6l2 2M16.4 16.4l2 2M3 12h3M18 12h3"/><rect x="8.5" y="8.5" width="7" height="7" rx="2"/></svg></div>
-        <span class="card-n">05</span>
-        <h3 data-i18n="svc5.h">AI Integration</h3>
-        <p data-i18n="svc5.p">Встраивание AI в сайты, сервисы и Telegram-боты — там, где это решает задачу.</p>
-        <ul class="ticks">
-          <li data-i18n="svc5.l1">Обработка текста и заявок</li>
-          <li data-i18n="svc5.l2">Поиск по своим данным</li>
-          <li data-i18n="svc5.l3">Помощник в боте</li>
-          <li data-i18n="svc5.l4">Разбор документов</li>
-        </ul>
+      <article class="svc r">
+        <span class="svc-n" aria-hidden="true">05</span>
+        <div class="svc-main">
+          <h3 data-i18n="svc5.h">AI Integration</h3>
+          <p data-i18n="svc5.p">Встраивание AI в сайты, сервисы и Telegram-боты — там, где это решает задачу.</p>
+        </div>
+        <div class="svc-more">
+          <ul>
+            <li data-i18n="svc5.l1">Обработка текста и заявок</li>
+            <li data-i18n="svc5.l2">Поиск по своим данным</li>
+            <li data-i18n="svc5.l3">Помощник в боте</li>
+            <li data-i18n="svc5.l4">Разбор документов</li>
+          </ul>
+        </div>
       </article>
     </div>
 
@@ -251,7 +268,7 @@
     </div>
 
     <ol class="steps">
-      <li class="glass r">
+      <li class="r">
         <span class="step-n">01 / 06</span>
         <div>
           <h3 data-i18n="step1.h">Знакомство</h3>
@@ -259,7 +276,7 @@
         </div>
         <span class="step-out" data-i18n="step1.out">→ список страниц и блоков</span>
       </li>
-      <li class="glass r">
+      <li class="r">
         <span class="step-n">02 / 06</span>
         <div>
           <h3 data-i18n="step2.h">Проектирование</h3>
@@ -267,7 +284,7 @@
         </div>
         <span class="step-out" data-i18n="step2.out">→ структура, согласованная до дизайна</span>
       </li>
-      <li class="glass r">
+      <li class="r">
         <span class="step-n">03 / 06</span>
         <div>
           <h3 data-i18n="step3.h">Разработка</h3>
@@ -275,7 +292,7 @@
         </div>
         <span class="step-out" data-i18n="step3.out">→ рабочая версия на тестовом адресе</span>
       </li>
-      <li class="glass r">
+      <li class="r">
         <span class="step-n">04 / 06</span>
         <div>
           <h3 data-i18n="step4.h">Тестирование</h3>
@@ -283,7 +300,7 @@
         </div>
         <span class="step-out" data-i18n="step4.out">→ список правок и их закрытие</span>
       </li>
-      <li class="glass r">
+      <li class="r">
         <span class="step-n">05 / 06</span>
         <div>
           <h3 data-i18n="step5.h">Запуск</h3>
@@ -291,7 +308,7 @@
         </div>
         <span class="step-out" data-i18n="step5.out">→ продукт в работе, доступы у вас</span>
       </li>
-      <li class="glass r">
+      <li class="r">
         <span class="step-n">06 / 06</span>
         <div>
           <h3 data-i18n="step6.h">Развитие</h3>
