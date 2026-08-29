@@ -100,10 +100,14 @@ favicon.svg         иконка вкладки
 
 ```bash
 ssh root@IP-СЕРВЕРА
-curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/main/averix/deploy/setup.sh -o setup.sh
+curl -fsSL "https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/ui-ux-pro-max-landing-n9y2jh/averix/deploy/setup.sh" -o setup.sh
 less setup.sh          # прочитать перед запуском
-bash setup.sh averix.tj
+bash setup.sh averix.dev
 ```
+
+Ветку указывать не нужно: скрипт берёт `main`, а если папки `averix/`
+там ещё нет — ветку разработки. После слияния в `main` он сам
+переключится на неё.
 
 Скрипт ставит nginx, git и certbot, клонирует репозиторий
 в `/var/www/averix-repo`, настраивает сайт, открывает 22/80/443
@@ -119,8 +123,16 @@ bash setup.sh averix.tj
 bash /var/www/averix-repo/averix/deploy/update.sh
 ```
 
-Скрипт делает `git reset --hard`, поэтому **править файлы прямо
-на сервере нельзя** — изменения будут стёрты. Правьте в репозитории.
+Ветку `update.sh` берёт ту, что уже развёрнута, — помнить её название
+не нужно. Скрипт делает `git reset --hard`, поэтому **править файлы
+прямо на сервере нельзя** — изменения будут стёрты.
+
+### Про домен .dev
+
+Зона `.dev` целиком входит в список HSTS preload, поэтому браузеры
+отказываются открывать её по `http` — не «без замка», а вообще.
+Пока certbot не выпустит сертификат, сайт не откроется. Если установка
+упала на этом шаге, дело почти всегда в A-записи: она ещё не разошлась.
 
 ### Про кеш
 
@@ -136,7 +148,7 @@ bash /var/www/averix-repo/averix/deploy/update.sh
 ## Перед публикацией
 
 - [ ] Вычитать таджикский перевод
-- [ ] Заменить `averix.tj` в `canonical` и `og:url` на реальный домен
+- [ ] Заменить `averix.dev` в `canonical` и `og:url` на реальный домен
 - [ ] Положить `og.png` (1200×630) в корень — превью в Telegram и соцсетях
 - [ ] Проверить, что заявка из формы доходит в Telegram
 - [ ] Проверить на телефоне, а не только в узком окне браузера

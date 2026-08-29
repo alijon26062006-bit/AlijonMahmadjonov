@@ -12,7 +12,10 @@ set -euo pipefail
 
 DOMAIN="${1:-}"
 REPO="${REPO:-https://github.com/alijon26062006-bit/AlijonMahmadjonov.git}"
-BRANCH="${BRANCH:-main}"
+# Ветку можно задать явно: BRANCH=... bash setup.sh averix.dev
+# Если не задана — берём main, а когда сайта там ещё нет, ветку разработки.
+BRANCH="${BRANCH:-}"
+FALLBACK_BRANCH="claude/ui-ux-pro-max-landing-n9y2jh"
 CLONE_DIR="/var/www/averix-repo"
 SITE_DIR="$CLONE_DIR/averix"      # сайт лежит в подпапке репозитория
 
@@ -40,15 +43,28 @@ apt-get update -qq
 apt-get install -y -qq nginx git curl certbot python3-certbot-nginx ufw
 
 say "Забираю сайт из репозитория"
-if [ -d "$CLONE_DIR/.git" ]; then
-  git -C "$CLONE_DIR" fetch --quiet origin "$BRANCH"
-  git -C "$CLONE_DIR" checkout --quiet "$BRANCH"
-  git -C "$CLONE_DIR" reset --hard --quiet "origin/$BRANCH"
-else
+if [ ! -d "$CLONE_DIR/.git" ]; then
   mkdir -p "$(dirname "$CLONE_DIR")"
-  git clone --quiet --branch "$BRANCH" "$REPO" "$CLONE_DIR"
+  git clone --quiet "$REPO" "$CLONE_DIR"
 fi
-[ -f "$SITE_DIR/index.html" ] || die "не нашёл $SITE_DIR/index.html — проверьте ветку BRANCH=$BRANCH"
+git -C "$CLONE_DIR" fetch --quiet --all --prune
+
+pick_branch() {
+  local b="$1"
+  git -C "$CLONE_DIR" rev-parse --verify --quiet "origin/$b" >/dev/null || return 1
+  git -C "$CLONE_DIR" ls-tree --name-only "origin/$b" averix/ 2>/dev/null | grep -q . || return 1
+}
+
+if [ -z "$BRANCH" ]; then
+  if pick_branch main; then BRANCH="main"
+  elif pick_branch "$FALLBACK_BRANCH"; then BRANCH="$FALLBACK_BRANCH"
+  else die "не нашёл папку averix/ ни в main, ни в $FALLBACK_BRANCH"; fi
+  echo "    ветка: $BRANCH"
+fi
+
+git -C "$CLONE_DIR" checkout --quiet -B "$BRANCH" "origin/$BRANCH"
+git -C "$CLONE_DIR" reset --hard --quiet "origin/$BRANCH"
+[ -f "$SITE_DIR/index.html" ] || die "не нашёл $SITE_DIR/index.html в ветке $BRANCH"
 
 # nginx читает файлы от имени www-data
 chown -R www-data:www-data "$CLONE_DIR"
@@ -74,9 +90,21 @@ if certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" \
      -m "alijon26.06.2006@gmail.com"; then
   echo "    HTTPS включён, продление настроено автоматически"
 else
-  echo "    Сертификат выпустить не удалось — сайт работает по http://"
-  echo "    Проверьте A-запись домена и повторите:"
+  echo
+  echo "    !! Сертификат выпустить не удалось."
+  case "$DOMAIN" in
+    *.dev)
+      echo "    Зона .dev целиком в списке HSTS preload: браузеры не дают"
+      echo "    открыть её по http вообще. Без сертификата сайт не откроется."
+      ;;
+    *)
+      echo "    Пока сайт доступен только по http://$DOMAIN"
+      ;;
+  esac
+  echo "    Обычно причина — A-запись ещё не разошлась. Проверьте и повторите:"
+  echo "      getent hosts $DOMAIN"
   echo "      certbot --nginx -d $DOMAIN -d www.$DOMAIN"
+  exit 1
 fi
 
 say "Готово"

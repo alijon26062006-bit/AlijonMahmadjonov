@@ -7,9 +7,11 @@
 set -euo pipefail
 
 CLONE_DIR="${CLONE_DIR:-/var/www/averix-repo}"
-BRANCH="${BRANCH:-main}"
 
 [ -d "$CLONE_DIR/.git" ] || { echo "Не нашёл репозиторий в $CLONE_DIR" >&2; exit 1; }
+
+# Берём ту ветку, что уже развёрнута, — не нужно помнить её название
+BRANCH="${BRANCH:-$(git -C "$CLONE_DIR" rev-parse --abbrev-ref HEAD)}"
 
 BEFORE="$(git -C "$CLONE_DIR" rev-parse --short HEAD)"
 git -C "$CLONE_DIR" fetch --quiet origin "$BRANCH"
