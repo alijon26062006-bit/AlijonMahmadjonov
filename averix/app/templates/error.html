@@ -1,0 +1,22 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block body %}
+<div class="center">
+  <div class="card err-card">
+    <a class="brand" href="/">
+      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+        <polygon points="55,6 69,6 59,27 45,27" fill="#B98CF2"/>
+        <polygon points="42,35 75,35 79,55 38,55" fill="#B98CF2"/>
+        <polygon points="34,63 82,63 86,83 30,83" fill="#3FD98A"/>
+      </svg>
+      <b>AVERI<span>X</span></b>
+    </a>
+
+    <p class="err-code" style="margin-top:1.25rem">ОШИБКА {{ code }}</p>
+    <h1>{{ title }}</h1>
+    <p>{{ text }}</p>
+
+    <a href="{{ back_url }}"><button type="button">{{ back_label }}</button></a>
+  </div>
+</div>
+{% endblock %}

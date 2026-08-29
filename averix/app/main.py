@@ -11,8 +11,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import models, security
+from . import journal, models, security
 from .uploads import UploadError, delete_image_file, save_image
 from .config import (
     ALLOW_INSECURE,
@@ -30,12 +31,15 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    journal.setup(DEBUG)
     applied = migrate()
     if applied:
-        print("Применены миграции:", ", ".join(applied))
+        journal.event("миграции.применены", files=", ".join(applied))
     with connect() as conn:
         security.purge_expired(conn)
+    journal.event("приложение.запущено")
     yield
+    journal.event("приложение.остановлено")
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -102,6 +106,24 @@ def no_store(resp: Response) -> Response:
     return resp
 
 
+_ERRORS = {
+    403: ("Доступ закрыт", "У вас нет прав на эту страницу.", "/admin", "К входу"),
+    404: ("Страница не найдена", "Такой страницы нет. Возможно, её удалили "
+          "или в адресе опечатка.", "/", "На главную"),
+    500: ("Что-то сломалось", "Ошибка на нашей стороне. Мы уже видим её в журнале — "
+          "попробуйте ещё раз через минуту.", "/", "На главную"),
+}
+
+
+def error_page(request: Request, code: int) -> Response:
+    title, text, back_url, back_label = _ERRORS.get(code, _ERRORS[500])
+    return no_store(templates.TemplateResponse(request, "error.html", {
+        "code": code, "title": title, "text": text,
+        "back_url": back_url, "back_label": back_label,
+    }, status_code=code))
+
+
+
 # ---------- вход ----------
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -147,6 +169,7 @@ async def admin_login(
     with connect() as conn:
         failures = security.recent_failures(conn, ip)
         if security.is_blocked(failures):
+            journal.warn("вход.заблокирован", ip=ip, login=username, попыток=failures)
             return login_page(
                 request,
                 "Слишком много попыток. Подождите 15 минут.",
@@ -162,12 +185,14 @@ async def admin_login(
         security.record_attempt(conn, ip, username, ok)
 
         if not ok:
+            journal.warn("вход.неудача", ip=ip, login=username, попыток=failures + 1)
             if delay:
                 await asyncio.sleep(delay)
             # Один и тот же текст для неверного логина и неверного пароля:
             # иначе по ответу можно узнать, какие логины существуют.
             return login_page(request, "Неверный логин или пароль.", 401)
 
+        journal.event("вход.успех", ip=ip, login=username)
         token = security.create_session(
             conn, row["id"], ip, request.headers.get("user-agent", "")
         )
@@ -183,6 +208,7 @@ async def admin_logout(request: Request, csrf: str = Form("")):
     session = current_session(request)
     if not security.check_csrf(session, csrf):
         return no_store(RedirectResponse("/admin", status_code=303))
+    journal.event("выход", login=session["username"])
     with connect() as conn:
         security.destroy_session(conn, request.cookies.get(SESSION_COOKIE))
     resp = RedirectResponse("/admin", status_code=303)
@@ -266,7 +292,8 @@ async def project_edit(request: Request, project_id: int):
     with connect() as conn:
         project = models.get_project(conn, project_id)
         if project is None:
-            return back()
+            # молчаливый переброс на список скрывал бы опечатку в адресе
+            return error_page(request, 404)
         imgs = models.images(conn, project_id)
         stack = ", ".join(models.tech(conn, project_id))
     return no_store(templates.TemplateResponse(request, "admin/project_form.html", {
@@ -323,6 +350,8 @@ async def project_save(request: Request):
             project_id = models.create_project(conn, data)
         models.set_tech(conn, project_id, val("tech", 500))
 
+    journal.event("проект.сохранён", id=project_id, slug=data["slug"],
+                  статус=data["status"], кем=session["username"])
     return back(f"/admin/projects/{project_id}")
 
 
@@ -337,6 +366,8 @@ async def project_delete(request: Request, project_id: int, csrf: str = Form("")
         files = models.delete_project(conn, project_id)
     for name in files:
         delete_image_file(name)
+    journal.warn("проект.удалён", id=project_id, картинок=len(files),
+                 кем=session["username"])
     return back()
 
 
@@ -359,6 +390,7 @@ async def project_toggle(
         elif field == "status":
             new = "draft" if project["status"] == "published" else "published"
             conn.execute("UPDATE projects SET status = ? WHERE id = ?", (new, project_id))
+            journal.event("проект.статус", id=project_id, стал=new, кем=session["username"])
     return back()
 
 
@@ -395,6 +427,8 @@ async def image_upload(request: Request, project_id: int):
     try:
         saved = save_image(raw, getattr(upload, "filename", ""))
     except UploadError as exc:
+        journal.warn("картинка.отклонена", проект=project_id, причина=str(exc),
+                     кем=session["username"])
         with connect() as conn:
             project = models.get_project(conn, project_id)
             imgs = models.images(conn, project_id)
@@ -413,6 +447,8 @@ async def image_upload(request: Request, project_id: int):
             return back()
         models.add_image(conn, project_id, saved,
                          str(form.get("alt_ru", ""))[:200])
+    journal.event("картинка.загружена", проект=project_id, файл=saved.filename,
+                  размер=f"{saved.width}x{saved.height}", кем=session["username"])
     return back(f"/admin/projects/{project_id}")
 
 
@@ -451,6 +487,8 @@ async def image_delete(
         filename = models.delete_image(conn, image_id)
     if filename:
         delete_image_file(filename)
+        journal.event("картинка.удалена", проект=project_id, файл=filename,
+                      кем=session["username"])
     return back(f"/admin/projects/{project_id}")
 
 
@@ -463,8 +501,18 @@ async def health():
     return {"ok": True}
 
 
-if not DEBUG:
-    @app.exception_handler(500)
-    async def server_error(_request: Request, _exc):
-        # Наружу не уходит ни трассировка, ни текст ошибки
-        return HTMLResponse("Внутренняя ошибка сервера", status_code=500)
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, exc: StarletteHTTPException):
+    if exc.status_code in _ERRORS:
+        return error_page(request, exc.status_code)
+    return HTMLResponse(f"Ошибка {exc.status_code}", status_code=exc.status_code)
+
+
+@app.exception_handler(Exception)
+async def unhandled(request: Request, exc: Exception):
+    # Наружу не уходит ни трассировка, ни текст ошибки — только в журнал
+    journal.error("ошибка.необработанная", путь=request.url.path,
+                  тип=type(exc).__name__)
+    if DEBUG:
+        raise exc
+    return error_page(request, 500)

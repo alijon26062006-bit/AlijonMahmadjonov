@@ -21,7 +21,7 @@
 
       <div>
         <div class="name">
-          <a href="/admin/projects/{{ p.id }}" style="color:inherit;text-decoration:none">{{ p.title_ru }}</a>
+          <a href="/admin/projects/{{ p.id }}">{{ p.title_ru }}</a>
         </div>
         <div class="meta">
           {{ categories.get(p.category, p.category) }}{% if p.year %} · {{ p.year }}{% endif %} · /{{ p.slug }}
