@@ -275,18 +275,11 @@ a{color:var(--violet)}
 .stats > div > span{display:block; margin-top:.6rem; font-family:var(--mono); font-size:.75rem; color:var(--faint); line-height:1.5; max-width:24ch}
 
 /* ============================================================
-   Живой замер страницы
+   Пульсирующая точка статуса
    ============================================================ */
-.measure{margin-top:var(--s3); border-radius:var(--r)}
-.measure-in{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s2) var(--s4); padding:var(--s2) var(--s3)}
-.measure-head{display:flex; align-items:center; gap:.6rem; margin-right:auto}
 .dot{width:8px; height:8px; border-radius:50%; background:var(--emerald); flex:none; position:relative}
 .dot::after{content:""; position:absolute; inset:-5px; border-radius:50%; border:1px solid var(--emerald); opacity:.5; animation:pulse 2.6s ease-out infinite}
 @keyframes pulse{0%{transform:scale(.55); opacity:.75} 70%,100%{transform:scale(1.7); opacity:0}}
-.measure dl{display:flex; flex-wrap:wrap; gap:var(--s2) var(--s4); margin:0}
-.measure div{display:flex; align-items:baseline; gap:.5rem}
-.measure dt{font-family:var(--mono); font-size:.74rem; color:var(--faint)}
-.measure dd{margin:0; font-family:var(--mono); font-size:.92rem; font-weight:500; color:var(--emerald); font-variant-numeric:tabular-nums}
 
 /* ============================================================
    [01] Кто я

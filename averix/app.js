@@ -10,41 +10,6 @@
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ============================================================
-     Замер этой же страницы
-     Цифры не вписаны в разметку — их измеряет браузер посетителя.
-     Если браузер не отдаёт размеры (например, файл открыт с диска),
-     пункт убирается, а не показывает выдуманное значение.
-     ============================================================ */
-  function measure() {
-    var nav = performance.getEntriesByType('navigation')[0];
-    var res = performance.getEntriesByType('resource');
-    if (!nav) return;
-
-    var bytes = nav.transferSize || 0;
-    res.forEach(function (r) { bytes += r.transferSize || 0; });
-
-    set('weight', bytes ? Math.round(bytes / 1024) + ' КБ' : null);
-    set('requests', res.length + 1);
-
-    var ms = nav.domContentLoadedEventEnd - nav.startTime;
-    set('time', ms > 0 ? (ms < 1000 ? Math.round(ms) + ' мс' : (ms / 1000).toFixed(1) + ' с') : null);
-  }
-
-  function set(metric, value) {
-    var el = document.querySelector('[data-metric="' + metric + '"]');
-    if (!el) return;
-    if (value === null) {
-      var row = el.closest('div');
-      if (row) row.remove();
-      return;
-    }
-    el.textContent = value;
-  }
-
-  if (document.readyState === 'complete') measure();
-  else window.addEventListener('load', function () { setTimeout(measure, 0); });
-
-  /* ============================================================
      Язык: русский в разметке, таджикский — словарём.
      Русские строки берём из самой страницы, поэтому без JS
      сайт остаётся полностью читаемым.
@@ -70,12 +35,6 @@
     'stats.years.note': 'ҳар рӯз код менависам',
     'stats.active': 'лоиҳа айни замон дар кор',
     'stats.happy': 'мизоҷон корро қабул карданд',
-
-    'measure.title': 'Ченкунии ҳамин саҳифа дар браузери шумо',
-    'measure.weight': 'вазн',
-    'measure.time': 'боркунӣ',
-    'measure.requests': 'дархостҳо',
-    'measure.contrast': 'контрасти матн',
 
     'who.label': 'Кӣ месозад',
     'who.h2': 'Номи ман <em>Алиҷон</em>',
