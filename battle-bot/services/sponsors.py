@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import logging
+from html import escape
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
@@ -80,9 +81,17 @@ async def missing(
 
 
 def keyboard(channels: list[tuple[str, str]], retry: str) -> InlineKeyboardMarkup:
-    """Кнопка на каждый неподписанный канал плюс «Я подписался»."""
+    """Кнопка на каждый неподписанный канал плюс «Я подписался».
+
+    Канал один — подпись короткая, «Подписаться»: название и так стоит
+    в тексте над кнопкой, дважды его читать незачем.
+    """
+    single = len(channels) == 1
     rows = [
-        [InlineKeyboardButton(text=f"Подписаться на {title} ↗", url=url, style=GREEN)]
+        [InlineKeyboardButton(
+            text="Подписаться ↗" if single else f"Подписаться на {title} ↗",
+            url=url, style=GREEN,
+        )]
         for title, url in channels
         if url
     ]
@@ -90,23 +99,41 @@ def keyboard(channels: list[tuple[str, str]], retry: str) -> InlineKeyboardMarku
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def text(channels: list[tuple[str, str]]) -> str:
+def short(url: str) -> str:
+    """Ссылка без «https://» — так её показывает сам Telegram."""
+    return url.replace("https://", "").replace("http://", "").rstrip("/")
+
+
+def text(channels: list[tuple[str, str]], action: str = "проголосовать") -> str:
+    """Короткое объяснение: голосуют только подписчики, вот куда подписаться.
+
+    Экран висит между человеком и его голосом, поэтому он в одну строку:
+    длинное объяснение здесь никто не читает.
+    """
     from services import texts
 
-    listing = "\n".join(f"• <b>{title}</b>" for title, _ in channels)
-    word = texts.plural(len(channels), "канал", "канала", "каналов")
-    tail = "<i>После подписки нажмите «Я подписался».</i>"
-    if not any(url for _, url in channels):
+    known = [(title, url) for title, url in channels if url]
+    if not known:
         # ссылку узнать не удалось — обычно бота забыли добавить в канал
-        tail = (
-            "<i>Ссылка не подгрузилась. Подпишитесь на канал и нажмите "
-            "«Я подписался», а если кнопки нет — напишите администратору.</i>"
+        listing = ", ".join(f"<b>{escape(title)}</b>" for title, _ in channels)
+        return (
+            f"⚠️ Чтобы {action}, нужна подписка на {listing}.\n\n"
+            "<i>Подпишитесь и нажмите «Я подписался», а если не получается — "
+            "напишите администратору.</i>"
         )
+
+    if len(known) == 1:
+        title, url = known[0]
+        return (
+            f"⚠️ Чтобы {action}, необходимо подписаться на канал: "
+            f'<a href="{url}">{escape(short(url))}</a>'
+        )
+
+    word = texts.plural(len(known), "канал", "канала", "каналов")
+    listing = "\n".join(
+        f'• <a href="{url}">{escape(short(url))}</a>' for _, url in known
+    )
     return (
-        f"⚠️ <b>Нужна подписка</b>\n"
-        f"{texts.RULE}\n\n"
-        f"Голосовать и участвовать могут только подписчики. "
-        f"Подпишитесь на {len(channels)} {word}:\n\n"
-        f"{listing}\n\n"
-        f"{tail}"
+        f"⚠️ Чтобы {action}, необходимо подписаться "
+        f"на {len(known)} {word}:\n{listing}"
     )

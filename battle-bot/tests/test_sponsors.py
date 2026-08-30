@@ -140,7 +140,7 @@ def test_the_screen_lists_every_channel_and_offers_a_retry():
     channels = [("Батлы", "https://t.me/realed"), ("Спонсор", "https://t.me/sponsor")]
 
     body = sponsors.text(channels)
-    assert "Батлы" in body and "Спонсор" in body
+    assert "t.me/realed" in body and "t.me/sponsor" in body
     assert "2 канала" in body
 
     markup = sponsors.keyboard(channels, "refresh:7")
@@ -148,6 +148,28 @@ def test_the_screen_lists_every_channel_and_offers_a_retry():
     assert len(markup.inline_keyboard) == 3, "две подписки плюс проверка"
     assert labels[-1].endswith("Я подписался")
     assert markup.inline_keyboard[-1][0].callback_data == "refresh:7"
+
+
+def test_one_channel_reads_as_a_single_line():
+    """Экран стоит между человеком и голосом — он должен быть коротким."""
+    body = sponsors.text([("Батлы", "https://t.me/seady")])
+
+    assert body.count("\n") == 0
+    assert "t.me/seady" in body
+    assert "https://" not in body.split('">')[-1], "ссылку показываем без протокола"
+
+
+def test_the_wording_matches_what_the_person_is_doing():
+    """Заявку подают не «чтобы проголосовать»."""
+    body = sponsors.text([("Батлы", "https://t.me/seady")], "участвовать")
+
+    assert "Чтобы участвовать" in body
+
+
+def test_a_single_channel_gets_a_short_button():
+    markup = sponsors.keyboard([("Батлы", "https://t.me/seady")], "join:retry")
+
+    assert markup.inline_keyboard[0][0].text == "Подписаться ↗"
 
 
 def test_a_channel_without_a_link_gets_no_broken_button():

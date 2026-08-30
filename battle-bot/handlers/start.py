@@ -113,7 +113,7 @@ async def _do_join(
     if unsubscribed:
         await ui.send(
             target,
-            sponsors.text(unsubscribed),
+            sponsors.text(unsubscribed, "участвовать"),
             reply_markup=sponsors.keyboard(unsubscribed, "join:retry"),
             disable_web_page_preview=True,
         )

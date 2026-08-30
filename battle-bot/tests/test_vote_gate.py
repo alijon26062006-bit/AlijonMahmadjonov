@@ -113,7 +113,7 @@ async def test_a_non_subscriber_cannot_vote(env):
 
     assert votes(repo, match_id) == 0, "голос не подписчика не должен попасть в счёт"
     assert "подписчик" in callback.alerts[-1].lower()
-    assert "Нужна подписка" in callback.message.sent[0]
+    assert "необходимо подписаться" in callback.message.sent[0]
 
 
 @pytest.mark.asyncio
@@ -181,7 +181,7 @@ async def test_i_subscribed_opens_the_match_only_for_a_real_subscriber(env):
 
     liar = Callback(f"open:{match_id}", 500, bot)
     await open_voting(liar, repo, config, settings)
-    assert "Нужна подписка" in liar.message.sent[0]
+    assert "необходимо подписаться" in liar.message.sent[0]
 
     bot.subscribed_to.add(MAIN)
     honest = Callback(f"open:{match_id}", 500, bot)
