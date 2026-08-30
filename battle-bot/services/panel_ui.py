@@ -407,16 +407,23 @@ def autopilot(values: dict, promos: list) -> tuple[str, InlineKeyboardMarkup]:
         f"🤖 <b>{texts.spaced('АВТОПИЛОТ')}</b>\n{RULE}\n\n"
         f"Состояние: <b>{onoff(values['autopilot_enabled'])}</b>\n"
         f"⏰ Напоминать за: <b>{hours}</b> ч до итогов\n"
-        f"📣 Реклама раз в: <b>{interval}</b> ч\n\n"
+        f"📣 Реклама раз в: <b>{interval}</b> ч\n"
+        f"🔥 Пост дня между батлами: <b>{onoff(values.get('daily_extra_enabled'))}</b>\n\n"
         f"<b>Рекламные посты</b> ({active} активных)\n{listing}\n\n"
         "<i>Бот сам напоминает перед итогами, зовёт в батл каждый день "
-        "в полдень и крутит рекламу по очереди в оба канала.</i>"
+        "в полдень и крутит рекламу по очереди в оба канала. Вечером, когда "
+        "батла нет, выходит короткий пост — ник дня, рекорд или зал славы, "
+        "чтобы канал не пустовал между батлами.</i>"
     )
     toggle = "Выключить автопилот" if values["autopilot_enabled"] else "Включить автопилот"
     rows = [
         [button("⏰ Напоминания", "edit:reminder_hours", BLUE),
          button("📣 Интервал", "edit:promo_interval_hours")],
         [button("➕ Добавить рекламу", "auto:promo:add", GREEN)],
+        [button(
+            f"🔥 Пост дня: {'вкл' if values.get('daily_extra_enabled') else 'выкл'}",
+            "auto:extra",
+        )],
     ]
     if promos:
         rows.append([button("🗂 Управление постами", "auto:promos")])

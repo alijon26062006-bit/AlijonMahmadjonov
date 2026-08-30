@@ -221,3 +221,103 @@ async def test_one_broken_task_does_not_stop_the_others(env):
     await auto.tick()
 
     assert any("Реклама" in text for text in bot.channel_posts)
+
+
+# ------------------------------------------------- жизнь между батлами
+
+def at(auto, hour: int, minute: int = 0):
+    """Подменить часы автопилота, не трогая остальное."""
+    moment = datetime.now(MSK).replace(hour=hour, minute=minute, second=0, microsecond=0)
+    auto.now = lambda: moment
+    return moment
+
+
+@pytest.mark.asyncio
+async def test_the_evening_post_goes_out_when_no_battle_runs(env):
+    bot, repo, _, _, auto = env
+    repo.upsert_user(1, "waiting", "Ждущий")
+    repo.enqueue(1, "waiting")
+    at(auto, 19)
+
+    await auto._daily_extra()
+
+    assert any("@waiting" in text for text in bot.channel_posts), bot.channel_posts
+
+
+@pytest.mark.asyncio
+async def test_it_stays_quiet_while_a_battle_is_running(env):
+    """Батл идёт — людям и так есть чем заняться."""
+    bot, repo, config, settings, auto = env
+    repo.upsert_user(1, "waiting", "Ждущий")
+    repo.enqueue(1, "waiting")
+    repo.create_battle(datetime.now(MSK) + timedelta(hours=2))
+    at(auto, 19)
+
+    await auto._daily_extra()
+
+    assert bot.channel_posts == []
+
+
+@pytest.mark.asyncio
+async def test_the_post_goes_out_once_a_day(env):
+    bot, repo, _, _, auto = env
+    repo.upsert_user(1, "waiting", "Ждущий")
+    repo.enqueue(1, "waiting")
+    at(auto, 19)
+
+    await auto._daily_extra()
+    await auto._daily_extra()
+
+    assert len(bot.channel_posts) == 1, "второй раз за день пост не уходит"
+
+
+@pytest.mark.asyncio
+async def test_nothing_is_posted_when_there_is_nothing_to_say(env):
+    """Пустая база — молчим, а не постим пустой экран."""
+    bot, _, _, _, auto = env
+    at(auto, 19)
+
+    await auto._daily_extra()
+
+    assert bot.channel_posts == []
+
+
+@pytest.mark.asyncio
+async def test_the_evening_post_can_be_switched_off(env):
+    bot, repo, _, settings, auto = env
+    repo.upsert_user(1, "waiting", "Ждущий")
+    repo.enqueue(1, "waiting")
+    settings.set("daily_extra_enabled", False)
+    at(auto, 19)
+
+    await auto._daily_extra()
+
+    assert bot.channel_posts == []
+
+
+def test_the_reason_changes_from_day_to_day(env):
+    """Одно и то же примелькается — поводы идут по кругу."""
+    _, repo, _, _, auto = env
+    repo.upsert_user(1, "waiting", "Ждущий")
+    repo.enqueue(1, "waiting")
+    battle_id = repo.create_battle(datetime.now(MSK) + timedelta(hours=1))
+    repo.add_participant(battle_id, 1, "waiting")
+    repo.set_place(battle_id, 1, 1)
+    repo.record_payout(battle_id, 1, 1, "1000", "photo")
+    from core.models import BattleStatus
+
+    repo.close_battle(battle_id, BattleStatus.FINISHED)
+
+    kinds = {auto._extra_text(day)[:40] for day in range(3)}
+
+    assert len(kinds) > 1
+
+
+def test_the_spotlight_prefers_the_queue(env):
+    _, repo, _, _, _ = env
+    repo.upsert_user(1, "waiting", "Ждущий")
+    repo.enqueue(1, "waiting")
+
+    row = repo.spotlight()
+
+    assert row["nickname"] == "waiting"

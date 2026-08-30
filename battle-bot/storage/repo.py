@@ -853,6 +853,54 @@ class Repo:
         ).fetchone()
         return int(row["total"]), int(row["live"]), int(row["posts"])
 
+    # ------------------------------------------------ ежедневная активность
+
+    def best_of_last_battle(self) -> sqlite3.Row | None:
+        """Кто набрал больше всех голосов в последнем завершённом батле.
+
+        Это готовый повод для поста: имя, число и повод позавидовать.
+        """
+        return self.conn.execute(
+            """SELECT b.id AS battle_id, s.user_id, s.nickname,
+                      SUM(s.votes) AS votes
+               FROM battles b
+               JOIN matches m ON m.battle_id = b.id
+               JOIN match_slots s ON s.match_id = m.id
+               WHERE b.id = (SELECT MAX(id) FROM battles WHERE status = 'finished')
+               GROUP BY s.user_id
+               HAVING votes > 0
+               ORDER BY votes DESC
+               LIMIT 1"""
+        ).fetchone()
+
+    def spotlight(self, offset: int = 0) -> sqlite3.Row | None:
+        """Кого показать «ником дня».
+
+        Сначала берём из очереди: этот человек уже ждёт батла, и внимание
+        удержит его до старта. Очередь пуста — берём из тех, кто играл.
+        ``offset`` крутит выбор по дням, чтобы имя не повторялось.
+        """
+        rows = self.conn.execute(
+            """SELECT q.user_id, q.nickname,
+                      COALESCE(st.battles, 0) AS battles,
+                      COALESCE(st.wins, 0) AS wins,
+                      COALESCE(st.titles, 0) AS titles
+               FROM queue q LEFT JOIN stats st ON st.user_id = q.user_id
+               ORDER BY q.joined_at, q.user_id"""
+        ).fetchall()
+
+        if not rows:
+            rows = self.conn.execute(
+                """SELECT u.user_id, u.username AS nickname,
+                          st.battles, st.wins, st.titles
+                   FROM stats st JOIN users u ON u.user_id = st.user_id
+                   WHERE st.battles > 0 AND u.is_banned = 0
+                   ORDER BY st.wins DESC, st.battles DESC, u.user_id
+                   LIMIT 20"""
+            ).fetchall()
+
+        return rows[offset % len(rows)] if rows else None
+
     # ---------------------------------------------------- выплаты призов
 
     def winners(self, battle_id: int, places: int) -> list[sqlite3.Row]:

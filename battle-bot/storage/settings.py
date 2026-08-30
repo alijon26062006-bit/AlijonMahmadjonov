@@ -93,6 +93,8 @@ FIELDS: dict[str, Field] = {
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
         Field("manual_pay_enabled", "Оплата вручную",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("daily_extra_enabled", "Пост дня между батлами",
+              lambda v: "1" if v else "0", lambda raw: raw == "1"),
         Field("card_title", "Заголовок на картинке", str, str,
               "например: БИТВА НИКОВ"),
         Field("manual_pay_title", "Название способа оплаты", str, str,
@@ -198,6 +200,8 @@ class Settings:
         "free_vote_scope": "battle",
         # со второго раунда соперников подбирает посев по силе, а не жребий
         "seeding": "snake",
+        # вечерний пост между батлами: ник дня, рекорд, зал славы
+        "daily_extra_enabled": True,
         # что написано сверху на картинке участника для сторис
         "card_title": "БИТВА НИКОВ",
         # пополнение вручную: реквизиты админ вписывает сам

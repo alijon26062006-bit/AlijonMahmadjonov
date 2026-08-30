@@ -315,6 +315,19 @@ async def show_votes(
     await callback.answer()
 
 
+@router.callback_query(F.data == "p:auto:extra")
+async def toggle_daily_extra(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """Вечерний пост между батлами — включить или выключить."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    on = not settings.get("daily_extra_enabled")
+    settings.set("daily_extra_enabled", on)
+    await render(callback, _auto_screen(repo, settings))
+    await callback.answer("Пост дня включён" if on else "Пост дня выключен")
+
+
 @router.callback_query(F.data == "p:pays")
 async def show_payouts(
     callback: CallbackQuery, repo: Repo, config: Config, settings: Settings

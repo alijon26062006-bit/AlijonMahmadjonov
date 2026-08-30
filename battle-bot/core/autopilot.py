@@ -30,6 +30,10 @@ from storage.settings import Settings
 log = logging.getLogger(__name__)
 
 DAILY_ANNOUNCE_HOUR = 12  # полдень МСК: до вечерних итогов есть время подать заявку
+DAILY_EXTRA_HOUR = 19     # вечер: людей в сети больше всего
+
+# чем занять канал между батлами — по одному поводу в день, по кругу
+EXTRA_KINDS = ("nick", "record", "hall")
 
 
 def parse_hours(raw: str) -> list[int]:
@@ -60,7 +64,9 @@ class Autopilot:
         if not self.settings.get("autopilot_enabled"):
             return
 
-        for task in (self._remind_before_deadline, self._daily_call, self._promo):
+        for task in (
+            self._remind_before_deadline, self._daily_call, self._daily_extra, self._promo,
+        ):
             try:
                 await task()
             except Exception:  # noqa: BLE001 - автопилот не должен ронять бота
@@ -158,6 +164,72 @@ class Autopilot:
         main_channel = self.settings.get("main_channel_id")
         if main_channel and main_channel != self.config.channel_id:
             await self._post(main_channel, text, join=True)
+
+    # -------------------------------------------- жизнь между батлами
+
+    async def _daily_extra(self) -> None:
+        """Один пост в день, когда батла нет.
+
+        Между батлами канал мёртвый, и набранные подписчики уходят до
+        следующего старта. Поэтому вечером выходит короткий повод вернуться —
+        каждый день другой, чтобы одно и то же не примелькалось.
+        """
+        if not self.settings.get("daily_extra_enabled"):
+            return
+
+        moment = self.now()
+        if moment.hour != DAILY_EXTRA_HOUR or moment.minute > 5:
+            return
+        if self.repo.current_battle() is not None:
+            return  # батл идёт: людям и так есть чем заняться
+
+        day = moment.strftime("%Y-%m-%d")
+        text = self._extra_text(moment.timetuple().tm_yday)
+        if not text:
+            return  # рассказывать пока нечего — молчим, а не постим пустое
+        if not self.repo.mark_done("extra", day):
+            return
+
+        await self.engine.publisher.announce(text)
+        main_channel = self.settings.get("main_channel_id")
+        if main_channel and main_channel != self.config.channel_id:
+            await self._post(main_channel, text, join=True)
+        log.info("Автопилот: пост дня (%s)", day)
+
+    def _extra_text(self, day_number: int) -> str:
+        """Повод дня. Пусто — сегодня рассказывать нечего.
+
+        Поводы идут по кругу, но если для сегодняшнего нет данных, берётся
+        следующий: молчать целый день из-за пустой таблицы незачем.
+        """
+        start = day_number % len(EXTRA_KINDS)
+        for shift in range(len(EXTRA_KINDS)):
+            kind = EXTRA_KINDS[(start + shift) % len(EXTRA_KINDS)]
+            text = self._extra_of_kind(kind, day_number)
+            if text:
+                return text
+        return ""
+
+    def _extra_of_kind(self, kind: str, day_number: int) -> str:
+        if kind == "nick":
+            row = self.repo.spotlight(day_number)
+            if row is None:
+                return ""
+            return texts.nick_of_the_day(
+                row["nickname"] or "участник",
+                int(row["battles"] or 0), int(row["wins"] or 0), int(row["titles"] or 0),
+            )
+
+        if kind == "record":
+            row = self.repo.best_of_last_battle()
+            if row is None:
+                return ""
+            return texts.record_of_the_day(
+                row["nickname"], int(row["votes"]), int(row["battle_id"])
+            )
+
+        payouts = self.repo.payouts(10)
+        return texts.hall_of_fame(payouts) if payouts else ""
 
     # ------------------------------------------------------------ реклама
 
