@@ -77,6 +77,10 @@ EDITORS: dict[str, dict] = {
         "back": "votes",
     },
     "stars_link": {"check": lambda raw: raw.strip(), "back": "votes"},
+    "paid_votes_per_match": {
+        "check": lambda raw: validation.as_int(raw, minimum=0, maximum=1000, example="0"),
+        "back": "votes",
+    },
     "manual_pay_title": {
         "check": lambda raw: validation.as_text(raw, limit=40), "back": "pay",
     },
@@ -846,6 +850,7 @@ def _votes_screen(repo: Repo, settings: Settings):
         repo.sold_votes(),
         settings.get("stars_link"),
         settings.get("free_vote_scope"),
+        int(settings.get("paid_votes_per_match") or 0),
     )
 
 

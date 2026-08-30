@@ -59,7 +59,20 @@ def percent(value: int, total: int) -> int:
     return round(value / total * 100) if total else 0
 
 
-def scoreboard(slots: list[Slot], show_place: bool = False) -> str:
+def split_line(split, user_id: int) -> str:
+    """«столько своими, столько купленными» — если купленные вообще были.
+
+    Показывается открыто: когда исход решают купленные голоса, остальные
+    должны это видеть. Скрытая покупка убивает доверие быстрее, чем
+    отсутствие призов.
+    """
+    free, paid = (split or {}).get(user_id, (0, 0))
+    if not paid:
+        return ""
+    return f"\n<i>👥 своими: {free} · ⭐ купленными: {paid}</i>"
+
+
+def scoreboard(slots: list[Slot], show_place: bool = False, split=None) -> str:
     """Список участников со шкалами — сердце и голосования, и итогов."""
     total = sum(slot.votes for slot in slots) or 0
     best = max((slot.votes for slot in slots), default=0)
@@ -72,6 +85,7 @@ def scoreboard(slots: list[Slot], show_place: bool = False) -> str:
             f"<b>{mark} {nick(slot.nickname)}</b>{crown}\n"
             f"<code>{bar(slot.votes, total)}</code> "
             f"<b>{votes_word(slot.votes)}</b> · <b>{percent(slot.votes, total)}%</b>"
+            f"{split_line(split, slot.user_id)}"
         )
     return "\n\n".join(lines)
 
@@ -126,7 +140,8 @@ def channel_post(
     )
 
 
-def channel_result(round_no: int, is_final: bool, ranking: list[Slot], tie_broken: bool) -> str:
+def channel_result(round_no: int, is_final: bool, ranking: list[Slot], tie_broken: bool,
+                   split=None) -> str:
     """Чем пост дополняется после закрытия голосования."""
     header = (
         f"🏆 <b>{spaced('ИТОГИ ФИНАЛА')}</b>"
@@ -143,6 +158,7 @@ def channel_result(round_no: int, is_final: bool, ranking: list[Slot], tie_broke
         lines.append(
             f"<b>{mark} {nick(slot.nickname)}</b>\n"
             f"<code>{bar(slot.votes, total)}</code> <b>{votes_word(slot.votes)}</b>"
+            f"{split_line(split, slot.user_id)}"
         )
 
     tail = "\n\n🎲 <i>Голоса сравнялись — победитель определён жребием.</i>" if tie_broken else ""
@@ -587,17 +603,27 @@ def match_result_dm(
     return body
 
 
-def voting_screen(round_no: int, is_final: bool, slots: list[Slot], deadline: datetime) -> str:
+def voting_screen(round_no: int, is_final: bool, slots: list[Slot], deadline: datetime,
+                  split=None) -> str:
     title = spaced("ФИНАЛ") if is_final else f"{round_no} раунд"
     total = sum(slot.votes for slot in slots)
     return (
         f"🚀 <b>ГОЛОСОВАНИЕ · {title}</b>\n"
         f"{RULE}\n\n"
-        f"{scoreboard(slots)}\n\n"
+        f"{scoreboard(slots, split=split)}\n\n"
         f"{RULE}\n"
         f"Всего: <b>{votes_word(total)}</b>\n"
         f"{deadline_line(deadline)}\n\n"
         f"🎁 <b>Выберите, за кого голосуете</b> — кнопки ниже."
+    )
+
+
+def paid_limit_reached(limit: int) -> str:
+    """Купленных на одну пару потрачено столько, сколько разрешено."""
+    word = plural(limit, "голос", "голоса", "голосов")
+    return (
+        f"В одну пару можно отдать не больше {limit} купленных {word}. "
+        "Поддержите кого-нибудь ещё — там ваши голоса ещё в силе."
     )
 
 

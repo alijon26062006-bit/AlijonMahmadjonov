@@ -65,6 +65,7 @@ class ChannelPublisher:
             is_final=bool(match["is_final"]),
             ranking=ranking,
             tie_broken=tie_broken,
+            split=self.repo.vote_split(match_id),
         )
         result = await self._send(text, reply_to=match["message_id"])
         if result is not None:

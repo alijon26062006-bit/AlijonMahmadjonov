@@ -70,7 +70,10 @@ async def show_voting(
     if match["status"] == MatchStatus.CLOSED.value:
         ranking = sorted(slots, key=lambda s: s.position or 99)
         await message.answer(
-            texts.channel_result(match["round_no"], bool(match["is_final"]), ranking, False)
+            texts.channel_result(
+                match["round_no"], bool(match["is_final"]), ranking, False,
+                repo.vote_split(match_id),
+            )
         )
         return
 
@@ -80,7 +83,8 @@ async def show_voting(
     rules = f"\n{texts.voting_rules(scope, balance)}" if scope else ""
     await message.answer(
         intro + texts.voting_screen(
-            match["round_no"], bool(match["is_final"]), slots, deadline
+            match["round_no"], bool(match["is_final"]), slots, deadline,
+            repo.vote_split(match_id),
         ) + rules,
         reply_markup=keyboards.voting(
             match_id, slots, config, _post_url(config, match), called_for
@@ -170,8 +174,14 @@ def _pick_vote_source(
     if not config.paid_votes_enabled:
         return None, spent
 
+    # по умолчанию купленные ничем не ограничены: хоть все в одну пару.
+    # Лимит — необязательная мера против того, чтобы один кошелёк решал
+    # исход в одиночку; включается в панели и по умолчанию выключен
+    limit = int(settings.get("paid_votes_per_match") or 0)
+    if limit and repo.paid_votes_in_match(match_id, voter_id) >= limit:
+        return None, texts.paid_limit_reached(limit)
+
     if repo.spend_vote(voter_id):
-        # купленные не ограничены ничем: хоть все в одну пару
         left = repo.vote_balance(voter_id)
         return VoteSource.PAID, f"Голос отдан ⭐ Осталось: {left}"
 

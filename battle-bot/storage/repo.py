@@ -853,6 +853,34 @@ class Repo:
         ).fetchone()
         return int(row["total"]), int(row["live"]), int(row["posts"])
 
+    def vote_split(self, match_id: int) -> dict[int, tuple[int, int]]:
+        """Сколько голосов у каждого свои, а сколько куплены.
+
+        Разделение показывается открыто: когда один человек решает исход
+        купленными голосами, остальные должны это видеть. Иначе батл
+        выглядит нечестным, и люди уходят молча.
+        """
+        rows = self.conn.execute(
+            """SELECT target_id,
+                      SUM(source = 'free') AS free,
+                      SUM(source <> 'free') AS paid
+               FROM votes WHERE match_id = ? GROUP BY target_id""",
+            (match_id,),
+        ).fetchall()
+        return {
+            int(row["target_id"]): (int(row["free"] or 0), int(row["paid"] or 0))
+            for row in rows
+        }
+
+    def paid_votes_in_match(self, match_id: int, voter_id: int) -> int:
+        """Сколько купленных голосов этот человек уже потратил в матче."""
+        row = self.conn.execute(
+            """SELECT COUNT(*) AS spent FROM votes
+               WHERE match_id = ? AND voter_id = ? AND source <> 'free'""",
+            (match_id, voter_id),
+        ).fetchone()
+        return int(row["spent"] or 0)
+
     # ------------------------------------------------ ежедневная активность
 
     def best_of_last_battle(self) -> sqlite3.Row | None:
