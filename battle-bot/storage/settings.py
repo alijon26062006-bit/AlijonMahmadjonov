@@ -93,8 +93,6 @@ FIELDS: dict[str, Field] = {
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
         Field("manual_pay_enabled", "Оплата вручную",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
-        Field("paid_votes_per_match", "Купленных на одну пару", str, int,
-              "0 — без ограничения"),
         Field("daily_extra_enabled", "Пост дня между батлами",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
         Field("card_title", "Заголовок на картинке", str, str,
@@ -198,9 +196,6 @@ class Settings:
         # до конца какого раунда новичок попадает в идущий батл, а не в очередь.
         # 1 — приём идёт весь первый раунд и закрывается, когда начинается второй
         "late_join_until_round": 1,
-        # сколько купленных голосов можно отдать в одну пару. 0 — сколько
-        # угодно: покупка голосов и есть заработок бота
-        "paid_votes_per_match": 0,
         # один бесплатный голос на весь батл: за остальные пары — купленными
         "free_vote_scope": "battle",
         # со второго раунда соперников подбирает посев по силе, а не жребий

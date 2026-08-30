@@ -98,39 +98,23 @@ def test_bought_votes_are_unlimited_by_default(env):
     assert repo.vote_split(match_id)[ONE] == (1, 10)
 
 
-def test_the_limit_stops_one_wallet_from_deciding(env):
+def test_bought_votes_work_in_every_pair(env):
+    """Хоть все голоса в одну пару, хоть по одному в каждую — ограничений нет."""
     repo, config, settings, match_id = env
-    settings.set("paid_votes_per_match", 3)
-    repo.add_votes(VOTER, 100)
-    repo.add_vote(match_id, VOTER, ONE, VoteSource.FREE)
-
-    for _ in range(3):
-        source, _ = _pick_vote_source(repo, match_id, VOTER, config, settings)
-        repo.add_vote(match_id, VOTER, ONE, source)
-
-    source, note = _pick_vote_source(repo, match_id, VOTER, config, settings)
-
-    assert source is None
-    assert "не больше 3" in note
-    assert repo.vote_balance(VOTER) == 97, "лишний голос не списывается"
-
-
-def test_the_limit_is_per_match_not_forever(env):
-    """Лимит на пару: в другой паре голоса снова в силе."""
-    repo, config, settings, match_id = env
-    settings.set("paid_votes_per_match", 1)
     repo.add_votes(VOTER, 10)
     repo.add_vote(match_id, VOTER, ONE, VoteSource.FREE)
-    repo.add_vote(match_id, VOTER, ONE, VoteSource.PAID)
 
     other = repo.create_match(
         battle_id=1, round_no=1, number=2,
         players=[Player(ONE, "one"), Player(TWO, "two")],
         advance=1, is_final=False, deadline=datetime.now() + timedelta(hours=2),
     )
+    for target_match in (match_id, other, match_id, other):
+        source, _ = _pick_vote_source(repo, target_match, VOTER, config, settings)
+        assert source is VoteSource.PAID
+        repo.add_vote(target_match, VOTER, TWO, source)
 
-    source, _ = _pick_vote_source(repo, other, VOTER, config, settings)
-    assert source is VoteSource.PAID
+    assert repo.vote_balance(VOTER) == 6
 
 
 def test_bought_votes_work_even_when_selling_is_off(env):
@@ -160,12 +144,7 @@ def test_an_empty_balance_is_explained(env):
     assert "Докупить" in note
 
 
-def test_the_panel_shows_the_limit():
-    text, markup = panel_ui.votes(5, True, (0, 0), "", "battle", 0)
+def test_the_panel_says_bought_votes_are_free_to_spend():
+    text, _ = panel_ui.votes(5, True, (0, 0), "", "battle")
+
     assert "сколько угодно" in text
-
-    text, _ = panel_ui.votes(5, True, (0, 0), "", "battle", 3)
-    assert "Купленных на одну пару: <b>3</b>" in text
-
-    actions = [b.callback_data for row in markup.inline_keyboard for b in row]
-    assert "p:edit:paid_votes_per_match" in actions

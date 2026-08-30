@@ -618,15 +618,6 @@ def voting_screen(round_no: int, is_final: bool, slots: list[Slot], deadline: da
     )
 
 
-def paid_limit_reached(limit: int) -> str:
-    """Купленных на одну пару потрачено столько, сколько разрешено."""
-    word = plural(limit, "голос", "голоса", "голосов")
-    return (
-        f"В одну пару можно отдать не больше {limit} купленных {word}. "
-        "Поддержите кого-нибудь ещё — там ваши голоса ещё в силе."
-    )
-
-
 def voting_rules(scope: str, balance: int = 0) -> str:
     """Правило голосования под экраном: бесплатный и купленные."""
     line = f"<i>{free_scope_line(scope)}.</i>"

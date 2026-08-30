@@ -241,10 +241,9 @@ SCOPE_NEXT = {"battle": "round", "round": "match", "match": "battle"}
 
 def votes(
     price: int, enabled: bool, sold: tuple[int, int], stars_link: str = "",
-    scope: str = "battle", paid_limit: int = 0,
+    scope: str = "battle",
 ) -> tuple[str, InlineKeyboardMarkup]:
     count, stars = sold
-    limit_title = f"{paid_limit}" if paid_limit else "сколько угодно"
     link = f"<code>{escape(stars_link)}</code>" if stars_link else "<i>не задана</i>"
     scope_title = SCOPE_TITLES.get(scope, scope)
     text = (
@@ -253,7 +252,7 @@ def votes(
         f"Продажа: <b>{onoff(enabled)}</b>\n"
         f"Ссылка «звёзды дешевле»: {link}\n\n"
         f"🎁 Бесплатный голос: <b>{scope_title}</b>\n"
-        f"⭐ Купленных на одну пару: <b>{limit_title}</b>\n\n"
+        "⭐ Купленных на пару: <b>сколько угодно</b>\n\n"
         f"Продано всего: <b>{count}</b> голосов на <b>{stars}⭐</b>\n\n"
         "<i>Чем уже бесплатный голос, тем чаще их покупают. "
         "«Один на весь батл» — поддержал одну пару, за остальные "
@@ -263,7 +262,6 @@ def votes(
     return text, keyboard(
         [button("✏️ Изменить цену", "edit:vote_price", BLUE)],
         [button(f"🎁 Бесплатный: {scope_title}", "votes:scope")],
-        [button("⭐ Купленных на пару", "edit:paid_votes_per_match")],
         [button("🏦 Оплата вручную", "pay")],
         [button("🧱 Ссылка на звёзды", "edit:stars_link")],
         [button(toggle, "votes:toggle", RED if enabled else GREEN)],

@@ -102,13 +102,9 @@ def _check_votes(
 
     report.note(f"Бесплатный голос {texts.FREE_SCOPE_WORDS.get(scope, 'здесь')} уже потрачен.")
 
-    limit = int(settings.get("paid_votes_per_match") or 0)
     used = repo.paid_votes_in_match(match_id, user_id)
-    if limit:
-        report.note(f"Купленных в эту пару: <b>{used}</b> из <b>{limit}</b>.")
-        if used >= limit:
-            report.stop("Достигнут лимит купленных голосов на одну пару.")
-            return
+    if used:
+        report.note(f"Купленных в эту пару уже отдано: <b>{used}</b> (это не предел).")
 
     if balance > 0:
         report.ok(f"Купленных голосов на балансе: <b>{balance}</b> — их можно тратить.")

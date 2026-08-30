@@ -120,18 +120,18 @@ async def test_a_ban_stops_everything(env):
 
 
 @pytest.mark.asyncio
-async def test_the_limit_is_shown(env):
-    repo, _, settings, match_id = env
-    settings.set("paid_votes_per_match", 2)
+async def test_spent_votes_do_not_stop_anyone(env):
+    """Сколько бы ни отдал в эту пару — может отдавать ещё."""
+    repo, _, _, match_id = env
     repo.add_votes(VOTER, 50)
     repo.add_vote(match_id, VOTER, ONE, VoteSource.FREE)
-    repo.add_vote(match_id, VOTER, ONE, VoteSource.PAID)
-    repo.add_vote(match_id, VOTER, ONE, VoteSource.PAID)
+    for _ in range(5):
+        repo.add_vote(match_id, VOTER, ONE, VoteSource.PAID)
 
     report = await check(env)
 
-    assert not report.can_vote
-    assert any("лимит" in line.lower() for line in report.lines)
+    assert report.can_vote
+    assert any("не предел" in line for line in report.lines)
 
 
 @pytest.mark.asyncio
