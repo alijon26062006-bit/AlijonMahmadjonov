@@ -171,8 +171,6 @@ def _pick_vote_source(
         return VoteSource.FREE, "Голос учтён 👍"
 
     spent = texts.free_vote_spent(scope)
-    if not config.paid_votes_enabled:
-        return None, spent
 
     # по умолчанию купленные ничем не ограничены: хоть все в одну пару.
     # Лимит — необязательная мера против того, чтобы один кошелёк решал
@@ -181,10 +179,16 @@ def _pick_vote_source(
     if limit and repo.paid_votes_in_match(match_id, voter_id) >= limit:
         return None, texts.paid_limit_reached(limit)
 
+    # Купленные голоса принадлежат человеку. Выключенная продажа
+    # останавливает новые покупки, а не замораживает то, что уже оплачено:
+    # иначе человек с полным балансом не может проголосовать и справедливо
+    # считает это обманом.
     if repo.spend_vote(voter_id):
         left = repo.vote_balance(voter_id)
         return VoteSource.PAID, f"Голос отдан ⭐ Осталось: {left}"
 
+    if not config.paid_votes_enabled:
+        return None, spent
     return None, f"{spent} Докупить их можно кнопкой ниже."
 
 

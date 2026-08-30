@@ -133,6 +133,33 @@ def test_the_limit_is_per_match_not_forever(env):
     assert source is VoteSource.PAID
 
 
+def test_bought_votes_work_even_when_selling_is_off(env):
+    """Выключенная продажа останавливает покупки, а не оплаченный баланс.
+
+    Иначе человек с полным балансом не может проголосовать и справедливо
+    считает это обманом.
+    """
+    repo, config, settings, match_id = env
+    repo.add_votes(VOTER, 5)
+    repo.add_vote(match_id, VOTER, ONE, VoteSource.FREE)
+    settings.set("paid_votes_enabled", False)
+
+    source, note = _pick_vote_source(repo, match_id, VOTER, config, settings)
+
+    assert source is VoteSource.PAID, note
+    assert repo.vote_balance(VOTER) == 4
+
+
+def test_an_empty_balance_is_explained(env):
+    repo, config, settings, match_id = env
+    repo.add_vote(match_id, VOTER, ONE, VoteSource.FREE)
+
+    source, note = _pick_vote_source(repo, match_id, VOTER, config, settings)
+
+    assert source is None
+    assert "Докупить" in note
+
+
 def test_the_panel_shows_the_limit():
     text, markup = panel_ui.votes(5, True, (0, 0), "", "battle", 0)
     assert "сколько угодно" in text
