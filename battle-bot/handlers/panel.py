@@ -23,8 +23,7 @@ from handlers import membership
 from core.engine import BattleEngine
 from services import (
     group_info, keyboards, main_post, panel_ui, prizes, sponsors, subscription,
-    texts, ui,
-    validation,
+    texts, ui, validation, vote_doctor,
 )
 from services.validation import InputError
 from storage.repo import Repo
@@ -1269,6 +1268,8 @@ async def _back_to(
             message,
             _votes_screen(repo, settings),
         )
+    elif section.startswith("person:"):
+        await render(message, _person_screen(repo, int(section.split(":")[1])))
     elif section == "pays":
         await render(message, _payouts_screen(repo, settings))
     elif section == "pay":
@@ -1476,12 +1477,44 @@ async def do_wipe(
 
 # ---------------------------------------------------------- действия: люди
 
+@router.callback_query(F.data.regexp(r"^p:person:\d+$"))
+async def show_person(callback: CallbackQuery, repo: Repo, config: Config) -> None:
+    """Карточка человека по прямой кнопке — например, «назад» с проверки."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, _person_screen(repo, int(callback.data.split(":")[-1])))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("p:person:why:"))
+async def why_no_vote(
+    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """Разобрать по шагам, почему человек не может проголосовать.
+
+    Отказ приходит короткой всплывашкой, и по ней не видно, что сработало.
+    Здесь видно всё сразу — от подписки до баланса.
+    """
+    if not is_admin(callback.from_user.id, config):
+        return
+
+    user_id = int(callback.data.split(":")[-1])
+    await callback.answer("Проверяю…")
+    report = await vote_doctor.diagnose(bot, repo, config, settings, user_id)
+    row = repo.get_user(user_id)
+    who = (row["username"] and f"@{row['username']}") or str(user_id)
+    await render(callback, panel_ui.vote_check(report, who, user_id))
+
+
 @router.callback_query(F.data.startswith("p:person:"))
 async def person_action(callback: CallbackQuery, repo: Repo, config: Config) -> None:
     if not is_admin(callback.from_user.id, config):
         return
-    _, _, action, raw_id = callback.data.split(":")
-    user_id = int(raw_id)
+    parts = callback.data.split(":")
+    if len(parts) != 4 or parts[2] not in {"ban", "unban"}:
+        await callback.answer("Кнопка устарела.", show_alert=True)
+        return
+    action, user_id = parts[2], int(parts[3])
 
     repo.set_banned(user_id, action == "ban")
     await render(

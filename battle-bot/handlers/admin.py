@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from aiogram import Router
+from aiogram import Bot, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 
@@ -11,7 +11,9 @@ from config import Config
 from core import bracket
 from core.engine import BattleEngine
 from core.models import BattleStatus
+from services import vote_doctor
 from storage.repo import Repo
+from storage.settings import Settings
 
 log = logging.getLogger(__name__)
 router = Router(name="admin")
@@ -34,7 +36,35 @@ async def admin_help(message: Message, config: Config) -> None:
         "/ban &lt;id&gt; — исключить аккаунт\n"
         "/unban &lt;id&gt;\n"
         "/votelog &lt;match_id&gt; — лог голосов матча\n"
+        "/whyvote [id] — почему человек не может проголосовать\n"
         "/broadcast — мастер рассылки"
+    )
+
+
+@router.message(Command("whyvote"))
+async def why_vote(
+    message: Message, command: CommandObject, bot: Bot, repo: Repo, config: Config,
+    settings: Settings,
+) -> None:
+    """Разобрать по шагам, почему голос не проходит.
+
+    Без аргумента проверяет самого админа — так быстрее всего понять, что
+    именно мешает: подписка, потраченный бесплатный голос или пустой баланс.
+    """
+    if not _is_admin(message, config):
+        return
+
+    raw = (command.args or "").strip().lstrip("@")
+    user_id = int(raw) if raw.isdigit() else message.from_user.id
+    report = await vote_doctor.diagnose(bot, repo, config, settings, user_id)
+    verdict = (
+        "✅ <b>Может голосовать</b>" if report.can_vote
+        else "⛔️ <b>Проголосовать не сможет</b>"
+    )
+    await message.answer(
+        f"🗳 <b>Проверка голоса</b> · <code>{user_id}</code>\n\n"
+        + "\n".join(report.lines)
+        + f"\n\n{verdict}"
     )
 
 

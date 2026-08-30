@@ -775,11 +775,29 @@ def person(row, stats_row, balance: int, invited: tuple[int, int] = (0, 0),
     unban = button("Разблокировать", f"person:unban:{row['user_id']}", GREEN)
     ban = button("Заблокировать", f"person:ban:{row['user_id']}", RED)
     rows += [
+        [button("🗳 Почему не голосует", f"person:why:{row['user_id']}", BLUE)],
         [unban if banned else ban],
         [button("🔎 Найти другого", "edit:find_user")],
         back_row("people"),
     ]
     return text, keyboard(*rows)
+
+
+def vote_check(report, who: str, user_id: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Разбор одного отказа в голосовании — по шагам, как их проходит бот."""
+    verdict = (
+        "✅ <b>Может голосовать</b>" if report.can_vote
+        else "⛔️ <b>Проголосовать не сможет</b>"
+    )
+    return (
+        f"🗳 <b>{texts.spaced('ПРОВЕРКА ГОЛОСА')}</b>\n{RULE}\n\n"
+        f"Кто: <b>{escape(who)}</b>\n\n"
+        + "\n".join(report.lines)
+        + f"\n\n{verdict}"
+    ), keyboard(
+        [button("🔄 Проверить снова", f"person:why:{user_id}", BLUE)],
+        back_row(f"person:{user_id}"),
+    )
 
 
 def leavers(rows, enabled: bool, price: int, total: int) -> tuple[str, InlineKeyboardMarkup]:
