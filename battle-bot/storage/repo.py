@@ -299,6 +299,19 @@ class Repo:
             for row in rows
         ]
 
+    def live_match_of(self, user_id: int) -> int | None:
+        """Идущий матч этого человека. Нет такого — None.
+
+        Нужен там, где кнопки под рукой нет: команда, меню, напоминание.
+        """
+        row = self.conn.execute(
+            """SELECT m.id FROM matches m
+               JOIN match_slots s ON s.match_id = m.id AND s.user_id = ?
+               WHERE m.status = ? ORDER BY m.id DESC LIMIT 1""",
+            (user_id, MatchStatus.VOTING.value),
+        ).fetchone()
+        return int(row["id"]) if row else None
+
     def open_matches(self, battle_id: int, round_no: int) -> list[sqlite3.Row]:
         return self.conn.execute(
             """SELECT * FROM matches

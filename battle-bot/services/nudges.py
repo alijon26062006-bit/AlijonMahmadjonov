@@ -16,7 +16,7 @@ from aiogram.exceptions import TelegramAPIError
 
 from config import Config
 from core.models import Slot
-from services import keyboards, texts
+from services import card, keyboards, texts
 from services.tg import is_blocked
 from storage.repo import Repo
 
@@ -55,7 +55,7 @@ async def notify_lead_change(
     if now is None or was is None or was.user_id == now.user_id:
         return None
 
-    markup = keyboards.my_match(match_id, config, post_url, own_channel)
+    markup = keyboards.my_match(match_id, config, post_url, own_channel, card.available())
     loser = next((s for s in after if s.user_id == was.user_id), was)
     notified: int | None = None
 

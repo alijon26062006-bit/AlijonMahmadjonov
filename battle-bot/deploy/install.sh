@@ -18,7 +18,8 @@ fi
 
 echo "==> Пакеты"
 apt-get update -qq
-apt-get install -y -qq python3 python3-venv python3-pip
+# fonts-dejavu-core — шрифт для картинки участника в сторис
+apt-get install -y -qq python3 python3-venv python3-pip fonts-dejavu-core
 
 echo "==> Пользователь $APP_USER"
 id -u "$APP_USER" >/dev/null 2>&1 \

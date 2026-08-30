@@ -13,7 +13,7 @@ from config import Config, MSK
 from core import bracket
 from core.models import BattleStatus, Player, Slot
 from core.scheduler import first_deadline, next_deadline
-from services import keyboards, links, main_post, member_channel, texts
+from services import card, keyboards, links, main_post, member_channel, texts
 from services.channel import ChannelPublisher
 from services.tg import is_blocked
 from storage.repo import Repo
@@ -182,7 +182,7 @@ class BattleEngine:
         message_id = await self.publisher.publish_match(match_id)
         markup = keyboards.my_match(
             match_id, self.config, self._post_url(message_id),
-            member_channel.enabled(self.settings),
+            member_channel.enabled(self.settings), card.available(),
         )
         for player in pair:
             rival = next(p.nickname for p in pair if p.user_id != player.user_id)
@@ -392,7 +392,7 @@ class BattleEngine:
             message_id = await self.publisher.publish_match(match_id)
             markup = keyboards.my_match(
                 match_id, self.config, self._post_url(message_id),
-                member_channel.enabled(self.settings),
+                member_channel.enabled(self.settings), card.available(),
             )
             for player in group:
                 rivals = [p.nickname for p in group if p.user_id != player.user_id]

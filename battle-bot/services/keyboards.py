@@ -284,6 +284,18 @@ def topup_decision(topup_id: int) -> InlineKeyboardMarkup:
     )
 
 
+def share_card(link: str) -> InlineKeyboardMarkup:
+    """Что делать с картинкой: отправить друзьям или скопировать ссылку."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="📢 Отправить друзьям", switch_inline_query=link, style=BLUE
+        )],
+        [InlineKeyboardButton(
+            text="📋 Копировать ссылку", copy_text=CopyTextButton(text=link)
+        )],
+    ])
+
+
 def pay(votes: int, total: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -298,7 +310,8 @@ def pay(votes: int, total: int) -> InlineKeyboardMarkup:
 
 
 def my_match(
-    match_id: int, config: Config, post_url: str | None = None, own_channel: bool = True
+    match_id: int, config: Config, post_url: str | None = None, own_channel: bool = True,
+    with_card: bool = True,
 ) -> InlineKeyboardMarkup:
     """Кнопки под сообщением «нашлась пара» и «вы прошли дальше».
 
@@ -326,6 +339,14 @@ def my_match(
             )
         ],
     ]
+    if with_card:
+        rows.insert(1, [
+            InlineKeyboardButton(
+                text="🖼 Картинка для сторис",
+                callback_data=f"card:{match_id}",
+                style=BLUE,
+            )
+        ])
     if own_channel:
         rows.append(
             [

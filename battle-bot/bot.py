@@ -14,7 +14,7 @@ from core.engine import BattleEngine
 from core.autopilot import Autopilot
 from core.scheduler import DeadlineWatcher, Ticker
 from handlers import (
-    admin, broadcast, emoji, errors, groups, membership, mychannel, panel,
+    admin, broadcast, card, emoji, errors, groups, membership, mychannel, panel,
     payments, referral, start, topup, voting,
 )
 from services.emoji import PremiumEmojiMiddleware, load_table
@@ -34,6 +34,7 @@ COMMANDS = [
     BotCommand(command="start", description="Главное меню"),
     BotCommand(command="join", description="Принять участие"),
     BotCommand(command="vote", description="Открыть голосование"),
+    BotCommand(command="card", description="Картинка для сторис"),
     BotCommand(command="me", description="Профиль"),
     BotCommand(command="top", description="Таблица лидеров"),
     BotCommand(command="buy", description="Купить голоса"),
@@ -53,6 +54,7 @@ ROUTERS = (
     broadcast.router,
     admin.router,
     emoji.router,
+    card.router,
     topup.router,
     payments.router,
     referral.router,
