@@ -89,10 +89,11 @@ async def card_command(
     message: Message, bot: Bot, repo: Repo, config: Config, settings: Settings
 ) -> None:
     """«/card» — картинка по текущей паре, без поиска нужной кнопки."""
-    match_id = repo.live_match_of(message.from_user.id)
-    if match_id is None:
+    match = repo.active_match_for(message.from_user.id)
+    if match is None:
         await message.answer(texts.CARD_NO_MATCH)
         return
+    match_id = int(match["id"])
 
     if not card.available():
         await message.answer(texts.CARD_UNAVAILABLE)

@@ -215,6 +215,16 @@ async def leaderboard(message: Message, repo: Repo) -> None:
     await message.answer(texts.leaderboard(repo.leaderboard()))
 
 
+@router.message(Command("hall"))
+async def hall(message: Message, repo: Repo) -> None:
+    """Зал славы: кому уже выплачены призы.
+
+    Обещанные призы ничего не стоят, выплаченные — стоят всего. Поэтому
+    список открыт любому, а не только админу.
+    """
+    await message.answer(texts.hall_of_fame(repo.payouts(15)))
+
+
 @router.message(Command("vote"))
 async def my_match(
     message: Message, repo: Repo, config: Config, settings: Settings

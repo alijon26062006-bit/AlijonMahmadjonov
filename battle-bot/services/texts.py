@@ -670,6 +670,83 @@ def pair_published(rival: str) -> str:
     )
 
 
+# ------------------------------------------------------- выплаты и слава
+
+def payout_post(nickname: str, place: int, prize: str, battle_id: int) -> str:
+    """Подпись под скриншотом выплаты в канале.
+
+    Пост с доказательством — самая дешёвая реклама, какая у батла есть:
+    призы видно, значит участвовать имеет смысл.
+    """
+    from services import prizes as prize_list
+
+    return (
+        f"💸 <b>Приз выплачен</b>\n"
+        f"{RULE}\n\n"
+        f"{MEDAL.get(place, '🏅')} <b>{nick(nickname)}</b> — "
+        f"<b>{prize_list.label(prize)}</b>\n"
+        f"Батл <b>#{battle_id}</b>\n\n"
+        "<i>Так выглядит каждый приз этого батла. Участвуйте — "
+        "следующим можете быть вы.</i>"
+    )
+
+
+def payout_dm(place: int, prize: str) -> str:
+    from services import prizes as prize_list
+
+    return (
+        f"💸 <b>Приз отправлен</b>\n"
+        f"{RULE}\n\n"
+        f"{MEDAL.get(place, '🏅')} Ваше место: <b>{place}</b>\n"
+        f"Приз: <b>{prize_list.label(prize)}</b>\n\n"
+        "<i>Доказательство выплаты опубликовано в канале.</i>"
+    )
+
+
+def hall_of_fame(rows, limit: int = 15) -> str:
+    """Зал славы: кому уже выплачены призы."""
+    from services import prizes as prize_list
+
+    if not rows:
+        return (
+            f"🏛 <b>{spaced('ЗАЛ СЛАВЫ')}</b>\n{RULE}\n\n"
+            "<i>Пока пусто. Первый приз — и первое имя здесь.</i>"
+        )
+
+    lines = [
+        f"{MEDAL.get(int(row['place']), '🏅')} <b>{nick(row['nickname'] or '—')}</b> — "
+        f"<b>{prize_list.label(str(row['prize']))}</b>  <i>батл #{row['battle_id']}</i>"
+        for row in rows[:limit]
+    ]
+    return (
+        f"🏛 <b>{spaced('ЗАЛ СЛАВЫ')}</b>\n{RULE}\n\n"
+        + "\n".join(lines)
+        + "\n\n<i>Все призы выплачены и подтверждены скриншотами в канале.</i>"
+    )
+
+
+def pay_the_winners(battle_id: int, winners) -> str:
+    """Напоминание админу сразу после финала."""
+    lines = "\n".join(
+        f"{MEDAL.get(slot.position or 0, '🏅')} <b>{nick(slot.nickname)}</b>"
+        for slot in winners
+    )
+    return (
+        f"💸 <b>Пора выплатить призы</b>\n"
+        f"{RULE}\n\n"
+        f"Батл <b>#{battle_id}</b> завершён.\n\n{lines}\n\n"
+        "<blockquote>Панель → 🏆 Призы → 💸 Выплаты. Пришлите скриншот "
+        "перевода — бот сам выложит его в канал. Именно эти посты и "
+        "заставляют людей верить в призы.</blockquote>"
+    )
+
+
+PAYOUT_NEED_PHOTO = (
+    "⚠️ Нужен <b>скриншот перевода</b> картинкой. "
+    "Пришлите фото, а не текст и не файл."
+)
+
+
 # ------------------------------------------------ картинка для сторис
 
 CARD_UNAVAILABLE = (

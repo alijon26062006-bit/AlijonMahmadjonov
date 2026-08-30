@@ -517,9 +517,23 @@ class BattleEngine:
                 )
             await self._rest_after_prize(slot.user_id, place, battle_id)
             await self._publish_result_to_own_channel(slot.user_id, 0, True, ranking)
+        await self._ask_admins_to_pay(battle_id, ranking)
         log.info("Батл #%s завершён", battle_id)
 
         log.info("Очередь на следующий батл: %s", self.repo.queue_size())
+
+    async def _ask_admins_to_pay(self, battle_id: int, ranking: list[Slot]) -> None:
+        """Напомнить админам выплатить призы, пока финал ещё свежий.
+
+        Невыплаченный приз бьёт по батлу сильнее любой поломки: люди говорят
+        друг другу, что призы не отдают, и следующий батл собирается хуже.
+        """
+        places = len(self.settings.get("prizes") or [])
+        winners = [slot for slot in ranking if (slot.position or 99) <= places]
+        if not winners:
+            return
+        for admin_id in self.config.admin_ids:
+            await self._dm(admin_id, texts.pay_the_winners(battle_id, winners))
 
     async def _show_off_in_main_channel(self, battle_id: int, ranking: list[Slot]) -> None:
         """Итоги батла — в главный канал, с кнопкой на следующий.

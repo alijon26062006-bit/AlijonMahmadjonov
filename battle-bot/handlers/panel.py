@@ -315,6 +315,86 @@ async def show_votes(
     await callback.answer()
 
 
+@router.callback_query(F.data == "p:pays")
+async def show_payouts(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """Кому приз ещё не отправлен и что уже выплачено."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, _payouts_screen(repo, settings))
+    await callback.answer()
+
+
+def _payouts_screen(repo: Repo, settings: Settings):
+    places = len(settings.get("prizes") or [])
+    return panel_ui.payouts(
+        repo.unpaid_winners(places), repo.payouts(5), repo.payout_count()
+    )
+
+
+@router.callback_query(F.data.startswith("p:pays:do:"))
+async def ask_payout_proof(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings,
+    state: FSMContext,
+) -> None:
+    """Выбрали победителя — ждём скриншот перевода."""
+    if not is_admin(callback.from_user.id, config):
+        return
+
+    parts = callback.data.split(":")
+    if len(parts) != 5 or not all(part.lstrip("-").isdigit() for part in parts[3:]):
+        await callback.answer("Кнопка устарела.", show_alert=True)
+        return
+
+    battle_id, user_id = int(parts[3]), int(parts[4])
+    winner = next(
+        (row for row in repo.unpaid_winners(len(settings.get("prizes") or []), 50)
+         if int(row["battle_id"]) == battle_id and int(row["user_id"]) == user_id),
+        None,
+    )
+    if winner is None:
+        await callback.answer("Этот приз уже выплачен.", show_alert=True)
+        await render(callback, _payouts_screen(repo, settings))
+        return
+
+    place = int(winner["place"])
+    prizes_list = settings.get("prizes") or []
+    prize = prizes_list[place - 1] if place <= len(prizes_list) else ""
+
+    await state.set_state(Panel.waiting_value)
+    await state.update_data(
+        key="payout", battle=battle_id, target=user_id, place=place, prize=prize
+    )
+    await render(
+        callback,
+        panel_ui.ask(
+            f"Скриншот выплаты · {winner['nickname']}",
+            f"{place} место · {prize or '—'}",
+            "пришлите фото перевода",
+            "pays",
+        ),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "p:pays:hall")
+async def post_hall(
+    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """Выложить зал славы в главный канал."""
+    if not is_admin(callback.from_user.id, config):
+        return
+
+    channel_id = settings.get("main_channel_id") or config.channel_id
+    try:
+        await bot.send_message(channel_id, texts.hall_of_fame(repo.payouts(15)))
+    except TelegramAPIError as error:
+        await callback.answer(f"Не вышло: {error}", show_alert=True)
+        return
+    await callback.answer("Зал славы опубликован")
+
+
 @router.callback_query(F.data == "p:pay")
 async def show_manual_pay(
     callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
@@ -1086,6 +1166,10 @@ async def _apply(
         await render(message, panel_ui.channel(main_post.state(repo, config, settings)))
         return
 
+    if key == "payout":
+        await _pay_out(message, data, repo, config, settings, state)
+        return
+
     if key == "main_post_photo":
         if not message.photo:
             raise InputError("Нужно прислать фото картинкой, а не текстом или файлом.")
@@ -1106,6 +1190,49 @@ async def _apply(
     await _back_to(message, editor["back"], repo, config, engine, settings)
 
 
+async def _pay_out(
+    message: Message, data: dict, repo: Repo, config: Config, settings: Settings,
+    state: FSMContext,
+) -> None:
+    """Записать выплату и выложить доказательство в канал."""
+    if not message.photo:
+        raise InputError(texts.PAYOUT_NEED_PHOTO)
+
+    battle_id, user_id = int(data["battle"]), int(data["target"])
+    place, prize = int(data["place"]), str(data.get("prize") or "")
+    photo_id = message.photo[-1].file_id
+    winner = repo.get_user(user_id)
+    nickname = (winner["username"] if winner and winner["username"] else str(user_id))
+
+    # одна выплата на приз: два админа могли начать одновременно
+    if not repo.record_payout(battle_id, user_id, place, prize, photo_id):
+        await state.clear()
+        await message.answer("Этот приз уже выплачен.")
+        await render(message, _payouts_screen(repo, settings))
+        return
+
+    await state.clear()
+    channel_id = settings.get("main_channel_id") or config.channel_id
+    try:
+        posted = await message.bot.send_photo(
+            channel_id, photo_id,
+            caption=texts.payout_post(nickname, place, prize, battle_id),
+        )
+        repo.set_payout_post(battle_id, user_id, posted.message_id)
+        await message.answer("✅ Доказательство выплаты в канале.")
+    except TelegramAPIError as error:
+        # выплата записана — важно, что она не потерялась; пост можно повторить
+        log.warning("Не смог выложить доказательство выплаты: %s", error)
+        await message.answer(f"Выплата записана, но пост не ушёл: {error}")
+
+    try:
+        await message.bot.send_message(user_id, texts.payout_dm(place, prize))
+    except TelegramAPIError as error:
+        log.info("Не смог сказать победителю %s о выплате: %s", user_id, error)
+
+    await render(message, _payouts_screen(repo, settings))
+
+
 def _channel_from_forward(message: Message) -> int | None:
     """Достать ID канала из пересланного сообщения, если это оно."""
     origin = getattr(message, "forward_origin", None)
@@ -1124,6 +1251,8 @@ async def _back_to(
             message,
             _votes_screen(repo, settings),
         )
+    elif section == "pays":
+        await render(message, _payouts_screen(repo, settings))
     elif section == "pay":
         await render(message, _manual_pay_screen(repo, settings))
     elif section == "auto":

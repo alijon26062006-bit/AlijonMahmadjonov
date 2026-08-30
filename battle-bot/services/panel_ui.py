@@ -167,7 +167,57 @@ def prizes(values: list[str]) -> tuple[str, InlineKeyboardMarkup]:
         "как звёзды, а любой другой текст — как есть. "
         "Например «Telegram Premium на 3 месяца» или «Реклама в канале».</blockquote>"
     )
-    return text, keyboard([button("✏️ Изменить", "edit:prizes", BLUE)], back_row())
+    return text, keyboard(
+        [button("✏️ Изменить", "edit:prizes", BLUE)],
+        [button("💸 Выплаты", "pays")],
+        back_row(),
+    )
+
+
+def payouts(unpaid, done, total: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Кому приз ещё не отправлен и что уже выплачено.
+
+    Пока список не пуст — кто-то ждёт свои звёзды и рассказывает об этом
+    другим. Поэтому он стоит первым.
+    """
+    from services import prizes as prize_list
+
+    waiting = "\n".join(
+        f"{texts.MEDAL.get(int(row['place']), '🏅')} <b>{escape(row['nickname'])}</b> "
+        f"<i>· батл #{row['battle_id']}</i>"
+        for row in unpaid
+    ) or "<i>никто не ждёт — все призы выплачены</i>"
+
+    paid = "\n".join(
+        f"{texts.MEDAL.get(int(row['place']), '🏅')} {escape(row['nickname'] or '—')} — "
+        f"<b>{prize_list.label(str(row['prize']))}</b>"
+        for row in done[:5]
+    ) or "<i>пока ничего</i>"
+
+    text = (
+        f"💸 <b>{texts.spaced('ВЫПЛАТЫ')}</b>\n{RULE}\n\n"
+        f"<b>Ждут приз</b>\n{waiting}\n\n"
+        f"<b>Последние выплаты</b>\n{paid}\n\n"
+        f"Всего выплачено: <b>{total}</b>\n\n"
+        "<i>Нажмите на имя и пришлите скриншот перевода — бот выложит его "
+        "в главный канал. Без доказательств призам не верят, а значит и "
+        "голоса не покупают.</i>"
+    )
+
+    buttons = [
+        [button(
+            f"{texts.MEDAL.get(int(row['place']), '🏅')} {row['nickname']} · #{row['battle_id']}",
+            f"pays:do:{row['battle_id']}:{row['user_id']}",
+            GREEN,
+        )]
+        for row in unpaid
+    ]
+    return text, keyboard(
+        *buttons,
+        [button("🏛 Выложить зал славы", "pays:hall", BLUE)],
+        [button("🔄 Обновить", "pays")],
+        back_row("prizes"),
+    )
 
 
 # ------------------------------------------------------------------ голоса

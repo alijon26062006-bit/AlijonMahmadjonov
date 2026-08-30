@@ -299,19 +299,6 @@ class Repo:
             for row in rows
         ]
 
-    def live_match_of(self, user_id: int) -> int | None:
-        """Идущий матч этого человека. Нет такого — None.
-
-        Нужен там, где кнопки под рукой нет: команда, меню, напоминание.
-        """
-        row = self.conn.execute(
-            """SELECT m.id FROM matches m
-               JOIN match_slots s ON s.match_id = m.id AND s.user_id = ?
-               WHERE m.status = ? ORDER BY m.id DESC LIMIT 1""",
-            (user_id, MatchStatus.VOTING.value),
-        ).fetchone()
-        return int(row["id"]) if row else None
-
     def open_matches(self, battle_id: int, round_no: int) -> list[sqlite3.Row]:
         return self.conn.execute(
             """SELECT * FROM matches
@@ -865,6 +852,79 @@ class Repo:
                FROM member_channels"""
         ).fetchone()
         return int(row["total"]), int(row["live"]), int(row["posts"])
+
+    # ---------------------------------------------------- выплаты призов
+
+    def winners(self, battle_id: int, places: int) -> list[sqlite3.Row]:
+        """Призёры батла по местам."""
+        return self.conn.execute(
+            """SELECT p.user_id, p.nickname, p.place, u.username
+               FROM participants p LEFT JOIN users u ON u.user_id = p.user_id
+               WHERE p.battle_id = ? AND p.place IS NOT NULL AND p.place <= ?
+               ORDER BY p.place""",
+            (battle_id, places),
+        ).fetchall()
+
+    def unpaid_winners(self, places: int, limit: int = 10) -> list[sqlite3.Row]:
+        """Кому приз ещё не выплачен — по свежим завершённым батлам.
+
+        Это рабочий список админа: пока он не пуст, кто-то ждёт свои звёзды.
+        """
+        return self.conn.execute(
+            """SELECT p.battle_id, p.user_id, p.nickname, p.place, u.username
+               FROM participants p
+               JOIN battles b ON b.id = p.battle_id AND b.status = 'finished'
+               LEFT JOIN users u ON u.user_id = p.user_id
+               LEFT JOIN payouts o
+                      ON o.battle_id = p.battle_id AND o.user_id = p.user_id
+               WHERE p.place IS NOT NULL AND p.place <= ? AND o.user_id IS NULL
+               ORDER BY p.battle_id DESC, p.place
+               LIMIT ?""",
+            (places, limit),
+        ).fetchall()
+
+    def record_payout(self, battle_id: int, user_id: int, place: int, prize: str,
+                      photo_id: str | None = None) -> bool:
+        """Отметить выплату. False — этот приз уже выплачен.
+
+        Проверку делает сама база первичным ключом: два админа могут нажать
+        одновременно, а выплата должна засчитаться один раз.
+        """
+        try:
+            self.conn.execute(
+                """INSERT INTO payouts(battle_id, user_id, place, prize, photo_id)
+                   VALUES(?, ?, ?, ?, ?)""",
+                (battle_id, user_id, place, prize, photo_id),
+            )
+        except sqlite3.IntegrityError:
+            self.conn.rollback()
+            return False
+        self.conn.commit()
+        return True
+
+    def set_payout_post(self, battle_id: int, user_id: int, message_id: int) -> None:
+        self.conn.execute(
+            "UPDATE payouts SET message_id = ? WHERE battle_id = ? AND user_id = ?",
+            (message_id, battle_id, user_id),
+        )
+        self.conn.commit()
+
+    def payouts(self, limit: int = 20) -> list[sqlite3.Row]:
+        """Зал славы: кому и что уже выплачено, свежие сверху."""
+        return self.conn.execute(
+            """SELECT o.*, u.username, p.nickname
+               FROM payouts o
+               LEFT JOIN users u ON u.user_id = o.user_id
+               LEFT JOIN participants p
+                      ON p.battle_id = o.battle_id AND p.user_id = o.user_id
+               ORDER BY o.created_at DESC, o.battle_id DESC, o.place
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+
+    def payout_count(self) -> int:
+        row = self.conn.execute("SELECT COUNT(*) AS total FROM payouts").fetchone()
+        return int(row["total"] or 0)
 
     # ------------------------------------------------ пополнение вручную
 

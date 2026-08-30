@@ -250,6 +250,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_topup
     ON topups(user_id) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS idx_topups_status ON topups(status, id);
 
+-- Доказательства выплат: скриншот перевода приза победителю.
+-- Без них никто не верит, что призы настоящие, — и голоса не покупают.
+-- Один приз выплачивается один раз: на это стоит первичный ключ.
+CREATE TABLE IF NOT EXISTS payouts (
+    battle_id  INTEGER NOT NULL REFERENCES battles(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(user_id),
+    place      INTEGER NOT NULL,
+    prize      TEXT NOT NULL,
+    photo_id   TEXT,
+    message_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (battle_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_payouts_time ON payouts(created_at DESC);
+
 CREATE TABLE IF NOT EXISTS stats (
     user_id     INTEGER PRIMARY KEY REFERENCES users(user_id),
     battles     INTEGER NOT NULL DEFAULT 0,

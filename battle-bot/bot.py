@@ -37,6 +37,7 @@ COMMANDS = [
     BotCommand(command="card", description="Картинка для сторис"),
     BotCommand(command="me", description="Профиль"),
     BotCommand(command="top", description="Таблица лидеров"),
+    BotCommand(command="hall", description="Зал славы: выплаченные призы"),
     BotCommand(command="buy", description="Купить голоса"),
     BotCommand(command="invite", description="Пригласить друзей"),
     BotCommand(command="mychannel", description="Мой канал"),
