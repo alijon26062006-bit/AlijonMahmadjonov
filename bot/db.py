@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 DIRECTIONS = ("out", "in")
 KINDS = ("transfer", "payment", "debt", "income")
@@ -83,7 +83,8 @@ CREATE TABLE IF NOT EXISTS users (
     invited_at    TEXT NOT NULL,
     registered_at TEXT,
     last_seen_at  TEXT,
-    reminder_hour INTEGER          -- во сколько слать автоматические напоминания
+    reminder_hour INTEGER,         -- во сколько слать автоматические напоминания
+    tz            TEXT             -- свой часовой пояс; пусто — общий из .env
 );
 
 CREATE TABLE IF NOT EXISTS reminders (
@@ -233,6 +234,12 @@ def _migrate_add_reminder_hour(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN reminder_hour INTEGER")
 
 
+def _migrate_add_user_tz(conn: sqlite3.Connection) -> None:
+    """Схема 3 → 4: у каждого человека свой часовой пояс."""
+    if table_exists(conn, "users") and "tz" not in columns_of(conn, "users"):
+        conn.execute("ALTER TABLE users ADD COLUMN tz TEXT")
+
+
 def current_version(conn: sqlite3.Connection) -> int:
     if not table_exists(conn, "schema_version"):
         return 0
@@ -248,6 +255,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # и на старой базе их создание упало бы с «no such column».
     _migrate_chat_id_to_owner_id(conn)
     _migrate_add_reminder_hour(conn)
+    _migrate_add_user_tz(conn)
 
     conn.executescript(_SCHEMA)
     conn.executescript(_TRIGGERS)
@@ -796,6 +804,53 @@ def reminder_hour(conn: sqlite3.Connection, user_id: int) -> int:
     user = get_user(conn, user_id)
     hour = user.get("reminder_hour") if user else None
     return int(hour) if hour is not None else DEFAULT_REMINDER_HOUR
+
+
+def set_user_tz(conn: sqlite3.Connection, user_id: int, tz_name: str) -> bool:
+    """Запомнить пояс. Неизвестное имя не принимаем — иначе напоминания уедут."""
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    try:
+        ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, ValueError, KeyError):
+        return False
+    cur = conn.execute("UPDATE users SET tz=? WHERE id=?", (tz_name, user_id))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def user_tz_name(conn: sqlite3.Connection, user_id: int, fallback: str) -> str:
+    user = get_user(conn, user_id)
+    return (user.get("tz") if user else None) or fallback
+
+
+def user_tz(conn: sqlite3.Connection, user_id: int, fallback: Any):
+    """Пояс человека как ZoneInfo. Битое имя в базе не должно ронять бота."""
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    if isinstance(fallback, str):
+        try:
+            fallback = ZoneInfo(fallback)
+        except (ZoneInfoNotFoundError, ValueError, KeyError):
+            fallback = ZoneInfo("UTC")
+
+    user = get_user(conn, user_id)
+    name = user.get("tz") if user else None
+    if not name:
+        return fallback
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError, KeyError):
+        log_tz_problem(user_id, name)
+        return fallback
+
+
+def log_tz_problem(user_id: int, name: str) -> None:
+    import logging
+
+    logging.getLogger(__name__).warning(
+        "У пользователя %s непонятный часовой пояс %r — беру общий", user_id, name
+    )
 
 
 def undescribed_documents(

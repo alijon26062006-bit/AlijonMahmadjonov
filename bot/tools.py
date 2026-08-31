@@ -169,7 +169,8 @@ def _sync_due_reminders(ctx: ToolContext, tx_id: int) -> None:
     from . import reminders as rem
 
     try:
-        rem.schedule_for_transaction(ctx.conn, ctx.owner_id, tx_id, ctx.tz, now=ctx.now)
+        tz = db.user_tz(ctx.conn, ctx.owner_id, ctx.tz)
+        rem.schedule_for_transaction(ctx.conn, ctx.owner_id, tx_id, tz, now=ctx.now)
     except Exception:  # напоминание — не повод потерять саму запись
         log.exception("Не удалось поставить напоминание о сроке для операции %s", tx_id)
 
@@ -278,26 +279,44 @@ def t_send_documents(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
 def t_create_reminder(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     from . import reminders as rem
 
-    when = clean_date(args.get("when"))
     text = " ".join(str(args.get("text") or "").split())[:300]
-    if not when:
-        return {"ok": False, "ошибка": "Нужна дата в формате ГГГГ-ММ-ДД."}
     if not text:
         return {"ok": False, "ошибка": "Нужен текст напоминания."}
 
-    hour = db.reminder_hour(ctx.conn, ctx.owner_id)
-    moment = rem.local_moment(when, args.get("time"), ctx.tz, hour)
     now = ctx.now or rem.utc_now()
-    if moment <= now:
-        return {"ok": False, "ошибка": "Этот момент уже прошёл — назови будущее время."}
+    tz = db.user_tz(ctx.conn, ctx.owner_id, ctx.tz)
 
+    delay = clean_amount(args.get("after_seconds"))
+    if delay is not None:
+        # «Через 30 секунд» — просто сдвиг от текущего момента: модель не считает
+        # дату сама, и целый класс ошибок с часовыми поясами не возникает.
+        seconds = int(delay)
+        if seconds < rem.MIN_DELAY.total_seconds():
+            return {"ok": False, "ошибка": "Слишком скоро — назови хотя бы 5 секунд."}
+        if seconds > rem.MAX_DELAY.total_seconds():
+            return {"ok": False, "ошибка": "Слишком далеко — не больше года."}
+        moment = rem.moment_after(seconds, now)
+    else:
+        when = clean_date(args.get("when"))
+        if not when:
+            return {"ok": False, "ошибка": "Нужна дата (ГГГГ-ММ-ДД) или after_seconds."}
+        hour = db.reminder_hour(ctx.conn, ctx.owner_id)
+        moment = rem.local_moment(when, args.get("time"), tz, hour)
+        if moment <= now:
+            return {"ok": False, "ошибка": "Этот момент уже прошёл — назови будущее время."}
+
+    fire_at = rem.to_utc_iso(moment)
     reminder_id = db.add_reminder(
-        ctx.conn, ctx.owner_id, fire_at=rem.to_utc_iso(moment), text=text, kind="manual"
+        ctx.conn, ctx.owner_id, fire_at=fire_at, text=text, kind="manual"
     )
     return {
         "ok": True,
-        "напоминание": {"id": reminder_id, "когда": rem.fmt_local(rem.to_utc_iso(moment), ctx.tz),
-                        "текст": text},
+        "напоминание": {
+            "id": reminder_id,
+            # Ближе минуты — «через 30 секунд», иначе дата и время.
+            "когда": rem.humanize_delay(moment, now) or rem.fmt_local(fire_at, tz),
+            "текст": text,
+        },
     }
 
 
@@ -305,10 +324,11 @@ def t_list_reminders(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     from . import reminders as rem
 
     rows = db.list_reminders(ctx.conn, ctx.owner_id)
+    tz = db.user_tz(ctx.conn, ctx.owner_id, ctx.tz)
     return {
         "найдено": len(rows),
         "напоминания": [
-            {"id": r["id"], "когда": rem.fmt_local(r["fire_at"], ctx.tz), "текст": r["text"]}
+            {"id": r["id"], "когда": rem.fmt_local(r["fire_at"], tz), "текст": r["text"]}
             for r in rows
         ],
     }

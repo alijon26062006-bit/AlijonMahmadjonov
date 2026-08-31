@@ -15,6 +15,24 @@ REMINDER_DONE = "rem:done:"
 REMINDER_SNOOZE = "rem:snooze:"
 REMINDER_CANCEL = "rem:cancel:"
 
+TZ_PREFIX = "tz:"
+# Русские названия для тех поясов, что мы предлагаем кнопками.
+TZ_NAMES_RU = {
+    "Asia/Dushanbe": "Душанбе",
+    "Asia/Almaty": "Алматы",
+    "Asia/Tashkent": "Ташкент",
+    "Europe/Moscow": "Москва",
+    "Asia/Bishkek": "Бишкек",
+    "Asia/Baku": "Баку",
+}
+# Те пояса, которые реально нужны этому боту. Остальные — командой /vremya Asia/Baku.
+TZ_CHOICES = (
+    ("🇹🇯 Душанбе", "Asia/Dushanbe"),
+    ("🇰🇿 Алматы", "Asia/Almaty"),
+    ("🇺🇿 Ташкент", "Asia/Tashkent"),
+    ("🇷🇺 Москва", "Europe/Moscow"),
+)
+
 # Панель админа
 ADMIN_LIST = "adm:list"
 ADMIN_ADD = "adm:add"
@@ -57,6 +75,18 @@ def reminders_list_keyboard(reminders: list[dict[str, Any]]) -> InlineKeyboardMa
                               callback_data=f"{REMINDER_CANCEL}{r['id']}")]
         for r in reminders
     ])
+
+
+def timezone_keyboard() -> InlineKeyboardMarkup:
+    rows, pair = [], []
+    for label, name in TZ_CHOICES:
+        pair.append(InlineKeyboardButton(text=label, callback_data=f"{TZ_PREFIX}{name}"))
+        if len(pair) == 2:
+            rows.append(pair)
+            pair = []
+    if pair:
+        rows.append(pair)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def grant_access_keyboard(user_id: int) -> InlineKeyboardMarkup:

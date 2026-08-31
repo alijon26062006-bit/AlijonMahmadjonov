@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -50,7 +50,7 @@ HELP_TEXT = """\
 
 Команды: /help — эта справка, /otchet — отчёт за текущий месяц,
 /istoriya Абубакр — вся история по человеку, /napominaniya — список напоминаний,
-/vremya 9 — во сколько напоминать, /imya — сменить своё имя.
+/vremya — время и часовой пояс, /imya — сменить своё имя.
 
 Твои записи видишь только ты.\
 """
@@ -258,22 +258,73 @@ async def cmd_reminders(
 
 
 @router.message(Command("vremya"))
-async def cmd_reminder_hour(
-    message: Message, conn: sqlite3.Connection, user: dict[str, Any]
+async def cmd_time(
+    message: Message, config: Config, conn: sqlite3.Connection, user: dict[str, Any]
 ) -> None:
-    raw = (message.text or "").partition(" ")[2].strip().replace(".", ":")
-    hour_part = raw.split(":")[0] if raw else ""
-    if not hour_part.isdigit() or not db.set_reminder_hour(conn, user["id"], int(hour_part)):
-        await message.answer(
-            f"Напиши так: /vremya 9\n\n"
-            f"Сейчас автоматические напоминания приходят в "
-            f"{db.reminder_hour(conn, user['id'])}:00."
-        )
+    """Всё про время: который час у бота, пояс и час автонапоминаний."""
+    argument = (message.text or "").partition(" ")[2].strip()
+
+    if argument:
+        # Число — час автоматических напоминаний.
+        hour_part = argument.replace(".", ":").split(":")[0]
+        if hour_part.isdigit():
+            if db.set_reminder_hour(conn, user["id"], int(hour_part)):
+                await message.answer(
+                    f"Готово. О сроках буду напоминать в {int(hour_part)}:00.\n"
+                    "Те, что ты просишь голосом, приходят в названное тобой время."
+                )
+            else:
+                await message.answer("Час должен быть от 0 до 23. Например: /vremya 9")
+            return
+        # Иначе — имя часового пояса.
+        if db.set_user_tz(conn, user["id"], argument):
+            await message.answer(_time_card(config, conn, user["id"]),
+                                 reply_markup=keyboards.timezone_keyboard())
+        else:
+            await message.answer(
+                f"Не знаю такой часовой пояс: {argument}\n\n"
+                "Пиши как Asia/Dushanbe или Asia/Almaty, либо выбери кнопкой в /vremya."
+            )
         return
-    await message.answer(
-        f"Готово. Напоминания о сроках буду присылать в {int(hour_part)}:00.\n"
-        "Те, что ты просишь голосом, приходят в названное тобой время."
+
+    await message.answer(_time_card(config, conn, user["id"]),
+                         reply_markup=keyboards.timezone_keyboard())
+
+
+def _time_card(config: Config, conn: sqlite3.Connection, user_id: int) -> str:
+    """Первая строка отвечает на «а сколько сейчас времени» — сверь с телефоном."""
+    tz = db.user_tz(conn, user_id, config.tz)
+    tz_name = db.user_tz_name(conn, user_id, config.tz_name)
+    now = datetime.now(tz)
+    city = keyboards.TZ_NAMES_RU.get(tz_name) or tz_name.rpartition("/")[2].replace("_", " ")
+
+    shift = now.utcoffset() or timedelta(0)
+    total_minutes = int(shift.total_seconds() // 60)
+    sign = "+" if total_minutes >= 0 else "−"
+    hours, minutes = divmod(abs(total_minutes), 60)
+    pretty_offset = f"UTC{sign}{hours}" + (f":{minutes:02d}" if minutes else "")
+    return (
+        f"Сейчас у тебя: {now:%d.%m.%Y}, {now:%H:%M}\n"
+        f"Часовой пояс: {city} ({pretty_offset})\n"
+        f"Напоминания о сроках: в {db.reminder_hour(conn, user_id)}:00\n\n"
+        "Не сходится со временем на телефоне — выбери свой пояс кнопкой ниже."
     )
+
+
+@router.callback_query(F.data.startswith(keyboards.TZ_PREFIX))
+async def on_timezone_button(
+    query: CallbackQuery, config: Config, conn: sqlite3.Connection, user: dict[str, Any]
+) -> None:
+    tz_name = query.data.removeprefix(keyboards.TZ_PREFIX)
+    if not db.set_user_tz(conn, user["id"], tz_name):
+        await query.answer("Не знаю такой пояс", show_alert=True)
+        return
+    await query.answer("Готово")
+    try:
+        await query.message.edit_text(_time_card(config, conn, user["id"]),
+                                      reply_markup=keyboards.timezone_keyboard())
+    except Exception:
+        pass
 
 
 @router.message(Command("help"))

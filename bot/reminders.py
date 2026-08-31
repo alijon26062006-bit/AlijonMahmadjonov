@@ -17,7 +17,14 @@ from . import db
 
 log = logging.getLogger(__name__)
 
-TICK_SECONDS = 30
+# Пять секунд, а не тридцать: иначе «напомни через 30 секунд» опоздает почти
+# на полминуты. Запрос лёгкий — выборка по индексу.
+TICK_SECONDS = 5
+
+# Границы для «напомни через …». Меньше — человек не успеет дочитать ответ бота;
+# больше года — почти наверняка ошибка распознавания речи.
+MIN_DELAY = timedelta(seconds=5)
+MAX_DELAY = timedelta(days=365)
 # Бот лежал дольше — не вываливать человеку кучу протухших напоминаний.
 MAX_LATE = timedelta(days=3)
 # Сколько ждать, прежде чем напомнить о неподписанном фото.
@@ -45,7 +52,32 @@ def parse_utc(value: str) -> datetime:
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
-def local_moment(day: date | str, hour_minute: str | None, tz: ZoneInfo, default_hour: int) -> datetime:
+def parse_clock(value: str | None, default_hour: int) -> tuple[int, int, int]:
+    """«15:30:45» или «15:30» или «7» → (час, минута, секунда).
+
+    Модель может прислать что угодно — мусор не должен ронять бота,
+    поэтому непонятное молча откатывается к часу по умолчанию.
+    """
+    if not value:
+        return default_hour, 0, 0
+    parts = str(value).strip().replace(".", ":").split(":")
+    numbers = []
+    for part in parts[:3]:
+        try:
+            numbers.append(int(part))
+        except ValueError:
+            return default_hour, 0, 0
+    if not numbers:
+        return default_hour, 0, 0
+    hour = max(0, min(numbers[0], 23))
+    minute = max(0, min(numbers[1], 59)) if len(numbers) > 1 else 0
+    second = max(0, min(numbers[2], 59)) if len(numbers) > 2 else 0
+    return hour, minute, second
+
+
+def local_moment(
+    day: date | str, clock: str | None, tz: ZoneInfo, default_hour: int
+) -> datetime:
     """Собрать момент в часовом поясе человека.
 
     Хранить будем в UTC: иначе смена TZ или переход на летнее время сдвинет
@@ -53,22 +85,37 @@ def local_moment(day: date | str, hour_minute: str | None, tz: ZoneInfo, default
     """
     if isinstance(day, str):
         day = datetime.strptime(day[:10], "%Y-%m-%d").date()
-    hour, minute = default_hour, 0
-    if hour_minute:
-        parts = str(hour_minute).replace(".", ":").split(":")
-        try:
-            hour = int(parts[0])
-            minute = int(parts[1]) if len(parts) > 1 else 0
-        except ValueError:
-            hour, minute = default_hour, 0
-    hour = max(0, min(hour, 23))
-    minute = max(0, min(minute, 59))
-    return datetime.combine(day, time(hour, minute), tzinfo=tz)
+    hour, minute, second = parse_clock(clock, default_hour)
+    return datetime.combine(day, time(hour, minute, second), tzinfo=tz)
+
+
+def moment_after(seconds: int, now: datetime | None = None) -> datetime:
+    """Момент «через N секунд». Пояс тут не при чём — это просто сдвиг."""
+    return (now or utc_now()) + timedelta(seconds=int(seconds))
+
+
+def humanize_delay(moment: datetime, now: datetime) -> str | None:
+    """«через 30 секунд» вместо даты, когда до срабатывания меньше минуты.
+
+    «Напомню 31.08.2026 в 17:32» на просьбу «через 30 секунд» выглядит глупо.
+    """
+    delta = moment - now
+    if delta >= timedelta(minutes=1) or delta < timedelta(0):
+        return None
+    seconds = max(1, round(delta.total_seconds()))
+    if seconds % 10 == 1 and seconds % 100 != 11:
+        word = "секунду"
+    elif 2 <= seconds % 10 <= 4 and not 12 <= seconds % 100 <= 14:
+        word = "секунды"
+    else:
+        word = "секунд"
+    return f"через {seconds} {word}"
 
 
 def fmt_local(iso: str, tz: ZoneInfo) -> str:
     moment = parse_utc(iso).astimezone(tz)
-    return moment.strftime("%d.%m.%Y в %H:%M")
+    pattern = "%d.%m.%Y в %H:%M:%S" if moment.second else "%d.%m.%Y в %H:%M"
+    return moment.strftime(pattern)
 
 
 # ── тексты ─────────────────────────────────────────────────────────────────
@@ -200,9 +247,10 @@ def schedule_photo_reminders(
         if db.has_pending_reminder(conn, owner_id, "photo", document_id=doc["id"]):
             continue
         hour = db.reminder_hour(conn, owner_id)
-        moment = local_moment(now.astimezone(tz).date(), None, tz, hour)
+        own = db.user_tz(conn, owner_id, tz)
+        moment = local_moment(now.astimezone(own).date(), None, own, hour)
         if moment <= now:
-            moment = local_moment(now.astimezone(tz).date() + timedelta(days=1), None, tz, hour)
+            moment = local_moment(now.astimezone(own).date() + timedelta(days=1), None, own, hour)
         created.append(db.add_reminder(
             conn, owner_id, fire_at=to_utc_iso(moment),
             text="Фото так и не подписано. Скажи, что это — иначе потом не найдёшь.",
@@ -232,6 +280,8 @@ async def deliver_due(
     sent = 0
 
     for reminder in db.due_reminders(conn, to_utc_iso(now)):
+        # Показываем время в поясе того, кому шлём, а не в общем.
+        owner_tz = db.user_tz(conn, reminder["owner_id"], tz)
         # Слишком старое не шлём: после недельного простоя десяток протухших
         # напоминаний хуже, чем молчание. В /napominaniya они остаются видны.
         if now - parse_utc(reminder["fire_at"]) > MAX_LATE:
@@ -242,7 +292,7 @@ async def deliver_due(
         try:
             await bot.send_message(
                 reminder["owner_id"],
-                format_message(reminder, tz, now=now),
+                format_message(reminder, owner_tz, now=now),
                 reply_markup=reminder_keyboard(reminder["id"]),
             )
             sent += 1
@@ -274,8 +324,10 @@ async def run_scheduler(
                 schedule_photo_reminders(conn, tz, now=now)
                 for user in db.list_users(conn):
                     if user["status"] == "active":
-                        backfill_due_reminders(conn, user["id"], tz, now=now)
-                        schedule_overdue(conn, user["id"], tz, now=now)
+                        # У каждого свой пояс — «в 9 утра» у всех своё.
+                        own = db.user_tz(conn, user["id"], tz)
+                        backfill_due_reminders(conn, user["id"], own, now=now)
+                        schedule_overdue(conn, user["id"], own, now=now)
 
             await deliver_due(bot, conn, tz, now=now)
         except asyncio.CancelledError:

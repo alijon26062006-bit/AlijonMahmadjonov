@@ -419,7 +419,44 @@ async def test_hour_command_rejects_nonsense(env):
     dispatcher, bot, session, brain, conn, _ = env
     await dispatcher.feed_update(bot, text_update("/vremya вечером"))
     assert db.reminder_hour(conn, CHAT_OWNER) == db.DEFAULT_REMINDER_HOUR
-    assert any("/vremya 9" in t for t in session.texts)
+    assert any("Не знаю такой часовой пояс" in t for t in session.texts)
+
+
+async def test_time_card_shows_the_current_time(env):
+    """Прямой ответ на «а сколько сейчас времени» — сверяется с телефоном."""
+    dispatcher, bot, session, brain, conn, _ = env
+    await dispatcher.feed_update(bot, text_update("/vremya"))
+
+    card = "\n".join(session.texts)
+    assert "Сейчас у тебя:" in card
+    assert "Душанбе (UTC+5)" in card
+
+
+async def test_timezone_button_switches_the_zone(env):
+    dispatcher, bot, session, brain, conn, _ = env
+    await dispatcher.feed_update(bot, press(f"{kb.TZ_PREFIX}Europe/Moscow"))
+
+    assert db.user_tz_name(conn, CHAT_OWNER, "Asia/Dushanbe") == "Europe/Moscow"
+
+
+async def test_timezone_can_be_set_by_name(env):
+    dispatcher, bot, session, brain, conn, _ = env
+    await dispatcher.feed_update(bot, text_update("/vremya Asia/Almaty"))
+
+    assert db.user_tz_name(conn, CHAT_OWNER, "Asia/Dushanbe") == "Asia/Almaty"
+    assert any("Алматы" in t for t in session.texts)
+
+
+async def test_hour_still_works_alongside_zones(env):
+    dispatcher, bot, session, brain, conn, _ = env
+    await dispatcher.feed_update(bot, text_update("/vremya 7"))
+    assert db.reminder_hour(conn, CHAT_OWNER) == 7
+
+
+async def test_out_of_range_hour_is_refused(env):
+    dispatcher, bot, session, brain, conn, _ = env
+    await dispatcher.feed_update(bot, text_update("/vremya 99"))
+    assert db.reminder_hour(conn, CHAT_OWNER) == db.DEFAULT_REMINDER_HOUR
 
 
 async def test_reminder_command_does_not_reach_claude(env):
@@ -457,3 +494,139 @@ def test_backfill_ignores_dates_already_passed(conn):
     db.add_transaction(conn, OWNER, amount=100, currency="TJS", due_date="2026-08-01")
 
     assert rem.backfill_due_reminders(conn, OWNER, TZ, now=moment("2026-09-01 10:00")) == []
+
+
+# ── «через N секунд» ───────────────────────────────────────────────────────
+
+MSK = ZoneInfo("Europe/Moscow")
+
+
+def test_thirty_seconds_fires_at_thirty_seconds(ctx):
+    """«Напомни через 30 секунд проверить бота»."""
+    ctx.now = moment("2026-08-31 17:32")
+    out = tools.t_create_reminder(ctx, {"after_seconds": 30, "text": "Проверить бота"})
+
+    assert out["ok"] is True
+    assert out["напоминание"]["когда"] == "через 30 секунд"
+
+    fire = ctx.now + timedelta(seconds=30)
+    assert db.due_reminders(ctx.conn, rem.to_utc_iso(fire - timedelta(seconds=1))) == []
+    assert len(db.due_reminders(ctx.conn, rem.to_utc_iso(fire))) == 1
+
+
+@pytest.mark.parametrize("seconds,expected", [
+    (60, timedelta(minutes=1)),        # «через минуту»
+    (300, timedelta(minutes=5)),       # «через 5 минут»
+    (1800, timedelta(minutes=30)),     # «через полчаса»
+    (7200, timedelta(hours=2)),        # «через два часа»
+])
+def test_relative_delays(ctx, seconds, expected):
+    ctx.now = moment("2026-08-31 17:32")
+    tools.t_create_reminder(ctx, {"after_seconds": seconds, "text": "Дело"})
+    stored = rem.parse_utc(db.list_reminders(ctx.conn, OWNER)[0]["fire_at"])
+    assert stored - ctx.now == expected
+
+
+@pytest.mark.parametrize("seconds", [0, 1, 4, -30])
+def test_too_soon_is_refused(ctx, seconds):
+    """Меньше пяти секунд человек не успеет даже дочитать ответ бота."""
+    out = tools.t_create_reminder(ctx, {"after_seconds": seconds, "text": "Дело"})
+    assert out["ok"] is False
+    assert db.list_reminders(ctx.conn, OWNER) == []
+
+
+def test_more_than_a_year_is_refused(ctx):
+    """Почти наверняка ошибка распознавания, а не настоящая просьба."""
+    out = tools.t_create_reminder(ctx, {"after_seconds": 400 * 24 * 3600, "text": "Дело"})
+    assert out["ok"] is False
+
+
+def test_reminder_needs_either_a_date_or_a_delay(ctx):
+    assert tools.t_create_reminder(ctx, {"text": "Без момента"})["ok"] is False
+
+
+def test_delay_wins_over_date_if_both_given(ctx):
+    """Промпт велит заполнять что-то одно; если модель прислала оба — берём «через»."""
+    ctx.now = moment("2026-08-31 17:32")
+    tools.t_create_reminder(ctx, {
+        "after_seconds": 60, "when": "2026-12-31", "text": "Дело"})
+    stored = rem.parse_utc(db.list_reminders(ctx.conn, OWNER)[0]["fire_at"])
+    assert stored == ctx.now + timedelta(minutes=1)
+
+
+# ── секунды в конкретном времени ───────────────────────────────────────────
+
+def test_time_with_seconds(ctx):
+    tools.t_create_reminder(ctx, {
+        "when": "2026-09-15", "time": "15:30:45", "text": "Точно в срок"})
+    assert db.list_reminders(ctx.conn, OWNER)[0]["fire_at"] == rem.to_utc_iso(
+        moment("2026-09-15 15:30").replace(second=45))
+
+
+def test_seconds_are_shown_only_when_they_matter(ctx):
+    with_seconds = rem.to_utc_iso(moment("2026-09-15 15:30").replace(second=45))
+    round_minute = rem.to_utc_iso(moment("2026-09-15 15:30"))
+    assert rem.fmt_local(with_seconds, TZ) == "15.09.2026 в 15:30:45"
+    assert rem.fmt_local(round_minute, TZ) == "15.09.2026 в 15:30"
+
+
+# ── завтра и послезавтра ───────────────────────────────────────────────────
+
+@pytest.mark.parametrize("when,expected_day", [
+    ("2026-09-01", 1),   # «завтра» при сегодня 31.08
+    ("2026-09-02", 2),   # «послезавтра»
+    ("2026-09-07", 7),   # «через неделю»
+])
+def test_relative_days(ctx, when, expected_day):
+    ctx.now = moment("2026-08-31 17:32")
+    tools.t_create_reminder(ctx, {"when": when, "time": "15:00", "text": "Дело"})
+    stored = rem.parse_utc(db.list_reminders(ctx.conn, OWNER)[0]["fire_at"]).astimezone(TZ)
+    assert stored.date() == moment("2026-08-31 00:00").date() + timedelta(days=expected_day)
+    assert stored.hour == 15
+
+
+# ── часовой пояс у каждого свой ────────────────────────────────────────────
+
+def test_same_words_mean_different_moments_in_different_zones(conn, config, tmp_path):
+    """«Завтра в 9 утра» в Душанбе и в Москве — это разные мгновения."""
+    config.ensure_dirs()
+    dushanbe, moscow = 111, 222
+    for who, zone in ((dushanbe, "Asia/Dushanbe"), (moscow, "Europe/Moscow")):
+        db.invite_user(conn, who)
+        db.register_user(conn, who, str(who))
+        db.set_user_tz(conn, who, zone)
+
+    for who in (dushanbe, moscow):
+        ctx = tools.ToolContext(
+            conn=conn, owner_id=who, result=tools.TurnResult(),
+            reports_dir=config.reports_dir, default_currency="TJS",
+            tz=TZ, now=moment("2026-08-31 17:32"),
+        )
+        tools.t_create_reminder(ctx, {"when": "2026-09-01", "time": "09:00", "text": "Утро"})
+
+    at_dushanbe = rem.parse_utc(db.list_reminders(conn, dushanbe)[0]["fire_at"])
+    at_moscow = rem.parse_utc(db.list_reminders(conn, moscow)[0]["fire_at"])
+
+    assert at_moscow - at_dushanbe == timedelta(hours=2)   # Москва на 2 часа позади
+    # Но каждому показывается ровно 09:00 — его собственных.
+    assert rem.fmt_local(db.list_reminders(conn, dushanbe)[0]["fire_at"], TZ).endswith("09:00")
+    assert rem.fmt_local(db.list_reminders(conn, moscow)[0]["fire_at"], MSK).endswith("09:00")
+
+
+def test_unknown_zone_in_the_database_does_not_break_anything(conn):
+    db.invite_user(conn, OWNER)
+    conn.execute("UPDATE users SET tz='Марс/Кратер' WHERE id=?", (OWNER,))
+    conn.commit()
+    assert db.user_tz(conn, OWNER, TZ) is TZ
+
+
+def test_a_bad_zone_is_never_saved(conn):
+    db.invite_user(conn, OWNER)
+    assert db.set_user_tz(conn, OWNER, "Марс/Кратер") is False
+    assert db.set_user_tz(conn, OWNER, "Asia/Almaty") is True
+    assert db.user_tz_name(conn, OWNER, "Asia/Dushanbe") == "Asia/Almaty"
+
+
+def test_without_a_zone_the_shared_one_is_used(conn):
+    db.invite_user(conn, OWNER)
+    assert db.user_tz(conn, OWNER, TZ) is TZ

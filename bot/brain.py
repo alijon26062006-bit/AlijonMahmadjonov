@@ -79,6 +79,7 @@ class Brain:
         context_block = prompts.build_context_block(
             today=today,
             weekday_ru=prompts.WEEKDAYS_RU[now.weekday()],
+            now_time=now.strftime("%H:%M"),
             tz_name=self.config.tz_name,
             default_currency=self.config.default_currency,
             pending_documents=db.pending_documents(self.conn, owner_id),
