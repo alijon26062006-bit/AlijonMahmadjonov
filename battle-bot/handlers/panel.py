@@ -19,7 +19,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import Config
 from core import background, bracket
-from handlers import membership
+from handlers import join_requests, membership
 from core.engine import BattleEngine
 from services import (
     group_info, keyboards, main_post, panel_ui, prizes, sponsors, subscription,
@@ -325,6 +325,68 @@ async def toggle_daily_extra(
     settings.set("daily_extra_enabled", on)
     await render(callback, _auto_screen(repo, settings))
     await callback.answer("Пост дня включён" if on else "Пост дня выключен")
+
+
+@router.callback_query(F.data == "p:joins")
+async def show_joins(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """Заявки на вступление в канал."""
+    if not is_admin(callback.from_user.id, config):
+        return
+    await render(callback, _joins_screen(repo, settings))
+    await callback.answer()
+
+
+def _joins_screen(repo: Repo, settings: Settings):
+    waiting, approved = repo.join_request_stats()
+    return panel_ui.join_requests(
+        waiting, approved, settings.get("join_auto_approve"),
+        repo.pending_join_requests(limit=10),
+    )
+
+
+@router.callback_query(F.data == "p:joins:auto")
+async def toggle_join_auto(
+    callback: CallbackQuery, repo: Repo, config: Config, settings: Settings
+) -> None:
+    if not is_admin(callback.from_user.id, config):
+        return
+    on = not settings.get("join_auto_approve")
+    settings.set("join_auto_approve", on)
+    await render(callback, _joins_screen(repo, settings))
+    await callback.answer("Автоприём включён" if on else "Автоприём выключен")
+
+
+@router.callback_query(F.data == "p:joins:all")
+async def approve_all_joins(
+    callback: CallbackQuery, bot: Bot, repo: Repo, config: Config, settings: Settings
+) -> None:
+    """Принять все записанные заявки — одной кнопкой.
+
+    Работа идёт фоном: тысяча заявок с паузой между ними — это минуты, и всё
+    это время бот должен отвечать остальным.
+    """
+    if not is_admin(callback.from_user.id, config):
+        return
+
+    waiting, _ = repo.join_request_stats()
+    if not waiting:
+        await callback.answer("Ждущих заявок нет.", show_alert=True)
+        return
+
+    await callback.answer(f"Принимаю {waiting}…")
+    message = ui.message_of(callback)
+
+    async def progress(seen: int, total: int, done: int, failed: int) -> None:
+        await ui.edit_or_send(callback, texts.join_requests_progress(seen, total, done))
+
+    async def run() -> None:
+        done, failed = await join_requests.approve_all(bot, repo, report=progress)
+        await ui.edit_or_send(callback, texts.join_requests_done(done, failed))
+        await render(message, _joins_screen(repo, settings))
+
+    background.run(run(), "приём заявок")
 
 
 @router.callback_query(F.data == "p:pays")

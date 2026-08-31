@@ -75,7 +75,7 @@ def home(stats: dict) -> tuple[str, InlineKeyboardMarkup]:
         [button("📨 Рассылка", "broadcast"), button("🤖 Автопилот", "auto")],
         [button("🔍 Проверка", "fraud"), button("📡 Каналы", "mych")],
         [button("🩺 Диагностика", "health"), button("🔗 Ссылки", "links")],
-        [button("🛡 Группы", "groups")],
+        [button("🛡 Группы", "groups"), button("🚪 Заявки", "joins")],
         [button("⚙️ Настройки", "settings")],
         [button("🔄 Обновить", "home", BLUE)],
     )
@@ -796,6 +796,38 @@ def vote_check(report, who: str, user_id: int) -> tuple[str, InlineKeyboardMarku
         [button("🔄 Проверить снова", f"person:why:{user_id}", BLUE)],
         back_row(f"person:{user_id}"),
     )
+
+
+def join_requests(waiting: int, approved: int, auto: bool, rows
+                  ) -> tuple[str, InlineKeyboardMarkup]:
+    """Заявки на вступление в канал: сколько ждёт и что с ними делать."""
+    listing = "\n".join(
+        f"• {escape(('@' + row['username']) if row['username'] else (row['first_name'] or '—'))}"
+        for row in rows[:10]
+    ) or "<i>сейчас никто не ждёт</i>"
+    more = f"\n<i>…и ещё {waiting - 10}</i>" if waiting > 10 else ""
+
+    text = (
+        f"🚪 <b>{texts.spaced('ЗАЯВКИ В КАНАЛ')}</b>\n{RULE}\n\n"
+        f"Ждут: <b>{waiting}</b>\n"
+        f"Принято ботом: <b>{approved}</b>\n"
+        f"🤖 Автоприём: <b>{onoff(auto)}</b>\n\n"
+        f"{listing}{more}\n\n"
+        "<blockquote>Бот видит только те заявки, которые пришли, пока он "
+        "администратор канала с правом добавлять участников. Заявки, "
+        "поданные до этого, Telegram боту не отдаёт — их принимают в самом "
+        "Telegram.</blockquote>"
+    )
+    toggle = "Выключить автоприём" if auto else "Включить автоприём"
+    rows_out = []
+    if waiting:
+        rows_out.append([button(f"✅ Принять всех ({waiting})", "joins:all", GREEN)])
+    rows_out += [
+        [button(toggle, "joins:auto", RED if auto else GREEN)],
+        [button("🔄 Обновить", "joins", BLUE)],
+        back_row(),
+    ]
+    return text, keyboard(*rows_out)
 
 
 def leavers(rows, enabled: bool, price: int, total: int) -> tuple[str, InlineKeyboardMarkup]:

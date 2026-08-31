@@ -93,6 +93,8 @@ FIELDS: dict[str, Field] = {
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
         Field("manual_pay_enabled", "Оплата вручную",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
+        Field("join_auto_approve", "Автоприём заявок в канал",
+              lambda v: "1" if v else "0", lambda raw: raw == "1"),
         Field("daily_extra_enabled", "Пост дня между батлами",
               lambda v: "1" if v else "0", lambda raw: raw == "1"),
         Field("card_title", "Заголовок на картинке", str, str,
@@ -200,6 +202,8 @@ class Settings:
         "free_vote_scope": "battle",
         # со второго раунда соперников подбирает посев по силе, а не жребий
         "seeding": "snake",
+        # заявки на вступление в канал бот принимает сам, как только видит
+        "join_auto_approve": True,
         # вечерний пост между батлами: ник дня, рекорд, зал славы
         "daily_extra_enabled": True,
         # что написано сверху на картинке участника для сторис

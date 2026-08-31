@@ -881,6 +881,65 @@ class Repo:
         ).fetchone()
         return int(row["spent"] or 0)
 
+    # -------------------------------------------- заявки в канал
+
+    def add_join_request(self, chat_id: int, user_id: int, username: str | None,
+                         first_name: str | None) -> None:
+        """Записать заявку на вступление.
+
+        Повторная заявка того же человека обновляет запись и снова делает её
+        ожидающей: он мог отозвать первую и подать новую.
+        """
+        self.conn.execute(
+            """INSERT INTO join_requests(chat_id, user_id, username, first_name)
+               VALUES(?, ?, ?, ?)
+               ON CONFLICT(chat_id, user_id) DO UPDATE SET
+                   username = excluded.username,
+                   first_name = excluded.first_name,
+                   status = 'pending',
+                   created_at = datetime('now'),
+                   decided_at = NULL""",
+            (chat_id, user_id, username, first_name),
+        )
+        self.conn.commit()
+
+    def pending_join_requests(self, chat_id: int | None = None,
+                              limit: int = 5000) -> list[sqlite3.Row]:
+        if chat_id is None:
+            return self.conn.execute(
+                """SELECT * FROM join_requests WHERE status = 'pending'
+                   ORDER BY created_at LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return self.conn.execute(
+            """SELECT * FROM join_requests WHERE status = 'pending' AND chat_id = ?
+               ORDER BY created_at LIMIT ?""",
+            (chat_id, limit),
+        ).fetchall()
+
+    def close_join_request(self, chat_id: int, user_id: int, status: str) -> bool:
+        """Отметить заявку решённой. False — её уже кто-то закрыл.
+
+        Проверка статуса внутри UPDATE: «Принять всех» и автоприём могут
+        работать одновременно, а принять одного человека надо один раз.
+        """
+        cursor = self.conn.execute(
+            """UPDATE join_requests SET status = ?, decided_at = datetime('now')
+               WHERE chat_id = ? AND user_id = ? AND status = 'pending'""",
+            (status, chat_id, user_id),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def join_request_stats(self) -> tuple[int, int]:
+        """Сколько заявок ждёт и сколько уже принято."""
+        row = self.conn.execute(
+            """SELECT SUM(status = 'pending') AS waiting,
+                      SUM(status = 'approved') AS approved
+               FROM join_requests"""
+        ).fetchone()
+        return int(row["waiting"] or 0), int(row["approved"] or 0)
+
     # ------------------------------------------------ ежедневная активность
 
     def best_of_last_battle(self) -> sqlite3.Row | None:

@@ -265,6 +265,22 @@ CREATE TABLE IF NOT EXISTS payouts (
 );
 CREATE INDEX IF NOT EXISTS idx_payouts_time ON payouts(created_at DESC);
 
+-- Заявки на вступление в канал. Telegram не умеет отдавать список
+-- накопленных заявок, поэтому бот записывает каждую в момент её появления —
+-- и уже по своему списку принимает их пачкой, одной кнопкой.
+CREATE TABLE IF NOT EXISTS join_requests (
+    chat_id    INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,
+    username   TEXT,
+    first_name TEXT,
+    status     TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    decided_at TEXT,
+    PRIMARY KEY (chat_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_join_requests_pending
+    ON join_requests(status, chat_id, created_at);
+
 CREATE TABLE IF NOT EXISTS stats (
     user_id     INTEGER PRIMARY KEY REFERENCES users(user_id),
     battles     INTEGER NOT NULL DEFAULT 0,

@@ -687,6 +687,38 @@ def pair_published(rival: str) -> str:
     )
 
 
+# ------------------------------------------------ заявки в канал
+
+def join_requests_waiting(waiting: int) -> str:
+    word = plural(waiting, "заявка", "заявки", "заявок")
+    return (
+        f"🚪 <b>Заявки в канал</b>\n"
+        f"{RULE}\n\n"
+        f"Ждёт: <b>{waiting}</b> {word}.\n\n"
+        "<i>Панель → 🚪 Заявки → «Принять всех».</i>"
+    )
+
+
+def join_requests_done(done: int, failed: int) -> str:
+    tail = f"\nНе вышло: <b>{failed}</b>" if failed else ""
+    return (
+        f"✅ <b>Заявки приняты</b>\n"
+        f"{RULE}\n\n"
+        f"Принято: <b>{done}</b>{tail}\n\n"
+        "<i>Включите автоприём, чтобы новые заявки принимались сами.</i>"
+    )
+
+
+def join_requests_progress(seen: int, total: int, done: int) -> str:
+    return (
+        f"⏳ <b>Принимаю заявки</b>\n"
+        f"{RULE}\n\n"
+        f"Обработано: <b>{seen}</b> из <b>{total}</b>\n"
+        f"Принято: <b>{done}</b>\n\n"
+        "<i>Идём по одной, чтобы Telegram не отключил бота за спешку.</i>"
+    )
+
+
 # ------------------------------------------------ ежедневная активность
 
 def nick_of_the_day(nickname: str, battles: int, wins: int, titles: int) -> str:

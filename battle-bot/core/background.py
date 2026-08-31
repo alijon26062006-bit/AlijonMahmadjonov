@@ -16,6 +16,18 @@ def register(name: str, task: asyncio.Task) -> None:
     _tasks[name] = task
 
 
+def run(coro, name: str) -> asyncio.Task:
+    """Запустить разовую работу фоном и не потерять её.
+
+    Ссылку на задачу держим: без неё сборщик мусора вправе выбросить задачу
+    посреди работы. По окончании имя убирается, чтобы список задач не рос.
+    """
+    task = asyncio.ensure_future(coro)
+    register(name, task)
+    task.add_done_callback(lambda _: forget(name))
+    return task
+
+
 def forget(name: str | None = None) -> None:
     if name is None:
         _tasks.clear()
