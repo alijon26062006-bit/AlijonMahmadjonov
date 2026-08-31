@@ -9,6 +9,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import Config
 from core.models import MatchStatus, VoteResult, VoteSource
+from handlers import join_requests
 from services import keyboards, links, nudges, sponsors, texts, ui
 from storage.repo import Repo
 from storage.settings import Settings
@@ -42,6 +43,14 @@ async def gate(
     unsubscribed = await sponsors.missing(bot, config, settings, user_id, force=True)
     if not unsubscribed:
         return False
+
+    # человек мог подать заявку на вступление и ждать решения. Раз он здесь,
+    # его ID у нас есть — примем заявку и проверим подписку заново
+    if await join_requests.let_in(bot, config, settings, user_id):
+        unsubscribed = await sponsors.missing(bot, config, settings, user_id, force=True)
+        if not unsubscribed:
+            return False
+
     await ui.send(
         target,
         sponsors.text(unsubscribed),

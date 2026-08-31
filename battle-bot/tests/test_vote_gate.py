@@ -27,6 +27,9 @@ class Bot:
         self.subscribed_to = set(subscribed_to)
         self.broken = broken
 
+    async def approve_chat_join_request(self, chat_id, user_id):
+        raise TelegramBadRequest(method=None, message="HIDE_REQUESTER_MISSING")
+
     async def get_chat_member(self, chat_id, user_id):
         if self.broken:
             raise TelegramBadRequest(method=None, message="chat not found")

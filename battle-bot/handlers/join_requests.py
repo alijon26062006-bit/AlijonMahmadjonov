@@ -18,7 +18,8 @@ from aiogram import Bot, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import ChatJoinRequest
 
-from services import texts
+from config import Config
+from services import sponsors, subscription, texts
 from storage.repo import Repo
 from storage.settings import Settings
 
@@ -61,6 +62,30 @@ async def approve_one(bot: Bot, repo: Repo, chat_id: int, user_id: int) -> bool:
 
     repo.close_join_request(chat_id, user_id, "approved")
     return True
+
+
+async def let_in(bot: Bot, config: Config, settings: Settings, user_id: int) -> bool:
+    """Впустить человека, если он стоит в заявках на обязательный канал.
+
+    Заявки, поданные по чужой ссылке, боту не видны — списка их нет. Зато
+    принять конкретного человека он может: для этого нужен только его ID.
+    А ID появляется ровно в тот момент, когда человек нажимает в боте
+    «Я подписался». Так висящая заявка превращается в подписку сразу, без
+    участия администратора.
+    """
+    approved = False
+    for channel_id in sponsors.required(config, settings):
+        try:
+            await bot.approve_chat_join_request(chat_id=channel_id, user_id=user_id)
+        except Exception as error:  # noqa: BLE001
+            # Заявки нет, он уже внутри или у бота нет прав. Ловим широко:
+            # это попутная услуга, и она не вправе сломать вход в голосование
+            log.debug("Заявку %s в %s не принял: %s", user_id, channel_id, error)
+            continue
+        subscription.forget(channel_id, user_id)
+        approved = True
+        log.info("Принял заявку %s в %s по нажатию в боте", user_id, channel_id)
+    return approved
 
 
 async def approve_all(

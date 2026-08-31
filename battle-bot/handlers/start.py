@@ -12,7 +12,7 @@ from aiogram import Bot
 from config import Config
 from core.engine import BattleEngine
 from handlers.referral import welcome_invited
-from handlers import voting
+from handlers import join_requests, voting
 from handlers.voting import show_voting
 from services import keyboards, links, referral, sponsors, texts, ui
 from storage.repo import Repo
@@ -110,6 +110,9 @@ async def _do_join(
     # бот берётся явно: у сообщения под кнопкой его может не оказаться
     bot = bot or getattr(ui.message_of(target), "bot", None)
     unsubscribed = await sponsors.missing(bot, config, settings, user.id)
+    if unsubscribed and await join_requests.let_in(bot, config, settings, user.id):
+        # заявка на вступление висела — приняли её прямо сейчас
+        unsubscribed = await sponsors.missing(bot, config, settings, user.id)
     if unsubscribed:
         await ui.send(
             target,

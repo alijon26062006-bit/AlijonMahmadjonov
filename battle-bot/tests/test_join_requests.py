@@ -185,3 +185,55 @@ def test_without_requests_there_is_no_button(env):
 
     actions = [b.callback_data for row in markup.inline_keyboard for b in row]
     assert "p:joins:all" not in actions
+
+
+# ------------------------------------------- впустить по нажатию в боте
+
+class GateBot(Bot):
+    """Бот, который умеет отвечать и про подписку."""
+
+    def __init__(self, has_request=True) -> None:
+        super().__init__()
+        self.has_request = has_request
+
+    async def approve_chat_join_request(self, chat_id, user_id):
+        if not self.has_request:
+            raise TelegramBadRequest(
+                method=None, message="Bad Request: HIDE_REQUESTER_MISSING"
+            )
+        self.approved.append(user_id)
+
+
+@pytest.mark.asyncio
+async def test_a_waiting_person_is_let_in_by_pressing_in_the_bot(env):
+    """Заявку по чужой ссылке бот не видит в списке — но принять может.
+
+    ID появляется в тот момент, когда человек нажимает «Я подписался».
+    """
+    _, settings, _ = env
+    config = make_config(channel_id=CHANNEL)
+    bot = GateBot()
+
+    assert await join_requests.let_in(bot, config, settings, 777) is True
+    assert bot.approved == [777]
+
+
+@pytest.mark.asyncio
+async def test_without_a_request_nothing_happens(env):
+    _, settings, _ = env
+    config = make_config(channel_id=CHANNEL)
+
+    assert await join_requests.let_in(GateBot(has_request=False), config, settings, 777) is False
+
+
+@pytest.mark.asyncio
+async def test_a_broken_bot_does_not_break_the_gate(env):
+    """Приём заявки — попутная услуга: она не вправе сломать голосование."""
+    _, settings, _ = env
+    config = make_config(channel_id=CHANNEL)
+
+    class Broken:
+        async def approve_chat_join_request(self, chat_id, user_id):
+            raise RuntimeError("что угодно")
+
+    assert await join_requests.let_in(Broken(), config, settings, 777) is False
