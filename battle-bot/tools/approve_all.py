@@ -32,6 +32,8 @@ try:
         FloodWaitError,
         PhoneCodeExpiredError,
         PhoneCodeInvalidError,
+        PhoneNumberInvalidError,
+        PhoneNumberUnoccupiedError,
         SessionPasswordNeededError,
     )
     from telethon.sessions import StringSession
@@ -74,9 +76,36 @@ async def login(client) -> None:
     if await client.is_user_authorized():
         return
 
-    await client.send_code_request(phone)
-    print("\nКод отправлен в Telegram — ищите сообщение от Telegram, не SMS.")
-    print("Никому его не пересылайте и не пишите в чатах: код сразу сгорает.\n")
+    # номер должен быть тот, под которым вы владеете каналом: на чужой
+    # номер уйдёт чужой код, а на незанятый Telegram предложит регистрацию
+    if ask(f"Отправляю код на {phone} — верно? (да/нет)", "да").lower() not in {
+        "да", "y", "yes", "д"
+    }:
+        sys.exit("Запустите battle-approve заново и введите нужный номер.")
+
+    try:
+        await client.send_code_request(phone)
+    except FloodWaitError as error:
+        sys.exit(
+            f"Telegram временно не шлёт коды на этот номер: подождите "
+            f"{error.seconds // 60 + 1} мин и запустите заново. Так бывает "
+            "после нескольких неверных попыток."
+        )
+    except PhoneNumberInvalidError:
+        sys.exit("Такого номера не бывает. Пишите с кодом страны, например +992...")
+    except PhoneNumberUnoccupiedError:
+        sys.exit(
+            "На этом номере нет аккаунта Telegram. Введите номер того "
+            "аккаунта, который владеет каналом."
+        )
+
+    print("\n─────────────────────────────────────────")
+    print("Код ушёл В САМО ПРИЛОЖЕНИЕ Telegram, а не по SMS.")
+    print("Откройте Telegram на телефоне и найдите чат «Telegram»")
+    print("(синяя галочка, служебные сообщения) — код там, 5 цифр.")
+    print()
+    print("Не пересылайте его в чатах: пересланный код сразу сгорает.")
+    print("─────────────────────────────────────────\n")
 
     for attempt in range(3):
         code = ask_code()
