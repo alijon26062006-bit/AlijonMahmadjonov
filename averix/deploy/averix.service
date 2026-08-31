@@ -15,6 +15,24 @@ Environment="AVERIX_SECURE_COOKIES=1"
 Environment="AVERIX_SITE_URL=__SITE_URL__"
 Environment="AVERIX_DEBUG=0"
 Environment="PYTHONUNBUFFERED=1"
+
+# Секреты — отдельным файлом, а не строками Environment здесь.
+# Причины две. Первая: этот файл по умолчанию читают все пользователи
+# системы, а /etc/averix.env кладётся с правами 600 для root.
+# Вторая: setup.sh пересобирает этот файл из шаблона при повторном
+# запуске, и вписанные сюда ключи потерялись бы молча.
+#
+# Минус перед путём означает «нет файла — не беда»: без секретов
+# сайт работает как обычно, просто без писем и без Telegram.
+#
+#   AVERIX_SMTP_HOST=smtp.resend.com
+#   AVERIX_SMTP_PORT=587
+#   AVERIX_SMTP_USER=resend
+#   AVERIX_SMTP_PASSWORD=ключ-от-сервиса
+#   AVERIX_SMTP_FROM=noreply@ваш-домен
+#   AVERIX_TELEGRAM_TOKEN=...
+#   AVERIX_TELEGRAM_CHAT=...
+EnvironmentFile=-/etc/averix.env
 # Миграции — отдельным шагом до запуска рабочих процессов: если бы их
 # применяли сами рабочие, два процесса взялись бы за одну миграцию разом.
 ExecStartPre=__VENV__/bin/python -m app.cli migrate
