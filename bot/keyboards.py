@@ -10,6 +10,11 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 EDIT_PREFIX = "edit:"
 DELETE_PREFIX = "del:"
 
+# Напоминания
+REMINDER_DONE = "rem:done:"
+REMINDER_SNOOZE = "rem:snooze:"
+REMINDER_CANCEL = "rem:cancel:"
+
 # Панель админа
 ADMIN_LIST = "adm:list"
 ADMIN_ADD = "adm:add"
@@ -35,6 +40,23 @@ def transaction_keyboard(tx_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🗑 Удалить", callback_data=f"{DELETE_PREFIX}{tx_id}"),
         ]]
     )
+
+
+def reminder_keyboard(reminder_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Сделано", callback_data=f"{REMINDER_DONE}{reminder_id}"),
+        InlineKeyboardButton(text="⏰ Отложить на день",
+                             callback_data=f"{REMINDER_SNOOZE}{reminder_id}"),
+    ]])
+
+
+def reminders_list_keyboard(reminders: list[dict[str, Any]]) -> InlineKeyboardMarkup:
+    """Список напоминаний — у каждого своя кнопка отмены."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"🗑 {r['text'][:40]}",
+                              callback_data=f"{REMINDER_CANCEL}{r['id']}")]
+        for r in reminders
+    ])
 
 
 def grant_access_keyboard(user_id: int) -> InlineKeyboardMarkup:

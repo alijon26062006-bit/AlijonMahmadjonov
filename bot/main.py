@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import sys
 
@@ -11,7 +12,7 @@ from aiogram.client.default import DefaultBotProperties
 
 from . import admin as admin_module
 from . import brain as brain_module
-from . import db, handlers, reports, stt
+from . import db, handlers, reminders, reports, stt
 from .access import AccessMiddleware, bootstrap_admins
 from .config import Config, load_config
 
@@ -66,10 +67,16 @@ async def run(config: Config) -> None:
     log.info("Админы: %s. Всего пользователей: %s",
              sorted(config.allowed_user_ids), len(db.list_users(conn)))
 
+    # Планировщик напоминаний живёт рядом с опросом Телеграма.
+    scheduler = asyncio.create_task(reminders.run_scheduler(bot, conn, config.tz))
+
     try:
         await bot.delete_webhook(drop_pending_updates=False)
         await dispatcher.start_polling(bot, allowed_updates=dispatcher.resolve_used_update_types())
     finally:
+        scheduler.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await scheduler
         await bot.session.close()
         conn.close()
 

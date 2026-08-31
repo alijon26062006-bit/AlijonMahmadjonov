@@ -65,7 +65,7 @@ def old_db(tmp_path):
 def test_migration_keeps_the_owners_records(old_db):
     """Главное при переходе: владелец не должен потерять то, что уже записал."""
     conn = db.connect(old_db)
-    assert db.current_version(conn) == 2
+    assert db.current_version(conn) == db.SCHEMA_VERSION
 
     found = db.search_transactions(conn, OWNER, text="сумки")
     assert len(found) == 1
@@ -99,14 +99,14 @@ def test_migration_can_run_twice(old_db):
     """Бот перезапускают часто — миграция обязана быть безобидной при повторе."""
     db.connect(old_db).close()
     conn = db.connect(old_db)
-    assert db.current_version(conn) == 2
+    assert db.current_version(conn) == db.SCHEMA_VERSION
     assert len(db.search_transactions(conn, OWNER)) == 1
     conn.close()
 
 
 def test_fresh_database_needs_no_migration(tmp_path):
     conn = db.connect(tmp_path / "new.db")
-    assert db.current_version(conn) == 2
+    assert db.current_version(conn) == db.SCHEMA_VERSION
     assert "owner_id" in db.columns_of(conn, "transactions")
     conn.close()
 

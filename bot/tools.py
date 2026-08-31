@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -14,6 +15,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import db, reports
+
+log = logging.getLogger(__name__)
 
 MAX_LIST = 60
 
@@ -38,6 +41,8 @@ class ToolContext:
     font_bold_path: str | None = None
     default_currency: str = "TJS"
     today: str = ""
+    tz: Any = None            # ZoneInfo пользователя
+    now: Any = None           # datetime в UTC — в тестах передаётся явно
 
 
 # ── проверка и приведение входных данных ───────────────────────────────────
@@ -151,8 +156,22 @@ def t_save_transaction(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]
         source=(args.get("source") or None),
     )
     ctx.result.saved_transaction_ids.append(tx_id)
+    _sync_due_reminders(ctx, tx_id)
     saved = db.get_transaction(ctx.conn, ctx.owner_id, tx_id)
     return {"ok": True, "сохранено": _tx_brief(saved) if saved else {"id": tx_id}}
+
+
+def _sync_due_reminders(ctx: ToolContext, tx_id: int) -> None:
+    """Напоминания о денежном сроке ставит код, а не решение модели: Claude может
+    забыть вызвать инструмент, а забытый денежный срок — это потерянные деньги."""
+    if ctx.tz is None:
+        return
+    from . import reminders as rem
+
+    try:
+        rem.schedule_for_transaction(ctx.conn, ctx.owner_id, tx_id, ctx.tz, now=ctx.now)
+    except Exception:  # напоминание — не повод потерять саму запись
+        log.exception("Не удалось поставить напоминание о сроке для операции %s", tx_id)
 
 
 def t_search_transactions(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
@@ -196,6 +215,7 @@ def t_update_transaction(ctx: ToolContext, args: dict[str, Any]) -> dict[str, An
 
     if not db.update_transaction(ctx.conn, ctx.owner_id, tx_id, **fields):
         return {"ok": False, "ошибка": f"Операция {tx_id} не найдена или менять нечего."}
+    _sync_due_reminders(ctx, tx_id)   # срок мог поменяться — пересоздаём
     updated = db.get_transaction(ctx.conn, ctx.owner_id, tx_id)
     return {"ok": True, "обновлено": _tx_brief(updated) if updated else {"id": tx_id}}
 
@@ -204,6 +224,7 @@ def t_delete_transaction(ctx: ToolContext, args: dict[str, Any]) -> dict[str, An
     tx_id = int(args["transaction_id"])
     if not db.delete_transaction(ctx.conn, ctx.owner_id, tx_id):
         return {"ok": False, "ошибка": f"Операция {tx_id} не найдена."}
+    db.cancel_reminders_for_transaction(ctx.conn, ctx.owner_id, tx_id)
     return {"ok": True, "удалено": tx_id}
 
 
@@ -254,6 +275,52 @@ def t_send_documents(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "будут_отправлены": sent, "не_найдены": missing}
 
 
+def t_create_reminder(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from . import reminders as rem
+
+    when = clean_date(args.get("when"))
+    text = " ".join(str(args.get("text") or "").split())[:300]
+    if not when:
+        return {"ok": False, "ошибка": "Нужна дата в формате ГГГГ-ММ-ДД."}
+    if not text:
+        return {"ok": False, "ошибка": "Нужен текст напоминания."}
+
+    hour = db.reminder_hour(ctx.conn, ctx.owner_id)
+    moment = rem.local_moment(when, args.get("time"), ctx.tz, hour)
+    now = ctx.now or rem.utc_now()
+    if moment <= now:
+        return {"ok": False, "ошибка": "Этот момент уже прошёл — назови будущее время."}
+
+    reminder_id = db.add_reminder(
+        ctx.conn, ctx.owner_id, fire_at=rem.to_utc_iso(moment), text=text, kind="manual"
+    )
+    return {
+        "ok": True,
+        "напоминание": {"id": reminder_id, "когда": rem.fmt_local(rem.to_utc_iso(moment), ctx.tz),
+                        "текст": text},
+    }
+
+
+def t_list_reminders(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    from . import reminders as rem
+
+    rows = db.list_reminders(ctx.conn, ctx.owner_id)
+    return {
+        "найдено": len(rows),
+        "напоминания": [
+            {"id": r["id"], "когда": rem.fmt_local(r["fire_at"], ctx.tz), "текст": r["text"]}
+            for r in rows
+        ],
+    }
+
+
+def t_cancel_reminder(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    reminder_id = int(args["reminder_id"])
+    if not db.cancel_reminder(ctx.conn, ctx.owner_id, reminder_id):
+        return {"ok": False, "ошибка": f"Напоминания {reminder_id} нет или оно уже прошло."}
+    return {"ok": True, "убрано": reminder_id}
+
+
 def t_build_report(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     date_from = clean_date(args.get("date_from"))
     date_to = clean_date(args.get("date_to"))
@@ -297,5 +364,8 @@ HANDLERS: dict[str, Callable[[ToolContext, dict[str, Any]], dict[str, Any]]] = {
     "describe_document": t_describe_document,
     "find_documents": t_find_documents,
     "send_documents": t_send_documents,
+    "create_reminder": t_create_reminder,
+    "list_reminders": t_list_reminders,
+    "cancel_reminder": t_cancel_reminder,
     "build_report": t_build_report,
 }

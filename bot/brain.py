@@ -67,6 +67,8 @@ class Brain:
             font_bold_path=self.config.font_bold_path,
             default_currency=self.config.default_currency,
             today=today,
+            tz=self.config.tz,
+            now=now.astimezone(__import__("datetime").timezone.utc),
         )
 
         editing = (

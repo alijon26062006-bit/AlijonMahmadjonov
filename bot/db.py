@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 DIRECTIONS = ("out", "in")
 KINDS = ("transfer", "payment", "debt", "income")
@@ -19,6 +19,12 @@ ROLES = ("admin", "user")
 # active        — пользуется
 # blocked       — доступ отозван, данные сохранены
 STATUSES = ("invited", "awaiting_name", "active", "blocked")
+
+# manual — продиктовал человек; due — денежный срок; goods — жду товар;
+# photo — неподписанное фото
+REMINDER_KINDS = ("manual", "due", "goods", "photo")
+REMINDER_STATUSES = ("pending", "sent", "cancelled")
+DEFAULT_REMINDER_HOUR = 9
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
@@ -76,8 +82,24 @@ CREATE TABLE IF NOT EXISTS users (
     status        TEXT NOT NULL,         -- invited | awaiting_name | active | blocked
     invited_at    TEXT NOT NULL,
     registered_at TEXT,
-    last_seen_at  TEXT
+    last_seen_at  TEXT,
+    reminder_hour INTEGER          -- во сколько слать автоматические напоминания
 );
+
+CREATE TABLE IF NOT EXISTS reminders (
+    id             INTEGER PRIMARY KEY,
+    owner_id       INTEGER NOT NULL,
+    fire_at        TEXT NOT NULL,   -- когда сработать, UTC ISO
+    text           TEXT NOT NULL,   -- что показать человеку
+    kind           TEXT NOT NULL,   -- manual | due | goods | photo
+    transaction_id INTEGER,         -- для kind='due' — чей это срок
+    document_id    INTEGER,         -- для kind='photo'
+    status         TEXT NOT NULL,   -- pending | sent | cancelled
+    created_at     TEXT NOT NULL,
+    sent_at        TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_rem_due ON reminders(status, fire_at);
+CREATE INDEX IF NOT EXISTS ix_rem_owner ON reminders(owner_id, status, fire_at);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS tx_fts USING fts5(
     counterparty, item, note, raw_text,
@@ -205,6 +227,12 @@ def _migrate_chat_id_to_owner_id(conn: sqlite3.Connection) -> bool:
     return changed
 
 
+def _migrate_add_reminder_hour(conn: sqlite3.Connection) -> None:
+    """Схема 2 → 3: у пользователя появилось своё время для напоминаний."""
+    if table_exists(conn, "users") and "reminder_hour" not in columns_of(conn, "users"):
+        conn.execute("ALTER TABLE users ADD COLUMN reminder_hour INTEGER")
+
+
 def current_version(conn: sqlite3.Connection) -> int:
     if not table_exists(conn, "schema_version"):
         return 0
@@ -219,6 +247,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # Миграции — строго до _SCHEMA: индексы в ней ссылаются на новые имена колонок,
     # и на старой базе их создание упало бы с «no such column».
     _migrate_chat_id_to_owner_id(conn)
+    _migrate_add_reminder_hour(conn)
 
     conn.executescript(_SCHEMA)
     conn.executescript(_TRIGGERS)
@@ -645,3 +674,152 @@ def delete_user(conn: sqlite3.Connection, user_id: int) -> dict[str, int]:
         except OSError:
             pass
     return stats
+
+
+# ── напоминания ────────────────────────────────────────────────────────────
+
+def add_reminder(
+    conn: sqlite3.Connection,
+    owner_id: int,
+    *,
+    fire_at: str,
+    text: str,
+    kind: str = "manual",
+    transaction_id: int | None = None,
+    document_id: int | None = None,
+) -> int:
+    cur = conn.execute(
+        """INSERT INTO reminders
+           (owner_id, fire_at, text, kind, transaction_id, document_id, status, created_at)
+           VALUES (?,?,?,?,?,?, 'pending', ?)""",
+        (owner_id, fire_at, text,
+         kind if kind in REMINDER_KINDS else "manual",
+         transaction_id, document_id, now_iso()),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def get_reminder(conn: sqlite3.Connection, reminder_id: int) -> dict[str, Any] | None:
+    row = conn.execute("SELECT * FROM reminders WHERE id=?", (reminder_id,)).fetchone()
+    return _row_to_dict(row) if row else None
+
+
+def due_reminders(conn: sqlite3.Connection, now: str, limit: int = 100) -> list[dict[str, Any]]:
+    """Что пора отправить. now — момент в UTC ISO."""
+    rows = conn.execute(
+        """SELECT * FROM reminders
+           WHERE status='pending' AND fire_at <= ?
+           ORDER BY fire_at LIMIT ?""",
+        (now, limit),
+    ).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def list_reminders(
+    conn: sqlite3.Connection, owner_id: int, *, status: str = "pending", limit: int = 50
+) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """SELECT * FROM reminders
+           WHERE owner_id=? AND status=? ORDER BY fire_at LIMIT ?""",
+        (owner_id, status, limit),
+    ).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def mark_sent(conn: sqlite3.Connection, reminder_id: int) -> None:
+    conn.execute(
+        "UPDATE reminders SET status='sent', sent_at=? WHERE id=?", (now_iso(), reminder_id)
+    )
+    conn.commit()
+
+
+def cancel_reminder(conn: sqlite3.Connection, owner_id: int, reminder_id: int) -> bool:
+    cur = conn.execute(
+        "UPDATE reminders SET status='cancelled' WHERE id=? AND owner_id=? AND status='pending'",
+        (reminder_id, owner_id),
+    )
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def reschedule_reminder(conn: sqlite3.Connection, reminder_id: int, fire_at: str) -> bool:
+    """Отложить: снова pending на новый момент."""
+    cur = conn.execute(
+        "UPDATE reminders SET fire_at=?, status='pending', sent_at=NULL WHERE id=?",
+        (fire_at, reminder_id),
+    )
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def cancel_reminders_for_transaction(
+    conn: sqlite3.Connection, owner_id: int, transaction_id: int
+) -> int:
+    """Операцию изменили или удалили — старые напоминания о её сроке не нужны."""
+    cur = conn.execute(
+        """UPDATE reminders SET status='cancelled'
+           WHERE owner_id=? AND transaction_id=? AND status='pending' AND kind='due'""",
+        (owner_id, transaction_id),
+    )
+    conn.commit()
+    return cur.rowcount
+
+
+def has_pending_reminder(
+    conn: sqlite3.Connection, owner_id: int, kind: str, *, document_id: int | None = None
+) -> bool:
+    """Есть ли уже такое напоминание — чтобы не плодить дубли каждый день."""
+    if document_id is not None:
+        row = conn.execute(
+            """SELECT 1 FROM reminders WHERE owner_id=? AND kind=? AND document_id=?
+               AND status='pending' LIMIT 1""",
+            (owner_id, kind, document_id),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT 1 FROM reminders WHERE owner_id=? AND kind=? AND status='pending' LIMIT 1",
+            (owner_id, kind),
+        ).fetchone()
+    return row is not None
+
+
+def set_reminder_hour(conn: sqlite3.Connection, user_id: int, hour: int) -> bool:
+    if not 0 <= hour <= 23:
+        return False
+    cur = conn.execute("UPDATE users SET reminder_hour=? WHERE id=?", (hour, user_id))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def reminder_hour(conn: sqlite3.Connection, user_id: int) -> int:
+    user = get_user(conn, user_id)
+    hour = user.get("reminder_hour") if user else None
+    return int(hour) if hour is not None else DEFAULT_REMINDER_HOUR
+
+
+def undescribed_documents(
+    conn: sqlite3.Connection, older_than_iso: str
+) -> list[dict[str, Any]]:
+    """Фото, которые человек прислал и забыл подписать."""
+    rows = conn.execute(
+        """SELECT * FROM documents
+           WHERE deleted_at IS NULL AND (description IS NULL OR description='')
+             AND created_at <= ?
+           ORDER BY id""",
+        (older_than_iso,),
+    ).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def transactions_with_due_date(
+    conn: sqlite3.Connection, owner_id: int, *, since: str | None = None
+) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """SELECT * FROM transactions
+           WHERE owner_id=? AND deleted_at IS NULL AND due_date IS NOT NULL
+             AND (? IS NULL OR due_date >= ?)
+           ORDER BY due_date""",
+        (owner_id, since, since),
+    ).fetchall()
+    return [_row_to_dict(r) for r in rows]

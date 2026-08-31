@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +13,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, FSInputFile, Message
 from aiogram.utils.chat_action import ChatActionSender
 
-from . import admin, db, keyboards, reports
+from . import admin, db, keyboards, reminders as rem, reports
 from .access import is_admin
 from .brain import Brain
 from .config import Config
@@ -40,11 +40,17 @@ HELP_TEXT = """\
  • Пришли фото → скажи «это накладная от женской обуви»
  • Потом: «Отправь накладную от женской обуви»
 
+Напомнить:
+ • «Напомни мне 15 сентября в три часа дня позвонить Абубакру»
+ • «Товар придёт через два дня» — напомню проверить
+ • О денежных сроках напомню сам: за день и в день
+
 Отчёт:
  • «Отправь отчёт с 1 августа по сегодня»
 
 Команды: /help — эта справка, /otchet — отчёт за текущий месяц,
-/istoriya Абубакр — вся история по человеку, /imya — сменить своё имя.
+/istoriya Абубакр — вся история по человеку, /napominaniya — список напоминаний,
+/vremya 9 — во сколько напоминать, /imya — сменить своё имя.
 
 Твои записи видишь только ты.\
 """
@@ -235,6 +241,41 @@ async def cmd_rename(message: Message, conn: sqlite3.Connection, user: dict[str,
     await message.answer(f"Теперь я зову тебя {name}.")
 
 
+@router.message(Command("napominaniya"))
+async def cmd_reminders(
+    message: Message, config: Config, conn: sqlite3.Connection, user: dict[str, Any]
+) -> None:
+    rows = db.list_reminders(conn, user["id"])
+    if not rows:
+        await message.answer(
+            "Напоминаний нет.\n\n"
+            "Скажи голосом: «Напомни мне завтра в три часа дня позвонить Абубакру»."
+        )
+        return
+    lines = ["Напоминания:", ""]
+    lines += [f"{rem.fmt_local(r['fire_at'], config.tz)} — {r['text']}" for r in rows]
+    await message.answer("\n".join(lines), reply_markup=keyboards.reminders_list_keyboard(rows))
+
+
+@router.message(Command("vremya"))
+async def cmd_reminder_hour(
+    message: Message, conn: sqlite3.Connection, user: dict[str, Any]
+) -> None:
+    raw = (message.text or "").partition(" ")[2].strip().replace(".", ":")
+    hour_part = raw.split(":")[0] if raw else ""
+    if not hour_part.isdigit() or not db.set_reminder_hour(conn, user["id"], int(hour_part)):
+        await message.answer(
+            f"Напиши так: /vremya 9\n\n"
+            f"Сейчас автоматические напоминания приходят в "
+            f"{db.reminder_hour(conn, user['id'])}:00."
+        )
+        return
+    await message.answer(
+        f"Готово. Напоминания о сроках буду присылать в {int(hour_part)}:00.\n"
+        "Те, что ты просишь голосом, приходят в названное тобой время."
+    )
+
+
 @router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
     await message.answer(HELP_TEXT)
@@ -359,6 +400,36 @@ async def on_delete(query: CallbackQuery, conn: sqlite3.Connection, user: dict[s
         except Exception:
             pass  # сообщение слишком старое для правки — не беда
         await query.message.answer("Удалил эту запись.")
+
+
+@router.callback_query(F.data.startswith("rem:"))
+async def on_reminder_button(
+    query: CallbackQuery, config: Config, conn: sqlite3.Connection, user: dict[str, Any]
+) -> None:
+    action, _, raw_id = query.data.partition(":")[2].partition(":")
+    reminder_id = int(raw_id)
+    reminder = db.get_reminder(conn, reminder_id)
+
+    # Напоминание чужое — кнопку могли переслать.
+    if not reminder or reminder["owner_id"] != user["id"]:
+        await query.answer("Это напоминание не твоё", show_alert=True)
+        return
+
+    if action == "snooze":
+        moment = rem.utc_now() + timedelta(days=1)
+        db.reschedule_reminder(conn, reminder_id, rem.to_utc_iso(moment))
+        await query.answer("Напомню завтра")
+        await query.message.answer(
+            f"⏰ Отложил: напомню {rem.fmt_local(rem.to_utc_iso(moment), config.tz)}."
+        )
+    else:  # done или cancel — и то и другое просто снимает напоминание
+        db.cancel_reminder(conn, user["id"], reminder_id)
+        await query.answer("Убрал")
+
+    try:
+        await query.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
 
 
 # ── обычный текст (регистрируется последним) ───────────────────────────────
