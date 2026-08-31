@@ -72,6 +72,10 @@ sed -e "s|__REPO_DIR__|${REPO_DIR}|" -e "s|__BRANCH__|${BRANCH}|" \
     "$SRC_DIR/deploy/update.sh" > /usr/local/bin/battle-update
 chmod +x /usr/local/bin/battle-update
 
+# battle-approve — принять все накопленные заявки в канал
+cp "$SRC_DIR/deploy/approve.sh" /usr/local/bin/battle-approve
+chmod +x /usr/local/bin/battle-approve
+
 echo "==> Служба systemd"
 cp "$SRC_DIR/deploy/battle-bot.service" /etc/systemd/system/battle-bot.service
 systemctl daemon-reload
@@ -87,6 +91,7 @@ if systemctl is-active --quiet battle-bot; then
     echo
     echo "Логи в реальном времени:  journalctl -u battle-bot -f"
     echo "Обновить бота одной командой:  battle-update"
+    echo "Принять все заявки в канал:    battle-approve"
 else
     echo
     echo "❌ Бот не поднялся. Причина в логе:"
