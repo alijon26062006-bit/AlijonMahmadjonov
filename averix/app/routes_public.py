@@ -93,8 +93,19 @@ async def careers(request: Request):
     return templates.TemplateResponse(request, "public/careers.html", ctx)
 
 
-@router.get("/freelance", response_class=HTMLResponse)
+@router.get("/freelance/studio", response_class=HTMLResponse)
 async def freelance(request: Request):
+    """
+    Анкета в закрытую базу специалистов студии.
+
+    Раньше эта страница жила по адресу /freelance. Теперь там площадка,
+    а анкета переехала на /freelance/studio — это разные вещи: анкета
+    попадает в базу студии и на сайт не выводится, а профиль на площадке
+    человек ведёт сам и сам решает, показывать ли его.
+
+    Адрес формы (/freelance/apply) намеренно оставлен прежним: на него
+    могут ссылаться закладки и уже отправленные письма.
+    """
     with connect() as conn:
         ctx = public_context(request, conn, page="freelance")
         ctx["specializations"] = work.SPECIALIZATIONS
@@ -321,6 +332,14 @@ async def robots():
         "User-agent: *\n"
         "Disallow: /admin\n"
         "Disallow: /freelancer\n"
+        # Личные разделы площадки: кабинет, вход, регистрация, ссылки
+        # из писем. Публичные разделы (/freelance, каталоги) открыты.
+        "Disallow: /freelance/dashboard\n"
+        "Disallow: /freelance/login\n"
+        "Disallow: /freelance/register\n"
+        "Disallow: /freelance/forgot\n"
+        "Disallow: /freelance/reset\n"
+        "Disallow: /freelance/verify\n"
         "Disallow: /thanks\n"
         "Disallow: /uploads/\n"
         f"\nSitemap: {SITE_URL}/sitemap.xml\n"
@@ -333,7 +352,8 @@ async def sitemap():
     # и черновиков здесь нет и быть не должно.
     urls = [("/", "1.0", None), ("/projects", "0.9", None),
             ("/team", "0.6", None), ("/careers", "0.6", None),
-            ("/freelance", "0.6", None)]
+            ("/freelance", "0.8", None),
+            ("/freelance/studio", "0.5", None)]
     with connect() as conn:
         for p in conn.execute(
             "SELECT slug, updated_at FROM projects"

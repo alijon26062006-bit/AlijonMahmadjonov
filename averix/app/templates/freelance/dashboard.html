@@ -1,0 +1,103 @@
+{% extends "freelance/base.html" %}
+{% block title %}Кабинет — AVERIX Freelance{% endblock %}
+
+{% block head_extra %}
+<style>
+.fl-who{display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1.5rem}
+.fl-tag{display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .7rem;
+  border-radius:var(--fl-r-sm); background:var(--fl-surface-2);
+  border:1px solid var(--fl-line); font-size:.85rem; color:var(--muted)}
+.fl-tag.on{color:var(--text); border-color:var(--fl-line-hi)}
+.fl-next{display:grid; gap:1px; background:var(--fl-line);
+  border:1px solid var(--fl-line); border-radius:var(--fl-r); overflow:hidden}
+.fl-next > div{background:var(--fl-surface); padding:1.25rem}
+.fl-next h2{font-size:1rem; margin-bottom:.35rem}
+.fl-next p{color:var(--muted); font-size:.92rem}
+.fl-next form{margin-top:.9rem}
+</style>
+{% endblock %}
+
+{% block body %}
+<main id="main" class="fl-main">
+  <div class="fl-head">
+    <p class="fl-sub">Кабинет</p>
+    <h1>{{ me.email }}</h1>
+  </div>
+
+  <div class="fl-who">
+    <span class="fl-tag{% if roles.client %} on{% endif %}">
+      {% if roles.client %}✓{% endif %} Заказчик
+    </span>
+    <span class="fl-tag{% if roles.freelancer %} on{% endif %}">
+      {% if roles.freelancer %}✓{% endif %} Специалист
+    </span>
+    <span class="fl-tag{% if me.email_verified %} on{% endif %}">
+      {% if me.email_verified %}✓ Почта подтверждена{% else %}Почта не подтверждена{% endif %}
+    </span>
+  </div>
+
+  {% if note == 'sent' %}
+  <p class="fl-alert ok" role="status">Письмо отправлено. Проверьте почту.</p>
+  {% elif note == 'often' %}
+  <p class="fl-alert" role="status">Слишком часто. Попробуйте через час.</p>
+  {% endif %}
+
+  <div class="fl-next">
+    {% if not me.email_verified %}
+    <div>
+      <h2>Подтвердите почту</h2>
+      <p>Пока адрес не подтверждён, восстановить пароль по нему не получится.
+         {% if not mail_ready %}Отправка писем на сайте сейчас не настроена —
+         напишите в студию.{% endif %}</p>
+      {% if mail_ready %}
+      <form method="post" action="/freelance/verify/resend">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-sm btn-line btn-ghost" type="submit">
+          Отправить письмо ещё раз
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if not roles.client %}
+    <div>
+      <h2>Стать заказчиком</h2>
+      <p>Публиковать проекты и нанимать специалистов. Отдельная регистрация
+         не нужна — это второе лицо того же аккаунта.</p>
+      <form method="post" action="/freelance/roles">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="role" value="client">
+        <input type="hidden" name="name" value="{{ roles.freelancer_name }}">
+        <button class="btn btn-sm btn-line btn-ghost" type="submit">
+          Добавить лицо заказчика
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if not roles.freelancer %}
+    <div>
+      <h2>Стать специалистом</h2>
+      <p>Искать заказы и откликаться на них. Отдельная регистрация не нужна —
+         это второе лицо того же аккаунта.</p>
+      <form method="post" action="/freelance/roles">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="role" value="freelancer">
+        <input type="hidden" name="name" value="{{ roles.client_name }}">
+        <button class="btn btn-sm btn-line btn-ghost" type="submit">
+          Добавить лицо специалиста
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    <div>
+      <h2>Что дальше</h2>
+      <p>Профиль, публикация проектов, отклики и переписка появляются
+         в кабинете по мере готовности разделов. Аккаунт уже ваш —
+         его не придётся создавать заново.</p>
+    </div>
+  </div>
+</main>
+{% endblock %}

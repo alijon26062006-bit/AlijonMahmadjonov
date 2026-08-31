@@ -49,6 +49,11 @@ def client():
             conn.execute("DELETE FROM task_history")
             conn.execute("DELETE FROM notifications")
             conn.execute("DELETE FROM admin_log")
+            conn.execute("DELETE FROM user_sessions")
+            conn.execute("DELETE FROM user_tokens")
+            conn.execute("DELETE FROM client_profiles")
+            conn.execute("DELETE FROM fl_rate_events")
+            conn.execute("DELETE FROM users")
             conn.execute(
                 "INSERT INTO admins (username, password_hash) VALUES (?, ?)",
                 (ADMIN_LOGIN, security.hash_password(ADMIN_PASSWORD)),
