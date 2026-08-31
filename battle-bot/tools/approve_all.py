@@ -28,7 +28,12 @@ import sys
 
 try:
     from telethon import TelegramClient, functions, types
-    from telethon.errors import FloodWaitError
+    from telethon.errors import (
+        FloodWaitError,
+        PhoneCodeExpiredError,
+        PhoneCodeInvalidError,
+        SessionPasswordNeededError,
+    )
     from telethon.sessions import StringSession
 except ImportError:  # pragma: no cover - подсказка вместо трассировки
     sys.exit(
@@ -44,6 +49,85 @@ def ask(question: str, default: str = "") -> str:
     hint = f" [{default}]" if default else ""
     answer = input(f"{question}{hint}: ").strip()
     return answer or default
+
+
+def ask_code() -> str:
+    """Код подтверждения. Берём из ввода только цифры.
+
+    Код приходит в само приложение Telegram сообщением «Login code: 12345».
+    Люди часто вводят его с пробелами или дописывают лишнее — цифры всё
+    равно достанем, чтобы не тратить попытку зря.
+    """
+    raw = input("Код из Telegram (5 цифр): ")
+    return "".join(char for char in raw if char.isdigit())
+
+
+async def login(client) -> None:
+    """Вход по телефону с понятными подсказками вместо английских.
+
+    Код Telegram присылает **в приложение**, а не по SMS. Важно: если
+    переслать или написать этот код в любом чате Telegram, он тут же
+    перестаёт работать — Telegram так защищает аккаунты.
+    """
+    phone = os.getenv("TG_PHONE") or ask("Номер телефона (например +992...)")
+    await client.connect()
+    if await client.is_user_authorized():
+        return
+
+    await client.send_code_request(phone)
+    print("\nКод отправлен в Telegram — ищите сообщение от Telegram, не SMS.")
+    print("Никому его не пересылайте и не пишите в чатах: код сразу сгорает.\n")
+
+    for attempt in range(3):
+        code = ask_code()
+        if not code:
+            print("Нужны только цифры кода. Попробуйте ещё раз.")
+            continue
+        try:
+            await client.sign_in(phone, code)
+            return
+        except PhoneCodeInvalidError:
+            print("Код не подошёл. Проверьте цифры и введите заново.")
+        except PhoneCodeExpiredError:
+            sys.exit(
+                "Код истёк. Запустите battle-approve заново — придёт новый."
+            )
+        except SessionPasswordNeededError:
+            password = ask("Облачный пароль (двухэтапная проверка)")
+            await client.sign_in(password=password)
+            return
+
+    sys.exit("Три раза код не подошёл. Запустите battle-approve заново.")
+
+
+async def find_channel(client, channel: str):
+    """Найти канал по @имени или по ID.
+
+    По одному числовому ID Telegram канал не отдаёт, пока аккаунт его
+    «не видел» в этой сессии. Поэтому при неудаче проходим по своим чатам
+    и ищем канал там — для владельца канала это всегда срабатывает.
+    """
+    try:
+        return await client.get_input_entity(
+            int(channel) if channel.lstrip("-").isdigit() else channel
+        )
+    except (ValueError, TypeError):
+        pass
+
+    print("Ищу канал среди ваших чатов…")
+    wanted = channel.lstrip("-").removeprefix("100")
+    async for dialog in client.iter_dialogs():
+        entity = dialog.entity
+        name = getattr(entity, "username", None) or ""
+        if str(entity.id).endswith(wanted) or name.lower() == channel.lstrip("@").lower():
+            print(f"Нашёл: {dialog.name}")
+            return await client.get_input_entity(entity)
+
+    sys.exit(
+        "Не нашёл такой канал у этого аккаунта. Проверьте ID (его видно "
+        "в панели бота, раздел «Канал») и что вы вошли тем аккаунтом, "
+        "который владеет каналом."
+    )
 
 
 async def waiting_count(client, peer) -> int:
@@ -109,12 +193,10 @@ async def main() -> None:
 
     # сессия живёт только в памяти: на диске не остаётся ничего от вашего входа
     client = TelegramClient(StringSession(), int(api_id), api_hash)
-    await client.start()
+    await login(client)
 
     try:
-        peer = await client.get_input_entity(
-            int(channel) if channel.lstrip("-").isdigit() else channel
-        )
+        peer = await find_channel(client, channel)
 
         waiting = await waiting_count(client, peer)
         print(f"\nЖдут решения: {waiting}")
