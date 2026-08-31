@@ -12,7 +12,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from . import audit, journal, security, taxonomy
+from . import audit, journal, security, specialists, taxonomy
 from .adminkit import back, error_page, guard, page
 from .db import connect
 
@@ -41,6 +41,10 @@ def _counts(conn) -> dict:
         "categories": one("SELECT COUNT(*) FROM fl_categories WHERE enabled = 1"),
         "skills": one("SELECT COUNT(*) FROM fl_skills WHERE status = 'active'"),
         "skills_pending": one("SELECT COUNT(*) FROM fl_skills WHERE status = 'pending'"),
+        "published": one("SELECT COUNT(*) FROM freelancers"
+                         " WHERE listing = 'published' AND user_id IS NOT NULL"),
+        "listing_pending": one("SELECT COUNT(*) FROM freelancers"
+                               " WHERE listing = 'pending'"),
     }
 
 
@@ -57,6 +61,72 @@ async def hub(request: Request):
     with connect() as conn:
         counts = _counts(conn)
     return page(request, session, "admin/fl_hub.html", counts=counts, sub="hub")
+
+
+# ============================================================
+# Профили специалистов: проверка перед публикацией
+# ============================================================
+
+@router.get("/specialists", response_class=HTMLResponse)
+async def specialists_list(request: Request, listing: str = "pending",
+                           error: str = ""):
+    session, stop = guard(request)
+    if stop:
+        return stop
+    if listing not in specialists.LISTINGS:
+        listing = ""
+    with connect() as conn:
+        sql = ("SELECT f.*, u.email, u.created_at AS user_since"
+               " FROM freelancers f JOIN users u ON u.id = f.user_id")
+        args: tuple = ()
+        if listing:
+            sql += " WHERE f.listing = ?"
+            args = (listing,)
+        sql += " ORDER BY f.listed_at DESC, f.id DESC"
+        rows = [dict(r) for r in conn.execute(sql, args)]
+        for row in rows:
+            row["skills"] = taxonomy.freelancer_skills(conn, row["id"])
+            row["works"] = int(conn.execute(
+                "SELECT COUNT(*) FROM fl_portfolio WHERE freelancer_id = ?",
+                (row["id"],)).fetchone()[0])
+        counts = {key: 0 for key in specialists.LISTINGS}
+        for row in conn.execute(
+            "SELECT listing, COUNT(*) n FROM freelancers"
+            " WHERE user_id IS NOT NULL GROUP BY listing"
+        ):
+            counts[row["listing"]] = row["n"]
+    return page(request, session, "admin/fl_specialists.html",
+                people=rows, active=listing, counts=counts,
+                listings=specialists.LISTINGS, levels=specialists.LEVELS,
+                error=error, sub="specialists")
+
+
+@router.post("/specialists/{freelancer_id}/listing")
+async def specialist_listing(request: Request, freelancer_id: int):
+    """
+    Решение по публикации профиля.
+
+    Отдельно от статуса специалиста в базе студии: одобрить человека
+    для задач и показать его карточку на сайте — разные решения,
+    и путать их нельзя.
+    """
+    session, stop = guard(request)
+    if stop:
+        return stop
+    form = await request.form()
+    if not security.check_csrf(session, form.get("csrf")):
+        return back(f"{HERE}/specialists")
+    listing = _val(form, "listing", 20)
+    note = _val(form, "note", 2000)
+    with connect() as conn:
+        problem = specialists.set_listing(conn, freelancer_id, listing, note)
+        if problem:
+            return back(f"{HERE}/specialists?error={problem}")
+        audit.record(conn, session, "FL_LISTING_CHANGED", "freelancers",
+                     freelancer_id, f"публикация: {listing}")
+    journal.event("площадка.профиль.решение", id=freelancer_id, состояние=listing,
+                  кто=session["username"])
+    return back(f"{HERE}/specialists?listing={_val(form, 'back', 20) or 'pending'}")
 
 
 # ============================================================

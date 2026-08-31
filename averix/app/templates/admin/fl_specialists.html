@@ -1,0 +1,105 @@
+{% extends "admin/base.html" %}
+{% block title %}Профили специалистов{% endblock %}
+{% block body %}
+{% with page = 'freelance' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar"><h1>Профили специалистов</h1></div>
+  {% include "admin/_fl_top.html" %}
+
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+  <p class="hint" style="margin-bottom:1rem">
+    Это профили площадки — люди, которые сами завели учётную запись
+    и сами попросили публикацию. Анкеты из закрытой базы студии сюда
+    не попадают и опубликованы быть не могут.
+  </p>
+
+  <nav class="filters" aria-label="Состояние публикации">
+    <a class="chip{% if not active %} on{% endif %}" href="/admin/freelance/specialists?listing=">
+      Все
+    </a>
+    {% for key, label in listings.items() %}
+    <a class="chip{% if active == key %} on{% endif %}"
+       href="/admin/freelance/specialists?listing={{ key }}"
+       {% if active == key %}aria-current="true"{% endif %}>
+      {{ label }} {{ counts[key] }}
+    </a>
+    {% endfor %}
+  </nav>
+
+  {% if people %}
+  {% for p in people %}
+  <article class="card" style="margin-bottom:1rem">
+    <div class="bar" style="margin-bottom:.75rem">
+      <h2 style="font-size:1.05rem; margin-right:auto">
+        {{ p.name }}{% if p.title %} — {{ p.title }}{% endif %}
+      </h2>
+      <span class="badge{% if p.listing == 'published' %} pub{% else %} draft{% endif %}">
+        {{ listings.get(p.listing, p.listing) }}
+      </span>
+    </div>
+
+    <div class="meta" style="margin-bottom:.75rem">
+      {{ p.email }} ·
+      {{ levels.get(p.level, p.level) }}{% if p.years %} · {{ p.years }} лет{% endif %}
+      {% if p.city %} · {{ p.city }}{% endif %}
+      · работ в портфолио: {{ p.works }}
+      {% if p.public_slug %}
+      · <a href="/freelance/specialists/{{ p.public_slug }}" target="_blank" rel="noopener">карточка ↗</a>
+      {% endif %}
+    </div>
+
+    {% if p.skills %}
+    <div class="meta" style="margin-bottom:.75rem">
+      Навыки: {{ p.skills|map(attribute='name')|join(', ') }}
+    </div>
+    {% endif %}
+
+    {% if p.about %}
+    <p class="msg" style="margin-bottom:.75rem">{{ p.about }}</p>
+    {% endif %}
+
+    <form method="post" action="/admin/freelance/specialists/{{ p.id }}/listing">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="back" value="{{ active }}">
+      <div class="field">
+        <label for="note-{{ p.id }}">Заметка (её видит специалист при отказе)</label>
+        <input id="note-{{ p.id }}" name="note" type="text" maxlength="2000"
+               value="{{ p.admin_note or '' }}">
+      </div>
+      <div class="acts">
+        {% if p.listing != 'published' %}
+        <button class="mini" type="submit" name="listing" value="published">
+          Опубликовать
+        </button>
+        {% endif %}
+        {% if p.listing != 'rejected' %}
+        <button class="mini" type="submit" name="listing" value="rejected">
+          Отказать
+        </button>
+        {% endif %}
+        {% if p.listing != 'draft' %}
+        <button class="mini" type="submit" name="listing" value="draft">
+          Снять с показа
+        </button>
+        {% endif %}
+      </div>
+    </form>
+  </article>
+  {% endfor %}
+
+  {% else %}
+  <div class="empty">
+    <p>
+      {% if active == 'pending' %}
+      Никто не ждёт проверки. Как только специалист заполнит профиль
+      и отправит его, он появится здесь.
+      {% else %}
+      В этом состоянии профилей нет.
+      {% endif %}
+    </p>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

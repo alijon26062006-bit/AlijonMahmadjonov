@@ -1,0 +1,81 @@
+{% extends "freelance/base.html" %}
+{% block title %}Кто вы — AVERIX Freelance{% endblock %}
+{% block body %}
+<main id="main" class="fl-main fl-narrow">
+  <div class="fl-head">
+    <p class="fl-sub">Профиль · шаг 1 из 5</p>
+    <h1>Кто вы</h1>
+    <p>Это первое, что видит заказчик в каталоге. Профессию пишите так,
+       как её ищут: «Frontend-разработчик», а не «специалист широкого профиля».</p>
+  </div>
+
+  {% include "freelance/_stepnav.html" %}
+  {% if error %}<p class="fl-alert" role="alert">{{ error }}</p>{% endif %}
+
+  <div class="fl-card" style="margin-bottom:1rem">
+    <h2 style="font-size:1rem; margin-bottom:.75rem">Фотография</h2>
+    <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap">
+      {% if person.photo %}
+      <img class="fl-ava" style="width:72px;height:72px"
+           src="/uploads/{{ person.photo }}" alt="Ваша фотография"
+           width="72" height="72">
+      {% else %}
+      <span class="fl-ava fl-ava-none" style="width:72px;height:72px" aria-hidden="true">?</span>
+      {% endif %}
+
+      <form method="post" action="/freelance/profile/photo"
+            enctype="multipart/form-data"
+            style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="sr" for="ph">Файл фотографии</label>
+        <input id="ph" name="photo" type="file" accept="image/jpeg,image/png,image/webp"
+               style="max-width:220px">
+        <button class="btn btn-sm btn-line btn-ghost" type="submit">Загрузить</button>
+      </form>
+
+      {% if person.photo %}
+      <form method="post" action="/freelance/profile/photo/delete">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn-quiet" type="submit">Удалить</button>
+      </form>
+      {% endif %}
+    </div>
+    <p class="hint" style="margin-top:.75rem; font-size:.82rem; color:var(--faint)">
+      JPEG, PNG или WebP. Мы пересохраняем файл сами, поэтому в него
+      не попадают данные съёмки — в том числе координаты.
+    </p>
+  </div>
+
+  <form class="fl-card" method="post" action="/freelance/profile/basics" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="fl-field">
+      <label for="b-name">Имя</label>
+      <input id="b-name" name="name" type="text" maxlength="100" required
+             value="{{ person.name }}">
+    </div>
+
+    <div class="fl-field">
+      <label for="b-title">Название профессии</label>
+      <input id="b-title" name="title" type="text" maxlength="120"
+             value="{{ person.title or '' }}" placeholder="Frontend-разработчик">
+      <p class="hint">Одна строка. Именно её видно в каталоге под именем.</p>
+    </div>
+
+    <div class="fl-two">
+      <div class="fl-field">
+        <label for="b-country">Страна</label>
+        <input id="b-country" name="country" type="text" maxlength="80"
+               value="{{ person.country or '' }}">
+      </div>
+      <div class="fl-field">
+        <label for="b-city">Город</label>
+        <input id="b-city" name="city" type="text" maxlength="80"
+               value="{{ person.city or '' }}">
+      </div>
+    </div>
+
+    <button class="btn btn-solid" type="submit">Сохранить и дальше</button>
+  </form>
+</main>
+{% endblock %}

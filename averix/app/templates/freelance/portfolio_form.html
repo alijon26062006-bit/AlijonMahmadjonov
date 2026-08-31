@@ -1,0 +1,121 @@
+{% extends "freelance/base.html" %}
+{% block title %}{{ 'Работа' if item else 'Новая работа' }} — AVERIX Freelance{% endblock %}
+{% block body %}
+<main id="main" class="fl-main fl-narrow">
+  <div class="fl-head">
+    <p class="fl-sub">Портфолио</p>
+    <h1>{{ item.title if item else 'Новая работа' }}</h1>
+  </div>
+
+  {% if error %}<p class="fl-alert" role="alert">{{ error }}</p>{% endif %}
+
+  <form class="fl-card" method="post" action="/freelance/profile/portfolio/save" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if item %}<input type="hidden" name="id" value="{{ item.id }}">{% endif %}
+
+    <div class="fl-field">
+      <label for="w-title">Название</label>
+      <input id="w-title" name="title" type="text" maxlength="120" required
+             value="{{ item.title if item else '' }}">
+    </div>
+
+    <div class="fl-field">
+      <label for="w-desc">Что за задача и что вы сделали</label>
+      <textarea id="w-desc" name="description" rows="5" maxlength="2000">{{ item.description if item else '' }}</textarea>
+    </div>
+
+    <div class="fl-field">
+      <label for="w-cat">Направление</label>
+      <select id="w-cat" name="category_id">
+        <option value="">— не важно</option>
+        {% for top in tree %}
+        <optgroup label="{{ top.name }}">
+          {% for child in top.children %}
+          <option value="{{ child.id }}"{% if item and item.category_id == child.id %} selected{% endif %}>{{ child.name }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="fl-two">
+      <div class="fl-field">
+        <label for="w-tech">Технологии</label>
+        <input id="w-tech" name="tech" type="text" maxlength="300"
+               value="{{ item.tech if item else '' }}" placeholder="React, FastAPI">
+      </div>
+      <div class="fl-field">
+        <label for="w-url">Ссылка на работу</label>
+        <input id="w-url" name="url" type="url" maxlength="300"
+               value="{{ item.url if item else '' }}" placeholder="https://">
+      </div>
+    </div>
+
+    <button class="btn btn-solid" type="submit">Сохранить</button>
+  </form>
+
+  {% if item %}
+  <div class="fl-card" style="margin-top:1rem">
+    <h2 style="font-size:1rem; margin-bottom:.75rem">Картинки</h2>
+
+    {% if item.images %}
+    <div class="fl-gallery" style="padding:0; margin-bottom:1rem">
+      {% for image in item.images %}
+      <figure>
+        <img src="/uploads/{{ image.filename }}" alt="Снимок работы «{{ item.title }}»"
+             width="{{ image.width or 800 }}" height="{{ image.height or 600 }}"
+             loading="lazy" decoding="async">
+        <form method="post" action="/freelance/profile/portfolio/image/{{ image.id }}/delete"
+              style="margin-top:.4rem">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="item_id" value="{{ item.id }}">
+          <button class="btn-quiet" type="submit">Удалить</button>
+        </form>
+      </figure>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if images_left and images_left > 0 %}
+    <form method="post" action="/freelance/profile/portfolio/{{ item.id }}/image"
+          enctype="multipart/form-data"
+          style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="sr" for="w-img">Файл картинки</label>
+      <input id="w-img" name="image" type="file" accept="image/jpeg,image/png,image/webp"
+             style="max-width:240px">
+      <button class="btn btn-sm btn-line btn-ghost" type="submit">Загрузить</button>
+    </form>
+    <p class="hint" style="margin-top:.6rem; font-size:.82rem; color:var(--faint)">
+      Осталось мест: {{ images_left }}. Файл пересохраняется на сервере,
+      данные съёмки в него не переносятся.
+    </p>
+    {% else %}
+    <p class="hint">Больше картинок к этой работе добавить нельзя.</p>
+    {% endif %}
+  </div>
+
+  <div style="margin-top:1rem">
+    <a class="btn btn-line btn-ghost" href="/freelance/profile/portfolio">К списку работ</a>
+  </div>
+
+  {# Подтверждение раскрытием, а не окном браузера: встроенные обработчики
+     событий запрещены политикой безопасности страниц, а своего скрипта
+     у площадки нет. Два действия вместо одного — этого и достаточно,
+     чтобы работа не удалилась случайным нажатием. #}
+  <details class="fl-danger">
+    <summary>Удалить работу</summary>
+    <p>Работа «{{ item.title }}» и {{ item.images|length }} её картинок
+       удалятся навсегда. Отменить это нельзя.</p>
+    <form method="post" action="/freelance/profile/portfolio/{{ item.id }}/delete">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-sm btn-line btn-danger" type="submit">
+        Да, удалить работу
+      </button>
+    </form>
+  </details>
+  {% else %}
+  <p class="fl-links"><a href="/freelance/profile/portfolio">К списку работ</a></p>
+  {% endif %}
+</main>
+{% endblock %}

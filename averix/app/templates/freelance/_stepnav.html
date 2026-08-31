@@ -1,0 +1,9 @@
+{# Шаги профиля. Галочка — не украшение: она стоит там, где шаг
+   действительно заполнен, и считается по настоящим полям. #}
+<nav class="fl-stepnav" aria-label="Шаги профиля">
+  {% for key, label, check in steps %}
+  <a href="/freelance/profile/{{ key }}"{% if step == key %} aria-current="step"{% endif %}>
+    {% if state.done[check] %}<span class="ok" aria-hidden="true">✓</span>{% endif %}{{ label }}
+  </a>
+  {% endfor %}
+</nav>

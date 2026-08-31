@@ -3,6 +3,8 @@
 <nav class="filters" aria-label="Разделы площадки" style="margin-bottom:1.5rem">
   <a class="chip{% if sub == 'hub' %} on{% endif %}" href="/admin/freelance"
      {% if sub == 'hub' %}aria-current="true"{% endif %}>Обзор</a>
+  <a class="chip{% if sub == 'specialists' %} on{% endif %}" href="/admin/freelance/specialists"
+     {% if sub == 'specialists' %}aria-current="true"{% endif %}>Профили</a>
   <a class="chip{% if sub == 'categories' %} on{% endif %}" href="/admin/freelance/categories"
      {% if sub == 'categories' %}aria-current="true"{% endif %}>Категории</a>
   <a class="chip{% if sub == 'skills' %} on{% endif %}" href="/admin/freelance/skills"

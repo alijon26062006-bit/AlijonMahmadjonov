@@ -335,6 +335,7 @@ async def robots():
         # Личные разделы площадки: кабинет, вход, регистрация, ссылки
         # из писем. Публичные разделы (/freelance, каталоги) открыты.
         "Disallow: /freelance/dashboard\n"
+        "Disallow: /freelance/profile\n"
         "Disallow: /freelance/login\n"
         "Disallow: /freelance/register\n"
         "Disallow: /freelance/forgot\n"
@@ -353,6 +354,7 @@ async def sitemap():
     urls = [("/", "1.0", None), ("/projects", "0.9", None),
             ("/team", "0.6", None), ("/careers", "0.6", None),
             ("/freelance", "0.8", None),
+            ("/freelance/specialists", "0.8", None),
             ("/freelance/studio", "0.5", None)]
     with connect() as conn:
         for p in conn.execute(
@@ -362,6 +364,14 @@ async def sitemap():
         ):
             urls.append((f"/projects/{p['slug']}", "0.8",
                          (p["updated_at"] or "")[:10] or None))
+
+        # Карточки специалистов — тем же условием, что и сам каталог,
+        # одним запросом на всех: скрытый профиль не может просочиться
+        # сюда в обход страницы каталога
+        from . import specialists
+        for person in specialists.public_slugs(conn):
+            urls.append((f"/freelance/specialists/{person['public_slug']}", "0.6",
+                         (person["updated_at"] or "")[:10] or None))
 
     body = ['<?xml version="1.0" encoding="UTF-8"?>',
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']

@@ -34,7 +34,9 @@ FORM_COOKIE = "averix_flc"
 # Разделы в шапке. Список пополняется вместе с готовыми разделами:
 # ссылка на страницу, которой ещё нет, — это сломанная ссылка,
 # а не обещание.
-NAV: list[dict] = []
+NAV: list[dict] = [
+    {"key": "specialists", "url": "/freelance/specialists", "label": "Специалисты"},
+]
 
 
 def _set_cookie(resp: Response, name: str, value: str, max_age: int) -> None:

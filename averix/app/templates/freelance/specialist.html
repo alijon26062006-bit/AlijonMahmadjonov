@@ -1,0 +1,138 @@
+{% extends "freelance/base.html" %}
+{% block title %}{{ person.name }}{% if person.title %} — {{ person.title }}{% endif %} — AVERIX Freelance{% endblock %}
+{% block description %}{{ (person.about or person.title or person.name)|striptags|truncate(160) }}{% endblock %}
+{% block robots %}{% endblock %}
+{% block og_type %}profile{% endblock %}
+
+{% block body %}
+<main id="main" class="fl-main">
+
+  <p class="fl-links" style="margin-top:0">
+    <a href="/freelance/specialists">← Все специалисты</a>
+  </p>
+
+  <div class="fl-hero-person">
+    {% if person.photo %}
+    <img class="fl-ava" src="/uploads/{{ person.photo }}"
+         alt="Фотография: {{ person.name }}" width="96" height="96">
+    {% else %}
+    <span class="fl-ava fl-ava-none" style="font-size:2rem" aria-hidden="true">{{ person.name[:1] }}</span>
+    {% endif %}
+    <div>
+      <h1>{{ person.name }}</h1>
+      {% if person.title %}<p class="role">{{ person.title }}</p>{% endif %}
+      <p class="line" style="margin-top:.35rem">
+        <span class="fl-dot {{ 'free' if person.availability == 'available' else 'part' if person.availability == 'partially_busy' else '' }}">
+          {{ 'Свободен для работы' if person.availability == 'available' else 'Частично занят' if person.availability == 'partially_busy' else 'Сейчас занят' }}
+        </span>
+        {% if person.city %} · {{ person.city }}{% if person.country %}, {{ person.country }}{% endif %}{% endif %}
+      </p>
+    </div>
+  </div>
+
+  {# Показываем только то, что человек заполнил сам. Ни рейтинга,
+     ни числа заказов, ни скорости ответа здесь нет: этих данных
+     пока просто не существует, а рисовать их нельзя. #}
+  <div class="fl-facts">
+    {% if person.level_label %}
+    <div><b>{{ person.level_label }}</b><span>уровень</span></div>
+    {% endif %}
+    {% if person.years %}
+    <div><b>{{ person.years }}</b><span>лет опыта</span></div>
+    {% endif %}
+    {% if person.rate_hour_text %}
+    <div><b>{{ person.rate_hour_text }} {{ currency }}</b><span>за час</span></div>
+    {% endif %}
+    {% if person.rate_project_text %}
+    <div><b>от {{ person.rate_project_text }} {{ currency }}</b><span>за проект</span></div>
+    {% endif %}
+    {% if person.category %}
+    <div>
+      <b>{{ person.category.name }}</b>
+      <span>{{ person.parent_category.name if person.parent_category else 'направление' }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if person.about %}
+  <section style="margin-bottom:2rem">
+    <h2 style="font-size:1.15rem; margin-bottom:.75rem">О специалисте</h2>
+    <div class="fl-card">
+      <p style="white-space:pre-line; color:var(--muted)">{{ person.about }}</p>
+      {% if person.experience %}
+      <p style="margin-top:1rem; color:var(--faint); font-size:.9rem">
+        Где работал: {{ person.experience }}
+      </p>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if person.skills %}
+  <section style="margin-bottom:2rem">
+    <h2 style="font-size:1.15rem; margin-bottom:.75rem">Навыки</h2>
+    <div class="fl-chips">
+      {% for s in person.skills %}
+      <a class="fl-chip" href="/freelance/specialists?skill={{ s.id }}"
+         style="text-decoration:none; min-height:32px; display:inline-flex; align-items:center">{{ s.name }}</a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if person.portfolio %}
+  <section style="margin-bottom:2rem">
+    <h2 style="font-size:1.15rem; margin-bottom:.75rem">Портфолио</h2>
+    {% for item in person.portfolio %}
+    <article class="fl-work">
+      {% if item.images %}
+      <div class="fl-gallery">
+        {% for image in item.images %}
+        <figure>
+          <img src="/uploads/{{ image.filename }}"
+               alt="Работа «{{ item.title }}»"
+               width="{{ image.width or 800 }}" height="{{ image.height or 600 }}"
+               loading="lazy" decoding="async">
+        </figure>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="fl-work-body">
+        <h3>{{ item.title }}</h3>
+        {% if item.description %}<p>{{ item.description }}</p>{% endif %}
+        {% if item.tech %}
+        <div class="fl-chips">
+          {% for t in item.tech.split(',') %}
+          {% if t.strip() %}<span class="fl-chip">{{ t.strip() }}</span>{% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if item.url %}
+        <p style="margin-top:.75rem">
+          <a href="{{ item.url }}" rel="nofollow noopener" target="_blank">Открыть работу ↗</a>
+        </p>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <section>
+    <h2 style="font-size:1.15rem; margin-bottom:.75rem">Связаться</h2>
+    <div class="fl-card">
+      {# Контакты специалиста здесь не показываются намеренно: открытый
+         адрес на публичной странице через месяц собирают роботы,
+         и человек получает рассылку вместо заказов. #}
+      <p style="color:var(--muted)">
+        Написать специалисту можно будет прямо отсюда, когда заработает
+        раздел сообщений. Пока напишите в студию — мы передадим.
+      </p>
+      <p style="margin-top:1rem">
+        <a class="btn btn-line btn-ghost" href="/#final">Написать в студию</a>
+      </p>
+    </div>
+  </section>
+
+</main>
+{% endblock %}
