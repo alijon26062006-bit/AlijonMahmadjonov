@@ -173,7 +173,7 @@ def test_the_panel_counts_and_warns(env):
     text, markup = panel_ui.join_requests(waiting, approved, True, repo.pending_join_requests())
 
     assert "Ждут: <b>3</b>" in text
-    assert "поданные до этого" in text, "честно сказано, чего бот не видит"
+    assert "Список заявок Telegram боту не отдаёт" in text, "честно сказано, чего бот не видит"
     actions = [b.callback_data for row in markup.inline_keyboard for b in row]
     assert "p:joins:all" in actions
 
