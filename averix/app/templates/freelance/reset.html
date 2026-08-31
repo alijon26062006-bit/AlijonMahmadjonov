@@ -1,0 +1,37 @@
+{% extends "freelance/base.html" %}
+{% block title %}Новый пароль — AVERIX Freelance{% endblock %}
+{% block body %}
+<main id="main" class="fl-main fl-narrow">
+  <div class="fl-head">
+    <h1>Новый пароль</h1>
+  </div>
+
+  {% if alert %}<p class="fl-alert" role="alert">{{ alert }}</p>{% endif %}
+
+  {% if token %}
+  <form class="fl-card" method="post" action="/freelance/reset" novalidate>
+    <input type="hidden" name="fc" value="{{ fc }}">
+    <input type="hidden" name="token" value="{{ token }}">
+    <div class="fl-field{% if errors.password %} bad{% endif %}">
+      <label for="p-new">Новый пароль</label>
+      <input id="p-new" name="password" type="password" autocomplete="new-password"
+             required minlength="10" autofocus>
+      {% if errors.password %}<p class="err" role="alert">{{ errors.password }}</p>
+      {% else %}<p class="hint">Не короче 10 символов.</p>{% endif %}
+    </div>
+    <p class="hint" style="margin-bottom:1rem">
+      После смены пароля все открытые входы закроются — на других
+      устройствах придётся войти заново.
+    </p>
+    <button class="btn btn-solid btn-block" type="submit">Сохранить пароль</button>
+  </form>
+  {% else %}
+  <div class="fl-empty">
+    <b>Ссылка не подходит</b>
+    <p>Она уже использована или устарела. Запросите новую — старая
+       перестаёт работать сразу после первого перехода.</p>
+    <a class="btn btn-solid" href="/freelance/forgot">Запросить новую ссылку</a>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

@@ -26,6 +26,7 @@ ACTIONS = {
     "CLIENT_PROJECT_CHANGED": "Клиентский проект изменён",
     "TASK_CHANGED": "Задача изменена",
     "SETTINGS_CHANGED": "Настройки изменены",
+    "FL_TAXONOMY_CHANGED": "Справочник площадки изменён",
 }
 
 

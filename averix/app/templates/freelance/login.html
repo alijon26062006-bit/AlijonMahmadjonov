@@ -1,0 +1,36 @@
+{% extends "freelance/base.html" %}
+{% block title %}Вход — AVERIX Freelance{% endblock %}
+{% block body %}
+<main id="main" class="fl-main fl-narrow">
+  <div class="fl-head">
+    <h1>Вход</h1>
+  </div>
+
+  {% if ok %}<p class="fl-alert ok" role="status">{{ ok }}</p>{% endif %}
+  {% if alert %}<p class="fl-alert" role="alert">{{ alert }}</p>{% endif %}
+
+  <form class="fl-card" method="post" action="/freelance/login" novalidate>
+    <input type="hidden" name="fc" value="{{ fc }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+
+    <div class="fl-field">
+      <label for="l-email">Почта</label>
+      <input id="l-email" name="email" type="email" autocomplete="email" required
+             maxlength="190" value="{{ old.email or '' }}" autofocus>
+    </div>
+
+    <div class="fl-field">
+      <label for="l-pass">Пароль</label>
+      <input id="l-pass" name="password" type="password"
+             autocomplete="current-password" required>
+    </div>
+
+    <button class="btn btn-solid btn-block" type="submit">Войти</button>
+  </form>
+
+  <p class="fl-links">
+    <a href="/freelance/register">Создать аккаунт</a>
+    <a href="/freelance/forgot">Забыли пароль?</a>
+  </p>
+</main>
+{% endblock %}

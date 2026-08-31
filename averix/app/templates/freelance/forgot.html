@@ -1,0 +1,43 @@
+{% extends "freelance/base.html" %}
+{% block title %}Восстановление пароля — AVERIX Freelance{% endblock %}
+{% block body %}
+<main id="main" class="fl-main fl-narrow">
+  <div class="fl-head">
+    <h1>Восстановление пароля</h1>
+    <p>Укажите адрес, на который зарегистрирован аккаунт. Мы отправим
+       на него ссылку для смены пароля.</p>
+  </div>
+
+  {% if sent %}
+  {# Ответ одинаковый и для существующего адреса, и для любого другого:
+     иначе по этой форме можно проверить, кто зарегистрирован. #}
+  <p class="fl-alert ok" role="status">
+    Если такой адрес зарегистрирован, письмо со ссылкой отправлено.
+    Ссылка действует два часа.
+  </p>
+  {% endif %}
+
+  {% if alert %}<p class="fl-alert" role="alert">{{ alert }}</p>{% endif %}
+
+  {% if not mail_ready %}
+  <p class="fl-alert" role="status">
+    Отправка писем на этом сайте пока не настроена, поэтому письмо не придёт.
+    Напишите в студию — пароль поменяют вручную.
+  </p>
+  {% endif %}
+
+  <form class="fl-card" method="post" action="/freelance/forgot" novalidate>
+    <input type="hidden" name="fc" value="{{ fc }}">
+    <div class="fl-field">
+      <label for="f-email">Почта</label>
+      <input id="f-email" name="email" type="email" autocomplete="email" required
+             maxlength="190" value="{{ old.email or '' }}">
+    </div>
+    <button class="btn btn-solid btn-block" type="submit">Отправить ссылку</button>
+  </form>
+
+  <p class="fl-links">
+    <a href="/freelance/login">Вернуться ко входу</a>
+  </p>
+</main>
+{% endblock %}

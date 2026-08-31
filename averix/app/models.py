@@ -29,10 +29,16 @@ _TRANSLIT = {
 }
 
 
-def slugify(text: str) -> str:
+def slugify(text: str, fallback: str = "proekt") -> str:
+    """
+    Адрес из названия. fallback — что вернуть, если после очистки
+    не осталось ничего: у проекта это «proekt», а у справочника
+    навыков пустая строка, чтобы «!!!» не превратилось в навык
+    с осмысленным на вид адресом.
+    """
     out = "".join(_TRANSLIT.get(ch, ch) for ch in (text or "").lower())
     out = re.sub(r"[^a-z0-9]+", "-", out).strip("-")
-    return out[:80] or "proekt"
+    return out[:80] or fallback
 
 
 def unique_slug(conn: sqlite3.Connection, base: str, exclude_id: int | None = None) -> str:

@@ -1,0 +1,214 @@
+{# ============================================================
+   AVERIX Freelance — оболочка приложения.
+
+   Витрина студии и площадка живут в одном бренде, но это разные
+   вещи: там читают, здесь работают. Поэтому здесь нет ни плывущего
+   фона, ни стекла на каждом блоке, ни радиуса в 26 пикселей —
+   плоские поверхности, узкие радиусы, плотная сетка.
+
+   Цвета, шрифты и кнопки берутся из styles.css: бренд один.
+   Всё остальное — в блоке ниже, отдельным слоем поверх.
+
+   Язык один — русский. Ни data-i18n, ни переключателя языка здесь
+   нет намеренно: приложение не двуязычное.
+   ============================================================ #}
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}AVERIX Freelance{% endblock %}</title>
+<meta name="description" content="{% block description %}AVERIX Freelance — площадка для заказчиков и специалистов.{% endblock %}">
+<meta name="theme-color" content="#0B0A11">
+{% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% if canonical %}<link rel="canonical" href="{{ site_url }}{{ canonical }}">{% endif %}
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/GolosText-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/fonts.css">
+<link rel="stylesheet" href="/styles.css">
+<style>
+/* ---------- слой приложения ---------- */
+:root{
+  --fl-bg:#0B0A11;
+  --fl-surface:#131220;
+  --fl-surface-2:#1A1828;
+  --fl-line:rgba(255,255,255,.09);
+  --fl-line-hi:rgba(255,255,255,.17);
+  --fl-r:12px;
+  --fl-r-sm:8px;
+  --fl-top:60px;
+}
+body{background:var(--fl-bg)}
+.fl-wrap{min-height:100dvh; display:flex; flex-direction:column}
+
+/* ---------- шапка ---------- */
+.fl-top{
+  position:sticky; top:0; z-index:40;
+  background:rgba(11,10,17,.92); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--fl-line);
+}
+.fl-top-in{
+  max-width:1180px; margin:0 auto; padding:0 1rem;
+  min-height:var(--fl-top); display:flex; align-items:center; gap:.75rem;
+}
+.fl-brand{display:inline-flex; align-items:center; gap:.55rem; text-decoration:none;
+  color:var(--text); min-height:44px; flex:0 0 auto}
+.fl-brand svg{width:22px; height:22px; flex:0 0 auto}
+.fl-brand b{font-family:var(--display); font-size:.9rem; letter-spacing:.14em; font-weight:600}
+.fl-brand i{font-style:normal; color:var(--faint); font-family:var(--mono);
+  font-size:.72rem; letter-spacing:.12em; text-transform:uppercase}
+@media(max-width:520px){.fl-brand i{display:none}}
+
+.fl-nav{display:flex; gap:.15rem; margin-left:.5rem; min-width:0; overflow-x:auto;
+  scrollbar-width:none}
+.fl-nav::-webkit-scrollbar{display:none}
+.fl-nav a{display:inline-flex; align-items:center; min-height:44px; padding:0 .8rem;
+  border-radius:var(--fl-r-sm); font-size:.92rem; color:var(--muted);
+  text-decoration:none; white-space:nowrap}
+.fl-nav a:hover{color:var(--text); background:rgba(255,255,255,.05)}
+.fl-nav a[aria-current]{color:var(--text); background:rgba(255,255,255,.08)}
+
+.fl-acts{display:flex; align-items:center; gap:.4rem; margin-left:auto; flex:0 0 auto}
+.fl-acts form{display:inline-flex}
+
+/* ---------- кнопки поверх общих ---------- */
+.btn-ghost{background:transparent; color:var(--muted); border-color:var(--fl-line-hi)}
+.btn-ghost:hover{color:var(--text); background:rgba(255,255,255,.05)}
+.btn-quiet{background:transparent; color:var(--muted); border:0; min-height:44px;
+  padding:0 .9rem; border-radius:var(--fl-r-sm); font-size:.9rem; cursor:pointer;
+  font-family:var(--body)}
+.btn-quiet:hover{color:var(--text); background:rgba(255,255,255,.05)}
+
+/* ---------- содержимое ---------- */
+.fl-main{flex:1; width:100%; max-width:1180px; margin:0 auto; padding:2rem 1rem 4rem}
+.fl-narrow{max-width:560px}
+.fl-head{margin-bottom:1.5rem}
+.fl-head h1{font-size:clamp(1.5rem, 3.5vw, 2rem)}
+.fl-head p{margin-top:.5rem; color:var(--muted); max-width:60ch}
+.fl-sub{font-family:var(--mono); font-size:.74rem; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--faint); margin-bottom:.5rem}
+
+.fl-card{background:var(--fl-surface); border:1px solid var(--fl-line);
+  border-radius:var(--fl-r); padding:1.5rem}
+.fl-card + .fl-card{margin-top:1rem}
+/* Строка длиннее 75 знаков читается заметно хуже: на 1440 без этого
+   ограничения абзац растягивался на всю ширину в 1140 пикселей. */
+.fl-card p, .fl-next p, .fl-head p{max-width:72ch}
+
+/* ---------- формы ---------- */
+.fl-field{display:flex; flex-direction:column; gap:.35rem; margin-bottom:1.1rem}
+.fl-field label{font-size:.85rem; color:var(--muted)}
+.fl-field input, .fl-field select, .fl-field textarea{
+  width:100%; min-height:48px; padding:.7rem .9rem;
+  background:var(--fl-bg); color:var(--text);
+  border:1px solid var(--fl-line); border-radius:var(--fl-r-sm);
+  font-family:var(--body); font-size:16px;
+}
+.fl-field textarea{min-height:120px; resize:vertical; line-height:1.55}
+.fl-field input:focus, .fl-field select:focus, .fl-field textarea:focus{
+  outline:none; border-color:var(--violet)}
+/* Шрифт задаём явно: в styles.css .hint — моноширинная подпись
+   под цифрами, а здесь это обычная поясняющая строка под полем,
+   и моноширинным она читается как машинный вывод. */
+.fl-field .hint{font-family:var(--body); font-size:.82rem; color:var(--faint);
+  letter-spacing:0; text-transform:none}
+.fl-field .err{font-family:var(--body); font-size:.85rem; color:var(--danger)}
+.fl-legend{font-size:.85rem; color:var(--muted); padding:0; margin-bottom:.5rem}
+.fl-field.bad input{border-color:var(--danger)}
+
+/* Поле-ловушка для роботов: человек его не видит и не заполняет.
+   display:none часть ботов пропускает, поэтому уводим за экран. */
+.fl-hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
+
+.fl-alert{padding:.85rem 1rem; border-radius:var(--fl-r-sm); font-size:.92rem;
+  margin-bottom:1.25rem; border-left:3px solid var(--danger);
+  background:rgba(255,154,147,.09)}
+.fl-alert.ok{border-left-color:var(--emerald); background:rgba(63,217,138,.09)}
+.fl-alert p + p{margin-top:.4rem}
+
+.fl-rows{display:flex; flex-direction:column; gap:.75rem}
+@media(min-width:600px){.fl-two{display:grid; grid-template-columns:1fr 1fr; gap:0 1rem}}
+
+/* Ссылки-строки тоже нажимают пальцем, поэтому у них своя высота:
+   строка текста даёт 22 пикселя, а нижняя граница цели — 44. */
+.fl-links{display:flex; flex-wrap:wrap; gap:0 1.25rem; margin-top:.75rem;
+  font-size:.9rem}
+.fl-links a{display:inline-flex; align-items:center; min-height:44px;
+  color:var(--muted)}
+.fl-links a:hover{color:var(--violet)}
+
+/* ---------- пустые состояния ---------- */
+.fl-empty{border:1px dashed var(--fl-line-hi); border-radius:var(--fl-r);
+  padding:2.5rem 1.5rem; text-align:center; color:var(--muted)}
+.fl-empty b{display:block; font-family:var(--display); font-size:1.05rem;
+  color:var(--text); margin-bottom:.4rem}
+.fl-empty .btn{margin-top:1.25rem}
+
+/* ---------- подвал ---------- */
+.fl-foot{border-top:1px solid var(--fl-line); padding:.75rem 1rem 1.5rem;
+  color:var(--faint); font-size:.85rem}
+.fl-foot-in{max-width:1180px; margin:0 auto; display:flex; flex-wrap:wrap;
+  gap:0 1.5rem; align-items:center}
+.fl-foot span{display:inline-flex; align-items:center; min-height:44px}
+.fl-foot a{display:inline-flex; align-items:center; min-height:44px;
+  color:var(--muted)}
+.fl-foot .grow{margin-left:auto}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+</style>
+{% block head_extra %}{% endblock %}
+</head>
+<body>
+<a class="skip" href="#main">Перейти к содержанию</a>
+
+<div class="fl-wrap">
+<header class="fl-top">
+  <div class="fl-top-in">
+    <a class="fl-brand" href="/freelance">
+      <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+        <polygon points="55,6 69,6 59,27 45,27" fill="#B98CF2"/>
+        <polygon points="42,35 75,35 79,55 38,55" fill="#B98CF2"/>
+        <polygon points="34,63 82,63 86,83 30,83" fill="#3FD98A"/>
+      </svg>
+      <b>AVERIX</b> <i>Freelance</i>
+    </a>
+
+    {% if nav %}
+    <nav class="fl-nav" aria-label="Разделы площадки">
+      {% for item in nav %}
+      <a href="{{ item.url }}"{% if page == item.key %} aria-current="page"{% endif %}>{{ item.label }}</a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    <div class="fl-acts">
+      {% if me %}
+      <a class="btn btn-sm btn-ghost" href="/freelance/dashboard">Кабинет</a>
+      <form method="post" action="/freelance/logout">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn-quiet" type="submit">Выйти</button>
+      </form>
+      {% else %}
+      <a class="btn-quiet" href="/freelance/login">Войти</a>
+      <a class="btn btn-sm btn-solid" href="/freelance/register">Регистрация</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+{% block body %}{% endblock %}
+
+<footer class="fl-foot">
+  <div class="fl-foot-in">
+    <span>© {{ year }} AVERIX Freelance</span>
+    <a href="/">Студия AVERIX</a>
+    <span class="grow"></span>
+    <a href="/freelance/studio">Анкета в базу студии</a>
+  </div>
+</footer>
+</div>
+{# Своего скрипта у площадки пока нет: всё, что здесь есть, работает
+   без JS. Появится он тогда, когда появится то, что без него не сделать
+   — и вместе с правилом в nginx, которое разрешит его отдавать. #}
+</body>
+</html>

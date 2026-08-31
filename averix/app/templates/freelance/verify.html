@@ -1,0 +1,23 @@
+{% extends "freelance/base.html" %}
+{% block title %}Подтверждение почты — AVERIX Freelance{% endblock %}
+{% block body %}
+<main id="main" class="fl-main fl-narrow">
+  {% if ok %}
+  <div class="fl-head">
+    <h1>Почта подтверждена</h1>
+    <p>Спасибо. Этот адрес теперь связан с вашим аккаунтом.</p>
+  </div>
+  <a class="btn btn-solid" href="/freelance/dashboard">В кабинет</a>
+  {% else %}
+  <div class="fl-head">
+    <h1>Ссылка не подходит</h1>
+  </div>
+  <div class="fl-empty">
+    <b>Ссылка уже использована или устарела</b>
+    <p>Каждая ссылка срабатывает один раз и живёт двое суток.
+       Новую можно запросить в кабинете.</p>
+    <a class="btn btn-solid" href="/freelance/dashboard">В кабинет</a>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

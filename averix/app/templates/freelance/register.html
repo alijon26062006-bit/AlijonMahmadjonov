@@ -1,0 +1,95 @@
+{% extends "freelance/base.html" %}
+{% block title %}Регистрация — AVERIX Freelance{% endblock %}
+
+{% block head_extra %}
+<style>
+.fl-roles{display:grid; gap:.6rem; margin-bottom:1.1rem}
+@media(min-width:520px){.fl-roles{grid-template-columns:1fr 1fr}}
+.fl-role{display:block; position:relative; border:1px solid var(--fl-line);
+  border-radius:var(--fl-r-sm); padding:1rem; cursor:pointer}
+.fl-role input{position:absolute; opacity:0; width:1px; height:1px}
+.fl-role b{display:block; font-size:.95rem; margin-bottom:.25rem}
+.fl-role span{color:var(--faint); font-size:.85rem}
+.fl-role:hover{border-color:var(--fl-line-hi)}
+.fl-role:has(input:checked){border-color:var(--violet); background:rgba(185,140,242,.07)}
+.fl-role:has(input:focus-visible){outline:2px solid var(--emerald); outline-offset:2px}
+</style>
+{% endblock %}
+
+{% block body %}
+<main id="main" class="fl-main fl-narrow">
+  <div class="fl-head">
+    <h1>Создать аккаунт</h1>
+    <p>Одна учётная запись на человека. Второе лицо — заказчика или
+       специалиста — можно добавить потом, в кабинете.</p>
+  </div>
+
+  {% if alert %}<p class="fl-alert" role="alert">{{ alert }}</p>{% endif %}
+
+  <form class="fl-card" method="post" action="/freelance/register" novalidate>
+    <input type="hidden" name="fc" value="{{ fc }}">
+
+    <div class="fl-hp" aria-hidden="true">
+      <label for="r-site">Не заполняйте это поле</label>
+      <input id="r-site" name="website" type="text" tabindex="-1" autocomplete="off">
+    </div>
+
+    <div class="fl-field{% if errors.name %} bad{% endif %}">
+      <label for="r-name">Имя</label>
+      <input id="r-name" name="name" type="text" autocomplete="name" required
+             maxlength="100" value="{{ old.name or '' }}">
+      {% if errors.name %}<p class="err" role="alert">{{ errors.name }}</p>{% endif %}
+    </div>
+
+    <div class="fl-field{% if errors.email %} bad{% endif %}">
+      <label for="r-email">Почта</label>
+      <input id="r-email" name="email" type="email" autocomplete="email" required
+             maxlength="190" value="{{ old.email or '' }}">
+      {% if errors.email %}<p class="err" role="alert">{{ errors.email }}</p>
+      {% else %}<p class="hint">На неё придёт письмо для подтверждения адреса.</p>{% endif %}
+    </div>
+
+    <div class="fl-field{% if errors.password %} bad{% endif %}">
+      <label for="r-pass">Пароль</label>
+      <input id="r-pass" name="password" type="password" autocomplete="new-password"
+             required minlength="10">
+      {% if errors.password %}<p class="err" role="alert">{{ errors.password }}</p>
+      {% else %}<p class="hint">Не короче 10 символов.</p>{% endif %}
+    </div>
+
+    <div class="fl-field">
+      <label for="r-tg">Telegram <span class="hint">— не обязательно</span></label>
+      <input id="r-tg" name="telegram" type="text" maxlength="120"
+             value="{{ old.telegram or '' }}" placeholder="@username">
+    </div>
+
+    <fieldset style="border:0; padding:0; margin:0 0 .5rem">
+      <legend class="fl-legend">Как вы будете пользоваться AVERIX?</legend>
+      <div class="fl-roles">
+        <label class="fl-role">
+          <input type="radio" name="role" value="client"
+                 {% if old.role == 'client' %}checked{% endif %}>
+          <b>Я заказчик</b>
+          <span>Публиковать проекты и нанимать специалистов</span>
+        </label>
+        <label class="fl-role">
+          <input type="radio" name="role" value="freelancer"
+                 {% if old.role == 'freelancer' %}checked{% endif %}>
+          <b>Я специалист</b>
+          <span>Искать заказы и откликаться на них</span>
+        </label>
+      </div>
+      {% if errors.role %}<p class="err" role="alert">{{ errors.role }}</p>{% endif %}
+      <p class="hint">Второе лицо добавляется в кабинете одной кнопкой.</p>
+    </fieldset>
+
+    <button class="btn btn-solid btn-block" type="submit" style="margin-top:1rem">
+      Создать аккаунт
+    </button>
+  </form>
+
+  <p class="fl-links">
+    <a href="/freelance/login">Уже есть аккаунт — войти</a>
+  </p>
+</main>
+{% endblock %}

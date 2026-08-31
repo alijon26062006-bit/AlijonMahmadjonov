@@ -30,6 +30,32 @@ ADMIN_LOGIN = "tester"
 ADMIN_PASSWORD = "Test-Pass-9137!"
 
 
+TAXONOMY_SQL = ROOT / "app" / "migrations" / "007_taxonomy.sql"
+
+
+def reseed_taxonomy(conn) -> None:
+    """
+    Возвращает справочники к исходному состоянию между тестами.
+
+    Категории и навыки — общие для всех: тест, который сливает
+    дубликаты или выключает категорию, иначе испортил бы данные
+    следующему, и порядок запуска начал бы влиять на результат.
+    Берём те же INSERT, что и миграция, — второго списка не заводим.
+    """
+    conn.execute("DELETE FROM fl_freelancer_skills")
+    conn.execute("DELETE FROM fl_skills")
+    conn.execute("DELETE FROM fl_categories")
+    body = TAXONOMY_SQL.read_text(encoding="utf-8")
+    for chunk in body.split(";"):
+        # Перед оператором в файле стоят комментарии; без их отбрасывания
+        # первый INSERT не опознавался, категории верхнего уровня
+        # не восстанавливались, и подкатегории падали на внешнем ключе
+        statement = "\n".join(line for line in chunk.splitlines()
+                              if not line.strip().startswith("--")).strip()
+        if statement.upper().startswith("INSERT"):
+            conn.execute(statement)
+
+
 @pytest.fixture
 def client():
     with TestClient(app) as c:
@@ -49,6 +75,12 @@ def client():
             conn.execute("DELETE FROM task_history")
             conn.execute("DELETE FROM notifications")
             conn.execute("DELETE FROM admin_log")
+            conn.execute("DELETE FROM user_sessions")
+            conn.execute("DELETE FROM user_tokens")
+            conn.execute("DELETE FROM client_profiles")
+            conn.execute("DELETE FROM fl_rate_events")
+            conn.execute("DELETE FROM users")
+            reseed_taxonomy(conn)
             conn.execute(
                 "INSERT INTO admins (username, password_hash) VALUES (?, ?)",
                 (ADMIN_LOGIN, security.hash_password(ADMIN_PASSWORD)),

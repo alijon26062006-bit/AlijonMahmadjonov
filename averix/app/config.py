@@ -39,6 +39,16 @@ SITE_URL = os.environ.get("AVERIX_SITE_URL", "https://averix.dev").rstrip("/")
 TELEGRAM_TOKEN = os.environ.get("AVERIX_TELEGRAM_TOKEN", "").strip()
 TELEGRAM_CHAT = os.environ.get("AVERIX_TELEGRAM_CHAT", "").strip()
 
+# Почта. Нужна только маркетплейсу: подтверждение адреса и восстановление
+# пароля. Без этих переменных сайт работает как обычно, а восстановление
+# пароля недоступно — притворяться, что письмо ушло, мы не будем.
+SMTP_HOST = os.environ.get("AVERIX_SMTP_HOST", "").strip()
+SMTP_PORT = int(os.environ.get("AVERIX_SMTP_PORT", "587") or 587)
+SMTP_USER = os.environ.get("AVERIX_SMTP_USER", "").strip()
+SMTP_PASSWORD = os.environ.get("AVERIX_SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("AVERIX_SMTP_FROM", "").strip()
+SMTP_TLS = _flag("AVERIX_SMTP_TLS", True)
+
 SESSION_COOKIE = "averix_session"
 SESSION_HOURS = 12
 
