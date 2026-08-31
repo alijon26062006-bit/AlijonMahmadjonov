@@ -56,22 +56,34 @@
 ## Установка
 
 ```bash
-git clone https://github.com/alijon26062006-bit/alijonmahmadjonov.git
-cd alijonmahmadjonov
+git clone https://github.com/alijon26062006-bit/AlijonMahmadjonov.git
+cd AlijonMahmadjonov
+
+# Шрифт с кириллицей для PDF. Под root — без sudo.
+apt install -y fonts-dejavu-core          # Debian / Ubuntu
 
 python3 -m venv .venv
-source .venv/bin/activate          # на Windows: .venv\Scripts\activate
+source .venv/bin/activate                 # на Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 cp .env.example .env
-nano .env                          # вписать три ключа и свой id
+nano .env                                 # вписать три ключа и свой id
 ```
 
-Нужен шрифт с кириллицей для PDF (на большинстве серверов уже стоит):
+### Проверить, что всё встало
+
+Это стоит сделать до того, как заводить ключи — тогда сразу видно, где проблема:
 
 ```bash
-sudo apt install fonts-dejavu-core     # Debian / Ubuntu
+python -c "import bot.main; print('бот на месте')"
+python -m bot.main
 ```
+
+Вторая команда должна ответить `Ошибка настройки: Не заданы обязательные настройки: ...`
+— это правильно, значит код на месте, осталось заполнить `.env`.
+
+Если вместо этого видишь `No module named 'bot'` — ты не в той папке. Проверь `pwd`:
+нужно быть внутри `AlijonMahmadjonov`, а не в домашней папке.
 
 ## Запуск
 
@@ -92,9 +104,9 @@ After=network-online.target
 
 [Service]
 Type=simple
-User=alijon
-WorkingDirectory=/home/alijon/alijonmahmadjonov
-ExecStart=/home/alijon/alijonmahmadjonov/.venv/bin/python -m bot.main
+User=root
+WorkingDirectory=/root/AlijonMahmadjonov
+ExecStart=/root/AlijonMahmadjonov/.venv/bin/python -m bot.main
 Restart=always
 RestartSec=10
 
@@ -102,17 +114,34 @@ RestartSec=10
 WantedBy=multi-user.target
 ```
 
+Если бот стоит в другом месте или работает под другим пользователем — поменяй эти
+три строки: `User`, `WorkingDirectory` и `ExecStart`.
+
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now moneybot
-sudo journalctl -u moneybot -f      # смотреть логи
+systemctl daemon-reload
+systemctl enable --now moneybot
+systemctl status moneybot           # работает или нет
+journalctl -u moneybot -f           # смотреть логи вживую
 ```
+
+## Обновление
+
+Когда в коде что-то поменяется:
+
+```bash
+cd /root/AlijonMahmadjonov
+git pull
+source .venv/bin/activate && pip install -r requirements.txt
+systemctl restart moneybot          # если настроен автозапуск
+```
+
+Папка `data/` при обновлении не трогается — все записи и накладные остаются на месте.
 
 ## Проверка без Telegram
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -q                    # 76 тестов, без сети и без ключей
+pytest -q                    # 100 тестов, без сети и без ключей
 python -m bot.selftest       # прогнать реальные фразы через Claude (нужен ANTHROPIC_API_KEY)
 python -m bot.selftest --keep "отправил Салиму 200 сомони"   # разобрать одну фразу
 ```
