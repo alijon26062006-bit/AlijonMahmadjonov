@@ -1,0 +1,74 @@
+{% extends "admin/base.html" %}
+{% block title %}Категории площадки{% endblock %}
+{% block body %}
+{% with page = 'freelance' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar"><h1>Категории</h1></div>
+  {% include "admin/_fl_top.html" %}
+
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+  <p class="hint" style="margin-bottom:1.5rem">
+    Два уровня: направление и внутри него специализация. Категорию
+    не удаляют, а выключают — на неё уже могут ссылаться профили
+    и проекты, и удаление порвало бы связи.
+  </p>
+
+  {% for top in tree %}
+  <div class="list" style="margin-bottom:1rem">
+    <article class="row">
+      <div>
+        <div class="name">{{ top.name }}</div>
+        <div class="meta">/{{ top.slug }}{% if not top.enabled %} · выключена{% endif %}</div>
+      </div>
+      <div class="acts">
+        <form method="post" action="/admin/freelance/categories/{{ top.id }}/toggle"
+              {% if top.enabled %}data-confirm="Выключить «{{ top.name }}»? Подкатегории тоже выключатся."{% endif %}>
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="mini" type="submit">{{ 'Выключить' if top.enabled else 'Включить' }}</button>
+        </form>
+      </div>
+    </article>
+
+    {% for child in top.children %}
+    <article class="row">
+      <div>
+        <div class="name" style="padding-left:1.5rem">— {{ child.name }}</div>
+        <div class="meta" style="padding-left:1.5rem">/{{ child.slug }}{% if not child.enabled %} · выключена{% endif %}</div>
+      </div>
+      <div class="acts">
+        <form method="post" action="/admin/freelance/categories/{{ child.id }}/toggle">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="mini" type="submit">{{ 'Выключить' if child.enabled else 'Включить' }}</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <h2 class="group">Добавить категорию</h2>
+  <form class="card" method="post" action="/admin/freelance/categories">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grid2">
+      <div class="field">
+        <label for="c-name">Название</label>
+        <input id="c-name" name="name" type="text" maxlength="80" required>
+      </div>
+      <div class="field">
+        <label for="c-parent">Внутри направления</label>
+        <select id="c-parent" name="parent_id">
+          <option value="">— это направление верхнего уровня</option>
+          {% for t in tops %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="c-sort">Порядок</label>
+      <input id="c-sort" name="sort_order" type="number" value="0" min="0" max="999">
+    </div>
+    <button type="submit">Добавить</button>
+  </form>
+</main>
+{% endblock %}

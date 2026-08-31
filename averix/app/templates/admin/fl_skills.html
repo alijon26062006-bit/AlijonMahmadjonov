@@ -1,0 +1,130 @@
+{% extends "admin/base.html" %}
+{% block title %}Навыки площадки{% endblock %}
+{% block body %}
+{% with page = 'freelance' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar"><h1>Навыки</h1></div>
+  {% include "admin/_fl_top.html" %}
+
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+  <p class="hint" style="margin-bottom:1rem">
+    Навык опознаётся по адресу, а не по написанию: React, react и REACT —
+    одна строка. Разные написания вроде «React.js» сливаются вручную,
+    и навыки специалистов при этом переезжают на конечный.
+  </p>
+
+  <form class="filters" method="get" action="/admin/freelance/skills" style="margin-bottom:1rem">
+    <input name="q" type="search" value="{{ q }}" placeholder="Поиск по названию"
+           maxlength="60" aria-label="Поиск навыка">
+    <select name="status" aria-label="Статус">
+      <option value="">Все</option>
+      {% for key, label in statuses.items() %}
+      <option value="{{ key }}"{% if status == key %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button class="mini" type="submit">Показать</button>
+  </form>
+
+  {% if pending %}
+  <p class="alert" role="status">
+    Ждут проверки: {{ pending }}. Такой навык уже работает в анкете,
+    но в фильтрах каталога не показывается.
+  </p>
+  {% endif %}
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Навык</th><th>Адрес</th><th>Людей</th><th>Статус</th><th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in skills %}
+        <tr>
+          <td>
+            <form method="post" action="/admin/freelance/skills/{{ s.id }}/rename"
+                  style="display:flex; gap:.4rem; align-items:center">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <input name="name" type="text" value="{{ s.name }}" maxlength="60"
+                     aria-label="Название навыка" style="min-width:140px">
+              <button class="mini" type="submit">Переименовать</button>
+            </form>
+          </td>
+          <td class="num">{{ s.slug }}</td>
+          <td class="num">{{ s.people }}</td>
+          <td>{{ statuses.get(s.status, s.status) }}</td>
+          <td>
+            <div class="acts">
+              {% for key, label in statuses.items() %}
+              {% if key != s.status %}
+              <form method="post" action="/admin/freelance/skills/{{ s.id }}/status">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <input type="hidden" name="status" value="{{ key }}">
+                <input type="hidden" name="q" value="{{ q }}">
+                <input type="hidden" name="back_status" value="{{ status }}">
+                <button class="mini" type="submit">{{ label }}</button>
+              </form>
+              {% endif %}
+              {% endfor %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">Ничего не найдено.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="group">Добавить навык</h2>
+  <form class="card" method="post" action="/admin/freelance/skills">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grid2">
+      <div class="field">
+        <label for="s-name">Название</label>
+        <input id="s-name" name="name" type="text" maxlength="60" required>
+      </div>
+      <div class="field">
+        <label for="s-cat">Направление</label>
+        <select id="s-cat" name="category_id">
+          <option value="">— без направления</option>
+          {% for c in categories %}
+          <option value="{{ c.id }}">{% if c.parent_id %}— {% endif %}{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <button type="submit">Добавить</button>
+  </form>
+
+  <h2 class="group">Слить дубликаты</h2>
+  <form class="card" method="post" action="/admin/freelance/skills/merge"
+        data-confirm="Слить навыки? Люди с первым получат второй, первый скроется.">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grid2">
+      <div class="field">
+        <label for="m-from">Что сливаем</label>
+        <select id="m-from" name="source_id" required>
+          <option value="">— выберите</option>
+          {% for s in skills %}
+          <option value="{{ s.id }}">{{ s.name }} ({{ s.people }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="m-to">Во что</label>
+        <select id="m-to" name="target_id" required>
+          <option value="">— выберите</option>
+          {% for s in active_skills %}
+          <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <button type="submit">Слить</button>
+  </form>
+</main>
+{% endblock %}

@@ -1,0 +1,10 @@
+{# Подшапка раздела Freelance. Разделов у площадки много, и в общей
+   строке навигации панели они бы её переполнили — поэтому свой уровень. #}
+<nav class="filters" aria-label="Разделы площадки" style="margin-bottom:1.5rem">
+  <a class="chip{% if sub == 'hub' %} on{% endif %}" href="/admin/freelance"
+     {% if sub == 'hub' %}aria-current="true"{% endif %}>Обзор</a>
+  <a class="chip{% if sub == 'categories' %} on{% endif %}" href="/admin/freelance/categories"
+     {% if sub == 'categories' %}aria-current="true"{% endif %}>Категории</a>
+  <a class="chip{% if sub == 'skills' %} on{% endif %}" href="/admin/freelance/skills"
+     {% if sub == 'skills' %}aria-current="true"{% endif %}>Навыки</a>
+</nav>

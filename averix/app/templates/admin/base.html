@@ -71,8 +71,12 @@ h1,h2{margin:0;letter-spacing:-.02em;text-wrap:balance}
 
 /* формы */
 label{display:block;font-size:.84rem;color:var(--muted);margin-bottom:.4rem}
+/* Перечень типов, а не просто input: голый селектор задел бы и чекбоксы
+   с радиокнопками. Каждый новый тип нужно добавлять сюда — забытый
+   type=search отрисовался высотой 21 пиксель вместо 48. */
 input[type=text],input[type=password],input[type=email],input[type=url],
-input[type=date],input[type=number],input[type=tel]{width:100%;min-height:48px;padding:.7rem .9rem;
+input[type=date],input[type=number],input[type=tel],input[type=search]{
+  width:100%;min-height:48px;padding:.7rem .9rem;
   background:var(--void);color:var(--text);border:1px solid var(--line-hi);
   border-radius:10px;font-family:var(--body);font-size:16px;transition:border-color var(--t)}
 input:focus{border-color:var(--violet);outline-offset:1px}

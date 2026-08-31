@@ -1,0 +1,54 @@
+{% extends "admin/base.html" %}
+{% block title %}Freelance{% endblock %}
+{% block body %}
+{% with page = 'freelance' %}{% include "admin/_top.html" %}{% endwith %}
+
+<main class="wrap">
+  <div class="bar"><h1>AVERIX Freelance</h1></div>
+  {% include "admin/_fl_top.html" %}
+
+  {# Все числа считаются запросом к базе. Ни одного нарисованного:
+     пустая площадка должна показывать нули, а не «1 200 специалистов». #}
+  <div class="stats">
+    <div><b>{{ counts.users }}</b><span>учётных записей</span></div>
+    <div><b>{{ counts.clients }}</b><span>заказчиков</span></div>
+    <div><b>{{ counts.freelancers }}</b><span>специалистов на площадке</span></div>
+    <div><b>{{ counts.categories }}</b><span>категорий</span></div>
+    <div><b>{{ counts.skills }}</b><span>навыков в справочнике</span></div>
+    <div><b>{{ counts.skills_pending }}</b><span>навыков ждут проверки</span></div>
+  </div>
+
+  {% if counts.skills_pending %}
+  <p class="alert" role="status" style="margin-top:1.5rem">
+    Новые навыки от пользователей ждут проверки: {{ counts.skills_pending }}.
+    Пока они не проверены, в фильтрах каталога их нет.
+    <a href="/admin/freelance/skills?status=pending">Посмотреть</a>
+  </p>
+  {% endif %}
+
+  <h2 class="group">Что где</h2>
+  <div class="list">
+    <article class="row">
+      <div>
+        <div class="name">Специалисты студии — отдельно</div>
+        <div class="meta">
+          {{ counts.studio_people }} анкет в закрытой базе. Они не имеют
+          отношения к площадке и на сайт не выводятся.
+        </div>
+      </div>
+      <div class="acts">
+        <a href="/admin/freelancers"><button class="mini" type="button">К анкетам студии</button></a>
+      </div>
+    </article>
+    <article class="row">
+      <div>
+        <div class="name">Деньги площадка не проводит</div>
+        <div class="meta">
+          Платёжного провайдера в проекте нет. Цена и сроки фиксируются
+          в договорённости, рассчитываются стороны сами.
+        </div>
+      </div>
+    </article>
+  </div>
+</main>
+{% endblock %}

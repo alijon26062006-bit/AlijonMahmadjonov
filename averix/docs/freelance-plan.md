@@ -153,17 +153,27 @@ notifications, admin_log, schema_migrations
 плавающего. Валюта настраивается в админке (`freelance_currency`).
 
 ```
-006_users.sql
+006_users.sql                                          ✔ сделано
   users(id, email UNIQUE NOCASE, password_hash, telegram, status,
-        email_verified, created_at, updated_at, last_seen_at)
+        email_verified, suspend_reason, created_at, updated_at, last_seen_at)
   user_sessions(token_hash PK, user_id, csrf_token, created_at,
         expires_at, ip, user_agent)
-  password_resets(token_hash PK, user_id, expires_at, used_at, created_at)
+  user_tokens(token_hash PK, user_id, kind, expires_at, used_at, created_at)
   client_profiles(id, user_id UNIQUE, display_name, about, location,
         avatar, created_at, updated_at)
-  ALTER freelancers: user_id, title, category_id, experience_level,
-        listing, public_slug, published_at, source
+  fl_rate_events(id, ip, kind, created_at)
+  ALTER freelancers: user_id
   UNIQUE INDEX freelancers(user_id) WHERE user_id IS NOT NULL
+
+  Колонки профиля специалиста (title, category_id, experience_level,
+  listing, public_slug, published_at) перенесены в фазу 3: category_id
+  ссылается на fl_categories, а этой таблицы в 006 ещё нет.
+
+007_taxonomy.sql                                       ✔ сделано
+  fl_categories(id, parent_id, name, slug UNIQUE, sort_order, enabled)
+  fl_skills(id, name, slug UNIQUE, category_id, status, merged_into_id)
+  fl_freelancer_skills(freelancer_id, skill_id) PK обе
+  Управление — /admin/freelance/categories и /admin/freelance/skills
 
 007_taxonomy.sql
   fl_categories(id, parent_id, name, slug UNIQUE, sort_order, enabled)
