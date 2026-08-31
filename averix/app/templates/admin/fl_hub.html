@@ -13,10 +13,20 @@
     <div><b>{{ counts.users }}</b><span>учётных записей</span></div>
     <div><b>{{ counts.clients }}</b><span>заказчиков</span></div>
     <div><b>{{ counts.freelancers }}</b><span>специалистов на площадке</span></div>
+    <div><b>{{ counts.published }}</b><span>профилей в каталоге</span></div>
+    <div><b>{{ counts.listing_pending }}</b><span>ждут проверки профиля</span></div>
     <div><b>{{ counts.categories }}</b><span>категорий</span></div>
     <div><b>{{ counts.skills }}</b><span>навыков в справочнике</span></div>
     <div><b>{{ counts.skills_pending }}</b><span>навыков ждут проверки</span></div>
   </div>
+
+  {% if counts.listing_pending %}
+  <p class="alert" role="status" style="margin-top:1.5rem">
+    Профилей ждут проверки: {{ counts.listing_pending }}. Пока профиль
+    не проверен, в каталоге его нет.
+    <a href="/admin/freelance/specialists?listing=pending">Посмотреть</a>
+  </p>
+  {% endif %}
 
   {% if counts.skills_pending %}
   <p class="alert" role="status" style="margin-top:1.5rem">

@@ -1,0 +1,78 @@
+{% extends "freelance/base.html" %}
+{% block title %}Условия и занятость — AVERIX Freelance{% endblock %}
+{% block body %}
+<main id="main" class="fl-main fl-narrow">
+  <div class="fl-head">
+    <p class="fl-sub">Профиль · шаг 4 из 5</p>
+    <h1>Условия и занятость</h1>
+    <p>Цена не обязательна, но профиль без неё смотрят реже: заказчику
+       приходится спрашивать вместо того, чтобы решать.</p>
+  </div>
+
+  {% include "freelance/_stepnav.html" %}
+  {% if error %}<p class="fl-alert" role="alert">{{ error }}</p>{% endif %}
+
+  <form class="fl-card" method="post" action="/freelance/profile/terms" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="fl-two">
+      <div class="fl-field">
+        <label for="t-hour">Ставка за час, {{ currency }}</label>
+        <input id="t-hour" name="rate_hour" type="text" maxlength="20" inputmode="decimal"
+               value="{{ person.rate_hour_text }}" placeholder="не обязательно">
+      </div>
+      <div class="fl-field">
+        <label for="t-project">Минимальная цена проекта, {{ currency }}</label>
+        <input id="t-project" name="rate_project" type="text" maxlength="20"
+               inputmode="decimal" value="{{ person.rate_project_text }}"
+               placeholder="не обязательно">
+      </div>
+    </div>
+
+    <div class="fl-field">
+      <label for="t-busy">Занятость сейчас</label>
+      <select id="t-busy" name="availability">
+        {% for key, label in availability.items() %}
+        <option value="{{ key }}"{% if person.availability == key %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="hint">В каталоге свободные показываются первыми.</p>
+    </div>
+
+    <h2 style="font-size:1rem; margin:1.5rem 0 .75rem">Связь</h2>
+    <p class="hint" style="margin-bottom:1rem">
+      Эти поля <b>не показываются</b> в каталоге. Заказчик пишет вам через
+      площадку, а вы уже отвечаете напрямую — так адрес не попадает
+      к сборщикам почты.
+    </p>
+
+    <div class="fl-two">
+      <div class="fl-field">
+        <label for="t-tg">Telegram</label>
+        <input id="t-tg" name="telegram" type="text" maxlength="120"
+               value="{{ person.telegram or '' }}" placeholder="@username">
+      </div>
+      <div class="fl-field">
+        <label for="t-email">Почта для связи</label>
+        <input id="t-email" name="email" type="email" maxlength="120"
+               value="{{ person.email or '' }}">
+      </div>
+    </div>
+
+    <div class="fl-two">
+      <div class="fl-field">
+        <label for="t-portfolio">Сайт с работами</label>
+        <input id="t-portfolio" name="portfolio_url" type="url" maxlength="300"
+               value="{{ person.portfolio_url or '' }}" placeholder="https://">
+      </div>
+      <div class="fl-field">
+        <label for="t-github">GitHub</label>
+        <input id="t-github" name="github_url" type="url" maxlength="300"
+               value="{{ person.github_url or '' }}" placeholder="https://github.com/">
+      </div>
+    </div>
+
+    <button class="btn btn-solid" type="submit">Сохранить и дальше</button>
+  </form>
+</main>
+{% endblock %}

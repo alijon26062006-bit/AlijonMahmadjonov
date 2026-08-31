@@ -1,0 +1,155 @@
+{% extends "freelance/base.html" %}
+{% block title %}Специалисты — AVERIX Freelance{% endblock %}
+{% block description %}Каталог специалистов AVERIX Freelance: разработчики, дизайнеры, тестировщики. Поиск по направлению, навыкам и занятости.{% endblock %}
+{% block robots %}{% endblock %}
+
+{% block body %}
+<main id="main" class="fl-main">
+  <div class="fl-head">
+    <h1>Специалисты</h1>
+    <p>
+      {% if facets.total %}
+      В каталоге {{ facets.total }} {{ people_word }}.
+      Каждый профиль заполнил сам его владелец, и каждый перед публикацией
+      посмотрел человек из студии.
+      {% else %}
+      Здесь будут профили специалистов площадки.
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="fl-layout">
+    <aside class="fl-side">
+      <div>
+        <h2>Направление</h2>
+        <a href="/freelance/specialists"{% if not cat %} aria-current="true"{% endif %}>
+          Все <span class="n">{{ facets.total }}</span>
+        </a>
+        {% for top in tree %}
+        <a href="/freelance/specialists?cat={{ top.id }}"
+           {% if cat == top.id|string %} aria-current="true"{% endif %}>
+          {{ top.name }} <span class="n">{{ top.count }}</span>
+        </a>
+        {% for child in top.children %}
+        <a class="sub" href="/freelance/specialists?cat={{ child.id }}"
+           {% if cat == child.id|string %} aria-current="true"{% endif %}>
+          {{ child.name }} <span class="n">{{ child.count }}</span>
+        </a>
+        {% endfor %}
+        {% endfor %}
+      </div>
+
+      <div>
+        <h2>Занятость</h2>
+        <a href="/freelance/specialists?busy=available{% if cat %}&cat={{ cat }}{% endif %}"
+           {% if busy == 'available' %} aria-current="true"{% endif %}>Свободен</a>
+        <a href="/freelance/specialists?busy=partially_busy{% if cat %}&cat={{ cat }}{% endif %}"
+           {% if busy == 'partially_busy' %} aria-current="true"{% endif %}>Частично занят</a>
+      </div>
+
+      <div>
+        <h2>Уровень</h2>
+        {% for key, label in levels.items() %}
+        <a href="/freelance/specialists?level={{ key }}{% if cat %}&cat={{ cat }}{% endif %}"
+           {% if level == key %} aria-current="true"{% endif %}>{{ label }}</a>
+        {% endfor %}
+      </div>
+
+      {% if cat or level or busy or q or skill %}
+      <div><a href="/freelance/specialists">Сбросить фильтры</a></div>
+      {% endif %}
+    </aside>
+
+    <div>
+      <form class="fl-search" method="get" action="/freelance/specialists" role="search">
+        {% if cat %}<input type="hidden" name="cat" value="{{ cat }}">{% endif %}
+        {% if level %}<input type="hidden" name="level" value="{{ level }}">{% endif %}
+        {% if busy %}<input type="hidden" name="busy" value="{{ busy }}">{% endif %}
+        <label class="sr" for="cat-q">Поиск по каталогу</label>
+        <input id="cat-q" name="q" type="search" value="{{ q }}" maxlength="80"
+               placeholder="Имя, профессия, технология или город">
+        <button class="btn btn-solid" type="submit">Найти</button>
+      </form>
+
+      {% if chosen_skill %}
+      <p class="fl-links" style="margin-top:0">
+        Навык: <b>{{ chosen_skill.name }}</b> ·
+        <a href="/freelance/specialists">убрать</a>
+      </p>
+      {% endif %}
+
+      {% if result.people %}
+      <div class="fl-grid">
+        {% for p in result.people %}
+        <article class="fl-person">
+          <div class="fl-person-top">
+            {% if p.photo %}
+            <img class="fl-ava" src="/uploads/{{ p.photo }}" alt=""
+                 width="52" height="52" loading="lazy" decoding="async">
+            {% else %}
+            <span class="fl-ava fl-ava-none" aria-hidden="true">{{ p.name[:1] }}</span>
+            {% endif %}
+            <div>
+              <h3><a href="/freelance/specialists/{{ p.public_slug }}">{{ p.name }}</a></h3>
+              {% if p.title %}<p class="role">{{ p.title }}</p>{% endif %}
+            </div>
+          </div>
+
+          <p class="line">
+            <span class="fl-dot {{ 'free' if p.availability == 'available' else 'part' if p.availability == 'partially_busy' else '' }}">
+              {{ 'Свободен' if p.availability == 'available' else 'Частично занят' if p.availability == 'partially_busy' else 'Занят' }}
+            </span>
+            {% if p.level_label %} · {{ p.level_label }}{% endif %}
+            {% if p.city %} · {{ p.city }}{% endif %}
+          </p>
+
+          {% if p.rate_hour_text or p.rate_project_text %}
+          <p class="line">
+            {% if p.rate_hour_text %}{{ p.rate_hour_text }} {{ currency }}/час{% endif %}
+            {% if p.rate_hour_text and p.rate_project_text %} · {% endif %}
+            {% if p.rate_project_text %}от {{ p.rate_project_text }} {{ currency }} за проект{% endif %}
+          </p>
+          {% endif %}
+
+          {% if p.skills %}
+          <div class="fl-chips">
+            {% for s in p.skills %}<span class="fl-chip">{{ s.name }}</span>{% endfor %}
+          </div>
+          {% endif %}
+        </article>
+        {% endfor %}
+      </div>
+
+      {% if result.pages > 1 %}
+      <nav class="fl-pager" aria-label="Страницы каталога">
+        {% for n in range(1, result.pages + 1) %}
+        {% if n == result.page %}
+        <span class="on" aria-current="page">{{ n }}</span>
+        {% else %}
+        <a href="?page={{ n }}{% if q %}&q={{ q }}{% endif %}{% if cat %}&cat={{ cat }}{% endif %}{% if level %}&level={{ level }}{% endif %}{% if busy %}&busy={{ busy }}{% endif %}">{{ n }}</a>
+        {% endif %}
+        {% endfor %}
+      </nav>
+      {% endif %}
+
+      {% elif facets.total %}
+      <div class="fl-empty">
+        <b>Никого не нашли</b>
+        <p>По этому запросу совпадений нет. Попробуйте другое слово
+           или сбросьте фильтры.</p>
+        <a class="btn btn-solid" href="/freelance/specialists">Показать всех</a>
+      </div>
+
+      {% else %}
+      <div class="fl-empty">
+        <b>Каталог пока пуст</b>
+        <p>Профилей, прошедших проверку, ещё нет. Мы не станем показывать
+           здесь выдуманных людей ради вида — как появятся настоящие,
+           они тут и будут.</p>
+        <a class="btn btn-solid" href="/freelance/register">Стать специалистом</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</main>
+{% endblock %}

@@ -27,6 +27,7 @@ ACTIONS = {
     "TASK_CHANGED": "Задача изменена",
     "SETTINGS_CHANGED": "Настройки изменены",
     "FL_TAXONOMY_CHANGED": "Справочник площадки изменён",
+    "FL_LISTING_CHANGED": "Публикация профиля изменена",
 }
 
 

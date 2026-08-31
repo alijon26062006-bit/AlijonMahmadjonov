@@ -1,0 +1,54 @@
+{% extends "freelance/base.html" %}
+{% block title %}Опыт — AVERIX Freelance{% endblock %}
+{% block body %}
+<main id="main" class="fl-main fl-narrow">
+  <div class="fl-head">
+    <p class="fl-sub">Профиль · шаг 3 из 5</p>
+    <h1>Опыт</h1>
+    <p>Это самая читаемая часть карточки. Заказчик решает по ней, писать вам
+       или листать дальше.</p>
+  </div>
+
+  {% include "freelance/_stepnav.html" %}
+  {% if error %}<p class="fl-alert" role="alert">{{ error }}</p>{% endif %}
+
+  <form class="fl-card" method="post" action="/freelance/profile/experience" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="fl-two">
+      <div class="fl-field">
+        <label for="e-level">Уровень</label>
+        <select id="e-level" name="level">
+          {% for key, label in levels.items() %}
+          <option value="{{ key }}"{% if person.level == key %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="fl-field">
+        <label for="e-years">Лет опыта</label>
+        <input id="e-years" name="years" type="text" maxlength="40" inputmode="numeric"
+               value="{{ person.years or '' }}" placeholder="3">
+      </div>
+    </div>
+
+    <div class="fl-field">
+      <label for="e-where">Где работали</label>
+      <input id="e-where" name="experience" type="text" maxlength="500"
+             value="{{ person.experience or '' }}"
+             placeholder="Студия «Пример», фриланс, свои проекты">
+    </div>
+
+    <div class="fl-field">
+      <label for="e-about">О себе</label>
+      <textarea id="e-about" name="about" rows="7" maxlength="3000"
+                placeholder="Что вы делаете, какие задачи любите, как работаете с заказчиком">{{ person.about or '' }}</textarea>
+      <p class="hint">
+        Хотя бы 120 символов — примерно две строки.
+        Сейчас: {{ (person.about or '')|length }}.
+      </p>
+    </div>
+
+    <button class="btn btn-solid" type="submit">Сохранить и дальше</button>
+  </form>
+</main>
+{% endblock %}

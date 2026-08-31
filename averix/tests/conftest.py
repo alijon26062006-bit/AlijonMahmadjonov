@@ -79,6 +79,8 @@ def client():
             conn.execute("DELETE FROM user_tokens")
             conn.execute("DELETE FROM client_profiles")
             conn.execute("DELETE FROM fl_rate_events")
+            conn.execute("DELETE FROM fl_portfolio_images")
+            conn.execute("DELETE FROM fl_portfolio")
             conn.execute("DELETE FROM users")
             reseed_taxonomy(conn)
             conn.execute(

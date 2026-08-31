@@ -1,0 +1,102 @@
+{% extends "freelance/base.html" %}
+{% block title %}Профиль специалиста — AVERIX Freelance{% endblock %}
+{% block body %}
+<main id="main" class="fl-main">
+  <div class="fl-head">
+    <p class="fl-sub">Профиль специалиста</p>
+    <h1>{{ person.name }}</h1>
+    {% if person.title %}<p>{{ person.title }}</p>{% endif %}
+  </div>
+
+  {% if error %}<p class="fl-alert" role="alert">{{ error }}</p>{% endif %}
+  {% if note == 'sent' %}
+  <p class="fl-alert ok" role="status">
+    Профиль отправлен на проверку. Как только его посмотрит человек
+    из студии, он появится в каталоге.
+  </p>
+  {% elif note == 'hidden' %}
+  <p class="fl-alert ok" role="status">Профиль убран из каталога.</p>
+  {% endif %}
+
+  <div class="fl-progress">
+    <div class="fl-progress-bar" role="img"
+         aria-label="Профиль заполнен на {{ state.percent }} процентов">
+      <i style="width:{{ state.percent }}%"></i>
+    </div>
+    <p>Профиль заполнен на {{ state.percent }}%{% if state.missing %} — осталось: {{ state.missing|join(', ')|lower }}{% endif %}</p>
+  </div>
+
+  {% include "freelance/_stepnav.html" %}
+
+  <div class="fl-next">
+    <div>
+      <h2>Показ в каталоге</h2>
+      {% if person.listing == 'published' %}
+      <p>Профиль виден в каталоге:
+         <a href="/freelance/specialists/{{ person.public_slug }}">открыть карточку</a>.
+         Убрать его можно в любой момент и без объяснений.</p>
+      <form method="post" action="/freelance/profile/publish">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="wanted" value="0">
+        <button class="btn btn-sm btn-line btn-ghost" type="submit">Убрать из каталога</button>
+      </form>
+
+      {% elif person.listing == 'pending' %}
+      <p>Профиль ждёт проверки. Это делает человек, а не робот, поэтому
+         может занять день. Пока он не проверен, в каталоге его нет.</p>
+      <form method="post" action="/freelance/profile/publish">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="wanted" value="0">
+        <button class="btn btn-sm btn-line btn-ghost" type="submit">Отозвать заявку</button>
+      </form>
+
+      {% elif person.listing == 'rejected' %}
+      <p>Студия отказала в публикации.
+         {% if person.admin_note %}Причина: {{ person.admin_note }}{% endif %}
+         Поправьте профиль и попросите проверку заново.</p>
+      <form method="post" action="/freelance/profile/publish">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="wanted" value="1">
+        <button class="btn btn-sm btn-solid" type="submit">Отправить на проверку</button>
+      </form>
+
+      {% else %}
+        {% if blockers %}
+        <p>Пока профиля нет в каталоге. Чтобы отправить его на проверку,
+           заполните: {{ blockers|join(', ')|lower }}.</p>
+        {% else %}
+        <p>Профиль готов. Отправьте его на проверку — после неё он появится
+           в каталоге, и заказчики смогут вас найти.</p>
+        <form method="post" action="/freelance/profile/publish">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="wanted" value="1">
+          <button class="btn btn-sm btn-solid" type="submit">Отправить на проверку</button>
+        </form>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <div>
+      <h2>Что видно в каталоге</h2>
+      <p>Имя, профессия, направление, навыки, опыт, город, занятость,
+         ставка и портфолио — то, что вы заполнили сами.</p>
+      <p style="margin-top:.4rem">Почта и Telegram в каталоге
+         <b>не показываются</b>. Заказчик пишет через площадку, а отвечаете
+         вы сами и уже напрямую.</p>
+    </div>
+
+    <div>
+      <h2>Заполненность</h2>
+      <ul class="fl-check">
+        {% for key, label in checklist %}
+        <li>
+          {% if state.done[key] %}<b aria-hidden="true">✓</b>{% else %}<span class="no" aria-hidden="true">—</span>{% endif %}
+          {{ label }}
+          <span class="sr">— {{ 'заполнено' if state.done[key] else 'не заполнено' }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</main>
+{% endblock %}

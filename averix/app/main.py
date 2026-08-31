@@ -55,7 +55,11 @@ from .routes_admin_work import router as work_router  # noqa: E402
 from .routes_freelancer import router as freelancer_router  # noqa: E402
 from .routes_freelance import router as freelance_router  # noqa: E402
 from .routes_admin_freelance import router as admin_freelance_router  # noqa: E402
+from .routes_fl_profile import router as fl_profile_router  # noqa: E402
+from .routes_fl_public import router as fl_public_router  # noqa: E402
 app.include_router(admin_freelance_router)
+app.include_router(fl_profile_router)
+app.include_router(fl_public_router)
 app.include_router(public_router)
 app.include_router(studio_router)
 app.include_router(work_router)

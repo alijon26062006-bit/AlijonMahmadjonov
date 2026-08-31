@@ -1,0 +1,41 @@
+{% extends "freelance/base.html" %}
+{% block title %}Портфолио — AVERIX Freelance{% endblock %}
+{% block body %}
+<main id="main" class="fl-main">
+  <div class="fl-head">
+    <p class="fl-sub">Профиль · шаг 5 из 5</p>
+    <h1>Портфолио</h1>
+    <p>Одна показанная работа убеждает сильнее, чем абзац о себе.
+       Хватит и двух — главное, чтобы они были ваши.</p>
+  </div>
+
+  {% include "freelance/_stepnav.html" %}
+  {% if error %}<p class="fl-alert" role="alert">{{ error }}</p>{% endif %}
+
+  {% if items %}
+  <div class="fl-grid" style="margin-bottom:1.5rem">
+    {% for item in items %}
+    <article class="fl-person">
+      <h3><a href="/freelance/profile/portfolio/{{ item.id }}">{{ item.title }}</a></h3>
+      {% if item.tech %}<p class="line">{{ item.tech }}</p>{% endif %}
+      <p class="line">{{ item.images|length }} картинок</p>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="fl-empty" style="margin-bottom:1.5rem">
+    <b>Работ пока нет</b>
+    <p>Добавьте хотя бы одну — с названием, парой слов о задаче и снимком.</p>
+  </div>
+  {% endif %}
+
+  <div style="display:flex; gap:.6rem; flex-wrap:wrap">
+    {% if items|length < limit %}
+    <a class="btn btn-solid" href="/freelance/profile/portfolio/new">Добавить работу</a>
+    {% else %}
+    <p class="hint">Больше {{ limit }} работ добавить нельзя.</p>
+    {% endif %}
+    <a class="btn btn-line btn-ghost" href="/freelance/profile">К профилю</a>
+  </div>
+</main>
+{% endblock %}
