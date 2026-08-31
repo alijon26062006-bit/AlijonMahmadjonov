@@ -53,14 +53,57 @@
 И свой Telegram id — узнать у [@userinfobot](https://t.me/userinfobot).
 **Бот отвечает только этому id**, иначе посторонние потратят твои ключи и увидят твои деньги.
 
-## Установка
+## Установка — одна команда
+
+```bash
+git clone https://github.com/alijon26062006-bit/AlijonMahmadjonov.git && cd AlijonMahmadjonov && bash setup.sh
+```
+
+Дальше мастер сам:
+
+1. поставит Python-окружение, зависимости и шрифт для кириллицы;
+2. спросит **токен бота** — и сразу проверит его, назвав имя твоего бота;
+3. **сам определит твой Telegram id** — просто напишешь боту любое сообщение,
+   искать id у @userinfobot не надо;
+4. спросит **ключ OpenAI** и **ключ Anthropic** — каждый проверит на месте
+   и скажет отдельно, если ключ неверный, и отдельно — если на счёте нет денег;
+5. предложит настроить автозапуск, чтобы бот сам поднимался после перезагрузки;
+6. запустит бота.
+
+Ключи нужно приготовить заранее:
+
+| Что | Где взять |
+|---|---|
+| Токен бота | [@BotFather](https://t.me/BotFather) → `/newbot` |
+| Ключ OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| Ключ Anthropic | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
+
+Мастер можно запускать сколько угодно раз: если ключи уже введены, он покажет их
+скрытыми и спросит, менять или оставить.
+
+Записываются ключи в файл `.env` с доступом только владельцу — другие пользователи
+сервера прочитать его не смогут.
+
+### Если что-то пошло не так
+
+**`No module named 'bot'`** — ты не в той папке. Проверь `pwd`: нужно быть внутри
+`AlijonMahmadjonov`.
+
+**`В токене посторонние символы`** — при копировании из чата прилипла кириллическая
+буква или неразрывный пробел. Скопируй заново, целиком.
+
+**`нет денег`** — ключ правильный, но счёт пустой. Пополни баланс у того сервиса,
+который назван в сообщении.
+
+### Установка вручную
+
+Если хочешь по шагам, без мастера:
 
 ```bash
 git clone https://github.com/alijon26062006-bit/AlijonMahmadjonov.git
 cd AlijonMahmadjonov
 
-# Шрифт с кириллицей для PDF. Под root — без sudo.
-apt install -y fonts-dejavu-core          # Debian / Ubuntu
+apt install -y fonts-dejavu-core          # шрифт для кириллицы в PDF
 
 python3 -m venv .venv
 source .venv/bin/activate                 # на Windows: .venv\Scripts\activate
@@ -68,22 +111,8 @@ pip install -r requirements.txt
 
 cp .env.example .env
 nano .env                                 # вписать три ключа и свой id
-```
-
-### Проверить, что всё встало
-
-Это стоит сделать до того, как заводить ключи — тогда сразу видно, где проблема:
-
-```bash
-python -c "import bot.main; print('бот на месте')"
 python -m bot.main
 ```
-
-Вторая команда должна ответить `Ошибка настройки: Не заданы обязательные настройки: ...`
-— это правильно, значит код на месте, осталось заполнить `.env`.
-
-Если вместо этого видишь `No module named 'bot'` — ты не в той папке. Проверь `pwd`:
-нужно быть внутри `AlijonMahmadjonov`, а не в домашней папке.
 
 ## Запуск
 
@@ -95,6 +124,7 @@ python -m bot.main
 
 ### Чтобы работал постоянно (systemd)
 
+`bash setup.sh` предлагает настроить это сам. Вручную — создай
 `/etc/systemd/system/moneybot.service`:
 
 ```ini
@@ -141,7 +171,7 @@ systemctl restart moneybot          # если настроен автозапу
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -q                    # 100 тестов, без сети и без ключей
+pytest -q                    # 130 тестов, без сети и без ключей
 python -m bot.selftest       # прогнать реальные фразы через Claude (нужен ANTHROPIC_API_KEY)
 python -m bot.selftest --keep "отправил Салиму 200 сомони"   # разобрать одну фразу
 ```
@@ -172,6 +202,8 @@ Telegram
 
 | Файл | Что делает |
 |---|---|
+| `setup.sh` | установка одной командой |
+| `bot/setup.py` | мастер: спрашивает и проверяет ключи |
 | `bot/main.py` | запуск, long polling |
 | `bot/handlers.py` | обработчики Telegram: голос, текст, фото, кнопки, команды |
 | `bot/stt.py` | голос → текст через Whisper |
