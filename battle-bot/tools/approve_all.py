@@ -29,6 +29,7 @@ import sys
 try:
     from telethon import TelegramClient, functions, types
     from telethon.errors import (
+        ApiIdInvalidError,
         FloodWaitError,
         PhoneCodeExpiredError,
         PhoneCodeInvalidError,
@@ -85,6 +86,17 @@ async def login(client) -> None:
 
     try:
         await client.send_code_request(phone)
+    except ApiIdInvalidError:
+        sys.exit(
+            "\nTelegram не принял api_id и api_hash.\n\n"
+            "Оба значения берутся с ОДНОЙ страницы:\n"
+            "  https://my.telegram.org → API development tools\n\n"
+            "Частые причины:\n"
+            "  • api_hash скопирован от другого приложения или обрезан;\n"
+            "  • при копировании потерялся символ;\n"
+            "  • api_id и api_hash перепутаны местами.\n\n"
+            "Откройте страницу заново и скопируйте оба значения подряд."
+        )
     except FloodWaitError as error:
         sys.exit(
             f"Telegram временно не шлёт коды на этот номер: подождите "
@@ -219,6 +231,16 @@ async def main() -> None:
 
     if not api_id.isdigit():
         sys.exit("api_id — это число. Возьмите его на https://my.telegram.org")
+
+    # api_hash — ровно 32 знака из цифр и букв a–f. Проверяем до входа:
+    # обрезанный при копировании ключ иначе всплыл бы только на отправке кода
+    api_hash = api_hash.strip().lower()
+    if len(api_hash) != 32 or any(char not in "0123456789abcdef" for char in api_hash):
+        sys.exit(
+            f"api_hash выглядит неправильно ({len(api_hash)} знаков вместо 32).\n"
+            "Это длинная строка из цифр и букв a–f на той же странице, "
+            "что и api_id: https://my.telegram.org → API development tools"
+        )
 
     # сессия живёт только в памяти: на диске не остаётся ничего от вашего входа
     client = TelegramClient(StringSession(), int(api_id), api_hash)
