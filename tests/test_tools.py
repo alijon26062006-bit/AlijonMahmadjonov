@@ -9,7 +9,7 @@ from bot import db, tools
 def ctx(conn, config, tmp_path):
     config.ensure_dirs()
     return tools.ToolContext(
-        conn=conn, chat_id=1, result=tools.TurnResult(),
+        conn=conn, owner_id=1, result=tools.TurnResult(),
         reports_dir=config.reports_dir,
         font_path=config.font_path, font_bold_path=config.font_bold_path,
         default_currency="TJS", today="2026-08-31",

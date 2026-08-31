@@ -5,9 +5,9 @@ from bot import db
 
 
 def add(conn, **kw):
-    kw.setdefault("chat_id", 1)
-    chat_id = kw.pop("chat_id")
-    return db.add_transaction(conn, chat_id, **kw)
+    kw.setdefault("owner_id", 1)
+    owner_id = kw.pop("owner_id")
+    return db.add_transaction(conn, owner_id, **kw)
 
 
 def test_normalize_lowercases_and_folds_yo():

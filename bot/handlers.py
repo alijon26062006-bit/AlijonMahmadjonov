@@ -13,7 +13,8 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, FSInputFile, Message
 from aiogram.utils.chat_action import ChatActionSender
 
-from . import db, keyboards, reports
+from . import admin, db, keyboards, reports
+from .access import is_admin
 from .brain import Brain
 from .config import Config
 from .stt import Transcriber
@@ -43,18 +44,35 @@ HELP_TEXT = """\
  • «Отправь отчёт с 1 августа по сегодня»
 
 Команды: /help — эта справка, /otchet — отчёт за текущий месяц,
-/istoriya Абубакр — вся история по человеку.\
+/istoriya Абубакр — вся история по человеку, /imya — сменить своё имя.
+
+Твои записи видишь только ты.\
 """
 
-# Кого бот ждёт с уточнением после нажатия «Исправить». chat_id → transaction_id.
+# Кого бот ждёт с уточнением после нажатия «Исправить». owner_id → transaction_id.
 _pending_edits: dict[int, int] = {}
 
 
-# ── доступ ─────────────────────────────────────────────────────────────────
+# ── регистрация ────────────────────────────────────────────────────────────
 
-def _allowed(config: Config, message: Message | CallbackQuery) -> bool:
-    user = message.from_user
-    return bool(user and user.id in config.allowed_user_ids)
+MIN_NAME, MAX_NAME = 2, 64
+
+ASK_NAME = "Привет! Как тебя зовут?"
+BAD_NAME = (
+    f"Имя должно быть от {MIN_NAME} до {MAX_NAME} символов, без ссылок. "
+    "Напиши, пожалуйста, ещё раз."
+)
+
+
+def clean_name(raw: str) -> str | None:
+    """Принять имя или вернуть None. Имя попадёт в панель админа — мусор не нужен."""
+    name = " ".join((raw or "").split())
+    if not MIN_NAME <= len(name) <= MAX_NAME:
+        return None
+    lowered = name.lower()
+    if any(bad in lowered for bad in ("http://", "https://", "t.me/", "<", ">")):
+        return None
+    return name
 
 
 # ── общая отправка результата ──────────────────────────────────────────────
@@ -92,9 +110,10 @@ def split_message(text: str, limit: int = TG_TEXT_LIMIT) -> list[str]:
     return [c for c in chunks if c.strip()]
 
 
-async def _deliver(message: Message, conn: sqlite3.Connection, result: TurnResult) -> None:
+async def _deliver(
+    message: Message, conn: sqlite3.Connection, owner_id: int, result: TurnResult
+) -> None:
     """Отправить ответ, карточки сохранённых записей, фото и PDF."""
-    chat_id = message.chat.id
 
     if result.reply:
         first_tx = result.saved_transaction_ids[0] if len(result.saved_transaction_ids) == 1 else None
@@ -112,14 +131,14 @@ async def _deliver(message: Message, conn: sqlite3.Connection, result: TurnResul
     # Если операций несколько — кнопки для каждой отдельным сообщением.
     if len(result.saved_transaction_ids) > 1:
         for tx_id in result.saved_transaction_ids:
-            row = db.get_transaction(conn, chat_id, tx_id)
+            row = db.get_transaction(conn, owner_id, tx_id)
             if row:
                 await message.answer(
                     _tx_line(row), reply_markup=keyboards.transaction_keyboard(tx_id)
                 )
 
     for doc_id in result.documents_to_send:
-        doc = db.get_document(conn, chat_id, doc_id)
+        doc = db.get_document(conn, owner_id, doc_id)
         if not doc:
             continue
         caption = (doc.get("description") or "Документ")[:TG_CAPTION_LIMIT]
@@ -160,17 +179,17 @@ async def _process(
     source: str,
     brain: Brain,
     conn: sqlite3.Connection,
+    owner_id: int,
 ) -> None:
-    chat_id = message.chat.id
-    editing_id = _pending_edits.pop(chat_id, None)
+    editing_id = _pending_edits.pop(owner_id, None)
 
     # Пишем в журнал ДО обращения к Claude: если модель упадёт, сказанное не пропадёт.
-    db.log_message(conn, chat_id, "user", text)
+    db.log_message(conn, owner_id, "user", text)
 
     try:
-        async with ChatActionSender.typing(bot=message.bot, chat_id=chat_id):
+        async with ChatActionSender.typing(bot=message.bot, chat_id=message.chat.id):
             result = await brain.handle(
-                chat_id, text, source=source, editing_transaction_id=editing_id
+                owner_id, text, source=source, editing_transaction_id=editing_id
             )
     except Exception:
         log.exception("Ошибка при обработке сообщения")
@@ -180,50 +199,69 @@ async def _process(
         )
         return
 
-    db.log_message(conn, chat_id, "assistant", result.reply)
-    await _deliver(message, conn, result)
+    db.log_message(conn, owner_id, "assistant", result.reply)
+    await _deliver(message, conn, owner_id, result)
 
 
 # ── команды ────────────────────────────────────────────────────────────────
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, config: Config) -> None:
-    if not _allowed(config, message):
+async def cmd_start(
+    message: Message, conn: sqlite3.Connection, user: dict[str, Any], sender: Any
+) -> None:
+    if user["status"] == "active":
+        name = user.get("name")
+        greeting = f"С возвращением, {name}. " if name else "Привет. "
+        await message.answer(greeting + HELP_TEXT)
         return
-    await message.answer("Привет. " + HELP_TEXT)
+
+    # Приглашён, но ещё не представился — спрашиваем имя и запоминаем это в базе,
+    # чтобы перезапуск бота не оставил человека в подвешенном состоянии.
+    db.start_registration(conn, user["id"], getattr(sender, "username", None))
+    suggested = getattr(sender, "first_name", None)
+    text = ASK_NAME
+    if suggested:
+        text += f"\n\nМожно просто написать: {suggested}"
+    await message.answer(text)
+
+
+@router.message(Command("imya"))
+async def cmd_rename(message: Message, conn: sqlite3.Connection, user: dict[str, Any]) -> None:
+    name = clean_name((message.text or "").partition(" ")[2])
+    if not name:
+        await message.answer("Напиши так: /imya Алиджон")
+        return
+    db.rename_user(conn, user["id"], name)
+    await message.answer(f"Теперь я зову тебя {name}.")
 
 
 @router.message(Command("help"))
-async def cmd_help(message: Message, config: Config) -> None:
-    if not _allowed(config, message):
-        return
+async def cmd_help(message: Message) -> None:
     await message.answer(HELP_TEXT)
 
 
 @router.message(Command("otchet"))
-async def cmd_report(message: Message, config: Config, brain: Brain, conn: sqlite3.Connection) -> None:
-    if not _allowed(config, message):
-        return
+async def cmd_report(message: Message, brain: Brain, conn: sqlite3.Connection,
+                     user: dict[str, Any]) -> None:
     today = date.today()
     first = today.replace(day=1)
     await _process(
         message,
         f"Сделай PDF-отчёт за период с {first.isoformat()} по {today.isoformat()}.",
-        source="text", brain=brain, conn=conn,
+        source="text", brain=brain, conn=conn, owner_id=user["id"],
     )
 
 
 @router.message(Command("istoriya"))
-async def cmd_history(message: Message, config: Config, brain: Brain, conn: sqlite3.Connection) -> None:
-    if not _allowed(config, message):
-        return
+async def cmd_history(message: Message, brain: Brain, conn: sqlite3.Connection,
+                      user: dict[str, Any]) -> None:
     name = (message.text or "").partition(" ")[2].strip()
     if not name:
         await message.answer("Напиши так: /istoriya Абубакр")
         return
     await _process(
         message, f"Покажи всю историю операций с человеком: {name}",
-        source="text", brain=brain, conn=conn,
+        source="text", brain=brain, conn=conn, owner_id=user["id"],
     )
 
 
@@ -231,10 +269,9 @@ async def cmd_history(message: Message, config: Config, brain: Brain, conn: sqli
 
 @router.message(F.voice | F.audio)
 async def on_voice(
-    message: Message, config: Config, brain: Brain, conn: sqlite3.Connection, stt: Transcriber
+    message: Message, config: Config, brain: Brain, conn: sqlite3.Connection,
+    stt: Transcriber, user: dict[str, Any]
 ) -> None:
-    if not _allowed(config, message):
-        return
 
     media = message.voice or message.audio
     duration = getattr(media, "duration", 0) or 0
@@ -261,22 +298,21 @@ async def on_voice(
         return
 
     await message.answer(f"🎙 {text}")
-    await _process(message, text, source="voice", brain=brain, conn=conn)
+    await _process(message, text, source="voice", brain=brain, conn=conn, owner_id=user["id"])
 
 
 # ── фото ───────────────────────────────────────────────────────────────────
 
 @router.message(F.photo)
 async def on_photo(
-    message: Message, config: Config, brain: Brain, conn: sqlite3.Connection
+    message: Message, config: Config, brain: Brain, conn: sqlite3.Connection,
+    user: dict[str, Any]
 ) -> None:
-    if not _allowed(config, message):
-        return
 
     photo = message.photo[-1]  # самое большое разрешение
-    chat_id = message.chat.id
+    owner_id = user["id"]
     config.photos_dir.mkdir(parents=True, exist_ok=True)
-    path = config.photos_dir / f"{chat_id}_{photo.file_unique_id}.jpg"
+    path = config.photos_dir / f"{owner_id}_{photo.file_unique_id}.jpg"
 
     try:
         await message.bot.download(photo.file_id, destination=path)
@@ -286,13 +322,13 @@ async def on_photo(
         return
 
     doc_id = db.add_document(
-        conn, chat_id, tg_file_id=photo.file_id, file_path=str(path)
+        conn, owner_id, tg_file_id=photo.file_id, file_path=str(path)
     )
     log.info("Фото сохранено: id=%s → %s", doc_id, path)
 
     caption = (message.caption or "").strip()
     if caption:
-        await _process(message, caption, source="text", brain=brain, conn=conn)
+        await _process(message, caption, source="text", brain=brain, conn=conn, owner_id=user["id"])
     else:
         await message.answer(
             "Фото сохранил. Скажи голосом или напиши, что это — например: "
@@ -303,12 +339,9 @@ async def on_photo(
 # ── кнопки ─────────────────────────────────────────────────────────────────
 
 @router.callback_query(F.data.startswith(keyboards.EDIT_PREFIX))
-async def on_edit(query: CallbackQuery, config: Config, conn: sqlite3.Connection) -> None:
-    if not _allowed(config, query):
-        await query.answer()
-        return
+async def on_edit(query: CallbackQuery, conn: sqlite3.Connection, user: dict[str, Any]) -> None:
     tx_id = int(query.data.removeprefix(keyboards.EDIT_PREFIX))
-    _pending_edits[query.message.chat.id] = tx_id
+    _pending_edits[user["id"]] = tx_id
     await query.answer()
     await query.message.answer(
         "Скажи или напиши, что исправить — например: «там было не 500, а 400 тысяч»."
@@ -316,12 +349,9 @@ async def on_edit(query: CallbackQuery, config: Config, conn: sqlite3.Connection
 
 
 @router.callback_query(F.data.startswith(keyboards.DELETE_PREFIX))
-async def on_delete(query: CallbackQuery, config: Config, conn: sqlite3.Connection) -> None:
-    if not _allowed(config, query):
-        await query.answer()
-        return
+async def on_delete(query: CallbackQuery, conn: sqlite3.Connection, user: dict[str, Any]) -> None:
     tx_id = int(query.data.removeprefix(keyboards.DELETE_PREFIX))
-    ok = db.delete_transaction(conn, query.message.chat.id, tx_id)
+    ok = db.delete_transaction(conn, user["id"], tx_id)
     await query.answer("Удалил" if ok else "Не нашёл")
     if ok:
         try:
@@ -335,8 +365,25 @@ async def on_delete(query: CallbackQuery, config: Config, conn: sqlite3.Connecti
 
 @router.message(F.text)
 async def on_text(
-    message: Message, config: Config, brain: Brain, conn: sqlite3.Connection
+    message: Message,
+    brain: Brain,
+    conn: sqlite3.Connection,
+    user: dict[str, Any],
+    bot_username: str | None = None,
 ) -> None:
-    if not _allowed(config, message):
+    # 1. Человек представляется — это его первое сообщение после Старта.
+    if user["status"] == "awaiting_name":
+        name = clean_name(message.text)
+        if not name:
+            await message.answer(BAD_NAME)
+            return
+        db.register_user(conn, user["id"], name)
+        await message.answer(f"Приятно познакомиться, {name}.\n\n" + HELP_TEXT)
         return
-    await _process(message, message.text.strip(), source="text", brain=brain, conn=conn)
+
+    # 2. Владелец вводит id нового человека после кнопки «Добавить по ID».
+    if is_admin(user) and await admin.handle_new_id(message, conn, user, bot_username):
+        return
+
+    await _process(message, message.text.strip(), source="text", brain=brain,
+                   conn=conn, owner_id=user["id"])

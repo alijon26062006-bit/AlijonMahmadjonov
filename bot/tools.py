@@ -31,7 +31,7 @@ class TurnResult:
 @dataclass
 class ToolContext:
     conn: sqlite3.Connection
-    chat_id: int
+    owner_id: int
     result: TurnResult
     reports_dir: Path
     font_path: str | None = None
@@ -135,7 +135,7 @@ def t_save_transaction(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]
     happened = clean_date(args.get("happened_on")) or ctx.today or date.today().isoformat()
     amount = clean_amount(args.get("amount"))
     tx_id = db.add_transaction(
-        ctx.conn, ctx.chat_id,
+        ctx.conn, ctx.owner_id,
         happened_on=happened,
         direction=clean_enum(args.get("direction"), db.DIRECTIONS) or "out",
         kind=clean_enum(args.get("kind"), db.KINDS) or "transfer",
@@ -151,14 +151,14 @@ def t_save_transaction(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]
         source=(args.get("source") or None),
     )
     ctx.result.saved_transaction_ids.append(tx_id)
-    saved = db.get_transaction(ctx.conn, ctx.chat_id, tx_id)
+    saved = db.get_transaction(ctx.conn, ctx.owner_id, tx_id)
     return {"ok": True, "сохранено": _tx_brief(saved) if saved else {"id": tx_id}}
 
 
 def t_search_transactions(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     limit = int(args.get("limit") or MAX_LIST)
     rows = db.search_transactions(
-        ctx.conn, ctx.chat_id,
+        ctx.conn, ctx.owner_id,
         text=args.get("text") or None,
         counterparty=args.get("counterparty") or None,
         date_from=clean_date(args.get("date_from")),
@@ -194,15 +194,15 @@ def t_update_transaction(ctx: ToolContext, args: dict[str, Any]) -> dict[str, An
     if args.get("kind"):
         fields["kind"] = clean_enum(args["kind"], db.KINDS)
 
-    if not db.update_transaction(ctx.conn, ctx.chat_id, tx_id, **fields):
+    if not db.update_transaction(ctx.conn, ctx.owner_id, tx_id, **fields):
         return {"ok": False, "ошибка": f"Операция {tx_id} не найдена или менять нечего."}
-    updated = db.get_transaction(ctx.conn, ctx.chat_id, tx_id)
+    updated = db.get_transaction(ctx.conn, ctx.owner_id, tx_id)
     return {"ok": True, "обновлено": _tx_brief(updated) if updated else {"id": tx_id}}
 
 
 def t_delete_transaction(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     tx_id = int(args["transaction_id"])
-    if not db.delete_transaction(ctx.conn, ctx.chat_id, tx_id):
+    if not db.delete_transaction(ctx.conn, ctx.owner_id, tx_id):
         return {"ok": False, "ошибка": f"Операция {tx_id} не найдена."}
     return {"ok": True, "удалено": tx_id}
 
@@ -211,20 +211,20 @@ def t_describe_document(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any
     doc_id = int(args["document_id"])
     tx_id = args.get("transaction_id")
     ok = db.describe_document(
-        ctx.conn, ctx.chat_id, doc_id,
+        ctx.conn, ctx.owner_id, doc_id,
         description=str(args.get("description") or "").strip(),
         doc_kind=(args.get("doc_kind") or None),
         transaction_id=int(tx_id) if tx_id else None,
     )
     if not ok:
         return {"ok": False, "ошибка": f"Фото {doc_id} не найдено."}
-    doc = db.get_document(ctx.conn, ctx.chat_id, doc_id)
+    doc = db.get_document(ctx.conn, ctx.owner_id, doc_id)
     return {"ok": True, "подписано": _doc_brief(doc) if doc else {"id": doc_id}}
 
 
 def t_find_documents(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     rows = db.search_documents(
-        ctx.conn, ctx.chat_id,
+        ctx.conn, ctx.owner_id,
         text=args.get("text") or None,
         date_from=clean_date(args.get("date_from")),
         date_to=clean_date(args.get("date_to")),
@@ -243,7 +243,7 @@ def t_send_documents(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
             doc_id = int(value)
         except (TypeError, ValueError):
             continue
-        if db.get_document(ctx.conn, ctx.chat_id, doc_id):
+        if db.get_document(ctx.conn, ctx.owner_id, doc_id):
             if doc_id not in ctx.result.documents_to_send:
                 ctx.result.documents_to_send.append(doc_id)
             sent.append(doc_id)
@@ -263,7 +263,7 @@ def t_build_report(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
         date_from, date_to = date_to, date_from
 
     path, count = reports.build_report(
-        ctx.conn, ctx.chat_id,
+        ctx.conn, ctx.owner_id,
         date_from=date_from, date_to=date_to,
         out_dir=ctx.reports_dir,
         font_path=ctx.font_path, font_bold_path=ctx.font_bold_path,
@@ -273,7 +273,7 @@ def t_build_report(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     )
     ctx.result.reports_to_send.append(path)
     rows = db.search_transactions(
-        ctx.conn, ctx.chat_id,
+        ctx.conn, ctx.owner_id,
         text=args.get("text") or None,
         counterparty=args.get("counterparty") or None,
         date_from=date_from, date_to=date_to,

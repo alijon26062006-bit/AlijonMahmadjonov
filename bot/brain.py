@@ -34,7 +34,7 @@ class Brain:
 
     async def handle(
         self,
-        chat_id: int,
+        owner_id: int,
         user_text: str,
         *,
         source: str = "text",
@@ -42,14 +42,14 @@ class Brain:
     ) -> tools.TurnResult:
         """Обработать одно сообщение пользователя целиком."""
         return await asyncio.to_thread(
-            self._handle_sync, chat_id, user_text, source, editing_transaction_id
+            self._handle_sync, owner_id, user_text, source, editing_transaction_id
         )
 
     # ── синхронная часть (выполняется в отдельном потоке) ──────────────────
 
     def _handle_sync(
         self,
-        chat_id: int,
+        owner_id: int,
         user_text: str,
         source: str,
         editing_transaction_id: int | None,
@@ -60,7 +60,7 @@ class Brain:
 
         ctx = tools.ToolContext(
             conn=self.conn,
-            chat_id=chat_id,
+            owner_id=owner_id,
             result=result,
             reports_dir=self.config.reports_dir,
             font_path=self.config.font_path,
@@ -70,7 +70,7 @@ class Brain:
         )
 
         editing = (
-            db.get_transaction(self.conn, chat_id, editing_transaction_id)
+            db.get_transaction(self.conn, owner_id, editing_transaction_id)
             if editing_transaction_id
             else None
         )
@@ -79,7 +79,7 @@ class Brain:
             weekday_ru=prompts.WEEKDAYS_RU[now.weekday()],
             tz_name=self.config.tz_name,
             default_currency=self.config.default_currency,
-            pending_documents=db.pending_documents(self.conn, chat_id),
+            pending_documents=db.pending_documents(self.conn, owner_id),
             editing_transaction=editing,
             source=source,
         )

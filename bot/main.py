@@ -9,8 +9,10 @@ import sys
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 
+from . import admin as admin_module
 from . import brain as brain_module
 from . import db, handlers, reports, stt
+from .access import AccessMiddleware, bootstrap_admins
 from .config import Config, load_config
 
 
@@ -32,6 +34,10 @@ async def run(config: Config) -> None:
     reports.register_fonts(config.font_path, config.font_bold_path)
 
     conn = db.connect(config.db_path)
+    # Владельцы из .env заводятся в базе как админы: при переходе со старой
+    # однопользовательской версии владелец не должен потерять свои записи.
+    bootstrap_admins(conn, config.allowed_user_ids)
+
     transcriber = stt.Transcriber(
         stt.make_client(config.openai_api_key), model=config.whisper_model
     )
@@ -39,6 +45,13 @@ async def run(config: Config) -> None:
 
     bot = Bot(config.telegram_token, default=DefaultBotProperties(parse_mode=None))
     dispatcher = Dispatcher()
+
+    # Доступ проверяется один раз для всех обработчиков сразу — обойти нельзя.
+    access = AccessMiddleware(conn)
+    dispatcher.message.outer_middleware(access)
+    dispatcher.callback_query.outer_middleware(access)
+
+    dispatcher.include_router(admin_module.router)   # панель — раньше общих обработчиков
     dispatcher.include_router(handlers.router)
 
     # Зависимости прокидываются в хендлеры как аргументы.
@@ -48,8 +61,10 @@ async def run(config: Config) -> None:
     dispatcher["stt"] = transcriber
 
     me = await bot.get_me()
+    dispatcher["bot_username"] = me.username
     log.info("Запущен как @%s. База: %s", me.username, config.db_path)
-    log.info("Отвечаю только этим id: %s", sorted(config.allowed_user_ids))
+    log.info("Админы: %s. Всего пользователей: %s",
+             sorted(config.allowed_user_ids), len(db.list_users(conn)))
 
     try:
         await bot.delete_webhook(drop_pending_updates=False)

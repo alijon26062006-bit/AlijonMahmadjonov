@@ -1,22 +1,8 @@
 """Разрезание длинных ответов и доступ по id."""
 
-from bot.config import Config
-from bot.handlers import TG_TEXT_LIMIT, _allowed, _tx_line, split_message
+import pytest
 
-
-class FakeUser:
-    def __init__(self, uid):
-        self.id = uid
-
-
-class FakeMessage:
-    def __init__(self, uid):
-        self.from_user = FakeUser(uid)
-
-
-def cfg(ids):
-    return Config(telegram_token="x", allowed_user_ids=frozenset(ids),
-                  openai_api_key="x", anthropic_api_key="x", data_dir="/tmp")
+from bot.handlers import TG_TEXT_LIMIT, clean_name, _tx_line, split_message
 
 
 def test_short_message_is_not_split():
@@ -47,10 +33,23 @@ def test_single_overlong_line_is_hard_split():
     assert sum(len(c) for c in chunks) == TG_TEXT_LIMIT * 2 + 7
 
 
-def test_only_the_owner_is_served():
-    config = cfg({111})
-    assert _allowed(config, FakeMessage(111)) is True
-    assert _allowed(config, FakeMessage(222)) is False
+@pytest.mark.parametrize("raw,expected", [
+    ("Алиджон", "Алиджон"),
+    ("  Алиджон   Махмаджонов  ", "Алиджон Махмаджонов"),
+    ("Ali", "Ali"),
+])
+def test_good_names_are_accepted(raw, expected):
+    assert clean_name(raw) == expected
+
+
+@pytest.mark.parametrize("raw", [
+    "", "А", "x" * 65,
+    "жми https://spam.example",      # имя попадает в панель админа — ссылок там быть не должно
+    "смотри t.me/spam",
+    "<b>жирный</b>",
+])
+def test_junk_names_are_rejected(raw):
+    assert clean_name(raw) is None
 
 
 def test_transaction_line_is_readable():

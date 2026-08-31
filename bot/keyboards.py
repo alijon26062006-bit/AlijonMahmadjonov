@@ -1,11 +1,31 @@
-"""Инлайн-кнопки под карточкой сохранённой операции."""
+"""Инлайн-кнопки: карточка операции и панель админа."""
 
 from __future__ import annotations
 
+from typing import Any
+
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+# Операции
 EDIT_PREFIX = "edit:"
 DELETE_PREFIX = "del:"
+
+# Панель админа
+ADMIN_LIST = "adm:list"
+ADMIN_ADD = "adm:add"
+ADMIN_USER = "adm:user:"        # + id
+ADMIN_BLOCK = "adm:block:"      # + id
+ADMIN_UNBLOCK = "adm:unblock:"  # + id
+ADMIN_WIPE_ASK = "adm:wipe?:"   # + id — спросить подтверждение
+ADMIN_WIPE_YES = "adm:wipe!:"   # + id — удалить насовсем
+ADMIN_GRANT = "adm:grant:"      # + id — дать доступ незнакомцу из уведомления
+
+STATUS_MARK = {
+    "active": "✅",
+    "invited": "⏳",
+    "awaiting_name": "⏳",
+    "blocked": "🚫",
+}
 
 
 def transaction_keyboard(tx_id: int) -> InlineKeyboardMarkup:
@@ -15,3 +35,62 @@ def transaction_keyboard(tx_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🗑 Удалить", callback_data=f"{DELETE_PREFIX}{tx_id}"),
         ]]
     )
+
+
+def grant_access_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Кнопка под уведомлением о незнакомце — чтобы не набирать id руками."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[
+            InlineKeyboardButton(text="➕ Дать доступ", callback_data=f"{ADMIN_GRANT}{user_id}"),
+        ]]
+    )
+
+
+def _user_label(user: dict[str, Any]) -> str:
+    mark = STATUS_MARK.get(user["status"], "•")
+    name = user.get("name") or (f"@{user['tg_username']}" if user.get("tg_username") else None)
+    title = name or f"id {user['id']}"
+    if user["role"] == "admin":
+        title += " · админ"
+    return f"{mark} {title}"
+
+
+def users_keyboard(users: list[dict[str, Any]]) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(text=_user_label(u), callback_data=f"{ADMIN_USER}{u['id']}")]
+        for u in users
+    ]
+    rows.append([
+        InlineKeyboardButton(text="➕ Добавить по ID", callback_data=ADMIN_ADD),
+        InlineKeyboardButton(text="🔄 Обновить", callback_data=ADMIN_LIST),
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def user_card_keyboard(user: dict[str, Any], *, is_self: bool) -> InlineKeyboardMarkup:
+    """Кнопки карточки. Себя заблокировать или удалить нельзя — иначе можно
+    остаться без единого админа и потерять управление ботом."""
+    rows: list[list[InlineKeyboardButton]] = []
+    user_id = user["id"]
+
+    if not is_self:
+        if user["status"] == "blocked":
+            rows.append([InlineKeyboardButton(
+                text="✅ Разрешить", callback_data=f"{ADMIN_UNBLOCK}{user_id}")])
+        else:
+            rows.append([InlineKeyboardButton(
+                text="🚫 Заблокировать", callback_data=f"{ADMIN_BLOCK}{user_id}")])
+        rows.append([InlineKeyboardButton(
+            text="🗑 Удалить вместе с данными", callback_data=f"{ADMIN_WIPE_ASK}{user_id}")])
+
+    rows.append([InlineKeyboardButton(text="⬅️ Назад", callback_data=ADMIN_LIST)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def confirm_wipe_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🗑 Да, удалить навсегда",
+                              callback_data=f"{ADMIN_WIPE_YES}{user_id}")],
+        [InlineKeyboardButton(text="⬅️ Нет, вернуться",
+                              callback_data=f"{ADMIN_USER}{user_id}")],
+    ])

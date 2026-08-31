@@ -80,7 +80,7 @@ def _styles() -> dict[str, ParagraphStyle]:
 
 def build_report(
     conn: sqlite3.Connection,
-    chat_id: int,
+    owner_id: int,
     *,
     date_from: str,
     date_to: str,
@@ -96,7 +96,7 @@ def build_report(
     st = _styles()
 
     rows = db.search_transactions(
-        conn, chat_id,
+        conn, owner_id,
         text=text, counterparty=counterparty,
         date_from=date_from, date_to=date_to, direction=direction,
         limit=2000,

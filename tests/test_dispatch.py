@@ -5,121 +5,13 @@
 отвечать на все сообщения.
 """
 
-import importlib
-import io
 from datetime import datetime
 from pathlib import Path
 
-import pytest
-from aiogram import Bot, Dispatcher
-from aiogram.client.default import DefaultBotProperties
-from aiogram.methods import SendMessage
 from aiogram.types import Chat, Message, Update, User
 
-from bot import db, handlers, keyboards
-from bot.brain import Brain
-from bot.stt import Transcriber
-
-TOKEN = "42:TESTTESTTESTTESTTESTTESTTESTTESTTEST"
-OWNER = 111
-STRANGER = 222
-
-
-class RecordingSession:
-    """Перехватывает исходящие вызовы вместо похода в Telegram."""
-
-    def __init__(self):
-        self.sent = []
-
-    async def __call__(self, bot, method, timeout=None):
-        self.sent.append(method)
-        return self._fake_result(method)
-
-    async def close(self):
-        pass
-
-    @staticmethod
-    def _fake_result(method):
-        chat = Chat(id=OWNER, type="private")
-        return Message(message_id=1, date=datetime.now(), chat=chat,
-                       text=getattr(method, "text", None))
-
-    @property
-    def texts(self):
-        return [m.text for m in self.sent if isinstance(m, SendMessage)]
-
-
-class ScriptedBrain(Brain):
-    """Вместо Claude — заранее заданный ответ."""
-
-    def __init__(self, reply="Записал."):
-        self.reply = reply
-        self.seen = []
-
-    async def handle(self, chat_id, user_text, *, source="text", editing_transaction_id=None):
-        from bot.tools import TurnResult
-
-        self.seen.append((user_text, source, editing_transaction_id))
-        return TurnResult(reply=self.reply)
-
-
-class ScriptedTranscriber(Transcriber):
-    def __init__(self, text="отправил Абубакру три тысячи сомони"):
-        self.text = text
-
-    async def transcribe(self, audio, filename="voice.ogg"):
-        return self.text
-
-
-@pytest.fixture
-def setup(conn, config):
-    # Роутер aiogram можно привязать только к одному Dispatcher, а состояние
-    # «жду правку» живёт в модуле — пересоздаём его для каждого теста.
-    importlib.reload(handlers)
-    config.ensure_dirs()
-    config = type(config)(**{**config.__dict__, "allowed_user_ids": frozenset({OWNER})})
-
-    session = RecordingSession()
-    bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=None))
-    bot.session = session
-
-    async def fake_download(file_id, destination=None, **kwargs):
-        if destination is not None:  # фото: пишем заглушку на диск
-            Path(destination).write_bytes(b"\xff\xd8\xff\xd9")
-            return None
-        return io.BytesIO(b"OggS-fake-audio")
-
-    bot.download = fake_download
-
-    brain = ScriptedBrain()
-    dispatcher = Dispatcher()
-    dispatcher.include_router(handlers.router)
-    dispatcher["config"] = config
-    dispatcher["conn"] = conn
-    dispatcher["brain"] = brain
-    dispatcher["stt"] = ScriptedTranscriber()
-
-    return dispatcher, bot, session, brain, conn
-
-
-def text_update(text, user_id=OWNER, update_id=1):
-    chat = Chat(id=user_id, type="private")
-    user = User(id=user_id, is_bot=False, first_name="Алиджон")
-    return Update(update_id=update_id, message=Message(
-        message_id=update_id, date=datetime.now(), chat=chat, from_user=user, text=text,
-    ))
-
-
-def voice_update(user_id=OWNER, duration=5):
-    from aiogram.types import Voice
-
-    chat = Chat(id=user_id, type="private")
-    user = User(id=user_id, is_bot=False, first_name="Алиджон")
-    return Update(update_id=2, message=Message(
-        message_id=2, date=datetime.now(), chat=chat, from_user=user,
-        voice=Voice(file_id="v1", file_unique_id="u1", duration=duration),
-    ))
-
+from bot import db, keyboards
+from conftest import OWNER, STRANGER, photo_update, text_update, voice_update
 
 async def test_text_message_reaches_the_brain_and_gets_an_answer(setup):
     dispatcher, bot, session, brain, _ = setup
@@ -146,13 +38,14 @@ async def test_too_long_voice_is_rejected_without_calling_whisper(setup):
     assert any("Слишком длинное" in t for t in session.texts)
 
 
-async def test_stranger_gets_no_answer_at_all(setup):
+async def test_stranger_never_reaches_the_model(setup):
     """Чужой не должен тратить твои ключи и видеть твои деньги."""
     dispatcher, bot, session, brain, _ = setup
     await dispatcher.feed_update(bot, text_update("покажи все мои деньги", user_id=STRANGER))
 
     assert brain.seen == []
-    assert session.sent == []
+    # Ему отвечают отказом с его id, а владельцу уходит уведомление.
+    assert any("нет доступа" in t and str(STRANGER) in t for t in session.texts)
 
 
 async def test_help_command_answers_without_calling_the_model(setup):
@@ -216,21 +109,6 @@ async def test_message_is_logged_before_the_model_is_called(setup):
     assert "Абубакру" in rows[0]["text"]
 
 
-def photo_update(caption=None, update_id=6, user_id=OWNER):
-    from aiogram.types import PhotoSize
-
-    chat = Chat(id=user_id, type="private")
-    user = User(id=user_id, is_bot=False, first_name="Алиджон")
-    return Update(update_id=update_id, message=Message(
-        message_id=update_id, date=datetime.now(), chat=chat, from_user=user,
-        caption=caption,
-        photo=[
-            PhotoSize(file_id="p_small", file_unique_id="us", width=90, height=90, file_size=100),
-            PhotoSize(file_id="p_big", file_unique_id="ub", width=1280, height=960, file_size=9000),
-        ],
-    ))
-
-
 async def test_photo_is_saved_and_waits_for_a_description(setup):
     """Фото без подписи должно лечь в базу как неподписанное и пережить рестарт."""
     dispatcher, bot, session, brain, conn = setup
@@ -257,4 +135,4 @@ async def test_stranger_photo_is_not_saved(setup):
     await dispatcher.feed_update(bot, photo_update(user_id=STRANGER))
 
     assert db.pending_documents(conn, STRANGER) == []
-    assert session.sent == []
+    assert brain.seen == []
