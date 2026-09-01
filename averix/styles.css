@@ -51,6 +51,11 @@
      внутри них, мелочь вроде полей ввода. Плюс пилюля для кнопок. */
   --r-lg:26px; --r:18px; --r-sm:12px; --pill:999px;
 
+  /* Заголовки — антиква. Она задаёт странице другой характер:
+     не «интерфейс», а «издание». Своего файла шрифта не заводим —
+     системная антиква есть везде и не стоит ни одного килобайта
+     загрузки, а кириллица у неё нормальная. */
+  --serif:Georgia,"Noto Serif","Times New Roman",serif;
   --display:"Geologica","Golos Text",system-ui,sans-serif;
   --body:"Golos Text",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
@@ -68,7 +73,10 @@ body{
   font-family:var(--body); font-size:16px; line-height:1.65;
   -webkit-font-smoothing:antialiased; overflow-x:hidden;
 }
-h1,h2,h3{margin:0; font-family:var(--display); font-weight:600; letter-spacing:-.02em; text-wrap:balance}
+/* Антиква у заголовков, гротеск у текста — пара, на которой держится
+   вся типографика сайта. Насыщенность у антиквы ниже: в 600 она
+   выглядит грузной, а не крупной. */
+h1,h2,h3{margin:0; font-family:var(--serif); font-weight:500; letter-spacing:-.01em; text-wrap:balance}
 p{margin:0}
 ul,ol{margin:0; padding:0; list-style:none}
 /* height:auto обязателен. Без него браузер применяет атрибут height
@@ -283,10 +291,72 @@ a{color:var(--violet)}
 /* Ограничение в 16 знаков нужно широкому экрану, чтобы строка
    не растянулась через весь монитор. На телефоне оно только режет
    заголовок на пять строк вместо трёх — там ширины и так в обрез. */
-.hero h1{margin-top:var(--s3); font-size:clamp(2.1rem,6.4vw,3.9rem); line-height:1.08}
+.hero h1{margin-top:var(--s3); font-size:clamp(2.3rem,7.2vw,4.2rem); line-height:1.05}
+/* Ограничение по знакам, а не по пикселям: строка держит длину,
+   удобную для чтения, при любом кегле. На большом экране позволяем
+   чуть длиннее — иначе заголовок рассыпается на четыре строки. */
 @media (min-width:700px){ .hero h1{max-width:16ch} }
-.hero-sub{margin-top:var(--s3); max-width:52ch; font-size:clamp(1rem,2.1vw,1.16rem); color:var(--muted)}
-.hero-cta{display:flex; flex-wrap:wrap; gap:var(--s2); margin-top:var(--s4)}
+@media (min-width:1100px){ .hero h1{max-width:19ch} }
+.hero-sub{margin-top:var(--s3); max-width:48ch; font-size:clamp(1.02rem,2.1vw,1.16rem); color:var(--muted)}
+
+/* Плашка над заголовком вместо строчки капителью: она держит верх
+   первого экрана и не сливается с текстом. */
+.pill{
+  display:inline-flex; align-items:center; padding:.45rem .95rem;
+  border:1px solid var(--glass-brd); border-radius:var(--pill);
+  background:var(--glass); backdrop-filter:var(--blur-lite);
+  font-family:var(--mono); font-size:.72rem; font-weight:500;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+}
+
+/* Две крупные кнопки одна под другой на телефоне: на первом экране
+   это два главных действия, и делить между ними ширину незачем. */
+.hero-cta{display:flex; flex-wrap:wrap; gap:.75rem; margin-top:var(--s4)}
+.hero-cta .btn{min-height:58px; padding:.9rem 1.8rem; font-size:1rem}
+@media (max-width:559px){
+  .hero-cta{flex-direction:column; align-items:stretch}
+  .hero-cta .btn{width:100%}
+}
+
+/* Черта и показатели держат ту же ширину, что текст: на широком
+   экране пара «цифра — что это» иначе расползается через весь монитор
+   и перестаёт читаться как пара. */
+.hero-rule{border:0; border-top:1px solid var(--glass-brd);
+  margin:var(--s4) 0 var(--s3); max-width:760px}
+
+/* Показатели строкой, а не плитой из стекла: короткая пара
+   «цифра — что это» читается быстрее, чем четыре карточки.
+   Два столбца начиная с самого узкого телефона: 150 пикселей
+   на колонку хватает и цифре, и подписи. */
+.marks{display:grid; gap:var(--s3) var(--s4); margin:0; max-width:760px;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.marks > div{display:grid; grid-template-columns:auto 1fr; gap:.15rem .7rem;
+  align-items:start}
+.marks .di{grid-row:1 / span 2; width:9px; height:9px; margin-top:.55rem;
+  background:var(--violet); transform:rotate(45deg); border-radius:2px}
+.marks dt{font-family:var(--display); font-weight:600; font-size:1rem;
+  font-variant-numeric:tabular-nums}
+.marks dt span:not(.num){color:var(--muted); font-weight:500}
+.marks dd{margin:0; font-size:.88rem; color:var(--faint); line-height:1.45}
+
+/* Снимок работы под первым экраном с подписью-плашкой в углу:
+   он показывает, что студия делает, раньше любого описания. */
+.hero-shot{position:relative; margin:var(--s5) 0 0; border-radius:var(--r-lg);
+  overflow:hidden; border:1px solid var(--glass-brd)}
+.hero-shot img{width:100%; height:auto; aspect-ratio:16/10; object-fit:cover;
+  object-position:top}
+.hero-shot figcaption{
+  position:absolute; left:0; bottom:0; max-width:min(86%,380px);
+  padding:.9rem 1.2rem 1rem; background:rgba(7,6,13,.92);
+  backdrop-filter:var(--blur-lite); border-radius:0 var(--r) 0 0;
+}
+.hero-shot figcaption .tag{display:block; font-family:var(--mono);
+  font-size:.68rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--faint); margin-bottom:.3rem}
+.hero-shot figcaption b{font-family:var(--serif); font-weight:500;
+  font-size:1.05rem; line-height:1.25}
+.hero-shot a{color:inherit; text-decoration:none}
+.hero-shot a::after{content:""; position:absolute; inset:0}
 
 .stats{
   display:grid; gap:var(--s3); margin-top:var(--s5); padding:var(--s4) var(--s3);

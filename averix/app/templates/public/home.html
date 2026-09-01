@@ -8,7 +8,7 @@
 <section class="hero" id="top">
   <div class="bloom" aria-hidden="true"></div>
   <div class="shell">
-    <p class="label r">{{ s.hero_eyebrow }}</p>
+    <p class="pill r">{{ s.hero_eyebrow }}</p>
     <h1 class="r d1">{{ s.hero_title | safe }}</h1>
     <p class="hero-sub r d2">{{ s.hero_subtitle }}</p>
     <div class="hero-cta r d3">
@@ -16,21 +16,46 @@
       <a class="btn btn-line" href="/projects" data-i18n="cta.projects">Смотреть проекты</a>
     </div>
 
+    {# Показатели те же, что владелец задал в админке, — но строкой,
+       а не плитой из стекла: пара «цифра — что это» читается быстрее
+       четырёх одинаковых карточек. #}
     {% if stats %}
-    <dl class="stats glass r d3">
+    <hr class="hero-rule r d3">
+    <dl class="marks r d3">
       {% for stat in stats %}
       <div>
-        <b><span class="num" data-count="{{ stat.value }}">{{ stat.value }}</span>{% if stat.unit %} <span>{{ stat.unit }}</span>{% endif %}</b>
-        <span>{{ stat.label }}</span>
+        <span class="di" aria-hidden="true"></span>
+        <dt><span class="num" data-count="{{ stat.value }}">{{ stat.value }}</span>{% if stat.unit %} <span>{{ stat.unit }}</span>{% endif %}</dt>
+        <dd>{{ stat.label }}</dd>
       </div>
       {% endfor %}
     </dl>
+    {% endif %}
+
+    {# Первая избранная работа показывается прямо здесь: она объясняет,
+       чем занимается студия, быстрее любого абзаца. Ниже по странице
+       она уже не повторяется. #}
+    {% if featured and featured[0].cover %}
+    <figure class="hero-shot r d3">
+      <img src="/uploads/{{ featured[0].cover }}"
+           alt="Экран проекта «{{ featured[0].title }}»"
+           width="{{ featured[0].cover_w or 1200 }}"
+           height="{{ featured[0].cover_h or 800 }}" decoding="async">
+      <figcaption>
+        <span class="tag" data-i18n="hero.shot">Свежая работа</span>
+        <b><a href="/projects/{{ featured[0].slug }}">{{ featured[0].title }}</a></b>
+      </figcaption>
+    </figure>
     {% endif %}
   </div>
 </section>
 
 <!-- ============ [01] ИЗБРАННЫЕ ПРОЕКТЫ ============ -->
-{% if featured %}
+{# Первая работа уже показана в первом экране, поэтому здесь
+   список начинается со второй: повторять её на одной странице
+   незачем. #}
+{% set rest = featured[1:] if featured and featured[0].cover else featured %}
+{% if rest %}
 <section class="section" id="work">
   <div class="shell">
     <div class="head">
@@ -44,7 +69,7 @@
     {# Тот же приём, что на странице проектов: одинаковый язык
        в двух местах вместо двух разных наборов карточек. #}
     <div class="work-list">
-      {% for p in featured %}
+      {% for p in rest %}
       <article class="work r">
         <a class="work-shot{% if not p.cover %} none{% endif %}" href="/projects/{{ p.slug }}"
            tabindex="-1" aria-hidden="true">
