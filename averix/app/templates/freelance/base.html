@@ -71,6 +71,15 @@ body{background:var(--fl-bg)}
 .fl-acts{display:flex; align-items:center; gap:.4rem; margin-left:auto; flex:0 0 auto}
 .fl-acts form{display:inline-flex}
 
+/* На телефоне «Войти» и «Регистрация» съедали всю строку, и от пункта
+   «Специалисты» оставалась одна буква. Разводим по строкам: бренд
+   и кнопки сверху, разделы отдельной строкой во всю ширину. */
+@media (max-width:640px){
+  .fl-top-in{flex-wrap:wrap; padding-bottom:.35rem}
+  .fl-nav{order:3; width:100%; margin-left:-.35rem}
+  .fl-acts{margin-left:auto}
+}
+
 /* ---------- кнопки поверх общих ---------- */
 .btn-ghost{background:transparent; color:var(--muted); border-color:var(--fl-line-hi)}
 .btn-ghost:hover{color:var(--text); background:rgba(255,255,255,.05)}
