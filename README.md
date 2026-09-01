@@ -201,7 +201,7 @@ systemctl restart moneybot          # если настроен автозапу
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -q                    # 280 тестов, без сети и без ключей
+pytest -q                    # 285 тестов, без сети и без ключей
 python -m bot.selftest       # прогнать реальные фразы через Claude (нужен ANTHROPIC_API_KEY)
 python -m bot.selftest --keep "отправил Салиму 200 сомони"   # разобрать одну фразу
 ```
@@ -353,6 +353,37 @@ Telegram
 но заметно дешевле.
 
 ## Если что-то не работает
+
+**Бот молчит на всё, даже на `/start`** — значит процесс не запущен. Живой бот молчать
+не может: он отвечает даже незнакомцу («у тебя нет доступа, твой id …»). Чаще всего так
+бывает, когда бот запускали руками в терминале, а потом отключились от сервера.
+
+```bash
+cd /root/AlijonMahmadjonov && bash setup.sh
+```
+
+На вопрос «Ввести ключи заново?» отвечай **н**, на «Настроить автозапуск?» — **д**.
+После этого бот поднимается сам и после перезагрузки, и после падений.
+
+Если автозапуск уже настроен:
+
+```bash
+systemctl restart moneybot && systemctl status moneybot --no-pager
+```
+
+Собрать всю картину разом (ключи не показывает — только есть они или нет):
+
+```bash
+cd /root/AlijonMahmadjonov && bash -c '
+echo "=== СЕРВИС:"; systemctl is-active moneybot 2>/dev/null || echo "  не настроен"
+echo "=== ПРОЦЕСС:"; pgrep -af "[b]ot\.main" || echo "  НЕ запущен"
+echo "=== GIT:"; git log --oneline -1; git status --short | head -5
+echo "=== .env:"; for k in TELEGRAM_BOT_TOKEN ALLOWED_USER_IDS OPENAI_API_KEY ANTHROPIC_API_KEY; do
+  grep -qE "^$k=.+" .env 2>/dev/null && echo "  $k: есть" || echo "  $k: НЕТ"; done
+echo "=== КОД:"; .venv/bin/python -c "import bot.main; print(\"  импортируется\")" 2>&1 | tail -5
+echo "=== ЛОГИ:"; journalctl -u moneybot -n 30 --no-pager 2>/dev/null || echo "  логов нет"
+'
+```
 
 **«Не заданы обязательные настройки»** — не заполнен `.env`. Скопируй `.env.example` и впиши ключи.
 

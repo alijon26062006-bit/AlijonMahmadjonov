@@ -413,25 +413,47 @@ def main() -> int:
     return finish()
 
 
+TERMINAL_WARNING = (
+    "Бот будет работать, только пока открыт этот терминал.\n"
+    "  Закроешь окно или отключишься от сервера — он остановится, "
+    "и в Телеграме замолчит на всё."
+)
+
+
 def finish(skip_setup: bool = False) -> int:
     python = Path(sys.executable)
 
-    if can_install_service() and not SERVICE_PATH.is_file():
-        say()
-        say(f"{BOLD}Автозапуск{OFF}")
-        hint("Бот будет сам подниматься после перезагрузки сервера и падений.")
-        if ask_yes("Настроить автозапуск?", default=True):
-            if install_service(python):
-                say(f"\n{GREEN}{BOLD}Готово. Бот работает.{OFF}")
-                say("Напиши ему в Телеграме — например: «Отправил Абубакру три тысячи сомони».")
-                return 0
-    elif SERVICE_PATH.is_file():
+    if SERVICE_PATH.is_file():
         say()
         ok("Автозапуск уже настроен")
         subprocess.run(["systemctl", "restart", SERVICE_NAME], check=False)
         say(f"\n{GREEN}{BOLD}Готово. Бот перезапущен с новыми настройками.{OFF}")
-        hint(f"Логи: journalctl -u {SERVICE_NAME} -f")
+        hint(f"Проверить:  systemctl status {SERVICE_NAME}")
+        hint(f"Логи:       journalctl -u {SERVICE_NAME} -f")
         return 0
+
+    if can_install_service():
+        say()
+        say(f"{BOLD}Автозапуск{OFF}")
+        hint("Бот будет сам подниматься после перезагрузки сервера и после падений.")
+        hint("Без него он живёт только пока открыт терминал — это главная причина,")
+        hint("по которой бот потом молча перестаёт отвечать.")
+        # Умолчание — «да»: отказ здесь почти всегда означает не осознанный выбор,
+        # а непонимание последствий.
+        if ask_yes("Настроить автозапуск?", default=True):
+            if install_service(python):
+                say(f"\n{GREEN}{BOLD}Готово. Бот работает и переживёт перезагрузку.{OFF}")
+                say("Напиши ему в Телеграме — например: «Отправил Абубакру три тысячи сомони».")
+                return 0
+        say()
+        say(f"{YELLOW}⚠ Автозапуск не настроен.{OFF}")
+        hint(TERMINAL_WARNING)
+        hint("Передумаешь — запусти ещё раз: bash setup.sh")
+    else:
+        say()
+        say(f"{YELLOW}⚠ Автозапуск настроить не смог{OFF} "
+            f"{DIM}(нужен root и systemd){OFF}")
+        hint(TERMINAL_WARNING)
 
     say(f"\n{GREEN}{BOLD}Запускаю бота.{OFF} {DIM}Остановить — Ctrl+C{OFF}")
     say("Напиши ему в Телеграме — например: «Отправил Абубакру три тысячи сомони».\n")

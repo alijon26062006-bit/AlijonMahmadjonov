@@ -193,3 +193,102 @@ def test_service_file_points_at_this_install(tmp_path):
     assert f"ExecStart={tmp_path}/.venv/bin/python -m bot.main" in unit
     assert "User=root" in unit
     assert "Restart=always" in unit
+
+
+# ── автозапуск: главная причина, по которой бот потом молчит ───────────────
+
+class Stop(Exception):
+    """Заглушка вместо реального запуска бота."""
+
+
+@pytest.fixture
+def wizard(monkeypatch, tmp_path):
+    """Мастер с подменённым systemd и запуском бота."""
+    import bot.main
+
+    state = {"installed": False, "restarted": False, "answers": [], "output": []}
+
+    monkeypatch.setattr(setup, "SERVICE_PATH", tmp_path / "moneybot.service")
+    monkeypatch.setattr(setup, "can_install_service", lambda: True)
+    monkeypatch.setattr(setup, "say", lambda text="": state["output"].append(text))
+    monkeypatch.setattr(setup, "hint", lambda text: state["output"].append(text))
+    monkeypatch.setattr(setup, "ok", lambda text: state["output"].append(text))
+
+    def fake_install(python):
+        state["installed"] = True
+        return True
+
+    def fake_run(cmd, **kwargs):
+        state["restarted"] = True
+
+    def refuse_to_run_bot():
+        raise Stop()
+
+    monkeypatch.setattr(setup, "install_service", fake_install)
+    monkeypatch.setattr(setup.subprocess, "run", fake_run)
+    monkeypatch.setattr(bot.main, "main", refuse_to_run_bot)
+    return state
+
+
+def text_of(state) -> str:
+    return "\n".join(state["output"])
+
+
+def test_autostart_is_offered_with_yes_as_the_default(wizard, monkeypatch):
+    """Отказ здесь почти всегда — непонимание последствий, а не выбор."""
+    asked = {}
+
+    def remember(prompt, default=True):
+        asked["default"] = default
+        return default
+
+    monkeypatch.setattr(setup, "ask_yes", remember)
+    setup.finish(skip_setup=True)
+
+    assert asked["default"] is True
+    assert wizard["installed"] is True
+
+
+def test_refusing_autostart_warns_about_the_terminal(wizard, monkeypatch):
+    """Именно этот случай и привёл к «бот молчит на всё»."""
+    monkeypatch.setattr(setup, "ask_yes", lambda prompt, default=True: False)
+
+    with pytest.raises(Stop):
+        setup.finish(skip_setup=True)
+
+    output = text_of(wizard)
+    assert wizard["installed"] is False
+    assert "только пока открыт этот терминал" in output
+    assert "замолчит на всё" in output
+    assert "bash setup.sh" in output       # как передумать
+
+
+def test_without_root_the_warning_is_still_shown(wizard, monkeypatch):
+    """Не смогли настроить — человек всё равно должен знать, чем это грозит."""
+    monkeypatch.setattr(setup, "can_install_service", lambda: False)
+
+    with pytest.raises(Stop):
+        setup.finish(skip_setup=True)
+
+    assert "только пока открыт этот терминал" in text_of(wizard)
+
+
+def test_existing_service_is_restarted_not_asked_about(wizard, monkeypatch):
+    """Повторный запуск на настроенном сервере просто перезапускает бота."""
+    setup.SERVICE_PATH.write_text("[Unit]\n")
+    monkeypatch.setattr(setup, "ask_yes",
+                        lambda *a, **kw: pytest.fail("не должен ничего спрашивать"))
+
+    assert setup.finish(skip_setup=True) == 0
+    assert wizard["restarted"] is True
+    assert "перезапущен" in text_of(wizard)
+
+
+def test_the_restart_path_tells_how_to_check_and_read_logs(wizard, monkeypatch):
+    setup.SERVICE_PATH.write_text("[Unit]\n")
+    monkeypatch.setattr(setup, "ask_yes", lambda *a, **kw: True)
+    setup.finish(skip_setup=True)
+
+    output = text_of(wizard)
+    assert "systemctl status" in output
+    assert "journalctl" in output
