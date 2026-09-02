@@ -28,6 +28,9 @@ class State:
     async def set_state(self, value):
         self.state = value
 
+    async def get_state(self):
+        return self.state
+
     async def update_data(self, **kwargs):
         self.data.update(kwargs)
 
@@ -260,8 +263,10 @@ async def test_a_command_lets_the_person_out(env):
 @pytest.mark.asyncio
 async def test_text_instead_of_a_photo_is_explained(env):
     message = Message("я оплатил честно")
+    state = State()
+    await state.set_state(topup.Topup.waiting_receipt)
 
-    await topup.not_a_receipt(message)
+    await topup.not_a_receipt(message, state)
 
     assert message.answers and "скриншот" in message.answers[0].lower()
 

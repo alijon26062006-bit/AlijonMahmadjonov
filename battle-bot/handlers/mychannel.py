@@ -11,7 +11,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from config import Config
-from services import keyboards, member_channel, texts
+from services import keyboards, member_channel, texts, ui
 from services.keyboards import BLUE, GREEN, RED
 from storage.repo import Repo
 from storage.settings import Settings
@@ -101,6 +101,9 @@ async def take_forward(
     message: Message, repo: Repo, config: Config, settings: Settings, state: FSMContext
 ) -> None:
     """Пересланный пост говорит, какой канал привязывать."""
+    if await ui.left_the_step(state):
+        raise SkipHandler()  # состояние сняли выше — это сообщение не наше
+
     chat_id, title, username, problem = member_channel.from_forward(message)
     if problem:
         await message.answer(problem)

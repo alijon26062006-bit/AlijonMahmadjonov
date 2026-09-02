@@ -68,6 +68,20 @@ def chat_id_of(target) -> int | None:
     return chat.id if chat is not None else None
 
 
+async def left_the_step(state) -> bool:
+    """Состояние уже сняли выше по цепочке — сообщение не наше.
+
+    aiogram запоминает состояние **один раз на апдейт**. Обработчик, который
+    снял состояние и передал сообщение дальше (``SkipHandler``), для
+    следующих фильтров всё ещё «в состоянии»: они срабатывают на снятом
+    состоянии и работают с пустыми данными. Так /start внутри ввода значения
+    в панели падал с KeyError вместо того, чтобы просто открыть меню.
+
+    Поэтому шаг мастера спрашивает состояние заново, а не верит фильтру.
+    """
+    return state is not None and await state.get_state() is None
+
+
 async def send(target, text: str, reply_markup=None, **kwargs):
     """Отправить новое сообщение туда, откуда пришло нажатие.
 

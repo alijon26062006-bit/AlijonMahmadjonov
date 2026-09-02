@@ -113,6 +113,9 @@ async def leave_wizard(message: Message, state: FSMContext) -> None:
 
 @router.message(Cast.media)
 async def got_media(message: Message, state: FSMContext) -> None:
+    if await ui.left_the_step(state):
+        raise SkipHandler()  # состояние сняли выше — это сообщение не наше
+
     found = broadcast.extract_media(message)
     if found is None:
         if message.text:
@@ -154,6 +157,9 @@ async def skip_media(callback: CallbackQuery, config: Config, state: FSMContext)
 
 @router.message(Cast.text)
 async def got_text(message: Message, state: FSMContext) -> None:
+    if await ui.left_the_step(state):
+        raise SkipHandler()  # состояние сняли выше — это сообщение не наше
+
     draft = _draft(await state.get_data())
     try:
         draft.text = validation.as_text(message.html_text or message.text or "")
@@ -210,6 +216,9 @@ async def ask_label(callback: CallbackQuery, config: Config, state: FSMContext) 
 
 @router.message(Cast.button_label)
 async def got_label(message: Message, state: FSMContext) -> None:
+    if await ui.left_the_step(state):
+        raise SkipHandler()  # состояние сняли выше — это сообщение не наше
+
     try:
         label = validation.as_text(message.text or "", limit=64)
     except InputError as error:
@@ -227,6 +236,9 @@ async def got_label(message: Message, state: FSMContext) -> None:
 
 @router.message(Cast.button_url)
 async def got_url(message: Message, state: FSMContext) -> None:
+    if await ui.left_the_step(state):
+        raise SkipHandler()  # состояние сняли выше — это сообщение не наше
+
     try:
         url = validation.as_url(message.text or "")
     except InputError as error:

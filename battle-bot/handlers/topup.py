@@ -102,6 +102,9 @@ async def take_receipt(
     state: FSMContext,
 ) -> None:
     """Получили чек — отправляем админу на решение."""
+    if await ui.left_the_step(state):
+        raise SkipHandler()  # состояние сняли выше — это сообщение не наше
+
     data = await state.get_data()
     topup = repo.topup(int(data.get("topup_id", 0)))
     await state.clear()
@@ -133,8 +136,11 @@ async def command_leaves_receipt(message: Message, repo: Repo, state: FSMContext
 
 
 @router.message(Topup.waiting_receipt)
-async def not_a_receipt(message: Message) -> None:
+async def not_a_receipt(message: Message, state: FSMContext) -> None:
     """Прислали текст вместо картинки — объясняем, а заявку не теряем."""
+    if await ui.left_the_step(state):
+        raise SkipHandler()  # состояние сняли выше — это сообщение не наше
+
     await message.answer(texts.MANUAL_NEED_PHOTO, reply_markup=keyboards.manual_wait())
 
 

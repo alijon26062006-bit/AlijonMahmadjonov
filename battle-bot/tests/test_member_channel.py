@@ -344,11 +344,16 @@ def test_stats_count_live_channels_and_posts(env):
 # ---------------------------------------------------------------- сценарий
 
 class State:
-    def __init__(self) -> None:
-        self.value = None
+    """Ожидание пересылки — как у настоящего бота в этот момент."""
+
+    def __init__(self, value=mychannel.MyChannel.waiting_forward) -> None:
+        self.value = value
 
     async def set_state(self, value) -> None:
         self.value = value
+
+    async def get_state(self):
+        return self.value
 
     async def clear(self) -> None:
         self.value = None

@@ -1179,9 +1179,15 @@ async def receive_value(
 ) -> None:
     if not is_admin(message.from_user.id, config):
         return
+    if await ui.left_the_step(state):
+        raise SkipHandler()  # состояние сняли выше — это сообщение не наше
 
     data = await state.get_data()
     key = data.get("key")
+    if not key:
+        # состояния нет, а данных тем более: пусть сообщение идёт дальше
+        await state.clear()
+        raise SkipHandler()
 
     try:
         await _apply(message, key, data, repo, config, engine, settings, state)

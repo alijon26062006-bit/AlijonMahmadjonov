@@ -156,6 +156,9 @@ async def amount_entered(
     message: Message, repo: Repo, settings: Settings, state: FSMContext
 ) -> None:
     """Человек ввёл количество — считаем сумму и показываем к оплате."""
+    if await ui.left_the_step(state):
+        raise SkipHandler()  # состояние сняли выше — это сообщение не наше
+
     price = settings.vote_price
     limit = max_votes(price)
     try:

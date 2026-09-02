@@ -6,6 +6,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from aiogram.dispatcher.event.bases import SkipHandler
+
 from core.engine import BattleEngine
 from core.models import VoteSource
 from handlers import panel
@@ -621,6 +623,9 @@ class FakeState:
     async def get_data(self):
         return self.data
 
+    async def get_state(self):
+        return None if self.cleared else "Panel:waiting_value"
+
     async def clear(self):
         self.cleared = True
 
@@ -773,3 +778,40 @@ def test_buying_also_releases_on_a_menu_button():
     assert magic(Stub("👤 Профиль"))
     assert magic(Stub("/start"))
     assert not magic(Stub("15"))
+
+
+# ------------------------------------------- выход из ввода командой
+
+@pytest.mark.asyncio
+async def test_a_command_leaves_the_input_and_is_handled_further(env):
+    """«/start» внутри ввода значения должен открыть меню, а не упасть.
+
+    aiogram запоминает состояние один раз на апдейт: обработчик, который снял
+    состояние и передал сообщение дальше, для следующих фильтров всё ещё
+    «в состоянии». Раньше приём значения срабатывал на снятом состоянии,
+    брал пустые данные и падал с KeyError: None.
+    """
+    repo, config, settings, engine = env
+    state = FakeState({"key": "vote_price", "back": "votes"})
+    message = FakeMessage(text="/start join")
+
+    with pytest.raises(SkipHandler):
+        await panel.command_escapes_input(message, state)
+    assert state.cleared
+
+    # то же сообщение идёт дальше по цепочке — и приём значения его не берёт
+    with pytest.raises(SkipHandler):
+        await panel.receive_value(message, repo, config, engine, settings, state)
+
+    assert message.replies == [], "человек не должен видеть жалобу на ввод"
+
+
+@pytest.mark.asyncio
+async def test_an_empty_key_does_not_break_the_panel(env):
+    """Состояние есть, а данных нет — сообщение просто идёт дальше."""
+    repo, config, settings, engine = env
+    state = FakeState({})
+    message = FakeMessage(text="что-нибудь")
+
+    with pytest.raises(SkipHandler):
+        await panel.receive_value(message, repo, config, engine, settings, state)
