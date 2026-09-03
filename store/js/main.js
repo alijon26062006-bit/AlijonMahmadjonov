@@ -113,8 +113,7 @@ function card(p) {
     <div class="card__media">
       ${off ? `<span class="card__badge">−${off}%</span>` : ''}
       ${p.hit ? `<span class="card__hit">${t('Хит', 'Хит')}</span>` : ''}
-      <img src="assets/products/${p.id}.jpg" alt="${p.name}" loading="lazy"
-           onerror="this.replaceWith(placeholder())">
+      <img src="assets/products/${p.id}.jpg" alt="${p.name}" loading="lazy">
     </div>
     <div class="card__body">
       <span class="card__brand">${p.brand}</span>
@@ -146,6 +145,12 @@ function renderGrid() {
   $('#empty').hidden = list.length > 0;
 
   $$('.add').forEach(btn => btn.addEventListener('click', () => addToCart(btn.dataset.id)));
+
+  // фото товара может ещё не быть — тогда показываем контур телефона
+  $$('.card__media img').forEach(img => {
+    if (img.complete && !img.naturalWidth) img.replaceWith(placeholder());
+    else img.addEventListener('error', () => img.replaceWith(placeholder()), { once: true });
+  });
 }
 
 $('#search').addEventListener('input', e => {
