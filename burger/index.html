@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Burger — бургеры и доставка в Душанбе</title>
+<meta name="description" content="The Burger — сочные бургеры из 100% мяса в Душанбе. Ул. Айни 49, ориентир GulyaGold. Доставка 30–40 минут, каждый день с 9:00 до 00:00.">
+<meta name="theme-color" content="#14130e">
+
+<meta property="og:type" content="restaurant">
+<meta property="og:title" content="The Burger — бургеры из 100% мяса, Душанбе">
+<meta property="og:description" content="Гриль после заказа, доставка 30–40 минут. Ул. Айни 49, ориентир GulyaGold.">
+<meta property="og:image" content="assets/logo.jpg">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="topline">
+  <div class="wrap topline__row">
+    <span class="topline__work">Каждый день <b>9:00 – 00:00</b></span>
+    <span class="topline__sep"></span>
+    <span class="topline__addr">ул. Айни 49 · ориентир GulyaGold</span>
+    <a class="topline__tg" href="https://t.me/theburgertj" target="_blank" rel="noopener">t.me/theburgertj</a>
+  </div>
+</div>
+
+<header class="head" id="head">
+  <div class="wrap head__row">
+    <a class="brand" href="#top">
+      <img class="brand__logo" src="assets/logo.jpg" alt="The Burger">
+      <span class="brand__name">The&nbsp;Burger</span>
+    </a>
+
+    <nav class="head__nav">
+      <a href="#menu">Меню</a>
+      <a href="#howto">Как заказать</a>
+      <a href="#delivery">Доставка</a>
+      <a href="#place">Заведение</a>
+    </nav>
+
+    <a class="head__phone" href="tel:+992939171997">+992 93 917 19 97</a>
+
+    <button class="basket-btn" id="basket-open" type="button">
+      <span class="basket-btn__label">Корзина</span>
+      <span class="basket-btn__sum" id="basket-sum">0 с.</span>
+    </button>
+
+    <button class="burger-btn" id="nav-toggle" type="button" aria-label="Меню сайта"><span></span><span></span><span></span></button>
+  </div>
+</header>
+
+<main>
+
+<section class="hero" id="top">
+  <div class="wrap hero__row">
+    <div class="hero__text">
+      <p class="hero__eyebrow">Душанбе · с 2021 года</p>
+      <h1>Сочные бургеры<br>из <span>100% мяса</span></h1>
+      <p class="hero__lead">
+        Котлету жарим на гриле после того, как вы нажали «заказать». Булочку печём каждое утро.
+        Ничего не лежит под лампой и не ждёт своего часа.
+      </p>
+      <div class="hero__cta">
+        <a class="btn btn--gold" href="#menu">Смотреть меню</a>
+        <a class="btn btn--line" href="tel:+992939171997">Заказать по телефону</a>
+      </div>
+      <dl class="hero__facts">
+        <div><dt>30–40</dt><dd>минут доставка</dd></div>
+        <div><dt>от 100 с.</dt><dd>доставка бесплатно</dd></div>
+        <div><dt>11,9 тыс.</dt><dd>в Instagram</dd></div>
+      </dl>
+    </div>
+
+    <div class="hero__plate">
+      <img src="assets/dishes/classic.jpg" alt="Бургер Классик" id="hero-photo">
+      <figure class="hero__mark" id="hero-mark">
+        <img src="assets/logo.jpg" alt="Знак The Burger">
+      </figure>
+      <div class="hero__ticket">
+        <span>гриль после заказа</span>
+        <b>без полуфабрикатов</b>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="menu" id="menu">
+  <div class="wrap">
+    <div class="menu__head">
+      <h2 class="h-display">Меню</h2>
+      <p>Цены в сомони. Состав и вес — как на кухне, без округлений в свою пользу.</p>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <div class="wrap tabs__row" id="tabs-row"></div>
+  </div>
+
+  <div class="wrap" id="menu-body"></div>
+</section>
+
+<section class="howto" id="howto">
+  <div class="wrap">
+    <h2 class="h-display">Как заказать</h2>
+    <ol class="steps">
+      <li>
+        <span class="steps__num">1</span>
+        <h3>Собираете корзину</h3>
+        <p>Отмечаете бургеры, снэки и напитки. Корзина считает сумму и доставку сразу.</p>
+      </li>
+      <li>
+        <span class="steps__num">2</span>
+        <h3>Выбираете доставку или самовывоз</h3>
+        <p>Доставка по городу 15 сомони, от 100 сомони — бесплатно. Самовывоз с ул. Айни 49.</p>
+      </li>
+      <li>
+        <span class="steps__num">3</span>
+        <h3>Подтверждаем звонком</h3>
+        <p>Заказ уходит нам в Telegram. Перезваниваем в течение пяти минут и ставим на гриль.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="delivery" id="delivery">
+  <div class="wrap delivery__row">
+    <div class="delivery__text">
+      <h2 class="h-display">Доставка и самовывоз</h2>
+      <ul class="dots">
+        <li><b>30–40 минут</b> по центру города, в час пик до часа — скажем честно при заказе</li>
+        <li><b>15 сомони</b> доставка, при заказе <b>от 100 сомони</b> — бесплатно</li>
+        <li>Минимальный заказ на доставку — <b>40 сомони</b></li>
+        <li>Самовывоз готов через <b>15 минут</b>, оплата на месте</li>
+        <li>Работаем каждый день с <b>9:00 до 00:00</b>, последний заказ в 23:30</li>
+      </ul>
+      <div class="delivery__phones">
+        <a class="btn btn--gold" href="tel:+992939171997">+992 93 917 19 97</a>
+        <a class="btn btn--line" href="tel:+992063202020">+992 06 320 20 20</a>
+      </div>
+    </div>
+
+    <div class="zone">
+      <div class="zone__head">
+        <span>Зона доставки</span>
+        <b>Душанбе</b>
+      </div>
+      <ul class="zone__list">
+        <li><span>Центр, Айни, Рудаки</span><b>15 с.</b></li>
+        <li><span>Сино, Фирдавси</span><b>15 с.</b></li>
+        <li><span>Шохмансур, И. Сомони</span><b>20 с.</b></li>
+        <li><span>За городом</span><b>по договорённости</b></li>
+      </ul>
+      <p class="zone__note">Точную сумму подтверждаем по телефону, сюрпризов у курьера не бывает.</p>
+    </div>
+  </div>
+</section>
+
+<section class="place" id="place">
+  <div class="wrap place__row">
+    <div class="place__card">
+      <img src="assets/logo.jpg" alt="The Burger">
+    </div>
+    <div class="place__text">
+      <h2 class="h-display">Заведение</h2>
+      <p>
+        Мы на ул. Айни 49, ориентир GulyaGold. Открытая кухня — видно, как жарится ваша котлета.
+        Внутри 40 мест, летом работает веранда.
+      </p>
+      <p>
+        Мясо берём у местного поставщика и рубим сами каждый день. Соусы делаем на кухне,
+        поэтому «как в прошлый раз» — это реально одно и то же.
+      </p>
+      <div class="place__grid">
+        <div><span>Адрес</span><b>ул. Айни 49, ориентир GulyaGold</b></div>
+        <div><span>Часы</span><b>9:00 – 00:00, без выходных</b></div>
+        <div><span>Телефоны</span><b><a href="tel:+992939171997">+992 93 917 19 97</a><br><a href="tel:+992063202020">+992 06 320 20 20</a></b></div>
+        <div><span>Мы в сети</span><b><a href="https://instagram.com/theburger.tj" target="_blank" rel="noopener">@theburger.tj</a><br><a href="https://t.me/theburgertj" target="_blank" rel="noopener">t.me/theburgertj</a></b></div>
+      </div>
+      <a class="btn btn--line" href="https://www.google.com/maps/search/%D1%83%D0%BB%D0%B8%D1%86%D0%B0+%D0%A1%D0%B0%D0%B4%D1%80%D0%B8%D0%B4%D0%B4%D0%B8%D0%BD%D0%B0+%D0%90%D0%B9%D0%BD%D0%B8+49+Dushanbe" target="_blank" rel="noopener">Открыть на карте</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot__row">
+    <div class="foot__brand">
+      <img src="assets/logo.jpg" alt="The Burger">
+      <p>Сочные бургеры из 100% мяса.<br>Душанбе, ул. Айни 49.</p>
+    </div>
+    <nav class="foot__nav">
+      <a href="#menu">Меню</a>
+      <a href="#howto">Как заказать</a>
+      <a href="#delivery">Доставка</a>
+      <a href="#place">Заведение</a>
+    </nav>
+    <div class="foot__contacts">
+      <a href="tel:+992939171997">+992 93 917 19 97</a>
+      <a href="tel:+992063202020">+992 06 320 20 20</a>
+      <a href="https://t.me/theburgertj" target="_blank" rel="noopener">t.me/theburgertj</a>
+      <a href="https://instagram.com/theburger.tj" target="_blank" rel="noopener">@theburger.tj</a>
+    </div>
+  </div>
+  <div class="wrap foot__bottom">© <span id="year"></span> The Burger · Душанбе</div>
+</footer>
+
+<!-- корзина оформлена как чек -->
+<div class="basket" id="basket" hidden>
+  <div class="basket__fade" data-close></div>
+  <aside class="basket__panel" role="dialog" aria-modal="true" aria-label="Корзина">
+    <div class="basket__head">
+      <b class="h-display">Ваш заказ</b>
+      <button class="x" type="button" data-close aria-label="Закрыть">&times;</button>
+    </div>
+
+    <div class="receipt" id="receipt"></div>
+
+    <div class="basket__mode" id="mode">
+      <button type="button" class="is-active" data-mode="delivery">Доставка</button>
+      <button type="button" data-mode="pickup">Самовывоз</button>
+    </div>
+
+    <div class="totals" id="totals"></div>
+
+    <button class="btn btn--gold btn--full" id="to-order" type="button">Оформить заказ</button>
+    <p class="basket__min" id="min-note"></p>
+  </aside>
+</div>
+
+<!-- форма заказа -->
+<div class="order" id="order" hidden>
+  <div class="order__fade" data-close></div>
+  <div class="order__box" role="dialog" aria-modal="true" aria-label="Оформление заказа">
+    <button class="x order__x" type="button" data-close aria-label="Закрыть">&times;</button>
+    <b class="h-display order__title">Куда везём</b>
+
+    <form id="order-form" novalidate>
+      <label class="fld">
+        <span>Как вас зовут</span>
+        <input name="name" type="text" autocomplete="name" placeholder="Далер" required>
+      </label>
+
+      <label class="fld">
+        <span>Телефон</span>
+        <input name="phone" type="tel" autocomplete="tel" placeholder="+992 93 000 00 00" required>
+      </label>
+
+      <label class="fld" id="addr-field">
+        <span>Адрес доставки</span>
+        <input name="address" type="text" placeholder="ул. Рудаки 12, кв. 4">
+      </label>
+
+      <label class="fld">
+        <span>Комментарий к заказу</span>
+        <input name="note" type="text" placeholder="Без лука, позвонить у подъезда">
+      </label>
+
+      <p class="fld__err" id="order-err" hidden></p>
+
+      <div class="order__sum">
+        <span>К оплате</span>
+        <b id="order-total">0 с.</b>
+      </div>
+
+      <button class="btn btn--gold btn--full" type="submit">Отправить заказ в Telegram</button>
+      <a class="btn btn--line btn--full" id="order-call" href="tel:+992939171997">Лучше позвоните мне</a>
+      <p class="order__hint">
+        Заказ откроется в Telegram готовым сообщением — останется нажать «отправить».
+        Текст заказа заодно скопируется в буфер.
+      </p>
+    </form>
+  </div>
+</div>
+
+<div class="snack" id="snack" hidden></div>
+
+<script src="js/menu.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
