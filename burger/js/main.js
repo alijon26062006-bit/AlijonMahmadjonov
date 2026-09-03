@@ -38,14 +38,14 @@ function bigCard(d) {
   <article class="dish">
     <div class="shot">
       ${tagHtml(d.tag)}
-      <img src="assets/dishes/${d.id}.jpg" alt="${d.name}" loading="lazy">
+      <img src="assets/dishes/${d.id}.jpg" alt="${d.name}" width="1216" height="896" loading="lazy">
       <div class="chip">
         <b>${som(d.price)}</b>
         ${d.oldPrice ? `<s>${som(d.oldPrice)}</s>` : ''}
       </div>
     </div>
     <div class="dish__body">
-      <h3>${d.name}</h3>
+      <h4>${d.name}</h4>
       <p class="dish__about">${d.about}</p>
       <div class="dish__foot">
         <span class="dish__weight">${d.weight} г</span>
@@ -211,14 +211,20 @@ $$('#mode button').forEach(btn => btn.addEventListener('click', () => {
 
 /* ── окна ───────────────────────────────────────────── */
 
+let returnFocusTo = null;
+
 function open(sel) {
+  returnFocusTo = document.activeElement;
   $(sel).hidden = false;
   document.body.classList.add('is-fixed');
 }
+
 function closeAll() {
+  const wasOpen = !$('#basket').hidden || !$('#order').hidden;
   $('#basket').hidden = true;
   $('#order').hidden = true;
   document.body.classList.remove('is-fixed');
+  if (wasOpen && returnFocusTo) returnFocusTo.focus();
 }
 
 $('#basket-open').addEventListener('click', () => open('#basket'));
@@ -279,7 +285,40 @@ $('#order-form').addEventListener('submit', e => {
   }
 });
 
+const phoneField = $('#order-form').elements.phone;
+phoneField.addEventListener('blur', () => {
+  const digits = phoneField.value.replace(/\D/g, '');
+  const err = $('#order-err');
+  if (phoneField.value && digits.length < 9) {
+    err.textContent = 'В номере не хватает цифр — проверьте, пожалуйста.';
+    err.hidden = false;
+  } else if (!err.hidden && digits.length >= 9) {
+    err.hidden = true;
+  }
+});
+
 $('#order-call').href = `tel:${PHONE_MAIN}`;
+
+/* Карточки появляются волной при прокрутке. Стартуют из видимого
+   состояния, а не из нуля: если наблюдателя нет или включён режим
+   уменьшенной анимации — меню просто на месте. */
+function revealDishes() {
+  const slow = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (slow || !('IntersectionObserver' in window)) return;
+
+  const io = new IntersectionObserver((entries, obs) => {
+    entries.filter(en => en.isIntersecting).forEach((en, i) => {
+      en.target.style.setProperty('--delay', `${Math.min(i, 5) * 60}ms`);
+      en.target.classList.add('is-in');
+      obs.unobserve(en.target);
+    });
+  }, { rootMargin: '0px 0px -12% 0px', threshold: .15 });
+
+  $$('.dish, .line').forEach(el => {
+    el.classList.add('will-rise');
+    io.observe(el);
+  });
+}
 
 /* ── вкладки категорий ──────────────────────────────── */
 
@@ -320,6 +359,7 @@ window.addEventListener('scroll', () => {
 $('#year').textContent = new Date().getFullYear();
 
 renderMenu();
+revealDishes();
 watchTabs();
 $$('#mode button').forEach(b => b.classList.toggle('is-active', b.dataset.mode === mode));
 $('#addr-field').hidden = mode === 'pickup';

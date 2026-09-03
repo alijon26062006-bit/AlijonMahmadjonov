@@ -57,8 +57,9 @@
 
 <section class="hero" id="top">
   <div class="hero__media">
-    <img src="assets/hero.jpg" alt="" id="hero-photo">
+    <img src="assets/hero.jpg" alt="" id="hero-photo" width="2688" height="1536">
   </div>
+  <div class="hero__glow" aria-hidden="true"></div>
   <div class="wrap hero__inner">
     <div class="hero__text">
       <p class="hero__eyebrow">Душанбе · с 2021 года</p>
@@ -159,7 +160,7 @@
 <section class="place" id="place">
   <div class="wrap place__row">
     <div class="place__card">
-      <img src="assets/place.jpg" alt="Зал The Burger" id="place-photo">
+      <img src="assets/place.jpg" alt="Зал The Burger" id="place-photo" width="1216" height="1520">
       <img class="place__logo" src="assets/logo.jpg" alt="The Burger">
     </div>
     <div class="place__text">
@@ -218,7 +219,7 @@
 
     <div class="receipt" id="receipt"></div>
 
-    <div class="basket__mode" id="mode">
+    <div class="basket__mode" id="mode" role="group" aria-label="Способ получения">
       <button type="button" class="is-active" data-mode="delivery">Доставка</button>
       <button type="button" data-mode="pickup">Самовывоз</button>
     </div>
@@ -250,7 +251,7 @@
 
       <label class="fld" id="addr-field">
         <span>Адрес доставки</span>
-        <input name="address" type="text" placeholder="ул. Рудаки 12, кв. 4">
+        <input name="address" type="text" autocomplete="street-address" placeholder="ул. Рудаки 12, кв. 4">
       </label>
 
       <label class="fld">
@@ -258,7 +259,7 @@
         <input name="note" type="text" placeholder="Без лука, позвонить у подъезда">
       </label>
 
-      <p class="fld__err" id="order-err" hidden></p>
+      <p class="fld__err" id="order-err" role="alert" hidden></p>
 
       <div class="order__sum">
         <span>К оплате</span>
@@ -275,7 +276,7 @@
   </div>
 </div>
 
-<div class="snack" id="snack" hidden></div>
+<div class="snack" id="snack" role="status" aria-live="polite" hidden></div>
 
 <script src="js/menu.js"></script>
 <script src="js/main.js"></script>
