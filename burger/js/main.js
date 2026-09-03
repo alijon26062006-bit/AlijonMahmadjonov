@@ -212,17 +212,29 @@ $$('#mode button').forEach(btn => btn.addEventListener('click', () => {
 /* ── окна ───────────────────────────────────────────── */
 
 let returnFocusTo = null;
+const slowMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function open(sel) {
+  const el = $(sel);
   returnFocusTo = document.activeElement;
-  $(sel).hidden = false;
+  el.hidden = false;
+  // класс ставим следующим кадром, иначе переход не запустится
+  requestAnimationFrame(() => el.classList.add('is-open'));
   document.body.classList.add('is-fixed');
 }
 
 function closeAll() {
-  const wasOpen = !$('#basket').hidden || !$('#order').hidden;
-  $('#basket').hidden = true;
-  $('#order').hidden = true;
+  let wasOpen = false;
+
+  ['#basket', '#order'].forEach(sel => {
+    const el = $(sel);
+    if (el.hidden) return;
+    wasOpen = true;
+    el.classList.remove('is-open');
+    if (slowMotion()) el.hidden = true;
+    else setTimeout(() => { if (!el.classList.contains('is-open')) el.hidden = true; }, 420);
+  });
+
   document.body.classList.remove('is-fixed');
   if (wasOpen && returnFocusTo) returnFocusTo.focus();
 }
@@ -232,9 +244,12 @@ $$('[data-close]').forEach(el => el.addEventListener('click', closeAll));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
 
 $('#to-order').addEventListener('click', () => {
-  $('#basket').hidden = true;
+  const basket = $('#basket');
+  basket.classList.remove('is-open');
+  setTimeout(() => { basket.hidden = true; }, slowMotion() ? 0 : 420);
+
   open('#order');
-  $('#order-form').elements.name.focus();
+  setTimeout(() => $('#order-form').elements.name.focus(), 120);
 });
 
 /* ── отправка заказа ────────────────────────────────── */
@@ -302,9 +317,8 @@ $('#order-call').href = `tel:${PHONE_MAIN}`;
 /* Карточки появляются волной при прокрутке. Стартуют из видимого
    состояния, а не из нуля: если наблюдателя нет или включён режим
    уменьшенной анимации — меню просто на месте. */
-function revealDishes() {
-  const slow = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (slow || !('IntersectionObserver' in window)) return;
+function revealOnScroll() {
+  if (slowMotion() || !('IntersectionObserver' in window)) return;
 
   const io = new IntersectionObserver((entries, obs) => {
     entries.filter(en => en.isIntersecting).forEach((en, i) => {
@@ -314,10 +328,13 @@ function revealDishes() {
     });
   }, { rootMargin: '0px 0px -12% 0px', threshold: .15 });
 
-  $$('.dish, .line').forEach(el => {
+  $$('.dish, .line, [data-rise]').forEach(el => {
     el.classList.add('will-rise');
     io.observe(el);
   });
+
+  // страховка: если наблюдатель почему-то не сработал, всё видно через 3 с
+  setTimeout(() => $$('.will-rise').forEach(el => el.classList.add('is-in')), 3000);
 }
 
 /* ── вкладки категорий ──────────────────────────────── */
@@ -331,6 +348,13 @@ function watchTabs() {
       if (!en.isIntersecting) return;
       const id = en.target.id.replace('sec-', '');
       links.forEach(a => a.classList.toggle('is-active', a.dataset.sec === id));
+
+      const active = links.find(a => a.dataset.sec === id);
+      const row = $('#tabs-row');
+      if (active && row.scrollWidth > row.clientWidth) {
+        const shift = active.offsetLeft - (row.clientWidth - active.offsetWidth) / 2;
+        row.scrollTo({ left: Math.max(shift, 0), behavior: slowMotion() ? 'auto' : 'smooth' });
+      }
     });
   }, { rootMargin: '-140px 0px -70% 0px' });
 
@@ -359,7 +383,7 @@ window.addEventListener('scroll', () => {
 $('#year').textContent = new Date().getFullYear();
 
 renderMenu();
-revealDishes();
+revealOnScroll();
 watchTabs();
 $$('#mode button').forEach(b => b.classList.toggle('is-active', b.dataset.mode === mode));
 $('#addr-field').hidden = mode === 'pickup';
