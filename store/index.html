@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RealPhone — смартфоны и аксессуары в Душанбе</title>
+<meta name="description" content="RealPhone — магазин смартфонов и аксессуаров в Душанбе. Оригинальная техника, гарантия 1 год, покупка в рассрочку (насия), доставка по городу.">
+<meta name="theme-color" content="#1b3ec4">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="RealPhone — смартфоны и аксессуары в Душанбе">
+<meta property="og:description" content="Оригинальные смартфоны, гарантия 1 год, рассрочка без переплаты.">
+<meta property="og:image" content="assets/shop.jpg">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- верхняя полоса: контакты и язык -->
+<div class="topbar">
+  <div class="container topbar__row">
+    <div class="topbar__info">
+      <span class="topbar__item">
+        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>
+        <span data-ru="Душанбе, ул. Айни 24" data-tj="Душанбе, кӯчаи Айнӣ 24"></span>
+      </span>
+      <span class="topbar__item topbar__item--hide-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 10.6 4 2.3-.9 1.5-5.1-3V6h2v6.6Z"/></svg>
+        <span data-ru="Каждый день 9:00 – 20:00" data-tj="Ҳар рӯз 9:00 – 20:00"></span>
+      </span>
+    </div>
+    <div class="topbar__side">
+      <a class="topbar__phone" href="tel:+992900000000">+992 90 000 00 00</a>
+      <div class="lang" role="group" aria-label="Язык / Забон">
+        <button class="lang__btn is-active" data-lang="ru" type="button">RU</button>
+        <button class="lang__btn" data-lang="tj" type="button">TJ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- шапка -->
+<header class="header" id="header">
+  <div class="container header__row">
+    <a class="logo" href="#top">
+      <svg class="logo__mark" viewBox="0 0 40 40" aria-hidden="true">
+        <path d="M20 2 5 12v16l15 10 15-10V12L20 2Z" fill="#1b3ec4"/>
+        <path d="M20 2 5 12l15 8 15-8L20 2Z" fill="#4c86ff"/>
+        <circle cx="20" cy="21" r="5" fill="#fff"/>
+      </svg>
+      <span class="logo__text">Real<b>Phone</b></span>
+    </a>
+
+    <form class="search" role="search" onsubmit="return false">
+      <svg class="search__icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2a8 8 0 1 0 4.9 14.3l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z"/></svg>
+      <input id="search" type="search" autocomplete="off"
+             data-ru-placeholder="Поиск: iPhone, Samsung, наушники…"
+             data-tj-placeholder="Ҷустуҷӯ: iPhone, Samsung, гӯшмонак…">
+    </form>
+
+    <nav class="header__nav">
+      <a href="#catalog" data-ru="Каталог" data-tj="Каталог"></a>
+      <a href="#nasiya" data-ru="Рассрочка" data-tj="Насия"></a>
+      <a href="#about" data-ru="О магазине" data-tj="Дар бораи мағоза"></a>
+      <a href="#contacts" data-ru="Контакты" data-tj="Тамос"></a>
+    </nav>
+
+    <button class="cart-btn" id="cart-open" type="button">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM7.2 14.8l.9-1.8h7.45c.75 0 1.41-.41 1.75-1.03l3.24-5.88A1 1 0 0 0 19.66 4H5.21l-.94-2H1v2h2l3.6 7.59-1.35 2.44C4.52 14.37 5.48 16 7 16h12v-2H7.42a.22.22 0 0 1-.22-.2l.03-.12Z"/></svg>
+      <span class="cart-btn__count" id="cart-count" hidden>0</span>
+    </button>
+
+    <button class="burger" id="burger" type="button" aria-label="Меню"><span></span><span></span><span></span></button>
+  </div>
+</header>
+
+<main>
+
+<!-- баннер -->
+<section class="hero" id="top">
+  <div class="container hero__row">
+    <div class="hero__text">
+      <span class="hero__badge" data-ru="Рассрочка 0% на 3 месяца" data-tj="Насия 0% ба 3 моҳ"></span>
+      <h1 data-ru="Оригинальные смартфоны в Душанбе" data-tj="Смартфонҳои аслӣ дар Душанбе"></h1>
+      <p data-ru="Apple, Samsung, Xiaomi и аксессуары. Гарантия 1 год, проверка при вас, доставка по городу в день заказа."
+         data-tj="Apple, Samsung, Xiaomi ва аксессуарҳо. Кафолати 1 сол, тафтиш дар назди шумо, расонидан дар як рӯз."></p>
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="#catalog" data-ru="Смотреть каталог" data-tj="Дидани каталог"></a>
+        <a class="btn btn--ghost" href="#nasiya" data-ru="Купить в насия" data-tj="Хариди ба насия"></a>
+      </div>
+      <ul class="hero__facts">
+        <li><b>1 год</b><span data-ru="гарантия" data-tj="кафолат"></span></li>
+        <li><b>0%</b><span data-ru="переплата" data-tj="иловапулӣ"></span></li>
+        <li><b>2 ч</b><span data-ru="доставка" data-tj="расонидан"></span></li>
+      </ul>
+    </div>
+    <div class="hero__media">
+      <img src="assets/shop.jpg" alt="Витрина магазина RealPhone в Душанбе" loading="eager">
+    </div>
+  </div>
+</section>
+
+<!-- категории -->
+<section class="section section--tight">
+  <div class="container">
+    <div class="cats" id="cats"></div>
+  </div>
+</section>
+
+<!-- каталог -->
+<section class="section" id="catalog">
+  <div class="container">
+    <div class="section__head">
+      <h2 data-ru="Каталог" data-tj="Каталог"></h2>
+      <select id="sort" class="select">
+        <option value="popular" data-ru="Сначала популярные" data-tj="Аввал маъмултарин"></option>
+        <option value="cheap" data-ru="Сначала дешёвые" data-tj="Аввал арзонтар"></option>
+        <option value="expensive" data-ru="Сначала дорогие" data-tj="Аввал гаронтар"></option>
+      </select>
+    </div>
+
+    <div class="filters" id="filters"></div>
+    <div class="grid" id="grid"></div>
+    <p class="empty" id="empty" hidden data-ru="Ничего не нашли. Попробуйте другой запрос." data-tj="Чизе ёфт нашуд. Дигар хел ҷустуҷӯ кунед."></p>
+  </div>
+</section>
+
+<!-- калькулятор насия -->
+<section class="section section--blue" id="nasiya">
+  <div class="container nasiya">
+    <div class="nasiya__text">
+      <h2 data-ru="Покупка в рассрочку" data-tj="Хариди ба насия"></h2>
+      <p data-ru="Нужен только паспорт. Первый взнос от 20%, остальное делим на равные месяцы. На 3 месяца — без переплаты."
+         data-tj="Танҳо шиноснома лозим аст. Пардохти аввал аз 20%, боқимонда ба моҳҳои баробар тақсим мешавад. Ба 3 моҳ — бе иловапулӣ."></p>
+      <ul class="ticks">
+        <li data-ru="Оформляем за 15 минут в магазине" data-tj="Дар 15 дақиқа дар мағоза ба расмият медарорем"></li>
+        <li data-ru="Без справки о доходах" data-tj="Бе маълумотнома дар бораи даромад"></li>
+        <li data-ru="Досрочное погашение без штрафа" data-tj="Пеш аз мӯҳлат пардохтан бе ҷарима"></li>
+      </ul>
+    </div>
+
+    <div class="calc">
+      <label class="calc__field">
+        <span data-ru="Стоимость товара, сомони" data-tj="Нархи мол, сомонӣ"></span>
+        <input type="number" id="calc-price" value="7990" min="500" step="10">
+      </label>
+
+      <label class="calc__field">
+        <span data-ru="Первый взнос" data-tj="Пардохти аввал"></span>
+        <input type="range" id="calc-down" min="20" max="70" step="5" value="30">
+        <output id="calc-down-out">30%</output>
+      </label>
+
+      <div class="calc__terms" id="calc-terms">
+        <button type="button" class="is-active" data-term="3">3 <small data-ru="мес" data-tj="моҳ"></small></button>
+        <button type="button" data-term="6">6 <small data-ru="мес" data-tj="моҳ"></small></button>
+        <button type="button" data-term="12">12 <small data-ru="мес" data-tj="моҳ"></small></button>
+      </div>
+
+      <div class="calc__result">
+        <div>
+          <span data-ru="Платёж в месяц" data-tj="Пардохти моҳона"></span>
+          <b id="calc-month">—</b>
+        </div>
+        <div>
+          <span data-ru="Переплата" data-tj="Иловапулӣ"></span>
+          <b id="calc-over">—</b>
+        </div>
+      </div>
+      <a class="btn btn--primary btn--wide" href="#contacts" data-ru="Оставить заявку" data-tj="Ариза гузоштан"></a>
+    </div>
+  </div>
+</section>
+
+<!-- преимущества -->
+<section class="section">
+  <div class="container">
+    <div class="perks">
+      <div class="perk">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Zm-1 14-4-4 1.4-1.4L11 13.2l5.6-5.6L18 9l-7 7Z"/></svg>
+        <h3 data-ru="Гарантия 1 год" data-tj="Кафолати 1 сол"></h3>
+        <p data-ru="Официальная гарантия магазина на каждый смартфон." data-tj="Кафолати расмии мағоза барои ҳар смартфон."></p>
+      </div>
+      <div class="perk">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1 3 6v6c0 5 3.8 9.7 9 11 5.2-1.3 9-6 9-11V6l-9-5Zm0 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 13c-2 0-3.9-1-5-2.6.1-1.6 3.3-2.4 5-2.4s4.9.8 5 2.4A6 6 0 0 1 12 19Z"/></svg>
+        <h3 data-ru="Только оригинал" data-tj="Танҳо аслӣ"></h3>
+        <p data-ru="Проверяем IMEI и работу телефона при вас." data-tj="IMEI ва кори телефонро дар назди шумо тафтиш мекунем."></p>
+      </div>
+      <div class="perk">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11v8H4V7Zm13 2h2.6L22 12.2V15h-5V9ZM6.5 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm11 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
+        <h3 data-ru="Доставка по городу" data-tj="Расонидан дар шаҳр"></h3>
+        <p data-ru="Привезём за 2 часа. Проверяете — потом платите." data-tj="Дар 2 соат меорем. Тафтиш мекунед — баъд пардохт."></p>
+      </div>
+      <div class="perk">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10l-2-3H9L7 7Zm-3 2v11h16V9H4Zm8 3 4 4h-2.5v3h-3v-3H8l4-4Z"/></svg>
+        <h3 data-ru="Обмен старого" data-tj="Иваз кардани куҳна"></h3>
+        <p data-ru="Trade-in: сдайте свой телефон в счёт нового." data-tj="Trade-in: телефони худро ба ҳисоби нав супоред."></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- о магазине -->
+<section class="section section--grey" id="about">
+  <div class="container about">
+    <div class="about__media">
+      <img src="assets/shop.jpg" alt="Магазин RealPhone" loading="lazy">
+    </div>
+    <div class="about__text">
+      <h2 data-ru="О магазине" data-tj="Дар бораи мағоза"></h2>
+      <p data-ru="RealPhone — магазин смартфонов и аксессуаров в Душанбе. Работаем с 2019 года, продали больше 6000 телефонов и держим цену ниже рынка за счёт прямых поставок."
+         data-tj="RealPhone — мағозаи смартфонҳо ва аксессуарҳо дар Душанбе. Аз соли 2019 кор мекунем, зиёда аз 6000 телефон фурӯхтем ва нархро аз бозор пасттар нигоҳ медорем."></p>
+      <p data-ru="У нас можно купить сразу или взять в насия. Каждый телефон проверяем перед выдачей, ставим защитное стекло и настраиваем — бесплатно."
+         data-tj="Дар мо метавонед якбора харед ё ба насия гиред. Ҳар телефонро пеш аз додан тафтиш мекунем, шишаи муҳофиз мегузорем ва танзим мекунем — ройгон."></p>
+      <div class="about__stats">
+        <div><b>6 000+</b><span data-ru="довольных клиентов" data-tj="муштариёни розӣ"></span></div>
+        <div><b>7 лет</b><span data-ru="на рынке" data-tj="дар бозор"></span></div>
+        <div><b>4.9</b><span data-ru="оценка в Instagram" data-tj="баҳо дар Instagram"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- отзывы -->
+<section class="section">
+  <div class="container">
+    <h2 class="section__title" data-ru="Отзывы покупателей" data-tj="Тақризи харидорон"></h2>
+    <div class="reviews">
+      <figure class="review">
+        <div class="review__stars">★★★★★</div>
+        <blockquote data-ru="Взял iPhone 14 в рассрочку, оформили за 10 минут. Телефон проверили при мне, стекло поставили бесплатно."
+                    data-tj="iPhone 14-ро ба насия гирифтам, дар 10 дақиқа ба расмият даровартанд. Телефонро дар назди ман тафтиш карданд."></blockquote>
+        <figcaption>Далер Р.</figcaption>
+      </figure>
+      <figure class="review">
+        <div class="review__stars">★★★★★</div>
+        <blockquote data-ru="Заказала AirPods через Telegram, привезли в тот же день на работу. Всё оригинальное, чек дали."
+                    data-tj="AirPods-ро тавассути Telegram фармоиш додам, ҳамон рӯз ба кор оварданд. Ҳама аслӣ, чек доданд."></blockquote>
+        <figcaption>Нилуфар С.</figcaption>
+      </figure>
+      <figure class="review">
+        <div class="review__stars">★★★★★</div>
+        <blockquote data-ru="Сдал старый Redmi по трейд-ин, доплатил и забрал 14T. Цена оказалась ниже, чем в других магазинах."
+                    data-tj="Redmi-и кӯҳнаро ба trade-in супоридам, иловапулӣ додам ва 14T гирифтам. Нарх аз дигар мағозаҳо арзонтар буд."></blockquote>
+        <figcaption>Шоҳрух М.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- вопросы -->
+<section class="section section--grey">
+  <div class="container container--narrow">
+    <h2 class="section__title" data-ru="Частые вопросы" data-tj="Саволҳои маъмул"></h2>
+    <div class="faq">
+      <details>
+        <summary data-ru="Что нужно для покупки в насия?" data-tj="Барои хариди ба насия чӣ лозим аст?"></summary>
+        <p data-ru="Паспорт и первый взнос от 20% стоимости. Оформление занимает около 15 минут."
+           data-tj="Шиноснома ва пардохти аввал аз 20% нарх. Ба расмият даровардан тақрибан 15 дақиқа."></p>
+      </details>
+      <details>
+        <summary data-ru="Телефоны новые или б/у?" data-tj="Телефонҳо нав ҳастанд ё истифодашуда?"></summary>
+        <p data-ru="В каталоге новые запечатанные аппараты. Б/у бывают отдельно — отмечаем это в описании и даём гарантию 3 месяца."
+           data-tj="Дар каталог дастгоҳҳои нав ва мӯҳршуда. Истифодашуда алоҳида мешавад — дар тавсиф қайд мекунем ва 3 моҳ кафолат медиҳем."></p>
+      </details>
+      <details>
+        <summary data-ru="Как оплатить онлайн?" data-tj="Чӣ тавр онлайн пардохт кунам?"></summary>
+        <p data-ru="Оформляете заказ, переводите на карту по реквизитам и присылаете фото чека боту. После проверки мы подтверждаем заказ и везём товар."
+           data-tj="Фармоиш медиҳед, ба корт мувофиқи реквизитҳо мегузаронед ва акси чекро ба бот мефиристед. Баъди тафтиш фармоишро тасдиқ мекунем."></p>
+      </details>
+      <details>
+        <summary data-ru="Есть доставка в другие города?" data-tj="Ба дигар шаҳрҳо расонидан ҳаст?"></summary>
+        <p data-ru="Да, отправляем по всему Таджикистану почтовой службой. Доставка по Душанбе — бесплатно от 1000 сомони."
+           data-tj="Бале, ба тамоми Тоҷикистон тавассути почта мефиристем. Расонидан дар Душанбе аз 1000 сомонӣ ройгон."></p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- контакты -->
+<section class="section" id="contacts">
+  <div class="container contacts">
+    <div class="contacts__text">
+      <h2 data-ru="Как нас найти" data-tj="Моро чӣ тавр ёбед"></h2>
+      <ul class="contacts__list">
+        <li>
+          <span data-ru="Адрес" data-tj="Суроға"></span>
+          <b data-ru="Душанбе, ул. Айни 24, ТЦ «Пойтахт», 1 этаж" data-tj="Душанбе, кӯчаи Айнӣ 24, МТ «Пойтахт», ошёнаи 1"></b>
+        </li>
+        <li>
+          <span data-ru="Телефон" data-tj="Телефон"></span>
+          <b><a href="tel:+992900000000">+992 90 000 00 00</a></b>
+        </li>
+        <li>
+          <span data-ru="Часы работы" data-tj="Соатҳои корӣ"></span>
+          <b data-ru="Ежедневно 9:00 – 20:00" data-tj="Ҳар рӯз 9:00 – 20:00"></b>
+        </li>
+      </ul>
+      <div class="contacts__social">
+        <a class="btn btn--primary" href="https://t.me/realphonetj" target="_blank" rel="noopener">Telegram</a>
+        <a class="btn btn--ghost" href="https://instagram.com/realphonetj" target="_blank" rel="noopener">Instagram</a>
+      </div>
+    </div>
+    <div class="contacts__map">
+      <iframe title="Карта" loading="lazy" allowfullscreen
+        src="https://www.openstreetmap.org/export/embed.html?bbox=68.75%2C38.55%2C68.82%2C38.60&layer=mapnik"></iframe>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="container footer__row">
+    <div>
+      <a class="logo logo--light" href="#top">
+        <svg class="logo__mark" viewBox="0 0 40 40" aria-hidden="true">
+          <path d="M20 2 5 12v16l15 10 15-10V12L20 2Z" fill="#fff" opacity=".25"/>
+          <path d="M20 2 5 12l15 8 15-8L20 2Z" fill="#fff"/>
+          <circle cx="20" cy="21" r="5" fill="#1b3ec4"/>
+        </svg>
+        <span class="logo__text">Real<b>Phone</b></span>
+      </a>
+      <p class="footer__note" data-ru="Смартфоны и аксессуары в Душанбе с 2019 года." data-tj="Смартфонҳо ва аксессуарҳо дар Душанбе аз соли 2019."></p>
+    </div>
+    <nav class="footer__nav">
+      <a href="#catalog" data-ru="Каталог" data-tj="Каталог"></a>
+      <a href="#nasiya" data-ru="Рассрочка" data-tj="Насия"></a>
+      <a href="#about" data-ru="О магазине" data-tj="Дар бораи мағоза"></a>
+      <a href="#contacts" data-ru="Контакты" data-tj="Тамос"></a>
+    </nav>
+    <div class="footer__contacts">
+      <a href="tel:+992900000000">+992 90 000 00 00</a>
+      <a href="https://t.me/realphonetj" target="_blank" rel="noopener">t.me/realphonetj</a>
+    </div>
+  </div>
+  <div class="container footer__bottom">
+    <span>© <span id="year"></span> RealPhone</span>
+  </div>
+</footer>
+
+<!-- корзина -->
+<div class="drawer" id="drawer" hidden>
+  <div class="drawer__overlay" data-close></div>
+  <aside class="drawer__panel" role="dialog" aria-modal="true">
+    <div class="drawer__head">
+      <h3 data-ru="Корзина" data-tj="Сабад"></h3>
+      <button class="icon-btn" type="button" data-close aria-label="Закрыть">&times;</button>
+    </div>
+    <div class="drawer__body" id="cart-items"></div>
+    <div class="drawer__foot">
+      <div class="drawer__sum">
+        <span data-ru="Итого" data-tj="Ҳамагӣ"></span>
+        <b id="cart-total">0 c</b>
+      </div>
+      <button class="btn btn--primary btn--wide" id="checkout" type="button" data-ru="Оформить заказ" data-tj="Ба расмият даровардан"></button>
+      <p class="drawer__hint" id="delivery-hint"></p>
+    </div>
+  </aside>
+</div>
+
+<!-- оформление заказа -->
+<div class="modal" id="checkout-modal" hidden>
+  <div class="modal__overlay" data-close></div>
+  <div class="modal__box" role="dialog" aria-modal="true">
+    <button class="icon-btn modal__close" type="button" data-close aria-label="Закрыть">&times;</button>
+    <h3 data-ru="Оплата и подтверждение" data-tj="Пардохт ва тасдиқ"></h3>
+    <p class="modal__lead" data-ru="Переведите сумму на любую карту ниже, затем отправьте фото чека нашему боту — он передаст заказ администратору."
+       data-tj="Маблағро ба яке аз кортҳои зерин гузаронед, сипас акси чекро ба боти мо фиристед — ӯ фармоишро ба администратор мерасонад."></p>
+
+    <div class="pay">
+      <div class="pay__row">
+        <span>Алиф Банк</span>
+        <b class="pay__num" data-copy="4444555566667777">4444 5555 6666 7777</b>
+      </div>
+      <div class="pay__row">
+        <span>Душанбе Сити</span>
+        <b class="pay__num" data-copy="5555666677778888">5555 6666 7777 8888</b>
+      </div>
+      <div class="pay__row">
+        <span>Эсхата</span>
+        <b class="pay__num" data-copy="6666777788889999">6666 7777 8888 9999</b>
+      </div>
+      <p class="pay__owner" data-ru="Получатель: Mahmadjonov A." data-tj="Гиранда: Маҳмадҷонов А."></p>
+    </div>
+
+    <div class="modal__total">
+      <span data-ru="К оплате" data-tj="Барои пардохт"></span>
+      <b id="modal-total">0 c</b>
+    </div>
+
+    <a class="btn btn--primary btn--wide" id="send-order" href="#" target="_blank" rel="noopener"
+       data-ru="Отправить заказ боту" data-tj="Фиристодани фармоиш ба бот"></a>
+    <p class="modal__hint" data-ru="В боте укажите имя, номер и адрес доставки, приложите фото чека. Администратор подтвердит заказ."
+       data-tj="Дар бот ном, рақам ва суроғаи расонданро нависед, акси чекро замима кунед. Администратор фармоишро тасдиқ мекунад."></p>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="js/products.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
