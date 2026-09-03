@@ -39,16 +39,16 @@ function bigCard(d) {
     <div class="shot">
       ${tagHtml(d.tag)}
       <img src="assets/dishes/${d.id}.jpg" alt="${d.name}" loading="lazy">
+      <div class="chip">
+        <b>${som(d.price)}</b>
+        ${d.oldPrice ? `<s>${som(d.oldPrice)}</s>` : ''}
+      </div>
     </div>
     <div class="dish__body">
       <h3>${d.name}</h3>
       <p class="dish__about">${d.about}</p>
       <div class="dish__foot">
-        <div class="dish__price">
-          <b>${som(d.price)}</b>
-          ${d.oldPrice ? `<s>${som(d.oldPrice)}</s>` : ''}
-          <span class="dish__weight">${d.weight} г</span>
-        </div>
+        <span class="dish__weight">${d.weight} г</span>
         <button class="add" type="button" data-id="${d.id}">В заказ</button>
       </div>
     </div>
@@ -97,17 +97,15 @@ function renderMenu() {
   });
 }
 
-/* фото в баннере тоже может отсутствовать */
-const heroPhoto = $('#hero-photo');
-if (heroPhoto) {
-  const heroFallback = () => {
-    heroPhoto.hidden = true;
-    $('#hero-mark').hidden = false;
-  };
-  $('#hero-mark').hidden = true;
-  if (heroPhoto.complete && !heroPhoto.naturalWidth) heroFallback();
-  else heroPhoto.addEventListener('error', heroFallback, { once: true });
+/* если фото баннера или зала нет — блок остаётся угольным, без пустой рамки */
+function photoOrNothing(img, holder, cls) {
+  if (!img) return;
+  const off = () => { img.hidden = true; holder.classList.add(cls); };
+  if (img.complete && !img.naturalWidth) off();
+  else img.addEventListener('error', off, { once: true });
 }
+photoOrNothing($('#hero-photo'), $('.hero'), 'is-nophoto');
+photoOrNothing($('#place-photo'), $('.place__card'), 'is-nophoto');
 
 /* ── корзина ────────────────────────────────────────── */
 
