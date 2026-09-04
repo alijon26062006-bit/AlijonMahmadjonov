@@ -8,6 +8,7 @@
     uvicorn app:app --host 0.0.0.0 --port 8000
 """
 
+import asyncio
 import logging
 import os
 import re
@@ -25,9 +26,9 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from pydantic import BaseModel, Field, field_validator
 
 try:
-    from . import db, notify
+    from . import courier, db, notify
 except ImportError:
-    import db, notify
+    import courier, db, notify
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 log = logging.getLogger('burger')
@@ -48,6 +49,10 @@ if not SECRET_KEY:
     log.warning('SECRET_KEY не задан — сгенерирован временный, входы слетят при перезапуске')
 
 signer = URLSafeTimedSerializer(SECRET_KEY, salt='burger-admin')
+courier.use_key(SECRET_KEY)
+
+# адрес вебхука знает только Telegram — иначе кто угодно пришлёт «нажатие кнопки»
+TG_HOOK = os.getenv('TG_HOOK_SECRET', '') or secrets.token_hex(8)
 
 app = FastAPI(title='The Burger', docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_methods=['GET', 'POST'],
@@ -248,11 +253,130 @@ def api_kitchen(request: Request, _=Depends(require_admin)):
 
 
 @app.post('/api/kitchen/{order_id}/status')
-def api_kitchen_status(order_id: int, status: str = Form(...), _=Depends(require_admin)):
+async def api_kitchen_status(order_id: int, status: str = Form(...), _=Depends(require_admin)):
     if status not in notify.STATUS_RU:
         raise HTTPException(400, 'Неизвестный статус')
     db.set_status(order_id, status)
+    if status == 'done':
+        await courier.call_couriers(order_id)
     return {'ok': True}
+
+
+# ── курьеры ─────────────────────────────────────────────
+
+def current_courier(request: Request, t: str = ''):
+    """Курьер входит по ссылке из бота: ?t=... Дальше ссылка лежит в куке."""
+    value = t or request.cookies.get('burger_courier', '')
+    chat = courier.chat_from_token(value)
+    if not chat:
+        return None
+    c = db.courier(chat)
+    return c if c and c['active'] else None
+
+
+def require_courier(request: Request, t: str = ''):
+    c = current_courier(request, t)
+    if not c:
+        raise HTTPException(403, 'Ссылка не подходит. Напишите боту /start')
+    return c
+
+
+@app.post('/tg/{secret}')
+async def telegram_hook(secret: str, request: Request):
+    """Сюда Telegram шлёт сообщения и нажатия кнопок."""
+    if not secrets.compare_digest(secret.encode(), TG_HOOK.encode()):
+        raise HTTPException(404, 'Не найдено')
+    try:
+        update = await request.json()
+    except Exception:
+        raise HTTPException(400, 'Не разобрал запрос')
+    return await courier.handle_update(update)
+
+
+@app.get('/courier', response_class=HTMLResponse)
+def courier_panel(request: Request, t: str = ''):
+    c = require_courier(request, t)
+    resp = templates.TemplateResponse(request, 'courier.html', {'courier': c})
+    if t:
+        resp.set_cookie('burger_courier', t, httponly=True, samesite='lax',
+                        max_age=courier.TOKEN_AGE)
+    return resp
+
+
+def courier_view(o, mine=False):
+    """Курьеру нужен адрес и сумма. Телефон — только по своему заказу."""
+    out = {'id': o['id'], 'number': o['number'], 'address': courier.address_of(o),
+           'landmark': o['landmark'], 'note': o['note'], 'total': o['total'],
+           'created_at': o['created_at'],
+           'items': [{'name': i['name'], 'qty': i['qty']} for i in o['items']]}
+    if mine:
+        out['name'] = o['name']
+        out['phone'] = o['phone']
+    return out
+
+
+@app.get('/api/courier/orders')
+def api_courier_orders(request: Request, t: str = ''):
+    c = require_courier(request, t)
+    data = db.courier_orders(c['chat_id'])
+    return {'name': c['name'],
+            'free': [courier_view(o) for o in data['free']],
+            'mine': [courier_view(o, mine=True) for o in data['mine']]}
+
+
+@app.post('/api/courier/orders/{order_id}/take')
+async def api_courier_take(order_id: int, request: Request, t: str = ''):
+    c = require_courier(request, t)
+    ok, message = await courier.take(order_id, c['chat_id'])
+    return {'ok': ok, 'message': message}
+
+
+@app.post('/api/courier/orders/{order_id}/delivered')
+async def api_courier_delivered(order_id: int, request: Request, t: str = ''):
+    c = require_courier(request, t)
+    ok, message = await courier.delivered(order_id, c['chat_id'])
+    return {'ok': ok, 'message': message}
+
+
+@app.get('/admin/couriers', response_class=HTMLResponse)
+def admin_couriers(request: Request, _=Depends(require_admin)):
+    return templates.TemplateResponse(request, 'couriers.html', {
+        'couriers': db.couriers(), 'hook': TG_HOOK, 'public_url': courier.PUBLIC_URL,
+        'bot_ready': bool(notify.TOKEN),
+    })
+
+
+@app.post('/admin/couriers/{chat_id}/active')
+async def admin_courier_active(chat_id: str, active: str = Form(''), _=Depends(require_admin)):
+    on = active == '1'
+    db.set_courier_active(chat_id, on)
+    if on:
+        hi, keys = courier.hello_ready(chat_id)
+        await notify.send_to(chat_id, hi, keys)
+    return RedirectResponse('/admin/couriers', status_code=303)
+
+
+@app.post('/admin/couriers/{chat_id}/delete')
+def admin_courier_delete(chat_id: str, _=Depends(require_admin)):
+    db.delete_courier(chat_id)
+    return RedirectResponse('/admin/couriers', status_code=303)
+
+
+@app.on_event('startup')
+async def start_reminders():
+    """Пока заказ никто не взял — бот напоминает. Кухня не должна ждать молча."""
+    if not notify.TOKEN:
+        return
+
+    async def loop():
+        while True:
+            try:
+                await courier.remind_tick()
+            except Exception as e:
+                log.error('напоминание курьерам не ушло: %s', e)
+            await asyncio.sleep(30)
+
+    asyncio.create_task(loop())
 
 
 # ── админка ─────────────────────────────────────────────
@@ -289,9 +413,11 @@ def admin_orders(request: Request, _=Depends(require_admin), status: str = ''):
 
 
 @app.post('/admin/orders/{order_id}/status')
-def admin_set_status(order_id: int, status: str = Form(...), _=Depends(require_admin)):
+async def admin_set_status(order_id: int, status: str = Form(...), _=Depends(require_admin)):
     if status in notify.STATUS_RU:
         db.set_status(order_id, status)
+        if status == 'done':
+            await courier.call_couriers(order_id)
     return RedirectResponse('/admin', status_code=303)
 
 

@@ -69,7 +69,10 @@ CREATE TABLE IF NOT EXISTS orders (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     number     INTEGER NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    status     TEXT NOT NULL DEFAULT 'new',    -- new | confirmed | cooking | done | canceled
+    status     TEXT NOT NULL DEFAULT 'new',    -- new | confirmed | cooking | done | on_way | delivered | canceled
+    courier_id   TEXT NOT NULL DEFAULT '',     -- кто повёз
+    courier_name TEXT NOT NULL DEFAULT '',
+    taken_at     TEXT NOT NULL DEFAULT '',
     mode       TEXT NOT NULL,                  -- delivery | pickup
     zone       TEXT NOT NULL DEFAULT '',
     name       TEXT NOT NULL,
@@ -81,6 +84,20 @@ CREATE TABLE IF NOT EXISTS orders (
     goods      INTEGER NOT NULL,
     delivery   INTEGER NOT NULL,
     total      INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS couriers (
+    chat_id    TEXT PRIMARY KEY,          -- id в Telegram
+    name       TEXT NOT NULL,
+    active     INTEGER NOT NULL DEFAULT 0, -- 0 = ждёт, пока админ разрешит
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS courier_msgs (
+    order_id   INTEGER NOT NULL,
+    chat_id    TEXT NOT NULL,
+    message_id INTEGER NOT NULL,
+    PRIMARY KEY (order_id, chat_id)
 );
 
 CREATE TABLE IF NOT EXISTS order_items (
@@ -114,6 +131,11 @@ def setup():
         for col in ('show_from', 'show_to'):
             if col not in cols:
                 con.execute(f"ALTER TABLE sections ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+
+        cols = {r['name'] for r in con.execute('PRAGMA table_info(orders)')}
+        for col in ('courier_id', 'courier_name', 'taken_at'):
+            if col not in cols:
+                con.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
 
 
 def seed_if_empty():
@@ -342,6 +364,103 @@ def orders(status=None, limit=200):
 def set_status(order_id, status):
     with connect() as con:
         con.execute('UPDATE orders SET status = ? WHERE id = ?', (status, order_id))
+
+
+# ── курьеры ─────────────────────────────────────────────
+
+def couriers(only_active=False):
+    sql = 'SELECT * FROM couriers'
+    if only_active:
+        sql += ' WHERE active = 1'
+    sql += ' ORDER BY name'
+    with connect() as con:
+        return [dict(r) for r in con.execute(sql)]
+
+
+def courier(chat_id):
+    with connect() as con:
+        r = con.execute('SELECT * FROM couriers WHERE chat_id = ?', (str(chat_id),)).fetchone()
+        return dict(r) if r else None
+
+
+def add_courier(chat_id, name):
+    """Курьер написал боту. Работать сможет, когда админ разрешит."""
+    with connect() as con:
+        con.execute('INSERT OR IGNORE INTO couriers (chat_id, name) VALUES (?,?)',
+                    (str(chat_id), name))
+        con.execute('UPDATE couriers SET name = ? WHERE chat_id = ?', (name, str(chat_id)))
+
+
+def set_courier_active(chat_id, active):
+    with connect() as con:
+        con.execute('UPDATE couriers SET active = ? WHERE chat_id = ?', (1 if active else 0, str(chat_id)))
+
+
+def delete_courier(chat_id):
+    with connect() as con:
+        con.execute('DELETE FROM couriers WHERE chat_id = ?', (str(chat_id),))
+
+
+def order(order_id):
+    with connect() as con:
+        r = con.execute('SELECT * FROM orders WHERE id = ?', (order_id,)).fetchone()
+        if not r:
+            return None
+        o = dict(r)
+        o['items'] = [dict(i) for i in con.execute(
+            'SELECT * FROM order_items WHERE order_id = ? ORDER BY id', (order_id,))]
+        return o
+
+
+def take_order(order_id, chat_id, name):
+    """Заказ забирает первый курьер, кто нажал. Остальным уже не достаётся."""
+    with connect() as con:
+        cur = con.execute(
+            """UPDATE orders SET status = 'on_way', courier_id = ?, courier_name = ?,
+                   taken_at = datetime('now')
+               WHERE id = ? AND status = 'done' AND courier_id = ''""",
+            (str(chat_id), name, order_id))
+        return cur.rowcount == 1
+
+
+def free_orders():
+    """Готовые заказы на доставку, которые ещё никто не взял."""
+    return [o for o in orders(status='done', limit=60)
+            if o['mode'] == 'delivery' and not o['courier_id']]
+
+
+def courier_orders(chat_id):
+    """Что видит курьер: свободные заказы и его собственные, ещё не сданные."""
+    mine = [o for o in orders(status='on_way', limit=60) if o['courier_id'] == str(chat_id)]
+    return {'free': free_orders(), 'mine': mine}
+
+
+def deliver_order(order_id, chat_id):
+    """Курьер отметил, что довёз. Чужой заказ закрыть нельзя."""
+    with connect() as con:
+        cur = con.execute(
+            """UPDATE orders SET status = 'delivered'
+               WHERE id = ? AND status = 'on_way' AND courier_id = ?""",
+            (order_id, str(chat_id)))
+        return cur.rowcount == 1
+
+
+def save_courier_msg(order_id, chat_id, message_id):
+    """Помним, каким сообщением позвали курьера — чтобы потом его поправить."""
+    with connect() as con:
+        con.execute("""INSERT OR REPLACE INTO courier_msgs (order_id, chat_id, message_id)
+                       VALUES (?,?,?)""", (order_id, str(chat_id), message_id))
+
+
+def courier_msgs(order_id):
+    with connect() as con:
+        return [dict(r) for r in con.execute(
+            'SELECT * FROM courier_msgs WHERE order_id = ?', (order_id,))]
+
+
+def clear_courier_msgs(order_id):
+    with connect() as con:
+        con.execute('DELETE FROM courier_msgs WHERE order_id = ?', (order_id,))
 
 
 def counts():

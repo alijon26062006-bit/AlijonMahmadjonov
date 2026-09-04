@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Курьер · The Burger</title>
+<meta name="theme-color" content="#0c0b0a">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/courier.css">
+</head>
+<body>
+
+<header class="bar">
+  <b>{{ courier.name }}</b>
+  <span class="dot" id="live" title="связь с сервером"></span>
+  <span class="clock" id="clock">--:--</span>
+</header>
+
+<main class="wrap">
+  <h2 class="lead">Мои заказы <span id="mine-count"></span></h2>
+  <div id="mine"></div>
+  <p class="empty" id="mine-empty">Пока ничего не везёте</p>
+
+  <h2 class="lead">Свободные <span id="free-count"></span></h2>
+  <div id="free"></div>
+  <p class="empty" id="free-empty">Свободных заказов нет</p>
+</main>
+
+<p class="snack" id="snack" hidden></p>
+
+<script src="/static/courier.js"></script>
+</body>
+</html>

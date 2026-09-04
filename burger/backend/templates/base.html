@@ -15,6 +15,7 @@
     <a href="/admin/menu" {% if '/menu' in request.url.path or '/dish' in request.url.path %}class="on"{% endif %}>Меню</a>
     <a href="/admin/settings" {% if '/settings' in request.url.path %}class="on"{% endif %}>Настройки</a>
     <a href="/kitchen" {% if '/kitchen' in request.url.path %}class="on"{% endif %}>Кухня</a>
+    <a href="/admin/couriers" {% if '/couriers' in request.url.path %}class="on"{% endif %}>Курьеры</a>
   </nav>
   <a class="out" href="/admin/logout">Выйти</a>
 </header>

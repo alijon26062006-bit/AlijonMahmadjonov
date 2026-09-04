@@ -43,6 +43,7 @@
     {% if o.mode == 'delivery' %}<br>{{ zones.get(o.zone, o.zone) }}: {{ o.address }}{% if o.flat %}, {{ o.flat }}{% endif %}
       {% if o.landmark %}<br>Ориентир: {{ o.landmark }}{% endif %}{% endif %}
     {% if o.note %}<br>Комментарий: {{ o.note }}{% endif %}
+    {% if o.courier_name %}<br>Курьер: {{ o.courier_name }}{% endif %}
   </p>
 
   <form class="row" method="post" action="/admin/orders/{{ o.id }}/status">

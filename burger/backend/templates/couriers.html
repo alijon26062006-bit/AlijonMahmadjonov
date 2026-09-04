@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Курьеры{% endblock %}
+{% block body %}
+<h1>Курьеры</h1>
+
+{% if not bot_ready %}
+<p class="empty">Бот не подключён: задайте <b>TG_TOKEN</b> в файле .env и перезапустите сервер.</p>
+{% endif %}
+
+<section class="card form">
+  <h2>Как добавить курьера</h2>
+  <ol class="steps">
+    <li>Курьер открывает вашего бота в Telegram и жмёт «Старт».</li>
+    <li>Он появится в списке ниже — нажмите «Допустить».</li>
+    <li>Готовые заказы на доставку сразу начнут приходить ему в чат.</li>
+  </ol>
+  <p class="empty">Адрес для Telegram (setWebhook):
+    <code>{{ public_url or 'https://ваш-домен' }}/tg/{{ hook }}</code></p>
+</section>
+
+<section class="card">
+  {% if not couriers %}
+  <p class="empty">Пока никто не написал боту.</p>
+  {% endif %}
+  {% for c in couriers %}
+  <div class="crow">
+    <div>
+      <b>{{ c.name }}</b>
+      <small>{{ 'на смене' if c.active else 'ждёт допуска' }} · id {{ c.chat_id }}</small>
+    </div>
+    <div class="crow__act">
+      <form method="post" action="/admin/couriers/{{ c.chat_id }}/active">
+        <input type="hidden" name="active" value="{{ '0' if c.active else '1' }}">
+        <button class="btn {{ 'ghost' if c.active else '' }}" type="submit">
+          {{ 'Снять со смены' if c.active else 'Допустить' }}</button>
+      </form>
+      <form method="post" action="/admin/couriers/{{ c.chat_id }}/delete"
+            onsubmit="return confirm('Удалить курьера {{ c.name }}?')">
+        <button class="btn ghost" type="submit">Удалить</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</section>
+{% endblock %}

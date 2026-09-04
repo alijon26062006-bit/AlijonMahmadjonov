@@ -216,3 +216,118 @@ def test_inactive_dish_hidden_and_unorderable(client):
         'items': [{'id': 'espresso', 'qty': 1}], 'mode': 'pickup',
         'name': 'Тест', 'phone': '937777777'})
     assert r.status_code == 400
+
+
+# ── курьеры ─────────────────────────────────────────────
+
+def ready_delivery_order(client, address='Рудаки 10'):
+    """Заказ на доставку, который кухня уже отметила готовым."""
+    client.post('/api/orders', json={
+        'items': [{'id': 'hamburger', 'qty': 2}], 'mode': 'delivery', 'zone': 'center',
+        'name': 'Клиент', 'phone': '937777777', 'address': address})
+    import db
+    oid = db.orders(limit=1)[0]['id']
+    client.post('/admin/login', data={'password': 'секрет-Test'})
+    client.post(f'/api/kitchen/{oid}/status', data={'status': 'done'})
+    return oid
+
+
+def courier_link(chat_id, name, active=True):
+    import courier, db
+    db.add_courier(chat_id, name)
+    db.set_courier_active(chat_id, active)
+    return courier.token(chat_id)
+
+
+def test_courier_panel_needs_link(client):
+    assert client.get('/courier').status_code == 403
+    assert client.get('/courier?t=подделка').status_code == 403
+    assert client.get('/api/courier/orders').status_code == 403
+
+
+def test_courier_sees_ready_delivery_orders(client):
+    ready_delivery_order(client, 'Айни 49')
+    t = courier_link(101, 'Курьер Раҳим')
+
+    data = client.get(f'/api/courier/orders?t={t}').json()
+    assert len(data['free']) == 1
+    assert data['free'][0]['address'] == 'Айни 49'
+    assert data['free'][0]['total'] == 94 + 15   # два гамбургера плюс доставка по центру
+    assert 'phone' not in data['free'][0]        # телефон только тому, кто взял
+    assert data['mine'] == []
+
+
+def test_pickup_order_not_offered_to_couriers(client):
+    client.post('/api/orders', json={
+        'items': [{'id': 'hamburger', 'qty': 1}], 'mode': 'pickup',
+        'name': 'Клиент', 'phone': '937777777'})
+    import db
+    oid = db.orders(limit=1)[0]['id']
+    client.post('/admin/login', data={'password': 'секрет-Test'})
+    client.post(f'/api/kitchen/{oid}/status', data={'status': 'done'})
+
+    t = courier_link(102, 'Курьер')
+    assert client.get(f'/api/courier/orders?t={t}').json()['free'] == []
+
+
+def test_only_first_courier_gets_the_order(client):
+    oid = ready_delivery_order(client)
+    one = courier_link(201, 'Первый')
+    two = courier_link(202, 'Второй')
+
+    first = client.post(f'/api/courier/orders/{oid}/take?t={one}').json()
+    second = client.post(f'/api/courier/orders/{oid}/take?t={two}').json()
+    assert first['ok'] is True
+    assert second['ok'] is False
+    assert 'Первый' in second['message']
+
+    mine = client.get(f'/api/courier/orders?t={one}').json()
+    assert len(mine['mine']) == 1
+    assert mine['mine'][0]['phone'] == '937777777'   # свой заказ — телефон виден
+    assert mine['free'] == []
+
+    other = client.get(f'/api/courier/orders?t={two}').json()
+    assert other['free'] == [] and other['mine'] == []
+
+
+def test_courier_cannot_close_foreign_order(client):
+    oid = ready_delivery_order(client)
+    one = courier_link(301, 'Первый')
+    two = courier_link(302, 'Второй')
+    client.post(f'/api/courier/orders/{oid}/take?t={one}')
+
+    assert client.post(f'/api/courier/orders/{oid}/delivered?t={two}').json()['ok'] is False
+    assert client.post(f'/api/courier/orders/{oid}/delivered?t={one}').json()['ok'] is True
+
+    import db
+    assert db.order(oid)['status'] == 'delivered'
+
+
+def test_courier_without_permission_is_not_let_in(client):
+    oid = ready_delivery_order(client)
+    t = courier_link(401, 'Новичок', active=False)
+    assert client.get(f'/api/courier/orders?t={t}').status_code == 403
+
+    import courier, db
+    db.set_courier_active(401, True)
+    assert client.get(f'/api/courier/orders?t={t}').status_code == 200
+    assert courier.chat_from_token(t) == '401'
+    assert db.order(oid)['courier_id'] == ''
+
+
+def test_telegram_hook_guards_the_address(client):
+    assert client.post('/tg/чужой-адрес', json={}).status_code == 404
+
+
+def test_start_in_bot_adds_courier_but_not_to_shift(client):
+    import app as app_module
+    import db
+
+    r = client.post(f'/tg/{app_module.TG_HOOK}', json={'message': {
+        'chat': {'id': 555}, 'from': {'first_name': 'Далер', 'last_name': 'С.'},
+        'text': '/start'}})
+    assert r.status_code == 200
+
+    c = db.courier(555)
+    assert c['name'] == 'Далер С.'
+    assert c['active'] == 0        # пока хозяин не допустит — заказов не увидит

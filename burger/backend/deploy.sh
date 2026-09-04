@@ -43,6 +43,8 @@ ADMIN_PASSWORD=$ADMIN_PASS
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 TG_TOKEN=
 TG_ADMIN_CHAT=
+PUBLIC_URL=
+TG_HOOK_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(8))")
 ALLOWED_ORIGINS=*
 ORDER_COOLDOWN=20
 ENV
@@ -105,6 +107,14 @@ cat <<DONE
    в $BACKEND/.env (TG_TOKEN и TG_ADMIN_CHAT), потом:
 
      systemctl restart $SERVICE
+
+3. Курьеры. В .env впишите PUBLIC_URL (адрес сайта с https),
+   перезапустите службу и один раз включите вебхук:
+
+     cd $BACKEND && python3 hook.py on
+
+   Дальше курьер жмёт «Старт» у бота, а вы допускаете его
+   на странице /admin/couriers.
 
 ${NEW_PASS:+Пароль в админку: $NEW_PASS  (сохраните, второй раз не покажу)}
 

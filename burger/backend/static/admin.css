@@ -51,6 +51,20 @@ small { color: var(--muted); font-weight: 400; }
 .btn:hover { filter: brightness(1.08); }
 
 .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.crow {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.crow:last-child { border-bottom: none; }
+.crow small { display: block; }
+.crow__act { display: flex; gap: 8px; }
+.crow__act .btn { min-height: 38px; padding: 0 14px; font-size: 14px; }
+
+.steps { margin: 0 0 12px; padding-left: 20px; color: var(--muted); }
+.steps li { margin-bottom: 6px; }
+code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 2px 6px; font-size: 13px; word-break: break-all; }
+
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 
 .form label, .login label { display: block; margin-bottom: 12px; color: var(--muted); font-size: 13px; }
@@ -120,8 +134,12 @@ small { color: var(--muted); font-weight: 400; }
 .danger { border-color: rgba(255,107,94,.4); }
 
 @media (max-width: 560px) {
-  .top { gap: 12px; }
-  .top nav { gap: 10px; font-size: 14px; }
+  .top { gap: 12px; padding: 10px 12px; }
+  /* с телефона ссылок больше, чем ширины: пусть строка листается вбок */
+  .top nav { gap: 14px; font-size: 14px; overflow-x: auto; scrollbar-width: none; }
+  .top nav::-webkit-scrollbar { display: none; }
+  .top nav a { white-space: nowrap; }
+  .top .brand, .top .out { flex: none; }
   .list li { grid-template-columns: 44px 1fr; }
   .list li b, .list li .btn { grid-column: 2; justify-self: start; }
 }
