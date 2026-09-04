@@ -34,8 +34,8 @@ def client(tmp_path, monkeypatch):
 
 def test_menu_has_dishes(client):
     data = client.get('/api/menu').json()
-    assert len(data['sections']) == 5
-    assert len(data['dishes']) == 25
+    assert len(data['sections']) == 14
+    assert len(data['dishes']) == 94
     assert data['delivery']['minOrder'] == 40
     assert any(z['price'] is None for z in data['zones'])   # за городом — по договорённости
 
@@ -43,29 +43,29 @@ def test_menu_has_dishes(client):
 def test_order_counts_price_on_server(client):
     """Цена берётся из базы: то, что прислал браузер, не влияет."""
     r = client.post('/api/orders', json={
-        'items': [{'id': 'classic', 'qty': 2, 'add': ['cheese']}],
+        'items': [{'id': 'hamburger', 'qty': 2}],
         'mode': 'pickup', 'name': 'Тест', 'phone': '937777777',
         'total': 1, 'goods': 1,
     })
     assert r.status_code == 200
-    assert r.json()['goods'] == (25 + 5) * 2
-    assert r.json()['total'] == 60
+    assert r.json()['goods'] == 47 * 2
+    assert r.json()['total'] == 94
 
 
 def test_delivery_price_by_zone(client):
     r = client.post('/api/orders', json={
-        'items': [{'id': 'bbq-bacon', 'qty': 1}, {'id': 'fries', 'qty': 1}],
+        'items': [{'id': 'shawarma-chicken', 'qty': 1}, {'id': 'espresso', 'qty': 1}],
         'mode': 'delivery', 'zone': 'shohmansur',
         'name': 'Тест', 'phone': '937777777', 'address': 'Рудаки 1',
     })
     body = r.json()
-    assert body['goods'] == 34 + 12
+    assert body['goods'] == 39 + 13
     assert body['delivery'] == 20          # меньше 100 сомони — доставка платная
 
 
 def test_free_delivery_over_threshold(client):
     r = client.post('/api/orders', json={
-        'items': [{'id': 'set-company', 'qty': 1}],
+        'items': [{'id': 'pizza-own-35', 'qty': 1}],
         'mode': 'delivery', 'zone': 'center',
         'name': 'Тест', 'phone': '937777777', 'address': 'Рудаки 1',
     })
@@ -74,7 +74,7 @@ def test_free_delivery_over_threshold(client):
 
 def test_out_of_town_delivery_not_in_total(client):
     r = client.post('/api/orders', json={
-        'items': [{'id': 'cheeseburger', 'qty': 3}],
+        'items': [{'id': 'hamburger', 'qty': 1}],
         'mode': 'delivery', 'zone': 'out',
         'name': 'Тест', 'phone': '937777777', 'address': 'Гиссар',
     })
@@ -85,7 +85,7 @@ def test_out_of_town_delivery_not_in_total(client):
 
 def test_min_order_rejected(client):
     r = client.post('/api/orders', json={
-        'items': [{'id': 'cheeseburger', 'qty': 1}],
+        'items': [{'id': 'espresso', 'qty': 1}],
         'mode': 'delivery', 'zone': 'center',
         'name': 'Тест', 'phone': '937777777', 'address': 'Рудаки 1',
     })
@@ -95,7 +95,7 @@ def test_min_order_rejected(client):
 
 def test_delivery_needs_address(client):
     r = client.post('/api/orders', json={
-        'items': [{'id': 'set-duo', 'qty': 1}],
+        'items': [{'id': 'pizza-4kinds-35', 'qty': 1}],
         'mode': 'delivery', 'zone': 'center', 'name': 'Тест', 'phone': '937777777',
     })
     assert r.status_code == 400
@@ -112,7 +112,7 @@ def test_unknown_dish_rejected(client):
 
 def test_short_phone_rejected(client):
     r = client.post('/api/orders', json={
-        'items': [{'id': 'classic', 'qty': 1}],
+        'items': [{'id': 'hamburger', 'qty': 1}],
         'mode': 'pickup', 'name': 'Тест', 'phone': '123',
     })
     assert r.status_code == 400
@@ -120,7 +120,7 @@ def test_short_phone_rejected(client):
 
 
 def test_order_numbers_grow(client):
-    body = {'items': [{'id': 'classic', 'qty': 1}], 'mode': 'pickup',
+    body = {'items': [{'id': 'hamburger', 'qty': 1}], 'mode': 'pickup',
             'name': 'Тест', 'phone': '937777777'}
     first = client.post('/api/orders', json=body).json()['number']
     second = client.post('/api/orders', json=body).json()['number']
@@ -142,28 +142,28 @@ def test_admin_login_with_cyrillic_password(client):
 
 def test_admin_can_edit_price(client):
     client.post('/admin/login', data={'password': 'секрет-Test'})
-    client.post('/admin/dish/classic', data={
-        'id': 'classic', 'section': 'burgers', 'name': 'Классик', 'about': 'тест',
-        'weight': 260, 'kcal': 620, 'cook': '12 мин', 'price': 31,
+    client.post('/admin/dish/cheeseburger', data={
+        'id': 'cheeseburger', 'section': 'burgers', 'name': 'Чизбургер', 'about': 'тест',
+        'weight': 260, 'kcal': 620, 'cook': '15–20 мин', 'price': 31,
         'old_price': '', 'tag': 'hit', 'parts': 'Булочка\nКотлета', 'active': '1', 'position': 0,
     })
     menu = client.get('/api/menu').json()
-    dish = [d for d in menu['dishes'] if d['id'] == 'classic'][0]
+    dish = [d for d in menu['dishes'] if d['id'] == 'cheeseburger'][0]
     assert dish['price'] == 31
     assert dish['parts'] == ['Булочка', 'Котлета']
 
 
 def test_inactive_dish_hidden_and_unorderable(client):
     client.post('/admin/login', data={'password': 'секрет-Test'})
-    client.post('/admin/dish/fries', data={
-        'id': 'fries', 'section': 'snacks', 'name': 'Картошка фри', 'about': '',
-        'weight': 150, 'kcal': 340, 'cook': '8 мин', 'price': 12,
-        'old_price': '', 'tag': '', 'parts': 'Картофель', 'position': 0,   # active не передан
+    client.post('/admin/dish/espresso', data={
+        'id': 'espresso', 'section': 'coffee', 'name': 'Экспрессо', 'about': '',
+        'weight': 0, 'kcal': 0, 'cook': '10–20 мин', 'price': 13,
+        'old_price': '', 'tag': '', 'parts': '', 'position': 0,   # active не передан
     })
     menu = client.get('/api/menu').json()
-    assert not [d for d in menu['dishes'] if d['id'] == 'fries']
+    assert not [d for d in menu['dishes'] if d['id'] == 'espresso']
 
     r = client.post('/api/orders', json={
-        'items': [{'id': 'fries', 'qty': 1}], 'mode': 'pickup',
+        'items': [{'id': 'espresso', 'qty': 1}], 'mode': 'pickup',
         'name': 'Тест', 'phone': '937777777'})
     assert r.status_code == 400

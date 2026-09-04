@@ -148,7 +148,7 @@ function dishCard(d) {
     <div class="dish__body">
       <h4 class="dish__name">${d.name}</h4>
       ${d.about ? `<p class="dish__about">${d.about}</p>` : ''}
-      <span class="dish__weight">${d.weight} г</span>
+      ${d.weight ? `<span class="dish__weight">${d.weight} г</span>` : ''}
       <div class="dish__foot">
         ${priceHtml(d)}
         ${pickControl(d.id)}
@@ -182,7 +182,7 @@ function renderMenu() {
 
   $('#menu-body').innerHTML = SECTIONS.map(s => {
     const items = MENU.filter(d => d.section === s.id);
-    const big = s.id === 'burgers' || s.id === 'sets';
+    const big = (s.layout || 'cards') === 'cards';
     return `
     <section class="sec" id="sec-${s.id}" aria-labelledby="h-${s.id}">
       <div class="sec__head">

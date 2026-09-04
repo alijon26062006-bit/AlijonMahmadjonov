@@ -121,7 +121,7 @@ def seed_if_empty():
             return False
 
         for i, s in enumerate(sd.SECTIONS):
-            layout = 'cards' if s['id'] in ('burgers', 'sets') else 'rows'
+            layout = s.get('layout', 'cards')
             con.execute(
                 'INSERT OR REPLACE INTO sections (id, title, note, layout, position) VALUES (?,?,?,?,?)',
                 (s['id'], s['title'], s.get('note', ''), layout, i))
