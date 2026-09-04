@@ -40,6 +40,14 @@ body {
 }
 .mute[aria-pressed="true"] { color: var(--late); border-color: var(--late); }
 
+.unlock {
+  display: block; width: calc(100% - 32px); margin: 16px;
+  min-height: 64px; padding: 14px 20px;
+  border: 2px solid var(--cook); border-radius: 12px;
+  background: rgba(242, 178, 51, .14); color: var(--cook);
+  font: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
+}
+
 .board {
   display: grid; gap: 16px; padding: 16px;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -106,14 +114,30 @@ body {
 .empty { padding: 80px 20px; text-align: center; color: var(--muted); font-size: 22px; }
 
 @media (min-width: 1400px) {
-  .board { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+  .unlock {
+  display: block; width: calc(100% - 32px); margin: 16px;
+  min-height: 64px; padding: 14px 20px;
+  border: 2px solid var(--cook); border-radius: 12px;
+  background: rgba(242, 178, 51, .14); color: var(--cook);
+  font: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
+}
+
+.board { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
   .ticket__no { font-size: 34px; }
 }
 @media (max-width: 520px) {
   .bar { gap: 12px; padding: 12px 14px; }
   .bar b { font-size: 20px; }
   .count { display: none; }
-  .board { grid-template-columns: 1fr; padding: 12px; }
+  .unlock {
+  display: block; width: calc(100% - 32px); margin: 16px;
+  min-height: 64px; padding: 14px 20px;
+  border: 2px solid var(--cook); border-radius: 12px;
+  background: rgba(242, 178, 51, .14); color: var(--cook);
+  font: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
+}
+
+.board { grid-template-columns: 1fr; padding: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }

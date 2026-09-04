@@ -9,19 +9,70 @@ let first = true;
 
 const STATUS = { new: 'Новый', confirmed: 'Принят', cooking: 'Готовится' };
 
-/* Короткий сигнал — без файлов, чтобы панель работала и без интернета. */
-function beep() {
+/* Сигнал для шумной кухни: три громких гудка в две ноты, квадратная волна —
+   она пробивается сквозь шум вытяжки лучше чистого тона.
+   Пока есть непринятый заказ, сигнал повторяется каждые 15 секунд. */
+
+let audio = null;
+let alarmTimer = null;
+
+function ensureAudio() {
+  if (!audio) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    audio = new Ctx();
+  }
+  if (audio.state === 'suspended') audio.resume();
+  return audio;
+}
+
+function pulse(at, seconds = 0.32) {
+  const ctx = audio;
+  const gain = ctx.createGain();
+  gain.connect(ctx.destination);
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(0.9, at + 0.015);
+  gain.gain.setValueAtTime(0.9, at + seconds - 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + seconds);
+
+  [880, 1320].forEach(freq => {
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    osc.start(at);
+    osc.stop(at + seconds);
+  });
+}
+
+function alarm() {
   if (muted) return;
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator(), gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
-    osc.start(); osc.stop(ctx.currentTime + 0.5);
-  } catch (e) { /* браузер не дал звук — панель всё равно работает */ }
+  const ctx = ensureAudio();
+  if (!ctx) return;
+
+  const t = ctx.currentTime;
+  pulse(t);
+  pulse(t + 0.45);
+  pulse(t + 0.9, 0.5);
+}
+
+/* Пока заказ не взяли в работу, кухня продолжает слышать сигнал. */
+function keepAlarm(orders) {
+  const waiting = orders.some(o => o.status === 'new');
+
+  if (!waiting || muted) {
+    clearInterval(alarmTimer);
+    alarmTimer = null;
+    return;
+  }
+  if (!alarmTimer) alarmTimer = setInterval(alarm, 15000);
+}
+
+/* Браузер не даёт звук, пока по экрану не нажали. Говорим об этом прямо. */
+function checkSound() {
+  const ctx = ensureAudio();
+  const blocked = !ctx || ctx.state === 'suspended';
+  $('#unlock').hidden = !blocked || muted;
 }
 
 const minutesSince = iso => {
@@ -71,10 +122,11 @@ async function refresh() {
 
     // звеним, только когда появился заказ, которого раньше не было
     const fresh = orders.filter(o => !known.has(o.number));
-    if (!first && fresh.length) beep();
+    if (!first && fresh.length) alarm();
     known = new Set(orders.map(o => o.number));
     first = false;
 
+    keepAlarm(orders);
     board.innerHTML = orders.map(ticket).join('');
     $('#empty').hidden = orders.length > 0;
     $('#count').textContent = `${orders.length} ${plural(orders.length)}`;
@@ -112,7 +164,8 @@ $('#mute').addEventListener('click', () => {
   localStorage.setItem('kitchen_muted', muted ? '1' : '0');
   $('#mute').textContent = muted ? 'Звук выкл' : 'Звук вкл';
   $('#mute').setAttribute('aria-pressed', String(muted));
-  if (!muted) beep();
+  if (!muted) alarm();
+  checkSound();
 });
 
 if (muted) {
@@ -125,7 +178,16 @@ function tick() {
   $('#clock').textContent = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+$('#unlock').addEventListener('click', () => {
+  ensureAudio();
+  alarm();
+  checkSound();
+});
+
+document.addEventListener('pointerdown', checkSound, { once: true });
+
 tick();
+checkSound();
 refresh();
-setInterval(refresh, 7000);   // новые заказы
+setInterval(refresh, 5000);   // новые заказы
 setInterval(tick, 20000);     // часы в шапке
