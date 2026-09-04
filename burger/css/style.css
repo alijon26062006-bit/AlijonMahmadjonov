@@ -260,6 +260,17 @@ svg { fill: currentColor; }
 .tabs__row a:hover { color: var(--text); }
 .tabs__row a.is-on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
+/* раздел, который сейчас по расписанию */
+.tabs__row a i {
+  margin-left: 6px; padding: 2px 6px;
+  border-radius: 999px; background: var(--accent); color: var(--on-accent);
+  font-size: 10px; font-style: normal; font-weight: 800;
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.tabs__row a.is-on i { background: rgba(0, 0, 0, .22); color: var(--on-accent); }
+.sec--now .sec__head h3 { color: var(--accent); }
+.sec--now .sec__head span { color: var(--accent); }
+
 .sec { margin-bottom: var(--s7); scroll-margin-top: calc(var(--head) + 68px); }
 .sec__head { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s4); }
 .sec__head h3 { font-family: var(--f-display); font-size: var(--t-h3); letter-spacing: .02em; text-transform: uppercase; }

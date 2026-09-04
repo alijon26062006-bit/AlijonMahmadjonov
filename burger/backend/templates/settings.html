@@ -35,6 +35,17 @@
   </section>
 
   <section class="card form">
+    <h2>Когда показывать раздел первым</h2>
+    <p class="empty">Например, завтраки с 07:30 до 09:00. Пусто — раздел всегда на своём месте.</p>
+    {% for sec in sections %}
+    <div class="grid">
+      <label>{{ sec.title }}<input name="hours_from_{{ sec.id }}" value="{{ sec.show_from }}" placeholder="07:30"></label>
+      <label>до<input name="hours_to_{{ sec.id }}" value="{{ sec.show_to }}" placeholder="09:00"></label>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="card form">
     <h2>Контакты</h2>
     <div class="grid">
       <label>Телефон<input name="phone_main" value="{{ settings.phone_main }}"></label>

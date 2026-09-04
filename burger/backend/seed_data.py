@@ -66,7 +66,9 @@ SECTIONS = [
         "id": "breakfast",
         "title": "Завтраки",
         "note": "Питательное и сладкое утро",
-        "layout": "cards"
+        "layout": "cards",
+        "showFrom": "07:30",
+        "showTo": "09:00"
     },
     {
         "id": "desserts",

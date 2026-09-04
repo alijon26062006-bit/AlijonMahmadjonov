@@ -7,6 +7,8 @@
    Вес, калории и состав заведение не давало — эти поля пустые и на сайте
    не показываются. Заполнить их можно в админке. */
 
+/* showFrom / showTo — окно, когда раздел поднимается наверх меню.
+   Пусто — раздел всегда на своём месте. */
 let SECTIONS = [
   { id: 'lunch', title: 'Бизнес ланч', note: 'Суп, основное блюдо и кола', layout: 'cards' },
   { id: 'burgers', title: 'Бургеры', note: 'Готовим после заказа', layout: 'cards' },
@@ -18,7 +20,7 @@ let SECTIONS = [
   { id: 'sandwiches', title: 'Сэндвичи', note: '', layout: 'cards' },
   { id: 'salads', title: 'Салаты', note: '', layout: 'cards' },
   { id: 'soups', title: 'Супы', note: 'Крем-супы', layout: 'cards' },
-  { id: 'breakfast', title: 'Завтраки', note: 'Питательное и сладкое утро', layout: 'cards' },
+  { id: 'breakfast', title: 'Завтраки', note: 'Питательное и сладкое утро', layout: 'cards', showFrom: '07:30', showTo: '09:00' },
   { id: 'desserts', title: 'Десерты', note: '', layout: 'cards' },
   { id: 'coffee', title: 'Кофе и чай', note: '', layout: 'cards' },
   { id: 'cold', title: 'Мохито и фреш', note: '', layout: 'cards' },

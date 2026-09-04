@@ -16,7 +16,9 @@ CREATE TABLE IF NOT EXISTS sections (
     title    TEXT NOT NULL,
     note     TEXT NOT NULL DEFAULT '',
     layout   TEXT NOT NULL DEFAULT 'cards',   -- cards | rows
-    position INTEGER NOT NULL DEFAULT 0
+    position INTEGER NOT NULL DEFAULT 0,
+    show_from TEXT NOT NULL DEFAULT '',       -- окно, когда раздел идёт первым
+    show_to   TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS dishes (
@@ -107,6 +109,11 @@ def connect():
 def setup():
     with connect() as con:
         con.executescript(SCHEMA)
+        # базы, созданные до появления расписания разделов
+        cols = {r['name'] for r in con.execute('PRAGMA table_info(sections)')}
+        for col in ('show_from', 'show_to'):
+            if col not in cols:
+                con.execute(f"ALTER TABLE sections ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
 
 
 def seed_if_empty():
@@ -122,9 +129,10 @@ def seed_if_empty():
 
         for i, s in enumerate(sd.SECTIONS):
             layout = s.get('layout', 'cards')
-            con.execute(
-                'INSERT OR REPLACE INTO sections (id, title, note, layout, position) VALUES (?,?,?,?,?)',
-                (s['id'], s['title'], s.get('note', ''), layout, i))
+            con.execute('''INSERT OR REPLACE INTO sections
+                (id, title, note, layout, position, show_from, show_to) VALUES (?,?,?,?,?,?,?)''',
+                (s['id'], s['title'], s.get('note', ''), layout, i,
+                 s.get('showFrom', ''), s.get('showTo', '')))
 
         for i, d in enumerate(sd.DISHES):
             con.execute("""INSERT INTO dishes
@@ -171,6 +179,12 @@ def save_setting(key, value):
 def sections():
     with connect() as con:
         return [dict(r) for r in con.execute('SELECT * FROM sections ORDER BY position, id')]
+
+
+def save_section_hours(section_id, show_from, show_to):
+    with connect() as con:
+        con.execute('UPDATE sections SET show_from = ?, show_to = ? WHERE id = ?',
+                    (show_from, show_to, section_id))
 
 
 def dishes(only_active=True):

@@ -87,7 +87,8 @@ def api_menu():
     """Всё, что нужно сайту для отрисовки меню."""
     st = db.settings()
     return {
-        'sections': [{'id': s['id'], 'title': s['title'], 'note': s['note'], 'layout': s['layout']}
+        'sections': [{'id': s['id'], 'title': s['title'], 'note': s['note'],
+                      'layout': s['layout'], 'showFrom': s['show_from'], 'showTo': s['show_to']}
                      for s in db.sections()],
         'dishes': [{
             'id': d['id'], 'section': d['section'], 'name': d['name'], 'about': d['about'],
@@ -327,7 +328,7 @@ def admin_delete_dish(dish_id: str, _=Depends(require_admin)):
 @app.get('/admin/settings', response_class=HTMLResponse)
 def admin_settings(request: Request, _=Depends(require_admin), saved: str = ''):
     return templates.TemplateResponse(request, 'settings.html', {
-        'settings': db.settings(), 'zones': db.zones(),
+        'settings': db.settings(), 'zones': db.zones(), 'sections': db.sections(),
         'addons': db.addons(), 'saved': saved})
 
 
@@ -345,6 +346,12 @@ async def admin_save_settings(request: Request, _=Depends(require_admin)):
         price = str(form.get(f'zone_price_{z["id"]}', '')).strip()
         if name:
             db.save_zone(z['id'], str(name).strip(), int(price) if price.isdigit() else None)
+
+    for sec in db.sections():
+        if f'hours_from_{sec["id"]}' in form:
+            db.save_section_hours(sec['id'],
+                                  str(form.get(f'hours_from_{sec["id"]}', '')).strip(),
+                                  str(form.get(f'hours_to_{sec["id"]}', '')).strip())
 
     for a in db.addons():
         name = form.get(f'addon_name_{a["id"]}')

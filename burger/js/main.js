@@ -107,6 +107,34 @@ function bumpDish(id, delta) {
   if (keys.length) setLineQty(keys[keys.length - 1], cart[keys[keys.length - 1]].qty - 1);
 }
 
+/* ── расписание разделов ────────────────────────────── */
+
+/* Раздел с окном показа поднимается наверх меню в свои часы:
+   утром человек первым делом видит завтраки, а не хот-доги. */
+
+const minutes = hhmm => {
+  const [h, m] = String(hhmm).split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+function sectionIsNow(s, at = new Date()) {
+  if (!s.showFrom || !s.showTo) return false;
+  const now = at.getHours() * 60 + at.getMinutes();
+  const from = minutes(s.showFrom), to = minutes(s.showTo);
+  return from <= to ? (now >= from && now < to) : (now >= from || now < to);
+}
+
+const sectionsInOrder = () => [
+  ...SECTIONS.filter(s => sectionIsNow(s)),
+  ...SECTIONS.filter(s => !sectionIsNow(s)),
+];
+
+const sectionNote = s => {
+  const hours = s.showFrom && s.showTo ? `с ${s.showFrom} до ${s.showTo}` : '';
+  if (sectionIsNow(s)) return `Сейчас · ${hours}`;
+  return [s.note, hours].filter(Boolean).join(' · ');
+};
+
 /* ── меню ───────────────────────────────────────────── */
 
 const camera = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3 7.2 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9Zm3 5.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Zm0 2a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/></svg>`;
@@ -177,17 +205,22 @@ function rowCard(d) {
 }
 
 function renderMenu() {
-  $('#tabs-row').innerHTML = SECTIONS
-    .map(s => `<a href="#sec-${s.id}" data-tab="${s.id}">${s.title}</a>`).join('');
+  const order = sectionsInOrder();
 
-  $('#menu-body').innerHTML = SECTIONS.map(s => {
+  $('#tabs-row').innerHTML = order
+    .map(s => `<a href="#sec-${s.id}" data-tab="${s.id}">${s.title}${sectionIsNow(s) ? ' <i>сейчас</i>' : ''}</a>`)
+    .join('');
+
+  $('#menu-body').innerHTML = order.map(s => {
     const items = MENU.filter(d => d.section === s.id);
     const big = (s.layout || 'cards') === 'cards';
+    const note = sectionNote(s);
+
     return `
-    <section class="sec" id="sec-${s.id}" aria-labelledby="h-${s.id}">
+    <section class="sec${sectionIsNow(s) ? ' sec--now' : ''}" id="sec-${s.id}" aria-labelledby="h-${s.id}">
       <div class="sec__head">
         <h3 id="h-${s.id}">${s.title}</h3>
-        ${s.note ? `<span>${s.note}</span>` : ''}
+        ${note ? `<span>${note}</span>` : ''}
       </div>
       <div class="${big ? 'dishes' : 'rows-menu'}">
         ${items.map(big ? dishCard : rowCard).join('')}
@@ -782,6 +815,21 @@ $$('.hero__media img, .shot-frame img').forEach(img => {
   }
 });
 
+/* Страницу могут держать открытой. Раз в минуту проверяем, не наступило
+   ли время раздела, и перестраиваем меню только если состав изменился. */
+function watchClock() {
+  let last = sectionsInOrder().map(s => s.id).join();
+
+  setInterval(() => {
+    const now = sectionsInOrder().map(s => s.id).join();
+    if (now === last) return;
+    last = now;
+    renderMenu();
+    watchTabs();
+    paint();
+  }, 60000);
+}
+
 async function start() {
   await loadMenu();
 
@@ -796,6 +844,7 @@ async function start() {
 
   renderMenu();
   watchTabs();
+  watchClock();
   setMode(mode);
   paint();
 }

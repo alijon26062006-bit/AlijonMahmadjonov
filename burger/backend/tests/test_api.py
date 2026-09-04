@@ -127,6 +127,22 @@ def test_order_numbers_grow(client):
     assert second == first + 1
 
 
+def test_breakfast_has_schedule(client):
+    """Завтраки поднимаются наверх меню с 7:30 до 9:00."""
+    sections = {s['id']: s for s in client.get('/api/menu').json()['sections']}
+    assert sections['breakfast']['showFrom'] == '07:30'
+    assert sections['breakfast']['showTo'] == '09:00'
+    assert sections['burgers']['showFrom'] == ''       # у остальных окна нет
+
+
+def test_admin_can_change_schedule(client):
+    client.post('/admin/login', data={'password': 'секрет-Test'})
+    client.post('/admin/settings', data={'hours_from_breakfast': '08:00', 'hours_to_breakfast': '11:00'})
+    sections = {s['id']: s for s in client.get('/api/menu').json()['sections']}
+    assert sections['breakfast']['showFrom'] == '08:00'
+    assert sections['breakfast']['showTo'] == '11:00'
+
+
 def test_admin_needs_password(client):
     assert client.get('/admin', follow_redirects=False).status_code == 303
     assert client.get('/admin/menu', follow_redirects=False).status_code == 303
