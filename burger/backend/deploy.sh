@@ -160,8 +160,14 @@ find /srv/backup -name 'burger-*.db' -mtime +14 -delete
 CRON
 chmod +x /etc/cron.daily/burger-backup
 
-sleep 2
-if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null; then
+say "Ждём, пока сервер поднимется"
+UP=''
+for _ in $(seq 1 40); do            # первый запуск наполняет базу — это пара секунд
+  if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then UP=1; break; fi
+  sleep 1
+done
+
+if [ -n "$UP" ]; then
   say "Сервер поднят"
 else
   echo
