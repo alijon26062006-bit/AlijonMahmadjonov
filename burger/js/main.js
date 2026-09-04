@@ -112,8 +112,6 @@ function renderMenu() {
     </section>`;
   }).join('');
 
-  $$('.add').forEach(b => b.addEventListener('click', () => addDish(b.dataset.id)));
-
   $$('.shot img').forEach(img => {
     if (img.complete && !img.naturalWidth) img.replaceWith(mark());
     else img.addEventListener('error', () => img.replaceWith(mark()), { once: true });
@@ -129,6 +127,60 @@ function photoOrNothing(img, holder, cls) {
 }
 photoOrNothing($('#hero-photo'), $('.hero'), 'is-nophoto');
 photoOrNothing($('#place-photo'), $('.place__card'), 'is-nophoto');
+
+/* ── карточка блюда: состав и характеристики ────────── */
+
+function openDish(id) {
+  const d = dish(id);
+  if (!d) return;
+
+  const facts = [
+    d.weight ? `<div><dt>${d.weight} г</dt><dd>вес порции</dd></div>` : '',
+    d.kcal ? `<div><dt>${d.kcal}</dt><dd>ккал</dd></div>` : '',
+    d.cook ? `<div><dt>${d.cook}</dt><dd>готовим</dd></div>` : ''
+  ].join('');
+
+  $('#ds-body').innerHTML = `
+    <div class="ds-shot">
+      ${tagHtml(d.tag)}
+      <img src="assets/dishes/${d.id}.jpg" alt="${d.name}" width="1216" height="896">
+    </div>
+    <div class="ds-text">
+      <h3 id="ds-name">${d.name}</h3>
+      ${d.about ? `<p class="ds-about">${d.about}</p>` : ''}
+
+      <dl class="ds-facts">${facts}</dl>
+
+      ${d.parts && d.parts.length ? `
+        <h4 class="ds-title">Состав</h4>
+        <ul class="ds-parts">${d.parts.map(p => `<li>${p}</li>`).join('')}</ul>` : ''}
+
+      <div class="ds-foot">
+        <div class="ds-price">
+          <b>${som(d.price)}</b>
+          ${d.oldPrice ? `<s>${som(d.oldPrice)}</s>` : ''}
+        </div>
+        ${pick(d.id)}
+      </div>
+    </div>`;
+
+  const img = $('#ds-body img');
+  if (img.complete && !img.naturalWidth) img.replaceWith(mark());
+  else img.addEventListener('error', () => img.replaceWith(mark()), { once: true });
+
+  syncPicks();
+  open('#dish-sheet');
+}
+
+/* Нажатие на карточку открывает описание. Кнопка «В заказ»
+   и счётчик при этом работают как раньше — их мы пропускаем. */
+document.addEventListener('click', e => {
+  if (e.target.closest('.pick')) return;
+  const card = e.target.closest('.dish, .line');
+  if (!card) return;
+  const id = $('.pick', card)?.dataset.id;
+  if (id) openDish(id);
+});
 
 /* ── корзина ────────────────────────────────────────── */
 
@@ -162,7 +214,9 @@ function addDish(id) {
   order[id] = (order[id] || 0) + 1;
   save();
   renderBasket();
-  snack(`${dish(id).name} — в заказе`);
+
+  // в открытой карточке блюда счётчик и так на виду — уведомление лишнее
+  if ($('#dish-sheet').hidden) snack(`${dish(id).name} — в заказе`);
 }
 
 function setQty(id, qty) {
@@ -235,7 +289,12 @@ function renderBasket() {
   $('#order-total').textContent = som(total());
 }
 
+/* Кнопки живут и в меню, и в карточке блюда, и появляются после
+   отрисовки — поэтому слушаем нажатия на документе, а не на каждой кнопке. */
 document.addEventListener('click', e => {
+  const add = e.target.closest('.add');
+  if (add) { addDish(add.dataset.id); return; }
+
   const btn = e.target.closest('.pick .stepper button');
   if (!btn) return;
   const id = btn.closest('.pick').dataset.id;
@@ -274,7 +333,7 @@ function open(sel) {
 function closeAll() {
   let wasOpen = false;
 
-  ['#basket', '#order'].forEach(sel => {
+  ['#basket', '#order', '#dish-sheet'].forEach(sel => {
     const el = $(sel);
     if (el.hidden) return;
     wasOpen = true;
@@ -317,7 +376,7 @@ $('#bottombar').addEventListener('click', () => open('#basket'));
     shift = 0;
   });
 })();
-$$('[data-close]').forEach(el => el.addEventListener('click', closeAll));
+$$('[data-close], [data-shut]').forEach(el => el.addEventListener('click', closeAll));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
 
 $('#to-order').addEventListener('click', () => {

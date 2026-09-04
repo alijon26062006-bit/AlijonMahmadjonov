@@ -278,6 +278,16 @@
   </div>
 </div>
 
+<!-- карточка блюда: состав и характеристики -->
+<div class="dish-sheet" id="dish-sheet" hidden>
+  <div class="dish-sheet__fade" data-shut></div>
+  <div class="dish-sheet__box" role="dialog" aria-modal="true" aria-labelledby="ds-name">
+    <span class="sheet-handle" aria-hidden="true"></span>
+    <button class="x dish-sheet__x" type="button" data-shut aria-label="Закрыть">&times;</button>
+    <div class="dish-sheet__body" id="ds-body"></div>
+  </div>
+</div>
+
 <button class="bottombar" id="bottombar" type="button" hidden>
   <span class="bottombar__count" id="bb-count">0</span>
   <span class="bottombar__label">Смотреть заказ</span>
