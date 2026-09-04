@@ -1,0 +1,14 @@
+{
+  "name": "The Burger — Душанбе",
+  "short_name": "The Burger",
+  "description": "Бургеры из 100% говядины. Доставка по Душанбе 30–40 минут.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0c0b0a",
+  "theme_color": "#0c0b0a",
+  "lang": "ru",
+  "icons": [
+    { "src": "assets/logo.jpg", "sizes": "512x512", "type": "image/jpeg", "purpose": "any" }
+  ]
+}
