@@ -151,6 +151,9 @@ let ZONES = [
   { id: 'out',        name: 'За городом',            price: null }
 ];
 
+/* Банки для перевода приходят с сервера — тут пусто, пока его нет. */
+let BANKS = [];
+
 let DELIVERY = {
   freeFrom: 100,
   minOrder: 40,

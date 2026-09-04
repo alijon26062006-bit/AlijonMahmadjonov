@@ -298,7 +298,65 @@
       <dl class="sums" id="checkout-sums"></dl>
       <p class="hint" id="checkout-hint" hidden></p>
       <button class="btn btn--accent btn--full" id="submit-order" type="submit" form="order-form">Подтвердить заказ</button>
+      <p class="hint" id="pay-hint" hidden>Дальше выберете, чем платить</p>
       <a class="btn btn--line btn--full" href="tel:+992939171997">Лучше позвоните мне</a>
+    </footer>
+  </div>
+</div>
+
+<!-- оплата: сначала выбор банка, потом реквизиты и чек -->
+<div class="sheet" id="pay-sheet" hidden>
+  <div class="sheet__fade" data-shut></div>
+  <div class="sheet__box" role="dialog" aria-modal="true" aria-labelledby="pay-title">
+    <span class="grip" aria-hidden="true"></span>
+    <header class="sheet__head">
+      <h2 class="h3" id="pay-title">Оплата</h2>
+      <button class="x" type="button" data-shut aria-label="Закрыть">&times;</button>
+    </header>
+
+    <div class="sheet__scroll">
+      <!-- шаг 1: чем платим -->
+      <div id="pay-pick">
+        <p class="pay__lead">Как удобнее оплатить?</p>
+        <div class="pay__ways" id="pay-ways" role="radiogroup" aria-label="Способ оплаты"></div>
+      </div>
+
+      <!-- шаг 2: куда переводить и куда прислать чек -->
+      <div id="pay-send" hidden>
+        <p class="pay__lead">Переведите <b id="pay-sum"></b> и пришлите чек.</p>
+
+        <div class="req">
+          <div class="req__row">
+            <span>Банк</span><b id="req-bank"></b>
+          </div>
+          <div class="req__row">
+            <span>Получатель</span><b id="req-holder"></b>
+          </div>
+          <div class="req__row req__row--main">
+            <span>Номер</span>
+            <b id="req-number"></b>
+            <button class="req__copy" id="req-copy" type="button">Копировать</button>
+          </div>
+          <p class="req__note" id="req-note"></p>
+        </div>
+
+        <label class="drop" id="receipt-drop">
+          <input type="file" id="receipt-file" accept="image/*,application/pdf" hidden>
+          <span class="drop__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a1 1 0 0 0 1 1h14a1
+              1 0 0 0 1-1v-2"/></svg>
+          </span>
+          <span class="drop__text" id="receipt-name">Прикрепить чек — фото или PDF</span>
+        </label>
+        <img class="drop__shot" id="receipt-shot" alt="" hidden>
+
+        <p class="err" id="pay-err" role="alert" hidden></p>
+      </div>
+    </div>
+
+    <footer class="sheet__foot">
+      <button class="btn btn--accent btn--full" id="pay-next" type="button">Далее</button>
+      <button class="btn btn--line btn--full" id="pay-back" type="button">Назад</button>
     </footer>
   </div>
 </div>

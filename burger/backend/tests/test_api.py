@@ -505,3 +505,95 @@ def test_admin_bot_hands_out_the_app_button(client):
 
     # чужой адрес вебхука никого не пускает
     assert client.post('/tg/admin/чужой', json={}).status_code == 404
+
+
+# ── оплата переводом ────────────────────────────────────
+
+def ready_bank(client):
+    import db
+    db.save_bank('alif', 'Алиф Банк', 'Алиджон Махмаджонов', '1234 5678 9012 3456',
+                 'Перевод по номеру')
+    return 'alif'
+
+
+def test_bank_without_details_is_hidden(client):
+    """Банк без имени и номера клиенту не показывают: платить было бы некуда."""
+    assert client.get('/api/menu').json()['banks'] == []
+
+    ready_bank(client)
+    banks = client.get('/api/menu').json()['banks']
+    assert [b['id'] for b in banks] == ['alif']
+    assert 'number' not in banks[0]        # реквизиты не лежат в общем меню
+
+
+def test_transfer_order_waits_for_the_receipt(client):
+    ready_bank(client)
+    r = client.post('/api/orders', json={
+        'items': [{'id': 'hamburger', 'qty': 1}], 'mode': 'pickup',
+        'name': 'Тест', 'phone': '937777777', 'pay': 'bank', 'bank': 'alif'})
+    assert r.status_code == 200
+
+    body = r.json()
+    assert body['pay'] == 'bank'
+    assert body['bank']['number'] == '1234 5678 9012 3456'   # реквизиты пришли только сейчас
+    assert body['receipt']
+
+    import db
+    o = db.orders(limit=1)[0]
+    assert o['status'] == 'awaiting'        # на кухню такой заказ ещё не идёт
+    assert client.get('/api/kitchen').status_code in (200, 303)
+
+    ok = client.post('/api/orders/receipt', data={'token': body['receipt']},
+                     files={'file': ('chek.jpg', b'\xff\xd8\xff\xe0 fake', 'image/jpeg')})
+    assert ok.status_code == 200 and ok.json()['number'] == body['number']
+
+    o = db.orders(limit=1)[0]
+    assert o['status'] == 'check' and o['receipt'].endswith('.jpg')
+
+    # второй раз тот же чек не примем
+    again = client.post('/api/orders/receipt', data={'token': body['receipt']},
+                        files={'file': ('chek.jpg', b'\xff\xd8\xff\xe0 fake', 'image/jpeg')})
+    assert again.status_code == 400
+
+
+def test_receipt_needs_a_real_ticket_and_a_real_file(client):
+    ready_bank(client)
+    body = client.post('/api/orders', json={
+        'items': [{'id': 'hamburger', 'qty': 1}], 'mode': 'pickup',
+        'name': 'Тест', 'phone': '937777777', 'pay': 'bank', 'bank': 'alif'}).json()
+
+    # чужой пропуск
+    assert client.post('/api/orders/receipt', data={'token': 'подделка'},
+                       files={'file': ('c.jpg', b'x', 'image/jpeg')}).status_code == 403
+    # не картинка и не PDF
+    assert client.post('/api/orders/receipt', data={'token': body['receipt']},
+                       files={'file': ('c.exe', b'MZ', 'application/x-msdownload')}
+                       ).status_code == 400
+    # пустой файл
+    assert client.post('/api/orders/receipt', data={'token': body['receipt']},
+                       files={'file': ('c.jpg', b'', 'image/jpeg')}).status_code == 400
+
+
+def test_unknown_bank_is_refused(client):
+    for bank in ('', 'нетакого', 'alif'):     # alif ещё без реквизитов
+        r = client.post('/api/orders', json={
+            'items': [{'id': 'hamburger', 'qty': 1}], 'mode': 'pickup',
+            'name': 'Тест', 'phone': '937777777', 'pay': 'bank', 'bank': bank})
+        assert r.status_code == 400, bank
+
+
+def test_owner_fills_the_details_in_admin(client):
+    client.post('/admin/login', data={'password': 'секрет-Test'})
+    r = client.post('/admin/banks', data={
+        'name_alif': 'Алиф Банк', 'holder_alif': 'Алиджон М.',
+        'number_alif': '9999 8888 7777 6666', 'note_alif': 'Перевод по номеру',
+        'active_alif': 'on',
+        'new_name': 'Спитамен Банк', 'new_holder': 'Алиджон М.', 'new_number': '5555',
+    }, follow_redirects=False)
+    assert r.status_code == 303
+
+    banks = client.get('/api/menu').json()['banks']
+    assert {b['name'] for b in banks} == {'Алиф Банк', 'Спитамен Банк'}
+
+    import db
+    assert db.bank('alif')['number'] == '9999 8888 7777 6666'

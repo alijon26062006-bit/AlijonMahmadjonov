@@ -61,6 +61,16 @@ CREATE TABLE IF NOT EXISTS zones (
     position INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS banks (
+    id       TEXT PRIMARY KEY,
+    name     TEXT NOT NULL,               -- «Душанбе Сити», «Алиф Банк», «Эсхата»
+    holder   TEXT NOT NULL DEFAULT '',    -- имя и фамилия получателя
+    number   TEXT NOT NULL DEFAULT '',    -- номер карты или счёта
+    note     TEXT NOT NULL DEFAULT '',    -- подсказка клиенту
+    active   INTEGER NOT NULL DEFAULT 1,
+    position INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -70,7 +80,10 @@ CREATE TABLE IF NOT EXISTS orders (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     number     INTEGER NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    status     TEXT NOT NULL DEFAULT 'new',    -- new | confirmed | cooking | done | on_way | delivered | canceled
+    status     TEXT NOT NULL DEFAULT 'new',    -- awaiting | check | new | confirmed | cooking | done | on_way | delivered | canceled
+    pay        TEXT NOT NULL DEFAULT 'cash',   -- cash | bank
+    bank       TEXT NOT NULL DEFAULT '',       -- каким банком платили
+    receipt    TEXT NOT NULL DEFAULT '',       -- файл чека в uploads/
     courier_id   TEXT NOT NULL DEFAULT '',     -- кто повёз
     courier_name TEXT NOT NULL DEFAULT '',
     taken_at     TEXT NOT NULL DEFAULT '',
@@ -140,6 +153,13 @@ def setup():
             if col not in cols:
                 con.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
 
+        cols = {r['name'] for r in con.execute('PRAGMA table_info(orders)')}
+        if 'pay' not in cols:
+            con.execute("ALTER TABLE orders ADD COLUMN pay TEXT NOT NULL DEFAULT 'cash'")
+        for col in ('bank', 'receipt'):
+            if col not in cols:
+                con.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+
         cols = {r['name'] for r in con.execute('PRAGMA table_info(couriers)')}
         for col in ('phone', 'step'):
             if col not in cols:
@@ -187,6 +207,12 @@ def seed_if_empty():
         for r in sd.REMOVALS:
             con.execute('INSERT INTO removals (section, name, gen) VALUES (?,?,?)',
                         (r['section'], r['name'], r['gen']))
+
+        for i, b in enumerate(getattr(sd, 'BANKS', [])):
+            con.execute("""INSERT OR REPLACE INTO banks (id, name, holder, number, note, position)
+                           VALUES (?,?,?,?,?,?)""",
+                        (b['id'], b['name'], b.get('holder', ''), b.get('number', ''),
+                         b.get('note', ''), i))
 
         for i, z in enumerate(sd.ZONES):
             con.execute('INSERT OR REPLACE INTO zones (id, name, price, position) VALUES (?,?,?,?)',
@@ -343,11 +369,62 @@ def next_number():
         return (last or 123) + 1
 
 
+# ── банки для перевода ──────────────────────────────────
+
+def banks(only_ready=False):
+    """only_ready — только те, у кого заполнены имя и номер: остальные клиенту
+    показывать нельзя, ему некуда будет платить."""
+    with connect() as con:
+        rows = [dict(r) for r in con.execute(
+            'SELECT * FROM banks WHERE active = 1 ORDER BY position, name')]
+    if only_ready:
+        rows = [b for b in rows if b['holder'].strip() and b['number'].strip()]
+    return rows
+
+
+def all_banks():
+    with connect() as con:
+        return [dict(r) for r in con.execute('SELECT * FROM banks ORDER BY position, name')]
+
+
+def bank(bank_id):
+    with connect() as con:
+        r = con.execute('SELECT * FROM banks WHERE id = ?', (bank_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def save_bank(bank_id, name, holder, number, note='', active=True, position=0):
+    with connect() as con:
+        con.execute("""INSERT INTO banks (id, name, holder, number, note, active, position)
+                       VALUES (?,?,?,?,?,?,?)
+                       ON CONFLICT(id) DO UPDATE SET
+                         name = excluded.name, holder = excluded.holder,
+                         number = excluded.number, note = excluded.note,
+                         active = excluded.active, position = excluded.position""",
+                    (bank_id, name, holder, number, note, 1 if active else 0, position))
+
+
+def delete_bank(bank_id):
+    with connect() as con:
+        con.execute('DELETE FROM banks WHERE id = ?', (bank_id,))
+
+
+def save_receipt(order_id, filename):
+    """Чек пришёл — заказ ждёт проверки хозяином."""
+    with connect() as con:
+        cur = con.execute(
+            """UPDATE orders SET receipt = ?, status = 'check'
+               WHERE id = ? AND status = 'awaiting'""", (filename, order_id))
+        return cur.rowcount == 1
+
+
 def create_order(order, items):
     with connect() as con:
         cur = con.execute("""INSERT INTO orders
-            (number, mode, zone, name, phone, address, flat, landmark, note, goods, delivery, total)
-            VALUES (:number,:mode,:zone,:name,:phone,:address,:flat,:landmark,:note,:goods,:delivery,:total)""",
+            (number, mode, zone, name, phone, address, flat, landmark, note,
+             goods, delivery, total, pay, bank, status)
+            VALUES (:number,:mode,:zone,:name,:phone,:address,:flat,:landmark,:note,
+                    :goods,:delivery,:total,:pay,:bank,:status)""",
             order)
         oid = cur.lastrowid
         for it in items:

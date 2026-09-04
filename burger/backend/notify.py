@@ -15,6 +15,8 @@ TOKEN = os.getenv('TG_TOKEN', '')
 CHAT = os.getenv('TG_ADMIN_CHAT', '')
 
 STATUS_RU = {
+    'awaiting': 'ждём чек',
+    'check': 'проверить чек',
     'new': 'новый',
     'confirmed': 'подтверждён',
     'cooking': 'готовится',

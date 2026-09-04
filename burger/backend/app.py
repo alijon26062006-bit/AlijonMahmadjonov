@@ -52,6 +52,7 @@ if not SECRET_KEY:
     log.warning('SECRET_KEY не задан — сгенерирован временный, входы слетят при перезапуске')
 
 signer = URLSafeTimedSerializer(SECRET_KEY, salt='burger-admin')
+receipts = URLSafeTimedSerializer(SECRET_KEY, salt='burger-receipt')
 courier.use_key(SECRET_KEY)
 
 # адрес вебхука знает только Telegram — иначе кто угодно пришлёт «нажатие кнопки»
@@ -145,6 +146,9 @@ def api_menu():
         'addons': db.addons(),
         'removals': db.removals(),
         'zones': db.zones(),
+        # реквизиты сюда не кладём: номер карты клиент увидит только на своём шаге
+        'banks': [{'id': b['id'], 'name': b['name'], 'note': b['note']}
+                  for b in db.banks(only_ready=True)],
         'delivery': {
             'freeFrom': int(st.get('free_from', 100)),
             'minOrder': int(st.get('min_order', 40)),
@@ -177,6 +181,15 @@ class OrderIn(BaseModel):
     flat: str = ''
     landmark: str = ''
     note: str = ''
+    pay: str = 'cash'
+    bank: str = ''
+
+    @field_validator('pay')
+    @classmethod
+    def check_pay(cls, v):
+        if v not in ('cash', 'bank'):
+            raise ValueError('способ оплаты указан неверно')
+        return v
 
     @field_validator('mode')
     @classmethod
@@ -240,21 +253,79 @@ async def api_order(payload: OrderIn, request: Request):
         if z.get('price') is not None and goods < free_from:
             delivery = z['price']
 
+    # Перевод: заказ ждёт чек и на кухню пока не идёт.
+    pay, bank_id, bank_row = payload.pay, '', None
+    if pay == 'bank':
+        bank_row = db.bank(payload.bank)
+        ready = bank_row and bank_row['active'] and bank_row['holder'] and bank_row['number']
+        if not ready:
+            raise HTTPException(400, 'Выберите банк из списка')
+        bank_id = bank_row['id']
+
     order = {
         'number': db.next_number(), 'mode': payload.mode, 'zone': payload.zone,
         'name': payload.name.strip(), 'phone': payload.phone.strip(),
         'address': payload.address.strip(), 'flat': payload.flat.strip(),
         'landmark': payload.landmark.strip(), 'note': payload.note.strip(),
         'goods': goods, 'delivery': delivery, 'total': goods + delivery,
+        'pay': pay, 'bank': bank_id,
+        'status': 'awaiting' if pay == 'bank' else 'new',
     }
-    db.create_order(order, items)
+    order_id = db.create_order(order, items)
     LAST_ORDERS[ip] = now
+
+    answer = {'number': order['number'], 'goods': goods, 'delivery': delivery,
+              'total': order['total'], 'time': st.get('delivery_time', ''), 'pay': pay}
+
+    if pay == 'bank':
+        # пропуск на загрузку чека: чужой заказ им не подменишь
+        answer['receipt'] = receipts.dumps(order_id)
+        answer['bank'] = {'name': bank_row['name'], 'holder': bank_row['holder'],
+                          'number': bank_row['number'], 'note': bank_row['note']}
+        log.info('заказ №%s на %s сомони — ждём чек', order['number'], order['total'])
+        return answer
 
     await notify.send(notify.order_text(order, items, zone_name))
     log.info('заказ №%s на %s сомони', order['number'], order['total'])
+    return answer
 
-    return {'number': order['number'], 'goods': goods, 'delivery': delivery,
-            'total': order['total'], 'time': st.get('delivery_time', '')}
+
+RECEIPT_TYPES = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp',
+                 'application/pdf': '.pdf'}
+RECEIPT_MAX = 8 * 1024 * 1024
+
+
+@app.post('/api/orders/receipt')
+async def api_receipt(token: str = Form(...), file: UploadFile = File(...)):
+    """Клиент прикладывает чек о переводе. Заказ уходит хозяину на проверку."""
+    try:
+        order_id = receipts.loads(token, max_age=2 * 3600)
+    except BadSignature:
+        raise HTTPException(403, 'Ссылка на загрузку устарела. Позвоните нам, пожалуйста.')
+
+    ext = RECEIPT_TYPES.get(file.content_type or '')
+    if not ext:
+        raise HTTPException(400, 'Подойдёт фото чека или PDF')
+
+    body = await file.read(RECEIPT_MAX + 1)
+    if len(body) > RECEIPT_MAX:
+        raise HTTPException(400, 'Файл слишком большой — до 8 МБ')
+    if not body:
+        raise HTTPException(400, 'Файл пустой')
+
+    name = f'receipt-{order_id}-{secrets.token_hex(4)}{ext}'
+    (UPLOADS / name).write_bytes(body)
+
+    if not db.save_receipt(order_id, name):
+        (UPLOADS / name).unlink(missing_ok=True)
+        raise HTTPException(400, 'Чек по этому заказу уже приняли')
+
+    o = db.order(order_id)
+    zone_name = (db.zone(o['zone']) or {}).get('name', '')
+    await notify.send(notify.order_text(o, o['items'], zone_name)
+                      + '\n\n💳 Оплата переводом, чек приложен — проверьте в админке.')
+    log.info('чек по заказу №%s получен', o['number'])
+    return {'ok': True, 'number': o['number']}
 
 
 @app.get('/api/health')
@@ -403,6 +474,48 @@ async def api_courier_release(order_id: int, request: Request, t: str = ''):
     return {'ok': ok, 'message': message}
 
 
+@app.get('/admin/banks', response_class=HTMLResponse)
+def admin_banks(request: Request, _=Depends(require_admin), saved: str = ''):
+    return templates.TemplateResponse(request, 'banks.html',
+                                      {'banks': db.all_banks(), 'saved': saved})
+
+
+@app.post('/admin/banks')
+async def admin_save_banks(request: Request, _=Depends(require_admin)):
+    """Реквизиты правит хозяин: пока имя и номер пустые, банк клиенту не покажут."""
+    form = await request.form()
+
+    for b in db.all_banks():
+        db.save_bank(
+            b['id'],
+            form.get(f"name_{b['id']}", b['name']).strip() or b['name'],
+            form.get(f"holder_{b['id']}", '').strip(),
+            form.get(f"number_{b['id']}", '').strip(),
+            form.get(f"note_{b['id']}", '').strip(),
+            active=form.get(f"active_{b['id']}") == 'on',
+            position=b['position'])
+
+    new_name = form.get('new_name', '').strip()
+    if new_name:
+        base = re.sub(r'[^a-z0-9]+', '-', new_name.lower()).strip('-') or 'bank'
+        taken = {b['id'] for b in db.all_banks()}
+        bank_id, n = base, 2
+        while bank_id in taken:
+            bank_id, n = f'{base}-{n}', n + 1
+        db.save_bank(bank_id, new_name,
+                     form.get('new_holder', '').strip(), form.get('new_number', '').strip(),
+                     form.get('new_note', '').strip(),
+                     active=True, position=len(taken))
+
+    return RedirectResponse('/admin/banks?saved=1', status_code=303)
+
+
+@app.post('/admin/banks/{bank_id}/delete')
+def admin_delete_bank(bank_id: str, _=Depends(require_admin)):
+    db.delete_bank(bank_id)
+    return RedirectResponse('/admin/banks', status_code=303)
+
+
 @app.get('/admin/stats', response_class=HTMLResponse)
 def admin_stats(request: Request, _=Depends(require_admin),
                 since: str = '', until: str = ''):
@@ -533,6 +646,7 @@ def admin_orders(request: Request, _=Depends(require_admin), status: str = ''):
         'orders': db.orders(status or None),
         'counts': db.counts(), 'status': status, 'status_ru': notify.STATUS_RU,
         'zones': {z['id']: z['name'] for z in db.zones()},
+        'banks': {b['id']: b['name'] for b in db.all_banks()},
     })
 
 

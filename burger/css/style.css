@@ -732,3 +732,64 @@ svg { fill: currentColor; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
   .tabs__row { scroll-behavior: auto; }
 }
+
+/* ── оплата переводом ───────────────────────────────── */
+
+.pay__lead { margin: 0 0 var(--s4); color: var(--muted); font-size: var(--t-body); }
+.pay__lead b { color: var(--text); }
+
+.pay__ways { display: grid; gap: var(--s3); }
+.way {
+  display: grid; gap: 2px; width: 100%; min-height: var(--tap);
+  padding: var(--s4); text-align: left;
+  border: 1px solid var(--line); border-radius: var(--r2);
+  background: var(--card); color: var(--text); font: inherit; cursor: pointer;
+}
+.way__name { font-weight: 700; font-size: 16px; }
+.way__note { color: var(--muted); font-size: var(--t-small); }
+.way.is-on { border-color: var(--accent); background: var(--card-2); }
+.way.is-on .way__name { color: var(--accent); }
+
+.req {
+  margin-bottom: var(--s4); padding: var(--s4);
+  border: 1px solid var(--line); border-radius: var(--r2); background: var(--card);
+}
+.req__row {
+  display: flex; align-items: baseline; gap: var(--s3);
+  padding: var(--s2) 0; border-bottom: 1px solid var(--line);
+}
+.req__row:last-of-type { border-bottom: 0; }
+.req__row span { color: var(--muted); font-size: var(--t-small); min-width: 84px; }
+.req__row b { font-size: 16px; }
+/* Номер карты рвать посреди группы нельзя — его переписывают руками.
+   Отдаём ему всю строку под подписью. */
+.req__row--main { flex-wrap: wrap; }
+.req__row--main span { order: 1; }
+.req__row--main .req__copy { order: 2; }
+.req__row--main b {
+  order: 3; flex: 1 0 100%; margin-top: var(--s2);
+  font-family: var(--f-mono); font-size: 18px; letter-spacing: .04em;
+}
+.req__copy {
+  margin-left: auto; padding: 8px 12px; min-height: 36px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: none; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer;
+}
+.req__note { margin: var(--s3) 0 0; color: var(--muted); font-size: var(--t-small); }
+
+.drop {
+  display: flex; align-items: center; gap: var(--s3);
+  min-height: 64px; padding: var(--s4);
+  border: 1px dashed var(--line); border-radius: var(--r2);
+  background: var(--card); cursor: pointer;
+}
+.drop:hover { border-color: var(--accent); }
+.drop__icon svg {
+  width: 24px; height: 24px; fill: none; stroke: var(--accent);
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.drop__text { font-size: 15px; word-break: break-word; }
+.drop__shot {
+  display: block; max-width: 200px; max-height: 220px;
+  margin-top: var(--s3); border-radius: var(--r2);
+}

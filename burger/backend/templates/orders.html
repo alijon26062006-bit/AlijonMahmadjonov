@@ -38,6 +38,25 @@
     <div class="total"><dt>Итого</dt><dd>{{ o.total }} сомони</dd></div>
   </dl>
 
+  {% if o.pay == 'bank' %}
+  <div class="paid">
+    <p class="paid__head">
+      Оплата переводом{% if banks.get(o.bank) %} · {{ banks[o.bank] }}{% endif %}
+    </p>
+    {% if o.receipt %}
+      <a class="paid__shot" href="/uploads/{{ o.receipt }}" target="_blank" rel="noopener">
+        {% if o.receipt.endswith('.pdf') %}
+          <span class="paid__pdf">Открыть чек (PDF)</span>
+        {% else %}
+          <img src="/uploads/{{ o.receipt }}" alt="Чек об оплате" loading="lazy">
+        {% endif %}
+      </a>
+    {% else %}
+      <p class="paid__wait">Чек ещё не пришёл</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <p class="who">
     {{ o.name }} · <a href="tel:{{ o.phone }}">{{ o.phone }}</a>
     {% if o.mode == 'delivery' %}<br>{{ zones.get(o.zone, o.zone) }}: {{ o.address }}{% if o.flat %}, {{ o.flat }}{% endif %}
@@ -47,9 +66,10 @@
   </p>
 
   {# обычный ход заказа — одна большая кнопка; всё остальное убрано под «Другой статус» #}
-  {% set next_step = {'new': 'confirmed', 'confirmed': 'cooking', 'cooking': 'done',
-                      'done': 'on_way', 'on_way': 'delivered'}.get(o.status) %}
-  {% set next_ru = {'confirmed': 'Подтвердить', 'cooking': 'Отдать на кухню',
+  {% set next_step = {'check': 'confirmed', 'new': 'confirmed', 'confirmed': 'cooking',
+                      'cooking': 'done', 'done': 'on_way', 'on_way': 'delivered'}.get(o.status) %}
+  {% set next_ru = {'confirmed': 'Оплата пришла — на кухню' if o.status == 'check' else 'Подтвердить',
+                    'cooking': 'Отдать на кухню',
                     'done': 'Готов', 'on_way': 'Отдать курьеру', 'delivered': 'Доставлен'} %}
 
   <form class="steps-form" method="post" action="/admin/orders/{{ o.id }}/status">

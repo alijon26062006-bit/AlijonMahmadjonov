@@ -464,7 +464,7 @@ function paint() {
 
 /* ── шторки и окна ──────────────────────────────────── */
 
-const SHEETS = ['#cart-sheet', '#dish-sheet', '#checkout-sheet', '#done-sheet'];
+const SHEETS = ['#cart-sheet', '#dish-sheet', '#checkout-sheet', '#pay-sheet', '#done-sheet'];
 let lastFocus = null;
 
 function openSheet(sel) {
@@ -613,16 +613,20 @@ $('#order-form').addEventListener('submit', e => {
   if (mode === 'delivery' && !f.address.value.trim()) return fail('Укажите улицу и дом, иначе курьер не доедет.', f.address);
 
   err.hidden = true;
+
+  // есть куда переводить — сначала спрашиваем, чем платить
+  if (server && BANKS.length) { openPay(f); return; }
   finish(f, err);
 });
 
-async function finish(f, err) {
+async function finish(f, err, pay = 'cash', bank = '') {
   const btn = $('#submit-order');
   btn.disabled = true;
 
   try {
     if (server) {
-      const done = await sendOrder(f);
+      const done = await sendOrder(f, pay, bank);
+      if (done.pay === 'bank') { showRequisites(done); return done; }
       $('#done-number').textContent = `№${done.number}`;
       $('#done-text').textContent = mode === 'delivery'
         ? `Мы получили заказ и скоро позвоним. Доставим за ${done.time || DELIVERY.time}.`
@@ -691,6 +695,7 @@ async function loadMenu() {
     SECTIONS = d.sections;
     MENU = d.dishes;
     ZONES = d.zones;
+    BANKS = d.banks || [];
     DELIVERY = { ...DELIVERY, ...d.delivery };
 
     MODIFIERS = {};
@@ -713,14 +718,14 @@ async function loadMenu() {
 }
 
 /* Заказ на сервер. Сервер сам пересчитывает цены и присылает номер. */
-async function sendOrder(f) {
+async function sendOrder(f, pay = 'cash', bank = '') {
   const items = Object.values(cart).map(l => ({
     id: l.id, qty: l.qty, add: l.add,
     remove: l.remove.map(r => REMOVE_GEN[r] || r.toLowerCase()),
   }));
 
   const order = {
-    items, mode, zone,
+    items, mode, zone, pay, bank,
     name: f.name.value.trim(), phone: f.phone.value.trim(),
     address: f.address.value.trim(), flat: f.flat.value.trim(),
     landmark: f.landmark.value.trim(), note: f.note.value.trim(),
@@ -966,3 +971,156 @@ $('#install').addEventListener('click', async () => {
 });
 
 addEventListener('appinstalled', () => { $('#install').hidden = true; });
+
+/* ── оплата переводом ───────────────────────────────── */
+
+/* Два шага: сначала клиент выбирает банк, потом видит реквизиты и прикладывает
+   чек. Реквизиты приходят с сервера вместе с номером заказа — заранее мы их
+   на странице не держим. */
+
+let payForm = null;      // форма заказа, к которой вернёмся
+let payWay = 'cash';     // cash или id банка
+let payTicket = '';      // пропуск на загрузку чека
+let receiptFile = null;
+
+function openPay(f) {
+  payForm = f;
+  payWay = 'cash';
+  payTicket = '';
+  receiptFile = null;
+
+  const ways = [{ id: 'cash', name: 'Наличными курьеру', note: mode === 'pickup'
+    ? 'Оплата при получении' : 'Курьер привезёт сдачу' }, ...BANKS];
+
+  $('#pay-ways').innerHTML = ways.map((w, i) => `
+    <button class="way${i === 0 ? ' is-on' : ''}" type="button" role="radio"
+            aria-checked="${i === 0}" data-way="${w.id}">
+      <span class="way__name">${w.name}</span>
+      ${w.note ? `<span class="way__note">${w.note}</span>` : ''}
+    </button>`).join('');
+
+  $('#pay-pick').hidden = false;
+  $('#pay-send').hidden = true;
+  $('#pay-err').hidden = true;
+  $('#pay-next').textContent = 'Далее';
+  $('#pay-back').hidden = false;
+  $('#receipt-name').textContent = 'Прикрепить чек — фото или PDF';
+  $('#receipt-shot').hidden = true;
+  $('#receipt-file').value = '';
+  $('#pay-sum').textContent = som(total());
+  openSheet('#pay-sheet');
+}
+
+$('#pay-ways').addEventListener('click', e => {
+  const btn = e.target.closest('[data-way]');
+  if (!btn) return;
+  payWay = btn.dataset.way;
+  $$('#pay-ways .way').forEach(w => {
+    const on = w === btn;
+    w.classList.toggle('is-on', on);
+    w.setAttribute('aria-checked', String(on));
+  });
+});
+
+function showRequisites(done) {
+  payTicket = done.receipt || '';
+  const b = done.bank || {};
+  $('#req-bank').textContent = b.name || '';
+  $('#req-holder').textContent = b.holder || '';
+  $('#req-number').textContent = b.number || '';
+  $('#req-note').textContent = b.note || '';
+  $('#pay-sum').textContent = som(done.total);
+
+  $('#pay-pick').hidden = true;
+  $('#pay-send').hidden = false;
+  $('#pay-next').textContent = 'Отправить чек';
+  $('#pay-back').hidden = true;      // заказ уже создан, назад некуда
+  openSheet('#pay-sheet');
+}
+
+$('#req-copy').addEventListener('click', async () => {
+  const number = $('#req-number').textContent;
+  try {
+    await navigator.clipboard.writeText(number.replace(/\s/g, ''));
+    snack('Номер скопирован');
+  } catch (e) {
+    snack('Не вышло скопировать — перепишите номер');
+  }
+});
+
+$('#receipt-file').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  if (file.size > 8 * 1024 * 1024) {
+    $('#pay-err').textContent = 'Файл больше 8 МБ. Пришлите фото поменьше.';
+    $('#pay-err').hidden = false;
+    e.target.value = '';
+    return;
+  }
+
+  receiptFile = file;
+  $('#pay-err').hidden = true;
+  $('#receipt-name').textContent = file.name;
+
+  const shot = $('#receipt-shot');
+  if (file.type.startsWith('image/')) {
+    shot.src = URL.createObjectURL(file);
+    shot.hidden = false;
+  } else {
+    shot.hidden = true;
+  }
+});
+
+$('#pay-back').addEventListener('click', () => openSheet('#checkout-sheet'));
+
+$('#pay-next').addEventListener('click', async () => {
+  const btn = $('#pay-next');
+  const err = $('#pay-err');
+
+  // шаг 1: заказ ещё не создан
+  if (!payTicket) {
+    btn.disabled = true;
+    try {
+      // ошибку показываем здесь же: форма заказа сейчас за этим окном и не видна
+      await finish(payForm, err,
+                   payWay === 'cash' ? 'cash' : 'bank',
+                   payWay === 'cash' ? '' : payWay);
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
+
+  // шаг 2: отправляем чек
+  if (!receiptFile) {
+    err.textContent = 'Прикрепите чек — фото перевода или PDF.';
+    err.hidden = false;
+    return;
+  }
+
+  btn.disabled = true;
+  err.hidden = true;
+  try {
+    const body = new FormData();
+    body.append('token', payTicket);
+    body.append('file', receiptFile);
+
+    const res = await fetch(url('/api/orders/receipt'), { method: 'POST', body });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Чек не ушёл. Попробуйте ещё раз.');
+
+    $('#done-number').textContent = `№${data.number}`;
+    $('#done-text').textContent =
+      'Чек получили. Проверим оплату и позвоним — после этого заказ уходит на кухню.';
+    cart = {};
+    save();
+    paint();
+    openSheet('#done-sheet');
+  } catch (e) {
+    err.textContent = e.message;
+    err.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+});

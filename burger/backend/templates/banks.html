@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Оплата{% endblock %}
+{% block body %}
+<h1>Куда клиент переводит деньги</h1>
+{% if saved %}<p class="ok">Сохранено</p>{% endif %}
+
+<p class="empty">Пока имя получателя и номер не заполнены, банк клиенту не показывается —
+  иначе он увидит пустые реквизиты и не поймёт, куда платить.</p>
+
+<form method="post" action="/admin/banks">
+  {% for b in banks %}
+  <section class="card form">
+    <div class="head-row">
+      <h2>{{ b.name }}</h2>
+      {% if b.holder and b.number %}
+        <small>{{ 'показывается клиентам' if b.active else 'выключен' }}</small>
+      {% else %}
+        <small>не заполнен</small>
+      {% endif %}
+    </div>
+
+    <div class="grid">
+      <label>Название банка<input name="name_{{ b.id }}" value="{{ b.name }}"></label>
+      <label>Имя и фамилия получателя
+        <input name="holder_{{ b.id }}" value="{{ b.holder }}" placeholder="Алиджон Махмаджонов"></label>
+      <label>Номер карты или счёта
+        <input name="number_{{ b.id }}" value="{{ b.number }}" inputmode="numeric"
+               placeholder="1234 5678 9012 3456"></label>
+      <label>Подсказка клиенту
+        <input name="note_{{ b.id }}" value="{{ b.note }}" placeholder="Перевод на карту"></label>
+    </div>
+
+    <label class="check">
+      <input type="checkbox" name="active_{{ b.id }}" {{ 'checked' if b.active }}>
+      Показывать клиентам
+    </label>
+  </section>
+  {% endfor %}
+
+  <section class="card form">
+    <h2>Добавить банк</h2>
+    <div class="grid">
+      <label>Название<input name="new_name" placeholder="Например, Спитамен Банк"></label>
+      <label>Имя и фамилия<input name="new_holder"></label>
+      <label>Номер<input name="new_number" inputmode="numeric"></label>
+      <label>Подсказка<input name="new_note" placeholder="Перевод на карту"></label>
+    </div>
+  </section>
+
+  <button class="btn btn--wide" type="submit">Сохранить</button>
+</form>
+
+{% if banks %}
+<section class="card">
+  <h2>Убрать банк</h2>
+  {% for b in banks %}
+  <div class="crow">
+    <div><b>{{ b.name }}</b><small>{{ b.number or 'номер не указан' }}</small></div>
+    <form method="post" action="/admin/banks/{{ b.id }}/delete"
+          onsubmit="return confirm('Убрать {{ b.name }} насовсем?')">
+      <button class="btn ghost" type="submit">Удалить</button>
+    </form>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}
