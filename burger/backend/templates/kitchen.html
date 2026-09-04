@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Кухня · The Burger</title>
+<meta name="theme-color" content="#0c0b0a">
+<link rel="stylesheet" href="/static/kitchen.css">
+</head>
+<body>
+
+<header class="bar">
+  <b>Кухня</b>
+  <span class="count" id="count">0 заказов</span>
+  <span class="clock" id="clock">--:--</span>
+  <button class="mute" id="mute" type="button" aria-pressed="false">Звук вкл</button>
+  <a class="back" href="/admin">Заказы</a>
+</header>
+
+<main class="board" id="board"></main>
+
+<p class="empty" id="empty" hidden>Новых заказов нет</p>
+
+<script src="/static/kitchen.js"></script>
+</body>
+</html>

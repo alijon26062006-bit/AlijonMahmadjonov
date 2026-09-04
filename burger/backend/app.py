@@ -216,6 +216,45 @@ def health():
     return {'ok': True, 'dishes': len(db.dishes()), 'orders': db.counts()}
 
 
+# ── панель кухни ────────────────────────────────────────
+
+KITCHEN_STATUSES = ('new', 'confirmed', 'cooking')
+
+
+def kitchen_orders():
+    """Заказы, которые кухня ещё готовит. Цены здесь не нужны."""
+    out = []
+    for o in db.orders(limit=60):
+        if o['status'] not in KITCHEN_STATUSES:
+            continue
+        out.append({
+            'id': o['id'], 'number': o['number'], 'status': o['status'],
+            'created_at': o['created_at'], 'mode': o['mode'],
+            'note': o['note'],
+            'items': [{'name': i['name'], 'qty': i['qty'], 'options': i['options']}
+                      for i in o['items']],
+        })
+    return out
+
+
+@app.get('/kitchen', response_class=HTMLResponse)
+def kitchen(request: Request, _=Depends(require_admin)):
+    return templates.TemplateResponse(request, 'kitchen.html', {})
+
+
+@app.get('/api/kitchen')
+def api_kitchen(request: Request, _=Depends(require_admin)):
+    return {'orders': kitchen_orders(), 'now': time.strftime('%Y-%m-%dT%H:%M:%S')}
+
+
+@app.post('/api/kitchen/{order_id}/status')
+def api_kitchen_status(order_id: int, status: str = Form(...), _=Depends(require_admin)):
+    if status not in notify.STATUS_RU:
+        raise HTTPException(400, 'Неизвестный статус')
+    db.set_status(order_id, status)
+    return {'ok': True}
+
+
 # ── админка ─────────────────────────────────────────────
 
 @app.get('/admin/login', response_class=HTMLResponse)

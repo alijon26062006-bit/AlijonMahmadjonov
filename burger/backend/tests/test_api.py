@@ -143,6 +143,39 @@ def test_admin_can_change_schedule(client):
     assert sections['breakfast']['showTo'] == '11:00'
 
 
+def test_kitchen_needs_password(client):
+    assert client.get('/kitchen', follow_redirects=False).status_code == 303
+    assert client.get('/api/kitchen', follow_redirects=False).status_code == 303
+
+
+def test_kitchen_shows_only_unfinished(client):
+    """Кухня видит то, что готовится, и не видит выданное и отменённое."""
+    body = {'items': [{'id': 'hamburger', 'qty': 2}], 'mode': 'pickup',
+            'name': 'Тест', 'phone': '937777777'}
+    first = client.post('/api/orders', json=body).json()['number']
+    client.post('/api/orders', json=body)
+
+    client.post('/admin/login', data={'password': 'секрет-Test'})
+    orders = client.get('/api/kitchen').json()['orders']
+    assert len(orders) == 2
+    assert orders[0]['items'][0]['qty'] == 2
+    assert 'price' not in orders[0]['items'][0]      # цены кухне не нужны
+
+    done = [o for o in orders if o['number'] == first][0]
+    client.post(f'/api/kitchen/{done["id"]}/status', data={'status': 'done'})
+    left = client.get('/api/kitchen').json()['orders']
+    assert [o['number'] for o in left] != [first]
+    assert len(left) == 1
+
+
+def test_kitchen_rejects_unknown_status(client):
+    client.post('/api/orders', json={'items': [{'id': 'hamburger', 'qty': 1}],
+                                     'mode': 'pickup', 'name': 'Т', 'phone': '937777777'})
+    client.post('/admin/login', data={'password': 'секрет-Test'})
+    oid = client.get('/api/kitchen').json()['orders'][0]['id']
+    assert client.post(f'/api/kitchen/{oid}/status', data={'status': 'взорвать'}).status_code == 400
+
+
 def test_admin_needs_password(client):
     assert client.get('/admin', follow_redirects=False).status_code == 303
     assert client.get('/admin/menu', follow_redirects=False).status_code == 303
