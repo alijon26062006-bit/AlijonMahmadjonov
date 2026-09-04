@@ -11,17 +11,27 @@
 Цены и суммы считает сервер. Данные из браузера для этого не используются:
 их можно подделать.
 
+## Установка на сервер одной командой
+
+На чистом VPS с Ubuntu или Debian:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/phone-store-frontend-design-fzwpi1/burger/backend/deploy.sh | sudo bash
+```
+
+Скрипт ставит Python и Caddy, забирает код, создаёт службу systemd,
+придумывает пароль админки, включает ежедневную копию базы и проверяет,
+что сервер отвечает. В конце печатает пароль и оставшиеся два шага:
+вписать домен в Caddyfile и токен бота в `.env`.
+
 ## Запуск на своей машине
 
 ```bash
 cd burger/backend
-pip install -r requirements.txt
-cp .env.example .env          # заполнить пароль и ключ
-
-export ADMIN_PASSWORD="ваш-пароль"
-export SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
-uvicorn app:app --reload --port 8000
+./run.sh
 ```
+
+Скрипт сам создаст окружение, поставит зависимости и запустит сервер.
 
 - сайт-API: http://127.0.0.1:8000/api/menu
 - админка: http://127.0.0.1:8000/admin
