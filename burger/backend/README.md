@@ -16,18 +16,25 @@
 На чистом VPS с Ubuntu или Debian:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/phone-store-frontend-design-fzwpi1/burger/backend/deploy.sh -o deploy.sh
-sudo bash deploy.sh theburger.tj      # вместо theburger.tj — ваш домен
+curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/phone-store-frontend-design-fzwpi1/burger/backend/deploy.sh | sudo bash -s -- theburger.tj
 ```
 
-Скрипт ставит Python и Caddy, забирает код, создаёт службу systemd,
-придумывает пароль админки, настраивает домен с бесплатным HTTPS, включает
-ежедневную копию базы и проверяет, что сервер отвечает.
+Скрипт ставит Python и Caddy, забирает код, создаёт службу systemd, придумывает
+пароль админки, настраивает домен с бесплатным HTTPS, включает ежедневную копию
+базы, спрашивает токен бота и сам включает вебхук курьеров.
+
+Токен можно передать и сразу, третьим и четвёртым словом — тогда вопросов не
+будет вовсе:
+
+```bash
+... | sudo bash -s -- theburger.tj 123456:ABC-токен 987654321
+```
 
 Домен должен заранее смотреть A-записью на этот сервер — Caddy получает
 сертификат сам, но только если домен до него доходит.
 
-В конце скрипт печатает пароль админки и последний шаг — токен бота.
+Скрипт можно запускать сколько угодно раз: он обновляет код и настройки, а базу
+и пароль не трогает.
 
 ## Запуск на своей машине
 

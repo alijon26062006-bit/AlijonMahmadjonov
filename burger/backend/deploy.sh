@@ -6,12 +6,28 @@ set -euo pipefail
 APP_DIR=${APP_DIR:-/srv/burger}
 SERVICE=burger
 PORT=${PORT:-8000}
+BRANCH=${BRANCH:-claude/phone-store-frontend-design-fzwpi1}
+
+# Всё можно передать одной строкой:
+#   bash deploy.sh theburger.tj 123456:ABC... 987654321
 DOMAIN=${1:-${DOMAIN:-}}
+BOT=${2:-${TG_TOKEN:-}}
+CHAT=${3:-${TG_ADMIN_CHAT:-}}
 
 say() { printf '\n\033[1;33m→ %s\033[0m\n' "$1"; }
 
 [ "$(id -u)" -eq 0 ] || { echo "Запустите от root: sudo bash deploy.sh вашдомен.tj"; exit 1; }
 [ -n "$DOMAIN" ] || { echo "Укажите домен: sudo bash deploy.sh theburger.tj"; exit 1; }
+
+# Токен можно не передавать в командной строке — спросим и не оставим в истории.
+if [ -z "$BOT" ] && [ -e /dev/tty ]; then
+  printf '\nТокен бота у @BotFather (Enter — настроить позже): '
+  read -r BOT < /dev/tty || BOT=''
+  if [ -n "$BOT" ]; then
+    printf 'Ваш id у @userinfobot — куда слать заказы: '
+    read -r CHAT < /dev/tty || CHAT=''
+  fi
+fi
 
 say "Ставим Python и Caddy"
 apt-get update -qq
@@ -26,11 +42,14 @@ fi
 
 say "Кладём код в $APP_DIR"
 mkdir -p "$APP_DIR"
+REPO=${REPO:-https://github.com/alijon26062006-bit/AlijonMahmadjonov.git}
 if [ -d "$APP_DIR/.git" ]; then
-  git -C "$APP_DIR" pull --ff-only
+  git -C "$APP_DIR" fetch --depth 1 origin "$BRANCH"
+  git -C "$APP_DIR" checkout -B "$BRANCH" FETCH_HEAD
 else
-  git clone --depth 1 "${REPO:-https://github.com/alijon26062006-bit/AlijonMahmadjonov.git}" "$APP_DIR"
+  git clone --depth 1 --branch "$BRANCH" "$REPO" "$APP_DIR"
 fi
+[ -f "$APP_DIR/burger/backend/app.py" ] || { echo "В репозитории нет burger/backend — не та ветка?"; exit 1; }
 
 BACKEND="$APP_DIR/burger/backend"
 python3 -m venv "$BACKEND/.venv"
@@ -56,6 +75,14 @@ else
   # домен могли поменять — держим настройки в согласии с ним
   sed -i "s|^PUBLIC_URL=.*|PUBLIC_URL=https://$DOMAIN|" "$BACKEND/.env"
   sed -i "s|^ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://$DOMAIN|" "$BACKEND/.env"
+fi
+
+# токен и чат — только если их передали, иначе не трогаем уже настроенное
+if [ -n "$BOT" ]; then
+  sed -i "s|^TG_TOKEN=.*|TG_TOKEN=$BOT|" "$BACKEND/.env"
+fi
+if [ -n "$CHAT" ]; then
+  sed -i "s|^TG_ADMIN_CHAT=.*|TG_ADMIN_CHAT=$CHAT|" "$BACKEND/.env"
 fi
 
 say "Служба systemd"
@@ -114,6 +141,13 @@ else
   echo "Сервер не ответил. Смотрите: journalctl -u $SERVICE -n 50"; exit 1
 fi
 
+if grep -q '^TG_TOKEN=.\+' "$BACKEND/.env"; then
+  say "Включаем бота курьеров"
+  (cd "$BACKEND" && "$BACKEND/.venv/bin/python" hook.py on) || \
+    echo "Вебхук не включился. Проверьте домен и повторите: cd $BACKEND && .venv/bin/python hook.py on"
+  BOT_READY=1
+fi
+
 cat <<DONE
 
 Готово. Сайт: https://$DOMAIN
@@ -121,17 +155,12 @@ cat <<DONE
 Проверьте, что A-запись домена (и www) указывает на этот сервер —
 без неё Caddy не получит сертификат, и сайт откроется только по IP.
 
-Остался один шаг — бот:
+${BOT_READY:+Бот включён. Курьер жмёт «Старт» у бота и появляется на
+https://$DOMAIN/admin/couriers — нажмите «Допустить», и заказы пойдут ему в чат.}
+${BOT_READY:-Бот пока не настроен. Когда будет токен у @BotFather:
 
-1. Токен у @BotFather, свой id у @userinfobot. Впишите в $BACKEND/.env
-   строки TG_TOKEN и TG_ADMIN_CHAT, потом:
-
-     systemctl restart $SERVICE
-     $BACKEND/.venv/bin/python $BACKEND/hook.py on
-
-2. Курьер жмёт «Старт» у бота и появляется на https://$DOMAIN/admin/couriers —
-   нажмите «Допустить», и заказы пойдут ему в чат.
-
+     sudo bash deploy.sh $DOMAIN ТОКЕН ВАШ_ID
+}
 ${NEW_PASS:+Пароль в админку: $NEW_PASS  (сохраните, второй раз не покажу)}
 
 Админка: https://$DOMAIN/admin
