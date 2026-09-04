@@ -36,55 +36,55 @@ SECTIONS = [
         "id": "hot",
         "title": "Горячие блюда",
         "note": "",
-        "layout": "rows"
+        "layout": "cards"
     },
     {
         "id": "pasta",
         "title": "Паста",
         "note": "",
-        "layout": "rows"
+        "layout": "cards"
     },
     {
         "id": "sandwiches",
         "title": "Сэндвичи",
         "note": "",
-        "layout": "rows"
+        "layout": "cards"
     },
     {
         "id": "salads",
         "title": "Салаты",
         "note": "",
-        "layout": "rows"
+        "layout": "cards"
     },
     {
         "id": "soups",
         "title": "Супы",
         "note": "Крем-супы",
-        "layout": "rows"
+        "layout": "cards"
     },
     {
         "id": "breakfast",
         "title": "Завтраки",
         "note": "Питательное и сладкое утро",
-        "layout": "rows"
+        "layout": "cards"
     },
     {
         "id": "desserts",
         "title": "Десерты",
         "note": "",
-        "layout": "rows"
+        "layout": "cards"
     },
     {
         "id": "coffee",
         "title": "Кофе и чай",
         "note": "",
-        "layout": "rows"
+        "layout": "cards"
     },
     {
         "id": "cold",
         "title": "Мохито и фреш",
         "note": "",
-        "layout": "rows"
+        "layout": "cards"
     }
 ]
 
