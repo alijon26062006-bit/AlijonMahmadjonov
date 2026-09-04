@@ -870,6 +870,8 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
   }
   .order.is-open .order__box { transform: none; }
   .topline__addr, .topline__sep { display: none; }
+  .topline__last, .topline__sep { display: none; }
+
   .head__nav {
     display: none;
     position: absolute; top: 100%; left: 0; right: 0;
@@ -890,8 +892,45 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
   .brand__name { font-size: var(--t-xl); }
   .basket-btn { display: none; }
 
+  /* ── Телефон: баннер-полоса вместо экрана на весь рост ──
+     Человек пришёл за едой — меню должно начаться сразу. */
   .hero { min-height: 0; }
-  .hero__inner { padding: 52px 0 60px; }
+  .hero__inner { padding: 22px 0 20px; }
+  .hero h1 { font-size: clamp(26px, 7.4vw, 32px); }
+  .hero__eyebrow { margin-bottom: 10px; font-size: 11px; }
+  .hero__lead { display: none; }
+  .hero__ticket { display: none; }
+  .hero__cta { gap: 10px; }
+  .hero__cta .btn { flex: 1; height: 48px; padding: 0 12px; font-size: var(--t-md); white-space: nowrap; }
+  .cta-long { display: none; }
+
+  /* цифры про доставку и режим есть в разделе «Доставка» —
+     в баннере они только отодвигают меню вниз */
+  .hero__facts { display: none; }
+
+  .menu { padding: var(--s3) 0 var(--s2); }
+  .menu__head { margin-bottom: 14px; }
+  .menu__head p { display: none; }
+  .sec { margin-bottom: var(--s5); }
+  .sec__head { margin-bottom: 14px; }
+  .sec__head span { display: none; }
+
+  /* ── Карточки по две в ряд ── */
+  .dishes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .shot { aspect-ratio: 1 / 1; }
+  .dish__body { padding: 10px 12px 12px; }
+  .dish__body h4 { font-size: var(--t-md); }
+  .dish__about { display: none; }
+  .dish__weight { display: none; }
+  .dish__foot { margin-top: 10px; }
+  .pick { margin-left: 0; width: 100%; }
+  .pick .add { width: 100%; height: 40px; padding: 0; font-size: var(--t-sm); }
+  .stepper { width: 100%; height: 40px; justify-content: space-between; }
+  .stepper button { width: 38px; height: 34px; }
+  .chip { right: 8px; bottom: 8px; padding: 5px 9px; }
+  .chip b { font-size: var(--t-base); }
+  .chip s { display: none; }
+  .tag { top: 8px; left: 8px; padding: 3px 8px; font-size: 10px; }
   .hero::before {
     background:
       linear-gradient(180deg, rgba(14, 12, 10, .72) 0%, rgba(14, 12, 10, .92) 55%),
@@ -899,7 +938,6 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
   }
   .hero__facts { gap: 22px; flex-wrap: wrap; }
   .hero__facts dt { font-size: 28px; }
-  .hero__ticket { position: static; margin-top: 28px; align-self: flex-start; display: inline-flex; }
 
   .menu__head h2 { font-size: 42px; }
   .sec__head h3 { font-size: 32px; }
@@ -911,7 +949,6 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
 }
 
 @media (max-width: 480px) {
-  .dishes { grid-template-columns: 1fr; }
   .place__grid { grid-template-columns: 1fr; }
   .basket__panel { padding: 16px; }
 }
