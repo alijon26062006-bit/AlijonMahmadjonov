@@ -10,5 +10,4 @@ data/
 *.db-shm
 .venv/
 .pytest_cache/
-store/realphone.html
 burger/theburger.html
