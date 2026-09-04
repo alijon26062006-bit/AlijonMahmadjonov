@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Меню{% endblock %}
+{% block body %}
+<div class="head-row">
+  <h1>Меню</h1>
+  <a class="btn" href="/admin/dish/new">Добавить блюдо</a>
+</div>
+
+{% for s in sections %}
+<section class="card">
+  <h2>{{ s.title }} <small>{{ by_section.get(s.id, [])|length }}</small></h2>
+  <ul class="list">
+    {% for d in by_section.get(s.id, []) %}
+    <li class="{{ '' if d.active else 'off' }}">
+      <img src="/uploads/{{ d.photo }}" alt="" onerror="this.style.visibility='hidden'">
+      <span class="name">{{ d.name }}{% if not d.active %} <small>нет в наличии</small>{% endif %}
+        <small>{{ d.about }}</small></span>
+      <b>{{ d.price }} сомони</b>
+      <a class="btn small ghost" href="/admin/dish/{{ d.id }}">Изменить</a>
+    </li>
+    {% else %}
+    <li class="empty">Пусто</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endfor %}
+{% endblock %}

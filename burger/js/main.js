@@ -1,6 +1,11 @@
 /* The Burger — меню, корзина, оформление заказа.
    Заказ уходит текстом в Telegram: сервер не нужен, ничего не теряется. */
 
+/* Адрес бэкенда. Пусто — сайт работает сам по себе на встроенном меню
+   и отправляет заказ текстом в Telegram. Заполнено — меню приходит с сервера,
+   заведение правит его в админке, а заказ уходит прямо в базу. */
+const API = '';
+
 const TG_CHAT = 'theburgertj';
 const PHONE_MAIN = '+992939171997';
 const FIRST_ORDER_NO = 124;
@@ -10,6 +15,7 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
 const som = n => `${n.toLocaleString('ru-RU').replace(/,/g, ' ')} сомони`;
 const dish = id => MENU.find(d => d.id === id);
+const photoUrl = d => (API && d.photo) ? `${API}/uploads/${d.photo}` : `assets/dishes/${d.id}.jpg`;
 const slow = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const plural = (n, one, few, many) => {
@@ -136,7 +142,7 @@ function dishCard(d) {
   return `
   <article class="dish" data-open="${d.id}">
     <div class="shot">
-      <img src="assets/dishes/${d.id}.jpg" alt="${d.name}" width="1216" height="760" loading="lazy">
+      <img src="${photoUrl(d)}" alt="${d.name}" width="1216" height="760" loading="lazy">
       <div class="badges">${badge(d.tag)}</div>
     </div>
     <div class="dish__body">
@@ -210,7 +216,7 @@ function openDish(id) {
 
   $('#dish-body').innerHTML = `
     <div class="ds-shot shot">
-      <img src="assets/dishes/${d.id}.jpg" alt="${d.name}" width="1216" height="760">
+      <img src="${photoUrl(d)}" alt="${d.name}" width="1216" height="760">
     </div>
     <h2 class="ds-name" id="dish-name">${d.name}</h2>
     ${d.about ? `<p class="ds-about">${d.about}</p>` : ''}
@@ -313,7 +319,7 @@ function renderCart() {
     return `
     <div class="cart-line" data-key="${key}">
       <div class="cart-line__shot shot">
-        <img src="assets/dishes/${d.id}.jpg" alt="" width="128" height="128" loading="lazy">
+        <img src="${photoUrl(d)}" alt="" width="128" height="128" loading="lazy">
       </div>
       <div class="cart-line__name">
         <b>${d.name}</b>
@@ -549,23 +555,44 @@ $('#order-form').addEventListener('submit', e => {
   if (mode === 'delivery' && !f.address.value.trim()) return fail('Укажите улицу и дом, иначе курьер не доедет.', f.address);
 
   err.hidden = true;
-
-  const no = nextOrderNo();
-  const text = orderText(f, no);
-
-  navigator.clipboard?.writeText(text).catch(() => {});
-  window.open(`https://t.me/${TG_CHAT}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
-
-  $('#done-number').textContent = `№${no}`;
-  $('#done-text').textContent = mode === 'delivery'
-    ? `Отправьте сообщение в Telegram — мы подтвердим заказ и привезём за ${DELIVERY.time}.`
-    : `Отправьте сообщение в Telegram — заказ будет готов через 15 минут на ${DELIVERY.pickup}.`;
-
-  cart = {};
-  save();
-  paint();
-  openSheet('#done-sheet');
+  finish(f, err);
 });
+
+async function finish(f, err) {
+  const btn = $('#submit-order');
+  btn.disabled = true;
+
+  try {
+    if (API) {
+      const done = await sendOrder(f);
+      $('#done-number').textContent = `№${done.number}`;
+      $('#done-text').textContent = mode === 'delivery'
+        ? `Мы получили заказ и скоро позвоним. Доставим за ${done.time || DELIVERY.time}.`
+        : `Мы получили заказ и скоро позвоним. Заберёте на ${DELIVERY.pickup}.`;
+    } else {
+      // без сервера: собираем текст и отдаём его в Telegram
+      const no = nextOrderNo();
+      const text = orderText(f, no);
+      navigator.clipboard?.writeText(text).catch(() => {});
+      window.open(`https://t.me/${TG_CHAT}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+
+      $('#done-number').textContent = `№${no}`;
+      $('#done-text').textContent = mode === 'delivery'
+        ? `Отправьте сообщение в Telegram — мы подтвердим заказ и привезём за ${DELIVERY.time}.`
+        : `Отправьте сообщение в Telegram — заказ будет готов через 15 минут на ${DELIVERY.pickup}.`;
+    }
+
+    cart = {};
+    save();
+    paint();
+    openSheet('#done-sheet');
+  } catch (e) {
+    err.textContent = e.message;
+    err.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+}
 
 /* телефон в местном формате: +992 XX XXX XX XX */
 $('#order-form').elements.phone.addEventListener('input', e => {
@@ -576,6 +603,66 @@ $('#order-form').elements.phone.addEventListener('input', e => {
   const parts = [d.slice(0, 2), d.slice(2, 5), d.slice(5, 7), d.slice(7, 9)].filter(Boolean);
   e.target.value = d ? `+992 ${parts.join(' ')}` : '';
 });
+
+/* ── связь с сервером ───────────────────────────────── */
+
+/* Меню с сервера. Не получилось — работаем на встроенном:
+   лучше показать вчерашние цены, чем пустую страницу. */
+async function loadMenu() {
+  if (!API) return false;
+
+  try {
+    const res = await fetch(`${API}/api/menu`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`сервер ответил ${res.status}`);
+    const d = await res.json();
+    if (!d.dishes?.length) throw new Error('сервер прислал пустое меню');
+
+    SECTIONS = d.sections;
+    MENU = d.dishes;
+    ZONES = d.zones;
+    DELIVERY = { ...DELIVERY, ...d.delivery };
+
+    MODIFIERS = {};
+    (d.addons || []).forEach(a => {
+      MODIFIERS[a.section] ??= { remove: [], add: [] };
+      MODIFIERS[a.section].add.push({ id: a.id, name: a.name, price: a.price });
+    });
+    REMOVE_GEN = {};
+    (d.removals || []).forEach(r => {
+      MODIFIERS[r.section] ??= { remove: [], add: [] };
+      MODIFIERS[r.section].remove.push(r.name);
+      REMOVE_GEN[r.name] = r.gen || r.name.toLowerCase();
+    });
+
+    return true;
+  } catch (e) {
+    console.warn('Меню с сервера не загрузилось, показываем встроенное:', e.message);
+    return false;
+  }
+}
+
+/* Заказ на сервер. Сервер сам пересчитывает цены и присылает номер. */
+async function sendOrder(f) {
+  const items = Object.values(cart).map(l => ({
+    id: l.id, qty: l.qty, add: l.add,
+    remove: l.remove.map(r => REMOVE_GEN[r] || r.toLowerCase()),
+  }));
+
+  const res = await fetch(`${API}/api/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      items, mode, zone,
+      name: f.name.value.trim(), phone: f.phone.value.trim(),
+      address: f.address.value.trim(), flat: f.flat.value.trim(),
+      landmark: f.landmark.value.trim(), note: f.note.value.trim(),
+    }),
+  });
+
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || 'Заказ не прошёл. Позвоните нам, пожалуйста.');
+  return body;
+}
 
 /* ── вкладки разделов ───────────────────────────────── */
 
@@ -684,15 +771,6 @@ $('#zone-select').addEventListener('change', e => {
 
 /* ── запуск ─────────────────────────────────────────── */
 
-$('#zone-select').innerHTML = ZONES
-  .map(z => `<option value="${z.id}"${z.id === zone ? ' selected' : ''}>${z.name}</option>`).join('');
-
-$('#zones').innerHTML = ZONES.map(z => `
-  <div class="zone${z.price === null ? ' zone--soft' : ''}">
-    <span>${z.name}</span>
-    <b>${z.price === null ? 'по договорённости' : som(z.price)}</b>
-  </div>`).join('');
-
 $('#year').textContent = new Date().getFullYear();
 $$('.hero__media img, .shot-frame img').forEach(img => {
   if (img.closest('.hero__media')) {
@@ -704,7 +782,22 @@ $$('.hero__media img, .shot-frame img').forEach(img => {
   }
 });
 
-renderMenu();
-watchTabs();
-setMode(mode);
-paint();
+async function start() {
+  await loadMenu();
+
+  $('#zone-select').innerHTML = ZONES
+    .map(z => `<option value="${z.id}"${z.id === zone ? ' selected' : ''}>${z.name}</option>`).join('');
+
+  $('#zones').innerHTML = ZONES.map(z => `
+    <div class="zone${z.price === null ? ' zone--soft' : ''}">
+      <span>${z.name}</span>
+      <b>${z.price === null ? 'по договорённости' : som(z.price)}</b>
+    </div>`).join('');
+
+  renderMenu();
+  watchTabs();
+  setMode(mode);
+  paint();
+}
+
+start();

@@ -1,0 +1,5 @@
+data/
+uploads/*
+!uploads/.gitkeep
+__pycache__/
+.env

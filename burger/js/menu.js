@@ -1,7 +1,10 @@
-/* Меню. Фото блюда кладём в assets/dishes/ и называем по id: cheeseburger.jpg
-   Пока фото нет — в карточке рисуется знак заведения, вёрстка не ломается. */
+/* Меню сайта.
 
-const SECTIONS = [
+   Это запасной вариант: если бэкенд подключён (API в js/main.js), меню
+   приходит оттуда и заведение правит его через админку. Если сервер
+   недоступен — сайт показывает то, что здесь, и продолжает работать. */
+
+let SECTIONS = [
   { id: 'burgers', title: 'Бургеры',   note: 'Котлета жарится на гриле после заказа' },
   { id: 'sets',    title: 'Сеты',      note: 'Собрали то, что чаще всего берут вместе' },
   { id: 'snacks',  title: 'К бургеру', note: '' },
@@ -9,7 +12,7 @@ const SECTIONS = [
   { id: 'drinks',  title: 'Напитки',   note: '' }
 ];
 
-const MENU = [
+let MENU = [
   {
     id: 'classic', section: 'burgers', name: 'Классик',
     about: 'Котлета из говядины, чеддер, салат айсберг, томат, соленый огурец, соус бургер',
@@ -107,21 +110,21 @@ const MENU = [
   { id: 'tea',       section: 'drinks', name: 'Чай',          about: 'Чёрный или зелёный', weight: 400, price: 5, kcal: 10, cook: 'сразу', parts: ['Чёрный или зелёный чай', 'Лимон по желанию'] }
 ];
 
-const TAGS = {
+let TAGS = {
   hit: { label: 'Хит', cls: 'is-hit' },
   hot: { label: 'Острый', cls: 'is-hot' },
   new: { label: 'Новинка', cls: 'is-new' }
 };
 
 /* Зоны доставки. Цена зависит от района, за городом — по договорённости. */
-const ZONES = [
+let ZONES = [
   { id: 'center',     name: 'Центр, Айни, Рудаки',   price: 15 },
   { id: 'sino',       name: 'Сино, Фирдавси',        price: 15 },
   { id: 'shohmansur', name: 'Шохмансур, И. Сомони',  price: 20 },
   { id: 'out',        name: 'За городом',            price: null }
 ];
 
-const DELIVERY = {
+let DELIVERY = {
   freeFrom: 100,          // по городу бесплатно от этой суммы
   minOrder: 40,           // меньше этого на доставку не возим
   time: '30–40 минут',
@@ -129,7 +132,7 @@ const DELIVERY = {
 };
 
 /* Что можно убрать из блюда и что добавить за доплату. */
-const MODIFIERS = {
+let MODIFIERS = {
   burgers: {
     remove: ['Лук', 'Солёный огурец', 'Томат', 'Соус'],
     add: [
@@ -146,13 +149,13 @@ const MODIFIERS = {
 };
 
 /* Родительный падеж — чтобы в корзине было «без лука», а не «без лук». */
-const REMOVE_GEN = {
+let REMOVE_GEN = {
   'Лук': 'лука',
   'Солёный огурец': 'солёного огурца',
   'Томат': 'томата',
   'Соус': 'соуса'
 };
 
-const ADDON = id => Object.values(MODIFIERS)
+let ADDON = id => Object.values(MODIFIERS)
   .flatMap(m => m.add)
   .find(a => a.id === id);

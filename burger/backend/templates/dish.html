@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Новое блюдо' if new else dish.name }}{% endblock %}
+{% block body %}
+<h1>{{ 'Новое блюдо' if new else dish.name }}</h1>
+
+<form class="card form" method="post" enctype="multipart/form-data"
+      action="/admin/dish/{{ 'new' if new else dish.id }}">
+
+  <label>Название
+    <input name="name" value="{{ dish.name if dish }}" required>
+  </label>
+
+  <label>Адрес блюда <small>латиницей: double-cheese</small>
+    <input name="id" value="{{ dish.id if dish }}" {% if not new %}readonly{% endif %} required>
+  </label>
+
+  <label>Раздел
+    <select name="section">
+      {% for s in sections %}
+        <option value="{{ s.id }}" {{ 'selected' if dish and dish.section == s.id }}>{{ s.title }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label>Короткое описание
+    <input name="about" value="{{ dish.about if dish }}">
+  </label>
+
+  <div class="grid">
+    <label>Цена, сомони<input name="price" type="number" min="0" value="{{ dish.price if dish else '' }}" required></label>
+    <label>Старая цена<input name="old_price" type="number" min="0" value="{{ dish.old_price if dish and dish.old_price else '' }}"></label>
+    <label>Вес, г<input name="weight" type="number" min="0" value="{{ dish.weight if dish else 0 }}"></label>
+    <label>Ккал<input name="kcal" type="number" min="0" value="{{ dish.kcal if dish else 0 }}"></label>
+  </div>
+
+  <div class="grid">
+    <label>Время приготовления<input name="cook" value="{{ dish.cook if dish }}" placeholder="12–15 мин"></label>
+    <label>Метка
+      <select name="tag">
+        <option value="">без метки</option>
+        {% for t, label in [('hit','Хит'), ('hot','Острый'), ('new','Новинка')] %}
+          <option value="{{ t }}" {{ 'selected' if dish and dish.tag == t }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Порядок<input name="position" type="number" value="{{ dish.position if dish else 0 }}"></label>
+  </div>
+
+  <label>Состав <small>по строке на пункт</small>
+    <textarea name="parts" rows="6">{{ dish.parts|join('\n') if dish }}</textarea>
+  </label>
+
+  <label>Фото <small>jpg, png или webp, до 6 МБ</small>
+    <input name="photo" type="file" accept="image/*">
+  </label>
+  {% if dish and dish.photo %}
+    <img class="preview" src="/uploads/{{ dish.photo }}" alt="" onerror="this.remove()">
+  {% endif %}
+
+  <label class="check">
+    <input type="checkbox" name="active" value="1" {{ 'checked' if not dish or dish.active }}>
+    Есть в наличии
+  </label>
+
+  <div class="row">
+    <button class="btn" type="submit">Сохранить</button>
+    <a class="btn ghost" href="/admin/menu">Отмена</a>
+  </div>
+</form>
+
+{% if not new %}
+<form class="card danger" method="post" action="/admin/dish/{{ dish.id }}/delete"
+      onsubmit="return confirm('Удалить блюдо «{{ dish.name }}» из меню?')">
+  <button class="btn ghost" type="submit">Удалить блюдо</button>
+</form>
+{% endif %}
+{% endblock %}

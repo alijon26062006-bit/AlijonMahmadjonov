@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Админка{% endblock %} · The Burger</title>
+<link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+{% if request.cookies.get('burger_admin') %}
+<header class="top">
+  <a class="brand" href="/admin">The Burger</a>
+  <nav>
+    <a href="/admin" {% if request.url.path == '/admin' %}class="on"{% endif %}>Заказы</a>
+    <a href="/admin/menu" {% if '/menu' in request.url.path or '/dish' in request.url.path %}class="on"{% endif %}>Меню</a>
+    <a href="/admin/settings" {% if '/settings' in request.url.path %}class="on"{% endif %}>Настройки</a>
+  </nav>
+  <a class="out" href="/admin/logout">Выйти</a>
+</header>
+{% endif %}
+<main class="wrap">{% block body %}{% endblock %}</main>
+</body>
+</html>

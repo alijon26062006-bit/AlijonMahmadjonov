@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block body %}
+<h1>Настройки</h1>
+{% if saved %}<p class="ok">Сохранено</p>{% endif %}
+
+<form method="post" action="/admin/settings">
+  <section class="card form">
+    <h2>Доставка</h2>
+    <div class="grid">
+      <label>Бесплатно от, сомони<input name="free_from" type="number" value="{{ settings.free_from }}"></label>
+      <label>Минимальный заказ<input name="min_order" type="number" value="{{ settings.min_order }}"></label>
+      <label>Среднее время<input name="delivery_time" value="{{ settings.delivery_time }}"></label>
+      <label>Адрес самовывоза<input name="pickup" value="{{ settings.pickup }}"></label>
+    </div>
+
+    <h3>Районы</h3>
+    {% for z in zones %}
+    <div class="grid">
+      <label>Район<input name="zone_name_{{ z.id }}" value="{{ z.name }}"></label>
+      <label>Цена <small>пусто = по договорённости</small>
+        <input name="zone_price_{{ z.id }}" type="number" value="{{ z.price if z.price is not none else '' }}"></label>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="card form">
+    <h2>Добавки к блюдам</h2>
+    {% for a in addons %}
+    <div class="grid">
+      <label>Название<input name="addon_name_{{ a.id }}" value="{{ a.name }}"></label>
+      <label>Цена<input name="addon_price_{{ a.id }}" type="number" value="{{ a.price }}"></label>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="card form">
+    <h2>Контакты</h2>
+    <div class="grid">
+      <label>Телефон<input name="phone_main" value="{{ settings.phone_main }}"></label>
+      <label>Второй телефон<input name="phone_extra" value="{{ settings.phone_extra }}"></label>
+      <label>Адрес<input name="address" value="{{ settings.address }}"></label>
+      <label>Часы работы<input name="hours" value="{{ settings.hours }}"></label>
+    </div>
+  </section>
+
+  <button class="btn" type="submit">Сохранить</button>
+</form>
+{% endblock %}

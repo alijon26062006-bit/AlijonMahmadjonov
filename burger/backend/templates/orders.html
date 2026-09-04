@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Заказы{% endblock %}
+{% block body %}
+<h1>Заказы</h1>
+
+<div class="chips">
+  <a href="/admin" class="{{ 'on' if not status }}">Все</a>
+  {% for key, label in status_ru.items() %}
+    <a href="/admin?status={{ key }}" class="{{ 'on' if status == key }}">
+      {{ label }}{% if counts.get(key) %} · {{ counts[key] }}{% endif %}
+    </a>
+  {% endfor %}
+</div>
+
+{% if not orders %}
+  <p class="empty">Заказов пока нет.</p>
+{% endif %}
+
+{% for o in orders %}
+<article class="card order status-{{ o.status }}">
+  <header>
+    <b>№{{ o.number }}</b>
+    <span class="tag">{{ status_ru[o.status] }}</span>
+    <time>{{ o.created_at }}</time>
+  </header>
+
+  <ul class="items">
+    {% for i in o['items'] %}
+      <li><span>{{ i.name }}{% if i.options %} <small>({{ i.options }})</small>{% endif %}</span>
+          <b>× {{ i.qty }}</b><em>{{ i.price * i.qty }} сомони</em></li>
+    {% endfor %}
+  </ul>
+
+  <dl class="facts">
+    <div><dt>Товары</dt><dd>{{ o.goods }} сомони</dd></div>
+    <div><dt>{{ 'Доставка' if o.mode == 'delivery' else 'Самовывоз' }}</dt>
+         <dd>{% if o.mode == 'delivery' %}{{ (o.delivery ~ ' сомони') if o.delivery else 'бесплатно' }}{% else %}—{% endif %}</dd></div>
+    <div class="total"><dt>Итого</dt><dd>{{ o.total }} сомони</dd></div>
+  </dl>
+
+  <p class="who">
+    {{ o.name }} · <a href="tel:{{ o.phone }}">{{ o.phone }}</a>
+    {% if o.mode == 'delivery' %}<br>{{ zones.get(o.zone, o.zone) }}: {{ o.address }}{% if o.flat %}, {{ o.flat }}{% endif %}
+      {% if o.landmark %}<br>Ориентир: {{ o.landmark }}{% endif %}{% endif %}
+    {% if o.note %}<br>Комментарий: {{ o.note }}{% endif %}
+  </p>
+
+  <form class="row" method="post" action="/admin/orders/{{ o.id }}/status">
+    {% for key, label in status_ru.items() %}
+      <button class="btn small {{ 'ghost' if o.status != key }}" name="status" value="{{ key }}">{{ label }}</button>
+    {% endfor %}
+  </form>
+</article>
+{% endfor %}
+{% endblock %}
