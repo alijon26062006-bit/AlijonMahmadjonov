@@ -164,7 +164,12 @@ sleep 2
 if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null; then
   say "Сервер поднят"
 else
-  echo "Сервер не ответил. Смотрите: journalctl -u $SERVICE -n 50"; exit 1
+  echo
+  echo "Сервер не ответил. Вот что пишет журнал:"
+  echo "──────────────────────────────────────────"
+  journalctl -u $SERVICE -n 30 --no-pager || true
+  echo "──────────────────────────────────────────"
+  exit 1
 fi
 
 if grep -q '^TG_TOKEN=.\+' "$BACKEND/.env"; then
