@@ -10,14 +10,40 @@ BRANCH=${BRANCH:-claude/phone-store-frontend-design-fzwpi1}
 
 # Всё можно передать одной строкой:
 #   bash deploy.sh theburger.tj 123456:ABC... 987654321
-DOMAIN=${1:-${DOMAIN:-}}
-BOT=${2:-${TG_TOKEN:-}}
-CHAT=${3:-${TG_ADMIN_CHAT:-}}
+#   bash deploy.sh theburger.tj --clean      — снести прошлую установку и поставить заново
+CLEAN=''
+ARGS=()
+for a in "$@"; do
+  case "$a" in
+    --clean|clean) CLEAN=1 ;;
+    *) ARGS+=("$a") ;;
+  esac
+done
+
+DOMAIN=${ARGS[0]:-${DOMAIN:-}}
+BOT=${ARGS[1]:-${TG_TOKEN:-}}
+CHAT=${ARGS[2]:-${TG_ADMIN_CHAT:-}}
 
 say() { printf '\n\033[1;33m→ %s\033[0m\n' "$1"; }
 
-[ "$(id -u)" -eq 0 ] || { echo "Запустите от root: sudo bash deploy.sh вашдомен.tj"; exit 1; }
-[ -n "$DOMAIN" ] || { echo "Укажите домен: sudo bash deploy.sh theburger.tj"; exit 1; }
+[ "$(id -u)" -eq 0 ] || { echo "Запустите от root: bash deploy.sh вашдомен.tj"; exit 1; }
+[ -n "$DOMAIN" ] || { echo "Укажите домен: bash deploy.sh theburger.tj"; exit 1; }
+
+if [ -n "$CLEAN" ]; then
+  say "Убираем прошлую установку"
+  # база — единственное, что нельзя терять. Копия остаётся, даже если её не просили.
+  if [ -f "$APP_DIR/burger/backend/data/burger.db" ]; then
+    mkdir -p /srv/backup
+    KEEP="/srv/backup/burger-before-clean-$(date +%F-%H%M).db"
+    cp "$APP_DIR/burger/backend/data/burger.db" "$KEEP"
+    echo "База сохранена: $KEEP"
+  fi
+  systemctl stop $SERVICE 2>/dev/null || true
+  systemctl disable $SERVICE 2>/dev/null || true
+  rm -f /etc/systemd/system/$SERVICE.service /etc/cron.daily/burger-backup
+  systemctl daemon-reload 2>/dev/null || true
+  rm -rf "$APP_DIR"
+fi
 
 # Токен можно не передавать в командной строке — спросим и не оставим в истории.
 if [ -z "$BOT" ] && [ -e /dev/tty ]; then
