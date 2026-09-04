@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Burger — бургеры и доставка в Душанбе</title>
 <meta name="description" content="The Burger — сочные бургеры из 100% мяса в Душанбе. Ул. Айни 49, ориентир GulyaGold. Доставка 30–40 минут, каждый день с 9:00 до 00:00.">
-<meta name="theme-color" content="#14130e">
+<meta name="theme-color" content="#0e0c0a">
 
 <meta property="og:type" content="restaurant">
 <meta property="og:title" content="The Burger — бургеры из 100% мяса, Душанбе">
@@ -213,6 +213,7 @@
 <div class="basket" id="basket" hidden>
   <div class="basket__fade" data-close></div>
   <aside class="basket__panel" role="dialog" aria-modal="true" aria-label="Корзина">
+    <span class="sheet-handle" aria-hidden="true"></span>
     <div class="basket__head">
       <b class="h-display">Ваш заказ</b>
       <button class="x" type="button" data-close aria-label="Закрыть">&times;</button>
@@ -276,6 +277,12 @@
     </form>
   </div>
 </div>
+
+<button class="bottombar" id="bottombar" type="button" hidden>
+  <span class="bottombar__count" id="bb-count">0</span>
+  <span class="bottombar__label">Смотреть заказ</span>
+  <span class="bottombar__sum" id="bb-sum">0 с.</span>
+</button>
 
 <div class="snack" id="snack" role="status" aria-live="polite" hidden></div>
 

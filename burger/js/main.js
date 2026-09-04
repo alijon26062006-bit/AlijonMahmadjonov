@@ -27,6 +27,29 @@ function mark() {
   return box;
 }
 
+/* Кнопка «В заказ» превращается в счётчик, когда блюдо уже взято —
+   так не нужно открывать корзину, чтобы добавить второй бургер. */
+function pick(id, small = false) {
+  return `
+  <div class="pick${small ? ' pick--small' : ''}" data-id="${id}">
+    <button class="add${small ? ' add--small' : ''}" type="button" data-id="${id}">${small ? '+' : 'В заказ'}</button>
+    <div class="stepper">
+      <button type="button" data-act="minus" aria-label="Убрать одну">−</button>
+      <span data-count>1</span>
+      <button type="button" data-act="plus" aria-label="Добавить ещё">+</button>
+    </div>
+  </div>`;
+}
+
+/* приводим счётчики на карточках в соответствие с заказом */
+function syncPicks() {
+  $$('.pick').forEach(box => {
+    const qty = order[box.dataset.id] || 0;
+    box.classList.toggle('is-picked', qty > 0);
+    if (qty > 0) $('[data-count]', box).textContent = qty;
+  });
+}
+
 function tagHtml(key) {
   if (!key || !TAGS[key]) return '';
   return `<span class="tag ${TAGS[key].cls}">${TAGS[key].label}</span>`;
@@ -49,7 +72,7 @@ function bigCard(d) {
       <p class="dish__about">${d.about}</p>
       <div class="dish__foot">
         <span class="dish__weight">${d.weight} г</span>
-        <button class="add" type="button" data-id="${d.id}">В заказ</button>
+        ${pick(d.id)}
       </div>
     </div>
   </article>`;
@@ -65,7 +88,7 @@ function row(d) {
     </div>
     <span class="line__weight">${d.weight} г</span>
     <b class="line__price">${som(d.price)}</b>
-    <button class="add add--small" type="button" data-id="${d.id}">+</button>
+    ${pick(d.id, true)}
   </div>`;
 }
 
@@ -150,8 +173,26 @@ function setQty(id, qty) {
 }
 
 function renderBasket() {
+  const count = positions();
+
   $('#basket-sum').textContent = som(total());
-  $('#basket-open').classList.toggle('is-full', positions() > 0);
+  $('#basket-open').classList.toggle('is-full', count > 0);
+
+  const bar = $('#bottombar');
+  $('#bb-count').textContent = count;
+  $('#bb-sum').textContent = som(total());
+
+  if (count > 0) {
+    bar.hidden = false;
+    requestAnimationFrame(() => bar.classList.add('is-on'));
+    document.body.classList.add('has-bar');
+  } else {
+    bar.classList.remove('is-on');
+    document.body.classList.remove('has-bar');
+    setTimeout(() => { if (!bar.classList.contains('is-on')) bar.hidden = true; }, 300);
+  }
+
+  syncPicks();
 
   const list = Object.entries(order);
 
@@ -193,6 +234,13 @@ function renderBasket() {
   $('#to-order').disabled = positions() === 0 || needMore;
   $('#order-total').textContent = som(total());
 }
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.pick .stepper button');
+  if (!btn) return;
+  const id = btn.closest('.pick').dataset.id;
+  setQty(id, (order[id] || 0) + (btn.dataset.act === 'plus' ? 1 : -1));
+});
 
 $('#receipt').addEventListener('click', e => {
   const btn = e.target.closest('button[data-act]');
@@ -240,6 +288,35 @@ function closeAll() {
 }
 
 $('#basket-open').addEventListener('click', () => open('#basket'));
+$('#bottombar').addEventListener('click', () => open('#basket'));
+
+/* Корзину-шторку на телефоне можно смахнуть вниз. */
+(function swipeToClose() {
+  const panel = $('.basket__panel');
+  let start = 0, shift = 0, active = false;
+
+  panel.addEventListener('touchstart', e => {
+    if ($('#receipt').scrollTop > 0) return;
+    active = true;
+    start = e.touches[0].clientY;
+    panel.style.transition = 'none';
+  }, { passive: true });
+
+  panel.addEventListener('touchmove', e => {
+    if (!active) return;
+    shift = Math.max(0, e.touches[0].clientY - start);
+    panel.style.transform = `translateY(${shift}px)`;
+  }, { passive: true });
+
+  panel.addEventListener('touchend', () => {
+    if (!active) return;
+    active = false;
+    panel.style.transition = '';
+    panel.style.transform = '';
+    if (shift > 110) closeAll();
+    shift = 0;
+  });
+})();
 $$('[data-close]').forEach(el => el.addEventListener('click', closeAll));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
 

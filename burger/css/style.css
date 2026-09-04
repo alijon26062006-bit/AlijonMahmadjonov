@@ -334,7 +334,12 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
 }
 .tabs__row { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0; scrollbar-width: none; }
 .tabs__row::-webkit-scrollbar { display: none; }
-.tabs__row { scroll-behavior: smooth; }
+.tabs__row {
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.tabs__row a { scroll-snap-align: center; }
 .tabs__row a {
   transition: background .25s ease, border-color .25s ease, color .25s ease;
   flex: none; padding: 11px 18px;
@@ -369,12 +374,15 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
   overflow: hidden;
   transition: border-color .25s ease, transform .35s var(--ease), box-shadow .35s ease;
 }
-.dish:hover {
-  border-color: rgba(242, 178, 51, .45);
-  transform: translateY(-4px);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, .45);
+@media (hover: hover) {
+  .dish:hover {
+    border-color: rgba(242, 178, 51, .45);
+    transform: translateY(-4px);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .45);
+  }
+  .dish:hover .shot img { transform: scale(1.05); }
 }
-.dish:hover .shot img { transform: scale(1.05); }
+.dish:active { transform: scale(.99); }
 
 .shot {
   position: relative;
@@ -437,7 +445,6 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
 }
 
 .add {
-  margin-left: auto;
   height: 44px; padding: 0 20px;
   border: 1px solid rgba(242, 178, 51, .5);
   border-radius: 9px;
@@ -453,10 +460,47 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
 .add:active { transform: scale(.96); }
 .add--small { width: 44px; height: 44px; padding: 0; font-size: 20px; line-height: 1; }
 
+/* Кнопка и счётчик занимают одно место: пока блюда нет — кнопка,
+   как только взяли — счётчик. Ширина не прыгает. */
+.pick { margin-left: auto; }
+.pick .stepper { display: none; }
+.pick.is-picked .add { display: none; }
+.pick.is-picked .stepper { display: flex; }
+
+.stepper {
+  display: flex; align-items: center;
+  height: 44px; padding: 0 4px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--flame), var(--ember));
+  animation: pick-in .28s var(--ease);
+}
+.stepper button {
+  width: 40px; height: 40px;
+  border: 0; border-radius: 8px;
+  background: rgba(0, 0, 0, .14);
+  color: var(--on-flame);
+  font: inherit; font-size: var(--t-lg); font-weight: 700; line-height: 1;
+  cursor: pointer;
+}
+.stepper button:active { transform: scale(.92); }
+.stepper span {
+  min-width: 34px; text-align: center;
+  color: var(--on-flame); font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.pick--small .stepper { height: 44px; }
+.pick--small .stepper button { width: 36px; height: 36px; }
+.pick--small .stepper span { min-width: 26px; font-size: var(--t-md); }
+
+@keyframes pick-in {
+  from { opacity: 0; transform: scale(.9); }
+  to   { opacity: 1; transform: none; }
+}
+
 /* строки меню */
 .lines { display: grid; gap: 3px; }
 .line {
-  display: grid; grid-template-columns: 1fr auto auto auto;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center; gap: 18px;
   padding: 16px 20px;
   background: var(--coal-2);
@@ -464,6 +508,7 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
   border-radius: 12px;
 }
 .line:hover { border-color: rgba(242, 178, 51, .3); }
+.line__name { min-width: 0; }
 .line__name b { font-size: 16px; }
 .line__name .tag { position: static; display: inline-block; margin-left: 8px; vertical-align: 2px; }
 .line__note { display: block; color: var(--cream-dim); font-size: 13px; }
@@ -598,10 +643,14 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
   box-shadow: -24px 0 60px rgba(0, 0, 0, .5);
 }
 .basket.is-open .basket__panel { transform: none; }
+.sheet-handle { display: none; }
+
 .basket__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .basket__head b { font-size: 32px; }
 
 .receipt {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   flex: 0 1 auto;
   max-height: 44vh;
   margin-bottom: 10px;
@@ -725,10 +774,40 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
 .order__box .btn + .btn { margin-top: 10px; }
 .order__hint { margin: 14px 0 0; font-size: 13px; color: var(--cream-dim); }
 
+/* ── нижняя панель заказа (телефон) ─────────────────── */
+
+.bottombar {
+  display: none;
+  position: fixed; z-index: 50;
+  left: 12px; right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  align-items: center; gap: 12px;
+  height: 58px; padding: 0 16px;
+  border: 0; border-radius: 14px;
+  background: linear-gradient(180deg, var(--flame), var(--ember));
+  color: var(--on-flame);
+  font: inherit; font-weight: 800;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .5);
+  cursor: pointer;
+  transform: translateY(140%);
+  transition: transform .38s var(--ease);
+}
+.bottombar.is-on { transform: none; }
+.bottombar__count {
+  display: grid; place-items: center;
+  min-width: 26px; height: 26px; padding: 0 7px;
+  border-radius: 13px;
+  background: rgba(0, 0, 0, .22);
+  font-size: var(--t-sm); font-variant-numeric: tabular-nums;
+}
+.bottombar__label { flex: 1; text-align: left; }
+.bottombar__sum { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+
 /* ── уведомление ────────────────────────────────────── */
 
 .snack {
   position: fixed; left: 50%; bottom: 26px;
+  max-width: calc(100% - 32px);
   transform: translateX(-50%); z-index: 80;
   animation: snack-in .34s var(--ease) both;
   padding: 13px 22px; border-radius: 10px;
@@ -753,6 +832,43 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
 
 @media (max-width: 780px) {
   :root { --head-h: 64px; }
+
+  .bottombar { display: flex; }
+  body.has-bar { padding-bottom: 84px; }
+  body.has-bar .snack { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+
+  /* корзина выезжает снизу, как в приложениях доставки */
+  .basket__panel {
+    top: auto; bottom: 0;
+    width: 100%; height: min(88vh, 100%);
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    border-left: 0;
+    border-top: 1px solid var(--edge);
+    border-radius: 20px 20px 0 0;
+    transform: translateY(100%);
+    transition: transform .42s var(--ease);
+    box-shadow: 0 -24px 60px rgba(0, 0, 0, .55);
+  }
+  .basket.is-open .basket__panel { transform: none; }
+
+  .sheet-handle {
+    display: block;
+    width: 44px; height: 4px;
+    margin: 2px auto 12px;
+    border-radius: 2px;
+    background: rgba(247, 239, 226, .28);
+  }
+  .receipt { max-height: 38vh; }
+
+  /* окно заказа тоже снизу — до кнопок ближе большим пальцем */
+  .order { align-items: end; padding: 0; }
+  .order__box {
+    width: 100%; max-height: 92vh;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+    border-radius: 20px 20px 0 0;
+    transform: translateY(100%) scale(1);
+  }
+  .order.is-open .order__box { transform: none; }
   .topline__addr, .topline__sep { display: none; }
   .head__nav {
     display: none;
@@ -765,8 +881,14 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
   .head__nav.is-open { display: flex; }
   .head__nav a { padding: 12px 0; border-bottom: 1px solid var(--edge); }
   .head__phone { display: none; }
-  .burger-btn { display: block; }
-  .basket-btn { margin-left: auto; }
+  .burger-btn { display: block; margin-left: auto; }
+
+  /* Шапка на телефоне — только логотип и меню: корзину из неё убираем,
+     её работу берёт нижняя панель заказа. Иначе строка не помещается. */
+  .head__row { gap: 10px; min-height: 60px; }
+  .brand { min-width: 0; }
+  .brand__name { font-size: var(--t-xl); }
+  .basket-btn { display: none; }
 
   .hero { min-height: 0; }
   .hero__inner { padding: 52px 0 60px; }
@@ -784,7 +906,7 @@ h1, .hero__facts dt, .basket__head b, .order__title, .brand__name, .zone__head b
   .howto h2, .delivery h2, .place h2 { font-size: 32px; }
   .foot__row { grid-template-columns: 1fr; gap: 24px; }
 
-  .line { grid-template-columns: 1fr auto auto; gap: 12px; padding: 14px 16px; }
+  .line { grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; padding: 14px; }
   .line__weight { display: none; }
 }
 
