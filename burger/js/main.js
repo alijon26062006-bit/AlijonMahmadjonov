@@ -1,10 +1,16 @@
 /* The Burger — меню, корзина, оформление заказа.
    Заказ уходит текстом в Telegram: сервер не нужен, ничего не теряется. */
 
-/* Адрес бэкенда. Пусто — сайт работает сам по себе на встроенном меню
-   и отправляет заказ текстом в Telegram. Заполнено — меню приходит с сервера,
-   заведение правит его в админке, а заказ уходит прямо в базу. */
-const API = '';
+/* Адрес бэкенда.
+   'auto' — сервер на том же домене, что и сайт (так на боевом домене).
+   Пусто — сайта нет на сервере: встроенное меню, заказ уходит текстом в Telegram.
+   Можно указать и чужой адрес: 'https://api.theburger.tj'.
+
+   Проверяем не настройку, а живой ответ сервера: если он молчит, сайт сам
+   переходит на встроенное меню и Telegram. Клиент этого не замечает. */
+const API = 'auto';
+const url = path => (API === 'auto' ? path : `${API}${path}`);
+let server = false;               // ответил ли сервер при загрузке
 
 const TG_CHAT = 'theburgertj';
 const PHONE_MAIN = '+992939171997';
@@ -15,7 +21,7 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
 const som = n => `${n.toLocaleString('ru-RU').replace(/,/g, ' ')} сомони`;
 const dish = id => MENU.find(d => d.id === id);
-const photoUrl = d => (API && d.photo) ? `${API}/uploads/${d.photo}` : `assets/dishes/${d.id}.jpg`;
+const photoUrl = d => (server && d.photo) ? url(`/uploads/${d.photo}`) : `assets/dishes/${d.id}.jpg`;
 const slow = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const plural = (n, one, few, many) => {
@@ -596,7 +602,7 @@ async function finish(f, err) {
   btn.disabled = true;
 
   try {
-    if (API) {
+    if (server) {
       const done = await sendOrder(f);
       $('#done-number').textContent = `№${done.number}`;
       $('#done-text').textContent = mode === 'delivery'
@@ -645,7 +651,7 @@ async function loadMenu() {
   if (!API) return false;
 
   try {
-    const res = await fetch(`${API}/api/menu`, { cache: 'no-store' });
+    const res = await fetch(url('/api/menu'), { cache: 'no-store' });
     if (!res.ok) throw new Error(`сервер ответил ${res.status}`);
     const d = await res.json();
     if (!d.dishes?.length) throw new Error('сервер прислал пустое меню');
@@ -681,7 +687,7 @@ async function sendOrder(f) {
     remove: l.remove.map(r => REMOVE_GEN[r] || r.toLowerCase()),
   }));
 
-  const res = await fetch(`${API}/api/orders`, {
+  const res = await fetch(url('/api/orders'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -831,7 +837,7 @@ function watchClock() {
 }
 
 async function start() {
-  await loadMenu();
+  server = await loadMenu();
 
   $('#zone-select').innerHTML = ZONES
     .map(z => `<option value="${z.id}"${z.id === zone ? ' selected' : ''}>${z.name}</option>`).join('');

@@ -6,10 +6,12 @@ set -euo pipefail
 APP_DIR=${APP_DIR:-/srv/burger}
 SERVICE=burger
 PORT=${PORT:-8000}
+DOMAIN=${1:-${DOMAIN:-}}
 
 say() { printf '\n\033[1;33m→ %s\033[0m\n' "$1"; }
 
-[ "$(id -u)" -eq 0 ] || { echo "Запустите от root: sudo bash deploy.sh"; exit 1; }
+[ "$(id -u)" -eq 0 ] || { echo "Запустите от root: sudo bash deploy.sh вашдомен.tj"; exit 1; }
+[ -n "$DOMAIN" ] || { echo "Укажите домен: sudo bash deploy.sh theburger.tj"; exit 1; }
 
 say "Ставим Python и Caddy"
 apt-get update -qq
@@ -43,13 +45,17 @@ ADMIN_PASSWORD=$ADMIN_PASS
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 TG_TOKEN=
 TG_ADMIN_CHAT=
-PUBLIC_URL=
+PUBLIC_URL=https://$DOMAIN
 TG_HOOK_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(8))")
-ALLOWED_ORIGINS=*
+ALLOWED_ORIGINS=https://$DOMAIN
 ORDER_COOLDOWN=20
 ENV
   chmod 600 "$BACKEND/.env"
   NEW_PASS=$ADMIN_PASS
+else
+  # домен могли поменять — держим настройки в согласии с ним
+  sed -i "s|^PUBLIC_URL=.*|PUBLIC_URL=https://$DOMAIN|" "$BACKEND/.env"
+  sed -i "s|^ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://$DOMAIN|" "$BACKEND/.env"
 fi
 
 say "Служба systemd"
@@ -74,6 +80,24 @@ systemctl daemon-reload
 systemctl enable --now $SERVICE
 systemctl restart $SERVICE
 
+say "Домен $DOMAIN и HTTPS"
+cat > /etc/caddy/Caddyfile <<CADDY
+$DOMAIN, www.$DOMAIN {
+    encode gzip
+
+    # всё, что относится к серверу: меню, заказы, админка, кухня, курьеры
+    @backend path /api/* /admin* /kitchen* /courier* /tg/* /uploads/* /static/*
+    reverse_proxy @backend 127.0.0.1:$PORT
+
+    # сам сайт — обычные файлы, отдаются без Python
+    root * $APP_DIR/burger
+    file_server
+
+    header /assets/* Cache-Control "public, max-age=604800"
+}
+CADDY
+systemctl reload caddy || systemctl restart caddy
+
 say "Ежедневная копия базы"
 mkdir -p /srv/backup
 cat > /etc/cron.daily/burger-backup <<'CRON'
@@ -92,32 +116,25 @@ fi
 
 cat <<DONE
 
-Готово. Осталось два шага:
+Готово. Сайт: https://$DOMAIN
 
-1. Домен. Впишите свой в /etc/caddy/Caddyfile:
+Проверьте, что A-запись домена (и www) указывает на этот сервер —
+без неё Caddy не получит сертификат, и сайт откроется только по IP.
 
-     api.вашдомен.tj {
-         reverse_proxy 127.0.0.1:$PORT
-     }
+Остался один шаг — бот:
 
-   потом: systemctl reload caddy
-   HTTPS Caddy оформит сам.
-
-2. Бот. Токен у @BotFather, свой id у @userinfobot — впишите
-   в $BACKEND/.env (TG_TOKEN и TG_ADMIN_CHAT), потом:
+1. Токен у @BotFather, свой id у @userinfobot. Впишите в $BACKEND/.env
+   строки TG_TOKEN и TG_ADMIN_CHAT, потом:
 
      systemctl restart $SERVICE
+     $BACKEND/.venv/bin/python $BACKEND/hook.py on
 
-3. Курьеры. В .env впишите PUBLIC_URL (адрес сайта с https),
-   перезапустите службу и один раз включите вебхук:
-
-     cd $BACKEND && python3 hook.py on
-
-   Дальше курьер жмёт «Старт» у бота, а вы допускаете его
-   на странице /admin/couriers.
+2. Курьер жмёт «Старт» у бота и появляется на https://$DOMAIN/admin/couriers —
+   нажмите «Допустить», и заказы пойдут ему в чат.
 
 ${NEW_PASS:+Пароль в админку: $NEW_PASS  (сохраните, второй раз не покажу)}
 
-Админка:  http://адрес-сервера/admin
-Проверка: curl http://127.0.0.1:$PORT/api/health
+Админка: https://$DOMAIN/admin
+Кухня:   https://$DOMAIN/kitchen
+Проверка: curl https://$DOMAIN/api/health
 DONE
