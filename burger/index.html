@@ -2,55 +2,59 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The Burger — бургеры и доставка в Душанбе</title>
-<meta name="description" content="The Burger — сочные бургеры из 100% мяса в Душанбе. Ул. Айни 49, ориентир GulyaGold. Доставка 30–40 минут, каждый день с 9:00 до 00:00.">
-<meta name="theme-color" content="#0e0c0a">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Burger — доставка бургеров в Душанбе</title>
+<meta name="description" content="The Burger — бургеры из 100% говядины в Душанбе. Доставка 30–40 минут, самовывоз с ул. Айни 49. Заказ онлайн.">
+<meta name="theme-color" content="#0d0c0b">
 
 <meta property="og:type" content="restaurant">
-<meta property="og:title" content="The Burger — бургеры из 100% мяса, Душанбе">
-<meta property="og:description" content="Гриль после заказа, доставка 30–40 минут. Ул. Айни 49, ориентир GulyaGold.">
-<meta property="og:image" content="assets/logo.jpg">
+<meta property="og:title" content="The Burger — бургеры в Душанбе">
+<meta property="og:description" content="Сочные бургеры из 100% мяса. Доставка 30–40 минут.">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<div class="topline">
-  <div class="wrap topline__row">
-    <span class="topline__work">Каждый день <b>9:00 – 00:00</b></span>
-    <span class="topline__sep"></span>
-    <span class="topline__addr">ул. Айни 49 · ориентир GulyaGold</span>
-    <span class="topline__sep"></span>
-    <span class="topline__last">Последний заказ в 23:30</span>
-  </div>
-</div>
+<a class="skip" href="#menu">Перейти к меню</a>
 
 <header class="head" id="head">
   <div class="wrap head__row">
-    <a class="brand" href="#top">
-      <img class="brand__logo" src="assets/logo.jpg" alt="The Burger">
+    <a class="brand" href="#top" aria-label="The Burger — на главную">
+      <img class="brand__logo" src="assets/logo.jpg" alt="" width="40" height="40">
       <span class="brand__name">The&nbsp;Burger</span>
     </a>
 
-    <nav class="head__nav">
+    <nav class="head__links" aria-label="Разделы сайта">
       <a href="#menu">Меню</a>
-      <a href="#howto">Как заказать</a>
       <a href="#delivery">Доставка</a>
       <a href="#place">Заведение</a>
+      <a href="#contacts">Контакты</a>
     </nav>
 
     <a class="head__phone" href="tel:+992939171997">+992 93 917 19 97</a>
 
-    <button class="basket-btn" id="basket-open" type="button">
-      <span class="basket-btn__label">Корзина</span>
-      <span class="basket-btn__sum" id="basket-sum">0 с.</span>
+    <button class="cart-btn" id="cart-open" type="button" aria-label="Открыть корзину">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM7.2 14.8l.9-1.8h7.45c.75 0 1.41-.41 1.75-1.03l3.24-5.88A1 1 0 0 0 19.66 4H5.21l-.94-2H1v2h2l3.6 7.59-1.35 2.44C4.52 14.37 5.48 16 7 16h12v-2H7.42a.22.22 0 0 1-.22-.2l.03-.12Z"/></svg>
+      <span class="cart-btn__count" id="cart-count" hidden>0</span>
     </button>
 
-    <button class="burger-btn" id="nav-toggle" type="button" aria-label="Меню сайта"><span></span><span></span><span></span></button>
+    <button class="nav-btn" id="nav-toggle" type="button" aria-label="Меню сайта" aria-expanded="false" aria-controls="nav-panel">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <a href="#menu">Меню</a>
+    <a href="#delivery">Доставка</a>
+    <a href="#place">Заведение</a>
+    <a href="#contacts">Контакты</a>
+    <div class="nav-panel__foot">
+      <span>Каждый день 9:00 – 00:00</span>
+      <a class="btn btn--line btn--full" href="tel:+992939171997">Позвонить</a>
+    </div>
   </div>
 </header>
 
@@ -58,130 +62,123 @@
 
 <section class="hero" id="top">
   <div class="hero__media">
-    <img src="assets/hero.jpg" alt="" id="hero-photo" width="2688" height="1536">
+    <img src="assets/hero.jpg" alt="" id="hero-photo" width="2688" height="1536" fetchpriority="high">
   </div>
-  <div class="hero__glow" aria-hidden="true"></div>
+
   <div class="wrap hero__inner">
-    <div class="hero__text">
-      <p class="hero__eyebrow" data-step="1">Душанбе · с 2021 года</p>
-      <h1 data-step="2">Сочные бургеры<br>из <span>100% мяса</span></h1>
-      <p class="hero__lead" data-step="3">
-        Котлету жарим на гриле после того, как вы нажали «заказать». Булочку печём каждое утро.
-        Ничего не лежит под лампой и не ждёт своего часа.
-      </p>
-      <div class="hero__cta" data-step="4">
-        <a class="btn btn--gold" href="#menu">Смотреть меню</a>
-        <a class="btn btn--line" href="tel:+992939171997">Позвонить<span class="cta-long">&nbsp;и заказать</span></a>
-      </div>
-      <dl class="hero__facts" data-step="5">
-        <div><dt>30–40</dt><dd>минут до вашей двери</dd></div>
-        <div><dt>100%</dt><dd>говядина, рубим сами</dd></div>
-        <div><dt>9:00–00:00</dt><dd>каждый день, без выходных</dd></div>
-      </dl>
+    <p class="hero__eyebrow">Душанбе · с 2021 года</p>
+    <h1>Сочные бургеры<br>из <span>100% мяса</span></h1>
+    <p class="hero__meta">30–40 минут · доставка от 15 сомони</p>
+
+    <div class="hero__cta">
+      <a class="btn btn--accent" href="#menu">Заказать</a>
+      <a class="btn btn--line" href="tel:+992939171997">Позвонить</a>
     </div>
 
-    <div class="hero__ticket" data-step="6">
-      <span>гриль после заказа</span>
-      <b>без полуфабрикатов</b>
-    </div>
+    <p class="hero__hours">Каждый день <b>9:00 – 00:00</b> · самовывоз ул. Айни 49</p>
   </div>
 </section>
 
-<section class="menu" id="menu">
+<section class="menu" id="menu" aria-labelledby="menu-title">
   <div class="wrap">
-    <div class="menu__head" data-rise>
-      <h2 class="h-display">Меню</h2>
-      <p>Цены в сомони. Состав и вес — как на кухне, без округлений в свою пользу.</p>
-    </div>
+    <h2 class="h2" id="menu-title">Меню</h2>
   </div>
 
   <div class="tabs" id="tabs">
-    <div class="wrap tabs__row" id="tabs-row"></div>
+    <div class="tabs__row" id="tabs-row" role="tablist" aria-label="Разделы меню"></div>
   </div>
 
   <div class="wrap" id="menu-body"></div>
 </section>
 
-<section class="howto" id="howto">
+<section class="delivery" id="delivery" aria-labelledby="delivery-title">
   <div class="wrap">
-    <h2 class="h-display" data-rise>Как заказать</h2>
-    <ol class="steps" data-rise>
-      <li>
-        <span class="steps__num">1</span>
-        <h3>Собираете корзину</h3>
-        <p>Отмечаете бургеры, снэки и напитки. Корзина считает сумму и доставку сразу.</p>
-      </li>
-      <li>
-        <span class="steps__num">2</span>
-        <h3>Выбираете доставку или самовывоз</h3>
-        <p>Доставка по городу 15 сомони, от 100 сомони — бесплатно. Самовывоз с ул. Айни 49.</p>
-      </li>
-      <li>
-        <span class="steps__num">3</span>
-        <h3>Подтверждаем звонком</h3>
-        <p>Заказ уходит нам в Telegram. Перезваниваем в течение пяти минут и ставим на гриль.</p>
-      </li>
+    <h2 class="h2" id="delivery-title">Доставка</h2>
+
+    <div class="zones" id="zones"></div>
+
+    <ul class="notes">
+      <li>По городу доставка <b>бесплатно от 100 сомони</b>. За городом бесплатной доставки нет — стоимость обсуждаем по телефону.</li>
+      <li>Минимальный заказ на доставку — <b>40 сомони</b>.</li>
+      <li>Среднее время — <b>30–40 минут</b>. В час пик может быть дольше, предупредим заранее.</li>
+      <li>Самовывоз — <b>ул. Айни 49</b>, ориентир GulyaGold. Заказ будет готов через 15 минут.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="howto" aria-labelledby="howto-title">
+  <div class="wrap">
+    <h2 class="h3" id="howto-title">Как заказать</h2>
+    <ol class="steps">
+      <li><span class="steps__num">01</span> Выберите блюда</li>
+      <li><span class="steps__num">02</span> Укажите доставку или самовывоз</li>
+      <li><span class="steps__num">03</span> Подтвердите заказ</li>
     </ol>
   </div>
 </section>
 
-<section class="delivery" id="delivery">
-  <div class="wrap delivery__row">
-    <div class="delivery__text" data-rise>
-      <h2 class="h-display">Доставка и самовывоз</h2>
-      <ul class="dots">
-        <li><b>30–40 минут</b> по центру города, в час пик до часа — скажем честно при заказе</li>
-        <li><b>15 сомони</b> доставка, при заказе <b>от 100 сомони</b> — бесплатно</li>
-        <li>Минимальный заказ на доставку — <b>40 сомони</b></li>
-        <li>Самовывоз готов через <b>15 минут</b>, оплата на месте</li>
-        <li>Работаем каждый день с <b>9:00 до 00:00</b>, последний заказ в 23:30</li>
-      </ul>
-      <div class="delivery__phones">
-        <a class="btn btn--gold" href="tel:+992939171997">+992 93 917 19 97</a>
-        <a class="btn btn--line" href="tel:+992063202020">+992 06 320 20 20</a>
-      </div>
+<section class="place" id="place" aria-labelledby="place-title">
+  <div class="wrap">
+    <h2 class="h2" id="place-title">Заведение</h2>
+
+    <div class="gallery" id="gallery">
+      <figure class="shot-frame" data-shot="place-hall"><img src="assets/place/hall.jpg" alt="Зал The Burger" loading="lazy" width="800" height="600"></figure>
+      <figure class="shot-frame" data-shot="place-kitchen"><img src="assets/place/kitchen.jpg" alt="Открытая кухня" loading="lazy" width="800" height="600"></figure>
+      <figure class="shot-frame" data-shot="place-front"><img src="assets/place/front.jpg" alt="Вход в заведение" loading="lazy" width="800" height="600"></figure>
+      <figure class="shot-frame" data-shot="place-grill"><img src="assets/place/grill.jpg" alt="Котлета на гриле" loading="lazy" width="800" height="600"></figure>
     </div>
 
-    <div class="zone" data-rise>
-      <div class="zone__head">
-        <span>Зона доставки</span>
-        <b>Душанбе</b>
-      </div>
-      <ul class="zone__list">
-        <li><span>Центр, Айни, Рудаки</span><b>15 с.</b></li>
-        <li><span>Сино, Фирдавси</span><b>15 с.</b></li>
-        <li><span>Шохмансур, И. Сомони</span><b>20 с.</b></li>
-        <li><span>За городом</span><b>по договорённости</b></li>
-      </ul>
-      <p class="zone__note">Точную сумму подтверждаем по телефону, сюрпризов у курьера не бывает.</p>
+    <div class="place__text">
+      <p>Мы на ул. Айни 49, ориентир GulyaGold. Открытая кухня — видно, как готовится ваш заказ.</p>
+      <p>40 мест, летом работает веранда. Мясо от местного поставщика: рубим и готовим каждый день. Соусы делаем на своей кухне.</p>
     </div>
   </div>
 </section>
 
-<section class="place" id="place">
-  <div class="wrap place__row">
-    <div class="place__card" data-rise>
-      <img src="assets/place.jpg" alt="Зал The Burger" id="place-photo" width="1216" height="1520">
-      <img class="place__logo" src="assets/logo.jpg" alt="The Burger">
-    </div>
-    <div class="place__text" data-rise>
-      <h2 class="h-display">Заведение</h2>
-      <p>
-        Мы на ул. Айни 49, ориентир GulyaGold. Открытая кухня — видно, как жарится ваша котлета.
-        Внутри 40 мест, летом работает веранда.
-      </p>
-      <p>
-        Мясо берём у местного поставщика и рубим сами каждый день. Соусы делаем на кухне,
-        поэтому «как в прошлый раз» — это реально одно и то же.
-      </p>
-      <div class="place__grid">
-        <div><span>Адрес</span><b>ул. Айни 49, ориентир GulyaGold</b></div>
-        <div><span>Часы</span><b>9:00 – 00:00, без выходных</b></div>
-        <div><span>Телефоны</span><b><a href="tel:+992939171997">+992 93 917 19 97</a><br><a href="tel:+992063202020">+992 06 320 20 20</a></b></div>
-        <div><span>Мы в сети</span><b><a href="https://instagram.com/theburger.tj" target="_blank" rel="noopener">@theburger.tj</a><br><a href="https://t.me/theburgertj" target="_blank" rel="noopener">t.me/theburgertj</a></b></div>
-      </div>
-      <a class="btn btn--line" href="https://www.google.com/maps/search/%D1%83%D0%BB%D0%B8%D1%86%D0%B0+%D0%A1%D0%B0%D0%B4%D1%80%D0%B8%D0%B4%D0%B4%D0%B8%D0%BD%D0%B0+%D0%90%D0%B9%D0%BD%D0%B8+49+Dushanbe" target="_blank" rel="noopener">Открыть на карте</a>
-    </div>
+<section class="contacts" id="contacts" aria-labelledby="contacts-title">
+  <div class="wrap">
+    <h2 class="h2" id="contacts-title">Контакты</h2>
+
+    <ul class="rows">
+      <li>
+        <a href="https://www.google.com/maps/search/?api=1&query=Ayni+49+Dushanbe" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>
+          <span><b>ул. Айни 49</b><small>ориентир GulyaGold</small></span>
+        </a>
+      </li>
+      <li>
+        <div class="rows__static">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 10.6 4 2.3-.9 1.5-5.1-3V6h2v6.6Z"/></svg>
+          <span><b>9:00 – 00:00</b><small>каждый день, последний заказ в 23:30</small></span>
+        </div>
+      </li>
+      <li>
+        <a href="tel:+992939171997">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1l-2.22 2.23Z"/></svg>
+          <span><b>+992 93 917 19 97</b><small>заказы и доставка</small></span>
+        </a>
+      </li>
+      <li>
+        <a href="tel:+992063202020">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1l-2.22 2.23Z"/></svg>
+          <span><b>+992 06 320 20 20</b><small>второй номер</small></span>
+        </a>
+      </li>
+      <li>
+        <a href="https://instagram.com/theburger.tj" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.25.07 1.65.07 4.85s0 3.6-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.25.06-1.65.07-4.85.07s-3.6 0-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.8 3.8 0 0 1-1.38-.9 3.8 3.8 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23C2.2 15.6 2.2 15.2 2.2 12s0-3.6.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.4 2.2 8.8 2.2 12 2.2Zm0 3.1a6.7 6.7 0 1 0 0 13.4 6.7 6.7 0 0 0 0-13.4Zm0 11a4.3 4.3 0 1 1 0-8.6 4.3 4.3 0 0 1 0 8.6Zm6.97-11.27a1.57 1.57 0 1 1-3.13 0 1.57 1.57 0 0 1 3.13 0Z"/></svg>
+          <span><b>@theburger.tj</b><small>фото и новинки</small></span>
+        </a>
+      </li>
+      <li>
+        <a href="https://t.me/theburgertj" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.9 4.3 18.8 19c-.23 1.03-.85 1.28-1.72.8l-4.75-3.5-2.3 2.2c-.25.26-.47.47-.96.47l.34-4.85 8.84-7.99c.38-.34-.09-.53-.6-.19L6.75 12.6l-4.7-1.47c-1.02-.32-1.04-1.02.21-1.51l18.38-7.08c.85-.31 1.6.2 1.26 1.76Z"/></svg>
+          <span><b>t.me/theburgertj</b><small>написать в Telegram</small></span>
+        </a>
+      </li>
+    </ul>
+
+    <a class="btn btn--line btn--full map-cta" href="https://www.google.com/maps/search/?api=1&query=Ayni+49+Dushanbe" target="_blank" rel="noopener">Открыть на карте</a>
   </div>
 </section>
 
@@ -189,109 +186,133 @@
 
 <footer class="foot">
   <div class="wrap foot__row">
-    <div class="foot__brand">
-      <img src="assets/logo.jpg" alt="The Burger">
-      <p>Сочные бургеры из 100% мяса.<br>Душанбе, ул. Айни 49.</p>
-    </div>
-    <nav class="foot__nav">
-      <a href="#menu">Меню</a>
-      <a href="#howto">Как заказать</a>
-      <a href="#delivery">Доставка</a>
-      <a href="#place">Заведение</a>
-    </nav>
-    <div class="foot__contacts">
-      <a href="tel:+992939171997">+992 93 917 19 97</a>
-      <a href="tel:+992063202020">+992 06 320 20 20</a>
-      <a href="https://t.me/theburgertj" target="_blank" rel="noopener">t.me/theburgertj</a>
-      <a href="https://instagram.com/theburger.tj" target="_blank" rel="noopener">@theburger.tj</a>
-    </div>
+    <a class="brand" href="#top">
+      <img class="brand__logo" src="assets/logo.jpg" alt="" width="36" height="36">
+      <span class="brand__name">The&nbsp;Burger</span>
+    </a>
+    <p>Бургеры из 100% говядины. Душанбе, ул. Айни 49.</p>
+    <p class="foot__copy">© <span id="year"></span> The Burger</p>
   </div>
-  <div class="wrap foot__bottom">© <span id="year"></span> The Burger · Душанбе</div>
 </footer>
 
-<!-- корзина оформлена как чек -->
-<div class="basket" id="basket" hidden>
-  <div class="basket__fade" data-close></div>
-  <aside class="basket__panel" role="dialog" aria-modal="true" aria-label="Корзина">
-    <span class="sheet-handle" aria-hidden="true"></span>
-    <div class="basket__head">
-      <b class="h-display">Ваш заказ</b>
-      <button class="x" type="button" data-close aria-label="Закрыть">&times;</button>
-    </div>
+<!-- корзина -->
+<div class="sheet sheet--side" id="cart-sheet" hidden>
+  <div class="sheet__fade" data-shut></div>
+  <aside class="sheet__box sheet__box--side" role="dialog" aria-modal="true" aria-labelledby="cart-title">
+    <span class="grip" aria-hidden="true"></span>
+    <header class="sheet__head">
+      <h2 class="h3" id="cart-title">Корзина</h2>
+      <button class="x" type="button" data-shut aria-label="Закрыть корзину">&times;</button>
+    </header>
 
-    <div class="receipt" id="receipt"></div>
+    <div class="sheet__scroll" id="cart-lines"></div>
 
-    <div class="basket__mode" id="mode" role="group" aria-label="Способ получения">
-      <button type="button" class="is-active" data-mode="delivery">Доставка</button>
-      <button type="button" data-mode="pickup">Самовывоз</button>
-    </div>
-
-    <div class="totals" id="totals"></div>
-
-    <button class="btn btn--gold btn--full" id="to-order" type="button">Оформить заказ</button>
-    <p class="basket__min" id="min-note"></p>
+    <footer class="sheet__foot" id="cart-foot">
+      <dl class="sums" id="cart-sums"></dl>
+      <p class="hint" id="cart-hint"></p>
+      <button class="btn btn--accent btn--full" id="to-checkout" type="button">Оформить заказ</button>
+    </footer>
   </aside>
 </div>
 
-<!-- форма заказа -->
-<div class="order" id="order" hidden>
-  <div class="order__fade" data-close></div>
-  <div class="order__box" role="dialog" aria-modal="true" aria-label="Оформление заказа">
-    <button class="x order__x" type="button" data-close aria-label="Закрыть">&times;</button>
-    <b class="h-display order__title">Куда везём</b>
+<!-- карточка блюда -->
+<div class="sheet" id="dish-sheet" hidden>
+  <div class="sheet__fade" data-shut></div>
+  <div class="sheet__box" role="dialog" aria-modal="true" aria-labelledby="dish-name">
+    <span class="grip" aria-hidden="true"></span>
+    <button class="x sheet__x" type="button" data-shut aria-label="Закрыть">&times;</button>
+    <div class="sheet__scroll" id="dish-body"></div>
+    <footer class="sheet__foot" id="dish-foot"></footer>
+  </div>
+</div>
 
-    <form id="order-form" novalidate>
+<!-- оформление заказа -->
+<div class="sheet" id="checkout-sheet" hidden>
+  <div class="sheet__fade" data-shut></div>
+  <div class="sheet__box" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
+    <span class="grip" aria-hidden="true"></span>
+    <header class="sheet__head">
+      <h2 class="h3" id="checkout-title">Оформление</h2>
+      <button class="x" type="button" data-shut aria-label="Закрыть">&times;</button>
+    </header>
+
+    <form id="order-form" class="sheet__scroll" novalidate>
+      <div class="switch" role="radiogroup" aria-label="Способ получения">
+        <button type="button" role="radio" aria-checked="true" data-mode="delivery">Доставка</button>
+        <button type="button" role="radio" aria-checked="false" data-mode="pickup">Самовывоз</button>
+      </div>
+
       <label class="fld">
-        <span>Как вас зовут</span>
-        <input name="name" type="text" autocomplete="name" placeholder="Далер" required>
+        <span>Имя</span>
+        <input name="name" type="text" autocomplete="name" placeholder="Как к вам обращаться" required>
       </label>
 
       <label class="fld">
         <span>Телефон</span>
-        <input name="phone" type="tel" autocomplete="tel" placeholder="+992 93 000 00 00" required>
+        <input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+992 __ ___ __ __" required>
       </label>
 
-      <label class="fld" id="addr-field">
-        <span>Адрес доставки</span>
-        <input name="address" type="text" autocomplete="street-address" placeholder="ул. Рудаки 12, кв. 4">
-      </label>
+      <div class="only-delivery">
+        <label class="fld">
+          <span>Район</span>
+          <select name="zone" id="zone-select"></select>
+        </label>
+
+        <label class="fld">
+          <span>Улица и дом</span>
+          <input name="address" type="text" autocomplete="street-address" placeholder="ул. Рудаки 12">
+        </label>
+
+        <div class="fld-pair">
+          <label class="fld">
+            <span>Кв. / этаж</span>
+            <input name="flat" type="text" inputmode="numeric" placeholder="14, 3 этаж">
+          </label>
+          <label class="fld">
+            <span>Ориентир</span>
+            <input name="landmark" type="text" placeholder="напротив школы">
+          </label>
+        </div>
+      </div>
 
       <label class="fld">
         <span>Комментарий к заказу</span>
-        <input name="note" type="text" placeholder="Без лука, позвонить у подъезда">
+        <input name="note" type="text" placeholder="без лука, позвонить у подъезда">
       </label>
 
-      <p class="fld__err" id="order-err" role="alert" hidden></p>
-
-      <div class="order__sum">
-        <span>К оплате</span>
-        <b id="order-total">0 с.</b>
-      </div>
-
-      <button class="btn btn--gold btn--full" type="submit">Отправить заказ в Telegram</button>
-      <a class="btn btn--line btn--full" id="order-call" href="tel:+992939171997">Лучше позвоните мне</a>
-      <p class="order__hint">
-        Заказ откроется в Telegram готовым сообщением — останется нажать «отправить».
-        Текст заказа заодно скопируется в буфер.
-      </p>
+      <p class="err" id="form-err" role="alert" hidden></p>
     </form>
+
+    <footer class="sheet__foot">
+      <dl class="sums" id="checkout-sums"></dl>
+      <p class="hint" id="checkout-hint" hidden></p>
+      <button class="btn btn--accent btn--full" id="submit-order" type="submit" form="order-form">Подтвердить заказ</button>
+      <a class="btn btn--line btn--full" href="tel:+992939171997">Лучше позвоните мне</a>
+    </footer>
   </div>
 </div>
 
-<!-- карточка блюда: состав и характеристики -->
-<div class="dish-sheet" id="dish-sheet" hidden>
-  <div class="dish-sheet__fade" data-shut></div>
-  <div class="dish-sheet__box" role="dialog" aria-modal="true" aria-labelledby="ds-name">
-    <span class="sheet-handle" aria-hidden="true"></span>
-    <button class="x dish-sheet__x" type="button" data-shut aria-label="Закрыть">&times;</button>
-    <div class="dish-sheet__body" id="ds-body"></div>
+<!-- заказ принят -->
+<div class="sheet" id="done-sheet" hidden>
+  <div class="sheet__fade" data-shut></div>
+  <div class="sheet__box" role="dialog" aria-modal="true" aria-labelledby="done-title">
+    <div class="done">
+      <span class="done__tick" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
+      </span>
+      <h2 class="h2" id="done-title">Заказ принят</h2>
+      <p class="done__no">Заказ <b id="done-number">№124</b></p>
+      <p class="done__text" id="done-text"></p>
+      <button class="btn btn--accent btn--full" type="button" data-shut>Вернуться в меню</button>
+      <a class="btn btn--line btn--full" href="tel:+992939171997">Позвонить</a>
+    </div>
   </div>
 </div>
 
-<button class="bottombar" id="bottombar" type="button" hidden>
-  <span class="bottombar__count" id="bb-count">0</span>
-  <span class="bottombar__label">Смотреть заказ</span>
-  <span class="bottombar__sum" id="bb-sum">0 с.</span>
+<button class="cartbar" id="cartbar" type="button" hidden>
+  <span class="cartbar__label"><b>Корзина</b> · <span id="cartbar-count">0 товаров</span></span>
+  <span class="cartbar__sum" id="cartbar-sum">0 с.</span>
+  <svg class="cartbar__arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
 </button>
 
 <div class="snack" id="snack" role="status" aria-live="polite" hidden></div>

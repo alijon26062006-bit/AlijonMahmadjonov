@@ -1,408 +1,499 @@
-/* The Burger — меню, корзина-чек, оформление заказа. */
+/* The Burger — меню, корзина, оформление заказа.
+   Заказ уходит текстом в Telegram: сервер не нужен, ничего не теряется. */
 
-const TG_CHAT = 'theburgertj';          // куда уходит заказ
+const TG_CHAT = 'theburgertj';
 const PHONE_MAIN = '+992939171997';
-
-let order = JSON.parse(localStorage.getItem('tb_order') || '{}');
-let mode = localStorage.getItem('tb_mode') || 'delivery';
+const FIRST_ORDER_NO = 124;
 
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-const som = n => n.toLocaleString('ru-RU').replace(/,/g, ' ') + ' с.';
+const som = n => `${n.toLocaleString('ru-RU').replace(/,/g, ' ')} сомони`;
 const dish = id => MENU.find(d => d.id === id);
+const slow = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const plural = (n, one, few, many) => {
+  const t = n % 100, u = n % 10;
+  if (t > 10 && t < 20) return many;
+  if (u === 1) return one;
+  if (u >= 2 && u <= 4) return few;
+  return many;
+};
+
+/* ── состояние ──────────────────────────────────────── */
+
+/* Позиция корзины — блюдо плюс выбранные изменения:
+   { id, qty, add: [id добавки], remove: [название] } */
+let cart = load();
+let mode = localStorage.getItem('tb_mode') || 'delivery';
+let zone = localStorage.getItem('tb_zone') || ZONES[0].id;
+
+function load() {
+  const raw = JSON.parse(localStorage.getItem('tb_cart') || '{}');
+  const out = {};
+
+  for (const [key, val] of Object.entries(raw)) {
+    // старый формат корзины хранил просто количество — переносим его
+    if (typeof val === 'number') {
+      if (dish(key)) out[lineKey(key, [], [])] = { id: key, qty: val, add: [], remove: [] };
+    } else if (val && dish(val.id)) {
+      out[key] = { id: val.id, qty: val.qty, add: val.add || [], remove: val.remove || [] };
+    }
+  }
+  return out;
+}
+
+function save() {
+  localStorage.setItem('tb_cart', JSON.stringify(cart));
+  localStorage.setItem('tb_mode', mode);
+  localStorage.setItem('tb_zone', zone);
+}
+
+const lineKey = (id, add, remove) =>
+  `${id}|${[...add].sort().join('+')}|${[...remove].sort().join('+')}`;
+
+const linePrice = line =>
+  dish(line.id).price + line.add.reduce((s, a) => s + (ADDON(a)?.price || 0), 0);
+
+const goods = () => Object.values(cart).reduce((s, l) => s + linePrice(l) * l.qty, 0);
+const positions = () => Object.values(cart).reduce((s, l) => s + l.qty, 0);
+const dishQty = id => Object.values(cart).filter(l => l.id === id).reduce((s, l) => s + l.qty, 0);
+
+const currentZone = () => ZONES.find(z => z.id === zone) || ZONES[0];
+
+/* Доставка: цена по району. По городу бесплатно от 100 сомони,
+   за городом — по договорённости, поэтому в сумму не попадает. */
+function deliveryCost() {
+  if (mode === 'pickup' || !positions()) return 0;
+  const z = currentZone();
+  if (z.price === null) return 0;
+  return goods() >= DELIVERY.freeFrom ? 0 : z.price;
+}
+const total = () => goods() + deliveryCost();
+
+/* ── корзина: изменения ─────────────────────────────── */
+
+function addLine(id, add = [], remove = [], qty = 1) {
+  const key = lineKey(id, add, remove);
+  if (cart[key]) cart[key].qty += qty;
+  else cart[key] = { id, qty, add: [...add], remove: [...remove] };
+  save();
+  paint();
+}
+
+function setLineQty(key, qty) {
+  if (!cart[key]) return;
+  if (qty <= 0) delete cart[key];
+  else cart[key].qty = qty;
+  save();
+  paint();
+}
+
+/* Счётчик на карточке меняет позицию без изменений.
+   Если такой нет, а количество уменьшают — трогаем последнюю позицию блюда. */
+function bumpDish(id, delta) {
+  const plain = lineKey(id, [], []);
+  if (cart[plain] || delta > 0) {
+    setLineQty(plain, (cart[plain]?.qty || 0) + delta);
+    return;
+  }
+  const keys = Object.keys(cart).filter(k => cart[k].id === id);
+  if (keys.length) setLineQty(keys[keys.length - 1], cart[keys[keys.length - 1]].qty - 1);
+}
 
 /* ── меню ───────────────────────────────────────────── */
 
-/* знак заведения вместо фото, пока фото нет */
-function mark() {
-  const box = document.createElement('div');
-  box.className = 'shot__mark';
-  box.innerHTML = `<svg viewBox="0 0 64 52" aria-hidden="true">
-    <path d="M14 17 10 3l7 5 5-8 5 8 7-5-4 14Z" transform="translate(10 0)" />
-    <rect x="6" y="24" width="52" height="10" rx="5" />
-    <rect x="9" y="36" width="46" height="5" rx="2.5" />
-    <rect x="6" y="43" width="52" height="8" rx="4" />
-  </svg>`;
-  return box;
+const camera = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3 7.2 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9Zm3 5.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Zm0 2a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/></svg>`;
+
+/* Фото может не быть — тогда остаётся аккуратное место под него. */
+function watchPhoto(img) {
+  const fail = () => {
+    const box = img.parentElement;
+    img.remove();
+    box.classList.add('shot--empty');
+    box.insertAdjacentHTML('beforeend', camera);
+  };
+  if (img.complete && !img.naturalWidth) fail();
+  else img.addEventListener('error', fail, { once: true });
 }
 
-/* Кнопка «В заказ» превращается в счётчик, когда блюдо уже взято —
-   так не нужно открывать корзину, чтобы добавить второй бургер. */
-function pick(id, small = false) {
-  return `
-  <div class="pick${small ? ' pick--small' : ''}" data-id="${id}">
-    <button class="add${small ? ' add--small' : ''}" type="button" data-id="${id}">${small ? '+' : 'В заказ'}</button>
+const badge = tag => tag && TAGS[tag]
+  ? `<span class="badge badge--${tag}">${TAGS[tag].label}</span>` : '';
+
+const pickControl = id => `
+  <div class="pick" data-pick="${id}">
+    <button class="add" type="button" data-add="${id}">Добавить <span aria-hidden="true">+</span></button>
     <div class="stepper">
-      <button type="button" data-act="minus" aria-label="Убрать одну">−</button>
-      <span data-count>1</span>
-      <button type="button" data-act="plus" aria-label="Добавить ещё">+</button>
+      <button type="button" data-bump="-1" data-id="${id}" aria-label="Убрать одну порцию">−</button>
+      <span data-count="${id}">1</span>
+      <button type="button" data-bump="1" data-id="${id}" aria-label="Добавить ещё порцию">+</button>
     </div>
   </div>`;
-}
 
-/* приводим счётчики на карточках в соответствие с заказом */
-function syncPicks() {
-  $$('.pick').forEach(box => {
-    const qty = order[box.dataset.id] || 0;
-    box.classList.toggle('is-picked', qty > 0);
-    if (qty > 0) $('[data-count]', box).textContent = qty;
-  });
-}
+const priceHtml = d => `<span class="price">${som(d.price)}${d.oldPrice ? `<s>${som(d.oldPrice)}</s>` : ''}</span>`;
 
-function tagHtml(key) {
-  if (!key || !TAGS[key]) return '';
-  return `<span class="tag ${TAGS[key].cls}">${TAGS[key].label}</span>`;
-}
-
-/* бургеры и сеты — крупными карточками с фото */
-function bigCard(d) {
+function dishCard(d) {
   return `
-  <article class="dish">
+  <article class="dish" data-open="${d.id}">
     <div class="shot">
-      ${tagHtml(d.tag)}
-      <img src="assets/dishes/${d.id}.jpg" alt="${d.name}" width="1216" height="896" loading="lazy">
-      <div class="chip">
-        <b>${som(d.price)}</b>
-        ${d.oldPrice ? `<s>${som(d.oldPrice)}</s>` : ''}
-      </div>
+      <img src="assets/dishes/${d.id}.jpg" alt="${d.name}" width="1216" height="760" loading="lazy">
+      <div class="badges">${badge(d.tag)}</div>
     </div>
     <div class="dish__body">
-      <h4>${d.name}</h4>
-      <p class="dish__about">${d.about}</p>
+      <h4 class="dish__name">${d.name}</h4>
+      ${d.about ? `<p class="dish__about">${d.about}</p>` : ''}
+      <span class="dish__weight">${d.weight} г</span>
       <div class="dish__foot">
-        <span class="dish__weight">${d.weight} г</span>
-        ${pick(d.id)}
+        ${priceHtml(d)}
+        ${pickControl(d.id)}
       </div>
     </div>
   </article>`;
 }
 
-/* снэки, соусы, напитки — компактными строками, как в бумажном меню */
-function row(d) {
+function rowCard(d) {
   return `
-  <div class="line">
-    <div class="line__name">
-      <b>${d.name}</b>${tagHtml(d.tag)}
-      ${d.about ? `<span class="line__note">${d.about}</span>` : ''}
+  <article class="row-item" data-open="${d.id}">
+    <div class="row-item__name">
+      <b>${d.name} ${badge(d.tag)}</b>
+      ${d.about ? `<small>${d.about}</small>` : ''}
     </div>
-    <span class="line__weight">${d.weight} г</span>
-    <b class="line__price">${som(d.price)}</b>
-    ${pick(d.id, true)}
-  </div>`;
+    ${priceHtml(d)}
+    <div class="pick" data-pick="${d.id}">
+      <button class="add add--icon" type="button" data-add="${d.id}" aria-label="Добавить ${d.name}">+</button>
+      <div class="stepper">
+        <button type="button" data-bump="-1" data-id="${d.id}" aria-label="Убрать одну">−</button>
+        <span data-count="${d.id}">1</span>
+        <button type="button" data-bump="1" data-id="${d.id}" aria-label="Добавить ещё">+</button>
+      </div>
+    </div>
+  </article>`;
 }
 
 function renderMenu() {
   $('#tabs-row').innerHTML = SECTIONS
-    .map(s => `<a href="#sec-${s.id}" data-sec="${s.id}">${s.title}</a>`).join('');
+    .map(s => `<a href="#sec-${s.id}" data-tab="${s.id}">${s.title}</a>`).join('');
 
   $('#menu-body').innerHTML = SECTIONS.map(s => {
     const items = MENU.filter(d => d.section === s.id);
     const big = s.id === 'burgers' || s.id === 'sets';
-
     return `
-    <section class="sec" id="sec-${s.id}">
+    <section class="sec" id="sec-${s.id}" aria-labelledby="h-${s.id}">
       <div class="sec__head">
-        <h3 class="h-display">${s.title}</h3>
+        <h3 id="h-${s.id}">${s.title}</h3>
         ${s.note ? `<span>${s.note}</span>` : ''}
       </div>
-      <div class="${big ? 'dishes' : 'lines'}">
-        ${items.map(big ? bigCard : row).join('')}
+      <div class="${big ? 'dishes' : 'rows-menu'}">
+        ${items.map(big ? dishCard : rowCard).join('')}
       </div>
     </section>`;
   }).join('');
 
-  $$('.shot img').forEach(img => {
-    if (img.complete && !img.naturalWidth) img.replaceWith(mark());
-    else img.addEventListener('error', () => img.replaceWith(mark()), { once: true });
-  });
+  $$('.shot img').forEach(watchPhoto);
 }
 
-/* если фото баннера или зала нет — блок остаётся угольным, без пустой рамки */
-function photoOrNothing(img, holder, cls) {
-  if (!img) return;
-  const off = () => { img.hidden = true; holder.classList.add(cls); };
-  if (img.complete && !img.naturalWidth) off();
-  else img.addEventListener('error', off, { once: true });
-}
-photoOrNothing($('#hero-photo'), $('.hero'), 'is-nophoto');
-photoOrNothing($('#place-photo'), $('.place__card'), 'is-nophoto');
+/* ── карточка блюда ─────────────────────────────────── */
 
-/* ── карточка блюда: состав и характеристики ────────── */
+let sheetDish = null;   // { id, qty, add, remove }
 
 function openDish(id) {
   const d = dish(id);
   if (!d) return;
+  sheetDish = { id, qty: 1, add: [], remove: [] };
 
+  const mods = MODIFIERS[d.section];
   const facts = [
-    d.weight ? `<div><dt>${d.weight} г</dt><dd>вес порции</dd></div>` : '',
-    d.kcal ? `<div><dt>${d.kcal}</dt><dd>ккал</dd></div>` : '',
-    d.cook ? `<div><dt>${d.cook}</dt><dd>готовим</dd></div>` : ''
-  ].join('');
+    d.weight && `<div><dt>${d.weight} г</dt><dd>вес</dd></div>`,
+    d.kcal && `<div><dt>${d.kcal}</dt><dd>ккал</dd></div>`,
+    d.cook && `<div><dt>${d.cook}</dt><dd>готовим</dd></div>`
+  ].filter(Boolean).join('');
 
-  $('#ds-body').innerHTML = `
-    <div class="ds-shot">
-      ${tagHtml(d.tag)}
-      <img src="assets/dishes/${d.id}.jpg" alt="${d.name}" width="1216" height="896">
+  $('#dish-body').innerHTML = `
+    <div class="ds-shot shot">
+      <img src="assets/dishes/${d.id}.jpg" alt="${d.name}" width="1216" height="760">
     </div>
-    <div class="ds-text">
-      <h3 id="ds-name">${d.name}</h3>
-      ${d.about ? `<p class="ds-about">${d.about}</p>` : ''}
+    <h2 class="ds-name" id="dish-name">${d.name}</h2>
+    ${d.about ? `<p class="ds-about">${d.about}</p>` : ''}
+    <dl class="ds-facts">${facts}</dl>
 
-      <dl class="ds-facts">${facts}</dl>
+    ${d.parts?.length ? `
+      <h3 class="ds-title">Состав</h3>
+      <ul class="ds-parts">${d.parts.map(p => `<li>${p}</li>`).join('')}</ul>` : ''}
 
-      ${d.parts && d.parts.length ? `
-        <h4 class="ds-title">Состав</h4>
-        <ul class="ds-parts">${d.parts.map(p => `<li>${p}</li>`).join('')}</ul>` : ''}
+    ${mods?.remove?.length ? `
+      <h3 class="ds-title">Убрать</h3>
+      <div class="opts">${mods.remove.map(name => `
+        <label class="opt">
+          <input type="checkbox" data-remove="${name}">
+          <span>${name}</span>
+        </label>`).join('')}</div>` : ''}
 
-      <div class="ds-foot">
-        <div class="ds-price">
-          <b>${som(d.price)}</b>
-          ${d.oldPrice ? `<s>${som(d.oldPrice)}</s>` : ''}
+    ${mods?.add?.length ? `
+      <h3 class="ds-title">Добавить</h3>
+      <div class="opts">${mods.add.map(a => `
+        <label class="opt">
+          <input type="checkbox" data-addon="${a.id}">
+          <span>${a.name}</span>
+          <b>+${som(a.price)}</b>
+        </label>`).join('')}</div>` : ''}
+  `;
+
+  $('#dish-foot').innerHTML = `
+    <div class="ds-qty">
+      <span>Количество</span>
+      <div class="stepper">
+        <button type="button" id="ds-minus" aria-label="Меньше">−</button>
+        <span id="ds-qty">1</span>
+        <button type="button" id="ds-plus" aria-label="Больше">+</button>
+      </div>
+    </div>
+    <button class="btn btn--accent btn--full" id="ds-add" type="button"></button>`;
+
+  watchPhoto($('#dish-body img'));
+  paintDishSheet();
+  openSheet('#dish-sheet');
+}
+
+function dishSheetPrice() {
+  const d = dish(sheetDish.id);
+  const extra = sheetDish.add.reduce((s, a) => s + (ADDON(a)?.price || 0), 0);
+  return (d.price + extra) * sheetDish.qty;
+}
+
+function paintDishSheet() {
+  $('#ds-qty').textContent = sheetDish.qty;
+  $('#ds-add').textContent = `Добавить в корзину · ${som(dishSheetPrice())}`;
+}
+
+document.addEventListener('change', e => {
+  if (!sheetDish || !e.target.matches('[data-addon], [data-remove]')) return;
+
+  const { addon, remove } = e.target.dataset;
+  const list = addon ? sheetDish.add : sheetDish.remove;
+  const val = addon || remove;
+  const at = list.indexOf(val);
+
+  if (e.target.checked && at === -1) list.push(val);
+  if (!e.target.checked && at > -1) list.splice(at, 1);
+
+  paintDishSheet();
+});
+
+/* ── корзина: экран ─────────────────────────────────── */
+
+function lineTitle(line) {
+  const bits = [
+    ...line.add.map(a => `+ ${ADDON(a)?.name || a}`),
+    ...line.remove.map(r => `без ${REMOVE_GEN[r] || r.toLowerCase()}`)
+  ];
+  return bits.join(', ');
+}
+
+function renderCart() {
+  const keys = Object.keys(cart);
+
+  $('#cart-lines').innerHTML = keys.length ? keys.map(key => {
+    const line = cart[key];
+    const d = dish(line.id);
+    const opts = lineTitle(line);
+    return `
+    <div class="cart-line" data-key="${key}">
+      <div class="cart-line__shot shot">
+        <img src="assets/dishes/${d.id}.jpg" alt="" width="128" height="128" loading="lazy">
+      </div>
+      <div class="cart-line__name">
+        <b>${d.name}</b>
+        ${opts ? `<span class="cart-line__opts">${opts}</span>` : ''}
+        <span class="cart-line__price">${som(linePrice(line))} × ${line.qty}</span>
+      </div>
+      <div class="cart-line__side">
+        <div class="stepper">
+          <button type="button" data-line="${key}" data-delta="-1" aria-label="Меньше">−</button>
+          <span>${line.qty}</span>
+          <button type="button" data-line="${key}" data-delta="1" aria-label="Больше">+</button>
         </div>
-        ${pick(d.id)}
+        <button class="cart-line__del" type="button" data-drop="${key}">Удалить</button>
       </div>
     </div>`;
+  }).join('') : `
+    <div class="empty">
+      <b>Корзина пуста</b>
+      <span>Начните с бургера — остальное соберётся само.</span>
+    </div>`;
 
-  const img = $('#ds-body img');
-  if (img.complete && !img.naturalWidth) img.replaceWith(mark());
-  else img.addEventListener('error', () => img.replaceWith(mark()), { once: true });
-
-  syncPicks();
-  open('#dish-sheet');
-}
-
-/* Нажатие на карточку открывает описание. Кнопка «В заказ»
-   и счётчик при этом работают как раньше — их мы пропускаем. */
-document.addEventListener('click', e => {
-  if (e.target.closest('.pick')) return;
-  const card = e.target.closest('.dish, .line');
-  if (!card) return;
-  const id = $('.pick', card)?.dataset.id;
-  if (id) openDish(id);
-});
-
-/* ── корзина ────────────────────────────────────────── */
-
-function save() {
-  localStorage.setItem('tb_order', JSON.stringify(order));
-  localStorage.setItem('tb_mode', mode);
-}
-
-function goods() {
-  return Object.entries(order).reduce((sum, [id, qty]) => {
-    const d = dish(id);
-    return d ? sum + d.price * qty : sum;
-  }, 0);
-}
-
-function deliveryCost() {
-  if (mode === 'pickup') return 0;
-  const g = goods();
-  return g === 0 || g >= DELIVERY.freeFrom ? 0 : DELIVERY.price;
-}
-
-function total() {
-  return goods() + deliveryCost();
-}
-
-function positions() {
-  return Object.values(order).reduce((s, n) => s + n, 0);
-}
-
-function addDish(id) {
-  order[id] = (order[id] || 0) + 1;
-  save();
-  renderBasket();
-
-  // в открытой карточке блюда счётчик и так на виду — уведомление лишнее
-  if ($('#dish-sheet').hidden) snack(`${dish(id).name} — в заказе`);
-}
-
-function setQty(id, qty) {
-  if (qty <= 0) delete order[id];
-  else order[id] = qty;
-  save();
-  renderBasket();
-}
-
-function renderBasket() {
-  const count = positions();
-
-  $('#basket-sum').textContent = som(total());
-  $('#basket-open').classList.toggle('is-full', count > 0);
-
-  const bar = $('#bottombar');
-  $('#bb-count').textContent = count;
-  $('#bb-sum').textContent = som(total());
-
-  if (count > 0) {
-    bar.hidden = false;
-    requestAnimationFrame(() => bar.classList.add('is-on'));
-    document.body.classList.add('has-bar');
-  } else {
-    bar.classList.remove('is-on');
-    document.body.classList.remove('has-bar');
-    setTimeout(() => { if (!bar.classList.contains('is-on')) bar.hidden = true; }, 300);
-  }
-
-  syncPicks();
-
-  const list = Object.entries(order);
-
-  $('#receipt').innerHTML = list.length
-    ? list.map(([id, qty]) => {
-        const d = dish(id);
-        return `
-        <div class="pos" data-id="${id}">
-          <div class="pos__name">
-            <b>${d.name}</b>
-            <span>${som(d.price)} × ${qty}</span>
-          </div>
-          <div class="counter">
-            <button type="button" data-act="minus" aria-label="Меньше">−</button>
-            <span>${qty}</span>
-            <button type="button" data-act="plus" aria-label="Больше">+</button>
-          </div>
-          <b class="pos__sum">${som(d.price * qty)}</b>
-        </div>`;
-      }).join('')
-    : `<p class="receipt__empty">Пока пусто. Начните с бургера — остальное само добавится.</p>`;
-
-  const dc = deliveryCost();
-  $('#totals').innerHTML = `
-    <div><span>Блюда</span><b>${som(goods())}</b></div>
-    <div><span>${mode === 'pickup' ? 'Самовывоз' : 'Доставка'}</span>
-         <b>${mode === 'pickup' ? 'бесплатно' : (dc ? som(dc) : 'бесплатно')}</b></div>
-    <div class="totals__big"><span>Итого к оплате</span><b>${som(total())}</b></div>`;
+  $$('#cart-lines img').forEach(watchPhoto);
 
   const short = DELIVERY.minOrder - goods();
-  const needMore = mode === 'delivery' && goods() > 0 && short > 0;
+  const needMore = mode === 'delivery' && positions() > 0 && short > 0;
 
-  $('#min-note').textContent = needMore
-    ? `Минимальный заказ на доставку — ${som(DELIVERY.minOrder)} Добавьте ещё на ${som(short)}`
-    : (mode === 'delivery' && goods() > 0 && dc
-        ? `До бесплатной доставки — ${som(DELIVERY.freeFrom - goods())}`
+  $('#cart-sums').innerHTML = sumsHtml();
+  $('#cart-hint').textContent = needMore
+    ? `Минимальный заказ на доставку — ${som(DELIVERY.minOrder)}. Добавьте ещё на ${som(short)}.`
+    : (mode === 'delivery' && deliveryCost() > 0
+        ? `До бесплатной доставки — ${som(DELIVERY.freeFrom - goods())}.`
         : '');
-
-  $('#to-order').disabled = positions() === 0 || needMore;
-  $('#order-total').textContent = som(total());
+  $('#cart-hint').hidden = !$('#cart-hint').textContent;
+  $('#cart-foot').hidden = !keys.length;
+  $('#to-checkout').disabled = !keys.length;
 }
 
-/* Кнопки живут и в меню, и в карточке блюда, и появляются после
-   отрисовки — поэтому слушаем нажатия на документе, а не на каждой кнопке. */
-document.addEventListener('click', e => {
-  const add = e.target.closest('.add');
-  if (add) { addDish(add.dataset.id); return; }
+function sumsHtml() {
+  const z = currentZone();
+  const cost = deliveryCost();
 
-  const btn = e.target.closest('.pick .stepper button');
-  if (!btn) return;
-  const id = btn.closest('.pick').dataset.id;
-  setQty(id, (order[id] || 0) + (btn.dataset.act === 'plus' ? 1 : -1));
-});
+  const delivery = mode === 'pickup'
+    ? 'самовывоз'
+    : z.price === null ? 'по договорённости' : (cost ? som(cost) : 'бесплатно');
 
-$('#receipt').addEventListener('click', e => {
-  const btn = e.target.closest('button[data-act]');
-  if (!btn) return;
-  const id = btn.closest('.pos').dataset.id;
-  setQty(id, order[id] + (btn.dataset.act === 'plus' ? 1 : -1));
-});
-
-$$('#mode button').forEach(btn => btn.addEventListener('click', () => {
-  mode = btn.dataset.mode;
-  $$('#mode button').forEach(b => b.classList.toggle('is-active', b === btn));
-  $('#addr-field').hidden = mode === 'pickup';
-  save();
-  renderBasket();
-}));
-
-/* ── окна ───────────────────────────────────────────── */
-
-let returnFocusTo = null;
-const slowMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-function open(sel) {
-  const el = $(sel);
-  returnFocusTo = document.activeElement;
-  el.hidden = false;
-  // класс ставим следующим кадром, иначе переход не запустится
-  requestAnimationFrame(() => el.classList.add('is-open'));
-  document.body.classList.add('is-fixed');
+  return `
+    <div><dt>Товары</dt><dd>${som(goods())}</dd></div>
+    <div><dt>Доставка</dt><dd>${delivery}</dd></div>
+    <div class="total"><dt>Итого</dt><dd>${som(total())}</dd></div>`;
 }
 
-function closeAll() {
-  let wasOpen = false;
+/* ── общая перерисовка ──────────────────────────────── */
 
-  ['#basket', '#order', '#dish-sheet'].forEach(sel => {
-    const el = $(sel);
-    if (el.hidden) return;
-    wasOpen = true;
-    el.classList.remove('is-open');
-    if (slowMotion()) el.hidden = true;
-    else setTimeout(() => { if (!el.classList.contains('is-open')) el.hidden = true; }, 420);
+function paint() {
+  const count = positions();
+
+  $$('.pick').forEach(box => {
+    const qty = dishQty(box.dataset.pick);
+    box.classList.toggle('is-on', qty > 0);
+    if (qty > 0) $(`[data-count="${box.dataset.pick}"]`, box).textContent = qty;
   });
 
-  document.body.classList.remove('is-fixed');
-  if (wasOpen && returnFocusTo) returnFocusTo.focus();
+  $('#cart-count').textContent = count;
+  $('#cart-count').hidden = !count;
+  $('#cartbar-count').textContent = `${count} ${plural(count, 'товар', 'товара', 'товаров')}`;
+  $('#cartbar-sum').textContent = som(total());
+
+  const bar = $('#cartbar');
+  if (count) {
+    bar.hidden = false;
+    requestAnimationFrame(() => bar.classList.add('is-up'));
+  } else {
+    bar.classList.remove('is-up');
+    setTimeout(() => { if (!bar.classList.contains('is-up')) bar.hidden = true; }, 260);
+  }
+
+  renderCart();
+  if (!$('#checkout-sheet').hidden) paintCheckout();
 }
 
-$('#basket-open').addEventListener('click', () => open('#basket'));
-$('#bottombar').addEventListener('click', () => open('#basket'));
+/* ── шторки и окна ──────────────────────────────────── */
 
-/* Корзину-шторку на телефоне можно смахнуть вниз. */
-(function swipeToClose() {
-  const panel = $('.basket__panel');
-  let start = 0, shift = 0, active = false;
+const SHEETS = ['#cart-sheet', '#dish-sheet', '#checkout-sheet', '#done-sheet'];
+let lastFocus = null;
 
-  panel.addEventListener('touchstart', e => {
-    if ($('#receipt').scrollTop > 0) return;
-    active = true;
-    start = e.touches[0].clientY;
-    panel.style.transition = 'none';
+function openSheet(sel) {
+  const el = $(sel);
+  lastFocus = document.activeElement;
+  SHEETS.filter(s => s !== sel).forEach(hideSheet);
+
+  el.hidden = false;
+  requestAnimationFrame(() => el.classList.add('is-open'));
+  document.body.classList.add('is-locked');
+
+  const first = $('.btn, button, input, select, [href]', el);
+  setTimeout(() => first?.focus({ preventScroll: true }), 120);
+}
+
+function hideSheet(sel) {
+  const el = $(sel);
+  if (el.hidden) return;
+  el.classList.remove('is-open');
+  if (slow()) el.hidden = true;
+  else setTimeout(() => { if (!el.classList.contains('is-open')) el.hidden = true; }, 280);
+}
+
+function closeSheets() {
+  const wasOpen = SHEETS.some(s => !$(s).hidden);
+  SHEETS.forEach(hideSheet);
+  document.body.classList.remove('is-locked');
+  if (wasOpen) lastFocus?.focus?.({ preventScroll: true });
+}
+
+document.addEventListener('keydown', e => {
+  const open = SHEETS.map(sel => $(sel)).find(el => !el.hidden);
+  if (!open) return;
+
+  if (e.key === 'Escape') { closeSheets(); return; }
+
+  // фокус не должен уходить из открытого окна
+  if (e.key !== 'Tab') return;
+  const items = $$('button, [href], input, select, textarea', open).filter(el => el.offsetParent !== null);
+  if (!items.length) return;
+
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
+/* смахивание шторки вниз на телефоне */
+SHEETS.forEach(sel => {
+  const box = $(`${sel} .sheet__box`);
+  let start = 0, shift = 0, live = false;
+
+  box.addEventListener('touchstart', e => {
+    const scroll = $('.sheet__scroll', box);
+    if (scroll && scroll.scrollTop > 0) return;
+    live = true; start = e.touches[0].clientY;
+    box.style.transition = 'none';
   }, { passive: true });
 
-  panel.addEventListener('touchmove', e => {
-    if (!active) return;
+  box.addEventListener('touchmove', e => {
+    if (!live) return;
     shift = Math.max(0, e.touches[0].clientY - start);
-    panel.style.transform = `translateY(${shift}px)`;
+    box.style.transform = `translateY(${shift}px)`;
   }, { passive: true });
 
-  panel.addEventListener('touchend', () => {
-    if (!active) return;
-    active = false;
-    panel.style.transition = '';
-    panel.style.transform = '';
-    if (shift > 110) closeAll();
+  box.addEventListener('touchend', () => {
+    if (!live) return;
+    live = false;
+    box.style.transition = '';
+    box.style.transform = '';
+    if (shift > 110) closeSheets();
     shift = 0;
   });
-})();
-$$('[data-close], [data-shut]').forEach(el => el.addEventListener('click', closeAll));
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
-
-$('#to-order').addEventListener('click', () => {
-  const basket = $('#basket');
-  basket.classList.remove('is-open');
-  setTimeout(() => { basket.hidden = true; }, slowMotion() ? 0 : 420);
-
-  open('#order');
-  setTimeout(() => $('#order-form').elements.name.focus(), 120);
 });
 
-/* ── отправка заказа ────────────────────────────────── */
+/* ── оформление заказа ──────────────────────────────── */
 
-function orderText(f) {
-  const rows = Object.entries(order).map(([id, qty]) => {
-    const d = dish(id);
-    return `• ${d.name} × ${qty} — ${som(d.price * qty)}`;
+function setMode(next) {
+  mode = next;
+  $$('.switch button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
+  $$('.only-delivery').forEach(el => { el.hidden = mode !== 'delivery'; });
+  save();
+  paint();
+}
+
+function paintCheckout() {
+  const short = DELIVERY.minOrder - goods();
+  const needMore = mode === 'delivery' && short > 0;
+
+  $('#checkout-sums').innerHTML = sumsHtml();
+  $('#checkout-hint').textContent = needMore
+    ? `Доставка — от ${som(DELIVERY.minOrder)}. Добавьте ещё на ${som(short)} или выберите самовывоз.`
+    : '';
+  $('#checkout-hint').hidden = !needMore;
+  $('#submit-order').textContent = `Подтвердить заказ · ${som(total())}`;
+}
+
+function orderText(f, no) {
+  const rows = Object.values(cart).map(l => {
+    const opts = lineTitle(l);
+    return `• ${dish(l.id).name}${opts ? ` (${opts})` : ''} × ${l.qty} — ${som(linePrice(l) * l.qty)}`;
   });
 
-  const lines = ['Заказ с сайта The Burger', '', ...rows, ''];
+  const lines = [`Заказ №${no} с сайта The Burger`, '', ...rows, '', `Товары: ${som(goods())}`];
 
   if (mode === 'delivery') {
-    lines.push(`Доставка: ${deliveryCost() ? som(deliveryCost()) : 'бесплатно'}`);
-    lines.push(`Адрес: ${f.address.value.trim() || '—'}`);
+    const z = currentZone();
+    lines.push(`Доставка: ${z.name} — ${z.price === null ? 'по договорённости' : (deliveryCost() ? som(deliveryCost()) : 'бесплатно')}`);
+    lines.push(`Адрес: ${f.address.value.trim()}${f.flat.value.trim() ? `, ${f.flat.value.trim()}` : ''}`);
+    if (f.landmark.value.trim()) lines.push(`Ориентир: ${f.landmark.value.trim()}`);
   } else {
-    lines.push('Самовывоз: ул. Айни 49');
+    lines.push(`Самовывоз: ${DELIVERY.pickup}`);
   }
 
   lines.push(`Итого: ${som(total())}`, '', `Имя: ${f.name.value.trim()}`, `Телефон: ${f.phone.value.trim()}`);
@@ -411,91 +502,92 @@ function orderText(f) {
   return lines.join('\n');
 }
 
+function nextOrderNo() {
+  const no = Number(localStorage.getItem('tb_order_no') || FIRST_ORDER_NO);
+  localStorage.setItem('tb_order_no', String(no + 1));
+  return no;
+}
+
 $('#order-form').addEventListener('submit', e => {
   e.preventDefault();
-  const f = e.target.elements;          // у формы своё свойство name, поля берём через elements
-  const err = $('#order-err');
+  const f = e.target.elements;
+  const err = $('#form-err');
 
-  const digits = f.phone.value.replace(/\D/g, '');
-  if (!f.name.value.trim()) return fail('Напишите, как вас зовут.');
-  if (digits.length < 9) return fail('Проверьте номер телефона — по нему подтверждаем заказ.');
-  if (mode === 'delivery' && !f.address.value.trim()) return fail('Нужен адрес, иначе курьер не доедет.');
+  const fail = (msg, field) => {
+    err.textContent = msg;
+    err.hidden = false;
+    field?.setAttribute('aria-invalid', 'true');
+    field?.focus();
+  };
+
+  $$('#order-form input').forEach(i => i.removeAttribute('aria-invalid'));
+
+  if (!f.name.value.trim()) return fail('Напишите, как вас зовут.', f.name);
+  if (f.phone.value.replace(/\D/g, '').length < 9) return fail('Проверьте номер — по нему подтверждаем заказ.', f.phone);
+  if (mode === 'delivery' && goods() < DELIVERY.minOrder)
+    return fail(`Доставка — от ${som(DELIVERY.minOrder)}. Добавьте ещё на ${som(DELIVERY.minOrder - goods())} или выберите самовывоз.`);
+  if (mode === 'delivery' && !f.address.value.trim()) return fail('Укажите улицу и дом, иначе курьер не доедет.', f.address);
 
   err.hidden = true;
 
-  const text = orderText(f);
+  const no = nextOrderNo();
+  const text = orderText(f, no);
+
   navigator.clipboard?.writeText(text).catch(() => {});
   window.open(`https://t.me/${TG_CHAT}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
 
-  closeAll();
-  snack('Заказ собран — отправьте сообщение в Telegram');
+  $('#done-number').textContent = `№${no}`;
+  $('#done-text').textContent = mode === 'delivery'
+    ? `Отправьте сообщение в Telegram — мы подтвердим заказ и привезём за ${DELIVERY.time}.`
+    : `Отправьте сообщение в Telegram — заказ будет готов через 15 минут на ${DELIVERY.pickup}.`;
 
-  function fail(msg) {
-    err.textContent = msg;
-    err.hidden = false;
-  }
+  cart = {};
+  save();
+  paint();
+  openSheet('#done-sheet');
 });
 
-const phoneField = $('#order-form').elements.phone;
-phoneField.addEventListener('blur', () => {
-  const digits = phoneField.value.replace(/\D/g, '');
-  const err = $('#order-err');
-  if (phoneField.value && digits.length < 9) {
-    err.textContent = 'В номере не хватает цифр — проверьте, пожалуйста.';
-    err.hidden = false;
-  } else if (!err.hidden && digits.length >= 9) {
-    err.hidden = true;
-  }
+/* телефон в местном формате: +992 XX XXX XX XX */
+$('#order-form').elements.phone.addEventListener('input', e => {
+  let d = e.target.value.replace(/\D/g, '');
+  if (d.startsWith('992')) d = d.slice(3);
+  d = d.slice(0, 9);
+
+  const parts = [d.slice(0, 2), d.slice(2, 5), d.slice(5, 7), d.slice(7, 9)].filter(Boolean);
+  e.target.value = d ? `+992 ${parts.join(' ')}` : '';
 });
 
-$('#order-call').href = `tel:${PHONE_MAIN}`;
-
-/* Карточки появляются волной при прокрутке. Стартуют из видимого
-   состояния, а не из нуля: если наблюдателя нет или включён режим
-   уменьшенной анимации — меню просто на месте. */
-function revealOnScroll() {
-  if (slowMotion() || !('IntersectionObserver' in window)) return;
-
-  const io = new IntersectionObserver((entries, obs) => {
-    entries.filter(en => en.isIntersecting).forEach((en, i) => {
-      en.target.style.setProperty('--delay', `${Math.min(i, 5) * 60}ms`);
-      en.target.classList.add('is-in');
-      obs.unobserve(en.target);
-    });
-  }, { rootMargin: '0px 0px -12% 0px', threshold: .15 });
-
-  $$('.dish, .line, [data-rise]').forEach(el => {
-    el.classList.add('will-rise');
-    io.observe(el);
-  });
-
-  // страховка: если наблюдатель почему-то не сработал, всё видно через 3 с
-  setTimeout(() => $$('.will-rise').forEach(el => el.classList.add('is-in')), 3000);
-}
-
-/* ── вкладки категорий ──────────────────────────────── */
+/* ── вкладки разделов ───────────────────────────────── */
 
 function watchTabs() {
-  const links = $$('#tabs-row a');
-  const secs = SECTIONS.map(s => $(`#sec-${s.id}`)).filter(Boolean);
+  const tabs = $$('#tabs-row a');
+  const row = $('#tabs-row');
+
+  tabs.forEach(a => a.addEventListener('click', e => {
+    e.preventDefault();
+    $(`#sec-${a.dataset.tab}`).scrollIntoView({ behavior: slow() ? 'auto' : 'smooth', block: 'start' });
+  }));
+
+  if (!('IntersectionObserver' in window)) return;
 
   const io = new IntersectionObserver(entries => {
-    entries.forEach(en => {
-      if (!en.isIntersecting) return;
-      const id = en.target.id.replace('sec-', '');
-      links.forEach(a => a.classList.toggle('is-active', a.dataset.sec === id));
+    const shown = entries.filter(en => en.isIntersecting)
+      .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (!shown) return;
 
-      const active = links.find(a => a.dataset.sec === id);
-      const row = $('#tabs-row');
-      if (active && row.scrollWidth > row.clientWidth) {
-        const shift = active.offsetLeft - (row.clientWidth - active.offsetWidth) / 2;
-        row.scrollTo({ left: Math.max(shift, 0), behavior: slowMotion() ? 'auto' : 'smooth' });
-      }
-    });
-  }, { rootMargin: '-140px 0px -70% 0px' });
+    const id = shown.target.id.replace('sec-', '');
+    tabs.forEach(a => a.classList.toggle('is-on', a.dataset.tab === id));
 
-  secs.forEach(s => io.observe(s));
-  links[0]?.classList.add('is-active');
+    // активная вкладка всегда должна быть видна целиком
+    const on = tabs.find(a => a.dataset.tab === id);
+    if (on && row.scrollWidth > row.clientWidth) {
+      const to = on.offsetLeft - (row.clientWidth - on.offsetWidth) / 2;
+      row.scrollTo({ left: Math.max(0, to), behavior: slow() ? 'auto' : 'smooth' });
+    }
+  }, { rootMargin: '-45% 0px -50% 0px' });
+
+  $$('.sec').forEach(s => io.observe(s));
+  tabs[0]?.classList.add('is-on');
 }
 
 /* ── мелочи ─────────────────────────────────────────── */
@@ -506,21 +598,93 @@ function snack(text) {
   box.textContent = text;
   box.hidden = false;
   clearTimeout(snackTimer);
-  snackTimer = setTimeout(() => { box.hidden = true; }, 2400);
+  snackTimer = setTimeout(() => { box.hidden = true; }, 2200);
 }
 
-$('#nav-toggle').addEventListener('click', () => $('.head__nav').classList.toggle('is-open'));
-$$('.head__nav a').forEach(a => a.addEventListener('click', () => $('.head__nav').classList.remove('is-open')));
+document.addEventListener('click', e => {
+  const t = e.target;
 
-window.addEventListener('scroll', () => {
-  $('#head').classList.toggle('is-down', window.scrollY > 8);
+  if (t.closest('[data-shut]')) { closeSheets(); return; }
+
+  const add = t.closest('[data-add]');
+  if (add) {
+    addLine(add.dataset.add);
+    if ($('#dish-sheet').hidden) snack(`${dish(add.dataset.add).name} — в корзине`);
+    return;
+  }
+
+  const bump = t.closest('[data-bump]');
+  if (bump) { bumpDish(bump.dataset.id, Number(bump.dataset.bump)); return; }
+
+  const line = t.closest('[data-line]');
+  if (line) { setLineQty(line.dataset.line, cart[line.dataset.line].qty + Number(line.dataset.delta)); return; }
+
+  const drop = t.closest('[data-drop]');
+  if (drop) { setLineQty(drop.dataset.drop, 0); return; }
+
+  if (t.closest('#ds-minus')) { sheetDish.qty = Math.max(1, sheetDish.qty - 1); paintDishSheet(); return; }
+  if (t.closest('#ds-plus'))  { sheetDish.qty += 1; paintDishSheet(); return; }
+
+  if (t.closest('#ds-add')) {
+    addLine(sheetDish.id, sheetDish.add, sheetDish.remove, sheetDish.qty);
+    closeSheets();
+    snack(`${dish(sheetDish.id).name} — в корзине`);
+    return;
+  }
+
+  const openCart = t.closest('#cartbar, #cart-open');
+  if (openCart) { openSheet('#cart-sheet'); return; }
+
+  if (t.closest('#to-checkout')) { paintCheckout(); openSheet('#checkout-sheet'); return; }
+
+  const modeBtn = t.closest('.switch button');
+  if (modeBtn) { setMode(modeBtn.dataset.mode); paintCheckout(); return; }
+
+  // карточка блюда открывается по нажатию, но не по кнопкам внутри
+  const card = t.closest('[data-open]');
+  if (card && !t.closest('.pick')) openDish(card.dataset.open);
 });
 
+$('#nav-toggle').addEventListener('click', () => {
+  const panel = $('#nav-panel');
+  const open = panel.hidden;
+  panel.hidden = !open;
+  $('#nav-toggle').setAttribute('aria-expanded', String(open));
+});
+$$('#nav-panel a').forEach(a => a.addEventListener('click', () => {
+  $('#nav-panel').hidden = true;
+  $('#nav-toggle').setAttribute('aria-expanded', 'false');
+}));
+
+$('#zone-select').addEventListener('change', e => {
+  zone = e.target.value;
+  save();
+  paint();
+});
+
+/* ── запуск ─────────────────────────────────────────── */
+
+$('#zone-select').innerHTML = ZONES
+  .map(z => `<option value="${z.id}"${z.id === zone ? ' selected' : ''}>${z.name}</option>`).join('');
+
+$('#zones').innerHTML = ZONES.map(z => `
+  <div class="zone${z.price === null ? ' zone--soft' : ''}">
+    <span>${z.name}</span>
+    <b>${z.price === null ? 'по договорённости' : som(z.price)}</b>
+  </div>`).join('');
+
 $('#year').textContent = new Date().getFullYear();
+$$('.hero__media img, .shot-frame img').forEach(img => {
+  if (img.closest('.hero__media')) {
+    const off = () => { img.hidden = true; $('.hero').classList.add('is-bare'); };
+    if (img.complete && !img.naturalWidth) off();
+    else img.addEventListener('error', off, { once: true });
+  } else {
+    watchPhoto(img);
+  }
+});
 
 renderMenu();
-revealOnScroll();
 watchTabs();
-$$('#mode button').forEach(b => b.classList.toggle('is-active', b.dataset.mode === mode));
-$('#addr-field').hidden = mode === 'pickup';
-renderBasket();
+setMode(mode);
+paint();

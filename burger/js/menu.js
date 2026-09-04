@@ -113,5 +113,46 @@ const TAGS = {
   new: { label: 'Новинка', cls: 'is-new' }
 };
 
-/* доставка */
-const DELIVERY = { price: 15, freeFrom: 100, minOrder: 40 };
+/* Зоны доставки. Цена зависит от района, за городом — по договорённости. */
+const ZONES = [
+  { id: 'center',     name: 'Центр, Айни, Рудаки',   price: 15 },
+  { id: 'sino',       name: 'Сино, Фирдавси',        price: 15 },
+  { id: 'shohmansur', name: 'Шохмансур, И. Сомони',  price: 20 },
+  { id: 'out',        name: 'За городом',            price: null }
+];
+
+const DELIVERY = {
+  freeFrom: 100,          // по городу бесплатно от этой суммы
+  minOrder: 40,           // меньше этого на доставку не возим
+  time: '30–40 минут',
+  pickup: 'ул. Айни 49'
+};
+
+/* Что можно убрать из блюда и что добавить за доплату. */
+const MODIFIERS = {
+  burgers: {
+    remove: ['Лук', 'Солёный огурец', 'Томат', 'Соус'],
+    add: [
+      { id: 'cheese', name: 'Дополнительный чеддер', price: 5 },
+      { id: 'patty',  name: 'Дополнительная котлета', price: 12 },
+      { id: 'bacon',  name: 'Бекон', price: 8 },
+      { id: 'jalap',  name: 'Халапеньо', price: 4 }
+    ]
+  },
+  snacks: {
+    remove: [],
+    add: [{ id: 'sauce-extra', name: 'Соус на выбор', price: 3 }]
+  }
+};
+
+/* Родительный падеж — чтобы в корзине было «без лука», а не «без лук». */
+const REMOVE_GEN = {
+  'Лук': 'лука',
+  'Солёный огурец': 'солёного огурца',
+  'Томат': 'томата',
+  'Соус': 'соуса'
+};
+
+const ADDON = id => Object.values(MODIFIERS)
+  .flatMap(m => m.add)
+  .find(a => a.id === id);
