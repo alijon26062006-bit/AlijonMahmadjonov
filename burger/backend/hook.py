@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Включить или выключить вебхук Telegram. Запускать один раз после установки.
+"""Включить или выключить вебхуки Telegram. Запускать один раз после установки.
 
-    python3 hook.py on     — сказать Telegram, куда слать нажатия курьеров
+Ботов два: курьерский и админский. Команда работает с обоими сразу.
+
+    python3 hook.py on     — сказать Telegram, куда слать нажатия
     python3 hook.py off    — отключить
     python3 hook.py info   — что сейчас настроено
 """
@@ -28,33 +30,45 @@ def env():
     return values
 
 
-def main():
-    what = sys.argv[1] if len(sys.argv) > 1 else 'info'
-    cfg = env()
-    token = cfg.get('TG_TOKEN', '')
-    if not token:
-        sys.exit('В .env не задан TG_TOKEN')
-
+def one(title, token, url, what):
     api = f'https://api.telegram.org/bot{token}'
 
     if what == 'on':
-        base = cfg.get('PUBLIC_URL', '').rstrip('/')
-        secret = cfg.get('TG_HOOK_SECRET', '')
-        if not base or not secret:
-            sys.exit('В .env нужны PUBLIC_URL и TG_HOOK_SECRET')
-        url = f'{base}/tg/{secret}'
         r = httpx.post(f'{api}/setWebhook',
                        json={'url': url, 'allowed_updates': ['message', 'callback_query'],
                              'drop_pending_updates': True}, timeout=15)
-        print(r.json().get('description', r.text))
-        print('Адрес вебхука:', url)
+        print(f"{title}: {r.json().get('description', r.text)}")
+        print(f'  адрес: {url}')
     elif what == 'off':
-        print(httpx.post(f'{api}/deleteWebhook', timeout=15).json().get('description'))
+        print(f"{title}: {httpx.post(f'{api}/deleteWebhook', timeout=15).json().get('description')}")
     else:
         info = httpx.get(f'{api}/getWebhookInfo', timeout=15).json().get('result', {})
-        print('Адрес:', info.get('url') or 'не задан')
+        print(f"{title}: {info.get('url') or 'вебхук не задан'}")
         if info.get('last_error_message'):
-            print('Последняя ошибка:', info['last_error_message'])
+            print('  последняя ошибка:', info['last_error_message'])
+
+
+def main():
+    what = sys.argv[1] if len(sys.argv) > 1 else 'info'
+    cfg = env()
+    base = cfg.get('PUBLIC_URL', '').rstrip('/')
+
+    bots = [('Бот курьеров', cfg.get('TG_TOKEN', ''),
+             f"{base}/tg/{cfg.get('TG_HOOK_SECRET', '')}"),
+            ('Бот админки', cfg.get('TG_ADMIN_TOKEN', ''),
+             f"{base}/tg/admin/{cfg.get('TG_ADMIN_HOOK_SECRET', '')}")]
+
+    if not any(token for _, token, _ in bots):
+        sys.exit('В .env не задан ни TG_TOKEN, ни TG_ADMIN_TOKEN')
+
+    if what == 'on' and not base:
+        sys.exit('В .env нужен PUBLIC_URL — иначе Telegram некуда стучаться')
+
+    for title, token, url in bots:
+        if not token:
+            print(f'{title}: токен не задан, пропускаю')
+            continue
+        one(title, token, url, what)
 
 
 if __name__ == '__main__':

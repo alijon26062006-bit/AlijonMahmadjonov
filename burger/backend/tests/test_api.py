@@ -240,9 +240,42 @@ def courier_link(chat_id, name, active=True):
 
 
 def test_courier_panel_needs_link(client):
-    assert client.get('/courier').status_code == 403
-    assert client.get('/courier?t=подделка').status_code == 403
+    """Без пропуска панель показывает не заказы, а объяснение, как войти."""
+    for url in ('/courier', '/courier?t=подделка'):
+        page = client.get(url)
+        assert page.status_code == 200
+        assert 'из бота' in page.text
+        assert 'Беру заказ' not in page.text
+
+    # данные закрыты в любом случае
     assert client.get('/api/courier/orders').status_code == 403
+    assert client.post('/api/courier/orders/1/take').status_code == 403
+
+
+def test_telegram_login_checks_the_signature(client):
+    """Панель пускает только по подписи Telegram, и только допущенных."""
+    import json, time
+    import notify, webapp
+
+    notify.TOKEN = '111:секрет-бота'
+    courier_link(701, 'Далер')
+    good = {'auth_date': int(time.time()),
+            'user': json.dumps({'id': 701, 'first_name': 'Далер'}, separators=(',', ':'))}
+
+    ok = client.post('/courier/tg-login', json={'initData': webapp.sign(good, notify.TOKEN)})
+    assert ok.status_code == 200 and 'burger_courier' in ok.cookies
+
+    # подпись чужим токеном — мимо
+    assert client.post('/courier/tg-login',
+                       json={'initData': webapp.sign(good, '999:чужой')}).status_code == 403
+
+    # подпись настоящая, но человек не курьер
+    stranger = {'auth_date': int(time.time()),
+                'user': json.dumps({'id': 702, 'first_name': 'Кто-то'}, separators=(',', ':'))}
+    assert client.post('/courier/tg-login',
+                       json={'initData': webapp.sign(stranger, notify.TOKEN)}).status_code == 403
+
+    notify.TOKEN = ''
 
 
 def test_courier_sees_ready_delivery_orders(client):
@@ -410,3 +443,65 @@ def test_dish_photo_is_not_claimed_without_a_file(client):
         con.execute("UPDATE dishes SET photo = id || '.jpg'")
     db.setup()
     assert all(not d['photo'] for d in db.dishes())
+
+
+def test_admin_opens_from_its_own_bot(client):
+    """Хозяин заходит в панель из своего бота — без пароля, но по подписи."""
+    import json, time
+    import app as app_module
+    import webapp
+
+    app_module.TG_ADMIN_TOKEN = '222:токен-админки'
+    app_module.ADMIN_TG_IDS = {'777'}
+
+    def data(user_id):
+        return {'auth_date': int(time.time()),
+                'user': json.dumps({'id': user_id, 'first_name': 'Хозяин'},
+                                   separators=(',', ':'))}
+
+    ok = client.post('/admin/tg-login',
+                     json={'initData': webapp.sign(data(777), app_module.TG_ADMIN_TOKEN)})
+    assert ok.status_code == 200
+    assert client.get('/admin', follow_redirects=False).status_code == 200
+
+    # чужой Telegram с настоящей подписью бота — всё равно мимо
+    client.cookies.clear()
+    assert client.post('/admin/tg-login',
+                       json={'initData': webapp.sign(data(123), app_module.TG_ADMIN_TOKEN)}
+                       ).status_code == 403
+    # подпись курьерского бота в админку не годится
+    assert client.post('/admin/tg-login',
+                       json={'initData': webapp.sign(data(777), '111:курьерский')}
+                       ).status_code == 403
+
+
+def test_admin_bot_hands_out_the_app_button(client):
+    import admin_bot
+    import app as app_module
+
+    app_module.TG_ADMIN_TOKEN = '222:токен-админки'
+    admin_bot.TOKEN = '222:токен-админки'
+    admin_bot.PUBLIC_URL = 'https://theburger.tj'
+
+    sent = []
+
+    async def catch(chat, text, keyboard=None, markup=None, token=None):
+        sent.append((str(chat), text, keyboard))
+        return 1
+
+    import notify
+    was, notify.send_to = notify.send_to, catch
+    try:
+        r = client.post(f'/tg/admin/{app_module.TG_ADMIN_HOOK}', json={'message': {
+            'chat': {'id': 777}, 'from': {'id': 777}, 'text': '/start'}})
+        assert r.status_code == 200
+    finally:
+        notify.send_to = was
+
+    assert sent, 'бот промолчал'
+    keys = sent[0][2]
+    app_button = keys[0][0]
+    assert app_button['web_app']['url'] == 'https://theburger.tj/admin'   # не ссылка в браузер
+
+    # чужой адрес вебхука никого не пускает
+    assert client.post('/tg/admin/чужой', json={}).status_code == 404

@@ -54,6 +54,7 @@ def chat_from_token(value):
 
 
 def panel_url(chat_id):
+    """Запасная ссылка: работает и вне Telegram, например с компьютера."""
     return f'{PUBLIC_URL}/courier?t={token(chat_id)}'
 
 
@@ -94,10 +95,15 @@ def taken_text(o, who):
     return f"Заказ №{o['number']} уже забрал {who}."
 
 
+def app_button(text='Открыть панель'):
+    """Кнопка открывает панель внутри Telegram, а не в постороннем браузере."""
+    return {'text': text, 'web_app': {'url': f'{PUBLIC_URL}/courier'}}
+
+
 def free_keys(o, chat_id):
     keys = [[{'text': '🛵 Беру заказ', 'callback_data': f"take:{o['id']}"}]]
     if PUBLIC_URL:
-        keys.append([{'text': 'Открыть панель', 'url': panel_url(chat_id)}])
+        keys.append([app_button()])
     return keys
 
 
@@ -193,7 +199,7 @@ async def remind_tick(now=None):
         keys = [[{'text': f"🛵 Беру №{o['number']}", 'callback_data': f"take:{o['id']}"}]
                 for o in free]
         if PUBLIC_URL:
-            keys.append([{'text': 'Открыть панель', 'url': panel_url(c['chat_id'])}])
+            keys.append([app_button()])
 
         mid = await notify.send_to(c['chat_id'], text, keys)
         if mid:
@@ -228,7 +234,7 @@ NOT_A_PHONE = 'Нажмите кнопку «📱 Отправить мой но
 
 
 def panel_keys(chat_id):
-    return [[{'text': '🛵 Открыть панель', 'url': panel_url(chat_id)}]] if PUBLIC_URL else None
+    return [[app_button('🛵 Открыть панель')]] if PUBLIC_URL else None
 
 
 def hello_ready(chat_id):

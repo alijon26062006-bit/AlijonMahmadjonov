@@ -245,6 +245,17 @@ code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
 .ok { color: var(--ok); }
 .danger { border-color: rgba(255,107,94,.4); }
 
+/* ── внутри Telegram ────────────────────────────────── */
+
+/* Telegram рисует свою шапку с названием и кнопкой «назад», наша вторая
+   лишняя: убираем её и отдаём место содержимому. Вкладки внизу оставляем —
+   без них между разделами не переключиться. */
+.in-tg .top { display: none; }
+.in-tg .wrap { margin-top: 14px; }
+.in-tg .find { top: 0; }
+.in-tg .tabbar { display: grid; padding-bottom: max(env(safe-area-inset-bottom), 10px); }
+.in-tg body { min-height: var(--tg-height, 100dvh); }
+
 /* ── нижние вкладки: только на телефоне ─────────────── */
 
 .tabbar { display: none; }
@@ -252,15 +263,18 @@ code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
 @media (max-width: 700px) {
   .tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-    display: grid; grid-template-columns: repeat(5, 1fr);
+    /* колонок столько, сколько разделов: добавится новый — сетка не сломается */
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
     background: var(--card); border-top: 1px solid var(--line);
     padding-bottom: env(safe-area-inset-bottom);
   }
   .tabbar a {
     display: grid; justify-items: center; gap: 3px;
     padding: 9px 2px 7px; min-height: var(--tap, 52px);
-    color: var(--muted); font-size: 11px; line-height: 1.1; text-align: center;
+    color: var(--muted); line-height: 1.1; text-align: center;
+    font-size: clamp(9px, 2.6vw, 11px);
   }
+  .tabbar span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tabbar svg {
     width: 22px; height: 22px; fill: none;
     stroke: currentColor; stroke-width: 1.9;

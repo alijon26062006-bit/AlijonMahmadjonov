@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Вход{% endblock %}
 {% block body %}
-<form class="card login" method="post" action="/admin/login">
+<div class="card login" id="tg-gate" hidden>
+  <h1>Вход в админку</h1>
+  <p class="empty" id="tg-say">Проверяю, кто вы…</p>
+</div>
+
+<form class="card login" method="post" action="/admin/login" id="by-password">
   <h1>Вход в админку</h1>
   {% if error %}<p class="err">Неверный пароль</p>{% endif %}
   <label>Пароль
@@ -9,4 +14,33 @@
   </label>
   <button class="btn" type="submit">Войти</button>
 </form>
+{% endblock %}
+
+{% block scripts %}
+{% if tg_login %}
+<script>
+/* Открыли панель из своего бота — пароль спрашивать незачем: Telegram уже
+   подтвердил, кто пришёл. Подпись проверяет сервер. */
+(async () => {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (!tg || !tg.initData) return;
+
+  document.querySelector('#by-password').hidden = true;
+  document.querySelector('#tg-gate').hidden = false;
+  const say = document.querySelector('#tg-say');
+
+  try {
+    const r = await fetch('/admin/tg-login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin', body: JSON.stringify({ initData: tg.initData }),
+    });
+    if (r.ok) { location.replace('/admin'); return; }
+    const body = await r.json().catch(() => ({}));
+    say.textContent = body.error || 'Telegram не подтвердил, кто вы.';
+  } catch (e) {
+    say.textContent = 'Нет связи с сервером. Попробуйте ещё раз.';
+  }
+})();
+</script>
+{% endif %}
 {% endblock %}

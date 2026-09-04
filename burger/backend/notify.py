@@ -51,14 +51,18 @@ def order_text(order, items, zone_name=''):
     return '\n'.join(lines)
 
 
-async def call(method, payload):
-    """Один вызов Telegram. Молча возвращает None, если бот не настроен или молчит."""
-    if not TOKEN:
-        log.warning('Telegram не настроен (TG_TOKEN пуст)')
+async def call(method, payload, token=None):
+    """Один вызов Telegram. Молча возвращает None, если бот не настроен или молчит.
+
+    token — чей это бот: курьерский по умолчанию, но админка живёт в своём.
+    """
+    token = token or TOKEN
+    if not token:
+        log.warning('Telegram не настроен (токен пуст)')
         return None
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.post(f'https://api.telegram.org/bot{TOKEN}/{method}', json=payload)
+            r = await client.post(f'https://api.telegram.org/bot{token}/{method}', json=payload)
             data = r.json()
         if not data.get('ok'):
             log.error('Telegram отказал (%s): %s', method, data.get('description'))
@@ -77,7 +81,7 @@ async def send(text):
     return await send_to(CHAT, text) is not None
 
 
-async def send_to(chat_id, text, keyboard=None, markup=None):
+async def send_to(chat_id, text, keyboard=None, markup=None, token=None):
     """Сообщение конкретному человеку. Возвращает id сообщения.
 
     keyboard — кнопки под сообщением, markup — целиком своя клавиатура
@@ -88,19 +92,20 @@ async def send_to(chat_id, text, keyboard=None, markup=None):
         payload['reply_markup'] = markup
     elif keyboard:
         payload['reply_markup'] = {'inline_keyboard': keyboard}
-    res = await call('sendMessage', payload)
+    res = await call('sendMessage', payload, token)
     return res.get('message_id') if res else None
 
 
-async def edit(chat_id, message_id, text, keyboard=None):
+async def edit(chat_id, message_id, text, keyboard=None, token=None):
     """Переписать уже отправленное сообщение — так заказ «исчезает» у остальных."""
     payload = {'chat_id': str(chat_id), 'message_id': message_id, 'text': text,
                'disable_web_page_preview': True}
     payload['reply_markup'] = {'inline_keyboard': keyboard or []}
-    return await call('editMessageText', payload) is not None
+    return await call('editMessageText', payload, token) is not None
 
 
-async def answer(callback_id, text='', alert=False):
-    """Ответ на нажатие кнопки — всплывашка у курьера."""
+async def answer(callback_id, text='', alert=False, token=None):
+    """Ответ на нажатие кнопки — всплывашка у того, кто нажал."""
     return await call('answerCallbackQuery',
-                      {'callback_query_id': callback_id, 'text': text, 'show_alert': alert})
+                      {'callback_query_id': callback_id, 'text': text, 'show_alert': alert},
+                      token)

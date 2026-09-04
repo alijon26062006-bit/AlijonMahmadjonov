@@ -27,9 +27,9 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from pydantic import BaseModel, Field, field_validator
 
 try:
-    from . import courier, db, notify
+    from . import admin_bot, courier, db, notify, webapp
 except ImportError:
-    import courier, db, notify
+    import admin_bot, courier, db, notify, webapp
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 log = logging.getLogger('burger')
@@ -57,6 +57,14 @@ courier.use_key(SECRET_KEY)
 # адрес вебхука знает только Telegram — иначе кто угодно пришлёт «нажатие кнопки»
 TG_HOOK = os.getenv('TG_HOOK_SECRET', '') or secrets.token_hex(8)
 
+# Админка живёт в отдельном боте: у хозяина свой вход, у курьеров свой.
+# Если второй токен не задан, админка работает по паролю, как раньше.
+TG_ADMIN_TOKEN = os.getenv('TG_ADMIN_TOKEN', '')
+TG_ADMIN_HOOK = os.getenv('TG_ADMIN_HOOK_SECRET', '') or secrets.token_hex(8)
+ADMIN_TG_IDS = {i.strip() for i in os.getenv('ADMIN_TG_IDS', '').split(',') if i.strip()}
+if not ADMIN_TG_IDS and os.getenv('TG_ADMIN_CHAT'):
+    ADMIN_TG_IDS = {os.getenv('TG_ADMIN_CHAT').strip()}
+
 app = FastAPI(title='The Burger', docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_methods=['GET', 'POST'],
                    allow_headers=['Content-Type'])
@@ -83,6 +91,15 @@ if db.seed_if_empty():
 
 
 # ── вход в админку ──────────────────────────────────────
+
+def cookie_rules(request: Request):
+    """Внутри Telegram страница живёт в чужой рамке, и обычная кука туда не дойдёт:
+    нужна SameSite=None, а её браузеры принимают только по HTTPS. На своей машине
+    без HTTPS остаёмся на lax — иначе вход просто не сохранится."""
+    https = request.url.scheme == 'https' or \
+        request.headers.get('x-forwarded-proto', '') == 'https'
+    return {'samesite': 'none', 'secure': True} if https else {'samesite': 'lax'}
+
 
 def valid_date(value):
     """Дата из адресной строки. Мусор молча игнорируем — покажем период по умолчанию."""
@@ -317,13 +334,30 @@ async def telegram_hook(secret: str, request: Request):
     return await courier.handle_update(update)
 
 
+@app.post('/tg/admin/{secret}')
+async def telegram_admin_hook(secret: str, request: Request):
+    """Вебхук второго бота — того, через который хозяин заходит в панель."""
+    if not TG_ADMIN_TOKEN:
+        raise HTTPException(404, 'Не найдено')
+    if not secrets.compare_digest(secret.encode(), TG_ADMIN_HOOK.encode()):
+        raise HTTPException(404, 'Не найдено')
+    try:
+        update = await request.json()
+    except Exception:
+        raise HTTPException(400, 'Не разобрал запрос')
+    return await admin_bot.handle_update(update)
+
+
 @app.get('/courier', response_class=HTMLResponse)
 def courier_panel(request: Request, t: str = ''):
-    c = require_courier(request, t)
+    c = current_courier(request, t)
+    if not c:
+        # открыли внутри Telegram — страница сама представится и вернётся сюда
+        return templates.TemplateResponse(request, 'courier-login.html', {})
     resp = templates.TemplateResponse(request, 'courier.html', {'courier': c})
     if t:
-        resp.set_cookie('burger_courier', t, httponly=True, samesite='lax',
-                        max_age=courier.TOKEN_AGE)
+        resp.set_cookie('burger_courier', t, httponly=True,
+                        max_age=courier.TOKEN_AGE, **cookie_rules(request))
     return resp
 
 
@@ -432,7 +466,8 @@ async def start_reminders():
 
 @app.get('/admin/login', response_class=HTMLResponse)
 def login_form(request: Request, error: str = ''):
-    return templates.TemplateResponse(request, 'login.html', {'error': error})
+    return templates.TemplateResponse(request, 'login.html',
+                                      {'error': error, 'tg_login': bool(TG_ADMIN_TOKEN)})
 
 
 @app.post('/admin/login')
@@ -441,7 +476,47 @@ def login(request: Request, password: str = Form('')):
         return RedirectResponse('/admin/login?error=1', status_code=303)
     resp = RedirectResponse('/admin', status_code=303)
     resp.set_cookie('burger_admin', signer.dumps('ok'), httponly=True,
-                    samesite='lax', max_age=7 * 24 * 3600)
+                    max_age=7 * 24 * 3600, **cookie_rules(request))
+    return resp
+
+
+@app.post('/admin/tg-login')
+async def tg_login(request: Request):
+    """Вход из Telegram: страница отдаёт подписанную строку, мы её проверяем."""
+    if not TG_ADMIN_TOKEN:
+        raise HTTPException(400, 'Бот админки не настроен')
+
+    body = await request.json() if request.headers.get('content-type', '').startswith('application/json') \
+        else dict(await request.form())
+    user = webapp.check(body.get('initData', ''), TG_ADMIN_TOKEN)
+    if not user:
+        raise HTTPException(403, 'Telegram не подтвердил, кто вы')
+
+    if ADMIN_TG_IDS and str(user['id']) not in ADMIN_TG_IDS:
+        log.warning('в админку ломится Telegram-пользователь %s', user['id'])
+        raise HTTPException(403, 'Эта админка не для вас')
+
+    resp = JSONResponse({'ok': True, 'name': user.get('first_name', '')})
+    resp.set_cookie('burger_admin', signer.dumps(f"tg:{user['id']}"), httponly=True,
+                    max_age=7 * 24 * 3600, **cookie_rules(request))
+    return resp
+
+
+@app.post('/courier/tg-login')
+async def courier_tg_login(request: Request):
+    """То же самое для курьера: панель открывается прямо в его боте."""
+    body = await request.json()
+    user = webapp.check(body.get('initData', ''), notify.TOKEN)
+    if not user:
+        raise HTTPException(403, 'Telegram не подтвердил, кто вы')
+
+    c = db.courier(user['id'])
+    if not c or not c['active']:
+        raise HTTPException(403, 'Вас ещё не допустили к заказам')
+
+    resp = JSONResponse({'ok': True, 'name': c['name']})
+    resp.set_cookie('burger_courier', courier.token(user['id']), httponly=True,
+                    max_age=courier.TOKEN_AGE, **cookie_rules(request))
     return resp
 
 

@@ -45,13 +45,17 @@ if [ -n "$CLEAN" ]; then
   rm -rf "$APP_DIR"
 fi
 
-# Токен можно не передавать в командной строке — спросим и не оставим в истории.
+ADMIN_BOT=${ARGS[3]:-${TG_ADMIN_TOKEN:-}}
+
+# Токены можно не передавать в командной строке — спросим и не оставим в истории.
 if [ -z "$BOT" ] && [ -e /dev/tty ]; then
-  printf '\nТокен бота у @BotFather (Enter — настроить позже): '
+  printf '\nТокен бота КУРЬЕРОВ у @BotFather (Enter — настроить позже): '
   read -r BOT < /dev/tty || BOT=''
   if [ -n "$BOT" ]; then
     printf 'Ваш id у @userinfobot — куда слать заказы: '
     read -r CHAT < /dev/tty || CHAT=''
+    printf 'Токен второго бота, для АДМИНКИ (Enter — пропустить): '
+    read -r ADMIN_BOT < /dev/tty || ADMIN_BOT=''
   fi
 fi
 
@@ -90,8 +94,10 @@ ADMIN_PASSWORD=$ADMIN_PASS
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 TG_TOKEN=
 TG_ADMIN_CHAT=
+TG_ADMIN_TOKEN=
 PUBLIC_URL=https://$DOMAIN
 TG_HOOK_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(8))")
+TG_ADMIN_HOOK_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(8))")
 ALLOWED_ORIGINS=https://$DOMAIN
 ORDER_COOLDOWN=20
 ENV
@@ -109,6 +115,13 @@ if [ -n "$BOT" ]; then
 fi
 if [ -n "$CHAT" ]; then
   sed -i "s|^TG_ADMIN_CHAT=.*|TG_ADMIN_CHAT=$CHAT|" "$BACKEND/.env"
+fi
+if [ -n "$ADMIN_BOT" ]; then
+  # в базах, поставленных до второго бота, этих строк ещё нет
+  grep -q '^TG_ADMIN_TOKEN=' "$BACKEND/.env" || echo 'TG_ADMIN_TOKEN=' >> "$BACKEND/.env"
+  grep -q '^TG_ADMIN_HOOK_SECRET=' "$BACKEND/.env" || \
+    echo "TG_ADMIN_HOOK_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(8))')" >> "$BACKEND/.env"
+  sed -i "s|^TG_ADMIN_TOKEN=.*|TG_ADMIN_TOKEN=$ADMIN_BOT|" "$BACKEND/.env"
 fi
 
 say "Служба systemd"
@@ -178,8 +191,8 @@ else
   exit 1
 fi
 
-if grep -q '^TG_TOKEN=.\+' "$BACKEND/.env"; then
-  say "Включаем бота курьеров"
+if grep -qE '^TG_(ADMIN_)?TOKEN=.+' "$BACKEND/.env"; then
+  say "Включаем ботов"
   (cd "$BACKEND" && "$BACKEND/.venv/bin/python" hook.py on) || \
     echo "Вебхук не включился. Проверьте домен и повторите: cd $BACKEND && .venv/bin/python hook.py on"
   BOT_READY=1
@@ -192,11 +205,14 @@ cat <<DONE
 Проверьте, что A-запись домена (и www) указывает на этот сервер —
 без неё Caddy не получит сертификат, и сайт откроется только по IP.
 
-${BOT_READY:+Бот включён. Курьер жмёт «Старт» у бота и появляется на
-https://$DOMAIN/admin/couriers — нажмите «Допустить», и заказы пойдут ему в чат.}
-${BOT_READY:-Бот пока не настроен. Когда будет токен у @BotFather:
+${BOT_READY:+Боты включены.
+— Админка открывается прямо в Telegram: напишите боту админки «Старт»
+  и нажмите «Открыть админку».
+— Курьер жмёт «Старт» у бота курьеров, отправляет номер и имя, а вы
+  нажимаете «Допустить» — в чате или на https://$DOMAIN/admin/couriers.}
+${BOT_READY:-Боты пока не настроены. Когда будут токены у @BotFather:
 
-     sudo bash deploy.sh $DOMAIN ТОКЕН ВАШ_ID
+     bash deploy.sh $DOMAIN ТОКЕН_КУРЬЕРОВ ВАШ_ID ТОКЕН_АДМИНКИ
 }
 ${NEW_PASS:+Пароль в админку: $NEW_PASS  (сохраните, второй раз не покажу)}
 

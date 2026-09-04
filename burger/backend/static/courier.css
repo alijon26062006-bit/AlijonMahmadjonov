@@ -60,6 +60,15 @@ a { color: inherit; }
 .btn.ghost { background: none; border-color: var(--line); color: var(--text); }
 .btn[disabled] { opacity: .5; }
 
+/* Внутри Telegram своя шапка уже есть — нашу делаем тоньше, без часов. */
+.in-tg .bar { position: static; padding-top: 10px; border-bottom: 0; background: none; }
+.in-tg .bar .clock { display: none; }
+.in-tg .wrap { margin-top: 4px; }
+
+.gate { display: grid; align-content: center; min-height: 70vh; text-align: center; gap: 10px; }
+.gate__title { font-size: 22px; margin: 0; }
+.gate__text { color: var(--muted); margin: 0; line-height: 1.5; }
+
 .drop {
   display: block; width: 100%; margin-top: 8px; padding: 10px;
   border: 0; background: none; color: var(--muted);
