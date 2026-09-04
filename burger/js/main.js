@@ -145,13 +145,32 @@ const sectionNote = s => {
 
 const camera = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3 7.2 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9Zm3 5.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Zm0 2a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/></svg>`;
 
-/* Фото может не быть — тогда остаётся аккуратное место под него. */
+/* Фото может не быть — тогда остаётся аккуратное место под него.
+
+   Битую картинку не просим второй раз: на слабом интернете сотня напрасных
+   запросов заметно тормозит страницу. С сервером и просить не надо — он сам
+   говорит, у какого блюда фото есть. */
+
+let noPhoto = new Set();
+try { noPhoto = new Set(JSON.parse(localStorage.getItem('burger_no_photo') || '[]')); } catch (e) {}
+
+const hasPhoto = d => (server ? !!d.photo : !noPhoto.has(d.id));
+
+const shot = (d, alt, w, h) => hasPhoto(d)
+  ? `<img src="${photoUrl(d)}" alt="${alt}" width="${w}" height="${h}" loading="lazy" decoding="async" data-dish="${d.id}">`
+  : camera;
+
 function watchPhoto(img) {
   const fail = () => {
     const box = img.parentElement;
+    const id = img.dataset.dish;
     img.remove();
     box.classList.add('shot--empty');
     box.insertAdjacentHTML('beforeend', camera);
+    if (id) {
+      noPhoto.add(id);
+      try { localStorage.setItem('burger_no_photo', JSON.stringify([...noPhoto])); } catch (e) {}
+    }
   };
   if (img.complete && !img.naturalWidth) fail();
   else img.addEventListener('error', fail, { once: true });
@@ -175,8 +194,8 @@ const priceHtml = d => `<span class="price">${som(d.price)}${d.oldPrice ? `<s>${
 function dishCard(d) {
   return `
   <article class="dish" data-open="${d.id}">
-    <div class="shot">
-      <img src="${photoUrl(d)}" alt="${d.name}" width="1216" height="760" loading="lazy">
+    <div class="shot${hasPhoto(d) ? '' : ' shot--empty'}">
+      ${shot(d, d.name, 1216, 760)}
       <div class="badges">${badge(d.tag)}</div>
     </div>
     <div class="dish__body">
@@ -254,8 +273,8 @@ function openDish(id) {
   ].filter(Boolean).join('');
 
   $('#dish-body').innerHTML = `
-    <div class="ds-shot shot">
-      <img src="${photoUrl(d)}" alt="${d.name}" width="1216" height="760">
+    <div class="ds-shot shot${hasPhoto(d) ? '' : ' shot--empty'}">
+      ${shot(d, d.name, 1216, 760)}
     </div>
     <h2 class="ds-name" id="dish-name">${d.name}</h2>
     ${d.about ? `<p class="ds-about">${d.about}</p>` : ''}
@@ -357,8 +376,8 @@ function renderCart() {
     const opts = lineTitle(line);
     return `
     <div class="cart-line" data-key="${key}">
-      <div class="cart-line__shot shot">
-        <img src="${photoUrl(d)}" alt="" width="128" height="128" loading="lazy">
+      <div class="cart-line__shot shot${hasPhoto(d) ? '' : ' shot--empty'}">
+        ${shot(d, '', 128, 128)}
       </div>
       <div class="cart-line__name">
         <b>${d.name}</b>
@@ -626,8 +645,21 @@ async function finish(f, err) {
     paint();
     openSheet('#done-sheet');
   } catch (e) {
-    err.textContent = e.message;
-    err.hidden = false;
+    if (e.message === 'ПОТОМ') {
+      // заказ уже отложен: показываем спокойный экран, а не ошибку
+      const no = nextOrderNo();
+      $('#done-number').textContent = `№${no}`;
+      $('#done-text').textContent =
+        'Связь пропала, но заказ сохранён — отправим его сами, как только интернет вернётся. '
+        + `Если спешите, позвоните: ${PHONE_MAIN}`;
+      cart = {};
+      save();
+      paint();
+      openSheet('#done-sheet');
+    } else {
+      err.textContent = e.message;
+      err.hidden = false;
+    }
   } finally {
     btn.disabled = false;
   }
@@ -687,20 +719,64 @@ async function sendOrder(f) {
     remove: l.remove.map(r => REMOVE_GEN[r] || r.toLowerCase()),
   }));
 
-  const res = await fetch(url('/api/orders'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      items, mode, zone,
-      name: f.name.value.trim(), phone: f.phone.value.trim(),
-      address: f.address.value.trim(), flat: f.flat.value.trim(),
-      landmark: f.landmark.value.trim(), note: f.note.value.trim(),
-    }),
-  });
+  const order = {
+    items, mode, zone,
+    name: f.name.value.trim(), phone: f.phone.value.trim(),
+    address: f.address.value.trim(), flat: f.flat.value.trim(),
+    landmark: f.landmark.value.trim(), note: f.note.value.trim(),
+  };
+
+  let res;
+  try {
+    res = await fetch(url('/api/orders'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(order),
+    });
+  } catch (e) {
+    // связь пропала на самой отправке — заказ не теряем, отложим до сети
+    keepForLater(order);
+    throw new Error('ПОТОМ');
+  }
 
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || 'Заказ не прошёл. Позвоните нам, пожалуйста.');
   return body;
+}
+
+/* ── заказ на слабой связи ──────────────────────────── */
+
+/* Связь может пропасть в подъезде или в лифте. Заказ, который человек уже
+   собрал, выбрасывать нельзя: кладём его и отправляем, как только сеть вернётся.
+   Повторяем только после обрыва связи — если сервер ответил отказом, значит
+   он заказ видел, и слать второй раз нельзя. */
+
+const LATER = 'burger_order_later';
+
+function keepForLater(order) {
+  try { localStorage.setItem(LATER, JSON.stringify({ order, at: Date.now() })); } catch (e) {}
+}
+
+async function sendKept() {
+  let kept;
+  try { kept = JSON.parse(localStorage.getItem(LATER) || 'null'); } catch (e) { return; }
+  if (!kept || !server) return;
+
+  // заказ старше суток отправлять поздно — кухня уже закрылась
+  if (Date.now() - kept.at > 24 * 3600 * 1000) { localStorage.removeItem(LATER); return; }
+
+  try {
+    const res = await fetch(url('/api/orders'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(kept.order),
+    });
+    const body = await res.json().catch(() => ({}));
+    localStorage.removeItem(LATER);        // ответил сервер — второй раз не шлём
+    if (res.ok) snack(`Отложенный заказ №${body.number} ушёл на кухню`);
+  } catch (e) {
+    /* сети всё ещё нет — попробуем при следующем возвращении связи */
+  }
 }
 
 /* ── вкладки разделов ───────────────────────────────── */
@@ -856,3 +932,37 @@ async function start() {
 }
 
 start();
+
+/* ── работа без интернета ───────────────────────────── */
+
+/* Кэш держит service worker: со второго раза сайт открывается из памяти
+   телефона за долю секунды и показывает меню даже без связи. */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .catch(e => console.warn('кэш не включился:', e.message));
+  });
+}
+
+/* Связь вернулась — досылаем то, что не ушло. */
+addEventListener('online', sendKept);
+setTimeout(sendKept, 2500);        // и один раз после загрузки, вдруг лежало со вчера
+
+/* Кнопка «поставить на телефон» показывается, только когда браузер
+   действительно готов установить сайт как приложение. */
+let installer = null;
+addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installer = e;
+  $('#install').hidden = false;
+});
+
+$('#install').addEventListener('click', async () => {
+  if (!installer) return;
+  $('#install').hidden = true;
+  installer.prompt();
+  await installer.userChoice;
+  installer = null;
+});
+
+addEventListener('appinstalled', () => { $('#install').hidden = true; });

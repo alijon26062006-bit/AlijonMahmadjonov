@@ -460,6 +460,7 @@ svg { fill: currentColor; }
 .foot { padding: var(--s6) 0 calc(var(--s6) + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line-soft); }
 .foot__row { display: grid; gap: var(--s3); color: var(--muted); font-size: var(--t-meta); }
 .foot__copy { color: #8f877d; font-size: var(--t-small); }
+.foot__install { justify-self: start; min-height: var(--tap); font-size: 14px; }
 
 /* ── нижняя панель корзины ──────────────────────────── */
 
