@@ -331,3 +331,16 @@ def test_start_in_bot_adds_courier_but_not_to_shift(client):
     c = db.courier(555)
     assert c['name'] == 'Далер С.'
     assert c['active'] == 0        # пока хозяин не допустит — заказов не увидит
+
+
+def test_dish_photo_is_not_claimed_without_a_file(client):
+    """Блюдо без загруженного фото не должно на него ссылаться: браузер
+    просил бы картинку у каждого блюда и каждый раз получал отказ."""
+    import db
+    assert all(not d['photo'] for d in db.dishes())
+
+    # старая база, где фото приписано всем: setup() чинит её сам
+    with db.connect() as con:
+        con.execute("UPDATE dishes SET photo = id || '.jpg'")
+    db.setup()
+    assert all(not d['photo'] for d in db.dishes())

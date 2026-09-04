@@ -146,6 +146,13 @@ function clock() {
     { hour: '2-digit', minute: '2-digit' });
 }
 
+/* Оболочка панели живёт в кэше: в подъезде и в лифте экран всё равно откроется,
+   а заказы всегда берутся с сервера. */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .catch(e => console.warn('кэш панели не включился:', e.message));
+}
+
 clock();
 setInterval(clock, 20000);
 load();

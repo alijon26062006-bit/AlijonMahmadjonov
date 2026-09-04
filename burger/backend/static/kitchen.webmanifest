@@ -1,0 +1,13 @@
+{
+  "name": "Кухня · The Burger",
+  "short_name": "Кухня",
+  "description": "Экран заказов для кухни",
+  "start_url": "/kitchen",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0c0b0a",
+  "theme_color": "#0c0b0a",
+  "lang": "ru",
+  "icons": [{ "src": "/static/icon-kitchen.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

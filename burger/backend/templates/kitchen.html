@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Кухня · The Burger</title>
 <meta name="theme-color" content="#0c0b0a">
+<link rel="icon" href="/static/icon-kitchen.svg">
+<link rel="manifest" href="/static/kitchen.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="/static/kitchen.css">
 </head>
 <body>
@@ -16,6 +19,11 @@
   <button class="mute" id="mute" type="button" aria-pressed="false">Звук вкл</button>
   <a class="back" href="/admin">Заказы</a>
 </header>
+
+<p class="lost" id="lost" hidden>
+  Нет связи с сервером. На экране заказы по состоянию на <b id="lost-time">--:--</b> —
+  новые могли не дойти. Проверьте интернет.
+</p>
 
 <button class="unlock" id="unlock" hidden>
   Нажмите, чтобы включить звук — браузер держит его выключенным до первого касания

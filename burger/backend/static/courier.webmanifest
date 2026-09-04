@@ -1,0 +1,12 @@
+{
+  "name": "Курьер · The Burger",
+  "short_name": "Курьер",
+  "description": "Заказы на доставку",
+  "start_url": "/courier",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0c0b0a",
+  "theme_color": "#0c0b0a",
+  "lang": "ru",
+  "icons": [{ "src": "/static/icon-courier.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

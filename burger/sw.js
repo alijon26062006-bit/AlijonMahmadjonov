@@ -75,8 +75,16 @@ self.addEventListener('fetch', e => {
   const url = new URL(request.url);
   if (url.origin !== location.origin) return;        // чужие адреса не трогаем
 
-  // админка, кухня, курьеры — всегда живые данные
-  if (/^\/(admin|kitchen|courier|tg|static)/.test(url.pathname)) return;
+  // админка, кухня, курьеры, бот — всегда живьём, кэш тут только навредит
+  if (/^\/(admin|kitchen|courier|tg)/.test(url.pathname)) return;
+
+  /* Оболочка рабочих панелей (стили, скрипты, иконки). Планшет на кухне и
+     телефон курьера в подъезде поднимут экран даже на моргающем wi-fi —
+     а сами заказы всё равно придут только с сервера. */
+  if (url.pathname.startsWith('/static/')) {
+    e.respondWith(freshOrSaved(request, SHELL));
+    return;
+  }
 
   if (url.pathname.endsWith('/api/menu')) {
     e.respondWith(freshOrSaved(request, DATA));

@@ -6,13 +6,36 @@
   <a class="btn" href="/admin/dish/new">Добавить блюдо</a>
 </div>
 
+<label class="find">
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/>
+  </svg>
+  <input id="find" type="search" placeholder="Найти блюдо — начните печатать"
+         autocomplete="off" aria-label="Поиск по меню">
+</label>
+<p class="empty" id="nothing" hidden>Ничего не нашлось</p>
+
 {% for s in sections %}
-<section class="card">
-  <h2>{{ s.title }} <small>{{ by_section.get(s.id, [])|length }}</small></h2>
+{% set dishes = by_section.get(s.id, []) %}
+<section class="card sec" data-section>
+  <button class="sec__head" type="button" aria-expanded="true">
+    <span>{{ s.title }} <small>{{ dishes|length }}</small></span>
+    <svg class="sec__arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
+
   <ul class="list">
-    {% for d in by_section.get(s.id, []) %}
-    <li class="{{ '' if d.active else 'off' }}">
-      <img src="/uploads/{{ d.photo }}" alt="" onerror="this.style.visibility='hidden'">
+    {% for d in dishes %}
+    <li class="{{ '' if d.active else 'off' }}" data-name="{{ d.name|lower }} {{ d.about|lower }}">
+      {% if d.photo %}
+        <img src="/uploads/{{ d.photo }}" alt="" loading="lazy"
+             onerror="this.style.visibility='hidden'">
+      {% else %}
+        <span class="nophoto" title="Фото не загружено" aria-label="Фото нет">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3 7.2 5H4a2 2 0 0 0-2 2v12a2
+            2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9Zm3 5.5a5.5 5.5 0 1 1 0 11
+            5.5 5.5 0 0 1 0-11Zm0 2a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/></svg>
+        </span>
+      {% endif %}
       <span class="name">{{ d.name }}{% if not d.active %} <small>нет в наличии</small>{% endif %}
         <small>{{ d.about }}</small></span>
       <b>{{ d.price }} сомони</b>
@@ -25,3 +48,5 @@
 </section>
 {% endfor %}
 {% endblock %}
+
+{% block scripts %}<script src="/static/admin.js"></script>{% endblock %}

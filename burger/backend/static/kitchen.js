@@ -112,13 +112,42 @@ function ticket(o) {
   </article>`;
 }
 
+/* Связь на кухне рвётся: планшет у вытяжки, wi-fi далеко. Старые заказы
+   оставляем на экране — но говорим об этом вслух, иначе повар будет думать,
+   что новых просто нет, а они копятся на сервере. */
+
+let lost = 0;               // сколько опросов подряд не дошло
+let lastOk = Date.now();
+let lostAlarm = null;
+
+function connection(ok) {
+  if (ok) {
+    lost = 0;
+    lastOk = Date.now();
+    clearInterval(lostAlarm);
+    lostAlarm = null;
+    $('#lost').hidden = true;
+    return;
+  }
+
+  lost += 1;
+  if (lost < 2) return;     // одиночный сбой — не пугаем
+
+  const at = new Date(lastOk);
+  $('#lost-time').textContent =
+    `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+  $('#lost').hidden = false;
+  if (!lostAlarm) lostAlarm = setInterval(alarm, 60000);   // раз в минуту, пока не вернётся
+}
+
 async function refresh() {
   try {
     const res = await fetch('/api/kitchen', { cache: 'no-store' });
     if (res.status === 303 || res.redirected) { location.href = '/admin/login'; return; }
-    if (!res.ok) return;
+    if (!res.ok) { connection(false); return; }
 
     const { orders } = await res.json();
+    connection(true);
 
     // звеним, только когда появился заказ, которого раньше не было
     const fresh = orders.filter(o => !known.has(o.number));
@@ -131,7 +160,7 @@ async function refresh() {
     $('#empty').hidden = orders.length > 0;
     $('#count').textContent = `${orders.length} ${plural(orders.length)}`;
   } catch (e) {
-    // связь пропала — оставляем на экране то, что было
+    connection(false);      // связь пропала — оставляем на экране то, что было
   }
 }
 
@@ -185,6 +214,13 @@ $('#unlock').addEventListener('click', () => {
 });
 
 document.addEventListener('pointerdown', checkSound, { once: true });
+
+/* Оболочка панели живёт в кэше: планшет поднимет экран даже на моргающем
+   wi-fi, а заказы всё равно берутся только с сервера. */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .catch(e => console.warn('кэш панели не включился:', e.message));
+}
 
 tick();
 checkSound();

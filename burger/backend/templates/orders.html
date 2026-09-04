@@ -46,10 +46,27 @@
     {% if o.courier_name %}<br>Курьер: {{ o.courier_name }}{% endif %}
   </p>
 
-  <form class="row" method="post" action="/admin/orders/{{ o.id }}/status">
-    {% for key, label in status_ru.items() %}
-      <button class="btn small {{ 'ghost' if o.status != key }}" name="status" value="{{ key }}">{{ label }}</button>
-    {% endfor %}
+  {# обычный ход заказа — одна большая кнопка; всё остальное убрано под «Другой статус» #}
+  {% set next_step = {'new': 'confirmed', 'confirmed': 'cooking', 'cooking': 'done',
+                      'done': 'on_way', 'on_way': 'delivered'}.get(o.status) %}
+  {% set next_ru = {'confirmed': 'Подтвердить', 'cooking': 'Отдать на кухню',
+                    'done': 'Готов', 'on_way': 'Отдать курьеру', 'delivered': 'Доставлен'} %}
+
+  <form class="steps-form" method="post" action="/admin/orders/{{ o.id }}/status">
+    {% if next_step %}
+      <button class="btn btn--wide" name="status" value="{{ next_step }}">{{ next_ru[next_step] }}</button>
+    {% endif %}
+
+    <details class="more">
+      <summary>Другой статус</summary>
+      <div class="row">
+        {% for key, label in status_ru.items() %}
+          {% if key != o.status and key != next_step %}
+            <button class="btn small ghost" name="status" value="{{ key }}">{{ label }}</button>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </details>
   </form>
 </article>
 {% endfor %}

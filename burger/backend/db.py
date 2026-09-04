@@ -137,6 +137,13 @@ def setup():
             if col not in cols:
                 con.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
 
+        # раньше блюду приписывалось фото, которого нет на диске: браузер просил
+        # его у каждого блюда и каждый раз получал отказ. Чиним такие записи.
+        photos = Path(__file__).parent / 'uploads'
+        for r in con.execute("SELECT id, photo FROM dishes WHERE photo <> ''"):
+            if not (photos / r['photo']).exists():
+                con.execute('UPDATE dishes SET photo = %s WHERE id = ?' % "''", (r['id'],))
+
 
 def seed_if_empty():
     """Первый запуск: переносим меню из seed_data.py. Повторно не трогаем."""
@@ -163,7 +170,7 @@ def seed_if_empty():
                 (d['id'], d['section'], d['name'], d.get('about', ''), d.get('weight', 0),
                  d.get('kcal', 0), d.get('cook', ''), d['price'], d.get('oldPrice'),
                  d.get('tag', ''), json.dumps(d.get('parts', []), ensure_ascii=False),
-                 f"{d['id']}.jpg", i))
+                 '', i))          # фото появится, когда его загрузят в админке
 
         for i, a in enumerate(sd.ADDONS):
             con.execute('INSERT OR REPLACE INTO addons (id, section, name, price, position) VALUES (?,?,?,?,?)',

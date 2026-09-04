@@ -51,6 +51,26 @@ small { color: var(--muted); font-weight: 400; }
 .btn:hover { filter: brightness(1.08); }
 
 .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.fold > summary { list-style: none; cursor: pointer; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary h2 { display: inline; }
+.fold > summary::after { content: ' ▾'; color: var(--muted); }
+.fold[open] > summary::after { content: ' ▴'; }
+.fold > summary small { display: block; margin-top: 4px; }
+.fold[open] > summary { margin-bottom: 8px; }
+
+.steps-form { display: grid; gap: 10px; }
+.btn--wide { width: 100%; }
+
+.more summary {
+  display: inline-block; padding: 8px 0;
+  color: var(--muted); font-size: 14px; cursor: pointer; list-style: none;
+}
+.more summary::-webkit-details-marker { display: none; }
+.more summary::before { content: '· · ·  '; letter-spacing: .1em; }
+.more[open] summary::before { content: '×  '; }
+.more .row { padding-top: 4px; }
+
 .crow {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line);
@@ -93,6 +113,47 @@ code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
 }
 .chips a.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
+/* ── поиск и сворачивание разделов ──────────────────── */
+
+.find {
+  position: sticky; top: 60px; z-index: 5;
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px; padding: 0 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+}
+.find svg {
+  width: 18px; height: 18px; flex: none; fill: none;
+  stroke: var(--muted); stroke-width: 2; stroke-linecap: round;
+}
+.find input {
+  flex: 1; min-height: 48px; padding: 0; border: 0;
+  background: none; color: var(--text); font: inherit; font-size: 16px;
+}
+.find input:focus { outline: none; }
+.find input::-webkit-search-cancel-button { filter: invert(.6); }
+
+.sec__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; margin: -4px 0 10px; padding: 0;
+  border: 0; background: none; color: var(--text);
+  font: inherit; font-size: 19px; font-weight: 700; text-align: left; cursor: pointer;
+}
+.sec__arrow {
+  width: 20px; height: 20px; flex: none; fill: none;
+  stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .18s ease;
+}
+.sec.is-shut .sec__arrow { transform: rotate(-90deg); }
+.sec.is-shut .list { display: none; }
+.sec.is-shut .sec__head { margin-bottom: 0; }
+
+.nophoto {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 8px;
+  background: var(--bg);
+}
+.nophoto svg { width: 20px; height: 20px; fill: var(--muted); opacity: .55; }
+
 .list { list-style: none; margin: 0; padding: 0; }
 .list li {
   display: grid; grid-template-columns: 44px 1fr auto auto;
@@ -133,13 +194,45 @@ code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
 .ok { color: var(--ok); }
 .danger { border-color: rgba(255,107,94,.4); }
 
+/* ── нижние вкладки: только на телефоне ─────────────── */
+
+.tabbar { display: none; }
+
+@media (max-width: 700px) {
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    background: var(--card); border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar a {
+    display: grid; justify-items: center; gap: 3px;
+    padding: 9px 2px 7px; min-height: var(--tap, 52px);
+    color: var(--muted); font-size: 11px; line-height: 1.1; text-align: center;
+  }
+  .tabbar svg {
+    width: 22px; height: 22px; fill: none;
+    stroke: currentColor; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .tabbar a.on { color: var(--accent); }
+  .wrap { margin-bottom: 92px; }        /* чтобы вкладки не накрывали последнюю кнопку */
+  .top nav { display: none; }           /* разделы переехали вниз */
+  .top { justify-content: space-between; }
+}
+
+@media (max-width: 700px) {
+  /* пальцем, а не мышкой: всё нажимаемое — не меньше 44 точек */
+  .list .btn, .chips a, .more summary, .more .btn { min-height: 44px; }
+  .form select, .form .check input { min-height: 44px; }
+  .form .check input { width: 24px; height: 24px; min-height: 24px; }
+  .chips a { display: inline-flex; align-items: center; }
+  .more summary { display: flex; align-items: center; }
+  .sec__head { min-height: 44px; }
+}
+
 @media (max-width: 560px) {
   .top { gap: 12px; padding: 10px 12px; }
-  /* с телефона ссылок больше, чем ширины: пусть строка листается вбок */
-  .top nav { gap: 14px; font-size: 14px; overflow-x: auto; scrollbar-width: none; }
-  .top nav::-webkit-scrollbar { display: none; }
-  .top nav a { white-space: nowrap; }
-  .top .brand, .top .out { flex: none; }
   .list li { grid-template-columns: 44px 1fr; }
   .list li b, .list li .btn { grid-column: 2; justify-self: start; }
 }

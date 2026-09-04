@@ -26,6 +26,9 @@
 
   <section class="card form">
     <h2>Добавки к блюдам</h2>
+    {% if not addons %}
+    <p class="empty">Добавок пока нет. Их можно завести вместе с блюдом — в карточке блюда.</p>
+    {% endif %}
     {% for a in addons %}
     <div class="grid">
       <label>Название<input name="addon_name_{{ a.id }}" value="{{ a.name }}"></label>
@@ -35,14 +38,28 @@
   </section>
 
   <section class="card form">
-    <h2>Когда показывать раздел первым</h2>
-    <p class="empty">Например, завтраки с 07:30 до 09:00. Пусто — раздел всегда на своём месте.</p>
-    {% for sec in sections %}
-    <div class="grid">
-      <label>{{ sec.title }}<input name="hours_from_{{ sec.id }}" value="{{ sec.show_from }}" placeholder="07:30"></label>
-      <label>до<input name="hours_to_{{ sec.id }}" value="{{ sec.show_to }}" placeholder="09:00"></label>
-    </div>
-    {% endfor %}
+    {# редко трогают, а места занимает много — поэтому свёрнуто #}
+    {% set on_clock = sections|selectattr('show_from')|list %}
+    <details class="fold"{% if on_clock %} open{% endif %}>
+      <summary>
+        <h2>Когда показывать раздел первым</h2>
+        <small>{% if on_clock %}
+          по часам: {{ on_clock|map(attribute='title')|join(', ') }}
+        {% else %}сейчас все разделы на своих местах{% endif %}</small>
+      </summary>
+
+      <p class="empty">Например, завтраки с 07:30 до 09:00 — в это время раздел
+        поднимается наверх меню. Пусто — раздел всегда на своём месте.</p>
+
+      {% for sec in sections %}
+      <div class="grid">
+        <label>{{ sec.title }}<input name="hours_from_{{ sec.id }}" value="{{ sec.show_from }}"
+               inputmode="numeric" placeholder="с"></label>
+        <label>до<input name="hours_to_{{ sec.id }}" value="{{ sec.show_to }}"
+               inputmode="numeric" placeholder="до"></label>
+      </div>
+      {% endfor %}
+    </details>
   </section>
 
   <section class="card form">

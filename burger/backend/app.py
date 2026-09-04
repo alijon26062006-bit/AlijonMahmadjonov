@@ -544,6 +544,13 @@ async def bad_fields(request: Request, exc: RequestValidationError):
                         status_code=400)
 
 
+# Сам сайт. На бою его быстрее отдаёт Caddy, но пусть и один сервер умеет всё:
+# так `run.sh` на своей машине показывает ровно то же, что увидит клиент.
+SITE = HERE.parent
+if (SITE / 'index.html').exists():
+    app.mount('/', StaticFiles(directory=SITE, html=True), name='site')
+
+
 @app.exception_handler(HTTPException)
 async def http_error(request: Request, exc: HTTPException):
     if exc.status_code == 303 and 'Location' in (exc.headers or {}):
