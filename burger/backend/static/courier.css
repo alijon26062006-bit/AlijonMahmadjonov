@@ -60,6 +60,12 @@ a { color: inherit; }
 .btn.ghost { background: none; border-color: var(--line); color: var(--text); }
 .btn[disabled] { opacity: .5; }
 
+.drop {
+  display: block; width: 100%; margin-top: 8px; padding: 10px;
+  border: 0; background: none; color: var(--muted);
+  font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer;
+}
+
 .snack {
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: calc(18px + env(safe-area-inset-bottom));

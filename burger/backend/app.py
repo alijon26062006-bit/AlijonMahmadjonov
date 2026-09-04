@@ -14,6 +14,7 @@ import os
 import re
 import secrets
 import time
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -40,6 +41,8 @@ UPLOADS.mkdir(exist_ok=True)
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', '')
 SECRET_KEY = os.getenv('SECRET_KEY', '')
 ORIGINS = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', '*').split(',') if o.strip()]
+# Душанбе круглый год +5, перевода часов нет
+TZ_SHIFT = timedelta(hours=int(os.getenv('TZ_HOURS', '5')))
 
 if not ADMIN_PASSWORD:
     ADMIN_PASSWORD = 'burger'
@@ -60,6 +63,19 @@ app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_methods=['GET', 
 app.mount('/uploads', StaticFiles(directory=UPLOADS), name='uploads')
 app.mount('/static', StaticFiles(directory=HERE / 'static'), name='static')
 templates = Jinja2Templates(directory=HERE / 'templates')
+templates.env.globals['timedelta'] = timedelta
+
+
+def local_time(value):
+    """Время из базы (по Гринвичу) — в душанбинское, коротко: «04.09, 20:03»."""
+    try:
+        at = datetime.strptime(str(value)[:19], '%Y-%m-%d %H:%M:%S') + TZ_SHIFT
+    except ValueError:
+        return value
+    return at.strftime('%d.%m, %H:%M')
+
+
+templates.env.filters['local'] = local_time
 
 db.setup()
 if db.seed_if_empty():
@@ -67,6 +83,14 @@ if db.seed_if_empty():
 
 
 # ── вход в админку ──────────────────────────────────────
+
+def valid_date(value):
+    """Дата из адресной строки. Мусор молча игнорируем — покажем период по умолчанию."""
+    try:
+        return date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
 
 def current_admin(request: Request):
     token = request.cookies.get('burger_admin')
@@ -336,6 +360,31 @@ async def api_courier_delivered(order_id: int, request: Request, t: str = ''):
     c = require_courier(request, t)
     ok, message = await courier.delivered(order_id, c['chat_id'])
     return {'ok': ok, 'message': message}
+
+
+@app.post('/api/courier/orders/{order_id}/release')
+async def api_courier_release(order_id: int, request: Request, t: str = ''):
+    c = require_courier(request, t)
+    ok, message = await courier.give_back(order_id, c['chat_id'])
+    return {'ok': ok, 'message': message}
+
+
+@app.get('/admin/stats', response_class=HTMLResponse)
+def admin_stats(request: Request, _=Depends(require_admin),
+                since: str = '', until: str = ''):
+    """Сводка за период. По умолчанию — последняя неделя."""
+    today = date.today()
+    since = valid_date(since) or today - timedelta(days=6)
+    until = valid_date(until) or today
+    if since > until:
+        since, until = until, since
+
+    data = db.stats(since.isoformat(), until.isoformat())
+    return templates.TemplateResponse(request, 'stats.html', {
+        **data, 'since': since, 'until': until, 'today': today,
+        'days': (until - since).days + 1,
+        'zone_names': {z['id']: z['name'] for z in db.zones()},
+    })
 
 
 @app.get('/admin/couriers', response_class=HTMLResponse)

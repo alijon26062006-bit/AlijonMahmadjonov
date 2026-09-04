@@ -77,10 +77,16 @@ async def send(text):
     return await send_to(CHAT, text) is not None
 
 
-async def send_to(chat_id, text, keyboard=None):
-    """Сообщение конкретному человеку. Возвращает id сообщения."""
+async def send_to(chat_id, text, keyboard=None, markup=None):
+    """Сообщение конкретному человеку. Возвращает id сообщения.
+
+    keyboard — кнопки под сообщением, markup — целиком своя клавиатура
+    (например, «Отправить номер телефона»).
+    """
     payload = {'chat_id': str(chat_id), 'text': text, 'disable_web_page_preview': True}
-    if keyboard:
+    if markup:
+        payload['reply_markup'] = markup
+    elif keyboard:
         payload['reply_markup'] = {'inline_keyboard': keyboard}
     res = await call('sendMessage', payload)
     return res.get('message_id') if res else None

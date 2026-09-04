@@ -11,7 +11,9 @@
   <h2>Как добавить курьера</h2>
   <ol class="steps">
     <li>Курьер открывает вашего бота в Telegram и жмёт «Старт».</li>
-    <li>Он появится в списке ниже — нажмите «Допустить».</li>
+    <li>Бот сам просит номер телефона одной кнопкой, потом имя.</li>
+    <li>Заявка приходит вам в Telegram и появляется в списке ниже —
+        нажмите «Допустить» здесь или прямо в чате с ботом.</li>
     <li>Готовые заказы на доставку сразу начнут приходить ему в чат.</li>
   </ol>
   <p class="empty">Адрес для Telegram (setWebhook):
@@ -25,8 +27,13 @@
   {% for c in couriers %}
   <div class="crow">
     <div>
-      <b>{{ c.name }}</b>
-      <small>{{ 'на смене' if c.active else 'ждёт допуска' }} · id {{ c.chat_id }}</small>
+      <b>{{ c.name or 'без имени' }}</b>
+      <small>
+        {% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a> · {% endif %}
+        {% if c.step == 'phone' %}не отправил номер
+        {% elif c.step == 'name' %}не написал имя
+        {% else %}{{ 'на смене' if c.active else 'ждёт допуска' }}{% endif %}
+      </small>
     </div>
     <div class="crow__act">
       <form method="post" action="/admin/couriers/{{ c.chat_id }}/active">

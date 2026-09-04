@@ -75,7 +75,8 @@ function card(o, mine) {
     ? `<div class="acts">
          <a class="btn ghost" href="tel:${esc(o.phone)}">Позвонить</a>
          <button class="btn" data-done="${o.id}" type="button">Доставил</button>
-       </div>`
+       </div>
+       <button class="drop" data-drop="${o.id}" type="button">Не смогу — вернуть заказ</button>`
     : `<div class="acts">
          <button class="btn" data-take="${o.id}" type="button">Беру заказ</button>
        </div>`;
@@ -137,8 +138,12 @@ async function act(id, what) {
 document.addEventListener('click', e => {
   const take = e.target.closest('[data-take]');
   if (take) return act(take.dataset.take, 'take');
+
   const done = e.target.closest('[data-done]');
   if (done) return act(done.dataset.done, 'delivered');
+
+  const drop = e.target.closest('[data-drop]');
+  if (drop && confirm('Вернуть заказ в общий список?')) return act(drop.dataset.drop, 'release');
 });
 
 function clock() {

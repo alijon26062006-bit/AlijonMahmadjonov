@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Статистика{% endblock %}
+{% block body %}
+<h1>Статистика</h1>
+
+{% set span = (until - since).days %}
+<form class="period" method="get" action="/admin/stats">
+  <label>С<input type="date" name="since" value="{{ since }}" max="{{ today }}"></label>
+  <label>По<input type="date" name="until" value="{{ until }}" max="{{ today }}"></label>
+  <button class="btn" type="submit">Показать</button>
+</form>
+
+<div class="chips">
+  <a href="/admin/stats?since={{ today }}&until={{ today }}"
+     class="{{ 'on' if span == 0 and until == today }}">Сегодня</a>
+  <a href="/admin/stats?since={{ today - timedelta(days=6) }}&until={{ today }}"
+     class="{{ 'on' if span == 6 and until == today }}">7 дней</a>
+  <a href="/admin/stats?since={{ today - timedelta(days=29) }}&until={{ today }}"
+     class="{{ 'on' if span == 29 and until == today }}">30 дней</a>
+  <a href="/admin/stats?since={{ today.replace(day=1) }}&until={{ today }}"
+     class="{{ 'on' if since == today.replace(day=1) and until == today }}">Этот месяц</a>
+</div>
+
+<section class="big">
+  <div class="big__one">
+    <b>{{ total.money }}</b><small>сомони выручки</small>
+  </div>
+  <div class="big__one">
+    <b>{{ total.orders }}</b><small>заказов</small>
+  </div>
+  <div class="big__one">
+    <b>{{ total.average }}</b><small>средний чек</small>
+  </div>
+  <div class="big__one">
+    <b>{{ (total.money / days)|round|int }}</b><small>в день, в среднем</small>
+  </div>
+</section>
+
+{% if not total.orders %}
+  <p class="empty">За этот период заказов не было.</p>
+{% else %}
+
+<section class="card">
+  <h2>По дням</h2>
+  {% set top_day = by_day|map(attribute='money')|max %}
+  <ul class="bars">
+    {% for d in by_day %}
+    <li>
+      <span class="bars__day">{{ d.day[8:10] }}.{{ d.day[5:7] }}</span>
+      <span class="bars__line"><i style="width: {{ (d.money * 100 / top_day)|round|int }}%"></i></span>
+      <b>{{ d.money }}</b>
+      <small>{{ d.orders }} зак.</small>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card">
+  <h2>Как забирают</h2>
+  <dl class="pairs">
+    <div><dt>Доставка</dt>
+      <dd>{{ by_mode.get('delivery', {}).get('orders', 0) }} зак. ·
+          {{ by_mode.get('delivery', {}).get('money', 0) }} сомони</dd></div>
+    <div><dt>Самовывоз</dt>
+      <dd>{{ by_mode.get('pickup', {}).get('orders', 0) }} зак. ·
+          {{ by_mode.get('pickup', {}).get('money', 0) }} сомони</dd></div>
+    <div><dt>Из них доставка стоила</dt><dd>{{ total.delivery }} сомони</dd></div>
+    {% if total.canceled %}
+    <div><dt>Отменено</dt><dd>{{ total.canceled }} — в выручку не вошли</dd></div>
+    {% endif %}
+  </dl>
+</section>
+
+<section class="card">
+  <h2>Что берут чаще</h2>
+  <ul class="list">
+    {% for t in top %}
+    <li class="rank">
+      <span class="rank__no">{{ loop.index }}</span>
+      <span class="name">{{ t.name }}</span>
+      <b>{{ t.qty }} шт.</b>
+      <small>{{ t.money }} сомони</small>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+{% if zones %}
+<section class="card">
+  <h2>Районы доставки</h2>
+  <dl class="pairs">
+    {% for z in zones %}
+    <div><dt>{{ zone_names.get(z.zone, z.zone or 'без района') }}</dt>
+      <dd>{{ z.orders }} зак. · {{ z.money }} сомони</dd></div>
+    {% endfor %}
+  </dl>
+</section>
+{% endif %}
+
+{% if couriers %}
+<section class="card">
+  <h2>Курьеры</h2>
+  <dl class="pairs">
+    {% for c in couriers %}
+    <div><dt>{{ c.name }}</dt><dd>{{ c.orders }} зак. · {{ c.money }} сомони</dd></div>
+    {% endfor %}
+  </dl>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Часы заказов</h2>
+  {% set top_hour = by_hour|map(attribute='orders')|max %}
+  <ul class="bars bars--hours">
+    {% for h in by_hour %}
+    <li>
+      <span class="bars__day">{{ '%02d' % h.hour }}:00</span>
+      <span class="bars__line"><i style="width: {{ (h.orders * 100 / top_hour)|round|int }}%"></i></span>
+      <b>{{ h.orders }}</b>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="empty">Время душанбинское.</p>
+</section>
+{% endif %}
+{% endblock %}

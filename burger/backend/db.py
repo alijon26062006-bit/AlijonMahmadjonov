@@ -5,6 +5,7 @@
 """
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 
@@ -89,7 +90,9 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS couriers (
     chat_id    TEXT PRIMARY KEY,          -- id в Telegram
     name       TEXT NOT NULL,
-    active     INTEGER NOT NULL DEFAULT 0, -- 0 = ждёт, пока админ разрешит
+    phone      TEXT NOT NULL DEFAULT '',
+    step       TEXT NOT NULL DEFAULT '',  -- на чём остановилась анкета: phone | name | ''
+    active     INTEGER NOT NULL DEFAULT 0, -- 0 = ждёт, пока хозяин разрешит
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -136,6 +139,11 @@ def setup():
         for col in ('courier_id', 'courier_name', 'taken_at'):
             if col not in cols:
                 con.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+
+        cols = {r['name'] for r in con.execute('PRAGMA table_info(couriers)')}
+        for col in ('phone', 'step'):
+            if col not in cols:
+                con.execute(f"ALTER TABLE couriers ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
 
         # раньше блюду приписывалось фото, которого нет на диске: браузер просил
         # его у каждого блюда и каждый раз получал отказ. Чиним такие записи.
@@ -390,12 +398,23 @@ def courier(chat_id):
         return dict(r) if r else None
 
 
-def add_courier(chat_id, name):
-    """Курьер написал боту. Работать сможет, когда админ разрешит."""
+def add_courier(chat_id, name='', phone='', step=''):
+    """Курьер написал боту. Работать сможет, когда хозяин разрешит."""
     with connect() as con:
-        con.execute('INSERT OR IGNORE INTO couriers (chat_id, name) VALUES (?,?)',
-                    (str(chat_id), name))
-        con.execute('UPDATE couriers SET name = ? WHERE chat_id = ?', (name, str(chat_id)))
+        con.execute('INSERT OR IGNORE INTO couriers (chat_id, name, phone, step) VALUES (?,?,?,?)',
+                    (str(chat_id), name, phone, step))
+
+
+def update_courier(chat_id, **fields):
+    """Меняем только то, что передали: анкета заполняется по шагам."""
+    allowed = {'name', 'phone', 'step'}
+    fields = {k: v for k, v in fields.items() if k in allowed}
+    if not fields:
+        return
+    sets = ', '.join(f'{k} = ?' for k in fields)
+    with connect() as con:
+        con.execute(f'UPDATE couriers SET {sets} WHERE chat_id = ?',
+                    (*fields.values(), str(chat_id)))
 
 
 def set_courier_active(chat_id, active):
@@ -452,6 +471,16 @@ def deliver_order(order_id, chat_id):
         return cur.rowcount == 1
 
 
+def release_order(order_id, chat_id):
+    """Курьер передумал: заказ возвращается в общий список, к остальным."""
+    with connect() as con:
+        cur = con.execute(
+            """UPDATE orders SET status = 'done', courier_id = '', courier_name = '', taken_at = ''
+               WHERE id = ? AND status = 'on_way' AND courier_id = ?""",
+            (order_id, str(chat_id)))
+        return cur.rowcount == 1
+
+
 def save_courier_msg(order_id, chat_id, message_id):
     """Помним, каким сообщением позвали курьера — чтобы потом его поправить."""
     with connect() as con:
@@ -468,6 +497,66 @@ def courier_msgs(order_id):
 def clear_courier_msgs(order_id):
     with connect() as con:
         con.execute('DELETE FROM courier_msgs WHERE order_id = ?', (order_id,))
+
+
+# ── статистика ──────────────────────────────────────────
+
+# отменённые в выручку не идут: это не продажа
+SOLD = "status <> 'canceled'"
+
+# База пишет время по Гринвичу, а считать надо по-душанбински: заказ в час ночи
+# должен попасть во вчерашнюю смену, а не в позавчерашнюю.
+TZ = os.getenv('TZ_OFFSET', '+5 hours')
+LOCAL = f"datetime(created_at, '{TZ}')"
+
+
+def stats(since, until):
+    """Сводка за период. Даты — «ГГГГ-ММ-ДД», обе включительно, по местному времени."""
+    frm, to = f'{since} 00:00:00', f'{until} 23:59:59'
+    where = f'{LOCAL} BETWEEN ? AND ? AND {SOLD}'
+
+    with connect() as con:
+        row = con.execute(f"""SELECT COUNT(*) orders, COALESCE(SUM(total),0) money,
+                                     COALESCE(SUM(goods),0) goods,
+                                     COALESCE(SUM(delivery),0) delivery
+                              FROM orders WHERE {where}""", (frm, to)).fetchone()
+        total = dict(row)
+        total['average'] = round(total['money'] / total['orders']) if total['orders'] else 0
+
+        total['canceled'] = con.execute(
+            f"SELECT COUNT(*) FROM orders WHERE {LOCAL} BETWEEN ? AND ? AND status = 'canceled'",
+            (frm, to)).fetchone()[0]
+
+        by_mode = {r['mode']: dict(r) for r in con.execute(
+            f"""SELECT mode, COUNT(*) orders, COALESCE(SUM(total),0) money
+                FROM orders WHERE {where} GROUP BY mode""", (frm, to))}
+
+        by_day = [dict(r) for r in con.execute(
+            f"""SELECT date({LOCAL}) day, COUNT(*) orders, COALESCE(SUM(total),0) money
+                FROM orders WHERE {where} GROUP BY day ORDER BY day""", (frm, to))]
+
+        by_hour = [dict(r) for r in con.execute(
+            f"""SELECT CAST(strftime('%H', {LOCAL}) AS INTEGER) hour, COUNT(*) orders
+                FROM orders WHERE {where} GROUP BY hour ORDER BY hour""", (frm, to))]
+
+        top = [dict(r) for r in con.execute(
+            f"""SELECT i.name, SUM(i.qty) qty, SUM(i.qty * i.price) money
+                FROM order_items i JOIN orders o ON o.id = i.order_id
+                WHERE datetime(o.created_at, '{TZ}') BETWEEN ? AND ? AND o.{SOLD}
+                GROUP BY i.name ORDER BY qty DESC, money DESC LIMIT 15""", (frm, to))]
+
+        couriers_ = [dict(r) for r in con.execute(
+            f"""SELECT courier_name name, COUNT(*) orders, COALESCE(SUM(total),0) money
+                FROM orders WHERE {where} AND courier_name <> ''
+                GROUP BY courier_name ORDER BY orders DESC""", (frm, to))]
+
+        zones_ = [dict(r) for r in con.execute(
+            f"""SELECT zone, COUNT(*) orders, COALESCE(SUM(total),0) money
+                FROM orders WHERE {where} AND mode = 'delivery'
+                GROUP BY zone ORDER BY orders DESC""", (frm, to))]
+
+    return {'total': total, 'by_mode': by_mode, 'by_day': by_day, 'by_hour': by_hour,
+            'top': top, 'couriers': couriers_, 'zones': zones_}
 
 
 def counts():

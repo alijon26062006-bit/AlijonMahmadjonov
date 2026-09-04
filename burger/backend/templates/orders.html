@@ -21,7 +21,7 @@
   <header>
     <b>№{{ o.number }}</b>
     <span class="tag">{{ status_ru[o.status] }}</span>
-    <time>{{ o.created_at }}</time>
+    <time>{{ o.created_at|local }}</time>
   </header>
 
   <ul class="items">

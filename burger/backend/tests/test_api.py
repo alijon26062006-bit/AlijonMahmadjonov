@@ -319,18 +319,84 @@ def test_telegram_hook_guards_the_address(client):
     assert client.post('/tg/чужой-адрес', json={}).status_code == 404
 
 
-def test_start_in_bot_adds_courier_but_not_to_shift(client):
+def bot(client, payload):
     import app as app_module
+    return client.post(f'/tg/{app_module.TG_HOOK}', json=payload)
+
+
+def test_bot_asks_phone_then_name_and_waits_for_approval(client):
     import db
 
-    r = client.post(f'/tg/{app_module.TG_HOOK}', json={'message': {
-        'chat': {'id': 555}, 'from': {'first_name': 'Далер', 'last_name': 'С.'},
-        'text': '/start'}})
-    assert r.status_code == 200
-
+    assert bot(client, {'message': {'chat': {'id': 555}, 'from': {'id': 555},
+                                    'text': '/start'}}).status_code == 200
     c = db.courier(555)
-    assert c['name'] == 'Далер С.'
-    assert c['active'] == 0        # пока хозяин не допустит — заказов не увидит
+    assert c['step'] == 'phone' and not c['phone'] and c['active'] == 0
+
+    # номер приходит кнопкой Telegram, а не текстом
+    bot(client, {'message': {'chat': {'id': 555}, 'from': {'id': 555},
+                             'contact': {'user_id': 555, 'phone_number': '992937777777'}}})
+    c = db.courier(555)
+    assert c['phone'] == '+992937777777' and c['step'] == 'name'
+
+    bot(client, {'message': {'chat': {'id': 555}, 'from': {'id': 555}, 'text': 'Далер Саидов'}})
+    c = db.courier(555)
+    assert c['name'] == 'Далер Саидов' and c['step'] == ''
+    assert c['active'] == 0         # пока хозяин не допустит — заказов не увидит
+
+
+def test_bot_does_not_take_someone_elses_number(client):
+    import db
+    bot(client, {'message': {'chat': {'id': 556}, 'from': {'id': 556}, 'text': '/start'}})
+    bot(client, {'message': {'chat': {'id': 556}, 'from': {'id': 556},
+                             'contact': {'user_id': 999, 'phone_number': '992900000000'}}})
+    c = db.courier(556)
+    assert c['phone'] == '' and c['step'] == 'phone'
+
+
+def test_courier_can_give_the_order_back(client):
+    oid = ready_delivery_order(client)
+    one = courier_link(601, 'Первый')
+    two = courier_link(602, 'Второй')
+
+    client.post(f'/api/courier/orders/{oid}/take?t={one}')
+    assert client.get(f'/api/courier/orders?t={two}').json()['free'] == []
+
+    assert client.post(f'/api/courier/orders/{oid}/release?t={one}').json()['ok'] is True
+    assert len(client.get(f'/api/courier/orders?t={two}').json()['free']) == 1
+
+    import db
+    o = db.order(oid)
+    assert o['status'] == 'done' and o['courier_id'] == ''
+
+
+def test_stats_counts_money_and_skips_canceled(client):
+    import datetime, db
+    client.post('/admin/login', data={'password': 'секрет-Test'})
+
+    for _ in range(3):
+        client.post('/api/orders', json={
+            'items': [{'id': 'hamburger', 'qty': 1}], 'mode': 'pickup',
+            'name': 'Тест', 'phone': '937777777'})
+    dead = db.orders(limit=1)[0]['id']
+    db.set_status(dead, 'canceled')
+
+    today = datetime.date.today().isoformat()
+    s = db.stats(today, today)
+    assert s['total']['orders'] == 2            # отменённый не в счёт
+    assert s['total']['money'] == 47 * 2
+    assert s['total']['canceled'] == 1
+    assert s['total']['average'] == 47
+    assert s['top'][0]['name'] == 'Гамбургер' and s['top'][0]['qty'] == 2
+
+    page = client.get(f'/admin/stats?since={today}&until={today}')
+    assert page.status_code == 200
+    assert '94' in page.text or 'сомони' in page.text
+
+
+def test_stats_ignores_broken_dates(client):
+    client.post('/admin/login', data={'password': 'секрет-Test'})
+    assert client.get('/admin/stats?since=вчера&until=завтра').status_code == 200
+    assert client.get('/admin/stats').status_code == 200
 
 
 def test_dish_photo_is_not_claimed_without_a_file(client):
