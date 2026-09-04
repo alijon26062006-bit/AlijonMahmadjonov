@@ -291,6 +291,20 @@ function lineTitle(line) {
 
 function renderCart() {
   const keys = Object.keys(cart);
+  const shown = $$('#cart-lines .cart-line').map(el => el.dataset.key);
+  const sameSet = keys.length > 0 && shown.length === keys.length && shown.every((k, i) => k === keys[i]);
+
+  // Меняется только количество — правим цифры на месте.
+  // Полная перерисовка сбрасывала прокрутку списка наверх.
+  if (sameSet) {
+    keys.forEach(key => {
+      const el = $(`.cart-line[data-key="${key}"]`);
+      $('.stepper span', el).textContent = cart[key].qty;
+      $('.cart-line__price', el).textContent = `${som(linePrice(cart[key]))} × ${cart[key].qty}`;
+    });
+    paintCartFoot();
+    return;
+  }
 
   $('#cart-lines').innerHTML = keys.length ? keys.map(key => {
     const line = cart[key];
@@ -322,7 +336,11 @@ function renderCart() {
     </div>`;
 
   $$('#cart-lines img').forEach(watchPhoto);
+  paintCartFoot();
+}
 
+function paintCartFoot() {
+  const keys = Object.keys(cart);
   const short = DELIVERY.minOrder - goods();
   const needMore = mode === 'delivery' && positions() > 0 && short > 0;
 
@@ -443,7 +461,9 @@ SHEETS.forEach(sel => {
 
   box.addEventListener('touchmove', e => {
     if (!live) return;
-    shift = Math.max(0, e.touches[0].clientY - start);
+    const delta = e.touches[0].clientY - start;
+    if (delta < 0) { live = false; box.style.transition = ''; box.style.transform = ''; return; }
+    shift = delta;
     box.style.transform = `translateY(${shift}px)`;
   }, { passive: true });
 
