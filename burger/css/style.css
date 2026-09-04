@@ -267,7 +267,8 @@ svg { fill: currentColor; }
 
 /* ── карточка блюда ─────────────────────────────────── */
 
-.dishes { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); }
+/* две колонки на телефоне: за экран попадает 3–4 блюда */
+.dishes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 
 .dish {
   display: grid;
@@ -281,7 +282,7 @@ svg { fill: currentColor; }
 }
 .dish:active { transform: scale(.995); }
 
-.shot { position: relative; aspect-ratio: 16 / 10; background: var(--card-2); overflow: hidden; }
+.shot { position: relative; aspect-ratio: 4 / 3; background: var(--card-2); overflow: hidden; }
 .shot img { width: 100%; height: 100%; object-fit: cover; }
 
 /* место под фото, пока его нет: спокойная штриховка и знак камеры */
@@ -294,23 +295,43 @@ svg { fill: currentColor; }
 }
 .shot--empty svg { width: 34px; height: 34px; }
 
-.badges { position: absolute; top: var(--s3); left: var(--s3); display: flex; gap: var(--s2); }
+.badges { position: absolute; top: var(--s2); left: var(--s2); display: flex; gap: 6px; }
 .badge {
-  padding: 4px 10px; border-radius: 6px;
-  font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  padding: 3px 7px; border-radius: 5px;
+  font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
 }
 .badge--hit { background: var(--accent); color: var(--on-accent); }
 .badge--hot { background: #b5301c; color: #fff; }
 .badge--new { background: var(--gold); color: #241a06; }
 
-.dish__body { display: flex; flex-direction: column; min-width: 0; gap: var(--s2); padding: var(--s4); }
-.dish__name { font-size: var(--t-title); font-weight: 800; letter-spacing: -.01em; }
-.dish__about { color: var(--muted); font-size: var(--t-meta); }
-.dish__weight { color: #8f877d; font-family: var(--f-mono); font-size: var(--t-small); }
+.dish__body { display: flex; flex-direction: column; min-width: 0; gap: 6px; padding: 12px; }
+.dish__name {
+  font-size: 16px; font-weight: 700; line-height: 1.2; letter-spacing: -.01em;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.dish__about {
+  color: var(--muted); font-size: 12.5px; line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.dish__weight { color: #8f877d; font-family: var(--f-mono); font-size: 11.5px; }
 
-.dish__foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s4); margin-top: auto; padding-top: var(--s2); }
+.dish__foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--s2); margin-top: auto; padding-top: var(--s2);
+}
 .price { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .price s { margin-left: var(--s2); color: var(--muted); font-size: 14px; font-weight: 500; }
+
+/* В карточке кнопка компактная: «Добавить» остаётся в названии для
+   скринридера, на экране — квадрат с плюсом. */
+.dish .price { font-size: 17px; }
+.dish .price s { display: none; }
+.dish .add { width: 44px; min-height: 44px; padding: 0; justify-content: center; font-size: 0; }
+.dish .add span { font-size: 22px; font-weight: 700; }
+.dish .pick.is-on { width: 100%; }
+.dish .stepper { width: 100%; height: 40px; padding: 0 2px; justify-content: space-between; }
+.dish .stepper button { width: 36px; height: 34px; font-size: 18px; }
+.dish .stepper span { min-width: 24px; font-size: 15px; }
 
 /* ── добавить / счётчик ─────────────────────────────── */
 
@@ -681,6 +702,9 @@ svg { fill: currentColor; }
 /* ── мелкие экраны ──────────────────────────────────── */
 
 @media (max-width: 359px) {
+  .dishes { gap: 10px; }
+  .dish__about { display: none; }
+  .dish .price { font-size: 16px; }
   .hero__cta { flex-direction: column; }
   .hero__cta .btn { max-width: none; }
   .fld-pair { grid-template-columns: 1fr; }
