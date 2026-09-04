@@ -26,7 +26,7 @@
   --f-body: Manrope, -apple-system, "Segoe UI", Roboto, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  --t-h1:    clamp(42px, 12.5vw, 68px);
+  --t-h1:    clamp(30px, 8.4vw, 64px);
   --t-h2:    clamp(30px, 8.4vw, 40px);
   --t-h3:    clamp(22px, 6vw, 28px);
   --t-title: clamp(18px, 4.6vw, 21px);
@@ -208,21 +208,21 @@ svg { fill: currentColor; }
     linear-gradient(180deg, #1b1613, var(--bg));
 }
 
-.hero__inner { padding: var(--s6) 0 var(--s5); }
+.hero__inner { padding: var(--s5) 0 var(--s4); }
 .hero__eyebrow {
-  margin-bottom: var(--s3);
-  color: var(--gold); font-size: 12px; font-weight: 700;
-  letter-spacing: .22em; text-transform: uppercase;
+  margin-bottom: var(--s2);
+  color: var(--gold); font-size: 11px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase;
 }
 .hero h1 {
   font-family: var(--f-display); font-size: var(--t-h1);
   letter-spacing: .01em; text-transform: uppercase; text-wrap: balance;
 }
 .hero h1 span { color: var(--accent); }
-.hero__meta { margin-top: var(--s3); color: var(--muted); font-size: 15px; }
-.hero__cta { display: flex; gap: var(--s3); margin-top: var(--s5); }
-.hero__cta .btn { flex: 1; max-width: 220px; }
-.hero__hours { margin-top: var(--s5); color: var(--muted); font-size: var(--t-small); }
+.hero__meta { margin-top: var(--s2); color: var(--muted); font-size: var(--t-meta); }
+.hero__cta { display: flex; gap: var(--s2); margin-top: var(--s4); }
+.hero__cta .btn { flex: 1; max-width: 200px; min-height: 46px; }
+.hero__hours { margin-top: var(--s4); color: var(--muted); font-size: 12px; }
 .hero__hours b { color: var(--text); }
 
 /* ── секции ─────────────────────────────────────────── */
@@ -665,7 +665,11 @@ svg { fill: currentColor; }
   .nav-btn, .nav-panel { display: none !important; }
 
   .hero__inner { padding: 96px 0 var(--s8); max-width: 720px; }
-  .hero__cta .btn { max-width: 200px; }
+  .hero__eyebrow { font-size: 12px; margin-bottom: var(--s3); }
+  .hero__meta { margin-top: var(--s3); font-size: 16px; }
+  .hero__cta { margin-top: var(--s5); }
+  .hero__cta .btn { max-width: 200px; min-height: 52px; }
+  .hero__hours { margin-top: var(--s5); font-size: var(--t-small); }
 
   .dishes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .rows-menu { grid-template-columns: repeat(2, minmax(0, 1fr)); display: grid; gap: var(--s2); }
