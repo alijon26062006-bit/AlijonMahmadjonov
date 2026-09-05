@@ -210,6 +210,12 @@ async def remind_tick(now=None):
     for o in due:
         count, _ = _reminded.get(o['id'], (0, 0))
         _reminded[o['id']] = (count + 1, now)
+
+    # заказы, о которых уже забыли, из памяти тоже убираем
+    if len(_reminded) > 500:
+        alive = {o['id'] for o in free}
+        for oid in [k for k in _reminded if k not in alive]:
+            _reminded.pop(oid, None)
     return sent
 
 

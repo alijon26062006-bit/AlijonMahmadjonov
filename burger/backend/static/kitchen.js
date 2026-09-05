@@ -3,6 +3,13 @@
 const $ = s => document.querySelector(s);
 const board = $('#board');
 
+/* Комментарий к заказу и пометки к блюдам пишет клиент. Вставлять их в разметку
+   как есть нельзя: строка вроде <img src=x onerror=...> выполнилась бы прямо
+   здесь, на планшете, который уже вошёл в админку. Поэтому всё чужое —
+   через esc. */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 let known = new Set();     // номера заказов, которые уже показывали
 let muted = localStorage.getItem('kitchen_muted') === '1';
 let first = true;
@@ -85,7 +92,7 @@ function ticket(o) {
   const late = mins >= 20;
 
   return `
-  <article class="ticket ticket--${o.status}${late ? ' ticket--late' : ''}" data-id="${o.id}">
+  <article class="ticket ticket--${esc(o.status)}${late ? ' ticket--late' : ''}" data-id="${o.id}">
     <header class="ticket__head">
       <span class="ticket__no">№${o.number}</span>
       <span class="ticket__mode ${o.mode === 'pickup' ? 'is-pickup' : ''}">
@@ -98,11 +105,12 @@ function ticket(o) {
       ${o.items.map(i => `
         <li>
           <span class="qty">${i.qty}</span>
-          <span class="name">${i.name}${i.options ? `<span class="opts">${i.options}</span>` : ''}</span>
+          <span class="name">${esc(i.name)}${i.options
+            ? `<span class="opts">${esc(i.options)}</span>` : ''}</span>
         </li>`).join('')}
     </ul>
 
-    ${o.note ? `<p class="ticket__note">${o.note}</p>` : ''}
+    ${o.note ? `<p class="ticket__note">${esc(o.note)}</p>` : ''}
 
     <div class="ticket__act">
       ${o.status !== 'cooking'

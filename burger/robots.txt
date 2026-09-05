@@ -1,0 +1,9 @@
+# Меню и контакты пусть индексируются, рабочие панели — нет.
+User-agent: *
+Disallow: /admin
+Disallow: /kitchen
+Disallow: /courier
+Disallow: /uploads
+Disallow: /tg
+
+Sitemap: https://theburger.tj/sitemap.xml

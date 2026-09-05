@@ -20,7 +20,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, URLSafeTimedSerializer
@@ -37,6 +37,14 @@ log = logging.getLogger('burger')
 HERE = Path(__file__).parent
 UPLOADS = HERE / 'uploads'
 UPLOADS.mkdir(exist_ok=True)
+
+# Чеки об оплате — это банковские документы клиентов, и лежать рядом с фотками
+# блюд им нельзя: папка uploads раздаётся всему интернету. Держим отдельно
+# и отдаём только хозяину.
+RECEIPTS = HERE / 'receipts'
+RECEIPTS.mkdir(exist_ok=True)
+for old_file in UPLOADS.glob('receipt-*'):        # переносим то, что успело лечь не туда
+    old_file.replace(RECEIPTS / old_file.name)
 
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', '')
 SECRET_KEY = os.getenv('SECRET_KEY', '')
@@ -89,6 +97,49 @@ templates.env.filters['local'] = local_time
 db.setup()
 if db.seed_if_empty():
     log.info('база наполнена начальным меню')
+
+
+# ── защита от чужих запросов ────────────────────────────
+
+SAFE_METHODS = {'GET', 'HEAD', 'OPTIONS'}
+GUARDED = ('/admin', '/api/kitchen', '/api/courier', '/courier/tg-login')
+
+
+@app.middleware('http')
+async def safe_headers(request: Request, call_next):
+    """Немного заголовков, которые ничего не ломают, но закрывают целый класс бед.
+
+    nosniff — чтобы браузер не решил, будто присланная «картинка» на самом деле
+    страница, и не выполнил её. Остальное — про то, чтобы сайт нельзя было
+    незаметно вставить в чужую рамку и утащить адрес страницы.
+    """
+    resp = await call_next(request)
+    resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    resp.headers.setdefault('Referrer-Policy', 'same-origin')
+    return resp
+
+
+@app.middleware('http')
+async def same_site_only(request: Request, call_next):
+    """Рабочие страницы меняются только запросами со своего же сайта.
+
+    Куки админки живут с SameSite=None — иначе панель не работает внутри
+    Telegram. Значит, браузер приложит их и к запросу с чужого сайта: тот
+    мог бы втихую сменить цену или удалить блюдо. Поэтому у всех изменяющих
+    запросов сверяем, откуда они пришли.
+    """
+    if request.method not in SAFE_METHODS and request.url.path.startswith(GUARDED):
+        came = request.headers.get('origin') or request.headers.get('referer') or ''
+        if came:
+            mine = f'{request.url.scheme}://{request.headers.get("host", "")}'
+            forwarded = request.headers.get('x-forwarded-proto')
+            if forwarded:
+                mine = f'{forwarded}://{request.headers.get("host", "")}'
+            if not came.startswith(mine):
+                log.warning('чужой запрос на %s с %s', request.url.path, came)
+                return JSONResponse({'error': 'Запрос пришёл не с нашего сайта'},
+                                    status_code=403)
+    return await call_next(request)
 
 
 # ── вход в админку ──────────────────────────────────────
@@ -165,24 +216,24 @@ def api_menu():
 
 
 class OrderItem(BaseModel):
-    id: str
+    id: str = Field(max_length=60)
     qty: int = Field(ge=1, le=50)
-    add: list[str] = []
-    remove: list[str] = []
+    add: list[str] = Field(default=[], max_length=20)
+    remove: list[str] = Field(default=[], max_length=20)
 
 
 class OrderIn(BaseModel):
     items: list[OrderItem] = Field(min_length=1, max_length=40)
     mode: str
-    zone: str = ''
+    zone: str = Field(default='', max_length=40)
     name: str = Field(min_length=1, max_length=60)
     phone: str = Field(min_length=6, max_length=30)
-    address: str = ''
-    flat: str = ''
-    landmark: str = ''
-    note: str = ''
-    pay: str = 'cash'
-    bank: str = ''
+    address: str = Field(default='', max_length=200)
+    flat: str = Field(default='', max_length=60)
+    landmark: str = Field(default='', max_length=120)
+    note: str = Field(default='', max_length=500)
+    pay: str = Field(default='cash', max_length=10)
+    bank: str = Field(default='', max_length=40)
 
     @field_validator('pay')
     @classmethod
@@ -208,6 +259,16 @@ class OrderIn(BaseModel):
 
 LAST_ORDERS = {}          # ip -> время последнего заказа
 COOLDOWN = int(os.getenv('ORDER_COOLDOWN', '20'))   # секунд между заказами с одного адреса
+
+
+def forget_old(store, keep_for, limit=5000):
+    """Список адресов не должен расти без конца: сервер работает месяцами."""
+    if len(store) <= limit:
+        return
+    now = time.time()
+    for ip in [k for k, t in store.items()
+               if now - (t[1] if isinstance(t, tuple) else t) > keep_for]:
+        store.pop(ip, None)
 
 
 @app.post('/api/orders')
@@ -263,7 +324,7 @@ async def api_order(payload: OrderIn, request: Request):
         bank_id = bank_row['id']
 
     order = {
-        'number': db.next_number(), 'mode': payload.mode, 'zone': payload.zone,
+        'mode': payload.mode, 'zone': payload.zone,
         'name': payload.name.strip(), 'phone': payload.phone.strip(),
         'address': payload.address.strip(), 'flat': payload.flat.strip(),
         'landmark': payload.landmark.strip(), 'note': payload.note.strip(),
@@ -273,6 +334,7 @@ async def api_order(payload: OrderIn, request: Request):
     }
     order_id = db.create_order(order, items)
     LAST_ORDERS[ip] = now
+    forget_old(LAST_ORDERS, max(COOLDOWN, 60) * 10)
 
     answer = {'number': order['number'], 'goods': goods, 'delivery': delivery,
               'total': order['total'], 'time': st.get('delivery_time', ''), 'pay': pay}
@@ -290,9 +352,21 @@ async def api_order(payload: OrderIn, request: Request):
     return answer
 
 
-RECEIPT_TYPES = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp',
-                 'application/pdf': '.pdf'}
 RECEIPT_MAX = 8 * 1024 * 1024
+
+# «Волшебные» первые байты: по ним видно, что это на самом деле
+MAGIC = ((b'\xff\xd8\xff', '.jpg'),
+         (b'\x89PNG\r\n\x1a\n', '.png'),
+         (b'%PDF-', '.pdf'))
+
+
+def kind_of(body):
+    for head, ext in MAGIC:
+        if body.startswith(head):
+            return ext
+    if body[:4] == b'RIFF' and body[8:12] == b'WEBP':
+        return '.webp'
+    return None
 
 
 @app.post('/api/orders/receipt')
@@ -303,21 +377,23 @@ async def api_receipt(token: str = Form(...), file: UploadFile = File(...)):
     except BadSignature:
         raise HTTPException(403, 'Ссылка на загрузку устарела. Позвоните нам, пожалуйста.')
 
-    ext = RECEIPT_TYPES.get(file.content_type or '')
-    if not ext:
-        raise HTTPException(400, 'Подойдёт фото чека или PDF')
-
     body = await file.read(RECEIPT_MAX + 1)
     if len(body) > RECEIPT_MAX:
         raise HTTPException(400, 'Файл слишком большой — до 8 МБ')
     if not body:
         raise HTTPException(400, 'Файл пустой')
 
-    name = f'receipt-{order_id}-{secrets.token_hex(4)}{ext}'
-    (UPLOADS / name).write_bytes(body)
+    # Тип, который назвал браузер, — это просто слово в запросе, его легко
+    # подменить. Смотрим на первые байты самого файла.
+    ext = kind_of(body)
+    if not ext:
+        raise HTTPException(400, 'Подойдёт фото чека или PDF')
+
+    name = f'receipt-{order_id}-{secrets.token_hex(8)}{ext}'
+    (RECEIPTS / name).write_bytes(body)
 
     if not db.save_receipt(order_id, name):
-        (UPLOADS / name).unlink(missing_ok=True)
+        (RECEIPTS / name).unlink(missing_ok=True)
         raise HTTPException(400, 'Чек по этому заказу уже приняли')
 
     o = db.order(order_id)
@@ -474,6 +550,26 @@ async def api_courier_release(order_id: int, request: Request, t: str = ''):
     return {'ok': ok, 'message': message}
 
 
+RECEIPT_NAME = re.compile(r'^receipt-\d+-[0-9a-f]+\.(jpg|png|webp|pdf)$')
+
+
+@app.get('/admin/receipt/{name}')
+def admin_receipt(name: str, _=Depends(require_admin)):
+    """Чек показываем только хозяину. Имя проверяем по образцу, чтобы через
+    него нельзя было попросить чужой файл с диска."""
+    if not RECEIPT_NAME.match(name):
+        raise HTTPException(404, 'Не найдено')
+
+    path = RECEIPTS / name
+    if not path.is_file():
+        raise HTTPException(404, 'Чек не найден')
+
+    kind = {'.jpg': 'image/jpeg', '.png': 'image/png',
+            '.webp': 'image/webp', '.pdf': 'application/pdf'}[path.suffix]
+    return FileResponse(path, media_type=kind,
+                        headers={'Cache-Control': 'private, max-age=600'})
+
+
 @app.get('/admin/banks', response_class=HTMLResponse)
 def admin_banks(request: Request, _=Depends(require_admin), saved: str = ''):
     return templates.TemplateResponse(request, 'banks.html',
@@ -583,10 +679,42 @@ def login_form(request: Request, error: str = ''):
                                       {'error': error, 'tg_login': bool(TG_ADMIN_TOKEN)})
 
 
+TRIES = {}                 # ip -> [сколько промахов, когда последний]
+MAX_TRIES = 8
+LOCK_FOR = 15 * 60
+
+
+def login_allowed(ip):
+    misses, last = TRIES.get(ip, (0, 0))
+    if misses >= MAX_TRIES and time.time() - last < LOCK_FOR:
+        return False
+    return True
+
+
+def login_missed(ip):
+    misses, last = TRIES.get(ip, (0, 0))
+    if time.time() - last > LOCK_FOR:
+        misses = 0
+    TRIES[ip] = (misses + 1, time.time())
+    if len(TRIES) > 5000:                    # список не должен расти вечно
+        stale = [k for k, (_, t) in TRIES.items() if time.time() - t > LOCK_FOR]
+        for k in stale:
+            TRIES.pop(k, None)
+
+
 @app.post('/admin/login')
 def login(request: Request, password: str = Form('')):
+    """Пароль подбирают перебором, поэтому после восьми промахов адрес отдыхает."""
+    ip = request.client.host if request.client else '?'
+    if not login_allowed(ip):
+        log.warning('перебор пароля с %s', ip)
+        return RedirectResponse('/admin/login?error=slow', status_code=303)
+
     if not secrets.compare_digest(password.encode('utf-8'), ADMIN_PASSWORD.encode('utf-8')):
+        login_missed(ip)
         return RedirectResponse('/admin/login?error=1', status_code=303)
+
+    TRIES.pop(ip, None)
     resp = RedirectResponse('/admin', status_code=303)
     resp.set_cookie('burger_admin', signer.dumps('ok'), httponly=True,
                     max_age=7 * 24 * 3600, **cookie_rules(request))

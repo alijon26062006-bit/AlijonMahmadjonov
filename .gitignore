@@ -5,6 +5,7 @@ __pycache__/
 # Секреты и данные бота — никогда не коммитить
 .env
 data/
+receipts/
 *.db
 *.db-wal
 *.db-shm

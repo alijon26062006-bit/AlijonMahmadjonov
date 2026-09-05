@@ -597,3 +597,102 @@ def test_owner_fills_the_details_in_admin(client):
 
     import db
     assert db.bank('alif')['number'] == '9999 8888 7777 6666'
+
+
+# ── защита ──────────────────────────────────────────────
+
+def test_receipt_is_not_public(client):
+    """Чек — банковский документ клиента. В открытой папке ему не место."""
+    ready_bank(client)
+    body = client.post('/api/orders', json={
+        'items': [{'id': 'hamburger', 'qty': 1}], 'mode': 'pickup',
+        'name': 'Тест', 'phone': '937777777', 'pay': 'bank', 'bank': 'alif'}).json()
+    client.post('/api/orders/receipt', data={'token': body['receipt']},
+                files={'file': ('c.jpg', b'\xff\xd8\xff\xe0' + b'x' * 40, 'image/jpeg')})
+
+    import db
+    name = db.orders(limit=1)[0]['receipt']
+    assert client.get(f'/uploads/{name}').status_code == 404      # мимо открытой папки
+    assert client.get(f'/admin/receipt/{name}',
+                      follow_redirects=False).status_code == 303  # и без входа тоже
+
+    client.post('/admin/login', data={'password': 'секрет-Test'})
+    assert client.get(f'/admin/receipt/{name}').status_code == 200
+
+    # через имя файла нельзя попросить чужой файл с диска
+    for bad in ('../.env', '..%2F.env', 'receipt-1-../../.env.jpg', 'что-угодно.jpg'):
+        assert client.get(f'/admin/receipt/{bad}').status_code == 404
+
+
+def test_receipt_checks_the_file_itself(client):
+    """Тип файла из запроса — просто слово, его подменяют. Смотрим на байты."""
+    ready_bank(client)
+    body = client.post('/api/orders', json={
+        'items': [{'id': 'hamburger', 'qty': 1}], 'mode': 'pickup',
+        'name': 'Тест', 'phone': '937777777', 'pay': 'bank', 'bank': 'alif'}).json()
+
+    # страница, притворяющаяся картинкой
+    sneaky = client.post('/api/orders/receipt', data={'token': body['receipt']},
+                         files={'file': ('c.jpg', b'<script>alert(1)</script>', 'image/jpeg')})
+    assert sneaky.status_code == 400
+
+    real = client.post('/api/orders/receipt', data={'token': body['receipt']},
+                       files={'file': ('c.bin', '%PDF-1.4 чек'.encode('utf-8'), 'application/octet-stream')})
+    assert real.status_code == 200          # настоящий PDF примем, как ни назови
+
+
+def test_requests_from_other_sites_are_refused(client):
+    """Кука админки живёт с SameSite=None ради Telegram — значит, чужой сайт мог
+    бы дёрнуть админку от имени хозяина. Сверяем, откуда пришёл запрос."""
+    client.post('/admin/login', data={'password': 'секрет-Test'})
+
+    stolen = client.post('/admin/orders/1/status', data={'status': 'canceled'},
+                         headers={'origin': 'https://evil.example'}, follow_redirects=False)
+    assert stolen.status_code == 403
+
+    ok = client.post('/admin/orders/1/status', data={'status': 'canceled'},
+                     headers={'origin': 'http://testserver'}, follow_redirects=False)
+    assert ok.status_code == 303
+
+
+def test_password_guessing_gets_locked_out(client):
+    import app as app_module
+    app_module.TRIES.clear()
+
+    for _ in range(app_module.MAX_TRIES):
+        client.post('/admin/login', data={'password': 'угадайка'}, follow_redirects=False)
+
+    # даже верный пароль теперь не пройдёт — адрес отдыхает
+    r = client.post('/admin/login', data={'password': 'секрет-Test'}, follow_redirects=False)
+    assert r.headers['location'] == '/admin/login?error=slow'
+    assert 'burger_admin' not in r.cookies
+    app_module.TRIES.clear()
+
+
+def test_order_fields_have_a_ceiling(client):
+    """Без потолка можно прислать мегабайт текста и раздуть базу."""
+    r = client.post('/api/orders', json={
+        'items': [{'id': 'hamburger', 'qty': 1}], 'mode': 'pickup',
+        'name': 'Тест', 'phone': '937777777', 'note': 'а' * 5000})
+    assert r.status_code == 400
+
+
+def test_order_numbers_do_not_repeat_under_load(client):
+    """Два заказа в одну секунду получали один номер — кухня видела два «№128»."""
+    import db
+    order = dict(mode='pickup', zone='', name='К', phone='9', address='', flat='',
+                 landmark='', note='', goods=50, delivery=0, total=50,
+                 pay='cash', bank='', status='new')
+    numbers = []
+    for _ in range(30):
+        o = dict(order)
+        db.create_order(o, [dict(dish_id='x', name='Б', qty=1, price=50, options='')])
+        numbers.append(o['number'])
+    assert len(set(numbers)) == 30
+    assert numbers == sorted(numbers)
+
+
+def test_safe_headers_are_set(client):
+    r = client.get('/api/menu')
+    assert r.headers['x-content-type-options'] == 'nosniff'
+    assert r.headers['referrer-policy'] == 'same-origin'

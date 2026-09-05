@@ -20,6 +20,12 @@ const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
 const som = n => `${n.toLocaleString('ru-RU').replace(/,/g, ' ')} сомони`;
+
+/* Названия блюд, разделов, районов и банков приходят с сервера — их печатает
+   человек в админке. Опечатка с угловой скобкой не должна ломать страницу,
+   а тем более что-то выполнять. */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dish = id => MENU.find(d => d.id === id);
 const photoUrl = d => (server && d.photo) ? url(`/uploads/${d.photo}`) : `assets/dishes/${d.id}.jpg`;
 const slow = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -38,10 +44,12 @@ const plural = (n, one, few, many) => {
    { id, qty, add: [id добавки], remove: [название] } */
 let cart = load();
 let mode = localStorage.getItem('tb_mode') || 'delivery';
-let zone = localStorage.getItem('tb_zone') || ZONES[0].id;
+let zone = localStorage.getItem('tb_zone') || (ZONES[0] || {}).id || '';
 
 function load() {
-  const raw = JSON.parse(localStorage.getItem('tb_cart') || '{}');
+  // Испорченная корзина не должна ронять весь сайт: лучше пустая, чем белый экран
+  let raw = {};
+  try { raw = JSON.parse(localStorage.getItem('tb_cart') || '{}') || {}; } catch (e) {}
   const out = {};
 
   for (const [key, val] of Object.entries(raw)) {
@@ -56,16 +64,22 @@ function load() {
 }
 
 function save() {
-  localStorage.setItem('tb_cart', JSON.stringify(cart));
-  localStorage.setItem('tb_mode', mode);
-  localStorage.setItem('tb_zone', zone);
+  // В приватном окне и при заполненной памяти запись падает — это не повод
+  // ломать заказ: корзина просто не переживёт перезагрузку
+  try {
+    localStorage.setItem('tb_cart', JSON.stringify(cart));
+    localStorage.setItem('tb_mode', mode);
+    localStorage.setItem('tb_zone', zone);
+  } catch (e) { /* память браузера занята или закрыта */ }
 }
 
 const lineKey = (id, add, remove) =>
   `${id}|${[...add].sort().join('+')}|${[...remove].sort().join('+')}`;
 
+/* Блюдо могли убрать из меню, пока корзина лежала в телефоне. Тогда dish()
+   вернёт ничего, и без проверки страница падала бы на первой же строке. */
 const linePrice = line =>
-  dish(line.id).price + line.add.reduce((s, a) => s + (ADDON(a)?.price || 0), 0);
+  (dish(line.id)?.price || 0) + line.add.reduce((s, a) => s + (ADDON(a)?.price || 0), 0);
 
 const goods = () => Object.values(cart).reduce((s, l) => s + linePrice(l) * l.qty, 0);
 const positions = () => Object.values(cart).reduce((s, l) => s + l.qty, 0);
@@ -199,8 +213,8 @@ function dishCard(d) {
       <div class="badges">${badge(d.tag)}</div>
     </div>
     <div class="dish__body">
-      <h4 class="dish__name">${d.name}</h4>
-      ${d.about ? `<p class="dish__about">${d.about}</p>` : ''}
+      <h4 class="dish__name">${esc(d.name)}</h4>
+      ${d.about ? `<p class="dish__about">${esc(d.about)}</p>` : ''}
       ${d.weight ? `<span class="dish__weight">${d.weight} г</span>` : ''}
       <div class="dish__foot">
         ${priceHtml(d)}
@@ -214,12 +228,12 @@ function rowCard(d) {
   return `
   <article class="row-item" data-open="${d.id}">
     <div class="row-item__name">
-      <b>${d.name} ${badge(d.tag)}</b>
-      ${d.about ? `<small>${d.about}</small>` : ''}
+      <b>${esc(d.name)} ${badge(d.tag)}</b>
+      ${d.about ? `<small>${esc(d.about)}</small>` : ''}
     </div>
     ${priceHtml(d)}
     <div class="pick" data-pick="${d.id}">
-      <button class="add add--icon" type="button" data-add="${d.id}" aria-label="Добавить ${d.name}">+</button>
+      <button class="add add--icon" type="button" data-add="${esc(d.id)}" aria-label="Добавить ${esc(d.name)}">+</button>
       <div class="stepper">
         <button type="button" data-bump="-1" data-id="${d.id}" aria-label="Убрать одну">−</button>
         <span data-count="${d.id}">1</span>
@@ -233,7 +247,7 @@ function renderMenu() {
   const order = sectionsInOrder();
 
   $('#tabs-row').innerHTML = order
-    .map(s => `<a href="#sec-${s.id}" data-tab="${s.id}">${s.title}${sectionIsNow(s) ? ' <i>сейчас</i>' : ''}</a>`)
+    .map(s => `<a href="#sec-${esc(s.id)}" data-tab="${esc(s.id)}">${esc(s.title)}${sectionIsNow(s) ? ' <i>сейчас</i>' : ''}</a>`)
     .join('');
 
   $('#menu-body').innerHTML = order.map(s => {
@@ -244,7 +258,7 @@ function renderMenu() {
     return `
     <section class="sec${sectionIsNow(s) ? ' sec--now' : ''}" id="sec-${s.id}" aria-labelledby="h-${s.id}">
       <div class="sec__head">
-        <h3 id="h-${s.id}">${s.title}</h3>
+        <h3 id="h-${esc(s.id)}">${esc(s.title)}</h3>
         ${note ? `<span>${note}</span>` : ''}
       </div>
       <div class="${big ? 'dishes' : 'rows-menu'}">
@@ -269,20 +283,20 @@ function openDish(id) {
   const facts = [
     d.weight && `<div><dt>${d.weight} г</dt><dd>вес</dd></div>`,
     d.kcal && `<div><dt>${d.kcal}</dt><dd>ккал</dd></div>`,
-    d.cook && `<div><dt>${d.cook}</dt><dd>готовим</dd></div>`
+    d.cook && `<div><dt>${esc(d.cook)}</dt><dd>готовим</dd></div>`
   ].filter(Boolean).join('');
 
   $('#dish-body').innerHTML = `
     <div class="ds-shot shot${hasPhoto(d) ? '' : ' shot--empty'}">
       ${shot(d, d.name, 1216, 760)}
     </div>
-    <h2 class="ds-name" id="dish-name">${d.name}</h2>
-    ${d.about ? `<p class="ds-about">${d.about}</p>` : ''}
+    <h2 class="ds-name" id="dish-name">${esc(d.name)}</h2>
+    ${d.about ? `<p class="ds-about">${esc(d.about)}</p>` : ''}
     <dl class="ds-facts">${facts}</dl>
 
     ${d.parts?.length ? `
       <h3 class="ds-title">Состав</h3>
-      <ul class="ds-parts">${d.parts.map(p => `<li>${p}</li>`).join('')}</ul>` : ''}
+      <ul class="ds-parts">${d.parts.map(p => `<li>${esc(p)}</li>`).join('')}</ul>` : ''}
 
     ${mods?.remove?.length ? `
       <h3 class="ds-title">Убрать</h3>
@@ -353,7 +367,16 @@ function lineTitle(line) {
   return bits.join(', ');
 }
 
+/* Убираем из корзины то, чего больше нет в меню. Возвращает, сколько выкинули. */
+function dropMissing() {
+  const gone = Object.keys(cart).filter(key => !dish(cart[key].id));
+  gone.forEach(key => delete cart[key]);
+  if (gone.length) save();
+  return gone.length;
+}
+
 function renderCart() {
+  dropMissing();
   const keys = Object.keys(cart);
   const shown = $$('#cart-lines .cart-line').map(el => el.dataset.key);
   const sameSet = keys.length > 0 && shown.length === keys.length && shown.every((k, i) => k === keys[i]);
@@ -380,8 +403,8 @@ function renderCart() {
         ${shot(d, '', 128, 128)}
       </div>
       <div class="cart-line__name">
-        <b>${d.name}</b>
-        ${opts ? `<span class="cart-line__opts">${opts}</span>` : ''}
+        <b>${esc(d.name)}</b>
+        ${opts ? `<span class="cart-line__opts">${esc(opts)}</span>` : ''}
         <span class="cart-line__price">${som(linePrice(line))} × ${line.qty}</span>
       </div>
       <div class="cart-line__side">
@@ -566,7 +589,7 @@ function paintCheckout() {
 function orderText(f, no) {
   const rows = Object.values(cart).map(l => {
     const opts = lineTitle(l);
-    return `• ${dish(l.id).name}${opts ? ` (${opts})` : ''} × ${l.qty} — ${som(linePrice(l) * l.qty)}`;
+    return `• ${dish(l.id)?.name || l.id}${opts ? ` (${opts})` : ''} × ${l.qty} — ${som(linePrice(l) * l.qty)}`;
   });
 
   const lines = [`Заказ №${no} с сайта The Burger`, '', ...rows, '', `Товары: ${som(goods())}`];
@@ -920,12 +943,18 @@ function watchClock() {
 async function start() {
   server = await loadMenu();
 
+  // меню могло измениться, пока корзина ждала в телефоне
+  const gone = dropMissing();
+  if (gone) setTimeout(() => snack(gone === 1
+    ? 'Одного блюда из корзины больше нет в меню'
+    : `${gone} блюда из корзины больше нет в меню`), 800);
+
   $('#zone-select').innerHTML = ZONES
-    .map(z => `<option value="${z.id}"${z.id === zone ? ' selected' : ''}>${z.name}</option>`).join('');
+    .map(z => `<option value="${esc(z.id)}"${z.id === zone ? ' selected' : ''}>${esc(z.name)}</option>`).join('');
 
   $('#zones').innerHTML = ZONES.map(z => `
     <div class="zone${z.price === null ? ' zone--soft' : ''}">
-      <span>${z.name}</span>
+      <span>${esc(z.name)}</span>
       <b>${z.price === null ? 'по договорённости' : som(z.price)}</b>
     </div>`).join('');
 
@@ -994,9 +1023,9 @@ function openPay(f) {
 
   $('#pay-ways').innerHTML = ways.map((w, i) => `
     <button class="way${i === 0 ? ' is-on' : ''}" type="button" role="radio"
-            aria-checked="${i === 0}" data-way="${w.id}">
-      <span class="way__name">${w.name}</span>
-      ${w.note ? `<span class="way__note">${w.note}</span>` : ''}
+            aria-checked="${i === 0}" data-way="${esc(w.id)}">
+      <span class="way__name">${esc(w.name)}</span>
+      ${w.note ? `<span class="way__note">${esc(w.note)}</span>` : ''}
     </button>`).join('');
 
   $('#pay-pick').hidden = false;

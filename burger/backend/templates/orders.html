@@ -44,11 +44,11 @@
       Оплата переводом{% if banks.get(o.bank) %} · {{ banks[o.bank] }}{% endif %}
     </p>
     {% if o.receipt %}
-      <a class="paid__shot" href="/uploads/{{ o.receipt }}" target="_blank" rel="noopener">
+      <a class="paid__shot" href="/admin/receipt/{{ o.receipt }}" target="_blank" rel="noopener">
         {% if o.receipt.endswith('.pdf') %}
           <span class="paid__pdf">Открыть чек (PDF)</span>
         {% else %}
-          <img src="/uploads/{{ o.receipt }}" alt="Чек об оплате" loading="lazy">
+          <img src="/admin/receipt/{{ o.receipt }}" alt="Чек об оплате" loading="lazy">
         {% endif %}
       </a>
     {% else %}

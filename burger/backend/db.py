@@ -132,15 +132,25 @@ CREATE INDEX IF NOT EXISTS idx_items_order ON order_items(order_id);
 
 
 def connect():
+    """Соединение с базой.
+
+    timeout и WAL — не украшение: кухня опрашивает сервер каждые 5 секунд,
+    курьеры каждые 7, и в этот момент кто-то оформляет заказ. Без них SQLite
+    отвечает «database is locked», и заказ теряется на ровном месте.
+    WAL позволяет читать во время записи, busy_timeout — подождать, а не падать.
+    """
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(DB_PATH)
+    con = sqlite3.connect(DB_PATH, timeout=15, isolation_level='IMMEDIATE')
     con.row_factory = sqlite3.Row
     con.execute('PRAGMA foreign_keys = ON')
+    con.execute('PRAGMA busy_timeout = 15000')
     return con
 
 
 def setup():
     with connect() as con:
+        # журнал вперёд: читатели не блокируют писателя и наоборот
+        con.execute('PRAGMA journal_mode = WAL')
         con.executescript(SCHEMA)
         # базы, созданные до появления расписания разделов
         cols = {r['name'] for r in con.execute('PRAGMA table_info(sections)')}
@@ -363,12 +373,6 @@ def delete_zone(zone_id):
 
 # ── заказы ──────────────────────────────────────────────
 
-def next_number():
-    with connect() as con:
-        last = con.execute('SELECT MAX(number) FROM orders').fetchone()[0]
-        return (last or 123) + 1
-
-
 # ── банки для перевода ──────────────────────────────────
 
 def banks(only_ready=False):
@@ -418,15 +422,28 @@ def save_receipt(order_id, filename):
         return cur.rowcount == 1
 
 
+FIRST_NUMBER = 124
+
+
 def create_order(order, items):
+    """Номер выдаём тем же запросом, что и вставку.
+
+    Раньше номер брался отдельным SELECT MAX(number)+1, и два заказа, поданные
+    в одну секунду, получали одинаковый номер — кухня видела два «№128».
+    Теперь номер считается внутри INSERT, а IMMEDIATE-транзакция не даёт
+    второму заказу влезть между чтением и записью.
+    """
     with connect() as con:
         cur = con.execute("""INSERT INTO orders
             (number, mode, zone, name, phone, address, flat, landmark, note,
              goods, delivery, total, pay, bank, status)
-            VALUES (:number,:mode,:zone,:name,:phone,:address,:flat,:landmark,:note,
+            VALUES ((SELECT COALESCE(MAX(number), :first - 1) + 1 FROM orders),
+                    :mode,:zone,:name,:phone,:address,:flat,:landmark,:note,
                     :goods,:delivery,:total,:pay,:bank,:status)""",
-            order)
+            {**order, 'first': FIRST_NUMBER})
         oid = cur.lastrowid
+        order['number'] = con.execute('SELECT number FROM orders WHERE id = ?',
+                                      (oid,)).fetchone()[0]
         for it in items:
             con.execute("""INSERT INTO order_items (order_id, dish_id, name, qty, price, options)
                            VALUES (?,?,?,?,?,?)""",

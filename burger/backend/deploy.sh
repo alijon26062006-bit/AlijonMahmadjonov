@@ -34,9 +34,15 @@ if [ -n "$CLEAN" ]; then
   # база — единственное, что нельзя терять. Копия остаётся, даже если её не просили.
   if [ -f "$APP_DIR/burger/backend/data/burger.db" ]; then
     mkdir -p /srv/backup
-    KEEP="/srv/backup/burger-before-clean-$(date +%F-%H%M).db"
+    STAMP=$(date +%F-%H%M)
+    KEEP="/srv/backup/burger-before-clean-$STAMP.db"
     cp "$APP_DIR/burger/backend/data/burger.db" "$KEEP"
     echo "База сохранена: $KEEP"
+    if [ -d "$APP_DIR/burger/backend/receipts" ]; then
+      tar -czf "/srv/backup/receipts-before-clean-$STAMP.tgz" \
+          -C "$APP_DIR/burger/backend" receipts 2>/dev/null || true
+      echo "Чеки сохранены: /srv/backup/receipts-before-clean-$STAMP.tgz"
+    fi
   fi
   systemctl stop $SERVICE 2>/dev/null || true
   systemctl disable $SERVICE 2>/dev/null || true
@@ -61,7 +67,9 @@ fi
 
 say "Ставим Python и Caddy"
 apt-get update -qq
-apt-get install -y -qq python3 python3-pip python3-venv git curl debian-keyring debian-archive-keyring apt-transport-https
+# sqlite3 нужен для ежедневной копии базы: без него копия молча не делалась
+apt-get install -y -qq python3 python3-pip python3-venv git curl sqlite3 \
+  debian-keyring debian-archive-keyring apt-transport-https
 if ! command -v caddy >/dev/null; then
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
     | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
@@ -148,8 +156,33 @@ systemctl restart $SERVICE
 
 say "Домен $DOMAIN и HTTPS"
 cat > /etc/caddy/Caddyfile <<CADDY
+{
+    servers {
+        timeouts {
+            read_body   30s
+            read_header 10s
+            write       60s
+            idle        2m
+        }
+    }
+}
+
 $DOMAIN, www.$DOMAIN {
     encode gzip
+
+    # ни один честный запрос не весит больше: чек — до 8 МБ, фото блюда — до 6
+    request_body {
+        max_size 12MB
+    }
+
+    header {
+        # браузер не должен додумывать тип файла и показывать сайт в чужой рамке
+        X-Content-Type-Options nosniff
+        Referrer-Policy same-origin
+        X-Frame-Options SAMEORIGIN
+        Strict-Transport-Security "max-age=31536000"
+        -Server
+    }
 
     # всё, что относится к серверу: меню, заказы, админка, кухня, курьеры
     @backend path /api/* /admin* /kitchen* /courier* /tg/* /uploads/* /static/*
@@ -160,16 +193,44 @@ $DOMAIN, www.$DOMAIN {
     file_server
 
     header /assets/* Cache-Control "public, max-age=604800"
+    header /css/* Cache-Control "public, max-age=86400"
+    header /js/* Cache-Control "public, max-age=86400"
+
+    # чеки об оплате рядом с фото блюд не лежат, но на всякий случай запрещаем
+    respond /uploads/receipt-* 404
 }
 CADDY
 systemctl reload caddy || systemctl restart caddy
+
+say "Сторож: следит, что сервер жив"
+cat > /etc/cron.d/burger-watchdog <<CRON
+# раз в пять минут: сервер отвечает? место есть? база цела?
+*/5 * * * * root BACKEND=$BACKEND SERVICE=$SERVICE PORT=$PORT sh $BACKEND/watchdog.sh
+CRON
+chmod 644 /etc/cron.d/burger-watchdog
 
 say "Ежедневная копия базы"
 mkdir -p /srv/backup
 cat > /etc/cron.daily/burger-backup <<'CRON'
 #!/bin/sh
-sqlite3 /srv/burger/burger/backend/data/burger.db ".backup /srv/backup/burger-$(date +%F).db" 2>/dev/null
-find /srv/backup -name 'burger-*.db' -mtime +14 -delete
+# Копия базы и чеков. Ошибки пишем в журнал, а не в тишину:
+# незамеченная поломка копий обнаруживается ровно в тот день, когда они нужны.
+set -e
+DB=/srv/burger/burger/backend/data/burger.db
+OUT=/srv/backup/burger-$(date +%F).db
+
+if ! sqlite3 "$DB" ".backup '$OUT'"; then
+  logger -t burger-backup "копия базы не сделана"
+  exit 1
+fi
+gzip -f "$OUT"
+
+tar -czf "/srv/backup/receipts-$(date +%F).tgz" \
+    -C /srv/burger/burger/backend receipts 2>/dev/null || true
+
+find /srv/backup -name 'burger-*.db.gz' -mtime +30 -delete
+find /srv/backup -name 'receipts-*.tgz' -mtime +30 -delete
+logger -t burger-backup "копия готова: $OUT.gz"
 CRON
 chmod +x /etc/cron.daily/burger-backup
 

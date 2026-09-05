@@ -8,7 +8,9 @@
 
 <form class="card login" method="post" action="/admin/login" id="by-password">
   <h1>Вход в админку</h1>
-  {% if error %}<p class="err">Неверный пароль</p>{% endif %}
+  {% if error == 'slow' %}
+    <p class="err">Слишком много попыток. Подождите 15 минут.</p>
+  {% elif error %}<p class="err">Неверный пароль</p>{% endif %}
   <label>Пароль
     <input type="password" name="password" autocomplete="current-password" autofocus required>
   </label>
