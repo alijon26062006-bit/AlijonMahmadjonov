@@ -150,21 +150,95 @@ h2 { font-size: 19px; margin: 0; }
 .scene { width: 100%; max-width: 460px; position: relative; }
 .scene svg { width: 100%; display: block; }
 
-.ground { stroke: var(--muted); stroke-width: 1; opacity: .25; }
-.middle { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 5 6; opacity: .5; }
-.rope { stroke: #b5854a; stroke-width: 4; stroke-linecap: round; }
-.knot { fill: var(--opp); }
-.knot-line { stroke: var(--opp); stroke-width: 3; stroke-linecap: round; }
-#rope-group, .team { transition: transform .18s cubic-bezier(.22,.9,.35,1); }
+.ground { stroke: var(--muted); stroke-width: 1; opacity: .22; }
+.middle { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 5 6; opacity: .45; }
+.rope { stroke: #b8843f; stroke-width: 4.5; stroke-linecap: round; }
+.knot-flag { fill: #e0453e; }
+.knot-line { stroke: #e0453e; stroke-width: 3; stroke-linecap: round; }
+#rope-group, #g-knot, .team { transition: transform .2s cubic-bezier(.22, .9, .35, 1); }
 
-.team .f-head { stroke-width: 0; }
-.team .f-body, .team .f-arm, .team .f-leg {
-  fill: none; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round;
+/* ── человечки ─────────────────────────────────────────────
+   Майка красится в цвет команды, остальное выводится из неё и из темы
+   Telegram — поэтому фигуры одинаково видны на светлом и на тёмном фоне. */
+
+.team.me { --shirt: var(--me); }
+.team.opp { --shirt: var(--opp); }
+.team {
+  --skin: #f3c078;
+  --pants: color-mix(in srgb, var(--fg) 74%, var(--bg));
+  --cap: color-mix(in srgb, var(--shirt) 34%, var(--fg));
+  --shoe: color-mix(in srgb, var(--shirt) 55%, var(--fg));
 }
-.team.me .f-head { fill: var(--me); }
-.team.me .f-body, .team.me .f-arm, .team.me .f-leg { stroke: var(--me); }
-.team.opp .f-head { fill: var(--opp); }
-.team.opp .f-body, .team.opp .f-arm, .team.opp .f-leg { stroke: var(--opp); }
+
+.f-shadow { fill: var(--fg); opacity: .1; }
+.f-body { fill: var(--shirt); }
+.f-print { fill: none; stroke: #fff; stroke-width: 1.7; stroke-linecap: round; opacity: .55; }
+.f-pants, .f-arm, .f-neck {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.f-pants { stroke: var(--pants); stroke-width: 8; }
+.f-arm { stroke: var(--shirt); stroke-width: 5.5; }
+.f-neck { stroke: var(--skin); stroke-width: 6; }
+.f-shoe { fill: var(--shoe); }
+.f-head, .f-hand { fill: var(--skin); }
+.f-cap { fill: var(--cap); }
+.f-eye { fill: #2b3140; }
+.f-mouth { fill: none; stroke: #2b3140; stroke-width: 1.3; stroke-linecap: round; opacity: .7; }
+
+/* ── натуга ────────────────────────────────────────────────
+   Фигуры качаются от пяток: канат тянут, а не стоят с ним в руках. */
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-1.3deg); }
+  50% { transform: rotate(1.3deg); }
+}
+
+.sway {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: sway 1.7s ease-in-out infinite;
+}
+
+/* Оба человечка в команде качаются вразнобой — иначе видно, что это копии. */
+.team.me .fig:nth-of-type(2) .sway { animation-delay: -.6s; animation-duration: 1.9s; }
+.team.opp .sway { animation-duration: 2.1s; animation-delay: -.35s; }
+.team.opp .fig:nth-of-type(2) .sway { animation-delay: -1.2s; animation-duration: 1.6s; }
+
+/* Флажок на канате подрагивает от натяжения. Качается вокруг самого каната,
+   поэтому точка вращения — левый край, там где узел. */
+@keyframes knot-bob {
+  0%, 100% { transform: rotate(-3.5deg); }
+  50% { transform: rotate(3.5deg); }
+}
+.knot {
+  transform-box: fill-box;
+  transform-origin: 0% 50%;
+  animation: knot-bob 1.7s ease-in-out infinite;
+}
+
+/* Верный ответ — рывок: вся сцена дёргается в сторону того, кто ответил. */
+@keyframes tug-left {
+  0% { transform: translateX(0); }
+  38% { transform: translateX(-5px); }
+  100% { transform: translateX(0); }
+}
+@keyframes tug-right {
+  0% { transform: translateX(0); }
+  38% { transform: translateX(5px); }
+  100% { transform: translateX(0); }
+}
+#g-scene.pull-me .tug { animation: tug-left .42s cubic-bezier(.2, .9, .3, 1); }
+#g-scene.pull-opp .tug { animation: tug-right .42s cubic-bezier(.2, .9, .3, 1); }
+
+/* Пока идёт пауза после ошибки, твоя команда стоит: тянуть некому. */
+#g-scene.frozen #g-team-me .sway { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sway, .knot { animation: none; }
+  #g-scene.pull-me .tug, #g-scene.pull-opp .tug { animation: none; }
+}
 
 .flash {
   position: absolute; inset: 0; border-radius: var(--radius);
@@ -195,6 +269,13 @@ h2 { font-size: 19px; margin: 0; }
 }
 .streak {
   margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--ok);
+}
+/* Серия дошла до двойного рывка — подсказка коротко вспыхивает. */
+.streak.boom { animation: boom .45s ease-out; }
+@keyframes boom {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.35); }
+  100% { transform: scale(1); }
 }
 
 .pad {

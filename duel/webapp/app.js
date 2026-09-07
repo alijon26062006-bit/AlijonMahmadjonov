@@ -24,7 +24,7 @@ const S = {
   leftMs: null,
   leftAt: 0,
   retry: 0,
-  wantRematch: false,
+  oppScore: 0,
   pendingRoom: '',
 };
 
@@ -244,7 +244,8 @@ function onAnswer(msg) {
   if (msg.correct) {
     haptic('ok');
     beep(msg.step > 1 ? 1046 : 784, 90);
-    if (msg.step > 1) toast(say('double', 'Двойной рывок!'));
+    pull('me');
+    if (msg.step > 1) $('g-streak').classList.add('boom');
   } else {
     haptic('bad');
     beep(180, 220, 'square');
@@ -258,13 +259,18 @@ function onAnswer(msg) {
 function freeze(ms) {
   S.frozenUntil = performance.now() + ms;
   $('g-pad').classList.add('locked');
+  $('g-scene').classList.add('frozen');
   setTimeout(() => {
-    if (performance.now() >= S.frozenUntil - 20) $('g-pad').classList.remove('locked');
+    if (performance.now() < S.frozenUntil - 20) return;
+    $('g-pad').classList.remove('locked');
+    $('g-scene').classList.remove('frozen');
   }, ms);
 }
 
 function onState(msg) {
   if (S.screen !== 'game' && msg.state !== 'finished') show('game');
+  if (msg.opp.score > S.oppScore) pull('opp');
+  S.oppScore = msg.opp.score;
   $('g-me-score').textContent = msg.me.score;
   $('g-opp-score').textContent = msg.opp.score;
   S.leftMs = msg.left_ms;
@@ -273,21 +279,36 @@ function onState(msg) {
 
   const streak = $('g-streak');
   if (msg.me.streak >= 3) {
-    streak.textContent = `${say('streak', 'серия')} ×${msg.me.streak} · ×2`;
+    streak.textContent = `${say('streak', 'серия')} ×${msg.me.streak} · ${say('double', '×2')}`;
     streak.classList.remove('hidden');
   } else {
     streak.classList.add('hidden');
+    streak.classList.remove('boom');
   }
 }
 
-/* Канат и обе команды едут вместе: тянет тот, у кого больше верных ответов. */
+/* Рывок: сцена дёргается в сторону того, кто только что ответил. */
+let pullTimer = 0;
+function pull(side) {
+  const scene = $('g-scene');
+  scene.classList.remove('pull-me', 'pull-opp');
+  scene.getBoundingClientRect();       // перезапустить анимацию с начала
+  scene.classList.add('pull-' + side);
+  clearTimeout(pullTimer);
+  pullTimer = setTimeout(() => scene.classList.remove('pull-' + side), 430);
+}
+
+/* Кто перетягивает — видно по флажку: он уходит от средней черты в сторону
+   ведущего. Сами команды при этом только чуть подаются следом, иначе на
+   узком экране они уехали бы за край. */
 function drawRope(rope) {
-  const unit = 50 / S.winSteps;
-  const dx = Math.max(-55, Math.min(55, -rope * unit));
-  const shift = `translate(${dx}, 0)`;
-  $('rope-group').setAttribute('transform', shift);
-  $('g-team-me').setAttribute('transform', shift);
-  $('g-team-opp').setAttribute('transform', shift);
+  const step = Math.max(-S.winSteps, Math.min(S.winSteps, rope));
+  const lean = `translate(${(-step * 16 / S.winSteps).toFixed(2)}, 0)`;
+  const flag = `translate(${(-step * 34 / S.winSteps).toFixed(2)}, 0)`;
+  $('rope-group').setAttribute('transform', lean);
+  $('g-team-me').setAttribute('transform', lean);
+  $('g-team-opp').setAttribute('transform', lean);
+  $('g-knot').setAttribute('transform', flag);
 }
 
 function onEnd(msg) {
@@ -396,6 +417,9 @@ function resetBoard() {
   S.input = '';
   S.task = null;
   S.frozenUntil = 0;
+  S.oppScore = 0;
+  $('g-scene').classList.remove('frozen', 'pull-me', 'pull-opp');
+  $('g-streak').classList.remove('boom');
   $('g-answer').textContent = '';
   $('g-question').textContent = '…';
   $('g-me-score').textContent = '0';
