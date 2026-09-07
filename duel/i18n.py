@@ -85,6 +85,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "ui.frozen": "Пауза после ошибки",
         "ui.lang": "Язык",
         "ui.sound": "Звук",
+        "ui.music": "Музыка",
         "ui.back": "Назад",
         "bot.start": (
             "⚔️ Математическая дуэль\n\n"
@@ -207,6 +208,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "ui.frozen": "Таваққуф баъди хато",
         "ui.lang": "Забон",
         "ui.sound": "Овоз",
+        "ui.music": "Мусиқӣ",
         "ui.back": "Бозгашт",
         "bot.start": (
             "⚔️ Дуэли математикӣ\n\n"

@@ -14,6 +14,9 @@ const S = {
   level: 'auto',
   winSteps: 10,
   sound: localStorage.getItem('duel.sound') !== 'off',
+  music: localStorage.getItem('duel.music') !== 'off',
+  streak: 0,
+  hurrying: false,
   lang: 'ru',
   bot: '',
   screen: 'loading',
@@ -61,25 +64,6 @@ function toast(text) {
   el.classList.remove('hidden');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.add('hidden'), 2600);
-}
-
-/* ── звук ───────────────────────────────────────────────── */
-
-let audio = null;
-function beep(freq, ms, type) {
-  if (!S.sound) return;
-  try {
-    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
-    osc.type = type || 'sine';
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.06, audio.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + ms / 1000);
-    osc.connect(gain).connect(audio.destination);
-    osc.start();
-    osc.stop(audio.currentTime + ms / 1000);
-  } catch (e) { /* звук не критичен */ }
 }
 
 const haptic = (kind) => {
@@ -142,7 +126,7 @@ function handle(msg) {
     case 'room': onRoom(msg); break;
     case 'room_error': toast(say('room.bad', 'Комнаты нет')); show('menu'); break;
     case 'found': onFound(msg); break;
-    case 'start': $('g-countdown').classList.add('hidden'); break;
+    case 'start': $('g-countdown').classList.add('hidden'); Sound.startMusic(); break;
     case 'task': onTask(msg); break;
     case 'ans': onAnswer(msg); break;
     case 'state': onState(msg); break;
@@ -202,7 +186,7 @@ function onFound(msg) {
   $('g-opp-name').textContent = msg.opp.name;
   show('game');
   startCountdown(msg.starts_in_ms || 0);
-  beep(660, 120);
+  Sound.match();
 }
 
 function startCountdown(ms) {
@@ -215,13 +199,14 @@ function startCountdown(ms) {
     const left = endsAt - performance.now();
     if (left <= 0) {
       label.textContent = say('go', 'Марш!');
+      Sound.go();
       setTimeout(() => box.classList.add('hidden'), 400);
       return;
     }
     const digit = Math.ceil(left / 1000);
     if (label.textContent !== String(digit)) {
       label.textContent = String(digit);
-      beep(440, 90);
+      Sound.tick();
     }
     requestAnimationFrame(step);
   })();
@@ -242,13 +227,15 @@ function onAnswer(msg) {
   setTimeout(() => (flash.className = 'flash'), 360);
 
   if (msg.correct) {
+    S.streak += 1;
     haptic('ok');
-    beep(msg.step > 1 ? 1046 : 784, 90);
+    Sound.correct(S.streak, msg.step);
     pull('me');
     if (msg.step > 1) $('g-streak').classList.add('boom');
   } else {
+    S.streak = 0;
     haptic('bad');
-    beep(180, 220, 'square');
+    Sound.wrong();
     $('g-answer').classList.add('bad');
     S.input = '';
     $('g-answer').textContent = '';
@@ -269,8 +256,12 @@ function freeze(ms) {
 
 function onState(msg) {
   if (S.screen !== 'game' && msg.state !== 'finished') show('game');
-  if (msg.opp.score > S.oppScore) pull('opp');
+  if (msg.opp.score > S.oppScore) {
+    pull('opp');
+    Sound.rival();
+  }
   S.oppScore = msg.opp.score;
+  S.streak = msg.me.streak;
   $('g-me-score').textContent = msg.me.score;
   $('g-opp-score').textContent = msg.opp.score;
   S.leftMs = msg.left_ms;
@@ -337,8 +328,8 @@ function onEnd(msg) {
   paint();
   show('result');
   haptic(msg.outcome === 'win' ? 'win' : 'bad');
-  if (msg.outcome === 'win') { beep(784, 120); setTimeout(() => beep(1046, 200), 130); }
-  else beep(300, 260, 'triangle');
+  Sound.stopMusic();
+  Sound[msg.outcome === 'win' ? 'win' : msg.outcome === 'draw' ? 'draw' : 'lose']();
 }
 
 function onError(msg) {
@@ -410,7 +401,13 @@ function paint() {
         `${say('games', 'Матчей')} ${p.games}`
       : say('no_games', 'Ещё ни одного матча');
   }
+  $('m-lang').title = say('lang', 'Язык');
+  $('m-sound').title = say('sound', 'Звук');
+  $('m-music').title = say('music', 'Музыка');
   $('m-sound').textContent = S.sound ? '🔊' : '🔇';
+  $('m-music').textContent = S.music ? '🎵' : '🚫';
+  $('m-music').classList.toggle('off', !S.music);
+  $('m-sound').classList.toggle('off', !S.sound);
 }
 
 function resetBoard() {
@@ -418,6 +415,9 @@ function resetBoard() {
   S.task = null;
   S.frozenUntil = 0;
   S.oppScore = 0;
+  S.streak = 0;
+  S.hurrying = false;
+  Sound.hurry(false);
   $('g-scene').classList.remove('frozen', 'pull-me', 'pull-opp');
   $('g-streak').classList.remove('boom');
   $('g-answer').textContent = '';
@@ -471,7 +471,12 @@ function tickClock() {
       const mm = Math.floor(total / 60);
       const ss = String(total % 60).padStart(2, '0');
       clock.textContent = mm > 0 ? `${mm}:${ss}` : `0:${ss}`;
-      clock.classList.toggle('low', total <= 10);
+      const low = total <= 10;
+      clock.classList.toggle('low', low);
+      if (low !== S.hurrying) {
+        S.hurrying = low;
+        Sound.hurry(low);
+      }
     }
   }
   requestAnimationFrame(tickClock);
@@ -508,6 +513,14 @@ function bind() {
   $('m-sound').onclick = () => {
     S.sound = !S.sound;
     localStorage.setItem('duel.sound', S.sound ? 'on' : 'off');
+    Sound.setSfx(S.sound);
+    if (S.sound) Sound.tick();
+    paint();
+  };
+  $('m-music').onclick = () => {
+    S.music = !S.music;
+    localStorage.setItem('duel.music', S.music ? 'on' : 'off');
+    Sound.setMusic(S.music);
     paint();
   };
 
@@ -557,6 +570,14 @@ function boot() {
     if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
     S.pendingRoom = (tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
   }
+  Sound.setSfx(S.sound);
+  Sound.setMusic(S.music);
+  // Телефоны не дают звучать, пока человек сам не коснётся экрана.
+  const wake = () => Sound.unlock();
+  document.addEventListener('pointerdown', wake, { passive: true });
+  document.addEventListener('keydown', wake);
+  document.addEventListener('visibilitychange', () => Sound.mute(document.hidden));
+
   bind();
   connect();
   tickClock();
