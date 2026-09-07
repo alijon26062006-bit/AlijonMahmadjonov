@@ -84,6 +84,29 @@ h2 { font-size: 19px; margin: 0; }
 .menu-head { display: flex; flex-direction: column; gap: 6px; }
 .me { color: var(--muted); font-size: 14px; }
 
+/* Счётчик людей в сети: сразу видно, есть ли с кем играть. */
+.online {
+  display: inline-flex; align-items: center; gap: 6px;
+  align-self: center;
+  background: var(--card); border-radius: 999px;
+  padding: 5px 12px 5px 9px;
+  font-size: 13px; font-weight: 600;
+}
+.online::before {
+  content: "";
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 70%, transparent);
+  animation: breathe 2s ease-out infinite;
+}
+.online.alone::before { background: var(--muted); animation: none; }
+
+@keyframes breathe {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); }
+  70% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
 .field { width: 100%; max-width: 420px; text-align: left; }
 .field-label { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
 

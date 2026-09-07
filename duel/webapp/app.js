@@ -30,6 +30,7 @@ const S = {
   oppScore: 0,
   pendingRoom: '',
   invite: '',
+  online: null,
 };
 
 const say = (key, fallback) => S.strings[key] || fallback || key;
@@ -121,6 +122,7 @@ function devId() {
 function handle(msg) {
   switch (msg.t) {
     case 'ready': onReady(msg); break;
+    case 'online': S.online = msg; paintOnline(); break;
     case 'strings': S.strings = msg.strings; S.lang = msg.lang; paint(); break;
     case 'queued': onQueued(msg); break;
     case 'idle': show('menu'); break;
@@ -144,6 +146,7 @@ function onReady(msg) {
   S.profile = msg.profile;
   S.winSteps = msg.win_steps || 10;
   S.bot = msg.bot || '';
+  S.online = msg;
   buildOptions(msg.durations, msg.levels);
   paint();
   if (S.screen === 'loading' || S.screen === 'search') show('menu');
@@ -445,10 +448,36 @@ function paint() {
   $('m-lang').title = say('lang', 'Язык');
   $('m-sound').title = say('sound', 'Звук');
   $('m-music').title = say('music', 'Музыка');
+  paintOnline();
   $('m-sound').textContent = S.sound ? '🔊' : '🔇';
   $('m-music').textContent = S.music ? '🎵' : '🚫';
   $('m-music').classList.toggle('off', !S.music);
   $('m-sound').classList.toggle('off', !S.sound);
+}
+
+/* Сколько людей сейчас в игре. Когда один — вместо цифры зовём друга:
+   «1 в сети» выглядит уныло и ничего не подсказывает. */
+function paintOnline() {
+  const box = $('m-online');
+  if (!box || !S.online) return;
+  const { online = 0, searching = 0, playing = 0 } = S.online;
+
+  if (online <= 1) {
+    box.textContent = say('online.alone', 'Пока ты один — позови друга');
+    box.classList.add('alone');
+    return;
+  }
+  box.classList.remove('alone');
+
+  const parts = [`${online} ${say('online', 'в сети')}`];
+  if (searching > 0) parts.push(`${searching} ${countWord('online.searching', searching)}`);
+  else if (playing > 0) parts.push(`${playing} ${countWord('online.playing', playing)}`);
+  box.textContent = parts.join(' · ');
+}
+
+/* «1 ищут соперника» режет глаз — берём форму слова по числу. */
+function countWord(key, count) {
+  return say(`${key}.${count === 1 ? 'one' : 'many'}`, key);
 }
 
 function resetBoard() {

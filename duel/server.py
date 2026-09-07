@@ -99,6 +99,8 @@ class Hub:
         self.matches: dict[int, Match] = {}
         self.match_of: dict[int, int] = {}
         self._ticker: asyncio.Task[None] | None = None
+        self._online: dict[str, int] = {}
+        self._online_at = 0.0
 
     # ── служебное ───────────────────────────────────────────────────
 
@@ -124,6 +126,20 @@ class Hub:
             "place": storage.place_of(self.db, conn.user_id),
             "photo_url": row["photo_url"],
         }
+
+    def online_stats(self) -> dict[str, int]:
+        """Сколько людей сейчас в игре. Видно прямо в меню."""
+
+        return {
+            "online": len(self.conns),
+            "searching": len(self.queue),
+            "playing": len(self.matches) * 2,
+        }
+
+    async def broadcast_online(self) -> None:
+        payload = {"t": "online", **self.online_stats()}
+        for conn in list(self.conns.values()):
+            await conn.send(payload)
 
     def leaderboard(self, limit: int = 50) -> list[dict[str, object]]:
         return [
@@ -317,6 +333,7 @@ class Hub:
                 "win_steps": WIN_STEPS,
                 "bot": self.bot_username,
                 "start_param": user.start_param,
+                **self.online_stats(),
             }
         )
 
@@ -631,6 +648,14 @@ class Hub:
         for one, other in self.queue.find_pairs(now):
             await self._start_match(one, other, now)
         self.queue.sweep_rooms(now)
+
+        # Счётчик людей в сети: шлём, только когда он и правда изменился.
+        if now - self._online_at >= 2.0:
+            self._online_at = now
+            stats = self.online_stats()
+            if stats != self._online:
+                self._online = stats
+                await self.broadcast_online()
 
         for match in list(self.matches.values()):
             was_running = match.state == STATE_RUNNING

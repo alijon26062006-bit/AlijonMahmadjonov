@@ -371,6 +371,49 @@ async def test_leaderboard_is_public(client):
     assert data["top"][0]["rating"] > data["top"][1]["rating"]
 
 
+async def test_online_counter_comes_with_the_first_message(client):
+    _, ready = await join(client, 1)
+    assert ready["online"] == 1
+    assert ready["searching"] == 0 and ready["playing"] == 0
+
+
+async def test_counter_grows_when_someone_else_comes_in(client):
+    one, _ = await join(client, 1)
+    await join(client, 2)
+    update = await one.recv("online", timeout=4)
+    assert update["online"] == 2
+
+
+async def test_counter_sees_who_is_searching_and_who_is_playing(client):
+    one, _ = await join(client, 1)
+    two, _ = await join(client, 2)
+    await one.send(t="find", duration=30, level="normal")
+    await one.recv("queued")
+    searching = await one.recv("online", timeout=4)
+    while searching["searching"] == 0:
+        searching = await one.recv("online", timeout=4)
+    assert searching["searching"] == 1
+
+    await two.send(t="find", duration=30, level="normal")
+    await one.recv("found")
+    playing = await one.recv("online", timeout=4)
+    while playing["playing"] == 0:
+        playing = await one.recv("online", timeout=4)
+    assert playing["playing"] == 2
+    assert playing["searching"] == 0, "ушедшие в матч в очереди не числятся"
+
+
+async def test_counter_drops_when_someone_leaves(client):
+    one, _ = await join(client, 1)
+    two, _ = await join(client, 2)
+    await one.recv("online", timeout=4)
+    await two.close()
+    update = await one.recv("online", timeout=4)
+    while update["online"] != 1:
+        update = await one.recv("online", timeout=4)
+    assert update["online"] == 1
+
+
 async def test_health_endpoint_answers(client):
     body = await (await client.get("/health")).json()
     assert body["ok"] is True and "players" in body
