@@ -392,6 +392,65 @@ async def test_calling_a_ghost_says_so(client):
     assert (await one.recv("challenge_error"))["reason"] == "gone"
 
 
+async def test_sharing_a_link_does_not_kill_the_room(client):
+    """Кнопка «Отправить другу» уводит из игры — Telegram открывает выбор чата.
+    Если комната умирает вместе с окном, ссылка у друга оказывается мёртвой."""
+    host, _ = await join(client, 1, "Алиджон")
+    await host.send(t="room", duration=30, level="easy")
+    room = await host.recv("room")
+
+    await host.close()
+    await asyncio.sleep(0.3)
+    assert client.hub.queue.find_room(room["code"]) is not None
+
+
+async def test_friend_accepts_while_the_host_is_away(client):
+    host, _ = await join(client, 1, "Алиджон")
+    await host.send(t="room", duration=30, level="easy")
+    room = await host.recv("room")
+    await host.close()
+    await asyncio.sleep(0.3)
+
+    guest, _ = await join(client, 2, "Друг")
+    await guest.send(t="join", code=room["code"], duration=30, level="easy")
+    waiting = await guest.recv("waiting_host")
+    assert waiting["name"] == "Алиджон"
+
+    # Хозяина позвали обратно письмом в чат.
+    letter = client.posted[-1]
+    assert letter["to"] == 1 and "Друг" in letter["text"]
+
+    # Он вернулся — бой начинается сам, без лишних нажатий.
+    again, _ = await join(client, 1, "Алиджон")
+    assert (await again.recv("found"))["opp"]["name"] == "Друг"
+    assert (await guest.recv("found"))["opp"]["name"] == "Алиджон"
+
+
+async def test_the_guest_is_let_go_if_the_host_never_returns(client, monkeypatch):
+    monkeypatch.setattr("duel.server.HOST_GRACE_SEC", 0.2)
+    host, _ = await join(client, 1, "Алиджон")
+    await host.send(t="room", duration=30, level="easy")
+    room = await host.recv("room")
+    await host.close()
+    await asyncio.sleep(0.3)
+
+    guest, _ = await join(client, 2, "Друг")
+    await guest.send(t="join", code=room["code"], duration=30, level="easy")
+    await guest.recv("waiting_host")
+    assert (await guest.recv("host_gone", timeout=4))["name"] == "Алиджон"
+    assert client.hub.queue.find_room(room["code"]) is None
+
+
+async def test_leaving_on_purpose_still_closes_the_room(client):
+    """Нажал «Отмена» — это уже не отлучка, комнаты быть не должно."""
+    host, _ = await join(client, 1, "Алиджон")
+    await host.send(t="room", duration=30, level="easy")
+    room = await host.recv("room")
+    await host.send(t="cancel")
+    await host.recv("idle")
+    assert client.hub.queue.find_room(room["code"]) is None
+
+
 async def test_wrong_room_code_says_so(client):
     player, _ = await join(client, 1)
     await player.send(t="join", code="НЕТУ", duration=30, level="easy")

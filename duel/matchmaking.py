@@ -24,6 +24,8 @@ FLEX_ANY_SEC = 40.0
 ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 ROOM_CODE_LEN = 6
 ROOM_TTL_SEC = 15 * 60
+# Друг принял вызов, а хозяин вышел из игры — столько ждём его возвращения.
+HOST_GRACE_SEC = 3 * 60
 
 
 @dataclass
@@ -69,6 +71,9 @@ class Room:
     host: Ticket
     created_at: float = 0.0
     target: int = 0
+    # Друг уже нажал «В бой», но хозяина в игре нет — ждём, пока он зайдёт.
+    accepted_by: int = 0
+    accepted_at: float = 0.0
 
 
 @dataclass
@@ -87,8 +92,19 @@ class Queue:
         self.tickets[ticket.user_id] = ticket
 
     def remove(self, user_id: int) -> Ticket | None:
+        """Уходит совсем: снимаем и заявку, и созданную им комнату."""
+
         self.drop_rooms_of(user_id)
         return self.tickets.pop(user_id, None)
+
+    def drop_ticket(self, user_id: int) -> Ticket | None:
+        """Просто закрыл приложение. Комнату не трогаем: он мог уйти делиться
+        ссылкой, и убивать её вместе с ним — значит рвать приглашение."""
+
+        return self.tickets.pop(user_id, None)
+
+    def rooms_of(self, user_id: int) -> list[Room]:
+        return [room for room in self.rooms.values() if room.host.user_id == user_id]
 
     def __len__(self) -> int:
         return len(self.tickets)

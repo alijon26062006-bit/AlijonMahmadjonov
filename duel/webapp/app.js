@@ -134,6 +134,11 @@ function handle(msg) {
     case 'invite': onInvite(msg); break;
     case 'players': onPeople(msg); break;
     case 'offer_bot': onRobotOffer(msg); break;
+    case 'waiting_host': onWaitingHost(msg); break;
+    case 'host_gone':
+      toast(say('host_gone', 'Так и не зашёл'));
+      show('menu');
+      break;
     case 'challenge_sent': onCalled(msg); break;
     case 'challenge_error':
       toast(say('called.error.' + msg.reason, say('error', 'Ошибка')));
@@ -171,6 +176,8 @@ function onReady(msg) {
 function onQueued(msg) {
   show('search');
   $('q-offer').classList.add('hidden');
+  document.querySelector('#s-search h2').textContent = say('searching', 'Ищем соперника');
+  $('q-hint').textContent = say('searching.hint', '');
   const n = Math.max(0, (msg.waiting || 1) - 1);
   $('q-count').textContent = n > 0 ? `${say('waiting_players', 'в очереди')}: ${n}` : '';
 }
@@ -192,17 +199,7 @@ function onRoom(msg) {
   document.querySelector('#s-room .muted').textContent = say('room.hint', '');
   $('r-waiting').textContent = say('room.waiting', '');
   $('r-code').textContent = msg.code;
-  $('r-share').onclick = () => {
-    const text = `${say('room.code', 'Код комнаты')}: ${msg.code}`;
-    if (msg.link && tg && tg.openTelegramLink) {
-      tg.openTelegramLink(
-        `https://t.me/share/url?url=${encodeURIComponent(msg.link)}&text=${encodeURIComponent(text)}`
-      );
-    } else {
-      navigator.clipboard && navigator.clipboard.writeText(msg.link || msg.code);
-      toast(msg.code);
-    }
-  };
+  $('r-share').onclick = () => shareInvite(msg);
 }
 
 /* Гостя встречает имя того, кто позвал, и одна кнопка. Влетать в бой сразу,
@@ -296,6 +293,16 @@ function callToBattle(button, id) {
   button.textContent = say('called', 'Позвали');
 }
 
+/* Друг нажал «В бой», а хозяина в игре нет. Ждём его — он уже позван в чате. */
+function onWaitingHost(msg) {
+  show('search');
+  $('q-offer').classList.add('hidden');
+  document.querySelector('#s-search h2').textContent =
+    `${say('waiting_host', 'Ждём, пока зайдёт')}: ${msg.name}`;
+  $('q-hint').textContent = say('waiting_host.hint', '');
+  $('q-count').textContent = '';
+}
+
 function onCalled(msg) {
   show('room');
   $('r-code').classList.add('hidden');
@@ -306,6 +313,25 @@ function onCalled(msg) {
     ? say('called.wait', 'Ждём ответа')
     : say('called.chat', 'Приглашение ушло ему в чат');
   $('r-waiting').textContent = '';
+}
+
+/* Отправить приглашение другу: открываем выбор чата прямо в Telegram.
+   Комната переживёт наш уход из игры, поэтому закрытое окно ничего не сломает. */
+function shareInvite(msg) {
+  const text = say('invite.share.text', 'Сыграем в математическую дуэль?');
+  if (msg.link && tg && tg.openTelegramLink) {
+    tg.openTelegramLink(
+      'https://t.me/share/url?url=' + encodeURIComponent(msg.link) +
+      '&text=' + encodeURIComponent(text)
+    );
+    return;
+  }
+  if (navigator.clipboard && msg.link) {
+    navigator.clipboard.writeText(msg.link);
+    toast(say('room.share.copied', 'Ссылка скопирована'));
+    return;
+  }
+  toast(msg.code);
 }
 
 function onFound(msg) {
@@ -738,13 +764,18 @@ async function openTop() {
     }
     const myId = S.profile && S.profile.id;
 
-    // Первая тройка — на пьедестал, в порядке 2-1-3, как на настоящем.
+    // На пьедестал встают только те, кто действительно играл. Остальные —
+    // списком ниже, включая новичков: пустой экран под пьедесталом выглядит
+    // сломанным, даже когда всё правильно.
+    const played = data.top.filter((row) => row.games > 0).slice(0, 3);
+    const rest = data.top.filter((row) => !played.includes(row));
+
     const medals = ['🥇', '🥈', '🥉'];
     const order = [1, 0, 2];
     podium.innerHTML = order
-      .filter((i) => data.top[i])
+      .filter((i) => played[i])
       .map((i) => {
-        const row = data.top[i];
+        const row = played[i];
         return `<div class="pod pod-${i + 1}">` +
           `<div class="pod-medal">${medals[i]}</div>` +
           `<div class="face" style="background:${colorOf(row.name)}">${initial(row.name)}</div>` +
@@ -755,7 +786,7 @@ async function openTop() {
       })
       .join('');
 
-    list.innerHTML = data.top.slice(3).map((row) => boardRow(row, row.id === myId)).join('');
+    list.innerHTML = rest.map((row) => boardRow(row, row.id === myId)).join('');
 
     // Своё место далеко внизу — показываем отдельной строкой, чтобы не искать.
     const mine = data.top.find((row) => row.id === myId);
@@ -775,12 +806,14 @@ async function openTop() {
 }
 
 function boardRow(row, self, bare) {
+  const played = row.games > 0;
   const inner =
-    `<span class="place">${row.place}</span>` +
+    `<span class="place">${played ? row.place : '—'}</span>` +
     `<span class="face" style="background:${colorOf(row.name)}">${initial(row.name)}</span>` +
     `<span class="name">${escapeHtml(row.name)}` +
-    `<span class="games"> · ${row.wins}/${row.games}</span></span>` +
-    `<span class="score">${row.rating}</span>`;
+    `<span class="games"> · ${played ? `${row.wins}/${row.games}` : say('top.newcomer', '')}` +
+    `</span></span>` +
+    `<span class="score">${played ? row.rating : ''}</span>`;
   return bare ? inner : `<li class="${self ? 'self' : ''}">${inner}</li>`;
 }
 

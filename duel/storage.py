@@ -198,13 +198,18 @@ def save_match(conn: sqlite3.Connection, **fields: Any) -> int:
 
 
 def top(conn: sqlite3.Connection, limit: int = 50) -> list[sqlite3.Row]:
-    """Таблица лидеров. Один сыгранный матч — минимум, чтобы попасть в неё."""
+    """Таблица лидеров: сначала сыгравшие по рейтингу, новички — в конце.
+
+    Новичок не может стоять выше того, кто играл и проиграл: у всех стартовые
+    тысяча очков, и без этого правила он обошёл бы половину таблицы, не сыграв
+    ни разу.
+    """
 
     return conn.execute(
         """
         SELECT id, name, username, rating, games, wins, losses, draws
-        FROM players WHERE games > 0
-        ORDER BY rating DESC, wins DESC, id ASC
+        FROM players
+        ORDER BY (games > 0) DESC, rating DESC, wins DESC, id ASC
         LIMIT ?
         """,
         (limit,),

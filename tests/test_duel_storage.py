@@ -48,13 +48,18 @@ def test_unknown_outcome_is_refused(db):
         storage.apply_result(db, 1, new_rating=1, outcome="чепуха", correct=0, wrong=0, best_streak=0)
 
 
-def test_leaderboard_is_sorted_and_skips_the_untested(db):
-    for user_id, name, score in ((1, "Первый", 1300), (2, "Второй", 1100), (3, "Третий", 1500)):
+def test_leaderboard_lists_everyone_with_newcomers_last(db):
+    """Новичок не может стоять выше того, кто играл и проиграл: стартовая
+    тысяча очков есть у всех. Но и прятать его незачем — под пьедесталом
+    должен быть список, а не пустота."""
+    for user_id, name, score in ((1, "Первый", 1300), (2, "Второй", 900), (3, "Третий", 1500)):
         storage.touch_player(db, user_id, name)
         storage.apply_result(db, user_id, new_rating=score, outcome="win", correct=1, wrong=0, best_streak=1)
-    storage.touch_player(db, 4, "Не играл")
-    names = [row["name"] for row in storage.top(db)]
-    assert names == ["Третий", "Первый", "Второй"]
+    storage.touch_player(db, 4, "Новичок")
+
+    rows = storage.top(db)
+    assert [row["name"] for row in rows] == ["Третий", "Первый", "Второй", "Новичок"]
+    assert rows[-1]["games"] == 0, "новичок в конце, хотя очков у него 1000"
 
 
 def test_place_is_counted_from_the_top(db):

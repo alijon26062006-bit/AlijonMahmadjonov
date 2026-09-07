@@ -35,7 +35,7 @@ from .game import (
     Side,
 )
 from .i18n import normalize, t, ui_strings
-from .matchmaking import Queue, Ticket, make_match
+from .matchmaking import HOST_GRACE_SEC, Queue, Ticket, make_match
 from .tasks import LEVELS
 
 log = logging.getLogger("duel.server")
@@ -352,6 +352,10 @@ class Hub:
             }
         )
 
+        # Друг принял вызов, пока нас не было, — начинаем бой немедленно.
+        if await self._resume_accepted_room(conn, time.monotonic()):
+            return conn
+
         # Вернулся в идущий матч — сразу возвращаем на поле, а не в меню.
         match = self.match_for(user.id)
         if match is not None and match.state != STATE_FINISHED:
@@ -441,15 +445,7 @@ class Hub:
             )
 
         elif kind == "join":
-            code = str(data.get("code", ""))
-            ticket = self.ticket_for(
-                conn, int(data.get("duration", 60) or 0), str(data.get("level", "auto")), now
-            )
-            pair = self.queue.join_room(code, ticket)
-            if pair is None:
-                await conn.send({"t": "room_error"})
-                return
-            await self._start_match(pair[0], pair[1], now, private=True)
+            await self._join_room(conn, data, now)
 
         elif kind == "answer":
             await self._answer(conn, data, now)
@@ -469,6 +465,70 @@ class Hub:
                 await self._settle(match, now)
             else:
                 await conn.send({"t": "idle"})
+
+    async def _join_room(self, conn: Conn, data: dict, now: float) -> None:
+        """Гость входит по коду или по ссылке."""
+
+        room = self.queue.find_room(str(data.get("code", "")))
+        wrong_room = (
+            room is None
+            or room.host.user_id == conn.user_id
+            or (room.target and room.target != conn.user_id)
+        )
+        if wrong_room:
+            await conn.send({"t": "room_error"})
+            return
+
+        host = self.conns.get(room.host.user_id)
+        if host is None or self.match_for(room.host.user_id) is not None:
+            # Хозяин вышел из игры — например, пошёл отправлять ссылку.
+            # Приглашение не рвём: зовём его обратно и держим гостя.
+            room.accepted_by = conn.user_id
+            room.accepted_at = now
+            self.queue.drop_ticket(conn.user_id)
+            await self._call_host_back(room, conn)
+            await conn.send({"t": "waiting_host", "name": room.host.name})
+            return
+
+        ticket = self.ticket_for(
+            conn, int(data.get("duration", 60) or 0), str(data.get("level", "auto")), now
+        )
+        pair = self.queue.join_room(room.code, ticket)
+        if pair is None:
+            await conn.send({"t": "room_error"})
+            return
+        await self._start_match(pair[0], pair[1], now, private=True)
+
+    async def _call_host_back(self, room, guest: Conn) -> None:
+        if self.notify is None:
+            return
+        row = storage.get_player(self.db, room.host.user_id)
+        lang = row["lang"] if row else "ru"
+        with contextlib.suppress(Exception):
+            await self.notify(
+                room.host.user_id,
+                t("bot.accepted", lang, name=guest.user.name),
+                button=t("bot.accepted.go", lang),
+                url=self.config.webapp_url,
+            )
+
+    async def _resume_accepted_room(self, conn: Conn, now: float) -> bool:
+        """Хозяин вернулся, а друг уже согласился — начинаем матч сразу."""
+
+        for room in self.queue.rooms_of(conn.user_id):
+            if not room.accepted_by:
+                continue
+            guest = self.conns.get(room.accepted_by)
+            if guest is None or self.match_for(room.accepted_by) is not None:
+                room.accepted_by = 0
+                continue
+            self.queue.rooms.pop(room.code, None)
+            guest_ticket = self.ticket_for(
+                guest, room.host.duration, room.host.level, now
+            )
+            await self._start_match(room.host, guest_ticket, now, private=True)
+            return True
+        return False
 
     async def _start_robot_match(
         self, conn: Conn, now: float, duration: int, level: str
@@ -648,7 +708,7 @@ class Hub:
 
     async def _on_close(self, conn: Conn) -> None:
         now = time.monotonic()
-        self.queue.remove(conn.user_id)
+        self.queue.drop_ticket(conn.user_id)
         if self.conns.get(conn.user_id) is conn:
             del self.conns[conn.user_id]
         match = self.match_for(conn.user_id)
@@ -816,6 +876,13 @@ class Hub:
 
         for one, other in self.queue.find_pairs(now):
             await self._start_match(one, other, now)
+        for room in list(self.queue.rooms.values()):
+            if not room.accepted_by or now - room.accepted_at < HOST_GRACE_SEC:
+                continue
+            guest = self.conns.get(room.accepted_by)
+            self.queue.rooms.pop(room.code, None)
+            if guest is not None:
+                await guest.send({"t": "host_gone", "name": room.host.name})
         self.queue.sweep_rooms(now)
 
         # Никто не пришёл за полминуты — предлагаем сыграть с роботом.
