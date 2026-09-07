@@ -58,6 +58,13 @@ valid_email() {
   [[ "${1:-}" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]
 }
 
+# git отказывается трогать репозиторий, который принадлежит не ему: с версии
+# 2.35 это защита от подмены кода. Папка игры принадлежит своему пользователю,
+# поэтому каждый вызов git помечаем как доверенный явно.
+git_duel() {
+  git -C "$DUEL_HOME" -c "safe.directory=$DUEL_HOME" "$@"
+}
+
 # ── что пишем в файлы ───────────────────────────────────────────────────────
 
 render_env() {  # render_env <токен> <домен>
@@ -243,15 +250,30 @@ id -u "$DUEL_USER" >/dev/null 2>&1 \
 SRC_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." 2>/dev/null && pwd || true)"
 
 if [ -d "${DUEL_HOME}/.git" ]; then
+  git config --global --add safe.directory "$DUEL_HOME" >/dev/null 2>&1 || true
+
   # Ветку не задали — остаёмся на той, с которой ставили в прошлый раз.
   if [ -z "$DUEL_BRANCH_GIVEN" ]; then
-    HERE="$(git -C "$DUEL_HOME" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
+    HERE="$(git_duel rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
     [ -z "$HERE" ] || [ "$HERE" = "HEAD" ] || DUEL_BRANCH="$HERE"
   fi
-  git -C "$DUEL_HOME" fetch --quiet origin "$DUEL_BRANCH" \
-    || die "Не удалось получить ветку ${DUEL_BRANCH}. Проверь интернет."
-  git -C "$DUEL_HOME" checkout --quiet "$DUEL_BRANCH"
-  git -C "$DUEL_HOME" reset --hard --quiet "origin/${DUEL_BRANCH}"
+
+  BRANCHES=("$DUEL_BRANCH")
+  [ "$DUEL_BRANCH" = "$DUEL_FALLBACK_BRANCH" ] || [ -n "$DUEL_BRANCH_GIVEN" ] \
+    || BRANCHES+=("$DUEL_FALLBACK_BRANCH")
+  FOUND=""
+  for BRANCH in "${BRANCHES[@]}"; do
+    # Скачано было одной веткой, поэтому спрашиваем нужную ссылку прямо.
+    git_duel fetch --quiet --depth 1 origin \
+      "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}" 2>/dev/null || continue
+    git_duel checkout --quiet -B "$BRANCH" "origin/${BRANCH}" 2>/dev/null || continue
+    git_duel reset --hard --quiet "origin/${BRANCH}" 2>/dev/null || continue
+    if [ -f "${DUEL_HOME}/duel/main.py" ]; then FOUND="$BRANCH"; break; fi
+    hint "В ветке ${BRANCH} игры нет, смотрю дальше…"
+  done
+  [ -n "$FOUND" ] \
+    || die "Не удалось обновить код в ${DUEL_HOME}. Что сказал git — видно выше."
+  DUEL_BRANCH="$FOUND"
   ok "Код обновлён из ветки ${DUEL_BRANCH}"
 elif [ -n "$SRC_DIR" ] && [ -f "${SRC_DIR}/duel/main.py" ] && [ "$SRC_DIR" != "$DUEL_HOME" ]; then
   mkdir -p "$DUEL_HOME"
@@ -300,8 +322,15 @@ ok "Библиотеки готовы"
 step 5 "Настройки"
 
 render_env "$TOKEN" "$DOMAIN" > "$ENV_FILE"
+
+# Код принадлежит root и доступен игре только на чтение: так служба не сможет
+# переписать сама себя, а git в этой папке работает без лишних разрешений.
+chown -R root:root "$DUEL_HOME"
+chmod -R a+rX "$DUEL_HOME"
+# Своё игре отдаём: база и настройки с токеном.
+chown -R "${DUEL_USER}:${DUEL_USER}" "${DUEL_HOME}/data"
+chown "${DUEL_USER}:${DUEL_USER}" "$ENV_FILE"
 chmod 600 "$ENV_FILE"
-chown -R "${DUEL_USER}:${DUEL_USER}" "$DUEL_HOME"
 ok "Токен записан в ${ENV_FILE} и закрыт от посторонних"
 
 # Игра должна импортироваться и настройки читаться — проверим до запуска службы.

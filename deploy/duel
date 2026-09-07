@@ -46,7 +46,7 @@ case "${1:-status}" in
   update)
     cd "$HOME_DIR"
     printf '%sЗабираю свежий код…%s\n' "$BOLD" "$OFF"
-    git pull --ff-only
+    git -c "safe.directory=${HOME_DIR}" pull --ff-only
     .venv/bin/pip install --quiet --upgrade -r requirements-duel.txt
     systemctl restart duel
     sleep 2

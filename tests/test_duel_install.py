@@ -243,6 +243,36 @@ def test_ip_prompt_offers_a_way_out():
     assert "duckdns.org" in text
 
 
+def test_git_never_runs_without_marking_the_folder_trusted():
+    """git с версии 2.35 отказывается работать в папке чужого владельца:
+    «detected dubious ownership». На сервере установщик на этом и встал."""
+    lines = INSTALL.read_text().splitlines()
+    assert any("git_duel()" in line for line in lines), "нужна обёртка над git"
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("git -C") and "safe.directory" not in stripped:
+            raise AssertionError(f"git без safe.directory: {stripped}")
+
+
+def test_update_command_also_marks_the_folder_trusted():
+    assert "safe.directory" in CONTROL.read_text()
+
+
+def test_code_belongs_to_root_and_only_data_to_the_game():
+    """Служба не должна иметь права переписать собственный код."""
+    text = INSTALL.read_text()
+    assert 'chown -R root:root "$DUEL_HOME"' in text
+    assert 'chown -R "${DUEL_USER}:${DUEL_USER}" "${DUEL_HOME}/data"' in text
+    assert 'chown "${DUEL_USER}:${DUEL_USER}" "$ENV_FILE"' in text
+
+
+def test_failures_do_not_blame_the_internet_for_everything():
+    """«Проверь интернет» на ошибку прав только сбивает с толку."""
+    text = INSTALL.read_text()
+    assert "Не удалось получить ветку" not in text
+    assert "Что сказал git — видно выше" in text
+
+
 def test_control_command_covers_daily_needs():
     text = CONTROL.read_text()
     for word in ("status", "logs", "restart", "update", "test"):
