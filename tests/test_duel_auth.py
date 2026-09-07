@@ -31,6 +31,16 @@ def make_init_data(token=TOKEN, user_id=42, name="Алиджон", auth_date=Non
     return urlencode(fields)
 
 
+def sign(fields, token=TOKEN, skip_blank=False):
+    """Подписывает набор полей так, как это делает Telegram."""
+    counted = {k: v for k, v in fields.items() if v != ""} if skip_blank else dict(fields)
+    check_string = "\n".join(f"{k}={counted[k]}" for k in sorted(counted))
+    secret = hmac.new(b"WebAppData", token.encode(), hashlib.sha256).digest()
+    signed = dict(fields)
+    signed["hash"] = hmac.new(secret, check_string.encode(), hashlib.sha256).hexdigest()
+    return urlencode(signed)
+
+
 def test_valid_signature_passes():
     fields = check_init_data(make_init_data(), TOKEN)
     assert json.loads(fields["user"])["id"] == 42
@@ -68,6 +78,38 @@ def test_stale_signature_is_rejected():
 def test_fresh_signature_within_the_window_passes():
     recent = make_init_data(auth_date=time.time() - 60)
     assert check_init_data(recent, TOKEN)
+
+
+def test_blank_field_counted_in_the_signature_passes():
+    """Пустое поле, посчитанное в подписи, — обычный случай."""
+    fields = {
+        "user": json.dumps({"id": 42, "first_name": "Али"}, separators=(",", ":")),
+        "auth_date": str(int(time.time())),
+        "start_param": "",
+    }
+    assert check_init_data(sign(fields), TOKEN)
+
+
+def test_blank_field_skipped_in_the_signature_also_passes():
+    """А некоторые клиенты пустые поля в подпись не берут. Подделать нельзя ни
+    так, ни так — для обеих нужен токен, поэтому принимаем оба варианта."""
+    fields = {
+        "user": json.dumps({"id": 42, "first_name": "Али"}, separators=(",", ":")),
+        "auth_date": str(int(time.time())),
+        "start_param": "",
+    }
+    assert check_init_data(sign(fields, skip_blank=True), TOKEN)
+
+
+def test_terpimost_k_pustym_polyam_ne_otkryvaet_dver():
+    """Терпимость к пустым полям не должна пропускать чужую подпись."""
+    fields = {
+        "user": json.dumps({"id": 42, "first_name": "Али"}, separators=(",", ":")),
+        "auth_date": str(int(time.time())),
+        "start_param": "",
+    }
+    with pytest.raises(AuthError):
+        check_init_data(sign(fields, token="999:OTHER-BOT-TOKEN-AAAAAAAAAAAA"), TOKEN)
 
 
 def test_user_is_parsed():

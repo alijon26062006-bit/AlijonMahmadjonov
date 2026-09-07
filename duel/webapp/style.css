@@ -49,6 +49,7 @@ body { display: flex; flex-direction: column; }
 h1 { font-size: 20px; margin: 0; }
 h2 { font-size: 19px; margin: 0; }
 .muted { color: var(--muted); font-size: 14px; margin: 0; }
+.tiny { font-size: 12px; opacity: .7; }
 
 /* ── кнопки ───────────────────────────────────────────────── */
 

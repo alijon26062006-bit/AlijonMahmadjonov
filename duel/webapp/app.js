@@ -335,8 +335,19 @@ function onEnd(msg) {
 function onError(msg) {
   if (msg.code === 'auth') {
     show('loading');
+    // Без подробностей такой экран нечем чинить: показываем, что именно не так.
+    const seen = !(window.Telegram && window.Telegram.WebApp)
+      ? say('auth.no_lib', 'Библиотека Telegram не загрузилась')
+      : (tg && tg.initData)
+        ? say('auth.bad_sign', 'Telegram передал данные, но сервер их не принял')
+        : say('auth.no_data', 'Telegram не передал данные о тебе');
     $('s-loading').innerHTML =
-      `<p class="muted">${say('auth_error', 'Открой игру из Telegram')}</p>`;
+      `<p>${say('auth_error', 'Открой игру из Telegram')}</p>` +
+      `<p class="muted">${escapeHtml(seen)}</p>` +
+      (msg.message ? `<p class="muted tiny">${escapeHtml(msg.message)}</p>` : '') +
+      `<button class="btn" id="retry">${say('retry', 'Попробовать снова')}</button>`;
+    const again = $('retry');
+    if (again) again.onclick = () => location.reload();
   } else if (msg.code === 'replaced') {
     if (S.ws) { S.ws.onclose = null; S.ws.close(); }
     show('loading');

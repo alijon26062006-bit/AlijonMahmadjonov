@@ -45,6 +45,30 @@ def _secret_key(bot_token: str) -> bytes:
     return hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
 
 
+def _hash_of(fields: dict[str, str], bot_token: str) -> str:
+    check_string = "\n".join(f"{k}={fields[k]}" for k in sorted(fields))
+    return hmac.new(
+        _secret_key(bot_token), check_string.encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def _signature_matches(fields: dict[str, str], given: str, bot_token: str) -> bool:
+    """Подпись считается по всем полям, кроме самой подписи.
+
+    Пустые поля — единственное место, где реализации расходятся: одни их
+    оставляют, другие выбрасывают. Подделать нельзя ни тот, ни другой вариант
+    (для обоих нужен токен), поэтому принимаем любой — иначе игра ломается
+    из-за мелочи в чужом коде.
+    """
+
+    if hmac.compare_digest(_hash_of(fields, bot_token), given):
+        return True
+    filled = {k: v for k, v in fields.items() if v != ""}
+    if len(filled) == len(fields):
+        return False
+    return hmac.compare_digest(_hash_of(filled, bot_token), given)
+
+
 def check_init_data(
     init_data: str,
     bot_token: str,
@@ -67,11 +91,7 @@ def check_init_data(
     if not given_hash:
         raise AuthError("в initData нет подписи")
 
-    check_string = "\n".join(f"{k}={fields[k]}" for k in sorted(fields))
-    expected = hmac.new(
-        _secret_key(bot_token), check_string.encode(), hashlib.sha256
-    ).hexdigest()
-    if not hmac.compare_digest(expected, given_hash):
+    if not _signature_matches(fields, given_hash, bot_token):
         raise AuthError("подпись не совпала")
 
     auth_date = fields.get("auth_date", "")

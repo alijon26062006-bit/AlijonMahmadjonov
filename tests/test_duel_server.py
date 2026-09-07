@@ -339,6 +339,24 @@ async def test_health_endpoint_answers(client):
     assert body["ok"] is True and "players" in body
 
 
+async def test_telegram_library_is_served_from_our_own_domain(client):
+    """У части операторов telegram.org с телефона не открывается, и тогда в
+    Mini App нет window.Telegram — игра не может узнать, кто зашёл."""
+    path = client.hub.tg_script_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("// WebApp " + "x" * 3000)
+    response = await client.get("/tg-webapp.js")
+    assert response.status == 200
+    assert "javascript" in response.headers["Content-Type"]
+    assert "WebApp" in await response.text()
+
+
+async def test_page_takes_the_library_from_us_and_telegram_as_backup(client):
+    body = await (await client.get("/")).text()
+    assert "/tg-webapp.js" in body
+    assert "telegram.org/js/telegram-web-app.js" in body, "запасной путь тоже нужен"
+
+
 async def test_mini_app_page_is_served(client):
     response = await client.get("/")
     assert response.status == 200

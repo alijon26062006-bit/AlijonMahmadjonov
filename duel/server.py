@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Awaitable, Callable
 
-from aiohttp import WSMsgType, web
+from aiohttp import ClientSession, ClientTimeout, WSMsgType, web
 
 from . import rating as rating_mod
 from . import storage
@@ -45,6 +45,11 @@ ANSWER_BURST = 25
 # Даже если ничего не поменялось, состояние шлём раз в полсекунды: так клиент
 # понимает, что связь жива.
 HEARTBEAT_SEC = 0.5
+
+# Библиотека Telegram, без которой Mini App не знает, кто её открыл.
+TG_SCRIPT_URL = "https://telegram.org/js/telegram-web-app.js"
+TG_SCRIPT_NAME = "telegram-web-app.js"
+TG_SCRIPT_MAX_AGE = 7 * 24 * 3600
 
 
 @dataclass
@@ -163,6 +168,58 @@ class Hub:
                 "matches": len(self.matches),
                 **storage.totals(self.db),
             }
+        )
+
+    @property
+    def tg_script_path(self) -> Path:
+        return self.config.data_dir / TG_SCRIPT_NAME
+
+    async def refresh_tg_script(self) -> bool:
+        """Забирает свежую библиотеку Telegram к себе. True — получилось."""
+
+        try:
+            async with ClientSession(timeout=ClientTimeout(total=20)) as session:
+                async with session.get(TG_SCRIPT_URL) as response:
+                    response.raise_for_status()
+                    body = await response.text()
+        except Exception as exc:  # сеть, блокировка, что угодно
+            log.warning("Не удалось получить %s: %s", TG_SCRIPT_URL, exc)
+            return False
+
+        # Заодно убеждаемся, что нам отдали именно её, а не страницу-заглушку.
+        if "WebApp" not in body or len(body) < 2000:
+            log.warning("По адресу %s пришло что-то не то", TG_SCRIPT_URL)
+            return False
+
+        self.config.data_dir.mkdir(parents=True, exist_ok=True)
+        self.tg_script_path.write_text(body, encoding="utf-8")
+        log.info("Библиотека Telegram обновлена (%s байт)", len(body))
+        return True
+
+    async def tg_script(self, _: web.Request) -> web.StreamResponse:
+        """Отдаёт библиотеку Telegram со своего домена.
+
+        У части операторов telegram.org с телефона не открывается — тогда в
+        Mini App не появляется window.Telegram, и игра не может узнать, кто
+        зашёл. Поэтому файл держим у себя и раздаём сами, а раз в неделю
+        обновляем из первоисточника.
+        """
+
+        path = self.tg_script_path
+        stale = not path.is_file() or (
+            time.time() - path.stat().st_mtime > TG_SCRIPT_MAX_AGE
+        )
+        if stale:
+            await self.refresh_tg_script()
+        if not path.is_file():
+            # Пусть страница попробует взять её напрямую у Telegram.
+            raise web.HTTPBadGateway(text="// библиотека Telegram недоступна")
+        return web.FileResponse(
+            path,
+            headers={
+                "Content-Type": "application/javascript; charset=utf-8",
+                "Cache-Control": "public, max-age=3600",
+            },
         )
 
     async def api_top(self, request: web.Request) -> web.Response:
@@ -582,6 +639,9 @@ class Hub:
     def start(self) -> None:
         if self._ticker is None:
             self._ticker = asyncio.create_task(self.run_ticker())
+        # Библиотеку Telegram готовим заранее: первый игрок не должен её ждать.
+        if not self.tg_script_path.is_file():
+            asyncio.create_task(self.refresh_tg_script())
 
     async def stop(self) -> None:
         if self._ticker is not None:
@@ -603,6 +663,7 @@ def make_app(hub: Hub) -> web.Application:
     app.router.add_get("/", hub.index)
     app.router.add_get("/health", hub.health)
     app.router.add_get("/api/top", hub.api_top)
+    app.router.add_get("/tg-webapp.js", hub.tg_script)
     app.router.add_get("/ws", hub.websocket)
     app.router.add_static("/static/", WEBAPP_DIR, name="static")
 

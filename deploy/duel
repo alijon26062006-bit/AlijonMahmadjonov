@@ -46,11 +46,23 @@ case "${1:-status}" in
   update)
     cd "$HOME_DIR"
     printf '%sЗабираю свежий код…%s\n' "$BOLD" "$OFF"
-    git -c "safe.directory=${HOME_DIR}" pull --ff-only
+    GIT=(git -C "$HOME_DIR" -c "safe.directory=${HOME_DIR}")
+    BRANCH="$("${GIT[@]}" rev-parse --abbrev-ref HEAD)"
+    # Скачано было одной веткой, поэтому просим нужную ссылку прямо, а не
+    # полагаемся на pull: он на такой копии спотыкается.
+    "${GIT[@]}" fetch --quiet --depth 1 origin \
+      "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+    "${GIT[@]}" reset --hard --quiet "origin/${BRANCH}"
     .venv/bin/pip install --quiet --upgrade -r requirements-duel.txt
+    # Обновляем и саму эту команду, и описание службы — они тоже меняются.
+    install -m 755 "${HOME_DIR}/deploy/duel" /usr/local/bin/duel
+    sed -e "s#/opt/duel#${HOME_DIR}#g" "${HOME_DIR}/deploy/duel.service" \
+      > /etc/systemd/system/duel.service
+    systemctl daemon-reload
     systemctl restart duel
     sleep 2
     health
+    printf '%sОбновлено до %s%s\n' "$GREEN" "$("${GIT[@]}" rev-parse --short HEAD)" "$OFF"
     ;;
   test)
     cd "$HOME_DIR"

@@ -208,7 +208,8 @@ elif [ -n "$DNS_IP" ]; then
   ok "Домен ведёт на этот сервер"
 fi
 
-if [ -z "$EMAIL" ] && [ -n "$INTERACTIVE" ]; then
+if [ -z "$EMAIL" ] && [ -n "$INTERACTIVE" ] \
+   && [ ! -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
   hint "На почту придёт письмо, если сертификат вдруг перестанет обновляться"
   EMAIL="$(prompt 'Почта (можно пропустить, Enter): ')"
 fi
