@@ -514,24 +514,29 @@ Telegram ──> Бот (aiogram)          /play, профиль, таблица
 **3. Выполни на сервере одну команду:**
 
 ```bash
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/main/deploy/install.sh)
+curl -fsSL -o install-duel.sh https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/main/deploy/install.sh && sudo bash install-duel.sh
 ```
 
 Установщик спросит токен и домен, поставит всё нужное, выпустит бесплатный
 сертификат, заведёт службу и запустит игру. Три-пять минут, и бот работает.
 
-Если код ещё не влит в `main`, укажи ветку:
+> Скачивание и запуск идут в два шага не случайно. Привычное
+> `sudo bash <(curl …)` на многих серверах падает с `/dev/fd/63: No such file
+> or directory`: sudo закрывает лишние дескрипторы, и подставленный файл
+> исчезает прямо из-под bash. Команда выше работает везде.
+
+Если код ещё не влит в `main`, установщик сам найдёт его в рабочей ветке.
+Нужна другая — задай явно:
 
 ```bash
-sudo DUEL_BRANCH=имя-ветки bash <(curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/имя-ветки/deploy/install.sh)
+DUEL_BRANCH=имя-ветки sudo -E bash install-duel.sh
 ```
 
 Можно и вовсе без вопросов — например, из своего скрипта:
 
 ```bash
 sudo DUEL_BOT_TOKEN=123456:AAE... DUEL_DOMAIN=duel.example.com \
-     DUEL_EMAIL=я@почта.ru \
-     bash <(curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/main/deploy/install.sh)
+     DUEL_EMAIL=я@почта.ru bash install-duel.sh
 ```
 
 **Что делает установщик**

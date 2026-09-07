@@ -173,6 +173,42 @@ def test_service_can_write_only_to_its_own_data():
     assert "NoNewPrivileges=true" in unit
 
 
+# ── как это запускают ───────────────────────────────────────────────────────
+
+
+def test_install_command_avoids_process_substitution():
+    """`sudo bash <(curl …)` падает с /dev/fd/63: sudo закрывает лишние
+    дескрипторы, и подставленный файл исчезает прямо из-под bash. На настоящем
+    сервере это уже случилось — пусть больше не вернётся."""
+    readme = (ROOT / "README.md").read_text()
+    command_lines = [
+        line for line in readme.splitlines()
+        if "install.sh" in line and "curl" in line and not line.startswith(">")
+    ]
+    assert command_lines, "в README должна быть команда установки"
+    for line in command_lines:
+        assert "bash <(" not in line, line
+    assert "curl -fsSL -o install-duel.sh" in readme
+
+    # В шапке установщика примеры запуска идут с отступом — проверяем их,
+    # а не пояснение, которое как раз про эту ловушку и рассказывает.
+    usage = [line for line in INSTALL.read_text().splitlines() if line.startswith("#   ")]
+    assert any("curl -fsSL -o install-duel.sh" in line for line in usage)
+    assert not any("bash <(" in line for line in usage)
+
+
+def test_installer_looks_in_other_branches_when_main_has_nothing():
+    """Пока код не влит в main, установщик обязан найти его сам."""
+    text = INSTALL.read_text()
+    assert "DUEL_FALLBACK_BRANCH" in text
+    assert "Не нашёл код игры ни в одной ветке" in text
+
+
+def test_repeat_install_stays_on_the_same_branch():
+    """Повторный запуск не должен утащить сервер на main, если ставили с ветки."""
+    assert "DUEL_BRANCH_GIVEN" in INSTALL.read_text()
+
+
 def test_control_command_covers_daily_needs():
     text = CONTROL.read_text()
     for word in ("status", "logs", "restart", "update", "test"):

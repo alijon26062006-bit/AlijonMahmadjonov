@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Установка математической дуэли на сервер одной командой.
 #
-#   sudo bash <(curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/main/deploy/install.sh)
+#   curl -fsSL -o install-duel.sh https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/main/deploy/install.sh
+#   sudo bash install-duel.sh
+#
+# Именно так, в два шага: `sudo bash <(curl …)` не работает — sudo закрывает
+# лишние дескрипторы, и подставленный файл исчезает прямо из-под bash.
 #
 # Ставит зависимости, спрашивает токен бота и домен, выпускает сертификат,
 # заводит службу и запускает. Повторный запуск обновляет уже установленное.
@@ -16,7 +20,10 @@ DUEL_HOME="${DUEL_HOME:-/opt/duel}"
 DUEL_USER="${DUEL_USER:-duel}"
 DUEL_PORT="${DUEL_PORT:-8081}"
 DUEL_REPO="${DUEL_REPO:-https://github.com/alijon26062006-bit/AlijonMahmadjonov.git}"
+DUEL_BRANCH_GIVEN="${DUEL_BRANCH:-}"
 DUEL_BRANCH="${DUEL_BRANCH:-main}"
+# Пока код не влит в main, установщик сам находит его здесь.
+DUEL_FALLBACK_BRANCH="${DUEL_FALLBACK_BRANCH:-claude/telegram-math-duel-bot-wutl1t}"
 
 BOLD=$'\033[1m'; DIM=$'\033[90m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'; RED=$'\033[31m'; OFF=$'\033[0m'
 
@@ -220,7 +227,13 @@ id -u "$DUEL_USER" >/dev/null 2>&1 \
 SRC_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." 2>/dev/null && pwd || true)"
 
 if [ -d "${DUEL_HOME}/.git" ]; then
-  git -C "$DUEL_HOME" fetch --quiet origin "$DUEL_BRANCH"
+  # Ветку не задали — остаёмся на той, с которой ставили в прошлый раз.
+  if [ -z "$DUEL_BRANCH_GIVEN" ]; then
+    HERE="$(git -C "$DUEL_HOME" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
+    [ -z "$HERE" ] || [ "$HERE" = "HEAD" ] || DUEL_BRANCH="$HERE"
+  fi
+  git -C "$DUEL_HOME" fetch --quiet origin "$DUEL_BRANCH" \
+    || die "Не удалось получить ветку ${DUEL_BRANCH}. Проверь интернет."
   git -C "$DUEL_HOME" checkout --quiet "$DUEL_BRANCH"
   git -C "$DUEL_HOME" reset --hard --quiet "origin/${DUEL_BRANCH}"
   ok "Код обновлён из ветки ${DUEL_BRANCH}"
@@ -229,9 +242,22 @@ elif [ -n "$SRC_DIR" ] && [ -f "${SRC_DIR}/duel/main.py" ] && [ "$SRC_DIR" != "$
   tar -C "$SRC_DIR" --exclude=.venv --exclude=data -cf - . | tar -C "$DUEL_HOME" -xf -
   ok "Код скопирован из ${SRC_DIR}"
 elif [ ! -f "${DUEL_HOME}/duel/main.py" ]; then
-  rm -rf "${DUEL_HOME}.tmp"
-  git clone --quiet --depth 1 --branch "$DUEL_BRANCH" "$DUEL_REPO" "${DUEL_HOME}.tmp" \
-    || die "Не удалось скачать код ветки ${DUEL_BRANCH}. Проверь интернет."
+  # Ветки пробуем по очереди: игра могла быть ещё не влита в main.
+  BRANCHES=("$DUEL_BRANCH")
+  [ "$DUEL_BRANCH" = "$DUEL_FALLBACK_BRANCH" ] || [ -n "$DUEL_BRANCH_GIVEN" ] \
+    || BRANCHES+=("$DUEL_FALLBACK_BRANCH")
+  FOUND=""
+  for BRANCH in "${BRANCHES[@]}"; do
+    rm -rf "${DUEL_HOME}.tmp"
+    if git clone --quiet --depth 1 --branch "$BRANCH" "$DUEL_REPO" "${DUEL_HOME}.tmp" 2>/dev/null \
+       && [ -f "${DUEL_HOME}.tmp/duel/main.py" ]; then
+      FOUND="$BRANCH"
+      break
+    fi
+    hint "В ветке ${BRANCH} игры нет, смотрю дальше…"
+  done
+  [ -n "$FOUND" ] || die "Не нашёл код игры ни в одной ветке. Задай нужную: DUEL_BRANCH=имя-ветки"
+  DUEL_BRANCH="$FOUND"
   mkdir -p "$DUEL_HOME"
   tar -C "${DUEL_HOME}.tmp" -cf - . | tar -C "$DUEL_HOME" -xf -
   rm -rf "${DUEL_HOME}.tmp"
