@@ -112,6 +112,15 @@ def test_room_lets_a_friend_in_by_code():
     assert queue.join_room(room.code, ticket(3)) is None, "код одноразовый"
 
 
+def test_peeking_at_a_room_does_not_take_it():
+    queue = Queue()
+    room = queue.create_room(ticket(1), 0.0)
+    assert queue.find_room(room.code) is room
+    assert queue.find_room(room.code.lower()) is room
+    assert queue.find_room("НЕТУ") is None
+    assert queue.join_room(room.code, ticket(2)) is not None, "комната осталась свободной"
+
+
 def test_room_code_is_case_insensitive():
     queue = Queue()
     room = queue.create_room(ticket(1), 0.0)

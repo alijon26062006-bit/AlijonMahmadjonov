@@ -73,6 +73,19 @@
   <button class="btn ghost" id="r-cancel" data-i18n="cancel">Отмена</button>
 </section>
 
+<!-- Пришёл по ссылке-приглашению -->
+<section class="screen hidden" id="s-invite">
+  <div class="caller">
+    <div class="face big" id="i-face">?</div>
+    <div class="caller-name" id="i-name">—</div>
+    <div class="muted" id="i-rank"></div>
+  </div>
+  <p class="invite-title" data-i18n="invite.title">Тебя зовут на дуэль</p>
+  <div class="invite-terms" id="i-terms"></div>
+  <button class="btn primary big" id="i-go" data-i18n="invite.go">⚔️ В бой!</button>
+  <button class="btn ghost" id="i-cancel" data-i18n="cancel">Отмена</button>
+</section>
+
 <!-- Игровое поле -->
 <section class="screen game hidden" id="s-game">
   <div class="hud">
@@ -302,7 +315,9 @@
 <!-- Таблица лидеров -->
 <section class="screen hidden" id="s-top">
   <h2 data-i18n="top">Таблица лидеров</h2>
+  <div class="podium" id="t-podium"></div>
   <ol class="board" id="t-list"></ol>
+  <div class="you-row hidden" id="t-you"></div>
   <button class="btn ghost" id="t-back" data-i18n="back">Назад</button>
 </section>
 

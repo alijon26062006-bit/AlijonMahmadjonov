@@ -184,6 +184,43 @@ async def test_friend_room_pairs_by_code(client):
     assert (await two.recv("found"))["opp"]
 
 
+async def test_invite_shows_who_is_calling_before_the_fight(client):
+    """Гость должен увидеть, кто зовёт, и нажать кнопку сам: влетать в бой
+    врасплох — верный способ проиграть первые секунды."""
+    one, _ = await join(client, 1, "Алиджон")
+    two, _ = await join(client, 2, "Гость")
+    await one.send(t="room", duration=30, level="easy")
+    room = await one.recv("room")
+
+    await two.send(t="peek", code=room["code"])
+    invite = await two.recv("invite")
+    assert invite["host"]["name"] == "Алиджон"
+    assert invite["host"]["rating"] == 1000
+    assert invite["duration"] == 30 and invite["level"] == "easy"
+    assert invite["code"] == room["code"]
+
+    # Заглянуть — не значит войти: комната всё ещё ждёт.
+    assert client.hub.queue.find_room(room["code"]) is not None
+    await two.silent("found", timeout=0.5)
+
+    await two.send(t="join", code=room["code"], duration=30, level="easy")
+    assert (await one.recv("found"))["opp"]["name"] == "Гость"
+
+
+async def test_peek_at_a_room_that_is_gone(client):
+    player, _ = await join(client, 1)
+    await player.send(t="peek", code="НЕТУ")
+    await player.recv("room_error")
+
+
+async def test_you_cannot_invite_yourself(client):
+    one, _ = await join(client, 1)
+    await one.send(t="room", duration=30, level="easy")
+    room = await one.recv("room")
+    await one.send(t="peek", code=room["code"])
+    await one.recv("room_error")
+
+
 async def test_wrong_room_code_says_so(client):
     player, _ = await join(client, 1)
     await player.send(t="join", code="НЕТУ", duration=30, level="easy")

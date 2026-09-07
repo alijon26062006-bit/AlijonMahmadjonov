@@ -29,6 +29,7 @@ const S = {
   retry: 0,
   oppScore: 0,
   pendingRoom: '',
+  invite: '',
 };
 
 const say = (key, fallback) => S.strings[key] || fallback || key;
@@ -37,7 +38,7 @@ const say = (key, fallback) => S.strings[key] || fallback || key;
 
 const SCREENS = {
   loading: 's-loading', menu: 's-menu', search: 's-search', room: 's-room',
-  game: 's-game', result: 's-result', top: 's-top',
+  game: 's-game', result: 's-result', top: 's-top', invite: 's-invite',
 };
 
 function show(name) {
@@ -47,7 +48,7 @@ function show(name) {
     $(id).classList.toggle('hidden', key !== name);
   }
   if (tg && tg.BackButton) {
-    if (name === 'top' || name === 'room') tg.BackButton.show();
+    if (name === 'top' || name === 'room' || name === 'invite') tg.BackButton.show();
     else tg.BackButton.hide();
   }
 }
@@ -125,6 +126,7 @@ function handle(msg) {
     case 'idle': show('menu'); break;
     case 'room': onRoom(msg); break;
     case 'room_error': toast(say('room.bad', 'Комнаты нет')); show('menu'); break;
+    case 'invite': onInvite(msg); break;
     case 'found': onFound(msg); break;
     case 'start': $('g-countdown').classList.add('hidden'); Sound.startMusic(); break;
     case 'task': onTask(msg); break;
@@ -146,12 +148,11 @@ function onReady(msg) {
   paint();
   if (S.screen === 'loading' || S.screen === 'search') show('menu');
 
-  // Открыли по ссылке-приглашению — сразу входим в комнату друга.
+  // Пришли по ссылке-приглашению: показываем, кто зовёт, и ждём нажатия.
   const code = S.pendingRoom || msg.start_param || '';
   if (code && /^[A-Z0-9]{4,10}$/i.test(code)) {
     S.pendingRoom = '';
-    send({ t: 'join', code: code, duration: S.duration, level: S.level });
-    show('search');
+    send({ t: 'peek', code: code });
   }
 }
 
@@ -175,6 +176,35 @@ function onRoom(msg) {
       toast(msg.code);
     }
   };
+}
+
+/* Гостя встречает имя того, кто позвал, и одна кнопка. Влетать в бой сразу,
+   без предупреждения, — верный способ проиграть первые десять секунд. */
+function onInvite(msg) {
+  S.invite = msg.code;
+  $('i-face').textContent = initial(msg.host.name);
+  $('i-face').style.background = colorOf(msg.host.name);
+  $('i-name').textContent = msg.host.name;
+  $('i-rank').textContent = `${say('rating', 'Рейтинг')} ${msg.host.rating} · ${msg.host.title}`;
+  document.querySelector('.invite-title').textContent = say('invite.title', 'зовёт тебя на дуэль');
+  $('i-terms').innerHTML =
+    `<span>${humanDuration(msg.duration)}</span>` +
+    `<span>${say('level.' + msg.level, msg.level)}</span>`;
+  show('invite');
+  Sound.match();
+}
+
+/* Первая буква имени и постоянный для него цвет — вместо аватарки. */
+function initial(name) {
+  return (name || '?').trim().charAt(0).toUpperCase() || '?';
+}
+
+function colorOf(name) {
+  let hash = 0;
+  for (let i = 0; i < (name || '').length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) % 360;
+  }
+  return `hsl(${hash}, 58%, 48%)`;
 }
 
 function onFound(msg) {
@@ -535,6 +565,13 @@ function bind() {
     paint();
   };
 
+  $('i-go').onclick = () => {
+    if (!S.invite) return show('menu');
+    send({ t: 'join', code: S.invite, duration: S.duration, level: S.level });
+    show('search');
+  };
+  $('i-cancel').onclick = () => { S.invite = ''; show('menu'); };
+
   $('m-top').onclick = openTop;
   $('t-back').onclick = () => show('menu');
   $('e-home').onclick = () => show('menu');
@@ -548,8 +585,13 @@ function bind() {
 
 async function openTop() {
   show('top');
+  const podium = $('t-podium');
   const list = $('t-list');
+  const you = $('t-you');
+  podium.innerHTML = '';
   list.innerHTML = '';
+  you.classList.add('hidden');
+
   try {
     const data = await (await fetch('/api/top?limit=100')).json();
     if (!data.top.length) {
@@ -557,15 +599,51 @@ async function openTop() {
       return;
     }
     const myId = S.profile && S.profile.id;
-    list.innerHTML = data.top.map((row) =>
-      `<li class="${row.id === myId ? 'self' : ''}">` +
-      `<span class="place">${row.place}</span>` +
-      `<span class="name">${escapeHtml(row.name)}</span>` +
-      `<span class="score">${row.rating}</span></li>`
-    ).join('');
+
+    // Первая тройка — на пьедестал, в порядке 2-1-3, как на настоящем.
+    const medals = ['🥇', '🥈', '🥉'];
+    const order = [1, 0, 2];
+    podium.innerHTML = order
+      .filter((i) => data.top[i])
+      .map((i) => {
+        const row = data.top[i];
+        return `<div class="pod pod-${i + 1}">` +
+          `<div class="pod-medal">${medals[i]}</div>` +
+          `<div class="face" style="background:${colorOf(row.name)}">${initial(row.name)}</div>` +
+          `<div class="pod-name">${escapeHtml(row.name)}</div>` +
+          `<div class="pod-rating">${row.rating}</div>` +
+          `<div class="pod-base">${row.place}</div>` +
+          `</div>`;
+      })
+      .join('');
+
+    list.innerHTML = data.top.slice(3).map((row) => boardRow(row, row.id === myId)).join('');
+
+    // Своё место далеко внизу — показываем отдельной строкой, чтобы не искать.
+    const mine = data.top.find((row) => row.id === myId);
+    if (!mine && S.profile && S.profile.games) {
+      you.innerHTML = boardRow({
+        place: S.profile.place,
+        name: S.profile.name,
+        rating: S.profile.rating,
+        wins: S.profile.wins,
+        games: S.profile.games,
+      }, true, true);
+      you.classList.remove('hidden');
+    }
   } catch (e) {
     list.innerHTML = `<p class="muted">${say('error', 'Ошибка')}</p>`;
   }
+}
+
+function boardRow(row, self, bare) {
+  const inner =
+    `<span class="place">${row.place}</span>` +
+    `<span class="face" style="background:${colorOf(row.name)}">${initial(row.name)}</span>` +
+    `<span class="name">${escapeHtml(row.name)}` +
+    `<span class="games"> · ${row.wins}/${row.games}</span></span>` +
+    `<span class="score">${row.rating}</span>`;
+  return bare ? inner : `<li class="${self ? 'self' : ''}">${inner}</li>`;
 }
 
 function escapeHtml(text) {

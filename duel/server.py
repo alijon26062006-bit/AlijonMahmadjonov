@@ -370,6 +370,28 @@ class Hub:
             )
             await conn.send({"t": "room", "code": room.code, "link": link})
 
+        elif kind == "peek":
+            # Гость пришёл по ссылке: сначала показываем, кто зовёт, и только
+            # по нажатию кнопки заводим матч — иначе бой начинается врасплох.
+            room = self.queue.find_room(str(data.get("code", "")))
+            if room is None or room.host.user_id == conn.user_id:
+                await conn.send({"t": "room_error"})
+                return
+            await conn.send(
+                {
+                    "t": "invite",
+                    "code": room.code,
+                    "duration": room.host.duration,
+                    "level": room.host.level,
+                    "host": {
+                        "name": room.host.name,
+                        "rating": room.host.rating,
+                        "title": rating_mod.title(room.host.rating),
+                        "photo": room.host.photo_url,
+                    },
+                }
+            )
+
         elif kind == "join":
             code = str(data.get("code", ""))
             ticket = self.ticket_for(

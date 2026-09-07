@@ -346,25 +346,120 @@ h2 { font-size: 19px; margin: 0; }
 .stats li + li { border-top: 1px solid color-mix(in srgb, var(--muted) 20%, transparent); }
 .stats b { font-variant-numeric: tabular-nums; }
 
+/* ── приглашение на бой ───────────────────────────────────── */
+
+.caller { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.caller-name { font-size: 22px; font-weight: 800; }
+
+.face {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-weight: 800; color: #fff;
+  background: var(--accent);
+  width: 34px; height: 34px; font-size: 15px;
+  flex: 0 0 auto;
+}
+.face.big {
+  width: 84px; height: 84px; font-size: 36px;
+  box-shadow: 0 0 0 4px var(--card);
+  animation: pop .45s cubic-bezier(.2, 1.2, .4, 1);
+}
+
+.invite-title { font-size: 17px; font-weight: 600; margin: 0; }
+.invite-terms {
+  display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+}
+.invite-terms span {
+  background: var(--card); border-radius: 999px;
+  padding: 7px 14px; font-size: 14px; font-weight: 600;
+}
+
 /* ── таблица лидеров ──────────────────────────────────────── */
+
+/* Первая тройка стоит на пьедестале: место видно раньше, чем цифры. */
+.podium {
+  display: grid;
+  grid-template-columns: 1fr 1.18fr 1fr;
+  align-items: end;
+  gap: 8px;
+  width: 100%; max-width: 460px;
+}
+
+.pod {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  min-width: 0;
+  animation: rise-pod .5s cubic-bezier(.2, 1, .4, 1) both;
+}
+.pod-2 { animation-delay: .05s; }
+.pod-1 { animation-delay: .15s; }
+.pod-3 { animation-delay: .25s; }
+
+@keyframes rise-pod {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pod-medal { font-size: 22px; line-height: 1; }
+.pod-1 .pod-medal { font-size: 28px; }
+.pod .face { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--pod-color); }
+.pod-1 .face { width: 54px; height: 54px; font-size: 22px; }
+
+.pod-name {
+  font-size: 13px; font-weight: 700;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pod-rating {
+  font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums;
+  color: var(--pod-color);
+}
+.pod-base {
+  width: 100%;
+  border-radius: 12px 12px 0 0;
+  background: linear-gradient(var(--pod-color), color-mix(in srgb, var(--pod-color) 55%, var(--bg)));
+  color: #fff;
+  font-size: 20px; font-weight: 800;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 6px;
+}
+.pod-1 { --pod-color: #f0b429; }
+.pod-2 { --pod-color: #7f8ca1; }
+.pod-3 { --pod-color: #c8813f; }
+.pod-1 .pod-base { height: 76px; }
+.pod-2 .pod-base { height: 56px; }
+.pod-3 .pod-base { height: 42px; }
 
 .board {
   list-style: none; padding: 0; margin: 0;
   width: 100%; max-width: 460px;
   overflow-y: auto; flex: 1;
+  display: flex; flex-direction: column; gap: 4px;
 }
 .board li {
   display: grid;
-  grid-template-columns: 32px 1fr auto;
+  grid-template-columns: 26px 34px 1fr auto;
   gap: 10px; align-items: center;
-  padding: 10px 12px; border-radius: 12px;
+  padding: 8px 12px; border-radius: 12px;
+  text-align: left;
+  background: var(--card);
+}
+.board li.self, .you-row {
+  outline: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+}
+.board .place { color: var(--muted); font-weight: 700; text-align: center; font-size: 14px; }
+.board .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.board .score { font-weight: 800; font-variant-numeric: tabular-nums; }
+.board .games { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+/* Своя строка всегда на виду, даже если до неё далеко листать. */
+.you-row {
+  width: 100%; max-width: 460px;
+  display: grid;
+  grid-template-columns: 26px 34px 1fr auto;
+  gap: 10px; align-items: center;
+  padding: 8px 12px; border-radius: 12px;
   text-align: left;
 }
-.board li:nth-child(odd) { background: var(--card); }
-.board li.self { outline: 2px solid var(--accent); }
-.board .place { color: var(--muted); font-weight: 700; text-align: center; }
-.board .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.board .score { font-weight: 800; font-variant-numeric: tabular-nums; }
 
 /* ── всплывающая подсказка ────────────────────────────────── */
 

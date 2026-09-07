@@ -175,6 +175,11 @@ class Queue:
         self.rooms[room.code] = room
         return room
 
+    def find_room(self, code: str) -> Room | None:
+        """Смотрит комнату по коду, не занимая её."""
+
+        return self.rooms.get(code.strip().upper())
+
     def join_room(self, code: str, guest: Ticket) -> tuple[Ticket, Ticket] | None:
         """Гость входит по коду. Возвращает пару или None, если комнаты нет."""
 
