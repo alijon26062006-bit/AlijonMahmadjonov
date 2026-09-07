@@ -6,11 +6,16 @@
 const tg = window.Telegram && window.Telegram.WebApp;
 const $ = (id) => document.getElementById(id);
 
+/* Длительность матча. Раньше её выбирали на экране, но выбор до игры только
+   мешает: человек пришёл играть, а не настраивать. */
+const MATCH_SECONDS = 60;
+
 const S = {
   ws: null,
   strings: {},
   profile: null,
-  duration: 60,
+  // Матч всегда на минуту: выбирать нечего, играют сразу.
+  duration: MATCH_SECONDS,
   level: 'auto',
   winSteps: 10,
   sound: localStorage.getItem('duel.sound') !== 'off',
@@ -538,16 +543,6 @@ function onError(msg) {
 /* ── экран и настройки ──────────────────────────────────── */
 
 function buildOptions(durations, levels) {
-  const box = $('m-durations');
-  if (!box.children.length) {
-    (durations || [30, 60, 120, 300, 0]).forEach((sec) => {
-      const chip = document.createElement('button');
-      chip.className = 'chip';
-      chip.dataset.duration = String(sec);
-      chip.onclick = () => { S.duration = sec; paint(); };
-      box.appendChild(chip);
-    });
-  }
   const lv = $('m-levels');
   if (!lv.children.length) {
     (levels || ['easy', 'normal', 'hard', 'auto']).forEach((name) => {
@@ -571,13 +566,10 @@ function paint() {
     const key = el.dataset.i18n;
     if (S.strings[key]) el.textContent = S.strings[key];
   });
+  // На экране лидеров заголовок остаётся полным, а кнопка в меню — короткой.
+  document.querySelector('#s-top h2').textContent = say('top', 'Таблица лидеров');
   $('m-title').textContent = say('title', 'Перетягивание каната');
 
-  document.querySelectorAll('#m-durations .chip').forEach((chip) => {
-    const sec = Number(chip.dataset.duration);
-    chip.textContent = humanDuration(sec);
-    chip.classList.toggle('on', sec === S.duration);
-  });
   document.querySelectorAll('#m-levels .chip').forEach((chip) => {
     const name = chip.dataset.level;
     chip.innerHTML =
