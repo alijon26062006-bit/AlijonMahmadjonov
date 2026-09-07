@@ -191,14 +191,35 @@ function onRobotOffer(msg) {
     : '';
 }
 
-function onRoom(msg) {
+/* Экран ожидания на три случая. Разница не косметическая: вызов, уже
+   брошенный в чат, не надо предлагать «отправить другу» — он отправлен. */
+function paintRoom({ title, hint, waiting, code, spinner }) {
   show('room');
-  $('r-code').classList.remove('hidden');
-  $('r-share').classList.remove('hidden');
-  document.querySelector('#s-room h2').textContent = say('room.title', 'Комната для друга');
-  document.querySelector('#s-room .muted').textContent = say('room.hint', '');
-  $('r-waiting').textContent = say('room.waiting', '');
-  $('r-code').textContent = msg.code;
+  $('r-title').textContent = title;
+  $('r-hint').textContent = hint;
+  $('r-waiting').textContent = waiting || '';
+  $('r-spinner').classList.toggle('hidden', !spinner);
+  $('r-code').classList.toggle('hidden', !code);
+  $('r-share').classList.toggle('hidden', !code);
+  if (code) $('r-code').textContent = code;
+}
+
+function onRoom(msg) {
+  if (msg.group) {
+    // Вызов уже в чате: остаётся только ждать, кто нажмёт первым.
+    paintRoom({
+      title: say('room.group.title', 'Вызов брошен в чат'),
+      hint: say('room.group.hint', 'Ждём соперника'),
+      spinner: true,
+    });
+    return;
+  }
+  paintRoom({
+    title: say('room.title', 'Комната для друга'),
+    hint: say('room.hint', ''),
+    waiting: say('room.waiting', ''),
+    code: msg.code,
+  });
   $('r-share').onclick = () => shareInvite(msg);
 }
 
@@ -304,15 +325,13 @@ function onWaitingHost(msg) {
 }
 
 function onCalled(msg) {
-  show('room');
-  $('r-code').classList.add('hidden');
-  $('r-share').classList.add('hidden');
-  document.querySelector('#s-room h2').textContent =
-    `${say('called', 'Позвали')}: ${msg.to.name}`;
-  document.querySelector('#s-room .muted').textContent = msg.to.online
-    ? say('called.wait', 'Ждём ответа')
-    : say('called.chat', 'Приглашение ушло ему в чат');
-  $('r-waiting').textContent = '';
+  paintRoom({
+    title: `${say('called', 'Позвали')}: ${msg.to.name}`,
+    hint: msg.to.online
+      ? say('called.wait', 'Ждём ответа')
+      : say('called.chat', 'Приглашение ушло ему в чат'),
+    spinner: true,
+  });
 }
 
 /* Отправить приглашение другу: открываем выбор чата прямо в Telegram.

@@ -75,8 +75,9 @@
 
 <!-- Комната для друга -->
 <section class="screen hidden" id="s-room">
-  <h2 data-i18n="room.title">Комната для друга</h2>
-  <p class="muted" data-i18n="room.hint"></p>
+  <div class="spinner hidden" id="r-spinner"></div>
+  <h2 id="r-title" data-i18n="room.title">Комната для друга</h2>
+  <p class="muted" id="r-hint" data-i18n="room.hint"></p>
   <div class="code" id="r-code">------</div>
   <button class="btn primary" id="r-share" data-i18n="room.share">Отправить другу</button>
   <p class="muted" id="r-waiting" data-i18n="room.waiting"></p>

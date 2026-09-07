@@ -447,7 +447,12 @@ class Hub:
             )
             room = self.queue.create_room(ticket, now)
             await conn.send(
-                {"t": "room", "code": room.code, "link": self.invite_link(room.code)}
+                {
+                    "t": "room",
+                    "code": room.code,
+                    "link": self.invite_link(room.code),
+                    "group": False,
+                }
             )
 
         elif kind == "play_bot":
@@ -472,9 +477,15 @@ class Hub:
                 await conn.send({"t": "room_error"})
                 return
             if room.host.user_id == conn.user_id:
-                # Свой же вызов: показываем комнату и ждём, кто откликнется.
+                # Свой же вызов: показываем ожидание, а не приглашение.
+                # Если вызов брошен в чат, делиться кодом уже незачем.
                 await conn.send(
-                    {"t": "room", "code": room.code, "link": self.invite_link(room.code)}
+                    {
+                        "t": "room",
+                        "code": room.code,
+                        "link": self.invite_link(room.code),
+                        "group": bool(room.chat_id),
+                    }
                 )
                 return
             await conn.send(

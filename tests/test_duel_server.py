@@ -352,6 +352,23 @@ async def test_the_score_goes_back_to_the_chat(client):
     assert "1 : 0" in text
 
 
+async def test_your_own_call_in_a_chat_shows_waiting_not_a_code(client):
+    """Вызов уже в чате — предлагать «отправь другу код» бессмысленно."""
+    storage.touch_player(client.hub.db, 1, "Алиджон")
+    room = client.hub.open_group_room(1, "Алиджон", -100500)
+    host, _ = await join(client, 1, "Алиджон")
+
+    await host.send(t="peek", code=room.code)
+    shown = await host.recv("room")
+    assert shown["group"] is True
+
+
+async def test_a_room_for_a_friend_is_not_marked_as_a_chat_call(client):
+    one, _ = await join(client, 1)
+    await one.send(t="room", duration=30, level="easy")
+    assert (await one.recv("room"))["group"] is False
+
+
 async def test_a_second_person_cannot_take_a_taken_call(client):
     storage.touch_player(client.hub.db, 1, "Алиджон")
     room = client.hub.open_group_room(1, "Алиджон", -100500)
