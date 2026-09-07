@@ -340,7 +340,7 @@ function onError(msg) {
       ? say('auth.no_lib', 'Библиотека Telegram не загрузилась')
       : (tg && tg.initData)
         ? say('auth.bad_sign', 'Telegram передал данные, но сервер их не принял')
-        : say('auth.no_data', 'Telegram не передал данные о тебе');
+        : say('auth.no_data', 'Открой игру кнопкой в боте');
     $('s-loading').innerHTML =
       `<p>${say('auth_error', 'Открой игру из Telegram')}</p>` +
       `<p class="muted">${escapeHtml(seen)}</p>` +

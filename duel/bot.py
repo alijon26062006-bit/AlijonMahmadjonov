@@ -37,12 +37,37 @@ def player_lang(conn: sqlite3.Connection, message: Message) -> str:
     return normalize(message.from_user.language_code if message.from_user else None)
 
 
-def main_keyboard(lang: str, webapp_url: str) -> ReplyKeyboardMarkup:
-    """Клавиатура под полем ввода. Кнопка с Mini App работает только в личке."""
+def play_keyboard(lang: str, webapp_url: str) -> InlineKeyboardMarkup:
+    """Кнопки под сообщением бота. Игру открывает верхняя.
+
+    Кнопка обязана быть именно здесь, а не на клавиатуре под полем ввода:
+    с той Telegram не передаёт в приложение данные о том, кто его открыл
+    (initData приходит пустой), и игра не может узнать игрока.
+    """
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=t("bot.play", lang), web_app=WebAppInfo(url=webapp_url))],
+            [
+                InlineKeyboardButton(text=t("bot.top", lang), callback_data="duel:top"),
+                InlineKeyboardButton(text=t("bot.me", lang), callback_data="duel:me"),
+            ],
+            [
+                InlineKeyboardButton(text=t("bot.rules", lang), callback_data="duel:rules"),
+                InlineKeyboardButton(text=t("bot.lang", lang), callback_data="duel:langs"),
+            ],
+        ]
+    )
+
+
+def main_keyboard(lang: str) -> ReplyKeyboardMarkup:
+    """Клавиатура под полем ввода — только текстовые кнопки.
+
+    Игру отсюда не открываем: см. play_keyboard.
+    """
 
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=t("bot.play", lang), web_app=WebAppInfo(url=webapp_url))],
             [KeyboardButton(text=t("bot.top", lang)), KeyboardButton(text=t("bot.me", lang))],
             [KeyboardButton(text=t("bot.rules", lang)), KeyboardButton(text=t("bot.lang", lang))],
         ],
@@ -91,10 +116,8 @@ async def start_deeplink(
     url = config.webapp_url
     if code:
         url = f"{url}?tgWebAppStartParam={code}"
-    await message.answer(
-        t("bot.start", lang),
-        reply_markup=main_keyboard(lang, url),
-    )
+    await message.answer(t("bot.start", lang), reply_markup=main_keyboard(lang))
+    await message.answer(t("bot.press", lang), reply_markup=play_keyboard(lang, url))
 
 
 @router.message(CommandStart())
@@ -105,8 +128,9 @@ async def start(message: Message, conn: sqlite3.Connection, config: DuelConfig) 
         await message.answer(t("bot.only_private", lang))
         return
     lang = ensure_player(conn, message)
+    await message.answer(t("bot.start", lang), reply_markup=main_keyboard(lang))
     await message.answer(
-        t("bot.start", lang), reply_markup=main_keyboard(lang, config.webapp_url)
+        t("bot.press", lang), reply_markup=play_keyboard(lang, config.webapp_url)
     )
 
 
@@ -139,10 +163,48 @@ async def lang_pick(
     storage.set_lang(conn, call.from_user.id, code)
     await call.answer()
     if isinstance(call.message, Message):
+        await call.message.answer(t("bot.lang.done", code), reply_markup=main_keyboard(code))
         await call.message.answer(
-            t("bot.lang.done", code),
-            reply_markup=main_keyboard(code, config.webapp_url),
+            t("bot.press", code), reply_markup=play_keyboard(code, config.webapp_url)
         )
+
+
+@router.callback_query(F.data == "duel:top")
+async def top_button_inline(call: CallbackQuery, conn: sqlite3.Connection) -> None:
+    await call.answer()
+    if isinstance(call.message, Message):
+        await call.message.answer(top_text(conn, _caller_lang(conn, call)))
+
+
+@router.callback_query(F.data == "duel:rules")
+async def rules_button_inline(call: CallbackQuery, conn: sqlite3.Connection) -> None:
+    await call.answer()
+    if isinstance(call.message, Message):
+        await call.message.answer(t("bot.rules.text", _caller_lang(conn, call)))
+
+
+@router.callback_query(F.data == "duel:me")
+async def me_button_inline(call: CallbackQuery, conn: sqlite3.Connection) -> None:
+    await call.answer()
+    if isinstance(call.message, Message):
+        lang = _caller_lang(conn, call)
+        await call.message.answer(_profile_of(conn, call.from_user.id, lang))
+
+
+@router.callback_query(F.data == "duel:langs")
+async def lang_button_inline(call: CallbackQuery, conn: sqlite3.Connection) -> None:
+    await call.answer()
+    if isinstance(call.message, Message):
+        await call.message.answer(
+            t("bot.lang.choose", _caller_lang(conn, call)), reply_markup=lang_keyboard()
+        )
+
+
+def _caller_lang(conn: sqlite3.Connection, call: CallbackQuery) -> str:
+    row = storage.get_player(conn, call.from_user.id)
+    if row is not None:
+        return normalize(row["lang"])
+    return normalize(call.from_user.language_code)
 
 
 # Кнопки нижней клавиатуры приходят обычным текстом — ловим их на обоих языках.
@@ -184,7 +246,11 @@ def top_text(conn: sqlite3.Connection, lang: str, limit: int = 20) -> str:
 
 
 def profile_text(conn: sqlite3.Connection, message: Message, lang: str) -> str:
-    row = storage.get_player(conn, message.from_user.id)
+    return _profile_of(conn, message.from_user.id, lang)
+
+
+def _profile_of(conn: sqlite3.Connection, user_id: int, lang: str) -> str:
+    row = storage.get_player(conn, user_id)
     if row is None:
         return t("bot.profile.empty", lang, name="—")
     if row["games"] == 0:
