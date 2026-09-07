@@ -499,54 +499,81 @@ Telegram ──> Бот (aiogram)          /play, профиль, таблица
 | `duel/i18n.py` | Русский и таджикский — один источник для бота и Mini App |
 | `duel/webapp/` | Сам экран игры: канат, клавиатура, анимация |
 | `duel/webapp/sound.js` | Звук и музыка — синтезируются на месте, без файлов |
+| `deploy/install.sh` | Установка на сервер одной командой |
+| `deploy/duel` | Команда `duel`: состояние, журнал, перезапуск, обновление |
 
-## Установка на сервер
+## Установка на сервер — одной командой
 
 Нужен свой сервер и домен: Telegram открывает Mini App только по `https`.
 
-**1. Заведи бота.** У [@BotFather](https://t.me/BotFather): `/newbot`. Это
-отдельный бот, не тот, что считает деньги.
+**1. Заведи бота** у [@BotFather](https://t.me/BotFather): `/newbot`. Это отдельный
+бот, не тот, что считает деньги.
 
-**2. Положи код и зависимости.**
+**2. Направь домен на сервер** — A-запись на его IP-адрес.
 
-```bash
-sudo useradd -r -m -d /opt/duel duel
-sudo -u duel git clone <адрес репозитория> /opt/duel
-cd /opt/duel
-sudo -u duel python3 -m venv .venv
-sudo -u duel .venv/bin/pip install -r requirements.txt
-```
-
-**3. Заполни `.env`** (см. `.env.example`, раздел про дуэль):
-
-```
-DUEL_BOT_TOKEN=токен от @BotFather
-DUEL_PUBLIC_URL=https://duel.твойдомен.ru
-DUEL_HOST=127.0.0.1
-DUEL_PORT=8081
-```
-
-**4. Подними nginx с сертификатом.**
+**3. Выполни на сервере одну команду:**
 
 ```bash
-sudo cp deploy/nginx.conf /etc/nginx/sites-available/duel
-sudo ln -s /etc/nginx/sites-available/duel /etc/nginx/sites-enabled/
-sudo nano /etc/nginx/sites-available/duel     # заменить duel.example.com
-sudo certbot --nginx -d duel.твойдомен.ru
-sudo nginx -t && sudo systemctl reload nginx
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/main/deploy/install.sh)
 ```
 
-**5. Запусти службу.**
+Установщик спросит токен и домен, поставит всё нужное, выпустит бесплатный
+сертификат, заведёт службу и запустит игру. Три-пять минут, и бот работает.
+
+Если код ещё не влит в `main`, укажи ветку:
 
 ```bash
-sudo cp deploy/duel.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now duel
-journalctl -u duel -f
+sudo DUEL_BRANCH=имя-ветки bash <(curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/имя-ветки/deploy/install.sh)
 ```
 
-Проверка: `curl https://duel.твойдомен.ru/health` должен ответить `{"ok": true, ...}`.
-Дальше открой бота в Telegram и жми **⚔️ Играть**.
+Можно и вовсе без вопросов — например, из своего скрипта:
+
+```bash
+sudo DUEL_BOT_TOKEN=123456:AAE... DUEL_DOMAIN=duel.example.com \
+     DUEL_EMAIL=я@почта.ru \
+     bash <(curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/main/deploy/install.sh)
+```
+
+**Что делает установщик**
+
+1. Проверяет, что это Linux с systemd и правами администратора.
+2. Спрашивает токен и домен. Токен тут же сверяет с Telegram, домен — с тем,
+   куда он на самом деле ведёт: обе ошибки видны сразу, а не посреди установки.
+3. Ставит python3-venv, nginx, certbot — только то, чего не хватает.
+4. Кладёт код в `/opt/duel`, заводит отдельного пользователя `duel`, ставит
+   библиотеки в своё окружение.
+5. Пишет `.env` и закрывает его от посторонних (`chmod 600`).
+   Перед запуском проверяет, что игра собирается и настройки читаются.
+6. Настраивает nginx, открывает порты в файрволе, выпускает сертификат
+   Let's Encrypt и переводит `http` на `https`.
+7. Заводит службу, запускает и убеждается, что сервер отвечает — и изнутри,
+   и снаружи по домену.
+
+Повторный запуск той же команды обновляет уже установленное: токен и домен
+переспрашивать не будет, возьмёт из `.env`.
+
+## Управление после установки
+
+Установщик кладёт команду `duel` — ей и пользуйся:
+
+| Команда | Что делает |
+|---|---|
+| `duel` | Что сейчас происходит: состояние службы и ответ сервера |
+| `duel logs` | Журнал вживую. Выход — Ctrl+C |
+| `duel restart` | Перезапустить |
+| `duel stop` / `duel start` | Остановить / запустить |
+| `duel update` | Забрать свежий код и перезапустить |
+| `duel test` | Прогнать тесты |
+
+Игра сама поднимется после перезагрузки сервера и сама перезапустится, если
+упадёт.
+
+## Если ставишь руками
+
+Установщик делает всё это сам, но если хочется по шагам — в `deploy/` лежат
+`nginx.conf` и `duel.service`, а порядок такой: `python3 -m venv .venv`,
+`pip install -r requirements-duel.txt`, `.env` по образцу из `.env.example`,
+`certbot --nginx -d домен`, `systemctl enable --now duel`.
 
 ## Посмотреть локально, без Telegram и домена
 
@@ -587,8 +614,8 @@ python -m pytest tests/test_duel_*.py -v
 ```
 
 Проверяются правила матча, генератор примеров (ответы сверяются вычислением),
-подбор соперников, рейтинг, подпись Telegram и весь путь целиком: два игрока
-подключаются по WebSocket и играют матч до победы.
+подбор соперников, рейтинг, подпись Telegram, установщик и весь путь целиком:
+два игрока подключаются по WebSocket и играют матч до победы.
 
 ## Если что-то не так
 
@@ -603,6 +630,13 @@ python -m pytest tests/test_duel_*.py -v
 
 **Соперник не находится** — посмотри `curl https://.../health`: там видно,
 сколько человек онлайн и сколько в очереди.
+
+**Установщик остановился на сертификате** — почти всегда домен ещё не ведёт на
+этот сервер или закрыт порт 80. Проверь A-запись, потом запусти установщик
+снова: он продолжит с того же места.
+
+**Игра не запустилась после установки** — `duel logs` покажет причину. Чаще
+всего это занятый порт 8081 или опечатка в токене.
 
 **Не слышно звука** — проверь кнопки 🔊 и 🎵 в меню, потом громкость на телефоне.
 Браузер включает звук только после касания экрана, поэтому на самом первом
