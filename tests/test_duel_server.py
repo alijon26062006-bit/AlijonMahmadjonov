@@ -67,8 +67,14 @@ async def client(tmp_path, monkeypatch):
         tick_hz=50,
     )
     conn = storage.connect(config.db_path)
-    hub = Hub(config, conn, bot_username="duel_bot")
+    posted: list = []
+
+    async def notify(user_id, text, button=None, url=None):
+        posted.append({"to": user_id, "text": text, "button": button, "url": url})
+
+    hub = Hub(config, conn, notify=notify, bot_username="duel_bot")
     test_client = TestClient(TestServer(make_app(hub)))
+    test_client.posted = posted
     await test_client.start_server()
     test_client.hub = hub
     test_client.players = []
@@ -219,6 +225,92 @@ async def test_you_cannot_invite_yourself(client):
     room = await one.recv("room")
     await one.send(t="peek", code=room["code"])
     await one.recv("room_error")
+
+
+# ── список игроков и личный вызов ───────────────────────────────────────────
+
+
+async def test_player_list_puts_those_online_on_top(client):
+    """Смысл списка в том, чтобы сверху были те, с кем можно сыграть сейчас."""
+    storage.touch_player(client.hub.db, 7, "Давний")
+    client.hub.db.execute(
+        "UPDATE players SET last_seen_at = '2024-01-01T00:00:00+00:00' WHERE id = 7"
+    )
+    client.hub.db.commit()
+    await join(client, 2, "Соперник")
+    one, _ = await join(client, 1, "Алиджон")
+
+    await one.send(t="players")
+    people = (await one.recv("players"))["list"]
+    names = [p["name"] for p in people]
+    assert "Алиджон" not in names, "себя в списке быть не должно"
+    assert names[0] == "Соперник" and people[0]["online"] is True
+    assert names[-1] == "Давний"
+    assert people[-1]["seen"] > 30 * 24 * 3600, "давний вход виден по времени"
+
+
+async def test_calling_someone_reaches_them_on_screen_and_in_chat(client):
+    two, _ = await join(client, 2, "Соперник")
+    one, _ = await join(client, 1, "Алиджон")
+
+    await one.send(t="challenge", to=2, duration=30, level="easy")
+    sent = await one.recv("challenge_sent")
+    assert sent["to"]["name"] == "Соперник" and sent["to"]["online"] is True
+
+    invite = await two.recv("invite")
+    assert invite["host"]["name"] == "Алиджон"
+    assert invite["code"] == sent["code"]
+
+    letter = client.posted[-1]
+    assert letter["to"] == 2
+    assert "Алиджон" in letter["text"]
+    assert sent["code"] in letter["url"], "кнопка в чате должна вести в тот же бой"
+
+    await two.send(t="join", code=sent["code"], duration=30, level="easy")
+    assert (await one.recv("found"))["opp"]["name"] == "Соперник"
+
+
+async def test_call_reaches_the_chat_even_when_the_game_is_closed(client):
+    storage.touch_player(client.hub.db, 5, "Ушедший")
+    one, _ = await join(client, 1, "Алиджон")
+    await one.send(t="challenge", to=5, duration=30, level="easy")
+    sent = await one.recv("challenge_sent")
+    assert sent["to"]["online"] is False
+    assert client.posted[-1]["to"] == 5
+
+
+async def test_a_personal_call_is_not_for_strangers(client):
+    two, _ = await join(client, 2, "Соперник")
+    three, _ = await join(client, 3, "Посторонний")
+    one, _ = await join(client, 1, "Алиджон")
+    await one.send(t="challenge", to=2, duration=30, level="easy")
+    sent = await one.recv("challenge_sent")
+
+    await three.send(t="join", code=sent["code"], duration=30, level="easy")
+    await three.recv("room_error")
+    assert client.hub.queue.find_room(sent["code"]) is not None, "комната ждёт своего"
+
+
+async def test_you_cannot_call_the_same_person_over_and_over(client):
+    await join(client, 2, "Соперник")
+    one, _ = await join(client, 1, "Алиджон")
+
+    await one.send(t="challenge", to=2)
+    await one.recv("challenge_sent")
+
+    await one.send(t="challenge", to=2)
+    assert (await one.recv("challenge_error"))["reason"] == "too_often"
+
+    # Даже когда общий перерыв прошёл, одному и тому же — не чаще раза в минуту.
+    client.hub._called_at.clear()
+    await one.send(t="challenge", to=2)
+    assert (await one.recv("challenge_error"))["reason"] == "already"
+
+
+async def test_calling_a_ghost_says_so(client):
+    one, _ = await join(client, 1)
+    await one.send(t="challenge", to=99999)
+    assert (await one.recv("challenge_error"))["reason"] == "gone"
 
 
 async def test_wrong_room_code_says_so(client):

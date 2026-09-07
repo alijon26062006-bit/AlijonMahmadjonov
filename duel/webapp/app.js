@@ -31,6 +31,8 @@ const S = {
   pendingRoom: '',
   invite: '',
   online: null,
+  people: [],
+  peopleOffset: 0,
 };
 
 const say = (key, fallback) => S.strings[key] || fallback || key;
@@ -40,6 +42,7 @@ const say = (key, fallback) => S.strings[key] || fallback || key;
 const SCREENS = {
   loading: 's-loading', menu: 's-menu', search: 's-search', room: 's-room',
   game: 's-game', result: 's-result', top: 's-top', invite: 's-invite',
+  players: 's-players',
 };
 
 function show(name) {
@@ -49,7 +52,7 @@ function show(name) {
     $(id).classList.toggle('hidden', key !== name);
   }
   if (tg && tg.BackButton) {
-    if (name === 'top' || name === 'room' || name === 'invite') tg.BackButton.show();
+    if (['top', 'room', 'invite', 'players'].includes(name)) tg.BackButton.show();
     else tg.BackButton.hide();
   }
 }
@@ -129,6 +132,11 @@ function handle(msg) {
     case 'room': onRoom(msg); break;
     case 'room_error': toast(say('room.bad', 'Комнаты нет')); show('menu'); break;
     case 'invite': onInvite(msg); break;
+    case 'players': onPeople(msg); break;
+    case 'challenge_sent': onCalled(msg); break;
+    case 'challenge_error':
+      toast(say('called.error.' + msg.reason, say('error', 'Ошибка')));
+      break;
     case 'found': onFound(msg); break;
     case 'start': $('g-countdown').classList.add('hidden'); Sound.startMusic(); break;
     case 'task': onTask(msg); break;
@@ -167,6 +175,11 @@ function onQueued(msg) {
 
 function onRoom(msg) {
   show('room');
+  $('r-code').classList.remove('hidden');
+  $('r-share').classList.remove('hidden');
+  document.querySelector('#s-room h2').textContent = say('room.title', 'Комната для друга');
+  document.querySelector('#s-room .muted').textContent = say('room.hint', '');
+  $('r-waiting').textContent = say('room.waiting', '');
   $('r-code').textContent = msg.code;
   $('r-share').onclick = () => {
     const text = `${say('room.code', 'Код комнаты')}: ${msg.code}`;
@@ -208,6 +221,80 @@ function colorOf(name) {
     hash = (hash * 31 + name.charCodeAt(i)) % 360;
   }
   return `hsl(${hash}, 58%, 48%)`;
+}
+
+/* ── все игроки ─────────────────────────────────────────── */
+
+function openPeople() {
+  S.people = [];
+  S.peopleOffset = 0;
+  $('p-list').innerHTML = '';
+  $('p-more').classList.add('hidden');
+  show('players');
+  send({ t: 'players', offset: 0 });
+}
+
+function onPeople(msg) {
+  S.people = S.people.concat(msg.list);
+  S.peopleOffset = msg.offset + msg.list.length;
+
+  const list = $('p-list');
+  if (!S.people.length) {
+    list.innerHTML = `<p class="muted">${say('players.empty', '')}</p>`;
+    return;
+  }
+  list.innerHTML = S.people.map(personRow).join('');
+  list.querySelectorAll('.call').forEach((button) => {
+    button.onclick = () => callToBattle(button, Number(button.dataset.id));
+  });
+  $('p-more').classList.toggle('hidden', S.peopleOffset >= msg.total);
+}
+
+function personRow(person) {
+  return `<li>` +
+    `<span class="face" style="background:${colorOf(person.name)}">${initial(person.name)}</span>` +
+    `<span class="who">` +
+      `<div class="nick">${escapeHtml(person.name)}</div>` +
+      `<div class="seen ${person.busy ? 'busy' : person.online ? 'now' : ''}">` +
+        `${seenText(person)} · <span class="rank">${person.rating}</span></div>` +
+    `</span>` +
+    `<button class="call" data-id="${person.id}">${say('players.call', 'Позвать')}</button>` +
+    `</li>`;
+}
+
+/* Точное время никому не нужно, а «вчера» и «давно» говорят главное:
+   стоит ли ждать ответа прямо сейчас. */
+function seenText(person) {
+  if (person.busy) return say('seen.busy', 'играет');
+  if (person.online) return say('seen.online', 'в сети');
+  // Сроки берём по прошедшему времени, а не по календарю: сервер шлёт
+  // секунды, а «сегодня» для того, кто был 18 часов назад, — уже неправда.
+  const s = person.seen;
+  if (s < 600) return say('seen.now', 'только что');
+  if (s < 7200) return say('seen.recent', 'недавно');
+  if (s < 86400) return say('seen.hours', 'несколько часов назад');
+  if (s < 259200) return say('seen.days', 'на днях');
+  if (s < 604800) return say('seen.week', 'на этой неделе');
+  if (s < 2592000) return say('seen.month', 'в этом месяце');
+  return say('seen.long', 'давно');
+}
+
+function callToBattle(button, id) {
+  send({ t: 'challenge', to: id, duration: S.duration, level: S.level });
+  button.classList.add('done');
+  button.textContent = say('called', 'Позвали');
+}
+
+function onCalled(msg) {
+  show('room');
+  $('r-code').classList.add('hidden');
+  $('r-share').classList.add('hidden');
+  document.querySelector('#s-room h2').textContent =
+    `${say('called', 'Позвали')}: ${msg.to.name}`;
+  document.querySelector('#s-room .muted').textContent = msg.to.online
+    ? say('called.wait', 'Ждём ответа')
+    : say('called.chat', 'Приглашение ушло ему в чат');
+  $('r-waiting').textContent = '';
 }
 
 function onFound(msg) {
@@ -601,6 +688,9 @@ function bind() {
   };
   $('i-cancel').onclick = () => { S.invite = ''; show('menu'); };
 
+  $('m-players').onclick = openPeople;
+  $('p-back').onclick = () => show('menu');
+  $('p-more').onclick = () => send({ t: 'players', offset: S.peopleOffset });
   $('m-top').onclick = openTop;
   $('t-back').onclick = () => show('menu');
   $('e-home').onclick = () => show('menu');

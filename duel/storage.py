@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS players (
 );
 
 CREATE INDEX IF NOT EXISTS idx_players_rating ON players(rating DESC);
+CREATE INDEX IF NOT EXISTS idx_players_seen ON players(last_seen_at DESC);
 
 CREATE TABLE IF NOT EXISTS matches (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -221,6 +222,45 @@ def place_of(conn: sqlite3.Connection, user_id: int) -> int:
         (row["rating"],),
     ).fetchone()
     return int(ahead["n"]) + 1
+
+
+def by_last_seen(
+    conn: sqlite3.Connection,
+    *,
+    exclude: int = 0,
+    limit: int = 60,
+    offset: int = 0,
+) -> list[sqlite3.Row]:
+    """Все игроки: кто заходил недавно — сверху, забытые — в самом низу."""
+
+    return conn.execute(
+        """
+        SELECT id, name, rating, games, wins, last_seen_at
+        FROM players
+        WHERE id != ?
+        ORDER BY last_seen_at DESC, id ASC
+        LIMIT ? OFFSET ?
+        """,
+        (exclude, limit, offset),
+    ).fetchall()
+
+
+def count_players(conn: sqlite3.Connection, exclude: int = 0) -> int:
+    row = conn.execute("SELECT COUNT(*) AS n FROM players WHERE id != ?", (exclude,)).fetchone()
+    return int(row["n"])
+
+
+def seconds_since(stamp: str, now: datetime | None = None) -> int:
+    """Сколько секунд прошло с записанного момента. Мусор — считаем давним."""
+
+    try:
+        seen = datetime.fromisoformat(stamp)
+    except (TypeError, ValueError):
+        return 10 ** 9
+    if seen.tzinfo is None:
+        seen = seen.replace(tzinfo=timezone.utc)
+    moment = now or datetime.now(timezone.utc)
+    return max(0, int((moment - seen).total_seconds()))
 
 
 def history(conn: sqlite3.Connection, user_id: int, limit: int = 10) -> list[sqlite3.Row]:

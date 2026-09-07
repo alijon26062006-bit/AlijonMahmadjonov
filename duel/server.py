@@ -46,6 +46,12 @@ ANSWER_BURST = 25
 # понимает, что связь жива.
 HEARTBEAT_SEC = 0.5
 
+# Одного и того же человека не зовём чаще, чем раз в минуту, и вообще не чаще
+# чем раз в восемь секунд: приглашение приходит в чат, спамить им нельзя.
+CHALLENGE_COOLDOWN = 60.0
+CHALLENGE_RATE = 8.0
+PLAYERS_PAGE = 60
+
 # Библиотека Telegram, без которой Mini App не знает, кто её открыл.
 TG_SCRIPT_URL = "https://telegram.org/js/telegram-web-app.js"
 TG_SCRIPT_NAME = "telegram-web-app.js"
@@ -87,7 +93,7 @@ class Hub:
         self,
         config: DuelConfig,
         conn: sqlite3.Connection,
-        notify: Callable[[int, str], Awaitable[None]] | None = None,
+        notify: Callable[..., Awaitable[None]] | None = None,
         bot_username: str = "",
     ) -> None:
         self.config = config
@@ -101,6 +107,8 @@ class Hub:
         self._ticker: asyncio.Task[None] | None = None
         self._online: dict[str, int] = {}
         self._online_at = 0.0
+        self._called: dict[tuple[int, int], float] = {}
+        self._called_at: dict[int, float] = {}
 
     # ── служебное ───────────────────────────────────────────────────
 
@@ -387,6 +395,12 @@ class Hub:
             )
             await conn.send({"t": "room", "code": room.code, "link": link})
 
+        elif kind == "players":
+            await self._send_players(conn, int(data.get("offset", 0) or 0))
+
+        elif kind == "challenge":
+            await self._challenge(conn, data, now)
+
         elif kind == "peek":
             # Гость пришёл по ссылке: сначала показываем, кто зовёт, и только
             # по нажатию кнопки заводим матч — иначе бой начинается врасплох.
@@ -438,6 +452,104 @@ class Hub:
                 await self._settle(match, now)
             else:
                 await conn.send({"t": "idle"})
+
+    async def _send_players(self, conn: Conn, offset: int) -> None:
+        """Все игроки: кто был в сети недавно — сверху, забытые — внизу."""
+
+        offset = max(0, min(5000, offset))
+        rows = storage.by_last_seen(
+            self.db, exclude=conn.user_id, limit=PLAYERS_PAGE, offset=offset
+        )
+        people = [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "rating": row["rating"],
+                "games": row["games"],
+                "wins": row["wins"],
+                # Сколько секунд назад заходил; кто в сети сейчас — отдельно.
+                "seen": storage.seconds_since(row["last_seen_at"]),
+                "online": row["id"] in self.conns,
+                "busy": self.match_for(row["id"]) is not None,
+            }
+            for row in rows
+        ]
+        # Кто сейчас в игре, тот всегда выше: с ним можно сыграть прямо сейчас.
+        people.sort(key=lambda p: (not p["online"], p["seen"]))
+        await conn.send(
+            {
+                "t": "players",
+                "list": people,
+                "offset": offset,
+                "total": storage.count_players(self.db, exclude=conn.user_id),
+            }
+        )
+
+    async def _challenge(self, conn: Conn, data: dict, now: float) -> None:
+        """Личный вызов: приглашение уходит человеку в чат и в открытую игру."""
+
+        try:
+            target = int(data.get("to", 0))
+        except (TypeError, ValueError):
+            return
+        if target == conn.user_id or self.match_for(conn.user_id) is not None:
+            return
+
+        row = storage.get_player(self.db, target)
+        if row is None:
+            await conn.send({"t": "challenge_error", "reason": "gone"})
+            return
+
+        if now - self._called_at.get(conn.user_id, 0.0) < CHALLENGE_RATE:
+            await conn.send({"t": "challenge_error", "reason": "too_often"})
+            return
+        if now - self._called.get((conn.user_id, target), 0.0) < CHALLENGE_COOLDOWN:
+            await conn.send({"t": "challenge_error", "reason": "already"})
+            return
+        self._called_at[conn.user_id] = now
+        self._called[(conn.user_id, target)] = now
+
+        ticket = self.ticket_for(
+            conn, int(data.get("duration", 60) or 0), str(data.get("level", "auto")), now
+        )
+        room = self.queue.create_room(ticket, now, target=target)
+
+        # Если человек уже в игре — зовём прямо на экран, как звонок.
+        peer = self.conns.get(target)
+        if peer is not None and self.match_for(target) is None:
+            await peer.send(
+                {
+                    "t": "invite",
+                    "code": room.code,
+                    "duration": ticket.duration,
+                    "level": ticket.level,
+                    "host": {
+                        "name": conn.user.name,
+                        "rating": conn.rating,
+                        "title": rating_mod.title(conn.rating),
+                        "photo": conn.user.photo_url,
+                    },
+                }
+            )
+
+        # И в чат — чтобы нашёл, даже если игру закрыл.
+        if self.notify is not None:
+            lang = row["lang"] if row else "ru"
+            with contextlib.suppress(Exception):
+                await self.notify(
+                    target,
+                    t("bot.challenge", lang, name=conn.user.name),
+                    button=t("bot.challenge.go", lang),
+                    url=f"{self.config.webapp_url}?tgWebAppStartParam={room.code}",
+                )
+
+        await conn.send(
+            {
+                "t": "challenge_sent",
+                "code": room.code,
+                "to": {"id": target, "name": row["name"], "online": peer is not None},
+            }
+        )
 
     async def _answer(self, conn: Conn, data: dict, now: float) -> None:
         match = self.match_for(conn.user_id)

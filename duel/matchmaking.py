@@ -60,11 +60,15 @@ class Ticket:
 
 @dataclass
 class Room:
-    """Приватная комната: играют только те, у кого есть код."""
+    """Приватная комната: играют только те, у кого есть код.
+
+    target — если вызов адресный, входит только тот, кого позвали.
+    """
 
     code: str
     host: Ticket
     created_at: float = 0.0
+    target: int = 0
 
 
 @dataclass
@@ -166,12 +170,12 @@ class Queue:
             if code not in self.rooms:
                 return code
 
-    def create_room(self, host: Ticket, now: float) -> Room:
-        """Хозяин создаёт комнату и зовёт друга по коду."""
+    def create_room(self, host: Ticket, now: float, target: int = 0) -> Room:
+        """Хозяин создаёт комнату и зовёт друга: по коду или лично."""
 
         self.drop_rooms_of(host.user_id)
         self.tickets.pop(host.user_id, None)
-        room = Room(code=self.new_code(), host=host, created_at=now)
+        room = Room(code=self.new_code(), host=host, created_at=now, target=target)
         self.rooms[room.code] = room
         return room
 
@@ -185,6 +189,9 @@ class Queue:
 
         room = self.rooms.get(code.strip().upper())
         if room is None or room.host.user_id == guest.user_id:
+            return None
+        # Позвали лично — чужой по коду не влезет.
+        if room.target and room.target != guest.user_id:
             return None
         del self.rooms[room.code]
         self.tickets.pop(guest.user_id, None)

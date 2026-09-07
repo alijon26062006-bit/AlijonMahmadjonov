@@ -9,6 +9,7 @@ import sys
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from aiohttp import web
 
 from . import bot as bot_module
@@ -35,10 +36,28 @@ async def run(config: DuelConfig) -> None:
     bot = Bot(config.bot_token, default=DefaultBotProperties(parse_mode=None))
     me = await bot.get_me()
 
-    async def notify(user_id: int, text: str) -> None:
-        """Итог матча в чат. Если человек заблокировал бота — молча пропускаем."""
+    async def notify(
+        user_id: int,
+        text: str,
+        button: str | None = None,
+        url: str | None = None,
+    ) -> None:
+        """Сообщение в чат: итог матча или вызов на бой.
+
+        С кнопкой приглашение открывается одним касанием прямо из чата — и
+        сразу с данными об игроке, потому что кнопка под сообщением.
+        Заблокировал бота — молча пропускаем.
+        """
+
+        markup = None
+        if button and url:
+            markup = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=button, web_app=WebAppInfo(url=url))]
+                ]
+            )
         with contextlib.suppress(Exception):
-            await bot.send_message(user_id, text)
+            await bot.send_message(user_id, text, reply_markup=markup)
 
     hub = Hub(config, conn, notify=notify, bot_username=me.username or "")
     runner = web.AppRunner(make_app(hub))

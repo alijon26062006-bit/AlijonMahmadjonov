@@ -133,6 +133,13 @@ def test_you_cannot_play_against_yourself():
     assert queue.join_room(room.code, ticket(1)) is None
 
 
+def test_personal_call_admits_only_the_one_invited():
+    queue = Queue()
+    room = queue.create_room(ticket(1), 0.0, target=2)
+    assert queue.join_room(room.code, ticket(3)) is None, "посторонний по коду не войдёт"
+    assert queue.join_room(room.code, ticket(2)) is not None
+
+
 def test_wrong_code_returns_nothing():
     assert Queue().join_room("НЕТУ", ticket(2)) is None
 

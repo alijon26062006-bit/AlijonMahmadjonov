@@ -46,6 +46,7 @@
     <button class="btn" id="m-join" data-i18n="join">Войти по коду</button>
   </div>
   <div class="row">
+    <button class="btn" id="m-players" data-i18n="players">Игроки</button>
     <button class="btn ghost" id="m-top" data-i18n="top">Таблица лидеров</button>
   </div>
   <div class="row toggles">
@@ -311,6 +312,15 @@
   <ul class="stats" id="e-stats"></ul>
   <button class="btn primary big" id="e-again" data-i18n="again">Ещё раз</button>
   <button class="btn ghost" id="e-home" data-i18n="home">В меню</button>
+</section>
+
+<!-- Все игроки: сверху те, кто заходил недавно -->
+<section class="screen hidden" id="s-players">
+  <h2 data-i18n="players">Игроки</h2>
+  <p class="muted" data-i18n="players.hint"></p>
+  <ul class="people" id="p-list"></ul>
+  <button class="btn ghost hidden" id="p-more" data-i18n="players.more">Показать ещё</button>
+  <button class="btn ghost" id="p-back" data-i18n="back">Назад</button>
 </section>
 
 <!-- Таблица лидеров -->

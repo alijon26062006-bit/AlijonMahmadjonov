@@ -79,6 +79,52 @@ def test_match_goes_into_history_for_both(db):
     assert storage.totals(db)["matches"] == 1
 
 
+def test_players_are_listed_by_when_they_last_came(db):
+    """Список нужен, чтобы позвать в бой: сверху те, кто заходил недавно."""
+    for user_id, name, when in (
+        (1, "Вчерашний", "2026-09-06T12:00:00+00:00"),
+        (2, "Сегодняшний", "2026-09-07T09:00:00+00:00"),
+        (3, "Годовалый", "2025-09-07T09:00:00+00:00"),
+    ):
+        storage.touch_player(db, user_id, name)
+        db.execute("UPDATE players SET last_seen_at = ? WHERE id = ?", (when, user_id))
+    db.commit()
+    assert [r["name"] for r in storage.by_last_seen(db)] == [
+        "Сегодняшний", "Вчерашний", "Годовалый",
+    ]
+
+
+def test_you_are_not_in_your_own_list(db):
+    storage.touch_player(db, 1, "Я")
+    storage.touch_player(db, 2, "Другой")
+    assert [r["name"] for r in storage.by_last_seen(db, exclude=1)] == ["Другой"]
+    assert storage.count_players(db, exclude=1) == 1
+
+
+def test_long_list_is_given_out_in_parts(db):
+    for user_id in range(1, 8):
+        storage.touch_player(db, user_id, f"Игрок {user_id}")
+    first = storage.by_last_seen(db, limit=3)
+    second = storage.by_last_seen(db, limit=3, offset=3)
+    assert len(first) == len(second) == 3
+    assert not ({r["id"] for r in first} & {r["id"] for r in second})
+
+
+def test_how_long_ago_someone_came(db):
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime(2026, 9, 7, 12, 0, tzinfo=timezone.utc)
+    hour_ago = (now - timedelta(hours=1)).isoformat()
+    assert storage.seconds_since(hour_ago, now) == 3600
+    assert storage.seconds_since(now.isoformat(), now) == 0
+
+
+def test_broken_time_counts_as_very_long_ago(db):
+    """Испорченная запись не должна ронять список — просто уходит в конец."""
+    assert storage.seconds_since("чепуха") > 10 ** 8
+    assert storage.seconds_since("") > 10 ** 8
+
+
 def test_language_is_remembered(db):
     storage.touch_player(db, 1, "Игрок")
     storage.set_lang(db, 1, "tg")
