@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Перетягивание каната: математика</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<!-- Пока идёт вход и проверка подписи Telegram -->
+<section class="screen" id="s-loading">
+  <div class="spinner"></div>
+</section>
+
+<!-- Главное меню -->
+<section class="screen hidden" id="s-menu">
+  <header class="menu-head">
+    <h1 id="m-title">Перетягивание каната</h1>
+    <div class="me" id="m-me"></div>
+  </header>
+
+  <div class="field">
+    <div class="field-label" data-i18n="duration">Сколько играем</div>
+    <div class="chips" id="m-durations"></div>
+  </div>
+
+  <div class="field">
+    <div class="field-label" data-i18n="level">Сложность</div>
+    <div class="chips levels" id="m-levels"></div>
+  </div>
+
+  <button class="btn primary big" id="m-play" data-i18n="play">Найти соперника</button>
+  <div class="row">
+    <button class="btn" id="m-friend" data-i18n="friend">Позвать друга</button>
+    <button class="btn" id="m-join" data-i18n="join">Войти по коду</button>
+  </div>
+  <div class="row">
+    <button class="btn ghost" id="m-top" data-i18n="top">Таблица лидеров</button>
+    <button class="btn ghost narrow" id="m-lang">🌐</button>
+    <button class="btn ghost narrow" id="m-sound">🔊</button>
+  </div>
+</section>
+
+<!-- Поиск соперника -->
+<section class="screen hidden" id="s-search">
+  <div class="spinner"></div>
+  <h2 data-i18n="searching">Ищем соперника</h2>
+  <p class="muted" id="q-hint" data-i18n="searching.hint"></p>
+  <p class="muted" id="q-count"></p>
+  <button class="btn ghost" id="q-cancel" data-i18n="cancel">Отмена</button>
+</section>
+
+<!-- Комната для друга -->
+<section class="screen hidden" id="s-room">
+  <h2 data-i18n="room.title">Комната для друга</h2>
+  <p class="muted" data-i18n="room.hint"></p>
+  <div class="code" id="r-code">------</div>
+  <button class="btn primary" id="r-share" data-i18n="room.share">Отправить другу</button>
+  <p class="muted" id="r-waiting" data-i18n="room.waiting"></p>
+  <button class="btn ghost" id="r-cancel" data-i18n="cancel">Отмена</button>
+</section>
+
+<!-- Игровое поле -->
+<section class="screen game hidden" id="s-game">
+  <div class="hud">
+    <div class="hud-side me">
+      <span class="hud-name" id="g-me-name">—</span>
+      <span class="hud-score" id="g-me-score">0</span>
+    </div>
+    <div class="hud-clock" id="g-clock">—</div>
+    <div class="hud-side opp">
+      <span class="hud-score" id="g-opp-score">0</span>
+      <span class="hud-name" id="g-opp-name">—</span>
+    </div>
+  </div>
+
+  <div class="scene">
+    <svg id="g-scene" viewBox="0 0 360 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <line class="ground" x1="8" y1="130" x2="352" y2="130"/>
+      <line class="middle" x1="180" y1="36" x2="180" y2="130"/>
+
+      <!-- Моя команда тянет влево, команда соперника — вправо. -->
+      <g id="g-team-me" class="team me">
+        <g class="fig" transform="translate(100,130)">
+          <circle class="f-head" cx="0" cy="-46" r="9"/>
+          <path class="f-body" fill="none" d="M0,-37 L-3,-16"/>
+          <path class="f-arm"  fill="none" d="M-1,-33 L16,-32"/>
+          <path class="f-leg"  fill="none" d="M-3,-16 L-15,0"/>
+          <path class="f-leg"  fill="none" d="M-3,-16 L9,-2"/>
+        </g>
+        <g class="fig" transform="translate(64,130)">
+          <circle class="f-head" cx="0" cy="-46" r="9"/>
+          <path class="f-body" fill="none" d="M0,-37 L-3,-16"/>
+          <path class="f-arm"  fill="none" d="M-1,-33 L16,-32"/>
+          <path class="f-leg"  fill="none" d="M-3,-16 L-15,0"/>
+          <path class="f-leg"  fill="none" d="M-3,-16 L9,-2"/>
+        </g>
+      </g>
+
+      <g id="rope-group">
+        <line class="rope" x1="116" y1="-32" x2="244" y2="-32" transform="translate(0,130)"/>
+        <g transform="translate(180,98)">
+          <path class="knot-line" d="M0,-11 L0,11"/>
+          <path class="knot" d="M0,-11 L13,-4 L0,3 z"/>
+        </g>
+      </g>
+
+      <g id="g-team-opp" class="team opp">
+        <g class="fig" transform="scale(-1,1) translate(-260,130)">
+          <circle class="f-head" cx="0" cy="-46" r="9"/>
+          <path class="f-body" fill="none" d="M0,-37 L-3,-16"/>
+          <path class="f-arm"  fill="none" d="M-1,-33 L16,-32"/>
+          <path class="f-leg"  fill="none" d="M-3,-16 L-15,0"/>
+          <path class="f-leg"  fill="none" d="M-3,-16 L9,-2"/>
+        </g>
+        <g class="fig" transform="scale(-1,1) translate(-294,130)">
+          <circle class="f-head" cx="0" cy="-46" r="9"/>
+          <path class="f-body" fill="none" d="M0,-37 L-3,-16"/>
+          <path class="f-arm"  fill="none" d="M-1,-33 L16,-32"/>
+          <path class="f-leg"  fill="none" d="M-3,-16 L-15,0"/>
+          <path class="f-leg"  fill="none" d="M-3,-16 L9,-2"/>
+        </g>
+      </g>
+    </svg>
+    <div class="flash" id="g-flash"></div>
+  </div>
+
+  <div class="task">
+    <div class="question" id="g-question">…</div>
+    <div class="answer" id="g-answer"></div>
+    <div class="streak hidden" id="g-streak"></div>
+  </div>
+
+  <div class="pad" id="g-pad">
+    <button class="key" data-key="1">1</button>
+    <button class="key" data-key="2">2</button>
+    <button class="key" data-key="3">3</button>
+    <button class="key" data-key="4">4</button>
+    <button class="key" data-key="5">5</button>
+    <button class="key" data-key="6">6</button>
+    <button class="key" data-key="7">7</button>
+    <button class="key" data-key="8">8</button>
+    <button class="key" data-key="9">9</button>
+    <button class="key del" data-key="del">←</button>
+    <button class="key" data-key="0">0</button>
+    <button class="key ok" data-key="ok">✓</button>
+  </div>
+
+  <div class="countdown hidden" id="g-countdown"><span>3</span></div>
+  <div class="freeze hidden" id="g-freeze"></div>
+</section>
+
+<!-- Итог матча -->
+<section class="screen hidden" id="s-result">
+  <div class="verdict" id="e-verdict">—</div>
+  <p class="muted" id="e-reason"></p>
+  <div class="final-score"><span id="e-score">0</span><i>:</i><span id="e-opp-score">0</span></div>
+  <div class="rating-line" id="e-rating"></div>
+  <ul class="stats" id="e-stats"></ul>
+  <button class="btn primary big" id="e-again" data-i18n="again">Ещё раз</button>
+  <button class="btn ghost" id="e-home" data-i18n="home">В меню</button>
+</section>
+
+<!-- Таблица лидеров -->
+<section class="screen hidden" id="s-top">
+  <h2 data-i18n="top">Таблица лидеров</h2>
+  <ol class="board" id="t-list"></ol>
+  <button class="btn ghost" id="t-back" data-i18n="back">Назад</button>
+</section>
+
+<div class="toast hidden" id="toast"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

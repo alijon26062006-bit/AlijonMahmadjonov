@@ -3,6 +3,7 @@ anthropic>=0.75
 openai>=1.60
 reportlab>=4.2
 python-dotenv>=1.0
+aiohttp>=3.9        # веб-сервер дуэли (ставится вместе с aiogram)
 
 # Для тестов (не нужно для работы бота):
 # pytest, pytest-asyncio, pypdf

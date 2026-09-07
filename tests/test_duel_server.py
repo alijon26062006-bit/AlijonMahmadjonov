@@ -1,0 +1,345 @@
+"""Сквозной тест: два игрока подключаются по WebSocket и играют матч."""
+
+import asyncio
+import time
+from pathlib import Path
+
+import pytest
+from aiohttp import WSMsgType
+from aiohttp.test_utils import TestClient, TestServer
+
+from duel import game, storage
+from duel.config import DuelConfig
+from duel.server import Hub, make_app
+from tests.test_duel_auth import TOKEN, make_init_data
+
+
+class Player:
+    """Игрок в тесте: читает сокет в фоне, чтобы ожидание не рвало связь."""
+
+    def __init__(self, ws):
+        self.ws = ws
+        self.inbox: asyncio.Queue = asyncio.Queue()
+        self.pending: list = []
+        self._pump = asyncio.create_task(self._read())
+
+    async def _read(self):
+        async for message in self.ws:
+            if message.type is WSMsgType.TEXT:
+                await self.inbox.put(message.json())
+
+    async def send(self, **payload):
+        await self.ws.send_json(payload)
+
+    async def recv(self, kind, timeout=6.0):
+        """Ждёт сообщение нужного вида. Остальные откладывает, а не теряет."""
+
+        for index, message in enumerate(self.pending):
+            if message.get("t") == kind:
+                return self.pending.pop(index)
+
+        async def wait():
+            while True:
+                message = await self.inbox.get()
+                if message.get("t") == kind:
+                    return message
+                self.pending.append(message)
+
+        return await asyncio.wait_for(wait(), timeout)
+
+    async def silent(self, kind, timeout=0.6):
+        """Проверяет, что такого сообщения не приходит."""
+        with pytest.raises(asyncio.TimeoutError):
+            await self.recv(kind, timeout)
+
+    async def close(self):
+        self._pump.cancel()
+        await self.ws.close()
+
+
+@pytest.fixture
+async def client(tmp_path, monkeypatch):
+    monkeypatch.setattr(game, "COUNTDOWN_SEC", 0.05)
+    config = DuelConfig(
+        bot_token=TOKEN,
+        public_url="https://duel.example.com",
+        data_dir=Path(tmp_path),
+        tick_hz=50,
+    )
+    conn = storage.connect(config.db_path)
+    hub = Hub(config, conn, bot_username="duel_bot")
+    test_client = TestClient(TestServer(make_app(hub)))
+    await test_client.start_server()
+    test_client.hub = hub
+    test_client.players = []
+    yield test_client
+    for player in test_client.players:
+        player._pump.cancel()
+    await test_client.close()
+    conn.close()
+
+
+async def join(client, user_id, name="Игрок"):
+    player = Player(await client.ws_connect("/ws"))
+    client.players.append(player)
+    await player.send(t="hello", initData=make_init_data(user_id=user_id, name=name))
+    return player, await player.recv("ready")
+
+
+async def play(client, duration=30, level="normal"):
+    """Заводит двоих в один матч и возвращает их вместе с первыми примерами."""
+    one, _ = await join(client, 1, "Первый")
+    two, _ = await join(client, 2, "Второй")
+    for player in (one, two):
+        await player.send(t="find", duration=duration, level=level)
+    await one.recv("found")
+    await two.recv("found")
+    return one, two, await one.recv("task"), await two.recv("task")
+
+
+async def respond(player, hub, user_id, task_id, correct=True):
+    """Отвечает как живой человек: не мгновенно, иначе сервер решит, что это бот."""
+    await asyncio.sleep(game.MIN_SOLVE_SEC + 0.03)
+    match = hub.match_for(user_id)
+    value = match.side(user_id).task.answer + (0 if correct else 7)
+    await player.send(t="answer", id=task_id, v=value, ms=900)
+
+
+async def state_where(player, check, tries=40):
+    """Ждёт состояние, которое удовлетворяет условию."""
+    for _ in range(tries):
+        message = await player.recv("state")
+        if check(message):
+            return message
+    raise AssertionError("подходящее состояние не пришло")
+
+
+# ── вход ────────────────────────────────────────────────────────────
+
+
+async def test_valid_player_gets_in(client):
+    _, ready = await join(client, 1, "Алиджон")
+    assert ready["profile"]["name"] == "Алиджон"
+    assert ready["profile"]["rating"] == 1000
+    assert ready["strings"]["play"]
+
+
+async def test_forged_init_data_is_refused(client):
+    player = Player(await client.ws_connect("/ws"))
+    client.players.append(player)
+    await player.send(t="hello", initData="user=%7B%22id%22%3A1%7D&hash=00")
+    assert (await player.recv("error"))["code"] == "auth"
+
+
+async def test_nothing_works_before_hello(client):
+    player = Player(await client.ws_connect("/ws"))
+    client.players.append(player)
+    await player.send(t="find", duration=30, level="normal")
+    assert (await player.recv("error"))["code"] == "no_hello"
+
+
+async def test_language_choice_is_saved(client):
+    player, ready = await join(client, 1)
+    assert ready["lang"] == "ru"
+    await player.send(t="lang", lang="tg")
+    assert (await player.recv("strings"))["strings"]["play"] == "Рақиб ёфтан"
+    await player.close()
+    _, again = await join(client, 1)
+    assert again["lang"] == "tg"
+
+
+# ── подбор соперника ────────────────────────────────────────────────
+
+
+async def test_two_players_find_each_other(client):
+    _, _, task_one, task_two = await play(client)
+    assert task_one["q"] and task_two["q"]
+    assert "answer" not in task_one, "правильный ответ клиенту не уходит"
+
+
+async def test_a_single_player_just_waits(client):
+    player, _ = await join(client, 1)
+    await player.send(t="find", duration=30, level="normal")
+    await player.recv("queued")
+    await player.silent("found")
+
+
+async def test_leaving_the_queue_returns_to_the_menu(client):
+    player, _ = await join(client, 1)
+    await player.send(t="find", duration=30, level="normal")
+    await player.recv("queued")
+    await player.send(t="cancel")
+    await player.recv("idle")
+    assert len(client.hub.queue) == 0
+
+
+async def test_friend_room_pairs_by_code(client):
+    one, _ = await join(client, 1)
+    two, _ = await join(client, 2)
+    await one.send(t="room", duration=30, level="easy")
+    room = await one.recv("room")
+    assert "duel_bot" in room["link"]
+    await two.send(t="join", code=room["code"], duration=30, level="easy")
+    assert (await one.recv("found"))["opp"]
+    assert (await two.recv("found"))["opp"]
+
+
+async def test_wrong_room_code_says_so(client):
+    player, _ = await join(client, 1)
+    await player.send(t="join", code="НЕТУ", duration=30, level="easy")
+    await player.recv("room_error")
+
+
+# ── ход матча ───────────────────────────────────────────────────────
+
+
+async def test_correct_answer_pulls_the_rope(client):
+    one, two, task, _ = await play(client)
+    await respond(one, client.hub, 1, task["id"])
+    assert (await one.recv("ans"))["correct"] is True
+    assert (await one.recv("task"))["id"] != task["id"], "сразу приходит новый пример"
+
+    mine = await state_where(one, lambda m: m["me"]["score"] == 1)
+    assert mine["rope"] == 1
+    theirs = await state_where(two, lambda m: m["opp"]["score"] == 1)
+    assert theirs["rope"] == -1, "соперник видит канат со своей стороны"
+
+
+async def test_wrong_answer_freezes_the_keypad(client):
+    one, _, task, _ = await play(client)
+    await respond(one, client.hub, 1, task["id"], correct=False)
+    reply = await one.recv("ans")
+    assert reply["correct"] is False
+    assert reply["freeze_ms"] >= 1000
+    assert client.hub.match_for(1).rope() == 0
+
+
+async def test_instant_answers_are_treated_as_a_robot(client):
+    """Быстрее, чем человек успевает нажать, — значит, отвечает скрипт."""
+    one, _, task, _ = await play(client)
+    match = client.hub.match_for(1)
+    await one.send(t="answer", id=task["id"], v=match.side(1).task.answer)
+    assert (await one.recv("ans"))["correct"] is False
+    assert client.hub.match_for(1).rope() == 0
+
+
+async def test_answer_to_an_old_task_is_ignored(client):
+    one, _, task, _ = await play(client)
+    await respond(one, client.hub, 1, task["id"])
+    await one.recv("ans")
+    await one.send(t="answer", id=task["id"], v=0)
+    await one.silent("ans")
+
+
+async def test_pulling_the_rope_to_the_edge_wins_the_match(client):
+    one, two, task, _ = await play(client, duration=0)
+    current = task["id"]
+    for _ in range(game.WIN_STEPS + 4):
+        if client.hub.match_for(1) is None:
+            break
+        await respond(one, client.hub, 1, current)
+        if not (await one.recv("ans"))["correct"]:
+            break
+        try:
+            current = (await one.recv("task", timeout=0.5))["id"]
+        except asyncio.TimeoutError:
+            break
+
+    win = await one.recv("end")
+    loss = await two.recv("end")
+    assert win["outcome"] == "win" and win["reason"] == "rope"
+    assert loss["outcome"] == "loss"
+    assert win["delta"] > 0 > loss["delta"]
+    assert win["rating"] > 1000 > loss["rating"]
+    assert win["best_streak"] >= 3
+
+
+async def test_time_running_out_ends_the_match(client):
+    one, two, task, _ = await play(client)
+    await respond(one, client.hub, 1, task["id"])
+    await one.recv("ans")
+    # Не ждём полминуты: сдвигаем финиш матча к текущему моменту.
+    client.hub.match_for(1).deadline = time.monotonic() + 0.2
+    result = await one.recv("end")
+    assert result["reason"] == "time" and result["outcome"] == "win"
+    assert (await two.recv("end"))["outcome"] == "loss"
+
+
+async def test_an_untouched_match_does_not_change_ratings(client):
+    one, two, _, _ = await play(client)
+    client.hub.match_for(1).deadline = time.monotonic() + 0.2
+    result = await one.recv("end")
+    assert result["rated"] is False and result["delta"] == 0
+    assert storage.get_player(client.hub.db, 1)["games"] == 0
+
+
+async def test_leaving_hands_the_win_to_the_opponent(client):
+    one, two, _, _ = await play(client)
+    await one.send(t="leave")
+    assert (await two.recv("end"))["outcome"] == "win"
+
+
+async def test_a_dropped_connection_is_not_an_instant_loss(client):
+    one, two, _, _ = await play(client)
+    await one.close()
+    await two.recv("opp_offline")
+    await two.silent("end", timeout=0.8)
+    assert client.hub.match_for(2) is not None
+
+
+async def test_coming_back_returns_the_player_to_the_field(client):
+    one, two, _, _ = await play(client)
+    match_id = client.hub.match_for(1).id
+    await one.close()
+    await two.recv("opp_offline")
+
+    again, _ = await join(client, 1)
+    assert (await again.recv("found"))["match"] == match_id
+    assert await again.recv("task"), "пример выдаётся заново"
+    assert await again.recv("state")
+
+
+async def test_opening_the_app_twice_closes_the_first_window(client):
+    first, _ = await join(client, 1)
+    second, _ = await join(client, 1)
+    assert (await first.recv("error"))["code"] == "replaced"
+
+
+# ── итоги ───────────────────────────────────────────────────────────
+
+
+async def test_the_match_lands_in_the_database(client):
+    one, two, task, _ = await play(client)
+    await respond(one, client.hub, 1, task["id"])
+    await one.recv("ans")
+    client.hub.match_for(1).deadline = time.monotonic() + 0.2
+    await one.recv("end")
+
+    assert storage.totals(client.hub.db)["matches"] == 1
+    row = storage.get_player(client.hub.db, 1)
+    assert row["games"] == 1 and row["wins"] == 1 and row["correct"] >= 1
+    assert len(storage.history(client.hub.db, 2)) == 1
+
+
+async def test_leaderboard_is_public(client):
+    one, two, task, _ = await play(client)
+    await respond(one, client.hub, 1, task["id"])
+    await one.recv("ans")
+    client.hub.match_for(1).deadline = time.monotonic() + 0.2
+    await one.recv("end")
+    await two.recv("end")
+
+    data = await (await client.get("/api/top")).json()
+    assert [row["place"] for row in data["top"]] == [1, 2]
+    assert data["top"][0]["rating"] > data["top"][1]["rating"]
+
+
+async def test_health_endpoint_answers(client):
+    body = await (await client.get("/health")).json()
+    assert body["ok"] is True and "players" in body
+
+
+async def test_mini_app_page_is_served(client):
+    response = await client.get("/")
+    assert response.status == 200
+    assert "static/app.js" in await response.text()

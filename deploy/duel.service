@@ -1,0 +1,36 @@
+# Служба математической дуэли: бот и сервер Mini App в одном процессе.
+#
+#   sudo cp deploy/duel.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now duel
+#   journalctl -u duel -f          # смотреть, что происходит
+
+[Unit]
+Description=Математическая дуэль: телеграм-бот и Mini App
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=duel
+Group=duel
+WorkingDirectory=/opt/duel
+# Настройки берутся из /opt/duel/.env — его читает сам процесс.
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/duel/.venv/bin/python -m duel.main
+Restart=always
+RestartSec=3
+
+# Упал — поднимаем, но не бесконечно в цикле, если сломан сам код.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# Службе нужен только свой каталог, всё остальное — только на чтение.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/duel/data
+
+[Install]
+WantedBy=multi-user.target
