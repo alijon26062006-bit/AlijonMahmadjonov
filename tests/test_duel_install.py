@@ -99,6 +99,25 @@ def test_junk_domain_is_rejected(junk):
     assert not check(f"valid_domain '{junk}'")
 
 
+@pytest.mark.parametrize("address", ["2.29.11.118", "127.0.0.1", "8.8.8.8", "192.168.1.1"])
+def test_ip_address_is_not_a_domain(address):
+    """На голый IP сертификат не выдают, а без https Telegram игру не откроет.
+    Настоящий сервер как раз на этом и споткнулся."""
+    assert not check(f"valid_domain '{address}'")
+    assert check(f"looks_like_ip '{address}'")
+
+
+def test_real_domain_is_not_mistaken_for_an_address():
+    assert not check("looks_like_ip 'duel.example.com'")
+    assert not check("looks_like_ip 'kanat.duckdns.org'")
+
+
+def test_free_subdomain_services_work():
+    """Своего домена может не быть — бесплатный подойдёт."""
+    assert check("valid_domain 'kanat.duckdns.org'")
+    assert check("valid_domain 'kanat.ddns.net'")
+
+
 def test_absurdly_long_domain_is_rejected():
     assert not check(f"valid_domain '{'a' * 250}.com'")
 
@@ -207,6 +226,21 @@ def test_installer_looks_in_other_branches_when_main_has_nothing():
 def test_repeat_install_stays_on_the_same_branch():
     """Повторный запуск не должен утащить сервер на main, если ставили с ветки."""
     assert "DUEL_BRANCH_GIVEN" in INSTALL.read_text()
+
+
+def test_build_check_does_not_depend_on_current_directory():
+    """Установщик запускают из любой папки — проверка сборки обязана находить
+    игру по абсолютному пути, а не по «.» в sys.path. На сервере это уже
+    обернулось ModuleNotFoundError: No module named 'duel'."""
+    text = INSTALL.read_text()
+    assert 'sys.path.insert(0, ".")' not in text
+    assert "PYTHONPATH=" in text
+
+
+def test_ip_prompt_offers_a_way_out():
+    """Ввели IP — надо не просто отказать, а сказать, где взять домен."""
+    text = INSTALL.read_text()
+    assert "duckdns.org" in text
 
 
 def test_control_command_covers_daily_needs():

@@ -41,9 +41,16 @@ valid_token() {
   [[ "${1:-}" =~ ^[0-9]{5,}:[A-Za-z0-9_-]{20,}$ ]]
 }
 
+looks_like_ip() {
+  [[ "${1:-}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || [[ "${1:-}" =~ ^[0-9A-Fa-f]*:[0-9A-Fa-f:]*$ ]]
+}
+
 valid_domain() {
   local d="${1:-}"
   [ ${#d} -le 253 ] || return 1
+  # Последняя часть домена никогда не бывает числом. Так отсеиваются IP-адреса:
+  # сертификат на голый IP не выдают, а без него Telegram игру не откроет.
+  [[ ! "$d" =~ \.[0-9]+$ ]] || return 1
   [[ "$d" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$ ]]
 }
 
@@ -166,8 +173,17 @@ ok "Бот @${BOT_USERNAME:-?} на связи"
 
 while ! valid_domain "$DOMAIN"; do
   [ -n "$INTERACTIVE" ] || die "Не задан DUEL_DOMAIN. Нужен домен, который смотрит на этот сервер."
-  [ -z "$DOMAIN" ] || bad "Это не похоже на домен. Пример: duel.example.com"
-  hint "Telegram открывает игру только по https, поэтому домен обязателен"
+  if looks_like_ip "$DOMAIN"; then
+    bad "Это IP-адрес, а нужен домен."
+    hint "Сертификат на голый IP не выдают, а без https Telegram игру не откроет."
+    hint "Нет своего домена — бесплатный за две минуты на duckdns.org:"
+    hint "заведи там имя, укажи адрес ${DOMAIN}, и введи сюда имя.duckdns.org"
+  elif [ -n "$DOMAIN" ]; then
+    bad "Это не похоже на домен. Пример: duel.example.com"
+    hint "Telegram открывает игру только по https, поэтому домен обязателен"
+  else
+    hint "Telegram открывает игру только по https, поэтому домен обязателен"
+  fi
   DOMAIN="$(prompt 'Домен: ')"
 done
 ok "Домен ${DOMAIN}"
@@ -289,16 +305,23 @@ chown -R "${DUEL_USER}:${DUEL_USER}" "$DUEL_HOME"
 ok "Токен записан в ${ENV_FILE} и закрыт от посторонних"
 
 # Игра должна импортироваться и настройки читаться — проверим до запуска службы.
-sudo -u "$DUEL_USER" env HOME="$DUEL_HOME" "${DUEL_HOME}/.venv/bin/python" - <<'CHECK' \
-  || die "Игра не собирается. Покажи вывод выше — по нему видно, что не так."
-import sys
-sys.path.insert(0, ".")
+# Путь к игре задаём явно: установщик мог быть запущен из любой папки.
+CHECK_PY="$(mktemp)"
+cat > "$CHECK_PY" <<'CHECK'
 from duel.config import load_config
 from duel import main  # noqa: F401
+
 config = load_config()
 assert config.public_url.startswith("https://"), config.public_url
 print("  настройки читаются:", config.public_url)
 CHECK
+chmod 644 "$CHECK_PY"
+if ! sudo -u "$DUEL_USER" env HOME="$DUEL_HOME" PYTHONPATH="$DUEL_HOME" \
+     "${DUEL_HOME}/.venv/bin/python" "$CHECK_PY"; then
+  rm -f "$CHECK_PY"
+  die "Игра не собирается. Покажи вывод выше — по нему видно, что не так."
+fi
+rm -f "$CHECK_PY"
 ok "Игра собирается, настройки читаются"
 
 # ── 6. Домен и сертификат ───────────────────────────────────────────────────
