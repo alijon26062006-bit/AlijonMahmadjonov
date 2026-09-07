@@ -169,11 +169,17 @@ done
 
 # Спросим у Телеграма, чей это токен: заодно узнаем имя бота для ссылки.
 BOT_USERNAME=""
+MAIN_APP=""
 if command -v curl >/dev/null 2>&1; then
   ME="$(curl -fsS --max-time 15 "https://api.telegram.org/bot${TOKEN}/getMe" 2>/dev/null || true)"
   case "$ME" in
     *'"ok":true'*) BOT_USERNAME="$(printf '%s' "$ME" | sed -n 's/.*"username":"\([^"]*\)".*/\1/p')" ;;
     *) die "Телеграм не признал этот токен. Проверь его у @BotFather." ;;
+  esac
+  # Есть ли главное мини-приложение: от этого зависит, откроется ли игра у
+  # друга с одного касания по ссылке или ему придётся жать «Начать».
+  case "$ME" in
+    *'"has_main_web_app":true'*) MAIN_APP=1 ;;
   esac
 fi
 ok "Бот @${BOT_USERNAME:-?} на связи"
@@ -433,3 +439,16 @@ say "  ${DIM}duel update   — забрать свежий код и перез�
 say ""
 say "  ${DIM}Игра сама поднимется после перезагрузки сервера.${OFF}"
 say ""
+
+if [ -z "$MAIN_APP" ]; then
+  warn "Осталось одно ручное действие — на него уйдёт полминуты."
+  say ""
+  say "  Сейчас ссылка-приглашение открывает у друга переписку с ботом, и ему"
+  say "  придётся нажать лишний раз. Чтобы игра открывалась сразу:"
+  say ""
+  say "  ${BOLD}@BotFather${OFF} → /mybots → @${BOT_USERNAME} → Bot Settings →"
+  say "  Configure Mini App → Enable Mini App → ${BOLD}https://${DOMAIN}/${OFF}"
+  say ""
+  say "  ${DIM}После этого перезапусти: duel restart${OFF}"
+  say ""
+fi

@@ -100,11 +100,15 @@ class Hub:
         conn: sqlite3.Connection,
         notify: Callable[..., Awaitable[None]] | None = None,
         bot_username: str = "",
+        main_app: bool = False,
     ) -> None:
         self.config = config
         self.db = conn
         self.notify = notify
         self.bot_username = bot_username
+        # Настроено ли у бота главное мини-приложение. От этого зависит, какая
+        # ссылка-приглашение открывает игру в одно касание.
+        self.main_app = main_app
         self.queue = Queue()
         self.conns: dict[int, Conn] = {}
         self.matches: dict[int, Match] = {}
@@ -118,6 +122,20 @@ class Hub:
         self._offered: set[int] = set()
 
     # ── служебное ───────────────────────────────────────────────────
+
+    def invite_link(self, code: str) -> str:
+        """Ссылка-приглашение, самая короткая из доступных.
+
+        С настроенным главным мини-приложением ?startapp= открывает игру одним
+        касанием — даже у того, кто бота ещё ни разу не запускал. Без него
+        Telegram просто откроет переписку, поэтому там нужен ?start=: бот
+        ответит на него сообщением с кнопкой.
+        """
+
+        if not self.bot_username:
+            return ""
+        key = "startapp" if self.main_app else "start"
+        return f"https://t.me/{self.bot_username}?{key}={code}"
 
     def match_for(self, user_id: int) -> Match | None:
         mid = self.match_of.get(user_id)
@@ -401,12 +419,9 @@ class Hub:
                 conn, int(data.get("duration", 60) or 0), str(data.get("level", "auto")), now
             )
             room = self.queue.create_room(ticket, now)
-            link = (
-                f"https://t.me/{self.bot_username}?startapp={room.code}"
-                if self.bot_username
-                else ""
+            await conn.send(
+                {"t": "room", "code": room.code, "link": self.invite_link(room.code)}
             )
-            await conn.send({"t": "room", "code": room.code, "link": link})
 
         elif kind == "play_bot":
             await self._start_robot_match(
@@ -647,11 +662,7 @@ class Hub:
             with contextlib.suppress(Exception):
                 # Кнопка — самый короткий путь, ссылка — запасной: её можно
                 # переслать, и она открывается даже там, где кнопки не видно.
-                link = (
-                    f"https://t.me/{self.bot_username}?startapp={room.code}"
-                    if self.bot_username
-                    else ""
-                )
+                link = self.invite_link(room.code)
                 await self.notify(
                     target,
                     t("bot.challenge", lang, name=conn.user.name, link=link),

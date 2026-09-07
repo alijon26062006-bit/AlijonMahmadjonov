@@ -59,7 +59,13 @@ async def run(config: DuelConfig) -> None:
         with contextlib.suppress(Exception):
             await bot.send_message(user_id, text, reply_markup=markup)
 
-    hub = Hub(config, conn, notify=notify, bot_username=me.username or "")
+    hub = Hub(
+        config,
+        conn,
+        notify=notify,
+        bot_username=me.username or "",
+        main_app=bool(getattr(me, "has_main_web_app", False)),
+    )
     runner = web.AppRunner(make_app(hub))
     await runner.setup()
     site = web.TCPSite(runner, config.host, config.port)
@@ -70,11 +76,20 @@ async def run(config: DuelConfig) -> None:
     dispatcher.include_router(bot_module.router)
     dispatcher["config"] = config
     dispatcher["conn"] = conn
+    dispatcher["hub"] = hub
 
     with contextlib.suppress(Exception):
         await bot_module.setup_bot_ui(bot, config)
 
     log.info("Бот @%s готов. База: %s", me.username, config.db_path)
+    if not hub.main_app:
+        log.warning(
+            "У бота не настроено главное мини-приложение. Ссылка-приглашение "
+            "будет открывать переписку, а не игру, и другу придётся нажать "
+            "лишний раз. Как включить одно касание: @BotFather → /mybots → "
+            "@%s → Bot Settings → Configure Mini App → Enable Mini App → %s",
+            me.username, config.webapp_url,
+        )
     if config.dev_mode:
         log.warning("DUEL_DEV_MODE включён: подпись Telegram не проверяется. "
                     "На боевом сервере обязательно выключи.")

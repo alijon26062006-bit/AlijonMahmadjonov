@@ -108,16 +108,29 @@ async def start_deeplink(
     command: CommandObject,
     conn: sqlite3.Connection,
     config: DuelConfig,
+    hub=None,
 ) -> None:
-    """Ссылка вида t.me/бот?start=КОД — зовём в комнату друга."""
+    """Пришёл по ссылке-приглашению: t.me/бот?start=КОД.
+
+    Так Telegram открывает переписку, а не игру. Значит, первое же сообщение
+    должно быть кнопкой прямо в бой — а не приветствием, которое надо читать.
+    """
 
     lang = ensure_player(conn, message)
     code = (command.args or "").strip().upper()
-    url = config.webapp_url
-    if code:
-        url = f"{url}?tgWebAppStartParam={code}"
+    if not code:
+        await start(message, conn, config)
+        return
+
+    url = f"{config.webapp_url}?tgWebAppStartParam={code}"
+    room = hub.queue.find_room(code) if hub is not None else None
+    text = (
+        t("bot.challenge", lang, name=room.host.name, link="").strip()
+        if room is not None
+        else t("bot.press", lang)
+    )
+    await message.answer(text, reply_markup=play_keyboard(lang, url))
     await message.answer(t("bot.start", lang), reply_markup=main_keyboard(lang))
-    await message.answer(t("bot.press", lang), reply_markup=play_keyboard(lang, url))
 
 
 @router.message(CommandStart())

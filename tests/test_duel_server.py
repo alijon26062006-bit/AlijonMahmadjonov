@@ -392,6 +392,40 @@ async def test_calling_a_ghost_says_so(client):
     assert (await one.recv("challenge_error"))["reason"] == "gone"
 
 
+async def test_invite_link_opens_the_game_in_one_tap_when_set_up(client):
+    """С настроенным главным мини-приложением ссылка открывает игру сразу —
+    даже у того, кто бота ни разу не запускал."""
+    client.hub.main_app = True
+    one, _ = await join(client, 1)
+    await one.send(t="room", duration=30, level="easy")
+    room = await one.recv("room")
+    assert room["link"] == f"https://t.me/duel_bot?startapp={room['code']}"
+
+
+async def test_without_the_main_mini_app_the_link_goes_through_the_chat(client):
+    """Без настройки ?startapp= откроет переписку, а не игру, — тогда ссылка
+    должна быть такой, на которую бот сможет ответить кнопкой."""
+    client.hub.main_app = False
+    one, _ = await join(client, 1)
+    await one.send(t="room", duration=30, level="easy")
+    room = await one.recv("room")
+    assert room["link"] == f"https://t.me/duel_bot?start={room['code']}"
+
+
+async def test_the_same_link_goes_into_the_chat_invitation(client):
+    client.hub.main_app = True
+    await join(client, 2, "Соперник")
+    one, _ = await join(client, 1, "Алиджон")
+    await one.send(t="challenge", to=2)
+    sent = await one.recv("challenge_sent")
+    assert f"startapp={sent['code']}" in client.posted[-1]["text"]
+
+
+async def test_without_a_bot_name_there_is_no_link(client):
+    client.hub.bot_username = ""
+    assert client.hub.invite_link("ABC123") == ""
+
+
 async def test_sharing_a_link_does_not_kill_the_room(client):
     """Кнопка «Отправить другу» уводит из игры — Telegram открывает выбор чата.
     Если комната умирает вместе с окном, ссылка у друга оказывается мёртвой."""
