@@ -146,6 +146,16 @@ h2 { font-size: 19px; margin: 0; }
   padding: 14px 20px;
 }
 
+/* Предложение сыграть с роботом появляется мягко, а не выпрыгивает. */
+.offer {
+  width: 100%; max-width: 420px;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--card); border-radius: var(--radius);
+  padding: 14px;
+  animation: rise-pod .4s cubic-bezier(.2, 1, .4, 1) both;
+}
+.offer-title { font-weight: 700; }
+
 /* ── игра ─────────────────────────────────────────────────── */
 
 .screen.game { justify-content: flex-start; gap: 10px; position: relative; }

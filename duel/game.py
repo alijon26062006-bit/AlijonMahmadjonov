@@ -70,6 +70,7 @@ class Side:
 
     connected: bool = True
     left_at: float | None = None
+    is_bot: bool = False
 
     solve_ms_total: int = 0
     fastest_ms: int = 0
@@ -319,9 +320,15 @@ class Match:
                 self.winner_id = None
 
     @property
-    def rated(self) -> bool:
-        """Идёт ли матч в рейтинг. Брошенный обоими — нет."""
+    def has_bot(self) -> bool:
+        return self.a.is_bot or self.b.is_bot
 
+    @property
+    def rated(self) -> bool:
+        """Идёт ли матч в рейтинг. Тренировка с роботом и брошенный — нет."""
+
+        if self.has_bot:
+            return False
         if self.state != STATE_FINISHED or self.reason == REASON_ABANDONED:
             return False
         return (self.a.score + self.b.score) > 0 or self.reason in {REASON_LEFT, REASON_CHEAT}

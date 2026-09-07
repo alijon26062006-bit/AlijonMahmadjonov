@@ -62,6 +62,14 @@
   <h2 data-i18n="searching">Ищем соперника</h2>
   <p class="muted" id="q-hint" data-i18n="searching.hint"></p>
   <p class="muted" id="q-count"></p>
+
+  <!-- Никого не нашлось за полминуты — предлагаем робота -->
+  <div class="offer hidden" id="q-offer">
+    <div class="offer-title" data-i18n="robot.offer">Сейчас никого рядом нет</div>
+    <p class="muted" data-i18n="robot.offer.hint"></p>
+    <button class="btn primary" id="q-robot" data-i18n="robot.play">🤖 Сыграть с роботом</button>
+  </div>
+
   <button class="btn ghost" id="q-cancel" data-i18n="cancel">Отмена</button>
 </section>
 

@@ -133,6 +133,7 @@ function handle(msg) {
     case 'room_error': toast(say('room.bad', 'Комнаты нет')); show('menu'); break;
     case 'invite': onInvite(msg); break;
     case 'players': onPeople(msg); break;
+    case 'offer_bot': onRobotOffer(msg); break;
     case 'challenge_sent': onCalled(msg); break;
     case 'challenge_error':
       toast(say('called.error.' + msg.reason, say('error', 'Ошибка')));
@@ -169,8 +170,18 @@ function onReady(msg) {
 
 function onQueued(msg) {
   show('search');
+  $('q-offer').classList.add('hidden');
   const n = Math.max(0, (msg.waiting || 1) - 1);
   $('q-count').textContent = n > 0 ? `${say('waiting_players', 'в очереди')}: ${n}` : '';
+}
+
+/* Полминуты в пустой очереди — и человек уходит. Предлагаем робота. */
+function onRobotOffer(msg) {
+  if (S.screen !== 'search') return;
+  $('q-offer').classList.remove('hidden');
+  $('q-count').textContent = msg.online > 1
+    ? `${msg.online} ${say('online', 'в сети')}`
+    : '';
 }
 
 function onRoom(msg) {
@@ -430,11 +441,15 @@ function onEnd(msg) {
   $('e-score').textContent = msg.score;
   $('e-opp-score').textContent = msg.opp_score;
 
-  const delta = msg.delta || 0;
-  const sign = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
-  $('e-rating').innerHTML =
-    `${say('result.rating', 'Рейтинг')}: <b>${msg.rating}</b> ` +
-    `<span class="${sign}">${delta > 0 ? '+' : ''}${delta}</span>`;
+  if (msg.rated === false) {
+    $('e-rating').innerHTML = `<span class="muted">${say('training', 'Тренировка')}</span>`;
+  } else {
+    const delta = msg.delta || 0;
+    const sign = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
+    $('e-rating').innerHTML =
+      `${say('result.rating', 'Рейтинг')}: <b>${msg.rating}</b> ` +
+      `<span class="${sign}">${delta > 0 ? '+' : ''}${delta}</span>`;
+  }
 
   $('e-stats').innerHTML = [
     [say('result.accuracy', 'Точность'), `${msg.accuracy}%`],
@@ -664,6 +679,10 @@ function bind() {
     if (code) send({ t: 'join', code: code.trim(), duration: S.duration, level: S.level });
   };
   $('q-cancel').onclick = () => { send({ t: 'cancel' }); show('menu'); };
+  $('q-robot').onclick = () => {
+    send({ t: 'play_bot', duration: S.duration, level: S.level });
+    $('q-offer').classList.add('hidden');
+  };
   $('r-cancel').onclick = () => { send({ t: 'cancel' }); show('menu'); };
 
   $('m-lang').onclick = () => send({ t: 'lang', lang: S.lang === 'ru' ? 'tg' : 'ru' });

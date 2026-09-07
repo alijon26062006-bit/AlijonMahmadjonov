@@ -25,12 +25,14 @@ from . import rating as rating_mod
 from . import storage
 from .auth import AuthError, WebAppUser, authenticate
 from .config import DuelConfig
+from . import robot as robot_mod
 from .game import (
     DURATIONS,
     STATE_FINISHED,
     STATE_RUNNING,
     WIN_STEPS,
     Match,
+    Side,
 )
 from .i18n import normalize, t, ui_strings
 from .matchmaking import Queue, Ticket, make_match
@@ -48,6 +50,9 @@ HEARTBEAT_SEC = 0.5
 
 # Одного и того же человека не зовём чаще, чем раз в минуту, и вообще не чаще
 # чем раз в восемь секунд: приглашение приходит в чат, спамить им нельзя.
+# Столько ждём живого соперника, прежде чем предложить робота: полминуты в
+# пустой очереди — это уже долго, дальше человек просто уходит.
+WAIT_FOR_ROBOT = 30.0
 CHALLENGE_COOLDOWN = 60.0
 CHALLENGE_RATE = 8.0
 PLAYERS_PAGE = 60
@@ -109,6 +114,8 @@ class Hub:
         self._online_at = 0.0
         self._called: dict[tuple[int, int], float] = {}
         self._called_at: dict[int, float] = {}
+        self.robots: dict[int, robot_mod.Robot] = {}
+        self._offered: set[int] = set()
 
     # ── служебное ───────────────────────────────────────────────────
 
@@ -370,6 +377,7 @@ class Hub:
                 conn, int(data.get("duration", 60) or 0), str(data.get("level", "auto")), now
             )
             self.queue.add(ticket)
+            self._offered.discard(conn.user_id)
             await conn.send(
                 {
                     "t": "queued",
@@ -381,6 +389,7 @@ class Hub:
 
         elif kind == "cancel":
             self.queue.remove(conn.user_id)
+            self._offered.discard(conn.user_id)
             await conn.send({"t": "idle"})
 
         elif kind == "room":
@@ -394,6 +403,14 @@ class Hub:
                 else ""
             )
             await conn.send({"t": "room", "code": room.code, "link": link})
+
+        elif kind == "play_bot":
+            await self._start_robot_match(
+                conn,
+                now,
+                int(data.get("duration", 60) or 0),
+                str(data.get("level", "auto")),
+            )
 
         elif kind == "players":
             await self._send_players(conn, int(data.get("offset", 0) or 0))
@@ -452,6 +469,38 @@ class Hub:
                 await self._settle(match, now)
             else:
                 await conn.send({"t": "idle"})
+
+    async def _start_robot_match(
+        self, conn: Conn, now: float, duration: int, level: str
+    ) -> None:
+        """Тренировка с роботом. В рейтинг не идёт и в историю не пишется."""
+
+        if self.match_for(conn.user_id) is not None:
+            return
+        self.queue.remove(conn.user_id)
+        self._offered.discard(conn.user_id)
+
+        ticket = self.ticket_for(conn, duration, level, now)
+        opponent = Side(
+            user_id=robot_mod.ROBOT_ID,
+            name=t("ui.robot", conn.lang),
+            rating=conn.rating,
+            is_bot=True,
+        )
+        match = Match(
+            a=ticket.to_side(),
+            b=opponent,
+            duration=ticket.duration,
+            level=ticket.level,
+            private=True,
+        )
+        match.begin(now)
+        self.matches[match.id] = match
+        self.match_of[conn.user_id] = match.id
+        self.robots[match.id] = robot_mod.Robot(speed=robot_mod.speed_for(conn.rating))
+        log.info("Матч #%s: %s против робота (%s)", match.id, conn.user.name,
+                 self.robots[match.id].speed)
+        await self._send_found(conn, match, now)
 
     async def _send_players(self, conn: Conn, offset: int) -> None:
         """Все игроки: кто был в сети недавно — сверху, забытые — внизу."""
@@ -536,9 +585,16 @@ class Hub:
         if self.notify is not None:
             lang = row["lang"] if row else "ru"
             with contextlib.suppress(Exception):
+                # Кнопка — самый короткий путь, ссылка — запасной: её можно
+                # переслать, и она открывается даже там, где кнопки не видно.
+                link = (
+                    f"https://t.me/{self.bot_username}?startapp={room.code}"
+                    if self.bot_username
+                    else ""
+                )
                 await self.notify(
                     target,
-                    t("bot.challenge", lang, name=conn.user.name),
+                    t("bot.challenge", lang, name=conn.user.name, link=link),
                     button=t("bot.challenge.go", lang),
                     url=f"{self.config.webapp_url}?tgWebAppStartParam={room.code}",
                 )
@@ -729,6 +785,7 @@ class Hub:
         for user_id in (match.a.user_id, match.b.user_id):
             self.match_of.pop(user_id, None)
         self.matches.pop(match.id, None)
+        self.robots.pop(match.id, None)
 
     async def _notify_result(self, user_id: int, result: dict[str, object]) -> None:
         """Короткая запись об итоге в чат — чтобы история матчей была под рукой."""
@@ -761,6 +818,24 @@ class Hub:
             await self._start_match(one, other, now)
         self.queue.sweep_rooms(now)
 
+        # Никто не пришёл за полминуты — предлагаем сыграть с роботом.
+        for ticket in list(self.queue.tickets.values()):
+            if ticket.user_id in self._offered:
+                continue
+            if ticket.waited(now) < WAIT_FOR_ROBOT:
+                continue
+            waiting = self.conns.get(ticket.user_id)
+            if waiting is None:
+                continue
+            self._offered.add(ticket.user_id)
+            await waiting.send(
+                {
+                    "t": "offer_bot",
+                    "online": len(self.conns),
+                    "waited": int(ticket.waited(now)),
+                }
+            )
+
         # Счётчик людей в сети: шлём, только когда он и правда изменился.
         if now - self._online_at >= 2.0:
             self._online_at = now
@@ -780,10 +855,13 @@ class Hub:
                         await conn.send({"t": "start"})
                         await conn.send({"t": "task", **side.task.public()})
 
+            robot = self.robots.get(match.id)
+            moved = bool(robot and robot.step(match, now))
+
             if match.state == STATE_FINISHED:
                 await self._settle(match, now)
             else:
-                await self._broadcast(match, now)
+                await self._broadcast(match, now, force=moved)
 
     async def run_ticker(self) -> None:
         interval = self.config.tick_interval

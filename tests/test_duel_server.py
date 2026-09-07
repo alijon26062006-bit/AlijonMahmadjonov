@@ -8,7 +8,7 @@ import pytest
 from aiohttp import WSMsgType
 from aiohttp.test_utils import TestClient, TestServer
 
-from duel import game, storage
+from duel import game, robot as robot_mod, storage
 from duel.config import DuelConfig
 from duel.server import Hub, make_app
 from tests.test_duel_auth import TOKEN, make_init_data
@@ -168,6 +168,85 @@ async def test_a_single_player_just_waits(client):
     await player.send(t="find", duration=30, level="normal")
     await player.recv("queued")
     await player.silent("found")
+
+
+# ── когда живых нет ─────────────────────────────────────────────────────────
+
+
+async def test_after_half_a_minute_alone_the_game_offers_a_robot(client):
+    player, _ = await join(client, 1)
+    await player.send(t="find", duration=30, level="normal")
+    await player.recv("queued")
+    await player.silent("offer_bot", timeout=0.5)
+
+    # Перематываем ожидание: сидеть в тесте полминуты незачем.
+    client.hub.queue.tickets[1].joined_at -= 31
+    offer = await player.recv("offer_bot", timeout=4)
+    assert offer["online"] == 1 and offer["waited"] >= 30
+
+
+async def test_the_offer_comes_once_and_not_again(client):
+    player, _ = await join(client, 1)
+    await player.send(t="find", duration=30, level="normal")
+    await player.recv("queued")
+    client.hub.queue.tickets[1].joined_at -= 31
+    await player.recv("offer_bot", timeout=4)
+    await player.silent("offer_bot", timeout=1.5)
+
+
+async def test_a_new_search_may_be_offered_a_robot_again(client):
+    player, _ = await join(client, 1)
+    await player.send(t="find", duration=30, level="normal")
+    await player.recv("queued")
+    client.hub.queue.tickets[1].joined_at -= 31
+    await player.recv("offer_bot", timeout=4)
+
+    await player.send(t="cancel")
+    await player.recv("idle")
+    await player.send(t="find", duration=30, level="normal")
+    await player.recv("queued")
+    client.hub.queue.tickets[1].joined_at -= 31
+    assert await player.recv("offer_bot", timeout=4)
+
+
+async def test_playing_against_the_robot(client, monkeypatch):
+    """Робот должен и правда отвечать, а не стоять столбом."""
+    monkeypatch.setattr(robot_mod, "MIN_THINK", 0.25)
+    monkeypatch.setattr(robot_mod, "SPEEDS", {"normal": (0.3, 0.0), "slow": (0.3, 0.0),
+                                              "fast": (0.3, 0.0)})
+    player, _ = await join(client, 1, "Алиджон")
+    await player.send(t="play_bot", duration=0, level="easy")
+
+    found = await player.recv("found")
+    assert found["opp"]["name"] == "Робот"
+    await player.recv("task")
+
+    state = await player.recv("state", timeout=6)
+    while state["opp"]["score"] == 0:
+        state = await player.recv("state", timeout=6)
+    assert state["rope"] < 0, "робот тянет канат на себя"
+
+
+async def test_training_does_not_touch_the_rating(client, monkeypatch):
+    monkeypatch.setattr(robot_mod, "MIN_THINK", 0.25)
+    monkeypatch.setattr(robot_mod, "SPEEDS", {"fast": (0.3, 0.0), "normal": (0.3, 0.0),
+                                              "slow": (0.3, 0.0)})
+    player, _ = await join(client, 1, "Алиджон")
+    await player.send(t="play_bot", duration=0, level="easy")
+    await player.recv("found")
+
+    result = await player.recv("end", timeout=30)
+    assert result["rated"] is False and result["delta"] == 0
+    row = storage.get_player(client.hub.db, 1)
+    assert row["games"] == 0 and row["rating"] == 1000
+    assert storage.totals(client.hub.db)["matches"] == 0, "тренировка не идёт в историю"
+
+
+async def test_the_robot_is_not_counted_among_people_online(client):
+    player, _ = await join(client, 1)
+    await player.send(t="play_bot", duration=30, level="easy")
+    await player.recv("found")
+    assert client.hub.online_stats()["online"] == 1
 
 
 async def test_leaving_the_queue_returns_to_the_menu(client):
