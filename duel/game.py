@@ -113,6 +113,8 @@ class Match:
     duration: int = 60
     level: str = "auto"
     private: bool = False
+    # Матч начался с вызова в групповом чате — туда вернётся счёт.
+    group_chat: int = 0
     seed: int | None = None
     id: int = field(default_factory=lambda: next(_match_ids))
 

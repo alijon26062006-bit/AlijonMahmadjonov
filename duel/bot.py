@@ -147,6 +147,54 @@ async def start(message: Message, conn: sqlite3.Connection, config: DuelConfig) 
     )
 
 
+@router.message(Command("duel"))
+async def duel_command(
+    message: Message,
+    conn: sqlite3.Connection,
+    config: DuelConfig,
+    hub=None,
+) -> None:
+    """Открытый вызов в групповом чате.
+
+    Кнопка тут обычная, со ссылкой: web_app-кнопки Telegram разрешает только
+    в личной переписке. Ссылка ведёт в ту же комнату, поэтому дерётся тот,
+    кто первым её откроет.
+    """
+
+    lang = ensure_player(conn, message)
+    if message.chat.type == "private":
+        await message.answer(
+            t("bot.press", lang), reply_markup=play_keyboard(lang, config.webapp_url)
+        )
+        return
+    if hub is None or message.from_user is None:
+        return
+
+    room = hub.open_group_room(
+        message.from_user.id,
+        message.from_user.first_name or f"Игрок {message.from_user.id}",
+        message.chat.id,
+    )
+    link = hub.invite_link(room.code)
+    if not link:
+        await message.answer(t("bot.duel.no_link", lang))
+        return
+
+    await message.answer(
+        t(
+            "bot.duel.call",
+            lang,
+            name=message.from_user.first_name or "",
+            duration=t("bot.duel.minute", lang),
+        ),
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=t("bot.duel.accept", lang), url=link)]
+            ]
+        ),
+    )
+
+
 @router.message(Command("rules"))
 async def rules_cmd(message: Message, conn: sqlite3.Connection) -> None:
     await message.answer(t("bot.rules.text", ensure_player(conn, message)))
@@ -295,6 +343,7 @@ async def setup_bot_ui(bot, config: DuelConfig) -> None:
     await bot.set_my_commands(
         [
             BotCommand(command="play", description=t("bot.menu.play")),
+            BotCommand(command="duel", description="Вызов в чате"),
             BotCommand(command="top", description="Таблица лидеров"),
             BotCommand(command="me", description="Мой профиль"),
             BotCommand(command="rules", description="Правила"),

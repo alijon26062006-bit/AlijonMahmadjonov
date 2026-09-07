@@ -35,7 +35,7 @@ from .game import (
     Side,
 )
 from .i18n import normalize, t, ui_strings
-from .matchmaking import HOST_GRACE_SEC, Queue, Ticket, make_match
+from .matchmaking import HOST_GRACE_SEC, Queue, Room, Ticket, make_match
 from .tasks import LEVELS
 
 log = logging.getLogger("duel.server")
@@ -122,6 +122,33 @@ class Hub:
         self._offered: set[int] = set()
 
     # ── служебное ───────────────────────────────────────────────────
+
+    def open_group_room(
+        self,
+        user_id: int,
+        name: str,
+        chat_id: int,
+        *,
+        duration: int = 60,
+        level: str = "auto",
+        now: float | None = None,
+    ) -> "Room":
+        """Открытый вызов в чате: дерётся тот, кто первым нажмёт кнопку."""
+
+        row = storage.get_player(self.db, user_id)
+        ticket = Ticket(
+            user_id=user_id,
+            name=name,
+            rating=row["rating"] if row else 1000,
+            games=row["games"] if row else 0,
+            lang=row["lang"] if row else "ru",
+            duration=duration if duration in DURATIONS else 60,
+            level=level if level in LEVELS else "auto",
+            joined_at=now if now is not None else time.monotonic(),
+        )
+        return self.queue.create_room(
+            ticket, ticket.joined_at, chat_id=chat_id
+        )
 
     def invite_link(self, code: str) -> str:
         """Ссылка-приглашение, самая короткая из доступных.
@@ -441,8 +468,14 @@ class Hub:
             # Гость пришёл по ссылке: сначала показываем, кто зовёт, и только
             # по нажатию кнопки заводим матч — иначе бой начинается врасплох.
             room = self.queue.find_room(str(data.get("code", "")))
-            if room is None or room.host.user_id == conn.user_id:
+            if room is None:
                 await conn.send({"t": "room_error"})
+                return
+            if room.host.user_id == conn.user_id:
+                # Свой же вызов: показываем комнату и ждём, кто откликнется.
+                await conn.send(
+                    {"t": "room", "code": room.code, "link": self.invite_link(room.code)}
+                )
                 return
             await conn.send(
                 {
@@ -508,11 +541,12 @@ class Hub:
         ticket = self.ticket_for(
             conn, int(data.get("duration", 60) or 0), str(data.get("level", "auto")), now
         )
+        chat_id = room.chat_id
         pair = self.queue.join_room(room.code, ticket)
         if pair is None:
             await conn.send({"t": "room_error"})
             return
-        await self._start_match(pair[0], pair[1], now, private=True)
+        await self._start_match(pair[0], pair[1], now, private=True, group_chat=chat_id)
 
     async def _call_host_back(self, room, guest: Conn) -> None:
         if self.notify is None:
@@ -541,7 +575,9 @@ class Hub:
             guest_ticket = self.ticket_for(
                 guest, room.host.duration, room.host.level, now
             )
-            await self._start_match(room.host, guest_ticket, now, private=True)
+            await self._start_match(
+                room.host, guest_ticket, now, private=True, group_chat=room.chat_id
+            )
             return True
         return False
 
@@ -735,9 +771,16 @@ class Hub:
     # ── матчи ───────────────────────────────────────────────────────
 
     async def _start_match(
-        self, one: Ticket, other: Ticket, now: float, *, private: bool = False
+        self,
+        one: Ticket,
+        other: Ticket,
+        now: float,
+        *,
+        private: bool = False,
+        group_chat: int = 0,
     ) -> Match:
         match = make_match(one, other, now, private=private)
+        match.group_chat = group_chat
         self.matches[match.id] = match
         self.match_of[one.user_id] = match.id
         self.match_of[other.user_id] = match.id
@@ -853,10 +896,43 @@ class Hub:
             if self.notify is not None and match.rated:
                 await self._notify_result(side.user_id, result)
 
+        if match.group_chat and match.rated:
+            await self._report_to_chat(match, ratings, deltas)
+
         for user_id in (match.a.user_id, match.b.user_id):
             self.match_of.pop(user_id, None)
         self.matches.pop(match.id, None)
         self.robots.pop(match.id, None)
+
+    async def _report_to_chat(
+        self, match: Match, ratings: dict[int, int], deltas: dict[int, int]
+    ) -> None:
+        """Счёт уходит в тот чат, где бросили вызов: его видят все."""
+
+        if self.notify is None:
+            return
+        lang = match.a.lang or "ru"
+        if match.winner_id is None:
+            head = t("bot.duel.draw", lang, one=match.a.name, two=match.b.name)
+        else:
+            winner = match.a if match.winner_id == match.a.user_id else match.b
+            loser = match.b if winner is match.a else match.a
+            head = t("bot.duel.won", lang, winner=winner.name, loser=loser.name)
+
+        def line(side) -> str:
+            delta = deltas[side.user_id]
+            sign = f"+{delta}" if delta > 0 else str(delta)
+            return f"{side.name} {ratings[side.user_id]} ({sign})"
+
+        body = t(
+            "bot.duel.score",
+            lang,
+            score=f"{match.a.score} : {match.b.score}",
+            one=line(match.a),
+            two=line(match.b),
+        )
+        with contextlib.suppress(Exception):
+            await self.notify(match.group_chat, f"{head}\n{body}")
 
     async def _notify_result(self, user_id: int, result: dict[str, object]) -> None:
         """Короткая запись об итоге в чат — чтобы история матчей была под рукой."""

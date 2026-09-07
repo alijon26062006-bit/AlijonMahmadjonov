@@ -74,6 +74,8 @@ class Room:
     # Друг уже нажал «В бой», но хозяина в игре нет — ждём, пока он зайдёт.
     accepted_by: int = 0
     accepted_at: float = 0.0
+    # Вызов брошен в групповом чате — туда же вернётся и счёт.
+    chat_id: int = 0
 
 
 @dataclass
@@ -186,12 +188,16 @@ class Queue:
             if code not in self.rooms:
                 return code
 
-    def create_room(self, host: Ticket, now: float, target: int = 0) -> Room:
-        """Хозяин создаёт комнату и зовёт друга: по коду или лично."""
+    def create_room(
+        self, host: Ticket, now: float, target: int = 0, chat_id: int = 0
+    ) -> Room:
+        """Хозяин создаёт комнату и зовёт: по коду, лично или на весь чат."""
 
         self.drop_rooms_of(host.user_id)
         self.tickets.pop(host.user_id, None)
-        room = Room(code=self.new_code(), host=host, created_at=now, target=target)
+        room = Room(
+            code=self.new_code(), host=host, created_at=now, target=target, chat_id=chat_id
+        )
         self.rooms[room.code] = room
         return room
 

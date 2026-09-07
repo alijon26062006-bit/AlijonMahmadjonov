@@ -298,12 +298,72 @@ async def test_peek_at_a_room_that_is_gone(client):
     await player.recv("room_error")
 
 
-async def test_you_cannot_invite_yourself(client):
+async def test_your_own_call_shows_the_room_not_a_refusal(client):
+    """В чате хозяин жмёт ту же кнопку, что и все: он должен попасть в свою
+    комнату и ждать отклика, а не получить отказ."""
     one, _ = await join(client, 1)
     await one.send(t="room", duration=30, level="easy")
     room = await one.recv("room")
+
     await one.send(t="peek", code=room["code"])
-    await one.recv("room_error")
+    again = await one.recv("room")
+    assert again["code"] == room["code"]
+    await one.silent("invite", timeout=0.4)
+
+
+# ── вызов в групповом чате ──────────────────────────────────────────────────
+
+
+async def test_a_call_in_a_chat_waits_for_whoever_taps_first(client):
+    storage.touch_player(client.hub.db, 1, "Алиджон")
+    room = client.hub.open_group_room(1, "Алиджон", -100500)
+    assert room.chat_id == -100500
+    assert client.hub.invite_link(room.code).endswith(room.code)
+
+    host, _ = await join(client, 1, "Алиджон")
+    guest, _ = await join(client, 2, "Фирдавс")
+
+    await guest.send(t="peek", code=room.code)
+    assert (await guest.recv("invite"))["host"]["name"] == "Алиджон"
+    await guest.send(t="join", code=room.code, duration=60, level="auto")
+    assert (await host.recv("found"))["opp"]["name"] == "Фирдавс"
+
+
+async def test_the_score_goes_back_to_the_chat(client):
+    """Смысл вызова в чате — чтобы счёт увидели все, кто там сидит."""
+    storage.touch_player(client.hub.db, 1, "Алиджон")
+    room = client.hub.open_group_room(1, "Алиджон", -100500)
+    host, _ = await join(client, 1, "Алиджон")
+    guest, _ = await join(client, 2, "Фирдавс")
+    await guest.send(t="join", code=room.code, duration=60, level="auto")
+    await host.recv("found")
+    await guest.recv("found")
+
+    task = await host.recv("task")
+    await respond(host, client.hub, 1, task["id"])
+    await host.recv("ans")
+    client.hub.match_for(1).deadline = time.monotonic() + 0.2
+    await host.recv("end")
+
+    to_chat = [letter for letter in client.posted if letter["to"] == -100500]
+    assert to_chat, "в чат ничего не пришло"
+    text = to_chat[-1]["text"]
+    assert "Алиджон" in text and "Фирдавс" in text
+    assert "1 : 0" in text
+
+
+async def test_a_second_person_cannot_take_a_taken_call(client):
+    storage.touch_player(client.hub.db, 1, "Алиджон")
+    room = client.hub.open_group_room(1, "Алиджон", -100500)
+    host, _ = await join(client, 1, "Алиджон")
+    guest, _ = await join(client, 2, "Фирдавс")
+    late, _ = await join(client, 3, "Опоздал")
+
+    await guest.send(t="join", code=room.code, duration=60, level="auto")
+    await host.recv("found")
+
+    await late.send(t="peek", code=room.code)
+    await late.recv("room_error")
 
 
 # ── список игроков и личный вызов ───────────────────────────────────────────

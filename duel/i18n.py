@@ -185,6 +185,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "bot.accepted": "⚔️ {name} принял твой вызов!\n\nЗаходи — он ждёт тебя в игре.",
         "bot.accepted.go": "⚔️ В бой",
         "bot.only_private": "Игра открывается в личной переписке с ботом.",
+        "bot.duel.call": "⚔️ {name} вызывает на дуэль!\n\n"
+                         "{duration} · примеры по силам\n"
+                         "Кто первым нажмёт — тот и дерётся.",
+        "bot.duel.accept": "⚔️ Принять вызов",
+        "bot.duel.won": "🏆 {winner} обыграл {loser}",
+        "bot.duel.draw": "🤝 {one} и {two} — ничья",
+        "bot.duel.score": "Верных ответов: {score}\n{one} · {two}",
+        "bot.duel.no_link": "Не могу составить ссылку на игру. "
+                            "Похоже, бот ещё не настроен до конца.",
+        "bot.duel.minute": "1 минута",
     },
     "tg": {
         "ui.title": "Кашиши арғамчин: математика",
@@ -363,6 +373,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "bot.accepted": "⚔️ {name} даъвати туро қабул кард!\n\nБиё — ӯ дар бозӣ туро интизор аст.",
         "bot.accepted.go": "⚔️ Ба ҷанг",
         "bot.only_private": "Бозӣ дар чати шахсӣ бо бот кушода мешавад.",
+        "bot.duel.call": "⚔️ {name} ба дуэл даъват мекунад!\n\n"
+                         "{duration} · мисолҳо мувофиқи қувва\n"
+                         "Кӣ аввал пахш кунад, ҳамон мебозад.",
+        "bot.duel.accept": "⚔️ Даъватро қабул кардан",
+        "bot.duel.won": "🏆 {winner} бар {loser} ғолиб омад",
+        "bot.duel.draw": "🤝 {one} ва {two} — баробар",
+        "bot.duel.score": "Ҷавобҳои дуруст: {score}\n{one} · {two}",
+        "bot.duel.no_link": "Истинодро сохта наметавонам. "
+                            "Аз афташ, бот пурра танзим нашудааст.",
+        "bot.duel.minute": "1 дақиқа",
     },
 }
 
