@@ -1,13 +1,10 @@
-"""Морской бой как матч: расстановка, снаряды, выстрелы, победа."""
+"""Морской бой как матч: расстановка, ходы по очереди, выстрелы, победа."""
 
 import random
-
-import pytest
 
 from duel import sea
 from duel.game import (
     DISCONNECT_GRACE,
-    FREEZE_SEC,
     REASON_ABANDONED,
     REASON_LEFT,
     REASON_TIME,
@@ -17,10 +14,12 @@ from duel.game import (
 )
 from duel.sea_match import (
     BATTLE_CAP_SEC,
-    MAX_SHELLS,
+    MAX_SKIPS,
     PLACE_SEC,
     REASON_FLEET,
+    REASON_IDLE,
     STATE_PLACING,
+    TURN_SEC,
     SeaMatch,
     SeaSide,
 )
@@ -31,7 +30,6 @@ def match(seed=1, duration=0):
         a=SeaSide(user_id=1, name="Первый"),
         b=SeaSide(user_id=2, name="Второй"),
         duration=duration,
-        level="normal",
         seed=seed,
     )
     m.begin(0.0)
@@ -49,10 +47,12 @@ def placed(seed=1, duration=0):
     return m
 
 
-def answer(m, user_id, now, correct=True):
-    side = m.side(user_id)
-    value = side.task.answer + (0 if correct else 7)
-    return m.submit(user_id, side.task.id, value, now)
+def ready(seed=1, duration=0):
+    """Матч, где первым ходит первый: тестам так проще рассказывать про ходы."""
+    m = placed(seed, duration)
+    if m.turn != 1:
+        m.turn = 1
+    return m
 
 
 def enemy_cells(m, user_id):
@@ -61,13 +61,25 @@ def enemy_cells(m, user_id):
     return [spot for ship in opp.board.ships for spot in ship.cells]
 
 
+def empty_cell(m, user_id):
+    """Клетка, где у соперника точно никого нет."""
+    taken = set(enemy_cells(m, user_id))
+    shots = m.opponent(user_id).board.shots
+    return next(
+        (r, c)
+        for r in range(sea.SIZE)
+        for c in range(sea.SIZE)
+        if (r, c) not in taken and (r, c) not in shots
+    )
+
+
 # ── расстановка ─────────────────────────────────────────────────────────────
 
 
 def test_a_new_match_starts_with_placement_not_a_countdown():
     m = match()
     assert m.state == STATE_PLACING
-    assert m.a.task is None, "примеров до боя нет"
+    assert m.a.task is None, "примеров в морском бою нет вовсе"
 
 
 def test_placement_is_checked_by_the_server():
@@ -111,73 +123,61 @@ def test_the_robot_places_itself_at_once():
     assert m.b.placed
 
 
-# ── снаряды ─────────────────────────────────────────────────────────────────
+# ── очередь хода ────────────────────────────────────────────────────────────
 
 
-def test_a_correct_answer_gives_a_shell():
+def test_the_battle_starts_with_somebody_s_turn():
     m = placed()
-    result = answer(m, 1, 5.0)
-    assert result.correct and result.shells == 1
-    assert m.a.shells == 1
-    assert result.task is not None, "сразу новый пример"
+    assert m.turn in (1, 2)
+    assert m.my_turn(m.turn) and not m.my_turn(3 - m.turn)
+    assert m.turn_deadline > 0
 
 
-def test_a_streak_gives_two_shells():
-    m = placed()
-    steps = [answer(m, 1, t).step for t in (5.0, 6.0, 7.0)]
-    assert steps == [1, 1, 2]
-    assert m.a.shells == 3
+def test_the_first_move_is_drawn_by_lot():
+    """Иначе первым всегда ходил бы тот, кто раньше нажал «Готов»."""
+    firsts = {placed(seed=seed).turn for seed in range(12)}
+    assert firsts == {1, 2}
 
 
-def test_shells_do_not_pile_up():
-    m = placed()
-    for t in range(5, 15):
-        answer(m, 1, float(t))
-    assert m.a.shells == MAX_SHELLS
+def test_you_cannot_shoot_out_of_turn():
+    m = ready()
+    row, col = enemy_cells(m, 2)[0]
+    assert m.fire(2, row, col, 5.0)["result"] == "not_your_turn"
+    assert not m.a.board.shots, "чужое поле осталось нетронутым"
 
 
-def test_a_wrong_answer_freezes_and_gives_nothing():
-    m = placed()
-    result = answer(m, 1, 5.0, correct=False)
-    assert not result.correct and m.a.shells == 0
-    assert m.a.frozen(5.5) and not m.a.frozen(5.0 + FREEZE_SEC + 0.1)
-
-
-# ── выстрелы ────────────────────────────────────────────────────────────────
-
-
-def test_no_shells_no_shot():
-    m = placed()
-    assert m.fire(1, 0, 0, 5.0)["result"] == "no_shells"
-    assert not m.b.board.shots
-
-
-def test_a_shot_costs_a_shell():
-    m = placed()
-    answer(m, 1, 5.0)
-    shot = m.fire(1, 0, 0, 5.5)
-    assert shot["result"] in ("miss", "hit", "sunk")
-    assert shot["shells"] == 0 and m.a.shells == 0
-
-
-def test_a_hit_is_counted():
-    m = placed()
-    answer(m, 1, 5.0)
+def test_a_hit_lets_you_shoot_again():
+    m = ready()
     row, col = enemy_cells(m, 1)[0]
-    shot = m.fire(1, row, col, 5.5)
-    assert shot["result"] in ("hit", "sunk")
-    assert m.a.hits_made == 1
+    shot = m.fire(1, row, col, 5.0)
+    assert shot["result"] in ("hit", "sunk") and shot["again"] is True
+    assert m.turn == 1
 
 
-def test_shooting_the_same_cell_twice_is_free():
-    """Палец промахнулся по уже открытой клетке — снаряд остаётся."""
-    m = placed()
-    answer(m, 1, 5.0)
-    answer(m, 1, 6.0)
-    m.fire(1, 0, 0, 6.5)
-    before = m.a.shells
-    assert m.fire(1, 0, 0, 6.6)["result"] == "repeat"
-    assert m.a.shells == before
+def test_a_miss_hands_the_turn_over():
+    m = ready()
+    row, col = empty_cell(m, 1)
+    shot = m.fire(1, row, col, 5.0)
+    assert shot["result"] == "miss" and shot["again"] is False
+    assert m.turn == 2
+    assert m.turn_deadline == 5.0 + TURN_SEC
+
+
+def test_a_hit_gives_a_fresh_thirty_seconds():
+    m = ready()
+    row, col = enemy_cells(m, 1)[0]
+    m.fire(1, row, col, 20.0)
+    assert m.turn_deadline == 20.0 + TURN_SEC
+
+
+def test_shooting_the_same_cell_twice_costs_nothing():
+    """Палец попал в уже открытую клетку — это не выстрел, ход остаётся."""
+    m = ready()
+    row, col = enemy_cells(m, 1)[0]
+    m.fire(1, row, col, 5.0)
+    shots = m.a.shots_fired
+    assert m.fire(1, row, col, 5.5)["result"] == "repeat"
+    assert m.turn == 1 and m.a.shots_fired == shots
 
 
 def test_you_cannot_fire_before_the_battle():
@@ -187,26 +187,66 @@ def test_you_cannot_fire_before_the_battle():
     assert m.fire(1, 0, 0, 0.5)["result"] == "not_running"
 
 
+def test_thinking_too_long_loses_the_turn():
+    m = ready()
+    assert m.poll(m.turn_deadline + 0.1)
+    assert m.turn == 2 and m.a.skips == 1
+
+
+def test_three_skipped_turns_in_a_row_lose_the_match():
+    m = ready()
+    now = m.turn_deadline
+    for _ in range(MAX_SKIPS * 2):
+        now += TURN_SEC + 0.1
+        m.poll(now)
+        if m.state == STATE_FINISHED:
+            break
+    assert m.state == STATE_FINISHED and m.reason == REASON_IDLE
+    assert m.winner_id == 2 and m.rated
+
+
+def test_a_shot_wipes_the_skips():
+    m = ready()
+    m.poll(m.turn_deadline + 0.1)   # пропустил первый
+    m.turn = 1
+    row, col = enemy_cells(m, 1)[0]
+    m.fire(1, row, col, 40.0)
+    assert m.a.skips == 0
+
+
+# ── попадания и победа ──────────────────────────────────────────────────────
+
+
+def test_hits_and_misses_are_counted_like_answers():
+    """Счёт — попадания, промахи — ошибки: рейтинг и точность считаются
+    тем же кодом, что и в канате."""
+    m = ready()
+    row, col = enemy_cells(m, 1)[0]
+    m.fire(1, row, col, 5.0)
+    assert m.a.hits_made == 1 and m.a.score == 1 and m.a.streak == 1
+    m.fire(1, *empty_cell(m, 1), 5.5)
+    assert m.a.misses_made == 1 and m.a.streak == 0
+    assert m.a.shots_fired == 2 and m.a.accuracy == 50
+
+
 def test_sinking_the_whole_fleet_wins():
-    m = placed()
+    m = ready()
     now = 5.0
     for row, col in enemy_cells(m, 1):
-        while m.a.shells == 0:
-            now += 1.0
-            answer(m, 1, now)
         now += 0.2
+        m.turn = 1          # попадания и так оставляют ход, но страхуемся
         m.fire(1, row, col, now)
     assert m.state == STATE_FINISHED
     assert m.reason == REASON_FLEET and m.winner_id == 1
     assert m.a.sunk_made == len(sea.FLEET)
+    assert m.a.best_streak == sum(sea.FLEET), "все девять подряд"
 
 
 def test_the_last_hit_reports_the_sunk_ship():
-    m = placed()
+    m = ready()
     opp = m.opponent(1)
     single = next(ship for ship in opp.board.ships if ship.size == 1)
-    answer(m, 1, 5.0)
-    shot = m.fire(1, *single.cells[0], 5.5)
+    shot = m.fire(1, *single.cells[0], 5.0)
     assert shot["result"] == "sunk"
     assert set(shot["ship"]) == set(single.cells)
     assert shot["halo"], "вокруг убитого — пусто, клиенту это надо показать"
@@ -216,33 +256,21 @@ def test_the_last_hit_reports_the_sunk_ship():
 
 
 def test_time_up_goes_to_whoever_hit_more():
-    m = placed()
-    answer(m, 1, 5.0)
+    m = ready()
     row, col = enemy_cells(m, 1)[0]
-    m.fire(1, row, col, 5.5)
-    answer(m, 2, 6.0)
-    m.fire(2, 6, 6, 6.5)   # почти наверняка мимо, но проверим честно
-    if m.b.hits_made == 1:
-        pytest.skip("случайно попал — не тот случай")
+    m.fire(1, row, col, 5.0)
     m.poll(BATTLE_CAP_SEC + 10)
     assert m.state == STATE_FINISHED and m.reason == REASON_TIME
     assert m.winner_id == 1
 
 
-def test_time_up_with_equal_hits_goes_to_the_better_solver():
-    m = placed()
-    answer(m, 1, 5.0)
-    answer(m, 1, 6.0)
-    answer(m, 2, 6.5)
-    m.poll(BATTLE_CAP_SEC + 10)
-    assert m.winner_id == 1
-
-
 def test_nothing_happened_at_all_is_a_draw():
-    m = placed()
-    m.poll(BATTLE_CAP_SEC + 10)
+    m = ready()
+    m.deadline = 1.0
+    m.poll(2.0)
     assert m.winner_id is None
     assert m.result_for(1)["outcome"] == "draw"
+    assert not m.rated, "никто не выстрелил — не за что менять рейтинг"
 
 
 def test_leaving_during_placement_ends_the_match():
@@ -280,18 +308,30 @@ def test_a_fixed_duration_is_honoured():
 
 
 def test_you_never_see_the_enemy_fleet():
-    m = placed()
+    m = ready()
     view = m.snapshot(1, 5.0)
     assert "ships" not in view["enemy"]
     assert view["me"]["board"]["ships"], "своё поле видно целиком"
     assert view["enemy"]["alive"] == len(sea.FLEET)
 
 
+def test_the_snapshot_says_whose_turn_it_is():
+    m = ready()
+    mine, theirs = m.snapshot(1, 5.0), m.snapshot(2, 5.0)
+    assert mine["my_turn"] is True and theirs["my_turn"] is False
+    assert mine["turn_ms"] > 0 and mine["turn_ms"] == theirs["turn_ms"]
+
+
+def test_the_clock_does_not_change_every_tick():
+    """Иначе состояние летело бы по сети двадцать раз в секунду."""
+    m = ready()
+    assert m.snapshot(1, 5.0)["turn_ms"] == m.snapshot(1, 5.1)["turn_ms"]
+
+
 def test_the_enemy_view_shows_only_what_you_found():
-    m = placed()
-    answer(m, 1, 5.0)
+    m = ready()
     row, col = enemy_cells(m, 1)[0]
-    m.fire(1, row, col, 5.5)
+    m.fire(1, row, col, 5.0)
     view = m.snapshot(1, 6.0)["enemy"]
     assert (row, col) in view["hits"]
     assert view["last"] == [row, col]
@@ -308,13 +348,17 @@ def test_the_snapshot_says_which_stage_we_are_in():
 
 
 def test_the_result_reveals_the_enemy_fleet_at_last():
-    m = placed()
+    m = ready()
+    row, col = enemy_cells(m, 1)[0]
+    m.fire(1, row, col, 5.0)
     m.poll(BATTLE_CAP_SEC + 10)
     result = m.result_for(1)
     assert len(result["enemy_fleet"]) == len(sea.FLEET)
     assert result["game"] == "sea"
+    # Последний выстрел тоже должен быть виден: состояния после него нет.
+    assert (row, col) in result["enemy_view"]["hits"]
 
 
 def test_the_match_knows_its_game():
     assert match().game == "sea"
-    assert placed().margin() == 0
+    assert ready().margin() == 0

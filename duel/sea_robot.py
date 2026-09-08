@@ -1,8 +1,11 @@
 """Робот для морского боя.
 
-Считает он так же, как робот в канате — тем же мозгом, с теми же паузами и
-ошибками. А стреляет по-человечески: пока ничего не нашёл — ищет по полю,
-попал — добивает вокруг, понял направление — идёт вдоль корабля.
+Ходит наравне с человеком: дождался своего хода, «прицелился» и выстрелил.
+Пока ничего не нашёл — ищет по полю через клетку, попал — добивает вокруг,
+понял направление — идёт вдоль корабля.
+
+Слабый робот целится дольше и иногда бьёт наугад, даже когда корабль уже
+ранен: у новичка должен быть шанс.
 """
 
 from __future__ import annotations
@@ -11,22 +14,28 @@ import random
 from dataclasses import dataclass, field
 
 from . import sea
-from .robot import ROBOT_ID, Robot
+from .robot import ROBOT_ID
 from .sea_match import STATE_RUNNING, SeaMatch, SeaSide
 
-# Между выстрелами робот «целится»: мгновенная очередь выглядит как автомат.
-AIM = (0.5, 1.3)
+# Сколько робот «целится» перед выстрелом. Мгновенный ответ выглядит как автомат.
+AIM = {
+    "slow": (2.0, 3.6),
+    "normal": (1.3, 2.5),
+    "fast": (0.8, 1.6),
+}
+# Насколько робот следует своему плану добивания. Остальное — выстрел наугад.
+SMART = {"slow": 0.6, "normal": 0.85, "fast": 1.0}
 
 Cell = tuple[int, int]
 
 
 @dataclass
 class SeaRobot:
-    """Ходит за робота в морском бою: и примеры решает, и стреляет."""
+    """Ходит за робота в морском бою."""
 
     speed: str = "normal"
     seed: int | None = None
-    brain: Robot = field(init=False)
+    # Когда выстрелит. Ноль — ещё не прицелился в этот ход.
     fire_at: float = 0.0
     # Клетки корабля, который сейчас добиваем, и куда стрелять дальше.
     wounded: list[Cell] = field(default_factory=list)
@@ -34,39 +43,50 @@ class SeaRobot:
     _rng: random.Random = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self.brain = Robot(speed=self.speed, seed=self.seed)
         self._rng = random.Random(self.seed)
 
+    @property
+    def _aim(self) -> tuple[float, float]:
+        return AIM.get(self.speed, AIM["normal"])
+
+    @property
+    def _smart(self) -> float:
+        return SMART.get(self.speed, SMART["normal"])
+
     def step(self, match: SeaMatch, now: float) -> bool:
-        """Один такт: подумать над примером, при снаряде — выстрелить."""
+        """Один такт. True — робот только что выстрелил."""
 
-        moved = self.brain.step(match, now)
-        if match.state != STATE_RUNNING:
-            return moved
+        if match.state != STATE_RUNNING or not match.my_turn(ROBOT_ID):
+            self.fire_at = 0.0
+            return False
 
-        me = match.side(ROBOT_ID)
         human = match.opponent(ROBOT_ID)
-        if not isinstance(me, SeaSide) or not isinstance(human, SeaSide):
-            return moved
-        if me.shells <= 0 or now < self.fire_at or human.board is None:
-            return moved
+        if not isinstance(human, SeaSide) or human.board is None:
+            return False
+
+        if not self.fire_at:
+            self.fire_at = now + self._rng.uniform(*self._aim)
+            return False
+        if now < self.fire_at:
+            return False
 
         target = self.choose(human.board)
         if target is None:
-            return moved
+            return False
         shot = match.fire(ROBOT_ID, target[0], target[1], now)
         self.learn(shot, human.board)
-        self.fire_at = now + self._rng.uniform(*AIM)
+        self.fire_at = 0.0
         return True
 
     # ── куда стрелять ───────────────────────────────────────────────
 
     def choose(self, board: sea.Board) -> Cell | None:
         known = board.shots
-        while self.targets:
-            spot = self.targets.pop(0)
-            if spot not in known and sea.inside(*spot):
-                return spot
+        if self._rng.random() < self._smart:
+            while self.targets:
+                spot = self.targets.pop(0)
+                if spot not in known and sea.inside(*spot):
+                    return spot
 
         free = [
             (r, c)

@@ -21,6 +21,7 @@ const S = {
   strings: {},
   profile: null,
   games: [DEFAULT_GAME],
+  gameInfo: {},
   // Игра, выбранная в меню, и игра идущего матча — не всегда одна и та же:
   // приглашение друга приводит в его игру.
   game: localStorage.getItem('duel.game') || DEFAULT_GAME,
@@ -60,9 +61,9 @@ const VIEWS = {
     screen: 'game', question: 'g-question', answer: 'g-answer', pad: 'g-pad',
     flash: 'g-flash', countdown: 'g-countdown', clock: 'g-clock',
   },
+  // В море примеров нет вовсе: ни вопроса, ни клавиатуры — только поля.
   sea: {
-    screen: 'sea', question: 'z-question', answer: 'z-answer', pad: 'z-pad',
-    flash: 'z-flash', countdown: 'z-countdown', clock: 'z-clock',
+    screen: 'sea', flash: 'z-flash', countdown: 'z-countdown', clock: 'z-clock',
   },
 };
 
@@ -93,10 +94,16 @@ function pickGame(game) {
   paint();
 }
 
-/* Что просим у сервера: игру, уровень и — для каната — длительность. */
+/* Есть ли в игре примеры. Если нет — и сложность спрашивать незачем. */
+function hasMath(game) {
+  const info = S.gameInfo[game || S.game];
+  return !info || info.math !== false;
+}
+
+/* Что просим у сервера: игру, уровень и — где есть примеры — длительность. */
 function wanted(game) {
   const g = game || S.game;
-  const out = { game: g, level: S.level };
+  const out = { game: g, level: hasMath(g) ? S.level : 'auto' };
   if (g === 'rope') out.duration = MATCH_SECONDS;
   return out;
 }
@@ -239,6 +246,7 @@ function onReady(msg) {
   S.bot = msg.bot || '';
   S.online = msg;
   if (Array.isArray(msg.games) && msg.games.length) S.games = msg.games;
+  S.gameInfo = msg.game_info || {};
   if (!S.games.includes(S.game)) S.game = S.games[0];
   buildOptions(msg.levels);
   buildGames();
@@ -544,8 +552,9 @@ function onState(msg) {
   S.leftAt = performance.now();
 
   if (game === 'sea') {
-    if (msg.state === 'placing') S.leftMs = msg.place_left_ms;
-    else S.leftMs = msg.left_ms;
+    // Часы наверху отсчитывают то, что сейчас важно: сколько осталось на
+    // расстановку, а в бою — сколько осталось на ход.
+    S.leftMs = msg.state === 'placing' ? msg.place_left_ms : msg.turn_ms;
     if (msg.state === 'countdown') startCountdown(msg.starts_in_ms || 0);
     Sea.state(msg);
     return;
@@ -623,9 +632,10 @@ function onEnd(msg) {
   const rows = sea
     ? [
       [say('result.sunk', 'Потоплено кораблей'), `${msg.sunk} / ${Sea.FLEET.length}`],
+      [say('result.hits', 'Попаданий'), `${msg.hits} : ${msg.opp_hits}`],
       [say('result.shots', 'Выстрелов'), msg.shots],
-      [say('result.correct', 'Верных ответов'), `${msg.score} : ${msg.opp_score}`],
       [say('result.accuracy', 'Точность'), `${msg.accuracy}%`],
+      [say('result.streak', 'Лучшая серия'), msg.best_streak],
       [say('rank', 'Место'), msg.place || '—'],
     ]
     : [
@@ -746,6 +756,9 @@ function paint() {
     chip.classList.toggle('on', name === S.level);
   });
 
+  // Морской бой — чистая игра по клеткам: настраивать в нём нечего.
+  $('m-levels').closest('.field').classList.toggle('hidden', !hasMath());
+
   document.querySelectorAll('#m-games .gcard').forEach((card) => {
     const game = card.dataset.game;
     const mine = standing(game);
@@ -817,10 +830,12 @@ function resetBoard() {
   $('g-me-score').textContent = '0';
   $('g-opp-score').textContent = '0';
   Object.values(VIEWS).forEach((v) => {
-    $(v.answer).textContent = '';
-    $(v.answer).classList.remove('bad');
-    $(v.question).textContent = '…';
-    $(v.pad).classList.remove('locked');
+    if (v.answer) {
+      $(v.answer).textContent = '';
+      $(v.answer).classList.remove('bad');
+      $(v.question).textContent = '…';
+      $(v.pad).classList.remove('locked');
+    }
     $(v.countdown).classList.add('hidden');
   });
   drawRope(0);
@@ -829,7 +844,7 @@ function resetBoard() {
 /* ── ввод ───────────────────────────────────────────────── */
 
 function press(key) {
-  if (!inMatch() || performance.now() < S.frozenUntil) return;
+  if (!inMatch() || !view().pad || performance.now() < S.frozenUntil) return;
   if (key === 'del') {
     S.input = S.input.slice(0, -1);
   } else if (key === 'ok') {
@@ -844,7 +859,7 @@ function press(key) {
 }
 
 function submit() {
-  if (!S.task || S.input === '') return;
+  if (!S.task || S.input === '' || !view().pad) return;
   send({
     t: 'answer',
     id: S.task.id,
@@ -871,8 +886,8 @@ function tickClock() {
       clock.textContent = mm > 0 ? `${mm}:${ss}` : `0:${ss}`;
       const low = total <= 10;
       clock.classList.toggle('low', low);
-      // Спешка — только в бою: во время расстановки музыки ещё нет.
-      const hurry = low && (S.playing !== 'sea' || Sea.mode() === 'battle');
+      // Спешка — только когда время поджимает у тебя, а не у соперника.
+      const hurry = low && (S.playing !== 'sea' || (Sea.mode() === 'battle' && Sea.myTurn()));
       if (hurry !== S.hurrying) {
         S.hurrying = hurry;
         Sound.hurry(hurry);
@@ -893,7 +908,7 @@ function bind() {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (!inMatch()) return;
+    if (!inMatch() || !view().pad) return;
     if (/^[0-9]$/.test(event.key)) press(event.key);
     else if (event.key === 'Backspace') press('del');
     else if (event.key === 'Enter') press('ok');

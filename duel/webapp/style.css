@@ -829,48 +829,41 @@ h2 { font-size: 19px; margin: 0; }
 
 /* ── бой ── */
 
-.sea-mid {
-  width: 100%;
-  display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start;
+/* Чей ход — самая важная строка на экране, поэтому она между полями,
+   там, куда и так смотрят. */
+.turnbar {
+  width: 100%; max-width: 420px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 2px solid var(--pen); border-radius: 12px;
+  background: var(--paper);
+  padding: 6px 10px;
 }
-.own-box { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
-.own-box .pen-label { font-size: 11px; letter-spacing: 2px; }
-.grid.own-small { --c: calc(var(--sq) * .44); }
+.turnbar.theirs { border-color: var(--pencil); opacity: .85; }
+.turn-who { font-weight: 800; font-size: 15px; color: var(--pen); }
+.turnbar.theirs .turn-who { color: var(--pencil); }
+.turnbar.mine { animation: turn-in .45s cubic-bezier(.2, 1.2, .4, 1); }
+.turnbar.shake { animation: shake .3s ease; }
+@keyframes turn-in {
+  from { transform: scale(.9); }
+  60% { transform: scale(1.04); }
+}
+.turn-note { min-height: 17px; font-size: 13px; font-weight: 700; color: var(--red); }
+.turn-note.ok { color: #1f8f4e; }
+.turn-note.calm { color: var(--pencil); font-weight: 600; }
+.turn-note.boom { animation: boom .45s ease-out; }
+
+/* Пока ходит соперник, по чужому полю не постучишь. */
+.grid.enemy.waiting .cells { opacity: .72; }
+.grid.enemy.waiting .cell { cursor: default; }
+
+.own-box { display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.own-box .pen-label { font-size: 11px; letter-spacing: 2px; align-self: flex-start; }
+.grid.own-small { --c: calc(var(--sq) * .62); }
 .own-box.quake { animation: quake .4s ease; }
 @keyframes quake {
   20% { transform: translate(-3px, 1px); } 40% { transform: translate(3px, -1px); }
   60% { transform: translate(-2px, 0); } 80% { transform: translate(2px, 1px); }
 }
-
-.sea-task { display: flex; flex-direction: column; gap: 4px; align-items: stretch; min-width: 0; }
-.shells { display: flex; gap: 6px; align-items: center; justify-content: center; font-size: 12px; color: var(--pencil); }
-.shell {
-  width: 15px; height: 15px; border-radius: 50%;
-  border: 2px solid var(--pen); box-sizing: border-box;
-  transition: background .15s ease;
-}
-.shell.full { background: var(--pen); }
-.shell.full.new { animation: pop .35s ease; }
-.shells.shake { animation: shake .3s ease; }
-.question.pen { color: var(--ink); font-size: clamp(24px, 7.5vw, 34px); }
-.answer.pen {
-  background: transparent; border-radius: 0;
-  border-bottom: 2px solid var(--pen);
-  color: var(--pen); height: 40px; line-height: 40px;
-}
-.sea-note { min-height: 18px; font-size: 13px; font-weight: 800; color: var(--red); }
-.sea-note.ok { color: #1f8f4e; }
-.sea-note.calm { color: var(--pencil); font-weight: 600; }
-.sea-note.boom { animation: boom .45s ease-out; }
-
-.pad.compact { grid-template-columns: repeat(4, 1fr); gap: 6px; max-width: 480px; }
-.sheet .key {
-  background: rgba(255, 255, 255, .75); color: var(--ink);
-  border: 1.5px solid var(--line); font-size: 21px; padding: 9px 0;
-}
-.sheet .key.del { color: var(--pencil); }
-.sheet .key.ok { background: var(--pen); color: #fff; border-color: var(--pen); }
-.sheet .key:active { background: var(--pen); color: #fff; }
 
 /* Раскрытый флот соперника на экране итога — тот же тетрадный лист. */
 .reveal {
@@ -888,8 +881,4 @@ h2 { font-size: 19px; margin: 0; }
 @media (max-height: 660px) {
   :root { --sq: min(calc((100vw - 64px) / 7), 34px); }
   .sheet { gap: 6px; }
-  .sheet .key { padding: 7px 0; font-size: 19px; }
-}
-@media (min-height: 720px) {
-  .sheet .key { padding: 12px 0; }
 }

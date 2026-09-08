@@ -2,7 +2,7 @@
 
    Правила здесь только для удобства — чтобы не дать поставить корабль
    впритык и сразу это показать. Решает всё равно сервер: он проверяет
-   расстановку и он же говорит, попал ты или нет.
+   расстановку, он же говорит, чей ход и попал ты или нет.
 
    Скрипт подключается раньше app.js и берёт его глобальные функции
    (send, say, toast, $) уже во время игры, когда они давно определены. */
@@ -13,7 +13,6 @@ const Sea = (function () {
   const SIZE = 7;
   const FLEET = [3, 2, 2, 1, 1];
   const LETTERS = 'АБВГДЕЖ';
-  const MAX_SHELLS = 3;
 
   // Расстановка: корабли по местам флота, выбранный и его поворот.
   const P = {
@@ -27,7 +26,7 @@ const Sea = (function () {
   // Бой: последнее состояние с сервера и собранные поля.
   const V = {
     mode: '',
-    shells: 0,
+    myTurn: false,
     enemy: null,
     board: null,
     grids: {},
@@ -258,7 +257,7 @@ const Sea = (function () {
 
   function renderPlacement(extra) {
     const grid = V.grids.ownBig;
-    const ships = P.ships.filter(Boolean).map((s, i) => ({
+    const ships = P.ships.filter(Boolean).map((s) => ({
       cells: cellsOf(s),
       classes: P.ships.indexOf(s) === P.selected ? ['sel'] : [],
     }));
@@ -331,9 +330,14 @@ const Sea = (function () {
     $('z-ready').classList.toggle('hidden', !placing);
     $('z-wait').classList.add('hidden');
     $('z-enemy').classList.toggle('hidden', placing);
+    $('z-turn').classList.toggle('hidden', placing);
     $('z-mid').classList.toggle('hidden', placing);
-    $('z-pad').classList.toggle('hidden', placing);
     $('z-enemy-fleet').classList.toggle('hidden', placing);
+    paintLabels();
+  }
+
+  function paintLabels() {
+    const placing = V.mode === 'placing';
     $('z-enemy-label').textContent = placing
       ? say('sea.you', 'ТЫ')
       : say('sea.enemy', 'СОПЕРНИК');
@@ -341,18 +345,19 @@ const Sea = (function () {
     $('z-opp-name').textContent = placing
       ? `${say('vs', 'против')} ${V.opp}`
       : V.opp;
+    $('z-you-label').textContent = say('sea.you', 'ТЫ');
   }
 
   /* ── бой ────────────────────────────────────────────────── */
 
   function tapEnemy(r, c) {
     if (V.mode !== 'battle' || !V.enemy) return;
-    if (V.shells <= 0) {
-      const shells = $('z-shells');
-      shells.classList.remove('shake');
-      shells.getBoundingClientRect();
-      shells.classList.add('shake');
-      toast(say('sea.no_shells', 'Реши пример — получишь снаряд'));
+    if (!V.myTurn) {
+      const bar = $('z-turn');
+      bar.classList.remove('shake');
+      bar.getBoundingClientRect();
+      bar.classList.add('shake');
+      toast(say('sea.not_your_turn', 'Сейчас ходит соперник'));
       return;
     }
     const known = V.enemy.hits.concat(V.enemy.misses);
@@ -375,6 +380,7 @@ const Sea = (function () {
       pending: V.pending,
       ships: (e.sunk || []).map((cells) => ({ cells, classes: ['sunk'] })),
     });
+    $('z-enemy').classList.toggle('waiting', !V.myTurn);
   }
 
   function paintOwn(board, last) {
@@ -391,15 +397,6 @@ const Sea = (function () {
     });
   }
 
-  function paintShells(count) {
-    const el = $('z-shells');
-    const grew = count > V.shells;
-    V.shells = count;
-    el.innerHTML = Array.from({ length: MAX_SHELLS }, (_, i) =>
-      `<span class="shell ${i < count ? 'full' : ''} ${grew && i === count - 1 ? 'new' : ''}"></span>`
-    ).join('') + `<span>${say('sea.shells', 'снаряды')}</span>`;
-  }
-
   function paintFleet(sunk) {
     // Потопленные вычёркиваем по размерам: два двухпалубных — два штриха.
     const gone = (sunk || []).map((cells) => cells.length);
@@ -411,10 +408,27 @@ const Sea = (function () {
     }).join('');
   }
 
+  /* Чей ход — главная строка экрана. Когда ход переходит к тебе, она
+     подпрыгивает и звенит: пропустить свой ход обидно. */
+  function paintTurn(mine, quiet) {
+    const changed = mine !== V.myTurn;
+    V.myTurn = mine;
+    const bar = $('z-turn');
+    bar.classList.toggle('mine', mine);
+    bar.classList.toggle('theirs', !mine);
+    $('z-turn-who').textContent = mine
+      ? say('sea.your_turn', 'Твой ход')
+      : say('sea.opp_turn', 'Ход соперника');
+    if (changed && mine && !quiet) {
+      Sound.turn();
+      haptic('ok');
+    }
+  }
+
   function note(text, kind) {
     const el = $('z-note');
     el.textContent = text;
-    el.className = 'sea-note ' + (kind || '');
+    el.className = 'turn-note ' + (kind || '');
     el.getBoundingClientRect();
     el.classList.add('boom');
   }
@@ -424,18 +438,15 @@ const Sea = (function () {
   function begin(found) {
     resetPlacement();
     V.mode = '';
-    V.shells = 0;
+    V.myTurn = false;
     V.enemy = null;
     V.board = null;
     V.pending = null;
     V.opp = found.opp.name;
     $('z-note').textContent = '';
-    $('z-note').className = 'sea-note';
-    $('z-question').textContent = '…';
-    $('z-answer').textContent = '';
+    $('z-note').className = 'turn-note';
     setMode('placing');
     $('z-wait').classList.add('hidden');
-    paintShells(0);
     paintFleet([]);
     renderPlacement();
   }
@@ -463,13 +474,7 @@ const Sea = (function () {
       return;
     }
 
-    if (!P.sent) {
-      // Расстановку не отправляли, а бой уже начался: время вышло,
-      // и сервер поставил корабли сам. Скажем об этом, а не промолчим.
-      P.sent = true;
-      P.locked = true;
-      toast(say('sea.auto', 'Время вышло — корабли расставлены за тебя'));
-    }
+    const first = V.mode !== 'battle';
     setMode('battle');
     V.enemy = msg.enemy;
     V.board = msg.me.board;
@@ -477,21 +482,21 @@ const Sea = (function () {
         V.pending[0] === msg.enemy.last[0] && V.pending[1] === msg.enemy.last[1]) {
       V.pending = null;
     }
+    paintTurn(!!msg.my_turn, first);
     paintEnemy();
     paintOwn(msg.me.board, msg.opp.last);
-    paintShells(msg.me.shells);
     paintFleet(msg.enemy.sunk);
-    if (msg.state === 'running' && !$('z-note').textContent) {
-      note(msg.me.shells > 0
-        ? say('sea.aim', 'Есть снаряд — стреляй по полю соперника')
-        : say('sea.no_shells', 'Реши пример — получишь снаряд'), 'calm');
+    if (first) {
+      note(msg.my_turn
+        ? say('sea.aim', 'Стреляй по полю соперника')
+        : say('sea.wait_shot', 'Соперник целится…'), 'calm');
     }
   }
 
   function onShot(msg) {
     V.pending = null;
-    if (msg.result === 'no_shells') {
-      toast(say('sea.no_shells', 'Реши пример — получишь снаряд'));
+    if (msg.result === 'not_your_turn') {
+      toast(say('sea.not_your_turn', 'Сейчас ходит соперник'));
       return;
     }
     if (msg.result === 'repeat') {
@@ -500,26 +505,29 @@ const Sea = (function () {
     }
     if (msg.result === 'miss') {
       Sound.miss();
-      note(say('sea.miss', 'Мимо'), 'calm');
+      note(say('sea.miss', 'Мимо — ход соперника'), 'calm');
     } else if (msg.result === 'hit') {
       Sound.hit();
       haptic('ok');
-      note(say('sea.hit', 'Ранил!'), 'ok');
+      note(say('sea.hit', 'Ранил! Стреляй ещё'), 'ok');
     } else if (msg.result === 'sunk') {
       Sound.sunk();
       haptic('win');
-      note(say('sea.sunk', 'Убил!'), 'ok');
+      note(say('sea.sunk', 'Убил! Стреляй ещё'), 'ok');
     }
   }
 
   function onIncoming(msg) {
-    if (msg.result === 'miss') return;
+    if (msg.result === 'miss') {
+      note(say('sea.incoming.miss', 'Соперник промахнулся'), 'calm');
+      return;
+    }
     Sound.incoming(msg.result === 'sunk');
     haptic('bad');
     note(msg.result === 'sunk'
       ? say('sea.incoming.sunk', 'Твой корабль потоплен')
       : say('sea.incoming.hit', 'В тебя попали'));
-    const own = document.querySelector('.own-box');
+    const own = $('z-mid');
     own.classList.remove('quake');
     own.getBoundingClientRect();
     own.classList.add('quake');
@@ -528,7 +536,9 @@ const Sea = (function () {
   /* На экране итога — поле соперника целиком: где стоял флот и куда ты бил. */
   function reveal(container, end) {
     const grid = makeGrid(container, null, true);
-    const e = V.enemy || { hits: [], misses: [] };
+    // Сервер присылает поле соперника целиком: с последним выстрелом,
+    // после которого состояния уже не было.
+    const e = end.enemy_view || V.enemy || { hits: [], misses: [] };
     const hits = new Set(e.hits.map(([r, c]) => key(r, c)));
     paintGrid(grid, {
       hits: e.hits,
@@ -542,18 +552,16 @@ const Sea = (function () {
   }
 
   function paint() {
-    $('z-you-label').textContent = say('sea.you', 'ТЫ');
-    $('z-enemy-label').textContent = V.mode === 'placing'
-      ? say('sea.you', 'ТЫ')
-      : say('sea.enemy', 'СОПЕРНИК');
+    paintLabels();
     $('e-reveal-label').textContent = say('result.enemy_fleet', 'Флот соперника');
     if (V.mode === 'placing') renderPlacement();
+    else if (V.mode === 'battle') paintTurn(V.myTurn, true);
   }
 
   function init() {
     V.grids.ownBig = makeGrid($('z-own-big'), tapPlacement, true);
     V.grids.enemy = makeGrid($('z-enemy'), tapEnemy, true);
-    V.grids.own = makeGrid($('z-own'), null, false);
+    V.grids.own = makeGrid($('z-own'), null, true);
     $('z-rotate').onclick = () => {
       if (P.locked) return;
       if (P.selected >= 0 && !P.ships[P.selected]) P.horizontal = !P.horizontal;
@@ -582,5 +590,6 @@ const Sea = (function () {
     layout: (msg) => { if (!P.locked) applyLayout(msg.layout || []); },
     reveal,
     mode: () => V.mode,
+    myTurn: () => V.myTurn,
   };
 })();

@@ -30,11 +30,19 @@ class GameInfo:
     duration: int
     # Значок игры в текстах бота.
     icon: str = "⚔️"
+    # Есть ли в игре примеры. От этого зависит, спрашивать ли сложность.
+    math: bool = True
 
 
 GAMES: dict[str, GameInfo] = {
-    ROPE: GameInfo(id=ROPE, match_cls=Match, side_cls=Side, robot_cls=Robot, duration=60, icon="🪢"),
-    SEA: GameInfo(id=SEA, match_cls=SeaMatch, side_cls=SeaSide, robot_cls=SeaRobot, duration=0, icon="🚢"),
+    ROPE: GameInfo(
+        id=ROPE, match_cls=Match, side_cls=Side, robot_cls=Robot,
+        duration=60, icon="🪢",
+    ),
+    SEA: GameInfo(
+        id=SEA, match_cls=SeaMatch, side_cls=SeaSide, robot_cls=SeaRobot,
+        duration=0, icon="🚢", math=False,
+    ),
 }
 
 GAME_IDS = tuple(GAMES)

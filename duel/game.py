@@ -102,7 +102,6 @@ class AnswerResult:
     task: Task | None = None
     freeze_ms: int = 0
     note: str = ""
-    shells: int = 0
 
 
 @dataclass

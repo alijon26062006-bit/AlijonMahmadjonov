@@ -52,9 +52,9 @@ HEARTBEAT_SEC = 0.5
 
 # Одного и того же человека не зовём чаще, чем раз в минуту, и вообще не чаще
 # чем раз в восемь секунд: приглашение приходит в чат, спамить им нельзя.
-# Столько ждём живого соперника, прежде чем предложить робота: полминуты в
-# пустой очереди — это уже долго, дальше человек просто уходит.
-WAIT_FOR_ROBOT = 30.0
+# Столько ждём живого соперника, прежде чем предложить робота: пятнадцать
+# секунд в пустой очереди — это уже долго, дальше человек просто уходит.
+WAIT_FOR_ROBOT = 15.0
 CHALLENGE_COOLDOWN = 60.0
 CHALLENGE_RATE = 8.0
 PLAYERS_PAGE = 60
@@ -247,7 +247,8 @@ class Hub:
         *,
         now: float,
     ) -> Ticket:
-        game = games.normalize(game)
+        info = games.info(game)
+        game = info.id
         return Ticket(
             user_id=conn.user_id,
             name=conn.user.name,
@@ -255,8 +256,10 @@ class Hub:
             games=conn.played(game),
             lang=conn.lang,
             photo_url=conn.user.photo_url,
-            duration=duration if duration in DURATIONS else games.info(game).duration,
-            level=level if level in LEVELS else "auto",
+            duration=duration if duration in DURATIONS else info.duration,
+            # Где примеров нет, сложность нечему настраивать — и очередь
+            # незачем делить на четыре по признаку, который ни на что не влияет.
+            level=(level if level in LEVELS else "auto") if info.math else "auto",
             joined_at=now,
             game=game,
         )
@@ -440,6 +443,10 @@ class Hub:
                 "levels": list(LEVELS),
                 "win_steps": WIN_STEPS,
                 "games": list(games.GAME_IDS),
+                "game_info": {
+                    g: {"math": games.info(g).math, "duration": games.info(g).duration}
+                    for g in games.GAME_IDS
+                },
                 "bot": self.bot_username,
                 "start_param": user.start_param,
                 **self.online_stats(),
@@ -712,7 +719,7 @@ class Hub:
             return
         shot = match.fire(conn.user_id, row, col, now)
         if shot.get("result") not in SHOT_RESULTS:
-            # Снаряда нет или клетка уже открыта — об этом знает только стрелявший.
+            # Не твой ход или клетка уже открыта — об этом знает только стрелявший.
             await conn.send({"t": "shot", **self._json_shot(shot)})
         await self._dispatch_shots(match)
 
@@ -878,7 +885,6 @@ class Hub:
                     "correct": result.correct,
                     "step": result.step,
                     "freeze_ms": result.freeze_ms,
-                    "shells": result.shells,
                 }
             )
             if result.task is not None:

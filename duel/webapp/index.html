@@ -334,7 +334,7 @@
     </div>
 
     <!-- Верхнее поле: пока расставляем — своё, в бою — соперника. -->
-    <div class="grid-slot big">
+    <div class="grid-slot">
       <div class="grid own-big" id="z-own-big"></div>
       <div class="grid enemy hidden" id="z-enemy"></div>
     </div>
@@ -348,33 +348,18 @@
     <button class="btn primary big" id="z-ready" data-i18n="sea.ready">⚓ Готов</button>
     <div class="sea-wait hidden" id="z-wait"><div class="spinner"></div><span id="z-wait-text"></span></div>
 
-    <!-- Бой -->
-    <div class="sea-mid hidden" id="z-mid">
-      <div class="own-box">
-        <span class="pen-label" id="z-you-label">ТЫ</span>
-        <div class="grid own-small" id="z-own"></div>
-      </div>
-      <div class="sea-task">
-        <div class="shells" id="z-shells"></div>
-        <div class="question pen" id="z-question">…</div>
-        <div class="answer pen" id="z-answer"></div>
-        <div class="sea-note" id="z-note"></div>
-      </div>
+    <!-- Бой: чей ход и что вышло из последнего выстрела -->
+    <div class="turnbar hidden" id="z-turn">
+      <span class="turn-who" id="z-turn-who">—</span>
+      <span class="turn-note" id="z-note"></span>
     </div>
-    <div class="pad compact hidden" id="z-pad">
-      <button class="key" data-key="1">1</button>
-      <button class="key" data-key="2">2</button>
-      <button class="key" data-key="3">3</button>
-      <button class="key del" data-key="del">←</button>
-      <button class="key" data-key="4">4</button>
-      <button class="key" data-key="5">5</button>
-      <button class="key" data-key="6">6</button>
-      <button class="key" data-key="0">0</button>
-      <button class="key" data-key="7">7</button>
-      <button class="key" data-key="8">8</button>
-      <button class="key" data-key="9">9</button>
-      <button class="key ok" data-key="ok">✓</button>
+
+    <!-- Своё поле: в бою оно снизу, как на листе в тетради -->
+    <div class="own-box hidden" id="z-mid">
+      <span class="pen-label" id="z-you-label">ТЫ</span>
+      <div class="grid own-small" id="z-own"></div>
     </div>
+
     <div class="flash" id="z-flash"></div>
   </div>
   <div class="countdown hidden" id="z-countdown"><span>3</span></div>

@@ -336,6 +336,13 @@ const Sound = (function () {
       }
     },
 
+    /* Твой ход: короткий светлый сигнал, чтобы не прозевать очередь. */
+    turn: function () {
+      phrase([659.25, 987.77], 0.09, {
+        type: 'triangle', dur: 0.26, gain: 0.13, cutoff: 5200,
+      });
+    },
+
     /* Корабль поставлен: тихий карандашный щелчок. */
     place: function () {
       sfx({ freq: 880, type: 'sine', dur: 0.07, gain: 0.08, cutoff: 3000 });

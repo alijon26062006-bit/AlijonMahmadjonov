@@ -35,3 +35,9 @@ def test_every_registered_game_is_complete():
         assert issubclass(info.side_cls, Side)
         assert hasattr(info.robot_cls, "step")
         assert info.duration >= 0
+
+
+def test_the_registry_says_where_the_maths_is():
+    """Морской бой — чистая игра по клеткам, сложность там настраивать нечему."""
+    assert games.info("rope").math is True
+    assert games.info("sea").math is False

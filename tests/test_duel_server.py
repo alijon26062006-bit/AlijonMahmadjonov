@@ -175,23 +175,24 @@ async def test_a_single_player_just_waits(client):
 # ── когда живых нет ─────────────────────────────────────────────────────────
 
 
-async def test_after_half_a_minute_alone_the_game_offers_a_robot(client):
+async def test_after_fifteen_seconds_alone_the_game_offers_a_robot(client):
     player, _ = await join(client, 1)
     await player.send(t="find", duration=30, level="normal")
     await player.recv("queued")
-    await player.silent("offer_bot", timeout=0.5)
 
-    # Перематываем ожидание: сидеть в тесте полминуты незачем.
-    client.hub.queue.tickets[1].joined_at -= 31
+    # Перематываем ожидание: сидеть в тесте четверть минуты незачем.
+    client.hub.queue.tickets[1].joined_at -= 14
+    await player.silent("offer_bot", timeout=0.5)   # рано: ещё ищем человека
+    client.hub.queue.tickets[1].joined_at -= 2
     offer = await player.recv("offer_bot", timeout=4)
-    assert offer["online"] == 1 and offer["waited"] >= 30
+    assert offer["online"] == 1 and offer["waited"] >= 15
 
 
 async def test_the_offer_comes_once_and_not_again(client):
     player, _ = await join(client, 1)
     await player.send(t="find", duration=30, level="normal")
     await player.recv("queued")
-    client.hub.queue.tickets[1].joined_at -= 31
+    client.hub.queue.tickets[1].joined_at -= 16
     await player.recv("offer_bot", timeout=4)
     await player.silent("offer_bot", timeout=1.5)
 
@@ -200,14 +201,14 @@ async def test_a_new_search_may_be_offered_a_robot_again(client):
     player, _ = await join(client, 1)
     await player.send(t="find", duration=30, level="normal")
     await player.recv("queued")
-    client.hub.queue.tickets[1].joined_at -= 31
+    client.hub.queue.tickets[1].joined_at -= 16
     await player.recv("offer_bot", timeout=4)
 
     await player.send(t="cancel")
     await player.recv("idle")
     await player.send(t="find", duration=30, level="normal")
     await player.recv("queued")
-    client.hub.queue.tickets[1].joined_at -= 31
+    client.hub.queue.tickets[1].joined_at -= 16
     assert await player.recv("offer_bot", timeout=4)
 
 
