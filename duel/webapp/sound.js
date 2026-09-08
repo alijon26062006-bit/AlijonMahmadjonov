@@ -98,6 +98,43 @@ const Sound = (function () {
     voice(options);
   }
 
+  /* Шум через фильтр: взрывы, всплески, выстрелы. Осциллятором такого
+     не получить — там нет случайности, а взрыв ею и звучит. */
+  let noiseBuffer = null;
+  function burst(options) {
+    if (!sfxOn || !ensure()) return;
+    const o = options || {};
+    const at = o.time || ctx.currentTime;
+    const dur = o.dur || 0.3;
+    if (!noiseBuffer) {
+      noiseBuffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer;
+    src.loop = true;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = o.filter || 'lowpass';
+    filter.frequency.setValueAtTime(o.cutoff || 1200, at);
+    if (o.sweep) {
+      filter.frequency.exponentialRampToValueAtTime(
+        Math.max(40, (o.cutoff || 1200) * o.sweep), at + dur
+      );
+    }
+    filter.Q.value = o.q || 0.7;
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, at);
+    env.gain.exponentialRampToValueAtTime(o.gain || 0.2, at + (o.attack || 0.008));
+    env.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+
+    src.connect(filter).connect(env).connect(sfxBus);
+    src.start(at);
+    src.stop(at + dur + 0.05);
+  }
+
   /* Небольшой перебор нот: победа, поражение, старт. */
   function phrase(freqs, gap, options) {
     if (!sfxOn || !ensure()) return;
@@ -257,6 +294,51 @@ const Sound = (function () {
       phrase([523.25, 523.25], 0.16, {
         type: 'triangle', dur: 0.4, gain: 0.14, cutoff: 3000,
       });
+    },
+
+    // ── морской бой ─────────────────────────────────────────
+
+    /* Выстрел: короткий глухой хлопок. */
+    fire: function () {
+      burst({ dur: 0.14, gain: 0.2, cutoff: 900, sweep: 0.3 });
+      sfx({ freq: 140, type: 'sine', dur: 0.12, gain: 0.12, glide: 0.5, cutoff: 500 });
+    },
+
+    /* Мимо: всплеск — шипящий шум с быстрым спадом. */
+    miss: function () {
+      burst({ dur: 0.35, gain: 0.1, cutoff: 3200, sweep: 0.25, filter: 'bandpass', q: 0.9 });
+      sfx({ freq: 420, type: 'sine', dur: 0.14, gain: 0.05, glide: 1.6, cutoff: 2200 });
+    },
+
+    /* Попадание: взрыв — низкий шум и удар. */
+    hit: function () {
+      burst({ dur: 0.45, gain: 0.32, cutoff: 700, sweep: 0.15 });
+      sfx({ freq: 110, type: 'triangle', dur: 0.32, gain: 0.18, glide: 0.35, cutoff: 600 });
+    },
+
+    /* Потопил: взрыв побольше и короткий победный ход вверх. */
+    sunk: function () {
+      burst({ dur: 0.7, gain: 0.38, cutoff: 900, sweep: 0.1 });
+      sfx({ freq: 90, type: 'triangle', dur: 0.5, gain: 0.2, glide: 0.3, cutoff: 500 });
+      phrase([659.25, 783.99, 1046.5], 0.09, {
+        type: 'triangle', dur: 0.3, gain: 0.12, cutoff: 5000,
+      });
+    },
+
+    /* В тебя попали: тот же взрыв, но приглушённый и без радости. */
+    incoming: function (sunk) {
+      burst({ dur: sunk ? 0.6 : 0.4, gain: sunk ? 0.3 : 0.2, cutoff: 500, sweep: 0.2 });
+      sfx({ freq: 160, type: 'sine', dur: 0.35, gain: 0.12, glide: 0.4, cutoff: 500 });
+      if (sunk) {
+        phrase([392, 329.63, 261.63], 0.12, {
+          type: 'triangle', dur: 0.35, gain: 0.1, cutoff: 2000,
+        });
+      }
+    },
+
+    /* Корабль поставлен: тихий карандашный щелчок. */
+    place: function () {
+      sfx({ freq: 880, type: 'sine', dur: 0.07, gain: 0.08, cutoff: 3000 });
     },
 
     // ── музыка ──────────────────────────────────────────────

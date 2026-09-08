@@ -1,21 +1,30 @@
 /* Клиент Mini App. Ответы не проверяет и правильных ответов не знает —
-   всё решает сервер. Здесь только экран, нажатия и связь. */
+   всё решает сервер. Здесь только экран, нажатия и связь.
+
+   Игр несколько, и у каждой свой экран, но пример, ответ и клавиатура
+   общие: где именно они на экране, говорит таблица VIEWS. Новая игра —
+   новая строка в ней, новый экран и свой модуль вроде sea.js. */
 
 'use strict';
 
 const tg = window.Telegram && window.Telegram.WebApp;
 const $ = (id) => document.getElementById(id);
 
-/* Длительность матча. Раньше её выбирали на экране, но выбор до игры только
+/* Длительность каната. Раньше её выбирали на экране, но выбор до игры только
    мешает: человек пришёл играть, а не настраивать. */
 const MATCH_SECONDS = 60;
+
+const DEFAULT_GAME = 'rope';
 
 const S = {
   ws: null,
   strings: {},
   profile: null,
-  // Матч всегда на минуту: выбирать нечего, играют сразу.
-  duration: MATCH_SECONDS,
+  games: [DEFAULT_GAME],
+  // Игра, выбранная в меню, и игра идущего матча — не всегда одна и та же:
+  // приглашение друга приводит в его игру.
+  game: localStorage.getItem('duel.game') || DEFAULT_GAME,
+  playing: '',
   level: 'auto',
   winSteps: 10,
   sound: localStorage.getItem('duel.sound') !== 'off',
@@ -38,16 +47,72 @@ const S = {
   online: null,
   people: [],
   peopleOffset: 0,
+  topGame: '',
 };
 
 const say = (key, fallback) => S.strings[key] || fallback || key;
+
+/* ── игры ───────────────────────────────────────────────── */
+
+/* Где у каждой игры пример, ответ, клавиатура и часы. */
+const VIEWS = {
+  rope: {
+    screen: 'game', question: 'g-question', answer: 'g-answer', pad: 'g-pad',
+    flash: 'g-flash', countdown: 'g-countdown', clock: 'g-clock',
+  },
+  sea: {
+    screen: 'sea', question: 'z-question', answer: 'z-answer', pad: 'z-pad',
+    flash: 'z-flash', countdown: 'z-countdown', clock: 'z-clock',
+  },
+};
+
+const view = () => VIEWS[S.playing] || VIEWS[S.game] || VIEWS.rope;
+
+/* Значки игр на карточках меню. */
+const GAME_ICONS = {
+  rope:
+    '<svg viewBox="0 0 64 36" aria-hidden="true">' +
+    '<path class="i-rope" d="M4 22 Q 20 16 32 20 T 60 18"/>' +
+    '<path class="i-flag" d="M31 4 L31 20 M31 4 L43 8.5 L31 13 z"/>' +
+    '<path class="i-rope" d="M31 6 L31 21" style="stroke:#e0453e;stroke-width:2.5"/>' +
+    '</svg>',
+  sea:
+    '<svg viewBox="0 0 64 36" aria-hidden="true">' +
+    '<path class="i-deck" d="M22 8 h14 v9 h-14 z M28 3 h6 v6 h-6 z"/>' +
+    '<path class="i-hull" d="M8 17 h48 l-8 11 h-32 z"/>' +
+    '<path class="i-wave" d="M4 31 q5 -4 10 0 t10 0 t10 0 t10 0 t10 0 t6 0"/>' +
+    '</svg>',
+};
+
+const gameName = (game) => say('game.' + game, game);
+
+function pickGame(game) {
+  if (!S.games.includes(game)) return;
+  S.game = game;
+  localStorage.setItem('duel.game', game);
+  paint();
+}
+
+/* Что просим у сервера: игру, уровень и — для каната — длительность. */
+function wanted(game) {
+  const g = game || S.game;
+  const out = { game: g, level: S.level };
+  if (g === 'rope') out.duration = MATCH_SECONDS;
+  return out;
+}
+
+/* Свои очки в игре: рейтинг, место, матчей. */
+function standing(game) {
+  const all = (S.profile && S.profile.standings) || {};
+  return all[game] || { rating: 1000, games: 0, place: 0, wins: 0 };
+}
 
 /* ── экраны ─────────────────────────────────────────────── */
 
 const SCREENS = {
   loading: 's-loading', menu: 's-menu', search: 's-search', room: 's-room',
-  game: 's-game', result: 's-result', top: 's-top', invite: 's-invite',
-  players: 's-players',
+  game: 's-game', sea: 's-sea', result: 's-result', top: 's-top',
+  invite: 's-invite', players: 's-players',
 };
 
 function show(name) {
@@ -61,6 +126,8 @@ function show(name) {
     else tg.BackButton.hide();
   }
 }
+
+const inMatch = () => S.screen === 'game' || S.screen === 'sea';
 
 let toastTimer = 0;
 function hideToast() {
@@ -102,7 +169,7 @@ function connect() {
     handle(msg);
   };
   ws.onclose = () => {
-    if (S.screen === 'game') toast(say('offline', 'Связь пропала…'));
+    if (inMatch()) toast(say('offline', 'Связь пропала…'));
     S.retry = Math.min(S.retry + 1, 6);
     setTimeout(connect, Math.min(500 * 2 ** (S.retry - 1), 5000));
   };
@@ -149,11 +216,16 @@ function handle(msg) {
       toast(say('called.error.' + msg.reason, say('error', 'Ошибка')));
       break;
     case 'found': onFound(msg); break;
-    case 'start': $('g-countdown').classList.add('hidden'); Sound.startMusic(); break;
+    case 'start': $(view().countdown).classList.add('hidden'); Sound.startMusic(); break;
     case 'task': onTask(msg); break;
     case 'ans': onAnswer(msg); break;
     case 'state': onState(msg); break;
     case 'end': onEnd(msg); break;
+    // морской бой
+    case 'placed': Sea.placed(msg); break;
+    case 'sea_layout': Sea.layout(msg); break;
+    case 'shot': Sea.shot(msg); break;
+    case 'incoming': Sea.incoming(msg); break;
     case 'opp_offline': toast(say('opp_offline', 'У соперника пропала связь')); break;
     case 'error': onError(msg); break;
   }
@@ -166,7 +238,10 @@ function onReady(msg) {
   S.winSteps = msg.win_steps || 10;
   S.bot = msg.bot || '';
   S.online = msg;
-  buildOptions(msg.durations, msg.levels);
+  if (Array.isArray(msg.games) && msg.games.length) S.games = msg.games;
+  if (!S.games.includes(S.game)) S.game = S.games[0];
+  buildOptions(msg.levels);
+  buildGames();
   paint();
   if (S.screen === 'loading' || S.screen === 'search') show('menu');
 
@@ -182,6 +257,7 @@ function onQueued(msg) {
   show('search');
   $('q-offer').classList.add('hidden');
   document.querySelector('#s-search h2').textContent = say('searching', 'Ищем соперника');
+  $('q-game').textContent = gameName(msg.game || S.game);
   $('q-hint').textContent = say('searching.hint', '');
   const n = Math.max(0, (msg.waiting || 1) - 1);
   $('q-count').textContent = n > 0 ? `${say('waiting_players', 'в очереди')}: ${n}` : '';
@@ -210,18 +286,19 @@ function paintRoom({ title, hint, waiting, code, spinner }) {
 }
 
 function onRoom(msg) {
+  const game = gameName(msg.game || S.game);
   if (msg.group) {
     // Вызов уже в чате: остаётся только ждать, кто нажмёт первым.
     paintRoom({
       title: say('room.group.title', 'Вызов брошен в чат'),
-      hint: say('room.group.hint', 'Ждём соперника'),
+      hint: `${game} · ${say('room.group.hint', 'Ждём соперника')}`,
       spinner: true,
     });
     return;
   }
   paintRoom({
     title: say('room.title', 'Комната для друга'),
-    hint: say('room.hint', ''),
+    hint: `${game} · ${say('room.hint', '')}`,
     waiting: say('room.waiting', ''),
     code: msg.code,
   });
@@ -238,6 +315,7 @@ function onInvite(msg) {
   $('i-rank').textContent = `${say('rating', 'Рейтинг')} ${msg.host.rating} · ${msg.host.title}`;
   document.querySelector('.invite-title').textContent = say('invite.title', 'зовёт тебя на дуэль');
   $('i-terms').innerHTML =
+    `<span>${escapeHtml(gameName(msg.game || DEFAULT_GAME))}</span>` +
     `<span>${humanDuration(msg.duration)}</span>` +
     `<span>${say('level.' + msg.level, msg.level)}</span>`;
   show('invite');
@@ -265,7 +343,7 @@ function openPeople() {
   $('p-list').innerHTML = '';
   $('p-more').classList.add('hidden');
   show('players');
-  send({ t: 'players', offset: 0 });
+  send({ t: 'players', offset: 0, game: S.game });
 }
 
 function onPeople(msg) {
@@ -314,7 +392,7 @@ function seenText(person) {
 }
 
 function callToBattle(button, id) {
-  send({ t: 'challenge', to: id, duration: S.duration, level: S.level });
+  send(Object.assign({ t: 'challenge', to: id }, wanted()));
   button.classList.add('done');
   button.textContent = say('called', 'Позвали');
 }
@@ -325,6 +403,7 @@ function onWaitingHost(msg) {
   $('q-offer').classList.add('hidden');
   document.querySelector('#s-search h2').textContent =
     `${say('waiting_host', 'Ждём, пока зайдёт')}: ${msg.name}`;
+  $('q-game').textContent = '';
   $('q-hint').textContent = say('waiting_host.hint', '');
   $('q-count').textContent = '';
 }
@@ -358,25 +437,39 @@ function shareInvite(msg) {
   toast(msg.code);
 }
 
+/* ── матч ───────────────────────────────────────────────── */
+
 function onFound(msg) {
+  S.playing = S.games.includes(msg.game) ? msg.game : DEFAULT_GAME;
   S.winSteps = msg.win_steps || 10;
   S.leftMs = msg.duration > 0 ? msg.duration * 1000 : null;
   S.leftAt = performance.now();
   resetBoard();
+  Sound.match();
+
+  if (S.playing === 'sea') {
+    Sea.begin(msg);
+    show('sea');
+    // Отсчёт в море идёт после расстановки — его объявит состояние.
+    return;
+  }
   $('g-me-name').textContent = (S.profile && S.profile.name) || say('you', 'Ты');
   $('g-opp-name').textContent = msg.opp.name;
   show('game');
   startCountdown(msg.starts_in_ms || 0);
-  Sound.match();
 }
 
+let countdownEnds = 0;
 function startCountdown(ms) {
-  const box = $('g-countdown');
+  const box = $(view().countdown);
   const label = box.querySelector('span');
   if (ms <= 0) { box.classList.add('hidden'); return; }
+  if (!box.classList.contains('hidden') && countdownEnds > performance.now()) return;
   box.classList.remove('hidden');
   const endsAt = performance.now() + ms;
+  countdownEnds = endsAt;
   (function step() {
+    if (countdownEnds !== endsAt) return;
     const left = endsAt - performance.now();
     if (left <= 0) {
       label.textContent = say('go', 'Марш!');
@@ -397,13 +490,15 @@ function onTask(msg) {
   S.task = msg;
   S.taskAt = performance.now();
   S.input = '';
-  $('g-question').textContent = `${msg.q} = ?`;
-  $('g-answer').textContent = '';
-  $('g-answer').classList.remove('bad');
+  const v = view();
+  $(v.question).textContent = `${msg.q} = ?`;
+  $(v.answer).textContent = '';
+  $(v.answer).classList.remove('bad');
 }
 
 function onAnswer(msg) {
-  const flash = $('g-flash');
+  const v = view();
+  const flash = $(v.flash);
   flash.className = 'flash ' + (msg.correct ? 'ok' : 'bad');
   setTimeout(() => (flash.className = 'flash'), 360);
 
@@ -411,42 +506,59 @@ function onAnswer(msg) {
     S.streak += 1;
     haptic('ok');
     Sound.correct(S.streak, msg.step);
-    pull('me');
-    if (msg.step > 1) $('g-streak').classList.add('boom');
+    if (S.playing === 'rope') {
+      pull('me');
+      if (msg.step > 1) $('g-streak').classList.add('boom');
+    }
   } else {
     S.streak = 0;
     haptic('bad');
     Sound.wrong();
-    $('g-answer').classList.add('bad');
+    $(v.answer).classList.add('bad');
     S.input = '';
-    $('g-answer').textContent = '';
+    $(v.answer).textContent = '';
     if (msg.freeze_ms) freeze(msg.freeze_ms);
   }
 }
 
 function freeze(ms) {
   S.frozenUntil = performance.now() + ms;
-  $('g-pad').classList.add('locked');
+  const pad = $(view().pad);
+  pad.classList.add('locked');
   $('g-scene').classList.add('frozen');
   setTimeout(() => {
     if (performance.now() < S.frozenUntil - 20) return;
-    $('g-pad').classList.remove('locked');
+    pad.classList.remove('locked');
     $('g-scene').classList.remove('frozen');
   }, ms);
 }
 
 function onState(msg) {
-  if (S.screen !== 'game' && msg.state !== 'finished') show('game');
+  if (msg.state === 'finished') return;
+  const game = msg.game || S.playing || DEFAULT_GAME;
+  if (game !== S.playing) S.playing = game;
+  const v = view();
+  if (S.screen !== v.screen) show(v.screen);
+
+  S.streak = msg.me.streak;
+  S.leftAt = performance.now();
+
+  if (game === 'sea') {
+    if (msg.state === 'placing') S.leftMs = msg.place_left_ms;
+    else S.leftMs = msg.left_ms;
+    if (msg.state === 'countdown') startCountdown(msg.starts_in_ms || 0);
+    Sea.state(msg);
+    return;
+  }
+
   if (msg.opp.score > S.oppScore) {
     pull('opp');
     Sound.rival();
   }
   S.oppScore = msg.opp.score;
-  S.streak = msg.me.streak;
   $('g-me-score').textContent = msg.me.score;
   $('g-opp-score').textContent = msg.opp.score;
   S.leftMs = msg.left_ms;
-  S.leftAt = performance.now();
   drawRope(msg.rope);
 
   const streak = $('g-streak');
@@ -484,12 +596,19 @@ function drawRope(rope) {
 }
 
 function onEnd(msg) {
+  const game = msg.game || S.playing || DEFAULT_GAME;
   const verdict = $('e-verdict');
   verdict.className = 'verdict ' + msg.outcome;
   verdict.textContent = say(msg.outcome, msg.outcome);
-  $('e-reason').textContent = say(`${msg.outcome}.${msg.reason}`, '');
-  $('e-score').textContent = msg.score;
-  $('e-opp-score').textContent = msg.opp_score;
+  const reasonKey = game === 'sea'
+    ? `sea.${msg.outcome}.${msg.reason}`
+    : `${msg.outcome}.${msg.reason}`;
+  $('e-reason').textContent = say(reasonKey, say(`${msg.outcome}.${msg.reason}`, ''));
+
+  // В море главный счёт — попадания, в канате — верные ответы.
+  const sea = game === 'sea';
+  $('e-score').textContent = sea ? msg.hits : msg.score;
+  $('e-opp-score').textContent = sea ? msg.opp_hits : msg.opp_score;
 
   if (msg.rated === false) {
     $('e-rating').innerHTML = `<span class="muted">${say('training', 'Тренировка')}</span>`;
@@ -497,19 +616,43 @@ function onEnd(msg) {
     const delta = msg.delta || 0;
     const sign = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
     $('e-rating').innerHTML =
-      `${say('result.rating', 'Рейтинг')}: <b>${msg.rating}</b> ` +
+      `${escapeHtml(gameName(game))} · ${say('result.rating', 'Рейтинг')}: <b>${msg.rating}</b> ` +
       `<span class="${sign}">${delta > 0 ? '+' : ''}${delta}</span>`;
   }
 
-  $('e-stats').innerHTML = [
-    [say('result.accuracy', 'Точность'), `${msg.accuracy}%`],
-    [say('result.streak', 'Лучшая серия'), msg.best_streak],
-    [say('result.speed', 'Среднее время'), msg.avg_ms ? `${(msg.avg_ms / 1000).toFixed(1)} c` : '—'],
-    [say('result.fastest', 'Быстрее всего'), msg.fastest_ms ? `${(msg.fastest_ms / 1000).toFixed(1)} c` : '—'],
-    [say('rank', 'Место'), msg.place || '—'],
-  ].map(([k, v]) => `<li><span>${k}</span><b>${v}</b></li>`).join('');
+  const rows = sea
+    ? [
+      [say('result.sunk', 'Потоплено кораблей'), `${msg.sunk} / ${Sea.FLEET.length}`],
+      [say('result.shots', 'Выстрелов'), msg.shots],
+      [say('result.correct', 'Верных ответов'), `${msg.score} : ${msg.opp_score}`],
+      [say('result.accuracy', 'Точность'), `${msg.accuracy}%`],
+      [say('rank', 'Место'), msg.place || '—'],
+    ]
+    : [
+      [say('result.accuracy', 'Точность'), `${msg.accuracy}%`],
+      [say('result.streak', 'Лучшая серия'), msg.best_streak],
+      [say('result.speed', 'Среднее время'), msg.avg_ms ? `${(msg.avg_ms / 1000).toFixed(1)} c` : '—'],
+      [say('result.fastest', 'Быстрее всего'), msg.fastest_ms ? `${(msg.fastest_ms / 1000).toFixed(1)} c` : '—'],
+      [say('rank', 'Место'), msg.place || '—'],
+    ];
+  $('e-stats').innerHTML = rows
+    .map(([k, v]) => `<li><span>${k}</span><b>${v}</b></li>`).join('');
 
-  if (S.profile) { S.profile.rating = msg.rating; S.profile.place = msg.place; }
+  const reveal = $('e-reveal');
+  reveal.classList.toggle('hidden', !sea);
+  if (sea) Sea.reveal($('e-fleet'), msg);
+
+  if (S.profile) {
+    const mine = standing(game);
+    S.profile.standings = S.profile.standings || {};
+    S.profile.standings[game] = Object.assign({}, mine, {
+      rating: msg.rating,
+      place: msg.place,
+      games: mine.games + (msg.rated === false ? 0 : 1),
+      wins: mine.wins + (msg.rated !== false && msg.outcome === 'win' ? 1 : 0),
+    });
+  }
+  S.playing = '';
   paint();
   show('result');
   haptic(msg.outcome === 'win' ? 'win' : 'bad');
@@ -542,7 +685,7 @@ function onError(msg) {
 
 /* ── экран и настройки ──────────────────────────────────── */
 
-function buildOptions(durations, levels) {
+function buildOptions(levels) {
   const lv = $('m-levels');
   if (!lv.children.length) {
     (levels || ['easy', 'normal', 'hard', 'auto']).forEach((name) => {
@@ -553,6 +696,31 @@ function buildOptions(durations, levels) {
       lv.appendChild(chip);
     });
   }
+}
+
+/* Карточки игр в меню и переключатель над таблицей лидеров. */
+function buildGames() {
+  const box = $('m-games');
+  box.innerHTML = S.games.map((game) =>
+    `<button class="gcard" data-game="${game}">` +
+      `<span class="gicon">${GAME_ICONS[game] || ''}</span>` +
+      `<span class="gname"></span>` +
+      `<span class="ghint"></span>` +
+      `<span class="gscore"></span>` +
+    `</button>`
+  ).join('');
+  box.querySelectorAll('.gcard').forEach((card) => {
+    card.onclick = () => pickGame(card.dataset.game);
+  });
+
+  const tabs = $('t-tabs');
+  tabs.innerHTML = S.games.map((game) =>
+    `<button class="tab" data-game="${game}"></button>`
+  ).join('');
+  tabs.querySelectorAll('.tab').forEach((tab) => {
+    tab.onclick = () => openTop(tab.dataset.game);
+  });
+  tabs.classList.toggle('hidden', S.games.length < 2);
 }
 
 function humanDuration(sec) {
@@ -568,7 +736,8 @@ function paint() {
   });
   // На экране лидеров заголовок остаётся полным, а кнопка в меню — короткой.
   document.querySelector('#s-top h2').textContent = say('top', 'Таблица лидеров');
-  $('m-title').textContent = say('title', 'Перетягивание каната');
+  $('m-title').textContent = say('app', 'Канат');
+  $('m-sub').textContent = say('app.sub', 'математические дуэли');
 
   document.querySelectorAll('#m-levels .chip').forEach((chip) => {
     const name = chip.dataset.level;
@@ -577,13 +746,26 @@ function paint() {
     chip.classList.toggle('on', name === S.level);
   });
 
-  if (S.profile) {
-    const p = S.profile;
-    $('m-me').textContent = p.games
-      ? `${say('rating', 'Рейтинг')} ${p.rating} · ${say('rank', 'Место')} ${p.place} · ` +
-        `${say('games', 'Матчей')} ${p.games}`
-      : say('no_games', 'Ещё ни одного матча');
-  }
+  document.querySelectorAll('#m-games .gcard').forEach((card) => {
+    const game = card.dataset.game;
+    const mine = standing(game);
+    card.classList.toggle('on', game === S.game);
+    card.querySelector('.gname').textContent = gameName(game);
+    card.querySelector('.ghint').textContent = say(`game.${game}.hint`, '');
+    const score = card.querySelector('.gscore');
+    score.classList.toggle('none', !mine.games);
+    score.textContent = mine.games
+      ? `${mine.rating} · ${say('rank', 'Место')} ${mine.place}`
+      : say('top.newcomer', 'ещё не играл');
+  });
+  document.querySelectorAll('#t-tabs .tab').forEach((tab) => {
+    tab.textContent = gameName(tab.dataset.game);
+    tab.classList.toggle('on', tab.dataset.game === S.topGame);
+  });
+
+  // Под карточками — подсказка, что рейтинг у каждой игры свой: она
+  // объясняет, почему в одной игре ты мастер, а в другой новичок.
+  $('m-me').textContent = say('game.pick.hint', '');
   $('m-lang').title = say('lang', 'Язык');
   $('m-sound').title = say('sound', 'Звук');
   $('m-music').title = say('music', 'Музыка');
@@ -592,6 +774,7 @@ function paint() {
   $('m-music').textContent = S.music ? '🎵' : '🚫';
   $('m-music').classList.toggle('off', !S.music);
   $('m-sound').classList.toggle('off', !S.sound);
+  Sea.paint();
 }
 
 /* Сколько людей сейчас в игре. Когда один — вместо цифры зовём друга:
@@ -626,22 +809,27 @@ function resetBoard() {
   S.oppScore = 0;
   S.streak = 0;
   S.hurrying = false;
+  countdownEnds = 0;
   Sound.hurry(false);
   $('g-scene').classList.remove('frozen', 'pull-me', 'pull-opp');
   $('g-streak').classList.remove('boom');
-  $('g-answer').textContent = '';
-  $('g-question').textContent = '…';
+  $('g-streak').classList.add('hidden');
   $('g-me-score').textContent = '0';
   $('g-opp-score').textContent = '0';
-  $('g-pad').classList.remove('locked');
-  $('g-streak').classList.add('hidden');
+  Object.values(VIEWS).forEach((v) => {
+    $(v.answer).textContent = '';
+    $(v.answer).classList.remove('bad');
+    $(v.question).textContent = '…';
+    $(v.pad).classList.remove('locked');
+    $(v.countdown).classList.add('hidden');
+  });
   drawRope(0);
 }
 
 /* ── ввод ───────────────────────────────────────────────── */
 
 function press(key) {
-  if (S.screen !== 'game' || performance.now() < S.frozenUntil) return;
+  if (!inMatch() || performance.now() < S.frozenUntil) return;
   if (key === 'del') {
     S.input = S.input.slice(0, -1);
   } else if (key === 'ok') {
@@ -650,8 +838,9 @@ function press(key) {
   } else if (S.input.length < 6) {
     S.input = (S.input === '0' ? '' : S.input) + key;
   }
-  $('g-answer').textContent = S.input;
-  $('g-answer').classList.remove('bad');
+  const answer = $(view().answer);
+  answer.textContent = S.input;
+  answer.classList.remove('bad');
 }
 
 function submit() {
@@ -663,14 +852,14 @@ function submit() {
     ms: Math.round(performance.now() - S.taskAt),
   });
   S.input = '';
-  $('g-answer').textContent = '';
+  $(view().answer).textContent = '';
 }
 
 /* ── часы ───────────────────────────────────────────────── */
 
 function tickClock() {
-  const clock = $('g-clock');
-  if (S.screen === 'game') {
+  if (inMatch()) {
+    const clock = $(view().clock);
     if (S.leftMs === null || S.leftMs === undefined) {
       clock.textContent = '∞';
       clock.classList.remove('low');
@@ -682,9 +871,11 @@ function tickClock() {
       clock.textContent = mm > 0 ? `${mm}:${ss}` : `0:${ss}`;
       const low = total <= 10;
       clock.classList.toggle('low', low);
-      if (low !== S.hurrying) {
-        S.hurrying = low;
-        Sound.hurry(low);
+      // Спешка — только в бою: во время расстановки музыки ещё нет.
+      const hurry = low && (S.playing !== 'sea' || Sea.mode() === 'battle');
+      if (hurry !== S.hurrying) {
+        S.hurrying = hurry;
+        Sound.hurry(hurry);
       }
     }
   }
@@ -694,30 +885,32 @@ function tickClock() {
 /* ── запуск ─────────────────────────────────────────────── */
 
 function bind() {
-  $('g-pad').addEventListener('click', (event) => {
-    const key = event.target.closest('.key');
-    if (key) press(key.dataset.key);
+  document.querySelectorAll('.pad').forEach((pad) => {
+    pad.addEventListener('click', (event) => {
+      const key = event.target.closest('.key');
+      if (key) press(key.dataset.key);
+    });
   });
 
   document.addEventListener('keydown', (event) => {
-    if (S.screen !== 'game') return;
+    if (!inMatch()) return;
     if (/^[0-9]$/.test(event.key)) press(event.key);
     else if (event.key === 'Backspace') press('del');
     else if (event.key === 'Enter') press('ok');
   });
 
   $('m-play').onclick = () => {
-    send({ t: 'find', duration: S.duration, level: S.level });
+    send(Object.assign({ t: 'find' }, wanted()));
     show('search');
   };
-  $('m-friend').onclick = () => send({ t: 'room', duration: S.duration, level: S.level });
+  $('m-friend').onclick = () => send(Object.assign({ t: 'room' }, wanted()));
   $('m-join').onclick = () => {
     const code = prompt(say('room.enter', 'Введи код комнаты'));
-    if (code) send({ t: 'join', code: code.trim(), duration: S.duration, level: S.level });
+    if (code) send(Object.assign({ t: 'join', code: code.trim() }, wanted()));
   };
   $('q-cancel').onclick = () => { send({ t: 'cancel' }); show('menu'); };
   $('q-robot').onclick = () => {
-    send({ t: 'play_bot', duration: S.duration, level: S.level });
+    send(Object.assign({ t: 'play_bot' }, wanted()));
     $('q-offer').classList.add('hidden');
   };
   $('r-cancel').onclick = () => { send({ t: 'cancel' }); show('menu'); };
@@ -739,27 +932,32 @@ function bind() {
 
   $('i-go').onclick = () => {
     if (!S.invite) return show('menu');
-    send({ t: 'join', code: S.invite, duration: S.duration, level: S.level });
+    // Игру и условия задаёт тот, кто позвал; своё сервер не спросит.
+    send(Object.assign({ t: 'join', code: S.invite }, wanted()));
     show('search');
   };
   $('i-cancel').onclick = () => { S.invite = ''; show('menu'); };
 
   $('m-players').onclick = openPeople;
   $('p-back').onclick = () => show('menu');
-  $('p-more').onclick = () => send({ t: 'players', offset: S.peopleOffset });
-  $('m-top').onclick = openTop;
+  $('p-more').onclick = () => send({ t: 'players', offset: S.peopleOffset, game: S.game });
+  $('m-top').onclick = () => openTop(S.game);
   $('t-back').onclick = () => show('menu');
   $('e-home').onclick = () => show('menu');
   $('e-again').onclick = () => {
-    send({ t: 'find', duration: S.duration, level: S.level });
+    send(Object.assign({ t: 'find' }, wanted()));
     show('search');
   };
+
+  Sea.init();
 
   if (tg && tg.BackButton) tg.BackButton.onClick(() => show('menu'));
 }
 
-async function openTop() {
+async function openTop(game) {
+  S.topGame = S.games.includes(game) ? game : S.game;
   show('top');
+  paint();
   const podium = $('t-podium');
   const list = $('t-list');
   const you = $('t-you');
@@ -768,7 +966,8 @@ async function openTop() {
   you.classList.add('hidden');
 
   try {
-    const data = await (await fetch('/api/top?limit=100')).json();
+    const data = await (await fetch(`/api/top?limit=100&game=${S.topGame}`)).json();
+    if ((data.game || S.topGame) !== S.topGame) return;   // уже переключили вкладку
     if (!data.top.length) {
       list.innerHTML = `<p class="muted">${say('top.empty', '')}</p>`;
       return;
@@ -801,13 +1000,14 @@ async function openTop() {
 
     // Своё место далеко внизу — показываем отдельной строкой, чтобы не искать.
     const mine = data.top.find((row) => row.id === myId);
-    if (!mine && S.profile && S.profile.games) {
+    const own = standing(S.topGame);
+    if (!mine && S.profile && own.games) {
       you.innerHTML = boardRow({
-        place: S.profile.place,
+        place: own.place,
         name: S.profile.name,
-        rating: S.profile.rating,
-        wins: S.profile.wins,
-        games: S.profile.games,
+        rating: own.rating,
+        wins: own.wins,
+        games: own.games,
       }, true, true);
       you.classList.remove('hidden');
     }

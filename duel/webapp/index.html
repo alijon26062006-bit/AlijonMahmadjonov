@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Перетягивание каната: математика</title>
+<title>Канат — математические дуэли</title>
 <link rel="stylesheet" href="/static/style.css">
 <!-- Библиотеку Telegram берём со своего домена: у части операторов
      telegram.org с телефона не открывается, и тогда игра не узнала бы,
@@ -25,10 +25,17 @@
 <!-- Главное меню -->
 <section class="screen hidden" id="s-menu">
   <header class="menu-head">
-    <h1 id="m-title">Перетягивание каната</h1>
-    <div class="me" id="m-me"></div>
+    <h1 id="m-title">Канат</h1>
+    <div class="sub" id="m-sub">математические дуэли</div>
     <div class="online" id="m-online"></div>
   </header>
+
+  <!-- Во что играем: карточки игр. Новая игра — новая карточка. -->
+  <div class="field">
+    <div class="field-label" data-i18n="pick_game">Во что играем</div>
+    <div class="games" id="m-games"></div>
+    <div class="me" id="m-me"></div>
+  </div>
 
   <div class="field">
     <div class="field-label" data-i18n="level">Сложность</div>
@@ -55,6 +62,7 @@
 <section class="screen hidden" id="s-search">
   <div class="spinner"></div>
   <h2 data-i18n="searching">Ищем соперника</h2>
+  <div class="game-tag" id="q-game"></div>
   <p class="muted" id="q-hint" data-i18n="searching.hint"></p>
   <p class="muted" id="q-count"></p>
 
@@ -307,12 +315,81 @@
   <div class="freeze hidden" id="g-freeze"></div>
 </section>
 
+<!-- Морской бой: тетрадный лист в клетку, поле соперника сверху, своё снизу -->
+<section class="screen sea hidden" id="s-sea">
+  <div class="sheet">
+    <div class="sea-head">
+      <div class="sea-side">
+        <span class="pen-label" id="z-enemy-label">СОПЕРНИК</span>
+        <span class="sea-name" id="z-opp-name">—</span>
+      </div>
+      <div class="sea-clock" id="z-clock">—</div>
+      <div class="fleet-dots" id="z-enemy-fleet" title="Корабли соперника"></div>
+    </div>
+
+    <!-- Расстановка -->
+    <div class="sea-place" id="z-place">
+      <div class="pen-title" data-i18n="sea.place.title">Расставь корабли</div>
+      <div class="sea-hint" id="z-place-hint"></div>
+    </div>
+
+    <!-- Верхнее поле: пока расставляем — своё, в бою — соперника. -->
+    <div class="grid-slot big">
+      <div class="grid own-big" id="z-own-big"></div>
+      <div class="grid enemy hidden" id="z-enemy"></div>
+    </div>
+
+    <div class="dock" id="z-dock"></div>
+    <div class="row sea-actions" id="z-actions">
+      <button class="btn pen" id="z-rotate">↻ <span data-i18n="sea.rotate">Повернуть</span></button>
+      <button class="btn pen" id="z-random">🎲 <span data-i18n="sea.random">Случайно</span></button>
+      <button class="btn pen" id="z-clear" data-i18n="sea.clear">Убрать</button>
+    </div>
+    <button class="btn primary big" id="z-ready" data-i18n="sea.ready">⚓ Готов</button>
+    <div class="sea-wait hidden" id="z-wait"><div class="spinner"></div><span id="z-wait-text"></span></div>
+
+    <!-- Бой -->
+    <div class="sea-mid hidden" id="z-mid">
+      <div class="own-box">
+        <span class="pen-label" id="z-you-label">ТЫ</span>
+        <div class="grid own-small" id="z-own"></div>
+      </div>
+      <div class="sea-task">
+        <div class="shells" id="z-shells"></div>
+        <div class="question pen" id="z-question">…</div>
+        <div class="answer pen" id="z-answer"></div>
+        <div class="sea-note" id="z-note"></div>
+      </div>
+    </div>
+    <div class="pad compact hidden" id="z-pad">
+      <button class="key" data-key="1">1</button>
+      <button class="key" data-key="2">2</button>
+      <button class="key" data-key="3">3</button>
+      <button class="key del" data-key="del">←</button>
+      <button class="key" data-key="4">4</button>
+      <button class="key" data-key="5">5</button>
+      <button class="key" data-key="6">6</button>
+      <button class="key" data-key="0">0</button>
+      <button class="key" data-key="7">7</button>
+      <button class="key" data-key="8">8</button>
+      <button class="key" data-key="9">9</button>
+      <button class="key ok" data-key="ok">✓</button>
+    </div>
+    <div class="flash" id="z-flash"></div>
+  </div>
+  <div class="countdown hidden" id="z-countdown"><span>3</span></div>
+</section>
+
 <!-- Итог матча -->
 <section class="screen hidden" id="s-result">
   <div class="verdict" id="e-verdict">—</div>
   <p class="muted" id="e-reason"></p>
   <div class="final-score"><span id="e-score">0</span><i>:</i><span id="e-opp-score">0</span></div>
   <div class="rating-line" id="e-rating"></div>
+  <div class="reveal hidden" id="e-reveal">
+    <div class="pen-label" id="e-reveal-label">ФЛОТ СОПЕРНИКА</div>
+    <div class="grid reveal-grid" id="e-fleet"></div>
+  </div>
   <ul class="stats" id="e-stats"></ul>
   <button class="btn primary big" id="e-again" data-i18n="again">Ещё раз</button>
   <button class="btn ghost" id="e-home" data-i18n="home">В меню</button>
@@ -330,6 +407,7 @@
 <!-- Таблица лидеров -->
 <section class="screen hidden" id="s-top">
   <h2 data-i18n="top">Таблица лидеров</h2>
+  <div class="tabs" id="t-tabs"></div>
   <div class="podium" id="t-podium"></div>
   <ol class="board" id="t-list"></ol>
   <div class="you-row hidden" id="t-you"></div>
@@ -339,6 +417,7 @@
 <div class="toast hidden" id="toast"></div>
 
 <script src="/static/sound.js"></script>
+<script src="/static/sea.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>
