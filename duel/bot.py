@@ -19,6 +19,7 @@ from aiogram.types import (
     WebAppInfo,
 )
 
+from . import games
 from . import rating as rating_mod
 from . import storage
 from .config import DuelConfig
@@ -147,6 +148,23 @@ async def start(message: Message, conn: sqlite3.Connection, config: DuelConfig) 
     )
 
 
+# Как игру называют в чате: «/duel море», «/duel sea», «/duel канат».
+_GAME_WORDS = {
+    games.SEA: ("sea", "море", "морской", "баҳр", "баҳрӣ", "флот", "ship"),
+    games.ROPE: ("rope", "канат", "арғамчин", "math"),
+}
+
+
+def game_from_text(text: str | None) -> str:
+    """Игра из аргумента команды. Без аргумента или с незнакомым — канат."""
+
+    words = (text or "").lower().split()[1:]
+    for game, names in _GAME_WORDS.items():
+        if any(w.startswith(n) for w in words for n in names):
+            return game
+    return games.DEFAULT_GAME
+
+
 @router.message(Command("duel"))
 async def duel_command(
     message: Message,
@@ -170,10 +188,12 @@ async def duel_command(
     if hub is None or message.from_user is None:
         return
 
+    game = game_from_text(message.text)
     room = hub.open_group_room(
         message.from_user.id,
         message.from_user.first_name or f"Игрок {message.from_user.id}",
         message.chat.id,
+        game=game,
     )
     link = hub.invite_link(room.code)
     if not link:
@@ -185,7 +205,8 @@ async def duel_command(
             "bot.duel.call",
             lang,
             name=message.from_user.first_name or "",
-            duration=t("bot.duel.minute", lang),
+            game=t(f"bot.game.{game}", lang),
+            duration=t("bot.duel.sea" if game == games.SEA else "bot.duel.minute", lang),
         ),
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
@@ -295,15 +316,22 @@ async def lang_button(message: Message, conn: sqlite3.Connection) -> None:
 
 
 def top_text(conn: sqlite3.Connection, lang: str, limit: int = 20) -> str:
-    rows = storage.top(conn, limit)
-    if not rows:
-        return t("bot.top.empty", lang)
+    """Таблица лидеров: по разделу на каждую игру, в которую кто-то уже играл."""
+
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-    lines = [t("bot.top.header", lang)]
-    for place, row in enumerate(rows, start=1):
-        mark = medals.get(place, f"{place}.")
-        lines.append(f"{mark} {row['name']} — {row['rating']} ({row['wins']}/{row['games']})")
-    return "\n".join(lines)
+    sections: list[str] = []
+    for game in games.GAME_IDS:
+        rows = [r for r in storage.top(conn, game, limit) if r["games"] > 0]
+        if not rows:
+            continue
+        lines = [f"{games.info(game).icon} {t(f'bot.game.{game}', lang)}"]
+        for place, row in enumerate(rows, start=1):
+            mark = medals.get(place, f"{place}.")
+            lines.append(f"{mark} {row['name']} — {row['rating']} ({row['wins']}/{row['games']})")
+        sections.append("\n".join(lines))
+    if not sections:
+        return t("bot.top.empty", lang)
+    return t("bot.top.header", lang) + "\n\n".join(sections)
 
 
 def profile_text(conn: sqlite3.Connection, message: Message, lang: str) -> str:
@@ -314,22 +342,32 @@ def _profile_of(conn: sqlite3.Connection, user_id: int, lang: str) -> str:
     row = storage.get_player(conn, user_id)
     if row is None:
         return t("bot.profile.empty", lang, name="—")
-    if row["games"] == 0:
+    blocks: list[str] = []
+    for game in games.GAME_IDS:
+        standing = storage.standing(conn, user_id, game)
+        title = f"{games.info(game).icon} {t(f'bot.game.{game}', lang)}"
+        if standing is None or standing["games"] == 0:
+            blocks.append(t("bot.profile.none", lang, game=title))
+            continue
+        blocks.append(
+            t(
+                "bot.profile.game",
+                lang,
+                game=title,
+                rating=standing["rating"],
+                title=title_of(rating_mod.title(standing["rating"]), lang),
+                place=storage.place_of(conn, user_id, game),
+                games=standing["games"],
+                wins=standing["wins"],
+                losses=standing["losses"],
+                draws=standing["draws"],
+                correct=standing["correct"],
+                streak=standing["best_streak"],
+            )
+        )
+    if all(storage.place_of(conn, user_id, g) == 0 for g in games.GAME_IDS):
         return t("bot.profile.empty", lang, name=row["name"])
-    return t(
-        "bot.profile",
-        lang,
-        name=row["name"],
-        rating=row["rating"],
-        title=title_of(rating_mod.title(row["rating"]), lang),
-        place=storage.place_of(conn, row["id"]),
-        games=row["games"],
-        wins=row["wins"],
-        losses=row["losses"],
-        draws=row["draws"],
-        correct=row["correct"],
-        streak=row["best_streak"],
-    )
+    return t("bot.profile", lang, name=row["name"]) + "\n\n".join(blocks)
 
 
 async def setup_bot_ui(bot, config: DuelConfig) -> None:

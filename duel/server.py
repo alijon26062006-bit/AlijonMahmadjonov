@@ -25,6 +25,7 @@ from . import rating as rating_mod
 from . import storage
 from .auth import AuthError, WebAppUser, authenticate
 from .config import DuelConfig
+from . import games
 from . import robot as robot_mod
 from .game import (
     DURATIONS,
@@ -36,6 +37,7 @@ from .game import (
 )
 from .i18n import normalize, t, ui_strings
 from .matchmaking import HOST_GRACE_SEC, Queue, Room, Ticket, make_match
+from .sea_match import SHOT_RESULTS, SeaMatch
 from .tasks import LEVELS
 
 log = logging.getLogger("duel.server")
@@ -70,8 +72,8 @@ class Conn:
     ws: web.WebSocketResponse
     user: WebAppUser
     lang: str = "ru"
-    rating: int = 1000
-    games: int = 0
+    # Рейтинг и число матчей по каждой игре: у каната и моря они разные.
+    scores: dict[str, tuple[int, int]] = field(default_factory=dict)
     last_state: str = ""
     last_state_at: float = 0.0
     answers: deque[float] = field(default_factory=lambda: deque(maxlen=ANSWER_BURST))
@@ -79,6 +81,12 @@ class Conn:
     @property
     def user_id(self) -> int:
         return self.user.id
+
+    def rating(self, game: str) -> int:
+        return self.scores.get(game, (1000, 0))[0]
+
+    def played(self, game: str) -> int:
+        return self.scores.get(game, (1000, 0))[1]
 
     async def send(self, payload: dict[str, object]) -> None:
         if self.ws.closed:
@@ -129,22 +137,26 @@ class Hub:
         name: str,
         chat_id: int,
         *,
-        duration: int = 60,
+        duration: int = -1,
         level: str = "auto",
+        game: str = games.DEFAULT_GAME,
         now: float | None = None,
     ) -> "Room":
         """Открытый вызов в чате: дерётся тот, кто первым нажмёт кнопку."""
 
+        game = games.normalize(game)
         row = storage.get_player(self.db, user_id)
+        rating, played = storage.rating_of(self.db, user_id, game)
         ticket = Ticket(
             user_id=user_id,
             name=name,
-            rating=row["rating"] if row else 1000,
-            games=row["games"] if row else 0,
+            rating=rating,
+            games=played,
             lang=row["lang"] if row else "ru",
-            duration=duration if duration in DURATIONS else 60,
+            duration=duration if duration in DURATIONS else games.info(game).duration,
             level=level if level in LEVELS else "auto",
             joined_at=now if now is not None else time.monotonic(),
+            game=game,
         )
         return self.queue.create_room(
             ticket, ticket.joined_at, chat_id=chat_id
@@ -168,13 +180,15 @@ class Hub:
         mid = self.match_of.get(user_id)
         return self.matches.get(mid) if mid else None
 
-    def profile(self, conn: Conn) -> dict[str, object]:
-        row = storage.get_player(self.db, conn.user_id)
+    def standing_of(self, user_id: int, game: str) -> dict[str, object]:
+        row = storage.standing(self.db, user_id, game)
         if row is None:
-            return {}
+            return {
+                "rating": 1000, "title": rating_mod.title(1000), "games": 0,
+                "wins": 0, "losses": 0, "draws": 0, "correct": 0,
+                "best_streak": 0, "place": 0,
+            }
         return {
-            "id": row["id"],
-            "name": row["name"],
             "rating": row["rating"],
             "title": rating_mod.title(row["rating"]),
             "games": row["games"],
@@ -183,8 +197,18 @@ class Hub:
             "draws": row["draws"],
             "correct": row["correct"],
             "best_streak": row["best_streak"],
-            "place": storage.place_of(self.db, conn.user_id),
+            "place": storage.place_of(self.db, user_id, game),
+        }
+
+    def profile(self, conn: Conn) -> dict[str, object]:
+        row = storage.get_player(self.db, conn.user_id)
+        if row is None:
+            return {}
+        return {
+            "id": row["id"],
+            "name": row["name"],
             "photo_url": row["photo_url"],
+            "standings": {g: self.standing_of(conn.user_id, g) for g in games.GAME_IDS},
         }
 
     def online_stats(self) -> dict[str, int]:
@@ -201,7 +225,7 @@ class Hub:
         for conn in list(self.conns.values()):
             await conn.send(payload)
 
-    def leaderboard(self, limit: int = 50) -> list[dict[str, object]]:
+    def leaderboard(self, limit: int = 50, game: str = games.DEFAULT_GAME) -> list[dict[str, object]]:
         return [
             {
                 "place": i,
@@ -211,21 +235,41 @@ class Hub:
                 "games": r["games"],
                 "wins": r["wins"],
             }
-            for i, r in enumerate(storage.top(self.db, limit), start=1)
+            for i, r in enumerate(storage.top(self.db, game, limit), start=1)
         ]
 
-    def ticket_for(self, conn: Conn, duration: int, level: str, now: float) -> Ticket:
+    def ticket_for(
+        self,
+        conn: Conn,
+        duration: int,
+        level: str,
+        game: str = games.DEFAULT_GAME,
+        *,
+        now: float,
+    ) -> Ticket:
+        game = games.normalize(game)
         return Ticket(
             user_id=conn.user_id,
             name=conn.user.name,
-            rating=conn.rating,
-            games=conn.games,
+            rating=conn.rating(game),
+            games=conn.played(game),
             lang=conn.lang,
             photo_url=conn.user.photo_url,
-            duration=duration if duration in DURATIONS else 60,
+            duration=duration if duration in DURATIONS else games.info(game).duration,
             level=level if level in LEVELS else "auto",
             joined_at=now,
+            game=game,
         )
+
+    @staticmethod
+    def _wanted(data: dict) -> tuple[int, str, str]:
+        """Что просит клиент: длительность, уровень, игра."""
+
+        try:
+            duration = int(data.get("duration", -1) if data.get("duration") is not None else -1)
+        except (TypeError, ValueError):
+            duration = -1
+        return duration, str(data.get("level", "auto")), games.normalize(data.get("game"))
 
     # ── HTTP ────────────────────────────────────────────────────────
 
@@ -303,7 +347,8 @@ class Hub:
             limit = max(1, min(100, int(request.query.get("limit", 50))))
         except ValueError:
             limit = 50
-        return web.json_response({"top": self.leaderboard(limit)})
+        game = games.normalize(request.query.get("game"))
+        return web.json_response({"top": self.leaderboard(limit, game), "game": game})
 
     # ── WebSocket ───────────────────────────────────────────────────
 
@@ -370,7 +415,10 @@ class Hub:
         )
 
         conn = Conn(
-            ws=ws, user=user, lang=lang, rating=row["rating"], games=row["games"]
+            ws=ws,
+            user=user,
+            lang=lang,
+            scores={g: storage.rating_of(self.db, user.id, g) for g in games.GAME_IDS},
         )
 
         # Открыли игру во второй раз — старое окно закрываем, иначе на один
@@ -391,6 +439,7 @@ class Hub:
                 "durations": list(DURATIONS),
                 "levels": list(LEVELS),
                 "win_steps": WIN_STEPS,
+                "games": list(games.GAME_IDS),
                 "bot": self.bot_username,
                 "start_param": user.start_param,
                 **self.online_stats(),
@@ -422,17 +471,18 @@ class Hub:
         elif kind == "find":
             if self.match_for(conn.user_id) is not None:
                 return
-            ticket = self.ticket_for(
-                conn, int(data.get("duration", 60) or 0), str(data.get("level", "auto")), now
-            )
+            ticket = self.ticket_for(conn, *self._wanted(data), now=now)
             self.queue.add(ticket)
             self._offered.discard(conn.user_id)
             await conn.send(
                 {
                     "t": "queued",
-                    "waiting": self.queue.waiting_like(ticket.duration, ticket.level),
+                    "waiting": self.queue.waiting_like(
+                        ticket.duration, ticket.level, ticket.game
+                    ),
                     "duration": ticket.duration,
                     "level": ticket.level,
+                    "game": ticket.game,
                 }
             )
 
@@ -442,9 +492,7 @@ class Hub:
             await conn.send({"t": "idle"})
 
         elif kind == "room":
-            ticket = self.ticket_for(
-                conn, int(data.get("duration", 60) or 0), str(data.get("level", "auto")), now
-            )
+            ticket = self.ticket_for(conn, *self._wanted(data), now=now)
             room = self.queue.create_room(ticket, now)
             await conn.send(
                 {
@@ -452,19 +500,29 @@ class Hub:
                     "code": room.code,
                     "link": self.invite_link(room.code),
                     "group": False,
+                    "game": ticket.game,
                 }
             )
 
         elif kind == "play_bot":
-            await self._start_robot_match(
-                conn,
-                now,
-                int(data.get("duration", 60) or 0),
-                str(data.get("level", "auto")),
-            )
+            await self._start_robot_match(conn, now, *self._wanted(data))
 
         elif kind == "players":
-            await self._send_players(conn, int(data.get("offset", 0) or 0))
+            await self._send_players(
+                conn, int(data.get("offset", 0) or 0), games.normalize(data.get("game"))
+            )
+
+        # ── морской бой ──
+        elif kind == "place":
+            await self._place(conn, data, now)
+
+        elif kind == "sea_random":
+            match = self.match_for(conn.user_id)
+            if isinstance(match, SeaMatch):
+                await conn.send({"t": "sea_layout", "layout": match.random_layout()})
+
+        elif kind == "fire":
+            await self._fire(conn, data, now)
 
         elif kind == "challenge":
             await self._challenge(conn, data, now)
@@ -485,6 +543,7 @@ class Hub:
                         "code": room.code,
                         "link": self.invite_link(room.code),
                         "group": bool(room.chat_id),
+                        "game": room.host.game,
                     }
                 )
                 return
@@ -492,6 +551,7 @@ class Hub:
                 {
                     "t": "invite",
                     "code": room.code,
+                    "game": room.host.game,
                     "duration": room.host.duration,
                     "level": room.host.level,
                     "host": {
@@ -550,7 +610,7 @@ class Hub:
             return
 
         ticket = self.ticket_for(
-            conn, int(data.get("duration", 60) or 0), str(data.get("level", "auto")), now
+            conn, room.host.duration, room.host.level, room.host.game, now=now
         )
         chat_id = room.chat_id
         pair = self.queue.join_room(room.code, ticket)
@@ -584,7 +644,7 @@ class Hub:
                 continue
             self.queue.rooms.pop(room.code, None)
             guest_ticket = self.ticket_for(
-                guest, room.host.duration, room.host.level, now
+                guest, room.host.duration, room.host.level, room.host.game, now=now
             )
             await self._start_match(
                 room.host, guest_ticket, now, private=True, group_chat=room.chat_id
@@ -593,7 +653,12 @@ class Hub:
         return False
 
     async def _start_robot_match(
-        self, conn: Conn, now: float, duration: int, level: str
+        self,
+        conn: Conn,
+        now: float,
+        duration: int,
+        level: str,
+        game: str = games.DEFAULT_GAME,
     ) -> None:
         """Тренировка с роботом. В рейтинг не идёт и в историю не пишется."""
 
@@ -602,16 +667,13 @@ class Hub:
         self.queue.remove(conn.user_id)
         self._offered.discard(conn.user_id)
 
-        ticket = self.ticket_for(conn, duration, level, now)
-        opponent = Side(
-            user_id=robot_mod.ROBOT_ID,
-            name=t("ui.robot", conn.lang),
-            rating=conn.rating,
-            is_bot=True,
-        )
-        match = Match(
-            a=ticket.to_side(),
-            b=opponent,
+        ticket = self.ticket_for(conn, duration, level, game, now=now)
+        rating = conn.rating(ticket.game)
+        opponent = games.robot_side(ticket.game, t("ui.robot", conn.lang), rating)
+        match = games.make_match(
+            ticket.game,
+            ticket.to_side(),
+            opponent,
             duration=ticket.duration,
             level=ticket.level,
             private=True,
@@ -619,17 +681,82 @@ class Hub:
         match.begin(now)
         self.matches[match.id] = match
         self.match_of[conn.user_id] = match.id
-        self.robots[match.id] = robot_mod.Robot(speed=robot_mod.speed_for(conn.rating))
-        log.info("Матч #%s: %s против робота (%s)", match.id, conn.user.name,
-                 self.robots[match.id].speed)
+        speed = robot_mod.speed_for(rating)
+        self.robots[match.id] = games.make_robot(ticket.game, speed)
+        log.info("Матч #%s (%s): %s против робота (%s)",
+                 match.id, ticket.game, conn.user.name, speed)
         await self._send_found(conn, match, now)
 
-    async def _send_players(self, conn: Conn, offset: int) -> None:
+    # ── морской бой ─────────────────────────────────────────────────
+
+    async def _place(self, conn: Conn, data: dict, now: float) -> None:
+        """Игрок расставил корабли. Проверяет сервер, клиенту не верим."""
+
+        match = self.match_for(conn.user_id)
+        if not isinstance(match, SeaMatch):
+            return
+        layout = data.get("layout")
+        error = match.place(conn.user_id, layout if isinstance(layout, list) else [])
+        await conn.send({"t": "placed", "ok": not error, "error": error})
+        if not error:
+            match.poll(now)
+            await self._broadcast(match, now, force=True)
+
+    async def _fire(self, conn: Conn, data: dict, now: float) -> None:
+        match = self.match_for(conn.user_id)
+        if not isinstance(match, SeaMatch):
+            return
+        try:
+            row, col = int(data.get("row")), int(data.get("col"))
+        except (TypeError, ValueError):
+            return
+        shot = match.fire(conn.user_id, row, col, now)
+        if shot.get("result") not in SHOT_RESULTS:
+            # Снаряда нет или клетка уже открыта — об этом знает только стрелявший.
+            await conn.send({"t": "shot", **self._json_shot(shot)})
+        await self._dispatch_shots(match)
+
+        if match.state == STATE_FINISHED:
+            await self._settle(match, now)
+        else:
+            await self._broadcast(match, now, force=True)
+
+    async def _dispatch_shots(self, match: Match) -> None:
+        """Рассказывает о выстрелах обоим: стрелявшему — «выстрел», второму —
+        «в тебя попали». Одинаково для людей и робота."""
+
+        if not isinstance(match, SeaMatch):
+            return
+        for shooter_id, shot in match.take_shots():
+            payload = self._json_shot(shot)
+            shooter = self.conns.get(shooter_id)
+            if shooter is not None:
+                await shooter.send({"t": "shot", **payload})
+            other = match.opponent(shooter_id)
+            victim = self.conns.get(other.user_id) if other else None
+            if victim is not None:
+                await victim.send({"t": "incoming", **payload})
+
+    @staticmethod
+    def _json_shot(shot: dict) -> dict:
+        """Кортежи клеток — в списки: JSON кортежей не знает."""
+
+        out = dict(shot)
+        if isinstance(out.get("cell"), tuple):
+            out["cell"] = list(out["cell"])
+        for key in ("ship", "halo"):
+            if key in out:
+                out[key] = [list(c) for c in out[key]]
+        return out
+
+    async def _send_players(
+        self, conn: Conn, offset: int, game: str = games.DEFAULT_GAME
+    ) -> None:
         """Все игроки: кто был в сети недавно — сверху, забытые — внизу."""
 
         offset = max(0, min(5000, offset))
         rows = storage.by_last_seen(
-            self.db, exclude=conn.user_id, limit=PLAYERS_PAGE, offset=offset
+            self.db, game=game, exclude=conn.user_id, limit=PLAYERS_PAGE, offset=offset
         )
         people = [
             {
@@ -680,9 +807,7 @@ class Hub:
         self._called_at[conn.user_id] = now
         self._called[(conn.user_id, target)] = now
 
-        ticket = self.ticket_for(
-            conn, int(data.get("duration", 60) or 0), str(data.get("level", "auto")), now
-        )
+        ticket = self.ticket_for(conn, *self._wanted(data), now=now)
         room = self.queue.create_room(ticket, now, target=target)
 
         # Если человек уже в игре — зовём прямо на экран, как звонок.
@@ -692,12 +817,13 @@ class Hub:
                 {
                     "t": "invite",
                     "code": room.code,
+                    "game": ticket.game,
                     "duration": ticket.duration,
                     "level": ticket.level,
                     "host": {
                         "name": conn.user.name,
-                        "rating": conn.rating,
-                        "title": rating_mod.title(conn.rating),
+                        "rating": ticket.rating,
+                        "title": rating_mod.title(ticket.rating),
                         "photo": conn.user.photo_url,
                     },
                 }
@@ -752,6 +878,7 @@ class Hub:
                     "correct": result.correct,
                     "step": result.step,
                     "freeze_ms": result.freeze_ms,
+                    "shells": result.shells,
                 }
             )
             if result.task is not None:
@@ -814,6 +941,7 @@ class Hub:
             {
                 "t": "found",
                 "match": match.id,
+                "game": match.game,
                 "duration": match.duration,
                 "level": match.level,
                 "win_steps": WIN_STEPS,
@@ -864,6 +992,7 @@ class Hub:
                 storage.apply_result(
                     self.db,
                     side.user_id,
+                    match.game,
                     new_rating=new_rating,
                     outcome=outcome,
                     correct=side.score,
@@ -875,6 +1004,7 @@ class Hub:
 
             storage.save_match(
                 self.db,
+                game=match.game,
                 duration=match.duration,
                 level=match.level,
                 private=match.private,
@@ -882,7 +1012,7 @@ class Hub:
                 player_b=match.b.user_id,
                 score_a=match.a.score,
                 score_b=match.b.score,
-                rope=match.rope(),
+                rope=match.margin(),
                 winner=match.winner_id,
                 reason=match.reason,
                 delta_a=deltas[match.a.user_id],
@@ -900,9 +1030,9 @@ class Hub:
             )
             conn = self.conns.get(side.user_id)
             if conn is not None:
-                conn.rating = ratings[side.user_id]
-                conn.games += 1 if match.rated else 0
-                result["place"] = storage.place_of(self.db, side.user_id)
+                played = conn.played(match.game) + (1 if match.rated else 0)
+                conn.scores[match.game] = (ratings[side.user_id], played)
+                result["place"] = storage.place_of(self.db, side.user_id, match.game)
                 await conn.send({"t": "end", **result})
             if self.notify is not None and match.rated:
                 await self._notify_result(side.user_id, result)
@@ -1022,6 +1152,8 @@ class Hub:
 
             robot = self.robots.get(match.id)
             moved = bool(robot and robot.step(match, now))
+            if moved:
+                await self._dispatch_shots(match)
 
             if match.state == STATE_FINISHED:
                 await self._settle(match, now)

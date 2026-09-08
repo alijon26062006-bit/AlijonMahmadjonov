@@ -10,6 +10,43 @@ LANG_NAMES = {"ru": "Русский", "tg": "Тоҷикӣ"}
 STRINGS: dict[str, dict[str, str]] = {
     "ru": {
         "ui.title": "Перетягивание каната: математика",
+        "ui.app": "Канат",
+        "ui.app.sub": "математические дуэли",
+        "ui.pick_game": "Во что играем",
+        "ui.game.rope": "Канат",
+        "ui.game.rope.hint": "Решай быстрее — тяни канат",
+        "ui.game.sea": "Морской бой",
+        "ui.game.sea.hint": "Реши пример — получи снаряд",
+        "ui.game.soon": "скоро",
+        "ui.sea.place.title": "Расставь корабли",
+        "ui.sea.place.hint": "Выбери корабль внизу и нажми на клетку. "
+                             "Нажми на корабль на поле — он повернётся",
+        "ui.sea.rotate": "Повернуть",
+        "ui.sea.random": "Случайно",
+        "ui.sea.clear": "Убрать",
+        "ui.sea.ready": "⚓ Готов",
+        "ui.sea.place.left": "Осталось поставить",
+        "ui.sea.place.bad": "Так нельзя: корабли не должны касаться",
+        "ui.sea.place.time": "На расстановку",
+        "ui.sea.waiting_opp": "Соперник ещё расставляет…",
+        "ui.sea.enemy": "СОПЕРНИК",
+        "ui.sea.you": "ТЫ",
+        "ui.sea.shells": "снаряды",
+        "ui.sea.no_shells": "Реши пример — получишь снаряд",
+        "ui.sea.hit": "Ранил!",
+        "ui.sea.miss": "Мимо",
+        "ui.sea.sunk": "Убил!",
+        "ui.sea.incoming.hit": "В тебя попали",
+        "ui.sea.incoming.sunk": "Твой корабль потоплен",
+        "ui.sea.fleet": "кораблей",
+        "ui.sea.win.fleet": "Ты потопил весь флот",
+        "ui.sea.loss.fleet": "Твой флот потоплен",
+        "ui.sea.win.time": "Время вышло — ты попадал чаще",
+        "ui.sea.loss.time": "Время вышло — соперник попадал чаще",
+        "ui.sea.draw.time": "Время вышло — поровну",
+        "ui.result.hits": "Попаданий",
+        "ui.result.sunk": "Потоплено кораблей",
+        "ui.result.shots": "Выстрелов",
         "ui.play": "Найти соперника",
         "ui.friend": "Позвать друга",
         "ui.join": "Войти по коду",
@@ -171,8 +208,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "Верных ответов: {score} : {opp_score}\n"
             "Рейтинг: {rating} ({delta})"
         ),
-        "bot.profile": (
-            "👤 {name}\n\n"
+        "bot.profile": "👤 {name}\n\n",
+        "bot.profile.game": (
+            "{game}\n"
             "Рейтинг: {rating} — {title}\n"
             "Место: {place}\n"
             "Матчей: {games} · побед {wins} · поражений {losses} · ничьих {draws}\n"
@@ -189,7 +227,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "bot.accepted.go": "⚔️ В бой",
         "bot.only_private": "Игра открывается в личной переписке с ботом.",
         "bot.duel.call": "⚔️ {name} вызывает на дуэль!\n\n"
-                         "{duration} · примеры по силам\n"
+                         "{game} · {duration} · примеры по силам\n"
                          "Кто первым нажмёт — тот и дерётся.",
         "bot.duel.accept": "⚔️ Принять вызов",
         "bot.duel.won": "🏆 {winner} обыграл {loser}",
@@ -198,9 +236,50 @@ STRINGS: dict[str, dict[str, str]] = {
         "bot.duel.no_link": "Не могу составить ссылку на игру. "
                             "Похоже, бот ещё не настроен до конца.",
         "bot.duel.minute": "1 минута",
+        "bot.game.rope": "Канат",
+        "bot.game.sea": "Морской бой",
+        "bot.duel.sea": "до победы · потопи флот",
+        "bot.profile.none": "{game}\nЕщё не играл",
     },
     "tg": {
         "ui.title": "Кашиши арғамчин: математика",
+        "ui.app": "Канат",
+        "ui.app.sub": "дуэлҳои математикӣ",
+        "ui.pick_game": "Чӣ бозӣ мекунем",
+        "ui.game.rope": "Арғамчин",
+        "ui.game.rope.hint": "Тезтар ҳал кун — арғамчинро каш",
+        "ui.game.sea": "Ҷанги баҳрӣ",
+        "ui.game.sea.hint": "Мисолро ҳал кун — тир гир",
+        "ui.game.soon": "ба зудӣ",
+        "ui.sea.place.title": "Киштиҳоро ҷойгир кун",
+        "ui.sea.place.hint": "Дар поён киштиро интихоб кун ва ба катак пахш кун. "
+                             "Ба кишти дар майдон пахш кун — мегардад",
+        "ui.sea.rotate": "Гардондан",
+        "ui.sea.random": "Тасодуфӣ",
+        "ui.sea.clear": "Бардоштан",
+        "ui.sea.ready": "⚓ Тайёр",
+        "ui.sea.place.left": "Боқӣ монд",
+        "ui.sea.place.bad": "Ин тавр намешавад: киштиҳо набояд ба ҳам расанд",
+        "ui.sea.place.time": "Барои ҷойгиркунӣ",
+        "ui.sea.waiting_opp": "Рақиб ҳанӯз ҷойгир мекунад…",
+        "ui.sea.enemy": "РАҚИБ",
+        "ui.sea.you": "ТУ",
+        "ui.sea.shells": "тирҳо",
+        "ui.sea.no_shells": "Мисолро ҳал кун — тир мегирӣ",
+        "ui.sea.hit": "Захмӣ!",
+        "ui.sea.miss": "Хато",
+        "ui.sea.sunk": "Ғарқ!",
+        "ui.sea.incoming.hit": "Ба ту заданд",
+        "ui.sea.incoming.sunk": "Киштии ту ғарқ шуд",
+        "ui.sea.fleet": "кишти",
+        "ui.sea.win.fleet": "Ту тамоми флотро ғарқ кардӣ",
+        "ui.sea.loss.fleet": "Флоти ту ғарқ шуд",
+        "ui.sea.win.time": "Вақт тамом — ту бештар задӣ",
+        "ui.sea.loss.time": "Вақт тамом — рақиб бештар зад",
+        "ui.sea.draw.time": "Вақт тамом — баробар",
+        "ui.result.hits": "Задан",
+        "ui.result.sunk": "Киштиҳои ғарқшуда",
+        "ui.result.shots": "Тирҳо",
         "ui.play": "Рақиб ёфтан",
         "ui.friend": "Дӯстро даъват кардан",
         "ui.join": "Бо рамз даромадан",
@@ -362,8 +441,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "Ҷавобҳои дуруст: {score} : {opp_score}\n"
             "Рейтинг: {rating} ({delta})"
         ),
-        "bot.profile": (
-            "👤 {name}\n\n"
+        "bot.profile": "👤 {name}\n\n",
+        "bot.profile.game": (
+            "{game}\n"
             "Рейтинг: {rating} — {title}\n"
             "Ҷой: {place}\n"
             "Бозиҳо: {games} · ғалаба {wins} · мағлубият {losses} · баробар {draws}\n"
@@ -380,7 +460,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "bot.accepted.go": "⚔️ Ба ҷанг",
         "bot.only_private": "Бозӣ дар чати шахсӣ бо бот кушода мешавад.",
         "bot.duel.call": "⚔️ {name} ба дуэл даъват мекунад!\n\n"
-                         "{duration} · мисолҳо мувофиқи қувва\n"
+                         "{game} · {duration} · мисолҳо мувофиқи қувва\n"
                          "Кӣ аввал пахш кунад, ҳамон мебозад.",
         "bot.duel.accept": "⚔️ Даъватро қабул кардан",
         "bot.duel.won": "🏆 {winner} бар {loser} ғолиб омад",
@@ -389,6 +469,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "bot.duel.no_link": "Истинодро сохта наметавонам. "
                             "Аз афташ, бот пурра танзим нашудааст.",
         "bot.duel.minute": "1 дақиқа",
+        "bot.game.rope": "Арғамчин",
+        "bot.game.sea": "Ҷанги баҳрӣ",
+        "bot.duel.sea": "то ғалаба · флотро ғарқ кун",
+        "bot.profile.none": "{game}\nҲанӯз бозӣ накардааст",
     },
 }
 

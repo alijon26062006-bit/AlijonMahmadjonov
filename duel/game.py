@@ -102,11 +102,14 @@ class AnswerResult:
     task: Task | None = None
     freeze_ms: int = 0
     note: str = ""
+    shells: int = 0
 
 
 @dataclass
 class Match:
-    """Матч двух игроков. Всё состояние — здесь."""
+    """Матч двух игроков в перетягивание каната. Всё состояние — здесь."""
+
+    game: str = field(default="rope", init=False)
 
     a: Side
     b: Side
@@ -235,14 +238,7 @@ class Match:
             side.fastest_ms = measured if not side.fastest_ms else min(side.fastest_ms, measured)
 
             step = BONUS_STEP if side.streak >= STREAK_BONUS_AT else 1
-            side.pull += step
-
-            if abs(self.rope()) >= WIN_STEPS:
-                self.finish(now, REASON_ROPE, winner_id=side.user_id)
-                return AnswerResult(accepted=True, correct=True, step=step)
-
-            task = self._issue(side, now)
-            return AnswerResult(accepted=True, correct=True, step=step, task=task)
+            return self._reward(side, step, now)
 
         side.wrong += 1
         side.streak = 0
@@ -253,6 +249,22 @@ class Match:
         return AnswerResult(
             accepted=True, correct=False, task=task, freeze_ms=int(FREEZE_SEC * 1000)
         )
+
+    def _reward(self, side: Side, step: int, now: float) -> AnswerResult:
+        """Что даёт верный ответ. В канате — рывок; другие игры платят иначе."""
+
+        side.pull += step
+        if abs(self.rope()) >= WIN_STEPS:
+            self.finish(now, REASON_ROPE, winner_id=side.user_id)
+            return AnswerResult(accepted=True, correct=True, step=step)
+
+        task = self._issue(side, now)
+        return AnswerResult(accepted=True, correct=True, step=step, task=task)
+
+    def margin(self) -> int:
+        """Насколько сторона A впереди. Пишется в историю матчей."""
+
+        return self.rope()
 
     # ── связь ───────────────────────────────────────────────────────
 

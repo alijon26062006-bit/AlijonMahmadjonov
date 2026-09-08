@@ -126,7 +126,9 @@ async def state_where(player, check, tries=40):
 async def test_valid_player_gets_in(client):
     _, ready = await join(client, 1, "Алиджон")
     assert ready["profile"]["name"] == "Алиджон"
-    assert ready["profile"]["rating"] == 1000
+    assert ready["profile"]["standings"]["rope"]["rating"] == 1000
+    assert ready["profile"]["standings"]["sea"]["games"] == 0
+    assert set(ready["games"]) == {"rope", "sea"}
     assert ready["strings"]["play"]
 
 
@@ -237,8 +239,7 @@ async def test_training_does_not_touch_the_rating(client, monkeypatch):
 
     result = await player.recv("end", timeout=30)
     assert result["rated"] is False and result["delta"] == 0
-    row = storage.get_player(client.hub.db, 1)
-    assert row["games"] == 0 and row["rating"] == 1000
+    assert storage.rating_of(client.hub.db, 1, "rope") == (1000, 0)
     assert storage.totals(client.hub.db)["matches"] == 0, "тренировка не идёт в историю"
 
 
@@ -694,8 +695,9 @@ async def test_the_match_lands_in_the_database(client):
     await one.recv("end")
 
     assert storage.totals(client.hub.db)["matches"] == 1
-    row = storage.get_player(client.hub.db, 1)
+    row = storage.standing(client.hub.db, 1, "rope")
     assert row["games"] == 1 and row["wins"] == 1 and row["correct"] >= 1
+    assert storage.standing(client.hub.db, 1, "sea") is None, "в море ещё не играл"
     assert len(storage.history(client.hub.db, 2)) == 1
 
 

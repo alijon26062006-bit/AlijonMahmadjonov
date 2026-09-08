@@ -7,9 +7,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .games import DEFAULT_GAME, GAME_IDS
 from .rating import START_RATING
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 LANGS = ("ru", "tg")
 
 _SCHEMA = """
@@ -37,8 +38,27 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE INDEX IF NOT EXISTS idx_players_rating ON players(rating DESC);
 CREATE INDEX IF NOT EXISTS idx_players_seen ON players(last_seen_at DESC);
 
+-- Очки по каждой игре отдельно: канат и морской бой — разные умения.
+CREATE TABLE IF NOT EXISTS standings (
+    player_id     INTEGER NOT NULL,
+    game          TEXT    NOT NULL,
+    rating        INTEGER NOT NULL DEFAULT 1000,
+    games         INTEGER NOT NULL DEFAULT 0,
+    wins          INTEGER NOT NULL DEFAULT 0,
+    losses        INTEGER NOT NULL DEFAULT 0,
+    draws         INTEGER NOT NULL DEFAULT 0,
+    correct       INTEGER NOT NULL DEFAULT 0,
+    wrong         INTEGER NOT NULL DEFAULT 0,
+    best_streak   INTEGER NOT NULL DEFAULT 0,
+    best_rating   INTEGER NOT NULL DEFAULT 1000,
+    PRIMARY KEY (player_id, game)
+);
+
+CREATE INDEX IF NOT EXISTS idx_standings_top ON standings(game, rating DESC);
+
 CREATE TABLE IF NOT EXISTS matches (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    game         TEXT    NOT NULL DEFAULT 'rope',
     started_at   TEXT    NOT NULL,
     finished_at  TEXT    NOT NULL,
     duration     INTEGER NOT NULL,
@@ -77,8 +97,34 @@ def connect(path: str | Path) -> sqlite3.Connection:
     row = conn.execute("SELECT version FROM schema_version").fetchone()
     if row is None:
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,))
+    elif int(row["version"]) < SCHEMA_VERSION:
+        _migrate(conn, int(row["version"]))
     conn.commit()
     return conn
+
+
+def _migrate(conn: sqlite3.Connection, version: int) -> None:
+    """Поднимает старую базу до текущей схемы, ничего не теряя."""
+
+    if version < 2:
+        # Очки каната переезжают из players в standings — с тем же рейтингом,
+        # теми же победами: для игроков ничего не должно измениться.
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO standings
+                (player_id, game, rating, games, wins, losses, draws,
+                 correct, wrong, best_streak, best_rating)
+            SELECT id, 'rope', rating, games, wins, losses, draws,
+                   correct, wrong, best_streak, best_rating
+            FROM players WHERE games > 0
+            """
+        )
+        columns = {r[1] for r in conn.execute("PRAGMA table_info(matches)")}
+        if "game" not in columns:
+            conn.execute(
+                "ALTER TABLE matches ADD COLUMN game TEXT NOT NULL DEFAULT 'rope'"
+            )
+    conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
 
 
 def touch_player(
@@ -131,9 +177,34 @@ def set_lang(conn: sqlite3.Connection, user_id: int, lang: str) -> None:
     conn.commit()
 
 
+def _check_game(game: str) -> str:
+    if game not in GAME_IDS:
+        raise ValueError(f"неизвестная игра: {game!r}")
+    return game
+
+
+def standing(
+    conn: sqlite3.Connection, user_id: int, game: str = DEFAULT_GAME
+) -> sqlite3.Row | None:
+    """Очки игрока в одной игре. None — ещё не играл в неё."""
+
+    return conn.execute(
+        "SELECT * FROM standings WHERE player_id = ? AND game = ?",
+        (user_id, _check_game(game)),
+    ).fetchone()
+
+
+def rating_of(conn: sqlite3.Connection, user_id: int, game: str = DEFAULT_GAME) -> tuple[int, int]:
+    """(рейтинг, сыграно) — то, что нужно подбору соперника."""
+
+    row = standing(conn, user_id, game)
+    return (int(row["rating"]), int(row["games"])) if row else (START_RATING, 0)
+
+
 def apply_result(
     conn: sqlite3.Connection,
     user_id: int,
+    game: str,
     *,
     new_rating: int,
     outcome: str,
@@ -141,13 +212,17 @@ def apply_result(
     wrong: int,
     best_streak: int,
 ) -> None:
-    """Записывает итог матча в профиль. outcome: 'win' | 'loss' | 'draw'."""
+    """Записывает итог матча в очки игры. outcome: 'win' | 'loss' | 'draw'."""
 
     if outcome not in {"win", "loss", "draw"}:
         raise ValueError(f"неизвестный итог: {outcome!r}")
+    _check_game(game)
+    conn.execute(
+        "INSERT OR IGNORE INTO standings (player_id, game) VALUES (?, ?)", (user_id, game)
+    )
     conn.execute(
         f"""
-        UPDATE players SET
+        UPDATE standings SET
             rating = ?,
             best_rating = MAX(best_rating, ?),
             games = games + 1,
@@ -155,12 +230,12 @@ def apply_result(
              'losses = losses + 1' if outcome == 'loss' else 'draws = draws + 1'},
             correct = correct + ?,
             wrong = wrong + ?,
-            best_streak = MAX(best_streak, ?),
-            last_seen_at = ?
-        WHERE id = ?
+            best_streak = MAX(best_streak, ?)
+        WHERE player_id = ? AND game = ?
         """,
-        (new_rating, new_rating, correct, wrong, best_streak, _now(), user_id),
+        (new_rating, new_rating, correct, wrong, best_streak, user_id, game),
     )
+    conn.execute("UPDATE players SET last_seen_at = ? WHERE id = ?", (_now(), user_id))
     conn.commit()
 
 
@@ -169,14 +244,15 @@ def save_match(conn: sqlite3.Connection, **fields: Any) -> int:
 
     cur = conn.execute(
         """
-        INSERT INTO matches (started_at, finished_at, duration, level, private,
+        INSERT INTO matches (game, started_at, finished_at, duration, level, private,
                              player_a, player_b, score_a, score_b, rope,
                              winner, reason, delta_a, delta_b)
-        VALUES (:started_at, :finished_at, :duration, :level, :private,
+        VALUES (:game, :started_at, :finished_at, :duration, :level, :private,
                 :player_a, :player_b, :score_a, :score_b, :rope,
                 :winner, :reason, :delta_a, :delta_b)
         """,
         {
+            "game": _check_game(str(fields.get("game", DEFAULT_GAME))),
             "started_at": fields.get("started_at") or _now(),
             "finished_at": fields.get("finished_at") or _now(),
             "duration": int(fields.get("duration", 0)),
@@ -197,8 +273,10 @@ def save_match(conn: sqlite3.Connection, **fields: Any) -> int:
     return int(cur.lastrowid)
 
 
-def top(conn: sqlite3.Connection, limit: int = 50) -> list[sqlite3.Row]:
-    """Таблица лидеров: сначала сыгравшие по рейтингу, новички — в конце.
+def top(
+    conn: sqlite3.Connection, game: str = DEFAULT_GAME, limit: int = 50
+) -> list[sqlite3.Row]:
+    """Таблица лидеров одной игры: сыгравшие по рейтингу, новички — в конце.
 
     Новичок не может стоять выше того, кто играл и проиграл: у всех стартовые
     тысяча очков, и без этого правила он обошёл бы половину таблицы, не сыграв
@@ -207,24 +285,30 @@ def top(conn: sqlite3.Connection, limit: int = 50) -> list[sqlite3.Row]:
 
     return conn.execute(
         """
-        SELECT id, name, username, rating, games, wins, losses, draws
-        FROM players
-        ORDER BY (games > 0) DESC, rating DESC, wins DESC, id ASC
+        SELECT p.id, p.name, p.username,
+               COALESCE(s.rating, ?) AS rating,
+               COALESCE(s.games, 0) AS games,
+               COALESCE(s.wins, 0) AS wins,
+               COALESCE(s.losses, 0) AS losses,
+               COALESCE(s.draws, 0) AS draws
+        FROM players p
+        LEFT JOIN standings s ON s.player_id = p.id AND s.game = ?
+        ORDER BY (COALESCE(s.games, 0) > 0) DESC, rating DESC, wins DESC, p.id ASC
         LIMIT ?
         """,
-        (limit,),
+        (START_RATING, _check_game(game), limit),
     ).fetchall()
 
 
-def place_of(conn: sqlite3.Connection, user_id: int) -> int:
-    """Какое место занимает игрок. 0 — ещё ни одного матча."""
+def place_of(conn: sqlite3.Connection, user_id: int, game: str = DEFAULT_GAME) -> int:
+    """Какое место занимает игрок в игре. 0 — ещё ни одного матча в ней."""
 
-    row = get_player(conn, user_id)
+    row = standing(conn, user_id, game)
     if row is None or row["games"] == 0:
         return 0
     ahead = conn.execute(
-        "SELECT COUNT(*) AS n FROM players WHERE games > 0 AND rating > ?",
-        (row["rating"],),
+        "SELECT COUNT(*) AS n FROM standings WHERE game = ? AND games > 0 AND rating > ?",
+        (game, row["rating"]),
     ).fetchone()
     return int(ahead["n"]) + 1
 
@@ -232,21 +316,27 @@ def place_of(conn: sqlite3.Connection, user_id: int) -> int:
 def by_last_seen(
     conn: sqlite3.Connection,
     *,
+    game: str = DEFAULT_GAME,
     exclude: int = 0,
     limit: int = 60,
     offset: int = 0,
 ) -> list[sqlite3.Row]:
-    """Все игроки: кто заходил недавно — сверху, забытые — в самом низу."""
+    """Все игроки: кто заходил недавно — сверху, забытые — в самом низу.
+    Рейтинг рядом с именем — той игры, из которой открыли список."""
 
     return conn.execute(
         """
-        SELECT id, name, rating, games, wins, last_seen_at
-        FROM players
-        WHERE id != ?
-        ORDER BY last_seen_at DESC, id ASC
+        SELECT p.id, p.name, p.last_seen_at,
+               COALESCE(s.rating, ?) AS rating,
+               COALESCE(s.games, 0) AS games,
+               COALESCE(s.wins, 0) AS wins
+        FROM players p
+        LEFT JOIN standings s ON s.player_id = p.id AND s.game = ?
+        WHERE p.id != ?
+        ORDER BY p.last_seen_at DESC, p.id ASC
         LIMIT ? OFFSET ?
         """,
-        (exclude, limit, offset),
+        (START_RATING, _check_game(game), exclude, limit, offset),
     ).fetchall()
 
 

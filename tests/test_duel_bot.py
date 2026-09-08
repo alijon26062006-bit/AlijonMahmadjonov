@@ -69,7 +69,7 @@ def test_leaderboard_shows_places_and_ratings(db):
     for user_id, name, score in ((1, "Алиджон", 1300), (2, "Соперник", 1100)):
         storage.touch_player(db, user_id, name)
         storage.apply_result(
-            db, user_id, new_rating=score, outcome="win", correct=5, wrong=1, best_streak=3
+            db, user_id, "rope", new_rating=score, outcome="win", correct=5, wrong=1, best_streak=3
         )
     text = bot_module.top_text(db, "ru")
     assert "🥇 Алиджон — 1300" in text
@@ -86,7 +86,7 @@ def test_profile_before_the_first_match(db):
 def test_profile_after_a_match(db):
     storage.touch_player(db, 1, "Алиджон")
     storage.apply_result(
-        db, 1, new_rating=1250, outcome="win", correct=12, wrong=2, best_streak=6
+        db, 1, "rope", new_rating=1250, outcome="win", correct=12, wrong=2, best_streak=6
     )
     text = bot_module._profile_of(db, 1, "ru")
     assert "1250" in text and "мастер" in text
@@ -97,7 +97,7 @@ def test_profile_after_a_match(db):
 def test_profile_speaks_tajik_too(db):
     storage.touch_player(db, 1, "Алиджон")
     storage.apply_result(
-        db, 1, new_rating=1250, outcome="win", correct=12, wrong=2, best_streak=6
+        db, 1, "rope", new_rating=1250, outcome="win", correct=12, wrong=2, best_streak=6
     )
     text = bot_module._profile_of(db, 1, "tg")
     assert "Ҷой: 1" in text
@@ -106,3 +106,42 @@ def test_profile_speaks_tajik_too(db):
 
 def test_unknown_player_gets_an_empty_profile(db):
     assert "—" in bot_module._profile_of(db, 999, "ru")
+
+
+def test_profile_keeps_each_game_apart(db):
+    """Рейтинг морского боя не смешивается с канатом."""
+    storage.touch_player(db, 1, "Алиджон")
+    storage.apply_result(
+        db, 1, "sea", new_rating=1310, outcome="win", correct=9, wrong=0, best_streak=9
+    )
+    text = bot_module._profile_of(db, 1, "ru")
+    assert "Морской бой" in text and "1310" in text
+    assert "Канат\nЕщё не играл" in text
+
+
+def test_leaderboard_has_a_section_per_game(db):
+    storage.touch_player(db, 1, "Алиджон")
+    storage.touch_player(db, 2, "Соперник")
+    storage.apply_result(db, 1, "rope", new_rating=1200, outcome="win", correct=5, wrong=1, best_streak=3)
+    storage.apply_result(db, 2, "sea", new_rating=1150, outcome="win", correct=5, wrong=1, best_streak=3)
+    text = bot_module.top_text(db, "ru")
+    rope, sea = text.split("Морской бой")
+    assert "🥇 Алиджон — 1200" in rope and "Соперник" not in rope
+    assert "🥇 Соперник — 1150" in sea and "Алиджон" not in sea
+
+
+@pytest.mark.parametrize(
+    "text, game",
+    [
+        ("/duel", "rope"),
+        ("/duel@KanatBot", "rope"),
+        ("/duel море", "sea"),
+        ("/duel sea", "sea"),
+        ("/duel@KanatBot морской бой", "sea"),
+        ("/duel канат", "rope"),
+        ("/duel баҳрӣ", "sea"),
+        ("/duel что-то", "rope"),
+    ],
+)
+def test_duel_command_understands_the_game(text, game):
+    assert bot_module.game_from_text(text) == game

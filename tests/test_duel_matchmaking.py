@@ -176,3 +176,42 @@ def test_a_fresh_match_starts_with_a_countdown():
     assert match.state == "countdown"
     assert match.starts_at > 5.0
     assert match.rope() == 0
+
+
+# ── разные игры ─────────────────────────────────────────────────────────────
+
+
+def test_rope_and_sea_never_meet():
+    """Игра — граница, которую не переходим ни при каком ожидании."""
+    queue = Queue()
+    queue.add(ticket(1))
+    queue.tickets[1].game = "sea"
+    queue.add(ticket(2))
+    assert queue.find_pairs(0.1) == []
+    assert queue.find_pairs(3600.0) == []
+
+
+def test_two_sailors_are_paired_into_a_sea_match():
+    queue = Queue()
+    for user_id in (1, 2):
+        queue.add(ticket(user_id))
+        queue.tickets[user_id].game = "sea"
+    (pair,) = queue.find_pairs(0.1)
+    match = make_match(*pair, now=1.0)
+    assert match.game == "sea"
+    assert match.state == "placing"
+
+
+def test_a_rope_match_is_still_a_rope_match():
+    match = make_match(ticket(1), ticket(2), now=1.0)
+    assert match.game == "rope"
+    assert match.state == "countdown"
+
+
+def test_waiting_counts_only_your_own_game():
+    queue = Queue()
+    queue.add(ticket(1))
+    queue.add(ticket(2))
+    queue.tickets[2].game = "sea"
+    assert queue.waiting_like(60, "normal") == 1
+    assert queue.waiting_like(60, "normal", "sea") == 1

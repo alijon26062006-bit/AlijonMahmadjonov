@@ -11,7 +11,9 @@ import random
 import string
 from dataclasses import dataclass, field
 
+# У заявки есть поле games (сколько сыграно), поэтому модуль игр берём по именам.
 from .game import Match, Side
+from .games import DEFAULT_GAME, make_match as build_match, make_side
 
 # Стартовая разница в рейтинге и насколько она растёт за секунду ожидания.
 WINDOW_START = 120
@@ -41,6 +43,7 @@ class Ticket:
     duration: int = 60
     level: str = "auto"
     joined_at: float = 0.0
+    game: str = DEFAULT_GAME
 
     def window(self, now: float) -> int:
         waited = max(0.0, now - self.joined_at)
@@ -50,7 +53,8 @@ class Ticket:
         return max(0.0, now - self.joined_at)
 
     def to_side(self) -> Side:
-        return Side(
+        return make_side(
+            self.game,
             user_id=self.user_id,
             name=self.name,
             rating=self.rating,
@@ -111,9 +115,11 @@ class Queue:
     def __len__(self) -> int:
         return len(self.tickets)
 
-    def waiting_like(self, duration: int, level: str) -> int:
+    def waiting_like(self, duration: int, level: str, game: str = DEFAULT_GAME) -> int:
         return sum(
-            1 for t in self.tickets.values() if t.duration == duration and t.level == level
+            1
+            for t in self.tickets.values()
+            if t.duration == duration and t.level == level and t.game == game
         )
 
     def _fits(self, one: Ticket, other: Ticket, now: float) -> bool:
@@ -148,10 +154,12 @@ class Queue:
         taken: set[int] = set()
         pairs: list[tuple[Ticket, Ticket]] = []
 
-        # Точное совпадение: та же длительность, тот же уровень.
-        buckets: dict[tuple[int, str], list[Ticket]] = {}
+        # Игра — граница, которую не переходим ни при каком ожидании.
+        # Точное совпадение: та же игра, длительность и уровень.
+        buckets: dict[tuple[str, int, str], list[Ticket]] = {}
         for ticket in self.tickets.values():
-            buckets.setdefault((ticket.duration, ticket.level), []).append(ticket)
+            key = (ticket.game, ticket.duration, ticket.level)
+            buckets.setdefault(key, []).append(ticket)
         for group in buckets.values():
             pairs += self._pair_within(group, now, taken)
 
@@ -161,19 +169,19 @@ class Queue:
             for t in self.tickets.values()
             if t.user_id not in taken and t.waited(now) >= FLEX_LEVEL_SEC
         ]
-        by_duration: dict[int, list[Ticket]] = {}
+        by_duration: dict[tuple[str, int], list[Ticket]] = {}
         for ticket in patient:
-            by_duration.setdefault(ticket.duration, []).append(ticket)
+            by_duration.setdefault((ticket.game, ticket.duration), []).append(ticket)
         for group in by_duration.values():
             pairs += self._pair_within(group, now, taken)
 
-        # Ждёт совсем долго — сведём с кем угодно, лишь бы не сидел один.
-        desperate = [
-            t
-            for t in self.tickets.values()
-            if t.user_id not in taken and t.waited(now) >= FLEX_ANY_SEC
-        ]
-        pairs += self._pair_within(desperate, now, taken)
+        # Ждёт совсем долго — сведём с кем угодно в той же игре.
+        by_game: dict[str, list[Ticket]] = {}
+        for ticket in self.tickets.values():
+            if ticket.user_id not in taken and ticket.waited(now) >= FLEX_ANY_SEC:
+                by_game.setdefault(ticket.game, []).append(ticket)
+        for group in by_game.values():
+            pairs += self._pair_within(group, now, taken)
 
         for one, other in pairs:
             self.tickets.pop(one.user_id, None)
@@ -247,9 +255,10 @@ def make_match(
     if one.level != other.level and "auto" in (one.level, other.level):
         level = one.level if other.level == "auto" else other.level
 
-    match = Match(
-        a=one.to_side(),
-        b=other.to_side(),
+    match = build_match(
+        host.game,
+        one.to_side(),
+        other.to_side(),
         duration=host.duration,
         level=level,
         private=private,
