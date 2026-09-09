@@ -776,29 +776,26 @@ h2 { font-size: 19px; margin: 0; }
   animation: spin .9s linear infinite;
 }
 
-/* Корабли: клетки, которые они занимают, обведены ручкой, а сверху —
-   сам кораблик, нарисованный той же ручкой. Обводка не украшение: без неё
-   на маленьком поле не видно, какие именно клетки заняты. */
+/* Корабли — рисунки ручкой, ничем не обведённые: на листе в клетку и так
+   видно, сколько клеток занял корабль. Длина рисунка всегда ровно в клетку,
+   поэтому по нему и читается размер. */
 .ships { position: absolute; inset: 0; pointer-events: none; }
 .ship {
   position: absolute;
   left: calc(var(--c) * var(--col)); top: calc(var(--c) * var(--row));
   width: calc(var(--c) * var(--w)); height: calc(var(--c) * var(--h));
-  border: max(2px, calc(var(--c) * .07)) solid var(--pen);
-  border-radius: calc(var(--c) * .22);
-  background: color-mix(in srgb, var(--pen) 9%, transparent);
   box-sizing: border-box;
   transition: left .12s ease, top .12s ease, width .12s ease, height .12s ease;
 }
 .ship::after {
   content: "";
-  position: absolute; inset: 4%;
+  position: absolute; inset: 1%;
   background: center / contain no-repeat var(--img, none);
 }
 /* Вертикальный корабль — тот же рисунок, положенный набок. */
 .ship.v::after {
   inset: auto; left: 50%; top: 50%;
-  width: calc(var(--c) * var(--h) * .92); height: calc(var(--c) * var(--w) * .92);
+  width: calc(var(--c) * var(--h) * .98); height: calc(var(--c) * var(--w) * .98);
   transform: translate(-50%, -50%) rotate(90deg);
 }
 
@@ -807,50 +804,43 @@ h2 { font-size: 19px; margin: 0; }
 .s2b { --img: url("/static/img/ship-2b.png"); }
 .s1a { --img: url("/static/img/ship-1a.png"); }
 .s1b { --img: url("/static/img/ship-1b.png"); }
-.ship.sel { box-shadow: 0 0 0 3px color-mix(in srgb, var(--pen) 30%, transparent); }
-.ship.sunk { border-color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); }
-.ship.sunk::after { opacity: .55; }
-.ship.ghost { border-style: dashed; background: transparent; opacity: .6; }
+.ship.sel::after { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--pen) 60%, transparent)); }
+.ship.sunk::after { opacity: .5; }
+.ship.ghost {
+  border: max(2px, calc(var(--c) * .07)) dashed var(--red);
+  border-radius: calc(var(--c) * .22);
+  opacity: .7;
+}
 .ship.ghost::after { display: none; }
-.ship.bad { border-color: var(--red); animation: shake .3s ease; }
+.ship.bad { animation: shake .3s ease; }
 
 /* ── расстановка ── */
 
 .sea-place { display: flex; flex-direction: column; gap: 2px; align-items: center; }
 
-/* Причал: корабли, которые ещё не на поле. Выбранный — в рамке. */
-.dock { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; min-height: 30px; }
+/* Причал: корабли, которые ещё не на поле. Выбранный — крупнее и ярче. */
+.dock { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; align-items: center; min-height: 32px; }
 .dock-ship {
-  display: grid; grid-auto-flow: column;
-  border: 2.5px solid var(--pen); border-radius: 6px;
-  background: color-mix(in srgb, var(--pen) 13%, transparent);
-  padding: 0; cursor: pointer;
-  transition: transform .08s ease, opacity .15s ease;
+  position: relative;
+  border: none; background: transparent; padding: 0;
+  width: calc(var(--sq) * .66 * var(--n)); height: calc(var(--sq) * .66);
+  cursor: pointer;
+  transition: transform .1s ease, opacity .15s ease;
 }
-.dock-ship i {
-  width: calc(var(--sq) * .62); height: calc(var(--sq) * .62);
-  border-right: 1px solid color-mix(in srgb, var(--pen) 35%, transparent);
-}
-.dock-ship i:last-child { border-right: none; }
-.dock-ship.vertical { grid-auto-flow: row; }
-.dock-ship.vertical i { border-right: none; border-bottom: 1px solid color-mix(in srgb, var(--pen) 35%, transparent); }
-.dock-ship.vertical i:last-child { border-bottom: none; }
-.dock-ship.on { box-shadow: 0 0 0 3px color-mix(in srgb, var(--pen) 30%, transparent); transform: scale(1.06); }
-.dock-ship.placed { opacity: .28; border-style: dashed; background: transparent; }
-.dock-ship.placed::after { opacity: .5; }
-
-/* Тот же рисунок, что встанет на поле, — видно, какой корабль берёшь. */
-.dock-ship { position: relative; }
 .dock-ship::after {
   content: "";
-  position: absolute; inset: 3%;
+  position: absolute; inset: 0;
   background: center / contain no-repeat var(--img, none);
 }
+.dock-ship.vertical { width: calc(var(--sq) * .66); height: calc(var(--sq) * .66 * var(--n)); }
 .dock-ship.vertical::after {
   inset: auto; left: 50%; top: 50%;
-  width: calc(var(--sq) * .62 * var(--n) * .94); height: calc(var(--sq) * .56);
+  width: calc(var(--sq) * .66 * var(--n)); height: calc(var(--sq) * .66);
   transform: translate(-50%, -50%) rotate(90deg);
 }
+.dock-ship.on { transform: scale(1.12); }
+.dock-ship.on::after { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--pen) 55%, transparent)); }
+.dock-ship.placed { opacity: .25; }
 
 .sea-actions { max-width: 380px; }
 .btn.pen {

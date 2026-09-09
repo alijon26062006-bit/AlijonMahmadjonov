@@ -298,8 +298,7 @@ const Sea = (function () {
       if (P.ships[i]) cls.push('placed');
       if (i === P.selected) cls.push('on');
       if (i === P.selected && !P.horizontal) cls.push('vertical');
-      return `<button class="${cls.join(' ')}" data-i="${i}" style="--n:${size}">` +
-        `${'<i></i>'.repeat(size)}</button>`;
+      return `<button class="${cls.join(' ')}" data-i="${i}" style="--n:${size}"></button>`;
     }).join('');
     dock.querySelectorAll('.dock-ship').forEach((chip) => {
       chip.onclick = () => tapDock(Number(chip.dataset.i));

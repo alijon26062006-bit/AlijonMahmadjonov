@@ -135,6 +135,29 @@ const Sound = (function () {
     src.stop(at + dur + 0.05);
   }
 
+  /* Взрыв. Одним звуком он не выходит: сначала резкий щелчок, следом
+     низкий удар в корпус и долгий шумовой хвост — так ухо и узнаёт взрыв.
+     `power` — насколько он тяжёлый, `dull` — приглушить (это по тебе попали). */
+  function explosion(power, dull) {
+    if (!sfxOn || !ensure()) return;
+    const at = ctx.currentTime;
+    const big = power || 1;
+    const tone = dull ? 0.55 : 1;
+
+    // щелчок первого мгновения
+    burst({ time: at, dur: 0.06, gain: 0.26 * big * tone,
+            cutoff: 5000 * tone, filter: 'highpass', q: 0.7 });
+    // тело взрыва: шум, уходящий вниз
+    burst({ time: at + 0.01, dur: 0.45 * big, gain: 0.42 * big,
+            cutoff: 1500 * tone, sweep: 0.08 });
+    // удар в корпус
+    voice({ freq: 160, time: at, type: 'sine', dur: 0.4 * big,
+            gain: 0.34 * big, glide: 0.2, cutoff: 400 });
+    // рокот вслед
+    burst({ time: at + 0.1, dur: 0.65 * big, gain: 0.16 * big,
+            cutoff: 480, sweep: 0.3 });
+  }
+
   /* Небольшой перебор нот: победа, поражение, старт. */
   function phrase(freqs, gap, options) {
     if (!sfxOn || !ensure()) return;
@@ -298,38 +321,48 @@ const Sound = (function () {
 
     // ── морской бой ─────────────────────────────────────────
 
-    /* Выстрел: короткий глухой хлопок. */
+    /* Выстрел: короткий глухой хлопок и свист снаряда. */
     fire: function () {
-      burst({ dur: 0.14, gain: 0.2, cutoff: 900, sweep: 0.3 });
-      sfx({ freq: 140, type: 'sine', dur: 0.12, gain: 0.12, glide: 0.5, cutoff: 500 });
+      if (!sfxOn || !ensure()) return;
+      const at = ctx.currentTime;
+      burst({ time: at, dur: 0.12, gain: 0.24, cutoff: 1100, sweep: 0.3 });
+      voice({ freq: 150, time: at, type: 'sine', dur: 0.12, gain: 0.14, glide: 0.5, cutoff: 500 });
+      // свист: снаряд летит к чужому полю
+      voice({ freq: 900, time: at + 0.05, type: 'sine', dur: 0.28, gain: 0.05,
+              glide: 0.35, cutoff: 3000 });
     },
 
     /* Мимо: всплеск — шипящий шум с быстрым спадом. */
     miss: function () {
-      burst({ dur: 0.35, gain: 0.1, cutoff: 3200, sweep: 0.25, filter: 'bandpass', q: 0.9 });
+      burst({ dur: 0.35, gain: 0.12, cutoff: 3200, sweep: 0.25, filter: 'bandpass', q: 0.9 });
       sfx({ freq: 420, type: 'sine', dur: 0.14, gain: 0.05, glide: 1.6, cutoff: 2200 });
     },
 
-    /* Попадание: взрыв — низкий шум и удар. */
+    /* Попал по кораблю — взрыв. */
     hit: function () {
-      burst({ dur: 0.45, gain: 0.32, cutoff: 700, sweep: 0.15 });
-      sfx({ freq: 110, type: 'triangle', dur: 0.32, gain: 0.18, glide: 0.35, cutoff: 600 });
+      explosion(1);
     },
 
-    /* Потопил: взрыв побольше и короткий победный ход вверх. */
+    /* Потопил: взрыв вдвое тяжелее, следом обломки и победный ход вверх. */
     sunk: function () {
-      burst({ dur: 0.7, gain: 0.38, cutoff: 900, sweep: 0.1 });
-      sfx({ freq: 90, type: 'triangle', dur: 0.5, gain: 0.2, glide: 0.3, cutoff: 500 });
+      explosion(1.7);
+      if (!sfxOn || !ensure()) return;
+      const at = ctx.currentTime;
+      // обломки: несколько сухих щелчков вразнобой
+      for (let i = 0; i < 5; i++) {
+        burst({ time: at + 0.25 + i * 0.07, dur: 0.07, gain: 0.07,
+                cutoff: 2600, filter: 'bandpass', q: 1.2 });
+      }
       phrase([659.25, 783.99, 1046.5], 0.09, {
-        type: 'triangle', dur: 0.3, gain: 0.12, cutoff: 5000,
+        type: 'triangle', dur: 0.3, gain: 0.11, cutoff: 5000,
       });
     },
 
-    /* В тебя попали: тот же взрыв, но приглушённый и без радости. */
+    /* В тебя попали: тот же взрыв, но глуше и без радости — он далеко,
+       на чужом краю листа, и радоваться тут нечему. */
     incoming: function (sunk) {
-      burst({ dur: sunk ? 0.6 : 0.4, gain: sunk ? 0.3 : 0.2, cutoff: 500, sweep: 0.2 });
-      sfx({ freq: 160, type: 'sine', dur: 0.35, gain: 0.12, glide: 0.4, cutoff: 500 });
-      if (sunk) {
+      explosion(sunk ? 1.4 : 0.9, true);
+      if (sunk && sfxOn && ensure()) {
         phrase([392, 329.63, 261.63], 0.12, {
           type: 'triangle', dur: 0.35, gain: 0.1, cutoff: 2000,
         });
