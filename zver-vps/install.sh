@@ -128,7 +128,7 @@ info "Устанавливаю пакеты (несколько минут)…"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq nginx mariadb-server certbot python3-certbot-nginx \
-        curl tar cron ca-certificates dnsutils >/dev/null
+        curl tar cron ca-certificates dnsutils openssl unzip >/dev/null
 grn "nginx, MariaDB, certbot"
 
 # PHP: берём самый свежий из репозитория, при нужде подключаем sury/ondrej
