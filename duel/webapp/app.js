@@ -91,6 +91,7 @@ function pickGame(game) {
   if (!S.games.includes(game)) return;
   S.game = game;
   localStorage.setItem('duel.game', game);
+  if (game === 'sea') Sea.preload();
   paint();
 }
 

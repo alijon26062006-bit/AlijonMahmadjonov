@@ -14,6 +14,29 @@ const Sea = (function () {
   const FLEET = [3, 2, 2, 1, 1];
   const LETTERS = 'АБВГДЕЖ';
 
+  /* Рисунки кораблей. На каждый размер их несколько, чтобы флот не выглядел
+     набором одинаковых полосок: два двухпалубных — катер и подлодка. */
+  const SPRITES = { 3: ['s3'], 2: ['s2a', 's2b'], 1: ['s1a', 's1b'] };
+
+  /* Свой флот всегда идёт в порядке FLEET, поэтому рисунок берётся по месту:
+     что выбрал в причале, то и стоит на поле. */
+  function fleetSprites(list) {
+    const seen = {};
+    return list.map((cells) => {
+      const size = (cells.length || cells) | 0;
+      const kinds = SPRITES[size] || SPRITES[3];
+      seen[size] = (seen[size] || 0) + 1;
+      return kinds[(seen[size] - 1) % kinds.length];
+    });
+  }
+
+  /* Чужие корабли приходят по одному, как их топят, — поэтому рисунок
+     привязан к самой клетке: он не поменяется, когда потонет соседний. */
+  function spriteAt(cells) {
+    const kinds = SPRITES[cells.length] || SPRITES[3];
+    return kinds[(cells[0][0] + cells[0][1]) % kinds.length];
+  }
+
   // Расстановка: корабли по местам флота, выбранный и его поворот.
   const P = {
     ships: [],
@@ -162,8 +185,11 @@ const Sea = (function () {
 
     grid.ships.innerHTML = (view.ships || []).map((ship) => {
       const b = box(ship.cells);
-      const cls = ['ship'].concat(ship.classes || []).join(' ');
-      return `<div class="${cls}" style="--row:${b.row};--col:${b.col};--w:${b.w};--h:${b.h}"></div>`;
+      const cls = ['ship'].concat(ship.classes || []);
+      if (ship.sprite) cls.push(ship.sprite);
+      if (b.h > b.w) cls.push('v');       // вертикальный — рисунок повернём
+      return `<div class="${cls.join(' ')}" ` +
+        `style="--row:${b.row};--col:${b.col};--w:${b.w};--h:${b.h}"></div>`;
     }).join('');
     grid.box.classList.toggle('locked', !!view.locked);
   }
@@ -257,8 +283,10 @@ const Sea = (function () {
 
   function renderPlacement(extra) {
     const grid = V.grids.ownBig;
+    const kinds = fleetSprites(FLEET);
     const ships = P.ships.filter(Boolean).map((s) => ({
       cells: cellsOf(s),
+      sprite: kinds[P.ships.indexOf(s)],
       classes: P.ships.indexOf(s) === P.selected ? ['sel'] : [],
     }));
     if (extra && extra.bad) ships.push({ cells: cellsOf(extra.bad), classes: ['ghost', 'bad'] });
@@ -266,11 +294,12 @@ const Sea = (function () {
 
     const dock = $('z-dock');
     dock.innerHTML = FLEET.map((size, i) => {
-      const cls = ['dock-ship'];
+      const cls = ['dock-ship', kinds[i]];
       if (P.ships[i]) cls.push('placed');
       if (i === P.selected) cls.push('on');
       if (i === P.selected && !P.horizontal) cls.push('vertical');
-      return `<button class="${cls.join(' ')}" data-i="${i}">${'<i></i>'.repeat(size)}</button>`;
+      return `<button class="${cls.join(' ')}" data-i="${i}" style="--n:${size}">` +
+        `${'<i></i>'.repeat(size)}</button>`;
     }).join('');
     dock.querySelectorAll('.dock-ship').forEach((chip) => {
       chip.onclick = () => tapDock(Number(chip.dataset.i));
@@ -378,7 +407,9 @@ const Sea = (function () {
       misses: e.misses,
       last: e.last,
       pending: V.pending,
-      ships: (e.sunk || []).map((cells) => ({ cells, classes: ['sunk'] })),
+      ships: (e.sunk || []).map((cells) => ({
+        cells, sprite: spriteAt(cells), classes: ['sunk'],
+      })),
     });
     $('z-enemy').classList.toggle('waiting', !V.myTurn);
   }
@@ -386,12 +417,14 @@ const Sea = (function () {
   function paintOwn(board, last) {
     if (!board) return;
     const hits = new Set(board.hits.map(([r, c]) => key(r, c)));
+    const kinds = fleetSprites(board.ships);
     paintGrid(V.grids.own, {
       hits: board.hits,
       misses: board.misses,
       last,
-      ships: board.ships.map((cells) => ({
+      ships: board.ships.map((cells, i) => ({
         cells,
+        sprite: kinds[i],
         classes: cells.every(([r, c]) => hits.has(key(r, c))) ? ['sunk'] : [],
       })),
     });
@@ -436,6 +469,7 @@ const Sea = (function () {
   /* ── сообщения сервера ──────────────────────────────────── */
 
   function begin(found) {
+    preload();
     resetPlacement();
     V.mode = '';
     V.myTurn = false;
@@ -545,6 +579,7 @@ const Sea = (function () {
       misses: e.misses,
       ships: (end.enemy_fleet || []).map((cells) => ({
         cells,
+        sprite: spriteAt(cells),
         classes: cells.every(([r, c]) => hits.has(key(r, c))) ? ['sunk'] : [],
       })),
       locked: true,
@@ -556,6 +591,19 @@ const Sea = (function () {
     $('e-reveal-label').textContent = say('result.enemy_fleet', 'Флот соперника');
     if (V.mode === 'placing') renderPlacement();
     else if (V.mode === 'battle') paintTurn(V.myTurn, true);
+  }
+
+  /* Рисунки кораблей — 30 КБ на все пять. Тянем их заранее, когда человек
+     только выбрал море в меню, чтобы на расстановке поле было сразу с флотом. */
+  let warmed = false;
+  function preload() {
+    if (warmed) return;
+    warmed = true;
+    Object.values(SPRITES).flat().forEach((kind) => {
+      const name = { s3: 'ship-3', s2a: 'ship-2a', s2b: 'ship-2b',
+                     s1a: 'ship-1a', s1b: 'ship-1b' }[kind];
+      new Image().src = `/static/img/${name}.png`;
+    });
   }
 
   function init() {
@@ -582,6 +630,7 @@ const Sea = (function () {
     FLEET,
     init,
     begin,
+    preload,
     paint,
     state: onState,
     shot: onShot,
