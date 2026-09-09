@@ -15,7 +15,7 @@ set -euo pipefail
 # ---------- настройки по умолчанию ----------
 REPO="${REPO:-alijon26062006-bit/AlijonMahmadjonov}"
 BRANCH="${BRANCH:-claude/zver-taj-server-deploy-gom4he}"
-RAW="${RAW:-https://raw.githubusercontent.com/${REPO}/${BRANCH}/zver-vps}"
+RAW="${RAW:-https://raw.githubusercontent.com/${REPO}/refs/heads/${BRANCH}/zver-vps}"
 DIR="${DIR:-/var/www/zver}"
 DB_NAME="${DB_NAME:-zver}"
 DB_USER="${DB_USER:-zver}"
