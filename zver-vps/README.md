@@ -19,15 +19,18 @@
 
 ## Установка одной командой
 
-Репозиторий приватный, поэтому нужен GitHub-токен с правом `repo`
-(создать: **Settings → Developer settings → Personal access tokens**).
+Выполните на сервере под root:
 
-Подставьте свой токен вместо `ВАШ_ТОКЕН` и выполните на сервере:
+```bash
+curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/zver-taj-server-deploy-gom4he/zver-vps/install.sh -o i.sh && sudo bash i.sh
+```
+
+Если репозиторий закрыт — добавьте токен с правом `repo`:
 
 ```bash
 T=ВАШ_ТОКЕН; curl -fsSL -H "Authorization: Bearer $T" \
-  https://raw.githubusercontent.com/alijon26062006-bit/zver-vps/main/install.sh \
-  -o i.sh && sudo GH_TOKEN=$T bash i.sh
+  https://raw.githubusercontent.com/ВЛАДЕЛЕЦ/РЕПО/ВЕТКА/zver-vps/install.sh \
+  -o i.sh && sudo GH_TOKEN=$T RAW=https://raw.githubusercontent.com/ВЛАДЕЛЕЦ/РЕПО/ВЕТКА/zver-vps bash i.sh
 ```
 
 Дальше скрипт спросит:

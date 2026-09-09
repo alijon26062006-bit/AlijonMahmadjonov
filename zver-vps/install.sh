@@ -13,8 +13,9 @@
 set -euo pipefail
 
 # ---------- настройки по умолчанию ----------
-REPO="${REPO:-alijon26062006-bit/zver-vps}"
-BRANCH="${BRANCH:-main}"
+REPO="${REPO:-alijon26062006-bit/AlijonMahmadjonov}"
+BRANCH="${BRANCH:-claude/zver-taj-server-deploy-gom4he}"
+RAW="${RAW:-https://raw.githubusercontent.com/${REPO}/${BRANCH}/zver-vps}"
 DIR="${DIR:-/var/www/zver}"
 DB_NAME="${DB_NAME:-zver}"
 DB_USER="${DB_USER:-zver}"
@@ -73,23 +74,34 @@ if [ -f "$SRC/zbot.php" ] && [ -f "$SRC/zapp.php" ]; then
     grn "файлы рядом со скриптом: $SRC"
 else
     command -v curl >/dev/null || { apt-get update -qq; apt-get install -y -qq curl; }
-    command -v tar  >/dev/null || apt-get install -y -qq tar
     WORK="$(mktemp -d)"
-    info "Скачиваю код из github.com/$REPO ($BRANCH)…"
+    CODE="$WORK"
+
     HDR=()
     [ -n "${GH_TOKEN:-}" ] && HDR=(-H "Authorization: Bearer ${GH_TOKEN}")
-    if ! curl -fsSL "${HDR[@]}" \
-            "https://api.github.com/repos/${REPO}/tarball/${BRANCH}" \
-            -o "$WORK/src.tgz"; then
-        red "Не удалось скачать репозиторий."
+
+    info "Скачиваю код бота…"
+    ok=1
+    for f in zbot.php zapp.php config.example.php; do
+        if ! curl -fsSL "${HDR[@]}" "${RAW}/${f}" -o "$WORK/${f}"; then
+            [ "$f" = "config.example.php" ] && continue
+            ok=0; break
+        fi
+    done
+
+    if [ "$ok" -eq 0 ]; then
+        red "Не удалось скачать файлы проекта."
+        red "Проверьте ссылку: ${RAW}/zbot.php"
         red "Если репозиторий приватный — передайте токен:"
         red "  sudo GH_TOKEN=ваш_токен bash install.sh"
         exit 1
     fi
-    tar -xzf "$WORK/src.tgz" -C "$WORK"
-    CODE="$(find "$WORK" -name zbot.php -printf '%h\n' -quit)"
-    [ -n "$CODE" ] || die "В архиве нет zbot.php"
-    grn "код скачан"
+
+    php -l "$WORK/zbot.php" >/dev/null 2>&1 || \
+        head -c 200 "$WORK/zbot.php" | grep -q '<?php' || \
+        die "Скачанный zbot.php повреждён (получена не та страница)"
+
+    grn "код скачан ($(wc -c < "$WORK/zbot.php") байт)"
 fi
 
 # ---------- 2. домен ----------
