@@ -718,8 +718,8 @@ h2 { font-size: 19px; margin: 0; }
 }
 .grid.nocoords { --cw: 0px; }
 .grid .coords { display: grid; color: var(--pencil); font-size: calc(var(--c) * .34); font-weight: 700; }
-.grid .coords.cols { grid-column: 2; grid-row: 1; grid-template-columns: repeat(7, var(--c)); align-items: end; }
-.grid .coords.rows { grid-column: 1; grid-row: 2; grid-template-rows: repeat(7, var(--c)); align-items: center; }
+.grid .coords.cols { grid-column: 2; grid-row: 1; grid-template-columns: repeat(var(--n, 7), var(--c)); align-items: end; }
+.grid .coords.rows { grid-column: 1; grid-row: 2; grid-template-rows: repeat(var(--n, 7), var(--c)); align-items: center; }
 .grid .coords i { font-style: normal; text-align: center; padding-bottom: 2px; }
 .grid.nocoords .coords { display: none; }
 
@@ -727,7 +727,7 @@ h2 { font-size: 19px; margin: 0; }
   grid-column: 2; grid-row: 2;
   position: relative;
   display: grid;
-  grid-template-columns: repeat(7, var(--c));
+  grid-template-columns: repeat(var(--n, 7), var(--c));
   grid-auto-rows: var(--c);
   border: calc(var(--c) * .06 + 1px) solid var(--pen);
   border-radius: 3px;
@@ -914,21 +914,33 @@ h2 { font-size: 19px; margin: 0; }
   .sheet { gap: 6px; }
 }
 
-/* ── пять в ряд ───────────────────────────────────────────────
-   Тот же тетрадный лист, что и в морском бою: поле девять на девять,
-   крестики синей ручкой, нолики красной — как в тетради, где играют
-   разными ручками, чтобы не путаться. */
+/* ── крестики-нолики ──────────────────────────────────────────
+   Тот же тетрадный лист: поле три на три с крупными клетками, крестики
+   синей ручкой, нолики красной — как в тетради, где играют разными
+   ручками, чтобы не путаться. */
 
-.grid.five { --c: min(calc((100vw - 56px) / 9), 40px); }
-.grid.five .cells { border-radius: 3px; }
+.grid.tic { --c: min(calc((100vw - 90px) / 3), 104px); --n: 3; }
+
+/* Название длинное — держим его в одну строку, чтобы шапка не разъезжалась. */
+#x-title { font-size: 11.5px; letter-spacing: 1.2px; white-space: nowrap; }
+.grid.tic .cells { border-radius: 4px; }
+
+/* Счёт партий — крупно между полем и шапкой: ради него всё и играется. */
+.rounds {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.rounds b { color: var(--pen); }
+.rounds b.theirs { color: var(--red); }
+.rounds i { color: var(--pencil); font-style: normal; font-size: 18px; }
 
 /* Крестик: два росчерка через клетку. */
 .cell.x::before, .cell.x::after {
   content: "";
   position: absolute; left: 50%; top: 50%;
-  width: calc(var(--c) * .74); height: max(2px, calc(var(--c) * .09));
-  margin-left: calc(var(--c) * -.37);
-  border-radius: 2px; background: var(--pen);
+  width: calc(var(--c) * .62); height: max(3px, calc(var(--c) * .08));
+  margin-left: calc(var(--c) * -.31);
+  border-radius: 3px; background: var(--pen);
   transform: translateY(-50%) rotate(45deg);
 }
 .cell.x::after { transform: translateY(-50%) rotate(-45deg); }
@@ -936,8 +948,8 @@ h2 { font-size: 19px; margin: 0; }
 /* Нолик: кружок красной ручкой. */
 .cell.o::before {
   content: "";
-  position: absolute; inset: 13%;
-  border: max(2px, calc(var(--c) * .09)) solid var(--red);
+  position: absolute; inset: 19%;
+  border: max(3px, calc(var(--c) * .08)) solid var(--red);
   border-radius: 50%;
 }
 
@@ -948,18 +960,16 @@ h2 { font-size: 19px; margin: 0; }
 @keyframes ring-in { from { opacity: 0; transform: scale(.3); } }
 
 /* Последний ход соперника обведён, чтобы его было видно сразу. */
-.cell.last { z-index: 2; }
-.cell.last::after { box-shadow: none; }
-.grid.five .cell.last {
-  outline: max(2px, calc(var(--c) * .06)) solid color-mix(in srgb, var(--pencil) 60%, transparent);
-  outline-offset: calc(var(--c) * -.06);
-  border-radius: 4px;
+.grid.tic .cell.last {
+  outline: max(2px, calc(var(--c) * .03)) solid color-mix(in srgb, var(--pencil) 55%, transparent);
+  outline-offset: calc(var(--c) * -.05);
+  border-radius: 6px;
 }
 
-/* Выигрышные пять перечёркнуты — так это делают на бумаге. */
+/* Выигрышная тройка перечёркнута — так это делают на бумаге. */
 .winline {
   position: absolute; z-index: 3;
-  height: max(3px, calc(var(--c) * .1));
+  height: max(4px, calc(var(--c) * .07));
   background: var(--red);
   border-radius: 3px;
   transform-origin: left center;
@@ -967,7 +977,7 @@ h2 { font-size: 19px; margin: 0; }
   pointer-events: none;
   opacity: .85;
 }
-@keyframes strike { from { transform-origin: left center; clip-path: inset(0 100% 0 0); } }
+@keyframes strike { from { clip-path: inset(0 100% 0 0); } }
 
 /* Чей знак — видно в углу, как подписывают на листе. */
 .marks {
@@ -978,6 +988,5 @@ h2 { font-size: 19px; margin: 0; }
 .marks .mark-opp { color: var(--pencil); }
 
 /* Поле на экране итога: те же знаки, только мельче. */
-.reveal-grid.five, #e-fleet.five { --c: 22px; }
-.cell.won::before, .cell.won::after { opacity: 1; }
+#e-fleet.tic { --c: 54px; --n: 3; }
 .cell.won { background: color-mix(in srgb, var(--red) 12%, transparent); }

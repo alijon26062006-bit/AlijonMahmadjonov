@@ -365,30 +365,32 @@
   <div class="countdown hidden" id="z-countdown"><span>3</span></div>
 </section>
 
-<!-- Пять в ряд: тот же тетрадный лист, крестики ручкой и красные нолики -->
-<section class="screen sea hidden" id="s-five">
+<!-- Крестики-нолики: три партии на тетрадном листе -->
+<section class="screen sea hidden" id="s-tic">
   <div class="sheet">
     <div class="sea-head">
       <div class="sea-side">
-        <span class="pen-label" data-i18n="five.title">ПЯТЬ В РЯД</span>
-        <span class="sea-name" id="f-opp-name">—</span>
+        <span class="pen-label" id="x-title">КРЕСТИКИ-НОЛИКИ</span>
+        <span class="sea-name" id="x-round">—</span>
       </div>
-      <div class="sea-clock" id="f-clock">—</div>
-      <div class="marks" id="f-marks"></div>
+      <div class="sea-clock" id="x-clock">—</div>
+      <div class="marks" id="x-marks"></div>
     </div>
+
+    <div class="rounds" id="x-score"></div>
 
     <div class="grid-slot">
-      <div class="grid five nocoords" id="f-grid"></div>
+      <div class="grid tic nocoords" id="x-grid"></div>
     </div>
 
-    <div class="turnbar" id="f-turn">
-      <span class="turn-who" id="f-turn-who">—</span>
-      <span class="turn-note" id="f-note"></span>
+    <div class="turnbar" id="x-turn">
+      <span class="turn-who" id="x-turn-who">—</span>
+      <span class="turn-note" id="x-note"></span>
     </div>
 
-    <div class="flash" id="f-flash"></div>
+    <div class="flash" id="x-flash"></div>
   </div>
-  <div class="countdown hidden" id="f-countdown"><span>3</span></div>
+  <div class="countdown hidden" id="x-countdown"><span>3</span></div>
 </section>
 
 <!-- Итог матча -->
@@ -429,7 +431,7 @@
 
 <script src="/static/sound.js"></script>
 <script src="/static/sea.js"></script>
-<script src="/static/five.js"></script>
+<script src="/static/tic.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

@@ -37,8 +37,8 @@ from .game import (
 )
 from .i18n import normalize, t, ui_strings
 from .matchmaking import HOST_GRACE_SEC, Queue, Room, Ticket, make_match
-from .five_match import FiveMatch
 from .sea_match import SHOT_RESULTS, SeaMatch
+from .tic_match import TicMatch
 from .tasks import LEVELS
 
 log = logging.getLogger("duel.server")
@@ -532,7 +532,7 @@ class Hub:
         elif kind == "fire":
             await self._fire(conn, data, now)
 
-        # ── пять в ряд ──
+        # ── крестики-нолики ──
         elif kind == "move":
             await self._move(conn, data, now)
 
@@ -733,13 +733,13 @@ class Hub:
         else:
             await self._broadcast(match, now, force=True)
 
-    # ── пять в ряд ──────────────────────────────────────────────────
+    # ── крестики-нолики ─────────────────────────────────────────────
 
     async def _move(self, conn: Conn, data: dict, now: float) -> None:
         """Игрок поставил свой знак. Проверяет сервер, клиенту не верим."""
 
         match = self.match_for(conn.user_id)
-        if not isinstance(match, FiveMatch):
+        if not isinstance(match, TicMatch):
             return
         try:
             row, col = int(data.get("row")), int(data.get("col"))

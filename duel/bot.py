@@ -151,8 +151,8 @@ async def start(message: Message, conn: sqlite3.Connection, config: DuelConfig) 
 # Как игру называют в чате: «/duel море», «/duel sea», «/duel канат».
 _GAME_WORDS = {
     games.SEA: ("sea", "море", "морской", "баҳр", "баҳрӣ", "флот", "ship"),
-    games.FIVE: ("five", "пять", "пятёрка", "пятерка", "крестик", "нолик",
-                 "панҷ", "панч", "точк"),
+    games.TIC: ("tic", "крестик", "нолик", "чорчӯба", "сифр", "xo",
+                "три", "3х3", "3x3"),
     games.ROPE: ("rope", "канат", "арғамчин", "math"),
 }
 

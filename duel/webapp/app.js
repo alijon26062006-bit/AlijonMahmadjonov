@@ -65,8 +65,8 @@ const VIEWS = {
   sea: {
     screen: 'sea', flash: 'z-flash', countdown: 'z-countdown', clock: 'z-clock',
   },
-  five: {
-    screen: 'five', flash: 'f-flash', countdown: 'f-countdown', clock: 'f-clock',
+  tic: {
+    screen: 'tic', flash: 'x-flash', countdown: 'x-countdown', clock: 'x-clock',
   },
 };
 
@@ -74,7 +74,7 @@ const VIEWS = {
    состояние, перерисоваться на другом языке и сказать, что на часах. */
 const MODULES = {
   sea: { view: () => Sea, countdown: false },
-  five: { view: () => Five, countdown: true },
+  tic: { view: () => Tic, countdown: true },
 };
 
 const module_of = (game) => (MODULES[game] ? MODULES[game].view() : null);
@@ -89,7 +89,7 @@ const GAME_ICONS = {
     '<path class="i-flag" d="M31 4 L31 20 M31 4 L43 8.5 L31 13 z"/>' +
     '<path class="i-rope" d="M31 6 L31 21" style="stroke:#e0453e;stroke-width:2.5"/>' +
     '</svg>',
-  five:
+  tic:
     '<svg viewBox="0 0 64 36" aria-hidden="true">' +
     '<path class="i-x" d="M8 8 L26 26 M26 8 L8 26"/>' +
     '<circle class="i-o" cx="46" cy="17" r="9"/>' +
@@ -136,7 +136,7 @@ function standing(game) {
 
 const SCREENS = {
   loading: 's-loading', menu: 's-menu', search: 's-search', room: 's-room',
-  game: 's-game', sea: 's-sea', five: 's-five', result: 's-result',
+  game: 's-game', sea: 's-sea', tic: 's-tic', result: 's-result',
   top: 's-top', invite: 's-invite', players: 's-players',
 };
 
@@ -252,7 +252,7 @@ function handle(msg) {
     case 'shot': Sea.shot(msg); break;
     case 'incoming': Sea.incoming(msg); break;
     // пять в ряд
-    case 'move_error': Five.error(msg); break;
+    case 'move_error': Tic.error(msg); break;
     case 'opp_offline': toast(say('opp_offline', 'У соперника пропала связь')); break;
     case 'error': onError(msg); break;
   }
@@ -645,7 +645,7 @@ function onEnd(msg) {
 
   // В море главный счёт — попадания, в «пяти в ряд» — ходы, в канате — ответы.
   const sea = game === 'sea';
-  const five = game === 'five';
+  const tic = game === 'tic';
   $('e-score').textContent = sea ? msg.hits : msg.score;
   $('e-opp-score').textContent = sea ? msg.opp_hits : msg.opp_score;
 
@@ -659,10 +659,10 @@ function onEnd(msg) {
       `<span class="${sign}">${delta > 0 ? '+' : ''}${delta}</span>`;
   }
 
-  const rows = five
+  const rows = tic
     ? [
+      [say('result.rounds', 'Партий выиграно'), `${msg.score} : ${msg.opp_score}`],
       [say('result.moves', 'Ходов'), msg.moves],
-      [say('result.line', 'Самая длинная линия'), `${msg.line} : ${msg.opp_line}`],
       [say('rank', 'Место'), msg.place || '—'],
     ]
     : sea
@@ -686,10 +686,10 @@ function onEnd(msg) {
 
   // После матча показываем поле целиком: во что оно превратилось.
   const reveal = $('e-reveal');
-  reveal.classList.toggle('hidden', !sea && !five);
-  $('e-fleet').classList.toggle('five', five);
+  reveal.classList.toggle('hidden', !sea && !tic);
+  $('e-fleet').classList.toggle('tic', tic);
   if (sea) Sea.reveal($('e-fleet'), msg);
-  else if (five) Five.reveal($('e-fleet'), msg);
+  else if (tic) Tic.reveal($('e-fleet'), msg);
 
   if (S.profile) {
     const mine = standing(game);
@@ -704,12 +704,12 @@ function onEnd(msg) {
   S.playing = '';
   paint();
   // Заголовок ставим после общей перерисовки: она подписывает его по-своему.
-  $('e-reveal-label').textContent = five
-    ? say('five.title', 'ПЯТЬ В РЯД')
+  $('e-reveal-label').textContent = tic
+    ? say('tic.title', 'КРЕСТИКИ-НОЛИКИ')
     : say('result.enemy_fleet', 'Флот соперника');
 
   // Победную линию надо успеть увидеть, а не сразу уехать на экран итога.
-  const hold = five && msg.win && msg.win.length ? 1200 : 0;
+  const hold = tic && msg.win && msg.win.length ? 1200 : 0;
   setTimeout(() => {
     show('result');
     haptic(msg.outcome === 'win' ? 'win' : 'bad');
@@ -836,7 +836,7 @@ function paint() {
   $('m-music').classList.toggle('off', !S.music);
   $('m-sound').classList.toggle('off', !S.sound);
   Sea.paint();
-  Five.paint();
+  Tic.paint();
 }
 
 /* Сколько людей сейчас в игре. Когда один — вместо цифры зовём друга:
@@ -1015,7 +1015,7 @@ function bind() {
   };
 
   Sea.init();
-  Five.init();
+  Tic.init();
 
   if (tg && tg.BackButton) tg.BackButton.onClick(() => show('menu'));
 }
