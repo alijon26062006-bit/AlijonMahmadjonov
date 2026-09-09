@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .five_match import FiveMatch, FiveSide
+from .five_robot import FiveRobot
 from .game import Match, Side
 from .robot import ROBOT_ID, Robot
 from .sea_match import SeaMatch, SeaSide
@@ -15,6 +17,7 @@ from .sea_robot import SeaRobot
 
 ROPE = "rope"
 SEA = "sea"
+FIVE = "five"
 DEFAULT_GAME = ROPE
 
 
@@ -42,6 +45,10 @@ GAMES: dict[str, GameInfo] = {
     SEA: GameInfo(
         id=SEA, match_cls=SeaMatch, side_cls=SeaSide, robot_cls=SeaRobot,
         duration=0, icon="🚢", math=False,
+    ),
+    FIVE: GameInfo(
+        id=FIVE, match_cls=FiveMatch, side_cls=FiveSide, robot_cls=FiveRobot,
+        duration=0, icon="✖️", math=False,
     ),
 }
 

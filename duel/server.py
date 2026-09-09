@@ -37,6 +37,7 @@ from .game import (
 )
 from .i18n import normalize, t, ui_strings
 from .matchmaking import HOST_GRACE_SEC, Queue, Room, Ticket, make_match
+from .five_match import FiveMatch
 from .sea_match import SHOT_RESULTS, SeaMatch
 from .tasks import LEVELS
 
@@ -531,6 +532,10 @@ class Hub:
         elif kind == "fire":
             await self._fire(conn, data, now)
 
+        # ── пять в ряд ──
+        elif kind == "move":
+            await self._move(conn, data, now)
+
         elif kind == "challenge":
             await self._challenge(conn, data, now)
 
@@ -727,6 +732,30 @@ class Hub:
             await self._settle(match, now)
         else:
             await self._broadcast(match, now, force=True)
+
+    # ── пять в ряд ──────────────────────────────────────────────────
+
+    async def _move(self, conn: Conn, data: dict, now: float) -> None:
+        """Игрок поставил свой знак. Проверяет сервер, клиенту не верим."""
+
+        match = self.match_for(conn.user_id)
+        if not isinstance(match, FiveMatch):
+            return
+        try:
+            row, col = int(data.get("row")), int(data.get("col"))
+        except (TypeError, ValueError):
+            return
+        result = match.play(conn.user_id, row, col, now)
+        if result.get("result") != "ok":
+            # Занято или не твой ход — об этом знает только сходивший.
+            await conn.send({"t": "move_error", "reason": result.get("result")})
+            return
+
+        # Сначала показываем поле обоим, и только потом итог: победную линию
+        # надо успеть увидеть, а не сразу уехать на экран результата.
+        await self._broadcast(match, now, force=True)
+        if match.state == STATE_FINISHED:
+            await self._settle(match, now)
 
     async def _dispatch_shots(self, match: Match) -> None:
         """Рассказывает о выстрелах обоим: стрелявшему — «выстрел», второму —

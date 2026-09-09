@@ -365,6 +365,32 @@
   <div class="countdown hidden" id="z-countdown"><span>3</span></div>
 </section>
 
+<!-- Пять в ряд: тот же тетрадный лист, крестики ручкой и красные нолики -->
+<section class="screen sea hidden" id="s-five">
+  <div class="sheet">
+    <div class="sea-head">
+      <div class="sea-side">
+        <span class="pen-label" data-i18n="five.title">ПЯТЬ В РЯД</span>
+        <span class="sea-name" id="f-opp-name">—</span>
+      </div>
+      <div class="sea-clock" id="f-clock">—</div>
+      <div class="marks" id="f-marks"></div>
+    </div>
+
+    <div class="grid-slot">
+      <div class="grid five nocoords" id="f-grid"></div>
+    </div>
+
+    <div class="turnbar" id="f-turn">
+      <span class="turn-who" id="f-turn-who">—</span>
+      <span class="turn-note" id="f-note"></span>
+    </div>
+
+    <div class="flash" id="f-flash"></div>
+  </div>
+  <div class="countdown hidden" id="f-countdown"><span>3</span></div>
+</section>
+
 <!-- Итог матча -->
 <section class="screen hidden" id="s-result">
   <div class="verdict" id="e-verdict">—</div>
@@ -373,7 +399,7 @@
   <div class="rating-line" id="e-rating"></div>
   <div class="reveal hidden" id="e-reveal">
     <div class="pen-label" id="e-reveal-label">ФЛОТ СОПЕРНИКА</div>
-    <div class="grid reveal-grid" id="e-fleet"></div>
+    <div class="grid reveal-grid nocoords" id="e-fleet"></div>
   </div>
   <ul class="stats" id="e-stats"></ul>
   <button class="btn primary big" id="e-again" data-i18n="again">Ещё раз</button>
@@ -403,6 +429,7 @@
 
 <script src="/static/sound.js"></script>
 <script src="/static/sea.js"></script>
+<script src="/static/five.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import random
 from dataclasses import dataclass, field
 
 from . import game as rules
@@ -23,39 +22,26 @@ from .game import (
     STATE_COUNTDOWN,
     STATE_FINISHED,
     STATE_RUNNING,
-    Match,
-    Side,
 )
+from .turns import MAX_SKIPS, REASON_IDLE, TURN_SEC, TurnMatch, TurnSide, ms as _ms
 
 STATE_PLACING = "placing"
 REASON_FLEET = "fleet"        # чужой флот потоплен целиком
-REASON_IDLE = "idle"          # игрок перестал ходить
+
+# Очередь хода, её таймер и пропуски — общие для всех пошаговых игр,
+# поэтому живут в turns.py; здесь только правила самого боя.
+__all__ = ["SeaMatch", "SeaSide", "TURN_SEC", "MAX_SKIPS", "REASON_IDLE"]
 
 # Сколько даём на расстановку. Дольше — соперник заскучает.
 PLACE_SEC = 60.0
-# Сколько думает над выстрелом один игрок. Не выстрелил — ход уходит.
-TURN_SEC = 30.0
-# Три пропуска подряд — человек просто ушёл, засчитываем поражение.
-MAX_SKIPS = 3
 # Бой не бесконечен: кто больше попал к этому времени, тот и победил.
 BATTLE_CAP_SEC = 10 * 60
 # Исходы настоящего выстрела — тех, о которых узнаёт и тот, в кого стреляли.
 SHOT_RESULTS = frozenset({sea.MISS, sea.HIT, sea.SUNK})
 
 
-def _ms(seconds: float) -> int:
-    """Миллисекунды с точностью до полусекунды.
-
-    Точное время слать незачем: часы клиент дальше отсчитывает сам, а от
-    точности до миллисекунды состояние менялось бы каждый такт и летело
-    бы по сети двадцать раз в секунду.
-    """
-
-    return max(0, int(seconds * 1000) // 500 * 500)
-
-
 @dataclass
-class SeaSide(Side):
+class SeaSide(TurnSide):
     """Сторона морского боя: всё, что у стороны каната, плюс флот и выстрелы.
 
     Счёт тут — попадания, промахи — `wrong`, серия — попадания подряд.
@@ -68,8 +54,6 @@ class SeaSide(Side):
     shots_fired: int = 0
     sunk_made: int = 0
     last_shot: tuple[int, int] | None = None
-    # Сколько ходов подряд человек продумал до конца таймера.
-    skips: int = 0
 
     @property
     def hits_made(self) -> int:
@@ -81,22 +65,14 @@ class SeaSide(Side):
 
 
 @dataclass
-class SeaMatch(Match):
+class SeaMatch(TurnMatch):
     """Правила боя: ходят по очереди, попал — ходишь снова."""
 
     game: str = field(default="sea", init=False)
     place_deadline: float = 0.0
-    # Чей сейчас ход и до какого времени он длится.
-    turn: int = 0
-    turn_deadline: float = 0.0
     # Выстрелы, о которых ещё не рассказали игрокам: (кто стрелял, что вышло).
     # Сюда попадают и выстрелы робота — сервер разошлёт их так же, как людские.
     unsent: list[tuple[int, dict]] = field(default_factory=list)
-    _rng: random.Random = field(init=False, repr=False)
-
-    def __post_init__(self) -> None:
-        super().__post_init__()
-        self._rng = random.Random(self.seed)
 
     # ── расстановка ─────────────────────────────────────────────────
 
@@ -145,8 +121,7 @@ class SeaMatch(Match):
         self.state = STATE_RUNNING
         self.starts_at = now
         self.deadline = now + (self.duration if self.duration > 0 else BATTLE_CAP_SEC)
-        self.turn = self._rng.choice([self.a.user_id, self.b.user_id])
-        self.turn_deadline = now + TURN_SEC
+        self.start_turns(now)
 
     def poll(self, now: float) -> bool:
         if self.state == STATE_FINISHED:
@@ -186,34 +161,11 @@ class SeaMatch(Match):
             self.finish(now, REASON_TIME)
             return True
         if now >= self.turn_deadline:
-            self._skip(now)
+            self.skip_turn(now)
             return True
         return False
 
-    # ── ходы и выстрелы ─────────────────────────────────────────────
-
-    def _pass_turn(self, now: float) -> None:
-        other = self.opponent(self.turn)
-        if other is not None:
-            self.turn = other.user_id
-        self.turn_deadline = now + TURN_SEC
-
-    def _skip(self, now: float) -> None:
-        """Время хода вышло. Ход уходит, а совсем неходящий проигрывает."""
-
-        side = self.side(self.turn)
-        if isinstance(side, SeaSide):
-            side.skips += 1
-            if side.skips >= MAX_SKIPS:
-                other = self.opponent(self.turn)
-                self.finish(
-                    now, REASON_IDLE, winner_id=other.user_id if other else None
-                )
-                return
-        self._pass_turn(now)
-
-    def my_turn(self, user_id: int) -> bool:
-        return self.state == STATE_RUNNING and self.turn == user_id
+    # ── выстрелы ────────────────────────────────────────────────────
 
     def fire(self, user_id: int, row: int, col: int, now: float) -> dict[str, object]:
         """Выстрел по полю соперника. Попал — ход остаётся, мимо — уходит."""
@@ -236,7 +188,7 @@ class SeaMatch(Match):
             return shot
 
         side.shots_fired += 1
-        side.skips = 0
+        self.moved()
         side.last_shot = (row, col)
         if shot["result"] == sea.MISS:
             side.wrong += 1
@@ -255,9 +207,9 @@ class SeaMatch(Match):
 
         # Попал — стреляешь ещё, промахнулся — очередь соперника.
         if shot["result"] == sea.MISS:
-            self._pass_turn(now)
+            self.pass_turn(now)
         else:
-            self.turn_deadline = now + TURN_SEC
+            self.hold_turn(now)
         shot["again"] = self.turn == user_id
         return shot
 
@@ -340,7 +292,7 @@ class SeaMatch(Match):
             if self.state == STATE_COUNTDOWN
             else 0,
             "my_turn": running and self.turn == user_id,
-            "turn_ms": _ms(self.turn_deadline - now) if running else 0,
+            "turn_ms": self.turn_ms(now),
             "me": {
                 "placed": me.placed,
                 "board": me.board.own_view() if me.board else None,

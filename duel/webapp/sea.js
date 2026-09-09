@@ -587,7 +587,6 @@ const Sea = (function () {
 
   function paint() {
     paintLabels();
-    $('e-reveal-label').textContent = say('result.enemy_fleet', 'Флот соперника');
     if (V.mode === 'placing') renderPlacement();
     else if (V.mode === 'battle') paintTurn(V.myTurn, true);
   }
@@ -639,5 +638,7 @@ const Sea = (function () {
     reveal,
     mode: () => V.mode,
     myTurn: () => V.myTurn,
+    // Часы наверху: пока расставляем — расстановка, в бою — время хода.
+    clock: (msg) => (msg.state === 'placing' ? msg.place_left_ms : msg.turn_ms),
   };
 })();

@@ -128,7 +128,7 @@ async def test_valid_player_gets_in(client):
     assert ready["profile"]["name"] == "Алиджон"
     assert ready["profile"]["standings"]["rope"]["rating"] == 1000
     assert ready["profile"]["standings"]["sea"]["games"] == 0
-    assert set(ready["games"]) == {"rope", "sea"}
+    assert set(ready["games"]) == {"rope", "sea", "five"}
     assert ready["strings"]["play"]
 
 

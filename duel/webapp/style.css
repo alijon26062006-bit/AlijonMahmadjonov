@@ -594,6 +594,12 @@ h2 { font-size: 19px; margin: 0; }
 .gicon .i-hull { fill: var(--accent); }
 .gicon .i-deck { fill: color-mix(in srgb, var(--accent) 55%, var(--fg)); }
 .gicon .i-wave { stroke: var(--accent); stroke-width: 2.5; fill: none; stroke-linecap: round; opacity: .55; }
+.gicon .i-x { stroke: var(--me); stroke-width: 5; stroke-linecap: round; fill: none; }
+.gicon .i-o { stroke: var(--opp); stroke-width: 5; fill: none; }
+
+/* Нечётная карточка не должна висеть в половину ряда — растягиваем её. */
+.games .gcard:last-child:nth-child(odd) { grid-column: span 2; }
+.games .gcard:last-child:nth-child(odd) .gicon svg { height: 30px; }
 
 /* Подпись игры на экранах поиска и приглашения. */
 .game-tag {
@@ -907,3 +913,71 @@ h2 { font-size: 19px; margin: 0; }
   :root { --sq: min(calc((100vw - 64px) / 7), 34px); }
   .sheet { gap: 6px; }
 }
+
+/* ── пять в ряд ───────────────────────────────────────────────
+   Тот же тетрадный лист, что и в морском бою: поле девять на девять,
+   крестики синей ручкой, нолики красной — как в тетради, где играют
+   разными ручками, чтобы не путаться. */
+
+.grid.five { --c: min(calc((100vw - 56px) / 9), 40px); }
+.grid.five .cells { border-radius: 3px; }
+
+/* Крестик: два росчерка через клетку. */
+.cell.x::before, .cell.x::after {
+  content: "";
+  position: absolute; left: 50%; top: 50%;
+  width: calc(var(--c) * .74); height: max(2px, calc(var(--c) * .09));
+  margin-left: calc(var(--c) * -.37);
+  border-radius: 2px; background: var(--pen);
+  transform: translateY(-50%) rotate(45deg);
+}
+.cell.x::after { transform: translateY(-50%) rotate(-45deg); }
+
+/* Нолик: кружок красной ручкой. */
+.cell.o::before {
+  content: "";
+  position: absolute; inset: 13%;
+  border: max(2px, calc(var(--c) * .09)) solid var(--red);
+  border-radius: 50%;
+}
+
+/* Только что поставленный знак вырастает, а не появляется рывком. */
+.cell.fresh::before, .cell.fresh::after { animation: mark-in .22s ease-out; }
+@keyframes mark-in { from { opacity: 0; transform: translateY(-50%) rotate(45deg) scale(.3); } }
+.cell.o.fresh::before { animation: ring-in .22s ease-out; }
+@keyframes ring-in { from { opacity: 0; transform: scale(.3); } }
+
+/* Последний ход соперника обведён, чтобы его было видно сразу. */
+.cell.last { z-index: 2; }
+.cell.last::after { box-shadow: none; }
+.grid.five .cell.last {
+  outline: max(2px, calc(var(--c) * .06)) solid color-mix(in srgb, var(--pencil) 60%, transparent);
+  outline-offset: calc(var(--c) * -.06);
+  border-radius: 4px;
+}
+
+/* Выигрышные пять перечёркнуты — так это делают на бумаге. */
+.winline {
+  position: absolute; z-index: 3;
+  height: max(3px, calc(var(--c) * .1));
+  background: var(--red);
+  border-radius: 3px;
+  transform-origin: left center;
+  animation: strike .45s cubic-bezier(.2, .9, .3, 1);
+  pointer-events: none;
+  opacity: .85;
+}
+@keyframes strike { from { transform-origin: left center; clip-path: inset(0 100% 0 0); } }
+
+/* Чей знак — видно в углу, как подписывают на листе. */
+.marks {
+  display: flex; flex-direction: column; align-items: flex-end;
+  font-size: 12px; font-weight: 700; line-height: 1.25;
+}
+.marks .mark-you { color: var(--pen); }
+.marks .mark-opp { color: var(--pencil); }
+
+/* Поле на экране итога: те же знаки, только мельче. */
+.reveal-grid.five, #e-fleet.five { --c: 22px; }
+.cell.won::before, .cell.won::after { opacity: 1; }
+.cell.won { background: color-mix(in srgb, var(--red) 12%, transparent); }

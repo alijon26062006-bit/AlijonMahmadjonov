@@ -65,7 +65,19 @@ const VIEWS = {
   sea: {
     screen: 'sea', flash: 'z-flash', countdown: 'z-countdown', clock: 'z-clock',
   },
+  five: {
+    screen: 'five', flash: 'f-flash', countdown: 'f-countdown', clock: 'f-clock',
+  },
 };
+
+/* Игры со своим экраном. Каждая умеет одно и то же: начаться, показать
+   состояние, перерисоваться на другом языке и сказать, что на часах. */
+const MODULES = {
+  sea: { view: () => Sea, countdown: false },
+  five: { view: () => Five, countdown: true },
+};
+
+const module_of = (game) => (MODULES[game] ? MODULES[game].view() : null);
 
 const view = () => VIEWS[S.playing] || VIEWS[S.game] || VIEWS.rope;
 
@@ -76,6 +88,11 @@ const GAME_ICONS = {
     '<path class="i-rope" d="M4 22 Q 20 16 32 20 T 60 18"/>' +
     '<path class="i-flag" d="M31 4 L31 20 M31 4 L43 8.5 L31 13 z"/>' +
     '<path class="i-rope" d="M31 6 L31 21" style="stroke:#e0453e;stroke-width:2.5"/>' +
+    '</svg>',
+  five:
+    '<svg viewBox="0 0 64 36" aria-hidden="true">' +
+    '<path class="i-x" d="M8 8 L26 26 M26 8 L8 26"/>' +
+    '<circle class="i-o" cx="46" cy="17" r="9"/>' +
     '</svg>',
   sea:
     '<svg viewBox="0 0 64 36" aria-hidden="true">' +
@@ -119,8 +136,8 @@ function standing(game) {
 
 const SCREENS = {
   loading: 's-loading', menu: 's-menu', search: 's-search', room: 's-room',
-  game: 's-game', sea: 's-sea', result: 's-result', top: 's-top',
-  invite: 's-invite', players: 's-players',
+  game: 's-game', sea: 's-sea', five: 's-five', result: 's-result',
+  top: 's-top', invite: 's-invite', players: 's-players',
 };
 
 function show(name) {
@@ -135,7 +152,7 @@ function show(name) {
   }
 }
 
-const inMatch = () => S.screen === 'game' || S.screen === 'sea';
+const inMatch = () => Object.values(VIEWS).some((v) => v.screen === S.screen);
 
 let toastTimer = 0;
 function hideToast() {
@@ -234,6 +251,8 @@ function handle(msg) {
     case 'sea_layout': Sea.layout(msg); break;
     case 'shot': Sea.shot(msg); break;
     case 'incoming': Sea.incoming(msg); break;
+    // пять в ряд
+    case 'move_error': Five.error(msg); break;
     case 'opp_offline': toast(say('opp_offline', 'У соперника пропала связь')); break;
     case 'error': onError(msg); break;
   }
@@ -456,10 +475,12 @@ function onFound(msg) {
   resetBoard();
   Sound.match();
 
-  if (S.playing === 'sea') {
-    Sea.begin(msg);
-    show('sea');
-    // Отсчёт в море идёт после расстановки — его объявит состояние.
+  const mod = MODULES[S.playing];
+  if (mod) {
+    mod.view().begin(msg);
+    show(view().screen);
+    // В море отсчёт идёт после расстановки — его объявит состояние.
+    if (mod.countdown) startCountdown(msg.starts_in_ms || 0);
     return;
   }
   $('g-me-name').textContent = (S.profile && S.profile.name) || say('you', 'Ты');
@@ -543,23 +564,28 @@ function freeze(ms) {
 }
 
 function onState(msg) {
-  if (msg.state === 'finished') return;
   const game = msg.game || S.playing || DEFAULT_GAME;
-  if (game !== S.playing) S.playing = game;
-  const v = view();
-  if (S.screen !== v.screen) show(v.screen);
-
-  S.streak = msg.me.streak;
-  S.leftAt = performance.now();
-
-  if (game === 'sea') {
-    // Часы наверху отсчитывают то, что сейчас важно: сколько осталось на
-    // расстановку, а в бою — сколько осталось на ход.
-    S.leftMs = msg.state === 'placing' ? msg.place_left_ms : msg.turn_ms;
-    if (msg.state === 'countdown') startCountdown(msg.starts_in_ms || 0);
-    Sea.state(msg);
+  const mod = module_of(game);
+  if (mod) {
+    if (game !== S.playing) S.playing = game;
+    const done = msg.state === 'finished';
+    // Последнее состояние тоже показываем: в нём перечёркнутая пятёрка
+    // и последний выстрел, ради которых всё и затевалось.
+    if (!done) {
+      if (S.screen !== view().screen) show(view().screen);
+      S.leftMs = mod.clock(msg);
+      if (msg.state === 'countdown') startCountdown(msg.starts_in_ms || 0);
+    }
+    S.streak = (msg.me && msg.me.streak) || 0;
+    S.leftAt = performance.now();
+    mod.state(msg);
     return;
   }
+
+  if (msg.state === 'finished') return;
+  if (S.screen !== view().screen) show(view().screen);
+  S.streak = msg.me.streak;
+  S.leftAt = performance.now();
 
   if (msg.opp.score > S.oppScore) {
     pull('opp');
@@ -610,13 +636,16 @@ function onEnd(msg) {
   const verdict = $('e-verdict');
   verdict.className = 'verdict ' + msg.outcome;
   verdict.textContent = say(msg.outcome, msg.outcome);
-  const reasonKey = game === 'sea'
-    ? `sea.${msg.outcome}.${msg.reason}`
-    : `${msg.outcome}.${msg.reason}`;
+  // У каждой игры свои причины конца: «перетянул канат» и «выстроил пять»
+  // это разные вещи, хотя исход и там и там называется победой.
+  const reasonKey = game === 'rope'
+    ? `${msg.outcome}.${msg.reason}`
+    : `${game}.${msg.outcome}.${msg.reason}`;
   $('e-reason').textContent = say(reasonKey, say(`${msg.outcome}.${msg.reason}`, ''));
 
-  // В море главный счёт — попадания, в канате — верные ответы.
+  // В море главный счёт — попадания, в «пяти в ряд» — ходы, в канате — ответы.
   const sea = game === 'sea';
+  const five = game === 'five';
   $('e-score').textContent = sea ? msg.hits : msg.score;
   $('e-opp-score').textContent = sea ? msg.opp_hits : msg.opp_score;
 
@@ -630,7 +659,13 @@ function onEnd(msg) {
       `<span class="${sign}">${delta > 0 ? '+' : ''}${delta}</span>`;
   }
 
-  const rows = sea
+  const rows = five
+    ? [
+      [say('result.moves', 'Ходов'), msg.moves],
+      [say('result.line', 'Самая длинная линия'), `${msg.line} : ${msg.opp_line}`],
+      [say('rank', 'Место'), msg.place || '—'],
+    ]
+    : sea
     ? [
       [say('result.sunk', 'Потоплено кораблей'), `${msg.sunk} / ${Sea.FLEET.length}`],
       [say('result.hits', 'Попаданий'), `${msg.hits} : ${msg.opp_hits}`],
@@ -649,9 +684,12 @@ function onEnd(msg) {
   $('e-stats').innerHTML = rows
     .map(([k, v]) => `<li><span>${k}</span><b>${v}</b></li>`).join('');
 
+  // После матча показываем поле целиком: во что оно превратилось.
   const reveal = $('e-reveal');
-  reveal.classList.toggle('hidden', !sea);
+  reveal.classList.toggle('hidden', !sea && !five);
+  $('e-fleet').classList.toggle('five', five);
   if (sea) Sea.reveal($('e-fleet'), msg);
+  else if (five) Five.reveal($('e-fleet'), msg);
 
   if (S.profile) {
     const mine = standing(game);
@@ -665,10 +703,19 @@ function onEnd(msg) {
   }
   S.playing = '';
   paint();
-  show('result');
-  haptic(msg.outcome === 'win' ? 'win' : 'bad');
-  Sound.stopMusic();
-  Sound[msg.outcome === 'win' ? 'win' : msg.outcome === 'draw' ? 'draw' : 'lose']();
+  // Заголовок ставим после общей перерисовки: она подписывает его по-своему.
+  $('e-reveal-label').textContent = five
+    ? say('five.title', 'ПЯТЬ В РЯД')
+    : say('result.enemy_fleet', 'Флот соперника');
+
+  // Победную линию надо успеть увидеть, а не сразу уехать на экран итога.
+  const hold = five && msg.win && msg.win.length ? 1200 : 0;
+  setTimeout(() => {
+    show('result');
+    haptic(msg.outcome === 'win' ? 'win' : 'bad');
+    Sound.stopMusic();
+    Sound[msg.outcome === 'win' ? 'win' : msg.outcome === 'draw' ? 'draw' : 'lose']();
+  }, hold);
 }
 
 function onError(msg) {
@@ -789,6 +836,7 @@ function paint() {
   $('m-music').classList.toggle('off', !S.music);
   $('m-sound').classList.toggle('off', !S.sound);
   Sea.paint();
+  Five.paint();
 }
 
 /* Сколько людей сейчас в игре. Когда один — вместо цифры зовём друга:
@@ -888,7 +936,8 @@ function tickClock() {
       const low = total <= 10;
       clock.classList.toggle('low', low);
       // Спешка — только когда время поджимает у тебя, а не у соперника.
-      const hurry = low && (S.playing !== 'sea' || (Sea.mode() === 'battle' && Sea.myTurn()));
+      const mod = module_of(S.playing);
+      const hurry = low && (!mod || !mod.myTurn || mod.myTurn());
       if (hurry !== S.hurrying) {
         S.hurrying = hurry;
         Sound.hurry(hurry);
@@ -966,6 +1015,7 @@ function bind() {
   };
 
   Sea.init();
+  Five.init();
 
   if (tg && tg.BackButton) tg.BackButton.onClick(() => show('menu'));
 }
