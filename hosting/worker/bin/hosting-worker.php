@@ -13,7 +13,7 @@ declare(strict_types=1);
  * Останавливается по SIGTERM/SIGINT — дорабатывает текущий job и выходит.
  */
 
-$root = dirname(__DIR__, 2);
+$root = dirname(__DIR__, 3);
 require $root . '/hosting/autoload.php';
 
 use Hosting\Config;

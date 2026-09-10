@@ -12,7 +12,7 @@ declare(strict_types=1);
  *   php panel/bin/migrate.php --status   — показать, что применено
  */
 
-$root = dirname(__DIR__, 2);
+$root = dirname(__DIR__, 3);
 require $root . '/hosting/autoload.php';
 
 use Hosting\Config;

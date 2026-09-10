@@ -15,6 +15,7 @@ require $root . '/hosting/autoload.php';
 use Hosting\Config;
 use Hosting\Controller\AdminController;
 use Hosting\Controller\AuthController;
+use Hosting\Controller\BackupController;
 use Hosting\Controller\DashboardController;
 use Hosting\Controller\DatabaseController;
 use Hosting\Controller\DomainController;
@@ -103,6 +104,7 @@ $logController = new LogController($config, $auth, $sites, $view);
 $databaseController = new DatabaseController($config, $db, $auth, $databases, $jobs, $view);
 $domainController = new DomainController($config, $db, $auth, $sites, $domains, $jobs, $view);
 $adminController = new AdminController($db, $auth, $users, $sites, $jobs, $view);
+$backupController = new BackupController($db, $auth, $backups, $jobs, $view);
 
 // ── маршруты ─────────────────────────────────────────────────────────────
 $router = new Router();
@@ -146,6 +148,10 @@ $router->post('/sites/{id}/domains/{id2}/delete', [$domainController, 'delete'])
 $router->get('/databases', [$databaseController, 'index']);
 $router->post('/databases', [$databaseController, 'create']);
 $router->post('/databases/{id}/delete', [$databaseController, 'delete']);
+
+$router->get('/backups', [$backupController, 'index']);
+$router->post('/backups', [$backupController, 'create']);
+$router->post('/backups/{id}/restore', [$backupController, 'restore']);
 
 $router->get('/admin', [$adminController, 'index']);
 $router->post('/admin/users/{id}/suspend', [$adminController, 'suspendUser']);

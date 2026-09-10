@@ -67,6 +67,7 @@ use Hosting\Support\Html;
   <a href="/dashboard">Обзор</a>
   <a href="/sites">Сайты</a>
   <a href="/databases">Базы данных</a>
+  <a href="/backups">Бэкапы</a>
   <?php if (($currentUser['role'] ?? '') === 'admin'): ?><a href="/admin">Админ</a><?php endif; ?>
 </nav>
 <?php endif; ?>

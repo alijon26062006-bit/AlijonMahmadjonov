@@ -14,7 +14,7 @@ declare(strict_types=1);
  * Exit code 0 — успех, 1 — ошибка валидации, 2 — задание провалено.
  */
 
-$root = dirname(__DIR__, 2);
+$root = dirname(__DIR__, 3);
 require $root . '/hosting/autoload.php';
 
 use Hosting\Config;
