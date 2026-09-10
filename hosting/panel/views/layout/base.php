@@ -139,11 +139,8 @@ use Hosting\Support\Html;
         <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z"/>
       </svg>
     </span>
-    <?php // Второе слово названия — синим, как в образце. Если слово одно, красим целиком.
-      $brandParts = preg_split('~(?=[A-ZА-Я])~u', $panelName, -1, PREG_SPLIT_NO_EMPTY) ?: [$panelName];
-      $brandTail = count($brandParts) > 1 ? array_pop($brandParts) : '';
-    ?>
-    <span><?= Html::e(implode('', $brandParts)) ?><em><?= Html::e($brandTail) ?></em></span>
+    <?php [$brandHead, $brandTail] = \Hosting\Support\Brand::split($panelName); ?>
+    <span><?= Html::e($brandHead) ?><em><?= Html::e($brandTail) ?></em></span>
   </a>
   <?php if ($currentUser): ?>
     <div class="muted">

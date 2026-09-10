@@ -155,12 +155,8 @@ function lp_icon(string $name): string
     <div class="lp-wrap">
       <span class="lp-pill"><i></i>Хостинг в Таджикистане</span>
 
-      <?php
-        // Название двухцветное, как в образце: первая часть тёмная, вторая — синяя.
-        $parts = preg_split('~(?=[A-ZА-Я])~u', $panelName, -1, PREG_SPLIT_NO_EMPTY) ?: [$panelName];
-        $tail  = count($parts) > 1 ? array_pop($parts) : '';
-      ?>
-      <h1 class="lp-title"><?= Html::e(implode('', $parts)) ?><em><?= Html::e($tail) ?></em></h1>
+      <?php [$head, $tail] = \Hosting\Support\Brand::split($panelName); ?>
+      <h1 class="lp-title"><?= Html::e($head) ?><em><?= Html::e($tail) ?></em></h1>
 
       <p class="lp-lead">
         Хостинг для PHP-сайтов: WordPress, Laravel или свой код.

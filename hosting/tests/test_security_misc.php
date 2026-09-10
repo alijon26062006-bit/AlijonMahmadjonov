@@ -224,3 +224,34 @@ function test_russian_plural_forms(): void
     assert_equals('101 сайт',  $sites(101));
     assert_equals('0 сайтов',  $sites(0));
 }
+
+// ── Название хостинга и двухцветный логотип ────────────────────────────────
+// Имя берётся из домена владельца, а не остаётся значением из примера,
+// и делится на две части для логотипа. Оба правила видны на каждой странице.
+
+function test_brand_name_from_domain(): void
+{
+    $from = static fn (string $d): string => \Hosting\Support\Brand::fromDomain($d);
+
+    assert_equals('DiyorHost', $from('diyorhost.com'));
+    assert_equals('DiyorHost', $from('DiyorHost.COM'));
+    assert_equals('SomonHost', $from('somonhost.com'));
+    assert_equals('Mysite',    $from('mysite.tj'));
+    // Кириллица: strtolower её не трогает, поэтому нужен mb_-вариант,
+    // иначе «ЭлитХост» превращался в «Литост».
+    assert_equals('ЭлитХост',  $from('элитхост.tj'));
+    assert_equals('',          $from(''));
+}
+
+function test_brand_split_for_two_tone_logo(): void
+{
+    $split = static fn (string $n): string => implode('|', \Hosting\Support\Brand::split($n));
+
+    assert_equals('Diyor|Host',  $split('DiyorHost'));
+    assert_equals('Alijon|Host', $split('AlijonHost'));
+    assert_equals('diyor|host',  $split('diyorhost'));
+    assert_equals('Элит|Хост',   $split('ЭлитХост'));
+    // Односоставное имя не режем искусственно — второй части просто нет.
+    assert_equals('Mysite|',     $split('Mysite'));
+    assert_equals('|',           $split(''));
+}

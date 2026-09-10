@@ -61,6 +61,15 @@ sudo bash hosting/scripts/doctor.sh   # проверить всё и узнат�
 миграции → nginx + php-fpm для панели → systemd (воркер + таймеры) →
 firewall → Fail2ban → `hostingctl` + sudoers → SFTP → тесты → итоговый статус.
 
+`setup.sh` сам выпускает сертификат для панели по HTTP-01 — без единой ручной
+записи в DNS: домен уже указывает на сервер, порт 80 открыт, certbot кладёт
+файл проверки в `/var/www/html`. Сразу после этого панель переезжает на HTTPS
+(vhost пересобирается скриптом `scripts/apply-panel-vhost.sh`), а `APP_URL`
+меняется на `https://`. Это обязательное условие для Telegram: и Mini App, и
+кнопку входа на сайте он принимает только по HTTPS. Wildcard `*.домен` нужен
+лишь поддоменам клиентов и предлагается отдельным необязательным шагом — он
+требует TXT-записи и не блокирует запуск.
+
 `setup.sh` доделывает всё, что раньше приходилось руками: спрашивает домен и
 проверяет, что A-запись и wildcard уже указывают на этот сервер; проверяет
 токен бота через Telegram API и сам записывает имя бота; создаёт
@@ -261,7 +270,7 @@ HOSTING_TEST_MYSQL_USER=hosting_test HOSTING_TEST_MYSQL_PASSWORD=... \
   php hosting/tests/run.php
 ```
 
-Без внешних зависимостей (без PHPUnit) — свой минимальный runner. 55 тестов:
+Без внешних зависимостей (без PHPUnit) — свой минимальный runner. 58 тестов:
 path traversal, Zip Slip, IDOR по сайтам и базам, откат невалидного
 nginx-конфига (с настоящим `nginx -t` через поддельный бинарник в PATH),
 Telegram initData и Login Widget (настоящий HMAC-SHA256, два разных

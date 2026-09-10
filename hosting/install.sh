@@ -427,16 +427,7 @@ sed "s/{{PANEL_NAME}}/${PANEL_NAME:-AlijonHost}/g" \
   "${HOSTING_DIR}/templates/nginx-global-hosting.conf.tpl" > /etc/nginx/conf.d/hosting-global.conf
 
 # Один vhost на панель и на публичную витрину: маршрут «/» сам решает, что показать.
-PANEL_DOMAIN="panel.${HOSTING_ROOT_DOMAIN} ${HOSTING_ROOT_DOMAIN} www.${HOSTING_ROOT_DOMAIN}"
-sed \
-  -e "s#{{PANEL_NAME}}#${PANEL_NAME:-AlijonHost}#g" \
-  -e "s#{{PANEL_DOMAIN}}#${PANEL_DOMAIN}#g" \
-  -e "s#{{PANEL_ROOT}}#${HOSTING_ROOT}/hosting/panel/public#g" \
-  -e "s#{{LOG_DIR}}#${LOG_DIR}#g" \
-  -e "s#{{UPLOAD_MAX_MB}}#${UPLOAD_MAX_MB:-64}#g" \
-  "${HOSTING_DIR}/templates/nginx-panel.conf.tpl" > /etc/nginx/sites-available/panel.conf
-
-strip_ipv6_if_unavailable /etc/nginx/sites-available/panel.conf /etc/nginx/conf.d/hosting-global.conf
+strip_ipv6_if_unavailable /etc/nginx/conf.d/hosting-global.conf
 
 # nginx считает повтор server_tokens в пределах http{} ошибкой, а не
 # переопределением: «server_tokens directive is duplicate». Валится при этом
@@ -448,20 +439,17 @@ if grep -qE '^[[:space:]]*server_tokens' /etc/nginx/nginx.conf 2>/dev/null; then
   sed -i -E '/^[[:space:]]*server_tokens/d' /etc/nginx/conf.d/hosting-global.conf
   log "server_tokens уже задан в nginx.conf — не дублирую"
 fi
-ln -sfn /etc/nginx/sites-available/panel.conf /etc/nginx/sites-enabled/panel.conf
 rm -f /etc/nginx/sites-enabled/default
+mkdir -p /var/www/html   # сюда certbot кладёт файл проверки HTTP-01
 
-# Провал nginx -t здесь — не предупреждение, а конец: конфиг не применяется
-# целиком, панель отдаёт 404 на каждой странице, а установка при этом идёт
-# дальше и рапортует об успехе. Именно так выглядел «хостинг установился, но
-# ничего не открывается». Останавливаемся и показываем настоящую ошибку.
-if NGINX_TEST_OUT=$(nginx -t 2>&1); then
-  systemctl enable --now nginx >/dev/null
-  systemctl reload nginx
+# Сам vhost собирает отдельный скрипт: он же вызывается из setup.sh сразу после
+# выпуска сертификата, чтобы панель переехала на HTTPS без ручной правки конфига.
+systemctl enable nginx >/dev/null 2>&1 || true
+systemctl start nginx >/dev/null 2>&1 || true
+if bash "${HOSTING_DIR}/scripts/apply-panel-vhost.sh"; then
   log "nginx настроен и перезагружен"
 else
-  echo "$NGINX_TEST_OUT" >&2
-  die "nginx -t не прошёл (вывод выше) — панель не заработает, пока это не исправлено"
+  die "vhost панели не применился (вывод выше) — панель не заработает, пока это не исправлено"
 fi
 
 # ── 10. php-fpm: пул панели ──────────────────────────────────────────────

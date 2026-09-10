@@ -83,6 +83,15 @@ set_env HOSTING_ROOT_DOMAIN "$DOMAIN"
 set_env HOSTING_SERVER_IP "$SERVER_IP"
 set_env APP_URL "https://panel.${DOMAIN}"
 
+# Название хостинга берём из домена: diyorhost.com → DiyorHost. Домен — то
+# единственное, что владелец точно уже выбрал и купил, а имя из примера
+# (AlijonHost) иначе так и остаётся на витрине у всех.
+SUGGESTED_NAME=$(php -r 'require $argv[1]; echo Hosting\Support\Brand::fromDomain($argv[2]);' \
+  "${REPO_ROOT}/hosting/autoload.php" "$DOMAIN" 2>/dev/null || true)
+PANEL_NAME_CURRENT=$(current_env PANEL_NAME)
+PANEL_NAME_NEW=$(ask "Название хостинга (видно на сайте и в панели)" "${SUGGESTED_NAME:-$PANEL_NAME_CURRENT}")
+[[ -n "$PANEL_NAME_NEW" ]] && set_env PANEL_NAME "$PANEL_NAME_NEW"
+
 # Проверяем DNS сразу: без wildcard сайты клиентов работать не будут, и лучше
 # узнать об этом здесь, чем после первой жалобы клиента.
 log "Проверяю DNS…"
@@ -165,27 +174,72 @@ log "Сервисы перезапущены"
 # ── 6. SSL ─────────────────────────────────────────────────────────────────
 head2 "SSL-сертификат"
 
+# Сертификат — не украшение: Telegram и Mini App, и кнопку входа на сайте
+# принимает ТОЛЬКО по HTTPS. Поэтому сначала выпускаем обычный сертификат для
+# самой панели по HTTP-01: он не требует ни одной ручной записи в DNS —
+# домен уже указывает сюда, порт 80 открыт, certbot кладёт файл проверки
+# в /var/www/html. Wildcard для поддоменов клиентов — отдельный шаг ниже,
+# он требует TXT-записи и не должен блокировать запуск Telegram.
+
+cert_dir_for() {
+  for c in "$DOMAIN" "panel.${DOMAIN}"; do
+    [[ -f "/etc/letsencrypt/live/${c}/fullchain.pem" ]] && { echo "$c"; return 0; }
+  done
+  return 1
+}
+
+if CERT_NAME=$(cert_dir_for); then
+  log "Сертификат уже есть (${CERT_NAME})"
+else
+  log "Выпускаю сертификат для ${DOMAIN}, panel.${DOMAIN} и www.${DOMAIN}…"
+  mkdir -p /var/www/html
+
+  CERT_ARGS=(--webroot -w /var/www/html --non-interactive --agree-tos
+             -d "$DOMAIN" -d "panel.${DOMAIN}" -d "www.${DOMAIN}")
+  if [[ -n "${ACME_EMAIL:-}" ]]; then
+    CERT_ARGS+=(--email "$ACME_EMAIL" --no-eff-email)
+  else
+    CERT_ARGS+=(--register-unsafely-without-email)
+  fi
+
+  if certbot certonly "${CERT_ARGS[@]}"; then
+    log "Сертификат выпущен"
+  else
+    warn "Certbot не выпустил сертификат."
+    warn "Чаще всего причина одна из двух: A-запись ещё не разошлась, либо порт 80 закрыт снаружи."
+    warn "Проверить снаружи: curl -I http://${DOMAIN}/.well-known/acme-challenge/test"
+    warn "Панель останется на http, вход через Telegram работать не будет."
+  fi
+fi
+
+# Перекладываем vhost панели на HTTPS, если сертификат появился.
+bash "${SCRIPT_DIR}/scripts/apply-panel-vhost.sh" || warn "Не удалось применить vhost панели"
+
+if CERT_NAME=$(cert_dir_for); then
+  # APP_URL уходит в data-auth-url виджета Telegram и в ссылки писем: по http
+  # Telegram его не примет.
+  set_env APP_URL "https://panel.${DOMAIN}"
+  APP_SCHEME="https"
+  # Сайтам клиентов конфиги перегенерирует воркер — теперь у них тоже может быть HTTPS.
+  systemctl restart hosting-worker 2>/dev/null || true
+else
+  APP_SCHEME="http"
+fi
+
+# Wildcard нужен ТОЛЬКО поддоменам клиентов (shop.домен). Панель и Telegram
+# работают и без него, поэтому это отдельный необязательный шаг.
 WILDCARD_CERT="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
-if [[ -f "$WILDCARD_CERT" ]]; then
-  log "Сертификат для ${DOMAIN} уже есть"
-elif ask_yes_no "Выпустить wildcard-сертификат сейчас? (нужно будет добавить TXT-запись у регистратора)"; then
+if [[ "${APP_SCHEME}" == "https" ]] \
+   && ! openssl x509 -noout -text -in "$WILDCARD_CERT" 2>/dev/null | grep -q "DNS:\*\.${DOMAIN}" \
+   && ask_yes_no "Выпустить ещё и wildcard (*.${DOMAIN}) для сайтов клиентов? Понадобится TXT-запись" n; then
   echo
-  echo "Certbot сейчас покажет TXT-запись. Добавьте её у регистратора домена,"
-  echo "подождите минуту и нажмите Enter в certbot."
+  echo "Certbot покажет TXT-запись. Добавьте её у регистратора, подождите минуту и нажмите Enter."
   echo
-  certbot certonly --manual --preferred-challenges dns \
+  certbot certonly --manual --preferred-challenges dns --cert-name "wildcard-${DOMAIN}" \
     -d "$DOMAIN" -d "*.${DOMAIN}" \
     ${ACME_EMAIL:+--email "$ACME_EMAIL"} ${ACME_EMAIL:+--agree-tos} \
-    ${ACME_EMAIL:+--no-eff-email} || warn "Certbot не завершил выпуск — можно повторить позже"
-
-  if [[ -f "$WILDCARD_CERT" ]]; then
-    log "Сертификат выпущен — HTTPS заработает для панели и всех поддоменов"
-    # Существующие сайты нужно перегенерировать: теперь у них может быть HTTPS.
-    systemctl restart hosting-worker 2>/dev/null || true
-  fi
-else
-  echo "Позже выпустите так:"
-  echo "  certbot certonly --manual --preferred-challenges dns -d ${DOMAIN} -d '*.${DOMAIN}'"
+    ${ACME_EMAIL:+--no-eff-email} || warn "Certbot не завершил выпуск wildcard — можно повторить позже"
+  systemctl restart hosting-worker 2>/dev/null || true
 fi
 
 # ── 6b. настройка самого бота через Bot API ────────────────────────────────
@@ -202,7 +256,7 @@ if [[ -n "${TG_TOKEN:-}" && -n "${BOT_NAME:-}" ]]; then
 
   MINIAPP_URL="https://panel.${DOMAIN}/telegram"
 
-  if [[ -f "$WILDCARD_CERT" ]]; then
+  if [[ "${APP_SCHEME}" == "https" ]]; then
     # Telegram принимает в web_app только https и только домен с валидным
     # сертификатом — до его выпуска этот вызов гарантированно провалится.
     RESP=$(tg_api setChatMenuButton --data-urlencode \
@@ -265,7 +319,20 @@ for svc in nginx mariadb hosting-worker; do
   fi
 done
 
-HEALTH=$(curl -s -m 10 -H "Host: panel.${DOMAIN}" http://127.0.0.1/health || true)
+# После перехода на HTTPS порт 80 отдаёт редирект всему, кроме проверки ACME,
+# поэтому проверяем по той же схеме, на которой панель реально работает.
+# --resolve вместо заголовка Host: он подставляет имя и в SNI тоже, иначе
+# TLS-рукопожатие пойдёт не с тем сертификатом.
+panel_curl() {
+  local path="$1"; shift
+  if [[ "${APP_SCHEME}" == "https" ]]; then
+    curl -s -m 10 --resolve "panel.${DOMAIN}:443:127.0.0.1" "https://panel.${DOMAIN}${path}" "$@"
+  else
+    curl -s -m 10 -H "Host: panel.${DOMAIN}" "http://127.0.0.1${path}" "$@"
+  fi
+}
+
+HEALTH=$(panel_curl /health || true)
 if grep -q '"status":"ok"' <<<"$HEALTH"; then
   echo "  ✓ панель отвечает и видит свою базу данных"
 else
@@ -273,7 +340,7 @@ else
   ALL_OK=0
 fi
 
-LOGIN_CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 10 -H "Host: panel.${DOMAIN}" http://127.0.0.1/login || true)
+LOGIN_CODE=$(panel_curl /login -o /dev/null -w '%{http_code}' || true)
 if [[ "$LOGIN_CODE" == "200" ]]; then
   echo "  ✓ страница входа открывается"
 else
@@ -283,7 +350,7 @@ fi
 
 echo
 if [[ $ALL_OK -eq 1 ]]; then
-  PROTO="http"; [[ -f "$WILDCARD_CERT" ]] && PROTO="https"
+  PROTO="${APP_SCHEME}"
   log "Готово. Панель: ${PROTO}://panel.${DOMAIN}"
   echo "   Вход: ${ADMIN_EMAIL}"
   echo

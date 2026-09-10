@@ -285,7 +285,29 @@ fi
 head2 "Панель отвечает"
 
 if [[ -n "${HOSTING_ROOT_DOMAIN:-}" ]]; then
-  HEALTH=$(curl -s -m 10 -H "Host: panel.${HOSTING_ROOT_DOMAIN}" http://127.0.0.1/health 2>/dev/null)
+  # Если сертификат выпущен, панель работает по HTTPS, а порт 80 отдаёт редирект.
+  # --resolve вместо заголовка Host: он подставляет имя и в SNI, иначе
+  # TLS-рукопожатие идёт не с тем сертификатом.
+  PANEL_SCHEME="http"
+  for c in "$HOSTING_ROOT_DOMAIN" "panel.${HOSTING_ROOT_DOMAIN}"; do
+    [[ -f "/etc/letsencrypt/live/${c}/fullchain.pem" ]] && PANEL_SCHEME="https"
+  done
+
+  panel_curl() {
+    local path="$1"; shift
+    # --noproxy: запрос идёт на сам сервер, через прокси его гнать не нужно
+    # (и с настроенным HTTPS_PROXY он бы туда ушёл и не дошёл).
+    # -k: доверие к сертификату проверяется отдельно, ниже; здесь важно только,
+    # отвечает ли панель, и самоподписанный сертификат не должен это скрывать.
+    if [[ "$PANEL_SCHEME" == "https" ]]; then
+      curl -sk --noproxy '*' -m 10 --resolve "panel.${HOSTING_ROOT_DOMAIN}:443:127.0.0.1" \
+        "https://panel.${HOSTING_ROOT_DOMAIN}${path}" "$@" 2>/dev/null
+    else
+      curl -s --noproxy '*' -m 10 -H "Host: ${HOSTING_ROOT_DOMAIN}" "http://127.0.0.1${path}" "$@" 2>/dev/null
+    fi
+  }
+
+  HEALTH=$(panel_curl /health)
   if grep -q '"status":"ok"' <<<"$HEALTH"; then
     ok "/health: панель видит свою базу"
   else
@@ -295,7 +317,7 @@ if [[ -n "${HOSTING_ROOT_DOMAIN:-}" ]]; then
 
   for path in / /register /login; do
     BODY_FILE=$(mktemp)
-    code=$(curl -s -o "$BODY_FILE" -w '%{http_code}' -m 10 -H "Host: ${HOSTING_ROOT_DOMAIN}" "http://127.0.0.1${path}" 2>/dev/null)
+    code=$(panel_curl "$path" -o "$BODY_FILE" -w '%{http_code}')
 
     if [[ "$code" != "200" ]]; then
       bad "страница ${path} отдала ${code}"
@@ -333,7 +355,26 @@ if [[ -f "$CERT" ]]; then
     ok "сертификат wildcard — поддомены клиентов покрыты"
   else
     warn "сертификат без wildcard — https на поддоменах клиентов работать не будет"
+    hint "панель и вход через Telegram работают и без него: sudo bash ${HOSTING_DIR}/setup.sh предложит выпустить"
   fi
+
+  # Браузер посетителя проверяет цепочку по системному хранилищу. Самоподписанный
+  # сертификат при этом «есть», но каждый гость видит предупреждение, а Telegram
+  # такой домен просто не примет — поэтому проверяем доверие отдельно от наличия.
+  if openssl verify -untrusted "$CERT" "$CERT" >/dev/null 2>&1; then
+    ok "сертификат доверенный (браузер не будет ругаться)"
+  else
+    bad "сертификат не проходит проверку доверия — браузеры покажут предупреждение,"
+    hint "а Telegram откажется работать с этим доменом. Выпустите настоящий: sudo bash ${HOSTING_DIR}/setup.sh"
+  fi
+
+  for name in "panel.${HOSTING_ROOT_DOMAIN}" "${HOSTING_ROOT_DOMAIN}"; do
+    if openssl x509 -noout -text -in "$CERT" 2>/dev/null | grep -qE "DNS:(\*\.)?${name//./\\.}"; then
+      ok "сертификат покрывает ${name}"
+    else
+      bad "сертификат НЕ покрывает ${name} — по этому адресу будет ошибка TLS"
+    fi
+  done
 else
   warn "нет сертификата для ${HOSTING_ROOT_DOMAIN:-домена} — панель работает только по http"
   hint "sudo bash ${HOSTING_DIR}/setup.sh"
