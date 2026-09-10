@@ -100,18 +100,52 @@ sed -i "s#^PHP_VERSIONS=.*#PHP_VERSIONS=${PHP_VERSION}#" "$ENV_FILE"
 sed -i "s#^FPM_POOL_DIR=.*#FPM_POOL_DIR=/etc/php/${PHP_VERSION}/fpm/pool.d#" "$ENV_FILE"
 export PHP_VERSIONS="$PHP_VERSION"
 export FPM_POOL_DIR="/etc/php/${PHP_VERSION}/fpm/pool.d"
-apt-get install -qq -y \
-  nginx \
-  "php${PHP_VERSION}-fpm" "php${PHP_VERSION}-mysql" "php${PHP_VERSION}-mbstring" \
-  "php${PHP_VERSION}-xml" "php${PHP_VERSION}-curl" "php${PHP_VERSION}-zip" \
-  "php${PHP_VERSION}-gd" "php${PHP_VERSION}-opcache" "php${PHP_VERSION}-cli" \
-  mariadb-server mariadb-client \
+# Ставит только те пакеты из списка, которые реально есть в репозиториях.
+# Нужно, потому что набор пакетов PHP отличается между выпусками: например,
+# в Ubuntu 26.04 отдельного php8.5-opcache нет — opcache вшит в основной пакет.
+apt_install_available() {
+  local available=() missing=() pkg
+  for pkg in "$@"; do
+    if apt-cache show "$pkg" >/dev/null 2>&1; then
+      available+=("$pkg")
+    else
+      missing+=("$pkg")
+    fi
+  done
+  [[ ${#missing[@]} -eq 0 ]] || log "Нет в репозиториях (пропускаю): ${missing[*]}"
+  [[ ${#available[@]} -eq 0 ]] && return 0
+  apt-get install -qq -y "${available[@]}" >/dev/null
+}
+
+apt_install_available \
+  nginx mariadb-server mariadb-client \
   certbot python3-certbot-nginx \
   fail2ban nftables \
-  curl unzip zip tar openssl \
-  quota \
-  >/dev/null || die "apt-get install не прошёл — смотрите вывод выше"
-log "Пакеты установлены"
+  curl unzip zip tar openssl quota \
+  || die "Не удалось установить базовые пакеты — смотрите вывод выше"
+
+apt_install_available \
+  "php${PHP_VERSION}-fpm" "php${PHP_VERSION}-cli" "php${PHP_VERSION}-mysql" \
+  "php${PHP_VERSION}-mbstring" "php${PHP_VERSION}-xml" "php${PHP_VERSION}-curl" \
+  "php${PHP_VERSION}-zip" "php${PHP_VERSION}-gd" "php${PHP_VERSION}-opcache" \
+  || die "Не удалось установить пакеты PHP — смотрите вывод выше"
+
+# Проверяем не имена пакетов, а что расширения реально доступны PHP: имена
+# пакетов от версии к версии меняются, а вот без pdo_mysql и zip панель работать
+# не сможет в принципе, поэтому на них останавливаемся.
+PHP_MODULES="$(php -m 2>/dev/null || true)"
+for ext in pdo_mysql zip mbstring; do
+  grep -qi "^${ext}$" <<<"$PHP_MODULES" \
+    || die "PHP-расширение ${ext} не установлено и не встроено — панель без него не запустится"
+done
+for ext in curl gd simplexml; do
+  grep -qi "^${ext}$" <<<"$PHP_MODULES" \
+    || warn "Нет PHP-расширения ${ext} — панели оно не нужно, но сайтам клиентов (WordPress) пригодится"
+done
+grep -qi "opcache" <<<"$PHP_MODULES" \
+  || warn "OPcache не активен — сайты будут работать заметно медленнее"
+
+log "Пакеты установлены (PHP ${PHP_VERSION})"
 
 # ── 4. системные пользователи/группы ────────────────────────────────────
 log "Создаю служебные группы и пользователей панели"
