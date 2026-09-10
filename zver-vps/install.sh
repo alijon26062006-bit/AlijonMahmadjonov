@@ -310,7 +310,8 @@ server {
     location ~ \.php\$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php${PHPV}-fpm.sock;
-        fastcgi_read_timeout 120;
+        fastcgi_send_timeout 1800;
+        fastcgi_read_timeout 1800;
     }
 }
 NGINX
@@ -326,7 +327,10 @@ PHPINI="/etc/php/${PHPV}/fpm/php.ini"
 if [ -f "$PHPINI" ]; then
     sed -i 's|^;\?opcache.enable=.*|opcache.enable=1|'                           "$PHPINI"
     sed -i 's|^;\?opcache.memory_consumption=.*|opcache.memory_consumption=128|' "$PHPINI"
-    sed -i 's|^;\?max_execution_time =.*|max_execution_time = 120|'              "$PHPINI"
+    # Синхронизация каталога делает по запросу к API на каждый товар:
+    # при 300+ товарах это 5–10 минут, стандартных 120 секунд не хватает.
+    sed -i 's|^;\?max_execution_time =.*|max_execution_time = 1800|'             "$PHPINI"
+    sed -i 's|^;\?ignore_user_abort =.*|ignore_user_abort = On|'                 "$PHPINI"
     sed -i 's|^;\?upload_max_filesize =.*|upload_max_filesize = 12M|'            "$PHPINI"
     sed -i 's|^;\?post_max_size =.*|post_max_size = 12M|'                        "$PHPINI"
 fi
