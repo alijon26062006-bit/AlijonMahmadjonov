@@ -24,6 +24,19 @@ note_status() { STATUS_LINES+=("$1"); }
 # ── 1. root и ОС ─────────────────────────────────────────────────────────
 [[ $EUID -eq 0 ]] || die "Запустите от root (sudo bash install.sh)"
 
+# Весь вывод дублируется в файл: если установка оборвётся, лог останется, и не
+# придётся вспоминать, что было на экране.
+INSTALL_LOG="/var/log/hosting-install.log"
+exec > >(tee -a "$INSTALL_LOG") 2>&1
+echo "=== установка запущена $(date -u +%FT%TZ) ==="
+
+# Из-за set -e любая неудачная команда обрывает скрипт молча, оставляя систему
+# в половинчатом состоянии и без объяснений. Ловим это и говорим прямо, на чём
+# именно споткнулись, — иначе потом гадать по симптомам.
+trap 'code=$?; echo -e "\033[1;31mОБОРВАЛОСЬ\033[0m на строке ${LINENO}, код ${code}: ${BASH_COMMAND}" >&2;
+      echo "Полный лог: ${INSTALL_LOG}" >&2;
+      echo "Установка идемпотентна — после исправления запустите её заново." >&2' ERR
+
 if [[ ! -f /etc/os-release ]]; then
   die "Не удалось определить ОС (/etc/os-release не найден)"
 fi
@@ -197,9 +210,32 @@ set +a
 
 # ── 7. MariaDB ───────────────────────────────────────────────────────────
 log "Настраиваю MariaDB"
-install -m 0644 "${HOSTING_DIR}/etc/mariadb/hosting.cnf" /etc/mysql/mariadb.conf.d/60-hosting.cnf
+
+# Каталог для conf.d у разных сборок называется по-разному, а у MySQL он вообще
+# другой. Берём первый существующий, а не предполагаем один жёстко зашитый путь.
+MYSQL_CONF_DIR=""
+for dir in /etc/mysql/mariadb.conf.d /etc/mysql/conf.d /etc/my.cnf.d; do
+  [[ -d "$dir" ]] && { MYSQL_CONF_DIR="$dir"; break; }
+done
+[[ -n "$MYSQL_CONF_DIR" ]] || die "Не нашёл каталог конфигов MariaDB (проверял mariadb.conf.d, conf.d, my.cnf.d)"
+
+# Конфиг пишет slow/error log в /var/log/mysql — если каталога нет или он чужой,
+# MariaDB просто не поднимется после рестарта.
+mkdir -p /var/log/mysql
+chown mysql:mysql /var/log/mysql 2>/dev/null || warn "Не удалось выставить владельца /var/log/mysql"
+
+install -m 0644 "${HOSTING_DIR}/etc/mariadb/hosting.cnf" "${MYSQL_CONF_DIR}/60-hosting.cnf"
+log "Конфиг MariaDB: ${MYSQL_CONF_DIR}/60-hosting.cnf"
 systemctl enable --now mariadb >/dev/null
-systemctl restart mariadb
+
+# Если MariaDB не переживёт наш конфиг — убираем его и поднимаем сервер обратно,
+# а не оставляем клиента с лежащей базой.
+if ! systemctl restart mariadb; then
+  rm -f "${MYSQL_CONF_DIR}/60-hosting.cnf"
+  systemctl restart mariadb || true
+  journalctl -u mariadb -n 20 --no-pager >&2 || true
+  die "MariaDB не стартовала с нашим конфигом — конфиг удалён, сервер поднят обратно (лог выше)"
+fi
 
 # Свежий apt-пакет mariadb-server пускает root без пароля через unix_socket (мы и есть
 # root, раз дошли до этой строки). Если так — ставим пароль из worker.env и на этом
