@@ -108,7 +108,7 @@ fi
 echo
 info "Домен (Telegram работает только по HTTPS)"
 
-if [ -z "${DOMAIN:-}" ] && [ "$INTERACTIVE" -eq 1 ]; then
+if [ -z "${DOMAIN:-}" ] && [ -z "${DUCKDNS_NAME:-}" ] && [ "$INTERACTIVE" -eq 1 ]; then
     echo "  Есть свой домен — введите его."
     echo "  Нет — оставьте пусто, сделаем бесплатный через DuckDNS."
     ask DOMAIN "Ваш домен (Enter = DuckDNS)"
