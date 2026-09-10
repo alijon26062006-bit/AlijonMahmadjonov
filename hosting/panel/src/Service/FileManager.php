@@ -159,7 +159,7 @@ final class FileManager
         if (!file_exists($path) && !is_link($path)) {
             throw new \RuntimeException('Файл не найден');
         }
-        SiteProvisioner::removeTree($path);
+        Path::removeTree($path);
     }
 
     public function rename(string $relative, string $newName): string

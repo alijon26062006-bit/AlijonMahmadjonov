@@ -7,11 +7,17 @@ use Hosting\Config;
 use PDO;
 
 /**
- * Создание баз MySQL/MariaDB для клиентов.
+ * Управление базами MySQL/MariaDB клиентов. Используется только root-воркером —
+ * веб-процесс панели этот класс с реальными admin-кредами не инстанцирует.
  *
- * Имена баз и пользователей строятся как <системное имя клиента>_<имя>, поэтому
- * клиенты не могут пересечься. В DDL параметры подставлять нельзя, поэтому
- * идентификаторы жёстко валидируются, а пароль экранируется драйвером.
+ * Модель прав (см. спецификацию, раздел MARIADB): один DB-пользователь на клиента
+ * (client1001@localhost, MAX_USER_CONNECTIONS ограничен тарифом) с правом
+ * GRANT ALL ON `client1001_%`.* — то есть доступ ко всем СВОИМ базам сразу,
+ * без выдачи отдельного пользователя на каждую базу.
+ *
+ * Хост 'localhost' выбран намеренно: MariaDB слушает только 127.0.0.1 (см. etc/mariadb-hosting.cnf),
+ * а PHP-приложения клиента должны подключаться через unix-сокет (DB_HOST=localhost
+ * в wp-config.php/.env клиента), а не по TCP — это и быстрее, и не требует открытого порта.
  */
 final class MysqlManager
 {
@@ -21,18 +27,18 @@ final class MysqlManager
     {
     }
 
-    /** Проверка имени, которое вводит клиент (без префикса). */
+    /** Проверка имени, которое вводит клиент (без префикса системного пользователя). */
     public static function isValidName(string $name): bool
     {
         return preg_match('~^[a-z][a-z0-9_]{1,24}$~', $name) === 1;
     }
 
-    public static function fullName(array $user, string $name): string
+    public static function fullDatabaseName(array $user, string $name): string
     {
         return $user['system_user'] . '_' . $name;
     }
 
-    public static function generatePassword(int $length = 20): string
+    public static function generatePassword(int $length = 24): string
     {
         $alphabet = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         $password = '';
@@ -65,36 +71,66 @@ final class MysqlManager
         );
 
         $this->pdo = new PDO($dsn, $this->config->str('mysql_admin'), $this->config->str('mysql_password'), [
-            PDO::ATTR_ERRMODE  => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT  => 5,
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => 5,
         ]);
 
         return $this->pdo;
     }
 
+    public function userExists(string $dbUser): bool
+    {
+        $this->assertIdentifier($dbUser);
+        $stmt = $this->connect()->prepare(
+            "SELECT 1 FROM mysql.user WHERE User = ? AND Host = 'localhost'"
+        );
+        $stmt->execute([$dbUser]);
+        return $stmt->fetchColumn() !== false;
+    }
+
     /**
-     * Создаёт базу и пользователя с полными правами только на неё.
-     * Возвращает пароль — показать клиенту один раз, в панели он не хранится.
+     * Идемпотентно создаёт DB-пользователя клиента, если его ещё нет. Существующему
+     * пользователю пароль НЕ переустанавливается (иначе на каждый create_database
+     * сломались бы уже подключённые сайты клиента).
+     *
+     * @return string|null сгенерированный пароль, если пользователь был создан впервые; null, если уже существовал
      */
-    public function createDatabase(string $dbName, string $dbUser, ?string $password = null): string
+    public function ensureUser(string $dbUser, int $maxConnections): ?string
+    {
+        $this->assertIdentifier($dbUser);
+
+        if ($this->userExists($dbUser)) {
+            return null;
+        }
+
+        $pdo = $this->connect();
+        $password = self::generatePassword();
+
+        $pdo->exec(sprintf(
+            "CREATE USER %s@'localhost' IDENTIFIED BY %s WITH MAX_USER_CONNECTIONS %d",
+            $pdo->quote($dbUser),
+            $pdo->quote($password),
+            $maxConnections,
+        ));
+        $pdo->exec('FLUSH PRIVILEGES');
+
+        return $password;
+    }
+
+    /** Создаёт базу и выдаёт права уже существующему DB-пользователю клиента (см. ensureUser). */
+    public function createDatabase(string $dbName, string $dbUser): void
     {
         $this->assertIdentifier($dbName);
         $this->assertIdentifier($dbUser);
+        $this->assertOwnedByUser($dbName, $dbUser);
 
         $pdo = $this->connect();
-        $password = $password ?? self::generatePassword();
-        $quotedPassword = $pdo->quote($password);
-        $quotedUser = $pdo->quote($dbUser);
-
         $pdo->exec(sprintf(
             'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
             $dbName
         ));
-        $pdo->exec(sprintf("CREATE USER IF NOT EXISTS %s@'%%' IDENTIFIED BY %s", $quotedUser, $quotedPassword));
-        $pdo->exec(sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO %s@'%%'", $dbName, $quotedUser));
+        $pdo->exec(sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO %s@'localhost'", $dbName, $pdo->quote($dbUser)));
         $pdo->exec('FLUSH PRIVILEGES');
-
-        return $password;
     }
 
     public function changePassword(string $dbUser, ?string $password = null): string
@@ -104,7 +140,7 @@ final class MysqlManager
         $pdo = $this->connect();
         $password = $password ?? self::generatePassword();
         $pdo->exec(sprintf(
-            "ALTER USER %s@'%%' IDENTIFIED BY %s",
+            "ALTER USER %s@'localhost' IDENTIFIED BY %s",
             $pdo->quote($dbUser),
             $pdo->quote($password)
         ));
@@ -113,14 +149,18 @@ final class MysqlManager
         return $password;
     }
 
-    public function dropDatabase(string $dbName, string $dbUser): void
+    public function dropDatabase(string $dbName): void
     {
         $this->assertIdentifier($dbName);
-        $this->assertIdentifier($dbUser);
+        $this->connect()->exec(sprintf('DROP DATABASE IF EXISTS `%s`', $dbName));
+    }
 
+    /** Удалять только когда у клиента не осталось ни одной базы (см. JobHandler). */
+    public function dropUser(string $dbUser): void
+    {
+        $this->assertIdentifier($dbUser);
         $pdo = $this->connect();
-        $pdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', $dbName));
-        $pdo->exec(sprintf("DROP USER IF EXISTS %s@'%%'", $pdo->quote($dbUser)));
+        $pdo->exec(sprintf("DROP USER IF EXISTS %s@'localhost'", $pdo->quote($dbUser)));
         $pdo->exec('FLUSH PRIVILEGES');
     }
 
@@ -138,11 +178,18 @@ final class MysqlManager
         return (int) $stmt->fetchColumn();
     }
 
-    /** Полное имя базы или пользователя, уже с префиксом клиента. */
     private function assertIdentifier(string $identifier): void
     {
         if (preg_match('~^[A-Za-z0-9_]{1,64}$~', $identifier) !== 1) {
             throw new \InvalidArgumentException('Недопустимое имя базы или пользователя');
+        }
+    }
+
+    /** База обязана быть в неймспейсе клиента (client1001_*) — иначе GRANT попал бы не туда. */
+    private function assertOwnedByUser(string $dbName, string $dbUser): void
+    {
+        if (!str_starts_with($dbName, $dbUser . '_')) {
+            throw new \InvalidArgumentException("База {$dbName} не принадлежит неймспейсу {$dbUser}_*");
         }
     }
 }

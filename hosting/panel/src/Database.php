@@ -6,29 +6,63 @@ namespace Hosting;
 use PDO;
 
 /**
- * SQLite-хранилище панели: пользователи, сайты, базы данных, журнал действий.
+ * Подключение к панельной БД.
+ *
+ * Production: только MariaDB (см. migrations/*.sql, применяются bin/migrate.php).
+ * Тесты: SQLite в памяти с зеркальной схемой (tests/schema.sqlite.sql) — чтобы юнит-тесты
+ * репозиториев и security-тесты можно было гонять без поднятого сервера MariaDB.
+ * Драйвер выбирается через DB_DRIVER=mysql|sqlite, по умолчанию mysql.
+ *
+ * Сама Database НЕ содержит бизнес-схемы — таблицы создаются миграциями/тестовым бутстрапом,
+ * а не здесь, чтобы существовал ровно один источник истины для схемы (миграции).
  */
 final class Database
 {
     private PDO $pdo;
+    private string $driver;
 
-    public function __construct(string $path)
+    public function __construct(Config $config)
     {
-        if ($path !== ':memory:') {
-            $dir = dirname($path);
-            if (!is_dir($dir)) {
-                mkdir($dir, 0o750, true);
+        $this->driver = $config->str('db_driver') === 'sqlite' ? 'sqlite' : 'mysql';
+
+        if ($this->driver === 'sqlite') {
+            $path = $config->str('db_sqlite_path');
+            if ($path !== ':memory:') {
+                $dir = dirname($path);
+                if (!is_dir($dir)) {
+                    mkdir($dir, 0o750, true);
+                }
             }
+            $this->pdo = new PDO('sqlite:' . $path, null, null, [
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]);
+            $this->pdo->exec('PRAGMA foreign_keys = ON');
+            return;
         }
 
-        $this->pdo = new PDO('sqlite:' . $path, null, null, [
+        $dsn = sprintf(
+            'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
+            $config->str('db_host'),
+            $config->int('db_port'),
+            $config->str('db_database'),
+        );
+
+        $this->pdo = new PDO($dsn, $config->str('db_username'), $config->str('db_password'), [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
+            PDO::MYSQL_ATTR_INIT_COMMAND => "SET time_zone = '+00:00'",
         ]);
-        $this->pdo->exec('PRAGMA journal_mode = WAL');
-        $this->pdo->exec('PRAGMA foreign_keys = ON');
-        $this->migrate();
+    }
+
+    /** Для тестов: обернуть уже открытое PDO-соединение (например, SQLite in-memory с готовой схемой). */
+    public static function fromPdo(PDO $pdo, string $driver = 'sqlite'): self
+    {
+        $instance = (new \ReflectionClass(self::class))->newInstanceWithoutConstructor();
+        $instance->pdo = $pdo;
+        $instance->driver = $driver;
+        return $instance;
     }
 
     public function pdo(): PDO
@@ -36,106 +70,62 @@ final class Database
         return $this->pdo;
     }
 
-    private function migrate(): void
+    public function driver(): string
     {
-        $this->pdo->exec(<<<'SQL'
-            CREATE TABLE IF NOT EXISTS users (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                -- Вход возможен двумя путями: e-mail с паролем или Telegram Mini App.
-                -- Поэтому оба поля необязательные, но каждое — уникальное.
-                email         TEXT    UNIQUE,
-                password_hash TEXT    NOT NULL DEFAULT '',
-                telegram_id   INTEGER UNIQUE,
-                telegram_name TEXT    NOT NULL DEFAULT '',
-                display_name  TEXT    NOT NULL DEFAULT '',
-                system_user   TEXT    NOT NULL DEFAULT '',
-                plan          TEXT    NOT NULL DEFAULT 'start',
-                disk_quota_mb INTEGER NOT NULL DEFAULT 1024,
-                max_sites     INTEGER NOT NULL DEFAULT 1,
-                max_databases INTEGER NOT NULL DEFAULT 1,
-                is_admin      INTEGER NOT NULL DEFAULT 0,
-                is_active     INTEGER NOT NULL DEFAULT 1,
-                created_at    TEXT    NOT NULL
-            )
-        SQL);
-
-        $this->pdo->exec(<<<'SQL'
-            CREATE TABLE IF NOT EXISTS sites (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                domain      TEXT    NOT NULL UNIQUE,
-                doc_root    TEXT    NOT NULL DEFAULT 'public_html',
-                php_version TEXT    NOT NULL DEFAULT '8.3',
-                is_active   INTEGER NOT NULL DEFAULT 1,
-                created_at  TEXT    NOT NULL
-            )
-        SQL);
-
-        $this->pdo->exec(<<<'SQL'
-            CREATE TABLE IF NOT EXISTS databases (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                name       TEXT    NOT NULL UNIQUE,
-                db_user    TEXT    NOT NULL UNIQUE,
-                created_at TEXT    NOT NULL
-            )
-        SQL);
-
-        $this->pdo->exec(<<<'SQL'
-            CREATE TABLE IF NOT EXISTS audit_log (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id    INTEGER,
-                action     TEXT NOT NULL,
-                details    TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL
-            )
-        SQL);
-
-        $this->pdo->exec(<<<'SQL'
-            CREATE TABLE IF NOT EXISTS state (
-                key   TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            )
-        SQL);
+        return $this->driver;
     }
 
-    public function setState(string $key, string $value): void
+    public function isMysql(): bool
+    {
+        return $this->driver === 'mysql';
+    }
+
+    public function log(?int $userId, string $action, string $objectType = '', ?int $objectId = null, string $result = 'success', array $details = [], string $ip = ''): void
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO state (key, value) VALUES (?, ?)
-             ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+            'INSERT INTO audit_logs (user_id, actor, action, object_type, object_id, ip, result, details, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$key, $value]);
+        $stmt->execute([
+            $userId,
+            $userId !== null ? ('user:' . $userId) : 'system',
+            $action,
+            $objectType,
+            $objectId,
+            $ip,
+            $result,
+            $details === [] ? null : json_encode($details, JSON_UNESCAPED_UNICODE),
+            gmdate('Y-m-d H:i:s'),
+        ]);
     }
 
-    public function getState(string $key, ?string $default = null): ?string
-    {
-        $stmt = $this->pdo->prepare('SELECT value FROM state WHERE key = ?');
-        $stmt->execute([$key]);
-        $row = $stmt->fetch();
-        return $row === false ? $default : (string) $row['value'];
-    }
-
-    public function log(?int $userId, string $action, string $details = ''): void
+    public function recordSecurityEvent(string $eventType, string $severity, string $ip, array $details = [], ?int $userId = null): void
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO audit_log (user_id, action, details, created_at) VALUES (?, ?, ?, ?)'
+            'INSERT INTO security_events (user_id, event_type, severity, ip, details, created_at) VALUES (?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$userId, $action, $details, gmdate('c')]);
+        $stmt->execute([
+            $userId,
+            $eventType,
+            $severity,
+            $ip,
+            $details === [] ? null : json_encode($details, JSON_UNESCAPED_UNICODE),
+            gmdate('Y-m-d H:i:s'),
+        ]);
     }
 
     /** @return list<array<string,mixed>> */
-    public function recentLog(int $limit = 50, ?int $userId = null): array
+    public function recentAuditLog(int $limit = 50, ?int $userId = null): array
     {
         if ($userId === null) {
-            $stmt = $this->pdo->prepare('SELECT * FROM audit_log ORDER BY id DESC LIMIT ?');
-            $stmt->execute([$limit]);
+            $stmt = $this->pdo->prepare('SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?');
+            $stmt->bindValue(1, $limit, PDO::PARAM_INT);
         } else {
-            $stmt = $this->pdo->prepare(
-                'SELECT * FROM audit_log WHERE user_id = ? ORDER BY id DESC LIMIT ?'
-            );
-            $stmt->execute([$userId, $limit]);
+            $stmt = $this->pdo->prepare('SELECT * FROM audit_logs WHERE user_id = ? ORDER BY id DESC LIMIT ?');
+            $stmt->bindValue(1, $userId, PDO::PARAM_INT);
+            $stmt->bindValue(2, $limit, PDO::PARAM_INT);
         }
+        $stmt->execute();
         return $stmt->fetchAll();
     }
 }

@@ -83,6 +83,25 @@ final class Path
         return preg_match('~^[A-Za-z0-9._\- ]+$~u', $name) === 1;
     }
 
+    /** Рекурсивно удаляет файл/симлинк/каталог. Используется только на путях, уже проверенных resolve(). */
+    public static function removeTree(string $path): void
+    {
+        if (is_link($path) || is_file($path)) {
+            @unlink($path);
+            return;
+        }
+        if (!is_dir($path)) {
+            return;
+        }
+        foreach ((array) scandir($path) as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            self::removeTree($path . '/' . $entry);
+        }
+        @rmdir($path);
+    }
+
     /** Человекочитаемый размер: 1536 → «1.5 КБ». */
     public static function humanSize(int|float $bytes): string
     {

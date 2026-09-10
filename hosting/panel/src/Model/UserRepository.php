@@ -4,19 +4,21 @@ declare(strict_types=1);
 namespace Hosting\Model;
 
 use Hosting\Database;
-use Hosting\Service\Plans;
 
 /**
- * Клиенты хостинга. Зарегистрироваться можно двумя способами:
- * по e-mail с паролем или входом через Telegram Mini App.
+ * Клиенты хостинга. Зарегистрироваться можно двумя способами: по e-mail с паролем
+ * или входом через Telegram Mini App (см. TelegramAccountRepository).
+ *
+ * system_user — unix-логин клиента вида client1001 (id + 1000, чтобы совпадать
+ * с примерами из архитектуры и не начинаться с однозначных чисел).
  */
 final class UserRepository
 {
-    public function __construct(private Database $db)
+    public function __construct(private Database $db, private PlanRepository $plans)
     {
     }
 
-    public function create(string $email, string $password, string $plan, bool $isAdmin = false): array
+    public function create(string $email, string $password, string $planCode): array
     {
         $email = strtolower(trim($email));
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -33,83 +35,62 @@ final class UserRepository
             'email'         => $email,
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
             'display_name'  => explode('@', $email)[0],
-            'plan'          => $plan,
-            'is_admin'      => $isAdmin,
+            'plan'          => $planCode,
         ]);
     }
 
     /**
-     * Регистрация из Mini App. Пароля нет: клиента опознаёт подпись Telegram.
+     * Регистрация из Mini App. Пароля нет: клиента опознаёт подпись Telegram
+     * (см. Hosting\Service\TelegramAuth) — она уже проверена до вызова этого метода.
      *
      * @param array{id:int,username?:string,first_name?:string,last_name?:string} $tgUser
      */
-    public function createFromTelegram(array $tgUser, string $plan): array
+    public function createFromTelegram(array $tgUser, string $planCode): array
     {
-        $telegramId = (int) $tgUser['id'];
-        if ($telegramId <= 0) {
-            throw new \InvalidArgumentException('Некорректный Telegram id');
-        }
-        if ($this->findByTelegramId($telegramId) !== null) {
-            throw new \RuntimeException('Этот Telegram уже привязан к аккаунту');
-        }
-
         $name = trim(($tgUser['first_name'] ?? '') . ' ' . ($tgUser['last_name'] ?? ''));
         if ($name === '') {
-            $name = $tgUser['username'] ?? ('tg' . $telegramId);
+            $name = $tgUser['username'] ?? ('tg' . $tgUser['id']);
         }
 
-        return $this->insert([
-            'telegram_id'   => $telegramId,
-            'telegram_name' => (string) ($tgUser['username'] ?? ''),
-            'display_name'  => $name,
-            'plan'          => $plan,
+        $user = $this->insert([
+            'display_name' => $name,
+            'plan'         => $planCode,
         ]);
-    }
 
-    /** Привязывает Telegram к уже существующему аккаунту с паролем. */
-    public function linkTelegram(int $userId, array $tgUser): void
-    {
-        $telegramId = (int) $tgUser['id'];
-        $existing = $this->findByTelegramId($telegramId);
-        if ($existing !== null && (int) $existing['id'] !== $userId) {
-            throw new \RuntimeException('Этот Telegram уже привязан к другому аккаунту');
-        }
-
-        $this->db->pdo()
-            ->prepare('UPDATE users SET telegram_id = ?, telegram_name = ? WHERE id = ?')
-            ->execute([$telegramId, (string) ($tgUser['username'] ?? ''), $userId]);
+        return $user;
     }
 
     private function insert(array $fields): array
     {
-        $plan = (string) $fields['plan'];
-        $limits = Plans::get($plan);
-        $pdo = $this->db->pdo();
+        $plan = $this->plans->findByCode((string) $fields['plan']);
+        if ($plan === null) {
+            throw new \InvalidArgumentException('Неизвестный тариф: ' . $fields['plan']);
+        }
 
+        $pdo = $this->db->pdo();
         $stmt = $pdo->prepare(
-            'INSERT INTO users (email, password_hash, telegram_id, telegram_name, display_name,
-                                system_user, plan, disk_quota_mb, max_sites, max_databases,
-                                is_admin, is_active, created_at)
-             VALUES (:email, :password_hash, :telegram_id, :telegram_name, :display_name,
-                     "", :plan, :disk, :sites, :dbs, :is_admin, 1, :created_at)'
+            'INSERT INTO users (email, password_hash, display_name, system_user, role,
+                                plan_id, status, disk_quota_mb, inode_limit, max_sites, max_databases,
+                                created_at, updated_at)
+             VALUES (:email, :password_hash, :display_name, "", "client",
+                     :plan_id, "active", :disk, :inodes, :sites, :dbs, :now, :now)'
         );
+        $now = gmdate('Y-m-d H:i:s');
         $stmt->execute([
             'email'         => $fields['email'] ?? null,
-            'password_hash' => $fields['password_hash'] ?? '',
-            'telegram_id'   => $fields['telegram_id'] ?? null,
-            'telegram_name' => $fields['telegram_name'] ?? '',
+            'password_hash' => $fields['password_hash'] ?? null,
             'display_name'  => $fields['display_name'] ?? '',
-            'plan'          => $plan,
-            'disk'          => $limits['disk_quota_mb'],
-            'sites'         => $limits['max_sites'],
-            'dbs'           => $limits['max_databases'],
-            'is_admin'      => !empty($fields['is_admin']) ? 1 : 0,
-            'created_at'    => gmdate('c'),
+            'plan_id'       => $plan['id'],
+            'disk'          => $plan['disk_quota_mb'],
+            'inodes'        => $plan['inode_limit'],
+            'sites'         => $plan['max_sites'],
+            'dbs'           => $plan['max_databases'],
+            'now'           => $now,
         ]);
 
         $id = (int) $pdo->lastInsertId();
-        // Системное имя вида u17: unix-пользователь, пул php-fpm и префикс баз данных.
-        $pdo->prepare('UPDATE users SET system_user = ? WHERE id = ?')->execute(['u' . $id, $id]);
+        $systemUser = 'client' . (1000 + $id);
+        $pdo->prepare('UPDATE users SET system_user = ? WHERE id = ?')->execute([$systemUser, $id]);
 
         return $this->findById($id) ?? throw new \RuntimeException('Не удалось создать клиента');
     }
@@ -124,9 +105,9 @@ final class UserRepository
         return $this->fetchOne('SELECT * FROM users WHERE email = ?', [strtolower(trim($email))]);
     }
 
-    public function findByTelegramId(int $telegramId): ?array
+    public function findBySystemUser(string $systemUser): ?array
     {
-        return $this->fetchOne('SELECT * FROM users WHERE telegram_id = ?', [$telegramId]);
+        return $this->fetchOne('SELECT * FROM users WHERE system_user = ?', [$systemUser]);
     }
 
     private function fetchOne(string $sql, array $params): ?array
@@ -150,7 +131,7 @@ final class UserRepository
 
     public function verifyPassword(array $user, string $password): bool
     {
-        $hash = (string) $user['password_hash'];
+        $hash = (string) ($user['password_hash'] ?? '');
         if ($hash === '') {
             return false;
         }
@@ -163,36 +144,51 @@ final class UserRepository
             throw new \InvalidArgumentException('Пароль короче 8 символов');
         }
         $this->db->pdo()
-            ->prepare('UPDATE users SET password_hash = ? WHERE id = ?')
-            ->execute([password_hash($password, PASSWORD_DEFAULT), $id]);
+            ->prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?')
+            ->execute([password_hash($password, PASSWORD_DEFAULT), gmdate('Y-m-d H:i:s'), $id]);
     }
 
-    public function setActive(int $id, bool $active): void
+    public function setStatus(int $id, string $status): void
     {
+        $allowed = ['active', 'grace', 'suspended', 'pending_delete'];
+        if (!in_array($status, $allowed, true)) {
+            throw new \InvalidArgumentException('Недопустимый статус: ' . $status);
+        }
         $this->db->pdo()
-            ->prepare('UPDATE users SET is_active = ? WHERE id = ?')
-            ->execute([$active ? 1 : 0, $id]);
+            ->prepare('UPDATE users SET status = ?, updated_at = ? WHERE id = ?')
+            ->execute([$status, gmdate('Y-m-d H:i:s'), $id]);
     }
 
-    public function setAdmin(int $id, bool $isAdmin): void
+    public function setRole(int $id, string $role): void
     {
-        $this->db->pdo()
-            ->prepare('UPDATE users SET is_admin = ? WHERE id = ?')
-            ->execute([$isAdmin ? 1 : 0, $id]);
+        if (!in_array($role, ['client', 'admin'], true)) {
+            throw new \InvalidArgumentException('Недопустимая роль: ' . $role);
+        }
+        $this->db->pdo()->prepare('UPDATE users SET role = ? WHERE id = ?')->execute([$role, $id]);
     }
 
-    /** Смена тарифа: лимиты перечитываются из тарифа. */
-    public function setPlan(int $id, string $plan): void
+    public function setPlan(int $id, string $planCode): void
     {
-        $limits = Plans::get($plan);
+        $plan = $this->plans->findByCode($planCode);
+        if ($plan === null) {
+            throw new \InvalidArgumentException('Неизвестный тариф: ' . $planCode);
+        }
         $this->db->pdo()->prepare(
-            'UPDATE users SET plan = ?, disk_quota_mb = ?, max_sites = ?, max_databases = ? WHERE id = ?'
-        )->execute([$plan, $limits['disk_quota_mb'], $limits['max_sites'], $limits['max_databases'], $id]);
+            'UPDATE users SET plan_id = ?, disk_quota_mb = ?, inode_limit = ?, max_sites = ?, max_databases = ?, updated_at = ? WHERE id = ?'
+        )->execute([
+            $plan['id'], $plan['disk_quota_mb'], $plan['inode_limit'],
+            $plan['max_sites'], $plan['max_databases'], gmdate('Y-m-d H:i:s'), $id,
+        ]);
     }
 
     public function delete(int $id): void
     {
         $this->db->pdo()->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
+    }
+
+    public static function isActive(array $user): bool
+    {
+        return in_array($user['status'], ['active', 'grace'], true);
     }
 
     public static function displayName(array $user): string
