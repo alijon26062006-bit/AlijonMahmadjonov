@@ -118,13 +118,7 @@ if [[ -n "$TG_TOKEN" ]]; then
     # Имя бота нужно кнопке «Войти через Telegram» на публичной главной —
     # виджет Telegram принимает username, а не токен.
     set_env TELEGRAM_BOT_USERNAME "$BOT_NAME"
-    echo
-    echo "  В @BotFather осталось сделать две вещи:"
-    echo "   1) /setmenubutton → выберите @${BOT_NAME} → ссылка https://panel.${DOMAIN}/telegram"
-    echo "      (это кнопка Mini App: клиент открывает бота и сразу попадает в панель)"
-    echo "   2) /setdomain → выберите @${BOT_NAME} → ${DOMAIN}"
-    echo "      (без этого кнопка «Войти через Telegram» на сайте работать не будет)"
-    echo
+    log "Кнопку Mini App настрою сам чуть ниже, после выпуска сертификата"
   else
     warn "Telegram не принял этот токен — вход через Mini App работать не будет"
   fi
@@ -192,6 +186,51 @@ elif ask_yes_no "Выпустить wildcard-сертификат сейчас? 
 else
   echo "Позже выпустите так:"
   echo "  certbot certonly --manual --preferred-challenges dns -d ${DOMAIN} -d '*.${DOMAIN}'"
+fi
+
+# ── 6b. настройка самого бота через Bot API ────────────────────────────────
+# Всё, что Telegram позволяет настроить программно, настраиваем здесь, а не
+# просим человека кликать в @BotFather. Единственное исключение — /setdomain
+# для кнопки входа на сайте: метода Bot API для него нет.
+if [[ -n "${TG_TOKEN:-}" && -n "${BOT_NAME:-}" ]]; then
+  head2 "Настраиваю бота @${BOT_NAME}"
+
+  tg_api() {
+    local method="$1"; shift
+    curl -s -m 15 "https://api.telegram.org/bot${TG_TOKEN}/${method}" "$@" 2>/dev/null
+  }
+
+  MINIAPP_URL="https://panel.${DOMAIN}/telegram"
+
+  if [[ -f "$WILDCARD_CERT" ]]; then
+    # Telegram принимает в web_app только https и только домен с валидным
+    # сертификатом — до его выпуска этот вызов гарантированно провалится.
+    RESP=$(tg_api setChatMenuButton --data-urlencode \
+      "menu_button={\"type\":\"web_app\",\"text\":\"Мой хостинг\",\"web_app\":{\"url\":\"${MINIAPP_URL}\"}}")
+    if grep -q '"ok":true' <<<"$RESP"; then
+      log "Кнопка Mini App настроена: клиент открывает бота и сразу попадает в панель"
+    else
+      warn "Не удалось настроить кнопку Mini App: ${RESP}"
+      warn "Сделайте вручную: @BotFather → /setmenubutton → @${BOT_NAME} → ${MINIAPP_URL}"
+    fi
+  else
+    warn "Кнопку Mini App пока не настроить — Telegram требует https, а сертификата ещё нет."
+    warn "Выпустите сертификат и запустите setup.sh ещё раз."
+  fi
+
+  RESP=$(tg_api setMyCommands --data-urlencode \
+    'commands=[{"command":"start","description":"Открыть панель хостинга"}]')
+  grep -q '"ok":true' <<<"$RESP" && log "Команды бота обновлены" || true
+
+  tg_api setMyShortDescription --data-urlencode \
+    "short_description=Хостинг для PHP-сайтов на ${DOMAIN}. Вход без регистрации." >/dev/null
+
+  echo
+  echo "  Осталось ровно одно действие в @BotFather (метода Bot API для него нет):"
+  echo "     /setdomain → @${BOT_NAME} → ${DOMAIN}"
+  echo "  Это включает кнопку «Войти через Telegram» на публичной главной."
+  echo "  Mini App внутри бота работает и без этого."
+  echo
 fi
 
 # ── 7. проверка ────────────────────────────────────────────────────────────

@@ -169,10 +169,21 @@ id -u hosting-panel >/dev/null 2>&1 || \
 id -u phpmyadmin    >/dev/null 2>&1 || \
   useradd --system --home-dir /var/www/phpmyadmin --shell /usr/sbin/nologin phpmyadmin
 
+# .env читают трое: root-воркер (root), веб-процесс панели и бот (оба —
+# hosting-panel). С владельцем root:root и правами 0640 панель свой же конфиг
+# прочитать НЕ МОЖЕТ: молча получает пустой пароль от базы и не поднимается.
+# Поэтому группа — hosting-panel, и выставляем это при каждом запуске, а не
+# только при создании файла (пользователь появляется позже самого .env).
+chown root:hosting-panel "$ENV_FILE"
+chmod 0640 "$ENV_FILE"
+
 # ── 5. каталоги ──────────────────────────────────────────────────────────
 log "Создаю каталоги"
 mkdir -p "$HOSTING_USERS_ROOT" "$LOG_DIR" "${HOSTING_ROOT}/backups" "${HOSTING_ROOT}/var" \
-  /etc/hosting /run/php
+  /etc/hosting /run/php /var/lib/hosting
+# Единственное, что пишет бот, — offset обработанных сообщений Telegram.
+chown hosting-panel:hosting-panel /var/lib/hosting
+chmod 0750 /var/lib/hosting
 chmod 0755 "$HOSTING_USERS_ROOT"
 chmod 0755 "$LOG_DIR"
 
@@ -317,8 +328,17 @@ sed \
   -e "s#{{ENV_FILE}}#${WORKER_ENV}#g" \
   "${HOSTING_DIR}/templates/systemd-worker.service.tpl" > /etc/systemd/system/hosting-worker.service
 
+# Бот отвечает на /start и открывает Mini App. Без него бот выглядел бы
+# сломанным: кнопка меню есть, а на сообщения никто не отвечает.
+sed \
+  -e "s#{{PANEL_NAME}}#${PANEL_NAME:-AlijonHost}#g" \
+  -e "s#{{HOSTING_ROOT}}#${HOSTING_ROOT}#g" \
+  -e "s#{{ENV_FILE}}#${ENV_FILE}#g" \
+  "${HOSTING_DIR}/templates/systemd-bot.service.tpl" > /etc/systemd/system/hosting-bot.service
+
 systemctl daemon-reload
 systemctl enable --now hosting-worker >/dev/null 2>&1 || warn "Не удалось запустить hosting-worker.service — проверьте journalctl -u hosting-worker"
+systemctl enable --now hosting-bot >/dev/null 2>&1 || warn "Не удалось запустить hosting-bot.service — проверьте journalctl -u hosting-bot"
 
 # ── 12. таймеры: monitor / backup / ssl-renew ────────────────────────────
 log "Устанавливаю systemd-таймеры (monitor, backup, ssl-renew)"
@@ -426,7 +446,7 @@ echo
 log "Установка завершена. Проверка сервисов:"
 
 SERVICES_OK=1
-for svc in nginx "php${PHP_VERSION}-fpm" mariadb hosting-worker fail2ban; do
+for svc in nginx "php${PHP_VERSION}-fpm" mariadb hosting-worker hosting-bot fail2ban; do
   # is-active выходит с ненулевым кодом на любом состоянии кроме active, но
   # состояние всё равно печатает. Поэтому подстановка и код возврата берутся
   # раздельно: иначе в вывод попадали бы сразу и "activating", и "неизвестно".

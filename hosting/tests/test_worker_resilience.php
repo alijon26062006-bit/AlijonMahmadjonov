@@ -117,3 +117,59 @@ function test_worker_rejects_job_type_outside_whitelist(): void
         $handler->handle(['id' => 1, 'type' => 'rm_rf', 'user_id' => null, 'site_id' => null, 'payload' => null]);
     }, 'Задание не из белого списка должно отклоняться, а не выполняться');
 }
+
+// ── Телеграм-бот ────────────────────────────────────────────────────────────
+
+function test_bot_waits_instead_of_dying_without_token(): void
+{
+    $root = dirname(__DIR__, 2);
+    $script = $root . '/hosting/worker/bin/hosting-bot.php';
+
+    // Пустой токен — штатная ситуация сразу после install.sh, до setup.sh.
+    // Бот обязан ждать настройки, а не падать: иначе systemd крутил бы
+    // рестарты по кругу до тех пор, пока админ не дойдёт до @BotFather.
+    $env = ['PATH' => getenv('PATH') ?: '/usr/bin:/bin', 'TELEGRAM_BOT_TOKEN' => ''];
+
+    $descriptors = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $process = proc_open([PHP_BINARY, $script], $descriptors, $pipes, $root, $env);
+    assert_true(is_resource($process), 'Бот не запустился вовсе');
+
+    stream_set_blocking($pipes[2], false);
+
+    $stderr = '';
+    $alive = false;
+    for ($i = 0; $i < 20; $i++) {
+        usleep(100_000);
+        $stderr .= (string) stream_get_contents($pipes[2]);
+        $status = proc_get_status($process);
+        $alive = $status['running'];
+        if (!$alive) {
+            break;
+        }
+    }
+
+    proc_terminate($process, SIGTERM);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    proc_close($process);
+
+    assert_true($alive, 'Бот без токена умер — systemd загонит службу в вечный цикл рестартов');
+    assert_true(
+        str_contains($stderr, 'TELEGRAM_BOT_TOKEN'),
+        'Бот должен объяснить в журнале, чего именно ему не хватает. Получено: ' . $stderr
+    );
+}
+
+function test_bot_unit_can_read_repository_in_root_home(): void
+{
+    $tpl = (string) file_get_contents(dirname(__DIR__) . '/templates/systemd-bot.service.tpl');
+
+    // Репозиторий на боевом сервере лежит в /root. ProtectHome=yes закрыл бы
+    // службе доступ к её же скрипту, и она не стартовала бы вообще.
+    assert_true(
+        !preg_match('~^ProtectHome\s*=\s*(yes|read-only)~mi', $tpl),
+        'ProtectHome в юните бота сломает установку, где репозиторий лежит в /root'
+    );
+    assert_true(str_contains($tpl, 'StartLimitIntervalSec=0'), 'Бот должен возвращаться сам после серии падений');
+    assert_true(str_contains($tpl, 'ReadWritePaths=/var/lib/hosting'), 'Боту нужно куда-то писать offset обработанных сообщений');
+}

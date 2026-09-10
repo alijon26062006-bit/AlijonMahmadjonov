@@ -51,7 +51,22 @@ if [[ "$PERM" == "640" || "$PERM" == "600" ]]; then
   ok "права на .env: ${PERM} (секреты не читает кто попало)"
 else
   bad ".env с правами ${PERM} — в нём пароль от базы и SESSION_SECRET"
-  hint "chmod 0640 ${ENV_FILE} && chown root:root ${ENV_FILE}"
+  hint "chown root:hosting-panel ${ENV_FILE} && chmod 0640 ${ENV_FILE}"
+fi
+
+# Права «не слишком широкие» — половина дела. Вторая половина: панель обязана
+# свой конфиг ПРОЧИТАТЬ. При root:root 0640 она молча получает пустой пароль
+# от базы и не поднимается, а по одним битам режима это незаметно.
+if id -u hosting-panel >/dev/null 2>&1; then
+  if su -s /bin/sh hosting-panel -c "test -r '${ENV_FILE}'" 2>/dev/null; then
+    ok "панель (hosting-panel) читает свой .env"
+  else
+    bad "пользователь hosting-panel НЕ может прочитать ${ENV_FILE}"
+    hint "панель из-за этого не видит пароль от базы: chown root:hosting-panel ${ENV_FILE} && chmod 0640 ${ENV_FILE}"
+  fi
+else
+  bad "нет системного пользователя hosting-panel — панель и бот не запустятся"
+  hint "sudo bash ${HOSTING_DIR}/install.sh"
 fi
 
 if [[ -f /etc/hosting/worker.env ]]; then
@@ -91,6 +106,16 @@ if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
   BOT_JSON=$(curl -s -m 10 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe" 2>/dev/null)
   if grep -q '"ok":true' <<<"$BOT_JSON"; then
     ok "Telegram принимает токен бота"
+
+    # Кнопка меню — это и есть вход в Mini App. Если она не настроена, клиент,
+    # открывший бота, никуда попасть не сможет.
+    MENU=$(curl -s -m 10 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getChatMenuButton" 2>/dev/null)
+    if grep -q '"type":"web_app"' <<<"$MENU"; then
+      ok "кнопка Mini App у бота настроена"
+    else
+      bad "у бота не настроена кнопка Mini App — из Telegram в панель не попасть"
+      hint "sudo bash ${HOSTING_DIR}/setup.sh (настроит сам, нужен выпущенный сертификат)"
+    fi
   else
     bad "Telegram отклонил токен бота: ${BOT_JSON:-нет ответа}"
     hint "возьмите свежий токен у @BotFather и перезапустите setup.sh"
@@ -105,7 +130,7 @@ head2 "Службы"
 PHP_VERSION="${PHP_VERSIONS%%,*}"
 PHP_VERSION="${PHP_VERSION:-8.3}"
 
-for svc in nginx "php${PHP_VERSION}-fpm" mariadb hosting-worker fail2ban; do
+for svc in nginx "php${PHP_VERSION}-fpm" mariadb hosting-worker hosting-bot fail2ban; do
   state=$(systemctl is-active "$svc" 2>/dev/null) || true
   [[ -n "$state" ]] || state="неизвестно"
 

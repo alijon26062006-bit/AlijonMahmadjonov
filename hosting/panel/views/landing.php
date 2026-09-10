@@ -42,6 +42,12 @@ use Hosting\Support\Html;
               data-auth-url="<?= Html::e($appUrl) ?>/telegram/widget"
               data-request-access="write"></script>
       <div class="muted">Вход в один клик — без пароля и анкет</div>
+      <?php // Виджет выше работает только после /setdomain в @BotFather. Ссылка на
+            // самого бота работает всегда — чтобы посетитель не упёрся в пустое место,
+            // если админ ещё не дошёл до этой настройки. ?>
+      <div style="margin-top:10px;">
+        <a class="btn" href="https://t.me/<?= Html::e($botUsername) ?>">Открыть в Telegram</a>
+      </div>
     <?php else: ?>
       <a class="btn" href="/register">Создать аккаунт</a>
       <div class="muted">Вход через Telegram появится, когда админ настроит бота</div>
