@@ -91,6 +91,26 @@ check_env_filled() {
     hint "sudo bash ${HOSTING_DIR}/setup.sh"
   fi
 }
+# HOSTING_ROOT обязан указывать на этот репозиторий: по нему systemd-юниты,
+# nginx-шаблоны и скрипты находят свои файлы. Если это пустой каталог, воркер
+# падает с 203/EXEC и служба вечно висит в activating, а причина совсем не там,
+# где её ищут.
+HR="${HOSTING_ROOT:-/opt/hosting}"
+if [[ "$(readlink -f "$HR" 2>/dev/null)" == "$(readlink -f "$REPO_ROOT")" ]]; then
+  ok "${HR} указывает на репозиторий (${REPO_ROOT})"
+else
+  bad "${HR} указывает на '$(readlink -f "$HR" 2>/dev/null || echo "ничего")', а репозиторий лежит в ${REPO_ROOT}"
+  hint "из-за этого systemd-юниты ссылаются на несуществующие файлы: sudo bash ${HOSTING_DIR}/install.sh"
+fi
+
+WORKER_BIN="${HR}/hosting/worker/bin/hosting-worker.php"
+if [[ -f "$WORKER_BIN" ]]; then
+  ok "воркер на месте: ${WORKER_BIN}"
+else
+  bad "нет файла ${WORKER_BIN}, а именно его запускает systemd"
+  hint "sudo bash ${HOSTING_DIR}/install.sh"
+fi
+
 check_env_filled HOSTING_ROOT_DOMAIN "без домена не строятся адреса сайтов клиентов"
 check_env_filled DB_PASSWORD         "панель не подключится к своей базе"
 check_env_filled SESSION_SECRET      "сессии можно будет подделать"

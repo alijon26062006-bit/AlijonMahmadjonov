@@ -62,7 +62,40 @@ if [[ ! -f "$ENV_FILE" ]]; then
   chmod 0640 "$ENV_FILE"
   note_status "Создан .env — ЗАПОЛНИТЕ HOSTING_ROOT_DOMAIN, HOSTING_SERVER_IP, TELEGRAM_BOT_TOKEN вручную"
 else
-  log ".env уже существует — не трогаю"
+  log ".env уже существует — дополняю недостающим"
+fi
+
+# Существующий .env чиним, а не пропускаем.
+#
+# «Файл есть — не трогаю» ломалось двумя способами. Во-первых, в корне репозитория
+# может лежать .env совсем другого проекта (Telegram-бот учёта денег) — тогда в нём
+# нет ни одной настройки хостинга. Во-вторых, прерванный прошлый запуск оставлял
+# .env без сгенерированных секретов. И то и другое всплывало гораздо позже —
+# строкой «DB_PASSWORD не задан в .env» посреди настройки MariaDB.
+ENV_ADDED=()
+while IFS= read -r line; do
+  [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || continue
+  key="${line%%=*}"
+  grep -qE "^${key}=" "$ENV_FILE" && continue
+  if [[ ${#ENV_ADDED[@]} -eq 0 ]]; then
+    printf '\n# Добавлено install.sh: настройки хостинга, которых не хватало.\n' >> "$ENV_FILE"
+  fi
+  printf '%s\n' "$line" >> "$ENV_FILE"
+  ENV_ADDED+=("$key")
+done < "${HOSTING_DIR}/.env.example"
+[[ ${#ENV_ADDED[@]} -gt 0 ]] && log "В .env добавлены недостающие настройки: ${ENV_ADDED[*]}"
+
+env_value() { grep -E "^${1}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2-; }
+
+# Секреты генерируем, если их нет ИЛИ они пустые — без этого установка
+# доходила до MariaDB и падала там.
+if [[ -z "$(env_value DB_PASSWORD)" ]]; then
+  sed -i "s#^DB_PASSWORD=.*#DB_PASSWORD=$(openssl rand -base64 24 | tr -d '=+/')#" "$ENV_FILE"
+  log "Сгенерирован пароль панельной базы"
+fi
+if [[ -z "$(env_value SESSION_SECRET)" ]]; then
+  sed -i "s#^SESSION_SECRET=.*#SESSION_SECRET=$(openssl rand -hex 32)#" "$ENV_FILE"
+  log "Сгенерирован SESSION_SECRET"
 fi
 
 set -a
@@ -178,6 +211,42 @@ chown root:hosting-panel "$ENV_FILE"
 chmod 0640 "$ENV_FILE"
 
 # ── 5. каталоги ──────────────────────────────────────────────────────────
+#
+# HOSTING_ROOT приводим в порядок ПЕРВЫМ делом, до создания подкаталогов.
+# Раньше было наоборот: mkdir -p "${HOSTING_ROOT}/backups" сам создавал
+# /opt/hosting обычным каталогом, после чего проверка ниже находила там не
+# симлинк и просто предупреждала. В результате на каждой чистой установке
+# HOSTING_ROOT оставался пустым каталогом, а все systemd-юниты ссылались на
+# ${HOSTING_ROOT}/hosting/worker/bin/... — файла по этому пути не существовало,
+# служба падала с 203/EXEC и навсегда висела в состоянии activating.
+log "Проверяю ${HOSTING_ROOT}"
+REPO_REAL="$(readlink -f "$REPO_ROOT")"
+
+if [[ "$(readlink -f "$HOSTING_ROOT" 2>/dev/null)" == "$REPO_REAL" ]]; then
+  log "${HOSTING_ROOT} уже указывает на репозиторий"
+elif [[ ! -e "$HOSTING_ROOT" ]] || [[ -L "$HOSTING_ROOT" ]]; then
+  ln -sfn "$REPO_ROOT" "$HOSTING_ROOT"
+  log "Симлинк ${HOSTING_ROOT} -> ${REPO_ROOT} создан"
+elif [[ -d "$HOSTING_ROOT" ]]; then
+  # Обычный каталог на месте HOSTING_ROOT — почти всегда наш же мусор от
+  # прошлых запусков (пустые backups/var). Пустой убираем молча; непустой
+  # НЕ удаляем, а отодвигаем: там могут лежать резервные копии клиентов.
+  if [[ -z "$(find "$HOSTING_ROOT" -mindepth 1 -not -path "*/backups" -not -path "*/var" -print -quit 2>/dev/null)" ]] \
+     && [[ -z "$(find "${HOSTING_ROOT}/backups" "${HOSTING_ROOT}/var" -mindepth 1 -print -quit 2>/dev/null)" ]]; then
+    rm -rf "${HOSTING_ROOT:?}"
+    ln -sfn "$REPO_ROOT" "$HOSTING_ROOT"
+    log "Пустой каталог ${HOSTING_ROOT} заменён симлинком на репозиторий"
+  else
+    HOSTING_ROOT_OLD="${HOSTING_ROOT}.old-$(date -u +%Y%m%d-%H%M%S)"
+    mv "$HOSTING_ROOT" "$HOSTING_ROOT_OLD"
+    ln -sfn "$REPO_ROOT" "$HOSTING_ROOT"
+    warn "${HOSTING_ROOT} был обычным каталогом с данными — перенесён в ${HOSTING_ROOT_OLD}"
+    note_status "Старое содержимое ${HOSTING_ROOT} лежит в ${HOSTING_ROOT_OLD} (ничего не удалено) — проверьте, нет ли там резервных копий"
+  fi
+else
+  die "${HOSTING_ROOT} существует и это не каталог и не симлинк — уберите его вручную"
+fi
+
 log "Создаю каталоги"
 mkdir -p "$HOSTING_USERS_ROOT" "$LOG_DIR" "${HOSTING_ROOT}/backups" "${HOSTING_ROOT}/var" \
   /etc/hosting /run/php /var/lib/hosting
@@ -186,17 +255,6 @@ chown hosting-panel:hosting-panel /var/lib/hosting
 chmod 0750 /var/lib/hosting
 chmod 0755 "$HOSTING_USERS_ROOT"
 chmod 0755 "$LOG_DIR"
-
-# Сам репозиторий должен физически лежать в HOSTING_ROOT (или быть на него
-# симлинкнут) — так все *.tpl/scripts/panel пути из .env совпадают с реальностью.
-if [[ ! -e "$HOSTING_ROOT" || "$(readlink -f "$HOSTING_ROOT" 2>/dev/null)" != "$(readlink -f "$REPO_ROOT")" ]]; then
-  if [[ -e "$HOSTING_ROOT" && ! -L "$HOSTING_ROOT" ]]; then
-    warn "${HOSTING_ROOT} уже существует и не является симлинком на репозиторий — оставляю как есть, проверьте вручную"
-  else
-    ln -sfn "$REPO_ROOT" "$HOSTING_ROOT"
-    log "Симлинк ${HOSTING_ROOT} -> ${REPO_ROOT} создан"
-  fi
-fi
 
 # ── 6. worker.env (секреты, доступные ТОЛЬКО root-воркеру) ──────────────
 WORKER_ENV="/etc/hosting/worker.env"
