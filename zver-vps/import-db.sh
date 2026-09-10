@@ -52,11 +52,28 @@ grn "подключение к базе работает"
 
 # ---------- проверка дампа ----------
 info "Проверяю дамп…"
-SIZE="$(du -h "$DUMP" | cut -f1)"
+# phpMyAdmin часто отдаёт архив — распакуем сами, оригинал не трогаем
+TMPSQL=""
 case "$DUMP" in
-    *.gz)  die "Сначала распакуйте: gunzip $DUMP" ;;
-    *.zip) die "Сначала распакуйте: unzip $DUMP" ;;
+    *.gz)
+        command -v gunzip >/dev/null || die "нет gunzip: apt-get install -y gzip"
+        TMPSQL="$(mktemp /tmp/zver-dump-XXXX.sql)"
+        gunzip -c "$DUMP" > "$TMPSQL" || die "не удалось распаковать $DUMP"
+        info "Распаковал архив"
+        DUMP="$TMPSQL" ;;
+    *.zip)
+        command -v unzip >/dev/null || { apt-get install -y -qq unzip >/dev/null 2>&1 || true; }
+        command -v unzip >/dev/null || die "нет unzip: apt-get install -y unzip"
+        TMPD="$(mktemp -d)"
+        unzip -qo "$DUMP" -d "$TMPD" || die "не удалось распаковать $DUMP"
+        TMPSQL="$(find "$TMPD" -name '*.sql' | head -1)"
+        [ -n "$TMPSQL" ] || die "в архиве нет .sql файла"
+        info "Распаковал архив"
+        DUMP="$TMPSQL" ;;
 esac
+trap '[ -n "${TMPSQL:-}" ] && rm -f "$TMPSQL"; [ -n "${TMPD:-}" ] && rm -rf "$TMPD"' EXIT
+
+SIZE="$(du -h "$DUMP" | cut -f1)"
 head -c 4000 "$DUMP" | grep -qiE "CREATE TABLE|INSERT INTO" \
     || die "Не похоже на SQL-дамп — внутри нет ни CREATE TABLE, ни INSERT"
 
@@ -86,6 +103,26 @@ grn "копия: $BACKUP ($(du -h "$BACKUP" | cut -f1))"
 
 # ---------- импорт ----------
 echo
+
+# Установщик уже создал пустые таблицы. Если дамп сам их создаёт, но без
+# DROP TABLE, импорт упал бы на «таблица уже существует». Поэтому пустые
+# таблицы, которые есть в дампе, убираем заранее — данные из дампа их
+# полностью заменят. Копия базы уже снята выше.
+if grep -qiE "CREATE TABLE.*z_" "$DUMP" && ! grep -qiE "DROP TABLE.*z_" "$DUMP"; then
+    info "Дамп создаёт таблицы сам — освобождаю место…"
+    DROPPED=0
+    for t in $(grep -oiE "CREATE TABLE (IF NOT EXISTS )?[\`\"']?z_[a-z_]+" "$DUMP" \
+               | grep -oE "z_[a-z_]+" | sort -u); do
+        rows="$("${MY[@]}" -N -B -e "SELECT COUNT(*) FROM \`$t\`" 2>/dev/null || echo 0)"
+        if [ "${rows:-0}" -gt 0 ]; then
+            ylw "  ⚠ в таблице $t уже есть $rows строк — она будет заменена данными из дампа"
+        fi
+        "${MY[@]}" -e "SET FOREIGN_KEY_CHECKS=0; DROP TABLE IF EXISTS \`$t\`;" 2>/dev/null \
+            && DROPPED=$((DROPPED+1))
+    done
+    grn "освобождено таблиц: $DROPPED"
+fi
+
 info "Импортирую дамп…"
 if "${MY[@]}" < "$DUMP" 2>/tmp/imp.err; then
     grn "дамп залит"
