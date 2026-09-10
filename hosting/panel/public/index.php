@@ -22,6 +22,7 @@ use Hosting\Controller\DomainController;
 use Hosting\Controller\FileController;
 use Hosting\Controller\LogController;
 use Hosting\Controller\SiteController;
+use Hosting\Controller\TelegramSiteController;
 use Hosting\Database;
 use Hosting\Http\ForbiddenException;
 use Hosting\Http\HttpException;
@@ -104,6 +105,9 @@ $view = new View($root . '/hosting/panel/views', static function () use ($auth, 
 });
 
 // ── контроллеры ──────────────────────────────────────────────────────────
+$telegramSiteController = new TelegramSiteController(
+    $config, $db, $auth, $sites, new \Hosting\Service\TelegramWebhook()
+);
 $authController = new AuthController($config, $db, $auth, $users, $plans, $telegramAccounts, $telegramAuth, $jobs, $view);
 $dashboardController = new DashboardController($config, $auth, $sites, $databases, $plans, $jobs, $backups, $notifications, $view);
 $siteController = new SiteController($config, $db, $auth, $sites, $plans, $jobs, $view);
@@ -162,7 +166,13 @@ $router->post('/sites/{id}/delete', [$siteController, 'delete']);
 $router->post('/sites/{id}/suspend', [$siteController, 'suspend']);
 $router->post('/sites/{id}/unsuspend', [$siteController, 'unsuspend']);
 
+$router->get('/sites/{id}', [$siteController, 'show']);
+$router->post('/sites/{id}/health', [$siteController, 'health']);
+
 $router->get('/sites/{id}/files', [$fileController, 'browse']);
+$router->get('/sites/{id}/files/download', [$fileController, 'download']);
+$router->post('/sites/{id}/files/extract', [$fileController, 'extract']);
+$router->post('/sites/{id}/files/template', [$fileController, 'fromTemplate']);
 $router->post('/sites/{id}/files/upload', [$fileController, 'upload']);
 $router->post('/sites/{id}/files/mkdir', [$fileController, 'mkdir']);
 $router->post('/sites/{id}/files/newfile', [$fileController, 'newFile']);
@@ -172,6 +182,12 @@ $router->get('/sites/{id}/files/edit', [$fileController, 'edit']);
 $router->post('/sites/{id}/files/save', [$fileController, 'save']);
 
 $router->get('/sites/{id}/logs', [$logController, 'show']);
+
+$router->post('/sites/{id}/telegram/token', [$telegramSiteController, 'saveToken']);
+$router->post('/sites/{id}/telegram/webhook-file', [$telegramSiteController, 'createWebhookFile']);
+$router->post('/sites/{id}/telegram/connect', [$telegramSiteController, 'connect']);
+$router->post('/sites/{id}/telegram/check', [$telegramSiteController, 'check']);
+$router->post('/sites/{id}/telegram/disconnect', [$telegramSiteController, 'disconnect']);
 
 $router->get('/sites/{id}/domains', [$domainController, 'index']);
 $router->post('/sites/{id}/domains', [$domainController, 'create']);

@@ -122,6 +122,17 @@ final class JobRepository
         return $stmt->fetchAll();
     }
 
+    /** Последние задания по конкретному сайту — для показа прогресса на его странице. */
+    public function recentForSite(int $siteId, int $limit = 10): array
+    {
+        $stmt = $this->db->pdo()->prepare(
+            'SELECT * FROM jobs WHERE site_id = :site ORDER BY id DESC LIMIT ' . max(1, min(100, $limit))
+        );
+        $stmt->execute(['site' => $siteId]);
+
+        return $stmt->fetchAll();
+    }
+
     public function countPending(): int
     {
         return (int) $this->db->pdo()->query("SELECT COUNT(*) AS c FROM jobs WHERE status IN ('pending','running')")->fetch()['c'];

@@ -27,6 +27,18 @@ final class UnixProvisioner
         return $result['code'] === 0;
     }
 
+    /**
+     * Общая группа веб-слоя: в неё входят hosting-panel (файловый менеджер панели)
+     * и www-data (nginx). Она же — группа каталогов клиента.
+     *
+     * Одной группы hosting-panel мало: nginx проверяет существование файла сам
+     * (try_files) и отдаёт статику, поэтому без доступа к каталогу он отвечает
+     * 404 на всё, включая index.php, — сайт выглядит несозданным. Отдельная
+     * группа лучше, чем добавлять www-data в группу панели: у неё понятное имя
+     * и понятный смысл — «кому веб-слой разрешает читать файлы клиентов».
+     */
+    public const PANEL_GROUP = 'hosting-web';
+
     public function createUser(string $systemUser): void
     {
         if (!preg_match('~^client[0-9]{1,10}$~', $systemUser)) {
@@ -53,7 +65,18 @@ final class UnixProvisioner
             if (!is_dir($path)) {
                 mkdir($path, 0o750, true);
             }
-            Shell::run(sprintf('chown -R %1$s:%1$s %2$s', escapeshellarg($systemUser), escapeshellarg($path)), 15);
+            // Владелец — клиент, группа — hosting-panel: под ней работает веб-процесс
+            // панели, и без доступа к группе файловый менеджер не может ни прочитать,
+            // ни создать ни одного файла клиента. Права 2770: setgid, чтобы всё
+            // созданное внутри наследовало группу, и «остальные» не видят ничего —
+            // клиенты по-прежнему изолированы друг от друга.
+            Shell::run(sprintf(
+                'chown -R %s:%s %s',
+                escapeshellarg($systemUser),
+                escapeshellarg(self::PANEL_GROUP),
+                escapeshellarg($path)
+            ), 15);
+            Shell::run(sprintf('chmod 2770 %s', escapeshellarg($path)), 15);
         }
 
         // ВАЖНО: сам $home (корень chroot для SFTP, см. etc/ssh/sshd-hosting.conf) обязан

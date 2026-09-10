@@ -164,5 +164,8 @@ use Hosting\Support\Html;
   <?php endforeach; ?>
   <?= $content ?>
 </main>
+<?php // Скрипт отдельным файлом: CSP панели разрешает только script-src 'self',
+      // поэтому атрибуты onclick/onsubmit в разметке не сработали бы. ?>
+<script src="/assets/panel.js"></script>
 </body>
 </html>

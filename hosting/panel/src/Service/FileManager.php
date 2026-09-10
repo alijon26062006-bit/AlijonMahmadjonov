@@ -105,6 +105,63 @@ final class FileManager
         return $target;
     }
 
+    /**
+     * Достраивает имя файла до осмысленного.
+     *
+     * Клиент пишет «index» — получает index.php. Дописываем расширение ЦЕЛИКОМ и
+     * только когда точки в имени нет: попытки «исправлять» уже введённое
+     * расширение как раз и дают файлы вроде «index.pp», которые не выполняются
+     * и выглядят для человека необъяснимо.
+     */
+    public static function suggestName(string $name, string $defaultExtension = 'php'): string
+    {
+        $name = trim($name);
+        if ($name === '' || str_contains($name, '.')) {
+            return $name;
+        }
+
+        return $name . '.' . ltrim($defaultExtension, '.');
+    }
+
+    /**
+     * Создаёт файл, при необходимости создавая промежуточные каталоги.
+     * Нужно шаблонам: они кладут файлы в public/, которого может не быть.
+     */
+    public function createFileDeep(string $relative, string $contents = '', bool $overwrite = false): string
+    {
+        $parts = explode('/', Path::normalize($relative));
+        $file = array_pop($parts);
+        if ($file === null || $file === '') {
+            throw new \RuntimeException('Не указано имя файла');
+        }
+        $this->assertName($file);
+        $this->assertAllowedExtension($file);
+
+        // Каталоги создаём по одному сверху вниз: Path::resolve проверяет каждый
+        // уровень отдельно и отказывается работать с несуществующим родителем —
+        // это и есть та проверка, ради которой он написан, обходить её нельзя.
+        $walked = '';
+        foreach ($parts as $part) {
+            $this->assertName($part);
+            $dir = $this->absolute($walked === '' ? $part : $walked . '/' . $part);
+            if (!is_dir($dir) && !@mkdir($dir, 0o2770) && !is_dir($dir)) {
+                throw new \RuntimeException('Не удалось создать каталог ' . $part);
+            }
+            $walked = $walked === '' ? $part : $walked . '/' . $part;
+        }
+
+        $target = $this->absolute(($walked === '' ? '' : $walked . '/') . $file);
+        if (file_exists($target) && !$overwrite) {
+            throw new \RuntimeException('Файл уже есть: ' . $file);
+        }
+        if (@file_put_contents($target, $contents) === false) {
+            throw new \RuntimeException('Не удалось создать файл');
+        }
+        @chmod($target, 0o664);
+
+        return $target;
+    }
+
     public function createFile(string $parent, string $name, string $contents = ''): string
     {
         $this->assertName($name);
@@ -117,6 +174,14 @@ final class FileManager
         if (@file_put_contents($target, $contents) === false) {
             throw new \RuntimeException('Не удалось создать файл');
         }
+        // 0664, а не 0660. Файл, созданный панелью, принадлежит пользователю
+        // hosting-panel, а выполняет его php-fpm КЛИЕНТА — он не владелец и не
+        // состоит в группе, то есть попадает в «остальные». При 0660 он получал
+        // «Permission denied», и сайт отдавал 403 на собственный файл.
+        // Прочитать файл «остальным» это не даёт: сам каталог сайта имеет права
+        // 2770 client:hosting-web, и зайти в него посторонний не может — доступ
+        // ограничивает каталог, а не биты файла.
+        @chmod($target, 0o664);
 
         return $target;
     }
@@ -148,6 +213,23 @@ final class FileManager
         if (@file_put_contents($path, $contents) === false) {
             throw new \RuntimeException('Не удалось сохранить файл');
         }
+        // См. комментарий к createFile: 0664 нужен, чтобы php-fpm клиента мог
+        // прочитать файл, записанный панелью. Изоляцию обеспечивает каталог.
+        @chmod($path, 0o664);
+    }
+
+    /** Абсолютный путь файла для отдачи на скачивание. Бросает, если это не файл. */
+    public function fileForDownload(string $relative): string
+    {
+        $path = $this->absolute($relative);
+        if (!is_file($path)) {
+            throw new \RuntimeException('Файл не найден');
+        }
+        if (is_link($path)) {
+            throw new \RuntimeException('Скачивание ссылок запрещено');
+        }
+
+        return $path;
     }
 
     public function delete(string $relative): void

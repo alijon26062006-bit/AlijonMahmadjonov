@@ -72,7 +72,7 @@ final class SiteRepository
 
     public function setStatus(int $id, string $status): void
     {
-        $allowed = ['pending', 'active', 'suspended', 'deleted'];
+        $allowed = ['pending', 'active', 'suspended', 'deleted', 'error'];
         if (!in_array($status, $allowed, true)) {
             throw new \InvalidArgumentException('Недопустимый статус сайта: ' . $status);
         }

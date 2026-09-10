@@ -81,7 +81,7 @@ CREATE TABLE sites (
     domain      TEXT NOT NULL UNIQUE,
     doc_root    TEXT NOT NULL DEFAULT 'public',
     php_version TEXT NOT NULL DEFAULT '8.3',
-    status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','active','suspended','deleted')),
+    status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','active','suspended','deleted','error')),
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
     UNIQUE (user_id, slug)

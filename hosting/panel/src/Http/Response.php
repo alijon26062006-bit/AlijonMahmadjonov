@@ -36,6 +36,24 @@ final class Response
         return new self($status, ['Content-Type' => 'text/plain; charset=utf-8'], $body);
     }
 
+    /**
+     * Файл на скачивание. Имя уходит в заголовок в двух видах: ASCII-запасной и
+     * filename* по RFC 5987 — без второго кириллические имена в браузере
+     * превращаются в мусор.
+     */
+    public static function download(string $body, string $filename, string $type = 'application/octet-stream'): self
+    {
+        $ascii = preg_replace('~[^A-Za-z0-9._-]~', '_', $filename) ?: 'file';
+
+        return new self(200, [
+            'Content-Type'        => $type,
+            'Content-Disposition' => 'attachment; filename="' . $ascii . '"; '
+                . "filename*=UTF-8''" . rawurlencode($filename),
+            'Content-Length'      => (string) strlen($body),
+            'Cache-Control'       => 'no-store',
+        ], $body);
+    }
+
     public function send(): void
     {
         if (!headers_sent()) {

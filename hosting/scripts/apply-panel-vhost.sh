@@ -85,7 +85,9 @@ mv "$TMP" "$AVAILABLE"
 ln -sfn "$AVAILABLE" "$ENABLED"
 
 if NGX=$(nginx -t 2>&1); then
-  systemctl reload nginx 2>/dev/null || nginx -s reload 2>/dev/null || true
+  # restart, а не reload: nginx должен войти в группу hosting-web, иначе не
+  # увидит файлы сайтов клиентов (reload членство в группах не перечитывает).
+  systemctl restart nginx 2>/dev/null || nginx -s reload 2>/dev/null || true
   rm -f "$BACKUP"
   echo "[vhost] применён${CERT_DOMAIN:+ (HTTPS)}"
 else

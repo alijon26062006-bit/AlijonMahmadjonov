@@ -40,20 +40,71 @@ final class SiteFiles
             }
         }
 
+        // Стартовая страница создаётся ВСЕГДА, а не только если найден каталог
+        // заготовки: без index.php свежесозданный сайт отдаёт 404, и человек
+        // видит ошибку там, где ожидал увидеть результат.
         if (is_dir($skelDir)) {
             self::copyTree($skelDir, $publicDir);
+        }
+        $index = $publicDir . '/index.php';
+        if (!file_exists($index) && !file_exists($publicDir . '/index.html')) {
+            file_put_contents($index, \Hosting\Service\SiteTemplates::defaultIndex());
+        }
+
+        // .env сайта — над public/, поэтому из браузера недоступен. Секрет для
+        // Telegram-webhook кладём сразу: он нужен ещё до того, как клиент введёт
+        // токен, и генерировать его должен сервер, а не человек.
+        $envFile = $siteDir . '/.env';
+        if (!file_exists($envFile)) {
+            file_put_contents($envFile, implode("\n", [
+                '# Настройки сайта. Файл лежит НАД public/ и через браузер не открывается.',
+                '# Читать его из PHP: см. пример в public/webhook.php.',
+                'TELEGRAM_BOT_TOKEN=',
+                'TELEGRAM_WEBHOOK_SECRET=' . \Hosting\Service\TelegramWebhook::generateSecret(),
+                '',
+            ]));
         }
 
         $this->applyPermissions($siteDir, $systemUser);
     }
 
+    /**
+     * Права на каталог сайта.
+     *
+     * Владелец — клиент (под ним работает его php-fpm), группа — hosting-panel
+     * (под ней работает панель). Без общей группы файловый менеджер панели не мог
+     * бы ни прочитать, ни изменить ни один файл клиента — а именно это он и должен
+     * делать. «Остальные» не получают ничего, поэтому клиенты по-прежнему не видят
+     * файлы друг друга.
+     *
+     * Каталоги 2770 — setgid: всё созданное внутри (и клиентом, и панелью)
+     * наследует группу, иначе доступ терялся бы на первом же новом подкаталоге.
+     * Файлы 0664: их создаёт то панель (пользователь hosting-panel), то воркер
+     * (от имени клиента), а выполняет php-fpm клиента. При 0660 сторона, не
+     * попавшая ни во владельца, ни в группу, получает «Permission denied» — и
+     * сайт отдаёт 403 на собственный файл. Изоляцию клиентов обеспечивает
+     * каталог 2770, а не биты файлов: зайти в чужой каталог посторонний не может.
+     */
     public function applyPermissions(string $siteDir, string $systemUser): void
     {
-        Shell::run(sprintf('chown -R %1$s:%1$s %2$s', escapeshellarg($systemUser), escapeshellarg($siteDir)), 30);
         Shell::run(sprintf(
-            "find %s -type d -exec chmod 0750 {} \; -o -type f -exec chmod 0640 {} \;",
+            'chown -R %s:%s %s',
+            escapeshellarg($systemUser),
+            escapeshellarg(UnixProvisioner::PANEL_GROUP),
+            escapeshellarg($siteDir)
+        ), 30);
+        Shell::run(sprintf(
+            "find %s -type d -exec chmod 2770 {} \; -o -type f -exec chmod 0664 {} \;",
             escapeshellarg($siteDir)
         ), 60);
+
+        // .env лежит вне public/ — из браузера он недоступен, и nginx отдельно
+        // запрещает *.env. Читать его должен php-fpm клиента (webhook.php), а
+        // писать — панель, поэтому режим тот же 0644, а закрывает файл каталог.
+        $env = $siteDir . '/.env';
+        if (is_file($env)) {
+            Shell::run(sprintf('chmod 0644 %s', escapeshellarg($env)), 10);
+        }
     }
 
     public function remove(string $home, string $slug): void

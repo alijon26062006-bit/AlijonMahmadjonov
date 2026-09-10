@@ -18,13 +18,21 @@ pm.process_idle_timeout = 30s
 pm.max_requests = 1000
 request_terminate_timeout = 30s
 
-php_admin_value[open_basedir] = {{HOSTING_ROOT}}:/tmp
+; Каталоги клиентов входят в open_basedir намеренно: файловый менеджер панели
+; должен читать и изменять файлы сайтов. Без этого он не открывает ни одного
+; файла — open_basedir режет доступ раньше, чем права на файлы.
+; Доступ всё равно ограничен: панель работает под hosting-panel, а каталоги
+; клиентов имеют права 2770 client:hosting-panel — «остальные» не видят ничего.
+php_admin_value[open_basedir] = {{HOSTING_ROOT}}:{{HOSTING_USERS_ROOT}}:/tmp
 php_admin_flag[expose_php] = off
 php_admin_flag[display_errors] = off
 php_admin_flag[log_errors] = on
 php_admin_value[error_log] = /var/log/hosting/panel-php-error.log
 
-; Панели не нужны shell-функции вообще
+; Панели не нужны shell-функции вообще. Проверка синтаксиса PHP перед сохранением
+; сделана без запуска процессов — через token_get_all(TOKEN_PARSE), см.
+; panel/src/Service/PhpSyntax.php: это тот же разбор, что делает php -l, но без
+; shell, без временных файлов и без права запускать что-либо.
 php_admin_value[disable_functions] = exec,shell_exec,system,passthru,proc_open,popen,pcntl_exec
 
 php_admin_value[memory_limit] = 128M

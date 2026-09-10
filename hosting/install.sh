@@ -233,10 +233,19 @@ log "Пакеты установлены (PHP ${PHP_VERSION})"
 log "Создаю служебные группы и пользователей панели"
 getent group hosting-sftp   >/dev/null || groupadd hosting-sftp
 getent group hosting-admins >/dev/null || groupadd hosting-admins
+# Общая группа веб-слоя: каталоги клиентов принадлежат ей, и через неё файлы
+# видят и панель (файловый менеджер), и nginx (проверка существования файла и
+# отдача статики). Без неё nginx отвечает 404 на любой сайт клиента.
+getent group hosting-web    >/dev/null || groupadd hosting-web
 id -u hosting-panel >/dev/null 2>&1 || \
   useradd --system --home-dir "${HOSTING_ROOT}" --shell /usr/sbin/nologin hosting-panel
 id -u phpmyadmin    >/dev/null 2>&1 || \
   useradd --system --home-dir /var/www/phpmyadmin --shell /usr/sbin/nologin phpmyadmin
+
+# Членство в группе процесс получает только при запуске, поэтому ниже (шаг 9/10)
+# nginx и php-fpm перезапускаются, а не перечитывают конфиг.
+usermod -aG hosting-web hosting-panel
+id -u www-data >/dev/null 2>&1 && usermod -aG hosting-web www-data
 
 # ── 4b. каталог проекта должен быть доступен веб-процессу ────────────────
 #
@@ -492,12 +501,15 @@ fi
 log "Настраиваю php-fpm пул панели"
 sed \
   -e "s#{{HOSTING_ROOT}}#${HOSTING_ROOT}#g" \
+  -e "s#{{HOSTING_USERS_ROOT}}#${HOSTING_USERS_ROOT}#g" \
   -e "s#{{UPLOAD_MAX_MB}}#${UPLOAD_MAX_MB:-64}#g" \
   "${HOSTING_DIR}/templates/php-fpm-panel.conf.tpl" > "/etc/php/${PHP_VERSION}/fpm/pool.d/hosting-panel.conf"
 
 if php-fpm"${PHP_VERSION}" -t >/dev/null 2>&1; then
   systemctl enable --now "php${PHP_VERSION}-fpm" >/dev/null
-  systemctl reload "php${PHP_VERSION}-fpm"
+  # Именно restart: reload не перечитывает членство процесса в группах, и панель
+  # осталась бы без доступа к каталогам клиентов до первой перезагрузки сервера.
+  systemctl restart "php${PHP_VERSION}-fpm"
   log "php-fpm настроен"
 else
   warn "php-fpm -t не прошёл — проверьте /etc/php/${PHP_VERSION}/fpm/pool.d/hosting-panel.conf"

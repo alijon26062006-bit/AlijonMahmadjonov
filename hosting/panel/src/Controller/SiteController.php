@@ -10,7 +10,13 @@ use Hosting\Http\Response;
 use Hosting\Model\JobRepository;
 use Hosting\Model\PlanRepository;
 use Hosting\Model\SiteRepository;
+use Hosting\Http\ForbiddenException;
+use Hosting\Http\NotFoundException;
+use Hosting\Http\UnauthorizedException;
 use Hosting\Service\Auth;
+use Hosting\Service\SiteEnv;
+use Hosting\Service\SiteHealth;
+use Hosting\Service\TelegramWebhook;
 use Hosting\Support\Domain;
 use Hosting\Support\Flash;
 use Hosting\Support\View;
@@ -38,6 +44,52 @@ final class SiteController
             'user'       => $user,
             'rootDomain' => $this->config->str('root_domain'),
         ]));
+    }
+
+    /** Страница одного сайта: всё управление им в одном месте. */
+    public function show(Request $request, int $siteId): Response
+    {
+        $user = $this->requireUser();
+        $site = $this->ownedSite($user, $siteId);
+
+        $siteDir = rtrim($this->config->str('users_root'), '/') . '/' . $user['system_user']
+            . '/sites/' . $site['slug'];
+        $env = new SiteEnv($siteDir);
+        $token = $env->get('TELEGRAM_BOT_TOKEN');
+
+        // Информацию о webhook показываем только сразу после нажатия «Проверить»,
+        // чтобы не дёргать Telegram на каждое открытие страницы.
+        $webhookInfo = $_SESSION['telegram_webhook_info'][$siteId] ?? null;
+        unset($_SESSION['telegram_webhook_info'][$siteId]);
+
+        return Response::html($this->view->page('sites/show', [
+            'csrf'         => $this->auth->csrfToken(),
+            'site'         => $site,
+            'jobs'         => $this->jobs->recentForSite((int) $site['id'], 6),
+            'hasWebhookFile' => is_file($siteDir . '/public/webhook.php'),
+            'botToken'     => $token,
+            'botMasked'    => SiteEnv::maskToken($token),
+            'botUsername'  => $env->get('TELEGRAM_BOT_USERNAME'),
+            'webhookUrl'   => 'https://' . $site['domain'] . '/webhook.php',
+            'webhookInfo'  => is_array($webhookInfo) ? $webhookInfo : null,
+            'webhookHint'  => is_array($webhookInfo) ? TelegramWebhook::explain($webhookInfo) : null,
+            'health'       => $_SESSION['site_health'][$siteId] ?? null,
+        ]));
+    }
+
+    /** Кнопка «Проверить сайт»: обычный HTTP-запрос по публичному адресу. */
+    public function health(Request $request, int $siteId): Response
+    {
+        $user = $this->requireUser();
+        $site = $this->ownedSite($user, $siteId);
+        if (!$this->auth->verifyCsrf($request->input('csrf'))) {
+            Flash::add('error', 'Форма устарела');
+            return Response::redirect('/sites/' . $siteId);
+        }
+
+        $_SESSION['site_health'][$siteId] = (new SiteHealth())->check((string) $site['domain']);
+
+        return Response::redirect('/sites/' . $siteId);
     }
 
     public function create(Request $request): Response
@@ -76,7 +128,10 @@ final class SiteController
 
         $this->db->log((int) $user['id'], 'site.create_requested', 'site', (int) $site['id']);
         Flash::add('success', "Сайт {$domain} создаётся — обычно это занимает несколько секунд.");
-        return Response::redirect('/sites');
+
+        // На страницу сайта, а не в общий список: там показан прогресс создания
+        // и страница сама обновляется, пока провижининг не закончится.
+        return Response::redirect('/sites/' . (int) $site['id']);
     }
 
     public function delete(Request $request, int $id): Response

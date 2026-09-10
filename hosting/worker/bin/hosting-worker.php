@@ -104,6 +104,18 @@ while ($running) {
             fwrite(STDOUT, "[hosting-worker] job #{$jobId}: OK\n");
         } catch (\Throwable $e) {
             $jobs->markFailed($jobId, $e->getMessage());
+
+            // Провалившееся создание сайта оставляет его в состоянии pending, и
+            // человек бесконечно смотрит на «Сайт создаётся». Помечаем явно.
+            if ($job['type'] === 'create_site' && $job['site_id'] !== null) {
+                try {
+                    $sitesRepo ??= new \Hosting\Model\SiteRepository($db);
+                    $sitesRepo->setStatus((int) $job['site_id'], 'error');
+                } catch (\Throwable) {
+                    // Не даём вторичной ошибке уронить воркер — она уже записана в jobs.
+                }
+            }
+
             $db->recordSecurityEvent('job_failed', 'warning', '', [
                 'job_id' => $jobId,
                 'type'   => $job['type'],
