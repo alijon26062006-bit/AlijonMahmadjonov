@@ -23,8 +23,27 @@ final class NginxManager
     }
 
     /** @throws \RuntimeException если nginx -t не проходит — старый конфиг остаётся нетронутым */
+    /**
+     * Убирает строки `listen [::]…`, если у ядра нет IPv6.
+     *
+     * nginx на такой машине падает на СТАРТЕ проверки конфига с
+     * «socket() [::]:80 failed (97: Address family not supported by protocol)»,
+     * то есть не применяется вообще ни один сайт — включая панель. Отсутствие
+     * /proc/net/if_inet6 — стандартный признак выключенного IPv6.
+     */
+    public static function stripIpv6IfUnavailable(string $contents): string
+    {
+        if (file_exists('/proc/net/if_inet6')) {
+            return $contents;
+        }
+
+        return (string) preg_replace('~^[ \t]*listen[ \t]+\[::\][^\n]*\n~m', '', $contents);
+    }
+
     public function writeAndApply(string $filename, string $contents): void
     {
+        $contents = self::stripIpv6IfUnavailable($contents);
+
         $this->assertSafeFilename($filename);
         $target = $this->availableDir . '/' . $filename;
         $tmp = $target . '.tmp';

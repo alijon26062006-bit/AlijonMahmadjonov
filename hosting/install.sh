@@ -47,6 +47,49 @@ case "${ID:-}" in
   *) die "Поддерживаются только Ubuntu/Debian, обнаружено: ${ID:-неизвестно}" ;;
 esac
 
+# ── 1b. каталог проекта должен быть доступен веб-процессу ────────────────
+#
+# nginx (www-data) и php-fpm панели (hosting-panel) читают файлы панели прямо
+# с диска. Каталог /root имеет права 0700, то есть внутрь него не может зайти
+# никто, кроме root: клон в /root/<проект> означает 404 на каждой странице
+# панели, сколько бы всё остальное ни было настроено правильно.
+#
+# Открывать /root наружу нельзя, поэтому переносим проект целиком в /opt и
+# оставляем на старом месте симлинк, чтобы привычные команды продолжали
+# работать. Переносим mv, так что .git и .env едут вместе с проектом.
+HOSTING_PANEL_HOME="/opt/hosting-panel"
+
+others_can_traverse() {
+  local p perm
+  p="$(readlink -f "$1")"
+  while [[ "$p" != "/" && -n "$p" ]]; do
+    perm="$(stat -c '%a' "$p" 2>/dev/null)" || return 1
+    # Последняя цифра прав — «для остальных»; заходить в каталог позволяет бит x.
+    [[ "${perm: -1}" =~ [1357] ]] || return 1
+    p="$(dirname "$p")"
+  done
+  return 0
+}
+
+if [[ -z "${HOSTING_RELOCATED:-}" ]] && ! others_can_traverse "$REPO_ROOT"; then
+  warn "Проект лежит в ${REPO_ROOT} — веб-процесс панели туда попасть не может"
+
+  if [[ -e "$HOSTING_PANEL_HOME" && "$(readlink -f "$HOSTING_PANEL_HOME")" != "$(readlink -f "$REPO_ROOT")" ]]; then
+    die "Нужно перенести проект в ${HOSTING_PANEL_HOME}, но там уже что-то есть.
+     Уберите или переименуйте ${HOSTING_PANEL_HOME} и запустите установку заново."
+  fi
+
+  log "Переношу проект в ${HOSTING_PANEL_HOME}"
+  mv "$REPO_ROOT" "$HOSTING_PANEL_HOME" || die "Не удалось перенести проект в ${HOSTING_PANEL_HOME}"
+  chmod 0755 "$HOSTING_PANEL_HOME"
+  # Симлинк на старом месте: `cd ~/<проект> && git pull` продолжает работать.
+  ln -sfn "$HOSTING_PANEL_HOME" "$REPO_ROOT"
+
+  note_status "Проект перенесён в ${HOSTING_PANEL_HOME} (на старом месте оставлен симлинк)"
+  export HOSTING_RELOCATED=1
+  exec bash "${HOSTING_PANEL_HOME}/hosting/install.sh" "$@"
+fi
+
 # ── 2. .env ──────────────────────────────────────────────────────────────
 ENV_FILE="${REPO_ROOT}/.env"
 if [[ ! -f "$ENV_FILE" ]]; then
@@ -327,11 +370,31 @@ CREATE DATABASE IF NOT EXISTS \`${DB_DATABASE}\` CHARACTER SET utf8mb4 COLLATE u
 -- (DB_HOST=127.0.0.1), поэтому заводим обе, иначе получаем ошибку 1130.
 CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
 CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'127.0.0.1' IDENTIFIED BY '${DB_PASSWORD}';
+-- CREATE USER IF NOT EXISTS для СУЩЕСТВУЮЩЕЙ учётки не делает ничего: пароль
+-- остаётся прежним, и никакой ошибки при этом нет. После перегенерации
+-- DB_PASSWORD в .env получалось расхождение и «Access denied ... (using
+-- password: YES)» уже на миграциях. Поэтому пароль выставляем явно.
+ALTER USER '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
+ALTER USER '${DB_USERNAME}'@'127.0.0.1' IDENTIFIED BY '${DB_PASSWORD}';
 GRANT ALL PRIVILEGES ON \`${DB_DATABASE}\`.* TO '${DB_USERNAME}'@'localhost';
 GRANT ALL PRIVILEGES ON \`${DB_DATABASE}\`.* TO '${DB_USERNAME}'@'127.0.0.1';
 FLUSH PRIVILEGES;
 SQL
 log "БД панели готова (${DB_DATABASE})"
+
+# Проверяем учётку ровно так, как ею пользуется панель: по TCP, с паролем из
+# .env. Если тут отказ — дальше падать будет на миграциях, где сообщение
+# ничего не объясняет.
+DB_HOST_CHECK="${DB_HOST:-127.0.0.1}"
+DB_PORT_CHECK="${DB_PORT:-3306}"
+if mysql -h "$DB_HOST_CHECK" -P "$DB_PORT_CHECK" -u"${DB_USERNAME}" -p"${DB_PASSWORD}" \
+     -e "USE \`${DB_DATABASE}\`" >/dev/null 2>&1; then
+  log "Панель может войти в свою базу (${DB_USERNAME}@${DB_HOST_CHECK})"
+else
+  die "Пользователь ${DB_USERNAME}@${DB_HOST_CHECK} не может войти в базу ${DB_DATABASE} с паролем из ${ENV_FILE}.
+     Проверьте вручную:
+       mysql -h ${DB_HOST_CHECK} -u${DB_USERNAME} -p'<пароль из .env>' -e 'SELECT 1'"
+fi
 
 # ── 8. миграции ──────────────────────────────────────────────────────────
 log "Применяю миграции панели"
@@ -339,6 +402,18 @@ php "${HOSTING_DIR}/panel/bin/migrate.php"
 
 # ── 9. nginx: базовый сниппет + панель ───────────────────────────────────
 log "Настраиваю nginx"
+
+# На машине без IPv6 nginx не просто игнорирует `listen [::]…`, а валится на
+# проверке конфига целиком: «socket() [::]:80 failed (97: Address family not
+# supported by protocol)». Не применяется НИ ОДИН сайт, включая панель.
+# Отсутствие /proc/net/if_inet6 — стандартный признак выключенного IPv6.
+strip_ipv6_if_unavailable() {
+  [[ -e /proc/net/if_inet6 ]] && return 0
+  sed -i -E '/^[[:space:]]*listen[[:space:]]+\[::\]/d' "$@"
+}
+if [[ ! -e /proc/net/if_inet6 ]]; then
+  warn "IPv6 в системе выключен — убираю строки listen [::] из конфигов nginx"
+fi
 mkdir -p /etc/nginx/conf.d /etc/nginx/sites-available /etc/nginx/sites-enabled
 sed "s/{{PANEL_NAME}}/${PANEL_NAME:-AlijonHost}/g" \
   "${HOSTING_DIR}/templates/nginx-global-hosting.conf.tpl" > /etc/nginx/conf.d/hosting-global.conf
@@ -352,6 +427,8 @@ sed \
   -e "s#{{LOG_DIR}}#${LOG_DIR}#g" \
   -e "s#{{UPLOAD_MAX_MB}}#${UPLOAD_MAX_MB:-64}#g" \
   "${HOSTING_DIR}/templates/nginx-panel.conf.tpl" > /etc/nginx/sites-available/panel.conf
+
+strip_ipv6_if_unavailable /etc/nginx/sites-available/panel.conf /etc/nginx/conf.d/hosting-global.conf
 ln -sfn /etc/nginx/sites-available/panel.conf /etc/nginx/sites-enabled/panel.conf
 rm -f /etc/nginx/sites-enabled/default
 
@@ -479,9 +556,23 @@ fi
 
 # ── 16. SSH/SFTP ──────────────────────────────────────────────────────────
 log "Настраиваю SFTP для клиентов"
-install -m 0644 "${HOSTING_DIR}/etc/ssh/sshd-hosting.conf" /etc/ssh/sshd_config.d/hosting.conf
-sshd -t 2>/dev/null && systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || \
-  warn "Не удалось перезагрузить sshd — проверьте конфиг вручную (sshd -t)"
+# Каталога sshd_config.d может не быть (минимальный образ, свежая установка
+# openssh-server). Без mkdir установка обрывалась здесь с «cannot create regular
+# file» — на шаге, который к тому же не критичен для запуска хостинга.
+if [[ -d /etc/ssh ]]; then
+  mkdir -p /etc/ssh/sshd_config.d
+  install -m 0644 "${HOSTING_DIR}/etc/ssh/sshd-hosting.conf" /etc/ssh/sshd_config.d/hosting.conf
+  if sshd -t 2>/dev/null; then
+    systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || \
+      warn "Не удалось перезагрузить sshd — проверьте вручную (sshd -t)"
+  else
+    warn "sshd -t не прошёл — конфиг SFTP записан, но sshd не перезагружен"
+    note_status "SFTP для клиентов не активирован: проверьте sshd -t"
+  fi
+else
+  warn "openssh-server не установлен — SFTP для клиентов не настроен"
+  note_status "SFTP не настроен: нет /etc/ssh (установите openssh-server и повторите install.sh)"
+fi
 
 # ── 17. cloudflare firewall allowlist (если сайты проксируются через Cloudflare) ──
 if [[ "${HOSTING_BEHIND_CLOUDFLARE:-false}" == "true" ]]; then

@@ -103,6 +103,20 @@ else
   hint "из-за этого systemd-юниты ссылаются на несуществующие файлы: sudo bash ${HOSTING_DIR}/install.sh"
 fi
 
+# Даже при правильном HOSTING_ROOT панель не отдаст ни одной страницы, если
+# веб-процесс не может дойти до файлов по пути. Классика: клон в /root, у
+# которого права 0700 — nginx и php-fpm получают отказ на входе в каталог,
+# а наружу это выглядит как 404 на каждой странице.
+if id -u hosting-panel >/dev/null 2>&1; then
+  PANEL_INDEX="${HR}/hosting/panel/public/index.php"
+  if su -s /bin/sh hosting-panel -c "test -r '${PANEL_INDEX}'" 2>/dev/null; then
+    ok "веб-процесс панели читает её файлы"
+  else
+    bad "пользователь hosting-panel не может прочитать ${PANEL_INDEX}"
+    hint "панель будет отдавать 404 на каждой странице. Обычно причина — проект лежит в /root (права 0700): sudo bash ${HOSTING_DIR}/install.sh перенесёт его в /opt/hosting-panel"
+  fi
+fi
+
 WORKER_BIN="${HR}/hosting/worker/bin/hosting-worker.php"
 if [[ -f "$WORKER_BIN" ]]; then
   ok "воркер на месте: ${WORKER_BIN}"

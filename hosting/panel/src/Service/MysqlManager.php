@@ -124,6 +124,27 @@ final class MysqlManager
                 $pdo->quote($password),
                 $maxConnections,
             ));
+
+            // Сюда мы попадаем, только если хотя бы одного из двух хостов не было
+            // (иначе выше сработал бы ранний return). Одна из учёток при этом
+            // могла остаться со старым паролем: CREATE USER IF NOT EXISTS для
+            // существующей учётки молча не делает ничего. Клиенту же мы отдаём
+            // $password — значит, обе учётки обязаны его принимать, иначе сайт
+            // клиента работал бы по TCP и отказывал через сокет.
+            $pdo->exec(sprintf(
+                'ALTER USER %s@%s IDENTIFIED BY %s',
+                $pdo->quote($dbUser),
+                $pdo->quote($host),
+                $pdo->quote($password),
+            ));
+
+            // Лимит подключений на уже существовавшей учётке мог быть не выставлен.
+            $pdo->exec(sprintf(
+                'GRANT USAGE ON *.* TO %s@%s WITH MAX_USER_CONNECTIONS %d',
+                $pdo->quote($dbUser),
+                $pdo->quote($host),
+                $maxConnections,
+            ));
         }
         $pdo->exec('FLUSH PRIVILEGES');
 
