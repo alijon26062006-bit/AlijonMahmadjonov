@@ -147,6 +147,17 @@ grn "база «${DB_NAME}» и пользователь «${DB_USER}» гото
 
 # ---------- 4. ключи ----------
 CFG=""
+
+# Порядок важен: явно переданные переменные окружения главнее всего —
+# так можно поменять список админов или токен, не трогая остального.
+if [ -n "${BOT_TOKEN:-}" ] && [ -n "${ADMINS:-}" ]; then
+    info "Беру ключи из переданных переменных"
+elif [ -n "${ADMINS:-}" ] && [ -f "$DIR/.env" ] && grep -q '^BOT_TOKEN=.\+' "$DIR/.env"; then
+    # передан только список админов — меняем его, остальное оставляем
+    info "Обновляю список админов, остальные ключи не трогаю"
+    CFG="__ENV__"
+    NEW_ADMINS="$ADMINS"
+else
 for c in "$SRC/config.php" /root/config.php /var/www/zver/config.php; do
     [ -f "$c" ] && { CFG="$c"; break; }
 done
@@ -174,19 +185,27 @@ else
         echo
     fi
 fi
+fi
 
 info "Собираю .env (значения на экран не выводятся)…"
 if [ "$CFG" = "__ENV__" ]; then
     # обновляем только доступы к базе, ключи не трогаем
-    python3 - "$DIR/.env" "$DB_NAME" "$DB_USER" "$DB_PASS" "$DB_HOST" "$DB_PORT" <<'PY'
-import pathlib, sys
+    python3 - "$DIR/.env" "$DB_NAME" "$DB_USER" "$DB_PASS" "$DB_HOST" "$DB_PORT" \
+             "${NEW_ADMINS:-}" <<'PY'
+import pathlib, re, sys
 env, name, user, pw, host, port = sys.argv[1:7]
+new_admins = sys.argv[7] if len(sys.argv) > 7 else ""
 p = pathlib.Path(env)
 lines, seen = [], set()
 for line in p.read_text(encoding="utf-8").splitlines():
     key = line.split("=", 1)[0].strip()
     repl = {"DB_NAME": name, "DB_USER": user, "DB_PASS": pw,
         "DB_HOST": host, "DB_PORT": port}
+    if new_admins and key == "ADMINS":
+        cleaned = ",".join(re.findall(r"-?\d+", new_admins))
+        lines.append(f"ADMINS={cleaned}"); seen.add("ADMINS")
+        print(f"  админов теперь: {cleaned}")
+        continue
     if key in repl:
         lines.append(f"{key}={repl[key]}"); seen.add(key)
     else:
