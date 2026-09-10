@@ -316,3 +316,130 @@ async def set_topup_status(tid: int, status: str, admin_id: int) -> bool:
                 (status, admin_id, int(time.time()), tid),
             )
             return cur.rowcount > 0
+
+
+# ─────────────────────────── промокоды ───────────────────────────
+
+async def promo_by_code(code: str) -> dict | None:
+    return await one("SELECT * FROM z_promo WHERE code=%s", (code.strip().upper(),))
+
+
+async def promo_used_by(promo_id: int, uid: int) -> int:
+    row = await one(
+        "SELECT COUNT(*) AS c FROM z_promo_use WHERE promo_id=%s AND uid=%s",
+        (promo_id, uid))
+    return int((row or {}).get("c", 0))
+
+
+async def promo_apply(promo_id: int, uid: int, order_id: int | None,
+                      off: Decimal) -> None:
+    """Отметить использование промокода. Счётчики и запись — одной транзакцией."""
+    async with _p().acquire() as conn:
+        await conn.begin()
+        try:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """INSERT INTO z_promo_use (promo_id, uid, order_id, sum_off, at)
+                       VALUES (%s,%s,%s,%s,%s)""",
+                    (promo_id, uid, order_id, str(off), int(time.time())))
+                await cur.execute(
+                    "UPDATE z_promo SET used=used+1, saved=saved+%s WHERE id=%s",
+                    (str(off), promo_id))
+            await conn.commit()
+        except Exception:
+            await conn.rollback()
+            raise
+
+
+# ─────────────────────────── обязательная подписка ───────────────────────────
+
+async def subs_list(only_active: bool = True) -> list[dict]:
+    """Каналы обязательной подписки. Если таблицы ещё нет — не роняем бота."""
+    where = "WHERE active=1" if only_active else ""
+    try:
+        return await all(f"SELECT * FROM z_subs {where} ORDER BY sort DESC, id ASC")
+    except Exception:
+        return []
+
+
+async def sub_ok_at(uid: int) -> int:
+    try:
+        row = await one("SELECT sub_ok_at FROM z_users WHERE id=%s", (uid,))
+        return int((row or {}).get("sub_ok_at") or 0)
+    except Exception:
+        return 0
+
+
+async def mark_sub_ok(uid: int) -> None:
+    try:
+        await run("UPDATE z_users SET sub_ok_at=%s WHERE id=%s", (int(time.time()), uid))
+    except Exception:
+        pass
+
+
+# ─────────────────────────── рефералы ───────────────────────────
+
+async def set_ref_by(uid: int, inviter: int) -> bool:
+    """Записать пригласившего — только если он ещё не записан и это не сам себя."""
+    if inviter == uid:
+        return False
+    if not await one("SELECT id FROM z_users WHERE id=%s", (inviter,)):
+        return False
+    async with _p().acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE z_users SET ref_by=%s WHERE id=%s AND ref_by IS NULL",
+                (inviter, uid))
+            return cur.rowcount > 0
+
+
+async def claim_ref_bonus(uid: int) -> int | None:
+    """Забронировать выплату бонуса за приглашение uid.
+
+    Возвращает id пригласившего, если выплату надо сделать именно сейчас,
+    иначе None. Флаг ref_paid ставится условным UPDATE, поэтому бонус
+    не начислится дважды даже при двух одновременных заказах.
+    """
+    u = await one("SELECT ref_by, ref_paid FROM z_users WHERE id=%s", (uid,))
+    if not u or not u.get("ref_by") or int(u.get("ref_paid") or 0) == 1:
+        return None
+    inviter = int(u["ref_by"])
+    if inviter == uid or not await one("SELECT id FROM z_users WHERE id=%s", (inviter,)):
+        return None
+    async with _p().acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE z_users SET ref_paid=1 WHERE id=%s AND ref_paid=0", (uid,))
+            return inviter if cur.rowcount > 0 else None
+
+
+async def pay_ref_bonus(inviter: int, bonus: Decimal, who: str,
+                        ref_uid: int) -> dict:
+    """Начислить бонус пригласившему. Возвращает его баланс и число друзей."""
+    async with _p().acquire() as conn:
+        await conn.begin()
+        try:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute(
+                    "SELECT balance FROM z_users WHERE id=%s FOR UPDATE", (inviter,))
+                row = await cur.fetchone()
+                new_bal = Decimal((row or {}).get("balance") or 0) + bonus
+                await cur.execute(
+                    """UPDATE z_users
+                          SET balance=%s, ref_sum=ref_sum+%s, ref_cnt=ref_cnt+1
+                        WHERE id=%s""",
+                    (str(new_bal), str(bonus), inviter))
+            await _tx(conn, inviter, "ref", bonus,
+                      new_bal, f"Бонус за друга · {who}", ref_uid)
+            await conn.commit()
+        except Exception:
+            await conn.rollback()
+            raise
+    row = await one("SELECT balance, ref_cnt FROM z_users WHERE id=%s", (inviter,))
+    return row or {"balance": ZERO, "ref_cnt": 0}
+
+
+async def ref_stats(uid: int) -> dict:
+    row = await one(
+        "SELECT ref_cnt, ref_sum FROM z_users WHERE id=%s", (uid,))
+    return row or {"ref_cnt": 0, "ref_sum": ZERO}

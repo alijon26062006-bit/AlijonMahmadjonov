@@ -4,7 +4,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from aiogram import F, Router
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
@@ -13,6 +13,7 @@ import config
 import db
 import keyboards as kb
 from handlers.common import money, notify_admins, parse_amount
+from services import referral, subs
 from texts import DEFAULT_LANG, t, status_text
 
 router = Router()
@@ -38,7 +39,8 @@ async def show_menu(msg: Message, lang: str, uid: int) -> None:
 
 
 @router.message(CommandStart())
-async def cmd_start(msg: Message, state: FSMContext) -> None:
+async def cmd_start(msg: Message, state: FSMContext,
+                    command: CommandObject | None = None) -> None:
     await state.clear()
     u = msg.from_user
     user, is_new = await db.ensure_user(
@@ -48,6 +50,10 @@ async def cmd_start(msg: Message, state: FSMContext) -> None:
     if user.get("blocked"):
         await msg.answer(t(user.get("lang"), "blocked"))
         return
+
+    # /start 123456789 — пришёл по реферальной ссылке
+    if is_new and command and command.args:
+        await referral.remember_inviter(u.id, command.args)
     # у новичка спрашиваем язык один раз, дальше — сразу меню
     if is_new:
         await msg.answer(t(DEFAULT_LANG, "choose_lang"), reply_markup=kb.langs_kb())
@@ -200,3 +206,33 @@ async def topup_receipt(msg: Message, state: FSMContext) -> None:
 async def topup_need_photo(msg: Message) -> None:
     user = await db.get_user(msg.from_user.id)
     await msg.answer(t((user or {}).get("lang"), "topup_wait_photo"))
+
+
+# ─────────────────────────── друзья ───────────────────────────
+
+@router.message(_btn("menu_ref"))
+async def btn_ref(msg: Message) -> None:
+    lang = await _lang(msg)
+    await msg.answer(await referral.invite_text(msg.bot, msg.from_user.id, lang))
+
+
+# ─────────────────────────── обязательная подписка ───────────────────────────
+
+@router.callback_query(F.data == "subchk")
+async def check_sub(cb: CallbackQuery) -> None:
+    """«Я подписался» — проверяем заново, кэш сбрасываем."""
+    uid = cb.from_user.id
+    user = await db.get_user(uid)
+    lang = (user or {}).get("lang") or DEFAULT_LANG
+
+    subs.drop_cache(uid)
+    if await subs.ok(cb.bot, uid):
+        await cb.answer(t(lang, "sub_thanks"))
+        try:
+            await cb.message.delete()
+        except Exception:
+            pass
+        await show_menu(cb.message, lang, uid)
+        return
+
+    await cb.answer(t(lang, "sub_still"), show_alert=True)

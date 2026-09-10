@@ -20,8 +20,9 @@ def main_menu(lang: str) -> ReplyKeyboardMarkup:
             [KeyboardButton(text=t(lang, "menu_buy")),
              KeyboardButton(text=t(lang, "menu_balance"))],
             [KeyboardButton(text=t(lang, "menu_orders")),
-             KeyboardButton(text=t(lang, "menu_lang"))],
-            [KeyboardButton(text=t(lang, "menu_support"))],
+             KeyboardButton(text=t(lang, "menu_ref"))],
+            [KeyboardButton(text=t(lang, "menu_lang")),
+             KeyboardButton(text=t(lang, "menu_support"))],
         ],
         resize_keyboard=True,
     )

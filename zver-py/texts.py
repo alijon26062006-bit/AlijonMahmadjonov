@@ -86,6 +86,34 @@ TJ = {
     "n_topup_ok":    ("✅ Ҳисоб пур шуд: <b>{amount} {cur}</b>.\n"
                       "Ҳоло дар ҳисоб: <b>{balance} {cur}</b>"),
     "n_topup_rej":   "❌ Дархости пуркунии <b>#{tid}</b> рад карда шуд.",
+    "menu_ref":      "👥 Дӯстон",
+
+    "sub_title":     "ОБУНА ШАВЕД",
+    "sub_txt":       "Барои истифодаи бот аввал ба канали мо обуна шавед.",
+    "sub_why":       "Дар канал: тахфифҳо, бозиҳои нав, хабарҳо ва ҷавоб ба саволҳо.",
+    "sub_check":     "Ман обуна шудам",
+    "sub_still":     "Шумо ҳанӯз обуна нашудаед.",
+    "sub_thanks":    "Раҳмат! Акнун метавонед харид кунед ✅",
+
+    "promo_ask":     "Промокод доред? Нависед ё «-» гузоред:",
+    "promo_ok":      "Промокод <b>{code}</b> — тахфиф <b>{off} {cur}</b> ✅",
+    "promo_skip":    "Бе промокод.",
+    "promo_not_found": "Чунин промокод нест",
+    "promo_off":     "Промокод хомӯш аст",
+    "promo_expired": "Мӯҳлати промокод гузашт",
+    "promo_limit":   "Промокод тамом шуд",
+    "promo_used":    "Шумо аллакай истифода кардед",
+    "promo_min":     "Ҳадди ақали харид: {min} {cur}",
+    "promo_empty":   "Рамзро нависед",
+    "confirm_disc":  "\nТахфиф: −<b>{off} {cur}</b>\nҲамагӣ: <b>{total} {cur}</b>",
+
+    "ref_paid":      ("<b>◆ БОНУСИ ДАЪВАТ</b>\n<code>───────────────</code>\n"
+                      "{who} хариди аввалро кард.\n\n+ <b>{bonus} {cur}</b>\n"
+                      "Ҳисоб · <b>{balance} {cur}</b>\nДӯстон · <b>{friends}</b>"),
+    "ref_info":      ("<b>👥 Дӯстонро даъват кунед</b>\n\n"
+                      "Барои ҳар дӯст, ки хариди аввал мекунад: <b>{bonus} {cur}</b>\n\n"
+                      "Ссылкаи шумо:\n<code>{link}</code>\n\n"
+                      "Даъватшуда · <b>{friends}</b>\nБа даст оварда · <b>{earned} {cur}</b>"),
 }
 
 RU = {
@@ -155,6 +183,34 @@ RU = {
     "n_topup_ok":    ("✅ Баланс пополнен на <b>{amount} {cur}</b>.\n"
                       "Текущий баланс: <b>{balance} {cur}</b>"),
     "n_topup_rej":   "❌ Заявка на пополнение <b>#{tid}</b> отклонена.",
+    "menu_ref":      "👥 Друзья",
+
+    "sub_title":     "ПОДПИШИТЕСЬ",
+    "sub_txt":       "Чтобы пользоваться ботом, подпишитесь на наш канал.",
+    "sub_why":       "В канале: скидки, новые игры, новости и ответы на вопросы.",
+    "sub_check":     "Я подписался",
+    "sub_still":     "Вы всё ещё не подписаны.",
+    "sub_thanks":    "Спасибо! Теперь можно покупать ✅",
+
+    "promo_ask":     "Есть промокод? Отправьте его или «-», чтобы пропустить:",
+    "promo_ok":      "Промокод <b>{code}</b> — скидка <b>{off} {cur}</b> ✅",
+    "promo_skip":    "Без промокода.",
+    "promo_not_found": "Такого промокода нет",
+    "promo_off":     "Промокод отключён",
+    "promo_expired": "Срок промокода истёк",
+    "promo_limit":   "Промокод исчерпан",
+    "promo_used":    "Вы уже использовали его",
+    "promo_min":     "Минимальная сумма: {min} {cur}",
+    "promo_empty":   "Введите код",
+    "confirm_disc":  "\nСкидка: −<b>{off} {cur}</b>\nИтого: <b>{total} {cur}</b>",
+
+    "ref_paid":      ("<b>◆ БОНУС ЗА ДРУГА</b>\n<code>───────────────</code>\n"
+                      "{who} сделал первую покупку.\n\n+ <b>{bonus} {cur}</b>\n"
+                      "Баланс · <b>{balance} {cur}</b>\nДрузей · <b>{friends}</b>"),
+    "ref_info":      ("<b>👥 Приглашайте друзей</b>\n\n"
+                      "За каждого друга, который сделает первую покупку: <b>{bonus} {cur}</b>\n\n"
+                      "Ваша ссылка:\n<code>{link}</code>\n\n"
+                      "Приглашено · <b>{friends}</b>\nЗаработано · <b>{earned} {cur}</b>"),
 }
 
 EN = {
@@ -224,6 +280,34 @@ EN = {
     "n_topup_ok":    ("✅ Balance topped up by <b>{amount} {cur}</b>.\n"
                       "Current balance: <b>{balance} {cur}</b>"),
     "n_topup_rej":   "❌ Top-up request <b>#{tid}</b> was rejected.",
+    "menu_ref":      "👥 Friends",
+
+    "sub_title":     "PLEASE SUBSCRIBE",
+    "sub_txt":       "To use the bot, subscribe to our channel first.",
+    "sub_why":       "In the channel: discounts, new games, news and answers.",
+    "sub_check":     "I've subscribed",
+    "sub_still":     "You are still not subscribed.",
+    "sub_thanks":    "Thanks! You can shop now ✅",
+
+    "promo_ask":     "Have a promo code? Send it, or «-» to skip:",
+    "promo_ok":      "Promo code <b>{code}</b> — discount <b>{off} {cur}</b> ✅",
+    "promo_skip":    "No promo code.",
+    "promo_not_found": "Promo code not found",
+    "promo_off":     "Promo code is disabled",
+    "promo_expired": "Promo code expired",
+    "promo_limit":   "Promo code limit reached",
+    "promo_used":    "You already used it",
+    "promo_min":     "Minimum amount: {min} {cur}",
+    "promo_empty":   "Enter the code",
+    "confirm_disc":  "\nDiscount: −<b>{off} {cur}</b>\nTotal: <b>{total} {cur}</b>",
+
+    "ref_paid":      ("<b>◆ REFERRAL BONUS</b>\n<code>───────────────</code>\n"
+                      "{who} made their first purchase.\n\n+ <b>{bonus} {cur}</b>\n"
+                      "Balance · <b>{balance} {cur}</b>\nFriends · <b>{friends}</b>"),
+    "ref_info":      ("<b>👥 Invite friends</b>\n\n"
+                      "For every friend who makes a first purchase: <b>{bonus} {cur}</b>\n\n"
+                      "Your link:\n<code>{link}</code>\n\n"
+                      "Invited · <b>{friends}</b>\nEarned · <b>{earned} {cur}</b>"),
 }
 
 _TABLE: dict[str, dict[str, str]] = {
