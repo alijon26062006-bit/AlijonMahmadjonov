@@ -82,6 +82,10 @@ final class Config
 
             // Telegram Mini App
             'telegram_bot_token' => $get('TELEGRAM_BOT_TOKEN', ''),
+            // Имя бота нужно кнопке «Войти через Telegram» на публичной главной:
+            // виджет Telegram принимает именно username, а не токен. Заполняется
+            // автоматически в setup.sh через getMe.
+            'telegram_bot_username' => ltrim($get('TELEGRAM_BOT_USERNAME', ''), '@'),
 
             // Cloudflare (wildcard DNS-01 + firewall allowlist)
             'cloudflare_api_token' => $get('CLOUDFLARE_API_TOKEN', ''),

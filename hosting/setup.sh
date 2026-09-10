@@ -115,7 +115,16 @@ if [[ -n "$TG_TOKEN" ]]; then
     | grep -oE '"username":"[^"]+"' | head -1 | cut -d'"' -f4 || true)
   if [[ -n "$BOT_NAME" ]]; then
     log "Токен рабочий, бот: @${BOT_NAME}"
-    echo "  Не забудьте в @BotFather: /setmenubutton → https://panel.${DOMAIN}/telegram"
+    # Имя бота нужно кнопке «Войти через Telegram» на публичной главной —
+    # виджет Telegram принимает username, а не токен.
+    set_env TELEGRAM_BOT_USERNAME "$BOT_NAME"
+    echo
+    echo "  В @BotFather осталось сделать две вещи:"
+    echo "   1) /setmenubutton → выберите @${BOT_NAME} → ссылка https://panel.${DOMAIN}/telegram"
+    echo "      (это кнопка Mini App: клиент открывает бота и сразу попадает в панель)"
+    echo "   2) /setdomain → выберите @${BOT_NAME} → ${DOMAIN}"
+    echo "      (без этого кнопка «Войти через Telegram» на сайте работать не будет)"
+    echo
   else
     warn "Telegram не принял этот токен — вход через Mini App работать не будет"
   fi

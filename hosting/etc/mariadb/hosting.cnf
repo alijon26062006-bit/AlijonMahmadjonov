@@ -7,6 +7,12 @@
 # Никогда не открываем порт наружу — только локальный доступ (see FIREWALL).
 bind-address = 127.0.0.1
 
+# Кодировка задаётся явно на всех уровнях. Без этого умолчание зависит от сборки
+# и версии, и любой инструмент, не указавший кодировку сам (mysql, mysqldump),
+# способен молча испортить кириллицу — в том числе в резервных копиях клиентов.
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+
 innodb_buffer_pool_size = 2G
 innodb_log_file_size    = 256M
 innodb_flush_log_at_trx_commit = 1
@@ -32,3 +38,9 @@ long_query_time     = 2
 
 # Только localhost видит error log с деталями — сам файл не должен быть публично читаем.
 log_error = /var/log/mysql/error.log
+
+[client]
+default-character-set = utf8mb4
+
+[mysqldump]
+default-character-set = utf8mb4

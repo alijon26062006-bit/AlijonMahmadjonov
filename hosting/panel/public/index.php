@@ -56,7 +56,10 @@ $isHttps = ($_SERVER['HTTPS'] ?? '') !== '' || ($_SERVER['HTTP_X_FORWARDED_PROTO
 // frame-ancestors разрешает встраивание в Telegram (Mini App открывается в их WebView/iframe),
 // но не в произвольный сторонний сайт — только web.telegram.org и сам себя.
 header("Content-Security-Policy: default-src 'self'; script-src 'self' https://telegram.org; "
-    . "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+    . "style-src 'self' 'unsafe-inline'; img-src 'self' data: https://t.me https://*.telegram.org; "
+    // frame-src нужен кнопке «Войти через Telegram»: виджет открывает окно
+    // авторизации в iframe с oauth.telegram.org.
+    . "frame-src https://oauth.telegram.org https://*.telegram.org; "
     . "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org;");
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: strict-origin-when-cross-origin');
@@ -109,7 +112,7 @@ $backupController = new BackupController($db, $auth, $backups, $jobs, $view);
 // ── маршруты ─────────────────────────────────────────────────────────────
 $router = new Router();
 
-$router->get('/', fn () => Response::redirect($auth->user() ? '/dashboard' : '/login'));
+$router->get('/', [$authController, 'landing']);
 
 // Публичный health-check — без аутентификации и без секретов в ответе (см. спецификацию
 // HEALTH CHECKS: "Никаких секретов в public health endpoint"). Используется внешним
@@ -144,6 +147,7 @@ $router->get('/logout', [$authController, 'logout']);
 $router->post('/logout', [$authController, 'logout']);
 $router->get('/telegram', [$authController, 'showTelegram']);
 $router->post('/telegram/callback', [$authController, 'telegramCallback']);
+$router->get('/telegram/widget', [$authController, 'telegramWidget']);
 
 $router->get('/dashboard', [$dashboardController, 'index']);
 

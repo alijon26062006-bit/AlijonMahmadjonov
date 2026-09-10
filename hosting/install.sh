@@ -274,7 +274,8 @@ mkdir -p /etc/nginx/conf.d /etc/nginx/sites-available /etc/nginx/sites-enabled
 sed "s/{{PANEL_NAME}}/${PANEL_NAME:-AlijonHost}/g" \
   "${HOSTING_DIR}/templates/nginx-global-hosting.conf.tpl" > /etc/nginx/conf.d/hosting-global.conf
 
-PANEL_DOMAIN="panel.${HOSTING_ROOT_DOMAIN}"
+# Один vhost на панель и на публичную витрину: маршрут «/» сам решает, что показать.
+PANEL_DOMAIN="panel.${HOSTING_ROOT_DOMAIN} ${HOSTING_ROOT_DOMAIN} www.${HOSTING_ROOT_DOMAIN}"
 sed \
   -e "s#{{PANEL_NAME}}#${PANEL_NAME:-AlijonHost}#g" \
   -e "s#{{PANEL_DOMAIN}}#${PANEL_DOMAIN}#g" \

@@ -81,6 +81,66 @@ final class TelegramAuth
     }
 
     /**
+     * Проверка данных от Telegram Login Widget — это вход с ОБЫЧНОГО САЙТА
+     * (кнопка «Войти через Telegram»), а не из Mini App.
+     *
+     * Алгоритм похож, но ключ считается иначе: здесь secret_key = SHA256(токен),
+     * а в Mini App — HMAC(токен, "WebAppData"). Перепутать их легко, и тогда
+     * подпись просто никогда не сойдётся.
+     *
+     * @param array<string,string> $params поля из query-строки колбэка (id, first_name, hash, …)
+     * @return array{id:int,first_name?:string,last_name?:string,username?:string}
+     * @throws \RuntimeException если подпись не сходится или данные просрочены
+     *
+     * @see https://core.telegram.org/widgets/login#checking-authorization
+     */
+    public function verifyLoginWidget(array $params, ?int $now = null): array
+    {
+        if (!$this->isConfigured()) {
+            throw new \RuntimeException('Вход через Telegram не настроен: нет токена бота');
+        }
+
+        $hash = (string) ($params['hash'] ?? '');
+        if ($hash === '') {
+            throw new \RuntimeException('В данных Telegram нет подписи');
+        }
+
+        $checked = $params;
+        unset($checked['hash']);
+        ksort($checked);
+
+        $lines = [];
+        foreach ($checked as $key => $value) {
+            $lines[] = $key . '=' . $value;
+        }
+
+        $secretKey = hash('sha256', $this->botToken, true);
+        $expected = hash_hmac('sha256', implode("\n", $lines), $secretKey);
+
+        if (!hash_equals($expected, $hash)) {
+            throw new \RuntimeException('Подпись Telegram не сходится');
+        }
+
+        $authDate = (int) ($params['auth_date'] ?? 0);
+        $now = $now ?? time();
+        if ($authDate <= 0 || $now - $authDate > self::MAX_AGE_SECONDS) {
+            throw new \RuntimeException('Данные Telegram устарели, войдите заново');
+        }
+
+        $id = (int) ($params['id'] ?? 0);
+        if ($id <= 0) {
+            throw new \RuntimeException('Telegram не передал идентификатор пользователя');
+        }
+
+        return [
+            'id'         => $id,
+            'first_name' => (string) ($params['first_name'] ?? ''),
+            'last_name'  => (string) ($params['last_name'] ?? ''),
+            'username'   => (string) ($params['username'] ?? ''),
+        ];
+    }
+
+    /**
      * Разбор query-строки вручную: parse_str портит ключи с точками и скобками,
      * а для подписи важно сохранить значения ровно такими, как их прислал Telegram.
      *

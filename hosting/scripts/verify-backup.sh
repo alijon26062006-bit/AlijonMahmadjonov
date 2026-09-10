@@ -45,8 +45,8 @@ for home in "${HOSTING_USERS_ROOT}"/client*; do
     for dump in "$workdir"/databases/*.sql; do
       [[ -f "$dump" ]] || continue
       testdb="verify_$(basename "$dump" .sql)_$$"
-      mysql -e "CREATE DATABASE \`${testdb}\` CHARACTER SET utf8mb4" 2>/dev/null
-      if mysql "$testdb" < "$dump" 2>/tmp/verify-${testdb}.err; then
+      mysql --default-character-set=utf8mb4 -e "CREATE DATABASE \`${testdb}\` CHARACTER SET utf8mb4" 2>/dev/null
+      if mysql --default-character-set=utf8mb4 "$testdb" < "$dump" 2>/tmp/verify-${testdb}.err; then
         tables=$(mysql -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${testdb}'")
         if [[ "$tables" -gt 0 ]]; then
           echo "[verify-backup] $user: дамп $(basename "$dump") восстановился, таблиц: $tables"

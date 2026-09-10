@@ -135,14 +135,29 @@ final class AuthController
         return Response::redirect('/login');
     }
 
+    /** Публичная главная: витрина с тарифами и кнопкой входа через Telegram. */
+    public function landing(Request $request): Response
+    {
+        if ($this->auth->user() !== null) {
+            return Response::redirect('/dashboard');
+        }
+
+        return Response::html($this->view->page('landing', [
+            'plans'        => $this->plans->all(),
+            'rootDomain'   => $this->config->str('root_domain'),
+            'botUsername'  => $this->config->str('telegram_bot_username'),
+            'appUrl'       => $this->config->str('app_url'),
+        ]));
+    }
+
     public function showTelegram(Request $request): Response
     {
         return Response::html($this->view->page('auth/telegram', []));
     }
 
+    /** Вход из Mini App: страница /telegram сама отправляет сюда подписанную initData. */
     public function telegramCallback(Request $request): Response
     {
-        $initData = $request->raw('init_data');
         $ip = (string) ($request->server['REMOTE_ADDR'] ?? '');
 
         if (!$this->telegramAuth->isConfigured()) {
@@ -151,32 +166,70 @@ final class AuthController
         }
 
         try {
-            $verified = $this->telegramAuth->verify($initData);
+            $verified = $this->telegramAuth->verify($request->raw('init_data'));
         } catch (\RuntimeException $e) {
             $this->db->recordSecurityEvent('telegram_auth_failed', 'warning', $ip, ['error' => $e->getMessage()]);
             Flash::add('error', 'Не удалось подтвердить вход через Telegram: ' . $e->getMessage());
             return Response::redirect('/telegram');
         }
 
-        $tgUser = $verified['user'];
-        $telegramId = (int) $tgUser['id'];
-        $account = $this->telegramAccounts->findByTelegramId($telegramId);
+        return $this->loginWithTelegram($verified['user'], $request, '/telegram');
+    }
+
+    /**
+     * Вход через кнопку «Войти через Telegram» на обычном сайте (Login Widget).
+     * Telegram присылает подписанные данные в query-строке.
+     */
+    public function telegramWidget(Request $request): Response
+    {
+        $ip = (string) ($request->server['REMOTE_ADDR'] ?? '');
+
+        if (!$this->telegramAuth->isConfigured()) {
+            Flash::add('error', 'Вход через Telegram не настроен на этом сервере');
+            return Response::redirect('/login');
+        }
+
+        try {
+            $tgUser = $this->telegramAuth->verifyLoginWidget($request->query);
+        } catch (\RuntimeException $e) {
+            $this->db->recordSecurityEvent('telegram_widget_auth_failed', 'warning', $ip, ['error' => $e->getMessage()]);
+            Flash::add('error', 'Не удалось подтвердить вход через Telegram: ' . $e->getMessage());
+            return Response::redirect('/');
+        }
+
+        return $this->loginWithTelegram($tgUser, $request, '/');
+    }
+
+    /**
+     * Общий путь для обоих способов входа через Telegram: если такой Telegram уже
+     * привязан — просто впускаем, если нет — молча заводим аккаунт. Никакой формы
+     * регистрации: подпись Telegram уже подтвердила, кто это.
+     *
+     * @param array{id:int,first_name?:string,last_name?:string,username?:string} $tgUser
+     */
+    private function loginWithTelegram(array $tgUser, Request $request, string $errorRedirect): Response
+    {
+        $ip = (string) ($request->server['REMOTE_ADDR'] ?? '');
+        $account = $this->telegramAccounts->findByTelegramId((int) $tgUser['id']);
 
         if ($account !== null) {
             $user = $this->users->findById((int) $account['user_id']);
-            if ($user === null || !\Hosting\Model\UserRepository::isActive($user)) {
+            if ($user === null || !UserRepository::isActive($user)) {
                 Flash::add('error', 'Аккаунт заблокирован');
-                return Response::redirect('/telegram');
+                return Response::redirect($errorRedirect);
             }
         } else {
             $planCode = $request->input('plan', $this->config->str('default_plan'));
             if (!$this->plans->exists($planCode)) {
                 $planCode = $this->config->str('default_plan');
             }
+
             $user = $this->users->createFromTelegram($tgUser, $planCode);
             $this->telegramAccounts->link((int) $user['id'], $tgUser);
+            // unix-пользователь и домашний каталог создаются асинхронно воркером
             $this->jobs->enqueue('create_user', (int) $user['id'], null);
             $this->db->log((int) $user['id'], 'auth.register_telegram', 'user', (int) $user['id'], 'success', [], $ip);
+            Flash::add('success', 'Добро пожаловать! Аккаунт создан — можно сразу создавать сайт.');
         }
 
         $this->auth->login($user, $ip, (string) $request->header('user-agent'));

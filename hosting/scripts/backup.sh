@@ -68,7 +68,9 @@ backup_one_user() {
     local dbs
     dbs=$(mysql -N -B -e "SHOW DATABASES LIKE '${user}\\_%'" 2>/dev/null || true)
     for db in $dbs; do
-      mysqldump --single-transaction --quick --routines \
+      # --default-character-set обязателен: иначе клиент возьмёт свою кодировку
+      # по умолчанию и кириллица в дампе окажется битой.
+      mysqldump --default-character-set=utf8mb4 --single-transaction --quick --routines \
         "$db" > "${workdir}/databases/${db}.sql" 2>/dev/null || {
           echo "[backup] $user: не удалось сдампить базу $db" >&2
         }

@@ -94,8 +94,8 @@ if [[ -d "$WORKDIR/databases" ]] && command -v mysql >/dev/null 2>&1; then
       echo "[restore] пропуск подозрительного имени базы в архиве: $db" >&2
       continue
     fi
-    mysql -e "CREATE DATABASE IF NOT EXISTS \`${db}\` CHARACTER SET utf8mb4" 2>/dev/null || true
-    mysql "$db" < "$dump"
+    mysql --default-character-set=utf8mb4 -e "CREATE DATABASE IF NOT EXISTS \`${db}\` CHARACTER SET utf8mb4" 2>/dev/null || true
+    mysql --default-character-set=utf8mb4 "$db" < "$dump"
     echo "[restore] база восстановлена: $db"
   done
 fi

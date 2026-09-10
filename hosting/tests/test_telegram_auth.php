@@ -113,3 +113,83 @@ function test_telegram_not_configured_without_token(): void
         $auth->verify('hash=x&auth_date=' . time());
     }, 'Без настроенного токена бота вход через Telegram должен быть недоступен');
 }
+
+// ── Login Widget: вход через кнопку на обычном сайте ────────────────────────
+// Здесь другой алгоритм подписи, чем в Mini App: secret_key = SHA256(токен),
+// а не HMAC(токен, "WebAppData"). Перепутать легко, поэтому проверяем отдельно.
+
+function hosting_test_build_widget_params(string $botToken, array $fields, ?int $authDate = null): array
+{
+    $fields['auth_date'] = (string) ($authDate ?? time());
+
+    $checked = $fields;
+    ksort($checked);
+    $lines = [];
+    foreach ($checked as $key => $value) {
+        $lines[] = $key . '=' . $value;
+    }
+
+    $secretKey = hash('sha256', $botToken, true);
+    $fields['hash'] = hash_hmac('sha256', implode("\n", $lines), $secretKey);
+
+    return $fields;
+}
+
+function test_telegram_widget_valid_signature_accepted(): void
+{
+    $token = 'test-bot-token-12345';
+    $auth = new TelegramAuth($token);
+    $params = hosting_test_build_widget_params($token, [
+        'id' => '777', 'first_name' => 'Алиджон', 'username' => 'alijon',
+    ]);
+
+    $user = $auth->verifyLoginWidget($params);
+    assert_equals(777, $user['id']);
+    assert_equals('alijon', $user['username']);
+}
+
+function test_telegram_widget_tampered_id_rejected(): void
+{
+    $token = 'test-bot-token-12345';
+    $auth = new TelegramAuth($token);
+    $params = hosting_test_build_widget_params($token, ['id' => '777', 'first_name' => 'Алиджон']);
+    // Подменяем id уже после подписи — так выглядела бы попытка войти за другого.
+    $params['id'] = '999';
+
+    assert_throws(static function () use ($auth, $params): void {
+        $auth->verifyLoginWidget($params);
+    }, 'Подменённый id должен ломать подпись');
+}
+
+function test_telegram_widget_mini_app_signature_not_accepted(): void
+{
+    // Подпись, сделанная по алгоритму Mini App, не должна проходить как виджет:
+    // иначе перепутанные ключи молча "работали" бы вполсилы.
+    $token = 'test-bot-token-12345';
+    $auth = new TelegramAuth($token);
+
+    $fields = ['id' => '777', 'auth_date' => (string) time()];
+    ksort($fields);
+    $lines = [];
+    foreach ($fields as $k => $v) {
+        $lines[] = $k . '=' . $v;
+    }
+    $miniAppSecret = hash_hmac('sha256', $token, 'WebAppData', true);
+    $fields['hash'] = hash_hmac('sha256', implode("\n", $lines), $miniAppSecret);
+
+    assert_throws(static function () use ($auth, $fields): void {
+        $auth->verifyLoginWidget($fields);
+    }, 'Подпись по алгоритму Mini App не должна приниматься виджетом');
+}
+
+function test_telegram_widget_expired_rejected(): void
+{
+    $token = 'test-bot-token-12345';
+    $auth = new TelegramAuth($token);
+    $old = time() - TelegramAuth::MAX_AGE_SECONDS - 600;
+    $params = hosting_test_build_widget_params($token, ['id' => '777'], $old);
+
+    assert_throws(static function () use ($auth, $params): void {
+        $auth->verifyLoginWidget($params);
+    }, 'Просроченные данные виджета должны отклоняться');
+}
