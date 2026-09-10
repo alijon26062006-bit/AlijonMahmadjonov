@@ -128,6 +128,15 @@ else
 fi
 
 check_env_filled HOSTING_ROOT_DOMAIN "без домена не строятся адреса сайтов клиентов"
+if [[ -n "${HOSTING_ROOT_DOMAIN:-}" ]]; then
+  if php -r 'require $argv[1]; exit(Hosting\Support\Domain::isValidFqdn($argv[2]) ? 0 : 1);' \
+       "${HOSTING_DIR}/autoload.php" "$HOSTING_ROOT_DOMAIN" 2>/dev/null; then
+    ok "HOSTING_ROOT_DOMAIN — настоящий домен (${HOSTING_ROOT_DOMAIN})"
+  else
+    bad "HOSTING_ROOT_DOMAIN содержит не домен: «${HOSTING_ROOT_DOMAIN}»"
+    hint "так бывает, если в ответ на вопрос о домене попала вставленная команда: sudo bash ${HOSTING_DIR}/setup.sh"
+  fi
+fi
 check_env_filled DB_PASSWORD         "панель не подключится к своей базе"
 check_env_filled SESSION_SECRET      "сессии можно будет подделать"
 

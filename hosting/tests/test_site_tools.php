@@ -276,3 +276,28 @@ function test_site_env_is_readable_by_client_php(): void
 
     @unlink($env->path());
 }
+
+// ── Домен хостинга ──────────────────────────────────────────────────────────
+
+function test_domain_validation_rejects_pasted_commands(): void
+{
+    // Реальный случай: человек вставил в терминал две команды сразу, и вторая
+    // строка попала в ответ на вопрос о домене. Мастер это принял, и дальше
+    // сломалось всё — vhost не собрался, Telegram отверг адрес Mini App.
+    $bad = [
+        'sudo bash hosting/scripts/telegram.sh',
+        'диёрхост.ком',
+        '',
+        '-bad.com',
+        'no-dot',
+        'domain.com/path',
+        'два слова.com',
+    ];
+    foreach ($bad as $value) {
+        assert_false(\Hosting\Support\Domain::isValidFqdn($value), 'Должно отклоняться: ' . $value);
+    }
+
+    foreach (['diyorhost.com', 'panel.diyorhost.com', 'a-b.example.tj'] as $value) {
+        assert_true(\Hosting\Support\Domain::isValidFqdn($value), 'Должно приниматься: ' . $value);
+    }
+}

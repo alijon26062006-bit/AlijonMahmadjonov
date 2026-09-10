@@ -45,6 +45,50 @@ ask_secret() {
   echo "$answer"
 }
 
+# Проверка ответов — не формальность.
+#
+# Реальный случай: человек вставил в терминал сразу две команды, вторая строка
+# попала в ответ на вопрос о домене, и в настройках оказалось
+# HOSTING_ROOT_DOMAIN="sudo bash hosting/scripts/telegram.sh". Мастер это принял,
+# и дальше сломалось всё: vhost не собрался, Telegram отверг адрес Mini App.
+# Поэтому ответы проверяются здесь, а не «падают» через три шага.
+is_valid_domain() {
+  php -r 'require $argv[1]; exit(Hosting\Support\Domain::isValidFqdn($argv[2]) ? 0 : 1);' \
+    "${REPO_ROOT}/hosting/autoload.php" "$1" 2>/dev/null
+}
+
+ask_domain() {
+  local prompt="$1" default="$2" answer
+  # Заведомо непригодное значение из .env не предлагаем как ответ по умолчанию.
+  if [[ -n "$default" ]] && ! is_valid_domain "$default"; then
+    warn "В настройках записан недопустимый домен: ${default} — введите правильный"
+    default=""
+  fi
+
+  while true; do
+    answer=$(ask "$prompt" "$default")
+    answer="${answer,,}"
+    answer="${answer#http://}"; answer="${answer#https://}"; answer="${answer%%/*}"
+    if is_valid_domain "$answer"; then
+      echo "$answer"
+      return 0
+    fi
+    warn "«${answer}» не похоже на домен. Нужен вид diyorhost.com — без http://, без пробелов."
+  done
+}
+
+ask_email() {
+  local prompt="$1" default="${2:-}" answer
+  while true; do
+    answer=$(ask "$prompt" "$default")
+    if [[ -z "$answer" ]] || [[ "$answer" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]; then
+      echo "$answer"
+      return 0
+    fi
+    warn "«${answer}» не похоже на e-mail."
+  done
+}
+
 ask_secret_optional() {
   local prompt="$1" answer
   read -rsp "$prompt (Enter — пропустить): " answer
@@ -81,7 +125,7 @@ echo "Отвечайте на вопросы; чтобы оставить зна
 # ── 1. домен и IP ─────────────────────────────────────────────────────────
 head2 "Домен и адрес сервера"
 
-DOMAIN=$(ask "Основной домен хостинга" "$(current_env HOSTING_ROOT_DOMAIN)")
+DOMAIN=$(ask_domain "Основной домен хостинга" "$(current_env HOSTING_ROOT_DOMAIN)")
 [[ -n "$DOMAIN" ]] || die "Домен обязателен"
 
 DETECTED_IP=$(curl -4 -s -m 10 ifconfig.me || true)
@@ -153,13 +197,13 @@ fi
 
 # ── 3. почта для сертификатов ──────────────────────────────────────────────
 head2 "Почта"
-ACME_EMAIL=$(ask "E-mail для Let's Encrypt (туда придёт письмо, если сертификат перестанет продлеваться)" "$(current_env ACME_EMAIL)")
+ACME_EMAIL=$(ask_email "E-mail для Let's Encrypt (туда придёт письмо, если сертификат перестанет продлеваться)" "$(current_env ACME_EMAIL)")
 [[ -n "$ACME_EMAIL" ]] && set_env ACME_EMAIL "$ACME_EMAIL"
 
 # ── 4. администратор ───────────────────────────────────────────────────────
 head2 "Администратор панели"
 
-ADMIN_EMAIL=$(ask "Ваш e-mail для входа в панель")
+ADMIN_EMAIL=$(ask_email "Ваш e-mail для входа в панель")
 [[ -n "$ADMIN_EMAIL" ]] || die "E-mail администратора обязателен"
 
 while true; do

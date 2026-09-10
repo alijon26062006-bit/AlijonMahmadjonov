@@ -25,7 +25,20 @@ set -a
 set +a
 
 DOMAIN="${HOSTING_ROOT_DOMAIN:-}"
-[[ -n "$DOMAIN" ]] || { echo "[vhost] HOSTING_ROOT_DOMAIN не задан в .env" >&2; exit 1; }
+if [[ -z "$DOMAIN" ]]; then
+  echo "[vhost] HOSTING_ROOT_DOMAIN не задан в ${ENV_FILE}" >&2
+  echo "[vhost] задайте его мастером: sudo bash ${HOSTING_DIR}/setup.sh" >&2
+  exit 1
+fi
+# Значение может быть не просто пустым, а мусорным — например, если в ответ на
+# вопрос о домене случайно попала вставленная команда. Собирать из такого vhost
+# нельзя: nginx примет что угодно как server_name, и поломка всплывёт позже.
+if ! php -r 'require $argv[1]; exit(Hosting\Support\Domain::isValidFqdn($argv[2]) ? 0 : 1);' \
+     "${HOSTING_DIR}/autoload.php" "$DOMAIN" 2>/dev/null; then
+  echo "[vhost] HOSTING_ROOT_DOMAIN в ${ENV_FILE} — не домен: «${DOMAIN}»" >&2
+  echo "[vhost] исправьте: sudo bash ${HOSTING_DIR}/setup.sh (он спросит домен заново)" >&2
+  exit 1
+fi
 
 PANEL_DOMAIN="panel.${DOMAIN} ${DOMAIN} www.${DOMAIN}"
 PANEL_ROOT="${HOSTING_ROOT:-/opt/hosting}/hosting/panel/public"
