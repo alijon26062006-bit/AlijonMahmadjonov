@@ -253,8 +253,13 @@ DB_USERNAME="${DB_USERNAME:-hosting_panel}"
 DB_PASSWORD="${DB_PASSWORD:?DB_PASSWORD не задан в .env}"
 mysql -uroot -p"${MYSQL_ADMIN_PASSWORD}" <<SQL
 CREATE DATABASE IF NOT EXISTS \`${DB_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- 'user'@'localhost' и 'user'@'127.0.0.1' — для MariaDB это РАЗНЫЕ учётки:
+-- первая пускает через unix-сокет, вторая по TCP. Панель ходит по TCP
+-- (DB_HOST=127.0.0.1), поэтому заводим обе, иначе получаем ошибку 1130.
 CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
+CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'127.0.0.1' IDENTIFIED BY '${DB_PASSWORD}';
 GRANT ALL PRIVILEGES ON \`${DB_DATABASE}\`.* TO '${DB_USERNAME}'@'localhost';
+GRANT ALL PRIVILEGES ON \`${DB_DATABASE}\`.* TO '${DB_USERNAME}'@'127.0.0.1';
 FLUSH PRIVILEGES;
 SQL
 log "БД панели готова (${DB_DATABASE})"

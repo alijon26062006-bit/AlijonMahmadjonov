@@ -11,16 +11,23 @@ use PDO;
  * веб-процесс панели этот класс с реальными admin-кредами не инстанцирует.
  *
  * Модель прав (см. спецификацию, раздел MARIADB): один DB-пользователь на клиента
- * (client1001@localhost, MAX_USER_CONNECTIONS ограничен тарифом) с правом
+ * (client1001, MAX_USER_CONNECTIONS ограничен тарифом) с правом
  * GRANT ALL ON `client1001_%`.* — то есть доступ ко всем СВОИМ базам сразу,
  * без выдачи отдельного пользователя на каждую базу.
  *
- * Хост 'localhost' выбран намеренно: MariaDB слушает только 127.0.0.1 (см. etc/mariadb-hosting.cnf),
- * а PHP-приложения клиента должны подключаться через unix-сокет (DB_HOST=localhost
- * в wp-config.php/.env клиента), а не по TCP — это и быстрее, и не требует открытого порта.
+ * Учётка заводится сразу для двух хостов — 'localhost' и '127.0.0.1'. Для MariaDB
+ * это разные пользователи: первый пускает через unix-сокет, второй по TCP. Клиенты
+ * пишут в конфиг своего приложения то одно, то другое (WordPress обычно localhost,
+ * Laravel по умолчанию 127.0.0.1), и если завести только один вариант, половина
+ * приложений получает загадочную ошибку 1130. Наружу это ничего не открывает:
+ * MariaDB слушает только 127.0.0.1 (см. etc/mariadb/hosting.cnf), а порт 3306
+ * закрыт firewall'ом.
  */
 final class MysqlManager
 {
+    /** Хосты, для которых заводится учётка клиента (см. комментарий к классу). */
+    private const USER_HOSTS = ['localhost', '127.0.0.1'];
+
     private ?PDO $pdo = null;
 
     public function __construct(private Config $config)
@@ -81,11 +88,12 @@ final class MysqlManager
     public function userExists(string $dbUser): bool
     {
         $this->assertIdentifier($dbUser);
+        $placeholders = implode(',', array_fill(0, count(self::USER_HOSTS), '?'));
         $stmt = $this->connect()->prepare(
-            "SELECT 1 FROM mysql.user WHERE User = ? AND Host = 'localhost'"
+            "SELECT COUNT(*) FROM mysql.user WHERE User = ? AND Host IN ({$placeholders})"
         );
-        $stmt->execute([$dbUser]);
-        return $stmt->fetchColumn() !== false;
+        $stmt->execute([$dbUser, ...self::USER_HOSTS]);
+        return (int) $stmt->fetchColumn() === count(self::USER_HOSTS);
     }
 
     /**
@@ -106,12 +114,17 @@ final class MysqlManager
         $pdo = $this->connect();
         $password = self::generatePassword();
 
-        $pdo->exec(sprintf(
-            "CREATE USER %s@'localhost' IDENTIFIED BY %s WITH MAX_USER_CONNECTIONS %d",
-            $pdo->quote($dbUser),
-            $pdo->quote($password),
-            $maxConnections,
-        ));
+        // Один и тот же пароль на оба хоста — для клиента это одна учётка,
+        // разделение на localhost/127.0.0.1 чисто внутреннее для MariaDB.
+        foreach (self::USER_HOSTS as $host) {
+            $pdo->exec(sprintf(
+                "CREATE USER IF NOT EXISTS %s@%s IDENTIFIED BY %s WITH MAX_USER_CONNECTIONS %d",
+                $pdo->quote($dbUser),
+                $pdo->quote($host),
+                $pdo->quote($password),
+                $maxConnections,
+            ));
+        }
         $pdo->exec('FLUSH PRIVILEGES');
 
         return $password;
@@ -129,7 +142,14 @@ final class MysqlManager
             'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
             $dbName
         ));
-        $pdo->exec(sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO %s@'localhost'", $dbName, $pdo->quote($dbUser)));
+        foreach (self::USER_HOSTS as $host) {
+            $pdo->exec(sprintf(
+                'GRANT ALL PRIVILEGES ON `%s`.* TO %s@%s',
+                $dbName,
+                $pdo->quote($dbUser),
+                $pdo->quote($host),
+            ));
+        }
         $pdo->exec('FLUSH PRIVILEGES');
     }
 
@@ -139,11 +159,14 @@ final class MysqlManager
 
         $pdo = $this->connect();
         $password = $password ?? self::generatePassword();
-        $pdo->exec(sprintf(
-            "ALTER USER %s@'localhost' IDENTIFIED BY %s",
-            $pdo->quote($dbUser),
-            $pdo->quote($password)
-        ));
+        foreach (self::USER_HOSTS as $host) {
+            $pdo->exec(sprintf(
+                'ALTER USER IF EXISTS %s@%s IDENTIFIED BY %s',
+                $pdo->quote($dbUser),
+                $pdo->quote($host),
+                $pdo->quote($password),
+            ));
+        }
         $pdo->exec('FLUSH PRIVILEGES');
 
         return $password;
@@ -160,7 +183,9 @@ final class MysqlManager
     {
         $this->assertIdentifier($dbUser);
         $pdo = $this->connect();
-        $pdo->exec(sprintf("DROP USER IF EXISTS %s@'localhost'", $pdo->quote($dbUser)));
+        foreach (self::USER_HOSTS as $host) {
+            $pdo->exec(sprintf('DROP USER IF EXISTS %s@%s', $pdo->quote($dbUser), $pdo->quote($host)));
+        }
         $pdo->exec('FLUSH PRIVILEGES');
     }
 

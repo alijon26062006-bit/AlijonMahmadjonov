@@ -71,7 +71,7 @@ final class DatabaseController
         $secret = $this->waitForSecret((int) $job['id']);
 
         if ($secret !== null) {
-            Flash::add('success', "База {$fullName} создана.\nПользователь: {$user['system_user']}\nХост: localhost\nПароль (показывается один раз): {$secret}");
+            Flash::add('success', "База {$fullName} создана.\nПользователь: {$user['system_user']}\nХост: localhost или 127.0.0.1 (работают оба)\nПароль (показывается один раз): {$secret}");
         } else {
             Flash::add('success', "База {$fullName} создаётся. Если пароль от пользователя базы вам уже известен по прошлой базе — он не меняется.");
         }
