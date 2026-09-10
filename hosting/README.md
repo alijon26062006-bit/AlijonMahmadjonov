@@ -27,11 +27,12 @@ Telegram-бота учёта денег в корне репо (`bot/`) — у �
 
 ## Требования к серверу
 
-- Ubuntu 22.04/24.04 или Debian 12 (только эти два дистрибутива поддерживает `install.sh`)
+- Ubuntu (22.04 и новее, включая 26.04) или Debian 12 — версия PHP определяется автоматически
+  из репозиториев конкретной системы
 - 4 vCPU / 8 GB RAM / NVMe — ориентир на ~200 hosting-аккаунтов, 200–400 сайтов
   (не 200 одновременно тяжёлых PHP-воркеров, см. SECURITY_CHECKLIST → CAPACITY)
 - Root-доступ по SSH
-- Свой домен (пока используем `myhost.tj` как placeholder — см. ниже)
+- Свой домен (текущий — `diyorhost.com`, задаётся одной переменной в `.env`)
 
 ## Установка
 
@@ -58,15 +59,15 @@ firewall → Fail2ban → `hostingctl` + sudoers → SFTP → тесты → и�
 
 ```bash
 # hosting/.env.example (после install.sh — файл .env в корне репозитория)
-HOSTING_ROOT_DOMAIN=myhost.tj   # ваш реальный домен, когда он появится
-HOSTING_SERVER_IP=              # IP этого VPS — нужен для проверки чужих доменов
+HOSTING_ROOT_DOMAIN=diyorhost.com   # базовый домен, от него идут поддомены клиентов
+HOSTING_SERVER_IP=2.29.11.118       # IP этого сервера — по нему проверяются чужие домены
 ```
 
 Секреты root-воркера (`MYSQL_ADMIN_PASSWORD` и т.п.) — отдельно, в
 `/etc/hosting/worker.env` (0600, только root). Панель этот файл не читает.
 
-Домен указан **в одном месте**. Когда получите настоящий — поменяйте
-`HOSTING_ROOT_DOMAIN` в `.env`, перезапустите `install.sh`, готово.
+Домен указан **в одном месте**. Сменить его — поменять `HOSTING_ROOT_DOMAIN`
+в `.env` и перезапустить `install.sh`, больше нигде править не нужно.
 
 ## Миграции базы данных
 
@@ -81,6 +82,7 @@ php hosting/panel/bin/migrate.php --status   # что уже применено
 ## Запуск / перезапуск сервисов
 
 ```bash
+# вместо 8.3 подставьте свою версию: она печатается установщиком и лежит в .env (PHP_VERSIONS)
 systemctl status  nginx php8.3-fpm mariadb hosting-worker fail2ban nftables
 systemctl restart nginx php8.3-fpm hosting-worker
 systemctl status  hosting-monitor.timer hosting-backup.timer hosting-ssl-renew.timer
@@ -182,11 +184,11 @@ mysql -uroot -p -e "UPDATE hosting_panel.users SET role='admin' WHERE email='в�
 У вашего DNS-провайдера (Cloudflare или другой):
 
 ```
-A     myhost.tj        <IP сервера>
-A     *.myhost.tj       <IP сервера>
+A     diyorhost.com        <IP сервера>
+A     *.diyorhost.com       <IP сервера>
 ```
 
-Новые поддомены клиентов (`shop.myhost.tj`) не требуют отдельной DNS-записи —
+Новые поддомены клиентов (`shop.diyorhost.com`) не требуют отдельной DNS-записи —
 это и есть смысл wildcard-записи.
 
 ## SSL
@@ -196,9 +198,9 @@ A     *.myhost.tj       <IP сервера>
 
 ```bash
 certbot certonly --manual --preferred-challenges dns \
-  -d myhost.tj -d '*.myhost.tj' \
+  -d diyorhost.com -d '*.diyorhost.com' \
   --email вы@example.com --agree-tos
-# certbot попросит добавить TXT-запись _acme-challenge.myhost.tj — добавьте
+# certbot попросит добавить TXT-запись _acme-challenge.diyorhost.com — добавьте
 # её у DNS-провайдера, дождитесь распространения, подтвердите в certbot.
 ```
 

@@ -4,10 +4,9 @@
 # Использование: sudo bash hosting/install.sh
 #
 # Идемпотентен: повторный запуск не разрушает существующие данные — каждый шаг
-# сначала проверяет, нужно ли вообще что-то делать. Домен пока не настоящий —
-# используется myhost.tj как placeholder (см. .env, переменная HOSTING_ROOT_DOMAIN),
-# после получения реального домена достаточно поменять одну эту переменную и
-# перезапустить install.sh.
+# сначала проверяет, нужно ли вообще что-то делать. Домен задаётся одной
+# переменной HOSTING_ROOT_DOMAIN в .env — сменить его можно в любой момент,
+# перезапустив install.sh.
 
 set -euo pipefail
 
@@ -58,7 +57,7 @@ set -a
 . "$ENV_FILE"
 set +a
 
-HOSTING_ROOT_DOMAIN="${HOSTING_ROOT_DOMAIN:-myhost.tj}"
+HOSTING_ROOT_DOMAIN="${HOSTING_ROOT_DOMAIN:-diyorhost.com}"
 HOSTING_ROOT="${HOSTING_ROOT:-/opt/hosting}"
 HOSTING_USERS_ROOT="${HOSTING_USERS_ROOT:-/home/hosting}"
 PHP_REQUESTED="${PHP_VERSIONS:-8.3}"
@@ -66,7 +65,7 @@ PHP_REQUESTED="${PHP_REQUESTED%%,*}"
 SSH_PORT="${HOSTING_SSH_PORT:-22}"
 LOG_DIR="${LOG_DIR:-/var/log/hosting}"
 
-log "Базовый домен: ${HOSTING_ROOT_DOMAIN} (placeholder, если ещё не сменили)"
+log "Базовый домен: ${HOSTING_ROOT_DOMAIN}"
 
 # ── 3. зависимости ───────────────────────────────────────────────────────
 log "Устанавливаю пакеты (может занять несколько минут)…"
