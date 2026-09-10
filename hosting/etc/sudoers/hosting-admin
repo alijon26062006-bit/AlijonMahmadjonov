@@ -8,8 +8,13 @@
 #
 # Добавить администратора: usermod -aG hosting-admins <его_unix_логин>
 
+# Две строки, чтобы работал и вызов с аргументами, и голый `sudo hostingctl`
+# (он просто печатает справку). Аргументы всё равно валидирует сам hostingctl:
+# каждый ID проверяется на ^[0-9]{1,10}$ до того, как куда-либо попадёт.
+%hosting-admins ALL=(root) NOPASSWD: /usr/local/sbin/hostingctl
 %hosting-admins ALL=(root) NOPASSWD: /usr/local/sbin/hostingctl *
 
-# sudo и так пишет каждый вызов в auth.log/journal — это и есть нужный audit trail,
-# специально ничего не отключаем и не подменяем.
-Defaults:%hosting-admins !requiretty
+# Никаких Defaults здесь намеренно нет: sudo и так пишет каждый вызов в
+# auth.log/journal — это и есть нужный audit trail. Директива requiretty,
+# которая раньше стояла здесь для совместимости, в новых версиях sudo
+# (Ubuntu 26.04) уже не распознаётся и роняет проверку visudo целиком.

@@ -387,10 +387,15 @@ systemctl restart fail2ban || warn "fail2ban не перезапустился �
 # ── 15. hostingctl + sudoers ──────────────────────────────────────────────
 log "Устанавливаю hostingctl"
 install -m 0755 "${HOSTING_DIR}/scripts/hostingctl" /usr/local/sbin/hostingctl
-if visudo -cf "${HOSTING_DIR}/etc/sudoers/hosting-admin" >/dev/null 2>&1; then
+# Битый файл в /etc/sudoers.d ломает sudo для ВСЕХ, поэтому сначала проверка,
+# и только потом установка. Вывод visudo показываем целиком — без него непонятно,
+# какая именно строка не понравилась этой версии sudo.
+if VISUDO_OUT="$(visudo -cf "${HOSTING_DIR}/etc/sudoers/hosting-admin" 2>&1)"; then
   install -m 0440 "${HOSTING_DIR}/etc/sudoers/hosting-admin" /etc/sudoers.d/hosting-admin
+  log "hostingctl установлен, sudoers-правило добавлено"
 else
-  die "etc/sudoers/hosting-admin не прошёл visudo -cf — установка остановлена (это критично)"
+  echo "$VISUDO_OUT" >&2
+  die "etc/sudoers/hosting-admin не прошёл visudo -cf (вывод выше) — установка остановлена: битый sudoers сломал бы sudo целиком"
 fi
 
 # ── 16. SSH/SFTP ──────────────────────────────────────────────────────────
