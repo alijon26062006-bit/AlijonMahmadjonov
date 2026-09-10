@@ -301,6 +301,34 @@ fi
 chown root:hosting-panel "$ENV_FILE"
 chmod 0640 "$ENV_FILE"
 
+# ── 4c. права на уже существующих клиентов ───────────────────────────────
+#
+# Каталоги, созданные прошлыми версиями, имеют права client:client 0750: панель
+# под ними не может ни прочитать, ни изменить файлы, а nginx отдаёт 404 на сайт.
+# Новые каталоги создаются правильно, но уже существующие надо починить здесь —
+# иначе у тех, кто обновляется, файловый менеджер и сайты останутся сломанными.
+if [[ -d "$HOSTING_USERS_ROOT" ]]; then
+  FIXED=0
+  for home in "${HOSTING_USERS_ROOT}"/client*; do
+    [[ -d "$home" ]] || continue
+    client=$(basename "$home")
+    id -u "$client" >/dev/null 2>&1 || continue
+
+    for sub in sites logs tmp backups; do
+      [[ -d "${home}/${sub}" ]] || continue
+      chown -R "${client}:hosting-web" "${home}/${sub}" 2>/dev/null || continue
+      find "${home}/${sub}" -type d -exec chmod 2770 {} \; -o -type f -exec chmod 0664 {} \; 2>/dev/null
+    done
+
+    # Корень домашнего каталога обязан оставаться root:root 0755 — это требование
+    # OpenSSH к ChrootDirectory для SFTP (см. UnixProvisioner::createUser).
+    chown root:root "$home" && chmod 0755 "$home"
+    FIXED=$((FIXED+1))
+  done
+  [[ $FIXED -gt 0 ]] && log "Права приведены в порядок у клиентов: ${FIXED}"
+fi
+chmod 0755 "$HOSTING_USERS_ROOT" 2>/dev/null || true
+
 # ── 5. каталоги ──────────────────────────────────────────────────────────
 #
 # HOSTING_ROOT приводим в порядок ПЕРВЫМ делом, до создания подкаталогов.
