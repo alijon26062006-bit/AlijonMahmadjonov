@@ -5,4 +5,4 @@ Description={{PANEL_NAME}} — один запуск monitor.sh
 Type=oneshot
 User=root
 EnvironmentFile={{ENV_FILE}}
-ExecStart={{HOSTING_ROOT}}/scripts/monitor.sh
+ExecStart={{HOSTING_ROOT}}/hosting/scripts/monitor.sh

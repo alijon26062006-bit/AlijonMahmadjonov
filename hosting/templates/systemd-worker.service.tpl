@@ -5,7 +5,7 @@ After=network.target mariadb.service
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/bin/php {{HOSTING_ROOT}}/worker/bin/hosting-worker.php
+ExecStart=/usr/bin/php {{HOSTING_ROOT}}/hosting/worker/bin/hosting-worker.php
 Restart=on-failure
 RestartSec=5
 EnvironmentFile={{ENV_FILE}}
