@@ -92,18 +92,26 @@ if [ -f "$SRC/bot.py" ] && [ -d "$SRC/handlers" ]; then
     cp "$SRC/services"/*.py "$DIR/services/" 2>/dev/null || true
     grn "код взят из $SRC"
 else
-    HDR=(); [ -n "${GH_TOKEN:-}" ] && HDR=(-H "Authorization: Bearer ${GH_TOKEN}")
+    # Сначала пробуем без авторизации: для публичного файла лишний заголовок
+    # Authorization заставляет GitHub ответить 404. Токен подключаем только
+    # если без него не получилось — тогда репозиторий закрытый.
+    fetch() {                       # fetch <относительный путь> <куда>
+        curl -fsSL "${RAW}/$1" -o "$2" 2>/dev/null && return 0
+        if [ -n "${GH_TOKEN:-}" ]; then
+            curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" \
+                 "${RAW}/$1" -o "$2" 2>/dev/null && return 0
+        fi
+        return 1
+    }
+
     for f in $FILES; do
-        curl -fsSL "${HDR[@]}" "${RAW}/${f}" -o "$DIR/${f}" \
-            || die "не скачался ${f} (проверьте ${RAW}/${f})"
+        fetch "$f" "$DIR/${f}" || die "не скачался ${f} (проверьте ${RAW}/${f})"
     done
     for f in $HFILES; do
-        curl -fsSL "${HDR[@]}" "${RAW}/handlers/${f}" -o "$DIR/handlers/${f}" \
-            || die "не скачался handlers/${f}"
+        fetch "handlers/${f}" "$DIR/handlers/${f}" || die "не скачался handlers/${f}"
     done
     for f in $SFILES; do
-        curl -fsSL "${HDR[@]}" "${RAW}/services/${f}" -o "$DIR/services/${f}" \
-            || die "не скачался services/${f}"
+        fetch "services/${f}" "$DIR/services/${f}" || die "не скачался services/${f}"
     done
     grn "код скачан из github.com/$REPO"
 fi
