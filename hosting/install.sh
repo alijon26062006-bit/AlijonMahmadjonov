@@ -61,8 +61,8 @@ set +a
 HOSTING_ROOT_DOMAIN="${HOSTING_ROOT_DOMAIN:-myhost.tj}"
 HOSTING_ROOT="${HOSTING_ROOT:-/opt/hosting}"
 HOSTING_USERS_ROOT="${HOSTING_USERS_ROOT:-/home/hosting}"
-PHP_VERSION="${PHP_VERSIONS:-8.3}"
-PHP_VERSION="${PHP_VERSION%%,*}"
+PHP_REQUESTED="${PHP_VERSIONS:-8.3}"
+PHP_REQUESTED="${PHP_REQUESTED%%,*}"
 SSH_PORT="${HOSTING_SSH_PORT:-22}"
 LOG_DIR="${LOG_DIR:-/var/log/hosting}"
 
@@ -72,6 +72,35 @@ log "Базовый домен: ${HOSTING_ROOT_DOMAIN} (placeholder, если е
 log "Устанавливаю пакеты (может занять несколько минут)…"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
+
+# Версия PHP не зашита в код: на разных выпусках Ubuntu/Debian в репозиториях
+# лежат разные версии (24.04 — 8.3, 26.04 — уже новее). Берём запрошенную, если
+# она есть, иначе самую свежую доступную php*-fpm.
+detect_php_version() {
+  local requested="$1"
+  if apt-cache policy "php${requested}-fpm" 2>/dev/null | grep -qE 'Candidate: [0-9]'; then
+    echo "$requested"
+    return 0
+  fi
+  apt-cache search --names-only '^php[0-9]+\.[0-9]+-fpm$' 2>/dev/null \
+    | grep -oE 'php[0-9]+\.[0-9]+' | sed 's/^php//' | sort -V | tail -1
+}
+
+PHP_VERSION="$(detect_php_version "$PHP_REQUESTED")"
+[[ -n "$PHP_VERSION" ]] || die "В репозиториях нет ни одного пакета php*-fpm — проверьте apt sources"
+
+if [[ "$PHP_VERSION" != "$PHP_REQUESTED" ]]; then
+  warn "PHP ${PHP_REQUESTED} в репозиториях нет — ставлю PHP ${PHP_VERSION} и правлю .env под него"
+  note_status "PHP: вместо ${PHP_REQUESTED} используется ${PHP_VERSION} (что есть в репозиториях этой ОС)"
+fi
+log "Версия PHP: ${PHP_VERSION}"
+
+# Панель и воркер должны знать ту же версию, что реально установлена, —
+# иначе пулы будут писаться не в тот каталог, а reload дёргать несуществующий юнит.
+sed -i "s#^PHP_VERSIONS=.*#PHP_VERSIONS=${PHP_VERSION}#" "$ENV_FILE"
+sed -i "s#^FPM_POOL_DIR=.*#FPM_POOL_DIR=/etc/php/${PHP_VERSION}/fpm/pool.d#" "$ENV_FILE"
+export PHP_VERSIONS="$PHP_VERSION"
+export FPM_POOL_DIR="/etc/php/${PHP_VERSION}/fpm/pool.d"
 apt-get install -qq -y \
   nginx \
   "php${PHP_VERSION}-fpm" "php${PHP_VERSION}-mysql" "php${PHP_VERSION}-mbstring" \
