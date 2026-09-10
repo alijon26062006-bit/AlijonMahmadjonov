@@ -72,9 +72,12 @@ final class UserRepository
             'INSERT INTO users (email, password_hash, display_name, system_user, role,
                                 plan_id, status, disk_quota_mb, inode_limit, max_sites, max_databases,
                                 created_at, updated_at)
-             VALUES (:email, :password_hash, :display_name, "", "client",
-                     :plan_id, "active", :disk, :inodes, :sites, :dbs, :now, :now)'
+             VALUES (:email, :password_hash, :display_name, \'\', \'client\',
+                     :plan_id, \'active\', :disk, :inodes, :sites, :dbs, :created_at, :updated_at)'
         );
+        // created_at и updated_at — два ОТДЕЛЬНЫХ параметра с одинаковым значением.
+        // Один :now, использованный дважды, работает в SQLite, но нативные prepared
+        // statements MariaDB отвечают на такое HY093 Invalid parameter number.
         $now = gmdate('Y-m-d H:i:s');
         $stmt->execute([
             'email'         => $fields['email'] ?? null,
@@ -85,7 +88,8 @@ final class UserRepository
             'inodes'        => $plan['inode_limit'],
             'sites'         => $plan['max_sites'],
             'dbs'           => $plan['max_databases'],
-            'now'           => $now,
+            'created_at'    => $now,
+            'updated_at'    => $now,
         ]);
 
         $id = (int) $pdo->lastInsertId();

@@ -16,7 +16,7 @@ final class DomainRepository
     {
         $stmt = $this->db->pdo()->prepare(
             'INSERT INTO domains (site_id, domain, is_primary, verified, ssl_status, created_at)
-             VALUES (?, ?, 0, 0, "none", ?)'
+             VALUES (?, ?, 0, 0, \'none\', ?)'
         );
         $stmt->execute([$siteId, strtolower($domain), gmdate('Y-m-d H:i:s')]);
 

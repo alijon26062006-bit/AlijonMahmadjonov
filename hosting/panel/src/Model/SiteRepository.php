@@ -16,7 +16,7 @@ final class SiteRepository
         $now = gmdate('Y-m-d H:i:s');
         $stmt = $this->db->pdo()->prepare(
             'INSERT INTO sites (user_id, slug, domain, doc_root, php_version, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, "pending", ?, ?)'
+             VALUES (?, ?, ?, ?, ?, \'pending\', ?, ?)'
         );
         $stmt->execute([$userId, $slug, strtolower($domain), $docRoot, $phpVersion, $now, $now]);
 

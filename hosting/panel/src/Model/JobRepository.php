@@ -20,7 +20,7 @@ final class JobRepository
     {
         $stmt = $this->db->pdo()->prepare(
             'INSERT INTO jobs (type, user_id, site_id, status, payload, created_at)
-             VALUES (?, ?, ?, "pending", ?, ?)'
+             VALUES (?, ?, ?, \'pending\', ?, ?)'
         );
         $stmt->execute([
             $type,

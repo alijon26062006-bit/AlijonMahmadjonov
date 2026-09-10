@@ -15,7 +15,7 @@ final class BackupRepository
     public function create(int $userId, string $type): array
     {
         $stmt = $this->db->pdo()->prepare(
-            'INSERT INTO backups (user_id, type, status, created_at) VALUES (?, ?, "pending", ?)'
+            'INSERT INTO backups (user_id, type, status, created_at) VALUES (?, ?, \'pending\', ?)'
         );
         $stmt->execute([$userId, $type, gmdate('Y-m-d H:i:s')]);
 

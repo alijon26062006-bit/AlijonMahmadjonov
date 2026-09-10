@@ -3,9 +3,20 @@
 declare(strict_types=1);
 
 /**
- * Тестовый бутстрап: поднимает SQLite in-memory по зеркальной схеме (schema.sqlite.sql)
- * и собирает те же классы, что использует боевая панель, только с Config, где
- * db_driver=sqlite. Никакой отдельной "тестовой" бизнес-логики — тестируется тот же код.
+ * Тестовый бутстрап. Умеет два режима:
+ *
+ *   SQLite (по умолчанию)  — быстро, работает где угодно, но прощает то, на чём
+ *                            боевая MariaDB падает: зарезервированные слова,
+ *                            повторные именованные параметры в prepared statement
+ *                            и прочие расхождения диалектов.
+ *   MariaDB (HOSTING_TEST_MYSQL_DB=имя_базы) — те же тесты, но на НАСТОЯЩЕЙ базе
+ *                            с НАСТОЯЩИМИ миграциями из migrations/*.sql.
+ *
+ * Второй режим появился после того, как три бага подряд прошли SQLite-тесты и
+ * упали на боевом сервере. Перед выкладкой прогонять обязательно оба:
+ *
+ *   php hosting/tests/run.php                              # SQLite
+ *   HOSTING_TEST_MYSQL_DB=hosting_panel_test php hosting/tests/run.php   # MariaDB
  */
 
 require dirname(__DIR__) . '/autoload.php';
@@ -13,9 +24,19 @@ require dirname(__DIR__) . '/autoload.php';
 use Hosting\Config;
 use Hosting\Database;
 
-/** Создаёт новую independent-от-других-тестов in-memory базу с применённой схемой. */
+function hosting_test_uses_mysql(): bool
+{
+    $db = getenv('HOSTING_TEST_MYSQL_DB');
+    return is_string($db) && $db !== '';
+}
+
+/** Создаёт чистую базу с применённой схемой — SQLite in-memory или реальную MariaDB. */
 function hosting_test_db(): Database
 {
+    if (hosting_test_uses_mysql()) {
+        return hosting_test_mysql_db();
+    }
+
     $pdo = new PDO('sqlite::memory:', null, null, [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -28,11 +49,60 @@ function hosting_test_db(): Database
     return Database::fromPdo($pdo, 'sqlite');
 }
 
+/**
+ * Реальная MariaDB. Схема накатывается настоящими миграциями один раз за прогон,
+ * между тестами таблицы просто очищаются — иначе 16 миграций на каждый тест
+ * съели бы всё время.
+ */
+function hosting_test_mysql_db(): Database
+{
+    static $pdo = null;
+    static $tables = [];
+
+    $dbName = (string) getenv('HOSTING_TEST_MYSQL_DB');
+    $host = getenv('HOSTING_TEST_MYSQL_HOST') ?: '127.0.0.1';
+    $user = getenv('HOSTING_TEST_MYSQL_USER') ?: 'root';
+    $pass = getenv('HOSTING_TEST_MYSQL_PASSWORD') ?: '';
+
+    if ($pdo === null) {
+        $root = new PDO("mysql:host={$host};charset=utf8mb4", $user, $pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        ]);
+        $root->exec("DROP DATABASE IF EXISTS `{$dbName}`");
+        $root->exec("CREATE DATABASE `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+        $pdo = new PDO("mysql:host={$host};dbname={$dbName};charset=utf8mb4", $user, $pass, [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            // Ровно как в проде (см. Hosting\Database): нативные prepared statements.
+            // Именно они ловят повторное использование одного :параметра — эмуляция
+            // такое прощает, а сервер отвечает HY093 Invalid parameter number.
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]);
+
+        foreach (glob(dirname(__DIR__) . '/migrations/*.sql') ?: [] as $file) {
+            $pdo->exec((string) file_get_contents($file));
+        }
+
+        $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    // Чистим состояние между тестами, plans пересоздаём — на них завязаны тарифы.
+    $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+    foreach ($tables as $table) {
+        $pdo->exec("TRUNCATE TABLE `{$table}`");
+    }
+    $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+    $pdo->exec((string) file_get_contents(dirname(__DIR__) . '/migrations/0001_create_plans.sql'));
+
+    return Database::fromPdo($pdo, 'mysql');
+}
+
 function hosting_test_config(array $overrides = []): Config
 {
     return Config::fromEnv(array_merge([
         'HOSTING_ROOT_DOMAIN' => 'myhost.tj',
-        'DB_DRIVER'           => 'sqlite',
+        'DB_DRIVER'           => hosting_test_uses_mysql() ? 'mysql' : 'sqlite',
     ], $overrides));
 }
 

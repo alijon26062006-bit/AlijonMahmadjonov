@@ -19,7 +19,7 @@ final class DatabaseRepository
     public function create(int $userId, ?int $siteId, string $dbName): array
     {
         $stmt = $this->db->pdo()->prepare(
-            'INSERT INTO client_databases (user_id, site_id, db_name, status, created_at) VALUES (?, ?, ?, "pending", ?)'
+            'INSERT INTO client_databases (user_id, site_id, db_name, status, created_at) VALUES (?, ?, ?, \'pending\', ?)'
         );
         $stmt->execute([$userId, $siteId, $dbName, gmdate('Y-m-d H:i:s')]);
 
