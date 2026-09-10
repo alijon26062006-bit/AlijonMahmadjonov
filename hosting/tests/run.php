@@ -12,6 +12,15 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
+// Буферизуем вывод, чтобы session_start() в тестах Auth/CSRF не ловил ложное
+// "headers already sent" из-за уже напечатанных строк предыдущих тестов в CLI.
+ob_start();
+register_shutdown_function(static function (): void {
+    if (ob_get_level() > 0) {
+        ob_end_flush();
+    }
+});
+
 $files = glob(__DIR__ . '/test_*.php') ?: [];
 sort($files, SORT_STRING);
 

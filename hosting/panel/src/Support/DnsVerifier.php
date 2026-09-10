@@ -50,8 +50,7 @@ final class DnsVerifier
             // Каждый резолвнутый адрес обязан быть публичным — иначе кто-то мог бы
             // указать A-запись на 127.0.0.1 / 169.254.x.x / 10.x.x.x и заставить
             // воркер обратиться туда (SSRF) вместо настоящего внешнего домена.
-            $isPublic = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
-            if (!$isPublic) {
+            if (!self::isPublicIp($ip)) {
                 return ['ok' => false, 'error' => "DNS-запись указывает на непубличный адрес: {$ip}"];
             }
         }
@@ -65,5 +64,16 @@ final class DnsVerifier
         }
 
         return ['ok' => true, 'error' => ''];
+    }
+
+    /**
+     * true только для «обычных» публичных адресов — отсекает приватные диапазоны
+     * (10/8, 172.16/12, 192.168/16), loopback (127/8, ::1), link-local (169.254/16,
+     * метаданные облаков) и зарезервированные диапазоны. Вынесено отдельно от
+     * pointsToServer(), чтобы эту логику можно было проверить тестами без реального DNS.
+     */
+    public static function isPublicIp(string $ip): bool
+    {
+        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
     }
 }
