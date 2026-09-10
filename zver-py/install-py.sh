@@ -277,9 +277,34 @@ grn ".env готов, права 600"
 # ---------- 5. виртуальное окружение ----------
 info "Ставлю библиотеки (aiogram, aiomysql)…"
 python3 -m venv "$DIR/.venv"
-"$DIR/.venv/bin/pip" install -q --upgrade pip >/dev/null 2>&1 || true
-"$DIR/.venv/bin/pip" install -q -r "$DIR/requirements.txt" >/dev/null
-grn "библиотеки установлены"
+
+# Свежий pip обязателен: старый не знает тегов колёс для новых версий
+# Python и уходит собирать пакеты из исходников.
+"$DIR/.venv/bin/pip" install -q --upgrade pip setuptools wheel >/dev/null 2>&1 || true
+
+PIPLOG="$(mktemp)"
+# --only-binary: ставим готовые колёса и не тратим время на компиляцию Rust.
+# Если для этой версии Python колёс ещё нет — падаем сразу и понятно.
+if ! "$DIR/.venv/bin/pip" install --only-binary=:all: \
+        -r "$DIR/requirements.txt" > "$PIPLOG" 2>&1; then
+    ylw "  Готовых пакетов нет, пробую обычную установку…"
+    if ! "$DIR/.venv/bin/pip" install -r "$DIR/requirements.txt" >> "$PIPLOG" 2>&1; then
+        red "  Не удалось поставить библиотеки. Последние строки:"
+        tail -20 "$PIPLOG" | sed 's/^/    /'
+        echo
+        PYV="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+        red "  Версия Python в системе: $PYV"
+        red "  Если она совсем свежая, готовых пакетов может ещё не быть."
+        red "  Обходной путь — поставить версию постарше и повторить:"
+        red "    apt-get install -y python3.12 python3.12-venv"
+        red "    rm -rf $DIR/.venv && ln -sf /usr/bin/python3.12 /usr/local/bin/python3"
+        rm -f "$PIPLOG"
+        die "останавливаюсь"
+    fi
+fi
+rm -f "$PIPLOG"
+grn "библиотеки установлены: $("$DIR/.venv/bin/pip" list 2>/dev/null \
+     | grep -iE '^aiogram' | tr -s ' ' | tr '\n' ' ')"
 
 # ---------- 6. таблицы ----------
 info "Создаю таблицы…"
