@@ -13,7 +13,7 @@ say()  { printf '%s\n' "$*"; }
 ok()   { printf '  %s✓%s %s\n' "$GREEN" "$OFF" "$*"; }
 bad()  { printf '  %s✗%s %s\n' "$RED" "$OFF" "$*" >&2; }
 hint() { printf '  %s%s%s\n' "$DIM" "$*" "$OFF"; }
-step() { printf '\n%s[%s/5] %s%s\n' "$BOLD" "$1" "$2" "$OFF"; }
+step() { printf '\n%s[%s/6] %s%s\n' "$BOLD" "$1" "$2" "$OFF"; }
 die()  { bad "$*"; exit 1; }
 
 SUDO=""
@@ -133,8 +133,30 @@ else
   ok "Токен сохранён в .env"
 fi
 
-say ""
-say "${BOLD}Готово.${OFF} Запускаю бота — открой его в Телеграме и напиши /start"
-hint "Остановить: Ctrl+C. Запустить снова: .venv/bin/python -m counter"
-say ""
-exec $PY -m counter
+# ── 6. Как запускать ───────────────────────────────────────────────────────
+step 6 "Запуск"
+
+MODE="${COUNTER_RUN_MODE:-}"
+if [ -z "$MODE" ] && [ -t 0 ]; then
+  say ""
+  say "  Как запускать бота?"
+  say "    1) круглосуточно — работает всегда, сам поднимается после"
+  say "       перезагрузки сервера и после сбоев ${DIM}(так лучше)${OFF}"
+  say "    2) прямо здесь, в этом окне — закроешь SSH, бот остановится"
+  printf "  Выбор [1]: "
+  read -r MODE || true
+fi
+
+case "${MODE:-1}" in
+  2|now|foreground)
+    say ""
+    say "${BOLD}Запускаю.${OFF} Открой бота в Телеграме и напиши /start"
+    hint "Остановить: Ctrl+C. Запустить снова: .venv/bin/python -m counter"
+    hint "Передумаешь — включить круглосуточную работу: bash service-counter.sh"
+    say ""
+    exec $PY -m counter
+    ;;
+  *)
+    exec bash service-counter.sh
+    ;;
+esac

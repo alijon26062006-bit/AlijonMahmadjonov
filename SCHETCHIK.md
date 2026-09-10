@@ -108,34 +108,33 @@ echo 'COUNTER_BOT_TOKEN=сюда_токен_от_BotFather' >> .env
 
 ## Запуск
 
+### Чтобы работал круглосуточно ← так и надо
+
+```bash
+bash service-counter.sh
+```
+
+Одна команда — и бот работает всегда: можно закрывать SSH, можно
+перезагружать сервер, можно уронить его ошибкой — он поднимется сам через
+5 секунд. Установщик `setup-counter.sh` предлагает это в самом конце.
+
+| Команда | Что делает |
+|---|---|
+| `bash service-counter.sh` | включить круглосуточную работу |
+| `bash service-counter.sh status` | работает или нет |
+| `bash service-counter.sh logs` | смотреть вживую, что происходит |
+| `bash service-counter.sh restart` | перезапустить (например, после `git pull`) |
+| `bash service-counter.sh stop` | остановить до следующего запуска |
+| `bash service-counter.sh remove` | убрать автозапуск совсем |
+
+### Запустить разок в окне
+
 ```bash
 .venv/bin/python -m counter
 ```
 
-Остановить — `Ctrl+C`. Пока окно с ботом закрыто, он не отвечает.
-
-### Чтобы работал сам, всегда
-
-```bash
-sudo tee /etc/systemd/system/schetchik.service >/dev/null <<EOF
-[Unit]
-Description=Счётчик товаров
-After=network-online.target
-
-[Service]
-WorkingDirectory=$PWD
-ExecStart=$PWD/.venv/bin/python -m counter
-Restart=always
-User=$USER
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl enable --now schetchik
-sudo systemctl status schetchik      # посмотреть, живой ли
-journalctl -u schetchik -f           # смотреть, что происходит
-```
+Так удобно смотреть ошибки, но **бот остановится, как только закроешь SSH**.
+Останавливается по `Ctrl+C`.
 
 ---
 
@@ -212,6 +211,18 @@ COUNTER_DATA_DIR=data                  # где хранить базу
 **В PDF латиница вместо русских букв**
 Не нашёлся шрифт с кириллицей. Поставь: `sudo apt install fonts-dejavu-core`.
 На Excel это никак не влияет.
+
+**Бот перестаёт отвечать, как только закрываю SSH**
+Он был запущен в окне терминала и умер вместе с ним. Включи круглосуточную
+работу: `bash service-counter.sh` — больше такого не будет.
+
+**Бот не отвечает, хотя запущен**
+Скорее всего он запущен дважды: один раз руками, второй — сервисом. Телеграм
+такого не разрешает. Лечится так:
+```bash
+pkill -f "python -m counter"
+bash service-counter.sh restart
+```
 
 **Первое голосовое обрабатывается долго**
 Модель грузится в память один раз при запуске. Дальше — быстро.
