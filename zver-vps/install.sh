@@ -77,13 +77,22 @@ else
     WORK="$(mktemp -d)"
     CODE="$WORK"
 
-    HDR=()
-    [ -n "${GH_TOKEN:-}" ] && HDR=(-H "Authorization: Bearer ${GH_TOKEN}")
+    # Для публичного файла лишний заголовок Authorization заставляет GitHub
+    # ответить 404, поэтому сначала пробуем без него, а токен подключаем
+    # только если без него не вышло.
+    fetch() {                       # fetch <файл> <куда>
+        curl -fsSL "${RAW}/$1" -o "$2" 2>/dev/null && return 0
+        if [ -n "${GH_TOKEN:-}" ]; then
+            curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" \
+                 "${RAW}/$1" -o "$2" 2>/dev/null && return 0
+        fi
+        return 1
+    }
 
     info "Скачиваю код бота…"
     ok=1
     for f in zbot.php zapp.php config.example.php; do
-        if ! curl -fsSL "${HDR[@]}" "${RAW}/${f}" -o "$WORK/${f}"; then
+        if ! fetch "$f" "$WORK/${f}"; then
             [ "$f" = "config.example.php" ] && continue
             ok=0; break
         fi
