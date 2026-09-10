@@ -56,7 +56,12 @@ $isHttps = ($_SERVER['HTTPS'] ?? '') !== '' || ($_SERVER['HTTP_X_FORWARDED_PROTO
 // frame-ancestors разрешает встраивание в Telegram (Mini App открывается в их WebView/iframe),
 // но не в произвольный сторонний сайт — только web.telegram.org и сам себя.
 header("Content-Security-Policy: default-src 'self'; script-src 'self' https://telegram.org; "
-    . "style-src 'self' 'unsafe-inline'; img-src 'self' data: https://t.me https://*.telegram.org; "
+    // Шрифт интерфейса приходит с Google Fonts: стиль — с fonts.googleapis.com,
+    // сами файлы шрифта — с fonts.gstatic.com. Без обоих CSP их молча заблокирует,
+    // и страница откатится на системный шрифт.
+    . "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    . "font-src 'self' https://fonts.gstatic.com; "
+    . "img-src 'self' data: https://t.me https://*.telegram.org; "
     // frame-src нужен кнопке «Войти через Telegram»: виджет открывает окно
     // авторизации в iframe с oauth.telegram.org.
     . "frame-src https://oauth.telegram.org https://*.telegram.org; "
