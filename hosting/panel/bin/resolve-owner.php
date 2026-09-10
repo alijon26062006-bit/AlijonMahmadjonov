@@ -31,7 +31,7 @@ Env::load($root . '/.env');
 Env::load('/etc/hosting/worker.env');
 $db = new Database(Config::fromEnv());
 
-$table = $type === 'site' ? 'sites' : 'databases';
+$table = $type === 'site' ? 'sites' : 'client_databases';
 $stmt = $db->pdo()->prepare("SELECT user_id FROM {$table} WHERE id = ?");
 $stmt->execute([$id]);
 $row = $stmt->fetch();

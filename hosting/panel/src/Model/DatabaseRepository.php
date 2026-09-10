@@ -19,7 +19,7 @@ final class DatabaseRepository
     public function create(int $userId, ?int $siteId, string $dbName): array
     {
         $stmt = $this->db->pdo()->prepare(
-            'INSERT INTO databases (user_id, site_id, db_name, status, created_at) VALUES (?, ?, ?, "pending", ?)'
+            'INSERT INTO client_databases (user_id, site_id, db_name, status, created_at) VALUES (?, ?, ?, "pending", ?)'
         );
         $stmt->execute([$userId, $siteId, $dbName, gmdate('Y-m-d H:i:s')]);
 
@@ -29,7 +29,7 @@ final class DatabaseRepository
 
     public function findById(int $id): ?array
     {
-        $stmt = $this->db->pdo()->prepare('SELECT * FROM databases WHERE id = ?');
+        $stmt = $this->db->pdo()->prepare('SELECT * FROM client_databases WHERE id = ?');
         $stmt->execute([$id]);
         $row = $stmt->fetch();
         return $row === false ? null : $row;
@@ -37,7 +37,7 @@ final class DatabaseRepository
 
     public function findByName(string $dbName): ?array
     {
-        $stmt = $this->db->pdo()->prepare('SELECT * FROM databases WHERE db_name = ?');
+        $stmt = $this->db->pdo()->prepare('SELECT * FROM client_databases WHERE db_name = ?');
         $stmt->execute([$dbName]);
         $row = $stmt->fetch();
         return $row === false ? null : $row;
@@ -46,7 +46,7 @@ final class DatabaseRepository
     /** @return list<array<string,mixed>> */
     public function forUser(int $userId): array
     {
-        $stmt = $this->db->pdo()->prepare("SELECT * FROM databases WHERE user_id = ? AND status != 'deleted' ORDER BY id");
+        $stmt = $this->db->pdo()->prepare("SELECT * FROM client_databases WHERE user_id = ? AND status != 'deleted' ORDER BY id");
         $stmt->execute([$userId]);
         return $stmt->fetchAll();
     }
@@ -54,7 +54,7 @@ final class DatabaseRepository
     public function countActiveForUser(int $userId): int
     {
         $stmt = $this->db->pdo()->prepare(
-            "SELECT COUNT(*) AS c FROM databases WHERE user_id = ? AND status != 'deleted'"
+            "SELECT COUNT(*) AS c FROM client_databases WHERE user_id = ? AND status != 'deleted'"
         );
         $stmt->execute([$userId]);
         return (int) $stmt->fetch()['c'];
@@ -66,12 +66,12 @@ final class DatabaseRepository
         if (!in_array($status, $allowed, true)) {
             throw new \InvalidArgumentException('Недопустимый статус базы: ' . $status);
         }
-        $this->db->pdo()->prepare('UPDATE databases SET status = ? WHERE id = ?')->execute([$status, $id]);
+        $this->db->pdo()->prepare('UPDATE client_databases SET status = ? WHERE id = ?')->execute([$status, $id]);
     }
 
     public function delete(int $id): void
     {
-        $this->db->pdo()->prepare('DELETE FROM databases WHERE id = ?')->execute([$id]);
+        $this->db->pdo()->prepare('DELETE FROM client_databases WHERE id = ?')->execute([$id]);
     }
 
     public static function belongsToUser(?array $database, int $userId): bool

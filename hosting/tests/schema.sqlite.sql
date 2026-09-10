@@ -101,7 +101,7 @@ CREATE TABLE domains (
     created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now'))
 );
 
-CREATE TABLE databases (
+CREATE TABLE client_databases (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     site_id    INTEGER REFERENCES sites(id) ON DELETE SET NULL,

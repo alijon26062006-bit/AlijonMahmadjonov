@@ -1,6 +1,6 @@
 -- Базы MariaDB, выданные клиентам. Реальные CREATE DATABASE/CREATE USER выполняет root worker,
 -- эта таблица — учёт и разрешение операций (кто чем владеет для IDOR-проверок).
-CREATE TABLE IF NOT EXISTS databases (
+CREATE TABLE IF NOT EXISTS client_databases (
     id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     user_id    BIGINT UNSIGNED NOT NULL,
     site_id    BIGINT UNSIGNED NULL,
