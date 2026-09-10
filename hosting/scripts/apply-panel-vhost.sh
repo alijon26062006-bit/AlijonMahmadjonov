@@ -15,9 +15,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOSTING_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${HOSTING_DIR}/.." && pwd)"
 
+# shellcheck source=lib/env-file.sh
+. "${SCRIPT_DIR}/lib/env-file.sh"
+ENV_FILE="$(hosting_env_file "$REPO_ROOT")"
+
 set -a
-# shellcheck disable=SC1091
-[[ -f "${REPO_ROOT}/.env" ]] && . "${REPO_ROOT}/.env"
+# shellcheck disable=SC1090
+[[ -f "$ENV_FILE" ]] && . "$ENV_FILE"
 set +a
 
 DOMAIN="${HOSTING_ROOT_DOMAIN:-}"

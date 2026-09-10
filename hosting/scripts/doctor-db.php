@@ -19,7 +19,7 @@ use Hosting\Config;
 use Hosting\Database;
 use Hosting\Support\Env;
 
-Env::load($root . '/.env');
+Env::loadHosting($root);
 
 function out(string $status, string $text): void
 {

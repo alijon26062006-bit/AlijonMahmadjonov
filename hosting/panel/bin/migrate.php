@@ -18,7 +18,7 @@ require $root . '/hosting/autoload.php';
 use Hosting\Config;
 use Hosting\Support\Env;
 
-Env::load($root . '/.env');
+Env::loadHosting($root);
 
 $config = Config::fromEnv();
 $migrationsDir = $root . '/hosting/migrations';

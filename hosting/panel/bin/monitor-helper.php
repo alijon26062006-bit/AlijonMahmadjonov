@@ -27,7 +27,7 @@ function opt(array $args, string $name, ?string $default = null): ?string
     return $default;
 }
 
-Env::load($root . '/.env');
+Env::loadHosting($root);
 Env::load('/etc/hosting/worker.env');
 $db = new Database(Config::fromEnv());
 

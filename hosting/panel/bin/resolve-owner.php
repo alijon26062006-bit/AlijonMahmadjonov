@@ -27,7 +27,7 @@ if (!in_array($type, ['site', 'database'], true) || $id <= 0) {
     exit(1);
 }
 
-Env::load($root . '/.env');
+Env::loadHosting($root);
 Env::load('/etc/hosting/worker.env');
 $db = new Database(Config::fromEnv());
 

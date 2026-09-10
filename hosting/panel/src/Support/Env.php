@@ -6,6 +6,32 @@ namespace Hosting\Support;
 /** Простой загрузчик .env (KEY=value, строки с # — комментарии). */
 final class Env
 {
+    /**
+     * Где лежит .env именно хостинга.
+     *
+     * Раньше это был .env в корне репозитория — тот же файл, из которого читает
+     * Telegram-бот учёта денег (bot/). Обе программы берут из него переменную
+     * TELEGRAM_BOT_TOKEN, то есть хостинг подхватывал токен чужого бота, а два
+     * процесса начинали одновременно опрашивать getUpdates одного и того же
+     * бота и перехватывать сообщения друг у друга — из-за этого /start часто
+     * оставался без ответа.
+     *
+     * Теперь у хостинга свой файл hosting/.env. Старый путь остаётся запасным,
+     * пока install.sh не перенесёт значения (он это делает при первом запуске).
+     */
+    public static function hostingPath(string $root): string
+    {
+        $own = $root . '/hosting/.env';
+
+        return is_file($own) ? $own : $root . '/.env';
+    }
+
+    /** Загружает .env хостинга (см. hostingPath). */
+    public static function loadHosting(string $root): void
+    {
+        self::load(self::hostingPath($root));
+    }
+
     public static function load(string $path): void
     {
         foreach (self::parseFile($path) as $key => $value) {

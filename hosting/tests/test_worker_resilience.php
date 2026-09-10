@@ -173,3 +173,81 @@ function test_bot_unit_can_read_repository_in_root_home(): void
     assert_true(str_contains($tpl, 'StartLimitIntervalSec=0'), 'Бот должен возвращаться сам после серии падений');
     assert_true(str_contains($tpl, 'ReadWritePaths=/var/lib/hosting'), 'Боту нужно куда-то писать offset обработанных сообщений');
 }
+
+// ── Бот действительно отвечает на /start ────────────────────────────────────
+//
+// Симптом с боевого сервера: «нажимаешь Старт — ничего не показывает». Проверять
+// это на живом Telegram нельзя, поэтому вместо api.telegram.org поднимается
+// локальная заглушка (fixtures/fake-telegram.php), а бот направляется на неё
+// через TELEGRAM_API_BASE. Тест смотрит не на код, а на то, что бот реально
+// ОТПРАВИЛ пользователю.
+
+function test_bot_answers_start_with_open_panel_button(): void
+{
+    $root = dirname(__DIR__, 2);
+    $log  = sys_get_temp_dir() . '/fake-tg-' . getmypid() . '.log';
+    @unlink($log);
+    @unlink($log . '.updates-served');
+
+    $port = 8100 + (getmypid() % 500);
+    $fakeEnv = array_merge($_ENV, ['FAKE_TG_LOG' => $log, 'PATH' => getenv('PATH') ?: '/usr/bin:/bin']);
+    $server = proc_open(
+        [PHP_BINARY, '-S', '127.0.0.1:' . $port, __DIR__ . '/fixtures/fake-telegram.php'],
+        [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']],
+        $sPipes,
+        $root,
+        $fakeEnv,
+    );
+    assert_true(is_resource($server), 'Заглушка Telegram не запустилась');
+
+    // Ждём, пока порт откроется, а не спим наугад.
+    $ready = false;
+    for ($i = 0; $i < 50 && !$ready; $i++) {
+        usleep(100_000);
+        $probe = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.2);
+        if ($probe !== false) {
+            fclose($probe);
+            $ready = true;
+        }
+    }
+    assert_true($ready, 'Заглушка Telegram не начала слушать порт');
+
+    $botEnv = [
+        'PATH'                => getenv('PATH') ?: '/usr/bin:/bin',
+        'TELEGRAM_API_BASE'   => 'http://127.0.0.1:' . $port,
+        'TELEGRAM_BOT_TOKEN'  => '123456789:AAEtest-token-for-local-fake-api',
+        'HOSTING_ROOT_DOMAIN' => 'example.tj',
+    ];
+    $bot = proc_open(
+        [PHP_BINARY, $root . '/hosting/worker/bin/hosting-bot.php'],
+        [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']],
+        $bPipes,
+        $root,
+        $botEnv,
+    );
+    assert_true(is_resource($bot), 'Бот не запустился');
+
+    $sent = '';
+    for ($i = 0; $i < 60; $i++) {
+        usleep(200_000);
+        if (is_file($log) && filesize($log) > 0) {
+            $sent = (string) file_get_contents($log);
+            break;
+        }
+    }
+
+    proc_terminate($bot, SIGTERM);
+    proc_close($bot);
+    proc_terminate($server, SIGTERM);
+    proc_close($server);
+    @unlink($log);
+    @unlink($log . '.updates-served');
+
+    assert_true($sent !== '', 'Бот не отправил НИЧЕГО в ответ на /start — именно это и видел пользователь');
+    assert_true(str_contains($sent, '"chat_id":"42"') || str_contains($sent, 'chat_id'),
+        'Ответ ушёл не в тот чат: ' . $sent);
+    assert_true(str_contains($sent, 'web_app'),
+        'В ответе нет кнопки Mini App — открыть панель из бота будет нечем: ' . $sent);
+    assert_true(str_contains($sent, 'panel.example.tj'),
+        'Кнопка ведёт не на панель этого хостинга: ' . $sent);
+}

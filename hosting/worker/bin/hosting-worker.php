@@ -22,7 +22,7 @@ use Hosting\Model\JobRepository;
 use Hosting\Support\Env;
 use Hosting\Worker\JobHandler;
 
-Env::load($root . '/.env');
+Env::loadHosting($root);
 Env::load('/etc/hosting/worker.env'); // root-only файл с MYSQL_ADMIN_*, см. install.sh
 
 $running = true;

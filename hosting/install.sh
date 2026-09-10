@@ -48,7 +48,43 @@ case "${ID:-}" in
 esac
 
 # ── 2. .env ──────────────────────────────────────────────────────────────
-ENV_FILE="${REPO_ROOT}/.env"
+#
+# У хостинга СВОЙ файл настроек — hosting/.env. Раньше использовался .env в
+# корне репозитория, но оттуда же читает Telegram-бот учёта денег (bot/), и обе
+# программы берут переменную с одним именем — TELEGRAM_BOT_TOKEN. В итоге
+# хостинг работал с токеном чужого бота, а два процесса одновременно опрашивали
+# getUpdates одного и того же бота и перехватывали сообщения друг у друга:
+# на /start пользователь то получал ответ, то нет.
+ENV_FILE="${REPO_ROOT}/hosting/.env"
+LEGACY_ENV="${REPO_ROOT}/.env"
+
+# Перенос со старой схемы: значения настроек хостинга копируем к себе, чужой
+# файл не трогаем — он принадлежит другому проекту.
+if [[ ! -f "$ENV_FILE" && -f "$LEGACY_ENV" ]]; then
+  log "Переношу настройки хостинга из ${LEGACY_ENV} в ${ENV_FILE}"
+  cp "${HOSTING_DIR}/.env.example" "$ENV_FILE"
+  MOVED=()
+  while IFS= read -r line; do
+    [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)= ]] || continue
+    key="${BASH_REMATCH[1]}"
+    old_value=$(grep -E "^${key}=" "$LEGACY_ENV" 2>/dev/null | head -1 | cut -d= -f2-)
+    [[ -n "$old_value" ]] || continue
+    escaped=$(printf '%s' "$old_value" | sed -e 's/[\&|]/\\&/g')
+    sed -i "s|^${key}=.*|${key}=${escaped}|" "$ENV_FILE"
+    MOVED+=("$key")
+  done < "${HOSTING_DIR}/.env.example"
+  [[ ${#MOVED[@]} -gt 0 ]] && log "Перенесено настроек: ${#MOVED[@]}"
+
+  # Токен бота НЕ переносим: в старом общем файле почти наверняка лежит токен
+  # другого бота, и молча его унаследовать — значит повторить ту же путаницу.
+  if grep -qE '^TELEGRAM_BOT_TOKEN=.+' "$ENV_FILE"; then
+    sed -i 's|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=|' "$ENV_FILE"
+    sed -i 's|^TELEGRAM_BOT_USERNAME=.*|TELEGRAM_BOT_USERNAME=|' "$ENV_FILE"
+    note_status "Токен Telegram НЕ перенесён из общего .env — он мог принадлежать другому боту. Задайте токен хостинга: sudo bash ${HOSTING_DIR}/scripts/telegram.sh"
+    warn "Токен Telegram не перенесён — задайте его отдельно (см. итог установки)"
+  fi
+fi
+
 if [[ ! -f "$ENV_FILE" ]]; then
   log "Создаю .env из hosting/.env.example (секреты генерируются автоматически)"
   # Не путать с корневым .env.example — тот принадлежит отдельному проекту

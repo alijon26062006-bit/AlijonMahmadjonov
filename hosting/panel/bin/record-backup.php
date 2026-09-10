@@ -35,7 +35,7 @@ function opt(array $args, string $name, ?string $default = null): ?string
 $args = array_slice($argv, 1);
 $command = array_shift($args) ?? '';
 
-Env::load($root . '/.env');
+Env::loadHosting($root);
 Env::load('/etc/hosting/worker.env');
 $db = new Database(Config::fromEnv());
 $backups = new BackupRepository($db);

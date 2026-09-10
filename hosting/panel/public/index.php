@@ -47,7 +47,7 @@ use Hosting\Support\Env;
 use Hosting\Support\Flash;
 use Hosting\Support\View;
 
-Env::load($root . '/.env');
+Env::loadHosting($root);
 
 $config = Config::fromEnv();
 $isHttps = ($_SERVER['HTTPS'] ?? '') !== '' || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';

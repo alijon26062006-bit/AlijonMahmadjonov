@@ -37,7 +37,7 @@ if (strlen($password) < 8) {
     exit(1);
 }
 
-Env::load($root . '/.env');
+Env::loadHosting($root);
 Env::load('/etc/hosting/worker.env');
 
 $config = Config::fromEnv();

@@ -17,7 +17,9 @@ set -uo pipefail   # намеренно без -e: доктор обязан д�
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOSTING_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${HOSTING_DIR}/.." && pwd)"
-ENV_FILE="${REPO_ROOT}/.env"
+# shellcheck source=lib/env-file.sh
+. "${SCRIPT_DIR}/lib/env-file.sh"
+ENV_FILE="$(hosting_env_file "$REPO_ROOT")"
 
 FAILS=0
 WARNS=0
@@ -140,6 +142,28 @@ if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
   BOT_JSON=$(curl -s -m 10 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe" 2>/dev/null)
   if grep -q '"ok":true' <<<"$BOT_JSON"; then
     ok "Telegram принимает токен бота"
+
+    # Имя бота в настройках должно совпадать с тем, чей это токен на самом деле.
+    # После замены токена старое имя остаётся, кнопка входа ведёт к чужому боту,
+    # и заметить это невозможно: токен-то валидный.
+    REAL_BOT=$(grep -oE '"username":"[^"]+"' <<<"$BOT_JSON" | head -1 | cut -d'"' -f4)
+    if [[ -n "$REAL_BOT" && "$REAL_BOT" == "${TELEGRAM_BOT_USERNAME:-}" ]]; then
+      ok "имя бота совпадает с токеном (@${REAL_BOT})"
+    elif [[ -n "$REAL_BOT" ]]; then
+      bad "в настройках бот @${TELEGRAM_BOT_USERNAME:-нет}, а токен принадлежит @${REAL_BOT}"
+      hint "кнопка входа ведёт не к тому боту: sudo bash ${HOSTING_DIR}/scripts/telegram.sh"
+    fi
+
+    # Telegram отдаёт одного бота только одному читателю. Если getUpdates отсюда
+    # проходит успешно — значит, службу бота никто не ведёт, и сообщения
+    # пользователей просто некому забирать.
+    POLL=$(curl -s -m 10 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?timeout=0&limit=1" 2>/dev/null)
+    if grep -q '"error_code":409' <<<"$POLL"; then
+      ok "бота опрашивает служба hosting-bot — на /start придёт ответ"
+    elif grep -q '"ok":true' <<<"$POLL"; then
+      bad "бота никто не опрашивает — на /start пользователь не получит ответа"
+      hint "systemctl status hosting-bot; journalctl -u hosting-bot -n 30"
+    fi
 
     # Кнопка меню — это и есть вход в Mini App. Если она не настроена, клиент,
     # открывший бота, никуда попасть не сможет.

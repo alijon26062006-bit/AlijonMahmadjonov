@@ -60,7 +60,7 @@ if ($userId === null) {
     fail('Нужен --user=<числовой id>');
 }
 
-Env::load($root . '/.env');
+Env::loadHosting($root);
 Env::load('/etc/hosting/worker.env');
 
 $config = Config::fromEnv();

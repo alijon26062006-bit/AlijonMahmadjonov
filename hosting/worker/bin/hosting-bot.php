@@ -21,7 +21,7 @@ require $root . '/hosting/autoload.php';
 
 use Hosting\Support\Env;
 
-Env::load($root . '/.env');
+Env::loadHosting($root);
 
 $token  = (string) (getenv('TELEGRAM_BOT_TOKEN') ?: '');
 $domain = (string) (getenv('HOSTING_ROOT_DOMAIN') ?: '');
@@ -34,10 +34,17 @@ if (function_exists('pcntl_async_signals')) {
     pcntl_signal(SIGINT, function () use (&$running): void { $running = false; });
 }
 
-/** Один вызов Bot API. Возвращает разобранный ответ или null, если сеть/Telegram подвели. */
+/**
+ * Один вызов Bot API. Возвращает разобранный ответ или null, если сеть/Telegram подвели.
+ *
+ * Адрес API вынесен в TELEGRAM_API_BASE: тесты поднимают вместо Telegram
+ * локальную заглушку и проверяют, что бот действительно отвечает на /start
+ * кнопкой, — иначе это можно было бы проверить только руками на живом боте.
+ */
 function tg(string $token, string $method, array $params = [], int $timeout = 60): ?array
 {
-    $ch = curl_init('https://api.telegram.org/bot' . $token . '/' . $method);
+    $base = rtrim((string) (getenv('TELEGRAM_API_BASE') ?: 'https://api.telegram.org'), '/');
+    $ch = curl_init($base . '/bot' . $token . '/' . $method);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
@@ -62,7 +69,7 @@ while ($running && $token === '') {
     for ($i = 0; $i < 60 && $running; $i++) {
         sleep(1);
     }
-    Env::load($root . '/.env');
+    Env::loadHosting($root);
     $token = (string) (getenv('TELEGRAM_BOT_TOKEN') ?: '');
 }
 
