@@ -47,49 +47,6 @@ case "${ID:-}" in
   *) die "Поддерживаются только Ubuntu/Debian, обнаружено: ${ID:-неизвестно}" ;;
 esac
 
-# ── 1b. каталог проекта должен быть доступен веб-процессу ────────────────
-#
-# nginx (www-data) и php-fpm панели (hosting-panel) читают файлы панели прямо
-# с диска. Каталог /root имеет права 0700, то есть внутрь него не может зайти
-# никто, кроме root: клон в /root/<проект> означает 404 на каждой странице
-# панели, сколько бы всё остальное ни было настроено правильно.
-#
-# Открывать /root наружу нельзя, поэтому переносим проект целиком в /opt и
-# оставляем на старом месте симлинк, чтобы привычные команды продолжали
-# работать. Переносим mv, так что .git и .env едут вместе с проектом.
-HOSTING_PANEL_HOME="/opt/hosting-panel"
-
-others_can_traverse() {
-  local p perm
-  p="$(readlink -f "$1")"
-  while [[ "$p" != "/" && -n "$p" ]]; do
-    perm="$(stat -c '%a' "$p" 2>/dev/null)" || return 1
-    # Последняя цифра прав — «для остальных»; заходить в каталог позволяет бит x.
-    [[ "${perm: -1}" =~ [1357] ]] || return 1
-    p="$(dirname "$p")"
-  done
-  return 0
-}
-
-if [[ -z "${HOSTING_RELOCATED:-}" ]] && ! others_can_traverse "$REPO_ROOT"; then
-  warn "Проект лежит в ${REPO_ROOT} — веб-процесс панели туда попасть не может"
-
-  if [[ -e "$HOSTING_PANEL_HOME" && "$(readlink -f "$HOSTING_PANEL_HOME")" != "$(readlink -f "$REPO_ROOT")" ]]; then
-    die "Нужно перенести проект в ${HOSTING_PANEL_HOME}, но там уже что-то есть.
-     Уберите или переименуйте ${HOSTING_PANEL_HOME} и запустите установку заново."
-  fi
-
-  log "Переношу проект в ${HOSTING_PANEL_HOME}"
-  mv "$REPO_ROOT" "$HOSTING_PANEL_HOME" || die "Не удалось перенести проект в ${HOSTING_PANEL_HOME}"
-  chmod 0755 "$HOSTING_PANEL_HOME"
-  # Симлинк на старом месте: `cd ~/<проект> && git pull` продолжает работать.
-  ln -sfn "$HOSTING_PANEL_HOME" "$REPO_ROOT"
-
-  note_status "Проект перенесён в ${HOSTING_PANEL_HOME} (на старом месте оставлен симлинк)"
-  export HOSTING_RELOCATED=1
-  exec bash "${HOSTING_PANEL_HOME}/hosting/install.sh" "$@"
-fi
-
 # ── 2. .env ──────────────────────────────────────────────────────────────
 ENV_FILE="${REPO_ROOT}/.env"
 if [[ ! -f "$ENV_FILE" ]]; then
@@ -245,6 +202,52 @@ id -u hosting-panel >/dev/null 2>&1 || \
 id -u phpmyadmin    >/dev/null 2>&1 || \
   useradd --system --home-dir /var/www/phpmyadmin --shell /usr/sbin/nologin phpmyadmin
 
+# ── 4b. каталог проекта должен быть доступен веб-процессу ────────────────
+#
+# nginx и php-fpm панели читают её файлы прямо с диска под пользователем
+# hosting-panel. Клон в /root (права 0700) означает 404 на каждой странице
+# панели и «Could not open input file» у бота — сколько бы всё остальное ни
+# было настроено правильно.
+#
+# Проверяем не биты прав, а ФАКТ: пусть сам hosting-panel попробует открыть
+# index.php панели. Любая арифметика по правам каталогов — это предсказание,
+# которое может разойтись с реальностью (ACL, монтирование, неожиданный режим
+# промежуточного каталога), а su -c даёт ровно тот ответ, который получит
+# php-fpm. Первая версия этой проверки считала биты — и на боевом сервере
+# разошлась с тем, что видел doctor.sh.
+HOSTING_PANEL_HOME="/opt/hosting-panel"
+PANEL_INDEX_REL="hosting/panel/public/index.php"
+
+panel_user_can_read() {
+  su -s /bin/sh hosting-panel -c "test -r '$1/${PANEL_INDEX_REL}'" 2>/dev/null
+}
+
+if [[ -z "${HOSTING_RELOCATED:-}" ]] && ! panel_user_can_read "$REPO_ROOT"; then
+  warn "Пользователь hosting-panel не может прочитать ${REPO_ROOT}/${PANEL_INDEX_REL}"
+  warn "Панель в таком расположении отдавала бы 404 на каждой странице"
+
+  if [[ -e "$HOSTING_PANEL_HOME" && "$(readlink -f "$HOSTING_PANEL_HOME")" != "$(readlink -f "$REPO_ROOT")" ]]; then
+    die "Нужно перенести проект в ${HOSTING_PANEL_HOME}, но там уже что-то есть.
+     Уберите или переименуйте ${HOSTING_PANEL_HOME} и запустите установку заново."
+  fi
+
+  log "Переношу проект в ${HOSTING_PANEL_HOME}"
+  mv "$REPO_ROOT" "$HOSTING_PANEL_HOME" || die "Не удалось перенести проект в ${HOSTING_PANEL_HOME}"
+  chmod 0755 "$HOSTING_PANEL_HOME"
+  # Симлинк на старом месте: `cd ~/<проект> && git pull` продолжает работать.
+  ln -sfn "$HOSTING_PANEL_HOME" "$REPO_ROOT"
+
+  if ! panel_user_can_read "$HOSTING_PANEL_HOME"; then
+    die "Даже после переноса в ${HOSTING_PANEL_HOME} пользователь hosting-panel не читает файлы панели.
+     Проверьте права: ls -ld ${HOSTING_PANEL_HOME} ${HOSTING_PANEL_HOME}/hosting/panel/public"
+  fi
+
+  log "Проект перенесён, панель теперь читается веб-процессом"
+  note_status "Проект перенесён в ${HOSTING_PANEL_HOME} (на старом месте оставлен симлинк, git pull работает как раньше)"
+  export HOSTING_RELOCATED=1
+  exec bash "${HOSTING_PANEL_HOME}/hosting/install.sh" "$@"
+fi
+
 # .env читают трое: root-воркер (root), веб-процесс панели и бот (оба —
 # hosting-panel). С владельцем root:root и правами 0640 панель свой же конфиг
 # прочитать НЕ МОЖЕТ: молча получает пустой пароль от базы и не поднимается.
@@ -265,7 +268,12 @@ chmod 0640 "$ENV_FILE"
 log "Проверяю ${HOSTING_ROOT}"
 REPO_REAL="$(readlink -f "$REPO_ROOT")"
 
-if [[ "$(readlink -f "$HOSTING_ROOT" 2>/dev/null)" == "$REPO_REAL" ]]; then
+# Сравниваем НЕПОСРЕДСТВЕННУЮ цель симлинка, а не конечную. После переноса
+# проекта получалась цепочка /opt/hosting -> /root/<проект> -> /opt/hosting-panel:
+# readlink -f разрешает её в правильный путь, но www-data, проходя по ней,
+# упирается в /root с правами 0700 и получает отказ. Цепочку через /root надо
+# спрямлять, а не считать исправной.
+if [[ -L "$HOSTING_ROOT" && "$(readlink "$HOSTING_ROOT")" == "$REPO_ROOT" ]]; then
   log "${HOSTING_ROOT} уже указывает на репозиторий"
 elif [[ ! -e "$HOSTING_ROOT" ]] || [[ -L "$HOSTING_ROOT" ]]; then
   ln -sfn "$REPO_ROOT" "$HOSTING_ROOT"
@@ -429,15 +437,31 @@ sed \
   "${HOSTING_DIR}/templates/nginx-panel.conf.tpl" > /etc/nginx/sites-available/panel.conf
 
 strip_ipv6_if_unavailable /etc/nginx/sites-available/panel.conf /etc/nginx/conf.d/hosting-global.conf
+
+# nginx считает повтор server_tokens в пределах http{} ошибкой, а не
+# переопределением: «server_tokens directive is duplicate». Валится при этом
+# ВЕСЬ конфиг, то есть панель не включается вообще. В nginx.conf разных
+# выпусков эта директива то закомментирована (Ubuntu 24.04), то активна
+# (Ubuntu 26.04) — поэтому смотрим на факт, а не на версию. Значение у нас и
+# у дистрибутива одинаковое (off), так что убрать нашу строку ничего не меняет.
+if grep -qE '^[[:space:]]*server_tokens' /etc/nginx/nginx.conf 2>/dev/null; then
+  sed -i -E '/^[[:space:]]*server_tokens/d' /etc/nginx/conf.d/hosting-global.conf
+  log "server_tokens уже задан в nginx.conf — не дублирую"
+fi
 ln -sfn /etc/nginx/sites-available/panel.conf /etc/nginx/sites-enabled/panel.conf
 rm -f /etc/nginx/sites-enabled/default
 
-if nginx -t >/dev/null 2>&1; then
+# Провал nginx -t здесь — не предупреждение, а конец: конфиг не применяется
+# целиком, панель отдаёт 404 на каждой странице, а установка при этом идёт
+# дальше и рапортует об успехе. Именно так выглядел «хостинг установился, но
+# ничего не открывается». Останавливаемся и показываем настоящую ошибку.
+if NGINX_TEST_OUT=$(nginx -t 2>&1); then
   systemctl enable --now nginx >/dev/null
   systemctl reload nginx
   log "nginx настроен и перезагружен"
 else
-  warn "nginx -t не прошёл — проверьте /etc/nginx/sites-available/panel.conf вручную"
+  echo "$NGINX_TEST_OUT" >&2
+  die "nginx -t не прошёл (вывод выше) — панель не заработает, пока это не исправлено"
 fi
 
 # ── 10. php-fpm: пул панели ──────────────────────────────────────────────

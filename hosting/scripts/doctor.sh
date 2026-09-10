@@ -293,14 +293,26 @@ if [[ -n "${HOSTING_ROOT_DOMAIN:-}" ]]; then
     hint "tail -30 ${LOG_DIR:-/var/log/hosting}/panel-error.log"
   fi
 
-  for path in / /login /register; do
-    code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 -H "Host: ${HOSTING_ROOT_DOMAIN}" "http://127.0.0.1${path}" 2>/dev/null)
-    if [[ "$code" == "200" ]]; then
-      ok "страница ${path} отдаёт 200"
-    else
+  for path in / /register /login; do
+    BODY_FILE=$(mktemp)
+    code=$(curl -s -o "$BODY_FILE" -w '%{http_code}' -m 10 -H "Host: ${HOSTING_ROOT_DOMAIN}" "http://127.0.0.1${path}" 2>/dev/null)
+
+    if [[ "$code" != "200" ]]; then
       bad "страница ${path} отдала ${code}"
       hint "tail -30 ${LOG_DIR:-/var/log/hosting}/panel-error.log"
+    elif grep -qi 'Welcome to nginx' "$BODY_FILE"; then
+      # Один только код 200 ничего не доказывает: если конфиг панели не
+      # применился, на / отвечает дефолтная страница nginx — и проверка
+      # «200» радостно проходит, пока /login отдаёт 404.
+      bad "на ${path} отвечает стандартная страница nginx, а не панель"
+      hint "конфиг панели не применён: nginx -t && systemctl reload nginx"
+    elif ! grep -q '<html lang="ru"' "$BODY_FILE"; then
+      bad "на ${path} отвечает не панель (в ответе нет её разметки)"
+      hint "проверьте, что включён именно /etc/nginx/sites-available/panel.conf"
+    else
+      ok "страница ${path} отдаёт панель"
     fi
+    rm -f "$BODY_FILE"
   done
 fi
 
