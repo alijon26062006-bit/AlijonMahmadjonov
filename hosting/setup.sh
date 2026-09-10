@@ -228,8 +228,19 @@ if [[ -n "${TG_TOKEN:-}" && -n "${BOT_NAME:-}" ]]; then
   echo
   echo "  Осталось ровно одно действие в @BotFather (метода Bot API для него нет):"
   echo "     /setdomain → @${BOT_NAME} → ${DOMAIN}"
-  echo "  Это включает кнопку «Войти через Telegram» на публичной главной."
-  echo "  Mini App внутри бота работает и без этого."
+  echo
+  echo "  Оно включает виджет «Войти через Telegram» прямо на главной странице."
+  echo "  Пока это не сделано, Telegram рисует на месте виджета белую плашку"
+  echo "  «Bot domain invalid» — поэтому виджет по умолчанию выключен, а вход"
+  echo "  идёт по кнопке-ссылке на бота, которая работает всегда."
+  echo
+  if ask_yes_no "Вы уже сделали /setdomain для @${BOT_NAME}? Включить виджет на главной?" n; then
+    set_env TELEGRAM_LOGIN_WIDGET true
+    log "Виджет входа включён"
+  else
+    set_env TELEGRAM_LOGIN_WIDGET false
+    echo "  Хорошо — сделаете /setdomain, запустите setup.sh ещё раз и ответьте «y»."
+  fi
   echo
 fi
 

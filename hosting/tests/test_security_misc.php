@@ -201,3 +201,26 @@ function test_cross_account_file_manager_isolated(): void
         exec('rm -rf ' . escapeshellarg($homeA) . ' ' . escapeshellarg($homeB));
     }
 }
+
+// ── Склонение числительных на витрине ───────────────────────────────────────
+// «1 баз данных» и «2 сайтов» на странице тарифов видит каждый посетитель,
+// поэтому правило проверяется, а не держится в голове.
+
+function test_russian_plural_forms(): void
+{
+    $sites = static fn (int $n): string => $n . ' ' . \Hosting\Support\Html::plural($n, 'сайт', 'сайта', 'сайтов');
+
+    assert_equals('1 сайт',    $sites(1));
+    assert_equals('2 сайта',   $sites(2));
+    assert_equals('4 сайта',   $sites(4));
+    assert_equals('5 сайтов',  $sites(5));
+    // 11–14 — исключение: несмотря на последнюю цифру, форма «много».
+    assert_equals('11 сайтов', $sites(11));
+    assert_equals('12 сайтов', $sites(12));
+    assert_equals('14 сайтов', $sites(14));
+    assert_equals('21 сайт',   $sites(21));
+    assert_equals('22 сайта',  $sites(22));
+    assert_equals('25 сайтов', $sites(25));
+    assert_equals('101 сайт',  $sites(101));
+    assert_equals('0 сайтов',  $sites(0));
+}

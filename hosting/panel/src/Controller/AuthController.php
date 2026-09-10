@@ -147,6 +147,7 @@ final class AuthController
             'rootDomain'   => $this->config->str('root_domain'),
             'botUsername'  => $this->config->str('telegram_bot_username'),
             'appUrl'       => $this->config->str('app_url'),
+            'loginWidget'  => $this->config->bool('telegram_login_widget'),
         ]));
     }
 

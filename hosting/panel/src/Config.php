@@ -86,6 +86,11 @@ final class Config
             // виджет Telegram принимает именно username, а не токен. Заполняется
             // автоматически в setup.sh через getMe.
             'telegram_bot_username' => ltrim($get('TELEGRAM_BOT_USERNAME', ''), '@'),
+            // Виджет «Войти через Telegram» работает только после /setdomain в
+            // @BotFather. Пока это не сделано, Telegram рисует на месте кнопки
+            // белую плашку «Bot domain invalid» — поэтому по умолчанию виджета
+            // нет, а вход идёт через ссылку на бота, которая работает всегда.
+            'telegram_login_widget' => $get('TELEGRAM_LOGIN_WIDGET', 'false') === 'true',
 
             // Cloudflare (wildcard DNS-01 + firewall allowlist)
             'cloudflare_api_token' => $get('CLOUDFLARE_API_TOKEN', ''),
