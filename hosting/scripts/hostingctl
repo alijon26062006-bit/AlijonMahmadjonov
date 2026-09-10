@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Ручной root-инструмент для админа хостинга. Строгий whitelist команд, каждый
+# аргумент-ID проходит проверку ^[0-9]{1,10}$ ПЕРЕД тем, как попасть куда бы то
+# ни было — никаких shell_exec с произвольной строкой пользователя (см. спецификацию,
+# раздел ROOT HELPER SECURITY). Вся реальная логика — в PHP (тот же JobHandler,
+# что использует постоянный воркер), это только тонкая обвязка с проверками.
+#
+# Устанавливается в /usr/local/sbin/hostingctl (install.sh), обычно вызывается
+# через sudo не-root администратором (см. etc/sudoers/hosting-admin).
+#
+# Команды:
+#   hostingctl create-site <site_id>
+#   hostingctl delete-site <site_id>
+#   hostingctl suspend-site <site_id>
+#   hostingctl unsuspend-site <site_id>
+#   hostingctl create-database <database_id>
+#   hostingctl delete-database <database_id>
+#   hostingctl apply-nginx <user_id>
+#   hostingctl apply-php-fpm <user_id>
+#   hostingctl apply-quota <user_id>
+#   hostingctl suspend-user <user_id>
+#   hostingctl unsuspend-user <user_id>
+#   hostingctl status                      — сводка (упавшие юниты, очередь, диск)
+
+set -euo pipefail
+
+HOSTING_ROOT="${HOSTING_ROOT:-/opt/hosting}"
+PHP_BIN="${PHP_BIN:-php}"
+BIN="${HOSTING_ROOT}/hosting/panel/bin"
+WORKER_BIN="${HOSTING_ROOT}/hosting/worker/bin"
+
+ID_RE='^[0-9]{1,10}$'
+
+die() { echo "hostingctl: $1" >&2; exit 1; }
+
+require_numeric_id() {
+  [[ "${1:-}" =~ $ID_RE ]] || die "аргумент должен быть числом (1-10 цифр), получено: '${1:-}'"
+}
+
+resolve_owner() {
+  local type="$1" id="$2"
+  "$PHP_BIN" "$BIN/resolve-owner.php" "$type" "$id"
+}
+
+COMMAND="${1:-}"
+ARG="${2:-}"
+
+case "$COMMAND" in
+  create-site|delete-site|suspend-site|unsuspend-site)
+    require_numeric_id "$ARG"
+    user_id=$(resolve_owner site "$ARG") || die "сайт #$ARG не найден"
+    job_type="${COMMAND//-/_}"
+    "$PHP_BIN" "$WORKER_BIN/run-job.php" "$job_type" --user="$user_id" --site="$ARG" \
+      --payload="{\"site_id\":$ARG}"
+    ;;
+
+  create-database|delete-database)
+    require_numeric_id "$ARG"
+    user_id=$(resolve_owner database "$ARG") || die "база #$ARG не найдена"
+    job_type="${COMMAND//-/_}"
+    "$PHP_BIN" "$WORKER_BIN/run-job.php" "$job_type" --user="$user_id" \
+      --payload="{\"database_id\":$ARG}"
+    ;;
+
+  apply-nginx|apply-php-fpm|apply-quota)
+    require_numeric_id "$ARG"
+    job_type="${COMMAND//-/_}"
+    "$PHP_BIN" "$WORKER_BIN/run-job.php" "$job_type" --user="$ARG"
+    ;;
+
+  suspend-user)
+    require_numeric_id "$ARG"
+    "$PHP_BIN" "$BIN/set-user-status.php" "$ARG" suspended
+    ;;
+
+  unsuspend-user)
+    require_numeric_id "$ARG"
+    "$PHP_BIN" "$BIN/set-user-status.php" "$ARG" active
+    ;;
+
+  status)
+    echo "--- упавшие systemd-юниты ---"
+    systemctl --failed --no-legend 2>/dev/null || echo "(systemctl недоступен)"
+    echo "--- заданий в очереди ---"
+    "$PHP_BIN" "$BIN/monitor-helper.php" pending-jobs 2>/dev/null || echo "?"
+    echo "--- диск ---"
+    df -h "${HOSTING_USERS_ROOT:-/home/hosting}" 2>/dev/null || true
+    ;;
+
+  *)
+    cat >&2 <<USAGE
+Использование: hostingctl <команда> <числовой-id>
+
+  create-site <site_id>        delete-site <site_id>
+  suspend-site <site_id>       unsuspend-site <site_id>
+  create-database <db_id>      delete-database <db_id>
+  apply-nginx <user_id>        apply-php-fpm <user_id>
+  apply-quota <user_id>
+  suspend-user <user_id>       unsuspend-user <user_id>
+  status
+USAGE
+    exit 1
+    ;;
+esac

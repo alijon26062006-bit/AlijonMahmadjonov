@@ -1,0 +1,34 @@
+# Стартовый конфиг MariaDB для VPS 4 vCPU / 8 GB RAM (см. спецификацию, раздел
+# SERVER MEMORY BUDGET — MariaDB нацелена примерно на 2–2.5 ГБ). install.sh кладёт
+# это в /etc/mysql/mariadb.conf.d/60-hosting.cnf. Правьте под фактическую нагрузку —
+# это стартовая точка, не результат бенчмарка вашей конкретной рабочей нагрузки.
+
+[mysqld]
+# Никогда не открываем порт наружу — только локальный доступ (see FIREWALL).
+bind-address = 127.0.0.1
+
+innodb_buffer_pool_size = 2G
+innodb_log_file_size    = 256M
+innodb_flush_log_at_trx_commit = 1
+innodb_flush_method     = O_DIRECT
+
+max_connections    = 120
+thread_cache_size  = 32
+table_open_cache   = 2000
+tmp_table_size     = 32M
+max_heap_table_size = 32M
+max_allowed_packet = 64M
+
+wait_timeout        = 120
+interactive_timeout = 300
+
+# Ускоряет привилегированные запросы, убирая DNS-резолвинг клиентов —
+# у нас всё локальное (127.0.0.1 / unix-сокет).
+skip_name_resolve = 1
+
+slow_query_log     = 1
+slow_query_log_file = /var/log/mysql/slow.log
+long_query_time     = 2
+
+# Только localhost видит error log с деталями — сам файл не должен быть публично читаем.
+log_error = /var/log/mysql/error.log

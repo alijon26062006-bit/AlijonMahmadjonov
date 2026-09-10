@@ -1,0 +1,53 @@
+#!/usr/sbin/nft -f
+# Базовый firewall хостинга. install.sh кладёт это в /etc/nftables.conf (или
+# подключает через include) и делает `systemctl enable --now nftables`.
+#
+# Публично открыты только 80/443 и SSH (см. HOSTING_SSH_PORT — по умолчанию 22,
+# но настоятельно рекомендуется сменить). MariaDB (3306), php-fpm sockets, Redis,
+# внутренние API воркера — НИЧЕГО из этого наружу не торчит (см. спецификацию FIREWALL).
+#
+# Набор адресов Cloudflare (cf_ipv4/cf_ipv6) обновляется отдельно скриптом
+# update-cloudflare-firewall.sh — если хостинг проксируется через Cloudflare,
+# 80/443 принимают соединения ТОЛЬКО из этих диапазонов плюс localhost (для health-check).
+# Если Cloudflare не используется, набор остаётся пустым и правило cf-only ниже не применяется
+# — тогда 80/443 открыты всем (обычный публичный веб-сервер).
+
+# install.sh подставляет реальный порт SSH сюда (по умолчанию 22 — заменить
+# при первой установке, если SSH слушает нестандартный порт).
+define ssh_port = 22
+
+table inet hosting_filter {
+    set cf_ipv4 {
+        type ipv4_addr
+        flags interval
+    }
+
+    set cf_ipv6 {
+        type ipv6_addr
+        flags interval
+    }
+
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        iif lo accept
+        ct state established,related accept
+        ct state invalid drop
+
+        icmp type { echo-request, destination-unreachable, time-exceeded } accept
+        icmpv6 type { echo-request, destination-unreachable, time-exceeded, nd-neighbor-solicit, nd-neighbor-advert } accept
+
+        tcp dport { 80, 443 } accept
+        tcp dport $ssh_port ct state new limit rate 10/minute accept
+
+        counter drop
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}

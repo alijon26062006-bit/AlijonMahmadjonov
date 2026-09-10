@@ -62,6 +62,9 @@ final class AuthController
         $this->auth->recordLoginAttempt($email, $ip, $ok);
 
         if (!$ok) {
+            // Формат строки специально фиксированный — его матчит fail2ban jail
+            // hosting-panel-login (см. etc/fail2ban/filter.d/hosting-panel-login.conf).
+            error_log("[hosting-auth] failed login ip={$ip} identifier={$email}");
             Flash::add('error', 'Неверный e-mail или пароль');
             return Response::redirect('/login');
         }

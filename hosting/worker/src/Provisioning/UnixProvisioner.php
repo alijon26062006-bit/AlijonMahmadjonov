@@ -53,10 +53,17 @@ final class UnixProvisioner
             if (!is_dir($path)) {
                 mkdir($path, 0o750, true);
             }
+            Shell::run(sprintf('chown -R %1$s:%1$s %2$s', escapeshellarg($systemUser), escapeshellarg($path)), 15);
         }
 
-        Shell::run(sprintf('chown -R %1$s:%1$s %2$s', escapeshellarg($systemUser), escapeshellarg($home)), 15);
-        chmod($home, 0o710);
+        // ВАЖНО: сам $home (корень chroot для SFTP, см. etc/ssh/sshd-hosting.conf) обязан
+        // принадлежать root и быть недоступен на запись группе/остальным — таково требование
+        // OpenSSH к ChrootDirectory. Владеть им клиенту нельзя, поэтому chown клиенту делаем
+        // только на подкаталоги ВНУТРИ (sites/, logs/, tmp/, backups/ — уже сделано выше),
+        // а сам $home остаётся root:root 0755.
+        chown($home, 'root');
+        chgrp($home, 'root');
+        chmod($home, 0o755);
     }
 
     /** Удаляет пользователя вместе с домашним каталогом. Вызывающий отвечает за бэкап до удаления. */

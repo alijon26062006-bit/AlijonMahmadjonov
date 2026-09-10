@@ -1,0 +1,15 @@
+# install.sh кладёт это в /etc/sudoers.d/hosting-admin (chmod 0440, владелец root:root —
+# visudo -cf проверяет синтаксис перед установкой, см. install.sh).
+#
+# Разрешает группе hosting-admins запускать ТОЛЬКО /usr/local/sbin/hostingctl
+# без пароля. Никаких ALL, никакого /bin/bash или systemctl напрямую — если нужна
+# новая операция, она добавляется как команда внутри hostingctl (с валидацией),
+# а не через расширение этого файла.
+#
+# Добавить администратора: usermod -aG hosting-admins <его_unix_логин>
+
+%hosting-admins ALL=(root) NOPASSWD: /usr/local/sbin/hostingctl *
+
+# sudo и так пишет каждый вызов в auth.log/journal — это и есть нужный audit trail,
+# специально ничего не отключаем и не подменяем.
+Defaults:%hosting-admins !requiretty
