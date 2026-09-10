@@ -22,7 +22,7 @@ final class Router
     public function add(string $method, string $pattern, callable $handler): void
     {
         // Части между {параметрами} экранируем, сами параметры — числовые группы.
-        $literals = preg_split('~\{[a-z_]+\}~', $pattern) ?: [$pattern];
+        $literals = preg_split('~\{[a-z0-9_]+\}~', $pattern) ?: [$pattern];
         $quoted = array_map(static fn (string $part): string => preg_quote($part, '~'), $literals);
 
         $this->routes[] = [

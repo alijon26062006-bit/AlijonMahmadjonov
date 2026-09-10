@@ -211,13 +211,22 @@ final class FileManager
         return $target;
     }
 
+    /** Не больше стольких записей в архиве — иначе распаковка «зип-бомбы» из миллиона файлов. */
+    public const MAX_ZIP_ENTRIES = 20_000;
+
+    /** Не больше стольких байт после распаковки — вторая линия защиты от зип-бомб, помимо квоты диска. */
+    public const MAX_ZIP_UNCOMPRESSED_BYTES = 1_073_741_824; // 1 ГБ
+
     /**
-     * Распаковывает ZIP в тот же каталог. Пути внутри архива нормализуются,
-     * файлы за пределы каталога назначения не выпускаются.
+     * Распаковывает ZIP в тот же каталог. Пути внутри архива нормализуются, за пределы
+     * каталога назначения ничего не выпускается (Zip Slip). Перед распаковкой проверяются
+     * заявленные в архиве число файлов и суммарный несжатый размер — если они превышают
+     * лимиты (или переданную $maxTotalBytes — например, остаток дисковой квоты клиента),
+     * архив не распаковывается вообще, а не обрывается на середине.
      *
      * @return int сколько файлов распаковано
      */
-    public function unzip(string $relative): int
+    public function unzip(string $relative, ?int $maxTotalBytes = null): int
     {
         if (!class_exists(\ZipArchive::class)) {
             throw new \RuntimeException('На сервере не включено расширение zip');
@@ -228,10 +237,34 @@ final class FileManager
             throw new \RuntimeException('Архив не найден');
         }
 
+        $limitBytes = $maxTotalBytes !== null
+            ? min($maxTotalBytes, self::MAX_ZIP_UNCOMPRESSED_BYTES)
+            : self::MAX_ZIP_UNCOMPRESSED_BYTES;
+
         $destination = dirname($archive);
         $zip = new \ZipArchive();
         if ($zip->open($archive) !== true) {
             throw new \RuntimeException('Не удалось открыть архив');
+        }
+
+        if ($zip->numFiles > self::MAX_ZIP_ENTRIES) {
+            $zip->close();
+            throw new \RuntimeException(
+                "В архиве слишком много файлов ({$zip->numFiles}), лимит — " . self::MAX_ZIP_ENTRIES
+            );
+        }
+
+        // Первый проход — только смотрим заявленные размеры, ничего не пишем на диск.
+        $totalUncompressed = 0;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $stat = $zip->statIndex($i);
+            $totalUncompressed += (int) ($stat['size'] ?? 0);
+            if ($totalUncompressed > $limitBytes) {
+                $zip->close();
+                throw new \RuntimeException(
+                    'Архив после распаковки превысит допустимый размер (' . Path::humanSize($limitBytes) . ')'
+                );
+            }
         }
 
         $extracted = 0;
