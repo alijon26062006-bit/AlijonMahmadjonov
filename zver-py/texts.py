@@ -106,6 +106,19 @@ TJ = {
     "promo_min":     "Ҳадди ақали харид: {min} {cur}",
     "promo_empty":   "Рамзро нависед",
     "confirm_disc":  "\nТахфиф: −<b>{off} {cur}</b>\nҲамагӣ: <b>{total} {cur}</b>",
+    "too_fast":      "Каме сабр кунед — хеле зуд амал мекунед.",
+    "rev_ask":       "Фармоишро баҳо диҳед:",
+    "rev_thanks":    "Раҳмат барои баҳо!",
+    "rev_text_ask":  "Чанд калима нависед ё «-» гузоред:",
+    "rev_saved":     "Шарҳи шумо сабт шуд. Раҳмат! ⭐",
+    "auto_refund":   ("<b>↩ ПУЛ БАРГАРДОНИДА ШУД</b>\n<code>───────────────</code>\n"
+                      "{game} · {pack}\nФармоиш #{oid} иҷро нашуд.\n\n"
+                      "<b>{amount} {cur}</b> ба ҳисоби шумо баргашт.\n"
+                      "Ҳисоб · <b>{balance} {cur}</b>\n\n"
+                      "<i>Бубахшед барои нороҳатӣ.</i>"),
+    "queue_done":    ("<b>● ФАРМОИШИ ШУМО ИҶРО ШУД</b>\n<code>───────────────</code>\n"
+                      "{game} · {pack}\nID · <code>{pid}</code>\n\n"
+                      "<i>Мағоза дубора пур шуд — фармоиш худкор иҷро гардид.</i>"),
 
     "ref_paid":      ("<b>◆ БОНУСИ ДАЪВАТ</b>\n<code>───────────────</code>\n"
                       "{who} хариди аввалро кард.\n\n+ <b>{bonus} {cur}</b>\n"
@@ -203,6 +216,19 @@ RU = {
     "promo_min":     "Минимальная сумма: {min} {cur}",
     "promo_empty":   "Введите код",
     "confirm_disc":  "\nСкидка: −<b>{off} {cur}</b>\nИтого: <b>{total} {cur}</b>",
+    "too_fast":      "Помедленнее — слишком много действий подряд.",
+    "rev_ask":       "Оцените заказ:",
+    "rev_thanks":    "Спасибо за оценку!",
+    "rev_text_ask":  "Напишите пару слов или отправьте «-»:",
+    "rev_saved":     "Ваш отзыв сохранён. Спасибо! ⭐",
+    "auto_refund":   ("<b>↩ ДЕНЬГИ ВОЗВРАЩЕНЫ</b>\n<code>───────────────</code>\n"
+                      "{game} · {pack}\nЗаказ #{oid} не был выполнен.\n\n"
+                      "<b>{amount} {cur}</b> вернулись на ваш баланс.\n"
+                      "Баланс · <b>{balance} {cur}</b>\n\n"
+                      "<i>Извините за неудобство.</i>"),
+    "queue_done":    ("<b>● ВАШ ЗАКАЗ ВЫПОЛНЕН</b>\n<code>───────────────</code>\n"
+                      "{game} · {pack}\nID · <code>{pid}</code>\n\n"
+                      "<i>Товар снова появился — заказ выполнен автоматически.</i>"),
 
     "ref_paid":      ("<b>◆ БОНУС ЗА ДРУГА</b>\n<code>───────────────</code>\n"
                       "{who} сделал первую покупку.\n\n+ <b>{bonus} {cur}</b>\n"
@@ -300,6 +326,19 @@ EN = {
     "promo_min":     "Minimum amount: {min} {cur}",
     "promo_empty":   "Enter the code",
     "confirm_disc":  "\nDiscount: −<b>{off} {cur}</b>\nTotal: <b>{total} {cur}</b>",
+    "too_fast":      "Slow down — too many actions in a row.",
+    "rev_ask":       "Rate your order:",
+    "rev_thanks":    "Thanks for the rating!",
+    "rev_text_ask":  "Add a few words, or send «-»:",
+    "rev_saved":     "Your review is saved. Thank you! ⭐",
+    "auto_refund":   ("<b>↩ REFUNDED</b>\n<code>───────────────</code>\n"
+                      "{game} · {pack}\nOrder #{oid} was not fulfilled.\n\n"
+                      "<b>{amount} {cur}</b> returned to your balance.\n"
+                      "Balance · <b>{balance} {cur}</b>\n\n"
+                      "<i>Sorry for the inconvenience.</i>"),
+    "queue_done":    ("<b>● YOUR ORDER IS COMPLETE</b>\n<code>───────────────</code>\n"
+                      "{game} · {pack}\nID · <code>{pid}</code>\n\n"
+                      "<i>Stock is back — the order was fulfilled automatically.</i>"),
 
     "ref_paid":      ("<b>◆ REFERRAL BONUS</b>\n<code>───────────────</code>\n"
                       "{who} made their first purchase.\n\n+ <b>{bonus} {cur}</b>\n"

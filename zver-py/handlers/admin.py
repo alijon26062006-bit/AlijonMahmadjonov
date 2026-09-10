@@ -15,6 +15,7 @@ from aiogram.types import CallbackQuery, Message
 import db
 import keyboards as kb
 from handlers.common import is_admin, log, money
+from services import reviews
 from texts import DEFAULT_LANG, t
 
 router = Router()
@@ -86,6 +87,10 @@ async def order_action(cb: CallbackQuery) -> None:
         await _tell(cb, order["uid"],
                     t(await _ulang(order["uid"]), "n_done", oid=oid,
                       game=order["game_name"], pack=order["pack_name"]))
+        try:
+            await reviews.ask(cb.bot, oid)
+        except Exception as e:
+            log.debug("отзыв по #%s не запрошен: %s", oid, e)
         return
 
     # отклонение — возвращаем деньги, но только один раз

@@ -7,12 +7,18 @@
 from __future__ import annotations
 
 import time
+import warnings
 from decimal import Decimal
 from typing import Any, Iterable
 
 import aiomysql
 
 import config
+
+# INSERT IGNORE и ON DUPLICATE KEY — штатный приём в этом коде: так мы
+# не заводим второй отзыв по заказу и не дублируем строку очереди.
+# MySQL сообщает о каждом пропуске предупреждением — в журнале это шум.
+warnings.filterwarnings("ignore", message=r".*Duplicate entry.*")
 
 _pool: aiomysql.Pool | None = None
 
@@ -443,3 +449,174 @@ async def ref_stats(uid: int) -> dict:
     row = await one(
         "SELECT ref_cnt, ref_sum FROM z_users WHERE id=%s", (uid,))
     return row or {"ref_cnt": 0, "ref_sum": ZERO}
+
+
+# ─────────────────────────── отзывы ───────────────────────────
+
+async def review_by_order(oid: int) -> dict | None:
+    try:
+        return await one("SELECT * FROM z_reviews WHERE order_id=%s", (oid,))
+    except Exception:
+        return None
+
+
+async def review_open(uid: int, oid: int) -> bool:
+    """Завести пустой отзыв. False — если по заказу его уже спрашивали."""
+    try:
+        async with _p().acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """INSERT IGNORE INTO z_reviews (uid, order_id, stars, created_at)
+                       VALUES (%s,%s,0,%s)""",
+                    (uid, oid, int(time.time())))
+                return cur.rowcount > 0
+    except Exception:
+        return False
+
+
+async def review_set_stars(oid: int, stars: int) -> None:
+    await run("UPDATE z_reviews SET stars=%s WHERE order_id=%s", (stars, oid))
+
+
+async def review_set_text(oid: int, txt: str) -> None:
+    await run("UPDATE z_reviews SET txt=%s WHERE order_id=%s", (txt[:2000], oid))
+
+
+async def review_mark_posted(oid: int) -> None:
+    await run("UPDATE z_reviews SET posted=1 WHERE order_id=%s", (oid,))
+
+
+async def orders_awaiting_review(limit: int = 15) -> list[dict]:
+    """Выполненные заказы, по которым отзыв ещё не спрашивали.
+
+    Берём старше двух минут (клиент успел получить товар) и не старше
+    трёх суток — как в PHP.
+    """
+    now = int(time.time())
+    try:
+        return await all(
+            """SELECT o.id, o.uid FROM z_orders o
+                 LEFT JOIN z_reviews r ON r.order_id = o.id
+                WHERE o.status='done' AND r.id IS NULL
+                  AND o.done_at > %s AND o.done_at < %s
+                ORDER BY o.id DESC LIMIT %s""",
+            (now - 3 * 86400, now - 120, limit))
+    except Exception:
+        return []
+
+
+# ─────────────────────────── зависшие заказы ───────────────────────────
+
+async def stuck_orders(min_age: int = 900, limit: int = 500) -> list[dict]:
+    return await all(
+        """SELECT o.*, u.name, u.username
+             FROM z_orders o LEFT JOIN z_users u ON u.id = o.uid
+            WHERE o.status='new' AND o.refunded=0 AND o.price > 0
+              AND o.created_at < %s
+            ORDER BY o.id ASC LIMIT %s""",
+        (int(time.time()) - min_age, limit))
+
+
+async def claim_stuck_refund(oid: int) -> bool:
+    """Забронировать авто-возврат по заказу. True — возвращать должны мы.
+
+    Условие status='new' AND refunded=0 гарантирует, что заказ, который
+    админ уже обработал руками, повторно не вернётся.
+    """
+    async with _p().acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """UPDATE z_orders
+                      SET status='refund', refunded=1, done_at=%s,
+                          note=CONCAT(COALESCE(note,''),' [авто-возврат]')
+                    WHERE id=%s AND status='new' AND refunded=0""",
+                (int(time.time()), oid))
+            return cur.rowcount > 0
+
+
+# ─────────────────────────── очередь повторов ───────────────────────────
+
+async def queue_add(oid: int, uid: int, err: str) -> None:
+    try:
+        await run(
+            """INSERT IGNORE INTO z_queue (order_id, uid, tries, last_err, created_at)
+               VALUES (%s,%s,0,%s,%s)""",
+            (oid, uid, (err or "")[:180], int(time.time())))
+        await run("UPDATE z_orders SET status='wait', note=NULL WHERE id=%s", (oid,))
+    except Exception:
+        pass
+
+
+async def queue_size() -> int:
+    try:
+        row = await one("SELECT COUNT(*) AS c FROM z_queue")
+        return int((row or {}).get("c", 0))
+    except Exception:
+        return 0
+
+
+async def queue_rows(limit: int = 25) -> list[dict]:
+    try:
+        return await all(
+            """SELECT q.*, o.status FROM z_queue q
+                 JOIN z_orders o ON o.id = q.order_id
+                ORDER BY q.id LIMIT %s""", (limit,))
+    except Exception:
+        return []
+
+
+async def queue_del(oid: int) -> None:
+    await run("DELETE FROM z_queue WHERE order_id=%s", (oid,))
+
+
+async def queue_bump(oid: int, err: str) -> None:
+    await run("UPDATE z_queue SET tries=tries+1, last_err=%s WHERE order_id=%s",
+              ((err or "")[:180], oid))
+
+
+# ─────────────────────────── баны и лимит частоты ───────────────────────────
+
+async def is_banned(key: str) -> bool:
+    try:
+        row = await one("SELECT until FROM z_bans WHERE ip=%s", (key[:64],))
+        return bool(row and int(row["until"] or 0) > int(time.time()))
+    except Exception:
+        return False
+
+
+async def ban(key: str, minutes: int, why: str = "") -> None:
+    try:
+        await run(
+            """INSERT INTO z_bans (ip, until, why) VALUES (%s,%s,%s)
+               ON DUPLICATE KEY UPDATE
+                 until = GREATEST(until, VALUES(until)), why = VALUES(why)""",
+            (key[:64], int(time.time()) + minutes * 60, (why or "")[:60]))
+    except Exception:
+        pass
+
+
+async def unban(key: str) -> None:
+    try:
+        await run("DELETE FROM z_bans WHERE ip=%s", (key[:64],))
+    except Exception:
+        pass
+
+
+async def rate_ok(key: str, limit: int, window: int) -> bool:
+    """True — действие в пределах лимита. Окно фиксированное, как в PHP.
+
+    Любая ошибка базы пропускает пользователя: лимитер не должен
+    становиться причиной отказа в обслуживании.
+    """
+    try:
+        now = int(time.time())
+        win = now - (now % window)
+        await run(
+            """INSERT INTO z_rate (k, cnt, win) VALUES (%s, 1, %s)
+               ON DUPLICATE KEY UPDATE
+                 cnt = IF(win = VALUES(win), cnt + 1, 1), win = VALUES(win)""",
+            (key[:78], win))
+        row = await one("SELECT cnt FROM z_rate WHERE k=%s AND win=%s", (key[:78], win))
+        return int((row or {}).get("cnt", 1)) <= limit
+    except Exception:
+        return True

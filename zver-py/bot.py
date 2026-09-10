@@ -19,7 +19,9 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 import config
 import db
-from handlers import admin, shop, user
+from handlers import admin, reviews, shop, user
+from middlewares import Guard
+from services import maintenance
 
 logging.basicConfig(
     level=logging.DEBUG if config.DEBUG else logging.INFO,
@@ -54,14 +56,24 @@ async def main() -> None:
     log.info("бот @%s запущен, админов: %s", me.username, len(config.ADMINS))
 
     dp = Dispatcher(storage=MemoryStorage())
+    dp.update.middleware(Guard())
     # админский роутер первым: его кнопки не должны перехватываться общими
     dp.include_router(admin.router)
+    dp.include_router(reviews.router)
     dp.include_router(shop.router)
     dp.include_router(user.router)
+
+    # фоновые задачи вместо cron: авто-возвраты, очередь, запросы отзывов
+    background = asyncio.create_task(maintenance.loop(bot))
 
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
+        background.cancel()
+        try:
+            await background
+        except asyncio.CancelledError:
+            pass
         await bot.session.close()
         await db.close()
         log.info("остановлен")
