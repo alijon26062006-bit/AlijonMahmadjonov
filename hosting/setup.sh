@@ -199,11 +199,18 @@ head2 "Проверка"
 
 ALL_OK=1
 for svc in nginx mariadb hosting-worker; do
-  state=$(systemctl is-active "$svc" 2>/dev/null || echo "не запущен")
+  # is-active печатает состояние и при этом выходит с ненулевым кодом на всём,
+  # кроме active. Поэтому значение и код возврата берём раздельно — иначе
+  # в переменную попадали бы обе строки сразу.
+  state=$(systemctl is-active "$svc" 2>/dev/null) || true
+  [[ -n "$state" ]] || state="не запущен"
+
   if [[ "$state" == "active" ]]; then
     echo "  ✓ ${svc}"
   else
     echo "  ✗ ${svc}: ${state}"
+    # "activating" значит перезапуск по кругу — причина всегда в журнале.
+    journalctl -u "$svc" -n 10 --no-pager 2>&1 | sed 's/^/      /'
     ALL_OK=0
   fi
 done
@@ -236,5 +243,9 @@ if [[ $ALL_OK -eq 1 ]]; then
   [[ -n "${BOT_NAME:-}" ]] && echo "  • В @BotFather: /setmenubutton → ${PROTO}://panel.${DOMAIN}/telegram"
 else
   warn "Часть проверок не прошла — смотрите отметки ✗ выше"
-  echo "Подробности: journalctl -u hosting-worker -n 30, tail /var/log/hosting/panel-error.log"
+  echo "Полная диагностика с причинами и командами для починки:"
+  echo "    sudo bash ${SCRIPT_DIR}/scripts/doctor.sh"
 fi
+
+echo
+echo "Проверить весь хостинг целиком в любой момент: sudo bash ${SCRIPT_DIR}/scripts/doctor.sh"

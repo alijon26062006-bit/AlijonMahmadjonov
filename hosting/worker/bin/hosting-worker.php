@@ -25,17 +25,52 @@ use Hosting\Worker\JobHandler;
 Env::load($root . '/.env');
 Env::load('/etc/hosting/worker.env'); // root-only файл с MYSQL_ADMIN_*, см. install.sh
 
-$config = Config::fromEnv();
-$db = new Database($config);
-$jobs = new JobRepository($db);
-$handler = new JobHandler($db, $config, $root . '/hosting/templates');
-
 $running = true;
 if (function_exists('pcntl_async_signals')) {
     pcntl_async_signals(true);
     pcntl_signal(SIGTERM, function () use (&$running): void { $running = false; });
     pcntl_signal(SIGINT, function () use (&$running): void { $running = false; });
 }
+
+$config = Config::fromEnv();
+
+// Подключение к панельной БД — с повторами, а не с падением.
+//
+// Если упасть здесь, systemd (Restart=..., RestartSec=5) будет поднимать процесс
+// заново каждые 5 секунд, служба навсегда застрянет в состоянии
+// "activating (auto-restart)", а настоящая причина утонет в потоке одинаковых
+// рестартов. Вместо этого остаёмся живыми, печатаем причину и ждём: как только
+// MariaDB поднимется (или починят пароль в .env), воркер сам начнёт разбирать
+// очередь — без ручного systemctl restart.
+$db = null;
+$attempt = 0;
+while ($running && $db === null) {
+    try {
+        $db = new Database($config);
+    } catch (\Throwable $e) {
+        $attempt++;
+        $wait = min(60, 5 * $attempt);
+        fwrite(STDERR, sprintf(
+            "[hosting-worker] нет связи с базой панели (попытка %d): %s\n"
+            . "[hosting-worker] проверьте DB_HOST/DB_USERNAME/DB_PASSWORD в %s и `systemctl status mariadb`; повтор через %d с\n",
+            $attempt,
+            $e->getMessage(),
+            $root . '/.env',
+            $wait,
+        ));
+        for ($i = 0; $i < $wait && $running; $i++) {
+            sleep(1);
+        }
+    }
+}
+
+if ($db === null) { // получили SIGTERM, так и не подключившись
+    fwrite(STDOUT, "[hosting-worker] остановлен до подключения к базе\n");
+    exit(0);
+}
+
+$jobs = new JobRepository($db);
+$handler = new JobHandler($db, $config, $root . '/hosting/templates');
 
 fwrite(STDOUT, "[hosting-worker] запущен, опрашиваю очередь заданий\n");
 

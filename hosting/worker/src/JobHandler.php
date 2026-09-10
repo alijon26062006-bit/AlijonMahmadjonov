@@ -32,6 +32,9 @@ final class JobHandler
         'create_user', 'create_site', 'delete_site', 'suspend_site', 'unsuspend_site',
         'create_database', 'delete_database', 'apply_nginx', 'apply_php_fpm',
         'issue_ssl', 'create_backup', 'restore_backup', 'apply_quota',
+        // ping ничего не делает — он существует только чтобы doctor.sh мог
+        // отличить «служба запущена» от «воркер реально разбирает очередь».
+        'ping',
     ];
 
     private UnixProvisioner $unix;
@@ -82,6 +85,12 @@ final class JobHandler
         $method = 'handle' . str_replace('_', '', ucwords($type, '_'));
 
         return $this->{$method}($job, $payload);
+    }
+
+    /** Проверка живости: успешно завершается, ничего не трогая (см. scripts/doctor.sh). */
+    private function handlePing(array $job, array $payload): ?string
+    {
+        return null;
     }
 
     // ── create_user ─────────────────────────────────────────────────────────────

@@ -424,20 +424,41 @@ fi
 # ── 19. итоговый статус ────────────────────────────────────────────────────
 echo
 log "Установка завершена. Проверка сервисов:"
+
+SERVICES_OK=1
 for svc in nginx "php${PHP_VERSION}-fpm" mariadb hosting-worker fail2ban; do
-  state=$(systemctl is-active "$svc" 2>/dev/null || echo "неизвестно")
+  # is-active выходит с ненулевым кодом на любом состоянии кроме active, но
+  # состояние всё равно печатает. Поэтому подстановка и код возврата берутся
+  # раздельно: иначе в вывод попадали бы сразу и "activating", и "неизвестно".
+  state=$(systemctl is-active "$svc" 2>/dev/null) || true
+  [[ -n "$state" ]] || state="неизвестно"
   printf "  %-20s %s\n" "$svc" "$state"
+
+  if [[ "$state" != "active" ]]; then
+    SERVICES_OK=0
+    # Показываем причину сразу. Строка "activating" сама по себе не говорит
+    # ничего: за ней стоит либо перезапуск по кругу, либо неудачный старт,
+    # и разницу видно только в journal.
+    echo "    ── почему ${svc} не в состоянии active ──"
+    systemctl status "$svc" --no-pager -l 2>&1 | sed -n '1,10p' | sed 's/^/    /'
+    journalctl -u "$svc" -n 15 --no-pager 2>&1 | sed 's/^/    /'
+    echo
+  fi
 done
 
 echo
-log "Дальнейшие шаги:"
-echo "  1. Направьте DNS: A ${HOSTING_ROOT_DOMAIN} -> IP сервера, A *.${HOSTING_ROOT_DOMAIN} -> IP сервера"
-echo "  2. Впишите реальный HOSTING_ROOT_DOMAIN и HOSTING_SERVER_IP в ${ENV_FILE}"
-echo "  3. Впишите TELEGRAM_BOT_TOKEN в ${ENV_FILE} для входа через Mini App"
-echo "  4. Выпустите wildcard-сертификат: certbot certonly --manual --preferred-challenges dns \\"
-echo "       -d ${HOSTING_ROOT_DOMAIN} -d *.${HOSTING_ROOT_DOMAIN} (см. README — DNS-01 через Cloudflare)"
-echo "  5. Зарегистрируйтесь через панель, затем сделайте себя админом:"
-echo "       mysql -uroot -p -e \"UPDATE ${DB_DATABASE}.users SET role='admin' WHERE email='ваш@email'\""
+if [[ $SERVICES_OK -eq 1 ]]; then
+  log "Все службы работают. Остался один шаг — мастер настройки:"
+else
+  warn "Часть служб не поднялась (причины напечатаны выше)."
+  log "Мастер настройки всё равно можно запускать — он проверит всё ещё раз:"
+fi
+echo
+echo "    sudo bash ${HOSTING_DIR}/setup.sh"
+echo
+echo "  Он спросит домен, токен бота от @BotFather и пароль администратора,"
+echo "  сам впишет всё в ${ENV_FILE}, выпустит SSL и проверит, что панель отвечает."
+echo "  Полная диагностика в любой момент: sudo bash ${HOSTING_DIR}/scripts/doctor.sh"
 if [[ ${#STATUS_LINES[@]} -gt 0 ]]; then
   echo
   warn "Требует вашего внимания:"
