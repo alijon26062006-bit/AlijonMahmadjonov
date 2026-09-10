@@ -260,8 +260,37 @@ systemctl enable --now hosting-monitor.timer hosting-backup.timer hosting-ssl-re
 
 # ── 13. firewall (nftables) ───────────────────────────────────────────────
 log "Настраиваю firewall (nftables)"
+
+# Firewall не должен отрезать то, что на сервере уже работало до нас. Собираем
+# порты, опубликованные контейнерами Docker наружу (0.0.0.0:PORT), и порты,
+# перечисленные вручную в HOSTING_EXTRA_TCP_PORTS, и оставляем их открытыми.
+EXTRA_PORTS="${HOSTING_EXTRA_TCP_PORTS:-}"
+DOCKER_RUNNING=0
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  DOCKER_RUNNING=1
+  DOCKER_PORTS=$(docker ps --format '{{.Ports}}' 2>/dev/null \
+    | grep -oE '0\.0\.0\.0:[0-9]+' | cut -d: -f2 | sort -un | tr '\n' ',' | sed 's/,$//')
+  if [[ -n "$DOCKER_PORTS" ]]; then
+    EXTRA_PORTS="${EXTRA_PORTS:+${EXTRA_PORTS},}${DOCKER_PORTS}"
+    log "Найдены опубликованные наружу порты Docker: ${DOCKER_PORTS} — оставляю открытыми"
+    note_status "В firewall открыты порты работавших до установки контейнеров Docker: ${DOCKER_PORTS}. Если какой-то из них наружу не нужен — уберите его из HOSTING_EXTRA_TCP_PORTS и перезапустите install.sh"
+  fi
+fi
+
 sed "s/define ssh_port = 22/define ssh_port = ${SSH_PORT}/" \
   "${HOSTING_DIR}/etc/nftables/hosting.nft" > /etc/nftables-hosting.conf
+
+if [[ -n "$EXTRA_PORTS" ]]; then
+  sed -i "s|# HOSTING_EXTRA_PORTS.*|tcp dport { ${EXTRA_PORTS} } accept|" /etc/nftables-hosting.conf
+fi
+
+if [[ $DOCKER_RUNNING -eq 1 ]]; then
+  # См. пояснение в самом hosting.nft: policy drop в forward убивает сеть Docker.
+  sed -i 's|.*# HOSTING_FORWARD_POLICY|        type filter hook forward priority 0; policy accept;|' \
+    /etc/nftables-hosting.conf
+  warn "Обнаружен Docker — forward оставлен в policy accept, иначе сеть контейнеров ляжет"
+  note_status "Из-за Docker цепочка forward не фильтруется хостингом (иначе контейнеры теряют сеть) — фильтрацией forward управляет сам Docker"
+fi
 if nft -c -f /etc/nftables-hosting.conf; then
   nft -f /etc/nftables-hosting.conf
   if ! grep -q 'include "/etc/nftables-hosting.conf"' /etc/nftables.conf 2>/dev/null; then

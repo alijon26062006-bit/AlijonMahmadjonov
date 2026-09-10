@@ -39,12 +39,20 @@ table inet hosting_filter {
 
         tcp dport { 80, 443 } accept
         tcp dport $ssh_port ct state new limit rate 10/minute accept
+        # HOSTING_EXTRA_PORTS — install.sh подставляет сюда порты, которые уже
+        # заняты на сервере чем-то посторонним (например, опубликованными
+        # контейнерами Docker), чтобы установка хостинга не отрезала их от мира.
 
         counter drop
     }
 
+    # ВНИМАНИЕ про forward: policy drop здесь ломает Docker. Опубликованный порт
+    # контейнера (`-p 3005:3000`) после DNAT идёт не в input, а в forward — и пустая
+    # цепочка с policy drop тихо убивает всю сеть контейнеров. Поэтому install.sh
+    # переключает эту строку на policy accept, если на сервере запущен Docker,
+    # и оставляет drop только на «чистом» сервере, где хостинг живёт один.
     chain forward {
-        type filter hook forward priority 0; policy drop;
+        type filter hook forward priority 0; policy drop; # HOSTING_FORWARD_POLICY
     }
 
     chain output {
