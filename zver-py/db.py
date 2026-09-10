@@ -18,7 +18,9 @@ import config
 # INSERT IGNORE и ON DUPLICATE KEY — штатный приём в этом коде: так мы
 # не заводим второй отзыв по заказу и не дублируем строку очереди.
 # MySQL сообщает о каждом пропуске предупреждением — в журнале это шум.
-warnings.filterwarnings("ignore", message=r".*Duplicate entry.*")
+for _noise in (r".*Duplicate entry.*", r".*already exists.*",
+               r".*Duplicate column name.*", r".*Duplicate key name.*"):
+    warnings.filterwarnings("ignore", message=_noise)
 
 _pool: aiomysql.Pool | None = None
 
@@ -56,7 +58,9 @@ def _p() -> aiomysql.Pool:
 async def all(sql: str, args: Iterable[Any] = ()) -> list[dict]:
     async with _p().acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute(sql, tuple(args))
+            # пустые параметры передаём как None: иначе драйвер прогоняет
+            # запрос через %-форматирование и спотыкается о LIKE 'z\_%'
+            await cur.execute(sql, tuple(args) or None)
             return list(await cur.fetchall())
 
 
@@ -69,7 +73,7 @@ async def run(sql: str, args: Iterable[Any] = ()) -> int:
     """Выполнить запрос. Возвращает lastrowid (или число задетых строк)."""
     async with _p().acquire() as conn:
         async with conn.cursor() as cur:
-            await cur.execute(sql, tuple(args))
+            await cur.execute(sql, tuple(args) or None)
             return cur.lastrowid or cur.rowcount
 
 

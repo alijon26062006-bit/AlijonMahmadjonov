@@ -19,6 +19,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 import config
 import db
+import schema
 from handlers import admin, reviews, shop, user
 from middlewares import Guard
 from services import maintenance
@@ -34,6 +35,8 @@ log = logging.getLogger("zver")
 async def main() -> None:
     await db.init()
     try:
+        # структуру создаём сами — PHP-версия для этого больше не нужна
+        await schema.ensure()
         row = await db.one("SELECT COUNT(*) AS c FROM z_users")
         log.info("база на связи, пользователей: %s", (row or {}).get("c", "?"))
     except Exception:
