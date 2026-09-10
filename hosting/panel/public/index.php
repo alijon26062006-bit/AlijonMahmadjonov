@@ -111,6 +111,31 @@ $router = new Router();
 
 $router->get('/', fn () => Response::redirect($auth->user() ? '/dashboard' : '/login'));
 
+// Публичный health-check — без аутентификации и без секретов в ответе (см. спецификацию
+// HEALTH CHECKS: "Никаких секретов в public health endpoint"). Используется внешним
+// мониторингом/балансировщиком. Раздельные проверки nginx/php-fpm/MariaDB как сервисов
+// делает scripts/monitor.sh (systemctl-уровень); этот endpoint проверяет то, что видно
+// изнутри самого PHP-процесса — соединение с панельной БД и очередь воркера.
+$router->get('/health', function () use ($db, $jobs, $config): Response {
+    $checks = ['db' => false, 'queue_backlog_ok' => false];
+    $httpStatus = 503;
+
+    try {
+        $db->pdo()->query('SELECT 1');
+        $checks['db'] = true;
+
+        $pending = $jobs->countPending();
+        $checks['queue_backlog_ok'] = $pending < 200;
+        $checks['queue_pending'] = $pending;
+
+        $httpStatus = ($checks['db'] && $checks['queue_backlog_ok']) ? 200 : 503;
+    } catch (\Throwable) {
+        // Ничего из исключения наружу не отдаём — только факт, что БД недоступна.
+    }
+
+    return Response::json(['status' => $httpStatus === 200 ? 'ok' : 'degraded', 'checks' => $checks], $httpStatus);
+});
+
 $router->get('/login', [$authController, 'showLogin']);
 $router->post('/login', [$authController, 'login']);
 $router->get('/register', [$authController, 'showRegister']);

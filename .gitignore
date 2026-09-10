@@ -10,3 +10,8 @@ data/
 *.db-shm
 .venv/
 .pytest_cache/
+
+# Хостинг-панель: рантайм-данные никогда не коммитятся (создаются на сервере)
+/backups/
+hosting/var/*
+!hosting/var/.gitignore

@@ -11,6 +11,7 @@ set -euo pipefail
 
 HOSTING_ROOT="${HOSTING_ROOT:-/opt/hosting}"
 HOSTING_USERS_ROOT="${HOSTING_USERS_ROOT:-/home/hosting}"
+BACKUP_DIR="${BACKUP_DIR:-${HOSTING_ROOT}/backups}"
 PHP_BIN="${PHP_BIN:-php}"
 RECORDER="${HOSTING_ROOT}/hosting/panel/bin/record-backup.php"
 
@@ -60,8 +61,8 @@ PARENT_DIR=$(dirname "$HOME_DIR")
 
 # Снимок текущего состояния перед перезаписью
 if [[ -d "$HOME_DIR" ]]; then
-  mkdir -p "${HOSTING_ROOT}/backups/${TARGET_USER}"
-  tar czf "${HOSTING_ROOT}/backups/${TARGET_USER}/pre-restore-$(date -u +%Y%m%d-%H%M%S).tar.gz" \
+  mkdir -p "${BACKUP_DIR}/${TARGET_USER}"
+  tar czf "${BACKUP_DIR}/${TARGET_USER}/pre-restore-$(date -u +%Y%m%d-%H%M%S).tar.gz" \
     --exclude='tmp' -C "$PARENT_DIR" "$(basename "$HOME_DIR")" || true
 fi
 
