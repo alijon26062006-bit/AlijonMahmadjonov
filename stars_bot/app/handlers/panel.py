@@ -37,7 +37,7 @@ from app.money import (
 from app.services import dcpay, pricing, rates
 from app.services import reviews as reviews_service
 from app.services import delivery
-from app.states import Panel, PromoNew
+from app.states import Panel, PartnerMove, PartnerNew, PromoNew
 
 log = logging.getLogger(__name__)
 router = Router(name="panel")
@@ -92,7 +92,10 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🔗 Рекламные ссылки", callback_data="pn:links"),
         InlineKeyboardButton(text="⭐️ Отзывы", callback_data="pn:reviews"),
     )
-    kb.row(InlineKeyboardButton(text="🎮 Steam", callback_data="pn:steam"))
+    kb.row(
+        InlineKeyboardButton(text="🎮 Steam", callback_data="pn:steam"),
+        InlineKeyboardButton(text="🤝 Партнёры", callback_data="pn:partners"),
+    )
     kb.row(InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"))
     return kb.as_markup()
 
@@ -2544,3 +2547,306 @@ async def cb_steam_rate(call: CallbackQuery, conn: aiosqlite.Connection, provide
            "не могу. Задайте его в разделе «Цены».</blockquote>"),
         back_kb("pn:steam", "‹ Назад"),
     )
+
+
+# ═══════════════════════════════════════════════════════════ партнёры
+
+
+def partner_line(partner: db.Partner, profit: int, totals: dict) -> str:
+    """Строка партнёра: доля прибыли, взносы, выплаты и что на руках."""
+    earned = profit * partner.share // 100
+    balance = earned + totals["put_in"] - totals["took_out"]
+    return (
+        f"👤 <b>{partner.name}</b> — доля <b>{partner.share}%</b>\n"
+        f"├ Заработал: <b>{fmt(earned)}</b>\n"
+        f"├ Внёс в оборот: <b>{fmt(totals['put_in'])}</b>\n"
+        f"├ Забрал себе: <b>{fmt(totals['took_out'])}</b>\n"
+        f"└ На руках: <b>{fmt(balance)}</b>"
+    )
+
+
+async def partners_text(conn: aiosqlite.Connection) -> str:
+    partners = await db.list_partners(conn)
+    money = await db.total_profit(conn)
+    profit = money["profit"]
+
+    if not partners:
+        body = (
+            "<blockquote>Партнёров пока нет. Добавьте себя и напарника, "
+            "поставьте доли — и бот начнёт считать, сколько чьё.</blockquote>"
+        )
+    else:
+        rows = []
+        for partner in partners:
+            totals = await db.partner_totals(conn, partner.id)
+            rows.append(partner_line(partner, profit, totals))
+        body = "\n\n".join(rows)
+
+    total_share = sum(p.share for p in partners)
+    warn = ""
+    if partners and total_share != 100:
+        warn = (f"\n\n[[warn]] <b>Доли в сумме дают {total_share}%</b>, а должно "
+                "быть 100. Пока так, расчёт будет неверным.")
+
+    return (
+        "🤝 <b>Партнёры</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"[[money]] <b>Общая прибыль: {fmt(profit)}</b>\n"
+        f"├ Продано на: <b>{fmt(money['revenue'])}</b>\n"
+        f"└ Себестоимость: <b>{fmt(money['cost'])}</b>\n\n"
+        f"{body}{warn}\n\n"
+        "<blockquote>Прибыль считается из выданных заказов. Взносы и выплаты "
+        "вы отмечаете сами — тогда видно, кто сколько вложил и забрал.</blockquote>"
+    )
+
+
+async def partners_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("➕ Добавить партнёра", "pn:pt_new", style=SUCCESS))
+    for partner in await db.list_partners(conn):
+        kb.row(InlineKeyboardButton(
+            text=f"👤 {partner.name}", callback_data=f"pn:pt:{partner.id}",
+        ))
+    kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
+    return kb.as_markup()
+
+
+async def show_partners(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    await safe_edit(call, substitute(await partners_text(conn)),
+                    await partners_kb(conn))
+
+
+@router.callback_query(F.data == "pn:partners")
+async def cb_partners(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    await state.clear()
+    await show_partners(call, conn)
+    await call.answer()
+
+
+# ------------------------------------------------------- карточка партнёра
+
+
+async def partner_card(conn: aiosqlite.Connection, partner: db.Partner) -> str:
+    money = await db.total_profit(conn)
+    totals = await db.partner_totals(conn, partner.id)
+    moves = await db.partner_moves(conn, partner.id)
+
+    history = ""
+    if moves:
+        rows = "\n".join(
+            f"├ {'+' if m['amount'] > 0 else '−'}{fmt(abs(m['amount']))}"
+            + (f" — <i>{m['note']}</i>" if m["note"] else "")
+            for m in moves[:8]
+        )
+        history = f"\n\n📜 <b>Движение денег</b>\n{rows}"
+
+    return (
+        partner_line(partner, money["profit"], totals)
+        + f"\n\n<i>С нами с {partner.created_at[:10]}</i>"
+        + history
+    )
+
+
+def partner_kb(partner: db.Partner) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(
+        btn("➕ Внёс в оборот", f"pn:pt_in:{partner.id}", style=SUCCESS),
+        btn("➖ Забрал себе", f"pn:pt_out:{partner.id}", style=DANGER),
+    )
+    kb.row(InlineKeyboardButton(text="📊 Изменить долю",
+                                callback_data=f"pn:pt_share:{partner.id}"))
+    kb.row(btn("🗑 Удалить партнёра", f"pn:pt_del:{partner.id}", style=DANGER))
+    kb.row(InlineKeyboardButton(text="‹ К партнёрам", callback_data="pn:partners"))
+    return kb.as_markup()
+
+
+@router.callback_query(F.data.startswith("pn:pt:"))
+async def cb_partner_card(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    partner = await db.get_partner(conn, int(call.data.rsplit(":", 1)[1]))
+    if partner is None:
+        await call.answer("Партнёр не найден.", show_alert=True)
+        await show_partners(call, conn)
+        return
+    await safe_edit(call, await partner_card(conn, partner), partner_kb(partner))
+    await call.answer()
+
+
+# ------------------------------------------------------------ добавление
+
+
+@router.callback_query(F.data == "pn:pt_new")
+async def cb_partner_new(call: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(PartnerNew.name)
+    await safe_edit(
+        call,
+        "🤝 <b>Новый партнёр</b>\n\n"
+        "<blockquote>Как его записать? Пришлите имя — например "
+        "<code>Алиджон</code>.</blockquote>",
+        back_kb("pn:partners", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.message(PartnerNew.name, F.text)
+async def on_partner_name(message: Message, state: FSMContext) -> None:
+    name = (message.text or "").strip()
+    if not 2 <= len(name) <= 40:
+        await message.answer("❌ Имя от 2 до 40 символов.")
+        return
+    await state.update_data(partner_name=name)
+    await state.set_state(PartnerNew.share)
+    await message.answer(
+        f"🤝 <b>{name}</b>\n\n"
+        "<blockquote>Какая у него доля в процентах? Например "
+        "<code>50</code>.</blockquote>",
+        reply_markup=back_kb("pn:partners", "❌ Отмена"),
+    )
+
+
+@router.message(PartnerNew.share, F.text)
+async def on_partner_share(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    raw = (message.text or "").strip().rstrip("%").strip()
+    if not raw.isdigit() or not 0 <= int(raw) <= 100:
+        await message.answer("❌ Введите число от 0 до 100.")
+        return
+
+    data = await state.get_data()
+
+    # Тот же шаг используется и для правки доли у существующего партнёра.
+    edit_id = data.get("edit_id")
+    if edit_id:
+        await db.update_partner(conn, edit_id, share=int(raw))
+        await state.clear()
+        partner = await db.get_partner(conn, edit_id)
+        kb = InlineKeyboardBuilder()
+        kb.row(btn("👤 Карточка", f"pn:pt:{edit_id}"))
+        kb.row(btn("‹ К партнёрам", "pn:partners"))
+        await message.answer(
+            f"✅ Доля <b>{partner.name if partner else ''}</b> теперь <b>{raw}%</b>",
+            reply_markup=kb.as_markup(),
+        )
+        return
+
+    name = data.get("partner_name", "").strip()
+    if not name:
+        await state.clear()
+        await message.answer("Не понял, кого добавляем. Откройте /panel заново.")
+        return
+
+    partner = await db.create_partner(conn, name, int(raw))
+    await state.clear()
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("👤 Карточка", f"pn:pt:{partner.id}"))
+    kb.row(btn("‹ К партнёрам", "pn:partners"))
+    await message.answer(
+        f"✅ <b>{name}</b> добавлен, доля <b>{raw}%</b>",
+        reply_markup=kb.as_markup(),
+    )
+
+
+# ------------------------------------------------------- взносы и выплаты
+
+
+@router.callback_query(F.data.startswith("pn:pt_in:"))
+async def cb_partner_in(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    await _ask_partner_amount(call, state, conn, "in")
+
+
+@router.callback_query(F.data.startswith("pn:pt_out:"))
+async def cb_partner_out(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    await _ask_partner_amount(call, state, conn, "out")
+
+
+async def _ask_partner_amount(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection, kind: str,
+) -> None:
+    partner = await db.get_partner(conn, int(call.data.rsplit(":", 1)[1]))
+    if partner is None:
+        await call.answer("Партнёр не найден.", show_alert=True)
+        return
+
+    await state.set_state(PartnerMove.amount)
+    await state.update_data(partner_id=partner.id, move_kind=kind)
+    title = "внёс в оборот" if kind == "in" else "забрал себе"
+    await safe_edit(
+        call,
+        f"🤝 <b>{partner.name} {title}</b>\n\n"
+        "<blockquote>Пришлите сумму в сомони. Можно с примечанием через "
+        "пробел: <code>500 пополнил FazerCards</code></blockquote>",
+        back_kb(f"pn:pt:{partner.id}", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.message(PartnerMove.amount, F.text)
+async def on_partner_amount(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    data = await state.get_data()
+    partner = await db.get_partner(conn, data.get("partner_id", 0))
+    if partner is None:
+        await state.clear()
+        await message.answer("Не понял, кому записать. Откройте /panel заново.")
+        return
+
+    raw, _, note = (message.text or "").strip().partition(" ")
+    amount = parse(raw)
+    if amount is None or amount <= 0:
+        await message.answer(
+            "❌ Введите сумму числом, например <code>500</code> "
+            "или <code>500 пополнил FazerCards</code>."
+        )
+        return
+
+    kind = data.get("move_kind", "in")
+    signed = amount if kind == "in" else -amount
+    await db.add_partner_move(
+        conn, partner_id=partner.id, amount=signed,
+        admin_id=message.from_user.id, note=note.strip() or None,
+    )
+    await state.clear()
+
+    totals = await db.partner_totals(conn, partner.id)
+    money = await db.total_profit(conn)
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("👤 Карточка", f"pn:pt:{partner.id}"))
+    kb.row(btn("‹ К партнёрам", "pn:partners"))
+    await message.answer(
+        f"✅ <b>{partner.name}</b> — "
+        f"{'внесено' if kind == 'in' else 'выплачено'} <b>{fmt(amount)}</b>\n\n"
+        + partner_line(partner, money["profit"], totals),
+        reply_markup=kb.as_markup(),
+    )
+
+
+# ------------------------------------------------------------- доля и удаление
+
+
+@router.callback_query(F.data.startswith("pn:pt_share:"))
+async def cb_partner_share(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    partner = await db.get_partner(conn, int(call.data.rsplit(":", 1)[1]))
+    if partner is None:
+        await call.answer("Партнёр не найден.", show_alert=True)
+        return
+    await state.set_state(PartnerNew.share)
+    await state.update_data(partner_name="", edit_id=partner.id)
+    await safe_edit(
+        call,
+        f"📊 <b>Доля: {partner.name}</b>\n\n"
+        f"Сейчас: <b>{partner.share}%</b>\n\n"
+        "<blockquote>Пришлите новый процент, например <code>50</code>."
+        "</blockquote>",
+        back_kb(f"pn:pt:{partner.id}", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:pt_del:"))
+async def cb_partner_delete(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    """Убираем из списка, но движение денег храним: это история расчётов."""
+    partner_id = int(call.data.rsplit(":", 1)[1])
+    await db.update_partner(conn, partner_id, active=0)
+    await call.answer("Удалён")
+    await show_partners(call, conn)

@@ -160,6 +160,29 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 -- Кому уже предлагали оставить отзыв. Без этой отметки повторное нажатие
 -- кнопки в панели дёргало бы одних и тех же людей снова и снова.
+-- Партнёры: деньги приходят на одну карту, поэтому делим не деньги,
+-- а учёт. Доля прибыли считается из заказов, взносы и выплаты пишутся
+-- отдельно — тогда «сколько чьё» не зависит от чьей-либо памяти.
+CREATE TABLE IF NOT EXISTS partners (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,
+    tg_id      INTEGER,                      -- необязательно
+    share      INTEGER NOT NULL DEFAULT 0,   -- доля в процентах
+    active     INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+
+-- Движение денег партнёра: со знаком. Плюс — внёс в оборот,
+-- минус — забрал себе.
+CREATE TABLE IF NOT EXISTS partner_moves (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    partner_id INTEGER NOT NULL,
+    amount     INTEGER NOT NULL,
+    note       TEXT,
+    admin_id   INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS review_asks (
     order_id   INTEGER PRIMARY KEY,
     user_id    INTEGER NOT NULL,
@@ -197,6 +220,7 @@ CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
 CREATE INDEX IF NOT EXISTS idx_tmsg_ticket    ON ticket_messages(ticket_id);
 CREATE INDEX IF NOT EXISTS idx_adj_user      ON adjustments(user_id);
 CREATE INDEX IF NOT EXISTS idx_adj_created   ON adjustments(created_at);
+CREATE INDEX IF NOT EXISTS idx_pmoves_partner ON partner_moves(partner_id);
 CREATE INDEX IF NOT EXISTS idx_rev_status    ON reviews(status);
 CREATE INDEX IF NOT EXISTS idx_rev_user      ON reviews(user_id);
 CREATE INDEX IF NOT EXISTS idx_hits_link     ON link_hits(link_id);
@@ -247,6 +271,16 @@ class Review:
     @property
     def stars(self) -> str:
         return "⭐️" * self.rating
+
+
+@dataclass
+class Partner:
+    id: int
+    name: str
+    tg_id: int | None
+    share: int
+    active: int
+    created_at: str
 
 
 @dataclass
@@ -525,6 +559,96 @@ async def top_clients(
         params = (ORDER_DELIVERED, limit)
     async with conn.execute(query, params) as cur:
         return [(_from_row(User, row), row["amount"]) for row in await cur.fetchall()]
+
+
+# -------------------------------------------------------------- партнёры
+
+
+async def create_partner(
+    conn: aiosqlite.Connection, name: str, share: int = 0, tg_id: int | None = None,
+) -> Partner:
+    cur = await conn.execute(
+        "INSERT INTO partners (name, tg_id, share, created_at) VALUES (?, ?, ?, ?)",
+        (name, tg_id, share, _now()),
+    )
+    await conn.commit()
+    partner = await get_partner(conn, cur.lastrowid)
+    assert partner is not None
+    return partner
+
+
+async def get_partner(conn: aiosqlite.Connection, partner_id: int) -> Partner | None:
+    async with conn.execute("SELECT * FROM partners WHERE id = ?", (partner_id,)) as cur:
+        row = await cur.fetchone()
+    return _from_row(Partner, row) if row else None
+
+
+async def list_partners(conn: aiosqlite.Connection) -> list[Partner]:
+    async with conn.execute(
+        "SELECT * FROM partners WHERE active = 1 ORDER BY id"
+    ) as cur:
+        return [_from_row(Partner, row) for row in await cur.fetchall()]
+
+
+async def update_partner(conn: aiosqlite.Connection, partner_id: int, **fields_) -> None:
+    if not fields_:
+        return
+    assignments = ", ".join(f"{key} = ?" for key in fields_)
+    await conn.execute(
+        f"UPDATE partners SET {assignments} WHERE id = ?",
+        (*fields_.values(), partner_id),
+    )
+    await conn.commit()
+
+
+async def add_partner_move(
+    conn: aiosqlite.Connection, *, partner_id: int, amount: int,
+    admin_id: int, note: str | None = None,
+) -> None:
+    """amount со знаком: плюс — внёс в оборот, минус — забрал себе."""
+    await conn.execute(
+        """INSERT INTO partner_moves (partner_id, amount, note, admin_id, created_at)
+           VALUES (?, ?, ?, ?, ?)""",
+        (partner_id, amount, note, admin_id, _now()),
+    )
+    await conn.commit()
+
+
+async def partner_moves(
+    conn: aiosqlite.Connection, partner_id: int, limit: int = 10,
+) -> list[aiosqlite.Row]:
+    async with conn.execute(
+        "SELECT * FROM partner_moves WHERE partner_id = ? ORDER BY id DESC LIMIT ?",
+        (partner_id, limit),
+    ) as cur:
+        return list(await cur.fetchall())
+
+
+async def partner_totals(conn: aiosqlite.Connection, partner_id: int) -> dict[str, int]:
+    """Сколько партнёр внёс и сколько забрал — обе суммы положительные."""
+    async with conn.execute(
+        """SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount END), 0)  AS put_in,
+                  COALESCE(SUM(CASE WHEN amount < 0 THEN -amount END), 0) AS took_out
+           FROM partner_moves WHERE partner_id = ?""",
+        (partner_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    return {key: (row[key] or 0) for key in row.keys()}
+
+
+async def total_profit(conn: aiosqlite.Connection) -> dict[str, int]:
+    """Выручка, себестоимость и прибыль за всё время по выданным заказам."""
+    async with conn.execute(
+        """SELECT COALESCE(SUM(price), 0) AS revenue,
+                  COALESCE(SUM(cost), 0)  AS cost,
+                  COUNT(*)                AS orders
+           FROM orders WHERE status = ?""",
+        (ORDER_DELIVERED,),
+    ) as cur:
+        row = await cur.fetchone()
+    data = {key: (row[key] or 0) for key in row.keys()}
+    data["profit"] = data["revenue"] - data["cost"]
+    return data
 
 
 # ---------------------------------------------------------------- отзывы

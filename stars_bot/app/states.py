@@ -46,6 +46,15 @@ class Review(StatesGroup):
     text = State()        # ждём текст отзыва после оценки
 
 
+class PartnerNew(StatesGroup):
+    name = State()        # ждём имя партнёра
+    share = State()       # ждём его долю в процентах
+
+
+class PartnerMove(StatesGroup):
+    amount = State()      # ждём сумму взноса или выплаты
+
+
 class Cast(StatesGroup):
     content = State()     # ждём сообщение для рассылки
     buttons = State()     # ждём список кнопок
