@@ -4,9 +4,10 @@
 Картинки лежат в интернете, список — в photos.json рядом. Скрипт скачивает
 каждую, кладёт в uploads/ и прописывает блюду в базе. Запускать на сервере:
 
-    .venv/bin/python photos.py            — скачать те, у которых фото ещё нет
-    .venv/bin/python photos.py --force    — перекачать всё заново
-    .venv/bin/python photos.py --clear    — убрать фото у всех блюд
+    .venv/bin/python photos.py             — скачать те, у которых фото ещё нет
+    .venv/bin/python photos.py --force     — перекачать всё заново
+    .venv/bin/python photos.py --optimize  — ужать те, что уже лежат
+    .venv/bin/python photos.py --clear     — убрать фото у всех блюд
 
 Скрипт можно запускать сколько угодно раз: уже скачанное он не трогает.
 Фото, загруженные вручную через админку, остаются на месте — если не --force.
@@ -27,8 +28,14 @@ HERE = Path(__file__).parent
 UPLOADS = HERE / 'uploads'
 LIST = HERE / 'photos.json'
 
-MAX_BYTES = 8 * 1024 * 1024
+MAX_BYTES = 12 * 1024 * 1024
 MAGIC = ((b'\xff\xd8\xff', '.jpg'), (b'\x89PNG\r\n\x1a\n', '.png'))
+
+# Карточка блюда на телефоне — это 200 точек шириной, на большом экране 600.
+# Держать ради неё двухмегабайтный PNG нельзя: в Душанбе мобильный интернет,
+# и меню из 94 таких картинок не откроется никогда.
+WIDTH = 900
+QUALITY = 82
 
 
 def kind_of(body):
@@ -40,22 +47,76 @@ def kind_of(body):
     return None
 
 
+def shrink(body):
+    """Ужать до разумного размера. Нет Pillow — сохраняем как есть."""
+    try:
+        import io
+
+        from PIL import Image
+    except ImportError:
+        return body, kind_of(body), False
+
+    try:
+        img = Image.open(io.BytesIO(body))
+        img = img.convert('RGB')
+        if img.width > WIDTH:
+            height = round(img.height * WIDTH / img.width)
+            img = img.resize((WIDTH, height), Image.LANCZOS)
+
+        out = io.BytesIO()
+        img.save(out, 'JPEG', quality=QUALITY, optimize=True, progressive=True)
+        return out.getvalue(), '.jpg', True
+    except Exception:
+        return body, kind_of(body), False
+
+
 def fetch(url):
     """Скачиваем и убеждаемся, что это правда картинка, а не страница с ошибкой."""
     r = httpx.get(url, timeout=60, follow_redirects=True)
     r.raise_for_status()
     body = r.content
     if len(body) > MAX_BYTES:
-        raise ValueError('файл больше 8 МБ')
-    ext = kind_of(body)
-    if not ext:
+        raise ValueError('файл слишком большой')
+    if not kind_of(body):
         raise ValueError('это не картинка')
-    return body, ext
+
+    was = len(body)
+    body, ext, squeezed = shrink(body)
+    return body, ext, was, squeezed
+
+
+def squeeze_existing():
+    """Ужать фотографии, которые уже лежат в uploads — в том числе те,
+    что загрузили руками через админку прямо с телефона."""
+    db.setup()
+    saved = 0
+    for d in db.dishes(only_active=False):
+        if not d['photo']:
+            continue
+        path = UPLOADS / d['photo']
+        if not path.is_file():
+            continue
+
+        was = path.stat().st_size
+        body, ext, squeezed = shrink(path.read_bytes())
+        if not squeezed or len(body) >= was:
+            continue
+
+        name = f"{d['id']}{ext}"
+        (UPLOADS / name).write_bytes(body)
+        if name != d['photo']:
+            path.unlink(missing_ok=True)
+            db.set_dish_photo(d['id'], name)
+        print(f"  ~ {d['id']}: {was // 1024} КБ → {len(body) // 1024} КБ")
+        saved += was - len(body)
+
+    print(f'\nСэкономлено {saved // 1024} КБ на каждой загрузке меню.')
 
 
 def main():
     force = '--force' in sys.argv
     clear = '--clear' in sys.argv
+    only_squeeze = '--optimize' in sys.argv
 
     db.setup()
     UPLOADS.mkdir(exist_ok=True)
@@ -67,6 +128,10 @@ def main():
                 db.set_dish_photo(d['id'], '')
                 gone += 1
         print(f'Фото убраны у {gone} блюд.')
+        return
+
+    if only_squeeze:
+        squeeze_existing()
         return
 
     if not LIST.exists():
@@ -91,16 +156,23 @@ def main():
             continue
 
         try:
-            body, ext = fetch(url)
+            body, ext, was, squeezed = fetch(url)
         except Exception as e:
             print(f'  ! {dish_id}: {e}')
             failed += 1
             continue
 
         name = f'{dish_id}{ext}'
+        for old_file in UPLOADS.glob(f'{dish_id}.*'):    # старое фото того же блюда
+            if old_file.name != name:
+                old_file.unlink(missing_ok=True)
         (UPLOADS / name).write_bytes(body)
         db.set_dish_photo(dish_id, name)
-        print(f'  + {dish_id} → {name} ({len(body) // 1024} КБ)')
+
+        size = f'{len(body) // 1024} КБ'
+        if squeezed and was > len(body):
+            size += f' (было {was // 1024})'
+        print(f'  + {dish_id} → {name} ({size})')
         added += 1
 
     print(f'\nГотово. Добавлено: {added}, уже было: {skipped}, '
