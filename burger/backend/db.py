@@ -354,6 +354,13 @@ def save_dish(data, new=False):
                         [row[k] for k in fields if k != 'id'] + [row['id']])
 
 
+def set_dish_photo(dish_id, filename):
+    """Только фото, ничего больше: остальные поля блюда не трогаем."""
+    with connect() as con:
+        cur = con.execute('UPDATE dishes SET photo = ? WHERE id = ?', (filename, dish_id))
+        return cur.rowcount == 1
+
+
 def delete_dish(dish_id):
     with connect() as con:
         con.execute('DELETE FROM dishes WHERE id = ?', (dish_id,))
