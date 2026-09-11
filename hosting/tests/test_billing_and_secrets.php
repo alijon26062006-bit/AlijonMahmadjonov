@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Hosting\Config;
+use Hosting\Model\DatabaseUserRepository;
 use Hosting\Service\Billing;
 use Hosting\Support\Brand;
 use Hosting\Support\Secret;
@@ -173,6 +174,80 @@ function test_pending_requests_list_only_unprocessed_ones(): void
     assert_equals(1, count($pending));
     assert_equals('10.00', number_format((float) $pending[0]['amount_tjs'], 2, '.', ''));
     assert_equals('list@test.tj', $pending[0]['email']);
+}
+
+// ── Пароль от базы: хранение и повторный показ ────────────────────────────
+
+function hosting_test_db_user(Hosting\Database $db, string $login): int
+{
+    $pdo = $db->pdo();
+    $pdo->exec("INSERT INTO users (email, system_user, plan_id) VALUES ('{$login}@test.tj', '{$login}', 1)");
+    $uid = (int) $pdo->lastInsertId();
+    (new DatabaseUserRepository($db))->getOrCreateForUser(
+        ['id' => $uid, 'system_user' => $login],
+        5
+    );
+
+    return $uid;
+}
+
+function test_database_password_is_shown_again_to_the_client(): void
+{
+    // Клиент теряет пароль от базы, а менять его — значит ломать уже настроенные
+    // сайты. Поэтому пароль обязан читаться обратно, а не только проверяться.
+    $db = hosting_test_db();
+    $repo = new DatabaseUserRepository($db);
+    $uid = hosting_test_db_user($db, 'showpw');
+
+    $repo->storePassword($uid, 'Xk7#pQ2mZr9Lw', hosting_test_key());
+    assert_equals('Xk7#pQ2mZr9Lw', $repo->revealPassword($uid, hosting_test_key()));
+}
+
+function test_database_password_is_never_stored_in_plain_text(): void
+{
+    $db = hosting_test_db();
+    $repo = new DatabaseUserRepository($db);
+    $uid = hosting_test_db_user($db, 'plainpw');
+
+    $repo->storePassword($uid, 'Xk7#pQ2mZr9Lw', hosting_test_key());
+
+    $stored = (string) $db->pdo()
+        ->query("SELECT password_enc FROM database_users WHERE user_id = {$uid}")
+        ->fetchColumn();
+
+    assert_true($stored !== '', 'Пароль должен быть сохранён');
+    assert_false(str_contains($stored, 'Xk7#pQ2mZr9Lw'), 'В базе не должно быть пароля открытым текстом');
+}
+
+function test_new_password_replaces_the_old_one(): void
+{
+    // После «Нового пароля» панель обязана показывать новый: если она покажет
+    // старый, клиент будет вводить его в phpMyAdmin и получать отказ.
+    $db = hosting_test_db();
+    $repo = new DatabaseUserRepository($db);
+    $uid = hosting_test_db_user($db, 'newpw');
+
+    $repo->storePassword($uid, 'старый-пароль', hosting_test_key());
+    $repo->storePassword($uid, 'новый-пароль', hosting_test_key());
+
+    assert_equals('новый-пароль', $repo->revealPassword($uid, hosting_test_key()));
+}
+
+function test_password_is_not_stored_at_all_without_app_key(): void
+{
+    // Лучше не показать пароль, чем положить его в базу открытым текстом.
+    $db = hosting_test_db();
+    $repo = new DatabaseUserRepository($db);
+    $uid = hosting_test_db_user($db, 'nokeypw');
+
+    $repo->storePassword($uid, 'Xk7#pQ2mZr9Lw', '');
+
+    $stored = $db->pdo()
+        ->query("SELECT password_enc FROM database_users WHERE user_id = {$uid}")
+        ->fetchColumn();
+
+    assert_true($stored === null || $stored === '', 'Без APP_KEY в базе не должно появиться ничего');
+    assert_true($repo->revealPassword($uid, hosting_test_key()) === null);
 }
 
 // ── Имя панели берётся из купленного домена ───────────────────────────────
