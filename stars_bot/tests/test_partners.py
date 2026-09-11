@@ -88,9 +88,9 @@ def buttons(markup) -> list[str]:
     return [b.text for row in markup.inline_keyboard for b in row]
 
 
-async def sale(conn, price: int, cost: int, user_id: int = 900) -> None:
+async def sale(conn, price: int, cost: int, product="stars", user_id: int = 900) -> None:
     order = await db.create_order(
-        conn, user_id=user_id, product_type="stars", quantity=100,
+        conn, user_id=user_id, product_type=product, quantity=100,
         recipient="kto", price=price, cost=cost,
     )
     await db.update_order(conn, order.id, status=db.ORDER_DELIVERED)
@@ -142,19 +142,86 @@ async def run(conn) -> None:
     await panel.on_partner_share(msg("40"), state, conn)
     check("второй партнёр добавлен", len(await db.list_partners(conn)) == 2)
 
-    # ------------------------------------------------ деление прибыли
-    await sale(conn, price=100_00, cost=80_00)     # прибыль 20.00
-    await sale(conn, price=200_00, cost=170_00)    # прибыль 30.00
+    # ------------------------------------------------ продажи по товарам
+    await sale(conn, price=100_00, cost=80_00, product="stars")    # +20.00
+    await sale(conn, price=200_00, cost=170_00, product="stars")   # +30.00
+    await sale(conn, price=70_00, cost=60_00, product="steam")     # +10.00
     money = await db.total_profit(conn)
-    check("прибыль считается из заказов", money["profit"] == 50_00, str(money))
-    check("выручка отдельно", money["revenue"] == 300_00, str(money))
+    check("прибыль считается из заказов", money["profit"] == 60_00, str(money))
+    check("выручка отдельно", money["revenue"] == 370_00, str(money))
+
+    rows = await db.sales_by_product(conn)
+    stars = next(r for r in rows if r["product_type"] == "stars")
+    check("продажи сгруппированы по товару", stars["orders"] == 2, str(stars))
+    check("выручка по товару верна", stars["revenue"] == 300_00, str(stars))
+    check("прибыль по товару верна", stars["profit"] == 50_00, str(stars))
+    check("у товара человеческое название", stars["title"] == "⭐ Звёзды")
+
+    # ------------------------------------------------ закрепление товаров
+    first, second = await db.list_partners(conn)
+    call = call_of(f"pn:pt_goods:{first.id}")
+    await panel.cb_partner_goods(call, conn)
+    check("экран товаров открывается", "Товары: Алиджон" in call.last)
+    check("все товары перечислены",
+          all(t in call.last for t in ("⭐ Звёзды", "👑 Telegram Premium", "🎮 Steam")))
+    check("пока все ничьи", call.last.count("ничей") == 3, call.last)
+
+    await panel.cb_partner_take(call_of(f"pn:pt_take:{first.id}:stars"), conn)
+    check("товар закреплён", (await db.product_owners(conn)).get("stars") == first.id)
+    await panel.cb_partner_take(call_of(f"pn:pt_take:{second.id}:steam"), conn)
+    check("второй товар у второго партнёра",
+          (await db.product_owners(conn)).get("steam") == second.id)
+
+    call = call_of(f"pn:pt_goods:{second.id}")
+    await panel.cb_partner_goods(call, conn)
+    check("чужой товар подписан именем владельца",
+          "Алиджон" in call.last, call.last)
 
     call = call_of("pn:partners")
     await panel.cb_partners(call, state, conn)
-    check("доля первого верна", "Заработал: <b>30.00 с.</b>" in call.last, call.last)
-    check("доля второго верна", "Заработал: <b>20.00 с.</b>" in call.last, call.last)
-    check("общая прибыль показана", "Общая прибыль: 50.00 с." in call.last)
-    check("предупреждения о долях нет", "должно быть 100" not in call.last)
+    check("первому засчитаны его звёзды",
+          "⭐ Звёзды: <b>2</b> шт. на <b>300.00 с.</b>" in call.last, call.last)
+    check("первый заработал прибыль со звёзд",
+          "Заработал: <b>50.00 с.</b>" in call.last, call.last)
+    check("второму засчитан Steam",
+          "🎮 Steam: <b>1</b> шт. на <b>70.00 с.</b>" in call.last, call.last)
+    check("второй заработал прибыль со Steam",
+          "Заработал: <b>10.00 с.</b>" in call.last, call.last)
+    check("общая прибыль показана", "Общая прибыль: 60.00 с." in call.last)
+    check("нераспределённого не осталось", "Не закреплено" not in call.last)
+
+    # снять товар — он снова ничей
+    await panel.cb_partner_take(call_of(f"pn:pt_take:{second.id}:steam"), conn)
+    check("товар снимается", "steam" not in await db.product_owners(conn))
+    call = call_of("pn:partners")
+    await panel.cb_partners(call, state, conn)
+    check("ничей товар показан отдельно", "Не закреплено" in call.last, call.last)
+    check("снятый Steam попал именно туда",
+          call.last.index("Не закреплено") < call.last.index("🎮 Steam: <b>1</b>"),
+          call.last)
+
+    # с долями нераспределённое делится
+    await db.update_partner(conn, first.id, share=50)
+    await db.update_partner(conn, second.id, share=50)
+    call = call_of("pn:partners")
+    await panel.cb_partners(call, state, conn)
+    check("доля от нераспределённого посчитана",
+          "Доля от общего (50%): <b>5.00 с.</b>" in call.last, call.last)
+    check("заработок вырос на эту долю",
+          "Заработал: <b>55.00 с.</b>" in call.last, call.last)
+    await db.set_product_owner(conn, "steam", second.id)
+    await db.update_partner(conn, first.id, share=0)
+    await db.update_partner(conn, second.id, share=0)
+
+    # ------------------------------------------------ деньги на реквизиты
+    deposit = await db.create_deposit(
+        conn, user_id=900, amount=150_00, method="card", receipt_file_id="x")
+    await db.resolve_deposit(conn, deposit.id, approved=True, admin_id=ADMIN)
+    call = call_of("pn:partners")
+    await panel.cb_partners(call, state, conn)
+    check("видно, сколько пришло на реквизиты",
+          "Всего: <b>150.00 с.</b>" in call.last, call.last[-400:])
+    check("и сколько было пополнений", "Пополнений: <b>1</b>" in call.last)
 
     # отменённый заказ в прибыль не идёт
     refunded = await db.create_order(
@@ -163,7 +230,8 @@ async def run(conn) -> None:
     )
     await db.update_order(conn, refunded.id, status=db.ORDER_REFUNDED)
     check("возврат в прибыль не попал",
-          (await db.total_profit(conn))["profit"] == 50_00)
+          (await db.total_profit(conn))["profit"] == 60_00,
+          str((await db.total_profit(conn))["profit"]))
 
     # ------------------------------------------------ взносы и выплаты
     first = (await db.list_partners(conn))[0]
@@ -190,10 +258,10 @@ async def run(conn) -> None:
     check("выплата записана", totals["took_out"] == 200_00, str(totals))
     check("взнос при этом не изменился", totals["put_in"] == 500_00)
 
-    # на руках = доля прибыли + внёс − забрал = 30 + 500 − 200 = 330
+    # на руках = прибыль его товаров + внёс − забрал = 50 + 500 − 200 = 350
     call = call_of(f"pn:pt:{first.id}")
     await panel.cb_partner_card(call, conn)
-    check("на руках посчитано верно", "На руках: <b>330.00 с.</b>" in call.last,
+    check("на руках посчитано верно", "На руках: <b>350.00 с.</b>" in call.last,
           call.last)
     check("в карточке видна история", "Движение денег" in call.last)
     check("в истории видны и плюс, и минус",
@@ -204,16 +272,11 @@ async def run(conn) -> None:
     # ------------------------------------------------ правка доли
     call = call_of(f"pn:pt_share:{first.id}")
     await panel.cb_partner_share(call, state, conn)
-    check("экран правки доли", "Сейчас: <b>60%</b>" in call.last, call.last[:120])
+    check("экран правки доли", "Сейчас: <b>" in call.last, call.last[:120])
     await panel.on_partner_share(msg("70"), state, conn)
     check("доля изменена", (await db.get_partner(conn, first.id)).share == 70)
     check("нового партнёра при этом не создалось",
           len(await db.list_partners(conn)) == 2)
-
-    call = call_of("pn:partners")
-    await panel.cb_partners(call, state, conn)
-    check("сумма долей не 110 — предупреждаем",
-          "должно быть 100" in call.last, call.last[-300:])
 
     # ------------------------------------------------ удаление
     call = call_of(f"pn:pt_del:{first.id}")

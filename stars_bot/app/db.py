@@ -174,6 +174,14 @@ CREATE TABLE IF NOT EXISTS partners (
 
 -- Движение денег партнёра: со знаком. Плюс — внёс в оборот,
 -- минус — забрал себе.
+-- Какой товар чей. Прибыль с товара идёт его владельцу; что никому
+-- не отдано — делится по долям.
+CREATE TABLE IF NOT EXISTS product_owners (
+    product_type TEXT PRIMARY KEY,
+    partner_id   INTEGER NOT NULL,
+    created_at   TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS partner_moves (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     partner_id INTEGER NOT NULL,
@@ -249,6 +257,18 @@ class User:
     is_banned: int
     created_at: str
     source: str | None = None      # код Deep Link, по которой пришёл
+
+
+#: Товары бота: код -> как называть в отчётах.
+PRODUCT_TITLES = {
+    "stars": "⭐ Звёзды",
+    "premium": "👑 Telegram Premium",
+    "steam": "🎮 Steam",
+}
+
+
+def product_title(code: str) -> str:
+    return PRODUCT_TITLES.get(code, code)
 
 
 REVIEW_PENDING = "pending"
@@ -631,6 +651,64 @@ async def partner_totals(conn: aiosqlite.Connection, partner_id: int) -> dict[st
                   COALESCE(SUM(CASE WHEN amount < 0 THEN -amount END), 0) AS took_out
            FROM partner_moves WHERE partner_id = ?""",
         (partner_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    return {key: (row[key] or 0) for key in row.keys()}
+
+
+async def set_product_owner(
+    conn: aiosqlite.Connection, product_type: str, partner_id: int | None,
+) -> None:
+    """Отдать товар партнёру. None — снять владельца."""
+    if partner_id is None:
+        await conn.execute(
+            "DELETE FROM product_owners WHERE product_type = ?", (product_type,)
+        )
+    else:
+        await conn.execute(
+            """INSERT INTO product_owners (product_type, partner_id, created_at)
+               VALUES (?, ?, ?)
+               ON CONFLICT(product_type) DO UPDATE SET partner_id = excluded.partner_id""",
+            (product_type, partner_id, _now()),
+        )
+    await conn.commit()
+
+
+async def product_owners(conn: aiosqlite.Connection) -> dict[str, int]:
+    async with conn.execute("SELECT * FROM product_owners") as cur:
+        return {row["product_type"]: row["partner_id"] for row in await cur.fetchall()}
+
+
+async def sales_by_product(
+    conn: aiosqlite.Connection, since: str | None = None, until: str | None = None,
+) -> list[dict[str, Any]]:
+    """Что продано по каждому товару: штук, на сколько, во что обошлось."""
+    sql = """SELECT product_type,
+                    COUNT(*)                  AS orders,
+                    COALESCE(SUM(quantity),0) AS quantity,
+                    COALESCE(SUM(price), 0)   AS revenue,
+                    COALESCE(SUM(cost), 0)    AS cost
+             FROM orders WHERE status = ?"""
+    params: list = [ORDER_DELIVERED]
+    if since and until:
+        sql += " AND created_at >= ? AND created_at < ?"
+        params += [since, until]
+    sql += " GROUP BY product_type ORDER BY revenue DESC"
+
+    async with conn.execute(sql, params) as cur:
+        rows = [dict(row) for row in await cur.fetchall()]
+    for row in rows:
+        row["profit"] = row["revenue"] - row["cost"]
+        row["title"] = product_title(row["product_type"])
+    return rows
+
+
+async def deposits_total(conn: aiosqlite.Connection) -> dict[str, int]:
+    """Сколько денег пришло на реквизиты за всё время."""
+    async with conn.execute(
+        """SELECT COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total
+           FROM deposits WHERE status = ?""",
+        (DEP_APPROVED,),
     ) as cur:
         row = await cur.fetchone()
     return {key: (row[key] or 0) for key in row.keys()}

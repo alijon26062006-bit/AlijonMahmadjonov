@@ -2552,13 +2552,47 @@ async def cb_steam_rate(call: CallbackQuery, conn: aiosqlite.Connection, provide
 # ═══════════════════════════════════════════════════════════ партнёры
 
 
-def partner_line(partner: db.Partner, profit: int, totals: dict) -> str:
-    """Строка партнёра: доля прибыли, взносы, выплаты и что на руках."""
-    earned = profit * partner.share // 100
-    balance = earned + totals["put_in"] - totals["took_out"]
+def partner_earnings(
+    partner: db.Partner, sales: list[dict], owners: dict[str, int], free_profit: int,
+) -> dict[str, int]:
+    """Что заработал партнёр: прибыль его товаров плюс доля от нераспределённого."""
+    mine = [row for row in sales if owners.get(row["product_type"]) == partner.id]
+    own = sum(row["profit"] for row in mine)
+    share = free_profit * partner.share // 100
+    return {
+        "own": own, "share": share, "earned": own + share,
+        "revenue": sum(row["revenue"] for row in mine),
+        "orders": sum(row["orders"] for row in mine),
+    }
+
+
+def partner_line(
+    partner: db.Partner, sales: list[dict], owners: dict[str, int],
+    free_profit: int, totals: dict,
+) -> str:
+    """Строка партнёра: его товары, заработок, взносы и что на руках."""
+    money = partner_earnings(partner, sales, owners, free_profit)
+    balance = money["earned"] + totals["put_in"] - totals["took_out"]
+
+    mine = [row for row in sales if owners.get(row["product_type"]) == partner.id]
+    goods = "\n".join(
+        f"├ {row['title']}: <b>{row['orders']}</b> шт. на <b>{fmt(row['revenue'])}</b>"
+        f" · прибыль <b>{fmt(row['profit'])}</b>"
+        for row in mine
+    )
+    if not mine:
+        goods = "├ <i>товары не закреплены</i>"
+
+    share_line = ""
+    if money["share"]:
+        share_line = (f"├ Доля от общего ({partner.share}%): "
+                      f"<b>{fmt(money['share'])}</b>\n")
+
     return (
-        f"👤 <b>{partner.name}</b> — доля <b>{partner.share}%</b>\n"
-        f"├ Заработал: <b>{fmt(earned)}</b>\n"
+        f"👤 <b>{partner.name}</b>\n"
+        f"{goods}\n"
+        f"├ Заработал: <b>{fmt(money['earned'])}</b>\n"
+        f"{share_line}"
         f"├ Внёс в оборот: <b>{fmt(totals['put_in'])}</b>\n"
         f"├ Забрал себе: <b>{fmt(totals['took_out'])}</b>\n"
         f"└ На руках: <b>{fmt(balance)}</b>"
@@ -2567,36 +2601,53 @@ def partner_line(partner: db.Partner, profit: int, totals: dict) -> str:
 
 async def partners_text(conn: aiosqlite.Connection) -> str:
     partners = await db.list_partners(conn)
+    sales = await db.sales_by_product(conn)
+    owners = await db.product_owners(conn)
     money = await db.total_profit(conn)
-    profit = money["profit"]
+
+    free = [row for row in sales if row["product_type"] not in owners]
+    free_profit = sum(row["profit"] for row in free)
 
     if not partners:
         body = (
             "<blockquote>Партнёров пока нет. Добавьте себя и напарника, "
-            "поставьте доли — и бот начнёт считать, сколько чьё.</blockquote>"
+            "закрепите за каждым его товары — и бот начнёт считать, "
+            "кто сколько продал.</blockquote>"
         )
     else:
         rows = []
         for partner in partners:
             totals = await db.partner_totals(conn, partner.id)
-            rows.append(partner_line(partner, profit, totals))
+            rows.append(partner_line(partner, sales, owners, free_profit, totals))
         body = "\n\n".join(rows)
 
-    total_share = sum(p.share for p in partners)
-    warn = ""
-    if partners and total_share != 100:
-        warn = (f"\n\n[[warn]] <b>Доли в сумме дают {total_share}%</b>, а должно "
-                "быть 100. Пока так, расчёт будет неверным.")
+    tail = ""
+    if free:
+        goods = "\n".join(
+            f"├ {row['title']}: <b>{row['orders']}</b> шт. на "
+            f"<b>{fmt(row['revenue'])}</b> · прибыль <b>{fmt(row['profit'])}</b>"
+            for row in free
+        )
+        split = ("делится по долям" if any(p.share for p in partners)
+                 else "<b>ничей</b> — закрепите за партнёром или поставьте доли")
+        tail = f"\n\n📦 <b>Не закреплено</b>\n{goods}\n└ <i>{split}</i>"
+
+    deposits = await db.deposits_total(conn)
+    tail += (
+        f"\n\n[[deposit]] <b>Пришло на реквизиты</b>\n"
+        f"├ Пополнений: <b>{deposits['count']}</b>\n"
+        f"└ Всего: <b>{fmt(deposits['total'])}</b>"
+    )
 
     return (
         "🤝 <b>Партнёры</b>\n"
         f"<code>{texts.LINE}</code>\n\n"
-        f"[[money]] <b>Общая прибыль: {fmt(profit)}</b>\n"
+        f"[[money]] <b>Общая прибыль: {fmt(money['profit'])}</b>\n"
         f"├ Продано на: <b>{fmt(money['revenue'])}</b>\n"
         f"└ Себестоимость: <b>{fmt(money['cost'])}</b>\n\n"
-        f"{body}{warn}\n\n"
-        "<blockquote>Прибыль считается из выданных заказов. Взносы и выплаты "
-        "вы отмечаете сами — тогда видно, кто сколько вложил и забрал.</blockquote>"
+        f"{body}{tail}\n\n"
+        "<blockquote>Прибыль с товара идёт его владельцу. Взносы и выплаты "
+        "отмечаете сами — тогда видно, кто сколько вложил и забрал.</blockquote>"
     )
 
 
@@ -2627,8 +2678,11 @@ async def cb_partners(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Co
 
 
 async def partner_card(conn: aiosqlite.Connection, partner: db.Partner) -> str:
-    money = await db.total_profit(conn)
+    sales = await db.sales_by_product(conn)
+    owners = await db.product_owners(conn)
     totals = await db.partner_totals(conn, partner.id)
+    free_profit = sum(row["profit"] for row in sales
+                      if row["product_type"] not in owners)
     moves = await db.partner_moves(conn, partner.id)
 
     history = ""
@@ -2641,7 +2695,7 @@ async def partner_card(conn: aiosqlite.Connection, partner: db.Partner) -> str:
         history = f"\n\n📜 <b>Движение денег</b>\n{rows}"
 
     return (
-        partner_line(partner, money["profit"], totals)
+        partner_line(partner, sales, owners, free_profit, totals)
         + f"\n\n<i>С нами с {partner.created_at[:10]}</i>"
         + history
     )
@@ -2653,7 +2707,9 @@ def partner_kb(partner: db.Partner) -> InlineKeyboardMarkup:
         btn("➕ Внёс в оборот", f"pn:pt_in:{partner.id}", style=SUCCESS),
         btn("➖ Забрал себе", f"pn:pt_out:{partner.id}", style=DANGER),
     )
-    kb.row(InlineKeyboardButton(text="📊 Изменить долю",
+    kb.row(InlineKeyboardButton(text="📦 Товары партнёра",
+                                callback_data=f"pn:pt_goods:{partner.id}"))
+    kb.row(InlineKeyboardButton(text="📊 Доля от нераспределённого",
                                 callback_data=f"pn:pt_share:{partner.id}"))
     kb.row(btn("🗑 Удалить партнёра", f"pn:pt_del:{partner.id}", style=DANGER))
     kb.row(InlineKeyboardButton(text="‹ К партнёрам", callback_data="pn:partners"))
@@ -2808,15 +2864,13 @@ async def on_partner_amount(
     )
     await state.clear()
 
-    totals = await db.partner_totals(conn, partner.id)
-    money = await db.total_profit(conn)
     kb = InlineKeyboardBuilder()
     kb.row(btn("👤 Карточка", f"pn:pt:{partner.id}"))
     kb.row(btn("‹ К партнёрам", "pn:partners"))
     await message.answer(
         f"✅ <b>{partner.name}</b> — "
         f"{'внесено' if kind == 'in' else 'выплачено'} <b>{fmt(amount)}</b>\n\n"
-        + partner_line(partner, money["profit"], totals),
+        + await partner_card(conn, partner),
         reply_markup=kb.as_markup(),
     )
 
@@ -2850,3 +2904,75 @@ async def cb_partner_delete(call: CallbackQuery, conn: aiosqlite.Connection) -> 
     await db.update_partner(conn, partner_id, active=0)
     await call.answer("Удалён")
     await show_partners(call, conn)
+
+
+@router.callback_query(F.data.startswith("pn:pt_goods:"))
+async def cb_partner_goods(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    """Какие товары закреплены за партнёром."""
+    partner = await db.get_partner(conn, int(call.data.rsplit(":", 1)[1]))
+    if partner is None:
+        await call.answer("Партнёр не найден.", show_alert=True)
+        return
+    await safe_edit(call, await goods_text(conn, partner),
+                    await goods_kb(conn, partner))
+    await call.answer()
+
+
+async def goods_text(conn: aiosqlite.Connection, partner: db.Partner) -> str:
+    owners = await db.product_owners(conn)
+    partners = {p.id: p.name for p in await db.list_partners(conn)}
+
+    rows = []
+    for code, title in db.PRODUCT_TITLES.items():
+        owner = owners.get(code)
+        if owner == partner.id:
+            mark = "✅ <b>ваш</b>"
+        elif owner:
+            mark = f"👤 <i>{partners.get(owner, 'другой партнёр')}</i>"
+        else:
+            mark = "<i>ничей</i>"
+        rows.append(f"├ {title} — {mark}")
+
+    return (
+        f"📦 <b>Товары: {partner.name}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        + "\n".join(rows)
+        + "\n\n<blockquote>Нажмите на товар, чтобы закрепить его за "
+          "этим партнёром или снять. Вся прибыль с товара идёт его "
+          "владельцу.</blockquote>"
+    )
+
+
+async def goods_kb(
+    conn: aiosqlite.Connection, partner: db.Partner
+) -> InlineKeyboardMarkup:
+    owners = await db.product_owners(conn)
+    kb = InlineKeyboardBuilder()
+    for code, title in db.PRODUCT_TITLES.items():
+        mine = owners.get(code) == partner.id
+        kb.row(btn(("✅ " if mine else "") + title,
+                   f"pn:pt_take:{partner.id}:{code}",
+                   style=SUCCESS if mine else None))
+    kb.row(InlineKeyboardButton(text="‹ К партнёру",
+                                callback_data=f"pn:pt:{partner.id}"))
+    return kb.as_markup()
+
+
+@router.callback_query(F.data.startswith("pn:pt_take:"))
+async def cb_partner_take(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    _, _, raw_id, code = call.data.split(":", 3)
+    partner = await db.get_partner(conn, int(raw_id))
+    if partner is None or code not in db.PRODUCT_TITLES:
+        await call.answer("Не найдено.", show_alert=True)
+        return
+
+    owners = await db.product_owners(conn)
+    if owners.get(code) == partner.id:
+        await db.set_product_owner(conn, code, None)
+        await call.answer("Снято")
+    else:
+        await db.set_product_owner(conn, code, partner.id)
+        await call.answer(f"Закреплено за {partner.name}")
+
+    await safe_edit(call, await goods_text(conn, partner),
+                    await goods_kb(conn, partner))
