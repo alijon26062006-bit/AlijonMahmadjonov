@@ -440,6 +440,22 @@ if mysql -uroot -e "SELECT 1" >/dev/null 2>&1; then
     2>/dev/null || warn "Не удалось автоматически установить пароль root MariaDB — сделайте это вручную и обновите ${WORKER_ENV}"
 fi
 
+# Учётка root@127.0.0.1 — отдельная от root@localhost.
+#
+# Воркер подключается по TCP (DB_HOST=127.0.0.1), а в нашем конфиге MariaDB
+# включён skip_name_resolve: сервер не превращает 127.0.0.1 в «localhost», и эти
+# две учётки для него разные. Без этой строки воркер получает
+# «Access denied for user 'root'@'127.0.0.1'», и создание базы у клиента просто
+# не выполняется — задание падает, а человек видит базу в статусе «создаётся».
+if mysql -uroot -p"${MYSQL_ADMIN_PASSWORD}" -e "SELECT 1" >/dev/null 2>&1; then
+  mysql -uroot -p"${MYSQL_ADMIN_PASSWORD}" <<SQL || warn "Не удалось завести root@127.0.0.1 — создание баз у клиентов работать не будет"
+CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '${MYSQL_ADMIN_PASSWORD}';
+ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '${MYSQL_ADMIN_PASSWORD}';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+SQL
+fi
+
 # Панельная БД + её собственный (непривилегированный) пользователь
 DB_DATABASE="${DB_DATABASE:-hosting_panel}"
 DB_USERNAME="${DB_USERNAME:-hosting_panel}"
@@ -541,6 +557,83 @@ if php-fpm"${PHP_VERSION}" -t >/dev/null 2>&1; then
   log "php-fpm настроен"
 else
   warn "php-fpm -t не прошёл — проверьте /etc/php/${PHP_VERSION}/fpm/pool.d/hosting-panel.conf"
+fi
+
+# ── 10b. phpMyAdmin ──────────────────────────────────────────────────────
+#
+# Панель ссылается на db.<домен> со страницы «Базы данных». Раньше установщик
+# заводил только системного пользователя phpmyadmin — самой программы не было,
+# и ссылка вела в никуда (а на серверах, где пакет уже стоял, открывалась его
+# ДОКУМЕНТАЦИЯ вместо приложения).
+#
+# Берём пакет дистрибутива, а не архив с сайта: пакет подписан ключами Ubuntu и
+# проверяется apt автоматически, тогда как для скачанного архива пришлось бы
+# зашивать в код контрольную сумму и обновлять её руками при каждом релизе.
+log "Настраиваю phpMyAdmin"
+PHPMYADMIN_ROOT="/usr/share/phpmyadmin"
+
+if [[ ! -d "$PHPMYADMIN_ROOT" ]]; then
+  # Пакет по умолчанию пытается сам настроить веб-сервер и завести служебную
+  # базу через dbconfig-common. И то и другое нам не нужно: vhost мы пишем свой,
+  # а хранилище настроек phpMyAdmin для shared-хостинга не обязательно.
+  echo "phpmyadmin phpmyadmin/dbconfig-install boolean false" | debconf-set-selections
+  echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect none" | debconf-set-selections
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends phpmyadmin >/dev/null 2>&1 \
+    || warn "Не удалось установить пакет phpmyadmin — страница «Базы данных» будет без ссылки"
+fi
+
+if [[ -d "$PHPMYADMIN_ROOT" ]]; then
+  # Свой файл настроек поверх пакетного: клиент входит СВОЕЙ учёткой базы,
+  # вход под root запрещён, соединение только с локальным сервером.
+  mkdir -p /etc/phpmyadmin/conf.d
+  BLOWFISH=$(openssl rand -hex 16)
+  cat > /etc/phpmyadmin/conf.d/60-hosting.php <<PMACONF
+<?php
+// Сгенерировано ${PANEL_NAME:-AlijonHost}. Не редактируйте вручную — файл
+// перезаписывается install.sh.
+
+// Ключ шифрования cookie. Ровно 32 символа, иначе phpMyAdmin ругается при входе.
+\$cfg['blowfish_secret'] = '${BLOWFISH}';
+
+\$i = 1;
+\$cfg['Servers'][\$i]['auth_type'] = 'cookie';
+\$cfg['Servers'][\$i]['host'] = '127.0.0.1';
+\$cfg['Servers'][\$i]['compress'] = false;
+\$cfg['Servers'][\$i]['AllowNoPassword'] = false;
+// Вход под root через веб запрещён: у root нет ограничений, и подбор пароля к
+// нему означал бы доступ ко всем базам всех клиентов сразу.
+\$cfg['Servers'][\$i]['AllowRoot'] = false;
+
+\$cfg['ShowServerInfo'] = false;
+\$cfg['ShowPhpInfo'] = false;
+\$cfg['VersionCheck'] = false;
+\$cfg['TempDir'] = '/var/lib/phpmyadmin/tmp';
+PMACONF
+  chmod 0644 /etc/phpmyadmin/conf.d/60-hosting.php
+  mkdir -p /var/lib/phpmyadmin/tmp
+  chown -R phpmyadmin:phpmyadmin /var/lib/phpmyadmin/tmp
+  chmod 0700 /var/lib/phpmyadmin/tmp
+
+  sed -e "s#{{PHPMYADMIN_ROOT}}#${PHPMYADMIN_ROOT}#g" \
+    "${HOSTING_DIR}/templates/php-fpm-phpmyadmin.conf.tpl" > "/etc/php/${PHP_VERSION}/fpm/pool.d/phpmyadmin.conf"
+
+  sed -e "s#{{PANEL_NAME}}#${PANEL_NAME:-AlijonHost}#g" \
+      -e "s#{{ROOT_DOMAIN}}#${HOSTING_ROOT_DOMAIN}#g" \
+      -e "s#{{PHPMYADMIN_ROOT}}#${PHPMYADMIN_ROOT}#g" \
+      -e "s#{{LOG_DIR}}#${LOG_DIR}#g" \
+    "${HOSTING_DIR}/templates/nginx-phpmyadmin.conf.tpl" > /etc/nginx/sites-available/phpmyadmin.conf
+  strip_ipv6_if_unavailable /etc/nginx/sites-available/phpmyadmin.conf
+  ln -sfn /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/phpmyadmin.conf
+
+  if nginx -t >/dev/null 2>&1; then
+    systemctl restart "php${PHP_VERSION}-fpm" >/dev/null 2>&1 || true
+    systemctl reload nginx >/dev/null 2>&1 || true
+    log "phpMyAdmin доступен на db.${HOSTING_ROOT_DOMAIN}"
+  else
+    rm -f /etc/nginx/sites-enabled/phpmyadmin.conf
+    warn "vhost phpMyAdmin не прошёл nginx -t — отключён, остальное не затронуто"
+  fi
+  note_status "phpMyAdmin: db.${HOSTING_ROOT_DOMAIN} (клиент входит логином и паролем своей базы)"
 fi
 
 # ── 11. root-воркер (systemd) ────────────────────────────────────────────

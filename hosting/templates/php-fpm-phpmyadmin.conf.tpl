@@ -13,7 +13,13 @@ pm.process_idle_timeout = 30s
 pm.max_requests = 300
 request_terminate_timeout = 60s
 
-php_admin_value[open_basedir] = {{PHPMYADMIN_ROOT}}:/tmp
+; Пакет дистрибутива разложен по нескольким каталогам: сам код в
+; {{PHPMYADMIN_ROOT}}, общие библиотеки (Composer CaBundle и прочие) в
+; /usr/share/php, настройки в /etc/phpmyadmin, сессии и временные файлы в
+; /var/lib/phpmyadmin. Без них open_basedir рубит загрузку автозагрузчика, и
+; phpMyAdmin отдаёт пустой 500 ещё до первой строки интерфейса.
+php_admin_value[open_basedir] = {{PHPMYADMIN_ROOT}}:/usr/share/php:/etc/phpmyadmin:/var/lib/phpmyadmin:/tmp
+php_admin_value[session.save_path] = /var/lib/phpmyadmin/tmp
 php_admin_value[memory_limit] = 256M
 php_admin_value[max_execution_time] = 60
 php_admin_value[upload_max_filesize] = 128M

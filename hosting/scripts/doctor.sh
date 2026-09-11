@@ -348,6 +348,22 @@ if [[ -n "${HOSTING_ROOT_DOMAIN:-}" ]]; then
     hint "tail -30 ${LOG_DIR:-/var/log/hosting}/panel-error.log"
   fi
 
+  # phpMyAdmin: клиенты заходят туда своей учёткой базы. Проверяем, что отдаётся
+  # форма входа, а не документация пакета и не 500 из-за open_basedir.
+  PMA_BODY=$(curl -s --noproxy '*' -m 10 -H "Host: db.${HOSTING_ROOT_DOMAIN}" http://127.0.0.1/ 2>/dev/null)
+  if grep -q 'name="pma_username"' <<<"$PMA_BODY"; then
+    ok "phpMyAdmin отвечает формой входа (db.${HOSTING_ROOT_DOMAIN})"
+  elif grep -qi "phpMyAdmin.s documentation\|Welcome to phpMyAdmin" <<<"$PMA_BODY"; then
+    bad "на db.${HOSTING_ROOT_DOMAIN} отдаётся ДОКУМЕНТАЦИЯ phpMyAdmin, а не сам phpMyAdmin"
+    hint "sudo bash ${HOSTING_DIR}/install.sh — он закроет /doc и поправит vhost"
+  elif [[ -z "$PMA_BODY" ]]; then
+    warn "phpMyAdmin не отвечает на db.${HOSTING_ROOT_DOMAIN} — клиенты не смогут открыть свои базы"
+    hint "sudo bash ${HOSTING_DIR}/install.sh"
+  else
+    bad "phpMyAdmin отвечает, но не формой входа — вероятно, ошибка PHP"
+    hint "tail -20 ${LOG_DIR:-/var/log/hosting}/phpmyadmin-error.log"
+  fi
+
   for path in / /register /login; do
     BODY_FILE=$(mktemp)
     code=$(panel_curl "$path" -o "$BODY_FILE" -w '%{http_code}')

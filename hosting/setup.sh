@@ -251,8 +251,10 @@ else
   log "Выпускаю сертификат для ${DOMAIN}, panel.${DOMAIN} и www.${DOMAIN}…"
   mkdir -p /var/www/html
 
+  # db.<домен> — адрес phpMyAdmin, он тоже должен открываться по https:
+  # клиент вводит там пароль от своей базы.
   CERT_ARGS=(--webroot -w /var/www/html --non-interactive --agree-tos
-             -d "$DOMAIN" -d "panel.${DOMAIN}" -d "www.${DOMAIN}")
+             -d "$DOMAIN" -d "panel.${DOMAIN}" -d "www.${DOMAIN}" -d "db.${DOMAIN}")
   if [[ -n "${ACME_EMAIL:-}" ]]; then
     CERT_ARGS+=(--email "$ACME_EMAIL" --no-eff-email)
   else

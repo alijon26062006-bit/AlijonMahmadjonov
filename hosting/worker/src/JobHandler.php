@@ -32,6 +32,7 @@ final class JobHandler
         'create_user', 'create_site', 'delete_site', 'suspend_site', 'unsuspend_site',
         'create_database', 'delete_database', 'apply_nginx', 'apply_php_fpm',
         'issue_ssl', 'create_backup', 'restore_backup', 'apply_quota',
+        'reset_db_password',
         // ping ничего не делает — он существует только чтобы doctor.sh мог
         // отличить «служба запущена» от «воркер реально разбирает очередь».
         'ping',
@@ -260,6 +261,29 @@ final class JobHandler
         // Пароль возвращается наверх (а не хранится в свойстве) — воркер положит его
         // в одноразовое поле jobs.result_secret, панель прочитает и сразу сотрёт.
         return $newPassword;
+    }
+
+    /**
+     * Смена пароля пользователя базы.
+     *
+     * Пароль у клиента один на все его базы (учётка MariaDB одна), поэтому смена
+     * — единственный способ узнать его заново: показанный один раз пароль нигде
+     * не хранится, ни в базе панели, ни в логах.
+     */
+    private function handleResetDbPassword(array $job, array $payload): ?string
+    {
+        $user = $this->requireUser($job);
+        $plan = $this->plans->findById((int) $user['plan_id']) ?? throw new \RuntimeException('У клиента не задан тариф');
+        $dbUserRow = $this->databaseUsers->getOrCreateForUser($user, (int) $plan['db_max_user_connections']);
+
+        // Учётка может ещё не существовать (клиент ни разу не создавал базу) —
+        // ensureUser заведёт её и вернёт пароль, иначе меняем пароль существующей.
+        $password = $this->mysql->ensureUser((string) $dbUserRow['db_user'], (int) $plan['db_max_user_connections'])
+            ?? $this->mysql->changePassword((string) $dbUserRow['db_user']);
+
+        $this->db->log((int) $user['id'], 'database.password_reset', 'user', (int) $user['id']);
+
+        return $password;
     }
 
     private function handleDeleteDatabase(array $job, array $payload): ?string

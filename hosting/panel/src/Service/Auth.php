@@ -119,6 +119,21 @@ final class Auth
 
     // ── CSRF ─────────────────────────────────────────────────────────────────
 
+    /**
+     * Гарантирует запущенную PHP-сессию.
+     *
+     * Сессия раньше стартовала только внутри csrfToken()/verifyCsrf(), то есть
+     * как побочный эффект работы с CSRF. Любой код, читавший $_SESSION до этого
+     * момента, получал пустой массив — например, одноразовый пароль от базы
+     * записывался при создании и бесследно пропадал на следующей странице.
+     */
+    public function ensureSession(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+    }
+
     public function csrfToken(): string
     {
         if (session_status() !== PHP_SESSION_ACTIVE) {

@@ -33,6 +33,7 @@ use Hosting\Http\Router;
 use Hosting\Http\UnauthorizedException;
 use Hosting\Model\BackupRepository;
 use Hosting\Model\DatabaseRepository as DatabaseModelRepository;
+use Hosting\Model\DatabaseUserRepository;
 use Hosting\Model\DomainRepository;
 use Hosting\Model\JobRepository;
 use Hosting\Model\LoginAttemptRepository;
@@ -113,7 +114,8 @@ $dashboardController = new DashboardController($config, $auth, $sites, $database
 $siteController = new SiteController($config, $db, $auth, $sites, $plans, $jobs, $view);
 $fileController = new FileController($config, $db, $auth, $sites, $view);
 $logController = new LogController($config, $auth, $sites, $view);
-$databaseController = new DatabaseController($config, $db, $auth, $databases, $jobs, $view);
+$databaseUsers = new DatabaseUserRepository($db);
+$databaseController = new DatabaseController($config, $db, $auth, $databases, $databaseUsers, $jobs, $view);
 $domainController = new DomainController($config, $db, $auth, $sites, $domains, $jobs, $view);
 $adminController = new AdminController($db, $auth, $users, $sites, $jobs, $view);
 $backupController = new BackupController($db, $auth, $backups, $jobs, $view);
@@ -197,6 +199,7 @@ $router->post('/sites/{id}/domains/{id2}/delete', [$domainController, 'delete'])
 
 $router->get('/databases', [$databaseController, 'index']);
 $router->post('/databases', [$databaseController, 'create']);
+$router->post('/databases/password', [$databaseController, 'resetPassword']);
 $router->post('/databases/{id}/delete', [$databaseController, 'delete']);
 
 $router->get('/backups', [$backupController, 'index']);

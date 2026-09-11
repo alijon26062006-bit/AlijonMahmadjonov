@@ -51,6 +51,7 @@ final class SiteController
     {
         $user = $this->requireUser();
         $site = $this->ownedSite($user, $siteId);
+        $this->auth->ensureSession();
 
         $siteDir = rtrim($this->config->str('users_root'), '/') . '/' . $user['system_user']
             . '/sites/' . $site['slug'];
@@ -87,6 +88,7 @@ final class SiteController
             return Response::redirect('/sites/' . $siteId);
         }
 
+        $this->auth->ensureSession();
         $_SESSION['site_health'][$siteId] = (new SiteHealth())->check((string) $site['domain']);
 
         return Response::redirect('/sites/' . $siteId);

@@ -9,6 +9,7 @@ use Hosting\Http\Request;
 use Hosting\Http\Response;
 use Hosting\Http\UnauthorizedException;
 use Hosting\Model\DatabaseRepository;
+use Hosting\Model\DatabaseUserRepository;
 use Hosting\Model\JobRepository;
 use Hosting\Service\Auth;
 use Hosting\Service\MysqlManager;
@@ -22,6 +23,7 @@ final class DatabaseController
         private Database $db,
         private Auth $auth,
         private DatabaseRepository $databases,
+        private DatabaseUserRepository $databaseUsers,
         private JobRepository $jobs,
         private View $view,
     ) {
@@ -30,12 +32,47 @@ final class DatabaseController
     public function index(Request $request): Response
     {
         $user = $this->requireUser();
+        $this->auth->ensureSession();
+
+        // Пароль показываем ровно один раз — сразу после создания базы или смены
+        // пароля. Он нигде не хранится: ни в базе панели, ни в логах, ни в сессии
+        // дольше одного показа.
+        $freshPassword = $_SESSION['db_password_once'] ?? null;
+        unset($_SESSION['db_password_once']);
+
+        $dbUser = $this->databaseUsers->findForUser((int) $user['id']);
+
         return Response::html($this->view->page('databases/index', [
-            'csrf'       => $this->auth->csrfToken(),
-            'databases'  => $this->databases->forUser((int) $user['id']),
-            'user'       => $user,
-            'rootDomain' => $this->config->str('root_domain'),
+            'csrf'          => $this->auth->csrfToken(),
+            'databases'     => $this->databases->forUser((int) $user['id']),
+            'user'          => $user,
+            'rootDomain'    => $this->config->str('root_domain'),
+            'dbUser'        => $dbUser['db_user'] ?? $user['system_user'],
+            'freshPassword' => is_string($freshPassword) ? $freshPassword : null,
         ]));
+    }
+
+    /** «Сменить пароль базы»: показанный один раз пароль иначе не вернуть. */
+    public function resetPassword(Request $request): Response
+    {
+        $user = $this->requireUser();
+        if (!$this->auth->verifyCsrf($request->input('csrf'))) {
+            Flash::add('error', 'Форма устарела');
+            return Response::redirect('/databases');
+        }
+
+        $job = $this->jobs->enqueue('reset_db_password', (int) $user['id'], null, []);
+        $secret = $this->waitForSecret((int) $job['id']);
+
+        $this->auth->ensureSession();
+        if ($secret !== null) {
+            $_SESSION['db_password_once'] = $secret;
+            Flash::add('success', 'Пароль изменён. Старый больше не работает — обновите его в настройках сайтов.');
+        } else {
+            Flash::add('error', 'Не удалось сменить пароль, попробуйте ещё раз через минуту');
+        }
+
+        return Response::redirect('/databases');
     }
 
     public function create(Request $request): Response
@@ -70,10 +107,15 @@ final class DatabaseController
         // показать одноразовый пароль, а не заставлять клиента обновлять страницу руками.
         $secret = $this->waitForSecret((int) $job['id']);
 
+        // Пароль не кладём во flash: там он схлопывается в одну строку без
+        // переносов, его неудобно выделить и легко потерять. Показываем
+        // отдельным блоком на странице — один раз.
+        $this->auth->ensureSession();
         if ($secret !== null) {
-            Flash::add('success', "База {$fullName} создана.\nПользователь: {$user['system_user']}\nХост: localhost или 127.0.0.1 (работают оба)\nПароль (показывается один раз): {$secret}");
+            $_SESSION['db_password_once'] = $secret;
+            Flash::add('success', "База {$fullName} создана");
         } else {
-            Flash::add('success', "База {$fullName} создаётся. Если пароль от пользователя базы вам уже известен по прошлой базе — он не меняется.");
+            Flash::add('success', "База {$fullName} создана. Логин и пароль — те же, что у прошлой базы: учётная запись MariaDB у вас одна на все базы.");
         }
 
         return Response::redirect('/databases');

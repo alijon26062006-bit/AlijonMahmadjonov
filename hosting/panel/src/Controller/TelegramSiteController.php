@@ -143,6 +143,7 @@ final class TelegramSiteController
             return $this->back($siteId);
         }
 
+        $this->auth->ensureSession();
         $result = $this->telegram->getInfo($token);
         if (!$result['ok']) {
             Flash::add('error', 'Telegram не ответил: ' . ($result['error'] ?? ''));
@@ -167,6 +168,7 @@ final class TelegramSiteController
             return $this->back($siteId);
         }
 
+        $this->auth->ensureSession();
         $result = $this->telegram->deleteWebhook($token);
         unset($_SESSION['telegram_webhook_info'][$siteId]);
 
