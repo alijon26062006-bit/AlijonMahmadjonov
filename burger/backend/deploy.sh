@@ -184,20 +184,36 @@ $DOMAIN, www.$DOMAIN {
         -Server
     }
 
+    # Чеки об оплате лежат в отдельной папке и сюда попасть не могут,
+    # но старые установки могли оставить их здесь — закрываем наглухо.
+    handle /uploads/receipt-* {
+        respond 404
+    }
+
+    # Фотографии блюд отдаёт сам Caddy, прямо с диска, без Python.
+    # Он написан на Go и раздаёт файлы в разы быстрее: на меню из сотни
+    # картинок это разница между «появляются по одной» и «уже на месте».
+    handle_path /uploads/* {
+        root * $BACKEND/uploads
+        file_server
+        header Cache-Control "public, max-age=2592000"
+    }
+
     # всё, что относится к серверу: меню, заказы, админка, кухня, курьеры
-    @backend path /api/* /admin* /kitchen* /courier* /tg/* /uploads/* /static/*
-    reverse_proxy @backend 127.0.0.1:$PORT
+    @backend path /api/* /admin* /kitchen* /courier* /tg/* /static/*
+    handle @backend {
+        reverse_proxy 127.0.0.1:$PORT
+    }
 
-    # сам сайт — обычные файлы, отдаются без Python
-    root * $APP_DIR/burger
-    file_server
+    # сам сайт — обычные файлы, тоже мимо Python
+    handle {
+        root * $APP_DIR/burger
+        file_server
 
-    header /assets/* Cache-Control "public, max-age=604800"
-    header /css/* Cache-Control "public, max-age=86400"
-    header /js/* Cache-Control "public, max-age=86400"
-
-    # чеки об оплате рядом с фото блюд не лежат, но на всякий случай запрещаем
-    respond /uploads/receipt-* 404
+        header /assets/* Cache-Control "public, max-age=604800"
+        header /css/* Cache-Control "public, max-age=86400"
+        header /js/* Cache-Control "public, max-age=86400"
+    }
 }
 CADDY
 systemctl reload caddy || systemctl restart caddy

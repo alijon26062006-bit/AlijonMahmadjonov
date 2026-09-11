@@ -170,9 +170,18 @@ try { noPhoto = new Set(JSON.parse(localStorage.getItem('burger_no_photo') || '[
 
 const hasPhoto = d => (server ? !!d.photo : !noPhoto.has(d.id));
 
-const shot = (d, alt, w, h) => hasPhoto(d)
-  ? `<img src="${photoUrl(d)}" alt="${alt}" width="${w}" height="${h}" loading="lazy" decoding="async" data-dish="${d.id}">`
-  : camera;
+/* Первые карточки грузим сразу и в первую очередь: человек смотрит на них,
+   пока листает остальное. Дальние — только когда до них долистают. */
+let eagerLeft = 0;
+
+const shot = (d, alt, w, h) => {
+  if (!hasPhoto(d)) return camera;
+  const now = eagerLeft > 0;
+  if (now) eagerLeft -= 1;
+  return `<img src="${photoUrl(d)}" alt="${alt}" width="${w}" height="${h}"
+    loading="${now ? 'eager' : 'lazy'}" fetchpriority="${now ? 'high' : 'auto'}"
+    decoding="async" data-dish="${d.id}">`;
+};
 
 function watchPhoto(img) {
   const fail = () => {
@@ -244,6 +253,7 @@ function rowCard(d) {
 }
 
 function renderMenu() {
+  eagerLeft = 6;          // столько помещается на первом экране
   const order = sectionsInOrder();
 
   $('#tabs-row').innerHTML = order

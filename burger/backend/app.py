@@ -116,6 +116,12 @@ async def safe_headers(request: Request, call_next):
     resp = await call_next(request)
     resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
     resp.headers.setdefault('Referrer-Policy', 'same-origin')
+
+    # На бою фотографии отдаёт Caddy и сам ставит этот заголовок. Здесь —
+    # для своей машины и на случай запуска без Caddy: браузер не должен
+    # выпрашивать одну и ту же картинку при каждом заходе.
+    if request.url.path.startswith('/uploads/'):
+        resp.headers.setdefault('Cache-Control', 'public, max-age=2592000')
     return resp
 
 

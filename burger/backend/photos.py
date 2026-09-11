@@ -35,7 +35,12 @@ MAGIC = ((b'\xff\xd8\xff', '.jpg'), (b'\x89PNG\r\n\x1a\n', '.png'))
 # Держать ради неё двухмегабайтный PNG нельзя: в Душанбе мобильный интернет,
 # и меню из 94 таких картинок не откроется никогда.
 WIDTH = 900
-QUALITY = 82
+QUALITY = 78
+
+# Какой формат легче — заранее не известно. На гладком снимке еды WebP
+# выигрывает у JPEG больше половины веса, а на пёстром, с крупой и зеленью,
+# наоборот проигрывает. Поэтому жмём обоими и оставляем тот, что меньше:
+# лишняя секунда на сервере против лишних килобайт у каждого клиента.
 
 
 def kind_of(body):
@@ -62,12 +67,25 @@ def shrink(body):
         if img.width > WIDTH:
             height = round(img.height * WIDTH / img.width)
             img = img.resize((WIDTH, height), Image.LANCZOS)
-
-        out = io.BytesIO()
-        img.save(out, 'JPEG', quality=QUALITY, optimize=True, progressive=True)
-        return out.getvalue(), '.jpg', True
     except Exception:
         return body, kind_of(body), False
+
+    tries = []
+    for kind, ext, extra in (
+            ('WEBP', '.webp', dict(method=6)),
+            ('JPEG', '.jpg', dict(optimize=True, progressive=True))):
+        try:
+            out = io.BytesIO()
+            img.save(out, kind, quality=QUALITY, **extra)
+            tries.append((len(out.getvalue()), out.getvalue(), ext))
+        except Exception:
+            continue
+
+    if not tries:
+        return body, kind_of(body), False
+
+    _, best, ext = min(tries, key=lambda t: t[0])
+    return best, ext, True
 
 
 def fetch(url):
