@@ -30,6 +30,7 @@ CREATE TABLE users (
     system_user       TEXT NOT NULL DEFAULT '' UNIQUE,
     role              TEXT NOT NULL DEFAULT 'client' CHECK (role IN ('client','admin')),
     plan_id           INTEGER REFERENCES plans(id) ON DELETE SET NULL,
+    balance_tjs       REAL NOT NULL DEFAULT 0,
     status            TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','grace','suspended','pending_delete')),
     disk_quota_mb     INTEGER NOT NULL DEFAULT 0,
     inode_limit       INTEGER NOT NULL DEFAULT 0,
@@ -114,6 +115,7 @@ CREATE TABLE database_users (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id         INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     db_user         TEXT NOT NULL UNIQUE,
+    password_enc    TEXT,
     max_connections INTEGER NOT NULL DEFAULT 5,
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now'))
 );

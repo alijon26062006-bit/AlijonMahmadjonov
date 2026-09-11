@@ -129,6 +129,10 @@ if [[ -z "$(env_value DB_PASSWORD)" ]]; then
   sed -i "s#^DB_PASSWORD=.*#DB_PASSWORD=$(openssl rand -base64 24 | tr -d '=+/')#" "$ENV_FILE"
   log "Сгенерирован пароль панельной базы"
 fi
+if [[ -z "$(env_value APP_KEY)" ]]; then
+  sed -i "s#^APP_KEY=.*#APP_KEY=$(openssl rand -hex 32)#" "$ENV_FILE"
+  log "Сгенерирован APP_KEY (ключ шифрования паролей от баз клиентов)"
+fi
 if [[ -z "$(env_value SESSION_SECRET)" ]]; then
   sed -i "s#^SESSION_SECRET=.*#SESSION_SECRET=$(openssl rand -hex 32)#" "$ENV_FILE"
   log "Сгенерирован SESSION_SECRET"

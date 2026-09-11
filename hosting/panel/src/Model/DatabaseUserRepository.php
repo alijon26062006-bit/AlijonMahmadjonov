@@ -41,4 +41,38 @@ final class DatabaseUserRepository
         return $this->findForUser((int) $user['id'])
             ?? throw new \RuntimeException('Не удалось создать учётку базы данных');
     }
+
+    /**
+     * Сохраняет пароль в зашифрованном виде.
+     *
+     * Клиенту пароль нужно видеть в панели, поэтому хеш не годится — нужно
+     * обратимое шифрование. Ключ лежит в .env (см. Support\Secret), а не в базе:
+     * дамп панельной базы сам по себе паролей не выдаёт.
+     */
+    public function storePassword(int $userId, string $password, string $appKey): void
+    {
+        if ($appKey === '') {
+            // Без ключа не храним ничего: лучше не показать пароль, чем положить
+            // его в базу открытым текстом.
+            return;
+        }
+
+        $this->db->pdo()
+            ->prepare('UPDATE database_users SET password_enc = ? WHERE user_id = ?')
+            ->execute([\Hosting\Support\Secret::encrypt($password, $appKey), $userId]);
+    }
+
+    /** @return string|null null, если пароль не сохранён или ключ не подходит */
+    public function revealPassword(int $userId, string $appKey): ?string
+    {
+        if ($appKey === '') {
+            return null;
+        }
+        $row = $this->findForUser($userId);
+        $stored = $row['password_enc'] ?? null;
+
+        return is_string($stored) && $stored !== ''
+            ? \Hosting\Support\Secret::decrypt($stored, $appKey)
+            : null;
+    }
 }

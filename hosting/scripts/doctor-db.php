@@ -98,6 +98,42 @@ if (isset($existing['users'])) {
     out('OK', "клиентов в панели: {$clients}");
 }
 
+// ── ключ шифрования паролей от баз ───────────────────────────────────────
+// APP_KEY генерируется установщиком один раз. Если его потерять или заменить,
+// уже сохранённые пароли от баз клиентов расшифровать нельзя — панель покажет
+// «пароль недоступен», и каждому клиенту придётся выдавать новый.
+if (isset($existing['database_users'])) {
+    $encrypted = (int) $pdo->query('SELECT COUNT(*) FROM database_users WHERE password_enc IS NOT NULL')->fetchColumn();
+    $key = $config->str('app_key');
+
+    if ($key === '') {
+        out(
+            $encrypted > 0 ? 'FAIL' : 'WARN',
+            $encrypted > 0
+                ? sprintf(
+                    'APP_KEY пуст, а в базе %d %s от баз клиентов — панель не сможет их показать',
+                    $encrypted,
+                    \Hosting\Support\Html::plural($encrypted, 'зашифрованный пароль', 'зашифрованных пароля', 'зашифрованных паролей')
+                  )
+                : 'APP_KEY пуст — пароли от баз будет негде хранить; перезапустите sudo bash hosting/install.sh'
+        );
+    } elseif ($encrypted > 0) {
+        // Проверяем не длину ключа, а то, что им реально расшифровывается
+        // существующая запись: подменённый ключ имеет правильную длину.
+        $sample = (string) $pdo->query(
+            'SELECT password_enc FROM database_users WHERE password_enc IS NOT NULL LIMIT 1'
+        )->fetchColumn();
+
+        if (\Hosting\Support\Secret::decrypt($sample, $key) === null) {
+            out('FAIL', 'APP_KEY не подходит к сохранённым паролям от баз — похоже, ключ заменили после установки');
+        } else {
+            out('OK', "APP_KEY на месте, пароли от баз читаются ({$encrypted} шт.)");
+        }
+    } else {
+        out('OK', 'APP_KEY задан');
+    }
+}
+
 // ── очередь заданий: главный признак живости воркера ─────────────────────
 if (isset($existing['jobs'])) {
     $stuck = (int) $pdo->query(

@@ -61,17 +61,20 @@ function hosting_test_mysql_db(): Database
 
     $dbName = (string) getenv('HOSTING_TEST_MYSQL_DB');
     $host = getenv('HOSTING_TEST_MYSQL_HOST') ?: '127.0.0.1';
+    // Отдельный порт: на машине разработчика 3306 обычно уже занят системной
+    // MariaDB, к которой нет пароля root.
+    $port = getenv('HOSTING_TEST_MYSQL_PORT') ?: '3306';
     $user = getenv('HOSTING_TEST_MYSQL_USER') ?: 'root';
     $pass = getenv('HOSTING_TEST_MYSQL_PASSWORD') ?: '';
 
     if ($pdo === null) {
-        $root = new PDO("mysql:host={$host};charset=utf8mb4", $user, $pass, [
+        $root = new PDO("mysql:host={$host};port={$port};charset=utf8mb4", $user, $pass, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         ]);
         $root->exec("DROP DATABASE IF EXISTS `{$dbName}`");
         $root->exec("CREATE DATABASE `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 
-        $pdo = new PDO("mysql:host={$host};dbname={$dbName};charset=utf8mb4", $user, $pass, [
+        $pdo = new PDO("mysql:host={$host};port={$port};dbname={$dbName};charset=utf8mb4", $user, $pass, [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             // Ровно как в проде (см. Hosting\Database): нативные prepared statements.

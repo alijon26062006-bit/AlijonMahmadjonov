@@ -49,6 +49,10 @@ final class DatabaseController
             'rootDomain'    => $this->config->str('root_domain'),
             'dbUser'        => $dbUser['db_user'] ?? $user['system_user'],
             'freshPassword' => is_string($freshPassword) ? $freshPassword : null,
+            // Сохранённый пароль показываем по кнопке «глаз»: без этого клиент,
+            // однажды закрывший страницу, не мог узнать его иначе как сменой,
+            // а смена ломает все уже настроенные сайты.
+            'storedPassword' => $this->databaseUsers->revealPassword((int) $user['id'], $this->config->str('app_key')),
         ]));
     }
 

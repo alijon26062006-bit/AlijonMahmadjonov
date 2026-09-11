@@ -22,6 +22,7 @@ final class DashboardController
     public function __construct(
         private Config $config,
         private Auth $auth,
+        private \Hosting\Service\Billing $billing,
         private SiteRepository $sites,
         private DatabaseRepository $databases,
         private PlanRepository $plans,
@@ -53,6 +54,8 @@ final class DashboardController
             'recentJobs'    => $this->jobs->recentForUser((int) $user['id'], 10),
             'lastBackup'    => $this->backups->latestSuccessful((int) $user['id']),
             'notifications' => $this->notifications->forUser((int) $user['id'], 5),
+            'summary'       => $this->billing->summary($user),
+            'databaseCount' => count($this->databases->forUser((int) $user['id'])),
         ]));
     }
 }

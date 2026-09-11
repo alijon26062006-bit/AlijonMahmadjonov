@@ -243,6 +243,11 @@ final class JobHandler
         $dbUserRow = $this->databaseUsers->getOrCreateForUser($user, (int) $plan['db_max_user_connections']);
 
         $newPassword = $this->mysql->ensureUser((string) $dbUserRow['db_user'], (int) $plan['db_max_user_connections']);
+        if ($newPassword !== null) {
+            // Сохраняем зашифрованным, чтобы клиент мог посмотреть пароль позже:
+            // иначе единственный способ его узнать — сменить, сломав все сайты.
+            $this->databaseUsers->storePassword((int) $user['id'], $newPassword, $this->config->str('app_key'));
+        }
         $this->mysql->createDatabase((string) $database['db_name'], (string) $dbUserRow['db_user']);
         $this->databases->setStatus($databaseId, 'active');
 
@@ -281,6 +286,7 @@ final class JobHandler
         $password = $this->mysql->ensureUser((string) $dbUserRow['db_user'], (int) $plan['db_max_user_connections'])
             ?? $this->mysql->changePassword((string) $dbUserRow['db_user']);
 
+        $this->databaseUsers->storePassword((int) $user['id'], $password, $this->config->str('app_key'));
         $this->db->log((int) $user['id'], 'database.password_reset', 'user', (int) $user['id']);
 
         return $password;

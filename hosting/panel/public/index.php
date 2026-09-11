@@ -98,26 +98,54 @@ $notifications = new NotificationRepository($db);
 $auth = new Auth($config, $sessions, $users, $loginAttempts, $isHttps);
 $telegramAuth = new TelegramAuth($config->str('telegram_bot_token'));
 $view = new View($root . '/hosting/panel/views', static function () use ($auth, $config): array {
+    // Заголовок раздела берётся по адресу страницы в одном месте, а не
+    // повторяется в каждом контроллере: иначе рано или поздно где-то забудут.
+    $titles = [
+        '/dashboard' => 'Главная',
+        '/sites'     => 'Мои сайты',
+        '/databases' => 'Базы данных',
+        '/backups'   => 'Бэкапы',
+        '/billing'   => 'Баланс',
+        '/profile'   => 'Профиль',
+        '/admin'     => 'Администрирование',
+    ];
+    $path = strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
+    $title = $titles[$path] ?? '';
+    if ($title === '') {
+        $title = match (true) {
+            str_contains($path, '/files')     => 'Файловый менеджер',
+            str_contains($path, '/logs')      => 'Логи',
+            str_contains($path, '/domains')   => 'Домены',
+            str_starts_with($path, '/sites/') => 'Сайт',
+            default                           => '',
+        };
+    }
+
     return [
         'currentUser' => $auth->user(),
         'flashes'     => Flash::pull(),
         'panelName'   => $config->str('panel_name'),
+        'pageTitle'   => $title,
     ];
 });
+
+$databaseUsers = new DatabaseUserRepository($db);
+$billing = new \Hosting\Service\Billing($db);
 
 // ── контроллеры ──────────────────────────────────────────────────────────
 $telegramSiteController = new TelegramSiteController(
     $config, $db, $auth, $sites, new \Hosting\Service\TelegramWebhook()
 );
 $authController = new AuthController($config, $db, $auth, $users, $plans, $telegramAccounts, $telegramAuth, $jobs, $view);
-$dashboardController = new DashboardController($config, $auth, $sites, $databases, $plans, $jobs, $backups, $notifications, $view);
-$siteController = new SiteController($config, $db, $auth, $sites, $plans, $jobs, $view);
+$dashboardController = new DashboardController($config, $auth, $billing, $sites, $databases, $plans, $jobs, $backups, $notifications, $view);
+$siteController = new SiteController($config, $db, $auth, $billing, $sites, $plans, $jobs, $view);
 $fileController = new FileController($config, $db, $auth, $sites, $view);
 $logController = new LogController($config, $auth, $sites, $view);
-$databaseUsers = new DatabaseUserRepository($db);
 $databaseController = new DatabaseController($config, $db, $auth, $databases, $databaseUsers, $jobs, $view);
 $domainController = new DomainController($config, $db, $auth, $sites, $domains, $jobs, $view);
-$adminController = new AdminController($db, $auth, $users, $sites, $jobs, $view);
+$billingController = new \Hosting\Controller\BillingController($config, $db, $auth, $billing, $view);
+$profileController = new \Hosting\Controller\ProfileController($config, $db, $auth, $users, $billing, $view);
+$adminController = new AdminController($db, $auth, $billing, $users, $sites, $jobs, $view);
 $backupController = new BackupController($db, $auth, $backups, $jobs, $view);
 
 // ── маршруты ─────────────────────────────────────────────────────────────
@@ -202,6 +230,11 @@ $router->post('/databases', [$databaseController, 'create']);
 $router->post('/databases/password', [$databaseController, 'resetPassword']);
 $router->post('/databases/{id}/delete', [$databaseController, 'delete']);
 
+$router->get('/billing', [$billingController, 'index']);
+$router->post('/billing/topup', [$billingController, 'requestTopUp']);
+$router->get('/profile', [$profileController, 'index']);
+$router->post('/profile', [$profileController, 'save']);
+
 $router->get('/backups', [$backupController, 'index']);
 $router->post('/backups', [$backupController, 'create']);
 $router->post('/backups/{id}/restore', [$backupController, 'restore']);
@@ -209,6 +242,9 @@ $router->post('/backups/{id}/restore', [$backupController, 'restore']);
 $router->get('/admin', [$adminController, 'index']);
 $router->post('/admin/users/{id}/suspend', [$adminController, 'suspendUser']);
 $router->post('/admin/users/{id}/activate', [$adminController, 'activateUser']);
+$router->post('/admin/users/{id}/credit', [$adminController, 'creditUser']);
+$router->post('/admin/payments/{id}/approve', [$adminController, 'approvePayment']);
+$router->post('/admin/payments/{id}/reject', [$adminController, 'rejectPayment']);
 
 // ── диспетчеризация ──────────────────────────────────────────────────────
 $request = Request::fromGlobals();

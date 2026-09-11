@@ -38,3 +38,62 @@
     }
   });
 })();
+
+// Кнопки «скопировать» рядом с полями: <button data-copy="значение">
+(function () {
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-copy]') : null;
+    if (!btn) {
+      return;
+    }
+    e.preventDefault();
+    var value = btn.getAttribute('data-copy');
+
+    function done() {
+      var old = btn.getAttribute('title') || '';
+      btn.setAttribute('title', 'Скопировано');
+      btn.classList.add('is-copied');
+      setTimeout(function () {
+        btn.setAttribute('title', old);
+        btn.classList.remove('is-copied');
+      }, 1200);
+    }
+
+    // navigator.clipboard есть только на https (и на localhost). На обычном http
+    // его нет вовсе, поэтому нужен запасной путь через скрытое поле — иначе
+    // кнопка молча ничего не делает.
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(value).then(done, fallback);
+    } else {
+      fallback();
+    }
+
+    function fallback() {
+      var tmp = document.createElement('textarea');
+      tmp.value = value;
+      tmp.setAttribute('readonly', '');
+      tmp.style.position = 'fixed';
+      tmp.style.opacity = '0';
+      document.body.appendChild(tmp);
+      tmp.select();
+      try { document.execCommand('copy'); done(); } catch (err) { /* нечего показать */ }
+      document.body.removeChild(tmp);
+    }
+  });
+
+  // Показать/скрыть пароль: <button data-reveal="#id-поля">
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-reveal]') : null;
+    if (!btn) {
+      return;
+    }
+    e.preventDefault();
+    var target = document.querySelector(btn.getAttribute('data-reveal'));
+    if (!target) {
+      return;
+    }
+    var hidden = target.getAttribute('data-hidden') === '1';
+    target.textContent = hidden ? target.getAttribute('data-secret') : '••••••••••';
+    target.setAttribute('data-hidden', hidden ? '0' : '1');
+  });
+})();

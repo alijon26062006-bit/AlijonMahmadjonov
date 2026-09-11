@@ -34,13 +34,19 @@ final class Config
         $root = rtrim($get('HOSTING_ROOT', '/srv/hosting'), '/');
         $usersRoot = rtrim($get('HOSTING_USERS_ROOT', '/home/hosting'), '/');
 
+        // Название панели по умолчанию берём из домена: diyorhost.com → DiyorHost.
+        // Домен владелец уже купил, а PANEL_NAME может остаться незаполненным —
+        // и тогда клиент видит в шапке чужое имя из примера конфигурации.
+        $rootDomain = strtolower($get('HOSTING_ROOT_DOMAIN', 'myhost.tj'));
+        $brand = Support\Brand::fromDomain($rootDomain);
+
         return new self([
             'app_env'         => $get('APP_ENV', 'production'),
             'app_url'         => rtrim($get('APP_URL', 'https://panel.myhost.tj'), '/'),
-            'panel_name'      => $get('PANEL_NAME', 'AlijonHost'),
+            'panel_name'      => $get('PANEL_NAME', $brand !== '' ? $brand : 'AlijonHost'),
 
             // Единственное место, откуда домен клиентов берётся во всей кодовой базе.
-            'root_domain'     => strtolower($get('HOSTING_ROOT_DOMAIN', 'myhost.tj')),
+            'root_domain'     => $rootDomain,
             'server_ip'       => $get('HOSTING_SERVER_IP', ''),
 
             'hosting_root'    => $root,
@@ -85,6 +91,9 @@ final class Config
             // Имя бота нужно кнопке «Войти через Telegram» на публичной главной:
             // виджет Telegram принимает именно username, а не токен. Заполняется
             // автоматически в setup.sh через getMe.
+            'app_key'         => $get('APP_KEY', ''),
+            // Реквизиты для пополнения — текстом, как вы их сообщаете клиентам.
+            'payment_details' => $get('PAYMENT_DETAILS', ''),
             'telegram_bot_username' => ltrim($get('TELEGRAM_BOT_USERNAME', ''), '@'),
             // Виджет «Войти через Telegram» работает только после /setdomain в
             // @BotFather. Пока это не сделано, Telegram рисует на месте кнопки

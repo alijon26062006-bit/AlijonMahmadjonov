@@ -14,6 +14,8 @@ use Hosting\Http\ForbiddenException;
 use Hosting\Http\NotFoundException;
 use Hosting\Http\UnauthorizedException;
 use Hosting\Service\Auth;
+use Hosting\Service\Billing;
+use Hosting\Service\Quota;
 use Hosting\Service\SiteEnv;
 use Hosting\Service\SiteHealth;
 use Hosting\Service\TelegramWebhook;
@@ -28,6 +30,7 @@ final class SiteController
         private Config $config,
         private Database $db,
         private Auth $auth,
+        private Billing $billing,
         private SiteRepository $sites,
         private PlanRepository $plans,
         private JobRepository $jobs,
@@ -38,11 +41,23 @@ final class SiteController
     public function index(Request $request): Response
     {
         $user = $this->requireUser();
+
+        // Тариф, место на диске и баланс показываем прямо здесь: клиент приходит
+        // на эту страницу создавать сайт, и лимит «2 из 2» должен быть виден
+        // до нажатия кнопки, а не в виде ошибки после.
+        $home = rtrim($this->config->str('users_root'), '/') . '/' . $user['system_user'];
+        $quota = is_dir($home)
+            ? Quota::usage($home, (int) $user['disk_quota_mb'])
+            : ['used' => 0, 'limit' => (int) $user['disk_quota_mb'] * 1024 * 1024, 'percent' => 0, 'exceeded' => false];
+
         return Response::html($this->view->page('sites/index', [
             'csrf'       => $this->auth->csrfToken(),
             'sites'      => $this->sites->forUser((int) $user['id']),
             'user'       => $user,
             'rootDomain' => $this->config->str('root_domain'),
+            'plan'       => $this->plans->findById((int) $user['plan_id']),
+            'quota'      => $quota,
+            'summary'    => $this->billing->summary($user),
         ]));
     }
 

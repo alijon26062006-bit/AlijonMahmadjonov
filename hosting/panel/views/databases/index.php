@@ -5,113 +5,139 @@
  *  @var string $rootDomain
  *  @var string $dbUser
  *  @var string|null $freshPassword
+ *  @var string|null $storedPassword
  */
 use Hosting\Support\Html;
 
 $pma = 'https://db.' . $rootDomain;
+$password = $freshPassword ?? $storedPassword;
+
+$copyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+     stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/>
+     <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
+$eyeIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+     stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/>
+     <circle cx="12" cy="12" r="3"/></svg>';
+
+/** Поле «значение + кнопка скопировать». */
+$field = static function (string $label, string $value, string $icon): string {
+    return '<div class="field"><span class="field-main"><span class="field-label">' . Html::e($label) . '</span>'
+        . '<span class="field-value">' . Html::e($value) . '</span></span>'
+        . '<button type="button" class="icon-btn" title="Скопировать" data-copy="' . Html::e($value) . '">'
+        . $icon . '</button></div>';
+};
 ?>
-<style>
-  .db-cred { display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); }
-  .db-cred div { background:var(--surface-2); border:1px solid var(--border);
-                 border-radius:var(--r-md); padding:12px 14px; }
-  .db-cred dt { font-size:12.5px; color:var(--muted); font-weight:600;
-                text-transform:uppercase; letter-spacing:.05em; }
-  .db-cred dd { margin:5px 0 0; font-family:ui-monospace,monospace; font-size:14px; word-break:break-all; }
-  .db-pass { border:2px solid var(--success); background:var(--success-soft);
-             border-radius:var(--r-lg); padding:18px; margin-bottom:18px; }
-  .db-pass h3 { margin:0 0 8px; color:#14532D; }
-  .db-pass code { display:block; background:#fff; border:1px solid #BBE9CD; padding:12px 14px;
-                  border-radius:var(--r-md); font-size:16px; word-break:break-all; user-select:all; }
-  .db-list { display:grid; gap:12px; }
-  .db-item { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:14px;
-             background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-md); }
-  .db-item .db-name { flex:1 1 auto; font-family:ui-monospace,monospace; font-weight:600; word-break:break-all; }
-  .db-new { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
-  .db-new > div { flex:1 1 200px; }
-  @media (max-width:640px) {
-    .db-item .btn, .db-item button { width:100%; }
-    .db-item form { flex:1 1 100%; }
-  }
-</style>
+<div class="card" style="background:linear-gradient(135deg,#12234B,#0E1A38);border:0;color:#E2E8F0;text-align:center;">
+  <span class="tile-ico" style="background:rgba(255,255,255,.08);color:#F59E0B;margin:0 auto 14px;width:56px;height:56px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px;">
+      <ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>
+    </svg>
+  </span>
+  <h2 style="margin:0 0 8px;color:#fff;">Базы данных</h2>
+  <p style="margin:0;color:#94A3B8;font-size:15px;">
+    Ваша личная база с полной защитой.<br>Другие клиенты доступа к ней не имеют.
+  </p>
+</div>
 
 <?php if ($freshPassword !== null): ?>
-  <div class="db-pass">
-    <h3>Сохраните пароль — он показывается один раз</h3>
-    <code><?= Html::e($freshPassword) ?></code>
-    <p class="muted" style="margin:10px 0 0;color:#14532D;">
-      Мы его не храним: ни в панели, ни в логах. Потеряете — нажмите «Сменить пароль»,
-      но тогда придётся обновить его во всех сайтах.
-    </p>
+  <div class="card" style="border:2px solid var(--success);background:var(--success-soft);">
+    <b style="color:#14532D;">Новый пароль создан</b>
+    <p class="muted" style="margin:6px 0 0;color:#14532D;">Он сохранён и показан ниже — записывать отдельно не нужно.</p>
   </div>
 <?php endif; ?>
 
-<div class="card">
-  <h2 style="margin-top:0;">Данные для подключения</h2>
-  <p class="muted" style="margin-top:0;">
-    Учётная запись MariaDB у вас одна на все базы — логин и пароль везде одинаковые.
-  </p>
-  <div class="db-cred">
-    <div><dt>Логин</dt><dd><?= Html::e($dbUser) ?></dd></div>
-    <div><dt>Пароль</dt><dd><?= $freshPassword !== null ? 'показан выше' : 'показан при создании' ?></dd></div>
-    <div><dt>Хост</dt><dd>localhost или 127.0.0.1</dd></div>
-    <div><dt>Порт</dt><dd>3306</dd></div>
+<?php foreach ($databases as $database): ?>
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <span class="tile-ico t-orange" style="width:44px;height:44px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>
+        </svg>
+      </span>
+      <b style="flex:1 1 auto;font-size:17px;word-break:break-all;"><?= Html::e($database['db_name']) ?></b>
+      <span class="muted"><?= Html::e(date('d.m.Y', strtotime((string) $database['created_at']))) ?></span>
+    </div>
+
+    <?= $field('Хост', 'localhost', $copyIcon) ?>
+    <?= $field('Имя базы', (string) $database['db_name'], $copyIcon) ?>
+    <?= $field('Пользователь', $dbUser, $copyIcon) ?>
+
+    <div class="field">
+      <span class="field-main">
+        <span class="field-label">Пароль</span>
+        <?php if ($password !== null): ?>
+          <span class="field-value" id="pw-<?= (int) $database['id'] ?>" data-hidden="1"
+                data-secret="<?= Html::e($password) ?>">••••••••••</span>
+        <?php else: ?>
+          <span class="field-value">не сохранён — нажмите «Новый пароль»</span>
+        <?php endif; ?>
+      </span>
+      <?php if ($password !== null): ?>
+        <button type="button" class="icon-btn" title="Показать" data-reveal="#pw-<?= (int) $database['id'] ?>"><?= $eyeIcon ?></button>
+        <button type="button" class="icon-btn" title="Скопировать" data-copy="<?= Html::e($password) ?>"><?= $copyIcon ?></button>
+      <?php endif; ?>
+    </div>
+
+    <?= $field('Порт', '3306', $copyIcon) ?>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+      <a class="btn secondary" href="<?= Html::e($pma) ?>" target="_blank" rel="noopener">phpMyAdmin</a>
+      <form method="post" action="/databases/password"
+            data-confirm="Сменить пароль? Старый перестанет работать во всех сайтах.">
+        <input type="hidden" name="csrf" value="<?= Html::e($csrf) ?>">
+        <button type="submit" class="secondary">Новый пароль</button>
+      </form>
+      <form method="post" action="/databases/<?= (int) $database['id'] ?>/delete"
+            data-confirm="Удалить базу <?= Html::e($database['db_name']) ?> со всеми таблицами? Это необратимо.">
+        <input type="hidden" name="csrf" value="<?= Html::e($csrf) ?>">
+        <button type="submit" class="danger">Удалить</button>
+      </form>
+    </div>
   </div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
-    <a class="btn" href="<?= Html::e($pma) ?>" target="_blank" rel="noopener">Открыть phpMyAdmin</a>
-    <form method="post" action="/databases/password"
-          data-confirm="Сменить пароль? Старый перестанет работать, и его придётся обновить во всех сайтах.">
-      <input type="hidden" name="csrf" value="<?= Html::e($csrf) ?>">
-      <button type="submit" class="secondary">Сменить пароль</button>
-    </form>
-  </div>
-</div>
+<?php endforeach; ?>
 
 <div class="card">
-  <h2 style="margin-top:0;">Новая база данных</h2>
-  <form method="post" action="/databases" class="db-new">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+    <span>
+      <b style="font-size:17px;">Добавить базу</b><br>
+      <span class="muted">Максимум: <?= (int) $user['max_databases'] ?> <?= Html::plural((int) $user['max_databases'], 'база', 'базы', 'баз') ?> по тарифу</span>
+    </span>
+  </div>
+  <form method="post" action="/databases" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:14px;">
     <input type="hidden" name="csrf" value="<?= Html::e($csrf) ?>">
-    <div>
+    <div style="flex:1 1 180px;">
       <label>Имя базы</label>
       <input type="text" name="name" placeholder="shop" required pattern="[a-z][a-z0-9_]{1,24}">
       <div class="muted" style="margin-top:6px;">Полное имя: <code><?= Html::e($user['system_user']) ?>_имя</code></div>
     </div>
-    <button type="submit">Создать базу</button>
+    <button type="submit">+ Создать базу</button>
   </form>
-  <p class="muted" style="margin-bottom:0;">Баз: <?= count($databases) ?> из <?= Html::e($user['max_databases']) ?> по тарифу</p>
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0;">Мои базы</h2>
-  <?php if ($databases === []): ?>
-    <p class="muted" style="margin:0;">Пока нет ни одной базы. Создайте первую — логин и пароль выдадутся сразу.</p>
-  <?php else: ?>
-    <div class="db-list">
-      <?php foreach ($databases as $database): ?>
-        <div class="db-item">
-          <span class="db-name"><?= Html::e($database['db_name']) ?></span>
-          <span class="badge <?= $database['status'] === 'active' ? 'active' : 'pending' ?>">
-            <?= Html::e($database['status'] === 'active' ? 'Готова' : 'Создаётся') ?>
-          </span>
-          <form method="post" action="/databases/<?= (int) $database['id'] ?>/delete"
-                data-confirm="Удалить базу <?= Html::e($database['db_name']) ?> со всеми таблицами? Это необратимо.">
-            <input type="hidden" name="csrf" value="<?= Html::e($csrf) ?>">
-            <button type="submit" class="danger">Удалить</button>
-          </form>
-        </div>
-      <?php endforeach; ?>
+  <h2 style="margin-top:0;display:flex;align-items:center;gap:10px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.9" stroke-linecap="round"
+         stroke-linejoin="round" style="width:22px;height:22px;"><path d="M12 3l7 3v6c0 4-3 7.5-7 9-4-1.5-7-5-7-9V6l7-3Z"/></svg>
+    Защита
+  </h2>
+  <div style="display:grid;gap:14px;">
+    <div style="display:flex;gap:14px;align-items:flex-start;">
+      <span class="tile-ico t-green" style="width:40px;height:40px;flex:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><path d="M12 3l7 3v6c0 4-3 7.5-7 9-4-1.5-7-5-7-9V6l7-3Z"/></svg>
+      </span>
+      <span><b>Полная изоляция</b><br><span class="muted">Каждый клиент видит только свою базу</span></span>
     </div>
-  <?php endif; ?>
-</div>
-
-<div class="card">
-  <h2 style="margin-top:0;">Как подключиться из сайта</h2>
-  <pre><?= Html::e('<?php
-$pdo = new PDO(
-    "mysql:host=127.0.0.1;dbname=' . ($databases[0]['db_name'] ?? ($user['system_user'] . '_shop')) . ';charset=utf8mb4",
-    "' . $dbUser . '",
-    "ваш пароль"
-);') ?></pre>
-  <p class="muted" style="margin-bottom:0;">
-    Пароль лучше держать в файле <code>.env</code> над <code>public/</code> — из браузера он недоступен.
-  </p>
+    <div style="display:flex;gap:14px;align-items:flex-start;">
+      <span class="tile-ico t-blue" style="width:40px;height:40px;flex:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      </span>
+      <span><b>Надёжный пароль</b><br><span class="muted">Случайный, выдаётся сервером, хранится зашифрованным</span></span>
+    </div>
+    <div style="display:flex;gap:14px;align-items:flex-start;">
+      <span class="tile-ico t-red" style="width:40px;height:40px;flex:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/></svg>
+      </span>
+      <span><b>Доступ снаружи закрыт</b><br><span class="muted">База отвечает только с этого сервера</span></span>
+    </div>
+  </div>
 </div>

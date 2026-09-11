@@ -75,13 +75,52 @@ use Hosting\Support\Html;
   .brand-mark svg { width:20px; height:20px; }
   .brand em { font-style:normal; color:var(--primary); }
 
-  nav.tabs { display:flex; gap:4px; flex-wrap:wrap; padding:8px 20px;
-             background:var(--surface); border-bottom:1px solid var(--border); }
-  nav.tabs a { padding:8px 14px; border-radius:var(--r-sm); color:var(--muted);
-               font-size:14px; font-weight:600; }
-  nav.tabs a:hover { background:var(--primary-soft); color:var(--primary); text-decoration:none; }
+  /* ── шапка с балансом ──────────────────────────────────────────────── */
+  header.top .top-title { flex:1 1 auto; font-weight:800; font-size:18px; letter-spacing:-.01em; }
+  header.top .top-right { display:flex; align-items:center; gap:8px; flex:none; }
+  .chip { padding:9px 14px; border-radius:999px; background:var(--primary-soft);
+          color:var(--primary); font-weight:800; font-size:14px; white-space:nowrap; }
+  .chip:hover { text-decoration:none; }
+  header.top .top-right .btn { padding:9px 16px; font-size:14px; white-space:nowrap; }
 
-  main { max-width:1000px; margin:0 auto; padding:20px; }
+  .burger { display:flex; flex-direction:column; justify-content:center; gap:4px;
+            width:40px; height:40px; flex:none; padding:9px 8px; border-radius:10px; }
+  .burger:hover { background:var(--surface-2); }
+  .burger span { display:block; height:2.5px; border-radius:2px; background:var(--text); }
+
+  /* ── меню-шторка ───────────────────────────────────────────────────── */
+  /* Открывается по :target — то есть работает без JavaScript. Скрипт мог не
+     загрузиться, а меню в панели управления обязано открываться всегда. */
+  .drawer { position:fixed; inset:0 auto 0 0; width:min(84vw,300px); z-index:70;
+            background:var(--surface); border-right:1px solid var(--border);
+            transform:translateX(-102%); transition:transform .22s ease;
+            display:flex; flex-direction:column; overflow-y:auto; }
+  .drawer:target { transform:none; box-shadow:0 0 60px rgba(14,26,56,.25); }
+  .drawer-scrim { position:fixed; inset:0; z-index:69; background:rgba(14,26,56,.45);
+                  opacity:0; pointer-events:none; transition:opacity .22s ease; }
+  .drawer:target ~ .drawer-scrim { opacity:1; pointer-events:auto; }
+
+  .drawer-head { display:flex; align-items:center; justify-content:space-between; gap:10px;
+                 padding:16px 18px; border-bottom:1px solid var(--border); }
+  .drawer-close { font-size:26px; line-height:1; color:var(--muted); padding:0 6px; }
+  .drawer-close:hover { text-decoration:none; color:var(--text); }
+
+  .drawer-user { display:flex; align-items:center; gap:12px; padding:16px 18px;
+                 border-bottom:1px solid var(--border); }
+  .drawer-user b { display:block; font-size:15px; }
+  .drawer-user small { color:var(--primary); font-weight:700; font-size:13.5px; }
+  .avatar { display:grid; place-items:center; width:44px; height:44px; flex:none;
+            border-radius:13px; background:var(--primary); color:#fff; font-weight:800; font-size:18px; }
+
+  .drawer-nav { display:flex; flex-direction:column; gap:2px; padding:12px; }
+  .drawer-nav a { display:flex; align-items:center; gap:12px; padding:12px 14px;
+                  border-radius:12px; color:var(--text); font-weight:600; font-size:15px; }
+  .drawer-nav a:hover { background:var(--surface-2); text-decoration:none; }
+  .drawer-nav a.is-active { background:var(--primary-soft); color:var(--primary); }
+  .drawer-nav svg { width:20px; height:20px; flex:none; color:var(--muted); }
+  .drawer-nav a.is-active svg { color:var(--primary); }
+
+  main { max-width:1000px; margin:0 auto; padding:18px 16px 40px; }
 
   /* ── компоненты ────────────────────────────────────────────────────── */
   .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg);
@@ -125,39 +164,147 @@ use Hosting\Support\Html;
   pre { padding:14px; overflow-x:auto; }
   .muted { color:var(--muted); font-size:14px; }
 
+  /* ── плитки, общие для главной и разделов ──────────────────────────── */
+  .tiles { display:grid; gap:12px; grid-template-columns:1fr 1fr; }
+  .tile { display:flex; flex-direction:column; gap:10px; padding:18px 16px; background:var(--surface);
+          border:1px solid var(--border); border-radius:var(--r-lg); box-shadow:var(--shadow-sm); }
+  .tile:hover { text-decoration:none; border-color:#C7D5F0; }
+  .tile-ico { display:grid; place-items:center; width:46px; height:46px; border-radius:14px; }
+  .tile-ico svg { width:23px; height:23px; }
+  .tile b { font-size:28px; font-weight:800; letter-spacing:-.02em; line-height:1.1; }
+  .tile span { font-size:13.5px; color:var(--muted); }
+  .tile.is-action { align-items:center; text-align:center; color:var(--text); }
+  .tile.is-action b { font-size:15px; font-weight:700; }
+  .t-blue { background:var(--primary-soft); color:var(--primary); }
+  .t-green { background:var(--success-soft); color:var(--success); }
+  .t-orange { background:var(--warning-soft); color:var(--warning); }
+  .t-red { background:var(--danger-soft); color:var(--danger); }
+  .t-purple { background:var(--purple-soft); color:var(--purple); }
+
+  /* ── поле «скопировать» ────────────────────────────────────────────── */
+  .field { display:flex; align-items:center; gap:10px; padding:12px 14px; margin-bottom:10px;
+           background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-md); }
+  .field-main { flex:1 1 auto; min-width:0; }
+  .field-label { display:block; font-size:11.5px; font-weight:700; letter-spacing:.08em;
+                 text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .field-value { display:inline-block; padding:4px 9px; border-radius:8px; background:var(--primary-soft);
+                 font-family:ui-monospace,monospace; font-size:14px; word-break:break-all; }
+  .field .icon-btn { flex:none; }
+  .icon-btn { display:grid; place-items:center; width:38px; height:38px; border-radius:11px;
+              background:transparent; border:0; color:var(--muted); cursor:pointer; padding:0; }
+  .icon-btn:hover { background:var(--surface); color:var(--primary); }
+  .icon-btn svg { width:19px; height:19px; }
+
+  .progress { height:8px; border-radius:999px; background:var(--border); overflow:hidden; }
+  .progress i { display:block; height:100%; border-radius:999px; background:var(--primary); }
+
   @media (prefers-reduced-motion:reduce) {
     * { animation-duration:.01ms !important; transition-duration:.01ms !important; }
   }
 </style>
 </head>
-<body>
-<header class="top">
-  <a class="brand" href="<?= $currentUser ? '/dashboard' : '/' ?>">
-    <span class="brand-mark" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z"/>
-      </svg>
-    </span>
-    <?php [$brandHead, $brandTail] = \Hosting\Support\Brand::split($panelName); ?>
-    <span><?= Html::e($brandHead) ?><em><?= Html::e($brandTail) ?></em></span>
-  </a>
-  <?php if ($currentUser): ?>
-    <div class="muted">
-      <?= Html::e($currentUser['display_name'] ?? $currentUser['email'] ?? '') ?>
-      · <a href="/logout" onclick="return true">Выйти</a>
+<body<?= $currentUser ? ' class="has-shell"' : '' ?>>
+<?php
+use Hosting\Service\Billing;
+
+$pageTitle ??= '';
+$balance   ??= null;
+
+/** Иконки меню — свои SVG, ровно те, что нужны: эмодзи выглядят по-разному на разных телефонах. */
+$navIcon = static function (string $name): string {
+    $p = [
+        'home'   => '<path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z"/>',
+        'sites'  => '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+        'files'  => '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
+        'domain' => '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18Z"/>',
+        'db'     => '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+        'backup' => '<path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M3 4v5h5"/>',
+        'wallet' => '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12h3"/>',
+        'money'  => '<path d="M12 3v18"/><path d="M16.5 7.5c0-1.7-2-2.5-4.5-2.5s-4.5.8-4.5 2.5S9.5 11 12 11s4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3"/>',
+        'user'   => '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+        'admin'  => '<path d="M12 3l7 3v6c0 4-3 7.5-7 9-4-1.5-7-5-7-9V6l7-3Z"/>',
+        'exit'   => '<path d="M15 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h9"/>',
+    ];
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+        . 'stroke-linecap="round" stroke-linejoin="round">' . ($p[$name] ?? '') . '</svg>';
+};
+
+$navItems = [
+    ['/dashboard', 'Главная',   'home'],
+    ['/sites',     'Мои сайты', 'sites'],
+    ['/databases', 'Базы данных', 'db'],
+    ['/backups',   'Бэкапы',    'backup'],
+    ['/billing',   'Баланс',    'money'],
+    ['/profile',   'Профиль',   'user'],
+];
+$currentPath = strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
+?>
+<?php if ($currentUser): ?>
+<div class="shell">
+  <?php // Меню-«шторка». Открывается ссылкой на #menu, закрывается ссылкой обратно —
+        // без JavaScript: так оно работает даже если скрипт не загрузился. ?>
+  <div class="drawer" id="menu">
+    <div class="drawer-head">
+      <a class="brand" href="/dashboard">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z"/>
+          </svg>
+        </span>
+        <?php [$bh, $bt] = \Hosting\Support\Brand::split($panelName); ?>
+        <span><?= Html::e($bh) ?><em><?= Html::e($bt) ?></em></span>
+      </a>
+      <a class="drawer-close" href="#" aria-label="Закрыть меню">&times;</a>
     </div>
+
+    <div class="drawer-user">
+      <span class="avatar"><?= Html::e(mb_strtoupper(mb_substr((string) ($currentUser['display_name'] ?: $currentUser['email']), 0, 1))) ?></span>
+      <span>
+        <b><?= Html::e($currentUser['display_name'] ?: strstr((string) $currentUser['email'], '@', true)) ?></b>
+        <small><?= Html::e(Billing::money((float) ($currentUser['balance_tjs'] ?? 0))) ?></small>
+      </span>
+    </div>
+
+    <nav class="drawer-nav">
+      <?php foreach ($navItems as [$href, $label, $icon]): ?>
+        <a href="<?= $href ?>" class="<?= $currentPath === $href ? 'is-active' : '' ?>">
+          <?= $navIcon($icon) ?><?= Html::e($label) ?>
+        </a>
+      <?php endforeach; ?>
+      <?php if (($currentUser['role'] ?? '') === 'admin'): ?>
+        <a href="/admin" class="<?= $currentPath === '/admin' ? 'is-active' : '' ?>"><?= $navIcon('admin') ?>Админ</a>
+      <?php endif; ?>
+      <a href="/logout"><?= $navIcon('exit') ?>Выйти</a>
+    </nav>
+  </div>
+  <a class="drawer-scrim" href="#" aria-hidden="true" tabindex="-1"></a>
+</div>
+<?php endif; ?>
+
+<header class="top">
+  <?php if ($currentUser): ?>
+    <a class="burger" href="#menu" aria-label="Меню">
+      <span></span><span></span><span></span>
+    </a>
+    <span class="top-title"><?= Html::e($pageTitle !== '' ? $pageTitle : $panelName) ?></span>
+    <span class="top-right">
+      <a class="chip" href="/billing"><?= Html::e(Billing::money((float) ($currentUser['balance_tjs'] ?? 0))) ?></a>
+      <a class="btn" href="/billing">+ Пополнить</a>
+    </span>
+  <?php else: ?>
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z"/>
+        </svg>
+      </span>
+      <?php [$bh, $bt] = \Hosting\Support\Brand::split($panelName); ?>
+      <span><?= Html::e($bh) ?><em><?= Html::e($bt) ?></em></span>
+    </a>
   <?php endif; ?>
 </header>
-<?php if ($currentUser): ?>
-<nav class="tabs">
-  <a href="/dashboard">Обзор</a>
-  <a href="/sites">Сайты</a>
-  <a href="/databases">Базы данных</a>
-  <a href="/backups">Бэкапы</a>
-  <?php if (($currentUser['role'] ?? '') === 'admin'): ?><a href="/admin">Админ</a><?php endif; ?>
-</nav>
-<?php endif; ?>
 <main>
   <?php foreach ($flashes as $flash): ?>
     <div class="flash <?= Html::e($flash['type']) ?>"><?= Html::e($flash['text']) ?></div>
