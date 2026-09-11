@@ -420,6 +420,21 @@ def delete_bank(bank_id):
         con.execute('DELETE FROM banks WHERE id = ?', (bank_id,))
 
 
+def drop_stale_awaiting(hours=3):
+    """Заказ переводом, за который так и не прислали чек.
+
+    Пропуск на загрузку чека живёт два часа, дальше человек всё равно не
+    сможет его отправить. Такие заказы отмечаем отменёнными: иначе список
+    у хозяина год копит строчки «ждём чек», среди которых теряются живые.
+    """
+    with connect() as con:
+        cur = con.execute(
+            f"""UPDATE orders SET status = 'canceled'
+                WHERE status = 'awaiting' AND receipt = ''
+                  AND created_at < datetime('now', '-{int(hours)} hours')""")
+        return cur.rowcount
+
+
 def save_receipt(order_id, filename):
     """Чек пришёл — заказ ждёт проверки хозяином."""
     with connect() as con:

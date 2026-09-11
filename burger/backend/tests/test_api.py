@@ -699,3 +699,40 @@ def test_safe_headers_are_set(client):
     r = client.get('/api/menu')
     assert r.headers['x-content-type-options'] == 'nosniff'
     assert r.headers['referrer-policy'] == 'same-origin'
+
+
+def test_transfer_order_without_receipt_is_dropped(client):
+    """Заказ переводом, за который не прислали чек, не должен висеть вечно."""
+    import db
+    ready_bank(client)
+    body = client.post('/api/orders', json={
+        'items': [{'id': 'hamburger', 'qty': 1}], 'mode': 'pickup',
+        'name': 'Тест', 'phone': '937777777', 'pay': 'bank', 'bank': 'alif'}).json()
+
+    oid = db.orders(limit=1)[0]['id']
+    assert db.order(oid)['status'] == 'awaiting'
+
+    # свежий заказ не трогаем: человек ещё переводит деньги
+    assert db.drop_stale_awaiting() == 0
+    assert db.order(oid)['status'] == 'awaiting'
+
+    # состарим его и уберём
+    with db.connect() as con:
+        con.execute("UPDATE orders SET created_at = datetime('now', '-5 hours') WHERE id = ?",
+                    (oid,))
+    assert db.drop_stale_awaiting() == 1
+    assert db.order(oid)['status'] == 'canceled'
+
+    # заказ, по которому чек всё-таки пришёл, остаётся ждать проверки
+    second = client.post('/api/orders', json={
+        'items': [{'id': 'hamburger', 'qty': 1}], 'mode': 'pickup',
+        'name': 'Тест', 'phone': '937777777', 'pay': 'bank', 'bank': 'alif'}).json()
+    client.post('/api/orders/receipt', data={'token': second['receipt']},
+                files={'file': ('c.jpg', b'\xff\xd8\xff\xe0' + b'x' * 40, 'image/jpeg')})
+    paid = db.orders(limit=1)[0]['id']
+    with db.connect() as con:
+        con.execute("UPDATE orders SET created_at = datetime('now', '-9 hours') WHERE id = ?",
+                    (paid,))
+    assert db.drop_stale_awaiting() == 0
+    assert db.order(paid)['status'] == 'check'
+    assert body['number'] != second['number']

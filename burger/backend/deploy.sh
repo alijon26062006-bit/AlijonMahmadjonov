@@ -90,6 +90,11 @@ fi
 [ -f "$APP_DIR/burger/backend/app.py" ] || { echo "В репозитории нет burger/backend — не та ветка?"; exit 1; }
 
 BACKEND="$APP_DIR/burger/backend"
+
+# Кэш сайта живёт по имени версии. Не поменять его при обновлении — и телефон
+# ещё сутки будет показывать прежние стили. Ставим версией номер сборки.
+BUILD=$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || date +%s)
+sed -i "s/^const VERSION = '.*';/const VERSION = '$BUILD';/" "$APP_DIR/burger/sw.js"
 python3 -m venv "$BACKEND/.venv"
 "$BACKEND/.venv/bin/pip" install -q --upgrade pip
 "$BACKEND/.venv/bin/pip" install -q -r "$BACKEND/requirements.txt"
@@ -260,6 +265,28 @@ tar -czf "/srv/backup/receipts-$(date +%F).tgz" \
 find /srv/backup -name 'burger-*.db.gz' -mtime +30 -delete
 find /srv/backup -name 'receipts-*.tgz' -mtime +30 -delete
 logger -t burger-backup "копия готова: $OUT.gz"
+
+# Копия на том же диске — это не копия. Умрёт сервер, умрёт и она вместе
+# с заказами. Отправляем базу себе в Telegram: она маленькая, а достать её
+# оттуда можно с любого телефона.
+ENV=/srv/burger/burger/backend/.env
+TOKEN=$(grep '^TG_ADMIN_TOKEN=' "$ENV" 2>/dev/null | cut -d= -f2-)
+[ -z "$TOKEN" ] && TOKEN=$(grep '^TG_TOKEN=' "$ENV" 2>/dev/null | cut -d= -f2-)
+CHAT=$(grep '^TG_ADMIN_CHAT=' "$ENV" 2>/dev/null | cut -d= -f2-)
+
+if [ -n "$TOKEN" ] && [ -n "$CHAT" ]; then
+  SIZE=$(stat -c %s "$OUT.gz" 2>/dev/null || echo 0)
+  if [ "$SIZE" -gt 0 ] && [ "$SIZE" -lt 45000000 ]; then
+    if curl -sS -m 120 -o /dev/null -F "chat_id=$CHAT" \
+        -F "caption=Копия базы The Burger за $(date +%F)" \
+        -F "document=@$OUT.gz" \
+        "https://api.telegram.org/bot$TOKEN/sendDocument"; then
+      logger -t burger-backup "копия ушла в Telegram"
+    else
+      logger -t burger-backup "копия в Telegram не ушла"
+    fi
+  fi
+fi
 CRON
 chmod +x /etc/cron.daily/burger-backup
 

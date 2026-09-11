@@ -687,6 +687,23 @@ async def start_reminders():
     asyncio.create_task(loop())
 
 
+@app.on_event('startup')
+async def start_housekeeping():
+    """Раз в полчаса убираем заказы переводом, за которые не прислали чек."""
+
+    async def loop():
+        while True:
+            try:
+                gone = db.drop_stale_awaiting()
+                if gone:
+                    log.info('отменено заказов без чека: %s', gone)
+            except Exception as e:
+                log.error('уборка не прошла: %s', e)
+            await asyncio.sleep(30 * 60)
+
+    asyncio.create_task(loop())
+
+
 # ── админка ─────────────────────────────────────────────
 
 @app.get('/admin/login', response_class=HTMLResponse)
