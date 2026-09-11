@@ -15,6 +15,7 @@
 
 import json
 import sys
+import time
 from pathlib import Path
 
 import httpx
@@ -88,10 +89,28 @@ def shrink(body):
     return best, ext, True
 
 
+TRIES = 3
+
+
 def fetch(url):
-    """Скачиваем и убеждаемся, что это правда картинка, а не страница с ошибкой."""
-    r = httpx.get(url, timeout=60, follow_redirects=True)
-    r.raise_for_status()
+    """Скачиваем и убеждаемся, что это правда картинка, а не страница с ошибкой.
+
+    Пробуем трижды: на мобильном канале одна оборванная загрузка из сотни —
+    обычное дело, и из-за неё блюдо оставалось без фото насовсем.
+    """
+    last = None
+    for attempt in range(TRIES):
+        try:
+            r = httpx.get(url, timeout=60, follow_redirects=True)
+            r.raise_for_status()
+            break
+        except Exception as e:
+            last = e
+            if attempt < TRIES - 1:
+                time.sleep(2 * (attempt + 1))
+    else:
+        raise last
+
     body = r.content
     if len(body) > MAX_BYTES:
         raise ValueError('файл слишком большой')
@@ -195,7 +214,16 @@ def main():
 
     print(f'\nГотово. Добавлено: {added}, уже было: {skipped}, '
           f'не нашлось блюд: {missing}, не скачалось: {failed}')
-    if added:
+
+    # Главное — не сводка, а список тех, у кого фото так и нет: иначе
+    # пропажу замечают уже на сайте.
+    empty = [d['id'] for d in db.dishes(only_active=False) if not d['photo']]
+    if empty:
+        print(f'\nБез фото осталось блюд: {len(empty)}')
+        for dish_id in empty:
+            print(f'  — {dish_id}')
+        print('Повторите команду — она докачает только их.')
+    elif added:
         print('Обновите страницу меню — фотографии уже на месте.')
 
 

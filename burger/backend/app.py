@@ -159,6 +159,16 @@ def cookie_rules(request: Request):
     return {'samesite': 'none', 'secure': True} if https else {'samesite': 'lax'}
 
 
+def local_today():
+    """Сегодня — по душанбинскому времени, а не по серверному.
+
+    Сервер живёт по Гринвичу. В час ночи в Душанбе там ещё вчерашний день,
+    и кнопка «Сегодня» в отчёте показывала бы вчерашнюю смену, а ночные
+    заказы не попадали бы никуда.
+    """
+    return (datetime.utcnow() + TZ_SHIFT).date()
+
+
 def valid_date(value):
     """Дата из адресной строки. Мусор молча игнорируем — покажем период по умолчанию."""
     try:
@@ -622,7 +632,7 @@ def admin_delete_bank(bank_id: str, _=Depends(require_admin)):
 def admin_stats(request: Request, _=Depends(require_admin),
                 since: str = '', until: str = ''):
     """Сводка за период. По умолчанию — последняя неделя."""
-    today = date.today()
+    today = local_today()
     since = valid_date(since) or today - timedelta(days=6)
     until = valid_date(until) or today
     if since > until:

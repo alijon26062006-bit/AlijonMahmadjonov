@@ -155,6 +155,7 @@ systemctl enable --now $SERVICE
 systemctl restart $SERVICE
 
 say "Домен $DOMAIN и HTTPS"
+[ -f /etc/caddy/Caddyfile ] && cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak
 cat > /etc/caddy/Caddyfile <<CADDY
 {
     servers {
@@ -216,7 +217,19 @@ $DOMAIN, www.$DOMAIN {
     }
 }
 CADDY
-systemctl reload caddy || systemctl restart caddy
+# Опечатка в конфиге кладёт сайт целиком. Проверяем до перезагрузки:
+# не сошлось — возвращаем прежний и говорим об этом вслух.
+if caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+  systemctl reload caddy || systemctl restart caddy
+else
+  echo "Новый конфиг Caddy не проходит проверку — оставляю прежний."
+  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | tail -5
+  if [ -f /etc/caddy/Caddyfile.bak ]; then
+    cp /etc/caddy/Caddyfile.bak /etc/caddy/Caddyfile
+    systemctl reload caddy || true
+  fi
+  exit 1
+fi
 
 say "Сторож: следит, что сервер жив"
 cat > /etc/cron.d/burger-watchdog <<CRON

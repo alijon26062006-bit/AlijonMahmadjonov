@@ -403,7 +403,10 @@ def test_courier_can_give_the_order_back(client):
 
 
 def test_stats_counts_money_and_skips_canceled(client):
+    """Считаем по душанбинскому дню. Раньше тест брал дату сервера и падал
+    каждую ночь: в час ночи в Душанбе по Гринвичу ещё вчера."""
     import datetime, db
+    import app as app_module
     client.post('/admin/login', data={'password': 'секрет-Test'})
 
     for _ in range(3):
@@ -413,7 +416,7 @@ def test_stats_counts_money_and_skips_canceled(client):
     dead = db.orders(limit=1)[0]['id']
     db.set_status(dead, 'canceled')
 
-    today = datetime.date.today().isoformat()
+    today = app_module.local_today().isoformat()
     s = db.stats(today, today)
     assert s['total']['orders'] == 2            # отменённый не в счёт
     assert s['total']['money'] == 47 * 2
