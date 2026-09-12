@@ -66,7 +66,14 @@ type Options struct {
 	// link is public-facing and a plain-HTTP page cannot be framed from an
 	// HTTPS app anyway.
 	AllowInsecure bool
-	// Allow localhost and private ranges. Development only.
+	// Allow loopback — localhost, 127.0.0.1, ::1 — and nothing else that is
+	// unroutable. Development only, where previewing http://localhost:3000 is
+	// a real workflow.
+	//
+	// Deliberately narrower than "private addresses": there is no workflow,
+	// in any environment, where a portfolio link or a preview should reach
+	// 10.0.0.5 or an intranet name, and allowing a whole private range in
+	// development is how an SSRF hole ends up shipped behind a flag.
 	AllowLoopback bool
 	MaxLength     int
 }
@@ -189,32 +196,42 @@ func Normalise(raw string, opts Options) (Result, error) {
 		return Result{}, reject("host_not_allowed",
 			"Local and internal addresses can't be used for a public project link.")
 	}
-	if !opts.AllowLoopback {
-		if _, denied := loopbackHosts[host]; denied {
-			return Result{}, reject("host_not_allowed",
-				"Local and internal addresses can't be used for a public project link.")
+	_, isLoopbackName := loopbackHosts[host]
+	if isLoopbackName && !opts.AllowLoopback {
+		return Result{}, reject("host_not_allowed",
+			"Local and internal addresses can't be used for a public project link.")
+	}
+	for _, suffix := range deniedSuffixes {
+		if !strings.HasSuffix(host, suffix) {
+			continue
 		}
-		for _, suffix := range deniedSuffixes {
-			if strings.HasSuffix(host, suffix) {
-				return Result{}, reject("host_not_allowed",
-					"That address only resolves on a private network.")
-			}
+		// ".localhost" resolves to the loopback interface by convention, so it
+		// travels with the loopback allowance; every other private suffix is
+		// refused in every environment.
+		if suffix == ".localhost" && opts.AllowLoopback {
+			isLoopbackName = true
+			break
 		}
+		return Result{}, reject("host_not_allowed",
+			"That address only resolves on a private network.")
 	}
 
 	isIP := false
 	if ip := net.ParseIP(host); ip != nil {
 		isIP = true
-		if !opts.AllowLoopback {
-			if why := classifyIP(ip); why != "" {
+		// The classification always runs. Only the loopback verdict can be
+		// waived, and only when the caller opted in: a private or reserved
+		// address is refused even in development.
+		if why := classifyIP(ip); why != "" {
+			if !(opts.AllowLoopback && ip.IsLoopback()) {
 				return Result{}, rejectDetail("ip_not_allowed",
 					"That IP address isn't reachable from the public internet.", why)
 			}
 		}
 	} else if !strings.Contains(host, ".") {
 		// A single-label host is an intranet name, not a public site — except
-		// when the caller has allowed loopback, where "localhost" is the point.
-		if !opts.AllowLoopback {
+		// for the loopback names, which is what a development preview needs.
+		if !isLoopbackName {
 			return Result{}, reject("invalid_host",
 				"Enter a full domain name, for example project.example.com.")
 		}
@@ -223,10 +240,21 @@ func Normalise(raw string, opts Options) (Result, error) {
 	}
 
 	port := u.Port()
+	// The default port carries no information and makes two spellings of the
+	// same address compare unequal — which matters, because the preview
+	// compares a stored URL's origin against a frame-ancestors source.
+	if (scheme == "https" && port == "443") || (scheme == "http" && port == "80") {
+		port = ""
+	}
 	if port != "" {
 		if !allowedPort(port, scheme) {
-			return Result{}, reject("port_not_allowed",
-				"Only the standard web ports can be used.")
+			service := deniedPorts[port]
+			if service == "" {
+				return Result{}, reject("port_not_allowed", "That port isn't valid.")
+			}
+			return Result{}, rejectDetail("port_not_allowed",
+				"That port is used by a service that can't be previewed.",
+				"port "+port+" is "+service)
 		}
 	}
 
@@ -261,12 +289,43 @@ func Normalise(raw string, opts Options) (Result, error) {
 	}, nil
 }
 
+// deniedPorts are the well-known service ports.
+//
+// An allow-list here would refuse legitimate sites — plenty run on 8081 or
+// 3001, and a developer's local preview can be on anything — while adding no
+// protection: SSRF is stopped by the address check, not by the port. What a
+// port list is genuinely good for is refusing to let the previewer be pointed
+// at a database or a mail server on a public host.
+var deniedPorts = map[string]string{
+	"22": "SSH", "23": "Telnet", "25": "SMTP", "53": "DNS", "69": "TFTP",
+	"110": "POP3", "111": "RPC", "135": "RPC", "137": "NetBIOS",
+	"138": "NetBIOS", "139": "NetBIOS", "143": "IMAP", "161": "SNMP",
+	"389": "LDAP", "445": "SMB", "465": "SMTPS", "512": "rexec",
+	"513": "rlogin", "514": "syslog", "587": "SMTP", "593": "RPC",
+	"636": "LDAPS", "993": "IMAPS", "995": "POP3S", "1433": "MSSQL",
+	"1521": "Oracle", "2049": "NFS", "2375": "Docker", "2376": "Docker",
+	"2379": "etcd", "2380": "etcd", "3306": "MySQL", "3389": "RDP",
+	"4444": "Metasploit", "5432": "PostgreSQL", "5672": "AMQP",
+	"5900": "VNC", "5984": "CouchDB", "6379": "Redis", "7000": "Cassandra",
+	"8086": "InfluxDB", "9042": "Cassandra", "9092": "Kafka",
+	"9200": "Elasticsearch", "9300": "Elasticsearch", "11211": "Memcached",
+	"27017": "MongoDB", "27018": "MongoDB", "50070": "Hadoop",
+}
+
 func allowedPort(port, scheme string) bool {
-	switch port {
-	case "80", "443", "8080", "8443", "3000":
-		return true
+	if _, denied := deniedPorts[port]; denied {
+		return false
 	}
-	return false
+	// A port is a 16-bit number; anything else is not a port.
+	if len(port) > 5 {
+		return false
+	}
+	for i := 0; i < len(port); i++ {
+		if port[i] < '0' || port[i] > '9' {
+			return false
+		}
+	}
+	return port != "0"
 }
 
 func validHostname(host string) bool {
@@ -382,6 +441,27 @@ func IsPublicIP(ip net.IP) bool { return classifyIP(ip) == "" }
 
 var ErrBlockedAddress = errors.New("address is not publicly routable")
 
+// The cloud metadata addresses. Blocked in every mode, including
+// development: there is no workflow where fetching one is legitimate, and
+// reaching them is how an SSRF becomes stolen infrastructure credentials.
+var alwaysBlockedIPs = func() []net.IP {
+	return []net.IP{
+		net.ParseIP("169.254.169.254"),
+		net.ParseIP("fd00:ec2::254"),
+		net.ParseIP("100.100.100.200"), // Alibaba Cloud
+		net.ParseIP("192.0.0.192"),     // Oracle Cloud
+	}
+}()
+
+func alwaysBlocked(ip net.IP) bool {
+	for _, blocked := range alwaysBlockedIPs {
+		if blocked != nil && blocked.Equal(ip) {
+			return true
+		}
+	}
+	return false
+}
+
 // SafeDialer builds a net.Dialer whose Control hook re-checks the address that
 // is actually about to be dialled.
 //
@@ -390,6 +470,15 @@ var ErrBlockedAddress = errors.New("address is not publicly routable")
 // accident through a CNAME. Checking in Control means the verdict is made on
 // the socket's real peer, after DNS, with no window in between.
 func SafeDialer(timeout time.Duration) *net.Dialer {
+	return SafeDialerFor(timeout, DefaultOptions())
+}
+
+// SafeDialerFor builds the dialler for a given set of options, so a caller
+// that legitimately allows loopback in development uses the same check rather
+// than its own.
+//
+// Even with AllowLoopback, the cloud metadata addresses are refused.
+func SafeDialerFor(timeout time.Duration, opts Options) *net.Dialer {
 	return &net.Dialer{
 		Timeout: timeout,
 		Control: func(network, address string, _ syscallRawConn) error {
@@ -401,7 +490,18 @@ func SafeDialer(timeout time.Duration) *net.Dialer {
 			if ip == nil {
 				return fmt.Errorf("%w: %q is not an IP address", ErrBlockedAddress, host)
 			}
+			if alwaysBlocked(ip) {
+				return fmt.Errorf("%w: %s is a cloud metadata endpoint", ErrBlockedAddress, ip)
+			}
 			if why := classifyIP(ip); why != "" {
+				// The loopback verdict is the only one the caller can waive,
+				// and only by asking for it. Everything else — private
+				// ranges, link-local, reserved — is refused in every
+				// environment, so a development flag cannot widen into an
+				// SSRF against the host's own network.
+				if opts.AllowLoopback && ip.IsLoopback() {
+					return nil
+				}
 				return fmt.Errorf("%w: %s is a %s", ErrBlockedAddress, ip, why)
 			}
 			return nil
@@ -410,8 +510,13 @@ func SafeDialer(timeout time.Duration) *net.Dialer {
 }
 
 // ResolvePublic checks that every address a hostname resolves to is public.
-// Used as an early, cheap rejection; SafeDialer remains the authority.
+// Used as an early, cheap rejection; the dialler remains the authority.
 func ResolvePublic(ctx context.Context, host string) error {
+	return ResolvePublicFor(ctx, host, DefaultOptions())
+}
+
+// ResolvePublicFor is ResolvePublic under a given set of options.
+func ResolvePublicFor(ctx context.Context, host string, opts Options) error {
 	resolveCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
@@ -423,7 +528,15 @@ func ResolvePublic(ctx context.Context, host string) error {
 		return fmt.Errorf("%w: %s resolved to nothing", ErrBlockedAddress, host)
 	}
 	for _, a := range addrs {
+		if alwaysBlocked(a.IP) {
+			return fmt.Errorf("%w: %s resolves to the metadata endpoint %s",
+				ErrBlockedAddress, host, a.IP)
+		}
 		if why := classifyIP(a.IP); why != "" {
+			// Same narrow waiver as the dialler: loopback only, on request.
+			if opts.AllowLoopback && a.IP.IsLoopback() {
+				continue
+			}
 			return fmt.Errorf("%w: %s resolves to %s (%s)", ErrBlockedAddress, host, a.IP, why)
 		}
 	}

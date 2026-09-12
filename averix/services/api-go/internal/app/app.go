@@ -16,6 +16,7 @@ import (
 	"github.com/averix/api/internal/clients"
 	"github.com/averix/api/internal/config"
 	"github.com/averix/api/internal/developers"
+	"github.com/averix/api/internal/files"
 	"github.com/averix/api/internal/githubint"
 	"github.com/averix/api/internal/health"
 	"github.com/averix/api/internal/matching"
@@ -24,6 +25,8 @@ import (
 	"github.com/averix/api/internal/platform/database"
 	"github.com/averix/api/internal/platform/httpx"
 	"github.com/averix/api/internal/platform/storage"
+	"github.com/averix/api/internal/portfolio"
+	"github.com/averix/api/internal/preview"
 	"github.com/averix/api/internal/projects"
 	"github.com/averix/api/internal/proposals"
 	"github.com/averix/api/internal/security"
@@ -53,6 +56,8 @@ type App struct {
 	Matching    *matching.Store
 	Projects    *projects.Service
 	Proposals   *proposals.Service
+	Files       *files.Store
+	Portfolio   *portfolio.Service
 	AI          *aiclient.Client
 	GitHub      *githubint.Service
 
@@ -96,6 +101,12 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	ai := aiclient.New(cfg.AI)
 	githubStore := githubint.NewStore(db, sealer)
 	githubOAuth := githubint.NewOAuth(cfg.GitHub, db)
+	fileStore := files.NewStore(db, store)
+	portfolioStore := portfolio.NewStore(db, store.PublicURL)
+	// The prober is the only thing in the product that fetches an address a
+	// user supplied, and it does so through the SSRF-safe dialler. Development
+	// is the only environment where a loopback preview is possible at all.
+	prober := preview.NewProber(cfg.AppURL, cfg.Env.IsDevelopment())
 
 	a := &App{
 		Cfg:         cfg,
@@ -119,6 +130,10 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		// interfaces are nil until then, and every call site checks.
 		Proposals: proposals.NewService(proposalStore, matchingStore, recorder,
 			settingsStore, nil, nil, nil),
+		Files: fileStore,
+		Portfolio: portfolio.NewService(portfolioStore,
+			portfolio.NewScreenshots(portfolioStore, fileStore, store, cfg.Limits.MaxImageBytes),
+			taxonomyStore, prober, recorder, cfg.Env.IsDevelopment()),
 		AI: ai,
 		GitHub: githubint.NewService(githubStore, githubOAuth, cfg, ai, recorder,
 			redis, matchingStore, nil),
@@ -216,6 +231,21 @@ func (a *App) Handler() http.Handler {
 		// guard, which protects the endpoint rather than the marketplace.
 		RateLimitWrite: a.AuthMW.RateLimitOnSuccess("proposal_submit", 20, time.Hour),
 	})
+
+	portfolio.NewHandlers(a.Portfolio, a.Cfg.Limits.MaxImageBytes).
+		Register(v1, portfolio.Middleware{
+			Require:         a.AuthMW.Require(),
+			CSRF:            a.AuthMW.CSRF(),
+			RequireDev:      a.AuthMW.RequireRole(security.RoleDeveloper),
+			RateLimitUpload: a.AuthMW.RateLimit("portfolio_upload", 60, time.Hour),
+			// A probe is an outbound request on our address, so it is the
+			// tightest allowance in the product.
+			RateLimitProbe: a.AuthMW.RateLimit("portfolio_probe", 20, time.Hour),
+		})
+
+	// Object serving. Registered under /api/v1 because that is where the
+	// filesystem driver's URLs point by default.
+	files.NewHandlers(a.Storage).Register(v1)
 
 	githubint.NewHandlers(a.GitHub).Register(v1, githubint.Middleware{
 		Require:    a.AuthMW.Require(),
