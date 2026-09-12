@@ -286,6 +286,52 @@ if ! docker compose -f "$COMPOSE_FILE" up -d; then
   fail "Fix what the logs above report, then run ./install.sh again."
 fi
 
+# ── 4b. Does the stack's own network have a way out? ────────────────────────
+#
+# The DNS probe earlier runs on Docker's default bridge. The stack runs on a
+# network of its own, and the two are not the same thing: a project network
+# created while the daemon was still misconfigured can come up without the
+# rules that give it a route off the host. Every container on it then gets
+# "network is unreachable" while the probe on the default bridge passes
+# happily — and the only symptom is Caddy never obtaining a certificate,
+# hours later, in a log nobody is reading.
+#
+# Recreating the network is what fixes it, and `down` plus `up` is exactly
+# that. It costs a few seconds and no data: everything durable is in volumes.
+
+project_network() {
+  container="$(docker compose -f "$COMPOSE_FILE" ps -q caddy 2>/dev/null | head -1)"
+  [ -n "$container" ] || container="$(docker compose -f "$COMPOSE_FILE" ps -q web 2>/dev/null | head -1)"
+  [ -n "$container" ] || return 0
+  docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' \
+    "$container" 2>/dev/null | head -1
+}
+
+network_has_egress() {
+  docker run --rm --pull=never --network "$1" alpine:3 \
+    sh -c 'nslookup acme-v02.api.letsencrypt.org >/dev/null 2>&1' >/dev/null 2>&1
+}
+
+if docker image inspect alpine:3 >/dev/null 2>&1; then
+  network="$(project_network)"
+  if [ -n "$network" ] && ! network_has_egress "$network"; then
+    warn "The stack's network ($network) has no route to the internet."
+    echo "   Recreating it. Nothing is lost: the data is in volumes."
+    docker compose -f "$COMPOSE_FILE" down >/dev/null 2>&1 || true
+    docker compose -f "$COMPOSE_FILE" up -d
+
+    network="$(project_network)"
+    if [ -n "$network" ] && network_has_egress "$network"; then
+      ok "Fixed: the stack can reach the internet"
+    else
+      warn "It still cannot. Without this no certificate can be issued."
+      echo "   Usually a firewall dropping forwarded traffic:"
+      echo "     iptables -P FORWARD ACCEPT"
+      echo "     ufw default allow routed        # if ufw is in use"
+    fi
+  fi
+fi
+
 # ── 5. Wait until it actually answers ───────────────────────────────────────
 
 bold "Waiting for the stack to become ready"
