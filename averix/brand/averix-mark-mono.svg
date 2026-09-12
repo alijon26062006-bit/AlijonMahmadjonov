@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 336 463" width="336" height="463" role="img" aria-label="AVERIX">
+  <title>AVERIX</title>
+  <!-- Single-colour variant for embossing, favicons and low-colour contexts. Inherits currentColor. -->
+  <g fill="currentColor">
+    <polygon points="134,0 214,0 148,144 71,144"/>
+    <polygon points="35,233 300,233 330,302 6,302"/>
+    <polygon points="30,393 307,393 336,463 0,463"/>
+  </g>
+</svg>

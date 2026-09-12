@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Build output
+.next/
+out/
+dist/
+build/
+/services/api-go/bin/
+*.test
+
+# Local environment — never commit a real .env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Local object storage (filesystem driver, development only)
+.storage/
+
+# Tooling caches
+.turbo/
+.eslintcache
+coverage/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+playwright-report/
+test-results/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
