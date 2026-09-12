@@ -9,14 +9,19 @@ package testsupport
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/averix/api/internal/app"
 	"github.com/averix/api/internal/config"
@@ -37,9 +42,22 @@ type Harness struct {
 func New(t *testing.T) *Harness {
 	t.Helper()
 
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
+	base := os.Getenv("TEST_DATABASE_URL")
+	if base == "" {
 		t.Skip("TEST_DATABASE_URL is not set; skipping integration test")
+	}
+
+	// Each test package gets its own database.
+	//
+	// `go test ./...` runs packages in parallel, and the harness truncates the
+	// tables it owns between tests. Sharing one database means two packages
+	// delete each other's fixtures mid-test — which passes when each package
+	// is run alone and fails in CI, the worst possible failure mode. A
+	// database per package removes the interference rather than papering over
+	// it with `-p 1`.
+	dsn, err := databaseForPackage(base)
+	if err != nil {
+		t.Fatalf("prepare per-package test database: %v", err)
 	}
 
 	// The environment the application reads is set here rather than in each
@@ -66,15 +84,15 @@ func New(t *testing.T) *Harness {
 		t.Setenv(k, v)
 	}
 
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("load test configuration: %v", err)
+	cfg, loadErr := config.Load()
+	if loadErr != nil {
+		t.Fatalf("load test configuration: %v", loadErr)
 	}
 
 	ctx := context.Background()
-	application, err := app.Build(ctx, cfg)
-	if err != nil {
-		t.Fatalf("build application: %v", err)
+	application, buildErr := app.Build(ctx, cfg)
+	if buildErr != nil {
+		t.Fatalf("build application: %v", buildErr)
 	}
 
 	if _, err := application.DB.Migrate(ctx); err != nil {
@@ -234,4 +252,225 @@ func (h *Harness) ObjectExists(key string, vis storage.Visibility) bool {
 	h.T.Helper()
 	ok, err := h.App.Storage.Exists(context.Background(), key, vis)
 	return err == nil && ok
+}
+
+// ── Fixtures ────────────────────────────────────────────────────────────────
+
+// Developer is a signed-in developer with a published profile.
+type Developer struct {
+	Client   *Client
+	Username string
+	UserID   string
+}
+
+// PublishDeveloper runs the whole onboarding flow, so tests that need a
+// searchable developer do not each repeat nine requests.
+func (h *Harness) PublishDeveloper(username, specialisation string, technologies ...string) *Developer {
+	h.T.Helper()
+
+	c := h.Client()
+	c.RegisterDeveloper(username)
+
+	c.PUT("/developers/me/basics", map[string]any{
+		"full_name": "Test " + username, "country_code": "TJ", "city": "Dushanbe",
+		"languages": []map[string]string{{"language": "English", "proficiency": "fluent"}},
+	}).OK(h.T, 200)
+	c.PUT("/developers/me/specialisation", map[string]any{"slug": specialisation}).OK(h.T, 200)
+
+	if len(technologies) == 0 {
+		technologies = []string{"go", "postgresql", "docker"}
+	}
+	entries := make([]map[string]any, 0, len(technologies))
+	for _, slug := range technologies {
+		entries = append(entries, map[string]any{"slug": slug, "level": "strong"})
+	}
+	c.PUT("/developers/me/technologies", map[string]any{"technologies": entries}).OK(h.T, 200)
+	c.PUT("/developers/me/experience", map[string]any{
+		"experience_level": "senior", "years_experience": 6,
+		"hourly_rate_minor": 3000, "currency": "USD",
+	}).OK(h.T, 200)
+	c.PUT("/developers/me/availability", map[string]any{
+		"availability": "available", "hours_per_week": 35,
+		"show_location": true, "show_hourly_rate": true,
+	}).OK(h.T, 200)
+	c.PUT("/developers/me/bio", map[string]any{
+		"bio": "I build backend systems and integrations, mostly APIs backed by " +
+			"PostgreSQL. I have shipped payment flows and admin panels, and I care " +
+			"about migrations that run safely and errors that say something useful.",
+	}).OK(h.T, 200)
+
+	h.Verify(username)
+	c.POST("/developers/me/finish", nil).OK(h.T, 200)
+
+	return &Developer{Client: c, Username: username, UserID: c.UserID()}
+}
+
+// ClientAccount is a signed-in client with a confirmed address.
+type ClientAccount struct {
+	Client   *Client
+	Username string
+	UserID   string
+}
+
+// NewClient registers a client and confirms their email, which publishing a
+// project requires.
+func (h *Harness) NewClient(username string) *ClientAccount {
+	h.T.Helper()
+	c := h.Client()
+	c.RegisterClient(username)
+	h.Verify(username)
+	// The session caches nothing, but the identity is re-resolved per request,
+	// so the confirmed address is visible immediately.
+	return &ClientAccount{Client: c, Username: username, UserID: c.UserID()}
+}
+
+// Verify marks an account's email address confirmed.
+func (h *Harness) Verify(username string) {
+	h.T.Helper()
+	h.Exec(`UPDATE users SET email_verified_at = now() WHERE username = $1`, username)
+}
+
+// PublishProject creates and publishes a project for a client, returning its id.
+func (h *Harness) PublishProject(c *ClientAccount, title, categorySlug string,
+	required []string, budgetMin, budgetMax int64) string {
+	h.T.Helper()
+
+	res := c.Client.POST("/projects", map[string]any{
+		"title":            title,
+		"description":      "We need this built properly. " + title + ". The scope is clear and the timeline is real.",
+		"category_slug":    categorySlug,
+		"required_skills":  required,
+		"budget_type":      "range",
+		"budget_min_minor": budgetMin,
+		"budget_max_minor": budgetMax,
+		"currency":         "USD",
+		"duration_days":    14,
+		"publish":          true,
+	}).OK(h.T, 201)
+
+	id := res.String("id")
+	if id == "" {
+		h.T.Fatalf("project creation returned no id: %s", res.Raw)
+	}
+	if res.String("status") != "open" {
+		h.T.Fatalf("project status = %q, want open", res.String("status"))
+	}
+	return id
+}
+
+// SetSetting changes a platform setting for the duration of one test and
+// restores it afterwards.
+//
+// It goes through the store's own Set, which invalidates the cache: writing
+// the row directly would leave the previous value cached for up to thirty
+// seconds and make the test flaky rather than failing.
+func (h *Harness) SetSetting(key string, value any) {
+	h.T.Helper()
+	ctx := context.Background()
+
+	var previous json.RawMessage
+	existed := true
+	if err := h.DB.QueryRow(ctx,
+		`SELECT value FROM platform_settings WHERE key = $1`, key).Scan(&previous); err != nil {
+		existed = false
+	}
+
+	if err := h.App.Settings.Set(ctx, key, value, uuid.Nil); err != nil {
+		h.T.Fatalf("set platform setting %s: %v", key, err)
+	}
+
+	h.T.Cleanup(func() {
+		restoreCtx := context.Background()
+		if !existed {
+			_, _ = h.DB.Exec(restoreCtx, `DELETE FROM platform_settings WHERE key = $1`, key)
+		} else {
+			var decoded any
+			if err := json.Unmarshal(previous, &decoded); err == nil {
+				_ = h.App.Settings.Set(restoreCtx, key, decoded, uuid.Nil)
+			}
+		}
+	})
+}
+
+// databaseForPackage returns a DSN pointing at a database named after the test
+// binary, creating it if it does not exist.
+//
+// The name comes from the binary rather than from a caller's file path so that
+// every test in a package shares one database and no two packages share any.
+func databaseForPackage(base string) (string, error) {
+	parsed, err := url.Parse(base)
+	if err != nil {
+		return "", fmt.Errorf("parse TEST_DATABASE_URL: %w", err)
+	}
+
+	suffix := packageSuffix()
+	if suffix == "" {
+		return base, nil
+	}
+	name := strings.TrimPrefix(parsed.Path, "/") + "_" + suffix
+	// PostgreSQL truncates identifiers at 63 bytes; a silently truncated name
+	// could collide with another package's.
+	if len(name) > 60 {
+		name = name[:60]
+	}
+
+	// Connect to the server's default database to issue CREATE DATABASE, which
+	// cannot run inside a transaction or against the database being created.
+	admin := *parsed
+	admin.Path = "/postgres"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	adminDB, err := database.Connect(ctx, config.Database{
+		URL: admin.String(), MaxConns: 2, MinConns: 1,
+		MaxConnLifetime: time.Minute, MaxConnIdleTime: time.Minute,
+		StatementTimeout: 15 * time.Second,
+	})
+	if err != nil {
+		// No permission to create databases: fall back to the shared one. The
+		// suite still runs, and `-p 1` makes it reliable.
+		return base, nil
+	}
+	defer adminDB.Close()
+
+	var exists bool
+	if err := adminDB.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)`, name).Scan(&exists); err != nil {
+		return base, nil
+	}
+	if !exists {
+		// A concurrent creation is not an error: whichever call wins, the
+		// database exists afterwards.
+		if _, err := adminDB.Exec(ctx, `CREATE DATABASE "`+name+`"`); err != nil &&
+			!strings.Contains(err.Error(), "already exists") {
+			return base, nil
+		}
+	}
+
+	out := *parsed
+	out.Path = "/" + name
+	return out.String(), nil
+}
+
+// packageSuffix derives a short identifier from the test binary's name.
+func packageSuffix() string {
+	binary := filepath.Base(os.Args[0])
+	binary = strings.TrimSuffix(binary, ".test")
+	binary = strings.TrimSuffix(binary, ".exe")
+
+	var b strings.Builder
+	for _, r := range strings.ToLower(binary) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '_', r == '-', r == '.':
+			b.WriteByte('_')
+		}
+	}
+	out := b.String()
+	if out == "" || out == "main" {
+		return ""
+	}
+	return out
 }

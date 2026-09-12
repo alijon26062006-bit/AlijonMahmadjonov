@@ -16,12 +16,16 @@ import (
 	"github.com/averix/api/internal/config"
 	"github.com/averix/api/internal/developers"
 	"github.com/averix/api/internal/health"
+	"github.com/averix/api/internal/matching"
 	"github.com/averix/api/internal/platform/cache"
 	"github.com/averix/api/internal/platform/cryptox"
 	"github.com/averix/api/internal/platform/database"
 	"github.com/averix/api/internal/platform/httpx"
 	"github.com/averix/api/internal/platform/storage"
+	"github.com/averix/api/internal/projects"
+	"github.com/averix/api/internal/proposals"
 	"github.com/averix/api/internal/security"
+	"github.com/averix/api/internal/settings"
 	"github.com/averix/api/internal/taxonomy"
 )
 
@@ -43,6 +47,10 @@ type App struct {
 	Developers  *developers.Service
 	Photos      *developers.PhotoService
 	Clients     *clients.Service
+	Settings    *settings.Store
+	Matching    *matching.Store
+	Projects    *projects.Service
+	Proposals   *proposals.Service
 
 	redisStartupError error
 }
@@ -77,6 +85,10 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	authStore := auth.NewStore(db)
 	taxonomyStore := taxonomy.NewStore(db)
 	developerStore := developers.NewStore(db, store.PublicURL)
+	settingsStore := settings.NewStore(db)
+	matchingStore := matching.NewStore(db)
+	projectStore := projects.NewStore(db)
+	proposalStore := proposals.NewStore(db, store.PublicURL)
 
 	a := &App{
 		Cfg:         cfg,
@@ -92,6 +104,14 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		Developers:  developers.NewService(developerStore, taxonomyStore, recorder),
 		Photos:      developers.NewPhotoService(developerStore, store, cfg.Limits.MaxImageBytes),
 		Clients:     clients.NewService(clients.NewStore(db)),
+		Settings:    settingsStore,
+		Matching:    matchingStore,
+		Projects: projects.NewService(projectStore, taxonomyStore, matchingStore,
+			recorder, settingsStore),
+		// Fees, moderation and notifications arrive in later phases; the
+		// interfaces are nil until then, and every call site checks.
+		Proposals: proposals.NewService(proposalStore, matchingStore, recorder,
+			settingsStore, nil, nil, nil),
 	}
 	a.redisStartupError = redisErr
 	return a, nil
@@ -155,6 +175,26 @@ func (a *App) Handler() http.Handler {
 		Require:       a.AuthMW.Require(),
 		CSRF:          a.AuthMW.CSRF(),
 		RequireClient: a.AuthMW.RequireRole(security.RoleClient),
+	})
+
+	projects.NewHandlers(a.Projects).Register(v1, projects.Middleware{
+		Require:        a.AuthMW.Require(),
+		CSRF:           a.AuthMW.CSRF(),
+		RequireClient:  a.AuthMW.RequireRole(security.RoleClient),
+		RequireDev:     a.AuthMW.RequireRole(security.RoleDeveloper),
+		VerifiedEmail:  a.AuthMW.RequireVerifiedEmail(),
+		RateLimitWrite: a.AuthMW.RateLimitOnSuccess("project_create", 20, time.Hour),
+	})
+
+	proposals.NewHandlers(a.Proposals, a.Projects.Store()).Register(v1, proposals.Middleware{
+		Require:       a.AuthMW.Require(),
+		CSRF:          a.AuthMW.CSRF(),
+		RequireClient: a.AuthMW.RequireRole(security.RoleClient),
+		RequireDev:    a.AuthMW.RequireRole(security.RoleDeveloper),
+		VerifiedEmail: a.AuthMW.RequireVerifiedEmail(),
+		// The durable per-day cap lives in the service; this is the burst
+		// guard, which protects the endpoint rather than the marketplace.
+		RateLimitWrite: a.AuthMW.RateLimitOnSuccess("proposal_submit", 20, time.Hour),
 	})
 
 	return r
