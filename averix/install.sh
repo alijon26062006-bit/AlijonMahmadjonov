@@ -217,7 +217,21 @@ bold "Building images (a few minutes the first time)"
 docker compose -f "$COMPOSE_FILE" build --pull
 
 bold "Starting"
-docker compose -f "$COMPOSE_FILE" up -d
+if ! docker compose -f "$COMPOSE_FILE" up -d; then
+  # Compose reports which service failed but not why, and the container it
+  # names has usually already gone. Print the logs here so the reason is on
+  # screen instead of one more command away.
+  echo
+  warn "The stack did not come up. The logs of the services that failed:"
+  for service in migrate api worker ai web caddy postgres redis; do
+    logs="$(docker compose -f "$COMPOSE_FILE" logs --no-color --tail 30 "$service" 2>/dev/null || true)"
+    if [ -n "$logs" ]; then
+      printf '\n----- %s -----\n%s\n' "$service" "$logs"
+    fi
+  done
+  echo
+  fail "Fix what the logs above report, then run ./install.sh again."
+fi
 
 # ── 5. Wait until it actually answers ───────────────────────────────────────
 

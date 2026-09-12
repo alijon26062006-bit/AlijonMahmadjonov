@@ -189,8 +189,12 @@ deterministically from manifests, and every generated field reports that it
 was not generated.
 
 **Object storage** — with one server, uploads live in a Docker volume and the
-backup script includes them. For more than one server, set `S3_DRIVER=s3` and
-the `S3_*` values; any S3-compatible provider works.
+backup script includes them. `STORAGE_ROOT` must be an absolute path — the
+compose file mounts the volume at `/data/storage` and the API refuses to start
+in production with a relative one, because a relative path writes inside the
+container and every upload would disappear on the next deployment. For more
+than one server, set `S3_DRIVER=s3` and the `S3_*` values; any S3-compatible
+provider works.
 
 **A payment gateway** — `PAYMENTS_DEFAULT_PROVIDER=manual` means bank transfer
 confirmed by an administrator, which needs no gateway at all. See

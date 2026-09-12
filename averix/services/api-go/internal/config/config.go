@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -289,8 +290,14 @@ func Load() (*Config, error) {
 
 	switch cfg.Storage.Driver {
 	case "filesystem":
-		if env.IsProduction() {
-			note("S3_DRIVER=filesystem is not supported in production; configure S3-compatible storage")
+		// A single server keeping uploads on a mounted volume is a legitimate
+		// deployment, and it is what the production compose file does. What is
+		// not legitimate is landing on the relative development default in
+		// production: that writes inside the container, so every upload
+		// disappears on the next deployment. Requiring an absolute path makes
+		// the operator name a directory they can mount and back up.
+		if env.IsProduction() && !filepath.IsAbs(cfg.Storage.Root) {
+			note("STORAGE_ROOT must be an absolute path on persistent storage when S3_DRIVER=filesystem in production (got %q)", cfg.Storage.Root)
 		}
 	case "s3":
 		if cfg.Storage.Endpoint == "" {

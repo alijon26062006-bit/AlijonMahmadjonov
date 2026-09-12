@@ -121,6 +121,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       AI_SERVICE_URL: http://ai:8000
     entrypoint: ['/usr/local/bin/averix-worker']
+    volumes:
+      # The same volume the API writes uploads to. The worker deletes the
+      # orphaned ones, and it cannot delete bytes it cannot see.
+      - averix-storage:/data/storage
     depends_on:
       migrate: { condition: service_completed_successfully }
     logging: *logging
