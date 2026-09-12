@@ -1,7 +1,15 @@
 # Putting AVERIX on a server
 
-One server, one command, HTTPS included. Everything below is the real
-procedure — copy and paste it.
+One server, one command, HTTPS included.
+
+```bash
+git clone <this repository> /srv/averix && cd /srv/averix
+./install.sh
+```
+
+That covers everything in the next three sections: Docker, the secrets, the
+build, the migrations and the certificate. The rest of this page is what the
+installer does, for when you want to do it yourself or something goes wrong.
 
 ## What you need
 
@@ -27,7 +35,7 @@ git clone https://github.com/YOUR-ACCOUNT/YOUR-REPO.git averix
 cd averix
 ```
 
-## 2. Configure it
+## 2. Configure it (the installer does this for you)
 
 ```bash
 cp .env.example .env
@@ -44,10 +52,10 @@ nano .env
 In the editor, set these four and save:
 
 ```
-AVERIX_DOMAIN=averix.example          # your domain, no https://
+AVERIX_DOMAIN=averix.dev          # your domain, no https://
 ACME_EMAIL=you@example.com            # certificate expiry warnings go here
-APP_URL=https://averix.example
-API_URL=https://averix.example
+APP_URL=https://averix.dev
+API_URL=https://averix.dev
 ```
 
 Then delete the placeholder lines that `openssl` replaced (the ones still
@@ -57,7 +65,7 @@ reading `replace-with-…`), so each value appears once.
 > Changing it later makes them unreadable. COOKIE_SECRET can be rotated —
 > everyone is simply signed out.
 
-## 3. Start it
+## 3. Start it (the installer does this for you)
 
 ```bash
 docker compose -f docker-compose.production.yml up -d --build

@@ -64,7 +64,8 @@
 	}
 }
 
-# Uncomment to serve the bare domain as well as www, or the other way round.
-# www.{$AVERIX_DOMAIN} {
-# 	redir https://{$AVERIX_DOMAIN}{uri} permanent
-# }
+# www goes to the bare domain, keeping the path. One canonical address means
+# one set of cookies and one set of search results.
+www.{$AVERIX_DOMAIN} {
+	redir https://{$AVERIX_DOMAIN}{uri} permanent
+}

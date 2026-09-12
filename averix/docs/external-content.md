@@ -60,7 +60,7 @@ make the verdict meaningless.
 reads the framing headers. `Content-Security-Policy: frame-ancestors` takes
 precedence over `X-Frame-Options`, because that is what browsers do. A site
 that names our origin in `frame-ancestors` is honoured as permission; scheme
-comparison is exact, so `http://averix.example` does not match an `https`
+comparison is exact, so `http://averix.dev` does not match an `https`
 origin.
 
 **A refusal is final.** If a site sends `X-Frame-Options: DENY` or a

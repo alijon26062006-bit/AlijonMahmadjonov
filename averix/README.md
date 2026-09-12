@@ -18,7 +18,15 @@ scripts/            Token build, reference-data sync, demo seed
 
 ## Running it locally
 
-You need PostgreSQL 16, Redis 7, Go 1.25 and Node 22.
+With Docker, one command:
+
+```bash
+./install.sh --dev        # http://localhost:3000
+node scripts/seed-demo.mjs
+```
+
+Or without Docker, if you want the services in your own terminal — you need
+PostgreSQL 16, Redis 7, Go 1.25 and Node 22.
 
 ```bash
 # 1. Database and cache
@@ -64,18 +72,27 @@ Accounts it creates all use the password `correct horse battery staple`:
 
 ## Putting it on a server
 
-One server, one command, HTTPS included:
+On a bare Ubuntu server whose DNS already points at it:
 
 ```bash
 git clone <this repository> /srv/averix && cd /srv/averix
-cp .env.example .env && nano .env      # domain, email, three generated secrets
-docker compose -f docker-compose.production.yml up -d --build
+./install.sh
 ```
 
-Migrations run before the API starts, Caddy gets the certificate itself, and
-`/ready` reports every dependency by name. The whole procedure, including
-backups, the first administrator and what to do when something is wrong, is in
-[`docs/deployment.md`](docs/deployment.md).
+That is the whole thing. It installs Docker if the machine lacks it, generates
+the secrets, writes `.env` for **averix.dev**, builds the images, applies every
+migration, starts the stack and waits until the site answers. Caddy gets the
+HTTPS certificate itself. Running it again is how you deploy a new version —
+existing secrets are kept.
+
+```bash
+./install.sh --domain averix.dev --email you@averix.dev   # a different domain
+./install.sh --dev                                        # localhost, no certificate
+make help                                                 # the day-to-day commands
+```
+
+The full procedure — backups, the first administrator, what to do when
+something is wrong — is in [`docs/deployment.md`](docs/deployment.md).
 
 ## Tests
 
