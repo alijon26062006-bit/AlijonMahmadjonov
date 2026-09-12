@@ -220,6 +220,21 @@ docker compose -f docker-compose.production.yml exec api averixctl migrate statu
 internet and the A record already pointing here. Check with
 `dig +short your-domain` and `docker compose logs caddy`.
 
+**The build fails with `i/o timeout` fetching a dependency.** DNS works on
+the host but not inside containers — common on VPS images whose provider
+resolver ignores NAT'd traffic. `./install.sh` detects and fixes this now; by
+hand it is:
+
+```bash
+cat > /etc/docker/daemon.json <<'JSON'
+{ "dns": ["1.1.1.1", "8.8.8.8"] }
+JSON
+systemctl restart docker
+```
+
+If it still fails, a firewall is dropping forwarded traffic:
+`iptables -P FORWARD ACCEPT`, or with ufw, `ufw default allow routed`.
+
 **The API restarts in a loop.** Almost always a missing or too-short secret —
 it refuses to start rather than falling back to a default.
 `docker compose logs api` names the variable.

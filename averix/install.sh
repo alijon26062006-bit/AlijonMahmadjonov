@@ -60,6 +60,90 @@ if ! docker info >/dev/null 2>&1; then
   fail "The Docker daemon is not running. Start it with: systemctl start docker"
 fi
 
+# ── 1b. Container DNS ───────────────────────────────────────────────────────
+#
+# A build resolves names from inside the container, not from the host. On a
+# good many VPS images those are different things: the host talks to its
+# provider's resolver happily while the container's NAT'd traffic is dropped
+# or ignored, and every build dies on "i/o timeout" fetching dependencies.
+#
+# This checks it before spending ten minutes finding out, and fixes it by
+# giving the daemon public resolvers — the same thing an operator would do by
+# hand, written down so nobody has to know it.
+
+dns_works() {
+  docker run --rm --pull=never alpine:3 \
+    sh -c 'nslookup proxy.golang.org >/dev/null 2>&1 || getent hosts proxy.golang.org >/dev/null 2>&1' \
+    >/dev/null 2>&1
+}
+
+bold "Checking DNS inside containers"
+if ! docker image inspect alpine:3 >/dev/null 2>&1; then
+  docker pull -q alpine:3 >/dev/null 2>&1 || true
+fi
+
+if ! docker image inspect alpine:3 >/dev/null 2>&1; then
+  # Without the probe image there is nothing to test with. Saying so beats
+  # "fixing" DNS on the strength of a failed image pull.
+  warn "Could not fetch the probe image, so container DNS was not checked."
+  warn "If the build fails with \"i/o timeout\" on a dependency, this is why."
+elif dns_works; then
+  ok "Containers can resolve names"
+else
+  warn "Containers cannot resolve names — builds would fail fetching dependencies."
+  echo "   Pointing the Docker daemon at public resolvers (1.1.1.1, 8.8.8.8)…"
+
+  python3 - <<'PYEOF'
+import json, os
+
+path = '/etc/docker/daemon.json'
+config = {}
+if os.path.exists(path):
+    try:
+        with open(path) as handle:
+            config = json.load(handle) or {}
+    except ValueError:
+        # A hand-edited file with a trailing comma should not cost someone
+        # their other daemon settings silently: keep it and say so.
+        backup = path + '.broken'
+        os.rename(path, backup)
+        print(f'   the existing {path} was not valid JSON; kept as {backup}')
+        config = {}
+
+# Only the resolvers are set. Anything else already configured is preserved.
+config['dns'] = ['1.1.1.1', '8.8.8.8']
+os.makedirs('/etc/docker', exist_ok=True)
+with open(path, 'w') as handle:
+    json.dump(config, handle, indent=2)
+    handle.write('\n')
+PYEOF
+
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl restart docker
+  else
+    service docker restart
+  fi
+
+  # The daemon takes a moment to come back.
+  for _ in $(seq 1 20); do
+    docker info >/dev/null 2>&1 && break
+    sleep 1
+  done
+
+  if dns_works; then
+    ok "Fixed: containers can resolve names now"
+  else
+    warn "Containers still cannot resolve names."
+    echo "   Two things to check on this server:"
+    echo "     1. A firewall dropping forwarded traffic:"
+    echo "          iptables -P FORWARD ACCEPT"
+    echo "          ufw default allow routed        # if ufw is in use"
+    echo "     2. Whether the host itself resolves:"
+    echo "          getent hosts proxy.golang.org"
+    fail "Fix DNS for containers, then run ./install.sh again."
+  fi
+fi
+
 # ── 2. Configuration ────────────────────────────────────────────────────────
 
 secret() { openssl rand -hex 32; }
