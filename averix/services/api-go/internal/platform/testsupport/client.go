@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -368,4 +369,23 @@ func (c *Client) Raw(method, path string, body []byte) *Response {
 		c.t.Fatalf("read response body: %v", err)
 	}
 	return &Response{Status: resp.StatusCode, Raw: raw, Header: resp.Header}
+}
+
+// Cookies returns the session cookies this client holds, so a test can open a
+// WebSocket with the same session the HTTP calls use.
+func (c *Client) Cookies() []*http.Cookie {
+	parsed, err := url.Parse(c.h.Server.URL)
+	if err != nil {
+		c.t.Fatalf("parse server URL: %v", err)
+	}
+	return c.http.Jar.Cookies(parsed)
+}
+
+// CookieHeader renders those cookies as a request header value.
+func (c *Client) CookieHeader() string {
+	var parts []string
+	for _, cookie := range c.Cookies() {
+		parts = append(parts, cookie.Name+"="+cookie.Value)
+	}
+	return strings.Join(parts, "; ")
 }

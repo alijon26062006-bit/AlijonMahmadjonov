@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -105,9 +106,35 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 	return n, err
 }
 
-// Unwrap lets http.ResponseController reach the underlying writer, which the
-// WebSocket hijack and SSE flushing need.
+// Unwrap lets http.ResponseController reach the underlying writer, which SSE
+// flushing needs.
 func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
+
+// Hijack passes the connection through to the WebSocket upgrade.
+//
+// Unwrap alone is not enough: the upgrade asserts http.Hijacker on the writer
+// it is handed, and a wrapper that only implements Unwrap fails that assertion
+// — which shows up as "bad handshake" on the client with nothing in the log.
+func (s *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := s.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("the underlying writer does not support hijacking")
+	}
+	// The status is recorded here because a hijacked connection never calls
+	// WriteHeader, and the access log would otherwise report a zero.
+	if !s.wrote {
+		s.status = http.StatusSwitchingProtocols
+		s.wrote = true
+	}
+	return hijacker.Hijack()
+}
+
+// Flush passes a flush through, for a streamed response.
+func (s *statusRecorder) Flush() {
+	if flusher, ok := s.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
 
 // Recover turns a panic into a 500 with the stack in the log, so one bad
 // request cannot take the process down.

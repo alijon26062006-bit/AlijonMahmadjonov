@@ -833,3 +833,104 @@ func nullIfBlank(s string) any {
 	}
 	return s
 }
+
+// ── Acceptance ──────────────────────────────────────────────────────────────
+
+// Acceptance is everything a proposal contributes to a contract at signature.
+//
+// Read in one query and handed over as a value: the contract copies these
+// terms rather than referencing the proposal, so editing or withdrawing a
+// proposal later cannot rewrite a live agreement.
+type Acceptance struct {
+	ProposalID    uuid.UUID
+	ProjectID     uuid.UUID
+	ProjectTitle  string
+	ProjectStatus string
+	ClientID      uuid.UUID
+	DeveloperID   uuid.UUID
+	Status        string
+	AmountMinor   int64
+	Currency      string
+	DeliveryDays  int
+	Milestones    []AcceptanceMilestone
+}
+
+type AcceptanceMilestone struct {
+	Position    int
+	Title       string
+	Detail      string
+	AmountMinor int64
+	Days        *int
+}
+
+func (s *Store) AcceptanceFacts(ctx context.Context, proposalID uuid.UUID) (Acceptance, error) {
+	var a Acceptance
+	a.ProposalID = proposalID
+	err := s.db.QueryRow(ctx, `
+		SELECT pr.project_id, pj.title, pj.status, pj.client_id, pr.developer_id,
+		       pr.status, pr.amount_minor, pr.currency, pr.delivery_days
+		FROM proposals pr JOIN projects pj ON pj.id = pr.project_id
+		WHERE pr.id = $1`, proposalID).
+		Scan(&a.ProjectID, &a.ProjectTitle, &a.ProjectStatus, &a.ClientID,
+			&a.DeveloperID, &a.Status, &a.AmountMinor, &a.Currency, &a.DeliveryDays)
+	if database.IsNoRows(err) {
+		return a, ErrNotFound
+	}
+	if err != nil {
+		return a, fmt.Errorf("load acceptance facts: %w", err)
+	}
+
+	rows, err := s.db.Query(ctx, `
+		SELECT position, title, coalesce(detail, ''), amount_minor, days
+		FROM proposal_milestones WHERE proposal_id = $1 ORDER BY position`, proposalID)
+	if err != nil {
+		return a, fmt.Errorf("load proposed milestones: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var m AcceptanceMilestone
+		if err := rows.Scan(&m.Position, &m.Title, &m.Detail, &m.AmountMinor, &m.Days); err != nil {
+			return a, err
+		}
+		a.Milestones = append(a.Milestones, m)
+	}
+	return a, rows.Err()
+}
+
+// MarkAccepted closes the proposal against a signed contract.
+//
+// The status is part of the WHERE clause, so two clients clicking accept on
+// two proposals at the same moment cannot both succeed on the same project:
+// the second writes nothing and the caller learns it raced.
+func (s *Store) MarkAccepted(ctx context.Context, proposalID, contractID uuid.UUID) error {
+	tag, err := s.db.Exec(ctx, `
+		UPDATE proposals SET status = 'accepted', responded_at = now(), updated_at = now()
+		WHERE id = $1 AND status IN ('submitted','viewed','shortlisted')`, proposalID)
+	if err != nil {
+		return fmt.Errorf("accept proposal: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("proposal is no longer open")
+	}
+	return nil
+}
+
+// DeclineOthers closes the remaining live proposals on a hired project.
+//
+// With a reason, and it is the honest one: a developer whose proposal sits
+// unanswered for weeks stops writing them, and "the client hired someone else"
+// is information they can act on.
+func (s *Store) DeclineOthers(ctx context.Context, projectID, acceptedID uuid.UUID,
+	reason string) (int, error) {
+
+	tag, err := s.db.Exec(ctx, `
+		UPDATE proposals SET status = 'declined', decline_reason = $3,
+		                     responded_at = now(), updated_at = now()
+		WHERE project_id = $1 AND id <> $2
+		  AND status IN ('submitted','viewed','shortlisted')`,
+		projectID, acceptedID, nullIfBlank(reason))
+	if err != nil {
+		return 0, fmt.Errorf("decline remaining proposals: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}

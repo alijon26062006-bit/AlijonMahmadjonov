@@ -19,7 +19,16 @@ type Router struct {
 }
 
 func NewRouter() *Router {
-	return &Router{mux: http.NewServeMux()}
+	r := &Router{mux: http.NewServeMux()}
+	// An unmatched path answers in the API's own envelope. Without this, Go's
+	// ServeMux writes a plain-text "404 page not found", so a client that
+	// mistypes a path gets a body in a different shape from every other error
+	// — which is exactly the kind of inconsistency an API client cannot code
+	// against.
+	r.mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		WriteError(w, req, NotFoundf("no route for %s %s", req.Method, req.URL.Path))
+	})
+	return r
 }
 
 // Group returns a router that prefixes paths and appends middleware. The parent

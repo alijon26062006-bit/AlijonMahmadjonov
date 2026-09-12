@@ -10,16 +10,20 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/averix/api/internal/aiclient"
 	"github.com/averix/api/internal/audit"
 	"github.com/averix/api/internal/auth"
 	"github.com/averix/api/internal/clients"
 	"github.com/averix/api/internal/config"
+	"github.com/averix/api/internal/contracts"
 	"github.com/averix/api/internal/developers"
 	"github.com/averix/api/internal/files"
 	"github.com/averix/api/internal/githubint"
 	"github.com/averix/api/internal/health"
 	"github.com/averix/api/internal/matching"
+	"github.com/averix/api/internal/messaging"
 	"github.com/averix/api/internal/platform/cache"
 	"github.com/averix/api/internal/platform/cryptox"
 	"github.com/averix/api/internal/platform/database"
@@ -58,6 +62,8 @@ type App struct {
 	Proposals   *proposals.Service
 	Files       *files.Store
 	Portfolio   *portfolio.Service
+	Contracts   *contracts.Service
+	Messaging   *messaging.Service
 	AI          *aiclient.Client
 	GitHub      *githubint.Service
 
@@ -102,6 +108,13 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	githubStore := githubint.NewStore(db, sealer)
 	githubOAuth := githubint.NewOAuth(cfg.GitHub, db)
 	fileStore := files.NewStore(db, store)
+	contractStore := contracts.NewStore(db, store.PublicURL)
+	messageStore := messaging.NewStore(db, store.PublicURL)
+	// One hub for the process. A deployment behind more than one API instance
+	// needs the events relayed between them; that is a Redis pub/sub away and
+	// is noted in the deployment docs rather than pretended here.
+	hub := messaging.NewHub()
+	messagingService := messaging.NewService(messageStore, fileStore, hub, settingsStore, nil, nil)
 	portfolioStore := portfolio.NewStore(db, store.PublicURL)
 	// The prober is the only thing in the product that fetches an address a
 	// user supplied, and it does so through the SSRF-safe dialler. Development
@@ -134,7 +147,14 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		Portfolio: portfolio.NewService(portfolioStore,
 			portfolio.NewScreenshots(portfolioStore, fileStore, store, cfg.Limits.MaxImageBytes),
 			taxonomyStore, prober, recorder, cfg.Env.IsDevelopment()),
-		AI: ai,
+		// The funder, the notifier and the workspace messenger arrive in the
+		// next phases; until then every call site checks for nil and the
+		// endpoints that need them say so plainly rather than pretending.
+		Contracts: contracts.NewService(contractStore,
+			proposalAcceptance{proposalStore}, projectStore, fileStore, recorder,
+			settingsStore, nil, nil, messagingService, cfg.Env.IsDevelopment()),
+		Messaging: messagingService,
+		AI:        ai,
 		GitHub: githubint.NewService(githubStore, githubOAuth, cfg, ai, recorder,
 			redis, matchingStore, nil),
 	}
@@ -232,6 +252,26 @@ func (a *App) Handler() http.Handler {
 		RateLimitWrite: a.AuthMW.RateLimitOnSuccess("proposal_submit", 20, time.Hour),
 	})
 
+	contracts.NewHandlers(a.Contracts).Register(v1, contracts.Middleware{
+		Require:       a.AuthMW.Require(),
+		CSRF:          a.AuthMW.CSRF(),
+		RequireClient: a.AuthMW.RequireRole(security.RoleClient),
+		VerifiedEmail: a.AuthMW.RequireVerifiedEmail(),
+		// Hiring is rate limited on success only: a client fixing a validation
+		// error should not burn their allowance.
+		RateLimitHire: a.AuthMW.RateLimitOnSuccess("contract_sign", 20, time.Hour),
+	})
+
+	messaging.NewHandlers(a.Messaging, a.Files, a.Cfg.AppURL, a.Cfg.Limits.MaxFileBytes).
+		Register(v1, messaging.Middleware{
+			Require: a.AuthMW.Require(),
+			CSRF:    a.AuthMW.CSRF(),
+			// Generous: a working conversation is fast. The flood guard in the
+			// service is what protects the other person's attention.
+			RateLimitSend:   a.AuthMW.RateLimit("message_send", 300, time.Hour),
+			RateLimitUpload: a.AuthMW.RateLimit("attachment_upload", 100, time.Hour),
+		})
+
 	portfolio.NewHandlers(a.Portfolio, a.Cfg.Limits.MaxImageBytes).
 		Register(v1, portfolio.Middleware{
 			Require:         a.AuthMW.Require(),
@@ -292,4 +332,59 @@ func (a *App) Serve(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), a.Cfg.Limits.ShutdownGrace)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// proposalAcceptance adapts the proposals store to what contracts needs.
+//
+// The two modules stay independent this way: proposals knows nothing about
+// contracts, contracts declares the shape it needs, and the translation
+// between them lives here, where the graph is already visible.
+type proposalAcceptance struct {
+	store *proposals.Store
+}
+
+func (p proposalAcceptance) AcceptanceFacts(ctx context.Context,
+	proposalID uuid.UUID) (contracts.Acceptance, error) {
+
+	facts, err := p.store.AcceptanceFacts(ctx, proposalID)
+	if err != nil {
+		return contracts.Acceptance{}, err
+	}
+	out := contracts.Acceptance{
+		ProposalID:    facts.ProposalID,
+		ProjectID:     facts.ProjectID,
+		ProjectTitle:  facts.ProjectTitle,
+		ProjectStatus: facts.ProjectStatus,
+		ClientID:      facts.ClientID,
+		DeveloperID:   facts.DeveloperID,
+		Status:        facts.Status,
+		AmountMinor:   facts.AmountMinor,
+		Currency:      facts.Currency,
+		DeliveryDays:  facts.DeliveryDays,
+	}
+	for _, milestone := range facts.Milestones {
+		var due *time.Time
+		if milestone.Days != nil {
+			when := time.Now().AddDate(0, 0, *milestone.Days)
+			due = &when
+		}
+		out.Milestones = append(out.Milestones, contracts.NewMilestone{
+			Position:    milestone.Position,
+			Title:       milestone.Title,
+			Detail:      milestone.Detail,
+			AmountMinor: milestone.AmountMinor,
+			DueOn:       due,
+		})
+	}
+	return out, nil
+}
+
+func (p proposalAcceptance) MarkAccepted(ctx context.Context, proposalID, contractID uuid.UUID) error {
+	return p.store.MarkAccepted(ctx, proposalID, contractID)
+}
+
+func (p proposalAcceptance) DeclineOthers(ctx context.Context, projectID, acceptedID uuid.UUID,
+	reason string) (int, error) {
+
+	return p.store.DeclineOthers(ctx, projectID, acceptedID, reason)
 }
