@@ -218,17 +218,36 @@ docker compose -f "$COMPOSE_FILE" build --pull
 
 bold "Starting"
 if ! docker compose -f "$COMPOSE_FILE" up -d; then
-  # Compose reports which service failed but not why, and the container it
-  # names has usually already gone. Print the logs here so the reason is on
-  # screen instead of one more command away.
+  # Compose names the service that failed but never says why, and the
+  # container is usually gone by the time anyone goes looking. Print the
+  # reason here — and only for the containers that actually failed, so the
+  # answer is the last thing on screen rather than scrolled away above the
+  # logs of everything that was merely waiting.
   echo
-  warn "The stack did not come up. The logs of the services that failed:"
-  for service in migrate api worker ai web caddy postgres redis; do
-    logs="$(docker compose -f "$COMPOSE_FILE" logs --no-color --tail 30 "$service" 2>/dev/null || true)"
-    if [ -n "$logs" ]; then
-      printf '\n----- %s -----\n%s\n' "$service" "$logs"
-    fi
+  broken=""
+  for service in $(docker compose -f "$COMPOSE_FILE" config --services); do
+    container="$(docker compose -f "$COMPOSE_FILE" ps -aq "$service" 2>/dev/null | head -1)"
+    [ -n "$container" ] || continue
+    state="$(docker inspect -f '{{.State.Status}}:{{.State.ExitCode}}' "$container" 2>/dev/null || echo 'unknown:1')"
+    case "$state" in
+      # Running is fine, exited 0 is a job that finished, and created means
+      # the container never got to start because something else failed first.
+      running:* | exited:0 | created:*) ;;
+      *) broken="$broken $service" ;;
+    esac
   done
+
+  if [ -n "$broken" ]; then
+    warn "These services failed:$broken"
+    for service in $broken; do
+      printf '\n----- %s -----\n' "$service"
+      docker compose -f "$COMPOSE_FILE" logs --no-color --tail 40 "$service" 2>&1 || true
+    done
+  else
+    warn "No container reported a failure. The whole stack, as it stands:"
+    docker compose -f "$COMPOSE_FILE" ps -a
+  fi
+
   echo
   fail "Fix what the logs above report, then run ./install.sh again."
 fi
