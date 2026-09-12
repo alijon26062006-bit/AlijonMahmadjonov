@@ -100,9 +100,15 @@ What changes:
 
 - Caddy is scaled to zero. The stack's definition is unchanged; dropping the
   overlay from the command line brings it back.
-- The API and the web application publish on `127.0.0.1:8080` and
-  `127.0.0.1:3000`. Nginx on the same host reaches them; nothing else on the
-  network does — the same exposure they had behind Caddy.
+- The API and the web application publish on the loopback interface only.
+  Nginx on the same host reaches them; nothing else on the network does — the
+  same exposure they had behind Caddy. The port numbers are chosen at install
+  time and recorded in `.env` as `AVERIX_WEB_HOST_PORT` and
+  `AVERIX_API_HOST_PORT`: a server that already runs Nginx usually runs other
+  things too, and 3000 and 8080 are the first ports anything takes. Binding
+  them blindly either fails or, worse, succeeds while Nginx ends up pointed at
+  somebody else's container — so before writing the site, the installer checks
+  that the port really answers with AVERIX and stops if it does not.
 - A site file is written to whichever of `sites-available` or `conf.d` this
   Nginx actually includes, and `nginx -t` has to pass before anything is
   reloaded. If it does not, the file is removed again.

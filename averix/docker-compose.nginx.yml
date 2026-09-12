@@ -12,12 +12,18 @@
 # The API and the web application publish on the loopback interface only. They
 # are reachable by Nginx on the same host and by nothing else on the network —
 # the same exposure they had behind Caddy.
+#
+# The host-side port numbers are not fixed. A server that already runs Nginx
+# usually runs other things too, and 3000 and 8080 are the first ports anything
+# takes; binding them blindly either fails or, worse, succeeds while Nginx is
+# pointed at somebody else's application. The installer finds free ports,
+# writes them here through .env, and generates the Nginx site to match.
 
 services:
   api:
     ports:
-      - '127.0.0.1:8080:8080'
+      - '127.0.0.1:${AVERIX_API_HOST_PORT:-18080}:8080'
 
   web:
     ports:
-      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:${AVERIX_WEB_HOST_PORT:-13000}:3000'

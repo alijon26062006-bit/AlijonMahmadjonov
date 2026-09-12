@@ -267,6 +267,57 @@ if [ "$MODE" = "production" ] && [ "$FRONT" = "auto" ]; then
 fi
 if [ "$FRONT" = "auto" ]; then FRONT="caddy"; fi
 
+# Behind Nginx the stack has to publish two host ports, and on a server that
+# already runs Nginx those are exactly the ports something else has taken —
+# 3000 and 8080 are the first any application claims. Binding them blindly
+# either fails outright or, worse, quietly leaves Nginx pointed at somebody
+# else's container. So the ports are chosen, recorded in .env, and the Nginx
+# site is generated to match. A port already recorded is kept: it is ours.
+port_is_free() {
+  ! ss -lnt "( sport = :$1 )" 2>/dev/null | grep -q LISTEN
+}
+
+pick_host_port() {   # $1 = variable name in .env, $2 = first port to try
+  existing="$(grep -E "^$1=" .env 2>/dev/null | cut -d= -f2- || true)"
+  if [ -n "$existing" ]; then printf '%s' "$existing"; return; fi
+  candidate="$2"
+  while [ "$candidate" -lt 65000 ]; do
+    if port_is_free "$candidate"; then printf '%s' "$candidate"; return; fi
+    candidate=$((candidate + 1))
+  done
+  printf '%s' "$2"
+}
+
+set_env_var() {      # $1 = key, $2 = value
+  AVERIX_SET_KEY="$1" AVERIX_SET_VALUE="$2" python3 - <<'PYEOF'
+import os
+
+key, value = os.environ['AVERIX_SET_KEY'], os.environ['AVERIX_SET_VALUE']
+with open('.env') as handle:
+    lines = handle.read().splitlines()
+
+for index, line in enumerate(lines):
+    if line.split('=', 1)[0].strip() == key:
+        lines[index] = f'{key}={value}'
+        break
+else:
+    lines.append(f'{key}={value}')
+
+with open('.env', 'w') as handle:
+    handle.write('\n'.join(lines) + '\n')
+PYEOF
+}
+
+WEB_HOST_PORT=3000
+API_HOST_PORT=8080
+if [ "$MODE" = "production" ] && [ "$FRONT" = "nginx" ]; then
+  WEB_HOST_PORT="$(pick_host_port AVERIX_WEB_HOST_PORT 13000)"
+  API_HOST_PORT="$(pick_host_port AVERIX_API_HOST_PORT 18080)"
+  set_env_var AVERIX_WEB_HOST_PORT "$WEB_HOST_PORT"
+  set_env_var AVERIX_API_HOST_PORT "$API_HOST_PORT"
+  ok "Publishing on 127.0.0.1:$WEB_HOST_PORT (site) and 127.0.0.1:$API_HOST_PORT (API)"
+fi
+
 # Every compose invocation below goes through this, so the overlay is applied
 # in one place rather than remembered at a dozen call sites.
 COMPOSE=(docker compose -f "$COMPOSE_FILE")
@@ -480,7 +531,10 @@ write_nginx_site() {
     tls_server=""
   fi
 
-  site="$(sed "s/__DOMAIN__/$DOMAIN/g" infrastructure/nginx/averix.conf.template)"
+  site="$(sed -e "s/__DOMAIN__/$DOMAIN/g" \
+              -e "s/__WEB_PORT__/$WEB_HOST_PORT/g" \
+              -e "s/__API_PORT__/$API_HOST_PORT/g" \
+              infrastructure/nginx/averix.conf.template)"
   site="${site//__HTTP_BODY__/$http_body}"
   site="${site//__TLS_SERVER__/$tls_server}"
 
@@ -514,6 +568,20 @@ if [ "$MODE" = "production" ] && [ "$FRONT" = "nginx" ]; then
   else
     bold "Configuring Nginx for $DOMAIN"
     mkdir -p /var/www/certbot
+
+    # Before pointing Nginx at a port, check that the port answers with this
+    # application. A published port that silently belongs to another container
+    # gives a site that loads and is somebody else's, which is worse than a
+    # site that does not load at all.
+    upstream_page="$(curl -fsS --max-time 5 "http://127.0.0.1:$WEB_HOST_PORT/" 2>/dev/null || true)"
+    case "$upstream_page" in
+      *AVERIX*|*averix*) ok "127.0.0.1:$WEB_HOST_PORT is serving AVERIX" ;;
+      "") warn "Nothing answered on 127.0.0.1:$WEB_HOST_PORT. Check: $COMPOSE_SHOW logs web" ;;
+      *)  fail "127.0.0.1:$WEB_HOST_PORT is answering, but it is not AVERIX.
+   Another container or service holds that port. Remove
+   AVERIX_WEB_HOST_PORT from .env and run ./install.sh again to pick another." ;;
+    esac
+
 
     live="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
     if [ ! -f "$live" ]; then
