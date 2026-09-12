@@ -15,6 +15,8 @@
 set -euo pipefail
 
 DOMAIN="${AVERIX_DOMAIN:-averix.dev}"
+# Set when the domain does not point here; repeated in the closing summary.
+DNS_VERDICT=""
 EMAIL="${ACME_EMAIL:-}"
 MODE="production"
 COMPOSE_FILE="docker-compose.production.yml"
@@ -196,18 +198,32 @@ PY
 
   # ── 3. DNS ────────────────────────────────────────────────────────────────
   # Not fatal: DNS may still be propagating, and Caddy will keep trying. But
-  # saying so now beats a mysterious certificate failure later.
-  resolved="$(getent hosts "$DOMAIN" 2>/dev/null | awk '{print $1}' | head -1 || true)"
-  public="$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
-  if [ -n "$resolved" ] && [ -n "$public" ]; then
-    if [ "$resolved" = "$public" ]; then
-      ok "DNS: $DOMAIN → $public"
-    else
-      warn "$DOMAIN resolves to $resolved but this server is $public."
-      warn "The certificate cannot be issued until the A record points here."
-    fi
-  elif [ -z "$resolved" ]; then
-    warn "$DOMAIN does not resolve yet. Point its A record at this server; Caddy will retry."
+  # saying so now beats a mysterious certificate failure later — and it is
+  # repeated at the very end, because a warning in the middle of a build
+  # scrolls away long before anyone reads it.
+  #
+  # Both families are checked. A server with only an IPv6 address needs an
+  # AAAA record, and comparing it against an A record would report a mismatch
+  # that is really a missing record.
+  ipv4="$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
+  ipv6="$(curl -6 -fsS --max-time 5 https://api6.ipify.org 2>/dev/null || true)"
+  resolved="$(getent ahosts "$DOMAIN" 2>/dev/null | awk '{print $1}' | sort -u || true)"
+
+  DNS_VERDICT=""
+  if [ -z "$resolved" ]; then
+    DNS_VERDICT="$DOMAIN does not resolve. No certificate can be issued until it does."
+  elif { [ -n "$ipv4" ] && printf '%s\n' "$resolved" | grep -qx "$ipv4"; } \
+    || { [ -n "$ipv6" ] && printf '%s\n' "$resolved" | grep -qx "$ipv6"; }; then
+    ok "DNS: $DOMAIN points at this server"
+  else
+    DNS_VERDICT="$DOMAIN points at $(printf '%s' "$resolved" | tr '\n' ' '), which is not this server."
+  fi
+
+  if [ -n "$DNS_VERDICT" ]; then
+    warn "$DNS_VERDICT"
+    [ -n "$ipv4" ] && echo "  This server's IPv4: $ipv4   (A record)"
+    [ -n "$ipv6" ] && echo "  This server's IPv6: $ipv6   (AAAA record)"
+    [ -z "$ipv4" ] && warn "This server has no IPv4 address. Visitors on IPv4-only networks will not reach it."
   fi
 fi
 
@@ -310,8 +326,17 @@ if [ "$MODE" = "production" ]; then
   echo "  Site        https://$DOMAIN"
   echo "  Health      https://$DOMAIN/ready"
   echo
-  echo "  The certificate is issued on the first request. If the site does not"
-  echo "  load, check that ports 80 and 443 are open and the A record points here."
+  if [ -n "$DNS_VERDICT" ]; then
+    echo
+    warn "The site will show a certificate warning until DNS is fixed:"
+    echo "    $DNS_VERDICT"
+    echo "  Set the record at your domain registrar. Caddy retries on its own —"
+    echo "  nothing here needs restarting once the record is correct."
+  else
+    echo
+    echo "  The certificate is issued on the first request. If the site does not"
+    echo "  load, check that ports 80 and 443 are open."
+  fi
 else
   echo "  Site        http://localhost:3000"
   echo "  API         http://localhost:8080/health"
