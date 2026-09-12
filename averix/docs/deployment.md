@@ -85,6 +85,40 @@ docker compose -f docker-compose.production.yml logs -f caddy
 
 Open `https://your-domain` — the certificate is already valid.
 
+## 3b. A server that already runs Nginx
+
+Plenty of servers already have Nginx on ports 80 and 443 — a hosting panel,
+another site. Stopping it to make room for AVERIX's own proxy would take those
+down, so the installer does not: when something else is already listening, it
+puts AVERIX behind it instead.
+
+```bash
+./install.sh --behind-nginx     # or just ./install.sh — it notices on its own
+```
+
+What changes:
+
+- Caddy is scaled to zero. The stack's definition is unchanged; dropping the
+  overlay from the command line brings it back.
+- The API and the web application publish on `127.0.0.1:8080` and
+  `127.0.0.1:3000`. Nginx on the same host reaches them; nothing else on the
+  network does — the same exposure they had behind Caddy.
+- A site file is written to whichever of `sites-available` or `conf.d` this
+  Nginx actually includes, and `nginx -t` has to pass before anything is
+  reloaded. If it does not, the file is removed again.
+- The certificate comes from `certbot certonly --webroot`, which does not edit
+  your Nginx configuration. Install certbot first (`apt-get install -y
+  certbot`) or the site stays on plain HTTP until you do.
+
+The site is written in two passes — plain HTTP, then HTTPS once the
+certificate exists — because a server block naming a certificate file that is
+not there yet fails `nginx -t`, and the certificate cannot be issued until
+Nginx is answering the challenge on port 80. Re-running is safe: an existing
+certificate skips straight to the second pass.
+
+Force the stack's own proxy instead with `--with-caddy`, which is the right
+choice on a server with nothing else on those ports.
+
 ## 4. Check it is healthy
 
 ```bash

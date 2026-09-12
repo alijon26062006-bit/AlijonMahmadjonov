@@ -1,0 +1,44 @@
+# AVERIX behind an Nginx that already owns ports 80 and 443.
+#
+# Written to the server by ./install.sh --behind-nginx, which substitutes the
+# domain and adds the TLS block once a certificate exists. Do not edit the
+# installed copy: the next run overwrites it.
+#
+# The stack publishes the API and the web application on the loopback
+# interface (docker-compose.nginx.yml), so Nginx proxies to 127.0.0.1 and
+# nothing else on the network can reach them.
+
+# Uniquely named so that this file cannot collide with a map or a zone another
+# site on this server has already defined.
+map $http_upgrade $averix_connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+limit_req_zone $binary_remote_addr zone=averix_api:10m rate=20r/s;
+
+upstream averix_api {
+    server 127.0.0.1:8080;
+    keepalive 32;
+}
+
+upstream averix_web {
+    server 127.0.0.1:3000;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__ www.__DOMAIN__;
+
+    # Let's Encrypt writes its challenge here. It stays served over plain HTTP
+    # after the certificate exists, because renewal uses the same path.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+__HTTP_BODY__
+}
+
+__TLS_SERVER__

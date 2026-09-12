@@ -1,0 +1,23 @@
+# Overlay for a server whose Nginx already owns ports 80 and 443.
+#
+#   docker compose -f docker-compose.production.yml -f docker-compose.nginx.yml \
+#     up -d --scale caddy=0
+#
+# ./install.sh --behind-nginx does this for you, and detects the situation on
+# its own when Nginx is already listening.
+#
+# Caddy is scaled to zero rather than deleted: the stack stays one definition,
+# and moving back to Caddy is dropping this file from the command line.
+#
+# The API and the web application publish on the loopback interface only. They
+# are reachable by Nginx on the same host and by nothing else on the network —
+# the same exposure they had behind Caddy.
+
+services:
+  api:
+    ports:
+      - '127.0.0.1:8080:8080'
+
+  web:
+    ports:
+      - '127.0.0.1:3000:3000'
