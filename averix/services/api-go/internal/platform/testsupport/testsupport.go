@@ -10,6 +10,7 @@ package testsupport
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"github.com/averix/api/internal/app"
 	"github.com/averix/api/internal/config"
 	"github.com/averix/api/internal/platform/database"
+	"github.com/averix/api/internal/platform/storage"
 )
 
 // Harness is a running application with an HTTP test server in front of it.
@@ -203,3 +205,33 @@ func envOr(key, fallback string) string {
 var NoRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
 var _ = fmt.Sprintf
+
+// Public and Private mirror the storage visibilities, so a test can read an
+// object back without importing the storage package.
+const (
+	Public  = storage.Public
+	Private = storage.Private
+)
+
+// ReadObject reads a stored object's bytes.
+func (h *Harness) ReadObject(key string, vis storage.Visibility) []byte {
+	h.T.Helper()
+	reader, _, err := h.App.Storage.Get(context.Background(), key, vis)
+	if err != nil {
+		h.T.Fatalf("read stored object %s: %v", key, err)
+	}
+	defer reader.Close()
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		h.T.Fatalf("read object body: %v", err)
+	}
+	return data
+}
+
+// ObjectExists reports whether a stored object is still present, which is how
+// the tests prove that superseded derivatives are cleaned up.
+func (h *Harness) ObjectExists(key string, vis storage.Visibility) bool {
+	h.T.Helper()
+	ok, err := h.App.Storage.Exists(context.Background(), key, vis)
+	return err == nil && ok
+}

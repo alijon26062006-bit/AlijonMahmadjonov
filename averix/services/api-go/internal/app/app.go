@@ -12,13 +12,16 @@ import (
 
 	"github.com/averix/api/internal/audit"
 	"github.com/averix/api/internal/auth"
+	"github.com/averix/api/internal/clients"
 	"github.com/averix/api/internal/config"
+	"github.com/averix/api/internal/developers"
 	"github.com/averix/api/internal/health"
 	"github.com/averix/api/internal/platform/cache"
 	"github.com/averix/api/internal/platform/cryptox"
 	"github.com/averix/api/internal/platform/database"
 	"github.com/averix/api/internal/platform/httpx"
 	"github.com/averix/api/internal/platform/storage"
+	"github.com/averix/api/internal/security"
 	"github.com/averix/api/internal/taxonomy"
 )
 
@@ -37,6 +40,9 @@ type App struct {
 	AuthService *auth.Service
 	AuthMW      *auth.Middleware
 	Taxonomy    *taxonomy.Store
+	Developers  *developers.Service
+	Photos      *developers.PhotoService
+	Clients     *clients.Service
 
 	redisStartupError error
 }
@@ -69,6 +75,8 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	recorder := audit.New(db)
 	authStore := auth.NewStore(db)
+	taxonomyStore := taxonomy.NewStore(db)
+	developerStore := developers.NewStore(db, store.PublicURL)
 
 	a := &App{
 		Cfg:         cfg,
@@ -80,7 +88,10 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		AuthStore:   authStore,
 		AuthService: auth.NewService(authStore, redis, cfg, recorder, nil),
 		AuthMW:      auth.NewMiddleware(authStore, cfg, redis, recorder),
-		Taxonomy:    taxonomy.NewStore(db),
+		Taxonomy:    taxonomyStore,
+		Developers:  developers.NewService(developerStore, taxonomyStore, recorder),
+		Photos:      developers.NewPhotoService(developerStore, store, cfg.Limits.MaxImageBytes),
+		Clients:     clients.NewService(clients.NewStore(db)),
 	}
 	a.redisStartupError = redisErr
 	return a, nil
@@ -131,6 +142,20 @@ func (a *App) Handler() http.Handler {
 
 	auth.NewHandlers(a.AuthService, a.AuthMW).Register(v1)
 	taxonomy.NewHandlers(a.Taxonomy, a.Cache).Register(v1)
+
+	developers.NewHandlers(a.Developers, a.Photos, a.Cfg.Limits.MaxImageBytes).
+		Register(v1, developers.Middleware{
+			Require:         a.AuthMW.Require(),
+			CSRF:            a.AuthMW.CSRF(),
+			RequireDev:      a.AuthMW.RequireRole(security.RoleDeveloper),
+			RateLimitUpload: a.AuthMW.RateLimit("upload", 30, time.Hour),
+		})
+
+	clients.NewHandlers(a.Clients).Register(v1, clients.Middleware{
+		Require:       a.AuthMW.Require(),
+		CSRF:          a.AuthMW.CSRF(),
+		RequireClient: a.AuthMW.RequireRole(security.RoleClient),
+	})
 
 	return r
 }

@@ -175,6 +175,14 @@ func (c *Client) do(method, path string, body any) *Response {
 		c.t.Fatalf("read response body: %v", err)
 	}
 
+	return c.decode(resp, raw)
+}
+
+// decode turns an HTTP response into the envelope shape the tests assert on,
+// capturing any CSRF token it carries.
+func (c *Client) decode(resp *http.Response, raw []byte) *Response {
+	c.t.Helper()
+
 	out := &Response{Status: resp.StatusCode, Raw: raw, Header: resp.Header}
 	if len(raw) == 0 {
 		return out
@@ -192,7 +200,7 @@ func (c *Client) do(method, path string, body any) *Response {
 	}
 	if err := json.Unmarshal(raw, &envelope); err != nil {
 		c.t.Fatalf("%s %s returned a body that is not the API envelope: %s",
-			method, path, truncateBody(raw))
+			resp.Request.Method, resp.Request.URL.Path, truncateBody(raw))
 	}
 	out.Meta = envelope.Meta
 	out.Code = envelope.Error.Code
@@ -297,4 +305,35 @@ func (c *Client) SetRawSessionCookie(value string) {
 func (r *Response) CSRFTokenChanged(previous string) bool {
 	current := r.String("csrf_token")
 	return current != "" && current != previous
+}
+
+// Multipart posts a pre-encoded multipart body, for the upload endpoints.
+func (c *Client) Multipart(path, contentType string, body []byte) *Response {
+	c.t.Helper()
+
+	req, err := http.NewRequest(http.MethodPost, c.h.APIURL(path), bytes.NewReader(body))
+	if err != nil {
+		c.t.Fatalf("build multipart request: %v", err)
+	}
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Origin", "http://localhost:3000")
+	switch {
+	case c.OverrideCSRF != "":
+		req.Header.Set("X-CSRF-Token", c.OverrideCSRF)
+	case c.SuppressCSRF:
+	case c.csrf != "":
+		req.Header.Set("X-CSRF-Token", c.csrf)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		c.t.Fatalf("POST %s: %v", path, err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.t.Fatalf("read response body: %v", err)
+	}
+	return c.decode(resp, raw)
 }
