@@ -38,6 +38,23 @@ func newID() string {
 	return hex.EncodeToString(b[:])
 }
 
+// Errors renders a handler's error into the response.
+//
+// It must sit inside RequestID and Logger so the request it renders with is the
+// one those middlewares augmented — the router's own fallback holds the
+// original request, whose context has no request id, which would leave every
+// error body without the reference a user needs to quote to support.
+func Errors() Middleware {
+	return func(next Handler) Handler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			if err := next(w, r); err != nil {
+				WriteError(w, r, err)
+			}
+			return nil
+		}
+	}
+}
+
 // Logger attaches a request-scoped logger and records the outcome once.
 func Logger() Middleware {
 	return func(next Handler) Handler {

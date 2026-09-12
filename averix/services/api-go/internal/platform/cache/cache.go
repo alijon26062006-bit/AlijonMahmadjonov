@@ -180,6 +180,42 @@ func (c *Cache) Allow(ctx context.Context, bucket, subject string, limit int, wi
 	return Allowance{Allowed: true, Remaining: remaining}, nil
 }
 
+// Peek reports the current allowance without consuming any of it.
+//
+// Paired with Consume, this lets an endpoint charge a caller only for the
+// requests that did something. Sign-up is the case that matters: a person
+// fumbling the form five times must not be locked out for an hour, while five
+// accounts created in an hour from one address must be.
+func (c *Cache) Peek(ctx context.Context, bucket, subject string, limit int, window time.Duration) (Allowance, error) {
+	if limit <= 0 {
+		return Allowance{Allowed: true}, nil
+	}
+	key := c.key("rl", bucket, subject)
+	count, err := c.client.Get(ctx, key).Int64()
+	if errors.Is(err, redis.Nil) {
+		return Allowance{Allowed: true, Remaining: limit}, nil
+	}
+	if err != nil {
+		return Allowance{Allowed: true, Remaining: limit}, err
+	}
+	remaining := limit - int(count)
+	if remaining > 0 {
+		return Allowance{Allowed: true, Remaining: remaining}, nil
+	}
+	ttl, err := c.client.PTTL(ctx, key).Result()
+	if err != nil || ttl <= 0 {
+		ttl = window
+	}
+	return Allowance{Allowed: false, RetryAfter: ttl}, nil
+}
+
+// Consume charges one unit against a window, creating it if absent.
+func (c *Cache) Consume(ctx context.Context, bucket, subject string, window time.Duration) error {
+	key := c.key("rl", bucket, subject)
+	_, err := slidingWindow.Run(ctx, c.client, []string{key}, 0, window.Milliseconds()).Slice()
+	return err
+}
+
 // Reset clears a limiter window, used after a successful login so one bad
 // password does not keep counting against a legitimate user.
 func (c *Cache) Reset(ctx context.Context, bucket, subject string) error {
