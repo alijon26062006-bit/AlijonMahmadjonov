@@ -1,0 +1,92 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--av-space-3);
+  border-radius: var(--av-radius-pill);
+  border: 1px solid transparent;
+  font-weight: var(--av-weight-medium);
+  white-space: nowrap;
+}
+
+.md { padding: 2px var(--av-space-5); font-size: var(--av-text-sm); }
+.sm { padding: 1px var(--av-space-4); font-size: var(--av-text-xs); }
+
+.neutral {
+  background: var(--av-surface-sunken);
+  color: var(--av-text-secondary);
+  border-color: var(--av-border-subtle);
+}
+
+.brand {
+  background: var(--av-brand-subtle);
+  color: var(--av-brand-text);
+  border-color: var(--av-brand-border);
+}
+
+.success {
+  background: var(--av-success-subtle);
+  color: var(--av-success-text);
+  border-color: var(--av-success-border);
+}
+
+.warning {
+  background: var(--av-warning-subtle);
+  color: var(--av-warning-text);
+  border-color: var(--av-warning-border);
+}
+
+.danger {
+  background: var(--av-danger-subtle);
+  color: var(--av-danger-text);
+  border-color: var(--av-danger-border);
+}
+
+.info {
+  background: var(--av-info-subtle);
+  color: var(--av-info-text);
+  border-color: var(--av-info-border);
+}
+
+/* Verification is the platform's own word, so it wears the brand's green
+   rather than a generic grey. */
+.verified {
+  background: var(--av-accent-subtle);
+  color: var(--av-accent-text);
+  border-color: var(--av-accent-border);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--av-space-4);
+  font-size: var(--av-text-sm);
+  color: var(--av-text-secondary);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: currentColor;
+}
+
+.status .neutral { background: var(--av-text-tertiary); }
+.status .brand { background: var(--av-brand); }
+.status .success { background: var(--av-success); }
+.status .warning { background: var(--av-warning); }
+.status .danger { background: var(--av-danger); }
+.status .info { background: var(--av-info); }
+.status .verified { background: var(--av-accent); }
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--av-space-4);
+  border-radius: var(--av-radius-sm);
+  background: var(--av-surface-sunken);
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-xs);
+  font-weight: var(--av-weight-medium);
+  white-space: nowrap;
+}

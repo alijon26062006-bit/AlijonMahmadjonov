@@ -1,0 +1,102 @@
+.title {
+  font-size: var(--av-text-xl);
+  font-weight: var(--av-weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-5);
+  margin: var(--av-space-6) 0;
+}
+
+.track {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--av-radius-pill);
+  background: var(--av-surface-sunken);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--av-accent);
+  transition: width var(--av-motion-slow) var(--av-motion-ease-out);
+}
+
+.money {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--av-space-5);
+  padding-top: var(--av-space-5);
+  border-top: 1px solid var(--av-border-subtle);
+}
+
+.moneyLabel {
+  display: block;
+  color: var(--av-text-tertiary);
+  font-size: var(--av-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.moneyValue {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--av-text-md);
+  font-weight: var(--av-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.observerNote {
+  display: flex;
+  gap: var(--av-space-4);
+  margin-top: var(--av-space-5);
+  padding-top: var(--av-space-5);
+  border-top: 1px solid var(--av-border-subtle);
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-sm);
+}
+
+.observerNote svg { color: var(--av-text-tertiary); flex: none; margin-top: 1px; }
+
+.people {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--av-space-5);
+  padding: var(--av-space-5) var(--av-space-6);
+  background: var(--av-surface);
+  border: 1px solid var(--av-border);
+  border-radius: var(--av-radius-xl);
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-5);
+  min-width: 0;
+}
+
+.sectionTitle {
+  font-size: var(--av-text-lg);
+  font-weight: var(--av-weight-semibold);
+}
+
+.messageButton { flex: none; }
+
+/* The label is dropped on a narrow phone rather than being truncated to
+   "Mes…", which tells nobody anything. */
+@media (max-width: 400px) {
+  .messageLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

@@ -465,6 +465,25 @@ func (s *Store) Transition(ctx context.Context, projectID uuid.UUID, to string) 
 	return to, nil
 }
 
+// IsInvolved reports whether a developer has already proposed on a project or
+// been hired for it.
+//
+// Used by the visibility rule: a brief that has closed is nobody else's
+// business, but the people who worked on it keep their access to it.
+func (s *Store) IsInvolved(ctx context.Context, projectID, developerID uuid.UUID) (bool, error) {
+	var involved bool
+	err := s.db.QueryRow(ctx, `
+		SELECT EXISTS (
+		  SELECT 1 FROM proposals
+		   WHERE project_id = $1 AND developer_id = $2
+		     AND status NOT IN ('draft','withdrawn')
+		) OR EXISTS (
+		  SELECT 1 FROM contracts
+		   WHERE project_id = $1 AND developer_id = $2
+		)`, projectID, developerID).Scan(&involved)
+	return involved, err
+}
+
 func (s *Store) OwnerOf(ctx context.Context, projectID uuid.UUID) (uuid.UUID, string, error) {
 	var owner uuid.UUID
 	var status string

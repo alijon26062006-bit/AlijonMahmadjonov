@@ -1,0 +1,113 @@
+.page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--av-space-8);
+  padding: var(--av-space-9) var(--av-space-6) var(--av-space-12);
+  background:
+    radial-gradient(110% 50% at 50% 0%, var(--av-brand-subtle) 0%, transparent 60%),
+    var(--av-bg);
+}
+
+.brand { display: inline-flex; }
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--av-space-6);
+  width: 100%;
+  max-width: 420px;
+  padding: var(--av-space-8) var(--av-space-7) var(--av-space-9);
+  background: var(--av-surface);
+  border: 1px solid var(--av-border);
+  border-radius: var(--av-radius-2xl);
+  box-shadow: var(--av-shadow-sm);
+}
+
+.title {
+  font-size: var(--av-text-2xl);
+  font-weight: var(--av-weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin-top: calc(var(--av-space-5) * -1);
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-sm);
+}
+
+.alert {
+  padding: var(--av-space-5);
+  border-radius: var(--av-radius-lg);
+  background: var(--av-danger-subtle);
+  border: 1px solid var(--av-danger-border);
+  color: var(--av-danger-text);
+  font-size: var(--av-text-sm);
+}
+
+.roles {
+  display: grid;
+  gap: var(--av-space-4);
+}
+
+.role {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--av-space-5) var(--av-space-6);
+  border-radius: var(--av-radius-lg);
+  border: 1px solid var(--av-border-strong);
+  background: var(--av-surface);
+  text-align: left;
+  transition:
+    border-color var(--av-motion-fast) var(--av-motion-ease),
+    background var(--av-motion-fast) var(--av-motion-ease);
+}
+
+.roleActive {
+  border-color: var(--av-brand);
+  background: var(--av-brand-subtle);
+}
+
+.roleTitle {
+  font-size: var(--av-text-md);
+  font-weight: var(--av-weight-semibold);
+  color: var(--av-text);
+}
+
+.roleBody {
+  font-size: var(--av-text-sm);
+  color: var(--av-text-secondary);
+}
+
+.switch {
+  text-align: center;
+  font-size: var(--av-text-sm);
+  color: var(--av-text-secondary);
+}
+
+.switch a {
+  color: var(--av-brand-text);
+  font-weight: var(--av-weight-medium);
+}
+
+.terms {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--av-space-4);
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-sm);
+  line-height: var(--av-leading-md);
+  cursor: pointer;
+}
+
+.terms input {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  flex: none;
+  accent-color: var(--av-brand);
+}
+
+.termsError { color: var(--av-danger-text); }

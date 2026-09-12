@@ -1,0 +1,17 @@
+.mark {
+  display: block;
+  flex: none;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--av-space-4);
+  font-weight: var(--av-weight-bold);
+  letter-spacing: 0.06em;
+  color: var(--av-text);
+}
+
+.word {
+  font-size: 0.86em;
+}

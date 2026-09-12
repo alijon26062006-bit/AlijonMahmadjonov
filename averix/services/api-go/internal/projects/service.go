@@ -365,12 +365,18 @@ func (s *Service) View(ctx context.Context, viewer *security.Identity, slugOrID 
 	// owner's. Reporting "exists but hidden" would leak that it is there.
 	visible := project.Status == StatusOpen && project.ModerationState == "approved"
 	if !visible && !isOwner && !isStaff {
-		// An invited developer may see an invite-only project.
-		invited := false
+		// An invited developer may see an invite-only project, and so may a
+		// developer already involved in it: once someone has proposed on a
+		// brief or been hired for it, the brief is part of their own record —
+		// and the contract workspace links straight to it.
+		allowed := false
 		if viewer.Authenticated() && viewer.ActiveRole == security.RoleDeveloper {
-			invited, _ = s.store.IsInvited(ctx, project.ID, viewer.UserID)
+			allowed, _ = s.store.IsInvited(ctx, project.ID, viewer.UserID)
+			if !allowed {
+				allowed, _ = s.store.IsInvolved(ctx, project.ID, viewer.UserID)
+			}
 		}
-		if !invited {
+		if !allowed {
 			return nil, httpx.NotFoundf("project %s is not visible to this caller", project.Reference)
 		}
 	}

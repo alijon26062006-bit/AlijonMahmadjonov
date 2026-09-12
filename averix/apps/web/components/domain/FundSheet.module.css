@@ -1,0 +1,98 @@
+.amountBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--av-space-2);
+  padding: var(--av-space-7);
+  border-radius: var(--av-radius-xl);
+  background: var(--av-surface-subtle);
+  border: 1px solid var(--av-border-subtle);
+  text-align: center;
+}
+
+.amount {
+  font-size: var(--av-text-4xl);
+  font-weight: var(--av-weight-bold);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  padding: 2px var(--av-space-5);
+  border-radius: var(--av-radius-pill);
+  background: var(--av-warning-subtle);
+  border: 1px solid var(--av-warning-border);
+  color: var(--av-warning-text);
+  font-size: var(--av-text-sm);
+  font-weight: var(--av-weight-medium);
+}
+
+.instructions {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--av-border);
+  border-radius: var(--av-radius-xl);
+  overflow: hidden;
+}
+
+.instructions li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--av-space-5);
+  padding: var(--av-space-5) var(--av-space-6);
+  border-bottom: 1px solid var(--av-border-subtle);
+}
+
+.instructions li:last-child { border-bottom: none; }
+
+.critical {
+  background: var(--av-brand-subtle);
+}
+
+.instructionLabel {
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-sm);
+  flex: none;
+}
+
+.value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--av-space-3);
+  min-height: 32px;
+  padding: 0 var(--av-space-3);
+  border-radius: var(--av-radius-sm);
+  font-family: var(--av-font-mono);
+  font-size: var(--av-text-sm);
+  font-weight: var(--av-weight-medium);
+  text-align: right;
+  word-break: break-all;
+}
+
+.value:hover { background: var(--av-surface-hover); }
+.value svg { color: var(--av-success); flex: none; }
+
+.note,
+.explain {
+  display: flex;
+  gap: var(--av-space-4);
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-sm);
+  line-height: var(--av-leading-lg);
+}
+
+.note svg { color: var(--av-accent); flex: none; margin-top: 1px; }
+
+.problem {
+  display: flex;
+  gap: var(--av-space-4);
+  padding: var(--av-space-6);
+  border-radius: var(--av-radius-lg);
+  background: var(--av-warning-subtle);
+  border: 1px solid var(--av-warning-border);
+  color: var(--av-warning-text);
+  font-size: var(--av-text-sm);
+}
+
+.problem svg { flex: none; margin-top: 1px; }

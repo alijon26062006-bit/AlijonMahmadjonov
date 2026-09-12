@@ -1,0 +1,235 @@
+@import "../styles/tokens.css";
+
+/* ── Reset ─────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  /* Anchored scrolling never hides behind the sticky header. */
+  scroll-padding-top: calc(var(--av-header-h) + var(--av-space-6));
+}
+
+body {
+  background: var(--av-bg);
+  color: var(--av-text);
+  font-family: var(--av-font-sans);
+  font-size: var(--av-text-md);
+  line-height: var(--av-leading-md);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* The bottom navigation is fixed; content ends above it, plus whatever the
+     phone's home indicator needs. */
+  padding-bottom: calc(var(--av-bottom-nav-h) + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  body {
+    padding-bottom: 0;
+  }
+}
+
+img,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+/* Every interactive element shows where the keyboard is. Removing this is how
+   a product becomes unusable without a mouse. */
+:focus-visible {
+  outline: 2px solid var(--av-focus);
+  outline-offset: 2px;
+  border-radius: var(--av-radius-xs);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+::selection {
+  background: var(--av-brand-subtle);
+  color: var(--av-brand-text);
+}
+
+/* Someone who asked their system for less motion gets less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Typography ────────────────────────────────────────────────────────── */
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: var(--av-weight-semibold);
+  letter-spacing: -0.01em;
+  line-height: var(--av-leading-sm);
+}
+
+h1 { font-size: var(--av-text-3xl); letter-spacing: -0.02em; }
+h2 { font-size: var(--av-text-xl); }
+h3 { font-size: var(--av-text-lg); }
+h4 { font-size: var(--av-text-md); }
+
+code, pre, .av-mono {
+  font-family: var(--av-font-mono);
+  font-size: 0.94em;
+}
+
+/* ── Layout helpers ────────────────────────────────────────────────────── */
+
+.av-page {
+  width: 100%;
+  max-width: var(--av-content-max);
+  margin: 0 auto;
+  /* 16px of side gutter at 375px, more when there is room. */
+  padding: var(--av-space-6) var(--av-space-6) var(--av-space-12);
+}
+
+@media (min-width: 768px) {
+  .av-page { padding-inline: var(--av-space-8); }
+}
+
+.av-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--av-space-6);
+}
+
+.av-stack-sm { display: flex; flex-direction: column; gap: var(--av-space-4); }
+.av-stack-lg { display: flex; flex-direction: column; gap: var(--av-space-9); }
+
+.av-row {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-5);
+}
+
+.av-row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--av-space-5);
+}
+
+.av-wrap { flex-wrap: wrap; }
+.av-grow { flex: 1 1 auto; min-width: 0; }
+
+/* ── Text helpers ──────────────────────────────────────────────────────── */
+
+.av-muted { color: var(--av-text-secondary); }
+.av-faint { color: var(--av-text-tertiary); }
+.av-small { font-size: var(--av-text-sm); line-height: var(--av-leading-md); }
+.av-xs { font-size: var(--av-text-xs); }
+.av-lg { font-size: var(--av-text-lg); }
+.av-strong { font-weight: var(--av-weight-semibold); }
+.av-numeric { font-variant-numeric: tabular-nums; }
+
+.av-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.av-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Visible to a screen reader, not to the eye. */
+.av-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* A skip link that stays hidden until it is focused. */
+.av-skip {
+  position: absolute;
+  top: var(--av-space-4);
+  left: var(--av-space-4);
+  z-index: var(--av-z-toast);
+  padding: var(--av-space-4) var(--av-space-6);
+  background: var(--av-surface);
+  border: 1px solid var(--av-border);
+  border-radius: var(--av-radius-md);
+  box-shadow: var(--av-shadow-md);
+  transform: translateY(-200%);
+  transition: transform var(--av-motion-fast) var(--av-motion-ease);
+}
+
+.av-skip:focus {
+  transform: translateY(0);
+}
+
+.av-divider {
+  height: 1px;
+  background: var(--av-border-subtle);
+  border: 0;
+}
+
+/* Horizontal scrollers (filter chips, galleries) hide their bar on desktop
+   but stay swipeable on a phone. */
+.av-scroller {
+  display: flex;
+  gap: var(--av-space-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  /* Bleed to the screen edge so the row reads as scrollable. */
+  margin-inline: calc(var(--av-space-6) * -1);
+  padding-inline: var(--av-space-6);
+}
+
+.av-scroller::-webkit-scrollbar { display: none; }
+.av-scroller > * { scroll-snap-align: start; flex: 0 0 auto; }

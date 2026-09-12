@@ -1,0 +1,201 @@
+.layout {
+  display: flex;
+  min-height: calc(100dvh - var(--av-header-h) - var(--av-bottom-nav-h));
+}
+
+@media (min-width: 1024px) {
+  .layout {
+    max-width: var(--av-content-max);
+    margin: 0 auto;
+    min-height: calc(100dvh - 60px);
+    gap: var(--av-space-6);
+  }
+}
+
+.heading {
+  font-size: var(--av-text-2xl);
+  font-weight: var(--av-weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.list { width: 100%; }
+
+/* On a phone the list and the thread are two screens, not two columns. */
+@media (max-width: 1023px) {
+  .listHidden { display: none; }
+}
+
+@media (min-width: 1024px) {
+  .list {
+    width: 360px;
+    flex: none;
+    border-right: 1px solid var(--av-border-subtle);
+  }
+}
+
+.thread {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-5);
+  width: 100%;
+  padding: var(--av-space-5);
+  border-radius: var(--av-radius-xl);
+  border: 1px solid transparent;
+  text-align: left;
+  transition: background var(--av-motion-fast) var(--av-motion-ease);
+}
+
+.thread:hover { background: var(--av-surface-hover); }
+.threadActive { background: var(--av-surface); border-color: var(--av-border); }
+
+.threadBody { flex: 1; min-width: 0; }
+
+.threadTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--av-space-4);
+}
+
+.unread {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--av-radius-pill);
+  background: var(--av-brand);
+  color: #fff;
+  font-size: var(--av-text-xs);
+  font-weight: var(--av-weight-semibold);
+  line-height: 20px;
+  text-align: center;
+  flex: none;
+}
+
+.thread_panel {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.panelOpen { display: flex; }
+
+@media (min-width: 1024px) {
+  .thread_panel { display: flex; }
+}
+
+.placeholder {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--av-space-5);
+  flex: 1;
+  color: var(--av-text-tertiary);
+}
+
+@media (min-width: 1024px) {
+  .placeholder { display: flex; }
+}
+
+.threadHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-5);
+  padding: var(--av-space-5) var(--av-space-6);
+  border-bottom: 1px solid var(--av-border-subtle);
+  background: var(--av-surface);
+}
+
+@media (min-width: 1024px) {
+  .backButton { display: none; }
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: -6px;
+  border-radius: var(--av-radius-md);
+  color: var(--av-text-secondary);
+}
+
+.stream {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--av-space-4);
+  padding: var(--av-space-6);
+  overflow-y: auto;
+}
+
+.system {
+  align-self: center;
+  padding: 3px var(--av-space-5);
+  border-radius: var(--av-radius-pill);
+  background: var(--av-surface-sunken);
+  color: var(--av-text-tertiary);
+  font-size: var(--av-text-xs);
+  text-align: center;
+}
+
+.bubbleRow { display: flex; }
+.mine { justify-content: flex-end; }
+
+.bubble {
+  position: relative;
+  max-width: min(78%, 520px);
+  padding: var(--av-space-5) var(--av-space-6) var(--av-space-6);
+  border-radius: var(--av-radius-xl);
+  background: var(--av-surface);
+  border: 1px solid var(--av-border);
+  font-size: var(--av-text-md);
+  line-height: var(--av-leading-lg);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mine .bubble {
+  background: var(--av-brand);
+  border-color: var(--av-brand);
+  color: var(--av-brand-on);
+}
+
+.time {
+  position: absolute;
+  right: var(--av-space-5);
+  bottom: 3px;
+  font-size: 10px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--av-space-4);
+  padding: var(--av-space-5) var(--av-space-6);
+  border-top: 1px solid var(--av-border-subtle);
+  background: var(--av-surface);
+}
+
+.input {
+  flex: 1;
+  min-height: 44px;
+  max-height: 140px;
+  padding: var(--av-space-5);
+  border-radius: var(--av-radius-lg);
+  border: 1px solid var(--av-border-strong);
+  background: var(--av-bg);
+  resize: none;
+  font-size: 16px;
+  line-height: var(--av-leading-md);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--av-brand);
+  box-shadow: 0 0 0 3px var(--av-brand-subtle);
+}

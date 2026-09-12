@@ -1,0 +1,173 @@
+'use client';
+
+import { Suspense, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import styles from '../auth.module.css';
+import { Wordmark } from '@/components/nav/Logo';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Field';
+import { ApiFailure, post, setCsrfToken } from '@/lib/api';
+import { useSession } from '@/lib/session';
+import type { Session } from '@/lib/session';
+
+type Role = 'client' | 'developer';
+
+function RegisterForm() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const { refresh } = useSession();
+
+  const [role, setRole] = useState<Role>(params.get('role') === 'client' ? 'client' : 'developer');
+  const [form, setForm] = useState({ full_name: '', username: '', email: '', password: '' });
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function update(key: keyof typeof form) {
+    return (event: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((current) => ({ ...current, [key]: event.target.value }));
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setFields({});
+    setMessage('');
+    try {
+      const session = await post<Session>('/auth/register', {
+        ...form,
+        accept_terms: acceptTerms,
+        email: form.email.trim(),
+        username: form.username.trim().toLowerCase(),
+        role,
+      });
+      if (session.csrf_token) setCsrfToken(session.csrf_token);
+      await refresh();
+      // A developer has a profile to build before anything else is useful.
+      router.replace(role === 'developer' ? '/onboarding' : '/dashboard');
+    } catch (error) {
+      if (error instanceof ApiFailure) {
+        setFields(error.fields);
+        setMessage(error.fields && Object.keys(error.fields).length ? '' : error.message);
+      } else {
+        setMessage("We couldn't reach the server. Please check your connection and try again.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className={styles.card} onSubmit={submit} noValidate>
+      <h1 className={styles.title}>Create your account</h1>
+      <p className={styles.subtitle}>
+        One account, one starting point. You can add the other side later.
+      </p>
+
+      <div className={styles.roles} role="radiogroup" aria-label="I am here to">
+        {(
+          [
+            { key: 'developer', title: 'Work on projects', body: 'Build a profile, find matching work' },
+            { key: 'client', title: 'Hire a developer', body: 'Post a project, review proposals' },
+          ] as const
+        ).map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            role="radio"
+            aria-checked={role === option.key}
+            className={[styles.role, role === option.key ? styles.roleActive : ''].join(' ')}
+            onClick={() => setRole(option.key)}
+          >
+            <span className={styles.roleTitle}>{option.title}</span>
+            <span className={styles.roleBody}>{option.body}</span>
+          </button>
+        ))}
+      </div>
+
+      {message ? (
+        <p className={styles.alert} role="alert">
+          {message}
+        </p>
+      ) : null}
+
+      <Input
+        label="Full name"
+        name="full_name"
+        autoComplete="name"
+        required
+        value={form.full_name}
+        error={fields.full_name}
+        onChange={update('full_name')}
+      />
+      <Input
+        label="Username"
+        name="username"
+        autoComplete="username"
+        required
+        prefix="@"
+        hint="This is your profile address: averix.dev/@username"
+        value={form.username}
+        error={fields.username}
+        onChange={update('username')}
+      />
+      <Input
+        label="Email"
+        type="email"
+        name="email"
+        autoComplete="email"
+        inputMode="email"
+        required
+        value={form.email}
+        error={fields.email}
+        onChange={update('email')}
+      />
+      <Input
+        label="Password"
+        type="password"
+        name="password"
+        autoComplete="new-password"
+        required
+        hint="At least 12 characters. A passphrase is easier to remember and harder to guess."
+        value={form.password}
+        error={fields.password}
+        onChange={update('password')}
+      />
+
+      <label className={styles.terms}>
+        <input
+          type="checkbox"
+          checked={acceptTerms}
+          onChange={(event) => setAcceptTerms(event.target.checked)}
+        />
+        <span>
+          I agree to the AVERIX terms and privacy notice.
+          {fields.accept_terms ? <span className={styles.termsError}> {fields.accept_terms}</span> : null}
+        </span>
+      </label>
+
+      <Button type="submit" size="lg" block loading={busy} disabled={!acceptTerms}>
+        Create account
+      </Button>
+
+      <p className={styles.switch}>
+        Already have an account? <Link href="/login">Sign in</Link>
+      </p>
+    </form>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <main id="main" className={styles.page}>
+      <Link href="/" className={styles.brand}>
+        <Wordmark size={20} />
+      </Link>
+      <Suspense fallback={null}>
+        <RegisterForm />
+      </Suspense>
+    </main>
+  );
+}

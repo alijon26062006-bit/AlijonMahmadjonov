@@ -1,0 +1,50 @@
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--av-skeleton) 25%,
+    var(--av-skeleton-sheen) 37%,
+    var(--av-skeleton) 63%
+  );
+  background-size: 400% 100%;
+  animation: sheen 1.4s ease-in-out infinite;
+}
+
+@keyframes sheen {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--av-space-5);
+  padding: var(--av-space-6);
+  background: var(--av-surface);
+  border: 1px solid var(--av-border);
+  border-radius: var(--av-radius-xl);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-5);
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--av-space-3);
+  flex: 1;
+}
+
+.chips {
+  display: flex;
+  gap: var(--av-space-4);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--av-space-5);
+}

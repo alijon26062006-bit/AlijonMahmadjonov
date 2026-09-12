@@ -1,0 +1,53 @@
+.heading {
+  font-size: var(--av-text-2xl);
+  font-weight: var(--av-weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--av-space-5);
+}
+
+.figureLabel {
+  color: var(--av-text-tertiary);
+  font-size: var(--av-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.figure {
+  margin: var(--av-space-3) 0 var(--av-space-2);
+  font-size: var(--av-text-2xl);
+  font-weight: var(--av-weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.sectionTitle {
+  font-size: var(--av-text-md);
+  font-weight: var(--av-weight-semibold);
+  margin-bottom: var(--av-space-5);
+}
+
+.entries { display: flex; flex-direction: column; }
+
+.entries li {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-5);
+  padding: var(--av-space-5) 0;
+  border-bottom: 1px solid var(--av-border-subtle);
+}
+
+.entries li:last-child { border-bottom: none; }
+
+.entryAmount {
+  font-weight: var(--av-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.positive { color: var(--av-success-text); }
+.negative { color: var(--av-text-secondary); }

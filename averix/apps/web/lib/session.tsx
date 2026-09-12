@@ -1,0 +1,108 @@
+'use client';
+
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { ApiFailure, get, post, setCsrfToken } from './api';
+
+export type Role = 'client' | 'developer' | 'admin' | 'moderator';
+
+export type Session = {
+  user_id: string;
+  username: string;
+  email: string;
+  full_name: string;
+  active_role: Role;
+  roles: Role[];
+  status: string;
+  email_verified: boolean;
+  identity_verified: boolean;
+  photo_url?: string;
+  csrf_token?: string;
+  permissions?: string[];
+  onboarding_step?: number;
+  onboarding_complete?: boolean;
+};
+
+type SessionState = {
+  session: Session | null;
+  loading: boolean;
+  refresh: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<Session>;
+  signOut: () => Promise<void>;
+  switchRole: (role: Role) => Promise<void>;
+  can: (permission: string) => boolean;
+};
+
+const SessionContext = createContext<SessionState | null>(null);
+
+export function SessionProvider({
+  initial,
+  children,
+}: {
+  initial?: Session | null;
+  children: ReactNode;
+}) {
+  const [session, setSession] = useState<Session | null>(initial ?? null);
+  const [loading, setLoading] = useState(initial === undefined);
+
+  const refresh = useCallback(async () => {
+    try {
+      const next = await get<Session>('/auth/session');
+      setSession(next);
+      if (next.csrf_token) setCsrfToken(next.csrf_token);
+    } catch (error) {
+      // Not being signed in is a state, not a failure.
+      if (error instanceof ApiFailure && error.isUnauthenticated) {
+        setSession(null);
+        setCsrfToken(null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    const next = await post<Session>('/auth/login', { email, password });
+    setSession(next);
+    if (next.csrf_token) setCsrfToken(next.csrf_token);
+    return next;
+  }, []);
+
+  const signOut = useCallback(async () => {
+    try {
+      await post('/auth/logout');
+    } finally {
+      setSession(null);
+      setCsrfToken(null);
+    }
+  }, []);
+
+  const switchRole = useCallback(async (role: Role) => {
+    // The API rotates the CSRF token on a role switch, and api() picks the new
+    // one out of the response, so nothing here has to remember it.
+    const next = await post<Session>('/auth/role/switch', { role });
+    setSession(next);
+  }, []);
+
+  const can = useCallback(
+    (permission: string) => Boolean(session?.permissions?.includes(permission)),
+    [session],
+  );
+
+  const value = useMemo<SessionState>(
+    () => ({ session, loading, refresh, signIn, signOut, switchRole, can }),
+    [session, loading, refresh, signIn, signOut, switchRole, can],
+  );
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
+export function useSession(): SessionState {
+  const context = useContext(SessionContext);
+  if (!context) throw new Error('useSession must be used inside <SessionProvider>');
+  return context;
+}

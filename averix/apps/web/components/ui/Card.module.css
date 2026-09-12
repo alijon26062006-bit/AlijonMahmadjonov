@@ -1,0 +1,82 @@
+.card {
+  display: block;
+  background: var(--av-surface);
+  border: 1px solid var(--av-border);
+  border-radius: var(--av-radius-xl);
+  /* A restrained shadow. Cards that float off the page look like a template. */
+  box-shadow: var(--av-shadow-xs);
+}
+
+.padded {
+  padding: var(--av-space-6);
+}
+
+@media (min-width: 768px) {
+  .padded { padding: var(--av-space-7); }
+}
+
+.interactive {
+  transition:
+    border-color var(--av-motion-fast) var(--av-motion-ease),
+    box-shadow var(--av-motion-fast) var(--av-motion-ease),
+    transform var(--av-motion-instant) var(--av-motion-ease);
+}
+
+.interactive:hover {
+  border-color: var(--av-border-strong);
+  box-shadow: var(--av-shadow-sm);
+}
+
+.interactive:active {
+  transform: scale(0.995);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--av-space-5);
+  margin-bottom: var(--av-space-6);
+}
+
+.headerText {
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--av-text-lg);
+  font-weight: var(--av-weight-semibold);
+}
+
+.subtitle {
+  margin-top: var(--av-space-2);
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-sm);
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--av-space-5);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-4);
+  font-size: var(--av-text-lg);
+  font-weight: var(--av-weight-semibold);
+}
+
+.count {
+  min-width: 22px;
+  padding: 0 var(--av-space-3);
+  border-radius: var(--av-radius-pill);
+  background: var(--av-surface-sunken);
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-sm);
+  font-weight: var(--av-weight-medium);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

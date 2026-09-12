@@ -1,0 +1,55 @@
+.greeting {
+  font-size: var(--av-text-2xl);
+  font-weight: var(--av-weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.seeAll {
+  color: var(--av-brand-text);
+  font-size: var(--av-text-sm);
+  font-weight: var(--av-weight-medium);
+}
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-5);
+  padding: var(--av-space-5) var(--av-space-6);
+  background: var(--av-brand-subtle);
+  border: 1px solid var(--av-brand-border);
+  border-radius: var(--av-radius-xl);
+  color: var(--av-text);
+  transition: background var(--av-motion-fast) var(--av-motion-ease);
+}
+
+.actionRow:hover { background: var(--av-brand-subtle-hover); }
+.actionRow svg { color: var(--av-brand-text); flex: none; }
+
+.amount {
+  font-weight: var(--av-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-5);
+  margin: var(--av-space-5) 0;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--av-radius-pill);
+  background: var(--av-surface-sunken);
+  overflow: hidden;
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--av-accent);
+  transition: width var(--av-motion-slow) var(--av-motion-ease-out);
+}

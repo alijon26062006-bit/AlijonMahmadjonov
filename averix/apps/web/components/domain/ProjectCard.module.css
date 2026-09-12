@@ -1,0 +1,100 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  background: var(--av-surface);
+  border: 1px solid var(--av-border);
+  border-radius: var(--av-radius-xl);
+  box-shadow: var(--av-shadow-xs);
+  transition:
+    border-color var(--av-motion-fast) var(--av-motion-ease),
+    box-shadow var(--av-motion-fast) var(--av-motion-ease);
+}
+
+.card:hover {
+  border-color: var(--av-border-strong);
+  box-shadow: var(--av-shadow-sm);
+}
+
+.body {
+  display: block;
+  padding: var(--av-space-6) var(--av-space-6) var(--av-space-5);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--av-space-5);
+}
+
+.headerText { min-width: 0; }
+
+.title {
+  font-size: var(--av-text-lg);
+  font-weight: var(--av-weight-semibold);
+  line-height: var(--av-leading-sm);
+  letter-spacing: -0.01em;
+}
+
+.meta {
+  margin-top: var(--av-space-3);
+  color: var(--av-text-tertiary);
+  font-size: var(--av-text-sm);
+}
+
+.excerpt {
+  margin-top: var(--av-space-5);
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-md);
+  line-height: var(--av-leading-lg);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--av-space-3);
+  margin-top: var(--av-space-5);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--av-space-4);
+  padding: var(--av-space-5) var(--av-space-6);
+  border-top: 1px solid var(--av-border-subtle);
+}
+
+.facts {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-4);
+  font-size: var(--av-text-sm);
+  color: var(--av-text-secondary);
+  min-width: 0;
+}
+
+.budget {
+  font-weight: var(--av-weight-semibold);
+  color: var(--av-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--av-border-strong);
+  flex: none;
+}
+
+.proposals,
+.verified {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--av-space-3);
+  white-space: nowrap;
+}
+
+.verified { color: var(--av-accent-text); }

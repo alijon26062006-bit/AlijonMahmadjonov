@@ -1,0 +1,125 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--av-space-4);
+  border-radius: var(--av-radius-lg);
+  font-weight: var(--av-weight-medium);
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition:
+    background var(--av-motion-fast) var(--av-motion-ease),
+    border-color var(--av-motion-fast) var(--av-motion-ease),
+    color var(--av-motion-fast) var(--av-motion-ease),
+    transform var(--av-motion-instant) var(--av-motion-ease);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Sizes ─────────────────────────────────────────────────────────────── */
+/* Nothing below 44px on a touch target: a control that needs a careful aim is
+   a control people get wrong. */
+
+.sm {
+  min-height: 36px;
+  padding: 0 var(--av-space-5);
+  font-size: var(--av-text-sm);
+}
+
+.md {
+  min-height: 44px;
+  padding: 0 var(--av-space-6);
+  font-size: var(--av-text-md);
+}
+
+.lg {
+  min-height: 50px;
+  padding: 0 var(--av-space-7);
+  font-size: var(--av-text-lg);
+}
+
+.block {
+  display: flex;
+  width: 100%;
+}
+
+/* ── Variants ──────────────────────────────────────────────────────────── */
+
+.primary {
+  background: var(--av-brand);
+  color: var(--av-brand-on);
+}
+
+.primary:hover:not(:disabled) { background: var(--av-brand-hover); }
+.primary:active:not(:disabled) { background: var(--av-brand-active); }
+
+.accent {
+  background: var(--av-accent);
+  color: var(--av-accent-on);
+}
+
+.accent:hover:not(:disabled) { background: var(--av-accent-hover); }
+
+.secondary {
+  background: var(--av-surface);
+  color: var(--av-text);
+  border-color: var(--av-border-strong);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--av-surface-hover);
+  border-color: var(--av-text-tertiary);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--av-text-secondary);
+}
+
+.ghost:hover:not(:disabled) {
+  background: var(--av-surface-hover);
+  color: var(--av-text);
+}
+
+.danger {
+  background: var(--av-danger-subtle);
+  color: var(--av-danger-text);
+  border-color: var(--av-danger-border);
+}
+
+.danger:hover:not(:disabled) {
+  background: var(--av-danger);
+  border-color: var(--av-danger);
+  color: #fff;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loading .label {
+  opacity: 0.85;
+}
+
+.spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
