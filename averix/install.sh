@@ -278,8 +278,25 @@ if ! docker compose -f "$COMPOSE_FILE" up -d; then
       docker compose -f "$COMPOSE_FILE" logs --no-color --tail 40 "$service" 2>&1 || true
     done
   else
-    warn "No container reported a failure. The whole stack, as it stands:"
+    warn "No container logged a failure — so it never got far enough to log."
+    echo "  Read the \"Error response from daemon\" line above: that is the reason."
+    echo "  The stack as it stands:"
     docker compose -f "$COMPOSE_FILE" ps -a
+  fi
+
+  # A port already taken is the usual reason a container dies before it can
+  # write a single line, and the daemon's message names the port but never
+  # what holds it.
+  if command -v ss >/dev/null 2>&1; then
+    listeners="$(ss -lntp 2>/dev/null | awk 'NR == 1 || $4 ~ /:(80|443)$/' || true)"
+    if [ "$(printf '%s\n' "$listeners" | wc -l)" -gt 1 ]; then
+      echo
+      echo "  Listening on ports 80 and 443 right now:"
+      printf '%s\n' "$listeners" | sed 's/^/    /'
+      echo "  If that is a web server of the host (nginx, apache, another Caddy),"
+      echo "  stop it — this stack needs both ports:"
+      echo "      systemctl disable --now nginx apache2 caddy"
+    fi
   fi
 
   echo
