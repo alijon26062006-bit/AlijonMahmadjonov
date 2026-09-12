@@ -172,6 +172,16 @@ func (h *Harness) Reset() {
 		_ = h.App.Cache.DeletePrefix(ctx, "rl")
 		_ = h.App.Cache.DeletePrefix(ctx, "tax")
 	}
+
+	// Settings a test created at runtime are removed, so configuration cannot
+	// leak from one test to the next — or, worse, from one run to the next,
+	// since the database outlives the process. The seeded rows carry a
+	// description and are left alone: they are migration content.
+	if _, err := h.DB.Exec(ctx,
+		`DELETE FROM platform_settings WHERE description IS NULL`); err != nil {
+		h.T.Fatalf("reset platform settings: %v", err)
+	}
+	h.App.Settings.Invalidate()
 }
 
 // URL builds an absolute URL against the test server.
@@ -338,6 +348,37 @@ func (h *Harness) NewClient(username string) *ClientAccount {
 	// The session caches nothing, but the identity is re-resolved per request,
 	// so the confirmed address is visible immediately.
 	return &ClientAccount{Client: c, Username: username, UserID: c.UserID()}
+}
+
+// Admin is a signed-in administrator.
+type Admin struct {
+	Client   *Client
+	Username string
+	UserID   string
+}
+
+// NewAdmin registers an account, grants it the admin role and switches the
+// session into it.
+//
+// The grant is written directly because there is deliberately no endpoint that
+// makes someone an administrator from inside the product — the first admin is
+// created by an operator, and every later one by an existing admin through the
+// admin panel.
+func (h *Harness) NewAdmin(username string) *Admin {
+	h.T.Helper()
+
+	c := h.Client()
+	c.RegisterClient(username)
+	h.Verify(username)
+	userID := c.UserID()
+
+	h.Exec(`INSERT INTO user_roles (user_id, role) VALUES ($1::uuid, 'admin')
+	        ON CONFLICT DO NOTHING`, userID)
+	// The session carries one active role, so holding the grant is not enough:
+	// the caller has to switch into it, exactly as a person would.
+	c.POST("/auth/role/switch", map[string]any{"role": "admin"}).OK(h.T, 200)
+
+	return &Admin{Client: c, Username: username, UserID: userID}
 }
 
 // Verify marks an account's email address confirmed.

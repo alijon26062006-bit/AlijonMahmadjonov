@@ -181,6 +181,13 @@ func (s *Store) Set(ctx context.Context, key string, value any, by uuid.UUID) er
 	return nil
 }
 
+// Invalidate drops the cached snapshot.
+//
+// Exported because settings can change outside this process — another API
+// instance, a migration, or a test resetting its fixtures — and a thirty
+// second window of stale configuration is a confusing thing to debug.
+func (s *Store) Invalidate() { s.invalidate() }
+
 // Public returns the settings the web app is allowed to read, so the client
 // knows the upload limits and which features are on without a private
 // endpoint.

@@ -36,7 +36,11 @@ func (h *Handlers) Register(r *httpx.Router, mw Middleware) {
 	read := r.Group("/contracts", mw.Require)
 	read.GET("", h.mine)
 	read.GET("/{id}", h.view)
-	read.GET("/reference/{reference}", h.byReference)
+	// Looked up by query rather than by a path segment: a reference in the
+	// path collides with /contracts/{id}/... once another module hangs an
+	// endpoint off a contract, and a collision that only appears when a later
+	// module is added is a trap.
+	read.GET("/by-reference", h.byReference)
 
 	// Hiring is the client's move, and it costs money, so it carries the
 	// verified-email requirement and its own limit.
@@ -53,7 +57,6 @@ func (h *Handlers) Register(r *httpx.Router, mw Middleware) {
 	// is resolved from it server-side, so a mismatched pair in the URL cannot
 	// be used to act on someone else's work.
 	milestones := r.Group("/milestones", mw.Require, mw.CSRF)
-	milestones.POST("/{id}/fund", h.fund)
 	milestones.POST("/{id}/start", h.start)
 	milestones.POST("/{id}/submit", h.submit)
 	milestones.POST("/{id}/request-revision", h.requestRevision)
@@ -87,8 +90,13 @@ func (h *Handlers) view(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *Handlers) byReference(w http.ResponseWriter, r *http.Request) error {
-	contract, err := h.svc.ByReference(r.Context(), security.FromContext(r.Context()),
-		r.PathValue("reference"))
+	reference := strings.TrimSpace(r.URL.Query().Get("reference"))
+	if reference == "" {
+		return httpx.Validation(map[string]string{
+			"reference": "Enter the contract reference, for example AVX-2026-1A2B3C4D.",
+		})
+	}
+	contract, err := h.svc.ByReference(r.Context(), security.FromContext(r.Context()), reference)
 	if err != nil {
 		return err
 	}
@@ -191,18 +199,6 @@ func (h *Handlers) removeObserver(w http.ResponseWriter, r *http.Request) error 
 }
 
 // ── Milestone actions ───────────────────────────────────────────────────────
-
-func (h *Handlers) fund(w http.ResponseWriter, r *http.Request) error {
-	milestoneID, err := pathID(r, "id")
-	if err != nil {
-		return err
-	}
-	result, err := h.svc.Fund(r.Context(), security.FromContext(r.Context()), milestoneID)
-	if err != nil {
-		return err
-	}
-	return httpx.JSON(w, http.StatusOK, result)
-}
 
 func (h *Handlers) start(w http.ResponseWriter, r *http.Request) error {
 	return h.milestoneAction(w, r, h.svc.Start)

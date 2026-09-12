@@ -368,6 +368,12 @@ func (c *Client) Raw(method, path string, body []byte) *Response {
 	if err != nil {
 		c.t.Fatalf("read response body: %v", err)
 	}
+	// Decoded when the body is the API envelope — an error from one of these
+	// endpoints should be assertable like any other — and left raw otherwise,
+	// which is what a redirect response looks like.
+	if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("{")) {
+		return c.decode(resp, raw)
+	}
 	return &Response{Status: resp.StatusCode, Raw: raw, Header: resp.Header}
 }
 

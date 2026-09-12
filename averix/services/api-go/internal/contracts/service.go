@@ -52,18 +52,20 @@ type Settings interface {
 	Int(ctx context.Context, key string, fallback int) int
 }
 
-// Funder moves money. Implemented by the payments module.
+// Funder is the payments module, seen from here.
 //
-// Nil until a provider is configured, and every call site says so plainly
-// rather than pretending a milestone was funded: an interface that silently
-// succeeded would be the worst kind of fake.
+// Deliberately narrow: contracts does not start payments, ask for
+// instructions or know what a provider is. It needs two things — whether
+// money can move at all in this environment, so a button is not offered when
+// it cannot, and a way to say "this milestone was approved, pay the
+// developer". Everything else about money lives in the payments module,
+// including the endpoint a client funds through.
+//
+// Nil until a provider exists; every call site checks and says so plainly
+// rather than pretending a milestone was funded.
 type Funder interface {
 	Configured() bool
-	// FundMilestone starts a payment for a milestone and returns where the
-	// payer should be sent, if the provider needs a redirect.
-	FundMilestone(ctx context.Context, contractID, milestoneID, payerID uuid.UUID,
-		amountMinor int64, currency string) (redirectURL string, err error)
-	// ReleaseMilestone pays the developer for an approved milestone.
+	// ReleaseMilestone queues the payout for an approved milestone.
 	ReleaseMilestone(ctx context.Context, contractID, milestoneID uuid.UUID) error
 }
 
@@ -108,6 +110,14 @@ func NewService(store *Store, proposals Proposals, projects Projects, fileStore 
 		messenger: messenger, urlOpts: options,
 	}
 }
+
+// AttachFunder wires the payments module in after construction.
+//
+// Contracts and payments each need the other: a contract asks whether money
+// can move, and payments asks a contract what a milestone is worth. Rather
+// than merge the two or invent a third module to hold both, the dependency is
+// set once at start-up, in the one place that already builds the graph.
+func (s *Service) AttachFunder(funder Funder) { s.funder = funder }
 
 // ── Signing ─────────────────────────────────────────────────────────────────
 
@@ -771,54 +781,45 @@ func (s *Service) MarkReleased(ctx context.Context, milestoneID uuid.UUID) error
 	return nil
 }
 
-// Fund starts a payment for a milestone.
+// ── What the payments module needs ──────────────────────────────────────────
+
+// FundingFacts is everything the payments module needs about a milestone, in
+// one read: who the parties are, what it is worth, and whether it is in a
+// state where money should move.
 //
-// Without a configured provider this reports that plainly. It does not mark
-// the milestone funded: a button that pretends money moved is worse than a
-// button that says the feature is not set up.
-func (s *Service) Fund(ctx context.Context, id *security.Identity, milestoneID uuid.UUID) (map[string]any, error) {
-	milestone, err := s.store.MilestoneByID(ctx, milestoneID)
-	if err != nil {
-		return nil, notFoundMilestone(err, milestoneID)
-	}
-	membership, err := s.store.MembershipOf(ctx, milestone.ContractID)
-	if err != nil {
-		return nil, notFound(err, milestone.ContractID)
-	}
-	role, err := s.authoriseAction(ctx, id, membership)
-	if err != nil {
-		return nil, err
-	}
-	if role != RoleClient {
-		e := *httpx.ErrForbidden
-		e.Code = "not_your_move"
-		e.Message = "Only the client can fund a milestone."
-		return nil, &e
-	}
-	if milestone.Status != MilestoneDraft {
-		e := *httpx.ErrConflict
-		e.Code = "milestone_state"
-		e.Message = "This milestone has already been funded."
-		return nil, &e
-	}
+// Exported as a value rather than by handing over the store, so payments
+// cannot reach into a contract's other fields or write to one.
+type FundingFacts struct {
+	MilestoneID       uuid.UUID
+	MilestoneTitle    string
+	MilestoneStatus   string
+	ContractID        uuid.UUID
+	ContractReference string
+	ContractTitle     string
+	ContractStatus    string
+	ClientID          uuid.UUID
+	DeveloperID       uuid.UUID
+	AmountMinor       int64
+	Currency          string
+	// The fee percentage frozen on the contract at signature, so a milestone
+	// payout uses the rate the parties agreed to rather than today's schedule.
+	FeePercent float64
+}
 
-	if !s.fundingAvailable() {
-		e := *httpx.ErrNotConfigured
-		e.Code = "payments_not_configured"
-		e.Message = "Payments aren't connected on this environment yet, so this milestone can't be funded."
-		return nil, &e
-	}
+func (s *Service) FundingFacts(ctx context.Context, milestoneID uuid.UUID) (FundingFacts, error) {
+	return s.store.fundingFacts(ctx, milestoneID)
+}
 
-	amount := int64(0)
-	if milestone.AmountMinor != nil {
-		amount = *milestone.AmountMinor
-	}
-	redirect, err := s.funder.FundMilestone(ctx, milestone.ContractID, milestoneID,
-		id.UserID, amount, milestone.Currency)
+// EnsureParty resolves a caller's position on a contract, for a module that
+// needs the same membership gate without duplicating it.
+func (s *Service) EnsureParty(ctx context.Context, id *security.Identity,
+	contractID uuid.UUID) (string, error) {
+
+	membership, err := s.store.MembershipOf(ctx, contractID)
 	if err != nil {
-		return nil, httpx.Internalf(err, "start milestone payment")
+		return "", notFound(err, contractID)
 	}
-	return map[string]any{"redirect_url": redirect, "status": "pending"}, nil
+	return s.authoriseAction(ctx, id, membership)
 }
 
 // ── Deliverables ────────────────────────────────────────────────────────────

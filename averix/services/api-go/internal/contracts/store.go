@@ -821,6 +821,28 @@ func (s *Store) addConversationParticipant(ctx context.Context, contractID, user
 	return err
 }
 
+// fundingFacts reads a milestone with its contract in one query.
+func (s *Store) fundingFacts(ctx context.Context, milestoneID uuid.UUID) (FundingFacts, error) {
+	var f FundingFacts
+	f.MilestoneID = milestoneID
+	err := s.db.QueryRow(ctx, `
+		SELECT m.title, m.status, m.amount_minor, m.currency,
+		       c.id, c.reference, c.title, c.status, c.client_id, c.developer_id,
+		       c.fee_percent
+		FROM milestones m JOIN contracts c ON c.id = m.contract_id
+		WHERE m.id = $1`, milestoneID).
+		Scan(&f.MilestoneTitle, &f.MilestoneStatus, &f.AmountMinor, &f.Currency,
+			&f.ContractID, &f.ContractReference, &f.ContractTitle, &f.ContractStatus,
+			&f.ClientID, &f.DeveloperID, &f.FeePercent)
+	if database.IsNoRows(err) {
+		return f, ErrNotFound
+	}
+	if err != nil {
+		return f, fmt.Errorf("load funding facts: %w", err)
+	}
+	return f, nil
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 func logWarn(ctx context.Context, message string, err error) {

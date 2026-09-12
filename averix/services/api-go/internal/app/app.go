@@ -24,6 +24,7 @@ import (
 	"github.com/averix/api/internal/health"
 	"github.com/averix/api/internal/matching"
 	"github.com/averix/api/internal/messaging"
+	"github.com/averix/api/internal/payments"
 	"github.com/averix/api/internal/platform/cache"
 	"github.com/averix/api/internal/platform/cryptox"
 	"github.com/averix/api/internal/platform/database"
@@ -64,6 +65,7 @@ type App struct {
 	Portfolio   *portfolio.Service
 	Contracts   *contracts.Service
 	Messaging   *messaging.Service
+	Payments    *payments.Service
 	AI          *aiclient.Client
 	GitHub      *githubint.Service
 
@@ -121,6 +123,17 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	// is the only environment where a loopback preview is possible at all.
 	prober := preview.NewProber(cfg.AppURL, cfg.Env.IsDevelopment())
 
+	// Payments: the manual provider is always present, because an environment
+	// with no gateway still has to be able to run a marketplace. Its transfer
+	// details come from platform settings, which an administrator fills in
+	// once; until they do, it reports itself unconfigured and the product
+	// shows a configuration state rather than asking anyone to pay nowhere.
+	manual := payments.NewManual(func(ctx context.Context) payments.ManualSettings {
+		return manualSettings(ctx, settingsStore)
+	})
+	paymentRegistry := payments.NewRegistry(manual)
+	paymentStore := payments.NewStore(db)
+
 	a := &App{
 		Cfg:         cfg,
 		DB:          db,
@@ -158,6 +171,14 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		GitHub: githubint.NewService(githubStore, githubOAuth, cfg, ai, recorder,
 			redis, matchingStore, nil),
 	}
+	// Payments needs the contracts service, and contracts needs to know
+	// whether money can move at all. Constructing payments second and handing
+	// it back is what keeps that mutual need from being a construction cycle.
+	a.Payments = payments.NewService(paymentStore, paymentRegistry, a.Contracts,
+		recorder, settingsStore, nil)
+	a.Contracts.AttachFunder(a.Payments)
+	a.Payments.SyncProviders(ctx)
+
 	a.redisStartupError = redisErr
 	return a, nil
 }
@@ -260,6 +281,15 @@ func (a *App) Handler() http.Handler {
 		// Hiring is rate limited on success only: a client fixing a validation
 		// error should not burn their allowance.
 		RateLimitHire: a.AuthMW.RateLimitOnSuccess("contract_sign", 20, time.Hour),
+	})
+
+	payments.NewHandlers(a.Payments).Register(v1, payments.Middleware{
+		Require:       a.AuthMW.Require(),
+		CSRF:          a.AuthMW.CSRF(),
+		RequireClient: a.AuthMW.RequireRole(security.RoleClient),
+		RequireAdmin:  a.AuthMW.RequireRole(security.RoleAdmin),
+		VerifiedEmail: a.AuthMW.RequireVerifiedEmail(),
+		RateLimitFund: a.AuthMW.RateLimitOnSuccess("milestone_fund", 60, time.Hour),
 	})
 
 	messaging.NewHandlers(a.Messaging, a.Files, a.Cfg.AppURL, a.Cfg.Limits.MaxFileBytes).
@@ -387,4 +417,21 @@ func (p proposalAcceptance) DeclineOthers(ctx context.Context, projectID, accept
 	reason string) (int, error) {
 
 	return p.store.DeclineOthers(ctx, projectID, acceptedID, reason)
+}
+
+// manualSettings reads the manual provider's transfer details from platform
+// settings, where an administrator enters them once.
+//
+// Deliberately not environment variables: these change when a bank account
+// changes, which is an operational act by a person with an admin session, not
+// a redeployment.
+func manualSettings(ctx context.Context, store *settings.Store) payments.ManualSettings {
+	return payments.ManualSettings{
+		AccountName:   store.String(ctx, "payments.manual.account_name", ""),
+		AccountNumber: store.String(ctx, "payments.manual.account_number", ""),
+		BankName:      store.String(ctx, "payments.manual.bank_name", ""),
+		ExtraLabel:    store.String(ctx, "payments.manual.extra_label", ""),
+		ExtraValue:    store.String(ctx, "payments.manual.extra_value", ""),
+		Note:          store.String(ctx, "payments.manual.note", ""),
+	}
 }
