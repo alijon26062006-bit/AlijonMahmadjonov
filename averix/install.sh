@@ -216,6 +216,24 @@ fi
 bold "Building images (a few minutes the first time)"
 docker compose -f "$COMPOSE_FILE" build --pull
 
+# The API and the worker run as uid 65532 and write uploads to a named
+# volume. Docker creates a volume owned by root, and seeds ownership from the
+# image only while the volume is still empty — so a volume created before the
+# image carried that directory stays unwritable forever. One chown settles it
+# either way, and it touches nothing but the owner, so a volume with real
+# uploads in it is safe.
+volume="$(docker volume ls --format '{{.Name}}' 2>/dev/null \
+  | grep -E '_averix-storage$' | head -1 || true)"
+[ -n "$volume" ] || volume="averix_averix-storage"
+if docker run --rm -v "$volume:/data/storage" alpine:3 \
+     chown -R 65532:65532 /data/storage >/dev/null 2>&1; then
+  ok "Uploads volume is writable by the application"
+else
+  warn "Could not set ownership on the uploads volume ($volume)."
+  echo "  If the API reports \"permission denied\" on /data/storage, run:"
+  echo "    docker run --rm -v $volume:/data/storage alpine:3 chown -R 65532:65532 /data/storage"
+fi
+
 bold "Starting"
 if ! docker compose -f "$COMPOSE_FILE" up -d; then
   # Compose names the service that failed but never says why, and the
