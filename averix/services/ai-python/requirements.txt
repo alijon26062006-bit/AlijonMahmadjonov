@@ -1,0 +1,11 @@
+# Pinned for reproducible container builds.
+# Regenerate with: pip install -e . && pip freeze > requirements.txt
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+pydantic==2.13.5
+pydantic-settings==2.13.0
+httpx==0.28.1
+structlog==26.1.0
+# The model SDK. Absent from the image in environments with no model
+# configured; every endpoint degrades rather than failing.
+anthropic==0.75.0

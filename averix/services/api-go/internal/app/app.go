@@ -10,11 +10,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/averix/api/internal/aiclient"
 	"github.com/averix/api/internal/audit"
 	"github.com/averix/api/internal/auth"
 	"github.com/averix/api/internal/clients"
 	"github.com/averix/api/internal/config"
 	"github.com/averix/api/internal/developers"
+	"github.com/averix/api/internal/githubint"
 	"github.com/averix/api/internal/health"
 	"github.com/averix/api/internal/matching"
 	"github.com/averix/api/internal/platform/cache"
@@ -51,6 +53,8 @@ type App struct {
 	Matching    *matching.Store
 	Projects    *projects.Service
 	Proposals   *proposals.Service
+	AI          *aiclient.Client
+	GitHub      *githubint.Service
 
 	redisStartupError error
 }
@@ -89,6 +93,9 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	matchingStore := matching.NewStore(db)
 	projectStore := projects.NewStore(db)
 	proposalStore := proposals.NewStore(db, store.PublicURL)
+	ai := aiclient.New(cfg.AI)
+	githubStore := githubint.NewStore(db, sealer)
+	githubOAuth := githubint.NewOAuth(cfg.GitHub, db)
 
 	a := &App{
 		Cfg:         cfg,
@@ -112,6 +119,9 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		// interfaces are nil until then, and every call site checks.
 		Proposals: proposals.NewService(proposalStore, matchingStore, recorder,
 			settingsStore, nil, nil, nil),
+		AI: ai,
+		GitHub: githubint.NewService(githubStore, githubOAuth, cfg, ai, recorder,
+			redis, matchingStore, nil),
 	}
 	a.redisStartupError = redisErr
 	return a, nil
@@ -150,9 +160,19 @@ func (a *App) Handler() http.Handler {
 
 	// Health endpoints sit outside /api/v1 and outside authentication, because
 	// an orchestrator probing them has no session.
-	health.New(a.Cfg, health.Options{
+	//
+	// The analysis service is an optional dependency: without it technologies
+	// are still detected deterministically, so its absence is degraded rather
+	// than not-ready.
+	healthOptions := health.Options{
 		DB: a.DB, Cache: a.Cache, Storage: a.Storage, Version: Version,
-	}).Register(r)
+	}
+	if a.AI.Configured() {
+		healthOptions.Extra = append(healthOptions.Extra, health.Checker{
+			Name: "analysis_service", Required: false, Probe: a.AI.Health,
+		})
+	}
+	health.New(a.Cfg, healthOptions).Register(r)
 
 	v1 := r.Group("/api/v1",
 		httpx.MaxBody(a.Cfg.Limits.MaxRequestBytes),
@@ -195,6 +215,15 @@ func (a *App) Handler() http.Handler {
 		// The durable per-day cap lives in the service; this is the burst
 		// guard, which protects the endpoint rather than the marketplace.
 		RateLimitWrite: a.AuthMW.RateLimitOnSuccess("proposal_submit", 20, time.Hour),
+	})
+
+	githubint.NewHandlers(a.GitHub).Register(v1, githubint.Middleware{
+		Require:    a.AuthMW.Require(),
+		CSRF:       a.AuthMW.CSRF(),
+		RequireDev: a.AuthMW.RequireRole(security.RoleDeveloper),
+		// A sync costs GitHub API quota and several seconds of work, so it is
+		// limited well below the general write allowance.
+		RateLimitSync: a.AuthMW.RateLimit("github_sync", 6, time.Hour),
 	})
 
 	return r

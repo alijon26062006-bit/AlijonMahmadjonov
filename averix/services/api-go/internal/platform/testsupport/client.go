@@ -337,3 +337,35 @@ func (c *Client) Multipart(path, contentType string, body []byte) *Response {
 	}
 	return c.decode(resp, raw)
 }
+
+// Raw issues a request without following redirects and without requiring the
+// response to be the JSON envelope, for the endpoints that redirect a browser
+// (the OAuth callback).
+func (c *Client) Raw(method, path string, body []byte) *Response {
+	c.t.Helper()
+
+	var reader io.Reader
+	if body != nil {
+		reader = bytes.NewReader(body)
+	}
+	req, err := http.NewRequest(method, c.h.APIURL(path), reader)
+	if err != nil {
+		c.t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("Origin", "http://localhost:3000")
+	if c.csrf != "" {
+		req.Header.Set("X-CSRF-Token", c.csrf)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		c.t.Fatalf("%s %s: %v", method, path, err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.t.Fatalf("read response body: %v", err)
+	}
+	return &Response{Status: resp.StatusCode, Raw: raw, Header: resp.Header}
+}

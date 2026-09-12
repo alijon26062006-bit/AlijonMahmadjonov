@@ -1,0 +1,665 @@
+{
+  "$comment": [
+    "Canonical dependency-to-technology map for AVERIX.",
+    "",
+    "Both the Go service (which detects deterministically when the analysis",
+    "service is unavailable) and the Python analysis service read this file.",
+    "A second hand-maintained copy would drift, and detection that differs",
+    "depending on which service answered would be a genuinely confusing bug:",
+    "a developer's evidence would change without their profile changing.",
+    "",
+    "scripts/sync-reference-data.sh copies this into both services, and each",
+    "has a test that fails if its copy no longer matches.",
+    "",
+    "confidence: how strongly the dependency's presence proves the",
+    "technology. A framework import is near-certain; a driver or client",
+    "library is strong but says less about the surrounding work."
+  ],
+  "dependencies": [
+    {
+      "match": "@angular/core",
+      "skill": "angular",
+      "confidence": 0.95
+    },
+    {
+      "match": "@anthropic-ai/sdk",
+      "skill": "anthropic-api",
+      "confidence": 0.9
+    },
+    {
+      "match": "@apollo/server",
+      "skill": "graphql",
+      "confidence": 0.9
+    },
+    {
+      "match": "@aws-sdk/client-s3",
+      "skill": "s3",
+      "confidence": 0.85
+    },
+    {
+      "match": "@nestjs/core",
+      "skill": "nestjs",
+      "confidence": 0.95
+    },
+    {
+      "match": "@playwright/test",
+      "skill": "testing",
+      "confidence": 0.85
+    },
+    {
+      "match": "@prisma/client",
+      "skill": "sql",
+      "confidence": 0.7
+    },
+    {
+      "match": "@supabase/supabase-js",
+      "skill": "supabase",
+      "confidence": 0.9
+    },
+    {
+      "match": "@telegram-apps/sdk",
+      "skill": "telegram-mini-apps",
+      "confidence": 0.95
+    },
+    {
+      "match": "actix-web",
+      "skill": "rust",
+      "confidence": 0.8
+    },
+    {
+      "match": "aiogram",
+      "skill": "aiogram",
+      "confidence": 0.95
+    },
+    {
+      "match": "anthropic",
+      "skill": "anthropic-api",
+      "confidence": 0.9
+    },
+    {
+      "match": "asyncpg",
+      "skill": "postgresql",
+      "confidence": 0.9
+    },
+    {
+      "match": "aws-sdk",
+      "skill": "aws",
+      "confidence": 0.85
+    },
+    {
+      "match": "axum",
+      "skill": "rust",
+      "confidence": 0.8
+    },
+    {
+      "match": "boto3",
+      "skill": "aws",
+      "confidence": 0.85
+    },
+    {
+      "match": "celery",
+      "skill": "celery",
+      "confidence": 0.9
+    },
+    {
+      "match": "clickhouse-driver",
+      "skill": "clickhouse",
+      "confidence": 0.85
+    },
+    {
+      "match": "django",
+      "skill": "django",
+      "confidence": 0.95
+    },
+    {
+      "match": "doctrine/orm",
+      "skill": "sql",
+      "confidence": 0.75
+    },
+    {
+      "match": "elasticsearch",
+      "skill": "elasticsearch",
+      "confidence": 0.85
+    },
+    {
+      "match": "express",
+      "skill": "express",
+      "confidence": 0.9
+    },
+    {
+      "match": "fastapi",
+      "skill": "fastapi",
+      "confidence": 0.95
+    },
+    {
+      "match": "firebase",
+      "skill": "firebase",
+      "confidence": 0.9
+    },
+    {
+      "match": "firebase_core",
+      "skill": "firebase",
+      "confidence": 0.85
+    },
+    {
+      "match": "flask",
+      "skill": "flask",
+      "confidence": 0.95
+    },
+    {
+      "match": "flutter",
+      "skill": "flutter",
+      "confidence": 0.95
+    },
+    {
+      "match": "github.com/99designs/gqlgen",
+      "skill": "graphql",
+      "confidence": 0.9
+    },
+    {
+      "match": "github.com/aws/aws-sdk-go",
+      "skill": "aws",
+      "confidence": 0.85
+    },
+    {
+      "match": "github.com/gin-gonic/gin",
+      "skill": "gin",
+      "confidence": 0.95
+    },
+    {
+      "match": "github.com/go-redis/redis",
+      "skill": "redis",
+      "confidence": 0.9
+    },
+    {
+      "match": "github.com/go-sql-driver/mysql",
+      "skill": "mysql",
+      "confidence": 0.9
+    },
+    {
+      "match": "github.com/go-telegram-bot-api/telegram-bot-api",
+      "skill": "telegram-api",
+      "confidence": 0.95
+    },
+    {
+      "match": "github.com/gofiber/fiber",
+      "skill": "fiber",
+      "confidence": 0.95
+    },
+    {
+      "match": "github.com/golang-jwt/jwt",
+      "skill": "oauth2",
+      "confidence": 0.6
+    },
+    {
+      "match": "github.com/gorilla/websocket",
+      "skill": "websocket",
+      "confidence": 0.85
+    },
+    {
+      "match": "github.com/graphql-go/graphql",
+      "skill": "graphql",
+      "confidence": 0.85
+    },
+    {
+      "match": "github.com/jackc/pgx",
+      "skill": "postgresql",
+      "confidence": 0.9
+    },
+    {
+      "match": "github.com/labstack/echo",
+      "skill": "echo",
+      "confidence": 0.95
+    },
+    {
+      "match": "github.com/lib/pq",
+      "skill": "postgresql",
+      "confidence": 0.9
+    },
+    {
+      "match": "github.com/minio/minio-go",
+      "skill": "s3",
+      "confidence": 0.85
+    },
+    {
+      "match": "github.com/prometheus/client_golang",
+      "skill": "prometheus",
+      "confidence": 0.85
+    },
+    {
+      "match": "github.com/redis/go-redis",
+      "skill": "redis",
+      "confidence": 0.9
+    },
+    {
+      "match": "github.com/stripe/stripe-go",
+      "skill": "stripe",
+      "confidence": 0.9
+    },
+    {
+      "match": "go.mongodb.org/mongo-driver",
+      "skill": "mongodb",
+      "confidence": 0.9
+    },
+    {
+      "match": "golang.org/x/oauth2",
+      "skill": "oauth2",
+      "confidence": 0.8
+    },
+    {
+      "match": "google.golang.org/grpc",
+      "skill": "grpc",
+      "confidence": 0.9
+    },
+    {
+      "match": "gopkg.in/telebot",
+      "skill": "telegram-api",
+      "confidence": 0.95
+    },
+    {
+      "match": "gorm.io/driver/postgres",
+      "skill": "postgresql",
+      "confidence": 0.85
+    },
+    {
+      "match": "graphql",
+      "skill": "graphql",
+      "confidence": 0.85
+    },
+    {
+      "match": "ioredis",
+      "skill": "redis",
+      "confidence": 0.85
+    },
+    {
+      "match": "jest",
+      "skill": "testing",
+      "confidence": 0.8
+    },
+    {
+      "match": "k8s.io/client-go",
+      "skill": "kubernetes",
+      "confidence": 0.85
+    },
+    {
+      "match": "langchain",
+      "skill": "langchain",
+      "confidence": 0.9
+    },
+    {
+      "match": "laravel/framework",
+      "skill": "laravel",
+      "confidence": 0.95
+    },
+    {
+      "match": "microsoft.aspnetcore",
+      "skill": "aspnet-core",
+      "confidence": 0.95
+    },
+    {
+      "match": "mongoose",
+      "skill": "mongodb",
+      "confidence": 0.9
+    },
+    {
+      "match": "motor",
+      "skill": "mongodb",
+      "confidence": 0.85
+    },
+    {
+      "match": "mysql2",
+      "skill": "mysql",
+      "confidence": 0.85
+    },
+    {
+      "match": "mysqlclient",
+      "skill": "mysql",
+      "confidence": 0.9
+    },
+    {
+      "match": "next",
+      "skill": "nextjs",
+      "confidence": 0.95
+    },
+    {
+      "match": "node-telegram-bot-api",
+      "skill": "telegram-api",
+      "confidence": 0.9
+    },
+    {
+      "match": "npgsql",
+      "skill": "postgresql",
+      "confidence": 0.9
+    },
+    {
+      "match": "nuxt",
+      "skill": "nuxt",
+      "confidence": 0.95
+    },
+    {
+      "match": "openai",
+      "skill": "openai-api",
+      "confidence": 0.9
+    },
+    {
+      "match": "opencv-python",
+      "skill": "opencv",
+      "confidence": 0.9
+    },
+    {
+      "match": "org.springframework.boot",
+      "skill": "spring-boot",
+      "confidence": 0.95
+    },
+    {
+      "match": "pandas",
+      "skill": "pandas",
+      "confidence": 0.9
+    },
+    {
+      "match": "pg",
+      "skill": "postgresql",
+      "confidence": 0.8
+    },
+    {
+      "match": "playwright",
+      "skill": "testing",
+      "confidence": 0.8
+    },
+    {
+      "match": "predis/predis",
+      "skill": "redis",
+      "confidence": 0.85
+    },
+    {
+      "match": "prisma",
+      "skill": "sql",
+      "confidence": 0.7
+    },
+    {
+      "match": "psycopg",
+      "skill": "postgresql",
+      "confidence": 0.9
+    },
+    {
+      "match": "psycopg2",
+      "skill": "postgresql",
+      "confidence": 0.9
+    },
+    {
+      "match": "pydantic",
+      "skill": "fastapi",
+      "confidence": 0.4
+    },
+    {
+      "match": "pymongo",
+      "skill": "mongodb",
+      "confidence": 0.9
+    },
+    {
+      "match": "pymysql",
+      "skill": "mysql",
+      "confidence": 0.9
+    },
+    {
+      "match": "pytelegrambotapi",
+      "skill": "telebot",
+      "confidence": 0.95
+    },
+    {
+      "match": "pytest",
+      "skill": "testing",
+      "confidence": 0.8
+    },
+    {
+      "match": "python-telegram-bot",
+      "skill": "telegram-api",
+      "confidence": 0.95
+    },
+    {
+      "match": "rails",
+      "skill": "ruby",
+      "confidence": 0.9
+    },
+    {
+      "match": "react",
+      "skill": "react",
+      "confidence": 0.9
+    },
+    {
+      "match": "react-native",
+      "skill": "react-native",
+      "confidence": 0.95
+    },
+    {
+      "match": "redis",
+      "skill": "redis",
+      "confidence": 0.85
+    },
+    {
+      "match": "sinatra",
+      "skill": "ruby",
+      "confidence": 0.85
+    },
+    {
+      "match": "socket.io",
+      "skill": "websocket",
+      "confidence": 0.9
+    },
+    {
+      "match": "spring-boot-starter",
+      "skill": "spring-boot",
+      "confidence": 0.95
+    },
+    {
+      "match": "sqlalchemy",
+      "skill": "sql",
+      "confidence": 0.8
+    },
+    {
+      "match": "sqlx",
+      "skill": "sql",
+      "confidence": 0.75
+    },
+    {
+      "match": "stripe",
+      "skill": "stripe",
+      "confidence": 0.9
+    },
+    {
+      "match": "stripe/stripe-php",
+      "skill": "stripe",
+      "confidence": 0.9
+    },
+    {
+      "match": "svelte",
+      "skill": "svelte",
+      "confidence": 0.9
+    },
+    {
+      "match": "symfony/framework-bundle",
+      "skill": "symfony",
+      "confidence": 0.95
+    },
+    {
+      "match": "symfony/symfony",
+      "skill": "symfony",
+      "confidence": 0.95
+    },
+    {
+      "match": "tailwindcss",
+      "skill": "tailwind",
+      "confidence": 0.9
+    },
+    {
+      "match": "telegraf",
+      "skill": "telegraf",
+      "confidence": 0.95
+    },
+    {
+      "match": "tokio",
+      "skill": "rust",
+      "confidence": 0.75
+    },
+    {
+      "match": "torch",
+      "skill": "pytorch",
+      "confidence": 0.9
+    },
+    {
+      "match": "typescript",
+      "skill": "typescript",
+      "confidence": 0.85
+    },
+    {
+      "match": "uvicorn",
+      "skill": "fastapi",
+      "confidence": 0.5
+    },
+    {
+      "match": "vitest",
+      "skill": "testing",
+      "confidence": 0.8
+    },
+    {
+      "match": "vue",
+      "skill": "vue",
+      "confidence": 0.9
+    },
+    {
+      "match": "ws",
+      "skill": "websocket",
+      "confidence": 0.8
+    }
+  ],
+  "$base_images_comment": "A container base image is what the developer actually deploys.",
+  "base_images": [
+    {
+      "prefix": "clickhouse",
+      "skill": "clickhouse"
+    },
+    {
+      "prefix": "eclipse-temurin",
+      "skill": "java"
+    },
+    {
+      "prefix": "golang",
+      "skill": "go"
+    },
+    {
+      "prefix": "mcr.microsoft.com/dotnet",
+      "skill": "csharp"
+    },
+    {
+      "prefix": "mongo",
+      "skill": "mongodb"
+    },
+    {
+      "prefix": "mysql",
+      "skill": "mysql"
+    },
+    {
+      "prefix": "nginx",
+      "skill": "nginx"
+    },
+    {
+      "prefix": "node",
+      "skill": "javascript"
+    },
+    {
+      "prefix": "openjdk",
+      "skill": "java"
+    },
+    {
+      "prefix": "php",
+      "skill": "php"
+    },
+    {
+      "prefix": "postgres",
+      "skill": "postgresql"
+    },
+    {
+      "prefix": "python",
+      "skill": "python"
+    },
+    {
+      "prefix": "redis",
+      "skill": "redis"
+    },
+    {
+      "prefix": "ruby",
+      "skill": "ruby"
+    },
+    {
+      "prefix": "rust",
+      "skill": "rust"
+    }
+  ],
+  "$compose_services_comment": "A composed service is infrastructure they have actually run.",
+  "compose_services": [
+    {
+      "prefix": "clickhouse",
+      "skill": "clickhouse"
+    },
+    {
+      "prefix": "elasticsearch",
+      "skill": "elasticsearch"
+    },
+    {
+      "prefix": "grafana/grafana",
+      "skill": "grafana"
+    },
+    {
+      "prefix": "mariadb",
+      "skill": "mysql"
+    },
+    {
+      "prefix": "minio/minio",
+      "skill": "s3"
+    },
+    {
+      "prefix": "mongo",
+      "skill": "mongodb"
+    },
+    {
+      "prefix": "mysql",
+      "skill": "mysql"
+    },
+    {
+      "prefix": "nginx",
+      "skill": "nginx"
+    },
+    {
+      "prefix": "postgis",
+      "skill": "postgresql"
+    },
+    {
+      "prefix": "postgres",
+      "skill": "postgresql"
+    },
+    {
+      "prefix": "prom/prometheus",
+      "skill": "prometheus"
+    },
+    {
+      "prefix": "rabbitmq",
+      "skill": "celery"
+    },
+    {
+      "prefix": "redis",
+      "skill": "redis"
+    },
+    {
+      "prefix": "traefik",
+      "skill": "nginx"
+    }
+  ],
+  "separators": [
+    "/",
+    "@",
+    "-",
+    ":",
+    "."
+  ],
+  "$separators_comment": "Package names extend their base in several conventions, all meaning the same technology: a Go module path, a scoped npm name, a variant distribution (psycopg2-binary), or a Maven coordinate."
+}

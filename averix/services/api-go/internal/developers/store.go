@@ -343,18 +343,11 @@ func (s *Store) SetSkills(ctx context.Context, userID uuid.UUID, skills []SkillI
 			return fmt.Errorf("clear skills: %w", err)
 		}
 		for i, sk := range skills {
-			// A nil slice would be written as SQL NULL, which the NOT NULL
-			// evidence column refuses; a skill with no corroboration yet has
-			// an empty array, not a missing one.
-			carried := evidence[sk.SkillID]
-			if carried == nil {
-				carried = []string{}
-			}
 			if _, err := q.Exec(ctx, `
 				INSERT INTO developer_skills (user_id, skill_id, level, years, is_primary, evidence, sort_order)
 				VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 				userID, sk.SkillID, sk.Level, sk.Years, sk.Primary,
-				carried, i); err != nil {
+				database.Array(evidence[sk.SkillID]), i); err != nil {
 				return fmt.Errorf("insert skill: %w", err)
 			}
 		}

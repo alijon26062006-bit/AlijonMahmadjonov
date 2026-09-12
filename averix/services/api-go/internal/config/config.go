@@ -99,6 +99,11 @@ type GitHub struct {
 	ClientSecret string
 	CallbackURL  string
 	APIBaseURL   string
+	// The OAuth endpoints. Configurable because GitHub Enterprise serves them
+	// from the installation's own host, and because a hard-coded host cannot
+	// be tested against a fake.
+	AuthorizeURL string
+	TokenURL     string
 	// Scopes requested for a normal connection. Private repository access asks
 	// for "repo" separately, on an explicit second consent.
 	Scopes []string
@@ -211,6 +216,8 @@ func Load() (*Config, error) {
 			ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
 			CallbackURL:  os.Getenv("GITHUB_CALLBACK_URL"),
 			APIBaseURL:   strDefault("GITHUB_API_BASE_URL", "https://api.github.com"),
+			AuthorizeURL: strDefault("GITHUB_AUTHORIZE_URL", "https://github.com/login/oauth/authorize"),
+			TokenURL:     strDefault("GITHUB_TOKEN_URL", "https://github.com/login/oauth/access_token"),
 			Scopes:       splitList(strDefault("GITHUB_SCOPES", "read:user,user:email")),
 		},
 		AI: AI{

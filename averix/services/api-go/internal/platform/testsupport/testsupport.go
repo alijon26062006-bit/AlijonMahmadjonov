@@ -9,6 +9,7 @@ package testsupport
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -39,7 +41,11 @@ type Harness struct {
 
 // New builds the harness, skipping the test when no test database is
 // configured, so `go test ./...` still works on a machine without one.
-func New(t *testing.T) *Harness {
+func New(t *testing.T) *Harness { return NewWith(t, nil) }
+
+// NewWith builds the harness with extra environment, for the tests that need
+// an integration pointed at a fake (GitHub, the analysis service).
+func NewWith(t *testing.T, extra map[string]string) *Harness {
 	t.Helper()
 
 	base := os.Getenv("TEST_DATABASE_URL")
@@ -68,6 +74,12 @@ func New(t *testing.T) *Harness {
 		"API_URL":      "http://localhost:8080",
 		"DATABASE_URL": dsn,
 		"REDIS_URL":    envOr("TEST_REDIS_URL", "redis://localhost:6379/15"),
+		// A key prefix per package, for the same reason as the database per
+		// package: the rate limiter is keyed by client address, every test
+		// connects from 127.0.0.1, and parallel packages sharing one Redis
+		// would exhaust each other's sign-up allowance. That failed only
+		// under `go test ./...`, which is the worst way for it to fail.
+		"REDIS_PREFIX": "averix-test-" + packageSuffix(),
 		"S3_DRIVER":    "filesystem",
 		"STORAGE_ROOT": t.TempDir(),
 		"LOG_LEVEL":    envOr("TEST_LOG_LEVEL", "error"),
@@ -81,6 +93,10 @@ func New(t *testing.T) *Harness {
 		"RATE_LIMIT_AUTH": "10000",
 	}
 	for k, v := range env {
+		t.Setenv(k, v)
+	}
+	// Applied after the defaults so a test can override any of them.
+	for k, v := range extra {
 		t.Setenv(k, v)
 	}
 
@@ -473,4 +489,220 @@ func packageSuffix() string {
 		return ""
 	}
 	return out
+}
+
+// FakeGitHub is an httptest server standing in for GitHub's API and OAuth
+// endpoints.
+//
+// The flow is worth testing end to end — the state is single-use, the identity
+// comes from the token rather than from anything the caller supplies, and a
+// second account must not be able to claim the same GitHub identity. None of
+// that can be checked against the real GitHub.
+type FakeGitHub struct {
+	Server *httptest.Server
+	// The identity /user returns. Tests change it to simulate a different
+	// GitHub account.
+	UserID    int64
+	Login     string
+	Name      string
+	Repos     []map[string]any
+	Languages map[string]map[string]int64
+	Files     map[string]map[string]string
+	// Set to make the token exchange or the user lookup fail.
+	FailExchange bool
+	FailUser     bool
+	// Scopes the exchange reports back.
+	Scopes string
+	// Recorded for assertions.
+	ExchangedCodes []string
+	mu             sync.Mutex
+}
+
+// NewFakeGitHub starts the fake and returns it with the environment variables
+// that point the application at it.
+func NewFakeGitHub(t *testing.T) *FakeGitHub {
+	t.Helper()
+
+	fake := &FakeGitHub{
+		UserID:    424242,
+		Login:     "alidev",
+		Name:      "Ali Mahmadjonov",
+		Scopes:    "read:user,user:email",
+		Languages: map[string]map[string]int64{},
+		Files:     map[string]map[string]string{},
+	}
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /login/oauth/access_token", func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		fake.mu.Lock()
+		fake.ExchangedCodes = append(fake.ExchangedCodes, r.FormValue("code"))
+		failing := fake.FailExchange
+		scopes := fake.Scopes
+		fake.mu.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		if failing {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error":             "bad_verification_code",
+				"error_description": "the code is invalid",
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "gho_" + r.FormValue("code"),
+			"token_type":   "bearer",
+			"scope":        scopes,
+		})
+	})
+
+	mux.HandleFunc("GET /user", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		fake.mu.Lock()
+		failing, id, login, name := fake.FailUser, fake.UserID, fake.Login, fake.Name
+		fake.mu.Unlock()
+
+		if failing {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":           id,
+			"login":        login,
+			"name":         name,
+			"html_url":     "https://github.com/" + login,
+			"avatar_url":   "https://avatars.example/" + login,
+			"public_repos": 12,
+			"followers":    34,
+			"created_at":   "2019-04-01T10:00:00Z",
+		})
+	})
+
+	mux.HandleFunc("GET /user/repos", func(w http.ResponseWriter, r *http.Request) {
+		fake.mu.Lock()
+		repos := fake.Repos
+		fake.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		// One page: the client stops when a page is short.
+		if r.URL.Query().Get("page") != "1" && r.URL.Query().Get("page") != "" {
+			_ = json.NewEncoder(w).Encode([]any{})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(repos)
+	})
+
+	mux.HandleFunc("GET /repos/{owner}/{repo}/languages", func(w http.ResponseWriter, r *http.Request) {
+		key := r.PathValue("owner") + "/" + r.PathValue("repo")
+		fake.mu.Lock()
+		languages := fake.Languages[key]
+		fake.mu.Unlock()
+		if languages == nil {
+			languages = map[string]int64{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(languages)
+	})
+
+	// One handler for both the root listing and a single file: Go's ServeMux
+	// treats "/contents/" and "/contents/{path...}" as the same pattern, and
+	// an empty path means the listing.
+	mux.HandleFunc("GET /repos/{owner}/{repo}/contents/{path...}",
+		func(w http.ResponseWriter, r *http.Request) {
+			key := r.PathValue("owner") + "/" + r.PathValue("repo")
+			path := r.PathValue("path")
+
+			fake.mu.Lock()
+			files := fake.Files[key]
+			fake.mu.Unlock()
+
+			w.Header().Set("Content-Type", "application/json")
+
+			if path == "" {
+				// The root listing, so the analyser only asks for manifests
+				// that exist rather than guessing sixteen names per repository.
+				entries := make([]map[string]any, 0, len(files))
+				for name := range files {
+					entries = append(entries, map[string]any{"name": name, "type": "file"})
+				}
+				_ = json.NewEncoder(w).Encode(entries)
+				return
+			}
+
+			content, ok := files[path]
+			if !ok {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"type":     "file",
+				"size":     len(content),
+				"encoding": "base64",
+				"content":  base64.StdEncoding.EncodeToString([]byte(content)),
+			})
+		})
+
+	mux.HandleFunc("GET /repos/{owner}/{repo}/readme", func(w http.ResponseWriter, r *http.Request) {
+		key := r.PathValue("owner") + "/" + r.PathValue("repo")
+		fake.mu.Lock()
+		content, ok := fake.Files[key]["README.md"]
+		fake.mu.Unlock()
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"size":     len(content),
+			"encoding": "base64",
+			"content":  base64.StdEncoding.EncodeToString([]byte(content)),
+		})
+	})
+
+	fake.Server = httptest.NewServer(mux)
+	t.Cleanup(fake.Server.Close)
+	return fake
+}
+
+// Env returns the environment that points the application at the fake.
+func (f *FakeGitHub) Env() map[string]string {
+	return map[string]string{
+		"GITHUB_CLIENT_ID":     "test-client-id",
+		"GITHUB_CLIENT_SECRET": "test-client-secret-long-enough",
+		"GITHUB_API_BASE_URL":  f.Server.URL,
+		"GITHUB_AUTHORIZE_URL": f.Server.URL + "/login/oauth/authorize",
+		"GITHUB_TOKEN_URL":     f.Server.URL + "/login/oauth/access_token",
+	}
+}
+
+// SetIdentity changes the account /user reports.
+func (f *FakeGitHub) SetIdentity(id int64, login string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.UserID, f.Login = id, login
+}
+
+// AddRepository registers a repository with its languages and files.
+func (f *FakeGitHub) AddRepository(repo map[string]any, languages map[string]int64, files map[string]string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Repos = append(f.Repos, repo)
+	fullName, _ := repo["full_name"].(string)
+	if languages != nil {
+		f.Languages[fullName] = languages
+	}
+	if files != nil {
+		f.Files[fullName] = files
+	}
+}
+
+// Fail makes the exchange or the user lookup fail.
+func (f *FakeGitHub) Fail(exchange, user bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.FailExchange, f.FailUser = exchange, user
 }

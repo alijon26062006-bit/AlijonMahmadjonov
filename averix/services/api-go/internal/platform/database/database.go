@@ -190,3 +190,17 @@ func (db *DB) Stats() map[string]any {
 		"canceled_acquire": s.CanceledAcquireCount(),
 	}
 }
+
+// Array prepares a slice for a NOT NULL array column.
+//
+// A nil Go slice is written as SQL NULL, which a `text[] NOT NULL DEFAULT '{}'`
+// column refuses — and the difference between "no topics" and "unknown
+// topics" is not one the schema wants to carry. Every write to such a column
+// goes through this, so an absent field means an empty array rather than a
+// failed insert.
+func Array[T any](values []T) []T {
+	if values == nil {
+		return []T{}
+	}
+	return values
+}
