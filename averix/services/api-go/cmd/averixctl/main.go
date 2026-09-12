@@ -9,8 +9,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/averix/api/internal/config"
 	"github.com/averix/api/internal/platform/database"
@@ -19,6 +21,7 @@ import (
 const usage = `averixctl — AVERIX operations
 
 Usage:
+  averixctl healthcheck        probe the local API over HTTP (used by Docker)
   averixctl migrate            apply every pending migration
   averixctl migrate status     list migrations and whether they are applied
   averixctl migrate rollback   revert the most recent migration
@@ -51,6 +54,8 @@ func run(args []string) error {
 		return createAdminCmd(ctx, args[1:])
 	case "seed":
 		return seedCmd(ctx, args[1:])
+	case "healthcheck":
+		return healthcheckCmd(ctx)
 	case "health":
 		return healthCmd(ctx)
 	case "help", "-h", "--help":
@@ -185,4 +190,35 @@ func prompt(label string) (string, error) {
 		return "", fmt.Errorf("read %s: %w", strings.TrimSpace(label), err)
 	}
 	return strings.TrimSpace(line), nil
+}
+
+// healthcheckCmd probes the API over its own HTTP port.
+//
+// This is what the container health check runs. It exists as a subcommand
+// because the runtime image is distroless: there is no curl and no shell in
+// it, which is the point — but a container still has to be able to say
+// whether it is alive.
+func healthcheckCmd(ctx context.Context) error {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	probeCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+
+	request, err := http.NewRequestWithContext(probeCtx, http.MethodGet,
+		"http://127.0.0.1:"+port+"/health", nil)
+	if err != nil {
+		return err
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("api is not answering on port %s: %w", port, err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("api answered %d", response.StatusCode)
+	}
+	return nil
 }

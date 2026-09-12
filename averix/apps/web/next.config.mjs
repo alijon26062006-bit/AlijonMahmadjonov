@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // The production image runs the standalone server, which carries only the
+  // dependencies the built pages actually import.
+  output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
   // The floating development badge sits on top of the bottom navigation,

@@ -1,0 +1,80 @@
+# Development stack.
+#
+# Everything the product needs to run locally, with the code mounted so a
+# change is visible without rebuilding an image. Production is a different
+# file — see docker-compose.production.yml.
+
+name: averix-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: averix
+      POSTGRES_PASSWORD: averix
+      POSTGRES_DB: averix
+    ports: ['5432:5432']
+    volumes: ['averix-postgres:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U averix -d averix']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports: ['6379:6379']
+    volumes: ['averix-redis:/data']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./services/api-go
+    environment:
+      APP_ENV: development
+      APP_URL: http://localhost:3000
+      API_URL: http://localhost:8080
+      DATABASE_URL: postgres://averix:averix@postgres:5432/averix?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      S3_DRIVER: filesystem
+      STORAGE_ROOT: /data/storage
+      S3_PUBLIC_BASE_URL: http://localhost:3000/api/v1/files
+      COOKIE_SECRET: development-cookie-secret-not-for-production-0000
+      DATA_ENCRYPTION_KEY: development-data-key-not-for-production-000000
+      AI_SERVICE_URL: http://ai:8000
+      AI_SERVICE_TOKEN: development-ai-token
+      LOG_LEVEL: debug
+      LOG_FORMAT: text
+    ports: ['8080:8080']
+    volumes: ['averix-storage:/data/storage']
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  ai:
+    build:
+      context: ./services/ai-python
+    environment:
+      APP_ENV: development
+      AI_SERVICE_TOKEN: development-ai-token
+      LOG_LEVEL: debug
+    ports: ['8000:8000']
+
+  web:
+    build:
+      context: ./apps/web
+    environment:
+      NODE_ENV: production
+      AVERIX_API_URL: http://api:8080
+    ports: ['3000:3000']
+    depends_on: [api]
+
+volumes:
+  averix-postgres:
+  averix-redis:
+  averix-storage:

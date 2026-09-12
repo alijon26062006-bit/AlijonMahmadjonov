@@ -1,0 +1,70 @@
+# AVERIX reverse proxy.
+#
+# Caddy gets and renews the certificate itself, so HTTPS needs no cron job and
+# no manual renewal. Point the domain's A record at this server and start the
+# stack; the certificate is issued on the first request.
+
+{
+	email {$ACME_EMAIL}
+	# Answers on every interface inside the container; the compose file
+	# decides what is published.
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+{$AVERIX_DOMAIN} {
+	encode zstd gzip
+
+	# Security headers for everything this origin serves.
+	header {
+		# HTTPS only, including subdomains, and ask for preloading. Remove
+		# the preload token if you are not ready for that commitment.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		# The product is never framed by anyone else. Its own preview
+		# browser frames other sites, which this does not affect.
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+		X-Robots-Tag "index, follow"
+		-Server
+	}
+
+	# The API, including the WebSocket upgrade — Caddy passes it through
+	# without extra configuration.
+	handle /api/* {
+		reverse_proxy api:8080 {
+			header_up X-Real-IP {remote_host}
+			# Long enough for a large upload on a slow connection, short
+			# enough that a stalled request does not hold a worker.
+			transport http {
+				read_timeout 120s
+				write_timeout 120s
+			}
+		}
+	}
+
+	handle /health {
+		reverse_proxy api:8080
+	}
+
+	handle /ready {
+		reverse_proxy api:8080
+	}
+
+	# Everything else is the web application.
+	handle {
+		reverse_proxy web:3000
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+# Uncomment to serve the bare domain as well as www, or the other way round.
+# www.{$AVERIX_DOMAIN} {
+# 	redir https://{$AVERIX_DOMAIN}{uri} permanent
+# }

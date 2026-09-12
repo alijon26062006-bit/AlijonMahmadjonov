@@ -290,6 +290,25 @@ func (s *Service) Sync(ctx context.Context, id *security.Identity, trigger strin
 	return analysis, nil
 }
 
+// SyncForUser runs a sync for one account without a session.
+//
+// The background worker's entry point: the same path a developer's own
+// refresh takes, minus the identity checks that only make sense inside a
+// request. It acts on behalf of nobody — it re-reads what the developer
+// already connected.
+func (s *Service) SyncForUser(ctx context.Context, userID uuid.UUID, trigger string) error {
+	account, err := s.store.ByUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if account == nil {
+		// Disconnected between the enqueue and now; nothing to do.
+		return nil
+	}
+	_, err = s.runSync(ctx, account, trigger)
+	return err
+}
+
 func (s *Service) runSync(ctx context.Context, account *Account, trigger string) (*Analysis, error) {
 	analysisID, err := s.store.StartAnalysis(ctx, account.ID, trigger)
 	if err != nil {

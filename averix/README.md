@@ -62,6 +62,21 @@ Accounts it creates all use the password `correct horse battery staple`:
 | Developer | saida@example.dev |
 | Administrator | ops@averix.example |
 
+## Putting it on a server
+
+One server, one command, HTTPS included:
+
+```bash
+git clone <this repository> /srv/averix && cd /srv/averix
+cp .env.example .env && nano .env      # domain, email, three generated secrets
+docker compose -f docker-compose.production.yml up -d --build
+```
+
+Migrations run before the API starts, Caddy gets the certificate itself, and
+`/ready` reports every dependency by name. The whole procedure, including
+backups, the first administrator and what to do when something is wrong, is in
+[`docs/deployment.md`](docs/deployment.md).
+
 ## Tests
 
 ```bash

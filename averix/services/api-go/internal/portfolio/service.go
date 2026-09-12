@@ -844,6 +844,26 @@ func (s *Service) CheckURL(ctx context.Context, id *security.Identity, projectID
 	return &result, nil
 }
 
+// RecheckPreview re-probes one project's live link.
+//
+// The background worker's entry point. No identity: it re-checks an address
+// the developer already saved, which already passed the URL guard — the only
+// kind of address this service ever fetches.
+func (s *Service) RecheckPreview(ctx context.Context, projectID uuid.UUID) error {
+	project, err := s.store.ByID(ctx, projectID)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	if project.ProjectURL == "" {
+		return nil
+	}
+	s.verdictFor(ctx, project, true)
+	return nil
+}
+
 // verdictFor returns the cached verdict, re-probing when it is missing, stale,
 // or the caller asked for a fresh answer.
 //

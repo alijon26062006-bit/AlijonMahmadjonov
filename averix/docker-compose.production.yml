@@ -1,0 +1,181 @@
+# Production stack.
+#
+# One server, four containers and a reverse proxy that gets its own
+# certificate. Everything reads from .env — there are no secrets in this file
+# and none in the image.
+#
+#   docker compose -f docker-compose.production.yml up -d
+#
+# Migrations run before the API starts (see the `migrate` service), so a
+# deployment never requires anyone to create a table by hand.
+
+name: averix
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-averix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-averix}
+      # Checksums catch silent corruption early, which matters for the one
+      # thing here that cannot be rebuilt.
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - averix-postgres:/var/lib/postgresql/data
+      - ./infrastructure/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    command:
+      ['postgres', '-c', 'config_file=/etc/postgresql/postgresql.conf']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-averix} -d ${POSTGRES_DB:-averix}']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    # Not published: the database is reachable only from this network.
+    expose: ['5432']
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      # Sessions and rate-limit counters live here; evicting the least
+      # recently used key is the right failure mode when memory runs out.
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes: ['averix-redis:/data']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    expose: ['6379']
+    logging: *logging
+
+  # Runs to completion before the API starts, and again on every deployment.
+  # Applying a migration twice is a no-op; forgetting to apply one is an
+  # outage, so this is not optional and not manual.
+  migrate:
+    build:
+      context: ./services/api-go
+      args:
+        VERSION: ${AVERIX_VERSION:-dev}
+    restart: 'no'
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-averix}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-averix}?sslmode=disable
+    entrypoint: ['/usr/local/bin/averixctl', 'migrate']
+    depends_on:
+      postgres: { condition: service_healthy }
+    logging: *logging
+
+  api:
+    build:
+      context: ./services/api-go
+      args:
+        VERSION: ${AVERIX_VERSION:-dev}
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      APP_ENV: production
+      PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-averix}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-averix}?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      AI_SERVICE_URL: http://ai:8000
+      # The proxy terminates TLS and sets X-Forwarded-For; without this the
+      # rate limiter would see one address for the whole internet.
+      TRUST_PROXY_HEADERS: 'true'
+    volumes:
+      # Only used by the filesystem storage driver. With S3 configured this
+      # holds nothing.
+      - averix-storage:/data/storage
+    expose: ['8080']
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    logging: *logging
+
+  worker:
+    build:
+      context: ./services/api-go
+      args:
+        VERSION: ${AVERIX_VERSION:-dev}
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-averix}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-averix}?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      AI_SERVICE_URL: http://ai:8000
+    entrypoint: ['/usr/local/bin/averix-worker']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    logging: *logging
+
+  ai:
+    build:
+      context: ./services/ai-python
+    restart: unless-stopped
+    # Deliberately not env_file: this container has no business holding the
+    # cookie secret, the database password or the payment keys. It gets the
+    # three values it actually uses and nothing else.
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?set AI_SERVICE_TOKEN in .env}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-sonnet-5}
+    # Never published. Reachable only from the API, and authenticated by
+    # AI_SERVICE_TOKEN even then.
+    expose: ['8000']
+    logging: *logging
+
+  web:
+    build:
+      context: ./apps/web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      AVERIX_API_URL: http://api:8080
+    expose: ['3000']
+    depends_on: [api]
+    logging: *logging
+
+  # The only container with published ports. Gets and renews its own
+  # certificate from Let's Encrypt; nothing else needs to know about TLS.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      AVERIX_DOMAIN: ${AVERIX_DOMAIN:?set AVERIX_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - averix-caddy-data:/data
+      - averix-caddy-config:/config
+    depends_on: [api, web]
+    logging: *logging
+
+volumes:
+  averix-postgres:
+  averix-redis:
+  averix-storage:
+  averix-caddy-data:
+  averix-caddy-config:
