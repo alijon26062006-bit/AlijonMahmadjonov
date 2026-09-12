@@ -150,6 +150,7 @@ services:
     environment:
       NODE_ENV: production
       AVERIX_API_URL: http://api:8080
+      AVERIX_APP_URL: ${APP_URL:-https://averix.dev}
     expose: ['3000']
     depends_on: [api]
     logging: *logging

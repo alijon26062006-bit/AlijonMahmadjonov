@@ -1,0 +1,13 @@
+# The build stage installs dependencies itself; copying a host node_modules in
+# would overwrite them with whatever architecture the developer's machine uses.
+node_modules
+.next
+out
+
+.env
+.env.*
+!.env.example
+
+npm-debug.log*
+.DS_Store
+*.tsbuildinfo
