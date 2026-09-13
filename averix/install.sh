@@ -239,21 +239,31 @@ PY
     echo "  never sent to a chat: a passport in a message history cannot be deleted"
     echo "  by this platform when its retention date arrives."
     echo
-    echo "  Token: create a bot in Telegram with @BotFather."
-    echo "  Chat:  add the bot to your staff chat, write anything there, then open"
-    echo "         https://api.telegram.org/bot<TOKEN>/getUpdates and copy \"chat\":{\"id\":…"
+    echo "  1. Create a bot: write to @BotFather in Telegram, /newbot, copy the token."
+    echo "  2. Decide where it writes — this is the number the next question asks for:"
+    echo "       · to you personally — your own Telegram id, a positive number."
+    echo "         Ask @userinfobot for it. Then OPEN YOUR OWN BOT AND PRESS START,"
+    echo "         or Telegram will not let it write to you first."
+    echo "       · to a staff group — the group id, usually negative. Add the bot to"
+    echo "         the group, write anything there, then open"
+    echo "         https://api.telegram.org/bot<TOKEN>/getUpdates and read \"chat\":{\"id\":…"
+    echo
+    echo "  This is not the administrator of the site. That one is an account with an"
+    echo "  email address, made further down with averixctl create-admin."
     echo
     printf '  Bot token: '
     read -r TELEGRAM_TOKEN_INPUT || TELEGRAM_TOKEN_INPUT=""
     if [ -n "$TELEGRAM_TOKEN_INPUT" ]; then
-      printf '  Chat id (a number, often negative): '
+      printf '  Telegram id of the person or group to notify: '
       read -r TELEGRAM_CHAT_INPUT || TELEGRAM_CHAT_INPUT=""
       if [ -n "$TELEGRAM_CHAT_INPUT" ]; then
         set_env_var TELEGRAM_BOT_TOKEN "$TELEGRAM_TOKEN_INPUT"
         set_env_var TELEGRAM_CHAT_ID "$TELEGRAM_CHAT_INPUT"
         ok "Staff chat configured. The token is in .env and is never printed anywhere."
+        echo "  Checked at the end of this run, and any time after it with:"
+        echo "    docker compose -f docker-compose.production.yml exec api averixctl chat-test"
       else
-        warn "No chat id — leaving the staff chat off. Add both values to .env later."
+        warn "No id — leaving the staff chat off. Add both values to .env later."
       fi
     else
       ok "Skipped. The admin panel will show the staff chat as not set up."
@@ -691,6 +701,21 @@ else
   echo "  Site        http://localhost:3000"
   echo "  API         http://localhost:8080/health"
 fi
+# The staff chat, checked rather than assumed. "The bot does not work" is
+# almost always Telegram refusing for a reason it states plainly — most often
+# that nobody pressed Start in the bot — and the operator should read that
+# sentence now, not discover it when the first verification arrives.
+if grep -qE '^TELEGRAM_BOT_TOKEN=.+' .env 2>/dev/null; then
+  echo
+  bold "Staff chat"
+  if "${COMPOSE[@]}" exec -T api averixctl chat-test 2>&1 | sed 's/^/  /'; then
+    :
+  else
+    warn "The staff chat is not working yet — see the explanation above."
+    echo "  Nothing else is affected: the panel still shows every verification."
+  fi
+fi
+
 echo
 echo "Next:"
 echo "  1. Sign up on the site, then make yourself an administrator:"

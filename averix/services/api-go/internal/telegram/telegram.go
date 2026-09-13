@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -143,14 +144,41 @@ func (c *Client) send(ctx context.Context, text string) error {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		// The token is in the URL, so the error is never passed through as-is.
-		return errors.New("telegram request failed")
+		// The token is in the URL, and Go puts the URL in the error, so the
+		// error is never passed through as-is. The host is enough: this branch
+		// means the server could not reach Telegram at all — a firewall, no
+		// outbound DNS — which is a different problem from a refusal.
+		host := strings.TrimPrefix(strings.TrimPrefix(c.cfg.BaseURL, "https://"), "http://")
+		return fmt.Errorf("не удалось соединиться с %s — проверьте, выпускает ли сервер исходящие запросы", host)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
+		// Telegram says why in plain words — "chat not found", "bot was
+		// blocked by the user" — and that sentence is the whole difference
+		// between "it is broken" and "press Start in the bot". It contains no
+		// credential, so it is passed through.
+		var answer struct {
+			Description string `json:"description"`
+		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
+		_ = json.Unmarshal(body, &answer)
+		if answer.Description != "" {
+			return fmt.Errorf("telegram refused it: %s", answer.Description)
+		}
 		return fmt.Errorf("telegram answered %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// Check sends a test line, so an operator can see that the chat works before
+// waiting for something real to happen — and see Telegram's own explanation
+// when it does not.
+func (c *Client) Check(ctx context.Context) error {
+	return c.send(ctx, strings.Join([]string{
+		"AVERIX на связи.",
+		"Сюда будут приходить короткие уведомления со ссылкой в панель.",
+		"Документы в чат не отправляются никогда.",
+	}, "\n"))
 }
 
 // Notify sends and swallows, for callers that must not fail because a chat

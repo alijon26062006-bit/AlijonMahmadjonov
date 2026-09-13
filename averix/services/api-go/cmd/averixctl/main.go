@@ -27,6 +27,7 @@ Usage:
   averixctl migrate rollback   revert the most recent migration
   averixctl create-admin       create or promote an administrator (interactive)
   averixctl verify-email       confirm an address when mail is not configured yet
+  averixctl chat-test          send a test line to the staff chat and say why not
   averixctl seed               load development demo data (refused in production)
   averixctl health             check that every dependency is reachable
 
@@ -55,6 +56,8 @@ func run(args []string) error {
 		return verifyEmailCmd(ctx, args[1:])
 	case "create-admin":
 		return createAdminCmd(ctx, args[1:])
+	case "chat-test":
+		return chatTestCmd(ctx, args[1:])
 	case "seed":
 		return seedCmd(ctx, args[1:])
 	case "healthcheck":

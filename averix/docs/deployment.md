@@ -287,9 +287,19 @@ container and every upload would disappear on the next deployment. For more
 than one server, set `S3_DRIVER=s3` and the `S3_*` values; any S3-compatible
 provider works.
 
-**A staff chat** — set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` and the
-staff chat gets one line and a link when something needs a person. It never
-receives documents, at any setting: see
+**A staff chat** — `./install.sh` asks for the bot token and the Telegram id to
+notify; press Enter to skip. The id is your own (positive, from @userinfobot —
+press Start in your bot first, or Telegram will not let it write to you) or a
+group's (usually negative). It is not the site's administrator: that is an
+account with an email address, made with `averixctl create-admin`. Check it
+with:
+
+```bash
+docker compose -f docker-compose.production.yml exec api averixctl chat-test
+```
+
+It prints Telegram's own explanation when a message does not arrive. The chat
+never receives documents, at any setting: see
 [identity-verification.md](identity-verification.md).
 
 **A payment gateway** — `PAYMENTS_DEFAULT_PROVIDER=manual` means bank transfer

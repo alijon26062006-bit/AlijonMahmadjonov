@@ -146,6 +146,13 @@ a deliberate choice an operator has to make; the default is not it.
   takes bytes, a storage key or a document id. A passport in a chat history
   cannot be deleted by this platform when the retention date arrives, so it
   never goes there in the first place. See `internal/telegram`.
+  The chat id in `TELEGRAM_CHAT_ID` is a Telegram id — your own (a positive
+  number, from @userinfobot) or a group's (usually negative). It is **not** the
+  administrator of the site: that is an account with an email address, made
+  with `averixctl create-admin`, and it has nothing to do with Telegram. If
+  you point it at yourself, open your bot and press Start first — Telegram does
+  not let a bot write to a person who never started it. `averixctl chat-test`
+  sends one line and prints Telegram's own explanation when it does not arrive.
 - Payment destinations are masked at the database query (`maskedInstrument`):
   a brand, the last four digits, a bank name. The platform stores no card
   number and no account number — there is no column for one — and never a CVV.
