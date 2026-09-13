@@ -25,9 +25,9 @@ export default function EarningsPage() {
       <TopBar />
       <div className="av-page av-stack">
         <header>
-          <h1 className={styles.heading}>Earnings</h1>
+          <h1 className={styles.heading}>Доходы</h1>
           <p className="av-muted av-small">
-            <IconLock size={13} /> Private to you. Nothing here appears on your public profile.
+            <IconLock size={13} /> Только для вас. Ничего отсюда не попадает в публичный профиль.
           </p>
         </header>
 
@@ -37,23 +37,23 @@ export default function EarningsPage() {
           <>
             <div className={styles.figures}>
               <Card>
-                <p className={styles.figureLabel}>Pending</p>
+                <p className={styles.figureLabel}>Ожидает выплаты</p>
                 <p className={styles.figure}>{money(balance.pending_minor, balance.currency)}</p>
-                <p className="av-xs av-faint">Approved work, payout not yet sent</p>
+                <p className="av-xs av-faint">Принятая работа, выплата ещё не отправлена</p>
               </Card>
               <Card>
-                <p className={styles.figureLabel}>Paid out</p>
+                <p className={styles.figureLabel}>Выплачено</p>
                 <p className={styles.figure}>
                   {money(balance.lifetime_minor - balance.fees_minor, balance.currency)}
                 </p>
                 <p className="av-xs av-faint">
-                  After {money(balance.fees_minor, balance.currency)} in platform fees
+                  За вычетом комиссии платформы {money(balance.fees_minor, balance.currency)}
                 </p>
               </Card>
             </div>
 
             <Card>
-              <h2 className={styles.sectionTitle}>Ledger</h2>
+              <h2 className={styles.sectionTitle}>История операций</h2>
               {balance.entries?.length ? (
                 <ul className={styles.entries}>
                   {balance.entries.map((entry) => (
@@ -80,8 +80,8 @@ export default function EarningsPage() {
               ) : (
                 <EmptyState
                   icon={<IconWallet size={20} />}
-                  title="No earnings yet"
-                  description="When a client approves a milestone and the payout is sent, every line of it appears here — what you earned, what the platform took, and what was paid."
+                  title="Доходов пока нет"
+                  description="Когда заказчик примет этап и выплата будет отправлена, каждая строка появится здесь: сколько заработано, сколько удержала платформа и сколько выплачено."
                 />
               )}
             </Card>
@@ -95,13 +95,13 @@ export default function EarningsPage() {
 function describe(kind: string) {
   switch (kind) {
     case 'earning':
-      return 'Milestone earned';
+      return 'Начислено за этап';
     case 'fee':
-      return 'Platform fee';
+      return 'Комиссия платформы';
     case 'payout':
-      return 'Paid out to you';
+      return 'Выплата вам';
     case 'refund':
-      return 'Refunded';
+      return 'Возврат';
     default:
       return kind;
   }

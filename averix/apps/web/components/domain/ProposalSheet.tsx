@@ -58,7 +58,7 @@ export function ProposalSheet({
       await post('/proposals', {
         project_id: project.id,
         amount_minor: amountMinor,
-        currency: project.budget.currency || 'USD',
+        currency: project.budget.currency || 'RUB',
         delivery_days: Number(form.delivery_days),
         cover_letter: form.cover_letter.trim(),
         approach: form.approach.trim(),
@@ -70,13 +70,13 @@ export function ProposalSheet({
     } catch (error) {
       if (error instanceof ApiFailure) {
         setFields(error.fields);
-        setMessage(Object.keys(error.fields).length ? 'Some sections need a little more.' : error.message);
+        setMessage(Object.keys(error.fields).length ? 'Некоторые разделы нужно дополнить.' : error.message);
         // Send the person to the step that holds the problem.
         if (error.fields.amount_minor || error.fields.delivery_days) setStep(0);
         else if (error.fields.cover_letter) setStep(1);
         else if (error.fields.approach || error.fields.relevant_experience) setStep(2);
       } else {
-        setMessage("We couldn't send that. Please check your connection and try again.");
+        setMessage('Не удалось отправить. Проверьте подключение и попробуйте ещё раз.');
       }
     } finally {
       setBusy(false);
@@ -85,32 +85,31 @@ export function ProposalSheet({
 
   const steps = [
     {
-      title: 'Your terms',
+      title: 'Условия',
       valid: amountMinor > 0 && Number(form.delivery_days) > 0,
       body: (
         <div className="av-stack">
           <Input
-            label={`Your price (${project.budget.currency || 'USD'})`}
+            label={`Ваша цена (${project.budget.currency || 'RUB'})`}
             inputMode="decimal"
-            placeholder="650"
-            prefix="$"
-            hint={`The client's budget: ${project.budget.display}`}
+            placeholder="15000"
+            hint={`Бюджет заказчика: ${project.budget.display}`}
             value={form.amount}
             error={fields.amount_minor}
             onChange={update('amount')}
           />
           {amountMinor > 0 ? (
             <p className={styles.fee}>
-              You quote <strong>{money(amountMinor, project.budget.currency)}</strong> · platform fee{' '}
-              {money(fee, project.budget.currency)} · you receive{' '}
+              Ваша цена <strong>{money(amountMinor, project.budget.currency)}</strong> · комиссия платформы{' '}
+              {money(fee, project.budget.currency)} · вы получите{' '}
               <strong>{money(amountMinor - fee, project.budget.currency)}</strong>
             </p>
           ) : null}
           <Input
-            label="Delivery time (days)"
+            label="Срок выполнения (дней)"
             inputMode="numeric"
             placeholder="12"
-            hint="From the day work starts, not from today."
+            hint="Считается с начала работы, а не с сегодняшнего дня."
             value={form.delivery_days}
             error={fields.delivery_days}
             onChange={update('delivery_days')}
@@ -119,13 +118,13 @@ export function ProposalSheet({
       ),
     },
     {
-      title: 'Why you',
+      title: 'Почему вы',
       valid: form.cover_letter.trim().length >= MINIMUMS.cover_letter,
       body: (
         <Textarea
-          label="Message to the client"
-          placeholder="What you understood about this project, and why you are a good fit for it."
-          hint="At least 120 characters. Clients read this first — a template gets skipped."
+          label="Сообщение заказчику"
+          placeholder="Что вы поняли о задаче и почему подходите именно вы."
+          hint="Не меньше 120 символов. Заказчик читает это первым — шаблон пролистают."
           max={4000}
           rows={8}
           value={form.cover_letter}
@@ -135,16 +134,16 @@ export function ProposalSheet({
       ),
     },
     {
-      title: 'How you will do it',
+      title: 'Как будете делать',
       valid:
         form.approach.trim().length >= MINIMUMS.approach &&
         form.relevant_experience.trim().length >= MINIMUMS.relevant_experience,
       body: (
         <div className="av-stack">
           <Textarea
-            label="Your approach"
-            placeholder="The order you would build this in, and what you would agree before starting."
-            hint="At least 120 characters."
+            label="Ваш подход"
+            placeholder="В каком порядке будете делать и что согласуете до начала."
+            hint="Не меньше 120 символов."
             max={4000}
             rows={6}
             value={form.approach}
@@ -152,9 +151,9 @@ export function ProposalSheet({
             onChange={update('approach')}
           />
           <Textarea
-            label="Relevant experience"
-            placeholder="The closest thing you have built before."
-            hint="At least 60 characters."
+            label="Похожий опыт"
+            placeholder="Самая похожая работа, которую вы делали раньше."
+            hint="Не меньше 60 символов."
             max={2000}
             rows={4}
             value={form.relevant_experience}
@@ -162,9 +161,9 @@ export function ProposalSheet({
             onChange={update('relevant_experience')}
           />
           <Textarea
-            label="Questions for the client"
+            label="Вопросы заказчику"
             optional
-            placeholder="Anything that would change your estimate."
+            placeholder="Всё, что может изменить вашу оценку."
             max={1000}
             rows={3}
             value={form.questions}
@@ -182,26 +181,26 @@ export function ProposalSheet({
     <Sheet
       open={open}
       onClose={onClose}
-      title="Send a proposal"
+      title="Отправить отклик"
       description={project.title}
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={() => (step === 0 ? onClose() : setStep(step - 1))}>
-            {step === 0 ? 'Cancel' : 'Back'}
+            {step === 0 ? 'Отмена' : 'Назад'}
           </Button>
           <Button
             loading={busy}
             disabled={!current.valid}
             onClick={() => (last ? void submit() : setStep(step + 1))}
           >
-            {last ? 'Send proposal' : 'Continue'}
+            {last ? 'Отправить отклик' : 'Далее'}
           </Button>
         </>
       }
     >
       <div className="av-stack">
-        <ol className={styles.steps} aria-label="Progress">
+        <ol className={styles.steps} aria-label="Шаги">
           {steps.map((item, index) => (
             <li
               key={item.title}

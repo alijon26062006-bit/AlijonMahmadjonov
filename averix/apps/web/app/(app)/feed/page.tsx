@@ -10,15 +10,16 @@ import { ProjectCard } from '@/components/domain/ProjectCard';
 import { Button } from '@/components/ui/Button';
 import { IconCompass, IconAlert } from '@/components/ui/Icon';
 import { get, list } from '@/lib/api';
+import { plural } from '@/lib/format';
 import type { FeedCard } from '@/lib/types';
 
 // The tabs are per developer: the category ones come from what this person
 // actually works in, so a Telegram developer gets a Telegram tab and an iOS
 // developer does not.
 const FALLBACK_TABS = [
-  { key: 'for_you', label: 'For you' },
-  { key: 'recent', label: 'Recent' },
-  { key: 'saved', label: 'Saved' },
+  { key: 'for_you', label: 'Для вас' },
+  { key: 'recent', label: 'Новые' },
+  { key: 'saved', label: 'Сохранённые' },
 ];
 
 export default function FeedPage() {
@@ -61,19 +62,19 @@ export default function FeedPage() {
       <TopBar />
       <div className="av-page">
         <header className={styles.intro}>
-          <h1 className={styles.heading}>Find work</h1>
+          <h1 className={styles.heading}>Найти заказ</h1>
           <p className={styles.subheading}>
-            Projects aimed at what you do, not everything posted today.
+            Заказы по вашему профилю, а не всё подряд.
           </p>
         </header>
 
         <div className={styles.tabs}>
-          <Tabs items={tabs} active={tab} onChange={setTab} ariaLabel="Feed sections" />
+          <Tabs items={tabs} active={tab} onChange={setTab} ariaLabel="Разделы ленты" />
         </div>
 
         {typeof meta.count === 'number' && cards?.length ? (
           <p className={styles.count}>
-            {meta.count} {meta.count === 1 ? 'project' : 'projects'} matched
+            {plural(meta.count, 'заказ', 'заказа', 'заказов')} по вашему профилю
           </p>
         ) : null}
 
@@ -82,11 +83,11 @@ export default function FeedPage() {
             <EmptyState
               tone="error"
               icon={<IconAlert size={20} />}
-              title="We couldn't load your feed"
-              description="This is on us, not on you. Try again in a moment."
+              title="Не удалось загрузить ленту"
+              description="Это на нашей стороне. Попробуйте через минуту."
               action={
                 <Button variant="secondary" onClick={() => void load(tab)}>
-                  Try again
+                  Повторить
                 </Button>
               }
             />
@@ -100,7 +101,7 @@ export default function FeedPage() {
               action={
                 tab === 'for_you' ? (
                   <Button variant="secondary" onClick={() => setTab('recent')}>
-                    Browse everything recent
+                    Смотреть все новые
                   </Button>
                 ) : undefined
               }
@@ -115,17 +116,17 @@ export default function FeedPage() {
 }
 
 function emptyTitle(tab: string) {
-  if (tab === 'saved') return 'Nothing saved yet';
-  if (tab === 'for_you') return 'No matching projects right now';
-  return 'No projects here yet';
+  if (tab === 'saved') return 'Пока ничего не сохранено';
+  if (tab === 'for_you') return 'Подходящих заказов пока нет';
+  return 'Здесь пока пусто';
 }
 
 function emptyBody(tab: string) {
   if (tab === 'saved') {
-    return 'Save a project from its page and it will wait for you here.';
+    return 'Сохраните заказ на его странице — он будет ждать вас здесь.';
   }
   if (tab === 'for_you') {
-    return 'Projects that match your specialisation and technologies will appear here as clients post them. Adding technologies to your profile widens what reaches you.';
+    return 'Заказы по вашей специализации и навыкам появятся здесь, как только заказчики их разместят. Добавьте навыки в профиль — и заказов станет больше.';
   }
-  return 'Clients post work throughout the day. Check back shortly.';
+  return 'Заказчики размещают работу в течение дня. Загляните чуть позже.';
 }

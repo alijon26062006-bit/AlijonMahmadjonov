@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MilestoneCard } from '@/components/domain/MilestoneCard';
 import { FundSheet } from '@/components/domain/FundSheet';
+import { ReviewPanel } from '@/components/domain/ReviewPanel';
 import { IconAlert, IconMessage, IconShield } from '@/components/ui/Icon';
 import { ApiFailure, get, post } from '@/lib/api';
 import { money, shortDate } from '@/lib/format';
@@ -44,13 +45,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   if (failed) {
     return (
       <>
-        <TopBar back="/contracts" title="Contract" />
+        <TopBar back="/contracts" title="Сделка" />
         <div className="av-page">
           <EmptyState
             tone="error"
             icon={<IconAlert size={20} />}
-            title="We couldn't open this contract"
-            description="Either it doesn't exist, or it isn't yours to see."
+            title="Не удалось открыть сделку"
+            description="Её не существует, или она не ваша."
           />
         </div>
       </>
@@ -60,7 +61,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   if (!contract) {
     return (
       <>
-        <TopBar back="/contracts" title="Contract" />
+        <TopBar back="/contracts" title="Сделка" />
         <div className="av-page av-stack">
           <Skeleton height={100} />
           <Skeleton height={64} />
@@ -82,7 +83,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               <h1 className={styles.title}>{contract.title}</h1>
               <p className="av-small av-muted">
                 <Link href={`/projects/${contract.project.slug}`}>{contract.project.title}</Link>
-                {contract.due_on ? ` · due ${shortDate(contract.due_on)}` : ''}
+                {contract.due_on ? ` · срок ${shortDate(contract.due_on)}` : ''}
               </p>
             </div>
             <Badge tone={statusTone(contract.status)}>{statusLabel(contract.status)}</Badge>
@@ -92,20 +93,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             <div className={styles.track} aria-hidden="true">
               <span className={styles.fill} style={{ width: `${contract.progress_percent}%` }} />
             </div>
-            <span className="av-small av-numeric av-muted">{contract.progress_percent}% approved</span>
+            <span className="av-small av-numeric av-muted">{contract.progress_percent}% принято</span>
           </div>
 
           {contract.amount_minor !== undefined ? (
             <div className={styles.money}>
               <div>
-                <span className={styles.moneyLabel}>Contract</span>
+                <span className={styles.moneyLabel}>Сумма сделки</span>
                 <span className={styles.moneyValue}>
                   {money(contract.amount_minor, contract.currency)}
                 </span>
               </div>
               <div>
                 <span className={styles.moneyLabel}>
-                  {contract.my_role === 'developer' ? 'You receive' : 'Platform fee'}
+                  {contract.my_role === 'developer' ? 'Вы получите' : 'Комиссия платформы'}
                 </span>
                 <span className={styles.moneyValue}>
                   {money(
@@ -115,7 +116,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 </span>
               </div>
               <div>
-                <span className={styles.moneyLabel}>Released</span>
+                <span className={styles.moneyLabel}>Выплачено</span>
                 <span className={styles.moneyValue}>
                   {money(contract.released_minor ?? 0, contract.currency)}
                 </span>
@@ -124,8 +125,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           ) : (
             <p className={styles.observerNote}>
               <IconShield size={15} />
-              You are on this workspace as an observer. What the work cost is between the client and
-              the developer.
+              Вы здесь как наблюдатель. Стоимость работы — дело заказчика и исполнителя.
             </p>
           )}
         </Card>
@@ -136,7 +136,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             <div className="av-grow">
               <p className="av-strong">{other.full_name}</p>
               <p className="av-small av-muted">
-                {contract.my_role === 'client' ? 'Developer' : 'Client'}
+                {contract.my_role === 'client' ? 'Исполнитель' : 'Заказчик'}
                 {other.title ? ` · ${other.title}` : ''}
               </p>
             </div>
@@ -146,15 +146,15 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             size="sm"
             icon={<IconMessage size={16} />}
             className={styles.messageButton}
-            aria-label="Open the conversation"
+            aria-label="Открыть переписку"
             onClick={() => (window.location.href = `/messages?contract=${contract.id}`)}
           >
-            <span className={styles.messageLabel}>Message</span>
+            <span className={styles.messageLabel}>Написать</span>
           </Button>
         </div>
 
         <section className="av-stack-sm">
-          <h2 className={styles.sectionTitle}>Milestones</h2>
+          <h2 className={styles.sectionTitle}>Этапы</h2>
           {contract.milestones.map((milestone) => (
             <MilestoneCard
               key={milestone.id}
@@ -178,6 +178,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             />
           ))}
         </section>
+
+        {contract.status === 'completed' ? (
+          <section className="av-stack-sm" id="review">
+            <h2 className={styles.sectionTitle}>Отзывы</h2>
+            <ReviewPanel contractId={contract.id} />
+          </section>
+        ) : null}
       </div>
 
       <FundSheet
@@ -203,27 +210,27 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
 const NOTE_COPY = {
   submit: {
-    title: 'Submit this milestone',
-    label: 'What are you handing over?',
-    placeholder: 'What is finished, where to find it, and anything the client should check first.',
-    hint: 'The client reviews this. Be specific about what is done.',
-    button: 'Submit for review',
+    title: 'Сдать этап',
+    label: 'Что вы передаёте?',
+    placeholder: 'Что готово, где это найти и на что заказчику стоит посмотреть в первую очередь.',
+    hint: 'Это прочитает заказчик. Опишите конкретно, что сделано.',
+    button: 'Сдать на проверку',
     min: 1,
   },
   revision: {
-    title: 'Request a revision',
-    label: 'What needs changing?',
-    placeholder: 'Be concrete: which part, what is wrong, what you expected instead.',
-    hint: 'At least a sentence. A revision without a reason wastes everyone’s time.',
-    button: 'Send back',
+    title: 'Вернуть на доработку',
+    label: 'Что нужно изменить?',
+    placeholder: 'Конкретно: какая часть, что не так и чего вы ожидали.',
+    hint: 'Хотя бы одно предложение. Доработка без причины — потеря времени для обоих.',
+    button: 'Вернуть',
     min: 20,
   },
   dispute: {
-    title: 'Open a dispute',
-    label: 'What has gone wrong?',
-    placeholder: 'Describe the problem and what you have already tried to resolve between you.',
-    hint: 'A person at AVERIX reads this. Both sides see what you write.',
-    button: 'Open dispute',
+    title: 'Открыть спор',
+    label: 'Что пошло не так?',
+    placeholder: 'Опишите проблему и что вы уже пытались решить между собой.',
+    hint: 'Это прочитает сотрудник AVERIX. Обе стороны видят, что вы напишете.',
+    button: 'Открыть спор',
     min: 30,
   },
 } as const;
@@ -255,7 +262,7 @@ function NoteSheet({
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Cancel
+            Отмена
           </Button>
           <Button
             loading={busy}
@@ -271,7 +278,7 @@ function NoteSheet({
                 setError(
                   failure instanceof ApiFailure
                     ? failure.fields.note || failure.message
-                    : "That didn't go through. Please try again.",
+                    : 'Не получилось отправить. Попробуйте ещё раз.',
                 );
               } finally {
                 setBusy(false);
@@ -315,15 +322,15 @@ function statusTone(status: string) {
 function statusLabel(status: string) {
   switch (status) {
     case 'pending_funding':
-      return 'Awaiting funding';
+      return 'Ожидает оплаты';
     case 'active':
-      return 'In progress';
+      return 'В работе';
     case 'completed':
-      return 'Completed';
+      return 'Завершена';
     case 'cancelled':
-      return 'Cancelled';
+      return 'Отменена';
     case 'disputed':
-      return 'Disputed';
+      return 'Спор';
     default:
       return status.replace('_', ' ');
   }

@@ -8,11 +8,11 @@ export const metadata: Metadata = {
   // origin, so a staging build does not point social previews at production.
   metadataBase: new URL(process.env.AVERIX_APP_URL ?? 'https://averix.dev'),
   title: {
-    default: 'AVERIX — hire developers who can show the work',
+    default: 'AVERIX — биржа фриланса: дизайн, тексты, разработка, маркетинг',
     template: '%s · AVERIX',
   },
   description:
-    'AVERIX connects clients with software developers. Verified project history, targeted matching, and a workspace where the work actually happens.',
+    'AVERIX соединяет заказчиков и исполнителей: дизайн, тексты, разработка, SEO, SMM, видео, бизнес-услуги. Проверенная история работ, безопасная сделка и рабочее пространство внутри платформы.',
   applicationName: 'AVERIX',
   formatDetection: { telephone: false, email: false, address: false },
   // The assets live in public/ rather than as app/icon.* files so that the
@@ -44,14 +44,14 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="ru" suppressHydrationWarning>
       <head>
         {/* Applied before first paint so a dark-mode visitor never gets a white flash. */}
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
       <body>
         <a href="#main" className="av-skip">
-          Skip to content
+          Перейти к содержимому
         </a>
         <ThemeProvider>
           <SessionProvider>{children}</SessionProvider>

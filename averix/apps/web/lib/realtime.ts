@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Message } from './types';
+import type { Message, Notification } from './types';
 
 export type RealtimeEvent = {
-  type: 'message' | 'read' | 'conversation';
-  conversation_id: string;
+  type: 'message' | 'read' | 'conversation' | 'notification';
+  conversation_id?: string;
   message?: Message;
   user_id?: string;
   read_at?: string;
   unread_count?: number;
+  /** Событие типа notification несёт саму запись уведомления. */
+  notification?: Notification;
   sent_at: string;
 };
 

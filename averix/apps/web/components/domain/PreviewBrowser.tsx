@@ -56,16 +56,16 @@ export function PreviewBrowser({
   const width = frame?.devices?.find((item) => item.key === device)?.width;
 
   return (
-    <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Project preview">
+    <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Предпросмотр сайта">
       <div className={styles.window}>
         <header className={styles.chrome}>
-          <button type="button" className={styles.chromeButton} onClick={onClose} aria-label="Close preview">
+          <button type="button" className={styles.chromeButton} onClick={onClose} aria-label="Закрыть предпросмотр">
             <IconClose size={18} />
           </button>
 
           <div className={styles.address}>
             <IconLock size={13} />
-            <span className={styles.host}>{frame?.host ?? 'loading…'}</span>
+            <span className={styles.host}>{frame?.host ?? 'загрузка…'}</span>
           </div>
 
           <div className={styles.chromeActions}>
@@ -73,7 +73,7 @@ export function PreviewBrowser({
               type="button"
               className={styles.chromeButton}
               onClick={() => setReloadKey((key) => key + 1)}
-              aria-label="Reload"
+              aria-label="Обновить"
               disabled={!allowed}
             >
               <IconRefresh size={17} />
@@ -84,7 +84,7 @@ export function PreviewBrowser({
                 href={frame.url}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
-                aria-label="Open in a new tab"
+                aria-label="Открыть в новой вкладке"
               >
                 <IconExternal size={17} />
               </a>
@@ -95,9 +95,9 @@ export function PreviewBrowser({
         {allowed ? (
           <div className={styles.devices}>
             {[
-              { key: 'mobile', label: 'Mobile', icon: <IconPhone size={15} /> },
-              { key: 'tablet', label: 'Tablet', icon: <IconTablet size={15} /> },
-              { key: 'desktop', label: 'Desktop', icon: <IconMonitor size={15} /> },
+              { key: 'mobile', label: 'Телефон', icon: <IconPhone size={15} /> },
+              { key: 'tablet', label: 'Планшет', icon: <IconTablet size={15} /> },
+              { key: 'desktop', label: 'Компьютер', icon: <IconMonitor size={15} /> },
             ].map((option) => (
               <button
                 key={option.key}
@@ -116,12 +116,12 @@ export function PreviewBrowser({
         <div className={styles.viewport}>
           {failed ? (
             <Unavailable
-              title="We couldn't open this preview"
-              body="Something went wrong on our end. The site itself may be fine."
+              title="Не удалось открыть предпросмотр"
+              body="Что-то пошло не так на нашей стороне. Сам сайт, скорее всего, в порядке."
               url={frame?.url}
             />
           ) : !preview ? (
-            <div className={styles.loading}>Loading preview…</div>
+            <div className={styles.loading}>Загружаем предпросмотр…</div>
           ) : allowed ? (
             <div
               className={styles.frameHolder}
@@ -144,11 +144,11 @@ export function PreviewBrowser({
             </div>
           ) : (
             <Unavailable
-              title="Live preview is unavailable for this site"
+              title="Предпросмотр этого сайта недоступен"
               body={
                 frame?.verdict === 'unreachable'
-                  ? "We couldn't reach this site just now."
-                  : 'This site asks not to be shown inside another page. That is its choice, and AVERIX respects it.'
+                  ? 'Сайт сейчас не отвечает.'
+                  : 'Сайт запрещает показывать себя внутри другой страницы. Это его выбор, и AVERIX его уважает.'
               }
               url={frame?.url}
               screenshot={preview.fallback?.url}
@@ -186,7 +186,7 @@ function Unavailable({
             icon={<IconExternal size={16} />}
             onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
           >
-            Open the website
+            Открыть сайт
           </Button>
         ) : null}
       </div>

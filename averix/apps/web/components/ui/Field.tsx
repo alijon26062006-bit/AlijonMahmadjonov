@@ -24,7 +24,7 @@ function Shell({ label, hint, error, counter, optional, children }: FieldShell) 
     <div className={styles.field}>
       <label htmlFor={id} className={styles.label}>
         {label}
-        {optional ? <span className={styles.optional}>optional</span> : null}
+        {optional ? <span className={styles.optional}>необязательно</span> : null}
       </label>
       {children(id, describedBy)}
       <div className={styles.footer}>

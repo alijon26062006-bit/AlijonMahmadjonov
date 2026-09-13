@@ -26,7 +26,7 @@ export function MatchExplainer({
   const tone = score >= 85 ? styles.strong : score >= 60 ? styles.fair : styles.weak;
 
   if (reasons.length === 0) {
-    return <span className={[styles.pill, tone].join(' ')}>{score}% match</span>;
+    return <span className={[styles.pill, tone].join(' ')}>{score}% совпадение</span>;
   }
 
   return (
@@ -42,7 +42,7 @@ export function MatchExplainer({
         }}
         aria-expanded={open}
       >
-        {score}% match
+        {score}% совпадение
         <IconChevronDown size={13} className={open ? styles.flip : undefined} />
       </button>
 

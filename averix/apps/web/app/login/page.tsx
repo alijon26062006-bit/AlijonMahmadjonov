@@ -36,7 +36,7 @@ function LoginForm() {
         setFields(error.fields);
         setMessage(error.message);
       } else {
-        setMessage("We couldn't reach the server. Please check your connection and try again.");
+        setMessage('Не удалось связаться с сервером. Проверьте подключение и попробуйте ещё раз.');
       }
     } finally {
       setBusy(false);
@@ -45,8 +45,8 @@ function LoginForm() {
 
   return (
     <form className={styles.card} onSubmit={submit} noValidate>
-      <h1 className={styles.title}>Sign in</h1>
-      <p className={styles.subtitle}>Welcome back.</p>
+      <h1 className={styles.title}>Вход</h1>
+      <p className={styles.subtitle}>С возвращением.</p>
 
       {message ? (
         <p className={styles.alert} role="alert">
@@ -55,7 +55,7 @@ function LoginForm() {
       ) : null}
 
       <Input
-        label="Email"
+        label="Электронная почта"
         type="email"
         name="email"
         autoComplete="email"
@@ -66,7 +66,7 @@ function LoginForm() {
         onChange={(event) => setEmail(event.target.value)}
       />
       <Input
-        label="Password"
+        label="Пароль"
         type="password"
         name="password"
         autoComplete="current-password"
@@ -77,11 +77,14 @@ function LoginForm() {
       />
 
       <Button type="submit" size="lg" block loading={busy}>
-        Sign in
+        Войти
       </Button>
 
       <p className={styles.switch}>
-        New to AVERIX? <Link href="/register">Create an account</Link>
+        <Link href="/forgot-password">Забыли пароль?</Link>
+      </p>
+      <p className={styles.switch}>
+        Впервые на AVERIX? <Link href="/register">Создать аккаунт</Link>
       </p>
     </form>
   );

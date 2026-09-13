@@ -44,9 +44,9 @@ export default function ClientDashboard() {
       <div className="av-page av-stack-lg">
         <header>
           <h1 className={styles.greeting}>
-            {greeting()}, {session?.full_name?.split(' ')[0] ?? 'there'}
+            {greeting()}, {session?.full_name?.split(' ')[0] ?? ''}
           </h1>
-          <p className="av-muted">Here is what needs you today.</p>
+          <p className="av-muted">Вот что ждёт вашего решения сегодня.</p>
         </header>
 
         {contracts === null || projects === null ? (
@@ -55,7 +55,7 @@ export default function ClientDashboard() {
           <>
             {live.some((contract) => contract.needs_my_action) ? (
               <section className="av-stack-sm">
-                <SectionHeading title="Waiting on you" />
+                <SectionHeading title="Ждут вас" />
                 {live
                   .filter((contract) => contract.needs_my_action)
                   .map((contract) => (
@@ -79,12 +79,12 @@ export default function ClientDashboard() {
 
             <section className="av-stack-sm">
               <SectionHeading
-                title="Active contracts"
+                title="Сделки в работе"
                 count={live.length}
                 action={
                   live.length ? (
                     <Link href="/contracts" className={styles.seeAll}>
-                      All contracts
+                      Все сделки
                     </Link>
                   ) : undefined
                 }
@@ -92,8 +92,8 @@ export default function ClientDashboard() {
               {live.length === 0 ? (
                 <EmptyState
                   icon={<IconBriefcase size={20} />}
-                  title="No active contracts"
-                  description="When you accept a proposal, the contract and its workspace appear here."
+                  title="Нет сделок в работе"
+                  description="Когда вы примете отклик или закажете услугу, сделка и её рабочее пространство появятся здесь."
                 />
               ) : (
                 live.map((contract) => (
@@ -122,7 +122,7 @@ export default function ClientDashboard() {
                     </div>
                     {contract.next_milestone ? (
                       <p className="av-small av-muted">
-                        Next: {contract.next_milestone.title} ·{' '}
+                        Далее: {contract.next_milestone.title} ·{' '}
                         <StatusDot tone={milestoneTone(contract.next_milestone.status)}>
                           {milestoneLabel(contract.next_milestone.status)}
                         </StatusDot>
@@ -135,22 +135,22 @@ export default function ClientDashboard() {
 
             <section className="av-stack-sm">
               <SectionHeading
-                title="Open projects"
+                title="Открытые заказы"
                 count={open.length}
                 action={
                   <ButtonLink href="/projects/new" size="sm" variant="secondary" icon={<IconPlus size={16} />}>
-                    New
+                    Создать
                   </ButtonLink>
                 }
               />
               {open.length === 0 ? (
                 <EmptyState
                   icon={<IconPlus size={20} />}
-                  title="No open projects"
-                  description="Describe what you want built and AVERIX will put it in front of developers who actually work with those technologies."
+                  title="Нет открытых заказов"
+                  description="Опишите, что нужно сделать, — AVERIX покажет заказ исполнителям, которые действительно этим занимаются."
                   action={
                     <Button onClick={() => (window.location.href = '/projects/new')}>
-                      Post a project
+                      Разместить заказ
                     </Button>
                   }
                 />
@@ -161,11 +161,11 @@ export default function ClientDashboard() {
                       <div className="av-grow">
                         <p className="av-strong">{project.title}</p>
                         <p className="av-small av-muted">
-                          {project.budget.display} · posted {timeAgo(project.published_at)}
+                          {project.budget.display} · {timeAgo(project.published_at)}
                         </p>
                       </div>
                       <Badge tone={project.proposals_count ? 'brand' : 'neutral'}>
-                        {plural(project.proposals_count, 'proposal')}
+                        {plural(project.proposals_count, 'отклик', 'отклика', 'откликов')}
                       </Badge>
                     </div>
                   </Card>
@@ -175,13 +175,13 @@ export default function ClientDashboard() {
 
             {drafts.length ? (
               <section className="av-stack-sm">
-                <SectionHeading title="Drafts" count={drafts.length} />
+                <SectionHeading title="Черновики" count={drafts.length} />
                 {drafts.map((project) => (
                   <Card key={project.id} href={`/projects/${project.slug}`}>
                     <div className="av-row-between">
-                      <p className="av-strong">{project.title || 'Untitled project'}</p>
+                      <p className="av-strong">{project.title || 'Заказ без названия'}</p>
                       <Badge tone="warning" size="sm">
-                        Draft
+                        Черновик
                       </Badge>
                     </div>
                   </Card>
@@ -197,16 +197,16 @@ export default function ClientDashboard() {
 
 function greeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 12) return 'Доброе утро';
+  if (hour < 18) return 'Добрый день';
+  return 'Добрый вечер';
 }
 
 function actionLabel(contract: ContractCard) {
   const status = contract.next_milestone?.status;
-  if (status === 'submitted') return 'Work submitted for your review';
-  if (status === 'draft') return 'Waiting to be funded';
-  return 'Needs your attention';
+  if (status === 'submitted') return 'Работа сдана — нужна ваша проверка';
+  if (status === 'draft') return 'Ждёт оплаты этапа';
+  return 'Нужно ваше участие';
 }
 
 export function milestoneTone(status: string) {
@@ -230,23 +230,23 @@ export function milestoneTone(status: string) {
 export function milestoneLabel(status: string) {
   switch (status) {
     case 'draft':
-      return 'Not funded';
+      return 'Не оплачен';
     case 'funded':
-      return 'Funded, ready to start';
+      return 'Оплачен, можно начинать';
     case 'in_progress':
-      return 'In progress';
+      return 'В работе';
     case 'submitted':
-      return 'Submitted for review';
+      return 'Сдан на проверку';
     case 'revision_requested':
-      return 'Revision requested';
+      return 'На доработке';
     case 'approved':
-      return 'Approved';
+      return 'Принят';
     case 'released':
-      return 'Paid';
+      return 'Выплачен';
     case 'disputed':
-      return 'Disputed';
+      return 'Спор';
     case 'cancelled':
-      return 'Cancelled';
+      return 'Отменён';
     default:
       return status;
   }

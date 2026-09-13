@@ -25,7 +25,7 @@ export function ProjectCard({ card }: { card: FeedCard }) {
               {card.published_at ? <> · {timeAgo(card.published_at)}</> : null}
             </p>
           </div>
-          {card.has_proposed ? <Badge tone="brand" size="sm">Proposed</Badge> : null}
+          {card.has_proposed ? <Badge tone="brand" size="sm">Вы откликнулись</Badge> : null}
         </header>
 
         {card.excerpt ? <p className={`${styles.excerpt} av-clamp-2`}>{card.excerpt}</p> : null}
@@ -45,14 +45,14 @@ export function ProjectCard({ card }: { card: FeedCard }) {
           <span className={styles.dot} aria-hidden="true" />
           <span className={styles.proposals}>
             <IconClock size={13} />
-            {plural(card.proposals_count, 'proposal')}
+            {plural(card.proposals_count, 'отклик', 'отклика', 'откликов')}
           </span>
           {card.client_verified ? (
             <>
               <span className={styles.dot} aria-hidden="true" />
               <span className={styles.verified}>
                 <IconShield size={13} />
-                Verified client
+                Проверенный заказчик
               </span>
             </>
           ) : null}

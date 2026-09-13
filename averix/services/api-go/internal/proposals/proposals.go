@@ -54,6 +54,12 @@ type Proposal struct {
 
 	// Set for the developer viewing their own proposal.
 	IsAuthor bool `json:"is_author,omitempty"`
+
+	// Filled for the developer's own list, so it can be read without opening
+	// each project.
+	ProjectTitle  string `json:"project_title,omitempty"`
+	ProjectSlug   string `json:"project_slug,omitempty"`
+	ProjectStatus string `json:"project_status,omitempty"`
 }
 
 // Card is the compact shape the client's proposal list renders.

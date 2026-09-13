@@ -49,8 +49,14 @@ function Messages() {
 
   // A contract's workspace links straight into its thread.
   useEffect(() => {
+    if (!threads?.length) return;
+    const direct = params.get('thread');
+    if (direct && threads.some((thread) => thread.id === direct)) {
+      void openThread(direct);
+      return;
+    }
     const contract = params.get('contract');
-    if (!contract || !threads?.length) return;
+    if (!contract) return;
     const found = threads.find((thread) => thread.contract_id === contract);
     if (found) void openThread(found.id);
   }, [params, threads, openThread]);
@@ -98,14 +104,14 @@ function Messages() {
       <div className={styles.layout}>
         <aside className={[styles.list, active ? styles.listHidden : ''].join(' ')}>
           <div className="av-page av-stack-sm">
-            <h1 className={styles.heading}>Messages</h1>
+            <h1 className={styles.heading}>Сообщения</h1>
             {threads === null ? (
               <SkeletonList count={3} />
             ) : threads.length === 0 ? (
               <EmptyState
                 icon={<IconMessage size={20} />}
-                title="No conversations yet"
-                description="Messages live with the work: a thread opens when you send or receive a proposal, and again when a contract is signed."
+                title="Диалогов пока нет"
+                description="Переписка привязана к работе: диалог открывается, когда вы отправляете или получаете отклик, и когда заключена сделка."
               />
             ) : (
               threads.map((item) => (
@@ -122,7 +128,7 @@ function Messages() {
                       <span className="av-xs av-faint">{timeAgo(item.last_message_at)}</span>
                     </div>
                     <p className="av-small av-muted av-clamp-2">
-                      {item.preview || item.project_title || 'No messages yet'}
+                      {item.preview || item.project_title || 'Сообщений пока нет'}
                     </p>
                   </div>
                   {item.unread_count > 0 ? (
@@ -138,7 +144,7 @@ function Messages() {
           {!active ? (
             <div className={styles.placeholder}>
               <IconMessage size={28} />
-              <p className="av-muted">Pick a conversation to read it.</p>
+              <p className="av-muted">Выберите диалог, чтобы прочитать.</p>
             </div>
           ) : (
             <>
@@ -147,7 +153,7 @@ function Messages() {
                   type="button"
                   className={styles.backButton}
                   onClick={() => setActive(null)}
-                  aria-label="Back to conversations"
+                  aria-label="К списку диалогов"
                 >
                   <IconArrowLeft size={18} />
                 </button>
@@ -174,7 +180,7 @@ function Messages() {
                       >
                         <div className={styles.bubble}>
                           {message.is_deleted ? (
-                            <span className="av-faint">This message was removed</span>
+                            <span className="av-faint">Сообщение удалено</span>
                           ) : (
                             message.body
                           )}
@@ -196,7 +202,7 @@ function Messages() {
               >
                 <textarea
                   className={styles.input}
-                  placeholder="Write a message"
+                  placeholder="Напишите сообщение"
                   rows={1}
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
@@ -213,7 +219,7 @@ function Messages() {
                   loading={sending}
                   disabled={!draft.trim()}
                   icon={<IconSend size={18} />}
-                  aria-label="Send"
+                  aria-label="Отправить"
                 />
               </form>
             </>
@@ -227,16 +233,18 @@ function Messages() {
 function systemText(message: Message) {
   const event = message.system_event ?? '';
   const map: Record<string, string> = {
-    'contract.signed': 'Contract signed',
-    'contract.completed': 'Contract completed',
-    'contract.cancelled': 'Contract cancelled',
-    'milestone.funded': 'Milestone funded',
-    'milestone.in_progress': 'Work started',
-    'milestone.submitted': 'Work submitted for review',
-    'milestone.revision_requested': 'Changes requested',
-    'milestone.approved': 'Milestone approved',
-    'milestone.released': 'Payment released',
-    'milestone.disputed': 'Dispute opened',
+    'contract.signed': 'Сделка заключена',
+    'contract.completed': 'Сделка завершена',
+    'contract.cancelled': 'Сделка отменена',
+    'milestone.funded': 'Этап оплачен в резерв',
+    'milestone.in_progress': 'Работа начата',
+    'milestone.submitted': 'Работа сдана на проверку',
+    'milestone.revision_requested': 'Запрошена доработка',
+    'milestone.approved': 'Этап принят',
+    'milestone.released': 'Оплата выплачена',
+    'milestone.disputed': 'Открыт спор',
+    'milestone.resolved': 'Спор разрешён платформой',
+    'milestone.cancelled': 'Этап отменён',
   };
   return map[event] ?? event.replace(/[._]/g, ' ');
 }

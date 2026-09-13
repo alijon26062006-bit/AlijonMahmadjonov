@@ -208,3 +208,25 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+.historyRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.historyRating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--av-warning-text);
+  font-size: var(--av-text-sm);
+  font-weight: var(--av-weight-semibold);
+}
+
+.serviceGrid {
+  display: grid;
+  gap: var(--av-space-4);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}

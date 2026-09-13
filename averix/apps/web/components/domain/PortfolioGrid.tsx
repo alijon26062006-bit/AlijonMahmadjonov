@@ -45,7 +45,7 @@ export function PortfolioGrid({
             {item.kind === 'averix_verified' ? (
               <span className={styles.verified}>
                 <IconShield size={13} />
-                AVERIX verified
+                Подтверждено AVERIX
               </span>
             ) : null}
           </div>
@@ -71,7 +71,7 @@ export function PortfolioGrid({
             <footer className={styles.footer}>
               <span className="av-xs av-faint">
                 {item.completed_on ? shortDate(item.completed_on) : ''}
-                {item.kind === 'portfolio' ? ' · self-declared' : ''}
+                {item.kind === 'portfolio' ? ' · из портфолио' : ''}
               </span>
               {item.can_preview ? (
                 <Button
@@ -80,11 +80,11 @@ export function PortfolioGrid({
                   icon={<IconExternal size={15} />}
                   onClick={() => onPreview(item.slug)}
                 >
-                  Live preview
+                  Открыть сайт
                 </Button>
               ) : item.demo_status === 'nda' ? (
                 <Badge tone="neutral" size="sm">
-                  Under NDA
+                  Под NDA
                 </Badge>
               ) : item.project_host ? (
                 <Badge tone="neutral" size="sm">

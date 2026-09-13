@@ -42,17 +42,19 @@ function RegisterForm() {
         email: form.email.trim(),
         username: form.username.trim().toLowerCase(),
         role,
+        locale: 'ru',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       if (session.csrf_token) setCsrfToken(session.csrf_token);
       await refresh();
-      // A developer has a profile to build before anything else is useful.
+      // Исполнителю сначала нужна анкета — без неё его никто не найдёт.
       router.replace(role === 'developer' ? '/onboarding' : '/dashboard');
     } catch (error) {
       if (error instanceof ApiFailure) {
         setFields(error.fields);
         setMessage(error.fields && Object.keys(error.fields).length ? '' : error.message);
       } else {
-        setMessage("We couldn't reach the server. Please check your connection and try again.");
+        setMessage('Не удалось связаться с сервером. Проверьте подключение и попробуйте ещё раз.');
       }
     } finally {
       setBusy(false);
@@ -61,16 +63,16 @@ function RegisterForm() {
 
   return (
     <form className={styles.card} onSubmit={submit} noValidate>
-      <h1 className={styles.title}>Create your account</h1>
+      <h1 className={styles.title}>Создать аккаунт</h1>
       <p className={styles.subtitle}>
-        One account, one starting point. You can add the other side later.
+        Один аккаунт — одна отправная точка. Вторую роль можно добавить позже.
       </p>
 
-      <div className={styles.roles} role="radiogroup" aria-label="I am here to">
+      <div className={styles.roles} role="radiogroup" aria-label="Я здесь, чтобы">
         {(
           [
-            { key: 'developer', title: 'Work on projects', body: 'Build a profile, find matching work' },
-            { key: 'client', title: 'Hire a developer', body: 'Post a project, review proposals' },
+            { key: 'developer', title: 'Выполнять заказы', body: 'Заполнить анкету, получать подходящие заказы' },
+            { key: 'client', title: 'Заказать работу', body: 'Разместить заказ, выбрать исполнителя' },
           ] as const
         ).map((option) => (
           <button
@@ -94,7 +96,7 @@ function RegisterForm() {
       ) : null}
 
       <Input
-        label="Full name"
+        label="Имя и фамилия"
         name="full_name"
         autoComplete="name"
         required
@@ -103,18 +105,18 @@ function RegisterForm() {
         onChange={update('full_name')}
       />
       <Input
-        label="Username"
+        label="Имя пользователя"
         name="username"
         autoComplete="username"
         required
         prefix="@"
-        hint="This is your profile address: averix.dev/@username"
+        hint="Это адрес вашего профиля: averix.dev/@username. Латиница, цифры, дефис."
         value={form.username}
         error={fields.username}
         onChange={update('username')}
       />
       <Input
-        label="Email"
+        label="Электронная почта"
         type="email"
         name="email"
         autoComplete="email"
@@ -125,12 +127,12 @@ function RegisterForm() {
         onChange={update('email')}
       />
       <Input
-        label="Password"
+        label="Пароль"
         type="password"
         name="password"
         autoComplete="new-password"
         required
-        hint="At least 12 characters. A passphrase is easier to remember and harder to guess."
+        hint="Не короче 12 символов. Фразу из нескольких слов легче запомнить и труднее подобрать."
         value={form.password}
         error={fields.password}
         onChange={update('password')}
@@ -143,17 +145,17 @@ function RegisterForm() {
           onChange={(event) => setAcceptTerms(event.target.checked)}
         />
         <span>
-          I agree to the AVERIX terms and privacy notice.
+          Я принимаю условия использования AVERIX и политику конфиденциальности.
           {fields.accept_terms ? <span className={styles.termsError}> {fields.accept_terms}</span> : null}
         </span>
       </label>
 
       <Button type="submit" size="lg" block loading={busy} disabled={!acceptTerms}>
-        Create account
+        Создать аккаунт
       </Button>
 
       <p className={styles.switch}>
-        Already have an account? <Link href="/login">Sign in</Link>
+        Уже есть аккаунт? <Link href="/login">Войти</Link>
       </p>
     </form>
   );

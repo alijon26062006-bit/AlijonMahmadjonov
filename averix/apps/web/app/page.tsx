@@ -6,15 +6,16 @@ import { useRouter } from 'next/navigation';
 import styles from './landing.module.css';
 import { Wordmark } from '@/components/nav/Logo';
 import { Button, ButtonLink } from '@/components/ui/Button';
-import { IconCheck, IconGitHub, IconShield } from '@/components/ui/Icon';
+import { IconCheck, IconLock, IconShield } from '@/components/ui/Icon';
 import { useSession } from '@/lib/session';
 import { defaultHome } from '@/components/nav/TopBar';
+import { SECTORS } from '@/lib/labels';
 
 export default function Landing() {
   const { session, loading } = useSession();
   const router = useRouter();
 
-  // A signed-in person does not need the pitch.
+  // Тому, кто уже вошёл, презентация не нужна.
   useEffect(() => {
     if (!loading && session) router.replace(defaultHome(session.active_role));
   }, [loading, session, router]);
@@ -25,50 +26,60 @@ export default function Landing() {
         <Wordmark size={20} />
         <div className="av-row">
           <Link href="/login" className={styles.signIn}>
-            Sign in
+            Войти
           </Link>
           <Button size="sm" onClick={() => router.push('/register')}>
-            Join
+            Регистрация
           </Button>
         </div>
       </header>
 
       <section className={styles.hero}>
-        <p className={styles.eyebrow}>For clients and developers</p>
+        <p className={styles.eyebrow}>Для заказчиков и исполнителей</p>
         <h1 className={styles.title}>
-          Hire developers who can <span className={styles.accent}>show the work</span>
+          Фриланс, где работу <span className={styles.accent}>можно проверить</span>
         </h1>
         <p className={styles.lede}>
-          Every finished contract on AVERIX attaches itself to the developer&rsquo;s profile — with
-          the client&rsquo;s review, the technologies used and the delivery date. It cannot be
-          written by hand, which is what makes it worth reading.
+          Дизайн, тексты, сайты, реклама, видео, бухгалтерия — исполнители в любой области.
+          Каждая завершённая сделка сама попадает в профиль исполнителя вместе с отзывом
+          заказчика и сроком сдачи. Такую историю нельзя написать руками — поэтому ей можно
+          верить.
         </p>
         <div className={styles.actions}>
           <ButtonLink href="/register?role=client" size="lg">
-            Post a project
+            Заказать работу
           </ButtonLink>
           <ButtonLink href="/register?role=developer" size="lg" variant="secondary">
-            Find work
+            Стать исполнителем
           </ButtonLink>
         </div>
+      </section>
+
+      <section className={styles.points}>
+        {SECTORS.map((sector) => (
+          <Link key={sector.slug} href={`/freelancers?sector=${sector.slug}`} className={styles.point}>
+            <h2 className={styles.pointTitle}>{sector.name}</h2>
+            <p className={styles.pointBody}>{sector.hint}</p>
+          </Link>
+        ))}
       </section>
 
       <section className={styles.points}>
         {[
           {
             icon: <IconShield size={18} />,
-            title: 'Verified history, not claims',
-            body: 'Completed AVERIX contracts appear on a profile automatically and are marked as verified. Self-declared portfolio work is shown separately, and labelled as such.',
+            title: 'Проверенная история, а не обещания',
+            body: 'Завершённые на AVERIX заказы появляются в профиле автоматически и помечаются как подтверждённые. Работы из портфолио показываются отдельно — и подписаны как портфолио.',
           },
           {
             icon: <IconCheck size={18} />,
-            title: 'Projects reach the right people',
-            body: 'A Telegram bot in Python reaches Telegram and Python developers — not every designer on the platform. Matching explains itself: which requirements you meet, and which you do not.',
+            title: 'Заказ находит нужных людей',
+            body: 'Логотип видят дизайнеры, а не все подряд; Telegram-бот на Python — разработчики ботов. Подбор объясняет себя: каким требованиям вы соответствуете, а каким нет.',
           },
           {
-            icon: <IconGitHub size={18} />,
-            title: 'GitHub, read honestly',
-            body: 'Connect your account and AVERIX reads your public repositories for the technologies you actually use. Code share is shown as code share — never converted into a competence score.',
+            icon: <IconLock size={18} />,
+            title: 'Безопасная сделка',
+            body: 'Заказчик резервирует оплату по этапу, исполнитель сдаёт работу, деньги переходят после приёмки. Спор разбирает платформа, а не тот, кто громче.',
           },
         ].map((point) => (
           <article key={point.title} className={styles.point}>
@@ -82,7 +93,7 @@ export default function Landing() {
       <footer className={styles.footer}>
         <Wordmark size={16} />
         <p className="av-small av-faint">
-          A marketplace for software work. AVERIX holds no funds and makes no escrow claim.
+          Биржа удалённой работы. Оплата проходит по этапам и подтверждается платформой.
         </p>
       </footer>
     </main>

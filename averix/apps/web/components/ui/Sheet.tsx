@@ -99,7 +99,7 @@ export function Sheet({
             <h2 className={styles.title}>{title}</h2>
             {description ? <p className={styles.description}>{description}</p> : null}
           </div>
-          <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
+          <button type="button" className={styles.close} onClick={onClose} aria-label="Закрыть">
             <IconClose size={18} />
           </button>
         </header>

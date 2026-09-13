@@ -1,0 +1,125 @@
+.shell {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-3);
+  margin-bottom: var(--av-space-5);
+}
+
+.track {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--av-radius-pill);
+  background: var(--av-surface-sunken);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--av-brand);
+  transition: width var(--av-motion-base) var(--av-motion-ease);
+}
+
+.stepLabel {
+  font-size: var(--av-text-xs);
+  color: var(--av-text-tertiary);
+  white-space: nowrap;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--av-text-2xl);
+  font-weight: var(--av-weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.lede {
+  margin: var(--av-space-3) 0 0;
+  color: var(--av-text-secondary);
+}
+
+.alert {
+  margin: 0;
+  padding: var(--av-space-3) var(--av-space-4);
+  border-radius: var(--av-radius-md);
+  background: var(--av-danger-subtle);
+  border: 1px solid var(--av-danger-border);
+  color: var(--av-danger-text);
+  font-size: var(--av-text-sm);
+}
+
+.grid {
+  display: grid;
+  gap: var(--av-space-3);
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--av-space-4);
+  border: 1px solid var(--av-border);
+  border-radius: var(--av-radius-lg);
+  background: var(--av-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tileActive {
+  border-color: var(--av-brand);
+  background: var(--av-brand-subtle);
+}
+
+.tileName {
+  font-weight: var(--av-weight-semibold);
+}
+
+.tileHint {
+  font-size: var(--av-text-xs);
+  color: var(--av-text-secondary);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--av-space-2);
+}
+
+.featureRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--av-space-2);
+  align-items: end;
+}
+
+.actions {
+  display: flex;
+  gap: var(--av-space-3);
+  margin-top: var(--av-space-6);
+}
+
+.actions > * {
+  flex: 1;
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--av-space-3);
+  margin: 0;
+  padding: 0;
+}
+
+.summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--av-space-4);
+  border-bottom: 1px solid var(--av-border-subtle);
+  padding-bottom: var(--av-space-2);
+}

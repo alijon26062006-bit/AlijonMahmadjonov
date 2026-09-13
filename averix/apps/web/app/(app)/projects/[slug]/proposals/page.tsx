@@ -15,16 +15,16 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { MatchExplainer } from '@/components/domain/MatchExplainer';
 import { IconCheck, IconShield, IconStarFilled, IconUser } from '@/components/ui/Icon';
 import { ApiFailure, get, post } from '@/lib/api';
-import { money, plural, timeAgo } from '@/lib/format';
+import { days, money, plural, timeAgo } from '@/lib/format';
 import type { Project, ProposalCard } from '@/lib/types';
 
 const SORTS = [
-  { key: 'recommended', label: 'Recommended' },
-  { key: 'match', label: 'Best match' },
-  { key: 'newest', label: 'Newest' },
-  { key: 'price', label: 'Price' },
-  { key: 'delivery', label: 'Fastest' },
-  { key: 'rating', label: 'Highest rated' },
+  { key: 'recommended', label: 'Рекомендуем' },
+  { key: 'match', label: 'Совпадение' },
+  { key: 'newest', label: 'Новые' },
+  { key: 'price', label: 'Цена' },
+  { key: 'delivery', label: 'Быстрее' },
+  { key: 'rating', label: 'Рейтинг' },
 ];
 
 export default function ProposalsPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -55,25 +55,25 @@ export default function ProposalsPage({ params }: { params: Promise<{ slug: stri
 
   return (
     <>
-      <TopBar back={`/dashboard`} title="Proposals" />
+      <TopBar back={`/dashboard`} title="Отклики" />
       <div className="av-page av-stack">
         <header>
-          <h1 className={styles.title}>{project?.title ?? 'Proposals'}</h1>
+          <h1 className={styles.title}>{project?.title ?? 'Отклики'}</h1>
           <p className="av-muted av-small">
-            {proposals ? plural(proposals.length, 'proposal') : 'Loading proposals'}
+            {proposals ? plural(proposals.length, 'отклик', 'отклика', 'откликов') : 'Загружаем отклики'}
             {project ? ` · ${project.budget.display}` : ''}
           </p>
         </header>
 
-        <Tabs items={SORTS} active={sort} onChange={setSort} ariaLabel="Sort proposals" />
+        <Tabs items={SORTS} active={sort} onChange={setSort} ariaLabel="Сортировка откликов" />
 
         {proposals === null ? (
           <SkeletonList count={3} />
         ) : proposals.length === 0 ? (
           <EmptyState
             icon={<IconUser size={20} />}
-            title="No proposals yet"
-            description="Developers matching your project will appear here. Most projects get their first proposal within a day."
+            title="Откликов пока нет"
+            description="Подходящие исполнители появятся здесь. Большинство заказов получают первый отклик в течение дня."
           />
         ) : (
           <div className="av-stack-sm">
@@ -90,7 +90,7 @@ export default function ProposalsPage({ params }: { params: Promise<{ slug: stri
                     <div className="av-grow">
                       <p className="av-strong">{proposal.developer.full_name}</p>
                       <p className="av-small av-muted">
-                        {proposal.developer.professional_title ?? 'Developer'}
+                        {proposal.developer.professional_title ?? 'Исполнитель'}
                         {proposal.developer.country_code ? ` · ${proposal.developer.country_code}` : ''}
                       </p>
                       <div className={styles.stats}>
@@ -102,14 +102,14 @@ export default function ProposalsPage({ params }: { params: Promise<{ slug: stri
                         ) : null}
                         {proposal.developer.projects_completed ? (
                           <span>
-                            {plural(proposal.developer.projects_completed, 'project')} on AVERIX
+                            {plural(proposal.developer.projects_completed, 'заказ', 'заказа', 'заказов')} на AVERIX
                           </span>
                         ) : (
-                          <span className="av-faint">New to AVERIX</span>
+                          <span className="av-faint">Новичок на AVERIX</span>
                         )}
                         {proposal.developer.identity_verified ? (
                           <span className={styles.verified}>
-                            <IconShield size={13} /> Verified
+                            <IconShield size={13} /> Проверен
                           </span>
                         ) : null}
                       </div>
@@ -118,10 +118,10 @@ export default function ProposalsPage({ params }: { params: Promise<{ slug: stri
 
                   <div className={styles.quote}>
                     <span className={styles.amount}>{proposal.amount_display}</span>
-                    <span className="av-small av-muted">{proposal.delivery_days} days</span>
+                    <span className="av-small av-muted">{days(proposal.delivery_days)}</span>
                     {proposal.shortlisted_at ? (
                       <Badge tone="brand" size="sm">
-                        Shortlisted
+                        В шорт-листе
                       </Badge>
                     ) : null}
                   </div>
@@ -157,8 +157,8 @@ export default function ProposalsPage({ params }: { params: Promise<{ slug: stri
                       }
                     >
                       {proposal.top_evidence.kind === 'averix_verified'
-                        ? 'AVERIX verified work'
-                        : 'From their portfolio'}
+                        ? 'Подтверждённая работа на AVERIX'
+                        : 'Из портфолио'}
                     </Badge>
                     <p className="av-small av-strong">{proposal.top_evidence.title}</p>
                     {proposal.top_evidence.technologies?.length ? (
@@ -170,7 +170,7 @@ export default function ProposalsPage({ params }: { params: Promise<{ slug: stri
                 ) : null}
 
                 <footer className={styles.footer}>
-                  <span className="av-small av-faint">Sent {timeAgo(proposal.created_at)}</span>
+                  <span className="av-small av-faint">Отправлен {timeAgo(proposal.created_at)}</span>
                   <div className="av-row">
                     <Button
                       size="sm"
@@ -182,10 +182,10 @@ export default function ProposalsPage({ params }: { params: Promise<{ slug: stri
                         void load(sort);
                       }}
                     >
-                      {proposal.shortlisted_at ? 'Remove from shortlist' : 'Shortlist'}
+                      {proposal.shortlisted_at ? 'Убрать из шорт-листа' : 'В шорт-лист'}
                     </Button>
                     <Button size="sm" onClick={() => setHiring(proposal)}>
-                      Hire
+                      Нанять
                     </Button>
                   </div>
                 </footer>
@@ -231,12 +231,12 @@ function HireSheet({
     <Sheet
       open={Boolean(proposal)}
       onClose={onClose}
-      title={`Hire ${proposal.developer.full_name}`}
+      title={`Нанять: ${proposal.developer.full_name}`}
       description={project?.title}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Cancel
+            Отмена
           </Button>
           <Button
             loading={busy}
@@ -253,14 +253,14 @@ function HireSheet({
                 setMessage(
                   error instanceof ApiFailure
                     ? error.message
-                    : "We couldn't create the contract. Please try again.",
+                    : 'Не удалось создать сделку. Попробуйте ещё раз.',
                 );
               } finally {
                 setBusy(false);
               }
             }}
           >
-            Create contract
+            Заключить сделку
           </Button>
         </>
       }
@@ -274,27 +274,27 @@ function HireSheet({
 
         <ul className={styles.terms}>
           <li>
-            <span className="av-muted">Agreed price</span>
+            <span className="av-muted">Цена</span>
             <strong>{proposal.amount_display}</strong>
           </li>
           <li>
-            <span className="av-muted">Platform fee (from the developer)</span>
+            <span className="av-muted">Комиссия платформы (удерживается с исполнителя)</span>
             <strong>{money(fee, proposal.currency)}</strong>
           </li>
           <li>
-            <span className="av-muted">Delivery</span>
-            <strong>{proposal.delivery_days} days</strong>
+            <span className="av-muted">Срок</span>
+            <strong>{days(proposal.delivery_days)}</strong>
           </li>
         </ul>
 
         <div className="av-stack-sm">
-          <p className="av-small av-strong">When this contract is finished, show its value as</p>
+          <p className="av-small av-strong">После завершения показывать стоимость сделки в профиле исполнителя как</p>
           <div className={styles.visibility}>
             {[
-              { key: 'public', label: 'Exact amount' },
-              { key: 'range', label: 'A range' },
-              { key: 'hidden', label: 'Nothing' },
-              { key: 'private', label: '“Private contract”' },
+              { key: 'public', label: 'Точная сумма' },
+              { key: 'range', label: 'Диапазон' },
+              { key: 'hidden', label: 'Не показывать' },
+              { key: 'private', label: '«Закрытая сделка»' },
             ].map((option) => (
               <button
                 key={option.key}
@@ -309,15 +309,15 @@ function HireSheet({
             ))}
           </div>
           <p className="av-small av-faint">
-            This controls what appears on the developer&rsquo;s public profile. Their earnings and
-            balance are never public whatever you choose.
+            Это влияет только на публичный профиль исполнителя. Его доходы и баланс не публичны
+            в любом случае.
           </p>
         </div>
 
         <p className={styles.note}>
           <IconShield size={15} />
-          Accepting closes the other proposals on this project, with a reason sent to each
-          developer. Milestones are funded one at a time — nothing is charged now.
+          Остальные отклики на этот заказ закроются, каждому исполнителю уйдёт причина. Этапы
+          оплачиваются по одному — сейчас ничего не списывается.
         </p>
       </div>
     </Sheet>

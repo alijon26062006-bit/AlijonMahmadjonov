@@ -529,7 +529,38 @@ func (s *Store) ForDeveloper(ctx context.Context, developerID uuid.UUID, status 
 		p.IsAuthor = true
 		out = append(out, *p)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// One query for the titles rather than a join in the shared select, so
+	// the other callers keep their column list.
+	if len(out) > 0 {
+		ids := make([]uuid.UUID, 0, len(out))
+		for _, p := range out {
+			ids = append(ids, p.ProjectID)
+		}
+		titleRows, err := s.db.Query(ctx,
+			`SELECT id, title, slug, status FROM projects WHERE id = ANY($1)`, ids)
+		if err != nil {
+			return nil, fmt.Errorf("query proposal projects: %w", err)
+		}
+		defer titleRows.Close()
+		titles := map[uuid.UUID][3]string{}
+		for titleRows.Next() {
+			var id uuid.UUID
+			var title, slug, status string
+			if err := titleRows.Scan(&id, &title, &slug, &status); err != nil {
+				return nil, err
+			}
+			titles[id] = [3]string{title, slug, status}
+		}
+		for i := range out {
+			if t, ok := titles[out[i].ProjectID]; ok {
+				out[i].ProjectTitle, out[i].ProjectSlug, out[i].ProjectStatus = t[0], t[1], t[2]
+			}
+		}
+	}
+	return out, nil
 }
 
 // ── State changes ───────────────────────────────────────────────────────────

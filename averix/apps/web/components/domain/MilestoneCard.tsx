@@ -47,28 +47,28 @@ export function MilestoneCard({
   const isDeveloper = role === 'developer';
 
   const actions: { kind: ActionKind; label: string; variant?: 'primary' | 'secondary' | 'danger' }[] = [];
-  if (milestone.status === 'funded' && isDeveloper) actions.push({ kind: 'start', label: 'Start work' });
+  if (milestone.status === 'funded' && isDeveloper) actions.push({ kind: 'start', label: 'Начать работу' });
   if ((milestone.status === 'in_progress' || milestone.status === 'revision_requested') && isDeveloper) {
-    actions.push({ kind: 'submit', label: 'Submit work' });
+    actions.push({ kind: 'submit', label: 'Сдать работу' });
   }
   if (milestone.status === 'submitted' && isClient) {
-    actions.push({ kind: 'approve', label: 'Approve' });
+    actions.push({ kind: 'approve', label: 'Принять' });
     if (milestone.revision_count < milestone.revision_limit) {
-      actions.push({ kind: 'revision', label: 'Request changes', variant: 'secondary' });
+      actions.push({ kind: 'revision', label: 'Вернуть на доработку', variant: 'secondary' });
     }
   }
   if (
     ['funded', 'in_progress', 'submitted', 'revision_requested'].includes(milestone.status) &&
     (isClient || isDeveloper)
   ) {
-    actions.push({ kind: 'dispute', label: 'Open dispute', variant: 'danger' });
+    actions.push({ kind: 'dispute', label: 'Открыть спор', variant: 'danger' });
   }
 
   return (
     <article className={[styles.card, styles[tone(milestone.status)]].join(' ')}>
       <header className={styles.header}>
         <div className={styles.headerText}>
-          <p className={styles.position}>Milestone {milestone.position}</p>
+          <p className={styles.position}>Этап {milestone.position}</p>
           <h3 className={styles.title}>{milestone.title}</h3>
         </div>
         <div className={styles.headerRight}>
@@ -85,7 +85,7 @@ export function MilestoneCard({
 
       {milestone.status === 'submitted' && milestone.submission_note ? (
         <blockquote className={styles.note}>
-          <span className={styles.noteLabel}>Submitted {timeAgo(milestone.submitted_at)}</span>
+          <span className={styles.noteLabel}>Сдано {timeAgo(milestone.submitted_at)}</span>
           {milestone.submission_note}
         </blockquote>
       ) : null}
@@ -93,7 +93,7 @@ export function MilestoneCard({
       {milestone.status === 'revision_requested' && milestone.revision_note ? (
         <blockquote className={[styles.note, styles.noteWarning].join(' ')}>
           <span className={styles.noteLabel}>
-            Revision {milestone.revision_count} of {milestone.revision_limit}
+            Доработка {milestone.revision_count} из {milestone.revision_limit}
           </span>
           {milestone.revision_note}
         </blockquote>
@@ -125,10 +125,10 @@ export function MilestoneCard({
 
       <footer className={styles.footer}>
         <div className={styles.meta}>
-          {milestone.due_on ? <span>Due {shortDate(milestone.due_on)}</span> : null}
+          {milestone.due_on ? <span>Срок {shortDate(milestone.due_on)}</span> : null}
           {milestone.events?.length ? (
             <button type="button" className={styles.historyToggle} onClick={() => setOpen(!open)}>
-              History
+              История
               <IconChevronDown size={13} className={open ? styles.flip : undefined} />
             </button>
           ) : null}
@@ -137,11 +137,11 @@ export function MilestoneCard({
         <div className={styles.actions}>
           {milestone.status === 'draft' && isClient ? (
             <Button size="sm" onClick={onFund}>
-              Fund milestone
+              Оплатить этап
             </Button>
           ) : null}
           {milestone.status === 'draft' && isDeveloper ? (
-            <span className="av-small av-faint">Waiting for the client to fund this</span>
+            <span className="av-small av-faint">Ждём, пока заказчик зарезервирует оплату</span>
           ) : null}
           {actions.map((item) => (
             <Button
@@ -165,7 +165,7 @@ export function MilestoneCard({
               <div>
                 <p className="av-small">
                   <strong>{label(event.to_status)}</strong>
-                  {event.actor ? <span className="av-muted"> by {event.actor.full_name}</span> : null}
+                  {event.actor ? <span className="av-muted"> — {event.actor.full_name}</span> : null}
                 </p>
                 <p className="av-xs av-faint">{timeAgo(event.created_at)}</p>
                 {event.note ? <p className="av-small av-muted">{event.note}</p> : null}
@@ -215,23 +215,23 @@ function badgeTone(status: string) {
 function label(status: string) {
   switch (status) {
     case 'draft':
-      return 'Not funded';
+      return 'Не оплачен';
     case 'funded':
-      return 'Funded';
+      return 'Оплата в резерве';
     case 'in_progress':
-      return 'In progress';
+      return 'В работе';
     case 'submitted':
-      return 'Submitted';
+      return 'Сдан на проверку';
     case 'revision_requested':
-      return 'Changes requested';
+      return 'На доработке';
     case 'approved':
-      return 'Approved';
+      return 'Принят';
     case 'released':
-      return 'Paid';
+      return 'Выплачен';
     case 'disputed':
-      return 'Disputed';
+      return 'Спор';
     case 'cancelled':
-      return 'Cancelled';
+      return 'Отменён';
     default:
       return status;
   }

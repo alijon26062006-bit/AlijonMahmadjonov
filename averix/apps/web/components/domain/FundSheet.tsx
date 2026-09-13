@@ -53,7 +53,7 @@ export function FundSheet({
           configurable: failure.code === 'payments_not_configured',
         });
       } else {
-        setError({ message: "We couldn't start that payment. Please try again." });
+        setError({ message: 'Не удалось начать оплату. Попробуйте ещё раз.' });
       }
     } finally {
       setBusy(false);
@@ -74,18 +74,18 @@ export function FundSheet({
     <Sheet
       open
       onClose={onClose}
-      title={payment ? 'Send the transfer' : 'Fund this milestone'}
+      title={payment ? 'Переведите оплату' : 'Оплатить этап'}
       description={milestone.title}
       footer={
         payment ? (
-          <Button onClick={onFunded}>Done</Button>
+          <Button onClick={onFunded}>Готово</Button>
         ) : (
           <>
             <Button variant="secondary" onClick={onClose}>
-              Cancel
+              Отмена
             </Button>
             <Button loading={busy} onClick={() => void start()} disabled={Boolean(error?.configurable)}>
-              Continue
+              Продолжить
             </Button>
           </>
         )
@@ -99,8 +99,8 @@ export function FundSheet({
               <p className="av-strong">{error.message}</p>
               {error.configurable ? (
                 <p className="av-small av-muted">
-                  An administrator has to add the transfer details before anyone can fund a
-                  milestone. Nothing has been charged.
+                  Администратор ещё не указал реквизиты для перевода — пока их нет, оплатить
+                  этап нельзя. Деньги не списаны.
                 </p>
               ) : null}
             </div>
@@ -110,7 +110,7 @@ export function FundSheet({
         {payment ? (
           <>
             <div className={styles.amountBlock}>
-              <span className="av-small av-muted">Send exactly</span>
+              <span className="av-small av-muted">Переведите ровно</span>
               <span className={styles.amount}>{money(payment.amount_minor, payment.currency)}</span>
               <span className={styles.status}>{payment.status_label}</span>
             </div>
@@ -123,7 +123,7 @@ export function FundSheet({
                     type="button"
                     className={styles.value}
                     onClick={() => void copy(instruction.value)}
-                    title="Copy"
+                    title="Скопировать"
                   >
                     {instruction.value}
                     {copied === instruction.value ? <IconCheck size={14} /> : null}
@@ -134,23 +134,21 @@ export function FundSheet({
 
             <p className={styles.note}>
               <IconShield size={15} />
-              Quote the payment reference exactly — that is how your transfer is matched to this
-              milestone. Once an administrator confirms it arrived, the developer can start. AVERIX
-              does not hold the funds.
+              Укажите номер платежа точно — по нему перевод сопоставят с этим этапом. Как только
+              администратор подтвердит поступление, исполнитель сможет начать работу.
             </p>
           </>
         ) : !error ? (
           <>
             <div className={styles.amountBlock}>
-              <span className="av-small av-muted">Amount for this milestone</span>
+              <span className="av-small av-muted">Сумма этапа</span>
               <span className={styles.amount}>
                 {money(milestone.amount_minor, milestone.currency)}
               </span>
             </div>
             <p className={styles.explain}>
-              You will get the transfer details and a reference to quote. The milestone becomes
-              funded once an administrator confirms the money arrived, and the developer starts
-              then — not before.
+              Вы получите реквизиты и номер платежа. Этап считается оплаченным после того, как
+              администратор подтвердит поступление денег, — и только тогда исполнитель начнёт.
             </p>
           </>
         ) : null}

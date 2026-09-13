@@ -6,8 +6,10 @@ import styles from './BottomNav.module.css';
 import {
   IconBriefcase,
   IconCompass,
+  IconLayers,
   IconMessage,
   IconPlus,
+  IconShield,
   IconUser,
   IconWallet,
 } from '@/components/ui/Icon';
@@ -22,9 +24,9 @@ type Item = {
 };
 
 /**
- * The bottom bar is the product's spine on a phone: five destinations, thumb
- * height, always there. It is not a shrunken desktop menu — the desktop header
- * carries the same destinations in a row instead, and this disappears.
+ * Нижняя панель — позвоночник продукта на телефоне: пять разделов на высоте
+ * большого пальца, всегда на месте. На десктопе те же разделы несёт шапка,
+ * а панель исчезает.
  */
 export function BottomNav({ unread = 0 }: { unread?: number }) {
   const pathname = usePathname();
@@ -35,35 +37,36 @@ export function BottomNav({ unread = 0 }: { unread?: number }) {
   const items: Item[] =
     role === 'client'
       ? [
-          { href: '/dashboard', label: 'Work', icon: IconBriefcase },
-          { href: '/talent', label: 'Talent', icon: IconCompass },
-          { href: '/projects/new', label: 'Post', icon: IconPlus },
-          { href: '/messages', label: 'Messages', icon: IconMessage, badge: unread },
-          { href: '/profile', label: 'Profile', icon: IconUser },
+          { href: '/dashboard', label: 'Заказы', icon: IconBriefcase },
+          { href: '/freelancers', label: 'Исполнители', icon: IconCompass },
+          { href: '/projects/new', label: 'Создать', icon: IconPlus },
+          { href: '/messages', label: 'Чаты', icon: IconMessage, badge: unread },
+          { href: '/services', label: 'Услуги', icon: IconLayers },
         ]
       : role === 'admin' || role === 'moderator'
         ? [
-            { href: '/admin', label: 'Overview', icon: IconBriefcase },
-            { href: '/admin/payments', label: 'Payments', icon: IconWallet },
-            { href: '/messages', label: 'Messages', icon: IconMessage, badge: unread },
-            { href: '/profile', label: 'Profile', icon: IconUser },
+            { href: '/admin', label: 'Обзор', icon: IconBriefcase, match: (path) => path === '/admin' },
+            { href: '/admin/moderation', label: 'Модерация', icon: IconShield },
+            { href: '/admin/payments', label: 'Платежи', icon: IconWallet },
+            { href: '/messages', label: 'Чаты', icon: IconMessage, badge: unread },
+            { href: '/profile', label: 'Профиль', icon: IconUser },
           ]
         : [
-            { href: '/feed', label: 'Find work', icon: IconCompass },
-            { href: '/contracts', label: 'Contracts', icon: IconBriefcase },
-            { href: '/messages', label: 'Messages', icon: IconMessage, badge: unread },
-            { href: '/earnings', label: 'Earnings', icon: IconWallet },
-            { href: '/profile', label: 'Profile', icon: IconUser },
+            { href: '/feed', label: 'Заказы', icon: IconCompass },
+            { href: '/contracts', label: 'Сделки', icon: IconBriefcase },
+            { href: '/messages', label: 'Чаты', icon: IconMessage, badge: unread },
+            { href: '/earnings', label: 'Доходы', icon: IconWallet },
+            { href: '/profile', label: 'Профиль', icon: IconUser },
           ];
 
-  // The most specific destination wins: on /admin/payments only Payments is
-  // current, not Overview as well.
+  // Побеждает самый конкретный адрес: на /admin/payments активен только
+  // «Платежи», а не «Обзор» вместе с ним.
   const currentHref = items
     .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
-    <nav className={styles.nav} aria-label="Main">
+    <nav className={styles.nav} aria-label="Главное меню">
       {items.map((item) => {
         const active = item.match ? item.match(pathname) : item.href === currentHref;
         const Icon = item.icon;

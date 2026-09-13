@@ -49,11 +49,11 @@ export function SkeletonCard() {
 
 export function SkeletonList({ count = 3 }: { count?: number }) {
   return (
-    <div className={styles.list} role="status" aria-label="Loading">
+    <div className={styles.list} role="status" aria-label="Загрузка">
       {Array.from({ length: count }, (_, index) => (
         <SkeletonCard key={index} />
       ))}
-      <span className="av-sr-only">Loading…</span>
+      <span className="av-sr-only">Загрузка…</span>
     </div>
   );
 }

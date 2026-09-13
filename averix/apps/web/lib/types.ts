@@ -487,3 +487,515 @@ export type PendingPayment = {
   payee_name?: string;
   created_at: string;
 };
+
+// ── Уведомления ─────────────────────────────────────────────────────────────
+
+export type Notification = {
+  id: string;
+  type: string;
+  title: string;
+  body?: string;
+  href?: string;
+  priority: string;
+  read_at?: string;
+  created_at: string;
+  actor?: { user_id: string; username: string; full_name: string; photo_url?: string };
+};
+
+export type NotificationPage = { items: Notification[]; next_before?: string; unread: number };
+
+export type NotificationPreference = {
+  type: string;
+  label: string;
+  in_app_locked: boolean;
+  in_app: boolean;
+  email: boolean;
+  push: boolean;
+};
+
+export type NotificationPreferenceGroup = {
+  key: string;
+  label: string;
+  preferences: NotificationPreference[];
+};
+
+// ── Отзывы и история ────────────────────────────────────────────────────────
+
+export type ReviewCategory = { key: string; label: string; hint?: string };
+
+export type Review = {
+  id: string;
+  contract_id: string;
+  direction: string;
+  author: { user_id: string; username: string; full_name: string; photo_url?: string };
+  subject: { user_id: string; username: string; full_name: string; photo_url?: string };
+  overall: number;
+  scores: Record<string, number>;
+  comment?: string;
+  would_work_again?: boolean;
+  response?: string;
+  response_at?: string;
+  published_at?: string;
+  created_at: string;
+  contract_title?: string;
+  is_mine?: boolean;
+  is_about_me?: boolean;
+  can_respond?: boolean;
+};
+
+export type ReviewSide = {
+  direction: string;
+  submitted: boolean;
+  published: boolean;
+  review?: Review;
+  categories: ReviewCategory[];
+};
+
+export type ContractReviews = {
+  contract_id: string;
+  can_review: boolean;
+  reason?: string;
+  my_direction?: string;
+  window_closes_at?: string;
+  of_developer: ReviewSide;
+  of_client: ReviewSide;
+};
+
+export type HistoryEntry = {
+  id: string;
+  contract_id: string;
+  title: string;
+  summary?: string;
+  category?: string;
+  client_rating?: number;
+  review_id?: string;
+  value_display?: string;
+  duration_days?: number;
+  completed_at: string;
+  is_visible: boolean;
+};
+
+// ── Услуги ──────────────────────────────────────────────────────────────────
+
+export type ServiceTier = {
+  id?: string;
+  position?: number;
+  name: string;
+  price_minor: number;
+  price_display?: string;
+  delivery_days: number;
+  revisions: number;
+  includes: string[];
+};
+
+export type ServiceSeller = {
+  user_id: string;
+  username: string;
+  full_name: string;
+  photo_url?: string;
+  professional_title?: string;
+  rating_avg?: number;
+  rating_count: number;
+  projects_completed: number;
+  availability: string;
+};
+
+export type ServiceCard = {
+  id: string;
+  slug: string;
+  title: string;
+  summary?: string;
+  category: CategoryRef;
+  cover_url?: string;
+  from_minor: number;
+  from_display: string;
+  currency: string;
+  delivery_days: number;
+  orders_count: number;
+  rating_avg?: number;
+  rating_count: number;
+  status: string;
+  seller: ServiceSeller;
+  created_at: string;
+};
+
+export type Service = ServiceCard & {
+  description: string;
+  revisions: number;
+  skills: SkillRef[];
+  tiers: ServiceTier[];
+  portfolio_ids: string[];
+  view_count: number;
+  moderation_state?: string;
+  updated_at: string;
+  is_owner?: boolean;
+  can_order: boolean;
+};
+
+// ── Поиск и каталог ─────────────────────────────────────────────────────────
+
+export type FreelancerCard = {
+  user_id: string;
+  username: string;
+  full_name: string;
+  photo_url?: string;
+  professional_title?: string;
+  specialisation?: { slug: string; name: string; short_name: string };
+  sector_slug?: string;
+  skills: (SkillRef & { verified?: boolean })[];
+  rating_avg?: number;
+  rating_count: number;
+  projects_completed: number;
+  hourly_rate_minor?: number;
+  rate_currency?: string;
+  rate_display?: string;
+  availability: string;
+  location?: string;
+  identity_verified: boolean;
+  github_verified: boolean;
+  is_featured?: boolean;
+  last_seen_at?: string;
+  is_saved?: boolean;
+  note?: string;
+  saved_at?: string;
+};
+
+export type ProjectHit = {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt?: string;
+  category_name: string;
+  category_slug: string;
+  budget_display: string;
+  proposals_count: number;
+  published_at?: string;
+};
+
+export type SearchResults = {
+  query: string;
+  freelancers: FreelancerCard[];
+  services: ServiceCard[] | null;
+  projects: ProjectHit[];
+  totals: Record<string, number>;
+};
+
+// ── Справочники ─────────────────────────────────────────────────────────────
+
+export type Specialisation = {
+  id: string;
+  slug: string;
+  name: string;
+  short_name: string;
+  description?: string;
+  sort_order: number;
+};
+
+export type Category = {
+  id: string;
+  parent_id?: string;
+  slug: string;
+  name: string;
+  description?: string;
+  path: string;
+  depth: number;
+  sort_order: number;
+  children?: Category[];
+};
+
+export type Skill = {
+  id: string;
+  slug: string;
+  name: string;
+  kind: string;
+  colour?: string;
+  is_core?: boolean;
+};
+
+// ── Аккаунт ─────────────────────────────────────────────────────────────────
+
+export type AccountSettings = {
+  user_id: string;
+  email: string;
+  email_verified: boolean;
+  pending_email?: string;
+  username: string;
+  full_name: string;
+  headline?: string;
+  timezone: string;
+  locale: string;
+  country_code?: string;
+  city?: string;
+  roles: string[];
+  identity_verified: boolean;
+  status: string;
+  active_sessions: number;
+  member_since: string;
+  has_password: boolean;
+  github_connected: boolean;
+  last_seen_at?: string;
+};
+
+export type AuthSession = {
+  id: string;
+  current: boolean;
+  role: string;
+  user_agent?: string;
+  ip?: string;
+  last_used_at: string;
+  created_at: string;
+  expires_at: string;
+};
+
+export type ClientProfile = {
+  user_id: string;
+  username: string;
+  full_name: string;
+  company_name?: string;
+  company_website?: string;
+  company_size?: string;
+  industry?: string;
+  about?: string;
+  country_code?: string;
+  city?: string;
+  timezone?: string;
+  hires_made?: number;
+  projects_posted?: number;
+  rating_avg?: number;
+  rating_count?: number;
+  verified?: boolean;
+  member_since?: string;
+};
+
+// ── Анкета исполнителя (свой профиль) ───────────────────────────────────────
+
+export type Onboarding = {
+  step: number;
+  total_steps: number;
+  completed: boolean;
+  completed_at?: string;
+  completeness: number;
+  missing?: { key: string; label: string; weight?: number }[];
+};
+
+export type OwnProfile = {
+  user_id: string;
+  username: string;
+  full_name: string;
+  email?: string;
+  primary_specialisation?: { slug: string; name: string; short_name: string };
+  additional_specialisations: { slug: string; name: string; short_name: string }[];
+  professional_title?: string;
+  bio?: string;
+  skills: { slug: string; name: string; kind?: string; level?: string; years?: number; is_primary?: boolean }[];
+  experience_level?: string;
+  years_experience?: number;
+  hourly_rate_minor?: number;
+  min_project_minor?: number;
+  rate_currency: string;
+  availability: string;
+  hours_per_week?: number;
+  available_from?: string;
+  overlap_from_utc?: number;
+  overlap_to_utc?: number;
+  country_code?: string;
+  city?: string;
+  timezone?: string;
+  languages: { language: string; proficiency: string }[];
+  show_location: boolean;
+  show_hourly_rate: boolean;
+  open_to_invitations: boolean;
+  photo?: PhotoSet;
+  reputation: Reputation;
+  onboarding: Onboarding;
+  github?: GitHubSummary;
+  identity_verified: boolean;
+  email_verified: boolean;
+  is_searchable: boolean;
+  member_since: string;
+};
+
+export type StepResult = { step: number; next_step: number; onboarding: Onboarding; profile?: OwnProfile };
+
+export type GitHubStatus = {
+  configured: boolean;
+  connected: boolean;
+  account?: { id: string; login: string; name?: string; avatar_url?: string; profile_url: string; company?: string };
+  analysis?: {
+    id: string;
+    status: string;
+    trigger: string;
+    repos_seen: number;
+    repos_analysed: number;
+    language_stats: { name: string; share: number; bytes?: number }[];
+    technology_summary: { name: string; repos?: number; share?: number }[];
+    ai_summary?: string;
+    focus_areas?: string[];
+    error_code?: string;
+    ai_generated_at?: string;
+  };
+  can_grant_private: boolean;
+  private_granted: boolean;
+  analysis_degraded?: string;
+};
+
+// ── Админка и модерация ─────────────────────────────────────────────────────
+
+export type AdminOverview = {
+  users: { total: number; clients: number; freelancers: number; listed_freelancers: number; new_this_week: number; suspended: number };
+  marketplace: {
+    open_projects: number;
+    active_services: number;
+    active_contracts: number;
+    completed_this_month: number;
+    proposals_this_week: number;
+    open_disputes: number;
+    published_reviews: number;
+  };
+  money: { currency: string; gross_minor: number; fee_minor: number; contracts: number }[];
+  attention: { moderation_pending: number; moderation_escalated: number; open_reports: number; pending_payments: number };
+  integrations: Record<string, boolean>;
+  version: string;
+};
+
+export type AdminUser = {
+  id: string;
+  username: string;
+  full_name: string;
+  email: string;
+  status: string;
+  roles: string[];
+  email_verified: boolean;
+  identity_verified: boolean;
+  suspended_reason?: string;
+  suspended_until?: string;
+  created_at: string;
+  last_seen_at?: string;
+  country_code?: string;
+  city?: string;
+  projects_posted?: number;
+  contracts_total?: number;
+  contracts_active?: number;
+  reports_against?: number;
+  reports_filed?: number;
+  warnings?: number;
+  active_sessions?: number;
+  github_connected?: boolean;
+  freelancer_listed?: boolean;
+};
+
+export type AdminSetting = {
+  key: string;
+  label: string;
+  description?: string;
+  type: 'int' | 'bool' | 'string';
+  value: unknown;
+  scope: string;
+  min?: number;
+  max?: number;
+  updated_at: string;
+  group: string;
+};
+
+export type FeatureFlag = { key: string; enabled: boolean; rollout_percent: number; description?: string; updated_at?: string };
+
+export type MatchingWeights = {
+  version?: number;
+  technical: number;
+  track_record: number;
+  github: number;
+  availability: number;
+  platform_history: number;
+  budget_fit: number;
+  feed_threshold: number;
+  note?: string;
+  created_at?: string;
+};
+
+export type AuditRow = {
+  id: number;
+  actor_id?: string;
+  actor_name?: string;
+  actor_role?: string;
+  action: string;
+  subject_type?: string;
+  subject_id?: string;
+  outcome: string;
+  detail?: string;
+  ip?: string;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+  created_at: string;
+};
+
+export type DisputedMilestone = {
+  milestone_id: string;
+  contract_id: string;
+  contract_title: string;
+  title: string;
+  amount_minor: number;
+  currency: string;
+  client: PartyRef;
+  developer: PartyRef;
+  disputed_at: string;
+  note?: string;
+};
+
+export type ModerationPreview = { title?: string; excerpt?: string; owner_id?: string; owner_username?: string; moderation_state?: string };
+
+export type ModerationItem = {
+  id: string;
+  subject_type: string;
+  subject_id: string;
+  reason: string;
+  origin: string;
+  priority: number;
+  status: string;
+  created_at: string;
+  preview: ModerationPreview;
+  decision?: { by: string; by_name?: string; note?: string; outcome: string; at: string };
+  reports: number;
+  href?: string;
+};
+
+export type ModerationReport = {
+  id: string;
+  subject_type: string;
+  subject_id: string;
+  reason: string;
+  reason_label: string;
+  detail?: string;
+  status: string;
+  reporter?: { user_id: string; username: string; full_name: string };
+  resolution?: string;
+  resolved_at?: string;
+  created_at: string;
+  preview: ModerationPreview;
+};
+
+export type OwnProposal = {
+  id: string;
+  project_id: string;
+  project_title?: string;
+  project_slug?: string;
+  project_status?: string;
+  amount_minor: number;
+  currency: string;
+  fee_minor: number;
+  payout_minor: number;
+  amount_display: string;
+  delivery_days: number;
+  cover_letter: string;
+  approach: string;
+  relevant_experience: string;
+  questions?: string;
+  status: string;
+  client_note?: string;
+  decline_reason?: string;
+  match_score?: number;
+  viewed_at?: string;
+  shortlisted_at?: string;
+  responded_at?: string;
+  withdrawn_at?: string;
+  created_at: string;
+};

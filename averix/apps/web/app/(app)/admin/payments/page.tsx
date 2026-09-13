@@ -17,8 +17,8 @@ import { money, timeAgo } from '@/lib/format';
 import type { PendingPayment } from '@/lib/types';
 
 const TABS = [
-  { key: 'charge', label: 'Incoming transfers' },
-  { key: 'payout', label: 'Payouts to send' },
+  { key: 'charge', label: 'Входящие переводы' },
+  { key: 'payout', label: 'Выплаты исполнителям' },
 ];
 
 export default function AdminPaymentsPage() {
@@ -44,25 +44,25 @@ export default function AdminPaymentsPage() {
       <TopBar />
       <div className="av-page av-stack">
         <header>
-          <h1 className={styles.heading}>Payments</h1>
+          <h1 className={styles.heading}>Платежи</h1>
           <p className="av-muted av-small">
-            Money moves by bank transfer; AVERIX records it. Nothing is funded or paid until someone
-            here confirms it actually happened.
+            Деньги идут банковским переводом, AVERIX ведёт учёт. Ни один этап не считается
+            оплаченным, пока здесь не подтвердят, что перевод действительно пришёл.
           </p>
         </header>
 
-        <Tabs items={TABS} active={direction} onChange={setDirection} ariaLabel="Payment queues" />
+        <Tabs items={TABS} active={direction} onChange={setDirection} ariaLabel="Очереди платежей" />
 
         {items === null ? (
           <SkeletonList count={2} />
         ) : items.length === 0 ? (
           <EmptyState
             icon={<IconWallet size={20} />}
-            title={direction === 'charge' ? 'No transfers waiting' : 'No payouts waiting'}
+            title={direction === 'charge' ? 'Переводов в ожидании нет' : 'Выплат в ожидании нет'}
             description={
               direction === 'charge'
-                ? 'When a client says they have sent a transfer, it appears here with the reference to look for on the statement.'
-                : 'When a client approves a milestone, the payout to the developer appears here to be sent.'
+                ? 'Когда заказчик сообщит о переводе, он появится здесь с номером, который нужно найти в выписке.'
+                : 'Когда заказчик примет этап, выплата исполнителю появится здесь.'
             }
           />
         ) : (
@@ -75,8 +75,8 @@ export default function AdminPaymentsPage() {
                     <p className="av-small av-muted">
                       {item.contract_reference} ·{' '}
                       {direction === 'charge'
-                        ? `from ${item.payer_name}`
-                        : `to ${item.payee_name ?? item.payee_username}`}
+                        ? `от ${item.payer_name}`
+                        : `для ${item.payee_name ?? item.payee_username}`}
                     </p>
                   </div>
                   <div className={styles.amountBlock}>
@@ -93,14 +93,14 @@ export default function AdminPaymentsPage() {
                 </div>
 
                 <div className={styles.reference}>
-                  <span className="av-small av-muted">Reference to match</span>
+                  <span className="av-small av-muted">Номер платежа для сверки</span>
                   <code className={styles.code}>{item.reference}</code>
                 </div>
 
                 <footer className={styles.footer}>
-                  <span className="av-xs av-faint">Requested {timeAgo(item.created_at)}</span>
+                  <span className="av-xs av-faint">Создан {timeAgo(item.created_at)}</span>
                   <Button size="sm" onClick={() => setConfirming(item)}>
-                    {direction === 'charge' ? 'Confirm receipt' : 'Confirm payout sent'}
+                    {direction === 'charge' ? 'Подтвердить поступление' : 'Подтвердить выплату'}
                   </Button>
                 </footer>
               </Card>
@@ -158,12 +158,12 @@ function ConfirmSheet({
     <Sheet
       open
       onClose={onClose}
-      title={direction === 'charge' ? 'Confirm the transfer arrived' : 'Confirm the payout was sent'}
+      title={direction === 'charge' ? 'Подтвердить поступление перевода' : 'Подтвердить отправку выплаты'}
       description={`${item.reference} · ${item.contract_reference ?? ''}`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Cancel
+            Отмена
           </Button>
           <Button
             loading={busy}
@@ -184,14 +184,14 @@ function ConfirmSheet({
                   setError(failure.fields);
                   setMessage(Object.keys(failure.fields).length ? '' : failure.message);
                 } else {
-                  setMessage("That didn't go through. Please try again.");
+                  setMessage('Не получилось. Попробуйте ещё раз.');
                 }
               } finally {
                 setBusy(false);
               }
             }}
           >
-            Confirm
+            Подтвердить
           </Button>
         </>
       }
@@ -204,31 +204,30 @@ function ConfirmSheet({
         ) : null}
 
         <p className={styles.warning}>
-          This is the only record that the money moved. It is written to the audit log with your
-          name, the amount and the reference — and it cannot be edited afterwards.
+          Это единственная запись о движении денег. Она попадает в журнал аудита с вашим именем,
+          суммой и номером — и потом её нельзя изменить.
         </p>
 
         <Input
-          label="Amount actually received"
+          label={`Фактическая сумма (${item.currency})`}
           inputMode="decimal"
-          prefix="$"
           value={amount}
           error={error.amount_minor}
-          hint="Must match the payment exactly. If it doesn't, reject it and ask what was sent."
+          hint="Должна совпадать с платежом точно. Если нет — отклоните и уточните, что было отправлено."
           onChange={(event) => setAmount(event.target.value)}
         />
         <Input
-          label="Bank reference"
-          placeholder="Statement line or transaction id"
+          label="Банковский идентификатор"
+          placeholder="Строка выписки или номер транзакции"
           value={reference}
           onChange={(event) => setReference(event.target.value)}
         />
         <Textarea
-          label="Note"
+          label="Примечание"
           optional
           rows={3}
           max={400}
-          placeholder="Anything worth recording — when it arrived, which account it came from."
+          placeholder="Что стоит зафиксировать: когда пришло, с какого счёта."
           value={note}
           onChange={(event) => setNote(event.target.value)}
         />

@@ -15,9 +15,9 @@ import { money, shortDate, timeAgo } from '@/lib/format';
 import type { ContractCard } from '@/lib/types';
 
 const TABS = [
-  { key: 'active', label: 'Active' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'all', label: 'All' },
+  { key: 'active', label: 'В работе' },
+  { key: 'completed', label: 'Завершённые' },
+  { key: 'all', label: 'Все' },
 ];
 
 export default function ContractsPage() {
@@ -46,22 +46,22 @@ export default function ContractsPage() {
       <TopBar />
       <div className="av-page av-stack">
         <header>
-          <h1 className={styles.heading}>Contracts</h1>
-          <p className="av-muted av-small">Signed work, its milestones and what has been paid.</p>
+          <h1 className={styles.heading}>Сделки</h1>
+          <p className="av-muted av-small">Заключённые сделки, их этапы и оплаты.</p>
         </header>
 
-        <Tabs items={TABS} active={tab} onChange={setTab} ariaLabel="Contract filters" />
+        <Tabs items={TABS} active={tab} onChange={setTab} ariaLabel="Фильтр сделок" />
 
         {contracts === null ? (
           <SkeletonList count={2} />
         ) : visible.length === 0 ? (
           <EmptyState
             icon={<IconBriefcase size={20} />}
-            title={tab === 'completed' ? 'Nothing finished yet' : 'No active contracts'}
+            title={tab === 'completed' ? 'Завершённых сделок пока нет' : 'Нет сделок в работе'}
             description={
               tab === 'completed'
-                ? 'Completed contracts stay here, and attach themselves to your profile as verified work.'
-                : 'When a proposal is accepted, the contract and its workspace appear here.'
+                ? 'Завершённые сделки остаются здесь и попадают в профиль как подтверждённая работа.'
+                : 'Когда отклик принят или услуга заказана, сделка и её рабочее пространство появятся здесь.'
             }
           />
         ) : (
@@ -90,7 +90,7 @@ export default function ContractsPage() {
                     ) : null}
                     {contract.needs_my_action ? (
                       <Badge tone="brand" size="sm">
-                        Needs you
+                        Нужны вы
                       </Badge>
                     ) : (
                       <span className="av-xs av-faint">{timeAgo(contract.updated_at)}</span>
@@ -107,11 +107,11 @@ export default function ContractsPage() {
 
                 <p className="av-small av-muted">
                   {contract.next_milestone
-                    ? `Next: ${contract.next_milestone.title}`
+                    ? `Далее: ${contract.next_milestone.title}`
                     : contract.status === 'completed'
-                      ? 'Completed'
-                      : 'No open milestones'}
-                  {contract.due_on ? ` · due ${shortDate(contract.due_on)}` : ''}
+                      ? 'Завершена'
+                      : 'Открытых этапов нет'}
+                  {contract.due_on ? ` · срок ${shortDate(contract.due_on)}` : ''}
                 </p>
               </Card>
             ))}
