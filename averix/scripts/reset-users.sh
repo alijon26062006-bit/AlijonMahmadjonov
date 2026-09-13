@@ -24,8 +24,25 @@ set -euo pipefail
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.production.yml}"
 COMPOSE=(docker compose -f "$COMPOSE_FILE")
 [ -f docker-compose.nginx.yml ] && [ -n "${AVERIX_WEB_HOST_PORT:-}" ] && COMPOSE+=(-f docker-compose.nginx.yml)
+
+# The database's name and user live in .env, not in the shell that runs this.
+# Reading them here is what keeps the script from politely emptying a database
+# called "averix" that does not exist while the real one keeps every account.
+if [ -f .env ]; then
+  POSTGRES_USER="$(sed -n 's/^POSTGRES_USER=//p' .env | tail -1)"
+  POSTGRES_DB="$(sed -n 's/^POSTGRES_DB=//p' .env | tail -1)"
+fi
 PG_USER="${POSTGRES_USER:-averix}"
 PG_DB="${POSTGRES_DB:-averix}"
+
+# Prove the database is there and is the one with the accounts, before the
+# backup and long before the delete.
+if ! "${COMPOSE[@]}" exec -T postgres psql -U "$PG_USER" -d "$PG_DB" -c 'SELECT 1' > /dev/null 2>&1; then
+  echo "Не получилось открыть базу «$PG_DB» пользователем «$PG_USER»." >&2
+  echo "Проверьте, что стек запущен, и что POSTGRES_USER и POSTGRES_DB в .env те же:" >&2
+  echo "  ${COMPOSE[*]} ps" >&2
+  exit 1
+fi
 
 psql_run() { "${COMPOSE[@]}" exec -T postgres psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 "$@"; }
 
@@ -160,7 +177,13 @@ else
 fi
 
 echo
-psql_run -At -c "SELECT '  пользователей осталось: ' || count(*) FROM users"
+LEFT="$(psql_run -At -c 'SELECT count(*) FROM users' | tr -d '[:space:]')"
+if [ "$LEFT" != "0" ]; then
+  echo "  ВНИМАНИЕ: пользователей осталось $LEFT — очистка не прошла полностью." >&2
+  echo "  Резервная копия на месте; ничего не предпринимайте до выяснения." >&2
+  exit 1
+fi
+echo "  пользователей осталось: 0 — все адреса свободны для регистрации заново"
 psql_run -At -c "SELECT '  профессий в справочнике: ' || count(*) FROM specialisations"
 echo
 echo "Готово. Теперь зарегистрируйтесь на сайте заново, а потом:"
