@@ -185,6 +185,23 @@ bank account clients should send money to. Until you do, funding a milestone
 answers "payments aren't set up on this platform yet" — it never asks anyone
 to send money nowhere.
 
+## 5b. Who may see identity documents
+
+Nobody, until you say so — not even you. The two permissions that open a
+passport photograph (`identity_verification.view` and
+`identity_verification.review`) are granted to one account at a time from
+**Пользователи → the person → Именные разрешения**, and revoking one takes
+effect on that person's next request. On top of the grant, opening the section
+asks the reviewer for their password again, for ten minutes.
+
+Raw images are deleted `identity.retention_days` days after the decision (180
+by default); the decision, its reason and the log of who looked survive. The
+worker does this hourly — if you run the API without the worker, nothing is
+ever purged.
+
+Full details, and what is deliberately impossible, in
+[identity-verification.md](identity-verification.md).
+
 ## 6. Turn on backups
 
 ```bash
@@ -269,6 +286,11 @@ in production with a relative one, because a relative path writes inside the
 container and every upload would disappear on the next deployment. For more
 than one server, set `S3_DRIVER=s3` and the `S3_*` values; any S3-compatible
 provider works.
+
+**A staff chat** — set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` and the
+staff chat gets one line and a link when something needs a person. It never
+receives documents, at any setting: see
+[identity-verification.md](identity-verification.md).
 
 **A payment gateway** — `PAYMENTS_DEFAULT_PROVIDER=manual` means bank transfer
 confirmed by an administrator, which needs no gateway at all. See
