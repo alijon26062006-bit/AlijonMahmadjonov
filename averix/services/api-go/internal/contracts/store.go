@@ -83,7 +83,7 @@ func (s *Store) Create(ctx context.Context, in NewContract) (uuid.UUID, error) {
 			   status, delivery_days, due_on, price_visibility, starts_on, is_demo)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,current_date,$16)
 			RETURNING id`,
-			reference, in.ProjectID, in.ProposalID, in.ClientID, in.DeveloperID,
+			reference, in.ProjectID, nullUUID(in.ProposalID), in.ClientID, in.DeveloperID,
 			in.Title, in.AmountMinor, defaultTo(in.Currency, "USD"), in.FeePercent,
 			in.FeeMinor, in.PayoutMinor, StatusPendingFunding, nullIfZero(in.DeliveryDays),
 			in.DueOn, in.PriceVisibility, in.IsDemo).Scan(&contractID)
@@ -120,7 +120,7 @@ func (s *Store) Create(ctx context.Context, in NewContract) (uuid.UUID, error) {
 		err = q.QueryRow(ctx, `
 			INSERT INTO conversations (project_id, contract_id, proposal_id, subject)
 			VALUES ($1, $2, $3, $4) RETURNING id`,
-			in.ProjectID, contractID, in.ProposalID, in.Title).Scan(&conversationID)
+			in.ProjectID, contractID, nullUUID(in.ProposalID), in.Title).Scan(&conversationID)
 		if err != nil {
 			return fmt.Errorf("create workspace conversation: %w", err)
 		}
@@ -861,6 +861,15 @@ func nullIfBlank(s string) any {
 		return nil
 	}
 	return s
+}
+
+// nullUUID turns the zero id into SQL NULL. A contract that came from a
+// service order has no proposal, and a zero uuid would violate the foreign key.
+func nullUUID(id uuid.UUID) any {
+	if id == uuid.Nil {
+		return nil
+	}
+	return id
 }
 
 func nullIfZero(v int) any {

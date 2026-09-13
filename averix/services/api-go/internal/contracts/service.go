@@ -279,6 +279,76 @@ func (s *Service) Accept(ctx context.Context, id *security.Identity, in AcceptRe
 	return s.View(ctx, id, contractID)
 }
 
+// OrderRequest is what a service order becomes: a contract with one
+// milestone, no proposal, and the price the freelancer published.
+type OrderRequest struct {
+	ProjectID       uuid.UUID
+	ClientID        uuid.UUID
+	DeveloperID     uuid.UUID
+	Title           string
+	MilestoneDetail string
+	AmountMinor     int64
+	Currency        string
+	DeliveryDays    int
+	PriceVisibility string
+}
+
+// CreateForOrder writes the contract for a service order. The caller (the
+// services module) has already checked the service is live and priced the
+// tier; this is the same consequence Accept has minus the proposal steps.
+func (s *Service) CreateForOrder(ctx context.Context, id *security.Identity, in OrderRequest) (*Contract, error) {
+	if err := security.RequireRole(id, security.RoleClient); err != nil {
+		return nil, forbidRole("Переключитесь на профиль заказчика, чтобы заказать услугу.", err)
+	}
+	if in.ClientID != id.UserID {
+		return nil, httpx.Forbiddenf("an order can only be placed by the client making it")
+	}
+	if in.AmountMinor <= 0 {
+		return nil, httpx.Validation(map[string]string{"amount_minor": "Сумма заказа должна быть больше нуля."})
+	}
+
+	visibility := defaultTo(in.PriceVisibility, "range")
+	feePercent, feeMinor := s.feeFor(ctx, in.AmountMinor)
+
+	var due *time.Time
+	if in.DeliveryDays > 0 {
+		when := time.Now().AddDate(0, 0, in.DeliveryDays)
+		due = &when
+	}
+	contractID, err := s.store.Create(ctx, NewContract{
+		ProjectID:       in.ProjectID,
+		ClientID:        in.ClientID,
+		DeveloperID:     in.DeveloperID,
+		Title:           in.Title,
+		AmountMinor:     in.AmountMinor,
+		Currency:        in.Currency,
+		FeePercent:      feePercent,
+		FeeMinor:        feeMinor,
+		PayoutMinor:     in.AmountMinor - feeMinor,
+		DeliveryDays:    in.DeliveryDays,
+		DueOn:           due,
+		PriceVisibility: visibility,
+		Milestones: []NewMilestone{{
+			Position: 1, Title: in.Title, Detail: in.MilestoneDetail,
+			AmountMinor: in.AmountMinor, DueOn: due,
+		}},
+	})
+	if err != nil {
+		return nil, httpx.Internalf(err, "create contract for order")
+	}
+
+	s.audit.RecordRequest(ctx, audit.Entry{
+		Action: audit.ActionContractCreated, SubjectType: "contract", SubjectID: &contractID,
+		After: map[string]any{"origin": "service_order", "amount_minor": in.AmountMinor,
+			"currency": in.Currency, "fee_minor": feeMinor},
+	})
+	if s.notifier != nil {
+		s.notifier.ContractSigned(ctx, contractID, in.DeveloperID)
+	}
+	s.postSystem(ctx, contractID, "contract.signed", nil, map[string]any{"origin": "service_order"})
+	return s.View(ctx, id, contractID)
+}
+
 // feeFor computes the platform fee.
 //
 // Integer arithmetic on minor units throughout: a float percentage of a

@@ -37,6 +37,7 @@ import (
 	"github.com/averix/api/internal/proposals"
 	"github.com/averix/api/internal/reviews"
 	"github.com/averix/api/internal/security"
+	"github.com/averix/api/internal/services"
 	"github.com/averix/api/internal/settings"
 	"github.com/averix/api/internal/taxonomy"
 )
@@ -73,6 +74,7 @@ type App struct {
 	Notifier    *notifications.Service
 	Mailer      *notifications.Mailer
 	Reviews     *reviews.Service
+	Services    *services.Svc
 
 	redisStartupError error
 }
@@ -197,6 +199,11 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	a.Reviews = reviews.NewService(reviews.NewStore(db, store.PublicURL), a.Contracts,
 		settingsStore, notifier, recorder)
 	a.Contracts.AttachCompletion(a.Reviews)
+
+	// Fixed-price services order straight into a contract, so they come after
+	// contracts. Moderation arrives with its module; nil until then.
+	a.Services = services.NewSvc(services.NewStore(db, store.PublicURL), taxonomyStore,
+		a.Contracts, projectStore, settingsStore, nil, recorder)
 
 	a.redisStartupError = redisErr
 	return a, nil
@@ -331,6 +338,16 @@ func (a *App) Handler() http.Handler {
 			// tightest allowance in the product.
 			RateLimitProbe: a.AuthMW.RateLimit("portfolio_probe", 20, time.Hour),
 		})
+
+	services.NewHandlers(a.Services).Register(v1, services.Middleware{
+		Require:       a.AuthMW.Require(),
+		CSRF:          a.AuthMW.CSRF(),
+		RequireDev:    a.AuthMW.RequireRole(security.RoleDeveloper),
+		RequireClient: a.AuthMW.RequireRole(security.RoleClient),
+		VerifiedEmail: a.AuthMW.RequireVerifiedEmail(),
+		// An order creates a contract; the same allowance as hiring.
+		RateLimitOrder: a.AuthMW.RateLimitOnSuccess("service_order", 20, time.Hour),
+	})
 
 	reviews.NewHandlers(a.Reviews).Register(v1, reviews.Middleware{
 		Require:    a.AuthMW.Require(),
