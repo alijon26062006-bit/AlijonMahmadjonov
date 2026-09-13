@@ -7,12 +7,32 @@ import { ApiFailure, get, post, setCsrfToken } from './api';
 
 export type Role = 'client' | 'developer' | 'admin' | 'moderator';
 
+/**
+ * Роль сессии сразу после регистрации: аккаунт есть, а сторона площадки ещё
+ * не выбрана. Держится отдельно от Role, потому что «pending» не открывает ни
+ * один интерфейс — на неё нельзя случайно сослаться там, где ждут заказчика
+ * или исполнителя.
+ */
+export type ActiveRole = Role | 'pending';
+
+/**
+ * Списки — всегда списки.
+ *
+ * У только что зарегистрированного человека ролей ещё нет, и отсутствующее
+ * поле вместо пустого массива — это ровно тот способ, которым интерфейс
+ * падает на `roles.includes(...)`. Сервер их теперь всегда присылает; здесь
+ * то же самое на случай старого ответа из кеша браузера.
+ */
+function normalise(session: Session): Session {
+  return { ...session, roles: session.roles ?? [], permissions: session.permissions ?? [] };
+}
+
 export type Session = {
   user_id: string;
   username: string;
   email: string;
   full_name: string;
-  active_role: Role;
+  active_role: ActiveRole;
   roles: Role[];
   status: string;
   email_verified: boolean;
@@ -53,7 +73,7 @@ export function SessionProvider({
       // alone is how a signed-out visitor ends up inside the signed-in shell,
       // watching every request fail with 401.
       if (next?.user_id) {
-        setSession(next);
+        setSession(normalise(next));
         if (next.csrf_token) setCsrfToken(next.csrf_token);
       } else {
         setSession(null);
@@ -76,7 +96,7 @@ export function SessionProvider({
 
   const signIn = useCallback(async (email: string, password: string) => {
     const next = await post<Session>('/auth/login', { email, password });
-    setSession(next);
+    setSession(normalise(next));
     if (next.csrf_token) setCsrfToken(next.csrf_token);
     return next;
   }, []);
@@ -94,7 +114,7 @@ export function SessionProvider({
     // The API rotates the CSRF token on a role switch, and api() picks the new
     // one out of the response, so nothing here has to remember it.
     const next = await post<Session>('/auth/role/switch', { role });
-    setSession(next);
+    setSession(normalise(next));
   }, []);
 
   const can = useCallback(

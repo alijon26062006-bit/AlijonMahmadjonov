@@ -66,7 +66,7 @@ func TestRegisterRejectsBadInput(t *testing.T) {
 		{"repetitive password", map[string]any{"email": "c@example.test", "username": "x5", "password": "aaaaaaaaaaaaaa", "full_name": "X", "role": "client", "accept_terms": true}, "password"},
 		{"reserved username", map[string]any{"email": "d@example.test", "username": "admin", "password": "quiet-lantern-4417", "full_name": "X", "role": "client", "accept_terms": true}, "username"},
 		{"username with spaces", map[string]any{"email": "e@example.test", "username": "not valid", "password": "quiet-lantern-4417", "full_name": "X", "role": "client", "accept_terms": true}, "username"},
-		{"no role", map[string]any{"email": "f@example.test", "username": "x6", "password": "quiet-lantern-4417", "full_name": "X", "accept_terms": true}, "role"},
+		{"unknown role", map[string]any{"email": "f@example.test", "username": "x6", "password": "quiet-lantern-4417", "full_name": "X", "role": "owner", "accept_terms": true}, "role"},
 		{"terms not accepted", map[string]any{"email": "g@example.test", "username": "x7", "password": "quiet-lantern-4417", "full_name": "X", "role": "client"}, "accept_terms"},
 	}
 	for _, tc := range cases {
@@ -690,4 +690,113 @@ func indexOf(s, sub string) int {
 		}
 	}
 	return -1
+}
+
+// Registration asks for an email and a password, and nothing else. The
+// question "работать или заказывать" comes afterwards, on its own screen with
+// two cards — and until it is answered the account holds no role, no profile
+// and no access to either interface.
+func TestTheRoleIsChosenAfterTheAccountExists(t *testing.T) {
+	h := testsupport.New(t)
+	c := h.Client()
+
+	res := c.POST("/auth/register", map[string]any{
+		"email": "aliya@example.test", "username": "aliya",
+		"password": testsupport.Password, "full_name": "Алия Рахимова",
+		"accept_terms": true,
+	}).OK(t, http.StatusCreated)
+
+	if !res.Bool("authenticated") {
+		t.Error("registration must leave the person signed in")
+	}
+	if res.String("active_role") != "pending" {
+		t.Errorf("active_role = %q, want pending", res.String("active_role"))
+	}
+	if len(res.Strings("roles")) != 0 {
+		t.Errorf("roles = %v, want none until the person chooses", res.Strings("roles"))
+	}
+
+	userID := res.String("user_id")
+	if n := h.Count(`SELECT count(*) FROM user_roles WHERE user_id = '` + userID + `'`); n != 0 {
+		t.Errorf("user_roles = %d, want 0 before the choice", n)
+	}
+	// No half-made profile for somebody who closed the tab on the second
+	// screen: the row appears when the role does.
+	if n := h.Count(`SELECT count(*) FROM developer_profiles WHERE user_id = '` + userID + `'`); n != 0 {
+		t.Errorf("developer_profiles = %d, want 0 before the choice", n)
+	}
+	if n := h.Count(`SELECT count(*) FROM client_profiles WHERE user_id = '` + userID + `'`); n != 0 {
+		t.Errorf("client_profiles = %d, want 0 before the choice", n)
+	}
+
+	// A session with no role opens neither interface.
+	c.POST("/projects", map[string]any{"title": "Логотип для кофейни"}).Fails(t, http.StatusForbidden, "")
+
+	// The two cards. This one says "я хочу работать и зарабатывать".
+	chosen := c.POST("/auth/role/choose", map[string]any{"role": "developer"}).OK(t, http.StatusOK)
+	if chosen.String("active_role") != "developer" {
+		t.Errorf("active_role = %q, want developer", chosen.String("active_role"))
+	}
+	if !chosen.Has("roles", "developer") {
+		t.Errorf("roles = %v, want developer", chosen.Strings("roles"))
+	}
+	if !chosen.Bool("is_new") {
+		t.Error("is_new must be set so the web app opens the profile form, not an empty dashboard")
+	}
+	if n := h.Count(`SELECT count(*) FROM developer_profiles WHERE user_id = '` + userID + `' AND onboarding_step = 1 AND NOT is_searchable`); n != 1 {
+		t.Error("choosing «исполнитель» must create the profile the interface reads")
+	}
+
+	// Choosing twice is not how a second role is added: that is a deliberate
+	// act in settings, with different words around it.
+	c.POST("/auth/role/choose", map[string]any{"role": "client"}).
+		Fails(t, http.StatusConflict, "role_already_chosen")
+	if n := h.Count(`SELECT count(*) FROM user_roles WHERE user_id = '` + userID + `'`); n != 1 {
+		t.Errorf("user_roles = %d, want exactly the one that was chosen", n)
+	}
+}
+
+// Somebody who closed the tab between the two screens comes back to the same
+// question rather than to a locked door.
+func TestAnAccountWithoutARoleCanSignInAndIsAskedAgain(t *testing.T) {
+	h := testsupport.New(t)
+	c := h.Client()
+
+	c.POST("/auth/register", map[string]any{
+		"email": "pending@example.test", "username": "pending",
+		"password": testsupport.Password, "full_name": "Пока Никто",
+		"accept_terms": true,
+	}).OK(t, http.StatusCreated)
+	c.POST("/auth/logout", nil).OK(t, http.StatusOK)
+
+	again := h.Client()
+	res := again.POST("/auth/login", map[string]any{
+		"email": "pending@example.test", "password": testsupport.Password,
+	}).OK(t, http.StatusOK)
+	if res.String("active_role") != "pending" {
+		t.Errorf("active_role = %q, want pending", res.String("active_role"))
+	}
+	if res.String("csrf_token") == "" {
+		t.Error("the session must carry a token so the choice can be submitted")
+	}
+	again.POST("/auth/role/choose", map[string]any{"role": "client"}).OK(t, http.StatusOK)
+}
+
+// A deployment with no Google credentials says so, and offers no button that
+// cannot work.
+func TestGoogleSignInIsAbsentUntilItIsConfigured(t *testing.T) {
+	h := testsupport.New(t)
+	c := h.Client()
+
+	providers := c.GET("/auth/providers").OK(t, http.StatusOK)
+	if providers.Bool("google") {
+		t.Error("google must be reported as unavailable without credentials")
+	}
+	if !providers.Bool("password") {
+		t.Error("email and password must always be available")
+	}
+	// And the route itself is not mounted, so there is nothing to poke at.
+	if res := c.GET("/auth/google/start"); res.Status != http.StatusNotFound {
+		t.Errorf("status = %d, want 404 when the provider is not configured", res.Status)
+	}
 }

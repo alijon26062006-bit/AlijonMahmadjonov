@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import styles from '../auth.module.css';
@@ -8,7 +8,8 @@ import { Wordmark } from '@/components/nav/Logo';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
 import { useSession } from '@/lib/session';
-import { ApiFailure } from '@/lib/api';
+import { ApiFailure, get } from '@/lib/api';
+import { GoogleButton } from '@/components/auth/GoogleButton';
 import { defaultHome } from '@/components/nav/TopBar';
 
 function LoginForm() {
@@ -22,6 +23,17 @@ function LoginForm() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [google, setGoogle] = useState(false);
+
+  useEffect(() => {
+    get<{ google: boolean }>('/auth/providers')
+      .then((providers) => setGoogle(Boolean(providers.google)))
+      .catch(() => setGoogle(false));
+  }, []);
+
+  // Возврат из Google, который не получился. Причину показываем словами, а не
+  // кодом: «вы отменили вход» и «что-то сломалось» — разные вещи.
+  const googleProblem = params.get('google');
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -30,7 +42,10 @@ function LoginForm() {
     setMessage('');
     try {
       const session = await signIn(email.trim(), password);
-      router.replace(next || defaultHome(session.active_role));
+      // Роль ещё не выбрана — сначала тот самый вопрос, куда бы человек ни шёл.
+      router.replace(
+        session.active_role === 'pending' ? '/welcome' : next || defaultHome(session.active_role),
+      );
     } catch (error) {
       if (error instanceof ApiFailure) {
         setFields(error.fields);
@@ -47,6 +62,23 @@ function LoginForm() {
     <form className={styles.card} onSubmit={submit} noValidate>
       <h1 className={styles.title}>Вход</h1>
       <p className={styles.subtitle}>С возвращением.</p>
+
+      {googleProblem ? (
+        <p className={styles.alert} role="alert">
+          {googleProblem === 'access_denied'
+            ? 'Вход через Google отменён — ничего не изменилось.'
+            : 'Через Google войти не удалось. Попробуйте ещё раз или войдите по почте.'}
+        </p>
+      ) : null}
+
+      {google ? (
+        <>
+          <GoogleButton label="Войти через Google" next={next ?? undefined} />
+          <div className={styles.divider}>
+            <span>или почтой</span>
+          </div>
+        </>
+      ) : null}
 
       {message ? (
         <p className={styles.alert} role="alert">

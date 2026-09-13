@@ -249,6 +249,8 @@ export function TopBar({
 }
 
 export function defaultHome(role: string) {
+  // Роль ещё не выбрана — домом остаётся тот самый вопрос.
+  if (role === 'pending') return '/welcome';
   if (role === 'client') return '/dashboard';
   if (role === 'admin' || role === 'moderator') return '/admin';
   return '/feed';

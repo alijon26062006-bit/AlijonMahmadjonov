@@ -1,0 +1,20 @@
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--av-space-3);
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--av-space-4);
+  border: 1px solid var(--av-border-subtle);
+  border-radius: var(--av-radius-md);
+  background: var(--av-surface);
+  color: var(--av-text-primary);
+  font-size: var(--av-text-sm);
+  font-weight: var(--av-weight-medium);
+  text-decoration: none;
+}
+
+.button:hover {
+  border-color: var(--av-border-strong, var(--av-text-tertiary));
+}

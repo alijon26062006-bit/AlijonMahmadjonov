@@ -2,11 +2,13 @@ package auth
 
 import (
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/averix/api/internal/platform/httpx"
+	"github.com/averix/api/internal/platform/logx"
 	"github.com/averix/api/internal/security"
 )
 
@@ -14,10 +16,14 @@ import (
 type Handlers struct {
 	svc *Service
 	mw  *Middleware
+	// Optional: nil-safe, and absent on a deployment with no Google credentials.
+	google *Google
+	// Where to send a browser after an OAuth round trip.
+	appURL string
 }
 
-func NewHandlers(svc *Service, mw *Middleware) *Handlers {
-	return &Handlers{svc: svc, mw: mw}
+func NewHandlers(svc *Service, mw *Middleware, google *Google, appURL string) *Handlers {
+	return &Handlers{svc: svc, mw: mw, google: google, appURL: appURL}
 }
 
 // Register mounts the routes. The limits differ per endpoint because the risk
@@ -25,6 +31,14 @@ func NewHandlers(svc *Service, mw *Middleware) *Handlers {
 // availability check.
 func (h *Handlers) Register(r *httpx.Router) {
 	pub := r.Group("/auth")
+
+	// What the sign-in screen may offer. A button for a provider this
+	// deployment has no credentials for is never rendered.
+	pub.GET("/providers", h.providers)
+	if h.google.Configured() {
+		pub.GET("/google/start", h.mw.RateLimit("google_start", 20, time.Hour)(h.googleStart))
+		pub.GET("/google/callback", h.googleCallback)
+	}
 
 	pub.POST("/register", h.mw.RateLimitOnSuccess("register", 5, time.Hour)(h.register))
 	pub.POST("/login", h.mw.RateLimit("login", 10, 10*time.Minute)(h.login))
@@ -42,6 +56,10 @@ func (h *Handlers) Register(r *httpx.Router) {
 	authed.POST("/logout-everywhere", h.logoutEverywhere)
 	authed.POST("/role/switch", h.switchRole)
 	authed.POST("/role/add", h.addRole)
+	// The screen right after registration. Separate from role/add because it
+	// answers a different question — "кто вы здесь", once — and because it is
+	// the one thing a session without a role is allowed to do.
+	authed.POST("/role/choose", h.chooseRole)
 	authed.POST("/password/change", h.mw.RateLimit("password_change", 5, time.Hour)(h.changePassword))
 	authed.POST("/email/resend", h.mw.RateLimit("email_resend", 3, time.Hour)(h.resendVerification))
 	authed.GET("/sessions", h.listSessions)
@@ -52,16 +70,19 @@ func (h *Handlers) Register(r *httpx.Router) {
 // the CSRF token because the client needs it for every subsequent mutation,
 // and permissions so the UI can hide actions the caller could not perform.
 type sessionResponse struct {
-	Authenticated    bool     `json:"authenticated"`
-	UserID           string   `json:"user_id,omitempty"`
-	Username         string   `json:"username,omitempty"`
-	Email            string   `json:"email,omitempty"`
-	ActiveRole       string   `json:"active_role,omitempty"`
-	Roles            []string `json:"roles,omitempty"`
+	Authenticated bool   `json:"authenticated"`
+	UserID        string `json:"user_id,omitempty"`
+	Username      string `json:"username,omitempty"`
+	Email         string `json:"email,omitempty"`
+	ActiveRole    string `json:"active_role,omitempty"`
+	// Always present, even when empty. An account that has not chosen a side
+	// yet holds no roles, and a missing field rather than an empty list is how
+	// a client ends up calling .includes on undefined.
+	Roles            []string `json:"roles"`
 	EmailVerified    bool     `json:"email_verified"`
 	IdentityVerified bool     `json:"identity_verified"`
 	CSRFToken        string   `json:"csrf_token,omitempty"`
-	Permissions      []string `json:"permissions,omitempty"`
+	Permissions      []string `json:"permissions"`
 	IsNew            bool     `json:"is_new,omitempty"`
 }
 
@@ -86,6 +107,56 @@ func toSessionResponse(id *security.Identity, isNew bool) sessionResponse {
 		Permissions:      id.Permissions(),
 		IsNew:            isNew,
 	}
+}
+
+// providers is public: the sign-in page asks before anyone is signed in.
+func (h *Handlers) providers(w http.ResponseWriter, r *http.Request) error {
+	return httpx.JSON(w, http.StatusOK, map[string]any{
+		"password": true,
+		"google":   h.google.Configured(),
+	})
+}
+
+func (h *Handlers) googleStart(w http.ResponseWriter, r *http.Request) error {
+	target, err := h.google.Start(r.Context(), r.URL.Query().Get("next"))
+	if err != nil {
+		return httpx.Internalf(err, "start google sign-in")
+	}
+	http.Redirect(w, r, target, http.StatusFound)
+	return nil
+}
+
+// googleCallback is the browser coming back from Google. It answers with a
+// redirect in every case, including failure: a person who cancelled at Google
+// should land on the sign-in page with a word about it, not on a JSON error.
+func (h *Handlers) googleCallback(w http.ResponseWriter, r *http.Request) error {
+	query := r.URL.Query()
+	if reason := query.Get("error"); reason != "" {
+		http.Redirect(w, r, h.appURL+"/login?google="+url.QueryEscape(reason), http.StatusFound)
+		return nil
+	}
+
+	result, destination, err := h.google.Callback(r.Context(),
+		query.Get("code"), query.Get("state"), r.UserAgent(), httpx.ClientIP(r.Context()))
+	if err != nil {
+		logx.From(r.Context()).Warn("google sign-in failed", "error", err)
+		http.Redirect(w, r, h.appURL+"/login?google=failed", http.StatusFound)
+		return nil
+	}
+
+	h.mw.SetCookie(w, result.Token)
+	// Where to land: the two cards when there is no role yet, otherwise where
+	// they were going before they were asked to sign in.
+	if result.Identity.ActiveRole == security.RolePending {
+		destination = "/welcome"
+	} else if destination == "" || destination == "/" {
+		destination = "/dashboard"
+		if result.Identity.ActiveRole == security.RoleDeveloper {
+			destination = "/feed"
+		}
+	}
+	http.Redirect(w, r, h.appURL+destination, http.StatusFound)
+	return nil
 }
 
 func (h *Handlers) register(w http.ResponseWriter, r *http.Request) error {
@@ -194,6 +265,23 @@ func (h *Handlers) switchRole(w http.ResponseWriter, r *http.Request) error {
 	updated.ActiveRole = security.Role(body.Role)
 	updated.CSRFToken = csrf
 	return httpx.JSON(w, http.StatusOK, toSessionResponse(&updated, false))
+}
+
+// chooseRole turns a pending account into a client or a freelancer.
+func (h *Handlers) chooseRole(w http.ResponseWriter, r *http.Request) error {
+	var body struct {
+		Role string `json:"role"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body, 1<<10); err != nil {
+		return err
+	}
+	updated, err := h.svc.ChooseRole(r.Context(), security.FromContext(r.Context()), body.Role)
+	if err != nil {
+		return err
+	}
+	// Marked as new so the web app routes into onboarding rather than into a
+	// dashboard that has nothing on it yet.
+	return httpx.JSON(w, http.StatusOK, toSessionResponse(updated, true))
 }
 
 func (h *Handlers) addRole(w http.ResponseWriter, r *http.Request) error {

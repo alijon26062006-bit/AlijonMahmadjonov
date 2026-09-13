@@ -149,7 +149,10 @@ func (s *Store) CreateAccount(ctx context.Context, in NewAccount) (*Account, err
 			                   locale, timezone, country_code)
 			VALUES ($1, $2, $3, $4, 'active', $5, $6, $7)
 			RETURNING id`,
-			in.Email, in.Username, in.PasswordHash, in.FullName,
+			// NULL rather than an empty string when the account signs in with
+			// Google: "no password" and "the password is the empty string" must
+			// not be the same value in the column that guards sign-in.
+			in.Email, in.Username, nullIfBlank(in.PasswordHash), in.FullName,
 			defaultTo(in.Locale, "en"), defaultTo(in.Timezone, "UTC"),
 			nullIfBlank(in.CountryCode)).Scan(&id)
 		if err != nil {
@@ -160,6 +163,15 @@ func (s *Store) CreateAccount(ctx context.Context, in NewAccount) (*Account, err
 				return ErrUsernameTaken
 			}
 			return fmt.Errorf("insert user: %w", err)
+		}
+
+		// An account with no role yet: registration created it, and the next
+		// screen asks which side of the marketplace this person is on. No role
+		// row and no profile row until they answer — a half-filled developer
+		// profile nobody asked for would otherwise exist for everyone who
+		// closed the tab.
+		if in.Role == "" {
+			return nil
 		}
 
 		if _, err := q.Exec(ctx,

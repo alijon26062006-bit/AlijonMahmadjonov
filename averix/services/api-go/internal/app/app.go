@@ -62,6 +62,7 @@ type App struct {
 	AuthStore   *auth.Store
 	AuthService *auth.Service
 	AuthMW      *auth.Middleware
+	GoogleAuth  *auth.Google
 	Taxonomy    *taxonomy.Store
 	Developers  *developers.Service
 	Photos      *developers.PhotoService
@@ -213,6 +214,10 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 			BaseURL: cfg.Telegram.BaseURL, AppURL: cfg.AppURL,
 		}),
 	}
+	// Sign-in with Google, when the operator configured it. Constructed after
+	// the service because it issues sessions through it.
+	a.GoogleAuth = auth.NewGoogle(cfg.Google, db, authStore, a.AuthService)
+
 	// The staff chat is optional and carries only a line and a link; without
 	// a bot token the identity service simply never calls it.
 	a.Identity.AttachChat(a.Chat)
@@ -296,7 +301,7 @@ func (a *App) Handler() http.Handler {
 		a.AuthMW.RateLimit("api", a.Cfg.Limits.AnonRatePerWindow, a.Cfg.Limits.RateLimitWindow),
 	)
 
-	auth.NewHandlers(a.AuthService, a.AuthMW).Register(v1)
+	auth.NewHandlers(a.AuthService, a.AuthMW, a.GoogleAuth, a.Cfg.AppURL).Register(v1)
 	taxonomy.NewHandlers(a.Taxonomy, a.Cache).Register(v1)
 
 	developers.NewHandlers(a.Developers, a.Photos, a.Cfg.Limits.MaxImageBytes).

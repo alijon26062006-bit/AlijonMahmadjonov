@@ -72,8 +72,18 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, userAgent, ip 
 	v.Length("full_name", "Имя и фамилия", in.FullName, 2, 120)
 	v.NoControlChars("full_name", "Имя и фамилия", in.FullName)
 
+	// The role is optional, and by default absent.
+	//
+	// Asking "вы ищете исполнителя или работу" in the same form as the email
+	// and the password asks it before the person has seen the place. So the
+	// account is created first and the question is asked on its own screen,
+	// with two cards. Until it is answered the account holds no role at all —
+	// which is a state the schema has always named 'pending'.
+	//
+	// A role is still accepted here, because a link from a landing page may
+	// carry one and there is no reason to make that person answer twice.
 	role := security.Role(strings.TrimSpace(in.Role))
-	if role != security.RoleClient && role != security.RoleDeveloper {
+	if role != "" && !role.Chooseable() {
 		v.Add("role", "Выберите: вы ищете исполнителя или работу.")
 	}
 	if !in.AcceptTerms {
@@ -122,7 +132,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, userAgent, ip 
 		ActorID: &account.ID, ActorRole: string(role),
 		Action: audit.ActionRegister, SubjectType: "user", SubjectID: &account.ID,
 		IP: ip, UserAgent: userAgent,
-		After: map[string]any{"role": role, "username": username},
+		After: map[string]any{"role": roleOrPending(role), "username": username},
 	})
 
 	// Email verification is issued but does not gate sign-in: blocking a brand
@@ -130,12 +140,64 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, userAgent, ip 
 	// status is what gates being searchable and submitting proposals.
 	s.sendVerificationEmail(ctx, account)
 
-	result, err := s.issueSession(ctx, account, role, userAgent, ip)
+	result, err := s.issueSession(ctx, account, roleOrPending(role), userAgent, ip)
 	if err != nil {
 		return nil, err
 	}
 	result.IsNew = true
 	return result, nil
+}
+
+// roleOrPending is the session's role for an account that has not chosen one.
+func roleOrPending(role security.Role) security.Role {
+	if role == "" {
+		return security.RolePending
+	}
+	return role
+}
+
+// ChooseRole answers the two-card screen that follows registration.
+//
+// It is the only thing a pending session may do, and it may do it once: this
+// is not a way to grant yourself a second interface later — that is AddRole,
+// which is deliberately a different screen in settings with different words
+// around it.
+func (s *Service) ChooseRole(ctx context.Context, id *security.Identity, requested string) (*security.Identity, error) {
+	if !id.Authenticated() {
+		return nil, httpx.ErrUnauthenticated
+	}
+	role := security.Role(strings.TrimSpace(requested))
+	if !role.Chooseable() {
+		return nil, httpx.Validation(map[string]string{
+			"role": "Выберите одну из двух карточек: работать или заказывать.",
+		})
+	}
+	if len(id.Roles) > 0 {
+		// Already chosen, in another tab or another device. Not an error worth
+		// showing: send them on with what they have.
+		e := *httpx.ErrConflict
+		e.Code = "role_already_chosen"
+		e.Message = "Роль уже выбрана. Вторую можно добавить в настройках."
+		return nil, &e
+	}
+
+	if err := s.store.AddRole(ctx, id.UserID, role); err != nil {
+		return nil, httpx.Internalf(err, "add role")
+	}
+	csrf, err := s.store.SwitchRole(ctx, id.SessionID, id.UserID, role)
+	if err != nil {
+		return nil, httpx.Internalf(err, "activate role")
+	}
+	s.audit.RecordRequest(ctx, audit.Entry{
+		Action: audit.ActionRoleGranted, SubjectType: "user", SubjectID: &id.UserID,
+		After: map[string]any{"role": role, "chosen_at_signup": true},
+	})
+
+	updated := *id
+	updated.ActiveRole = role
+	updated.Roles = append(append([]security.Role{}, id.Roles...), role)
+	updated.CSRFToken = csrf
+	return &updated, nil
 }
 
 // ── Sign-in ─────────────────────────────────────────────────────────────────
@@ -219,8 +281,19 @@ func (s *Service) Login(ctx context.Context, in LoginInput, userAgent, ip string
 		return nil, &e
 	}
 
+	// Registered but never picked a side — usually a closed tab between the
+	// two screens. Signing in is allowed and lands on the same question.
 	if len(account.Roles) == 0 {
-		return nil, httpx.ErrForbidden.Wrap(errors.New("account holds no roles"))
+		result, err := s.issueSession(ctx, account, security.RolePending, userAgent, ip)
+		if err != nil {
+			return nil, err
+		}
+		s.audit.Record(ctx, audit.Entry{
+			ActorID: &account.ID, Action: audit.ActionLogin,
+			SubjectType: "user", SubjectID: &account.ID, IP: ip, UserAgent: userAgent,
+			Detail: "role not chosen yet",
+		})
+		return result, nil
 	}
 
 	role, err := s.resolveLoginRole(account, in.Role)

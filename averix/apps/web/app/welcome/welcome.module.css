@@ -1,0 +1,117 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--av-space-6);
+  align-items: center;
+  min-height: 100dvh;
+  padding: var(--av-space-8) var(--av-space-4);
+  background: var(--av-bg);
+}
+
+.head {
+  max-width: 560px;
+  text-align: center;
+}
+
+.title {
+  margin: 0 0 var(--av-space-2);
+  font-size: var(--av-text-3xl, var(--av-text-2xl));
+  font-weight: var(--av-weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-sm);
+}
+
+.alert {
+  margin: 0;
+  padding: var(--av-space-3) var(--av-space-4);
+  border-radius: var(--av-radius-md);
+  background: var(--av-danger-subtle);
+  border: 1px solid var(--av-danger-border);
+  color: var(--av-danger-text);
+  font-size: var(--av-text-sm);
+}
+
+/* Две карточки рядом на большом экране и друг под другом на телефоне —
+   одинаковой высоты, чтобы ни одна не выглядела главной. */
+.cards {
+  display: grid;
+  gap: var(--av-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  width: 100%;
+  max-width: 760px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--av-space-2);
+  align-items: flex-start;
+  padding: var(--av-space-6);
+  min-height: 220px;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: var(--av-radius-xl, var(--av-radius-lg));
+  background: var(--av-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease-out, transform 120ms ease-out;
+}
+
+.card:hover:not(:disabled) {
+  border-color: var(--av-brand-border, var(--av-text-tertiary));
+  transform: translateY(-2px);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--av-brand, currentColor);
+  outline-offset: 2px;
+}
+
+.card:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--av-space-2);
+  border-radius: var(--av-radius-lg);
+  background: var(--av-surface-raised, var(--av-bg));
+  color: var(--av-text-primary);
+}
+
+.cardTitle {
+  font-size: var(--av-text-lg);
+  font-weight: var(--av-weight-bold);
+  line-height: 1.3;
+}
+
+.cardBody {
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-sm);
+}
+
+.cardRole {
+  margin-top: auto;
+  padding-top: var(--av-space-3);
+  color: var(--av-text-tertiary);
+  font-size: var(--av-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.note {
+  margin: 0;
+  max-width: 560px;
+  text-align: center;
+  color: var(--av-text-tertiary);
+  font-size: var(--av-text-xs);
+}

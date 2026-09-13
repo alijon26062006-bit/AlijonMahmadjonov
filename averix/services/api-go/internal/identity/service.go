@@ -354,6 +354,12 @@ func (s *Service) Unlock(ctx context.Context, id *security.Identity, password st
 		s.audit.Denial(ctx, "identity.unlock", nil, "wrong password")
 		return time.Time{}, httpx.Validation(map[string]string{"password": "Пароль не подошёл."})
 	}
+	if s.cache == nil {
+		e := *httpx.ErrUnavailable
+		e.Code = "identity_unlock_unavailable"
+		e.Message = "Подтверждение пароля сейчас недоступно. Попробуйте позже."
+		return time.Time{}, &e
+	}
 	until := time.Now().Add(unlockTTL)
 	if err := s.cache.SetJSON(ctx, unlockKey(id.SessionID), until, unlockTTL); err != nil {
 		return time.Time{}, httpx.Internalf(err, "store identity unlock")
@@ -363,7 +369,16 @@ func (s *Service) Unlock(ctx context.Context, id *security.Identity, password st
 }
 
 // unlocked reports whether this session has re-authenticated recently.
+//
+// The ten-minute unlock lives in Redis. When Redis is not there — not
+// configured, or down — nobody is unlocked and the documents stay shut. That
+// is the direction this particular failure has to fall: a cache outage must
+// not turn into "everyone can see passports", and it must not turn into a
+// crash either.
 func (s *Service) unlocked(ctx context.Context, id *security.Identity) bool {
+	if s.cache == nil {
+		return false
+	}
 	var until time.Time
 	if err := s.cache.GetJSON(ctx, unlockKey(id.SessionID), &until); err != nil {
 		return false

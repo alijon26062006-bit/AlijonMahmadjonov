@@ -111,3 +111,21 @@
 }
 
 .termsError { color: var(--av-danger-text); }
+
+/* Разделитель между входом через Google и почтой. */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--av-space-3);
+  margin: var(--av-space-2) 0;
+  color: var(--av-text-tertiary);
+  font-size: var(--av-text-xs);
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--av-border-subtle);
+}

@@ -311,6 +311,14 @@ container and every upload would disappear on the next deployment. For more
 than one server, set `S3_DRIVER=s3` and the `S3_*` values; any S3-compatible
 provider works.
 
+**Sign in with Google** — create an OAuth client (type: Web application) at
+https://console.cloud.google.com/apis/credentials, add
+`https://your-domain/api/v1/auth/google/callback` as a redirect URI, then set
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Without both, the sign-in and
+registration pages show no Google button at all — the product never renders one
+that cannot work. An account created this way has no password and a verified
+address; a password can be added later from settings.
+
 **A staff chat** — `./install.sh` asks for the bot token and the Telegram id to
 notify; press Enter to skip. The id is your own (positive, from @userinfobot —
 press Start in your bot first, or Telegram will not let it write to you) or a

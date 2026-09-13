@@ -41,6 +41,7 @@ type Config struct {
 	Storage  Storage
 	Auth     Auth
 	GitHub   GitHub
+	Google   Google
 	AI       AI
 	Mail     Mail
 	Push     Push
@@ -113,6 +114,21 @@ type GitHub struct {
 }
 
 func (g GitHub) Configured() bool { return g.ClientID != "" && g.ClientSecret != "" }
+
+// Google is sign-in with a Google account. Optional: without both values the
+// button is not shown, because a button that cannot work is worse than no
+// button.
+type Google struct {
+	ClientID     string
+	ClientSecret string
+	CallbackURL  string
+	// Endpoints, configurable so tests never talk to Google.
+	AuthorizeURL string
+	TokenURL     string
+	UserInfoURL  string
+}
+
+func (g Google) Configured() bool { return g.ClientID != "" && g.ClientSecret != "" }
 
 type AI struct {
 	ServiceURL string
@@ -190,9 +206,11 @@ func Load() (*Config, error) {
 		note("APP_ENV must be development, staging, production or test (got %q)", env)
 	}
 
+	appURL := strings.TrimRight(strDefault("APP_URL", "http://localhost:3000"), "/")
+
 	cfg := &Config{
 		Env:       env,
-		AppURL:    strings.TrimRight(strDefault("APP_URL", "http://localhost:3000"), "/"),
+		AppURL:    appURL,
 		APIURL:    strings.TrimRight(strDefault("API_URL", "http://localhost:8080"), "/"),
 		Port:      intDefault("PORT", 8080),
 		LogLevel:  strDefault("LOG_LEVEL", "info"),
@@ -244,6 +262,15 @@ func Load() (*Config, error) {
 			AuthorizeURL: strDefault("GITHUB_AUTHORIZE_URL", "https://github.com/login/oauth/authorize"),
 			TokenURL:     strDefault("GITHUB_TOKEN_URL", "https://github.com/login/oauth/access_token"),
 			Scopes:       splitList(strDefault("GITHUB_SCOPES", "read:user,user:email")),
+		},
+		Google: Google{
+			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+			CallbackURL: strDefault("GOOGLE_CALLBACK_URL",
+				strings.TrimRight(appURL, "/")+"/api/v1/auth/google/callback"),
+			AuthorizeURL: strDefault("GOOGLE_AUTHORIZE_URL", "https://accounts.google.com/o/oauth2/v2/auth"),
+			TokenURL:     strDefault("GOOGLE_TOKEN_URL", "https://oauth2.googleapis.com/token"),
+			UserInfoURL:  strDefault("GOOGLE_USERINFO_URL", "https://openidconnect.googleapis.com/v1/userinfo"),
 		},
 		AI: AI{
 			ServiceURL:   strings.TrimRight(os.Getenv("AI_SERVICE_URL"), "/"),

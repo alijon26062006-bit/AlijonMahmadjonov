@@ -159,6 +159,26 @@ func (s *Store) ResolveSession(ctx context.Context, raw string, idleTTL time.Dur
 	for _, p := range granted {
 		identity.Granted = append(identity.Granted, security.Permission(p))
 	}
+	// A session that is still waiting for the two-card screen. It is valid
+	// exactly while the account has no roles: it opens no interface, and the
+	// only endpoint it can reach is the one that answers the question.
+	if role == security.RolePending {
+		if len(identity.Roles) == 0 {
+			held = true
+		} else {
+			// Answered somewhere else — another tab, another device. Promote
+			// this session to what the account actually is rather than sign
+			// the person out of it.
+			role = identity.Roles[0]
+			identity.ActiveRole = role
+			held = true
+			if _, err := s.db.Exec(ctx,
+				`UPDATE sessions SET active_role = $2 WHERE id = $1`, sessionID, role); err != nil {
+				return nil, fmt.Errorf("promote pending session: %w", err)
+			}
+		}
+	}
+
 	if !held {
 		_ = s.RevokeSession(context.WithoutCancel(ctx), sessionID)
 		return nil, fmt.Errorf("%w: role %q is no longer held", ErrSessionInvalid, role)

@@ -77,14 +77,16 @@ async function login(who) {
 }
 
 async function register(who, role) {
-  await page.goto(`${BASE}/register?role=${role}`, { waitUntil: 'networkidle' });
-  await page.getByRole('radio', { name: role === 'client' ? /Заказать работу/ : /Выполнять заказы/ }).click();
+  await page.goto(`${BASE}/register`, { waitUntil: 'networkidle' });
   await page.getByLabel('Имя и фамилия').fill(who.name);
   await page.getByLabel('Имя пользователя').fill(who.user);
   await page.getByLabel('Электронная почта').fill(who.email);
   await page.getByLabel('Пароль').fill(who.pass);
   await page.locator('input[type=checkbox]').check();
   await page.getByRole('button', { name: 'Создать аккаунт' }).click();
+  await page.waitForURL(/welcome/, { timeout: 20000 });
+  // Выбор роли — отдельный экран: две карточки, одна из них наша.
+  await page.getByRole('button', { name: role === 'client' ? /Я хочу заказать услугу/ : /Я хочу работать и зарабатывать/ }).click();
   await page.waitForURL(/onboarding|dashboard/, { timeout: 15000 });
 }
 

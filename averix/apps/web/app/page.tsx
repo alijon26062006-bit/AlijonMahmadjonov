@@ -45,12 +45,15 @@ export default function Landing() {
           заказчика и сроком сдачи. Такую историю нельзя написать руками — поэтому ей можно
           верить.
         </p>
+        {/* Одна дверь для всех. Кем человек будет здесь — исполнителем или
+            заказчиком — спрашивается после регистрации, двумя карточками, а не
+            двумя кнопками до того, как он увидел площадку. */}
         <div className={styles.actions}>
-          <ButtonLink href="/register?role=client" size="lg">
-            Заказать работу
+          <ButtonLink href="/register" size="lg">
+            Создать аккаунт
           </ButtonLink>
-          <ButtonLink href="/register?role=developer" size="lg" variant="secondary">
-            Стать исполнителем
+          <ButtonLink href="/freelancers" size="lg" variant="secondary">
+            Посмотреть исполнителей
           </ButtonLink>
         </div>
       </section>

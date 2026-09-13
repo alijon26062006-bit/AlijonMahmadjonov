@@ -25,6 +25,15 @@ const (
 	RoleDeveloper Role = "developer"
 	RoleModerator Role = "moderator"
 	RoleAdmin     Role = "admin"
+
+	// RolePending is an account that exists and has not chosen a side yet.
+	//
+	// Registration creates the account first and asks "работать или заказывать"
+	// second, so this state is real, if usually brief: the person may close the
+	// tab between the two screens. It is deliberately absent from the
+	// permission table below — a pending session can do exactly one thing,
+	// choose a role, and that endpoint checks for this state by name.
+	RolePending Role = "pending"
 )
 
 func (r Role) Valid() bool {
@@ -34,6 +43,10 @@ func (r Role) Valid() bool {
 	}
 	return false
 }
+
+// Chooseable reports whether a person may give themselves this role. The two
+// staff roles are not on the list: they are granted, never chosen.
+func (r Role) Chooseable() bool { return r == RoleClient || r == RoleDeveloper }
 
 // Permission names a capability. Kept coarse on purpose: a permission per
 // endpoint would be unmaintainable, and a permission per domain action is what

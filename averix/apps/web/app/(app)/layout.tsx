@@ -20,8 +20,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
-    if (!loading && !session) {
+    if (loading) return;
+    if (!session) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      return;
+    }
+    // Зарегистрировался и закрыл вкладку на вопросе «работать или заказывать».
+    // Пока на него нет ответа, ни один из двух интерфейсов не покажет ничего
+    // осмысленного — и API их всё равно не отдаст.
+    if (session.active_role === 'pending') {
+      router.replace('/welcome');
     }
   }, [loading, session, router, pathname]);
 
@@ -35,6 +43,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [session, pathname]);
+
+  // Нижняя навигация принадлежит роли; пока роли нет, показывать нечего.
+  if (session?.active_role === 'pending') {
+    return <main id="main">{children}</main>;
+  }
 
   return (
     <>

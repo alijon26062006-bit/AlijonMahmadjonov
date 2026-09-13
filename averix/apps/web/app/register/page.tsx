@@ -1,29 +1,42 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import styles from '../auth.module.css';
 import { Wordmark } from '@/components/nav/Logo';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
-import { ApiFailure, post, setCsrfToken } from '@/lib/api';
+import { GoogleButton } from '@/components/auth/GoogleButton';
+import { ApiFailure, get, post, setCsrfToken } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import type { Session } from '@/lib/session';
 
-type Role = 'client' | 'developer';
-
+/**
+ * Регистрация спрашивает ровно то, без чего аккаунта не существует.
+ *
+ * Кем человек будет на площадке — исполнителем или заказчиком — спрашивается
+ * следующим экраном, двумя карточками. Этот вопрос заданный здесь, между
+ * почтой и паролем, человек отвечает до того, как увидел площадку, и половина
+ * отвечает наугад. Документов и телефона на этом шаге нет вовсе: проверка
+ * личности — дело добровольное и позднее.
+ */
 function RegisterForm() {
-  const params = useSearchParams();
   const router = useRouter();
   const { refresh } = useSession();
 
-  const [role, setRole] = useState<Role>(params.get('role') === 'client' ? 'client' : 'developer');
   const [form, setForm] = useState({ full_name: '', username: '', email: '', password: '' });
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [google, setGoogle] = useState(false);
+
+  useEffect(() => {
+    get<{ google: boolean }>('/auth/providers')
+      .then((providers) => setGoogle(Boolean(providers.google)))
+      .catch(() => setGoogle(false));
+  }, []);
 
   function update(key: keyof typeof form) {
     return (event: React.ChangeEvent<HTMLInputElement>) =>
@@ -41,14 +54,16 @@ function RegisterForm() {
         accept_terms: acceptTerms,
         email: form.email.trim(),
         username: form.username.trim().toLowerCase(),
-        role,
+        // Роль здесь не передаётся вовсе: вход один для всех, вопрос — на
+        // следующем экране. API её принимает, но только ради старых ссылок.
         locale: 'ru',
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       if (session.csrf_token) setCsrfToken(session.csrf_token);
       await refresh();
-      // Исполнителю сначала нужна анкета — без неё его никто не найдёт.
-      router.replace(role === 'developer' ? '/onboarding' : '/dashboard');
+      if (session.active_role === 'developer') router.replace('/onboarding');
+      else if (session.active_role === 'client') router.replace('/dashboard');
+      else router.replace('/welcome');
     } catch (error) {
       if (error instanceof ApiFailure) {
         setFields(error.fields);
@@ -65,29 +80,17 @@ function RegisterForm() {
     <form className={styles.card} onSubmit={submit} noValidate>
       <h1 className={styles.title}>Создать аккаунт</h1>
       <p className={styles.subtitle}>
-        Один аккаунт — одна отправная точка. Вторую роль можно добавить позже.
+        Две минуты. Кем вы будете здесь — исполнителем или заказчиком — спросим на следующем шаге.
       </p>
 
-      <div className={styles.roles} role="radiogroup" aria-label="Я здесь, чтобы">
-        {(
-          [
-            { key: 'developer', title: 'Выполнять заказы', body: 'Заполнить анкету, получать подходящие заказы' },
-            { key: 'client', title: 'Заказать работу', body: 'Разместить заказ, выбрать исполнителя' },
-          ] as const
-        ).map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            role="radio"
-            aria-checked={role === option.key}
-            className={[styles.role, role === option.key ? styles.roleActive : ''].join(' ')}
-            onClick={() => setRole(option.key)}
-          >
-            <span className={styles.roleTitle}>{option.title}</span>
-            <span className={styles.roleBody}>{option.body}</span>
-          </button>
-        ))}
-      </div>
+      {google ? (
+        <>
+          <GoogleButton label="Продолжить с Google" />
+          <div className={styles.divider}>
+            <span>или почтой</span>
+          </div>
+        </>
+      ) : null}
 
       {message ? (
         <p className={styles.alert} role="alert">
