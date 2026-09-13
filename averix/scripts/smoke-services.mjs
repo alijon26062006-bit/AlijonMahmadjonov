@@ -147,7 +147,7 @@ await page.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
 const admin = await page.locator('body').innerText();
 step('панель администратора открывается', /Люди|Площадка|Требует внимания/.test(admin), admin.slice(0, 160).replace(/\n/g, ' | '));
-for (const [path, marker] of [['/admin/users', /Пользователи|Найти/], ['/admin/moderation', /Очередь|Жалобы/], ['/admin/settings', /Параметры|Комиссия/], ['/admin/disputes', /спор/i], ['/admin/audit', /Журнал|записей/i]]) {
+for (const [path, marker] of [['/admin/users', /Пользователи|Найти/], ['/admin/moderation', /Очередь|Жалобы/], ['/admin/settings', /Параметры|Комиссия/], ['/admin/disputes', /спор/i], ['/admin/audit', /Журнал|записей/i], ['/admin/identity', /Раздел вам не открыт|Введите пароль|Ждут проверки/]]) {
   await page.goto(BASE + path, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
   step(`${path} работает`, marker.test(await page.locator('body').innerText()));

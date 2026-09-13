@@ -32,6 +32,7 @@ export default function VerificationPage() {
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
   const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState({ documentType: '', countryCode: '' });
 
   const load = useCallback(async () => {
     try {
@@ -48,12 +49,20 @@ export default function VerificationPage() {
       .catch(() => setOptions(null));
   }, [load]);
 
-  async function saveDetails(body: Record<string, string>) {
+  // Дело создаётся, только когда выбрано и то и другое: сохранять половину
+  // формы — значит показать человеку красную надпись про страну ровно в тот
+  // момент, когда он выбрал документ и до страны ещё не дошёл.
+  async function saveDetails(documentType: string, countryCode: string) {
+    setDraft({ documentType, countryCode });
+    if (!documentType || !countryCode) return;
     setBusy(true);
     setError('');
     setOk('');
     try {
-      setItem(await post<IdentityCase>('/account/identity', body));
+      setItem(await post<IdentityCase>('/account/identity', {
+        document_type: documentType,
+        country_code: countryCode,
+      }));
     } catch (failure) {
       setError(failure instanceof ApiFailure ? Object.values(failure.fields)[0] || failure.message : 'Не получилось.');
     } finally {
@@ -88,7 +97,8 @@ export default function VerificationPage() {
 
   const status = item?.status ?? 'none';
   const editable = status === 'none' || status === 'draft' || status === 'resubmit_requested' || status === 'rejected';
-  const needsBack = options.document_types.find((type) => type.key === item?.document_type)?.needs_back ?? false;
+  const chosenType = item?.document_type || draft.documentType;
+  const needsBack = options.document_types.find((type) => type.key === chosenType)?.needs_back ?? false;
 
   const kinds: { key: string; label: string }[] = [
     { key: 'front', label: 'Лицевая сторона' },
@@ -166,13 +176,10 @@ export default function VerificationPage() {
           <div className={styles.form}>
             <Select
               label="Что вы покажете"
-              value={item?.document_type ?? ''}
+              value={item?.document_type || draft.documentType}
               disabled={!editable || busy}
               onChange={(event) =>
-                void saveDetails({
-                  document_type: event.target.value,
-                  country_code: item?.country_code ?? '',
-                })
+                void saveDetails(event.target.value, item?.country_code || draft.countryCode)
               }
             >
               <option value="">Выберите документ</option>
@@ -184,13 +191,11 @@ export default function VerificationPage() {
             </Select>
             <Select
               label="Страна выдачи"
-              value={item?.country_code ?? ''}
+              value={item?.country_code || draft.countryCode}
               disabled={!editable || busy}
+              hint="Страна, которая выдала документ."
               onChange={(event) =>
-                void saveDetails({
-                  document_type: item?.document_type ?? '',
-                  country_code: event.target.value,
-                })
+                void saveDetails(item?.document_type || draft.documentType, event.target.value)
               }
             >
               <option value="">Выберите страну</option>
@@ -203,7 +208,7 @@ export default function VerificationPage() {
           </div>
         </Card>
 
-        {item?.document_type ? (
+        {item && item.document_type ? (
           <Card>
             <SectionHeading title="Снимки" />
             <p className="av-small av-muted">
