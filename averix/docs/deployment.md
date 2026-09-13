@@ -202,6 +202,30 @@ ever purged.
 Full details, and what is deliberately impossible, in
 [identity-verification.md](identity-verification.md).
 
+## 5c. Starting over with no accounts
+
+After testing with your own registrations, to open the site with nothing on it:
+
+```bash
+./scripts/reset-users.sh          # says what it would delete, and stops
+./scripts/reset-users.sh --yes    # takes a backup, then does it
+```
+
+It removes every account and everything people made — profiles, projects,
+proposals, contracts, payments, messages, reviews, portfolios, services,
+notifications, the audit log and every uploaded file, identity documents
+included. It keeps what the platform needs to work: профессии и навыки,
+настройки площадки, комиссия, веса подбора, платёжные провайдеры and the
+migration history, so the site is empty rather than broken.
+
+It deliberately does not use `TRUNCATE ... CASCADE`: four of the tables the
+platform needs record *who* changed a setting, and CASCADE reads that as
+permission to empty them — taking the commission rate and the transfer details
+with the test accounts. A backup is taken first either way; if you emptied the
+wrong database, `./scripts/restore.sh` puts it back.
+
+Then sign up again and make yourself an administrator, as in section 5.
+
 ## 6. Turn on backups
 
 ```bash
