@@ -137,6 +137,10 @@ export default function AdminOverviewPage() {
                   </div>
                 ))}
               </div>
+              <p className="av-xs av-faint">
+                В чат сотрудников уходит только строка и ссылка на панель: документы туда не отправляются
+                ни при какой настройке.
+              </p>
               <p className="av-xs av-faint">Версия сборки: {overview.version}</p>
             </Card>
           </>
@@ -153,6 +157,7 @@ const INTEGRATION_LABEL: Record<string, string> = {
   ai: 'Сервис анализа',
   payments: 'Реквизиты для переводов',
   storage: 'Хранилище файлов',
+  telegram: 'Чат сотрудников (Telegram)',
 };
 
 function Tile({ label, value, note, warn }: { label: string; value: number; note: string; warn?: boolean }) {

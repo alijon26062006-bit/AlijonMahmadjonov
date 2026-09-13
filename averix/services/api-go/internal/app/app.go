@@ -45,6 +45,7 @@ import (
 	"github.com/averix/api/internal/services"
 	"github.com/averix/api/internal/settings"
 	"github.com/averix/api/internal/taxonomy"
+	"github.com/averix/api/internal/telegram"
 )
 
 // Version is set at build time with -ldflags.
@@ -83,6 +84,7 @@ type App struct {
 	Search      *search.Service
 	Moderation  *moderation.Service
 	Identity    *identity.Service
+	Chat        *telegram.Client
 	Admin       *admin.Service
 	Account     *account.Service
 
@@ -206,7 +208,15 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		// them, which is the point.
 		Identity: identity.NewService(identity.NewStore(db, store), db, redis,
 			settingsStore, recorder, notifier, authStore),
+		Chat: telegram.New(telegram.Config{
+			BotToken: cfg.Telegram.BotToken, ChatID: cfg.Telegram.ChatID,
+			BaseURL: cfg.Telegram.BaseURL, AppURL: cfg.AppURL,
+		}),
 	}
+	// The staff chat is optional and carries only a line and a link; without
+	// a bot token the identity service simply never calls it.
+	a.Identity.AttachChat(a.Chat)
+
 	// Payments needs the contracts service, and contracts needs to know
 	// whether money can move at all. Constructing payments second and handing
 	// it back is what keeps that mutual need from being a construction cycle.

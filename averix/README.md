@@ -148,6 +148,9 @@ Further reading:
 - [`docs/external-content.md`](docs/external-content.md) — URL validation, SSRF
   defence, and the sandboxed in-app browser that previews a developer's live
   project without giving it access to AVERIX.
+- [`docs/identity-verification.md`](docs/identity-verification.md) — where
+  passport photographs live, the permission no role grants, the two-minute
+  ticket a reviewer needs for each image, and the date they are deleted on.
 
 ## Design
 

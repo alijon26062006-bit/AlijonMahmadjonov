@@ -72,6 +72,9 @@ func (s *Service) Overview(ctx context.Context, id *security.Identity) (*Overvie
 		"github": s.cfg.GitHub.Configured(),
 		"ai":     s.cfg.AI.Configured(),
 		"push":   s.cfg.Push.Configured(),
+		// Настроен — значит, сотрудники получат ссылку в чат. Ни одного
+		// изображения туда не уходит ни при какой настройке.
+		"telegram": s.cfg.Telegram.Configured(),
 	}
 	o.Version = s.version
 	return o, nil

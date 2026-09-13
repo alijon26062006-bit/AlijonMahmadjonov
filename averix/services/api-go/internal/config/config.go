@@ -44,6 +44,7 @@ type Config struct {
 	AI       AI
 	Mail     Mail
 	Push     Push
+	Telegram Telegram
 	Payments Payments
 	Limits   Limits
 }
@@ -133,6 +134,16 @@ type Push struct {
 }
 
 func (p Push) Configured() bool { return p.VAPIDPublicKey != "" && p.VAPIDPrivateKey != "" }
+
+// Telegram is the staff chat that gets a line and a link when something needs
+// a person. It never carries documents — see internal/telegram for why.
+type Telegram struct {
+	BotToken string
+	ChatID   string
+	BaseURL  string
+}
+
+func (t Telegram) Configured() bool { return t.BotToken != "" && t.ChatID != "" }
 
 type Mail struct {
 	Host        string
@@ -243,6 +254,11 @@ func Load() (*Config, error) {
 			VAPIDPublicKey:  os.Getenv("VAPID_PUBLIC_KEY"),
 			VAPIDPrivateKey: os.Getenv("VAPID_PRIVATE_KEY"),
 			Subject:         strDefault("VAPID_SUBJECT", "mailto:"+strDefault("MAIL_FROM_ADDRESS", "no-reply@averix.local")),
+		},
+		Telegram: Telegram{
+			BotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
+			ChatID:   os.Getenv("TELEGRAM_CHAT_ID"),
+			BaseURL:  strDefault("TELEGRAM_API_BASE_URL", "https://api.telegram.org"),
 		},
 		Mail: Mail{
 			Host:        os.Getenv("SMTP_HOST"),

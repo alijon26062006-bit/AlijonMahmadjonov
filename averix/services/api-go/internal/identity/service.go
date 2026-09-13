@@ -44,12 +44,28 @@ type Service struct {
 	audit    *audit.Recorder
 	notify   Notifier
 	pass     Passwords
+	chat     Chat
 }
 
 func NewService(store *Store, db *database.DB, c *cache.Cache, set *settings.Store,
 	rec *audit.Recorder, notify Notifier, pass Passwords) *Service {
 	return &Service{store: store, db: db, cache: c, settings: set, audit: rec, notify: notify, pass: pass}
 }
+
+// Chat is the staff chat, if the operator set one up.
+//
+// Look at the signature: a reference and a user id. It is not possible to hand
+// this interface an image, a storage key or a document id, which is the whole
+// design — a passport must not end up in a message history nobody on the
+// platform can delete.
+type Chat interface {
+	Configured() bool
+	IdentitySubmitted(ctx context.Context, reference string, userID fmt.Stringer) error
+}
+
+// AttachChat is optional. Without it the product behaves exactly as before:
+// the notification in the panel is the only signal.
+func (s *Service) AttachChat(c Chat) { s.chat = c }
 
 // maxDocumentBytes is generous enough for a phone photograph and far below
 // what would let someone use this endpoint as storage.
@@ -221,6 +237,16 @@ func (s *Service) SubmitForReview(ctx context.Context, id *security.Identity) (*
 	s.audit.RecordRequest(ctx, audit.Entry{
 		Action: "identity.submitted", SubjectType: "identity_verification", SubjectID: &row.ID,
 	})
+	if s.chat != nil && s.chat.Configured() {
+		// Best effort and out of band: a chat that is down must not stop a
+		// person from submitting their documents.
+		reference := "AVX-" + strings.ToUpper(id.UserID.String()[:8])
+		go func(ctx context.Context) {
+			if err := s.chat.IdentitySubmitted(ctx, reference, id.UserID); err != nil {
+				logx.From(ctx).Warn("identity: staff chat notice not delivered", "error", err)
+			}
+		}(context.WithoutCancel(ctx))
+	}
 	if s.notify != nil {
 		s.notify.IdentitySubmitted(ctx, id.UserID)
 	}
