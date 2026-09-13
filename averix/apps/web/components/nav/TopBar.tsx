@@ -38,8 +38,11 @@ const DESKTOP_LINKS: Record<string, { href: string; label: string }[]> = {
     { href: '/admin', label: 'Обзор' },
     { href: '/admin/moderation', label: 'Модерация' },
   ],
+  // Гость видит те же каталоги, что и все: площадка открыта для просмотра,
+  // и вход требуется только на действие.
   anonymous: [
     { href: '/freelancers', label: 'Исполнители' },
+    { href: '/projects', label: 'Заказы' },
     { href: '/services', label: 'Услуги' },
   ],
 };
@@ -143,6 +146,9 @@ export function TopBar({
               <span className={styles.avatarPlaceholder} aria-hidden="true" />
             ) : (
               <>
+                <Link href="/search" className={styles.iconButton} aria-label="Поиск">
+                  <IconSearch size={19} />
+                </Link>
                 <Link href="/login" className={styles.plainLink}>
                   Войти
                 </Link>

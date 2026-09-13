@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import styles from './project.module.css';
 import { TopBar } from '@/components/nav/TopBar';
+import { BottomNav } from '@/components/nav/BottomNav';
 import { VerificationNotice } from '@/components/VerificationNotice';
 import { Card } from '@/components/ui/Card';
 import { Badge, Tag } from '@/components/ui/Badge';
@@ -302,7 +303,9 @@ export default function ProjectPage({ params }: { params: Promise<{ slug: string
             ) : null}
             {!session ? (
               <p className="av-small av-muted">
-                <Link href={`/login?next=/projects/${project.slug}`}>Войдите</Link> как исполнитель, чтобы откликнуться.
+                Заказ открыт для всех. Аккаунт нужен только чтобы откликнуться —{' '}
+                <Link href="/register">создайте его</Link>, и сразу после регистрации выберете,
+                работать вам или заказывать.
               </p>
             ) : null}
           </div>
@@ -312,6 +315,23 @@ export default function ProjectPage({ params }: { params: Promise<{ slug: string
           {isDeveloper && project.status === 'open' && session && !session.identity_verified ? (
             <div style={{ marginTop: 'var(--av-space-4)' }}>
               <VerificationNotice where="proposal" />
+            </div>
+          ) : null}
+
+          {/* Гость видит ту же панель, что исполнитель: сначала бюджет и
+              число откликов, потом действие. Действие ведёт на вход и
+              возвращает человека сюда же. */}
+          {!session && project.status === 'open' ? (
+            <div className={styles.actionBar}>
+              <div className={styles.actionInfo}>
+                <span className={styles.actionBudget}>{project.budget.display}</span>
+                <span className="av-small av-muted">
+                  <IconClock size={12} /> {plural(project.proposals_count, 'отклик', 'отклика', 'откликов')}
+                </span>
+              </div>
+              <ButtonLink href={`/login?next=${encodeURIComponent(`/projects/${project.slug}`)}`} size="lg">
+                Откликнуться
+              </ButtonLink>
             </div>
           ) : null}
 
@@ -352,6 +372,7 @@ export default function ProjectPage({ params }: { params: Promise<{ slug: string
           />
         </>
       )}
+      <BottomNav />
     </>
   );
 }

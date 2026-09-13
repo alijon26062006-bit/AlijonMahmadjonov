@@ -75,6 +75,39 @@ func (s *Service) Everything(ctx context.Context, id *security.Identity, text st
 	}, nil
 }
 
+// BrowseProjects lists open briefs for anyone, signed in or not.
+//
+// A marketplace that hides its work behind a sign-up form asks people to
+// believe there is work. Letting them look is both more honest and more
+// persuasive; the account is asked for at the moment it is actually needed —
+// when somebody wants to respond.
+func (s *Service) BrowseProjects(ctx context.Context, q ProjectQuery) ([]ProjectHit, ProjectPage, error) {
+	if n := len([]rune(q.Text)); n > 100 {
+		q.Text = string([]rune(q.Text)[:100])
+	}
+	switch q.Sort {
+	case "", "newest", "budget", "proposals":
+	default:
+		return nil, ProjectPage{}, httpx.Validation(map[string]string{"sort": "Сортировка: newest, budget или proposals."})
+	}
+	if len(q.Skills) > 10 {
+		q.Skills = q.Skills[:10]
+	}
+	// Приводится здесь, а не только в хранилище, чтобы страница могла честно
+	// написать в meta, сколько заказов она попросила.
+	if q.Limit <= 0 || q.Limit > 50 {
+		q.Limit = 24
+	}
+	if q.Offset < 0 {
+		q.Offset = 0
+	}
+	projects, total, err := s.store.BrowseProjects(ctx, q)
+	if err != nil {
+		return nil, ProjectPage{}, httpx.Internalf(err, "browse projects")
+	}
+	return projects, ProjectPage{Total: total, Offset: q.Offset, Limit: q.Limit}, nil
+}
+
 // ── Favourites ──────────────────────────────────────────────────────────────
 
 func (s *Service) SaveFreelancer(ctx context.Context, id *security.Identity, username, note string) error {

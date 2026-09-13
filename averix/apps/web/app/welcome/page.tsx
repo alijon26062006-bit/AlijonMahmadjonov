@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import styles from './welcome.module.css';
 import { Wordmark } from '@/components/nav/Logo';
 import { ApiFailure, post, setCsrfToken } from '@/lib/api';
@@ -19,8 +19,13 @@ type Choice = 'developer' | 'client';
  * настройках, и об этом сказано прямо здесь, чтобы выбор не казался
  * необратимым.
  */
-export default function WelcomePage() {
+function Welcome() {
   const router = useRouter();
+  const params = useSearchParams();
+  // Страница, с которой человека отправили регистрироваться: заказ, услуга,
+  // профиль исполнителя. Заказчика возвращаем туда — он пришёл за действием,
+  // а не за рабочим столом.
+  const next = params.get('next');
   const { session, loading, refresh } = useSession();
   const [busy, setBusy] = useState<Choice | null>(null);
   const [error, setError] = useState('');
@@ -32,29 +37,30 @@ export default function WelcomePage() {
   useEffect(() => {
     if (loading || decided.current) return;
     if (!session) {
-      router.replace('/login');
+      router.replace(next ? `/login?next=${encodeURIComponent(next)}` : '/login');
       return;
     }
     if (session.active_role && session.active_role !== 'pending') {
-      router.replace(session.active_role === 'developer' ? '/feed' : '/dashboard');
+      router.replace(session.active_role === 'developer' ? '/feed' : next || '/dashboard');
     }
-  }, [loading, session, router]);
+  }, [loading, session, router, next]);
 
   async function choose(role: Choice) {
     decided.current = true;
     setBusy(role);
     setError('');
     try {
-      const next = await post<Session>('/auth/role/choose', { role });
-      if (next.csrf_token) setCsrfToken(next.csrf_token);
+      const updated = await post<Session>('/auth/role/choose', { role });
+      if (updated.csrf_token) setCsrfToken(updated.csrf_token);
       await refresh();
-      // Исполнителю сразу анкета: без неё его никто не найдёт. Заказчику —
-      // рабочий стол, где уже можно разместить заказ.
-      router.replace(role === 'developer' ? '/onboarding' : '/dashboard');
+      // Исполнителю сразу анкета: без неё его никто не найдёт, и откликаться
+      // он всё равно не сможет. Заказчику — туда, откуда он пришёл, а если
+      // он пришёл сам по себе, на рабочий стол.
+      router.replace(role === 'developer' ? '/onboarding' : next || '/dashboard');
     } catch (failure) {
       if (failure instanceof ApiFailure && failure.code === 'role_already_chosen') {
         await refresh();
-        router.replace(role === 'developer' ? '/feed' : '/dashboard');
+        router.replace(role === 'developer' ? '/feed' : next || '/dashboard');
         return;
       }
       setError(
@@ -123,6 +129,14 @@ export default function WelcomePage() {
         Ни документов, ни телефона сейчас не нужно. Проверка личности — добровольная, и живёт в настройках.
       </p>
     </main>
+  );
+}
+
+export default function WelcomePage() {
+  return (
+    <Suspense fallback={null}>
+      <Welcome />
+    </Suspense>
   );
 }
 

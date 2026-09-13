@@ -148,7 +148,13 @@ func (h *Handlers) googleCallback(w http.ResponseWriter, r *http.Request) error 
 	// Where to land: the two cards when there is no role yet, otherwise where
 	// they were going before they were asked to sign in.
 	if result.Identity.ActiveRole == security.RolePending {
-		destination = "/welcome"
+		// Роли ещё нет — сначала два вопроса-карточки. Куда человек шёл,
+		// не теряется: адрес едет дальше и отрабатывает после выбора.
+		if destination != "" && destination != "/" {
+			destination = "/welcome?next=" + url.QueryEscape(destination)
+		} else {
+			destination = "/welcome"
+		}
 	} else if destination == "" || destination == "/" {
 		destination = "/dashboard"
 		if result.Identity.ActiveRole == security.RoleDeveloper {

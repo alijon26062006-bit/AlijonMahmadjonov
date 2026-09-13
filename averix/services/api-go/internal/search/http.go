@@ -29,6 +29,10 @@ func (h *Handlers) Register(r *httpx.Router, mw Middleware) {
 	pub := r.Group("")
 	pub.GET("/freelancers", mw.RateLimit(h.freelancers))
 	pub.GET("/search", mw.RateLimit(h.everything))
+	// Открытые заказы — такой же публичный каталог, как исполнители. Живёт
+	// рядом с ними, а не в модуле проектов, где /projects занята лентой
+	// исполнителя, которая требует роли.
+	pub.GET("/projects/browse", mw.RateLimit(h.browseProjects))
 
 	client := r.Group("/freelancers", mw.Require, mw.RequireClient, mw.CSRF)
 	client.POST("/{username}/save", h.saveFreelancer)
@@ -81,6 +85,37 @@ func (h *Handlers) freelancers(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return httpx.JSONMeta(w, http.StatusOK, cards, meta)
+}
+
+// commaList разбирает «go,postgresql» — тот же формат, что у фильтра
+// исполнителей, чтобы ссылки выглядели одинаково.
+func commaList(raw string) []string {
+	out := []string{}
+	for _, item := range strings.Split(raw, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func (h *Handlers) browseProjects(w http.ResponseWriter, r *http.Request) error {
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	offset, _ := strconv.Atoi(q.Get("offset"))
+	projects, page, err := h.svc.BrowseProjects(r.Context(), ProjectQuery{
+		Text:     strings.TrimSpace(q.Get("q")),
+		Category: strings.TrimSpace(q.Get("category")),
+		Skills:   commaList(q.Get("skills")),
+		Sort:     strings.TrimSpace(q.Get("sort")),
+		Limit:    limit, Offset: offset,
+	})
+	if err != nil {
+		return err
+	}
+	return httpx.JSONMeta(w, http.StatusOK, projects, map[string]any{
+		"total": page.Total, "offset": page.Offset, "limit": page.Limit,
+	})
 }
 
 func (h *Handlers) everything(w http.ResponseWriter, r *http.Request) error {

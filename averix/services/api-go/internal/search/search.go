@@ -79,6 +79,29 @@ type FreelancerQuery struct {
 	ViewerID       *uuid.UUID
 }
 
+// ProjectQuery is the public catalogue of open briefs: what a visitor sees
+// before they have an account, and the same thing a freelancer browses.
+//
+// It deliberately carries no viewer: a published project is a public page, and
+// the list of them is a public list. Whether the reader has signed in changes
+// what they can *do* about one, never whether they can read it.
+type ProjectQuery struct {
+	Text     string
+	Category string
+	Skills   []string
+	Sort     string // newest | budget | proposals
+	Offset   int
+	Limit    int
+}
+
+// ProjectPage is what the catalogue needs to draw «показать ещё»: how many
+// briefs there are in total and which window of them came back.
+type ProjectPage struct {
+	Total  int
+	Offset int
+	Limit  int
+}
+
 // ProjectHit is an open brief as the global search shows it.
 type ProjectHit struct {
 	ID            uuid.UUID  `json:"id"`
@@ -90,6 +113,9 @@ type ProjectHit struct {
 	BudgetDisplay string     `json:"budget_display"`
 	Proposals     int        `json:"proposals_count"`
 	PublishedAt   *time.Time `json:"published_at,omitempty"`
+	// Навыки показываются в каталоге: по ним человек понимает, его ли это
+	// заказ, не открывая карточку.
+	Skills []string `json:"skills,omitempty"`
 }
 
 // Results is the global search response: a few of each kind, with totals so

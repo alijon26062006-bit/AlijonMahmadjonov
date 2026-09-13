@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useSession } from './session';
 import type { Message, Notification } from './types';
 
 export type RealtimeEvent = {
@@ -22,14 +23,21 @@ export type RealtimeEvent = {
  * already in the database, so a dropped frame costs a refresh and nothing
  * else. Nothing is ever sent over it — every write goes through an ordinary
  * authenticated request.
+ *
+ * Without a session there is nothing to subscribe to, and the socket is not
+ * opened at all: the server refuses the handshake and the reconnect loop
+ * keeps asking. Now that the marketplace is browsable without an account,
+ * that is an ordinary case rather than a rare one.
  */
 export function useRealtime(onEvent: (event: RealtimeEvent) => void) {
   const [connected, setConnected] = useState(false);
+  const { session } = useSession();
+  const userID = session?.user_id;
   const handler = useRef(onEvent);
   handler.current = onEvent;
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !userID) return;
 
     let socket: WebSocket | null = null;
     let closed = false;
@@ -72,7 +80,7 @@ export function useRealtime(onEvent: (event: RealtimeEvent) => void) {
       if (timer) clearTimeout(timer);
       socket?.close();
     };
-  }, []);
+  }, [userID]);
 
   return { connected };
 }

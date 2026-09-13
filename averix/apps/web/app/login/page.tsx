@@ -44,7 +44,11 @@ function LoginForm() {
       const session = await signIn(email.trim(), password);
       // Роль ещё не выбрана — сначала тот самый вопрос, куда бы человек ни шёл.
       router.replace(
-        session.active_role === 'pending' ? '/welcome' : next || defaultHome(session.active_role),
+        session.active_role === 'pending'
+          ? next
+            ? `/welcome?next=${encodeURIComponent(next)}`
+            : '/welcome'
+          : next || defaultHome(session.active_role),
       );
     } catch (error) {
       if (error instanceof ApiFailure) {
@@ -116,7 +120,10 @@ function LoginForm() {
         <Link href="/forgot-password">Забыли пароль?</Link>
       </p>
       <p className={styles.switch}>
-        Впервые на AVERIX? <Link href="/register">Создать аккаунт</Link>
+        Впервые на AVERIX?{' '}
+        <Link href={next ? `/register?next=${encodeURIComponent(next)}` : '/register'}>
+          Создать аккаунт
+        </Link>
       </p>
     </form>
   );

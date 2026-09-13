@@ -25,6 +25,12 @@ export default function Landing() {
       <header className={styles.header}>
         <Wordmark size={20} />
         <div className="av-row">
+          <Link href="/freelancers" className={styles.navLink}>
+            Исполнители
+          </Link>
+          <Link href="/projects" className={styles.navLink}>
+            Заказы
+          </Link>
           <Link href="/login" className={styles.signIn}>
             Войти
           </Link>
@@ -55,7 +61,15 @@ export default function Landing() {
           <ButtonLink href="/freelancers" size="lg" variant="secondary">
             Посмотреть исполнителей
           </ButtonLink>
+          <ButtonLink href="/projects" size="lg" variant="secondary">
+            Открытые заказы
+          </ButtonLink>
         </div>
+        {/* Аккаунт нужен на действии, а не на входе: смотреть площадку можно
+            целиком и без него. */}
+        <p className={styles.browseNote}>
+          Исполнителей, портфолио, отзывы и заказы видно без регистрации.
+        </p>
       </section>
 
       <section className={styles.points}>

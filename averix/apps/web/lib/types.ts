@@ -670,6 +670,7 @@ export type ProjectHit = {
   budget_display: string;
   proposals_count: number;
   published_at?: string;
+  skills?: string[];
 };
 
 export type SearchResults = {

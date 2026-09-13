@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -418,6 +419,91 @@ func (s *Store) Projects(ctx context.Context, text string, limit int) ([]Project
 		var minMinor, maxMinor *int64
 		if err := rows.Scan(&h.ID, &h.Slug, &h.Title, &h.Excerpt, &h.CategoryName, &h.CategorySlug,
 			&budgetType, &minMinor, &maxMinor, &currency, &h.Proposals, &h.PublishedAt); err != nil {
+			return nil, 0, err
+		}
+		h.BudgetDisplay = budgetDisplay(budgetType, minMinor, maxMinor, strings.TrimSpace(currency))
+		out = append(out, h)
+	}
+	return out, total, rows.Err()
+}
+
+// BrowseProjects is the public catalogue of open briefs.
+//
+// Everything it returns is already public: a published project has its own
+// page that opens without a session. This is the list of those pages, with the
+// filters a person actually uses — направление, навыки, поиск и сортировка.
+func (s *Store) BrowseProjects(ctx context.Context, q ProjectQuery) ([]ProjectHit, int, error) {
+	if q.Limit <= 0 || q.Limit > 50 {
+		q.Limit = 24
+	}
+	if q.Offset < 0 {
+		q.Offset = 0
+	}
+
+	where := []string{"p.status = 'open'", "p.visibility = 'public'", "p.moderation_state = 'approved'"}
+	args := []any{}
+	arg := func(v any) string {
+		args = append(args, v)
+		return "$" + strconv.Itoa(len(args))
+	}
+	if text := strings.TrimSpace(q.Text); text != "" {
+		n := arg(text)
+		where = append(where, "(p.search_doc @@ websearch_to_tsquery('russian', "+n+")"+
+			" OR p.search_doc @@ websearch_to_tsquery('simple', "+n+")"+
+			" OR p.title ILIKE '%' || "+n+" || '%')")
+	}
+	if category := strings.TrimSpace(q.Category); category != "" {
+		where = append(where, "(c.slug = "+arg(category)+
+			" OR c.id IN (SELECT id FROM categories WHERE parent_id = (SELECT id FROM categories WHERE slug = "+arg(category)+")))")
+	}
+	if len(q.Skills) > 0 {
+		where = append(where, `EXISTS (
+			SELECT 1 FROM project_skills ps JOIN skills sk ON sk.id = ps.skill_id
+			WHERE ps.project_id = p.id AND sk.slug = ANY(`+arg(database.Array(q.Skills))+`))`)
+	}
+	clause := strings.Join(where, " AND ")
+
+	var total int
+	if err := s.db.QueryRow(ctx,
+		`SELECT count(*) FROM projects p JOIN categories c ON c.id = p.category_id WHERE `+clause,
+		args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count open projects: %w", err)
+	}
+
+	order := "p.published_at DESC NULLS LAST"
+	switch q.Sort {
+	case "budget":
+		order = "coalesce(p.budget_max_minor, p.budget_min_minor, 0) DESC, p.published_at DESC"
+	case "proposals":
+		// Меньше откликов — выше: у такого заказа больше шансов быть замеченным.
+		order = "p.proposals_count ASC, p.published_at DESC"
+	}
+
+	rows, err := s.db.Query(ctx, `
+		SELECT p.id, p.slug, p.title, coalesce(p.summary, left(p.description, 160)),
+		       c.name, c.slug, p.budget_type, p.budget_min_minor, p.budget_max_minor, p.currency,
+		       p.proposals_count, p.published_at,
+		       coalesce(array_agg(DISTINCT sk.name) FILTER (WHERE sk.name IS NOT NULL), '{}')
+		FROM projects p
+		JOIN categories c ON c.id = p.category_id
+		LEFT JOIN project_skills ps ON ps.project_id = p.id
+		LEFT JOIN skills sk ON sk.id = ps.skill_id
+		WHERE `+clause+`
+		GROUP BY p.id, c.name, c.slug
+		ORDER BY `+order+`
+		LIMIT `+arg(q.Limit)+` OFFSET `+arg(q.Offset), args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list open projects: %w", err)
+	}
+	defer rows.Close()
+
+	out := []ProjectHit{}
+	for rows.Next() {
+		var h ProjectHit
+		var budgetType, currency string
+		var minMinor, maxMinor *int64
+		if err := rows.Scan(&h.ID, &h.Slug, &h.Title, &h.Excerpt, &h.CategoryName, &h.CategorySlug,
+			&budgetType, &minMinor, &maxMinor, &currency, &h.Proposals, &h.PublishedAt, &h.Skills); err != nil {
 			return nil, 0, err
 		}
 		h.BudgetDisplay = budgetDisplay(budgetType, minMinor, maxMinor, strings.TrimSpace(currency))

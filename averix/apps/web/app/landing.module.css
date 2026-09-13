@@ -25,6 +25,22 @@
   color: var(--av-text-secondary);
 }
 
+/* На телефоне шапка несёт только вход и регистрацию: каталоги тут же под
+   ней, кнопками в первом экране, и дублировать их некуда. */
+.navLink {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .navLink {
+    padding: var(--av-space-4);
+    font-size: var(--av-text-md);
+    font-weight: var(--av-weight-medium);
+    color: var(--av-text-secondary);
+    display: inline-block;
+  }
+}
+
 .hero {
   max-width: 760px;
   width: 100%;
@@ -34,7 +50,23 @@
 }
 
 @media (min-width: 768px) {
-  .hero { padding-top: var(--av-space-13); }
+  /* На телефоне шапка несёт только вход и регистрацию: каталоги тут же под
+   ней, кнопками в первом экране, и дублировать их некуда. */
+.navLink {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .navLink {
+    padding: var(--av-space-4);
+    font-size: var(--av-text-md);
+    font-weight: var(--av-weight-medium);
+    color: var(--av-text-secondary);
+    display: inline-block;
+  }
+}
+
+.hero { padding-top: var(--av-space-13); }
 }
 
 .eyebrow {
@@ -77,7 +109,7 @@
 }
 
 @media (min-width: 480px) {
-  .actions { flex-direction: row; justify-content: center; }
+  .actions { flex-direction: row; flex-wrap: wrap; justify-content: center; }
 }
 
 .points {
@@ -133,4 +165,10 @@
   padding: var(--av-space-8) var(--av-space-6) calc(var(--av-space-9) + env(safe-area-inset-bottom));
   border-top: 1px solid var(--av-border-subtle);
   text-align: center;
+}
+
+.browseNote {
+  margin: var(--av-space-4) 0 0;
+  font-size: var(--av-text-sm);
+  color: var(--av-text-tertiary);
 }

@@ -6,6 +6,7 @@ import styles from './BottomNav.module.css';
 import {
   IconBriefcase,
   IconCompass,
+  IconLayers,
   IconMessage,
   IconPlus,
   IconShield,
@@ -26,15 +27,24 @@ type Item = {
  * Нижняя панель — позвоночник продукта на телефоне: пять разделов на высоте
  * большого пальца, всегда на месте. На десктопе те же разделы несёт шапка,
  * а панель исчезает.
+ *
+ * У гостя она тоже есть. Площадка открыта для просмотра, и человеку без
+ * аккаунта нужны те же три каталога — исполнители, заказы, услуги, — а вход
+ * стоит последним пунктом, а не преградой перед первым.
  */
 export function BottomNav({ unread = 0 }: { unread?: number }) {
   const pathname = usePathname();
   const { session } = useSession();
-  if (!session) return null;
 
-  const role = session.active_role;
-  const items: Item[] =
-    role === 'client'
+  const role = session?.active_role;
+  const items: Item[] = !session
+    ? [
+        { href: '/freelancers', label: 'Исполнители', icon: IconCompass },
+        { href: '/projects', label: 'Заказы', icon: IconBriefcase },
+        { href: '/services', label: 'Услуги', icon: IconLayers },
+        { href: '/login', label: 'Войти', icon: IconUser },
+      ]
+    : role === 'client'
       ? [
           { href: '/dashboard', label: 'Заказы', icon: IconBriefcase },
           { href: '/freelancers', label: 'Исполнители', icon: IconCompass },

@@ -8,10 +8,11 @@ export const revalidate = 0;
 
 type Freelancer = { username: string; last_seen_at?: string };
 type Service = { id: string; created_at?: string };
+type Project = { slug: string; published_at?: string };
 
 /**
- * The sitemap lists what is genuinely public: the two catalogues, and the
- * profiles and services inside them.
+ * The sitemap lists what is genuinely public: the three catalogues, and the
+ * profiles, services and open briefs inside them.
  *
  * The entries are read from the API rather than guessed. If the API is not
  * answering, the catalogues are still listed and the individual pages are
@@ -27,11 +28,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: site, lastModified: now, changeFrequency: 'daily', priority: 1 },
     { url: `${site}/freelancers`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
     { url: `${site}/services`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${site}/projects`, lastModified: now, changeFrequency: 'hourly', priority: 0.9 },
   ];
 
-  const [freelancers, services] = await Promise.all([
+  const [freelancers, services, projects] = await Promise.all([
     read<Freelancer[]>(`${api}/api/v1/freelancers?limit=200&sort=newest`),
     read<Service[]>(`${api}/api/v1/services?limit=200&sort=newest`),
+    read<Project[]>(`${api}/api/v1/projects/browse?limit=50&sort=newest`),
   ]);
 
   for (const person of freelancers ?? []) {
@@ -48,6 +51,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: service.created_at ? new Date(service.created_at) : now,
       changeFrequency: 'weekly',
       priority: 0.6,
+    });
+  }
+
+  for (const project of projects ?? []) {
+    entries.push({
+      url: `${site}/projects/${encodeURIComponent(project.slug)}`,
+      lastModified: project.published_at ? new Date(project.published_at) : now,
+      // Заказ закрывается, как только его берут в работу: краулеру не стоит
+      // возвращаться к нему через неделю.
+      changeFrequency: 'daily',
+      priority: 0.5,
     });
   }
 

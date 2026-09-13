@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import styles from '../auth.module.css';
 import { Wordmark } from '@/components/nav/Logo';
 import { Button } from '@/components/ui/Button';
@@ -23,6 +23,10 @@ import type { Session } from '@/lib/session';
  */
 function RegisterForm() {
   const router = useRouter();
+  const params = useSearchParams();
+  // Сюда приходят со страницы, где человек нажал «Откликнуться» или
+  // «Заказать». После выбора роли он вернётся ровно туда.
+  const next = params.get('next');
   const { refresh } = useSession();
 
   const [form, setForm] = useState({ full_name: '', username: '', email: '', password: '' });
@@ -62,8 +66,8 @@ function RegisterForm() {
       if (session.csrf_token) setCsrfToken(session.csrf_token);
       await refresh();
       if (session.active_role === 'developer') router.replace('/onboarding');
-      else if (session.active_role === 'client') router.replace('/dashboard');
-      else router.replace('/welcome');
+      else if (session.active_role === 'client') router.replace(next || '/dashboard');
+      else router.replace(next ? `/welcome?next=${encodeURIComponent(next)}` : '/welcome');
     } catch (error) {
       if (error instanceof ApiFailure) {
         setFields(error.fields);
@@ -85,7 +89,7 @@ function RegisterForm() {
 
       {google ? (
         <>
-          <GoogleButton label="Продолжить с Google" />
+          <GoogleButton label="Продолжить с Google" next={next ?? undefined} />
           <div className={styles.divider}>
             <span>или почтой</span>
           </div>
@@ -158,7 +162,8 @@ function RegisterForm() {
       </Button>
 
       <p className={styles.switch}>
-        Уже есть аккаунт? <Link href="/login">Войти</Link>
+        Уже есть аккаунт?{' '}
+        <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>Войти</Link>
       </p>
     </form>
   );

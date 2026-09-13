@@ -134,3 +134,108 @@ func TestGlobalSearch(t *testing.T) {
 		t.Errorf("budget_display = %v", hit["budget_display"])
 	}
 }
+
+// Площадку можно смотреть без регистрации.
+//
+// Проверяется не «страница открылась», а то, что незнакомец видит то же, что
+// участник: каталог исполнителей, профиль, портфолио, отзывы, услуги и все
+// открытые заказы. Аккаунт спрашивают на действии, а не на входе.
+func TestAVisitorWithoutAnAccountSeesTheMarketplace(t *testing.T) {
+	h := testsupport.New(t)
+	dev := h.PublishDeveloper("otkrytyi", "telegram-developer", "python", "telegram-api")
+	client := h.NewClient("zakazchik")
+	projectID := h.PublishProject(client, "Бот для записи в барбершоп", "telegram-bots",
+		[]string{"python"}, 40000, 90000)
+
+	// Ни одного cookie: это посетитель с улицы.
+	visitor := h.Client()
+
+	catalogue := visitor.GET("/freelancers").OK(t, http.StatusOK)
+	if len(catalogue.List) == 0 {
+		t.Error("каталог исполнителей должен открываться без входа")
+	}
+
+	profile := visitor.GET("/developers/otkrytyi").OK(t, http.StatusOK)
+	if profile.String("username") != "otkrytyi" {
+		t.Errorf("профиль исполнителя не открылся: %s", profile.Raw)
+	}
+	visitor.GET("/developers/otkrytyi/portfolio").OK(t, http.StatusOK)
+	visitor.GET("/developers/otkrytyi/reviews").OK(t, http.StatusOK)
+	visitor.GET("/developers/otkrytyi/services").OK(t, http.StatusOK)
+	visitor.GET("/taxonomy/specialisations").OK(t, http.StatusOK)
+	visitor.GET("/taxonomy/categories").OK(t, http.StatusOK)
+
+	// Все опубликованные заказы — публичный каталог и публичная страница.
+	open := visitor.GET("/projects/browse").OK(t, http.StatusOK)
+	if len(open.List) != 1 {
+		t.Fatalf("открытых заказов видно %d, ждали один: %s", len(open.List), open.Raw)
+	}
+	first, _ := open.List[0].(map[string]any)
+	if first["title"] != "Бот для записи в барбершоп" {
+		t.Errorf("в каталоге не тот заказ: %v", first)
+	}
+	if first["budget_display"] == "" {
+		t.Error("в карточке заказа должен быть бюджет")
+	}
+
+	slug, _ := first["slug"].(string)
+	page := visitor.GET("/projects/"+slug).OK(t, http.StatusOK)
+	if page.String("title") == "" {
+		t.Errorf("страница заказа не открылась: %s", page.Raw)
+	}
+
+	// Фильтры каталога работают и без входа.
+	byCategory := visitor.GET("/projects/browse?category=telegram-bots").OK(t, http.StatusOK)
+	if len(byCategory.List) != 1 {
+		t.Errorf("фильтр по направлению вернул %d", len(byCategory.List))
+	}
+	if empty := visitor.GET("/projects/browse?category=web-development").OK(t, http.StatusOK); len(empty.List) != 0 {
+		t.Errorf("чужое направление вернуло %d заказов", len(empty.List))
+	}
+	if bySkill := visitor.GET("/projects/browse?skills=python").OK(t, http.StatusOK); len(bySkill.List) != 1 {
+		t.Errorf("фильтр по навыку вернул %d", len(bySkill.List))
+	}
+	if byText := visitor.GET("/projects/browse?q=барбершоп").OK(t, http.StatusOK); len(byText.List) != 1 {
+		t.Errorf("поиск по словам вернул %d", len(byText.List))
+	}
+
+	// А вот действие требует аккаунта — и отказ приходит от сервера, а не от
+	// спрятанной кнопки.
+	visitor.POST("/proposals", map[string]any{"project_id": projectID}).
+		Fails(t, http.StatusUnauthorized, "unauthenticated")
+	visitor.POST("/projects", map[string]any{"title": "Что-нибудь"}).
+		Fails(t, http.StatusUnauthorized, "unauthenticated")
+	// Переписка начинается с отклика или заказа услуги, и оба закрыты для
+	// гостя; сам список бесед — тоже.
+	visitor.GET("/conversations").Fails(t, http.StatusUnauthorized, "unauthenticated")
+	_ = dev
+}
+
+// Черновики и снятые заказы в публичный каталог не попадают.
+func TestTheOpenCatalogueShowsOnlyOpenWork(t *testing.T) {
+	h := testsupport.New(t)
+	client := h.NewClient("hiding")
+
+	draft := client.Client.POST("/projects", map[string]any{
+		"title":            "Черновик, который никто не должен видеть",
+		"description":      "Пока думаю, что именно мне нужно, и не публикую это никому.",
+		"category_slug":    "telegram-bots",
+		"required_skills":  []string{"python"},
+		"budget_type":      "range",
+		"budget_min_minor": 10000, "budget_max_minor": 20000,
+		"currency": "USD", "duration_days": 7,
+	}).OK(t, http.StatusCreated)
+
+	published := h.PublishProject(client, "Открытый заказ", "telegram-bots",
+		[]string{"python"}, 30000, 50000)
+
+	visitor := h.Client()
+	open := visitor.GET("/projects/browse").OK(t, http.StatusOK)
+	if len(open.List) != 1 {
+		t.Fatalf("в каталоге %d заказов, ждали только опубликованный: %s", len(open.List), open.Raw)
+	}
+	if first, _ := open.List[0].(map[string]any); first["id"] != published {
+		t.Errorf("в каталоге не тот заказ: %v", first)
+	}
+	_ = draft
+}

@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import styles from './profile.module.css';
 import { TopBar } from '@/components/nav/TopBar';
+import { BottomNav } from '@/components/nav/BottomNav';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
@@ -93,6 +94,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             description="Возможно, адрес указан неверно или исполнитель скрыл свой профиль."
           />
         </div>
+        <BottomNav />
       </>
     );
   }
@@ -106,6 +108,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           <Skeleton height={60} />
           <Skeleton height={140} />
         </div>
+        <BottomNav />
       </>
     );
   }
@@ -206,7 +209,23 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 Пожаловаться
               </Button>
             </div>
-          ) : null}
+          ) : (
+            /* Гостю профиль виден целиком. Вход просят на действии — когда он
+               решил заказать, а не когда открыл страницу. Кнопка возвращает
+               его сюда же: заказывают услугу с этой страницы. */
+            <div className={styles.actions}>
+              <ButtonLink href={`/login?next=${encodeURIComponent(`/developers/${profile.username}`)}`} block>
+                Войти и заказать
+              </ButtonLink>
+              <ButtonLink
+                href={`/register?next=${encodeURIComponent(`/developers/${profile.username}`)}`}
+                variant="secondary"
+                block
+              >
+                Создать аккаунт
+              </ButtonLink>
+            </div>
+          )}
         </Card>
 
         <Tabs items={TABS} active={tab} onChange={setTab} ariaLabel="Разделы профиля" />
@@ -386,6 +405,12 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           <p className="av-xs av-faint">
             Хотите заказать работу у этого исполнителя? <Link href="/projects/new">Разместите заказ</Link> — он увидит его первым, если подходит по навыкам, или закажите готовую услугу.
           </p>
+        ) : !isOwner ? (
+          <p className="av-xs av-faint">
+            Профиль, портфолио и отзывы открыты всем. Аккаунт нужен, только чтобы заказать
+            услугу или разместить заказ — переписка начинается со сделки, а не с холодного
+            сообщения.
+          </p>
         ) : null}
       </div>
 
@@ -399,6 +424,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         title={profile.full_name}
         onClose={() => setReporting(false)}
       />
+      <BottomNav />
     </>
   );
 }

@@ -65,3 +65,67 @@
 .shell {
   padding-bottom: calc(var(--av-bottom-nav-h) + var(--av-space-6));
 }
+
+/* ── Карточка заказа в публичном каталоге ─────────────────────────────── */
+
+.cardLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.cardLink:focus-visible {
+  outline: 2px solid var(--av-focus);
+  outline-offset: 2px;
+  border-radius: var(--av-radius-xl);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--av-space-3);
+  margin-bottom: var(--av-space-2);
+}
+
+.cardBudget {
+  font-weight: var(--av-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cardTitle {
+  margin: 0 0 var(--av-space-2);
+  font-size: var(--av-text-lg);
+  font-weight: var(--av-weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+.cardExcerpt {
+  margin: 0 0 var(--av-space-3);
+  color: var(--av-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.cardTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--av-space-2);
+  margin-bottom: var(--av-space-3);
+}
+
+.cardMeta {
+  margin: 0;
+  font-size: var(--av-text-sm);
+  color: var(--av-text-tertiary);
+}
+
+.invite {
+  margin-top: var(--av-space-6);
+  font-size: var(--av-text-sm);
+  color: var(--av-text-secondary);
+}

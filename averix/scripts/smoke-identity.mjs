@@ -15,6 +15,11 @@ import { PNG } from './lib/png.mjs';
 
 const BASE = process.env.AVERIX_SMOKE_URL ?? 'http://localhost:3100';
 const PSQL = process.env.AVERIX_SMOKE_PSQL ?? '-d "postgres://postgres@/averix_smoke?host=/var/run/postgresql&sslmode=disable"';
+// Создание администратора — единственное действие, которого нет в интерфейсе
+// ни у кого: первый администратор заводится командой. Путь к собранному
+// averixctl можно переопределить, окружение (DATABASE_URL и остальное) он
+// берёт из окружения запуска.
+const CTL = process.env.AVERIX_SMOKE_CTL ?? '/tmp/averix-smoke-ctl';
 const fail = [];
 
 function step(name, ok, detail = '') {
@@ -147,7 +152,7 @@ step('публичный профиль молчит о документах', !
 
 const reviewerPage = await open();
 await register(reviewerPage, reviewer, 'client');
-execSync(`/tmp/averix-smoke-ctl create-admin --email ${reviewer.email}`, { stdio: 'ignore', env: process.env });
+execSync(`${CTL} create-admin --email ${reviewer.email}`, { stdio: 'ignore', env: process.env });
 await login(reviewerPage, reviewer);
 
 await reviewerPage.goto(`${BASE}/admin/users/${personID}`, { waitUntil: 'networkidle' });
@@ -215,7 +220,7 @@ step('причина записана в журнал доступа', logged ==
 const url = await reviewerPage.locator('img[alt="Лицевая сторона"], img[alt="Селфи"]').first().getAttribute('src');
 const otherPage = await open();
 await register(otherPage, other, 'client');
-execSync(`/tmp/averix-smoke-ctl create-admin --email ${other.email}`, { stdio: 'ignore', env: process.env });
+execSync(`${CTL} create-admin --email ${other.email}`, { stdio: 'ignore', env: process.env });
 await login(otherPage, other);
 const stolen = await otherPage.request.get(`${BASE}${url}`);
 step('украденная ссылка не работает у другого администратора', stolen.status() === 403, `статус ${stolen.status()}`);
