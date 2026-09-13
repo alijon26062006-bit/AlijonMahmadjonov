@@ -146,8 +146,16 @@ func (h *Handlers) login(w http.ResponseWriter, r *http.Request) error {
 	return httpx.JSON(w, http.StatusOK, toSessionResponse(result.Identity, false))
 }
 
+// session answers "who am I". The route is public so that a page can ask
+// before it knows, and the answer for a visitor without a session is 401 —
+// not 200 carrying an identity of zero values. Answering 200 tells a client
+// it is signed in as a user with no id, which is how a signed-out visitor
+// ends up looking at a signed-in screen where every request fails.
 func (h *Handlers) session(w http.ResponseWriter, r *http.Request) error {
 	id := security.FromContext(r.Context())
+	if !id.Authenticated() {
+		return httpx.ErrUnauthenticated
+	}
 	return httpx.JSON(w, http.StatusOK, toSessionResponse(id, false))
 }
 

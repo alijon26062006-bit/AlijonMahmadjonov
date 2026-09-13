@@ -27,6 +27,10 @@ func RequestID() Middleware {
 				id = newID()
 			}
 			ctx := logx.WithRequestID(r.Context(), id)
+			// Tag the logger here, once. Every later layer takes the logger
+			// from the context and adds only what it knows itself, so a field
+			// is never written twice into the same line.
+			ctx = logx.WithLogger(ctx, logx.From(ctx))
 			w.Header().Set("X-Request-Id", id)
 			return next(w, r.WithContext(ctx))
 		}
@@ -61,8 +65,9 @@ func Logger() Middleware {
 	return func(next Handler) Handler {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			start := time.Now()
+			// The request id is already on the context logger; adding it
+			// again would print it twice.
 			log := logx.From(r.Context()).With(
-				"request_id", logx.RequestID(r.Context()),
 				"method", r.Method,
 				"path", r.URL.Path,
 			)

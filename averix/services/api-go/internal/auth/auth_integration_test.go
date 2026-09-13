@@ -142,7 +142,16 @@ func TestLoginAndSession(t *testing.T) {
 	h.Client().RegisterClient("buyer")
 
 	c := h.Client()
-	if c.Session().Bool("authenticated") {
+	// 401, not 200 with an empty identity. A client that gets 200 concludes it
+	// is signed in and shows the signed-in screens to a visitor who is not,
+	// where every request behind them fails. Asserting only on the body missed
+	// exactly that: an "authenticated" field absent from an error body reads
+	// as false too.
+	anonymous := c.Session()
+	if anonymous.Status != http.StatusUnauthorized {
+		t.Errorf("anonymous session status = %d, want %d", anonymous.Status, http.StatusUnauthorized)
+	}
+	if anonymous.Bool("authenticated") {
 		t.Error("a fresh client must start anonymous")
 	}
 
@@ -648,7 +657,10 @@ func TestErrorResponsesCarryARequestIDAndNoInternals(t *testing.T) {
 
 func TestSecurityHeadersArePresent(t *testing.T) {
 	h := testsupport.New(t)
-	res := h.Client().Session().OK(t, http.StatusOK)
+	// Deliberately an error response: headers written by a middleware are easy
+	// to lose on the path that returns early, and that is the path an attacker
+	// reaches without credentials.
+	res := h.Client().Session().OK(t, http.StatusUnauthorized)
 
 	want := map[string]string{
 		"X-Content-Type-Options": "nosniff",

@@ -61,11 +61,10 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	ctx := r.Context()
 	log := logx.From(ctx)
 
+	// The method and path are already on the request-scoped logger.
 	fields := []any{
 		"code", apiErr.Code,
 		"status", apiErr.Status,
-		"method", r.Method,
-		"path", r.URL.Path,
 	}
 	if cause := errors.Unwrap(apiErr); cause != nil {
 		fields = append(fields, "cause", cause.Error())

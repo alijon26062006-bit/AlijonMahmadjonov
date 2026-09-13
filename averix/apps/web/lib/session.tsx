@@ -48,8 +48,16 @@ export function SessionProvider({
   const refresh = useCallback(async () => {
     try {
       const next = await get<Session>('/auth/session');
-      setSession(next);
-      if (next.csrf_token) setCsrfToken(next.csrf_token);
+      // A session without a user is not a session. Trusting the status code
+      // alone is how a signed-out visitor ends up inside the signed-in shell,
+      // watching every request fail with 401.
+      if (next?.user_id) {
+        setSession(next);
+        if (next.csrf_token) setCsrfToken(next.csrf_token);
+      } else {
+        setSession(null);
+        setCsrfToken(null);
+      }
     } catch (error) {
       // Not being signed in is a state, not a failure.
       if (error instanceof ApiFailure && error.isUnauthenticated) {
