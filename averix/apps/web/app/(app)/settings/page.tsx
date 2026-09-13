@@ -29,15 +29,29 @@ const TABS = [
   { key: 'integrations', label: 'Интеграции' },
 ];
 
-export default function SettingsPage() {
+export default function SettingsPage({ initialTab }: { initialTab?: string } = {}) {
   const router = useRouter();
   const { session, refresh, signOut, switchRole } = useSession();
-  const [tab, setTab] = useState('account');
+  const [tab, setTab] = useState(initialTab ?? 'account');
   const [account, setAccount] = useState<AccountSettings | null>(null);
+  const [githubNotice, setGithubNotice] = useState('');
 
+  // Ссылки из уведомлений и возврат из GitHub приходят сюда с якорем или
+  // параметром: открываем сразу нужную вкладку, а не «Аккаунт» по умолчанию.
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash === '#notifications') setTab('notifications');
-    if (typeof window !== 'undefined' && window.location.hash === '#roles') setTab('account');
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash;
+    if (hash === '#notifications') setTab('notifications');
+    if (hash === '#integrations') setTab('integrations');
+    const github = new URLSearchParams(window.location.search).get('github');
+    if (github) {
+      setTab('integrations');
+      setGithubNotice(
+        github === 'cancelled'
+          ? 'Подключение GitHub отменено — ничего не изменилось.'
+          : 'GitHub не удалось подключить. Попробуйте ещё раз или обратитесь в поддержку.',
+      );
+    }
   }, []);
 
   const load = useCallback(() => {
@@ -86,7 +100,7 @@ export default function SettingsPage() {
         ) : tab === 'notifications' ? (
           <NotificationsCard />
         ) : (
-          <IntegrationsCard isDeveloper={session?.roles.includes('developer') ?? false} />
+          <IntegrationsCard isDeveloper={session?.roles.includes('developer') ?? false} notice={githubNotice} />
         )}
       </div>
     </>
@@ -607,7 +621,7 @@ function NotificationsCard() {
   );
 }
 
-function IntegrationsCard({ isDeveloper }: { isDeveloper: boolean }) {
+function IntegrationsCard({ isDeveloper, notice }: { isDeveloper: boolean; notice?: string }) {
   const [status, setStatus] = useState<GitHubStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -634,6 +648,7 @@ function IntegrationsCard({ isDeveloper }: { isDeveloper: boolean }) {
     <Card>
       <h2 className={styles.sectionTitle}>GitHub</h2>
       <div className="av-stack-sm">
+        {notice ? <p className={styles.notice}>{notice}</p> : null}
         {error ? <p className={styles.alert}>{error}</p> : null}
         {!status ? (
           <Skeleton height={80} />

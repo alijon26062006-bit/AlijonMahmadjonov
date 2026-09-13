@@ -233,9 +233,9 @@ func TestProjectValueVisibilityLadder(t *testing.T) {
 		wantDisplay string
 		wantFigure  bool
 	}{
-		{"public", "$1,200", false},
-		{"range", "$1,000–$2,500", false},
-		{"private", "Private contract", false},
+		{"public", "$1 200", false},
+		{"range", "$1 000 – 1 500", false},
+		{"private", "Закрытая сделка", false},
 		{"hidden", "", false},
 	}
 	for _, tc := range cases {

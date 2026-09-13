@@ -153,7 +153,7 @@ func (s *Service) Accept(ctx context.Context, id *security.Identity, in AcceptRe
 	proposalID, err := uuid.Parse(strings.TrimSpace(in.ProposalID))
 	if err != nil {
 		return nil, httpx.Validation(map[string]string{
-			"proposal_id": "That proposal reference isn't valid.",
+			"proposal_id": "Ссылка на отклик указана неверно.",
 		})
 	}
 
@@ -170,13 +170,13 @@ func (s *Service) Accept(ctx context.Context, id *security.Identity, in AcceptRe
 	if !isLive(facts.Status) {
 		e := *httpx.ErrConflict
 		e.Code = "proposal_not_open"
-		e.Message = "This proposal is no longer open. Ask the developer to send a new one."
+		e.Message = "Отклик больше не активен. Попросите исполнителя прислать новый."
 		return nil, &e
 	}
 	if facts.ProjectStatus != "open" {
 		e := *httpx.ErrConflict
 		e.Code = "project_not_open"
-		e.Message = "This project isn't open for hiring. Reopen it first."
+		e.Message = "Заказ закрыт для найма. Сначала откройте его снова."
 		return nil, &e
 	}
 
@@ -185,7 +185,7 @@ func (s *Service) Accept(ctx context.Context, id *security.Identity, in AcceptRe
 		visibility = "range"
 	}
 	v := validate.New()
-	visibility = v.OneOf("price_visibility", "The price visibility", visibility,
+	visibility = v.OneOf("price_visibility", "Видимость цены", visibility,
 		"public", "range", "hidden", "private")
 	if v.Any() {
 		return nil, httpx.Validation(v.Fields())
@@ -381,7 +381,7 @@ func (s *Service) Mine(ctx context.Context, id *security.Identity, status string
 		return nil, httpx.ErrUnauthenticated
 	}
 	if status != "" && !knownContractStatus(status) {
-		return nil, httpx.Validation(map[string]string{"status": "That status isn't one we use."})
+		return nil, httpx.Validation(map[string]string{"status": "Такого статуса мы не используем."})
 	}
 	cards, err := s.store.ForUser(ctx, id.UserID, status, 30)
 	if err != nil {
@@ -604,7 +604,7 @@ func (s *Service) Submit(ctx context.Context, id *security.Identity, milestoneID
 
 	if strings.TrimSpace(in.Note) == "" && len(in.Deliverables) == 0 {
 		return nil, httpx.Validation(map[string]string{
-			"note": "Say what you're handing over, or attach the work itself.",
+			"note": "Опишите, что сдаёте, или приложите саму работу.",
 		})
 	}
 	return s.move(ctx, id, milestoneID, MilestoneSubmitted, in)
@@ -616,7 +616,7 @@ func (s *Service) RequestRevision(ctx context.Context, id *security.Identity,
 
 	if len(strings.TrimSpace(in.Note)) < 20 {
 		return nil, httpx.Validation(map[string]string{
-			"note": "Explain what needs changing — at least a sentence. A revision without a reason wastes everyone's time.",
+			"note": "Объясните, что нужно исправить, — хотя бы одним предложением. Доработка без причины тратит время обоих.",
 		})
 	}
 	return s.move(ctx, id, milestoneID, MilestoneRevision, in)
@@ -637,7 +637,7 @@ func (s *Service) Dispute(ctx context.Context, id *security.Identity, milestoneI
 
 	if len(strings.TrimSpace(in.Note)) < 30 {
 		return nil, httpx.Validation(map[string]string{
-			"note": "Describe the problem in a few sentences so we can look into it properly.",
+			"note": "Опишите проблему в нескольких предложениях — иначе разобраться не получится.",
 		})
 	}
 	return s.move(ctx, id, milestoneID, MilestoneDisputed, in)
@@ -686,7 +686,7 @@ func (s *Service) move(ctx context.Context, id *security.Identity, milestoneID u
 		e := *httpx.ErrConflict
 		e.Code = "revision_limit_reached"
 		e.Message = fmt.Sprintf(
-			"You've used the %d revisions agreed for this milestone. If the work still isn't right, open a dispute and we'll look at it.",
+			"Вы использовали все %d доработок, оговорённых по этапу. Если работа всё ещё не та — откройте спор, и мы разберёмся.",
 			milestone.RevisionLimit)
 		return nil, &e
 	}
@@ -712,7 +712,7 @@ func (s *Service) move(ctx context.Context, id *security.Identity, milestoneID u
 	if errors.Is(err, ErrRaced) {
 		e := *httpx.ErrConflict
 		e.Code = "milestone_changed"
-		e.Message = "This milestone was just updated by the other party. Please refresh and try again."
+		e.Message = "Вторая сторона только что изменила этап. Обновите страницу и повторите."
 		return nil, &e
 	}
 	if err != nil {
@@ -869,7 +869,7 @@ func (s *Service) entitled(ctx context.Context, role, to string, milestoneID uui
 		// as an endpoint would let a client mark money paid that never moved.
 		e := *httpx.ErrForbidden
 		e.Code = "not_your_move"
-		e.Message = "This step happens automatically once the payment settles."
+		e.Message = "Этот шаг произойдёт сам, когда платёж пройдёт."
 		return &e
 	}
 	s.audit.Denial(ctx, "milestone", &milestoneID,
@@ -1068,14 +1068,14 @@ func (s *Service) AddDeliverable(ctx context.Context, id *security.Identity,
 	}
 	if !membership.CanUpload[id.UserID] && role != roleAdmin {
 		e := *httpx.ErrForbidden
-		e.Message = "You don't have upload access on this contract."
+		e.Message = "У вас нет прав загружать файлы по этой сделке."
 		return nil, &e
 	}
 	if milestoneID != nil {
 		milestone, err := s.store.MilestoneByID(ctx, *milestoneID)
 		if err != nil || milestone.ContractID != contractID {
 			return nil, httpx.Validation(map[string]string{
-				"milestone_id": "That milestone isn't part of this contract.",
+				"milestone_id": "Этот этап не относится к данной сделке.",
 			})
 		}
 	}
@@ -1087,14 +1087,14 @@ func (s *Service) addDeliverable(ctx context.Context, id *security.Identity,
 	in DeliverableRequest) (*Deliverable, error) {
 
 	v := validate.New()
-	kind := v.OneOf("kind", "The deliverable type", defaultKind(in.Kind),
+	kind := v.OneOf("kind", "Тип результата", defaultKind(in.Kind),
 		DeliverableFile, DeliverableLink, DeliverableRepository, DeliverableNote)
 	title := strings.TrimSpace(in.Title)
-	v.Required("title", "A title", title)
-	v.Length("title", "The title", title, 2, 160)
-	v.NoControlChars("title", "The title", title)
+	v.Required("title", "Название", title)
+	v.Length("title", "Название", title, 2, 160)
+	v.NoControlChars("title", "Название", title)
 	if detail := strings.TrimSpace(in.Detail); detail != "" {
-		v.Length("detail", "The description", detail, 0, 4000)
+		v.Length("detail", "Описание", detail, 0, 4000)
 	}
 
 	var fileID *uuid.UUID
@@ -1103,18 +1103,18 @@ func (s *Service) addDeliverable(ctx context.Context, id *security.Identity,
 	case DeliverableFile:
 		parsed, err := uuid.Parse(strings.TrimSpace(in.FileID))
 		if err != nil {
-			v.Add("file_id", "Upload the file first, then attach it.")
+			v.Add("file_id", "Сначала загрузите файл, потом приложите его.")
 			break
 		}
 		// Ownership is the gate: the uploader must be the caller. This is what
 		// stops someone attaching a file id they guessed.
 		file, err := s.files.OwnedByID(ctx, parsed, id.UserID)
 		if err != nil {
-			v.Add("file_id", "We couldn't find that upload. Please upload the file again.")
+			v.Add("file_id", "Файл не найден. Загрузите его заново.")
 			break
 		}
 		if file.Purpose != files.PurposeDeliverable {
-			v.Add("file_id", "That upload wasn't made for a deliverable.")
+			v.Add("file_id", "Этот файл загружался не как результат работы.")
 			break
 		}
 		fileID = &parsed
@@ -1195,19 +1195,19 @@ func (s *Service) AddObserver(ctx context.Context, id *security.Identity,
 	}
 	if role != RoleClient && role != RoleDeveloper {
 		e := *httpx.ErrForbidden
-		e.Message = "Only the client or the developer can add someone to this workspace."
+		e.Message = "Добавить человека в рабочее пространство могут только заказчик и исполнитель."
 		return nil, &e
 	}
 
 	userID, err := s.store.userIDByUsername(ctx, in.Username)
 	if err != nil {
 		return nil, httpx.Validation(map[string]string{
-			"username": "We couldn't find that account.",
+			"username": "Такого аккаунта мы не нашли.",
 		})
 	}
 	if userID == membership.ClientID || userID == membership.DeveloperID {
 		return nil, httpx.Validation(map[string]string{
-			"username": "That person is already a party to this contract.",
+			"username": "Этот человек уже участвует в сделке.",
 		})
 	}
 
@@ -1241,7 +1241,7 @@ func (s *Service) RemoveObserver(ctx context.Context, id *security.Identity,
 	}
 	if role != RoleClient && role != RoleDeveloper {
 		e := *httpx.ErrForbidden
-		e.Message = "Only the client or the developer can change who is on this workspace."
+		e.Message = "Менять состав рабочего пространства могут только заказчик и исполнитель."
 		return &e
 	}
 	if err := s.store.RemoveParticipant(ctx, contractID, userID); err != nil {
@@ -1277,12 +1277,12 @@ func (s *Service) Cancel(ctx context.Context, id *security.Identity, contractID 
 	if role != RoleClient {
 		e := *httpx.ErrForbidden
 		e.Code = "not_your_move"
-		e.Message = "Only the client can cancel a contract. If something has gone wrong, open a dispute."
+		e.Message = "Отменить сделку может только заказчик. Если что-то пошло не так — откройте спор."
 		return nil, &e
 	}
 	if len(strings.TrimSpace(in.Reason)) < 20 {
 		return nil, httpx.Validation(map[string]string{
-			"reason": "Please say why you're cancelling — the developer is owed an explanation.",
+			"reason": "Скажите, почему отменяете: исполнитель вправе знать причину.",
 		})
 	}
 
@@ -1295,7 +1295,7 @@ func (s *Service) Cancel(ctx context.Context, id *security.Identity, contractID 
 		case MilestoneApproved, MilestoneReleased, MilestoneSubmitted:
 			e := *httpx.ErrConflict
 			e.Code = "work_delivered"
-			e.Message = "Work has already been delivered on this contract, so it can't simply be cancelled. Open a dispute and we'll help resolve it."
+			e.Message = "По сделке уже сдана работа — просто отменить её нельзя. Откройте спор, и мы поможем разобраться."
 			return nil, &e
 		}
 	}

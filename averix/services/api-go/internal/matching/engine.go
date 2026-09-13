@@ -23,6 +23,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/averix/api/internal/platform/money"
 )
 
 // Weights is one versioned weight set. They sum to 1.
@@ -281,13 +283,13 @@ func (e *Engine) specialisationRelevance(p ProjectFacts, d DeveloperFacts) (floa
 // know the stack cannot do the work, however good their history.
 func (e *Engine) technical(p ProjectFacts, d DeveloperFacts) Dimension {
 	dim := Dimension{
-		Key: "technical", Label: "Technical requirements", Weight: e.weights.Technical,
+		Key: "technical", Label: "Совпадение по навыкам", Weight: e.weights.Technical,
 	}
 
 	if len(p.RequiredSkills) == 0 && len(p.OptionalSkills) == 0 {
 		// Nothing specified: neutral rather than a free full mark.
 		dim.Raw = 0.6
-		dim.Reasons = []Reason{{Label: "No specific technologies requested", Met: true}}
+		dim.Reasons = []Reason{{Label: "Конкретные навыки не указаны", Met: true}}
 		return dim
 	}
 
@@ -312,7 +314,7 @@ func (e *Engine) technical(p ProjectFacts, d DeveloperFacts) Dimension {
 			// Declared and backed by a manifest or a completed contract.
 			requiredHit += 1.0
 			dim.Reasons = append(dim.Reasons, Reason{
-				Label: skillLabel(slug), Met: true, Detail: "verified", Weight: 1.0,
+				Label: skillLabel(slug), Met: true, Detail: "подтверждено", Weight: 1.0,
 			})
 		case declared:
 			requiredHit += levelCredit(fact.Level)
@@ -324,7 +326,7 @@ func (e *Engine) technical(p ProjectFacts, d DeveloperFacts) Dimension {
 			// developer has not claimed it, so it counts for less.
 			requiredHit += 0.6
 			dim.Reasons = append(dim.Reasons, Reason{
-				Label: skillLabel(slug), Met: true, Detail: "found in GitHub", Weight: 0.6,
+				Label: skillLabel(slug), Met: true, Detail: "найдено в GitHub", Weight: 0.6,
 			})
 		default:
 			dim.Reasons = append(dim.Reasons, Reason{Label: skillLabel(slug), Met: false})
@@ -337,7 +339,7 @@ func (e *Engine) technical(p ProjectFacts, d DeveloperFacts) Dimension {
 		if fact, ok := d.Skills[slug]; ok {
 			optionalHit += levelCredit(fact.Level)
 			dim.Reasons = append(dim.Reasons, Reason{
-				Label: skillLabel(slug), Met: true, Detail: "nice to have", Weight: 0.3,
+				Label: skillLabel(slug), Met: true, Detail: "желательно", Weight: 0.3,
 			})
 		}
 	}
@@ -374,11 +376,11 @@ func levelCredit(level string) float64 {
 // matters: work from four years ago says less than work from last quarter.
 func (e *Engine) trackRecord(p ProjectFacts, d DeveloperFacts) Dimension {
 	dim := Dimension{
-		Key: "track_record", Label: "Relevant completed projects", Weight: e.weights.TrackRecord,
+		Key: "track_record", Label: "Подходящие завершённые заказы", Weight: e.weights.TrackRecord,
 	}
 
 	if len(d.CompletedProjects) == 0 {
-		dim.Reasons = []Reason{{Label: "No completed AVERIX projects yet", Met: false}}
+		dim.Reasons = []Reason{{Label: "Завершённых заказов на AVERIX пока нет", Met: false}}
 		return dim
 	}
 
@@ -438,9 +440,9 @@ func (e *Engine) trackRecord(p ProjectFacts, d DeveloperFacts) Dimension {
 
 	if relevant == 0 {
 		dim.Reasons = []Reason{{
-			Label:  "No completed projects in this area",
+			Label:  "Завершённых работ в этой области нет",
 			Met:    false,
-			Detail: fmt.Sprintf("%d completed elsewhere", len(d.CompletedProjects)),
+			Detail: fmt.Sprintf("%d в других областях", len(d.CompletedProjects)),
 		}}
 		return dim
 	}
@@ -450,15 +452,12 @@ func (e *Engine) trackRecord(p ProjectFacts, d DeveloperFacts) Dimension {
 	// and thirty matters far less to a client than the difference between zero
 	// and three.
 	dim.Raw = clamp01(credit / 3.0)
-	detail := fmt.Sprintf("%d similar project", relevant)
-	if relevant != 1 {
-		detail += "s"
-	}
+	detail := fmt.Sprintf("%d похожих %s", relevant, plural(relevant, "заказ", "заказа", "заказов"))
 	if sameCategory > 0 {
-		detail += fmt.Sprintf(", %d in this exact category", sameCategory)
+		detail += fmt.Sprintf(", из них %d в этой же категории", sameCategory)
 	}
 	dim.Reasons = append(dim.Reasons, Reason{
-		Label: "Relevant completed work", Met: true, Detail: detail, Weight: dim.Raw,
+		Label: "Подходящие завершённые работы", Met: true, Detail: detail, Weight: dim.Raw,
 	})
 	return dim
 }
@@ -469,15 +468,15 @@ func (e *Engine) trackRecord(p ProjectFacts, d DeveloperFacts) Dimension {
 // capped accordingly, because 90% Go in a repository of tutorials says less
 // than one dependency in a shipped service.
 func (e *Engine) github(p ProjectFacts, d DeveloperFacts) Dimension {
-	dim := Dimension{Key: "github", Label: "GitHub relevance", Weight: e.weights.GitHub}
+	dim := Dimension{Key: "github", Label: "Подтверждение из GitHub", Weight: e.weights.GitHub}
 
 	if !d.GitHubConnected {
-		dim.Reasons = []Reason{{Label: "GitHub not connected", Met: false}}
+		dim.Reasons = []Reason{{Label: "GitHub не подключён", Met: false}}
 		return dim
 	}
 	if len(p.RequiredSkills) == 0 {
 		dim.Raw = 0.5
-		dim.Reasons = []Reason{{Label: "GitHub connected", Met: true}}
+		dim.Reasons = []Reason{{Label: "GitHub подключён", Met: true}}
 		return dim
 	}
 
@@ -486,7 +485,7 @@ func (e *Engine) github(p ProjectFacts, d DeveloperFacts) Dimension {
 		if confidence, ok := d.GitHubTechnologies[slug]; ok {
 			manifestHits += clamp01(confidence)
 			dim.Reasons = append(dim.Reasons, Reason{
-				Label: skillLabel(slug), Met: true, Detail: "in their repositories", Weight: 0.8,
+				Label: skillLabel(slug), Met: true, Detail: "в его репозиториях", Weight: 0.8,
 			})
 			continue
 		}
@@ -497,7 +496,7 @@ func (e *Engine) github(p ProjectFacts, d DeveloperFacts) Dimension {
 			dim.Reasons = append(dim.Reasons, Reason{
 				Label:  skillLabel(slug),
 				Met:    true,
-				Detail: fmt.Sprintf("%.0f%% of their public code", share*100),
+				Detail: fmt.Sprintf("%.0f%% его публичного кода", share*100),
 				Weight: 0.4,
 			})
 		}
@@ -509,8 +508,8 @@ func (e *Engine) github(p ProjectFacts, d DeveloperFacts) Dimension {
 	if dim.Raw < 0.25 {
 		dim.Raw = 0.25
 		if len(dim.Reasons) == 0 {
-			dim.Reasons = []Reason{{Label: "GitHub connected", Met: true,
-				Detail: "no matching technologies found", Weight: 0.25}}
+			dim.Reasons = []Reason{{Label: "GitHub подключён", Met: true,
+				Detail: "совпадающих навыков нет", Weight: 0.25}}
 		}
 	}
 	return dim
@@ -518,21 +517,21 @@ func (e *Engine) github(p ProjectFacts, d DeveloperFacts) Dimension {
 
 // availability judges whether the developer can actually start.
 func (e *Engine) availability(p ProjectFacts, d DeveloperFacts) Dimension {
-	dim := Dimension{Key: "availability", Label: "Availability", Weight: e.weights.Availability}
+	dim := Dimension{Key: "availability", Label: "Доступность", Weight: e.weights.Availability}
 
 	switch d.Availability {
 	case "available":
 		dim.Raw = 1.0
-		dim.Reasons = append(dim.Reasons, Reason{Label: "Available for work", Met: true, Weight: 1.0})
+		dim.Reasons = append(dim.Reasons, Reason{Label: "Свободен для заказов", Met: true, Weight: 1.0})
 	case "limited":
 		dim.Raw = 0.65
-		dim.Reasons = append(dim.Reasons, Reason{Label: "Limited availability", Met: true, Weight: 0.65})
+		dim.Reasons = append(dim.Reasons, Reason{Label: "Ограниченная занятость", Met: true, Weight: 0.65})
 	case "booked":
 		dim.Raw = 0.25
-		dim.Reasons = append(dim.Reasons, Reason{Label: "Currently booked", Met: false})
+		dim.Reasons = append(dim.Reasons, Reason{Label: "Сейчас занят", Met: false})
 	default:
 		dim.Raw = 0.0
-		dim.Reasons = append(dim.Reasons, Reason{Label: "Not taking work", Met: false})
+		dim.Reasons = append(dim.Reasons, Reason{Label: "Не берёт заказы", Met: false})
 		return dim
 	}
 
@@ -545,9 +544,9 @@ func (e *Engine) availability(p ProjectFacts, d DeveloperFacts) Dimension {
 	if d.AvailableFrom != nil && d.AvailableFrom.After(e.now().AddDate(0, 0, 30)) {
 		dim.Raw *= 0.5
 		dim.Reasons = append(dim.Reasons, Reason{
-			Label:  "Not free for over a month",
+			Label:  "Освободится не раньше чем через месяц",
 			Met:    false,
-			Detail: d.AvailableFrom.Format("2 January 2006"),
+			Detail: formatDate(*d.AvailableFrom),
 		})
 	}
 
@@ -558,18 +557,18 @@ func (e *Engine) availability(p ProjectFacts, d DeveloperFacts) Dimension {
 		switch {
 		case overlap >= 4:
 			dim.Reasons = append(dim.Reasons, Reason{
-				Label: "Working hours overlap", Met: true,
-				Detail: fmt.Sprintf("%d hours", overlap), Weight: 0.5,
+				Label: "Пересечение рабочих часов", Met: true,
+				Detail: fmt.Sprintf("%d %s", overlap, plural(overlap, "час", "часа", "часов")), Weight: 0.5,
 			})
 		case overlap > 0:
 			dim.Raw *= 0.9
 			dim.Reasons = append(dim.Reasons, Reason{
-				Label: "Limited hours overlap", Met: true,
-				Detail: fmt.Sprintf("%d hours", overlap),
+				Label: "Рабочие часы пересекаются мало", Met: true,
+				Detail: fmt.Sprintf("%d %s", overlap, plural(overlap, "час", "часа", "часов")),
 			})
 		default:
 			dim.Raw *= 0.7
-			dim.Reasons = append(dim.Reasons, Reason{Label: "No overlapping working hours", Met: false})
+			dim.Reasons = append(dim.Reasons, Reason{Label: "Рабочие часы не пересекаются", Met: false})
 		}
 	}
 
@@ -581,7 +580,7 @@ func (e *Engine) availability(p ProjectFacts, d DeveloperFacts) Dimension {
 // punctuality, repeat clients.
 func (e *Engine) platformHistory(p ProjectFacts, d DeveloperFacts) Dimension {
 	dim := Dimension{
-		Key: "platform_history", Label: "Track record on AVERIX", Weight: e.weights.PlatformHistory,
+		Key: "platform_history", Label: "История работ на AVERIX", Weight: e.weights.PlatformHistory,
 	}
 
 	if d.RatingCount == 0 && d.ProjectsCompleted == 0 {
@@ -589,10 +588,10 @@ func (e *Engine) platformHistory(p ProjectFacts, d DeveloperFacts) Dimension {
 		// the benefit of the doubt, clearly labelled, because a marketplace
 		// that never surfaces newcomers has no newcomers.
 		dim.Raw = 0.5
-		dim.Reasons = []Reason{{Label: "New to AVERIX", Met: true, Detail: "no history yet"}}
+		dim.Reasons = []Reason{{Label: "Новичок на AVERIX", Met: true, Detail: "истории пока нет"}}
 		if d.IdentityVerified {
 			dim.Raw = 0.6
-			dim.Reasons = append(dim.Reasons, Reason{Label: "Identity verified", Met: true, Weight: 0.3})
+			dim.Reasons = append(dim.Reasons, Reason{Label: "Личность подтверждена", Met: true, Weight: 0.3})
 		}
 		return dim
 	}
@@ -608,9 +607,9 @@ func (e *Engine) platformHistory(p ProjectFacts, d DeveloperFacts) Dimension {
 		components += (0.5 + 0.5*confidence) * normalised * 0.45
 		weightSum += 0.45
 		dim.Reasons = append(dim.Reasons, Reason{
-			Label:  "Client rating",
+			Label:  "Оценки заказчиков",
 			Met:    *d.RatingAvg >= 4.0,
-			Detail: fmt.Sprintf("%.1f from %d review%s", *d.RatingAvg, d.RatingCount, plural(d.RatingCount)),
+			Detail: fmt.Sprintf("%.1f по %d %s", *d.RatingAvg, d.RatingCount, plural(d.RatingCount, "отзыву", "отзывам", "отзывам")),
 			Weight: normalised,
 		})
 	}
@@ -618,7 +617,7 @@ func (e *Engine) platformHistory(p ProjectFacts, d DeveloperFacts) Dimension {
 		components += clamp01(*d.SuccessRate/100) * 0.25
 		weightSum += 0.25
 		dim.Reasons = append(dim.Reasons, Reason{
-			Label:  "Project success",
+			Label:  "Доля успешных заказов",
 			Met:    *d.SuccessRate >= 85,
 			Detail: fmt.Sprintf("%.0f%%", *d.SuccessRate),
 			Weight: clamp01(*d.SuccessRate / 100),
@@ -628,7 +627,7 @@ func (e *Engine) platformHistory(p ProjectFacts, d DeveloperFacts) Dimension {
 		components += clamp01(*d.OnTimeRate/100) * 0.2
 		weightSum += 0.2
 		dim.Reasons = append(dim.Reasons, Reason{
-			Label:  "Delivered on time",
+			Label:  "Сдаёт в срок",
 			Met:    *d.OnTimeRate >= 80,
 			Detail: fmt.Sprintf("%.0f%%", *d.OnTimeRate),
 		})
@@ -637,7 +636,7 @@ func (e *Engine) platformHistory(p ProjectFacts, d DeveloperFacts) Dimension {
 		components += math.Min(1.0, float64(d.RepeatClients)/3.0) * 0.1
 		weightSum += 0.1
 		dim.Reasons = append(dim.Reasons, Reason{
-			Label:  "Clients who hired again",
+			Label:  "Заказчики, нанявшие повторно",
 			Met:    true,
 			Detail: fmt.Sprintf("%d", d.RepeatClients),
 			Weight: 0.6,
@@ -652,7 +651,7 @@ func (e *Engine) platformHistory(p ProjectFacts, d DeveloperFacts) Dimension {
 
 	if d.ResponseTimeSeconds != nil && *d.ResponseTimeSeconds <= 3600 {
 		dim.Reasons = append(dim.Reasons, Reason{
-			Label:  "Responds quickly",
+			Label:  "Быстро отвечает",
 			Met:    true,
 			Detail: humaniseDuration(*d.ResponseTimeSeconds),
 			Weight: 0.4,
@@ -665,7 +664,7 @@ func (e *Engine) platformHistory(p ProjectFacts, d DeveloperFacts) Dimension {
 // the most common reason a proposal goes nowhere, so it is worth scoring rather
 // than discovering after a conversation.
 func (e *Engine) budgetFit(p ProjectFacts, d DeveloperFacts) Dimension {
-	dim := Dimension{Key: "budget_fit", Label: "Budget and preferences", Weight: e.weights.BudgetFit}
+	dim := Dimension{Key: "budget_fit", Label: "Бюджет и пожелания", Weight: e.weights.BudgetFit}
 
 	// Experience level is part of "client preferences".
 	experienceOK := true
@@ -675,20 +674,20 @@ func (e *Engine) budgetFit(p ProjectFacts, d DeveloperFacts) Dimension {
 		switch {
 		case have >= wanted:
 			dim.Reasons = append(dim.Reasons, Reason{
-				Label: "Experience level", Met: true,
+				Label: "Уровень опыта", Met: true,
 				Detail: capitalise(d.ExperienceLevel), Weight: 0.5,
 			})
 		case wanted-have == 1:
 			experienceOK = false
 			dim.Reasons = append(dim.Reasons, Reason{
-				Label: "Slightly below the requested experience level", Met: false,
+				Label: "Немного ниже требуемого уровня опыта", Met: false,
 			})
 		default:
 			experienceOK = false
 			dim.Reasons = append(dim.Reasons, Reason{
-				Label:  "Below the requested experience level",
+				Label:  "Ниже требуемого уровня опыта",
 				Met:    false,
-				Detail: fmt.Sprintf("wanted %s", p.ExperienceWanted),
+				Detail: fmt.Sprintf("требуется уровень: %s", experienceLabel(p.ExperienceWanted)),
 			})
 		}
 	}
@@ -701,7 +700,7 @@ func (e *Engine) budgetFit(p ProjectFacts, d DeveloperFacts) Dimension {
 			// a hard mismatch, not a soft preference.
 			budgetScore = 0.05
 			dim.Reasons = append(dim.Reasons, Reason{
-				Label:  "Below their minimum project size",
+				Label:  "Меньше его минимального заказа",
 				Met:    false,
 				Detail: formatMoney(*d.MinProjectMinor, d.RateCurrency),
 			})
@@ -721,24 +720,24 @@ func (e *Engine) budgetFit(p ProjectFacts, d DeveloperFacts) Dimension {
 			case p.BudgetMaxMinor < *d.HourlyRateMinor*hoursForADay:
 				budgetScore = 0.2
 				dim.Reasons = append(dim.Reasons, Reason{
-					Label:  "Budget is below a day's work at their rate",
+					Label:  "Бюджета не хватает даже на день его работы",
 					Met:    false,
-					Detail: formatMoney(*d.HourlyRateMinor, d.RateCurrency) + "/hr",
+					Detail: formatMoney(*d.HourlyRateMinor, d.RateCurrency) + " в час",
 				})
 			case p.BudgetMaxMinor < *d.HourlyRateMinor*hoursForAWeek:
 				budgetScore = 0.6
 				dim.Reasons = append(dim.Reasons, Reason{
-					Label:  "Budget is tight for their rate",
+					Label:  "Бюджет для его ставки тесноват",
 					Met:    true,
-					Detail: formatMoney(*d.HourlyRateMinor, d.RateCurrency) + "/hr",
+					Detail: formatMoney(*d.HourlyRateMinor, d.RateCurrency) + " в час",
 					Weight: 0.3,
 				})
 			default:
 				budgetScore = 1.0
 				dim.Reasons = append(dim.Reasons, Reason{
-					Label:  "Budget works at their rate",
+					Label:  "Бюджет соответствует его ставке",
 					Met:    true,
-					Detail: formatMoney(*d.HourlyRateMinor, d.RateCurrency) + "/hr",
+					Detail: formatMoney(*d.HourlyRateMinor, d.RateCurrency) + " в час",
 					Weight: 0.7,
 				})
 			}
@@ -751,7 +750,7 @@ func (e *Engine) budgetFit(p ProjectFacts, d DeveloperFacts) Dimension {
 		budgetScore *= 0.7
 	}
 	if len(dim.Reasons) == 0 {
-		dim.Reasons = append(dim.Reasons, Reason{Label: "No budget conflicts", Met: true})
+		dim.Reasons = append(dim.Reasons, Reason{Label: "Бюджет вопросов не вызывает", Met: true})
 	}
 	dim.Raw = clamp01(budgetScore)
 	return dim
@@ -891,36 +890,62 @@ func skillLabel(slug string) string {
 	return strings.Join(parts, " ")
 }
 
-func plural(n int) string {
-	if n == 1 {
-		return ""
+// plural picks the Russian form for a count: 1 отзыв, 2 отзыва, 5 отзывов.
+func plural(n int, one, few, many string) string {
+	mod100 := n % 100
+	if mod100 > 10 && mod100 < 20 {
+		return many
 	}
-	return "s"
+	switch n % 10 {
+	case 1:
+		return one
+	case 2, 3, 4:
+		return few
+	default:
+		return many
+	}
+}
+
+// formatDate writes a date the way it is read aloud in Russian.
+func formatDate(t time.Time) string {
+	months := [...]string{"января", "февраля", "марта", "апреля", "мая", "июня",
+		"июля", "августа", "сентября", "октября", "ноября", "декабря"}
+	return fmt.Sprintf("%d %s %d", t.Day(), months[int(t.Month())-1], t.Year())
+}
+
+// experienceLabel names an experience level for a person rather than a column.
+func experienceLabel(level string) string {
+	switch level {
+	case "junior":
+		return "начинающий"
+	case "mid":
+		return "уверенный"
+	case "senior":
+		return "опытный"
+	case "lead":
+		return "эксперт"
+	case "any", "":
+		return "любой"
+	default:
+		return level
+	}
 }
 
 func humaniseDuration(seconds int) string {
 	switch {
 	case seconds < 60:
-		return "under a minute"
+		return "меньше минуты"
 	case seconds < 3600:
-		return fmt.Sprintf("%d min", seconds/60)
+		return fmt.Sprintf("%d мин", seconds/60)
 	case seconds < 86400:
-		return fmt.Sprintf("%d hour%s", seconds/3600, plural(seconds/3600))
+		n := seconds / 3600
+		return fmt.Sprintf("%d %s", n, plural(n, "час", "часа", "часов"))
 	default:
-		return fmt.Sprintf("%d day%s", seconds/86400, plural(seconds/86400))
+		n := seconds / 86400
+		return fmt.Sprintf("%d %s", n, plural(n, "день", "дня", "дней"))
 	}
 }
 
 func formatMoney(minor int64, currency string) string {
-	if currency == "" {
-		currency = "USD"
-	}
-	symbol := map[string]string{"USD": "$", "EUR": "€", "GBP": "£"}[currency]
-	if symbol == "" {
-		return fmt.Sprintf("%d.%02d %s", minor/100, minor%100, currency)
-	}
-	if minor%100 == 0 {
-		return fmt.Sprintf("%s%d", symbol, minor/100)
-	}
-	return fmt.Sprintf("%s%d.%02d", symbol, minor/100, minor%100)
+	return money.Format(minor, currency)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/averix/api/internal/platform/logx"
+	"github.com/averix/api/internal/platform/money"
 )
 
 // Realtime is the live channel: the same socket that carries chat.
@@ -315,47 +316,9 @@ func (s *Service) DeliverPending(ctx context.Context) (string, error) {
 
 // ── Formatting ──────────────────────────────────────────────────────────────
 
-// FormatMoney renders minor units the way a person reads them: thousands
-// separated by a thin space, the currency's own sign after the number.
+// FormatMoney renders minor units the way a person reads them.
 func FormatMoney(minor int64, currency string) string {
-	negative := minor < 0
-	if negative {
-		minor = -minor
-	}
-	whole := minor / 100
-	cents := minor % 100
-
-	digits := fmt.Sprintf("%d", whole)
-	var grouped strings.Builder
-	for i, r := range digits {
-		if i > 0 && (len(digits)-i)%3 == 0 {
-			grouped.WriteString(" ")
-		}
-		grouped.WriteRune(r)
-	}
-	amount := grouped.String()
-	if cents != 0 {
-		amount += fmt.Sprintf(",%02d", cents)
-	}
-	if negative {
-		amount = "−" + amount
-	}
-	switch strings.ToUpper(currency) {
-	case "RUB":
-		return amount + " ₽"
-	case "USD":
-		return "$" + amount
-	case "EUR":
-		return amount + " €"
-	case "UZS":
-		return amount + " сум"
-	case "KZT":
-		return amount + " ₸"
-	case "UAH":
-		return amount + " ₴"
-	default:
-		return amount + " " + strings.ToUpper(currency)
-	}
+	return money.Format(minor, currency)
 }
 
 func plural(n int, one, few, many string) string {

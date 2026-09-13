@@ -64,7 +64,7 @@ func (s *Service) StartConnect(ctx context.Context, id *security.Identity, redir
 	}
 	if !s.oauth.Configured() {
 		e := *httpx.ErrNotConfigured
-		e.Message = "GitHub isn't configured on this environment yet."
+		e.Message = "GitHub пока не настроен на этой площадке."
 		return "", &e
 	}
 
@@ -75,7 +75,7 @@ func (s *Service) StartConnect(ctx context.Context, id *security.Identity, redir
 		// away read access to their private code.
 		if _, err := s.store.ByUser(ctx, id.UserID); err != nil {
 			return "", httpx.Validation(map[string]string{
-				"github": "Connect your GitHub account before granting private access.",
+				"github": "Сначала подключите GitHub, потом открывайте доступ к закрытым репозиториям.",
 			})
 		}
 		intent = IntentPrivate
@@ -108,7 +108,7 @@ func (s *Service) Callback(ctx context.Context, code, state string) (*CallbackRe
 		if errors.Is(err, ErrStateInvalid) {
 			e := *httpx.ErrBadRequest
 			e.Code = "github_state_invalid"
-			e.Message = "That GitHub link has expired or was already used. Please try connecting again."
+			e.Message = "Ссылка GitHub устарела или уже использована. Начните подключение заново."
 			return nil, &e
 		}
 		return nil, httpx.Internalf(err, "consume oauth state")
@@ -125,7 +125,7 @@ func (s *Service) Callback(ctx context.Context, code, state string) (*CallbackRe
 		logx.From(ctx).Warn("github token exchange failed", "error", err)
 		e := *httpx.ErrBadRequest
 		e.Code = "github_exchange_failed"
-		e.Message = "GitHub didn't complete the connection. Please try again."
+		e.Message = "GitHub не завершил подключение. Попробуйте ещё раз."
 		return nil, &e
 	}
 
@@ -135,7 +135,7 @@ func (s *Service) Callback(ctx context.Context, code, state string) (*CallbackRe
 		logx.From(ctx).Warn("could not identify the github account", "error", err)
 		e := *httpx.ErrUnavailable
 		e.Code = "github_unreachable"
-		e.Message = "We couldn't reach GitHub to confirm your account. Please try again shortly."
+		e.Message = "Не удалось связаться с GitHub, чтобы подтвердить аккаунт. Попробуйте чуть позже."
 		return nil, &e
 	}
 
@@ -150,7 +150,7 @@ func (s *Service) Callback(ctx context.Context, code, state string) (*CallbackRe
 	if errors.Is(err, ErrAlreadyClaimed) {
 		e := *httpx.ErrConflict
 		e.Code = "github_already_connected"
-		e.Message = "That GitHub account is already connected to another AVERIX account."
+		e.Message = "Этот GitHub уже привязан к другому аккаунту AVERIX."
 		return nil, &e
 	}
 	if err != nil {
@@ -265,7 +265,7 @@ func (s *Service) Sync(ctx context.Context, id *security.Identity, trigger strin
 	if errors.Is(err, ErrNoAccount) {
 		e := *httpx.ErrNotFound
 		e.Code = "github_not_connected"
-		e.Message = "Connect your GitHub account first."
+		e.Message = "Сначала подключите аккаунт GitHub."
 		return nil, &e
 	}
 	if err != nil {
@@ -277,7 +277,7 @@ func (s *Service) Sync(ctx context.Context, id *security.Identity, trigger strin
 		if !ok {
 			e := *httpx.ErrConflict
 			e.Code = "github_sync_in_progress"
-			e.Message = "An analysis of your GitHub account is already running."
+			e.Message = "Анализ вашего GitHub уже идёт."
 			return nil, &e
 		}
 		defer release()
@@ -349,12 +349,12 @@ func (s *Service) runSync(ctx context.Context, account *Account, trigger string)
 		case errors.Is(syncErr, ErrUnauthorised):
 			e := *httpx.ErrForbidden
 			e.Code = "github_authorisation_expired"
-			e.Message = "GitHub no longer accepts our access. Please reconnect your account."
+			e.Message = "GitHub больше не принимает наш доступ. Подключите аккаунт заново."
 			return nil, &e
 		case errors.Is(syncErr, ErrRateLimited):
 			e := *httpx.ErrRateLimited
 			e.Code = "github_rate_limited"
-			e.Message = "GitHub's rate limit was reached. Please try again in an hour."
+			e.Message = "Достигнут лимит запросов к GitHub. Попробуйте через час."
 			e.RetryAfter = 3600
 			return nil, &e
 		}

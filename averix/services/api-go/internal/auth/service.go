@@ -68,26 +68,26 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, userAgent, ip 
 	email := v.Email("email", in.Email)
 	username := v.Username("username", in.Username)
 	v.Password("password", in.Password, s.cfg.Auth.PasswordMinLen)
-	fullName := v.Required("full_name", "Your name", in.FullName)
-	v.Length("full_name", "Your name", in.FullName, 2, 120)
-	v.NoControlChars("full_name", "Your name", in.FullName)
+	fullName := v.Required("full_name", "Имя и фамилия", in.FullName)
+	v.Length("full_name", "Имя и фамилия", in.FullName, 2, 120)
+	v.NoControlChars("full_name", "Имя и фамилия", in.FullName)
 
 	role := security.Role(strings.TrimSpace(in.Role))
 	if role != security.RoleClient && role != security.RoleDeveloper {
-		v.Add("role", "Choose whether you're hiring or looking for work.")
+		v.Add("role", "Выберите: вы ищете исполнителя или работу.")
 	}
 	if !in.AcceptTerms {
-		v.Add("accept_terms", "Please accept the terms to continue.")
+		v.Add("accept_terms", "Примите условия, чтобы продолжить.")
 	}
 	// A password that contains the email or username is trivially guessable
 	// once either is known, and both are public on this product.
 	if in.Password != "" {
 		lower := strings.ToLower(in.Password)
 		if username != "" && strings.Contains(lower, username) {
-			v.Add("password", "Your password can't contain your username.")
+			v.Add("password", "Пароль не должен содержать ваше имя пользователя.")
 		}
 		if local, _, ok := strings.Cut(email, "@"); ok && len(local) > 3 && strings.Contains(lower, local) {
-			v.Add("password", "Your password can't contain your email address.")
+			v.Add("password", "Пароль не должен содержать ваш адрес почты.")
 		}
 	}
 	if v.Any() {
@@ -215,7 +215,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput, userAgent, ip string
 	case "deactivated":
 		e := *httpx.ErrForbidden
 		e.Code = "account_deactivated"
-		e.Message = "This account has been deactivated."
+		e.Message = "Этот аккаунт деактивирован."
 		return nil, &e
 	}
 
@@ -347,7 +347,7 @@ func (s *Service) SwitchRole(ctx context.Context, id *security.Identity, request
 	}
 	role := security.Role(strings.TrimSpace(requested))
 	if !role.Valid() {
-		return "", httpx.Validation(map[string]string{"role": "That isn't a valid interface."})
+		return "", httpx.Validation(map[string]string{"role": "Такого интерфейса нет."})
 	}
 	if !id.HasRole(role) {
 		return "", httpx.Forbiddenf("account does not hold role %q", role)
@@ -379,7 +379,7 @@ func (s *Service) AddRole(ctx context.Context, id *security.Identity, requested 
 	role := security.Role(strings.TrimSpace(requested))
 	if role != security.RoleClient && role != security.RoleDeveloper {
 		return httpx.Validation(map[string]string{
-			"role": "You can add the client or the developer interface.",
+			"role": "Можно добавить роль заказчика или исполнителя.",
 		})
 	}
 	if id.HasRole(role) {
@@ -449,7 +449,7 @@ func (s *Service) ResetPassword(ctx context.Context, in ResetPasswordInput, ip s
 	v := validate.New()
 	v.Password("password", in.Password, s.cfg.Auth.PasswordMinLen)
 	if strings.TrimSpace(in.Token) == "" {
-		v.Add("token", "This reset link is incomplete.")
+		v.Add("token", "Ссылка для смены пароля неполная.")
 	}
 	if v.Any() {
 		return httpx.Validation(v.Fields())
@@ -459,7 +459,7 @@ func (s *Service) ResetPassword(ctx context.Context, in ResetPasswordInput, ip s
 	if errors.Is(err, ErrNotFound) {
 		e := *httpx.ErrBadRequest
 		e.Code = "reset_link_invalid"
-		e.Message = "This reset link has expired or has already been used. Please request a new one."
+		e.Message = "Ссылка для смены пароля устарела или уже использована. Запросите новую."
 		return &e
 	}
 	if err != nil {
@@ -507,10 +507,10 @@ func (s *Service) ChangePassword(ctx context.Context, id *security.Identity, in 
 	v := validate.New()
 	v.Password("new_password", in.NewPassword, s.cfg.Auth.PasswordMinLen)
 	if in.CurrentPassword == "" {
-		v.Add("current_password", "Enter your current password.")
+		v.Add("current_password", "Введите текущий пароль.")
 	}
 	if in.CurrentPassword == in.NewPassword {
-		v.Add("new_password", "Choose a password you haven't used here before.")
+		v.Add("new_password", "Выберите пароль, которым вы здесь ещё не пользовались.")
 	}
 	if v.Any() {
 		return httpx.Validation(v.Fields())
@@ -524,7 +524,7 @@ func (s *Service) ChangePassword(ctx context.Context, id *security.Identity, in 
 	// from being turned into permanent account takeover.
 	if !cryptox.VerifyPassword(account.PasswordHash, in.CurrentPassword) {
 		return httpx.Validation(map[string]string{
-			"current_password": "That isn't your current password.",
+			"current_password": "Это не ваш текущий пароль.",
 		})
 	}
 
@@ -581,7 +581,7 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 	if errors.Is(err, ErrNotFound) {
 		e := *httpx.ErrBadRequest
 		e.Code = "verification_link_invalid"
-		e.Message = "This verification link has expired or has already been used."
+		e.Message = "Ссылка для подтверждения устарела или уже использована."
 		return &e
 	}
 	if err != nil {

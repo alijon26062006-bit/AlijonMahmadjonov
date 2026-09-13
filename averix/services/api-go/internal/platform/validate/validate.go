@@ -41,7 +41,7 @@ func (e *Errors) Fields() map[string]string { return e.fields }
 func (e *Errors) Required(field, label, value string) string {
 	v := strings.TrimSpace(value)
 	if v == "" {
-		e.Addf(field, "%s is required.", label)
+		e.Addf(field, "«%s» — обязательное поле.", label)
 	}
 	return v
 }
@@ -52,11 +52,11 @@ func (e *Errors) Length(field, label, value string, min, max int) {
 	n := utf8.RuneCountInString(strings.TrimSpace(value))
 	switch {
 	case n < min && n == 0:
-		e.Addf(field, "%s is required.", label)
+		e.Addf(field, "«%s» — обязательное поле.", label)
 	case n < min:
-		e.Addf(field, "%s needs at least %d characters (currently %d).", label, min, n)
+		e.Addf(field, "«%s»: нужно не меньше %d символов (сейчас %d).", label, min, n)
 	case max > 0 && n > max:
-		e.Addf(field, "%s can be at most %d characters (currently %d).", label, max, n)
+		e.Addf(field, "«%s»: не больше %d символов (сейчас %d).", label, max, n)
 	}
 }
 
@@ -67,7 +67,7 @@ func (e *Errors) NoControlChars(field, label, value string) {
 		// indexes and slugs, so they are refused with the control characters.
 		const zeroWidthSpace, byteOrderMark = '\u200b', '\ufeff'
 		if r != '\n' && r != '\t' && (unicode.IsControl(r) || r == zeroWidthSpace || r == byteOrderMark) {
-			e.Addf(field, "%s contains characters that aren't allowed.", label)
+			e.Addf(field, "«%s» содержит недопустимые символы.", label)
 			return
 		}
 	}
@@ -81,21 +81,21 @@ const maxEmailLength = 254
 func (e *Errors) Email(field, value string) string {
 	v := strings.ToLower(strings.TrimSpace(value))
 	if v == "" {
-		e.Add(field, "Enter your email address.")
+		e.Add(field, "Укажите адрес электронной почты.")
 		return ""
 	}
 	if len(v) > maxEmailLength {
-		e.Add(field, "That email address is too long.")
+		e.Add(field, "Этот адрес слишком длинный.")
 		return v
 	}
 	addr, err := mail.ParseAddress(v)
 	if err != nil || addr.Address != v || !strings.Contains(v, ".") {
-		e.Add(field, "Enter a valid email address.")
+		e.Add(field, "Проверьте адрес: похоже, в нём опечатка.")
 		return v
 	}
 	// A display name would smuggle a second address past the parser.
 	if addr.Name != "" {
-		e.Add(field, "Enter just the email address.")
+		e.Add(field, "Укажите только адрес, без имени перед ним.")
 	}
 	return addr.Address
 }
@@ -126,27 +126,27 @@ var reservedUsernames = map[string]struct{}{
 func (e *Errors) Username(field, value string) string {
 	v := strings.ToLower(strings.TrimSpace(value))
 	if v == "" {
-		e.Add(field, "Choose a username.")
+		e.Add(field, "Придумайте имя пользователя.")
 		return ""
 	}
 	if len(v) < 3 {
-		e.Add(field, "Usernames need at least 3 characters.")
+		e.Add(field, "Имя пользователя — не короче 3 символов.")
 		return v
 	}
 	if len(v) > 30 {
-		e.Add(field, "Usernames can be at most 30 characters.")
+		e.Add(field, "Имя пользователя — не длиннее 30 символов.")
 		return v
 	}
 	if !usernamePattern.MatchString(v) {
-		e.Add(field, "Use lowercase letters, numbers, hyphens and underscores. Start and end with a letter or number.")
+		e.Add(field, "Строчные латинские буквы, цифры, дефис и подчёркивание. Начинаться и заканчиваться — буквой или цифрой.")
 		return v
 	}
 	if strings.Contains(v, "--") || strings.Contains(v, "__") {
-		e.Add(field, "Usernames can't contain repeated hyphens or underscores.")
+		e.Add(field, "Два дефиса или два подчёркивания подряд использовать нельзя.")
 		return v
 	}
 	if _, reserved := reservedUsernames[v]; reserved {
-		e.Add(field, "That username is reserved. Please choose another.")
+		e.Add(field, "Это имя зарезервировано. Выберите другое.")
 	}
 	return v
 }
@@ -168,26 +168,26 @@ var commonPasswords = map[string]struct{}{
 // and not being obviously guessable is what actually helps.
 func (e *Errors) Password(field, value string, minLength int) {
 	if value == "" {
-		e.Add(field, "Choose a password.")
+		e.Add(field, "Придумайте пароль.")
 		return
 	}
 	n := utf8.RuneCountInString(value)
 	if n < minLength {
-		e.Addf(field, "Passwords need at least %d characters.", minLength)
+		e.Addf(field, "Пароль — не короче %d символов.", minLength)
 		return
 	}
 	if n > 200 {
-		e.Add(field, "That password is longer than we can accept.")
+		e.Add(field, "Такой длинный пароль мы принять не можем.")
 		return
 	}
 	lower := strings.ToLower(value)
 	if _, common := commonPasswords[lower]; common {
-		e.Add(field, "That password is too common. Please choose something harder to guess.")
+		e.Add(field, "Этот пароль слишком распространён. Придумайте тот, который труднее подобрать.")
 		return
 	}
 	// A single repeated character passes any length rule.
 	if distinctRunes(value) < 5 {
-		e.Add(field, "That password is too repetitive. Please choose something harder to guess.")
+		e.Add(field, "В пароле слишком мало разных символов. Придумайте тот, который труднее подобрать.")
 	}
 }
 
@@ -203,18 +203,18 @@ func distinctRunes(s string) int {
 
 func (e *Errors) IntRange(field, label string, value, min, max int) {
 	if value < min || value > max {
-		e.Addf(field, "%s must be between %d and %d.", label, min, max)
+		e.Addf(field, "«%s»: значение от %d до %d.", label, min, max)
 	}
 }
 
 // MoneyMinor validates an amount in minor units.
 func (e *Errors) MoneyMinor(field, label string, value, min, max int64) {
 	if value < min {
-		e.Addf(field, "%s must be at least %s.", label, formatMinor(min))
+		e.Addf(field, "«%s»: не меньше %s.", label, formatMinor(min))
 		return
 	}
 	if max > 0 && value > max {
-		e.Addf(field, "%s can be at most %s.", label, formatMinor(max))
+		e.Addf(field, "«%s»: не больше %s.", label, formatMinor(max))
 	}
 }
 
@@ -230,7 +230,7 @@ func (e *Errors) OneOf(field, label, value string, allowed ...string) string {
 			return v
 		}
 	}
-	e.Addf(field, "%s must be one of: %s.", label, strings.Join(allowed, ", "))
+	e.Addf(field, "«%s»: допустимые значения — %s.", label, strings.Join(allowed, ", "))
 	return v
 }
 
@@ -238,15 +238,15 @@ func (e *Errors) OneOf(field, label, value string, allowed ...string) string {
 func (e *Errors) Currency(field, value string) string {
 	v := strings.ToUpper(strings.TrimSpace(value))
 	if v == "" {
-		return "USD"
+		return "RUB"
 	}
 	if len(v) != 3 {
-		e.Add(field, "Use a three-letter currency code, for example USD.")
+		e.Add(field, "Код валюты — три латинские буквы, например RUB.")
 		return v
 	}
 	for i := 0; i < 3; i++ {
 		if v[i] < 'A' || v[i] > 'Z' {
-			e.Add(field, "Use a three-letter currency code, for example USD.")
+			e.Add(field, "Код валюты — три латинские буквы, например RUB.")
 			return v
 		}
 	}

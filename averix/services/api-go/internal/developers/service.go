@@ -136,25 +136,25 @@ func formatLocation(city, country string) string {
 func badgesFor(p *Profile) []Badge {
 	badges := []Badge{}
 	if p.IdentityVerified {
-		badges = append(badges, Badge{Kind: "identity_verified", Label: "Identity verified"})
+		badges = append(badges, Badge{Kind: "identity_verified", Label: "Личность подтверждена"})
 	}
 	if p.GitHub != nil && !p.GitHub.VerifiedAt.IsZero() {
-		badges = append(badges, Badge{Kind: "github_verified", Label: "GitHub connected"})
+		badges = append(badges, Badge{Kind: "github_verified", Label: "GitHub подключён"})
 	}
 	if p.Availability == "available" {
-		badges = append(badges, Badge{Kind: "available", Label: "Available for work"})
+		badges = append(badges, Badge{Kind: "available", Label: "Свободен для заказов"})
 	}
 	// Top rated needs both a high average and enough reviews for it to mean
 	// something; one five-star review is not a track record.
 	if p.Reputation.RatingAvg != nil && *p.Reputation.RatingAvg >= 4.8 && p.Reputation.RatingCount >= 5 {
-		badges = append(badges, Badge{Kind: "top_rated", Label: "Top rated"})
+		badges = append(badges, Badge{Kind: "top_rated", Label: "Высокий рейтинг"})
 	}
 	if p.Reputation.ResponseTimeSeconds != nil && *p.Reputation.ResponseTimeSeconds <= 3600 &&
 		p.Reputation.RatingCount >= 3 {
-		badges = append(badges, Badge{Kind: "fast_responder", Label: "Responds quickly"})
+		badges = append(badges, Badge{Kind: "fast_responder", Label: "Быстро отвечает"})
 	}
 	if p.IsFeatured {
-		badges = append(badges, Badge{Kind: "featured", Label: "Featured"})
+		badges = append(badges, Badge{Kind: "featured", Label: "Рекомендуем"})
 	}
 	return badges
 }
@@ -254,17 +254,17 @@ func (s *Service) SaveBasics(ctx context.Context, id *security.Identity, in Basi
 	}
 
 	v := validate.New()
-	name := v.Required("full_name", "Your name", in.FullName)
-	v.Length("full_name", "Your name", in.FullName, 2, 120)
-	v.NoControlChars("full_name", "Your name", in.FullName)
+	name := v.Required("full_name", "Имя и фамилия", in.FullName)
+	v.Length("full_name", "Имя и фамилия", in.FullName, 2, 120)
+	v.NoControlChars("full_name", "Имя и фамилия", in.FullName)
 	if in.CountryCode != "" && len(in.CountryCode) != 2 {
-		v.Add("country_code", "Use a two-letter country code.")
+		v.Add("country_code", "Код страны — две латинские буквы.")
 	}
 	if in.City != "" {
-		v.Length("city", "City", in.City, 1, 80)
+		v.Length("city", "Город", in.City, 1, 80)
 	}
 	if len(in.Languages) > 10 {
-		v.Add("languages", "You can list up to 10 languages.")
+		v.Add("languages", "Можно указать не больше 10 языков.")
 	}
 	for i, l := range in.Languages {
 		if strings.TrimSpace(l.Language) == "" {
@@ -300,10 +300,10 @@ func (s *Service) SavePrimarySpecialisation(ctx context.Context, id *security.Id
 	}
 
 	v := validate.New()
-	slug := v.Required("slug", "Your main profession", in.Slug)
+	slug := v.Required("slug", "Основная профессия", in.Slug)
 	if in.Title != "" {
-		v.Length("professional_title", "Your title", in.Title, 3, 80)
-		v.NoControlChars("professional_title", "Your title", in.Title)
+		v.Length("professional_title", "Ваш заголовок", in.Title, 3, 80)
+		v.NoControlChars("professional_title", "Ваш заголовок", in.Title)
 	}
 	if v.Any() {
 		return nil, httpx.Validation(v.Fields())
@@ -314,7 +314,7 @@ func (s *Service) SavePrimarySpecialisation(ctx context.Context, id *security.Id
 	specID, err := s.taxonomy.SpecialisationIDBySlug(ctx, slug)
 	if err != nil {
 		return nil, httpx.Validation(map[string]string{
-			"slug": "That isn't one of the available professions.",
+			"slug": "Такой профессии в списке нет.",
 		})
 	}
 
@@ -337,7 +337,7 @@ func (s *Service) SaveAdditionalSpecialisations(ctx context.Context, id *securit
 	// would have nothing to work with.
 	if len(in.Slugs) > 3 {
 		return nil, httpx.Validation(map[string]string{
-			"slugs": "Choose up to 3 additional areas. Your main profession is what clients see first.",
+			"slugs": "Не больше трёх дополнительных направлений. Заказчик в первую очередь видит основную профессию.",
 		})
 	}
 
@@ -346,7 +346,7 @@ func (s *Service) SaveAdditionalSpecialisations(ctx context.Context, id *securit
 		specID, err := s.taxonomy.SpecialisationIDBySlug(ctx, strings.TrimSpace(slug))
 		if err != nil {
 			return nil, httpx.Validation(map[string]string{
-				"slugs": fmt.Sprintf("%q isn't one of the available professions.", slug),
+				"slugs": fmt.Sprintf("Профессии %q в списке нет.", slug),
 			})
 		}
 		ids = append(ids, specID)
@@ -355,10 +355,10 @@ func (s *Service) SaveAdditionalSpecialisations(ctx context.Context, id *securit
 	err := s.store.SetAdditionalSpecialisations(ctx, id.UserID, ids)
 	switch {
 	case errors.Is(err, ErrTooManySpecialisations):
-		return nil, httpx.Validation(map[string]string{"slugs": "Choose up to 3 additional areas."})
+		return nil, httpx.Validation(map[string]string{"slugs": "Не больше трёх дополнительных направлений."})
 	case err != nil && strings.Contains(err.Error(), "repeat your main profession"):
 		return nil, httpx.Validation(map[string]string{
-			"slugs": "An additional area can't repeat your main profession.",
+			"slugs": "Дополнительное направление не может повторять основную профессию.",
 		})
 	case err != nil:
 		return nil, httpx.Internalf(err, "set additional specialisations")
@@ -383,10 +383,10 @@ func (s *Service) SaveTechnologies(ctx context.Context, id *security.Identity, i
 
 	v := validate.New()
 	if len(in.Technologies) == 0 {
-		v.Add("technologies", "Choose at least one technology you work with.")
+		v.Add("technologies", "Выберите хотя бы один навык, с которым вы работаете.")
 	}
 	if len(in.Technologies) > 15 {
-		v.Add("technologies", "Choose up to 15 technologies — the ones you'd actually take work in.")
+		v.Add("technologies", "Не больше 15 навыков — тех, по которым вы правда возьмёте заказ.")
 	}
 	slugs := make([]string, 0, len(in.Technologies))
 	for i, t := range in.Technologies {
@@ -407,7 +407,7 @@ func (s *Service) SaveTechnologies(ctx context.Context, id *security.Identity, i
 	}
 	if len(unknown) > 0 {
 		return nil, httpx.Validation(map[string]string{
-			"technologies": fmt.Sprintf("We don't recognise: %s.", strings.Join(unknown, ", ")),
+			"technologies": fmt.Sprintf("Не распознали: %s.", strings.Join(unknown, ", ")),
 		})
 	}
 
@@ -427,7 +427,7 @@ func (s *Service) SaveTechnologies(ctx context.Context, id *security.Identity, i
 	if err := s.store.SetSkills(ctx, id.UserID, inputs); err != nil {
 		if errors.Is(err, ErrTooManySkills) {
 			return nil, httpx.Validation(map[string]string{
-				"technologies": "Choose up to 15 technologies.",
+				"technologies": "Не больше 15 навыков.",
 			})
 		}
 		return nil, httpx.Internalf(err, "save technologies")
@@ -449,19 +449,19 @@ func (s *Service) SaveExperience(ctx context.Context, id *security.Identity, in 
 	}
 
 	v := validate.New()
-	level := v.OneOf("experience_level", "Experience level", in.Level,
+	level := v.OneOf("experience_level", "Уровень опыта", in.Level,
 		"junior", "mid", "senior", "lead")
 	if in.Years != nil {
-		v.IntRange("years_experience", "Years of experience", *in.Years, 0, 50)
+		v.IntRange("years_experience", "Лет опыта", *in.Years, 0, 50)
 	}
 	currency := v.Currency("currency", in.Currency)
 	if in.HourlyRateMinor != nil {
 		// A floor and a ceiling: a $0 rate is a mistake, and a $10,000/hour
 		// rate is a typo or a test.
-		v.MoneyMinor("hourly_rate_minor", "Hourly rate", *in.HourlyRateMinor, 100, 100_000_00)
+		v.MoneyMinor("hourly_rate_minor", "Ставка за час", *in.HourlyRateMinor, 100, 100_000_00)
 	}
 	if in.MinProjectMinor != nil {
-		v.MoneyMinor("min_project_minor", "Minimum project", *in.MinProjectMinor, 0, 1_000_000_00)
+		v.MoneyMinor("min_project_minor", "Минимальный заказ", *in.MinProjectMinor, 0, 1_000_000_00)
 	}
 	if v.Any() {
 		return nil, httpx.Validation(v.Fields())
@@ -496,26 +496,26 @@ func (s *Service) SaveAvailability(ctx context.Context, id *security.Identity, i
 	}
 
 	v := validate.New()
-	availability := v.OneOf("availability", "Availability", in.Availability,
+	availability := v.OneOf("availability", "Занятость", in.Availability,
 		"available", "limited", "booked", "unavailable")
 	if in.HoursPerWeek != nil {
-		v.IntRange("hours_per_week", "Hours per week", *in.HoursPerWeek, 1, 80)
+		v.IntRange("hours_per_week", "Часов в неделю", *in.HoursPerWeek, 1, 80)
 	}
 	if in.OverlapFromUTC != nil {
-		v.IntRange("overlap_from_utc", "Timezone overlap start", *in.OverlapFromUTC, -12, 14)
+		v.IntRange("overlap_from_utc", "Начало пересечения часовых поясов", *in.OverlapFromUTC, -12, 14)
 	}
 	if in.OverlapToUTC != nil {
-		v.IntRange("overlap_to_utc", "Timezone overlap end", *in.OverlapToUTC, -12, 14)
+		v.IntRange("overlap_to_utc", "Конец пересечения часовых поясов", *in.OverlapToUTC, -12, 14)
 	}
 	if in.OverlapFromUTC != nil && in.OverlapToUTC != nil && *in.OverlapFromUTC > *in.OverlapToUTC {
-		v.Add("overlap_to_utc", "The end of your overlap window must come after the start.")
+		v.Add("overlap_to_utc", "Конец окна должен быть позже начала.")
 	}
 
 	var availableFrom *time.Time
 	if in.AvailableFrom != nil && *in.AvailableFrom != "" {
 		parsed, err := time.Parse("2006-01-02", *in.AvailableFrom)
 		if err != nil {
-			v.Add("available_from", "Use the format YYYY-MM-DD.")
+			v.Add("available_from", "Формат даты: ГГГГ-ММ-ДД.")
 		} else {
 			availableFrom = &parsed
 		}
@@ -553,10 +553,10 @@ func (s *Service) SaveBio(ctx context.Context, id *security.Identity, in BioRequ
 	// A floor of 120 characters is the product's judgement that three words is
 	// not a professional summary, and the client shows a live counter so the
 	// requirement is visible before submitting.
-	v.Length("bio", "Your professional summary", in.Bio, 120, 3000)
-	v.NoControlChars("bio", "Your professional summary", in.Bio)
+	v.Length("bio", "О себе", in.Bio, 120, 3000)
+	v.NoControlChars("bio", "О себе", in.Bio)
 	if in.Title != "" {
-		v.Length("professional_title", "Your title", in.Title, 3, 80)
+		v.Length("professional_title", "Ваш заголовок", in.Title, 3, 80)
 	}
 	if v.Any() {
 		return nil, httpx.Validation(v.Fields())
@@ -582,19 +582,19 @@ func (s *Service) Finish(ctx context.Context, id *security.Identity) (*Profile, 
 	// would waste a client's time and the developer's first impression.
 	v := validate.New()
 	if profile.PrimarySpecialisation == nil {
-		v.Add("specialisation", "Choose your main profession before publishing.")
+		v.Add("specialisation", "Перед публикацией выберите основную профессию.")
 	}
 	if countPrimarySkills(profile) == 0 {
-		v.Add("technologies", "Add the technologies you work with before publishing.")
+		v.Add("technologies", "Перед публикацией добавьте навыки, с которыми вы работаете.")
 	}
 	if len([]rune(strings.TrimSpace(profile.Bio))) < 120 {
-		v.Add("bio", "Write your professional summary before publishing.")
+		v.Add("bio", "Перед публикацией напишите о себе.")
 	}
 	if profile.ExperienceLevel == "" {
-		v.Add("experience_level", "Set your experience level before publishing.")
+		v.Add("experience_level", "Перед публикацией укажите уровень опыта.")
 	}
 	if !id.EmailVerified {
-		v.Add("email", "Confirm your email address before publishing your profile.")
+		v.Add("email", "Подтвердите адрес почты, прежде чем публиковать анкету.")
 	}
 	if v.Any() {
 		return nil, httpx.Validation(v.Fields())
@@ -631,7 +631,7 @@ func (s *Service) SetVisibility(ctx context.Context, id *security.Identity, sear
 	}
 	if searchable && !profile.Onboarding.Completed {
 		return httpx.Validation(map[string]string{
-			"searchable": "Finish setting up your profile before making it visible.",
+			"searchable": "Сначала заполните анкету, потом делайте её видимой.",
 		})
 	}
 	if err := s.store.SetSearchable(ctx, id.UserID, searchable); err != nil {

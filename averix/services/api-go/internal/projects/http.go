@@ -157,7 +157,7 @@ func (h *Handlers) feed(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 		if len(query.SkillSlugs) > 20 {
-			return httpx.Validation(map[string]string{"skills": "Filter by up to 20 technologies."})
+			return httpx.Validation(map[string]string{"skills": "В фильтре не больше 20 навыков."})
 		}
 	}
 	if raw := q.Get("budget_min"); raw != "" {
@@ -173,7 +173,7 @@ func (h *Handlers) feed(w http.ResponseWriter, r *http.Request) error {
 	if cursor := q.Get("cursor"); cursor != "" {
 		t, id, err := DecodeCursor(cursor)
 		if err != nil {
-			return httpx.Validation(map[string]string{"cursor": "That page reference isn't valid."})
+			return httpx.Validation(map[string]string{"cursor": "Ссылка на страницу указана неверно."})
 		}
 		query.CursorTime, query.CursorID = t, id
 	}

@@ -68,7 +68,7 @@ func (h *Handlers) servePrivate(w http.ResponseWriter, r *http.Request) error {
 		// Deliberately the same answer for an expired link and a forged one:
 		// the difference is of no use to anybody but an attacker.
 		e := *httpx.ErrForbidden
-		e.Message = "This link has expired. Please reopen the page to get a new one."
+		e.Message = "Ссылка устарела. Откройте страницу заново, чтобы получить новую."
 		return e.Wrap(err)
 	}
 

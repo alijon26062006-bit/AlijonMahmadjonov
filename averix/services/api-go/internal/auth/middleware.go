@@ -124,7 +124,7 @@ func (m *Middleware) RequireVerifiedEmail() httpx.Middleware {
 			if !id.EmailVerified {
 				e := *httpx.ErrForbidden
 				e.Code = "email_not_verified"
-				e.Message = "Please confirm your email address to continue. We've sent you a link."
+				e.Message = "Подтвердите адрес почты, чтобы продолжить. Мы отправили вам ссылку."
 				return &e
 			}
 			return next(w, r)

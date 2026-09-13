@@ -42,8 +42,8 @@ func TestCreateAndPublishAProject(t *testing.T) {
 		t.Errorf("reference = %q, want an AVX- reference", res.String("reference"))
 	}
 	budget, _ := res.Data["budget"].(map[string]any)
-	if budget["display"] != "$500–$800" {
-		t.Errorf("budget display = %v, want $500–$800", budget["display"])
+	if budget["display"] != "$500 – $800" {
+		t.Errorf("budget display = %v, want $500 – $800", budget["display"])
 	}
 
 	// Targeting is resolved from the category, not supplied by the client.
@@ -437,7 +437,7 @@ func TestProjectUnderContractIsLocked(t *testing.T) {
 	res := owner.Client.PATCH("/projects/"+projectID,
 		map[string]any{"title": "Changing the deal after signing"}).
 		Fails(t, http.StatusConflict, "project_locked")
-	if !strings.Contains(res.Message, "workspace") {
+	if !strings.Contains(res.Message, "рабочем пространстве") {
 		t.Errorf("the message should point at the workspace, got %q", res.Message)
 	}
 }

@@ -182,13 +182,13 @@ func (s *Service) Send(ctx context.Context, id *security.Identity, conversationI
 		// party that the party did not send would corrupt the record a dispute
 		// is judged on.
 		e := *httpx.ErrForbidden
-		e.Message = "You're not a participant in this conversation."
+		e.Message = "Вы не участник этого диалога."
 		return nil, &e
 	}
 	if membership.IsLocked {
 		e := *httpx.ErrConflict
 		e.Code = "conversation_locked"
-		e.Message = "This conversation is closed. It stays readable, but no new messages can be added."
+		e.Message = "Диалог закрыт: читать можно, писать — нет."
 		return nil, &e
 	}
 
@@ -197,15 +197,15 @@ func (s *Service) Send(ctx context.Context, id *security.Identity, conversationI
 	if kind == "" {
 		kind = KindText
 	}
-	kind = v.OneOf("kind", "The message type", kind, KindText, KindCode)
+	kind = v.OneOf("kind", "Тип сообщения", kind, KindText, KindCode)
 
 	body := strings.TrimSpace(in.Body)
 	if length := len([]rune(body)); length > MaxBodyRunes {
-		v.Addf("body", "That message is %d characters. Please keep it under %d — anything longer is better as a file.",
+		v.Addf("body", "В сообщении %d символов. Уместитесь в %d — то, что длиннее, лучше приложить файлом.",
 			length, MaxBodyRunes)
 	}
 	if kind == KindCode && body == "" {
-		v.Add("body", "Paste the code you want to share.")
+		v.Add("body", "Вставьте код, которым хотите поделиться.")
 	}
 
 	fileIDs, err := s.resolveAttachments(ctx, id.UserID, in.FileIDs, v)
@@ -213,21 +213,21 @@ func (s *Service) Send(ctx context.Context, id *security.Identity, conversationI
 		return nil, err
 	}
 	if body == "" && len(fileIDs) == 0 {
-		v.Add("body", "Write something or attach a file.")
+		v.Add("body", "Напишите что-нибудь или приложите файл.")
 	}
 
 	var replyTo *uuid.UUID
 	if raw := strings.TrimSpace(in.ReplyToID); raw != "" {
 		parsed, err := uuid.Parse(raw)
 		if err != nil {
-			v.Add("reply_to_id", "That message reference isn't valid.")
+			v.Add("reply_to_id", "Ссылка на сообщение указана неверно.")
 		} else {
 			// A reply must point at a message in this same thread, or a
 			// crafted id would pull another conversation's message into the
 			// client's rendering.
 			target, err := s.store.MessageByID(ctx, parsed, id.UserID)
 			if err != nil || target.ConversationID != conversationID {
-				v.Add("reply_to_id", "You can only reply to a message in this conversation.")
+				v.Add("reply_to_id", "Отвечать можно только на сообщение из этого диалога.")
 			} else {
 				replyTo = &parsed
 			}
@@ -244,7 +244,7 @@ func (s *Service) Send(ctx context.Context, id *security.Identity, conversationI
 	if err == nil && recent >= perMinute {
 		e := *httpx.ErrRateLimited
 		e.Code = "message_flood"
-		e.Message = "You're sending messages very quickly. Take a moment and try again."
+		e.Message = "Вы пишете слишком быстро. Переведите дух и попробуйте снова."
 		e.RetryAfter = 30
 		return nil, &e
 	}
@@ -308,7 +308,7 @@ func (s *Service) resolveAttachments(ctx context.Context, ownerID uuid.UUID,
 		return nil, nil
 	}
 	if len(raw) > MaxAttachments {
-		v.Addf("file_ids", "You can attach up to %d files to one message.", MaxAttachments)
+		v.Addf("file_ids", "К одному сообщению можно приложить не больше %d файлов.", MaxAttachments)
 		return nil, nil
 	}
 
@@ -316,18 +316,18 @@ func (s *Service) resolveAttachments(ctx context.Context, ownerID uuid.UUID,
 	for _, value := range raw {
 		parsed, err := uuid.Parse(strings.TrimSpace(value))
 		if err != nil {
-			v.Add("file_ids", "One of those attachments isn't a valid reference.")
+			v.Add("file_ids", "Одно из вложений указано неверно.")
 			return nil, nil
 		}
 		file, err := s.files.OwnedByID(ctx, parsed, ownerID)
 		if err != nil {
 			// The id is not echoed back: a refusal that confirms which ids
 			// exist is a probe's reward.
-			v.Add("file_ids", "We couldn't find one of those uploads. Please upload it again.")
+			v.Add("file_ids", "Один из файлов не найден. Загрузите его заново.")
 			return nil, nil
 		}
 		if file.Purpose != files.PurposeMessageAttachment {
-			v.Add("file_ids", "One of those uploads wasn't made for a message.")
+			v.Add("file_ids", "Один из загруженных файлов не предназначен для сообщения.")
 			return nil, nil
 		}
 		out = append(out, parsed)

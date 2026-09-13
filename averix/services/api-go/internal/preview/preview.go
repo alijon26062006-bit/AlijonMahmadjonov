@@ -414,9 +414,9 @@ type Device struct {
 // Devices are the widths the preview offers, matching the breakpoints the rest
 // of the product is designed around.
 var Devices = []Device{
-	{Key: "mobile", Label: "Mobile", Width: 390, Height: 844},
-	{Key: "tablet", Label: "Tablet", Width: 768, Height: 1024},
-	{Key: "desktop", Label: "Desktop", Width: 1280},
+	{Key: "mobile", Label: "Телефон", Width: 390, Height: 844},
+	{Key: "tablet", Label: "Планшет", Width: 768, Height: 1024},
+	{Key: "desktop", Label: "Компьютер", Width: 1280},
 }
 
 // BuildFrame turns a probe result into render instructions.

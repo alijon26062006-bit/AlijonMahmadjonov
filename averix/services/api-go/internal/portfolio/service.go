@@ -122,30 +122,30 @@ func (s *Service) validate(ctx context.Context, in SaveRequest, creating bool) (
 
 	title := strings.TrimSpace(in.Title)
 	if creating || title != "" {
-		v.Required("title", "A title", title)
-		v.Length("title", "The title", title, 3, 120)
-		v.NoControlChars("title", "The title", title)
+		v.Required("title", "Название", title)
+		v.Length("title", "Название", title, 3, 120)
+		v.NoControlChars("title", "Название", title)
 		out.title = title
 		out.sent["title"] = true
 	}
 
 	if short := strings.TrimSpace(in.ShortDescription); short != "" {
-		v.Length("short_description", "The one-line summary", short, 0, 200)
+		v.Length("short_description", "Краткое описание", short, 0, 200)
 		out.shortDescription = short
 		out.sent["short_description"] = true
 	}
 
 	if desc := strings.TrimSpace(in.Description); desc != "" {
-		v.Length("description", "The description", desc, 0, 8000)
+		v.Length("description", "Описание", desc, 0, 8000)
 		if validate.LooksLikeSpam(desc) {
-			v.Add("description", "This description doesn't read like a description of your work. Please rewrite it.")
+			v.Add("description", "Это не похоже на описание работы. Пожалуйста, перепишите.")
 		}
 		out.description = desc
 		out.sent["description"] = true
 	}
 
 	if role := strings.TrimSpace(in.DeveloperRole); role != "" {
-		v.Length("developer_role", "Your role", role, 0, 120)
+		v.Length("developer_role", "Ваша роль", role, 0, 120)
 		out.developerRole = role
 		out.sent["developer_role"] = true
 	}
@@ -153,7 +153,7 @@ func (s *Service) validate(ctx context.Context, in SaveRequest, creating bool) (
 	if slug := strings.TrimSpace(in.CategorySlug); slug != "" {
 		categoryID, err := s.taxonomy.CategoryIDBySlug(ctx, slug)
 		if err != nil {
-			v.Add("category_slug", "That category doesn't exist. Please choose one from the list.")
+			v.Add("category_slug", "Такой категории нет. Выберите из списка.")
 		} else {
 			out.categoryID = &categoryID
 			out.sent["category_slug"] = true
@@ -162,7 +162,7 @@ func (s *Service) validate(ctx context.Context, in SaveRequest, creating bool) (
 
 	if in.Technologies != nil {
 		if len(in.Technologies) > MaxTechnologies {
-			v.Addf("technologies", "Choose up to %d technologies — the ones that mattered on this project.",
+			v.Addf("technologies", "Не больше %d навыков — тех, что действительно понадобились в этой работе.",
 				MaxTechnologies)
 		} else {
 			ids, unknown, err := s.taxonomy.ResolveSkillIDs(ctx, in.Technologies)
@@ -170,7 +170,7 @@ func (s *Service) validate(ctx context.Context, in SaveRequest, creating bool) (
 				return nil, httpx.Internalf(err, "resolve technologies")
 			}
 			if len(unknown) > 0 {
-				v.Addf("technologies", "We don't recognise %s. Please pick from the list.",
+				v.Addf("technologies", "Мы не знаем «%s». Выберите из списка.",
 					strings.Join(unknown, ", "))
 			}
 			out.skillIDs = ids
@@ -205,11 +205,11 @@ func (s *Service) validate(ctx context.Context, in SaveRequest, creating bool) (
 		when, err := time.Parse("2006-01-02", raw)
 		switch {
 		case err != nil:
-			v.Add("completed_on", "Use a date in the form 2024-08-31.")
+			v.Add("completed_on", "Дата в формате 2024-08-31.")
 		case when.After(time.Now().AddDate(0, 0, 1)):
-			v.Add("completed_on", "A completion date can't be in the future.")
+			v.Add("completed_on", "Дата завершения не может быть в будущем.")
 		case when.Year() < 1990:
-			v.Add("completed_on", "That date looks too far in the past.")
+			v.Add("completed_on", "Эта дата слишком далеко в прошлом.")
 		default:
 			out.completedOn = &when
 			out.sent["completed_on"] = true
@@ -217,13 +217,13 @@ func (s *Service) validate(ctx context.Context, in SaveRequest, creating bool) (
 	}
 
 	if in.DurationDays != nil {
-		v.IntRange("duration_days", "The duration", *in.DurationDays, 1, 3650)
+		v.IntRange("duration_days", "Срок", *in.DurationDays, 1, 3650)
 		out.durationDays = in.DurationDays
 		out.sent["duration_days"] = true
 	}
 
 	if in.ValueMinor != nil {
-		v.MoneyMinor("value_minor", "The project value", *in.ValueMinor, 0, 100_000_000_00)
+		v.MoneyMinor("value_minor", "Стоимость работы", *in.ValueMinor, 0, 100_000_000_00)
 		out.valueMinor = in.ValueMinor
 		out.sent["value_minor"] = true
 	}
@@ -232,7 +232,7 @@ func (s *Service) validate(ctx context.Context, in SaveRequest, creating bool) (
 		out.sent["currency"] = true
 	}
 	if visibility := strings.TrimSpace(in.ValueVisibility); visibility != "" {
-		out.valueVisibility = v.OneOf("value_visibility", "The value visibility",
+		out.valueVisibility = v.OneOf("value_visibility", "Видимость суммы",
 			visibility, valueVisibilities...)
 		out.sent["value_visibility"] = true
 	} else if creating {
@@ -243,7 +243,7 @@ func (s *Service) validate(ctx context.Context, in SaveRequest, creating bool) (
 	}
 
 	if status := strings.TrimSpace(in.DemoStatus); status != "" {
-		out.demoStatus = v.OneOf("demo_status", "The demo status", status, demoStatuses...)
+		out.demoStatus = v.OneOf("demo_status", "Статус демонстрации", status, demoStatuses...)
 		out.sent["demo_status"] = true
 	} else if creating {
 		out.demoStatus = DemoNone
@@ -300,7 +300,7 @@ func (s *Service) Create(ctx context.Context, id *security.Identity, in SaveRequ
 		e := *httpx.ErrConflict
 		e.Code = "portfolio_full"
 		e.Message = fmt.Sprintf(
-			"Your portfolio already has %d projects. Remove one to add another.", MaxProjects)
+			"В портфолио уже %d работ. Удалите одну, чтобы добавить новую.", MaxProjects)
 		return nil, &e
 	}
 	if err != nil {
@@ -506,7 +506,7 @@ func (s *Service) AddImage(ctx context.Context, id *security.Identity, in Screen
 	case errors.Is(err, ErrTooManyImages):
 		e := *httpx.ErrConflict
 		e.Code = "gallery_full"
-		e.Message = fmt.Sprintf("This project already has %d images.", MaxImages)
+		e.Message = fmt.Sprintf("В работе уже %d изображений.", MaxImages)
 		return nil, &e
 	case err != nil:
 		return nil, imageError(err)
@@ -573,7 +573,7 @@ func (s *Service) SetCover(ctx context.Context, id *security.Identity,
 	}
 	if fileID == nil {
 		return nil, httpx.Validation(map[string]string{
-			"image_id": "That image isn't part of this project.",
+			"image_id": "Это изображение не относится к данной работе.",
 		})
 	}
 
@@ -600,19 +600,19 @@ func (s *Service) AddLink(ctx context.Context, id *security.Identity,
 
 	v := validate.New()
 	label := strings.TrimSpace(in.Label)
-	v.Required("label", "A label", label)
-	v.Length("label", "The label", label, 2, 40)
-	v.NoControlChars("label", "The label", label)
+	v.Required("label", "Название ссылки", label)
+	v.Length("label", "Название", label, 2, 40)
+	v.NoControlChars("label", "Название", label)
 	kind := in.Kind
 	if strings.TrimSpace(kind) == "" {
 		kind = LinkOther
 	}
-	kind = v.OneOf("kind", "The link type", kind, LinkLive, LinkRepository,
+	kind = v.OneOf("kind", "Тип ссылки", kind, LinkLive, LinkRepository,
 		LinkCaseStudy, LinkAppStore, LinkPlayStore, LinkArticle, LinkOther)
 
 	var normalised urlguard.Result
 	if raw := strings.TrimSpace(in.URL); raw == "" {
-		v.Add("url", "Add the address this link should open.")
+		v.Add("url", "Укажите адрес, который должна открывать ссылка.")
 	} else {
 		result, err := urlguard.Normalise(raw, s.urlOptions)
 		if err != nil {
@@ -636,7 +636,7 @@ func (s *Service) AddLink(ctx context.Context, id *security.Identity,
 	if len(existing.Links) >= MaxLinks {
 		e := *httpx.ErrConflict
 		e.Code = "links_full"
-		e.Message = fmt.Sprintf("This project already has %d links.", MaxLinks)
+		e.Message = fmt.Sprintf("В работе уже %d ссылок.", MaxLinks)
 		return nil, &e
 	}
 
@@ -792,7 +792,7 @@ func (s *Service) Preview(ctx context.Context, id *security.Identity, username, 
 	}
 	if project.ProjectURL == "" {
 		return nil, httpx.Validation(map[string]string{
-			"project_url": "This project doesn't have a live link.",
+			"project_url": "У этой работы нет рабочей ссылки.",
 		})
 	}
 
@@ -837,7 +837,7 @@ func (s *Service) CheckURL(ctx context.Context, id *security.Identity, projectID
 	}
 	if project.ProjectURL == "" {
 		return nil, httpx.Validation(map[string]string{
-			"project_url": "Add a live link first.",
+			"project_url": "Сначала добавьте рабочую ссылку.",
 		})
 	}
 	result := s.verdictFor(ctx, project, true)
@@ -915,7 +915,7 @@ func notFound(err error, projectID uuid.UUID) error {
 
 func forbid(err error) error {
 	e := *httpx.ErrForbidden
-	e.Message = "Switch to your developer profile to manage your portfolio."
+	e.Message = "Портфолио редактируется в роли исполнителя — переключитесь на неё."
 	return e.Wrap(err)
 }
 
@@ -925,26 +925,26 @@ func imageError(err error) error {
 	switch {
 	case errors.Is(err, ErrImageTooLarge), errors.Is(err, files.ErrTooLarge):
 		e := *httpx.ErrPayloadTooLarge
-		e.Message = "That image is too large. Please choose one under 10 MB."
+		e.Message = "Изображение слишком большое. Выберите файл до 10 МБ."
 		return e.Wrap(err)
 	case errors.Is(err, imaging.ErrUnsupportedFormat), errors.Is(err, files.ErrTypeNotAllowed):
 		e := *httpx.ErrUnsupportedMedia
-		e.Message = "That image format isn't supported. Please use a JPEG, PNG or WebP file."
+		e.Message = "Такой формат изображения не поддерживается. Подойдут JPEG, PNG или WebP."
 		return e.Wrap(err)
 	case errors.Is(err, imaging.ErrNotAnImage):
 		e := *httpx.ErrUnsupportedMedia
-		e.Message = "That file isn't an image."
+		e.Message = "Это не изображение."
 		return e.Wrap(err)
 	case errors.Is(err, imaging.ErrDimensions):
 		return httpx.Validation(map[string]string{
-			"image": "That image is either too small or too large. Please use one between 16 and 12000 pixels on each side.",
+			"image": "Изображение слишком маленькое или слишком большое. Сторона должна быть от 16 до 12000 пикселей.",
 		}).Wrap(err)
 	case errors.Is(err, imaging.ErrDecompressionBomb):
 		e := *httpx.ErrUnsupportedMedia
-		e.Message = "That image couldn't be processed."
+		e.Message = "Не удалось обработать изображение."
 		return e.Wrap(err)
 	case errors.Is(err, files.ErrEmpty):
-		return httpx.Validation(map[string]string{"image": "That file is empty."}).Wrap(err)
+		return httpx.Validation(map[string]string{"image": "Файл пустой."}).Wrap(err)
 	}
 	return httpx.Internalf(err, "store screenshot")
 }

@@ -93,7 +93,7 @@ func (h *Handlers) byReference(w http.ResponseWriter, r *http.Request) error {
 	reference := strings.TrimSpace(r.URL.Query().Get("reference"))
 	if reference == "" {
 		return httpx.Validation(map[string]string{
-			"reference": "Enter the contract reference, for example AVX-2026-1A2B3C4D.",
+			"reference": "Укажите номер сделки, например AVX-2026-1A2B3C4D.",
 		})
 	}
 	contract, err := h.svc.ByReference(r.Context(), security.FromContext(r.Context()), reference)
@@ -151,7 +151,7 @@ func (h *Handlers) addDeliverable(w http.ResponseWriter, r *http.Request) error 
 		parsed, err := uuid.Parse(raw)
 		if err != nil {
 			return httpx.Validation(map[string]string{
-				"milestone_id": "That milestone reference isn't valid.",
+				"milestone_id": "Ссылка на этап указана неверно.",
 			})
 		}
 		milestoneID = &parsed

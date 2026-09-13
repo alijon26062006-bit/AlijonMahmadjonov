@@ -258,7 +258,7 @@ func (h *Handlers) readFilePart(w http.ResponseWriter, r *http.Request) (*multip
 	for {
 		part, err := reader.NextPart()
 		if errors.Is(err, io.EOF) {
-			return nil, httpx.Validation(map[string]string{"file": "Choose a file to upload."})
+			return nil, httpx.Validation(map[string]string{"file": "Выберите файл для загрузки."})
 		}
 		if err != nil {
 			return nil, httpx.ErrBadRequest.Wrap(fmt.Errorf("read multipart body: %w", err))
@@ -276,14 +276,14 @@ func uploadError(err error) error {
 	switch {
 	case errors.Is(err, files.ErrTooLarge):
 		e := *httpx.ErrPayloadTooLarge
-		e.Message = "That file is too large to attach. The limit is 25 MB."
+		e.Message = "Файл слишком большой для вложения. Предел — 25 МБ."
 		return e.Wrap(err)
 	case errors.Is(err, files.ErrTypeNotAllowed):
 		e := *httpx.ErrUnsupportedMedia
-		e.Message = "That file type can't be attached. Images, PDFs, documents and zip archives are accepted."
+		e.Message = "Такой тип файла приложить нельзя. Принимаются изображения, PDF, документы и zip-архивы."
 		return e.Wrap(err)
 	case errors.Is(err, files.ErrEmpty):
-		return httpx.Validation(map[string]string{"file": "That file is empty."}).Wrap(err)
+		return httpx.Validation(map[string]string{"file": "Файл пустой."}).Wrap(err)
 	}
 	return httpx.Internalf(err, "store attachment")
 }

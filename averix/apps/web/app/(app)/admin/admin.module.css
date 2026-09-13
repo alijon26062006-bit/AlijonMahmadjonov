@@ -1,0 +1,115 @@
+.shell {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--av-text-2xl);
+  font-weight: var(--av-weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.tiles {
+  display: grid;
+  gap: var(--av-space-4);
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--av-space-4);
+  border: 1px solid var(--av-border-subtle);
+  border-radius: var(--av-radius-lg);
+  background: var(--av-surface);
+}
+
+.tileLabel {
+  font-size: var(--av-text-xs);
+  color: var(--av-text-tertiary);
+}
+
+.tileValue {
+  font-size: var(--av-text-2xl);
+  font-weight: var(--av-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.tileNote {
+  font-size: var(--av-text-xs);
+  color: var(--av-text-secondary);
+}
+
+.attention {
+  border-color: var(--av-warning-border);
+  background: var(--av-warning-subtle);
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--av-space-2);
+}
+
+.row {
+  display: flex;
+  gap: var(--av-space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--av-space-3) 0;
+  border-bottom: 1px solid var(--av-border-subtle);
+}
+
+.alert {
+  margin: 0;
+  padding: var(--av-space-3) var(--av-space-4);
+  border-radius: var(--av-radius-md);
+  background: var(--av-danger-subtle);
+  border: 1px solid var(--av-danger-border);
+  color: var(--av-danger-text);
+  font-size: var(--av-text-sm);
+}
+
+.ok {
+  composes: alert;
+  background: var(--av-success-subtle);
+  border-color: var(--av-success-border);
+  color: var(--av-success-text);
+}
+
+.settingRow {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: var(--av-space-4);
+  align-items: start;
+  padding: var(--av-space-4) 0;
+  border-bottom: 1px solid var(--av-border-subtle);
+}
+
+@media (max-width: 640px) {
+  .settingRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.auditRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--av-space-3) 0;
+  border-bottom: 1px solid var(--av-border-subtle);
+  font-size: var(--av-text-sm);
+}
+
+.code {
+  font-family: var(--av-font-mono);
+  font-size: var(--av-text-xs);
+}
+
+.excerpt {
+  margin: 0;
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-sm);
+}

@@ -88,7 +88,7 @@ func (s *Service) Submit(ctx context.Context, id *security.Identity, in SubmitRe
 
 	projectID, err := uuid.Parse(strings.TrimSpace(in.ProjectID))
 	if err != nil {
-		return nil, httpx.Validation(map[string]string{"project_id": "That project reference isn't valid."})
+		return nil, httpx.Validation(map[string]string{"project_id": "Ссылка на заказ указана неверно."})
 	}
 
 	// A daily cap is what stops one developer carpet-bombing fifty projects.
@@ -103,7 +103,7 @@ func (s *Service) Submit(ctx context.Context, id *security.Identity, in SubmitRe
 		e := *httpx.ErrRateLimited
 		e.Code = "proposal_limit_reached"
 		e.Message = fmt.Sprintf(
-			"You've sent %d proposals today. Take the time to tailor the next one — the limit resets in 24 hours.",
+			"Сегодня вы отправили %d откликов. Напишите следующий вдумчиво — лимит обновится через сутки.",
 			sentToday)
 		e.RetryAfter = 3600
 		return nil, &e
@@ -150,12 +150,12 @@ func (s *Service) Submit(ctx context.Context, id *security.Identity, in SubmitRe
 	case errors.Is(err, ErrAlreadyProposed):
 		e := *httpx.ErrConflict
 		e.Code = "already_proposed"
-		e.Message = "You've already sent a proposal for this project. Withdraw it first if you want to send a new one."
+		e.Message = "Вы уже отправили отклик на этот заказ. Чтобы отправить новый, сначала отзовите прежний."
 		return nil, &e
 	case errors.Is(err, ErrProjectClosed):
 		e := *httpx.ErrConflict
 		e.Code = "project_closed"
-		e.Message = "This project is no longer accepting proposals."
+		e.Message = "Заказ больше не принимает отклики."
 		return nil, &e
 	case errors.Is(err, ErrNotFound):
 		return nil, httpx.NotFoundf("project %s does not exist", projectID)
@@ -193,21 +193,21 @@ func (s *Service) validateSubmission(ctx context.Context, in SubmitRequest) (*Ne
 	v := validate.New()
 
 	currency := v.Currency("currency", in.Currency)
-	v.MoneyMinor("amount_minor", "Your price", in.AmountMinor, 1000, 10_000_000_00)
-	v.IntRange("delivery_days", "Delivery time", in.DeliveryDays, 1, 730)
+	v.MoneyMinor("amount_minor", "Ваша цена", in.AmountMinor, 1000, 10_000_000_00)
+	v.IntRange("delivery_days", "Срок выполнения", in.DeliveryDays, 1, 730)
 
 	// The minimum lengths are the product decision. The client shows a live
 	// counter for each field, so the requirement is visible before submitting
 	// rather than a surprise on the way back.
 	minCover := s.settings.Int(ctx, "proposals.min_cover_letter", 120)
-	v.Length("cover_letter", "Your message", in.CoverLetter, minCover, 4000)
-	v.Length("approach", "Your approach", in.Approach, 120, 4000)
-	v.Length("relevant_experience", "Relevant experience", in.RelevantExperience, 60, 3000)
+	v.Length("cover_letter", "Сообщение", in.CoverLetter, minCover, 4000)
+	v.Length("approach", "Ваш подход", in.Approach, 120, 4000)
+	v.Length("relevant_experience", "Похожий опыт", in.RelevantExperience, 60, 3000)
 	if in.Questions != "" {
-		v.Length("questions", "Your questions", in.Questions, 0, 2000)
+		v.Length("questions", "Вопросы", in.Questions, 0, 2000)
 	}
-	v.NoControlChars("cover_letter", "Your message", in.CoverLetter)
-	v.NoControlChars("approach", "Your approach", in.Approach)
+	v.NoControlChars("cover_letter", "Сообщение", in.CoverLetter)
+	v.NoControlChars("approach", "Ваш подход", in.Approach)
 
 	// Length alone is easy to game with a wall of one repeated word.
 	for field, label := range map[string]string{
@@ -218,25 +218,25 @@ func (s *Service) validateSubmission(ctx context.Context, in SubmitRequest) (*Ne
 			text = in.Approach
 		}
 		if validate.LooksLikeSpam(text) {
-			v.Addf(field, "%s needs to say something specific about this project.", label)
+			v.Addf(field, "«%s»: напишите что-то конкретное об этом заказе.", label)
 		}
 	}
 
 	if len(in.Milestones) > 20 {
-		v.Add("milestones", "Twenty milestones is more than a proposal should need.")
+		v.Add("milestones", "Двадцать этапов — больше, чем нужно одному отклику.")
 	}
 	milestones := make([]Milestone, 0, len(in.Milestones))
 	var milestoneTotal int64
 	for i, m := range in.Milestones {
 		field := fmt.Sprintf("milestones.%d", i)
 		if strings.TrimSpace(m.Title) == "" {
-			v.Addf(field+".title", "Name this milestone.")
+			v.Addf(field+".title", "Назовите этап.")
 		}
 		if len(m.Title) > 160 {
-			v.Addf(field+".title", "Keep the milestone title under 160 characters.")
+			v.Addf(field+".title", "Название этапа — не длиннее 160 символов.")
 		}
 		if m.AmountMinor <= 0 {
-			v.Addf(field+".amount_minor", "Set an amount for this milestone.")
+			v.Addf(field+".amount_minor", "Укажите сумму этапа.")
 		}
 		if m.Days != nil {
 			v.IntRange(field+".days", "Milestone duration", *m.Days, 1, 365)
@@ -254,12 +254,12 @@ func (s *Service) validateSubmission(ctx context.Context, in SubmitRequest) (*Ne
 	// nobody agreed to, so the mismatch is refused here rather than reconciled
 	// later.
 	if len(milestones) > 0 && milestoneTotal != in.AmountMinor {
-		v.Addf("milestones", "Your milestones add up to %s but your price is %s.",
+		v.Addf("milestones", "Сумма этапов — %s, а ваша цена — %s.",
 			FormatMoney(milestoneTotal, currency), FormatMoney(in.AmountMinor, currency))
 	}
 
 	if len(in.PortfolioIDs)+len(in.HistoryIDs) > 6 {
-		v.Add("portfolio_ids", "Attach up to six pieces of past work — the most relevant ones.")
+		v.Add("portfolio_ids", "Приложите не больше шести прошлых работ — самых близких по теме.")
 	}
 
 	if v.Any() {
@@ -314,14 +314,14 @@ func (s *Service) resolveEvidence(ctx context.Context, developerID uuid.UUID,
 		s.audit.Denial(ctx, "portfolio_project", nil,
 			"proposal attached portfolio items the developer does not own")
 		return nil, nil, httpx.Validation(map[string]string{
-			"portfolio_ids": "One of the attached portfolio projects isn't available.",
+			"portfolio_ids": "Одна из приложенных работ портфолио недоступна.",
 		})
 	}
 	if len(ownedHistory) != len(historyIDs) {
 		s.audit.Denial(ctx, "completed_project_history", nil,
 			"proposal attached verified history the developer does not own")
 		return nil, nil, httpx.Validation(map[string]string{
-			"history_ids": "One of the attached completed projects isn't available.",
+			"history_ids": "Одна из приложенных завершённых работ недоступна.",
 		})
 	}
 	return ownedPortfolio, ownedHistory, nil
@@ -389,7 +389,7 @@ func (s *Service) ForProject(ctx context.Context, id *security.Identity,
 		return nil, httpx.NotFoundf("project %s does not belong to user %s", projectID, id.UserID)
 	}
 	if sort != "" && !sort.Valid() {
-		return nil, httpx.Validation(map[string]string{"sort": "That isn't one of the available orders."})
+		return nil, httpx.Validation(map[string]string{"sort": "Такой сортировки нет."})
 	}
 
 	cards, err := s.store.ForProject(ctx, projectID, sort, 200)
@@ -425,7 +425,7 @@ func (s *Service) Shortlist(ctx context.Context, id *security.Identity, proposal
 		return err
 	}
 	if len(note) > 1000 {
-		return httpx.Validation(map[string]string{"note": "Keep your note under 1000 characters."})
+		return httpx.Validation(map[string]string{"note": "Примечание — не длиннее 1000 символов."})
 	}
 
 	if err := s.store.SetShortlisted(ctx, proposalID, shortlisted, strings.TrimSpace(note)); err != nil {
@@ -446,11 +446,11 @@ func (s *Service) Decline(ctx context.Context, id *security.Identity, proposalID
 	if !Live(parties.Status) {
 		e := *httpx.ErrConflict
 		e.Code = "cannot_decline"
-		e.Message = "This proposal has already been responded to."
+		e.Message = "На этот отклик уже ответили."
 		return &e
 	}
 	if len(reason) > 1000 {
-		return httpx.Validation(map[string]string{"reason": "Keep your reason under 1000 characters."})
+		return httpx.Validation(map[string]string{"reason": "Причина — не длиннее 1000 символов."})
 	}
 
 	if err := s.store.Decline(ctx, proposalID, strings.TrimSpace(reason)); err != nil {
@@ -482,14 +482,14 @@ func (s *Service) Withdraw(ctx context.Context, id *security.Identity, proposalI
 	if parties.Status == StatusAccepted {
 		e := *httpx.ErrConflict
 		e.Code = "already_accepted"
-		e.Message = "This proposal has been accepted. Talk to the client in the workspace if something has changed."
+		e.Message = "Отклик принят. Если что-то изменилось — напишите заказчику в рабочем пространстве."
 		return &e
 	}
 
 	if err := s.store.Withdraw(ctx, proposalID, id.UserID); err != nil {
 		e := *httpx.ErrConflict
 		e.Code = "cannot_withdraw"
-		e.Message = "This proposal can't be withdrawn in its current state."
+		e.Message = "В текущем состоянии отклик отозвать нельзя."
 		return e.Wrap(err)
 	}
 	return nil

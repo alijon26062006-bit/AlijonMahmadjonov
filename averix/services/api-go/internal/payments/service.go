@@ -83,7 +83,7 @@ func (s *Service) active(ctx context.Context) (Provider, error) {
 	if !ok {
 		e := *httpx.ErrNotConfigured
 		e.Code = "payments_not_configured"
-		e.Message = "Payments aren't set up on this platform yet. An administrator has to add the transfer details first."
+		e.Message = "Платежи пока не настроены: администратор ещё не указал реквизиты для перевода."
 		return nil, &e
 	}
 	return provider, nil
@@ -123,13 +123,13 @@ func (s *Service) Fund(ctx context.Context, id *security.Identity, milestoneID u
 	if role != contracts.RoleClient {
 		e := *httpx.ErrForbidden
 		e.Code = "not_your_move"
-		e.Message = "Only the client funds a milestone."
+		e.Message = "Оплачивает этап только заказчик."
 		return nil, &e
 	}
 	if facts.MilestoneStatus != contracts.MilestoneDraft {
 		e := *httpx.ErrConflict
 		e.Code = "milestone_state"
-		e.Message = "This milestone has already been funded."
+		e.Message = "Этот этап уже оплачен."
 		return nil, &e
 	}
 
@@ -175,7 +175,7 @@ func (s *Service) Fund(ctx context.Context, id *security.Identity, milestoneID u
 			if errors.Is(err, ErrNotConfigured) {
 				e := *httpx.ErrNotConfigured
 				e.Code = "payments_not_configured"
-				e.Message = "Payments aren't set up on this platform yet."
+				e.Message = "Платежи на площадке пока не настроены."
 				return nil, &e
 			}
 			return nil, httpx.Internalf(err, "start payment")
@@ -323,7 +323,7 @@ func (s *Service) ConfirmCharge(ctx context.Context, id *security.Identity,
 	}
 	if intent.Direction != DirectionCharge {
 		return nil, httpx.Validation(map[string]string{
-			"payment": "That payment is not a client transfer.",
+			"payment": "Этот платёж — не перевод от заказчика.",
 		})
 	}
 	if err := s.checkAmount(intent, in.AmountMinor); err != nil {
@@ -338,7 +338,7 @@ func (s *Service) ConfirmCharge(ctx context.Context, id *security.Identity,
 		if errors.Is(err, ErrAlreadySettled) {
 			e := *httpx.ErrConflict
 			e.Code = "already_settled"
-			e.Message = "This payment has already been confirmed."
+			e.Message = "Этот платёж уже подтверждён."
 			return nil, &e
 		}
 		return nil, httpx.Internalf(err, "settle payment")
@@ -410,7 +410,7 @@ func (s *Service) ConfirmPayout(ctx context.Context, id *security.Identity,
 	}
 	if intent.Direction != DirectionPayout {
 		return nil, httpx.Validation(map[string]string{
-			"payment": "That payment is not a payout.",
+			"payment": "Этот платёж — не выплата.",
 		})
 	}
 	net := intent.AmountMinor - intent.FeeMinor
@@ -428,7 +428,7 @@ func (s *Service) ConfirmPayout(ctx context.Context, id *security.Identity,
 		if errors.Is(err, ErrAlreadySettled) {
 			e := *httpx.ErrConflict
 			e.Code = "already_settled"
-			e.Message = "This payout has already been recorded."
+			e.Message = "Эта выплата уже записана."
 			return nil, &e
 		}
 		return nil, httpx.Internalf(err, "settle payout")
@@ -516,7 +516,7 @@ func (s *Service) Reject(ctx context.Context, id *security.Identity,
 	}
 	if len(strings.TrimSpace(in.Reason)) < 10 {
 		return nil, httpx.Validation(map[string]string{
-			"reason": "Say why — the payer sees this and needs to know what to do next.",
+			"reason": "Объясните причину: плательщик увидит её и должен понимать, что делать дальше.",
 		})
 	}
 
@@ -527,7 +527,7 @@ func (s *Service) Reject(ctx context.Context, id *security.Identity,
 	if intent.Status == StatusSucceeded {
 		e := *httpx.ErrConflict
 		e.Code = "already_settled"
-		e.Message = "This payment was already confirmed. Use a refund instead."
+		e.Message = "Платёж уже подтверждён — используйте возврат."
 		return nil, &e
 	}
 	if err := s.store.Fail(ctx, intentID, "not_received", strings.TrimSpace(in.Reason)); err != nil {
@@ -567,7 +567,7 @@ func (s *Service) Refund(ctx context.Context, id *security.Identity,
 	if intent.Status != StatusSucceeded && intent.Status != StatusPartiallyRefunded {
 		e := *httpx.ErrConflict
 		e.Code = "not_refundable"
-		e.Message = "Only a confirmed payment can be refunded."
+		e.Message = "Вернуть можно только подтверждённый платёж."
 		return nil, &e
 	}
 	remaining := intent.AmountMinor - intent.RefundedMinor
@@ -579,7 +579,7 @@ func (s *Service) Refund(ctx context.Context, id *security.Identity,
 	}
 	if len(strings.TrimSpace(in.Reason)) < 10 {
 		return nil, httpx.Validation(map[string]string{
-			"reason": "Record why this is being refunded.",
+			"reason": "Запишите, почему делается возврат.",
 		})
 	}
 
@@ -623,7 +623,7 @@ func (s *Service) Queue(ctx context.Context, id *security.Identity, direction st
 	}
 	if direction != "" && direction != DirectionCharge && direction != DirectionPayout &&
 		direction != DirectionRefund {
-		return nil, httpx.Validation(map[string]string{"direction": "Unknown payment direction."})
+		return nil, httpx.Validation(map[string]string{"direction": "Неизвестное направление платежа."})
 	}
 	return s.store.Pending(ctx, direction, 100)
 }
@@ -683,16 +683,16 @@ func (s *Service) SetManualDetails(ctx context.Context, id *security.Identity,
 
 	v := validate.New()
 	name := strings.TrimSpace(in.AccountName)
-	v.Required("account_name", "The account name", name)
-	v.Length("account_name", "The account name", name, 2, 120)
-	v.NoControlChars("account_name", "The account name", name)
+	v.Required("account_name", "Получатель перевода", name)
+	v.Length("account_name", "Получатель перевода", name, 2, 120)
+	v.NoControlChars("account_name", "Получатель перевода", name)
 
 	number := strings.TrimSpace(in.AccountNumber)
 	extraLabel := strings.TrimSpace(in.ExtraLabel)
 	extraValue := strings.TrimSpace(in.ExtraValue)
 	if number == "" && extraValue == "" {
 		v.Add("account_number",
-			"Add the account number, or use the extra field for an IBAN, card or wallet address.")
+			"Укажите номер счёта — или используйте дополнительное поле для IBAN, карты или кошелька.")
 	}
 	for field, value := range map[string]string{
 		"account_number": number, "bank_name": strings.TrimSpace(in.BankName),
@@ -701,16 +701,16 @@ func (s *Service) SetManualDetails(ctx context.Context, id *security.Identity,
 		if value == "" {
 			continue
 		}
-		v.Length(field, "That field", value, 1, 160)
-		v.NoControlChars(field, "That field", value)
+		v.Length(field, "Это поле", value, 1, 160)
+		v.NoControlChars(field, "Это поле", value)
 	}
 	if extraValue != "" && extraLabel == "" {
-		v.Add("extra_label", "Give the extra field a label, so the payer knows what it is.")
+		v.Add("extra_label", "Назовите дополнительное поле — иначе плательщик не поймёт, что это.")
 	}
 	note := strings.TrimSpace(in.Note)
 	if note != "" {
-		v.Length("note", "The note", note, 0, 400)
-		v.NoControlChars("note", "The note", note)
+		v.Length("note", "Примечание", note, 0, 400)
+		v.NoControlChars("note", "Примечание", note)
 	}
 	if v.Any() {
 		return nil, httpx.Validation(v.Fields())
@@ -781,7 +781,7 @@ func (s *Service) ForContract(ctx context.Context, id *security.Identity,
 	if role == contracts.RoleObserver {
 		// An observer sees the work, never what it cost.
 		e := *httpx.ErrForbidden
-		e.Message = "Payments on this contract are between the client and the developer."
+		e.Message = "Платежи по этой сделке — дело заказчика и исполнителя."
 		return nil, &e
 	}
 
@@ -840,7 +840,7 @@ func (s *Service) Webhook(ctx context.Context, providerCode string,
 		// better than accepting a body and pretending to process it.
 		e := *httpx.ErrNotConfigured
 		e.Code = "no_webhooks"
-		e.Message = "This payment provider does not send webhooks."
+		e.Message = "Этот платёжный провайдер не присылает уведомлений."
 		return &e
 	}
 
@@ -864,7 +864,7 @@ func (s *Service) Webhook(ctx context.Context, providerCode string,
 		// attacker learns nothing from the difference.
 		e := *httpx.ErrForbidden
 		e.Code = "webhook_rejected"
-		e.Message = "This request could not be verified."
+		e.Message = "Не удалось проверить запрос."
 		return &e
 	}
 	if !fresh {

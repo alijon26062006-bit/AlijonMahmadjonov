@@ -11,6 +11,7 @@ import (
 
 	"github.com/averix/api/internal/platform/cryptox"
 	"github.com/averix/api/internal/platform/database"
+	"github.com/averix/api/internal/platform/money"
 )
 
 type Store struct{ db *database.DB }
@@ -541,42 +542,16 @@ func slugify(input string) string {
 }
 
 func formatBudget(b Budget) string {
-	symbol := map[string]string{"USD": "$", "EUR": "€", "GBP": "£"}[b.Currency]
-	if symbol == "" {
-		symbol = b.Currency + " "
-	}
-	amount := func(minor int64) string {
-		whole := minor / 100
-		if minor%100 == 0 {
-			return fmt.Sprintf("%s%s", symbol, thousands(whole))
-		}
-		return fmt.Sprintf("%s%s.%02d", symbol, thousands(whole), minor%100)
-	}
 	switch {
 	case b.MinMinor != nil && b.MaxMinor != nil && *b.MinMinor != *b.MaxMinor:
-		return amount(*b.MinMinor) + "–" + amount(*b.MaxMinor)
+		return money.Round(*b.MinMinor, b.Currency) + " – " + money.Round(*b.MaxMinor, b.Currency)
 	case b.MaxMinor != nil:
 		if b.Type == "hourly" {
-			return amount(*b.MaxMinor) + "/hr"
+			return money.Round(*b.MaxMinor, b.Currency) + " в час"
 		}
-		return amount(*b.MaxMinor)
+		return money.Round(*b.MaxMinor, b.Currency)
 	case b.MinMinor != nil:
-		return "from " + amount(*b.MinMinor)
+		return "от " + money.Round(*b.MinMinor, b.Currency)
 	}
-	return "Budget not set"
-}
-
-func thousands(v int64) string {
-	s := fmt.Sprintf("%d", v)
-	if len(s) <= 3 {
-		return s
-	}
-	var out []byte
-	for i, digit := range []byte(s) {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			out = append(out, ',')
-		}
-		out = append(out, digit)
-	}
-	return string(out)
+	return "Бюджет не указан"
 }

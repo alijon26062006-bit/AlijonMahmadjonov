@@ -86,7 +86,7 @@ func (s *Service) Create(ctx context.Context, id *security.Identity, in CreateRe
 		e := *httpx.ErrConflict
 		e.Code = "too_many_open_projects"
 		e.Message = fmt.Sprintf(
-			"You have %d projects open or in draft. Close or publish some before adding another.", open)
+			"У вас %d открытых заказов и черновиков. Закройте или опубликуйте часть, прежде чем создавать новый.", open)
 		return nil, &e
 	}
 
@@ -113,58 +113,58 @@ func (s *Service) Create(ctx context.Context, id *security.Identity, in CreateRe
 func (s *Service) validateCreate(ctx context.Context, in CreateRequest) (*NewProject, error) {
 	v := validate.New()
 
-	title := v.Required("title", "Project title", in.Title)
-	v.Length("title", "Project title", in.Title, 8, 140)
-	v.NoControlChars("title", "Project title", in.Title)
+	title := v.Required("title", "Название заказа", in.Title)
+	v.Length("title", "Название заказа", in.Title, 8, 140)
+	v.NoControlChars("title", "Название заказа", in.Title)
 
-	description := v.Required("description", "Project description", in.Description)
+	description := v.Required("description", "Описание заказа", in.Description)
 	// 40 characters is the floor the database enforces; the client shows a
 	// counter, so anything shorter is a deliberate attempt to post nothing.
-	v.Length("description", "Project description", in.Description, 40, 20000)
-	v.NoControlChars("description", "Project description", in.Description)
+	v.Length("description", "Описание заказа", in.Description, 40, 20000)
+	v.NoControlChars("description", "Описание заказа", in.Description)
 
 	if in.Summary != "" {
-		v.Length("summary", "Summary", in.Summary, 0, 300)
+		v.Length("summary", "Краткое описание", in.Summary, 0, 300)
 	}
 
-	budgetType := v.OneOf("budget_type", "Budget type", defaultTo(in.BudgetType, "fixed"),
+	budgetType := v.OneOf("budget_type", "Тип бюджета", defaultTo(in.BudgetType, "fixed"),
 		"fixed", "range", "hourly")
 	currency := v.Currency("currency", in.Currency)
-	visibility := v.OneOf("visibility", "Visibility", defaultTo(in.Visibility, "public"),
+	visibility := v.OneOf("visibility", "Видимость", defaultTo(in.Visibility, "public"),
 		"public", "invite_only", "private")
 
 	if in.BudgetMinMinor != nil {
-		v.MoneyMinor("budget_min_minor", "Minimum budget", *in.BudgetMinMinor, 1000, 10_000_000_00)
+		v.MoneyMinor("budget_min_minor", "Минимальный бюджет", *in.BudgetMinMinor, 1000, 10_000_000_00)
 	}
 	if in.BudgetMaxMinor != nil {
-		v.MoneyMinor("budget_max_minor", "Maximum budget", *in.BudgetMaxMinor, 1000, 10_000_000_00)
+		v.MoneyMinor("budget_max_minor", "Максимальный бюджет", *in.BudgetMaxMinor, 1000, 10_000_000_00)
 	}
 	if in.BudgetMinMinor != nil && in.BudgetMaxMinor != nil && *in.BudgetMinMinor > *in.BudgetMaxMinor {
-		v.Add("budget_max_minor", "The maximum budget must be at least the minimum.")
+		v.Add("budget_max_minor", "Максимум бюджета не может быть меньше минимума.")
 	}
 	if in.BudgetMinMinor == nil && in.BudgetMaxMinor == nil {
-		v.Add("budget_max_minor", "Set a budget so developers know what to propose.")
+		v.Add("budget_max_minor", "Укажите бюджет — исполнителям нужно понимать, что предлагать.")
 	}
 	if budgetType == "range" && (in.BudgetMinMinor == nil || in.BudgetMaxMinor == nil) {
-		v.Add("budget_min_minor", "A budget range needs both a minimum and a maximum.")
+		v.Add("budget_min_minor", "Для диапазона нужны и минимум, и максимум.")
 	}
 
 	if in.DurationDays != nil {
-		v.IntRange("duration_days", "Duration", *in.DurationDays, 1, 1095)
+		v.IntRange("duration_days", "Срок", *in.DurationDays, 1, 1095)
 	}
 	if in.Starts != "" {
-		v.OneOf("starts", "Start time", in.Starts,
+		v.OneOf("starts", "Когда начинать", in.Starts,
 			"immediately", "within_week", "within_month", "flexible")
 	}
 	if in.ExperienceWanted != "" {
-		v.OneOf("experience_wanted", "Experience wanted", in.ExperienceWanted,
+		v.OneOf("experience_wanted", "Требуемый уровень", in.ExperienceWanted,
 			"any", "junior", "mid", "senior", "lead")
 	}
 	if in.OverlapFromUTC != nil {
-		v.IntRange("overlap_from_utc", "Overlap start", *in.OverlapFromUTC, -12, 14)
+		v.IntRange("overlap_from_utc", "Начало пересечения по времени", *in.OverlapFromUTC, -12, 14)
 	}
 	if in.OverlapToUTC != nil {
-		v.IntRange("overlap_to_utc", "Overlap end", *in.OverlapToUTC, -12, 14)
+		v.IntRange("overlap_to_utc", "Конец пересечения по времени", *in.OverlapToUTC, -12, 14)
 	}
 
 	var deadline *time.Time
@@ -172,25 +172,25 @@ func (s *Service) validateCreate(ctx context.Context, in CreateRequest) (*NewPro
 		parsed, err := time.Parse("2006-01-02", *in.Deadline)
 		switch {
 		case err != nil:
-			v.Add("deadline", "Use the format YYYY-MM-DD.")
+			v.Add("deadline", "Формат даты: ГГГГ-ММ-ДД.")
 		case parsed.Before(time.Now().AddDate(0, 0, -1)):
-			v.Add("deadline", "The deadline is in the past.")
+			v.Add("deadline", "Крайняя дата уже прошла.")
 		default:
 			deadline = &parsed
 		}
 	}
 
 	if strings.TrimSpace(in.CategorySlug) == "" {
-		v.Add("category_slug", "Choose what kind of work this is.")
+		v.Add("category_slug", "Выберите, к какой категории относится работа.")
 	}
 	if len(in.RequiredSkills) > 15 {
-		v.Add("required_skills", "List up to 15 required technologies.")
+		v.Add("required_skills", "Не больше 15 обязательных навыков.")
 	}
 	if len(in.OptionalSkills) > 15 {
-		v.Add("optional_skills", "List up to 15 nice-to-have technologies.")
+		v.Add("optional_skills", "Не больше 15 желательных навыков.")
 	}
 	if len(in.Features) > 40 {
-		v.Add("features", "That is more features than a single project should carry.")
+		v.Add("features", "Столько пунктов один заказ нести не должен.")
 	}
 	for i, f := range in.Features {
 		if strings.TrimSpace(f.Title) == "" {
@@ -208,7 +208,7 @@ func (s *Service) validateCreate(ctx context.Context, in CreateRequest) (*NewPro
 	categoryID, err := s.taxonomy.CategoryIDBySlug(ctx, strings.TrimSpace(in.CategorySlug))
 	if err != nil {
 		return nil, httpx.Validation(map[string]string{
-			"category_slug": "That isn't one of the available categories.",
+			"category_slug": "Такой категории в списке нет.",
 		})
 	}
 
@@ -218,7 +218,7 @@ func (s *Service) validateCreate(ctx context.Context, in CreateRequest) (*NewPro
 	}
 	if len(unknown) > 0 {
 		return nil, httpx.Validation(map[string]string{
-			"required_skills": fmt.Sprintf("We don't recognise: %s.", strings.Join(unknown, ", ")),
+			"required_skills": fmt.Sprintf("Не распознали: %s.", strings.Join(unknown, ", ")),
 		})
 	}
 	optionalIDs, unknown, err := s.taxonomy.ResolveSkillIDs(ctx, in.OptionalSkills)
@@ -227,7 +227,7 @@ func (s *Service) validateCreate(ctx context.Context, in CreateRequest) (*NewPro
 	}
 	if len(unknown) > 0 {
 		return nil, httpx.Validation(map[string]string{
-			"optional_skills": fmt.Sprintf("We don't recognise: %s.", strings.Join(unknown, ", ")),
+			"optional_skills": fmt.Sprintf("Не распознали: %s.", strings.Join(unknown, ", ")),
 		})
 	}
 
@@ -237,7 +237,7 @@ func (s *Service) validateCreate(ctx context.Context, in CreateRequest) (*NewPro
 		parsed, err := uuid.Parse(*in.AssistantSessionID)
 		if err != nil {
 			return nil, httpx.Validation(map[string]string{
-				"assistant_session_id": "That draft reference isn't valid.",
+				"assistant_session_id": "Ссылка на черновик указана неверно.",
 			})
 		}
 		assistantSession = &parsed
@@ -307,21 +307,21 @@ func (s *Service) publish(ctx context.Context, id *security.Identity, projectID 
 	if !id.EmailVerified {
 		e := *httpx.ErrForbidden
 		e.Code = "email_not_verified"
-		e.Message = "Please confirm your email address before publishing a project."
+		e.Message = "Подтвердите адрес почты, прежде чем публиковать заказ."
 		return nil, &e
 	}
 
 	v := validate.New()
 	if len(project.Skills) == 0 {
-		v.Add("required_skills", "Add at least one technology so the right developers see this.")
+		v.Add("required_skills", "Добавьте хотя бы один навык — по нему заказ найдёт нужных исполнителей.")
 	}
 	if project.Budget.MinMinor == nil && project.Budget.MaxMinor == nil {
-		v.Add("budget", "Set a budget before publishing.")
+		v.Add("budget", "Перед публикацией укажите бюджет.")
 	}
 	if len(project.Targeting) == 0 {
 		// Nobody would ever see it, which is a configuration problem rather
 		// than the client's mistake — so say something useful.
-		v.Add("category_slug", "This category isn't matched to any specialisation yet. Please choose another.")
+		v.Add("category_slug", "К этой категории пока не привязана ни одна специализация. Выберите другую.")
 	}
 	if v.Any() {
 		return nil, httpx.Validation(v.Fields())
@@ -331,7 +331,7 @@ func (s *Service) publish(ctx context.Context, id *security.Identity, projectID 
 		if errors.Is(err, ErrBadTransition) {
 			e := *httpx.ErrConflict
 			e.Code = "cannot_publish"
-			e.Message = "This project can't be published from its current state."
+			e.Message = "Из текущего состояния заказ опубликовать нельзя."
 			return nil, e.Wrap(err)
 		}
 		return nil, httpx.Internalf(err, "publish project")
@@ -488,7 +488,7 @@ func (s *Service) MyProjects(ctx context.Context, id *security.Identity, status 
 		return nil, err
 	}
 	if status != "" && !isKnownStatus(status) {
-		return nil, httpx.Validation(map[string]string{"status": "That isn't a project status."})
+		return nil, httpx.Validation(map[string]string{"status": "Такого статуса у заказа нет."})
 	}
 	projects, err := s.store.ClientProjects(ctx, id.UserID, status, 100)
 	if err != nil {
@@ -540,7 +540,7 @@ func (s *Service) Update(ctx context.Context, id *security.Identity, projectID u
 	if existing.Status == StatusInProgress || existing.Status == StatusCompleted {
 		e := *httpx.ErrConflict
 		e.Code = "project_locked"
-		e.Message = "This project is already under contract, so its brief can't be changed. Talk to the developer in the workspace."
+		e.Message = "По заказу уже идёт сделка, менять описание нельзя. Обсудите изменения с исполнителем в рабочем пространстве."
 		return nil, &e
 	}
 
@@ -548,22 +548,22 @@ func (s *Service) Update(ctx context.Context, id *security.Identity, projectID u
 	update := UpdateInput{}
 
 	if in.Title != nil {
-		v.Length("title", "Project title", *in.Title, 8, 140)
+		v.Length("title", "Название заказа", *in.Title, 8, 140)
 		trimmed := strings.TrimSpace(*in.Title)
 		update.Title = &trimmed
 	}
 	if in.Summary != nil {
-		v.Length("summary", "Summary", *in.Summary, 0, 300)
+		v.Length("summary", "Краткое описание", *in.Summary, 0, 300)
 		trimmed := strings.TrimSpace(*in.Summary)
 		update.Summary = &trimmed
 	}
 	if in.Description != nil {
-		v.Length("description", "Project description", *in.Description, 40, 20000)
+		v.Length("description", "Описание заказа", *in.Description, 40, 20000)
 		trimmed := strings.TrimSpace(*in.Description)
 		update.Description = &trimmed
 	}
 	if in.BudgetType != nil {
-		value := v.OneOf("budget_type", "Budget type", *in.BudgetType, "fixed", "range", "hourly")
+		value := v.OneOf("budget_type", "Тип бюджета", *in.BudgetType, "fixed", "range", "hourly")
 		update.BudgetType = &value
 	}
 	if in.Currency != nil {
@@ -571,43 +571,43 @@ func (s *Service) Update(ctx context.Context, id *security.Identity, projectID u
 		update.Currency = &value
 	}
 	if in.Visibility != nil {
-		value := v.OneOf("visibility", "Visibility", *in.Visibility, "public", "invite_only", "private")
+		value := v.OneOf("visibility", "Видимость", *in.Visibility, "public", "invite_only", "private")
 		update.Visibility = &value
 	}
 	if in.BudgetMinMinor != nil {
-		v.MoneyMinor("budget_min_minor", "Minimum budget", *in.BudgetMinMinor, 1000, 10_000_000_00)
+		v.MoneyMinor("budget_min_minor", "Минимальный бюджет", *in.BudgetMinMinor, 1000, 10_000_000_00)
 		update.BudgetMinMinor = in.BudgetMinMinor
 	}
 	if in.BudgetMaxMinor != nil {
-		v.MoneyMinor("budget_max_minor", "Maximum budget", *in.BudgetMaxMinor, 1000, 10_000_000_00)
+		v.MoneyMinor("budget_max_minor", "Максимальный бюджет", *in.BudgetMaxMinor, 1000, 10_000_000_00)
 		update.BudgetMaxMinor = in.BudgetMaxMinor
 	}
 	if in.DurationDays != nil {
-		v.IntRange("duration_days", "Duration", *in.DurationDays, 1, 1095)
+		v.IntRange("duration_days", "Срок", *in.DurationDays, 1, 1095)
 		update.DurationDays = in.DurationDays
 	}
 	if in.Starts != nil {
-		value := v.OneOf("starts", "Start time", *in.Starts,
+		value := v.OneOf("starts", "Когда начинать", *in.Starts,
 			"immediately", "within_week", "within_month", "flexible")
 		update.Starts = &value
 	}
 	if in.ExperienceWanted != nil {
-		value := v.OneOf("experience_wanted", "Experience wanted", *in.ExperienceWanted,
+		value := v.OneOf("experience_wanted", "Требуемый уровень", *in.ExperienceWanted,
 			"any", "junior", "mid", "senior", "lead")
 		update.ExperienceWanted = &value
 	}
 	if in.OverlapFromUTC != nil {
-		v.IntRange("overlap_from_utc", "Overlap start", *in.OverlapFromUTC, -12, 14)
+		v.IntRange("overlap_from_utc", "Начало пересечения по времени", *in.OverlapFromUTC, -12, 14)
 		update.OverlapFromUTC = in.OverlapFromUTC
 	}
 	if in.OverlapToUTC != nil {
-		v.IntRange("overlap_to_utc", "Overlap end", *in.OverlapToUTC, -12, 14)
+		v.IntRange("overlap_to_utc", "Конец пересечения по времени", *in.OverlapToUTC, -12, 14)
 		update.OverlapToUTC = in.OverlapToUTC
 	}
 	if in.Deadline != nil && *in.Deadline != "" {
 		parsed, err := time.Parse("2006-01-02", *in.Deadline)
 		if err != nil {
-			v.Add("deadline", "Use the format YYYY-MM-DD.")
+			v.Add("deadline", "Формат даты: ГГГГ-ММ-ДД.")
 		} else {
 			update.Deadline = &parsed
 		}
@@ -615,28 +615,28 @@ func (s *Service) Update(ctx context.Context, id *security.Identity, projectID u
 	if in.CategorySlug != nil {
 		categoryID, err := s.taxonomy.CategoryIDBySlug(ctx, strings.TrimSpace(*in.CategorySlug))
 		if err != nil {
-			v.Add("category_slug", "That isn't one of the available categories.")
+			v.Add("category_slug", "Такой категории в списке нет.")
 		} else {
 			update.CategoryID = &categoryID
 		}
 	}
 	if in.RequiredSkills != nil || in.OptionalSkills != nil {
 		if len(in.RequiredSkills) > 15 {
-			v.Add("required_skills", "List up to 15 required technologies.")
+			v.Add("required_skills", "Не больше 15 обязательных навыков.")
 		}
 		requiredIDs, unknown, err := s.taxonomy.ResolveSkillIDs(ctx, in.RequiredSkills)
 		if err != nil {
 			return nil, httpx.Internalf(err, "resolve required skills")
 		}
 		if len(unknown) > 0 {
-			v.Addf("required_skills", "We don't recognise: %s.", strings.Join(unknown, ", "))
+			v.Addf("required_skills", "Не распознали: %s.", strings.Join(unknown, ", "))
 		}
 		optionalIDs, unknown, err := s.taxonomy.ResolveSkillIDs(ctx, in.OptionalSkills)
 		if err != nil {
 			return nil, httpx.Internalf(err, "resolve optional skills")
 		}
 		if len(unknown) > 0 {
-			v.Addf("optional_skills", "We don't recognise: %s.", strings.Join(unknown, ", "))
+			v.Addf("optional_skills", "Не распознали: %s.", strings.Join(unknown, ", "))
 		}
 		update.RequiredSkills = requiredIDs
 		update.OptionalSkills = optionalIDs
@@ -689,7 +689,7 @@ func (s *Service) Cancel(ctx context.Context, id *security.Identity, projectID u
 		if errors.Is(err, ErrBadTransition) {
 			e := *httpx.ErrConflict
 			e.Code = "cannot_cancel"
-			e.Message = "This project can't be cancelled from its current state."
+			e.Message = "Из текущего состояния заказ отменить нельзя."
 			return e.Wrap(err)
 		}
 		return httpx.Internalf(err, "cancel project")

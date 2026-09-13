@@ -181,15 +181,15 @@ func TestFundingProducesInstructionsAndWaitsForConfirmation(t *testing.T) {
 		instruction, _ := entry.(map[string]any)
 		labels[instruction["label"].(string)] = instruction["value"].(string)
 	}
-	if labels["Amount"] != "$300.00" {
-		t.Errorf("amount = %q, want the milestone's value", labels["Amount"])
+	if labels["Сумма"] != "$300" {
+		t.Errorf("amount = %q, want the milestone's value", labels["Сумма"])
 	}
-	if labels["Payment reference"] != reference {
+	if labels["Номер платежа"] != reference {
 		t.Errorf("the quoted reference (%q) must match the payment (%q)",
-			labels["Payment reference"], reference)
+			labels["Номер платежа"], reference)
 	}
-	if labels["Account name"] != "AVERIX Operations" {
-		t.Errorf("account name = %q", labels["Account name"])
+	if labels["Получатель"] != "AVERIX Operations" {
+		t.Errorf("account name = %q", labels["Получатель"])
 	}
 
 	// Nothing has moved: the milestone is not funded by asking to pay.

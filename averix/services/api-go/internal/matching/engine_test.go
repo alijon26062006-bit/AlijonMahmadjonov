@@ -371,7 +371,7 @@ func TestLanguageShareAloneIsAWeakSignal(t *testing.T) {
 	}
 	// The wording shown to a user must describe code, not knowledge.
 	for _, r := range languageDim.Reasons {
-		if r.Detail != "" && !contains(r.Detail, "code") {
+		if r.Detail != "" && !contains(r.Detail, "кода") {
 			t.Errorf("language-share reason reads %q; it must describe code share", r.Detail)
 		}
 	}
@@ -440,7 +440,7 @@ func TestNewDeveloperIsNotBuried(t *testing.T) {
 	// And it must be labelled honestly rather than presented as a track record.
 	labelled := false
 	for _, r := range history.Reasons {
-		if contains(r.Label, "New to AVERIX") {
+		if contains(r.Label, "Новичок на AVERIX") {
 			labelled = true
 		}
 	}
@@ -492,7 +492,7 @@ func TestBudgetMismatchIsSurfaced(t *testing.T) {
 	}
 	surfaced := false
 	for _, r := range dim.Reasons {
-		if !r.Met && contains(r.Label, "minimum project size") {
+		if !r.Met && contains(r.Label, "минимального заказа") {
 			surfaced = true
 		}
 	}

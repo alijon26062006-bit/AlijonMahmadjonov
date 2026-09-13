@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/averix/api/internal/notifications"
 	"github.com/averix/api/internal/platform/database"
+	"github.com/averix/api/internal/platform/money"
 )
 
 var (
@@ -399,29 +399,8 @@ func (s *Store) SetHistoryVisibility(ctx context.Context, developerID, entryID u
 // parties agreed: the figure, a bracket, or nothing. The developer's total
 // earnings are never derivable from what is shown here.
 func displayValue(minor int64, currency, visibility string) string {
-	switch visibility {
-	case "public":
-		return notifications.FormatMoney(minor, currency)
-	case "range":
-		lower, upper := bracket(minor)
-		return notifications.FormatMoney(lower, currency) + " – " + notifications.FormatMoney(upper, currency)
-	default:
-		return ""
-	}
+	return money.Visible(minor, currency, visibility)
 }
 
 // bracket returns a round band around an amount so "about this much" is
 // honest without being exact.
-func bracket(minor int64) (int64, int64) {
-	step := int64(10_000_00) // 10 000 in major units
-	switch {
-	case minor < 50_000_00:
-		step = 5_000_00
-	case minor < 500_000_00:
-		step = 25_000_00
-	case minor < 5_000_000_00:
-		step = 100_000_00
-	}
-	lower := (minor / step) * step
-	return lower, lower + step
-}

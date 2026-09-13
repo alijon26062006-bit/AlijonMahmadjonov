@@ -18,7 +18,7 @@ type Error struct {
 	Status  int
 	Code    string
 	Message string
-	// Field-level validation problems: {"email": "Enter a valid email address."}
+	// Field-level validation problems: {"email": "Проверьте адрес электронной почты."}
 	Fields map[string]string
 	// Internal cause. Logged, never serialised.
 	cause error
@@ -62,41 +62,41 @@ func newError(status int, code, message string) *Error {
 // internal service names.
 var (
 	ErrBadRequest = newError(http.StatusBadRequest, "bad_request",
-		"We couldn't process that request. Please check the details and try again.")
+		"Не удалось обработать запрос. Проверьте данные и попробуйте ещё раз.")
 	ErrValidation = newError(http.StatusUnprocessableEntity, "validation_failed",
-		"Some details need attention before we can continue.")
+		"Проверьте заполненные поля — что-то нужно поправить.")
 	ErrUnauthenticated = newError(http.StatusUnauthorized, "unauthenticated",
-		"Please sign in to continue.")
+		"Войдите, чтобы продолжить.")
 	ErrInvalidCredentials = newError(http.StatusUnauthorized, "invalid_credentials",
-		"That email and password don't match an account.")
+		"Такой почты и пароля у нас нет.")
 	ErrSessionExpired = newError(http.StatusUnauthorized, "session_expired",
-		"Your session has expired. Please sign in again.")
+		"Сеанс истёк. Войдите заново.")
 	ErrForbidden = newError(http.StatusForbidden, "forbidden",
-		"You don't have access to this.")
+		"У вас нет доступа к этому разделу.")
 	ErrCSRF = newError(http.StatusForbidden, "csrf_failed",
-		"Your session couldn't be verified. Please refresh the page and try again.")
+		"Не удалось проверить сеанс. Обновите страницу и попробуйте ещё раз.")
 	ErrNotFound = newError(http.StatusNotFound, "not_found",
-		"We couldn't find what you were looking for.")
+		"Мы не нашли то, что вы искали.")
 	ErrConflict = newError(http.StatusConflict, "conflict",
-		"That change conflicts with the current state. Please refresh and try again.")
+		"Данные изменились с момента загрузки. Обновите страницу и повторите.")
 	ErrEmailTaken = newError(http.StatusConflict, "email_taken",
-		"An account with this email already exists.")
+		"Аккаунт с такой почтой уже есть.")
 	ErrUsernameTaken = newError(http.StatusConflict, "username_taken",
-		"That username is already taken.")
+		"Это имя пользователя уже занято.")
 	ErrPayloadTooLarge = newError(http.StatusRequestEntityTooLarge, "payload_too_large",
-		"That file is larger than we can accept.")
+		"Файл больше, чем мы можем принять.")
 	ErrUnsupportedMedia = newError(http.StatusUnsupportedMediaType, "unsupported_media_type",
-		"That file type isn't supported here.")
+		"Такой тип файла здесь не поддерживается.")
 	ErrRateLimited = newError(http.StatusTooManyRequests, "rate_limited",
-		"You're doing that a little too quickly. Please wait a moment and try again.")
+		"Слишком часто. Подождите немного и попробуйте снова.")
 	ErrAccountLocked = newError(http.StatusTooManyRequests, "account_locked",
-		"Too many failed attempts. Please try again shortly or reset your password.")
+		"Слишком много неудачных попыток. Подождите или восстановите пароль.")
 	ErrInternal = newError(http.StatusInternalServerError, "internal_error",
-		"Something went wrong on our end. Please try again.")
+		"Что-то пошло не так на нашей стороне. Попробуйте ещё раз.")
 	ErrNotConfigured = newError(http.StatusServiceUnavailable, "not_configured",
-		"This feature isn't configured on this environment yet.")
+		"Эта возможность пока не настроена на площадке.")
 	ErrUnavailable = newError(http.StatusServiceUnavailable, "unavailable",
-		"This service is temporarily unavailable. Please try again shortly.")
+		"Сервис временно недоступен. Попробуйте чуть позже.")
 )
 
 // Validation builds a 422 carrying per-field messages.

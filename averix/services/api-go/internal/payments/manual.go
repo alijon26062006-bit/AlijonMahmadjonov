@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/averix/api/internal/platform/money"
 )
 
 // Manual is the provider for environments with no gateway.
@@ -126,26 +128,26 @@ func (m *Manual) CreatePayment(ctx context.Context, in Request) (Result, error) 
 func (m *Manual) instructions(ctx context.Context, in Request) []Instruction {
 	settings := m.current(ctx)
 	out := []Instruction{
-		{Label: "Amount", Value: formatMoney(in.AmountMinor, in.Currency), Critical: true},
+		{Label: "Сумма", Value: formatMoney(in.AmountMinor, in.Currency), Critical: true},
 		// The reference is what lets an administrator match an anonymous bank
 		// line to this milestone. It is the one field that must be exact.
-		{Label: "Payment reference", Value: in.Reference, Critical: true},
-		{Label: "Account name", Value: settings.AccountName},
+		{Label: "Номер платежа", Value: in.Reference, Critical: true},
+		{Label: "Получатель", Value: settings.AccountName},
 	}
 	if settings.AccountNumber != "" {
-		out = append(out, Instruction{Label: "Account number", Value: settings.AccountNumber})
+		out = append(out, Instruction{Label: "Счёт или карта", Value: settings.AccountNumber})
 	}
 	if settings.BankName != "" {
-		out = append(out, Instruction{Label: "Bank", Value: settings.BankName})
+		out = append(out, Instruction{Label: "Банк", Value: settings.BankName})
 	}
 	if settings.ExtraLabel != "" && settings.ExtraValue != "" {
 		out = append(out, Instruction{Label: settings.ExtraLabel, Value: settings.ExtraValue})
 	}
 	if in.ContractReference != "" {
-		out = append(out, Instruction{Label: "Contract", Value: in.ContractReference})
+		out = append(out, Instruction{Label: "Сделка", Value: in.ContractReference})
 	}
 	if settings.Note != "" {
-		out = append(out, Instruction{Label: "Note", Value: settings.Note})
+		out = append(out, Instruction{Label: "Примечание", Value: settings.Note})
 	}
 	return out
 }
@@ -195,26 +197,5 @@ func (m *Manual) GetTransaction(ctx context.Context, providerRef string) (Transa
 }
 
 func formatMoney(minor int64, currency string) string {
-	symbol := map[string]string{"USD": "$", "EUR": "€", "GBP": "£"}[strings.ToUpper(currency)]
-	whole, cents := minor/100, minor%100
-	grouped := group(whole)
-	if symbol == "" {
-		return fmt.Sprintf("%s %s.%02d", strings.ToUpper(currency), grouped, cents)
-	}
-	return fmt.Sprintf("%s%s.%02d", symbol, grouped, cents)
-}
-
-func group(v int64) string {
-	s := fmt.Sprintf("%d", v)
-	if len(s) <= 3 {
-		return s
-	}
-	var out []byte
-	for i, digit := range []byte(s) {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			out = append(out, ',')
-		}
-		out = append(out, digit)
-	}
-	return string(out)
+	return money.Format(minor, currency)
 }

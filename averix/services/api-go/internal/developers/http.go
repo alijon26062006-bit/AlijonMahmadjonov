@@ -271,7 +271,7 @@ func (h *Handlers) readSinglePart(w http.ResponseWriter, r *http.Request, field 
 		part, err := reader.NextPart()
 		if errors.Is(err, io.EOF) {
 			return nil, "", httpx.Validation(map[string]string{
-				field: "Choose an image to upload.",
+				field: "Выберите изображение для загрузки.",
 			})
 		}
 		if err != nil {
@@ -296,35 +296,35 @@ func photoError(err error) error {
 	switch {
 	case errors.Is(err, ErrPhotoTooLarge):
 		e := *httpx.ErrPayloadTooLarge
-		e.Message = "That image is too large. Please choose one under 10 MB."
+		e.Message = "Изображение слишком большое. Выберите файл до 10 МБ."
 		return &e
 	case errors.Is(err, imaging.ErrUnsupportedFormat):
 		e := *httpx.ErrUnsupportedMedia
-		e.Message = "That image format isn't supported. Please use a JPEG, PNG or WebP file."
+		e.Message = "Такой формат изображения не поддерживается. Подойдут JPEG, PNG или WebP."
 		return e.Wrap(err)
 	case errors.Is(err, imaging.ErrNotAnImage):
 		e := *httpx.ErrUnsupportedMedia
-		e.Message = "That file isn't an image."
+		e.Message = "Это не изображение."
 		return e.Wrap(err)
 	case errors.Is(err, imaging.ErrDimensions):
 		return httpx.Validation(map[string]string{
-			"photo": "That image is either too small or too large. Please use one between 16 and 12000 pixels on each side.",
+			"photo": "Изображение слишком маленькое или слишком большое. Сторона должна быть от 16 до 12000 пикселей.",
 		}).Wrap(err)
 	case errors.Is(err, imaging.ErrDecompressionBomb):
 		e := *httpx.ErrUnsupportedMedia
-		e.Message = "That image couldn't be processed."
+		e.Message = "Не удалось обработать изображение."
 		return e.Wrap(err)
 	case errors.Is(err, ErrInvalidCrop):
 		return httpx.Validation(map[string]string{
-			"crop": "That crop doesn't fit inside the image. Please adjust it and try again.",
+			"crop": "Область обрезки выходит за пределы изображения. Поправьте и попробуйте снова.",
 		}).Wrap(err)
 	case errors.Is(err, ErrNoPhoto):
 		e := *httpx.ErrNotFound
-		e.Message = "There's no photo to adjust yet. Upload one first."
+		e.Message = "Пока нечего обрезать — сначала загрузите фотографию."
 		return e.Wrap(err)
 	case errors.Is(err, ErrPhotoUnreadable):
 		e := *httpx.ErrBadRequest
-		e.Message = "We couldn't read that file. Please try uploading it again."
+		e.Message = "Не удалось прочитать файл. Загрузите его ещё раз."
 		return e.Wrap(err)
 	}
 	return httpx.Internalf(err, "process photo")

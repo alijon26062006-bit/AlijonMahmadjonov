@@ -13,6 +13,7 @@ import (
 
 	"github.com/averix/api/internal/platform/cryptox"
 	"github.com/averix/api/internal/platform/database"
+	"github.com/averix/api/internal/platform/money"
 )
 
 type Store struct {
@@ -830,65 +831,17 @@ func FormatVisibleValue(minor int64, currency, visibility string) string {
 	case "range":
 		return formatRange(minor, currency)
 	case "private":
-		return "Private contract"
+		return "Закрытая сделка"
 	}
 	return ""
 }
 
 func formatMoney(minor int64, currency string) string {
-	symbol := map[string]string{"USD": "$", "EUR": "€", "GBP": "£"}[currency]
-	if symbol == "" {
-		symbol = currency + " "
-	}
-	whole := minor / 100
-	if minor%100 == 0 {
-		return symbol + thousands(whole)
-	}
-	return fmt.Sprintf("%s%s.%02d", symbol, thousands(whole), minor%100)
+	return money.Format(minor, currency)
 }
 
 func formatRange(minor int64, currency string) string {
-	symbol := map[string]string{"USD": "$", "EUR": "€", "GBP": "£"}[currency]
-	if symbol == "" {
-		symbol = currency + " "
-	}
-	bands := []struct {
-		upto  int64
-		lower string
-		upper string
-	}{
-		{25000, "", "250"},
-		{50000, "250", "500"},
-		{100000, "500", "1,000"},
-		{250000, "1,000", "2,500"},
-		{500000, "2,500", "5,000"},
-		{1000000, "5,000", "10,000"},
-		{2500000, "10,000", "25,000"},
-	}
-	for _, band := range bands {
-		if minor < band.upto {
-			if band.lower == "" {
-				return "under " + symbol + band.upper
-			}
-			return symbol + band.lower + "–" + symbol + band.upper
-		}
-	}
-	return symbol + "25,000+"
-}
-
-func thousands(v int64) string {
-	s := fmt.Sprintf("%d", v)
-	if len(s) <= 3 {
-		return s
-	}
-	var out []byte
-	for i, digit := range []byte(s) {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			out = append(out, ',')
-		}
-		out = append(out, digit)
-	}
-	return string(out)
+	return money.Band(minor, currency)
 }
 
 func slugify(input string) string {

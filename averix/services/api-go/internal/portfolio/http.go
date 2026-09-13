@@ -271,7 +271,7 @@ func (h *Handlers) setCover(w http.ResponseWriter, r *http.Request) error {
 	}
 	imageID, err := uuid.Parse(strings.TrimSpace(body.ImageID))
 	if err != nil {
-		return httpx.Validation(map[string]string{"image_id": "That image reference isn't valid."})
+		return httpx.Validation(map[string]string{"image_id": "Ссылка на изображение указана неверно."})
 	}
 	project, err := h.svc.SetCover(r.Context(), security.FromContext(r.Context()), projectID, imageID)
 	if err != nil {
@@ -367,7 +367,7 @@ func (h *Handlers) readImagePart(w http.ResponseWriter, r *http.Request) (*multi
 		part, err := reader.NextPart()
 		if errors.Is(err, io.EOF) {
 			return nil, nil, httpx.Validation(map[string]string{
-				"image": "Choose an image to upload.",
+				"image": "Выберите изображение для загрузки.",
 			})
 		}
 		if err != nil {

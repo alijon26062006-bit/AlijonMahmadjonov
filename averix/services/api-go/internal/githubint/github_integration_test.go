@@ -429,7 +429,7 @@ func TestSyncRequiresAConnectedAccount(t *testing.T) {
 	dev := h.PublishDeveloper("unconnected", "backend-developer", "go")
 
 	res := dev.Client.POST("/github/sync", nil).Fails(t, http.StatusNotFound, "github_not_connected")
-	if !strings.Contains(strings.ToLower(res.Message), "connect") {
+	if !strings.Contains(strings.ToLower(res.Message), "подключите") {
 		t.Errorf("the message should tell the developer what to do, got %q", res.Message)
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/averix/api/internal/matching"
 	"github.com/averix/api/internal/platform/database"
+	"github.com/averix/api/internal/platform/money"
 )
 
 type Store struct {
@@ -761,21 +762,13 @@ func (s *Store) OwnedEvidence(ctx context.Context, developerID uuid.UUID,
 
 // FormatMoney renders an amount for display.
 func FormatMoney(minor int64, currency string) string {
-	symbol := map[string]string{"USD": "$", "EUR": "€", "GBP": "£"}[currency]
-	if symbol == "" {
-		symbol = currency + " "
-	}
-	whole := minor / 100
-	if minor%100 == 0 {
-		return symbol + thousands(whole)
-	}
-	return fmt.Sprintf("%s%s.%02d", symbol, thousands(whole), minor%100)
+	return money.Format(minor, currency)
 }
 
 // FormatVisibleValue applies the price visibility ladder from the
 // specification.
 //
-// "private" is rendered as "Private contract" rather than omitted: the work
+// "private" is rendered as "Закрытая сделка" rather than omitted: the work
 // happened, and hiding its existence would misrepresent the developer's
 // history. Only the figure is withheld.
 func FormatVisibleValue(minor int64, currency, visibility string) string {
@@ -787,7 +780,7 @@ func FormatVisibleValue(minor int64, currency, visibility string) string {
 	case "hidden":
 		return ""
 	case "private":
-		return "Private contract"
+		return "Закрытая сделка"
 	}
 	return ""
 }
@@ -795,51 +788,7 @@ func FormatVisibleValue(minor int64, currency, visibility string) string {
 // formatRange buckets a figure so the scale is visible without the exact
 // amount.
 func formatRange(minor int64, currency string) string {
-	bands := []struct {
-		upto  int64
-		label string
-	}{
-		{25000, "under %s250"},
-		{50000, "%s250–%s500"},
-		{100000, "%s500–%s1,000"},
-		{250000, "%s1,000–%s2,500"},
-		{500000, "%s2,500–%s5,000"},
-		{1000000, "%s5,000–%s10,000"},
-		{2500000, "%s10,000–%s25,000"},
-	}
-	symbol := map[string]string{"USD": "$", "EUR": "€", "GBP": "£"}[currency]
-	if symbol == "" {
-		symbol = currency + " "
-	}
-	for _, band := range bands {
-		if minor < band.upto {
-			return fillSymbol(band.label, symbol)
-		}
-	}
-	return fillSymbol("%s25,000+", symbol)
-}
-
-func fillSymbol(template, symbol string) string {
-	out := template
-	for strings.Contains(out, "%s") {
-		out = strings.Replace(out, "%s", symbol, 1)
-	}
-	return out
-}
-
-func thousands(v int64) string {
-	s := fmt.Sprintf("%d", v)
-	if len(s) <= 3 {
-		return s
-	}
-	var out []byte
-	for i, digit := range []byte(s) {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			out = append(out, ',')
-		}
-		out = append(out, digit)
-	}
-	return string(out)
+	return money.Band(minor, currency)
 }
 
 // previewOf takes the opening of a cover letter for the list view.

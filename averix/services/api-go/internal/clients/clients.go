@@ -268,22 +268,22 @@ func (s *Service) Update(ctx context.Context, id *security.Identity, in UpdateRe
 
 	v := validate.New()
 	if in.FullName != "" {
-		v.Length("full_name", "Your name", in.FullName, 2, 120)
-		v.NoControlChars("full_name", "Your name", in.FullName)
+		v.Length("full_name", "Имя и фамилия", in.FullName, 2, 120)
+		v.NoControlChars("full_name", "Имя и фамилия", in.FullName)
 	}
 	if in.CompanyName != "" {
-		v.Length("company_name", "Company name", in.CompanyName, 2, 120)
+		v.Length("company_name", "Название компании", in.CompanyName, 2, 120)
 	}
 	if in.CompanySize != "" {
-		v.OneOf("company_size", "Company size", in.CompanySize,
+		v.OneOf("company_size", "Размер компании", in.CompanySize,
 			"solo", "2-10", "11-50", "51-200", "200+")
 	}
 	if in.About != "" {
-		v.Length("about", "About", in.About, 0, 2000)
-		v.NoControlChars("about", "About", in.About)
+		v.Length("about", "О компании", in.About, 0, 2000)
+		v.NoControlChars("about", "О компании", in.About)
 	}
 	if in.CountryCode != "" && len(in.CountryCode) != 2 {
-		v.Add("country_code", "Use a two-letter country code.")
+		v.Add("country_code", "Код страны — две латинские буквы.")
 	}
 
 	// A company website is a user-supplied URL, so it goes through the same
@@ -296,7 +296,7 @@ func (s *Service) Update(ctx context.Context, id *security.Identity, in UpdateRe
 			if errors.As(err, &rejection) {
 				v.Add("company_website", rejection.Human())
 			} else {
-				v.Add("company_website", "That website address isn't valid.")
+				v.Add("company_website", "Такой адрес сайта не подходит.")
 			}
 		} else {
 			website = result.URL

@@ -193,7 +193,7 @@ func TestAdditionalSpecialisationCannotRepeatThePrimary(t *testing.T) {
 	res := c.PUT("/developers/me/additional-specialisations", map[string]any{
 		"slugs": []string{"backend-developer"},
 	}).Fails(t, http.StatusUnprocessableEntity, "validation_failed")
-	if !strings.Contains(strings.ToLower(res.Fields["slugs"]), "main profession") {
+	if !strings.Contains(strings.ToLower(res.Fields["slugs"]), "основную профессию") {
 		t.Errorf("the message should explain the duplication, got %q", res.Fields["slugs"])
 	}
 }
@@ -603,7 +603,7 @@ func TestRecropWithoutAPhotoIsAClearError(t *testing.T) {
 	res := c.PUT("/developers/me/photo/crop", map[string]any{
 		"x": 0, "y": 0, "width": 200, "height": 200,
 	}).Fails(t, http.StatusNotFound, "not_found")
-	if !strings.Contains(strings.ToLower(res.Message), "upload one first") {
+	if !strings.Contains(strings.ToLower(res.Message), "загрузите фотографию") {
 		t.Errorf("the message should tell the user what to do, got %q", res.Message)
 	}
 }
