@@ -305,6 +305,14 @@ func (s *Service) issueSession(ctx context.Context, account *Account, role secur
 		IdentityVerified: account.IdentityVerifiedAt != nil,
 		CSRFToken:        sess.CSRFToken,
 	}
+	// Permissions granted to this account by name. Loaded here as well as on
+	// session resolve so the very first response after signing in already
+	// reflects them.
+	granted, err := s.store.GrantedPermissions(ctx, account.ID)
+	if err != nil {
+		return nil, httpx.Internalf(err, "load granted permissions")
+	}
+	identity.Granted = granted
 	return &AuthResult{Identity: identity, Token: token, Session: sess}, nil
 }
 

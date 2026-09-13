@@ -146,6 +146,21 @@ func TestModeratorSeesQueueNotSettings(t *testing.T) {
 
 	mod.Client.GET("/admin/overview").OK(t, http.StatusOK)
 	mod.Client.GET("/admin/moderation/queue").OK(t, http.StatusOK)
+
+	// Finding an account is part of handling a report, so the list is open to
+	// a moderator. Everything that changes an account, or looks at what it
+	// hides, is not.
+	mod.Client.GET("/admin/users").OK(t, http.StatusOK)
 	mod.Client.GET("/admin/settings").Fails(t, http.StatusForbidden, "forbidden")
-	mod.Client.GET("/admin/users").Fails(t, http.StatusForbidden, "forbidden")
+	mod.Client.POST("/admin/users/"+root.UserID+"/suspend",
+		map[string]any{"reason": "проверка прав модератора"}).Fails(t, http.StatusForbidden, "forbidden")
+	mod.Client.POST("/admin/users/"+root.UserID+"/block",
+		map[string]any{"reason": "проверка прав модератора"}).Fails(t, http.StatusForbidden, "forbidden")
+	mod.Client.GET("/admin/users/"+root.UserID+"/payments").Fails(t, http.StatusForbidden, "forbidden")
+	mod.Client.GET("/admin/users/"+root.UserID+"/security").Fails(t, http.StatusForbidden, "forbidden")
+
+	// The identity section is closed to a moderator, and to an administrator
+	// who has not been given the permission by name.
+	mod.Client.GET("/admin/identity/queue").Fails(t, http.StatusForbidden, "forbidden")
+	root.Client.GET("/admin/identity/queue").Fails(t, http.StatusForbidden, "forbidden")
 }

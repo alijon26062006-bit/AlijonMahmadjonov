@@ -124,6 +124,11 @@ func run() error {
 	// closes: silence must not veto it.
 	w.Schedule("publish-expired-reviews", time.Hour, application.Reviews.PublishExpired)
 
+	// Identity documents past their retention. Hourly rather than daily so a
+	// shortened retention takes effect the same day it is set, and so a long
+	// outage does not leave a backlog of passports nobody meant to keep.
+	w.Schedule("purge-identity-documents", time.Hour, application.Identity.PurgeExpired)
+
 	// Jobs whose worker died mid-run.
 	w.Schedule("release-stalled-jobs", 5*time.Minute, w.ReleaseStale)
 

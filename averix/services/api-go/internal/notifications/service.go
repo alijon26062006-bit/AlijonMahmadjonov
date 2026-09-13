@@ -261,6 +261,40 @@ func (s *Service) AccountWarning(ctx context.Context, userID uuid.UUID, reason s
 		Title: "Предупреждение от модерации", Body: reason, Href: "/settings"})
 }
 
+// ── Проверка личности ───────────────────────────────────────────────────────
+//
+// Ни одно из этих уведомлений не несёт ни изображения документа, ни его
+// номера: в письме и в списке уведомлений остаётся только решение и ссылка на
+// защищённый раздел.
+
+func (s *Service) IdentitySubmitted(ctx context.Context, userID uuid.UUID) {
+	s.Notify(ctx, Input{UserID: userID, Type: TypeIdentitySubmitted,
+		Title: "Документы приняты на проверку",
+		Body:  "Обычно проверка занимает до суток. Мы напишем, как только будет решение.",
+		Href:  "/settings/verification"})
+}
+
+func (s *Service) IdentityApproved(ctx context.Context, userID uuid.UUID) {
+	s.Notify(ctx, Input{UserID: userID, Type: TypeIdentityApproved, Priority: "high",
+		Title: "Личность подтверждена",
+		Body:  "В вашем профиле появился знак подтверждённой личности. Заказчики видят его рядом с именем.",
+		Href:  "/settings/verification"})
+}
+
+func (s *Service) IdentityRejected(ctx context.Context, userID uuid.UUID, reason string) {
+	s.Notify(ctx, Input{UserID: userID, Type: TypeIdentityRejected, Priority: "high",
+		Title: "Проверка личности отклонена",
+		Body:  reason,
+		Href:  "/settings/verification"})
+}
+
+func (s *Service) IdentityResubmitRequested(ctx context.Context, userID uuid.UUID, what string) {
+	s.Notify(ctx, Input{UserID: userID, Type: TypeIdentityResubmit, Priority: "high",
+		Title: "Нужно переснять документ",
+		Body:  what + " Заново заполнять анкету не нужно — только этот шаг.",
+		Href:  "/settings/verification"})
+}
+
 func (s *Service) DisputeResolved(ctx context.Context, userID, contractID uuid.UUID, outcome string) {
 	s.Notify(ctx, Input{UserID: userID, Type: TypeDisputeResolved, Priority: "high", ContractID: &contractID,
 		Title: "Спор решён", Body: outcome, Href: "/contracts/" + contractID.String()})

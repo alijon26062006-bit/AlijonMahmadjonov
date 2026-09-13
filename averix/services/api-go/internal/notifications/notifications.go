@@ -45,6 +45,10 @@ const (
 	TypeAccountVerified     = "account_verified"
 	TypeAccountWarning      = "account_warning"
 	TypeAccountSuspended    = "account_suspended"
+	TypeIdentitySubmitted   = "identity_submitted"
+	TypeIdentityApproved    = "identity_approved"
+	TypeIdentityRejected    = "identity_rejected"
+	TypeIdentityResubmit    = "identity_resubmit_requested"
 )
 
 // Channels.
@@ -172,6 +176,10 @@ var catalogue = map[string]typeInfo{
 	TypeAccountVerified:     {Group: "account", Label: "Аккаунт подтверждён", Email: true, Push: false, InAppLocked: true},
 	TypeAccountWarning:      {Group: "account", Label: "Предупреждение по аккаунту", Email: true, Push: true, InAppLocked: true},
 	TypeAccountSuspended:    {Group: "account", Label: "Аккаунт заблокирован", Email: true, Push: false, InAppLocked: true},
+	TypeIdentitySubmitted:   {Group: "account", Label: "Документы приняты на проверку", Email: true, Push: false, InAppLocked: true},
+	TypeIdentityApproved:    {Group: "account", Label: "Личность подтверждена", Email: true, Push: true, InAppLocked: true},
+	TypeIdentityRejected:    {Group: "account", Label: "Проверка личности отклонена", Email: true, Push: true, InAppLocked: true},
+	TypeIdentityResubmit:    {Group: "account", Label: "Нужно переснять документ", Email: true, Push: true, InAppLocked: true},
 }
 
 var groupLabels = []struct{ Key, Label string }{

@@ -136,7 +136,23 @@ func (c *Client) PATCH(path string, body any) *Response {
 }
 func (c *Client) DELETE(path string) *Response { return c.do(http.MethodDelete, path, nil) }
 
+// Fetch performs a GET without expecting the JSON envelope, for the few
+// endpoints that answer with a file rather than with data. The response still
+// carries its status and headers, which is what those endpoints are asserted
+// on: an image must never arrive cacheable.
+func (c *Client) Fetch(path string) *Response {
+	c.t.Helper()
+	resp, raw := c.send(http.MethodGet, path, nil)
+	return &Response{Status: resp.StatusCode, Raw: raw, Header: resp.Header}
+}
+
 func (c *Client) do(method, path string, body any) *Response {
+	c.t.Helper()
+	resp, raw := c.send(method, path, body)
+	return c.decode(resp, raw)
+}
+
+func (c *Client) send(method, path string, body any) (*http.Response, []byte) {
 	c.t.Helper()
 
 	var reader io.Reader
@@ -176,7 +192,7 @@ func (c *Client) do(method, path string, body any) *Response {
 		c.t.Fatalf("read response body: %v", err)
 	}
 
-	return c.decode(resp, raw)
+	return resp, raw
 }
 
 // decode turns an HTTP response into the envelope shape the tests assert on,
@@ -247,7 +263,12 @@ func (c *Client) RegisterClient(username string) *Response {
 }
 
 // defaultPassword satisfies the validator without being a common password.
-const defaultPassword = "quiet-lantern-4417"
+// Password is the password every account the harness creates signs in with.
+// Exported because a test that re-authenticates mid-session needs to type it
+// again, exactly as a person would.
+const Password = "quiet-lantern-4417"
+
+const defaultPassword = Password
 
 func (c *Client) Login(email, password string) *Response {
 	c.t.Helper()

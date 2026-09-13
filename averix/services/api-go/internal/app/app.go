@@ -24,6 +24,7 @@ import (
 	"github.com/averix/api/internal/files"
 	"github.com/averix/api/internal/githubint"
 	"github.com/averix/api/internal/health"
+	"github.com/averix/api/internal/identity"
 	"github.com/averix/api/internal/matching"
 	"github.com/averix/api/internal/messaging"
 	"github.com/averix/api/internal/moderation"
@@ -81,6 +82,7 @@ type App struct {
 	Services    *services.Svc
 	Search      *search.Service
 	Moderation  *moderation.Service
+	Identity    *identity.Service
 	Admin       *admin.Service
 	Account     *account.Service
 
@@ -199,6 +201,11 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		Mailer:     mailer,
 		Moderation: moderator,
 		Account:    account.NewService(db, authStore, mailer, recorder),
+		// Identity documents keep their own store, their own storage prefix
+		// and their own permission. Nothing else in the product can reach
+		// them, which is the point.
+		Identity: identity.NewService(identity.NewStore(db, store), db, redis,
+			settingsStore, recorder, notifier, authStore),
 	}
 	// Payments needs the contracts service, and contracts needs to know
 	// whether money can move at all. Constructing payments second and handing
@@ -220,7 +227,7 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		a.Contracts, projectStore, settingsStore, moderator, recorder)
 	a.Search = search.NewService(search.NewStore(db, store.PublicURL), a.Services.Store(), recorder)
 	a.Admin = admin.NewService(admin.NewStore(db), authStore, settingsStore, matchingStore,
-		a.Contracts, notifier, recorder, cfg, Version)
+		a.Contracts, notifier, recorder, cfg, Version, store.PublicURL)
 
 	a.redisStartupError = redisErr
 	return a, nil
@@ -379,6 +386,14 @@ func (a *App) Handler() http.Handler {
 		Require:      a.AuthMW.Require(),
 		CSRF:         a.AuthMW.CSRF(),
 		RequireStaff: staff,
+	})
+	identity.NewHandlers(a.Identity).Register(v1, identity.Middleware{
+		Require:      a.AuthMW.Require(),
+		CSRF:         a.AuthMW.CSRF(),
+		RequireStaff: staff,
+		// Photographing a document a hundred times an hour is not a person
+		// verifying themselves.
+		RateLimitUpload: a.AuthMW.RateLimit("identity_upload", 30, time.Hour),
 	})
 	account.NewHandlers(a.Account, a.AuthMW.ClearCookie).Register(v1, account.Middleware{
 		Require:   a.AuthMW.Require(),

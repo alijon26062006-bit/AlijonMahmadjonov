@@ -6,6 +6,7 @@
 package admin
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -51,43 +52,102 @@ type MoneyRow struct {
 }
 
 // UserRow is one line of the user list.
+//
+// What is absent matters as much as what is here: no document number, no
+// payment destination, no financial total. A list of accounts is read dozens
+// of times a day by whoever is on support; sensitive data belongs behind a
+// deliberate click, not in a table anyone can leave open on a screen.
 type UserRow struct {
-	ID               uuid.UUID  `json:"id"`
-	Username         string     `json:"username"`
-	FullName         string     `json:"full_name"`
-	Email            string     `json:"email"`
-	Status           string     `json:"status"`
-	Roles            []string   `json:"roles"`
-	EmailVerified    bool       `json:"email_verified"`
-	IdentityVerified bool       `json:"identity_verified"`
+	ID               uuid.UUID `json:"id"`
+	Reference        string    `json:"reference"`
+	Username         string    `json:"username"`
+	FullName         string    `json:"full_name"`
+	Email            string    `json:"email"`
+	Phone            string    `json:"phone,omitempty"`
+	PhotoURL         string    `json:"photo_url,omitempty"`
+	Status           string    `json:"status"`
+	Roles            []string  `json:"roles"`
+	EmailVerified    bool      `json:"email_verified"`
+	IdentityVerified bool      `json:"identity_verified"`
+	// Where the person's verification stands: "none" when they never started.
+	IdentityStatus   string     `json:"identity_status"`
+	FreelancerListed bool       `json:"freelancer_listed"`
+	CountryCode      string     `json:"country_code,omitempty"`
+	City             string     `json:"city,omitempty"`
 	SuspendedReason  string     `json:"suspended_reason,omitempty"`
 	SuspendedUntil   *time.Time `json:"suspended_until,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
 	LastSeenAt       *time.Time `json:"last_seen_at,omitempty"`
+
+	// photoKey is the storage key of the avatar, turned into a URL by the
+	// service. It never reaches the response.
+	photoKey string
+}
+
+// SetPhoto turns a stored avatar key into the URL the panel renders.
+func (u *UserRow) SetPhoto(url func(string) string) {
+	if u.photoKey != "" && url != nil {
+		u.PhotoURL = url(u.photoKey)
+	}
+	u.Reference = Reference(u.ID)
+}
+
+// Reference is how an account is named in a support conversation: short
+// enough to read aloud, long enough not to collide.
+func Reference(id uuid.UUID) string {
+	return "AVX-" + strings.ToUpper(id.String()[:8])
 }
 
 // UserDetail adds the figures a decision about a person needs.
 type UserDetail struct {
 	UserRow
-	CountryCode      string `json:"country_code,omitempty"`
-	City             string `json:"city,omitempty"`
-	ProjectsPosted   int    `json:"projects_posted"`
-	ContractsTotal   int    `json:"contracts_total"`
-	ContractsActive  int    `json:"contracts_active"`
-	ReportsAgainst   int    `json:"reports_against"`
-	ReportsFiled     int    `json:"reports_filed"`
-	Warnings         int    `json:"warnings"`
-	ActiveSessions   int    `json:"active_sessions"`
-	GitHubConnected  bool   `json:"github_connected"`
-	FreelancerListed bool   `json:"freelancer_listed"`
+	ProjectsPosted  int  `json:"projects_posted"`
+	ProjectsOpen    int  `json:"projects_open"`
+	ContractsTotal  int  `json:"contracts_total"`
+	ContractsActive int  `json:"contracts_active"`
+	ContractsDone   int  `json:"contracts_completed"`
+	Disputes        int  `json:"disputes"`
+	ReportsAgainst  int  `json:"reports_against"`
+	ReportsFiled    int  `json:"reports_filed"`
+	Warnings        int  `json:"warnings"`
+	ActiveSessions  int  `json:"active_sessions"`
+	GitHubConnected bool `json:"github_connected"`
+	// Two-factor authentication is not part of the product yet. The field is
+	// here because the panel must say so plainly rather than leave a gap that
+	// reads as "off".
+	TwoFactor          string     `json:"two_factor"`
+	LastLoginAt        *time.Time `json:"last_login_at,omitempty"`
+	PasswordChangedAt  *time.Time `json:"password_changed_at,omitempty"`
+	Timezone           string     `json:"timezone,omitempty"`
+	Locale             string     `json:"locale,omitempty"`
+	ProfessionalStatus string     `json:"professional_status"`
+	// Permissions handed to this account by name, for a staff member.
+	Grants []Grant `json:"grants,omitempty"`
+}
+
+// Grant is one permission given to an account on top of its role.
+type Grant struct {
+	Permission  string     `json:"permission"`
+	Label       string     `json:"label"`
+	GrantedBy   *uuid.UUID `json:"granted_by,omitempty"`
+	GrantedName string     `json:"granted_by_name,omitempty"`
+	GrantedAt   time.Time  `json:"granted_at"`
+	Note        string     `json:"note,omitempty"`
 }
 
 type UserQuery struct {
-	Text   string
-	Status string
-	Role   string
-	Limit  int
-	Offset int
+	Text           string
+	Status         string
+	Role           string
+	Identity       string
+	Country        string
+	Specialisation string
+	Listed         bool
+	Reported       bool
+	RegisteredFrom *time.Time
+	RegisteredTo   *time.Time
+	Limit          int
+	Offset         int
 }
 
 // SettingRow is one platform setting with the catalogue's description of it.

@@ -37,12 +37,15 @@ type Service struct {
 	audit     *audit.Recorder
 	cfg       *config.Config
 	version   string
+	publicURL func(string) string
 }
 
 func NewService(store *Store, authStore *auth.Store, settingsStore *settings.Store, matchingStore *matching.Store,
-	contractsSvc *contracts.Service, notifier Notifier, rec *audit.Recorder, cfg *config.Config, version string) *Service {
+	contractsSvc *contracts.Service, notifier Notifier, rec *audit.Recorder, cfg *config.Config,
+	version string, publicURL func(string) string) *Service {
 	return &Service{store: store, auth: authStore, settings: settingsStore, matching: matchingStore,
-		contracts: contractsSvc, notifier: notifier, audit: rec, cfg: cfg, version: version}
+		contracts: contractsSvc, notifier: notifier, audit: rec, cfg: cfg,
+		version: version, publicURL: publicURL}
 }
 
 func (s *Service) require(ctx context.Context, id *security.Identity, perm security.Permission, what string) error {
@@ -77,26 +80,39 @@ func (s *Service) Overview(ctx context.Context, id *security.Identity) (*Overvie
 // ── Users ───────────────────────────────────────────────────────────────────
 
 func (s *Service) Users(ctx context.Context, id *security.Identity, q UserQuery) ([]UserRow, int, error) {
-	if err := s.require(ctx, id, security.PermUserManage, "the user list"); err != nil {
+	// Seeing the list is a lighter right than changing anyone on it: a
+	// moderator handling reports needs to find an account without being able
+	// to suspend it.
+	if err := s.require(ctx, id, security.PermUserView, "the user list"); err != nil {
 		return nil, 0, err
 	}
 	switch q.Status {
-	case "", "pending", "active", "suspended", "deactivated":
+	case "", "pending", "active", "suspended", "banned", "deactivated":
 	default:
 		return nil, 0, httpx.Validation(map[string]string{"status": "Неизвестный статус."})
 	}
 	if q.Role != "" && !security.Role(q.Role).Valid() {
 		return nil, 0, httpx.Validation(map[string]string{"role": "Неизвестная роль."})
 	}
+	switch q.Identity {
+	case "", "verified", "unverified", "none",
+		"draft", "submitted", "under_review", "resubmit_requested",
+		"approved", "rejected", "suspended", "expired":
+	default:
+		return nil, 0, httpx.Validation(map[string]string{"identity": "Неизвестный статус проверки."})
+	}
 	users, total, err := s.store.Users(ctx, q)
 	if err != nil {
 		return nil, 0, httpx.Internalf(err, "list users")
+	}
+	for i := range users {
+		users[i].SetPhoto(s.publicURL)
 	}
 	return users, total, nil
 }
 
 func (s *Service) User(ctx context.Context, id *security.Identity, userID uuid.UUID) (*UserDetail, error) {
-	if err := s.require(ctx, id, security.PermUserManage, "a user's detail"); err != nil {
+	if err := s.require(ctx, id, security.PermUserView, "a user's detail"); err != nil {
 		return nil, err
 	}
 	d, err := s.store.User(ctx, userID)
@@ -106,6 +122,7 @@ func (s *Service) User(ctx context.Context, id *security.Identity, userID uuid.U
 	case err != nil:
 		return nil, httpx.Internalf(err, "load user")
 	}
+	d.SetPhoto(s.publicURL)
 	return d, nil
 }
 
@@ -117,7 +134,7 @@ type SuspendRequest struct {
 }
 
 func (s *Service) Suspend(ctx context.Context, id *security.Identity, userID uuid.UUID, in SuspendRequest) error {
-	if err := s.require(ctx, id, security.PermUserManage, "suspending"); err != nil {
+	if err := s.require(ctx, id, security.PermUserSuspend, "suspending"); err != nil {
 		return err
 	}
 	if userID == id.UserID {
@@ -471,4 +488,201 @@ func (s *Service) Audit(ctx context.Context, id *security.Identity, q AuditQuery
 		return nil, 0, httpx.Internalf(err, "load audit log")
 	}
 	return rows, total, nil
+}
+
+// ── Blocking ────────────────────────────────────────────────────────────────
+
+// Block is not a long suspension.
+//
+// A suspension has an end: it lifts itself, and the person is told when. A
+// block does not — it is what happens to an account that should not come
+// back, and it takes a separate permission because the two decisions are not
+// the same size.
+func (s *Service) Block(ctx context.Context, id *security.Identity, userID uuid.UUID, reason string) error {
+	if err := s.require(ctx, id, security.PermUserBan, "blocking an account"); err != nil {
+		return err
+	}
+	if userID == id.UserID {
+		return httpx.Forbiddenf("you cannot block yourself")
+	}
+	reason = strings.TrimSpace(reason)
+	if len([]rune(reason)) < 10 {
+		return httpx.Validation(map[string]string{"reason": "Укажите причину — её увидит человек."})
+	}
+	target, err := s.auth.AccountByID(ctx, userID)
+	if err != nil {
+		return httpx.NotFoundf("user %s does not exist", userID)
+	}
+	for _, role := range target.Roles {
+		if role == security.RoleAdmin {
+			return httpx.Forbiddenf("an administrator's account cannot be blocked from the panel")
+		}
+	}
+
+	if err := s.store.SetStatus(ctx, userID, "banned", reason); err != nil {
+		return httpx.Internalf(err, "block account")
+	}
+	if _, err := s.auth.RevokeAllSessions(ctx, userID, uuid.Nil); err != nil {
+		return httpx.Internalf(err, "revoke sessions")
+	}
+	s.audit.RecordRequest(ctx, audit.Entry{
+		Action: "user.blocked", SubjectType: "user", SubjectID: &userID,
+		After: map[string]any{"status": "banned"}, Detail: reason,
+	})
+	if s.notifier != nil {
+		s.notifier.AccountSuspended(ctx, userID, reason)
+	}
+	return nil
+}
+
+func (s *Service) Unblock(ctx context.Context, id *security.Identity, userID uuid.UUID) error {
+	if err := s.require(ctx, id, security.PermUserBan, "unblocking an account"); err != nil {
+		return err
+	}
+	if err := s.store.SetStatus(ctx, userID, "active", ""); err != nil {
+		return httpx.Internalf(err, "unblock account")
+	}
+	s.audit.RecordRequest(ctx, audit.Entry{
+		Action: "user.unblocked", SubjectType: "user", SubjectID: &userID,
+		After: map[string]any{"status": "active"},
+	})
+	return nil
+}
+
+// ── Permissions by name ─────────────────────────────────────────────────────
+
+// GrantPermission hands one account a right its role does not carry.
+//
+// Only a staff account can receive one: a permission on a client's account
+// would be dead weight at best and a mistake waiting to matter at worst.
+func (s *Service) GrantPermission(ctx context.Context, id *security.Identity, userID uuid.UUID,
+	permission, note string) ([]Grant, error) {
+
+	if err := s.require(ctx, id, security.PermRoleGrant, "granting a permission"); err != nil {
+		return nil, err
+	}
+	perm := security.Permission(strings.TrimSpace(permission))
+	if !security.Grantable(perm) {
+		return nil, httpx.Validation(map[string]string{
+			"permission": "Это право нельзя выдать поимённо.",
+		})
+	}
+	target, err := s.auth.AccountByID(ctx, userID)
+	if err != nil {
+		return nil, httpx.NotFoundf("user %s does not exist", userID)
+	}
+	staff := false
+	for _, role := range target.Roles {
+		if role == security.RoleAdmin || role == security.RoleModerator {
+			staff = true
+		}
+	}
+	if !staff {
+		e := *httpx.ErrConflict
+		e.Code = "not_staff"
+		e.Message = "Права выдаются только администраторам и модераторам."
+		return nil, &e
+	}
+
+	if err := s.store.Grant(ctx, userID, id.UserID, string(perm), strings.TrimSpace(note)); err != nil {
+		return nil, httpx.Internalf(err, "grant permission")
+	}
+	s.audit.RecordRequest(ctx, audit.Entry{
+		Action: "permission.granted", SubjectType: "user", SubjectID: &userID,
+		After: map[string]any{"permission": string(perm)}, Detail: strings.TrimSpace(note),
+	})
+	return s.grants(ctx, userID)
+}
+
+func (s *Service) RevokePermission(ctx context.Context, id *security.Identity, userID uuid.UUID,
+	permission string) ([]Grant, error) {
+
+	if err := s.require(ctx, id, security.PermRoleGrant, "revoking a permission"); err != nil {
+		return nil, err
+	}
+	if err := s.store.Revoke(ctx, userID, id.UserID, strings.TrimSpace(permission)); err != nil {
+		return nil, httpx.Internalf(err, "revoke permission")
+	}
+	s.audit.RecordRequest(ctx, audit.Entry{
+		Action: "permission.revoked", SubjectType: "user", SubjectID: &userID,
+		Before: map[string]any{"permission": permission},
+	})
+	return s.grants(ctx, userID)
+}
+
+func (s *Service) grants(ctx context.Context, userID uuid.UUID) ([]Grant, error) {
+	out, err := s.store.Grants(ctx, userID)
+	if err != nil {
+		return nil, httpx.Internalf(err, "list grants")
+	}
+	return out, nil
+}
+
+// Grantable lists what may be handed out, so the panel does not hard-code it.
+func (s *Service) Grantable(ctx context.Context, id *security.Identity) ([]map[string]string, error) {
+	if err := s.require(ctx, id, security.PermRoleGrant, "the permission catalogue"); err != nil {
+		return nil, err
+	}
+	out := make([]map[string]string, 0)
+	for _, p := range security.GrantablePermissions() {
+		out = append(out, map[string]string{
+			"permission": string(p),
+			"label":      permissionLabel(string(p)),
+		})
+	}
+	return out, nil
+}
+
+// ── The tabs of a user's page ───────────────────────────────────────────────
+
+// Projects is the person's history on both sides of the marketplace.
+func (s *Service) Projects(ctx context.Context, id *security.Identity, userID uuid.UUID) (*UserProjects, error) {
+	if err := s.require(ctx, id, security.PermUserView, "a user's project history"); err != nil {
+		return nil, err
+	}
+	out, err := s.store.UserProjects(ctx, userID)
+	if err != nil {
+		return nil, httpx.Internalf(err, "load project history")
+	}
+	return out, nil
+}
+
+// Payments is the money that moved through this account.
+//
+// Behind its own permission, and with the destination masked: a support
+// conversation needs to know that a card ending 4284 was used, and never the
+// rest of it.
+func (s *Service) Payments(ctx context.Context, id *security.Identity, userID uuid.UUID) ([]PaymentRow, error) {
+	if err := s.require(ctx, id, security.PermPaymentView, "a user's payments"); err != nil {
+		return nil, err
+	}
+	out, err := s.store.UserPayments(ctx, userID)
+	if err != nil {
+		return nil, httpx.Internalf(err, "load payments")
+	}
+	return out, nil
+}
+
+// Security is how this account is being signed into.
+func (s *Service) Security(ctx context.Context, id *security.Identity, userID uuid.UUID) (*UserSecurity, error) {
+	if err := s.require(ctx, id, security.PermSecurityView, "a user's security"); err != nil {
+		return nil, err
+	}
+	out, err := s.store.UserSecurity(ctx, userID)
+	if err != nil {
+		return nil, httpx.Internalf(err, "load security")
+	}
+	return out, nil
+}
+
+// AdminHistory is what staff have done to this account.
+func (s *Service) AdminHistory(ctx context.Context, id *security.Identity, userID uuid.UUID) ([]AuditRow, error) {
+	if err := s.require(ctx, id, security.PermAuditRead, "a user's admin history"); err != nil {
+		return nil, err
+	}
+	rows, _, err := s.store.Audit(ctx, AuditQuery{SubjectType: "user", SubjectID: &userID, Limit: 100})
+	if err != nil {
+		return nil, httpx.Internalf(err, "load admin history")
+	}
+	return rows, nil
 }

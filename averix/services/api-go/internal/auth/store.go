@@ -280,3 +280,40 @@ func nullIfBlank(v string) any {
 	}
 	return v
 }
+
+// GrantedPermissions lists the permissions handed to an account by name, on
+// top of whatever its role already grants.
+func (s *Store) GrantedPermissions(ctx context.Context, userID uuid.UUID) ([]security.Permission, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT permission FROM admin_permission_grants
+		WHERE user_id = $1 AND revoked_at IS NULL`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list granted permissions: %w", err)
+	}
+	defer rows.Close()
+
+	var out []security.Permission
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		out = append(out, security.Permission(p))
+	}
+	return out, rows.Err()
+}
+
+// PasswordHash returns the stored hash for an account, for the places that
+// re-check a password mid-session rather than at sign-in.
+func (s *Store) PasswordHash(ctx context.Context, userID uuid.UUID) (string, error) {
+	var hash string
+	err := s.db.QueryRow(ctx,
+		`SELECT password_hash FROM users WHERE id = $1 AND deleted_at IS NULL`, userID).Scan(&hash)
+	if database.IsNoRows(err) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("load password hash: %w", err)
+	}
+	return hash, nil
+}

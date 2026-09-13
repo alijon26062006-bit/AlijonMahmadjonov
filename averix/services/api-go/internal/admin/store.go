@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/averix/api/internal/platform/database"
+	"github.com/averix/api/internal/platform/money"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -82,11 +83,21 @@ const userColumns = `
 	u.id, u.username, u.full_name, u.email, u.status,
 	coalesce((SELECT array_agg(r.role ORDER BY r.role) FROM user_roles r WHERE r.user_id = u.id), '{}'),
 	u.email_verified_at IS NOT NULL, u.identity_verified_at IS NOT NULL,
-	coalesce(u.suspended_reason, ''), u.suspended_until, u.created_at, u.last_seen_at`
+	coalesce(u.suspended_reason, ''), u.suspended_until, u.created_at, u.last_seen_at,
+	coalesce(u.phone, ''), coalesce(u.country_code, ''), coalesce(u.city, ''),
+	coalesce((SELECT v.status FROM identity_verifications v
+	           WHERE v.user_id = u.id
+	           ORDER BY (v.status IN ('draft','submitted','under_review','resubmit_requested')) DESC,
+	                    v.created_at DESC LIMIT 1), 'none'),
+	coalesce((SELECT d.is_searchable FROM developer_profiles d WHERE d.user_id = u.id), false),
+	coalesce((SELECT p.derivatives->'webp'->>'64' FROM developer_photos p
+	           WHERE p.user_id = u.id AND p.is_current AND p.moderation_state = 'approved' LIMIT 1), '')`
 
 func scanUser(row interface{ Scan(...any) error }, u *UserRow) error {
 	return row.Scan(&u.ID, &u.Username, &u.FullName, &u.Email, &u.Status, &u.Roles,
-		&u.EmailVerified, &u.IdentityVerified, &u.SuspendedReason, &u.SuspendedUntil, &u.CreatedAt, &u.LastSeenAt)
+		&u.EmailVerified, &u.IdentityVerified, &u.SuspendedReason, &u.SuspendedUntil,
+		&u.CreatedAt, &u.LastSeenAt,
+		&u.Phone, &u.CountryCode, &u.City, &u.IdentityStatus, &u.FreelancerListed, &u.photoKey)
 }
 
 func (s *Store) Users(ctx context.Context, q UserQuery) ([]UserRow, int, error) {
@@ -97,14 +108,64 @@ func (s *Store) Users(ctx context.Context, q UserQuery) ([]UserRow, int, error) 
 	}
 	where := []string{"u.deleted_at IS NULL"}
 	if q.Text != "" {
-		p := arg(q.Text)
-		where = append(where, fmt.Sprintf(`(u.username ILIKE '%%' || %[1]s || '%%' OR u.full_name ILIKE '%%' || %[1]s || '%%' OR u.email::text ILIKE '%%' || %[1]s || '%%')`, p))
+		// One box, every way a person is named here: @handle, full name, any
+		// part of it, an address, a phone with or without punctuation, or the
+		// account's own id pasted from a support ticket.
+		text := strings.TrimPrefix(strings.TrimSpace(q.Text), "@")
+		p := arg(text)
+		digits := arg(digitsOf(text))
+		terms := []string{
+			fmt.Sprintf("u.username ILIKE '%%' || %[1]s || '%%'", p),
+			fmt.Sprintf("u.full_name ILIKE '%%' || %[1]s || '%%'", p),
+			fmt.Sprintf("u.email::text ILIKE '%%' || %[1]s || '%%'", p),
+			fmt.Sprintf("(%[1]s <> '' AND u.phone_digits LIKE '%%' || %[1]s || '%%')", digits),
+		}
+		if id, err := uuid.Parse(text); err == nil {
+			terms = append(terms, "u.id = "+arg(id))
+		} else if short := strings.TrimPrefix(strings.ToLower(text), "avx-"); len(short) >= 6 && short != strings.ToLower(text) {
+			// The panel shows accounts as AVX-xxxxxxxx: the first eight
+			// characters of the id. Searching for what is on screen must work.
+			terms = append(terms, "u.id::text LIKE "+arg(short+"%"))
+		}
+		where = append(where, "("+strings.Join(terms, " OR ")+")")
 	}
 	if q.Status != "" {
 		where = append(where, "u.status = "+arg(q.Status))
 	}
 	if q.Role != "" {
 		where = append(where, "EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role = "+arg(q.Role)+")")
+	}
+	switch q.Identity {
+	case "":
+	case "verified":
+		where = append(where, "u.identity_verified_at IS NOT NULL")
+	case "unverified":
+		where = append(where, "u.identity_verified_at IS NULL")
+	case "none":
+		where = append(where, "NOT EXISTS (SELECT 1 FROM identity_verifications v WHERE v.user_id = u.id)")
+	default:
+		where = append(where, "EXISTS (SELECT 1 FROM identity_verifications v WHERE v.user_id = u.id AND v.status = "+arg(q.Identity)+")")
+	}
+	if q.Country != "" {
+		where = append(where, "upper(u.country_code) = "+arg(strings.ToUpper(q.Country)))
+	}
+	if q.Listed {
+		where = append(where, "EXISTS (SELECT 1 FROM developer_profiles d WHERE d.user_id = u.id AND d.is_searchable)")
+	}
+	if q.Reported {
+		where = append(where, "EXISTS (SELECT 1 FROM reports r WHERE r.subject_type = 'user' AND r.subject_id = u.id)")
+	}
+	if q.Specialisation != "" {
+		where = append(where, `EXISTS (
+			SELECT 1 FROM developer_profiles d
+			JOIN specialisations sp ON sp.id = d.primary_specialisation_id
+			WHERE d.user_id = u.id AND sp.slug = `+arg(q.Specialisation)+`)`)
+	}
+	if q.RegisteredFrom != nil {
+		where = append(where, "u.created_at >= "+arg(*q.RegisteredFrom))
+	}
+	if q.RegisteredTo != nil {
+		where = append(where, "u.created_at < "+arg(*q.RegisteredTo))
 	}
 	limit := q.Limit
 	if limit <= 0 || limit > 100 {
@@ -144,32 +205,145 @@ func (s *Store) User(ctx context.Context, id uuid.UUID) (*UserDetail, error) {
 		}
 		return nil, err
 	}
-	var country, city *string
+	var timezone, locale *string
 	err := s.db.QueryRow(ctx, `
-		SELECT u.country_code, u.city,
+		SELECT u.timezone, u.locale,
 		       (SELECT count(*) FROM projects p WHERE p.client_id = u.id),
+		       (SELECT count(*) FROM projects p WHERE p.client_id = u.id AND p.status = 'open'),
 		       (SELECT count(*) FROM contracts c WHERE c.client_id = u.id OR c.developer_id = u.id),
 		       (SELECT count(*) FROM contracts c WHERE (c.client_id = u.id OR c.developer_id = u.id)
 		          AND c.status IN ('pending_funding','active','paused','submitted','disputed')),
+		       (SELECT count(*) FROM contracts c WHERE (c.client_id = u.id OR c.developer_id = u.id)
+		          AND c.status = 'completed'),
+		       (SELECT count(*) FROM milestones m
+		          JOIN contracts c ON c.id = m.contract_id
+		         WHERE (c.client_id = u.id OR c.developer_id = u.id) AND m.status = 'disputed'),
 		       (SELECT count(*) FROM reports r WHERE r.subject_type = 'user' AND r.subject_id = u.id),
 		       (SELECT count(*) FROM reports r WHERE r.reporter_id = u.id),
 		       (SELECT count(*) FROM audit_logs a WHERE a.subject_type = 'user' AND a.subject_id = u.id AND a.action = 'user.warned'),
 		       (SELECT count(*) FROM sessions se WHERE se.user_id = u.id AND se.revoked_at IS NULL AND se.expires_at > now()),
 		       EXISTS (SELECT 1 FROM github_accounts g WHERE g.user_id = u.id AND g.revoked_at IS NULL),
-		       coalesce((SELECT d.is_searchable FROM developer_profiles d WHERE d.user_id = u.id), false)
+		       (SELECT max(se.created_at) FROM sessions se WHERE se.user_id = u.id),
+		       (SELECT max(a.created_at) FROM audit_logs a
+		         WHERE a.actor_id = u.id AND a.action IN ('auth.password_changed','auth.password_reset'))
 		FROM users u WHERE u.id = $1`, id).
-		Scan(&country, &city, &d.ProjectsPosted, &d.ContractsTotal, &d.ContractsActive, &d.ReportsAgainst,
-			&d.ReportsFiled, &d.Warnings, &d.ActiveSessions, &d.GitHubConnected, &d.FreelancerListed)
+		Scan(&timezone, &locale, &d.ProjectsPosted, &d.ProjectsOpen, &d.ContractsTotal,
+			&d.ContractsActive, &d.ContractsDone, &d.Disputes, &d.ReportsAgainst,
+			&d.ReportsFiled, &d.Warnings, &d.ActiveSessions, &d.GitHubConnected,
+			&d.LastLoginAt, &d.PasswordChangedAt)
 	if err != nil {
 		return nil, err
 	}
-	if country != nil {
-		d.CountryCode = *country
+	d.Timezone, d.Locale = derefText(timezone), derefText(locale)
+	// Said plainly rather than left blank: an empty field reads as "off",
+	// and there is a difference between "this person has not enabled it" and
+	// "the product does not offer it yet".
+	d.TwoFactor = "not_available"
+	d.ProfessionalStatus = professionalStatus(d.FreelancerListed, d.Roles)
+
+	grants, err := s.Grants(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-	if city != nil {
-		d.City = *city
-	}
+	d.Grants = grants
 	return &d, nil
+}
+
+func derefText(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
+}
+
+func professionalStatus(listed bool, roles []string) string {
+	isDeveloper := false
+	for _, r := range roles {
+		if r == "developer" {
+			isDeveloper = true
+		}
+	}
+	switch {
+	case !isDeveloper:
+		return "not_a_freelancer"
+	case listed:
+		return "published"
+	default:
+		return "draft"
+	}
+}
+
+// Grants lists the permissions handed to an account by name.
+func (s *Store) Grants(ctx context.Context, userID uuid.UUID) ([]Grant, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT g.permission, g.granted_by, b.full_name, g.granted_at, coalesce(g.note, '')
+		FROM admin_permission_grants g
+		LEFT JOIN users b ON b.id = g.granted_by
+		WHERE g.user_id = $1 AND g.revoked_at IS NULL
+		ORDER BY g.granted_at`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list permission grants: %w", err)
+	}
+	defer rows.Close()
+
+	out := []Grant{}
+	for rows.Next() {
+		var g Grant
+		var name *string
+		if err := rows.Scan(&g.Permission, &g.GrantedBy, &name, &g.GrantedAt, &g.Note); err != nil {
+			return nil, err
+		}
+		g.GrantedName = derefText(name)
+		g.Label = permissionLabel(g.Permission)
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
+// Grant hands a permission to an account, or updates the note on one it
+// already has.
+func (s *Store) Grant(ctx context.Context, userID, by uuid.UUID, permission, note string) error {
+	_, err := s.db.Exec(ctx, `
+		INSERT INTO admin_permission_grants (user_id, permission, granted_by, note)
+		VALUES ($1,$2,$3,nullif($4,''))
+		ON CONFLICT (user_id, permission) WHERE revoked_at IS NULL
+		DO UPDATE SET note = excluded.note, granted_by = excluded.granted_by, granted_at = now()`,
+		userID, permission, by, note)
+	if err != nil {
+		return fmt.Errorf("grant permission: %w", err)
+	}
+	return nil
+}
+
+// Revoke withdraws a permission, keeping the record that it was once held.
+func (s *Store) Revoke(ctx context.Context, userID, by uuid.UUID, permission string) error {
+	_, err := s.db.Exec(ctx, `
+		UPDATE admin_permission_grants
+		   SET revoked_at = now(), revoked_by = $3
+		 WHERE user_id = $1 AND permission = $2 AND revoked_at IS NULL`, userID, permission, by)
+	if err != nil {
+		return fmt.Errorf("revoke permission: %w", err)
+	}
+	return nil
+}
+
+// permissionLabel names a permission for the panel.
+func permissionLabel(p string) string {
+	switch p {
+	case "identity_verification.view":
+		return "Смотреть документы, удостоверяющие личность"
+	case "identity_verification.review":
+		return "Принимать решения по проверке личности"
+	case "payments.view":
+		return "Видеть платежи пользователя"
+	case "security.view":
+		return "Видеть сеансы и вход в аккаунт"
+	case "audit.read":
+		return "Читать журналы"
+	case "users.view":
+		return "Видеть список пользователей"
+	}
+	return p
 }
 
 func (s *Store) SetSuspended(ctx context.Context, id uuid.UUID, reason string, until *time.Time) error {
@@ -342,4 +516,264 @@ func (s *Store) Audit(ctx context.Context, q AuditQuery) ([]AuditRow, int, error
 		out = append(out, r)
 	}
 	return out, total, rows.Err()
+}
+
+// digitsOf reduces a phone to the digits it is stored by, so "+7 (999)
+// 123-45-67" finds the same account as "9991234567".
+func digitsOf(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() < 3 {
+		return ""
+	}
+	return b.String()
+}
+
+// SetStatus moves an account between states, recording the reason when there
+// is one. A suspension sets its own expiry; a block has none by definition.
+func (s *Store) SetStatus(ctx context.Context, id uuid.UUID, status, reason string) error {
+	tag, err := s.db.Exec(ctx, `
+		UPDATE users
+		   SET status = $2,
+		       suspended_reason = nullif($3, ''),
+		       suspended_until = NULL,
+		       updated_at = now()
+		 WHERE id = $1 AND deleted_at IS NULL`, id, status, reason)
+	if err != nil {
+		return fmt.Errorf("set account status: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UserProjects is the marketplace history of one account, from both sides.
+type UserProjects struct {
+	Posted    []ProjectRow  `json:"posted"`
+	Contracts []ContractRow `json:"contracts"`
+}
+
+type ProjectRow struct {
+	ID        uuid.UUID  `json:"id"`
+	Slug      string     `json:"slug"`
+	Reference string     `json:"reference"`
+	Title     string     `json:"title"`
+	Status    string     `json:"status"`
+	Budget    string     `json:"budget_display,omitempty"`
+	Proposals int        `json:"proposals_count"`
+	CreatedAt time.Time  `json:"created_at"`
+	Published *time.Time `json:"published_at,omitempty"`
+}
+
+type ContractRow struct {
+	ID          uuid.UUID  `json:"id"`
+	Reference   string     `json:"reference"`
+	Title       string     `json:"title"`
+	Status      string     `json:"status"`
+	Role        string     `json:"role"`
+	Counterpart string     `json:"counterparty"`
+	AmountMinor *int64     `json:"amount_minor,omitempty"`
+	Currency    string     `json:"currency,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+}
+
+func (s *Store) UserProjects(ctx context.Context, userID uuid.UUID) (*UserProjects, error) {
+	out := &UserProjects{Posted: []ProjectRow{}, Contracts: []ContractRow{}}
+
+	rows, err := s.db.Query(ctx, `
+		SELECT p.id, p.slug, p.reference, p.title, p.status,
+		       p.budget_min_minor, p.budget_max_minor, coalesce(p.currency, 'RUB'),
+		       p.proposals_count, p.created_at, p.published_at
+		FROM projects p WHERE p.client_id = $1
+		ORDER BY p.created_at DESC LIMIT 100`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list posted projects: %w", err)
+	}
+	for rows.Next() {
+		var p ProjectRow
+		var min, max *int64
+		var currency string
+		if err := rows.Scan(&p.ID, &p.Slug, &p.Reference, &p.Title, &p.Status,
+			&min, &max, &currency, &p.Proposals, &p.CreatedAt, &p.Published); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		p.Budget = money.Range(min, max, currency)
+		out.Posted = append(out.Posted, p)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	rows, err = s.db.Query(ctx, `
+		SELECT c.id, c.reference, c.title, c.status,
+		       CASE WHEN c.client_id = $1 THEN 'client' ELSE 'developer' END,
+		       CASE WHEN c.client_id = $1 THEN dev.full_name ELSE cl.full_name END,
+		       c.amount_minor, coalesce(c.currency, ''), c.created_at, c.completed_at
+		FROM contracts c
+		JOIN users cl ON cl.id = c.client_id
+		JOIN users dev ON dev.id = c.developer_id
+		WHERE c.client_id = $1 OR c.developer_id = $1
+		ORDER BY c.created_at DESC LIMIT 100`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list contracts: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var c ContractRow
+		if err := rows.Scan(&c.ID, &c.Reference, &c.Title, &c.Status, &c.Role,
+			&c.Counterpart, &c.AmountMinor, &c.Currency, &c.CreatedAt, &c.CompletedAt); err != nil {
+			return nil, err
+		}
+		out.Contracts = append(out.Contracts, c)
+	}
+	return out, rows.Err()
+}
+
+// PaymentRow is one movement of money, with the destination masked.
+type PaymentRow struct {
+	ID          uuid.UUID `json:"id"`
+	Reference   string    `json:"reference"`
+	Direction   string    `json:"direction"`
+	AmountMinor int64     `json:"amount_minor"`
+	FeeMinor    int64     `json:"fee_minor"`
+	Currency    string    `json:"currency"`
+	Status      string    `json:"status"`
+	Provider    string    `json:"provider"`
+	// What the money was for, never who it was paid to in full.
+	ContractRef   string     `json:"contract_reference,omitempty"`
+	Destination   string     `json:"destination,omitempty"`
+	RefundedMinor int64      `json:"refunded_minor"`
+	CreatedAt     time.Time  `json:"created_at"`
+	CapturedAt    *time.Time `json:"captured_at,omitempty"`
+}
+
+func (s *Store) UserPayments(ctx context.Context, userID uuid.UUID) ([]PaymentRow, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT pi.id, pi.reference, pi.direction, pi.amount_minor, pi.fee_minor,
+		       pi.currency, pi.status, pi.provider_code,
+		       coalesce(c.reference, ''), coalesce(pi.refunded_minor, 0),
+		       pi.created_at, pi.captured_at
+		FROM payment_intents pi
+		LEFT JOIN contracts c ON c.id = pi.contract_id
+		WHERE pi.payer_id = $1 OR pi.payee_id = $1
+		ORDER BY pi.created_at DESC LIMIT 100`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list payments: %w", err)
+	}
+	defer rows.Close()
+
+	out := []PaymentRow{}
+	for rows.Next() {
+		var p PaymentRow
+		if err := rows.Scan(&p.ID, &p.Reference, &p.Direction, &p.AmountMinor, &p.FeeMinor,
+			&p.Currency, &p.Status, &p.Provider, &p.ContractRef, &p.RefundedMinor,
+			&p.CreatedAt, &p.CapturedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// UserSecurity is how an account is being signed into.
+type UserSecurity struct {
+	TwoFactor         string        `json:"two_factor"`
+	Sessions          []SessionRow  `json:"sessions"`
+	Events            []SecurityRow `json:"events"`
+	GitHubConnected   bool          `json:"github_connected"`
+	GitHubLogin       string        `json:"github_login,omitempty"`
+	PasswordChangedAt *time.Time    `json:"password_changed_at,omitempty"`
+	FailedLogins      int           `json:"failed_logins"`
+	LockedUntil       *time.Time    `json:"locked_until,omitempty"`
+}
+
+type SessionRow struct {
+	ID        uuid.UUID `json:"id"`
+	Role      string    `json:"role"`
+	UserAgent string    `json:"user_agent,omitempty"`
+	IP        string    `json:"ip,omitempty"`
+	LastUsed  time.Time `json:"last_used_at"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+type SecurityRow struct {
+	Action    string    `json:"action"`
+	Outcome   string    `json:"outcome"`
+	IP        string    `json:"ip,omitempty"`
+	Detail    string    `json:"detail,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (s *Store) UserSecurity(ctx context.Context, userID uuid.UUID) (*UserSecurity, error) {
+	out := &UserSecurity{TwoFactor: "not_available", Sessions: []SessionRow{}, Events: []SecurityRow{}}
+
+	// Neither the password hash nor any token is read here. What an
+	// administrator needs is when things happened, not what the secrets are.
+	err := s.db.QueryRow(ctx, `
+		SELECT u.failed_login_count, u.locked_until,
+		       EXISTS (SELECT 1 FROM github_accounts g WHERE g.user_id = u.id AND g.revoked_at IS NULL),
+		       coalesce((SELECT g.login FROM github_accounts g
+		                  WHERE g.user_id = u.id AND g.revoked_at IS NULL LIMIT 1), ''),
+		       (SELECT max(a.created_at) FROM audit_logs a
+		         WHERE a.actor_id = u.id AND a.action IN ('auth.password_changed','auth.password_reset'))
+		FROM users u WHERE u.id = $1`, userID).
+		Scan(&out.FailedLogins, &out.LockedUntil, &out.GitHubConnected, &out.GitHubLogin,
+			&out.PasswordChangedAt)
+	if database.IsNoRows(err) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load security overview: %w", err)
+	}
+
+	rows, err := s.db.Query(ctx, `
+		SELECT id, active_role, coalesce(user_agent, ''), coalesce(host(ip), ''),
+		       last_used_at, created_at, expires_at
+		FROM sessions
+		WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()
+		ORDER BY last_used_at DESC LIMIT 20`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list sessions: %w", err)
+	}
+	for rows.Next() {
+		var se SessionRow
+		if err := rows.Scan(&se.ID, &se.Role, &se.UserAgent, &se.IP,
+			&se.LastUsed, &se.CreatedAt, &se.ExpiresAt); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out.Sessions = append(out.Sessions, se)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	rows, err = s.db.Query(ctx, `
+		SELECT action, outcome, coalesce(host(ip), ''), coalesce(detail, ''), created_at
+		FROM audit_logs
+		WHERE (actor_id = $1 OR (subject_type = 'user' AND subject_id = $1))
+		  AND (action LIKE 'auth.%' OR action = 'access.denied')
+		ORDER BY created_at DESC LIMIT 50`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list security events: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e SecurityRow
+		if err := rows.Scan(&e.Action, &e.Outcome, &e.IP, &e.Detail, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out.Events = append(out.Events, e)
+	}
+	return out, rows.Err()
 }

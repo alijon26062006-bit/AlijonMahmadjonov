@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -30,6 +31,11 @@ func (h *Handlers) Register(r *httpx.Router, mw Middleware) {
 	read.GET("/overview", h.overview)
 	read.GET("/users", h.users)
 	read.GET("/users/{id}", h.user)
+	read.GET("/users/{id}/projects", h.userProjects)
+	read.GET("/users/{id}/payments", h.userPayments)
+	read.GET("/users/{id}/security", h.userSecurity)
+	read.GET("/users/{id}/history", h.userHistory)
+	read.GET("/permissions", h.grantable)
 	read.GET("/settings", h.settings)
 	read.GET("/flags", h.flags)
 	read.GET("/matching/weights", h.weights)
@@ -43,6 +49,10 @@ func (h *Handlers) Register(r *httpx.Router, mw Middleware) {
 	write.POST("/users/{id}/roles", h.grantRole)
 	write.DELETE("/users/{id}/roles/{role}", h.revokeRole)
 	write.PUT("/users/{id}/identity", h.verifyIdentity)
+	write.POST("/users/{id}/block", h.block)
+	write.POST("/users/{id}/unblock", h.unblock)
+	write.POST("/users/{id}/permissions", h.grantPermission)
+	write.DELETE("/users/{id}/permissions/{permission}", h.revokePermission)
 	write.PUT("/settings/{key}", h.setSetting)
 	write.PUT("/flags/{key}", h.setFlag)
 	write.PUT("/matching/weights", h.setWeights)
@@ -71,9 +81,32 @@ func (h *Handlers) users(w http.ResponseWriter, r *http.Request) error {
 	q := r.URL.Query()
 	limit, _ := strconv.Atoi(q.Get("limit"))
 	offset, _ := strconv.Atoi(q.Get("offset"))
-	users, total, err := h.svc.Users(r.Context(), caller(r), UserQuery{
-		Text: strings.TrimSpace(q.Get("q")), Status: q.Get("status"), Role: q.Get("role"), Limit: limit, Offset: offset,
-	})
+	query := UserQuery{
+		Text:           strings.TrimSpace(q.Get("q")),
+		Status:         q.Get("status"),
+		Role:           q.Get("role"),
+		Identity:       strings.TrimSpace(q.Get("identity")),
+		Country:        strings.TrimSpace(q.Get("country")),
+		Specialisation: strings.TrimSpace(q.Get("specialisation")),
+		Listed:         q.Get("listed") == "true",
+		Reported:       q.Get("reported") == "true",
+		Limit:          limit, Offset: offset,
+	}
+	for name, target := range map[string]**time.Time{
+		"registered_from": &query.RegisteredFrom,
+		"registered_to":   &query.RegisteredTo,
+	} {
+		raw := strings.TrimSpace(q.Get(name))
+		if raw == "" {
+			continue
+		}
+		parsed, err := time.Parse("2006-01-02", raw)
+		if err != nil {
+			return httpx.Validation(map[string]string{name: "Дата в формате ГГГГ-ММ-ДД."})
+		}
+		*target = &parsed
+	}
+	users, total, err := h.svc.Users(r.Context(), caller(r), query)
 	if err != nil {
 		return err
 	}
@@ -291,4 +324,125 @@ func (h *Handlers) auditLog(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return httpx.JSONMeta(w, http.StatusOK, rows, map[string]any{"total": total, "offset": query.Offset})
+}
+
+// ── The tabs of a user's page ───────────────────────────────────────────────
+
+func (h *Handlers) userProjects(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r, "id")
+	if err != nil {
+		return err
+	}
+	out, err := h.svc.Projects(r.Context(), caller(r), id)
+	if err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, out)
+}
+
+func (h *Handlers) userPayments(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r, "id")
+	if err != nil {
+		return err
+	}
+	out, err := h.svc.Payments(r.Context(), caller(r), id)
+	if err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, out)
+}
+
+func (h *Handlers) userSecurity(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r, "id")
+	if err != nil {
+		return err
+	}
+	out, err := h.svc.Security(r.Context(), caller(r), id)
+	if err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, out)
+}
+
+func (h *Handlers) userHistory(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r, "id")
+	if err != nil {
+		return err
+	}
+	out, err := h.svc.AdminHistory(r.Context(), caller(r), id)
+	if err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, out)
+}
+
+// ── Blocking ────────────────────────────────────────────────────────────────
+
+func (h *Handlers) block(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r, "id")
+	if err != nil {
+		return err
+	}
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
+		return err
+	}
+	if err := h.svc.Block(r.Context(), caller(r), id, body.Reason); err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, map[string]any{"status": "banned"})
+}
+
+func (h *Handlers) unblock(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r, "id")
+	if err != nil {
+		return err
+	}
+	if err := h.svc.Unblock(r.Context(), caller(r), id); err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, map[string]any{"status": "active"})
+}
+
+// ── Permissions by name ─────────────────────────────────────────────────────
+
+func (h *Handlers) grantable(w http.ResponseWriter, r *http.Request) error {
+	out, err := h.svc.Grantable(r.Context(), caller(r))
+	if err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, out)
+}
+
+func (h *Handlers) grantPermission(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r, "id")
+	if err != nil {
+		return err
+	}
+	var body struct {
+		Permission string `json:"permission"`
+		Note       string `json:"note"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
+		return err
+	}
+	out, err := h.svc.GrantPermission(r.Context(), caller(r), id, body.Permission, body.Note)
+	if err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, out)
+}
+
+func (h *Handlers) revokePermission(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r, "id")
+	if err != nil {
+		return err
+	}
+	out, err := h.svc.RevokePermission(r.Context(), caller(r), id, r.PathValue("permission"))
+	if err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, out)
 }

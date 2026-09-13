@@ -72,16 +72,55 @@ const (
 	PermContentHide      Permission = "content.hide"
 
 	// Administration
+	PermUserView          Permission = "users.view"
 	PermUserManage        Permission = "user.manage"
+	PermUserSuspend       Permission = "users.suspend"
+	PermUserBan           Permission = "users.ban"
 	PermRoleGrant         Permission = "role.grant"
+	PermPaymentView       Permission = "payments.view"
 	PermPaymentManage     Permission = "payment.manage"
 	PermPaymentRelease    Permission = "payment.release"
+	PermSecurityView      Permission = "security.view"
 	PermDisputeResolve    Permission = "dispute.resolve"
 	PermSettingsManage    Permission = "settings.manage"
 	PermAuditRead         Permission = "audit.read"
 	PermAdminDashboard    Permission = "admin.dashboard"
 	PermMatchingConfigure Permission = "matching.configure"
+
+	// Identity documents.
+	//
+	// Deliberately absent from every role's grant table below. A passport is
+	// not something a person should be able to look at because somebody made
+	// them a moderator; these two are granted by name, to one account at a
+	// time, and the grant is recorded in admin_permission_grants.
+	PermIdentityView   Permission = "identity_verification.view"
+	PermIdentityReview Permission = "identity_verification.review"
 )
+
+// grantableByName is the set of permissions an administrator may hand to
+// another account on top of what its role already gives.
+//
+// A closed list on purpose: an endpoint that accepted any string would let a
+// typo create a permission nothing checks, and a well-chosen string create one
+// that everything does.
+var grantableByName = set(
+	PermIdentityView, PermIdentityReview,
+	PermPaymentView, PermSecurityView, PermAuditRead, PermUserView,
+)
+
+// Grantable reports whether a permission may be granted to an account by name.
+func Grantable(p Permission) bool {
+	_, ok := grantableByName[p]
+	return ok
+}
+
+// GrantablePermissions lists what an administrator may hand out, for the panel.
+func GrantablePermissions() []Permission {
+	return []Permission{
+		PermIdentityView, PermIdentityReview,
+		PermPaymentView, PermSecurityView, PermAuditRead, PermUserView,
+	}
+}
 
 // rolePermissions is the whole grant table. Admin is listed explicitly rather
 // than given a wildcard, so adding a permission is a deliberate decision about
@@ -101,12 +140,14 @@ var rolePermissions = map[Role]map[Permission]struct{}{
 	),
 	RoleModerator: set(
 		PermModerationQueue, PermModerationDecide, PermReportReview,
-		PermContentHide, PermAdminDashboard, PermProfileManage,
+		PermContentHide, PermAdminDashboard, PermUserView, PermProfileManage,
 	),
 	RoleAdmin: set(
 		PermModerationQueue, PermModerationDecide, PermReportReview,
-		PermContentHide, PermAdminDashboard, PermUserManage, PermRoleGrant,
-		PermPaymentManage, PermPaymentRelease, PermDisputeResolve,
+		PermContentHide, PermAdminDashboard, PermUserView, PermUserManage,
+		PermUserSuspend, PermUserBan, PermRoleGrant,
+		PermPaymentView, PermPaymentManage, PermPaymentRelease,
+		PermSecurityView, PermDisputeResolve,
 		PermSettingsManage, PermAuditRead, PermMatchingConfigure,
 		PermProfileManage,
 	),
@@ -130,7 +171,10 @@ type Identity struct {
 	Email      string
 	ActiveRole Role
 	// Every role the account holds, for the role switcher.
-	Roles            []Role
+	Roles []Role
+	// Permissions granted to this account by name, on top of its role. Empty
+	// for everyone who is not staff.
+	Granted          []Permission
 	Status           string
 	EmailVerified    bool
 	IdentityVerified bool
@@ -168,6 +212,16 @@ func (i *Identity) Can(p Permission) bool {
 	if i.Status != "active" {
 		return false
 	}
+	// A permission granted by name still requires the caller to be acting in a
+	// staff role: an administrator browsing the marketplace as a client must
+	// not carry the right to open someone's passport into a client screen.
+	if i.ActiveRole == RoleAdmin || i.ActiveRole == RoleModerator {
+		for _, granted := range i.Granted {
+			if granted == p {
+				return true
+			}
+		}
+	}
 	perms, ok := rolePermissions[i.ActiveRole]
 	if !ok {
 		return false
@@ -183,9 +237,16 @@ func (i *Identity) Permissions() []string {
 		return nil
 	}
 	perms := rolePermissions[i.ActiveRole]
-	out := make([]string, 0, len(perms))
+	out := make([]string, 0, len(perms)+len(i.Granted))
 	for p := range perms {
 		out = append(out, string(p))
+	}
+	if i.ActiveRole == RoleAdmin || i.ActiveRole == RoleModerator {
+		for _, p := range i.Granted {
+			if _, already := perms[p]; !already {
+				out = append(out, string(p))
+			}
+		}
 	}
 	return out
 }

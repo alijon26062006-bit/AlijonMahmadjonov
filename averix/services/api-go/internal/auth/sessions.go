@@ -86,16 +86,19 @@ func (s *Store) ResolveSession(ctx context.Context, raw string, idleTTL time.Dur
 		emailVerified    bool
 		identityVerified bool
 		roles            []string
+		granted          []string
 	)
 	err = s.db.QueryRow(ctx, `
 		SELECT s.id, s.user_id, s.verifier_hash, s.active_role, s.csrf_token,
 		       s.expires_at, s.last_used_at,
 		       u.username, u.email, u.status,
 		       u.email_verified_at IS NOT NULL, u.identity_verified_at IS NOT NULL,
-		       coalesce(array_agg(r.role) FILTER (WHERE r.role IS NOT NULL), '{}')
+		       coalesce(array_agg(r.role) FILTER (WHERE r.role IS NOT NULL), '{}'),
+		       coalesce(array_agg(DISTINCT g.permission) FILTER (WHERE g.permission IS NOT NULL), '{}')
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		LEFT JOIN user_roles r ON r.user_id = u.id
+		LEFT JOIN admin_permission_grants g ON g.user_id = u.id AND g.revoked_at IS NULL
 		WHERE s.selector = $1
 		  AND s.revoked_at IS NULL
 		  AND s.expires_at > now()
@@ -103,7 +106,7 @@ func (s *Store) ResolveSession(ctx context.Context, raw string, idleTTL time.Dur
 		GROUP BY s.id, u.id`, token.Selector).
 		Scan(&sessionID, &userID, &verifierHash, &activeRole, &csrfToken,
 			&expiresAt, &lastUsedAt, &username, &email, &status,
-			&emailVerified, &identityVerified, &roles)
+			&emailVerified, &identityVerified, &roles, &granted)
 	if database.IsNoRows(err) {
 		return nil, ErrSessionInvalid
 	}
@@ -152,6 +155,9 @@ func (s *Store) ResolveSession(ctx context.Context, raw string, idleTTL time.Dur
 		if security.Role(r) == role {
 			held = true
 		}
+	}
+	for _, p := range granted {
+		identity.Granted = append(identity.Granted, security.Permission(p))
 	}
 	if !held {
 		_ = s.RevokeSession(context.WithoutCancel(ctx), sessionID)
