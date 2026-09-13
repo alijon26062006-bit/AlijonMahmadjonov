@@ -326,6 +326,11 @@ func (h *Harness) PublishDeveloper(username, specialisation string, technologies
 	}).OK(h.T, 200)
 
 	h.Verify(username)
+	// A published freelancer in the new world is a verified one: without the
+	// identity check they could not send a proposal, publish a service or be
+	// hired. Tests about those things want a working freelancer, not a
+	// half-registered one; the gate itself has its own tests.
+	h.VerifyIdentity(username)
 	c.POST("/developers/me/finish", nil).OK(h.T, 200)
 
 	return &Developer{Client: c, Username: username, UserID: c.UserID()}
@@ -385,6 +390,15 @@ func (h *Harness) NewAdmin(username string) *Admin {
 func (h *Harness) Verify(username string) {
 	h.T.Helper()
 	h.Exec(`UPDATE users SET email_verified_at = now() WHERE username = $1`, username)
+}
+
+// VerifyIdentity marks the identity check passed, the way a reviewer's
+// approval does. Separate from Verify so a test can have a freelancer with a
+// confirmed address and no verified identity — which is exactly the state the
+// gate exists for.
+func (h *Harness) VerifyIdentity(username string) {
+	h.T.Helper()
+	h.Exec(`UPDATE users SET identity_verified_at = now() WHERE username = $1`, username)
 }
 
 // PublishProject creates and publishes a project for a client, returning its id.

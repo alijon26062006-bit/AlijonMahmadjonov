@@ -11,7 +11,7 @@ import { ButtonLink } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ReviewCard } from '@/components/domain/ReviewPanel';
-import { IconAlert, IconLock, IconShield, IconStarFilled } from '@/components/ui/Icon';
+import { IconAlert, IconLock, IconStarFilled } from '@/components/ui/Icon';
 import { get } from '@/lib/api';
 import { plural, shortDate } from '@/lib/format';
 import { COMPANY_SIZE, countryName } from '@/lib/labels';
@@ -122,7 +122,6 @@ function ClientProfileScreen() {
               src={session?.photo_url}
               name={profile.company_name || profile.full_name}
               size={64}
-              verified={profile.identity_verified}
             />
             <div className="av-grow">
               <h1 className={styles.name}>{profile.company_name || profile.full_name}</h1>
@@ -141,9 +140,9 @@ function ClientProfileScreen() {
             <Badge tone={session?.email_verified ? 'success' : 'warning'} size="sm">
               {session?.email_verified ? 'Почта подтверждена' : 'Почта не подтверждена'}
             </Badge>
-            <Badge tone={profile.identity_verified ? 'verified' : 'neutral'} size="sm" icon={<IconShield size={13} />}>
-              {profile.identity_verified ? 'Личность подтверждена' : 'Личность не подтверждена'}
-            </Badge>
+            {/* Значка «личность подтверждена» у заказчика нет: он ничего не
+                подтверждает, и «не подтверждена» читалось бы как невыполненная
+                задача, которую ему негде выполнить. */}
             {profile.payment_verified ? (
               <Badge tone="success" size="sm">
                 Оплата подтверждена

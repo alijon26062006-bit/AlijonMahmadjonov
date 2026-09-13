@@ -40,6 +40,7 @@ type Notifier interface {
 
 type Service struct {
 	store     *Store
+	identity  IdentityGate
 	matching  *matching.Store
 	audit     *audit.Recorder
 	settings  Settings
@@ -47,6 +48,18 @@ type Service struct {
 	moderator Moderator
 	notifier  Notifier
 }
+
+// IdentityGate is the rule that a freelancer proves who they are before they
+// can earn. Declared as an interface here so this package keeps no dependency
+// on the verification module itself.
+type IdentityGate interface {
+	Require(ctx context.Context, id *security.Identity) error
+	RequireUser(ctx context.Context, userID uuid.UUID) error
+}
+
+// AttachIdentityGate is optional: without it nothing is gated, which is what
+// the tests that predate the rule rely on.
+func (s *Service) AttachIdentityGate(g IdentityGate) { s.identity = g }
 
 func NewService(store *Store, match *matching.Store, rec *audit.Recorder,
 	settings Settings, fees FeeResolver, moderator Moderator, notifier Notifier) *Service {
@@ -84,6 +97,13 @@ type MilestoneRequest struct {
 func (s *Service) Submit(ctx context.Context, id *security.Identity, in SubmitRequest) (*Proposal, error) {
 	if err := s.requireDeveloper(id); err != nil {
 		return nil, err
+	}
+	// Sending a proposal is the first step towards being paid, so it is the
+	// first place the identity rule applies.
+	if s.identity != nil {
+		if err := s.identity.Require(ctx, id); err != nil {
+			return nil, err
+		}
 	}
 
 	projectID, err := uuid.Parse(strings.TrimSpace(in.ProjectID))

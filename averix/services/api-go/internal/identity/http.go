@@ -68,6 +68,10 @@ func (h *Handlers) mine(w http.ResponseWriter, r *http.Request) error {
 // options tells the form what it may offer, so the list of document types
 // lives in one place rather than being retyped in the web app.
 func (h *Handlers) options(w http.ResponseWriter, r *http.Request) error {
+	// The form itself is only for freelancers; so is the list it renders from.
+	if err := requireFreelancer(security.FromContext(r.Context())); err != nil {
+		return err
+	}
 	types := make([]map[string]any, 0, len(DocumentTypes))
 	for _, t := range DocumentTypes {
 		types = append(types, map[string]any{"key": t.Key, "label": t.Label, "needs_back": t.NeedsBack})

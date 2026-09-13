@@ -34,7 +34,9 @@ const browser = await chromium.launch(
 );
 
 const stamp = Date.now();
+// Документы подаёт исполнитель: заказчика о них не спрашивают вовсе.
 const person = { name: 'Алия Рахимова', user: 'aliya' + (stamp % 100000), email: `p${stamp}@example.test`, pass: 'тихий-фонарь-4417-ok' };
+const buyer = { name: 'Руслан Ким', user: 'buyer' + (stamp % 100000), email: `q${stamp}@example.test`, pass: 'тихий-фонарь-4417-ok' };
 const reviewer = { name: 'Сергей Волков', user: 'reviewer' + (stamp % 100000), email: `r${stamp}@example.test`, pass: 'тихий-фонарь-4417-ok' };
 const other = { name: 'Олег Петров', user: 'other' + (stamp % 100000), email: `o${stamp}@example.test`, pass: 'тихий-фонарь-4417-ok' };
 
@@ -69,16 +71,42 @@ async function login(page, who) {
   await page.waitForURL(/feed|dashboard|admin/, { timeout: 20000 });
 }
 
-// ── 1. Человек подаёт документы ─────────────────────────────────────────────
+// ── 0. Заказчику проверка не положена ───────────────────────────────────────
+
+const buyerPage = await open();
+await register(buyerPage, buyer, 'client');
+await buyerPage.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+await buyerPage.waitForTimeout(1200);
+step(
+  'в настройках заказчика нет раздела «Личность»',
+  (await buyerPage.locator('text=Личность').count()) === 0,
+);
+await buyerPage.goto(`${BASE}/settings/verification`, { waitUntil: 'networkidle' });
+await buyerPage.waitForTimeout(1200);
+step(
+  'экран проверки заказчику объясняет, что она ему не нужна',
+  (await buyerPage.locator('text=Вам это не нужно').count()) > 0,
+);
+const buyerRefused = await buyerPage.evaluate(async () => {
+  const response = await fetch('/api/v1/account/identity', { credentials: 'include' });
+  return response.status;
+});
+step('и мимо интерфейса — тоже отказ', buyerRefused === 403, `статус ${buyerRefused}`);
+
+// ── 1. Исполнитель подаёт документы ─────────────────────────────────────────
 
 const personPage = await open();
-await register(personPage, person, 'client');
+await register(personPage, person, 'developer');
 const personID = sql(`SELECT id FROM users WHERE email = '${person.email}'`);
-step('заказчик зарегистрирован', personID.length === 36, personID);
+step('исполнитель зарегистрирован', personID.length === 36, personID);
 
 await personPage.goto(`${BASE}/settings/verification`, { waitUntil: 'networkidle' });
 await personPage.waitForSelector('text=Зачем это нужно', { timeout: 15000 });
 step('экран проверки открывается из кабинета', true);
+step(
+  'экран говорит, что без проверки нельзя откликаться',
+  (await personPage.locator('text=нельзя откликаться').count()) > 0,
+);
 step(
   'экран объясняет, что снимки удаляются после решения',
   (await personPage.locator('text=удаляются').count()) > 0,
@@ -112,7 +140,7 @@ step('снимки лежат в своём разделе хранилища', 
 step('в имени файла нет идентификатора человека', !keys.includes(personID));
 
 // Страница профиля ничего не говорит о документах.
-const html = await (await fetch(`${BASE}/api/v1/clients/${person.user}`)).text().catch(() => '');
+const html = await (await fetch(`${BASE}/api/v1/developers/${person.user}`)).text().catch(() => '');
 step('публичный профиль молчит о документах', !html.includes('identity_doc') && !html.includes('storage_key'));
 
 // ── 2. Администратор без разрешения ─────────────────────────────────────────
@@ -246,7 +274,7 @@ await personPage.goto(`${BASE}/settings/verification`, { waitUntil: 'networkidle
 await personPage.waitForTimeout(1200);
 step('человеку видно, что личность подтверждена', (await personPage.locator('text=Личность подтверждена').count()) > 0);
 
-const errors = [...personPage.errors, ...reviewerPage.errors].filter((e) => !e.includes('403') && !e.includes('Failed to load resource'));
+const errors = [...personPage.errors, ...buyerPage.errors, ...reviewerPage.errors].filter((e) => !e.includes('403') && !e.includes('Failed to load resource'));
 step('в консоли нет ошибок страниц', errors.length === 0, errors.slice(0, 3).join(' | '));
 
 await browser.close();

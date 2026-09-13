@@ -12,16 +12,11 @@ import { Tabs } from '@/components/ui/Tabs';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IconLock, IconShield } from '@/components/ui/Icon';
-import { ApiFailure, get, list, post } from '@/lib/api';
+import { ApiFailure, list, post } from '@/lib/api';
 import { longDate, pluralWord } from '@/lib/format';
 import { countryName } from '@/lib/labels';
 import { identityStatusLabel, identityTone } from '@/lib/admin';
-import type { IdentityOptions, IdentityQueueItem } from '@/lib/types';
-
-/** Названия документов приходят с сервера — один список на кабинет и админку. */
-function documentLabel(types: IdentityOptions['document_types'], key: string): string {
-  return types.find((type) => type.key === key)?.label ?? key;
-}
+import type { IdentityQueueItem } from '@/lib/types';
 
 // Значения ровно те, что понимает API: «Ждут проверки» — это отправленные и
 // взятые в работу вместе, иначе дело исчезает из очереди ровно в тот момент,
@@ -41,7 +36,6 @@ export default function IdentityQueuePage() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [types, setTypes] = useState<IdentityOptions['document_types']>([]);
 
   const load = useCallback(async () => {
     setItems(null);
@@ -61,12 +55,6 @@ export default function IdentityQueuePage() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    get<IdentityOptions>('/account/identity/options')
-      .then((options) => setTypes(options.document_types))
-      .catch(() => setTypes([]));
-  }, []);
 
   async function unlock(event: React.FormEvent) {
     event.preventDefault();
@@ -131,7 +119,9 @@ export default function IdentityQueuePage() {
                       </Link>{' '}
                       <span className="av-faint">@{item.username}</span>
                       <p className="av-xs av-faint">
-                        {item.document_type ? `${documentLabel(types, item.document_type)} · ` : ''}
+                        {item.document_label || item.document_type
+                          ? `${item.document_label || item.document_type} · `
+                          : ''}
                         {item.country_code ? `${countryName(item.country_code)} · ` : ''}
                         {item.documents} {pluralWord(item.documents, 'изображение', 'изображения', 'изображений')}
                         {item.submitted_at ? ` · отправлено ${longDate(item.submitted_at)}` : ''}

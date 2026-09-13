@@ -92,6 +92,7 @@ type SystemMessenger interface {
 
 type Service struct {
 	store      *Store
+	identity   IdentityGate
 	completion Completion
 	proposals  Proposals
 	projects   Projects
@@ -103,6 +104,17 @@ type Service struct {
 	messenger  SystemMessenger
 	urlOpts    urlguard.Options
 }
+
+// IdentityGate is the rule that a freelancer proves who they are before money
+// moves towards them. An interface, so this package does not depend on the
+// verification module itself.
+type IdentityGate interface {
+	Require(ctx context.Context, id *security.Identity) error
+	RequireUser(ctx context.Context, userID uuid.UUID) error
+}
+
+// AttachIdentityGate is optional; without it nothing is gated.
+func (s *Service) AttachIdentityGate(g IdentityGate) { s.identity = g }
 
 func NewService(store *Store, proposals Proposals, projects Projects, fileStore *files.Store,
 	rec *audit.Recorder, settings Settings, funder Funder, notifier Notifier,
@@ -166,6 +178,14 @@ func (s *Service) Accept(ctx context.Context, id *security.Identity, in AcceptRe
 	if facts.ClientID != id.UserID {
 		s.audit.Denial(ctx, "proposal", &proposalID, "not the project's client")
 		return nil, httpx.NotFoundf("proposal %s does not exist", proposalID)
+	}
+	// Hiring moves money towards the freelancer, so this is where the identity
+	// rule applies on the client's side of the deal. The client themselves is
+	// never asked for documents.
+	if s.identity != nil {
+		if err := s.identity.RequireUser(ctx, facts.DeveloperID); err != nil {
+			return nil, err
+		}
 	}
 	if !isLive(facts.Status) {
 		e := *httpx.ErrConflict

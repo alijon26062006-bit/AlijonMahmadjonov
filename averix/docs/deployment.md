@@ -185,7 +185,14 @@ bank account clients should send money to. Until you do, funding a milestone
 answers "payments aren't set up on this platform yet" — it never asks anyone
 to send money nowhere.
 
-## 5b. Who may see identity documents
+## 5b. Who has to verify, and who may see the documents
+
+Verification is a **freelancer's** step, never a client's: the platform pays
+freelancers and has to know who they are, while a client only pays. A
+freelancer fills in their profile, then verifies, and only then can send
+proposals, publish services or be hired. Turn the requirement off with the
+`identity.required_for_work` setting if your deployment does not need it.
+
 
 Nobody, until you say so — not even you. The two permissions that open a
 passport photograph (`identity_verification.view` and

@@ -47,6 +47,16 @@ page.on('response', (r) => {
   }
 });
 
+function verifyIdentity(email) {
+  // Проверка личности — отдельный сценарий с документами и сотрудником;
+  // здесь важно только то, что без неё исполнителю нельзя работать.
+  execSync(
+    `psql ${process.env.AVERIX_SMOKE_PSQL ?? '-U postgres -h /var/run/postgresql -d averix_dev'} -c ` +
+      `"UPDATE users SET identity_verified_at = now() WHERE email = '${email}'"`,
+    { stdio: 'ignore' },
+  );
+}
+
 function verifyEmail(email) {
   // В разработке письма не уходят, поэтому адрес подтверждается напрямую —
   // это единственное место, где тест обходит интерфейс.
@@ -146,8 +156,18 @@ await verifyEmail(dev.email);
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForSelector('text=Готово', { timeout: 15000 });
 await page.getByRole('button', { name: 'Опубликовать анкету' }).click();
-await page.waitForURL(/\/developers\//, { timeout: 20000 });
-step('анкета публикуется и открывается профиль', page.url().includes('/developers/'), page.url());
+// Анкета заполнена — дальше по новому правилу идёт проверка личности: без неё
+// исполнитель не может ни откликаться, ни продавать услуги.
+await page.waitForURL(/\/settings\/verification/, { timeout: 20000 });
+step('после анкеты исполнителя ведут на проверку личности', page.url().includes('/settings/verification'), page.url());
+
+// Саму проверку проходит человек, а решение принимает сотрудник — этот
+// сценарий не про них (для них есть smoke-identity.mjs), поэтому отметка
+// ставится напрямую, как и подтверждение почты выше.
+verifyIdentity(dev.email);
+
+await page.goto(`${BASE}/developers/${dev.user}`, { waitUntil: 'networkidle' });
+step('анкета опубликована и открывается профиль', page.url().includes('/developers/'), page.url());
 
 await page.waitForSelector(`text=${dev.name}`, { timeout: 15000 });
 const profileText = await page.locator('body').innerText();

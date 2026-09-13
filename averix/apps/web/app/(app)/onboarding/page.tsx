@@ -177,7 +177,11 @@ export default function OnboardingPage() {
       else if (step === 8) setProfile(await get<OwnProfile>('/developers/me'));
       if (step === TOTAL) {
         await refresh();
-        router.replace(`/developers/${session?.username ?? ''}`);
+        // Профиль заполнен — остаётся то, без чего работать нельзя. Кто уже
+        // проверен, идёт смотреть свою анкету.
+        router.replace(
+          profile?.identity_verified ? `/developers/${session?.username ?? ''}` : '/settings/verification',
+        );
         return;
       }
       setStep(step + 1);
@@ -637,6 +641,19 @@ export default function OnboardingPage() {
                   После публикации анкета появится в каталоге исполнителей, и подходящие заказы начнут
                   приходить в ленту. Изменить всё это можно в любой момент.
                 </p>
+
+                {/* Анкету публикуют без документов: проверка — следующий шаг, и
+                    о нём лучше узнать здесь, а не при первом отклике. */}
+                {profile.identity_verified ? null : (
+                  <div className={styles.notice}>
+                    <p className="av-small av-strong">Дальше — проверка личности</p>
+                    <p className="av-small">
+                      Она нужна один раз и только исполнителям: площадка переводит деньги живым людям
+                      и должна знать, кому. Без неё нельзя откликаться на заказы, публиковать услуги и
+                      получать оплату. Сразу после публикации анкеты мы откроем этот экран.
+                    </p>
+                  </div>
+                )}
               </div>
             ) : null}
 

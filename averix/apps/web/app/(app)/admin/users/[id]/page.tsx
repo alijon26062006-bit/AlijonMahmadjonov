@@ -147,7 +147,9 @@ export default function AdminUserPage() {
         {tab === 'portfolio' ? <Portfolio username={user.username} /> : null}
         {tab === 'projects' ? <Projects userID={userID} /> : null}
         {tab === 'payments' ? <Payments userID={userID} /> : null}
-        {tab === 'identity' ? <IdentityPanel userID={userID} fullName={user.full_name} onChanged={load} /> : null}
+        {tab === 'identity' ? (
+          <IdentityPanel userID={userID} fullName={user.full_name} roles={user.roles} onChanged={load} />
+        ) : null}
         {tab === 'security' ? <Security userID={userID} /> : null}
         {tab === 'reports' ? <Reports userID={userID} /> : null}
         {tab === 'history' ? <History userID={userID} /> : null}

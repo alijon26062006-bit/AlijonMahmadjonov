@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Field';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ApiFailure, get, post, upload } from '@/lib/api';
+import { useSession } from '@/lib/session';
 import { fileSize, longDate } from '@/lib/format';
 import { identityStatusLabel, identityTone } from '@/lib/admin';
 import type { IdentityCase, IdentityOptions } from '@/lib/types';
@@ -27,6 +28,7 @@ const COUNTRIES = [
 ];
 
 export default function VerificationPage() {
+  const { session } = useSession();
   const [item, setItem] = useState<IdentityCase | null>(null);
   const [options, setOptions] = useState<IdentityOptions | null>(null);
   const [error, setError] = useState('');
@@ -84,6 +86,28 @@ export default function VerificationPage() {
     }
   }
 
+  // Заказчику здесь нечего делать: у него документы не спрашивают.
+  if (session && !session.roles.includes('developer')) {
+    return (
+      <>
+        <TopBar back="/settings" title="Проверка личности" />
+        <div className="av-page av-stack">
+          <Card>
+            <SectionHeading title="Вам это не нужно" />
+            <p className="av-small av-muted">
+              Проверка личности нужна только исполнителям — тем, кто получает оплату за работу. Как
+              заказчик вы ничего не подтверждаете и документы не присылаете.
+            </p>
+            <p className="av-small av-muted">
+              Если вы решите и сами выполнять заказы, добавьте роль исполнителя в настройках — тогда
+              проверка появится здесь.
+            </p>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
   if (!options) {
     return (
       <>
@@ -122,9 +146,13 @@ export default function VerificationPage() {
             }
           />
           <p className="av-small av-muted">
-            Подтверждённая личность — это значок на профиле и доверие заказчика. Изображения видит только
-            сотрудник с отдельным разрешением, каждый просмотр записывается, а после решения снимки
-            удаляются: у площадки остаётся результат проверки, а не ваш паспорт.
+            Это последний шаг перед работой: без подтверждённой личности нельзя откликаться на заказы,
+            публиковать услуги и получать оплату. Площадка переводит деньги живым людям и должна знать,
+            кому именно.
+          </p>
+          <p className="av-small av-muted">
+            Изображения видит только сотрудник с отдельным разрешением, каждый просмотр записывается, а
+            после решения снимки удаляются: у площадки остаётся результат проверки, а не ваш паспорт.
           </p>
         </Card>
 

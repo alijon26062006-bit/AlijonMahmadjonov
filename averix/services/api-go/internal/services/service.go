@@ -28,6 +28,7 @@ type Moderator interface {
 
 // Svc is the service layer. Named Svc because Service is the model.
 type Svc struct {
+	identity  IdentityGate
 	store     *Store
 	taxonomy  *taxonomy.Store
 	contracts *contracts.Service
@@ -43,6 +44,17 @@ func NewSvc(store *Store, tax *taxonomy.Store, contractsSvc *contracts.Service,
 		settings: settings, moderator: moderator, audit: rec}
 }
 
+// IdentityGate is the rule that a freelancer proves who they are before they
+// can earn. An interface, so this package does not depend on the verification
+// module itself.
+type IdentityGate interface {
+	Require(ctx context.Context, id *security.Identity) error
+	RequireUser(ctx context.Context, userID uuid.UUID) error
+}
+
+// AttachIdentityGate is optional; without it nothing is gated.
+func (s *Svc) AttachIdentityGate(g IdentityGate) { s.identity = g }
+
 func (s *Svc) Store() *Store { return s.store }
 
 // ── Editing ─────────────────────────────────────────────────────────────────
@@ -50,6 +62,13 @@ func (s *Svc) Store() *Store { return s.store }
 func (s *Svc) Create(ctx context.Context, id *security.Identity, in UpsertRequest) (*Service, error) {
 	if err := security.RequireRole(id, security.RoleDeveloper); err != nil {
 		return nil, httpx.Forbiddenf("only a freelancer can offer a service")
+	}
+	// A service is an offer to be paid, so it waits for the identity check the
+	// same way a proposal does.
+	if s.identity != nil {
+		if err := s.identity.Require(ctx, id); err != nil {
+			return nil, err
+		}
 	}
 	limit := 20
 	if s.settings != nil {
@@ -398,6 +417,13 @@ func (s *Svc) Order(ctx context.Context, id *security.Identity, serviceID uuid.U
 	}
 	if sv.Seller.UserID == id.UserID {
 		return nil, httpx.Forbiddenf("you cannot order your own service")
+	}
+	// The client is not asked for documents; the person who will be paid is,
+	// and this is the last moment to notice they have not been.
+	if s.identity != nil {
+		if err := s.identity.RequireUser(ctx, sv.Seller.UserID); err != nil {
+			return nil, err
+		}
 	}
 
 	v := validate.New()

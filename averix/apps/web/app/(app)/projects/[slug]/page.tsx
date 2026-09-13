@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import styles from './project.module.css';
 import { TopBar } from '@/components/nav/TopBar';
+import { VerificationNotice } from '@/components/VerificationNotice';
 import { Card } from '@/components/ui/Card';
 import { Badge, Tag } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -306,6 +307,14 @@ export default function ProjectPage({ params }: { params: Promise<{ slug: string
             ) : null}
           </div>
 
+          {/* Кнопка «Откликнуться» у непроверенного исполнителя всё равно
+              упрётся в отказ сервера — объясняем до нажатия. */}
+          {isDeveloper && project.status === 'open' && session && !session.identity_verified ? (
+            <div style={{ marginTop: 'var(--av-space-4)' }}>
+              <VerificationNotice where="proposal" />
+            </div>
+          ) : null}
+
           {isDeveloper && project.status === 'open' ? (
             <div className={styles.actionBar}>
               <div className={styles.actionInfo}>
@@ -314,7 +323,11 @@ export default function ProjectPage({ params }: { params: Promise<{ slug: string
                   <IconClock size={12} /> {plural(project.proposals_count, 'отклик', 'отклика', 'откликов')}
                 </span>
               </div>
-              <Button size="lg" disabled={project.has_proposed} onClick={() => setProposing(true)}>
+              <Button
+                size="lg"
+                disabled={project.has_proposed || !session?.identity_verified}
+                onClick={() => setProposing(true)}
+              >
                 {project.has_proposed ? 'Отклик отправлен' : 'Откликнуться'}
               </Button>
             </div>

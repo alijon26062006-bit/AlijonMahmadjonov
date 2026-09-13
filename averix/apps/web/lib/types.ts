@@ -1027,6 +1027,7 @@ export type IdentityQueueItem = {
   status: string;
   status_label: string;
   document_type?: string;
+  document_label?: string;
   country_code?: string;
   submitted_at?: string;
   waiting_hours: number;

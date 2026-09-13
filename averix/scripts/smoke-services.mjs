@@ -50,6 +50,12 @@ async function register(who, role) {
   await page.getByRole('button', { name: role === 'client' ? /Я хочу заказать услугу/ : /Я хочу работать и зарабатывать/ }).click();
   await page.waitForURL(/onboarding|dashboard/, { timeout: 15000 });
   sql(`UPDATE users SET email_verified_at = now() WHERE email = '${who.email}'`);
+  if (role === 'developer') {
+    // Услуги продаёт только проверенный исполнитель. Сама проверка — с
+    // документами и сотрудником — это smoke-identity.mjs; здесь отметка
+    // ставится напрямую, как и подтверждение почты строкой выше.
+    sql(`UPDATE users SET identity_verified_at = now() WHERE email = '${who.email}'`);
+  }
 }
 async function signOut() {
   await page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });

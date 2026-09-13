@@ -73,11 +73,31 @@ const maxDocumentBytes int64 = 12 << 20
 
 // ── The owner's side ────────────────────────────────────────────────────────
 
+// requireFreelancer is the first line of every owner-side call.
+//
+// Verification exists so that the person receiving money is who they say they
+// are. A client receives nothing — they pay — so the platform has no reason to
+// hold their passport, and does not ask for one. An account that holds both
+// roles is a freelancer for this purpose.
+func requireFreelancer(id *security.Identity) error {
+	if !id.Authenticated() {
+		return httpx.ErrUnauthenticated
+	}
+	if !id.HasRole(security.RoleDeveloper) {
+		e := *httpx.ErrForbidden
+		e.Code = "identity_not_applicable"
+		e.Message = "Проверка личности нужна только исполнителям — тем, кто получает оплату. " +
+			"Заказчику она не требуется, и документы у него не запрашиваются."
+		return &e
+	}
+	return nil
+}
+
 // Mine returns the caller's own case. A person always sees their own
 // documents' existence, never anybody else's.
 func (s *Service) Mine(ctx context.Context, id *security.Identity) (*Case, error) {
-	if !id.Authenticated() {
-		return nil, httpx.ErrUnauthenticated
+	if err := requireFreelancer(id); err != nil {
+		return nil, err
 	}
 	row, err := s.store.Current(ctx, id.UserID)
 	if errors.Is(err, ErrNotFound) {
@@ -110,8 +130,8 @@ type DetailsRequest struct {
 
 // SaveDetails starts a case, or updates the one the person is still filling in.
 func (s *Service) SaveDetails(ctx context.Context, id *security.Identity, in DetailsRequest) (*Case, error) {
-	if !id.Authenticated() {
-		return nil, httpx.ErrUnauthenticated
+	if err := requireFreelancer(id); err != nil {
+		return nil, err
 	}
 
 	v := validate.New()
@@ -168,8 +188,8 @@ func (s *Service) openCase(ctx context.Context, userID uuid.UUID) (*caseRow, err
 
 // Upload stores one side of the document.
 func (s *Service) Upload(ctx context.Context, id *security.Identity, kind string, r io.Reader) (*Case, error) {
-	if !id.Authenticated() {
-		return nil, httpx.ErrUnauthenticated
+	if err := requireFreelancer(id); err != nil {
+		return nil, err
 	}
 	switch kind {
 	case KindFront, KindBack, KindSelfie, KindSelfieWithDocument:
@@ -206,8 +226,8 @@ func (s *Service) Upload(ctx context.Context, id *security.Identity, kind string
 
 // SubmitForReview closes the person's side of the case.
 func (s *Service) SubmitForReview(ctx context.Context, id *security.Identity) (*Case, error) {
-	if !id.Authenticated() {
-		return nil, httpx.ErrUnauthenticated
+	if err := requireFreelancer(id); err != nil {
+		return nil, err
 	}
 	row, err := s.openCase(ctx, id.UserID)
 	if err != nil {
@@ -480,6 +500,9 @@ func (s *Service) Queue(ctx context.Context, id *security.Identity, q QueueQuery
 		}
 		item.StatusLabel = statusLabel(item.Status)
 		item.DocumentType, item.CountryCode = deref(docType), deref(country)
+		if label, _, ok := documentType(item.DocumentType); ok {
+			item.DocumentLabel = label
+		}
 		if item.SubmittedAt != nil {
 			item.WaitingHours = int(time.Since(*item.SubmittedAt).Hours())
 		}

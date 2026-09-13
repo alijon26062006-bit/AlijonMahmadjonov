@@ -240,6 +240,14 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	// contracts. Moderation arrives with its module; nil until then.
 	a.Services = services.NewSvc(services.NewStore(db, store.PublicURL), taxonomyStore,
 		a.Contracts, projectStore, settingsStore, moderator, recorder)
+	// The identity rule, in one place and handed to the three modules where
+	// money starts moving: a proposal, a service, a hire. Nothing else in the
+	// product asks about verification, and the client side never does.
+	identityGate := identity.NewGate(db, settingsStore)
+	a.Proposals.AttachIdentityGate(identityGate)
+	a.Services.AttachIdentityGate(identityGate)
+	a.Contracts.AttachIdentityGate(identityGate)
+
 	a.Search = search.NewService(search.NewStore(db, store.PublicURL), a.Services.Store(), recorder)
 	a.Admin = admin.NewService(admin.NewStore(db), authStore, settingsStore, matchingStore,
 		a.Contracts, notifier, recorder, cfg, Version, store.PublicURL)

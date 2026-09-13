@@ -181,17 +181,21 @@ func statusLabel(status string) string {
 // QueueItem is one line of the reviewer's queue. It names the person and the
 // state of their case, and nothing from the documents themselves.
 type QueueItem struct {
-	ID           uuid.UUID  `json:"id"`
-	UserID       uuid.UUID  `json:"user_id"`
-	Username     string     `json:"username"`
-	FullName     string     `json:"full_name"`
-	Status       string     `json:"status"`
-	StatusLabel  string     `json:"status_label"`
-	DocumentType string     `json:"document_type,omitempty"`
-	CountryCode  string     `json:"country_code,omitempty"`
-	SubmittedAt  *time.Time `json:"submitted_at,omitempty"`
-	WaitingHours int        `json:"waiting_hours"`
-	Documents    int        `json:"documents"`
+	ID           uuid.UUID `json:"id"`
+	UserID       uuid.UUID `json:"user_id"`
+	Username     string    `json:"username"`
+	FullName     string    `json:"full_name"`
+	Status       string    `json:"status"`
+	StatusLabel  string    `json:"status_label"`
+	DocumentType string    `json:"document_type,omitempty"`
+	// Название документа словами. Очередь читают сотрудники, у которых нет
+	// роли исполнителя, — а список типов документов живёт за формой подачи,
+	// которая только для исполнителей. Проще прислать готовую подпись.
+	DocumentLabel string     `json:"document_label,omitempty"`
+	CountryCode   string     `json:"country_code,omitempty"`
+	SubmittedAt   *time.Time `json:"submitted_at,omitempty"`
+	WaitingHours  int        `json:"waiting_hours"`
+	Documents     int        `json:"documents"`
 }
 
 // AccessEntry is one line of the log of who looked at what.

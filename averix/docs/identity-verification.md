@@ -1,8 +1,48 @@
-# Identity verification: documents, who may look, and when they are deleted
+# Identity verification: whose documents, who may look, and when they are deleted
 
 A passport photograph is not an upload. It is the one thing on this platform
 that, leaked, cannot be rotated, revoked or apologised away. Everything below
 follows from that.
+
+## 0. One side of the marketplace, not both
+
+Verification belongs to **freelancers**. They are the ones who receive money,
+and the platform has to know who it is paying.
+
+A client is never asked. They pay; nothing is paid to them; there is nothing
+the platform needs to prove about them that a confirmed email address does not
+already cover — and the safest personal data is the data you do not hold. This
+is not a hidden button: the endpoints refuse a client (`identity_not_applicable`),
+the settings screen has no such card for them, and a database trigger refuses to
+create a verification row for an account without the `developer` role, so no
+script or future module can quietly start collecting them.
+
+An account that holds both roles is a freelancer for this purpose.
+
+## 0b. When a freelancer has to pass it
+
+After the profile is filled in, and before any of the four things that lead to
+being paid:
+
+| Action | Checked in |
+| --- | --- |
+| sending a proposal | `proposals.Submit` |
+| publishing a service | `services.Create` |
+| being hired on a proposal | `contracts.Accept` — the client's call, checked against the freelancer |
+| having a service ordered | `services.Order` — same |
+
+Everything else stays open: filling in the profile, publishing it, appearing in
+the catalogue, browsing work, talking to people. None of that earns, so none of
+it is gated — and a client can still find and message somebody who has not
+finished verifying.
+
+The last two are checked against the *other* party, from the database rather
+than from the session, because the caller there is the client. The rule is
+enforced on the server in all four places; the buttons the web app hides are a
+courtesy, not the control.
+
+`identity.required_for_work` (default **true**) turns the requirement off for a
+deployment that does not want it.
 
 | Question | Answered by | Where |
 | --- | --- | --- |

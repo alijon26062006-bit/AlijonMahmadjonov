@@ -22,7 +22,7 @@ import (
 func TestIdentityDocumentsAreUnreachableWithoutAnExplicitGrant(t *testing.T) {
 	h := testsupport.New(t)
 	admin := h.NewAdmin("operator")
-	person := h.NewClient("applicant")
+	person := newApplicant(h, "applicant")
 
 	// A person submits.
 	submitVerification(t, h, person.Client)
@@ -71,7 +71,7 @@ func TestIdentityDocumentsAreUnreachableWithoutAnExplicitGrant(t *testing.T) {
 func TestReviewerSeesDocumentsOnlyThroughAShortLivedTicket(t *testing.T) {
 	h := testsupport.New(t)
 	admin := h.NewAdmin("reviewer")
-	person := h.NewClient("applicant")
+	person := newApplicant(h, "applicant")
 	submitVerification(t, h, person.Client)
 	unlockedReviewer(t, h, admin)
 
@@ -140,8 +140,8 @@ func TestReviewerSeesDocumentsOnlyThroughAShortLivedTicket(t *testing.T) {
 
 func TestOwnerSeesTheirOwnCaseAndNobodyElsesDocuments(t *testing.T) {
 	h := testsupport.New(t)
-	person := h.NewClient("applicant")
-	other := h.NewClient("stranger")
+	person := newApplicant(h, "applicant")
+	other := newApplicant(h, "stranger")
 	submitVerification(t, h, person.Client)
 
 	mine := person.Client.GET("/account/identity").OK(t, http.StatusOK)
@@ -170,7 +170,7 @@ func TestOwnerSeesTheirOwnCaseAndNobodyElsesDocuments(t *testing.T) {
 func TestDecisionsNotifyThePersonAndLeaveARecord(t *testing.T) {
 	h := testsupport.New(t)
 	admin := h.NewAdmin("reviewer")
-	person := h.NewClient("applicant")
+	person := newApplicant(h, "applicant")
 	submitVerification(t, h, person.Client)
 	unlockedReviewer(t, h, admin)
 
@@ -237,7 +237,7 @@ func TestDecisionsNotifyThePersonAndLeaveARecord(t *testing.T) {
 func TestRetentionRemovesImagesAndKeepsTheDecision(t *testing.T) {
 	h := testsupport.New(t)
 	admin := h.NewAdmin("reviewer")
-	person := h.NewClient("applicant")
+	person := newApplicant(h, "applicant")
 	submitVerification(t, h, person.Client)
 	unlockedReviewer(t, h, admin)
 
@@ -266,6 +266,16 @@ func TestRetentionRemovesImagesAndKeepsTheDecision(t *testing.T) {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+// newApplicant — тот, кто вообще может подавать документы: исполнитель.
+// Проверка снимается сразу после регистрации, потому что PublishDeveloper
+// отдаёт уже проверенного, а здесь проверяется сам путь к этому состоянию.
+func newApplicant(h *testsupport.Harness, username string) *testsupport.Developer {
+	h.T.Helper()
+	dev := h.PublishDeveloper(username, "telegram-developer", "python", "telegram-api")
+	h.Exec(`UPDATE users SET identity_verified_at = NULL WHERE username = $1`, username)
+	return dev
+}
 
 func submitVerification(t *testing.T, h *testsupport.Harness, c *testsupport.Client) {
 	t.Helper()
@@ -324,4 +334,140 @@ func samplePNG(width, height int) []byte {
 		panic(err)
 	}
 	return buf.Bytes()
+}
+
+// serviceBody — услуга, у которой в порядке все поля: проверяется не форма, а
+// доступ к деньгам.
+func serviceBody() map[string]any {
+	return map[string]any{
+		"title":   "Настрою обмен с 1С под ключ",
+		"summary": "Выгрузка номенклатуры, остатков и документов в обе стороны.",
+		"description": "Настраиваю обмен между 1С и сайтом: справочники, остатки, цены и " +
+			"документы. Показываю на тестовой базе, потом переношу в рабочую.",
+		"category_slug": "telegram-bots",
+		"currency":      "USD",
+		"revisions":     2,
+		"skills":        []string{"python", "telegram-api"},
+		"tiers": []map[string]any{
+			{"name": "Базовый", "price_minor": 30000, "delivery_days": 7, "revisions": 1,
+				"includes": []string{"Справочники"}},
+			{"name": "Полный", "price_minor": 60000, "delivery_days": 14, "revisions": 2,
+				"includes": []string{"Справочники", "Документы"}},
+		},
+	}
+}
+
+// proposalBody — отклик, который проходит проверку полей: дело не в них, а в
+// том, пускают ли исполнителя вообще.
+func proposalBody(projectID string) map[string]any {
+	return map[string]any{
+		"project_id":    projectID,
+		"amount_minor":  150000,
+		"currency":      "USD",
+		"delivery_days": 14,
+		"cover_letter": "Делал такие интеграции трижды, последний раз для оптовой базы " +
+			"с обменом номенклатурой и документами. Начну с выгрузки справочников, " +
+			"потом двусторонний обмен документами, покажу на тестовой базе.",
+		"approach": "Сначала согласуем список объектов обмена и расписание, потом " +
+			"выгрузка справочников в одну сторону, приёмка, и только после этого " +
+			"документы в обе стороны — так ошибки видно сразу, а не в конце.",
+		"relevant_experience": "Шесть лет на бэкенде, из них три — интеграции с учётными " +
+			"системами и обменом через файлы и HTTP.",
+	}
+}
+
+// Верификация принадлежит одной стороне площадки.
+//
+// Заказчик платит и ничего не получает от площадки деньгами — его паспорт ей
+// не нужен, и она его не спрашивает. Проверяется не только то, что кнопки нет
+// в интерфейсе: интерфейс можно обойти, а этот отказ — нет.
+func TestAClientIsNeverAskedForDocuments(t *testing.T) {
+	h := testsupport.New(t)
+	client := h.NewClient("buyer")
+
+	for _, call := range []struct {
+		name string
+		do   func() *testsupport.Response
+	}{
+		{"своё дело", func() *testsupport.Response { return client.Client.GET("/account/identity") }},
+		{"список документов", func() *testsupport.Response { return client.Client.GET("/account/identity/options") }},
+		{"начать проверку", func() *testsupport.Response {
+			return client.Client.POST("/account/identity", map[string]any{
+				"document_type": "passport", "country_code": "RU",
+			})
+		}},
+		{"отправить на проверку", func() *testsupport.Response {
+			return client.Client.POST("/account/identity/submit", nil)
+		}},
+	} {
+		call.do().Fails(t, http.StatusForbidden, "identity_not_applicable")
+		_ = call.name
+	}
+
+	if n := h.Count(`SELECT count(*) FROM identity_verifications`); n != 0 {
+		t.Errorf("дел заведено %d, а у заказчика их не бывает", n)
+	}
+}
+
+// Исполнителю она, наоборот, нужна — и до неё он не может зарабатывать.
+func TestAFreelancerWorksOnlyAfterVerification(t *testing.T) {
+	h := testsupport.New(t)
+
+	// Профиль заполнен и опубликован: анкета проверки не требует.
+	dev := h.PublishDeveloper("unverified", "telegram-developer", "python", "telegram-api")
+	h.Exec(`UPDATE users SET identity_verified_at = NULL WHERE username = 'unverified'`)
+
+	client := h.NewClient("hiring")
+	projectID := h.PublishProject(client, "Интеграция с 1С", "telegram-bots",
+		[]string{"python"}, 100000, 200000)
+
+	// Отклик — первый шаг к оплате, и он закрыт.
+	dev.Client.POST("/proposals", proposalBody(projectID)).Fails(t, http.StatusForbidden, "identity_not_verified")
+
+	// Услуга — тоже предложение работы за деньги.
+	dev.Client.POST("/services", serviceBody()).Fails(t, http.StatusForbidden, "identity_not_verified")
+
+	// А профиль остаётся своим: заполнять и смотреть можно без документов.
+	dev.Client.GET("/developers/me").OK(t, http.StatusOK)
+
+	// Проверка пройдена — и всё то же самое работает.
+	h.VerifyIdentity("unverified")
+	proposal := dev.Client.POST("/proposals", proposalBody(projectID)).OK(t, http.StatusCreated)
+
+	// И нанять его теперь можно.
+	client.Client.POST("/contracts", map[string]any{"proposal_id": proposal.String("id")}).
+		OK(t, http.StatusCreated)
+}
+
+// Заказчик не может нанять того, кто ещё не подтвердил личность: правило
+// живёт на сервере, а не в кнопке, которую ему не показали.
+func TestHiringAnUnverifiedFreelancerIsRefused(t *testing.T) {
+	h := testsupport.New(t)
+	dev := h.PublishDeveloper("pending-check", "telegram-developer", "python", "telegram-api")
+	client := h.NewClient("employer")
+	projectID := h.PublishProject(client, "Телеграм-бот для записи", "telegram-bots",
+		[]string{"python"}, 50000, 90000)
+
+	proposal := dev.Client.POST("/proposals", proposalBody(projectID)).OK(t, http.StatusCreated)
+
+	// Проверка снята уже после отклика — так бывает, если решение отменили.
+	h.Exec(`UPDATE users SET identity_verified_at = NULL WHERE username = 'pending-check'`)
+
+	client.Client.POST("/contracts", map[string]any{"proposal_id": proposal.String("id")}).
+		Fails(t, http.StatusForbidden, "identity_not_verified")
+}
+
+// Требование выключается настройкой — площадке, которой оно не нужно, оно не
+// навязывается.
+func TestTheRequirementCanBeTurnedOff(t *testing.T) {
+	h := testsupport.New(t)
+	h.SetSetting("identity.required_for_work", false)
+
+	dev := h.PublishDeveloper("nochecks", "telegram-developer", "python", "telegram-api")
+	h.Exec(`UPDATE users SET identity_verified_at = NULL WHERE username = 'nochecks'`)
+	client := h.NewClient("relaxed")
+	projectID := h.PublishProject(client, "Лендинг для студии", "telegram-bots",
+		[]string{"python"}, 30000, 60000)
+
+	dev.Client.POST("/proposals", proposalBody(projectID)).OK(t, http.StatusCreated)
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import styles from './feed.module.css';
 import { TopBar } from '@/components/nav/TopBar';
+import { VerificationNotice } from '@/components/VerificationNotice';
 import { Tabs } from '@/components/ui/Tabs';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -70,6 +71,12 @@ export default function FeedPage() {
             Заказы по вашему профилю, а не всё подряд.
           </p>
         </header>
+
+        {/* Смотреть заказы можно всем; откликаться — после проверки. Сказать
+            об этом здесь честнее, чем встретить человека отказом в форме. */}
+        <div style={{ marginBottom: 'var(--av-space-4)' }}>
+          <VerificationNotice where="feed" />
+        </div>
 
         <div className={styles.tabs}>
           <Tabs items={tabs} active={tab} onChange={setTab} ariaLabel="Разделы ленты" />

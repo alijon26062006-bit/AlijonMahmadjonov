@@ -35,10 +35,12 @@ type Gate = 'loading' | 'no-permission' | 'locked' | 'open' | 'none';
 export function IdentityPanel({
   userID,
   fullName,
+  roles,
   onChanged,
 }: {
   userID: string;
   fullName: string;
+  roles: string[];
   onChanged: () => void;
 }) {
   const [gate, setGate] = useState<Gate>('loading');
@@ -94,6 +96,17 @@ export function IdentityPanel({
     }
   }
 
+  // У заказчика проверки нет вовсе — и это не пустая вкладка, а правило.
+  if (!roles.includes('developer')) {
+    return (
+      <EmptyState
+        icon={<IconShield size={20} />}
+        title="Заказчику проверка не нужна"
+        description={`${fullName} — заказчик: он платит, а не получает оплату. Документы у него не запрашиваются, и завести дело на этот аккаунт нельзя ни отсюда, ни запросом к API.`}
+      />
+    );
+  }
+
   if (gate === 'loading') return <SkeletonList count={2} />;
 
   if (gate === 'no-permission') {
@@ -138,7 +151,7 @@ export function IdentityPanel({
       <EmptyState
         icon={<IconShield size={20} />}
         title="Проверка не начиналась"
-        description={`${fullName} не отправлял документы. Отметку о проверке можно поставить вручную во вкладке «Обзор», но она не заменяет документы.`}
+        description={`${fullName} ещё не отправлял документы. Пока они не проверены, он не может откликаться на заказы, публиковать услуги и получать оплату.`}
       />
     );
   }

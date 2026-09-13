@@ -84,7 +84,9 @@ export default function SettingsPage({ initialTab }: { initialTab?: string } = {
                 router.push(role === 'client' ? '/dashboard' : '/feed');
               }}
             />
-            <VerificationCard account={account} />
+            {/* Проверка личности — только для тех, кто получает деньги. У
+                заказчика её нет вовсе: у него ничего и не спрашивают. */}
+            {account.roles.includes('developer') ? <VerificationCard account={account} /> : null}
             <DangerCard
               onDone={async () => {
                 await signOut();
@@ -205,7 +207,12 @@ function AccountCard({ account, onSaved }: { account: AccountSettings; onSaved: 
   );
 }
 
-/** Вход в проверку личности: одна карточка, которая говорит, где вы сейчас. */
+/**
+ * Вход в проверку личности: одна карточка, которая говорит, где вы сейчас.
+ *
+ * Показывается только исполнителю. Заказчик платит, а не получает, — его
+ * документы площадке не нужны, и она их не просит.
+ */
 function VerificationCard({ account }: { account: AccountSettings }) {
   return (
     <Card>
@@ -219,7 +226,7 @@ function VerificationCard({ account }: { account: AccountSettings }) {
         <p className="av-small av-muted">
           {account.identity_verified
             ? 'На вашем профиле стоит значок проверенной личности. Снимки документов после проверки удаляются — у площадки остаётся только результат.'
-            : 'Заказчики чаще выбирают исполнителей с подтверждённой личностью. Понадобится документ и селфи; снимки видит только сотрудник с отдельным разрешением, и каждый просмотр записывается.'}
+            : 'Без неё нельзя откликаться на заказы, публиковать услуги и получать оплату. Понадобится документ и селфи; снимки видит только сотрудник с отдельным разрешением, и каждый просмотр записывается.'}
         </p>
         <div>
           <ButtonLink href="/settings/verification" variant="secondary" size="sm">
