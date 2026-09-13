@@ -24,6 +24,7 @@ import (
 	"github.com/averix/api/internal/health"
 	"github.com/averix/api/internal/matching"
 	"github.com/averix/api/internal/messaging"
+	"github.com/averix/api/internal/notifications"
 	"github.com/averix/api/internal/payments"
 	"github.com/averix/api/internal/platform/cache"
 	"github.com/averix/api/internal/platform/cryptox"
@@ -68,6 +69,8 @@ type App struct {
 	Payments    *payments.Service
 	AI          *aiclient.Client
 	GitHub      *githubint.Service
+	Notifier    *notifications.Service
+	Mailer      *notifications.Mailer
 
 	redisStartupError error
 }
@@ -116,7 +119,15 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	// needs the events relayed between them; that is a Redis pub/sub away and
 	// is noted in the deployment docs rather than pretended here.
 	hub := messaging.NewHub()
-	messagingService := messaging.NewService(messageStore, fileStore, hub, settingsStore, nil, nil)
+
+	// Notifications ride the chat socket for live delivery and the worker for
+	// email. The mailer records every message in email_log whether or not
+	// SMTP is configured, so "was this sent" always has an answer.
+	notificationStore := notifications.NewStore(db, store.PublicURL)
+	mailer := notifications.NewMailer(cfg.Mail, cfg.AppURL, cfg.Env.IsProduction(), notificationStore)
+	notifier := notifications.NewService(notificationStore, mailer, hub, cfg.Push.Configured())
+
+	messagingService := messaging.NewService(messageStore, fileStore, hub, settingsStore, notifier, nil)
 	portfolioStore := portfolio.NewStore(db, store.PublicURL)
 	// The prober is the only thing in the product that fetches an address a
 	// user supplied, and it does so through the SSRF-safe dialler. Development
@@ -142,7 +153,7 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		Audit:       recorder,
 		Sealer:      sealer,
 		AuthStore:   authStore,
-		AuthService: auth.NewService(authStore, redis, cfg, recorder, nil),
+		AuthService: auth.NewService(authStore, redis, cfg, recorder, mailer),
 		AuthMW:      auth.NewMiddleware(authStore, cfg, redis, recorder),
 		Taxonomy:    taxonomyStore,
 		Developers:  developers.NewService(developerStore, taxonomyStore, recorder),
@@ -152,30 +163,30 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		Matching:    matchingStore,
 		Projects: projects.NewService(projectStore, taxonomyStore, matchingStore,
 			recorder, settingsStore),
-		// Fees, moderation and notifications arrive in later phases; the
-		// interfaces are nil until then, and every call site checks.
+		// Fees and moderation arrive with their modules; the interfaces are
+		// nil until then, and every call site checks.
 		Proposals: proposals.NewService(proposalStore, matchingStore, recorder,
-			settingsStore, nil, nil, nil),
+			settingsStore, nil, nil, notifier),
 		Files: fileStore,
 		Portfolio: portfolio.NewService(portfolioStore,
 			portfolio.NewScreenshots(portfolioStore, fileStore, store, cfg.Limits.MaxImageBytes),
 			taxonomyStore, prober, recorder, cfg.Env.IsDevelopment()),
-		// The funder, the notifier and the workspace messenger arrive in the
-		// next phases; until then every call site checks for nil and the
-		// endpoints that need them say so plainly rather than pretending.
+		// The funder is attached below, once payments exists.
 		Contracts: contracts.NewService(contractStore,
 			proposalAcceptance{proposalStore}, projectStore, fileStore, recorder,
-			settingsStore, nil, nil, messagingService, cfg.Env.IsDevelopment()),
+			settingsStore, nil, notifier, messagingService, cfg.Env.IsDevelopment()),
 		Messaging: messagingService,
 		AI:        ai,
 		GitHub: githubint.NewService(githubStore, githubOAuth, cfg, ai, recorder,
-			redis, matchingStore, nil),
+			redis, matchingStore, notifier),
+		Notifier: notifier,
+		Mailer:   mailer,
 	}
 	// Payments needs the contracts service, and contracts needs to know
 	// whether money can move at all. Constructing payments second and handing
 	// it back is what keeps that mutual need from being a construction cycle.
 	a.Payments = payments.NewService(paymentStore, paymentRegistry, a.Contracts,
-		recorder, settingsStore, nil)
+		recorder, settingsStore, notifier)
 	a.Contracts.AttachFunder(a.Payments)
 	a.Payments.SyncProviders(ctx)
 
@@ -311,6 +322,12 @@ func (a *App) Handler() http.Handler {
 			// A probe is an outbound request on our address, so it is the
 			// tightest allowance in the product.
 			RateLimitProbe: a.AuthMW.RateLimit("portfolio_probe", 20, time.Hour),
+		})
+
+	notifications.NewHandlers(a.Notifier, a.Cfg.Push.Configured(), a.Cfg.Push.VAPIDPublicKey).
+		Register(v1, notifications.Middleware{
+			Require: a.AuthMW.Require(),
+			CSRF:    a.AuthMW.CSRF(),
 		})
 
 	// Object serving. Registered under /api/v1 because that is where the

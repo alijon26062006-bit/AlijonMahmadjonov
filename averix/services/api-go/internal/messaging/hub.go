@@ -182,15 +182,26 @@ func (c *connection) close() {
 // A connection whose buffer is full is dropped rather than waited on: one
 // stalled phone must not hold up a milestone update to everyone else.
 func (h *Hub) Publish(ctx context.Context, recipients []uuid.UUID, event Event) {
+	event.SentAt = time.Now().UTC()
+	h.PublishRaw(ctx, recipients, event)
+}
+
+// PublishRaw fans out any JSON-encodable payload. The socket carries more
+// than chat: a notification arrives on the same connection, so the bell can
+// update without polling — and it uses this rather than a second hub.
+func (h *Hub) PublishRaw(ctx context.Context, recipients []uuid.UUID, payload any) {
 	if len(recipients) == 0 {
 		return
 	}
-	event.SentAt = time.Now().UTC()
-	payload, err := json.Marshal(event)
+	encoded, err := json.Marshal(payload)
 	if err != nil {
 		logx.From(ctx).Error("messaging: could not encode a realtime event", "error", err)
 		return
 	}
+	h.deliver(recipients, encoded)
+}
+
+func (h *Hub) deliver(recipients []uuid.UUID, payload []byte) {
 
 	h.mu.RLock()
 	targets := make([]*connection, 0, len(recipients))

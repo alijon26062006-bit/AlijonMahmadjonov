@@ -43,6 +43,7 @@ type Config struct {
 	GitHub   GitHub
 	AI       AI
 	Mail     Mail
+	Push     Push
 	Payments Payments
 	Limits   Limits
 }
@@ -120,6 +121,18 @@ type AI struct {
 }
 
 func (a AI) Configured() bool { return a.ServiceURL != "" }
+
+// Push holds the VAPID key pair for web push. Without it, push deliveries are
+// recorded as skipped rather than silently dropped, and the settings screen
+// says push is not configured instead of offering a switch that does nothing.
+type Push struct {
+	VAPIDPublicKey  string
+	VAPIDPrivateKey string
+	// The mailto: or https: contact a push service may use to reach the operator.
+	Subject string
+}
+
+func (p Push) Configured() bool { return p.VAPIDPublicKey != "" && p.VAPIDPrivateKey != "" }
 
 type Mail struct {
 	Host        string
@@ -225,6 +238,11 @@ func Load() (*Config, error) {
 			ServiceURL:   strings.TrimRight(os.Getenv("AI_SERVICE_URL"), "/"),
 			ServiceToken: os.Getenv("AI_SERVICE_TOKEN"),
 			Timeout:      durDefault("AI_SERVICE_TIMEOUT", 30*time.Second),
+		},
+		Push: Push{
+			VAPIDPublicKey:  os.Getenv("VAPID_PUBLIC_KEY"),
+			VAPIDPrivateKey: os.Getenv("VAPID_PRIVATE_KEY"),
+			Subject:         strDefault("VAPID_SUBJECT", "mailto:"+strDefault("MAIL_FROM_ADDRESS", "no-reply@averix.local")),
 		},
 		Mail: Mail{
 			Host:        os.Getenv("SMTP_HOST"),

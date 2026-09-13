@@ -115,6 +115,11 @@ func run() error {
 		return "", nil
 	})
 
+	// Emails and pushes queued by the API. Every thirty seconds is fast
+	// enough for "you have a new message" and slow enough that a burst does
+	// not become a mail-server problem.
+	w.Schedule("deliver-notifications", 30*time.Second, application.Notifier.DeliverPending)
+
 	// Jobs whose worker died mid-run.
 	w.Schedule("release-stalled-jobs", 5*time.Minute, w.ReleaseStale)
 
