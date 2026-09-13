@@ -17,6 +17,7 @@ import (
 
 	"github.com/averix/api/internal/platform/database"
 	"github.com/averix/api/internal/platform/httpx"
+	"github.com/averix/api/internal/platform/money"
 	"github.com/averix/api/internal/platform/places"
 	"github.com/averix/api/internal/platform/urlguard"
 	"github.com/averix/api/internal/platform/validate"
@@ -50,11 +51,21 @@ type Profile struct {
 
 	// Private to the owner and staff: what a client has spent is not a
 	// developer's business.
-	TotalSpentMinor *int64 `json:"total_spent_minor,omitempty"`
-	SpendCurrency   string `json:"spend_currency,omitempty"`
+	//
+	// One row per currency rather than one number. A client who paid in
+	// roubles and in dollars has no single total, and adding the two would
+	// produce a figure that is wrong in both.
+	Spent []SpentRow `json:"spent,omitempty"`
 
 	MemberSince time.Time  `json:"member_since"`
 	LastSeenAt  *time.Time `json:"last_seen_at,omitempty"`
+}
+
+// SpentRow is what a client has paid out in one currency.
+type SpentRow struct {
+	Currency string `json:"currency"`
+	Minor    int64  `json:"minor"`
+	Display  string `json:"display"`
 }
 
 // PublicProfile is what a developer sees when deciding whether to bid.
@@ -91,7 +102,7 @@ const clientSelect = `
 	SELECT u.id, u.username, u.full_name, u.email, u.country_code, u.city, u.timezone,
 	       u.identity_verified_at IS NOT NULL, u.last_seen_at, u.created_at,
 	       c.company_name, c.company_website, c.company_size, c.industry, c.about,
-	       c.projects_posted, c.hires_made, c.total_spent_minor, c.spend_currency,
+	       c.projects_posted, c.hires_made,
 	       c.rating_avg, c.rating_count, c.payment_verified_at IS NOT NULL
 	FROM users u
 	JOIN client_profiles c ON c.user_id = u.id
@@ -102,13 +113,12 @@ func (s *Store) scan(ctx context.Context, where string, arg any) (*Profile, erro
 	var (
 		country, city, tz                       *string
 		company, website, size, industry, about *string
-		spent                                   int64
 	)
 	err := s.db.QueryRow(ctx, clientSelect+" AND "+where, arg).Scan(
 		&p.UserID, &p.Username, &p.FullName, &p.Email, &country, &city, &tz,
 		&p.IdentityVerified, &p.LastSeenAt, &p.MemberSince,
 		&company, &website, &size, &industry, &about,
-		&p.ProjectsPosted, &p.HiresMade, &spent, &p.SpendCurrency,
+		&p.ProjectsPosted, &p.HiresMade,
 		&p.RatingAvg, &p.RatingCount, &p.PaymentVerified)
 	if database.IsNoRows(err) {
 		return nil, ErrNotFound
@@ -124,8 +134,45 @@ func (s *Store) scan(ctx context.Context, where string, arg any) (*Profile, erro
 	p.CompanySize = deref(size)
 	p.Industry = deref(industry)
 	p.About = deref(about)
-	p.TotalSpentMinor = &spent
+
+	spent, err := s.spent(ctx, p.UserID)
+	if err != nil {
+		return nil, err
+	}
+	p.Spent = spent
 	return &p, nil
+}
+
+// spent totals the payments a client actually made, per currency.
+//
+// Read from the payments themselves rather than from a counter: the column
+// that used to hold this was never written to, so every client's spend read
+// as zero for as long as the product has existed. A figure nobody maintains
+// is worse than no figure at all — this one cannot drift, because there is
+// nothing to keep in step.
+func (s *Store) spent(ctx context.Context, userID uuid.UUID) ([]SpentRow, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT currency, sum(amount_minor - coalesce(refunded_minor, 0))
+		FROM payment_intents
+		WHERE payer_id = $1 AND direction = 'charge' AND status = 'succeeded'
+		GROUP BY currency
+		HAVING sum(amount_minor - coalesce(refunded_minor, 0)) > 0
+		ORDER BY 2 DESC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("total client spend: %w", err)
+	}
+	defer rows.Close()
+
+	out := []SpentRow{}
+	for rows.Next() {
+		var row SpentRow
+		if err := rows.Scan(&row.Currency, &row.Minor); err != nil {
+			return nil, fmt.Errorf("scan client spend: %w", err)
+		}
+		row.Display = money.Format(row.Minor, row.Currency)
+		out = append(out, row)
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) ByID(ctx context.Context, id uuid.UUID) (*Profile, error) {

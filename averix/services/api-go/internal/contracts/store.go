@@ -131,6 +131,16 @@ func (s *Store) Create(ctx context.Context, in NewContract) (uuid.UUID, error) {
 				return fmt.Errorf("add conversation participant: %w", err)
 			}
 		}
+
+		// A signed contract is a hire. This counter is the first thing a
+		// freelancer looks at before spending an hour on a proposal — "has
+		// this client ever actually hired anyone?" — so it is written in the
+		// same transaction as the contract rather than derived later.
+		if _, err := q.Exec(ctx, `
+			UPDATE client_profiles SET hires_made = hires_made + 1, updated_at = now()
+			WHERE user_id = $1`, in.ClientID); err != nil {
+			return fmt.Errorf("count the hire: %w", err)
+		}
 		return nil
 	})
 	return contractID, err

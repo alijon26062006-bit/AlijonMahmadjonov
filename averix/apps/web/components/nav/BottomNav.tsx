@@ -6,7 +6,6 @@ import styles from './BottomNav.module.css';
 import {
   IconBriefcase,
   IconCompass,
-  IconLayers,
   IconMessage,
   IconPlus,
   IconShield,
@@ -41,7 +40,7 @@ export function BottomNav({ unread = 0 }: { unread?: number }) {
           { href: '/freelancers', label: 'Исполнители', icon: IconCompass },
           { href: '/projects/new', label: 'Создать', icon: IconPlus },
           { href: '/messages', label: 'Чаты', icon: IconMessage, badge: unread },
-          { href: '/services', label: 'Услуги', icon: IconLayers },
+          { href: '/profile', label: 'Профиль', icon: IconUser },
         ]
       : role === 'admin' || role === 'moderator'
         ? [

@@ -751,6 +751,7 @@ export type ClientProfile = {
   user_id: string;
   username: string;
   full_name: string;
+  email?: string;
   company_name?: string;
   company_website?: string;
   company_size?: string;
@@ -759,12 +760,16 @@ export type ClientProfile = {
   country_code?: string;
   city?: string;
   timezone?: string;
-  hires_made?: number;
-  projects_posted?: number;
+  projects_posted: number;
+  hires_made: number;
   rating_avg?: number;
-  rating_count?: number;
-  verified?: boolean;
-  member_since?: string;
+  rating_count: number;
+  payment_verified: boolean;
+  identity_verified: boolean;
+  /** Видно только владельцу: сколько заказчик потратил — не дело исполнителей. */
+  spent?: { currency: string; minor: number; display: string }[];
+  member_since: string;
+  last_seen_at?: string;
 };
 
 // ── Анкета исполнителя (свой профиль) ───────────────────────────────────────

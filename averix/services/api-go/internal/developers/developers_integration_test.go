@@ -702,8 +702,10 @@ func TestClientProfileUpdateAndPublicView(t *testing.T) {
 	if public.String("display_name") != "Company X" {
 		t.Errorf("display_name = %q, want the company name", public.String("display_name"))
 	}
-	if _, present := public.Data["total_spent_minor"]; present {
-		t.Error("a client's spend must not be visible to developers")
+	for _, field := range []string{"total_spent_minor", "spent"} {
+		if _, present := public.Data[field]; present {
+			t.Errorf("a client's spend (%s) must not be visible to developers", field)
+		}
 	}
 	if _, present := public.Data["email"]; present {
 		t.Error("a client's email must not be visible to developers")

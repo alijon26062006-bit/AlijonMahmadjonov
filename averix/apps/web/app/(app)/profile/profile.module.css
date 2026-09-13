@@ -1,0 +1,112 @@
+.shell {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.identity {
+  display: flex;
+  gap: var(--av-space-4);
+  align-items: center;
+}
+
+.name {
+  margin: 0;
+  font-size: var(--av-text-xl);
+  font-weight: var(--av-weight-bold);
+  letter-spacing: -0.01em;
+}
+
+.handle {
+  margin: 2px 0 0;
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-sm);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--av-space-2);
+  margin-top: var(--av-space-4);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--av-space-3);
+  margin-top: var(--av-space-5);
+}
+
+@media (min-width: 600px) {
+  .stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--av-space-4);
+  border: 1px solid var(--av-border-subtle);
+  border-radius: var(--av-radius-lg);
+  background: var(--av-surface-subtle);
+}
+
+.statLabel {
+  font-size: var(--av-text-xs);
+  color: var(--av-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.statValue {
+  font-size: var(--av-text-xl);
+  font-weight: var(--av-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.statNote {
+  font-size: var(--av-text-xs);
+  color: var(--av-text-secondary);
+}
+
+.private {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--av-space-3);
+  font-size: var(--av-text-xs);
+  color: var(--av-text-tertiary);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--av-space-3);
+  font-size: var(--av-text-lg);
+  font-weight: var(--av-weight-semibold);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--av-space-3);
+  margin-top: var(--av-space-5);
+}
+
+.about {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: var(--av-leading-lg);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--av-space-4);
+  padding: var(--av-space-3) 0;
+  border-bottom: 1px solid var(--av-border-subtle);
+  font-size: var(--av-text-sm);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
