@@ -15,11 +15,12 @@ import { ApiFailure, get, post } from '@/lib/api';
 import { useRoleGuard } from '@/lib/session';
 import { days, plural } from '@/lib/format';
 import { SERVICE_STATUS } from '@/lib/labels';
-import type { ServiceCard } from '@/lib/types';
+import type { OwnProfile, ServiceCard } from '@/lib/types';
 
 export default function MyServicesPage() {
   useRoleGuard('developer');
   const [items, setItems] = useState<ServiceCard[] | null>(null);
+  const [profile, setProfile] = useState<OwnProfile | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
 
@@ -27,6 +28,11 @@ export default function MyServicesPage() {
     get<ServiceCard[]>('/services/mine/list')
       .then((data) => setItems(data ?? []))
       .catch(() => setItems([]));
+    // Услуга показывается в каталоге только от опубликованной анкеты. Без
+    // этой проверки исполнитель видел бы «Опубликована» и пустой каталог.
+    get<OwnProfile>('/developers/me')
+      .then(setProfile)
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => load(), [load]);
@@ -56,6 +62,23 @@ export default function MyServicesPage() {
         }
       />
       <main id="main" className={`av-page av-stack ${styles.shell}`}>
+        {profile && !profile.is_searchable ? (
+          <Card>
+            <div className="av-stack-sm">
+              <p className="av-strong">Анкета ещё не опубликована</p>
+              <p className="av-small av-muted">
+                Услуги показываются в каталоге от имени исполнителя, поэтому сначала нужна
+                заполненная анкета: без неё заказчику некуда посмотреть, кто вы.
+              </p>
+              <div>
+                <ButtonLink href="/onboarding" size="sm">
+                  Заполнить анкету
+                </ButtonLink>
+              </div>
+            </div>
+          </Card>
+        ) : null}
+
         {error ? (
           <p role="alert" style={{ color: 'var(--av-danger)' }}>
             {error}

@@ -1,9 +1,22 @@
 # AVERIX
 
-A marketplace for software work: clients post projects, developers propose, and
-the contract, the milestones, the messages and the money all live in one place.
+Биржа удалённой работы на русском языке: заказчик размещает заказ или покупает
+готовую услугу, исполнитель откликается, а сделка, этапы, переписка и деньги
+живут в одном месте.
 
-This repository holds the whole product.
+Площадка не только для программистов. Восемь направлений: дизайн, разработка
+и IT, тексты и переводы, SEO, SMM и маркетинг, аудио и видео, бизнес-услуги,
+обучение — 31 профессия, 117 категорий и 171 навык, по которым заказ находит
+исполнителя.
+
+Продаются два разных способа купить работу, и оба доведены до конца:
+
+- **Заказ** — вы описываете задачу, исполнители присылают отклики с ценой,
+  сроком и подходом, вы выбираете и заключаете сделку.
+- **Услуга** — готовое предложение с фиксированной ценой и сроком: выбрали
+  пакет, описали задачу, сделка открылась сразу, без переговоров.
+
+Этот репозиторий содержит продукт целиком.
 
 ```
 apps/web            Next.js front end (mobile first, 375px up)
@@ -13,7 +26,7 @@ database/migrations Reversible SQL migrations, the schema's source of truth
 brand/              Design tokens and the AVERIX mark
 infrastructure/     Nginx and Docker configuration
 docs/               How the parts that need explaining actually work
-scripts/            Token build, reference-data sync, demo seed
+scripts/            Token build, reference-data sync, demo seed, browser smoke tests
 ```
 
 ## Running it locally
@@ -55,20 +68,21 @@ first-party in development exactly as it is in production.
 node scripts/seed-demo.mjs
 ```
 
-Creates a client, two developers and an administrator, publishes projects and
-portfolio work, sends proposals, signs a contract, funds a milestone through
-the manual payment flow and leaves a conversation behind — all by driving the
-real API, so nothing in it is fabricated. **Development only**: every record is
-marked as demo data and the script refuses to touch a production database.
+Создаёт заказчика, двух исполнителей (разработчика и дизайнера) и
+администратора, публикует заказы в разных направлениях и работы в портфолио,
+отправляет отклики, заключает сделку, проводит оплату этапа через ручной
+перевод и оставляет переписку — всё через настоящий API, поэтому ничего в этих
+данных не нарисовано. **Только для разработки**: сценарий отказывается
+работать с производственной базой.
 
-Accounts it creates all use the password `correct horse battery staple`:
+Все аккаунты используют пароль `правильная лошадь батарейка скрепка`:
 
-| Role | Email |
+| Роль | Почта |
 | --- | --- |
-| Client | nilufar@nurstore.example |
-| Developer | alijon@example.dev |
-| Developer | saida@example.dev |
-| Administrator | ops@averix.example |
+| Заказчик | nilufar@nurstore.example |
+| Исполнитель (разработка) | alijon@example.dev |
+| Исполнитель (дизайн) | saida@example.dev |
+| Администратор | ops@averix.example |
 
 ## Putting it on a server
 
@@ -104,6 +118,19 @@ cd apps/web && npm run typecheck && npm run build
 
 The Go suite runs against a real PostgreSQL and Redis — every migration,
 authorisation rule and database trigger is exercised, not mocked.
+
+Сквозная проверка в настоящем браузере, по живому стеку:
+
+```bash
+AVERIX_SMOKE_URL=http://localhost:3000 node scripts/smoke.mjs
+AVERIX_SMOKE_URL=http://localhost:3000 node scripts/smoke-services.mjs
+```
+
+Первый сценарий проходит путь «регистрация → анкета из девяти шагов →
+публикация → заказ → отклик → наём → сделка» с двух сторон. Второй —
+«услуга → покупка в один шаг» и все экраны администратора. Юнит-тесты
+проверяют модули; эти два отвечают на вопрос, может ли человек довести дело
+до конца, не открывая консоль.
 
 ## How it fits together
 

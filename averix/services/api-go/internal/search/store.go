@@ -10,6 +10,7 @@ import (
 
 	"github.com/averix/api/internal/notifications"
 	"github.com/averix/api/internal/platform/database"
+	"github.com/averix/api/internal/platform/places"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -95,14 +96,7 @@ func (s *Store) scanCard(row scanner) (*FreelancerCard, error) {
 		c.RateDisplay = notifications.FormatMoney(*rate, c.RateCurrency) + "/ч"
 	}
 	if showLocation {
-		parts := []string{}
-		if city != nil && *city != "" {
-			parts = append(parts, *city)
-		}
-		if country != nil && *country != "" {
-			parts = append(parts, strings.ToUpper(*country))
-		}
-		c.Location = strings.Join(parts, ", ")
+		c.Location = places.Format(deref(city), deref(country))
 	}
 	if s.publicURL != nil {
 		for _, format := range []string{"webp", "jpeg"} {

@@ -12,7 +12,9 @@ const state = new Map(); // label -> { cookie, csrf }
 
 async function call(as, method, path, body, { form } = {}) {
   const session = as ? state.get(as) : null;
-  const headers = { Accept: 'application/json', Origin: 'http://localhost:3000' };
+  // API проверяет Origin у любой записи, поэтому он должен совпадать с
+  // APP_URL той площадки, куда сид смотрит.
+  const headers = { Accept: 'application/json', Origin: process.env.AVERIX_APP_URL || 'http://localhost:3000' };
   if (session?.cookie) headers.Cookie = session.cookie;
   if (session?.csrf && method !== 'GET') headers['X-CSRF-Token'] = session.csrf;
   if (body && !form) headers['Content-Type'] = 'application/json';
@@ -45,7 +47,7 @@ async function call(as, method, path, body, { form } = {}) {
   return payload.data;
 }
 
-async function register(label, { username, full_name, email, role, password = 'correct horse battery staple' }) {
+async function register(label, { username, full_name, email, role, password = 'правильная лошадь батарейка скрепка' }) {
   state.set(label, {});
   const session = await call(label, 'POST', '/auth/register', {
     username, full_name, email, role, password, accept_terms: true,
@@ -61,31 +63,34 @@ async function main() {
   // taxonomy, the fee schedule, the matching weights and the platform
   // settings are reference data, not fixtures.
   const { execSync } = await import('node:child_process');
-  const database = process.env.PGDATABASE || 'averix_demo';
+  // Подключение берётся из PSQL_ARGS, чтобы сценарий работал и с сокетом, и
+  // с TCP, и с базой под другим именем: захардкоженный порт 5433 означал, что
+  // сид запускался только на машине автора.
+  const connection = process.env.PSQL_ARGS || `-h ${process.env.PGHOST || '/tmp'} -p ${process.env.PGPORT || 5433} -U ${process.env.PGUSER || 'postgres'} -d ${process.env.PGDATABASE || 'averix_demo'}`;
   const psql = (sql) =>
-    execSync(`psql -h /tmp -p 5433 -U postgres -d ${database} -qtA -c ${JSON.stringify(sql)}`, {
+    execSync(`psql ${connection} -qtA -c ${JSON.stringify(sql)}`, {
       stdio: ['ignore', 'pipe', 'pipe'],
     }).toString().trim();
-  console.log('clearing previous demo data…');
+  console.log('очищаем прежние демоданные…');
   psql('TRUNCATE users, payment_intents, payment_webhook_events, audit_logs CASCADE');
   psql(`DELETE FROM platform_settings WHERE description IS NULL`);
 
   // ── People ───────────────────────────────────────────────────────────────
-  console.log('creating accounts…');
+  console.log('создаём аккаунты…');
   await register('client', {
-    username: 'nurstore', full_name: 'Nilufar Rahimova',
+    username: 'nurstore', full_name: 'Нилуфар Рахимова',
     email: 'nilufar@nurstore.example', role: 'client',
   });
   await register('dev', {
-    username: 'alijon', full_name: 'Alijon Mahmadjonov',
+    username: 'alijon', full_name: 'Алижон Махмаджонов',
     email: 'alijon@example.dev', role: 'developer',
   });
   await register('dev2', {
-    username: 'saida', full_name: 'Saida Karimova',
+    username: 'saida', full_name: 'Саида Каримова',
     email: 'saida@example.dev', role: 'developer',
   });
   await register('admin', {
-    username: 'averixops', full_name: 'AVERIX Operations',
+    username: 'averixops', full_name: 'Поддержка AVERIX',
     email: 'ops@averix.example', role: 'client',
   });
 
@@ -95,7 +100,7 @@ async function main() {
   await call('admin', 'POST', '/auth/role/switch', { role: 'admin' });
 
   // ── Developer profiles ───────────────────────────────────────────────────
-  console.log('building developer profiles…');
+  console.log('заполняем анкеты исполнителей…');
   async function onboard(label, profile) {
     await call(label, 'PUT', '/developers/me/basics', profile.basics);
     await call(label, 'PUT', '/developers/me/specialisation', profile.specialisation);
@@ -111,15 +116,15 @@ async function main() {
 
   await onboard('dev', {
     basics: {
-      full_name: 'Alijon Mahmadjonov', country_code: 'TJ', city: 'Dushanbe',
+      full_name: 'Алижон Махмаджонов', country_code: 'TJ', city: 'Душанбе',
       timezone: 'Asia/Dushanbe',
       languages: [
-        { language: 'Tajik', proficiency: 'native' },
-        { language: 'Russian', proficiency: 'fluent' },
-        { language: 'English', proficiency: 'conversational' },
+        { language: 'Таджикский', proficiency: 'native' },
+        { language: 'Русский', proficiency: 'fluent' },
+        { language: 'Английский', proficiency: 'conversational' },
       ],
     },
-    specialisation: { slug: 'backend-developer', professional_title: 'Backend & Telegram bot developer' },
+    specialisation: { slug: 'backend-developer', professional_title: 'Бэкенд и Telegram-боты' },
     additional: { slugs: ['telegram-developer', 'devops-engineer'] },
     technologies: [
       { slug: 'python', level: 'expert', years: 6 },
@@ -131,47 +136,47 @@ async function main() {
       { slug: 'go', level: 'working', years: 2 },
       { slug: 'nginx', level: 'working', years: 3 },
     ],
-    experience: { experience_level: 'senior', years_experience: 6, hourly_rate_minor: 3500, currency: 'USD' },
+    experience: { experience_level: 'senior', years_experience: 6, hourly_rate_minor: 250000, currency: 'RUB' },
     availability: { availability: 'available', hours_per_week: 35, show_location: true, show_hourly_rate: true },
-    bio: 'I build Telegram bots and the backends behind them — catalogues, orders, payments and the admin screens your staff actually use every day. Most of my work is Python with PostgreSQL, deployed in Docker with a small amount of Go where it earns its keep. I care about migrations that run safely, errors that say something useful, and handing over something your team can run without me.',
+    bio: 'Делаю Telegram-ботов и бэкенд под ними: каталог, заказы, оплату и админку, которой ваши сотрудники пользуются каждый день. Основное — Python с PostgreSQL, разворачиваю в Docker, Go добавляю там, где он окупается. Слежу за тем, чтобы миграции применялись безопасно, ошибки говорили что-то внятное, а результат ваша команда могла вести без меня.',
   });
 
   await onboard('dev2', {
     basics: {
-      full_name: 'Saida Karimova', country_code: 'UZ', city: 'Tashkent', timezone: 'Asia/Tashkent',
+      full_name: 'Саида Каримова', country_code: 'UZ', city: 'Ташкент', timezone: 'Asia/Tashkent',
       languages: [
-        { language: 'Uzbek', proficiency: 'native' },
-        { language: 'English', proficiency: 'fluent' },
+        { language: 'Узбекский', proficiency: 'native' },
+        { language: 'Русский', proficiency: 'fluent' },
+        { language: 'Английский', proficiency: 'conversational' },
       ],
     },
-    specialisation: { slug: 'fullstack-developer', professional_title: 'Full-stack developer' },
-    additional: { slugs: ['telegram-developer'] },
+    specialisation: { slug: 'graphic-designer', professional_title: 'Логотипы и фирменный стиль' },
+    additional: { slugs: ['web-designer', 'illustrator'] },
     technologies: [
-      { slug: 'python', level: 'strong', years: 4 },
-      { slug: 'telegram-api', level: 'strong', years: 3 },
-      { slug: 'react', level: 'strong', years: 4 },
-      { slug: 'postgresql', level: 'working', years: 3 },
-      { slug: 'typescript', level: 'strong', years: 4 },
+      { slug: 'figma', level: 'expert', years: 5 },
+      { slug: 'adobe-illustrator', level: 'expert', years: 6 },
+      { slug: 'branding', level: 'strong', years: 5 },
+      { slug: 'photoshop', level: 'strong', years: 6 },
     ],
-    experience: { experience_level: 'mid', years_experience: 4, hourly_rate_minor: 2800, currency: 'USD' },
+    experience: { experience_level: 'mid', years_experience: 5, hourly_rate_minor: 180000, currency: 'RUB' },
     availability: { availability: 'limited', hours_per_week: 20, show_location: true, show_hourly_rate: true },
-    bio: 'Full-stack developer working mostly in Python and React. I like projects where the interface matters as much as the API, and I have shipped several small commerce products end to end.',
+    bio: 'Рисую логотипы и фирменные стили для небольших компаний: кофейни, клиники, локальные производства. Начинаю с разговора о том, кому вы продаёте и чем отличаетесь от соседей, и только потом берусь за эскизы — иначе получается красиво, но мимо. Отдаю исходники и короткий гайд, чтобы стилем можно было пользоваться без меня.',
   });
 
   // ── Portfolio ────────────────────────────────────────────────────────────
-  console.log('publishing portfolio work…');
+  console.log('публикуем портфолио…');
   const portfolio = await call('dev', 'POST', '/portfolio', {
-    title: 'Warehouse stock and ordering API',
-    short_description: 'A stock and ordering API that replaced a spreadsheet for a wholesaler',
+    title: 'Складской учёт и приём заказов для оптовика',
+    short_description: 'API учёта и заказов вместо таблицы, по которой работал весь склад',
     description:
-      'A Python service that replaced a spreadsheet-driven stock process for a food wholesaler. It exposes an ordering API for their sales team, reconciles deliveries against invoices, and pushes low-stock alerts into the warehouse team’s Telegram group. Built with FastAPI and PostgreSQL, deployed with Docker Compose on a single server, with nightly backups the client can restore themselves.',
+      'Сервис на Python, заменивший таблицу, по которой оптовик продуктов вёл склад. Отдаёт API приёма заказов для отдела продаж, сверяет поставки с накладными и шлёт предупреждения об остатках в Telegram-группу склада. FastAPI и PostgreSQL, разворачивается одним Docker Compose на одном сервере, с ночными резервными копиями, которые заказчик восстанавливает сам.',
     category_slug: 'api-development',
-    developer_role: 'Backend developer, sole engineer',
+    developer_role: 'Бэкенд-разработчик, один на проекте',
     technologies: ['python', 'fastapi', 'postgresql', 'docker', 'redis'],
     completed_on: '2025-11-20',
     duration_days: 45,
-    value_minor: 240000,
-    currency: 'USD',
+    value_minor: 18000000,
+    currency: 'RUB',
     value_visibility: 'range',
     demo_status: 'live',
   });
@@ -186,8 +191,8 @@ async function main() {
   // A cover image, re-encoded by the API into the sizes the product serves.
   const { createCanvasPng } = await import('./demo-image.mjs');
   for (const [index, spec] of [
-    { hue: 268, label: 'Dashboard' },
-    { hue: 150, label: 'Orders' },
+    { hue: 268, label: 'Сводка' },
+    { hue: 150, label: 'Заказы' },
   ].entries()) {
     const png = createCanvasPng(1600, 900, spec.hue, spec.label);
     const form = new FormData();
@@ -199,175 +204,175 @@ async function main() {
   await call('dev', 'POST', `/portfolio/${portfolio.id}/publish`, { published: true });
 
   const secondPortfolio = await call('dev', 'POST', '/portfolio', {
-    title: 'Delivery tracking bot for a courier company',
-    short_description: 'Telegram bot that tracks parcels and tells customers where they are',
+    title: 'Бот отслеживания посылок для курьерской службы',
+    short_description: 'Telegram-бот, который отвечает клиенту, где сейчас его посылка',
     description:
-      'A Telegram bot for a courier company in Dushanbe. Customers send a tracking number and get the parcel’s current status; couriers update status from the same bot with a keyboard rather than a separate app. Handles about 2,000 lookups a day against a PostgreSQL database, with a small admin panel for the dispatcher.',
+      'Telegram-бот для курьерской службы в Душанбе. Клиент отправляет номер отправления и получает текущий статус; курьеры меняют статус в том же боте с клавиатуры, а не в отдельном приложении. Около двух тысяч запросов в сутки к PostgreSQL и небольшая панель для диспетчера.',
     category_slug: 'telegram-bots',
-    developer_role: 'Backend developer',
+    developer_role: 'Бэкенд-разработчик',
     technologies: ['python', 'telegram-api', 'postgresql'],
     completed_on: '2025-06-02',
     duration_days: 21,
     value_visibility: 'private',
-    value_minor: 90000,
+    value_minor: 7000000,
     demo_status: 'private_repo',
   });
-  const cover = createCanvasPng(1600, 900, 205, 'Tracking');
+  const cover = createCanvasPng(1600, 900, 205, 'Отслеживание');
   const coverForm = new FormData();
   coverForm.append('image', new Blob([cover], { type: 'image/png' }), 'tracking.png');
   await call('dev', 'POST', `/portfolio/${secondPortfolio.id}/images`, coverForm, { form: true });
   await call('dev', 'POST', `/portfolio/${secondPortfolio.id}/publish`, { published: true });
 
   // ── Projects ─────────────────────────────────────────────────────────────
-  console.log('posting projects…');
+  console.log('размещаем заказы…');
   const project = await call('client', 'POST', '/projects', {
-    title: 'Telegram bot for an online clothing store',
+    title: 'Telegram-бот для магазина одежды',
     description:
-      'We sell clothing through Instagram and a small website, and we take orders by hand in direct messages — about 300 a month, and we are losing some of them. We need a Telegram bot where a customer can browse the catalogue by category, add items to a cart, choose a size, and place an order that lands in our system rather than in someone’s inbox. Our staff need a simple admin screen to load new products and mark orders as sent. Payment can come later, but the cart and the order flow have to be right first.',
+      'Продаём одежду через соцсети и небольшой сайт, заказы принимаем руками в личных сообщениях — около трёхсот в месяц, и часть теряется. Нужен Telegram-бот, где покупатель смотрит каталог по категориям, кладёт вещь в корзину, выбирает размер и оформляет заказ, который попадает в нашу систему, а не в чью-то переписку. Сотрудникам нужен простой экран, чтобы загружать товары и отмечать заказы отправленными. Оплату можно добавить позже, но корзина и оформление должны работать сразу.',
     category_slug: 'telegram-bots',
     required_skills: ['python', 'telegram-api', 'postgresql'],
     budget_type: 'range',
-    budget_min_minor: 50000,
-    budget_max_minor: 90000,
-    currency: 'USD',
+    budget_min_minor: 15000000,
+    budget_max_minor: 25000000,
+    currency: 'RUB',
     duration_days: 21,
     experience_wanted: 'senior',
     publish: true,
   });
 
   await call('client', 'POST', '/projects', {
-    title: 'Nightly reconciliation between our shop and our accounting system',
+    title: 'Ночная сверка магазина с бухгалтерией',
     description:
-      'Every night we need to compare orders in our shop database with what our accountant’s system says, and produce a short report of anything that does not match. Today one person does this by hand every morning and it takes two hours. We want it to run by itself and only tell us when something is wrong.',
+      'Каждую ночь нужно сравнивать заказы в базе магазина с тем, что говорит система бухгалтера, и выдавать короткий отчёт обо всех расхождениях. Сейчас это делает человек каждое утро руками, и уходит два часа. Хотим, чтобы сверка шла сама и сообщала только тогда, когда что-то не сошлось.',
     category_slug: 'ai-workflow-automation',
     required_skills: ['python', 'postgresql'],
     budget_type: 'fixed',
-    budget_max_minor: 45000,
-    currency: 'USD',
+    budget_max_minor: 9000000,
+    currency: 'RUB',
     duration_days: 14,
     publish: true,
   });
 
   await call('client', 'POST', '/projects', {
-    title: 'Telegram bot that books appointments for a dental clinic',
+    title: 'Логотип и вывеска для новой кофейни',
     description:
-      'Our receptionist spends most of the day on the phone taking bookings. We want patients to book a slot in Telegram: pick a doctor, see free times for the next two weeks, confirm, and get a reminder the day before. The clinic staff need to see the day’s bookings and move or cancel one if something changes.',
-    category_slug: 'telegram-service-bot',
-    required_skills: ['python', 'telegram-api', 'postgresql'],
+      'Открываем кофейню на двенадцать мест в центре города. Нужен логотип, который читается на вывеске с другой стороны улицы и не разваливается на бумажном стакане. Отдельно нужен вариант в одну краску — на стаканы и на пакеты. Название уже есть, настроение тёплое, без модного минимализма. Ждём три направления на выбор и доработку одного.',
+    category_slug: 'design-logo',
+    required_skills: ['branding', 'adobe-illustrator', 'figma'],
     budget_type: 'range',
-    budget_min_minor: 60000,
-    budget_max_minor: 120000,
-    currency: 'USD',
+    budget_min_minor: 1500000,
+    budget_max_minor: 3000000,
+    currency: 'RUB',
     duration_days: 30,
     experience_wanted: 'mid',
     publish: true,
   });
 
   await call('client', 'POST', '/projects', {
-    title: 'API to connect our warehouse system to a courier company',
+    title: 'Тексты для сайта клиники: главная и три услуги',
     description:
-      'When an order is packed, our warehouse system should create a delivery with our courier partner and store the tracking number against the order. Right now someone copies numbers between two screens. The courier has a REST API and reasonable documentation. We need this to be reliable and to tell us clearly when the courier’s side is down.',
-    category_slug: 'integrations',
-    required_skills: ['python', 'fastapi', 'postgresql', 'docker'],
+      'У клиники есть сайт, но тексты на нём писал врач между приёмами. Нужно переписать главную и три страницы услуг так, чтобы человек понял, что с ним будут делать, сколько это стоит и почему не страшно. Медицинские формулировки согласуем с врачом, продающих обещаний не нужно — их нам и так запрещает закон.',
+    category_slug: 'texts-copywriting',
+    required_skills: ['copywriting'],
     budget_type: 'fixed',
-    budget_max_minor: 85000,
-    currency: 'USD',
+    budget_max_minor: 4000000,
+    currency: 'RUB',
     duration_days: 20,
     experience_wanted: 'senior',
     publish: true,
   });
 
   // ── Proposals ────────────────────────────────────────────────────────────
-  console.log('sending proposals…');
+  console.log('отправляем отклики…');
   const proposal = await call('dev', 'POST', '/proposals', {
     project_id: project.id,
-    amount_minor: 68000,
-    currency: 'USD',
+    amount_minor: 21000000,
+    currency: 'RUB',
     delivery_days: 18,
     cover_letter:
-      'I have built three Telegram commerce bots, the most recent for a clothing retailer doing about 400 orders a month, so your catalogue, cart and size selection map closely onto work I have already shipped. The part I would want to agree in detail before starting is the order hand-off: whether orders should land in a panel your staff open, or be pushed into something you already use.',
+      'Я сделал три коммерческих Telegram-бота, последний — для магазина одежды примерно на четыреста заказов в месяц, так что каталог, корзина и выбор размера у вас ложатся на уже пройденный путь. Что хочу обсудить подробно до начала: куда попадает заказ — в панель, которую открывают ваши сотрудники, или сразу в то, чем вы уже пользуетесь.',
     approach:
-      'I would start with the data model for products, variants and orders, because sizes are where these bots usually go wrong. Then the admin screen, so your staff can load the catalogue while I build the customer flow against real products rather than test data. The cart and checkout come next, and payment goes in last, after the cart works end to end — testing payment against a half-built cart wastes everyone’s time.',
+      'Начну с модели данных для товаров, вариантов и заказов: именно на размерах такие боты обычно и ломаются. Потом админка, чтобы ваши сотрудники загружали каталог, пока я собираю покупательскую часть на настоящих товарах, а не на тестовых. Дальше корзина и оформление, оплата — последней, когда корзина уже работает целиком: проверять оплату на недоделанной корзине значит потерять время обоим.',
     relevant_experience:
-      'Six years of Python, most of it on Telegram bots and the backends behind them, with PostgreSQL throughout. Two of my three commerce bots are still running in production.',
-    questions: 'Do you already have a payment provider in mind, or should I recommend one for Tajikistan?',
+      'Шесть лет Python, в основном Telegram-боты и бэкенд под ними, всюду PostgreSQL. Два из трёх моих коммерческих ботов до сих пор работают.',
+    questions: 'У вас уже выбран платёжный провайдер или подсказать подходящий?',
     milestones: [
-      { title: 'Catalogue, products and admin screen', amount_minor: 30000, days: 7,
-        detail: 'Products, variants, categories and the staff admin screen for loading them.' },
-      { title: 'Cart, sizes and order flow', amount_minor: 38000, days: 11,
-        detail: 'Customer browsing, cart, size selection and the order hand-off to your staff.' },
+      { title: 'Каталог, товары и админка', amount_minor: 9000000, days: 7,
+        detail: 'Товары, варианты, категории и экран для сотрудников, чтобы всё это загружать.' },
+      { title: 'Корзина, размеры и оформление заказа', amount_minor: 12000000, days: 11,
+        detail: 'Просмотр каталога, корзина, выбор размера и передача заказа вашим сотрудникам.' },
     ],
   });
 
   await call('dev2', 'POST', '/proposals', {
     project_id: project.id,
-    amount_minor: 54000,
-    currency: 'USD',
+    amount_minor: 17000000,
+    currency: 'RUB',
     delivery_days: 24,
     cover_letter:
-      'I build full-stack products and have done two Telegram shops before, both with a React admin panel rather than a bot-only admin. If your staff would rather load products from a browser than from inside Telegram, that is the difference between my proposal and most others you will get here.',
+      'Обычно я оформляю магазины, а не пишу их, но здесь важна витрина: карточка товара в боте — это тоже дизайн. Предлагаю сделать оформление каталога и карточек вместе с разработчиком, чтобы бот не выглядел как таблица. Если вам нужна только разработка, честно скажу — берите другой отклик.',
     approach:
-      'Bot first with a minimal catalogue so you can try the customer flow within the first week, then the React admin panel, then sizes and the order hand-off. I would keep the bot and the panel talking to one API so there is a single source of truth for stock.',
+      'Сначала соберу, как выглядит карточка товара и каталог: обложки, порядок, подписи размеров. Потом передам разработчику готовые макеты и проверю на живом боте, что всё читается с телефона.',
     relevant_experience:
-      'Four years of Python and React. Two Telegram commerce bots with admin panels, both still in use.',
+      'Пять лет в графике и вебе, два оформленных магазина в соцсетях и один каталог для Telegram-бота.',
     milestones: [
-      { title: 'Bot and catalogue', amount_minor: 24000, days: 10 },
-      { title: 'Admin panel and orders', amount_minor: 30000, days: 14 },
+      { title: 'Оформление каталога и карточек', amount_minor: 8000000, days: 10 },
+      { title: 'Проверка на живом боте и правки', amount_minor: 9000000, days: 14 },
     ],
   });
 
   // ── Contract ─────────────────────────────────────────────────────────────
-  console.log('signing a contract…');
+  console.log('заключаем сделку…');
   const contract = await call('client', 'POST', '/contracts', {
     proposal_id: proposal.id,
     price_visibility: 'range',
   });
 
   // ── Payments, the manual way ─────────────────────────────────────────────
-  console.log('configuring manual payments…');
+  console.log('настраиваем реквизиты для переводов…');
   await call('admin', 'PUT', '/admin/payments/manual-details', {
-    account_name: 'AVERIX Operations LLC',
-    account_number: 'TJ02 0000 1111 2222 3333',
-    bank_name: 'Amonatbonk',
-    extra_label: 'SWIFT',
-    extra_value: 'AMONTJ22',
-    note: 'Quote the payment reference exactly so we can match your transfer.',
+    account_name: 'ООО «АВЕРИКС»',
+    account_number: '40702810000000012345',
+    bank_name: 'Демобанк',
+    extra_label: 'БИК',
+    extra_value: '044525000',
+    note: 'Укажите номер платежа точно — по нему мы найдём ваш перевод.',
   });
 
   const first = contract.milestones[0];
   const payment = await call('client', 'POST', `/milestones/${first.id}/fund`);
   await call('admin', 'POST', `/admin/payments/${payment.id}/confirm`, {
     amount_minor: payment.amount_minor,
-    reference: 'STMT-40219',
-    note: 'Received 11:42, Amonatbonk transfer.',
+    reference: 'ВЫПИСКА-40219',
+    note: 'Поступило в 11:42, перевод из Демобанка.',
   });
 
-  console.log('working the milestone…');
+  console.log('проходим первый этап…');
   await call('dev', 'POST', `/milestones/${first.id}/start`);
   await call('dev', 'POST', `/milestones/${first.id}/submit`, {
-    note: 'Catalogue, variants and the admin screen are on the staging bot. Load a few real products and tell me if the size fields match how you actually sell.',
+    note: 'Каталог, варианты и админка уже на тестовом боте. Загрузите несколько настоящих товаров и скажите, совпадают ли поля размеров с тем, как вы продаёте на самом деле.',
     deliverables: [
-      { kind: 'link', title: 'Staging bot', url: 'https://example.org/staging-bot' },
-      { kind: 'repository', title: 'Source', url: 'https://github.com/example/clothing-bot' },
+      { kind: 'link', title: 'Тестовый бот', url: 'https://example.org/staging-bot' },
+      { kind: 'repository', title: 'Исходники', url: 'https://github.com/example/clothing-bot' },
     ],
   });
 
   // ── Conversation ─────────────────────────────────────────────────────────
-  console.log('adding messages…');
+  console.log('добавляем переписку…');
   const conversations = await call('client', 'GET', '/conversations');
   const thread = conversations.find((item) => item.contract_id === contract.id);
   if (thread) {
     await call('client', 'POST', `/conversations/${thread.id}/messages`, {
-      body: 'Morning — the product photos are in the shared drive now. Sizes are S to XXL, and a few items are one-size.',
+      body: 'Доброе утро! Фотографии товаров выложила в общую папку. Размеры от S до XXL, несколько вещей — безразмерные.',
     });
     await call('dev', 'POST', `/conversations/${thread.id}/messages`, {
-      body: 'Got them, thank you. One-size items will show as a single option rather than an empty size list.',
+      body: 'Забрал, спасибо. Безразмерные покажу одним вариантом, а не пустым списком размеров.',
     });
     await call('client', 'POST', `/conversations/${thread.id}/messages`, {
-      body: 'That works. Can customers change the size after adding to the cart?',
+      body: 'Так подойдёт. А покупатель сможет поменять размер уже в корзине?',
     });
     await call('dev', 'POST', `/conversations/${thread.id}/messages`, {
-      body: 'Yes — the cart line has an edit button that reopens the size keyboard. I will show it on the staging bot this evening.',
+      body: 'Да, у строки в корзине есть кнопка правки, она открывает клавиатуру размеров заново. Вечером покажу на тестовом боте.',
     });
   }
 
@@ -388,7 +393,7 @@ async function main() {
           developer: 'alijon@example.dev',
           developer2: 'saida@example.dev',
           admin: 'ops@averix.example',
-          password: 'correct horse battery staple',
+          password: 'правильная лошадь батарейка скрепка',
         },
       },
       null,
@@ -396,15 +401,15 @@ async function main() {
     ),
   );
 
-  console.log('\ndemo data ready.');
-  console.log('  client    nilufar@nurstore.example');
-  console.log('  developer alijon@example.dev');
-  console.log('  developer saida@example.dev');
-  console.log('  admin     ops@averix.example');
-  console.log('  password  correct horse battery staple');
+  console.log('\nдемоданные готовы.');
+  console.log('  заказчик    nilufar@nurstore.example');
+  console.log('  исполнитель alijon@example.dev');
+  console.log('  исполнитель saida@example.dev');
+  console.log('  админ       ops@averix.example');
+  console.log('  пароль      правильная лошадь батарейка скрепка');
 }
 
 main().catch((error) => {
-  console.error('\nseed failed:', error.message);
+  console.error('\nне удалось создать демоданные:', error.message);
   process.exit(1);
 });

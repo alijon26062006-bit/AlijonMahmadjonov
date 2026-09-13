@@ -11,6 +11,7 @@ import (
 
 	"github.com/averix/api/internal/audit"
 	"github.com/averix/api/internal/platform/httpx"
+	"github.com/averix/api/internal/platform/places"
 	"github.com/averix/api/internal/platform/validate"
 	"github.com/averix/api/internal/security"
 	"github.com/averix/api/internal/taxonomy"
@@ -119,14 +120,7 @@ func toPublic(p *Profile) *PublicProfile {
 }
 
 func formatLocation(city, country string) string {
-	switch {
-	case city != "" && country != "":
-		return city + ", " + country
-	case country != "":
-		return country
-	default:
-		return city
-	}
+	return places.Format(city, country)
 }
 
 // badgesFor derives the trust markers shown under a developer's name.

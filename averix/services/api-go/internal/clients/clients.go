@@ -17,6 +17,7 @@ import (
 
 	"github.com/averix/api/internal/platform/database"
 	"github.com/averix/api/internal/platform/httpx"
+	"github.com/averix/api/internal/platform/places"
 	"github.com/averix/api/internal/platform/urlguard"
 	"github.com/averix/api/internal/platform/validate"
 	"github.com/averix/api/internal/security"
@@ -374,14 +375,7 @@ func (h *Handlers) update(w http.ResponseWriter, r *http.Request) error {
 }
 
 func formatLocation(city, country string) string {
-	switch {
-	case city != "" && country != "":
-		return city + ", " + country
-	case country != "":
-		return country
-	default:
-		return city
-	}
+	return places.Format(city, country)
 }
 
 func deref(s *string) string {

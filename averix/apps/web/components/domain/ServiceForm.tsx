@@ -245,7 +245,7 @@ export function ServiceForm({ existing }: { existing?: Service }) {
                 ) : null}
               </div>
               <Input
-                label="Название"
+                label="Название пакета"
                 placeholder="Базовый"
                 value={tier.name}
                 onChange={(event) => {
