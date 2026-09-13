@@ -658,6 +658,26 @@ echo "Next:"
 echo "  1. Sign up on the site, then make yourself an administrator:"
 echo "       $COMPOSE_SHOW exec api averixctl create-admin --email you@$DOMAIN"
 echo "  2. In the admin panel, open Payments and enter the transfer details."
+echo "     Until they are there, nobody can fund a milestone — the site says so"
+echo "     plainly rather than pretending a payment went through."
+if ! grep -qE '^SMTP_HOST=.+' .env 2>/dev/null; then
+  echo
+  warn "Email is not configured — this blocks real users."
+  echo "  Publishing a profile or a project requires a confirmed address, and the"
+  echo "  confirmation link is sent by email. With no SMTP server set, that link is"
+  echo "  never sent and nobody but you can publish anything."
+  echo
+  echo "  Add your mail server to .env and run ./install.sh again:"
+  echo "    SMTP_HOST=smtp.example.com"
+  echo "    SMTP_PORT=587"
+  echo "    SMTP_USERNAME=no-reply@$DOMAIN"
+  echo "    SMTP_PASSWORD=…"
+  echo "    MAIL_FROM_ADDRESS=no-reply@$DOMAIN"
+  echo
+  echo "  Until then you can confirm an address from the server:"
+  echo "    $COMPOSE_SHOW exec api averixctl verify-email --email someone@example.com"
+  echo
+fi
 echo "  3. Turn on backups:"
 echo "       (crontab -l 2>/dev/null; echo \"0 3 * * * cd $(pwd) && ./scripts/backup.sh >> /var/log/averix-backup.log 2>&1\") | crontab -"
 echo

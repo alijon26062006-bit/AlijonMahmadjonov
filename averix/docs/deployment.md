@@ -11,6 +11,40 @@ That covers everything in the next three sections: Docker, the secrets, the
 build, the migrations and the certificate. The rest of this page is what the
 installer does, for when you want to do it yourself or something goes wrong.
 
+
+## Email: what breaks without it
+
+Confirming an address is not decoration. Publishing a profile, publishing a
+project and changing an email all require a confirmed address, and the
+confirmation arrives by email. On a deployment with no SMTP server configured,
+that link is never sent, so nobody except the operator can publish anything —
+and the platform looks broken while behaving exactly as designed.
+
+Set these in `.env` and run `./install.sh` again:
+
+```
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587            # 465 also works; the client picks STARTTLS or TLS
+SMTP_USERNAME=no-reply@averix.dev
+SMTP_PASSWORD=…
+MAIL_FROM_ADDRESS=no-reply@averix.dev
+MAIL_FROM_NAME=AVERIX
+```
+
+Nothing is silently dropped while mail is unconfigured: every message is still
+written to `email_log` with the status `failed` and the reason
+`smtp_not_configured`, so the record of what should have been sent survives.
+
+Until the mail server is there, an address can be confirmed from the server:
+
+```bash
+docker compose -f docker-compose.production.yml exec api \
+  averixctl verify-email --email someone@example.com
+```
+
+This is an operator's act, recorded in the audit log like every other. It
+grants nothing new — whoever can run it already has the database.
+
 ## What you need
 
 - A server with **2 CPU, 4 GB RAM, 40 GB SSD** and Ubuntu 22.04 or 24.04.

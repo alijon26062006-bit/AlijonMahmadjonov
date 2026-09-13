@@ -60,6 +60,12 @@ func createAdminCmd(ctx context.Context, args []string) error {
 		if err := store.AddRole(ctx, existing.ID, security.RoleAdmin); err != nil {
 			return fmt.Errorf("grant admin role: %w", err)
 		}
+		// Someone with shell access on the server proved more about this
+		// address than a link in an email would, and on a deployment with no
+		// mail configured that link never arrives at all.
+		if err := store.MarkEmailVerified(ctx, existing.ID); err != nil {
+			return fmt.Errorf("mark email verified: %w", err)
+		}
 		recorder.Record(ctx, audit.Entry{
 			Action: audit.ActionRoleGranted, SubjectType: "user", SubjectID: &existing.ID,
 			After:  map[string]any{"role": "admin"},
@@ -173,4 +179,52 @@ func flagValue(args []string, name string) string {
 		}
 	}
 	return ""
+}
+
+// verifyEmailCmd confirms an address from the server.
+//
+// Publishing a profile or a project requires a confirmed address, and the
+// confirmation arrives by email. On a deployment where SMTP is not configured
+// yet, that link is never sent and nobody can publish anything — the platform
+// looks broken while behaving exactly as designed. This is the operator's way
+// out, recorded in the audit log like every other privileged act.
+//
+// It is not a way around the rule: whoever runs it already has the database.
+func verifyEmailCmd(ctx context.Context, args []string) error {
+	_, db, err := connect(ctx)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	store := auth.NewStore(db)
+	recorder := audit.New(db)
+
+	email := flagValue(args, "--email")
+	if email == "" {
+		if email, err = prompt("Email: "); err != nil {
+			return err
+		}
+	}
+	v := validate.New()
+	email = v.Email("email", email)
+	if v.Any() {
+		return errors.New(v.Fields()["email"])
+	}
+
+	account, err := store.AccountByEmail(ctx, email)
+	if errors.Is(err, auth.ErrNotFound) {
+		return fmt.Errorf("no account with the address %s", email)
+	} else if err != nil {
+		return fmt.Errorf("look up account: %w", err)
+	}
+	if err := store.MarkEmailVerified(ctx, account.ID); err != nil {
+		return fmt.Errorf("mark email verified: %w", err)
+	}
+	recorder.Record(ctx, audit.Entry{
+		Action: audit.ActionEmailVerified, SubjectType: "user", SubjectID: &account.ID,
+		Detail: "confirmed by averixctl verify-email",
+	})
+	fmt.Printf("%s is confirmed\n", email)
+	return nil
 }
