@@ -112,18 +112,21 @@ type DecideRequest struct {
 
 // Report is one user's report as the admin list shows it.
 type Report struct {
-	ID          uuid.UUID  `json:"id"`
-	SubjectType string     `json:"subject_type"`
-	SubjectID   uuid.UUID  `json:"subject_id"`
-	Reason      string     `json:"reason"`
-	ReasonLabel string     `json:"reason_label"`
-	Detail      string     `json:"detail,omitempty"`
-	Status      string     `json:"status"`
-	Reporter    *Person    `json:"reporter,omitempty"`
-	Resolution  string     `json:"resolution,omitempty"`
-	ResolvedAt  *time.Time `json:"resolved_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	Preview     Preview    `json:"preview"`
+	ID          uuid.UUID `json:"id"`
+	SubjectType string    `json:"subject_type"`
+	SubjectID   uuid.UUID `json:"subject_id"`
+	Reason      string    `json:"reason"`
+	ReasonLabel string    `json:"reason_label"`
+	Detail      string    `json:"detail,omitempty"`
+	Status      string    `json:"status"`
+	// Which way round this report is, when the list is about one person:
+	// "against" — filed about them, "filed" — filed by them.
+	Direction  string     `json:"direction,omitempty"`
+	Reporter   *Person    `json:"reporter,omitempty"`
+	Resolution string     `json:"resolution,omitempty"`
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	Preview    Preview    `json:"preview"`
 }
 
 type Person struct {

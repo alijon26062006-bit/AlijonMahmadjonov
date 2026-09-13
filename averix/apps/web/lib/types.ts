@@ -887,7 +887,178 @@ export type AdminUser = {
   active_sessions?: number;
   github_connected?: boolean;
   freelancer_listed?: boolean;
+  reference?: string;
+  phone?: string;
+  photo_url?: string;
+  identity_status?: string;
+  projects_open?: number;
+  contracts_completed?: number;
+  disputes?: number;
+  two_factor?: string;
+  last_login_at?: string;
+  password_changed_at?: string;
+  timezone?: string;
+  locale?: string;
+  professional_status?: string;
+  grants?: AdminGrant[];
 };
+
+/** Извлекается отдельным запросом: вкладки страницы пользователя. */
+export type AdminGrant = {
+  permission: string;
+  label: string;
+  granted_by?: string;
+  granted_by_name?: string;
+  granted_at: string;
+  note?: string;
+};
+
+export type AdminGrantable = { permission: string; label: string };
+
+export type AdminUserProjects = {
+  posted: {
+    id: string;
+    slug: string;
+    reference: string;
+    title: string;
+    status: string;
+    budget_display?: string;
+    proposals_count: number;
+    created_at: string;
+    published_at?: string;
+  }[];
+  contracts: {
+    id: string;
+    reference: string;
+    title: string;
+    status: string;
+    role: string;
+    counterparty: string;
+    amount_minor?: number;
+    currency?: string;
+    created_at: string;
+    completed_at?: string;
+  }[];
+};
+
+export type AdminPayment = {
+  id: string;
+  reference: string;
+  direction: string;
+  amount_minor: number;
+  fee_minor: number;
+  currency: string;
+  status: string;
+  provider: string;
+  contract_reference?: string;
+  /** Уже замаскировано на сервере: «•••• 4242». Полного номера здесь не бывает. */
+  destination?: string;
+  refunded_minor: number;
+  created_at: string;
+  captured_at?: string;
+};
+
+export type AdminSecurity = {
+  two_factor: string;
+  sessions: {
+    id: string;
+    role: string;
+    user_agent?: string;
+    ip?: string;
+    last_used_at: string;
+    created_at: string;
+    expires_at: string;
+  }[];
+  events: { action: string; outcome: string; ip?: string; detail?: string; created_at: string }[];
+  github_connected: boolean;
+  github_login?: string;
+  password_changed_at?: string;
+  failed_logins: number;
+  locked_until?: string;
+};
+
+/** Проверка личности. Ни один из этих типов не несёт ссылок на изображения. */
+export type IdentityDocument = {
+  id: string;
+  kind: string;
+  kind_label: string;
+  mime: string;
+  byte_size: number;
+  width?: number;
+  height?: number;
+  status: string;
+  created_at: string;
+  deleted_at?: string;
+};
+
+export type IdentityCase = {
+  id: string;
+  user_id: string;
+  status: string;
+  status_label: string;
+  document_type?: string;
+  document_label?: string;
+  country_code?: string;
+  submitted_at?: string;
+  reviewed_at?: string;
+  reviewed_by?: string;
+  reviewer_name?: string;
+  decision_reason?: string;
+  resubmit?: { key: string; label: string }[];
+  required: string[];
+  missing: string[];
+  documents: IdentityDocument[];
+  retention_expires_at?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type IdentityOptions = {
+  document_types: { key: string; label: string; needs_back: boolean }[];
+  selfie_with_document: boolean;
+  max_bytes: number;
+};
+
+export type IdentityQueueItem = {
+  id: string;
+  user_id: string;
+  username: string;
+  full_name: string;
+  status: string;
+  status_label: string;
+  document_type?: string;
+  country_code?: string;
+  submitted_at?: string;
+  waiting_hours: number;
+  documents: number;
+};
+
+export type IdentityAccessEntry = {
+  id: number;
+  actor_id?: string;
+  actor_name?: string;
+  subject_user_id?: string;
+  resource_type: string;
+  resource_id?: string;
+  action: string;
+  reason?: string;
+  ip?: string;
+  created_at: string;
+};
+
+export type IdentityReviewAction = {
+  id: number;
+  actor_id?: string;
+  actor_name?: string;
+  action: string;
+  reason?: string;
+  detail?: string;
+  created_at: string;
+};
+
+export type IdentityViewToken = { token: string; url: string; expires_at: string };
+
+export type ResubmitReason = { key: string; label: string; kinds: string[] | null };
 
 export type AdminSetting = {
   key: string;
@@ -971,6 +1142,8 @@ export type ModerationReport = {
   reason_label: string;
   detail?: string;
   status: string;
+  /** На странице одного человека: жалоба на него («against») или его («filed»). */
+  direction?: 'against' | 'filed';
   reporter?: { user_id: string; username: string; full_name: string };
   resolution?: string;
   resolved_at?: string;

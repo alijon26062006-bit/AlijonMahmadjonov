@@ -84,6 +84,7 @@ export default function SettingsPage({ initialTab }: { initialTab?: string } = {
                 router.push(role === 'client' ? '/dashboard' : '/feed');
               }}
             />
+            <VerificationCard account={account} />
             <DangerCard
               onDone={async () => {
                 await signOut();
@@ -199,6 +200,32 @@ function AccountCard({ account, onSaved }: { account: AccountSettings; onSaved: 
         >
           Сохранить
         </Button>
+      </div>
+    </Card>
+  );
+}
+
+/** Вход в проверку личности: одна карточка, которая говорит, где вы сейчас. */
+function VerificationCard({ account }: { account: AccountSettings }) {
+  return (
+    <Card>
+      <h2 className={styles.sectionTitle}>Личность</h2>
+      <div className="av-stack-sm">
+        <div className="av-row av-wrap">
+          <Badge tone={account.identity_verified ? 'verified' : 'neutral'} size="sm">
+            {account.identity_verified ? 'Подтверждена' : 'Не подтверждена'}
+          </Badge>
+        </div>
+        <p className="av-small av-muted">
+          {account.identity_verified
+            ? 'На вашем профиле стоит значок проверенной личности. Снимки документов после проверки удаляются — у площадки остаётся только результат.'
+            : 'Заказчики чаще выбирают исполнителей с подтверждённой личностью. Понадобится документ и селфи; снимки видит только сотрудник с отдельным разрешением, и каждый просмотр записывается.'}
+        </p>
+        <div>
+          <ButtonLink href="/settings/verification" variant="secondary" size="sm">
+            {account.identity_verified ? 'Посмотреть состояние' : 'Пройти проверку'}
+          </ButtonLink>
+        </div>
       </div>
     </Card>
   );

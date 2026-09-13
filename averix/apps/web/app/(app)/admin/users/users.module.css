@@ -1,0 +1,90 @@
+.search {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--av-space-3);
+  align-items: end;
+}
+
+@media (max-width: 560px) {
+  .search {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--av-space-2);
+  margin-top: var(--av-space-3);
+}
+
+.chip {
+  border: 1px solid var(--av-border-subtle);
+  background: var(--av-surface);
+  color: var(--av-text-secondary);
+  border-radius: var(--av-radius-full, 999px);
+  padding: 6px 12px;
+  font-size: var(--av-text-xs);
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--av-border-strong, var(--av-border-subtle));
+  color: var(--av-text-primary);
+}
+
+.chipOn {
+  background: var(--av-brand-subtle, var(--av-surface-raised));
+  border-color: var(--av-brand-border, var(--av-border-subtle));
+  color: var(--av-brand-text, var(--av-text-primary));
+  font-weight: var(--av-weight-medium);
+}
+
+.more {
+  margin-top: var(--av-space-3);
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--av-text-secondary);
+  font-size: var(--av-text-xs);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.advanced {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--av-space-3);
+  margin-top: var(--av-space-3);
+}
+
+.grid {
+  display: grid;
+  gap: var(--av-space-3);
+}
+
+/* One card per person. On a phone this is the whole list: a table with eight
+   columns is unreadable there, and truncating an email to four characters
+   helps nobody. */
+.card {
+  display: flex;
+  gap: var(--av-space-3);
+  align-items: flex-start;
+  padding: var(--av-space-4);
+  border: 1px solid var(--av-border-subtle);
+  border-radius: var(--av-radius-lg);
+  background: var(--av-surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.card:hover {
+  border-color: var(--av-brand-border, var(--av-border-subtle));
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--av-space-2);
+}

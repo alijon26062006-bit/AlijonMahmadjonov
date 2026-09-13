@@ -660,7 +660,12 @@ func (s *Store) UserPayments(ctx context.Context, userID uuid.UUID) ([]PaymentRo
 		SELECT pi.id, pi.reference, pi.direction, pi.amount_minor, pi.fee_minor,
 		       pi.currency, pi.status, pi.provider_code,
 		       coalesce(c.reference, ''), coalesce(pi.refunded_minor, 0),
-		       pi.created_at, pi.captured_at
+		       pi.created_at, pi.captured_at,
+		       -- Only the three fields a provider may report about an
+		       -- instrument, never the payload itself: whatever else a
+		       -- provider chose to send back stays in the database.
+		       pi.provider_meta -> 'brand', pi.provider_meta -> 'last4',
+		       pi.provider_meta -> 'bank'
 		FROM payment_intents pi
 		LEFT JOIN contracts c ON c.id = pi.contract_id
 		WHERE pi.payer_id = $1 OR pi.payee_id = $1
@@ -673,14 +678,41 @@ func (s *Store) UserPayments(ctx context.Context, userID uuid.UUID) ([]PaymentRo
 	out := []PaymentRow{}
 	for rows.Next() {
 		var p PaymentRow
+		var brand, last4, bank *string
 		if err := rows.Scan(&p.ID, &p.Reference, &p.Direction, &p.AmountMinor, &p.FeeMinor,
 			&p.Currency, &p.Status, &p.Provider, &p.ContractRef, &p.RefundedMinor,
-			&p.CreatedAt, &p.CapturedAt); err != nil {
+			&p.CreatedAt, &p.CapturedAt, &brand, &last4, &bank); err != nil {
 			return nil, err
 		}
+		p.Destination = maskedInstrument(derefText(brand), derefText(last4), derefText(bank))
 		out = append(out, p)
 	}
 	return out, rows.Err()
+}
+
+// maskedInstrument is everything an administrator is allowed to learn about
+// how money moved: enough to match a payment against a bank statement, never
+// enough to charge the card again.
+//
+// The platform stores no card number and no account number — there is no
+// column for one. This only shapes what a provider reported back, and takes
+// nothing but the last four digits even if the provider sent more.
+func maskedInstrument(brand, last4, bank string) string {
+	digits := digitsOf(last4)
+	if len(digits) > 4 {
+		digits = digits[len(digits)-4:]
+	}
+	parts := make([]string, 0, 3)
+	if brand = strings.TrimSpace(brand); brand != "" && len(brand) <= 32 {
+		parts = append(parts, brand)
+	}
+	if digits != "" {
+		parts = append(parts, "•••• "+digits)
+	}
+	if bank = strings.TrimSpace(bank); bank != "" && len(bank) <= 64 {
+		parts = append(parts, bank)
+	}
+	return strings.Join(parts, " · ")
 }
 
 // UserSecurity is how an account is being signed into.

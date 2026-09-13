@@ -17,6 +17,7 @@ const LINKS = [
   { href: '/admin/disputes', label: 'Споры' },
   { href: '/admin/payments', label: 'Платежи' },
   { href: '/admin/users', label: 'Пользователи' },
+  { href: '/admin/identity', label: 'Проверка личности' },
   { href: '/admin/settings', label: 'Настройки платформы' },
   { href: '/admin/audit', label: 'Журнал действий' },
 ];

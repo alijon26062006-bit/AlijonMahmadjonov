@@ -144,6 +144,19 @@ func (s *Service) Reports(ctx context.Context, id *security.Identity, status str
 	return out, total, nil
 }
 
+// ReportsAbout is the moderation record of one account, for the user page in
+// the admin panel.
+func (s *Service) ReportsAbout(ctx context.Context, id *security.Identity, userID uuid.UUID, limit int) ([]Report, error) {
+	if err := security.RequirePermission(id, security.PermReportReview); err != nil {
+		return nil, httpx.Forbiddenf("reports need the report.review permission")
+	}
+	out, err := s.store.ReportsAbout(ctx, userID, limit)
+	if err != nil {
+		return nil, httpx.Internalf(err, "load reports about a user")
+	}
+	return out, nil
+}
+
 func (s *Service) ResolveReport(ctx context.Context, id *security.Identity, reportID uuid.UUID, status, resolution string) error {
 	if err := security.RequirePermission(id, security.PermReportReview); err != nil {
 		return httpx.Forbiddenf("resolving reports needs the report.review permission")

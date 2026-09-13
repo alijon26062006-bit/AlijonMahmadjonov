@@ -1,0 +1,73 @@
+.pairs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--av-space-3);
+}
+
+.pair {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pairLabel {
+  font-size: var(--av-text-xs);
+  color: var(--av-text-tertiary);
+}
+
+.pairValue {
+  font-size: var(--av-text-sm);
+  word-break: break-word;
+}
+
+.note {
+  margin: var(--av-space-3) 0 0;
+  font-size: var(--av-text-xs);
+  color: var(--av-text-tertiary);
+}
+
+.docs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--av-space-3);
+}
+
+/* No thumbnails. A preview of a passport is still a passport, and it would sit
+   in the browser cache of every screen that merely listed the case. */
+.doc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  padding: var(--av-space-4);
+  border: 1px solid var(--av-border-subtle);
+  border-radius: var(--av-radius-lg);
+  background: var(--av-surface);
+  cursor: pointer;
+  text-align: left;
+}
+
+.doc:hover {
+  border-color: var(--av-brand-border, var(--av-border-subtle));
+}
+
+.open {
+  font-size: var(--av-text-xs);
+  color: var(--av-brand-text, var(--av-text-primary));
+  text-decoration: underline;
+}
+
+.reasons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--av-space-2);
+}
+
+.reason {
+  display: flex;
+  gap: var(--av-space-2);
+  align-items: flex-start;
+  font-size: var(--av-text-sm);
+  color: var(--av-text-secondary);
+}

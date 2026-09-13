@@ -31,6 +31,7 @@ func (h *Handlers) Register(r *httpx.Router, mw Middleware) {
 	staff := r.Group("/admin/moderation", mw.Require, mw.RequireStaff)
 	staff.GET("/queue", h.queue)
 	staff.GET("/reports", h.reports)
+	staff.GET("/users/{id}/reports", h.reportsAbout)
 
 	write := r.Group("/admin/moderation", mw.Require, mw.RequireStaff, mw.CSRF)
 	write.POST("/queue/{id}/decide", h.decide)
@@ -94,6 +95,19 @@ func (h *Handlers) reports(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return httpx.JSONMeta(w, http.StatusOK, out, map[string]any{"total": total, "offset": offset})
+}
+
+func (h *Handlers) reportsAbout(w http.ResponseWriter, r *http.Request) error {
+	userID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		return httpx.ErrBadRequest.Wrap(err)
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	out, err := h.svc.ReportsAbout(r.Context(), security.FromContext(r.Context()), userID, limit)
+	if err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, out)
 }
 
 func (h *Handlers) resolveReport(w http.ResponseWriter, r *http.Request) error {

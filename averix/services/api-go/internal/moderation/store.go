@@ -337,6 +337,56 @@ func (s *Store) Reports(ctx context.Context, status string, limit, offset int) (
 	return out, total, nil
 }
 
+// ReportsAbout is every report that names this person, in both directions:
+// what was filed against them and what they filed. A decision about an account
+// reads differently when the same person has filed nine reports themselves.
+func (s *Store) ReportsAbout(ctx context.Context, userID uuid.UUID, limit int) ([]Report, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	rows, err := s.db.Query(ctx, `
+		SELECT r.id, r.subject_type, r.subject_id, r.reason, coalesce(r.detail, ''), r.status,
+		       u.id, u.username, u.full_name, coalesce(r.resolution, ''), r.resolved_at, r.created_at,
+		       (r.reporter_id = $1) AS filed_by_them
+		FROM reports r
+		LEFT JOIN users u ON u.id = r.reporter_id
+		WHERE (r.subject_type = 'user' AND r.subject_id = $1) OR r.reporter_id = $1
+		ORDER BY r.created_at DESC
+		LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []Report{}
+	for rows.Next() {
+		var r Report
+		var reporterID *uuid.UUID
+		var username, fullName *string
+		var filed bool
+		if err := rows.Scan(&r.ID, &r.SubjectType, &r.SubjectID, &r.Reason, &r.Detail, &r.Status,
+			&reporterID, &username, &fullName, &r.Resolution, &r.ResolvedAt, &r.CreatedAt, &filed); err != nil {
+			return nil, err
+		}
+		r.ReasonLabel = reportReasons[r.Reason]
+		r.Direction = "against"
+		if filed {
+			r.Direction = "filed"
+		}
+		if reporterID != nil {
+			r.Reporter = &Person{UserID: *reporterID, Username: deref(username), FullName: deref(fullName)}
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range out {
+		out[i].Preview = s.preview(ctx, out[i].SubjectType, out[i].SubjectID)
+	}
+	return out, nil
+}
+
 func (s *Store) ResolveReport(ctx context.Context, id, byID uuid.UUID, status, resolution string) error {
 	tag, err := s.db.Exec(ctx, `
 		UPDATE reports
