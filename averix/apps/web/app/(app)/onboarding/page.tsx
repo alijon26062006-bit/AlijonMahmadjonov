@@ -84,6 +84,8 @@ export default function OnboardingPage() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     get<OwnProfile>('/developers/me')
@@ -172,6 +174,7 @@ export default function OnboardingPage() {
     try {
       const result = await submitStep(step, draft);
       if (result?.profile) setProfile(result.profile);
+      else if (step === 8) setProfile(await get<OwnProfile>('/developers/me'));
       if (step === TOTAL) {
         await refresh();
         router.replace(`/developers/${session?.username ?? ''}`);
@@ -584,6 +587,52 @@ export default function OnboardingPage() {
                     ))
                   )}
                 </ul>
+
+                {/* Публикация требует подтверждённой почты, поэтому об этом
+                    говорится до нажатия кнопки, а не после отказа. */}
+                {profile.email_verified ? null : (
+                  <div className={styles.notice}>
+                    <p className="av-small av-strong">Подтвердите адрес почты</p>
+                    <p className="av-small">
+                      Мы отправили письмо со ссылкой при регистрации. Пока адрес не подтверждён,
+                      анкету нельзя опубликовать — так на площадке не заводятся анкеты на чужие
+                      адреса.
+                    </p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      loading={resending}
+                      onClick={async () => {
+                        setResending(true);
+                        setMessage('');
+                        try {
+                          await post('/auth/email/resend');
+                          setSent(true);
+                        } catch (error) {
+                          setMessage(error instanceof ApiFailure ? error.message : 'Письмо отправить не удалось.');
+                        } finally {
+                          setResending(false);
+                        }
+                      }}
+                    >
+                      Отправить письмо ещё раз
+                    </Button>
+                    {sent ? <p className="av-small av-muted">Письмо отправлено — проверьте почту.</p> : null}
+                  </div>
+                )}
+
+                {/* Отказ на последнем шаге приходит по полям, а полей тут нет:
+                    без этого списка кнопка просто ничего бы не делала. */}
+                {Object.keys(fields).length > 0 ? (
+                  <ul className={styles.missing}>
+                    {Object.entries(fields).map(([key, text]) => (
+                      <li key={key} style={{ color: 'var(--av-danger-text)' }}>
+                        <IconClose size={15} /> {text}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
                 <p className="av-small av-muted">
                   После публикации анкета появится в каталоге исполнителей, и подходящие заказы начнут
                   приходить в ленту. Изменить всё это можно в любой момент.

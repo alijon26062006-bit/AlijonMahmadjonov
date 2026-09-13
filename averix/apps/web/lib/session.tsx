@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ApiFailure, get, post, setCsrfToken } from './api';
 
@@ -107,6 +108,24 @@ export function SessionProvider({
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
+/**
+ * Sends a person to their own home when they open a screen that belongs to
+ * the other side of the marketplace.
+ *
+ * Without this a developer who opens the client dashboard sees an empty page
+ * and a 403 in the console: every request on it is refused by the API, which
+ * is correct but useless to look at.
+ */
+export function useRoleGuard(role: Role) {
+  const { session, loading } = useSession();
+  const router = useRouter();
+  useEffect(() => {
+    if (loading || !session || session.active_role === role) return;
+    router.replace(session.active_role === 'client' ? '/dashboard' : session.active_role === 'developer' ? '/feed' : '/admin');
+  }, [session, loading, role, router]);
+  return session?.active_role === role;
 }
 
 export function useSession(): SessionState {

@@ -13,22 +13,24 @@ import { Avatar } from '@/components/ui/Avatar';
 import { IconBriefcase, IconChevronRight, IconPlus } from '@/components/ui/Icon';
 import { get } from '@/lib/api';
 import { money, plural, timeAgo } from '@/lib/format';
-import { useSession } from '@/lib/session';
+import { useRoleGuard, useSession } from '@/lib/session';
 import type { ContractCard, Project } from '@/lib/types';
 
 export default function ClientDashboard() {
   const { session } = useSession();
+  const isClient = useRoleGuard('client');
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [contracts, setContracts] = useState<ContractCard[] | null>(null);
 
   const load = useCallback(async () => {
+    if (!isClient) return;
     const [projectList, contractList] = await Promise.allSettled([
       get<Project[]>('/projects/mine/list'),
       get<ContractCard[]>('/contracts'),
     ]);
     setProjects(projectList.status === 'fulfilled' ? projectList.value : []);
     setContracts(contractList.status === 'fulfilled' ? contractList.value : []);
-  }, []);
+  }, [isClient]);
 
   useEffect(() => {
     void load();

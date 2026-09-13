@@ -11,6 +11,7 @@ import { SkeletonList } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IconSend } from '@/components/ui/Icon';
 import { ApiFailure, get, post } from '@/lib/api';
+import { useRoleGuard } from '@/lib/session';
 import { days, money, timeAgo } from '@/lib/format';
 import { PROPOSAL_STATUS } from '@/lib/labels';
 import type { OwnProposal } from '@/lib/types';
@@ -24,6 +25,7 @@ const TABS = [
 ];
 
 export default function MyProposalsPage() {
+  useRoleGuard('developer');
   const [status, setStatus] = useState('');
   const [items, setItems] = useState<OwnProposal[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);

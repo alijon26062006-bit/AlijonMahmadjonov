@@ -7,11 +7,13 @@ import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IconLock, IconWallet } from '@/components/ui/Icon';
+import { useRoleGuard } from '@/lib/session';
 import { get } from '@/lib/api';
 import { money, shortDate } from '@/lib/format';
 import type { Balance } from '@/lib/types';
 
 export default function EarningsPage() {
+  useRoleGuard('developer');
   const [balance, setBalance] = useState<Balance | null>(null);
 
   useEffect(() => {

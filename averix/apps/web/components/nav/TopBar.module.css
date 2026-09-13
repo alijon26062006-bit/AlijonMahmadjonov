@@ -178,3 +178,11 @@
   line-height: 16px;
   text-align: center;
 }
+
+.avatarPlaceholder {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--av-skeleton);
+}

@@ -16,6 +16,14 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Next resolves rewrites at build time, not at startup: the value the running
+# container sets is too late. The reverse proxy in front of the stack routes
+# /api/ straight to the API and never uses this rewrite, but a deployment
+# without such a proxy would otherwise proxy the API to the web container
+# itself and fail with nothing in the logs to explain it.
+ARG AVERIX_API_URL=http://api:8080
+ENV AVERIX_API_URL=${AVERIX_API_URL}
 RUN npm run build
 
 FROM node:22-alpine AS runtime

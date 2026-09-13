@@ -487,6 +487,21 @@ function NewProject() {
                     </option>
                   ))}
                 </Select>
+                {/* Отказ на последнем шаге приходит по полям, которых на этом
+                    шаге нет — например «подтвердите почту». Без этого списка
+                    кнопка выглядела бы сломанной. */}
+                {Object.entries(fields).filter(([key]) => key !== 'visibility').length > 0 ? (
+                  <ul className={styles.summary}>
+                    {Object.entries(fields)
+                      .filter(([key]) => key !== 'visibility')
+                      .map(([key, text]) => (
+                        <li key={key} style={{ color: 'var(--av-danger-text)', listStyle: 'none' }}>
+                          {text}
+                        </li>
+                      ))}
+                  </ul>
+                ) : null}
+
                 <p className="av-small av-muted">
                   Публикация бесплатна. Деньги резервируются только по этапам, когда вы выберете
                   исполнителя и подтвердите сделку.

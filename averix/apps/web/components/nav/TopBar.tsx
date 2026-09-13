@@ -59,7 +59,7 @@ export function TopBar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, signOut, switchRole } = useSession();
+  const { session, loading, signOut, switchRole } = useSession();
   const { choice, setChoice } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -137,6 +137,10 @@ export function TopBar({
                   <Avatar src={session.photo_url} name={session.full_name} size={32} />
                 </button>
               </>
+            ) : loading ? (
+              // Пока сессия не проверена, вход не предлагается: у вошедшего
+              // человека это мигание выглядит как «вас выкинуло».
+              <span className={styles.avatarPlaceholder} aria-hidden="true" />
             ) : (
               <>
                 <Link href="/login" className={styles.plainLink}>

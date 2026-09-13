@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import styles from './proposals.module.css';
 import { TopBar } from '@/components/nav/TopBar';
 import { Tabs } from '@/components/ui/Tabs';
@@ -29,6 +30,7 @@ const SORTS = [
 
 export default function ProposalsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
+  const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [proposals, setProposals] = useState<ProposalCard[] | null>(null);
   const [sort, setSort] = useState('recommended');
@@ -201,7 +203,7 @@ export default function ProposalsPage({ params }: { params: Promise<{ slug: stri
         onClose={() => setHiring(null)}
         onHired={(contractId) => {
           setHiring(null);
-          window.location.href = `/contracts/${contractId}`;
+          router.push(`/contracts/${contractId}`);
         }}
       />
     </>

@@ -12,11 +12,13 @@ import { SkeletonList } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IconLayers } from '@/components/ui/Icon';
 import { ApiFailure, get, post } from '@/lib/api';
+import { useRoleGuard } from '@/lib/session';
 import { days, plural } from '@/lib/format';
 import { SERVICE_STATUS } from '@/lib/labels';
 import type { ServiceCard } from '@/lib/types';
 
 export default function MyServicesPage() {
+  useRoleGuard('developer');
   const [items, setItems] = useState<ServiceCard[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');

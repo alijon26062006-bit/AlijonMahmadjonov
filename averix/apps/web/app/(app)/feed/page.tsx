@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { IconCompass, IconAlert } from '@/components/ui/Icon';
 import { get, list } from '@/lib/api';
 import { plural } from '@/lib/format';
+import { useRoleGuard } from '@/lib/session';
 import type { FeedCard } from '@/lib/types';
 
 // The tabs are per developer: the category ones come from what this person
@@ -23,6 +24,7 @@ const FALLBACK_TABS = [
 ];
 
 export default function FeedPage() {
+  const isDeveloper = useRoleGuard('developer');
   const [tabs, setTabs] = useState(FALLBACK_TABS);
   const [tab, setTab] = useState('for_you');
   const [cards, setCards] = useState<FeedCard[] | null>(null);
@@ -30,6 +32,7 @@ export default function FeedPage() {
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(async (key: string) => {
+    if (!isDeveloper) return;
     setCards(null);
     setFailed(false);
     try {
@@ -39,7 +42,7 @@ export default function FeedPage() {
     } catch {
       setFailed(true);
     }
-  }, []);
+  }, [isDeveloper]);
 
   useEffect(() => {
     void load(tab);

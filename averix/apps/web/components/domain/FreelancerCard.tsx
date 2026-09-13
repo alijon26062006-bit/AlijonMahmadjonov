@@ -60,7 +60,7 @@ export function FreelancerCard({ card }: { card: FreelancerCardType }) {
             ) : (
               <span className="av-faint">Новичок</span>
             )}
-            {card.rate_display ? <span>{card.rate_display}/ч</span> : null}
+            {card.rate_display ? <span>{card.rate_display}</span> : null}
             {card.location ? <span>{card.location}</span> : null}
           </div>
           {card.skills?.length ? (

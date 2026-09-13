@@ -2,9 +2,11 @@
 
 import { TopBar } from '@/components/nav/TopBar';
 import { BottomNav } from '@/components/nav/BottomNav';
+import { useRoleGuard } from '@/lib/session';
 import { ServiceForm } from '@/components/domain/ServiceForm';
 
 export default function NewServicePage() {
+  useRoleGuard('developer');
   return (
     <>
       <TopBar back="/services/mine" title="Новая услуга" />
