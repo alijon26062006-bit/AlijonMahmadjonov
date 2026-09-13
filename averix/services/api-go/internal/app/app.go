@@ -12,6 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/averix/api/internal/account"
+	"github.com/averix/api/internal/admin"
 	"github.com/averix/api/internal/aiclient"
 	"github.com/averix/api/internal/audit"
 	"github.com/averix/api/internal/auth"
@@ -24,6 +26,7 @@ import (
 	"github.com/averix/api/internal/health"
 	"github.com/averix/api/internal/matching"
 	"github.com/averix/api/internal/messaging"
+	"github.com/averix/api/internal/moderation"
 	"github.com/averix/api/internal/notifications"
 	"github.com/averix/api/internal/payments"
 	"github.com/averix/api/internal/platform/cache"
@@ -77,6 +80,9 @@ type App struct {
 	Reviews     *reviews.Service
 	Services    *services.Svc
 	Search      *search.Service
+	Moderation  *moderation.Service
+	Admin       *admin.Service
+	Account     *account.Service
 
 	redisStartupError error
 }
@@ -133,7 +139,11 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	mailer := notifications.NewMailer(cfg.Mail, cfg.AppURL, cfg.Env.IsProduction(), notificationStore)
 	notifier := notifications.NewService(notificationStore, mailer, hub, cfg.Push.Configured())
 
-	messagingService := messaging.NewService(messageStore, fileStore, hub, settingsStore, notifier, nil)
+	// Moderation queues what other modules flag. It needs only the database
+	// and the notifier, so it exists before the modules that flag into it.
+	moderator := moderation.NewService(moderation.NewStore(db), recorder, notifier)
+
+	messagingService := messaging.NewService(messageStore, fileStore, hub, settingsStore, notifier, moderator)
 	portfolioStore := portfolio.NewStore(db, store.PublicURL)
 	// The prober is the only thing in the product that fetches an address a
 	// user supplied, and it does so through the SSRF-safe dialler. Development
@@ -169,10 +179,10 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		Matching:    matchingStore,
 		Projects: projects.NewService(projectStore, taxonomyStore, matchingStore,
 			recorder, settingsStore),
-		// Fees and moderation arrive with their modules; the interfaces are
-		// nil until then, and every call site checks.
+		// The fee resolver arrives with a gateway provider; nil until then,
+		// and every call site checks.
 		Proposals: proposals.NewService(proposalStore, matchingStore, recorder,
-			settingsStore, nil, nil, notifier),
+			settingsStore, nil, moderator, notifier),
 		Files: fileStore,
 		Portfolio: portfolio.NewService(portfolioStore,
 			portfolio.NewScreenshots(portfolioStore, fileStore, store, cfg.Limits.MaxImageBytes),
@@ -185,8 +195,10 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		AI:        ai,
 		GitHub: githubint.NewService(githubStore, githubOAuth, cfg, ai, recorder,
 			redis, matchingStore, notifier),
-		Notifier: notifier,
-		Mailer:   mailer,
+		Notifier:   notifier,
+		Mailer:     mailer,
+		Moderation: moderator,
+		Account:    account.NewService(db, authStore, mailer, recorder),
 	}
 	// Payments needs the contracts service, and contracts needs to know
 	// whether money can move at all. Constructing payments second and handing
@@ -205,8 +217,10 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	// Fixed-price services order straight into a contract, so they come after
 	// contracts. Moderation arrives with its module; nil until then.
 	a.Services = services.NewSvc(services.NewStore(db, store.PublicURL), taxonomyStore,
-		a.Contracts, projectStore, settingsStore, nil, recorder)
+		a.Contracts, projectStore, settingsStore, moderator, recorder)
 	a.Search = search.NewService(search.NewStore(db, store.PublicURL), a.Services.Store(), recorder)
+	a.Admin = admin.NewService(admin.NewStore(db), authStore, settingsStore, matchingStore,
+		a.Contracts, notifier, recorder, cfg, Version)
 
 	a.redisStartupError = redisErr
 	return a, nil
@@ -350,6 +364,26 @@ func (a *App) Handler() http.Handler {
 		VerifiedEmail: a.AuthMW.RequireVerifiedEmail(),
 		// An order creates a contract; the same allowance as hiring.
 		RateLimitOrder: a.AuthMW.RateLimitOnSuccess("service_order", 20, time.Hour),
+	})
+
+	staff := a.AuthMW.RequireRole(security.RoleAdmin, security.RoleModerator)
+	moderation.NewHandlers(a.Moderation).Register(v1, moderation.Middleware{
+		Require:      a.AuthMW.Require(),
+		CSRF:         a.AuthMW.CSRF(),
+		RequireStaff: staff,
+		// Reports are cheap to file and expensive to read; a person who files
+		// thirty an hour is not helping.
+		RateLimitReport: a.AuthMW.RateLimit("report", 30, time.Hour),
+	})
+	admin.NewHandlers(a.Admin).Register(v1, admin.Middleware{
+		Require:      a.AuthMW.Require(),
+		CSRF:         a.AuthMW.CSRF(),
+		RequireStaff: staff,
+	})
+	account.NewHandlers(a.Account, a.AuthMW.ClearCookie).Register(v1, account.Middleware{
+		Require:   a.AuthMW.Require(),
+		CSRF:      a.AuthMW.CSRF(),
+		RateLimit: a.AuthMW.RateLimit("account_sensitive", 10, time.Hour),
 	})
 
 	search.NewHandlers(a.Search).Register(v1, search.Middleware{

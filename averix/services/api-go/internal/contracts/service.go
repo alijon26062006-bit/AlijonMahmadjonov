@@ -723,6 +723,139 @@ func (s *Service) move(ctx context.Context, id *security.Identity, milestoneID u
 	return updated, nil
 }
 
+// DisputeOutcome is an administrator's ruling on a disputed milestone.
+type DisputeOutcome struct {
+	// "developer_favoured" approves the work; "client_favoured" cancels the
+	// milestone so the funds return; "no_action" sends it back to work.
+	Outcome string `json:"outcome"`
+	Note    string `json:"note"`
+}
+
+// ResolveDispute is the one move a party cannot make: it belongs to the
+// platform. The milestone leaves 'disputed' for the state the ruling names,
+// the ruling is written to the disputes table with who made it, and both
+// parties are told. Money follows the state exactly as it would have without
+// the dispute — an approval releases through payments, a cancellation refunds
+// — so nothing here moves money directly.
+func (s *Service) ResolveDispute(ctx context.Context, id *security.Identity, milestoneID uuid.UUID,
+	in DisputeOutcome) (*Milestone, error) {
+
+	if err := security.RequirePermission(id, security.PermDisputeResolve); err != nil {
+		s.audit.Denial(ctx, "milestone", &milestoneID, "caller lacks dispute.resolve")
+		return nil, httpx.Forbiddenf("resolving a dispute needs the dispute.resolve permission")
+	}
+	to := map[string]string{
+		"developer_favoured": MilestoneApproved,
+		"client_favoured":    MilestoneCancelled,
+		"no_action":          MilestoneInProgress,
+	}[in.Outcome]
+	if to == "" {
+		return nil, httpx.Validation(map[string]string{"outcome": "Решение: developer_favoured, client_favoured или no_action."})
+	}
+	note := strings.TrimSpace(in.Note)
+	if len([]rune(note)) < 20 {
+		return nil, httpx.Validation(map[string]string{"note": "Объясните решение хотя бы в одном предложении — его увидят обе стороны."})
+	}
+
+	milestone, err := s.store.MilestoneByID(ctx, milestoneID)
+	if err != nil {
+		return nil, notFoundMilestone(err, milestoneID)
+	}
+	if milestone.Status != MilestoneDisputed {
+		e := *httpx.ErrConflict
+		e.Code = "milestone_state"
+		e.Message = "Этот этап не находится в споре."
+		return nil, &e
+	}
+	membership, err := s.store.MembershipOf(ctx, milestone.ContractID)
+	if err != nil {
+		return nil, notFound(err, milestone.ContractID)
+	}
+
+	updated, err := s.store.Transition(ctx, TransitionInput{
+		MilestoneID: milestoneID, From: MilestoneDisputed, To: to, ActorID: id.UserID, Note: note,
+	})
+	if errors.Is(err, ErrRaced) {
+		e := *httpx.ErrConflict
+		e.Code = "milestone_changed"
+		e.Message = "Этап только что изменился. Обновите страницу."
+		return nil, &e
+	}
+	if err != nil {
+		return nil, httpx.Internalf(err, "resolve dispute")
+	}
+
+	if _, err := s.store.db.Exec(ctx, `
+		INSERT INTO disputes (reference, contract_id, milestone_id, opened_by, against_id, reason, claim,
+		                      status, outcome, outcome_note, resolved_by, resolved_at)
+		VALUES ('DSP-' || upper(substr(md5(random()::text), 1, 8)), $1, $2, $3, $4, 'other',
+		        $5, 'resolved', $6, $7, $8, now())`,
+		milestone.ContractID, milestoneID, membership.ClientID, membership.DeveloperID,
+		"Открыт по этапу «"+milestone.Title+"»", in.Outcome, note, id.UserID); err != nil {
+		logWarn(ctx, "contracts: could not record the dispute ruling", err)
+	}
+
+	s.audit.RecordRequest(ctx, audit.Entry{
+		Action: audit.ActionDisputeResolved, SubjectType: "milestone", SubjectID: &milestoneID,
+		Detail: in.Outcome + ": " + note,
+	})
+	s.afterMove(ctx, id, membership, milestone, updated, to)
+	s.postSystem(ctx, milestone.ContractID, "dispute.resolved", &milestoneID,
+		map[string]any{"outcome": in.Outcome, "note": note})
+	return updated, nil
+}
+
+// DisputedMilestone is one open dispute as the administrator's list shows it.
+type DisputedMilestone struct {
+	MilestoneID   uuid.UUID `json:"milestone_id"`
+	ContractID    uuid.UUID `json:"contract_id"`
+	ContractTitle string    `json:"contract_title"`
+	Title         string    `json:"title"`
+	AmountMinor   int64     `json:"amount_minor"`
+	Currency      string    `json:"currency"`
+	Client        PartyRef  `json:"client"`
+	Developer     PartyRef  `json:"developer"`
+	DisputedAt    time.Time `json:"disputed_at"`
+	Note          string    `json:"note,omitempty"`
+}
+
+// OpenDisputes lists milestones in dispute, oldest first. Administrators only.
+func (s *Service) OpenDisputes(ctx context.Context, id *security.Identity) ([]DisputedMilestone, error) {
+	if err := security.RequirePermission(id, security.PermDisputeResolve); err != nil {
+		return nil, httpx.Forbiddenf("listing disputes needs the dispute.resolve permission")
+	}
+	rows, err := s.store.db.Query(ctx, `
+		SELECT m.id, c.id, c.title, m.title, m.amount_minor, m.currency,
+		       cu.id, cu.username, cu.full_name, du.id, du.username, du.full_name,
+		       m.updated_at,
+		       coalesce((SELECT e.note FROM milestone_events e
+		                 WHERE e.milestone_id = m.id AND e.to_status = 'disputed'
+		                 ORDER BY e.created_at DESC LIMIT 1), '')
+		FROM milestones m
+		JOIN contracts c ON c.id = m.contract_id
+		JOIN users cu ON cu.id = c.client_id
+		JOIN users du ON du.id = c.developer_id
+		WHERE m.status = 'disputed'
+		ORDER BY m.updated_at`)
+	if err != nil {
+		return nil, httpx.Internalf(err, "list disputes")
+	}
+	defer rows.Close()
+	out := []DisputedMilestone{}
+	for rows.Next() {
+		var d DisputedMilestone
+		if err := rows.Scan(&d.MilestoneID, &d.ContractID, &d.ContractTitle, &d.Title, &d.AmountMinor, &d.Currency,
+			&d.Client.ID, &d.Client.Username, &d.Client.FullName,
+			&d.Developer.ID, &d.Developer.Username, &d.Developer.FullName,
+			&d.DisputedAt, &d.Note); err != nil {
+			return nil, httpx.Internalf(err, "scan dispute")
+		}
+		d.Currency = strings.TrimSpace(d.Currency)
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
 // entitled checks that the caller's position allows this particular move.
 func (s *Service) entitled(ctx context.Context, role, to string, milestoneID uuid.UUID) error {
 	wanted := ActorFor(to)

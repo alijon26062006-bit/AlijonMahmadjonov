@@ -262,6 +262,28 @@ func (m *Mailer) SendPasswordChanged(ctx context.Context, userID uuid.UUID, emai
 		Subject: "Пароль изменён — AVERIX", Text: text, HTML: htmlBody})
 }
 
+// SendEmailChange goes to the *new* address: proving the person controls it
+// is the whole point, so the old address gets a plain notice instead.
+func (m *Mailer) SendEmailChange(ctx context.Context, userID uuid.UUID, newEmail, name, token string) error {
+	path := "/confirm-email/" + token
+	text, htmlBody := m.render("Подтвердите новый адрес",
+		greeting(name)+"Вы попросили сменить адрес электронной почты на этот. Подтвердите его по ссылке — она действует один час. Если это были не вы, просто не открывайте её.",
+		"Подтвердить новый адрес", path)
+	m.logTokenIfAllowed(ctx, "email_change", newEmail, path)
+	return m.Send(ctx, Message{UserID: &userID, To: newEmail, ToName: name, Template: "email_change",
+		Subject: "Подтвердите новый адрес — AVERIX", Text: text, HTML: htmlBody})
+}
+
+// SendEmailChanged tells the old address that the change happened, so a
+// hijacked account is noticed by the person who lost it.
+func (m *Mailer) SendEmailChanged(ctx context.Context, userID uuid.UUID, oldEmail, name, newEmail string) error {
+	text, htmlBody := m.render("Адрес электронной почты изменён",
+		greeting(name)+"Адрес вашего аккаунта AVERIX изменён на "+newEmail+". Если это были не вы, немедленно сбросьте пароль и завершите остальные сессии.",
+		"Открыть настройки безопасности", "/settings/security")
+	return m.Send(ctx, Message{UserID: &userID, To: oldEmail, ToName: name, Template: "email_changed",
+		Subject: "Адрес изменён — AVERIX", Text: text, HTML: htmlBody})
+}
+
 // SendNotification is the generic delivery for the notification queue.
 func (m *Mailer) SendNotification(ctx context.Context, userID uuid.UUID, email, name, kind,
 	title, body, href string) error {
