@@ -88,16 +88,31 @@ func TestOnboardingFlowPublishesAProfile(t *testing.T) {
 		"hard to see: migrations that run safely, and errors that say something useful."
 	c.PUT("/developers/me/bio", map[string]any{"bio": bio}).OK(t, http.StatusOK)
 
-	// Publishing requires a verified address, which is deliberate: a searchable
-	// profile is a public claim under an address the person controls.
-	c.POST("/developers/me/finish", nil).
+	// Отправка требует подтверждённого адреса — анкета в каталоге это публичное
+	// заявление от имени человека, который этим адресом владеет.
+	refused := c.POST("/developers/me/finish", nil).
 		Fails(t, http.StatusUnprocessableEntity, "validation_failed")
+	if _, ok := refused.Fields["portfolio"]; !ok {
+		t.Errorf("без единой работы заявку принимать нельзя, поля: %v", refused.Fields)
+	}
 
 	h.Exec(`UPDATE users SET email_verified_at = now() WHERE username = 'alidev'`)
 
+	// И одной работы: анкета без единого примера просит заказчика поверить
+	// незнакомцу на слово.
+	c.POST("/developers/me/finish", nil).Fails(t, http.StatusUnprocessableEntity, "validation_failed")
+	h.AddWorkSample(c, "Складской учёт для оптовика")
+
 	published := c.POST("/developers/me/finish", nil).OK(t, http.StatusOK)
-	if !published.Bool("is_searchable") {
-		t.Error("finishing onboarding must make the profile searchable")
+	if published.Bool("is_searchable") {
+		t.Error("заявка не публикует анкету — это делает решение администратора")
+	}
+	if published.String("moderation_state") != "pending" {
+		t.Errorf("moderation_state = %q, want pending", published.String("moderation_state"))
+	}
+	if n := h.Count(`SELECT count(*) FROM moderation_queue
+	                 WHERE subject_type = 'developer_profile' AND status IN ('pending','escalated')`); n != 1 {
+		t.Errorf("заявка должна попасть в очередь модерации, найдено %d", n)
 	}
 
 	onboarding, _ := published.Data["onboarding"].(map[string]any)
@@ -784,8 +799,13 @@ func publishedDeveloper(t *testing.T, h *testsupport.Harness, username string) *
 			"about migrations that run safely and errors that say something useful.",
 	}).OK(t, http.StatusOK)
 
+	h.AddWorkSample(c, "Складской учёт для оптовика")
 	h.Exec(`UPDATE users SET email_verified_at = now() WHERE username = $1`, username)
 	c.POST("/developers/me/finish", nil).OK(t, http.StatusOK)
+	// Заявку смотрит человек; здесь его решение ставится напрямую, иначе
+	// анкеты не было бы в каталоге и половина этих проверок проверяла бы
+	// очередь модерации вместо приватности профиля.
+	h.ApproveProfile(username)
 	return c
 }
 

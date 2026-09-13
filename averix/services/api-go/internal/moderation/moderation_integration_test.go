@@ -27,11 +27,18 @@ func TestReportsAndTheQueue(t *testing.T) {
 	serviceID := created.String("id")
 	dev.Client.POST("/services/"+serviceID+"/publish", nil).OK(t, http.StatusOK)
 
+	// В очереди теперь бывает и заявка исполнителя — анкета уходит на
+	// рассмотрение вместе с публикацией. Ищем именно услугу.
 	queue := root.Client.GET("/admin/moderation/queue").OK(t, http.StatusOK)
-	if len(queue.List) != 1 {
-		t.Fatalf("queue = %d, want the flagged service: %s", len(queue.List), queue.Raw)
+	var item map[string]any
+	for _, raw := range queue.List {
+		if row, ok := raw.(map[string]any); ok && row["subject_type"] == "service" {
+			item = row
+		}
 	}
-	item := queue.List[0].(map[string]any)
+	if item == nil {
+		t.Fatalf("очередь не содержит помеченную услугу: %s", queue.Raw)
+	}
 	if item["subject_type"] != "service" || item["origin"] != "automatic" {
 		t.Errorf("queue item = %v", item)
 	}
@@ -55,14 +62,24 @@ func TestReportsAndTheQueue(t *testing.T) {
 		"subject_type": "user", "subject_id": client.UserID, "reason": "spam",
 	}).Fails(t, http.StatusUnprocessableEntity, "validation_failed")
 
+	// Жалоба не заводит вторую строку на тот же предмет, а поднимает
+	// существующую. Заявка исполнителя в очереди своя и здесь ни при чём.
 	queue = root.Client.GET("/admin/moderation/queue").OK(t, http.StatusOK)
-	if len(queue.List) != 1 {
-		t.Fatalf("a report must not duplicate the queue item, got %d", len(queue.List))
+	services := 0
+	var flagged map[string]any
+	for _, raw := range queue.List {
+		if row, ok := raw.(map[string]any); ok && row["subject_type"] == "service" {
+			services++
+			flagged = row
+		}
 	}
-	if queue.List[0].(map[string]any)["reports"] != float64(1) {
-		t.Errorf("reports count on the item = %v, want 1", queue.List[0].(map[string]any)["reports"])
+	if services != 1 {
+		t.Fatalf("жалоба не должна создавать вторую строку, услуг в очереди: %d", services)
 	}
-	itemID := queue.List[0].(map[string]any)["id"].(string)
+	if flagged["reports"] != float64(1) {
+		t.Errorf("reports count on the item = %v, want 1", flagged["reports"])
+	}
+	itemID := flagged["id"].(string)
 
 	// Rejecting hides the service everywhere and tells the owner why.
 	root.Client.POST("/admin/moderation/queue/"+itemID+"/decide", map[string]any{"outcome": "reject", "note": "x"}).

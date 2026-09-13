@@ -278,7 +278,14 @@ func (s *Store) Decide(ctx context.Context, id, moderatorID uuid.UUID, outcome, 
 		}
 		_, err = q.Exec(ctx, `UPDATE `+target.Table+` SET moderation_state = $2 WHERE id = $1`, item.SubjectID, state)
 		if item.SubjectType == SubjectDeveloperProfile {
-			_, err = q.Exec(ctx, `UPDATE developer_profiles SET moderation_state = $2 WHERE user_id = $1`, item.SubjectID, state)
+			// Approval is what puts a freelancer in the catalogue: the form
+			// itself only submits an application. A profile that was never
+			// finished stays out either way.
+			_, err = q.Exec(ctx, `
+				UPDATE developer_profiles
+				SET moderation_state = $2,
+				    is_searchable = ($2 = 'approved' AND onboarding_completed_at IS NOT NULL)
+				WHERE user_id = $1`, item.SubjectID, state)
 		}
 		return err
 	})

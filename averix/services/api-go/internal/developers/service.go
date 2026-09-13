@@ -21,11 +21,33 @@ type Service struct {
 	store    *Store
 	taxonomy *taxonomy.Store
 	audit    *audit.Recorder
+	review   Review
+	notifier Applicant
 }
 
 func NewService(store *Store, tax *taxonomy.Store, rec *audit.Recorder) *Service {
 	return &Service{store: store, taxonomy: tax, audit: rec}
 }
+
+// Review is the moderation queue, as this package needs it: a finished profile
+// is put in front of a person before it reaches the catalogue.
+type Review interface {
+	Flag(ctx context.Context, subjectType string, subjectID uuid.UUID, reason string)
+}
+
+// Applicant is told that the application was received. Separate from Review so
+// a deployment without notifications still submits.
+type Applicant interface {
+	ProfileSubmitted(ctx context.Context, userID uuid.UUID)
+}
+
+// AttachReview is optional. Without it a submitted profile still leaves the
+// catalogue alone and waits — it simply waits without a queue entry, which is
+// a configuration to notice rather than a silent publish.
+func (s *Service) AttachReview(r Review) { s.review = r }
+
+// AttachNotifier is optional, like the queue itself.
+func (s *Service) AttachNotifier(n Applicant) { s.notifier = n }
 
 // Me returns the caller's own profile, including the private figures.
 func (s *Service) Me(ctx context.Context, id *security.Identity) (*Profile, error) {
@@ -40,7 +62,31 @@ func (s *Service) Me(ctx context.Context, id *security.Identity) (*Profile, erro
 		return nil, httpx.Internalf(err, "load own profile")
 	}
 	profile.Onboarding = s.assessOnboarding(profile)
+	s.fillApplication(ctx, profile)
 	return profile, nil
+}
+
+// fillApplication adds the two things the form's last screen needs: how many
+// pieces of work there are, and where the application stands.
+func (s *Service) fillApplication(ctx context.Context, p *Profile) {
+	if samples, err := s.store.WorkSamples(ctx, p.UserID); err == nil {
+		p.Onboarding.WorkSamples = samples
+	}
+	p.Onboarding.Status = applicationStatus(p)
+}
+
+func applicationStatus(p *Profile) string {
+	if !p.Onboarding.Completed {
+		return "draft"
+	}
+	switch p.ModerationState {
+	case "pending":
+		return "review"
+	case "rejected", "hidden":
+		return "rejected"
+	default:
+		return "approved"
+	}
 }
 
 // Public returns a developer's public profile.
@@ -588,21 +634,41 @@ func (s *Service) Finish(ctx context.Context, id *security.Identity) (*Profile, 
 		v.Add("experience_level", "Перед публикацией укажите уровень опыта.")
 	}
 	if !id.EmailVerified {
-		v.Add("email", "Подтвердите адрес почты, прежде чем публиковать анкету.")
+		v.Add("email", "Подтвердите адрес почты, прежде чем отправлять заявку.")
+	}
+	// At least one piece of work. A profile that lists skills and shows nothing
+	// asks a client to take a stranger's word for it.
+	samples, err := s.store.WorkSamples(ctx, id.UserID)
+	if err != nil {
+		return nil, httpx.Internalf(err, "count work samples")
+	}
+	if samples == 0 {
+		v.Add("portfolio", "Добавьте хотя бы одну работу: проект, который вы сделали, или заказ, который выполнили.")
 	}
 	if v.Any() {
 		return nil, httpx.Validation(v.Fields())
 	}
 
 	assessment := s.assessOnboarding(profile)
-	if err := s.store.CompleteOnboarding(ctx, id.UserID, assessment.Completeness); err != nil {
-		return nil, httpx.Internalf(err, "complete onboarding")
+	if err := s.store.SubmitForReview(ctx, id.UserID, assessment.Completeness); err != nil {
+		return nil, httpx.Internalf(err, "submit profile for review")
+	}
+
+	// Straight to the moderation queue: the person who decides is a person,
+	// and the freelancer sees "на рассмотрении" until they do.
+	if s.review != nil {
+		s.review.Flag(context.WithoutCancel(ctx), "developer_profile", id.UserID,
+			"новая анкета исполнителя")
+	}
+
+	if s.notifier != nil {
+		s.notifier.ProfileSubmitted(context.WithoutCancel(ctx), id.UserID)
 	}
 
 	s.audit.RecordRequest(ctx, audit.Entry{
-		Action: "developer.profile_published", SubjectType: "developer_profile",
+		Action: "developer.profile_submitted", SubjectType: "developer_profile",
 		SubjectID: &id.UserID,
-		After:     map[string]any{"completeness": assessment.Completeness},
+		After:     map[string]any{"completeness": assessment.Completeness, "work_samples": samples},
 	})
 
 	updated, err := s.store.ByID(ctx, id.UserID)
@@ -610,6 +676,7 @@ func (s *Service) Finish(ctx context.Context, id *security.Identity) (*Profile, 
 		return nil, httpx.Internalf(err, "reload profile")
 	}
 	updated.Onboarding = s.assessOnboarding(updated)
+	s.fillApplication(ctx, updated)
 	return updated, nil
 }
 
@@ -646,6 +713,8 @@ func (s *Service) completeStep(ctx context.Context, id *security.Identity, step 
 	}
 	assessment := s.assessOnboarding(profile)
 	profile.Onboarding = assessment
+	s.fillApplication(ctx, profile)
+	assessment = profile.Onboarding
 
 	next := step + 1
 	if next > TotalOnboardingSteps {

@@ -207,6 +207,13 @@ type Onboarding struct {
 	Completed    bool       `json:"completed"`
 	CompletedAt  *time.Time `json:"completed_at,omitempty"`
 	Completeness int        `json:"completeness"`
+	// Where the application stands, in one word the interface can render:
+	// "draft" — ещё заполняется, "review" — отправлена и ждёт человека,
+	// "approved" — опубликована, "rejected" — отклонена.
+	Status string `json:"status"`
+	// Работы в портфолио плюс сделки, завершённые через AVERIX. Хотя бы одна
+	// нужна, чтобы отправить заявку.
+	WorkSamples int `json:"work_samples"`
 	// What is still missing, so the UI can prompt for the highest-value item
 	// rather than a generic "complete your profile".
 	Missing []MissingItem `json:"missing,omitempty"`

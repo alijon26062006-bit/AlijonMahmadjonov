@@ -47,6 +47,17 @@ page.on('response', (r) => {
   }
 });
 
+function approveProfile(email) {
+  // Решение администратора по заявке. Отдельный сценарий проверяет саму
+  // очередь; здесь это просто состояние, с которого начинается работа.
+  execSync(
+    `psql ${process.env.AVERIX_SMOKE_PSQL ?? '-U postgres -h /var/run/postgresql -d averix_dev'} -c ` +
+      `"UPDATE developer_profiles SET moderation_state = 'approved', is_searchable = true ` +
+      `WHERE user_id = (SELECT id FROM users WHERE email = '${email}')"`,
+    { stdio: 'ignore' },
+  );
+}
+
 function verifyIdentity(email) {
   // Проверка личности — отдельный сценарий с документами и сотрудником;
   // здесь важно только то, что без неё исполнителю нельзя работать.
@@ -104,15 +115,12 @@ async function register(who, role) {
 await register(dev, 'developer');
 step('регистрация исполнителя ведёт в анкету', page.url().includes('/onboarding'), page.url());
 
-// 2. Анкета: шаг 1
-await page.waitForSelector('text=Кто вы и где', { timeout: 15000 });
+// 2. Анкета: шаг 1 из четырёх — кто вы, профессия, фотография
+await page.waitForSelector('text=Шаг 1 из 4', { timeout: 15000 });
+step('анкета разбита на короткие шаги', true);
 await page.getByLabel('Код страны').fill('RU');
 await page.getByLabel('Город').fill('Казань');
-await page.getByRole('button', { name: 'Далее' }).click();
-await page.waitForSelector('text=Чем вы занимаетесь', { timeout: 15000 });
-step('шаг 1 анкеты сохраняется', true);
 
-// 3. Выбор профессии — должна быть не только IT
 const professions = await page.locator('button:has-text("дизайнер"), button:has-text("Копирайтер")').count();
 step('в списке профессий есть не только IT', professions > 0, `найдено ${professions}`);
 const designer = page.locator('button', { hasText: 'Графический дизайнер' }).first();
@@ -120,50 +128,55 @@ if (await designer.count()) await designer.click();
 else await page.locator('button:has-text("Бэкенд-разработчик")').first().click();
 await page.getByLabel('Как вас представить').fill('Дизайнер логотипов и айдентики');
 await page.getByRole('button', { name: 'Далее' }).click();
-await page.waitForSelector('text=Дополнительные направления', { timeout: 15000 });
-await page.getByRole('button', { name: 'Пропустить' }).click();
 
-// 4. Навыки
-await page.waitForSelector('text=Навыки и инструменты', { timeout: 15000 });
+// 3. Шаг 2 — навыки, опыт, занятость и о себе на одном экране
+await page.waitForSelector('text=Шаг 2 из 4', { timeout: 15000 });
 await page.getByLabel('Найти навык').fill('Figma');
 await page.waitForTimeout(1200);
 const chip = page.locator('button[aria-pressed]', { hasText: /Figma/i }).first();
 const hasChip = await chip.count();
 if (hasChip) await chip.click();
 step('поиск навыков возвращает результат', hasChip > 0);
-await page.getByRole('button', { name: 'Далее' }).click();
-
-// 5. Опыт → занятость → о себе
-await page.waitForSelector('text=Опыт и цены', { timeout: 15000 });
 await page.getByLabel('Ставка за час').fill('1500');
-await page.getByRole('button', { name: 'Далее' }).click();
-await page.waitForSelector('text=Занятость и приватность', { timeout: 15000 });
-await page.getByRole('button', { name: 'Далее' }).click();
-await page.waitForSelector('text=О себе', { timeout: 15000 });
 await page.getByLabel('О себе').fill(
   'Рисую логотипы и фирменные стили для небольших компаний уже семь лет: кофейни, ' +
   'частные клиники, локальные производства. Начинаю с разговора о том, кому вы продаёте ' +
   'и чем отличаетесь, и только потом берусь за эскизы. Отдаю исходники и короткий гайд.',
 );
 await page.getByRole('button', { name: 'Далее' }).click();
-await page.waitForSelector('text=Фотография', { timeout: 15000 });
-await page.getByRole('button', { name: 'Пропустить' }).click();
-await page.waitForSelector('text=Готово', { timeout: 15000 });
-// Публикация требует подтверждённой почты — экран об этом говорит.
+
+// 4. Шаг 3 — работа в портфолио, без неё заявку не отправить
+await page.waitForSelector('text=Шаг 3 из 4', { timeout: 15000 });
+step('без работы дальше не пускают', await page.getByRole('button', { name: 'Далее' }).isDisabled());
+await page.getByRole('button', { name: 'Добавить работу' }).click();
+await page.getByLabel('Что вы сделали').fill('Логотип и вывеска для кофейни «Зерно»');
+await page.getByLabel('Направление').selectOption({ index: 1 });
+await page.getByLabel('Коротко, одной строкой').fill('Логотип, вывеска и стаканы для кофейни в центре');
+await page.getByLabel('Что именно вы делали').fill(
+  'Сделала логотип, вывеску и оформление стаканов для кофейни на двадцать мест. ' +
+  'Начали с разговора о гостях и районе, потом три направления эскизов, дальше отрисовка.',
+);
+await page.getByLabel('Ссылка на работу').fill('https://example.org/zerno');
+await page.getByRole('button', { name: 'Сохранить работу' }).click();
+await page.waitForTimeout(2000);
+step('работа добавлена', !(await page.getByRole('button', { name: 'Далее' }).isDisabled()));
+await page.getByRole('button', { name: 'Далее' }).click();
+
+// 5. Шаг 4 — сводка и заявка
+await page.waitForSelector('text=Шаг 4 из 4', { timeout: 15000 });
 const gate = await page.locator('body').innerText();
-step('шаг «Готово» требует подтвердить почту', /Подтвердите адрес почты/.test(gate));
+step('перед отправкой требуют подтвердить почту', /Подтвердите адрес почты/.test(gate));
 await verifyEmail(dev.email);
 await page.reload({ waitUntil: 'networkidle' });
-await page.waitForSelector('text=Готово', { timeout: 15000 });
-await page.getByRole('button', { name: 'Опубликовать анкету' }).click();
-// Анкета заполнена — дальше по новому правилу идёт проверка личности: без неё
-// исполнитель не может ни откликаться, ни продавать услуги.
-await page.waitForURL(/\/settings\/verification/, { timeout: 20000 });
-step('после анкеты исполнителя ведут на проверку личности', page.url().includes('/settings/verification'), page.url());
+await page.waitForSelector('text=Шаг 4 из 4', { timeout: 15000 });
+await page.getByRole('button', { name: 'Отправить заявку' }).click();
+await page.waitForSelector('text=Заявка на рассмотрении', { timeout: 20000 });
+step('после отправки показан статус «Заявка на рассмотрении»', true);
 
-// Саму проверку проходит человек, а решение принимает сотрудник — этот
-// сценарий не про них (для них есть smoke-identity.mjs), поэтому отметка
-// ставится напрямую, как и подтверждение почты выше.
+// Заявку смотрит администратор, а проверку личности проходит человек — оба
+// сценария свои (smoke-application.mjs и smoke-identity.mjs). Здесь важно
+// только то, что дальше по пути они уже пройдены.
+approveProfile(dev.email);
 verifyIdentity(dev.email);
 
 await page.goto(`${BASE}/developers/${dev.user}`, { waitUntil: 'networkidle' });

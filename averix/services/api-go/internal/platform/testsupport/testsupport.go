@@ -325,6 +325,11 @@ func (h *Harness) PublishDeveloper(username, specialisation string, technologies
 			"about migrations that run safely and errors that say something useful.",
 	}).OK(h.T, 200)
 
+	// At least one piece of work: the application cannot be sent without it,
+	// which is the point of asking. Tests about other things want a freelancer
+	// who got through, not one stuck on the last screen.
+	h.AddWorkSample(c, "Каталог для оптовой базы")
+
 	h.Verify(username)
 	// A published freelancer in the new world is a verified one: without the
 	// identity check they could not send a proposal, publish a service or be
@@ -332,6 +337,11 @@ func (h *Harness) PublishDeveloper(username, specialisation string, technologies
 	// half-registered one; the gate itself has its own tests.
 	h.VerifyIdentity(username)
 	c.POST("/developers/me/finish", nil).OK(h.T, 200)
+
+	// The application goes to a person. Standing in for that person here, the
+	// same way Verify stands in for the confirmation email — the review itself
+	// has its own tests.
+	h.ApproveProfile(username)
 
 	return &Developer{Client: c, Username: username, UserID: c.UserID()}
 }
@@ -390,6 +400,35 @@ func (h *Harness) NewAdmin(username string) *Admin {
 func (h *Harness) Verify(username string) {
 	h.T.Helper()
 	h.Exec(`UPDATE users SET email_verified_at = now() WHERE username = $1`, username)
+}
+
+// AddWorkSample puts one entry in the portfolio and publishes it.
+func (h *Harness) AddWorkSample(c *Client, title string) string {
+	h.T.Helper()
+	created := c.POST("/portfolio", map[string]any{
+		"title":             title,
+		"short_description": "Склад, заказы и остатки в одном месте",
+		"description": "Сервис, который заменил работу с остатками в таблицах: приём заказов, " +
+			"сверка поставок со счетами и уведомления о заканчивающемся товаре.",
+		"category_slug":  "api-development",
+		"developer_role": "Бэкенд-разработчик",
+		"technologies":   []string{"go", "postgresql"},
+		"completed_on":   "2025-03-14",
+		"duration_days":  45,
+		// Публикация требует, чтобы было на что посмотреть: ссылка или снимок.
+		"project_url": "https://example.org/warehouse",
+		"demo_status": "live",
+	}).OK(h.T, 201)
+	id := created.String("id")
+	c.POST("/portfolio/"+id+"/publish", map[string]any{"published": true}).OK(h.T, 200)
+	return id
+}
+
+// ApproveProfile is the moderator's decision, applied directly.
+func (h *Harness) ApproveProfile(username string) {
+	h.T.Helper()
+	h.Exec(`UPDATE developer_profiles SET moderation_state = 'approved', is_searchable = true
+	        WHERE user_id = (SELECT id FROM users WHERE username = $1)`, username)
 }
 
 // VerifyIdentity marks the identity check passed, the way a reviewer's

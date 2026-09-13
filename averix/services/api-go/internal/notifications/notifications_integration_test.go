@@ -45,6 +45,9 @@ func TestProposalNotifiesTheClient(t *testing.T) {
 	projectID := h.PublishProject(client, "Telegram bot for a clothing store",
 		"telegram-bots", []string{"python", "telegram-api"}, 50000, 80000)
 	dev := h.PublishDeveloper("botmaker", "telegram-developer", "python", "telegram-api")
+	// Публикация анкеты сама шлёт «заявка на рассмотрении». Уведомление про
+	// другое, а этот тест считает строки без разбора — поэтому его здесь нет.
+	h.Exec(`DELETE FROM notifications WHERE type = 'profile_submitted'`)
 
 	before := client.Client.GET("/notifications/unread").OK(t, http.StatusOK)
 	if before.Float("unread") != 0 {

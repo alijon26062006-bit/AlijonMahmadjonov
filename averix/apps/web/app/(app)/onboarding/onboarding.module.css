@@ -175,3 +175,130 @@
   background: var(--av-warning-subtle);
   color: var(--av-warning-text);
 }
+
+/* Шаги над формой: видно, где человек и сколько осталось. На телефоне
+   подписи скрываются, кружки остаются — четыре слова в строку не влезают. */
+.dots {
+  display: flex;
+  gap: var(--av-space-2);
+  margin: var(--av-space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dot {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--av-text-tertiary);
+  font-size: var(--av-text-xs);
+}
+
+.dot + .dot::before {
+  content: '';
+  width: 12px;
+  height: 1px;
+  background: var(--av-border-subtle);
+}
+
+.dotMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dotNow {
+  color: var(--av-text-primary);
+  font-weight: var(--av-weight-medium);
+}
+
+.dotNow .dotMark {
+  border-color: var(--av-text-primary);
+}
+
+.dotDone .dotMark {
+  border-color: var(--av-success-border, var(--av-border-subtle));
+  color: var(--av-success-text, var(--av-text-primary));
+}
+
+@media (max-width: 560px) {
+  .dotLabel {
+    display: none;
+  }
+}
+
+/* Работы, добавленные на третьем шаге. */
+.works {
+  display: grid;
+  gap: var(--av-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.work {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--av-space-3) var(--av-space-4);
+  border: 1px solid var(--av-border-subtle);
+  border-radius: var(--av-radius-md);
+  background: var(--av-surface);
+}
+
+/* Сводка перед отправкой. */
+.summary {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: var(--av-radius-lg);
+  overflow: hidden;
+}
+
+.summaryRow {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: var(--av-space-3);
+  padding: var(--av-space-3) var(--av-space-4);
+  border-bottom: 1px solid var(--av-border-subtle);
+  font-size: var(--av-text-sm);
+}
+
+.summaryRow:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 560px) {
+  .summaryRow {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+.summaryLabel {
+  color: var(--av-text-tertiary);
+  font-size: var(--av-text-xs);
+}
+
+.summaryValue {
+  word-break: break-word;
+}
+
+/* Подзаголовок раздела внутри шага. */
+.sectionTitle {
+  margin: 0;
+  font-size: var(--av-text-sm);
+  font-weight: var(--av-weight-bold);
+  color: var(--av-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sectionTitle:not(:first-child) {
+  margin-top: var(--av-space-4);
+}

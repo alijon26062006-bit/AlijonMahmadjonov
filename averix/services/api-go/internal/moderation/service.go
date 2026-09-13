@@ -16,6 +16,7 @@ import (
 // Notifier tells an owner their content was hidden or that they were warned.
 type Notifier interface {
 	AccountWarning(ctx context.Context, userID uuid.UUID, reason string)
+	ProfileApproved(ctx context.Context, userID uuid.UUID)
 }
 
 type Service struct {
@@ -120,6 +121,13 @@ func (s *Service) Decide(ctx context.Context, id *security.Identity, itemID uuid
 	}
 	s.audit.RecordRequest(ctx, audit.Entry{Action: action, SubjectType: item.SubjectType,
 		SubjectID: &item.SubjectID, Detail: note})
+
+	// An approved profile is the freelancer's application answered: they have
+	// been waiting on it, and nothing else tells them.
+	if in.Outcome == "approve" && s.notifier != nil &&
+		item.SubjectType == SubjectDeveloperProfile && item.SubjectID != uuid.Nil {
+		s.notifier.ProfileApproved(context.WithoutCancel(ctx), item.SubjectID)
+	}
 
 	if in.Outcome == "reject" && s.notifier != nil && item.Preview.OwnerID != uuid.Nil {
 		msg := "Ваш контент «" + item.Preview.Title + "» скрыт модерацией. Причина: " + note

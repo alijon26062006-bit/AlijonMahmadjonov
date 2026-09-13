@@ -256,6 +256,23 @@ func (s *Service) AccountSuspended(ctx context.Context, userID uuid.UUID, reason
 	})
 }
 
+// ProfileSubmitted подтверждает исполнителю, что заявка ушла: экран об этом
+// говорит, но человек мог его закрыть, а уведомление остаётся.
+func (s *Service) ProfileSubmitted(ctx context.Context, userID uuid.UUID) {
+	s.Notify(ctx, Input{UserID: userID, Type: TypeProfileSubmitted,
+		Title: "Заявка на рассмотрении",
+		Body:  "Мы получили вашу анкету и работы. Обычно решение занимает день; вы получите уведомление.",
+		Href:  "/onboarding"})
+}
+
+// ProfileApproved — то, ради чего всё это: анкета в каталоге.
+func (s *Service) ProfileApproved(ctx context.Context, userID uuid.UUID) {
+	s.Notify(ctx, Input{UserID: userID, Type: TypeProfileApproved, Priority: "high",
+		Title: "Анкета одобрена",
+		Body:  "Ваш профиль опубликован в каталоге, и подходящие заказы начнут приходить в ленту.",
+		Href:  "/feed"})
+}
+
 func (s *Service) AccountWarning(ctx context.Context, userID uuid.UUID, reason string) {
 	s.Notify(ctx, Input{UserID: userID, Type: TypeAccountWarning, Priority: "high",
 		Title: "Предупреждение от модерации", Body: reason, Href: "/settings"})

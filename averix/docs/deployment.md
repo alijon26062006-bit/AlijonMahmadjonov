@@ -209,6 +209,17 @@ ever purged.
 Full details, and what is deliberately impossible, in
 [identity-verification.md](identity-verification.md).
 
+## 5b2. Freelancer applications wait for you
+
+A freelancer fills in a short form — three steps — adds at least one piece of
+work, and presses **Отправить заявку**. That does not publish anything: the
+profile goes to **Модерация** with the state `pending` and stays out of the
+catalogue until somebody approves it there. The freelancer sees «Заявка на
+рассмотрении» and gets a notification when it is decided.
+
+If nobody watches that queue, nobody gets published. Approving is one click in
+**Панель → Модерация**.
+
 ## 5c. Starting over with no accounts
 
 After testing with your own registrations, to open the site with nothing on it:

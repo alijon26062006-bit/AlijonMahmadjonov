@@ -243,6 +243,10 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	// The identity rule, in one place and handed to the three modules where
 	// money starts moving: a proposal, a service, a hire. Nothing else in the
 	// product asks about verification, and the client side never does.
+	// A finished profile goes to a person before it goes into the catalogue.
+	a.Developers.AttachReview(moderator)
+	a.Developers.AttachNotifier(notifier)
+
 	identityGate := identity.NewGate(db, settingsStore)
 	a.Proposals.AttachIdentityGate(identityGate)
 	a.Services.AttachIdentityGate(identityGate)

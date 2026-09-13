@@ -10,7 +10,7 @@
 //   AVERIX_SMOKE_URL=http://localhost:3000 node scripts/smoke-services.mjs
 //
 // Подтверждение почты, публикация анкеты и выдача роли администратора идут
-// напрямую в базу: письма в разработке не уходят, а девять шагов анкеты уже
+// напрямую в базу: письма в разработке не уходят, а шаги анкеты уже
 // проверены в scripts/smoke.mjs и повторять их здесь нечего.
 
 import { chromium } from 'playwright';
@@ -74,7 +74,9 @@ async function login(who) {
 // Исполнитель публикует услугу. Каталог показывает услуги только от
 // опубликованной анкеты, поэтому сначала анкета — как и в жизни.
 await register(dev, 'developer');
-sql(`UPDATE developer_profiles SET is_searchable = true, onboarding_completed_at = now() WHERE user_id = (SELECT id FROM users WHERE email = '${dev.email}')`);
+// Анкета заполнена, отправлена и одобрена — этот сценарий про услуги, а весь
+// путь заявки проверяет smoke-application.mjs.
+sql(`UPDATE developer_profiles SET is_searchable = true, onboarding_completed_at = now(), moderation_state = 'approved' WHERE user_id = (SELECT id FROM users WHERE email = '${dev.email}')`);
 await page.goto(`${BASE}/services/new`, { waitUntil: 'networkidle' });
 await page.waitForSelector('text=Направление', { timeout: 15000 });
 await page.getByRole('button', { name: 'Аудио и видео' }).first().click();

@@ -42,6 +42,8 @@ const (
 	TypeContractCancelled   = "contract_cancelled"
 	TypeDisputeOpened       = "dispute_opened"
 	TypeDisputeResolved     = "dispute_resolved"
+	TypeProfileSubmitted    = "profile_submitted"
+	TypeProfileApproved     = "profile_approved"
 	TypeAccountVerified     = "account_verified"
 	TypeAccountWarning      = "account_warning"
 	TypeAccountSuspended    = "account_suspended"
@@ -173,6 +175,8 @@ var catalogue = map[string]typeInfo{
 	TypeContractCancelled:   {Group: "contracts", Label: "Контракт отменён", Email: true, Push: true, InAppLocked: true},
 	TypeDisputeOpened:       {Group: "contracts", Label: "Открыт спор", Email: true, Push: true, InAppLocked: true},
 	TypeDisputeResolved:     {Group: "contracts", Label: "Спор решён", Email: true, Push: true, InAppLocked: true},
+	TypeProfileSubmitted:    {Group: "account", Label: "Заявка отправлена на рассмотрение", Email: true, Push: false, InAppLocked: true},
+	TypeProfileApproved:     {Group: "account", Label: "Анкета одобрена", Email: true, Push: true, InAppLocked: true},
 	TypeAccountVerified:     {Group: "account", Label: "Аккаунт подтверждён", Email: true, Push: false, InAppLocked: true},
 	TypeAccountWarning:      {Group: "account", Label: "Предупреждение по аккаунту", Email: true, Push: true, InAppLocked: true},
 	TypeAccountSuspended:    {Group: "account", Label: "Аккаунт заблокирован", Email: true, Push: false, InAppLocked: true},

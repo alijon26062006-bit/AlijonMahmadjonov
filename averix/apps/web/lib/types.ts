@@ -780,6 +780,10 @@ export type Onboarding = {
   completed: boolean;
   completed_at?: string;
   completeness: number;
+  /** Где заявка: «draft» — заполняется, «review» — у администратора, «approved», «rejected». */
+  status?: 'draft' | 'review' | 'approved' | 'rejected';
+  /** Работы в портфолио плюс сделки, завершённые через AVERIX. */
+  work_samples?: number;
   missing?: { key: string; label: string; weight?: number }[];
 };
 

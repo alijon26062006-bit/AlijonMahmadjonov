@@ -14,6 +14,7 @@ import (
 	"github.com/averix/api/internal/platform/cryptox"
 	"github.com/averix/api/internal/platform/database"
 	"github.com/averix/api/internal/platform/money"
+	"github.com/averix/api/internal/platform/validate"
 )
 
 type Store struct {
@@ -844,23 +845,14 @@ func formatRange(minor int64, currency string) string {
 	return money.Band(minor, currency)
 }
 
-func slugify(input string) string {
-	var b strings.Builder
-	lastDash := true
-	for _, r := range strings.ToLower(input) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
-			b.WriteRune(r)
-			lastDash = false
-		default:
-			if !lastDash {
-				b.WriteByte('-')
-				lastDash = true
-			}
-		}
-	}
-	return strings.Trim(b.String(), "-")
-}
+// slugify makes the URL a portfolio item lives at.
+//
+// It transliterates rather than drops: this marketplace is Russian, and a
+// title like «Обмен с 1С для оптовой базы» used to come out as "1" — one
+// character, from the digit, because everything else was thrown away. The
+// shared implementation already knows the alphabet, so this uses it instead of
+// keeping a second, worse copy.
+func slugify(input string) string { return validate.Slugify(input) }
 
 func nullIfBlank(s string) any {
 	if strings.TrimSpace(s) == "" {

@@ -51,11 +51,12 @@ func TestPortfolioLifecycle(t *testing.T) {
 		t.Error("a new item must start as a draft")
 	}
 
-	// A draft is invisible to a visitor, including its very existence.
+	// A draft is invisible to a visitor, including its very existence. The one
+	// item a visitor does see is the work sample every application needs.
 	anon := h.Client()
 	list := anon.GET("/developers/alidev/portfolio").OK(t, http.StatusOK)
-	if len(list.List) != 0 {
-		t.Errorf("a visitor sees %d unpublished items, want 0", len(list.List))
+	if len(list.List) != 1 {
+		t.Errorf("a visitor sees %d items, want only the published work sample", len(list.List))
 	}
 	anon.GET("/developers/alidev/portfolio/warehouse-stock-api").
 		Fails(t, http.StatusNotFound, "not_found")
@@ -73,12 +74,20 @@ func TestPortfolioLifecycle(t *testing.T) {
 	c.POST("/portfolio/"+projectID+"/publish", map[string]any{"published": true}).
 		OK(t, http.StatusOK)
 
-	// Now the visitor sees a card with a cover.
+	// Now the visitor sees this one too, with a cover.
 	list = anon.GET("/developers/alidev/portfolio").OK(t, http.StatusOK)
-	if len(list.List) != 1 {
-		t.Fatalf("a visitor sees %d published items, want 1", len(list.List))
+	if len(list.List) != 2 {
+		t.Fatalf("a visitor sees %d published items, want 2", len(list.List))
 	}
-	card, _ := list.List[0].(map[string]any)
+	var card map[string]any
+	for _, raw := range list.List {
+		if row, ok := raw.(map[string]any); ok && row["slug"] == "warehouse-stock-api" {
+			card = row
+		}
+	}
+	if card == nil {
+		t.Fatalf("опубликованной работы нет в списке: %s", list.Raw)
+	}
 	if card["cover"] == nil {
 		t.Error("a published card with a screenshot must carry a cover")
 	}

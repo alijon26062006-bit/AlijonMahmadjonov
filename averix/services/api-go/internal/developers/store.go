@@ -461,6 +461,49 @@ func (s *Store) CompleteOnboarding(ctx context.Context, userID uuid.UUID, comple
 	return nil
 }
 
+// WorkSamples counts what a freelancer can show a client: entries they added
+// to their portfolio, and work finished through AVERIX, which the platform
+// vouches for itself.
+//
+// One of these is required before the application is sent. A profile without a
+// single piece of work asks a client to take a stranger's word for it, and
+// that is the thing this marketplace exists not to do.
+func (s *Store) WorkSamples(ctx context.Context, userID uuid.UUID) (int, error) {
+	var n int
+	err := s.db.QueryRow(ctx, `
+		SELECT (SELECT count(*) FROM portfolio_projects p
+		         -- Опубликованные: черновик, который никто не видит, заказчику
+		         -- ничего не показывает.
+		         WHERE p.developer_id = $1 AND p.is_published
+		           AND p.moderation_state <> 'rejected')
+		     + (SELECT count(*) FROM completed_project_history h
+		         WHERE h.developer_id = $1)`, userID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("count work samples: %w", err)
+	}
+	return n, nil
+}
+
+// SubmitForReview is what the last step of the form does: the profile is
+// complete, it goes to a person, and until that person says yes it is not in
+// the catalogue.
+func (s *Store) SubmitForReview(ctx context.Context, userID uuid.UUID, completeness int) error {
+	_, err := s.db.Exec(ctx, `
+		UPDATE developer_profiles SET
+		  onboarding_step         = $3,
+		  onboarding_completed_at = coalesce(onboarding_completed_at, now()),
+		  profile_completeness    = $2,
+		  moderation_state        = 'pending',
+		  -- Not in the catalogue yet. Appearing there is what approval grants.
+		  is_searchable           = false,
+		  updated_at              = now()
+		WHERE user_id = $1`, userID, completeness, TotalOnboardingSteps)
+	if err != nil {
+		return fmt.Errorf("submit profile for review: %w", err)
+	}
+	return nil
+}
+
 func (s *Store) SaveCompleteness(ctx context.Context, userID uuid.UUID, completeness int) error {
 	_, err := s.db.Exec(ctx,
 		`UPDATE developer_profiles SET profile_completeness = $2 WHERE user_id = $1`,
