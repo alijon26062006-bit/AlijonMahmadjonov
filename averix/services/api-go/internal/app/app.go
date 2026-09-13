@@ -35,6 +35,7 @@ import (
 	"github.com/averix/api/internal/preview"
 	"github.com/averix/api/internal/projects"
 	"github.com/averix/api/internal/proposals"
+	"github.com/averix/api/internal/reviews"
 	"github.com/averix/api/internal/security"
 	"github.com/averix/api/internal/settings"
 	"github.com/averix/api/internal/taxonomy"
@@ -71,6 +72,7 @@ type App struct {
 	GitHub      *githubint.Service
 	Notifier    *notifications.Service
 	Mailer      *notifications.Mailer
+	Reviews     *reviews.Service
 
 	redisStartupError error
 }
@@ -189,6 +191,12 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		recorder, settingsStore, notifier)
 	a.Contracts.AttachFunder(a.Payments)
 	a.Payments.SyncProviders(ctx)
+
+	// Reviews need contracts to say who is a party; contracts need to tell
+	// reviews when a contract finishes. Same shape as the funder.
+	a.Reviews = reviews.NewService(reviews.NewStore(db, store.PublicURL), a.Contracts,
+		settingsStore, notifier, recorder)
+	a.Contracts.AttachCompletion(a.Reviews)
 
 	a.redisStartupError = redisErr
 	return a, nil
@@ -323,6 +331,12 @@ func (a *App) Handler() http.Handler {
 			// tightest allowance in the product.
 			RateLimitProbe: a.AuthMW.RateLimit("portfolio_probe", 20, time.Hour),
 		})
+
+	reviews.NewHandlers(a.Reviews).Register(v1, reviews.Middleware{
+		Require:    a.AuthMW.Require(),
+		CSRF:       a.AuthMW.CSRF(),
+		RequireDev: a.AuthMW.RequireRole(security.RoleDeveloper),
+	})
 
 	notifications.NewHandlers(a.Notifier, a.Cfg.Push.Configured(), a.Cfg.Push.VAPIDPublicKey).
 		Register(v1, notifications.Middleware{

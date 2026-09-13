@@ -120,6 +120,10 @@ func run() error {
 	// not become a mail-server problem.
 	w.Schedule("deliver-notifications", 30*time.Second, application.Notifier.DeliverPending)
 
+	// A review the other side never answered is published once the window
+	// closes: silence must not veto it.
+	w.Schedule("publish-expired-reviews", time.Hour, application.Reviews.PublishExpired)
+
 	// Jobs whose worker died mid-run.
 	w.Schedule("release-stalled-jobs", 5*time.Minute, w.ReleaseStale)
 

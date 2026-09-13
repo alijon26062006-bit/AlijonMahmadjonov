@@ -223,6 +223,14 @@ func (s *Service) GitHubAnalysisFailed(ctx context.Context, userID uuid.UUID, re
 
 // reviews
 
+func (s *Service) ContractCompleted(ctx context.Context, userID, contractID uuid.UUID) {
+	title := s.store.contractTitle(ctx, contractID)
+	s.Notify(ctx, Input{UserID: userID, Type: TypeContractCompleted, Priority: "high", ContractID: &contractID,
+		Title: "Контракт завершён: «" + title + "»",
+		Body:  "Все этапы приняты и оплачены. Оставьте отзыв о второй стороне — окно открыто 14 дней, и отзывы публикуются одновременно.",
+		Href:  "/contracts/" + contractID.String() + "#review"})
+}
+
 func (s *Service) ReviewReceived(ctx context.Context, subjectID, authorID, contractID uuid.UUID) {
 	author := s.store.userName(ctx, authorID)
 	s.Notify(ctx, Input{UserID: subjectID, Type: TypeReviewReceived, ActorID: &authorID, ContractID: &contractID,

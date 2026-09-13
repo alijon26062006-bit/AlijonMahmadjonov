@@ -76,6 +76,13 @@ type Notifier interface {
 	ContractSigned(ctx context.Context, contractID, developerID uuid.UUID)
 }
 
+// Completion is told when a contract finishes, so the verified history and
+// the review window can begin. Kept as an interface: contracts does not know
+// what a review is, only that finishing is the moment one becomes possible.
+type Completion interface {
+	ContractCompleted(ctx context.Context, contractID uuid.UUID)
+}
+
 // SystemMessenger writes the milestone events into the workspace thread, so
 // the conversation is a complete record without duplicating state.
 type SystemMessenger interface {
@@ -84,16 +91,17 @@ type SystemMessenger interface {
 }
 
 type Service struct {
-	store     *Store
-	proposals Proposals
-	projects  Projects
-	files     *files.Store
-	audit     *audit.Recorder
-	settings  Settings
-	funder    Funder
-	notifier  Notifier
-	messenger SystemMessenger
-	urlOpts   urlguard.Options
+	store      *Store
+	completion Completion
+	proposals  Proposals
+	projects   Projects
+	files      *files.Store
+	audit      *audit.Recorder
+	settings   Settings
+	funder     Funder
+	notifier   Notifier
+	messenger  SystemMessenger
+	urlOpts    urlguard.Options
 }
 
 func NewService(store *Store, proposals Proposals, projects Projects, fileStore *files.Store,
@@ -733,7 +741,15 @@ func (s *Service) settle(ctx context.Context, contractID uuid.UUID) {
 			logWarn(ctx, "contracts: could not complete the project", err)
 		}
 	}
+	if s.completion != nil {
+		s.completion.ContractCompleted(context.WithoutCancel(ctx), contractID)
+	}
 }
+
+// AttachCompletion registers the module that records finished contracts.
+// Attached after construction for the same reason the funder is: reviews
+// need contracts, and contracts need to tell reviews when to begin.
+func (s *Service) AttachCompletion(c Completion) { s.completion = c }
 
 // MarkFunded records that a payment for a milestone settled.
 //
