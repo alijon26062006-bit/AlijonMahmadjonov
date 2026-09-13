@@ -157,6 +157,26 @@ fi
 
 secret() { openssl rand -hex 32; }
 
+set_env_var() {      # $1 = key, $2 = value
+  AVERIX_SET_KEY="$1" AVERIX_SET_VALUE="$2" python3 - <<'PYEOF'
+import os
+
+key, value = os.environ['AVERIX_SET_KEY'], os.environ['AVERIX_SET_VALUE']
+with open('.env') as handle:
+    lines = handle.read().splitlines()
+
+for index, line in enumerate(lines):
+    if line.split('=', 1)[0].strip() == key:
+        lines[index] = f'{key}={value}'
+        break
+else:
+    lines.append(f'{key}={value}')
+
+with open('.env', 'w') as handle:
+    handle.write('\n'.join(lines) + '\n')
+PYEOF
+}
+
 if [ "$MODE" = "production" ]; then
   if [ ! -f .env ]; then
     bold "Writing .env"
@@ -201,6 +221,43 @@ PY
   else
     ok ".env already exists — keeping it, including its secrets"
     DOMAIN="$(grep -E '^AVERIX_DOMAIN=' .env | cut -d= -f2- || echo "$DOMAIN")"
+  fi
+
+  # ── 2b. The staff chat ────────────────────────────────────────────────────
+  #
+  # Optional, and asked for rather than left in the file for somebody to find:
+  # an operator who does not know the integration exists never sets it up. One
+  # question, skippable with Enter, and only when nobody has answered it yet.
+  #
+  # What it turns on: a line and a link in your chat when somebody sends
+  # documents for verification. Never the documents themselves — that is not a
+  # setting, it is the way the code is built (see internal/telegram).
+  if [ -t 0 ] && ! grep -qE '^TELEGRAM_BOT_TOKEN=.+' .env 2>/dev/null; then
+    echo
+    bold "Staff chat in Telegram (optional — press Enter to skip)"
+    echo "  Sends one line and a link when a verification arrives. Documents are"
+    echo "  never sent to a chat: a passport in a message history cannot be deleted"
+    echo "  by this platform when its retention date arrives."
+    echo
+    echo "  Token: create a bot in Telegram with @BotFather."
+    echo "  Chat:  add the bot to your staff chat, write anything there, then open"
+    echo "         https://api.telegram.org/bot<TOKEN>/getUpdates and copy \"chat\":{\"id\":…"
+    echo
+    printf '  Bot token: '
+    read -r TELEGRAM_TOKEN_INPUT || TELEGRAM_TOKEN_INPUT=""
+    if [ -n "$TELEGRAM_TOKEN_INPUT" ]; then
+      printf '  Chat id (a number, often negative): '
+      read -r TELEGRAM_CHAT_INPUT || TELEGRAM_CHAT_INPUT=""
+      if [ -n "$TELEGRAM_CHAT_INPUT" ]; then
+        set_env_var TELEGRAM_BOT_TOKEN "$TELEGRAM_TOKEN_INPUT"
+        set_env_var TELEGRAM_CHAT_ID "$TELEGRAM_CHAT_INPUT"
+        ok "Staff chat configured. The token is in .env and is never printed anywhere."
+      else
+        warn "No chat id — leaving the staff chat off. Add both values to .env later."
+      fi
+    else
+      ok "Skipped. The admin panel will show the staff chat as not set up."
+    fi
   fi
 
   # ── 3. DNS ────────────────────────────────────────────────────────────────
@@ -288,25 +345,6 @@ pick_host_port() {   # $1 = variable name in .env, $2 = first port to try
   printf '%s' "$2"
 }
 
-set_env_var() {      # $1 = key, $2 = value
-  AVERIX_SET_KEY="$1" AVERIX_SET_VALUE="$2" python3 - <<'PYEOF'
-import os
-
-key, value = os.environ['AVERIX_SET_KEY'], os.environ['AVERIX_SET_VALUE']
-with open('.env') as handle:
-    lines = handle.read().splitlines()
-
-for index, line in enumerate(lines):
-    if line.split('=', 1)[0].strip() == key:
-        lines[index] = f'{key}={value}'
-        break
-else:
-    lines.append(f'{key}={value}')
-
-with open('.env', 'w') as handle:
-    handle.write('\n'.join(lines) + '\n')
-PYEOF
-}
 
 WEB_HOST_PORT=3000
 API_HOST_PORT=8080
@@ -660,6 +698,10 @@ echo "       $COMPOSE_SHOW exec api averixctl create-admin --email you@$DOMAIN"
 echo "  2. In the admin panel, open Payments and enter the transfer details."
 echo "     Until they are there, nobody can fund a milestone — the site says so"
 echo "     plainly rather than pretending a payment went through."
+echo "  2b. To review identity documents, grant yourself the two permissions:"
+echo "     Users → your account → Именные разрешения. No role carries them, and"
+echo "     revoking one takes effect on that person's next request. Every view is"
+echo "     logged, and the images are deleted 180 days after the decision."
 if ! grep -qE '^SMTP_HOST=.+' .env 2>/dev/null; then
   echo
   warn "Email is not configured — this blocks real users."
