@@ -1,9 +1,11 @@
-# Public pages are meant to be found: a developer's profile and an open
-# project are how someone arrives here from a search.
+# Public pages are meant to be found: a freelancer's profile, a service and an
+# open project are how someone arrives here from a search.
 User-agent: *
 Allow: /$
 Allow: /developers/
 Allow: /projects/
+Allow: /freelancers
+Allow: /services
 
 # Everything behind a session is nobody's search result.
 Disallow: /dashboard
@@ -13,6 +15,8 @@ Disallow: /earnings
 Disallow: /admin
 Disallow: /settings
 Disallow: /onboarding
+Disallow: /proposals
+Disallow: /notifications
 Disallow: /api/
 
 Sitemap: https://averix.dev/sitemap.xml
