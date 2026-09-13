@@ -44,3 +44,6 @@ apps/web/AGENTS.md
 apps/web/CLAUDE.md
 apps/web/.next/
 apps/web/node_modules/
+
+# Redis writes this where it is started; it is never part of the source.
+dump.rdb
