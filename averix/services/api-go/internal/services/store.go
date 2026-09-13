@@ -368,12 +368,13 @@ func (s *Store) Catalogue(ctx context.Context, q Query) ([]Card, int, error) {
 		where = append(where, fmt.Sprintf(
 			`c.path LIKE (SELECT path || '%%' FROM categories WHERE slug = %s)`, arg(q.CategorySlug)))
 	}
+	textArg := ""
 	if q.Text != "" {
-		p := arg(q.Text)
+		textArg = arg(q.Text)
 		where = append(where, fmt.Sprintf(
 			`(s.search_doc @@ websearch_to_tsquery('russian', %s)
 			  OR s.search_doc @@ websearch_to_tsquery('simple', %s)
-			  OR s.title ILIKE '%%' || %s || '%%')`, p, p, p))
+			  OR s.title ILIKE '%%' || %s || '%%')`, textArg, textArg, textArg))
 	}
 	if q.MinMinor != nil {
 		where = append(where, "s.from_minor >= "+arg(*q.MinMinor))
@@ -399,9 +400,11 @@ func (s *Store) Catalogue(ctx context.Context, q Query) ([]Card, int, error) {
 	case "popular":
 		order = "s.orders_count DESC, s.rating_avg DESC NULLS LAST, s.created_at DESC"
 	case "relevance":
-		if q.Text != "" {
+		// Reuses the text placeholder: the count query below runs with the
+		// same argument list and must reference every placeholder in it.
+		if textArg != "" {
 			order = fmt.Sprintf("ts_rank(s.search_doc, websearch_to_tsquery('russian', %s)) DESC, s.orders_count DESC",
-				arg(q.Text))
+				textArg)
 		}
 	}
 

@@ -36,6 +36,7 @@ import (
 	"github.com/averix/api/internal/projects"
 	"github.com/averix/api/internal/proposals"
 	"github.com/averix/api/internal/reviews"
+	"github.com/averix/api/internal/search"
 	"github.com/averix/api/internal/security"
 	"github.com/averix/api/internal/services"
 	"github.com/averix/api/internal/settings"
@@ -75,6 +76,7 @@ type App struct {
 	Mailer      *notifications.Mailer
 	Reviews     *reviews.Service
 	Services    *services.Svc
+	Search      *search.Service
 
 	redisStartupError error
 }
@@ -204,6 +206,7 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	// contracts. Moderation arrives with its module; nil until then.
 	a.Services = services.NewSvc(services.NewStore(db, store.PublicURL), taxonomyStore,
 		a.Contracts, projectStore, settingsStore, nil, recorder)
+	a.Search = search.NewService(search.NewStore(db, store.PublicURL), a.Services.Store(), recorder)
 
 	a.redisStartupError = redisErr
 	return a, nil
@@ -347,6 +350,16 @@ func (a *App) Handler() http.Handler {
 		VerifiedEmail: a.AuthMW.RequireVerifiedEmail(),
 		// An order creates a contract; the same allowance as hiring.
 		RateLimitOrder: a.AuthMW.RateLimitOnSuccess("service_order", 20, time.Hour),
+	})
+
+	search.NewHandlers(a.Search).Register(v1, search.Middleware{
+		Require:       a.AuthMW.Require(),
+		CSRF:          a.AuthMW.CSRF(),
+		RequireClient: a.AuthMW.RequireRole(security.RoleClient),
+		RequireDev:    a.AuthMW.RequireRole(security.RoleDeveloper),
+		// Public catalogues are the cheapest thing to scrape; the general
+		// anonymous allowance still applies on top.
+		RateLimit: a.AuthMW.RateLimit("catalogue", 120, time.Minute),
 	})
 
 	reviews.NewHandlers(a.Reviews).Register(v1, reviews.Middleware{
