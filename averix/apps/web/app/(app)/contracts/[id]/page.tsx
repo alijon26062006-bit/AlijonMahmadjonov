@@ -17,7 +17,7 @@ import { FundSheet } from '@/components/domain/FundSheet';
 import { ReviewPanel } from '@/components/domain/ReviewPanel';
 import { IconAlert, IconMessage, IconShield } from '@/components/ui/Icon';
 import { ApiFailure, get, post } from '@/lib/api';
-import { money, shortDate } from '@/lib/format';
+import { days, money, shortDate, timeAgo } from '@/lib/format';
 import type { Contract, Milestone } from '@/lib/types';
 
 type Action = { milestone: Milestone; kind: 'submit' | 'revision' | 'dispute' };
@@ -28,6 +28,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [failed, setFailed] = useState(false);
   const [funding, setFunding] = useState<Milestone | null>(null);
   const [action, setAction] = useState<Action | null>(null);
+  const [answering, setAnswering] = useState(false);
+  const [declineReason, setDeclineReason] = useState('');
+  const [answerError, setAnswerError] = useState('');
 
   const load = useCallback(async () => {
     setFailed(false);
@@ -105,14 +108,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 </span>
               </div>
               <div>
+                {/* Заказчику показывать «Комиссия 0 ₽» бессмысленно: при
+                    нулевой ставке он видит, что платит ровно сумму сделки. */}
                 <span className={styles.moneyLabel}>
-                  {contract.my_role === 'developer' ? 'Вы получите' : 'Комиссия платформы'}
+                  {contract.my_role === 'developer'
+                    ? 'Вы получите'
+                    : contract.fee_minor
+                      ? 'Комиссия платформы'
+                      : 'Комиссия'}
                 </span>
                 <span className={styles.moneyValue}>
-                  {money(
-                    contract.my_role === 'developer' ? contract.payout_minor : contract.fee_minor,
-                    contract.currency,
-                  )}
+                  {contract.my_role === 'developer'
+                    ? money(contract.payout_minor, contract.currency)
+                    : contract.fee_minor
+                      ? money(contract.fee_minor, contract.currency)
+                      : 'нет'}
                 </span>
               </div>
               <div>
@@ -129,6 +139,103 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </p>
           )}
         </Card>
+
+        {/* Заказ услуги, на который исполнитель ещё не ответил. Обе стороны
+            видят одно и то же: срок и что будет, когда он выйдет. */}
+        {contract.awaiting_confirmation ? (
+          <Card className={styles.awaiting}>
+            <div className="av-stack-sm">
+              <p className="av-strong">
+                {contract.my_role === 'developer'
+                  ? 'Новый заказ ждёт вашего ответа'
+                  : 'Заказ ждёт ответа исполнителя'}
+              </p>
+              <p className="av-small av-muted">
+                {contract.confirm_deadline
+                  ? `Ответ нужен до ${shortDate(contract.confirm_deadline)}, ${new Date(
+                      contract.confirm_deadline,
+                    ).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}. `
+                  : ''}
+                {contract.my_role === 'developer'
+                  ? 'Если не ответить, заказ отменится сам, а частые пропуски снижают уровень.'
+                  : 'Если исполнитель не ответит, заказ отменится сам и деньги не спишутся.'}
+              </p>
+              {answerError ? (
+                <p className="av-small" role="alert" style={{ color: 'var(--av-danger)' }}>
+                  {answerError}
+                </p>
+              ) : null}
+              {contract.can?.confirm_order ? (
+                <div className="av-row av-wrap">
+                  <Button
+                    loading={answering}
+                    onClick={async () => {
+                      setAnswering(true);
+                      setAnswerError('');
+                      try {
+                        await post(`/contracts/${contract.id}/confirm`);
+                        void load();
+                      } catch (error) {
+                        setAnswerError(
+                          error instanceof ApiFailure ? error.message : 'Не получилось. Попробуйте ещё раз.',
+                        );
+                      } finally {
+                        setAnswering(false);
+                      }
+                    }}
+                  >
+                    Принять заказ
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    loading={answering}
+                    onClick={async () => {
+                      const reason = window.prompt(
+                        'Почему отказываетесь? Заказчик увидит эту причину — так честнее, чем молчание.',
+                        declineReason,
+                      );
+                      if (reason === null) return;
+                      setDeclineReason(reason);
+                      setAnswering(true);
+                      setAnswerError('');
+                      try {
+                        await post(`/contracts/${contract.id}/decline`, { reason: reason.trim() });
+                        void load();
+                      } catch (error) {
+                        setAnswerError(
+                          error instanceof ApiFailure ? error.message : 'Не получилось. Попробуйте ещё раз.',
+                        );
+                      } finally {
+                        setAnswering(false);
+                      }
+                    }}
+                  >
+                    Отказаться
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          </Card>
+        ) : null}
+
+        {contract.options?.length ? (
+          <Card>
+            <h2 className={styles.sectionTitle}>Что докупили к пакету</h2>
+            <ul className={styles.options}>
+              {contract.options.map((option) => (
+                <li key={option.name}>
+                  <span>
+                    {option.name}
+                    {option.extra_days ? (
+                      <span className="av-small av-muted"> · +{days(option.extra_days)}</span>
+                    ) : null}
+                  </span>
+                  <strong>{option.price_display ?? money(option.price_minor, contract.currency)}</strong>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
 
         <div className={styles.people}>
           <div className={styles.person}>

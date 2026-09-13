@@ -39,6 +39,7 @@ type Review interface {
 // a deployment without notifications still submits.
 type Applicant interface {
 	ProfileSubmitted(ctx context.Context, userID uuid.UUID)
+	SellerLevelChanged(ctx context.Context, userID uuid.UUID, from, to string)
 }
 
 // AttachReview is optional. Without it a submitted profile still leaves the
@@ -48,6 +49,47 @@ func (s *Service) AttachReview(r Review) { s.review = r }
 
 // AttachNotifier is optional, like the queue itself.
 func (s *Service) AttachNotifier(n Applicant) { s.notifier = n }
+
+// ── Уровень исполнителя ─────────────────────────────────────────────────────
+
+// LevelLabel is the Russian name of a level, for anything that shows one.
+func LevelLabel(level string) string {
+	switch level {
+	case "professional":
+		return "Профессионал"
+	case "advanced":
+		return "Продвинутый"
+	default:
+		return "Новичок"
+	}
+}
+
+// RefreshSellerLevels recomputes everyone's level and tells the people whose
+// level moved. Run by the worker; safe to run at any time.
+//
+// The notification goes out in both directions. Being told you have gone up is
+// the point of a level at all; being told you have gone down — and why it is
+// possible to go down — is what keeps the badge worth something.
+func (s *Service) RefreshSellerLevels(ctx context.Context) (string, error) {
+	changes, err := s.store.RefreshSellerLevels(ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(changes) == 0 {
+		return "", nil
+	}
+	if s.notifier != nil {
+		for _, change := range changes {
+			s.notifier.SellerLevelChanged(ctx, change.UserID, change.From, change.To)
+		}
+	}
+	return fmt.Sprintf("%d level(s) changed", len(changes)), nil
+}
+
+// SellerLevel reads one freelancer's level.
+func (s *Service) SellerLevel(ctx context.Context, userID uuid.UUID) (string, error) {
+	return s.store.SellerLevel(ctx, userID)
+}
 
 // Me returns the caller's own profile, including the private figures.
 func (s *Service) Me(ctx context.Context, id *security.Identity) (*Profile, error) {
@@ -162,7 +204,17 @@ func toPublic(p *Profile) *PublicProfile {
 		out.Location = formatLocation(p.City, p.CountryCode)
 	}
 	out.Badges = badgesFor(p)
+	out.SellerLevel = defaultLevel(p.SellerLevel)
 	return out
+}
+
+// defaultLevel keeps the field a value rather than an empty string for a
+// profile written before levels existed.
+func defaultLevel(level string) string {
+	if level == "" {
+		return "new"
+	}
+	return level
 }
 
 func formatLocation(city, country string) string {
@@ -192,6 +244,13 @@ func badgesFor(p *Profile) []Badge {
 	if p.Reputation.ResponseTimeSeconds != nil && *p.Reputation.ResponseTimeSeconds <= 3600 &&
 		p.Reputation.RatingCount >= 3 {
 		badges = append(badges, Badge{Kind: "fast_responder", Label: "Быстро отвечает"})
+	}
+	// Уровень показывается только там, где он что-то значит: «Новичок» —
+	// это отсутствие истории, а не достижение, и вешать его ярлыком на
+	// человека незачем.
+	if p.SellerLevel == "advanced" || p.SellerLevel == "professional" {
+		badges = append(badges, Badge{Kind: "seller_level_" + p.SellerLevel,
+			Label: LevelLabel(p.SellerLevel)})
 	}
 	if p.IsFeatured {
 		badges = append(badges, Badge{Kind: "featured", Label: "Рекомендуем"})

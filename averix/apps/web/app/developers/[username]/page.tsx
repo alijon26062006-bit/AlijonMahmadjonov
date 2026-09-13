@@ -190,14 +190,22 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           </div>
 
           {isOwner ? (
-            <div className={styles.actions}>
-              <ButtonLink href="/onboarding" variant="secondary" block>
-                Редактировать анкету
-              </ButtonLink>
-              <ButtonLink href="/services/mine" variant="secondary" block>
-                Мои услуги
-              </ButtonLink>
-            </div>
+            <>
+              {/* Уровень объясняется только своему хозяину: заказчику нужен
+                  значок, а исполнителю — правила, по которым он считается. */}
+              <div className={styles.level}>
+                <span className={styles.levelName}>Ваш уровень: {levelLabel(profile.seller_level)}</span>
+                <span className={styles.levelHint}>{levelHint(profile.seller_level)}</span>
+              </div>
+              <div className={styles.actions}>
+                <ButtonLink href="/onboarding" variant="secondary" block>
+                  Редактировать анкету
+                </ButtonLink>
+                <ButtonLink href="/services/mine" variant="secondary" block>
+                  Мои услуги
+                </ButtonLink>
+              </div>
+            </>
           ) : session ? (
             <div className={styles.actions}>
               {isClient ? (
@@ -451,6 +459,29 @@ function badgeIcon(kind: string) {
   if (kind === 'github_verified') return <IconGitHub size={13} />;
   if (kind === 'top_rated') return <IconStarFilled size={13} />;
   return undefined;
+}
+
+/** Название уровня по-русски. */
+function levelLabel(level: string | undefined) {
+  if (level === 'professional') return 'Профессионал';
+  if (level === 'advanced') return 'Продвинутый';
+  return 'Новичок';
+}
+
+/**
+ * Что нужно, чтобы подняться — и почему можно опуститься.
+ *
+ * Уровень считается по последним ста сделкам, поэтому он и растёт, и падает.
+ * Сказать об этом прямо честнее, чем показать значок и промолчать.
+ */
+function levelHint(level: string | undefined) {
+  if (level === 'professional') {
+    return 'Считается по последним ста сделкам: от 50 завершённых, меньше 8% сорванных и рейтинг от 4,5. Уровень держится, пока держатся эти цифры.';
+  }
+  if (level === 'advanced') {
+    return 'До «Профессионала» — 50 завершённых сделок, меньше 8% сорванных и рейтинг от 4,5. Считается по последним ста сделкам, поэтому уровень можно и потерять.';
+  }
+  return 'До «Продвинутого» — 10 завершённых сделок, меньше 10% сорванных и рейтинг от 4,0. Отказаться от заказа вовремя не считается срывом; не ответить на него — считается.';
 }
 
 function proficiency(level: string) {

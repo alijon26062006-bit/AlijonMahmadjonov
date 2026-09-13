@@ -12,6 +12,7 @@ import (
 	"github.com/averix/api/internal/audit"
 	"github.com/averix/api/internal/files"
 	"github.com/averix/api/internal/platform/httpx"
+	"github.com/averix/api/internal/platform/money"
 	"github.com/averix/api/internal/platform/urlguard"
 	"github.com/averix/api/internal/platform/validate"
 	"github.com/averix/api/internal/security"
@@ -74,6 +75,10 @@ type Notifier interface {
 	MilestoneChanged(ctx context.Context, contractID, milestoneID, recipientID uuid.UUID,
 		status string)
 	ContractSigned(ctx context.Context, contractID, developerID uuid.UUID)
+	OrderAwaitingConfirmation(ctx context.Context, contractID, developerID uuid.UUID, deadline time.Time)
+	OrderAnswered(ctx context.Context, contractID, clientID uuid.UUID, accepted bool, reason string)
+	OrderExpired(ctx context.Context, contractID, clientID, developerID uuid.UUID)
+	MilestoneAutoApproved(ctx context.Context, contractID, milestoneID, recipientID uuid.UUID, days int)
 }
 
 // Completion is told when a contract finishes, so the verified history and
@@ -311,6 +316,20 @@ type OrderRequest struct {
 	Currency        string
 	DeliveryDays    int
 	PriceVisibility string
+	// Paid extras the client added to the tier, priced by the seller. Stored
+	// as a snapshot: what an option costs may change, this order did not.
+	Options []OrderOption
+	// Whether the freelancer still has to accept. True for a service order,
+	// where nobody asked them beforehand; false for a hire from a proposal,
+	// where agreeing was the proposal.
+	AwaitConfirmation bool
+}
+
+// OrderOption is one paid extra as it was bought.
+type OrderOption struct {
+	Name       string
+	PriceMinor int64
+	ExtraDays  int
 }
 
 // CreateForOrder writes the contract for a service order. The caller (the
@@ -335,6 +354,16 @@ func (s *Service) CreateForOrder(ctx context.Context, id *security.Identity, in 
 		when := time.Now().AddDate(0, 0, in.DeliveryDays)
 		due = &when
 	}
+
+	// Сколько у исполнителя есть на ответ. Ноль часов выключает ожидание:
+	// заказ открывается сразу, как было до появления подтверждения.
+	var confirmDeadline *time.Time
+	if in.AwaitConfirmation {
+		if hours := s.settings.Int(ctx, "contracts.confirm_hours", 24); hours > 0 {
+			when := time.Now().Add(time.Duration(hours) * time.Hour)
+			confirmDeadline = &when
+		}
+	}
 	contractID, err := s.store.Create(ctx, NewContract{
 		ProjectID:       in.ProjectID,
 		ClientID:        in.ClientID,
@@ -348,6 +377,8 @@ func (s *Service) CreateForOrder(ctx context.Context, id *security.Identity, in 
 		DeliveryDays:    in.DeliveryDays,
 		DueOn:           due,
 		PriceVisibility: visibility,
+		Options:         in.Options,
+		ConfirmDeadline: confirmDeadline,
 		Milestones: []NewMilestone{{
 			Position: 1, Title: in.Title, Detail: in.MilestoneDetail,
 			AmountMinor: in.AmountMinor, DueOn: due,
@@ -363,7 +394,12 @@ func (s *Service) CreateForOrder(ctx context.Context, id *security.Identity, in 
 			"currency": in.Currency, "fee_minor": feeMinor},
 	})
 	if s.notifier != nil {
-		s.notifier.ContractSigned(ctx, contractID, in.DeveloperID)
+		if confirmDeadline != nil {
+			// Исполнителя зовут отвечать, а не праздновать: сделки ещё нет.
+			s.notifier.OrderAwaitingConfirmation(ctx, contractID, in.DeveloperID, *confirmDeadline)
+		} else {
+			s.notifier.ContractSigned(ctx, contractID, in.DeveloperID)
+		}
 	}
 	s.postSystem(ctx, contractID, "contract.signed", nil, map[string]any{"origin": "service_order"})
 	return s.View(ctx, id, contractID)
@@ -374,7 +410,10 @@ func (s *Service) CreateForOrder(ctx context.Context, id *security.Identity, in 
 // Integer arithmetic on minor units throughout: a float percentage of a
 // currency amount is how rounding errors become accounting disputes.
 func (s *Service) feeFor(ctx context.Context, amountMinor int64) (float64, int64) {
-	basisPoints := int64(s.settings.Int(ctx, "platform.fee_basis_points", 1000))
+	// Ноль по умолчанию: площадка работает без комиссии, пока её не включат
+	// в панели. Уже подписанные сделки это не меняет — ставка записана в них
+	// снимком.
+	basisPoints := int64(s.settings.Int(ctx, "platform.fee_basis_points", 0))
 	if basisPoints < 0 {
 		basisPoints = 0
 	}
@@ -469,6 +508,15 @@ func (s *Service) View(ctx context.Context, id *security.Identity, contractID uu
 		milestone.Events = events
 	}
 	contract.Deliverables = loose
+
+	options, err := s.store.OptionsFor(ctx, contractID)
+	if err != nil {
+		return nil, httpx.Internalf(err, "load contract options")
+	}
+	for i := range options {
+		options[i].PriceDisplay = money.Format(options[i].PriceMinor, contract.Currency)
+	}
+	contract.Options = options
 
 	contract.MyRole = role
 	contract.Can = capabilitiesFor(role, contract, membership, id.UserID, s.fundingAvailable())
@@ -572,6 +620,15 @@ func capabilitiesFor(role string, c *Contract, m Membership, userID uuid.UUID, f
 		return can
 	}
 
+	// Заказ услуги ждёт ответа исполнителя. До ответа работать по нему нельзя
+	// ни одной стороне: заказчику — чтобы не оплачивать то, за что ещё никто
+	// не взялся, исполнителю — чтобы «начать работу» не заменяло согласие.
+	if c.AwaitingConfirmation {
+		can.ConfirmOrder = role == RoleDeveloper
+		can.Cancel = role == RoleClient
+		return can
+	}
+
 	for _, milestone := range c.Milestones {
 		switch milestone.Status {
 		case MilestoneDraft:
@@ -595,6 +652,12 @@ func capabilitiesFor(role string, c *Contract, m Membership, userID uuid.UUID, f
 	can.Cancel = role == RoleClient && c.ProgressPercent == 0
 	can.AddParticipant = role == RoleClient || role == RoleDeveloper
 	return can
+}
+
+// awaitingConfirmation reports whether the order still needs the freelancer's
+// answer, which is the one state in which no milestone may move.
+func awaitingConfirmation(c *Contract) bool {
+	return c.ConfirmDeadline != nil && c.ConfirmedAt == nil && c.Status != StatusCancelled
 }
 
 func (s *Service) fundingAvailable() bool {
@@ -691,6 +754,16 @@ func (s *Service) move(ctx context.Context, id *security.Identity, milestoneID u
 		return nil, err
 	}
 
+	// Пока заказ услуги не принят исполнителем, по нему ничего не двигается:
+	// ни оплаты, ни начала работы. Единственный выход отсюда — принять или
+	// отклонить заказ.
+	if contract, err := s.store.ByID(ctx, milestone.ContractID); err == nil && awaitingConfirmation(contract) {
+		e := *httpx.ErrConflict
+		e.Code = "order_not_confirmed"
+		e.Message = "Заказ ещё не принят исполнителем. Работа по нему начнётся после его ответа."
+		return nil, &e
+	}
+
 	if !CanTransition(milestone.Status, to) {
 		e := *httpx.ErrConflict
 		e.Code = "milestone_state"
@@ -722,13 +795,19 @@ func (s *Service) move(ctx context.Context, id *security.Identity, milestoneID u
 		}
 	}
 
-	updated, err := s.store.Transition(ctx, TransitionInput{
+	transition := TransitionInput{
 		MilestoneID: milestoneID,
 		From:        milestone.Status,
 		To:          to,
 		ActorID:     id.UserID,
 		Note:        strings.TrimSpace(in.Note),
-	})
+	}
+	if to == MilestoneSubmitted {
+		// Со сдачей у заказчика начинается срок на ответ, и он виден обеим
+		// сторонам — сюрприза «работу приняли за меня» не будет.
+		transition.AutoApproveAt = s.autoApproveAt(ctx)
+	}
+	updated, err := s.store.Transition(ctx, transition)
 	if errors.Is(err, ErrRaced) {
 		e := *httpx.ErrConflict
 		e.Code = "milestone_changed"
@@ -1428,4 +1507,192 @@ func forbidRole(message string, err error) error {
 	e := *httpx.ErrForbidden
 	e.Message = message
 	return e.Wrap(err)
+}
+
+// ── Заказ услуги: подтверждение исполнителем ────────────────────────────────
+
+// ConfirmOrder is the freelancer accepting a service order.
+//
+// Until they do, nothing about the contract may move: the client ordered
+// without asking anyone, and agreeing has to be somebody's deliberate act
+// rather than the absence of a refusal.
+func (s *Service) ConfirmOrder(ctx context.Context, id *security.Identity,
+	contractID uuid.UUID) (*Contract, error) {
+
+	membership, err := s.store.MembershipOf(ctx, contractID)
+	if err != nil {
+		return nil, notFound(err, contractID)
+	}
+	role, err := s.authoriseAction(ctx, id, membership)
+	if err != nil {
+		return nil, err
+	}
+	if role != RoleDeveloper {
+		return nil, httpx.Forbiddenf("only the freelancer may accept an order")
+	}
+
+	if err := s.store.ConfirmOrder(ctx, contractID, id.UserID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			e := *httpx.ErrConflict
+			e.Code = "order_not_awaiting"
+			e.Message = "Этот заказ уже нельзя принять: срок ответа истёк или заказ отменён."
+			return nil, &e
+		}
+		return nil, httpx.Internalf(err, "confirm order")
+	}
+
+	s.audit.RecordRequest(ctx, audit.Entry{
+		Action: "contract.order_confirmed", SubjectType: "contract", SubjectID: &contractID,
+	})
+	if s.notifier != nil {
+		s.notifier.OrderAnswered(ctx, contractID, membership.ClientID, true, "")
+	}
+	s.postSystem(ctx, contractID, "order.confirmed", &id.UserID, nil)
+	return s.View(ctx, id, contractID)
+}
+
+// DeclineOrder is the freelancer refusing one, which is better for everybody
+// than silence: the client learns now instead of a day from now.
+func (s *Service) DeclineOrder(ctx context.Context, id *security.Identity,
+	contractID uuid.UUID, reason string) error {
+
+	membership, err := s.store.MembershipOf(ctx, contractID)
+	if err != nil {
+		return notFound(err, contractID)
+	}
+	role, err := s.authoriseAction(ctx, id, membership)
+	if err != nil {
+		return err
+	}
+	if role != RoleDeveloper {
+		return httpx.Forbiddenf("only the freelancer may decline an order")
+	}
+
+	reason = strings.TrimSpace(reason)
+	if len([]rune(reason)) > 300 {
+		reason = string([]rune(reason)[:300])
+	}
+	note := "Исполнитель отказался от заказа."
+	if reason != "" {
+		note += " Причина: " + reason
+	}
+	if err := s.store.CancelUnconfirmed(ctx, contractID, note); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			e := *httpx.ErrConflict
+			e.Code = "order_not_awaiting"
+			e.Message = "Этот заказ уже нельзя отклонить: он принят или отменён."
+			return &e
+		}
+		return httpx.Internalf(err, "decline order")
+	}
+
+	s.audit.RecordRequest(ctx, audit.Entry{
+		Action: "contract.order_declined", SubjectType: "contract", SubjectID: &contractID,
+		After: map[string]any{"reason": reason},
+	})
+	if s.notifier != nil {
+		s.notifier.OrderAnswered(ctx, contractID, membership.ClientID, false, reason)
+	}
+	s.postSystem(ctx, contractID, "order.declined", &id.UserID, nil)
+	return nil
+}
+
+// ExpireUnconfirmedOrders cancels service orders nobody answered in time.
+//
+// Called by the worker on a schedule. The cancellation is the promise the
+// client was given when they ordered: silence ends in their money coming
+// back, not in waiting forever.
+func (s *Service) ExpireUnconfirmedOrders(ctx context.Context) (string, error) {
+	orders, err := s.store.ExpiredOrders(ctx, 200)
+	if err != nil {
+		return "", err
+	}
+	cancelled := 0
+	for _, order := range orders {
+		if err := s.store.CancelUnconfirmed(ctx, order.ContractID,
+			"Исполнитель не ответил на заказ в отведённое время."); err != nil {
+			if errors.Is(err, ErrNotFound) {
+				continue // Кто-то успел ответить между выборкой и записью.
+			}
+			return "", err
+		}
+		cancelled++
+		s.audit.Record(ctx, audit.Entry{
+			Action: "contract.order_expired", SubjectType: "contract", SubjectID: &order.ContractID,
+		})
+		if s.notifier != nil {
+			s.notifier.OrderExpired(ctx, order.ContractID, order.ClientID, order.DeveloperID)
+		}
+		s.postSystem(ctx, order.ContractID, "order.expired", nil, nil)
+	}
+	if cancelled == 0 {
+		return "", nil
+	}
+	return fmt.Sprintf("cancelled %d unanswered order(s)", cancelled), nil
+}
+
+// ── Автоприёмка сданной работы ──────────────────────────────────────────────
+
+// autoApproveAt is when work submitted now would be accepted on its own.
+// Zero days in the settings turns the clock off entirely.
+func (s *Service) autoApproveAt(ctx context.Context) *time.Time {
+	days := s.settings.Int(ctx, "contracts.auto_approve_days", 3)
+	if days <= 0 {
+		return nil
+	}
+	when := time.Now().AddDate(0, 0, days)
+	return &when
+}
+
+// AutoApproveDelivered accepts work the client left unanswered.
+//
+// Without it a milestone sits in "submitted" forever when a client disappears,
+// and the freelancer's money sits with it. The move is recorded as made by
+// nobody, which is exactly what it is — the history says "принято
+// автоматически", not "принято заказчиком".
+func (s *Service) AutoApproveDelivered(ctx context.Context) (string, error) {
+	due, err := s.store.DueForAutoApproval(ctx, 200)
+	if err != nil {
+		return "", err
+	}
+	days := s.settings.Int(ctx, "contracts.auto_approve_days", 3)
+	approved := 0
+	for _, milestoneID := range due {
+		milestone, err := s.store.MilestoneByID(ctx, milestoneID)
+		if err != nil {
+			continue
+		}
+		membership, err := s.store.MembershipOf(ctx, milestone.ContractID)
+		if err != nil {
+			continue
+		}
+		updated, err := s.store.Transition(ctx, TransitionInput{
+			MilestoneID: milestoneID,
+			From:        MilestoneSubmitted,
+			To:          MilestoneApproved,
+			Note:        fmt.Sprintf("Принято автоматически: заказчик не ответил за %d дн.", days),
+		})
+		if errors.Is(err, ErrRaced) {
+			continue // Заказчик ответил сам, пока задача шла по списку.
+		}
+		if err != nil {
+			return "", err
+		}
+		approved++
+		s.audit.Record(ctx, audit.Entry{
+			Action: "milestone.auto_approved", SubjectType: "milestone", SubjectID: &milestoneID,
+			After: map[string]any{"after_days": days},
+		})
+		if s.notifier != nil {
+			s.notifier.MilestoneAutoApproved(ctx, milestone.ContractID, milestoneID, membership.DeveloperID, days)
+			s.notifier.MilestoneAutoApproved(ctx, milestone.ContractID, milestoneID, membership.ClientID, days)
+		}
+		s.postSystem(ctx, milestone.ContractID, "milestone.auto_approved", nil,
+			map[string]any{"milestone_id": milestoneID, "after_days": days})
+		s.settle(ctx, updated.ContractID)
+	}
+	if approved == 0 {
+		return "", nil
+	}
+	return fmt.Sprintf("auto-approved %d milestone(s)", approved), nil
 }

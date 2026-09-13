@@ -5,7 +5,7 @@ import styles from './MilestoneCard.module.css';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { IconCheck, IconChevronDown, IconExternal, IconPaperclip } from '@/components/ui/Icon';
-import { money, shortDate, timeAgo } from '@/lib/format';
+import { dateInSentence, money, shortDate, timeAgo } from '@/lib/format';
 import type { Milestone } from '@/lib/types';
 
 type ActionKind = 'start' | 'submit' | 'approve' | 'revision' | 'dispute';
@@ -88,6 +88,16 @@ export function MilestoneCard({
           <span className={styles.noteLabel}>Сдано {timeAgo(milestone.submitted_at)}</span>
           {milestone.submission_note}
         </blockquote>
+      ) : null}
+
+      {/* Срок приёмки виден обеим сторонам: заказчику — чтобы не пропустить,
+          исполнителю — чтобы знать, что ожидание конечно. */}
+      {milestone.status === 'submitted' && milestone.auto_approve_at ? (
+        <p className={styles.autoApprove}>
+          {isClient
+            ? `Если не ответить до ${dateInSentence(milestone.auto_approve_at)}, работа будет принята автоматически.`
+            : `Заказчик отвечает до ${dateInSentence(milestone.auto_approve_at)}. Если промолчит, работа будет принята автоматически.`}
+        </p>
       ) : null}
 
       {milestone.status === 'revision_requested' && milestone.revision_note ? (

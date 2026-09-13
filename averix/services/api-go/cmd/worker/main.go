@@ -124,6 +124,20 @@ func run() error {
 	// closes: silence must not veto it.
 	w.Schedule("publish-expired-reviews", time.Hour, application.Reviews.PublishExpired)
 
+	// Сданная работа, которую заказчик не принял и не отклонил. Каждые
+	// пятнадцать минут: срок меряется днями, но человек, у которого он вышел,
+	// не должен ждать до следующего часа.
+	w.Schedule("auto-approve-delivered", 15*time.Minute, application.Contracts.AutoApproveDelivered)
+
+	// Заказы услуг, на которые исполнитель не ответил. Тот же интервал и по
+	// той же причине: деньги заказчика заморожены, пока заказ висит.
+	w.Schedule("expire-unconfirmed-orders", 15*time.Minute, application.Contracts.ExpireUnconfirmedOrders)
+
+	// Уровни исполнителей. Раз в полчаса: уровень меняется от завершённой
+	// сделки, и человек должен увидеть новый значок в тот же день, а не в
+	// следующий.
+	w.Schedule("refresh-seller-levels", 30*time.Minute, application.Developers.RefreshSellerLevels)
+
 	// Identity documents past their retention. Hourly rather than daily so a
 	// shortened retention takes effect the same day it is set, and so a long
 	// outage does not leave a backlog of passports nobody meant to keep.

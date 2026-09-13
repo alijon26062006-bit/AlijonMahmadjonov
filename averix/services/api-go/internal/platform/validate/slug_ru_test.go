@@ -7,9 +7,9 @@ import "testing"
 // остальное выбрасывалось.
 func TestSlugifyTransliteratesRussian(t *testing.T) {
 	cases := map[string]string{
-		"Обмен с 1С для оптовой базы":          "obmen-s-1s-dla-optovoi-bazy",
+		"Обмен с 1С для оптовой базы":           "obmen-s-1s-dla-optovoi-bazy",
 		"Логотип и вывеска для кофейни «Зерно»": "logotip-i-vyveska-dla-kofeini-zerno",
-		"Warehouse stock API":                   "warehouse-stock-api",
+		"Warehouse stock API": "warehouse-stock-api",
 	}
 	for input, want := range cases {
 		if got := Slugify(input); got != want {

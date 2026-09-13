@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Field';
 import { ApiFailure, post } from '@/lib/api';
 import { money } from '@/lib/format';
+import { feeOn, usePlatform } from '@/lib/platform';
 import type { Project } from '@/lib/types';
 
 const MINIMUMS = { cover_letter: 120, approach: 120, relevant_experience: 60 };
@@ -29,6 +30,7 @@ export function ProposalSheet({
   onClose: () => void;
   onSent: () => void;
 }) {
+  const platform = usePlatform();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     amount: '',
@@ -48,7 +50,9 @@ export function ProposalSheet({
   }
 
   const amountMinor = Math.round(Number(form.amount.replace(/[^\d.]/g, '')) * 100);
-  const fee = Math.round(amountMinor * 0.1);
+  // Ставку комиссии приносит сервер: раньше здесь стояли жёсткие 10%, и
+  // стоило администратору её поменять, как исполнителю показывали неправду.
+  const fee = feeOn(platform, amountMinor);
 
   async function submit() {
     setBusy(true);
@@ -100,9 +104,18 @@ export function ProposalSheet({
           />
           {amountMinor > 0 ? (
             <p className={styles.fee}>
-              Ваша цена <strong>{money(amountMinor, project.budget.currency)}</strong> · комиссия платформы{' '}
-              {money(fee, project.budget.currency)} · вы получите{' '}
-              <strong>{money(amountMinor - fee, project.budget.currency)}</strong>
+              {fee > 0 ? (
+                <>
+                  Ваша цена <strong>{money(amountMinor, project.budget.currency)}</strong> · комиссия
+                  платформы {money(fee, project.budget.currency)} · вы получите{' '}
+                  <strong>{money(amountMinor - fee, project.budget.currency)}</strong>
+                </>
+              ) : (
+                <>
+                  Ваша цена <strong>{money(amountMinor, project.budget.currency)}</strong> — вы получите
+                  её целиком: площадка пока не берёт комиссию.
+                </>
+              )}
             </p>
           ) : null}
           <Input

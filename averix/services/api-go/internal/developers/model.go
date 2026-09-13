@@ -55,11 +55,15 @@ type Profile struct {
 
 	GitHub *GitHubSummary `json:"github,omitempty"`
 
-	IdentityVerified bool   `json:"identity_verified"`
-	EmailVerified    bool   `json:"email_verified"`
-	IsSearchable     bool   `json:"is_searchable"`
-	IsFeatured       bool   `json:"is_featured"`
-	ModerationState  string `json:"moderation_state,omitempty"`
+	IdentityVerified bool `json:"identity_verified"`
+	EmailVerified    bool `json:"email_verified"`
+	// Уровень исполнителя: «new», «advanced», «professional». Считается из
+	// завершённых сделок, доли провалов и рейтинга — не назначается вручную и
+	// теряется так же, как получается.
+	SellerLevel     string `json:"seller_level"`
+	IsSearchable    bool   `json:"is_searchable"`
+	IsFeatured      bool   `json:"is_featured"`
+	ModerationState string `json:"moderation_state,omitempty"`
 
 	LastSeenAt  *time.Time `json:"last_seen_at,omitempty"`
 	MemberSince time.Time  `json:"member_since"`
@@ -98,6 +102,10 @@ type PublicProfile struct {
 
 	Reputation Reputation `json:"reputation"`
 	Badges     []Badge    `json:"badges"`
+	// Уровень исполнителя. Отдаётся отдельным полем, а не только значком:
+	// интерфейсу иногда нужно объяснить, почему уровень такой, а значок —
+	// это только вывеска.
+	SellerLevel string `json:"seller_level"`
 
 	GitHub *GitHubSummary `json:"github,omitempty"`
 

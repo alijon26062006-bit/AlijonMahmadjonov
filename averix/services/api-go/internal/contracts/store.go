@@ -51,6 +51,10 @@ type NewContract struct {
 	DueOn           *time.Time
 	PriceVisibility string
 	Milestones      []NewMilestone
+	Options         []OrderOption
+	// Set for a service order: the moment after which an unanswered order
+	// cancels itself.
+	ConfirmDeadline *time.Time
 	IsDemo          bool
 }
 
@@ -80,13 +84,14 @@ func (s *Store) Create(ctx context.Context, in NewContract) (uuid.UUID, error) {
 			INSERT INTO contracts
 			  (reference, project_id, proposal_id, client_id, developer_id, title,
 			   amount_minor, currency, fee_percent, fee_minor, payout_minor,
-			   status, delivery_days, due_on, price_visibility, starts_on, is_demo)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,current_date,$16)
+			   status, delivery_days, due_on, price_visibility, starts_on, is_demo,
+			   developer_confirm_deadline)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,current_date,$16,$17)
 			RETURNING id`,
 			reference, in.ProjectID, nullUUID(in.ProposalID), in.ClientID, in.DeveloperID,
 			in.Title, in.AmountMinor, defaultTo(in.Currency, "USD"), in.FeePercent,
 			in.FeeMinor, in.PayoutMinor, StatusPendingFunding, nullIfZero(in.DeliveryDays),
-			in.DueOn, in.PriceVisibility, in.IsDemo).Scan(&contractID)
+			in.DueOn, in.PriceVisibility, in.IsDemo, in.ConfirmDeadline).Scan(&contractID)
 		if err != nil {
 			return fmt.Errorf("insert contract: %w", err)
 		}
@@ -99,6 +104,15 @@ func (s *Store) Create(ctx context.Context, in NewContract) (uuid.UUID, error) {
 				INSERT INTO contract_participants (contract_id, user_id, role)
 				VALUES ($1, $2, $3)`, contractID, party.id, party.role); err != nil {
 				return fmt.Errorf("insert participant: %w", err)
+			}
+		}
+
+		for _, option := range in.Options {
+			if _, err := q.Exec(ctx, `
+				INSERT INTO contract_options (contract_id, name, price_minor, extra_days)
+				VALUES ($1,$2,$3,$4)`,
+				contractID, option.Name, option.PriceMinor, option.ExtraDays); err != nil {
+				return fmt.Errorf("insert contract option: %w", err)
 			}
 		}
 
@@ -167,6 +181,7 @@ const contractSelect = `
 	       c.starts_on, c.due_on, c.delivery_days,
 	       c.price_visibility, c.client_allows_showcase,
 	       c.completed_at, c.cancelled_at, coalesce(c.cancellation_reason, ''),
+	       c.developer_confirm_deadline, c.developer_confirmed_at,
 	       c.created_at, c.updated_at,
 	       p.id, p.slug, p.title, coalesce(cat.name, ''),
 	       cl.id, cl.username, cl.full_name,
@@ -192,6 +207,7 @@ func (s *Store) scan(row interface{ Scan(...any) error }) (*Contract, error) {
 		&c.StartsOn, &c.DueOn, &c.DeliveryDays,
 		&c.PriceVisibility, &c.ClientAllowsShowcase,
 		&c.CompletedAt, &c.CancelledAt, &c.CancellationReason,
+		&c.ConfirmDeadline, &c.ConfirmedAt,
 		&c.CreatedAt, &c.UpdatedAt,
 		&c.Project.ID, &c.Project.Slug, &c.Project.Title, &c.Project.Category,
 		&c.Client.ID, &c.Client.Username, &c.Client.FullName,
@@ -210,6 +226,8 @@ func (s *Store) scan(row interface{ Scan(...any) error }) (*Contract, error) {
 	c.Client.Role, c.Developer.Role = RoleClient, RoleDeveloper
 	c.Client.PhotoURL = s.avatarURL(clientPhoto)
 	c.Developer.PhotoURL = s.avatarURL(developerPhoto)
+	c.AwaitingConfirmation = c.ConfirmDeadline != nil && c.ConfirmedAt == nil &&
+		c.Status != StatusCancelled
 	return &c, nil
 }
 
@@ -347,7 +365,7 @@ func (s *Store) milestonesFor(ctx context.Context, contractID uuid.UUID) ([]Mile
 		SELECT id, contract_id, position, title, coalesce(detail, ''), amount_minor,
 		       currency, status, due_on, revision_count, revision_limit,
 		       submitted_at, coalesce(submission_note, ''), approved_at, released_at,
-		       coalesce(revision_note, ''), created_at, updated_at
+		       coalesce(revision_note, ''), auto_approve_at, created_at, updated_at
 		FROM milestones WHERE contract_id = $1 ORDER BY position`, contractID)
 	if err != nil {
 		return nil, fmt.Errorf("query milestones: %w", err)
@@ -361,7 +379,7 @@ func (s *Store) milestonesFor(ctx context.Context, contractID uuid.UUID) ([]Mile
 		if err := rows.Scan(&m.ID, &m.ContractID, &m.Position, &m.Title, &m.Detail,
 			&amount, &m.Currency, &m.Status, &m.DueOn, &m.RevisionCount,
 			&m.RevisionLimit, &m.SubmittedAt, &m.SubmissionNote, &m.ApprovedAt,
-			&m.ReleasedAt, &m.RevisionNote, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			&m.ReleasedAt, &m.RevisionNote, &m.AutoApproveAt, &m.CreatedAt, &m.UpdatedAt); err != nil {
 			return nil, err
 		}
 		m.AmountMinor = &amount
@@ -379,12 +397,12 @@ func (s *Store) MilestoneByID(ctx context.Context, milestoneID uuid.UUID) (*Mile
 		SELECT id, contract_id, position, title, coalesce(detail, ''), amount_minor,
 		       currency, status, due_on, revision_count, revision_limit,
 		       submitted_at, coalesce(submission_note, ''), approved_at, released_at,
-		       coalesce(revision_note, ''), created_at, updated_at
+		       coalesce(revision_note, ''), auto_approve_at, created_at, updated_at
 		FROM milestones WHERE id = $1`, milestoneID).
 		Scan(&m.ID, &m.ContractID, &m.Position, &m.Title, &m.Detail, &amount,
 			&m.Currency, &m.Status, &m.DueOn, &m.RevisionCount, &m.RevisionLimit,
 			&m.SubmittedAt, &m.SubmissionNote, &m.ApprovedAt, &m.ReleasedAt,
-			&m.RevisionNote, &m.CreatedAt, &m.UpdatedAt)
+			&m.RevisionNote, &m.AutoApproveAt, &m.CreatedAt, &m.UpdatedAt)
 	if database.IsNoRows(err) {
 		return nil, ErrNotFound
 	}
@@ -557,6 +575,9 @@ type TransitionInput struct {
 	// Set when the move is a revision request, so the count is bumped in the
 	// same statement as the status.
 	CountRevision bool
+	// When work is submitted: the moment it will be accepted on its own if the
+	// client says nothing. NULL turns the clock off.
+	AutoApproveAt *time.Time
 }
 
 // Transition moves a milestone and records the event.
@@ -574,18 +595,25 @@ func (s *Store) Transition(ctx context.Context, in TransitionInput) (*Milestone,
 		args := []any{in.MilestoneID, in.To, in.From}
 		switch in.To {
 		case MilestoneSubmitted:
-			fields += ", submitted_at = now(), submission_note = nullif($4, '')"
-			args = append(args, in.Note)
+			// Со сдачей начинается отсчёт приёмки. Ноль дней означает, что
+			// автоприёмка выключена в настройках: тогда срока нет и работа
+			// ждёт человека, как раньше.
+			fields += ", submitted_at = now(), submission_note = nullif($4, ''), auto_approve_at = $5"
+			args = append(args, in.Note, in.AutoApproveAt)
 		case MilestoneRevision:
-			fields += ", revision_note = nullif($4, ''), revision_count = revision_count + 1"
+			// Отправили на доработку — отсчёт снимается: считать его заново
+			// будет следующая сдача.
+			fields += ", revision_note = nullif($4, ''), revision_count = revision_count + 1, auto_approve_at = NULL"
 			args = append(args, in.Note)
 		case MilestoneApproved:
-			fields += ", approved_at = now(), approved_by = $4"
+			fields += ", approved_at = now(), approved_by = $4, auto_approve_at = NULL"
 			args = append(args, actorOrNil(in.ActorID))
 		case MilestoneReleased:
 			fields += ", released_at = now()"
+		case MilestoneDisputed:
+			fields += ", auto_approve_at = NULL"
 		case MilestoneCancelled:
-			fields += ", cancelled_at = now()"
+			fields += ", cancelled_at = now(), auto_approve_at = NULL"
 		}
 
 		tag, err := q.Exec(ctx,
@@ -901,4 +929,124 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// ── Опции заказа, подтверждение исполнителя, автоприёмка ────────────────────
+
+// OptionsFor returns the paid extras bought with a contract.
+func (s *Store) OptionsFor(ctx context.Context, contractID uuid.UUID) ([]ContractOption, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT name, price_minor, extra_days FROM contract_options
+		WHERE contract_id = $1 ORDER BY created_at`, contractID)
+	if err != nil {
+		return nil, fmt.Errorf("query contract options: %w", err)
+	}
+	defer rows.Close()
+
+	out := []ContractOption{}
+	for rows.Next() {
+		var o ContractOption
+		if err := rows.Scan(&o.Name, &o.PriceMinor, &o.ExtraDays); err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+// ConfirmOrder records the freelancer accepting a service order.
+//
+// The deadline is part of the WHERE clause rather than checked beforehand: an
+// order that expired one second ago must not be confirmable, and the database
+// is the only place that can answer that without a race.
+func (s *Store) ConfirmOrder(ctx context.Context, contractID, developerID uuid.UUID) error {
+	tag, err := s.db.Exec(ctx, `
+		UPDATE contracts SET developer_confirmed_at = now(), updated_at = now()
+		WHERE id = $1 AND developer_id = $2
+		  AND developer_confirm_deadline IS NOT NULL
+		  AND developer_confirmed_at IS NULL
+		  AND developer_confirm_deadline > now()
+		  AND status <> 'cancelled'`, contractID, developerID)
+	if err != nil {
+		return fmt.Errorf("confirm order: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// CancelUnconfirmed closes an order the freelancer did not accept — because
+// they declined it, or because the clock ran out.
+func (s *Store) CancelUnconfirmed(ctx context.Context, contractID uuid.UUID, reason string) error {
+	tag, err := s.db.Exec(ctx, `
+		UPDATE contracts
+		SET status = 'cancelled', cancelled_at = now(), cancellation_reason = $2,
+		    updated_at = now()
+		WHERE id = $1 AND developer_confirm_deadline IS NOT NULL
+		  AND developer_confirmed_at IS NULL AND status <> 'cancelled'`, contractID, reason)
+	if err != nil {
+		return fmt.Errorf("cancel unconfirmed order: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ExpiredOrders lists orders whose confirmation window has closed.
+func (s *Store) ExpiredOrders(ctx context.Context, limit int) ([]ExpiredOrder, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, client_id, developer_id, title FROM contracts
+		WHERE developer_confirm_deadline IS NOT NULL
+		  AND developer_confirmed_at IS NULL
+		  AND developer_confirm_deadline <= now()
+		  AND status NOT IN ('cancelled','completed','closed')
+		ORDER BY developer_confirm_deadline
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query expired orders: %w", err)
+	}
+	defer rows.Close()
+
+	out := []ExpiredOrder{}
+	for rows.Next() {
+		var o ExpiredOrder
+		if err := rows.Scan(&o.ContractID, &o.ClientID, &o.DeveloperID, &o.Title); err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+// ExpiredOrder is one service order nobody answered.
+type ExpiredOrder struct {
+	ContractID  uuid.UUID
+	ClientID    uuid.UUID
+	DeveloperID uuid.UUID
+	Title       string
+}
+
+// DueForAutoApproval lists delivered work whose acceptance window has closed.
+func (s *Store) DueForAutoApproval(ctx context.Context, limit int) ([]uuid.UUID, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT id FROM milestones
+		WHERE status = 'submitted' AND auto_approve_at IS NOT NULL AND auto_approve_at <= now()
+		ORDER BY auto_approve_at
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query milestones due for auto-approval: %w", err)
+	}
+	defer rows.Close()
+
+	out := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
 }

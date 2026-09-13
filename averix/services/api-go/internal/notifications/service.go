@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -107,6 +108,116 @@ func (s *Service) ContractSigned(ctx context.Context, contractID, developerID uu
 		Title: "Контракт подписан: «" + title + "»",
 		Body:  "Заказчик принял ваш отклик. Откройте рабочее пространство — там этапы, сроки и переписка.",
 		Href:  "/contracts/" + contractID.String(), ContractID: &contractID,
+	})
+}
+
+// OrderAwaitingConfirmation tells the freelancer a service order is waiting,
+// and by when. The deadline is in the text rather than implied: "ответьте
+// поскорее" is not a deadline, a date is.
+func (s *Service) OrderAwaitingConfirmation(ctx context.Context, contractID, developerID uuid.UUID, deadline time.Time) {
+	title := s.store.contractTitle(ctx, contractID)
+	s.Notify(ctx, Input{
+		UserID: developerID, Type: TypeOrderAwaiting, Priority: "high",
+		Title: "Новый заказ: «" + title + "»",
+		Body: "Заказчик оформил заказ и ждёт вашего ответа до " + formatMoment(deadline) +
+			". Если не ответить, заказ отменится сам и деньги вернутся заказчику.",
+		Href: "/contracts/" + contractID.String(), ContractID: &contractID,
+	})
+}
+
+// OrderAnswered tells the client what the freelancer decided.
+func (s *Service) OrderAnswered(ctx context.Context, contractID, clientID uuid.UUID, accepted bool, reason string) {
+	title := s.store.contractTitle(ctx, contractID)
+	input := Input{
+		UserID: clientID, Priority: "high",
+		Href: "/contracts/" + contractID.String(), ContractID: &contractID,
+	}
+	if accepted {
+		input.Type = TypeOrderConfirmed
+		input.Title = "Заказ принят: «" + title + "»"
+		input.Body = "Исполнитель взялся за работу. Откройте сделку — там сроки, этапы и переписка."
+	} else {
+		input.Type = TypeOrderDeclined
+		input.Title = "Исполнитель отказался: «" + title + "»"
+		input.Body = "Заказ отменён, деньги не списаны."
+		if reason != "" {
+			input.Body += " Причина: " + reason
+		}
+	}
+	s.Notify(ctx, input)
+}
+
+// OrderExpired tells both sides that nobody answered in time.
+func (s *Service) OrderExpired(ctx context.Context, contractID, clientID, developerID uuid.UUID) {
+	title := s.store.contractTitle(ctx, contractID)
+	href := "/contracts/" + contractID.String()
+	s.Notify(ctx, Input{
+		UserID: clientID, Type: TypeOrderExpired, Priority: "high",
+		Title: "Заказ отменён: «" + title + "»",
+		Body:  "Исполнитель не ответил в отведённое время. Деньги не списаны — можно заказать у кого-то ещё.",
+		Href:  href, ContractID: &contractID,
+	})
+	s.Notify(ctx, Input{
+		UserID: developerID, Type: TypeOrderExpired, Priority: "normal",
+		Title: "Заказ отменён: «" + title + "»",
+		Body:  "Вы не ответили на заказ вовремя, и он отменился. Частые пропуски снижают уровень.",
+		Href:  href, ContractID: &contractID,
+	})
+}
+
+// SellerLevelChanged tells a freelancer their level moved, in either
+// direction, and says what it depends on — a badge nobody can explain is not
+// worth earning.
+func (s *Service) SellerLevelChanged(ctx context.Context, userID uuid.UUID, from, to string) {
+	rising := levelRank(to) > levelRank(from)
+	input := Input{
+		UserID: userID, Type: TypeSellerLevelChanged, Priority: "normal",
+		Href: "/profile",
+	}
+	if rising {
+		input.Title = "Ваш уровень повышен: " + levelName(to)
+		input.Body = "Его видят заказчики рядом с вашим именем. Уровень считается по завершённым " +
+			"сделкам, доле сорванных заказов и рейтингу за последние сто сделок."
+	} else {
+		input.Title = "Ваш уровень снижен: " + levelName(to)
+		input.Body = "Уровень считается по последним ста сделкам, поэтому его можно вернуть: " +
+			"завершайте заказы в срок и отказывайтесь от тех, которые не успеваете, заранее."
+	}
+	s.Notify(ctx, input)
+}
+
+func levelRank(level string) int {
+	switch level {
+	case "professional":
+		return 2
+	case "advanced":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func levelName(level string) string {
+	switch level {
+	case "professional":
+		return "«Профессионал»"
+	case "advanced":
+		return "«Продвинутый»"
+	default:
+		return "«Новичок»"
+	}
+}
+
+// MilestoneAutoApproved tells both sides the clock accepted the work.
+func (s *Service) MilestoneAutoApproved(ctx context.Context, contractID, milestoneID, recipientID uuid.UUID, days int) {
+	milestone := s.store.milestoneTitle(ctx, milestoneID)
+	s.Notify(ctx, Input{
+		UserID: recipientID, Type: TypeMilestoneAutoOK, Priority: "high",
+		Title: "Работа принята автоматически: «" + milestone + "»",
+		Body: fmt.Sprintf(
+			"Прошло %s с момента сдачи, и заказчик не ответил, поэтому этап принят автоматически — так работают правила площадки.",
+			plural(days, "день", "дня", "дней")),
+		Href: "/contracts/" + contractID.String(), ContractID: &contractID, MilestoneID: &milestoneID,
 	})
 }
 
@@ -368,6 +479,17 @@ func (s *Service) DeliverPending(ctx context.Context) (string, error) {
 // ── Formatting ──────────────────────────────────────────────────────────────
 
 // FormatMoney renders minor units the way a person reads them.
+// formatMoment writes a deadline the way a person reads it: «14 сентября,
+// 18:40». Месяц словом, потому что 09.14 и 14.09 читаются по-разному в разных
+// странах, а ошибиться в сроке — дорого.
+func formatMoment(at time.Time) string {
+	months := [...]string{"января", "февраля", "марта", "апреля", "мая", "июня",
+		"июля", "августа", "сентября", "октября", "ноября", "декабря"}
+	local := at.Local()
+	return fmt.Sprintf("%d %s, %02d:%02d", local.Day(), months[int(local.Month())-1],
+		local.Hour(), local.Minute())
+}
+
 func FormatMoney(minor int64, currency string) string {
 	return money.Format(minor, currency)
 }

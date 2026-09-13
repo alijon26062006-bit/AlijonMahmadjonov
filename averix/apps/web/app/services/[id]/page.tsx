@@ -28,6 +28,9 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
   const [service, setService] = useState<Service | null>(null);
   const [failed, setFailed] = useState(false);
   const [tier, setTier] = useState(0);
+  // Выбранные опции живут на странице, а не в окне заказа: цена в нижней
+  // панели должна меняться сразу, до того как человек нажал «Заказать».
+  const [chosen, setChosen] = useState<string[]>([]);
   const [ordering, setOrdering] = useState(false);
   const [reporting, setReporting] = useState(false);
 
@@ -75,6 +78,11 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
   }
 
   const selected = service.tiers[tier] ?? service.tiers[0];
+  const total =
+    (selected?.price_minor ?? 0) +
+    (service.options ?? [])
+      .filter((option) => chosen.includes(option.id))
+      .reduce((sum, option) => sum + option.price_minor, 0);
   const isClient = session?.active_role === 'client';
 
   return (
@@ -167,6 +175,38 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
           </div>
         </Card>
 
+        {service.options?.length ? (
+          <Card>
+            <h2 className={styles.sectionTitle}>Можно добавить</h2>
+            <div className="av-stack-sm">
+              {service.options.map((option) => (
+                <label key={option.id} className={styles.option}>
+                  <input
+                    type="checkbox"
+                    checked={chosen.includes(option.id)}
+                    onChange={() =>
+                      setChosen((current) =>
+                        current.includes(option.id)
+                          ? current.filter((item) => item !== option.id)
+                          : [...current, option.id],
+                      )
+                    }
+                  />
+                  <span className="av-grow">
+                    {option.name}
+                    {option.extra_days ? (
+                      <span className="av-small av-muted"> · +{days(option.extra_days)} к сроку</span>
+                    ) : null}
+                  </span>
+                  <span className={styles.optionPrice}>
+                    +{option.price_display ?? money(option.price_minor, service.currency)}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </Card>
+        ) : null}
+
         <Card>
           <h2 className={styles.sectionTitle}>Описание</h2>
           <p className={styles.description}>{service.description}</p>
@@ -209,10 +249,11 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
         {!service.is_owner ? (
           <div className={styles.orderBar}>
             <div>
-              <span className="av-xs av-muted">{selected?.name}</span>
-              <p className={styles.orderPrice}>
-                {selected?.price_display ?? money(selected?.price_minor ?? 0, service.currency)}
-              </p>
+              <span className="av-xs av-muted">
+                {selected?.name}
+                {chosen.length ? ` + ${plural(chosen.length, 'опция', 'опции', 'опций')}` : ''}
+              </span>
+              <p className={styles.orderPrice}>{money(total, service.currency)}</p>
             </div>
             {isClient ? (
               <Button size="lg" disabled={!service.can_order} onClick={() => setOrdering(true)}>
@@ -233,6 +274,7 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
         open={ordering}
         service={service}
         tier={tier}
+        chosen={chosen}
         onClose={() => setOrdering(false)}
       />
       <ReportSheet
@@ -251,11 +293,13 @@ function OrderSheet({
   open,
   service,
   tier,
+  chosen,
   onClose,
 }: {
   open: boolean;
   service: Service;
   tier: number;
+  chosen: string[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -266,6 +310,12 @@ function OrderSheet({
   const [fields, setFields] = useState<Record<string, string>>({});
 
   const selected = service.tiers[tier] ?? service.tiers[0];
+  const extras = (service.options ?? []).filter((option) => chosen.includes(option.id));
+  const total =
+    (selected?.price_minor ?? 0) + extras.reduce((sum, option) => sum + option.price_minor, 0);
+  const deliveryDays =
+    (selected?.delivery_days ?? service.delivery_days) +
+    extras.reduce((sum, option) => sum + (option.extra_days ?? 0), 0);
 
   return (
     <Sheet
@@ -289,6 +339,7 @@ function OrderSheet({
               try {
                 const contract = await post<{ id: string }>(`/services/${service.id}/order`, {
                   tier: tier + 1,
+                  option_ids: chosen,
                   brief: brief.trim(),
                   price_visibility: visibility,
                 });
@@ -322,13 +373,19 @@ function OrderSheet({
             <span className="av-muted">Пакет</span>
             <strong>{selected?.name}</strong>
           </div>
+          {extras.map((option) => (
+            <div key={option.id} className="av-row-between">
+              <span className="av-muted">{option.name}</span>
+              <strong>+{option.price_display ?? money(option.price_minor, service.currency)}</strong>
+            </div>
+          ))}
           <div className="av-row-between">
-            <span className="av-muted">Цена</span>
-            <strong>{selected?.price_display ?? money(selected?.price_minor ?? 0, service.currency)}</strong>
+            <span className="av-muted">{extras.length ? 'Итого' : 'Цена'}</span>
+            <strong>{money(total, service.currency)}</strong>
           </div>
           <div className="av-row-between">
             <span className="av-muted">Срок</span>
-            <strong>{days(selected?.delivery_days ?? service.delivery_days)}</strong>
+            <strong>{days(deliveryDays)}</strong>
           </div>
         </Card>
 

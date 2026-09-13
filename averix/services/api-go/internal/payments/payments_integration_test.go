@@ -337,6 +337,9 @@ func TestATransferThatNeverArrivedIsRejectedWithAReason(t *testing.T) {
 
 func TestApprovalQueuesAPayoutAndConfirmingItPaysTheDeveloper(t *testing.T) {
 	h := testsupport.New(t)
+	// Комиссию тест назначает сам: площадка сейчас работает без неё, а
+	// проверяется здесь удержание, а не его размер.
+	h.SetSetting("platform.fee_basis_points", 1000)
 	_, milestoneID, client, dev := setup(t, h)
 	admin := configure(t, h)
 

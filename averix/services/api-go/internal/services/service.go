@@ -29,6 +29,7 @@ type Moderator interface {
 // Svc is the service layer. Named Svc because Service is the model.
 type Svc struct {
 	identity  IdentityGate
+	levels    Levels
 	store     *Store
 	taxonomy  *taxonomy.Store
 	contracts *contracts.Service
@@ -55,6 +56,42 @@ type IdentityGate interface {
 // AttachIdentityGate is optional; without it nothing is gated.
 func (s *Svc) AttachIdentityGate(g IdentityGate) { s.identity = g }
 
+// Levels tells this module a freelancer's level, which decides how many
+// services they may keep live at once. An interface, so services does not
+// depend on the developers module.
+type Levels interface {
+	SellerLevel(ctx context.Context, userID uuid.UUID) (string, error)
+}
+
+// AttachLevels is optional; without it everybody gets the newcomer's allowance.
+func (s *Svc) AttachLevels(l Levels) { s.levels = l }
+
+// serviceAllowance is how many live services a level may hold.
+//
+// The ceiling rises with the level for the same reason it exists at all: a
+// catalogue full of untested offers from accounts with no history is worse for
+// buyers than a small one. Somebody who has finished fifty deals has earned
+// the room.
+func (s *Svc) serviceAllowance(ctx context.Context, userID uuid.UUID) (int, string) {
+	level := "new"
+	if s.levels != nil {
+		if found, err := s.levels.SellerLevel(ctx, userID); err == nil && found != "" {
+			level = found
+		}
+	}
+	key, fallback := "services.max_new", 10
+	switch level {
+	case "professional":
+		key, fallback = "services.max_professional", 50
+	case "advanced":
+		key, fallback = "services.max_advanced", 25
+	}
+	if s.settings == nil {
+		return fallback, level
+	}
+	return s.settings.Int(ctx, key, fallback), level
+}
+
 func (s *Svc) Store() *Store { return s.store }
 
 // ── Editing ─────────────────────────────────────────────────────────────────
@@ -70,10 +107,7 @@ func (s *Svc) Create(ctx context.Context, id *security.Identity, in UpsertReques
 			return nil, err
 		}
 	}
-	limit := 20
-	if s.settings != nil {
-		limit = s.settings.Int(ctx, "services.max_per_developer", 20)
-	}
+	limit, level := s.serviceAllowance(ctx, id.UserID)
 	n, err := s.store.CountActive(ctx, id.UserID)
 	if err != nil {
 		return nil, httpx.Internalf(err, "count services")
@@ -81,7 +115,9 @@ func (s *Svc) Create(ctx context.Context, id *security.Identity, in UpsertReques
 	if n >= limit {
 		e := *httpx.ErrConflict
 		e.Code = "service_limit_reached"
-		e.Message = fmt.Sprintf("У вас уже %d услуг. Заархивируйте неактуальные, чтобы добавить новую.", n)
+		e.Message = fmt.Sprintf(
+			"У вас уже %d услуг — это предел для уровня «%s». Заархивируйте неактуальные или поднимите уровень: он растёт с завершёнными сделками.",
+			n, levelLabel(level))
 		return nil, &e
 	}
 
@@ -278,6 +314,24 @@ func (s *Svc) validate(ctx context.Context, ownerID uuid.UUID, in UpsertRequest)
 		}
 	}
 
+	// Опции — это то, что докупают к тарифу. Их может не быть вовсе: услуга
+	// без опций работает ровно как раньше.
+	if len(in.Options) > 10 {
+		v.Add("options", "Опций может быть не больше десяти.")
+	} else {
+		for i, option := range in.Options {
+			field := fmt.Sprintf("options.%d", i)
+			name := strings.TrimSpace(option.Name)
+			v.Length(field+".name", "Название опции", name, 3, 80)
+			v.NoControlChars(field+".name", "Название опции", name)
+			v.MoneyMinor(field+".price_minor", "Цена опции", option.PriceMinor, 100, 100_000_000_00)
+			v.IntRange(field+".extra_days", "Дополнительный срок", option.ExtraDays, 0, 30)
+			out.Options = append(out.Options, OptionInput{
+				Name: name, PriceMinor: option.PriceMinor, ExtraDays: option.ExtraDays,
+			})
+		}
+	}
+
 	if len(in.Skills) > 12 {
 		v.Add("skills", "Не больше двенадцати навыков.")
 	} else if len(in.Skills) > 0 {
@@ -441,19 +495,63 @@ func (s *Svc) Order(ctx context.Context, id *security.Identity, serviceID uuid.U
 		visibility = "range"
 	}
 	visibility = v.OneOf("price_visibility", "Видимость цены", visibility, "public", "range", "hidden", "private")
+
+	// Опции: клиент присылает только их идентификаторы. Цена и срок каждой
+	// берутся из таблицы — иначе покупатель мог бы назначить себе скидку,
+	// поправив тело запроса.
+	var optionIDs []uuid.UUID
+	if len(in.OptionIDs) > 10 {
+		v.Add("option_ids", "Опций можно выбрать не больше десяти.")
+	}
+	for _, raw := range in.OptionIDs {
+		optionID, err := uuid.Parse(strings.TrimSpace(raw))
+		if err != nil {
+			v.Add("option_ids", "Неверная ссылка на опцию.")
+			break
+		}
+		optionIDs = append(optionIDs, optionID)
+	}
 	if v.Any() {
 		return nil, httpx.Validation(v.Fields())
+	}
+
+	options, err := s.store.PickOptions(ctx, serviceID, optionIDs)
+	if err != nil {
+		return nil, httpx.Internalf(err, "load chosen options")
+	}
+	if len(options) != len(optionIDs) {
+		return nil, httpx.Validation(map[string]string{
+			"option_ids": "Одна из выбранных опций больше не предлагается. Обновите страницу.",
+		})
 	}
 
 	title := "Заказ услуги: " + sv.Title
 	if len([]rune(title)) > 140 {
 		title = string([]rune(title)[:137]) + "…"
 	}
-	description := brief + "\n\nУслуга: " + sv.Title + " — тариф «" + tier.Name + "» (" +
-		fmt.Sprintf("%d", tier.DeliveryDays) + " дн.)"
 	price := tier.PriceMinor
 	days := tier.DeliveryDays
-	projectID, err := s.projects.Create(ctx, projects.NewProject{
+	orderOptions := make([]contracts.OrderOption, 0, len(options))
+	for _, option := range options {
+		price += option.PriceMinor
+		days += option.ExtraDays
+		orderOptions = append(orderOptions, contracts.OrderOption{
+			Name: option.Name, PriceMinor: option.PriceMinor, ExtraDays: option.ExtraDays,
+		})
+	}
+
+	description := brief + "\n\nУслуга: " + sv.Title + " — тариф «" + tier.Name + "» (" +
+		fmt.Sprintf("%d", days) + " дн.)"
+	if len(options) > 0 {
+		description += "\nДополнительно:"
+		for _, option := range options {
+			description += "\n— " + option.Name
+			if option.ExtraDays > 0 {
+				description += fmt.Sprintf(" (+%d дн.)", option.ExtraDays)
+			}
+		}
+	}
+	projectID, createErr := s.projects.Create(ctx, projects.NewProject{
 		ClientID:       id.UserID,
 		Title:          title,
 		Summary:        sv.Summary,
@@ -467,8 +565,8 @@ func (s *Svc) Order(ctx context.Context, id *security.Identity, serviceID uuid.U
 		Visibility:     "private",
 		Origin:         "manual",
 	})
-	if err != nil {
-		return nil, httpx.Internalf(err, "create order project")
+	if createErr != nil {
+		return nil, httpx.Internalf(createErr, "create order project")
 	}
 	if err := s.store.MarkOrderProject(ctx, projectID, sv.Seller.UserID); err != nil {
 		return nil, httpx.Internalf(err, "mark order project")
@@ -480,10 +578,14 @@ func (s *Svc) Order(ctx context.Context, id *security.Identity, serviceID uuid.U
 		DeveloperID:     sv.Seller.UserID,
 		Title:           sv.Title + " — " + tier.Name,
 		MilestoneDetail: brief,
-		AmountMinor:     tier.PriceMinor,
+		AmountMinor:     price,
 		Currency:        sv.Currency,
-		DeliveryDays:    tier.DeliveryDays,
+		DeliveryDays:    days,
 		PriceVisibility: visibility,
+		Options:         orderOptions,
+		// Заказ услуги ждёт подтверждения исполнителя: он не соглашался на
+		// него заранее, в отличие от найма по отклику.
+		AwaitConfirmation: true,
 	})
 	if err != nil {
 		return nil, err
@@ -492,7 +594,8 @@ func (s *Svc) Order(ctx context.Context, id *security.Identity, serviceID uuid.U
 		return nil, httpx.Internalf(err, "count order")
 	}
 	s.audit.RecordRequest(ctx, audit.Entry{Action: "service.order", SubjectType: "service", SubjectID: &serviceID,
-		After: map[string]any{"contract_id": contract.ID, "tier": tier.Position, "amount_minor": tier.PriceMinor}})
+		After: map[string]any{"contract_id": contract.ID, "tier": tier.Position,
+			"amount_minor": price, "options": len(options)}})
 	if s.moderator != nil {
 		if found := validate.ContactDetails(brief); len(found) > 0 {
 			s.moderator.Flag(context.WithoutCancel(ctx), "project", projectID,
@@ -508,4 +611,16 @@ func (s *Svc) categoryID(ctx context.Context, slug string) uuid.UUID {
 		return uuid.Nil
 	}
 	return id
+}
+
+// levelLabel names a level in Russian for a message shown to a person.
+func levelLabel(level string) string {
+	switch level {
+	case "professional":
+		return "Профессионал"
+	case "advanced":
+		return "Продвинутый"
+	default:
+		return "Новичок"
+	}
 }

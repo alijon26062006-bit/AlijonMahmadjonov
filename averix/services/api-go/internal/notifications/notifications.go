@@ -30,6 +30,7 @@ const (
 	TypeMilestoneRevision   = "milestone_revision_requested"
 	TypeMilestoneApproved   = "milestone_approved"
 	TypeMilestoneReleased   = "milestone_released"
+	TypeMilestoneAutoOK     = "milestone_auto_approved"
 	TypePaymentSucceeded    = "payment_succeeded"
 	TypePaymentFailed       = "payment_failed"
 	TypePaymentRefunded     = "payment_refunded"
@@ -40,6 +41,11 @@ const (
 	TypeContractStarted     = "contract_started"
 	TypeContractCompleted   = "contract_completed"
 	TypeContractCancelled   = "contract_cancelled"
+	TypeOrderAwaiting       = "order_awaiting_confirmation"
+	TypeOrderConfirmed      = "order_confirmed"
+	TypeOrderDeclined       = "order_declined"
+	TypeOrderExpired        = "order_expired"
+	TypeSellerLevelChanged  = "seller_level_changed"
 	TypeDisputeOpened       = "dispute_opened"
 	TypeDisputeResolved     = "dispute_resolved"
 	TypeProfileSubmitted    = "profile_submitted"
@@ -163,6 +169,7 @@ var catalogue = map[string]typeInfo{
 	TypeMilestoneRevision:   {Group: "contracts", Label: "Запрошены правки", Email: true, Push: true, InAppLocked: true},
 	TypeMilestoneApproved:   {Group: "contracts", Label: "Этап принят", Email: true, Push: true, InAppLocked: true},
 	TypeMilestoneReleased:   {Group: "contracts", Label: "Оплата этапа переведена", Email: true, Push: true, InAppLocked: true},
+	TypeMilestoneAutoOK:     {Group: "contracts", Label: "Работа принята автоматически", Email: true, Push: true, InAppLocked: true},
 	TypePaymentSucceeded:    {Group: "payments", Label: "Платёж подтверждён", Email: true, Push: true, InAppLocked: true},
 	TypePaymentFailed:       {Group: "payments", Label: "Платёж не прошёл", Email: true, Push: true, InAppLocked: true},
 	TypePaymentRefunded:     {Group: "payments", Label: "Возврат средств", Email: true, Push: true, InAppLocked: true},
@@ -173,6 +180,11 @@ var catalogue = map[string]typeInfo{
 	TypeContractStarted:     {Group: "contracts", Label: "Контракт подписан", Email: true, Push: true, InAppLocked: true},
 	TypeContractCompleted:   {Group: "contracts", Label: "Контракт завершён", Email: true, Push: true, InAppLocked: true},
 	TypeContractCancelled:   {Group: "contracts", Label: "Контракт отменён", Email: true, Push: true, InAppLocked: true},
+	TypeOrderAwaiting:       {Group: "contracts", Label: "Новый заказ ждёт вашего ответа", Email: true, Push: true, InAppLocked: true},
+	TypeOrderConfirmed:      {Group: "contracts", Label: "Исполнитель принял заказ", Email: true, Push: true, InAppLocked: true},
+	TypeOrderDeclined:       {Group: "contracts", Label: "Исполнитель отказался от заказа", Email: true, Push: true, InAppLocked: true},
+	TypeOrderExpired:        {Group: "contracts", Label: "Заказ отменён: нет ответа", Email: true, Push: true, InAppLocked: true},
+	TypeSellerLevelChanged:  {Group: "account", Label: "Изменился уровень исполнителя", Email: true, Push: false},
 	TypeDisputeOpened:       {Group: "contracts", Label: "Открыт спор", Email: true, Push: true, InAppLocked: true},
 	TypeDisputeResolved:     {Group: "contracts", Label: "Спор решён", Email: true, Push: true, InAppLocked: true},
 	TypeProfileSubmitted:    {Group: "account", Label: "Заявка отправлена на рассмотрение", Email: true, Push: false, InAppLocked: true},

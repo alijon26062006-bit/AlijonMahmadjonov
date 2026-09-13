@@ -41,6 +41,29 @@ type TierInput struct {
 	Includes     []string `json:"includes"`
 }
 
+// Option is something the client buys on top of a tier: "make it in a day",
+// "hand over the source files", "two more variants".
+//
+// A tier says what the price includes; an option says what it does not, and
+// what that would cost. Without them a freelancer either pads every package
+// for the rare client who needs more, or does the extra work for free.
+type Option struct {
+	ID           uuid.UUID `json:"id"`
+	Position     int       `json:"position"`
+	Name         string    `json:"name"`
+	PriceMinor   int64     `json:"price_minor"`
+	PriceDisplay string    `json:"price_display"`
+	// How much the option moves the deadline. Zero is a legitimate value:
+	// handing over source files takes no extra day.
+	ExtraDays int `json:"extra_days"`
+}
+
+type OptionInput struct {
+	Name       string `json:"name"`
+	PriceMinor int64  `json:"price_minor"`
+	ExtraDays  int    `json:"extra_days"`
+}
+
 type SkillRef struct {
 	Slug   string `json:"slug"`
 	Name   string `json:"name"`
@@ -93,6 +116,7 @@ type Service struct {
 	Revisions   int        `json:"revisions"`
 	Skills      []SkillRef `json:"skills"`
 	Tiers       []Tier     `json:"tiers"`
+	Options     []Option   `json:"options"`
 	// Portfolio items the freelancer attached as examples of this work.
 	PortfolioIDs    []uuid.UUID `json:"portfolio_ids"`
 	ViewCount       int         `json:"view_count"`
@@ -106,22 +130,26 @@ type Service struct {
 // UpsertRequest is what the editor posts. Every field is required on
 // publish, not on save: a draft may be as thin as a title.
 type UpsertRequest struct {
-	Title        string      `json:"title"`
-	Summary      string      `json:"summary"`
-	Description  string      `json:"description"`
-	CategorySlug string      `json:"category_slug"`
-	Currency     string      `json:"currency"`
-	Revisions    int         `json:"revisions"`
-	Skills       []string    `json:"skills"`
-	Tiers        []TierInput `json:"tiers"`
-	PortfolioIDs []string    `json:"portfolio_ids"`
-	CoverFileID  string      `json:"cover_file_id"`
+	Title        string        `json:"title"`
+	Summary      string        `json:"summary"`
+	Description  string        `json:"description"`
+	CategorySlug string        `json:"category_slug"`
+	Currency     string        `json:"currency"`
+	Revisions    int           `json:"revisions"`
+	Skills       []string      `json:"skills"`
+	Tiers        []TierInput   `json:"tiers"`
+	Options      []OptionInput `json:"options"`
+	PortfolioIDs []string      `json:"portfolio_ids"`
+	CoverFileID  string        `json:"cover_file_id"`
 }
 
 // OrderRequest is what a client sends to buy.
 type OrderRequest struct {
-	Tier  int    `json:"tier"`
-	Brief string `json:"brief"`
+	Tier int `json:"tier"`
+	// Which paid options the client added. Ids rather than prices: the price
+	// of an option is the freelancer's to set, never the buyer's to send.
+	OptionIDs []string `json:"option_ids"`
+	Brief     string   `json:"brief"`
 	// How the finished work may appear on the freelancer's profile.
 	PriceVisibility string `json:"price_visibility"`
 }

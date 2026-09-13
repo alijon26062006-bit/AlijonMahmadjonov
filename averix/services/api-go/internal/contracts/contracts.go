@@ -53,9 +53,17 @@ type Contract struct {
 	PriceVisibility      string `json:"price_visibility"`
 	ClientAllowsShowcase bool   `json:"client_allows_showcase"`
 
-	Milestones   []Milestone   `json:"milestones"`
-	Deliverables []Deliverable `json:"deliverables,omitempty"`
-	Participants []PartyRef    `json:"participants,omitempty"`
+	Milestones   []Milestone      `json:"milestones"`
+	Deliverables []Deliverable    `json:"deliverables,omitempty"`
+	Participants []PartyRef       `json:"participants,omitempty"`
+	Options      []ContractOption `json:"options,omitempty"`
+
+	// Заказ услуги ждёт, пока исполнитель его примет. Пока срок не вышел и
+	// подтверждения нет, работа не начинается, а заказчик видит, до какого
+	// момента ждать.
+	ConfirmDeadline      *time.Time `json:"confirm_deadline,omitempty"`
+	ConfirmedAt          *time.Time `json:"confirmed_at,omitempty"`
+	AwaitingConfirmation bool       `json:"awaiting_confirmation,omitempty"`
 
 	CompletedAt        *time.Time `json:"completed_at,omitempty"`
 	CancelledAt        *time.Time `json:"cancelled_at,omitempty"`
@@ -105,6 +113,17 @@ type Can struct {
 	Cancel          bool `json:"cancel"`
 	Dispute         bool `json:"dispute"`
 	AddParticipant  bool `json:"add_participant"`
+	// Принять или отклонить заказ услуги — только у исполнителя и только
+	// пока заказ ждёт ответа.
+	ConfirmOrder bool `json:"confirm_order"`
+}
+
+// ContractOption is a paid extra as it was bought: a snapshot, not a link.
+type ContractOption struct {
+	Name         string `json:"name"`
+	PriceMinor   int64  `json:"price_minor"`
+	PriceDisplay string `json:"price_display,omitempty"`
+	ExtraDays    int    `json:"extra_days,omitempty"`
 }
 
 type Milestone struct {
@@ -125,6 +144,8 @@ type Milestone struct {
 	ApprovedAt     *time.Time `json:"approved_at,omitempty"`
 	ReleasedAt     *time.Time `json:"released_at,omitempty"`
 	RevisionNote   string     `json:"revision_note,omitempty"`
+	// Когда сданная работа будет принята сама, если заказчик промолчит.
+	AutoApproveAt *time.Time `json:"auto_approve_at,omitempty"`
 
 	Deliverables []Deliverable    `json:"deliverables,omitempty"`
 	Events       []MilestoneEvent `json:"events,omitempty"`

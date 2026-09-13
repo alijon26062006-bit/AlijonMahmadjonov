@@ -250,6 +250,7 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	identityGate := identity.NewGate(db, settingsStore)
 	a.Proposals.AttachIdentityGate(identityGate)
 	a.Services.AttachIdentityGate(identityGate)
+	a.Services.AttachLevels(a.Developers)
 	a.Contracts.AttachIdentityGate(identityGate)
 
 	a.Search = search.NewService(search.NewStore(db, store.PublicURL), a.Services.Store(), recorder)
@@ -315,6 +316,7 @@ func (a *App) Handler() http.Handler {
 
 	auth.NewHandlers(a.AuthService, a.AuthMW, a.GoogleAuth, a.Cfg.AppURL).Register(v1)
 	taxonomy.NewHandlers(a.Taxonomy, a.Cache).Register(v1)
+	settings.NewHandlers(a.Settings).Register(v1)
 
 	developers.NewHandlers(a.Developers, a.Photos, a.Cfg.Limits.MaxImageBytes).
 		Register(v1, developers.Middleware{

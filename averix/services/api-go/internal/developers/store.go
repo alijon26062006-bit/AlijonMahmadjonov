@@ -54,7 +54,7 @@ const profileSelect = `
 	  d.projects_completed, d.success_rate, d.on_time_rate, d.repeat_client_count,
 	  d.response_time_seconds, d.total_earned_minor, d.earnings_currency,
 	  d.onboarding_step, d.onboarding_completed_at, d.profile_completeness,
-	  d.is_searchable, d.is_featured, d.moderation_state
+	  d.seller_level, d.is_searchable, d.is_featured, d.moderation_state
 	FROM users u
 	JOIN developer_profiles d ON d.user_id = u.id
 	LEFT JOIN specialisations sp ON sp.id = d.primary_specialisation_id
@@ -97,7 +97,7 @@ func (s *Store) scanProfile(ctx context.Context, where string, arg any) (*Profil
 		&p.Reputation.OnTimeRate, &p.Reputation.RepeatClients,
 		&p.Reputation.ResponseTimeSeconds, &earnedMinor, &earningsCur,
 		&p.Onboarding.Step, &completedAt, &p.Onboarding.Completeness,
-		&p.IsSearchable, &p.IsFeatured, &p.ModerationState,
+		&p.SellerLevel, &p.IsSearchable, &p.IsFeatured, &p.ModerationState,
 	)
 	if database.IsNoRows(err) {
 		return nil, ErrNotFound
@@ -542,4 +542,100 @@ func nullIfBlank(s string) any {
 		return nil
 	}
 	return s
+}
+
+// ── Уровень исполнителя ─────────────────────────────────────────────────────
+
+// LevelChange is one freelancer whose level moved, either way.
+type LevelChange struct {
+	UserID uuid.UUID
+	From   string
+	To     string
+}
+
+// RefreshSellerLevels recomputes every freelancer's level and returns the ones
+// that changed.
+//
+// The numbers come from contracts rather than from a counter kept up to date
+// by hand: a level is a claim about someone's record, and the record is the
+// contracts table. Only the last hundred finished deals count, so a bad month
+// three years ago does not follow a person forever — and a good year does not
+// excuse this month.
+//
+// What counts as a failure is deliberately narrow. A client who cancels before
+// any work started is not the freelancer's fault; declining an order in time
+// is not a failure at all — refusing honestly is better than accepting and
+// disappearing. Cancelling after work began, and letting an order expire
+// unanswered, are.
+func (s *Store) RefreshSellerLevels(ctx context.Context) ([]LevelChange, error) {
+	rows, err := s.db.Query(ctx, `
+		WITH recent AS (
+			SELECT c.developer_id, c.status, c.cancelled_by, c.progress_percent,
+			       c.developer_confirm_deadline, c.developer_confirmed_at, c.cancelled_at,
+			       row_number() OVER (
+			           PARTITION BY c.developer_id
+			           ORDER BY coalesce(c.completed_at, c.cancelled_at, c.updated_at) DESC) AS n
+			FROM contracts c
+			WHERE c.status IN ('completed','cancelled') AND NOT c.is_demo
+		),
+		stats AS (
+			SELECT developer_id,
+			       count(*) FILTER (WHERE status = 'completed') AS completed,
+			       count(*) FILTER (WHERE status = 'cancelled' AND (
+			           cancelled_by = developer_id
+			           OR progress_percent > 0
+			           OR (developer_confirm_deadline IS NOT NULL
+			               AND developer_confirmed_at IS NULL
+			               AND cancelled_at > developer_confirm_deadline))) AS failed
+			FROM recent WHERE n <= 100 GROUP BY developer_id
+		),
+		levelled AS (
+			SELECT dp.user_id, dp.seller_level AS was,
+			       CASE
+			         WHEN coalesce(s.completed, 0) >= 50
+			              AND coalesce(s.failed, 0) <= 0.08 *
+			                  greatest(coalesce(s.completed, 0) + coalesce(s.failed, 0), 1)
+			              AND (dp.rating_avg IS NULL OR dp.rating_avg >= 4.5) THEN 'professional'
+			         WHEN coalesce(s.completed, 0) >= 10
+			              AND coalesce(s.failed, 0) <= 0.10 *
+			                  greatest(coalesce(s.completed, 0) + coalesce(s.failed, 0), 1)
+			              AND (dp.rating_avg IS NULL OR dp.rating_avg >= 4.0) THEN 'advanced'
+			         ELSE 'new'
+			       END AS level
+			FROM developer_profiles dp
+			LEFT JOIN stats s ON s.developer_id = dp.user_id
+		)
+		UPDATE developer_profiles d
+		SET seller_level = l.level, seller_level_updated_at = now()
+		FROM levelled l
+		WHERE d.user_id = l.user_id AND d.seller_level IS DISTINCT FROM l.level
+		RETURNING d.user_id, l.was, l.level`)
+	if err != nil {
+		return nil, fmt.Errorf("refresh seller levels: %w", err)
+	}
+	defer rows.Close()
+
+	out := []LevelChange{}
+	for rows.Next() {
+		var change LevelChange
+		if err := rows.Scan(&change.UserID, &change.From, &change.To); err != nil {
+			return nil, err
+		}
+		out = append(out, change)
+	}
+	return out, rows.Err()
+}
+
+// SellerLevel reads one freelancer's level, for the rules that depend on it.
+func (s *Store) SellerLevel(ctx context.Context, userID uuid.UUID) (string, error) {
+	var level string
+	err := s.db.QueryRow(ctx,
+		`SELECT seller_level FROM developer_profiles WHERE user_id = $1`, userID).Scan(&level)
+	if database.IsNoRows(err) {
+		return "new", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read seller level: %w", err)
+	}
+	return level, nil
 }

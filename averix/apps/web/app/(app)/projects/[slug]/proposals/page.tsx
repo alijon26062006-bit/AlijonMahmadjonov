@@ -17,6 +17,7 @@ import { MatchExplainer } from '@/components/domain/MatchExplainer';
 import { IconCheck, IconShield, IconStarFilled, IconUser } from '@/components/ui/Icon';
 import { ApiFailure, get, post } from '@/lib/api';
 import { days, money, plural, timeAgo } from '@/lib/format';
+import { feeOn, usePlatform } from '@/lib/platform';
 import type { Project, ProposalCard } from '@/lib/types';
 
 const SORTS = [
@@ -221,13 +222,15 @@ function HireSheet({
   onClose: () => void;
   onHired: (contractId: string) => void;
 }) {
+  const platform = usePlatform();
   const [visibility, setVisibility] = useState('range');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
   if (!proposal) return null;
 
-  const fee = Math.round(proposal.amount_minor * 0.1);
+  // Ставка приходит с сервера, а не зашита здесь: администратор может её изменить.
+  const fee = feeOn(platform, proposal.amount_minor);
 
   return (
     <Sheet
@@ -280,8 +283,10 @@ function HireSheet({
             <strong>{proposal.amount_display}</strong>
           </li>
           <li>
-            <span className="av-muted">Комиссия платформы (удерживается с исполнителя)</span>
-            <strong>{money(fee, proposal.currency)}</strong>
+            <span className="av-muted">
+              {fee > 0 ? 'Комиссия платформы (удерживается с исполнителя)' : 'Комиссия платформы'}
+            </span>
+            <strong>{fee > 0 ? money(fee, proposal.currency) : 'сейчас нет'}</strong>
           </li>
           <li>
             <span className="av-muted">Срок</span>

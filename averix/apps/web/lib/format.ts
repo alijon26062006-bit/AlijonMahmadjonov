@@ -57,6 +57,17 @@ export function timeAgo(iso: string | null | undefined): string {
   return shortDate(iso);
 }
 
+/**
+ * Дата в середине предложения.
+ *
+ * «16 сент.» уже оканчивается точкой, и своя точка после неё выглядит
+ * опечаткой; в декабре её нет вовсе. Эта обёртка снимает точку у даты, чтобы
+ * предложение ставило свою там, где ей положено.
+ */
+export function dateInSentence(iso: string | null | undefined): string {
+  return shortDate(iso).replace(/\.$/, '');
+}
+
 export function shortDate(iso: string | null | undefined): string {
   if (!iso) return '';
   const date = new Date(iso);

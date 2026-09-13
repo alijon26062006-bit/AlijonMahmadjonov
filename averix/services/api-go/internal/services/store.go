@@ -36,6 +36,7 @@ type newService struct {
 	Currency     string
 	Revisions    int
 	Tiers        []TierInput
+	Options      []OptionInput
 	SkillIDs     []uuid.UUID
 	PortfolioIDs []uuid.UUID
 }
@@ -92,7 +93,7 @@ func (s *Store) Update(ctx context.Context, id uuid.UUID, in newService) error {
 		if tag.RowsAffected() == 0 {
 			return ErrNotFound
 		}
-		for _, table := range []string{"service_tiers", "service_skills", "service_portfolio_links"} {
+		for _, table := range []string{"service_tiers", "service_options", "service_skills", "service_portfolio_links"} {
 			if _, err := q.Exec(ctx, `DELETE FROM `+table+` WHERE service_id = $1`, id); err != nil {
 				return err
 			}
@@ -109,6 +110,14 @@ func (s *Store) writeChildren(ctx context.Context, q database.Querier, id, owner
 			id, i+1, tier.Name, tier.PriceMinor, tier.DeliveryDays, tier.Revisions,
 			database.Array(tier.Includes)); err != nil {
 			return fmt.Errorf("insert tier: %w", err)
+		}
+	}
+	for i, option := range in.Options {
+		if _, err := q.Exec(ctx, `
+			INSERT INTO service_options (service_id, position, name, price_minor, extra_days)
+			VALUES ($1,$2,$3,$4,$5)`,
+			id, i+1, option.Name, option.PriceMinor, option.ExtraDays); err != nil {
+			return fmt.Errorf("insert option: %w", err)
 		}
 	}
 	for _, skillID := range in.SkillIDs {
@@ -304,6 +313,24 @@ func (s *Store) ByID(ctx context.Context, id uuid.UUID) (*Service, error) {
 		out.Tiers = append(out.Tiers, t)
 	}
 	tiers.Close()
+
+	options, err := s.db.Query(ctx, `
+		SELECT id, position, name, price_minor, extra_days
+		FROM service_options WHERE service_id = $1 ORDER BY position`, id)
+	if err != nil {
+		return nil, err
+	}
+	out.Options = []Option{}
+	for options.Next() {
+		var o Option
+		if err := options.Scan(&o.ID, &o.Position, &o.Name, &o.PriceMinor, &o.ExtraDays); err != nil {
+			options.Close()
+			return nil, err
+		}
+		o.PriceDisplay = notifications.FormatMoney(o.PriceMinor, out.Currency)
+		out.Options = append(out.Options, o)
+	}
+	options.Close()
 
 	skills, err := s.db.Query(ctx, `
 		SELECT sk.slug, sk.name, coalesce(sk.colour, '')
@@ -504,4 +531,34 @@ func (s *Store) OwnedFile(ctx context.Context, fileID, ownerID uuid.UUID) (bool,
 
 func (s *Store) touch(ctx context.Context, id uuid.UUID, when time.Time) {
 	_, _ = s.db.Exec(ctx, `UPDATE services SET updated_at = $2 WHERE id = $1`, id, when)
+}
+
+// PickOptions returns the chosen options of one service, in the freelancer's
+// own order, ignoring anything that is not theirs.
+//
+// The prices come from the table rather than from the request: what an option
+// costs is the seller's to decide, and a buyer who edits the payload gets the
+// real price or nothing.
+func (s *Store) PickOptions(ctx context.Context, serviceID uuid.UUID, ids []uuid.UUID) ([]Option, error) {
+	if len(ids) == 0 {
+		return []Option{}, nil
+	}
+	rows, err := s.db.Query(ctx, `
+		SELECT id, position, name, price_minor, extra_days
+		FROM service_options
+		WHERE service_id = $1 AND id = ANY($2) ORDER BY position`, serviceID, database.Array(ids))
+	if err != nil {
+		return nil, fmt.Errorf("load chosen options: %w", err)
+	}
+	defer rows.Close()
+
+	out := []Option{}
+	for rows.Next() {
+		var o Option
+		if err := rows.Scan(&o.ID, &o.Position, &o.Name, &o.PriceMinor, &o.ExtraDays); err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
 }

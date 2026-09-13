@@ -46,6 +46,12 @@ logs-all: ## Follow every log
 migrate: ## Apply pending migrations
 	$(COMPOSE) run --rm migrate
 
+.PHONY: sync-migrations
+sync-migrations: ## Copy database/migrations into the Go binary's embedded copy
+	@rm -f services/api-go/internal/platform/database/migrations/*.sql
+	@cp database/migrations/*.sql services/api-go/internal/platform/database/migrations/
+	@echo "synced $$(ls database/migrations/*.sql | wc -l) file(s)"
+
 .PHONY: admin
 admin: ## Grant the admin role (make admin EMAIL=you@averix.dev)
 	@test -n "$(EMAIL)" || { echo "usage: make admin EMAIL=you@averix.dev"; exit 1; }

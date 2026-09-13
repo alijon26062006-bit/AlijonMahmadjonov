@@ -163,3 +163,64 @@ func TestServiceValidation(t *testing.T) {
 	stranger.Client.PATCH("/services/"+created.String("id"), offer()).Fails(t, http.StatusNotFound, "not_found")
 	stranger.Client.POST("/services/"+created.String("id")+"/publish", nil).Fails(t, http.StatusNotFound, "not_found")
 }
+
+// Опции — это то, что докупают к тарифу. Проверяется главное: цену и срок
+// считает сервер по своей таблице, а не по тому, что прислал браузер.
+func TestOrderingWithPaidOptions(t *testing.T) {
+	h := testsupport.New(t)
+	dev := h.PublishDeveloper("botmaker", "telegram-developer", "python", "telegram-api")
+	client := h.NewClient("buyer")
+
+	withOptions := offer()
+	withOptions["options"] = []map[string]any{
+		{"name": "Сделаю за три дня вместо десяти", "price_minor": 15000, "extra_days": 0},
+		{"name": "Отдам исходники и инструкцию", "price_minor": 5000, "extra_days": 1},
+	}
+	created := dev.Client.POST("/services", withOptions).OK(t, http.StatusCreated)
+	serviceID := created.String("id")
+	dev.Client.POST("/services/"+serviceID+"/publish", nil).OK(t, http.StatusOK)
+
+	page := client.Client.GET("/services/"+serviceID).OK(t, http.StatusOK)
+	options, _ := page.Data["options"].([]any)
+	if len(options) != 2 {
+		t.Fatalf("options on the page = %d, want 2: %s", len(options), page.Raw)
+	}
+	first, _ := options[0].(map[string]any)
+	if first["price_display"] == nil || first["price_display"] == "" {
+		t.Error("an option needs a price a person can read, not only minor units")
+	}
+	optionIDs := []string{options[0].(map[string]any)["id"].(string),
+		options[1].(map[string]any)["id"].(string)}
+
+	// Тариф «Стандарт» — 60000 за 10 дней; обе опции добавляют 20000 и один день.
+	order := client.Client.POST("/services/"+serviceID+"/order", map[string]any{
+		"tier":       2,
+		"option_ids": optionIDs,
+		"brief":      "Магазин домашней выпечки: 40 позиций, самовывоз и доставка по городу, оплата картой.",
+	}).OK(t, http.StatusCreated)
+	if order.Float("amount_minor") != 80000 {
+		t.Errorf("amount_minor = %v, want 60000 + 15000 + 5000", order.Data["amount_minor"])
+	}
+	if order.Float("delivery_days") != 11 {
+		t.Errorf("delivery_days = %v, want 10 + 1", order.Data["delivery_days"])
+	}
+	bought, _ := order.Data["options"].([]any)
+	if len(bought) != 2 {
+		t.Errorf("the contract must carry what was bought, got %d", len(bought))
+	}
+
+	// Опция чужой услуги не подходит к этой: заказ отклоняется целиком.
+	other := dev.Client.POST("/services", offer()).OK(t, http.StatusCreated).String("id")
+	client.Client.POST("/services/"+other+"/order", map[string]any{
+		"tier":       1,
+		"option_ids": optionIDs,
+		"brief":      "Магазин домашней выпечки: 40 позиций, самовывоз и доставка, оплата картой.",
+	}).Fails(t, http.StatusNotFound, "not_found")
+
+	// Опция, которой не существует, тоже не проходит — и не молча.
+	client.Client.POST("/services/"+serviceID+"/order", map[string]any{
+		"tier":       1,
+		"option_ids": []string{"00000000-0000-0000-0000-000000000000"},
+		"brief":      "Магазин домашней выпечки: 40 позиций, самовывоз и доставка, оплата картой.",
+	}).Fails(t, http.StatusUnprocessableEntity, "validation_failed")
+}

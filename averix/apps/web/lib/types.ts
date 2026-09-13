@@ -176,6 +176,8 @@ export type Milestone = {
   approved_at?: string;
   released_at?: string;
   revision_note?: string;
+  /** Когда сданная работа будет принята сама, если заказчик промолчит. */
+  auto_approve_at?: string;
   deliverables?: Deliverable[];
   events?: MilestoneEvent[];
 };
@@ -229,6 +231,12 @@ export type Contract = {
   participants?: PartyRef[];
   completed_at?: string;
   cancellation_reason?: string;
+  /** Что докупили к тарифу — снимком на момент заказа. */
+  options?: { name: string; price_minor: number; price_display?: string; extra_days?: number }[];
+  /** Заказ услуги ждёт ответа исполнителя. */
+  awaiting_confirmation?: boolean;
+  confirm_deadline?: string;
+  confirmed_at?: string;
   my_role: string;
   can: Record<string, boolean>;
 };
@@ -306,6 +314,8 @@ export type PublicProfile = {
   photo?: PhotoSet;
   reputation: Reputation;
   badges: ProfileBadge[];
+  /** «new» | «advanced» | «professional» — считается из сделок, не назначается. */
+  seller_level?: string;
   github?: GitHubSummary;
   member_since: string;
   is_owner?: boolean;
@@ -588,6 +598,16 @@ export type ServiceTier = {
   includes: string[];
 };
 
+/** Платная опция к услуге: то, что докупают сверх тарифа. */
+export type ServiceOption = {
+  id: string;
+  position?: number;
+  name: string;
+  price_minor: number;
+  price_display?: string;
+  extra_days?: number;
+};
+
 export type ServiceSeller = {
   user_id: string;
   username: string;
@@ -624,6 +644,7 @@ export type Service = ServiceCard & {
   revisions: number;
   skills: SkillRef[];
   tiers: ServiceTier[];
+  options: ServiceOption[];
   portfolio_ids: string[];
   view_count: number;
   moderation_state?: string;

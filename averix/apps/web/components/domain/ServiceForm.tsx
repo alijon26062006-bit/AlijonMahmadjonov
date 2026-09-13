@@ -12,8 +12,10 @@ import { CURRENCIES, SECTORS } from '@/lib/labels';
 import type { Category, Service, Skill } from '@/lib/types';
 
 type TierDraft = { name: string; price: string; delivery_days: string; revisions: string; includes: string };
+type OptionDraft = { name: string; price: string; extra_days: string };
 
 const BLANK_TIER: TierDraft = { name: '', price: '', delivery_days: '', revisions: '1', includes: '' };
+const BLANK_OPTION: OptionDraft = { name: '', price: '', extra_days: '0' };
 
 /**
  * Форма услуги — одна и та же для создания и правки.
@@ -42,6 +44,14 @@ export function ServiceForm({ existing }: { existing?: Service }) {
           includes: (tier.includes ?? []).join('\n'),
         }))
       : [{ ...BLANK_TIER, name: 'Базовый' }],
+  );
+
+  const [options, setOptions] = useState<OptionDraft[]>(
+    existing?.options?.map((option) => ({
+      name: option.name,
+      price: String(Math.round(option.price_minor / 100)),
+      extra_days: String(option.extra_days ?? 0),
+    })) ?? [],
   );
 
   const [tree, setTree] = useState<Category[]>([]);
@@ -118,6 +128,13 @@ export function ServiceForm({ existing }: { existing?: Service }) {
             .split('\n')
             .map((line) => line.trim())
             .filter(Boolean),
+        })),
+      options: options
+        .filter((option) => option.name.trim())
+        .map((option) => ({
+          name: option.name.trim(),
+          price_minor: Math.round(Number(option.price.replace(/[^\d.]/g, '')) * 100) || 0,
+          extra_days: Number(option.extra_days) || 0,
         })),
       portfolio_ids: [],
     };
@@ -307,6 +324,73 @@ export function ServiceForm({ existing }: { existing?: Service }) {
             </Button>
           ) : null}
           <p className="av-xs av-faint">Цены должны идти по возрастанию: следующий пакет дороже предыдущего.</p>
+        </div>
+
+        {/* Опции — то, что заказчик докупает к пакету. Без них приходится
+            либо раздувать пакет ради редкой просьбы, либо делать лишнее
+            бесплатно. */}
+        <div className="av-stack-sm">
+          <p className="av-small av-strong">Дополнительные опции</p>
+          <p className="av-xs av-faint">
+            То, что не входит в пакет, но заказчик может докупить: срочность, исходники, лишний
+            вариант. Цена и срок прибавятся к выбранному пакету.
+          </p>
+          {fields.options ? <p className={styles.alert}>{fields.options}</p> : null}
+          {options.map((option, index) => (
+            <div key={index} className={styles.tier}>
+              <div className="av-row-between">
+                <span className="av-small av-strong">Опция {index + 1}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Убрать опцию"
+                  icon={<IconClose size={15} />}
+                  onClick={() => setOptions(options.filter((_, i) => i !== index))}
+                />
+              </div>
+              <Input
+                label="Что именно"
+                placeholder="Сделаю за три дня вместо десяти"
+                value={option.name}
+                error={fields[`options.${index}.name`]}
+                onChange={(event) => {
+                  const next = [...options];
+                  next[index] = { ...next[index], name: event.target.value };
+                  setOptions(next);
+                }}
+              />
+              <div className="av-row">
+                <Input
+                  label="Доплата"
+                  inputMode="numeric"
+                  value={option.price}
+                  error={fields[`options.${index}.price_minor`]}
+                  onChange={(event) => {
+                    const next = [...options];
+                    next[index] = { ...next[index], price: event.target.value };
+                    setOptions(next);
+                  }}
+                />
+                <Input
+                  label="+ дней к сроку"
+                  inputMode="numeric"
+                  hint="Ноль, если срок не меняется."
+                  value={option.extra_days}
+                  error={fields[`options.${index}.extra_days`]}
+                  onChange={(event) => {
+                    const next = [...options];
+                    next[index] = { ...next[index], extra_days: event.target.value };
+                    setOptions(next);
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+          {options.length < 10 ? (
+            <Button variant="secondary" size="sm" onClick={() => setOptions([...options, { ...BLANK_OPTION }])}>
+              Добавить опцию
+            </Button>
+          ) : null}
         </div>
 
         <div className="av-stack-sm">

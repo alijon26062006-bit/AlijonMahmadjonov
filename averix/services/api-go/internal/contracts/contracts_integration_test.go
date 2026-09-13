@@ -82,6 +82,10 @@ func milestoneIDs(t *testing.T, res *testsupport.Response) []string {
 
 func TestAcceptingAProposalSignsAContract(t *testing.T) {
 	h := testsupport.New(t)
+	// Комиссию тест назначает сам: площадка сейчас работает без неё, и тест,
+	// написанный вокруг значения по умолчанию, проверял бы значение, а не
+	// правило. Отдельный тест ниже проверяет как раз нулевую ставку.
+	h.SetSetting("platform.fee_basis_points", 1000)
 	contractID, client, dev := hire(t, h)
 
 	res := client.Client.GET("/contracts/"+contractID).OK(t, http.StatusOK)
@@ -94,7 +98,7 @@ func TestAcceptingAProposalSignsAContract(t *testing.T) {
 	if res.Float("amount_minor") != 65000 {
 		t.Errorf("amount_minor = %v, want the proposal's price", res.Data["amount_minor"])
 	}
-	// The fee is frozen at signature: 10% of 65000 by default.
+	// The fee is frozen at signature: 10% of 65000 at the rate set above.
 	if res.Float("fee_minor") != 6500 || res.Float("payout_minor") != 58500 {
 		t.Errorf("fee = %v, payout = %v, want 6500 and 58500",
 			res.Data["fee_minor"], res.Data["payout_minor"])

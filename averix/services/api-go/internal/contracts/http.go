@@ -49,6 +49,11 @@ func (h *Handlers) Register(r *httpx.Router, mw Middleware) {
 
 	write := r.Group("/contracts", mw.Require, mw.CSRF)
 	write.POST("/{id}/cancel", h.cancel)
+	// Ответ исполнителя на заказ услуги. Кто это может — решает сервис: здесь
+	// маршрут общий для обеих сторон, потому что 404 на чужой сделке лучше,
+	// чем 403, который подтверждает, что она существует.
+	write.POST("/{id}/confirm", h.confirmOrder)
+	write.POST("/{id}/decline", h.declineOrder)
 	write.POST("/{id}/deliverables", h.addDeliverable)
 	write.POST("/{id}/observers", h.addObserver)
 	write.DELETE("/{id}/observers/{userID}", h.removeObserver)
@@ -253,4 +258,36 @@ func pathID(r *http.Request, name string) (uuid.UUID, error) {
 			fmt.Errorf("%s is not a valid identifier", name))
 	}
 	return parsed, nil
+}
+
+// confirmOrder is the freelancer accepting a service order.
+func (h *Handlers) confirmOrder(w http.ResponseWriter, r *http.Request) error {
+	contractID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		return httpx.ErrBadRequest.Wrap(err)
+	}
+	contract, err := h.svc.ConfirmOrder(r.Context(), security.FromContext(r.Context()), contractID)
+	if err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, contract)
+}
+
+// declineOrder is them refusing it, with an optional word about why.
+func (h *Handlers) declineOrder(w http.ResponseWriter, r *http.Request) error {
+	contractID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		return httpx.ErrBadRequest.Wrap(err)
+	}
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
+		return err
+	}
+	if err := h.svc.DeclineOrder(r.Context(), security.FromContext(r.Context()),
+		contractID, body.Reason); err != nil {
+		return err
+	}
+	return httpx.JSON(w, http.StatusOK, map[string]any{"status": StatusCancelled})
 }

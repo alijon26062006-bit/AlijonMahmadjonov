@@ -157,3 +157,13 @@
   background: var(--av-border-strong);
   flex: none;
 }
+
+/* Срок, после которого сданная работа принимается сама. */
+.autoApprove {
+  margin: var(--av-space-3) 0 0;
+  padding: var(--av-space-3);
+  border-radius: var(--av-radius-md);
+  background: var(--av-warning-subtle);
+  color: var(--av-warning-text);
+  font-size: var(--av-text-sm);
+}

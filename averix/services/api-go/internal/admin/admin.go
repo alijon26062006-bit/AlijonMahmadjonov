@@ -176,12 +176,16 @@ type settingSpec struct {
 func intPtr(n int) *int { return &n }
 
 var catalogue = map[string]settingSpec{
-	"platform.fee_basis_points":      {Label: "Комиссия платформы", Description: "В базисных пунктах: 1000 = 10%. Фиксируется на контракте при подписании и не меняет уже подписанные.", Type: "int", Group: "money", Min: intPtr(0), Max: intPtr(3000)},
+	"platform.fee_basis_points":      {Label: "Комиссия платформы", Description: "В базисных пунктах: 0 — бесплатно, 1000 = 10%. Фиксируется на контракте при подписании и не меняет уже подписанные.", Type: "int", Group: "money", Min: intPtr(0), Max: intPtr(3000)},
+	"contracts.auto_approve_days":    {Label: "Приёмка работы, дней", Description: "Через сколько дней сданный этап принимается сам, если заказчик молчит. 0 — не принимать автоматически.", Type: "int", Group: "marketplace", Min: intPtr(0), Max: intPtr(30)},
+	"contracts.confirm_hours":        {Label: "Ответ на заказ услуги, часов", Description: "Сколько часов у исполнителя есть, чтобы принять заказ. По истечении заказ отменяется сам. 0 — не спрашивать подтверждение.", Type: "int", Group: "marketplace", Min: intPtr(0), Max: intPtr(168)},
 	"payments.provider":              {Label: "Платёжный провайдер", Description: "manual — перевод по реквизитам, который подтверждает администратор.", Type: "string", Group: "money", Options: []string{"manual"}},
 	"proposals.max_per_day":          {Label: "Откликов в сутки на исполнителя", Type: "int", Group: "limits", Min: intPtr(1), Max: intPtr(100)},
 	"proposals.min_cover_letter":     {Label: "Минимальная длина сопроводительного письма", Type: "int", Group: "limits", Min: intPtr(0), Max: intPtr(2000)},
 	"projects.max_open_per_client":   {Label: "Открытых проектов у одного заказчика", Type: "int", Group: "limits", Min: intPtr(1), Max: intPtr(100)},
-	"services.max_per_developer":     {Label: "Услуг у одного исполнителя", Type: "int", Group: "limits", Min: intPtr(1), Max: intPtr(100)},
+	"services.max_new":               {Label: "Услуг у «Новичка»", Type: "int", Group: "limits", Min: intPtr(1), Max: intPtr(100)},
+	"services.max_advanced":          {Label: "Услуг у «Продвинутого»", Type: "int", Group: "limits", Min: intPtr(1), Max: intPtr(200)},
+	"services.max_professional":      {Label: "Услуг у «Профессионала»", Type: "int", Group: "limits", Min: intPtr(1), Max: intPtr(500)},
 	"messages.max_per_minute":        {Label: "Сообщений в минуту", Description: "Защита от флуда в переписке.", Type: "int", Group: "limits", Min: intPtr(5), Max: intPtr(300)},
 	"reviews.window_days":            {Label: "Окно для отзыва, дней", Description: "Сколько дней после завершения контракта можно оставить отзыв; по истечении одиночный отзыв публикуется сам.", Type: "int", Group: "marketplace", Min: intPtr(3), Max: intPtr(60)},
 	"feed.threshold_override":        {Label: "Порог ленты «Для вас»", Description: "Минимальный балл совпадения, чтобы проект попал в ленту. −1 — использовать порог из набора весов.", Type: "int", Group: "marketplace", Min: intPtr(-1), Max: intPtr(100)},
