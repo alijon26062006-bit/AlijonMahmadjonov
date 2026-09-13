@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Generates services/ai-python/app/taxonomy.py from the reference-data migration.
+"""Generates services/ai-python/app/taxonomy.py from the reference-data migrations.
 
 The analysis service needs the closed set of category and technology slugs so
-it can refuse to invent one. Hand-maintaining a second copy of 87 slugs would
-drift within a month, so it is generated, and a test in the Python suite fails
-if the generated file no longer matches the migration.
+it can refuse to invent one. Hand-maintaining a second copy of a few hundred
+slugs would drift within a month, so it is generated, and a test in the Python
+suite fails if the generated file no longer matches the migrations.
+
+Every up-migration is read, because reference data is not confined to one
+file: 0016 brought the software taxonomy and 0019 the rest of the
+marketplace, and a later migration may add a sector of its own. A slug that
+is inserted anywhere is part of the taxonomy.
 """
 
 from __future__ import annotations
@@ -14,54 +19,70 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MIGRATION = ROOT / "database/migrations/0016_reference_data.up.sql"
+MIGRATIONS = ROOT / "database/migrations"
 OUTPUT = ROOT / "services/ai-python/app/taxonomy.py"
 
+# Every INSERT INTO <table> (...) VALUES (...) ; block, for the plain form.
+_VALUES_BLOCK = r"INSERT INTO {table}\s*\([^)]*\)\s*VALUES(.*?);"
+# Every INSERT INTO <table> (...) SELECT ... FROM (VALUES ...) block, for the
+# tree-building form where each row starts with the parent's slug.
+_SELECT_BLOCK = r"INSERT INTO {table}\s*\([^)]*\)\s*SELECT(.*?);"
 
-def extract_block(sql: str, table: str) -> str:
-    """Returns the text of the first INSERT ... VALUES block for a table."""
-    pattern = re.compile(
-        rf"INSERT INTO {table}\s*\([^)]*\)\s*VALUES(.*?);", re.DOTALL | re.IGNORECASE
-    )
-    match = pattern.search(sql)
-    if not match:
-        raise SystemExit(f"could not find an INSERT INTO {table} block in {MIGRATION.name}")
-    return match.group(1)
+
+def values_blocks(sql: str, table: str) -> list[str]:
+    return re.findall(_VALUES_BLOCK.format(table=table), sql, re.DOTALL | re.IGNORECASE)
+
+
+def select_blocks(sql: str, table: str) -> list[str]:
+    return re.findall(_SELECT_BLOCK.format(table=table), sql, re.DOTALL | re.IGNORECASE)
 
 
 def first_column_values(block: str) -> list[str]:
-    """Returns the first quoted value of every row in a VALUES block."""
+    """The first quoted value of every row in a VALUES block."""
     return re.findall(r"\(\s*'([^']+)'", block)
 
 
-def child_category_slugs(sql: str) -> list[str]:
-    """Category slugs from the INSERT ... SELECT blocks that build the tree.
+def second_column_values(block: str) -> list[str]:
+    """The second quoted value of every row: the slug in a (parent, slug, …) row."""
+    return re.findall(r"\(\s*'[^']+'\s*,\s*'([^']+)'", block)
 
-    Those rows come from inline VALUES lists shaped
-    ('parent-slug', 'slug', 'Name', 'leaf', order), so the slug is the second
-    quoted value rather than the first.
-    """
-    slugs: list[str] = []
-    for block in re.findall(
-        r"INSERT INTO categories\s*\([^)]*\)\s*SELECT(.*?);", sql, re.DOTALL | re.IGNORECASE
-    ):
-        slugs.extend(re.findall(r"\(\s*'[^']+'\s*,\s*'([^']+)'", block))
-    return slugs
+
+def collect(sql_files: list[Path]) -> tuple[list[str], list[str], list[str]]:
+    specialisations: list[str] = []
+    categories: list[str] = []
+    skills: list[str] = []
+    for path in sql_files:
+        sql = path.read_text(encoding="utf-8")
+        for block in values_blocks(sql, "specialisations"):
+            specialisations.extend(first_column_values(block))
+        for block in values_blocks(sql, "categories"):
+            categories.extend(first_column_values(block))
+        for block in select_blocks(sql, "categories"):
+            # Only the blocks that carry an inline VALUES list define slugs;
+            # a SELECT that copies rows between tables names none.
+            if "VALUES" in block.upper():
+                categories.extend(second_column_values(block))
+        for block in values_blocks(sql, "skills"):
+            skills.extend(first_column_values(block))
+    return specialisations, categories, skills
 
 
 def main() -> int:
-    sql = MIGRATION.read_text(encoding="utf-8")
+    sql_files = sorted(MIGRATIONS.glob("*.up.sql"))
+    if not sql_files:
+        raise SystemExit(f"no migrations found in {MIGRATIONS}")
 
-    specialisations = first_column_values(extract_block(sql, "specialisations"))
-    categories = first_column_values(extract_block(sql, "categories")) + child_category_slugs(sql)
-    skills = first_column_values(extract_block(sql, "skills"))
+    specialisations, categories, skills = collect(sql_files)
 
-    if len(specialisations) < 8:
-        raise SystemExit(f"only {len(specialisations)} specialisations found; the parser is wrong")
-    if len(categories) < 40:
-        raise SystemExit(f"only {len(categories)} categories found; the parser is wrong")
-    if len(skills) < 60:
-        raise SystemExit(f"only {len(skills)} skills found; the parser is wrong")
+    # A parser that silently matches nothing would generate an empty taxonomy
+    # and the analysis service would reject every slug. These floors are what
+    # the migrations are known to contain.
+    if len(set(specialisations)) < 30:
+        raise SystemExit(f"only {len(set(specialisations))} specialisations found; the parser is wrong")
+    if len(set(categories)) < 100:
+        raise SystemExit(f"only {len(set(categories))} categories found; the parser is wrong")
+    if len(set(skills)) < 150:
+        raise SystemExit(f"only {len(set(skills))} skills found; the parser is wrong")
 
     def render(name: str, values: list[str], comment: str) -> str:
         unique = sorted(set(values))
@@ -70,22 +91,25 @@ def main() -> int:
         lines.extend(["    }", ")", ""])
         return "\n".join(lines)
 
+    sources = ", ".join(p.name for p in sql_files if any(
+        t in p.read_text(encoding="utf-8") for t in ("INSERT INTO specialisations", "INSERT INTO skills")
+    ))
     body = [
         '"""The closed AVERIX taxonomy.',
         "",
-        "GENERATED by scripts/generate-python-taxonomy.py from",
-        "database/migrations/0016_reference_data.up.sql. Do not edit by hand.",
+        "GENERATED by scripts/generate-python-taxonomy.py from the reference-data",
+        f"migrations ({sources}). Do not edit by hand.",
         "",
         "The analysis service uses these to refuse a slug the taxonomy does not",
-        'contain: a category or technology the model invented is dropped rather',
+        "contain: a category or skill the model invented is dropped rather",
         "than stored, because a slug nobody can search for is worse than none.",
         '"""',
         "",
         "from __future__ import annotations",
         "",
-        render("SPECIALISATION_SLUGS", specialisations, "One primary specialisation per developer."),
-        render("CATEGORY_SLUGS", categories, "The project category tree, flattened."),
-        render("SKILL_SLUGS", skills, "Every technology the platform knows."),
+        render("SPECIALISATION_SLUGS", specialisations, "One primary profession per freelancer."),
+        render("CATEGORY_SLUGS", categories, "The category tree, flattened: sectors and everything under them."),
+        render("SKILL_SLUGS", skills, "Every technology, tool and practice the platform knows."),
     ]
 
     OUTPUT.write_text("\n".join(body), encoding="utf-8")
@@ -93,7 +117,7 @@ def main() -> int:
         f"wrote {OUTPUT.relative_to(ROOT)}: "
         f"{len(set(specialisations))} specialisations, "
         f"{len(set(categories))} categories, "
-        f"{len(set(skills))} technologies"
+        f"{len(set(skills))} skills"
     )
     return 0
 

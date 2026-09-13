@@ -393,14 +393,18 @@ func (s *Store) ClientProjects(ctx context.Context, clientID uuid.UUID, status s
 // rather than being a fixed list.
 func (s *Store) Tabs(ctx context.Context, developerID uuid.UUID) ([]Tab, error) {
 	tabs := []Tab{
-		{Key: string(TabForYou), Label: "For you"},
+		{Key: string(TabForYou), Label: "Для вас"},
 	}
 
+	// The tabs are the categories one level under a sector — «Telegram-боты»,
+	// «Логотипы» — not the sector itself. A sector tab («Разработка и IT»)
+	// would show a backend developer every iOS brief, which is exactly what
+	// the feed exists to avoid.
 	rows, err := s.db.Query(ctx, `
 		SELECT DISTINCT c.slug, c.name, c.sort_order
 		FROM category_specialisations cs
 		JOIN categories c ON c.id = cs.category_id
-		WHERE c.depth = 0 AND c.is_active
+		WHERE c.depth = 1 AND c.is_active
 		  AND cs.relevance >= 0.6
 		  AND cs.specialisation_id IN (
 		    SELECT primary_specialisation_id FROM developer_profiles
@@ -432,14 +436,14 @@ func (s *Store) Tabs(ctx context.Context, developerID uuid.UUID) ([]Tab, error) 
 		SELECT count(*) FROM project_invitations
 		WHERE developer_id = $1 AND status IN ('sent','viewed')`, developerID).Scan(&invitations)
 	if invitations > 0 {
-		tabs = append(tabs, Tab{Key: string(TabInvitations), Label: "Invitations", Count: &invitations})
+		tabs = append(tabs, Tab{Key: string(TabInvitations), Label: "Приглашения", Count: &invitations})
 	}
 
 	var saved int
 	_ = s.db.QueryRow(ctx,
 		`SELECT count(*) FROM saved_projects WHERE developer_id = $1`, developerID).Scan(&saved)
-	tabs = append(tabs, Tab{Key: string(TabSaved), Label: "Saved", Count: &saved})
-	tabs = append(tabs, Tab{Key: string(TabRecent), Label: "Recent"})
+	tabs = append(tabs, Tab{Key: string(TabSaved), Label: "Сохранённые", Count: &saved})
+	tabs = append(tabs, Tab{Key: string(TabRecent), Label: "Новые"})
 	return tabs, nil
 }
 

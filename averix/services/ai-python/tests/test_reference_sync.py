@@ -18,7 +18,7 @@ import pytest
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 LOCAL_MAP = SERVICE_ROOT / "app/github/reference/dependency-map.json"
 CANONICAL_MAP = SERVICE_ROOT / "../../database/reference/dependency-map.json"
-CANONICAL_TAXONOMY = SERVICE_ROOT / "../../database/migrations/0016_reference_data.up.sql"
+CANONICAL_MIGRATIONS = SERVICE_ROOT / "../../database/migrations"
 
 
 def digest(path: Path) -> str:
@@ -71,23 +71,27 @@ def test_every_mapped_skill_exists_in_the_taxonomy() -> None:
     )
 
 
-def test_taxonomy_is_generated_from_the_migration() -> None:
-    if not CANONICAL_TAXONOMY.exists():
-        pytest.skip("the canonical migration is not reachable from here")
+def test_taxonomy_is_generated_from_the_migrations() -> None:
+    if not CANONICAL_MIGRATIONS.exists():
+        pytest.skip("the canonical migrations are not reachable from here")
 
     from app.taxonomy import CATEGORY_SLUGS, SKILL_SLUGS, SPECIALISATION_SLUGS
 
-    sql = CANONICAL_TAXONOMY.read_text(encoding="utf-8")
-    # A handful of spot checks rather than reparsing the migration: the
-    # generator already does that, and this catches a stale generated file.
-    for slug in ("backend-developer", "telegram-developer", "ui-ux-designer"):
-        assert slug in SPECIALISATION_SLUGS
+    sql = "\n".join(
+        p.read_text(encoding="utf-8") for p in sorted(CANONICAL_MIGRATIONS.glob("*.up.sql"))
+    )
+    # Spot checks across both reference-data migrations rather than reparsing
+    # them: the generator already does that, and this catches a stale
+    # generated file — including one generated before the marketplace grew
+    # past software work.
+    for slug in ("backend-developer", "telegram-developer", "graphic-designer", "copywriter", "tutor"):
+        assert slug in SPECIALISATION_SLUGS, f"{slug} is missing from the generated taxonomy"
         assert f"'{slug}'" in sql
-    for slug in ("telegram-bots", "backend-development", "saas", "backend-go"):
+    for slug in ("it", "design", "telegram-bots", "backend-go", "design-logo", "texts-translation", "smm-targeting"):
         assert slug in CATEGORY_SLUGS, f"{slug} is missing from the generated taxonomy"
-    for slug in ("go", "python", "telegram-api", "postgresql", "nextjs"):
-        assert slug in SKILL_SLUGS
+    for slug in ("go", "python", "telegram-api", "postgresql", "nextjs", "photoshop", "copywriting", "yandex-direct"):
+        assert slug in SKILL_SLUGS, f"{slug} is missing from the generated taxonomy"
 
-    assert len(SPECIALISATION_SLUGS) == 8
-    assert len(CATEGORY_SLUGS) >= 55
-    assert len(SKILL_SLUGS) >= 85
+    assert len(SPECIALISATION_SLUGS) >= 31
+    assert len(CATEGORY_SLUGS) >= 115
+    assert len(SKILL_SLUGS) >= 170
