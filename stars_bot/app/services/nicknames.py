@@ -176,20 +176,45 @@ def trusted_name(data, uid: str) -> str | None:
     return name
 
 
+def _why_empty(data, uid: str) -> str:
+    """Ответ пришёл, а ника нет. Сказать, что именно в нём было.
+
+    Без этого «не ответил» покрывает три разные беды: сервис недоступен,
+    сервис ответил «нет такого игрока» и сервис ответил про кого-то
+    другого. Лечатся они по-разному, поэтому и различать их надо.
+    """
+    if not isinstance(data, dict):
+        return "ответ не похож на JSON"
+    if not data:
+        return "ответ пустой"
+
+    found = pick_id(data)
+    if found and found != str(uid).strip():
+        return f"ответ про чужой ID {found}"
+    for key in ("error", "message", "msg", "detail", "status"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return f"ответил: {value.strip()[:60]}"
+    return "в ответе нет ника"
+
+
 async def _from_glob(
     session: aiohttp.ClientSession, uid: str, region: str, key: str,
-) -> tuple[str | None, str]:
+) -> tuple[str | None, str, str]:
     """Ни ключа, ни региона — только ID игрока."""
-    async with session.get(f"{GLOBINFO}?uid={uid}") as response:
+    url = f"{GLOBINFO}?uid={uid}"
+    async with session.get(url) as response:
         if response.status != 200:
             log.info("Ники: glob-info ответил %s", response.status)
-            return None, "unknown"
+            return None, "unknown", f"HTTP {response.status}"
         data = await response.json(content_type=None)
 
     if isinstance(data, dict) and data.get("error"):
-        return None, "unknown"
+        return None, "unknown", f"ответил: {str(data.get('error'))[:60]}"
     name = trusted_name(data, uid)
-    return (name, "ok") if name else (None, "unknown")
+    if name:
+        return name, "ok", ""
+    return None, "unknown", _why_empty(data, uid)
 
 
 async def _from_community(
@@ -207,42 +232,48 @@ async def _from_community(
         if response.status in (400, 402):
             # Прямой отказ по игроку. Покупку он всё равно не запирает —
             # это решает вызывающий, — но и ник придумывать не из чего.
-            return None, "bad"
+            return None, "bad", f"HTTP {response.status}"
         if response.status == 404:
             # Двусмысленно: так отвечают и на «нет игрока», и на «нет
             # такого адреса». Принять второе за первое — значит пугать
             # клиента из-за переехавшего сервиса.
             log.info("Ники: freefirecommunity вернул 404 по %s", uid)
-            return None, "unknown"
+            return None, "unknown", "HTTP 404"
         if response.status != 200:
             log.info("Ники: freefirecommunity ответил %s", response.status)
-            return None, "unknown"
+            return None, "unknown", f"HTTP {response.status}"
         data = await response.json(content_type=None)
 
     name = trusted_name(data, uid)
-    return (name, "ok") if name else (None, "unknown")
+    if name:
+        return name, "ok", ""
+    return None, "unknown", _why_empty(data, uid)
 
 
 async def _from_gameskinbo(
     session: aiohttp.ClientSession, uid: str, region: str, key: str,
-) -> tuple[str | None, str]:
+) -> tuple[str | None, str, str]:
     region = known_region(region)
     url = f"{GAMESKINBO}?uid={uid}" + (f"&region={region}" if region else "")
     async with session.get(url, headers={"x-api-key": key}) as response:
         if response.status == 402:
-            return None, "bad"          # сервис прямо говорит: ID неверный
-        if response.status in (401, 429):
-            log.info("Ники: gameskinbo ответил %s", response.status)
-            return None, "unknown"
+            # Сервис прямо говорит: ID неверный.
+            return None, "bad", "HTTP 402"
+        if response.status == 401:
+            return None, "unknown", "HTTP 401: ключ не принят"
+        if response.status == 429:
+            return None, "unknown", "HTTP 429: лимит исчерпан"
         if response.status != 200:
-            return None, "unknown"
+            return None, "unknown", f"HTTP {response.status}"
         data = await response.json(content_type=None)
 
     name = trusted_name(data, uid)
-    return (name, "ok") if name else (None, "unknown")
+    if name:
+        return name, "ok", ""
+    return None, "unknown", _why_empty(data, uid)
 
 
-async def _from_fallback(uid: str, region: str) -> tuple[str | None, str]:
+async def _from_fallback(uid: str, region: str) -> tuple[str | None, str, str]:
     # У этого источника свой список регионов — в нём есть и СНГ.
     url = (f"{FALLBACK}?region="
            f"{known_region(region, FALLBACK_REGIONS) or 'BR'}&uid={uid}")
@@ -250,14 +281,16 @@ async def _from_fallback(uid: str, region: str) -> tuple[str | None, str]:
         async with aiohttp.ClientSession(timeout=FALLBACK_TIMEOUT) as session:
             async with session.get(url) as response:
                 if response.status != 200:
-                    return None, "unknown"
+                    return None, "unknown", f"HTTP {response.status}"
                 data = await response.json(content_type=None)
     except Exception as exc:  # noqa: BLE001 — запасной источник ненадёжен
         log.info("Ники: запасной источник молчит — %s", exc)
-        return None, "unknown"
+        return None, "unknown", f"{type(exc).__name__}: {str(exc)[:60]}"
 
     name = trusted_name(data, uid)
-    return (name, "ok") if name else (None, "unknown")
+    if name:
+        return name, "ok", ""
+    return None, "unknown", _why_empty(data, uid)
 
 
 async def free_fire(
@@ -286,7 +319,10 @@ async def free_fire(
             continue       # без ключа этот источник не отвечает вовсе
         try:
             async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
-                name, verdict = await fetch(session, uid, region, source_key)
+                name, verdict, note = await fetch(
+                    session, uid, region, source_key)
+            if note:
+                log.info("Ники: %s — %s", source, note)
         except Exception as exc:  # noqa: BLE001 — переходим к следующему
             log.info("Ники: %s не ответил — %s", source, exc)
             continue
@@ -347,11 +383,12 @@ async def probe(
         started = time.monotonic()
         try:
             async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
-                found, verdict = await fetch(session, uid, region, source_key)
-            row["name"], row["verdict"] = found, verdict
+                found, verdict, note = await fetch(
+                    session, uid, region, source_key)
+            row["name"], row["verdict"], row["error"] = found, verdict, note
         except Exception as exc:  # noqa: BLE001 — это и есть предмет проверки
             row["verdict"] = "сбой"
-            row["error"] = str(exc)[:120]
+            row["error"] = f"{type(exc).__name__}: {str(exc)[:90]}"
         row["seconds"] = round(time.monotonic() - started, 1)
         out.append(row)
     return out

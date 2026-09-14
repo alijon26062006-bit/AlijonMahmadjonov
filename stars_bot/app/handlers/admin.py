@@ -547,6 +547,20 @@ async def _strip(call: CallbackQuery) -> None:
         log.debug("Кнопки уже убраны: %s", exc)
 
 
+#: Признаки того, что до сервиса вообще не дозвонились. Источники
+#: сообщают о таком по-разному: одни бросают исключение, другие ловят
+#: его сами и возвращают текст, — а лечится это всё одинаково.
+OFFLINE_MARKS = (
+    "сбой", "timeout", "oserror", "cannot connect", "clientconnector",
+    "serverdisconnected", "connectionreset", "нет связи", "ssl",
+)
+
+
+def _offline(row: dict) -> bool:
+    text = f"{row.get('verdict', '')} {row.get('error', '')}".lower()
+    return any(mark in text for mark in OFFLINE_MARKS)
+
+
 @router.message(Command("nick"))
 async def cmd_nick(message: Message, command: CommandObject) -> None:
     """Спросить ник у всех источников сразу и показать, кто что ответил.
@@ -575,23 +589,45 @@ async def cmd_nick(message: Message, command: CommandObject) -> None:
     )
 
     lines, names = [], []
+    offline = 0        # сколько источников вообще не дозвонились
     for row in rows:
         if row["name"]:
             names.append(row["name"])
             lines.append(f"✅ <b>{row['name']}</b>\n"
                          f"   <i>{row['source']} · {row['seconds']} сек</i>")
-        elif row["verdict"] == "bad":
-            lines.append(f"⛔️ <i>{row['source']}</i> — такого игрока нет")
+            continue
+
+        why = f" — {row['error']}" if row["error"] else ""
+        if row["verdict"] == "bad":
+            lines.append(f"⛔️ <i>{row['source']}</i> — нет такого игрока{why}")
         elif row["verdict"] == "нет ключа":
             lines.append(f"➖ <i>{row['source']}</i> — ключ не задан")
         else:
-            why = f" ({row['error']})" if row["error"] else ""
-            lines.append(f"❌ <i>{row['source']}</i> — не ответил{why}")
+            if _offline(row):
+                offline += 1
+            lines.append(f"❌ <i>{row['source']}</i>{why or ' — пусто'}"
+                         f"  <code>{row['seconds']}с</code>")
 
     unique = set(names)
-    if not unique:
-        verdict = ("😔 <b>Ник не узнал никто</b>\n\n"
-                   "<i>Либо ID неверный, либо все источники сейчас молчат.</i>")
+    asked = [r for r in rows if r["verdict"] != "нет ключа"]
+    if not unique and offline >= max(len(asked), 1):
+        verdict = (
+            "🌐 <b>Ни один сервис не отозвался</b>\n\n"
+            "<blockquote>Похоже, дело не в ID: до сервисов не достучался "
+            "никто. Так бывает, когда у сервера закрыт выход в интернет "
+            "или провайдер режет эти адреса.\n\n"
+            "Проверить прямо на сервере:\n"
+            "<code>curl -m 10 -s -o /dev/null -w '%{http_code}\\n' "
+            "https://glob-info2.vercel.app/info?uid=1</code></blockquote>"
+        )
+    elif not unique:
+        verdict = (
+            "😔 <b>Ник не узнал никто</b>\n\n"
+            "<blockquote>Связь есть — сервисы ответили, но ника не дали. "
+            "Причина у каждого написана выше.\n\n"
+            "Скорее всего ID не существует: проверьте каждую цифру "
+            "в профиле игры.</blockquote>"
+        )
     elif len(unique) == 1:
         verdict = (f"✅ <b>Ник: {names[0]}</b>\n\n"
                    f"<i>Согласны источников: {len(names)}. "

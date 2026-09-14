@@ -1019,9 +1019,35 @@ async def nick_probe(conn) -> None:
         nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({})
         told = await run("777")
         check("молчание всех источников названо прямо",
-              "не узнал никто" in told.last, told.last[-200:])
-        check("перечислено, кто именно молчал",
-              told.last.count("не ответил") >= 2, told.last)
+              "не узнал никто" in told.last, told.last[-300:])
+        check("у каждого написана причина",
+              told.last.count("HTTP 404") >= 2, told.last)
+        check("подсказано, что проверить",
+              "ID не существует" in told.last, told.last[-300:])
+
+        # связь оборвалась совсем — это другая беда, и лечится иначе
+        class Dead:
+            def get(self, url, headers=None):
+                raise OSError("Cannot connect to host")
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+        nicknames.forget_all()
+        nicknames.aiohttp.ClientSession = lambda *a, **kw: Dead()
+        told = await run("777")
+        check("обрыв связи отличается от «нет игрока»",
+              "не отозвался" in told.last, told.last[-400:])
+        check("названа вероятная причина",
+              "выход в интернет" in told.last, told.last[-400:])
+        check("дана команда для проверки на сервере",
+              "curl" in told.last, told.last[-400:])
+        check("видна и сама ошибка связи",
+              "OSError" in told.last or "Cannot connect" in told.last,
+              told.last[:400])
 
         # кэш не должен подменять проверку
         nicknames.remember("777", "ИзКэша")
