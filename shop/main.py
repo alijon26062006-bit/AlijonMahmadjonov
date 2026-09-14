@@ -17,7 +17,7 @@ from . import catalog
 from .config import Config, load_config
 from .db import Database
 from .handlers import build_router
-from .middlewares import ErrorGuardMiddleware, GuardMiddleware
+from .middlewares import ButtonStyleFallback, ErrorGuardMiddleware, GuardMiddleware
 from .supplier import build_supplier
 
 log = logging.getLogger("shop")
@@ -33,6 +33,7 @@ ADMIN_COMMANDS = COMMANDS + [
     BotCommand(command="admin", description="Панели админ"),
     BotCommand(command="balance", description="Баланси таъминкунанда"),
     BotCommand(command="sku", description="Санҷиши SKU-ҳо"),
+    BotCommand(command="rang", description="Санҷиши ранги тугмаҳо"),
 ]
 
 
@@ -89,6 +90,8 @@ async def run() -> None:
         token=cfg.token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    # Агар Telegram рангҳоро нашиносад — бот кор карданашро давом медиҳад.
+    bot.session.middleware(ButtonStyleFallback())
     dp = build_dispatcher(db, cfg, supplier)
 
     try:

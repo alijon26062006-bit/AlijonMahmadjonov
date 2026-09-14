@@ -32,7 +32,7 @@ def _btn(text: str, data: str, color: str | None = None) -> InlineKeyboardButton
     )
 
 
-def _url(text: str, link: str, color: str | None = style.LINK) -> InlineKeyboardButton:
+def _url(text: str, link: str, color: str | None = None) -> InlineKeyboardButton:
     return InlineKeyboardButton(text=text, url=link, style=style.pick(color))
 
 
@@ -142,9 +142,9 @@ def payment(
     rows: list[list[InlineKeyboardButton]] = []
     pay_row: list[InlineKeyboardButton] = []
     if link:
-        pay_row.append(_url(texts.BTN_OPEN_LINK, link))
+        pay_row.append(_url(texts.BTN_OPEN_LINK, link, style.PRIMARY))
     if alif:
-        pay_row.append(_url(texts.BTN_OPEN_ALIF, alif))
+        pay_row.append(_url(texts.BTN_OPEN_ALIF, alif, style.PRIMARY))
     if pay_row:
         rows.append(pay_row)
     rows.append([_btn(texts.BTN_PAID, f"{CB_TOPUP_PAID}{topup_id}", style.SUCCESS)])
@@ -159,7 +159,7 @@ def back_home() -> InlineKeyboardMarkup:
 def support(username: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if username:
-        rows.append([_url("✍️ Навиштан", f"https://t.me/{username}")])
+        rows.append([_url("✍️ Навиштан", f"https://t.me/{username}", style.PRIMARY)])
     rows.append([_btn(texts.BTN_HOME, CB_HOME)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

@@ -440,3 +440,47 @@ async def cb_supplier(cb: CallbackQuery, cfg: Config, supplier) -> None:
     )
     await safe_edit(cb, text, keyboards.admin_back())
     await cb.answer()
+
+
+# ── санҷиши ранги тугмаҳо ─────────────────────────────────────────────
+@router.message(Command("rang", "colors"))
+async def cmd_colors(message: Message, bot: Bot) -> None:
+    """Се тугмаи намуна мефиристад — то бо чашми худ бубинед, ранг ҳаст ё не."""
+    import aiogram
+    from aiogram.exceptions import TelegramBadRequest
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+    from .. import style
+
+    probe = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🟢 Сабз (success)", callback_data="a:home",
+                                  style=style.SUCCESS)],
+            [InlineKeyboardButton(text="🔴 Сурх (danger)", callback_data="a:home",
+                                  style=style.DANGER)],
+            [InlineKeyboardButton(text="🔵 Кабуд (primary)", callback_data="a:home",
+                                  style=style.PRIMARY)],
+        ]
+    )
+    head = (
+        "🎨 <b>Санҷиши ранги тугмаҳо</b>\n\n"
+        f"📶 Ҳолат дар бот: {'✅ фаъол' if style.enabled() else '🚫 хомӯш'}\n"
+        f"📦 aiogram {aiogram.__version__} · Bot API {aiogram.__api_version__}\n\n"
+    )
+    try:
+        await bot.send_message(
+            message.chat.id,
+            head
+            + "Агар тугмаҳои поён <b>ранга</b> бошанд — ҳама чиз кор мекунад.\n"
+              "Агар ҳамаашон як ранг бошанд — Telegram-и шумо кӯҳна аст, "
+              "барномаро нав кунед.",
+            reply_markup=probe,
+        )
+    except TelegramBadRequest as exc:
+        await message.answer(
+            head
+            + "❌ <b>Telegram рангро қабул накард.</b>\n\n"
+              f"Ҷавоби сервер:\n<code>{texts.esc(exc)}</code>\n\n"
+              "Дар <code>.env</code> нависед <code>SHOP_BUTTON_COLORS=0</code> "
+              "ва ботро аз нав оғоз кунед."
+        )

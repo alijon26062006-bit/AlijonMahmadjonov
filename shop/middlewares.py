@@ -6,9 +6,11 @@ import logging
 from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware
+from aiogram.client.session.middlewares.base import BaseRequestMiddleware
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import TelegramObject, Update
 
-from . import texts
+from . import style, texts
 from .config import Config
 from .db import Database
 
@@ -71,3 +73,29 @@ class ErrorGuardMiddleware(BaseMiddleware):
             if src is not None:
                 await _tell(data.get("bot"), src.id, texts.ERROR)
             return None
+
+
+class ButtonStyleFallback(BaseRequestMiddleware):
+    """Муҳофиз: агар Telegram рангҳоро қабул накунад, бот наафтад.
+
+    Баъзе серверҳо ё версияҳои кӯҳна майдони ``style``-ро намешиносанд ва
+    тамоми паёмро рад мекунанд. Дар ин ҳолат рангҳоро хомӯш мекунем,
+    аз клавиатура мебардорем ва паёмро аз нав мефиристем.
+    """
+
+    async def __call__(self, make_request, bot, method):
+        try:
+            return await make_request(bot, method)
+        except TelegramBadRequest as exc:
+            markup = getattr(method, "reply_markup", None)
+            if markup is None or "style" not in str(exc).lower():
+                raise
+            log.error(
+                "Telegram ранги тугмаҳоро қабул накард (%s). "
+                "Рангҳо хомӯш карда шуданд — SHOP_BUTTON_COLORS=0 дар .env нависед.",
+                exc,
+            )
+            style.set_enabled(False)
+            if not style.strip(markup):
+                raise
+            return await make_request(bot, method)

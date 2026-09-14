@@ -408,14 +408,71 @@ def test_admin_money_buttons(db):
     assert _find(unlocked, texts.ADM_BTN_UNBLOCK).style == style.SUCCESS
 
 
-def test_external_links_marked_as_link():
+def test_payment_links_are_blue():
     from shop import style
 
-    menu = keyboards.main_menu(reviews_url="https://t.me/x")
-    assert _find(menu, texts.BTN_REVIEWS).style == style.LINK
     pay = keyboards.payment(1, "https://dc.tj/x", "https://alif/x")
-    assert _find(pay, texts.BTN_OPEN_LINK).style == style.LINK
-    assert _find(pay, texts.BTN_OPEN_ALIF).style == style.LINK
+    assert _find(pay, texts.BTN_OPEN_LINK).style == style.PRIMARY
+    assert _find(pay, texts.BTN_OPEN_ALIF).style == style.PRIMARY
+
+
+def _every_button(*markups):
+    for markup in markups:
+        for row in markup.inline_keyboard:
+            yield from row
+
+
+def test_no_keyboard_button_uses_link_style():
+    """Telegram дар клавиатура танҳо danger/success/primary-ро қабул мекунад.
+
+    Агар «link» ба он ҷо афтад, тамоми паём рад мешавад — ин тест
+    чунин хаторо дар реша мегирад.
+    """
+    from types import SimpleNamespace
+    from shop import style
+
+    user = SimpleNamespace(id=1, is_blocked=False)
+    everything = (
+        keyboards.main_menu(is_admin=True, reviews_url="https://t.me/x"),
+        keyboards.telegram_menu(),
+        keyboards.cancel_only(),
+        keyboards.confirm_target(),
+        keyboards.confirm_order(),
+        keyboards.need_money(),
+        keyboards.topup_menu((1000, 2000)),
+        keyboards.payment(1, "https://a", "https://b"),
+        keyboards.back_home(),
+        keyboards.support("user"),
+        keyboards.admin_home(),
+        keyboards.admin_back(),
+        keyboards.admin_user(user),
+        keyboards.admin_order(1),
+        keyboards.admin_topup(1),
+        keyboards.admin_price_categories(),
+        keyboards.admin_price_item("stars_50", True),
+        keyboards.admin_price_item("stars_50", False),
+    )
+    for button in _every_button(*everything):
+        assert button.style in (None, style.SUCCESS, style.DANGER, style.PRIMARY), (
+            f"тугмаи «{button.text}» ранги мамнӯъ дорад: {button.style}"
+        )
+
+
+def test_pick_drops_forbidden_style():
+    from shop import style
+
+    assert style.pick(style.LINK) is None          # барои клавиатура мамнӯъ
+    assert style.pick(style.SUCCESS) == style.SUCCESS
+
+
+def test_strip_removes_all_colors():
+    from shop import style
+
+    menu = keyboards.main_menu()
+    assert any(b.style for b in _every_button(menu))
+    assert style.strip(menu) is True
+    assert all(b.style is None for b in _every_button(menu))
+    assert style.strip(menu) is False              # дуюм бор чизе намемонад
 
 
 def test_colors_can_be_switched_off():
