@@ -6,7 +6,7 @@ from typing import Sequence
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from . import catalog, style, texts
+from . import catalog, db, style, texts
 
 # ── калидҳои callback ─────────────────────────────────────────────────
 CB_HOME = "m:home"
@@ -72,13 +72,19 @@ def telegram_menu() -> InlineKeyboardMarkup:
     )
 
 
-def products(rows: Sequence, category: str, *, currency: str = texts.CURRENCY) -> InlineKeyboardMarkup:
+def products(
+    rows: Sequence,
+    category: str,
+    *,
+    currency: str = texts.CURRENCY,
+    partner: bool = False,
+) -> InlineKeyboardMarkup:
     """Рӯйхати молҳо: ду дар як сатр, агар номҳо кӯтоҳ бошанд."""
     buttons: list[list[InlineKeyboardButton]] = []
     line: list[InlineKeyboardButton] = []
     two_columns = len(rows) > 6
     for row in rows:
-        label = f"{row['title']} — {texts.money(row['price'], currency)}"
+        label = f"{row['title']} — {texts.money(db.price_of(row, partner), currency)}"
         line.append(_btn(label, CB_PRODUCT + row["code"], style.PRIMARY))
         if not two_columns or len(line) == 2:
             buttons.append(line)
@@ -190,7 +196,10 @@ def admin_home() -> InlineKeyboardMarkup:
                 _btn(texts.ADM_BTN_PRICES, "a:prices", style.PRIMARY),
                 _btn(texts.ADM_BTN_BROADCAST, "a:bc", style.PRIMARY),
             ],
-            [_btn(texts.ADM_BTN_SUPPLIER, "a:supplier", style.PRIMARY)],
+            [
+                _btn(texts.ADM_BTN_PARTNERS, "a:partners", style.PRIMARY),
+                _btn(texts.ADM_BTN_SUPPLIER, "a:supplier", style.PRIMARY),
+            ],
             [_btn(texts.BTN_HOME, CB_HOME)],
         ]
     )
@@ -219,6 +228,19 @@ def admin_user(user) -> InlineKeyboardMarkup:
             ],
         ]
     )
+
+
+def admin_partners(rows: Sequence) -> InlineKeyboardMarkup:
+    buttons: list[list[InlineKeyboardButton]] = [
+        [_btn(texts.ADM_BTN_ADD_PARTNER, "a:padd", style.SUCCESS)]
+    ]
+    for row in rows:
+        name = row["first_name"] or (f"@{row['username']}" if row["username"] else row["user_id"])
+        buttons.append(
+            [_btn(f"🗑 {name}", f"a:pdel:{row['user_id']}", style.DANGER)]
+        )
+    buttons.append([_btn(texts.BTN_BACK, "a:home")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def admin_order(order_id: int) -> InlineKeyboardMarkup:
@@ -276,12 +298,18 @@ def admin_price_list(rows: Sequence, *, currency: str = texts.CURRENCY) -> Inlin
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def admin_price_item(code: str, active: bool) -> InlineKeyboardMarkup:
+def admin_price_item(
+    code: str, active: bool, has_partner_price: bool = False
+) -> InlineKeyboardMarkup:
     toggle = "🚫 Хомӯш кардан" if active else "✅ Фаъол кардан"
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [_btn("💲 Иваз кардани нарх", f"a:setprice:{code}", style.PRIMARY)],
-            [_btn(toggle, f"a:toggle:{code}", style.DANGER if active else style.SUCCESS)],
-            [_btn(texts.BTN_BACK, "a:prices")],
-        ]
-    )
+    rows = [
+        [_btn("💲 Нархи оддӣ", f"a:setprice:{code}", style.PRIMARY)],
+        [_btn(texts.ADM_BTN_PARTNER_PRICE, f"a:setpp:{code}", style.PRIMARY)],
+    ]
+    if has_partner_price:
+        rows.append(
+            [_btn(texts.ADM_BTN_PARTNER_OFF, f"a:delpp:{code}", style.DANGER)]
+        )
+    rows.append([_btn(toggle, f"a:toggle:{code}", style.DANGER if active else style.SUCCESS)])
+    rows.append([_btn(texts.BTN_BACK, "a:prices")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)

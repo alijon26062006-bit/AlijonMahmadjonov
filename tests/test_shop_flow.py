@@ -704,3 +704,116 @@ async def test_main_menu_has_no_reply_keyboard(db, cfg, state):
     await menu_h.cmd_start(message, state, db, cfg)
     welcome = [m for m in message.sent if "Хуш омадед" in (m[0] or "")]
     assert welcome and isinstance(welcome[0][1], InlineKeyboardMarkup)
+
+
+# ── шарикон: нархи махсус ─────────────────────────────────────────────
+async def test_partner_sees_cheaper_price_in_list(db, cfg, state):
+    db.touch_user(USER_ID)
+    db.set_price("pubg_660", 9370)
+    db.set_partner_price("pubg_660", 9200)
+
+    normal = FakeCallback(keyboards.CB_CAT + catalog.CAT_PUBG)
+    await menu_h.cb_category(normal, state, db, cfg)
+    assert "93.70" in " ".join(_labels(normal.message.last_markup))
+
+    db.add_partner(USER_ID)
+    partner = FakeCallback(keyboards.CB_CAT + catalog.CAT_PUBG)
+    await menu_h.cb_category(partner, state, db, cfg)
+    labels = " ".join(_labels(partner.message.last_markup))
+    assert "92.00" in labels and "93.70" not in labels
+
+
+async def test_partner_pays_partner_price(db, cfg, state, bot):
+    """Асосӣ: аз ҳисоб маҳз нархи шарикӣ бардошта мешавад."""
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 50000, "topup")
+    db.set_partner_price("pubg_660", 9200)
+    db.add_partner(USER_ID)
+
+    await _reach_confirm(db, cfg, state, code="pubg_660", target="123456789")
+    await buy_h.cb_buy(FakeCallback(keyboards.CB_BUY_OK), state, db, cfg, bot, ManualSupplier())
+
+    order = db.user_orders(USER_ID)[0]
+    assert order["price"] == 9200
+    assert db.user(USER_ID).balance == 50000 - 9200
+
+
+async def test_ordinary_user_pays_full_price(db, cfg, state, bot):
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 50000, "topup")
+    db.set_price("pubg_660", 9370)
+    db.set_partner_price("pubg_660", 9200)
+
+    await _reach_confirm(db, cfg, state, code="pubg_660", target="123456789")
+    await buy_h.cb_buy(FakeCallback(keyboards.CB_BUY_OK), state, db, cfg, bot, ManualSupplier())
+    assert db.user_orders(USER_ID)[0]["price"] == 9370
+
+
+async def test_partner_without_special_price_pays_normal(db, cfg, state, bot):
+    """Агар барои мол нархи шарикӣ гузошта нашуда бошад — нархи оддӣ."""
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 50000, "topup")
+    db.add_partner(USER_ID)
+    db.set_partner_price("prem_3", None)
+
+    await _reach_confirm(db, cfg, state, code="prem_3", target="@Alijon_26")
+    await buy_h.cb_buy(FakeCallback(keyboards.CB_BUY_OK), state, db, cfg, bot, ManualSupplier())
+    assert db.user_orders(USER_ID)[0]["price"] == db.product("prem_3")["price"]
+
+
+async def test_partner_badge_on_start(db, cfg, state):
+    db.add_partner(USER_ID)
+    message = FakeMessage("/start")
+    await menu_h.cmd_start(message, state, db, cfg)
+    assert "шарикӣ" in message.all_text()
+
+
+async def test_no_badge_for_ordinary_user(db, cfg, state):
+    message = FakeMessage("/start")
+    await menu_h.cmd_start(message, state, db, cfg)
+    assert "шарикӣ" not in message.all_text()
+
+
+async def test_admin_adds_partner_and_person_is_told(db, cfg, state, bot):
+    db.touch_user(USER_ID, "ali", "Alijon")
+    message = FakeMessage("@ali", user_id=ADMIN_ID)
+    await admin_h.got_partner(message, state, db, cfg, bot)
+    assert db.is_partner(USER_ID)
+    assert "шарики мо шудед" in bot.to(USER_ID)
+
+
+async def test_admin_cannot_add_unknown_person(db, cfg, state, bot):
+    message = FakeMessage("@kase_nest", user_id=ADMIN_ID)
+    await admin_h.got_partner(message, state, db, cfg, bot)
+    assert db.partners() == []
+    assert "ёфт нашуд" in message.last
+
+
+async def test_admin_removes_partner(db, cfg, state, bot):
+    db.touch_user(USER_ID)
+    db.add_partner(USER_ID)
+    cb = FakeCallback(f"a:pdel:{USER_ID}", user_id=ADMIN_ID)
+    await admin_h.cb_partner_remove(cb, db, cfg, bot)
+    assert not db.is_partner(USER_ID)
+    assert "бекор карда шуд" in bot.to(USER_ID)
+
+
+async def test_partner_price_must_be_lower(db, cfg, state):
+    """Нархи шарикӣ бояд аз нархи оддӣ кам бошад — вагарна маънӣ надорад."""
+    db.set_price("pubg_660", 9370)
+    await state.set_data({"price_code": "pubg_660"})
+    message = FakeMessage("100", user_id=ADMIN_ID)      # 100.00 > 93.70
+    await admin_h.got_partner_price(message, state, db, cfg)
+    assert db.product("pubg_660")["partner_price"] != 10000
+    assert "кам бошад" in message.last
+
+
+async def test_admin_sets_and_clears_partner_price(db, cfg, state):
+    db.set_price("pubg_660", 9370)
+    await state.set_data({"price_code": "pubg_660"})
+    await admin_h.got_partner_price(FakeMessage("92", user_id=ADMIN_ID), state, db, cfg)
+    assert db.product("pubg_660")["partner_price"] == 9200
+
+    await state.set_data({"price_code": "pubg_660"})
+    await admin_h.got_partner_price(FakeMessage("0", user_id=ADMIN_ID), state, db, cfg)
+    assert db.product("pubg_660")["partner_price"] is None

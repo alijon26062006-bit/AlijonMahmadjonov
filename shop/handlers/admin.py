@@ -66,7 +66,8 @@ async def cb_find(cb: CallbackQuery, state: FSMContext) -> None:
 async def _send_user_card(message: Message, user, db: Database, cfg: Config) -> None:
     await message.answer(
         texts.admin_user_card(
-            user, db.user_orders(user.id, 5), db.user_topups(user.id, 5), cfg.currency
+            user, db.user_orders(user.id, 5), db.user_topups(user.id, 5), cfg.currency,
+            partner=db.is_partner(user.id),
         ),
         reply_markup=keyboards.admin_user(user),
     )
@@ -165,7 +166,8 @@ async def cb_block(cb: CallbackQuery, db: Database, cfg: Config) -> None:
     await safe_edit(
         cb,
         texts.admin_user_card(
-            fresh, db.user_orders(user_id, 5), db.user_topups(user_id, 5), cfg.currency
+            fresh, db.user_orders(user_id, 5), db.user_topups(user_id, 5), cfg.currency,
+            partner=db.is_partner(user_id),
         ),
         keyboards.admin_user(fresh),
     )
@@ -285,13 +287,20 @@ async def cb_price_item(cb: CallbackQuery, db: Database, cfg: Config) -> None:
         await cb.answer(texts.UNKNOWN, show_alert=True)
         return
     status = "✅ фаъол" if row["active"] else "🚫 хомӯш"
+    partner_price = row["partner_price"]
+    partner_line = (
+        f"🤝 Нархи шарикӣ: <b>{texts.money(partner_price, cfg.currency)}</b>"
+        if partner_price
+        else "🤝 Нархи шарикӣ: <i>гузошта нашудааст</i> (шарик нархи оддиро медиҳад)"
+    )
     await safe_edit(
         cb,
         f"📦 <b>{texts.esc(row['title'])}</b>\n\n"
-        f"💰 Нарх: <b>{texts.money(row['price'], cfg.currency)}</b>\n"
+        f"💰 Нархи оддӣ: <b>{texts.money(row['price'], cfg.currency)}</b>\n"
+        f"{partner_line}\n"
         f"📶 Ҳолат: {status}\n"
         f"🔖 Код: <code>{texts.esc(code)}</code>",
-        keyboards.admin_price_item(code, bool(row["active"])),
+        keyboards.admin_price_item(code, bool(row["active"]), bool(partner_price)),
     )
     await cb.answer()
 
@@ -331,10 +340,122 @@ async def got_price(message: Message, state: FSMContext, db: Database, cfg: Conf
     await state.clear()
     row = db.product(code)
     await message.answer(
-        f"✅ Нархи <b>{texts.esc(row['title'])}</b> акнун "
+        f"✅ Нархи оддии <b>{texts.esc(row['title'])}</b> акнун "
         f"<b>{texts.money(price, cfg.currency)}</b>",
-        reply_markup=keyboards.admin_price_item(code, bool(row["active"])),
+        reply_markup=keyboards.admin_price_item(
+            code, bool(row["active"]), bool(row["partner_price"])
+        ),
     )
+
+
+# ── шарикон ───────────────────────────────────────────────────────────
+@router.callback_query(F.data == "a:partners")
+async def cb_partners(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Config) -> None:
+    await state.clear()
+    rows = db.partners()
+    await safe_edit(
+        cb, texts.admin_partners(rows, cfg.currency), keyboards.admin_partners(rows)
+    )
+    await cb.answer()
+
+
+@router.callback_query(F.data == "a:padd")
+async def cb_partner_add(cb: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Admin.waiting_partner)
+    await safe_edit(cb, texts.ADMIN_ASK_PARTNER, keyboards.admin_back())
+    await cb.answer()
+
+
+@router.message(Admin.waiting_partner, F.text)
+async def got_partner(
+    message: Message, state: FSMContext, db: Database, cfg: Config, bot: Bot
+) -> None:
+    found = db.find_user(message.text)
+    if found is None:
+        await message.answer(
+            texts.ADMIN_USER_NOT_FOUND
+            + "\n\n<i>Шояд ӯ ҳанӯз ботро накушодааст. Бигӯед, ки /start-ро пахш кунад.</i>",
+            reply_markup=keyboards.admin_back(),
+        )
+        return
+    await state.clear()
+    db.add_partner(found.id, admin_id=message.from_user.id)
+    await message.answer(texts.partner_added(found))
+    await notify_user(bot, found.id, texts.PARTNER_WELCOME)
+    rows = db.partners()
+    await message.answer(
+        texts.admin_partners(rows, cfg.currency), reply_markup=keyboards.admin_partners(rows)
+    )
+
+
+@router.callback_query(F.data.startswith("a:pdel:"))
+async def cb_partner_remove(
+    cb: CallbackQuery, db: Database, cfg: Config, bot: Bot
+) -> None:
+    user_id = int(cb.data.rsplit(":", 1)[1])
+    if db.remove_partner(user_id):
+        await notify_user(bot, user_id, texts.PARTNER_REMOVED)
+    rows = db.partners()
+    await safe_edit(
+        cb, texts.admin_partners(rows, cfg.currency), keyboards.admin_partners(rows)
+    )
+    await cb.answer("🗑 Бекор шуд")
+
+
+@router.callback_query(F.data.startswith("a:setpp:"))
+async def cb_set_partner_price(cb: CallbackQuery, state: FSMContext) -> None:
+    code = cb.data.rsplit(":", 1)[1]
+    await state.set_state(Admin.waiting_partner_price)
+    await state.update_data(price_code=code)
+    await cb.message.answer(texts.ADMIN_ASK_PARTNER_PRICE, reply_markup=keyboards.admin_back())
+    await cb.answer()
+
+
+@router.message(Admin.waiting_partner_price, F.text)
+async def got_partner_price(
+    message: Message, state: FSMContext, db: Database, cfg: Config
+) -> None:
+    raw = message.text.strip().replace(",", ".")
+    price = None if raw in ("0", "0.0", "0.00") else texts.to_diram(raw)
+    if price is None and raw not in ("0", "0.0", "0.00"):
+        await message.answer(texts.ADMIN_ASK_PARTNER_PRICE)
+        return
+    data = await state.get_data()
+    code = data.get("price_code", "")
+    row = db.product(code)
+    if row is None:
+        await state.clear()
+        await message.answer(texts.UNKNOWN, reply_markup=keyboards.admin_back())
+        return
+    if price is not None and price >= row["price"]:
+        await message.answer(
+            "⚠️ Нархи шарикӣ аз нархи оддӣ "
+            f"({texts.money(row['price'], cfg.currency)}) кам бошад.\n"
+            "Рақами дигар нависед."
+        )
+        return
+
+    db.set_partner_price(code, price)
+    await state.clear()
+    row = db.product(code)
+    note = (
+        f"акнун <b>{texts.money(price, cfg.currency)}</b>"
+        if price
+        else "бардошта шуд — шарик нархи оддиро медиҳад"
+    )
+    await message.answer(
+        f"✅ Нархи шарикии <b>{texts.esc(row['title'])}</b> {note}",
+        reply_markup=keyboards.admin_price_item(
+            code, bool(row["active"]), bool(row["partner_price"])
+        ),
+    )
+
+
+@router.callback_query(F.data.startswith("a:delpp:"))
+async def cb_del_partner_price(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    code = cb.data.rsplit(":", 1)[1]
+    db.set_partner_price(code, None)
+    await cb_price_item(cb, db, cfg)
 
 
 # ── эълон ─────────────────────────────────────────────────────────────

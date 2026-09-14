@@ -21,3 +21,5 @@ class Admin(StatesGroup):
     waiting_minus = State()
     waiting_price = State()
     waiting_broadcast = State()
+    waiting_partner = State()
+    waiting_partner_price = State()

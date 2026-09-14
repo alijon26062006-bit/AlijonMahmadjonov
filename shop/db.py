@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS products (
     title    TEXT    NOT NULL,
     amount   INTEGER NOT NULL DEFAULT 0,
     price    INTEGER NOT NULL,
+    partner_price INTEGER,
     sku      TEXT    NOT NULL DEFAULT '',
     kind     TEXT    NOT NULL DEFAULT 'game',
     sort     INTEGER NOT NULL DEFAULT 0,
@@ -100,6 +101,13 @@ CREATE TABLE IF NOT EXISTS balance_log (
 );
 CREATE INDEX IF NOT EXISTS idx_balance_log_user ON balance_log(user_id, id DESC);
 
+CREATE TABLE IF NOT EXISTS partners (
+    user_id    INTEGER PRIMARY KEY,
+    note       TEXT,
+    added_by   INTEGER,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -109,6 +117,18 @@ CREATE TABLE IF NOT EXISTS settings (
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def price_of(row: sqlite3.Row, partner: bool = False) -> int:
+    """Нархе, ки харидор воқеан мепардозад.
+
+    Шарик нархи махсусро мегирад, агар он гузошта шуда бошад.
+    """
+    if partner:
+        special = row["partner_price"] if "partner_price" in row.keys() else None
+        if special:
+            return int(special)
+    return int(row["price"])
 
 
 class NotEnoughMoney(Exception):
@@ -181,6 +201,7 @@ class Database:
         self.seed_products()
 
     _NEW_COLUMNS = (
+        ("products", "partner_price", "INTEGER"),
         ("products", "sku", "TEXT NOT NULL DEFAULT ''"),
         ("products", "kind", "TEXT NOT NULL DEFAULT 'game'"),
         ("orders", "sku", "TEXT NOT NULL DEFAULT ''"),
@@ -220,9 +241,10 @@ class Database:
             for i, p in enumerate(catalog.DEFAULT_PRODUCTS):
                 self._conn.execute(
                     "INSERT OR IGNORE INTO products"
-                    "(code, category, title, amount, price, sku, kind, sort, active) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)",
-                    (p.code, p.category, p.title, p.amount, p.price, p.sku, p.kind, i),
+                    "(code, category, title, amount, price, partner_price, sku, kind, sort, active) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+                    (p.code, p.category, p.title, p.amount, p.price,
+                     p.partner_price or None, p.sku, p.kind, i),
                 )
                 self._conn.execute(
                     "UPDATE products SET category = ?, title = ?, amount = ?, "
@@ -247,6 +269,13 @@ class Database:
     def product(self, code: str) -> sqlite3.Row | None:
         return self._one("SELECT * FROM products WHERE code = ?", (code,))
 
+    def set_partner_price(self, code: str, price: int | None) -> bool:
+        """Нархи шарикӣ. `None` — шарик нархи оддиро мепардозад."""
+        cur = self._run(
+            "UPDATE products SET partner_price = ? WHERE code = ?", (price, code)
+        )
+        return cur.rowcount > 0
+
     def set_price(self, code: str, price: int) -> bool:
         cur = self._run("UPDATE products SET price = ? WHERE code = ?", (price, code))
         return cur.rowcount > 0
@@ -256,6 +285,28 @@ class Database:
             "UPDATE products SET active = ? WHERE code = ?", (1 if active else 0, code)
         )
         return cur.rowcount > 0
+
+    # ── шарикон ───────────────────────────────────────────────────────
+    def add_partner(self, user_id: int, note: str = "", admin_id: int | None = None) -> None:
+        self._run(
+            "INSERT INTO partners(user_id, note, added_by, created_at) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(user_id) DO UPDATE SET note = excluded.note",
+            (user_id, note, admin_id, now()),
+        )
+
+    def remove_partner(self, user_id: int) -> bool:
+        return self._run("DELETE FROM partners WHERE user_id = ?", (user_id,)).rowcount > 0
+
+    def is_partner(self, user_id: int) -> bool:
+        return self._one("SELECT 1 FROM partners WHERE user_id = ?", (user_id,)) is not None
+
+    def partners(self) -> list[sqlite3.Row]:
+        return self._all(
+            "SELECT p.*, u.username, u.first_name, u.balance, u.spent "
+            "FROM partners p LEFT JOIN users u ON u.id = p.user_id "
+            "ORDER BY p.created_at DESC"
+        )
 
     # ── корбарон ──────────────────────────────────────────────────────
     def touch_user(

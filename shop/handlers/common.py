@@ -60,7 +60,7 @@ async def show_main_menu(
     user_id = event.from_user.id
     user = db.user(user_id)
     balance = user.balance if user else 0
-    text = texts.welcome(balance, cfg.currency)
+    text = texts.welcome(balance, cfg.currency, partner=db.is_partner(user_id))
     markup = keyboards.main_menu(
         is_admin=cfg.is_admin(user_id), reviews_url=cfg.reviews_url
     )

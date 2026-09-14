@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, Message
 
 from .. import catalog, keyboards, texts
 from ..config import Config
-from ..db import Database, NotEnoughMoney
+from ..db import Database, NotEnoughMoney, price_of
 from ..fulfillment import deliver_in_background
 from ..states import Buy
 from ..supplier import Supplier
@@ -52,10 +52,11 @@ async def cb_product(
     await state.clear()
     await state.set_state(Buy.waiting_target)
     await state.update_data(code=code)
+    price = price_of(row, db.is_partner(cb.from_user.id))
     if info.target == "username":
-        text = texts.ask_username(info, row["title"], row["price"], cfg.currency)
+        text = texts.ask_username(info, row["title"], price, cfg.currency)
     else:
-        text = texts.ask_player_id(info, row["title"], row["price"], cfg.currency)
+        text = texts.ask_player_id(info, row["title"], price, cfg.currency)
     await safe_edit(cb, text, keyboards.cancel_only())
     await cb.answer()
 
@@ -123,16 +124,18 @@ async def _show_confirm(
         return
     info = catalog.CATEGORY_INFO[row["category"]]
     user = db.touch_user(message.chat.id)
+    partner = db.is_partner(user.id)
     await state.set_state(Buy.confirming)
     await message.answer(
         texts.confirm_order(
             info,
             row["title"],
-            row["price"],
+            price_of(row, partner),
             data.get("target", ""),
             data.get("nickname"),
             user.balance,
             cfg.currency,
+            partner=partner,
         ),
         reply_markup=keyboards.confirm_order(),
     )
@@ -160,7 +163,7 @@ async def cb_id_no(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Conf
     ask = texts.ask_username if info.target == "username" else texts.ask_player_id
     await safe_edit(
         cb,
-        ask(info, row["title"], row["price"], cfg.currency),
+        ask(info, row["title"], price_of(row, db.is_partner(cb.from_user.id)), cfg.currency),
         keyboards.cancel_only(),
     )
     await cb.answer()
@@ -183,7 +186,7 @@ async def cb_buy(
         return
 
     user = current_user(cb, db)
-    price = row["price"]
+    price = price_of(row, db.is_partner(user.id))
     if user.balance < price:
         await safe_edit(
             cb, texts.not_enough(price, user.balance, cfg.currency), keyboards.need_money()

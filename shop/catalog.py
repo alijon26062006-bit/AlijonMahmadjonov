@@ -91,9 +91,10 @@ class Product:
     category: str
     title: str
     amount: int          # ситора/алмос/UC/моҳ
-    price: int           # дирам
+    price: int           # дирам — нархи оддӣ
     sku: str             # SKU-и FireLoot ("" барои молҳои дастӣ)
     kind: FulfillKind
+    partner_price: int = 0   # дирам; 0 — шарик нархи оддиро мепардозад
 
 
 def _p(
@@ -104,8 +105,13 @@ def _p(
     price_somoni: float,
     sku: str,
     kind: FulfillKind = "game",
+    partner_somoni: float = 0,
 ) -> Product:
-    return Product(code, category, title, amount, round(price_somoni * 100), sku, kind)
+    """Нархҳо бо сомонӣ навишта мешаванд, дар база бо дирам нигоҳ дошта."""
+    return Product(
+        code, category, title, amount, round(price_somoni * 100),
+        sku, kind, round(partner_somoni * 100),
+    )
 
 
 DEFAULT_PRODUCTS: tuple[Product, ...] = (
@@ -122,16 +128,16 @@ DEFAULT_PRODUCTS: tuple[Product, ...] = (
     _p("prem_12", CAT_PREMIUM, "👑 Premium — 12 моҳ", 12, 390.00, "", "manual"),
 
     # ── Free Fire ИДМ — алмосҳо ──────────────────────────────────────
-    _p("ffcis_110", CAT_FF_CIS, "💎 110 Алмаз", 110, 9.00, "diamonds_110"),
-    _p("ffcis_341", CAT_FF_CIS, "💎 341 Алмаз", 341, 28.00, "diamonds_341"),
-    _p("ffcis_572", CAT_FF_CIS, "💎 572 Алмаз", 572, 45.00, "diamonds_572"),
-    _p("ffcis_1166", CAT_FF_CIS, "💎 1166 Алмаз", 1166, 89.90, "diamonds_1166"),
-    _p("ffcis_2398", CAT_FF_CIS, "💎 2398 Алмаз", 2398, 177.00, "diamonds_2398"),
-    _p("ffcis_6160", CAT_FF_CIS, "💎 6160 Алмаз", 6160, 429.00, "diamonds_6160"),
+    _p("ffcis_110", CAT_FF_CIS, "💎 110 Алмаз", 110, 9.00, "diamonds_110", partner_somoni=8.4),
+    _p("ffcis_341", CAT_FF_CIS, "💎 341 Алмаз", 341, 28.00, "diamonds_341", partner_somoni=25.0),
+    _p("ffcis_572", CAT_FF_CIS, "💎 572 Алмаз", 572, 45.00, "diamonds_572", partner_somoni=42.5),
+    _p("ffcis_1166", CAT_FF_CIS, "💎 1166 Алмаз", 1166, 89.90, "diamonds_1166", partner_somoni=86.0),
+    _p("ffcis_2398", CAT_FF_CIS, "💎 2398 Алмаз", 2398, 177.00, "diamonds_2398", partner_somoni=170.0),
+    _p("ffcis_6160", CAT_FF_CIS, "💎 6160 Алмаз", 6160, 429.00, "diamonds_6160", partner_somoni=414.0),
     # ── Free Fire ИДМ — ваучерҳо ─────────────────────────────────────
-    _p("ffcis_week_lite", CAT_FF_CIS, "🔹 Ваучери Лайт (Weekly Lite)", 0, 6.00, "voucher_week_lite_2"),
-    _p("ffcis_week", CAT_FF_CIS, "🎟 Ваучери Ҳафтаина", 0, 16.80, "voucher_week"),
-    _p("ffcis_month", CAT_FF_CIS, "🎟 Ваучери Моҳона", 0, 64.80, "voucher_month"),
+    _p("ffcis_week_lite", CAT_FF_CIS, "🔹 Ваучери Лайт (Weekly Lite)", 0, 6.00, "voucher_week_lite_2", partner_somoni=4.5),
+    _p("ffcis_week", CAT_FF_CIS, "🎟 Ваучери Ҳафтаина", 0, 16.80, "voucher_week", partner_somoni=16.2),
+    _p("ffcis_month", CAT_FF_CIS, "🎟 Ваучери Моҳона", 0, 64.80, "voucher_month", partner_somoni=59.0),
 
     # ── Free Fire Индонезия — алмосҳо ────────────────────────────────
     _p("ffid_50", CAT_FF_ID, "💎 50 Алмаз", 50, 5.50, "id_diamonds_50"),
@@ -152,16 +158,16 @@ DEFAULT_PRODUCTS: tuple[Product, ...] = (
     _p("ffid_month", CAT_FF_ID, "🎟 Моҳона (Monthly)", 0, 69.80, "id_membership_monthly"),
 
     # ── PUBG Mobile UC ───────────────────────────────────────────────
-    _p("pubg_60", CAT_PUBG, "🎮 60 UC", 60, 10.00, "pubg_uc_60"),
-    _p("pubg_325", CAT_PUBG, "🎮 300 + 25 UC", 325, 48.95, "pubg_uc_325"),
-    _p("pubg_660", CAT_PUBG, "🎮 600 + 60 UC", 660, 93.70, "pubg_uc_660"),
-    _p("pubg_1800", CAT_PUBG, "🎮 1 500 + 300 UC", 1800, 241.00, "pubg_uc_1800"),
-    _p("pubg_3850", CAT_PUBG, "🎮 3 000 + 850 UC", 3850, 452.00, "pubg_uc_3850"),
-    _p("pubg_8100", CAT_PUBG, "🎮 6 000 + 2 100 UC", 8100, 900.00, "pubg_uc_8100"),
-    _p("pubg_16200", CAT_PUBG, "🎮 12 000 + 4 200 UC", 16200, 1800.00, "pubg_uc_16200"),
-    _p("pubg_24300", CAT_PUBG, "🎮 18 000 + 6 300 UC", 24300, 2700.00, "pubg_uc_24300"),
-    _p("pubg_32400", CAT_PUBG, "🎮 24 000 + 8 400 UC", 32400, 3700.00, "pubg_uc_32400"),
-    _p("pubg_40500", CAT_PUBG, "🎮 30 000 + 10 500 UC", 40500, 4500.00, "pubg_uc_40500"),
+    _p("pubg_60", CAT_PUBG, "🎮 60 UC", 60, 10.00, "pubg_uc_60", partner_somoni=9.6),
+    _p("pubg_325", CAT_PUBG, "🎮 300 + 25 UC", 325, 48.95, "pubg_uc_325", partner_somoni=47.8),
+    _p("pubg_660", CAT_PUBG, "🎮 600 + 60 UC", 660, 93.70, "pubg_uc_660", partner_somoni=92.0),
+    _p("pubg_1800", CAT_PUBG, "🎮 1 500 + 300 UC", 1800, 241.00, "pubg_uc_1800", partner_somoni=235.0),
+    _p("pubg_3850", CAT_PUBG, "🎮 3 000 + 850 UC", 3850, 452.00, "pubg_uc_3850", partner_somoni=440.0),
+    _p("pubg_8100", CAT_PUBG, "🎮 6 000 + 2 100 UC", 8100, 900.00, "pubg_uc_8100", partner_somoni=865.0),
+    _p("pubg_16200", CAT_PUBG, "🎮 12 000 + 4 200 UC", 16200, 1800.00, "pubg_uc_16200", partner_somoni=1670.0),
+    _p("pubg_24300", CAT_PUBG, "🎮 18 000 + 6 300 UC", 24300, 2700.00, "pubg_uc_24300", partner_somoni=2650.0),
+    _p("pubg_32400", CAT_PUBG, "🎮 24 000 + 8 400 UC", 32400, 3700.00, "pubg_uc_32400", partner_somoni=3650.0),
+    _p("pubg_40500", CAT_PUBG, "🎮 30 000 + 10 500 UC", 40500, 4500.00, "pubg_uc_40500", partner_somoni=4450.0),
 )
 
 # Маблағҳои тайёр барои пур кардани ҳисоб (дирам).

@@ -79,10 +79,12 @@ WELCOME_QUOTE = (
 CHOOSE_SECTION = "<i>Бахшро аз поён интихоб кунед</i> 👇"
 
 
-def welcome(balance: int, currency: str = CURRENCY) -> str:
+def welcome(balance: int, currency: str = CURRENCY, partner: bool = False) -> str:
+    badge = f"\n{PARTNER_BADGE}\n" if partner else ""
     return (
         f"{WELCOME_TITLE}\n\n"
-        f"{WELCOME_QUOTE}\n\n"
+        f"{WELCOME_QUOTE}\n"
+        f"{badge}\n"
         f"💳 Ҳисоби шумо: <b>{money(balance, currency)}</b>\n\n"
         f"{CHOOSE_SECTION}"
     )
@@ -96,9 +98,15 @@ TELEGRAM_MENU = (
 )
 
 
-def category_menu(cat: catalog.Category, balance: int, currency: str = CURRENCY) -> str:
+PARTNER_BADGE = "🤝 <b>Нархи шарикӣ</b> барои шумо фаъол аст"
+
+
+def category_menu(
+    cat: catalog.Category, balance: int, currency: str = CURRENCY, partner: bool = False
+) -> str:
+    badge = f"\n{PARTNER_BADGE}" if partner else ""
     return (
-        f"{cat.icon} <b>{esc(cat.title)}</b>\n\n"
+        f"{cat.icon} <b>{esc(cat.title)}</b>{badge}\n\n"
         f"Маҳсулотро интихоб кунед.\n"
         f"💳 Ҳисоби шумо: <b>{money(balance, currency)}</b>"
     )
@@ -164,6 +172,7 @@ def confirm_order(
     nickname: str | None,
     balance: int,
     currency: str = CURRENCY,
+    partner: bool = False,
 ) -> str:
     lines = [
         "🧾 <b>Тасдиқи фармоиш</b>",
@@ -176,7 +185,8 @@ def confirm_order(
         lines.append(f"👤 Лақаб: <b>{esc(nickname)}</b>")
     lines += [
         "",
-        f"💰 Нарх: <b>{money(price, currency)}</b>",
+        f"💰 Нарх: <b>{money(price, currency)}</b>"
+        + ("  🤝 <i>нархи шарикӣ</i>" if partner else ""),
         f"💳 Ҳисоби шумо: {money(balance, currency)}",
         f"💵 Пас аз харид: {money(balance - price, currency)}",
         "",
@@ -428,6 +438,10 @@ ADM_BTN_TOPUPS = "💳 Пардохтҳои интизорӣ"
 ADM_BTN_PRICES = "💲 Нархҳо"
 ADM_BTN_BROADCAST = "📢 Эълон ба ҳама"
 ADM_BTN_SUPPLIER = "🔌 Таъминкунанда"
+ADM_BTN_PARTNERS = "🤝 Шарикон"
+ADM_BTN_ADD_PARTNER = "➕ Шарики нав"
+ADM_BTN_PARTNER_PRICE = "🤝 Нархи шарикӣ"
+ADM_BTN_PARTNER_OFF = "🗑 Нархи шарикиро бардоштан"
 ADM_BTN_PLUS = "➕ Илова кардан"
 ADM_BTN_MINUS = "➖ Кам кардан"
 ADM_BTN_BLOCK = "🚫 Маҳдуд кардан"
@@ -454,6 +468,61 @@ ADMIN_NO_ORDERS = "✅ Фармоиши кушода нест."
 ADMIN_NO_TOPUPS = "✅ Пардохти интизорӣ нест."
 
 
+ADMIN_ASK_PARTNER = (
+    "🤝 ID ё @username-и шарики навро нависед.\n\n"
+    "Намуна: <code>123456789</code> ё <code>@username</code>\n\n"
+    "<i>Шахс бояд ҳадди ақал як бор /start-ро пахш карда бошад — "
+    "вагарна ботро намешиносад.</i>"
+)
+ADMIN_ASK_PARTNER_PRICE = (
+    "🤝 Нархи шарикиро бо сомонӣ нависед.\n\n"
+    "Намуна: <code>8.40</code>\n"
+    "Барои бардоштан нависед: <code>0</code>"
+)
+
+
+def admin_partners(rows: list, currency: str = CURRENCY) -> str:
+    if not rows:
+        return (
+            "🤝 <b>Шарикон</b>\n\n"
+            "Ҳоло шарик нест.\n\n"
+            "<i>Шарик нархи махсуси шуморо мебинад — ба ҷои нархи оддӣ.</i>"
+        )
+    lines = [f"🤝 <b>Шарикон</b> ({len(rows)} нафар)\n"]
+    for row in rows:
+        name = esc(row["first_name"] or "—")
+        user = f"@{esc(row['username'])}" if row["username"] else "—"
+        note = f" · {esc(row['note'])}" if row["note"] else ""
+        lines.append(
+            f"• <code>{row['user_id']}</code> — <b>{name}</b> {user}{note}\n"
+            f"  💳 {money(row['balance'] or 0, currency)} · "
+            f"харҷ: {money(row['spent'] or 0, currency)}"
+        )
+    return "\n".join(lines)
+
+
+def partner_added(user) -> str:
+    return (
+        "✅ <b>Шарик илова шуд!</b>\n\n"
+        f"👤 {esc(user.title)}\n"
+        f"🆔 <code>{user.id}</code>\n\n"
+        "Акнун ӯ дар ҳамаи бахшҳо нархи шарикиро мебинад."
+    )
+
+
+PARTNER_WELCOME = (
+    "🤝 <b>Табрик! Шумо шарики мо шудед.</b>\n\n"
+    "Акнун барои шумо нархҳои махсус — аз нархи оддӣ арзонтар.\n"
+    "Онҳо худкор дар ҳамаи бахшҳо нишон дода мешаванд.\n\n"
+    "Барои дидан /start-ро пахш кунед."
+)
+
+PARTNER_REMOVED = (
+    "ℹ️ Нархи шарикии шумо бекор карда шуд.\n"
+    "Аз ин пас нархҳои оддӣ амал мекунанд."
+)
+
+
 def admin_stats(data: dict, currency: str = CURRENCY) -> str:
     return (
         "📊 <b>Омори умумӣ</b>\n\n"
@@ -468,10 +537,12 @@ def admin_stats(data: dict, currency: str = CURRENCY) -> str:
     )
 
 
-def admin_user_card(user, orders: list, topups: list, currency: str = CURRENCY) -> str:
+def admin_user_card(
+    user, orders: list, topups: list, currency: str = CURRENCY, partner: bool = False
+) -> str:
     status = "🚫 Маҳдуд" if user.is_blocked else "✅ Фаъол"
     lines = [
-        "👤 <b>Корти корбар</b>\n",
+        "👤 <b>Корти корбар</b>" + ("  🤝 <b>ШАРИК</b>" if partner else "") + "\n",
         f"🆔 ID: <code>{user.id}</code>",
         f"👤 Ном: <b>{esc(user.first_name or '—')}</b>",
         f"🔗 Username: {('@' + esc(user.username)) if user.username else '—'}",

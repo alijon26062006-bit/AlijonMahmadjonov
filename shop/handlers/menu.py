@@ -115,10 +115,11 @@ async def cb_category(cb: CallbackQuery, state: FSMContext, db: Database, cfg: C
         await cb.answer()
         return
     user = current_user(cb, db)
+    partner = db.is_partner(user.id)
     await safe_edit(
         cb,
-        texts.category_menu(info, user.balance, cfg.currency),
-        keyboards.products(rows, code, currency=cfg.currency),
+        texts.category_menu(info, user.balance, cfg.currency, partner=partner),
+        keyboards.products(rows, code, currency=cfg.currency, partner=partner),
     )
     await cb.answer()
 
