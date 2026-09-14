@@ -20,6 +20,8 @@ SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
   echo "BRANCH=\"$BRANCH\""
   cat <<'BODY'
 SERVICE="almaz-shop"
+PIDFILE="$ROOT/data/bot.pid"
+LOGFILE="$ROOT/data/bot.log"
 set -uo pipefail
 
 if [ "$(id -u)" -eq 0 ]; then SUDO=""
@@ -28,10 +30,36 @@ else SUDO=""; fi
 
 cd "$ROOT" 2>/dev/null || { echo "❌ Папка $ROOT пропала"; exit 1; }
 
+# На части серверов systemd нет — тогда запускаем бота обычным процессом.
+has_systemd() {
+  command -v systemctl >/dev/null 2>&1 && systemctl list-units >/dev/null 2>&1
+}
+
+bot_alive() {
+  [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null
+}
+
+plain_stop() {
+  bot_alive && kill "$(cat "$PIDFILE")" 2>/dev/null
+  rm -f "$PIDFILE"
+}
+
+plain_start() {
+  mkdir -p "$ROOT/data"
+  nohup "$ROOT/.venv/bin/python" -m shop.main >>"$LOGFILE" 2>&1 &
+  echo $! > "$PIDFILE"
+}
+
 case "${1:-update}" in
-  log|logs)  exec $SUDO journalctl -u "$SERVICE" -f ;;
-  stop)      $SUDO systemctl stop "$SERVICE" && echo "⏹  Бот остановлен"; exit ;;
-  start)     $SUDO systemctl start "$SERVICE" && echo "▶️  Бот запущен"; exit ;;
+  log|logs)
+    if has_systemd; then exec $SUDO journalctl -u "$SERVICE" -f
+    else exec tail -n 50 -f "$LOGFILE"; fi ;;
+  stop)
+    if has_systemd; then $SUDO systemctl stop "$SERVICE"; else plain_stop; fi
+    echo "⏹  Бот остановлен"; exit ;;
+  start)
+    if has_systemd; then $SUDO systemctl start "$SERVICE"; else plain_start; fi
+    echo "▶️  Бот запущен"; exit ;;
   check)     exec bash "$ROOT/check_shop.sh" ;;
   admin)     shift; exec bash "$ROOT/add_admin.sh" "$@" ;;
   api)       shift; exec bash "$ROOT/check_api.sh" "$@" ;;
@@ -69,22 +97,34 @@ echo "2/4  Обновляю зависимости..."
 .venv/bin/pip install -q -r requirements-shop.txt || { echo "❌ Зависимости не встали"; exit 1; }
 
 echo "3/4  Перезапускаю бота..."
-if systemctl list-units --all --type=service 2>/dev/null | grep -q "${SERVICE}.service"; then
-  $SUDO systemctl restart "$SERVICE"
+if has_systemd; then
+  if systemctl list-units --all --type=service 2>/dev/null | grep -q "${SERVICE}.service"; then
+    $SUDO systemctl restart "$SERVICE"
+  else
+    bash "$ROOT/start_shop.sh" --service >/dev/null || { echo "❌ Не удалось поставить службу"; exit 1; }
+  fi
 else
-  bash "$ROOT/start_shop.sh" --service >/dev/null || { echo "❌ Не удалось поставить службу"; exit 1; }
+  plain_stop
+  plain_start
 fi
-sleep 2
+sleep 3
 
 echo "4/4  Проверяю..."
-if [ "$($SUDO systemctl is-active "$SERVICE" 2>/dev/null)" = "active" ]; then
+if has_systemd; then
+  RUNNING=$([ "$($SUDO systemctl is-active "$SERVICE" 2>/dev/null)" = "active" ] && echo 1 || echo 0)
+else
+  RUNNING=$(bot_alive && echo 1 || echo 0)
+fi
+
+if [ "$RUNNING" = "1" ]; then
   echo
   echo "✅ ГОТОВО. Бот работает на свежей версии."
   echo "   Логи: bot log"
 else
   echo
   echo "❌ Бот не запустился. Причина:"
-  $SUDO journalctl -u "$SERVICE" -n 25 --no-pager
+  if has_systemd; then $SUDO journalctl -u "$SERVICE" -n 25 --no-pager
+  else tail -n 25 "$LOGFILE" 2>/dev/null; fi
   exit 1
 fi
 BODY
