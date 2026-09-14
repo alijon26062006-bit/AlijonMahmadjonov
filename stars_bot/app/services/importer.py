@@ -18,6 +18,8 @@ ID_RE = re.compile(r"\b(\d{5,15})\b")
 MONEY_RE = re.compile(r"(\d+(?:[.,]\d{1,2})?)")
 #: Юзернейм, если он есть в строке.
 NAME_RE = re.compile(r"@([A-Za-z0-9_]{4,32})")
+#: Юзернейм целиком — для колонки, где он уже отделён от прочего.
+NAME_OK = re.compile(r"[A-Za-z0-9_]{4,32}")
 #: Хвост таблицы выгрузки: баланс, потрачено, число заказов.
 #: Без этого из строки «… 70.00  0.00  0» взялось бы последнее число —
 #: количество заказов, и все балансы обнулились бы.
@@ -28,7 +30,8 @@ TABLE_TAIL = re.compile(
 
 def to_diram(text: str) -> int | None:
     """Сумму в сомони — в дирамы. None — не разобрали."""
-    cleaned = text.replace(",", ".").strip()
+    cleaned = str(text or "").replace(",", ".").replace(" ", "").strip()
+    cleaned = cleaned.replace("\u00a0", "")
     try:
         value = round(float(cleaned) * 100)
     except ValueError:
@@ -87,6 +90,85 @@ def parse_balances(raw: str) -> tuple[list[dict], list[str]]:
         }
 
     return list(found.values()), skipped
+
+
+#: Как в выгрузках называют колонку с ID.
+ID_HEADERS = ("telegram id", "telegram_id", "user id", "user_id", "id",
+              "чат", "chat id", "chat_id", "корбар")
+#: И колонку с остатком на счету. «Харҷ» (потрачено) сюда не входит
+#: намеренно: спутать её с балансом — раздать людям чужие деньги.
+MONEY_HEADERS = ("ҳамён", "хамён", "hamyon", "баланс", "balance", "wallet",
+                 "остаток", "счёт", "счет", "сумма", "amount")
+#: И колонку с юзернеймом.
+NAME_HEADERS = ("username", "юзернейм", "ник", "nick", "@")
+
+
+def _header_index(cells: list[str], names: tuple[str, ...]) -> int | None:
+    for index, cell in enumerate(cells):
+        low = str(cell).strip().lower()
+        if low and any(mark in low for mark in names):
+            return index
+    return None
+
+
+def find_header(rows: list[list[str]]) -> tuple[int, dict] | None:
+    """Найти строку заголовка и номера нужных колонок.
+
+    Без заголовка пришлось бы гадать по порядку колонок, а он у каждой
+    выгрузки свой: где-то баланс третий, где-то пятый, а рядом стоит
+    «потрачено» — и перепутать их значит раздать людям чужие деньги.
+    """
+    for number, cells in enumerate(rows[:20]):
+        ids = _header_index(cells, ID_HEADERS)
+        money = _header_index(cells, MONEY_HEADERS)
+        if ids is not None and money is not None:
+            return number, {
+                "id": ids, "amount": money,
+                "username": _header_index(cells, NAME_HEADERS),
+            }
+    return None
+
+
+def parse_rows(rows: list[list[str]]) -> tuple[list[dict], list[str]]:
+    """Разобрать таблицу из файла.
+
+    Если в ней есть понятный заголовок — читаем по колонкам. Если нет,
+    склеиваем ячейки обратно в строку и разбираем как обычный список:
+    так файл без заголовка тоже не пропадёт.
+    """
+    header = find_header(rows)
+    if header is None:
+        text = "\n".join(" ".join(str(cell) for cell in row) for row in rows)
+        return parse_balances(text)
+
+    start, columns = header
+    found: dict[int, dict] = {}
+    skipped: list[str] = []
+
+    for cells in rows[start + 1:]:
+        raw_id = _at(cells, columns["id"])
+        digits = "".join(ch for ch in raw_id if ch.isdigit())
+        if len(digits) < 5:
+            continue          # пустая строка, итоги, разделитель
+
+        amount = to_diram(_at(cells, columns["amount"]))
+        if amount is None:
+            skipped.append(" ".join(str(cell) for cell in cells)[:80])
+            continue
+
+        name = _at(cells, columns["username"]).lstrip("@").strip()
+        found[int(digits)] = {
+            "id": int(digits),
+            "amount": amount,
+            "username": name if NAME_OK.fullmatch(name) else "",
+        }
+    return list(found.values()), skipped
+
+
+def _at(cells: list[str], index: int | None) -> str:
+    if index is None or index >= len(cells):
+        return ""
+    return str(cells[index]).strip()
 
 
 def with_money(rows: list[dict]) -> list[dict]:

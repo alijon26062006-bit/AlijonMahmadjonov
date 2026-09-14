@@ -2128,17 +2128,51 @@ async def cb_transfer(call: CallbackQuery, state: FSMContext) -> None:
         call,
         "📥 <b>Перенос балансов</b>\n"
         f"<code>{texts.LINE}</code>\n\n"
-        "<blockquote>Пришлите список одним сообщением — по записи "
-        "на строку:\n\n"
-        "<code>123456789 100</code>\n"
-        "<code>987654321 45.50</code>\n\n"
-        "Разберу почти любой вид: с тире, запятыми, словами вокруг. "
-        "Из строки беру первое длинное число как ID и последнее как "
-        "сумму в сомони.\n\n"
+        "<blockquote>Пришлите <b>файл</b> со списком — Excel "
+        "(<code>.xlsx</code>) или <code>.csv</code>.\n\n"
+        "В нём должны быть колонка с <b>ID</b> и колонка с "
+        "<b>остатком</b> — по заголовкам я их найду сам. Колонку "
+        "«потрачено» не трону.\n\n"
+        "Можно и просто вставить список текстом, если файла нет.\n\n"
         "Сразу ничего не применю — сначала покажу, что понял.</blockquote>",
         back_kb("pn:users", "❌ Отмена"),
     )
     await call.answer()
+
+
+@router.message(Panel.transfer, F.document)
+async def on_transfer_file(
+    message: Message, state: FSMContext, bot: Bot
+) -> None:
+    """Список файлом: Excel или CSV."""
+    from app.services import importer, sheets
+
+    document = message.document
+    if document.file_size and document.file_size > sheets.MAX_BYTES:
+        await message.answer("❌ Файл слишком большой.")
+        return
+
+    notice = await message.answer("📥 Читаю файл…")
+    try:
+        buffer = await bot.download(document)
+        rows = sheets.read(buffer.read(), document.file_name or "")
+    except sheets.SheetError as exc:
+        await notice.edit_text(
+            f"❌ <b>Файл не прочитался</b> — {exc}.\n\n"
+            "<blockquote>Подойдёт Excel (<code>.xlsx</code>) или "
+            "<code>.csv</code>. Файл <code>.xls</code> старого образца "
+            "не читается — пересохраните его как <code>.xlsx</code>."
+            "</blockquote>"
+        )
+        return
+    except Exception as exc:  # noqa: BLE001 — показать владельцу причину
+        log.warning("Перенос: файл не прочитался — %s", exc)
+        await notice.edit_text(f"❌ Файл не прочитался: <code>{str(exc)[:150]}</code>")
+        return
+
+    pairs, skipped = importer.parse_rows(rows)
+    await _transfer_preview(notice, state, pairs, skipped,
+                            source=document.file_name or "файл", edit=True)
 
 
 @router.message(Panel.transfer, F.text)
@@ -2146,11 +2180,28 @@ async def on_transfer_list(message: Message, state: FSMContext) -> None:
     from app.services import importer
 
     pairs, skipped = importer.parse_balances(message.text or "")
+    await _transfer_preview(message, state, pairs, skipped, source="список")
+
+
+async def _transfer_preview(
+    message: Message, state: FSMContext, pairs: list, skipped: list,
+    source: str = "", edit: bool = False,
+) -> None:
+    """Показать, что понято, и спросить подтверждения. Ничего не меняет.
+
+    edit — поправить своё же сообщение «Читаю файл…» вместо нового:
+    после файла ответ должен встать на место ожидания, а не под ним.
+    """
+    from app.services import importer
+
+    say = message.edit_text if edit else message.answer
+
     if not pairs:
-        await message.answer(
+        await say(
             "❌ <b>Ни одной записи не понял</b>\n\n"
-            "<blockquote>Нужно, чтобы в строке был ID (от пяти цифр), "
-            "а после него сумма:\n<code>123456789 100</code></blockquote>"
+            "<blockquote>Нужна колонка с ID (от пяти цифр) и колонка "
+            "с остатком. В тексте — ID и сумма в строке:\n"
+            "<code>123456789 100</code></blockquote>"
         )
         return
 
@@ -2182,10 +2233,11 @@ async def on_transfer_list(message: Message, state: FSMContext) -> None:
     kb.row(btn("❌ Отмена", "pn:users", style=DANGER))
 
     zero = len(pairs) - len(rich)
-    await message.answer(
+    await say(
         "📥 <b>Проверьте перед записью</b>\n"
         f"<code>{texts.LINE}</code>\n\n"
-        f"├ Всего строк: <b>{len(pairs)}</b>\n"
+        + (f"<i>Из: {source}</i>\n\n" if source else "")
+        + f"├ Всего строк: <b>{len(pairs)}</b>\n"
         f"├ С деньгами: <b>{len(rich)}</b>\n"
         f"├ С нулём: <b>{zero}</b>\n"
         f"└ Всего денег: <b>{fmt(total)}</b>\n\n"

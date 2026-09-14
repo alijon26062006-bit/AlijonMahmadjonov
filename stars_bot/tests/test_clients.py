@@ -217,6 +217,72 @@ async def transfer(conn) -> None:
     check("повторный перенос не удваивает баланс", again.balance == 2500,
           str(again.balance))
 
+    # ---- то же самое, но файлом
+    from app.services import sheets
+
+    table = [
+        ["TELEGRAM ID", "USERNAME", "НОМ", "ТЕЛЕФОН", "ҲАМЁН", "ХАРҶ", "ФРМ"],
+        ["7614804941", "", "abuw.axxi", "", "70.0", "0.0", "0"],
+        ["7664430907", "@rutsiyax", "uways", "992107140706", "60.5", "58.5", "8"],
+        ["5927541684", "", "40205", "", "1.0", "36.0", "4"],
+        ["", "", "Ҳамагӣ", "", "131.5", "94.5", "12"],
+    ]
+    rows, skipped = importer.parse_rows(table)
+    money = {r["id"]: r["amount"] for r in rows}
+    check("колонка остатка найдена по заголовку",
+          money.get(7614804941) == 7000, str(money.get(7614804941)))
+    check("колонка «потрачено» не взята",
+          money.get(7664430907) == 6050, str(money.get(7664430907)))
+    check("ник из цифр в колонке не мешает",
+          money.get(5927541684) == 100, str(money.get(5927541684)))
+    check("строка итогов без ID пропущена", len(rows) == 3, str(len(rows)))
+    check("юзернейм без собачки", rows[1]["username"] == "rutsiyax",
+          rows[1]["username"])
+    check("файл разобран без ошибок", skipped == [], str(skipped))
+
+    # заголовок в другом порядке — всё равно находим
+    other = [
+        ["balance", "chat id", "note"],
+        ["12.50", "777123456", "—"],
+    ]
+    rows, _ = importer.parse_rows(other)
+    check("порядок колонок не важен",
+          rows and rows[0] == {"id": 777123456, "amount": 1250, "username": ""},
+          str(rows))
+
+    # без заголовка — разбираем как обычный список
+    plain = [["888123456", "25"], ["888123457", "10.50"]]
+    rows, _ = importer.parse_rows(plain)
+    check("без заголовка файл тоже читается", len(rows) == 2, str(rows))
+
+    # ---- сам читатель файлов
+    csv_bytes = "id;balance\n777999111;33.25\n777999222;0\n".encode()
+    got = sheets.read(csv_bytes, "spisok.csv")
+    check("csv прочитан", len(got) == 3, str(got))
+    check("разделитель «;» понят", got[1] == ["777999111", "33.25"], str(got[1]))
+    rows, _ = importer.parse_rows(got)
+    check("и разобран по заголовку",
+          {r["id"]: r["amount"] for r in rows} == {777999111: 3325, 777999222: 0},
+          str(rows))
+
+    check("cp1251 не роняет чтение",
+          sheets.read("id;balance\n777999111;5".encode("cp1251"))[1][0]
+          == "777999111")
+
+    broken = False
+    try:
+        sheets.read(b"PK\x03\x04" + "мусор".encode(), "x.xlsx")
+    except sheets.SheetError:
+        broken = True
+    check("битый Excel назван по-человечески", broken)
+
+    huge = False
+    try:
+        sheets.read(b"x" * (sheets.MAX_BYTES + 1))
+    except sheets.SheetError:
+        huge = True
+    check("слишком большой файл отклонён", huge)
+
     # ---- можно взять только тех, у кого деньги
     state = FakeState()
     message = FakeMessage("777000333 0\n777000444 15")
