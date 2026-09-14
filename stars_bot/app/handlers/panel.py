@@ -3216,7 +3216,9 @@ async def cb_game_pick(call: CallbackQuery, conn: aiosqlite.Connection, provider
     have = {game.category_id for game in await db.list_games(conn)}
     groups: dict[str, list[dict]] = {}
     for item in catalog:
-        groups.setdefault(reg.family_of(item["category_id"]), []).append(item)
+        groups.setdefault(
+            reg.family_of(item["category_id"], item.get("name", "")), []
+        ).append(item)
 
     if not groups:
         await safe_edit(call, "📚 Поставщик не назвал ни одной игры.",
@@ -3225,10 +3227,10 @@ async def cb_game_pick(call: CallbackQuery, conn: aiosqlite.Connection, provider
 
     kb = InlineKeyboardBuilder()
     for family, items in sorted(groups.items()):
-        items.sort(key=lambda i: reg.sort_key(i["category_id"]))
+        items.sort(key=lambda i: reg.sort_key(i["category_id"], i.get("name", "")))
         added = sum(1 for i in items if i["category_id"] in have)
         mark = "✅" if added == len(items) else ("◻️" if not added else "▫️")
-        name = items[0]["name"] or family
+        name = reg.clean_title(items[0]["category_id"], items[0].get("name", "")) or family
         kb.row(InlineKeyboardButton(
             text=f"{mark} {name} · регионов: {len(items)}",
             callback_data=f"pn:game_add:{family}",
@@ -3267,18 +3269,17 @@ async def cb_game_add_family(
         await call.answer(f"Каталог не пришёл: {str(exc)[:120]}", show_alert=True)
         return
 
-    items = [i for i in catalog if reg.family_of(i["category_id"]) == family]
+    items = [i for i in catalog
+             if reg.family_of(i["category_id"], i.get("name", "")) == family]
     if not items:
         await call.answer("Такой игры у поставщика больше нет.", show_alert=True)
         return
 
     # Название берём то, что уже стоит у нас: владелец мог поставить
     # своё с эмодзи, и терять его при добавлении регионов незачем.
-    existing = {g.category_id: g for g in await db.list_games(conn)}
-    title = next((g.title for cid, g in existing.items()
-                  if reg.family_of(cid) == family), "")
+    mine = {g.category_id: g.title for g in await db.list_games(conn)}
 
-    items.sort(key=lambda i: reg.sort_key(i["category_id"]))
+    items.sort(key=lambda i: reg.sort_key(i["category_id"], i.get("name", "")))
     lines = []
     for item in items:
         code = item["category_id"]
@@ -3289,11 +3290,14 @@ async def cb_game_add_family(
                 field = str(name)
                 break
         field = field or await gsvc.detect_field(client, code) or "user_id"
+        # У каждого региона своё имя от поставщика; регион из него потом
+        # вычитается. Уже стоящее у нас имя не трогаем.
         await db.add_game(
-            conn, category_id=code, title=title or item["name"] or family,
-            field=field, region=reg.nick_region(code),
+            conn, category_id=code,
+            title=mine.get(code) or item["name"] or code,
+            field=field, region=reg.nick_region(code, item.get("name", "")),
         )
-        lines.append(f"├ {reg.title_of(code) or 'без региона'} — "
+        lines.append(f"├ {reg.title_of(code, item.get('name', '')) or 'без региона'} — "
                      f"<code>{code}</code> · поле <code>{field}</code>")
     await db.load_game_titles(conn)
 
@@ -3304,7 +3308,8 @@ async def cb_game_add_family(
 
     await safe_edit(
         call,
-        f"✅ <b>{title or items[0]['name']}</b> — добавлено регионов: "
+        f"✅ <b>{reg.clean_title(items[0]['category_id'], items[0]['name'])}</b>"
+        " — добавлено регионов: "
         f"<b>{len(items)}</b>\n"
         f"<code>{texts.LINE}</code>\n\n" + "\n".join(lines) + "\n\n"
         "<blockquote>Пока регионы скрыты от клиентов. Включите их кнопкой "
@@ -3326,7 +3331,7 @@ async def cb_game_family_on(call: CallbackQuery, conn: aiosqlite.Connection) -> 
     family = call.data.split(":", 2)[2]
     turned = 0
     for game in await db.list_games(conn):
-        if reg.family_of(game.category_id) == family and not game.enabled:
+        if reg.family_of(game) == family and not game.enabled:
             await db.update_game(conn, game.category_id, enabled=1)
             turned += 1
     await call.answer(f"Включено: {turned}" if turned else "Уже включены.")
@@ -3348,9 +3353,9 @@ def _region_label(game: db.Game) -> str:
     """Регион в карточке: название с флагом, если он читается из кода."""
     from app.services import regions as reg
 
-    title = reg.title_of(game.category_id)
+    title = reg.title_of(game)
     if title:
-        return f"{title} ({reg.suffix_of(game.category_id).upper()})"
+        return f"{title} ({reg.suffix_of(game).upper()})"
     return game.region or "один на все"
 
 

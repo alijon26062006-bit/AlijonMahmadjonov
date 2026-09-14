@@ -13,6 +13,8 @@ free_fire_id, free_fire_cis. Отсюда правило: код = семья + 
 """
 from __future__ import annotations
 
+import re
+
 #: Хвост кода → (как показать клиенту, код региона для поиска ников).
 #: Порядок важен: первым идёт то, что чаще спрашивают в Душанбе.
 REGIONS: dict[str, tuple[str, str]] = {
@@ -44,8 +46,40 @@ REGIONS: dict[str, tuple[str, str]] = {
 ORDER = ["cis", "ru", "id", "br"]
 
 
-def split(category_id: str) -> tuple[str, str]:
-    """Код категории → (семья, хвост региона).
+#: Регион в названии пишут по-разному: «Free Fire (RU)», «Free Fire — Brazil»,
+#: «Free Fire Indonesia». Приводим написание к ключу справочника.
+BY_WORD: dict[str, str] = {
+    "снг": "cis", "cis": "cis", "россия": "ru", "russia": "ru", "ru": "ru",
+    "индонезия": "id", "indonesia": "id", "id": "id", "idn": "id",
+    "бразилия": "br", "brazil": "br", "brasil": "br", "br": "br", "bra": "br",
+    "глобал": "global", "глобальный": "global", "global": "global",
+    "europe": "eu", "европа": "eu", "eu": "eu",
+    "индия": "ind", "india": "ind", "ind": "ind", "in": "in",
+    "пакистан": "pk", "pakistan": "pk", "pk": "pk",
+    "бангладеш": "bd", "bangladesh": "bd", "bd": "bd",
+    "таиланд": "th", "thailand": "th", "th": "th",
+    "вьетнам": "vn", "vietnam": "vn", "vn": "vn",
+    "филиппины": "ph", "philippines": "ph", "ph": "ph",
+    "сингапур": "sg", "singapore": "sg", "sg": "sg",
+    "малайзия": "my", "malaysia": "my", "my": "my",
+    "тайвань": "tw", "taiwan": "tw", "tw": "tw",
+    "турция": "tr", "turkey": "tr", "tr": "tr",
+    "украина": "ua", "ukraine": "ua", "ua": "ua",
+    "ближний восток": "mena", "mena": "mena", "me": "me",
+    "сша": "na", "north america": "na", "na": "na",
+    "южная америка": "sac", "south america": "sac", "sac": "sac",
+}
+
+#: Хвост названия в скобках или после тире: «… (RU)», «… - Brazil».
+_TAIL_RE = re.compile(r"[\s\-–—]*[\(\[]([^\)\]]{1,24})[\)\]]\s*$|[\-–—]\s*([^\-–—]{1,24})$")
+
+
+def _by_word(text: str) -> str:
+    return BY_WORD.get((text or "").strip().lower().strip(".,"), "")
+
+
+def split_code(category_id: str) -> tuple[str, str]:
+    """Код категории → (семья, регион).
 
     Хвост признаётся регионом, только если он есть в справочнике, — иначе
     pubg_mobile превратился бы в семью «pubg» с «регионом» mobile.
@@ -57,30 +91,76 @@ def split(category_id: str) -> tuple[str, str]:
     return code, ""
 
 
-def family_of(category_id: str) -> str:
-    return split(category_id)[0]
+def split_title(title: str) -> tuple[str, str]:
+    """Название → (название без региона, регион).
+
+    Поставщик часто пишет регион прямо в названии: «Magic Chess Go Go (RU)».
+    Если это не разобрать, у клиента получится десяток одинаковых кнопок.
+    """
+    name = (title or "").strip()
+    found = _TAIL_RE.search(name)
+    if not found:
+        return name, ""
+    tail = found.group(1) or found.group(2) or ""
+    key = _by_word(tail)
+    if not key:
+        return name, ""
+    return name[:found.start()].strip(" -–—"), key
 
 
-def suffix_of(category_id: str) -> str:
-    return split(category_id)[1]
+def split(category_id: str, title: str = "") -> tuple[str, str]:
+    """Игра → (ключ семьи, регион). Код важнее названия: он точнее."""
+    family, region = split_code(category_id)
+    if region:
+        return family, region
+    base, region = split_title(title)
+    if region:
+        return base.lower(), region
+    return family, ""
 
 
-def title_of(category_id: str) -> str:
+def _pair(game_or_code, title: str = "") -> tuple[str, str]:
+    """Принимаем и игру из базы, и голый код — так короче на вызове."""
+    if isinstance(game_or_code, str):
+        return split(game_or_code, title)
+    return split(getattr(game_or_code, "category_id", ""),
+                 getattr(game_or_code, "title", ""))
+
+
+def family_of(game_or_code, title: str = "") -> str:
+    return _pair(game_or_code, title)[0]
+
+
+def suffix_of(game_or_code, title: str = "") -> str:
+    return _pair(game_or_code, title)[1]
+
+
+def title_of(game_or_code, title: str = "") -> str:
     """Как назвать регион на кнопке. Пусто — регион не распознан."""
-    tail = suffix_of(category_id)
+    tail = suffix_of(game_or_code, title)
     return REGIONS[tail][0] if tail else ""
 
 
-def nick_region(category_id: str) -> str:
+def nick_region(game_or_code, title: str = "") -> str:
     """Код региона для сервиса ников."""
-    tail = suffix_of(category_id)
+    tail = suffix_of(game_or_code, title)
     return REGIONS[tail][1] if tail else ""
 
 
-def sort_key(category_id: str) -> tuple[int, str]:
+def clean_title(game_or_code, title: str = "") -> str:
+    """Название игры без приписки региона — для кнопки в меню."""
+    if isinstance(game_or_code, str):
+        name = title
+    else:
+        name = getattr(game_or_code, "title", "")
+    base, region = split_title(name)
+    return base if region and base else name
+
+
+def sort_key(game_or_code, title: str = "") -> tuple[int, str]:
     """Сортировка регионов: сначала нужные нам, потом остальные по алфавиту."""
-    tail = suffix_of(category_id)
-    return (ORDER.index(tail) if tail in ORDER else len(ORDER), tail or category_id)
+    family, tail = _pair(game_or_code, title)
+    return (ORDER.index(tail) if tail in ORDER else len(ORDER), tail or family)
 
 
 def group(games: list) -> list[dict]:
@@ -91,16 +171,16 @@ def group(games: list) -> list[dict]:
     """
     out: dict[str, dict] = {}
     for game in games:
-        family = family_of(game.category_id)
+        family = family_of(game)
         holder = out.setdefault(
-            family, {"family": family, "title": game.title, "games": []}
+            family, {"family": family, "title": clean_title(game), "games": []}
         )
         holder["games"].append(game)
     for holder in out.values():
-        holder["games"].sort(key=lambda g: sort_key(g.category_id))
+        holder["games"].sort(key=sort_key)
     return list(out.values())
 
 
 def region_title(game) -> str:
     """Подпись региона для кнопки: из справочника, иначе название игры."""
-    return title_of(game.category_id) or game.title
+    return title_of(game) or game.title

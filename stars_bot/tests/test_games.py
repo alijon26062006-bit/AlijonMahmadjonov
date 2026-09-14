@@ -305,7 +305,7 @@ async def flow(conn) -> None:
 
     bad = msg("abc")
     await gh.on_player_id(bad, state, conn, provider)
-    check("нечисловой ID отклонён", "Игрок не найден" in bad.last, bad.last[:80])
+    check("нечисловой ID отклонён", "не похоже на ID" in bad.last, bad.last[:80])
 
     good = msg("1724367212")
     await gh.on_player_id(good, state, conn, provider)
@@ -442,10 +442,13 @@ async def unknown_nick(conn) -> None:
         await state.set_state(gh.Game.player)
         message = msg("4444444444")
         await gh.on_player_id(message, state, conn, provider)
-        check("неверный ID покупку блокирует",
-              "Игрок не найден" in message.last, message.last[:80])
+        # проверка не нашла ID — но покупку это не запирает
+        check("непроверенный ID не запирает покупку",
+              "не подтвердился" in message.last, message.last[:80])
         check("и подсказано про регион", "регион" in message.last.lower(),
               message.last)
+        check("до подтверждения доходит и без проверки",
+              await state.get_state() == "Game:confirm")
 
         # справочник ников говорит «нет такого» — а он бесплатный и
         # знает не все регионы. Его слово покупку рубить не должно.
@@ -555,12 +558,29 @@ async def wrong_region(conn) -> None:
         await state.set_state(gh.Game.player)
         message = msg("1234567890")
         await gh.on_player_id(message, state, conn, Nowhere())
-        check("если нигде нет — так и говорим",
-              "Игрок не найден" in message.last, message.last[:80])
+        check("если нигде нет — честно предупреждаем",
+              "не подтвердился" in message.last, message.last[:80])
+        check("но купить всё равно даём",
+              any(b.callback_data == "g:ok"
+                  for row in message.markup.inline_keyboard for b in row),
+              str(message.markup))
         check("и даём сменить регион",
               any(b.callback_data == "gf:free_fire"
                   for row in message.markup.inline_keyboard for b in row),
               str(message.markup))
+        check("сумма списания показана", "К списанию" in message.last,
+              message.last[:200])
+
+        # и покупка после этого действительно проходит
+        bot = FakeBot()
+        call = call_of("g:ok")
+        seller = Nowhere()
+        await gh.cb_buy(call, state, conn, seller, bot)
+        check("покупка без подтверждения ID доходит до поставщика",
+              len(seller.orders) == 1, str(seller.orders))
+        check("в заказ ушёл именно введённый ID",
+              seller.orders and seller.orders[0]["fields"]
+              == {"user_id": "1234567890"}, str(seller.orders))
 
         # у игры один регион — кнопки смены не предлагаем
         await db.update_game(conn, "free_fire_cis", enabled=0)
@@ -1201,6 +1221,37 @@ async def region_step(conn) -> None:
     check("Бразилия распознаётся", reg.title_of("free_fire_br") == "🇧🇷 Бразилия")
     check("для ников берётся код сервера",
           reg.nick_region("free_fire_id") == "ID", reg.nick_region("free_fire_id"))
+
+    # поставщик часто пишет регион не в коде, а в названии
+    check("регион читается из названия в скобках",
+          reg.split("mcgg_1", "Magic Chess Go Go (RU)") == ("magic chess go go", "ru"),
+          str(reg.split("mcgg_1", "Magic Chess Go Go (RU)")))
+    check("регион читается и через тире",
+          reg.suffix_of("ff_x", "Free Fire - Brazil") == "br",
+          reg.suffix_of("ff_x", "Free Fire - Brazil"))
+    check("название на кнопке без приписки региона",
+          reg.clean_title("mcgg_1", "Magic Chess Go Go (RU)") == "Magic Chess Go Go",
+          reg.clean_title("mcgg_1", "Magic Chess Go Go (RU)"))
+    check("код важнее названия",
+          reg.suffix_of("free_fire_br", "Free Fire (RU)") == "br",
+          reg.suffix_of("free_fire_br", "Free Fire (RU)"))
+    check("случайные скобки регионом не считаются",
+          reg.split("abc", "Genshin Impact (новинка)") == ("abc", ""),
+          str(reg.split("abc", "Genshin Impact (новинка)")))
+
+    for code, name in (("mcgg_1", "Magic Chess Go Go (RU)"),
+                       ("mcgg_2", "Magic Chess Go Go (ID)"),
+                       ("mcgg_3", "Magic Chess Go Go (BR)")):
+        await db.add_game(conn, category_id=code, title=name, field="user_id")
+        await db.update_game(conn, code, enabled=1)
+    await db.load_game_titles(conn)
+    menu = buttons(keyboards.games_menu(await db.list_games(conn, only_enabled=True)))
+    check("игра с регионом в названии — одна кнопка",
+          sum(1 for b in menu if "Magic Chess" in b) == 1, str(menu))
+    check("и без приписки региона на ней",
+          any(b.strip() == "Magic Chess Go Go" for b in menu), str(menu))
+    for code in ("mcgg_1", "mcgg_2", "mcgg_3"):
+        await db.delete_game(conn, code)
 
     for code in ("free_fire_cis", "free_fire_id"):
         await db.add_game(conn, category_id=code, title="🔥 Free Fire",

@@ -74,7 +74,7 @@ async def cb_games(
 
 def _region(game: db.Game) -> str:
     """Приписка с регионом. Пусто, если регион у игры один — лишний шум."""
-    title = regions.title_of(game.category_id)
+    title = regions.title_of(game)
     return f" · {title}" if title else ""
 
 
@@ -86,9 +86,9 @@ async def cb_family(
     await state.clear()
     family = call.data.split(":", 1)[1]
     games = await db.list_games(conn, only_enabled=True)
-    items = [g for g in games if regions.family_of(g.category_id) == family]
+    items = [g for g in games if regions.family_of(g) == family]
     # СНГ первым: он нужен чаще всего, и листать до него не надо.
-    items.sort(key=lambda g: regions.sort_key(g.category_id))
+    items.sort(key=regions.sort_key)
     if not items:
         await call.answer("Эта игра больше не продаётся.", show_alert=True)
         return
@@ -184,7 +184,7 @@ async def on_player_id(
 ) -> None:
     player = (message.text or "").strip()
     if not re.fullmatch(r"\d{5,20}", player):
-        await message.answer(texts.GAME_BAD_ID.format(player=player[:20] or "—"))
+        await message.answer(texts.GAME_ID_FORMAT)
         return
 
     data = await state.get_data()
@@ -213,9 +213,20 @@ async def on_player_id(
                 reply_markup=keyboards.game_found_in([other_game]),
             )
             return
+        # Нигде не нашли — но запирать покупку нельзя: проверка работает
+        # не у всех серверов, а пополнение идёт по ID. Предупреждаем и
+        # оставляем решение за клиентом.
+        user = await db.get_user(conn, message.from_user.id)
+        balance = user.balance if user else 0
+        price = data["price"]
+        await state.update_data(player=player, player_name="")
+        await state.set_state(Game.confirm)
         await notice.edit_text(
-            texts.GAME_BAD_ID.format(player=player),
-            reply_markup=keyboards.game_retry(game, len(others) + 1),
+            texts.GAME_UNVERIFIED.format(
+                player=player, pack=data["pack"], price=fmt(price),
+                rest=fmt(max(balance - price, 0)),
+            ),
+            reply_markup=keyboards.confirm_unverified(game, len(others) + 1),
         )
         return
 
@@ -237,13 +248,13 @@ async def on_player_id(
 
 async def _other_regions(conn, game: db.Game) -> list[db.Game]:
     """Остальные регионы этой же игры, в порядке спроса."""
-    family = regions.family_of(game.category_id)
+    family = regions.family_of(game)
     others = [
         other for other in await db.list_games(conn, only_enabled=True)
-        if regions.family_of(other.category_id) == family
+        if regions.family_of(other) == family
         and other.category_id != game.category_id
     ]
-    others.sort(key=lambda g: regions.sort_key(g.category_id))
+    others.sort(key=regions.sort_key)
     return others
 
 
@@ -281,7 +292,7 @@ async def _lookup(provider, game: db.Game, player: str) -> tuple[str | None, str
     if "free_fire" in game.category_id or "freefire" in game.category_id:
         key = runtime.get("gameskinbo_key") or db.settings.gameskinbo_key
         # Регион берём из кода категории: он там точнее, чем в подсказке.
-        region = regions.nick_region(game.category_id) or game.region
+        region = regions.nick_region(game) or game.region
         found = await nicknames.free_fire(player, key=key, region=region)
         if found.verdict == "ok":
             return found.name, "ok"

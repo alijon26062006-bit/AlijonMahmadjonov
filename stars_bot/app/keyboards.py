@@ -174,20 +174,6 @@ def game_packs(category_id: str, offers: list) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def game_retry(game, family_size: int = 1) -> InlineKeyboardMarkup:
-    """Что делать, когда ID не нашёлся: сменить регион или выйти.
-
-    Без этих кнопок клиент упирается в тупик и уходит: угадать, что дело
-    в регионе, он не обязан.
-    """
-    kb = InlineKeyboardBuilder()
-    if family_size > 1:
-        kb.row(btn("🌍 Сменить регион",
-                   f"gf:{regions.family_of(game.category_id)}", style=PRIMARY))
-    kb.row(btn(labeled("back", "К играм"), "m:games"))
-    return kb.as_markup()
-
-
 def game_found_in(games: list) -> InlineKeyboardMarkup:
     """Регионы, в которых ID всё-таки нашёлся."""
     kb = InlineKeyboardBuilder()
@@ -195,6 +181,21 @@ def game_found_in(games: list) -> InlineKeyboardMarkup:
         kb.row(btn(f"✅ {regions.region_title(game)}",
                    f"g:{game.category_id}", style=SUCCESS))
     kb.row(btn(labeled("back", "К играм"), "m:games"))
+    return kb.as_markup()
+
+
+def confirm_unverified(game, family_size: int = 1) -> InlineKeyboardMarkup:
+    """Купить без подтверждённого ID — под свою ответственность.
+
+    Проверка ID работает не у всех регионов и не у всех игр. Запирать
+    из-за неё покупку нельзя: пополнение идёт по ID, а не по проверке.
+    """
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("⚠️ Всё равно купить", "g:ok", style=DANGER))
+    if family_size > 1:
+        kb.row(btn("🌍 Сменить регион", f"gf:{regions.family_of(game)}"))
+    kb.row(btn(labeled("edit", "Другой ID"), f"g:{game.category_id}"))
+    kb.row(btn(labeled("cancel", "Отмена"), "m:main"))
     return kb.as_markup()
 
 
