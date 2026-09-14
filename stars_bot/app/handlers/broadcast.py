@@ -20,6 +20,7 @@ from aiogram.types import (
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.config import settings
+from app.services import access
 from app.handlers.panel import AUDIENCES, back_kb, safe_edit, show_home
 from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
 from app.states import Cast
@@ -27,8 +28,8 @@ from app.states import Cast
 log = logging.getLogger(__name__)
 router = Router(name="broadcast")
 
-router.message.filter(F.from_user.func(lambda u: settings.is_admin(u.id)))
-router.callback_query.filter(F.from_user.func(lambda u: settings.is_admin(u.id)))
+router.message.filter(F.from_user.func(lambda u: access.is_admin(u.id)))
+router.callback_query.filter(F.from_user.func(lambda u: access.is_admin(u.id)))
 
 # «Название - https://...» или «Название | https://...»
 BUTTON_RE = re.compile(r"^(.{1,64}?)\s*[|\-–—]\s*(https?://\S+|t\.me/\S+)$")

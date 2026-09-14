@@ -29,6 +29,7 @@ from contextlib import suppress
 from app import db, emoji, links, reports, runtime, texts
 from app.handlers.menu import top_basis
 from app.config import settings
+from app.services import access
 from app.emoji import substitute
 from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
 from app.money import (
@@ -42,8 +43,8 @@ from app.states import GameNew, Panel, PartnerMove, PartnerNew, PromoNew
 log = logging.getLogger(__name__)
 router = Router(name="panel")
 
-router.message.filter(F.from_user.func(lambda u: settings.is_admin(u.id)))
-router.callback_query.filter(F.from_user.func(lambda u: settings.is_admin(u.id)))
+router.message.filter(F.from_user.func(lambda u: access.is_admin(u.id)))
+router.callback_query.filter(F.from_user.func(lambda u: access.is_admin(u.id)))
 
 # Аудитории рассылки: ключ -> (подпись, SQL-условие)
 AUDIENCES = {
@@ -100,7 +101,10 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🕹 Игры", callback_data="pn:games"),
         InlineKeyboardButton(text="💳 Балансы ключей", callback_data="pn:keys"),
     )
-    kb.row(InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"))
+    kb.row(
+        InlineKeyboardButton(text="👮 Доступ к панели", callback_data="pn:admins"),
+        InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"),
+    )
     return kb.as_markup()
 
 
@@ -2118,6 +2122,151 @@ async def cb_users(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Conne
         kb.as_markup(),
     )
     await call.answer()
+
+
+@router.callback_query(F.data == "pn:admins")
+async def cb_admins(call: CallbackQuery, state: FSMContext,
+                    conn: aiosqlite.Connection) -> None:
+    """Кому открыта панель. Раздаёт доступ только владелец."""
+    await state.clear()
+    me = call.from_user.id
+    owner = access.is_owner(me)
+
+    lines = []
+    for uid in access.owners():
+        user = await db.get_user(conn, uid)
+        who = f" · @{user.username}" if user and user.username else ""
+        lines.append(f"👑 <code>{uid}</code>{who} <i>— владелец</i>")
+    for uid in access.extra():
+        user = await db.get_user(conn, uid)
+        who = f" · @{user.username}" if user and user.username else ""
+        lines.append(f"👮 <code>{uid}</code>{who}")
+
+    kb = InlineKeyboardBuilder()
+    if owner:
+        kb.row(btn("➕ Дать доступ по ID", "pn:admin_add", style=SUCCESS))
+        for uid in access.extra():
+            kb.row(InlineKeyboardButton(
+                text=f"🗑 Забрать у {uid}", callback_data=f"pn:admin_del:{uid}"))
+    kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
+
+    tail = (
+        "<blockquote>👑 <b>Владелец</b> — тот, чей ID стоит в настройках "
+        "на сервере. Его нельзя снять отсюда: иначе бота можно потерять "
+        "целиком, ошибившись человеком один раз.\n\n"
+        "👮 <b>Админ</b> — может всё то же самое: заявки, заказы, цены, "
+        "балансы клиентов, рассылка. Не может одного — раздавать "
+        "доступ.</blockquote>"
+    )
+    if not owner:
+        tail += ("\n\n<i>Менять список может только владелец. Свой ID "
+                 "владельца задают на сервере: "
+                 "<code>sudo stars-bot telegram</code>.</i>")
+
+    await safe_edit(
+        call,
+        "👮 <b>Доступ к панели</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        + "\n".join(lines) + "\n\n" + tail,
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:admin_add")
+async def cb_admin_add(call: CallbackQuery, state: FSMContext) -> None:
+    if not access.is_owner(call.from_user.id):
+        await call.answer("Раздавать доступ может только владелец.",
+                          show_alert=True)
+        return
+    await state.set_state(Panel.admin_add)
+    await safe_edit(
+        call,
+        "➕ <b>Дать доступ к панели</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        "<blockquote>Пришлите <b>ID</b> человека — только цифры.\n\n"
+        "Свой ID он узнает у @userinfobot: перешлёт туда любое своё "
+        "сообщение или просто нажмёт «старт».\n\n"
+        "[[warn]] Он получит полный доступ: заявки, заказы, цены, "
+        "балансы клиентов и рассылка. Давайте только тому, кому "
+        "доверяете деньги.</blockquote>",
+        back_kb("pn:admins", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.message(Panel.admin_add, F.text)
+async def on_admin_add(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection, bot: Bot
+) -> None:
+    if not access.is_owner(message.from_user.id):
+        await state.clear()
+        await message.answer("Раздавать доступ может только владелец.")
+        return
+
+    raw = (message.text or "").strip().lstrip("@")
+    if not raw.isdigit() or not 5 <= len(raw) <= 15:
+        await message.answer(
+            "❌ Нужен <b>числовой ID</b>, например <code>123456789</code>.\n\n"
+            "<blockquote>По юзернейму доступ дать нельзя: его можно "
+            "сменить, и тогда доступ уедет к чужому человеку. ID не "
+            "меняется никогда.</blockquote>"
+        )
+        return
+
+    user_id = int(raw)
+    if not await access.grant(conn, user_id):
+        await state.clear()
+        await message.answer(
+            f"У <code>{user_id}</code> доступ уже есть.",
+            reply_markup=back_kb("pn:admins", "‹ К списку"),
+        )
+        return
+
+    await state.clear()
+    user = await db.get_user(conn, user_id)
+    who = f" (@{user.username})" if user and user.username else ""
+    await message.answer(
+        f"✅ <b>Доступ выдан</b>\n\n"
+        f"👮 <code>{user_id}</code>{who}\n\n"
+        "<blockquote>Пусть откроет бота и отправит <code>/panel</code>.\n\n"
+        "Забрать доступ можно там же, где выдали.</blockquote>",
+        reply_markup=back_kb("pn:admins", "‹ К списку"),
+    )
+
+    # Человек должен узнать, что доступ у него есть, — иначе он о нём
+    # просто не догадается.
+    try:
+        await bot.send_message(
+            user_id,
+            "👮 <b>Вам открыт доступ к админ-панели</b>\n\n"
+            "<blockquote>Откройте её командой <code>/panel</code>.\n\n"
+            "Там заявки на пополнение, заказы, цены и балансы клиентов — "
+            "будьте внимательны, это живые деньги.</blockquote>",
+        )
+    except TelegramAPIError as exc:
+        log.info("Доступ: не смог написать %s — %s", user_id, exc)
+        await message.answer(
+            "<i>Написать ему не удалось — он ещё не открывал бота. "
+            "Доступ всё равно выдан.</i>"
+        )
+
+
+@router.callback_query(F.data.startswith("pn:admin_del:"))
+async def cb_admin_del(call: CallbackQuery, state: FSMContext,
+                       conn: aiosqlite.Connection) -> None:
+    if not access.is_owner(call.from_user.id):
+        await call.answer("Забирать доступ может только владелец.",
+                          show_alert=True)
+        return
+
+    user_id = int(call.data.split(":", 2)[2])
+    if await access.revoke(conn, user_id):
+        await call.answer(f"Доступ у {user_id} забран")
+    else:
+        await call.answer("У этого человека доступ снять нельзя.",
+                          show_alert=True)
+    await cb_admins(call, state, conn)
 
 
 @router.callback_query(F.data == "pn:transfer")

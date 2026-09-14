@@ -79,6 +79,8 @@ def _build_defaults() -> dict[str, str]:
         "dc_comment": settings.dc_comment,
         # тексты
         "support_notice": "",
+        # Кому ещё открыта админ-панель, кроме владельцев из .env.
+        "extra_admins": "",
         # пути API сервиса выдачи, найденные перебором
         "fazer_balance_path": "",
         "fazer_order_path": "",

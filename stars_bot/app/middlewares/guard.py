@@ -11,6 +11,7 @@ from aiogram.types import CallbackQuery, Message, TelegramObject, User
 
 from app import db, links, texts
 from app.config import settings
+from app.services import access
 
 REF_RE = re.compile(r"^ref(\d+)$")
 
@@ -39,7 +40,7 @@ class UserGuardMiddleware(BaseMiddleware):
             await db.record_link_hit(conn, payload, user.id, is_new)
 
         # Админа не банит собственный бан-лист — иначе можно потерять доступ.
-        if not settings.is_admin(user.id) and await _banned(conn, user.id):
+        if not access.is_admin(user.id) and await _banned(conn, user.id):
             if isinstance(event, Message):
                 await event.answer(texts.BANNED)
             elif isinstance(event, CallbackQuery):

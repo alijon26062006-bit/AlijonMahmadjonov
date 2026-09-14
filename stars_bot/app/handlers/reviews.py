@@ -9,6 +9,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app import db, keyboards, texts
 from app.config import settings
+from app.services import access
 from app.keyboards import btn
 from app.services import reviews
 from app.states import Review
@@ -111,7 +112,7 @@ async def _finish(bot: Bot, conn: aiosqlite.Connection, target: Message, review_
 
 @router.callback_query(F.data.startswith("rv:ok:"))
 async def cb_publish(call: CallbackQuery, conn: aiosqlite.Connection, bot: Bot) -> None:
-    if not settings.is_admin(call.from_user.id):
+    if not access.is_admin(call.from_user.id):
         await call.answer("Это кнопка владельца.", show_alert=True)
         return
 
@@ -143,7 +144,7 @@ async def cb_publish(call: CallbackQuery, conn: aiosqlite.Connection, bot: Bot) 
 
 @router.callback_query(F.data.startswith("rv:no:"))
 async def cb_delete(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
-    if not settings.is_admin(call.from_user.id):
+    if not access.is_admin(call.from_user.id):
         await call.answer("Это кнопка владельца.", show_alert=True)
         return
 

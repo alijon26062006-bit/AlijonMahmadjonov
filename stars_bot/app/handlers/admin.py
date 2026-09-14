@@ -13,6 +13,7 @@ from aiogram.types import CallbackQuery, Message
 from app import db, keyboards, texts
 from app import runtime
 from app.config import settings
+from app.services import access
 from app.emoji import substitute
 from app.money import fmt, parse
 from app.services import delivery
@@ -22,8 +23,8 @@ log = logging.getLogger(__name__)
 router = Router(name="admin")
 
 # Весь роутер доступен только админам.
-router.message.filter(F.from_user.func(lambda u: settings.is_admin(u.id)))
-router.callback_query.filter(F.from_user.func(lambda u: settings.is_admin(u.id)))
+router.message.filter(F.from_user.func(lambda u: access.is_admin(u.id)))
+router.callback_query.filter(F.from_user.func(lambda u: access.is_admin(u.id)))
 
 
 @router.message(Command("admin", "help"))

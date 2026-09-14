@@ -51,6 +51,7 @@ class Panel(StatesGroup):
     adjust = State()      # ждём сумму правки баланса
     transfer = State()    # ждём список балансов со старого бота
     link = State()        # ждём название рекламной ссылки
+    admin_add = State()   # ждём ID того, кому открыть панель
 
 
 class Review(StatesGroup):
