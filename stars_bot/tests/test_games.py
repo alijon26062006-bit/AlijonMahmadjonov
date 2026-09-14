@@ -938,6 +938,142 @@ async def two_fields(conn) -> None:
     gh._offers.update(_offers_backup)
 
 
+async def volsever_check(conn) -> None:
+    """Volsever: проверка ID и ника перед покупкой, для любых игр."""
+    from app.services import volsever
+
+    calls: list[str] = []
+
+    class Resp:
+        def __init__(self, payload, status=200):
+            self.payload, self.status = payload, status
+
+        async def json(self, content_type=None):
+            return self.payload
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    class Session:
+        def __init__(self, reply):
+            self.reply = reply
+
+        def get(self, url, headers=None):
+            calls.append(url)
+            self.headers = headers
+            return self.reply
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    real = volsever.aiohttp.ClientSession
+    try:
+        # ---- обычная проверка
+        volsever.aiohttp.ClientSession = lambda *a, **kw: Session(Resp({
+            "status": True, "code": 200,
+            "data": {"game": "free-fire-asia", "username": "ProPlayer",
+                     "user_id": "1724367212"},
+        }))
+        name, verdict, note = await volsever.check(
+            "pk_test", "free-fire-asia", "1724367212")
+        check("ник получен", name == "ProPlayer" and verdict == "ok", str(name))
+        check("код игры попал в адрес",
+              "game/free-fire-asia" in calls[-1], calls[-1])
+        check("ID попал в адрес", "id=1724367212" in calls[-1], calls[-1])
+        check("без сервера лишнего параметра нет",
+              "zone=" not in calls[-1], calls[-1])
+
+        # ---- игра с сервером: второе число уходит как зона
+        await volsever.check("pk_test", "magic-chess", "123456789", "1234")
+        check("номер сервера уходит отдельно",
+              "zone=1234" in calls[-1], calls[-1])
+
+        # ---- сервис прямо говорит «нет такого»
+        volsever.aiohttp.ClientSession = lambda *a, **kw: Session(
+            Resp({"status": False, "message": "Account not found"}, status=404))
+        name, verdict, note = await volsever.check("pk_test", "g", "1")
+        check("отказ по аккаунту распознан", verdict == "bad", verdict)
+        check("и причина сохранена", "not found" in note.lower(), note)
+
+        # ---- поломки сервиса покупку не рубят
+        for status, mark in ((401, "ключ"), (429, "лимит"), (500, "HTTP 500")):
+            volsever.aiohttp.ClientSession = lambda *a, s=status, **kw: Session(
+                Resp({}, status=s))
+            name, verdict, note = await volsever.check("pk_test", "g", "1")
+            check(f"HTTP {status} — не «нет игрока»", verdict == "unknown",
+                  f"{verdict} / {note}")
+            check(f"причина HTTP {status} названа", mark in note, note)
+
+        # ---- чужой ник не пропускаем
+        volsever.aiohttp.ClientSession = lambda *a, **kw: Session(Resp({
+            "data": {"username": "Чужой", "user_id": "999"}}))
+        name, verdict, note = await volsever.check("pk_test", "g", "111")
+        check("ответ про чужой ID отброшен", name is None, str(name))
+        check("и это не «нет игрока»", verdict == "unknown", verdict)
+        check("в пояснении виден чужой ID", "999" in note, note)
+
+        # ---- без ключа не ходим никуда
+        before = len(calls)
+        name, verdict, note = await volsever.check("", "g", "1")
+        check("без ключа запрос не уходит", len(calls) == before, str(calls[-1:]))
+        check("и сказано почему", "ключ" in note, note)
+
+        # ---- список игр
+        volsever.aiohttp.ClientSession = lambda *a, **kw: Session(Resp({
+            "data": [
+                {"code": "free-fire-asia", "name": "Free Fire Asia"},
+                {"code": "magic-chess", "name": "Magic Chess", "zone": True},
+            ]}))
+        catalog = await volsever.games("pk_test")
+        check("список игр разобран", len(catalog) == 2, str(catalog))
+        check("видно, где нужен сервер",
+              catalog[1]["zone"] is True and catalog[0]["zone"] is False,
+              str(catalog))
+
+        # ---- привязка игры к коду проверки
+        await db.add_game(conn, category_id="free_fire_br",
+                          title="🔥 Free Fire", field="user_id")
+        await db.update_game(conn, "free_fire_br", checker="")
+        game = await db.get_game(conn, "free_fire_br")
+        check("новая игра без проверки", game.checker == "", game.checker)
+
+        match = panel._best_match(game, catalog)
+        check("код подобрался по названию",
+              match and match["code"] == "free-fire-asia", str(match))
+
+        await db.update_game(conn, "free_fire_br", checker="free-fire-asia")
+        game = await db.get_game(conn, "free_fire_br")
+        check("код сохранился", game.checker == "free-fire-asia", game.checker)
+
+        # ---- и он же используется при покупке
+        await runtime.set_value(conn, "volsever_key", "pk_test")
+        volsever.aiohttp.ClientSession = lambda *a, **kw: Session(Resp({
+            "data": {"username": "ИзVolsever", "user_id": "1724367212"}}))
+        name, verdict = await gh._lookup(
+            GameProvider(validate=(None, "unknown")), game,
+            {"user_id": "1724367212"})
+        check("при покупке ник берётся у Volsever",
+              name == "ИзVolsever" and verdict == "ok", f"{name} / {verdict}")
+
+        # без привязки игры к коду — молчит и не мешает
+        await db.update_game(conn, "free_fire_br", checker="")
+        bare = await db.get_game(conn, "free_fire_br")
+        name, verdict = await gh._volsever(bare, {"user_id": "1"})
+        check("без привязки проверка пропускается", verdict == "unknown",
+              verdict)
+
+        await runtime.set_value(conn, "volsever_key", "")
+        await db.update_game(conn, "free_fire_br", checker="")
+    finally:
+        volsever.aiohttp.ClientSession = real
+
+
 async def nick_probe(conn) -> None:
     """/nick — опрос всех источников разом: видно, кто врёт и кто молчит."""
     from aiogram.filters import CommandObject
@@ -2001,6 +2137,7 @@ async def main() -> None:
         await full_catalog(conn)
         await wrong_code(conn)
         await two_fields(conn)
+        await volsever_check(conn)
         await nick_probe(conn)
         await verdict_reading(conn)
         await wrong_region(conn)

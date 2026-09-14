@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     # Второй справочник ников: developers.freefirecommunity.com.
     # Работает и без ключа — ключ снимает ограничения.
     ff_community_key: str = ""
+    # Volsever: проверка ID и ника для любых игр (pk_live_…).
+    volsever_key: str = ""
     # Ключ второго поставщика — с него идут игры.
     fazer_games_key: str = ""
     # Пути из разделов Orders и Account: их надо сверить с документацией,

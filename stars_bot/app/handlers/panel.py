@@ -37,7 +37,7 @@ from app.money import (
 from app.services import dcpay, nicknames, pricing, rates
 from app.services import reviews as reviews_service
 from app.services import delivery
-from app.states import GameFind, GameNew, Panel, PartnerMove, PartnerNew, PromoNew
+from app.states import GameNew, Panel, PartnerMove, PartnerNew, PromoNew
 
 log = logging.getLogger(__name__)
 router = Router(name="panel")
@@ -608,6 +608,13 @@ FIELDS.update({
 
 # Куда возвращаться после сохранения
 FIELD_PARENT = {key: "pn:pay" for key in PAY_FIELDS}
+FIELDS["volsever_key"] = (
+    "🔑 Ключ проверки ID (Volsever)",
+    "Ключ <code>pk_live_…</code> из кабинета volsever.com "
+    "(или <code>-</code>, чтобы убрать). Им проверяется ID игрока "
+    "и показывается его ник перед покупкой:", "text",
+)
+
 FIELDS["ff_community_key"] = (
     "🔑 Второй справочник ников",
     "Ключ с <b>developers.freefirecommunity.com</b> "
@@ -620,7 +627,7 @@ FIELD_PARENT.update({
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "star_packs": "pn:prices", "reviews_channel": "pn:reviews",
     "gameskinbo_key": "pn:games", "fazer_games_key": "pn:games",
-    "ff_community_key": "pn:games",
+    "ff_community_key": "pn:games", "volsever_key": "pn:checker",
     "steam_price_e4": "pn:steam", "steam_cost_e4": "pn:steam",
     "steam_currency": "pn:steam", "steam_packs": "pn:steam",
     "usd_rate_diram": "pn:prices", "usd_rate_spread": "pn:prices",
@@ -699,6 +706,26 @@ async def on_field_value(
             "<i>Эта цена держится сама по себе: смена курса и наценки её "
             "не трогает.</i>",
             reply_markup=back_kb(f"pn:game_packs:{code}", "‹ К пакетам"),
+        )
+        return
+
+    # Код игры у сервиса проверки ID.
+    if field.startswith("game_checker:"):
+        code = field.split(":", 1)[1]
+        value = "" if raw == "-" else raw.strip().lower()
+        if value and not re.fullmatch(r"[a-z0-9_\-]{2,48}", value):
+            await message.answer(
+                "❌ Код — латиница, цифры, дефис и подчёркивание, "
+                "например <code>free-fire-asia</code>."
+            )
+            return
+        await db.update_game(conn, code, checker=value)
+        await state.clear()
+        game = await db.get_game(conn, code)
+        await message.answer(
+            f"✅ <b>{game.title if game else code}</b> — проверка ID "
+            + (f"<code>{value}</code>" if value else "<i>выключена</i>"),
+            reply_markup=back_kb("pn:checker", "‹ К проверке"),
         )
         return
 
@@ -3135,7 +3162,7 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn("➕ Добавить игру", "pn:game_new", style=SUCCESS))
     kb.row(btn("📚 Взять из каталога поставщика", "pn:game_pick", style=PRIMARY))
-    kb.row(btn("🔎 Найти игру у поставщика", "pn:game_find", style=PRIMARY))
+    kb.row(btn("🪪 Проверка ID игрока", "pn:checker", style=PRIMARY))
     kb.row(InlineKeyboardButton(text="📋 Все категории поставщика",
                                 callback_data="pn:game_codes"))
     kb.row(InlineKeyboardButton(text="🔔 Мгновенные отчёты (вебхук)",
@@ -3351,6 +3378,160 @@ async def cb_hook(call: CallbackQuery, state: FSMContext,
     kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
 
     await safe_edit(call, body, kb.as_markup())
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:checker")
+async def cb_checker(call: CallbackQuery, state: FSMContext,
+                     conn: aiosqlite.Connection) -> None:
+    """Проверка ID игрока: ключ, остаток лимита и привязка игр."""
+    await state.clear()
+    from app.services import volsever
+
+    key = runtime.get("volsever_key") or settings.volsever_key
+    games = await db.list_games(conn)
+    linked = [g for g in games if g.checker]
+
+    if key:
+        head = "🟢 <b>Ключ задан</b>"
+        left = await volsever.usage(key)
+        if left:
+            head += f"\n<code>{str(left)[:200]}</code>"
+    else:
+        head = ("🔴 <b>Ключ не задан</b> — ID не проверяется, "
+                "ник клиенту не показывается")
+
+    body = "\n".join(
+        f"{'✅' if g.checker else '➖'} <b>{g.title}</b>"
+        + (f"\n   <code>{g.checker}</code>" if g.checker
+           else "\n   <i>проверка не настроена</i>")
+        for g in games
+    ) or "<i>Игр пока нет.</i>"
+
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🔑 Ключ Volsever", "pn:set:volsever_key", style=PRIMARY))
+    if key:
+        kb.row(btn("🔗 Привязать игры к проверке", "pn:checker_link",
+                   style=SUCCESS))
+    for game in games:
+        kb.row(InlineKeyboardButton(
+            text=("✅ " if game.checker else "➖ ") + game.title,
+            callback_data=f"pn:checker_set:{game.category_id}",
+        ))
+    kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
+
+    await safe_edit(
+        call,
+        "🪪 <b>Проверка ID игрока</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"{head}\n\n{body}\n\n"
+        f"Привязано игр: <b>{len(linked)}</b> из <b>{len(games)}</b>\n\n"
+        "<blockquote>Перед покупкой бот спрашивает у сервиса, есть ли "
+        "такой аккаунт, и показывает клиенту его ник. Это отсекает "
+        "опечатки в ID до оплаты, а не после.\n\n"
+        "У каждой игры свой код у сервиса проверки — он не совпадает с "
+        "кодом поставщика выдачи, поэтому игры привязываются "
+        "отдельно.</blockquote>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:checker_link")
+async def cb_checker_link(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    """Подобрать код проверки каждой игре автоматически, по названию."""
+    from app.services import volsever
+
+    key = runtime.get("volsever_key") or settings.volsever_key
+    await safe_edit(call, "🔗 Спрашиваю список игр…", back_kb("pn:checker", "‹ Назад"))
+    await call.answer()
+
+    catalog = await volsever.games(key)
+    if not catalog:
+        await safe_edit(
+            call,
+            "❌ <b>Список игр не пришёл</b>\n\n"
+            "<blockquote>Проверьте ключ. Если он верный — возможно, у "
+            "сервиса другой адрес списка; привяжите игры вручную, нажав "
+            "игру в списке.</blockquote>",
+            back_kb("pn:checker", "‹ Назад"),
+        )
+        return
+
+    lines = []
+    for game in await db.list_games(conn):
+        if game.checker:
+            continue
+        match = _best_match(game, catalog)
+        if match:
+            await db.update_game(conn, game.category_id, checker=match["code"])
+            lines.append(f"✅ {game.title} → <code>{match['code']}</code>")
+        else:
+            lines.append(f"➖ {game.title} — <i>похожего не нашлось</i>")
+
+    await safe_edit(
+        call,
+        f"🔗 <b>Привязка к проверке</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"Игр у сервиса: <b>{len(catalog)}</b>\n\n"
+        + ("\n".join(lines) or "<i>Все игры уже привязаны.</i>")
+        + "\n\n<blockquote>Проверьте подбор: коды подбирались по "
+        "названию, а названия у сервисов расходятся. Неверную привязку "
+        "поправьте, нажав игру.</blockquote>",
+        back_kb("pn:checker", "‹ К проверке"),
+    )
+
+
+def _best_match(game: db.Game, catalog: list[dict]) -> dict | None:
+    """Код проверки, больше всего похожий на нашу игру.
+
+    Считаем по словам названия: «free fire» роднит free-fire-asia и
+    «🔥 Free Fire», а длина совпадения ничего не значит.
+    """
+    from app.services import regions as reg
+
+    mine = {w for w in re.split(r"[^a-zа-я0-9]+", game.title.lower()) if len(w) > 2}
+    mine |= {w for w in re.split(r"[^a-z0-9]+", game.category_id.lower()) if w}
+    want = reg.suffix_of(game)
+
+    best, score = None, 0
+    for item in catalog:
+        theirs = {w for w in re.split(r"[^a-z0-9]+",
+                                      f"{item['code']} {item['name']}".lower()) if w}
+        common = len(mine & theirs)
+        if not common:
+            continue
+        # Совпавший регион — сильный довод: у Free Fire коды разложены
+        # по серверам, и привязать не тот значит проверять не там.
+        if want and want in theirs:
+            common += 2
+        if common > score:
+            best, score = item, common
+    return best
+
+
+@router.callback_query(F.data.startswith("pn:checker_set:"))
+async def cb_checker_set(call: CallbackQuery, state: FSMContext,
+                         conn: aiosqlite.Connection) -> None:
+    """Задать код проверки вручную."""
+    code = call.data.split(":", 2)[2]
+    game = await db.get_game(conn, code)
+    if game is None:
+        await call.answer("Игра не найдена.", show_alert=True)
+        return
+
+    await state.set_state(Panel.value)
+    await state.update_data(field=f"game_checker:{code}")
+    await safe_edit(
+        call,
+        f"🪪 <b>Проверка ID: {game.title}</b>\n\n"
+        f"Сейчас: <code>{game.checker or 'не задана'}</code>\n\n"
+        "<blockquote>Пришлите код этой игры у сервиса проверки — "
+        "например <code>free-fire-asia</code>.\n\n"
+        "Чтобы выключить проверку для этой игры, пришлите "
+        "<code>-</code>.</blockquote>",
+        back_kb("pn:checker", "❌ Отмена"),
+    )
     await call.answer()
 
 

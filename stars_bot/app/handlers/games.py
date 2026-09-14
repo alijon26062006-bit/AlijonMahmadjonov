@@ -16,6 +16,7 @@ from app.services import games as svc
 from app.services import suppliers
 from app.services import nicknames
 from app.services import regions
+from app.services import volsever
 from app.services.fragment import DeliveryError, DeliveryProvider, DeliveryUncertain
 from app.states import Game
 
@@ -368,6 +369,27 @@ def shown_id(values: list[str]) -> str:
     return f"{values[0]} ({', '.join(values[1:])})"
 
 
+async def _volsever(game: db.Game, fields: dict[str, str]) -> tuple[str | None, str]:
+    """Проверка через Volsever — он сделан ровно для этого.
+
+    В отличие от справочников ников, работает не только с Free Fire и
+    принимает второе поле: у Magic Chess и Mobile Legends аккаунт задан
+    парой «ID игрока + сервер».
+    """
+    key = runtime.get("volsever_key") or db.settings.volsever_key
+    if not key or not game.checker:
+        return None, "unknown"
+
+    values = list(fields.values())
+    name, verdict, note = await volsever.check(
+        key, game.checker, values[0] if values else "",
+        values[1] if len(values) > 1 else "",
+    )
+    if note:
+        log.info("Volsever: %s — %s", game.checker, note)
+    return name, verdict
+
+
 async def _lookup(
     provider, game: db.Game, fields: dict[str, str],
 ) -> tuple[str | None, str]:
@@ -376,6 +398,13 @@ async def _lookup(
     Блокируем покупку только на явном «такого игрока нет». Если ник просто
     не пришёл — продаём: пополнение идёт по ID, ник нужен для сверки глазами.
     """
+    # Volsever спрашиваем первым: он для этого и сделан, и знает больше
+    # игр, чем поставщик выдачи.
+    name, verdict = await _volsever(game, fields)
+    if verdict == "ok" and name:
+        return name, "ok"
+    refused = verdict == "bad"
+
     name, verdict = await provider.validate_game_id(game.category_id, fields)
     if verdict == "ok" and name:
         return name, "ok"
@@ -399,7 +428,9 @@ async def _lookup(
         # через поставщика — его слово здесь единственное весомое.
         log.info("Игры: справочник ников не нашёл %s (%s) — продаём дальше",
                  player, found.verdict)
-    return None, "unknown"
+    # Отказ Volsever учитываем только здесь, в самом конце: у него могла
+    # быть не та игра в настройке, а поставщик выдачи — промолчать.
+    return None, ("bad" if refused else "unknown")
 
 
 @router.callback_query(Game.confirm, F.data == "g:ok")

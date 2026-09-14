@@ -24,9 +24,6 @@ class GameNew(StatesGroup):
     data = State()          # ждём «код_игры Название» при добавлении
 
 
-class GameFind(StatesGroup):
-    query = State()         # ждём название игры для поиска по каталогу
-
 
 class Deposit(StatesGroup):
     amount = State()      # ждём сумму пополнения

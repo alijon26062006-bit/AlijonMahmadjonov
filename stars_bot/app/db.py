@@ -193,6 +193,7 @@ CREATE TABLE IF NOT EXISTS games (
     category_id TEXT PRIMARY KEY,   -- как называет игру сервис выдачи
     title       TEXT NOT NULL,      -- как показываем клиенту
     field       TEXT NOT NULL DEFAULT 'user_id',   -- поля ID через запятую
+    checker     TEXT NOT NULL DEFAULT '',          -- код игры у проверки ID
     region      TEXT NOT NULL DEFAULT '',          -- подсказка для поиска ника
     margin      INTEGER NOT NULL DEFAULT 0,        -- своя наценка, % (0 — общая)
     enabled     INTEGER NOT NULL DEFAULT 0,
@@ -348,6 +349,7 @@ class Game:
     margin: int
     enabled: int
     created_at: str
+    checker: str = ""
 
     @property
     def product_type(self) -> str:
@@ -479,6 +481,9 @@ MIGRATIONS: dict[str, dict[str, str]] = {
     },
     "deposits": {"reference": "TEXT"},
     "users": {"source": "TEXT"},
+    # Код этой же игры у сервиса проверки ID — он свой, не как у
+    # поставщика выдачи.
+    "games": {"checker": "TEXT NOT NULL DEFAULT ''"},
 }
 
 
