@@ -106,7 +106,7 @@ async def transfer(conn) -> None:
     from app.services import importer
 
     # ---- разбор: список выгружают кто во что горазд
-    pairs, skipped = importer.parse_balances(
+    rows, skipped = importer.parse_balances(
         "123456789 100\n"
         "987654321 - 45.50\n"
         "id: 111222333, balance: 12,30\n"
@@ -115,7 +115,7 @@ async def transfer(conn) -> None:
         "\n"
         "123456789 999\n"
     )
-    found = dict(pairs)
+    found = {row["id"]: row["amount"] for row in rows}
     check("простая строка разобрана", found.get(123456789) == 99900,
           str(found.get(123456789)))
     check("тире не мешает", found.get(987654321) == 4550, str(found.get(987654321)))
@@ -125,15 +125,58 @@ async def transfer(conn) -> None:
           str(found.get(444555666)))
     check("повтор не удваивает, берётся последняя строка",
           found.get(123456789) == 99900)
-    check("строка без ID отложена", skipped == ["Итого: 500"], str(skipped))
+    check("шапка и итоги не считаются ошибкой", skipped == [], str(skipped))
 
     check("совсем пустой список — пусто",
           importer.parse_balances("") == ([], []))
     check("строка без суммы не проходит",
           importer.parse_balances("123456789")[0] == [])
-    check("отрицательная сумма не проходит",
-          importer.parse_balances("123456789 -5")[0] == [(123456789, 500)],
-          str(importer.parse_balances("123456789 -5")[0]))
+
+    # ---- настоящая выгрузка: три числа в конце строки
+    table = (
+        "=== КОРБАРОН · 1096 ===\n"
+        "Ҳамагӣ дар ҳамёнҳо : 617.96 Tjs\n"
+        "Бо пул дар ҳамён   : 168\n"
+        "──────────────────────────────────────────\n"
+        "TELEGRAM ID   USERNAME    НОМ      ТЕЛЕФОН       ҲАМЁН   ХАРҶ  ФРМ\n"
+        "──────────────────────────────────────────\n"
+        "7614804941    —           abuw.axxi   —          70.00    0.00    0\n"
+        "7664430907    @rutsiyax   uways   992107140706   60.50   58.50    8\n"
+        "8187133381    —           VIP     992400410505    6.91  192.59    7\n"
+        "5927541684    —           40205       —           1.00   36.00    4\n"
+        "6803799162    —           919046661   —           0.00    0.00    0\n"
+        "1607261985    @Sheix_80   Милый   992945829009    0.90 1087.10    5\n"
+    )
+    rows, skipped = importer.parse_balances(table)
+    money = {row["id"]: row["amount"] for row in rows}
+    check("баланс взят, а не число заказов",
+          money.get(7614804941) == 7000, str(money.get(7614804941)))
+    check("потраченное за баланс не принято",
+          money.get(7664430907) == 6050, str(money.get(7664430907)))
+    check("копейки на месте", money.get(8187133381) == 691,
+          str(money.get(8187133381)))
+    check("ник из одних цифр не спутан с суммой",
+          money.get(5927541684) == 100, str(money.get(5927541684)))
+    check("длинный ник-число тоже не спутан",
+          money.get(6803799162) == 0, str(money.get(6803799162)))
+    check("большая трата не подменила баланс",
+          money.get(1607261985) == 90, str(money.get(1607261985)))
+    check("телефон за баланс не принят",
+          all(amount < 100_000 for amount in money.values()), str(money))
+    check("шапка выгрузки в ошибки не попала", skipped == [], str(skipped))
+    check("разобраны все строки с людьми", len(rows) == 6, str(len(rows)))
+
+    names = {row["id"]: row["username"] for row in rows}
+    check("юзернейм подхвачен", names.get(7664430907) == "rutsiyax",
+          str(names.get(7664430907)))
+    check("без юзернейма поле пустое", names.get(7614804941) == "",
+          str(names.get(7614804941)))
+
+    rich = importer.with_money(rows)
+    check("нулевые отделены от денежных", len(rich) == 5, str(len(rich)))
+    check("в предпросмотре сначала крупные",
+          importer.preview(rows)[0]["id"] == 7614804941,
+          str(importer.preview(rows)[0]))
 
     # ---- предпросмотр ничего не применяет
     state = FakeState()
@@ -147,13 +190,14 @@ async def transfer(conn) -> None:
     await panel.on_transfer_list(message, state)
     check("показан предпросмотр", "Проверьте перед записью" in message.last,
           message.last[:60])
-    check("видно количество", "Записей: <b>2</b>" in message.last, message.last)
+    check("видно количество", "Всего строк: <b>2</b>" in message.last,
+          message.last)
     check("видна общая сумма", "35.50" in message.last, message.last)
     check("до нажатия деньги не начислены",
           await db.get_user(conn, 777000111) is None)
 
     # ---- а теперь применяем
-    call = FakeCallback("pn:transfer_go")
+    call = FakeCallback("pn:transfer_go:all")
     await panel.cb_transfer_go(call, state, conn)
     first = await db.get_user(conn, 777000111)
     second = await db.get_user(conn, 777000222)
@@ -168,10 +212,22 @@ async def transfer(conn) -> None:
     state = FakeState()
     message = FakeMessage("777000111 25")
     await panel.on_transfer_list(message, state)
-    await panel.cb_transfer_go(FakeCallback("pn:transfer_go"), state, conn)
+    await panel.cb_transfer_go(FakeCallback("pn:transfer_go:all"), state, conn)
     again = await db.get_user(conn, 777000111)
     check("повторный перенос не удваивает баланс", again.balance == 2500,
           str(again.balance))
+
+    # ---- можно взять только тех, у кого деньги
+    state = FakeState()
+    message = FakeMessage("777000333 0\n777000444 15")
+    await panel.on_transfer_list(message, state)
+    check("нули посчитаны отдельно", "С нулём: <b>1</b>" in message.last,
+          message.last[:300])
+    await panel.cb_transfer_go(FakeCallback("pn:transfer_go:rich"), state, conn)
+    check("клиент с деньгами заведён",
+          (await db.get_user(conn, 777000444)) is not None)
+    check("пустого заводить не стали",
+          await db.get_user(conn, 777000333) is None)
 
     # ---- /start не затирает перенесённый баланс
     await db.upsert_user(conn, 777000111, "vasya", "Вася")
@@ -189,7 +245,7 @@ async def transfer(conn) -> None:
           message.last[:60])
 
     # ---- нечего применять
-    call = FakeCallback("pn:transfer_go")
+    call = FakeCallback("pn:transfer_go:all")
     await panel.cb_transfer_go(call, FakeState(), conn)
     check("пустое применение не падает",
           any("потерялся" in a for a in call.alerts), str(call.alerts))

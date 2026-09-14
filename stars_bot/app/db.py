@@ -1142,7 +1142,7 @@ async def list_links(conn: aiosqlite.Connection) -> list[tuple[Link, dict[str, i
 
 
 async def import_balance(
-    conn: aiosqlite.Connection, user_id: int, amount: int,
+    conn: aiosqlite.Connection, user_id: int, amount: int, username: str = "",
 ) -> bool:
     """Перенести баланс со старого бота. True — клиента завели заново.
 
@@ -1160,8 +1160,16 @@ async def import_balance(
     if fresh:
         await conn.execute(
             """INSERT INTO users (id, username, first_name, balance, created_at)
-               VALUES (?, NULL, NULL, ?, ?)""",
-            (user_id, amount, _now()),
+               VALUES (?, ?, NULL, ?, ?)""",
+            (user_id, username or None, amount, _now()),
+        )
+    elif username:
+        # Имя из выгрузки лучше пустого, но живое из Telegram важнее:
+        # его бот обновляет сам при каждом «старте».
+        await conn.execute(
+            """UPDATE users SET balance = ?,
+                   username = COALESCE(username, ?) WHERE id = ?""",
+            (amount, username, user_id),
         )
     else:
         await conn.execute(

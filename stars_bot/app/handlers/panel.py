@@ -2154,12 +2154,14 @@ async def on_transfer_list(message: Message, state: FSMContext) -> None:
         )
         return
 
-    total = sum(amount for _, amount in pairs)
+    rich = importer.with_money(pairs)
+    total = sum(row["amount"] for row in pairs)
     rows = "\n".join(
-        f"├ <code>{uid}</code> → <b>{fmt(amount)}</b>"
-        for uid, amount in importer.preview(pairs)
+        f"├ <code>{row['id']}</code> → <b>{fmt(row['amount'])}</b>"
+        + (f"  @{row['username']}" if row["username"] else "")
+        for row in importer.preview(pairs)
     )
-    more = f"\n└ <i>…и ещё {len(pairs) - 5}</i>" if len(pairs) > 5 else ""
+    more = (f"\n└ <i>…и ещё {len(pairs) - 5}</i>") if len(pairs) > 5 else ""
     lost = ""
     if skipped:
         sample = "\n".join(f"├ {line[:60]}" for line in skipped[:3])
@@ -2170,48 +2172,66 @@ async def on_transfer_list(message: Message, state: FSMContext) -> None:
     await state.update_data(transfer=pairs)
 
     kb = InlineKeyboardBuilder()
-    kb.row(btn(f"✅ Записать {len(pairs)} балансов", "pn:transfer_go",
-               style=SUCCESS))
+    if rich and len(rich) != len(pairs):
+        kb.row(btn(f"💰 Только с деньгами — {len(rich)}",
+                   "pn:transfer_go:rich", style=SUCCESS))
+        kb.row(btn(f"👥 Всех — {len(pairs)}", "pn:transfer_go:all"))
+    else:
+        kb.row(btn(f"✅ Записать {len(pairs)}", "pn:transfer_go:all",
+                   style=SUCCESS))
     kb.row(btn("❌ Отмена", "pn:users", style=DANGER))
 
+    zero = len(pairs) - len(rich)
     await message.answer(
         "📥 <b>Проверьте перед записью</b>\n"
         f"<code>{texts.LINE}</code>\n\n"
-        f"Записей: <b>{len(pairs)}</b>\n"
-        f"Всего денег: <b>{fmt(total)}</b>\n\n"
-        f"{rows}{more}{lost}\n\n"
-        "<blockquote>Баланс <b>устанавливается</b>, а не прибавляется — "
-        "если запустить перенос дважды, деньги не удвоятся.\n\n"
+        f"├ Всего строк: <b>{len(pairs)}</b>\n"
+        f"├ С деньгами: <b>{len(rich)}</b>\n"
+        f"├ С нулём: <b>{zero}</b>\n"
+        f"└ Всего денег: <b>{fmt(total)}</b>\n\n"
+        f"<b>Самые крупные:</b>\n{rows}{more}{lost}\n\n"
+        "<blockquote>Сверьте суммы с выгрузкой — это главное. Если "
+        "колонка взята не та, скажите, и я поправлю разбор.\n\n"
+        "Баланс <b>устанавливается</b>, а не прибавляется: запустите "
+        "перенос дважды — деньги не удвоятся.\n\n"
         "Кого ещё нет в базе, заведу: он нажмёт «старт» и сразу увидит "
         "свой баланс.</blockquote>",
         reply_markup=kb.as_markup(),
     )
 
 
-@router.callback_query(F.data == "pn:transfer_go")
+@router.callback_query(F.data.startswith("pn:transfer_go"))
 async def cb_transfer_go(
     call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
 ) -> None:
+    from app.services import importer
+
     data = await state.get_data()
-    pairs = data.get("transfer") or []
+    rows = data.get("transfer") or []
     await state.clear()
 
-    if not pairs:
+    if not rows:
         await call.answer("Список потерялся, пришлите заново.", show_alert=True)
         return
 
+    only_rich = call.data.endswith(":rich")
+    if only_rich:
+        rows = importer.with_money(rows)
+
     await call.answer("Записываю…")
     created = 0
-    for uid, amount in pairs:
-        if await db.import_balance(conn, int(uid), int(amount)):
+    for row in rows:
+        if await db.import_balance(conn, int(row["id"]), int(row["amount"]),
+                                   username=row.get("username", "")):
             created += 1
 
-    total = sum(amount for _, amount in pairs)
+    total = sum(row["amount"] for row in rows)
     await safe_edit(
         call,
         "✅ <b>Балансы перенесены</b>\n"
         f"<code>{texts.LINE}</code>\n\n"
-        f"├ Записей: <b>{len(pairs)}</b>\n"
+        f"├ Записей: <b>{len(rows)}</b>"
+        + (" <i>(только с деньгами)</i>" if only_rich else "") + "\n"
         f"├ Новых клиентов: <b>{created}</b>\n"
         f"└ Всего денег: <b>{fmt(total)}</b>\n\n"
         "<blockquote>Клиенты увидят баланс сразу, как откроют бота. "
