@@ -137,24 +137,28 @@ def main_menu(games: bool = False) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+#: Пустая на вид подпись. Текст кнопки Telegram требует непустым, а
+#: показать мы хотим только значок — этот символ ничего не рисует.
+BLANK = "\u3164"
+
+
 def games_entry_btn() -> InlineKeyboardButton:
-    """Вход в игры: два значка и ничего больше.
+    """Вход в игры: один значок и ничего больше.
 
-    Премиум-значок на кнопке может быть только один — поле под него у
-    Telegram одно. Поэтому первый значок идёт премиум-значком, второй —
-    обычным, в подписи. Выглядят они рядом, как и задумано.
+    Премиум-значок на кнопке может быть только один: поле под него у
+    Telegram одно. Ставить вторым обычный эмодзи — плохо: рядом с живой
+    иконкой игры он выглядит чужеродной картинкой. Поэтому значок один.
 
-    Когда премиум-эмодзи выключены, в подписи стоят оба обычных: пустой
+    Когда премиум-эмодзи выключены, в подписи стоят обычные: пустой
     кнопки у клиента быть не должно.
     """
-    second = em("pubg")
     emoji_id = custom_id("game")
     if emoji_id and premium_on():
         return InlineKeyboardButton(
-            text=second or em("game"), callback_data="m:games",
+            text=BLANK, callback_data="m:games",
             style=PRIMARY, icon_custom_emoji_id=emoji_id,
         )
-    return btn(f"{em('game')} {second}".strip(), "m:games", style=PRIMARY)
+    return btn(f"{em('game')} {em('pubg')}".strip(), "m:games", style=PRIMARY)
 
 
 def back(target: str = "m:main", text: str = "") -> InlineKeyboardMarkup:
