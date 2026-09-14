@@ -53,6 +53,12 @@ CATEGORY_CANDIDATES = [
 ]
 #: Где в ответе может лежать сам список.
 CATEGORY_LIST_KEYS = ["categories", "items", "data", "topups", "list", "result"]
+#: Списки поставщик отдаёт страницами: по 200 за раз, не больше 500.
+#: Берём максимум — чем меньше запросов, тем быстрее открывается каталог.
+PAGE_SIZE = 500
+#: Сколько страниц готовы прочесть. Двух сотен категорий на странице
+#: хватает на любой каталог, а предел спасает от бесконечного круга.
+PAGE_LIMIT = 20
 
 # Пополнение кошелька Steam
 STEAM_RATES = "/api/v2/steam-topup/rates"
@@ -297,6 +303,10 @@ class FazerProvider(DeliveryProvider):
         Список validate-id для этого не годится — в нём только игры
         с проверкой ID. Именно поэтому Free Fire мог не найтись, а заказ
         падал с «Unknown or unavailable category_id».
+
+        Список выдаётся страницами: без дочитывания видна только первая,
+        и игра со второй страницы выглядит так, будто её у поставщика
+        нет вовсе.
         """
         from app import runtime
 
@@ -305,10 +315,7 @@ class FazerProvider(DeliveryProvider):
         paths += [p for p in CATEGORY_CANDIDATES if p not in paths]
 
         for path in paths:
-            status, data = await self._get_raw(path)
-            if not self._looks_ok(status, data):
-                continue
-            items = _category_list(data)
+            items = await self._all_pages(path)
             if not items:
                 continue
             if path != runtime.get("fazer_topups_path"):
@@ -317,6 +324,37 @@ class FazerProvider(DeliveryProvider):
 
         log.info("Игры: список категорий не нашёлся ни по одному адресу")
         return []
+
+    async def _all_pages(self, path: str) -> list[dict]:
+        """Дочитать список до конца, идя по курсору.
+
+        Страниц берём ограниченное число: курсор, который перестал
+        меняться, увёл бы обход в бесконечный круг.
+        """
+        found: list[dict] = []
+        seen: set[str] = set()
+        cursor = ""
+
+        for _ in range(PAGE_LIMIT):
+            query = f"limit={PAGE_SIZE}" + (f"&cursor={cursor}" if cursor else "")
+            joiner = "&" if "?" in path else "?"
+            status, data = await self._get_raw(f"{path}{joiner}{query}")
+            if not self._looks_ok(status, data):
+                return found
+
+            page = _category_list(data)
+            if not page:
+                return found
+            found.extend(page)
+
+            meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+            nxt = str(meta.get("next_cursor") or "")
+            if not meta.get("has_more") or not nxt or nxt in seen:
+                break
+            seen.add(nxt)
+            cursor = nxt
+
+        return found
 
     async def game_catalog(self) -> list[dict]:
         """Игры, у которых сервис умеет проверять ID, и какие поля им нужны."""

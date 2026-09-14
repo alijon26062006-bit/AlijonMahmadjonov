@@ -374,6 +374,61 @@ async def main() -> None:
           fz.settings.fazer_balance_path == "/api/v2/balance",
           fz.settings.fazer_balance_path)
 
+    # ------------------- каталог отдаётся страницами: дочитываем до конца
+    class Paged(fz.FazerProvider):
+        """Поставщик, отдающий список по страницам."""
+
+        def __init__(self, pages):
+            self.pages = pages
+            self.asked: list[str] = []
+            self._base = "https://x"
+            self.api_key = "k"
+            self._session = None
+
+        async def _get_raw(self, path):
+            self.asked.append(path)
+            index = len(self.asked) - 1
+            if index >= len(self.pages):
+                return 200, {"ok": True, "items": []}
+            return 200, self.pages[index]
+
+        async def _remember(self, key, value):
+            return None
+
+    api = Paged([
+        {"ok": True, "items": [{"category_id": "a", "name": "A"}],
+         "meta": {"has_more": True, "next_cursor": "c1"}},
+        {"ok": True, "items": [{"category_id": "pubg_mobile_global",
+                                "name": "PUBG Mobile"}],
+         "meta": {"has_more": False, "next_cursor": None}},
+    ])
+    found = await api.game_categories()
+    check("прочитаны обе страницы", len(found) == 2, str(found))
+    check("игра со второй страницы видна",
+          any(i["category_id"] == "pubg_mobile_global" for i in found), str(found))
+    check("во втором запросе передан курсор",
+          "cursor=c1" in api.asked[1], str(api.asked))
+    check("размер страницы взят максимальный",
+          "limit=500" in api.asked[0], api.asked[0])
+
+    # курсор, который не меняется, не должен уводить в круг
+    loop = Paged([
+        {"ok": True, "items": [{"category_id": "a", "name": "A"}],
+         "meta": {"has_more": True, "next_cursor": "same"}},
+        {"ok": True, "items": [{"category_id": "b", "name": "B"}],
+         "meta": {"has_more": True, "next_cursor": "same"}},
+        {"ok": True, "items": [{"category_id": "c", "name": "C"}],
+         "meta": {"has_more": True, "next_cursor": "same"}},
+    ])
+    found = await loop.game_categories()
+    check("повторяющийся курсор обход останавливает",
+          len(loop.asked) == 2, str(loop.asked))
+
+    one = Paged([{"ok": True, "items": [{"category_id": "a", "name": "A"}]}])
+    found = await one.game_categories()
+    check("без страниц читается один раз",
+          len(one.asked) == 1 and len(found) == 1, str(one.asked))
+
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")
     if FAIL:
         print("ПРОВАЛЫ:", ", ".join(FAIL))
