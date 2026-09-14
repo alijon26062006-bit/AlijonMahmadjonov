@@ -70,7 +70,6 @@ Wants=network-online.target
 Type=simple
 User=$(id -un)
 WorkingDirectory=$ROOT
-EnvironmentFile=$ROOT/.env
 ExecStart=$VENV/bin/python -m shop.main
 Restart=always
 RestartSec=5
