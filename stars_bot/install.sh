@@ -202,6 +202,25 @@ case "\${1:-help}" in
         [ "\$1" = "mystars" ] || [ "\$1" = "delivery" ] && \
             echo "   Проверьте: /panel -> Проверить связь"
         ;;
+    games)
+        # Ключи второго поставщика одной командой: файлы руками не правим,
+        # бот перезапускается сам.
+        if [ -z "\${2:-}" ]; then
+            echo "Использование: stars-bot games КЛЮЧ_ПОСТАВЩИКА [КЛЮЧ_НИКОВ]"
+            echo "  КЛЮЧ_ПОСТАВЩИКА — с его счёта покупаются игры"
+            echo "  КЛЮЧ_НИКОВ      — gameskinbo, ник по ID (необязательно)"
+            exit 1
+        fi
+        sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set \
+            FAZER_GAMES_KEY="\$2"
+        if [ -n "\${3:-}" ]; then
+            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set \
+                GAMESKINBO_KEY="\$3"
+        fi
+        systemctl restart "\$SERVICE"
+        echo "✅ Ключи для игр записаны, бот перезапущен"
+        echo "   Проверьте: /panel → Балансы ключей"
+        ;;
     mock)
         sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set FRAGMENT_MODE=mock
         systemctl restart "\$SERVICE" && echo "✅ Режим проверки: звёзды не отправляются"
@@ -223,6 +242,8 @@ case "\${1:-help}" in
   stars-bot logs      смотреть логи живьём (Ctrl+C — выйти)
   stars-bot errors    последние ошибки
   stars-bot setup     изменить настройки и перезапустить
+  stars-bot games КЛЮЧ [КЛЮЧ_НИКОВ]
+                      ключи второго поставщика: с него идут игры
   stars-bot backup    сохранить копию базы
 
 Настройка по частям (спрашивает по одному вопросу):
