@@ -32,17 +32,7 @@ def _flag(name: str, default: str = "1") -> bool:
 #: Ранги аслии Telegram (Bot API 10.3). SHOP_BUTTON_COLORS=0 — хомӯш.
 _ENABLED = _flag("SHOP_BUTTON_COLORS")
 
-#: Доираҳои ранга дар матни тугма. Инҳоро ҲАР версияи Telegram нишон медиҳад,
-#: бинобар ин ранг ҳатто дар барномаи кӯҳна дида мешавад.
-#: SHOP_BUTTON_MARKERS=0 — хомӯш.
-_MARKERS = _flag("SHOP_BUTTON_MARKERS")
 
-#: Доира барои ҳар ранг. Барои PRIMARY доира намегузорем — бахшҳо
-#: аллакай аломати мавзӯии худро доранд (⭐️ 🔥 🇮🇩 🎯).
-MARKERS = {SUCCESS: "🟢", DANGER: "🔴"}
-
-#: Агар доираҳо хомӯш бошанд, тугма бе аломат намемонад.
-PLAIN_ICONS = {SUCCESS: "✅", DANGER: "✖️"}
 
 
 def enabled() -> bool:
@@ -55,23 +45,6 @@ def set_enabled(value: bool) -> None:
     _ENABLED = value
 
 
-def markers_enabled() -> bool:
-    return _MARKERS
-
-
-def set_markers(value: bool) -> None:
-    global _MARKERS
-    _MARKERS = value
-
-
-def decorate(text: str, color: str | None) -> str:
-    """Ба матни тугма аломати ранга илова мекунад.
-
-    Ранги аслии Telegram танҳо дар барномаҳои нав дида мешавад, вале
-    доираи ранга дар матн — дар ҳама. Бинобар ин ҳар ду усул кор мекунанд.
-    """
-    icon = (MARKERS if _MARKERS else PLAIN_ICONS).get(color)
-    return f"{icon} {text}" if icon else text
 
 
 def pick(style: str | None) -> str | None:

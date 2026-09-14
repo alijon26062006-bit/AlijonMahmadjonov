@@ -464,18 +464,16 @@ async def cmd_colors(message: Message, bot: Bot) -> None:
     )
     head = (
         "🎨 <b>Санҷиши ранги тугмаҳо</b>\n\n"
-        f"🎨 Ранги аслии Telegram: {'✅ фаъол' if style.enabled() else '🚫 хомӯш'}\n"
-        f"🟢 Доираҳои ранга: {'✅ фаъол' if style.markers_enabled() else '🚫 хомӯш'}\n"
+        f"🎨 Ранги тугмаҳо: {'✅ фаъол' if style.enabled() else '🚫 хомӯш'}\n"
         f"📦 aiogram {aiogram.__version__} · Bot API {aiogram.__api_version__}\n\n"
     )
     try:
         await bot.send_message(
             message.chat.id,
             head
-            + "Тугмаҳои поён бояд <b>ранга</b> бошанд.\n\n"
-              "Агар ранги худи тугмаҳо як хел бошад — Telegram-и шумо кӯҳна "
-              "аст (ранг аз Bot API 10.3 сар мешавад), барномаро нав кунед. "
-              "Доираҳои 🟢🔴🔵 дар матн дар ҳар версия дида мешаванд.",
+            + "Тугмаҳои поён бояд се ранги гуногун дошта бошанд.\n\n"
+              "Агар ҳамаашон як хел бошанд — Telegram-и шумо кӯҳна аст "
+              "(ранг аз Bot API 10.3 сар мешавад), барномаро нав кунед.",
             reply_markup=probe,
         )
     except TelegramBadRequest as exc:

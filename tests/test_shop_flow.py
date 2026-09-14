@@ -153,8 +153,7 @@ def _labels(markup) -> list[str]:
 
 
 def _has(markup, title: str) -> bool:
-    """Аломати ранга ба матн илова мешавад, пас муқоисаи қисмӣ мекунем."""
-    return any(title in label for label in _labels(markup))
+    return title in _labels(markup)
 
 
 # ── оғоз ──────────────────────────────────────────────────────────────

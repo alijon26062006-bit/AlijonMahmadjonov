@@ -28,7 +28,7 @@ CB_TOPUP_PAID = "t:paid:"  # t:paid:<id>
 
 def _btn(text: str, data: str, color: str | None = None) -> InlineKeyboardButton:
     return InlineKeyboardButton(
-        text=style.decorate(text, color),
+        text=text,
         callback_data=data,
         style=style.pick(color),
     )
@@ -36,7 +36,7 @@ def _btn(text: str, data: str, color: str | None = None) -> InlineKeyboardButton
 
 def _url(text: str, link: str, color: str | None = None) -> InlineKeyboardButton:
     return InlineKeyboardButton(
-        text=style.decorate(text, color), url=link, style=style.pick(color)
+        text=text, url=link, style=style.pick(color)
     )
 
 
@@ -48,11 +48,14 @@ def main_menu(*, is_admin: bool = False, reviews_url: str = "") -> InlineKeyboar
         [_btn(texts.BTN_FF_ID, CB_CAT + catalog.CAT_FF_ID, style.PRIMARY)],
         [_btn(texts.BTN_PUBG, CB_CAT + catalog.CAT_PUBG, style.PRIMARY)],
         [_btn(texts.BTN_TOPUP, CB_TOPUP, style.SUCCESS)],
-        [_btn(texts.BTN_SUPPORT, CB_SUPPORT), _btn(texts.BTN_TOP, CB_TOP)],
-        [_btn(texts.BTN_MY_ORDERS, CB_MY_ORDERS)],
+        [
+            _btn(texts.BTN_SUPPORT, CB_SUPPORT, style.PRIMARY),
+            _btn(texts.BTN_TOP, CB_TOP, style.PRIMARY),
+        ],
+        [_btn(texts.BTN_MY_ORDERS, CB_MY_ORDERS, style.PRIMARY)],
     ]
     if reviews_url:
-        rows.append([_url(texts.BTN_REVIEWS, reviews_url)])
+        rows.append([_url(texts.BTN_REVIEWS, reviews_url, style.PRIMARY)])
     if is_admin:
         rows.append([_btn(texts.BTN_ADMIN, "a:home", style.PRIMARY)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -76,7 +79,7 @@ def products(rows: Sequence, category: str, *, currency: str = texts.CURRENCY) -
     two_columns = len(rows) > 6
     for row in rows:
         label = f"{row['title']} — {texts.money(row['price'], currency)}"
-        line.append(_btn(label, CB_PRODUCT + row["code"]))
+        line.append(_btn(label, CB_PRODUCT + row["code"], style.PRIMARY))
         if not two_columns or len(line) == 2:
             buttons.append(line)
             line = []
@@ -101,7 +104,7 @@ def confirm_target() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [_btn(texts.BTN_YES_MINE, CB_ID_OK, style.SUCCESS)],
-            [_btn(texts.BTN_NO_WRONG, CB_ID_NO)],
+            [_btn(texts.BTN_NO_WRONG, CB_ID_NO, style.PRIMARY)],
             [_btn(texts.BTN_CANCEL, CB_CANCEL, style.DANGER)],
         ]
     )
@@ -129,7 +132,9 @@ def topup_menu(presets: Sequence[int], *, currency: str = texts.CURRENCY) -> Inl
     buttons: list[list[InlineKeyboardButton]] = []
     line: list[InlineKeyboardButton] = []
     for value in presets:
-        line.append(_btn(texts.money(value, currency), CB_TOPUP_SUM + str(value)))
+        line.append(
+            _btn(texts.money(value, currency), CB_TOPUP_SUM + str(value), style.SUCCESS)
+        )
         if len(line) == 2:
             buttons.append(line)
             line = []
@@ -173,10 +178,19 @@ def support(username: str) -> InlineKeyboardMarkup:
 def admin_home() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [_btn(texts.ADM_BTN_STATS, "a:stats"), _btn(texts.ADM_BTN_FIND, "a:find")],
-            [_btn(texts.ADM_BTN_ORDERS, "a:orders"), _btn(texts.ADM_BTN_TOPUPS, "a:topups")],
-            [_btn(texts.ADM_BTN_PRICES, "a:prices"), _btn(texts.ADM_BTN_BROADCAST, "a:bc")],
-            [_btn(texts.ADM_BTN_SUPPLIER, "a:supplier")],
+            [
+                _btn(texts.ADM_BTN_STATS, "a:stats", style.PRIMARY),
+                _btn(texts.ADM_BTN_FIND, "a:find", style.PRIMARY),
+            ],
+            [
+                _btn(texts.ADM_BTN_ORDERS, "a:orders", style.PRIMARY),
+                _btn(texts.ADM_BTN_TOPUPS, "a:topups", style.PRIMARY),
+            ],
+            [
+                _btn(texts.ADM_BTN_PRICES, "a:prices", style.PRIMARY),
+                _btn(texts.ADM_BTN_BROADCAST, "a:bc", style.PRIMARY),
+            ],
+            [_btn(texts.ADM_BTN_SUPPLIER, "a:supplier", style.PRIMARY)],
             [_btn(texts.BTN_HOME, CB_HOME)],
         ]
     )
@@ -199,7 +213,10 @@ def admin_user(user) -> InlineKeyboardMarkup:
                 _btn(texts.ADM_BTN_MINUS, f"a:minus:{user.id}", style.DANGER),
             ],
             [block],
-            [_btn(texts.ADM_BTN_FIND, "a:find"), _btn(texts.BTN_BACK, "a:home")],
+            [
+                _btn(texts.ADM_BTN_FIND, "a:find", style.PRIMARY),
+                _btn(texts.BTN_BACK, "a:home"),
+            ],
         ]
     )
 
@@ -230,7 +247,7 @@ def admin_topup(topup_id: int) -> InlineKeyboardMarkup:
 
 def admin_price_categories() -> InlineKeyboardMarkup:
     rows = [
-        [_btn(f"{c.icon} {c.title}", f"a:pcat:{c.code}")]
+        [_btn(f"{c.icon} {c.title}", f"a:pcat:{c.code}", style.PRIMARY)]
         for c in catalog.CATEGORY_INFO.values()
     ]
     rows.append([_btn(texts.BTN_BACK, "a:home")])
@@ -243,8 +260,12 @@ def admin_price_list(rows: Sequence, *, currency: str = texts.CURRENCY) -> Inlin
     for row in rows:
         mark = "" if row["active"] else "🚫 "
         line.append(
-            _btn(f"{mark}{row['title']} — {texts.money(row['price'], currency)}",
-                 f"a:price:{row['code']}")
+            _btn(
+                f"{mark}{row['title']} — {texts.money(row['price'], currency)}",
+                f"a:price:{row['code']}",
+                # Моли хомӯш сурх — фавран дар назар менамояд.
+                style.PRIMARY if row["active"] else style.DANGER,
+            )
         )
         if len(line) == 2:
             buttons.append(line)
@@ -256,7 +277,7 @@ def admin_price_list(rows: Sequence, *, currency: str = texts.CURRENCY) -> Inlin
 
 
 def admin_price_item(code: str, active: bool) -> InlineKeyboardMarkup:
-    toggle = "Хомӯш кардан" if active else "Фаъол кардан"
+    toggle = "🚫 Хомӯш кардан" if active else "✅ Фаъол кардан"
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [_btn("💲 Иваз кардани нарх", f"a:setprice:{code}", style.PRIMARY)],

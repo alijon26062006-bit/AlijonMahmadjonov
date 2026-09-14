@@ -500,51 +500,75 @@ def test_no_bottom_keyboard_left():
     assert not hasattr(keyboards, "persistent_menu")
 
 
-# ── доираҳои ранга дар матни тугма ────────────────────────────────────
-def test_green_marker_on_money_buttons():
-    """Ранги Telegram танҳо дар барномаи нав дида мешавад — доира дар ҳама."""
-    assert _find(keyboards.main_menu(), texts.BTN_TOPUP).text.startswith("🟢")
-    assert _find(keyboards.confirm_order(), texts.BTN_PAY).text.startswith("🟢")
-    assert _find(keyboards.payment(1, None), texts.BTN_PAID).text.startswith("🟢")
+# ── фарогирии ранг ───────────────────────────────────────────────────
+NEUTRAL = ("◀️", "🏠")  # танҳо тугмаҳои роҳнамоӣ бе ранг мемонанд
 
 
-def test_red_marker_on_cancel_and_reject():
-    assert _find(keyboards.cancel_only(), texts.BTN_CANCEL).text.startswith("🔴")
-    assert _find(keyboards.admin_order(1), texts.ADM_BTN_REJECT).text.startswith("🔴")
+def test_every_action_button_has_a_color():
+    """Ҳар тугмаи амал бояд ранг дошта бошад — ба ғайр аз роҳнамоӣ."""
+    from types import SimpleNamespace
+
+    user = SimpleNamespace(id=1, is_blocked=False)
+    everything = (
+        keyboards.main_menu(is_admin=True, reviews_url="https://t.me/x"),
+        keyboards.telegram_menu(),
+        keyboards.cancel_only(),
+        keyboards.confirm_target(),
+        keyboards.confirm_order(),
+        keyboards.need_money(),
+        keyboards.topup_menu((1000, 2000)),
+        keyboards.payment(1, "https://a", "https://b"),
+        keyboards.support("user"),
+        keyboards.admin_home(),
+        keyboards.admin_user(user),
+        keyboards.admin_order(1),
+        keyboards.admin_topup(1),
+        keyboards.admin_price_categories(),
+        keyboards.admin_price_item("stars_50", True),
+    )
+    colorless = [
+        b.text
+        for b in _every_button(*everything)
+        if b.style is None and not b.text.startswith(NEUTRAL)
+    ]
+    assert not colorless, f"бе ранг мондаанд: {colorless}"
 
 
-def test_sections_keep_their_own_icons():
-    """Ба бахшҳо доира намегузорем — онҳо аллакай аломати мавзӯӣ доранд."""
-    menu = keyboards.main_menu()
-    for title, icon in (
-        (texts.BTN_TELEGRAM, "⭐️"), (texts.BTN_FF_CIS, "🔥"),
-        (texts.BTN_FF_ID, "🇮🇩"), (texts.BTN_PUBG, "🎯"),
-    ):
-        label = _find(menu, title).text
-        assert label.startswith(icon), label
-        assert "🟢" not in label and "🔴" not in label
+def test_navigation_stays_neutral():
+    """Роҳнамоӣ бе ранг — то тугмаҳои амал фарқ кунанд."""
+    home = _find(keyboards.back_home(), texts.BTN_HOME)
+    assert home.style is None
 
 
-def test_markers_off_still_leaves_an_icon():
-    """Бе доираҳо тугма урён намемонад."""
+def test_product_list_is_blue(db):
     from shop import style
 
-    style.set_markers(False)
-    try:
-        assert _find(keyboards.main_menu(), texts.BTN_TOPUP).text.startswith("✅")
-        assert _find(keyboards.cancel_only(), texts.BTN_CANCEL).text.startswith("✖️")
-    finally:
-        style.set_markers(True)
+    rows = db.products(catalog.CAT_PUBG)
+    for button in _every_button(keyboards.products(rows, catalog.CAT_PUBG)):
+        if not button.text.startswith(NEUTRAL):
+            assert button.style == style.PRIMARY, button.text
 
 
-def test_markers_and_native_colors_are_independent():
-    """Ранги Telegram хомӯш — доираҳо ҳамоно кор мекунанд."""
+def test_topup_amounts_are_green():
     from shop import style
 
-    style.set_enabled(False)
-    try:
-        button = _find(keyboards.main_menu(), texts.BTN_TOPUP)
-        assert button.style is None
-        assert button.text.startswith("🟢")
-    finally:
-        style.set_enabled(True)
+    kb = keyboards.topup_menu((2000, 5000, 10000))
+    greens = [b for b in _every_button(kb) if b.style == style.SUCCESS]
+    assert len(greens) == 3
+
+
+def test_disabled_product_is_red_for_admin(db):
+    from shop import style
+
+    db.set_active("stars_50", False)
+    rows = db.products(catalog.CAT_STARS, only_active=False)
+    kb = keyboards.admin_price_list(rows)
+    off = _find(kb, "50 Stars")
+    assert off.style == style.DANGER
+
+
+def test_no_emoji_markers_left():
+    """Доираҳои 🟢🔴 аз матни тугмаҳо тамоман бардошта шуданд."""
+    kb = keyboards.main_menu(is_admin=True)
+    for button in _every_button(kb, keyboards.confirm_order(), keyboards.cancel_only()):
+        assert "🟢" not in button.text and "🔴" not in button.text
