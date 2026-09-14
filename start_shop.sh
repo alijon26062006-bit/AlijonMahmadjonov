@@ -82,7 +82,16 @@ RestartSec=5
 WantedBy=multi-user.target
 UNIT
   $SUDO systemctl daemon-reload
-  $SUDO systemctl enable --now "$SERVICE_NAME"
+  $SUDO systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
+  # Именно restart, а не enable --now: уже запущенная служба иначе
+  # продолжила бы крутить старый код.
+  $SUDO systemctl restart "$SERVICE_NAME"
+  sleep 2
+  if [ "$($SUDO systemctl is-active "$SERVICE_NAME" 2>/dev/null)" != "active" ]; then
+    err "Служба не поднялась. Причина:"
+    $SUDO journalctl -u "$SERVICE_NAME" -n 25 --no-pager || true
+    exit 1
+  fi
   ok "Бот работает как служба и переживёт перезагрузку"
   echo
   echo "  Логи:      journalctl -u $SERVICE_NAME -f"
