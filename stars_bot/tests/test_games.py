@@ -233,7 +233,120 @@ async def nick_lookup() -> None:
     check("429 не считается неверным ID", over.verdict == "unknown", str(over))
     check("неудача не кэшируется", nicknames.cached("555") is None)
 
+    # ---------------------------------------- три источника по очереди
+    nicknames.forget_all()
+    calls.clear()
+
+    class ByUrl:
+        """Каждому адресу — свой ответ. Так видно, кого спросили и в каком
+        порядке."""
+
+        def __init__(self, replies):
+            self.replies = replies
+
+        def get(self, url, headers=None):
+            calls.append(url)
+            for mark, reply in self.replies.items():
+                if mark in url:
+                    return reply
+            return Resp({}, status=404)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "gameskinbo": Resp({}, status=429),
+        "freefirecommunity": Resp({"nickname": "CommunityMan"}),
+    })
+    found = await nicknames.free_fire("111222333", key="k", region="BR")
+    check("второй справочник подхватывает",
+          found.name == "CommunityMan" and found.verdict == "ok", str(found))
+    check("источник назван", found.source == "freefirecommunity", found.source)
+    check("сначала спросили первый",
+          "gameskinbo" in calls[0], str(calls[:2]))
+    check("потом второй", "freefirecommunity" in calls[1], str(calls[:2]))
+    check("до запасного не дошли",
+          not any("onrender" in c for c in calls), str(calls))
+
+    # первый источник ответил — второй не трогаем, лимит не тратим
+    nicknames.forget_all()
+    calls.clear()
+    nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "gameskinbo": Resp({"AccountInfo": {"AccountName": "FirstOne"}}),
+        "freefirecommunity": Resp({"nickname": "Второй"}),
+    })
+    found = await nicknames.free_fire("444555666", key="k")
+    check("первый нашёл — второй не спрашиваем",
+          found.name == "FirstOne", str(found))
+    check("лишних запросов нет", len(calls) == 1, str(calls))
+
+    # без ключа первого спрашиваем сразу второго
+    nicknames.forget_all()
+    calls.clear()
+    nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "freefirecommunity": Resp({"AccountInfo": {"AccountName": "NoKeyMan"}}),
+    })
+    found = await nicknames.free_fire("777888999")
+    check("без ключа работает второй справочник",
+          found.name == "NoKeyMan", str(found))
+    check("к первому без ключа не ходим",
+          not any("gameskinbo" in c for c in calls), str(calls))
+
+    # оба отказали по игроку — это «нет такого»
+    nicknames.forget_all()
+    calls.clear()
+    nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "gameskinbo": Resp({}, status=402),
+        "freefirecommunity": Resp({}, status=402),
+        "onrender": Resp({}, status=404),
+    })
+    found = await nicknames.free_fire("000111222", key="k")
+    check("отказ обоих — «нет такого»", found.verdict == "bad", str(found))
+
+    # 404 у второго справочника двусмысленно: так отвечают и на
+    # переехавший адрес
+    nicknames.forget_all()
+    calls.clear()
+    nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "freefirecommunity": Resp({}, status=404),
+        "onrender": Resp({}, status=404),
+    })
+    found = await nicknames.free_fire("121212121")
+    check("404 не выдаём за «нет игрока»", found.verdict == "unknown",
+          str(found))
+    check("но очередь всё равно прошли до конца",
+          any("freefirecommunity" in c for c in calls), str(calls))
+
+    # один отказал, другой нашёл — верим нашедшему
+    nicknames.forget_all()
+    calls.clear()
+    nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "gameskinbo": Resp({}, status=402),
+        "freefirecommunity": Resp({"basicInfo": {"nickname": "Живой"}}),
+    })
+    found = await nicknames.free_fire("333444555", key="k")
+    check("нашедший важнее отказавшего",
+          found.name == "Живой" and found.verdict == "ok", str(found))
+
+    # ник узнаётся в любой обёртке
+    check("AccountInfo разбирается",
+          nicknames.pick_name({"AccountInfo": {"AccountName": "A"}}) == "A")
+    check("basicInfo разбирается",
+          nicknames.pick_name({"basicInfo": {"nickname": "B"}}) == "B")
+    check("вложенный data разбирается",
+          nicknames.pick_name({"data": {"player": {"name": "C"}}}) == "C")
+    check("список аккаунтов разбирается",
+          nicknames.pick_name({"result": [{"nickname": "D"}]}) == "D")
+    check("пустое поле за ник не считается",
+          nicknames.pick_name({"AccountInfo": {"AccountName": "  "}}) is None)
+    check("чужой ответ не выдумывает ник",
+          nicknames.pick_name({"error": "not found"}) is None)
+
     nicknames.aiohttp.ClientSession = real
+    nicknames.forget_all()
 
 
 # ───────────────────────────────────────────────────── покупка
@@ -420,7 +533,7 @@ async def unknown_nick(conn) -> None:
 
     real = nicknames.free_fire
 
-    async def silent(uid, key="", region=""):
+    async def silent(uid, key="", region="", community_key=""):
         return nicknames.Nickname(uid=uid, name=None, verdict="unknown")
 
     nicknames.free_fire = silent
@@ -452,7 +565,7 @@ async def unknown_nick(conn) -> None:
 
         # справочник ников говорит «нет такого» — а он бесплатный и
         # знает не все регионы. Его слово покупку рубить не должно.
-        async def lying(uid, key="", region=""):
+        async def lying(uid, key="", region="", community_key=""):
             return nicknames.Nickname(uid=uid, name=None, verdict="bad")
 
         nicknames.free_fire = lying
@@ -779,7 +892,7 @@ async def wrong_region(conn) -> None:
     """ID не нашёлся в выбранном регионе — ищем его в остальных."""
     real = nicknames.free_fire
 
-    async def silent(uid, key="", region=""):
+    async def silent(uid, key="", region="", community_key=""):
         return nicknames.Nickname(uid=uid, name=None, verdict="unknown")
 
     nicknames.free_fire = silent

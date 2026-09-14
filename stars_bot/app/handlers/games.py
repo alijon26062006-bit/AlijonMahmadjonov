@@ -384,10 +384,13 @@ async def _lookup(
 
     if "free_fire" in game.category_id or "freefire" in game.category_id:
         key = runtime.get("gameskinbo_key") or db.settings.gameskinbo_key
+        community = (runtime.get("ff_community_key")
+                     or db.settings.ff_community_key)
         # Регион берём из кода категории: он там точнее, чем в подсказке.
         region = regions.nick_region(game) or game.region
         player = next(iter(fields.values()), "")
-        found = await nicknames.free_fire(player, key=key, region=region)
+        found = await nicknames.free_fire(player, key=key, region=region,
+                                          community_key=community)
         if found.verdict == "ok":
             return found.name, "ok"
         # А вот «нет такого» от него покупку НЕ рубит. Это бесплатный

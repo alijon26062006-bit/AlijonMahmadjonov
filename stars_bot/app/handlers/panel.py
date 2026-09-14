@@ -608,11 +608,19 @@ FIELDS.update({
 
 # Куда возвращаться после сохранения
 FIELD_PARENT = {key: "pn:pay" for key in PAY_FIELDS}
+FIELDS["ff_community_key"] = (
+    "🔑 Второй справочник ников",
+    "Ключ с <b>developers.freefirecommunity.com</b> "
+    "(или <code>-</code>, чтобы убрать). Справочник работает и без ключа — "
+    "ключ снимает ограничения:", "text",
+)
+
 FIELD_PARENT.update({
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "star_packs": "pn:prices", "reviews_channel": "pn:reviews",
     "gameskinbo_key": "pn:games", "fazer_games_key": "pn:games",
+    "ff_community_key": "pn:games",
     "steam_price_e4": "pn:steam", "steam_cost_e4": "pn:steam",
     "steam_currency": "pn:steam", "steam_packs": "pn:steam",
     "usd_rate_diram": "pn:prices", "usd_rate_spread": "pn:prices",
@@ -3144,6 +3152,8 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
     kb.row(InlineKeyboardButton(text="🔑 Ключ поставщика для игр",
                                 callback_data="pn:set:fazer_games_key"))
     kb.row(btn("🔑 Ключ для ников Free Fire", "pn:set:gameskinbo_key"))
+    kb.row(InlineKeyboardButton(text="🔑 Второй справочник ников",
+                                callback_data="pn:set:ff_community_key"))
     kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
     return kb.as_markup()
 
