@@ -685,19 +685,31 @@ async def on_field_value(
 
     # Имя поля с ID игрока — тоже из таблицы игр.
     if field.startswith("game_field:"):
+        from app.services import games as gsvc
+
         code = field.split(":", 1)[1]
-        if not re.fullmatch(r"[a-z0-9_]{2,32}", raw):
+        # Полей может быть несколько: у Magic Chess и Mobile Legends
+        # аккаунт задаётся парой «ID игрока + номер сервера».
+        names = [part.strip().lower()
+                 for part in re.split(r"[,\s;]+", raw) if part.strip()]
+        if not names or not all(
+            re.fullmatch(r"[a-z0-9_]{2,32}", name) for name in names
+        ):
             await message.answer(
-                "❌ Имя поля — латиница, цифры и подчёркивание, "
-                "например <code>player_id</code>."
+                "❌ Имя поля — латиница, цифры и подчёркивание, например\n"
+                "<code>player_id</code> — одно поле\n"
+                "<code>player_id, server_id</code> — два поля"
             )
             return
-        await db.update_game(conn, code, field=raw)
+        value = ",".join(names)
+        await db.update_game(conn, code, field=value)
         await state.clear()
         game = await db.get_game(conn, code)
+        asked = ", ".join(gsvc.field_label(name) for name in names)
         await message.answer(
-            f"✅ <b>{game.title if game else code}</b> — поле "
-            f"<code>{raw}</code>",
+            f"✅ <b>{game.title if game else code}</b> — поля "
+            f"<code>{value}</code>\n\n"
+            f"<i>Бот спросит у клиента: {asked}.</i>",
             reply_markup=back_kb(f"pn:game:{code}", "‹ К игре"),
         )
         return
@@ -3104,6 +3116,8 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn("➕ Добавить игру", "pn:game_new", style=SUCCESS))
     kb.row(btn("📚 Взять из каталога поставщика", "pn:game_pick", style=PRIMARY))
+    kb.row(InlineKeyboardButton(text="📋 Все категории поставщика",
+                                callback_data="pn:game_codes"))
     for game in await db.list_games(conn):
         kb.row(InlineKeyboardButton(
             text=("✅ " if game.enabled else "🚫 ") + game.title,
@@ -3167,7 +3181,8 @@ async def on_game_new(
     from app.services import games as gsvc
     from app.services import suppliers
 
-    field = await gsvc.detect_field(suppliers.for_games(provider), code) or "user_id"
+    found = await gsvc.detect_fields(suppliers.for_games(provider), code)
+    field = ",".join(found) or "user_id"
     game = await db.add_game(conn, category_id=code, title=title,
                              field=field, region=region)
     await db.load_game_titles(conn)
@@ -3178,7 +3193,7 @@ async def on_game_new(
     kb.row(btn("‹ К играм", "pn:games"))
     await message.answer(
         f"✅ <b>{title}</b> добавлена\n\n"
-        f"├ Поле для ID: <code>{field}</code>\n"
+        f"├ Поля для ID: <code>{field}</code>\n"
         "└ <i>определено у поставщика</i>\n\n"
         "<blockquote>Проверьте пакеты кнопкой «Проверить пакеты», "
         "поставьте наценку и включите игру.</blockquote>",
@@ -3250,6 +3265,58 @@ async def cb_game_pick(call: CallbackQuery, conn: aiosqlite.Connection, provider
     )
 
 
+@router.callback_query(F.data == "pn:game_codes")
+async def cb_game_codes(call: CallbackQuery, provider) -> None:
+    """Сырой список категорий поставщика: код, название, распознанный регион.
+
+    Нужен, когда непонятно, есть ли у игры нужный сервер: гадать по
+    названию в меню бесполезно, а здесь видно всё как есть.
+    """
+    await safe_edit(call, "📋 Спрашиваю каталог…", back_kb("pn:games", "‹ Назад"))
+    await call.answer()
+
+    from app.services import regions as reg
+    from app.services import suppliers
+
+    try:
+        catalog = await suppliers.for_games(provider).game_catalog()
+    except Exception as exc:  # noqa: BLE001
+        await safe_edit(
+            call,
+            "❌ <b>Каталог не пришёл</b>\n\n"
+            f"<blockquote expandable>{str(exc)[:400]}</blockquote>",
+            back_kb("pn:games", "‹ К играм"),
+        )
+        return
+
+    if not catalog:
+        await safe_edit(call, "📋 Поставщик не назвал ни одной категории.",
+                        back_kb("pn:games", "‹ К играм"))
+        return
+
+    catalog.sort(key=lambda i: (reg.family_of(i["category_id"], i.get("name", "")),
+                                reg.sort_key(i["category_id"], i.get("name", ""))))
+    rows = []
+    for item in catalog:
+        code, name = item["category_id"], item.get("name", "")
+        mark = reg.title_of(code, name) or "<i>регион не распознан</i>"
+        fields = ", ".join(
+            str(spec.get("name") if isinstance(spec, dict) else spec)
+            for spec in (item.get("fields") or [])
+        )
+        rows.append(f"├ <code>{code}</code>\n"
+                    f"│  {name} · {mark}"
+                    + (f"\n│  поля: <code>{fields}</code>" if fields else ""))
+
+    text = ("📋 <b>Категории поставщика</b>\n"
+            f"<code>{texts.LINE}</code>\n\n"
+            f"Всего: <b>{len(catalog)}</b>\n\n" + "\n".join(rows))
+    if len(text) > 3800:
+        text = text[:3800] + "\n\n<i>…список обрезан</i>"
+
+    await safe_edit(call, text, back_kb("pn:games", "‹ К играм"))
+
+
 @router.callback_query(F.data.startswith("pn:game_add:"))
 async def cb_game_add_family(
     call: CallbackQuery, conn: aiosqlite.Connection, provider
@@ -3283,13 +3350,10 @@ async def cb_game_add_family(
     lines = []
     for item in items:
         code = item["category_id"]
-        field = ""
-        for spec in item.get("fields") or []:
-            name = spec.get("name") if isinstance(spec, dict) else spec
-            if name:
-                field = str(name)
-                break
-        field = field or await gsvc.detect_field(client, code) or "user_id"
+        names = [str(spec.get("name") if isinstance(spec, dict) else spec)
+                 for spec in item.get("fields") or []
+                 if (spec.get("name") if isinstance(spec, dict) else spec)]
+        field = ",".join(names) or await gsvc.detect_field(client, code) or "user_id"
         # У каждого региона своё имя от поставщика; регион из него потом
         # вычитается. Уже стоящее у нас имя не трогаем.
         await db.add_game(
@@ -3349,6 +3413,13 @@ async def cb_game_card(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     await call.answer()
 
 
+def _fields_asked(game: db.Game) -> str:
+    """Что бот спросит у клиента, человеческими словами."""
+    from app.services import games as gsvc
+
+    return ", ".join(gsvc.field_label(name) for name in game.field_names)
+
+
 def _region_label(game: db.Game) -> str:
     """Регион в карточке: название с флагом, если он читается из кода."""
     from app.services import regions as reg
@@ -3364,7 +3435,8 @@ def game_card(game: db.Game) -> str:
         f"🕹 <b>{game.title}</b>\n"
         f"<code>{texts.LINE}</code>\n\n"
         f"├ Код: <code>{game.category_id}</code>\n"
-        f"├ Поле для ID: <code>{game.field}</code>\n"
+        f"├ Поля для ID: <code>{game.field}</code>\n"
+        f"│  <i>спрашиваем: {_fields_asked(game)}</i>\n"
         f"├ Регион: <b>{_region_label(game)}</b>\n"
         f"├ Наценка: <b>{game.margin or runtime.margin_percent()}%</b>"
         + ("" if game.margin else " <i>(общая)</i>")
@@ -3380,7 +3452,7 @@ def game_kb(game: db.Game) -> InlineKeyboardMarkup:
     kb.row(btn("📦 Проверить пакеты", f"pn:game_packs:{game.category_id}",
                style=PRIMARY))
     kb.row(
-        InlineKeyboardButton(text="🔤 Поле для ID",
+        InlineKeyboardButton(text="🔤 Поля для ID",
                              callback_data=f"pn:game_field:{game.category_id}"),
         InlineKeyboardButton(text="📈 Своя наценка",
                              callback_data=f"pn:game_margin:{game.category_id}"),
@@ -3592,11 +3664,14 @@ async def cb_game_field(
     from app.services import games as gsvc
     from app.services import suppliers
 
-    guess = await gsvc.detect_field(suppliers.for_games(provider), game.category_id)
+    guess = await gsvc.detect_fields(suppliers.for_games(provider),
+                                     game.category_id)
     hint = ""
-    if guess and guess != game.field:
-        hint = (f"\n\n<blockquote>Поставщик ждёт <code>{guess}</code> — "
-                "пришлите это.</blockquote>")
+    if guess and guess != game.field_names:
+        wanted = ",".join(guess)
+        asked = ", ".join(gsvc.field_label(name) for name in guess)
+        hint = (f"\n\n<blockquote>Поставщик ждёт <code>{wanted}</code> "
+                f"({asked}) — пришлите это.</blockquote>")
     elif guess:
         hint = "\n\n<blockquote>Поставщик подтверждает текущее.</blockquote>"
 
@@ -3604,11 +3679,15 @@ async def cb_game_field(
     await state.update_data(field=f"game_field:{game.category_id}")
     await safe_edit(
         call,
-        f"🔤 <b>Поле для ID: {game.title}</b>\n\n"
-        f"Сейчас: <code>{game.field}</code>{hint}\n\n"
+        f"🔤 <b>Поля для ID: {game.title}</b>\n\n"
+        f"Сейчас: <code>{game.field}</code>\n"
+        f"<i>спрашиваем: {_fields_asked(game)}</i>{hint}\n\n"
         "<blockquote>Обычно это <code>user_id</code>, <code>player_id</code> "
-        "или <code>uid</code>. Точное имя пишет сам поставщик в отказе "
-        "вида «Field ... is required».</blockquote>",
+        "или <code>uid</code>. Части игр нужна пара — ID игрока и номер "
+        "сервера: пришлите оба через запятую.\n\n"
+        "<code>player_id, server_id</code>\n\n"
+        "Точное имя пишет сам поставщик в отказе вида "
+        "«Field ... is required».</blockquote>",
         back_kb(f"pn:game:{game.category_id}", "❌ Отмена"),
     )
     await call.answer()
@@ -3754,14 +3833,14 @@ async def cb_games_check(call: CallbackQuery, conn: aiosqlite.Connection, provid
             lines.append(f"{mark} <b>{game.title}</b>{note}\n"
                          f"   ❌ пакеты: <code>{str(exc)[:140]}</code>")
             continue
-        field = await gsvc.detect_field(client, game.category_id)
+        found = await gsvc.detect_fields(client, game.category_id)
         field_note = ""
-        if field and field != game.field:
-            field_note = (f"\n   ⚠️ поле <code>{game.field}</code>, "
-                          f"а нужно <code>{field}</code>")
+        if found and found != game.field_names:
+            field_note = (f"\n   ⚠️ поля <code>{game.field}</code>, "
+                          f"а нужно <code>{','.join(found)}</code>")
         lines.append(
             f"{mark} <b>{game.title}</b>{note}\n"
-            f"   пакетов: <b>{len(offers)}</b> · поле: <code>{game.field}</code>"
+            f"   пакетов: <b>{len(offers)}</b> · поля: <code>{game.field}</code>"
             f"{field_note}"
         )
 

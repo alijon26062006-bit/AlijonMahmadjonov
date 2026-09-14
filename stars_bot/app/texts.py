@@ -102,6 +102,24 @@ _RAW["GAME_ASK_ID"] = (
     "в профиле игры рядом с ником.</blockquote>"
 )
 
+_RAW["GAME_ASK_TWO"] = (
+    "[[game]] <b>{title}</b>{region} — {pack}\n"
+    f"<code>{LINE}</code>\n\n"
+    "[[profile]] <b>{first} и {second}</b>\n\n"
+    "<blockquote>Пришлите одним сообщением через пробел:\n"
+    "<code>{example}</code>\n\n"
+    "В профиле игры они стоят рядом: сначала ID, потом сервер "
+    "в скобках.</blockquote>"
+)
+
+_RAW["GAME_TWO_FORMAT"] = (
+    "[[fail]] <b>Нужны два числа</b>\n\n"
+    "<blockquote>{first} и {second} — одним сообщением через пробел:\n"
+    "<code>{example}</code>\n\n"
+    "В профиле игры они написаны рядом, сервер обычно в "
+    "скобках.</blockquote>"
+)
+
 _RAW["GAME_CHECKING"] = "[[search]] <i>Проверяю ID</i> <code>{player}</code>…"
 
 _RAW["GAME_CONFIRM"] = (

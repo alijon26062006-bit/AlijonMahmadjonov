@@ -91,23 +91,85 @@ def missing_field(error: str) -> str | None:
     return found.group(1) if found else None
 
 
-async def detect_field(provider, category_id: str) -> str | None:
-    """Спросить у поставщика, как называется поле ID для этой игры."""
+#: Как назвать поле клиенту. Части игр мало одного ID: Magic Chess и
+#: Mobile Legends требуют ещё и номер сервера.
+FIELD_LABELS: dict[str, str] = {
+    "user_id": "ID игрока",
+    "player_id": "ID игрока",
+    "uid": "ID игрока",
+    "account_id": "ID аккаунта",
+    "server_id": "ID сервера",
+    "zone_id": "ID сервера",
+    "zone": "ID сервера",
+    "server": "ID сервера",
+    "region_id": "ID региона",
+    "character_id": "ID персонажа",
+    "login": "логин",
+    "email": "почта",
+}
+
+
+def field_label(name: str) -> str:
+    return FIELD_LABELS.get(name.lower(), name)
+
+
+async def detect_fields(provider, category_id: str) -> list[str]:
+    """Какие поля поставщик требует для этой игры. Пусто — не узнали."""
     try:
         catalog = await provider.game_catalog()
     except Exception as exc:  # noqa: BLE001 — не смогли, не беда
         log.info("Игры: каталог полей не пришёл — %s", exc)
-        return None
+        return []
 
     for item in catalog:
         if item.get("category_id") != category_id:
             continue
-        fields = item.get("fields") or []
-        for field in fields:
+        names = []
+        for field in item.get("fields") or []:
             name = field.get("name") if isinstance(field, dict) else field
             if name:
-                return str(name)
-    return None
+                names.append(str(name))
+        return names
+    return []
+
+
+async def detect_field(provider, category_id: str) -> str | None:
+    """Первое поле ID. Оставлено для мест, где нужно одно имя."""
+    names = await detect_fields(provider, category_id)
+    return names[0] if names else None
+
+
+#: Порядок ввода: ID игрока всегда первым, сервер за ним.
+FIELD_RANK: dict[str, int] = {
+    "user_id": 0, "player_id": 0, "uid": 0, "account_id": 0,
+    "server_id": 1, "zone_id": 1, "zone": 1, "server": 1,
+    "region_id": 2,
+}
+
+
+def with_field(current: str, wanted: str) -> str:
+    """Учесть поле, которого поставщику не хватило.
+
+    Разница принципиальная. «Нужен player_id» вместо нашего user_id —
+    это то же самое поле под другим именем, его надо ЗАМЕНИТЬ. А «нужен
+    server_id» рядом с player_id — второе поле, его надо ДОБАВИТЬ:
+    у Magic Chess и Mobile Legends аккаунт задаётся парой чисел.
+    Спутать эти два случая — значит гонять заказы по кругу.
+    """
+    names = [part.strip() for part in (current or "").split(",") if part.strip()]
+    if not wanted or wanted in names:
+        return ",".join(names) or wanted
+
+    label = field_label(wanted)
+    for index, name in enumerate(names):
+        if field_label(name) == label:
+            names[index] = wanted        # то же поле, другое имя
+            break
+    else:
+        names.append(wanted)
+
+    names.sort(key=lambda name: FIELD_RANK.get(name.lower(), 9))
+    return ",".join(names)
 
 
 def status_of(order: dict | None) -> str:
@@ -117,13 +179,13 @@ def status_of(order: dict | None) -> str:
 
 
 async def place(
-    provider, *, game: db.Game, offer_id: str, player_id: str,
+    provider, *, game: db.Game, offer_id: str, fields: dict[str, str],
     quantity: int, order_id: int,
 ) -> str:
     """Отправить заказ поставщику. Возвращает его номер заказа."""
     order = await provider.order_game(
         category_id=game.category_id, offer_id=offer_id,
-        fields={game.field: player_id}, quantity=quantity,
+        fields=fields, quantity=quantity,
         idempotency_key=idempotency_key(order_id),
     )
     external = str(order.get("order_id") or order.get("id") or "")

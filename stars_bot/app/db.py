@@ -181,7 +181,7 @@ CREATE TABLE IF NOT EXISTS partners (
 CREATE TABLE IF NOT EXISTS games (
     category_id TEXT PRIMARY KEY,   -- как называет игру сервис выдачи
     title       TEXT NOT NULL,      -- как показываем клиенту
-    field       TEXT NOT NULL DEFAULT 'user_id',   -- какое поле спрашивать
+    field       TEXT NOT NULL DEFAULT 'user_id',   -- поля ID через запятую
     region      TEXT NOT NULL DEFAULT '',          -- подсказка для поиска ника
     margin      INTEGER NOT NULL DEFAULT 0,        -- своя наценка, % (0 — общая)
     enabled     INTEGER NOT NULL DEFAULT 0,
@@ -342,6 +342,17 @@ class Game:
     def product_type(self) -> str:
         """Игра живёт в заказах как обычный товар."""
         return f"game:{self.category_id}"
+
+    @property
+    def field_names(self) -> list[str]:
+        """Какие поля спрашивать у клиента.
+
+        Части игр мало одного ID: Magic Chess и Mobile Legends требуют ещё
+        и номер сервера. Поэтому в одной колонке лежит список через
+        запятую — старые записи с одним полем читаются как прежде.
+        """
+        names = [part.strip() for part in (self.field or "").split(",")]
+        return [name for name in names if name] or ["user_id"]
 
 
 @dataclass

@@ -170,11 +170,47 @@ async def cb_pack(
         price=offer["price"], cost=offer["cost"],
     )
     await call.message.edit_text(
-        texts.GAME_ASK_ID.format(title=game.title, region=_region(game),
-                                 pack=offer["name"]),
+        _ask_text(game, offer["name"]),
         reply_markup=keyboards.cancel(),
     )
     await call.answer()
+
+
+def _ask_text(game: db.Game, pack: str) -> str:
+    """Что просим у клиента: один ID или ID вместе с номером сервера."""
+    names = game.field_names
+    if len(names) < 2:
+        return texts.GAME_ASK_ID.format(
+            title=game.title, region=_region(game), pack=pack
+        )
+    return texts.GAME_ASK_TWO.format(
+        title=game.title, region=_region(game), pack=pack,
+        first=svc.field_label(names[0]), second=svc.field_label(names[1]),
+        example=EXAMPLE,
+    )
+
+
+#: Пример ввода двух чисел. Настоящие ID выглядят именно так.
+EXAMPLE = "123456789 1234"
+
+#: ID и сервер клиенты пишут по-разному: «123 456», «123(456)», «123-456».
+_NUMBERS = re.compile(r"\d+")
+
+
+def parse_ids(raw: str, count: int) -> list[str] | None:
+    """Разобрать введённые ID. None — введено не то.
+
+    Разделителем считаем что угодно, кроме цифр: клиент копирует ID из
+    игры вместе со скобками, и придираться к пробелу — терять покупку.
+    """
+    found = _NUMBERS.findall(raw or "")
+    if len(found) != count:
+        return None
+    if not all(1 <= len(value) <= 20 for value in found):
+        return None
+    if len(found[0]) < 5:
+        return None
+    return found
 
 
 @router.message(Game.player, F.text)
@@ -182,11 +218,6 @@ async def on_player_id(
     message: Message, state: FSMContext, conn: aiosqlite.Connection,
     provider: DeliveryProvider,
 ) -> None:
-    player = (message.text or "").strip()
-    if not re.fullmatch(r"\d{5,20}", player):
-        await message.answer(texts.GAME_ID_FORMAT)
-        return
-
     data = await state.get_data()
     game = await db.get_game(conn, data.get("category_id", ""))
     if game is None:
@@ -194,15 +225,30 @@ async def on_player_id(
         await message.answer("Игра больше не продаётся. Откройте меню: /menu")
         return
 
+    names = game.field_names
+    values = parse_ids(message.text or "", len(names))
+    if values is None:
+        if len(names) < 2:
+            await message.answer(texts.GAME_ID_FORMAT)
+        else:
+            await message.answer(texts.GAME_TWO_FORMAT.format(
+                first=svc.field_label(names[0]),
+                second=svc.field_label(names[1]), example=EXAMPLE,
+            ))
+        return
+
+    fields = dict(zip(names, values))
+    player = shown_id(values)
+
     notice = await message.answer(texts.GAME_CHECKING.format(player=player))
     client = suppliers.for_games(provider)
-    name, verdict = await _lookup(client, game, player)
+    name, verdict = await _lookup(client, game, fields)
 
     if verdict == "bad":
         # Чаще всего дело не в ID, а в регионе: аккаунт есть, но на другом
         # сервере. Ищем его там сами, чтобы клиент не гадал.
         others = await _other_regions(conn, game)
-        found = await _search_regions(client, others, player)
+        found = await _search_regions(client, others, values)
         if found:
             other_game, other_name = found
             await notice.edit_text(
@@ -219,7 +265,7 @@ async def on_player_id(
         user = await db.get_user(conn, message.from_user.id)
         balance = user.balance if user else 0
         price = data["price"]
-        await state.update_data(player=player, player_name="")
+        await state.update_data(player=player, player_name="", fields=fields)
         await state.set_state(Game.confirm)
         await notice.edit_text(
             texts.GAME_UNVERIFIED.format(
@@ -233,7 +279,7 @@ async def on_player_id(
     user = await db.get_user(conn, message.from_user.id)
     balance = user.balance if user else 0
     price = data["price"]
-    await state.update_data(player=player, player_name=name or "")
+    await state.update_data(player=player, player_name=name or "", fields=fields)
     await state.set_state(Game.confirm)
 
     template = texts.GAME_CONFIRM if name else texts.GAME_NO_NAME
@@ -259,13 +305,16 @@ async def _other_regions(conn, game: db.Game) -> list[db.Game]:
 
 
 async def _search_regions(
-    provider, games: list[db.Game], player: str,
+    provider, games: list[db.Game], values: list[str],
 ) -> tuple[db.Game, str | None] | None:
     """Поискать ID по остальным регионам. None — нигде не нашёлся."""
     for game in games:
+        names = game.field_names
+        if len(names) != len(values):
+            continue          # у этого региона другой набор полей
         try:
             name, verdict = await provider.validate_game_id(
-                game.category_id, {game.field: player}
+                game.category_id, dict(zip(names, values))
             )
         except Exception as exc:  # noqa: BLE001 — это подсказка, не покупка
             log.info("Игры: регион %s не проверился — %s", game.category_id, exc)
@@ -275,15 +324,22 @@ async def _search_regions(
     return None
 
 
-async def _lookup(provider, game: db.Game, player: str) -> tuple[str | None, str]:
+def shown_id(values: list[str]) -> str:
+    """Как показать ID клиенту и записать в заказ: «123456789 (1234)»."""
+    if len(values) < 2:
+        return values[0] if values else ""
+    return f"{values[0]} ({', '.join(values[1:])})"
+
+
+async def _lookup(
+    provider, game: db.Game, fields: dict[str, str],
+) -> tuple[str | None, str]:
     """Ник игрока. Сначала сервис выдачи, для Free Fire — отдельный источник.
 
     Блокируем покупку только на явном «такого игрока нет». Если ник просто
     не пришёл — продаём: пополнение идёт по ID, ник нужен для сверки глазами.
     """
-    name, verdict = await provider.validate_game_id(
-        game.category_id, {game.field: player}
-    )
+    name, verdict = await provider.validate_game_id(game.category_id, fields)
     if verdict == "ok" and name:
         return name, "ok"
     if verdict == "bad":
@@ -293,6 +349,7 @@ async def _lookup(provider, game: db.Game, player: str) -> tuple[str | None, str
         key = runtime.get("gameskinbo_key") or db.settings.gameskinbo_key
         # Регион берём из кода категории: он там точнее, чем в подсказке.
         region = regions.nick_region(game) or game.region
+        player = next(iter(fields.values()), "")
         found = await nicknames.free_fire(player, key=key, region=region)
         if found.verdict == "ok":
             return found.name, "ok"
@@ -346,21 +403,25 @@ async def cb_buy(
     try:
         external = await svc.place(
             provider, game=game, offer_id=data["offer_id"],
-            player_id=data["player"], quantity=1, order_id=order.id,
+            fields=data.get("fields") or {game.field_names[0]: data["player"]},
+            quantity=1, order_id=order.id,
         )
     except DeliveryError as exc:
         # Явный отказ — выдачи не было, возвращаем деньги сразу.
         await svc._refund(bot, conn, order, str(exc))
 
-        # Поставщик сам называет поле, которого ему не хватило. Запоминаем
-        # его, чтобы следующий заказ по этой игре ушёл правильно.
+        # Поставщик сам называет поле, которого ему не хватило. Добавляем
+        # его к набору — именно добавляем: жалуется он по одному полю за
+        # раз, и замена гоняла бы заказы по кругу.
         fixed = ""
         wanted = svc.missing_field(str(exc))
-        if wanted and wanted != game.field:
-            await db.update_game(conn, game.category_id, field=wanted)
-            fixed = (f"\n\n✅ <b>Поле исправлено:</b> <code>{game.field}</code> → "
-                     f"<code>{wanted}</code>\nСледующий заказ пройдёт — "
-                     "попросите клиента повторить.")
+        if wanted and wanted not in game.field_names:
+            updated = svc.with_field(game.field, wanted)
+            await db.update_game(conn, game.category_id, field=updated)
+            asked = ", ".join(svc.field_label(n) for n in updated.split(","))
+            fixed = (f"\n\n✅ <b>Поля исправлены:</b> <code>{updated}</code>\n"
+                     f"Теперь бот спрашивает: <b>{asked}</b>.\n"
+                     "Следующий заказ пройдёт — попросите клиента повторить.")
 
         await delivery.notify_admins(
             bot,

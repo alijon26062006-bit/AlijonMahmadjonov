@@ -470,6 +470,125 @@ async def unknown_nick(conn) -> None:
         nicknames.free_fire = real
 
 
+async def two_fields(conn) -> None:
+    """Игры, где аккаунт задан парой: ID игрока и номер сервера."""
+    check("одно поле читается как раньше",
+          db.Game("x", "X", "player_id", "", 0, 1, "").field_names == ["player_id"])
+    check("список полей разбирается",
+          db.Game("x", "X", "player_id,server_id", "", 0, 1, "").field_names
+          == ["player_id", "server_id"])
+    check("пустое поле не роняет покупку",
+          db.Game("x", "X", "", "", 0, 1, "").field_names == ["user_id"])
+
+    check("синоним заменяет, а не удваивает",
+          svc.with_field("user_id", "player_id") == "player_id",
+          svc.with_field("user_id", "player_id"))
+    check("второе поле добавляется",
+          svc.with_field("player_id", "server_id") == "player_id,server_id",
+          svc.with_field("player_id", "server_id"))
+    check("ID игрока встаёт первым",
+          svc.with_field("server_id", "player_id") == "player_id,server_id",
+          svc.with_field("server_id", "player_id"))
+    check("уже известное поле ничего не меняет",
+          svc.with_field("player_id,server_id", "server_id")
+          == "player_id,server_id")
+    check("поле сервера названо по-человечески",
+          svc.field_label("server_id") == "ID сервера")
+
+    check("два числа разбираются", gh.parse_ids("123456789 1234", 2)
+          == ["123456789", "1234"], str(gh.parse_ids("123456789 1234", 2)))
+    check("скобки не мешают", gh.parse_ids("123456789 (1234)", 2)
+          == ["123456789", "1234"], str(gh.parse_ids("123456789 (1234)", 2)))
+    check("одно число вместо двух — отказ",
+          gh.parse_ids("123456789", 2) is None)
+    check("лишнее число — тоже отказ",
+          gh.parse_ids("1 2 3", 2) is None)
+    check("короткий ID не принимается", gh.parse_ids("12 1234", 2) is None)
+    check("в заказе видны оба числа",
+          gh.shown_id(["123456789", "1234"]) == "123456789 (1234)",
+          gh.shown_id(["123456789", "1234"]))
+
+    class TwoField(GameProvider):
+        async def game_catalog(self):
+            return [{"category_id": "magic_chess_ru", "name": "Magic Chess (RU)",
+                     "fields": [{"name": "player_id"}, {"name": "server_id"}]}]
+
+        async def validate_game_id(self, category_id, fields):
+            if set(fields) != {"player_id", "server_id"}:
+                raise DeliveryError('Field "server_id" is required.')
+            return "ChessMan", "ok"
+
+        async def order_game(self, **kw):
+            if set(kw["fields"]) != {"player_id", "server_id"}:
+                raise DeliveryError('Field "server_id" is required.')
+            return await super().order_game(**kw)
+
+    provider = TwoField()
+    check("оба поля читаются из каталога",
+          await svc.detect_fields(provider, "magic_chess_ru")
+          == ["player_id", "server_id"],
+          str(await svc.detect_fields(provider, "magic_chess_ru")))
+
+    await db.add_game(conn, category_id="magic_chess_ru",
+                      title="Magic Chess Go Go (RU)", field="player_id,server_id")
+    await db.update_game(conn, "magic_chess_ru", enabled=1)
+    await db.load_game_titles(conn)
+
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage,
+                       key=StorageKey(bot_id=1, chat_id=BUYER, user_id=BUYER))
+    call = call_of("gp:magic_chess_ru:0")
+    _offers_backup = dict(gh._offers)
+    await gh.cb_game(call_of("g:magic_chess_ru"), state, conn, provider)
+    await gh.cb_pack(call, state, conn)
+    check("бот просит оба числа", "ID сервера" in call.last, call.last[:200])
+    check("и показывает пример", "123456789 1234" in call.last, call.last[:250])
+
+    message = msg("123456789")
+    await gh.on_player_id(message, state, conn, provider)
+    check("одного числа мало", "два числа" in message.last.lower(),
+          message.last[:120])
+
+    message = msg("123456789 (1234)")
+    await gh.on_player_id(message, state, conn, provider)
+    check("пара принята", "Проверьте аккаунт" in message.last, message.last[:120])
+    check("ник получен по паре", "ChessMan" in message.last, message.last[:200])
+    check("в подтверждении видны оба числа",
+          "123456789 (1234)" in message.last, message.last[:200])
+
+    bot = FakeBot()
+    call = call_of("g:ok")
+    await gh.cb_buy(call, state, conn, provider, bot)
+    check("в заказ ушли оба поля",
+          provider.orders and provider.orders[0]["fields"]
+          == {"player_id": "123456789", "server_id": "1234"},
+          str(provider.orders))
+
+    order = (await db.last_game_orders(conn))[0]
+    check("в заказе записаны оба числа",
+          order.recipient == "123456789 (1234)", order.recipient)
+
+    # отказ «нужно ещё одно поле» чинится добавлением, а не заменой
+    await db.update_game(conn, "magic_chess_ru", field="player_id")
+    bot = FakeBot()
+    await state.set_state(gh.Game.confirm)
+    await state.update_data(category_id="magic_chess_ru", offer_id="off_1",
+                            pack="100 алмазов", price=1400, cost=1090,
+                            player="123456789", player_name="ChessMan",
+                            fields={"player_id": "123456789"})
+    await gh.cb_buy(call_of("g:ok"), state, conn, provider, bot)
+    fixed = await db.get_game(conn, "magic_chess_ru")
+    check("недостающее поле добавлено, прежнее цело",
+          fixed.field == "player_id,server_id", fixed.field)
+    told = [t for t in bot.to(ADMIN) if "Поля исправлены" in t]
+    check("владельцу объяснили по-человечески",
+          told and "ID игрока, ID сервера" in told[0], str(told[:1]))
+
+    await db.delete_game(conn, "magic_chess_ru")
+    gh._offers.clear()
+    gh._offers.update(_offers_backup)
+
+
 async def verdict_reading(conn) -> None:
     """Отказ поставщика читается по смыслу: «нет игрока» ≠ «нет категории»."""
     from app.services.fazer import FazerProvider
@@ -894,7 +1013,7 @@ async def id_field(conn) -> None:
     check("поле игры исправлено на нужное",
           (await db.get_game(conn, "free_fire_br")).field == "player_id",
           (await db.get_game(conn, "free_fire_br")).field)
-    told = [t for t in bot.to(ADMIN) if "Поле исправлено" in t]
+    told = [t for t in bot.to(ADMIN) if "Поля исправлены" in t]
     check("владельцу сказали, что починено", bool(told), str(bot.to(ADMIN)))
     check("и что можно повторить", told and "повторить" in told[0])
 
@@ -1403,6 +1522,7 @@ async def main() -> None:
         await timeout_setting(conn)
         await gorder_command(conn)
         await region_step(conn)
+        await two_fields(conn)
         await verdict_reading(conn)
         await wrong_region(conn)
         await catalog_pick(conn)
