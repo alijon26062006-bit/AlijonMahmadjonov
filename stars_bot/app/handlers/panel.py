@@ -657,6 +657,28 @@ async def on_field_value(
     field = data.get("field", "")
     raw = (message.text or "").strip()
 
+    # Своя цена пакета: ключ вида game_price:игра:пакет.
+    if field.startswith("game_price:"):
+        _, code, offer_id = field.split(":", 2)
+        amount = parse(raw)
+        if amount is None or amount <= 0:
+            await message.answer(
+                "❌ Введите цену числом, например <code>25</code> "
+                "или <code>24.50</code>."
+            )
+            return
+        await db.set_game_price(conn, code, offer_id, amount)
+        await state.clear()
+        game = await db.get_game(conn, code)
+        await message.answer(
+            f"✅ <b>{game.title if game else code}</b> — пакет стоит "
+            f"<b>{fmt(amount)}</b>\n\n"
+            "<i>Эта цена держится сама по себе: смена курса и наценки её "
+            "не трогает.</i>",
+            reply_markup=back_kb(f"pn:game_packs:{code}", "‹ К пакетам"),
+        )
+        return
+
     # Имя поля с ID игрока — тоже из таблицы игр.
     if field.startswith("game_field:"):
         code = field.split(":", 1)[1]
@@ -3207,7 +3229,7 @@ async def cb_game_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> Non
 
 @router.callback_query(F.data.startswith("pn:game_packs:"))
 async def cb_game_offers(call: CallbackQuery, conn: aiosqlite.Connection, provider) -> None:
-    """Показать пакеты так, как их увидит клиент — с ценой в сомони."""
+    """Пакеты игры: цена, себестоимость и кнопка на каждый — поправить цену."""
     game = await db.get_game(conn, call.data.split(":", 2)[2])
     if game is None:
         await call.answer("Игра не найдена.", show_alert=True)
@@ -3215,12 +3237,17 @@ async def cb_game_offers(call: CallbackQuery, conn: aiosqlite.Connection, provid
 
     await safe_edit(call, "📦 Спрашиваю пакеты…", back_kb("pn:games", "‹ Назад"))
     await call.answer()
+    await show_packs(call, conn, game, provider)
 
+
+async def show_packs(
+    call: CallbackQuery, conn: aiosqlite.Connection, game: db.Game, provider,
+) -> None:
     from app.handlers.games import offers_of
     from app.services import suppliers
 
     try:
-        offers = await offers_of(suppliers.for_games(provider), game)
+        offers = await offers_of(suppliers.for_games(provider), game, conn)
     except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
         await safe_edit(
             call,
@@ -3240,23 +3267,121 @@ async def cb_game_offers(call: CallbackQuery, conn: aiosqlite.Connection, provid
         return
 
     rows = "\n".join(
-        f"├ {o['name']} — <b>{fmt(o['price'])}</b> "
-        f"<i>(себестоимость {fmt(o['cost'])})</i>"
+        f"{'✏️' if o['manual'] else '├'} {o['name']} — <b>{fmt(o['price'])}</b>"
+        f" <i>(себест. {fmt(o['cost'])})</i>"
         for o in offers[:20]
     )
+    kb = InlineKeyboardBuilder()
+    for index, offer in enumerate(offers[:20]):
+        kb.row(InlineKeyboardButton(
+            text=("✏️ " if offer["manual"] else "") +
+                 f"{offer['name']} — {fmt(offer['price'])}",
+            callback_data=f"pn:pk:{game.category_id}:{index}",
+        ))
+    kb.row(InlineKeyboardButton(text="‹ К игре",
+                                callback_data=f"pn:game:{game.category_id}"))
+
     await safe_edit(
         call,
         f"📦 <b>Пакеты: {game.title}</b>\n"
         f"<code>{texts.LINE}</code>\n\n{rows}\n\n"
         f"<blockquote>Наценка {game.margin or runtime.margin_percent()}%, "
-        f"курс {fmt(runtime.usd_rate())} за доллар. Так их увидит клиент."
-        "</blockquote>",
-        back_kb(f"pn:game:{game.category_id}", "‹ Назад"),
+        f"курс {fmt(runtime.usd_rate())} за доллар. ✏️ — цена задана руками.\n\n"
+        "Нажмите на пакет, чтобы поставить свою цену.</blockquote>",
+        kb.as_markup(),
     )
 
 
+def pack_of(category_id: str, index: int) -> dict | None:
+    """Пакет из последнего показанного списка."""
+    from app.handlers.games import _offers
+
+    offers = _offers.get(category_id) or []
+    return offers[index] if 0 <= index < len(offers) else None
+
+
+@router.callback_query(F.data.startswith("pn:pk:"))
+async def cb_pack_card(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    _, _, category_id, raw_index = call.data.split(":", 3)
+    game = await db.get_game(conn, category_id)
+    offer = pack_of(category_id, int(raw_index) if raw_index.isdigit() else -1)
+    if game is None or offer is None:
+        await call.answer("Список устарел, откройте пакеты заново.", show_alert=True)
+        return
+
+    profit = offer["price"] - offer["cost"]
+    percent = round(profit * 100 / offer["cost"]) if offer["cost"] else 0
+
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("✏️ Своя цена", f"pn:pkset:{category_id}:{raw_index}", style=PRIMARY))
+    if offer["manual"]:
+        kb.row(btn("♻️ Вернуть по наценке",
+                   f"pn:pkauto:{category_id}:{raw_index}", style=DANGER))
+    kb.row(InlineKeyboardButton(text="‹ К пакетам",
+                                callback_data=f"pn:game_packs:{category_id}"))
+
+    await safe_edit(
+        call,
+        f"📦 <b>{offer['name']}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"├ Игра: <b>{game.title}</b>\n"
+        f"├ Себестоимость: <b>{fmt(offer['cost'])}</b> (${offer['usd']})\n"
+        f"├ Цена продажи: <b>{fmt(offer['price'])}</b>"
+        + (" <i>(своя)</i>" if offer["manual"] else " <i>(по наценке)</i>")
+        + (f"\n├ По наценке было бы: <b>{fmt(offer['auto'])}</b>"
+           if offer["manual"] else "")
+        + f"\n└ Прибыль: <b>{fmt(profit)}</b> ({percent}%)\n\n"
+        "<blockquote>Своя цена не пересчитывается при смене курса и "
+        "наценки — она держится, пока вы её не вернёте.</blockquote>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:pkset:"))
+async def cb_pack_price(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    _, _, category_id, raw_index = call.data.split(":", 3)
+    offer = pack_of(category_id, int(raw_index) if raw_index.isdigit() else -1)
+    if offer is None:
+        await call.answer("Список устарел, откройте пакеты заново.", show_alert=True)
+        return
+
+    await state.set_state(Panel.value)
+    await state.update_data(field=f"game_price:{category_id}:{offer['offer_id']}")
+    await safe_edit(
+        call,
+        f"✏️ <b>Цена: {offer['name']}</b>\n\n"
+        f"├ Сейчас: <b>{fmt(offer['price'])}</b>\n"
+        f"├ Себестоимость: <b>{fmt(offer['cost'])}</b>\n"
+        f"└ По наценке: <b>{fmt(offer['auto'])}</b>\n\n"
+        "<blockquote>Пришлите цену в сомони, например <code>25</code> "
+        "или <code>24.50</code>.</blockquote>",
+        back_kb(f"pn:game_packs:{category_id}", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:pkauto:"))
+async def cb_pack_auto(
+    call: CallbackQuery, conn: aiosqlite.Connection, provider
+) -> None:
+    _, _, category_id, raw_index = call.data.split(":", 3)
+    offer = pack_of(category_id, int(raw_index) if raw_index.isdigit() else -1)
+    game = await db.get_game(conn, category_id)
+    if offer is None or game is None:
+        await call.answer("Список устарел.", show_alert=True)
+        return
+
+    await db.set_game_price(conn, category_id, offer["offer_id"], None)
+    await call.answer("Считается по наценке")
+    await show_packs(call, conn, game, provider)
+
+
 @router.callback_query(F.data.startswith("pn:game_margin:"))
-async def cb_game_margin(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+async def cb_game_margin(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    """Наценка всей игры. Пакеты со своей ценой она не трогает."""
     game = await db.get_game(conn, call.data.split(":", 2)[2])
     if game is None:
         await call.answer("Игра не найдена.", show_alert=True)
@@ -3269,7 +3394,8 @@ async def cb_game_margin(call: CallbackQuery, state: FSMContext, conn: aiosqlite
         f"Сейчас: <b>{game.margin or runtime.margin_percent()}%</b>"
         + ("" if game.margin else " <i>(общая)</i>")
         + "\n\n<blockquote>Пришлите процент только для этой игры, "
-          "или <code>0</code> — брать общую.</blockquote>",
+          "или <code>0</code> — брать общую.\n\nПакеты со своей ценой "
+          "наценка не трогает.</blockquote>",
         back_kb(f"pn:game:{game.category_id}", "❌ Отмена"),
     )
     await call.answer()

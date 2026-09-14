@@ -188,6 +188,16 @@ CREATE TABLE IF NOT EXISTS games (
     created_at  TEXT NOT NULL
 );
 
+-- Своя цена пакета. Обычно цена считается из себестоимости и наценки,
+-- но иногда её нужно поставить руками — ровной суммой или под конкурента.
+CREATE TABLE IF NOT EXISTS game_prices (
+    category_id TEXT NOT NULL,
+    offer_id    TEXT NOT NULL,
+    price       INTEGER NOT NULL,      -- дирамы
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (category_id, offer_id)
+);
+
 CREATE TABLE IF NOT EXISTS product_owners (
     product_type TEXT PRIMARY KEY,
     partner_id   INTEGER NOT NULL,
@@ -750,9 +760,40 @@ async def update_game(conn: aiosqlite.Connection, category_id: str, **fields_) -
 async def delete_game(conn: aiosqlite.Connection, category_id: str) -> None:
     await conn.execute("DELETE FROM games WHERE category_id = ?", (category_id,))
     await conn.execute(
+        "DELETE FROM game_prices WHERE category_id = ?", (category_id,)
+    )
+    await conn.execute(
         "DELETE FROM product_owners WHERE product_type = ?", (f"game:{category_id}",)
     )
     await conn.commit()
+
+
+async def set_game_price(
+    conn: aiosqlite.Connection, category_id: str, offer_id: str, price: int | None,
+) -> None:
+    """Задать свою цену пакета. None — вернуть расчёт по наценке."""
+    if price is None:
+        await conn.execute(
+            "DELETE FROM game_prices WHERE category_id = ? AND offer_id = ?",
+            (category_id, offer_id),
+        )
+    else:
+        await conn.execute(
+            """INSERT INTO game_prices (category_id, offer_id, price, created_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(category_id, offer_id) DO UPDATE SET price = excluded.price""",
+            (category_id, offer_id, price, _now()),
+        )
+    await conn.commit()
+
+
+async def game_prices(conn: aiosqlite.Connection, category_id: str) -> dict[str, int]:
+    """Свои цены пакетов этой игры: offer_id -> дирамы."""
+    async with conn.execute(
+        "SELECT offer_id, price FROM game_prices WHERE category_id = ?",
+        (category_id,),
+    ) as cur:
+        return {row["offer_id"]: row["price"] for row in await cur.fetchall()}
 
 
 async def set_product_owner(

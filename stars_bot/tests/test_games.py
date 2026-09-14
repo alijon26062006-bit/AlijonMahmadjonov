@@ -490,7 +490,7 @@ async def panel_screens(conn) -> None:
     call = call_of("pn:game_packs:free_fire_br", uid=ADMIN)
     await panel.cb_game_offers(call, conn, GameProvider())
     check("пакеты показаны владельцу", "100 алмазов" in call.last, call.last[:200])
-    check("рядом видна себестоимость", "себестоимость" in call.last)
+    check("рядом видна себестоимость", "себест." in call.last, call.last[:250])
 
     call = call_of("pn:game_margin:free_fire_br", uid=ADMIN)
     await panel.cb_game_margin(call, state, conn)
@@ -508,6 +508,7 @@ async def panel_screens(conn) -> None:
           any("Балансы ключей" in b.text
               for r in panel.home_kb().inline_keyboard for b in r))
 
+    await manual_prices(conn)
     await id_field(conn)
     await two_keys(conn)
     await key_balances(conn)
@@ -521,6 +522,92 @@ async def panel_screens(conn) -> None:
     check("у него название игры", ff and ff["title"] == "🔥 Free Fire")
     check("игра закреплена за партнёром",
           (await db.product_owners(conn)).get("game:free_fire_br") == partner.id)
+
+
+async def manual_prices(conn) -> None:
+    """Цену каждого пакета можно поставить руками."""
+    state = FSMContext(storage=MemoryStorage(),
+                       key=StorageKey(bot_id=1, chat_id=ADMIN, user_id=ADMIN))
+    provider = GameProvider()
+    # Наценку фиксируем: раньше её меняли, и цифры зависели бы от порядка.
+    await db.update_game(conn, "free_fire_br", margin=20)
+    game = await db.get_game(conn, "free_fire_br")
+
+    call = call_of("pn:game_packs:free_fire_br", uid=ADMIN)
+    await panel.cb_game_offers(call, conn, provider)
+    check("пакеты стали кнопками",
+          any("100 алмазов" in b for b in buttons(call.markup)),
+          str(buttons(call.markup)))
+    check("сказано, что можно поставить свою цену",
+          "свою цену" in call.last, call.last[-200:])
+
+    call = call_of("pn:pk:free_fire_br:0", uid=ADMIN)
+    await panel.cb_pack_card(call, conn)
+    check("карточка пакета открывается", "100 алмазов" in call.last, call.last[:80])
+    check("видна себестоимость", "Себестоимость" in call.last)
+    check("видна прибыль в процентах", "Прибыль" in call.last and "%" in call.last)
+    check("пока цена по наценке", "(по наценке)" in call.last, call.last[:300])
+    check("кнопки возврата к наценке ещё нет",
+          not any("Вернуть по наценке" in b for b in buttons(call.markup)))
+
+    call = call_of("pn:pkset:free_fire_br:0", uid=ADMIN)
+    await panel.cb_pack_price(call, state, conn)
+    check("просит цену", "Пришлите цену" in call.last, call.last[-150:])
+
+    bad = msg("дорого", uid=ADMIN)
+    await panel.on_field_value(bad, state, conn)
+    check("нечисловая цена отклонена", "❌" in bad.last)
+
+    good = msg("25", uid=ADMIN)
+    await panel.on_field_value(good, state, conn)
+    prices = await db.game_prices(conn, "free_fire_br")
+    check("своя цена сохранена", prices.get("off_1") == 25_00, str(prices))
+    check("сказано, что курс её не тронет", "не трогает" in good.last, good.last)
+
+    from app.handlers.games import offers_of
+
+    offers = await offers_of(provider, game, conn)
+    first = offers[0]
+    check("клиент увидит свою цену", first["price"] == 25_00, str(first["price"]))
+    check("пакет помечен как ручной", first["manual"] is True)
+    check("расчётная цена рядом сохранена", first["auto"] == 1400, str(first["auto"]))
+    check("остальные пакеты считаются как раньше",
+          offers[1]["price"] == offers[1]["auto"] and not offers[1]["manual"])
+
+    # смена курса не трогает ручную цену
+    await runtime.set_value(conn, "usd_rate_diram", "2000")
+    offers = await offers_of(provider, game, conn)
+    check("при смене курса своя цена держится",
+          offers[0]["price"] == 25_00, str(offers[0]["price"]))
+    check("а расчётная меняется", offers[0]["auto"] != 1400, str(offers[0]["auto"]))
+    await runtime.set_value(conn, "usd_rate_diram", "1090")
+
+    call = call_of("pn:pk:free_fire_br:0", uid=ADMIN)
+    await panel.cb_pack_card(call, conn)
+    check("в карточке видно, что цена своя", "(своя)" in call.last, call.last[:300])
+    check("показано, сколько было бы по наценке",
+          "По наценке было бы" in call.last, call.last[:400])
+    check("появилась кнопка возврата",
+          any("Вернуть по наценке" in b for b in buttons(call.markup)))
+
+    call = call_of("pn:pkauto:free_fire_br:0", uid=ADMIN)
+    await panel.cb_pack_auto(call, conn, provider)
+    check("цена вернулась к расчёту",
+          await db.game_prices(conn, "free_fire_br") == {},
+          str(await db.game_prices(conn, "free_fire_br")))
+    offers = await offers_of(provider, game, conn)
+    check("и клиент снова видит расчётную", offers[0]["price"] == 1400,
+          str(offers[0]["price"]))
+
+    # удаление игры уносит её цены
+    await db.set_game_price(conn, "free_fire_br", "off_1", 30_00)
+    await db.delete_game(conn, "free_fire_br")
+    check("цены удалённой игры не остаются",
+          await db.game_prices(conn, "free_fire_br") == {})
+    await db.add_game(conn, category_id="free_fire_br", title="🔥 Free Fire",
+                      field="player_id", region="BR")
+    await db.update_game(conn, "free_fire_br", enabled=1)
+    await db.load_game_titles(conn)
 
 
 async def id_field(conn) -> None:

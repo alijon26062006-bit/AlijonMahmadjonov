@@ -25,20 +25,29 @@ router = Router(name="games")
 _offers: dict[str, list[dict]] = {}
 
 
-async def offers_of(provider, game: db.Game) -> list[dict]:
-    """Пакеты игры с ценой в сомони."""
+async def offers_of(provider, game: db.Game, conn=None) -> list[dict]:
+    """Пакеты игры с ценой в сомони.
+
+    Своя цена, если она задана, важнее расчёта по наценке: владелец мог
+    поставить ровную сумму или подстроиться под конкурента.
+    """
     raw = await provider.game_offers(game.category_id)
     margin = svc.margin_of(game)
-    offers = [
-        {
+    manual = await db.game_prices(conn, game.category_id) if conn else {}
+
+    offers = []
+    for item in raw:
+        auto = svc.offer_price(item["usd"], margin)
+        own = manual.get(item["offer_id"])
+        offers.append({
             "offer_id": item["offer_id"],
             "name": item["name"],
             "usd": item["usd"],
-            "price": svc.offer_price(item["usd"], margin),
+            "price": own if own is not None else auto,
+            "auto": auto,
+            "manual": own is not None,
             "cost": svc.offer_cost(item["usd"]),
-        }
-        for item in raw
-    ]
+        })
     offers = [o for o in offers if o["price"] > 0]
     _offers[game.category_id] = offers
     return offers
@@ -75,7 +84,7 @@ async def cb_game(
     await call.answer("Смотрю пакеты…")
     provider = suppliers.for_games(provider)
     try:
-        offers = await offers_of(provider, game)
+        offers = await offers_of(provider, game, conn)
     except (DeliveryError, DeliveryUncertain) as exc:
         log.info("Игры: пакеты %s не пришли — %s", category_id, exc)
         await call.message.edit_text(
