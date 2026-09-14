@@ -130,8 +130,8 @@ _RAW["GAME_ACCEPTED"] = (
     "├ Пакет: <b>{pack}</b>\n"
     "├ ID: <code>{player}</code>\n"
     "└ Списано: <b>{price}</b>\n\n"
-    "<blockquote>[[wait]] Пополнение идёт — обычно несколько минут. "
-    "Напишу, как только всё придёт.</blockquote>"
+    "<blockquote>[[wait]] Пополнение уже идёт — обычно меньше минуты. "
+    "Напишу, как только дойдёт.</blockquote>"
 )
 
 _RAW["GAME_DELIVERED"] = (

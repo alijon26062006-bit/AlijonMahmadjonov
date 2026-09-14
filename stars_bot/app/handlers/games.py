@@ -1,6 +1,7 @@
 """Покупка игровых пополнений: выбор пакета, проверка ID, заказ."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 
@@ -307,8 +308,14 @@ async def cb_buy(
     # Заказ почти всегда уходит в processing, поэтому проверяем сразу —
     # вдруг он уже готов, — а дальше за ним следит фоновая задача.
     fresh = await db.get_order(conn, order.id)
+    done = False
     if fresh:
-        await svc.check(bot, conn, provider, fresh)
+        done = await svc.check(bot, conn, provider, fresh) != "waiting"
+
+    if not done:
+        # Выдача обычно занимает секунды. Опрашиваем часто, чтобы клиент
+        # узнал сразу, а не через пятиминутный обход.
+        asyncio.create_task(svc.follow(bot, provider, order.id))
 
     await call.message.answer(
         "Меню:", reply_markup=await main_markup(conn)

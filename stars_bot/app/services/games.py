@@ -37,6 +37,12 @@ WATCH_EVERY = 5 * 60
 #: Сколько ждём выполнения, прежде чем вернуть деньги.
 TIMEOUT_MINUTES = 20
 
+# Сразу после оплаты заказ опрашивается часто: выдача обычно занимает
+# секунды, и ждать пятиминутного обхода незачем — клиент всё это время
+# сидит с сообщением «пополнение идёт».
+FAST_EVERY = 3
+FAST_SECONDS = 3 * 60
+
 DONE = {"completed", "complete", "done", "delivered", "success", "fulfilled"}
 FAILED = {"failed", "fail", "error", "cancelled", "canceled", "rejected",
           "refunded", "expired"}
@@ -203,6 +209,38 @@ async def _refund(
         ),
     )
     log.warning("Игры: заказ %s возвращён — %s", order.id, reason)
+
+
+async def follow(bot: Bot, provider, order_id: int) -> str:
+    """Досмотреть свежий заказ до конца, опрашивая часто.
+
+    Своё соединение с базой: задача живёт дольше обработчика, и его
+    соединение к этому моменту уже закрыто.
+    """
+    waited = 0
+    conn = await db.connect()
+    try:
+        while waited < FAST_SECONDS:
+            await asyncio.sleep(FAST_EVERY)
+            waited += FAST_EVERY
+
+            order = await db.get_order(conn, order_id)
+            if order is None or order.status not in (db.ORDER_DELIVERING,
+                                                     db.ORDER_FAILED):
+                return "done"
+            try:
+                result = await check(bot, conn, provider, order)
+            except Exception as exc:  # noqa: BLE001 — подхватит общий обход
+                log.info("Игры: быстрый опрос заказа %s сорвался — %s",
+                         order_id, exc)
+                return "waiting"
+            if result != "waiting":
+                log.info("Игры: заказ %s закрылся за ~%s сек (%s)",
+                         order_id, waited, result)
+                return result
+    finally:
+        await conn.close()
+    return "waiting"
 
 
 async def watch_loop(provider, bot: Bot) -> None:

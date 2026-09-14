@@ -337,7 +337,8 @@ async def flow(conn) -> None:
     said = [t for t, _ in call.message._log]
     check("клиенту сказано, что заказ принят",
           any("принят" in t for t in said), str(said[-2:]))
-    check("и что нужно подождать", any("несколько минут" in t for t in said))
+    check("и что нужно подождать", any("меньше минуты" in t for t in said),
+          str(said[-1:]))
 
     # ------------------------------------------------ доглядчик доводит до конца
     provider.status = "completed"
@@ -508,6 +509,7 @@ async def panel_screens(conn) -> None:
           any("Балансы ключей" in b.text
               for r in panel.home_kb().inline_keyboard for b in r))
 
+    await fast_follow(conn)
     await manual_prices(conn)
     await id_field(conn)
     await two_keys(conn)
@@ -522,6 +524,55 @@ async def panel_screens(conn) -> None:
     check("у него название игры", ff and ff["title"] == "🔥 Free Fire")
     check("игра закреплена за партнёром",
           (await db.product_owners(conn)).get("game:free_fire_br") == partner.id)
+
+
+async def fast_follow(conn) -> None:
+    """Свежий заказ опрашивается часто, а не раз в пять минут."""
+    check("быстрый опрос чаще общего обхода",
+          svc.FAST_EVERY < svc.WATCH_EVERY, f"{svc.FAST_EVERY} < {svc.WATCH_EVERY}")
+    check("быстрый опрос короче таймаута возврата",
+          svc.FAST_SECONDS < svc.TIMEOUT_MINUTES * 60)
+
+    bot = FakeBot()
+    provider = GameProvider(status="processing")
+    order = await db.create_order(
+        conn, user_id=BUYER, product_type="game:free_fire_br", quantity=1,
+        recipient="1724367212", price=1400, cost=1090,
+    )
+    await db.update_order(conn, order.id, fragment_order_id="ord-fast")
+
+    # выдача происходит между опросами
+    real_sleep = svc.asyncio.sleep
+    ticks = {"n": 0}
+
+    async def tick(_seconds):
+        ticks["n"] += 1
+        if ticks["n"] == 2:
+            provider.status = "completed"
+        await real_sleep(0)
+
+    svc.asyncio.sleep = tick
+    try:
+        result = await svc.follow(bot, provider, order.id)
+    finally:
+        svc.asyncio.sleep = real_sleep
+
+    check("быстрый опрос доводит заказ до конца", result == "done", result)
+    check("хватило пары проверок", ticks["n"] <= 3, str(ticks["n"]))
+    check("заказ закрыт",
+          (await db.get_order(conn, order.id)).status == db.ORDER_DELIVERED)
+    check("клиент получил сообщение сразу",
+          any("выполнен" in t for t in bot.to(BUYER)), str(bot.to(BUYER)))
+
+    # уже закрытый заказ опрашивать незачем
+    ticks["n"] = 0
+    svc.asyncio.sleep = tick
+    try:
+        result = await svc.follow(bot, provider, order.id)
+    finally:
+        svc.asyncio.sleep = real_sleep
+    check("закрытый заказ бросается сразу", result == "done" and ticks["n"] == 1,
+          f"{result} за {ticks['n']}")
 
 
 async def manual_prices(conn) -> None:
