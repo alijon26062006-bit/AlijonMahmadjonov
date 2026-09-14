@@ -113,6 +113,48 @@ def field_label(name: str) -> str:
     return FIELD_LABELS.get(name.lower(), name)
 
 
+async def full_catalog(provider) -> list[dict]:
+    """Все категории поставщика вместе с полями для ID.
+
+    Два списка у сервиса разные: категории — что продаётся, validate-id —
+    у чего работает проверка ID. Владельцу нужен первый, а поля берутся
+    из второго, поэтому сводим их вместе.
+    """
+    categories: list[dict] = []
+    failure: Exception | None = None
+    if hasattr(provider, "game_categories"):
+        try:
+            categories = await provider.game_categories()
+        except Exception as exc:  # noqa: BLE001 — попробуем второй список
+            log.info("Игры: список категорий не пришёл — %s", exc)
+            failure = exc
+
+    try:
+        validated = await provider.game_catalog()
+    except Exception as exc:  # noqa: BLE001
+        log.info("Игры: список validate-id не пришёл — %s", exc)
+        validated = []
+        # Молчать нельзя: пустой каталог владелец прочтёт как «у
+        # поставщика ничего нет», а на деле это оборванная связь или
+        # неверный ключ.
+        if not categories:
+            raise
+    if failure is not None and not categories and not validated:
+        raise failure
+
+    fields = {item["category_id"]: item.get("fields") or []
+              for item in validated}
+
+    merged = {item["category_id"]: dict(item) for item in categories}
+    for item in validated:
+        merged.setdefault(item["category_id"], dict(item))
+    for code, item in merged.items():
+        if not item.get("fields") and fields.get(code):
+            item["fields"] = fields[code]
+        item["checkable"] = code in fields
+    return list(merged.values())
+
+
 async def detect_fields(provider, category_id: str) -> list[str]:
     """Какие поля поставщик требует для этой игры. Пусто — не узнали."""
     try:

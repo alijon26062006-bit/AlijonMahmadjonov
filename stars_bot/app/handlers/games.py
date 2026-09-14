@@ -72,6 +72,33 @@ async def cb_games(
     await call.answer()
 
 
+#: О какой игре уже писали владельцу. Иначе каждый зашедший клиент
+#: присылал бы ему одно и то же сообщение.
+_told: set[str] = set()
+
+
+async def _tell_admins_broken(bot: Bot, game: db.Game, error: str) -> None:
+    """Сказать владельцу, что код игры больше не работает."""
+    if game.category_id in _told or bot is None:
+        return
+    _told.add(game.category_id)
+    log.warning("Игры: код %s не принят поставщиком — %s",
+                game.category_id, error)
+
+    from app.services import delivery
+
+    await delivery.notify_admins(
+        bot,
+        "⚠️ <b>Игра не открывается у клиентов</b>\n"
+        f"├ {game.title}\n"
+        f"└ Код: <code>{game.category_id}</code>\n\n"
+        f"<blockquote expandable>{error[:400]}</blockquote>\n\n"
+        "<blockquote>Поставщик не знает такого кода. Панель → 🕹 Игры → "
+        "эта игра → «📦 Проверить пакеты»: бот покажет похожие коды из "
+        "каталога и переставит одним нажатием.</blockquote>",
+    )
+
+
 def _region(game: db.Game) -> str:
     """Приписка с регионом. Пусто, если регион у игры один — лишний шум."""
     title = regions.title_of(game)
@@ -102,7 +129,7 @@ async def cb_family(
 @router.callback_query(F.data.startswith("g:"), ~F.data.in_({"g:ok"}))
 async def cb_game(
     call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection,
-    provider: DeliveryProvider,
+    provider: DeliveryProvider, bot: Bot = None,
 ) -> None:
     category_id = call.data.split(":", 1)[1]
     game = await db.get_game(conn, category_id)
@@ -116,10 +143,20 @@ async def cb_game(
         offers = await offers_of(provider, game, conn)
     except (DeliveryError, DeliveryUncertain) as exc:
         log.info("Игры: пакеты %s не пришли — %s", category_id, exc)
-        await call.message.edit_text(
-            "😔 Пакеты этой игры сейчас недоступны. Попробуйте позже.",
-            reply_markup=keyboards.back(),
-        )
+        # Неверный код категории сам не пройдёт: ждать бесполезно, и
+        # владелец должен узнать об этом, а не клиент — переставить код.
+        if "category" in str(exc).lower():
+            await _tell_admins_broken(bot, game, str(exc))
+            await call.message.edit_text(
+                "😔 Эта игра сейчас недоступна. Мы уже разбираемся — "
+                "попробуйте другую или напишите в поддержку.",
+                reply_markup=keyboards.back(),
+            )
+        else:
+            await call.message.edit_text(
+                "😔 Пакеты этой игры сейчас недоступны. Попробуйте позже.",
+                reply_markup=keyboards.back(),
+            )
         return
 
     if not offers:

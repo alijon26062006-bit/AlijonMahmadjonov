@@ -3228,9 +3228,11 @@ async def cb_game_pick(call: CallbackQuery, conn: aiosqlite.Connection, provider
     from app.services import regions as reg
     from app.services import suppliers
 
+    from app.services import games as gsvc
+
     client = suppliers.for_games(provider)
     try:
-        catalog = await client.game_catalog()
+        catalog = await gsvc.full_catalog(client)
     except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
         await safe_edit(
             call,
@@ -3354,8 +3356,10 @@ async def cb_game_codes(call: CallbackQuery, provider) -> None:
     from app.services import regions as reg
     from app.services import suppliers
 
+    from app.services import games as gsvc
+
     try:
-        catalog = await suppliers.for_games(provider).game_catalog()
+        catalog = await gsvc.full_catalog(suppliers.for_games(provider))
     except Exception as exc:  # noqa: BLE001
         await safe_edit(
             call,
@@ -3376,6 +3380,8 @@ async def cb_game_codes(call: CallbackQuery, provider) -> None:
     for item in catalog:
         code, name = item["category_id"], item.get("name", "")
         mark = reg.title_of(code, name) or "<i>регион не распознан</i>"
+        if not item.get("checkable", True):
+            mark += " · <i>без проверки ID</i>"
         fields = ", ".join(
             str(spec.get("name") if isinstance(spec, dict) else spec)
             for spec in (item.get("fields") or [])
@@ -3407,7 +3413,7 @@ async def cb_game_add_family(
 
     client = suppliers.for_games(provider)
     try:
-        catalog = await client.game_catalog()
+        catalog = await gsvc.full_catalog(client)
     except Exception as exc:  # noqa: BLE001
         await call.answer(f"Каталог не пришёл: {str(exc)[:120]}", show_alert=True)
         return
@@ -3566,6 +3572,81 @@ async def cb_game_offers(call: CallbackQuery, conn: aiosqlite.Connection, provid
     await show_packs(call, conn, game, provider)
 
 
+async def _similar_codes(provider, game: db.Game, limit: int = 6) -> list[dict]:
+    """Коды из каталога, похожие на наш. Ищем по словам, не по буквам:
+    free_fire_br и free_fire_cis роднит «free», а не длина совпадения."""
+    from app.services import games as gsvc
+    from app.services import suppliers
+
+    try:
+        catalog = await gsvc.full_catalog(suppliers.for_games(provider))
+    except Exception as exc:  # noqa: BLE001 — подсказка не обязана работать
+        log.info("Игры: каталог для подсказки не пришёл — %s", exc)
+        return []
+
+    words = {w for w in re.split(r"[^a-z0-9]+", game.category_id.lower()) if w}
+    words |= {w for w in re.split(r"[^a-z0-9]+", game.title.lower()) if len(w) > 2}
+    scored = []
+    for item in catalog:
+        theirs = {w for w in re.split(r"[^a-z0-9]+", item["category_id"].lower()) if w}
+        theirs |= {w for w in re.split(r"[^a-z0-9]+",
+                                       str(item.get("name", "")).lower()) if len(w) > 2}
+        common = len(words & theirs)
+        if common:
+            scored.append((common, item))
+    scored.sort(key=lambda pair: -pair[0])
+    return [item for _, item in scored[:limit]]
+
+
+def _codes_kb(game: db.Game, near: list[dict]) -> InlineKeyboardBuilder:
+    kb = InlineKeyboardBuilder()
+    for item in near:
+        kb.row(InlineKeyboardButton(
+            text=f"↪️ {item['category_id']} · {item.get('name', '')}"[:60],
+            callback_data=f"pn:game_code:{game.category_id}:{item['category_id']}",
+        ))
+    if near:
+        kb.row(InlineKeyboardButton(text="📋 Все категории поставщика",
+                                    callback_data="pn:game_codes"))
+    return kb
+
+
+@router.callback_query(F.data.startswith("pn:game_code:"))
+async def cb_game_recode(
+    call: CallbackQuery, conn: aiosqlite.Connection, provider
+) -> None:
+    """Переставить игру на другой код категории, не теряя настроек.
+
+    Наценка, своя цена и «показана в меню» привязаны к коду, поэтому
+    удалить и добавить заново — значит потерять их.
+    """
+    _, _, old_code, new_code = call.data.split(":", 3)
+    game = await db.get_game(conn, old_code)
+    if game is None:
+        await call.answer("Игра не найдена.", show_alert=True)
+        return
+    if await db.get_game(conn, new_code) is not None:
+        await call.answer("Игра с таким кодом уже есть.", show_alert=True)
+        return
+
+    from app.services import games as gsvc
+    from app.services import suppliers
+
+    found = await gsvc.detect_fields(suppliers.for_games(provider), new_code)
+    await db.move_game(conn, old_code, new_code,
+                       field=",".join(found) or game.field)
+    await db.load_game_titles(conn)
+    await call.answer("Код заменён")
+
+    fresh = await db.get_game(conn, new_code)
+    await safe_edit(
+        call,
+        f"✅ Код заменён: <code>{old_code}</code> → <code>{new_code}</code>\n\n"
+        f"{game_card(fresh)}",
+        game_kb(fresh),
+    )
+
+
 async def show_packs(
     call: CallbackQuery, conn: aiosqlite.Connection, game: db.Game, provider,
 ) -> None:
@@ -3575,13 +3656,29 @@ async def show_packs(
     try:
         offers = await offers_of(suppliers.for_games(provider), game, conn)
     except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
+        # «Неизвестная категория» — не поломка связи, а неверный код игры.
+        # Гадать его владельцу не надо: подбираем похожие по каталогу.
+        kb = InlineKeyboardBuilder()
+        hint = ("<blockquote>Проверьте код игры — это "
+                "<code>category_id</code> у поставщика.</blockquote>")
+        if "category" in str(exc).lower():
+            near = await _similar_codes(provider, game)
+            kb = _codes_kb(game, near)
+            hint = (
+                "<blockquote>Такого кода у поставщика нет. Это не поломка: "
+                "код просто другой.\n\n"
+                + ("Похожие коды из каталога — ниже, нажмите нужный.\n\n"
+                   if near else
+                   "Похожих кодов в каталоге не нашлось.\n\n")
+                + "Весь список: «📋 Все категории поставщика».</blockquote>"
+            )
+        kb.row(InlineKeyboardButton(
+            text="‹ Назад", callback_data=f"pn:game:{game.category_id}"))
         await safe_edit(
             call,
             f"📦 <b>Пакеты {game.title} не пришли</b>\n\n"
-            f"<blockquote expandable>{exc}</blockquote>\n\n"
-            "<blockquote>Проверьте код игры — это <code>category_id</code> "
-            "у поставщика.</blockquote>",
-            back_kb(f"pn:game:{game.category_id}", "‹ Назад"),
+            f"<blockquote expandable>{exc}</blockquote>\n\n{hint}",
+            kb.as_markup(),
         )
         return
 

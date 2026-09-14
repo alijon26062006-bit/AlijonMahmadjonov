@@ -470,6 +470,165 @@ async def unknown_nick(conn) -> None:
         nicknames.free_fire = real
 
 
+async def full_catalog(conn) -> None:
+    """Каталог категорий и каталог проверки ID — разные списки.
+
+    Заказ падал с «Unknown or unavailable category_id» именно потому, что
+    владелец видел только второй: в нём перечислены игры с проверкой ID,
+    а продаются и остальные.
+    """
+    class Rich(GameProvider):
+        async def game_categories(self):
+            return [
+                {"category_id": "freefire_br", "name": "Free Fire (BR)",
+                 "fields": []},
+                {"category_id": "freefire_ru", "name": "Free Fire (RU)",
+                 "fields": []},
+                {"category_id": "pubgm", "name": "PUBG Mobile", "fields": []},
+            ]
+
+        async def game_catalog(self):
+            return [{"category_id": "freefire_br", "name": "Free Fire (BR)",
+                     "fields": [{"name": "player_id"}]}]
+
+    merged = await svc.full_catalog(Rich())
+    codes = {i["category_id"] for i in merged}
+    check("видны все категории, не только проверяемые",
+          codes == {"freefire_br", "freefire_ru", "pubgm"}, str(codes))
+    ff = next(i for i in merged if i["category_id"] == "freefire_br")
+    check("поля подтянулись из списка проверки",
+          ff["fields"] == [{"name": "player_id"}], str(ff))
+    check("проверяемые помечены", ff["checkable"] is True)
+    check("непроверяемые помечены тоже",
+          next(i for i in merged if i["category_id"] == "pubgm")["checkable"]
+          is False)
+
+    # один список отвалился — работаем по второму
+    class HalfBroken(Rich):
+        async def game_categories(self):
+            raise DeliveryError("HTTP 404")
+
+    half = await svc.full_catalog(HalfBroken())
+    check("без списка категорий берём проверяемые",
+          {i["category_id"] for i in half} == {"freefire_br"}, str(half))
+
+    class OldProvider(GameProvider):
+        """Поставщик без нового метода — так было до правки."""
+
+    old_style = await svc.full_catalog(OldProvider())
+    check("старый поставщик тоже понятен",
+          {i["category_id"] for i in old_style} == {"free_fire_br"},
+          str(old_style))
+
+    class Dead(GameProvider):
+        async def game_categories(self):
+            raise DeliveryError("HTTP 401: ключ не принят")
+
+        async def game_catalog(self):
+            raise DeliveryError("HTTP 401: ключ не принят")
+
+    failed = False
+    try:
+        await svc.full_catalog(Dead())
+    except DeliveryError:
+        failed = True
+    check("полный отказ не выдаём за пустой каталог", failed)
+
+
+async def wrong_code(conn) -> None:
+    """Неверный код игры: бот подсказывает похожие и переставляет его."""
+    class Catalog(GameProvider):
+        async def game_categories(self):
+            return [
+                {"category_id": "freefire_br", "name": "Free Fire (BR)",
+                 "fields": [{"name": "player_id"}]},
+                {"category_id": "freefire_ru", "name": "Free Fire (RU)",
+                 "fields": [{"name": "player_id"}]},
+                {"category_id": "roblox", "name": "Roblox", "fields": []},
+            ]
+
+        async def game_catalog(self):
+            return await self.game_categories()
+
+        async def game_offers(self, category_id):
+            if category_id not in ("freefire_br", "freefire_ru", "roblox"):
+                raise DeliveryError("Unknown or unavailable category_id.")
+            return await super().game_offers(category_id)
+
+    await db.add_game(conn, category_id="free_fire_xx", title="🔥 Free Fire",
+                      field="user_id")
+    await db.update_game(conn, "free_fire_xx", enabled=1, margin=35)
+    await db.set_game_price(conn, "free_fire_xx", "off_1", 2500)
+    await db.load_game_titles(conn)
+
+    game = await db.get_game(conn, "free_fire_xx")
+    call = call_of("pn:game_packs:free_fire_xx", uid=ADMIN)
+    await panel.show_packs(call, conn, game, Catalog())
+    check("отказ показан как есть",
+          "Unknown or unavailable" in call.last, call.last[:200])
+    check("объяснено, что код просто другой",
+          "Такого кода у поставщика нет" in call.last, call.last[:300])
+    picks = buttons(call.markup)
+    check("похожие коды предложены",
+          any("freefire_br" in b for b in picks), str(picks))
+    check("непохожие не лезут", not any("roblox" in b for b in picks), str(picks))
+    check("есть выход на весь список",
+          any("Все категории" in b for b in picks), str(picks))
+
+    call = call_of("pn:game_code:free_fire_xx:freefire_ru", uid=ADMIN)
+    await panel.cb_game_recode(call, conn, Catalog())
+    moved = await db.get_game(conn, "freefire_ru")
+    check("игра переставлена на новый код", moved is not None)
+    check("старого кода не осталось",
+          await db.get_game(conn, "free_fire_xx") is None)
+    check("наценка не потерялась", moved and moved.margin == 35, str(moved))
+    check("игра осталась в меню", moved and moved.enabled == 1)
+    check("поля взяты у поставщика", moved and moved.field == "player_id",
+          moved.field if moved else "")
+    prices = await db.game_prices(conn, "freefire_ru")
+    check("своя цена пакета переехала", prices.get("off_1") == 2500, str(prices))
+    check("владельцу показали новый код",
+          "freefire_ru" in call.last, call.last[:200])
+
+    # занятый код не занимаем повторно
+    await db.add_game(conn, category_id="freefire_br", title="🔥 Free Fire BR",
+                      field="player_id")
+    call = call_of("pn:game_code:freefire_ru:freefire_br", uid=ADMIN)
+    await panel.cb_game_recode(call, conn, Catalog())
+    check("на занятый код не переставляем",
+          any("уже есть" in a for a in call.alerts), str(call.alerts))
+
+    # клиенту в такой ситуации не говорят «попробуйте позже»
+    await db.update_game(conn, "freefire_br", enabled=1)
+    await db.add_game(conn, category_id="broken_code", title="🎲 Сломанная",
+                      field="user_id")
+    await db.update_game(conn, "broken_code", enabled=1)
+    await db.load_game_titles(conn)
+    gh._told.clear()
+
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage,
+                       key=StorageKey(bot_id=1, chat_id=BUYER, user_id=BUYER))
+    bot = FakeBot()
+    call = call_of("g:broken_code")
+    await gh.cb_game(call, state, conn, Catalog(), bot)
+    check("клиенту не обещаем «позже»",
+          "позже" not in call.last, call.last[:120])
+    told = [t for t in bot.to(ADMIN) if "не открывается" in t]
+    check("владельца позвали", bool(told), str(bot.to(ADMIN)))
+    check("в сообщении код игры", told and "broken_code" in told[0])
+    check("и что делать", told and "Проверить пакеты" in told[0], str(told[:1]))
+
+    bot2 = FakeBot()
+    await gh.cb_game(call_of("g:broken_code"), state, conn, Catalog(), bot2)
+    check("второй клиент владельца не будит", not bot2.to(ADMIN),
+          str(bot2.sent))
+
+    for code in ("broken_code", "freefire_br", "freefire_ru"):
+        await db.delete_game(conn, code)
+    gh._told.clear()
+
+
 async def two_fields(conn) -> None:
     """Игры, где аккаунт задан парой: ID игрока и номер сервера."""
     check("одно поле читается как раньше",
@@ -1522,6 +1681,8 @@ async def main() -> None:
         await timeout_setting(conn)
         await gorder_command(conn)
         await region_step(conn)
+        await full_catalog(conn)
+        await wrong_code(conn)
         await two_fields(conn)
         await verdict_reading(conn)
         await wrong_region(conn)

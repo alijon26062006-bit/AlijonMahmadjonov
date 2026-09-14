@@ -779,6 +779,34 @@ async def update_game(conn: aiosqlite.Connection, category_id: str, **fields_) -
     await conn.commit()
 
 
+async def move_game(
+    conn: aiosqlite.Connection, old_code: str, new_code: str, *, field: str = "",
+) -> None:
+    """Переставить игру на другой код категории.
+
+    Настройки привязаны к коду: наценка, свои цены пакетов, владелец-
+    партнёр и записанные заказы. Поэтому переносим их вместе с игрой, а
+    не заводим игру заново.
+    """
+    updates = {"category_id": new_code}
+    if field:
+        updates["field"] = field
+    assignments = ", ".join(f"{key} = ?" for key in updates)
+    await conn.execute(
+        f"UPDATE games SET {assignments} WHERE category_id = ?",
+        (*updates.values(), old_code),
+    )
+    await conn.execute(
+        "UPDATE game_prices SET category_id = ? WHERE category_id = ?",
+        (new_code, old_code),
+    )
+    await conn.execute(
+        "UPDATE product_owners SET product_type = ? WHERE product_type = ?",
+        (f"game:{new_code}", f"game:{old_code}"),
+    )
+    await conn.commit()
+
+
 async def delete_game(conn: aiosqlite.Connection, category_id: str) -> None:
     await conn.execute("DELETE FROM games WHERE category_id = ?", (category_id,))
     await conn.execute(

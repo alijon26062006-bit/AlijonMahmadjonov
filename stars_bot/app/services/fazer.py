@@ -41,6 +41,19 @@ TOPUP_VALIDATE = "/api/v2/topups/validate-id"
 TOPUP_ORDER = "/api/v2/topups/order"
 ORDER_ONE = "/api/v2/orders/{order_id}"
 
+# Полный список категорий пополнения — это НЕ то же самое, что список
+# validate-id: там перечислены только игры, у которых работает проверка
+# ID, а продаются и остальные. Точный путь в выжимке из документации не
+# указан, поэтому пробуем вероятные и запоминаем сработавший.
+TOPUP_CATEGORIES = "/api/v2/topups/categories"
+CATEGORY_CANDIDATES = [
+    "/api/v2/topups/categories", "/api/v2/topups", "/api/v2/topups/catalog",
+    "/api/v2/topups/list", "/api/v2/categories?type=topup",
+    "/api/v2/catalog/topups",
+]
+#: Где в ответе может лежать сам список.
+CATEGORY_LIST_KEYS = ["categories", "items", "data", "topups", "list", "result"]
+
 # Пополнение кошелька Steam
 STEAM_RATES = "/api/v2/steam-topup/rates"
 STEAM_CHECK = "/api/v2/steam-topup/check-login"
@@ -277,6 +290,33 @@ class FazerProvider(DeliveryProvider):
             for offer in offers
             if isinstance(offer, dict) and offer.get("offer_id")
         ]
+
+    async def game_categories(self) -> list[dict]:
+        """Все категории пополнения: что вообще можно продавать.
+
+        Список validate-id для этого не годится — в нём только игры
+        с проверкой ID. Именно поэтому Free Fire мог не найтись, а заказ
+        падал с «Unknown or unavailable category_id».
+        """
+        from app import runtime
+
+        paths = [runtime.get("fazer_topups_path")] if runtime.get(
+            "fazer_topups_path") else []
+        paths += [p for p in CATEGORY_CANDIDATES if p not in paths]
+
+        for path in paths:
+            status, data = await self._get_raw(path)
+            if not self._looks_ok(status, data):
+                continue
+            items = _category_list(data)
+            if not items:
+                continue
+            if path != runtime.get("fazer_topups_path"):
+                await self._remember("fazer_topups_path", path)
+            return items
+
+        log.info("Игры: список категорий не нашёлся ни по одному адресу")
+        return []
 
     async def game_catalog(self) -> list[dict]:
         """Игры, у которых сервис умеет проверять ID, и какие поля им нужны."""
@@ -707,6 +747,34 @@ class FazerProvider(DeliveryProvider):
         # Списка нет — возможно, доступен только одиночный заказ. Проверить
         # его без настоящего номера нельзя, поэтому честно говорим «не знаем».
         return ""
+
+
+def _category_list(data: dict) -> list[dict]:
+    """Вытащить категории из ответа, как бы сервис их ни обернул."""
+    raw = None
+    for key in CATEGORY_LIST_KEYS:
+        value = data.get(key)
+        if isinstance(value, list):
+            raw = value
+            break
+    if raw is None:
+        return []
+
+    out = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        code = _first(item, ["category_id", "id", "slug", "code", "key"])
+        if not code:
+            continue
+        name = _first(item, ["name", "title", "label", "display_name"])
+        fields = item.get("fields") if isinstance(item.get("fields"), list) else []
+        out.append({
+            "category_id": str(code),
+            "name": str(name or code),
+            "fields": fields,
+        })
+    return out
 
 
 def _order_id(order: dict) -> str | None:
