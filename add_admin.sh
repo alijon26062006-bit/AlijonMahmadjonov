@@ -77,7 +77,8 @@ ok "Админы теперь: $result"
 echo "   (старый .env сохранён как ${ENV_FILE}.bak)"
 
 if systemctl list-units --all --type=service 2>/dev/null | grep -q "${SERVICE_NAME}.service"; then
-  SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+  SUDO=""
+  [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && SUDO="sudo"
   $SUDO systemctl restart "$SERVICE_NAME"
   ok "Бот перезапущен — зайдите в бота и нажмите /admin"
 else

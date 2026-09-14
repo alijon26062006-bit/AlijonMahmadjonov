@@ -13,6 +13,12 @@ hdr()  { printf '\n\033[1;36m── %s ─────────────�
 
 hdr "Папка и код"
 echo "Проект: $ROOT"
+BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+WANT="claude/telegram-digital-sales-bot-jaubw5"
+if [ -n "$BRANCH" ] && [ "$BRANCH" != "$WANT" ]; then
+  bad "Вы на ветке «$BRANCH», а бот живёт в «$WANT» — обновления сюда не приходят!"
+  echo "   Лечится так: bash update_shop.sh"
+fi
 if [ -d "$ROOT/shop" ]; then ok "Новый бот (папка shop/) на месте"; else bad "Папки shop/ нет — вы не в том каталоге"; fi
 git -C "$ROOT" log --oneline -1 2>/dev/null | sed 's/^/Последний коммит: /'
 git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null | sed 's/^/Ветка: /'
@@ -86,4 +92,4 @@ hdr "Что делать"
 echo "1. Напишите боту /id — он ответит вашим настоящим Telegram ID."
 echo "2. Сверьте его со списком админов выше."
 echo "3. Не совпал — выполните: bash add_admin.sh <ваш_id>"
-echo "4. Совпал, а панели нет — перезапустите: sudo systemctl restart $SERVICE_NAME"
+echo "4. Совпал, а панели нет — обновитесь и перезапуститесь: bash update_shop.sh"

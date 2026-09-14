@@ -9,19 +9,24 @@ ROOT="$(pwd)"
 VENV="$ROOT/.venv"
 SERVICE_NAME="almaz-shop"
 
+# Под root sudo не нужен, а во многих образах Debian его просто нет.
+if [ "$(id -u)" -eq 0 ]; then SUDO=""
+elif command -v sudo >/dev/null 2>&1; then SUDO="sudo"
+else SUDO=""; fi
+
 say()  { printf '\033[1;36m%s\033[0m\n' "$*"; }
 ok()   { printf '\033[1;32m✅ %s\033[0m\n' "$*"; }
 err()  { printf '\033[1;31m❌ %s\033[0m\n' "$*" >&2; }
 
 # ── 1. Python ─────────────────────────────────────────────────────────
 if ! command -v python3 >/dev/null 2>&1; then
-  err "python3 не найден. Установите: sudo apt update && sudo apt install -y python3 python3-venv"
+  err "python3 не найден. Установите: $SUDO apt update && $SUDO apt install -y python3 python3-venv"
   exit 1
 fi
 
 if ! python3 -c 'import venv' >/dev/null 2>&1; then
   say "Ставлю python3-venv..."
-  sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv
+  $SUDO apt-get update -qq && $SUDO apt-get install -y -qq python3-venv
 fi
 
 # ── 2. Окружение и зависимости ────────────────────────────────────────
@@ -54,11 +59,10 @@ ok "Настройки прочитаны"
 
 # ── 4. Служба systemd (опционально) ───────────────────────────────────
 if [ "${1:-}" = "--service" ]; then
-  if [ "$(id -u)" -ne 0 ] && ! command -v sudo >/dev/null 2>&1; then
-    err "Для установки службы нужны права root."
+  if [ "$(id -u)" -ne 0 ] && [ -z "$SUDO" ]; then
+    err "Для установки службы нужны права root, а sudo в системе нет."
     exit 1
   fi
-  SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
   say "Ставлю службу $SERVICE_NAME..."
   $SUDO tee "/etc/systemd/system/${SERVICE_NAME}.service" >/dev/null <<UNIT
 [Unit]
@@ -82,8 +86,8 @@ UNIT
   ok "Бот работает как служба и переживёт перезагрузку"
   echo
   echo "  Логи:      journalctl -u $SERVICE_NAME -f"
-  echo "  Стоп:      sudo systemctl stop $SERVICE_NAME"
-  echo "  Рестарт:   sudo systemctl restart $SERVICE_NAME"
+  echo "  Стоп:      ${SUDO:+$SUDO }systemctl stop $SERVICE_NAME"
+  echo "  Рестарт:   ${SUDO:+$SUDO }systemctl restart $SERVICE_NAME"
   echo
   $SUDO systemctl --no-pager --lines=15 status "$SERVICE_NAME" || true
   exit 0
