@@ -28,30 +28,43 @@ router = Router(name="games")
 _offers: dict[str, list[dict]] = {}
 
 
-async def offers_of(provider, game: db.Game, conn=None) -> list[dict]:
+async def offers_of(
+    provider, game: db.Game, conn=None, *, for_owner: bool = False,
+) -> list[dict]:
     """Пакеты игры с ценой в сомони.
 
-    Своя цена, если она задана, важнее расчёта по наценке: владелец мог
-    поставить ровную сумму или подстроиться под конкурента.
+    Своя цена, название и скрытие, если заданы, важнее того, что прислал
+    поставщик: владелец мог поставить ровную сумму, назвать пакет
+    по-человечески или убрать его из продажи.
+
+    for_owner — показать и скрытые: в панели их надо видеть, чтобы
+    вернуть обратно.
     """
     raw = await provider.game_offers(game.category_id)
     margin = svc.margin_of(game)
-    manual = await db.game_prices(conn, game.category_id) if conn else {}
+    setup = await db.game_offers_setup(conn, game.category_id) if conn else {}
 
     offers = []
     for item in raw:
         auto = svc.offer_price(item["usd"], margin)
-        own = manual.get(item["offer_id"])
+        own = setup.get(item["offer_id"], {})
+        price = own.get("price")
         offers.append({
             "offer_id": item["offer_id"],
-            "name": item["name"],
+            "name": own.get("title") or item["name"],
+            "supplier_name": item["name"],
             "usd": item["usd"],
-            "price": own if own is not None else auto,
+            "price": price if price is not None else auto,
             "auto": auto,
-            "manual": own is not None,
+            "manual": price is not None,
+            "renamed": bool(own.get("title")),
+            "hidden": bool(own.get("hidden")),
             "cost": svc.offer_cost(item["usd"]),
         })
+
     offers = [o for o in offers if o["price"] > 0]
+    if not for_owner:
+        offers = [o for o in offers if not o["hidden"]]
     _offers[game.category_id] = offers
     return offers
 

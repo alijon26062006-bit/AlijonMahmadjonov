@@ -713,6 +713,21 @@ async def on_field_value(
         )
         return
 
+    # Своё название пакета: у поставщика они часто безликие.
+    if field.startswith("pack_name:"):
+        _, code, offer_id = field.split(":", 2)
+        title = "" if raw == "-" else raw.strip()[:64]
+        await db.set_game_offer_title(conn, code, offer_id, title)
+        await state.clear()
+        game = await db.get_game(conn, code)
+        await message.answer(
+            f"✅ <b>{game.title if game else code}</b> — пакет "
+            + (f"теперь называется <b>{title}</b>" if title
+               else "снова называется как у поставщика"),
+            reply_markup=back_kb(f"pn:game_packs:{code}", "‹ К пакетам"),
+        )
+        return
+
     # Код игры у сервиса проверки ID.
     if field.startswith("game_checker:"):
         code = field.split(":", 1)[1]
@@ -4165,6 +4180,19 @@ async def cb_game_recode(
     )
 
 
+def _pack_mark(offer: dict) -> str:
+    """Значок пакета: сразу видно, что в нём поменяли."""
+    if offer.get("hidden"):
+        return "🚫"
+    if offer.get("manual") and offer.get("renamed"):
+        return "✏️"
+    if offer.get("manual"):
+        return "💵"
+    if offer.get("renamed"):
+        return "🏷"
+    return "├"
+
+
 async def show_packs(
     call: CallbackQuery, conn: aiosqlite.Connection, game: db.Game, provider,
 ) -> None:
@@ -4172,7 +4200,8 @@ async def show_packs(
     from app.services import suppliers
 
     try:
-        offers = await offers_of(suppliers.for_games(provider), game, conn)
+        offers = await offers_of(suppliers.for_games(provider), game, conn,
+                                 for_owner=True)
     except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
         # «Неизвестная категория» — не поломка связи, а неверный код игры.
         # Гадать его владельцу не надо: подбираем похожие по каталогу.
@@ -4208,15 +4237,14 @@ async def show_packs(
         return
 
     rows = "\n".join(
-        f"{'✏️' if o['manual'] else '├'} {o['name']} — <b>{fmt(o['price'])}</b>"
+        f"{_pack_mark(o)} {o['name']} — <b>{fmt(o['price'])}</b>"
         f" <i>(себест. {fmt(o['cost'])})</i>"
         for o in offers[:20]
     )
     kb = InlineKeyboardBuilder()
     for index, offer in enumerate(offers[:20]):
         kb.row(InlineKeyboardButton(
-            text=("✏️ " if offer["manual"] else "") +
-                 f"{offer['name']} — {fmt(offer['price'])}",
+            text=f"{_pack_mark(offer)} {offer['name']} — {fmt(offer['price'])}",
             callback_data=f"pn:pk:{game.category_id}:{index}",
         ))
     kb.row(InlineKeyboardButton(text="‹ К игре",
@@ -4254,29 +4282,114 @@ async def cb_pack_card(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     percent = round(profit * 100 / offer["cost"]) if offer["cost"] else 0
 
     kb = InlineKeyboardBuilder()
-    kb.row(btn("✏️ Своя цена", f"pn:pkset:{category_id}:{raw_index}", style=PRIMARY))
-    if offer["manual"]:
-        kb.row(btn("♻️ Вернуть по наценке",
-                   f"pn:pkauto:{category_id}:{raw_index}", style=DANGER))
+    kb.row(btn("💵 Своя цена", f"pn:pkset:{category_id}:{raw_index}",
+               style=PRIMARY))
+    kb.row(btn("🏷 Переименовать", f"pn:pkname:{category_id}:{raw_index}"))
+    if offer["hidden"]:
+        kb.row(btn("✅ Вернуть в продажу",
+                   f"pn:pkshow:{category_id}:{raw_index}", style=SUCCESS))
+    else:
+        kb.row(btn("🚫 Убрать из продажи",
+                   f"pn:pkhide:{category_id}:{raw_index}", style=DANGER))
+    if offer["manual"] or offer["renamed"]:
+        kb.row(btn("♻️ Вернуть как у поставщика",
+                   f"pn:pkauto:{category_id}:{raw_index}"))
     kb.row(InlineKeyboardButton(text="‹ К пакетам",
                                 callback_data=f"pn:game_packs:{category_id}"))
+
+    hidden_note = ""
+    if offer["hidden"]:
+        hidden_note = ("\n\n🚫 <b>Пакет убран из продажи</b> — клиенты его "
+                       "не видят.")
 
     await safe_edit(
         call,
         f"📦 <b>{offer['name']}</b>\n"
         f"<code>{texts.LINE}</code>\n\n"
         f"├ Игра: <b>{game.title}</b>\n"
-        f"├ Себестоимость: <b>{fmt(offer['cost'])}</b> (${offer['usd']})\n"
+        + (f"├ У поставщика: <i>{offer['supplier_name']}</i>\n"
+           if offer["renamed"] else "")
+        + f"├ Себестоимость: <b>{fmt(offer['cost'])}</b> (${offer['usd']})\n"
         f"├ Цена продажи: <b>{fmt(offer['price'])}</b>"
         + (" <i>(своя)</i>" if offer["manual"] else " <i>(по наценке)</i>")
         + (f"\n├ По наценке было бы: <b>{fmt(offer['auto'])}</b>"
            if offer["manual"] else "")
-        + f"\n└ Прибыль: <b>{fmt(profit)}</b> ({percent}%)\n\n"
-        "<blockquote>Своя цена не пересчитывается при смене курса и "
-        "наценки — она держится, пока вы её не вернёте.</blockquote>",
+        + f"\n└ Прибыль: <b>{fmt(profit)}</b> ({percent}%)"
+        + hidden_note + "\n\n"
+        "<blockquote>Своя цена и своё название не пересчитываются и не "
+        "сбрасываются: держатся, пока вы их не вернёте.\n\n"
+        "Убранный пакет остаётся у поставщика — мы просто не показываем "
+        "его клиентам.</blockquote>",
         kb.as_markup(),
     )
     await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:pkname:"))
+async def cb_pack_rename(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    """Своё название пакета: у поставщика они часто безликие."""
+    _, _, category_id, raw_index = call.data.split(":", 3)
+    offer = pack_of(category_id, int(raw_index) if raw_index.isdigit() else -1)
+    if offer is None:
+        await call.answer("Список устарел, откройте пакеты заново.",
+                          show_alert=True)
+        return
+
+    await state.set_state(Panel.value)
+    await state.update_data(field=f"pack_name:{category_id}:{offer['offer_id']}")
+    await safe_edit(
+        call,
+        f"🏷 <b>Название пакета</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"├ Сейчас: <b>{offer['name']}</b>\n"
+        f"└ У поставщика: <i>{offer['supplier_name']}</i>\n\n"
+        "<blockquote>Пришлите новое название — его увидят клиенты.\n\n"
+        "Например: <code>💎 100 алмазов</code>\n\n"
+        "Чтобы вернуть название поставщика, пришлите <code>-</code>."
+        "</blockquote>",
+        back_kb(f"pn:pk:{category_id}:{raw_index}", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith(("pn:pkhide:", "pn:pkshow:")))
+async def cb_pack_visibility(
+    call: CallbackQuery, conn: aiosqlite.Connection, provider
+) -> None:
+    """Убрать пакет из продажи или вернуть обратно."""
+    action, _, category_id, raw_index = call.data.split(":", 3)
+    offer = pack_of(category_id, int(raw_index) if raw_index.isdigit() else -1)
+    game = await db.get_game(conn, category_id)
+    if offer is None or game is None:
+        await call.answer("Список устарел, откройте пакеты заново.",
+                          show_alert=True)
+        return
+
+    hide = call.data.startswith("pn:pkhide:")
+    await db.set_game_offer_hidden(conn, category_id, offer["offer_id"], hide)
+    await call.answer("Убран из продажи" if hide else "Вернули в продажу")
+    await show_packs(call, conn, game, provider)
+
+
+@router.callback_query(F.data.startswith("pn:pkauto:"))
+async def cb_pack_reset(
+    call: CallbackQuery, conn: aiosqlite.Connection, provider
+) -> None:
+    """Вернуть пакету и цену, и название поставщика."""
+    _, _, category_id, raw_index = call.data.split(":", 3)
+    offer = pack_of(category_id, int(raw_index) if raw_index.isdigit() else -1)
+    game = await db.get_game(conn, category_id)
+    if offer is None or game is None:
+        await call.answer("Список устарел, откройте пакеты заново.",
+                          show_alert=True)
+        return
+
+    await db.set_game_price(conn, category_id, offer["offer_id"], None)
+    await db.set_game_offer_title(conn, category_id, offer["offer_id"], "")
+    await call.answer("Вернули как у поставщика")
+    await show_packs(call, conn, game, provider)
 
 
 @router.callback_query(F.data.startswith("pn:pkset:"))
@@ -4300,22 +4413,6 @@ async def cb_pack_price(call: CallbackQuery, state: FSMContext, conn: aiosqlite.
         back_kb(f"pn:game_packs:{category_id}", "❌ Отмена"),
     )
     await call.answer()
-
-
-@router.callback_query(F.data.startswith("pn:pkauto:"))
-async def cb_pack_auto(
-    call: CallbackQuery, conn: aiosqlite.Connection, provider
-) -> None:
-    _, _, category_id, raw_index = call.data.split(":", 3)
-    offer = pack_of(category_id, int(raw_index) if raw_index.isdigit() else -1)
-    game = await db.get_game(conn, category_id)
-    if offer is None or game is None:
-        await call.answer("Список устарел.", show_alert=True)
-        return
-
-    await db.set_game_price(conn, category_id, offer["offer_id"], None)
-    await call.answer("Считается по наценке")
-    await show_packs(call, conn, game, provider)
 
 
 @router.callback_query(F.data.startswith("pn:game_margin:"))

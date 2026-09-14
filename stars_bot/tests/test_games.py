@@ -1560,16 +1560,89 @@ async def manual_prices(conn) -> None:
     check("показано, сколько было бы по наценке",
           "По наценке было бы" in call.last, call.last[:400])
     check("появилась кнопка возврата",
-          any("Вернуть по наценке" in b for b in buttons(call.markup)))
+          any("Вернуть как у поставщика" in b for b in buttons(call.markup)),
+          str(buttons(call.markup)))
 
     call = call_of("pn:pkauto:free_fire_br:0", uid=ADMIN)
-    await panel.cb_pack_auto(call, conn, provider)
+    await panel.cb_pack_reset(call, conn, provider)
     check("цена вернулась к расчёту",
           await db.game_prices(conn, "free_fire_br") == {},
           str(await db.game_prices(conn, "free_fire_br")))
     offers = await offers_of(provider, game, conn)
     check("и клиент снова видит расчётную", offers[0]["price"] == 1400,
           str(offers[0]["price"]))
+
+    # ---------------------------------------- своё название пакета
+    call = call_of("pn:pkname:free_fire_br:0", uid=ADMIN)
+    await panel.cb_pack_rename(call, state, conn)
+    check("бот просит название", "Название пакета" in call.last, call.last[:80])
+    check("показано название поставщика",
+          "100 алмазов" in call.last, call.last[:200])
+
+    message = msg("💎 Сто алмазов", uid=ADMIN)
+    await panel.on_field_value(message, state, conn)
+    check("название сохранено", "Сто алмазов" in message.last, message.last[:120])
+
+    offers = await offers_of(provider, game, conn)
+    check("клиент видит своё название",
+          offers[0]["name"] == "💎 Сто алмазов", offers[0]["name"])
+    check("название поставщика сохранено рядом",
+          offers[0]["supplier_name"] == "100 алмазов", offers[0]["supplier_name"])
+    check("пакет помечен переименованным", offers[0]["renamed"] is True)
+
+    packs = buttons(keyboards.game_packs("free_fire_br", offers))
+    check("и на кнопке покупки оно же",
+          any("Сто алмазов" in b for b in packs), str(packs))
+
+    # ---------------------------------------- убрать пакет из продажи
+    call = call_of("pn:pkhide:free_fire_br:0", uid=ADMIN)
+    await panel.cb_pack_visibility(call, conn, provider)
+    offers = await offers_of(provider, game, conn)
+    check("клиенту скрытый пакет не показывается",
+          all(o["offer_id"] != "off_1" for o in offers), str(offers))
+    check("другие пакеты на месте", len(offers) == 1, str(len(offers)))
+
+    owner_view = await offers_of(provider, game, conn, for_owner=True)
+    check("владелец скрытый пакет видит", len(owner_view) == 2,
+          str(len(owner_view)))
+    check("и он помечен скрытым",
+          any(o["hidden"] for o in owner_view), str(owner_view))
+
+    call = call_of("pn:pk:free_fire_br:0", uid=ADMIN)
+    await panel.cb_pack_card(call, conn)
+    check("в карточке сказано, что убран из продажи",
+          "убран из продажи" in call.last.lower(), call.last[:400])
+    check("и есть кнопка вернуть",
+          any("Вернуть в продажу" in b for b in buttons(call.markup)),
+          str(buttons(call.markup)))
+
+    call = call_of("pn:pkshow:free_fire_br:0", uid=ADMIN)
+    await panel.cb_pack_visibility(call, conn, provider)
+    offers = await offers_of(provider, game, conn)
+    check("вернули — снова виден", len(offers) == 2, str(len(offers)))
+    check("название при этом не потерялось",
+          offers[0]["name"] == "💎 Сто алмазов", offers[0]["name"])
+
+    # скрытие и своя цена живут вместе
+    await db.set_game_price(conn, "free_fire_br", "off_1", 2000)
+    await db.set_game_offer_hidden(conn, "free_fire_br", "off_1", True)
+    setup = await db.game_offers_setup(conn, "free_fire_br")
+    check("цена, название и скрытие не мешают друг другу",
+          setup["off_1"] == {"price": 2000, "title": "💎 Сто алмазов",
+                             "hidden": True}, str(setup.get("off_1")))
+
+    # ---------------------------------------- полный сброс
+    call = call_of("pn:pkauto:free_fire_br:0", uid=ADMIN)
+    await panel.cb_pack_reset(call, conn, provider)
+    owner_view = await offers_of(provider, game, conn, for_owner=True)
+    first = next(o for o in owner_view if o["offer_id"] == "off_1")
+    check("сброс вернул название поставщика",
+          first["name"] == "100 алмазов", first["name"])
+    check("и расчётную цену", first["manual"] is False)
+    check("но из продажи не вернул сам",
+          first["hidden"] is True, str(first["hidden"]))
+
+    await db.set_game_offer_hidden(conn, "free_fire_br", "off_1", False)
 
     # удаление игры уносит её цены
     await db.set_game_price(conn, "free_fire_br", "off_1", 30_00)

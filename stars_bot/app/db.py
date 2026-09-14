@@ -202,10 +202,15 @@ CREATE TABLE IF NOT EXISTS games (
 
 -- Своя цена пакета. Обычно цена считается из себестоимости и наценки,
 -- но иногда её нужно поставить руками — ровной суммой или под конкурента.
+-- Что владелец поменял в пакете поставщика: цену, название, видимость.
+-- Цена -1 означает «своей цены нет, считать по наценке»: строка при этом
+-- может остаться ради названия или скрытия.
 CREATE TABLE IF NOT EXISTS game_prices (
     category_id TEXT NOT NULL,
     offer_id    TEXT NOT NULL,
-    price       INTEGER NOT NULL,      -- дирамы
+    price       INTEGER NOT NULL,      -- дирамы, -1 — своей цены нет
+    title       TEXT NOT NULL DEFAULT '',
+    hidden      INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL,
     PRIMARY KEY (category_id, offer_id)
 );
@@ -484,6 +489,10 @@ MIGRATIONS: dict[str, dict[str, str]] = {
     # Код этой же игры у сервиса проверки ID — он свой, не как у
     # поставщика выдачи.
     "games": {"checker": "TEXT NOT NULL DEFAULT ''"},
+    "game_prices": {
+        "title": "TEXT NOT NULL DEFAULT ''",
+        "hidden": "INTEGER NOT NULL DEFAULT 0",
+    },
 }
 
 
@@ -823,29 +832,81 @@ async def delete_game(conn: aiosqlite.Connection, category_id: str) -> None:
     await conn.commit()
 
 
+#: Цена, которой нет: считать по наценке. Отдельной строкой, потому что
+#: строка настроек может жить ради названия или скрытия.
+NO_PRICE = -1
+
+
+async def _offer_row(
+    conn: aiosqlite.Connection, category_id: str, offer_id: str, **fields_,
+) -> None:
+    """Записать настройку пакета, не затирая остальные."""
+    await conn.execute(
+        """INSERT OR IGNORE INTO game_prices
+               (category_id, offer_id, price, created_at)
+           VALUES (?, ?, ?, ?)""",
+        (category_id, offer_id, NO_PRICE, _now()),
+    )
+    assignments = ", ".join(f"{key} = ?" for key in fields_)
+    await conn.execute(
+        f"UPDATE game_prices SET {assignments} "
+        "WHERE category_id = ? AND offer_id = ?",
+        (*fields_.values(), category_id, offer_id),
+    )
+    # Пустую настройку не держим: иначе таблица копит строки ни о чём.
+    await conn.execute(
+        """DELETE FROM game_prices
+           WHERE category_id = ? AND offer_id = ?
+             AND price = ? AND title = '' AND hidden = 0""",
+        (category_id, offer_id, NO_PRICE),
+    )
+    await conn.commit()
+
+
 async def set_game_price(
     conn: aiosqlite.Connection, category_id: str, offer_id: str, price: int | None,
 ) -> None:
     """Задать свою цену пакета. None — вернуть расчёт по наценке."""
-    if price is None:
-        await conn.execute(
-            "DELETE FROM game_prices WHERE category_id = ? AND offer_id = ?",
-            (category_id, offer_id),
-        )
-    else:
-        await conn.execute(
-            """INSERT INTO game_prices (category_id, offer_id, price, created_at)
-               VALUES (?, ?, ?, ?)
-               ON CONFLICT(category_id, offer_id) DO UPDATE SET price = excluded.price""",
-            (category_id, offer_id, price, _now()),
-        )
-    await conn.commit()
+    await _offer_row(conn, category_id, offer_id,
+                     price=NO_PRICE if price is None else price)
+
+
+async def set_game_offer_title(
+    conn: aiosqlite.Connection, category_id: str, offer_id: str, title: str,
+) -> None:
+    """Своё название пакета. Пусто — вернуть название поставщика."""
+    await _offer_row(conn, category_id, offer_id, title=title.strip())
+
+
+async def set_game_offer_hidden(
+    conn: aiosqlite.Connection, category_id: str, offer_id: str, hidden: bool,
+) -> None:
+    """Убрать пакет из продажи или вернуть обратно."""
+    await _offer_row(conn, category_id, offer_id, hidden=int(hidden))
+
+
+async def game_offers_setup(
+    conn: aiosqlite.Connection, category_id: str,
+) -> dict[str, dict]:
+    """Всё, что владелец поменял в пакетах этой игры."""
+    async with conn.execute(
+        "SELECT * FROM game_prices WHERE category_id = ?", (category_id,)
+    ) as cur:
+        return {
+            row["offer_id"]: {
+                "price": None if row["price"] == NO_PRICE else row["price"],
+                "title": row["title"] or "",
+                "hidden": bool(row["hidden"]),
+            }
+            for row in await cur.fetchall()
+        }
 
 
 async def game_prices(conn: aiosqlite.Connection, category_id: str) -> dict[str, int]:
     """Свои цены пакетов этой игры: offer_id -> дирамы."""
     async with conn.execute(
-        "SELECT offer_id, price FROM game_prices WHERE category_id = ?",
+        "SELECT offer_id, price FROM game_prices "
+        "WHERE category_id = ? AND price >= 0",
         (category_id,),
     ) as cur:
         return {row["offer_id"]: row["price"] for row in await cur.fetchall()}
