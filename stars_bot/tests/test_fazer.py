@@ -53,7 +53,8 @@ class FakeFazer(fz.FazerProvider):
         self.balance = balance
         self.calls: list[str] = []
 
-    async def _request(self, method, path, payload=None, *, safe=False):
+    async def _request(self, method, path, payload=None, *, safe=False,
+                       headers=None):
         self.calls.append(f"{method} {path}")
         for key, exc in self.raise_on.items():
             if key in path:
@@ -64,6 +65,12 @@ class FakeFazer(fz.FazerProvider):
             return PREMIUM_PRICE
         if path in (fz.STARS_BUY, fz.PREMIUM_BUY):
             return self.buy_response
+        if path == fz.BALANCE_PATH:
+            # Прямой адрес из документации. Без баланса — молчим, чтобы
+            # сработал прежний перебор адресов.
+            if self.balance is None:
+                raise fz.DeliveryError("HTTP 404")
+            return self.balance
         if self.balance is not None:
             return self.balance
         raise AssertionError(f"неожиданный путь {path}")

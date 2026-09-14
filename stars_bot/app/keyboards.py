@@ -83,12 +83,11 @@ def main_menu(games: bool = False) -> InlineKeyboardMarkup:
         kb.row(btn(labeled("premium", "Telegram Premium"), "m:premium",
                    style=PRIMARY, icon="premium"))
 
-    if games:
-        kb.row(btn(labeled("game", "Пополнить игру"), "m:games",
+    # Steam и игры живут за одной кнопкой: для покупателя это одно и то же
+    # действие — пополнить игровой аккаунт.
+    if games or runtime.steam_on():
+        kb.row(btn(labeled("game", "Игры и Steam"), "m:games",
                    style=PRIMARY, icon="game"))
-    if runtime.steam_on():
-        kb.row(btn(labeled("steam", "Пополнить Steam"), "m:steam",
-                   style=PRIMARY, icon="steam"))
 
     deposit = btn(labeled("deposit", "Пополнить"), "m:deposit",
                   style=SUCCESS, icon="deposit")
@@ -139,6 +138,9 @@ def stars_entry() -> InlineKeyboardMarkup:
 
 def games_menu(games: list) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    if runtime.steam_on():
+        kb.row(btn(labeled("steam", "Steam"), "m:steam",
+                   style=PRIMARY, icon="steam"))
     for game in games:
         kb.row(btn(game.title, f"g:{game.category_id}", style=PRIMARY))
     kb.row(btn(labeled("back", "Назад"), "m:main"))

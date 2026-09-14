@@ -260,6 +260,31 @@ async def flow(conn) -> None:
     check("сказано, что пароль не нужен", "пароль" in call.last.lower())
     check("игра показана кнопкой", "🔥 Free Fire" in buttons(call.markup))
 
+    # Steam и игры — за одной кнопкой меню
+    await runtime.set_value(conn, "steam_price_e4", "1400")
+    await runtime.set_value(conn, "steam_enabled", "1")
+    check("в меню один вход на игры и Steam",
+          sum("Игры и Steam" in b for b in buttons(keyboards.main_menu(games=True))) == 1,
+          str(buttons(keyboards.main_menu(games=True))))
+    check("отдельной кнопки Steam в меню нет",
+          not any(b.strip().endswith("Пополнить Steam")
+                  for b in buttons(keyboards.main_menu(games=True))))
+
+    call = call_of("m:games")
+    await gh.cb_games(call, state, conn)
+    inner = buttons(call.markup)
+    check("внутри раздела есть Steam", any("Steam" in b for b in inner), str(inner))
+    check("и обе игры", "🔥 Free Fire" in inner, str(inner))
+
+    # только Steam, без игр — раздел всё равно открывается
+    await db.update_game(conn, "free_fire_br", enabled=0)
+    call = call_of("m:games")
+    await gh.cb_games(call, state, conn)
+    check("с одним Steam раздел работает",
+          any("Steam" in b for b in buttons(call.markup)), str(buttons(call.markup)))
+    await db.update_game(conn, "free_fire_br", enabled=1)
+    await runtime.set_value(conn, "steam_enabled", "0")
+
     call = call_of("g:free_fire_br")
     await gh.cb_game(call, state, conn, provider)
     check("пакеты показаны", "Выберите пакет" in call.last, call.last[:80])
@@ -465,6 +490,11 @@ async def panel_screens(conn) -> None:
 
     check("раздел есть в главном меню панели",
           any("Игры" in b.text for r in panel.home_kb().inline_keyboard for b in r))
+    check("кнопка балансов ключей есть",
+          any("Балансы ключей" in b.text
+              for r in panel.home_kb().inline_keyboard for b in r))
+
+    await key_balances(conn)
 
     # игру можно закрепить за партнёром
     partner = await db.create_partner(conn, "Напарник", 0)
@@ -475,6 +505,57 @@ async def panel_screens(conn) -> None:
     check("у него название игры", ff and ff["title"] == "🔥 Free Fire")
     check("игра закреплена за партнёром",
           (await db.product_owners(conn)).get("game:free_fire_br") == partner.id)
+
+
+async def key_balances(conn) -> None:
+    """Экран балансов: деньги поставщика и лимит сервиса ников."""
+    from app.services import nicknames as nk
+
+    class Rich(DeliveryProvider):
+        async def get_balance(self):
+            return "119.40 USD"
+
+    class Broken(DeliveryProvider):
+        async def get_balance(self):
+            raise DeliveryError("HTTP 401: ключ не принят")
+
+    await runtime.set_value(conn, "usd_rate_diram", "1090")
+    await runtime.set_value(conn, "gameskinbo_key", "kluch")
+
+    real = nk.usage
+
+    async def usage(key):
+        return {"used": 10, "limit": 100, "remaining": 90, "plan": "free"}
+
+    nk.usage = usage
+    try:
+        call = call_of("pn:keys", uid=ADMIN)
+        await panel.cb_keys(call, Rich())
+        check("баланс поставщика показан", "119.40 USD" in call.last, call.last[:200])
+        check("он пересчитан в сомони", "1 301.46" in call.last, call.last[:300])
+        check("виден остаток лимита ников", "Осталось: <b>90</b>" in call.last,
+              call.last)
+
+        async def spent(key):
+            return {"used": 95, "limit": 100, "remaining": 5, "plan": "free"}
+
+        nk.usage = spent
+        call = call_of("pn:keys", uid=ADMIN)
+        await panel.cb_keys(call, Rich())
+        check("малый остаток помечен другим цветом", "🟠" in call.last, call.last)
+
+        call = call_of("pn:keys", uid=ADMIN)
+        await panel.cb_keys(call, Broken())
+        check("отказ поставщика виден", "не ответил" in call.last, call.last[:200])
+        check("и причина показана", "401" in call.last)
+
+        await runtime.set_value(conn, "gameskinbo_key", "")
+        call = call_of("pn:keys", uid=ADMIN)
+        await panel.cb_keys(call, Rich())
+        check("без ключа ников так и сказано",
+              "ключ не задан" in call.last, call.last[-300:])
+    finally:
+        nk.usage = real
 
 
 async def main() -> None:

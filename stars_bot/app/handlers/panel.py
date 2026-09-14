@@ -34,7 +34,7 @@ from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
 from app.money import (
     exact_stars_cost, fmt, fmt4, parse, parse4, round_price, steam_cost,
 )
-from app.services import dcpay, pricing, rates
+from app.services import dcpay, nicknames, pricing, rates
 from app.services import reviews as reviews_service
 from app.services import delivery
 from app.states import GameNew, Panel, PartnerMove, PartnerNew, PromoNew
@@ -96,7 +96,10 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🎮 Steam", callback_data="pn:steam"),
         InlineKeyboardButton(text="🤝 Партнёры", callback_data="pn:partners"),
     )
-    kb.row(InlineKeyboardButton(text="🕹 Игры", callback_data="pn:games"))
+    kb.row(
+        InlineKeyboardButton(text="🕹 Игры", callback_data="pn:games"),
+        InlineKeyboardButton(text="💳 Балансы ключей", callback_data="pn:keys"),
+    )
     kb.row(InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"))
     return kb.as_markup()
 
@@ -3235,3 +3238,66 @@ async def cb_game_delete(call: CallbackQuery, conn: aiosqlite.Connection) -> Non
     await db.load_game_titles(conn)
     await call.answer("Удалена")
     await safe_edit(call, substitute(await games_text(conn)), await games_kb(conn))
+
+
+# ═══════════════════════════════════════════════════════ балансы ключей
+
+
+@router.callback_query(F.data == "pn:keys")
+async def cb_keys(call: CallbackQuery, provider) -> None:
+    """Сколько осталось на каждом ключе — поставщик и сервис ников."""
+    await safe_edit(call, "💳 Смотрю балансы…", back_kb("pn:home", "‹ В панель"))
+    await call.answer()
+
+    lines: list[str] = []
+
+    # ---- поставщик товаров: деньги, с которых идёт выдача
+    try:
+        balance = await provider.get_balance()
+    except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
+        lines.append("🔴 <b>FazerCards</b>\n└ не ответил: "
+                     f"<code>{str(exc)[:200]}</code>")
+    else:
+        somoni = ""
+        rate = runtime.usd_rate()
+        number = _usd_number(balance)
+        if rate > 0 and number is not None:
+            somoni = f"\n└ Это примерно <b>{fmt(int(number * rate))}</b>"
+        lines.append(f"🟢 <b>FazerCards</b>\n├ Баланс: <b>{balance}</b>{somoni}")
+
+    # ---- сервис ников: лимит бесплатного плана
+    key = runtime.get("gameskinbo_key") or settings.gameskinbo_key
+    if not key:
+        lines.append("⚪️ <b>Ники Free Fire</b>\n└ ключ не задан — "
+                     "работает запасной источник")
+    else:
+        data = await nicknames.usage(key)
+        if data is None:
+            lines.append("🔴 <b>Ники Free Fire</b>\n└ сервис не ответил")
+        else:
+            left = data.get("remaining")
+            lines.append(
+                f"{'🟢' if (left or 0) > 10 else '🟠'} <b>Ники Free Fire</b>\n"
+                f"├ Использовано: <b>{data.get('used', '?')}</b> "
+                f"из <b>{data.get('limit', '?')}</b>\n"
+                f"└ Осталось: <b>{left}</b> · план {data.get('plan', '—')}"
+            )
+
+    await safe_edit(
+        call,
+        "💳 <b>Балансы ключей</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        + "\n\n".join(lines)
+        + "\n\n<blockquote>FazerCards — деньги, с которых идёт выдача. "
+          "Ники Free Fire тратят лимит только на новые ID: повторы "
+          "полчаса берутся из памяти.</blockquote>",
+        back_kb("pn:home", "‹ В панель"),
+    )
+
+
+def _usd_number(balance: str) -> float | None:
+    """Вытащить число из строки вида «119.40 USD»."""
+    import re as _re
+
+    found = _re.search(r"-?\d+(?:\.\d+)?", str(balance))
+    return float(found.group()) if found else None

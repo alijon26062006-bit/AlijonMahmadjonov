@@ -71,6 +71,7 @@ PENDING = {"pending", "processing", "in_progress", "inprogress", "queued",
 
 # Вероятные пути к балансу и заказам. Документация в руках владельца, но
 # перебрать варианты ключом быстрее, чем сверять скриншоты вручную.
+BALANCE_PATH = "/api/v2/balance"
 BALANCE_CANDIDATES = [
     "/api/v2/account", "/api/v2/account/balance", "/api/v2/account/me",
     "/api/v2/account/info", "/api/v2/balance", "/api/v2/me",
@@ -592,6 +593,16 @@ class FazerProvider(DeliveryProvider):
         return found
 
     async def get_balance(self) -> str:
+        # Документация называет точный адрес; перебор остался запасным
+        # вариантом на случай, если сервис его поменяет.
+        try:
+            data = await self._request("GET", BALANCE_PATH, safe=True)
+            value = _balance_of(data)
+            if value not in (None, ""):
+                return f"{value} {data.get('currency') or 'USD'}"
+        except (DeliveryError, DeliveryUncertain) as exc:
+            log.info("Баланс по прямому адресу не пришёл: %s", exc)
+
         found = await self.find_balance()
         if found is None:
             raise DeliveryError(

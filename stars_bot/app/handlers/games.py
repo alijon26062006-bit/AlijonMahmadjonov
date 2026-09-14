@@ -49,7 +49,9 @@ async def cb_games(
 ) -> None:
     await state.clear()
     games = await db.list_games(conn, only_enabled=True)
-    if not games or not runtime.get_bool("games_enabled"):
+    if not runtime.get_bool("games_enabled"):
+        games = []
+    if not games and not runtime.steam_on():
         await call.answer("Раздел временно закрыт.", show_alert=True)
         return
     await call.message.edit_text(
