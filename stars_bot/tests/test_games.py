@@ -509,6 +509,7 @@ async def panel_screens(conn) -> None:
           any("Балансы ключей" in b.text
               for r in panel.home_kb().inline_keyboard for b in r))
 
+    await no_supplier_number(conn)
     await fast_follow(conn)
     await manual_prices(conn)
     await id_field(conn)
@@ -524,6 +525,38 @@ async def panel_screens(conn) -> None:
     check("у него название игры", ff and ff["title"] == "🔥 Free Fire")
     check("игра закреплена за партнёром",
           (await db.product_owners(conn)).get("game:free_fire_br") == partner.id)
+
+
+async def no_supplier_number(conn) -> None:
+    """Заказ без номера у поставщика зовёт владельца сразу."""
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage,
+                       key=StorageKey(bot_id=1, chat_id=BUYER, user_id=BUYER))
+
+    class Nameless(GameProvider):
+        async def order_game(self, **kw):
+            return {"status": "processing"}       # номера нет
+
+    bot = FakeBot()
+    await state.set_state(gh.Game.confirm)
+    await state.update_data(category_id="free_fire_br", offer_id="off_1",
+                            pack="100 алмазов", price=1400, cost=1090,
+                            player="1724367212", player_name="Ник")
+    await gh.cb_buy(call_of("g:ok"), state, conn, Nameless(), bot)
+
+    told = [t for t in bot.to(ADMIN) if "без номера" in t]
+    check("владельцу сказали сразу", bool(told), str(bot.to(ADMIN)))
+    check("в сообщении есть ID игрока", told and "1724367212" in told[0])
+    check("подсказаны команды", told and "/done" in told[0] and "/refund" in told[0])
+    check("предупреждён автоматический возврат",
+          told and "20 минут" in told[0], str(told[:1]))
+
+    order = (await db.last_game_orders(conn))[0]
+    check("заказ помечен зависшим", order.status == db.ORDER_FAILED, order.status)
+    check("номера у поставщика и правда нет", not order.fragment_order_id)
+
+    waiting = await svc.check(bot, conn, GameProvider(), order)
+    check("без номера доглядчик не выдумывает статус", waiting == "waiting", waiting)
 
 
 async def fast_follow(conn) -> None:

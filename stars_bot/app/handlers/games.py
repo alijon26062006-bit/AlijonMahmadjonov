@@ -284,10 +284,24 @@ async def cb_buy(
         )
         return
     except DeliveryUncertain as exc:
-        # Ответа нет: деньги придерживаем, доглядчик разберётся сам.
+        # Номера заказа у поставщика нет — статус спросить нечем, и сам он
+        # не разрешится. Зовём владельца сразу, а не через 20 минут, когда
+        # сработает возврат по таймауту.
         await db.transition_order(
             conn, order.id, expected=db.ORDER_DELIVERING, new=db.ORDER_FAILED,
             error=str(exc)[:1000],
+        )
+        await delivery.notify_admins(
+            bot,
+            "⚠️ <b>Игровой заказ без номера у поставщика</b>\n"
+            f"├ Заказ: <code>{order.id}</code> — {game.title}\n"
+            f"├ ID игрока: <code>{data['player']}</code>\n"
+            f"└ Списано: <b>{fmt(order.price)}</b>\n\n"
+            f"<blockquote expandable>{str(exc)[:600]}</blockquote>\n\n"
+            "<blockquote>Отследить его бот не может. Проверьте кабинет "
+            f"поставщика: дошло → <code>/done {order.id}</code>, "
+            f"нет → <code>/refund {order.id}</code>.\n\nБез решения деньги "
+            "вернутся клиенту сами через 20 минут.</blockquote>",
         )
         await call.message.edit_text(
             texts.GAME_ACCEPTED.format(

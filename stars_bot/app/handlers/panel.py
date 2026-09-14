@@ -3100,6 +3100,7 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
             text=("✅ " if game.enabled else "🚫 ") + game.title,
             callback_data=f"pn:game:{game.category_id}",
         ))
+    kb.row(btn("🔌 Проверить поставщика игр", "pn:games_check", style=PRIMARY))
     kb.row(InlineKeyboardButton(text="🔑 Ключ поставщика для игр",
                                 callback_data="pn:set:fazer_games_key"))
     kb.row(btn("🔑 Ключ для ников Free Fire", "pn:set:gameskinbo_key"))
@@ -3522,3 +3523,83 @@ def _usd_number(balance: str) -> float | None:
 
     found = _re.search(r"-?\d+(?:\.\d+)?", str(balance))
     return float(found.group()) if found else None
+
+
+@router.callback_query(F.data == "pn:games_check")
+async def cb_games_check(call: CallbackQuery, conn: aiosqlite.Connection, provider) -> None:
+    """Полная проверка поставщика игр: счёт, каталог, пакеты, последние заказы.
+
+    Нужна, когда заказы «не доходят»: показывает, на каком именно шаге
+    всё останавливается, вместо догадок.
+    """
+    await safe_edit(call, "🔌 Проверяю поставщика игр…", back_kb("pn:games", "‹ Назад"))
+    await call.answer()
+
+    from app.handlers.games import offers_of
+    from app.services import games as gsvc
+    from app.services import suppliers
+
+    client = suppliers.for_games(provider)
+    own = suppliers.has_own_games_key()
+    lines: list[str] = [
+        "🔑 Ключ: " + ("<b>отдельный для игр</b>" if own else
+                       "<i>общий со звёздами</i>")
+    ]
+
+    # ---- 1. деньги на счету, с которого идёт выдача
+    try:
+        balance = await client.get_balance()
+    except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
+        lines.append(f"💳 Баланс: ❌ <code>{str(exc)[:160]}</code>")
+    else:
+        lines.append(f"💳 Баланс: <b>{balance}</b>")
+        if _usd_number(balance) == 0:
+            lines.append("   ❗️ <b>Счёт пуст — заказы не пройдут</b>")
+
+    # ---- 2. какие игры вообще знает поставщик
+    try:
+        catalog = await client.game_catalog()
+    except Exception as exc:  # noqa: BLE001
+        catalog = []
+        lines.append(f"📚 Каталог игр: ❌ <code>{str(exc)[:160]}</code>")
+    else:
+        lines.append(f"📚 Каталог игр: <b>{len(catalog)}</b>")
+
+    known = {item["category_id"] for item in catalog}
+
+    # ---- 3. каждая наша игра: есть ли она у поставщика и есть ли пакеты
+    for game in await db.list_games(conn):
+        mark = "✅" if game.category_id in known else "⚠️"
+        note = "" if game.category_id in known else " <i>— нет в каталоге</i>"
+        try:
+            offers = await offers_of(client, game, conn)
+        except Exception as exc:  # noqa: BLE001
+            lines.append(f"{mark} <b>{game.title}</b>{note}\n"
+                         f"   ❌ пакеты: <code>{str(exc)[:140]}</code>")
+            continue
+        field = await gsvc.detect_field(client, game.category_id)
+        field_note = ""
+        if field and field != game.field:
+            field_note = (f"\n   ⚠️ поле <code>{game.field}</code>, "
+                          f"а нужно <code>{field}</code>")
+        lines.append(
+            f"{mark} <b>{game.title}</b>{note}\n"
+            f"   пакетов: <b>{len(offers)}</b> · поле: <code>{game.field}</code>"
+            f"{field_note}"
+        )
+
+    # ---- 4. чем кончились последние заказы
+    recent = await db.last_game_orders(conn)
+    if recent:
+        rows = []
+        for order in recent:
+            external = order.fragment_order_id or "<i>номера нет</i>"
+            rows.append(f"├ №{order.id} {order.status_title} · {external}")
+        lines.append("📦 <b>Последние заказы</b>\n" + "\n".join(rows))
+
+    await safe_edit(
+        call,
+        "🔌 <b>Проверка поставщика игр</b>\n"
+        f"<code>{texts.LINE}</code>\n\n" + "\n\n".join(lines),
+        back_kb("pn:games", "‹ К играм"),
+    )

@@ -1277,6 +1277,18 @@ async def transition_order(
     return True
 
 
+async def last_game_orders(
+    conn: aiosqlite.Connection, limit: int = 5,
+) -> list[Order]:
+    """Последние игровые заказы — чем бы они ни кончились."""
+    async with conn.execute(
+        "SELECT * FROM orders WHERE product_type LIKE 'game:%' "
+        "ORDER BY id DESC LIMIT ?",
+        (limit,),
+    ) as cur:
+        return [_from_row(Order, row) for row in await cur.fetchall()]
+
+
 async def unfinished_game_orders(
     conn: aiosqlite.Connection, limit: int = 100,
 ) -> list[Order]:
