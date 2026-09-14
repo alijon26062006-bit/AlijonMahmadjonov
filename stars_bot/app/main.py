@@ -183,6 +183,9 @@ async def main() -> None:
 
 async def _shutdown(bot: Bot, conn, provider) -> None:
     """Аккуратно закрыть всё: незакрытое соединение с базой держит процесс."""
+    from app.services import suppliers
+
+    await suppliers.close_all()
     await provider.close()
     await conn.close()
     await bot.session.close()

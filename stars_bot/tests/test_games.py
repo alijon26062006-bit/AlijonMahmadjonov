@@ -494,6 +494,7 @@ async def panel_screens(conn) -> None:
           any("Балансы ключей" in b.text
               for r in panel.home_kb().inline_keyboard for b in r))
 
+    await two_keys(conn)
     await key_balances(conn)
 
     # игру можно закрепить за партнёром
@@ -505,6 +506,42 @@ async def panel_screens(conn) -> None:
     check("у него название игры", ff and ff["title"] == "🔥 Free Fire")
     check("игра закреплена за партнёром",
           (await db.product_owners(conn)).get("game:free_fire_br") == partner.id)
+
+
+async def two_keys(conn) -> None:
+    """Игры идут с ключа напарника, звёзды — с основного."""
+    from app.services import suppliers
+
+    suppliers.forget()
+    await runtime.set_value(conn, "fazer_games_key", "")
+    main = GameProvider()
+    check("без своего ключа игры идут с основного счёта",
+          suppliers.for_games(main) is main)
+    check("отдельного ключа нет", suppliers.has_own_games_key() is False)
+
+    await runtime.set_value(conn, "fazer_games_key", "fc_partner_key")
+    check("со своим ключом это другой клиент",
+          suppliers.for_games(main) is not main)
+    check("отдельный ключ виден", suppliers.has_own_games_key() is True)
+
+    partner_client = suppliers.for_games(main)
+    check("у клиента ключ напарника",
+          partner_client.api_key == "fc_partner_key", partner_client.api_key)
+    check("клиент переиспользуется",
+          suppliers.for_games(main) is partner_client)
+
+    await runtime.set_value(conn, "fazer_games_key", "fc_another")
+    suppliers.forget()
+    check("после смены ключа клиент новый",
+          suppliers.for_games(main).api_key == "fc_another")
+
+    # тот же ключ, что основной, — отдельным счётом не считается
+    await runtime.set_value(conn, "fazer_games_key", db.settings.fazer_api_key)
+    check("совпадающий ключ не считается отдельным",
+          suppliers.has_own_games_key() is False)
+
+    await suppliers.close_all()
+    await runtime.set_value(conn, "fazer_games_key", "")
 
 
 async def key_balances(conn) -> None:
@@ -532,6 +569,8 @@ async def key_balances(conn) -> None:
         call = call_of("pn:keys", uid=ADMIN)
         await panel.cb_keys(call, Rich())
         check("баланс поставщика показан", "119.40 USD" in call.last, call.last[:200])
+        check("при одном ключе счёт назван общим",
+              "Все товары" in call.last, call.last[:200])
         check("он пересчитан в сомони", "1 301.46" in call.last, call.last[:300])
         check("виден остаток лимита ников", "Осталось: <b>90</b>" in call.last,
               call.last)
@@ -554,6 +593,29 @@ async def key_balances(conn) -> None:
         await panel.cb_keys(call, Rich())
         check("без ключа ников так и сказано",
               "ключ не задан" in call.last, call.last[-300:])
+
+        # два ключа — два счёта на экране
+        from app.services import suppliers
+
+        suppliers.forget()
+        await runtime.set_value(conn, "fazer_games_key", "fc_partner_key")
+
+        class PartnerRich(DeliveryProvider):
+            async def get_balance(self):
+                return "42.00 USD"
+
+        suppliers._clients["fc_partner_key"] = PartnerRich()
+        call = call_of("pn:keys", uid=ADMIN)
+        await panel.cb_keys(call, Rich())
+        check("показаны оба счёта",
+              "Звёзды и Premium" in call.last and "Игры" in call.last, call.last)
+        check("у каждого свой баланс",
+              "119.40 USD" in call.last and "42.00 USD" in call.last, call.last)
+        check("объяснено, зачем второй ключ",
+              "не смешивались" in call.last or "не смешиваются" in call.last,
+              call.last[-400:])
+        suppliers.forget()
+        await runtime.set_value(conn, "fazer_games_key", "")
     finally:
         nk.usage = real
 

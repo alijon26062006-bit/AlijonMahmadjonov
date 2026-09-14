@@ -123,10 +123,13 @@ class FazerProvider(DeliveryProvider):
     supports_name_lookup = False   # проверки юзернейма у сервиса нет
     instant = True                 # деньги списываются с баланса сразу
 
-    def __init__(self) -> None:
-        if not settings.fazer_api_key:
+    def __init__(self, api_key: str = "", base_url: str = "") -> None:
+        """api_key задаётся явно, когда товар идёт с чужого счёта: у каждого
+        партнёра свой ключ, и заказ должен списаться именно с его баланса."""
+        self.api_key = (api_key or settings.fazer_api_key).strip()
+        if not self.api_key:
             raise RuntimeError("Не задан FAZER_API_KEY")
-        self._base = settings.fazer_base_url.rstrip("/")
+        self._base = (base_url or settings.fazer_base_url).rstrip("/")
         self._session: aiohttp.ClientSession | None = None
 
     # ------------------------------------------------------------ транспорт
@@ -136,7 +139,7 @@ class FazerProvider(DeliveryProvider):
             self._session = aiohttp.ClientSession(
                 timeout=REQUEST_TIMEOUT,
                 headers={
-                    "X-API-Key": settings.fazer_api_key,
+                    "X-API-Key": self.api_key,
                     "Accept": "application/json",
                 },
             )

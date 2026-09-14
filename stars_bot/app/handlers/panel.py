@@ -551,6 +551,10 @@ FIELDS: dict[str, tuple[str, str, str]] = {
                         "Бот должен быть в канале администратором с правом "
                         "публиковать. Пришлите <code>-</code>, чтобы убрать:",
                         "text"),
+    "fazer_games_key": ("🔑 Ключ поставщика для игр",
+                        "Ключ того, чей счёт тратится на игры. Оставьте "
+                        "пустым — игры пойдут с основного счёта.\n"
+                        "<code>-</code> — вернуть на основной:", "text"),
     "gameskinbo_key": ("🔑 Ключ для ников Free Fire",
                        "Ключ с gameskinbo.com — бот показывает ник игрока "
                        "по его ID. Без ключа работает запасной источник, "
@@ -596,7 +600,7 @@ FIELD_PARENT.update({
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "star_packs": "pn:prices", "reviews_channel": "pn:reviews",
-    "gameskinbo_key": "pn:games",
+    "gameskinbo_key": "pn:games", "fazer_games_key": "pn:games",
     "steam_price_e4": "pn:steam", "steam_cost_e4": "pn:steam",
     "steam_currency": "pn:steam", "steam_packs": "pn:steam",
     "usd_rate_diram": "pn:prices", "usd_rate_spread": "pn:prices",
@@ -752,6 +756,11 @@ async def on_field_value(
         shown = value or "убрано"
 
     await runtime.set_value(conn, field, value)
+    if field == "fazer_games_key":
+        # Старый клиент держит прежний ключ — выбрасываем его.
+        from app.services import suppliers
+
+        suppliers.forget()
     await state.clear()
 
     extra = note
@@ -3050,6 +3059,8 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
             text=("✅ " if game.enabled else "🚫 ") + game.title,
             callback_data=f"pn:game:{game.category_id}",
         ))
+    kb.row(InlineKeyboardButton(text="🔑 Ключ поставщика для игр",
+                                callback_data="pn:set:fazer_games_key"))
     kb.row(btn("🔑 Ключ для ников Free Fire", "pn:set:gameskinbo_key"))
     kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
     return kb.as_markup()
@@ -3174,9 +3185,10 @@ async def cb_game_offers(call: CallbackQuery, conn: aiosqlite.Connection, provid
     await call.answer()
 
     from app.handlers.games import offers_of
+    from app.services import suppliers
 
     try:
-        offers = await offers_of(provider, game)
+        offers = await offers_of(suppliers.for_games(provider), game)
     except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
         await safe_edit(
             call,
@@ -3251,19 +3263,17 @@ async def cb_keys(call: CallbackQuery, provider) -> None:
 
     lines: list[str] = []
 
-    # ---- поставщик товаров: деньги, с которых идёт выдача
-    try:
-        balance = await provider.get_balance()
-    except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
-        lines.append("🔴 <b>FazerCards</b>\n└ не ответил: "
-                     f"<code>{str(exc)[:200]}</code>")
+    # ---- счета поставщика: с них идёт выдача
+    from app.services import suppliers
+
+    accounts = [("Звёзды и Premium", provider)]
+    if suppliers.has_own_games_key():
+        accounts.append(("Игры", suppliers.for_games(provider)))
     else:
-        somoni = ""
-        rate = runtime.usd_rate()
-        number = _usd_number(balance)
-        if rate > 0 and number is not None:
-            somoni = f"\n└ Это примерно <b>{fmt(int(number * rate))}</b>"
-        lines.append(f"🟢 <b>FazerCards</b>\n├ Баланс: <b>{balance}</b>{somoni}")
+        accounts[0] = ("Все товары", provider)
+
+    for title, client in accounts:
+        lines.append(await _balance_line(title, client))
 
     # ---- сервис ников: лимит бесплатного плана
     key = runtime.get("gameskinbo_key") or settings.gameskinbo_key
@@ -3289,10 +3299,28 @@ async def cb_keys(call: CallbackQuery, provider) -> None:
         f"<code>{texts.LINE}</code>\n\n"
         + "\n\n".join(lines)
         + "\n\n<blockquote>FazerCards — деньги, с которых идёт выдача. "
-          "Ники Free Fire тратят лимит только на новые ID: повторы "
-          "полчаса берутся из памяти.</blockquote>",
+          "Когда у игр свой ключ, они списываются с его счёта — так "
+          "расходы партнёров не смешиваются.\n\nНики Free Fire тратят "
+          "лимит только на новые ID: повторы полчаса берутся из памяти."
+          "</blockquote>",
         back_kb("pn:home", "‹ В панель"),
     )
+
+
+async def _balance_line(title: str, client) -> str:
+    """Строка счёта поставщика с пересчётом в сомони."""
+    try:
+        balance = await client.get_balance()
+    except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
+        return (f"🔴 <b>FazerCards · {title}</b>\n└ не ответил: "
+                f"<code>{str(exc)[:200]}</code>")
+
+    somoni = ""
+    rate = runtime.usd_rate()
+    number = _usd_number(balance)
+    if rate > 0 and number is not None:
+        somoni = f"\n└ Это примерно <b>{fmt(int(number * rate))}</b>"
+    return f"🟢 <b>FazerCards · {title}</b>\n├ Баланс: <b>{balance}</b>{somoni}"
 
 
 def _usd_number(balance: str) -> float | None:

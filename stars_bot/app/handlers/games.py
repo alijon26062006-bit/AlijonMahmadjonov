@@ -12,6 +12,7 @@ from aiogram.types import CallbackQuery, Message
 from app import db, keyboards, runtime, texts
 from app.money import fmt
 from app.services import games as svc
+from app.services import suppliers
 from app.services import nicknames
 from app.services.fragment import DeliveryError, DeliveryProvider, DeliveryUncertain
 from app.states import Game
@@ -72,6 +73,7 @@ async def cb_game(
         return
 
     await call.answer("Смотрю пакеты…")
+    provider = suppliers.for_games(provider)
     try:
         offers = await offers_of(provider, game)
     except (DeliveryError, DeliveryUncertain) as exc:
@@ -154,7 +156,7 @@ async def on_player_id(
         return
 
     notice = await message.answer(texts.GAME_CHECKING.format(player=player))
-    name, verdict = await _lookup(provider, game, player)
+    name, verdict = await _lookup(suppliers.for_games(provider), game, player)
 
     if verdict == "bad":
         await notice.edit_text(texts.GAME_BAD_ID.format(player=player))
@@ -215,6 +217,8 @@ async def cb_buy(
         await call.answer("Игра больше не продаётся.", show_alert=True)
         return
     await state.clear()
+    # Игры списываются с того счёта, чей ключ задан для игр.
+    provider = suppliers.for_games(provider)
 
     if not await db.charge(conn, call.from_user.id, data["price"]):
         user = await db.get_user(conn, call.from_user.id)

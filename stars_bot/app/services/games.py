@@ -180,11 +180,14 @@ async def watch_loop(provider, bot: Bot) -> None:
     while True:
         try:
             await asyncio.sleep(WATCH_EVERY)
+            from app.services import suppliers
+
             conn = await db.connect()
             try:
+                games_provider = suppliers.for_games(provider)
                 pending = await db.unfinished_game_orders(conn)
                 for order in pending:
-                    await check(bot, conn, provider, order)
+                    await check(bot, conn, games_provider, order)
             finally:
                 await conn.close()
         except asyncio.CancelledError:
