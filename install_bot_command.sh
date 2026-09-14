@@ -107,22 +107,43 @@ else
   plain_stop
   plain_start
 fi
-sleep 3
 
-echo "4/4  Проверяю..."
-if has_systemd; then
-  RUNNING=$([ "$($SUDO systemctl is-active "$SERVICE" 2>/dev/null)" = "active" ] && echo 1 || echo 0)
-else
-  RUNNING=$(bot_alive && echo 1 || echo 0)
-fi
+echo "4/4  Проверяю, что бот действительно поднялся..."
 
-if [ "$RUNNING" = "1" ]; then
+# Бот пишет «Бот омода: @имя», когда связался с Telegram. Ждём именно этого,
+# а не просто «процесс ещё жив» — упасть он может и через пару секунд.
+ready_marker() {
+  if has_systemd; then
+    $SUDO journalctl -u "$SERVICE" --since "-60 seconds" --no-pager 2>/dev/null \
+      | grep -q "Бот омода"
+  else
+    tail -n 60 "$LOGFILE" 2>/dev/null | grep -q "Бот омода"
+  fi
+}
+
+still_running() {
+  if has_systemd; then
+    [ "$($SUDO systemctl is-active "$SERVICE" 2>/dev/null)" = "active" ]
+  else
+    bot_alive
+  fi
+}
+
+READY=0
+for _ in $(seq 1 12); do          # до 24 секунд
+  sleep 2
+  if ready_marker; then READY=1; break; fi
+  still_running || break
+done
+
+if [ "$READY" = "1" ]; then
   echo
   echo "✅ ГОТОВО. Бот работает на свежей версии."
   echo "   Логи: bot log"
 else
   echo
-  echo "❌ Бот не запустился. Причина:"
+  echo "❌ Бот НЕ запустился. Последние строки журнала:"
+  echo
   if has_systemd; then $SUDO journalctl -u "$SERVICE" -n 25 --no-pager
   else tail -n 25 "$LOGFILE" 2>/dev/null; fi
   exit 1
