@@ -25,6 +25,7 @@ from aiogram.types import (
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from contextlib import suppress
+from html import escape as esc
 
 from app import db, emoji, links, reports, runtime, texts
 from app.handlers.menu import top_basis
@@ -685,7 +686,8 @@ async def cb_set_field(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(Panel.value, F.text)
 async def on_field_value(
-    message: Message, state: FSMContext, conn: aiosqlite.Connection
+    message: Message, state: FSMContext, conn: aiosqlite.Connection,
+    provider=None,
 ) -> None:
     data = await state.get_data()
     field = data.get("field", "")
@@ -711,6 +713,54 @@ async def on_field_value(
             "не трогает.</i>",
             reply_markup=back_kb(f"pn:game_packs:{code}", "‹ К пакетам"),
         )
+        return
+
+    # Прайс целиком: разбираем и показываем, что получилось.
+    if field.startswith("price_list:"):
+        from app.handlers.games import offers_of
+        from app.services import pricelist, suppliers
+
+        code = field.split(":", 1)[1]
+        game = await db.get_game(conn, code)
+        if game is None:
+            await state.clear()
+            await message.answer("❌ Игра не найдена.")
+            return
+
+        try:
+            offers = await offers_of(suppliers.for_games(provider), game,
+                                     conn, for_owner=True)
+        except Exception as exc:  # noqa: BLE001 — показать владельцу поломку
+            await state.clear()
+            await message.answer(
+                f"📦 <b>Пакеты {game.title} не пришли</b>\n\n"
+                f"<blockquote expandable>{esc(str(exc))}</blockquote>",
+                reply_markup=back_kb(f"pn:game:{code}", "‹ К игре"),
+            )
+            return
+
+        plan = pricelist.build(raw, offers)
+        if not plan.matched:
+            await message.answer(
+                "❌ <b>Ни одна строка не легла на пакет</b>\n\n"
+                "<blockquote>Проверьте, что в строке есть название и цена: "
+                "<code>60 UC - 10</code>.\n\nЕсли названия у поставщика "
+                "другие — сначала переименуйте пакет, а потом присылайте "
+                "прайс.</blockquote>",
+                reply_markup=back_kb(f"pn:game_packs:{code}", "‹ К пакетам"),
+            )
+            return
+
+        await state.clear()
+        _plans[code] = plan
+        kb = InlineKeyboardBuilder()
+        kb.row(btn(f"✅ Поставить цены ({len(plan.changed)})",
+                   f"pn:price_go:{code}", style=SUCCESS))
+        if any(r.name != r.offer["name"] for r in plan.matched):
+            kb.row(btn("🏷 Цены и названия из прайса",
+                       f"pn:price_name:{code}"))
+        kb.row(btn("❌ Отмена", f"pn:game_packs:{code}", style=DANGER))
+        await message.answer(_price_preview(game, plan), reply_markup=kb.as_markup())
         return
 
     # Своё название пакета: у поставщика они часто безликие.
@@ -4214,14 +4264,18 @@ async def cb_game_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> Non
 @router.callback_query(F.data.startswith("pn:game_packs:"))
 async def cb_game_offers(call: CallbackQuery, conn: aiosqlite.Connection, provider) -> None:
     """Пакеты игры: цена, себестоимость и кнопка на каждый — поправить цену."""
-    game = await db.get_game(conn, call.data.split(":", 2)[2])
+    code, _, raw_page = call.data.split(":", 2)[2].partition(":")
+    game = await db.get_game(conn, code)
     if game is None:
         await call.answer("Игра не найдена.", show_alert=True)
         return
 
-    await safe_edit(call, "📦 Спрашиваю пакеты…", back_kb("pn:games", "‹ Назад"))
+    page = int(raw_page) if raw_page.isdigit() else 0
+    if not page:
+        await safe_edit(call, "📦 Спрашиваю пакеты…",
+                        back_kb("pn:games", "‹ Назад"))
     await call.answer()
-    await show_packs(call, conn, game, provider)
+    await show_packs(call, conn, game, provider, page)
 
 
 async def _similar_codes(provider, game: db.Game, limit: int = 6) -> list[dict]:
@@ -4312,8 +4366,14 @@ def _pack_mark(offer: dict) -> str:
     return "├"
 
 
+#: Сколько пакетов помещается на экран. У PUBG их за тридцать —
+#: одним списком кнопки не влезают, Telegram обрезает разметку.
+PACK_PAGE = 20
+
+
 async def show_packs(
     call: CallbackQuery, conn: aiosqlite.Connection, game: db.Game, provider,
+    page: int = 0,
 ) -> None:
     from app.handlers.games import offers_of
     from app.services import suppliers
@@ -4355,27 +4415,51 @@ async def show_packs(
         )
         return
 
+    total = len(offers)
+    pages = max(1, -(-total // PACK_PAGE))
+    page = max(0, min(page, pages - 1))
+    start = page * PACK_PAGE
+    shown = offers[start:start + PACK_PAGE]
+
     rows = "\n".join(
         f"{_pack_mark(o)} {o['name']} — <b>{fmt(o['price'])}</b>"
         f" <i>(себест. {fmt(o['cost'])})</i>"
-        for o in offers[:20]
+        for o in shown
     )
     kb = InlineKeyboardBuilder()
-    for index, offer in enumerate(offers[:20]):
+    for shift, offer in enumerate(shown):
+        index = start + shift
         kb.row(InlineKeyboardButton(
             text=f"{_pack_mark(offer)} {offer['name']} — {fmt(offer['price'])}",
             callback_data=f"pn:pk:{game.category_id}:{index}",
         ))
+    if pages > 1:
+        flip = []
+        if page:
+            flip.append(InlineKeyboardButton(
+                text="‹ Раньше",
+                callback_data=f"pn:game_packs:{game.category_id}:{page - 1}"))
+        if page < pages - 1:
+            flip.append(InlineKeyboardButton(
+                text="Дальше ›",
+                callback_data=f"pn:game_packs:{game.category_id}:{page + 1}"))
+        kb.row(*flip)
+    kb.row(btn("📋 Прайс списком", f"pn:price_list:{game.category_id}",
+               style=PRIMARY))
     kb.row(InlineKeyboardButton(text="‹ К игре",
                                 callback_data=f"pn:game:{game.category_id}"))
+
+    counter = (f"\n\n<i>Пакеты {start + 1}–{start + len(shown)} из {total}</i>"
+               if pages > 1 else "")
 
     await safe_edit(
         call,
         f"📦 <b>Пакеты: {game.title}</b>\n"
-        f"<code>{texts.LINE}</code>\n\n{rows}\n\n"
+        f"<code>{texts.LINE}</code>\n\n{rows}{counter}\n\n"
         f"<blockquote>Наценка {game.margin or runtime.margin_percent()}%, "
         f"курс {fmt(runtime.usd_rate())} за доллар. ✏️ — цена задана руками.\n\n"
-        "Нажмите на пакет, чтобы поставить свою цену.</blockquote>",
+        "Нажмите на пакет, чтобы поставить свою цену, или пришлите "
+        "весь прайс сразу — «📋 Прайс списком».</blockquote>",
         kb.as_markup(),
     )
 
@@ -4532,6 +4616,123 @@ async def cb_pack_price(call: CallbackQuery, state: FSMContext, conn: aiosqlite.
         back_kb(f"pn:game_packs:{category_id}", "❌ Отмена"),
     )
     await call.answer()
+
+
+#: Разобранный прайс до подтверждения: игра -> план. Держим в памяти,
+#: а не в базе: это черновик на минуту, и переживать перезапуск ему
+#: незачем — владелец просто пришлёт список заново.
+_plans: dict[str, object] = {}
+
+
+@router.callback_query(F.data.startswith("pn:price_list:"))
+async def cb_price_list(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    """Прайс списком: вбивать тридцать цен по одной — полчаса тыканья."""
+    code = call.data.split(":", 2)[2]
+    game = await db.get_game(conn, code)
+    if game is None:
+        await call.answer("Игра не найдена.", show_alert=True)
+        return
+
+    await state.set_state(Panel.value)
+    await state.update_data(field=f"price_list:{code}")
+    await safe_edit(
+        call,
+        f"📋 <b>Прайс списком: {game.title}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        "Пришлите весь прайс одним сообщением — по строке на пакет:\n\n"
+        "<blockquote><code>60 UC - 10\n"
+        "120 UC - 21\n"
+        "325 UC - 45\n"
+        "660 UC - 89</code></blockquote>\n"
+        "<blockquote>Цена в сомони. Слово «сомонӣ» или «с.» в конце "
+        "писать можно — я его пойму.\n\n"
+        "Пакеты, которых нет в списке, останутся как были. Прежде чем "
+        "поставить цены, покажу, что получилось.</blockquote>",
+        back_kb(f"pn:game_packs:{code}", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+def _price_preview(game: db.Game, plan) -> str:
+    """Что получится из прайса — до того, как цены встанут."""
+    lines = []
+    for row in plan.matched[:25]:
+        was = row.offer["price"]
+        mark = "✅" if was != row.price else "▫️"
+        lines.append(
+            f"{mark} {esc(row.offer['name'])} — <b>{fmt(row.price)}</b>"
+            + (f" <s>{fmt(was)}</s>" if was != row.price else " <i>(так и было)</i>")
+        )
+    if len(plan.matched) > 25:
+        lines.append(f"<i>…и ещё {len(plan.matched) - 25}</i>")
+
+    text = (
+        f"📋 <b>Прайс: {game.title}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        + ("\n".join(lines) if lines else "<i>Ни одна строка не легла на пакет.</i>")
+    )
+
+    if plan.lost:
+        misses = "\n".join(
+            f"├ <code>{esc(row.line)}</code> — <i>{row.why}</i>"
+            for row in plan.lost[:8]
+        )
+        text += (
+            f"\n\n⚠️ <b>Не нашёл пакет — {len(plan.lost)}</b>\n{misses}"
+            + (f"\n└ <i>…и ещё {len(plan.lost) - 8}</i>" if len(plan.lost) > 8 else "")
+        )
+    if plan.bad:
+        skipped = "\n".join(f"├ <code>{esc(line)}</code>" for line in plan.bad[:5])
+        text += (
+            f"\n\n🤷 <b>Не понял строку — {len(plan.bad)}</b>\n{skipped}"
+            + (f"\n└ <i>…и ещё {len(plan.bad) - 5}</i>" if len(plan.bad) > 5 else "")
+        )
+
+    text += (
+        "\n\n<blockquote>Поменяются "
+        f"<b>{len(plan.changed)}</b> из {len(plan.matched)} найденных. "
+        "Остальные пакеты останутся как были.\n\n"
+        "Эти цены держатся сами: смена курса и наценки их не трогает. "
+        "Вернуть пакету цену по наценке — «♻️ Вернуть как у поставщика» "
+        "в его карточке.\n\n"
+        "«🏷 Цены и названия» заодно переименует пакеты так, как они "
+        "написаны в прайсе — клиенты увидят ваши названия, а не "
+        "длинные поставщика.</blockquote>"
+    )
+    return text
+
+
+@router.callback_query(F.data.startswith(("pn:price_go:", "pn:price_name:")))
+async def cb_price_apply(
+    call: CallbackQuery, conn: aiosqlite.Connection, provider
+) -> None:
+    """Поставить цены из разобранного прайса.
+
+    Вторая кнопка забирает из прайса и названия: у поставщика пакет
+    зовётся «PUBG Mobile 60 UC», и на кнопке от этого остаётся огрызок.
+    В прайсе владелец уже написал, как надо — «60 UC».
+    """
+    code = call.data.split(":", 2)[2]
+    plan = _plans.pop(code, None)
+    game = await db.get_game(conn, code)
+    if plan is None or game is None:
+        await call.answer("Прайс устарел, пришлите его заново.", show_alert=True)
+        return
+
+    rename = call.data.startswith("pn:price_name:")
+    for row in plan.matched:
+        await db.set_game_price(conn, code, row.offer["offer_id"], row.price)
+        if rename:
+            await db.set_game_offer_title(conn, code, row.offer["offer_id"],
+                                          row.name[:64])
+
+    await call.answer(
+        (f"Цены и названия: {len(plan.matched)}" if rename
+         else f"Цены поставлены: {len(plan.matched)}")
+    )
+    await show_packs(call, conn, game, provider)
 
 
 @router.callback_query(F.data.startswith("pn:game_margin:"))

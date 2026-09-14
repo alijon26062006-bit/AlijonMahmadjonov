@@ -2374,6 +2374,188 @@ async def catalog_pick(conn) -> None:
     await db.delete_game(conn, "mobile_legends_ph")
 
 
+# ────────────────────────────────────────────── прайс списком
+
+
+class UcProvider(GameProvider):
+    """Поставщик с длинным прайсом: у PUBG пакетов за тридцать."""
+
+    async def game_catalog(self):
+        return [{"category_id": "pubg_mobile", "name": "PUBG Mobile",
+                 "fields": [{"name": "player_id", "label": "ID игрока"}]}]
+
+    async def game_offers(self, category_id):
+        uc = [60, 120, 325, 660, 985, 1320, 1800, 2460, 3850, 5650,
+              8100, 11950, 16200]
+        offers = [
+            {"offer_id": f"uc_{n}", "name": f"PUBG Mobile {n} UC",
+             "usd": Decimal("1.00"), "raw": {}}
+            for n in uc
+        ]
+        offers += [
+            {"offer_id": f"extra_{i}", "name": name,
+             "usd": Decimal("2.00"), "raw": {}}
+            for i, name in enumerate([
+                "First Purchase", "Prime (1 месяц)", "Prime (3 месяца)",
+                "Prime Plus (1 месяц)", "Elite Pass (уровни 1-50)",
+                "Elite Pass Plus (уровни 1-100)", "Еженедельный набор",
+                "Пакет Mythic Emblem",
+            ])
+        ]
+        return offers
+
+
+async def price_list(conn) -> None:
+    from app.services import pricelist
+
+    offers = [
+        {"offer_id": "a", "name": "60 UC", "supplier_name": "PUBG Mobile 60 UC",
+         "price": 1100},
+        {"offer_id": "b", "name": "120 UC", "supplier_name": "PUBG Mobile 120 UC",
+         "price": 2200},
+        {"offer_id": "c", "name": "Elite Pass Plus (уровни 1-100)",
+         "supplier_name": "Elite Pass Plus 1-100", "price": 26000},
+        {"offer_id": "d", "name": "1320 UC", "supplier_name": "PUBG 1320 UC",
+         "price": 18500},
+    ]
+
+    plan = pricelist.build(
+        "Махсулоти PUBG Mobile-ро интихоб кунед:\n"
+        "60 UC - 10 сомонӣ\n"
+        "120 UC — 21 с.\n"
+        "1320 UC 180\n"
+        "Elite Pass Plus (уровни 1-100) - 250 сомонӣ\n"
+        "9999 UC - 12\n",
+        offers,
+    )
+    got = {r.offer["offer_id"]: r.price for r in plan.matched}
+    check("прайс разложен по пакетам",
+          got == {"a": 1000, "b": 2100, "d": 18000, "c": 25000}, str(got))
+    check("тире внутри названия не путает разбор",
+          got.get("c") == 25000, str(got))
+    check("цена без валюты понимается", got.get("d") == 18000, str(got))
+    check("строка без пакета показана отдельно",
+          [r.name for r in plan.lost] == ["9999 UC"],
+          str([r.name for r in plan.lost]))
+    check("заголовок не считается пакетом", len(plan.bad) == 1, str(plan.bad))
+    check("меняются только те, где цена другая", len(plan.changed) == 4)
+
+    # две строки на один пакет — вторую молча применять нельзя
+    twice = pricelist.build("60 UC - 10\n60 UC - 99\n", offers)
+    check("один пакет занимается один раз", len(twice.matched) == 1,
+          str([r.line for r in twice.matched]))
+    check("вторая строка на тот же пакет не теряется",
+          len(twice.lost) == 1, str([r.line for r in twice.lost]))
+
+    # неоднозначность: два пакета с тем же числом и без общих слов
+    murky = pricelist.build("60 - 10\n", [
+        {"offer_id": "x", "name": "60 UC", "supplier_name": "", "price": 100},
+        {"offer_id": "y", "name": "60 алмазов", "supplier_name": "", "price": 100},
+    ])
+    check("спорную строку не применяем молча",
+          not murky.matched and murky.lost[0].why == "подходит сразу несколько",
+          murky.lost[0].why if murky.lost else "—")
+
+    check("копейки в прайсе не теряются",
+          pricelist.build("60 UC - 7,20\n", offers).matched[0].price == 720)
+
+    # ─── экран панели
+    state = FSMContext(storage=MemoryStorage(),
+                       key=StorageKey(bot_id=1, chat_id=ADMIN, user_id=ADMIN))
+    provider = UcProvider()
+    await db.add_game(conn, category_id="pubg_mobile", title="🎯 PUBG",
+                      field="player_id")
+    await db.update_game(conn, "pubg_mobile", enabled=1)
+
+    call = call_of("pn:game_packs:pubg_mobile", uid=ADMIN)
+    await panel.cb_game_offers(call, conn, provider)
+    check("в пакетах есть прайс списком",
+          "📋 Прайс списком" in buttons(call.markup), str(buttons(call.markup)))
+    check("длинный список разбит на страницы",
+          "Дальше ›" in buttons(call.markup), str(buttons(call.markup)))
+    check("на первой странице нет кнопки назад по страницам",
+          "‹ Раньше" not in buttons(call.markup))
+    check("видно, сколько всего пакетов",
+          "из 21" in call.last, call.last[-300:])
+
+    call = call_of("pn:game_packs:pubg_mobile:1", uid=ADMIN)
+    await panel.cb_game_offers(call, conn, provider)
+    check("вторая страница открывается",
+          "‹ Раньше" in buttons(call.markup), str(buttons(call.markup)))
+    check("на второй странице видны последние пакеты",
+          "Mythic Emblem" in call.last, call.last[:400])
+    check("на второй странице нет первых пакетов",
+          "60 UC" not in call.last, call.last[:300])
+
+    call = call_of("pn:price_list:pubg_mobile", uid=ADMIN)
+    await panel.cb_price_list(call, state, conn)
+    check("бот просит прайс", "Прайс списком" in call.last, call.last[:80])
+    check("показан пример строки", "60 UC - 10" in call.last, call.last[:400])
+    check("ждём текст прайса", await state.get_state() == "Panel:value")
+
+    sent = msg("60 UC - 10\n120 UC - 21\n325 UC - 45\n"
+               "Elite Pass Plus (уровни 1-100) - 250\n"
+               "777 UC - 5\n", uid=ADMIN)
+    await panel.on_field_value(sent, state, conn, provider)
+    check("показан предпросмотр", "Прайс:" in sent.last, sent.last[:80])
+    check("в предпросмотре новая цена", "10.00 с." in sent.last, sent.last[:400])
+    check("в предпросмотре видна старая цена", "<s>" in sent.last, sent.last[:400])
+    check("непонятая строка названа",
+          "777 UC" in sent.last, sent.last[-600:])
+    check("цены ещё не поставлены",
+          not await db.game_prices(conn, "pubg_mobile"))
+    check("кнопка применения показывает счёт",
+          any("Поставить цены (4)" in b for b in buttons(sent.markup)),
+          str(buttons(sent.markup)))
+
+    check("можно забрать из прайса и названия",
+          any("Цены и названия" in b for b in buttons(sent.markup)),
+          str(buttons(sent.markup)))
+
+    call = call_of("pn:price_go:pubg_mobile", uid=ADMIN)
+    await panel.cb_price_apply(call, conn, provider)
+    saved = await db.game_prices(conn, "pubg_mobile")
+    check("цены из прайса встали",
+          saved.get("uc_60") == 1000 and saved.get("uc_120") == 2100
+          and saved.get("uc_325") == 4500, str(saved))
+    check("длинное название тоже нашло свой пакет",
+          saved.get("extra_5") == 25000, str(saved))
+    check("пакеты вне прайса не тронуты", "uc_660" not in saved, str(saved))
+    check("после применения снова видны пакеты",
+          "Пакеты:" in call.last, call.last[:80])
+
+    # прайс применяется один раз: второй нажим — список уже устарел
+    call = call_of("pn:price_go:pubg_mobile", uid=ADMIN)
+    await panel.cb_price_apply(call, conn, provider)
+    check("повторное применение не проходит",
+          any("устарел" in a for a in call.alerts), str(call.alerts))
+
+    # вторая кнопка забирает из прайса ещё и названия
+    call = call_of("pn:price_list:pubg_mobile", uid=ADMIN)
+    await panel.cb_price_list(call, state, conn)
+    again = msg("60 UC - 10\n120 UC - 21\n", uid=ADMIN)
+    await panel.on_field_value(again, state, conn, provider)
+    call = call_of("pn:price_name:pubg_mobile", uid=ADMIN)
+    await panel.cb_price_apply(call, conn, provider)
+    setup = await db.game_offers_setup(conn, "pubg_mobile")
+    check("название пакета взято из прайса",
+          setup["uc_60"]["title"] == "60 UC", str(setup.get("uc_60")))
+    check("длинное название поставщика больше не показывается",
+          "PUBG Mobile 60 UC" not in call.last, call.last[:300])
+    check("короткое название видно клиенту",
+          "✏️ 60 UC — <b>10.00" in call.last, call.last[:300])
+
+    # прайс совсем не про эту игру
+    call = call_of("pn:price_list:pubg_mobile", uid=ADMIN)
+    await panel.cb_price_list(call, state, conn)
+    junk = msg("привет как дела", uid=ADMIN)
+    await panel.on_field_value(junk, state, conn, provider)
+    check("пустой разбор объяснён",
+          "Ни одна строка" in junk.last, junk.last[:80])
+
+    await db.delete_game(conn, "pubg_mobile")
+
+
 async def main() -> None:
     for sfx in ("", "-wal", "-shm"):
         Path(str(db.settings.db_file) + sfx).unlink(missing_ok=True)
@@ -2400,6 +2582,7 @@ async def main() -> None:
         await verdict_reading(conn)
         await wrong_region(conn)
         await catalog_pick(conn)
+        await price_list(conn)
     finally:
         await conn.close()
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")
