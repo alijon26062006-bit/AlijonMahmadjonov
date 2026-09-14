@@ -35,6 +35,12 @@ PREMIUM_QUOTE = "/api/v2/telegram/premium"
 STARS_BUY = "/api/v2/telegram/stars/buy"
 PREMIUM_BUY = "/api/v2/telegram/premium/buy"
 
+# Игры: пополнение игровых аккаунтов
+TOPUP_OFFERS = "/api/v2/topups/offers"
+TOPUP_VALIDATE = "/api/v2/topups/validate-id"
+TOPUP_ORDER = "/api/v2/topups/order"
+ORDER_ONE = "/api/v2/orders/{order_id}"
+
 # Пополнение кошелька Steam
 STEAM_RATES = "/api/v2/steam-topup/rates"
 STEAM_CHECK = "/api/v2/steam-topup/check-login"
@@ -149,13 +155,16 @@ class FazerProvider(DeliveryProvider):
         return str(data)[:250] or f"HTTP {status}"
 
     async def _request(
-        self, method: str, path: str, payload: dict | None = None, *, safe: bool = False
+        self, method: str, path: str, payload: dict | None = None, *,
+        safe: bool = False, headers: dict | None = None,
     ) -> dict:
         """safe=True — запрос ничего не меняет, поэтому сетевой сбой можно
         считать обычной ошибкой, а не неопределённым исходом."""
         session = await self._get_session()
         try:
-            async with session.request(method, self._base + path, json=payload) as resp:
+            async with session.request(
+                method, self._base + path, json=payload, headers=headers,
+            ) as resp:
                 try:
                     data = await resp.json(content_type=None)
                 except Exception:  # noqa: BLE001 — при сбое может прийти HTML
@@ -213,6 +222,109 @@ class FazerProvider(DeliveryProvider):
             quantity=amount, amount=f"{total:.4f}", currency="usd",
             usd_total=total, usd_per_unit=per_unit,
         )
+
+    # --------------------------------------------------------------- игры
+
+    async def game_offers(self, category_id: str) -> list[dict]:
+        """Пакеты пополнения для игры: что и почём продаёт сервис."""
+        data = await self._request(
+            "GET", f"{TOPUP_OFFERS}?category_id={category_id}&include_ui=1",
+            safe=True,
+        )
+        offers = data.get("offers")
+        if not isinstance(offers, list):
+            raise DeliveryError(f"Сервис не вернул пакеты: {str(data)[:200]}")
+        return [
+            {
+                "offer_id": str(offer.get("offer_id") or ""),
+                "name": str(offer.get("name") or "пакет"),
+                "usd": _decimal(offer.get("price_usd"), "price_usd"),
+                "raw": offer,
+            }
+            for offer in offers
+            if isinstance(offer, dict) and offer.get("offer_id")
+        ]
+
+    async def game_catalog(self) -> list[dict]:
+        """Игры, у которых сервис умеет проверять ID, и какие поля им нужны."""
+        data = await self._request("GET", TOPUP_VALIDATE, safe=True)
+        items = data.get("items")
+        if not isinstance(items, list):
+            return []
+        return [
+            {
+                "category_id": str(item.get("category_id") or ""),
+                "name": str(item.get("name") or item.get("category_id") or ""),
+                "fields": item.get("fields") or [],
+            }
+            for item in items
+            if isinstance(item, dict) and item.get("category_id")
+        ]
+
+    async def validate_game_id(
+        self, category_id: str, fields: dict[str, str],
+    ) -> tuple[str | None, str]:
+        """Проверить ID игрока. Возвращает (ник, вердикт).
+
+        Вердикт: ok — ID верный, bad — сервис сказал «неверный»,
+        unknown — проверить не удалось. Разница важна: покупку блокирует
+        только явный отказ, а на «не смог» продавать всё равно можно —
+        пополнение идёт по ID, ник нужен лишь для сверки глазами.
+        """
+        try:
+            data = await self._request(
+                "POST", TOPUP_VALIDATE,
+                {"category_id": category_id, "fields": fields}, safe=True,
+            )
+        except DeliveryError as exc:
+            text = str(exc).lower()
+            if "unsupported" in text:
+                return None, "unknown"
+            if "invalid" in text or "not found" in text or "не найден" in text:
+                return None, "bad"
+            log.info("Игры: проверка ID не прошла — %s", exc)
+            return None, "unknown"
+
+        if str(data.get("status") or "").lower() == "unsupported":
+            return None, "unknown"
+        name = data.get("player_name") or data.get("nickname")
+        if data.get("ok") is True and name:
+            return str(name), "ok"
+        if data.get("ok") is False:
+            return None, "bad"
+        return (str(name) if name else None), "unknown"
+
+    async def order_game(
+        self, *, category_id: str, offer_id: str, fields: dict[str, str],
+        quantity: int, idempotency_key: str,
+    ) -> dict:
+        """Создать заказ. Ответ ok:true означает лишь «принят», не «доставлен»."""
+        data = await self._request(
+            "POST", TOPUP_ORDER,
+            {
+                "category_id": category_id, "offer_id": offer_id,
+                "fields": fields, "quantity": quantity,
+            },
+            headers={"Idempotency-Key": idempotency_key},
+        )
+        order = data.get("order")
+        if not isinstance(order, dict):
+            raise DeliveryUncertain(
+                f"Сервис принял заказ, но не вернул его данные: {str(data)[:200]}"
+            )
+        return order
+
+    async def order_status(self, order_id: str) -> dict | None:
+        """Статус заказа по номеру сервиса."""
+        try:
+            data = await self._request(
+                "GET", ORDER_ONE.format(order_id=order_id), safe=True,
+            )
+        except DeliveryError as exc:
+            log.info("Игры: статус заказа %s не прочитался — %s", order_id, exc)
+            return None
+        order = data.get("order")
+        return order if isinstance(order, dict) else data
 
     # --------------------------------------------------------------- Steam
 

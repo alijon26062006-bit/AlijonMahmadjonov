@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     # Баланс реселлера пополняется один раз, сид-фраза не нужна.
     fazer_api_key: str = ""
     fazer_base_url: str = "https://api.fzr.cards"
+    gameskinbo_key: str = ""
     # Пути из разделов Orders и Account: их надо сверить с документацией,
     # угадывать молча нельзя — от них зависит подтверждение выдачи.
     fazer_order_path: str = "/api/v2/orders/{order_id}"

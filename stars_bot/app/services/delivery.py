@@ -223,6 +223,11 @@ async def manual_complete(bot: Bot, conn: aiosqlite.Connection, order: db.Order)
 def _done_text(order: db.Order) -> str:
     """Сообщение о выполненном заказе. У Steam свой текст: получатель там —
     логин, а не юзернейм Telegram, и путать их нельзя."""
+    if order.product_type.startswith("game:"):
+        return texts.GAME_DELIVERED.format(
+            order_id=order.id, pack=db.product_title(order.product_type),
+            player=order.recipient, price=fmt(order.price),
+        )
     if order.product_type == "steam":
         return texts.STEAM_DELIVERED.format(
             order_id=order.id, login=order.recipient,

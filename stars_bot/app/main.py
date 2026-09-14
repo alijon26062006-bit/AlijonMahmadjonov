@@ -14,7 +14,7 @@ from aiogram.types import BotCommand, BotCommandScopeChat
 from app import db, runtime
 from app.config import settings
 from app.handlers import (
-    reviews,
+    games, reviews,
     admin, broadcast, deposit, menu, panel, profile, shop, support,
 )
 from app.middlewares.emoji_guard import CustomEmojiGuard
@@ -22,6 +22,7 @@ from app.middlewares.escape import CommandEscapeMiddleware
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.billing import make_sender
 from app.services.fragment import build_provider
+from app.services.games import watch_loop as games_watch
 from app.services.pricing import auto_price_loop
 
 log = logging.getLogger(__name__)
@@ -94,6 +95,7 @@ async def main() -> None:
     # Настройки из панели грузим до проверки готовности: реквизиты могли
     # быть заданы через бота, а не в .env.
     await runtime.load(conn)
+    await db.load_game_titles(conn)
 
     if not print_readiness():
         await conn.close()
@@ -127,6 +129,7 @@ async def main() -> None:
     dp.include_router(profile.router)
     dp.include_router(support.router)
     dp.include_router(reviews.router)
+    dp.include_router(games.router)
 
     try:
         me = await bot.me()
@@ -164,13 +167,17 @@ async def main() -> None:
 
     # Автоцены держат наценку постоянной, пока курс гуляет.
     pricing_task = asyncio.create_task(auto_price_loop(provider, bot))
+    # Игровые заказы почти всегда уходят «в обработку»: без присмотра они
+    # зависли бы навсегда, а клиент остался бы и без денег, и без товара.
+    games_task = asyncio.create_task(games_watch(provider, bot))
 
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
-        pricing_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await pricing_task
+        for task in (pricing_task, games_task):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
         await _shutdown(bot, conn, provider)
 
 

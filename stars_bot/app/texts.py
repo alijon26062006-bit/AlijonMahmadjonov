@@ -66,6 +66,84 @@ _RAW["STARS_NOT_ENOUGH"] = (
     "<blockquote>Пополните баланс — и заказ пройдёт сразу.</blockquote>"
 )
 
+# ═══════════════════════════════════════════════════════════════ игры
+
+_RAW["GAMES_ENTRY"] = (
+    "[[game]] <b>Пополнение игр</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Алмазы и валюта приходят прямо на игровой аккаунт. "
+    "Нужен только <b>ID игрока</b> — пароль от аккаунта не спрашиваем "
+    "никогда.</blockquote>\n\n"
+    "<i>Выберите игру</i> [[point]]"
+)
+
+_RAW["GAME_PACKS"] = (
+    "[[game]] <b>{title}</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<blockquote>Выберите пакет — дальше спрошу ID игрока и покажу ник, "
+    "чтобы вы убедились, что это ваш аккаунт.</blockquote>"
+)
+
+_RAW["GAME_ASK_ID"] = (
+    "[[game]] <b>{title}</b> — {pack}\n"
+    f"<code>{LINE}</code>\n\n"
+    "[[profile]] <b>ID игрока</b>\n\n"
+    "<blockquote>Пришлите <b>числовой ID</b> вашего аккаунта. Он виден "
+    "в профиле игры рядом с ником.</blockquote>"
+)
+
+_RAW["GAME_CHECKING"] = "[[search]] <i>Проверяю ID</i> <code>{player}</code>…"
+
+_RAW["GAME_CONFIRM"] = (
+    "[[search]] <b>Проверьте аккаунт</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Игрок: <b>{name}</b>\n"
+    "├ ID: <code>{player}</code>\n"
+    "├ Пакет: <b>{pack}</b>\n"
+    "├ К списанию: <b>{price}</b>\n"
+    "└ Останется: <b>{rest}</b>\n\n"
+    "<blockquote>[[warn]] Пополнение уйдёт на этот ID, вернуть его будет "
+    "нельзя. Убедитесь, что аккаунт ваш.</blockquote>"
+)
+
+_RAW["GAME_NO_NAME"] = (
+    "[[search]] <b>ID принят</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ ID: <code>{player}</code>\n"
+    "├ Пакет: <b>{pack}</b>\n"
+    "├ К списанию: <b>{price}</b>\n"
+    "└ Останется: <b>{rest}</b>\n\n"
+    "<blockquote>[[warn]] Ник показать не удалось — проверьте ID сами, "
+    "особенно каждую цифру. Пополнение уйдёт на этот ID, и вернуть его "
+    "будет нельзя.</blockquote>"
+)
+
+_RAW["GAME_BAD_ID"] = (
+    "[[fail]] <b>Такого игрока нет</b>\n\n"
+    "<blockquote>ID <code>{player}</code> не найден. Проверьте каждую "
+    "цифру и пришлите ещё раз.</blockquote>"
+)
+
+_RAW["GAME_ACCEPTED"] = (
+    "[[ok]] <b>Заказ №{order_id} принят</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Пакет: <b>{pack}</b>\n"
+    "├ ID: <code>{player}</code>\n"
+    "└ Списано: <b>{price}</b>\n\n"
+    "<blockquote>[[wait]] Пополнение идёт — обычно несколько минут. "
+    "Напишу, как только всё придёт.</blockquote>"
+)
+
+_RAW["GAME_DELIVERED"] = (
+    "[[party]] <b>Заказ №{order_id} выполнен!</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Пакет: <b>{pack}</b>\n"
+    "├ ID: <code>{player}</code>\n"
+    "└ Списано: <b>{price}</b>\n\n"
+    "<blockquote>Проверьте игру. Если пополнения нет — напишите "
+    "в поддержку.</blockquote>"
+)
+
 # ══════════════════════════════════════════════════════════════ steam
 
 _RAW["STEAM_ENTRY"] = (

@@ -12,7 +12,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
 from app import runtime
-from app.handlers.menu import menu_text
+from app.handlers.menu import main_markup, menu_text
 from app.money import (
     affordable_stars, discount_of, fmt, fmt4, stars_cost, steam_cost,
 )
@@ -411,7 +411,8 @@ async def cb_pay(
     # delivery-сервис — он единственный знает, чем всё кончилось.
     # Здесь только возвращаем пользователя в меню со свежим балансом.
     await call.message.answer(
-        await menu_text(conn, call.from_user.id), reply_markup=keyboards.main_menu()
+        await menu_text(conn, call.from_user.id),
+        reply_markup=await main_markup(conn),
     )
 
 
@@ -568,5 +569,6 @@ async def cb_steam_pay(
         return
 
     await call.message.answer(
-        await menu_text(conn, call.from_user.id), reply_markup=keyboards.main_menu()
+        await menu_text(conn, call.from_user.id),
+        reply_markup=await main_markup(conn),
     )

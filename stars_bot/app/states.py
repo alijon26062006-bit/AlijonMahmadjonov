@@ -15,6 +15,15 @@ class Steam(StatesGroup):
     confirm = State()       # показали аккаунт, ждём подтверждения
 
 
+class Game(StatesGroup):
+    player = State()        # ждём ID игрока
+    confirm = State()       # показали ник, ждём подтверждения
+
+
+class GameNew(StatesGroup):
+    data = State()          # ждём «код_игры Название» при добавлении
+
+
 class Deposit(StatesGroup):
     amount = State()      # ждём сумму пополнения
     receipt = State()     # ждём скриншот чека

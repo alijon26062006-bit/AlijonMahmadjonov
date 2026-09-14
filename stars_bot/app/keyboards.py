@@ -74,7 +74,7 @@ def reviews_link() -> str:
     return settings.reviews_url
 
 
-def main_menu() -> InlineKeyboardMarkup:
+def main_menu(games: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if runtime.get_bool("stars_enabled"):
         kb.row(btn(labeled("stars", "Купить звёзды"), "m:stars",
@@ -83,6 +83,9 @@ def main_menu() -> InlineKeyboardMarkup:
         kb.row(btn(labeled("premium", "Telegram Premium"), "m:premium",
                    style=PRIMARY, icon="premium"))
 
+    if games:
+        kb.row(btn(labeled("game", "Пополнить игру"), "m:games",
+                   style=PRIMARY, icon="game"))
     if runtime.steam_on():
         kb.row(btn(labeled("steam", "Пополнить Steam"), "m:steam",
                    style=PRIMARY, icon="steam"))
@@ -131,6 +134,32 @@ def stars_entry() -> InlineKeyboardMarkup:
         ])
     kb.row(btn(labeled("edit", "Другое количество"), "stars:buy"))
     kb.row(btn(labeled("back", "Назад"), "m:main"))
+    return kb.as_markup()
+
+
+def games_menu(games: list) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for game in games:
+        kb.row(btn(game.title, f"g:{game.category_id}", style=PRIMARY))
+    kb.row(btn(labeled("back", "Назад"), "m:main"))
+    return kb.as_markup()
+
+
+def game_packs(category_id: str, offers: list) -> InlineKeyboardMarkup:
+    """Пакеты игры: название и цена в сомони."""
+    kb = InlineKeyboardBuilder()
+    for index, offer in enumerate(offers):
+        kb.row(btn(f"{offer['name']} — {fmt(offer['price'])}",
+                   f"gp:{category_id}:{index}", style=PRIMARY))
+    kb.row(btn(labeled("back", "Назад"), "m:games"))
+    return kb.as_markup()
+
+
+def confirm_game(category_id: str) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(btn(labeled("confirm", "Да, это мой аккаунт"), "g:ok", style=SUCCESS))
+    kb.row(btn(labeled("edit", "Другой ID"), f"g:{category_id}"))
+    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
     return kb.as_markup()
 
 

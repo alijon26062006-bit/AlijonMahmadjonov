@@ -37,7 +37,7 @@ from app.money import (
 from app.services import dcpay, pricing, rates
 from app.services import reviews as reviews_service
 from app.services import delivery
-from app.states import Panel, PartnerMove, PartnerNew, PromoNew
+from app.states import GameNew, Panel, PartnerMove, PartnerNew, PromoNew
 
 log = logging.getLogger(__name__)
 router = Router(name="panel")
@@ -96,6 +96,7 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🎮 Steam", callback_data="pn:steam"),
         InlineKeyboardButton(text="🤝 Партнёры", callback_data="pn:partners"),
     )
+    kb.row(InlineKeyboardButton(text="🕹 Игры", callback_data="pn:games"))
     kb.row(InlineKeyboardButton(text="⌨️ Все команды", callback_data="pn:help"))
     return kb.as_markup()
 
@@ -547,6 +548,10 @@ FIELDS: dict[str, tuple[str, str, str]] = {
                         "Бот должен быть в канале администратором с правом "
                         "публиковать. Пришлите <code>-</code>, чтобы убрать:",
                         "text"),
+    "gameskinbo_key": ("🔑 Ключ для ников Free Fire",
+                       "Ключ с gameskinbo.com — бот показывает ник игрока "
+                       "по его ID. Без ключа работает запасной источник, "
+                       "но медленнее. <code>-</code> — убрать:", "text"),
     "steam_price_e4": ("🎮 Цена единицы Steam",
                        "За сколько сомони продаёте 1 единицу валюты Steam.\n"
                        "Например <code>0.14</code> за рубль:", "price4"),
@@ -588,6 +593,7 @@ FIELD_PARENT.update({
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "star_packs": "pn:prices", "reviews_channel": "pn:reviews",
+    "gameskinbo_key": "pn:games",
     "steam_price_e4": "pn:steam", "steam_cost_e4": "pn:steam",
     "steam_currency": "pn:steam", "steam_packs": "pn:steam",
     "usd_rate_diram": "pn:prices", "usd_rate_spread": "pn:prices",
@@ -643,6 +649,22 @@ async def on_field_value(
     data = await state.get_data()
     field = data.get("field", "")
     raw = (message.text or "").strip()
+
+    # Наценка конкретной игры — своя ветка: она лежит в таблице игр.
+    if field.startswith("game_margin:"):
+        code = field.split(":", 1)[1]
+        if not raw.isdigit() or int(raw) > 500:
+            await message.answer("❌ Введите процент числом, например <code>20</code>.")
+            return
+        await db.update_game(conn, code, margin=int(raw))
+        await state.clear()
+        game = await db.get_game(conn, code)
+        await message.answer(
+            f"✅ Наценка <b>{game.title if game else code}</b> — <b>{raw}%</b>"
+            + ("" if int(raw) else " <i>(берётся общая)</i>"),
+            reply_markup=back_kb(f"pn:game:{code}", "‹ К игре"),
+        )
+        return
 
     # Тариф Premium — отдельная ветка, он живёт в JSON-списке.
     if field.startswith("premium:"):
@@ -2976,3 +2998,240 @@ async def cb_partner_take(call: CallbackQuery, conn: aiosqlite.Connection) -> No
 
     await safe_edit(call, await goods_text(conn, partner),
                     await goods_kb(conn, partner))
+
+
+# ═════════════════════════════════════════════════════════════════ игры
+
+
+async def games_text(conn: aiosqlite.Connection) -> str:
+    items = await db.list_games(conn)
+    if not items:
+        body = (
+            "<blockquote>Игр пока нет. Нажмите «Добавить игру» и пришлите "
+            "её код у поставщика с названием — например\n"
+            "<code>free_fire_br 🔥 Free Fire</code></blockquote>"
+        )
+    else:
+        body = "\n".join(
+            f"{'✅' if game.enabled else '🚫'} <b>{game.title}</b>\n"
+            f"├ Код: <code>{game.category_id}</code>\n"
+            f"├ Поле: <code>{game.field}</code>"
+            + (f" · регион {game.region}" if game.region else "")
+            + f"\n└ Наценка: <b>{game.margin or runtime.margin_percent()}%</b>"
+            + ("" if game.margin else " <i>(общая)</i>")
+            for game in items
+        )
+
+    rate = runtime.usd_rate()
+    warn = ""
+    if rate <= 0:
+        warn = ("\n\n[[warn]] <b>Курс доллара не задан</b> — цены пакетов "
+                "посчитать не из чего, раздел работать не будет.")
+
+    return (
+        "🕹 <b>Игры</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"{body}{warn}\n\n"
+        "<blockquote>Цена пакета считается сама: себестоимость поставщика "
+        "в долларах по курсу плюс наценка. Заказы почти всегда уходят "
+        "«в обработку», бот следит за ними и возвращает деньги, если "
+        "пополнение не дошло за 20 минут.</blockquote>"
+    )
+
+
+async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("➕ Добавить игру", "pn:game_new", style=SUCCESS))
+    for game in await db.list_games(conn):
+        kb.row(InlineKeyboardButton(
+            text=("✅ " if game.enabled else "🚫 ") + game.title,
+            callback_data=f"pn:game:{game.category_id}",
+        ))
+    kb.row(btn("🔑 Ключ для ников Free Fire", "pn:set:gameskinbo_key"))
+    kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
+    return kb.as_markup()
+
+
+@router.callback_query(F.data == "pn:games")
+async def cb_games(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    await state.clear()
+    await safe_edit(call, substitute(await games_text(conn)), await games_kb(conn))
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:game_new")
+async def cb_game_new(call: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(GameNew.data)
+    await safe_edit(
+        call,
+        "🕹 <b>Новая игра</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        "<blockquote>Пришлите одной строкой: <b>код название</b>\n\n"
+        "Например:\n"
+        "<code>free_fire_br 🔥 Free Fire</code>\n"
+        "<code>pubg_mobile 🎯 PUBG Mobile</code>\n\n"
+        "Код берётся у поставщика — это его <code>category_id</code>."
+        "</blockquote>",
+        back_kb("pn:games", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.message(GameNew.data, F.text)
+async def on_game_new(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    code, _, title = (message.text or "").strip().partition(" ")
+    code, title = code.strip(), title.strip()
+    if not re.fullmatch(r"[a-z0-9_\-]{2,40}", code) or len(title) < 2:
+        await message.answer(
+            "❌ Формат: <code>код название</code>, например\n"
+            "<code>free_fire_br 🔥 Free Fire</code>"
+        )
+        return
+
+    region = "BR" if "free_fire" in code else ""
+    game = await db.add_game(conn, category_id=code, title=title, region=region)
+    await db.load_game_titles(conn)
+    await state.clear()
+
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🕹 Открыть игру", f"pn:game:{game.category_id}"))
+    kb.row(btn("‹ К играм", "pn:games"))
+    await message.answer(
+        f"✅ <b>{title}</b> добавлена\n\n"
+        "<blockquote>Проверьте пакеты кнопкой «Проверить пакеты», "
+        "поставьте наценку и включите игру.</blockquote>",
+        reply_markup=kb.as_markup(),
+    )
+
+
+@router.callback_query(F.data.startswith("pn:game:"))
+async def cb_game_card(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    game = await db.get_game(conn, call.data.split(":", 2)[2])
+    if game is None:
+        await call.answer("Игра не найдена.", show_alert=True)
+        await safe_edit(call, substitute(await games_text(conn)), await games_kb(conn))
+        return
+    await safe_edit(call, game_card(game), game_kb(game))
+    await call.answer()
+
+
+def game_card(game: db.Game) -> str:
+    return (
+        f"🕹 <b>{game.title}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"├ Код: <code>{game.category_id}</code>\n"
+        f"├ Поле для ID: <code>{game.field}</code>\n"
+        f"├ Регион: <b>{game.region or 'не задан'}</b>\n"
+        f"├ Наценка: <b>{game.margin or runtime.margin_percent()}%</b>"
+        + ("" if game.margin else " <i>(общая)</i>")
+        + f"\n└ В меню: <b>{'да' if game.enabled else 'нет'}</b>"
+    )
+
+
+def game_kb(game: db.Game) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🚫 Убрать из меню" if game.enabled else "✅ Показать в меню",
+               f"pn:game_on:{game.category_id}",
+               style=DANGER if game.enabled else SUCCESS))
+    kb.row(btn("📦 Проверить пакеты", f"pn:game_packs:{game.category_id}",
+               style=PRIMARY))
+    kb.row(InlineKeyboardButton(text="📈 Своя наценка",
+                                callback_data=f"pn:game_margin:{game.category_id}"))
+    kb.row(btn("🗑 Удалить игру", f"pn:game_del:{game.category_id}", style=DANGER))
+    kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
+    return kb.as_markup()
+
+
+@router.callback_query(F.data.startswith("pn:game_on:"))
+async def cb_game_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    game = await db.get_game(conn, call.data.split(":", 2)[2])
+    if game is None:
+        await call.answer("Игра не найдена.", show_alert=True)
+        return
+    if not game.enabled and runtime.usd_rate() <= 0:
+        await call.answer("Сначала задайте курс доллара.", show_alert=True)
+        return
+    await db.update_game(conn, game.category_id, enabled=0 if game.enabled else 1)
+    await call.answer("Убрана" if game.enabled else "Показана")
+    fresh = await db.get_game(conn, game.category_id)
+    await safe_edit(call, game_card(fresh), game_kb(fresh))
+
+
+@router.callback_query(F.data.startswith("pn:game_packs:"))
+async def cb_game_offers(call: CallbackQuery, conn: aiosqlite.Connection, provider) -> None:
+    """Показать пакеты так, как их увидит клиент — с ценой в сомони."""
+    game = await db.get_game(conn, call.data.split(":", 2)[2])
+    if game is None:
+        await call.answer("Игра не найдена.", show_alert=True)
+        return
+
+    await safe_edit(call, "📦 Спрашиваю пакеты…", back_kb("pn:games", "‹ Назад"))
+    await call.answer()
+
+    from app.handlers.games import offers_of
+
+    try:
+        offers = await offers_of(provider, game)
+    except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
+        await safe_edit(
+            call,
+            f"📦 <b>Пакеты {game.title} не пришли</b>\n\n"
+            f"<blockquote expandable>{exc}</blockquote>\n\n"
+            "<blockquote>Проверьте код игры — это <code>category_id</code> "
+            "у поставщика.</blockquote>",
+            back_kb(f"pn:game:{game.category_id}", "‹ Назад"),
+        )
+        return
+
+    if not offers:
+        await safe_edit(
+            call, f"📦 У <b>{game.title}</b> нет пакетов в продаже.",
+            back_kb(f"pn:game:{game.category_id}", "‹ Назад"),
+        )
+        return
+
+    rows = "\n".join(
+        f"├ {o['name']} — <b>{fmt(o['price'])}</b> "
+        f"<i>(себестоимость {fmt(o['cost'])})</i>"
+        for o in offers[:20]
+    )
+    await safe_edit(
+        call,
+        f"📦 <b>Пакеты: {game.title}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n{rows}\n\n"
+        f"<blockquote>Наценка {game.margin or runtime.margin_percent()}%, "
+        f"курс {fmt(runtime.usd_rate())} за доллар. Так их увидит клиент."
+        "</blockquote>",
+        back_kb(f"pn:game:{game.category_id}", "‹ Назад"),
+    )
+
+
+@router.callback_query(F.data.startswith("pn:game_margin:"))
+async def cb_game_margin(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    game = await db.get_game(conn, call.data.split(":", 2)[2])
+    if game is None:
+        await call.answer("Игра не найдена.", show_alert=True)
+        return
+    await state.set_state(Panel.value)
+    await state.update_data(field=f"game_margin:{game.category_id}")
+    await safe_edit(
+        call,
+        f"📈 <b>Наценка: {game.title}</b>\n\n"
+        f"Сейчас: <b>{game.margin or runtime.margin_percent()}%</b>"
+        + ("" if game.margin else " <i>(общая)</i>")
+        + "\n\n<blockquote>Пришлите процент только для этой игры, "
+          "или <code>0</code> — брать общую.</blockquote>",
+        back_kb(f"pn:game:{game.category_id}", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:game_del:"))
+async def cb_game_delete(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    code = call.data.split(":", 2)[2]
+    await db.delete_game(conn, code)
+    await db.load_game_titles(conn)
+    await call.answer("Удалена")
+    await safe_edit(call, substitute(await games_text(conn)), await games_kb(conn))

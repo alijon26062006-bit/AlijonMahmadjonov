@@ -94,6 +94,9 @@ def _build_defaults() -> dict[str, str]:
         # отзывы
         "reviews_on": "1",               # спрашивать отзыв после заказа
         "reviews_channel": "",           # @канал или id, куда публиковать
+        # Игры
+        "games_enabled": "1",            # раздел игр в меню
+        "gameskinbo_key": "",            # ключ для ников Free Fire
         # Steam: пополнение кошелька
         "steam_enabled": "0",            # выключен, пока не сверены поля API
         "steam_currency": "RUB",         # валюта кошелька Steam

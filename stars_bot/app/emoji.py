@@ -15,6 +15,7 @@ GROUPS: dict[str, dict[str, tuple[str, str]]] = {
         "premium": ("👑", "Telegram Premium"),
         "gift": ("🎁", "Подарок"),
         "steam": ("🎮", "Steam"),
+        "game": ("🕹", "Игры"),
     },
     "Деньги": {
         "money": ("💰", "Баланс"),

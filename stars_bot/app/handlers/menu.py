@@ -20,13 +20,21 @@ async def menu_text(conn: aiosqlite.Connection, user_id: int) -> str:
     return texts.MENU.format(balance=fmt(user.balance if user else 0))
 
 
+async def main_markup(conn: aiosqlite.Connection):
+    """Клавиатура меню. Раздел игр показываем, только если игры открыты."""
+    has_games = bool(runtime.get_bool("games_enabled")
+                     and await db.list_games(conn, only_enabled=True))
+    return keyboards.main_menu(games=has_games)
+
+
 async def render_menu(target: Message | CallbackQuery, conn: aiosqlite.Connection) -> None:
     """Показать меню. У Message берём отправителя, у CallbackQuery — нажавшего."""
     text = await menu_text(conn, target.from_user.id)
+    markup = await main_markup(conn)
     if isinstance(target, CallbackQuery):
-        await target.message.edit_text(text, reply_markup=keyboards.main_menu())
+        await target.message.edit_text(text, reply_markup=markup)
     else:
-        await target.answer(text, reply_markup=keyboards.main_menu())
+        await target.answer(text, reply_markup=markup)
 
 
 @router.message(CommandStart())

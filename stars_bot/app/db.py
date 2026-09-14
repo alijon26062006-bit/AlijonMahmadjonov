@@ -176,6 +176,18 @@ CREATE TABLE IF NOT EXISTS partners (
 -- минус — забрал себе.
 -- Какой товар чей. Прибыль с товара идёт его владельцу; что никому
 -- не отдано — делится по долям.
+-- Игры, которые владелец открыл к продаже. Каждая игра — отдельный
+-- товар: её можно закрепить за партнёром и увидеть в отчётах отдельно.
+CREATE TABLE IF NOT EXISTS games (
+    category_id TEXT PRIMARY KEY,   -- как называет игру сервис выдачи
+    title       TEXT NOT NULL,      -- как показываем клиенту
+    field       TEXT NOT NULL DEFAULT 'user_id',   -- какое поле спрашивать
+    region      TEXT NOT NULL DEFAULT '',          -- подсказка для поиска ника
+    margin      INTEGER NOT NULL DEFAULT 0,        -- своя наценка, % (0 — общая)
+    enabled     INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS product_owners (
     product_type TEXT PRIMARY KEY,
     partner_id   INTEGER NOT NULL,
@@ -267,8 +279,21 @@ PRODUCT_TITLES = {
 }
 
 
+#: Названия игр подставляются на лету — их список живёт в базе.
+GAME_TITLES: dict[str, str] = {}
+
+
 def product_title(code: str) -> str:
+    if code.startswith("game:"):
+        return GAME_TITLES.get(code, "🎮 " + code.split(":", 1)[1])
     return PRODUCT_TITLES.get(code, code)
+
+
+async def load_game_titles(conn: aiosqlite.Connection) -> None:
+    """Подтянуть названия игр в память — отчёты собираются синхронно."""
+    GAME_TITLES.clear()
+    for game in await list_games(conn):
+        GAME_TITLES[game.product_type] = game.title
 
 
 REVIEW_PENDING = "pending"
@@ -291,6 +316,22 @@ class Review:
     @property
     def stars(self) -> str:
         return "⭐️" * self.rating
+
+
+@dataclass
+class Game:
+    category_id: str
+    title: str
+    field: str
+    region: str
+    margin: int
+    enabled: int
+    created_at: str
+
+    @property
+    def product_type(self) -> str:
+        """Игра живёт в заказах как обычный товар."""
+        return f"game:{self.category_id}"
 
 
 @dataclass
@@ -353,6 +394,8 @@ class Order:
             from app import runtime
 
             return f"🎮 Steam {self.quantity} {runtime.steam_currency()}"
+        if self.product_type.startswith("game:"):
+            return f"{product_title(self.product_type)} × {self.quantity}"
         return f"👑 Premium {self.quantity} мес."
 
     @property
@@ -654,6 +697,62 @@ async def partner_totals(conn: aiosqlite.Connection, partner_id: int) -> dict[st
     ) as cur:
         row = await cur.fetchone()
     return {key: (row[key] or 0) for key in row.keys()}
+
+
+async def add_game(
+    conn: aiosqlite.Connection, *, category_id: str, title: str,
+    field: str = "user_id", region: str = "",
+) -> Game:
+    await conn.execute(
+        """INSERT INTO games (category_id, title, field, region, created_at)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(category_id) DO UPDATE SET title = excluded.title,
+                                                  field = excluded.field,
+                                                  region = excluded.region""",
+        (category_id, title, field, region, _now()),
+    )
+    await conn.commit()
+    game = await get_game(conn, category_id)
+    assert game is not None
+    return game
+
+
+async def get_game(conn: aiosqlite.Connection, category_id: str) -> Game | None:
+    async with conn.execute(
+        "SELECT * FROM games WHERE category_id = ?", (category_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    return _from_row(Game, row) if row else None
+
+
+async def list_games(
+    conn: aiosqlite.Connection, only_enabled: bool = False
+) -> list[Game]:
+    sql = "SELECT * FROM games"
+    if only_enabled:
+        sql += " WHERE enabled = 1"
+    sql += " ORDER BY title"
+    async with conn.execute(sql) as cur:
+        return [_from_row(Game, row) for row in await cur.fetchall()]
+
+
+async def update_game(conn: aiosqlite.Connection, category_id: str, **fields_) -> None:
+    if not fields_:
+        return
+    assignments = ", ".join(f"{key} = ?" for key in fields_)
+    await conn.execute(
+        f"UPDATE games SET {assignments} WHERE category_id = ?",
+        (*fields_.values(), category_id),
+    )
+    await conn.commit()
+
+
+async def delete_game(conn: aiosqlite.Connection, category_id: str) -> None:
+    await conn.execute("DELETE FROM games WHERE category_id = ?", (category_id,))
+    await conn.execute(
+        "DELETE FROM product_owners WHERE product_type = ?", (f"game:{category_id}",)
+    )
+    await conn.commit()
 
 
 async def set_product_owner(
@@ -1135,6 +1234,19 @@ async def transition_order(
         if order and order.promo:
             await use_promo(conn, order.promo, order.user_id)
     return True
+
+
+async def unfinished_game_orders(
+    conn: aiosqlite.Connection, limit: int = 100,
+) -> list[Order]:
+    """Игровые заказы, ещё не дошедшие до конца."""
+    async with conn.execute(
+        """SELECT * FROM orders
+           WHERE status IN (?, ?) AND product_type LIKE 'game:%'
+           ORDER BY id LIMIT ?""",
+        (ORDER_DELIVERING, ORDER_FAILED, limit),
+    ) as cur:
+        return [_from_row(Order, row) for row in await cur.fetchall()]
 
 
 async def user_order_stats(conn: aiosqlite.Connection, user_id: int) -> dict[str, int]:
