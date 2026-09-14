@@ -1141,6 +1141,36 @@ async def list_links(conn: aiosqlite.Connection) -> list[tuple[Link, dict[str, i
 # ---------------------------------------------------------------- деньги
 
 
+async def import_balance(
+    conn: aiosqlite.Connection, user_id: int, amount: int,
+) -> bool:
+    """Перенести баланс со старого бота. True — клиента завели заново.
+
+    Баланс именно УСТАНАВЛИВАЕТСЯ, а не добавляется: перенос делают
+    один раз, но запустить его дважды легко, и сложение удвоило бы
+    людям деньги. Повторный перенос того же списка теперь ничего не
+    меняет.
+
+    Клиента заводим, даже если он ещё не писал боту: он нажмёт «старт»
+    и сразу увидит свой баланс, а не ноль.
+    """
+    async with conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)) as cur:
+        fresh = await cur.fetchone() is None
+
+    if fresh:
+        await conn.execute(
+            """INSERT INTO users (id, username, first_name, balance, created_at)
+               VALUES (?, NULL, NULL, ?, ?)""",
+            (user_id, amount, _now()),
+        )
+    else:
+        await conn.execute(
+            "UPDATE users SET balance = ? WHERE id = ?", (amount, user_id)
+        )
+    await conn.commit()
+    return fresh
+
+
 async def charge(conn: aiosqlite.Connection, user_id: int, amount: int) -> bool:
     """Списать amount с баланса. False — если денег не хватило.
 

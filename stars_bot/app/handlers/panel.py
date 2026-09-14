@@ -2106,14 +2106,119 @@ async def cb_users(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Conne
         )
         tail = f"\n\n✍️ <b>Последние правки</b>\n{rows}"
 
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("📥 Перенести балансы со старого бота", "pn:transfer"))
+    kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
+
     await safe_edit(
         call,
         "👥 <b>Клиенты</b>\n\n"
         "<blockquote>Пришлите <b>ID</b> или <b>@username</b> — покажу карточку "
         "с балансом и кнопками начисления и списания.</blockquote>" + tail,
-        back_kb("pn:home", "‹ В панель"),
+        kb.as_markup(),
     )
     await call.answer()
+
+
+@router.callback_query(F.data == "pn:transfer")
+async def cb_transfer(call: CallbackQuery, state: FSMContext) -> None:
+    """Перенос балансов: принимаем список в любом виде."""
+    await state.set_state(Panel.transfer)
+    await safe_edit(
+        call,
+        "📥 <b>Перенос балансов</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        "<blockquote>Пришлите список одним сообщением — по записи "
+        "на строку:\n\n"
+        "<code>123456789 100</code>\n"
+        "<code>987654321 45.50</code>\n\n"
+        "Разберу почти любой вид: с тире, запятыми, словами вокруг. "
+        "Из строки беру первое длинное число как ID и последнее как "
+        "сумму в сомони.\n\n"
+        "Сразу ничего не применю — сначала покажу, что понял.</blockquote>",
+        back_kb("pn:users", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.message(Panel.transfer, F.text)
+async def on_transfer_list(message: Message, state: FSMContext) -> None:
+    from app.services import importer
+
+    pairs, skipped = importer.parse_balances(message.text or "")
+    if not pairs:
+        await message.answer(
+            "❌ <b>Ни одной записи не понял</b>\n\n"
+            "<blockquote>Нужно, чтобы в строке был ID (от пяти цифр), "
+            "а после него сумма:\n<code>123456789 100</code></blockquote>"
+        )
+        return
+
+    total = sum(amount for _, amount in pairs)
+    rows = "\n".join(
+        f"├ <code>{uid}</code> → <b>{fmt(amount)}</b>"
+        for uid, amount in importer.preview(pairs)
+    )
+    more = f"\n└ <i>…и ещё {len(pairs) - 5}</i>" if len(pairs) > 5 else ""
+    lost = ""
+    if skipped:
+        sample = "\n".join(f"├ {line[:60]}" for line in skipped[:3])
+        lost = (f"\n\n⚠️ <b>Не понял строк: {len(skipped)}</b>\n{sample}"
+                + ("\n└ <i>…</i>" if len(skipped) > 3 else ""))
+
+    # Список держим в состоянии: применять будем по кнопке, а не сразу.
+    await state.update_data(transfer=pairs)
+
+    kb = InlineKeyboardBuilder()
+    kb.row(btn(f"✅ Записать {len(pairs)} балансов", "pn:transfer_go",
+               style=SUCCESS))
+    kb.row(btn("❌ Отмена", "pn:users", style=DANGER))
+
+    await message.answer(
+        "📥 <b>Проверьте перед записью</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"Записей: <b>{len(pairs)}</b>\n"
+        f"Всего денег: <b>{fmt(total)}</b>\n\n"
+        f"{rows}{more}{lost}\n\n"
+        "<blockquote>Баланс <b>устанавливается</b>, а не прибавляется — "
+        "если запустить перенос дважды, деньги не удвоятся.\n\n"
+        "Кого ещё нет в базе, заведу: он нажмёт «старт» и сразу увидит "
+        "свой баланс.</blockquote>",
+        reply_markup=kb.as_markup(),
+    )
+
+
+@router.callback_query(F.data == "pn:transfer_go")
+async def cb_transfer_go(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    data = await state.get_data()
+    pairs = data.get("transfer") or []
+    await state.clear()
+
+    if not pairs:
+        await call.answer("Список потерялся, пришлите заново.", show_alert=True)
+        return
+
+    await call.answer("Записываю…")
+    created = 0
+    for uid, amount in pairs:
+        if await db.import_balance(conn, int(uid), int(amount)):
+            created += 1
+
+    total = sum(amount for _, amount in pairs)
+    await safe_edit(
+        call,
+        "✅ <b>Балансы перенесены</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"├ Записей: <b>{len(pairs)}</b>\n"
+        f"├ Новых клиентов: <b>{created}</b>\n"
+        f"└ Всего денег: <b>{fmt(total)}</b>\n\n"
+        "<blockquote>Клиенты увидят баланс сразу, как откроют бота. "
+        "Сообщать им бот ничего не станет — если нужно, отправьте "
+        "рассылку.</blockquote>",
+        back_kb("pn:users", "‹ К клиентам"),
+    )
 
 
 @router.message(Panel.user_search, F.text)

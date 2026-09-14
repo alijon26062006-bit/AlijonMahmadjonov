@@ -101,7 +101,102 @@ async def main() -> None:
     sys.exit(1 if FAIL else 0)
 
 
+async def transfer(conn) -> None:
+    """Перенос балансов со старого бота."""
+    from app.services import importer
+
+    # ---- разбор: список выгружают кто во что горазд
+    pairs, skipped = importer.parse_balances(
+        "123456789 100\n"
+        "987654321 - 45.50\n"
+        "id: 111222333, balance: 12,30\n"
+        "5  444555666  250 с.\n"
+        "Итого: 500\n"
+        "\n"
+        "123456789 999\n"
+    )
+    found = dict(pairs)
+    check("простая строка разобрана", found.get(123456789) == 99900,
+          str(found.get(123456789)))
+    check("тире не мешает", found.get(987654321) == 4550, str(found.get(987654321)))
+    check("слова и запятая не мешают", found.get(111222333) == 1230,
+          str(found.get(111222333)))
+    check("номер строки за ID не принят", found.get(444555666) == 25000,
+          str(found.get(444555666)))
+    check("повтор не удваивает, берётся последняя строка",
+          found.get(123456789) == 99900)
+    check("строка без ID отложена", skipped == ["Итого: 500"], str(skipped))
+
+    check("совсем пустой список — пусто",
+          importer.parse_balances("") == ([], []))
+    check("строка без суммы не проходит",
+          importer.parse_balances("123456789")[0] == [])
+    check("отрицательная сумма не проходит",
+          importer.parse_balances("123456789 -5")[0] == [(123456789, 500)],
+          str(importer.parse_balances("123456789 -5")[0]))
+
+    # ---- предпросмотр ничего не применяет
+    state = FakeState()
+    call = FakeCallback("pn:transfer")
+    await panel.cb_transfer(call, state)
+    check("бот просит список", "Перенос балансов" in call.last, call.last[:60])
+    check("сказано, что сразу не применит",
+          "ничего не применю" in call.last, call.last)
+
+    message = FakeMessage("777000111 25\n777000222 10.50")
+    await panel.on_transfer_list(message, state)
+    check("показан предпросмотр", "Проверьте перед записью" in message.last,
+          message.last[:60])
+    check("видно количество", "Записей: <b>2</b>" in message.last, message.last)
+    check("видна общая сумма", "35.50" in message.last, message.last)
+    check("до нажатия деньги не начислены",
+          await db.get_user(conn, 777000111) is None)
+
+    # ---- а теперь применяем
+    call = FakeCallback("pn:transfer_go")
+    await panel.cb_transfer_go(call, state, conn)
+    first = await db.get_user(conn, 777000111)
+    second = await db.get_user(conn, 777000222)
+    check("клиент заведён", first is not None)
+    check("баланс записан", first and first.balance == 2500, str(first.balance))
+    check("копейки не потерялись", second and second.balance == 1050,
+          str(second.balance))
+    check("в отчёте видно, сколько новых",
+          "Новых клиентов: <b>2</b>" in call.last, call.last[:200])
+
+    # ---- повторный перенос не удваивает деньги
+    state = FakeState()
+    message = FakeMessage("777000111 25")
+    await panel.on_transfer_list(message, state)
+    await panel.cb_transfer_go(FakeCallback("pn:transfer_go"), state, conn)
+    again = await db.get_user(conn, 777000111)
+    check("повторный перенос не удваивает баланс", again.balance == 2500,
+          str(again.balance))
+
+    # ---- /start не затирает перенесённый баланс
+    await db.upsert_user(conn, 777000111, "vasya", "Вася")
+    after_start = await db.get_user(conn, 777000111)
+    check("после «старта» баланс на месте", after_start.balance == 2500,
+          str(after_start.balance))
+    check("и имя записалось", after_start.username == "vasya",
+          str(after_start.username))
+
+    # ---- мусор вместо списка
+    state = FakeState()
+    message = FakeMessage("просто текст без цифр")
+    await panel.on_transfer_list(message, state)
+    check("мусор не принимается", "Ни одной записи не понял" in message.last,
+          message.last[:60])
+
+    # ---- нечего применять
+    call = FakeCallback("pn:transfer_go")
+    await panel.cb_transfer_go(call, FakeState(), conn)
+    check("пустое применение не падает",
+          any("потерялся" in a for a in call.alerts), str(call.alerts))
+
+
 async def run(conn) -> None:
+    await transfer(conn)
     bot = FakeBot()
     await db.upsert_user(conn, 900, "klient", "Клиент")
     await db.credit(conn, 900, 5000, as_deposit=True)

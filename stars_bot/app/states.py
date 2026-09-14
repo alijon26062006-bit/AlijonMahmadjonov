@@ -49,6 +49,7 @@ class Panel(StatesGroup):
     period = State()      # ждём даты для отчёта
     user_search = State() # ждём ID или юзернейм клиента
     adjust = State()      # ждём сумму правки баланса
+    transfer = State()    # ждём список балансов со старого бота
     link = State()        # ждём название рекламной ссылки
 
 
