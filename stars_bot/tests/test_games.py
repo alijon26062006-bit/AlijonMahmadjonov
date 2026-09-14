@@ -305,7 +305,7 @@ async def flow(conn) -> None:
 
     bad = msg("abc")
     await gh.on_player_id(bad, state, conn, provider)
-    check("нечисловой ID отклонён", "Такого игрока нет" in bad.last)
+    check("нечисловой ID отклонён", "Игрок не найден" in bad.last, bad.last[:80])
 
     good = msg("1724367212")
     await gh.on_player_id(good, state, conn, provider)
@@ -443,9 +443,146 @@ async def unknown_nick(conn) -> None:
         message = msg("4444444444")
         await gh.on_player_id(message, state, conn, provider)
         check("неверный ID покупку блокирует",
-              "Такого игрока нет" in message.last, message.last[:80])
+              "Игрок не найден" in message.last, message.last[:80])
+        check("и подсказано про регион", "регион" in message.last.lower(),
+              message.last)
+
+        # справочник ников говорит «нет такого» — а он бесплатный и
+        # знает не все регионы. Его слово покупку рубить не должно.
+        async def lying(uid, key="", region=""):
+            return nicknames.Nickname(uid=uid, name=None, verdict="bad")
+
+        nicknames.free_fire = lying
+        provider.validate_reply = (None, "unknown")
+        await state.set_state(gh.Game.player)
+        await state.update_data(category_id="free_fire_br", offer_id="off_1",
+                                pack="100 алмазов", price=1400, cost=1090)
+        message = msg("6666666666")
+        await gh.on_player_id(message, state, conn, provider)
+        check("справочник ников покупку не рубит", "ID принят" in message.last,
+              message.last[:120])
+        check("и до подтверждения доходит",
+              await state.get_state() == "Game:confirm")
     finally:
         nicknames.free_fire = real
+
+
+async def verdict_reading(conn) -> None:
+    """Отказ поставщика читается по смыслу: «нет игрока» ≠ «нет категории»."""
+    from app.services.fazer import FazerProvider
+
+    client = FazerProvider(api_key="x")
+
+    async def raising(*args, **kw):
+        raise DeliveryError(raising.text)
+
+    client._request = raising
+    cases = [
+        ("Invalid player id", "bad", "неверный ID — это отказ"),
+        ("Player not found", "bad", "не найден игрок — это отказ"),
+        ("Invalid category_id", "unknown", "неизвестная категория — не про игрока"),
+        ('Field "player_id" is required', "unknown", "нехватка поля — не про игрока"),
+        ("Validation unsupported for this category", "unknown",
+         "проверка не поддерживается — не про игрока"),
+        ("Rate limit exceeded", "unknown", "превышен лимит — не про игрока"),
+        ("Internal server error", "unknown", "поломка сервиса — не про игрока"),
+    ]
+    for text, want, name in cases:
+        raising.text = text
+        _, verdict = await client.validate_game_id("free_fire_br", {"user_id": "1"})
+        check(name, verdict == want, f"{text} → {verdict}")
+    await client.close()
+
+
+async def wrong_region(conn) -> None:
+    """ID не нашёлся в выбранном регионе — ищем его в остальных."""
+    real = nicknames.free_fire
+
+    async def silent(uid, key="", region=""):
+        return nicknames.Nickname(uid=uid, name=None, verdict="unknown")
+
+    nicknames.free_fire = silent
+    nicknames.forget_all()
+
+    from app.services import regions as reg
+
+    for code in ("free_fire_cis", "free_fire_id"):
+        await db.add_game(conn, category_id=code, title="🔥 Free Fire",
+                          field="user_id", region=reg.nick_region(code))
+        await db.update_game(conn, code, enabled=1)
+    await db.load_game_titles(conn)
+
+    class OnlyBrazil(GameProvider):
+        """Игрок живёт в Бразилии, а клиент выбрал СНГ."""
+
+        def __init__(self):
+            super().__init__()
+            self.asked: list[str] = []
+
+        async def validate_game_id(self, category_id, fields):
+            self.asked.append(category_id)
+            if category_id == "free_fire_br":
+                return "BrPlayer", "ok"
+            return None, "bad"
+
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage,
+                       key=StorageKey(bot_id=1, chat_id=BUYER, user_id=BUYER))
+    provider = OnlyBrazil()
+    try:
+        await state.set_state(gh.Game.player)
+        await state.update_data(category_id="free_fire_cis", offer_id="off_1",
+                                pack="100 алмазов", price=1400, cost=1090)
+        message = msg("1234567890")
+        await gh.on_player_id(message, state, conn, provider)
+
+        check("бот сам обошёл остальные регионы",
+              "free_fire_br" in provider.asked, str(provider.asked))
+        check("клиенту сказали, где аккаунт нашёлся",
+              "другом регионе" in message.last, message.last[:120])
+        check("назван нужный регион", "Бразилия" in message.last, message.last)
+        check("и ник оттуда", "BrPlayer" in message.last, message.last)
+        check("кнопка ведёт прямо в этот регион",
+              any(b.callback_data == "g:free_fire_br"
+                  for row in message.markup.inline_keyboard for b in row),
+              str(message.markup))
+
+        # нигде не нашёлся — тогда честный отказ, но с выходом
+        class Nowhere(GameProvider):
+            async def validate_game_id(self, category_id, fields):
+                return None, "bad"
+
+        await state.set_state(gh.Game.player)
+        message = msg("1234567890")
+        await gh.on_player_id(message, state, conn, Nowhere())
+        check("если нигде нет — так и говорим",
+              "Игрок не найден" in message.last, message.last[:80])
+        check("и даём сменить регион",
+              any(b.callback_data == "gf:free_fire"
+                  for row in message.markup.inline_keyboard for b in row),
+              str(message.markup))
+
+        # у игры один регион — кнопки смены не предлагаем
+        await db.update_game(conn, "free_fire_cis", enabled=0)
+        await db.update_game(conn, "free_fire_id", enabled=0)
+        await db.update_game(conn, "free_fire_br", enabled=0)
+        await db.add_game(conn, category_id="solo_game", title="🎲 Solo",
+                          field="user_id")
+        await db.update_game(conn, "solo_game", enabled=1)
+        await state.set_state(gh.Game.player)
+        await state.update_data(category_id="solo_game", offer_id="off_1",
+                                pack="100 алмазов", price=1400, cost=1090)
+        message = msg("1234567890")
+        await gh.on_player_id(message, state, conn, Nowhere())
+        check("у игры без регионов лишней кнопки нет",
+              not any(b.callback_data.startswith("gf:")
+                      for row in message.markup.inline_keyboard for b in row),
+              str(message.markup))
+    finally:
+        nicknames.free_fire = real
+        await db.delete_game(conn, "solo_game")
+        for code in ("free_fire_br", "free_fire_cis", "free_fire_id"):
+            await db.update_game(conn, code, enabled=1)
 
 
 # ─────────────────────────────────────────────────────────── панель
@@ -1215,6 +1352,8 @@ async def main() -> None:
         await timeout_setting(conn)
         await gorder_command(conn)
         await region_step(conn)
+        await verdict_reading(conn)
+        await wrong_region(conn)
         await catalog_pick(conn)
     finally:
         await conn.close()

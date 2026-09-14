@@ -195,10 +195,28 @@ async def on_player_id(
         return
 
     notice = await message.answer(texts.GAME_CHECKING.format(player=player))
-    name, verdict = await _lookup(suppliers.for_games(provider), game, player)
+    client = suppliers.for_games(provider)
+    name, verdict = await _lookup(client, game, player)
 
     if verdict == "bad":
-        await notice.edit_text(texts.GAME_BAD_ID.format(player=player))
+        # Чаще всего дело не в ID, а в регионе: аккаунт есть, но на другом
+        # сервере. Ищем его там сами, чтобы клиент не гадал.
+        others = await _other_regions(conn, game)
+        found = await _search_regions(client, others, player)
+        if found:
+            other_game, other_name = found
+            await notice.edit_text(
+                texts.GAME_WRONG_REGION.format(
+                    player=player, name=other_name or "—",
+                    region=regions.region_title(other_game),
+                ),
+                reply_markup=keyboards.game_found_in([other_game]),
+            )
+            return
+        await notice.edit_text(
+            texts.GAME_BAD_ID.format(player=player),
+            reply_markup=keyboards.game_retry(game, len(others) + 1),
+        )
         return
 
     user = await db.get_user(conn, message.from_user.id)
@@ -215,6 +233,35 @@ async def on_player_id(
         ),
         reply_markup=keyboards.confirm_game(game.category_id),
     )
+
+
+async def _other_regions(conn, game: db.Game) -> list[db.Game]:
+    """Остальные регионы этой же игры, в порядке спроса."""
+    family = regions.family_of(game.category_id)
+    others = [
+        other for other in await db.list_games(conn, only_enabled=True)
+        if regions.family_of(other.category_id) == family
+        and other.category_id != game.category_id
+    ]
+    others.sort(key=lambda g: regions.sort_key(g.category_id))
+    return others
+
+
+async def _search_regions(
+    provider, games: list[db.Game], player: str,
+) -> tuple[db.Game, str | None] | None:
+    """Поискать ID по остальным регионам. None — нигде не нашёлся."""
+    for game in games:
+        try:
+            name, verdict = await provider.validate_game_id(
+                game.category_id, {game.field: player}
+            )
+        except Exception as exc:  # noqa: BLE001 — это подсказка, не покупка
+            log.info("Игры: регион %s не проверился — %s", game.category_id, exc)
+            continue
+        if verdict == "ok":
+            return game, name
+    return None
 
 
 async def _lookup(provider, game: db.Game, player: str) -> tuple[str | None, str]:
@@ -238,8 +285,12 @@ async def _lookup(provider, game: db.Game, player: str) -> tuple[str | None, str
         found = await nicknames.free_fire(player, key=key, region=region)
         if found.verdict == "ok":
             return found.name, "ok"
-        if found.verdict == "bad":
-            return None, "bad"
+        # А вот «нет такого» от него покупку НЕ рубит. Это бесплатный
+        # сторонний справочник: он знает не все регионы и спокойно
+        # отвечает «не найден» на живого игрока. Пополнение идёт по ID
+        # через поставщика — его слово здесь единственное весомое.
+        log.info("Игры: справочник ников не нашёл %s (%s) — продаём дальше",
+                 player, found.verdict)
     return None, "unknown"
 
 

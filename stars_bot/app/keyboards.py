@@ -174,6 +174,30 @@ def game_packs(category_id: str, offers: list) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def game_retry(game, family_size: int = 1) -> InlineKeyboardMarkup:
+    """Что делать, когда ID не нашёлся: сменить регион или выйти.
+
+    Без этих кнопок клиент упирается в тупик и уходит: угадать, что дело
+    в регионе, он не обязан.
+    """
+    kb = InlineKeyboardBuilder()
+    if family_size > 1:
+        kb.row(btn("🌍 Сменить регион",
+                   f"gf:{regions.family_of(game.category_id)}", style=PRIMARY))
+    kb.row(btn(labeled("back", "К играм"), "m:games"))
+    return kb.as_markup()
+
+
+def game_found_in(games: list) -> InlineKeyboardMarkup:
+    """Регионы, в которых ID всё-таки нашёлся."""
+    kb = InlineKeyboardBuilder()
+    for game in games:
+        kb.row(btn(f"✅ {regions.region_title(game)}",
+                   f"g:{game.category_id}", style=SUCCESS))
+    kb.row(btn(labeled("back", "К играм"), "m:games"))
+    return kb.as_markup()
+
+
 def confirm_game(category_id: str) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn(labeled("confirm", "Да, это мой аккаунт"), "g:ok", style=SUCCESS))

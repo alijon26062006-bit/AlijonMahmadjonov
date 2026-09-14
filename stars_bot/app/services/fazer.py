@@ -57,6 +57,14 @@ STEAM_OK_KEYS = ["exists", "valid", "found", "ok", "success", "is_valid"]
 STEAM_NAME_KEYS = ["name", "nickname", "persona", "persona_name", "display_name",
                    "account_name", "steam_name"]
 
+#: Слова в отказе проверки ID, означающие «дело не в игроке». Такой отказ
+#: покупку не блокирует: поставщик пополняет по ID, а не по нашей проверке.
+NOT_ABOUT_PLAYER = (
+    "unsupported", "category", "offer", "field", "required", "permission",
+    "forbidden", "unauthorized", "rate limit", "too many", "timeout",
+    "internal", "server error", "temporarily", "maintenance",
+)
+
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=45)
 
 # Формулировки статусов могут отличаться, поэтому распознаём широкий набор,
@@ -282,7 +290,11 @@ class FazerProvider(DeliveryProvider):
             )
         except DeliveryError as exc:
             text = str(exc).lower()
-            if "unsupported" in text:
+            # Сначала отсекаем отказы, которые вообще не про игрока:
+            # «неизвестная категория», «не хватает поля». Принять их за
+            # «такого игрока нет» — значит соврать клиенту и потерять
+            # покупку на ровном месте.
+            if any(word in text for word in NOT_ABOUT_PLAYER):
                 return None, "unknown"
             if "invalid" in text or "not found" in text or "не найден" in text:
                 return None, "bad"
