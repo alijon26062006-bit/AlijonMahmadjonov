@@ -346,6 +346,34 @@ async def main() -> None:
     report = await HealthApi({"/api/v2/account": {"ok": True, "balance": "5.00"}}).healthcheck()
     check("без доступа к заказам проверка не даёт добро", not report["ok"])
 
+    # ------------------- адрес сервиса: документация пишет его с /api/v2,
+    #                     а пути в коде уже с ним — склеивать нельзя
+    check("хвост /api/v2 из адреса убирается",
+          fz.normalize_base("https://api.fzr.cards/api/v2")
+          == "https://api.fzr.cards",
+          fz.normalize_base("https://api.fzr.cards/api/v2"))
+    check("обычный адрес не портится",
+          fz.normalize_base("https://api.fzr.cards/") == "https://api.fzr.cards")
+    check("лишний слэш тоже убирается",
+          fz.normalize_base("https://api.fzr.cards/api/v2/")
+          == "https://api.fzr.cards")
+    check("адрес из документации даёт правильный путь",
+          fz.FazerProvider(api_key="fc_x",
+                           base_url="https://api.fzr.cards/api/v2")._base
+          + fz.TOPUP_ORDER == "https://api.fzr.cards/api/v2/topups/order")
+
+    # ------------------- сроки запросов из документации поставщика
+    check("на заказ ждём не дольше 20 секунд",
+          fz.ORDER_TIMEOUT.total == 20, str(fz.ORDER_TIMEOUT.total))
+    check("на остальное — 25", fz.REQUEST_TIMEOUT.total == 25,
+          str(fz.REQUEST_TIMEOUT.total))
+    check("на соединение — 6", fz.REQUEST_TIMEOUT.connect == 6,
+          str(fz.REQUEST_TIMEOUT.connect))
+
+    check("баланс по умолчанию спрашивается там, где он есть",
+          fz.settings.fazer_balance_path == "/api/v2/balance",
+          fz.settings.fazer_balance_path)
+
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")
     if FAIL:
         print("ПРОВАЛЫ:", ", ".join(FAIL))

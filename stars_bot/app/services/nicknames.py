@@ -32,6 +32,17 @@ TIMEOUT = aiohttp.ClientTimeout(total=8, connect=4)
 FALLBACK_TIMEOUT = aiohttp.ClientTimeout(total=10, connect=5)
 CACHE_TTL = 30 * 60          # полчаса
 
+#: Регионы, которые понимает gameskinbo. Чужой код слать нельзя: сервис
+#: либо ответит отказом, либо будет искать не там. Регион вообще
+#: необязателен — он только ускоряет поиск, ID в Free Fire уникален
+#: глобально, поэтому незнакомый код просто выбрасываем.
+KNOWN_REGIONS = {"BD", "IND", "BR", "US", "SAC", "NA", "ID", "SG", "PK"}
+
+
+def known_region(region: str) -> str:
+    code = (region or "").strip().upper()
+    return code if code in KNOWN_REGIONS else ""
+
 _cache: dict[str, tuple[float, str]] = {}
 
 
@@ -65,6 +76,7 @@ def forget_all() -> None:
 async def _from_gameskinbo(
     session: aiohttp.ClientSession, uid: str, region: str, key: str,
 ) -> tuple[str | None, str]:
+    region = known_region(region)
     url = f"{GAMESKINBO}?uid={uid}" + (f"&region={region}" if region else "")
     async with session.get(url, headers={"x-api-key": key}) as response:
         if response.status == 402:
@@ -82,7 +94,7 @@ async def _from_gameskinbo(
 
 
 async def _from_fallback(uid: str, region: str) -> tuple[str | None, str]:
-    url = f"{FALLBACK}?region={region or 'BR'}&uid={uid}"
+    url = f"{FALLBACK}?region={known_region(region) or 'BR'}&uid={uid}"
     try:
         async with aiohttp.ClientSession(timeout=FALLBACK_TIMEOUT) as session:
             async with session.get(url) as response:

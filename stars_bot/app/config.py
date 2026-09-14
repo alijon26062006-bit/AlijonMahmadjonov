@@ -64,7 +64,15 @@ class Settings(BaseSettings):
     # Пути из разделов Orders и Account: их надо сверить с документацией,
     # угадывать молча нельзя — от них зависит подтверждение выдачи.
     fazer_order_path: str = "/api/v2/orders/{order_id}"
-    fazer_balance_path: str = "/api/v2/account"
+    fazer_balance_path: str = "/api/v2/balance"
+    # Секрет вебхука (whsec_…) из кабинета FazerCards. Им подписан каждый
+    # приходящий отчёт о статусе заказа.
+    fazer_webhook_secret: str = ""
+    # Где бот слушает вебхуки. Порт 0 — не слушать вовсе.
+    webhook_port: int = 0
+    webhook_host: str = "0.0.0.0"
+    # Публичный адрес этого бота (https://...), его вставляют в кабинет.
+    webhook_public_url: str = ""
 
     # ---- MyStars FaaS (api.mystars.tg) ----
     # Ключ выдаётся в @my_stars_tg_bot. Сид-фраза сервису НЕ передаётся.

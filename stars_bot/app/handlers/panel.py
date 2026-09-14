@@ -586,6 +586,15 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "autostop_after": ("🔢 Порог автостопа",
                        "После скольких неудачных заказов подряд бот гасит "
                        "продажу. Обычно 3:", "int"),
+    "fazer_webhook_secret": ("🔔 Секрет вебхука",
+                            "Секрет <code>whsec_…</code> из кабинета "
+                            "поставщика — им подписан каждый отчёт:", "text"),
+    "webhook_port": ("🔌 Порт вебхука",
+                     "На каком порту слушать отчёты поставщика "
+                     "(например 8081). Ноль — выключить:", "int"),
+    "webhook_public_url": ("🌐 Адрес бота",
+                           "Публичный адрес бота, например "
+                           "<code>https://bot.example.com</code>:", "text"),
     "games_timeout_min": ("⏱ Ожидание выдачи (игры)",
                           "Сколько минут ждать пополнение, прежде чем "
                           "вернуть деньги клиенту. Обычно 20:", "int"),
@@ -611,6 +620,8 @@ FIELD_PARENT.update({
     "referral_percent": "pn:prices", "support_notice": "pn:home",
     "autostop_after": "pn:wallet",
     "games_timeout_min": "pn:games",
+    "fazer_webhook_secret": "pn:hook", "webhook_port": "pn:hook",
+    "webhook_public_url": "pn:hook",
 })
 
 
@@ -3118,6 +3129,8 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
     kb.row(btn("📚 Взять из каталога поставщика", "pn:game_pick", style=PRIMARY))
     kb.row(InlineKeyboardButton(text="📋 Все категории поставщика",
                                 callback_data="pn:game_codes"))
+    kb.row(InlineKeyboardButton(text="🔔 Мгновенные отчёты (вебхук)",
+                                callback_data="pn:hook"))
     for game in await db.list_games(conn):
         kb.row(InlineKeyboardButton(
             text=("✅ " if game.enabled else "🚫 ") + game.title,
@@ -3263,6 +3276,69 @@ async def cb_game_pick(call: CallbackQuery, conn: aiosqlite.Connection, provider
         "пополнение не доходит.</blockquote>",
         kb.as_markup(),
     )
+
+
+@router.callback_query(F.data == "pn:hook")
+async def cb_hook(call: CallbackQuery, state: FSMContext,
+                  conn: aiosqlite.Connection) -> None:
+    """Вебхук: поставщик сам сообщает о выдаче, клиент узнаёт за секунду."""
+    await state.clear()
+    from app.services import webhook as hook
+
+    port = runtime.get_int("webhook_port") or 0
+    key = hook.secret()
+    url = hook.public_url()
+    seen, last = await db.events_seen(conn)
+
+    if not key:
+        status = "🔴 <b>Выключен</b> — не задан секрет"
+    elif port <= 0:
+        status = "🔴 <b>Выключен</b> — не задан порт"
+    elif not url:
+        status = "🟠 <b>Слушает</b>, но адрес для кабинета не задан"
+    else:
+        status = "🟢 <b>Включён</b>"
+
+    body = (
+        "🔔 <b>Мгновенные отчёты</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"{status}\n\n"
+        f"├ Секрет: <b>{'задан' if key else 'нет'}</b>\n"
+        f"├ Порт: <b>{port or 'нет'}</b>\n"
+        f"├ Адрес: <code>{url or 'не задан'}</code>\n"
+        f"└ Принято отчётов: <b>{seen}</b>"
+        + (f" · последний {last[:16]}" if last else "") + "\n\n"
+        "<blockquote>Сейчас бот сам спрашивает поставщика, выполнен ли "
+        "заказ. Это занимает от нескольких секунд до нескольких минут.\n\n"
+        "С вебхуком поставщик сообщает сам, и клиент узнаёт о пополнении "
+        "сразу. Опрос при этом остаётся: отчёт может не дойти, и тогда "
+        "заказ всё равно закроется.</blockquote>\n\n"
+        "<blockquote expandable>Как включить:\n"
+        "1. Задайте секрет — это строка <code>whsec_…</code> из кабинета "
+        "поставщика.\n"
+        "2. Задайте порт, который открыт на сервере (например 8081).\n"
+        "3. Задайте адрес бота вида <code>https://bot.example.com</code>.\n"
+        "4. В кабинете поставщика впишите адрес, который бот покажет "
+        "здесь.\n\n"
+        "Без https поставщик отчёты слать не станет.</blockquote>"
+    )
+
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🔑 Секрет вебхука", "pn:set:fazer_webhook_secret",
+               style=PRIMARY))
+    kb.row(InlineKeyboardButton(text="🔌 Порт",
+                                callback_data="pn:set:webhook_port"),
+           InlineKeyboardButton(text="🌐 Адрес бота",
+                                callback_data="pn:set:webhook_public_url"))
+    if url:
+        kb.row(InlineKeyboardButton(
+            text="📋 Скопировать адрес для кабинета",
+            copy_text=CopyTextButton(text=url),
+        ))
+    kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
+
+    await safe_edit(call, body, kb.as_markup())
+    await call.answer()
 
 
 @router.callback_query(F.data == "pn:game_codes")
@@ -3843,6 +3919,22 @@ async def cb_games_check(call: CallbackQuery, conn: aiosqlite.Connection, provid
             f"   пакетов: <b>{len(offers)}</b> · поля: <code>{game.field}</code>"
             f"{field_note}"
         )
+
+    # ---- 3.5 мгновенные отчёты: с ними выдача видна сразу
+    from app.services import webhook as hookmod
+
+    seen, _ = await db.events_seen(conn)
+    if not hookmod.secret() or (runtime.get_int("webhook_port") or 0) <= 0:
+        lines.append("🔔 Мгновенные отчёты: <i>выключены</i>\n"
+                     "   <i>бот сам опрашивает поставщика — это дольше</i>")
+    else:
+        lines.append(f"🔔 Мгновенные отчёты: <b>включены</b> · "
+                     f"принято: <b>{seen}</b>"
+                     + ("" if seen else "\n   ⚠️ <i>ни одного отчёта ещё не "
+                        "пришло — проверьте адрес в кабинете поставщика</i>"))
+
+    lines.append(f"⏱ Ожидание выдачи: <b>{gsvc.timeout_minutes()} мин</b>, "
+                 "потом деньги возвращаются клиенту")
 
     # ---- 4. чем кончились последние заказы
     recent = await db.last_game_orders(conn)

@@ -171,6 +171,18 @@ async def main() -> None:
     # зависли бы навсегда, а клиент остался бы и без денег, и без товара.
     games_task = asyncio.create_task(games_watch(provider, bot))
 
+    # Поставщик умеет сам сообщать о выдаче. Это не отменяет присмотра
+    # выше — отчёт может не дойти, — но с ним клиент узнаёт за секунду,
+    # а не через несколько минут опроса.
+    from app.services import webhook as webhook_service
+
+    hook = None
+    try:
+        hook = await webhook_service.serve(bot, provider)
+    except OSError as exc:
+        log.error("Вебхук не поднялся (%s). Бот работает без него: "
+                  "заказы закроются опросом.", exc)
+
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
@@ -178,6 +190,8 @@ async def main() -> None:
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
+        if hook is not None:
+            await hook.cleanup()
         await _shutdown(bot, conn, provider)
 
 

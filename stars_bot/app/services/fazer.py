@@ -65,7 +65,11 @@ NOT_ABOUT_PLAYER = (
     "internal", "server error", "temporarily", "maintenance",
 )
 
-REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=45)
+# Сроки из документации сервиса: дольше ждать нельзя — клиент сидит
+# в боте и смотрит на «пополнение идёт». Создание заказа короче прочего:
+# там важнее быстро узнать отказ, чем дождаться медленного ответа.
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=25, connect=6)
+ORDER_TIMEOUT = aiohttp.ClientTimeout(total=20, connect=6)
 
 # Формулировки статусов могут отличаться, поэтому распознаём широкий набор,
 # а незнакомое считаем «ещё в работе»: соврать клиенту дороже, чем подождать.
@@ -96,6 +100,21 @@ ORDER_ONE_CANDIDATES = [
     "/api/v2/orders/{order_id}", "/api/v2/order/{order_id}",
     "/api/v2/orders/{order_id}/status", "/api/v2/account/orders/{order_id}",
 ]
+
+
+def normalize_base(url: str) -> str:
+    """Адрес сервиса без хвоста /api/v2.
+
+    В документации базовым назван https://api.fzr.cards/api/v2, а все пути
+    в коде уже начинаются с /api/v2. Скопировав адрес из документации в
+    .env, владелец получил бы /api/v2/api/v2/... и «404» на всё подряд.
+    """
+    base = (url or "").strip().rstrip("/")
+    for tail in ("/api/v2", "/api/v1", "/api"):
+        if base.endswith(tail):
+            base = base[: -len(tail)].rstrip("/")
+            break
+    return base
 
 
 @dataclass
@@ -137,7 +156,7 @@ class FazerProvider(DeliveryProvider):
         self.api_key = (api_key or settings.fazer_api_key).strip()
         if not self.api_key:
             raise RuntimeError("Не задан FAZER_API_KEY")
-        self._base = (base_url or settings.fazer_base_url).rstrip("/")
+        self._base = normalize_base(base_url or settings.fazer_base_url)
         self._session: aiohttp.ClientSession | None = None
 
     # ------------------------------------------------------------ транспорт
@@ -169,6 +188,7 @@ class FazerProvider(DeliveryProvider):
     async def _request(
         self, method: str, path: str, payload: dict | None = None, *,
         safe: bool = False, headers: dict | None = None,
+        timeout: aiohttp.ClientTimeout | None = None,
     ) -> dict:
         """safe=True — запрос ничего не меняет, поэтому сетевой сбой можно
         считать обычной ошибкой, а не неопределённым исходом."""
@@ -176,6 +196,7 @@ class FazerProvider(DeliveryProvider):
         try:
             async with session.request(
                 method, self._base + path, json=payload, headers=headers,
+                timeout=timeout,
             ) as resp:
                 try:
                     data = await resp.json(content_type=None)
@@ -322,6 +343,7 @@ class FazerProvider(DeliveryProvider):
                 "fields": fields, "quantity": quantity,
             },
             headers={"Idempotency-Key": idempotency_key},
+            timeout=ORDER_TIMEOUT,
         )
         order = data.get("order")
         if not isinstance(order, dict):

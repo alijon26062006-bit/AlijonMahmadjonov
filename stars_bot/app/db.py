@@ -144,6 +144,17 @@ CREATE TABLE IF NOT EXISTS adjustments (
 );
 
 -- Отзывы: один завершённый заказ = один отзыв (UNIQUE на order_id).
+-- Поставщик может прислать одно и то же событие дважды — в его
+-- документации это сказано прямо. Первичный ключ по event_id и есть
+-- защита: повтор не вставится, и обработка второй раз не запустится.
+CREATE TABLE IF NOT EXISTS webhook_events (
+    event_id   TEXT PRIMARY KEY,
+    kind       TEXT NOT NULL DEFAULT '',
+    order_id   TEXT NOT NULL DEFAULT '',
+    status     TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+
 -- Проверять это в коде мало: две кнопки, нажатые подряд, успели бы
 -- проскочить обе.
 CREATE TABLE IF NOT EXISTS reviews (
@@ -1685,6 +1696,34 @@ async def daily_series(
             (row["day"], row["done"], row["revenue"], row["profit"])
             for row in await cur.fetchall()
         ]
+
+
+async def remember_event(
+    conn: aiosqlite.Connection, event_id: str, *,
+    kind: str = "", order_id: str = "", status: str = "",
+) -> bool:
+    """Записать событие вебхука. False — такое уже приходило.
+
+    Вся защита от повторов держится на первичном ключе: проверка «а нет ли
+    уже» отдельным запросом пропустила бы два события, пришедших разом.
+    """
+    cur = await conn.execute(
+        """INSERT OR IGNORE INTO webhook_events
+               (event_id, kind, order_id, status, created_at)
+           VALUES (?, ?, ?, ?, ?)""",
+        (str(event_id), kind, str(order_id), status, _now()),
+    )
+    await conn.commit()
+    return cur.rowcount > 0
+
+
+async def events_seen(conn: aiosqlite.Connection) -> tuple[int, str]:
+    """Сколько событий приняли и когда было последнее."""
+    async with conn.execute(
+        "SELECT COUNT(*) AS n, MAX(created_at) AS last FROM webhook_events"
+    ) as cur:
+        row = await cur.fetchone()
+    return (row["n"] or 0), (row["last"] or "")
 
 
 async def find_order_by_external(
