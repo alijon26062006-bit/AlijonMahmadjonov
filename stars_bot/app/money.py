@@ -30,6 +30,19 @@ def fmt(diram: int) -> str:
     return f"{sign}{whole:,}".replace(",", " ") + f".{frac:02d} {settings.currency}"
 
 
+def fmt_short(diram: int) -> str:
+    """То же, но без копеек, когда их нет: 1000 -> '10 с.'
+
+    Нужно для кнопок: их по две в ряд, и лишние «.00» съедают место,
+    из-за которого обрезается название пакета.
+    """
+    whole, frac = divmod(abs(diram), 100)
+    if frac:
+        return fmt(diram)
+    sign = "-" if diram < 0 else ""
+    return f"{sign}{whole:,}".replace(",", " ") + f" {settings.currency}"
+
+
 def parse4(raw: str) -> int | None:
     """'0.1629' -> 1629 (десятитысячные сомони). None, если не число."""
     text = raw.strip().replace(" ", "").replace(",", ".")

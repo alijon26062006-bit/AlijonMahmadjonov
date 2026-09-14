@@ -183,7 +183,7 @@ async def cb_game(
     await state.clear()
     await call.message.edit_text(
         texts.GAME_PACKS.format(title=game.title, region=_region(game)),
-        reply_markup=keyboards.game_packs(category_id, offers),
+        reply_markup=keyboards.game_packs(game, offers),
     )
 
 

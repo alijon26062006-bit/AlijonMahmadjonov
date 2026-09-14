@@ -489,9 +489,21 @@ async def flow(conn) -> None:
     check("пакеты показаны", "Выберите пакет" in call.last, call.last[:80])
     labels = buttons(call.markup)
     check("на кнопке пакет и цена в сомони",
-          "100 алмазов — 14.00 с." in labels, str(labels))
+          "100 алмазов — 14 с." in labels, str(labels))
     check("дорогой пакет тоже посчитан",
-          "500 алмазов — 59.00 с." in labels, str(labels))
+          "500 алмазов — 59 с." in labels, str(labels))
+    check("копейки без нужды не пишутся",
+          not any(".00" in b for b in labels), str(labels))
+
+    # пакеты идут по две кнопки в ряд — иначе список на два экрана
+    grid = keyboards.game_packs(await db.get_game(conn, "free_fire_br"), [
+        {"offer_id": f"o{i}", "name": f"{i} алмазов", "price": 1000 + i}
+        for i in range(5)
+    ])
+    widths = [len(row) for row in grid.inline_keyboard[:-1]]
+    check("пакеты по два в ряд", widths == [2, 2, 1], str(widths))
+    check("кнопка «назад» остаётся своей строкой",
+          len(grid.inline_keyboard[-1]) == 1)
 
     call = call_of("gp:free_fire_br:0")
     await gh.cb_pack(call, state, conn)
@@ -1666,7 +1678,7 @@ async def manual_prices(conn) -> None:
           offers[0]["supplier_name"] == "100 алмазов", offers[0]["supplier_name"])
     check("пакет помечен переименованным", offers[0]["renamed"] is True)
 
-    packs = buttons(keyboards.game_packs("free_fire_br", offers))
+    packs = buttons(keyboards.game_packs(game, offers))
     check("и на кнопке покупки оно же",
           any("Сто алмазов" in b for b in packs), str(packs))
 

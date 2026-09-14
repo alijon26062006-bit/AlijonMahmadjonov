@@ -17,7 +17,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app import runtime
 from app.config import settings
 from app.emoji import custom_id, em, premium_on
-from app.money import fmt, stars_cost, steam_cost
+from app.money import fmt, fmt_short, stars_cost, steam_cost
 from app.services import regions
 
 #: Значения поля style из Bot API 9.4
@@ -218,12 +218,38 @@ def game_regions(games: list) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def game_packs(category_id: str, offers: list) -> InlineKeyboardMarkup:
-    """Пакеты игры: название и цена в сомони."""
+def game_packs(game, offers: list) -> InlineKeyboardMarkup:
+    """Пакеты игры по две в ряд: значок, название и цена.
+
+    По одной в строку список из полутора десятков пакетов вытягивается
+    на два экрана, и до нужного приходится листать. По две — он виден
+    целиком.
+    """
+    from app.emoji import game_key
+
+    category_id = getattr(game, "category_id", game)
+    emoji_id = ""
+    if not isinstance(game, str):
+        own = (getattr(game, "emoji", "") or "").strip()
+        emoji_id = own or custom_id(game_key(category_id))
+
     kb = InlineKeyboardBuilder()
+    row: list[InlineKeyboardButton] = []
     for index, offer in enumerate(offers):
-        kb.row(btn(f"{offer['name']} — {fmt(offer['price'])}",
-                   f"gp:{category_id}:{index}", style=PRIMARY))
+        text = f"{offer['name']} — {fmt_short(offer['price'])}"
+        if emoji_id and premium_on():
+            row.append(InlineKeyboardButton(
+                text=text, callback_data=f"gp:{category_id}:{index}",
+                style=PRIMARY, icon_custom_emoji_id=emoji_id,
+            ))
+        else:
+            row.append(btn(text, f"gp:{category_id}:{index}", style=PRIMARY))
+        if len(row) == 2:
+            kb.row(*row)
+            row = []
+    if row:
+        kb.row(*row)
+
     kb.row(btn(labeled("back", "Назад"), "m:games"))
     return kb.as_markup()
 
