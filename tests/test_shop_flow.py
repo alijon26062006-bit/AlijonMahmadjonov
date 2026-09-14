@@ -52,6 +52,9 @@ class FakeMessage:
         self.sent.append((text, reply_markup))
         return self
 
+    async def delete(self):
+        return True
+
     @property
     def last(self) -> str:
         return self.sent[-1][0] if self.sent else ""
@@ -672,3 +675,28 @@ async def test_broken_supplier_never_loses_the_order(db, cfg_api, bot):
 
     assert db.order(order_id)["status"] == ORDER_NEW
     assert "дастӣ санҷед" in bot.to(ADMIN_ID)
+
+
+# ── клавиатураи поёнӣ ─────────────────────────────────────────────────
+async def test_bottom_keyboard_removed_once(db, cfg, state):
+    """Паёми хидматӣ барои ҳар корбар танҳо як бор меояд."""
+    from aiogram.types import ReplyKeyboardRemove
+
+    first = FakeMessage("/start")
+    await menu_h.cmd_start(first, state, db, cfg)
+    removals = [m for m in first.sent if isinstance(m[1], ReplyKeyboardRemove)]
+    assert len(removals) == 1
+
+    second = FakeMessage("/start")
+    await menu_h.cmd_start(second, state, db, cfg)
+    assert not [m for m in second.sent if isinstance(m[1], ReplyKeyboardRemove)]
+
+
+async def test_main_menu_has_no_reply_keyboard(db, cfg, state):
+    """Дар менюи асосӣ танҳо тугмаҳои inline мемонанд."""
+    from aiogram.types import InlineKeyboardMarkup
+
+    message = FakeMessage("/start")
+    await menu_h.cmd_start(message, state, db, cfg)
+    welcome = [m for m in message.sent if "Хуш омадед" in (m[0] or "")]
+    assert welcome and isinstance(welcome[0][1], InlineKeyboardMarkup)

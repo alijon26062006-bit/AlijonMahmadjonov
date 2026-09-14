@@ -4,14 +4,9 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from aiogram.types import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
-    KeyboardButton,
-)
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from . import catalog, texts
+from . import catalog, style, texts
 
 # ── калидҳои callback ─────────────────────────────────────────────────
 CB_HOME = "m:home"
@@ -31,25 +26,31 @@ CB_TOPUP_OTHER = "t:other"
 CB_TOPUP_PAID = "t:paid:"  # t:paid:<id>
 
 
-def _btn(text: str, data: str) -> InlineKeyboardButton:
-    return InlineKeyboardButton(text=text, callback_data=data)
+def _btn(text: str, data: str, color: str | None = None) -> InlineKeyboardButton:
+    return InlineKeyboardButton(
+        text=text, callback_data=data, style=style.pick(color)
+    )
+
+
+def _url(text: str, link: str, color: str | None = style.LINK) -> InlineKeyboardButton:
+    return InlineKeyboardButton(text=text, url=link, style=style.pick(color))
 
 
 def main_menu(*, is_admin: bool = False, reviews_url: str = "") -> InlineKeyboardMarkup:
     """Менюи асосӣ — ҳамон тарҳбандии намуна."""
     rows: list[list[InlineKeyboardButton]] = [
-        [_btn(texts.BTN_TELEGRAM, CB_TG_MENU)],
-        [_btn(texts.BTN_FF_CIS, CB_CAT + catalog.CAT_FF_CIS)],
-        [_btn(texts.BTN_FF_ID, CB_CAT + catalog.CAT_FF_ID)],
-        [_btn(texts.BTN_PUBG, CB_CAT + catalog.CAT_PUBG)],
-        [_btn(texts.BTN_TOPUP, CB_TOPUP)],
+        [_btn(texts.BTN_TELEGRAM, CB_TG_MENU, style.PRIMARY)],
+        [_btn(texts.BTN_FF_CIS, CB_CAT + catalog.CAT_FF_CIS, style.PRIMARY)],
+        [_btn(texts.BTN_FF_ID, CB_CAT + catalog.CAT_FF_ID, style.PRIMARY)],
+        [_btn(texts.BTN_PUBG, CB_CAT + catalog.CAT_PUBG, style.PRIMARY)],
+        [_btn(texts.BTN_TOPUP, CB_TOPUP, style.SUCCESS)],
         [_btn(texts.BTN_SUPPORT, CB_SUPPORT), _btn(texts.BTN_TOP, CB_TOP)],
         [_btn(texts.BTN_MY_ORDERS, CB_MY_ORDERS)],
     ]
     if reviews_url:
-        rows.append([InlineKeyboardButton(text=texts.BTN_REVIEWS, url=reviews_url)])
+        rows.append([_url(texts.BTN_REVIEWS, reviews_url)])
     if is_admin:
-        rows.append([_btn(texts.BTN_ADMIN, "a:home")])
+        rows.append([_btn(texts.BTN_ADMIN, "a:home", style.PRIMARY)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -57,8 +58,8 @@ def telegram_menu() -> InlineKeyboardMarkup:
     """Қадами дуюм: Stars ё Premium."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [_btn(texts.BTN_STARS, CB_CAT + catalog.CAT_STARS)],
-            [_btn(texts.BTN_PREMIUM, CB_CAT + catalog.CAT_PREMIUM)],
+            [_btn(texts.BTN_STARS, CB_CAT + catalog.CAT_STARS, style.PRIMARY)],
+            [_btn(texts.BTN_PREMIUM, CB_CAT + catalog.CAT_PREMIUM, style.PRIMARY)],
             [_btn(texts.BTN_HOME, CB_HOME)],
         ]
     )
@@ -84,7 +85,10 @@ def products(rows: Sequence, category: str, *, currency: str = texts.CURRENCY) -
 
 def cancel_only() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        inline_keyboard=[[_btn(texts.BTN_CANCEL, CB_CANCEL), _btn(texts.BTN_HOME, CB_HOME)]]
+        inline_keyboard=[[
+            _btn(texts.BTN_CANCEL, CB_CANCEL, style.DANGER),
+            _btn(texts.BTN_HOME, CB_HOME),
+        ]]
     )
 
 
@@ -92,9 +96,9 @@ def confirm_target() -> InlineKeyboardMarkup:
     """Панели тафтиши аккаунт."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [_btn(texts.BTN_YES_MINE, CB_ID_OK)],
+            [_btn(texts.BTN_YES_MINE, CB_ID_OK, style.SUCCESS)],
             [_btn(texts.BTN_NO_WRONG, CB_ID_NO)],
-            [_btn(texts.BTN_CANCEL, CB_CANCEL)],
+            [_btn(texts.BTN_CANCEL, CB_CANCEL, style.DANGER)],
         ]
     )
 
@@ -102,8 +106,8 @@ def confirm_target() -> InlineKeyboardMarkup:
 def confirm_order() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [_btn(texts.BTN_PAY, CB_BUY_OK)],
-            [_btn(texts.BTN_CANCEL, CB_CANCEL)],
+            [_btn(texts.BTN_PAY, CB_BUY_OK, style.SUCCESS)],
+            [_btn(texts.BTN_CANCEL, CB_CANCEL, style.DANGER)],
         ]
     )
 
@@ -111,7 +115,7 @@ def confirm_order() -> InlineKeyboardMarkup:
 def need_money() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [_btn(texts.BTN_TOPUP, CB_TOPUP)],
+            [_btn(texts.BTN_TOPUP, CB_TOPUP, style.SUCCESS)],
             [_btn(texts.BTN_HOME, CB_HOME)],
         ]
     )
@@ -127,7 +131,7 @@ def topup_menu(presets: Sequence[int], *, currency: str = texts.CURRENCY) -> Inl
             line = []
     if line:
         buttons.append(line)
-    buttons.append([_btn(texts.BTN_OTHER_SUM, CB_TOPUP_OTHER)])
+    buttons.append([_btn(texts.BTN_OTHER_SUM, CB_TOPUP_OTHER, style.PRIMARY)])
     buttons.append([_btn(texts.BTN_HOME, CB_HOME)])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -138,13 +142,13 @@ def payment(
     rows: list[list[InlineKeyboardButton]] = []
     pay_row: list[InlineKeyboardButton] = []
     if link:
-        pay_row.append(InlineKeyboardButton(text=texts.BTN_OPEN_LINK, url=link))
+        pay_row.append(_url(texts.BTN_OPEN_LINK, link))
     if alif:
-        pay_row.append(InlineKeyboardButton(text=texts.BTN_OPEN_ALIF, url=alif))
+        pay_row.append(_url(texts.BTN_OPEN_ALIF, alif))
     if pay_row:
         rows.append(pay_row)
-    rows.append([_btn(texts.BTN_PAID, f"{CB_TOPUP_PAID}{topup_id}")])
-    rows.append([_btn(texts.BTN_CANCEL, CB_CANCEL)])
+    rows.append([_btn(texts.BTN_PAID, f"{CB_TOPUP_PAID}{topup_id}", style.SUCCESS)])
+    rows.append([_btn(texts.BTN_CANCEL, CB_CANCEL, style.DANGER)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -155,20 +159,10 @@ def back_home() -> InlineKeyboardMarkup:
 def support(username: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if username:
-        rows.append(
-            [InlineKeyboardButton(text="✍️ Навиштан", url=f"https://t.me/{username}")]
-        )
+        rows.append([_url("✍️ Навиштан", f"https://t.me/{username}")])
     rows.append([_btn(texts.BTN_HOME, CB_HOME)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
-
-def persistent_menu() -> ReplyKeyboardMarkup:
-    """Тугмаи доимӣ дар поёни экран."""
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=texts.BTN_HOME)]],
-        resize_keyboard=True,
-        is_persistent=True,
-    )
 
 
 # ── Панели админ ──────────────────────────────────────────────────────
@@ -190,15 +184,15 @@ def admin_back() -> InlineKeyboardMarkup:
 
 def admin_user(user) -> InlineKeyboardMarkup:
     block = (
-        _btn(texts.ADM_BTN_UNBLOCK, f"a:unblock:{user.id}")
+        _btn(texts.ADM_BTN_UNBLOCK, f"a:unblock:{user.id}", style.SUCCESS)
         if user.is_blocked
-        else _btn(texts.ADM_BTN_BLOCK, f"a:block:{user.id}")
+        else _btn(texts.ADM_BTN_BLOCK, f"a:block:{user.id}", style.DANGER)
     )
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                _btn(texts.ADM_BTN_PLUS, f"a:plus:{user.id}"),
-                _btn(texts.ADM_BTN_MINUS, f"a:minus:{user.id}"),
+                _btn(texts.ADM_BTN_PLUS, f"a:plus:{user.id}", style.SUCCESS),
+                _btn(texts.ADM_BTN_MINUS, f"a:minus:{user.id}", style.DANGER),
             ],
             [block],
             [_btn(texts.ADM_BTN_FIND, "a:find"), _btn(texts.BTN_BACK, "a:home")],
@@ -210,8 +204,8 @@ def admin_order(order_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                _btn(texts.ADM_BTN_DONE, f"a:odone:{order_id}"),
-                _btn(texts.ADM_BTN_REJECT, f"a:orej:{order_id}"),
+                _btn(texts.ADM_BTN_DONE, f"a:odone:{order_id}", style.SUCCESS),
+                _btn(texts.ADM_BTN_REJECT, f"a:orej:{order_id}", style.DANGER),
             ],
             [_btn(texts.BTN_BACK, "a:home")],
         ]
@@ -222,8 +216,8 @@ def admin_topup(topup_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                _btn(texts.ADM_BTN_CONFIRM_PAY, f"a:tok:{topup_id}"),
-                _btn(texts.ADM_BTN_REJECT, f"a:trej:{topup_id}"),
+                _btn(texts.ADM_BTN_CONFIRM_PAY, f"a:tok:{topup_id}", style.SUCCESS),
+                _btn(texts.ADM_BTN_REJECT, f"a:trej:{topup_id}", style.DANGER),
             ],
             [_btn(texts.BTN_BACK, "a:home")],
         ]
@@ -261,8 +255,8 @@ def admin_price_item(code: str, active: bool) -> InlineKeyboardMarkup:
     toggle = "🚫 Хомӯш кардан" if active else "✅ Фаъол кардан"
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [_btn("💲 Иваз кардани нарх", f"a:setprice:{code}")],
-            [_btn(toggle, f"a:toggle:{code}")],
+            [_btn("💲 Иваз кардани нарх", f"a:setprice:{code}", style.PRIMARY)],
+            [_btn(toggle, f"a:toggle:{code}", style.DANGER if active else style.SUCCESS)],
             [_btn(texts.BTN_BACK, "a:prices")],
         ]
     )

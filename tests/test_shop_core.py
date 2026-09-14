@@ -344,3 +344,100 @@ def test_all_texts_are_tajik_not_russian():
     )
     for word in russian_words:
         assert word not in all_labels
+
+
+# ── ранги тугмаҳо (майдони style-и Telegram) ──────────────────────────
+def _find(markup, text_part: str):
+    for row in markup.inline_keyboard:
+        for button in row:
+            if text_part in button.text:
+                return button
+    raise AssertionError(f"тугмаи «{text_part}» ёфт нашуд")
+
+
+def test_topup_button_is_green():
+    """Пур кардани ҳисоб — пул ба ҳисоб меояд, пас сабз."""
+    from shop import style
+
+    button = _find(keyboards.main_menu(), texts.BTN_TOPUP)
+    assert button.style == style.SUCCESS
+
+
+def test_sections_are_blue():
+    from shop import style
+
+    menu = keyboards.main_menu()
+    for title in (texts.BTN_TELEGRAM, texts.BTN_FF_CIS, texts.BTN_FF_ID, texts.BTN_PUBG):
+        assert _find(menu, title).style == style.PRIMARY
+
+
+def test_cancel_is_red_everywhere():
+    from shop import style
+
+    for markup in (keyboards.cancel_only(), keyboards.confirm_order(), keyboards.confirm_target()):
+        assert _find(markup, texts.BTN_CANCEL).style == style.DANGER
+
+
+def test_pay_and_confirm_are_green():
+    from shop import style
+
+    assert _find(keyboards.confirm_order(), texts.BTN_PAY).style == style.SUCCESS
+    assert _find(keyboards.confirm_target(), texts.BTN_YES_MINE).style == style.SUCCESS
+    assert _find(keyboards.payment(1, None), texts.BTN_PAID).style == style.SUCCESS
+
+
+def test_admin_approve_green_reject_red():
+    from shop import style
+
+    order = keyboards.admin_order(1)
+    assert _find(order, texts.ADM_BTN_DONE).style == style.SUCCESS
+    assert _find(order, texts.ADM_BTN_REJECT).style == style.DANGER
+    topup = keyboards.admin_topup(1)
+    assert _find(topup, texts.ADM_BTN_CONFIRM_PAY).style == style.SUCCESS
+
+
+def test_admin_money_buttons(db):
+    from types import SimpleNamespace
+    from shop import style
+
+    card = keyboards.admin_user(SimpleNamespace(id=1, is_blocked=False))
+    assert _find(card, texts.ADM_BTN_PLUS).style == style.SUCCESS
+    assert _find(card, texts.ADM_BTN_MINUS).style == style.DANGER
+    assert _find(card, texts.ADM_BTN_BLOCK).style == style.DANGER
+    unlocked = keyboards.admin_user(SimpleNamespace(id=1, is_blocked=True))
+    assert _find(unlocked, texts.ADM_BTN_UNBLOCK).style == style.SUCCESS
+
+
+def test_external_links_marked_as_link():
+    from shop import style
+
+    menu = keyboards.main_menu(reviews_url="https://t.me/x")
+    assert _find(menu, texts.BTN_REVIEWS).style == style.LINK
+    pay = keyboards.payment(1, "https://dc.tj/x", "https://alif/x")
+    assert _find(pay, texts.BTN_OPEN_LINK).style == style.LINK
+    assert _find(pay, texts.BTN_OPEN_ALIF).style == style.LINK
+
+
+def test_colors_can_be_switched_off():
+    """SHOP_BUTTON_COLORS=0 — ҳамаи рангҳо хомӯш мешаванд."""
+    from shop import style
+
+    style.set_enabled(False)
+    try:
+        assert _find(keyboards.main_menu(), texts.BTN_TOPUP).style is None
+        assert _find(keyboards.confirm_order(), texts.BTN_CANCEL).style is None
+    finally:
+        style.set_enabled(True)
+
+
+def test_style_values_are_what_telegram_accepts():
+    from shop import style
+
+    assert {style.SUCCESS, style.DANGER, style.PRIMARY, style.LINK} == {
+        "success", "danger", "primary", "link"
+    }
+
+
+def test_no_bottom_keyboard_left():
+    """Клавиатураи поёнӣ тамоман хориҷ шуд."""
+    assert not hasattr(keyboards, "persistent_menu")

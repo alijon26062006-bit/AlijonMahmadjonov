@@ -5,7 +5,7 @@ from __future__ import annotations
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from .. import catalog, keyboards, texts
 from ..config import Config
@@ -16,11 +16,29 @@ router = Router(name="menu")
 fallback_router = Router(name="fallback")
 
 
+async def _drop_bottom_keyboard(message: Message, db: Database) -> None:
+    """Клавиатураи поёниро аз мизоҷони версияи кӯҳна мебардорад.
+
+    Telegram онро танҳо ҳамроҳи паём бардошта метавонад, бинобар ин
+    паёми хидматӣ мефиристем ва фавран нест мекунем. Барои ҳар корбар
+    ин як маротиба иҷро мешавад — то ҳар дафъа дар назар нанамояд.
+    """
+    key = f"kb_cleared:{message.from_user.id}"
+    if db.setting(key) == "1":
+        return
+    try:
+        service = await message.answer("⌛️", reply_markup=ReplyKeyboardRemove())
+        await service.delete()
+    except Exception:  # паём аллакай нест ё ҳуқуқ нарасид — муҳим нест
+        pass
+    db.set_setting(key, "1")
+
+
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, db: Database, cfg: Config) -> None:
     await state.clear()
     current_user(message, db)
-    await message.answer(texts.PRESS_BUTTON, reply_markup=keyboards.persistent_menu())
+    await _drop_bottom_keyboard(message, db)
     await show_main_menu(message, db, cfg, edit=False)
 
 
