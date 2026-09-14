@@ -545,3 +545,66 @@ async def _strip(call: CallbackQuery) -> None:
         await call.message.edit_reply_markup(reply_markup=None)
     except TelegramAPIError as exc:
         log.debug("Кнопки уже убраны: %s", exc)
+
+
+@router.message(Command("gorder"))
+async def cmd_game_order(
+    message: Message, command: CommandObject, conn: aiosqlite.Connection, provider
+) -> None:
+    """Что поставщик говорит про игровой заказ прямо сейчас.
+
+    Нужна, когда заказ «не дошёл»: показывает сырой ответ, а не наше
+    толкование — по нему видно, зависло у поставщика или бот не понял статус.
+    """
+    query = (command.args or "").strip()
+    if not query:
+        await message.answer(
+            "Использование: <code>/gorder 26</code> — по нашему номеру\n"
+            "или <code>/gorder ord-1296254</code> — по номеру поставщика."
+        )
+        return
+
+    order = None
+    external = query
+    if query.isdigit():
+        order = await db.get_order(conn, int(query))
+        if order is None:
+            await message.answer(f"Заказа №{query} нет.")
+            return
+        if not order.fragment_order_id:
+            await message.answer(
+                f"У заказа №{order.id} нет номера у поставщика — "
+                "спросить его статус нечем."
+            )
+            return
+        external = order.fragment_order_id
+
+    from app.services import games as gsvc
+    from app.services import suppliers
+
+    client = suppliers.for_games(provider)
+    remote = await client.order_status(external)
+    if remote is None:
+        await message.answer(
+            f"❌ Поставщик не ответил про <code>{external}</code>.\n\n"
+            "<i>Проверьте ключ для игр и номер заказа.</i>"
+        )
+        return
+
+    status = gsvc.status_of(remote)
+    verdict = "🟢 выполнен" if status in gsvc.DONE else (
+        "🔴 отклонён" if status in gsvc.FAILED else "⏳ ещё в работе"
+    )
+    ours = ""
+    if order is not None:
+        ours = (f"├ У нас: №{order.id} — {order.status_title}\n"
+                f"├ Списано: <b>{fmt(order.price)}</b>\n")
+
+    await message.answer(
+        f"🎮 <b>Заказ у поставщика</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"{ours}"
+        f"├ Номер: <code>{external}</code>\n"
+        f"└ Статус: <b>{status or '—'}</b> {verdict}\n\n"
+        f"<blockquote expandable>{str(remote)[:900]}</blockquote>"
+    )

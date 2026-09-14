@@ -18,6 +18,7 @@ from app import runtime
 from app.config import settings
 from app.emoji import custom_id, em, premium_on
 from app.money import fmt, stars_cost, steam_cost
+from app.services import regions
 
 #: Значения поля style из Bot API 9.4
 PRIMARY = "primary"    # синий — главное действие экрана
@@ -141,9 +142,25 @@ def games_menu(games: list) -> InlineKeyboardMarkup:
     if runtime.steam_on():
         kb.row(btn(labeled("steam", "Steam"), "m:steam",
                    style=PRIMARY, icon="steam"))
-    for game in games:
-        kb.row(btn(game.title, f"g:{game.category_id}", style=PRIMARY))
+    # Одна игра — одна кнопка, даже если у поставщика она разложена
+    # по регионам: регион спрашиваем следующим шагом.
+    for group in regions.group(games):
+        items = group["games"]
+        if len(items) == 1:
+            kb.row(btn(items[0].title, f"g:{items[0].category_id}", style=PRIMARY))
+        else:
+            kb.row(btn(group["title"], f"gf:{group['family']}", style=PRIMARY))
     kb.row(btn(labeled("back", "Назад"), "m:main"))
+    return kb.as_markup()
+
+
+def game_regions(games: list) -> InlineKeyboardMarkup:
+    """Регионы одной игры. Регион решает, на каком сервере искать игрока."""
+    kb = InlineKeyboardBuilder()
+    for game in games:
+        kb.row(btn(regions.region_title(game), f"g:{game.category_id}",
+                   style=PRIMARY))
+    kb.row(btn(labeled("back", "Назад"), "m:games"))
     return kb.as_markup()
 
 

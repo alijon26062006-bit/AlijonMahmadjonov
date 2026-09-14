@@ -77,15 +77,25 @@ _RAW["GAMES_ENTRY"] = (
     "<i>Выберите игру</i> [[point]]"
 )
 
-_RAW["GAME_PACKS"] = (
+_RAW["GAME_REGION"] = (
     "[[game]] <b>{title}</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "[[point]] <b>Выберите регион аккаунта</b>\n\n"
+    "<blockquote>Регион — это сервер, на котором вы играете. Он виден "
+    "в профиле игры рядом с ником и ID.\n\n"
+    "Регион важен: на чужом сервере ваш ID просто не найдётся, и "
+    "пополнение не дойдёт.</blockquote>"
+)
+
+_RAW["GAME_PACKS"] = (
+    "[[game]] <b>{title}</b>{region}\n"
     f"<code>{LINE}</code>\n\n"
     "<blockquote>Выберите пакет — дальше спрошу ID игрока и покажу ник, "
     "чтобы вы убедились, что это ваш аккаунт.</blockquote>"
 )
 
 _RAW["GAME_ASK_ID"] = (
-    "[[game]] <b>{title}</b> — {pack}\n"
+    "[[game]] <b>{title}</b>{region} — {pack}\n"
     f"<code>{LINE}</code>\n\n"
     "[[profile]] <b>ID игрока</b>\n\n"
     "<blockquote>Пришлите <b>числовой ID</b> вашего аккаунта. Он виден "
@@ -693,7 +703,7 @@ _RAW["ADMIN_HELP"] = (
     "├ /stats — статистика\n"
     "├ /orders — последние заказы\n"
     "├ /retry &lt;id&gt; — повторить выдачу\n"
-    "├ /done &lt;id&gt; · /refund &lt;id&gt; — закрыть или вернуть\n"
+    "├ /done &lt;id&gt; · /refund &lt;id&gt; — закрыть или вернуть\n"    "├ /gorder &lt;id&gt; — статус игрового заказа у поставщика\n"
     "├ /give &lt;id&gt; &lt;сумма&gt; — начислить\n"
     "└ /take &lt;id&gt; &lt;сумма&gt; — списать\n\n"
     "<b>Прочее</b>\n"

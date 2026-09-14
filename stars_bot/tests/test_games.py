@@ -17,7 +17,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import CallbackQuery, Chat, Message, User
 from pydantic import PrivateAttr
 
-from app import db, keyboards, runtime
+from app import db, keyboards, runtime, texts
 from app.handlers import games as gh
 from app.handlers import panel
 from app.money import fmt
@@ -549,7 +549,7 @@ async def no_supplier_number(conn) -> None:
     check("в сообщении есть ID игрока", told and "1724367212" in told[0])
     check("подсказаны команды", told and "/done" in told[0] and "/refund" in told[0])
     check("предупреждён автоматический возврат",
-          told and "20 минут" in told[0], str(told[:1]))
+          told and f"{svc.timeout_minutes()} мин" in told[0], str(told[:1]))
 
     order = (await db.last_game_orders(conn))[0]
     check("заказ помечен зависшим", order.status == db.ORDER_FAILED, order.status)
@@ -875,6 +875,330 @@ async def key_balances(conn) -> None:
         nk.usage = real
 
 
+async def after_refund(conn) -> None:
+    """Заказ, выполнившийся уже после возврата денег, находится и не теряется.
+
+    Возврат по таймауту — ставка: поставщик может отдать товар позже. Тогда
+    клиент получил его бесплатно, и владелец должен узнать об этом один раз,
+    а не на каждом круге присмотра.
+    """
+    bot = FakeBot()
+    late = await db.create_order(
+        conn, user_id=BUYER, product_type="game:free_fire_br", quantity=1,
+        recipient="1724367212", price=1400, cost=1090,
+    )
+    await db.update_order(conn, late.id, fragment_order_id="ord-late")
+    await db.transition_order(
+        conn, late.id, expected=db.ORDER_DELIVERING, new=db.ORDER_REFUNDED,
+        error=f"{svc.TIMEOUT_MARK} не выполнился за отведённое время",
+    )
+
+    # поставщик всё ещё думает — трогать нечего
+    found = await svc.check_after_refund(bot, conn, GameProvider(status="processing"))
+    check("пока заказ в работе, тревоги нет", found == 0, str(found))
+    check("метка возврата осталась на месте",
+          (await db.get_order(conn, late.id)).error.startswith(svc.TIMEOUT_MARK))
+
+    # а теперь он его выполнил
+    found = await svc.check_after_refund(bot, conn, GameProvider(status="completed"))
+    told = [t for t in bot.to(ADMIN) if "ord-late" in t]
+    check("выполненный после возврата заказ найден", found >= 1 and bool(told),
+          str(found))
+    check("владельцу сказали", bool(told), str(bot.to(ADMIN)))
+    check("в сообщении номер поставщика", told and "ord-late" in told[0])
+    check("и ID игрока, кому ушёл товар", told and "1724367212" in told[0])
+    check("и сумма возврата", told and fmt(1400) in told[0], str(told[:1]))
+    check("подсказано, как списать обратно",
+          told and "Клиенты" in told[0], str(told[:1]))
+
+    # второй круг про тот же заказ молчит
+    again = await svc.check_after_refund(bot, conn, GameProvider(status="completed"))
+    check("повторно о том же не пишем", again == 0, str(again))
+    check("причина возврата переписана",
+          "выполнен после возврата" in (await db.get_order(conn, late.id)).error,
+          (await db.get_order(conn, late.id)).error)
+
+    # обычный возврат (отказ поставщика) присмотром не подхватывается
+    plain = await db.create_order(
+        conn, user_id=BUYER, product_type="game:free_fire_br", quantity=1,
+        recipient="42", price=1400, cost=1090,
+    )
+    await db.update_order(conn, plain.id, fragment_order_id="ord-plain")
+    await db.transition_order(
+        conn, plain.id, expected=db.ORDER_DELIVERING, new=db.ORDER_REFUNDED,
+        error="поставщик вернул статус failed",
+    )
+    quiet = await svc.check_after_refund(bot, conn, GameProvider(status="completed"))
+    check("возврат по отказу присмотром не берётся", quiet == 0, str(quiet))
+
+    # старые возвраты уходят из-под присмотра
+    old_ts = (datetime.now(timezone.utc)
+              - timedelta(hours=svc.AFTER_REFUND_HOURS + 1)).isoformat(timespec="seconds")
+    aged = await db.create_order(
+        conn, user_id=BUYER, product_type="game:free_fire_br", quantity=1,
+        recipient="43", price=1400, cost=1090,
+    )
+    await db.update_order(conn, aged.id, fragment_order_id="ord-aged")
+    await db.transition_order(
+        conn, aged.id, expected=db.ORDER_DELIVERING, new=db.ORDER_REFUNDED,
+        error=f"{svc.TIMEOUT_MARK} не выполнился за отведённое время",
+    )
+    await conn.execute("UPDATE orders SET updated_at = ? WHERE id = ?",
+                       (old_ts, aged.id))
+    await conn.commit()
+    stale = await svc.check_after_refund(bot, conn, GameProvider(status="completed"))
+    check("давний возврат уже не сторожим", stale == 0, str(stale))
+
+
+async def timeout_setting(conn) -> None:
+    """Время ожидания выдачи меняется из панели."""
+    check("по умолчанию ждём 20 минут",
+          svc.timeout_minutes() == 20, str(svc.timeout_minutes()))
+
+    await runtime.set_value(conn, "games_timeout_min", "45")
+    check("значение из панели важнее",
+          svc.timeout_minutes() == 45, str(svc.timeout_minutes()))
+
+    # ждать меньше двух минут нельзя: выдача столько и идёт
+    await runtime.set_value(conn, "games_timeout_min", "0")
+    check("ноль не выключает ожидание", svc.timeout_minutes() >= 2,
+          str(svc.timeout_minutes()))
+
+    await runtime.set_value(conn, "games_timeout_min", "5")
+    call = call_of("pn:games", uid=ADMIN)
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage,
+                       key=StorageKey(bot_id=1, chat_id=ADMIN, user_id=ADMIN))
+    await panel.cb_games(call, state, conn)
+    check("в панели видно текущее ожидание",
+          any("5 мин" in b for b in buttons(call.markup)), str(buttons(call.markup)))
+    check("и оно же в пояснении", "5 мин" in call.last, call.last[-200:])
+
+    # заказ закрывается по новому сроку, а не по старому
+    bot = FakeBot()
+    order = await db.create_order(
+        conn, user_id=BUYER, product_type="game:free_fire_br", quantity=1,
+        recipient="1724367212", price=1400, cost=1090,
+    )
+    await db.update_order(conn, order.id, fragment_order_id="ord-short")
+    ago = (datetime.now(timezone.utc) - timedelta(minutes=8)).isoformat(timespec="seconds")
+    await conn.execute("UPDATE orders SET created_at = ? WHERE id = ?",
+                       (ago, order.id))
+    await conn.commit()
+    result = await svc.check(bot, conn, GameProvider(status="processing"),
+                             await db.get_order(conn, order.id))
+    check("укороченное ожидание работает", result == "timeout", result)
+
+    await runtime.set_value(conn, "games_timeout_min", "20")
+
+
+async def gorder_command(conn) -> None:
+    """/gorder показывает сырой ответ поставщика по игровому заказу."""
+    from aiogram.filters import CommandObject
+
+    from app.handlers import admin
+
+    order = await db.create_order(
+        conn, user_id=BUYER, product_type="game:free_fire_br", quantity=1,
+        recipient="1724367212", price=1400, cost=1090,
+    )
+    await db.update_order(conn, order.id, fragment_order_id="ord-1296254")
+
+    async def run(args: str, provider=None):
+        message = msg("/gorder " + args, uid=ADMIN)
+        await admin.cmd_game_order(
+            message, CommandObject(command="gorder", args=args),
+            conn, provider or GameProvider(status="processing"),
+        )
+        return message
+
+    told = await run("")
+    check("без номера показана подсказка", "Использование" in told.last, told.last[:80])
+
+    told = await run(str(order.id))
+    check("наш номер понимается", "ord-1296254" in told.last, told.last[:200])
+    check("видно, что заказ ещё в работе", "в работе" in told.last, told.last[:300])
+    check("показан сырой ответ поставщика", "processing" in told.last, told.last)
+    check("и наша сторона заказа", f"№{order.id}" in told.last, told.last[:300])
+
+    told = await run("ord-1296254", GameProvider(status="completed"))
+    check("номер поставщика понимается тоже", "выполнен" in told.last, told.last[:300])
+
+    told = await run("ord-1296254", GameProvider(status="failed"))
+    check("отказ виден отдельно", "отклонён" in told.last, told.last[:300])
+
+    told = await run("999999")
+    check("несуществующий заказ назван", "нет" in told.last, told.last[:80])
+
+    bare = await db.create_order(
+        conn, user_id=BUYER, product_type="game:free_fire_br", quantity=1,
+        recipient="7", price=1400, cost=1090,
+    )
+    told = await run(str(bare.id))
+    check("про заказ без номера сказано прямо",
+          "нет номера" in told.last, told.last[:120])
+
+    class Silent(GameProvider):
+        async def order_status(self, order_id):
+            return None
+
+    told = await run("ord-1296254", Silent())
+    check("молчание поставщика не ломает команду",
+          "не ответил" in told.last, told.last[:120])
+
+    check("команда есть в справке админа", "/gorder" in texts.ADMIN_HELP)
+
+
+async def region_step(conn) -> None:
+    """Сначала игра, потом регион: ID игрока живёт на конкретном сервере."""
+    from app.services import regions as reg
+
+    check("регион читается из кода категории",
+          reg.split("free_fire_br") == ("free_fire", "br"),
+          str(reg.split("free_fire_br")))
+    check("у кода без региона семья — он сам",
+          reg.split("pubg_mobile") == ("pubg_mobile", ""),
+          str(reg.split("pubg_mobile")))
+    check("СНГ распознаётся", reg.title_of("free_fire_cis") == "🌍 СНГ")
+    check("Индонезия распознаётся", reg.title_of("free_fire_id") == "🇮🇩 Индонезия")
+    check("Бразилия распознаётся", reg.title_of("free_fire_br") == "🇧🇷 Бразилия")
+    check("для ников берётся код сервера",
+          reg.nick_region("free_fire_id") == "ID", reg.nick_region("free_fire_id"))
+
+    for code in ("free_fire_cis", "free_fire_id"):
+        await db.add_game(conn, category_id=code, title="🔥 Free Fire",
+                          field="user_id", region=reg.nick_region(code))
+        await db.update_game(conn, code, enabled=1)
+    await db.load_game_titles(conn)
+
+    games = await db.list_games(conn, only_enabled=True)
+    menu = buttons(keyboards.games_menu(games))
+    check("три региона показаны одной кнопкой",
+          sum(1 for b in menu if "Free Fire" in b) == 1, str(menu))
+
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage,
+                       key=StorageKey(bot_id=1, chat_id=BUYER, user_id=BUYER))
+    call = call_of("m:games")
+    await gh.cb_games(call, state, conn)
+    check("в меню кнопка ведёт к выбору региона",
+          any(b.callback_data == "gf:free_fire"
+              for row in call.markup.inline_keyboard for b in row),
+          str(buttons(call.markup)))
+
+    call = call_of("gf:free_fire")
+    await gh.cb_family(call, state, conn)
+    check("экран региона открылся", "регион" in call.last.lower(), call.last[:120])
+    check("объяснено, зачем регион",
+          "не найдётся" in call.last or "не найдется" in call.last, call.last)
+    picks = buttons(call.markup)
+    check("предложены все три региона",
+          all(any(name in b for b in picks)
+              for name in ("СНГ", "Индонезия", "Бразилия")), str(picks))
+    check("СНГ стоит первым", "СНГ" in picks[0], str(picks))
+    check("каждый регион ведёт в свою категорию",
+          {b.callback_data for row in call.markup.inline_keyboard for b in row}
+          >= {"g:free_fire_cis", "g:free_fire_id", "g:free_fire_br"},
+          str([b.callback_data for row in call.markup.inline_keyboard for b in row]))
+
+    call = call_of("g:free_fire_id")
+    await gh.cb_game(call, state, conn, GameProvider())
+    check("после региона показаны пакеты", "Выберите пакет" in call.last,
+          call.last[:120])
+    check("регион виден в заголовке", "Индонезия" in call.last, call.last[:120])
+
+    call = call_of("gp:free_fire_id:0")
+    await gh.cb_pack(call, state, conn)
+    check("регион виден и при вводе ID", "Индонезия" in call.last, call.last[:120])
+
+    # выключенный регион исчезает из выбора
+    await db.update_game(conn, "free_fire_id", enabled=0)
+    call = call_of("gf:free_fire")
+    await gh.cb_family(call, state, conn)
+    picks = buttons(call.markup)
+    check("выключенный регион не предлагается",
+          not any("Индонезия" in b for b in picks), str(picks))
+
+    # игра с одним регионом лишнего шага не просит
+    await db.add_game(conn, category_id="genshin_impact", title="⚔️ Genshin",
+                      field="uid")
+    await db.update_game(conn, "genshin_impact", enabled=1)
+    games = await db.list_games(conn, only_enabled=True)
+    codes = {b.callback_data
+             for row in keyboards.games_menu(games).inline_keyboard for b in row}
+    check("одиночная игра ведёт сразу к пакетам",
+          "g:genshin_impact" in codes, str(codes))
+
+    await db.delete_game(conn, "genshin_impact")
+    await db.update_game(conn, "free_fire_id", enabled=1)
+
+
+async def catalog_pick(conn) -> None:
+    """Каталог поставщика в панели: коды и регионы не переписываются руками."""
+    class Catalog(GameProvider):
+        async def game_catalog(self):
+            return [
+                {"category_id": "free_fire_br", "name": "Free Fire",
+                 "fields": [{"name": "player_id"}]},
+                {"category_id": "free_fire_id", "name": "Free Fire",
+                 "fields": [{"name": "player_id"}]},
+                {"category_id": "free_fire_cis", "name": "Free Fire",
+                 "fields": [{"name": "player_id"}]},
+                {"category_id": "mobile_legends_ph", "name": "Mobile Legends",
+                 "fields": [{"name": "user_id"}]},
+            ]
+
+    call = call_of("pn:game_pick", uid=ADMIN)
+    await panel.cb_game_pick(call, conn, Catalog())
+    picks = buttons(call.markup)
+    check("каталог показан", "Каталог поставщика" in call.last, call.last[:80])
+    check("игры сгруппированы, а не по регионам",
+          sum(1 for b in picks if "Free Fire" in b) == 1, str(picks))
+    check("видно число регионов",
+          any("регионов: 3" in b for b in picks), str(picks))
+    check("вторая игра тоже в списке",
+          any("Mobile Legends" in b for b in picks), str(picks))
+
+    call = call_of("pn:game_add:mobile_legends", uid=ADMIN)
+    await panel.cb_game_add_family(call, conn, Catalog())
+    added = await db.get_game(conn, "mobile_legends_ph")
+    check("регион добавлен одной кнопкой", added is not None)
+    check("поле для ID взято из каталога", added and added.field == "user_id",
+          added.field if added else "")
+    check("регион для ников проставлен", added and added.region == "PH",
+          added.region if added else "")
+    check("новая игра сразу не продаётся", added and added.enabled == 0)
+    check("показано, что именно добавлено",
+          "Филиппины" in call.last, call.last[:300])
+
+    call = call_of("pn:game_all_on:mobile_legends", uid=ADMIN)
+    await panel.cb_game_family_on(call, conn)
+    check("все регионы включаются одной кнопкой",
+          (await db.get_game(conn, "mobile_legends_ph")).enabled == 1)
+
+    # название, поставленное владельцем, при добавлении регионов не теряется
+    call = call_of("pn:game_add:free_fire", uid=ADMIN)
+    await panel.cb_game_add_family(call, conn, Catalog())
+    for code in ("free_fire_br", "free_fire_cis", "free_fire_id"):
+        game = await db.get_game(conn, code)
+        check(f"название сохранено у {code}",
+              game is not None and game.title == "🔥 Free Fire",
+              game.title if game else "")
+    check("включённый регион не выключился",
+          (await db.get_game(conn, "free_fire_br")).enabled == 1)
+
+    class Broken(GameProvider):
+        async def game_catalog(self):
+            raise DeliveryError("HTTP 401: ключ не принят")
+
+    call = call_of("pn:game_pick", uid=ADMIN)
+    await panel.cb_game_pick(call, conn, Broken())
+    check("поломка каталога объяснена", "не пришёл" in call.last, call.last[:120])
+    check("и подсказано, куда смотреть", "ключ" in call.last.lower(), call.last)
+
+    await db.delete_game(conn, "mobile_legends_ph")
+
+
 async def main() -> None:
     for sfx in ("", "-wal", "-shm"):
         Path(str(db.settings.db_file) + sfx).unlink(missing_ok=True)
@@ -887,6 +1211,11 @@ async def main() -> None:
         await flow(conn)
         await unknown_nick(conn)
         await panel_screens(conn)
+        await after_refund(conn)
+        await timeout_setting(conn)
+        await gorder_command(conn)
+        await region_step(conn)
+        await catalog_pick(conn)
     finally:
         await conn.close()
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")

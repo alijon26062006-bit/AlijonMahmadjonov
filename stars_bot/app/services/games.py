@@ -43,6 +43,13 @@ TIMEOUT_MINUTES = 20
 FAST_EVERY = 3
 FAST_SECONDS = 3 * 60
 
+#: Метка причины возврата: по ней узнаём заказы, за которыми надо
+#: присмотреть и после возврата денег.
+TIMEOUT_MARK = "таймаут:"
+#: Сколько ещё следим за возвращённым заказом. Поставщик может выполнить
+#: его позже — тогда товар ушёл даром, и владелец должен узнать об этом.
+AFTER_REFUND_HOURS = 6
+
 DONE = {"completed", "complete", "done", "delivered", "success", "fulfilled"}
 FAILED = {"failed", "fail", "error", "cancelled", "canceled", "rejected",
           "refunded", "expired"}
@@ -161,8 +168,9 @@ async def check(
         await _refund(bot, conn, order, f"поставщик вернул статус {status}")
         return "failed"
 
-    if _minutes_waiting(order) >= TIMEOUT_MINUTES:
-        await _refund(bot, conn, order, "заказ не выполнился за отведённое время")
+    if _minutes_waiting(order) >= timeout_minutes():
+        await _refund(bot, conn, order,
+                      f"{TIMEOUT_MARK} не выполнился за отведённое время")
         await delivery.notify_admins(
             bot,
             "⚠️ <b>Игровой заказ висел слишком долго</b>\n"
@@ -176,6 +184,51 @@ async def check(
         return "timeout"
 
     return "waiting"
+
+
+def timeout_minutes() -> int:
+    """Сколько ждать выдачу. Меняется в панели: у разных игр своя скорость."""
+    return max(runtime.get_int("games_timeout_min") or TIMEOUT_MINUTES, 2)
+
+
+async def check_after_refund(bot: Bot, conn: aiosqlite.Connection, provider) -> int:
+    """Догнать заказы, которые выполнились уже после возврата денег.
+
+    Возврат по таймауту — ставка: заказ мог дойти позже, и тогда товар ушёл
+    бесплатно. Молча это оставлять нельзя.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    since = (datetime.now(timezone.utc)
+             - timedelta(hours=AFTER_REFUND_HOURS)).isoformat(timespec="seconds")
+    found = 0
+    for order in await db.refunded_game_orders(conn, TIMEOUT_MARK, since):
+        remote = await provider.order_status(order.fragment_order_id or "")
+        if status_of(remote) not in DONE:
+            continue
+
+        # Метку снимаем сразу: иначе о том же заказе напишем на каждом круге.
+        await db.update_order(
+            conn, order.id,
+            error=f"выполнен после возврата ({order.fragment_order_id})",
+        )
+        found += 1
+        from app.services import delivery
+
+        await delivery.notify_admins(
+            bot,
+            "❗️ <b>Заказ выполнился после возврата</b>\n"
+            f"├ Наш номер: <code>{order.id}</code>\n"
+            f"├ У поставщика: <code>{order.fragment_order_id}</code>\n"
+            f"├ Игрок: <code>{order.recipient}</code>\n"
+            f"└ Клиенту вернули <b>{fmt(order.price)}</b>\n\n"
+            "<blockquote>Товар дошёл, а деньги вернулись — клиент получил "
+            "его бесплатно. Списать обратно: панель → 👥 Клиенты → "
+            f"<code>{order.user_id}</code> → ➖ Списать.\n\n"
+            "Если это повторяется, увеличьте время ожидания в разделе "
+            "«Игры».</blockquote>",
+        )
+    return found
 
 
 def _minutes_waiting(order: db.Order) -> int:
@@ -256,6 +309,7 @@ async def watch_loop(provider, bot: Bot) -> None:
                 pending = await db.unfinished_game_orders(conn)
                 for order in pending:
                     await check(bot, conn, games_provider, order)
+                await check_after_refund(bot, conn, games_provider)
             finally:
                 await conn.close()
         except asyncio.CancelledError:

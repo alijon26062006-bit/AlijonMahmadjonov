@@ -586,6 +586,9 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "autostop_after": ("🔢 Порог автостопа",
                        "После скольких неудачных заказов подряд бот гасит "
                        "продажу. Обычно 3:", "int"),
+    "games_timeout_min": ("⏱ Ожидание выдачи (игры)",
+                          "Сколько минут ждать пополнение, прежде чем "
+                          "вернуть деньги клиенту. Обычно 20:", "int"),
     "support_notice": ("📝 Объявление в поддержке",
                        "Текст, который увидят клиенты в разделе «Поддержка» "
                        "(или <code>-</code>, чтобы убрать):", "text"),
@@ -607,6 +610,7 @@ FIELD_PARENT.update({
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
     "referral_percent": "pn:prices", "support_notice": "pn:home",
     "autostop_after": "pn:wallet",
+    "games_timeout_min": "pn:games",
 })
 
 
@@ -3057,6 +3061,8 @@ async def cb_partner_take(call: CallbackQuery, conn: aiosqlite.Connection) -> No
 
 
 async def games_text(conn: aiosqlite.Connection) -> str:
+    from app.services import games as gsvc
+
     items = await db.list_games(conn)
     if not items:
         body = (
@@ -3088,19 +3094,26 @@ async def games_text(conn: aiosqlite.Connection) -> str:
         "<blockquote>Цена пакета считается сама: себестоимость поставщика "
         "в долларах по курсу плюс наценка. Заказы почти всегда уходят "
         "«в обработку», бот следит за ними и возвращает деньги, если "
-        "пополнение не дошло за 20 минут.</blockquote>"
+        f"пополнение не дошло за {gsvc.timeout_minutes()} мин.</blockquote>"
     )
 
 
 async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
+    from app.services import games as gsvc
+
     kb = InlineKeyboardBuilder()
     kb.row(btn("➕ Добавить игру", "pn:game_new", style=SUCCESS))
+    kb.row(btn("📚 Взять из каталога поставщика", "pn:game_pick", style=PRIMARY))
     for game in await db.list_games(conn):
         kb.row(InlineKeyboardButton(
             text=("✅ " if game.enabled else "🚫 ") + game.title,
             callback_data=f"pn:game:{game.category_id}",
         ))
     kb.row(btn("🔌 Проверить поставщика игр", "pn:games_check", style=PRIMARY))
+    kb.row(InlineKeyboardButton(
+        text=f"⏱ Ожидание выдачи · {gsvc.timeout_minutes()} мин",
+        callback_data="pn:set:games_timeout_min",
+    ))
     kb.row(InlineKeyboardButton(text="🔑 Ключ поставщика для игр",
                                 callback_data="pn:set:fazer_games_key"))
     kb.row(btn("🔑 Ключ для ников Free Fire", "pn:set:gameskinbo_key"))
@@ -3146,7 +3159,9 @@ async def on_game_new(
         )
         return
 
-    region = "BR" if "free_fire" in code else ""
+    from app.services import regions as reg
+
+    region = reg.nick_region(code)
 
     # Поле с ID у каждой игры своё: спрашиваем у поставщика, а не гадаем.
     from app.services import games as gsvc
@@ -3171,6 +3186,153 @@ async def on_game_new(
     )
 
 
+@router.callback_query(F.data == "pn:game_pick")
+async def cb_game_pick(call: CallbackQuery, conn: aiosqlite.Connection, provider) -> None:
+    """Список игр поставщика кнопками: коды и регионы не надо переписывать руками.
+
+    Ошибка в коде категории стоит дорого: игра добавляется, а пакеты к ней
+    не приходят. Поэтому берём коды у самого поставщика.
+    """
+    await safe_edit(call, "📚 Спрашиваю каталог поставщика…",
+                    back_kb("pn:games", "‹ Назад"))
+    await call.answer()
+
+    from app.services import regions as reg
+    from app.services import suppliers
+
+    client = suppliers.for_games(provider)
+    try:
+        catalog = await client.game_catalog()
+    except Exception as exc:  # noqa: BLE001 — показать админу любую поломку
+        await safe_edit(
+            call,
+            "❌ <b>Каталог не пришёл</b>\n\n"
+            f"<blockquote expandable>{str(exc)[:400]}</blockquote>\n\n"
+            "<i>Проверьте ключ поставщика для игр.</i>",
+            back_kb("pn:games", "‹ К играм"),
+        )
+        return
+
+    have = {game.category_id for game in await db.list_games(conn)}
+    groups: dict[str, list[dict]] = {}
+    for item in catalog:
+        groups.setdefault(reg.family_of(item["category_id"]), []).append(item)
+
+    if not groups:
+        await safe_edit(call, "📚 Поставщик не назвал ни одной игры.",
+                        back_kb("pn:games", "‹ К играм"))
+        return
+
+    kb = InlineKeyboardBuilder()
+    for family, items in sorted(groups.items()):
+        items.sort(key=lambda i: reg.sort_key(i["category_id"]))
+        added = sum(1 for i in items if i["category_id"] in have)
+        mark = "✅" if added == len(items) else ("◻️" if not added else "▫️")
+        name = items[0]["name"] or family
+        kb.row(InlineKeyboardButton(
+            text=f"{mark} {name} · регионов: {len(items)}",
+            callback_data=f"pn:game_add:{family}",
+        ))
+    kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
+
+    await safe_edit(
+        call,
+        "📚 <b>Каталог поставщика</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"Игр: <b>{len(groups)}</b>\n\n"
+        "<blockquote>Нажмите игру — добавлю сразу все её регионы. Клиент "
+        "выберет игру, а потом регион своего аккаунта.\n\n"
+        "Регион важен: на чужом сервере ID игрока не находится, и "
+        "пополнение не доходит.</blockquote>",
+        kb.as_markup(),
+    )
+
+
+@router.callback_query(F.data.startswith("pn:game_add:"))
+async def cb_game_add_family(
+    call: CallbackQuery, conn: aiosqlite.Connection, provider
+) -> None:
+    """Добавить все регионы одной игры разом."""
+    family = call.data.split(":", 2)[2]
+    await call.answer("Добавляю…")
+
+    from app.services import games as gsvc
+    from app.services import regions as reg
+    from app.services import suppliers
+
+    client = suppliers.for_games(provider)
+    try:
+        catalog = await client.game_catalog()
+    except Exception as exc:  # noqa: BLE001
+        await call.answer(f"Каталог не пришёл: {str(exc)[:120]}", show_alert=True)
+        return
+
+    items = [i for i in catalog if reg.family_of(i["category_id"]) == family]
+    if not items:
+        await call.answer("Такой игры у поставщика больше нет.", show_alert=True)
+        return
+
+    # Название берём то, что уже стоит у нас: владелец мог поставить
+    # своё с эмодзи, и терять его при добавлении регионов незачем.
+    existing = {g.category_id: g for g in await db.list_games(conn)}
+    title = next((g.title for cid, g in existing.items()
+                  if reg.family_of(cid) == family), "")
+
+    items.sort(key=lambda i: reg.sort_key(i["category_id"]))
+    lines = []
+    for item in items:
+        code = item["category_id"]
+        field = ""
+        for spec in item.get("fields") or []:
+            name = spec.get("name") if isinstance(spec, dict) else spec
+            if name:
+                field = str(name)
+                break
+        field = field or await gsvc.detect_field(client, code) or "user_id"
+        await db.add_game(
+            conn, category_id=code, title=title or item["name"] or family,
+            field=field, region=reg.nick_region(code),
+        )
+        lines.append(f"├ {reg.title_of(code) or 'без региона'} — "
+                     f"<code>{code}</code> · поле <code>{field}</code>")
+    await db.load_game_titles(conn)
+
+    kb = InlineKeyboardBuilder()
+    kb.row(btn(f"✅ Показать все {len(items)} региона в меню",
+               f"pn:game_all_on:{family}", style=SUCCESS))
+    kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
+
+    await safe_edit(
+        call,
+        f"✅ <b>{title or items[0]['name']}</b> — добавлено регионов: "
+        f"<b>{len(items)}</b>\n"
+        f"<code>{texts.LINE}</code>\n\n" + "\n".join(lines) + "\n\n"
+        "<blockquote>Пока регионы скрыты от клиентов. Включите их кнопкой "
+        "ниже — тогда при покупке этой игры появится выбор региона.\n\n"
+        "Отдельный регион можно выключить в его карточке.</blockquote>",
+        kb.as_markup(),
+    )
+
+
+@router.callback_query(F.data.startswith("pn:game_all_on:"))
+async def cb_game_family_on(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    """Включить в меню сразу все регионы игры."""
+    if runtime.usd_rate() <= 0:
+        await call.answer("Сначала задайте курс доллара.", show_alert=True)
+        return
+
+    from app.services import regions as reg
+
+    family = call.data.split(":", 2)[2]
+    turned = 0
+    for game in await db.list_games(conn):
+        if reg.family_of(game.category_id) == family and not game.enabled:
+            await db.update_game(conn, game.category_id, enabled=1)
+            turned += 1
+    await call.answer(f"Включено: {turned}" if turned else "Уже включены.")
+    await safe_edit(call, substitute(await games_text(conn)), await games_kb(conn))
+
+
 @router.callback_query(F.data.startswith("pn:game:"))
 async def cb_game_card(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     game = await db.get_game(conn, call.data.split(":", 2)[2])
@@ -3182,13 +3344,23 @@ async def cb_game_card(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     await call.answer()
 
 
+def _region_label(game: db.Game) -> str:
+    """Регион в карточке: название с флагом, если он читается из кода."""
+    from app.services import regions as reg
+
+    title = reg.title_of(game.category_id)
+    if title:
+        return f"{title} ({reg.suffix_of(game.category_id).upper()})"
+    return game.region or "один на все"
+
+
 def game_card(game: db.Game) -> str:
     return (
         f"🕹 <b>{game.title}</b>\n"
         f"<code>{texts.LINE}</code>\n\n"
         f"├ Код: <code>{game.category_id}</code>\n"
         f"├ Поле для ID: <code>{game.field}</code>\n"
-        f"├ Регион: <b>{game.region or 'не задан'}</b>\n"
+        f"├ Регион: <b>{_region_label(game)}</b>\n"
         f"├ Наценка: <b>{game.margin or runtime.margin_percent()}%</b>"
         + ("" if game.margin else " <i>(общая)</i>")
         + f"\n└ В меню: <b>{'да' if game.enabled else 'нет'}</b>"

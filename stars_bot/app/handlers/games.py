@@ -15,6 +15,7 @@ from app.money import fmt
 from app.services import games as svc
 from app.services import suppliers
 from app.services import nicknames
+from app.services import regions
 from app.services.fragment import DeliveryError, DeliveryProvider, DeliveryUncertain
 from app.states import Game
 
@@ -71,6 +72,33 @@ async def cb_games(
     await call.answer()
 
 
+def _region(game: db.Game) -> str:
+    """Приписка с регионом. Пусто, если регион у игры один — лишний шум."""
+    title = regions.title_of(game.category_id)
+    return f" · {title}" if title else ""
+
+
+@router.callback_query(F.data.startswith("gf:"))
+async def cb_family(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    """Выбор региона: у одной игры их несколько, и ID ищется только в своём."""
+    await state.clear()
+    family = call.data.split(":", 1)[1]
+    games = await db.list_games(conn, only_enabled=True)
+    items = [g for g in games if regions.family_of(g.category_id) == family]
+    # СНГ первым: он нужен чаще всего, и листать до него не надо.
+    items.sort(key=lambda g: regions.sort_key(g.category_id))
+    if not items:
+        await call.answer("Эта игра больше не продаётся.", show_alert=True)
+        return
+    await call.message.edit_text(
+        texts.GAME_REGION.format(title=items[0].title),
+        reply_markup=keyboards.game_regions(items),
+    )
+    await call.answer()
+
+
 @router.callback_query(F.data.startswith("g:"), ~F.data.in_({"g:ok"}))
 async def cb_game(
     call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection,
@@ -103,7 +131,7 @@ async def cb_game(
 
     await state.clear()
     await call.message.edit_text(
-        texts.GAME_PACKS.format(title=game.title),
+        texts.GAME_PACKS.format(title=game.title, region=_region(game)),
         reply_markup=keyboards.game_packs(category_id, offers),
     )
 
@@ -142,7 +170,8 @@ async def cb_pack(
         price=offer["price"], cost=offer["cost"],
     )
     await call.message.edit_text(
-        texts.GAME_ASK_ID.format(title=game.title, pack=offer["name"]),
+        texts.GAME_ASK_ID.format(title=game.title, region=_region(game),
+                                 pack=offer["name"]),
         reply_markup=keyboards.cancel(),
     )
     await call.answer()
@@ -204,7 +233,9 @@ async def _lookup(provider, game: db.Game, player: str) -> tuple[str | None, str
 
     if "free_fire" in game.category_id or "freefire" in game.category_id:
         key = runtime.get("gameskinbo_key") or db.settings.gameskinbo_key
-        found = await nicknames.free_fire(player, key=key, region=game.region)
+        # Регион берём из кода категории: он там точнее, чем в подсказке.
+        region = regions.nick_region(game.category_id) or game.region
+        found = await nicknames.free_fire(player, key=key, region=region)
         if found.verdict == "ok":
             return found.name, "ok"
         if found.verdict == "bad":
@@ -285,8 +316,8 @@ async def cb_buy(
         return
     except DeliveryUncertain as exc:
         # Номера заказа у поставщика нет — статус спросить нечем, и сам он
-        # не разрешится. Зовём владельца сразу, а не через 20 минут, когда
-        # сработает возврат по таймауту.
+        # не разрешится. Зовём владельца сразу, а не когда сработает
+        # возврат по таймауту.
         await db.transition_order(
             conn, order.id, expected=db.ORDER_DELIVERING, new=db.ORDER_FAILED,
             error=str(exc)[:1000],
@@ -301,7 +332,8 @@ async def cb_buy(
             "<blockquote>Отследить его бот не может. Проверьте кабинет "
             f"поставщика: дошло → <code>/done {order.id}</code>, "
             f"нет → <code>/refund {order.id}</code>.\n\nБез решения деньги "
-            "вернутся клиенту сами через 20 минут.</blockquote>",
+            f"вернутся клиенту сами через {svc.timeout_minutes()} мин."
+            "</blockquote>",
         )
         await call.message.edit_text(
             texts.GAME_ACCEPTED.format(

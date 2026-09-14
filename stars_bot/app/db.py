@@ -1277,6 +1277,21 @@ async def transition_order(
     return True
 
 
+async def refunded_game_orders(
+    conn: aiosqlite.Connection, marker: str, since: str, limit: int = 50,
+) -> list[Order]:
+    """Заказы, возвращённые по таймауту, за которыми ещё стоит присмотреть."""
+    async with conn.execute(
+        """SELECT * FROM orders
+           WHERE status = ? AND product_type LIKE 'game:%'
+             AND fragment_order_id IS NOT NULL
+             AND error LIKE ? AND updated_at >= ?
+           ORDER BY id DESC LIMIT ?""",
+        (ORDER_REFUNDED, f"{marker}%", since, limit),
+    ) as cur:
+        return [_from_row(Order, row) for row in await cur.fetchall()]
+
+
 async def last_game_orders(
     conn: aiosqlite.Connection, limit: int = 5,
 ) -> list[Order]:
