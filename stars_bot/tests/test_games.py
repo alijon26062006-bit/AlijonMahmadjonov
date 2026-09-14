@@ -217,7 +217,8 @@ async def nick_lookup() -> None:
     found = await nicknames.free_fire("1724367212", key="k", region="BR")
     check("ник получен", found.name == "ProPlayer" and found.verdict == "ok",
           str(found))
-    check("регион ушёл в запрос", "region=BR" in calls[-1], calls[-1])
+    check("первым спрашиваем источник без ключа",
+          "glob-info" in calls[0], str(calls[:2]))
 
     before = len(calls)
     again = await nicknames.free_fire("1724367212", key="k", region="BR")
@@ -258,16 +259,21 @@ async def nick_lookup() -> None:
             return False
 
     nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "glob-info": Resp({}, status=502),
         "gameskinbo": Resp({}, status=429),
         "freefirecommunity": Resp({"nickname": "CommunityMan"}),
     })
     found = await nicknames.free_fire("111222333", key="k", region="BR")
-    check("второй справочник подхватывает",
+    check("следующий справочник подхватывает",
           found.name == "CommunityMan" and found.verdict == "ok", str(found))
     check("источник назван", found.source == "freefirecommunity", found.source)
-    check("сначала спросили первый",
-          "gameskinbo" in calls[0], str(calls[:2]))
-    check("потом второй", "freefirecommunity" in calls[1], str(calls[:2]))
+    check("очередь идёт сверху вниз",
+          "glob-info" in calls[0] and "gameskinbo" in calls[1]
+          and "freefirecommunity" in calls[2], str(calls[:3]))
+    check("регион ушёл в запрос к gameskinbo",
+          "region=BR" in calls[1], calls[1])
+    check("источнику без региона его и не шлём",
+          "region" not in calls[0], calls[0])
     check("до запасного не дошли",
           not any("onrender" in c for c in calls), str(calls))
 
@@ -275,30 +281,35 @@ async def nick_lookup() -> None:
     nicknames.forget_all()
     calls.clear()
     nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
-        "gameskinbo": Resp({"AccountInfo": {"AccountName": "FirstOne"}}),
-        "freefirecommunity": Resp({"nickname": "Второй"}),
+        "glob-info": Resp({"basicInfo": {"accountId": "444555666",
+                                         "nickname": "FirstOne"}}),
+        "gameskinbo": Resp({"AccountInfo": {"AccountName": "Второй"}}),
     })
     found = await nicknames.free_fire("444555666", key="k")
-    check("первый нашёл — второй не спрашиваем",
+    check("первый нашёл — остальных не спрашиваем",
           found.name == "FirstOne", str(found))
     check("лишних запросов нет", len(calls) == 1, str(calls))
+    check("месячный лимит при этом цел",
+          not any("gameskinbo" in c for c in calls), str(calls))
 
     # без ключа первого спрашиваем сразу второго
     nicknames.forget_all()
     calls.clear()
     nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "glob-info": Resp({}, status=503),
         "freefirecommunity": Resp({"AccountInfo": {"AccountName": "NoKeyMan"}}),
     })
     found = await nicknames.free_fire("777888999")
-    check("без ключа работает второй справочник",
+    check("без ключей ник всё равно находится",
           found.name == "NoKeyMan", str(found))
-    check("к первому без ключа не ходим",
+    check("к источнику с ключом без ключа не ходим",
           not any("gameskinbo" in c for c in calls), str(calls))
 
     # оба отказали по игроку — это «нет такого»
     nicknames.forget_all()
     calls.clear()
     nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "glob-info": Resp({"error": "not found"}),
         "gameskinbo": Resp({}, status=402),
         "freefirecommunity": Resp({}, status=402),
         "onrender": Resp({}, status=404),
@@ -324,12 +335,78 @@ async def nick_lookup() -> None:
     nicknames.forget_all()
     calls.clear()
     nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "glob-info": Resp({}, status=500),
         "gameskinbo": Resp({}, status=402),
         "freefirecommunity": Resp({"basicInfo": {"nickname": "Живой"}}),
     })
     found = await nicknames.free_fire("333444555", key="k")
     check("нашедший важнее отказавшего",
           found.name == "Живой" and found.verdict == "ok", str(found))
+
+    # ------------------------------- чужой ник не проходит никогда
+    nicknames.forget_all()
+    calls.clear()
+    nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        # сервис ответил про ДРУГОГО игрока — так бывает при путанице
+        # с кэшем на бесплатном хостинге
+        "glob-info": Resp({"basicInfo": {"accountId": "999999999",
+                                         "nickname": "ЧужойИгрок"}}),
+        "gameskinbo": Resp({}, status=429),
+        "freefirecommunity": Resp({}, status=500),
+        "onrender": Resp({}, status=500),
+    })
+    found = await nicknames.free_fire("123123123")
+    check("ник про чужой ID отбрасывается",
+          found.name is None, str(found))
+    check("и «нет такого» из этого не делаем",
+          found.verdict == "unknown", str(found))
+    check("чужой ник не попадает в кэш",
+          nicknames.cached("123123123") is None)
+
+    # тот же ответ, но ID совпадает — ник берём
+    nicknames.forget_all()
+    nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "glob-info": Resp({"basicInfo": {"accountId": "123123123",
+                                         "nickname": "Свой"}}),
+    })
+    found = await nicknames.free_fire("123123123")
+    check("совпал ID — ник принят", found.name == "Свой", str(found))
+
+    check("ID из ответа достаётся",
+          nicknames.pick_id({"basicInfo": {"accountId": "42"}}) == "42")
+    check("ID ищется и глубже",
+          nicknames.pick_id({"data": {"player": {"uid": 77}}}) == "77")
+    check("нечисловой ID за ID не считается",
+          nicknames.pick_id({"accountId": "abc"}) is None)
+    check("без ID в ответе ник всё равно берём",
+          nicknames.trusted_name({"AccountInfo": {"AccountName": "X"}}, "55")
+          == "X")
+    check("несовпадение ID режет ник",
+          nicknames.trusted_name(
+              {"basicInfo": {"accountId": "1", "nickname": "X"}}, "2") is None)
+    check("совпадение ID ник пропускает",
+          nicknames.trusted_name(
+              {"basicInfo": {"accountId": "2", "nickname": "X"}}, "2") == "X")
+
+    # ------------------------------- у каждого источника свой список регионов
+    check("СНГ понятен запасному источнику",
+          nicknames.known_region("CIS", nicknames.FALLBACK_REGIONS) == "CIS")
+    check("а первому справочнику — нет",
+          nicknames.known_region("CIS") == "")
+    check("общий регион понятен обоим",
+          nicknames.known_region("BR") == "BR"
+          and nicknames.known_region("BR", nicknames.FALLBACK_REGIONS) == "BR")
+
+    nicknames.forget_all()
+    calls.clear()
+    nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+        "glob-info": Resp({}, status=500),
+        "onrender": Resp({"basicInfo": {"accountId": "55", "nickname": "СНГшник"}}),
+    })
+    found = await nicknames.free_fire("55", region="CIS")
+    check("запасному источнику СНГ уходит как есть",
+          any("region=CIS" in c for c in calls), str(calls))
+    check("и ник оттуда приходит", found.name == "СНГшник", str(found))
 
     # ник узнаётся в любой обёртке
     check("AccountInfo разбирается",

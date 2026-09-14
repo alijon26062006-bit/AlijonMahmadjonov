@@ -28,6 +28,10 @@ GAMESKINBO_USAGE = "https://api.gameskinbo.com/api/usage"
 #: мало, поэтому спрашиваем и его: два независимых источника дают ник
 #: чаще, чем один.
 COMMUNITY = "https://developers.freefirecommunity.com/api/v1/info"
+#: Первый по очереди источник: ни ключа, ни региона — только ID игрока,
+#: а регион он возвращает сам. Ради него и стоит спрашивать его первым:
+#: пока он отвечает, месячный лимит gameskinbo вообще не тратится.
+GLOBINFO = "https://glob-info2.vercel.app/info"
 #: Запасной источник без ключа. Живёт на бесплатном хостинге и засыпает,
 #: поэтому спрашиваем его последним.
 FALLBACK = "https://free-ff-api-src-5plp.onrender.com/api/v1/account"
@@ -44,6 +48,12 @@ NEST_KEYS = (
     "AccountInfo", "accountInfo", "basicInfo", "basic_info",
     "data", "result", "player", "account", "profile", "info",
 )
+#: Где в ответе лежит ID аккаунта. По нему проверяем, что сервис ответил
+#: про того самого игрока, а не про кого-то ещё.
+ID_KEYS = (
+    "accountId", "account_id", "AccountId", "accountID", "uid", "UID",
+    "player_id", "playerId", "id",
+)
 
 TIMEOUT = aiohttp.ClientTimeout(total=8, connect=4)
 FALLBACK_TIMEOUT = aiohttp.ClientTimeout(total=10, connect=5)
@@ -54,11 +64,15 @@ CACHE_TTL = 30 * 60          # полчаса
 #: необязателен — он только ускоряет поиск, ID в Free Fire уникален
 #: глобально, поэтому незнакомый код просто выбрасываем.
 KNOWN_REGIONS = {"BD", "IND", "BR", "US", "SAC", "NA", "ID", "SG", "PK"}
+#: А этот источник знает и СНГ. Список у каждого свой: общий на всех
+#: выбрасывал бы RU и CIS, которые здесь как раз работают.
+FALLBACK_REGIONS = {"IND", "BR", "SG", "RU", "ID", "TW", "US", "VN", "TH",
+                    "ME", "PK", "CIS", "BD"}
 
 
-def known_region(region: str) -> str:
+def known_region(region: str, allowed: set[str] | None = None) -> str:
     code = (region or "").strip().upper()
-    return code if code in KNOWN_REGIONS else ""
+    return code if code in (allowed or KNOWN_REGIONS) else ""
 
 _cache: dict[str, tuple[float, str]] = {}
 
@@ -118,6 +132,66 @@ def pick_name(data, depth: int = 0) -> str | None:
     return None
 
 
+def pick_id(data, depth: int = 0) -> str | None:
+    """Достать ID аккаунта из ответа — тем же способом, что и ник."""
+    if not isinstance(data, dict) or depth > 4:
+        return None
+
+    for key in ID_KEYS:
+        value = data.get(key)
+        if isinstance(value, (str, int)):
+            text = str(value).strip()
+            if text.isdigit():
+                return text
+
+    for key in NEST_KEYS:
+        found = pick_id(data.get(key), depth + 1)
+        if found:
+            return found
+    return None
+
+
+def trusted_name(data, uid: str) -> str | None:
+    """Ник из ответа — но только если ответ точно про этого игрока.
+
+    Главная защита от чужого ника. Сервисы бесплатные и живут на чужих
+    хостингах: любой из них может отдать закэшированный чужой профиль,
+    перепутать параметры или подставить «похожего» игрока. Показать
+    клиенту чужой ник хуже, чем не показать никакого: он подтвердит
+    покупку, а алмазы уйдут не туда, и вернуть их будет нельзя.
+
+    Поэтому: нашли в ответе ID — он обязан совпасть с запрошенным.
+    Не нашли ID вовсе — ник берём (проверить нечем, но и подмены не
+    видно), это случай gameskinbo.
+    """
+    name = pick_name(data)
+    if not name:
+        return None
+
+    found = pick_id(data, 0)
+    if found and found != str(uid).strip():
+        log.warning("Ники: ответ про чужой ID (просили %s, пришёл %s) — "
+                    "ник отброшен", uid, found)
+        return None
+    return name
+
+
+async def _from_glob(
+    session: aiohttp.ClientSession, uid: str, region: str, key: str,
+) -> tuple[str | None, str]:
+    """Ни ключа, ни региона — только ID игрока."""
+    async with session.get(f"{GLOBINFO}?uid={uid}") as response:
+        if response.status != 200:
+            log.info("Ники: glob-info ответил %s", response.status)
+            return None, "unknown"
+        data = await response.json(content_type=None)
+
+    if isinstance(data, dict) and data.get("error"):
+        return None, "unknown"
+    name = trusted_name(data, uid)
+    return (name, "ok") if name else (None, "unknown")
+
+
 async def _from_community(
     session: aiohttp.ClientSession, uid: str, region: str, key: str,
 ) -> tuple[str | None, str]:
@@ -145,7 +219,7 @@ async def _from_community(
             return None, "unknown"
         data = await response.json(content_type=None)
 
-    name = pick_name(data)
+    name = trusted_name(data, uid)
     return (name, "ok") if name else (None, "unknown")
 
 
@@ -164,12 +238,14 @@ async def _from_gameskinbo(
             return None, "unknown"
         data = await response.json(content_type=None)
 
-    name = pick_name(data)
+    name = trusted_name(data, uid)
     return (name, "ok") if name else (None, "unknown")
 
 
 async def _from_fallback(uid: str, region: str) -> tuple[str | None, str]:
-    url = f"{FALLBACK}?region={known_region(region) or 'BR'}&uid={uid}"
+    # У этого источника свой список регионов — в нём есть и СНГ.
+    url = (f"{FALLBACK}?region="
+           f"{known_region(region, FALLBACK_REGIONS) or 'BR'}&uid={uid}")
     try:
         async with aiohttp.ClientSession(timeout=FALLBACK_TIMEOUT) as session:
             async with session.get(url) as response:
@@ -180,7 +256,7 @@ async def _from_fallback(uid: str, region: str) -> tuple[str | None, str]:
         log.info("Ники: запасной источник молчит — %s", exc)
         return None, "unknown"
 
-    name = pick_name(data)
+    name = trusted_name(data, uid)
     return (name, "ok") if name else (None, "unknown")
 
 
@@ -190,9 +266,13 @@ async def free_fire(
     """Ник по ID. Регион только ускоряет поиск — ID в Free Fire уникален
     глобально, поэтому регион аккаунта с регионом товара не сверяем.
 
-    Источников три, и спрашиваются они по очереди: у первого месячный
-    лимит в сто запросов, второй без лимита, третий живёт на бесплатном
+    Источников четыре, и спрашиваются они по очереди. Первый не просит
+    ни ключа, ни региона — пока он отвечает, месячный лимит второго
+    (сто запросов) не тратится вовсе. Последний живёт на бесплатном
     хостинге и часто спит. Первый же найденный ник обрывает очередь.
+
+    Ник берётся только из ответа, который точно про запрошенный ID —
+    см. trusted_name. Чужой ник хуже, чем никакого.
     """
     uid = str(uid).strip()
     hit = cached(uid)
@@ -201,18 +281,16 @@ async def free_fire(
 
     refused = False        # хоть один источник прямо сказал «нет такого»
 
-    for source, fetch, needs_key in (
-        ("gameskinbo", _from_gameskinbo, key),
-        ("freefirecommunity", _from_community, None),
+    for source, fetch, source_key, needs_key in (
+        ("glob-info", _from_glob, "", False),
+        ("gameskinbo", _from_gameskinbo, key, True),
+        ("freefirecommunity", _from_community, community_key, False),
     ):
-        if needs_key is not None and not needs_key:
-            continue       # у gameskinbo без ключа спрашивать нечего
+        if needs_key and not source_key:
+            continue       # без ключа этот источник не отвечает вовсе
         try:
             async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
-                name, verdict = await fetch(
-                    session, uid, region,
-                    key if source == "gameskinbo" else community_key,
-                )
+                name, verdict = await fetch(session, uid, region, source_key)
         except Exception as exc:  # noqa: BLE001 — переходим к следующему
             log.info("Ники: %s не ответил — %s", source, exc)
             continue
