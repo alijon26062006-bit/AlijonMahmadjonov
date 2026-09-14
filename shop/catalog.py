@@ -1,7 +1,8 @@
 """Каталоги молҳо. Нархҳо дар дирам (1 сомонӣ = 100 дирам) нигоҳ дошта мешаванд.
 
-Ин рӯйхат танҳо қиматҳои ибтидоист: ҳангоми аввалин оғоз ба базаи маълумот
+Ин рӯйхат қиматҳои ибтидоист: ҳангоми аввалин оғоз ба базаи маълумот
 кӯчонида мешавад, баъд админ нархҳоро аз панели худ иваз карда метавонад.
+Нархҳо дигар мешаванд, аммо SKU ва навъи мол ҳамеша аз ҳамин файл гирифта мешавад.
 """
 
 from __future__ import annotations
@@ -20,19 +21,24 @@ CATEGORIES = (CAT_STARS, CAT_PREMIUM, CAT_FF_CIS, CAT_FF_ID, CAT_PUBG)
 
 # Чӣ тавр молро ба харидор мерасонем:
 #   "username" — ба @username-и Telegram
-#   "player"   — ба ID-и бозӣ (бо тафтиши лақаб)
+#   "player"   — ба ID-и бозӣ
 TargetKind = Literal["username", "player"]
+
+# Чӣ тавр фармоиш иҷро мешавад:
+#   "game"   — FireLoot: /validate + /order
+#   "stars"  — FireLoot: /telegram/check + /telegram/order
+#   "manual" — API надорад, админ дастӣ иҷро мекунад
+FulfillKind = Literal["game", "stars", "manual"]
 
 
 @dataclass(frozen=True)
 class Category:
     code: str
-    title: str          # номи бахш барои тугма
-    unit: str           # воҳиди ченак: ситора, алмос, UC, моҳ
+    title: str
+    unit: str
     target: TargetKind
-    game: str           # калиди бозӣ барои API-и таъминкунанда
     icon: str
-    hint: str           # тавзеҳ дар экрани вориди ID/username
+    hint: str
 
 
 CATEGORY_INFO: dict[str, Category] = {
@@ -41,7 +47,6 @@ CATEGORY_INFO: dict[str, Category] = {
         title="Telegram Stars",
         unit="ситора",
         target="username",
-        game="telegram_stars",
         icon="⭐️",
         hint="@username-и аккаунтеро нависед, ки ситораҳо ба он равона мешаванд.",
     ),
@@ -50,7 +55,6 @@ CATEGORY_INFO: dict[str, Category] = {
         title="Telegram Premium",
         unit="моҳ",
         target="username",
-        game="telegram_premium",
         icon="👑",
         hint="@username-и аккаунтеро нависед, ки Premium ба он фаъол мешавад.",
     ),
@@ -59,25 +63,22 @@ CATEGORY_INFO: dict[str, Category] = {
         title="Free Fire (ИДМ)",
         unit="алмос",
         target="player",
-        game="freefire_cis",
         icon="🔥",
-        hint="ID-и бозигари Free Fire (ИДМ)-ро нависед — танҳо рақамҳо.",
+        hint="ID-и бозигари Free Fire-ро нависед — танҳо рақамҳо.",
     ),
     CAT_FF_ID: Category(
         code=CAT_FF_ID,
         title="Free Fire (Индонезия)",
         unit="алмос",
         target="player",
-        game="freefire_id",
         icon="🇮🇩",
-        hint="ID-и бозигари Free Fire (Индонезия)-ро нависед — танҳо рақамҳо.",
+        hint="ID-и бозигари Free Fire Indonesia-ро нависед — танҳо рақамҳо.",
     ),
     CAT_PUBG: Category(
         code=CAT_PUBG,
         title="PUBG Mobile",
         unit="UC",
         target="player",
-        game="pubg_mobile",
         icon="🎯",
         hint="ID-и бозигари PUBG Mobile-ро нависед — танҳо рақамҳо.",
     ),
@@ -89,61 +90,78 @@ class Product:
     code: str
     category: str
     title: str
-    amount: int      # шумораи ситора/алмос/UC/моҳ
-    price: int       # дирам
+    amount: int          # ситора/алмос/UC/моҳ
+    price: int           # дирам
+    sku: str             # SKU-и FireLoot ("" барои молҳои дастӣ)
+    kind: FulfillKind
 
 
-def _p(code: str, category: str, title: str, amount: int, price_somoni: float) -> Product:
-    return Product(code, category, title, amount, round(price_somoni * 100))
+def _p(
+    code: str,
+    category: str,
+    title: str,
+    amount: int,
+    price_somoni: float,
+    sku: str,
+    kind: FulfillKind = "game",
+) -> Product:
+    return Product(code, category, title, amount, round(price_somoni * 100), sku, kind)
 
 
 DEFAULT_PRODUCTS: tuple[Product, ...] = (
-    # ── Telegram Stars ────────────────────────────────────────────────
-    _p("stars_50", CAT_STARS, "50 ⭐️", 50, 11),
-    _p("stars_75", CAT_STARS, "75 ⭐️", 75, 16),
-    _p("stars_100", CAT_STARS, "100 ⭐️", 100, 21),
-    _p("stars_150", CAT_STARS, "150 ⭐️", 150, 31),
-    _p("stars_250", CAT_STARS, "250 ⭐️", 250, 51),
-    _p("stars_350", CAT_STARS, "350 ⭐️", 350, 71),
-    _p("stars_500", CAT_STARS, "500 ⭐️", 500, 100),
-    _p("stars_750", CAT_STARS, "750 ⭐️", 750, 149),
-    _p("stars_1000", CAT_STARS, "1000 ⭐️", 1000, 197),
-    _p("stars_1500", CAT_STARS, "1500 ⭐️", 1500, 295),
-    _p("stars_2500", CAT_STARS, "2500 ⭐️", 2500, 490),
-    _p("stars_5000", CAT_STARS, "5000 ⭐️", 5000, 975),
-    _p("stars_10000", CAT_STARS, "10000 ⭐️", 10000, 1940),
-    # ── Telegram Premium ──────────────────────────────────────────────
-    _p("prem_3", CAT_PREMIUM, "Premium — 3 моҳ", 3, 165),
-    _p("prem_6", CAT_PREMIUM, "Premium — 6 моҳ", 6, 225),
-    _p("prem_12", CAT_PREMIUM, "Premium — 12 моҳ", 12, 390),
-    # ── Free Fire ИДМ ─────────────────────────────────────────────────
-    _p("ffcis_100", CAT_FF_CIS, "100 💎", 100, 24),
-    _p("ffcis_310", CAT_FF_CIS, "310 💎", 310, 70),
-    _p("ffcis_520", CAT_FF_CIS, "520 💎", 520, 115),
-    _p("ffcis_1060", CAT_FF_CIS, "1060 💎", 1060, 230),
-    _p("ffcis_2180", CAT_FF_CIS, "2180 💎", 2180, 460),
-    _p("ffcis_5600", CAT_FF_CIS, "5600 💎", 5600, 1150),
-    _p("ffcis_week", CAT_FF_CIS, "Обунаи ҳафтаина", 0, 55),
-    _p("ffcis_month", CAT_FF_CIS, "Обунаи моҳона", 0, 260),
-    # ── Free Fire Индонезия ───────────────────────────────────────────
-    _p("ffid_5", CAT_FF_ID, "5 💎", 5, 2),
-    _p("ffid_12", CAT_FF_ID, "12 💎", 12, 4),
-    _p("ffid_50", CAT_FF_ID, "50 💎", 50, 14),
-    _p("ffid_70", CAT_FF_ID, "70 💎", 70, 19),
-    _p("ffid_140", CAT_FF_ID, "140 💎", 140, 37),
-    _p("ffid_355", CAT_FF_ID, "355 💎", 355, 90),
-    _p("ffid_720", CAT_FF_ID, "720 💎", 720, 180),
-    _p("ffid_1450", CAT_FF_ID, "1450 💎", 1450, 355),
-    _p("ffid_2180", CAT_FF_ID, "2180 💎", 2180, 530),
-    _p("ffid_week", CAT_FF_ID, "Обунаи ҳафтаина", 0, 45),
-    _p("ffid_month", CAT_FF_ID, "Обунаи моҳона", 0, 215),
-    # ── PUBG Mobile ───────────────────────────────────────────────────
-    _p("pubg_60", CAT_PUBG, "60 UC", 60, 22),
-    _p("pubg_325", CAT_PUBG, "325 UC", 325, 105),
-    _p("pubg_660", CAT_PUBG, "660 UC", 660, 210),
-    _p("pubg_1800", CAT_PUBG, "1800 UC", 1800, 520),
-    _p("pubg_3850", CAT_PUBG, "3850 UC", 3850, 1040),
-    _p("pubg_8100", CAT_PUBG, "8100 UC", 8100, 2080),
+    # ── Telegram Stars (FireLoot /telegram/order) ─────────────────────
+    _p("stars_50", CAT_STARS, "⭐ 50 Stars", 50, 9.80, "stars_50", "stars"),
+    _p("stars_100", CAT_STARS, "⭐ 100 Stars", 100, 19.25, "stars_100", "stars"),
+    _p("stars_500", CAT_STARS, "⭐ 500 Stars", 500, 90.00, "stars_500", "stars"),
+    _p("stars_1000", CAT_STARS, "⭐ 1000 Stars", 1000, 175.00, "stars_1000", "stars"),
+    _p("stars_2500", CAT_STARS, "⭐ 2500 Stars", 2500, 425.00, "stars_2500", "stars"),
+
+    # ── Telegram Premium (дастӣ — дар FireLoot нест) ──────────────────
+    _p("prem_3", CAT_PREMIUM, "👑 Premium — 3 моҳ", 3, 165.00, "", "manual"),
+    _p("prem_6", CAT_PREMIUM, "👑 Premium — 6 моҳ", 6, 225.00, "", "manual"),
+    _p("prem_12", CAT_PREMIUM, "👑 Premium — 12 моҳ", 12, 390.00, "", "manual"),
+
+    # ── Free Fire ИДМ — алмосҳо ──────────────────────────────────────
+    _p("ffcis_110", CAT_FF_CIS, "💎 110 Алмаз", 110, 9.00, "diamonds_110"),
+    _p("ffcis_341", CAT_FF_CIS, "💎 341 Алмаз", 341, 28.00, "diamonds_341"),
+    _p("ffcis_572", CAT_FF_CIS, "💎 572 Алмаз", 572, 45.00, "diamonds_572"),
+    _p("ffcis_1166", CAT_FF_CIS, "💎 1166 Алмаз", 1166, 89.90, "diamonds_1166"),
+    _p("ffcis_2398", CAT_FF_CIS, "💎 2398 Алмаз", 2398, 177.00, "diamonds_2398"),
+    _p("ffcis_6160", CAT_FF_CIS, "💎 6160 Алмаз", 6160, 429.00, "diamonds_6160"),
+    # ── Free Fire ИДМ — ваучерҳо ─────────────────────────────────────
+    _p("ffcis_week_lite", CAT_FF_CIS, "🔹 Ваучери Лайт (Weekly Lite)", 0, 6.00, "voucher_week_lite_2"),
+    _p("ffcis_week", CAT_FF_CIS, "🎟 Ваучери Ҳафтаина", 0, 16.80, "voucher_week"),
+    _p("ffcis_month", CAT_FF_CIS, "🎟 Ваучери Моҳона", 0, 64.80, "voucher_month"),
+
+    # ── Free Fire Индонезия — алмосҳо ────────────────────────────────
+    _p("ffid_50", CAT_FF_ID, "💎 50 Алмаз", 50, 5.50, "id_diamonds_50"),
+    _p("ffid_100", CAT_FF_ID, "💎 100 Алмаз", 100, 10.50, "id_diamonds_100"),
+    _p("ffid_140", CAT_FF_ID, "💎 140 Алмаз", 140, 14.00, "id_diamonds_140"),
+    _p("ffid_210", CAT_FF_ID, "💎 210 Алмаз", 210, 19.00, "id_diamonds_210"),
+    _p("ffid_280", CAT_FF_ID, "💎 280 Алмаз", 280, 24.00, "id_diamonds_280"),
+    _p("ffid_355", CAT_FF_ID, "💎 355 Алмаз", 355, 30.00, "id_diamonds_355"),
+    _p("ffid_500", CAT_FF_ID, "💎 500 Алмаз", 500, 45.00, "id_diamonds_500"),
+    _p("ffid_720", CAT_FF_ID, "💎 720 Алмаз", 720, 60.00, "id_diamonds_720"),
+    _p("ffid_1000", CAT_FF_ID, "💎 1000 Алмаз", 1000, 85.00, "id_diamonds_1000"),
+    _p("ffid_1450", CAT_FF_ID, "💎 1450 Алмаз", 1450, 114.00, "id_diamonds_1450"),
+    _p("ffid_2180", CAT_FF_ID, "💎 2180 Алмаз", 2180, 175.00, "id_diamonds_2180"),
+    _p("ffid_3640", CAT_FF_ID, "💎 3640 Алмаз", 3640, 290.00, "id_diamonds_3640"),
+    _p("ffid_7290", CAT_FF_ID, "💎 7290 Алмаз", 7290, 600.00, "id_diamonds_7290"),
+    # ── Free Fire Индонезия — Membership ─────────────────────────────
+    _p("ffid_week", CAT_FF_ID, "🎟 Ҳафтаина (Weekly)", 0, 19.50, "id_membership_weekly"),
+    _p("ffid_month", CAT_FF_ID, "🎟 Моҳона (Monthly)", 0, 69.80, "id_membership_monthly"),
+
+    # ── PUBG Mobile UC ───────────────────────────────────────────────
+    _p("pubg_60", CAT_PUBG, "🎮 60 UC", 60, 10.00, "pubg_uc_60"),
+    _p("pubg_325", CAT_PUBG, "🎮 300 + 25 UC", 325, 48.95, "pubg_uc_325"),
+    _p("pubg_660", CAT_PUBG, "🎮 600 + 60 UC", 660, 93.70, "pubg_uc_660"),
+    _p("pubg_1800", CAT_PUBG, "🎮 1 500 + 300 UC", 1800, 241.00, "pubg_uc_1800"),
+    _p("pubg_3850", CAT_PUBG, "🎮 3 000 + 850 UC", 3850, 452.00, "pubg_uc_3850"),
+    _p("pubg_8100", CAT_PUBG, "🎮 6 000 + 2 100 UC", 8100, 900.00, "pubg_uc_8100"),
+    _p("pubg_16200", CAT_PUBG, "🎮 12 000 + 4 200 UC", 16200, 1800.00, "pubg_uc_16200"),
+    _p("pubg_24300", CAT_PUBG, "🎮 18 000 + 6 300 UC", 24300, 2700.00, "pubg_uc_24300"),
+    _p("pubg_32400", CAT_PUBG, "🎮 24 000 + 8 400 UC", 32400, 3700.00, "pubg_uc_32400"),
+    _p("pubg_40500", CAT_PUBG, "🎮 30 000 + 10 500 UC", 40500, 4500.00, "pubg_uc_40500"),
 )
 
 # Маблағҳои тайёр барои пур кардани ҳисоб (дирам).

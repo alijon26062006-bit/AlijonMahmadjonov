@@ -10,7 +10,8 @@ from aiogram.types import CallbackQuery, Message
 
 from .. import catalog, keyboards, texts
 from ..config import Config
-from ..db import Database, NotEnoughMoney, ORDER_SENT
+from ..db import Database, NotEnoughMoney
+from ..fulfillment import deliver_in_background
 from ..states import Buy
 from ..supplier import Supplier
 from .common import (
@@ -80,23 +81,35 @@ async def got_target(
         if target is None:
             await message.answer(texts.BAD_USERNAME, reply_markup=keyboards.cancel_only())
             return
+    else:
+        target = clean_player_id(message.text)
+        if target is None:
+            await message.answer(texts.BAD_PLAYER_ID, reply_markup=keyboards.cancel_only())
+            return
+
+    kind = row["kind"] or "game"
+    if kind == "manual":
+        # Premium: API надорад — рост ба тасдиқи фармоиш меравем.
         await state.update_data(target=target, nickname=None)
         await _show_confirm(message, state, db, cfg)
         return
 
-    # Бозиҳо: ID-ро тафтиш мекунем ва панели тасдиқро нишон медиҳем.
-    player_id = clean_player_id(message.text)
-    if player_id is None:
-        await message.answer(texts.BAD_PLAYER_ID, reply_markup=keyboards.cancel_only())
-        return
-
-    info_player = await supplier.check_player(info.game, player_id)
-    nickname = info_player.nickname if info_player.ok else None
-    await state.update_data(target=player_id, nickname=nickname)
-    await message.answer(
-        texts.confirm_player(info, player_id, nickname),
-        reply_markup=keyboards.confirm_player(),
+    waiting = await message.answer("⏳ Дар ҳоли тафтиши аккаунт...")
+    checked = await supplier.check(
+        kind=kind, sku=row["sku"] or "", target=target, amount=row["amount"]
     )
+    nickname = checked.nickname if checked.ok else None
+    await state.update_data(target=target, nickname=nickname)
+    try:
+        await waiting.edit_text(
+            texts.confirm_target(info, target, nickname, checked.error),
+            reply_markup=keyboards.confirm_target(),
+        )
+    except Exception:
+        await message.answer(
+            texts.confirm_target(info, target, nickname, checked.error),
+            reply_markup=keyboards.confirm_target(),
+        )
 
 
 async def _show_confirm(
@@ -144,9 +157,10 @@ async def cb_id_no(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Conf
         return
     info = catalog.CATEGORY_INFO[row["category"]]
     await state.set_state(Buy.waiting_target)
+    ask = texts.ask_username if info.target == "username" else texts.ask_player_id
     await safe_edit(
         cb,
-        texts.ask_player_id(info, row["title"], row["price"], cfg.currency),
+        ask(info, row["title"], row["price"], cfg.currency),
         keyboards.cancel_only(),
     )
     await cb.answer()
@@ -186,6 +200,8 @@ async def cb_buy(
             price=price,
             target=target,
             nickname=data.get("nickname"),
+            sku=row["sku"] or "",
+            kind=row["kind"] or "game",
         )
     except NotEnoughMoney:
         fresh = db.user(user.id)
@@ -205,25 +221,5 @@ async def cb_buy(
     )
     await cb.answer("✅")
 
-    # Ба таъминкунанда мефиристем (дар реҷаи manual — танҳо ба админ).
-    info = catalog.CATEGORY_INFO[row["category"]]
-    result = await supplier.place_order(
-        game=info.game,
-        product_code=row["code"],
-        player_id=target,
-        amount=row["amount"],
-    )
-    if result.external_id:
-        db.set_order_status(order_id, ORDER_SENT, external_id=result.external_id)
-    elif not result.ok:
-        # Фармоиш дар навбат мемонад — админ онро дастӣ иҷро мекунад.
-        db.set_order_note(order_id, f"supplier: {result.error}")
-        log.warning("Таъминкунанда фармоиши #%s-ро қабул накард: %s", order_id, result.error)
-
-    saved = db.order(order_id)
-    await notify_admins(
-        bot,
-        cfg,
-        texts.admin_new_order(saved, db.user(user.id), cfg.currency),
-        keyboards.admin_order(order_id),
-    )
+    # Иҷро дар паси парда: бот фавран ҷавобгӯ мемонад.
+    deliver_in_background(bot, db, cfg, supplier, order_id)

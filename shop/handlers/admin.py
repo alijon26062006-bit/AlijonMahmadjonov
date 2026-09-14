@@ -360,3 +360,83 @@ async def got_broadcast(message: Message, state: FSMContext, db: Database, bot: 
     await message.answer(
         texts.broadcast_result(sent, failed), reply_markup=keyboards.admin_home()
     )
+
+
+# ── таъминкунанда (FireLoot) ──────────────────────────────────────────
+@router.message(Command("balance", "hisob"))
+async def cmd_supplier_balance(message: Message, cfg: Config, supplier) -> None:
+    """Баланси таъминкунанда — то донем, ки барои чанд фармоиш пул ҳаст."""
+    if not cfg.has_supplier:
+        await message.answer(
+            "ℹ️ Таъминкунанда хомӯш аст (реҷаи дастӣ).\n"
+            "Барои фаъол кардан дар <code>.env</code>: "
+            "<code>SHOP_SUPPLIER=fireloot</code> ва калиди API."
+        )
+        return
+    waiting = await message.answer("⏳ Дар ҳоли пурсиши баланс...")
+    data = await supplier.balance()
+    if not data.get("ok"):
+        await waiting.edit_text(f"❌ Хатогӣ: <code>{texts.esc(data.get('error'))}</code>")
+        return
+    stars = data.get("stars_balance")
+    lines = [
+        "💰 <b>Баланси таъминкунанда</b>\n",
+        f"💵 Асосӣ: <b>{texts.esc(data.get('balance'))} {texts.esc(data.get('currency'))}</b>",
+    ]
+    if stars is not None:
+        lines.append(f"⭐️ Stars: <b>{texts.esc(stars)}</b>")
+    if data.get("telegram_active") is not None:
+        lines.append(
+            "📶 Telegram Stars: "
+            + ("✅ фаъол" if data.get("telegram_active") else "🚫 хомӯш")
+        )
+    await waiting.edit_text("\n".join(lines))
+
+
+@router.message(Command("sku"))
+async def cmd_check_sku(message: Message, db: Database, cfg: Config, supplier) -> None:
+    """Санҷиши SKU-ҳо бо каталоги воқеии таъминкунанда."""
+    if not cfg.has_supplier:
+        await message.answer("ℹ️ Таъминкунанда хомӯш аст — санҷиш лозим нест.")
+        return
+    waiting = await message.answer("⏳ Каталоги таъминкунанда гирифта мешавад...")
+    live = await supplier.products()
+    if not live:
+        await waiting.edit_text(
+            "⚠️ Каталогро гирифта натавонистам (калид ё шабака). SKU-ҳо санҷида нашуданд."
+        )
+        return
+
+    missing = []
+    for category in catalog.CATEGORIES:
+        for row in db.products(category, only_active=False):
+            sku = row["sku"]
+            if row["kind"] == "game" and sku and sku not in live:
+                missing.append(f"• {texts.esc(row['title'])} → <code>{texts.esc(sku)}</code>")
+
+    if not missing:
+        await waiting.edit_text(
+            f"✅ Ҳамаи SKU-ҳо дурустанд.\nДар каталоги таъминкунанда: <b>{len(live)}</b> мол."
+        )
+        return
+    await waiting.edit_text(
+        f"❌ <b>Ин SKU-ҳо дар каталоги таъминкунанда нестанд ({len(missing)}):</b>\n\n"
+        + "\n".join(missing[:30])
+        + "\n\n<i>Нархро тағйир додан кифоя нест — SKU-ро дар "
+          "<code>shop/catalog.py</code> дуруст кунед.</i>"
+    )
+
+
+@router.callback_query(F.data == "a:supplier")
+async def cb_supplier(cb: CallbackQuery, cfg: Config, supplier) -> None:
+    mode = "🔌 FireLoot (худкор)" if cfg.has_supplier else "✋ Дастӣ (API хомӯш)"
+    text = (
+        "🔌 <b>Таъминкунанда</b>\n\n"
+        f"📶 Реҷа: <b>{mode}</b>\n"
+        f"🌐 Суроға: <code>{texts.esc(cfg.supplier_url or '—')}</code>\n\n"
+        "Фармонҳо:\n"
+        "• /balance — баланси таъминкунанда\n"
+        "• /sku — санҷиши SKU-ҳои каталог"
+    )
+    await safe_edit(cb, text, keyboards.admin_back())
+    await cb.answer()

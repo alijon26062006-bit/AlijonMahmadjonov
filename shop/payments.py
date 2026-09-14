@@ -31,6 +31,22 @@ def amount_text(diram: int) -> str:
     return f"{diram // 100}.{diram % 100:02d}"
 
 
+def build_alif_link(template: str, *, account: str, amount: int) -> str | None:
+    """Ҳаволаи Alif Mobi. Ҷойнишинҳо: {account} {amount} {amount_int} {diram}."""
+    template = (template or "").strip()
+    if not template or not account:
+        return None
+    try:
+        return template.format(
+            account=quote(str(account), safe=""),
+            amount=amount_text(amount),
+            amount_int=str(amount // 100),
+            diram=str(amount),
+        )
+    except (KeyError, IndexError, ValueError):
+        return None
+
+
 def build_pay_link(template: str, *, card: str, amount: int, comment: str) -> str | None:
     """Ҳаволаро аз шаблон месозад.
 

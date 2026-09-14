@@ -88,8 +88,8 @@ def cancel_only() -> InlineKeyboardMarkup:
     )
 
 
-def confirm_player() -> InlineKeyboardMarkup:
-    """Панели тафтиши ID."""
+def confirm_target() -> InlineKeyboardMarkup:
+    """Панели тафтиши аккаунт."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [_btn(texts.BTN_YES_MINE, CB_ID_OK)],
@@ -132,10 +132,17 @@ def topup_menu(presets: Sequence[int], *, currency: str = texts.CURRENCY) -> Inl
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def payment(topup_id: int, link: str | None) -> InlineKeyboardMarkup:
+def payment(
+    topup_id: int, link: str | None, alif: str | None = None
+) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
+    pay_row: list[InlineKeyboardButton] = []
     if link:
-        rows.append([InlineKeyboardButton(text=texts.BTN_OPEN_LINK, url=link)])
+        pay_row.append(InlineKeyboardButton(text=texts.BTN_OPEN_LINK, url=link))
+    if alif:
+        pay_row.append(InlineKeyboardButton(text=texts.BTN_OPEN_ALIF, url=alif))
+    if pay_row:
+        rows.append(pay_row)
     rows.append([_btn(texts.BTN_PAID, f"{CB_TOPUP_PAID}{topup_id}")])
     rows.append([_btn(texts.BTN_CANCEL, CB_CANCEL)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -171,6 +178,7 @@ def admin_home() -> InlineKeyboardMarkup:
             [_btn(texts.ADM_BTN_STATS, "a:stats"), _btn(texts.ADM_BTN_FIND, "a:find")],
             [_btn(texts.ADM_BTN_ORDERS, "a:orders"), _btn(texts.ADM_BTN_TOPUPS, "a:topups")],
             [_btn(texts.ADM_BTN_PRICES, "a:prices"), _btn(texts.ADM_BTN_BROADCAST, "a:bc")],
+            [_btn(texts.ADM_BTN_SUPPLIER, "a:supplier")],
             [_btn(texts.BTN_HOME, CB_HOME)],
         ]
     )

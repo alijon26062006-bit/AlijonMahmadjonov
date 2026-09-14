@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from html import escape
 
 from . import catalog
@@ -63,7 +64,8 @@ BTN_YES_MINE = "✅ Ҳа, аккаунти ман аст"
 BTN_NO_WRONG = "🔄 Не, ID-ро иваз мекунам"
 BTN_PAY = "💰 Пардохт кардан"
 BTN_PAID = "✅ Пардохт кардам"
-BTN_OPEN_LINK = "🔗 Кушодани Душанбе Сити"
+BTN_OPEN_LINK = "🏦 Душанбе Сити"
+BTN_OPEN_ALIF = "📱 Alif Mobi"
 BTN_OTHER_SUM = "✏️ Маблағи дигар"
 BTN_ADMIN = "🛠 Панели админ"
 
@@ -130,16 +132,27 @@ BAD_USERNAME = (
 BAD_PLAYER_ID = "❌ ID нодуруст аст. Танҳо рақамҳо, аз 6 то 12 рақам."
 
 
-def confirm_player(cat: catalog.Category, player_id: str, nickname: str | None) -> str:
-    """Панели тафтиши ID — харидор бояд тасдиқ кунад, ки ин аккаунти ӯст."""
-    head = f"🔎 <b>Тафтиши ID</b>\n\n" f"🎮 Бозӣ: <b>{esc(cat.title)}</b>\n" f"🆔 ID: <code>{esc(player_id)}</code>\n"
-    if nickname:
-        head += f"👤 Лақаб: <b>{esc(nickname)}</b>\n"
-    else:
-        head += (
-            "👤 Лақаб: <i>ҳоло тафтиш карда намешавад</i>\n"
-            "<i>Илтимос, ID-ро бодиққат санҷед.</i>\n"
+def confirm_target(
+    cat: catalog.Category, target: str, nickname: str | None, error: str | None = None
+) -> str:
+    """Панели тафтиш — харидор бояд тасдиқ кунад, ки ин аккаунти ӯст."""
+    is_player = cat.target == "player"
+    head = (
+        "🔎 <b>Тафтиши аккаунт</b>\n\n"
+        f"{cat.icon} Бахш: <b>{esc(cat.title)}</b>\n"
+        + (
+            f"🆔 ID: <code>{esc(target)}</code>\n"
+            if is_player
+            else f"👤 Username: <code>{esc(target)}</code>\n"
         )
+    )
+    if nickname:
+        label = "Лақаб" if is_player else "Ном"
+        head += f"✅ {label}: <b>{esc(nickname)}</b>\n"
+    else:
+        head += "⚠️ <i>Аккаунт худкор тафтиш нашуд"
+        head += f" ({esc(error)})" if error else ""
+        head += ".\nИлтимос, худатон бодиққат санҷед.</i>\n"
     return head + "\n<b>Ин аккаунти шумост?</b>"
 
 
@@ -189,8 +202,64 @@ def order_created(order_id: int, title: str, target: str, price: int, currency: 
         f"📦 Мол: <b>{esc(title)}</b>\n"
         f"🎯 Гиранда: <code>{esc(target)}</code>\n"
         f"💰 Пардохт: {money(price, currency)}\n\n"
-        "⏳ Фармоиш ба коркард рафт. Одатан 5–30 дақиқа вақт мегирад.\n"
-        "Вақте иҷро шуд, ба шумо хабар медиҳем."
+        "⏳ <b>Фармоиш ба коркард рафт.</b>\n"
+        "Каме сабр кунед — натиҷаро ҳамин ҷо менависем."
+    )
+
+
+def receipt(
+    order_id: int,
+    title: str,
+    target: str,
+    nickname: str | None,
+    price: int,
+    external_id: str | None,
+    is_player: bool,
+    currency: str = CURRENCY,
+) -> str:
+    """Чеки ниҳоии харид."""
+    stamp = datetime.now().strftime("%d.%m.%Y • %H:%M")
+    number = f"<code>#{order_id}</code>"
+    if external_id:
+        number += f" (№ {esc(external_id)})"
+    lines = [
+        "🧾 <b>ЧЕКИ ХАРИД</b>",
+        "━━━━━━━━━━━━━━━━━━━━",
+        "✅ <b>Ҳолат:</b> БОМУВАФФАҚИЯТ",
+        f"🔢 <b>Фармоиш:</b> {number}",
+        (f"🆔 <b>ID:</b> <code>{esc(target)}</code>" if is_player
+         else f"👤 <b>Username:</b> <code>{esc(target)}</code>"),
+    ]
+    if nickname:
+        lines.append(f"👤 <b>{'Лақаб' if is_player else 'Ном'}:</b> {esc(nickname)}")
+    lines += [
+        f"📦 <b>Мол:</b> {esc(title)}",
+        f"💰 <b>Маблағ:</b> {money(price, currency)}",
+        f"📅 <b>Сана:</b> {stamp}",
+        "━━━━━━━━━━━━━━━━━━━━",
+        "🎉 <b>Хариди шумо иҷро шуд!</b>",
+        "",
+        "Ташаккур барои харид! ❤️",
+    ]
+    return "\n".join(lines)
+
+
+def auto_refunded(order_id: int, price: int, reason: str | None, currency: str = CURRENCY) -> str:
+    """Фармоиш иҷро нашуд — пул худкор баргардонида шуд."""
+    why = f"\n📌 Сабаб: <code>{esc(reason)}</code>" if reason else ""
+    return (
+        f"⚠️ <b>Фармоиши #{order_id} иҷро нашуд.</b>{why}\n\n"
+        f"💳 <b>{money(price, currency)}</b> худкор ба ҳисоби шумо баргардонида шуд.\n"
+        "Метавонед аз нав кӯшиш кунед ё ба дастгирӣ нависед."
+    )
+
+
+def order_pending_admin(order_id: int) -> str:
+    """Фармоиш ба админ монд (мол API надорад ё ҷавоб дер кард)."""
+    return (
+        f"⏳ <b>Фармоиши #{order_id} дар коркард аст.</b>\n\n"
+        "Онро админ дастӣ иҷро мекунад — одатан 5–30 дақиқа.\n"
+        "Вақте тайёр шуд, ба шумо хабар медиҳем."
     )
 
 
@@ -359,6 +428,7 @@ ADM_BTN_ORDERS = "🧾 Фармоишҳои кушода"
 ADM_BTN_TOPUPS = "💳 Пардохтҳои интизорӣ"
 ADM_BTN_PRICES = "💲 Нархҳо"
 ADM_BTN_BROADCAST = "📢 Эълон ба ҳама"
+ADM_BTN_SUPPLIER = "🔌 Таъминкунанда"
 ADM_BTN_PLUS = "➕ Илова кардан"
 ADM_BTN_MINUS = "➖ Кам кардан"
 ADM_BTN_BLOCK = "🚫 Маҳдуд кардан"

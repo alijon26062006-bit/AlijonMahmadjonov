@@ -18,10 +18,13 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CARD = "0000 0000 0000 0000"
 DEFAULT_HOLDER = "ALIJON M."
 
-# Шаблони ҳавола ба Душанбе Сити.
-# Ҷойнишинҳо: {card} {amount} {comment}
-# Намуна: https://dc.tj/pay?card={card}&amount={amount}&comment={comment}
-DEFAULT_PAY_LINK = ""
+# Шаблони ҳавола ба Душанбе Сити (DC Pay) — корт, маблағ ва код худкор пур мешаванд.
+DEFAULT_PAY_LINK = "http://pay.dc.tj/?A={card}&s={amount}&c={comment}&f1=133&FIELD2=&FIELD3="
+
+# Шаблони ҳавола ба Alif Mobi.
+DEFAULT_ALIF_LINK = "https://alifmobi.page.link/providers?id=124&amount={amount}&account={account}"
+
+FIRELOOT_BASE = "https://partner.firelootshop.com/api/v1"
 
 
 def _ids(raw: str) -> tuple[int, ...]:
@@ -56,12 +59,18 @@ class Config:
     card_number: str
     card_holder: str
     pay_link: str
+    alif_link: str
+    alif_account: str
     min_topup: int          # дар дирам
     max_topup: int          # дар дирам
-    supplier: str           # manual | http
+    supplier: str           # fireloot | manual
     supplier_url: str
     supplier_key: str
     log_level: str
+
+    @property
+    def has_supplier(self) -> bool:
+        return self.supplier == "fireloot" and bool(self.supplier_url and self.supplier_key)
 
     @property
     def has_pay_link(self) -> bool:
@@ -96,10 +105,12 @@ def load_config(env_file: str | os.PathLike[str] | None = None) -> Config:
         card_number=os.getenv("SHOP_CARD_NUMBER", DEFAULT_CARD),
         card_holder=os.getenv("SHOP_CARD_HOLDER", DEFAULT_HOLDER),
         pay_link=os.getenv("SHOP_PAY_LINK", DEFAULT_PAY_LINK),
+        alif_link=os.getenv("SHOP_ALIF_LINK", DEFAULT_ALIF_LINK),
+        alif_account=os.getenv("SHOP_ALIF_ACCOUNT", ""),
         min_topup=_int(os.getenv("SHOP_MIN_TOPUP"), 1000),      # 10.00 с.
         max_topup=_int(os.getenv("SHOP_MAX_TOPUP"), 5_000_00),  # 5000 с.
-        supplier=os.getenv("SHOP_SUPPLIER", "manual").strip().lower(),
-        supplier_url=os.getenv("SHOP_SUPPLIER_URL", ""),
-        supplier_key=os.getenv("SHOP_SUPPLIER_KEY", ""),
+        supplier=os.getenv("SHOP_SUPPLIER", "fireloot").strip().lower(),
+        supplier_url=os.getenv("SHOP_SUPPLIER_URL", FIRELOOT_BASE),
+        supplier_key=os.getenv("SHOP_SUPPLIER_KEY", os.getenv("FIRELOOT_KEY", "")),
         log_level=os.getenv("SHOP_LOG_LEVEL", "INFO").upper(),
     )

@@ -1,30 +1,53 @@
-"""Пайвасти таъминкунанда (API).
+"""Пайвасти таъминкунанда — FireLoot Partner API.
 
-Ҳоло ду реҷа:
+Се навъи мол:
 
-*   ``manual`` — бе API. Фармоиш ба админ меравад, ӯ дастӣ иҷро мекунад.
-    ID-и бозигар тафтиш намешавад — харидор худаш тасдиқ мекунад.
-*   ``http``   — шаблон барои API-и воқеӣ. Вақте ҳуҷҷатҳо ва калид омаданд,
-    танҳо ду метод дар ``HttpSupplier`` пур карда мешавад — боқӣ ҳама тайёр.
+*   ``game``   — Free Fire ва PUBG: ``POST /validate`` (лақаб) ва ``POST /order``
+*   ``stars``  — Telegram Stars: ``POST /telegram/check`` ва ``POST /telegram/order``
+*   ``manual`` — API надорад (масалан Premium): фармоишро админ дастӣ иҷро мекунад
 
-Ҳамаи хатоҳо дар дохил гирифта мешаванд: бот ҳеҷ гоҳ аз сабаби таъминкунанда
-намеафтад.
+Ҳамаи хатоҳо дар дохил гирифта мешаванд — бот аз сабаби таъминкунанда намеафтад.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 log = logging.getLogger(__name__)
 
+# Ҳолатҳои ниҳоии фармоиш дар FireLoot
+FINAL_STATUSES = ("completed", "failed", "refunded")
+
+CHECK_ERRORS = {
+    "invalid_uid": "ID-и бозигар нодуруст аст",
+    "invalid_request": "Дархост нопурра аст",
+    "unauthorized": "Калиди API нодуруст аст",
+    "region_unsupported": "Региони аккаунт дастгирӣ намешавад",
+    "product_not_found": "Ин мол дар таъминкунанда нест",
+    "rate_limited": "Дархостҳо хеле зиёданд, каме сабр кунед",
+    "service_unavailable": "Хидмат вақтинча дастнорас аст",
+    "not_found": "Username пайдо нашуд",
+    "invalid_username": "Username нодуруст аст",
+}
+
+ORDER_ERRORS = {
+    **CHECK_ERRORS,
+    "insufficient_balance": "Баланси таъминкунанда кофӣ нест",
+    "insufficient_stars_balance": "Баланси Stars-и таъминкунанда кофӣ нест",
+    "duplicate_order": "Ин рақами фармоиш аллакай истифода шудааст",
+    "order_not_found": "Фармоиш пайдо нашуд",
+    "invalid_quantity": "Миқдор нодуруст аст",
+}
+
 
 @dataclass(frozen=True)
-class PlayerInfo:
-    """Натиҷаи тафтиши ID-и бозигар."""
+class CheckResult:
+    """Натиҷаи тафтиши ID ё username."""
 
-    player_id: str
+    target: str
     nickname: str | None = None
     ok: bool = True
     error: str | None = None
@@ -33,109 +56,226 @@ class PlayerInfo:
 @dataclass(frozen=True)
 class OrderResult:
     ok: bool
-    external_id: str | None = None
+    external_id: str | None = None   # рақами фармоиш дар таъминкунанда
+    status: str | None = None
     error: str | None = None
+    code: str | None = None
 
 
 class Supplier(Protocol):
     name: str
 
-    async def check_player(self, game: str, player_id: str) -> PlayerInfo: ...
+    async def check(self, *, kind: str, sku: str, target: str, amount: int) -> CheckResult: ...
 
     async def place_order(
-        self, *, game: str, product_code: str, player_id: str, amount: int
+        self, *, kind: str, sku: str, target: str, amount: int, order_id: str
     ) -> OrderResult: ...
+
+    async def order_status(self, external_id: str, *, by_external: bool = False) -> OrderResult: ...
+
+    async def balance(self) -> dict[str, Any]: ...
 
     async def close(self) -> None: ...
 
 
 class ManualSupplier:
-    """Бе API: ҳама чиз дастӣ аз панели админ."""
+    """Бе API: ҳама фармоишҳо дастӣ аз панели админ иҷро мешаванд."""
 
     name = "manual"
 
-    async def check_player(self, game: str, player_id: str) -> PlayerInfo:
-        # Лақаб маълум нест — харидор ID-и худро худаш тасдиқ мекунад.
-        return PlayerInfo(player_id=player_id, nickname=None, ok=True)
+    async def check(self, *, kind: str, sku: str, target: str, amount: int) -> CheckResult:
+        # Лақаб маълум нест — харидор худаш ID-и худро тасдиқ мекунад.
+        return CheckResult(target=target, nickname=None, ok=True)
 
     async def place_order(
-        self, *, game: str, product_code: str, player_id: str, amount: int
+        self, *, kind: str, sku: str, target: str, amount: int, order_id: str
     ) -> OrderResult:
-        return OrderResult(ok=True, external_id=None)
+        return OrderResult(ok=True, external_id=None, status=None)
+
+    async def order_status(self, external_id: str, *, by_external: bool = False) -> OrderResult:
+        return OrderResult(ok=False, error="manual")
+
+    async def balance(self) -> dict[str, Any]:
+        return {"ok": False, "error": "Реҷаи дастӣ — баланс нест"}
 
     async def close(self) -> None:
         return None
 
 
-class HttpSupplier:
-    """Шаблон барои API-и воқеӣ.
+class FireLootSupplier:
+    """Муштарии FireLoot Partner API."""
 
-    Вақте ҳуҷҷатҳои таъминкунанда омаданд, се чизро иваз кардан кофист:
-    ``_CHECK_PATH``, ``_ORDER_PATH`` ва тарзи хондани ҷавоб.
-    """
+    name = "fireloot"
 
-    name = "http"
-
-    _CHECK_PATH = "/check"
-    _ORDER_PATH = "/order"
-
-    def __init__(self, base_url: str, api_key: str, timeout: float = 20.0) -> None:
+    def __init__(self, base_url: str, api_key: str, timeout: float = 35.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
         self._session = None
+        self._lock = asyncio.Lock()
 
+    # ── дохилӣ ────────────────────────────────────────────────────────
     async def _get_session(self):
         import aiohttp
 
-        if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
-                headers={"Authorization": f"Bearer {self.api_key}"},
-            )
+        async with self._lock:
+            if self._session is None or self._session.closed:
+                self._session = aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=self.timeout),
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                )
         return self._session
 
-    async def check_player(self, game: str, player_id: str) -> PlayerInfo:
-        if not self.base_url:
-            return PlayerInfo(player_id=player_id, nickname=None, ok=True)
-        try:
-            session = await self._get_session()
-            async with session.get(
-                f"{self.base_url}{self._CHECK_PATH}",
-                params={"game": game, "player_id": player_id},
-            ) as resp:
+    async def _request(self, method: str, path: str, **kwargs) -> tuple[int, dict]:
+        session = await self._get_session()
+        async with session.request(method, f"{self.base_url}{path}", **kwargs) as resp:
+            try:
                 data = await resp.json(content_type=None)
-            if resp.status >= 400:
-                return PlayerInfo(player_id, None, ok=False, error=f"HTTP {resp.status}")
-            nickname = data.get("nickname") or data.get("username") or data.get("name")
-            return PlayerInfo(player_id=player_id, nickname=nickname, ok=bool(nickname))
-        except Exception as exc:  # хатои шабака набояд ботро афтонад
-            log.warning("check_player нашуд: %s", exc)
-            return PlayerInfo(player_id, None, ok=False, error=str(exc))
+            except Exception:
+                data = {}
+            return resp.status, (data if isinstance(data, (dict, list)) else {})
 
-    async def place_order(
-        self, *, game: str, product_code: str, player_id: str, amount: int
-    ) -> OrderResult:
-        if not self.base_url:
-            return OrderResult(ok=True, external_id=None)
+    @staticmethod
+    def _error(data: dict, status: int, table: dict[str, str]) -> tuple[str, str | None]:
+        """Ҷавоби хаторо ба матни фаҳмо табдил медиҳад."""
+        err = data.get("error") if isinstance(data.get("error"), dict) else {}
+        code = err.get("code") or data.get("code")
+        message = err.get("message") or data.get("message") or f"HTTP {status}"
+        return table.get(code, f"{code or status}: {message}"), code
+
+    # ── тафтиши ID / username ─────────────────────────────────────────
+    async def check(self, *, kind: str, sku: str, target: str, amount: int) -> CheckResult:
+        if kind == "manual" or not self.base_url:
+            return CheckResult(target=target, nickname=None, ok=True)
         try:
-            session = await self._get_session()
-            async with session.post(
-                f"{self.base_url}{self._ORDER_PATH}",
-                json={
-                    "game": game,
-                    "product": product_code,
-                    "player_id": player_id,
-                    "amount": amount,
-                },
-            ) as resp:
-                data = await resp.json(content_type=None)
-            if resp.status >= 400:
-                return OrderResult(ok=False, error=f"HTTP {resp.status}: {data}")
-            return OrderResult(ok=True, external_id=str(data.get("order_id") or ""))
+            if kind == "stars":
+                username = target.lstrip("@").strip()
+                status, data = await self._request(
+                    "POST", "/telegram/check",
+                    json={"username": username, "stars": int(amount)},
+                )
+                nickname = data.get("name") or username
+            else:
+                status, data = await self._request(
+                    "POST", "/validate", json={"sku": sku, "uid": str(target)},
+                )
+                nickname = data.get("player_name")
+
+            if status == 200 and data.get("valid") is True and nickname:
+                return CheckResult(target=target, nickname=nickname, ok=True)
+            message, _ = self._error(data, status, CHECK_ERRORS)
+            return CheckResult(target=target, nickname=None, ok=False, error=message)
         except Exception as exc:
-            log.warning("place_order нашуд: %s", exc)
+            log.warning("Тафтиши %s нашуд: %s", target, exc)
+            return CheckResult(target=target, nickname=None, ok=False, error="Вақти тафтиш гузашт")
+
+    # ── фиристодани фармоиш ───────────────────────────────────────────
+    async def place_order(
+        self, *, kind: str, sku: str, target: str, amount: int, order_id: str
+    ) -> OrderResult:
+        if kind == "manual" or not self.base_url:
+            return OrderResult(ok=True, external_id=None, status=None)
+        try:
+            if kind == "stars":
+                status, data = await self._request(
+                    "POST", "/telegram/order",
+                    json={
+                        "username": target.lstrip("@").strip(),
+                        "stars": int(amount),
+                        "external_id": str(order_id),
+                    },
+                )
+            else:
+                status, data = await self._request(
+                    "POST", "/order",
+                    json={
+                        "external_id": str(order_id),
+                        "sku": sku,
+                        "uid": str(target),
+                    },
+                )
+
+            if status in (200, 201):
+                external = data.get("order_id") or data.get("id")
+                return OrderResult(
+                    ok=True,
+                    external_id=str(external) if external else None,
+                    status=data.get("status"),
+                )
+            message, code = self._error(data, status, ORDER_ERRORS)
+            return OrderResult(ok=False, error=message, code=code)
+        except Exception as exc:
+            log.warning("Фармоиши %s фиристода нашуд: %s", order_id, exc)
+            return OrderResult(ok=False, error=f"Хатои шабака: {exc}")
+
+    # ── санҷиши ҳолат ─────────────────────────────────────────────────
+    async def order_status(self, external_id: str, *, by_external: bool = False) -> OrderResult:
+        if not self.base_url:
+            return OrderResult(ok=False, error="API танзим нашудааст")
+        path = f"/order/{external_id}" + ("?by=external" if by_external else "")
+        try:
+            status, data = await self._request("GET", path)
+            if status == 200:
+                return OrderResult(
+                    ok=True, external_id=str(external_id), status=data.get("status")
+                )
+            message, code = self._error(data, status, ORDER_ERRORS)
+            return OrderResult(ok=False, error=message, code=code)
+        except Exception as exc:
             return OrderResult(ok=False, error=str(exc))
+
+    async def wait_until_done(
+        self, external_id: str, *, by_external: bool = False,
+        max_wait: int = 120, interval: int = 4,
+    ) -> OrderResult:
+        """То ҳолати ниҳоӣ интизор мешавад (completed / failed / refunded)."""
+        waited = 0
+        last = OrderResult(ok=False, error="timeout")
+        while waited < max_wait:
+            result = await self.order_status(external_id, by_external=by_external)
+            if result.ok:
+                last = result
+                if result.status in FINAL_STATUSES:
+                    return result
+            await asyncio.sleep(interval)
+            waited += interval
+        return last
+
+    # ── баланс ва каталог ─────────────────────────────────────────────
+    async def balance(self) -> dict[str, Any]:
+        if not self.base_url:
+            return {"ok": False, "error": "API танзим нашудааст"}
+        try:
+            status, data = await self._request("GET", "/balance")
+            if status == 200:
+                return {
+                    "ok": True,
+                    "balance": data.get("balance"),
+                    "currency": data.get("currency", "USD"),
+                    "stars_balance": data.get("stars_balance"),
+                    "telegram_active": data.get("telegram_active"),
+                }
+            message, _ = self._error(data, status, ORDER_ERRORS)
+            return {"ok": False, "error": message}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    async def products(self) -> dict[str, dict]:
+        """Каталоги воқеии таъминкунанда — барои санҷиши SKU-ҳо."""
+        if not self.base_url:
+            return {}
+        try:
+            status, data = await self._request("GET", "/products")
+            if status == 200 and isinstance(data, list):
+                return {item["sku"]: item for item in data if "sku" in item}
+            log.warning("GET /products: HTTP %s", status)
+            return {}
+        except Exception as exc:
+            log.warning("GET /products дастнорас: %s", exc)
+            return {}
 
     async def close(self) -> None:
         if self._session is not None and not self._session.closed:
@@ -143,6 +283,7 @@ class HttpSupplier:
 
 
 def build_supplier(kind: str, url: str = "", key: str = "") -> Supplier:
-    if kind == "http" and url:
-        return HttpSupplier(url, key)
+    """`kind`: ``fireloot`` ё ``manual``."""
+    if kind in ("fireloot", "http") and url and key:
+        return FireLootSupplier(url, key)
     return ManualSupplier()

@@ -87,6 +87,9 @@ async def _start_payment(
     link = payments.build_pay_link(
         cfg.pay_link, card=cfg.card_number, amount=amount, comment=code
     )
+    alif = payments.build_alif_link(
+        cfg.alif_link, account=cfg.alif_account, amount=amount
+    )
     text = texts.payment_details(
         topup_id,
         amount,
@@ -95,10 +98,15 @@ async def _start_payment(
         cfg.card_holder,
         cfg.currency,
     )
-    if link is None:
+    if link is None and alif is None:
         text += "\n\n" + texts.NO_PAY_LINK
+    elif alif is not None:
+        text += (
+            "\n\n<i>Тавассути Alif маблағ худкор пур мешавад, вале кодро "
+            "ҳатман дар шарҳ нависед.</i>"
+        )
     await state.update_data(topup_id=topup_id)
-    await message.answer(text, reply_markup=keyboards.payment(topup_id, link))
+    await message.answer(text, reply_markup=keyboards.payment(topup_id, link, alif))
 
 
 @router.callback_query(F.data.startswith(keyboards.CB_TOPUP_PAID))

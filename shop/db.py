@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS products (
     title    TEXT    NOT NULL,
     amount   INTEGER NOT NULL DEFAULT 0,
     price    INTEGER NOT NULL,
+    sku      TEXT    NOT NULL DEFAULT '',
+    kind     TEXT    NOT NULL DEFAULT 'game',
     sort     INTEGER NOT NULL DEFAULT 0,
     active   INTEGER NOT NULL DEFAULT 1
 );
@@ -60,6 +62,8 @@ CREATE TABLE IF NOT EXISTS orders (
     category     TEXT    NOT NULL,
     title        TEXT    NOT NULL,
     price        INTEGER NOT NULL,
+    sku          TEXT    NOT NULL DEFAULT '',
+    kind         TEXT    NOT NULL DEFAULT 'game',
     target       TEXT,
     nickname     TEXT,
     status       TEXT    NOT NULL,
@@ -167,6 +171,7 @@ class Database:
     def _init_schema(self) -> None:
         with self._lock:
             self._conn.executescript(_SCHEMA)
+            self._add_missing_columns()
             row = self._conn.execute("SELECT version FROM schema_version").fetchone()
             if row is None:
                 self._conn.execute(
@@ -174,6 +179,21 @@ class Database:
                 )
             self._conn.commit()
         self.seed_products()
+
+    _NEW_COLUMNS = (
+        ("products", "sku", "TEXT NOT NULL DEFAULT ''"),
+        ("products", "kind", "TEXT NOT NULL DEFAULT 'game'"),
+        ("orders", "sku", "TEXT NOT NULL DEFAULT ''"),
+        ("orders", "kind", "TEXT NOT NULL DEFAULT 'game'"),
+    )
+
+    def _add_missing_columns(self) -> None:
+        """Базаи кӯҳнаро бе гум кардани маълумот нав мекунад."""
+        for table, column, decl in self._NEW_COLUMNS:
+            have = {r["name"] for r in self._conn.execute(f"PRAGMA table_info({table})")}
+            if column not in have:
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+        self._conn.commit()
 
     def _all(self, sql: str, params: Sequence[Any] = ()) -> list[sqlite3.Row]:
         with self._lock:
@@ -191,14 +211,30 @@ class Database:
 
     # ── молҳо ─────────────────────────────────────────────────────────
     def seed_products(self) -> None:
-        """Молҳои нави каталогро илова мекунад. Нархҳои мавҷударо ламс намекунад."""
+        """Каталогро нав мекунад.
+
+        Нарх ва ҳолати «фаъол» ба админ тааллуқ доранд — ламс намешаванд.
+        Ном, SKU, навъ ва тартиб ҳамеша аз `catalog.py` гирифта мешаванд.
+        """
         with self._lock:
             for i, p in enumerate(catalog.DEFAULT_PRODUCTS):
                 self._conn.execute(
-                    "INSERT OR IGNORE INTO products(code, category, title, amount, price, sort, active) "
-                    "VALUES (?, ?, ?, ?, ?, ?, 1)",
-                    (p.code, p.category, p.title, p.amount, p.price, i),
+                    "INSERT OR IGNORE INTO products"
+                    "(code, category, title, amount, price, sku, kind, sort, active) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)",
+                    (p.code, p.category, p.title, p.amount, p.price, p.sku, p.kind, i),
                 )
+                self._conn.execute(
+                    "UPDATE products SET category = ?, title = ?, amount = ?, "
+                    "sku = ?, kind = ?, sort = ? WHERE code = ?",
+                    (p.category, p.title, p.amount, p.sku, p.kind, i, p.code),
+                )
+            # Молҳое, ки дигар дар каталог нестанд, пинҳон карда мешаванд.
+            known = tuple(p.code for p in catalog.DEFAULT_PRODUCTS)
+            marks = ", ".join("?" * len(known))
+            self._conn.execute(
+                f"UPDATE products SET active = 0 WHERE code NOT IN ({marks})", known
+            )
             self._conn.commit()
 
     def products(self, category: str, *, only_active: bool = True) -> list[sqlite3.Row]:
@@ -328,6 +364,8 @@ class Database:
         price: int,
         target: str | None,
         nickname: str | None,
+        sku: str = "",
+        kind: str = "game",
     ) -> int:
         """Пулро аз ҳисоб мегирад ва фармоиш мекушояд. Ҳама дар як амалиёт."""
         stamp = now()
@@ -343,10 +381,11 @@ class Database:
                 "UPDATE users SET balance = ? WHERE id = ?", (new_balance, user_id)
             )
             cur = self._conn.execute(
-                "INSERT INTO orders(user_id, product_code, category, title, price, target, "
-                "nickname, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO orders(user_id, product_code, category, title, price, sku, kind, "
+                "target, nickname, status, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    user_id, product_code, category, title, price,
+                    user_id, product_code, category, title, price, sku, kind,
                     target, nickname, ORDER_NEW, stamp, stamp,
                 ),
             )
