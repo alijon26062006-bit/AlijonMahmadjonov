@@ -52,6 +52,7 @@ class Panel(StatesGroup):
     transfer = State()    # ждём список балансов со старого бота
     link = State()        # ждём название рекламной ссылки
     admin_add = State()   # ждём ID того, кому открыть панель
+    game_find = State()   # ждём название игры для поиска по каталогу
 
 
 class Review(StatesGroup):

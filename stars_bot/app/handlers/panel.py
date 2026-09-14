@@ -3523,7 +3523,9 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
 
     kb = InlineKeyboardBuilder()
     kb.row(btn("➕ Добавить игру", "pn:game_new", style=SUCCESS))
-    kb.row(btn("📚 Взять из каталога поставщика", "pn:game_pick", style=PRIMARY))
+    kb.row(btn("🔎 Найти игру по названию", "pn:game_find", style=PRIMARY))
+    kb.row(InlineKeyboardButton(text="📚 Взять из каталога поставщика",
+                                callback_data="pn:game_pick"))
     kb.row(btn("🪪 Проверка ID игрока", "pn:checker", style=PRIMARY))
     kb.row(InlineKeyboardButton(text="📋 Все категории поставщика",
                                 callback_data="pn:game_codes"))
@@ -3895,6 +3897,99 @@ async def cb_checker_set(call: CallbackQuery, state: FSMContext,
         back_kb("pn:checker", "❌ Отмена"),
     )
     await call.answer()
+
+
+@router.callback_query(F.data == "pn:game_find")
+async def cb_game_find(call: CallbackQuery, state: FSMContext) -> None:
+    """Поиск по каталогу: у поставщика две сотни игр, листать их нельзя."""
+    await state.set_state(Panel.game_find)
+    await safe_edit(
+        call,
+        "🔎 <b>Найти игру у поставщика</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        "<blockquote>Пришлите название или его часть — покажу все "
+        "подходящие коды.\n\n"
+        "Например: <code>pubg</code>, <code>free fire</code>, "
+        "<code>mobile legends</code>.\n\n"
+        "Искать можно и по коду: <code>pubgm</code>.</blockquote>",
+        back_kb("pn:games", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.message(Panel.game_find, F.text)
+async def on_game_find(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection, provider
+) -> None:
+    from app.services import games as gsvc
+    from app.services import regions as reg
+    from app.services import suppliers
+
+    query = (message.text or "").strip().lower()
+    if len(query) < 2:
+        await message.answer("❌ Слишком короткий запрос — нужно хотя бы две буквы.")
+        return
+
+    notice = await message.answer("🔎 Ищу в каталоге…")
+    try:
+        catalog = await gsvc.full_catalog(suppliers.for_games(provider),
+                                          cached=True)
+    except Exception as exc:  # noqa: BLE001 — показать владельцу причину
+        await notice.edit_text(
+            "❌ <b>Каталог не пришёл</b>\n\n"
+            f"<blockquote expandable>{str(exc)[:300]}</blockquote>"
+        )
+        return
+
+    # Ищем по словам: «mobile legends» должно находить и там, где в
+    # названии между ними стоит что-то ещё.
+    words = [w for w in re.split(r"[^a-zа-я0-9]+", query) if w]
+    found = []
+    for item in catalog:
+        haystack = f"{item['category_id']} {item.get('name', '')}".lower()
+        if all(word in haystack for word in words):
+            found.append(item)
+
+    if not found:
+        await notice.edit_text(
+            f"😔 <b>По запросу «{query}» ничего нет</b>\n\n"
+            "<blockquote>Попробуйте короче — например одно слово. "
+            "Поставщик пишет названия по-английски: "
+            "<code>pubg</code>, а не «пабг».</blockquote>",
+            reply_markup=back_kb("pn:game_find", "🔎 Искать снова"),
+        )
+        return
+
+    have = {game.category_id for game in await db.list_games(conn)}
+    found.sort(key=lambda i: reg.sort_key(i["category_id"], i.get("name", "")))
+
+    rows, kb = [], InlineKeyboardBuilder()
+    families: dict[str, dict] = {}
+    for item in found[:30]:
+        code, name = item["category_id"], item.get("name", "")
+        mark = "✅" if code in have else "◻️"
+        region = reg.title_of(code, name)
+        rows.append(f"{mark} <code>{code}</code>\n   {name}"
+                    + (f" · {region}" if region else ""))
+        families.setdefault(reg.family_of(code, name), item)
+
+    for family, item in list(families.items())[:8]:
+        name = reg.clean_title(item["category_id"], item.get("name", ""))
+        kb.row(InlineKeyboardButton(
+            text=f"➕ Добавить {name}"[:60],
+            callback_data=f"pn:game_add:{family}",
+        ))
+    kb.row(InlineKeyboardButton(text="🔎 Искать снова",
+                                callback_data="pn:game_find"))
+    kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
+
+    await state.clear()
+    text = (f"🔎 <b>Найдено: {len(found)}</b>\n"
+            f"<code>{texts.LINE}</code>\n\n" + "\n".join(rows)
+            + ("\n\n<i>…показаны первые 30</i>" if len(found) > 30 else "")
+            + "\n\n<blockquote>✅ — уже добавлена, ◻️ — ещё нет.\n\n"
+            "Кнопка добавляет игру сразу со всеми её регионами.</blockquote>")
+    await notice.edit_text(text[:4000], reply_markup=kb.as_markup())
 
 
 @router.callback_query(F.data == "pn:game_codes")

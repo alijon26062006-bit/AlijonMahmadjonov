@@ -730,6 +730,77 @@ async def full_catalog(conn) -> None:
     check("полный отказ не выдаём за пустой каталог", failed)
 
 
+async def catalog_search(conn) -> None:
+    """Поиск по каталогу: у поставщика две сотни игр, листать их нельзя."""
+    class Catalog(GameProvider):
+        async def game_categories(self):
+            return [
+                {"category_id": "pubg_mobile_global", "name": "PUBG Mobile (Global)"},
+                {"category_id": "pubg_mobile_id", "name": "PUBG Mobile (ID)"},
+                {"category_id": "pubgm_uc", "name": "PUBG UC"},
+                {"category_id": "free_fire_br", "name": "Free Fire (BR)"},
+                {"category_id": "mobile_legends_ph", "name": "Mobile Legends (PH)"},
+                {"category_id": "roblox", "name": "Roblox"},
+            ]
+
+        async def game_catalog(self):
+            return await self.game_categories()
+
+    from app.services import games as gsvc
+
+    gsvc.forget_catalog()
+    state = FSMContext(storage=MemoryStorage(),
+                       key=StorageKey(bot_id=1, chat_id=ADMIN, user_id=ADMIN))
+
+    call = call_of("pn:game_find", uid=ADMIN)
+    await panel.cb_game_find(call, state)
+    check("бот просит название", "Найти игру" in call.last, call.last[:60])
+    check("показан пример с pubg", "pubg" in call.last, call.last[:250])
+
+    message = msg("p", uid=ADMIN)
+    await panel.on_game_find(message, state, conn, Catalog())
+    check("слишком короткий запрос отклонён",
+          "две буквы" in message.last, message.last[:80])
+
+    message = msg("pubg", uid=ADMIN)
+    await panel.on_game_find(message, state, conn, Catalog())
+    check("PUBG найден", "Найдено: 3" in message.last, message.last[:80])
+    check("видны коды", "pubg_mobile_global" in message.last, message.last[:400])
+    check("и названия", "PUBG Mobile (Global)" in message.last,
+          message.last[:400])
+    check("чужие игры не попали",
+          "roblox" not in message.last and "free_fire" not in message.last,
+          message.last[:500])
+    check("регион распознан", "Индонезия" in message.last, message.last[:500])
+    check("есть кнопка добавления",
+          any("Добавить" in b for b in buttons(message.markup)),
+          str(buttons(message.markup)))
+
+    # поиск по двум словам, даже если между ними что-то стоит
+    message = msg("mobile legends", uid=ADMIN)
+    await panel.on_game_find(message, state, conn, Catalog())
+    check("ищется по нескольким словам",
+          "mobile_legends_ph" in message.last, message.last[:300])
+
+    # уже добавленные помечены
+    await db.add_game(conn, category_id="pubgm_uc", title="PUBG UC")
+    message = msg("pubg", uid=ADMIN)
+    await panel.on_game_find(message, state, conn, Catalog())
+    check("добавленная игра помечена", "✅" in message.last, message.last[:400])
+    check("не добавленная — тоже помечена", "◻️" in message.last,
+          message.last[:400])
+    await db.delete_game(conn, "pubgm_uc")
+
+    message = msg("counter strike", uid=ADMIN)
+    await panel.on_game_find(message, state, conn, Catalog())
+    check("ненайденное названо прямо", "ничего нет" in message.last,
+          message.last[:80])
+    check("и подсказано, что писать по-английски",
+          "по-английски" in message.last, message.last[:300])
+
+    gsvc.forget_catalog()
+
+
 async def wrong_code(conn) -> None:
     """Неверный код игры: бот подсказывает похожие и переставляет его."""
     class Catalog(GameProvider):
@@ -2278,6 +2349,7 @@ async def main() -> None:
         await game_icons(conn)
         await region_step(conn)
         await full_catalog(conn)
+        await catalog_search(conn)
         await wrong_code(conn)
         await two_fields(conn)
         await volsever_check(conn)
