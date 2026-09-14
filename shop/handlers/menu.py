@@ -38,6 +38,18 @@ async def cmd_cancel(message: Message, state: FSMContext, db: Database, cfg: Con
     await show_main_menu(message, db, cfg, edit=False)
 
 
+@router.message(Command("admin", "panel"))
+async def cmd_admin_denied(message: Message, cfg: Config) -> None:
+    """Сюда попадают только НЕ админы — роутери админ онҳоро намегузаронад."""
+    await message.answer(
+        f"{texts.ADMIN_DENIED}\n\n"
+        f"🆔 ID-и шумо: <code>{message.from_user.id}</code>\n\n"
+        "<i>Агар ин ID-и шумо бошад ва панел лозим бошад — онро ба "
+        "<code>SHOP_ADMIN_IDS</code> дар файли <code>.env</code> илова кунед "
+        "ва ботро аз нав оғоз кунед.</i>"
+    )
+
+
 @router.message(Command("id"))
 async def cmd_id(message: Message) -> None:
     await message.answer(f"🆔 ID-и шумо: <code>{message.from_user.id}</code>")
