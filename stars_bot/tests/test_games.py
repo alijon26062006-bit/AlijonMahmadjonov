@@ -116,6 +116,10 @@ class GameProvider(DeliveryProvider):
         self.orders: list[dict] = []
         self.idempotency: list[str] = []
 
+    async def game_catalog(self):
+        return [{"category_id": "free_fire_br", "name": "Free Fire",
+                 "fields": [{"name": "player_id", "label": "ID игрока"}]}]
+
     async def game_offers(self, category_id):
         return [
             {"offer_id": "off_1", "name": "100 алмазов",
@@ -460,14 +464,24 @@ async def panel_screens(conn) -> None:
     check("просит код и название", "код название" in call.last, call.last[:120])
 
     bad = msg("ЕРУНДА", uid=ADMIN)
-    await panel.on_game_new(bad, state, conn)
+    await panel.on_game_new(bad, state, conn, GameProvider())
     check("кривой формат отклонён", "❌" in bad.last)
 
     good = msg("pubg_mobile 🎯 PUBG Mobile", uid=ADMIN)
-    await panel.on_game_new(good, state, conn)
+    await panel.on_game_new(good, state, conn, GameProvider())
     pubg = await db.get_game(conn, "pubg_mobile")
     check("вторая игра добавлена", pubg is not None and pubg.title == "🎯 PUBG Mobile")
     check("новая игра сразу не продаётся", pubg.enabled == 0)
+    check("незнакомой игре ставится поле по умолчанию",
+          pubg.field == "user_id", pubg.field)
+
+    call = call_of("pn:game_field:free_fire_br", uid=ADMIN)
+    await panel.cb_game_field(call, state, conn, GameProvider())
+    check("экран поля показывает текущее", "player_id" in call.last, call.last[:200])
+    await panel.on_field_value(msg("uid", uid=ADMIN), state, conn)
+    check("поле правится вручную",
+          (await db.get_game(conn, "free_fire_br")).field == "uid")
+    await db.update_game(conn, "free_fire_br", field="player_id")
 
     call = call_of("pn:game_on:pubg_mobile", uid=ADMIN)
     await panel.cb_game_toggle(call, conn)
@@ -494,6 +508,7 @@ async def panel_screens(conn) -> None:
           any("Балансы ключей" in b.text
               for r in panel.home_kb().inline_keyboard for b in r))
 
+    await id_field(conn)
     await two_keys(conn)
     await key_balances(conn)
 
@@ -506,6 +521,65 @@ async def panel_screens(conn) -> None:
     check("у него название игры", ff and ff["title"] == "🔥 Free Fire")
     check("игра закреплена за партнёром",
           (await db.product_owners(conn)).get("game:free_fire_br") == partner.id)
+
+
+async def id_field(conn) -> None:
+    """Поле с ID у каждой игры своё — бот его узнаёт, а не угадывает."""
+    check("имя поля читается из отказа",
+          svc.missing_field('Field "player_id" is required.') == "player_id")
+    check("другой формулировки тоже хватает",
+          svc.missing_field("field uid is required") == "uid")
+    check("посторонний отказ полем не считается",
+          svc.missing_field("INSUFFICIENT_BALANCE") is None)
+
+    provider = GameProvider()
+    check("поле определяется по каталогу поставщика",
+          await svc.detect_field(provider, "free_fire_br") == "player_id")
+    check("для незнакомой игры поля нет",
+          await svc.detect_field(provider, "нет_такой") is None)
+
+    class NoCatalog(DeliveryProvider):
+        async def game_catalog(self):
+            raise DeliveryError("503")
+
+    check("молчащий каталог не роняет",
+          await svc.detect_field(NoCatalog(), "free_fire_br") is None)
+
+    # отказ про поле чинит игру сам
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage,
+                       key=StorageKey(bot_id=1, chat_id=BUYER, user_id=BUYER))
+    await db.update_game(conn, "free_fire_br", field="user_id")
+    broken = GameProvider(order_error=DeliveryError('Field "player_id" is required.'))
+    bot = FakeBot()
+
+    await state.set_state(gh.Game.confirm)
+    await state.update_data(category_id="free_fire_br", offer_id="off_1",
+                            pack="100 алмазов", price=1400, cost=1090,
+                            player="1724367212", player_name="Ник")
+    before = (await db.get_user(conn, BUYER)).balance
+    call = call_of("g:ok")
+    await gh.cb_buy(call, state, conn, broken, bot)
+
+    check("деньги за неудачный заказ вернулись",
+          (await db.get_user(conn, BUYER)).balance == before, fmt(before))
+    check("поле игры исправлено на нужное",
+          (await db.get_game(conn, "free_fire_br")).field == "player_id",
+          (await db.get_game(conn, "free_fire_br")).field)
+    told = [t for t in bot.to(ADMIN) if "Поле исправлено" in t]
+    check("владельцу сказали, что починено", bool(told), str(bot.to(ADMIN)))
+    check("и что можно повторить", told and "повторить" in told[0])
+
+    # следующий заказ уходит уже с правильным полем
+    ok = GameProvider()
+    await state.set_state(gh.Game.confirm)
+    await state.update_data(category_id="free_fire_br", offer_id="off_1",
+                            pack="100 алмазов", price=1400, cost=1090,
+                            player="1724367212", player_name="Ник")
+    await gh.cb_buy(call_of("g:ok"), state, conn, ok, FakeBot())
+    check("повторный заказ ушёл с правильным полем",
+          ok.orders and ok.orders[0]["fields"] == {"player_id": "1724367212"},
+          str(ok.orders))
 
 
 async def two_keys(conn) -> None:

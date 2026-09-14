@@ -657,6 +657,25 @@ async def on_field_value(
     field = data.get("field", "")
     raw = (message.text or "").strip()
 
+    # Имя поля с ID игрока — тоже из таблицы игр.
+    if field.startswith("game_field:"):
+        code = field.split(":", 1)[1]
+        if not re.fullmatch(r"[a-z0-9_]{2,32}", raw):
+            await message.answer(
+                "❌ Имя поля — латиница, цифры и подчёркивание, "
+                "например <code>player_id</code>."
+            )
+            return
+        await db.update_game(conn, code, field=raw)
+        await state.clear()
+        game = await db.get_game(conn, code)
+        await message.answer(
+            f"✅ <b>{game.title if game else code}</b> — поле "
+            f"<code>{raw}</code>",
+            reply_markup=back_kb(f"pn:game:{code}", "‹ К игре"),
+        )
+        return
+
     # Наценка конкретной игры — своя ветка: она лежит в таблице игр.
     if field.startswith("game_margin:"):
         code = field.split(":", 1)[1]
@@ -3093,7 +3112,7 @@ async def cb_game_new(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(GameNew.data, F.text)
 async def on_game_new(
-    message: Message, state: FSMContext, conn: aiosqlite.Connection
+    message: Message, state: FSMContext, conn: aiosqlite.Connection, provider
 ) -> None:
     code, _, title = (message.text or "").strip().partition(" ")
     code, title = code.strip(), title.strip()
@@ -3105,7 +3124,14 @@ async def on_game_new(
         return
 
     region = "BR" if "free_fire" in code else ""
-    game = await db.add_game(conn, category_id=code, title=title, region=region)
+
+    # Поле с ID у каждой игры своё: спрашиваем у поставщика, а не гадаем.
+    from app.services import games as gsvc
+    from app.services import suppliers
+
+    field = await gsvc.detect_field(suppliers.for_games(provider), code) or "user_id"
+    game = await db.add_game(conn, category_id=code, title=title,
+                             field=field, region=region)
     await db.load_game_titles(conn)
     await state.clear()
 
@@ -3114,6 +3140,8 @@ async def on_game_new(
     kb.row(btn("‹ К играм", "pn:games"))
     await message.answer(
         f"✅ <b>{title}</b> добавлена\n\n"
+        f"├ Поле для ID: <code>{field}</code>\n"
+        "└ <i>определено у поставщика</i>\n\n"
         "<blockquote>Проверьте пакеты кнопкой «Проверить пакеты», "
         "поставьте наценку и включите игру.</blockquote>",
         reply_markup=kb.as_markup(),
@@ -3151,8 +3179,12 @@ def game_kb(game: db.Game) -> InlineKeyboardMarkup:
                style=DANGER if game.enabled else SUCCESS))
     kb.row(btn("📦 Проверить пакеты", f"pn:game_packs:{game.category_id}",
                style=PRIMARY))
-    kb.row(InlineKeyboardButton(text="📈 Своя наценка",
-                                callback_data=f"pn:game_margin:{game.category_id}"))
+    kb.row(
+        InlineKeyboardButton(text="🔤 Поле для ID",
+                             callback_data=f"pn:game_field:{game.category_id}"),
+        InlineKeyboardButton(text="📈 Своя наценка",
+                             callback_data=f"pn:game_margin:{game.category_id}"),
+    )
     kb.row(btn("🗑 Удалить игру", f"pn:game_del:{game.category_id}", style=DANGER))
     kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
     return kb.as_markup()
@@ -3238,6 +3270,41 @@ async def cb_game_margin(call: CallbackQuery, state: FSMContext, conn: aiosqlite
         + ("" if game.margin else " <i>(общая)</i>")
         + "\n\n<blockquote>Пришлите процент только для этой игры, "
           "или <code>0</code> — брать общую.</blockquote>",
+        back_kb(f"pn:game:{game.category_id}", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:game_field:"))
+async def cb_game_field(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection, provider
+) -> None:
+    """Как поставщик называет поле с ID игрока: user_id, player_id, uid…"""
+    game = await db.get_game(conn, call.data.split(":", 2)[2])
+    if game is None:
+        await call.answer("Игра не найдена.", show_alert=True)
+        return
+
+    from app.services import games as gsvc
+    from app.services import suppliers
+
+    guess = await gsvc.detect_field(suppliers.for_games(provider), game.category_id)
+    hint = ""
+    if guess and guess != game.field:
+        hint = (f"\n\n<blockquote>Поставщик ждёт <code>{guess}</code> — "
+                "пришлите это.</blockquote>")
+    elif guess:
+        hint = "\n\n<blockquote>Поставщик подтверждает текущее.</blockquote>"
+
+    await state.set_state(Panel.value)
+    await state.update_data(field=f"game_field:{game.category_id}")
+    await safe_edit(
+        call,
+        f"🔤 <b>Поле для ID: {game.title}</b>\n\n"
+        f"Сейчас: <code>{game.field}</code>{hint}\n\n"
+        "<blockquote>Обычно это <code>user_id</code>, <code>player_id</code> "
+        "или <code>uid</code>. Точное имя пишет сам поставщик в отказе "
+        "вида «Field ... is required».</blockquote>",
         back_kb(f"pn:game:{game.category_id}", "❌ Отмена"),
     )
     await call.answer()

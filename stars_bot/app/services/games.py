@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -65,6 +66,35 @@ def idempotency_key(order_id: int) -> str:
     """Уникальный ключ заказа. Один заказ бота — один ключ, поэтому повтор
     запроса не спишет у поставщика деньги дважды."""
     return f"bot-{order_id}-{uuid.uuid5(uuid.NAMESPACE_URL, str(order_id)).hex[:12]}"
+
+
+#: Из отказа вида Field "player_id" is required достаём имя поля.
+FIELD_RE = re.compile(r'[Ff]ield\s+"?([A-Za-z0-9_]+)"?\s+is\s+required')
+
+
+def missing_field(error: str) -> str | None:
+    """Какое поле требует поставщик. None — отказ не про поле."""
+    found = FIELD_RE.search(str(error))
+    return found.group(1) if found else None
+
+
+async def detect_field(provider, category_id: str) -> str | None:
+    """Спросить у поставщика, как называется поле ID для этой игры."""
+    try:
+        catalog = await provider.game_catalog()
+    except Exception as exc:  # noqa: BLE001 — не смогли, не беда
+        log.info("Игры: каталог полей не пришёл — %s", exc)
+        return None
+
+    for item in catalog:
+        if item.get("category_id") != category_id:
+            continue
+        fields = item.get("fields") or []
+        for field in fields:
+            name = field.get("name") if isinstance(field, dict) else field
+            if name:
+                return str(name)
+    return None
 
 
 def status_of(order: dict | None) -> str:

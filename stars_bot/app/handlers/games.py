@@ -248,12 +248,23 @@ async def cb_buy(
     except DeliveryError as exc:
         # Явный отказ — выдачи не было, возвращаем деньги сразу.
         await svc._refund(bot, conn, order, str(exc))
+
+        # Поставщик сам называет поле, которого ему не хватило. Запоминаем
+        # его, чтобы следующий заказ по этой игре ушёл правильно.
+        fixed = ""
+        wanted = svc.missing_field(str(exc))
+        if wanted and wanted != game.field:
+            await db.update_game(conn, game.category_id, field=wanted)
+            fixed = (f"\n\n✅ <b>Поле исправлено:</b> <code>{game.field}</code> → "
+                     f"<code>{wanted}</code>\nСледующий заказ пройдёт — "
+                     "попросите клиента повторить.")
+
         await delivery.notify_admins(
             bot,
             "⚠️ <b>Игровой заказ не прошёл</b>\n"
             f"├ Заказ: <code>{order.id}</code> — {game.title}\n"
             f"└ Клиенту вернули <b>{fmt(order.price)}</b>\n\n"
-            f"<blockquote expandable>{str(exc)[:600]}</blockquote>",
+            f"<blockquote expandable>{str(exc)[:600]}</blockquote>{fixed}",
         )
         await call.message.answer(
             texts.REFUNDED.format(
