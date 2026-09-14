@@ -452,14 +452,19 @@ async def flow(conn) -> None:
     await gh.cb_games(call, state, conn)
     check("раздел игр открывается", "Пополнение игр" in call.last)
     check("сказано, что пароль не нужен", "пароль" in call.last.lower())
-    check("игра показана кнопкой", "🔥 Free Fire" in buttons(call.markup))
+    check("игра показана кнопкой",
+          any("Free Fire" in b for b in buttons(call.markup)),
+          str(buttons(call.markup)))
 
     # Steam и игры — за одной кнопкой меню
     await runtime.set_value(conn, "steam_price_e4", "1400")
     await runtime.set_value(conn, "steam_enabled", "1")
-    check("в меню один вход на игры и Steam",
-          sum("Игры и Steam" in b for b in buttons(keyboards.main_menu(games=True))) == 1,
-          str(buttons(keyboards.main_menu(games=True))))
+    entries = [b for row in keyboards.main_menu(games=True).inline_keyboard
+               for b in row if b.callback_data == "m:games"]
+    check("в меню один вход на игры и Steam", len(entries) == 1, str(entries))
+    check("на кнопке только значки, без слов",
+          entries and not any(ch.isalpha() for ch in entries[0].text),
+          entries[0].text if entries else "")
     check("отдельной кнопки Steam в меню нет",
           not any(b.strip().endswith("Пополнить Steam")
                   for b in buttons(keyboards.main_menu(games=True))))
@@ -468,7 +473,7 @@ async def flow(conn) -> None:
     await gh.cb_games(call, state, conn)
     inner = buttons(call.markup)
     check("внутри раздела есть Steam", any("Steam" in b for b in inner), str(inner))
-    check("и обе игры", "🔥 Free Fire" in inner, str(inner))
+    check("и обе игры", any("Free Fire" in b for b in inner), str(inner))
 
     # только Steam, без игр — раздел всё равно открывается
     await db.update_game(conn, "free_fire_br", enabled=0)

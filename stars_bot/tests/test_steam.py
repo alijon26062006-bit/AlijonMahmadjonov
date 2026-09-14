@@ -197,8 +197,11 @@ async def flow(conn) -> None:
     await db.upsert_user(conn, BUYER, "buyer", "Клиент")
     await db.credit(conn, BUYER, 200_00, as_deposit=True)
 
+    # На кнопке входа в игры и Steam стоят только значки, без слов —
+    # ищем её по адресу, а не по подписи.
     check("раздел появился в меню",
-          any("Steam" in b for b in buttons(keyboards.main_menu())),
+          any(b.callback_data == "m:games"
+              for row in keyboards.main_menu().inline_keyboard for b in row),
           str(buttons(keyboards.main_menu())))
 
     call = call_of("m:steam")

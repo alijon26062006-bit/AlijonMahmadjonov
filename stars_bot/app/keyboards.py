@@ -118,8 +118,7 @@ def main_menu(games: bool = False) -> InlineKeyboardMarkup:
     # Steam и игры живут за одной кнопкой: для покупателя это одно и то же
     # действие — пополнить игровой аккаунт.
     if games or runtime.steam_on():
-        kb.row(btn(labeled("game", "Игры и Steam"), "m:games",
-                   style=PRIMARY, icon="game"))
+        kb.row(games_entry_btn())
 
     deposit = btn(labeled("deposit", "Пополнить"), "m:deposit",
                   style=SUCCESS, icon="deposit")
@@ -136,6 +135,26 @@ def main_menu(games: bool = False) -> InlineKeyboardMarkup:
         kb.row(btn(labeled("reviews", "Отзывы"), url=link, icon="reviews"))
     kb.row(btn(labeled("top", "Топ клиентов"), "m:top", icon="top"))
     return kb.as_markup()
+
+
+def games_entry_btn() -> InlineKeyboardButton:
+    """Вход в игры: два значка и ничего больше.
+
+    Премиум-значок на кнопке может быть только один — поле под него у
+    Telegram одно. Поэтому первый значок идёт премиум-значком, второй —
+    обычным, в подписи. Выглядят они рядом, как и задумано.
+
+    Когда премиум-эмодзи выключены, в подписи стоят оба обычных: пустой
+    кнопки у клиента быть не должно.
+    """
+    second = em("pubg")
+    emoji_id = custom_id("game")
+    if emoji_id and premium_on():
+        return InlineKeyboardButton(
+            text=second or em("game"), callback_data="m:games",
+            style=PRIMARY, icon_custom_emoji_id=emoji_id,
+        )
+    return btn(f"{em('game')} {second}".strip(), "m:games", style=PRIMARY)
 
 
 def back(target: str = "m:main", text: str = "") -> InlineKeyboardMarkup:
