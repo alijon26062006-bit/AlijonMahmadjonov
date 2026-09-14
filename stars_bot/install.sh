@@ -221,6 +221,22 @@ case "\${1:-help}" in
         echo "✅ Ключи для игр записаны, бот перезапущен"
         echo "   Проверьте: /panel → Балансы ключей"
         ;;
+    checker)
+        # Ключ проверки ID: он показывает клиенту ник до оплаты.
+        # Вписываем на сервере, а не в репозиторий: репозиторий открытый.
+        if [ -z "\${2:-}" ]; then
+            echo "Использование: stars-bot checker КЛЮЧ"
+            echo "  КЛЮЧ — pk_live_… из кабинета volsever.com"
+            echo "  Проверяет ID игрока и показывает его ник перед покупкой."
+            exit 1
+        fi
+        sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set \
+            VOLSEVER_KEY="\$2"
+        systemctl restart "\$SERVICE"
+        echo "✅ Ключ проверки ID записан, бот перезапущен"
+        echo "   Дальше: /panel → Игры → Проверка ID игрока →"
+        echo "           Привязать игры к проверке"
+        ;;
     mock)
         sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --set FRAGMENT_MODE=mock
         systemctl restart "\$SERVICE" && echo "✅ Режим проверки: звёзды не отправляются"
@@ -244,6 +260,8 @@ case "\${1:-help}" in
   stars-bot setup     изменить настройки и перезапустить
   stars-bot games КЛЮЧ [КЛЮЧ_НИКОВ]
                       ключи второго поставщика: с него идут игры
+  stars-bot checker КЛЮЧ
+                      ключ проверки ID: ник игрока до оплаты
   stars-bot backup    сохранить копию базы
 
 Настройка по частям (спрашивает по одному вопросу):
