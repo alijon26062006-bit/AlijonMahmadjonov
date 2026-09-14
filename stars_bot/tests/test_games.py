@@ -496,7 +496,8 @@ async def flow(conn) -> None:
           not any(".00" in b for b in labels), str(labels))
 
     # пакеты идут по две кнопки в ряд — иначе список на два экрана
-    grid = keyboards.game_packs(await db.get_game(conn, "free_fire_br"), [
+    game_row = await db.get_game(conn, "free_fire_br")
+    grid = keyboards.game_packs(game_row, [
         {"offer_id": f"o{i}", "name": f"{i} алмазов", "price": 1000 + i}
         for i in range(5)
     ])
@@ -504,6 +505,36 @@ async def flow(conn) -> None:
     check("пакеты по два в ряд", widths == [2, 2, 1], str(widths))
     check("кнопка «назад» остаётся своей строкой",
           len(grid.inline_keyboard[-1]) == 1)
+
+    # длинное название в половину ширины не влезает — такому пакету
+    # отдаём всю строку, иначе клиент видит обрезок вместо названия
+    grid = keyboards.game_packs(game_row, [
+        {"offer_id": "o1", "name": "110 алмазов", "price": 900},
+        {"offer_id": "o2", "name": "341 алмаз", "price": 2900},
+        {"offer_id": "o3", "name": "Еженедельный ваучер", "price": 1700},
+        {"offer_id": "o4", "name": "Доступ EVO (3 дня)", "price": 720},
+        {"offer_id": "o5", "name": "572 алмаза", "price": 4900},
+        {"offer_id": "o6", "name": "1166 алмазов", "price": 9800},
+    ])
+    rows = [[b.text for b in row] for row in grid.inline_keyboard[:-1]]
+    widths = [len(row) for row in rows]
+    check("короткие пакеты в паре, длинные на всю строку",
+          widths == [2, 1, 1, 2], str(rows))
+    check("длинный пакет один в строке",
+          rows[1] == ["Еженедельный ваучер — 17 с."], str(rows))
+    check("второй длинный тоже один",
+          rows[2] == ["Доступ EVO (3 дня) — 7.20 с."], str(rows))
+    check("алмазы стоят парой",
+          rows[0] == ["110 алмазов — 9 с.", "341 алмаз — 29 с."], str(rows))
+
+    # длинный между двумя короткими не склеивает соседей через себя
+    grid = keyboards.game_packs(game_row, [
+        {"offer_id": "o1", "name": "Набор новичка, большой", "price": 600},
+        {"offer_id": "o2", "name": "110 алмазов", "price": 900},
+    ])
+    widths = [len(row) for row in grid.inline_keyboard[:-1]]
+    check("после длинного короткий остаётся один",
+          widths == [1, 1], str(widths))
 
     call = call_of("gp:free_fire_br:0")
     await gh.cb_pack(call, state, conn)

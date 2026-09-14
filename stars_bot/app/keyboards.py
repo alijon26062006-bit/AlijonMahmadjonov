@@ -218,12 +218,18 @@ def game_regions(games: list) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def game_packs(game, offers: list) -> InlineKeyboardMarkup:
-    """Пакеты игры по две в ряд: значок, название и цена.
+#: Длиннее этого подпись в половину ширины не помещается — Telegram
+#: обрежет её многоточием. Такие пакеты ставим на всю строку.
+PAIR_LIMIT = 22
 
-    По одной в строку список из полутора десятков пакетов вытягивается
-    на два экрана, и до нужного приходится листать. По две — он виден
-    целиком.
+
+def game_packs(game, offers: list) -> InlineKeyboardMarkup:
+    """Пакеты игры: короткие по две в ряд, длинные на всю строку.
+
+    Полтора десятка пакетов по одному в строку вытягиваются на два
+    экрана. Но и загонять в пару всё подряд нельзя: «Еженедельный
+    ваучер — 17 с.» в половину ширины не влезает, и клиент видит
+    обрезок вместо названия. Поэтому пара — только для коротких.
     """
     from app.emoji import game_key
 
@@ -233,22 +239,28 @@ def game_packs(game, offers: list) -> InlineKeyboardMarkup:
         own = (getattr(game, "emoji", "") or "").strip()
         emoji_id = own or custom_id(game_key(category_id))
 
-    kb = InlineKeyboardBuilder()
-    row: list[InlineKeyboardButton] = []
-    for index, offer in enumerate(offers):
-        text = f"{offer['name']} — {fmt_short(offer['price'])}"
+    labels = [f"{o['name']} — {fmt_short(o['price'])}" for o in offers]
+
+    def make(index: int) -> InlineKeyboardButton:
         if emoji_id and premium_on():
-            row.append(InlineKeyboardButton(
-                text=text, callback_data=f"gp:{category_id}:{index}",
+            return InlineKeyboardButton(
+                text=labels[index], callback_data=f"gp:{category_id}:{index}",
                 style=PRIMARY, icon_custom_emoji_id=emoji_id,
-            ))
+            )
+        return btn(labels[index], f"gp:{category_id}:{index}", style=PRIMARY)
+
+    kb = InlineKeyboardBuilder()
+    index = 0
+    while index < len(labels):
+        short = len(labels[index]) <= PAIR_LIMIT
+        pairable = (short and index + 1 < len(labels)
+                    and len(labels[index + 1]) <= PAIR_LIMIT)
+        if pairable:
+            kb.row(make(index), make(index + 1))
+            index += 2
         else:
-            row.append(btn(text, f"gp:{category_id}:{index}", style=PRIMARY))
-        if len(row) == 2:
-            kb.row(*row)
-            row = []
-    if row:
-        kb.row(*row)
+            kb.row(make(index))
+            index += 1
 
     kb.row(btn(labeled("back", "Назад"), "m:games"))
     return kb.as_markup()
