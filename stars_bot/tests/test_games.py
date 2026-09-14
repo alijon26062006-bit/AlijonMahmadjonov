@@ -609,6 +609,16 @@ async def two_keys(conn) -> None:
     check("после смены ключа клиент новый",
           suppliers.for_games(main).api_key == "fc_another")
 
+    # ключ можно задать и в .env, но панель важнее
+    await runtime.set_value(conn, "fazer_games_key", "")
+    db.settings.__dict__["fazer_games_key"] = "fc_iz_env"
+    check("ключ берётся из .env, когда в панели пусто",
+          suppliers.games_key() == "fc_iz_env", suppliers.games_key())
+    await runtime.set_value(conn, "fazer_games_key", "fc_iz_paneli")
+    check("ключ из панели важнее .env",
+          suppliers.games_key() == "fc_iz_paneli", suppliers.games_key())
+    db.settings.__dict__["fazer_games_key"] = ""
+
     # тот же ключ, что основной, — отдельным счётом не считается
     await runtime.set_value(conn, "fazer_games_key", db.settings.fazer_api_key)
     check("совпадающий ключ не считается отдельным",

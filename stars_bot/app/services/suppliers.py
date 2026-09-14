@@ -21,8 +21,12 @@ _clients: dict[str, DeliveryProvider] = {}
 
 
 def games_key() -> str:
-    """Ключ для игр. Пусто — игры идут с основного счёта."""
-    return (runtime.get("fazer_games_key") or "").strip()
+    """Ключ для игр. Пусто — игры идут с основного счёта.
+
+    Панель важнее .env: ключ можно поменять на ходу, не трогая сервер.
+    """
+    return (runtime.get("fazer_games_key")
+            or settings.fazer_games_key or "").strip()
 
 
 def has_own_games_key() -> bool:
