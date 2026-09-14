@@ -251,6 +251,23 @@ class Database:
                     "sku = ?, kind = ?, sort = ? WHERE code = ?",
                     (p.category, p.title, p.amount, p.sku, p.kind, i, p.code),
                 )
+            # Нархи шарикӣ ЯК бор пур карда мешавад — баъдан танҳо админ онро
+            # идора мекунад. Бе ин базаи кӯҳна бе нархи шарикӣ мемонд ва шарик
+            # нархи пурраро мепардохт.
+            if self._conn.execute(
+                "SELECT value FROM settings WHERE key = 'partner_prices_seeded'"
+            ).fetchone() is None:
+                for p in catalog.DEFAULT_PRODUCTS:
+                    if p.partner_price:
+                        self._conn.execute(
+                            "UPDATE products SET partner_price = ? "
+                            "WHERE code = ? AND partner_price IS NULL",
+                            (p.partner_price, p.code),
+                        )
+                self._conn.execute(
+                    "INSERT INTO settings(key, value) VALUES ('partner_prices_seeded', '1')"
+                )
+
             # Молҳое, ки дигар дар каталог нестанд, пинҳон карда мешаванд.
             known = tuple(p.code for p in catalog.DEFAULT_PRODUCTS)
             marks = ", ".join("?" * len(known))

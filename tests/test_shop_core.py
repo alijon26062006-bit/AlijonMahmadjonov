@@ -572,3 +572,77 @@ def test_no_emoji_markers_left():
     kb = keyboards.main_menu(is_admin=True)
     for button in _every_button(kb, keyboards.confirm_order(), keyboards.cancel_only()):
         assert "🟢" not in button.text and "🔴" not in button.text
+
+
+# ── нархҳои шарикӣ: рӯйхати тасдиқшудаи соҳиби дӯкон ──────────────────
+PARTNER_PRICE_LIST = [
+    ("ffcis_110", 840), ("ffcis_341", 2500), ("ffcis_572", 4250),
+    ("ffcis_1166", 8600), ("ffcis_2398", 17000), ("ffcis_6160", 41400),
+    ("ffcis_week", 1620), ("ffcis_month", 5900), ("ffcis_week_lite", 450),
+    ("pubg_60", 960), ("pubg_325", 4780), ("pubg_660", 9200),
+    ("pubg_1800", 23500), ("pubg_3850", 44000), ("pubg_8100", 86500),
+    ("pubg_16200", 167000), ("pubg_24300", 265000),
+    ("pubg_32400", 365000), ("pubg_40500", 445000),
+]
+
+
+@pytest.mark.parametrize("code,expected", PARTNER_PRICE_LIST)
+def test_partner_price_matches_owner_list(db, code, expected):
+    """Ҳар нарх маҳз ҳамон аст, ки соҳиби дӯкон тасдиқ кардааст."""
+    from shop.db import price_of
+
+    row = db.product(code)
+    assert row is not None, f"моли {code} дар каталог нест"
+    assert row["partner_price"] == expected
+    assert price_of(row, True) == expected      # шарик маҳз инро мепардозад
+    assert price_of(row, False) == row["price"]  # оддӣ — нархи пурра
+
+
+def test_partner_price_is_always_cheaper(db):
+    for code, _ in PARTNER_PRICE_LIST:
+        row = db.product(code)
+        assert row["partner_price"] < row["price"], code
+
+
+def test_old_database_gets_partner_prices(tmp_path):
+    """Базае, ки то ин навсозӣ сохта шудааст, нархи шарикиро мегирад."""
+    import sqlite3
+
+    from shop.db import Database
+
+    path = tmp_path / "old.sqlite3"
+    con = sqlite3.connect(path)
+    con.executescript(
+        "CREATE TABLE products (code TEXT PRIMARY KEY, category TEXT NOT NULL, "
+        "title TEXT NOT NULL, amount INTEGER NOT NULL DEFAULT 0, price INTEGER NOT NULL, "
+        "sku TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL DEFAULT 'game', "
+        "sort INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1);"
+        "INSERT INTO products(code,category,title,amount,price,sku,kind,sort) VALUES "
+        "('pubg_660','pubg','600 + 60 UC',660,9370,'pubg_uc_660','game',0);"
+    )
+    con.commit()
+    con.close()
+
+    upgraded = Database(path)
+    assert upgraded.product("pubg_660")["partner_price"] == 9200
+    upgraded.close()
+
+
+def test_cleared_partner_price_does_not_come_back(tmp_path):
+    """Админ нархро бардошт — пас аз азнавоғозкунӣ барнагардад."""
+    from shop.db import Database
+
+    path = tmp_path / "shop.sqlite3"
+    first = Database(path)
+    assert first.product("pubg_660")["partner_price"] == 9200
+    first.set_partner_price("pubg_660", None)
+    first.close()
+
+    second = Database(path)
+    assert second.product("pubg_660")["partner_price"] is None
+    second.set_partner_price("pubg_660", 8500)
+    second.close()
+
+    third = Database(path)
+    assert third.product("pubg_660")["partner_price"] == 8500
+    third.close()
