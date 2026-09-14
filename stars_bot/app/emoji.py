@@ -15,7 +15,8 @@ GROUPS: dict[str, dict[str, tuple[str, str]]] = {
         "premium": ("👑", "Telegram Premium"),
         "gift": ("🎁", "Подарок"),
         "steam": ("🎮", "Steam"),
-        "game": ("🕹", "Игры"),
+        "game": ("🔥", "Игры, Free Fire"),
+        "pubg": ("🎯", "PUBG"),
     },
     "Деньги": {
         "money": ("💰", "Баланс"),
@@ -69,7 +70,36 @@ PREMIUM_IDS: dict[str, str] = {
     "calc":     "5226513232549664618",
     "info":     "5258503720928288433",
     "top":      "5469967260380612012",
+    "game":     "6012423622730192070",
+    "pubg":     "5204252919565657978",
 }
+
+#: Значок известной игры по её коду у поставщика. Игр много, и заводить
+#: каждой настройку в панели незачем: те, что мы правда продаём, узнаются
+#: по коду. Свой значок у игры, если он задан, всё равно важнее.
+GAME_EMOJI: dict[str, str] = {
+    # Free Fire делит значок с разделом игр: он же стоит на кнопке
+    # «Игры и Steam», и заводить второй такой же незачем.
+    "free_fire": "game",
+    "freefire": "game",
+    "pubg": "pubg",
+    "pubg_mobile": "pubg",
+    "pubgm": "pubg",
+}
+
+
+def game_key(category_id: str) -> str:
+    """Ключ значка для игры. Пусто — своего значка у неё нет."""
+    from app.services import regions
+
+    family = regions.family_of(category_id)
+    if family in GAME_EMOJI:
+        return GAME_EMOJI[family]
+    # Коды у поставщиков пишут по-разному: pubg_mobile_global, freefire_br.
+    for mark, key in GAME_EMOJI.items():
+        if mark in family:
+            return key
+    return ""
 
 #: Плоский словарь ключ -> значок по умолчанию
 DEFAULTS: dict[str, str] = {

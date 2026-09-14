@@ -343,7 +343,7 @@ async def premium_ids(conn) -> None:
     from app.handlers import panel
 
     check("ID прописаны для всех значков главного экрана",
-          len(emoji.PREMIUM_IDS) == 10, str(len(emoji.PREMIUM_IDS)))
+          len(emoji.PREMIUM_IDS) == 12, str(len(emoji.PREMIUM_IDS)))
     check("все ключи существуют",
           all(key in emoji.DEFAULTS for key in emoji.PREMIUM_IDS),
           str([k for k in emoji.PREMIUM_IDS if k not in emoji.DEFAULTS]))

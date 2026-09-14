@@ -58,6 +58,37 @@ def btn(
     return InlineKeyboardButton(**fields)
 
 
+def game_btn(game, data: str, text: str = "") -> InlineKeyboardButton:
+    """Кнопка игры со своим значком.
+
+    На кнопке Telegram держит ровно один премиум-значок — поле для него
+    одно. Поэтому два значка рядом бывают только в тексте сообщения,
+    а здесь ставится тот, что относится к самой игре.
+
+    Заданный владельцу ID важнее справочника: справочник знает только те
+    игры, что мы продаём сегодня.
+    """
+    from app.emoji import game_key
+
+    own = (getattr(game, "emoji", "") or "").strip()
+    if own and premium_on():
+        return InlineKeyboardButton(
+            text=_without_plain(text or game.title),
+            callback_data=data, style=PRIMARY, icon_custom_emoji_id=own,
+        )
+    return btn(text or game.title, data, style=PRIMARY,
+               icon=game_key(game.category_id))
+
+
+def _without_plain(text: str) -> str:
+    """Убрать обычный значок из начала подписи: рядом с премиум-значком
+    он оказался бы вторым таким же."""
+    stripped = text.lstrip()
+    while stripped and not (stripped[0].isalnum() or stripped[0] in "«\"("):
+        stripped = stripped[1:].lstrip()
+    return stripped or text
+
+
 def labeled(icon: str, text: str) -> str:
     """Подпись со значком — значок берётся из настроек оформления."""
     return f"{em(icon)} {text}"
@@ -147,9 +178,9 @@ def games_menu(games: list) -> InlineKeyboardMarkup:
     for group in regions.group(games):
         items = group["games"]
         if len(items) == 1:
-            kb.row(btn(items[0].title, f"g:{items[0].category_id}", style=PRIMARY))
+            kb.row(game_btn(items[0], f"g:{items[0].category_id}"))
         else:
-            kb.row(btn(group["title"], f"gf:{group['family']}", style=PRIMARY))
+            kb.row(game_btn(items[0], f"gf:{group['family']}", group["title"]))
     kb.row(btn(labeled("back", "Назад"), "m:main"))
     return kb.as_markup()
 

@@ -194,6 +194,7 @@ CREATE TABLE IF NOT EXISTS games (
     title       TEXT NOT NULL,      -- как показываем клиенту
     field       TEXT NOT NULL DEFAULT 'user_id',   -- поля ID через запятую
     checker     TEXT NOT NULL DEFAULT '',          -- код игры у проверки ID
+    emoji       TEXT NOT NULL DEFAULT '',          -- ID премиум-эмодзи
     region      TEXT NOT NULL DEFAULT '',          -- подсказка для поиска ника
     margin      INTEGER NOT NULL DEFAULT 0,        -- своя наценка, % (0 — общая)
     enabled     INTEGER NOT NULL DEFAULT 0,
@@ -355,6 +356,7 @@ class Game:
     enabled: int
     created_at: str
     checker: str = ""
+    emoji: str = ""
 
     @property
     def product_type(self) -> str:
@@ -488,7 +490,11 @@ MIGRATIONS: dict[str, dict[str, str]] = {
     "users": {"source": "TEXT"},
     # Код этой же игры у сервиса проверки ID — он свой, не как у
     # поставщика выдачи.
-    "games": {"checker": "TEXT NOT NULL DEFAULT ''"},
+    "games": {
+        "checker": "TEXT NOT NULL DEFAULT ''",
+        # ID премиум-эмодзи для кнопки этой игры.
+        "emoji": "TEXT NOT NULL DEFAULT ''",
+    },
     "game_prices": {
         "title": "TEXT NOT NULL DEFAULT ''",
         "hidden": "INTEGER NOT NULL DEFAULT 0",

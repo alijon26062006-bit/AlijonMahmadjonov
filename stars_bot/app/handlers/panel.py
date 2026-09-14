@@ -728,6 +728,27 @@ async def on_field_value(
         )
         return
 
+    # Премиум-значок игры: хранится прямым ID, а не ключом.
+    if field.startswith("game_emoji:"):
+        code = field.split(":", 1)[1]
+        value = "" if raw == "-" else raw.strip()
+        if value and not re.fullmatch(r"\d{5,25}", value):
+            await message.answer(
+                "❌ Нужен <b>числовой ID</b> премиум-эмодзи.\n\n"
+                "<blockquote>Перешлите сам эмодзи боту @idstickerbot — "
+                "он пришлёт ID.</blockquote>"
+            )
+            return
+        await db.update_game(conn, code, emoji=value)
+        await state.clear()
+        game = await db.get_game(conn, code)
+        await message.answer(
+            f"✅ <b>{game.title if game else code}</b> — значок "
+            + (f"<code>{value}</code>" if value else "<i>убран</i>"),
+            reply_markup=back_kb(f"pn:game:{code}", "‹ К игре"),
+        )
+        return
+
     # Код игры у сервиса проверки ID.
     if field.startswith("game_checker:"):
         code = field.split(":", 1)[1]
@@ -4053,7 +4074,8 @@ def game_card(game: db.Game) -> str:
         f"├ Поля для ID: <code>{game.field}</code>\n"
         f"│  <i>спрашиваем: {_fields_asked(game)}</i>\n"
         f"├ Регион: <b>{_region_label(game)}</b>\n"
-        f"├ Наценка: <b>{game.margin or runtime.margin_percent()}%</b>"
+        + (f"├ Значок: <code>{game.emoji}</code>\n" if game.emoji else "")
+        + f"├ Наценка: <b>{game.margin or runtime.margin_percent()}%</b>"
         + ("" if game.margin else " <i>(общая)</i>")
         + f"\n└ В меню: <b>{'да' if game.enabled else 'нет'}</b>"
     )
@@ -4072,6 +4094,8 @@ def game_kb(game: db.Game) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📈 Своя наценка",
                              callback_data=f"pn:game_margin:{game.category_id}"),
     )
+    kb.row(InlineKeyboardButton(text="😀 Значок игры",
+                                callback_data=f"pn:game_emoji:{game.category_id}"))
     kb.row(btn("🗑 Удалить игру", f"pn:game_del:{game.category_id}", style=DANGER))
     kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
     return kb.as_markup()
@@ -4476,6 +4500,50 @@ async def cb_game_field(
         "<code>player_id, server_id</code>\n\n"
         "Точное имя пишет сам поставщик в отказе вида "
         "«Field ... is required».</blockquote>",
+        back_kb(f"pn:game:{game.category_id}", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:game_emoji:"))
+async def cb_game_emoji(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    """Свой премиум-значок на кнопке игры."""
+    game = await db.get_game(conn, call.data.split(":", 2)[2])
+    if game is None:
+        await call.answer("Игра не найдена.", show_alert=True)
+        return
+
+    from app.emoji import GAME_EMOJI, custom_id, game_key, premium_on
+
+    guess = game_key(game.category_id)
+    now = game.emoji or (custom_id(guess) if guess else "")
+    source = ("<i>задан вручную</i>" if game.emoji
+              else ("<i>подобран по коду игры</i>" if now else ""))
+
+    warn = ""
+    if not premium_on():
+        warn = ("\n\n[[warn]] Премиум-эмодзи сейчас выключены — значок "
+                "не появится, пока вы не включите их в разделе "
+                "«🎨 Оформление».")
+
+    await state.set_state(Panel.value)
+    await state.update_data(field=f"game_emoji:{game.category_id}")
+    await safe_edit(
+        call,
+        substitute(
+            f"😀 <b>Значок: {game.title}</b>\n"
+            f"<code>{texts.LINE}</code>\n\n"
+            f"└ Сейчас: <code>{now or 'обычный из названия'}</code> {source}"
+            f"{warn}\n\n"
+            "<blockquote>Пришлите <b>ID премиум-эмодзи</b> — только цифры.\n\n"
+            "Где его взять: отправьте себе премиум-эмодзи, перешлите "
+            "его боту @idstickerbot — он пришлёт ID.\n\n"
+            "Чтобы убрать свой значок, пришлите <code>-</code>.\n\n"
+            "На кнопке помещается ровно один значок — это ограничение "
+            "Telegram, а не бота.</blockquote>"
+        ),
         back_kb(f"pn:game:{game.category_id}", "❌ Отмена"),
     )
     await call.answer()

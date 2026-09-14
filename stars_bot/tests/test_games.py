@@ -2010,6 +2010,70 @@ async def gorder_command(conn) -> None:
     check("команда есть в справке админа", "/gorder" in texts.ADMIN_HELP)
 
 
+async def game_icons(conn) -> None:
+    """Премиум-значки: на кнопке игры свой, в заголовке раздела — оба."""
+    from app import emoji
+
+    check("Free Fire узнаётся по коду",
+          emoji.game_key("free_fire_br") == "game",
+          emoji.game_key("free_fire_br"))
+    check("и с другим написанием тоже",
+          emoji.game_key("freefire_asia") == "game")
+    check("PUBG узнаётся", emoji.game_key("pubg_mobile") == "pubg")
+    check("незнакомая игра значка не получает",
+          emoji.game_key("magic_chess_ru") == "", emoji.game_key("magic_chess_ru"))
+
+    await runtime.set_value(conn, "custom_emoji_on", "1")
+    await db.add_game(conn, category_id="pubg_mobile", title="🎯 PUBG",
+                      field="user_id")
+    await db.update_game(conn, "pubg_mobile", enabled=1)
+    await db.load_game_titles(conn)
+
+    games = await db.list_games(conn, only_enabled=True)
+    marks = {}
+    for row in keyboards.games_menu(games).inline_keyboard:
+        for b in row:
+            marks[b.text] = b.icon_custom_emoji_id
+
+    check("на Free Fire стоит его значок",
+          marks.get("Free Fire") == "6012423622730192070", str(marks))
+    check("на PUBG — свой", marks.get("PUBG") == "5204252919565657978", str(marks))
+    check("обычный значок из подписи убран",
+          "🔥 Free Fire" not in marks, str(list(marks)))
+
+    # свой ID владельца важнее справочника
+    await db.update_game(conn, "pubg_mobile", emoji="1111222233334444")
+    games = await db.list_games(conn, only_enabled=True)
+    marks = {b.text: b.icon_custom_emoji_id
+             for row in keyboards.games_menu(games).inline_keyboard for b in row}
+    check("заданный вручную значок важнее",
+          marks.get("PUBG") == "1111222233334444", str(marks))
+
+    await db.update_game(conn, "pubg_mobile", emoji="")
+
+    # без премиум-эмодзи кнопки не ломаются
+    await runtime.set_value(conn, "custom_emoji_on", "0")
+    games = await db.list_games(conn, only_enabled=True)
+    plain = keyboards.games_menu(games).inline_keyboard
+    check("с выключенными премиум-эмодзи значков нет",
+          all(b.icon_custom_emoji_id is None for row in plain for b in row))
+    check("и подписи остались целыми",
+          any("Free Fire" in b.text for row in plain for b in row),
+          str([b.text for row in plain for b in row]))
+    await runtime.set_value(conn, "custom_emoji_on", "1")
+
+    # в заголовке раздела помещаются оба
+    from app.emoji import substitute
+
+    head = substitute(texts.GAMES_ENTRY)
+    check("в заголовке раздела значок Free Fire",
+          "6012423622730192070" in head, head[:200])
+    check("и значок PUBG рядом", "5204252919565657978" in head, head[:200])
+
+    await db.delete_game(conn, "pubg_mobile")
+    await runtime.set_value(conn, "custom_emoji_on", "0")
+
+
 async def region_step(conn) -> None:
     """Сначала игра, потом регион: ID игрока живёт на конкретном сервере."""
     from app.services import regions as reg
@@ -2206,6 +2270,7 @@ async def main() -> None:
         await after_refund(conn)
         await timeout_setting(conn)
         await gorder_command(conn)
+        await game_icons(conn)
         await region_step(conn)
         await full_catalog(conn)
         await wrong_code(conn)
