@@ -165,7 +165,11 @@ async def run(conn) -> None:
     await dep_h.on_amount(msg, state)
 
     check("сумма принята и показаны реквизиты", "120.00" in msg.last)
-    check("предложена быстрая оплата", "Душанбе Сити" in msg.last, msg.last[:120])
+    labels = [b.text for row in msg.markups[-1].inline_keyboard for b in row]
+    check("предложена быстрая оплата",
+          any("Душанбе Сити" in b for b in labels), str(labels))
+    check("и подтверждение оплаты рядом",
+          any("оплатил" in b for b in labels), str(labels))
     check("код платежа показан клиенту",
           state.data.get("reference", "") in msg.last, str(state.data))
 

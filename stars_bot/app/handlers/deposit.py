@@ -61,38 +61,74 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     reference = dcpay.make_reference()
     await state.update_data(amount=amount, reference=reference)
     await state.set_state(Deposit.receipt)
+    body, markup = _requisites(amount, reference)
+    await message.answer(body, reply_markup=markup)
 
-    card_holder = runtime.get("pay_card_holder")
-    card_bank = runtime.get("pay_card_bank")
+
+def _requisites(amount: int, reference: str) -> tuple[str, object]:
+    """Экран реквизитов: один, короткий, с кнопками под рукой.
+
+    Раньше на нём же просили прислать чек. Клиент этого ещё не сделал —
+    и просьба тонула в длинном тексте. Теперь про чек говорим отдельным
+    шагом, после нажатия «Я оплатил».
+    """
+    card = runtime.get("pay_card_number") or "— реквизиты не заданы —"
+    holder = runtime.get("pay_card_holder")
+    bank = runtime.get("pay_card_bank")
+    city = runtime.get("pay_city")
     note = runtime.get("pay_extra")
-    holder = f"👤 Получатель: <b>{card_holder}</b>\n" if card_holder else ""
-    bank = f"🏦 Банк: <b>{card_bank}</b>\n" if card_bank else ""
-    extra = f"\n{note}\n" if note else ""
 
-    dc_block = ""
-    markup = keyboards.cancel()
+    where = " · ".join(part for part in (bank, city) if part)
+    body = texts.DEPOSIT_REQUISITES.format(
+        amount=fmt(amount),
+        card=card,
+        holder=f"👤 <b>{holder}</b>\n" if holder else "",
+        bank=f"🏦 {where}\n" if where else "",
+        extra=f"\n{note}\n" if note else "\n",
+        dc_block=texts.DEPOSIT_DC_BLOCK.format(reference=reference),
+    )
 
+    link = ""
     if dcpay.is_ready():
         link = dcpay.build_link(
             dcpay.account(), amount,
             dcpay.build_comment(dcpay.comment_prefix(), reference),
             dcpay.service(),
         )
-        dc_block = texts.DEPOSIT_DC_BLOCK.format(reference=reference)
-        markup = keyboards.deposit_pay(link)
+    # Копировать даём только настоящий номер: владелец мог записать
+    # реквизиты словами, и кнопка «скопировать» скопировала бы фразу.
+    digits = "".join(ch for ch in card if ch.isdigit())
+    return body, keyboards.deposit_pay(link, digits if len(digits) >= 8 else "")
 
-    await message.answer(
-        texts.DEPOSIT_REQUISITES.format(
-            amount=fmt(amount),
-            dc_block=dc_block,
-            card=runtime.get("pay_card_number") or "— реквизиты не заданы —",
-            holder=holder,
-            bank=bank,
-            city=runtime.get("pay_city"),
-            extra=extra,
-        ),
-        reply_markup=markup,
+
+@router.callback_query(Deposit.receipt, F.data == "dep:paid")
+async def cb_paid(call: CallbackQuery, state: FSMContext) -> None:
+    """«Я оплатил» — теперь и только теперь просим чек."""
+    data = await state.get_data()
+    amount = data.get("amount")
+    if not amount:
+        await state.clear()
+        await call.answer("Заявка потерялась, начните заново.", show_alert=True)
+        return
+    await call.message.edit_text(
+        texts.DEPOSIT_ASK_RECEIPT.format(amount=fmt(amount)),
+        reply_markup=keyboards.deposit_receipt(),
     )
+    await call.answer()
+
+
+@router.callback_query(Deposit.receipt, F.data == "dep:back")
+async def cb_back_to_requisites(call: CallbackQuery, state: FSMContext) -> None:
+    """Вернуться к реквизитам: клиент мог закрыть банк, не заплатив."""
+    data = await state.get_data()
+    amount, reference = data.get("amount"), data.get("reference", "")
+    if not amount:
+        await state.clear()
+        await call.answer("Заявка потерялась, начните заново.", show_alert=True)
+        return
+    body, markup = _requisites(amount, reference)
+    await call.message.edit_text(body, reply_markup=markup)
+    await call.answer()
 
 
 @router.message(Deposit.receipt, F.photo | F.document)

@@ -66,14 +66,21 @@ class FakeMessage:
         self.bot = bot or FakeBot()
         self.replies: list[str] = []
         self.copies: list[int] = []
+        self.markups: list = []
 
-    async def answer(self, text, **kwargs):
+    async def answer(self, text, reply_markup=None, **kwargs):
         self.replies.append(text)
+        self.markups.append(reply_markup)
         return self
 
-    async def edit_text(self, text, **kwargs):
+    async def edit_text(self, text, reply_markup=None, **kwargs):
         self.replies.append(text)
+        self.markups.append(reply_markup)
         return self
+
+    @property
+    def markup(self):
+        return self.markups[-1] if self.markups else None
 
     async def edit_reply_markup(self, **kwargs):
         return self
@@ -182,9 +189,36 @@ async def run_scenario(conn) -> None:
     check("выдаются реквизиты Душанбе", "Душанбе" in msg.last and "100.00" in msg.last)
     check("состояние ждёт чек", await state.get_state() == "Deposit:receipt")
 
+    check("про чек на первом экране не просим",
+          "чек" not in msg.last.lower(), msg.last[:200])
+    check("экран реквизитов короткий", len(msg.last) < 420, str(len(msg.last)))
+    buttons = [b.text for row in msg.markup.inline_keyboard for b in row]
+    check("есть кнопка «я оплатил»",
+          any("оплатил" in b for b in buttons), str(buttons))
+    check("номер карты можно скопировать",
+          any("копировать" in b.lower() for b in buttons), str(buttons))
+
+    call = FakeCallback("dep:paid", bot=bot)
+    await dep_h.cb_paid(call, state)
+    check("после «я оплатил» просят чек", "скриншот чека" in call.last,
+          call.last[:120])
+    check("сказано жирным, что слать сюда",
+          "<b>Отправьте сюда" in call.last, call.last[:200])
+    check("названа сумма к зачислению", "100.00" in call.last, call.last)
+    check("состояние осталось прежним",
+          await state.get_state() == "Deposit:receipt")
+
+    call = FakeCallback("dep:back", bot=bot)
+    await dep_h.cb_back_to_requisites(call, state)
+    check("к реквизитам можно вернуться", "Переведите" in call.last,
+          call.last[:80])
+
+    call = FakeCallback("dep:paid", bot=bot)
+    await dep_h.cb_paid(call, state)
+
     msg = FakeMessage("вот перевёл", bot=bot)
     await dep_h.on_receipt_wrong(msg)
-    check("текст вместо чека не принимается", "фото или файл" in msg.last)
+    check("текст вместо чека не принимается", "скриншот" in msg.last)
 
     msg = FakeMessage(photo=True, bot=bot)
     await dep_h.on_receipt(msg, state, conn, bot)

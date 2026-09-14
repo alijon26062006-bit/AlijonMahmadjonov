@@ -11,7 +11,7 @@ success (зелёный) и danger (красный). Цвет здесь не у
 """
 from __future__ import annotations
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app import runtime
@@ -291,10 +291,30 @@ def deposit_methods() -> InlineKeyboardMarkup:
 # ════════════════════════════════════════════════════════════ профиль
 
 
-def deposit_pay(link: str) -> InlineKeyboardMarkup:
-    """Кнопка открывает приложение с готовыми счётом и суммой."""
+def deposit_pay(link: str = "", card: str = "") -> InlineKeyboardMarkup:
+    """Реквизиты одним экраном: оплатить, скопировать карту, «я оплатил».
+
+    Просить чек на этом же экране бесполезно — клиент ещё не платил, и
+    длинный текст он дочитывает до кнопок, а не до просьбы. Поэтому про
+    чек говорим отдельным шагом, когда он уже перевёл.
+    """
     kb = InlineKeyboardBuilder()
-    kb.row(btn("🏙 Оплатить в Душанбе Сити", url=link, style=SUCCESS))
+    if link:
+        kb.row(btn("🏙 Оплатить в Душанбе Сити", url=link, style=SUCCESS))
+    if card:
+        kb.row(InlineKeyboardButton(
+            text="📋 Скопировать номер карты",
+            copy_text=CopyTextButton(text=card),
+        ))
+    kb.row(btn("✅ Я оплатил", "dep:paid", style=PRIMARY))
+    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    return kb.as_markup()
+
+
+def deposit_receipt() -> InlineKeyboardMarkup:
+    """Шаг чека: вернуться к реквизитам или выйти."""
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("‹ Реквизиты", "dep:back"))
     kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
     return kb.as_markup()
 
