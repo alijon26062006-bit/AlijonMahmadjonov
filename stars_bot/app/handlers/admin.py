@@ -547,6 +547,69 @@ async def _strip(call: CallbackQuery) -> None:
         log.debug("Кнопки уже убраны: %s", exc)
 
 
+@router.message(Command("nick"))
+async def cmd_nick(message: Message, command: CommandObject) -> None:
+    """Спросить ник у всех источников сразу и показать, кто что ответил.
+
+    Сервисы ников бесплатные и живут на чужих хостингах: сегодня отвечает,
+    завтра молчит, а послезавтра отдаёт чужой ник. Гадать не надо — вот
+    команда, которая проверяет их все на настоящем ID.
+    """
+    uid = (command.args or "").strip()
+    if not uid.isdigit():
+        await message.answer(
+            "Использование: <code>/nick 1724367212</code>\n\n"
+            "<i>Спрошу ник у всех источников и покажу, кто что ответил.</i>"
+        )
+        return
+
+    from app.services import nicknames
+
+    notice = await message.answer(f"🔎 Спрашиваю ник <code>{uid}</code>…")
+    nicknames.forget_all()          # ответ из кэша тут ничего не проверит
+    rows = await nicknames.probe(
+        uid,
+        key=runtime.get("gameskinbo_key") or settings.gameskinbo_key,
+        community_key=runtime.get("ff_community_key")
+        or settings.ff_community_key,
+    )
+
+    lines, names = [], []
+    for row in rows:
+        if row["name"]:
+            names.append(row["name"])
+            lines.append(f"✅ <b>{row['name']}</b>\n"
+                         f"   <i>{row['source']} · {row['seconds']} сек</i>")
+        elif row["verdict"] == "bad":
+            lines.append(f"⛔️ <i>{row['source']}</i> — такого игрока нет")
+        elif row["verdict"] == "нет ключа":
+            lines.append(f"➖ <i>{row['source']}</i> — ключ не задан")
+        else:
+            why = f" ({row['error']})" if row["error"] else ""
+            lines.append(f"❌ <i>{row['source']}</i> — не ответил{why}")
+
+    unique = set(names)
+    if not unique:
+        verdict = ("😔 <b>Ник не узнал никто</b>\n\n"
+                   "<i>Либо ID неверный, либо все источники сейчас молчат.</i>")
+    elif len(unique) == 1:
+        verdict = (f"✅ <b>Ник: {names[0]}</b>\n\n"
+                   f"<i>Согласны источников: {len(names)}. "
+                   "Значит ник верный.</i>")
+    else:
+        verdict = ("⚠️ <b>Источники не согласны между собой</b>\n\n"
+                   "<blockquote>Разные ники на один ID — так быть не должно. "
+                   "Пришлите этот экран разработчику: источник, который "
+                   "врёт, надо убрать.</blockquote>")
+
+    await notice.edit_text(
+        f"🔎 <b>Проверка ника</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"ID: <code>{uid}</code>\n\n"
+        + "\n".join(lines) + f"\n\n{verdict}"
+    )
+
+
 @router.message(Command("gorder"))
 async def cmd_game_order(
     message: Message, command: CommandObject, conn: aiosqlite.Connection, provider

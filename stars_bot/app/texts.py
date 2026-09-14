@@ -751,7 +751,7 @@ _RAW["ADMIN_HELP"] = (
     "├ /stats — статистика\n"
     "├ /orders — последние заказы\n"
     "├ /retry &lt;id&gt; — повторить выдачу\n"
-    "├ /done &lt;id&gt; · /refund &lt;id&gt; — закрыть или вернуть\n"    "├ /gorder &lt;id&gt; — статус игрового заказа у поставщика\n"
+    "├ /done &lt;id&gt; · /refund &lt;id&gt; — закрыть или вернуть\n"    "├ /gorder &lt;id&gt; — статус игрового заказа у поставщика\n"    "├ /nick &lt;id&gt; — проверить ник у всех источников\n"
     "├ /give &lt;id&gt; &lt;сумма&gt; — начислить\n"
     "└ /take &lt;id&gt; &lt;сумма&gt; — списать\n\n"
     "<b>Прочее</b>\n"

@@ -281,11 +281,7 @@ async def free_fire(
 
     refused = False        # хоть один источник прямо сказал «нет такого»
 
-    for source, fetch, source_key, needs_key in (
-        ("glob-info", _from_glob, "", False),
-        ("gameskinbo", _from_gameskinbo, key, True),
-        ("freefirecommunity", _from_community, community_key, False),
-    ):
+    for source, fetch, source_key, needs_key in sources(key, community_key):
         if needs_key and not source_key:
             continue       # без ключа этот источник не отвечает вовсе
         try:
@@ -303,13 +299,62 @@ async def free_fire(
             # знает другие регионы и может найти того же игрока.
             refused = True
 
-    name, verdict = await _from_fallback(uid, region)
-    if verdict == "ok" and name:
-        remember(uid, name)
-        return Nickname(uid=uid, name=name, verdict="ok", source="запасной")
     if refused:
         return Nickname(uid=uid, name=None, verdict="bad")
     return Nickname(uid=uid, name=None, verdict="unknown")
+
+
+#: Все источники в одном месте: очередь берёт их отсюда, и проверка —
+#: тоже. Два разных списка рано или поздно разошлись бы.
+def sources(key: str = "", community_key: str = "") -> list[tuple]:
+    """(имя, функция, ключ, нужен ли ключ) в порядке опроса."""
+    return [
+        ("glob-info", _from_glob, "", False),
+        ("gameskinbo", _from_gameskinbo, key, True),
+        ("freefirecommunity", _from_community, community_key, False),
+        ("free-ff-api", _fallback_source, "", False),
+    ]
+
+
+async def _fallback_source(session, uid, region, key):
+    """Запасной источник в общем виде — он поднимает своё соединение."""
+    return await _from_fallback(uid, region)
+
+
+async def probe(
+    uid: str, key: str = "", region: str = "", community_key: str = "",
+) -> list[dict]:
+    """Спросить ник у ВСЕХ источников и сказать, кто что ответил.
+
+    Нужна, чтобы выбирать источники по факту, а не по обещаниям в их
+    документации: сервисы бесплатные, живут на чужих хостингах и со
+    временем портятся молча. Раз в пару месяцев стоит посмотреть, кто
+    ещё отвечает и не расходятся ли ответы.
+    """
+    import time
+
+    uid = str(uid).strip()
+    out: list[dict] = []
+
+    for name, fetch, source_key, needs_key in sources(key, community_key):
+        row = {"source": name, "name": None, "verdict": "", "error": "",
+               "seconds": 0.0}
+        if needs_key and not source_key:
+            row["verdict"] = "нет ключа"
+            out.append(row)
+            continue
+
+        started = time.monotonic()
+        try:
+            async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
+                found, verdict = await fetch(session, uid, region, source_key)
+            row["name"], row["verdict"] = found, verdict
+        except Exception as exc:  # noqa: BLE001 — это и есть предмет проверки
+            row["verdict"] = "сбой"
+            row["error"] = str(exc)[:120]
+        row["seconds"] = round(time.monotonic() - started, 1)
+        out.append(row)
+    return out
 
 
 async def usage(key: str) -> dict | None:

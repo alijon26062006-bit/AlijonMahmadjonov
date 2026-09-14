@@ -938,6 +938,107 @@ async def two_fields(conn) -> None:
     gh._offers.update(_offers_backup)
 
 
+async def nick_probe(conn) -> None:
+    """/nick — опрос всех источников разом: видно, кто врёт и кто молчит."""
+    from aiogram.filters import CommandObject
+
+    from app.handlers import admin
+
+    real = nicknames.aiohttp.ClientSession
+    nicknames.forget_all()
+
+    class Resp:
+        def __init__(self, payload, status=200):
+            self.payload, self.status = payload, status
+
+        async def json(self, content_type=None):
+            return self.payload
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    class ByUrl:
+        def __init__(self, replies):
+            self.replies = replies
+
+        def get(self, url, headers=None):
+            for mark, reply in self.replies.items():
+                if mark in url:
+                    return reply
+            return Resp({}, status=404)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    async def run(args: str):
+        message = msg("/nick " + args, uid=ADMIN)
+        await admin.cmd_nick(message, CommandObject(command="nick", args=args))
+        return message
+
+    try:
+        told = await run("")
+        check("без ID показана подсказка", "Использование" in told.last,
+              told.last[:60])
+
+        # все согласны
+        nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+            "glob-info": Resp({"basicInfo": {"accountId": "777", "nickname": "Один"}}),
+            "freefirecommunity": Resp({"nickname": "Один"}),
+            "onrender": Resp({"basicInfo": {"accountId": "777", "nickname": "Один"}}),
+        })
+        told = await run("777")
+        check("ник показан", "Один" in told.last, told.last[:200])
+        check("сказано, сколько источников согласны",
+              "Согласны источников" in told.last, told.last)
+        check("вывод — ник верный", "Ник: Один" in told.last, told.last[-200:])
+        check("видно, кто из источников ответил",
+              "glob-info" in told.last, told.last)
+        check("без ключа источник помечен отдельно",
+              "ключ не задан" in told.last, told.last)
+
+        # источники разошлись — это тревога
+        nicknames.forget_all()
+        nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+            "glob-info": Resp({"basicInfo": {"accountId": "777", "nickname": "Первый"}}),
+            "freefirecommunity": Resp({"nickname": "Второй"}),
+            "onrender": Resp({}, status=500),
+        })
+        told = await run("777")
+        check("расхождение замечено", "не согласны" in told.last, told.last[-300:])
+        check("и сказано, что делать",
+              "разработчику" in told.last, told.last[-300:])
+
+        # никто не ответил
+        nicknames.forget_all()
+        nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({})
+        told = await run("777")
+        check("молчание всех источников названо прямо",
+              "не узнал никто" in told.last, told.last[-200:])
+        check("перечислено, кто именно молчал",
+              told.last.count("не ответил") >= 2, told.last)
+
+        # кэш не должен подменять проверку
+        nicknames.remember("777", "ИзКэша")
+        nicknames.aiohttp.ClientSession = lambda *a, **kw: ByUrl({
+            "glob-info": Resp({"basicInfo": {"accountId": "777", "nickname": "Свежий"}}),
+        })
+        told = await run("777")
+        check("проверка не берёт ник из кэша",
+              "ИзКэша" not in told.last and "Свежий" in told.last,
+              told.last[:200])
+
+        check("команда есть в справке админа", "/nick" in texts.ADMIN_HELP)
+    finally:
+        nicknames.aiohttp.ClientSession = real
+        nicknames.forget_all()
+
+
 async def verdict_reading(conn) -> None:
     """Отказ поставщика читается по смыслу: «нет игрока» ≠ «нет категории»."""
     from app.services.fazer import FazerProvider
@@ -1874,6 +1975,7 @@ async def main() -> None:
         await full_catalog(conn)
         await wrong_code(conn)
         await two_fields(conn)
+        await nick_probe(conn)
         await verdict_reading(conn)
         await wrong_region(conn)
         await catalog_pick(conn)

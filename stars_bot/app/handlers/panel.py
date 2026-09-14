@@ -37,7 +37,7 @@ from app.money import (
 from app.services import dcpay, nicknames, pricing, rates
 from app.services import reviews as reviews_service
 from app.services import delivery
-from app.states import GameNew, Panel, PartnerMove, PartnerNew, PromoNew
+from app.states import GameFind, GameNew, Panel, PartnerMove, PartnerNew, PromoNew
 
 log = logging.getLogger(__name__)
 router = Router(name="panel")
@@ -3135,6 +3135,7 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn("➕ Добавить игру", "pn:game_new", style=SUCCESS))
     kb.row(btn("📚 Взять из каталога поставщика", "pn:game_pick", style=PRIMARY))
+    kb.row(btn("🔎 Найти игру у поставщика", "pn:game_find", style=PRIMARY))
     kb.row(InlineKeyboardButton(text="📋 Все категории поставщика",
                                 callback_data="pn:game_codes"))
     kb.row(InlineKeyboardButton(text="🔔 Мгновенные отчёты (вебхук)",

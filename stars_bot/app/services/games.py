@@ -113,13 +113,31 @@ def field_label(name: str) -> str:
     return FIELD_LABELS.get(name.lower(), name)
 
 
-async def full_catalog(provider) -> list[dict]:
+#: Каталог поставщика меняется редко, а страниц и поисков по нему много.
+#: Держим ненадолго в памяти: иначе каждое нажатие — новый запрос.
+_catalog: dict[int, tuple[float, list[dict]]] = {}
+CATALOG_TTL = 10 * 60
+
+
+def forget_catalog() -> None:
+    _catalog.clear()
+
+
+async def full_catalog(provider, cached: bool = False) -> list[dict]:
     """Все категории поставщика вместе с полями для ID.
 
     Два списка у сервиса разные: категории — что продаётся, validate-id —
     у чего работает проверка ID. Владельцу нужен первый, а поля берутся
     из второго, поэтому сводим их вместе.
     """
+    import time
+
+    key = id(provider)
+    if cached:
+        hit = _catalog.get(key)
+        if hit and time.time() - hit[0] < CATALOG_TTL:
+            return hit[1]
+
     categories: list[dict] = []
     failure: Exception | None = None
     if hasattr(provider, "game_categories"):
@@ -152,7 +170,10 @@ async def full_catalog(provider) -> list[dict]:
         if not item.get("fields") and fields.get(code):
             item["fields"] = fields[code]
         item["checkable"] = code in fields
-    return list(merged.values())
+
+    out = list(merged.values())
+    _catalog[key] = (time.time(), out)
+    return out
 
 
 async def detect_fields(provider, category_id: str) -> list[str]:
