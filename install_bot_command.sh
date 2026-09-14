@@ -7,6 +7,11 @@ ROOT="$(dirname "$(readlink -f "$0")")"
 BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)"
 TARGET="/usr/local/bin/bot"
 
+# Повторный запуск безопасен: команда просто перезаписывается свежей.
+if [ -e "$TARGET" ]; then
+  echo "ℹ️  Команда bot уже есть — обновляю её."
+fi
+
 if [ "$(id -u)" -ne 0 ] && ! command -v sudo >/dev/null 2>&1; then
   echo "❌ Нужны права root." >&2
   exit 1
