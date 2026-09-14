@@ -25,10 +25,24 @@ LINK = ButtonStyle.LINK  # барои клавиатураи inline истифо
 #: Танҳо инҳоро Telegram дар тугмаҳои клавиатура қабул мекунад.
 KEYBOARD_STYLES = frozenset({SUCCESS, DANGER, PRIMARY})
 
-#: Агар мизоҷони кӯҳна рангро дастгирӣ накунанд — SHOP_BUTTON_COLORS=0
-_ENABLED = os.getenv("SHOP_BUTTON_COLORS", "1").strip().lower() not in (
-    "0", "no", "false", "off",
-)
+def _flag(name: str, default: str = "1") -> bool:
+    return os.getenv(name, default).strip().lower() not in ("0", "no", "false", "off")
+
+
+#: Ранги аслии Telegram (Bot API 10.3). SHOP_BUTTON_COLORS=0 — хомӯш.
+_ENABLED = _flag("SHOP_BUTTON_COLORS")
+
+#: Доираҳои ранга дар матни тугма. Инҳоро ҲАР версияи Telegram нишон медиҳад,
+#: бинобар ин ранг ҳатто дар барномаи кӯҳна дида мешавад.
+#: SHOP_BUTTON_MARKERS=0 — хомӯш.
+_MARKERS = _flag("SHOP_BUTTON_MARKERS")
+
+#: Доира барои ҳар ранг. Барои PRIMARY доира намегузорем — бахшҳо
+#: аллакай аломати мавзӯии худро доранд (⭐️ 🔥 🇮🇩 🎯).
+MARKERS = {SUCCESS: "🟢", DANGER: "🔴"}
+
+#: Агар доираҳо хомӯш бошанд, тугма бе аломат намемонад.
+PLAIN_ICONS = {SUCCESS: "✅", DANGER: "✖️"}
 
 
 def enabled() -> bool:
@@ -39,6 +53,25 @@ def set_enabled(value: bool) -> None:
     """Барои тестҳо ва танзими дастӣ."""
     global _ENABLED
     _ENABLED = value
+
+
+def markers_enabled() -> bool:
+    return _MARKERS
+
+
+def set_markers(value: bool) -> None:
+    global _MARKERS
+    _MARKERS = value
+
+
+def decorate(text: str, color: str | None) -> str:
+    """Ба матни тугма аломати ранга илова мекунад.
+
+    Ранги аслии Telegram танҳо дар барномаҳои нав дида мешавад, вале
+    доираи ранга дар матн — дар ҳама. Бинобар ин ҳар ду усул кор мекунанд.
+    """
+    icon = (MARKERS if _MARKERS else PLAIN_ICONS).get(color)
+    return f"{icon} {text}" if icon else text
 
 
 def pick(style: str | None) -> str | None:

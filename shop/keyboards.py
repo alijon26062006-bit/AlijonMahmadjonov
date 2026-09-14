@@ -28,12 +28,16 @@ CB_TOPUP_PAID = "t:paid:"  # t:paid:<id>
 
 def _btn(text: str, data: str, color: str | None = None) -> InlineKeyboardButton:
     return InlineKeyboardButton(
-        text=text, callback_data=data, style=style.pick(color)
+        text=style.decorate(text, color),
+        callback_data=data,
+        style=style.pick(color),
     )
 
 
 def _url(text: str, link: str, color: str | None = None) -> InlineKeyboardButton:
-    return InlineKeyboardButton(text=text, url=link, style=style.pick(color))
+    return InlineKeyboardButton(
+        text=style.decorate(text, color), url=link, style=style.pick(color)
+    )
 
 
 def main_menu(*, is_admin: bool = False, reviews_url: str = "") -> InlineKeyboardMarkup:
@@ -252,7 +256,7 @@ def admin_price_list(rows: Sequence, *, currency: str = texts.CURRENCY) -> Inlin
 
 
 def admin_price_item(code: str, active: bool) -> InlineKeyboardMarkup:
-    toggle = "🚫 Хомӯш кардан" if active else "✅ Фаъол кардан"
+    toggle = "Хомӯш кардан" if active else "Фаъол кардан"
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [_btn("💲 Иваз кардани нарх", f"a:setprice:{code}", style.PRIMARY)],

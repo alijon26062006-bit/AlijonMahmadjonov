@@ -152,13 +152,18 @@ def _labels(markup) -> list[str]:
     return [b.text for row in markup.inline_keyboard for b in row]
 
 
+def _has(markup, title: str) -> bool:
+    """Аломати ранга ба матн илова мешавад, пас муқоисаи қисмӣ мекунем."""
+    return any(title in label for label in _labels(markup))
+
+
 # ── оғоз ──────────────────────────────────────────────────────────────
 async def test_start_shows_welcome_and_menu(db, cfg, state):
     message = FakeMessage("/start")
     await menu_h.cmd_start(message, state, db, cfg)
     assert "Хуш омадед" in message.all_text()
     assert "0.00 с." in message.all_text()
-    assert texts.BTN_TELEGRAM in _labels(message.last_markup)
+    assert _has(message.last_markup, texts.BTN_TELEGRAM)
 
 
 async def test_start_registers_user(db, cfg, state):
@@ -179,8 +184,8 @@ async def test_welcome_shows_real_balance(db, cfg, state):
 async def test_telegram_button_opens_second_step(db, cfg, state):
     cb = FakeCallback(keyboards.CB_TG_MENU)
     await menu_h.cb_telegram(cb, state)
-    assert texts.BTN_STARS in _labels(cb.message.last_markup)
-    assert texts.BTN_PREMIUM in _labels(cb.message.last_markup)
+    assert _has(cb.message.last_markup, texts.BTN_STARS)
+    assert _has(cb.message.last_markup, texts.BTN_PREMIUM)
 
 
 async def test_premium_has_three_periods(db, cfg, state):
@@ -253,7 +258,7 @@ async def test_player_id_shows_verification_panel(db, cfg, state):
     await buy_h.got_target(message, state, db, cfg, ManualSupplier())
     assert "Тафтиши аккаунт" in message.last
     assert "123456789" in message.last
-    assert texts.BTN_YES_MINE in _labels(message.last_markup)
+    assert _has(message.last_markup, texts.BTN_YES_MINE)
 
 
 async def test_verification_shows_nickname_from_supplier(db, cfg, state):
@@ -297,7 +302,7 @@ async def test_buying_without_money_offers_topup(db, cfg, state, bot):
     cb = FakeCallback(keyboards.CB_BUY_OK)
     await buy_h.cb_buy(cb, state, db, cfg, bot, ManualSupplier())
     assert "кифоя нест" in cb.message.last
-    assert texts.BTN_TOPUP in _labels(cb.message.last_markup)
+    assert _has(cb.message.last_markup, texts.BTN_TOPUP)
     assert db.user_orders(USER_ID) == []
 
 
@@ -349,7 +354,7 @@ async def test_price_change_applies_to_next_purchase(db, cfg, state, bot):
 async def test_topup_menu_lists_amounts(db, cfg, state):
     cb = FakeCallback(keyboards.CB_TOPUP)
     await top_h.cb_topup(cb, state, db, cfg)
-    assert texts.BTN_OTHER_SUM in _labels(cb.message.last_markup)
+    assert _has(cb.message.last_markup, texts.BTN_OTHER_SUM)
 
 
 async def test_preset_amount_shows_card_and_code(db, cfg, state):

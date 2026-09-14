@@ -302,23 +302,23 @@ def test_card_format():
 # ── тугмаҳо ───────────────────────────────────────────────────────────
 def test_main_menu_has_all_sections():
     kb = keyboards.main_menu(reviews_url="https://t.me/x")
-    labels = [b.text for row in kb.inline_keyboard for b in row]
-    assert texts.BTN_TELEGRAM in labels
-    assert texts.BTN_FF_CIS in labels
-    assert texts.BTN_FF_ID in labels
-    assert texts.BTN_PUBG in labels
-    assert texts.BTN_TOPUP in labels
+    labels = " ".join(b.text for row in kb.inline_keyboard for b in row)
+    for title in (
+        texts.BTN_TELEGRAM, texts.BTN_FF_CIS, texts.BTN_FF_ID,
+        texts.BTN_PUBG, texts.BTN_TOPUP,
+    ):
+        assert title in labels
     assert texts.BTN_ADMIN not in labels
 
 
 def test_admin_button_only_for_admin():
     kb = keyboards.main_menu(is_admin=True)
-    labels = [b.text for row in kb.inline_keyboard for b in row]
+    labels = " ".join(b.text for row in kb.inline_keyboard for b in row)
     assert texts.BTN_ADMIN in labels
 
 
 def test_telegram_submenu_has_stars_and_premium():
-    labels = [b.text for row in keyboards.telegram_menu().inline_keyboard for b in row]
+    labels = " ".join(b.text for row in keyboards.telegram_menu().inline_keyboard for b in row)
     assert texts.BTN_STARS in labels and texts.BTN_PREMIUM in labels
 
 
@@ -330,9 +330,9 @@ def test_product_buttons_carry_price(db):
 
 
 def test_payment_keyboard_hides_link_when_missing():
-    labels = [b.text for row in keyboards.payment(1, None).inline_keyboard for b in row]
+    labels = " ".join(b.text for row in keyboards.payment(1, None).inline_keyboard for b in row)
     assert texts.BTN_OPEN_LINK not in labels
-    labels = [b.text for row in keyboards.payment(1, "https://x").inline_keyboard for b in row]
+    labels = " ".join(b.text for row in keyboards.payment(1, "https://x").inline_keyboard for b in row)
     assert texts.BTN_OPEN_LINK in labels
 
 
@@ -498,3 +498,53 @@ def test_style_values_are_what_telegram_accepts():
 def test_no_bottom_keyboard_left():
     """Клавиатураи поёнӣ тамоман хориҷ шуд."""
     assert not hasattr(keyboards, "persistent_menu")
+
+
+# ── доираҳои ранга дар матни тугма ────────────────────────────────────
+def test_green_marker_on_money_buttons():
+    """Ранги Telegram танҳо дар барномаи нав дида мешавад — доира дар ҳама."""
+    assert _find(keyboards.main_menu(), texts.BTN_TOPUP).text.startswith("🟢")
+    assert _find(keyboards.confirm_order(), texts.BTN_PAY).text.startswith("🟢")
+    assert _find(keyboards.payment(1, None), texts.BTN_PAID).text.startswith("🟢")
+
+
+def test_red_marker_on_cancel_and_reject():
+    assert _find(keyboards.cancel_only(), texts.BTN_CANCEL).text.startswith("🔴")
+    assert _find(keyboards.admin_order(1), texts.ADM_BTN_REJECT).text.startswith("🔴")
+
+
+def test_sections_keep_their_own_icons():
+    """Ба бахшҳо доира намегузорем — онҳо аллакай аломати мавзӯӣ доранд."""
+    menu = keyboards.main_menu()
+    for title, icon in (
+        (texts.BTN_TELEGRAM, "⭐️"), (texts.BTN_FF_CIS, "🔥"),
+        (texts.BTN_FF_ID, "🇮🇩"), (texts.BTN_PUBG, "🎯"),
+    ):
+        label = _find(menu, title).text
+        assert label.startswith(icon), label
+        assert "🟢" not in label and "🔴" not in label
+
+
+def test_markers_off_still_leaves_an_icon():
+    """Бе доираҳо тугма урён намемонад."""
+    from shop import style
+
+    style.set_markers(False)
+    try:
+        assert _find(keyboards.main_menu(), texts.BTN_TOPUP).text.startswith("✅")
+        assert _find(keyboards.cancel_only(), texts.BTN_CANCEL).text.startswith("✖️")
+    finally:
+        style.set_markers(True)
+
+
+def test_markers_and_native_colors_are_independent():
+    """Ранги Telegram хомӯш — доираҳо ҳамоно кор мекунанд."""
+    from shop import style
+
+    style.set_enabled(False)
+    try:
+        button = _find(keyboards.main_menu(), texts.BTN_TOPUP)
+        assert button.style is None
+        assert button.text.startswith("🟢")
+    finally:
+        style.set_enabled(True)
