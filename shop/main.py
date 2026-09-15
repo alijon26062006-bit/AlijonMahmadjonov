@@ -13,7 +13,7 @@ from aiogram.exceptions import TelegramNetworkError, TelegramUnauthorizedError
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, BotCommandScopeChat
 
-from . import catalog
+from . import catalog, requisites
 from .config import Config, load_config
 from .db import Database
 from .handlers import build_router
@@ -85,6 +85,7 @@ async def run() -> None:
         )
 
     db = Database(cfg.db_path)
+    requisites.seed(db, cfg)
     supplier = build_supplier(cfg.supplier, cfg.supplier_url, cfg.supplier_key)
     bot = Bot(
         token=cfg.token,

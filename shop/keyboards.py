@@ -326,11 +326,27 @@ def admin_topup(topup_id: int) -> InlineKeyboardMarkup:
 def admin_settings() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            [_btn(texts.ADM_BTN_REQUISITES, "a:req", style.SUCCESS)],
             [_btn(texts.ADM_BTN_CHANNELS, "a:channels", style.PRIMARY)],
             [_btn(texts.ADM_BTN_REVIEW_CH, "a:revch", style.PRIMARY)],
             [_btn(texts.ADM_BTN_WHATSAPP, "a:wa", style.PRIMARY)],
             [_btn(texts.ADM_BTN_GROUPS, "a:groups", style.PRIMARY)],
             [_btn(texts.BTN_BACK, "a:home")],
+        ]
+    )
+
+
+def admin_requisites(req) -> InlineKeyboardMarkup:
+    dc_toggle = "🚫 Душанбе Ситиро хомӯш" if req.dc_enabled else "✅ Душанбе Ситиро фаъол"
+    alif_toggle = "🚫 Alif-ро хомӯш" if req.alif_enabled else "✅ Alif-ро фаъол"
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_btn("💳 Рақами корт", "a:card", style.PRIMARY)],
+            [_btn("👤 Номи соҳиби корт", "a:holder", style.PRIMARY)],
+            [_btn(dc_toggle, "a:dctoggle", style.DANGER if req.dc_enabled else style.SUCCESS)],
+            [_btn("🔢 Ҳисоби Alif Mobi", "a:alif", style.PRIMARY)],
+            [_btn(alif_toggle, "a:aliftoggle", style.DANGER if req.alif_enabled else style.SUCCESS)],
+            [_btn(texts.BTN_BACK, "a:settings")],
         ]
     )
 

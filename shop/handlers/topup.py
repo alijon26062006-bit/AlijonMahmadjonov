@@ -8,7 +8,7 @@ from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from .. import catalog, keyboards, payments, texts
+from .. import catalog, keyboards, payments, requisites, texts
 from ..config import Config
 from ..db import Database, TOPUP_WAITING
 from ..states import Topup
@@ -82,21 +82,21 @@ async def _start_payment(
 ) -> None:
     """Сабти пардохт месозад ва реквизитҳоро нишон медиҳад."""
     db.touch_user(user_id)
+    req = requisites.get(db, cfg)
+    if not req.any_enabled:
+        await message.answer(texts.NO_REQUISITES, reply_markup=keyboards.back_home())
+        return
     code = payments.make_code()
     topup_id = db.create_topup(user_id, amount, code)
-    link = payments.build_pay_link(
-        cfg.pay_link, card=cfg.card_number, amount=amount, comment=code
-    )
-    alif = payments.build_alif_link(
-        cfg.alif_link, account=cfg.alif_account, amount=amount
-    )
+    link, alif = requisites.pay_links(req, cfg, amount, code)
     text = texts.payment_details(
         topup_id,
         amount,
         code,
-        payments.format_card(cfg.card_number),
-        cfg.card_holder,
+        payments.format_card(req.card) if req.dc_enabled and req.card else "",
+        req.holder,
         cfg.currency,
+        alif_account=req.alif_account if req.alif_enabled else "",
     )
     if link is None and alif is None:
         text += "\n\n" + texts.NO_PAY_LINK

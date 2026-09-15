@@ -1053,3 +1053,113 @@ async def test_users_screen_counts_money(db, cfg, state):
     cb = FakeCallback("a:users", user_id=ADMIN_ID)
     await st.cb_users(cb, db, cfg)
     assert "150.00" in cb.message.last     # 100 + 50
+
+
+# ── реквизитҳо ────────────────────────────────────────────────────────
+def _req(db, cfg):
+    from shop import requisites
+
+    return requisites.get(db, cfg)
+
+
+async def test_requisites_start_from_env(db, cfg):
+    from shop import requisites
+
+    requisites.seed(db, cfg)
+    req = _req(db, cfg)
+    assert req.card == cfg.card_number
+    assert req.alif_account == cfg.alif_account
+    assert req.dc_enabled and req.alif_enabled
+
+
+async def test_admin_changes_card_and_buyer_sees_it(db, cfg, state):
+    from shop.handlers import settings as st
+
+    await st.got_card(FakeMessage("8888 9999 0000 1111", user_id=ADMIN_ID), state, db, cfg)
+    await st.got_holder(FakeMessage("ФИРУЗ Н.", user_id=ADMIN_ID), state, db, cfg)
+
+    cb = FakeCallback(keyboards.CB_TOPUP_SUM + "10000")
+    await top_h.cb_preset_sum(cb, state, db, cfg)
+    text = cb.message.all_text()
+    assert "8888 9999 0000 1111" in text
+    assert "ФИРУЗ Н." in text
+    assert cfg.card_number not in text          # корти кӯҳна дигар нест
+
+
+async def test_new_card_goes_into_payment_link(db, cfg, state):
+    from shop.handlers import settings as st
+
+    await st.got_card(FakeMessage("8888999900001111", user_id=ADMIN_ID), state, db, cfg)
+    cb = FakeCallback(keyboards.CB_TOPUP_SUM + "15000")
+    await top_h.cb_preset_sum(cb, state, db, cfg)
+    urls = [b.url for row in cb.message.last_markup.inline_keyboard for b in row if b.url]
+    assert any("A=8888999900001111" in u for u in urls)
+
+
+async def test_admin_changes_alif_account(db, cfg, state):
+    from shop.handlers import settings as st
+
+    await st.got_alif(FakeMessage("900112233", user_id=ADMIN_ID), state, db, cfg)
+    cb = FakeCallback(keyboards.CB_TOPUP_SUM + "10000")
+    await top_h.cb_preset_sum(cb, state, db, cfg)
+    urls = [b.url for row in cb.message.last_markup.inline_keyboard for b in row if b.url]
+    assert any("account=900112233" in u for u in urls)
+
+
+@pytest.mark.parametrize("bad", ["12345", "abcdefghijkl", "1234567890123456789012"])
+async def test_bad_card_refused(db, cfg, state, bad):
+    from shop import requisites
+    from shop.handlers import settings as st
+
+    requisites.seed(db, cfg)
+    before = _req(db, cfg).card
+    message = FakeMessage(bad, user_id=ADMIN_ID)
+    await st.got_card(message, state, db, cfg)
+    assert _req(db, cfg).card == before
+    assert "нодуруст" in message.last
+
+
+async def test_disabled_alif_disappears_for_buyer(db, cfg, state):
+    from shop import requisites
+    from shop.handlers import settings as st
+
+    requisites.seed(db, cfg)
+    cb = FakeCallback("a:aliftoggle", user_id=ADMIN_ID)
+    await st.cb_toggle_method(cb, db, cfg)
+    assert _req(db, cfg).alif_enabled is False
+
+    pay = FakeCallback(keyboards.CB_TOPUP_SUM + "10000")
+    await top_h.cb_preset_sum(pay, state, db, cfg)
+    urls = [b.url for row in pay.message.last_markup.inline_keyboard for b in row if b.url]
+    assert not any("alifmobi" in u for u in urls)
+    assert "Alif" not in pay.message.all_text()
+
+
+async def test_last_method_cannot_be_switched_off(db, cfg, state):
+    """Агар ҳарду хомӯш шаванд, харидор пул гузаронида наметавонад."""
+    from shop import requisites
+    from shop.handlers import settings as st
+
+    requisites.seed(db, cfg)
+    await st.cb_toggle_method(FakeCallback("a:aliftoggle", user_id=ADMIN_ID), db, cfg)
+
+    cb = FakeCallback("a:dctoggle", user_id=ADMIN_ID)
+    await st.cb_toggle_method(cb, db, cfg)
+    assert _req(db, cfg).dc_enabled is True          # хомӯш нашуд
+    assert any("ягона" in (a or "") for a in cb.answers)
+
+
+async def test_requisites_survive_restart(db, cfg, state, tmp_path):
+    """Реквизитҳо дар база мемонанд, на дар .env."""
+    from shop import requisites
+    from shop.db import Database
+    from shop.handlers import settings as st
+
+    await st.got_card(FakeMessage("7777888899990000", user_id=ADMIN_ID), state, db, cfg)
+    path = db.path
+    db.close()
+
+    again = Database(path)
+    requisites.seed(again, cfg)                      # оғози нави бот
+    assert requisites.get(again, cfg).card == "7777888899990000"
+    again.close()

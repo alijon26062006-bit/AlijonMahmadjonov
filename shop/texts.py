@@ -347,6 +347,12 @@ def bad_amount(min_sum: int, max_sum: int, currency: str = CURRENCY) -> str:
     )
 
 
+NO_REQUISITES = (
+    "⚠️ <b>Пур кардани ҳисоб ҳоло дастрас нест.</b>\n\n"
+    "Реквизитҳо танзим нашудаанд. Лутфан ба дастгирӣ муроҷиат кунед."
+)
+
+
 def payment_details(
     topup_id: int,
     amount: int,
@@ -354,20 +360,36 @@ def payment_details(
     card: str,
     holder: str,
     currency: str = CURRENCY,
+    alif_account: str = "",
 ) -> str:
-    return (
-        "💳 <b>Реквизитҳо барои пардохт</b>\n\n"
-        f"🏦 <b>Душанбе Сити</b>\n"
-        f"💳 Корт: <code>{esc(card)}</code>\n"
-        f"👤 Ном: <b>{esc(holder)}</b>\n"
-        f"💰 Маблағ: <b>{money(amount, currency)}</b>\n\n"
-        f"🔑 <b>Коди тасдиқ: <code>{esc(code)}</code></b>\n"
+    lines = ["💳 <b>Реквизитҳо барои пардохт</b>\n"]
+    if card:
+        lines += [
+            "🏦 <b>Душанбе Сити</b>",
+            f"💳 Корт: <code>{esc(card)}</code>",
+        ]
+        if holder:
+            lines.append(f"👤 Ном: <b>{esc(holder)}</b>")
+        lines.append("")
+    if alif_account:
+        lines += [
+            "📱 <b>Alif Mobi</b>",
+            f"🔢 Ҳисоб: <code>{esc(alif_account)}</code>",
+            "",
+        ]
+    lines += [
+        f"💰 Маблағ: <b>{money(amount, currency)}</b>",
+        "",
+        f"🔑 <b>Коди тасдиқ: <code>{esc(code)}</code></b>",
         "<i>Ин кодро ҳатман дар «Шарҳ / Комментарий»-и ҳавола нависед — "
-        "бе он пардохт зуд пайдо намешавад.</i>\n\n"
-        f"🧾 Рақами пардохт: <code>#{topup_id}</code>\n\n"
+        "бе он пардохт зуд пайдо намешавад.</i>",
+        "",
+        f"🧾 Рақами пардохт: <code>#{topup_id}</code>",
+        "",
         "Пас аз ҳавола тугмаи <b>«✅ Пардохт кардам»</b>-ро пахш кунед "
-        "ва скриншот ё чекро фиристед."
-    )
+        "ва скриншот ё чекро фиристед.",
+    ]
+    return "\n".join(lines)
 
 
 def topup_waiting(topup_id: int) -> str:
@@ -539,6 +561,7 @@ ADM_BTN_CHANNELS = "📢 Каналҳои обуна"
 ADM_BTN_REVIEW_CH = "💬 Канали шарҳҳо"
 ADM_BTN_WHATSAPP = "🟢 WhatsApp"
 ADM_BTN_GROUPS = "🗂 Номи зербахшҳо"
+ADM_BTN_REQUISITES = "💳 Реквизитҳо"
 ADM_BTN_ADD_PARTNER = "➕ Шарики нав"
 ADM_BTN_PARTNER_PRICE = "🤝 Нархи шарикӣ"
 ADM_BTN_PARTNER_OFF = "🗑 Нархи шарикиро бардоштан"
@@ -676,6 +699,39 @@ def admin_bc_preview(has_media: bool, has_body: bool, buttons: int, users: int) 
         f"🔗 Тугмаҳо: {buttons}\n"
         f"👥 Гирандагон: <b>{users}</b>\n\n"
         "Мефиристем?"
+    )
+
+
+ADMIN_ASK_CARD = (
+    "💳 Рақами корти Душанбе Ситиро нависед.\n\n"
+    "Намуна: <code>9762 0001 0986 6409</code>\n"
+    "<i>Фосилаҳо муҳим нестанд — бот худаш тартиб медиҳад.</i>"
+)
+ADMIN_ASK_HOLDER = (
+    "👤 Номи соҳиби кортро нависед.\n\nНамуна: <code>ALIJON M.</code>"
+)
+ADMIN_ASK_ALIF = (
+    "📱 Рақами ҳисоби Alif Mobi-ро нависед.\n\n"
+    "Намуна: <code>939880805</code>"
+)
+ADMIN_LAST_METHOD = (
+    "⚠️ Ин ягона тарзи пардохт аст — хомӯш карда намешавад.\n"
+    "Аввал тарзи дуюмро фаъол кунед."
+)
+
+
+def admin_requisites(req, currency: str = CURRENCY) -> str:
+    dc_state = "✅ фаъол" if req.dc_enabled else "🚫 хомӯш"
+    alif_state = "✅ фаъол" if req.alif_enabled else "🚫 хомӯш"
+    return (
+        "💳 <b>Реквизитҳои пардохт</b>\n\n"
+        f"🏦 <b>Душанбе Сити</b> — {dc_state}\n"
+        f"   💳 Корт: <code>{esc(req.card or '—')}</code>\n"
+        f"   👤 Ном: <b>{esc(req.holder or '—')}</b>\n\n"
+        f"📱 <b>Alif Mobi</b> — {alif_state}\n"
+        f"   🔢 Ҳисоб: <code>{esc(req.alif_account or '—')}</code>\n\n"
+        "<i>Ҳаволаҳои пардохт худкор сохта мешаванд — маблағ ва коди тасдиқ "
+        "дар онҳо аллакай пур мешаванд.</i>"
     )
 
 

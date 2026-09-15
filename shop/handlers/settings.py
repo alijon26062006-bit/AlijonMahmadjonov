@@ -9,7 +9,7 @@ from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.fsm.context import FSMContext
 
-from .. import catalog, keyboards, texts
+from .. import catalog, keyboards, payments, requisites, texts
 from ..config import Config
 from ..db import Database
 from ..states import Admin
@@ -350,3 +350,107 @@ async def cb_broadcast_send(
     await cb.message.answer(
         texts.broadcast_result(sent, failed), reply_markup=keyboards.admin_home()
     )
+
+
+# ── реквизитҳои пардохт ───────────────────────────────────────────────
+async def _show_requisites(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    req = requisites.get(db, cfg)
+    await safe_edit(cb, texts.admin_requisites(req), keyboards.admin_requisites(req))
+
+
+@router.callback_query(F.data == "a:req")
+async def cb_requisites(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Config) -> None:
+    await state.clear()
+    await _show_requisites(cb, db, cfg)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "a:card")
+async def cb_card(cb: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Admin.waiting_card)
+    await safe_edit(cb, texts.ADMIN_ASK_CARD, keyboards.admin_back())
+    await cb.answer()
+
+
+@router.message(Admin.waiting_card, F.text)
+async def got_card(message: Message, state: FSMContext, db: Database, cfg: Config) -> None:
+    digits = payments.card_digits(message.text)
+    if not 12 <= len(digits) <= 19:
+        await message.answer(
+            "❌ Рақами корт нодуруст аст — аз 12 то 19 рақам бошад.",
+            reply_markup=keyboards.admin_back(),
+        )
+        return
+    await state.clear()
+    db.set_setting(requisites.CARD_KEY, digits)
+    req = requisites.get(db, cfg)
+    await message.answer(
+        f"✅ Корт: <code>{payments.format_card(digits)}</code>",
+        reply_markup=keyboards.admin_requisites(req),
+    )
+
+
+@router.callback_query(F.data == "a:holder")
+async def cb_holder(cb: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Admin.waiting_holder)
+    await safe_edit(cb, texts.ADMIN_ASK_HOLDER, keyboards.admin_back())
+    await cb.answer()
+
+
+@router.message(Admin.waiting_holder, F.text)
+async def got_holder(message: Message, state: FSMContext, db: Database, cfg: Config) -> None:
+    name = message.text.strip()
+    if not 2 <= len(name) <= 64:
+        await message.answer("❌ Ном бояд аз 2 то 64 аломат бошад.")
+        return
+    await state.clear()
+    db.set_setting(requisites.HOLDER_KEY, name)
+    req = requisites.get(db, cfg)
+    await message.answer(
+        f"✅ Номи соҳиби корт: <b>{texts.esc(name)}</b>",
+        reply_markup=keyboards.admin_requisites(req),
+    )
+
+
+@router.callback_query(F.data == "a:alif")
+async def cb_alif(cb: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Admin.waiting_alif)
+    await safe_edit(cb, texts.ADMIN_ASK_ALIF, keyboards.admin_back())
+    await cb.answer()
+
+
+@router.message(Admin.waiting_alif, F.text)
+async def got_alif(message: Message, state: FSMContext, db: Database, cfg: Config) -> None:
+    digits = "".join(ch for ch in message.text if ch.isdigit())
+    if not 6 <= len(digits) <= 15:
+        await message.answer(
+            "❌ Рақами ҳисоб нодуруст аст. Намуна: <code>939880805</code>",
+            reply_markup=keyboards.admin_back(),
+        )
+        return
+    await state.clear()
+    db.set_setting(requisites.ALIF_KEY, digits)
+    req = requisites.get(db, cfg)
+    await message.answer(
+        f"✅ Ҳисоби Alif: <code>{digits}</code>",
+        reply_markup=keyboards.admin_requisites(req),
+    )
+
+
+@router.callback_query(F.data.in_({"a:dctoggle", "a:aliftoggle"}))
+async def cb_toggle_method(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    """Охирин тарзи пардохтро хомӯш кардан мумкин нест."""
+    req = requisites.get(db, cfg)
+    is_dc = cb.data == "a:dctoggle"
+    turning_off = req.dc_enabled if is_dc else req.alif_enabled
+    other_on = req.alif_enabled if is_dc else req.dc_enabled
+
+    if turning_off and not other_on:
+        await cb.answer(texts.ADMIN_LAST_METHOD.replace("<b>", "").replace("</b>", ""),
+                        show_alert=True)
+        return
+
+    key = requisites.DC_ON_KEY if is_dc else requisites.ALIF_ON_KEY
+    db.set_setting(key, "0" if turning_off else "1")
+    await _show_requisites(cb, db, cfg)
+    await cb.answer("🚫 Хомӯш шуд" if turning_off else "✅ Фаъол шуд")
