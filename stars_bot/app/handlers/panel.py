@@ -1915,8 +1915,126 @@ def report_kb(active: str = "") -> InlineKeyboardMarkup:
     if row:
         kb.row(*row)
     kb.row(btn("📅 Свой период", "pn:repcustom", style=PRIMARY))
+    kb.row(
+        btn("⭐ Поставщик 1", f"pn:sup:main:{active or 'today'}"),
+        btn("🕹 Поставщик 2", f"pn:sup:games:{active or 'today'}"),
+    )
     kb.row(btn("‹ Назад", "pn:home"))
     return kb.as_markup()
+
+
+#: Кто чей: у звёзд, Premium и Steam один счёт у поставщика, у игр —
+#: другой. Так же решает и app/services/suppliers.py, когда выбирает
+#: ключ для заказа: всё, что не игра, идёт с основного счёта.
+SUPPLIERS: dict[str, tuple[str, str]] = {
+    "main":  ("⭐ Поставщик 1", "Звёзды, Telegram Premium и Steam"),
+    "games": ("🕹 Поставщик 2", "Игры"),
+}
+
+
+def supplier_kb(who: str, active: str) -> InlineKeyboardMarkup:
+    """Тот же выбор периода, но не уходя с экрана поставщика."""
+    kb = InlineKeyboardBuilder()
+    row = []
+    for key, (label, _) in reports.PRESETS.items():
+        mark = "• " if key == active else ""
+        row.append(btn(mark + label, f"pn:sup:{who}:{key}"))
+        if len(row) == 3:
+            kb.row(*row)
+            row = []
+    if row:
+        kb.row(*row)
+
+    other = "games" if who == "main" else "main"
+    kb.row(btn(SUPPLIERS[other][0], f"pn:sup:{other}:{active}", style=PRIMARY))
+    kb.row(btn("‹ К отчёту", f"pn:rep:{active}"))
+    return kb.as_markup()
+
+
+def supplier_report(who: str, title: str, rows: list, same_key: bool) -> str:
+    """Сколько мы должны одному поставщику за период.
+
+    Главная цифра здесь не выручка, а себестоимость: именно её владелец
+    отправляет поставщику. Выручку и прибыль показываем рядом, чтобы
+    было видно, из чего сумма сложилась.
+    """
+    name, what = SUPPLIERS[who]
+    mine = [r for r in rows if (r["is_game"] if who == "games" else not r["is_game"])]
+
+    orders = sum(r["orders"] for r in mine)
+    revenue = sum(r["revenue"] for r in mine)
+    cost = sum(r["cost"] for r in mine)
+    refunds = sum(r["refunds"] for r in mine)
+    refunded_sum = sum(r["refunded_sum"] for r in mine)
+    profit = revenue - cost
+    margin = round(profit * 100 / cost) if cost else 0
+
+    head = (f"🏷 <b>{name}</b> — {what}\n"
+            f"<i>{title}</i>\n"
+            f"<code>{texts.LINE}</code>\n\n")
+
+    if not orders:
+        body = ("<blockquote>За этот период по этому поставщику продаж "
+                "не было.</blockquote>")
+        if refunds:
+            body += (f"\n\n↩️ <b>Возвраты:</b> {refunds} "
+                     f"<i>({fmt(refunded_sum)})</i>")
+        return head + body + _same_key_note(same_key)
+
+    sold = [r for r in mine if r["orders"]]
+    lines = "\n".join(
+        f"{'└' if index == len(sold) - 1 else '├'} {r['title']} — "
+        f"<b>{r['orders']}</b> зак. · продано {fmt(r['revenue'])} · "
+        f"<b>ему {fmt(r['cost'])}</b>"
+        for index, r in enumerate(sold)
+    )
+
+    return (
+        head
+        + f"💸 <b>Ему за период: {fmt(cost)}</b>\n"
+        "<i>это себестоимость — сумма, которую вы ему отправляете</i>\n\n"
+        f"📦 <b>Итого</b>\n"
+        f"├ Заказов выполнено: <b>{orders}</b>\n"
+        f"├ Продано клиентам на: <b>{fmt(revenue)}</b>\n"
+        f"└ <b>Ваша прибыль: {fmt(profit)}</b> <i>({margin}%)</i>\n\n"
+        f"🧾 <b>По товарам</b>\n{lines}\n"
+        + (f"\n↩️ <b>Возвраты:</b> {refunds} <i>({fmt(refunded_sum)})</i>\n"
+           "<i>за них поставщик денег не берёт</i>\n" if refunds else "")
+        + _same_key_note(same_key)
+    )
+
+
+def _same_key_note(same_key: bool) -> str:
+    """Один ключ на всё — значит и счёт один, и делить нечего."""
+    if not same_key:
+        return ""
+    return ("\n\n<blockquote>⚠️ Отдельный ключ для игр не задан — игры идут "
+            "с того же счёта, что звёзды. Сумму поставщику считайте "
+            "по обоим экранам вместе.</blockquote>")
+
+
+@router.callback_query(F.data.startswith("pn:sup:"))
+async def cb_supplier_report(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    """Отчёт по одному поставщику: сколько ему отправлять за период."""
+    from app.services import suppliers
+
+    _, _, who, preset = call.data.split(":", 3)
+    if who not in SUPPLIERS:
+        await call.answer("Неизвестный поставщик.", show_alert=True)
+        return
+
+    await state.clear()
+    start, end, title = reports.preset_range(preset)
+    rows = await db.report_by_product(conn, *reports.bounds(start, end))
+    await safe_edit(
+        call,
+        substitute(supplier_report(who, title, rows,
+                                   not suppliers.has_own_games_key())),
+        supplier_kb(who, preset),
+    )
+    await call.answer()
 
 
 def product_block(rows: list) -> str:

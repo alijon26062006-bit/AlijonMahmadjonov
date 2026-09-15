@@ -198,6 +198,54 @@ async def run(conn) -> None:
     check("за пустой период разбивка пустая",
           await db.report_by_product(conn, since, until) == [])
 
+    # ------------------------------- отчёт по каждому поставщику отдельно
+    # Звёзды, Premium и Steam идут с одного счёта, игры — с другого.
+    # Владельцу надо знать, сколько отправить каждому: это себестоимость.
+    main = panel.supplier_report("main", "Сегодня", by, same_key=False)
+    check("в отчёте поставщика названа сумма к отправке",
+          "Ему за период" in main, main[:80])
+    head = main.split("📦")[0]
+    check("к отправке идёт себестоимость, а не выручка",
+          fmt(6000 + 4300) in head and fmt(11500 + 5000) not in head, head)
+    check("выручка показана отдельной строкой",
+          f"Продано клиентам на: <b>{fmt(11500 + 5000)}</b>" in main,
+          main[:500])
+    check("у первого поставщика звёзды и Steam",
+          "Звёзды" in main and "Steam" in main)
+    check("игры к первому поставщику не попали", "Free Fire" not in main)
+
+    games = panel.supplier_report("games", "Сегодня", by, same_key=False)
+    check("у второго поставщика только игры",
+          "Free Fire" in games and "PUBG" in games and "Звёзды" not in games)
+    check("сумма второму поставщику — себестоимость игр",
+          fmt(2600 + 1022) in games, games[:400])
+    check("возвраты показаны отдельно и не считаются в сумму",
+          "Возвраты" in games and "денег не берёт" in games, games[-300:])
+
+    empty_sup = panel.supplier_report("games", "Сегодня", [], same_key=False)
+    check("без продаж отчёт поставщика не врёт",
+          "продаж не было" in empty_sup, empty_sup[:200])
+    check("без своего ключа предупреждаем про общий счёт",
+          "с того же счёта" in panel.supplier_report("games", "Сегодня", by,
+                                                     same_key=True))
+    check("со своим ключом предупреждения нет",
+          "с того же счёта" not in games)
+
+    labels = [b.text for row in panel.report_kb("today").inline_keyboard
+              for b in row]
+    check("под отчётом есть кнопки обоих поставщиков",
+          "⭐ Поставщик 1" in labels and "🕹 Поставщик 2" in labels, str(labels))
+
+    kb = panel.supplier_kb("main", "week")
+    data_all = [b.callback_data for row in kb.inline_keyboard for b in row]
+    check("период на экране поставщика не теряется",
+          "pn:sup:main:today" in data_all and "pn:sup:main:week" in data_all,
+          str(data_all))
+    check("с экрана поставщика видно второго",
+          "pn:sup:games:week" in data_all, str(data_all))
+    check("возврат к отчёту сохраняет период",
+          "pn:rep:week" in data_all, str(data_all))
+
     # ------------------------------------------- сверка номеров заказов
     found = await db.find_order_by_external(conn, "FZ-109")
     check("заказ находится по номеру платформы",
