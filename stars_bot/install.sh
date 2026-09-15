@@ -262,7 +262,11 @@ case "\${1:-help}" in
             login)
                 # Первый вход делается руками: Telegram пришлёт код.
                 echo "Telegram пришлёт код в ваш же Telegram. Введите его здесь."
-                sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" -m app.userbot.login
+                # Запускать обязательно из папки бота: «python -m app...»
+                # ищет пакет в текущем каталоге, а службы выше спасает
+                # WorkingDirectory в unit-файле — здесь его нет.
+                ( cd "\$APP" && sudo -u "\$RUN_USER" \
+                    "\$APP/.venv/bin/python" -m app.userbot.login )
                 ;;
             start)   systemctl enable --now "\$UB" && echo "✅ Юзербот запущен" ;;
             stop)    systemctl disable --now "\$UB" && echo "⏹  Юзербот остановлен" ;;
