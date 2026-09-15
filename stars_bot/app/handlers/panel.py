@@ -99,6 +99,9 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🤝 Партнёры", callback_data="pn:partners"),
     )
     kb.row(
+        InlineKeyboardButton(text="🧩 API", callback_data="pn:api"),
+    )
+    kb.row(
         InlineKeyboardButton(text="🕹 Игры", callback_data="pn:games"),
         InlineKeyboardButton(text="💳 Балансы ключей", callback_data="pn:keys"),
     )
@@ -949,6 +952,19 @@ async def on_field_value(
         shown = value or "убрано"
 
     await runtime.set_value(conn, field, value)
+    # Лимит запросов API — простое число с разумными границами.
+    if field == "api_rate_per_min":
+        if not raw.isdigit() or not 1 <= int(raw) <= 10_000:
+            await message.answer("❌ Нужно число от 1 до 10000.")
+            return
+        await runtime.set_value(conn, "api_rate_per_min", raw)
+        await state.clear()
+        await message.answer(
+            f"✅ Лимит: <b>{raw}</b> запросов в минуту на ключ.",
+            reply_markup=back_kb("pn:api", "‹ К API"),
+        )
+        return
+
     if field == "fazer_games_key":
         # Старый клиент держит прежний ключ — выбрасываем его.
         from app.services import suppliers
@@ -5205,3 +5221,260 @@ async def cb_games_check(call: CallbackQuery, conn: aiosqlite.Connection, provid
         f"<code>{texts.LINE}</code>\n\n" + "\n\n".join(lines),
         back_kb("pn:games", "‹ К играм"),
     )
+
+
+# ══════════════════════════════════════════════════ API для разработчиков
+
+
+@router.callback_query(F.data == "pn:api")
+async def cb_api(call: CallbackQuery, state: FSMContext,
+                 conn: aiosqlite.Connection) -> None:
+    """Общий экран API: включён ли, кто им пользуется, что происходит."""
+    from app.api import server as api_server
+    from app.services import webhook as hook_service
+
+    await state.clear()
+    on = api_server.enabled()
+    keys = await db.all_api_keys(conn, limit=200)
+    owners = {key.user_id for key in keys}
+    live = sum(1 for key in keys if key.live)
+    url = api_server.base_url()
+    port = runtime.get_int("webhook_port") or settings.webhook_port
+
+    async with conn.execute(
+        "SELECT COUNT(*) AS total, COALESCE(SUM(status >= 400), 0) AS bad "
+        "FROM api_requests"
+    ) as cur:
+        req = dict(await cur.fetchone())
+    async with conn.execute(
+        """SELECT COUNT(*) AS cnt, COALESCE(SUM(o.price), 0) AS sold
+           FROM api_orders a JOIN orders o ON o.id = a.order_id
+           WHERE o.status = ?""", (db.ORDER_DELIVERED,)
+    ) as cur:
+        sales = dict(await cur.fetchone())
+
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🚫 Выключить API" if on else "✅ Включить API", "pn:api_toggle",
+               style=DANGER if on else SUCCESS))
+    kb.row(btn("👥 Клиенты API", "pn:api_clients"),
+           btn("📋 Запросы", "pn:api_log"))
+    kb.row(btn("⚡️ Лимит запросов", "pn:api_rate"))
+    kb.row(btn("🌐 За обратным прокси: "
+               + ("да" if runtime.get_bool("api_behind_proxy") else "нет"),
+               "pn:api_proxy"))
+    if url:
+        kb.row(InlineKeyboardButton(text="📖 Документация", url=f"{url}/docs"))
+    kb.row(btn(labeled("back", "Назад"), "pn:home"))
+
+    trouble = ""
+    if on and port <= 0:
+        trouble = ("\n\n⚠️ <b>Порт не задан</b> — сервер не поднимется. "
+                   "Задайте <code>webhook_port</code> в .env.")
+    elif on and not hook_service.public_url():
+        trouble = ("\n\n⚠️ <b>Публичный адрес не задан</b> — разработчикам "
+                   "нечего дать. Задайте <code>webhook_public_url</code>.")
+
+    await safe_edit(
+        call,
+        f"🧩 <b>API для разработчиков</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"Состояние: <b>{'🟢 включён' if on else '⚪️ выключен'}</b>\n"
+        f"Адрес: <code>{url or '—'}</code>\n\n"
+        f"👥 <b>Клиенты</b>\n"
+        f"├ Разработчиков: <b>{len(owners)}</b>\n"
+        f"└ Живых ключей: <b>{live}</b> из {len(keys)}\n\n"
+        f"🔁 <b>Запросы</b>\n"
+        f"├ Всего: <b>{req['total']}</b>\n"
+        f"└ С ошибкой: <b>{req['bad']}</b>\n\n"
+        f"📦 <b>Продажи через API</b>\n"
+        f"├ Заказов: <b>{sales['cnt']}</b>\n"
+        f"└ На сумму: <b>{fmt(sales['sold'])}</b>"
+        + trouble
+        + "\n\n<blockquote>Разработчик заходит в бота, жмёт /api и сам "
+          "создаёт ключ. Покупает он со своего баланса — того же, что "
+          "и в боте.</blockquote>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:api_toggle")
+async def cb_api_toggle(call: CallbackQuery, state: FSMContext,
+                        conn: aiosqlite.Connection) -> None:
+    from app.api import server as api_server
+
+    on = not api_server.enabled()
+    await runtime.set_value(conn, "api_enabled", "1" if on else "0")
+    await call.answer(
+        "API включён — перезапустите бота, чтобы поднялся сервер" if on
+        else "API выключен: запросы сразу получают отказ"
+    )
+    await cb_api(call, state, conn)
+
+
+@router.callback_query(F.data == "pn:api_proxy")
+async def cb_api_proxy(call: CallbackQuery, state: FSMContext,
+                       conn: aiosqlite.Connection) -> None:
+    """Верить ли X-Forwarded-For.
+
+    Включать только если перед ботом правда стоит nginx: иначе любой
+    сможет подделать заголовок и обойти защиту от подбора ключа.
+    """
+    on = not runtime.get_bool("api_behind_proxy")
+    await runtime.set_value(conn, "api_behind_proxy", "1" if on else "0")
+    await call.answer(
+        "Адрес берём из X-Forwarded-For" if on
+        else "Адрес берём из самого соединения"
+    )
+    await cb_api(call, state, conn)
+
+
+@router.callback_query(F.data == "pn:api_rate")
+async def cb_api_rate(call: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Panel.value)
+    await state.update_data(field="api_rate_per_min")
+    await safe_edit(
+        call,
+        f"⚡️ <b>Лимит запросов</b>\n<code>{texts.LINE}</code>\n\n"
+        f"Сейчас: <b>{runtime.get_int('api_rate_per_min', 60)}</b> "
+        "запросов в минуту на один ключ.\n\n"
+        "<blockquote>Пришлите число. Лимит считается «дырявым ведром»: "
+        "ровная нагрузка проходит вся, а короткий всплеск — пока есть "
+        "запас.</blockquote>",
+        back_kb("pn:api", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:api_clients")
+async def cb_api_clients(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    keys = await db.all_api_keys(conn, limit=30)
+    kb = InlineKeyboardBuilder()
+    rows = []
+    for key in keys:
+        user = await db.get_user(conn, key.user_id)
+        who = f"@{user.username}" if user and user.username else str(key.user_id)
+        rows.append(
+            f"{'🟢' if key.live else '⚪️'} <code>{key.masked}</code> — {who}\n"
+            f"   <i>баланс {fmt(user.balance if user else 0)}, "
+            f"запросов {key.requests}</i>"
+        )
+        kb.row(btn(f"{'🟢' if key.live else '⚪️'} {who} — {key.label or key.masked}",
+                   f"pn:api_key:{key.id}"))
+    kb.row(btn(labeled("back", "Назад"), "pn:api"))
+
+    await safe_edit(
+        call,
+        f"👥 <b>Клиенты API</b>\n<code>{texts.LINE}</code>\n\n"
+        + ("\n\n".join(rows) if rows else "<i>Ключей ещё никто не создал.</i>"),
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:api_key:"))
+async def cb_api_key(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    """Карточка чужого ключа: что с ним происходит и как его закрыть."""
+    from app.api import guard
+    from app.api import keys as apikeys
+
+    raw = call.data.rsplit(":", 1)[1]
+    key = await db.get_api_key(conn, int(raw)) if raw.isdigit() else None
+    if key is None:
+        await call.answer("Ключ не найден.", show_alert=True)
+        return
+
+    user = await db.get_user(conn, key.user_id)
+    orders = await db.api_orders_of(conn, key.user_id, limit=500)
+    done = [row for row in orders if row["status"] == db.ORDER_DELIVERED]
+    stats = await db.api_stats(conn, key.user_id)
+
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("⏸ Выключить ключ" if key.enabled else "▶️ Включить ключ",
+               f"pn:api_kt:{key.id}",
+               style=DANGER if key.enabled else SUCCESS))
+    kb.row(btn("🗑 Отозвать навсегда", f"pn:api_kill:{key.id}", style=DANGER))
+    if user:
+        kb.row(btn("🚫 Заблокировать клиента" if not user.is_banned
+                   else "✅ Разблокировать клиента",
+                   f"pn:ban:{user.id}", style=DANGER if not user.is_banned else SUCCESS))
+        kb.row(btn("👤 Карточка клиента", f"pn:user:{user.id}"))
+    kb.row(btn(labeled("back", "Назад"), "pn:api_clients"))
+
+    await safe_edit(
+        call,
+        f"🔑 <b>{key.label or 'Ключ'}</b> <code>{key.masked}</code>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"├ Владелец: <code>{key.user_id}</code>"
+        + (f" @{user.username}" if user and user.username else "") + "\n"
+        f"├ Баланс: <b>{fmt(user.balance if user else 0)}</b>\n"
+        f"├ Состояние: <b>{'🟢 работает' if key.live else '⚪️ не работает'}</b>\n"
+        f"├ Создан: <i>{key.created_at[:16].replace('T', ' ')}</i>\n"
+        f"├ Последний запрос: <i>"
+        + ((key.last_used_at or "")[:16].replace("T", " ") or "не было") + "</i>\n"
+        f"├ Запросов ключом: <b>{key.requests}</b>\n"
+        f"├ Всего по клиенту: <b>{stats['total']}</b> "
+        f"<i>(ошибок {stats['errors']})</i>\n"
+        f"├ Заказов: <b>{len(orders)}</b>, выполнено <b>{len(done)}</b>\n"
+        f"└ Продано на: <b>{fmt(sum(row['price'] for row in done))}</b>"
+        + ("\n\n🚫 <b>Клиент заблокирован</b> — все его ключи отказывают."
+           if user and user.is_banned else ""),
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith(("pn:api_kt:", "pn:api_kill:")))
+async def cb_api_key_act(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    from app.api import guard
+    from app.api import keys as apikeys
+
+    raw = call.data.rsplit(":", 1)[1]
+    key = await db.get_api_key(conn, int(raw)) if raw.isdigit() else None
+    if key is None:
+        await call.answer("Ключ не найден.", show_alert=True)
+        return
+
+    if call.data.startswith("pn:api_kill:"):
+        await db.revoke_api_key(conn, key.id)
+        note = "Ключ отозван"
+    else:
+        await db.set_api_key_enabled(conn, key.id, not key.enabled)
+        note = "Ключ выключен" if key.enabled else "Ключ включён"
+
+    # Кеш проверенных ключей сбрасываем сразу: выключают ключ как раз
+    # тогда, когда он утёк, и лишняя минута жизни тут лишняя.
+    apikeys.forget(key.id)
+    guard.forget_rate(key.id)
+    await call.answer(note)
+    call.data = f"pn:api_key:{key.id}"
+    await cb_api_key(call, conn)
+
+
+@router.callback_query(F.data == "pn:api_log")
+async def cb_api_log(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    """Последние запросы. Ни ключа, ни тела — только кто, куда и чем кончилось."""
+    async with conn.execute(
+        "SELECT * FROM api_requests ORDER BY id DESC LIMIT 15"
+    ) as cur:
+        rows = [dict(row) for row in await cur.fetchall()]
+
+    body = "\n".join(
+        f"<code>{row['created_at'][11:19]}</code> "
+        f"{row['method']} {esc(row['path'])} — <b>{row['status']}</b>"
+        + (f" <i>{esc(row['error'])}</i>" if row["error"] else "")
+        + f" <i>{row['ms']} мс</i>\n"
+        f"   <i>{esc(row['ip'] or '—')} · "
+        f"{esc((row['user_agent'] or '—')[:40])}</i>"
+        for row in rows
+    ) or "<i>Запросов ещё не было.</i>"
+
+    await safe_edit(
+        call,
+        f"📋 <b>Последние запросы</b>\n<code>{texts.LINE}</code>\n\n{body}\n\n"
+        "<blockquote>Ключей и тел запросов в журнале нет и не будет: "
+        "ключ в логах — это ключ, доступный всем, у кого есть логи."
+        "</blockquote>",
+        back_kb("pn:api", "‹ Назад"),
+    )
+    await call.answer()

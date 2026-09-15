@@ -1,0 +1,669 @@
+"""API для сторонних разработчиков: ключи, авторизация, покупка, вебхук.
+
+Сервер поднимается настоящий, на свободном порту, и все проверки идут
+по HTTP — так же, как пойдёт чужой код. Подменять обработчики значило бы
+проверять не то, что работает у клиента.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import sys
+from decimal import Decimal
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import env_fixture  # noqa: F401
+
+import aiohttp
+from aiohttp import web
+
+from app import db, runtime
+from app.api import catalog, guard, hooks
+from app.api import keys as apikeys
+from app.api import server as api_server
+from app.services.fragment import DeliveryError, DeliveryProvider
+
+BUYER = 501
+PASS, FAIL = [], []
+
+
+def check(name: str, cond: bool, detail: str = "") -> None:
+    (PASS if cond else FAIL).append(name)
+    print(f"{'✅' if cond else '❌'} {name}" + (f"  — {detail}" if detail else ""))
+
+
+class FakeBot:
+    def __init__(self):
+        self.sent = []
+
+    async def send_message(self, chat_id, text, **kw):
+        self.sent.append((chat_id, text))
+
+
+class Provider(DeliveryProvider):
+    """Поставщик, который выдаёт всё и сразу."""
+
+    def __init__(self, *, fail_stars=False):
+        self.fail_stars = fail_stars
+        self.delivered = []
+
+    async def deliver_stars(self, recipient, quantity):
+        if self.fail_stars:
+            raise DeliveryError("нет средств на кошельке")
+        self.delivered.append(("stars", recipient, quantity))
+        return type("R", (), {"order_id": f"FZ-{len(self.delivered)}"})()
+
+    async def deliver_premium(self, recipient, months):
+        self.delivered.append(("premium", recipient, months))
+        return type("R", (), {"order_id": "FZ-P"})()
+
+    async def game_catalog(self):
+        return []
+
+    async def game_offers(self, category_id):
+        return [{"offer_id": "off_1", "name": "100 алмазов",
+                 "usd": Decimal("1.00"), "raw": {}}]
+
+
+class Client:
+    """Тонкая обёртка над HTTP: тело всегда JSON, ответ — (код, данные)."""
+
+    def __init__(self, base: str, session: aiohttp.ClientSession):
+        self.base, self.session = base, session
+
+    async def call(self, method, path, *, key="", body=None, headers=None):
+        head = dict(headers or {})
+        if key:
+            head["Authorization"] = f"Bearer {key}"
+        async with self.session.request(
+            method, self.base + path, headers=head,
+            data=(json.dumps(body) if body is not None else None),
+        ) as resp:
+            try:
+                return resp.status, await resp.json(), resp.headers
+            except Exception:
+                return resp.status, {"raw": await resp.text()}, resp.headers
+
+    async def get(self, path, key="", **kw):
+        return await self.call("GET", path, key=key, **kw)
+
+    async def post(self, path, key="", **kw):
+        return await self.call("POST", path, key=key, **kw)
+
+
+async def make_key(conn, user_id=BUYER, label="test") -> str:
+    raw = apikeys.generate()
+    await db.add_api_key(
+        conn, user_id=user_id, label=label, prefix=apikeys.prefix_of(raw),
+        tail=apikeys.tail_of(raw), key_hash=apikeys.hash_key(raw),
+    )
+    return raw
+
+
+# ───────────────────────────────────────────────── ключи
+
+
+async def key_safety(conn) -> None:
+    raw = apikeys.generate()
+    stored = apikeys.hash_key(raw)
+
+    check("ключ начинается с приставки", raw.startswith("sk_live_"), raw[:12])
+    check("ключ достаточно длинный", len(raw) >= 40, str(len(raw)))
+    check("два ключа не совпадают", apikeys.generate() != apikeys.generate())
+    check("сам ключ в хеше не лежит", raw not in stored, stored[:30])
+    check("свой ключ проходит", apikeys.verify(raw, stored))
+    check("чужой ключ не проходит", not apikeys.verify(apikeys.generate(), stored))
+    check("подделка хвоста не проходит", not apikeys.verify(raw[:-1] + "x", stored))
+    check("битый хеш не пропускает", not apikeys.verify(raw, "мусор"))
+    check("соль у двух хешей разная",
+          apikeys.hash_key(raw) != apikeys.hash_key(raw))
+    check("непохожая строка отсеивается до базы",
+          not apikeys.looks_like("Bearer abc") and apikeys.looks_like(raw))
+
+    await make_key(conn)
+    saved = (await db.api_keys_of(conn, BUYER))[0]
+    check("в базе лежит только отпечаток",
+          "scrypt$" in saved.key_hash and "sk_live_" not in saved.key_hash)
+    check("видна только часть ключа",
+          saved.masked.count("…") == 1 and len(saved.masked) < 24, saved.masked)
+    check("дата создания сохранена", bool(saved.created_at), saved.created_at)
+
+    await db.set_api_key_enabled(conn, saved.id, False)
+    check("ключ выключается", not (await db.get_api_key(conn, saved.id)).live)
+    await db.set_api_key_enabled(conn, saved.id, True)
+    check("и включается обратно", (await db.get_api_key(conn, saved.id)).live)
+
+    await db.revoke_api_key(conn, saved.id)
+    check("отозванный ключ не работает",
+          not (await db.get_api_key(conn, saved.id)).live)
+    check("отозванный ключ пропал из списка",
+          not [k for k in await db.api_keys_of(conn, BUYER) if k.id == saved.id])
+    check("но строка осталась для учёта",
+          await db.get_api_key(conn, saved.id) is not None)
+
+
+# ───────────────────────────────────────────────── адрес вебхука
+
+
+def hook_urls() -> None:
+    bad = {
+        "": "пустой", "http://a.tj/h": "не https",
+        "https://127.0.0.1/h": "петля", "https://localhost/h": "localhost",
+        "https://10.0.0.5/h": "частная сеть",
+        "https://169.254.169.254/meta": "метаданные облака",
+        "https://[::1]/h": "петля IPv6",
+        "https://a.tj:8080/h": "чужой порт",
+    }
+    for url, why in bad.items():
+        check(f"вебхук отклонён — {why}", bool(hooks.check_url(url)), url)
+    check("внешний https принимается",
+          not hooks.check_url("https://example.com/hooks"))
+
+    body = b'{"event":"order.completed"}'
+    sig = hooks.sign(body, "whsec_test")
+    check("подпись считается", len(sig) == 64, sig[:16])
+    check("подпись зависит от тела", hooks.sign(body + b" ", "whsec_test") != sig)
+    check("подпись зависит от секрета", hooks.sign(body, "whsec_other") != sig)
+
+
+# ───────────────────────────────────────────────── сам API
+
+
+async def over_http(conn, bot, provider) -> None:
+    app = web.Application()
+    app["bot"] = bot
+    app["provider"] = provider
+    api_server.mount(app, bot, provider)
+
+    runner = web.AppRunner(app, access_log=None)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    port = runner.addresses[0][1]
+    base = f"http://127.0.0.1:{port}{api_server.PREFIX}"
+
+    async with aiohttp.ClientSession() as session:
+        api = Client(base, session)
+        try:
+            await run_http(conn, api, provider)
+        finally:
+            await runner.cleanup()
+
+
+async def run_http(conn, api: Client, provider) -> None:
+    # Лимит проверяем отдельным разделом. Пока он не мешает: иначе
+    # половина проверок ниже упёрлась бы в 429 и ничего не проверила.
+    await runtime.set_value(conn, "api_rate_per_min", "100000")
+    guard.forget_rate()
+    key = await make_key(conn)
+
+    # ---- авторизация ------------------------------------------------
+    status, body, headers = await api.get("/balance")
+    check("без ключа доступа нет", status == 401, str(status))
+    check("отказ объяснён кодом", body["error"]["code"] == "invalid_key",
+          str(body))
+    check("в ответе есть номер запроса", "X-Request-Id" in headers,
+          str(dict(headers)))
+
+    status, body, _ = await api.get("/balance", key="sk_live_" + "A" * 32)
+    check("выдуманный ключ не проходит", status == 401, str(status))
+    check("о чужом ключе не рассказываем лишнего",
+          body["error"]["message"] == "Ключ не принят.", str(body))
+
+    status, _, _ = await api.get("/balance", headers={"Authorization": key})
+    check("ключ без слова Bearer не принимается", status == 401, str(status))
+
+    status, body, _ = await api.get("/balance", key=key)
+    check("свой ключ проходит", status == 200, str(body))
+    check("баланс приходит числом и строкой",
+          isinstance(body["balance"]["amount"], int)
+          and "amount_text" in body["balance"], str(body))
+
+    # ---- чужой ключ ------------------------------------------------
+    other = await make_key(conn, user_id=BUYER + 1, label="сосед")
+    await db.upsert_user(conn, BUYER + 1, "neighbour", "Сосед")
+    status, body, _ = await api.get("/user", key=other)
+    check("у каждого ключа свой аккаунт",
+          body["user"]["id"] == BUYER + 1, str(body["user"]["id"]))
+
+    # ---- выключенный и отозванный ключ ------------------------------
+    doomed_raw = await make_key(conn, label="на отзыв")
+    doomed = (await db.api_keys_of(conn, BUYER))[0]
+    await api.get("/balance", key=doomed_raw)          # прогреваем кеш
+    await db.set_api_key_enabled(conn, doomed.id, False)
+    apikeys.forget(doomed.id)
+    status, body, _ = await api.get("/balance", key=doomed_raw)
+    check("выключенный ключ отказывает сразу", status == 403, str(status))
+    check("и говорит почему", body["error"]["code"] == "key_disabled", str(body))
+
+    await db.revoke_api_key(conn, doomed.id)
+    apikeys.forget(doomed.id)
+    status, _, _ = await api.get("/balance", key=doomed_raw)
+    check("отозванный ключ отказывает", status == 403, str(status))
+
+    # ---- заблокированный клиент -------------------------------------
+    await db.set_banned(conn, BUYER, True)
+    status, body, _ = await api.get("/balance", key=key)
+    check("заблокированному клиенту закрыто", status == 403, str(status))
+    check("причина названа", body["error"]["code"] == "account_blocked", str(body))
+    await db.set_banned(conn, BUYER, False)
+
+    # ---- каталог ----------------------------------------------------
+    status, body, _ = await api.get("/products", key=key)
+    check("каталог отдаётся", status == 200 and body["success"], str(status))
+    ids = [item["id"] for item in body["products"]]
+    check("в каталоге есть звёзды", "stars" in ids, str(ids[:6]))
+    check("себестоимость наружу не уходит",
+          all("cost" not in item for item in body["products"]), str(ids[:3]))
+    check("у товара есть валюта",
+          all(item.get("currency") or item.get("unit_price")
+              for item in body["products"]), str(body["products"][:1]))
+
+    status, body, _ = await api.get("/products?type=premium", key=key)
+    check("каталог фильтруется по типу",
+          all(item["type"] == "premium" for item in body["products"]),
+          str([i["id"] for i in body["products"]]))
+
+    status, body, _ = await api.get("/products/stars", key=key)
+    check("товар открывается по id", body["product"]["id"] == "stars", str(body))
+    status, body, _ = await api.get("/products/нет-такого", key=key)
+    check("несуществующий товар — 404", status == 404, str(status))
+
+    # ---- баланс не даёт купить --------------------------------------
+    status, body, _ = await api.post(
+        "/order/create", key=key,
+        body={"product_id": "stars", "quantity": 100, "customer": "@durov"},
+    )
+    check("без денег заказ не проходит", status == 402, str(body))
+    check("сказано, сколько надо",
+          body["error"]["required"] > 0 and body["error"]["code"] == "insufficient_funds",
+          str(body["error"]))
+    check("деньги не списаны",
+          (await db.get_user(conn, BUYER)).balance == 0)
+
+    # ---- покупка ----------------------------------------------------
+    await db.credit(conn, BUYER, 100_000)
+    before = (await db.get_user(conn, BUYER)).balance
+
+    status, body, _ = await api.post(
+        "/order/create", key=key,
+        body={"product_id": "stars", "quantity": 100, "customer": "@durov"},
+    )
+    check("заказ создан", status == 200 and body["success"], str(body))
+    ref = body.get("order_id", "")
+    check("номер заказа выглядит как номер", ref.startswith("ORD-"), ref)
+    check("статус вернулся", body["status"] in
+          ("processing", "completed"), str(body.get("status")))
+    check("сумма в ответе целым числом",
+          isinstance(body["amount"], int) and body["amount"] > 0, str(body))
+    check("номер транзакции вернулся",
+          body["transaction_id"].startswith("TX-"), str(body.get("transaction_id")))
+
+    after = (await db.get_user(conn, BUYER)).balance
+    check("деньги списаны ровно один раз",
+          after == before - body["amount"], f"{before} → {after}")
+    check("товар выдан", ("stars", "@durov", 100) in provider.delivered,
+          str(provider.delivered))
+
+    # ---- журнал транзакций ------------------------------------------
+    txs = await db.api_txs_of(conn, BUYER)
+    check("списание попало в журнал", txs and txs[0]["kind"] == "charge", str(txs[:1]))
+    check("в журнале есть баланс до и после",
+          txs[0]["balance_before"] == before and txs[0]["balance_after"] == after,
+          f"{txs[0]['balance_before']} → {txs[0]['balance_after']}")
+    check("транзакция привязана к заказу", txs[0]["order_ref"] == ref, str(txs[0]))
+
+    # ---- статус заказа ----------------------------------------------
+    status, body, _ = await api.get(f"/order/status?order_id={ref}", key=key)
+    check("статус заказа читается", status == 200 and body["order_id"] == ref,
+          str(body))
+    status, body, _ = await api.get(f"/orders/{ref}", key=key)
+    check("заказ открывается и по пути", body["order_id"] == ref, str(body))
+    status, _, _ = await api.get("/order/status?order_id=ORD-999999", key=key)
+    check("чужого заказа нет", status == 404, str(status))
+
+    status, body, _ = await api.get(f"/orders/{ref}", key=other)
+    check("чужой заказ не показывается соседу", status == 404, str(status))
+
+    status, _, _ = await api.get("/order/status", key=key)
+    check("без номера заказа — 400", status == 400, str(status))
+
+    status, body, _ = await api.get("/orders?limit=5", key=key)
+    check("список заказов отдаётся",
+          body["count"] >= 1 and body["orders"][0]["order_id"] == ref, str(body))
+    status, body, _ = await api.get("/orders?limit=99999", key=key)
+    check("огромный limit урезается", body["limit"] <= 100, str(body.get("limit")))
+
+    # ---- идемпотентность --------------------------------------------
+    before = (await db.get_user(conn, BUYER)).balance
+    args = {"product_id": "stars", "quantity": 100, "customer": "@durov",
+            "idempotency_key": "order-1001"}
+    status, first, _ = await api.post("/order/create", key=key, body=args)
+    status2, second, _ = await api.post("/order/create", key=key, body=args)
+    check("повтор не создаёт второй заказ",
+          first["order_id"] == second["order_id"], f"{first} / {second}")
+    spent = before - (await db.get_user(conn, BUYER)).balance
+    check("повтор не списал деньги дважды", spent == first["amount"],
+          f"списано {spent}, цена {first['amount']}")
+
+    status, body, _ = await api.post(
+        "/order/create", key=key,
+        body=dict(args, idempotency_key="кор"),
+    )
+    check("короткий ключ идемпотентности отклонён", status == 400, str(body))
+
+    # тот же ключ у другого разработчика — другой заказ
+    await db.credit(conn, BUYER + 1, 100_000)
+    status, third, _ = await api.post("/order/create", key=other, body=args)
+    check("ключи идемпотентности у разных клиентов не мешаются",
+          third.get("order_id") not in ("", first["order_id"]), str(third))
+
+    # ---- проверка входных данных ------------------------------------
+    bad_cases = [
+        ({}, "missing_product_id"),
+        ({"product_id": "stars", "quantity": 100}, "missing_customer"),
+        ({"product_id": "stars", "quantity": 0, "customer": "@a"}, "bad_quantity"),
+        ({"product_id": "stars", "quantity": -5, "customer": "@a"}, "bad_quantity"),
+        ({"product_id": "stars", "quantity": "сто", "customer": "@a"}, "bad_quantity"),
+        ({"product_id": "stars", "quantity": 10 ** 9, "customer": "@a"}, "bad_quantity"),
+        ({"product_id": "нет", "quantity": 1, "customer": "@a"}, "product_not_found"),
+    ]
+    for payload, expect in bad_cases:
+        status, body, _ = await api.post("/order/create", key=key, body=payload)
+        check(f"отклонено: {expect}",
+              status >= 400 and body["error"]["code"] == expect,
+              f"{payload} → {body.get('error')}")
+
+    status, body, _ = await api.call(
+        "POST", "/order/create", key=key,
+        headers={"Content-Type": "application/json"},
+    )
+    check("пустое тело не ломает сервер", status == 400, str(body))
+
+    async with api.session.post(
+        api.base + "/order/create", data="{не json",
+        headers={"Authorization": f"Bearer {key}"},
+    ) as resp:
+        check("кривой JSON не ломает сервер", resp.status == 400, str(resp.status))
+
+    # ---- попытки внедрения ------------------------------------------
+    sneaky = [
+        "'; DROP TABLE users;--",
+        "1 OR 1=1",
+        "<script>alert(1)</script>",
+        "../../etc/passwd",
+        "%00",
+    ]
+    for probe in sneaky:
+        status, body, _ = await api.get(
+            f"/order/status?order_id={probe}", key=key)
+        check(f"безвредно: {probe[:18]}", status == 404, str(status))
+    check("таблица клиентов на месте",
+          await db.get_user(conn, BUYER) is not None)
+
+    status, body, _ = await api.post(
+        "/order/create", key=key,
+        body={"product_id": "stars", "quantity": 100,
+              "customer": "<script>alert(1)</script>"},
+    )
+    if status == 200:
+        saved = await db.api_order_by_ref(conn, body["order_id"])
+        check("разметка сохраняется как есть, без выполнения",
+              saved["customer"] == "<script>alert(1)</script>", str(saved))
+
+    # ---- неизвестные адреса и методы --------------------------------
+    status, body, _ = await api.get("/нет-такой-точки", key=key)
+    check("неизвестный адрес — 404", status == 404, str(status))
+    check("и это по-прежнему JSON", body.get("success") is False, str(body))
+    status, _, _ = await api.get("/order/create", key=key)
+    check("чужой метод — 405", status == 405, str(status))
+
+    # ---- открытые точки ---------------------------------------------
+    status, body, _ = await api.get("/health")
+    check("проверка живости работает без ключа",
+          status == 200 and body["status"] == "ok", str(body))
+    status, _, _ = await api.get("/docs")
+    check("документация открыта без ключа", status == 200, str(status))
+
+    # ---- журнал запросов --------------------------------------------
+    log = await db.api_requests_of(conn, BUYER, limit=200)
+    check("запросы пишутся в журнал", len(log) > 10, str(len(log)))
+    check("в журнале нет ключа",
+          not any(key in json.dumps(row, ensure_ascii=False) for row in log))
+    check("в журнале есть адрес и клиент",
+          all(row["ip"] for row in log[:3]), str(log[:1]))
+    check("у каждого запроса свой номер",
+          len({row["request_id"] for row in log}) == len(log))
+
+    fresh_key = await db.get_api_key(conn, (await db.api_keys_of(conn, BUYER))[-1].id)
+    check("последний запрос ключа отмечен", bool(fresh_key.last_used_at),
+          str(fresh_key.last_used_at))
+
+    # ---- лимит запросов ----------------------------------------------
+    await runtime.set_value(conn, "api_rate_per_min", "60")
+    guard.forget_rate()
+    hits = [await api.get("/health") for _ in range(3)]      # без ключа не считается
+    key_id = (await db.api_keys_of(conn, BUYER))[-1].id
+    codes = []
+    for _ in range(guard.BURST + 5):
+        status, _, headers = await api.get("/balance", key=key)
+        codes.append(status)
+    check("лимит срабатывает", 429 in codes, str(codes[-6:]))
+    check("до лимита запросы проходят", codes[0] == 200, str(codes[:3]))
+
+    status, body, headers = await api.get("/balance", key=key)
+    if status == 429:
+        check("сказано, через сколько повторить",
+              "Retry-After" in headers, str(dict(headers)))
+        check("код отказа машинный",
+              body["error"]["code"] == "rate_limited", str(body))
+    guard.forget_rate()
+
+    # ---- защита от подбора -------------------------------------------
+    guard.forget_bad()
+    codes = []
+    for index in range(guard.BAD_LIMIT + 2):
+        status, _, _ = await api.get(
+            "/balance", key="sk_live_" + "B" * 31 + str(index % 10))
+        codes.append(status)
+    check("подбор ключа закрывает адрес", codes[-1] == 429, str(codes))
+    status, _, _ = await api.get("/balance", key=key)
+    check("после блокировки не пускают и с верным ключом",
+          status == 429, str(status))
+    guard.forget_bad()
+    status, _, _ = await api.get("/balance", key=key)
+    check("после снятия блокировки всё работает", status == 200, str(status))
+
+    # ---- выключенный API ---------------------------------------------
+    await runtime.set_value(conn, "api_enabled", "0")
+    status, body, _ = await api.get("/balance", key=key)
+    check("выключенный API отвечает 503", status == 503, str(status))
+    check("и говорит, что выключен",
+          body["error"]["code"] == "api_disabled", str(body))
+    status, _, _ = await api.get("/health")
+    check("живость видна и при выключенном API", status == 200, str(status))
+    await runtime.set_value(conn, "api_enabled", "1")
+
+
+# ───────────────────────────────────────────────── возврат денег
+
+
+async def refunds(conn, bot) -> None:
+    """Поставщик отказал — деньги должны вернуться, и это должно быть видно."""
+    from app.services import delivery
+
+    provider = Provider(fail_stars=True)
+    bot.sent.clear()
+    await db.credit(conn, BUYER, 50_000)
+    before = (await db.get_user(conn, BUYER)).balance
+
+    key = await make_key(conn, label="возврат")
+    key_row = (await db.api_keys_of(conn, BUYER))[0]
+    ref = await db.next_api_ref(conn)
+    paid, tx = await db.charge_logged(conn, BUYER, 1400, order_ref=ref,
+                                      note="звёзды")
+    check("списание прошло", paid and tx.startswith("TX-"), tx)
+
+    order = await db.create_order(
+        conn, user_id=BUYER, product_type="stars", quantity=100,
+        recipient="@durov", price=1400, cost=1000,
+    )
+    await db.link_api_order(conn, ref=ref, order_id=order.id, key_id=key_row.id,
+                            user_id=BUYER, product_id="stars", customer="@durov")
+    await delivery.run(bot, conn, provider, order)
+
+    fresh = await db.get_order(conn, order.id)
+    check("заказ помечен возвращённым", fresh.status == db.ORDER_REFUNDED,
+          fresh.status)
+    check("деньги вернулись на баланс",
+          (await db.get_user(conn, BUYER)).balance == before, str(before))
+
+    txs = await db.api_txs_of(conn, BUYER, limit=3)
+    check("возврат записан в журнал", txs[0]["kind"] == "refund", str(txs[0]))
+    check("возврат привязан к тому же заказу", txs[0]["order_ref"] == ref,
+          str(txs[0]))
+    check("журнал сходится по балансу",
+          txs[0]["balance_after"] == before, str(txs[0]))
+
+    check("роботу в Telegram не написали",
+          not any(chat == BUYER for chat, _ in bot.sent), str(bot.sent[:2]))
+    check("владельцу о сбое сообщили", bool(bot.sent), str(len(bot.sent)))
+
+    # заказ из бота — человеку писать надо
+    bot.sent.clear()
+    human = await db.create_order(
+        conn, user_id=BUYER, product_type="stars", quantity=100,
+        recipient="@durov", price=1400, cost=1000,
+    )
+    await db.charge(conn, BUYER, 1400)
+    await delivery.run(bot, conn, provider, human)
+    check("человеку о возврате пишут",
+          any(chat == BUYER for chat, _ in bot.sent), str(bot.sent[:2]))
+
+
+# ───────────────────────────────────────────────── вебхук клиенту
+
+
+async def webhook_out(conn) -> None:
+    """Проверяем настоящей доставкой: поднимаем сервер клиента."""
+    got = []
+
+    async def receive(request):
+        body = await request.read()
+        got.append((dict(request.headers), body))
+        return web.json_response({"ok": True})
+
+    app = web.Application()
+    app.router.add_post("/hook", receive)
+    runner = web.AppRunner(app, access_log=None)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    port = runner.addresses[0][1]
+
+    try:
+        secret = hooks.new_secret()
+        await db.set_api_hook(conn, BUYER, f"http://127.0.0.1:{port}/hook", secret)
+
+        rows = await db.api_orders_to_notify(conn)
+        check("есть о чём сообщить", bool(rows), str(len(rows)))
+
+        # check_url в доставке отвергает петлю — это правильно, и это
+        # ровно то, что мы хотим проверить отдельно.
+        async with aiohttp.ClientSession() as session:
+            row = rows[0]
+            await hooks.deliver(session, conn, row)
+        check("на внутренний адрес не пошли", not got, str(got))
+        hook = await db.get_api_hook(conn, BUYER)
+        check("причина отказа записана", bool(hook["last_error"]),
+              hook["last_error"])
+        check("счётчик неудач вырос", hook["fails"] >= 1, str(hook["fails"]))
+
+        outside = await db.get_api_hook(conn, BUYER + 1)
+        await db.set_api_hook(conn, BUYER + 1,
+                              f"https://127.0.0.1:{port}/hook", "whsec_x")
+        saved = await db.get_api_hook(conn, BUYER + 1)
+        check("внутренний адрес по https тоже не вызывается",
+              bool(hooks.check_url(saved["url"])), saved["url"])
+
+        # А теперь проверим само тело и подпись, без сетевого запрета.
+        body = json.dumps(hooks.payload_of(rows[0]), ensure_ascii=False).encode()
+        payload = json.loads(body)
+        check("в событии есть номер заказа",
+              payload["order_id"].startswith("ORD-"), str(payload))
+        check("в событии есть статус",
+              payload["status"] in
+              ("processing", "completed", "refunded"), str(payload))
+        check("событие названо по статусу",
+              payload["event"] == f"order.{payload['status']}", str(payload))
+        check("ключа в событии нет", "sk_live_" not in body.decode())
+
+        signature = hooks.sign(body, secret)
+        check("клиент может проверить подпись",
+              hooks.sign(body, secret) == signature)
+        check("чужим секретом подпись не сходится",
+              hooks.sign(body, "whsec_other") != signature)
+    finally:
+        await runner.cleanup()
+
+
+async def hook_marks(conn) -> None:
+    """Состояние рассылки живёт в базе и не теряется при перезапуске."""
+    rows = await db.api_orders_to_notify(conn)
+    if not rows:
+        check("нечего проверять — очередь пуста", True)
+        return
+    ref, status = rows[0]["ref"], rows[0]["status"]
+
+    await db.note_api_hook(conn, ref, sent=status)
+    left = [row["ref"] for row in await db.api_orders_to_notify(conn)]
+    check("отправленное уходит из очереди", ref not in left, str(left[:3]))
+
+    await db.note_api_hook(conn, ref, failed=True)
+    saved = await db.api_order_by_ref(conn, ref)
+    check("неудачи считаются", saved["hook_tries"] == 1, str(saved["hook_tries"]))
+
+    second = [row for row in await db.api_orders_to_notify(conn)][0]["ref"]
+    for _ in range(10):
+        await db.note_api_hook(conn, second, failed=True)
+    still = [row["ref"] for row in await db.api_orders_to_notify(conn)]
+    check("после восьми неудач не долбимся вечно", second not in still,
+          str(still[:3]))
+
+
+# ───────────────────────────────────────────────── запуск
+
+
+async def main() -> None:
+    for sfx in ("", "-wal", "-shm"):
+        Path(str(db.settings.db_file) + sfx).unlink(missing_ok=True)
+    conn = await db.connect()
+    bot = FakeBot()
+    provider = Provider()
+    try:
+        await db.init(conn)
+        await runtime.load(conn)
+        await runtime.set_value(conn, "api_enabled", "1")
+        await runtime.set_value(conn, "stars_enabled", "1")
+        await runtime.set_value(conn, "premium_enabled", "1")
+        await runtime.set_value(conn, "usd_rate_diram", "1090")
+        await db.upsert_user(conn, BUYER, "dev", "Разработчик")
+
+        await key_safety(conn)
+        hook_urls()
+        await over_http(conn, bot, provider)
+        await refunds(conn, bot)
+        await webhook_out(conn)
+        await hook_marks(conn)
+    finally:
+        await conn.close()
+
+    print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")
+    if FAIL:
+        print("ПРОВАЛЫ:", ", ".join(FAIL))
+    sys.exit(1 if FAIL else 0)
+
+
+asyncio.run(main())

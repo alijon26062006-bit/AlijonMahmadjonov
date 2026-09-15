@@ -44,6 +44,23 @@ async def notify_admins(bot: Bot, text: str, **kwargs) -> None:
         await notify(bot, settings.orders_chat_id, text, **kwargs)
 
 
+async def tell_buyer(
+    bot: Bot, conn: aiosqlite.Connection, order: db.Order, text: str, **kwargs
+) -> None:
+    """Написать покупателю — если покупатель человек, а не программа.
+
+    Заказ, пришедший по API, сделал чужой бот. Его владельцу о статусе
+    сообщает вебхук, а сообщением в Telegram на каждый заказ мы завалили
+    бы ему личку на первой же сотне и упёрлись в лимиты Telegram.
+
+    Проверяем по базе, а не по флагу: статус заказа меняют пять разных
+    путей, и забыть передать флаг в один из них — значит начать спамить.
+    """
+    if await db.api_order_of(conn, order.id) is not None:
+        return
+    await notify(bot, order.user_id, text, **kwargs)
+
+
 class NotEnoughFunds(Exception):
     pass
 
@@ -107,8 +124,8 @@ async def _run_delivery(
             conn, order.id, expected=db.ORDER_DELIVERING, new=db.ORDER_FAILED,
             error=str(exc)[:1000],
         )
-        await notify(
-            bot, order.user_id,
+        await tell_buyer(
+            bot, conn, order,
             f"⏳ <b>Заказ №{order.id} проверяется.</b>\n\n"
             f"Fragment не ответил вовремя. Проверяю вручную — напишу в течение "
             f"нескольких минут. Деньги в безопасности.",
@@ -135,8 +152,8 @@ async def _run_delivery(
             fragment_order_id=result.order_id, error=None,
         )
         await runtime.note_delivery_ok(conn, order.product_type, order.quantity)
-        await notify(
-            bot, order.user_id, _done_text(order), reply_markup=keyboards.back()
+        await tell_buyer(
+            bot, conn, order, _done_text(order), reply_markup=keyboards.back()
         )
         await notify_admins(
             bot,
@@ -148,6 +165,23 @@ async def _run_delivery(
         )
         log.info("Заказ %s выдан, fragment_id=%s", order.id, result.order_id)
         await _ask_review(bot, conn, order)
+
+
+async def _give_back(conn: aiosqlite.Connection, order: db.Order) -> None:
+    """Вернуть деньги за заказ.
+
+    Заказу по API возврат пишется ещё и в журнал транзакций: разработчик
+    должен видеть в истории, за что ему вернули деньги, а не гадать,
+    почему баланс вырос сам.
+    """
+    api = await db.api_order_of(conn, order.id)
+    if api is None:
+        await db.credit(conn, order.user_id, order.price)
+        return
+    await db.credit_logged(
+        conn, order.user_id, order.price, kind="refund",
+        order_ref=api["ref"], note=(order.error or "заказ не прошёл")[:190],
+    )
 
 
 async def _refund(
@@ -163,9 +197,9 @@ async def _refund(
         log.warning("Заказ %s: возврат пропущен, статус уже изменён", order.id)
         return
 
-    await db.credit(conn, order.user_id, order.price)
-    await notify(
-        bot, order.user_id,
+    await _give_back(conn, order)
+    await tell_buyer(
+        bot, conn, order,
         texts.REFUNDED.format(
             order_id=order.id, price=fmt(order.price), support=texts.support()
         ),
@@ -199,9 +233,9 @@ async def manual_refund(bot: Bot, conn: aiosqlite.Connection, order: db.Order) -
         conn, order.id, expected=db.ORDER_FAILED, new=db.ORDER_REFUNDED
     ):
         return False
-    await db.credit(conn, order.user_id, order.price)
-    await notify(
-        bot, order.user_id,
+    await _give_back(conn, order)
+    await tell_buyer(
+        bot, conn, order,
         texts.REFUNDED.format(
             order_id=order.id, price=fmt(order.price), support=texts.support()
         ),
@@ -215,7 +249,7 @@ async def manual_complete(bot: Bot, conn: aiosqlite.Connection, order: db.Order)
         conn, order.id, expected=db.ORDER_FAILED, new=db.ORDER_DELIVERED
     ):
         return False
-    await notify(bot, order.user_id, _done_text(order))
+    await tell_buyer(bot, conn, order, _done_text(order))
     await _ask_review(bot, conn, order)
     return True
 
@@ -242,8 +276,15 @@ def _done_text(order: db.Order) -> str:
 
 async def _ask_review(bot: Bot, conn: aiosqlite.Connection, order: db.Order) -> None:
     """Спросить отзыв. Импорт внутри: сервис отзывов сам зовёт базу и тексты,
-    а на верхнем уровне это замкнуло бы модули друг на друга."""
+    а на верхнем уровне это замкнуло бы модули друг на друга.
+
+    У заказа по API отзыва не просим: покупал его чужой бот, и просить
+    оценку у программы — значит писать её владельцу на каждый заказ.
+    """
     from app.services import reviews
+
+    if await db.api_order_of(conn, order.id) is not None:
+        return
 
     try:
         await reviews.offer(bot, conn, order)
@@ -277,3 +318,17 @@ async def _watch_failures(bot: Bot, conn: aiosqlite.Connection, reason: str) -> 
         "Деньги клиентам возвращены. Пополните кошелёк и отметьте это "
         "в /panel → 💼 Кошелёк — продажа включится обратно.",
     )
+
+
+async def run(
+    bot: Bot, conn: aiosqlite.Connection, provider: DeliveryProvider,
+    order: db.Order,
+) -> db.Order:
+    """Выдать уже созданный и уже оплаченный заказ.
+
+    Нужно API: там деньги списываются и заказ заводится отдельно, чтобы
+    успеть связать его с ключом разработчика ДО первой выдачи. Иначе
+    выдача считала бы заказ человеческим и написала бы роботу в Telegram.
+    """
+    await _run_delivery(bot, conn, provider, order)
+    return await db.get_order(conn, order.id) or order

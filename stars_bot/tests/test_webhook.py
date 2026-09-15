@@ -18,7 +18,9 @@ from app.services import webhook as hook
 from app.services.fragment import DeliveryProvider
 
 BUYER = 777
-SECRET = "whsec_52ac47b55c732e7424707b75cb8ed822514612357fe5dcd00ff44989b80834da"
+#: Выдуманный секрет. Настоящему в исходниках не место: репозиторий
+#: читают больше людей, чем кажется, и история git ничего не забывает.
+SECRET = "whsec_" + "0123456789abcdef" * 4
 PASS, FAIL = [], []
 
 

@@ -191,26 +191,42 @@ async def handle(request: web.Request) -> web.Response:
 
 
 async def serve(bot: Bot, provider) -> web.AppRunner | None:
-    """Поднять приёмник. None — он выключен или не настроен."""
+    """Поднять HTTP-сервер. None — он никому не нужен и не запущен.
+
+    На одном порту живут две разные вещи: приёмник отчётов поставщика и
+    API для сторонних разработчиков. Каждая включается сама по себе —
+    можно открыть API, не заводя вебхук поставщика, и наоборот.
+    """
+    from app.api import server as api_server
+
     port = int(runtime.get_int("webhook_port") or settings.webhook_port or 0)
     if port <= 0:
         return None
-    if not secret():
-        log.warning("Вебхук: порт задан, но секрет пуст — приёмник не запущен. "
-                    "Возьмите whsec_… в кабинете поставщика.")
+
+    take_hooks = bool(secret())
+    take_api = api_server.enabled()
+    if not take_hooks and not take_api:
+        log.warning("Порт задан, но включать нечего: нет ни секрета вебхука, "
+                    "ни включённого API. Сервер не запущен.")
         return None
 
     app = web.Application(client_max_size=MAX_BODY)
     app["bot"] = bot
     app["provider"] = provider
-    app.router.add_post(PATH, handle)
     app.router.add_get("/healthz", lambda _: web.json_response({"ok": True}))
+    if take_hooks:
+        app.router.add_post(PATH, handle)
+    if take_api:
+        api_server.mount(app, bot, provider)
 
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     site = web.TCPSite(runner, settings.webhook_host, port)
     await site.start()
-    log.info("✅ Вебхук слушает %s:%s%s", settings.webhook_host, port, PATH)
-    if public_url():
-        log.info("   Адрес для кабинета поставщика: %s", public_url())
+    log.info("✅ HTTP слушает %s:%s", settings.webhook_host, port)
+    if take_hooks:
+        log.info("   Отчёты поставщика: %s", public_url() or PATH)
+    if take_api:
+        log.info("   API разработчикам: %s",
+                 api_server.base_url() or api_server.PREFIX)
     return runner

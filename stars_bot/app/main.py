@@ -14,6 +14,7 @@ from aiogram.types import BotCommand, BotCommandScopeChat
 from app import db, runtime
 from app.config import settings
 from app.handlers import (
+    api_cab,
     games, reviews,
     admin, broadcast, deposit, menu, panel, profile, shop, support,
 )
@@ -30,6 +31,7 @@ log = logging.getLogger(__name__)
 USER_COMMANDS = [
     BotCommand(command="start", description="Главное меню"),
     BotCommand(command="menu", description="Главное меню"),
+    BotCommand(command="api", description="API для разработчиков"),
 ]
 
 ADMIN_COMMANDS = USER_COMMANDS + [
@@ -130,6 +132,7 @@ async def main() -> None:
     dp.include_router(support.router)
     dp.include_router(reviews.router)
     dp.include_router(games.router)
+    dp.include_router(api_cab.router)
 
     try:
         me = await bot.me()
@@ -183,10 +186,17 @@ async def main() -> None:
         log.error("Вебхук не поднялся (%s). Бот работает без него: "
                   "заказы закроются опросом.", exc)
 
+    # Рассылка вебхуков разработчикам, купившим через API. Отдельная
+    # задача, а не вызов из каждого места смены статуса: статус меняют
+    # пять разных путей, и забыть один — значит молча не сообщить.
+    from app.api import hooks as api_hooks
+
+    api_task = asyncio.create_task(api_hooks.loop(conn))
+
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
-        for task in (pricing_task, games_task):
+        for task in (pricing_task, games_task, api_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task

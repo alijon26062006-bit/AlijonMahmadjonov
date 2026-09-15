@@ -491,29 +491,9 @@ async def cb_buy(
             quantity=1, order_id=order.id,
         )
     except DeliveryError as exc:
-        # Явный отказ — выдачи не было, возвращаем деньги сразу.
-        await svc._refund(bot, conn, order, str(exc))
-
-        # Поставщик сам называет поле, которого ему не хватило. Добавляем
-        # его к набору — именно добавляем: жалуется он по одному полю за
-        # раз, и замена гоняла бы заказы по кругу.
-        fixed = ""
-        wanted = svc.missing_field(str(exc))
-        if wanted and wanted not in game.field_names:
-            updated = svc.with_field(game.field, wanted)
-            await db.update_game(conn, game.category_id, field=updated)
-            asked = ", ".join(svc.field_label(n) for n in updated.split(","))
-            fixed = (f"\n\n✅ <b>Поля исправлены:</b> <code>{updated}</code>\n"
-                     f"Теперь бот спрашивает: <b>{asked}</b>.\n"
-                     "Следующий заказ пройдёт — попросите клиента повторить.")
-
-        await delivery.notify_admins(
-            bot,
-            "⚠️ <b>Игровой заказ не прошёл</b>\n"
-            f"├ Заказ: <code>{order.id}</code> — {game.title}\n"
-            f"└ Клиенту вернули <b>{fmt(order.price)}</b>\n\n"
-            f"<blockquote expandable>{str(exc)[:600]}</blockquote>{fixed}",
-        )
+        # Явный отказ — выдачи не было. Возврат, починка поля и письмо
+        # владельцу живут в сервисе: тем же путём идут заказы по API.
+        await svc.refund_place(bot, conn, order, game, exc)
         await call.message.answer(
             texts.REFUNDED.format(
                 order_id=order.id, price=fmt(order.price), support=texts.support()
@@ -525,23 +505,7 @@ async def cb_buy(
         # Номера заказа у поставщика нет — статус спросить нечем, и сам он
         # не разрешится. Зовём владельца сразу, а не когда сработает
         # возврат по таймауту.
-        await db.transition_order(
-            conn, order.id, expected=db.ORDER_DELIVERING, new=db.ORDER_FAILED,
-            error=str(exc)[:1000],
-        )
-        await delivery.notify_admins(
-            bot,
-            "⚠️ <b>Игровой заказ без номера у поставщика</b>\n"
-            f"├ Заказ: <code>{order.id}</code> — {game.title}\n"
-            f"├ ID игрока: <code>{data['player']}</code>\n"
-            f"└ Списано: <b>{fmt(order.price)}</b>\n\n"
-            f"<blockquote expandable>{str(exc)[:600]}</blockquote>\n\n"
-            "<blockquote>Отследить его бот не может. Проверьте кабинет "
-            f"поставщика: дошло → <code>/done {order.id}</code>, "
-            f"нет → <code>/refund {order.id}</code>.\n\nБез решения деньги "
-            f"вернутся клиенту сами через {svc.timeout_minutes()} мин."
-            "</blockquote>",
-        )
+        await svc.hold_place(bot, conn, order, game, exc, data["player"])
         await call.message.edit_text(
             texts.GAME_ACCEPTED.format(
                 order_id=order.id, pack=data["pack"],

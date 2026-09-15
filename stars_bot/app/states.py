@@ -81,3 +81,9 @@ class PromoNew(StatesGroup):
     percent = State()     # ждём процент скидки
     limit = State()       # ждём число активаций
     confirm = State()     # показали сводку, ждём «Сохранить»
+
+
+class ApiCab(StatesGroup):
+    """Кабинет разработчика: всё, что бот у него спрашивает."""
+    key_label = State()     # ждём название нового ключа
+    hook_url = State()      # ждём адрес вебхука

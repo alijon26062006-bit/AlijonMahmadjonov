@@ -1,0 +1,345 @@
+"""Обработчики /api/v1/*.
+
+Общий вид ответа один на все точки: {"success": true, ...} при удаче и
+{"success": false, "error": {"code", "message"}} при отказе. Разбирать
+два разных формата в чужом коде — лишняя работа для того, кто к нам
+подключается.
+
+Деньги везде — целые числа в дирамах (1 сомони = 100 дирам), рядом
+amount_text для показа человеку. Дробных чисел в деньгах нет нарочно.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import re
+
+from aiohttp import web
+
+from app import db, runtime
+from app.api import catalog, hooks
+from app.api.guard import Denied
+
+log = logging.getLogger(__name__)
+
+#: Максимум записей на страницу. Больше отдавать незачем, и это ещё
+#: и защита: запрос на миллион строк положил бы бота.
+MAX_LIMIT = 100
+
+#: Тело POST больше этого не читаем.
+MAX_BODY = 32 * 1024
+
+#: Ключ идемпотентности: печатный ASCII, разумной длины.
+IDEM_RE = re.compile(r"^[A-Za-z0-9._:\-]{8,128}$")
+
+
+def ok(**data) -> web.Response:
+    return web.json_response({"success": True, **data}, dumps=_dumps)
+
+
+def _dumps(obj) -> str:
+    return json.dumps(obj, ensure_ascii=False)
+
+
+def fail(status: int, code: str, message: str, **extra) -> web.Response:
+    return web.json_response(
+        {"success": False, "error": {"code": code, "message": message, **extra}},
+        status=status, dumps=_dumps,
+    )
+
+
+def caller_of(request: web.Request):
+    return request["caller"]
+
+
+def _page(request: web.Request) -> tuple[int, int]:
+    """limit и offset из запроса, приведённые к разумным пределам."""
+    def number(name: str, default: int, top: int) -> int:
+        raw = request.query.get(name, "")
+        try:
+            value = int(raw) if raw else default
+        except ValueError:
+            value = default
+        return max(0, min(value, top))
+
+    return max(1, number("limit", 20, MAX_LIMIT)), number("offset", 0, 1_000_000)
+
+
+# ─────────────────────────────────────────────────────── товары
+
+
+async def products(request: web.Request) -> web.Response:
+    items = await catalog.listing(
+        request["conn"], request.app["provider"], request.query.get("type", "")
+    )
+    return ok(count=len(items),
+          products=[catalog.public(i) for i in items])
+
+
+async def product(request: web.Request) -> web.Response:
+    item = await catalog.find(request["conn"], request.app["provider"],
+                              request.match_info["product_id"])
+    if item is None:
+        return fail(404, "product_not_found", "Такого товара нет.")
+    return ok(product=catalog.public(item))
+
+
+# ─────────────────────────────────────────────────────── аккаунт
+
+
+async def balance(request: web.Request) -> web.Response:
+    caller = caller_of(request)
+    fresh = await db.get_user(request["conn"], caller.user_id)
+    return ok(balance=catalog.money(fresh.balance if fresh else 0))
+
+
+async def user(request: web.Request) -> web.Response:
+    caller = caller_of(request)
+    conn = request["conn"]
+    fresh = await db.get_user(conn, caller.user_id)
+    stats = await db.api_stats(conn, caller.user_id)
+    hook = await db.get_api_hook(conn, caller.user_id)
+    return ok(user={
+        "id": caller.user_id,
+        "username": (fresh.username if fresh else None),
+        "balance": catalog.money(fresh.balance if fresh else 0),
+        "created_at": fresh.created_at if fresh else None,
+        "key": {
+            "id": caller.key.id,
+            "label": caller.key.label,
+            "masked": caller.key.masked,
+            "created_at": caller.key.created_at,
+            "last_used_at": caller.key.last_used_at,
+            "requests": caller.key.requests,
+        },
+        "rate_limit_per_minute": runtime.get_int("api_rate_per_min", 60),
+        "requests": stats,
+        "webhook": {
+            "url": (hook or {}).get("url") or "",
+            "enabled": bool((hook or {}).get("enabled", 0)),
+        },
+    })
+
+
+# ─────────────────────────────────────────────────────── заказы
+
+
+def order_view(row: dict) -> dict:
+    """Один заказ так, как его видит разработчик."""
+    status = hooks.PUBLIC.get(row["status"], "processing")
+    view = {
+        "order_id": row["ref"],
+        "status": status,
+        "product_id": row["product_id"],
+        "quantity": row.get("quantity", 1),
+        "customer": row.get("customer") or "",
+        "result": row.get("recipient") or "",
+        "created_at": row["created_at"],
+        "updated_at": row.get("updated_at") or row["created_at"],
+        **catalog.money(row.get("price", 0)),
+    }
+    if status == "refunded":
+        view["reason"] = (row.get("error") or "")[:300]
+    return view
+
+
+async def orders(request: web.Request) -> web.Response:
+    limit, offset = _page(request)
+    rows = await db.api_orders_of(request["conn"], caller_of(request).user_id,
+                                  limit, offset)
+    return ok(count=len(rows), limit=limit, offset=offset,
+              orders=[order_view(row) for row in rows])
+
+
+async def _one_order(request: web.Request, ref: str) -> web.Response:
+    conn = request["conn"]
+    row = await db.api_order_by_ref(conn, ref)
+    if row is None or row["user_id"] != caller_of(request).user_id:
+        # Чужой заказ и несуществующий отвечают одинаково: иначе по коду
+        # ответа можно было бы перебором узнать, какие номера заняты.
+        return fail(404, "order_not_found", "Заказ не найден.")
+
+    order = await db.get_order(conn, row["order_id"])
+    if order is None:
+        return fail(404, "order_not_found", "Заказ не найден.")
+    row |= {"status": order.status, "price": order.price,
+            "quantity": order.quantity, "recipient": order.recipient,
+            "error": order.error, "updated_at": order.updated_at}
+    return ok(**order_view(row))
+
+
+async def order_by_id(request: web.Request) -> web.Response:
+    return await _one_order(request, request.match_info["order_id"])
+
+
+async def order_status(request: web.Request) -> web.Response:
+    ref = (request.query.get("order_id") or "").strip()
+    if not ref:
+        return fail(400, "missing_order_id", "Укажите order_id.")
+    return await _one_order(request, ref)
+
+
+# ─────────────────────────────────────────────────────── покупка
+
+
+async def _body(request: web.Request) -> dict:
+    raw = await request.content.read(MAX_BODY + 1)
+    if len(raw) > MAX_BODY:
+        raise Denied(413, "body_too_large", "Тело запроса слишком большое.")
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise Denied(400, "bad_json", "Тело запроса — не JSON.") from None
+    if not isinstance(data, dict):
+        raise Denied(400, "bad_json", "Ожидается объект JSON.")
+    return data
+
+
+async def order_create(request: web.Request) -> web.Response:
+    from app.services import delivery
+
+    conn = request["conn"]
+    caller = caller_of(request)
+    data = await _body(request)
+
+    product_id = str(data.get("product_id") or "").strip()
+    if not product_id:
+        return fail(400, "missing_product_id", "Укажите product_id.")
+
+    item = await catalog.find(conn, request.app["provider"], product_id)
+    if item is None:
+        return fail(404, "product_not_found", "Такого товара нет или он снят.")
+
+    quantity = data.get("quantity", 1)
+    if not isinstance(quantity, int) or isinstance(quantity, bool) or quantity < 1:
+        return fail(400, "bad_quantity", "quantity — целое число от 1.")
+    if item["variable"]:
+        if not item["min_quantity"] <= quantity <= item["max_quantity"]:
+            return fail(400, "bad_quantity",
+                        f"quantity от {item['min_quantity']} "
+                        f"до {item['max_quantity']}.")
+    elif quantity != 1:
+        return fail(400, "bad_quantity",
+                    "У этого товара фиксированный объём, quantity = 1.")
+
+    customer = str(data.get("customer") or "").strip()
+    if item["customer_required"] and not customer:
+        return fail(400, "missing_customer", f"Укажите customer: {item['customer']}")
+    if len(customer) > 190:
+        return fail(400, "bad_customer", "customer слишком длинный.")
+
+    idem = str(data.get("idempotency_key")
+               or request.headers.get("Idempotency-Key") or "").strip()
+    if idem and not IDEM_RE.match(idem):
+        return fail(400, "bad_idempotency_key",
+                    "idempotency_key — 8–128 знаков: буквы, цифры, . _ : -")
+
+    if idem:
+        free, existing = await db.reserve_idem(conn, caller.key.id, idem)
+        if not free:
+            if not existing:
+                return fail(409, "in_progress",
+                            "Этот же запрос ещё выполняется. Повторите позже.")
+            return await _one_order(request, existing)
+
+    try:
+        return await _place(request, caller, item, quantity, customer, idem)
+    except Exception:
+        # Заказ не создался — резерв надо отпустить, иначе повтор того же
+        # запроса навсегда упирался бы в «уже выполняется».
+        if idem:
+            await db.release_idem(conn, caller.key.id, idem)
+        raise
+
+
+async def _place(request, caller, item, quantity, customer, idem) -> web.Response:
+    """Создать и оплатить заказ.
+
+    Порядок шагов выбран так, чтобы ни одна поломка не оставила клиента
+    без денег и без товара, а нас — без следов:
+
+      1. списываем деньги — атомарно, проверкой баланса в том же UPDATE,
+         и сразу записью в журнал транзакций;
+      2. заводим заказ в общей таблице orders: отчёты, возвраты и
+         статистика считают его вместе с заказами из бота;
+      3. связываем заказ с ключом разработчика — ДО первой выдачи,
+         иначе выдача сочла бы его человеческим и написала бы роботу
+         в Telegram;
+      4. и только теперь зовём поставщика.
+
+    Если поставщик откажет, деньги вернёт та же общая логика, что и в
+    боте: возврат попадёт и в журнал транзакций, и в вебхук клиенту.
+    """
+    from app.services import delivery, suppliers
+    from app.services import games as gsvc
+
+    conn = request["conn"]
+    price = catalog.price_of(item, quantity)
+    if price <= 0:
+        return fail(409, "product_unavailable", "Цена товара сейчас не задана.")
+
+    product_type, real_quantity = catalog.order_plan(item, quantity)
+    game = None
+    if item["type"] == "game":
+        game = await db.get_game(conn, item["game_id"])
+        if game is None:
+            return fail(404, "product_not_found", "Игра снята с продажи.")
+        fields = _game_fields(game, customer)
+        if fields is None:
+            return fail(400, "bad_customer",
+                        "Для этой игры нужно: "
+                        f"{', '.join(game.field_names)} — через пробел, "
+                        "запятую или знак минус.")
+
+    ref = await db.next_api_ref(conn)
+    paid, tx_id = await db.charge_logged(
+        conn, caller.user_id, price, order_ref=ref, note=item["name"][:180]
+    )
+    if not paid:
+        fresh = await db.get_user(conn, caller.user_id)
+        return fail(402, "insufficient_funds", "Недостаточно средств.",
+                    required=price, balance=(fresh.balance if fresh else 0),
+                    currency=catalog.currency())
+
+    cost = (int(item.get("cost", 0)) if item["type"] == "game"
+            else runtime.cost_of(product_type, real_quantity))
+    order = await db.create_order(
+        conn, user_id=caller.user_id, product_type=product_type,
+        quantity=real_quantity, recipient=customer, price=price, cost=cost,
+    )
+    await db.link_api_order(
+        conn, ref=ref, order_id=order.id, key_id=caller.key.id,
+        user_id=caller.user_id, product_id=item["id"], customer=customer,
+        idem_key=idem,
+    )
+    if idem:
+        await db.finish_idem(conn, caller.key.id, idem, ref)
+
+    bot, provider = request.app["bot"], request.app["provider"]
+    if game is not None:
+        order = await gsvc.order_now(
+            bot, conn, suppliers.for_games(provider), game=game,
+            offer_id=catalog.offer_id_of(item), fields=fields, order=order,
+        )
+    else:
+        order = await delivery.run(bot, conn, provider, order)
+
+    row = {"ref": ref, "product_id": item["id"], "customer": customer,
+           "status": order.status, "price": order.price,
+           "quantity": order.quantity, "recipient": order.recipient,
+           "error": order.error, "created_at": order.created_at,
+           "updated_at": order.updated_at}
+    return ok(transaction_id=tx_id, **order_view(row))
+
+
+def _game_fields(game, customer: str) -> dict[str, str] | None:
+    """Разобрать customer на поля аккаунта. None — данных не хватило."""
+    from app.handlers.games import parse_ids
+
+    values = parse_ids(customer)
+    names = list(game.field_names)
+    if len(values) < len(names):
+        return None
+    return dict(zip(names, values))

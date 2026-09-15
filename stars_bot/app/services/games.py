@@ -284,7 +284,7 @@ async def check(
         if await db.transition_order(
             conn, order.id, expected=order.status, new=db.ORDER_DELIVERED, error=None
         ):
-            await delivery.notify(bot, order.user_id, delivery._done_text(order))
+            await delivery.tell_buyer(bot, conn, order, delivery._done_text(order))
             await delivery._ask_review(bot, conn, order)
             log.info("Игры: заказ %s выполнен", order.id)
         return "done"
@@ -379,9 +379,9 @@ async def _refund(
         error=reason[:1000],
     ):
         return
-    await db.credit(conn, order.user_id, order.price)
-    await delivery.notify(
-        bot, order.user_id,
+    await delivery._give_back(conn, await db.get_order(conn, order.id) or order)
+    await delivery.tell_buyer(
+        bot, conn, order,
         texts.REFUNDED.format(
             order_id=order.id, price=fmt(order.price), support=texts.support()
         ),
@@ -442,3 +442,101 @@ async def watch_loop(provider, bot: Bot) -> None:
         except Exception as exc:  # noqa: BLE001 — фон не должен умирать
             log.exception("Игры: присмотр за заказами упал: %s", exc)
             await asyncio.sleep(60)
+
+
+async def refund_place(
+    bot: Bot, conn: aiosqlite.Connection, order: db.Order, game: db.Game, exc,
+) -> str:
+    """Поставщик отказал: вернуть деньги, поправить поле, позвать владельца.
+
+    Возвращает приписку о починке поля — обработчик показывает её
+    владельцу вместе с остальным. Общая на бота и на API нарочно: два
+    разных разбора одной ошибки разошлись бы при первой же правке.
+    """
+    from app.services import delivery
+
+    await _refund(bot, conn, order, str(exc))
+
+    # Поставщик сам называет поле, которого ему не хватило. Добавляем
+    # его к набору — именно добавляем: жалуется он по одному полю за
+    # раз, и замена гоняла бы заказы по кругу.
+    fixed = ""
+    wanted = missing_field(str(exc))
+    if wanted and wanted not in game.field_names:
+        updated = with_field(game.field, wanted)
+        await db.update_game(conn, game.category_id, field=updated)
+        asked = ", ".join(field_label(n) for n in updated.split(","))
+        fixed = (f"\n\n✅ <b>Поля исправлены:</b> <code>{updated}</code>\n"
+                 f"Теперь бот спрашивает: <b>{asked}</b>.\n"
+                 "Следующий заказ пройдёт — попросите клиента повторить.")
+
+    await delivery.notify_admins(
+        bot,
+        "⚠️ <b>Игровой заказ не прошёл</b>\n"
+        f"├ Заказ: <code>{order.id}</code> — {game.title}\n"
+        f"└ Клиенту вернули <b>{fmt(order.price)}</b>\n\n"
+        f"<blockquote expandable>{str(exc)[:600]}</blockquote>{fixed}",
+    )
+    return fixed
+
+
+async def hold_place(
+    bot: Bot, conn: aiosqlite.Connection, order: db.Order, game: db.Game,
+    exc, player: str,
+) -> None:
+    """Номера у поставщика нет: деньги придержать, позвать владельца.
+
+    Автовозврата здесь быть не может — неизвестно, ушёл товар или нет,
+    и вернуть деньги значило бы раздать его бесплатно.
+    """
+    from app.services import delivery
+
+    await db.transition_order(
+        conn, order.id, expected=db.ORDER_DELIVERING, new=db.ORDER_FAILED,
+        error=str(exc)[:1000],
+    )
+    await delivery.notify_admins(
+        bot,
+        "⚠️ <b>Игровой заказ без номера у поставщика</b>\n"
+        f"├ Заказ: <code>{order.id}</code> — {game.title}\n"
+        f"├ ID игрока: <code>{player}</code>\n"
+        f"└ Списано: <b>{fmt(order.price)}</b>\n\n"
+        f"<blockquote expandable>{str(exc)[:600]}</blockquote>\n\n"
+        "<blockquote>Отследить его бот не может. Проверьте кабинет "
+        f"поставщика: дошло → <code>/done {order.id}</code>, "
+        f"нет → <code>/refund {order.id}</code>.\n\nБез решения деньги "
+        f"вернутся клиенту сами через {timeout_minutes()} мин."
+        "</blockquote>",
+    )
+
+
+async def order_now(
+    bot: Bot, conn: aiosqlite.Connection, provider, *, game: db.Game,
+    offer_id: str, fields: dict[str, str], order: db.Order,
+) -> db.Order:
+    """Отправить уже оплаченный игровой заказ поставщику.
+
+    Деньги списаны и заказ заведён снаружи — так API успевает связать его
+    со своим ключом до первой выдачи. Здесь только отправка и разбор
+    отказа, общий с ботом.
+    """
+    try:
+        external = await place(
+            provider, game=game, offer_id=offer_id, fields=fields,
+            quantity=1, order_id=order.id,
+        )
+    except DeliveryError as exc:
+        await refund_place(bot, conn, order, game, exc)
+        return await db.get_order(conn, order.id) or order
+    except DeliveryUncertain as exc:
+        await hold_place(bot, conn, order, game, exc, order.recipient)
+        return await db.get_order(conn, order.id) or order
+
+    await db.update_order(conn, order.id, fragment_order_id=external)
+
+    # Заказ почти всегда уходит в processing, поэтому проверяем сразу —
+    # вдруг он уже готов, — а дальше за ним следит фоновая задача.
+    fresh = await db.get_order(conn, order.id)
+    if fresh and await check(bot, conn, provider, fresh) == "waiting":
+        asyncio.create_task(follow(bot, provider, order.id))
+    return await db.get_order(conn, order.id) or order

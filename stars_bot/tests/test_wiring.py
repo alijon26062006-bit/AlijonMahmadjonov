@@ -14,13 +14,14 @@ from aiogram import Dispatcher
 
 from app import db, keyboards, runtime
 from app.handlers import (
-    admin, broadcast, deposit, menu, panel, profile, shop, support,
+    admin, api_cab, broadcast, deposit, menu, panel, profile, shop, support,
 )
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.fragment import build_provider
 
 ROUTERS = [panel.router, broadcast.router, admin.router, menu.router,
-           shop.router, deposit.router, profile.router, support.router]
+           shop.router, deposit.router, profile.router, support.router,
+           api_cab.router]
 
 
 def declared_callbacks() -> set[str]:
