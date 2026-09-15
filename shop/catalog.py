@@ -60,7 +60,7 @@ CATEGORY_INFO: dict[str, Category] = {
     ),
     CAT_FF_CIS: Category(
         code=CAT_FF_CIS,
-        title="Free Fire (ИДМ)",
+        title="Free Fire",
         unit="алмос",
         target="player",
         icon="🔥",

@@ -44,7 +44,7 @@ def esc(value: object) -> str:
 
 # ── Тугмаҳои менюи асосӣ ──────────────────────────────────────────────
 BTN_TELEGRAM = "⭐️ Telegram Stars ва Premium"
-BTN_FF_CIS = "🔥 Free Fire (ИДМ)"
+BTN_FF_CIS = "🔥 Free Fire"
 BTN_FF_ID = "🇮🇩 Free Fire (Индонезия)"
 BTN_PUBG = "🎯 PUBG Mobile"
 BTN_TOPUP = "💳 Пур кардани ҳисоб"
