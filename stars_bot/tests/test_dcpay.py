@@ -120,16 +120,16 @@ async def main() -> None:
 
 async def run(conn) -> None:
     # ------------------------------------------------ ссылка собирается верно
-    sample = "https://pay.dc.tj/?a=9762000123726019&c=%40uwayscoder%20TOP2248&f1=133&s=50"
-    built = dcpay.build_link("9762000123726019", 5000, "@uwayscoder TOP2248")
+    sample = "https://pay.dc.tj/?a=9999000011112222&c=%40uwayscoder%20TOP2248&f1=133&s=50"
+    built = dcpay.build_link("9999000011112222", 5000, "@uwayscoder TOP2248")
     check("ссылка совпадает с образцом", built == sample, built)
 
     check("пробелы в номере счёта не мешают",
-          dcpay.build_link("9762 0001 2372 6019", 5000, "x") ==
-          dcpay.build_link("9762000123726019", 5000, "x"))
+          dcpay.build_link("9999 0000 1111 2222", 5000, "x") ==
+          dcpay.build_link("9999000011112222", 5000, "x"))
 
     q = parse_qs(urlparse(built).query)
-    check("счёт попадает в параметр a", q["a"] == ["9762000123726019"])
+    check("счёт попадает в параметр a", q["a"] == ["9999000011112222"])
     check("сумма попадает в параметр s", q["s"] == ["50"])
     check("код услуги по умолчанию 133", q["f1"] == ["133"])
 
@@ -138,7 +138,7 @@ async def run(conn) -> None:
         check(f"сумма {diram} дирам -> {expected}",
               dcpay.amount_text(diram) == expected, dcpay.amount_text(diram))
 
-    link = dcpay.build_link("9762000123726019", 5050, "@shop TOP1234", "200")
+    link = dcpay.build_link("9999000011112222", 5050, "@shop TOP1234", "200")
     q = parse_qs(urlparse(link).query)
     check("копейки передаются", q["s"] == ["50.50"], str(q["s"]))
     check("свой код услуги подставляется", q["f1"] == ["200"])
@@ -151,12 +151,12 @@ async def run(conn) -> None:
           len({dcpay.make_reference() for _ in range(20)}) > 10)
 
     check("короткий номер не считается счётом", not dcpay.is_ready("123"))
-    check("нормальный счёт принимается", dcpay.is_ready("9762000123726019"))
+    check("нормальный счёт принимается", dcpay.is_ready("9999000011112222"))
 
     # ------------------------------------------ кнопка появляется в пополнении
     await db.upsert_user(conn, 555, "buyer", "Покупатель")
     await runtime.set_value(conn, "pay_card_number", "8888 7777 6666 5555")
-    await runtime.set_value(conn, "dc_account", "9762000123726019")
+    await runtime.set_value(conn, "dc_account", "9999000011112222")
     await runtime.set_value(conn, "dc_comment", "@uwayscoder")
 
     state = FakeState()
@@ -179,7 +179,7 @@ async def run(conn) -> None:
     check("кнопка зелёная", pay.style == "success", str(pay.style))
 
     q = parse_qs(urlparse(pay.url).query)
-    check("в ссылке счёт из настроек", q["a"] == ["9762000123726019"], str(q["a"]))
+    check("в ссылке счёт из настроек", q["a"] == ["9999000011112222"], str(q["a"]))
     check("в ссылке сумма, которую выбрал клиент", q["s"] == ["120"], str(q["s"]))
     check("в комментарии подпись и код платежа",
           q["c"][0].startswith("@uwayscoder TOP"), str(q["c"]))
@@ -208,9 +208,9 @@ async def run(conn) -> None:
     check("в ссылке карта из реквизитов",
           "a=8888777766665555" in (pay.url if pay else ""), pay.url if pay else "—")
 
-    await runtime.set_value(conn, "dc_account", "9762000123726019")
+    await runtime.set_value(conn, "dc_account", "9999000011112222")
     check("отдельный счёт перекрывает карту",
-          dcpay.account() == "9762000123726019")
+          dcpay.account() == "9999000011112222")
 
     # ---------------------------- без реквизитов вовсе кнопки нет
     await runtime.set_value(conn, "dc_account", "")
@@ -227,7 +227,7 @@ async def run(conn) -> None:
 
     # ------------------------------------------------ проверка в панели
     await runtime.set_value(conn, "pay_card_number", "8888 7777 6666 5555")
-    await runtime.set_value(conn, "dc_account", "9762000123726019")
+    await runtime.set_value(conn, "dc_account", "9999000011112222")
     call = FakeCallback("pn:dctest")
     await panel.cb_dc_test(call)
     check("панель показывает пробную ссылку", "pay.dc.tj" in call.last)

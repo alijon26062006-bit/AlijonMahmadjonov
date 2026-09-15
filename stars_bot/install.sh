@@ -145,6 +145,39 @@ RestrictSUIDSGID=true
 WantedBy=multi-user.target
 UNIT
 
+# Юзербот — отдельная служба. Отдельная нарочно: он входит в Telegram
+# под номером владельца, и если его уронит отзыв сессии, продажи в боте
+# продолжатся — оплату просто придётся подтверждать руками.
+# Запускается только когда настроен: без ключей Telegram делать ему нечего.
+$SUDO tee "/etc/systemd/system/$SERVICE-userbot.service" >/dev/null <<UNIT
+[Unit]
+Description=Stars Bot — приём оплат от банковского бота
+After=network-online.target $SERVICE.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$RUN_USER
+WorkingDirectory=$APP
+ExecStart=$APP/.venv/bin/python -m app.userbot
+Restart=always
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=$APP/data
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
 # Короткая команда управления, чтобы не помнить длинные пути.
 $SUDO tee /usr/local/bin/stars-bot >/dev/null <<HELPER
 #!/usr/bin/env bash
@@ -220,6 +253,54 @@ case "\${1:-help}" in
         systemctl restart "\$SERVICE"
         echo "✅ Ключи для игр записаны, бот перезапущен"
         echo "   Проверьте: /panel → Балансы ключей"
+        ;;
+    userbot)
+        # Управление приёмом оплат от банка. Отдельной службой, чтобы
+        # падение юзербота не трогало продажи.
+        UB="\$SERVICE-userbot"
+        case "\${2:-help}" in
+            login)
+                # Первый вход делается руками: Telegram пришлёт код.
+                echo "Telegram пришлёт код в ваш же Telegram. Введите его здесь."
+                sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" -m app.userbot.login
+                ;;
+            start)   systemctl enable --now "\$UB" && echo "✅ Юзербот запущен" ;;
+            stop)    systemctl disable --now "\$UB" && echo "⏹  Юзербот остановлен" ;;
+            restart) systemctl restart "\$UB" && echo "✅ Перезапущен" ;;
+            logs)    journalctl -u "\$UB" -f ;;
+            status)  systemctl status "\$UB" --no-pager ;;
+            bank)
+                if [ -z "\${3:-}" ]; then
+                    echo "Использование: stars-bot userbot bank ЮЗЕРНЕЙМ_ИЛИ_ID"
+                    echo "  Уведомления от кого-либо ещё разбираться не будут."
+                    exit 1
+                fi
+                sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" \
+                    --set BANK_BOT="\${3#@}"
+                systemctl restart "\$UB" 2>/dev/null || true
+                echo "✅ Банковский бот: \${3#@}"
+                ;;
+            keys)
+                if [ -z "\${4:-}" ]; then
+                    echo "Использование: stars-bot userbot keys API_ID API_HASH"
+                    echo "  Берутся на https://my.telegram.org → API development tools"
+                    exit 1
+                fi
+                sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" \
+                    --set TG_API_ID="\$3" TG_API_HASH="\$4"
+                echo "✅ Ключи Telegram записаны"
+                echo "   Дальше: stars-bot userbot login"
+                ;;
+            *)
+                echo "stars-bot userbot login     первый вход в Telegram"
+                echo "stars-bot userbot keys ID HASH   ключи с my.telegram.org"
+                echo "stars-bot userbot bank ИМЯ  чей уведомления слушать"
+                echo "stars-bot userbot start     включить и запустить"
+                echo "stars-bot userbot stop      остановить"
+                echo "stars-bot userbot logs      смотреть работу живьём"
+                echo "stars-bot userbot status    работает ли"
+                ;;
+        esac
         ;;
     api)
         # Адрес для API и вебхуков одной командой: .env руками не правим,
@@ -309,6 +390,7 @@ case "\${1:-help}" in
   stars-bot errors    последние ошибки
   stars-bot setup     изменить настройки и перезапустить
   stars-bot api АДРЕС задать адрес для API и вебхуков
+  stars-bot userbot   приём оплат от банка (login/start/stop/logs)
   stars-bot games КЛЮЧ [КЛЮЧ_НИКОВ]
                       ключи второго поставщика: с него идут игры
   stars-bot checker КЛЮЧ

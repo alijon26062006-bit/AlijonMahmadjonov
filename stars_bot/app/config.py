@@ -96,6 +96,17 @@ class Settings(BaseSettings):
     news_url: str = ""
     bot_username: str = ""
 
+    # ---- юзербот: читает уведомления банковского бота ----
+    # api_id и api_hash берутся на my.telegram.org. В коде их нет и быть
+    # не может: с ними чужой человек войдёт в ваш Telegram как вы.
+    tg_api_id: int = 0
+    tg_api_hash: str = ""
+    #: Единственный источник, чьи уведомления вообще разбираются.
+    #: Юзернейм без собачки или числовой id.
+    bank_bot: str = ""
+    #: Где лежит файл сессии. В git его быть не должно никогда.
+    userbot_session: str = "data/userbot.session"
+
     db_path: str = "data/bot.sqlite3"
     log_level: str = "INFO"
 
@@ -118,6 +129,16 @@ class Settings(BaseSettings):
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_ids
+
+    @property
+    def session_file(self) -> Path:
+        path = Path(self.userbot_session)
+        return path if path.is_absolute() else BASE_DIR / path
+
+    @property
+    def userbot_ready(self) -> bool:
+        """Хватает ли настроек, чтобы юзербота вообще запускать."""
+        return bool(self.tg_api_id and self.tg_api_hash and self.bank_bot)
 
 
 settings = Settings()  # type: ignore[call-arg]

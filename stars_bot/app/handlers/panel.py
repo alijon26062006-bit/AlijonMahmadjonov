@@ -100,6 +100,7 @@ def home_kb() -> InlineKeyboardMarkup:
     )
     kb.row(
         InlineKeyboardButton(text="🧩 API", callback_data="pn:api"),
+        InlineKeyboardButton(text="🏦 Оплаты банка", callback_data="pn:bank"),
     )
     kb.row(
         InlineKeyboardButton(text="🕹 Игры", callback_data="pn:games"),
@@ -2292,7 +2293,7 @@ async def cb_dc_test(call: CallbackQuery) -> None:
             call,
             "🏙 <b>Кнопка оплаты не настроена</b>\n\n"
             "<blockquote>Возьмите свою ссылку вида\n"
-            "<code>pay.dc.tj/?a=9762...&amp;c=...&amp;f1=133&amp;s=50</code>\n\n"
+            "<code>pay.dc.tj/?a=НОМЕР...&amp;c=...&amp;f1=133&amp;s=50</code>\n\n"
             "и впишите из неё номер счёта — это параметр <code>a</code>."
             "</blockquote>",
             back_kb("pn:set:dc_account", "🏙 Вписать счёт"),
@@ -5476,5 +5477,101 @@ async def cb_api_log(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
         "ключ в логах — это ключ, доступный всем, у кого есть логи."
         "</blockquote>",
         back_kb("pn:api", "‹ Назад"),
+    )
+    await call.answer()
+
+
+# ══════════════════════════════════════════ зачисления от банка
+
+
+#: Какие платежи ждут решения владельца.
+BANK_OPEN = (db.BANK_AMBIGUOUS, db.BANK_UNKNOWN, db.BANK_FAILED)
+
+
+@router.callback_query(F.data == "pn:bank")
+async def cb_bank(call: CallbackQuery, state: FSMContext,
+                  conn: aiosqlite.Connection) -> None:
+    """Что пришло от банка и что юзербот с этим сделал."""
+    await state.clear()
+    stats = await db.bank_payment_stats(conn)
+    rows = await db.list_bank_payments(conn, limit=10)
+    open_count = sum(stats.get(key, 0) for key in BANK_OPEN)
+
+    kb = InlineKeyboardBuilder()
+    if open_count:
+        kb.row(btn(f"⚠️ Требуют проверки ({open_count})", "pn:bank_open",
+                   style=DANGER))
+    kb.row(btn("📥 К заявкам", "pn:deposits", style=PRIMARY))
+    kb.row(btn(labeled("back", "Назад"), "pn:home"))
+
+    body = "\n".join(_bank_line(row) for row in rows) or (
+        "<i>Уведомлений от банка ещё не приходило.</i>\n\n"
+        "Юзербот запускается отдельно: <code>stars-bot userbot</code>"
+    )
+
+    await safe_edit(
+        call,
+        f"🏦 <b>Оплаты от банка</b>\n<code>{texts.LINE}</code>\n\n"
+        f"✅ Зачислено само: <b>{stats.get(db.BANK_MATCHED, 0)}</b>\n"
+        f"⚠️ Несколько заявок: <b>{stats.get(db.BANK_AMBIGUOUS, 0)}</b>\n"
+        f"❔ Без заявки: <b>{stats.get(db.BANK_UNKNOWN, 0)}</b>\n"
+        f"🚫 Не разобрал: <b>{stats.get(db.BANK_FAILED, 0)}</b>\n\n"
+        f"<b>Последние</b>\n{body}\n\n"
+        "<blockquote>Юзербот зачисляет сам, только когда заявка на такую "
+        "сумму ровно одна. Во всех остальных случаях деньги ждут вас — "
+        "выбрать наугад значило бы зачислить чужой платёж.</blockquote>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+def _bank_line(row: db.BankPayment) -> str:
+    mark = db.BANK_TITLES.get(row.status, row.status)[:2]
+    when = (row.bank_time or row.seen_at[11:16]).strip()
+    text = f"{mark} <b>{fmt(row.amount)}</b> · <i>{esc(when)}</i>"
+    if row.sender:
+        text += f" · <code>{esc(row.sender)}</code>"
+    if row.deposit_id:
+        text += f" → заявка <code>№{row.deposit_id}</code>"
+    elif row.note:
+        text += f"\n   <i>{esc(row.note)}</i>"
+    return text
+
+
+@router.callback_query(F.data == "pn:bank_open")
+async def cb_bank_open(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    """Платежи, с которыми юзербот не справился сам."""
+    rows: list[db.BankPayment] = []
+    for status in BANK_OPEN:
+        rows += await db.list_bank_payments(conn, status=status, limit=8)
+    rows.sort(key=lambda row: row.id, reverse=True)
+
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("📥 К заявкам", "pn:deposits", style=PRIMARY))
+    kb.row(btn(labeled("back", "Назад"), "pn:bank"))
+
+    if not rows:
+        body = "<i>Всё разобрано — ждать нечего.</i>"
+    else:
+        body = "\n\n".join(
+            f"{db.BANK_TITLES.get(row.status, row.status)}\n"
+            f"├ Сумма: <b>{fmt(row.amount)}</b>\n"
+            + (f"├ Отправитель: <code>{esc(row.sender)}</code>\n"
+               if row.sender else "")
+            + (f"├ Карта: <code>••{esc(row.card_tail)}</code>\n"
+               if row.card_tail else "")
+            + (f"├ Код банка: <code>{esc(row.op_code)}</code>\n"
+               if row.op_code else "")
+            + f"└ <i>{esc(row.note or row.bank_time or '—')}</i>"
+            for row in rows[:10]
+        )
+
+    await safe_edit(
+        call,
+        f"⚠️ <b>Платежи на проверке</b>\n<code>{texts.LINE}</code>\n\n{body}\n\n"
+        "<blockquote>Сверьте отправителя с заявкой и подтвердите нужную "
+        "в разделе «📥 Заявки» — или начислите вручную в «👥 Клиенты», "
+        "если заявки не было вовсе.</blockquote>",
+        kb.as_markup(),
     )
     await call.answer()

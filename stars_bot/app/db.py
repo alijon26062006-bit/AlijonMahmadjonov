@@ -258,6 +258,26 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
+-- ──────────────────────────── зачисления от банковского бота ──
+-- Каждое банковское уведомление записывается ДО всякой обработки.
+-- Два уникальных индекса ниже и есть защита от двойного зачисления:
+-- повтор упирается в них и до денег не доходит.
+CREATE TABLE IF NOT EXISTS bank_payments (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    source     TEXT NOT NULL,              -- откуда: юзернейм или id бота
+    message_id INTEGER NOT NULL,           -- id сообщения в Telegram
+    op_code    TEXT,                       -- Kod банка, если он был
+    amount     INTEGER NOT NULL,           -- дирамы, фактически зачислено
+    sender     TEXT NOT NULL DEFAULT '',   -- отправитель, уже замаскирован
+    card_tail  TEXT NOT NULL DEFAULT '',   -- последние 4 знака карты
+    bank_time  TEXT NOT NULL DEFAULT '',   -- время из самого уведомления
+    seen_at    TEXT NOT NULL,              -- когда его увидел юзербот
+    status     TEXT NOT NULL,              -- matched|ambiguous|unknown|failed
+    deposit_id INTEGER,                    -- какая заявка закрыта
+    note       TEXT NOT NULL DEFAULT '',
+    body       TEXT NOT NULL DEFAULT ''    -- текст уведомления, без карты
+);
+
 -- ────────────────────────────── API для сторонних разработчиков ──
 -- Клиент API — обычный клиент бота: тот же users.id, тот же баланс.
 -- Отдельной таблицы пользователей нет намеренно: два списка людей
@@ -359,6 +379,13 @@ CREATE INDEX IF NOT EXISTS idx_rev_status    ON reviews(status);
 CREATE INDEX IF NOT EXISTS idx_rev_user      ON reviews(user_id);
 CREATE INDEX IF NOT EXISTS idx_hits_link     ON link_hits(link_id);
 CREATE INDEX IF NOT EXISTS idx_hits_user     ON link_hits(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_msg
+    ON bank_payments(source, message_id);
+-- Код операции у банка свой и уникальный: одно и то же зачисление могло
+-- прийти двумя разными сообщениями, и тогда message_id не спасёт.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_code
+    ON bank_payments(op_code) WHERE op_code IS NOT NULL AND op_code != '';
+CREATE INDEX IF NOT EXISTS idx_bank_status  ON bank_payments(status);
 CREATE INDEX IF NOT EXISTS idx_akeys_user    ON api_keys(user_id);
 CREATE INDEX IF NOT EXISTS idx_akeys_prefix  ON api_keys(prefix);
 CREATE INDEX IF NOT EXISTS idx_areq_key      ON api_requests(key_id);
@@ -2449,3 +2476,120 @@ async def release_idem(
         (key_id, idem_key),
     )
     await conn.commit()
+
+
+# ═══════════════════════════════════ зачисления от банковского бота
+
+
+#: Что случилось с банковским уведомлением.
+BANK_MATCHED = "matched"       # нашлась ровно одна заявка, деньги зачислены
+BANK_AMBIGUOUS = "ambiguous"   # подходящих заявок несколько — решает владелец
+BANK_UNKNOWN = "unknown"       # заявки на такую сумму нет
+BANK_FAILED = "failed"         # уведомление не разобралось
+
+BANK_TITLES = {
+    BANK_MATCHED: "✅ Зачислено",
+    BANK_AMBIGUOUS: "⚠️ Несколько заявок",
+    BANK_UNKNOWN: "❔ Заявка не найдена",
+    BANK_FAILED: "🚫 Не разобрал",
+}
+
+
+@dataclass
+class BankPayment:
+    id: int
+    source: str
+    message_id: int
+    op_code: str | None
+    amount: int
+    sender: str
+    card_tail: str
+    bank_time: str
+    seen_at: str
+    status: str
+    deposit_id: int | None
+    note: str
+    body: str
+
+
+async def claim_bank_payment(
+    conn: aiosqlite.Connection, *, source: str, message_id: int,
+    op_code: str = "", amount: int = 0, sender: str = "", card_tail: str = "",
+    bank_time: str = "", status: str = BANK_FAILED, note: str = "", body: str = "",
+) -> BankPayment | None:
+    """Записать уведомление. None — такое уже обрабатывали.
+
+    Запись идёт ДО всякой работы с деньгами и падает на уникальном
+    индексе, если это повтор. Проверять отдельным SELECT нельзя: два
+    сообщения подряд успевают проскочить между проверкой и вставкой.
+    """
+    try:
+        cur = await conn.execute(
+            """INSERT INTO bank_payments (source, message_id, op_code, amount,
+                   sender, card_tail, bank_time, seen_at, status, note, body)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (source, message_id, op_code or None, amount, sender[:64],
+             card_tail[:8], bank_time[:32], _now(), status, note[:190],
+             body[:2000]),
+        )
+        await conn.commit()
+    except sqlite3.IntegrityError:
+        return None
+    return await get_bank_payment(conn, cur.lastrowid)
+
+
+async def get_bank_payment(
+    conn: aiosqlite.Connection, payment_id: int
+) -> BankPayment | None:
+    async with conn.execute(
+        "SELECT * FROM bank_payments WHERE id = ?", (payment_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    return _from_row(BankPayment, row) if row else None
+
+
+async def close_bank_payment(
+    conn: aiosqlite.Connection, payment_id: int, *, status: str,
+    deposit_id: int | None = None, note: str = "",
+) -> None:
+    await conn.execute(
+        "UPDATE bank_payments SET status = ?, deposit_id = ?, note = ? WHERE id = ?",
+        (status, deposit_id, note[:190], payment_id),
+    )
+    await conn.commit()
+
+
+async def list_bank_payments(
+    conn: aiosqlite.Connection, *, status: str = "", limit: int = 20
+) -> list[BankPayment]:
+    sql = "SELECT * FROM bank_payments"
+    params: list[Any] = []
+    if status:
+        sql += " WHERE status = ?"
+        params.append(status)
+    sql += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+    async with conn.execute(sql, params) as cur:
+        return [_from_row(BankPayment, row) for row in await cur.fetchall()]
+
+
+async def bank_payment_stats(conn: aiosqlite.Connection) -> dict[str, int]:
+    async with conn.execute(
+        "SELECT status, COUNT(*) AS cnt FROM bank_payments GROUP BY status"
+    ) as cur:
+        return {row["status"]: row["cnt"] for row in await cur.fetchall()}
+
+
+async def pending_deposits_for(
+    conn: aiosqlite.Connection, amount: int
+) -> list[Deposit]:
+    """Заявки на проверке ровно на эту сумму.
+
+    Сравнение целыми числами в дирамах: у дробных чисел 617.00 и 617.0000001
+    оказались бы разными, и платёж повис бы без причины.
+    """
+    async with conn.execute(
+        "SELECT * FROM deposits WHERE status = ? AND amount = ? ORDER BY id",
+        (DEP_PENDING, amount),
+    ) as cur:
+        return [_from_row(Deposit, row) for row in await cur.fetchall()]
