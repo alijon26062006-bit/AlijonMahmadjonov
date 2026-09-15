@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app import db
+from app import db, runtime
 from app.money import fmt
 from app.userbot import parser
 from app.userbot.log import get
@@ -88,7 +88,9 @@ async def handle(
         log.info("[USERBOT] Operation code: %s", notice.op_code)
     log.info("[USERBOT] Matching order...")
 
-    waiting = await db.pending_deposits_for(conn, notice.amount)
+    waiting = await db.pending_deposits_for(
+        conn, notice.amount, hours=runtime.get_int("deposit_match_hours", 6)
+    )
 
     if len(waiting) == 1:
         return await _confirm(conn, bot, payment, waiting[0], notice)

@@ -177,15 +177,15 @@ async def run_scenario(conn) -> None:
     check("пополнение спрашивает сумму", "Введите сумму" in call.last)
 
     msg = FakeMessage("abc", bot=bot)
-    await dep_h.on_amount(msg, state)
+    await dep_h.on_amount(msg, state, conn)
     check("нечисловая сумма отклоняется", "Введите сумму числом" in msg.last)
 
     msg = FakeMessage("5", bot=bot)
-    await dep_h.on_amount(msg, state)
+    await dep_h.on_amount(msg, state, conn)
     check("сумма ниже минимума отклоняется", "Минимальная сумма" in msg.last)
 
     msg = FakeMessage("100", bot=bot)
-    await dep_h.on_amount(msg, state)
+    await dep_h.on_amount(msg, state, conn)
     check("выдаются реквизиты Душанбе", "Душанбе" in msg.last and "100.00" in msg.last)
     check("состояние ждёт чек", await state.get_state() == "Deposit:receipt")
 
@@ -200,10 +200,14 @@ async def run_scenario(conn) -> None:
 
     call = FakeCallback("dep:paid", bot=bot)
     await dep_h.cb_paid(call, state)
-    check("после «я оплатил» просят чек", "скриншот чека" in call.last,
-          call.last[:120])
-    check("сказано жирным, что слать сюда",
-          "<b>Отправьте сюда" in call.last, call.last[:200])
+    # Чек больше не требуется: заявка уже заведена, и юзербот закроет её
+    # сам, как только банк сообщит о переводе. Просить скриншот у каждого
+    # — ровно та ручная работа, от которой мы уходили.
+    check("после «я оплатил» обещают зачислить само",
+          "сам" in call.last, call.last[:160])
+    check("чек предложен запасным путём, а не обязанностью",
+          "скриншот чека" in call.last and "не изменился" in call.last,
+          call.last[:240])
     check("названа сумма к зачислению", "100.00" in call.last, call.last)
     check("состояние осталось прежним",
           await state.get_state() == "Deposit:receipt")

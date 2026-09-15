@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass, fields
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import logging
@@ -2581,15 +2581,39 @@ async def bank_payment_stats(conn: aiosqlite.Connection) -> dict[str, int]:
 
 
 async def pending_deposits_for(
-    conn: aiosqlite.Connection, amount: int
+    conn: aiosqlite.Connection, amount: int, hours: int = 6
 ) -> list[Deposit]:
-    """Заявки на проверке ровно на эту сумму.
+    """Свежие заявки на проверке ровно на эту сумму.
 
     Сравнение целыми числами в дирамах: у дробных чисел 617.00 и 617.0000001
     оказались бы разными, и платёж повис бы без причины.
+
+    Старые заявки в расчёт не берём. Клиент мог ввести сумму и передумать
+    платить — такая заявка висит в ожидании вечно. Через неделю их
+    накопится столько, что каждая настоящая оплата станет «спорной», и
+    автоматика перестанет работать вовсе. Окно в несколько часов покрывает
+    любой реальный перевод: банк присылает уведомление за секунды.
     """
+    edge = (datetime.now(timezone.utc)
+            - timedelta(hours=max(1, hours))).isoformat(timespec="seconds")
     async with conn.execute(
-        "SELECT * FROM deposits WHERE status = ? AND amount = ? ORDER BY id",
-        (DEP_PENDING, amount),
+        "SELECT * FROM deposits WHERE status = ? AND amount = ? "
+        "AND created_at >= ? ORDER BY id",
+        (DEP_PENDING, amount, edge),
     ) as cur:
         return [_from_row(Deposit, row) for row in await cur.fetchall()]
+
+
+async def attach_receipt(
+    conn: aiosqlite.Connection, deposit_id: int, file_id: str
+) -> None:
+    """Прикрепить чек к уже созданной заявке.
+
+    Статус не трогаем: заявку мог уже закрыть юзербот, пока клиент искал
+    скриншот, и возвращать её в ожидание значило бы зачислить дважды.
+    """
+    await conn.execute(
+        "UPDATE deposits SET receipt_file_id = ?, updated_at = ? WHERE id = ?",
+        (file_id, _now(), deposit_id),
+    )
+    await conn.commit()

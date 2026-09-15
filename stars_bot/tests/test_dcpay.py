@@ -162,7 +162,7 @@ async def run(conn) -> None:
     state = FakeState()
     await state.set_state("Deposit:amount")
     msg = FakeMessage("120")
-    await dep_h.on_amount(msg, state)
+    await dep_h.on_amount(msg, state, conn)
 
     check("сумма принята и показаны реквизиты", "120.00" in msg.last)
     labels = [b.text for row in msg.markups[-1].inline_keyboard for b in row]
@@ -202,7 +202,7 @@ async def run(conn) -> None:
 
     state = FakeState()
     msg = FakeMessage("120")
-    await dep_h.on_amount(msg, state)
+    await dep_h.on_amount(msg, state, conn)
     pay = next((b for row in msg.last_markup.inline_keyboard for b in row if b.url), None)
     check("кнопка появляется сразу после заполнения реквизитов", pay is not None)
     check("в ссылке карта из реквизитов",
@@ -217,7 +217,7 @@ async def run(conn) -> None:
     await runtime.set_value(conn, "pay_card_number", "")
     state = FakeState()
     msg = FakeMessage("120")
-    await dep_h.on_amount(msg, state)
+    await dep_h.on_amount(msg, state, conn)
     check("без счёта быстрой оплаты не предлагаем",
           "Душанбе Сити" not in msg.last)
     check("реквизиты показываются даже без кнопки",

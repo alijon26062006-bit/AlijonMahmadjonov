@@ -1065,23 +1065,50 @@ async def cb_stats(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
 
 @router.callback_query(F.data == "pn:deposits")
 async def cb_deposits(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
-    deposits = await db.list_deposits(conn, status=db.DEP_PENDING, limit=10)
+    deposits = await db.list_deposits(conn, status=db.DEP_PENDING, limit=20)
     kb = InlineKeyboardBuilder()
+
+    # Заявка заводится, как только клиент назвал сумму, — иначе юзерботу
+    # не с чем сопоставлять пришедшие деньги. Поэтому здесь два разных
+    # списка: где чек уже прислали и где ещё просто ждут перевода.
+    # Мешать их в кучу нельзя: во втором делать нечего, пока не заплатят.
+    with_receipt = [d for d in deposits if d.receipt_file_id]
+    waiting = [d for d in deposits if not d.receipt_file_id]
+
     if not deposits:
-        body = "📥 <b>Заявки на пополнение</b>\n\nНа проверке ничего нет."
+        body = ("📥 <b>Заявки на пополнение</b>\n\nНа проверке ничего нет.\n\n"
+                "<blockquote>Оплаты, которые банк подтвердил сам, "
+                "зачисляются без вас — смотрите «🏦 Оплаты банка»."
+                "</blockquote>")
     else:
-        lines = []
-        for dep in deposits:
-            lines.append(f"<b>№{dep.id}</b> · {fmt(dep.amount)} · <code>{dep.user_id}</code>")
-            kb.row(
-                InlineKeyboardButton(text=f"✅ №{dep.id}", callback_data=f"a:dep_ok:{dep.id}"),
-                InlineKeyboardButton(text=f"❌ №{dep.id}", callback_data=f"a:dep_no:{dep.id}"),
+        parts = []
+        if with_receipt:
+            rows = []
+            for dep in with_receipt[:10]:
+                rows.append(f"<b>№{dep.id}</b> · {fmt(dep.amount)} · "
+                            f"<code>{dep.user_id}</code>")
+                kb.row(
+                    InlineKeyboardButton(text=f"✅ №{dep.id}",
+                                         callback_data=f"a:dep_ok:{dep.id}"),
+                    InlineKeyboardButton(text=f"❌ №{dep.id}",
+                                         callback_data=f"a:dep_no:{dep.id}"),
+                )
+            parts.append("📸 <b>Чек прислан — нужна проверка</b>\n"
+                         + "\n".join(rows))
+
+        if waiting:
+            rows = "\n".join(
+                f"<b>№{dep.id}</b> · {fmt(dep.amount)} · "
+                f"<code>{dep.user_id}</code> · <i>{dep.created_at[11:16]}</i>"
+                for dep in waiting[:8]
             )
-        body = (
-            "📥 <b>Заявки на пополнение</b>\n\n" + "\n".join(lines)
-            + "\n\n💡 Чек с кнопками пришёл отдельным сообщением — "
-              "сверьте сумму в банке перед зачислением."
-        )
+            parts.append(f"⏳ <b>Ждут перевода — {len(waiting)}</b>\n{rows}\n"
+                         "<i>Делать ничего не надо: придут деньги — "
+                         "зачислится само.</i>")
+
+        body = ("📥 <b>Заявки на пополнение</b>\n\n" + "\n\n".join(parts)
+                + "\n\n<blockquote>💡 Зачисляйте только то, что видите "
+                  "в банке. Чек можно нарисовать.</blockquote>")
     kb.row(InlineKeyboardButton(text="🔄 Обновить", callback_data="pn:deposits"))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
     await safe_edit(call, body, kb.as_markup())

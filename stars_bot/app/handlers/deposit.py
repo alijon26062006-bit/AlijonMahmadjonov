@@ -45,7 +45,9 @@ async def cb_card(call: CallbackQuery, state: FSMContext) -> None:
 
 
 @router.message(Deposit.amount, F.text)
-async def on_amount(message: Message, state: FSMContext) -> None:
+async def on_amount(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
     amount = parse(message.text or "")
     if amount is None or amount <= 0:
         await message.answer(texts.DEPOSIT_BAD_AMOUNT)
@@ -59,7 +61,21 @@ async def on_amount(message: Message, state: FSMContext) -> None:
     # Код платежа нужен, чтобы найти перевод в выписке, даже если чек
     # придёт позже или не придёт вовсе.
     reference = dcpay.make_reference()
-    await state.update_data(amount=amount, reference=reference)
+
+    # Заявку заводим ПРЯМО СЕЙЧАС, до оплаты и до всякого чека.
+    #
+    # Раньше она появлялась только после присланного чека — и это ломало
+    # автоматику: клиент платил, банк присылал уведомление, а сопоставлять
+    # его было не с чем, заявки ещё не существовало. Каждый такой платёж
+    # приходилось подтверждать руками, ровно то, от чего мы уходим.
+    #
+    # Теперь порядок обратный: заявка ждёт денег, а не деньги ждут заявку.
+    deposit = await db.create_deposit(
+        conn, user_id=message.from_user.id, amount=amount,
+        method="Перевод на карту", receipt_file_id="", reference=reference,
+    )
+    await state.update_data(amount=amount, reference=reference,
+                            deposit_id=deposit.id)
     await state.set_state(Deposit.receipt)
     body, markup = _requisites(amount, reference)
     await message.answer(body, reply_markup=markup)
@@ -143,12 +159,34 @@ async def on_receipt(
         return
 
     file_id = message.photo[-1].file_id if message.photo else message.document.file_id
-    deposit = await db.create_deposit(
-        conn, user_id=message.from_user.id, amount=amount,
-        method="Перевод на карту", receipt_file_id=file_id,
-        reference=data.get("reference"),
-    )
+
+    # Заявка уже создана на шаге суммы — чек к ней прикрепляется.
+    # Заводить вторую нельзя: две заявки на одну сумму сделали бы платёж
+    # спорным, и юзербот отказался бы зачислять его сам.
+    deposit = await db.get_deposit(conn, data.get("deposit_id") or 0)
+    if deposit is None or deposit.user_id != message.from_user.id:
+        deposit = await db.create_deposit(
+            conn, user_id=message.from_user.id, amount=amount,
+            method="Перевод на карту", receipt_file_id=file_id,
+            reference=data.get("reference"),
+        )
+    else:
+        await db.attach_receipt(conn, deposit.id, file_id)
+
+    # Пока клиент искал чек, деньги могли уже прийти и юзербот мог
+    # закрыть заявку сам. Тогда и говорить надо другое.
+    fresh = await db.get_deposit(conn, deposit.id)
     await state.clear()
+    if fresh and fresh.status == db.DEP_APPROVED:
+        user = await db.get_user(conn, message.from_user.id)
+        await message.answer(
+            texts.DEPOSIT_APPROVED.format(
+                amount=fmt(amount), balance=fmt(user.balance if user else 0)
+            ),
+            reply_markup=keyboards.back(),
+        )
+        return
+
     await message.answer(
         texts.DEPOSIT_SENT.format(deposit_id=deposit.id, amount=fmt(amount)),
         reply_markup=keyboards.back(),
