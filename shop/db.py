@@ -25,6 +25,10 @@ TOPUP_PAID = "paid"
 TOPUP_REJECTED = "rejected"
 TOPUP_STATUSES = (TOPUP_WAITING, TOPUP_PAID, TOPUP_REJECTED)
 
+REVIEW_PENDING = "pending"
+REVIEW_PUBLISHED = "published"
+REVIEW_REJECTED = "rejected"
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 
@@ -49,6 +53,7 @@ CREATE TABLE IF NOT EXISTS products (
     amount   INTEGER NOT NULL DEFAULT 0,
     price    INTEGER NOT NULL,
     partner_price INTEGER,
+    group_code TEXT  NOT NULL DEFAULT '',
     sku      TEXT    NOT NULL DEFAULT '',
     kind     TEXT    NOT NULL DEFAULT 'game',
     sort     INTEGER NOT NULL DEFAULT 0,
@@ -100,6 +105,34 @@ CREATE TABLE IF NOT EXISTS balance_log (
     created_at    TEXT    NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_balance_log_user ON balance_log(user_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS groups (
+    code     TEXT PRIMARY KEY,
+    category TEXT    NOT NULL,
+    title    TEXT    NOT NULL,
+    sort     INTEGER NOT NULL DEFAULT 0,
+    active   INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_groups_cat ON groups(category, sort);
+
+CREATE TABLE IF NOT EXISTS channels (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id    TEXT    NOT NULL UNIQUE,
+    title      TEXT,
+    link       TEXT,
+    created_at TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS reviews (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    order_id   INTEGER,
+    text       TEXT    NOT NULL,
+    status     TEXT    NOT NULL,
+    created_at TEXT    NOT NULL,
+    updated_at TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reviews_status ON reviews(status, id DESC);
 
 CREATE TABLE IF NOT EXISTS partners (
     user_id    INTEGER PRIMARY KEY,
@@ -202,6 +235,7 @@ class Database:
 
     _NEW_COLUMNS = (
         ("products", "partner_price", "INTEGER"),
+        ("products", "group_code", "TEXT NOT NULL DEFAULT ''"),
         ("products", "sku", "TEXT NOT NULL DEFAULT ''"),
         ("products", "kind", "TEXT NOT NULL DEFAULT 'game'"),
         ("orders", "sku", "TEXT NOT NULL DEFAULT ''"),
@@ -238,18 +272,29 @@ class Database:
         Ном, SKU, навъ ва тартиб ҳамеша аз `catalog.py` гирифта мешаванд.
         """
         with self._lock:
+            for i, g in enumerate(catalog.DEFAULT_GROUPS):
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO groups(code, category, title, sort, active) "
+                    "VALUES (?, ?, ?, ?, 1)",
+                    (g.code, g.category, g.title, i),
+                )
+                # Ном ба админ тааллуқ дорад — танҳо бахш ва тартиб нав мешаванд.
+                self._conn.execute(
+                    "UPDATE groups SET category = ?, sort = ? WHERE code = ?",
+                    (g.category, i, g.code),
+                )
             for i, p in enumerate(catalog.DEFAULT_PRODUCTS):
                 self._conn.execute(
                     "INSERT OR IGNORE INTO products"
-                    "(code, category, title, amount, price, partner_price, sku, kind, sort, active) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+                    "(code, category, title, amount, price, partner_price, group_code, "
+                    "sku, kind, sort, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
                     (p.code, p.category, p.title, p.amount, p.price,
-                     p.partner_price or None, p.sku, p.kind, i),
+                     p.partner_price or None, p.group, p.sku, p.kind, i),
                 )
                 self._conn.execute(
                     "UPDATE products SET category = ?, title = ?, amount = ?, "
-                    "sku = ?, kind = ?, sort = ? WHERE code = ?",
-                    (p.category, p.title, p.amount, p.sku, p.kind, i, p.code),
+                    "group_code = ?, sku = ?, kind = ?, sort = ? WHERE code = ?",
+                    (p.category, p.title, p.amount, p.group, p.sku, p.kind, i, p.code),
                 )
             # Нархи шарикӣ ЯК бор пур карда мешавад — баъдан танҳо админ онро
             # идора мекунад. Бе ин базаи кӯҳна бе нархи шарикӣ мемонд ва шарик
@@ -275,6 +320,72 @@ class Database:
                 f"UPDATE products SET active = 0 WHERE code NOT IN ({marks})", known
             )
             self._conn.commit()
+
+    # ── зербахшҳо ─────────────────────────────────────────────────────
+    def groups(self, category: str, *, only_active: bool = True) -> list[sqlite3.Row]:
+        sql = "SELECT * FROM groups WHERE category = ?"
+        if only_active:
+            sql += " AND active = 1"
+        return self._all(sql + " ORDER BY sort", (category,))
+
+    def group(self, code: str) -> sqlite3.Row | None:
+        return self._one("SELECT * FROM groups WHERE code = ?", (code,))
+
+    def rename_group(self, code: str, title: str) -> bool:
+        return self._run(
+            "UPDATE groups SET title = ? WHERE code = ?", (title, code)
+        ).rowcount > 0
+
+    def set_group_active(self, code: str, active: bool) -> bool:
+        return self._run(
+            "UPDATE groups SET active = ? WHERE code = ?", (1 if active else 0, code)
+        ).rowcount > 0
+
+    def group_products(self, group_code: str, *, only_active: bool = True) -> list[sqlite3.Row]:
+        sql = "SELECT * FROM products WHERE group_code = ?"
+        if only_active:
+            sql += " AND active = 1"
+        return self._all(sql + " ORDER BY sort, price", (group_code,))
+
+    # ── каналҳои обунаи ҳатмӣ ─────────────────────────────────────────
+    def add_channel(self, chat_id: str, title: str = "", link: str = "") -> None:
+        self._run(
+            "INSERT INTO channels(chat_id, title, link, created_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(chat_id) DO UPDATE SET title = excluded.title, link = excluded.link",
+            (chat_id, title, link, now()),
+        )
+
+    def remove_channel(self, channel_id: int) -> bool:
+        return self._run("DELETE FROM channels WHERE id = ?", (channel_id,)).rowcount > 0
+
+    def channels(self) -> list[sqlite3.Row]:
+        return self._all("SELECT * FROM channels ORDER BY id")
+
+    # ── шарҳҳо ────────────────────────────────────────────────────────
+    def create_review(self, user_id: int, text: str, order_id: int | None = None) -> int:
+        stamp = now()
+        cur = self._run(
+            "INSERT INTO reviews(user_id, order_id, text, status, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, order_id, text, REVIEW_PENDING, stamp, stamp),
+        )
+        return int(cur.lastrowid)
+
+    def review(self, review_id: int) -> sqlite3.Row | None:
+        return self._one("SELECT * FROM reviews WHERE id = ?", (review_id,))
+
+    def set_review_status(self, review_id: int, status: str) -> sqlite3.Row | None:
+        self._run(
+            "UPDATE reviews SET status = ?, updated_at = ? WHERE id = ?",
+            (status, now(), review_id),
+        )
+        return self.review(review_id)
+
+    def pending_reviews(self, limit: int = 20) -> list[sqlite3.Row]:
+        return self._all(
+            "SELECT * FROM reviews WHERE status = ? ORDER BY id LIMIT ?",
+            (REVIEW_PENDING, limit),
+        )
 
     def products(self, category: str, *, only_active: bool = True) -> list[sqlite3.Row]:
         sql = "SELECT * FROM products WHERE category = ?"
@@ -372,6 +483,12 @@ class Database:
 
     def all_user_ids(self) -> list[int]:
         return [r["id"] for r in self._all("SELECT id FROM users WHERE is_blocked = 0")]
+
+    def users_with_money(self) -> list[User]:
+        rows = self._all(
+            "SELECT * FROM users WHERE balance > 0 ORDER BY balance DESC"
+        )
+        return [_user(r) for r in rows]
 
     def top_users(self, limit: int = 10) -> list[User]:
         rows = self._all(

@@ -14,7 +14,9 @@ CB_TG_MENU = "m:tg"
 CB_SUPPORT = "m:support"
 CB_TOP = "m:top"
 CB_MY_ORDERS = "m:orders"
+CB_BALANCE = "m:balance"
 CB_CAT = "c:"          # c:<category>
+CB_GROUP = "g:"        # g:<group_code>
 CB_PRODUCT = "p:"      # p:<code>
 CB_BUY_OK = "buy:ok"
 CB_ID_OK = "id:ok"
@@ -24,6 +26,8 @@ CB_TOPUP = "t:menu"
 CB_TOPUP_SUM = "t:s:"  # t:s:<diram>
 CB_TOPUP_OTHER = "t:other"
 CB_TOPUP_PAID = "t:paid:"  # t:paid:<id>
+CB_CHECK_SUB = "sub:check"
+CB_REVIEW = "rev:new"
 
 
 def _btn(text: str, data: str, color: str | None = None) -> InlineKeyboardButton:
@@ -52,7 +56,10 @@ def main_menu(*, is_admin: bool = False, reviews_url: str = "") -> InlineKeyboar
             _btn(texts.BTN_SUPPORT, CB_SUPPORT, style.PRIMARY),
             _btn(texts.BTN_TOP, CB_TOP, style.PRIMARY),
         ],
-        [_btn(texts.BTN_MY_ORDERS, CB_MY_ORDERS, style.PRIMARY)],
+        [
+            _btn(texts.BTN_BALANCE, CB_BALANCE, style.SUCCESS),
+            _btn(texts.BTN_MY_ORDERS, CB_MY_ORDERS, style.PRIMARY),
+        ],
     ]
     if reviews_url:
         rows.append([_url(texts.BTN_REVIEWS, reviews_url, style.PRIMARY)])
@@ -72,27 +79,50 @@ def telegram_menu() -> InlineKeyboardMarkup:
     )
 
 
+def groups(rows: Sequence, category: str) -> InlineKeyboardMarkup:
+    """Зербахшҳо: масалан «Алмосҳо» ва «Ваучерҳо»."""
+    buttons = [
+        [_btn(row["title"], CB_GROUP + row["code"], style.PRIMARY)] for row in rows
+    ]
+    back = CB_TG_MENU if category in (catalog.CAT_STARS, catalog.CAT_PREMIUM) else CB_HOME
+    buttons.append([_btn(texts.BTN_BACK, back), _btn(texts.BTN_HOME, CB_HOME)])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 def products(
     rows: Sequence,
     category: str,
     *,
     currency: str = texts.CURRENCY,
     partner: bool = False,
+    back_to: str | None = None,
 ) -> InlineKeyboardMarkup:
-    """Рӯйхати молҳо: ду дар як сатр, агар номҳо кӯтоҳ бошанд."""
+    """Рӯйхати молҳо — ҳар мол дар сатри худ, то ном ва нарх пурра дида шаванд."""
     buttons: list[list[InlineKeyboardButton]] = []
-    line: list[InlineKeyboardButton] = []
-    two_columns = len(rows) > 6
     for row in rows:
         label = f"{row['title']} — {texts.money(db.price_of(row, partner), currency)}"
-        line.append(_btn(label, CB_PRODUCT + row["code"], style.PRIMARY))
-        if not two_columns or len(line) == 2:
-            buttons.append(line)
-            line = []
-    if line:
-        buttons.append(line)
-    back = CB_TG_MENU if category in (catalog.CAT_STARS, catalog.CAT_PREMIUM) else CB_HOME
-    buttons.append([_btn(texts.BTN_BACK, back), _btn(texts.BTN_HOME, CB_HOME)])
+        buttons.append([_btn(label, CB_PRODUCT + row["code"], style.PRIMARY)])
+    if back_to is None:
+        back_to = (
+            CB_TG_MENU
+            if category in (catalog.CAT_STARS, catalog.CAT_PREMIUM)
+            else CB_HOME
+        )
+    buttons.append([_btn(texts.BTN_BACK, back_to), _btn(texts.BTN_HOME, CB_HOME)])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def subscribe(rows: Sequence) -> InlineKeyboardMarkup:
+    """Рӯйхати каналҳо + тугмаи санҷиш."""
+    from .subscription import channel_link
+
+    buttons: list[list[InlineKeyboardButton]] = []
+    for row in rows:
+        link = channel_link(row)
+        name = row["title"] or row["chat_id"]
+        if link:
+            buttons.append([_url(f"📢 {name}", link, style.PRIMARY)])
+    buttons.append([_btn(texts.BTN_CHECK_SUB, CB_CHECK_SUB, style.SUCCESS)])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -167,14 +197,36 @@ def payment(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def review_invite() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_btn(texts.BTN_WRITE_REVIEW, CB_REVIEW, style.SUCCESS)],
+            [_btn(texts.BTN_SKIP, CB_HOME)],
+        ]
+    )
+
+
+def admin_review(review_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                _btn("✅ Нашр кардан", f"a:revok:{review_id}", style.SUCCESS),
+                _btn("❌ Рад кардан", f"a:revno:{review_id}", style.DANGER),
+            ]
+        ]
+    )
+
+
 def back_home() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[_btn(texts.BTN_HOME, CB_HOME)]])
 
 
-def support(username: str) -> InlineKeyboardMarkup:
+def support(username: str, whatsapp: str = "") -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if username:
-        rows.append([_url("✍️ Навиштан", f"https://t.me/{username}", style.PRIMARY)])
+        rows.append([_url("✈️ Telegram", f"https://t.me/{username}", style.PRIMARY)])
+    if whatsapp:
+        rows.append([_url("🟢 WhatsApp", f"https://wa.me/{whatsapp}", style.SUCCESS)])
     rows.append([_btn(texts.BTN_HOME, CB_HOME)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -198,6 +250,10 @@ def admin_home() -> InlineKeyboardMarkup:
             ],
             [
                 _btn(texts.ADM_BTN_PARTNERS, "a:partners", style.PRIMARY),
+                _btn(texts.ADM_BTN_USERS, "a:users", style.PRIMARY),
+            ],
+            [
+                _btn(texts.ADM_BTN_SETTINGS, "a:settings", style.PRIMARY),
                 _btn(texts.ADM_BTN_SUPPLIER, "a:supplier", style.PRIMARY),
             ],
             [_btn(texts.BTN_HOME, CB_HOME)],
@@ -263,6 +319,54 @@ def admin_topup(topup_id: int) -> InlineKeyboardMarkup:
                 _btn(texts.ADM_BTN_REJECT, f"a:trej:{topup_id}", style.DANGER),
             ],
             [_btn(texts.BTN_BACK, "a:home")],
+        ]
+    )
+
+
+def admin_settings() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_btn(texts.ADM_BTN_CHANNELS, "a:channels", style.PRIMARY)],
+            [_btn(texts.ADM_BTN_REVIEW_CH, "a:revch", style.PRIMARY)],
+            [_btn(texts.ADM_BTN_WHATSAPP, "a:wa", style.PRIMARY)],
+            [_btn(texts.ADM_BTN_GROUPS, "a:groups", style.PRIMARY)],
+            [_btn(texts.BTN_BACK, "a:home")],
+        ]
+    )
+
+
+def admin_channels(rows: Sequence) -> InlineKeyboardMarkup:
+    buttons = [[_btn("➕ Канали нав", "a:chadd", style.SUCCESS)]]
+    for row in rows:
+        name = row["title"] or row["chat_id"]
+        buttons.append([_btn(f"🗑 {name}", f"a:chdel:{row['id']}", style.DANGER)])
+    buttons.append([_btn(texts.BTN_BACK, "a:settings")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def admin_groups(rows: Sequence) -> InlineKeyboardMarkup:
+    buttons = [
+        [_btn(f"{row['title']}  ✏️", f"a:gname:{row['code']}", style.PRIMARY)]
+        for row in rows
+    ]
+    buttons.append([_btn(texts.BTN_BACK, "a:settings")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def admin_group_categories() -> InlineKeyboardMarkup:
+    rows = [
+        [_btn(f"{c.icon} {c.title}", f"a:gcat:{c.code}", style.PRIMARY)]
+        for c in catalog.CATEGORY_INFO.values()
+    ]
+    rows.append([_btn(texts.BTN_BACK, "a:settings")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def admin_bc_confirm() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_btn("📤 Фиристодан", "a:bcgo", style.SUCCESS)],
+            [_btn(texts.BTN_CANCEL, "a:home", style.DANGER)],
         ]
     )
 

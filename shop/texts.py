@@ -52,6 +52,7 @@ BTN_SUPPORT = "🎧 Дастгирӣ"
 BTN_TOP = "🏆 Беҳтарин харидорон"
 BTN_REVIEWS = "👍 Шарҳҳо"
 BTN_MY_ORDERS = "🧾 Фармоишҳои ман"
+BTN_BALANCE = "💰 Ҳисоби ман"
 
 BTN_STARS = "⭐️ Telegram Stars"
 BTN_PREMIUM = "👑 Telegram Premium"
@@ -107,6 +108,21 @@ def category_menu(
     badge = f"\n{PARTNER_BADGE}" if partner else ""
     return (
         f"{cat.icon} <b>{esc(cat.title)}</b>{badge}\n\n"
+        f"Маҳсулотро интихоб кунед.\n"
+        f"💳 Ҳисоби шумо: <b>{money(balance, currency)}</b>"
+    )
+
+
+def group_menu(
+    cat: catalog.Category,
+    group_title: str,
+    balance: int,
+    currency: str = CURRENCY,
+    partner: bool = False,
+) -> str:
+    badge = f"\n{PARTNER_BADGE}" if partner else ""
+    return (
+        f"{cat.icon} <b>{esc(cat.title)}</b> · {esc(group_title)}{badge}\n\n"
         f"Маҳсулотро интихоб кунед.\n"
         f"💳 Ҳисоби шумо: <b>{money(balance, currency)}</b>"
     )
@@ -383,14 +399,36 @@ NO_PAY_LINK = (
 )
 
 # ── Бахшҳои иловагӣ ───────────────────────────────────────────────────
-def support(username: str) -> str:
-    who = f"@{esc(username)}" if username else "<i>ҳоло нишон дода нашудааст</i>"
-    return (
-        "🎧 <b>Дастгирӣ</b>\n\n"
-        f"Ба мо нависед: {who}\n\n"
-        "Кор мекунем: ҳар рӯз, аз 08:00 то 00:00.\n"
-        "Ҳангоми муроҷиат рақами фармоишро нависед — зудтар кӯмак мекунем."
-    )
+def support(username: str, whatsapp: str = "") -> str:
+    lines = ["🎧 <b>Дастгирӣ</b>\n"]
+    if username:
+        lines.append(f"✈️ Telegram: @{esc(username)}")
+    if whatsapp:
+        lines.append(f"🟢 WhatsApp: <code>+{esc(whatsapp)}</code>")
+    if not username and not whatsapp:
+        lines.append("<i>Тамос ҳоло нишон дода нашудааст.</i>")
+    lines += [
+        "",
+        "Кор мекунем: ҳар рӯз, аз 08:00 то 00:00.",
+        "Ҳангоми муроҷиат рақами фармоишро нависед — зудтар кӯмак мекунем.",
+    ]
+    return "\n".join(lines)
+
+
+def my_balance(balance: int, log_rows: list, currency: str = CURRENCY) -> str:
+    lines = [
+        "💰 <b>Ҳисоби ман</b>\n",
+        f"💳 Маблағ: <b>{money(balance, currency)}</b>",
+    ]
+    if log_rows:
+        lines.append("\n<b>Ҳаракати охирин:</b>")
+        for row in log_rows[:8]:
+            sign = "➕" if row["delta"] > 0 else "➖"
+            when = esc(row["created_at"][:10])
+            lines.append(f"{sign} {money(abs(row['delta']), currency)} · {when}")
+    else:
+        lines.append("\n<i>Ҳоло ҳаракат нест.</i>")
+    return "\n".join(lines)
 
 
 def top_clients(rows: list, currency: str = CURRENCY) -> str:
@@ -421,6 +459,62 @@ def my_orders(rows: list, currency: str = CURRENCY) -> str:
     return "\n\n".join(lines)
 
 
+BTN_CHECK_SUB = "✅ Обуна шудам — санҷед"
+BTN_WRITE_REVIEW = "✍️ Шарҳ навиштан"
+BTN_SKIP = "⏭ Ҳозир не"
+
+ASK_REVIEW = (
+    "✍️ <b>Шарҳи худро нависед</b>\n\n"
+    "Чанд ҷумла кифоя аст — чӣ харидед ва чӣ гуна буд.\n"
+    "<i>Шарҳ пас аз тасдиқи админ дар канал нашр мешавад.</i>"
+)
+REVIEW_TOO_SHORT = "❌ Шарҳ хеле кӯтоҳ аст. Ақаллан 10 аломат нависед."
+REVIEW_SENT = (
+    "🙏 <b>Ташаккур барои шарҳ!</b>\n\n"
+    "Онро месанҷем ва дар канал нашр мекунем."
+)
+REVIEW_PUBLISHED_NOTE = "✅ Шарҳи шумо дар канал нашр шуд. Ташаккур! ❤️"
+REVIEW_REJECTED_NOTE = "ℹ️ Шарҳи шумо нашр нашуд."
+REVIEW_INVITE = (
+    "\n\n💬 <b>Шарҳи худро мемонед?</b>\n"
+    "<i>Ба мо кӯмак мекунад, ба шумо — чанд сония вақт.</i>"
+)
+
+
+def review_for_channel(text: str, name: str) -> str:
+    """Чӣ тавр шарҳ дар канал нашр мешавад."""
+    return (
+        "⭐️ <b>Шарҳи харидор</b>\n\n"
+        f"<blockquote>{esc(text)}</blockquote>\n\n"
+        f"👤 {esc(name)}"
+    )
+
+
+def admin_new_review(row, user) -> str:
+    who = f"<code>{user.id}</code>" if user else "—"
+    if user and user.username:
+        who += f" @{esc(user.username)}"
+    return (
+        f"💬 <b>ШАРҲИ НАВ #{row['id']}</b>\n\n"
+        f"👤 Аз: {who}\n\n"
+        f"<blockquote>{esc(row['text'])}</blockquote>\n\n"
+        "Нашр кунем?"
+    )
+
+
+def subscribe_required(rows: list) -> str:
+    word = "канал" if len(rows) == 1 else "каналҳо"
+    return (
+        "🔒 <b>Барои истифодаи бот обуна лозим аст</b>\n\n"
+        f"Ба {word}и зерин обуна шавед, баъд тугмаи "
+        f"<b>«{BTN_CHECK_SUB}»</b>-ро пахш кунед.\n\n"
+        "<i>Ин як маротиба аст — баъдан бот озод кор мекунад.</i>"
+    )
+
+
+SUB_NOT_YET = "❌ Шумо ҳанӯз ба ҳамаи каналҳо обуна нашудаед."
+SUB_OK = "✅ Ташаккур! Акнун бот дастрас аст."
+
 BLOCKED = (
     "🚫 Дастрасии шумо ба бот маҳдуд аст.\n"
     "Барои маълумот ба дастгирӣ муроҷиат кунед."
@@ -439,6 +533,12 @@ ADM_BTN_PRICES = "💲 Нархҳо"
 ADM_BTN_BROADCAST = "📢 Эълон ба ҳама"
 ADM_BTN_SUPPLIER = "🔌 Таъминкунанда"
 ADM_BTN_PARTNERS = "🤝 Шарикон"
+ADM_BTN_SETTINGS = "⚙️ Танзимот"
+ADM_BTN_USERS = "👥 Корбарон"
+ADM_BTN_CHANNELS = "📢 Каналҳои обуна"
+ADM_BTN_REVIEW_CH = "💬 Канали шарҳҳо"
+ADM_BTN_WHATSAPP = "🟢 WhatsApp"
+ADM_BTN_GROUPS = "🗂 Номи зербахшҳо"
 ADM_BTN_ADD_PARTNER = "➕ Шарики нав"
 ADM_BTN_PARTNER_PRICE = "🤝 Нархи шарикӣ"
 ADM_BTN_PARTNER_OFF = "🗑 Нархи шарикиро бардоштан"
@@ -521,6 +621,108 @@ PARTNER_REMOVED = (
     "ℹ️ Нархи шарикии шумо бекор карда шуд.\n"
     "Аз ин пас нархҳои оддӣ амал мекунанд."
 )
+
+
+ADMIN_ASK_CHANNEL = (
+    "📢 Каналро нависед: <code>@username</code> ё ID-и рақамӣ "
+    "(<code>-1001234567890</code>).\n\n"
+    "<b>Муҳим:</b> ботро дар он канал <b>админ</b> кунед — вагарна обунаро "
+    "тафтиш карда наметавонад.\n\n"
+    "Барои канали пӯшида ҳаволаро низ илова кунед:\n"
+    "<code>-1001234567890 | https://t.me/+abc123</code>"
+)
+ADMIN_ASK_REVIEW_CHANNEL = (
+    "💬 Канали шарҳҳоро нависед: <code>@username</code> ё ID-и рақамӣ.\n\n"
+    "Шарҳҳои тасдиқшуда маҳз ба он ҷо мераванд.\n"
+    "Ботро дар канал админ кунед.\n\n"
+    "Барои хомӯш кардан нависед: <code>-</code>"
+)
+ADMIN_ASK_WHATSAPP = (
+    "🟢 Рақами WhatsApp-ро нависед.\n\n"
+    "Намуна: <code>992939880805</code>\n"
+    "Барои бардоштан нависед: <code>-</code>"
+)
+ADMIN_ASK_GROUP_TITLE = (
+    "🗂 Номи нави зербахшро нависед.\n\nНамуна: <code>💎 Алмосҳо</code>"
+)
+ADMIN_BC_STEP1 = (
+    "📢 <b>Эълон — қадами 1 аз 3</b>\n\n"
+    "Акс ё видео фиристед.\n"
+    "Агар лозим набошад — нависед <code>-</code>"
+)
+ADMIN_BC_STEP2 = (
+    "📢 <b>Эълон — қадами 2 аз 3</b>\n\n"
+    "Акнун худи паёмро фиристед: матн, овоз, стикер, доира, ҳуҷҷат, файл ё ҳавола.\n"
+    "Агар лозим набошад — нависед <code>-</code>"
+)
+ADMIN_BC_STEP3 = (
+    "📢 <b>Эълон — қадами 3 аз 3</b>\n\n"
+    "Тугмаи ҳавола илова кунем?\n"
+    "Дар як сатр нависед: <code>Ном | https://ҳавола</code>\n"
+    "Якчанд тугма — ҳар кадом дар сатри нав.\n\n"
+    "Агар лозим набошад — нависед <code>-</code>"
+)
+ADMIN_BC_EMPTY = "❌ Эълони холӣ. Ақаллан як қадамро пур кунед."
+ADMIN_BC_BAD_BUTTON = (
+    "❌ Тугма нодуруст аст.\n\nНамуна: <code>Канали мо | https://t.me/almaz_tj</code>"
+)
+
+
+def admin_bc_preview(has_media: bool, has_body: bool, buttons: int, users: int) -> str:
+    return (
+        "📢 <b>Эълон тайёр аст</b>\n\n"
+        f"🖼 Акс/видео: {'ҳа' if has_media else 'не'}\n"
+        f"✉️ Паём: {'ҳа' if has_body else 'не'}\n"
+        f"🔗 Тугмаҳо: {buttons}\n"
+        f"👥 Гирандагон: <b>{users}</b>\n\n"
+        "Мефиристем?"
+    )
+
+
+def admin_settings(channels: int, review_channel: str, whatsapp: str) -> str:
+    return (
+        "⚙️ <b>Танзимот</b>\n\n"
+        f"📢 Каналҳои обунаи ҳатмӣ: <b>{channels}</b>\n"
+        f"💬 Канали шарҳҳо: <code>{esc(review_channel or '—')}</code>\n"
+        f"🟢 WhatsApp: <code>{esc(whatsapp or '—')}</code>"
+    )
+
+
+def admin_channels(rows: list) -> str:
+    if not rows:
+        return (
+            "📢 <b>Каналҳои обунаи ҳатмӣ</b>\n\n"
+            "Ҳоло канал нест — бот ба ҳама кушода аст.\n\n"
+            "<i>Пас аз илова кардан, то обуна нашудан бот кор намекунад.</i>"
+        )
+    lines = [f"📢 <b>Каналҳои обунаи ҳатмӣ</b> ({len(rows)})\n"]
+    for row in rows:
+        name = esc(row["title"] or row["chat_id"])
+        lines.append(f"• <b>{name}</b> — <code>{esc(row['chat_id'])}</code>")
+    lines.append("\n<i>Бот бояд дар ҳар канал админ бошад.</i>")
+    return "\n".join(lines)
+
+
+def admin_users(total: int, with_money: list, money_sum: int, currency: str = CURRENCY) -> str:
+    lines = [
+        "👥 <b>Корбарон</b>\n",
+        f"Ҳамагӣ: <b>{total}</b>",
+        f"Бо маблағ дар ҳисоб: <b>{len(with_money)}</b>",
+        f"Дар ҳисобҳо ҷамъ: <b>{money(money_sum, currency)}</b>",
+    ]
+    if with_money:
+        lines.append("\n<b>Онҳое, ки маблағ доранд:</b>")
+        for user in with_money[:25]:
+            name = esc(user.first_name or "—")
+            tag = f"@{esc(user.username)}" if user.username else f"<code>{user.id}</code>"
+            lines.append(f"• {name} {tag} — <b>{money(user.balance, currency)}</b>")
+        if len(with_money) > 25:
+            lines.append(f"<i>… ва боз {len(with_money) - 25} нафар</i>")
+    return "\n".join(lines)
+
+
+def admin_groups(rows: list) -> str:
+    return "🗂 <b>Зербахшҳо</b>\n\nБарои иваз кардани ном яке аз онҳоро интихоб кунед."
 
 
 def admin_stats(data: dict, currency: str = CURRENCY) -> str:

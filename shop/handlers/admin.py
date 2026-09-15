@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from aiogram import Bot, F, Router
@@ -458,29 +457,38 @@ async def cb_del_partner_price(cb: CallbackQuery, db: Database, cfg: Config) -> 
     await cb_price_item(cb, db, cfg)
 
 
-# ── эълон ─────────────────────────────────────────────────────────────
-@router.callback_query(F.data == "a:bc")
-async def cb_broadcast(cb: CallbackQuery, state: FSMContext) -> None:
-    await state.set_state(Admin.waiting_broadcast)
-    await safe_edit(cb, texts.ADMIN_ASK_BROADCAST, keyboards.admin_back())
-    await cb.answer()
+# ── шарҳҳо ────────────────────────────────────────────────────────────
+@router.callback_query(F.data.startswith("a:revok:") | F.data.startswith("a:revno:"))
+async def cb_review_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bot) -> None:
+    from ..db import REVIEW_PUBLISHED, REVIEW_REJECTED
+    from .reviews import publish_review
 
+    action = cb.data.split(":")[1]
+    review_id = int(cb.data.rsplit(":", 1)[1])
+    row = db.review(review_id)
+    if row is None:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
 
-@router.message(Admin.waiting_broadcast, F.text)
-async def got_broadcast(message: Message, state: FSMContext, db: Database, bot: Bot) -> None:
-    await state.clear()
-    text = message.html_text
-    sent = failed = 0
-    for user_id in db.all_user_ids():
-        try:
-            await bot.send_message(user_id, text)
-            sent += 1
-        except Exception:
-            failed += 1
-        await asyncio.sleep(0.05)  # то ба маҳдудияти Telegram нарасем
-    await message.answer(
-        texts.broadcast_result(sent, failed), reply_markup=keyboards.admin_home()
-    )
+    if action == "revno":
+        db.set_review_status(review_id, REVIEW_REJECTED)
+        await safe_edit(cb, f"❌ Шарҳи #{review_id} рад шуд.", keyboards.admin_back())
+        await notify_user(bot, row["user_id"], texts.REVIEW_REJECTED_NOTE)
+        await cb.answer("❌")
+        return
+
+    published, reason = await publish_review(bot, db, review_id)
+    if not published:
+        await cb.answer("⚠️", show_alert=False)
+        await cb.message.answer(
+            f"⚠️ Нашр нашуд: <code>{texts.esc(reason)}</code>\n\n"
+            "Канали шарҳҳоро дар панел гузоред ва ботро ба он админ кунед."
+        )
+        return
+    db.set_review_status(review_id, REVIEW_PUBLISHED)
+    await safe_edit(cb, f"✅ Шарҳи #{review_id} нашр шуд.", keyboards.admin_back())
+    await notify_user(bot, row["user_id"], texts.REVIEW_PUBLISHED_NOTE)
+    await cb.answer("✅")
 
 
 # ── таъминкунанда (FireLoot) ──────────────────────────────────────────

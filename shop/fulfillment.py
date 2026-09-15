@@ -45,20 +45,25 @@ async def _send_receipt(bot: Bot, cfg: Config, db: Database, order_id: int) -> N
     if row is None:
         return
     info = catalog.CATEGORY_INFO.get(row["category"])
-    await _tell(
-        bot,
-        row["user_id"],
-        texts.receipt(
-            order_id=order_id,
-            title=row["title"],
-            target=row["target"] or "",
-            nickname=row["nickname"],
-            price=row["price"],
-            external_id=row["external_id"],
-            is_player=bool(info and info.target == "player"),
-            currency=cfg.currency,
-        ),
+    receipt = texts.receipt(
+        order_id=order_id,
+        title=row["title"],
+        target=row["target"] or "",
+        nickname=row["nickname"],
+        price=row["price"],
+        external_id=row["external_id"],
+        is_player=bool(info and info.target == "player"),
+        currency=cfg.currency,
     )
+    # Ҳар харидорро ба навиштани шарҳ даъват мекунем.
+    try:
+        await bot.send_message(
+            row["user_id"],
+            receipt + texts.REVIEW_INVITE,
+            reply_markup=keyboards.review_invite(),
+        )
+    except Exception as exc:
+        log.info("Чек ба %s нарасид: %s", row["user_id"], exc)
 
 
 async def _refund(

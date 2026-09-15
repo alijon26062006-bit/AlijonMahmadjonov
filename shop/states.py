@@ -15,6 +15,10 @@ class Topup(StatesGroup):
     waiting_receipt = State()  # интизори чек/скриншот
 
 
+class Review(StatesGroup):
+    waiting_text = State()
+
+
 class Admin(StatesGroup):
     waiting_user = State()
     waiting_plus = State()
@@ -23,3 +27,10 @@ class Admin(StatesGroup):
     waiting_broadcast = State()
     waiting_partner = State()
     waiting_partner_price = State()
+    waiting_channel = State()
+    waiting_review_channel = State()
+    waiting_whatsapp = State()
+    waiting_group_title = State()
+    waiting_bc_media = State()
+    waiting_bc_text = State()
+    waiting_bc_button = State()

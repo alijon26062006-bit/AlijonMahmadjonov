@@ -817,3 +817,239 @@ async def test_admin_sets_and_clears_partner_price(db, cfg, state):
     await state.set_data({"price_code": "pubg_660"})
     await admin_h.got_partner_price(FakeMessage("0", user_id=ADMIN_ID), state, db, cfg)
     assert db.product("pubg_660")["partner_price"] is None
+
+
+# ── зербахшҳо ─────────────────────────────────────────────────────────
+async def test_free_fire_shows_two_groups(db, cfg, state):
+    cb = FakeCallback(keyboards.CB_CAT + catalog.CAT_FF_CIS)
+    await menu_h.cb_category(cb, state, db, cfg)
+    labels = _labels(cb.message.last_markup)
+    assert any("Алмос" in x for x in labels)
+    assert any("Ваучер" in x for x in labels)
+
+
+async def test_pubg_goes_straight_to_prices(db, cfg, state):
+    """Як зербахш — экрани иловагӣ лозим нест."""
+    cb = FakeCallback(keyboards.CB_CAT + catalog.CAT_PUBG)
+    await menu_h.cb_category(cb, state, db, cfg)
+    assert any("UC —" in x for x in _labels(cb.message.last_markup))
+
+
+async def test_group_opens_long_buttons(db, cfg, state):
+    cb = FakeCallback(keyboards.CB_GROUP + "ffcis_diamonds")
+    await menu_h.cb_group(cb, state, db, cfg)
+    rows = cb.message.last_markup.inline_keyboard
+    products = [r for r in rows if len(r) == 1 and "—" in r[0].text]
+    assert len(products) == 6                       # ҳамаи алмосҳо
+    assert all(len(r) == 1 for r in rows[:-1])      # ҳар кадом дар сатри худ
+    assert "9.00" in products[0][0].text            # нарх дида мешавад
+
+
+async def test_group_back_returns_to_category(db, cfg, state):
+    cb = FakeCallback(keyboards.CB_GROUP + "ffcis_vouchers")
+    await menu_h.cb_group(cb, state, db, cfg)
+    back = cb.message.last_markup.inline_keyboard[-1]
+    assert back[0].callback_data == keyboards.CB_CAT + catalog.CAT_FF_CIS
+
+
+async def test_admin_renames_group(db, cfg, state):
+    from shop.handlers import settings as st
+
+    await state.set_data({"group_code": "ffcis_diamonds"})
+    message = FakeMessage("💎 Алмосҳои арзон", user_id=ADMIN_ID)
+    await st.got_group_title(message, state, db)
+    assert db.group("ffcis_diamonds")["title"] == "💎 Алмосҳои арзон"
+
+    cb = FakeCallback(keyboards.CB_CAT + catalog.CAT_FF_CIS)
+    await menu_h.cb_category(cb, state, db, cfg)
+    assert any("арзон" in x for x in _labels(cb.message.last_markup))
+
+
+# ── обунаи ҳатмӣ ──────────────────────────────────────────────────────
+class SubBot(FakeBot):
+    """Бот бо аъзогии идорашаванда."""
+
+    def __init__(self, member=True, raise_error=False):
+        super().__init__()
+        self.member = member
+        self.raise_error = raise_error
+
+    async def get_chat_member(self, chat_id, user_id):
+        from types import SimpleNamespace
+
+        if self.raise_error:
+            raise RuntimeError("бот админ нест")
+        return SimpleNamespace(status="member" if self.member else "left")
+
+
+async def test_no_channels_means_no_gate(db, cfg):
+    from shop.subscription import missing_channels
+
+    assert await missing_channels(SubBot(), db, USER_ID) == []
+
+
+async def test_unsubscribed_user_is_stopped(db, cfg):
+    db.add_channel("@test_channel", "Тест", "https://t.me/test_channel")
+    guard = GuardMiddleware(db, cfg)
+    called = False
+
+    async def handler(event, data):
+        nonlocal called
+        called = True
+
+    bot = SubBot(member=False)
+    await guard(handler, FakeMessage("/start"), {"bot": bot})
+    assert called is False
+    assert "обуна" in bot.to(USER_ID)
+
+
+async def test_subscribed_user_passes(db, cfg):
+    db.add_channel("@test_channel", "Тест")
+    guard = GuardMiddleware(db, cfg)
+    called = False
+
+    async def handler(event, data):
+        nonlocal called
+        called = True
+
+    await guard(handler, FakeMessage("/start"), {"bot": SubBot(member=True)})
+    assert called is True
+
+
+async def test_admin_skips_subscription(db, cfg):
+    db.add_channel("@test_channel", "Тест")
+    guard = GuardMiddleware(db, cfg)
+    called = False
+
+    async def handler(event, data):
+        nonlocal called
+        called = True
+
+    await guard(handler, FakeMessage("/start", user_id=ADMIN_ID), {"bot": SubBot(member=False)})
+    assert called is True
+
+
+async def test_unreachable_channel_does_not_lock_everyone_out(db, cfg):
+    """Агар ботро аз канал хориҷ кунанд — харидорон набояд маҳрум шаванд."""
+    from shop.subscription import missing_channels
+
+    db.add_channel("@gone", "Нест шуд")
+    assert await missing_channels(SubBot(raise_error=True), db, USER_ID) == []
+
+
+async def test_many_channels_all_required(db, cfg):
+    from shop.subscription import missing_channels
+
+    for i in range(5):
+        db.add_channel(f"@ch{i}", f"Канал {i}")
+    assert len(await missing_channels(SubBot(member=False), db, USER_ID)) == 5
+
+
+# ── шарҳҳо ────────────────────────────────────────────────────────────
+async def test_review_goes_to_admin(db, cfg, state, bot):
+    from shop.handlers import reviews as rv
+
+    db.touch_user(USER_ID, "ali", "Alijon")
+    await state.set_state(rv.Review.waiting_text)
+    message = FakeMessage("Хеле зуд расид, ташаккур!")
+    await rv.got_review(message, state, db, cfg, bot)
+
+    rows = db.pending_reviews()
+    assert len(rows) == 1 and rows[0]["text"].startswith("Хеле зуд")
+    assert "ШАРҲИ НАВ" in bot.to(ADMIN_ID)
+
+
+async def test_short_review_refused(db, cfg, state, bot):
+    from shop.handlers import reviews as rv
+
+    await state.set_state(rv.Review.waiting_text)
+    message = FakeMessage("зур")
+    await rv.got_review(message, state, db, cfg, bot)
+    assert db.pending_reviews() == []
+    assert "кӯтоҳ" in message.last
+
+
+async def test_approved_review_is_published(db, cfg, state, bot):
+    from shop.db import REVIEW_PUBLISHED
+
+    db.touch_user(USER_ID, "ali", "Alijon")
+    db.set_setting("review_channel", "@reviews")
+    review_id = db.create_review(USER_ID, "Ҳамааш аъло буд!")
+
+    cb = FakeCallback(f"a:revok:{review_id}", user_id=ADMIN_ID)
+    await admin_h.cb_review_action(cb, db, cfg, bot)
+
+    assert db.review(review_id)["status"] == REVIEW_PUBLISHED
+    assert "Шарҳи харидор" in bot.to("@reviews")
+    assert "нашр шуд" in bot.to(USER_ID)
+
+
+async def test_review_not_published_without_channel(db, cfg, state, bot):
+    from shop.db import REVIEW_PENDING
+
+    db.touch_user(USER_ID)
+    review_id = db.create_review(USER_ID, "Матни шарҳи хуб")
+    cb = FakeCallback(f"a:revok:{review_id}", user_id=ADMIN_ID)
+    await admin_h.cb_review_action(cb, db, cfg, bot)
+
+    assert db.review(review_id)["status"] == REVIEW_PENDING   # дар навбат мемонад
+    assert "гузошта нашудааст" in cb.message.all_text()
+
+
+async def test_rejected_review_is_not_published(db, cfg, state, bot):
+    from shop.db import REVIEW_REJECTED
+
+    db.touch_user(USER_ID)
+    db.set_setting("review_channel", "@reviews")
+    review_id = db.create_review(USER_ID, "Матни шарҳи хуб")
+    cb = FakeCallback(f"a:revno:{review_id}", user_id=ADMIN_ID)
+    await admin_h.cb_review_action(cb, db, cfg, bot)
+
+    assert db.review(review_id)["status"] == REVIEW_REJECTED
+    assert bot.to("@reviews") == ""
+
+
+# ── эълон ─────────────────────────────────────────────────────────────
+def test_broadcast_buttons_parsed():
+    from shop.handlers.settings import parse_buttons
+
+    rows = parse_buttons("Канали мо | https://t.me/almaz\nСайт | https://almaz.tj")
+    assert [b.text for row in rows for b in row] == ["Канали мо", "Сайт"]
+    assert rows[0][0].url == "https://t.me/almaz"
+
+
+@pytest.mark.parametrize("raw", ["бе ҳавола", "Ном | not-a-url", "| https://x", ""])
+def test_broadcast_bad_buttons_refused(raw):
+    from shop.handlers.settings import parse_buttons
+
+    assert parse_buttons(raw) is None
+
+
+# ── дастгирӣ ва ҳисоб ─────────────────────────────────────────────────
+async def test_support_shows_whatsapp(db, cfg, state):
+    db.set_setting("whatsapp", "992939880805")
+    cb = FakeCallback(keyboards.CB_SUPPORT)
+    await menu_h.cb_support(cb, db, cfg)
+    assert "992939880805" in cb.message.last
+    urls = [b.url for row in cb.message.last_markup.inline_keyboard for b in row if b.url]
+    assert any("wa.me/992939880805" in u for u in urls)
+
+
+async def test_balance_button_shows_history(db, cfg, state):
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 15000, "topup")
+    cb = FakeCallback(keyboards.CB_BALANCE)
+    await menu_h.cb_balance(cb, db, cfg)
+    assert "150.00" in cb.message.last
+
+
+async def test_users_screen_counts_money(db, cfg, state):
+    from shop.handlers import settings as st
+
+    for uid, amount in ((1, 10000), (2, 5000), (3, 0)):
+        db.touch_user(uid)
+        if amount:
+            db.change_balance(uid, amount, "topup")
+    cb = FakeCallback("a:users", user_id=ADMIN_ID)
+    await st.cb_users(cb, db, cfg)
+    assert "150.00" in cb.message.last     # 100 + 50

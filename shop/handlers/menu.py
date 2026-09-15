@@ -79,6 +79,24 @@ async def text_home(message: Message, state: FSMContext, db: Database, cfg: Conf
     await show_main_menu(message, db, cfg, edit=False)
 
 
+@router.callback_query(F.data == keyboards.CB_CHECK_SUB)
+async def cb_check_sub(
+    cb: CallbackQuery, state: FSMContext, db: Database, cfg: Config, bot
+) -> None:
+    from ..subscription import missing_channels
+
+    missing = await missing_channels(bot, db, cb.from_user.id)
+    if missing:
+        await cb.answer(texts.SUB_NOT_YET, show_alert=True)
+        await safe_edit(
+            cb, texts.subscribe_required(missing), keyboards.subscribe(missing)
+        )
+        return
+    await cb.answer(texts.SUB_OK)
+    await state.clear()
+    await show_main_menu(cb, db, cfg)
+
+
 @router.callback_query(F.data == keyboards.CB_HOME)
 async def cb_home(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Config) -> None:
     await state.clear()
@@ -103,19 +121,32 @@ async def cb_telegram(cb: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith(keyboards.CB_CAT))
 async def cb_category(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Config) -> None:
+    """Агар бахш зербахш дошта бошад — аввал онҳоро нишон медиҳем."""
     await state.clear()
     code = cb.data[len(keyboards.CB_CAT):]
     info = catalog.CATEGORY_INFO.get(code)
     if info is None:
         await cb.answer(texts.UNKNOWN, show_alert=True)
         return
-    rows = db.products(code)
+
+    user = current_user(cb, db)
+    partner = db.is_partner(user.id)
+    group_rows = db.groups(code)
+
+    if len(group_rows) > 1:
+        await safe_edit(
+            cb,
+            texts.category_menu(info, user.balance, cfg.currency, partner=partner),
+            keyboards.groups(group_rows, code),
+        )
+        await cb.answer()
+        return
+
+    rows = db.group_products(group_rows[0]["code"]) if group_rows else db.products(code)
     if not rows:
         await safe_edit(cb, texts.EMPTY_CATEGORY, keyboards.back_home())
         await cb.answer()
         return
-    user = current_user(cb, db)
-    partner = db.is_partner(user.id)
     await safe_edit(
         cb,
         texts.category_menu(info, user.balance, cfg.currency, partner=partner),
@@ -124,9 +155,52 @@ async def cb_category(cb: CallbackQuery, state: FSMContext, db: Database, cfg: C
     await cb.answer()
 
 
+@router.callback_query(F.data.startswith(keyboards.CB_GROUP))
+async def cb_group(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Config) -> None:
+    await state.clear()
+    code = cb.data[len(keyboards.CB_GROUP):]
+    group = db.group(code)
+    if group is None:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    info = catalog.CATEGORY_INFO.get(group["category"])
+    rows = db.group_products(code)
+    if not rows or info is None:
+        await safe_edit(cb, texts.EMPTY_CATEGORY, keyboards.back_home())
+        await cb.answer()
+        return
+    user = current_user(cb, db)
+    partner = db.is_partner(user.id)
+    await safe_edit(
+        cb,
+        texts.group_menu(info, group["title"], user.balance, cfg.currency, partner=partner),
+        keyboards.products(
+            rows, group["category"], currency=cfg.currency, partner=partner,
+            back_to=keyboards.CB_CAT + group["category"],
+        ),
+    )
+    await cb.answer()
+
+
 @router.callback_query(F.data == keyboards.CB_SUPPORT)
-async def cb_support(cb: CallbackQuery, cfg: Config) -> None:
-    await safe_edit(cb, texts.support(cfg.support), keyboards.support(cfg.support))
+async def cb_support(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    whatsapp = db.setting("whatsapp")
+    await safe_edit(
+        cb,
+        texts.support(cfg.support, whatsapp),
+        keyboards.support(cfg.support, whatsapp),
+    )
+    await cb.answer()
+
+
+@router.callback_query(F.data == keyboards.CB_BALANCE)
+async def cb_balance(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    user = current_user(cb, db)
+    await safe_edit(
+        cb,
+        texts.my_balance(user.balance, db.balance_log(user.id, 8), cfg.currency),
+        keyboards.need_money(),
+    )
     await cb.answer()
 
 

@@ -10,7 +10,8 @@ from aiogram.client.session.middlewares.base import BaseRequestMiddleware
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import TelegramObject, Update
 
-from . import style, texts
+from . import keyboards, style, texts
+from .subscription import missing_channels
 from .config import Config
 from .db import Database
 
@@ -52,7 +53,31 @@ class GuardMiddleware(BaseMiddleware):
             await _tell(data.get("bot"), src.id, texts.BLOCKED)
             return None
 
+        if not await self._subscribed(inner, data, src.id):
+            return None
+
         return await handler(event, data)
+
+    async def _subscribed(self, inner, data: dict[str, Any], user_id: int) -> bool:
+        """Обунаи ҳатмӣ. Админ ва худи тугмаи санҷиш озоданд."""
+        bot = data.get("bot")
+        if bot is None or self.cfg.is_admin(user_id):
+            return True
+        if getattr(inner, "data", None) == keyboards.CB_CHECK_SUB:
+            return True  # ҳамин тугма обунаро месанҷад
+
+        missing = await missing_channels(bot, self.db, user_id)
+        if not missing:
+            return True
+        try:
+            await bot.send_message(
+                user_id,
+                texts.subscribe_required(missing),
+                reply_markup=keyboards.subscribe(missing),
+            )
+        except Exception as exc:
+            log.info("Дархости обуна ба %s нарасид: %s", user_id, exc)
+        return False
 
 
 class ErrorGuardMiddleware(BaseMiddleware):
