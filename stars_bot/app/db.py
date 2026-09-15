@@ -2617,3 +2617,19 @@ async def attach_receipt(
         (file_id, _now(), deposit_id),
     )
     await conn.commit()
+
+
+async def bank_payment_for_deposit(
+    conn: aiosqlite.Connection, deposit_id: int
+) -> BankPayment | None:
+    """Каким банковским зачислением закрыта заявка.
+
+    Нужно, чтобы рядом с чеком клиента показать, что банк подтвердил на
+    самом деле. Чек рисуется за минуту, выписка банка — нет.
+    """
+    async with conn.execute(
+        "SELECT * FROM bank_payments WHERE deposit_id = ? ORDER BY id DESC LIMIT 1",
+        (deposit_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    return _from_row(BankPayment, row) if row else None

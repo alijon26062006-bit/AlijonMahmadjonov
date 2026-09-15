@@ -534,20 +534,39 @@ async def without_receipt(conn, bot) -> None:
           any(chat == CLIENT for chat, _ in bot.sent), str(bot.sent[:1]))
 
     # Клиент всё-таки прислал чек — уже после зачисления.
+    was = len(await db.list_deposits(conn, user_id=CLIENT, limit=50))
     late = Msg()
     late.photo = [type("P", (), {"file_id": "photo1"})()]
+    late.copies = []
+
+    async def copy_to(chat_id, caption="", **kw):
+        late.copies.append((chat_id, caption, kw.get("reply_markup")))
+        return None
+
+    late.copy_to = copy_to
     state.name = "Deposit:receipt"
     await dep_h.on_receipt(late, state, conn, bot)
-    check("поздний чек не создаёт вторую заявку",
-          len(await db.list_deposits(conn, user_id=CLIENT, limit=50)) ==
-          len([d for d in await db.list_deposits(conn, user_id=CLIENT, limit=50)]),
-          "")
-    same = await db.get_deposit(conn, deposit.id)
+
+    now = await db.list_deposits(conn, user_id=CLIENT, limit=50)
+    check("поздний чек не создаёт вторую заявку", len(now) == was,
+          f"было {was}, стало {len(now)}")
+    check("чек прикрепился к той же заявке",
+          (await db.get_deposit(conn, deposit.id)).receipt_file_id == "photo1",
+          str((await db.get_deposit(conn, deposit.id)).receipt_file_id))
     check("деньги второй раз не зачислены",
           (await db.get_user(conn, CLIENT)).balance == before + 333,
           str((await db.get_user(conn, CLIENT)).balance))
     check("клиенту сказали, что уже зачислено",
           "Баланс пополнен" in late.last, late.last[:60])
+
+    # Чек всё равно уходит владельцу: при споре искать его будет негде.
+    check("чек переслан владельцу", bool(late.copies), str(len(late.copies)))
+    caption = late.copies[0][1] if late.copies else ""
+    check("в подписи видно, что банк подтвердил",
+          "Банк подтвердил" in caption and "3.33" in caption, caption[:200])
+    check("и код банка для сверки", "99001" in caption, caption[:200])
+    check("кнопок «зачислить» у оплаченной нет",
+          late.copies[0][2] is None, str(late.copies[0][2]))
 
     # Брошенная заявка не должна мешать через неделю.
     old = await db.create_deposit(

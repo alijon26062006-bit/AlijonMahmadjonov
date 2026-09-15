@@ -205,9 +205,10 @@ async def run_scenario(conn) -> None:
     # — ровно та ручная работа, от которой мы уходили.
     check("после «я оплатил» обещают зачислить само",
           "сам" in call.last, call.last[:160])
-    check("чек предложен запасным путём, а не обязанностью",
-          "скриншот чека" in call.last and "не изменился" in call.last,
-          call.last[:240])
+    check("чек всё-таки просят — он нужен для сверки",
+          "скриншот чека" in call.last, call.last[:240])
+    check("но зачисление обещано без него",
+          "пополнится <b>сам</b>" in call.last, call.last[:240])
     check("названа сумма к зачислению", "100.00" in call.last, call.last)
     check("состояние осталось прежним",
           await state.get_state() == "Deposit:receipt")

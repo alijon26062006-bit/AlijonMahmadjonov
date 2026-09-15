@@ -174,10 +174,12 @@ async def on_receipt(
         await db.attach_receipt(conn, deposit.id, file_id)
 
     # Пока клиент искал чек, деньги могли уже прийти и юзербот мог
-    # закрыть заявку сам. Тогда и говорить надо другое.
+    # закрыть заявку сам. Тогда и клиенту, и владельцу говорим другое.
     fresh = await db.get_deposit(conn, deposit.id)
+    paid = fresh is not None and fresh.status == db.DEP_APPROVED
     await state.clear()
-    if fresh and fresh.status == db.DEP_APPROVED:
+
+    if paid:
         user = await db.get_user(conn, message.from_user.id)
         await message.answer(
             texts.DEPOSIT_APPROVED.format(
@@ -185,29 +187,54 @@ async def on_receipt(
             ),
             reply_markup=keyboards.back(),
         )
-        return
+    else:
+        await message.answer(
+            texts.DEPOSIT_SENT.format(deposit_id=deposit.id, amount=fmt(amount)),
+            reply_markup=keyboards.back(),
+        )
 
-    await message.answer(
-        texts.DEPOSIT_SENT.format(deposit_id=deposit.id, amount=fmt(amount)),
-        reply_markup=keyboards.back(),
-    )
+    await _send_receipt(message, conn, deposit, amount, paid)
 
+
+async def _send_receipt(message, conn, deposit, amount: int, paid: bool) -> None:
+    """Переслать чек владельцу.
+
+    Чек уходит и тогда, когда деньги уже зачислены автоматически: сверять
+    нечего, но при споре с клиентом он понадобится, а искать его потом
+    будет негде.
+
+    Разница в подписи и кнопках. У зачисленной заявки кнопок «зачислить»
+    и «отклонить» нет: нажимать их некуда, а вид рабочей кнопки, которая
+    ничего не делает, сбивает с толку в самый неподходящий момент.
+    """
     buyer = f"@{message.from_user.username}" if message.from_user.username else (
         message.from_user.first_name or "без имени"
     )
-    caption = texts.ADMIN_NEW_DEPOSIT.format(
-        deposit_id=deposit.id, amount=fmt(amount), method=deposit.method,
-        buyer=buyer, user_id=message.from_user.id,
-        reference=deposit.reference or "—",
-    )
+
+    if paid:
+        bank = await db.bank_payment_for_deposit(conn, deposit.id)
+        caption = texts.ADMIN_DEPOSIT_RECEIPT.format(
+            deposit_id=deposit.id, amount=fmt(amount),
+            paid=fmt(bank.amount) if bank else fmt(amount),
+            code=(bank.op_code if bank and bank.op_code else "—"),
+            sender=(bank.sender if bank and bank.sender else "—"),
+            buyer=buyer, user_id=message.from_user.id,
+        )
+        markup = None
+    else:
+        caption = texts.ADMIN_NEW_DEPOSIT.format(
+            deposit_id=deposit.id, amount=fmt(amount), method=deposit.method,
+            buyer=buyer, user_id=message.from_user.id,
+            reference=deposit.reference or "—",
+        )
+        markup = keyboards.admin_deposit(deposit.id)
+
     targets = list(settings.admin_ids)
     if settings.orders_chat_id:
         targets.append(settings.orders_chat_id)
     for chat_id in targets:
         try:
-            await message.copy_to(
-                chat_id, caption=caption, reply_markup=keyboards.admin_deposit(deposit.id)
-            )
+            await message.copy_to(chat_id, caption=caption, reply_markup=markup)
         except TelegramAPIError as exc:
             log.warning("Заявка %s не ушла в чат %s: %s", deposit.id, chat_id, exc)
 
