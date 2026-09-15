@@ -132,6 +132,72 @@ async def run(conn) -> None:
     panel.format_report("Пусто", empty, [])
     check("пустой отчёт тоже собирается", True)
 
+    # ---------------------------------------- разбивка отчёта по товарам
+    db.GAME_TITLES["game:free_fire_cis"] = "🔥 Free Fire"
+    db.GAME_TITLES["game:pubg_mobile"] = "🎯 PUBG Mobile"
+    await add_order(conn, today, price=3200, cost=2600, qty=1,
+                    kind="game:free_fire_cis")
+    await add_order(conn, today, price=1400, cost=1022, qty=1,
+                    kind="game:pubg_mobile")
+    await add_order(conn, today, price=1700, cost=0, qty=1,
+                    kind="game:free_fire_cis", status=db.ORDER_REFUNDED)
+    await add_order(conn, today, price=5000, cost=4300, qty=1, kind="steam")
+
+    by = await db.report_by_product(conn, *reports.bounds(today, today))
+    got = {r["product_type"]: r for r in by}
+    check("в разбивке видно каждое направление",
+          set(got) == {"stars", "steam", "game:free_fire_cis", "game:pubg_mobile"},
+          str(sorted(got)))
+    check("выручка игры считается отдельно",
+          got["game:free_fire_cis"]["revenue"] == 3200,
+          fmt(got["game:free_fire_cis"]["revenue"]))
+    check("прибыль по направлению считается",
+          got["game:pubg_mobile"]["profit"] == 378,
+          fmt(got["game:pubg_mobile"]["profit"]))
+    check("возврат виден у своего направления",
+          got["game:free_fire_cis"]["refunds"] == 1
+          and got["game:free_fire_cis"]["refunded_sum"] == 1700,
+          str(got["game:free_fire_cis"]["refunds"]))
+    check("возврат не попал в выручку направления",
+          got["game:free_fire_cis"]["revenue"] == 3200)
+    check("игры помечены как игры",
+          got["game:pubg_mobile"]["is_game"] and not got["steam"]["is_game"])
+    check("звёзды и Steam не смешались",
+          got["steam"]["revenue"] == 5000 and got["stars"]["revenue"] == 11500,
+          f"{got['steam']['revenue']} / {got['stars']['revenue']}")
+    check("направления идут от крупного к мелкому",
+          [r["product_type"] for r in by][0] == "stars",
+          str([r["product_type"] for r in by]))
+    check("название направления подставлено",
+          got["game:free_fire_cis"]["title"] == "🔥 Free Fire",
+          got["game:free_fire_cis"]["title"])
+
+    # пустое направление в отчёт не лезет: строка «Premium — 0» ничего
+    # не говорит, а места занимает столько же, сколько настоящая продажа
+    check("направления без заказов не показываются", "premium" not in got,
+          str(sorted(got)))
+
+    text = panel.format_report("Тест", data, days, by_product=by)
+    check("в отчёте есть разбивка", "Что продано" in text, text[:60])
+    check("в разбивке названа игра", "Free Fire" in text)
+    check("игры сведены в одну строку", "🕹 Игры" in text, text[:400])
+    check("возвраты видны в разбивке", "возвратов" in text)
+
+    only_stars = [r for r in by if r["product_type"] == "stars"]
+    check("одно направление не делает лишнего итога",
+          "🕹 Игры" not in panel.product_block(only_stars))
+    one_game = [r for r in by if r["product_type"] == "game:pubg_mobile"]
+    check("одна игра сама себе итог",
+          "🕹 Игры" not in panel.product_block(one_game)
+          and "PUBG" in panel.product_block(one_game))
+    check("без продаж разбивки нет", panel.product_block([]) == "")
+    check("пустой отчёт не спотыкается о разбивку",
+          "Что продано" not in panel.format_report("Пусто", empty, []))
+
+    since, until = reports.bounds(date(2020, 1, 1), date(2020, 1, 2))
+    check("за пустой период разбивка пустая",
+          await db.report_by_product(conn, since, until) == [])
+
     # ------------------------------------------- сверка номеров заказов
     found = await db.find_order_by_external(conn, "FZ-109")
     check("заказ находится по номеру платформы",

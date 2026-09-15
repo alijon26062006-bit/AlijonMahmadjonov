@@ -1919,7 +1919,64 @@ def report_kb(active: str = "") -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def format_report(title: str, data: dict, days: list, hint: str = "") -> str:
+def product_block(rows: list) -> str:
+    """Что продано по направлениям: звёзды, Premium, Steam, каждая игра.
+
+    Одна общая цифра выручки не отвечает на главный вопрос владельца —
+    это звёзды или игры. Игры сводим ещё и в одну строку: их много, и
+    по отдельности видно каждую, а вместе — сколько даёт направление.
+
+    Возвраты показываем тут же. Пятнадцать возвратов на тринадцать
+    выдач в общей сводке выглядят загадкой, а в разбивке сразу видно,
+    какое направление их делает.
+    """
+    if not rows:
+        return ""
+
+    def line(mark: str, row: dict) -> str:
+        parts = [f"<b>{row['orders']}</b> зак.", f"<b>{fmt(row['revenue'])}</b>"]
+        if row["cost"]:
+            parts.append(f"<i>+{fmt(row['profit'])}</i>")
+        text = f"{mark} {row['title']} — " + " · ".join(parts)
+        if row["refunds"]:
+            # Вторая строка идёт под своей веткой: у «├» ветка тянется
+            # дальше, у «└» она уже закончилась.
+            cont = mark.replace("├", "│").replace("└", " ") + "   "
+            text += (f"\n{cont}↩️ возвратов: <b>{row['refunds']}</b> "
+                     f"<i>({fmt(row['refunded_sum'])})</i>")
+        return text
+
+    games = [r for r in rows if r["is_game"]]
+    plain = [r for r in rows if not r["is_game"]]
+
+    out = []
+    for index, row in enumerate(plain):
+        last = index == len(plain) - 1 and not games
+        out.append(line("└" if last else "├", row))
+
+    if games:
+        # Одна игра сама себе итог — вторая такая же строка только мешает.
+        if len(games) == 1:
+            out.append(line("└", games[0]))
+        else:
+            out.append(line("└", {
+                "title": "🕹 Игры",
+                "orders": sum(r["orders"] for r in games),
+                "revenue": sum(r["revenue"] for r in games),
+                "cost": sum(r["cost"] for r in games),
+                "profit": sum(r["profit"] for r in games),
+                "refunds": sum(r["refunds"] for r in games),
+                "refunded_sum": sum(r["refunded_sum"] for r in games),
+            }))
+            for index, row in enumerate(games):
+                out.append(line("   └" if index == len(games) - 1 else "   ├",
+                                row))
+
+    return "🧾 <b>Что продано</b>\n" + "\n".join(out) + "\n\n"
+
+
+def format_report(title: str, data: dict, days: list, hint: str = "",
+                  by_product: list | None = None) -> str:
     """Отчёт за период. Ручные правки показываем отдельной строкой:
     без этого деньги на балансах не сходились бы с пополнениями."""
     """Отчёт за период. Прибыль показываем, только если знаем себестоимость."""
@@ -1960,7 +2017,8 @@ def format_report(title: str, data: dict, days: list, hint: str = "") -> str:
         f"├ На разборе: <b>{data['failed']}</b>\n"
         f"├ Звёзд продано: <b>{data['stars']}</b>\n"
         f"└ Premium: <b>{data['premium_months']}</b> мес.\n\n"
-        f"[[referral]] <b>Клиенты</b>\n"
+        + product_block(by_product or [])
+        + f"[[referral]] <b>Клиенты</b>\n"
         f"├ Новых: <b>{data['new_users']}</b>\n"
         f"├ Покупали: <b>{data['buyers']}</b>\n"
         f"└ Пополнений: <b>{data['deposits']}</b> "
@@ -1980,9 +2038,10 @@ async def show_report(
     since, until = reports.bounds(start, end)
     data = await db.report(conn, since, until)
     days = await db.daily_series(conn, since, until, reports.tz_hours())
+    by_product = await db.report_by_product(conn, since, until)
     await safe_edit(
         call,
-        substitute(format_report(title, data, days)),
+        substitute(format_report(title, data, days, by_product=by_product)),
         report_kb(active),
     )
 
@@ -2037,10 +2096,11 @@ async def on_report_period(
     since, until = reports.bounds(start, end)
     data = await db.report(conn, since, until)
     days = await db.daily_series(conn, since, until, reports.tz_hours())
+    by_product = await db.report_by_product(conn, since, until)
     title = (f"{start.strftime('%d.%m.%Y')} — {end.strftime('%d.%m.%Y')}"
              if start != end else start.strftime("%d.%m.%Y"))
     await message.answer(
-        substitute(format_report(title, data, days)),
+        substitute(format_report(title, data, days, by_product=by_product)),
         reply_markup=report_kb(),
     )
 

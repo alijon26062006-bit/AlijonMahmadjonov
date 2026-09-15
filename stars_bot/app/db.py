@@ -1811,6 +1811,44 @@ async def report(
     return data
 
 
+async def report_by_product(
+    conn: aiosqlite.Connection, since: str, until: str
+) -> list[dict[str, Any]]:
+    """Что продано за период по каждому направлению.
+
+    Общая цифра «продано на 186 сомони» не отвечает на главный вопрос:
+    это звёзды или игры. Возвраты считаем здесь же — пятнадцать возвратов
+    на тринадцать выдач видно только в разбивке, и сразу понятно, какое
+    направление их делает.
+    """
+    async with conn.execute(
+        """SELECT product_type,
+                  COALESCE(SUM(status = ?), 0)                          AS orders,
+                  COALESCE(SUM(CASE WHEN status = ? THEN quantity END), 0) AS quantity,
+                  COALESCE(SUM(CASE WHEN status = ? THEN price END), 0) AS revenue,
+                  COALESCE(SUM(CASE WHEN status = ? THEN cost  END), 0) AS cost,
+                  COALESCE(SUM(status = ?), 0)                          AS refunds,
+                  COALESCE(SUM(CASE WHEN status = ? THEN price END), 0) AS refunded_sum
+           FROM orders
+           WHERE created_at >= ? AND created_at < ?
+           GROUP BY product_type""",
+        (ORDER_DELIVERED, ORDER_DELIVERED, ORDER_DELIVERED, ORDER_DELIVERED,
+         ORDER_REFUNDED, ORDER_REFUNDED, since, until),
+    ) as cur:
+        rows = [dict(row) for row in await cur.fetchall()]
+
+    for row in rows:
+        row["profit"] = row["revenue"] - row["cost"]
+        row["title"] = product_title(row["product_type"])
+        row["is_game"] = row["product_type"].startswith("game:")
+
+    # Пустые направления в отчёте не нужны: строка «Premium — 0» ничего
+    # не говорит, а места занимает столько же, сколько настоящая продажа.
+    rows = [r for r in rows if r["orders"] or r["refunds"]]
+    rows.sort(key=lambda r: (-r["revenue"], -r["orders"], r["title"]))
+    return rows
+
+
 async def daily_series(
     conn: aiosqlite.Connection, since: str, until: str, tz_hours: int
 ) -> list[tuple[str, int, int, int]]:
