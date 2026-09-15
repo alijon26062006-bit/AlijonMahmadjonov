@@ -275,6 +275,11 @@ case "\${1:-help}" in
                     echo "  Уведомления от кого-либо ещё разбираться не будут."
                     exit 1
                 fi
+                if ! echo "\${3#@}" | grep -qE '^[A-Za-z0-9_]{4,32}$'; then
+                    echo "❌ Это не похоже на юзернейм или id: \$3"
+                    echo "   Нужно вроде bank_notify_bot или числовой id."
+                    exit 1
+                fi
                 sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" \
                     --set BANK_BOT="\${3#@}"
                 systemctl restart "\$UB" 2>/dev/null || true
@@ -284,6 +289,21 @@ case "\${1:-help}" in
                 if [ -z "\${4:-}" ]; then
                     echo "Использование: stars-bot userbot keys API_ID API_HASH"
                     echo "  Берутся на https://my.telegram.org → API development tools"
+                    exit 1
+                fi
+                # Проверяем форму ключей, а не только их наличие: подставить
+                # слово-заготовку вместо значения — самая частая ошибка, и
+                # без проверки она всплывёт только при входе в Telegram.
+                if ! echo "\$3" | grep -qE '^[0-9]{5,12}$'; then
+                    echo "❌ API_ID — это число, например 12345678."
+                    echo "   Вы прислали: \$3"
+                    echo "   Возьмите его на https://my.telegram.org"
+                    exit 1
+                fi
+                if ! echo "\$4" | grep -qiE '^[a-f0-9]{32}$'; then
+                    echo "❌ API_HASH — 32 знака: цифры и буквы a-f."
+                    echo "   Длина присланного: \${#4}"
+                    echo "   Возьмите его на https://my.telegram.org"
                     exit 1
                 fi
                 sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" \
