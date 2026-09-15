@@ -33,6 +33,15 @@ log = get()
 RETRY_MIN = 5
 RETRY_MAX = 300
 
+#: После скольких неудач подряд зовём владельца.
+#:
+#: Юзербот переподключается сам, и обрыв связи на минуту — обычное дело,
+#: беспокоить из-за него незачем. Но сессию могут и отозвать («Завершить
+#: все сеансы» в Telegram), и тогда он будет молча стучаться в закрытую
+#: дверь сутками, пока владелец не заметит, что оплаты перестали
+#: подтверждаться. Пять неудач подряд — это уже не связь.
+ALERT_AFTER = 5
+
 #: Сколько уведомлений держим в очереди. Больше — значит что-то совсем
 #: не так, и лишние лучше потерять, чем съесть всю память.
 QUEUE = 100
@@ -88,8 +97,23 @@ async def _drain(queue: asyncio.Queue, bot) -> None:
         await conn.close()
 
 
-async def run() -> None:
-    """Запустить юзербота. Возвращается только по отмене задачи."""
+async def _tell(bot, text: str) -> None:
+    """Написать владельцам. Сообщение о поломке не должно ломать то, что
+    ещё работает, — поэтому ошибки здесь глотаются."""
+    from app.services.delivery import notify_admins
+
+    try:
+        await notify_admins(bot, text)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("[USERBOT] не смог написать владельцу: %s", exc)
+
+
+async def run(bot=None) -> None:
+    """Запустить юзербота. Возвращается только по отмене задачи.
+
+    bot — чем писать владельцу. Свой заводится сам; передают его снаружи
+    только проверки, которым настоящий Telegram не нужен.
+    """
     from aiogram import Bot
     from aiogram.client.default import DefaultBotProperties
     from aiogram.enums import ParseMode
@@ -109,11 +133,15 @@ async def run() -> None:
     log.info("[USERBOT] Слушаю уведомления от: %s", wanted_name)
 
     settings.session_file.parent.mkdir(parents=True, exist_ok=True)
-    bot = Bot(settings.bot_token,
-              default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    own_bot = bot is None
+    if own_bot:
+        bot = Bot(settings.bot_token,
+                  default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     queue: asyncio.Queue = asyncio.Queue(maxsize=QUEUE)
     worker = asyncio.create_task(_drain(queue, bot))
     pause = RETRY_MIN
+    misses = 0          # неудач подряд
+    told = False        # владельцу уже сообщили о поломке
 
     try:
         while True:
@@ -139,13 +167,31 @@ async def run() -> None:
                 await client.start()
                 me = await client.get_me()
                 log.info("[USERBOT] Подключён как @%s", me.username or me.id)
-                pause = RETRY_MIN
+                if told:
+                    await _tell(bot, "✅ <b>Юзербот снова на связи</b>\n\n"
+                                     "<i>Оплаты опять подтверждаются сами.</i>")
+                pause, misses, told = RETRY_MIN, 0, False
                 await client.run_until_disconnected()
                 log.warning("[USERBOT] Связь с Telegram пропала")
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001 — обрыв связи не ошибка
                 log.warning("[USERBOT] Подключение сорвалось: %s", exc)
+                misses += 1
+                if misses >= ALERT_AFTER and not told:
+                    told = True
+                    await _tell(
+                        bot,
+                        "🔌 <b>Юзербот не может подключиться к Telegram</b>\n"
+                        f"├ Попыток подряд: <b>{misses}</b>\n"
+                        f"└ <code>{str(exc)[:200]}</code>\n\n"
+                        "<blockquote>Оплаты сейчас <b>не подтверждаются "
+                        "сами</b> — проверяйте заявки руками: "
+                        "/panel → 📥 Заявки.\n\n"
+                        "Частая причина — сеанс завершён в Telegram. "
+                        "Тогда нужен новый вход: "
+                        "<code>stars-bot userbot login</code></blockquote>",
+                    )
             finally:
                 with contextlib.suppress(Exception):
                     await client.disconnect()
@@ -157,5 +203,6 @@ async def run() -> None:
         worker.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await worker
-        with contextlib.suppress(Exception):
-            await bot.session.close()
+        if own_bot:
+            with contextlib.suppress(Exception):
+                await bot.session.close()

@@ -379,6 +379,75 @@ async def worker_loop(bot) -> None:
           str(saved.get(3002)))
 
 
+async def reconnect(bot) -> None:
+    """Обрыв связи не ошибка, а вот пять обрывов подряд — уже повод."""
+    import app.userbot.runner as runner
+
+    # Подменяем Telegram: клиент, который всегда отказывается подключаться.
+    class DeadClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        def on(self, _event):
+            return lambda fn: fn
+
+        async def start(self):
+            raise ConnectionError("сеанс завершён")
+
+        async def disconnect(self):
+            return None
+
+    import types
+    fake = types.ModuleType("telethon")
+    fake.TelegramClient = DeadClient
+    fake.events = types.SimpleNamespace(NewMessage=lambda **kw: None)
+    real = sys.modules.get("telethon")
+    sys.modules["telethon"] = fake
+
+    slept = []
+
+    async def no_sleep(seconds):
+        slept.append(seconds)
+        if len(slept) > runner.ALERT_AFTER + 1:
+            raise asyncio.CancelledError
+
+    real_sleep = asyncio.sleep
+    asyncio.sleep = no_sleep
+    settings_ready = None
+    try:
+        from app.config import settings
+        settings_ready = (settings.tg_api_id, settings.tg_api_hash,
+                          settings.bank_bot)
+        settings.tg_api_id, settings.tg_api_hash = 1, "x" * 32
+        settings.bank_bot = "bank_test_bot"
+        bot.clear()
+        with contextlib.suppress(asyncio.CancelledError):
+            await runner.run(bot)
+    finally:
+        asyncio.sleep = real_sleep
+        if real is not None:
+            sys.modules["telethon"] = real
+        else:
+            sys.modules.pop("telethon", None)
+        if settings_ready:
+            from app.config import settings as back
+            back.tg_api_id, back.tg_api_hash, back.bank_bot = settings_ready
+
+    check("после обрыва пробует снова", len(slept) > 1, str(slept[:4]))
+    check("пауза растёт, а не долбит Telegram",
+          slept[:3] == sorted(slept[:3]) and slept[0] == runner.RETRY_MIN,
+          str(slept[:4]))
+    check("пауза не растёт бесконечно",
+          all(value <= runner.RETRY_MAX for value in slept), str(slept))
+    warned = [text for _, text in bot.sent if "не может подключиться" in text]
+    check("после пяти неудач владельца зовут", len(warned) >= 1,
+          str(len(warned)))
+    check("но зовут один раз, а не каждые пять секунд", len(warned) <= 2,
+          str(len(warned)))
+    check("в письме сказано, что делать",
+          warned and "userbot login" in warned[0], warned[0][-90:] if warned else "")
+
+
 # ────────────────────────────────────────────────── запуск
 
 
@@ -397,6 +466,7 @@ async def main() -> None:
     finally:
         await conn.close()
     await worker_loop(bot)
+    await reconnect(bot)
 
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")
     if FAIL:
