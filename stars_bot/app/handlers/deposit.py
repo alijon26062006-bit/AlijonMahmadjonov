@@ -173,27 +173,64 @@ async def on_receipt(
     else:
         await db.attach_receipt(conn, deposit.id, file_id)
 
-    # Пока клиент искал чек, деньги могли уже прийти и юзербот мог
-    # закрыть заявку сам. Тогда и клиенту, и владельцу говорим другое.
-    fresh = await db.get_deposit(conn, deposit.id)
-    paid = fresh is not None and fresh.status == db.DEP_APPROVED
     await state.clear()
 
-    if paid:
-        user = await db.get_user(conn, message.from_user.id)
-        await message.answer(
-            texts.DEPOSIT_APPROVED.format(
-                amount=fmt(amount), balance=fmt(user.balance if user else 0)
-            ),
-            reply_markup=keyboards.back(),
-        )
-    else:
-        await message.answer(
-            texts.DEPOSIT_SENT.format(deposit_id=deposit.id, amount=fmt(amount)),
-            reply_markup=keyboards.back(),
-        )
+    # Чек — вторая половина условия. Деньги от банка могли прийти раньше
+    # и ждать именно этого: теперь обе части на месте, можно зачислять.
+    credited = await _credit_if_paid(conn, bot, deposit)
+
+    fresh = await db.get_deposit(conn, deposit.id)
+    paid = fresh is not None and fresh.status == db.DEP_APPROVED
+
+    # Про пополнение клиенту уже написали при зачислении — второй раз
+    # то же самое слать нельзя: выглядит как два разных пополнения.
+    if not credited:
+        if paid:
+            user = await db.get_user(conn, message.from_user.id)
+            await message.answer(
+                texts.DEPOSIT_APPROVED.format(
+                    amount=fmt(amount), balance=fmt(user.balance if user else 0)
+                ),
+                reply_markup=keyboards.back(),
+            )
+        else:
+            await message.answer(
+                texts.DEPOSIT_SENT.format(deposit_id=deposit.id,
+                                          amount=fmt(amount)),
+                reply_markup=keyboards.back(),
+            )
 
     await _send_receipt(message, conn, deposit, amount, paid)
+
+
+async def _credit_if_paid(conn, bot, deposit) -> bool:
+    """Зачислить, если перевод уже пришёл и ждал чека.
+
+    True — деньги зачислены прямо сейчас, и клиенту об этом написали.
+
+    Порядок «сначала чек, потом деньги» выбран владельцем нарочно:
+    совпадения одной суммы мало, чтобы решить, чей это перевод. Зато
+    когда обе половины на месте, подтверждать вручную уже нечего.
+    """
+    from app.handlers.admin import _resolve_deposit
+    from app.userbot.processor import ROBOT
+
+    held = await db.held_bank_payment(conn, deposit.id)
+    if held is None:
+        return False
+
+    await _resolve_deposit(conn, bot, deposit.id, ROBOT, approved=True)
+    fresh = await db.get_deposit(conn, deposit.id)
+    if fresh is None or fresh.status != db.DEP_APPROVED:
+        return False
+
+    await db.close_bank_payment(
+        conn, held.id, status=db.BANK_MATCHED, deposit_id=deposit.id,
+        note="зачислено после чека",
+    )
+    log.info("Заявка %s закрыта: пришёл чек к уже полученному переводу",
+             deposit.id)
+    return True
 
 
 async def _send_receipt(message, conn, deposit, amount: int, paid: bool) -> None:

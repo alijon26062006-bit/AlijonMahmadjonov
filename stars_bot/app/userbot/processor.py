@@ -102,8 +102,20 @@ async def handle(
 
 
 async def _confirm(conn, bot, payment, deposit, notice) -> Result:
-    """Ровно одна подходящая заявка — закрываем её."""
+    """Ровно одна подходящая заявка.
+
+    Но зачисляем только если клиент уже прислал чек. Совпадения одной
+    суммы мало, чтобы решить, чьи это деньги: заявку на 1 сомони мог
+    оставить один человек, а заплатить в ту же минуту — другой, вообще
+    без заявки. Чек связывает перевод с тем, кто его просит.
+
+    Чека ещё нет — деньги ждут его. Заявка остаётся открытой, и владелец
+    в любой момент может закрыть её руками.
+    """
     from app.handlers.admin import _resolve_deposit
+
+    if not deposit.receipt_file_id:
+        return await _hold(conn, bot, payment, deposit, notice)
 
     report = await _resolve_deposit(conn, bot, deposit.id, ROBOT, approved=True)
     fresh = await db.get_deposit(conn, deposit.id)
@@ -139,6 +151,45 @@ async def _confirm(conn, bot, payment, deposit, notice) -> Result:
     )
     return Result(status=db.BANK_MATCHED, amount=notice.amount,
                   deposit_id=deposit.id, note=report)
+
+
+async def _hold(conn, bot, payment, deposit, notice) -> Result:
+    """Деньги пришли, чека ещё нет. Придержать и попросить чек."""
+    await db.close_bank_payment(
+        conn, payment.id, status=db.BANK_HOLD, deposit_id=deposit.id,
+        note="ждём чек от клиента",
+    )
+    log.info("[USERBOT] Payment held — заявка %s ждёт чек", deposit.id)
+
+    from app.services.delivery import notify
+
+    try:
+        await notify(
+            bot, deposit.user_id,
+            f"💰 <b>Перевод на {fmt(notice.amount)} получен</b>\n\n"
+            "Осталось прислать сюда <b>скриншот чека</b> — и баланс "
+            "пополнится сразу.\n\n"
+            "<blockquote>Чек нужен, чтобы мы точно знали, что этот "
+            "перевод ваш.</blockquote>",
+        )
+    except Exception as exc:  # noqa: BLE001 — письмо не важнее платежа
+        log.warning("[USERBOT] не смог написать клиенту: %s", exc)
+
+    await _tell_owner(
+        bot,
+        "📸 <b>Оплата получена, ждём чек</b>\n"
+        f"├ Заявка: <code>№{deposit.id}</code>\n"
+        f"├ Сумма: <b>{fmt(notice.amount)}</b>\n"
+        f"├ Клиент: <code>{deposit.user_id}</code>\n"
+        + (f"├ Отправитель: <code>{notice.sender}</code>\n"
+           if notice.sender else "")
+        + f"└ Код банка: <code>{notice.op_code or '—'}</code>\n\n"
+        "<blockquote>Деньги придут на баланс, как только клиент пришлёт "
+        "чек. Если он этого не сделает — зачислите сами: "
+        f"<code>/dep_ok {deposit.id}</code></blockquote>",
+    )
+    return Result(status=db.BANK_HOLD, amount=notice.amount,
+                  deposit_id=deposit.id, note="ждём чек")
 
 
 async def _ambiguous(conn, bot, payment, waiting, notice) -> Result:

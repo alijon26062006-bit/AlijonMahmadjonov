@@ -516,7 +516,7 @@ async def without_receipt(conn, bot) -> None:
     check("клиенту обещано автоматическое зачисление",
           "сам" in ask.last, ask.last[-160:])
 
-    # Деньги пришли. Чека нет, кнопок никто не нажимал.
+    # Деньги пришли, чека ещё нет — зачислять рано.
     before = (await db.get_user(conn, CLIENT)).balance
     bot.clear()
     result = await processor.handle(
@@ -524,49 +524,66 @@ async def without_receipt(conn, bot) -> None:
         text=sample(zach="Zachislenie 3.33 TJS", summa="Summa 3.33 TJS",
                     kod="Kod 99001"))
 
-    check("оплата без чека подтверждена сама", result.confirmed, result.status)
-    check("закрыта та самая заявка", result.deposit_id == deposit.id,
-          str(result.deposit_id))
-    check("деньги на балансе",
-          (await db.get_user(conn, CLIENT)).balance == before + 333,
+    check("без чека деньги придержаны", result.status == db.BANK_HOLD,
+          result.status)
+    check("баланс не тронут",
+          (await db.get_user(conn, CLIENT)).balance == before,
           str((await db.get_user(conn, CLIENT)).balance))
-    check("клиенту сказали о пополнении",
-          any(chat == CLIENT for chat, _ in bot.sent), str(bot.sent[:1]))
+    check("заявка осталась открытой",
+          (await db.get_deposit(conn, deposit.id)).status == db.DEP_PENDING)
+    check("клиента попросили чек",
+          any(chat == CLIENT and "чек" in text.lower()
+              for chat, text in bot.sent), str(bot.sent[:1]))
+    check("владельцу сказали, что деньги ждут",
+          any("ждём чек" in text for _, text in bot.sent), str(bot.sent[-1:]))
 
-    # Клиент всё-таки прислал чек — уже после зачисления.
-    was = len(await db.list_deposits(conn, user_id=CLIENT, limit=50))
-    late = Msg()
-    late.photo = [type("P", (), {"file_id": "photo1"})()]
-    late.copies = []
+    # Чек пришёл — вот теперь зачисляем.
+    receipt = Msg()
+    receipt.photo = [type("P", (), {"file_id": "photo1"})()]
+    receipt.copies = []
 
     async def copy_to(chat_id, caption="", **kw):
-        late.copies.append((chat_id, caption, kw.get("reply_markup")))
+        receipt.copies.append((chat_id, caption, kw.get("reply_markup")))
         return None
 
-    late.copy_to = copy_to
+    receipt.copy_to = copy_to
+    bot.clear()
     state.name = "Deposit:receipt"
-    await dep_h.on_receipt(late, state, conn, bot)
+    await dep_h.on_receipt(receipt, state, conn, bot)
 
-    now = await db.list_deposits(conn, user_id=CLIENT, limit=50)
-    check("поздний чек не создаёт вторую заявку", len(now) == was,
-          f"было {was}, стало {len(now)}")
-    check("чек прикрепился к той же заявке",
-          (await db.get_deposit(conn, deposit.id)).receipt_file_id == "photo1",
-          str((await db.get_deposit(conn, deposit.id)).receipt_file_id))
-    check("деньги второй раз не зачислены",
+    check("после чека деньги зачислены",
           (await db.get_user(conn, CLIENT)).balance == before + 333,
           str((await db.get_user(conn, CLIENT)).balance))
-    check("клиенту сказали, что уже зачислено",
-          "Баланс пополнен" in late.last, late.last[:60])
+    check("заявка закрыта",
+          (await db.get_deposit(conn, deposit.id)).status == db.DEP_APPROVED)
+    check("чек прикреплён к ней",
+          (await db.get_deposit(conn, deposit.id)).receipt_file_id == "photo1")
 
-    # Чек всё равно уходит владельцу: при споре искать его будет негде.
-    check("чек переслан владельцу", bool(late.copies), str(len(late.copies)))
-    caption = late.copies[0][1] if late.copies else ""
-    check("в подписи видно, что банк подтвердил",
+    told = [text for chat, text in bot.sent if chat == CLIENT
+            and "Баланс пополнен" in text]
+    check("клиенту сказали о пополнении один раз", len(told) == 1,
+          str(len(told)))
+    check("и бот не повторил это же сообщение",
+          "Баланс пополнен" not in receipt.last, receipt.last[:60])
+
+    check("чек ушёл владельцу", bool(receipt.copies), str(len(receipt.copies)))
+    caption = receipt.copies[0][1] if receipt.copies else ""
+    check("в подписи видно, что подтвердил банк",
           "Банк подтвердил" in caption and "3.33" in caption, caption[:200])
     check("и код банка для сверки", "99001" in caption, caption[:200])
     check("кнопок «зачислить» у оплаченной нет",
-          late.copies[0][2] is None, str(late.copies[0][2]))
+          receipt.copies[0][2] is None, str(receipt.copies[0][2]))
+
+    # Повтор того же уведомления ничего не меняет.
+    balance = (await db.get_user(conn, CLIENT)).balance
+    again = await processor.handle(
+        conn, bot, source=SOURCE, message_id=4001,
+        text=sample(zach="Zachislenie 3.33 TJS", summa="Summa 3.33 TJS",
+                    kod="Kod 99001"))
+    check("повтор уведомления отброшен", again.status == "duplicate",
+          again.status)
+    check("и денег не прибавилось",
+          (await db.get_user(conn, CLIENT)).balance == balance)
 
     # Брошенная заявка не должна мешать через неделю.
     old = await db.create_deposit(
@@ -581,12 +598,17 @@ async def without_receipt(conn, bot) -> None:
     check("старая брошенная заявка в подбор не идёт",
           [d.id for d in found] == [fresh.id], str([d.id for d in found]))
 
+    # У свежей заявки чек уже есть — значит деньги можно зачислять сразу.
+    await db.attach_receipt(conn, fresh.id, "photo2")
     balance = (await db.get_user(conn, CLIENT)).balance
     result = await processor.handle(
         conn, bot, source=SOURCE, message_id=4002,
         text=sample(zach="Zachislenie 4.44 TJS", summa="Summa 4.44 TJS",
                     kod="Kod 99002"))
-    check("и не делает оплату спорной", result.confirmed, result.status)
+    check("чек прислан раньше денег — зачисляем сразу", result.confirmed,
+          result.status)
+    check("и не делает оплату спорной", result.deposit_id == fresh.id,
+          str(result.deposit_id))
     check("деньги ушли живой заявке",
           (await db.get_user(conn, CLIENT)).balance == balance + 444,
           str((await db.get_user(conn, CLIENT)).balance))

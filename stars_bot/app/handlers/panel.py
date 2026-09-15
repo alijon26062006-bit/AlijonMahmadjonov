@@ -5512,7 +5512,8 @@ async def cb_api_log(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
 
 
 #: Какие платежи ждут решения владельца.
-BANK_OPEN = (db.BANK_AMBIGUOUS, db.BANK_UNKNOWN, db.BANK_FAILED)
+BANK_OPEN = (db.BANK_HOLD, db.BANK_AMBIGUOUS, db.BANK_UNKNOWN,
+             db.BANK_FAILED)
 
 
 @router.callback_query(F.data == "pn:bank")
@@ -5540,13 +5541,15 @@ async def cb_bank(call: CallbackQuery, state: FSMContext,
         call,
         f"🏦 <b>Оплаты от банка</b>\n<code>{texts.LINE}</code>\n\n"
         f"✅ Зачислено само: <b>{stats.get(db.BANK_MATCHED, 0)}</b>\n"
+        f"📸 Ждут чек: <b>{stats.get(db.BANK_HOLD, 0)}</b>\n"
         f"⚠️ Несколько заявок: <b>{stats.get(db.BANK_AMBIGUOUS, 0)}</b>\n"
         f"❔ Без заявки: <b>{stats.get(db.BANK_UNKNOWN, 0)}</b>\n"
         f"🚫 Не разобрал: <b>{stats.get(db.BANK_FAILED, 0)}</b>\n\n"
         f"<b>Последние</b>\n{body}\n\n"
-        "<blockquote>Юзербот зачисляет сам, только когда заявка на такую "
-        "сумму ровно одна. Во всех остальных случаях деньги ждут вас — "
-        "выбрать наугад значило бы зачислить чужой платёж.</blockquote>",
+        "<blockquote>Деньги зачисляются сами, когда сошлось всё сразу: "
+        "заявка на эту сумму ровно одна и клиент прислал чек. Иначе "
+        "платёж ждёт вас — выбрать наугад значило бы отдать чужие "
+        "деньги.</blockquote>",
         kb.as_markup(),
     )
     await call.answer()

@@ -2483,12 +2483,14 @@ async def release_idem(
 
 #: Что случилось с банковским уведомлением.
 BANK_MATCHED = "matched"       # нашлась ровно одна заявка, деньги зачислены
+BANK_HOLD = "hold"             # деньги пришли, ждём чек от клиента
 BANK_AMBIGUOUS = "ambiguous"   # подходящих заявок несколько — решает владелец
 BANK_UNKNOWN = "unknown"       # заявки на такую сумму нет
 BANK_FAILED = "failed"         # уведомление не разобралось
 
 BANK_TITLES = {
     BANK_MATCHED: "✅ Зачислено",
+    BANK_HOLD: "📸 Ждём чек",
     BANK_AMBIGUOUS: "⚠️ Несколько заявок",
     BANK_UNKNOWN: "❔ Заявка не найдена",
     BANK_FAILED: "🚫 Не разобрал",
@@ -2630,6 +2632,24 @@ async def bank_payment_for_deposit(
     async with conn.execute(
         "SELECT * FROM bank_payments WHERE deposit_id = ? ORDER BY id DESC LIMIT 1",
         (deposit_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    return _from_row(BankPayment, row) if row else None
+
+
+async def held_bank_payment(
+    conn: aiosqlite.Connection, deposit_id: int
+) -> BankPayment | None:
+    """Зачисление, которое ждёт чек по этой заявке.
+
+    Деньги от банка уже пришли и сумма сошлась, но клиент ещё не прислал
+    чек. Пока чека нет, баланс не трогаем: совпадения одной суммы мало,
+    чтобы решить, чьи это деньги.
+    """
+    async with conn.execute(
+        "SELECT * FROM bank_payments WHERE deposit_id = ? AND status = ? "
+        "ORDER BY id DESC LIMIT 1",
+        (deposit_id, BANK_HOLD),
     ) as cur:
         row = await cur.fetchone()
     return _from_row(BankPayment, row) if row else None
