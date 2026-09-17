@@ -16,6 +16,8 @@
 """
 from __future__ import annotations
 
+import asyncio
+import time
 from decimal import ROUND_HALF_UP, Decimal
 
 from app import db, runtime
@@ -95,6 +97,26 @@ def _steam() -> list[dict]:
     return out
 
 
+def _game_item(game, offer: dict, shadow: bool = False) -> dict:
+    """Один пакет игры в виде товара API."""
+    return {
+        "id": f"game:{game.category_id}:{offer['offer_id']}",
+        "type": "game",
+        "name": f"{game.title} — {offer['name']}",
+        "game": game.title,
+        "game_id": game.category_id,
+        "unit": "pack",
+        "variable": False,
+        "quantity": 1,
+        "customer": ", ".join(game.field_names),
+        "customer_required": True,
+        "fields": list(game.field_names),
+        "cost": offer["cost"],       # внутреннее: в ответ не уходит
+        "shadow": shadow,            # внутреннее: игры нет в боте
+        **money(offer["price"]),
+    }
+
+
 async def _games(conn, provider) -> list[dict]:
     """Игровые пакеты. Молчим о сломанном поставщике: остальной каталог
     должен отдаваться, даже если игры сейчас не отвечают."""
@@ -103,6 +125,8 @@ async def _games(conn, provider) -> list[dict]:
 
     if not runtime.get_bool("games_enabled"):
         return []
+    if runtime.get_bool("api_all_games"):
+        return await all_supplier_games(conn, provider)
 
     out = []
     for game in await db.list_games(conn, only_enabled=True):
@@ -110,29 +134,128 @@ async def _games(conn, provider) -> list[dict]:
             offers = await offers_of(suppliers.for_games(provider), game, conn)
         except Exception:  # noqa: BLE001 — одна игра не должна гасить каталог
             continue
-        for offer in offers:
-            out.append({
-                "id": f"game:{game.category_id}:{offer['offer_id']}",
-                "type": "game",
-                "name": f"{game.title} — {offer['name']}",
-                "game": game.title,
-                "game_id": game.category_id,
-                "unit": "pack",
-                "variable": False,
-                "quantity": 1,
-                "customer": ", ".join(game.field_names),
-                "customer_required": True,
-                "fields": list(game.field_names),
-                "cost": offer["cost"],       # внутреннее: в ответ не уходит
-                **money(offer["price"]),
-            })
+        out += [_game_item(game, offer) for offer in offers]
     return out
+
+
+# ──────────────────────────────────── весь каталог поставщика
+
+#: Пакеты каждой категории — отдельный запрос к поставщику, а категорий
+#: у него десятки. Поэтому собранный каталог живёт FULL_TTL, собирается
+#: строго в одном потоке (иначе десяток разработчиков устроил бы
+#: поставщику лавину) и по нескольку категорий за раз.
+FULL_TTL = 10 * 60
+FETCH_AT_ONCE = 8
+#: Предел на всякий случай: ответ на сотню тысяч позиций не осилит ни
+#: наш сервер, ни клиент на той стороне.
+MAX_GAME_ITEMS = 5000
+
+_full: tuple[float, list[dict]] | None = None
+_building = asyncio.Lock()
+
+
+def forget_full() -> None:
+    """Забыть собранный каталог — после смены ключа или правки игры."""
+    global _full
+    _full = None
+
+
+def _shadow_game(entry: dict):
+    """Игра, которой в боте нет: берём её прямо из каталога поставщика.
+
+    Запись в базу не заводим до первой покупки — иначе один заход в
+    каталог засорил бы список игр владельца сотней строк, которые он не
+    заводил.
+    """
+    names = []
+    for field in entry.get("fields") or []:
+        name = field.get("name") if isinstance(field, dict) else field
+        if name:
+            names.append(str(name))
+    code = str(entry.get("category_id") or "")
+    return db.Game(
+        category_id=code, title=str(entry.get("name") or code),
+        field=",".join(names), region="", margin=0, enabled=0, created_at="",
+    )
+
+
+async def all_supplier_games(conn, provider) -> list[dict]:
+    """Весь игровой каталог поставщика, а не только включённое в боте."""
+    global _full
+
+    if _full and time.time() - _full[0] < FULL_TTL:
+        return _full[1]
+    async with _building:
+        # Пока ждали очереди, каталог мог собрать кто-то другой.
+        if _full and time.time() - _full[0] < FULL_TTL:
+            return _full[1]
+        items = await _build_supplier_games(conn, provider)
+        _full = (time.time(), items)
+        return items
+
+
+async def _build_supplier_games(conn, provider) -> list[dict]:
+    from app.handlers.games import offers_of
+    from app.services import games as gsvc
+    from app.services import suppliers
+
+    supplier = suppliers.for_games(provider)
+    try:
+        categories = await gsvc.full_catalog(supplier, cached=True)
+    except Exception:  # noqa: BLE001 — поставщик молчит, каталог не пуст
+        return []
+
+    # Настройки владельца важнее каталога поставщика: где игра заведена
+    # в боте, берём её название, наценку и свои цены пакетов.
+    known = {game.category_id: game for game in await db.list_games(conn)}
+    gate = asyncio.Semaphore(FETCH_AT_ONCE)
+
+    async def one(entry: dict) -> list[dict]:
+        code = str(entry.get("category_id") or "")
+        if not code:
+            return []
+        game = known.get(code)
+        shadow = game is None
+        if shadow:
+            game = _shadow_game(entry)
+        async with gate:
+            try:
+                offers = await offers_of(supplier, game, conn, cached=True)
+            except Exception:  # noqa: BLE001 — одна игра не гасит каталог
+                return []
+        return [_game_item(game, offer, shadow) for offer in offers]
+
+    out: list[dict] = []
+    for chunk in await asyncio.gather(*(one(entry) for entry in categories)):
+        out += chunk
+        if len(out) >= MAX_GAME_ITEMS:
+            return out[:MAX_GAME_ITEMS]
+    return out
+
+
+async def game_for(conn, item: dict):
+    """Игра под товар из каталога. None — её больше нет.
+
+    Игру, которой в боте не было, заводим здесь, при первой покупке:
+    дальше всё — выдача, разбор отказа, починка полей, отчёты — идёт по
+    общей дороге с играми из бота. Заводим выключенной: в меню бота она
+    не появится, пока владелец сам её не включит.
+    """
+    game = await db.get_game(conn, item["game_id"])
+    if game is not None:
+        return game
+    if not item.get("shadow"):
+        return None
+    return await db.add_game(
+        conn, category_id=item["game_id"], title=item["game"],
+        field=",".join(item.get("fields") or ["user_id"]),
+    )
 
 
 #: Поля, которые наружу не уходят никогда: себестоимость и служебные
 #: пометки. Перечислены явно — новое внутреннее поле лучше пусть
 #: сломает проверку, чем однажды тихо уедет разработчику.
-HIDDEN = ("cost", "cost_unit_e4", "wholesale")
+HIDDEN = ("cost", "cost_unit_e4", "wholesale", "shadow")
 
 
 def public(item: dict) -> dict:

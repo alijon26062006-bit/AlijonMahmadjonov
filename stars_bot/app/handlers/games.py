@@ -30,6 +30,7 @@ _offers: dict[str, list[dict]] = {}
 
 async def offers_of(
     provider, game: db.Game, conn=None, *, for_owner: bool = False,
+    cached: bool = False,
 ) -> list[dict]:
     """Пакеты игры с ценой в сомони.
 
@@ -40,7 +41,7 @@ async def offers_of(
     for_owner — показать и скрытые: в панели их надо видеть, чтобы
     вернуть обратно.
     """
-    raw = await provider.game_offers(game.category_id)
+    raw = await svc.offers_raw(provider, game.category_id, cached)
     margin = svc.margin_of(game)
     setup = await db.game_offers_setup(conn, game.category_id) if conn else {}
 

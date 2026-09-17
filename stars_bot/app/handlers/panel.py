@@ -5301,6 +5301,10 @@ async def cb_api(call: CallbackQuery, state: FSMContext,
            btn("📋 Запросы", "pn:api_log"))
     kb.row(btn("⚡️ Лимит запросов", "pn:api_rate"),
            btn("💰 Наценка", "pn:set:api_margin"))
+    kb.row(btn("🎮 Каталог игр: "
+               + ("весь у поставщика" if runtime.get_bool("api_all_games")
+                  else "как в боте"),
+               "pn:api_allgames"))
     kb.row(btn("🌐 За обратным прокси: "
                + ("да" if runtime.get_bool("api_behind_proxy") else "нет"),
                "pn:api_proxy"))
@@ -5357,6 +5361,19 @@ async def cb_api_toggle(call: CallbackQuery, state: FSMContext,
         else "API выключен: запросы сразу получают отказ"
     )
     await cb_api(call, state, conn)
+
+
+@router.callback_query(F.data == "pn:api_allgames")
+async def cb_api_all_games(call: CallbackQuery, state: FSMContext,
+                           conn: aiosqlite.Connection) -> None:
+    """Отдавать разработчикам весь каталог поставщика или только своё."""
+    from app.api import catalog as api_catalog
+
+    on = runtime.get_bool("api_all_games")
+    await runtime.set_value(conn, "api_all_games", "0" if on else "1")
+    api_catalog.forget_full()
+    await cb_api(call, state, conn)
+    await call.answer("Теперь как в боте" if on else "Теперь весь каталог")
 
 
 @router.callback_query(F.data == "pn:api_proxy")

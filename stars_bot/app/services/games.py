@@ -119,8 +119,38 @@ _catalog: dict[int, tuple[float, list[dict]]] = {}
 CATALOG_TTL = 10 * 60
 
 
+#: Пакеты каждой категории — отдельный запрос к поставщику. Когда через
+#: API отдаётся весь его каталог, таких запросов десятки, и без памяти
+#: каждый заход разработчика превращался бы в лавину.
+_offers_raw: dict[tuple[int, str], tuple[float, list[dict]]] = {}
+
+
 def forget_catalog() -> None:
     _catalog.clear()
+    _offers_raw.clear()
+    # Готовый каталог API собран из этих же данных — он тоже устарел.
+    from app.api import catalog as api_catalog
+
+    api_catalog.forget_full()
+
+
+async def offers_raw(provider, category_id: str, cached: bool = False) -> list[dict]:
+    """Пакеты категории у поставщика.
+
+    cached — отдать запомненное, если оно свежее CATALOG_TTL. Просят об
+    этом только там, где категорий много: в боте пакеты берутся живьём,
+    как и раньше.
+    """
+    import time
+
+    key = (id(provider), category_id)
+    if cached:
+        hit = _offers_raw.get(key)
+        if hit and time.time() - hit[0] < CATALOG_TTL:
+            return hit[1]
+    data = await provider.game_offers(category_id)
+    _offers_raw[key] = (time.time(), data)
+    return data
 
 
 async def full_catalog(provider, cached: bool = False) -> list[dict]:

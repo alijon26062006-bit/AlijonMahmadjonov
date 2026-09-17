@@ -283,7 +283,7 @@ async def _place(request, caller, item, quantity, customer, idem) -> web.Respons
     product_type, real_quantity = catalog.order_plan(item, quantity)
     game = None
     if item["type"] == "game":
-        game = await db.get_game(conn, item["game_id"])
+        game = await catalog.game_for(conn, item)
         if game is None:
             return fail(404, "product_not_found", "Игра снята с продажи.")
         fields = _game_fields(game, customer)

@@ -699,6 +699,96 @@ async def wholesale_prices(conn) -> None:
     await runtime.set_value(conn, "api_margin", "0")
 
 
+
+# ──────────────────────────────────── весь каталог поставщика
+
+
+class GamesProvider(Provider):
+    """Поставщик с двумя играми: одна заведена в боте, второй там нет."""
+
+    def __init__(self):
+        super().__init__()
+        self.asked: list[str] = []
+        self.ordered: list[dict] = []
+
+    async def game_categories(self):
+        return [{"category_id": "in_bot", "name": "Игра из бота"},
+                {"category_id": "not_in_bot", "name": "Новая игра"}]
+
+    async def game_catalog(self):
+        return [{"category_id": "not_in_bot", "name": "Новая игра",
+                 "fields": [{"name": "user_id"}, {"name": "server_id"}]}]
+
+    async def game_offers(self, category_id):
+        self.asked.append(category_id)
+        return [{"offer_id": "p1", "name": "100 алмазов",
+                 "usd": Decimal("1.00"), "raw": {}}]
+
+    async def order_game(self, **kw):
+        self.ordered.append(kw)
+        return {"order_id": "SUP-1", "status": "completed"}
+
+
+async def full_supplier_catalog(conn) -> None:
+    """Каталог целиком: игры, которых в боте нет, тоже продаются."""
+    from app.services import games as gsvc
+
+    supplier = GamesProvider()
+    await runtime.set_value(conn, "games_enabled", "1")
+    await runtime.set_value(conn, "margin_percent", "20")
+    await db.add_game(conn, category_id="in_bot", title="Игра из бота")
+    await db.update_game(conn, "in_bot", enabled=1)
+
+    await runtime.set_value(conn, "api_all_games", "0")
+    gsvc.forget_catalog()
+    only_mine = [i["id"] for i in await catalog.listing(conn, supplier, "game")]
+    check("по умолчанию отдаём только свои игры",
+          only_mine == ["game:in_bot:p1"], str(only_mine))
+
+    await runtime.set_value(conn, "api_all_games", "1")
+    gsvc.forget_catalog()
+    whole = {i["id"]: i for i in await catalog.listing(conn, supplier, "game")}
+    check("весь каталог поставщика отдаётся",
+          set(whole) == {"game:in_bot:p1", "game:not_in_bot:p1"},
+          ", ".join(sorted(whole)))
+
+    new = whole["game:not_in_bot:p1"]
+    check("у чужой игры взяты её поля",
+          new["fields"] == ["user_id", "server_id"], str(new["fields"]))
+    check("название взято у поставщика",
+          new["game"] == "Новая игра", new["game"])
+    check("служебная пометка наружу не уходит",
+          "shadow" not in catalog.public(new))
+
+    # Игры, которой нет в боте, в списке игр владельца быть не должно:
+    # иначе один заход в каталог засорил бы ему панель.
+    listed = {game.category_id for game in await db.list_games(conn)}
+    check("каталог не заводит игру в боте сам по себе",
+          "not_in_bot" not in listed, ", ".join(sorted(listed)))
+
+    # Второй заход не должен снова дёргать поставщика: категорий у него
+    # десятки, и каждый запрос — отдельное обращение по сети.
+    before = len(supplier.asked)
+    await catalog.listing(conn, supplier, "game")
+    check("собранный каталог не пересобирается на каждый запрос",
+          len(supplier.asked) == before, f"{before} → {len(supplier.asked)}")
+
+    # А вот при покупке игра заводится — и выключенной, чтобы не всплыть
+    # в меню бота без ведома владельца.
+    game = await catalog.game_for(conn, new)
+    check("при покупке игра заводится сама", game is not None
+          and game.category_id == "not_in_bot")
+    check("и заведена выключенной", game is not None and not game.enabled,
+          str(game.enabled if game else "нет"))
+    check("поля перенесены как есть",
+          game is not None and game.field_names == ["user_id", "server_id"],
+          str(game.field_names if game else []))
+
+    await runtime.set_value(conn, "api_all_games", "0")
+    await runtime.set_value(conn, "games_enabled", "0")
+    gsvc.forget_catalog()
+
+
 # ───────────────────────────────────────────────── запуск
 
 
@@ -724,6 +814,7 @@ async def main() -> None:
         await webhook_out(conn)
         await hook_marks(conn)
         await wholesale_prices(conn)
+        await full_supplier_catalog(conn)
     finally:
         await conn.close()
 
