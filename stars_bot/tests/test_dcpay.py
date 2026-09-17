@@ -13,6 +13,7 @@ import env_fixture  # noqa: F401
 from app import db, keyboards, runtime, texts
 from app.handlers import deposit as dep_h
 from app.handlers import panel
+from app.money import fmt
 from app.services import dcpay
 
 PASS, FAIL = [], []
@@ -164,7 +165,13 @@ async def run(conn) -> None:
     msg = FakeMessage("120")
     await dep_h.on_amount(msg, state, conn)
 
-    check("сумма принята и показаны реквизиты", "120.00" in msg.last)
+    # Сумма получает уникальный хвост в копейках — по нему бот узнаёт
+    # именно этот перевод. Клиент просил 120, платит 120.0X.
+    shown = state.data["amount"]
+    check("к сумме добавлен хвост в копейках",
+          12000 < shown <= 12010, str(shown))
+    check("сумма принята и показаны реквизиты",
+          fmt(shown) in msg.last, msg.last[:200])
     labels = [b.text for row in msg.markups[-1].inline_keyboard for b in row]
     check("предложена быстрая оплата",
           any("Душанбе Сити" in b for b in labels), str(labels))
@@ -180,7 +187,8 @@ async def run(conn) -> None:
 
     q = parse_qs(urlparse(pay.url).query)
     check("в ссылке счёт из настроек", q["a"] == ["9999000011112222"], str(q["a"]))
-    check("в ссылке сумма, которую выбрал клиент", q["s"] == ["120"], str(q["s"]))
+    check("в ссылке та же сумма, что на экране",
+          q["s"] == [dcpay.amount_text(shown)], str(q["s"]))
     check("в комментарии подпись и код платежа",
           q["c"][0].startswith("@uwayscoder TOP"), str(q["c"]))
 
@@ -192,7 +200,8 @@ async def run(conn) -> None:
     check("код платежа сохранён в заявке",
           deposits[0].reference and deposits[0].reference.startswith("TOP"),
           str(deposits[0].reference))
-    check("сумма заявки верная", deposits[0].amount == 12000, str(deposits[0].amount))
+    check("сумма заявки совпадает с показанной",
+          deposits[0].amount == shown, str(deposits[0].amount))
 
     # -------------- счёт берётся из реквизитов, если отдельно не задан
     await runtime.set_value(conn, "dc_account", "")

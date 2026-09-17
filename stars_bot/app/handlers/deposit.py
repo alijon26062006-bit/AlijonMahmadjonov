@@ -62,6 +62,14 @@ async def on_amount(
     # придёт позже или не придёт вовсе.
     reference = dcpay.make_reference()
 
+    # К сумме добавляются копейки — не для красоты, а чтобы платёж стал
+    # узнаваемым. Клиент просит 10 сомони, платит 10.04, и такая сумма
+    # прямо сейчас не ждёт больше никого. Тогда уведомление банка
+    # опознаётся одной цифрой, без чеков и без гадания, чей это перевод.
+    amount = await db.free_amount(
+        conn, amount, hours=runtime.get_int("deposit_match_hours", 6)
+    )
+
     # Заявку заводим ПРЯМО СЕЙЧАС, до оплаты и до всякого чека.
     #
     # Раньше она появлялась только после присланного чека — и это ломало
@@ -78,7 +86,18 @@ async def on_amount(
                             deposit_id=deposit.id)
     await state.set_state(Deposit.receipt)
     body, markup = _requisites(amount, reference)
-    await message.answer(body, reply_markup=markup)
+    shown = await message.answer(body, reply_markup=markup)
+
+    # Запоминаем, где показаны реквизиты: когда деньги придут, номер
+    # карты надо будет убрать с экрана — платить по нему больше нечего.
+    await _remember_screen(conn, deposit.id, shown)
+
+
+async def _remember_screen(conn, deposit_id: int, shown) -> None:
+    chat = getattr(getattr(shown, "chat", None), "id", None)
+    msg_id = getattr(shown, "message_id", None)
+    if chat and msg_id:
+        await db.set_deposit_screen(conn, deposit_id, chat, msg_id)
 
 
 def _requisites(amount: int, reference: str) -> tuple[str, object]:
@@ -134,17 +153,17 @@ async def cb_paid(
         await call.answer("Заявка потерялась, начните заново.", show_alert=True)
         return
 
-    known = bool(await db.senders_of(conn, call.from_user.id))
-    body = (texts.DEPOSIT_WAIT_KNOWN if known else texts.DEPOSIT_ASK_RECEIPT)
     await call.message.edit_text(
-        body.format(amount=fmt(amount)),
+        texts.DEPOSIT_WAITING.format(amount=fmt(amount)),
         reply_markup=keyboards.deposit_receipt(),
     )
     await call.answer()
 
 
 @router.callback_query(Deposit.receipt, F.data == "dep:back")
-async def cb_back_to_requisites(call: CallbackQuery, state: FSMContext) -> None:
+async def cb_back_to_requisites(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
     """Вернуться к реквизитам: клиент мог закрыть банк, не заплатив."""
     data = await state.get_data()
     amount, reference = data.get("amount"), data.get("reference", "")
@@ -154,6 +173,8 @@ async def cb_back_to_requisites(call: CallbackQuery, state: FSMContext) -> None:
         return
     body, markup = _requisites(amount, reference)
     await call.message.edit_text(body, reply_markup=markup)
+    if data.get("deposit_id"):
+        await _remember_screen(conn, data["deposit_id"], call.message)
     await call.answer()
 
 

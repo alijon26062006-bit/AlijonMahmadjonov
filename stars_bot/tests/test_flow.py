@@ -186,7 +186,11 @@ async def run_scenario(conn) -> None:
 
     msg = FakeMessage("100", bot=bot)
     await dep_h.on_amount(msg, state, conn)
-    check("выдаются реквизиты Душанбе", "Душанбе" in msg.last and "100.00" in msg.last)
+    # Сумма получает хвост в копейках: по нему узнаётся перевод.
+    paying = (await state.get_data())["amount"]
+    check("к сумме добавлен хвост", 10000 < paying <= 10010, str(paying))
+    check("выдаются реквизиты Душанбе",
+          "Душанбе" in msg.last and fmt(paying) in msg.last, msg.last[:200])
     check("состояние ждёт чек", await state.get_state() == "Deposit:receipt")
 
     check("про чек на первом экране не просим",
@@ -209,12 +213,12 @@ async def run_scenario(conn) -> None:
           "скриншот чека" in call.last, call.last[:240])
     check("но зачисление обещано без него",
           "пополнится <b>сам</b>" in call.last, call.last[:240])
-    check("названа сумма к зачислению", "100.00" in call.last, call.last)
+    check("названа сумма к зачислению", fmt(paying) in call.last, call.last)
     check("состояние осталось прежним",
           await state.get_state() == "Deposit:receipt")
 
     call = FakeCallback("dep:back", bot=bot)
-    await dep_h.cb_back_to_requisites(call, state)
+    await dep_h.cb_back_to_requisites(call, state, conn)
     check("к реквизитам можно вернуться", "Переведите" in call.last,
           call.last[:80])
 
@@ -229,13 +233,15 @@ async def run_scenario(conn) -> None:
     await dep_h.on_receipt(msg, state, conn, bot)
     pending = await db.list_deposits(conn, status=db.DEP_PENDING)
     check("заявка на пополнение создана", len(pending) == 1
-          and pending[0].amount == 10000, fmt(pending[0].amount) if pending else "—")
+          and pending[0].amount == paying,
+          fmt(pending[0].amount) if pending else "—")
 
     # админ подтверждает
     from app.handlers.admin import _resolve_deposit
     report = await _resolve_deposit(conn, bot, pending[0].id, 111, approved=True)
     user = await db.get_user(conn, USER_ID)
-    check("после подтверждения баланс пополнен", user.balance == 10000, fmt(user.balance))
+    check("после подтверждения баланс пополнен", user.balance == paying,
+          fmt(user.balance))
     check("повторное подтверждение не проходит",
           "уже обработана" in await _resolve_deposit(conn, bot, pending[0].id, 111, approved=True))
 
@@ -281,7 +287,7 @@ async def run_scenario(conn) -> None:
     check("после подтверждения показывается сводка заказа",
           "Подтверждение заказа" in call.last)
     check("в сводке верная сумма и остаток",
-          "20.00" in call.last and "80.00" in call.last,
+          "20.00" in call.last and fmt(paying - 2000) in call.last,
           call.last.replace("\n", " ")[:100])
 
     call = FakeCallback("order:go", bot=bot)
@@ -290,7 +296,7 @@ async def run_scenario(conn) -> None:
     orders = await db.list_orders(conn, user_id=USER_ID)
     check("звёзды отправлены получателю", provider.delivered == [("target_user", 100)],
           str(provider.delivered))
-    check("баланс списан", user.balance == 8000, fmt(user.balance))
+    check("баланс списан", user.balance == paying - 2000, fmt(user.balance))
     check("заказ выполнен", orders and orders[0].status == db.ORDER_DELIVERED)
     check("покупателю пришло подтверждение",
           any("выполнен" in text for _, text in bot.messages))
@@ -307,7 +313,7 @@ async def run_scenario(conn) -> None:
     call = FakeCallback("m:profile", bot=bot)
     await prof_h.cb_profile(call, state, conn)
     check("профиль показывает баланс и статистику",
-          "80.00" in call.last and "Звёзд куплено" in call.last
+          fmt(paying - 2000) in call.last and "Звёзд куплено" in call.last
           and "100" in call.last)
 
     call = FakeCallback("p:history", bot=bot)

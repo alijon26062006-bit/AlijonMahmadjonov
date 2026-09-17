@@ -284,12 +284,37 @@ async def matching(conn, bot) -> None:
         conn, bot, source=SOURCE, message_id=2002,
         text=sample(zach="Zachislenie 100.01 TJS", kod="Kod 77002",
                     otpr="Otpravitel 9991110002222"))
-    check("14. 100.01 не закрывает заявку на 100.00",
-          result.status == db.BANK_UNKNOWN, result.status)
-    check("    деньги не тронуты",
-          (await db.get_user(conn, CLIENT)).balance == balance)
-    check("    заявка ждёт дальше",
-          (await db.get_deposit(conn, first.id)).status == db.DEP_PENDING)
+    # 14. Сумма разошлась на копейку. Раньше это был отказ, теперь —
+    # закрытие ближайшей заявки, если она рядом ровно одна: бот сам
+    # просит платить с копейками, и человек, отправивший круглую сумму,
+    # не должен из-за этого ждать владельца. Двух рядом это не касается.
+    check("14. копейка разницы закрывает единственную соседнюю заявку",
+          result.confirmed, result.status)
+    check("    зачислено столько, сколько пришло",
+          (await db.get_user(conn, CLIENT)).balance == balance + 10001,
+          str((await db.get_user(conn, CLIENT)).balance))
+    check("    и заявка стала на ту же сумму",
+          (await db.get_deposit(conn, first.id)).amount == 10001,
+          str((await db.get_deposit(conn, first.id)).amount))
+
+    # А вот когда рядом двое — по-прежнему решает владелец.
+    near1 = await db.create_deposit(conn, user_id=CLIENT, amount=7001,
+                                    method="card", receipt_file_id="")
+    near2 = await db.create_deposit(conn, user_id=OTHER, amount=7002,
+                                    method="card", receipt_file_id="")
+    balance = (await db.get_user(conn, CLIENT)).balance
+    result = await processor.handle(
+        conn, bot, source=SOURCE, message_id=2009,
+        text=sample(zach="Zachislenie 70.00 TJS", summa="Summa 70.00 TJS",
+                    kod="Kod 77009", otpr="Otpravitel 9991110009999"))
+    check("    но двух соседей наугад не разбираем",
+          result.status == db.BANK_AMBIGUOUS, result.status)
+    check("    и деньги никому не ушли",
+          (await db.get_user(conn, CLIENT)).balance == balance
+          and (await db.get_deposit(conn, near1.id)).status == db.DEP_PENDING
+          and (await db.get_deposit(conn, near2.id)).status == db.DEP_PENDING)
+    await db.resolve_deposit(conn, near1.id, approved=False, admin_id=1)
+    await db.resolve_deposit(conn, near2.id, approved=False, admin_id=1)
 
     # ---- заявки нет вовсе
     bot.clear()
@@ -303,6 +328,8 @@ async def matching(conn, bot) -> None:
 
     # ---- неразобранное сообщение
     bot.clear()
+    open_one = await db.create_deposit(conn, user_id=CLIENT, amount=9500,
+                                       method="card", receipt_file_id="")
     result = await processor.handle(
         conn, bot, source=SOURCE, message_id=2004, text="Spisanie\nSumma 50.00 TJS")
     check("списание не закрывает заявок", result.status == db.BANK_FAILED,
@@ -310,7 +337,7 @@ async def matching(conn, bot) -> None:
     check("владельцу сказали, что не разобрал",
           "не разобрал" in bot.last(), bot.last()[:60])
     check("заявка по-прежнему ждёт",
-          (await db.get_deposit(conn, first.id)).status == db.DEP_PENDING)
+          (await db.get_deposit(conn, open_one.id)).status == db.DEP_PENDING)
 
     # ---- гонка: заявку закрыли раньше нас
     await db.resolve_deposit(conn, first.id, approved=True, admin_id=777)
@@ -449,11 +476,12 @@ async def reconnect(bot) -> None:
           warned and "userbot login" in warned[0], warned[0][-90:] if warned else "")
 
 
-async def without_receipt(conn, bot) -> None:
-    """Главный сценарий: клиент назвал сумму, заплатил — и всё.
+async def unique_kopeck(conn, bot) -> None:
+    """Главный сценарий: копейки делают платёж узнаваемым.
 
-    Чек не присылал, кнопок не нажимал, владелец ничего не подтверждал.
-    Именно ради этого юзербот и писался.
+    Клиент просит 10 сомони, платит 10.04 — и такой суммы прямо сейчас
+    не ждёт больше никто. Тогда уведомление банка опознаётся одной
+    цифрой: ни чека, ни подтверждения владельцем.
     """
     from app.handlers import deposit as dep_h
     from app.states import Deposit
@@ -479,8 +507,9 @@ async def without_receipt(conn, bot) -> None:
             self.name = None
 
     class Msg:
-        def __init__(self, text=None, uid=CLIENT):
+        def __init__(self, text=None, uid=CLIENT, message_id=700):
             self.text = text
+            self.message_id = message_id
             self.from_user = type("U", (), {"id": uid, "username": "client",
                                             "first_name": "Клиент"})()
             self.chat = type("C", (), {"id": uid})()
@@ -490,7 +519,8 @@ async def without_receipt(conn, bot) -> None:
 
         async def answer(self, text, **kw):
             self.replies.append(text)
-            return self
+            answer = Msg(uid=self.from_user.id, message_id=self.message_id + 1)
+            return answer
 
         async def copy_to(self, *a, **kw):
             return None
@@ -499,216 +529,167 @@ async def without_receipt(conn, bot) -> None:
         def last(self):
             return self.replies[-1] if self.replies else ""
 
+    class Edits(FakeBot):
+        """Бот, который помнит правки чужих сообщений."""
+
+        def __init__(self):
+            super().__init__()
+            self.edits = []
+
+        async def edit_message_text(self, chat_id, message_id, text, **kw):
+            self.edits.append((chat_id, message_id, text))
+
+    watcher = Edits()
     await runtime.set_value(conn, "min_deposit_diram", "100")
     await runtime.set_value(conn, "pay_card_number", "9999000011112222")
 
+    # ---- трое просят одну и ту же сумму
+    amounts = []
+    for index in range(3):
+        state = State()
+        await state.set_state(Deposit.amount)
+        ask = Msg("10", uid=CLIENT + index)
+        await db.upsert_user(conn, CLIENT + index, f"c{index}", "К")
+        await dep_h.on_amount(ask, state, conn)
+        amounts.append(state.data["amount"])
+
+    check("троим выдали разные суммы", len(set(amounts)) == 3, str(amounts))
+    check("все начинаются с запрошенных 10",
+          all(1000 < value <= 1010 for value in amounts), str(amounts))
+    check("клиенту объяснили, зачем копейки",
+          "Копейки не убирайте" in ask.last, ask.last[-200:])
+
+    saved = await db.get_deposit(conn, state.data["deposit_id"])
+    check("бот запомнил, где показаны реквизиты",
+          saved.pay_chat and saved.pay_msg, f"{saved.pay_chat}/{saved.pay_msg}")
+
+    # ---- платит второй: попадает ровно в свою заявку
+    payer = CLIENT + 1
+    target = await db.pending_deposits_for(conn, amounts[1])
+    check("на эту сумму ждёт ровно один", len(target) == 1, str(len(target)))
+    before = (await db.get_user(conn, payer)).balance
+    watcher.clear()
+    watcher.edits.clear()
+
+    kopecks = amounts[1] % 100
+    result = await processor.handle(
+        conn, watcher, source=SOURCE, message_id=6001,
+        text=sample(zach=f"Zachislenie 10.{kopecks:02d} TJS",
+                    summa=f"Summa 10.{kopecks:02d} TJS",
+                    kod="Kod 66001", otpr="Otpravitel 9993330001111"))
+
+    check("платёж зачислен без чека", result.confirmed, result.status)
+    check("деньги ушли нужному клиенту", result.deposit_id == target[0].id,
+          str(result.deposit_id))
+    check("сумма зачислена полностью",
+          (await db.get_user(conn, payer)).balance == before + amounts[1],
+          str((await db.get_user(conn, payer)).balance))
+    others_open = [
+        (await db.get_deposit(conn, d.id)).status
+        for d in await db.pending_deposits_for(conn, amounts[0])
+    ]
+    check("чужие заявки не тронуты",
+          others_open and all(value == db.DEP_PENDING for value in others_open),
+          str(others_open))
+
+    check("реквизиты убраны с экрана", bool(watcher.edits), str(watcher.edits))
+    screen = watcher.edits[0][2] if watcher.edits else ""
+    check("на их месте — ответ об оплате",
+          "Оплата получена" in screen, screen[:80])
+    check("и новый баланс", "Текущий баланс" in screen, screen[:160])
+    check("номера карты на экране больше нет",
+          "9999000011112222" not in screen, screen[:160])
+
+    # ---- копейка освободилась: её можно выдать снова
     state = State()
     await state.set_state(Deposit.amount)
-    ask = Msg("3.33")
-    await dep_h.on_amount(ask, state, conn)
+    again = Msg("10", uid=CLIENT + 5)
+    await db.upsert_user(conn, CLIENT + 5, "c5", "К")
+    await dep_h.on_amount(again, state, conn)
+    check("освободившаяся копейка снова в ходу",
+          state.data["amount"] == amounts[1], 
+          f"{state.data['amount']} против {amounts[1]}")
 
-    check("заявка создана сразу на шаге суммы",
-          bool(state.data.get("deposit_id")), str(state.data))
-    deposit = await db.get_deposit(conn, state.data["deposit_id"])
-    check("она ждёт денег, а не проверки",
-          deposit.status == db.DEP_PENDING and not deposit.receipt_file_id,
-          str(deposit.status))
-    check("сумма заявки верная", deposit.amount == 333, str(deposit.amount))
-    check("клиенту обещано автоматическое зачисление",
-          "сам" in ask.last, ask.last[-160:])
+    # ---- заплатил круглую сумму вместо названной
+    await db.resolve_deposit(conn, state.data["deposit_id"], approved=False,
+                             admin_id=1)
+    for extra in await db.pending_deposits_for(conn, amounts[0]):
+        await db.resolve_deposit(conn, extra.id, approved=False, admin_id=1)
+    for extra in await db.pending_deposits_for(conn, amounts[2]):
+        await db.resolve_deposit(conn, extra.id, approved=False, admin_id=1)
 
-    # Деньги пришли, чека ещё нет — зачислять рано.
-    before = (await db.get_user(conn, CLIENT)).balance
-    bot.clear()
+    state = State()
+    await state.set_state(Deposit.amount)
+    lone = Msg("20", uid=CLIENT + 6)
+    await db.upsert_user(conn, CLIENT + 6, "c6", "К")
+    await dep_h.on_amount(lone, state, conn)
+    asked = state.data["amount"]
+    before = (await db.get_user(conn, CLIENT + 6)).balance
+
     result = await processor.handle(
-        conn, bot, source=SOURCE, message_id=4001,
-        text=sample(zach="Zachislenie 3.33 TJS", summa="Summa 3.33 TJS",
-                    kod="Kod 99001", otpr="Otpravitel 9992220001111"))
-
-    check("без чека деньги придержаны", result.status == db.BANK_HOLD,
+        conn, watcher, source=SOURCE, message_id=6002,
+        text=sample(zach="Zachislenie 20.00 TJS", summa="Summa 20.00 TJS",
+                    kod="Kod 66002", otpr="Otpravitel 9993330002222"))
+    check("круглая сумма закрыла ближайшую заявку", result.confirmed,
           result.status)
-    check("баланс не тронут",
-          (await db.get_user(conn, CLIENT)).balance == before,
-          str((await db.get_user(conn, CLIENT)).balance))
-    check("заявка осталась открытой",
-          (await db.get_deposit(conn, deposit.id)).status == db.DEP_PENDING)
-    check("клиента попросили чек",
-          any(chat == CLIENT and "чек" in text.lower()
-              for chat, text in bot.sent), str(bot.sent[:1]))
-    check("владельцу сказали, что деньги ждут",
-          any("ждём чек" in text for _, text in bot.sent), str(bot.sent[-1:]))
+    check("зачислено ровно столько, сколько пришло",
+          (await db.get_user(conn, CLIENT + 6)).balance == before + 2000,
+          str((await db.get_user(conn, CLIENT + 6)).balance))
+    check("а не столько, сколько просили", asked != 2000, str(asked))
 
-    # Чек пришёл — вот теперь зачисляем.
-    receipt = Msg()
-    receipt.photo = [type("P", (), {"file_id": "photo1"})()]
-    receipt.copies = []
-
-    async def copy_to(chat_id, caption="", **kw):
-        receipt.copies.append((chat_id, caption, kw.get("reply_markup")))
-        return None
-
-    receipt.copy_to = copy_to
-    bot.clear()
-    state.name = "Deposit:receipt"
-    await dep_h.on_receipt(receipt, state, conn, bot)
-
-    check("после чека деньги зачислены",
-          (await db.get_user(conn, CLIENT)).balance == before + 333,
-          str((await db.get_user(conn, CLIENT)).balance))
-    check("заявка закрыта",
-          (await db.get_deposit(conn, deposit.id)).status == db.DEP_APPROVED)
-    check("чек прикреплён к ней",
-          (await db.get_deposit(conn, deposit.id)).receipt_file_id == "photo1")
-
-    told = [text for chat, text in bot.sent if chat == CLIENT
-            and "Баланс пополнен" in text]
-    check("клиенту сказали о пополнении один раз", len(told) == 1,
-          str(len(told)))
-    check("и бот не повторил это же сообщение",
-          "Баланс пополнен" not in receipt.last, receipt.last[:60])
-
-    check("чек ушёл владельцу", bool(receipt.copies), str(len(receipt.copies)))
-    caption = receipt.copies[0][1] if receipt.copies else ""
-    check("в подписи видно, что подтвердил банк",
-          "Банк подтвердил" in caption and "3.33" in caption, caption[:200])
-    check("и код банка для сверки", "99001" in caption, caption[:200])
-    check("кнопок «зачислить» у оплаченной нет",
-          receipt.copies[0][2] is None, str(receipt.copies[0][2]))
-
-    # Повтор того же уведомления ничего не меняет.
-    balance = (await db.get_user(conn, CLIENT)).balance
-    again = await processor.handle(
-        conn, bot, source=SOURCE, message_id=4001,
-        text=sample(zach="Zachislenie 3.33 TJS", summa="Summa 3.33 TJS",
-                    kod="Kod 99001", otpr="Otpravitel 9992220001111"))
-    check("повтор уведомления отброшен", again.status == "duplicate",
-          again.status)
-    check("и денег не прибавилось",
-          (await db.get_user(conn, CLIENT)).balance == balance)
-
-    # Брошенная заявка не должна мешать через неделю.
-    old = await db.create_deposit(
-        conn, user_id=OTHER, amount=444, method="card", receipt_file_id="")
-    await conn.execute(
-        "UPDATE deposits SET created_at = '2020-01-01T00:00:00+00:00' WHERE id = ?",
-        (old.id,))
-    await conn.commit()
-    fresh = await db.create_deposit(
-        conn, user_id=CLIENT, amount=444, method="card", receipt_file_id="")
-    found = await db.pending_deposits_for(conn, 444, hours=6)
-    check("старая брошенная заявка в подбор не идёт",
-          [d.id for d in found] == [fresh.id], str([d.id for d in found]))
-
-    # У свежей заявки чек уже есть — значит деньги можно зачислять сразу.
-    await db.attach_receipt(conn, fresh.id, "photo2")
-    balance = (await db.get_user(conn, CLIENT)).balance
+    # ---- рядом две заявки — гадать нельзя
+    first = await db.create_deposit(conn, user_id=CLIENT + 7, amount=5001,
+                                    method="card", receipt_file_id="")
+    second = await db.create_deposit(conn, user_id=CLIENT + 8, amount=5002,
+                                     method="card", receipt_file_id="")
+    await db.upsert_user(conn, CLIENT + 7, "c7", "К")
+    await db.upsert_user(conn, CLIENT + 8, "c8", "К")
     result = await processor.handle(
-        conn, bot, source=SOURCE, message_id=4002,
-        text=sample(zach="Zachislenie 4.44 TJS", summa="Summa 4.44 TJS",
-                    kod="Kod 99002", otpr="Otpravitel 9992220002222"))
-    check("чек прислан раньше денег — зачисляем сразу", result.confirmed,
-          result.status)
-    check("и не делает оплату спорной", result.deposit_id == fresh.id,
-          str(result.deposit_id))
-    check("деньги ушли живой заявке",
-          (await db.get_user(conn, CLIENT)).balance == balance + 444,
-          str((await db.get_user(conn, CLIENT)).balance))
+        conn, watcher, source=SOURCE, message_id=6003,
+        text=sample(zach="Zachislenie 50.00 TJS", summa="Summa 50.00 TJS",
+                    kod="Kod 66003", otpr="Otpravitel 9993330003333"))
+    check("две заявки рядом — решает владелец",
+          result.status == db.BANK_AMBIGUOUS, result.status)
+    check("никому ничего не зачислено",
+          (await db.get_deposit(conn, first.id)).status == db.DEP_PENDING
+          and (await db.get_deposit(conn, second.id)).status == db.DEP_PENDING)
 
 
 async def known_sender(conn, bot) -> None:
-    """Постоянный клиент: второй платёж проходит без чека.
+    """Знакомый плательщик разбирает спор одинаковых сумм.
 
-    Это и есть вся идея. Чек нужен один раз, чтобы связать счёт
-    плательщика с клиентом. Дальше банк сам называет этот счёт в каждом
-    уведомлении, и узнавать клиента можно без всякой бумаги.
+    С уникальными копейками такой спор почти невозможен, но старые
+    заявки — заведённые до этой затеи — суммы не метили. Для них
+    остаётся вторая примета: счёт, с которого пришли деньги.
     """
     REGULAR = 930
     await db.upsert_user(conn, REGULAR, "regular", "Постоянный")
 
-    # ---- первый платёж: плательщик незнаком, чек нужен
-    first = await db.create_deposit(
-        conn, user_id=REGULAR, amount=1500, method="card", receipt_file_id="")
+    # ---- первый платёж: сумма уникальна, чека не просим
+    await db.create_deposit(
+        conn, user_id=REGULAR, amount=1507, method="card", receipt_file_id="")
     before = (await db.get_user(conn, REGULAR)).balance
     bot.clear()
 
     result = await processor.handle(
         conn, bot, source=SOURCE, message_id=5001,
-        text=sample(zach="Zachislenie 15.00 TJS", summa="Summa 15.00 TJS",
+        text=sample(zach="Zachislenie 15.07 TJS", summa="Summa 15.07 TJS",
                     kod="Kod 55001", otpr="Otpravitel 9990001112233"))
-    check("первый платёж ждёт чека", result.status == db.BANK_HOLD,
-          result.status)
-    check("счёт ещё не закреплён",
-          not await db.senders_of(conn, REGULAR), "")
-
-    # чек пришёл — зачисляем и запоминаем счёт
-    await db.attach_receipt(conn, first.id, "chek1")
-    from app.handlers import deposit as dep_h
-
-    class Msg:
-        def __init__(self, uid=REGULAR):
-            self.from_user = type("U", (), {"id": uid, "username": "regular",
-                                            "first_name": "П"})()
-            self.chat = type("C", (), {"id": uid})()
-            self.photo = [type("P", (), {"file_id": "chek1"})()]
-            self.document = None
-            self.replies = []
-
-        async def answer(self, text, **kw):
-            self.replies.append(text)
-            return self
-
-        async def copy_to(self, *a, **kw):
-            return None
-
-        @property
-        def last(self):
-            return self.replies[-1] if self.replies else ""
-
-    class State:
-        def __init__(self, data):
-            self.data = data
-
-        async def get_data(self):
-            return dict(self.data)
-
-        async def clear(self):
-            self.data.clear()
-
-    await dep_h.on_receipt(Msg(), State({"amount": 1500, "deposit_id": first.id}),
-                           conn, bot)
-    check("после чека зачислено",
-          (await db.get_user(conn, REGULAR)).balance == before + 1500,
+    check("первый платёж проходит без чека", result.confirmed, result.status)
+    check("деньги зачислены",
+          (await db.get_user(conn, REGULAR)).balance == before + 1507,
           str((await db.get_user(conn, REGULAR)).balance))
 
     bound = await db.senders_of(conn, REGULAR)
-    check("счёт плательщика закреплён за клиентом", len(bound) == 1,
-          str(bound))
+    check("счёт плательщика закреплён за клиентом", len(bound) == 1, str(bound))
     check("закреплён именно тот счёт",
           bound[0].sender == "999000***2233", bound[0].sender)
 
-    # ---- второй платёж: чек больше не нужен
-    second = await db.create_deposit(
-        conn, user_id=REGULAR, amount=2500, method="card", receipt_file_id="")
-    before = (await db.get_user(conn, REGULAR)).balance
-    bot.clear()
-
-    result = await processor.handle(
-        conn, bot, source=SOURCE, message_id=5002,
-        text=sample(zach="Zachislenie 25.00 TJS", summa="Summa 25.00 TJS",
-                    kod="Kod 55002", otpr="Otpravitel 9990001112233"))
-    check("знакомый счёт — зачисляем без чека", result.confirmed, result.status)
-    check("деньги пришли сразу",
-          (await db.get_user(conn, REGULAR)).balance == before + 2500,
-          str((await db.get_user(conn, REGULAR)).balance))
-    check("владельцу отмечено, что плательщик знакомый",
-          any("знакомый" in text for _, text in bot.sent), str(bot.sent[-1:]))
-
-    # ---- знакомый счёт разрешает спор одинаковых сумм
+    # ---- две старые заявки на одну и ту же сумму
     mine = await db.create_deposit(
         conn, user_id=REGULAR, amount=3300, method="card", receipt_file_id="")
     stranger = await db.create_deposit(
         conn, user_id=OTHER, amount=3300, method="card", receipt_file_id="")
-    before = (await db.get_user(conn, REGULAR)).balance
     others = (await db.get_user(conn, OTHER)).balance
 
     result = await processor.handle(
@@ -722,22 +703,27 @@ async def known_sender(conn, bot) -> None:
     check("чужая заявка не тронута",
           (await db.get_user(conn, OTHER)).balance == others
           and (await db.get_deposit(conn, stranger.id)).status == db.DEP_PENDING)
+    await db.resolve_deposit(conn, stranger.id, approved=False, admin_id=1)
 
-    # ---- знакомый счёт, но заявка только у чужого — не отдаём
+    # ---- знакомый счёт, но заявки только у чужих — не отдаём
     only_other = await db.create_deposit(
-        conn, user_id=OTHER, amount=4400, method="card", receipt_file_id="")
+        conn, user_id=OTHER, amount=4401, method="card", receipt_file_id="")
+    second_other = await db.create_deposit(
+        conn, user_id=OTHER + 1, amount=4402, method="card", receipt_file_id="")
+    await db.upsert_user(conn, OTHER + 1, "third", "Третий")
     others = (await db.get_user(conn, OTHER)).balance
+
     result = await processor.handle(
         conn, bot, source=SOURCE, message_id=5004,
         text=sample(zach="Zachislenie 44.00 TJS", summa="Summa 44.00 TJS",
                     kod="Kod 55004", otpr="Otpravitel 9990001112233"))
-    check("чужую заявку знакомому не отдаём",
+    check("чужие заявки знакомому не отдаём",
           result.status == db.BANK_AMBIGUOUS, result.status)
     check("и деньги никому не ушли",
-          (await db.get_user(conn, OTHER)).balance == others)
-
-
-# ────────────────────────────────────────────────── запуск
+          (await db.get_user(conn, OTHER)).balance == others
+          and (await db.get_deposit(conn, only_other.id)).status == db.DEP_PENDING)
+    await db.resolve_deposit(conn, only_other.id, approved=False, admin_id=1)
+    await db.resolve_deposit(conn, second_other.id, approved=False, admin_id=1)
 
 
 async def main() -> None:
@@ -752,7 +738,7 @@ async def main() -> None:
         masking()
         await matching(conn, bot)
         await sources()
-        await without_receipt(conn, bot)
+        await unique_kopeck(conn, bot)
         await known_sender(conn, bot)
     finally:
         await conn.close()

@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS deposits (
     reference       TEXT,
     status          TEXT NOT NULL,
     reviewed_by     INTEGER,
+    pay_chat        INTEGER,        -- где показан экран с реквизитами
+    pay_msg         INTEGER,        -- и какое это сообщение
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
@@ -543,6 +545,8 @@ class Deposit:
     reviewed_by: int | None
     created_at: str
     updated_at: str
+    pay_chat: int | None = None
+    pay_msg: int | None = None
 
     @property
     def status_title(self) -> str:
@@ -625,7 +629,13 @@ MIGRATIONS: dict[str, dict[str, str]] = {
         "kind": "TEXT NOT NULL DEFAULT 'bonus'",
         "percent": "INTEGER NOT NULL DEFAULT 0",
     },
-    "deposits": {"reference": "TEXT"},
+    # Где висит экран с реквизитами. Когда деньги придут, номер карты
+    # надо убрать с глаз — платить по нему больше нечего.
+    "deposits": {
+        "reference": "TEXT",
+        "pay_chat": "INTEGER",
+        "pay_msg": "INTEGER",
+    },
     "users": {"source": "TEXT"},
     # Код этой же игры у сервиса проверки ID — он свой, не как у
     # поставщика выдачи.
@@ -2733,3 +2743,98 @@ async def list_senders(
         "SELECT * FROM bank_senders ORDER BY last_at DESC LIMIT ?", (limit,)
     ) as cur:
         return [_from_row(BankSender, row) for row in await cur.fetchall()]
+
+
+#: Сколько копеек добавляем к сумме, чтобы платёж стал узнаваемым.
+#: Десяти хватает: столкнуться могут только заявки, оказавшиеся в работе
+#: одновременно, а не все за историю.
+KOPECK_MIN, KOPECK_MAX = 1, 10
+
+#: Если и эти заняты — расширяемся. До тупика дело дойти не должно.
+KOPECK_WIDE = 99
+
+
+async def busy_amounts(conn: aiosqlite.Connection, hours: int = 6) -> set[int]:
+    """Суммы, которые прямо сейчас кого-то ждут.
+
+    Только живые заявки. Закрытые и просроченные в расчёт не идут: их
+    копейки снова свободны, иначе через месяц свободных не осталось бы.
+    """
+    edge = (datetime.now(timezone.utc)
+            - timedelta(hours=max(1, hours))).isoformat(timespec="seconds")
+    async with conn.execute(
+        "SELECT amount FROM deposits WHERE status = ? AND created_at >= ?",
+        (DEP_PENDING, edge),
+    ) as cur:
+        return {row["amount"] for row in await cur.fetchall()}
+
+
+async def free_amount(
+    conn: aiosqlite.Connection, base: int, hours: int = 6
+) -> int:
+    """Сумма с уникальным хвостом: base плюс свободные копейки.
+
+    Копейки не случайные, а выбранные из свободных. Случайные могли бы
+    совпасть у двоих, и тогда пришлось бы гадать, чей это перевод — ровно
+    то, от чего хвост и придуман.
+
+    Сравниваем с ВСЕМИ живыми заявками, а не только с такой же круглой
+    суммой: 10.07 столкнулось бы и с базой 10.00, и с базой 10.06.
+    """
+    busy = await busy_amounts(conn, hours)
+    for tail in range(KOPECK_MIN, KOPECK_MAX + 1):
+        if base + tail not in busy:
+            return base + tail
+    for tail in range(KOPECK_MAX + 1, KOPECK_WIDE + 1):
+        if base + tail not in busy:
+            return base + tail
+    # Сто заявок на одну сумму одновременно — такого не бывает, но
+    # оставить человека без суммы нельзя: берём как есть.
+    return base + KOPECK_MIN
+
+
+async def pending_near(
+    conn: aiosqlite.Connection, amount: int, spread: int = KOPECK_MAX,
+    hours: int = 6,
+) -> list[Deposit]:
+    """Заявки, чья сумма отличается от пришедшей не больше чем на spread.
+
+    Нужно для тех, кто заплатил круглую сумму вместо названной: бот
+    просил 10.04, человек по привычке отправил 10.00. Если рядом ждёт
+    ровно одна заявка — это она и есть. Если несколько, гадать не станем.
+    """
+    edge = (datetime.now(timezone.utc)
+            - timedelta(hours=max(1, hours))).isoformat(timespec="seconds")
+    async with conn.execute(
+        "SELECT * FROM deposits WHERE status = ? AND created_at >= ? "
+        "AND amount BETWEEN ? AND ? ORDER BY id",
+        (DEP_PENDING, edge, amount - spread, amount + spread),
+    ) as cur:
+        return [_from_row(Deposit, row) for row in await cur.fetchall()]
+
+
+async def set_deposit_screen(
+    conn: aiosqlite.Connection, deposit_id: int, chat_id: int, message_id: int
+) -> None:
+    """Запомнить, где показан экран с реквизитами."""
+    await conn.execute(
+        "UPDATE deposits SET pay_chat = ?, pay_msg = ? WHERE id = ?",
+        (chat_id, message_id, deposit_id),
+    )
+    await conn.commit()
+
+
+async def set_deposit_amount(
+    conn: aiosqlite.Connection, deposit_id: int, amount: int
+) -> bool:
+    """Поправить сумму заявки под то, что правда пришло от банка.
+
+    Меняем только у заявки на проверке: у закрытой это переписало бы
+    историю, а зачислено там уже другое.
+    """
+    cur = await conn.execute(
+        "UPDATE deposits SET amount = ?, updated_at = ? WHERE id = ? AND status = ?",
+        (amount, _now(), deposit_id, DEP_PENDING),
+    )
+    await conn.commit()
+    return cur.rowcount > 0
