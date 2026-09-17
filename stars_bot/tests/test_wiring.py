@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -11,6 +13,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import env_fixture  # noqa: F401  — фиксирует настройки до импорта app
 
 from aiogram import Dispatcher
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.base import StorageKey
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from app import db, keyboards, runtime
 from app.handlers import (
@@ -58,6 +63,138 @@ def handled_patterns() -> list[str]:
     return patterns
 
 
+def exact_datas() -> list[str]:
+    """Адреса кнопок без параметров: те, что сравниваются целиком."""
+    found = set()
+    for path in Path("app/handlers").glob("*.py"):
+        found |= set(re.findall(r'F\.data\s*==\s*"([^"]+)"', path.read_text()))
+    return sorted(found)
+
+
+def screens() -> list[tuple[str, object]]:
+    """Экраны, которые открываются одной кнопкой.
+
+    Обработчик ищем не разбором текста фильтра — у aiogram он объект без
+    внятного вида, — а честной проверкой: подсовываем фильтру нажатие с
+    нужным адресом и смотрим, согласился ли он.
+    """
+    class Probe:
+        def __init__(self, data):
+            self.data = data
+
+    out = []
+    for data in exact_datas():
+        # Только экраны панели. Шаги покупки и рассылки открываются
+        # посреди диалога и без его состояния не имеют смысла — их
+        # проверяют свои наборы, каждый со своим сценарием.
+        if not data.startswith("pn:"):
+            continue
+        probe = Probe(data)
+        for router in ROUTERS:
+            for handler in router.observers["callback_query"].handlers:
+                magics = [flt.magic for flt in (handler.filters or [])
+                          if getattr(flt, "magic", None) is not None]
+                if magics and all(m.resolve(probe) for m in magics):
+                    out.append((data, handler.callback))
+                    break
+            else:
+                continue
+            break
+    return out
+
+
+class Dumb:
+    """Заглушка вместо поставщика: любой вызов — отказ, как при обрыве."""
+
+    def __getattr__(self, name):
+        async def refuse(*a, **kw):
+            raise RuntimeError("нет связи")
+        return refuse
+
+
+class Sent:
+    """Что «отправил» подставной бот: хватает id, чтобы это потом удалить."""
+    message_id = 1
+    chat = type("C", (), {"id": 111})()
+
+
+class MuteBot:
+    """Телеграм, который всё принимает и ничего не делает."""
+
+    def __getattr__(self, name):
+        async def nothing(*a, **kw):
+            return Sent()
+        return nothing
+
+
+class Spy:
+    """Сообщение и нажатие в одном: лишь бы обработчику было куда писать."""
+
+    def __init__(self, data: str, uid: int = 111):
+        self.data = data
+        self.from_user = type("U", (), {"id": uid, "username": "admin",
+                                        "first_name": "A", "is_bot": False})()
+        self.chat = type("C", (), {"id": uid})()
+        self.message = self
+        self.message_id = 1
+        self.text = "x"
+        self.date = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        self.html_text = "x"
+        self.photo = None
+        self.document = None
+        self.said: list = []
+
+    async def edit_text(self, text, **kw):
+        self.said.append(text)
+        return self
+
+    async def answer(self, text="", **kw):
+        if text:
+            self.said.append(text)
+        return self
+
+    async def edit_reply_markup(self, **kw):
+        return self
+
+    async def copy_to(self, *a, **kw):
+        return None
+
+
+async def open_every_screen(conn) -> int:
+    """Открыть каждый экран панели и убедиться, что он не падает.
+
+    Проверка «кнопка ведёт в обработчик» пропускала настоящую поломку:
+    обработчик был, но валился на первой строке — забытый импорт, и
+    экран просто не открывался. Кнопку видно, ошибку нет.
+    """
+    state = FSMContext(storage=MemoryStorage(),
+                       key=StorageKey(bot_id=1, chat_id=111, user_id=111))
+    ready = {"conn": conn, "state": state, "provider": Dumb(), "bot": MuteBot()}
+
+    broken = []
+    for data, handler in sorted(set(screens())):
+        spy = Spy(data)
+        kwargs = {}
+        for name, param in inspect.signature(handler).parameters.items():
+            if name in ready:
+                kwargs[name] = ready[name]
+            elif param.default is inspect.Parameter.empty and not kwargs:
+                continue
+        try:
+            await handler(spy, **kwargs)
+        except Exception as exc:  # noqa: BLE001 — мы тут именно за этим
+            broken.append(f"{data} → {type(exc).__name__}: {exc}")
+
+    if broken:
+        print("\n❌ Экраны, которые не открываются:")
+        for line in broken:
+            print("  ", line)
+        return len(broken)
+
+    print(f"✅ Все {len(set(screens()))} экранов открываются")
+    return 0
+
+
 async def main() -> None:
     for suffix in ("", "-wal", "-shm"):
         Path(str(db.settings.db_file) + suffix).unlink(missing_ok=True)
@@ -89,6 +226,10 @@ async def main() -> None:
         sys.exit(1)
 
     print(f"\n✅ Все {len(declared_callbacks())} кнопок ведут в обработчики")
+
+    if await open_every_screen(conn):
+        await conn.close()
+        sys.exit(1)
     await conn.close()
 
 

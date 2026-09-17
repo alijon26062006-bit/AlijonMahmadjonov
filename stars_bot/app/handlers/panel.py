@@ -32,7 +32,7 @@ from app.handlers.menu import top_basis
 from app.config import settings
 from app.services import access
 from app.emoji import substitute
-from app.keyboards import DANGER, PRIMARY, SUCCESS, btn
+from app.keyboards import DANGER, PRIMARY, SUCCESS, btn, labeled
 from app.money import (
     exact_stars_cost, fmt, fmt4, parse, parse4, round_price, steam_cost,
 )
@@ -519,13 +519,17 @@ async def cb_preview_pay(call: CallbackQuery) -> None:
     holder = runtime.get("pay_card_holder")
     bank = runtime.get("pay_card_bank")
     note = runtime.get("pay_extra")
+    # Собираем ровно тем же шаблоном и теми же полями, что и настоящий
+    # экран пополнения. Иначе предпросмотр показывает не то, что клиент,
+    # а при смене шаблона просто падает — так и было.
+    where = " · ".join(part for part in (bank, runtime.get("pay_city")) if part)
     preview = texts.DEPOSIT_REQUISITES.format(
-        amount=fmt(10000),
+        amount=fmt(10007),
         card=runtime.get("pay_card_number") or "— реквизиты не заданы —",
-        holder=f"👤 Получатель: <b>{holder}</b>\n" if holder else "",
-        bank=f"🏦 Банк: <b>{bank}</b>\n" if bank else "",
-        city=runtime.get("pay_city"),
-        extra=f"\n{note}\n" if note else "",
+        holder=f"👤 <b>{holder}</b>\n" if holder else "",
+        bank=f"🏦 {where}\n" if where else "",
+        extra=f"\n{note}\n" if note else "\n",
+        dc_block=texts.DEPOSIT_DC_BLOCK.format(reference="TOP1234"),
     )
     await safe_edit(
         call, "👁 <b>Так это видит клиент:</b>\n\n" + preview, back_kb("pn:pay")
