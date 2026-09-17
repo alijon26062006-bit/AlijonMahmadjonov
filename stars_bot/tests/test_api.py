@@ -432,6 +432,18 @@ async def run_http(conn, api: Client, provider) -> None:
     status, _, _ = await api.get("/docs")
     check("документация открыта без ключа", status == 200, str(status))
 
+    from app.api import docs as docspage
+
+    html = docspage.html()
+    check("в документации есть обозреватель каталога",
+          all(mark in html for mark in ('id="browser"', 'id="apikey"',
+                                        'id="chips"', "/games")))
+    # Названия игр приходят от поставщика и попадают на страницу. Если
+    # обозреватель когда-нибудь начнёт собирать их строкой, чужая кавычка
+    # в названии станет дырой — поэтому сверяем, что он этого не делает.
+    check("обозреватель не строит разметку строками",
+          "innerHTML" not in docspage.JS)
+
     # ---- журнал запросов --------------------------------------------
     log = await db.api_requests_of(conn, BUYER, limit=200)
     check("запросы пишутся в журнал", len(log) > 10, str(len(log)))

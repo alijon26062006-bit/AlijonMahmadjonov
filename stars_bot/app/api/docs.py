@@ -101,7 +101,25 @@ border-color:var(--code)}
 .tabs+pre{border-radius:0 10px 10px 10px;margin-top:0}
 footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);
 color:var(--muted);font-size:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 6px}
+.row input{flex:1 1 260px;min-width:0;font:14px/1 ui-monospace,monospace;
+padding:11px 13px;border:1px solid var(--line);border-radius:9px;
+background:var(--bg);color:var(--fg)}
+.row button{font:600 14px/1 inherit;padding:11px 20px;border:0;border-radius:9px;
+background:var(--accent);color:#fff;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0}
+.chips button{font:500 13px/1.3 inherit;padding:7px 12px;border:1px solid var(--line);
+background:var(--card);color:var(--fg);border-radius:20px;cursor:pointer;
+text-align:left}
+.chips button[aria-pressed=true]{background:var(--accent);color:#fff;
+border-color:var(--accent)}
+.chips button span{color:var(--muted);font-size:12px}
+.chips button[aria-pressed=true] span{color:#dbe9ff}
+.hint{color:var(--muted);font-size:14px;margin:6px 0}
+.hint.bad{color:var(--post)}
+.pick{max-height:320px;overflow-y:auto;padding-right:4px}
 """
+
 
 JS = """
 document.querySelectorAll('.sample').forEach(function(box){
@@ -114,6 +132,127 @@ document.querySelectorAll('.sample').forEach(function(box){
     });
   });
 });
+
+// ── обозреватель каталога ───────────────────────────────────────────────
+// Ключ живёт только в этой переменной: ни в localStorage, ни в адресе
+// строки — закрыл вкладку, и его нет.
+(function(){
+  var box = document.getElementById('browser');
+  if (!box) return;
+
+  var api   = location.pathname.replace(/\/docs\/?$/, '');
+  var field = document.getElementById('apikey');
+  var msg   = document.getElementById('msg');
+  var chips = document.getElementById('chips');
+  var items = document.getElementById('items');
+  var key   = '';
+
+  function say(text, bad){
+    msg.textContent = text || '';
+    msg.className = bad ? 'hint bad' : 'hint';
+  }
+
+  function ask(path){
+    return fetch(api + path, {headers: {Authorization: 'Bearer ' + key}})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.success) throw new Error((d.error && d.error.message) || 'Ошибка');
+        return d;
+      });
+  }
+
+  function el(tag, text, cls){
+    var node = document.createElement(tag);
+    // Только textContent: названия приходят от поставщика, и кавычка
+    // внутри такого названия не должна превращаться в разметку.
+    if (text !== undefined) node.textContent = text;
+    if (cls) node.className = cls;
+    return node;
+  }
+
+  function chip(label, note, load){
+    var b = el('button', label);
+    b.setAttribute('aria-pressed', 'false');
+    if (note) { b.appendChild(document.createTextNode(' ')); b.appendChild(el('span', note)); }
+    b.addEventListener('click', function(){
+      chips.querySelectorAll('button').forEach(function(o){
+        o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
+      });
+      items.textContent = '';
+      say('Загружаю…');
+      load().then(function(list){
+        say(list.length ? '' : 'У этой игры сейчас нет пакетов.');
+        items.appendChild(table(list));
+      }).catch(function(e){ say(e.message, true); });
+    });
+    return b;
+  }
+
+  function price(p){
+    if (p.amount_text) return p.amount_text + ' ' + p.currency;
+    if (p.unit_price)  return (p.unit_price / 10000).toFixed(4) + ' за штуку';
+    return '—';
+  }
+
+  function table(list){
+    var t = el('table');
+    var head = el('thead'), hr = el('tr');
+    ['product_id', 'Название', 'Цена', 'Что спросить у клиента']
+      .forEach(function(h){ hr.appendChild(el('th', h)); });
+    head.appendChild(hr); t.appendChild(head);
+
+    var body = el('tbody');
+    list.forEach(function(p){
+      var tr = el('tr');
+      var id = el('td'); id.appendChild(el('code', p.id)); tr.appendChild(id);
+      tr.appendChild(el('td', p.name));
+      tr.appendChild(el('td', price(p)));
+      tr.appendChild(el('td', p.customer || '—'));
+      body.appendChild(tr);
+    });
+    t.appendChild(body);
+    return t;
+  }
+
+  function start(){
+    key = (field.value || '').trim();
+    chips.textContent = '';
+    items.textContent = '';
+    if (!key) { say('Вставьте ключ.', true); return; }
+    say('Загружаю…');
+
+    ask('/products?limit=1000').then(function(d){
+      var groups = [
+        ['Telegram Stars', 'stars'],
+        ['Telegram Premium', 'premium'],
+        ['Steam', 'steam'],
+      ];
+      groups.forEach(function(g){
+        var found = d.products.filter(function(p){ return p.type === g[1]; });
+        if (!found.length) return;
+        chips.appendChild(chip(g[0], found.length + ' шт.', function(){
+          return Promise.resolve(found);
+        }));
+      });
+      return ask('/games');
+    }).then(function(d){
+      var games = d.games || [];
+      games.forEach(function(g){
+        chips.appendChild(chip(g.name, g.packs + ' пак.', function(){
+          return ask('/products?game=' + encodeURIComponent(g.id) + '&limit=1000')
+            .then(function(r){ return r.products; });
+        }));
+      });
+      chips.className = games.length > 30 ? 'chips pick' : 'chips';
+      say(games.length
+          ? 'Игр: ' + games.length + '. Нажмите на любую.'
+          : 'Игр сейчас нет — выберите раздел выше.');
+    }).catch(function(e){ say(e.message, true); });
+  }
+
+  document.getElementById('show').addEventListener('click', start);
+  field.addEventListener('keydown', function(e){ if (e.key === 'Enter') start(); });
+})();
 """
 
 
@@ -296,6 +435,26 @@ def html() -> str:
 переменной окружения, не кладите в git и не показывайте в браузере:
 запрос из JavaScript на странице отдаёт ключ каждому посетителю.
 Вызывайте API со своего сервера.</div>
+
+<h2>Каталог живьём</h2>
+<p>Вставьте свой ключ — ниже появятся все игры и разделы. Нажмите на
+любой, и увидите его товары: <code>product_id</code> для запроса,
+название, цену и что спросить у клиента.</p>
+
+<div id="browser">
+<div class="row">
+<input id="apikey" type="password" autocomplete="off" spellcheck="false"
+ placeholder="sk_live_…">
+<button id="show">Показать</button>
+</div>
+<p id="msg" class="hint"></p>
+<div id="chips" class="chips"></div>
+<div id="items"></div>
+</div>
+
+<div class="note">Ключ остаётся в этой вкладке: он не сохраняется, не
+попадает в адресную строку и уходит только на этот же адрес API.
+Закрыли страницу — его больше нет.</div>
 
 <h2>Точки</h2>
 <table><thead><tr><th>Метод</th><th>Путь</th><th>Что делает</th>
