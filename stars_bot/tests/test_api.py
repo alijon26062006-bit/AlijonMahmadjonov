@@ -638,6 +638,67 @@ async def hook_marks(conn) -> None:
           str(still[:3]))
 
 
+
+# ───────────────────────────────────────────── цены для разработчиков
+
+
+async def wholesale_prices(conn) -> None:
+    """Разработчику продаём по закупке плюс процент, а не по витрине.
+
+    Проверяем три вещи, каждая из которых стоит денег, если сломается:
+    цену видно ту же, что спишется; себестоимость наружу не уходит; там,
+    где закупка неизвестна, цена витрины остаётся — продать ниже закупки
+    хуже, чем продать дороже.
+    """
+    await runtime.set_value(conn, "star_cost_e4", "1000")    # 0.10 с. за звезду
+    await runtime.set_value(conn, "star_price_e4", "1500")   # витрина 0.15
+    await runtime.save_premium_plans(conn, [{"months": 3, "price": 15000},
+                                            {"months": 12, "price": 40000}])
+    await runtime.save_premium_costs(conn, {3: 10000})       # у 12 мес. закупки нет
+    await runtime.set_value(conn, "api_margin", "0")
+
+    retail = {item["id"]: item for item in await catalog.listing(conn, None)}
+    check("без наценки цены как в боте",
+          retail["premium:3"]["amount"] == 15000
+          and retail["stars"]["unit_price"] == 1500,
+          f"{retail['premium:3']['amount']}, {retail['stars']['unit_price']}")
+
+    await runtime.set_value(conn, "api_margin", "8")
+    api = {item["id"]: item for item in await catalog.listing(conn, None)}
+
+    check("Premium продаётся по закупке плюс 8%",
+          api["premium:3"]["amount"] == 10800, str(api["premium:3"]["amount"]))
+    check("звезда считается от закупки, а не от витрины",
+          api["stars"]["unit_price"] == 1080, str(api["stars"]["unit_price"]))
+    check("без закупки остаётся цена витрины",
+          api["premium:12"]["amount"] == 40000, str(api["premium:12"]["amount"]))
+
+    # Списывается ровно то, что показано: иначе разработчик считает одно,
+    # а платит другое, и первая же сверка превращается в спор.
+    check("спишется ровно показанная цена",
+          catalog.price_of(api["premium:3"], 1) == api["premium:3"]["amount"])
+    check("сотня звёзд считается по той же цене за штуку",
+          catalog.price_of(api["stars"], 100) == 1080,
+          str(catalog.price_of(api["stars"], 100)))
+
+    shown = catalog.public(api["premium:3"])
+    check("себестоимость наружу не уходит",
+          not any(key in shown for key in catalog.HIDDEN),
+          ", ".join(k for k in catalog.HIDDEN if k in shown) or "чисто")
+    shown_stars = catalog.public(api["stars"])
+    check("и у звёзд тоже",
+          "cost_unit_e4" not in shown_stars and "wholesale" not in shown_stars)
+
+    # Отрицательная наценка — это продажа в убыток по опечатке.
+    await runtime.set_value(conn, "api_margin", "-20")
+    guarded = {item["id"]: item for item in await catalog.listing(conn, None)}
+    check("минус в наценке не уводит цену ниже закупки",
+          guarded["premium:3"]["amount"] == 15000,
+          str(guarded["premium:3"]["amount"]))
+
+    await runtime.set_value(conn, "api_margin", "0")
+
+
 # ───────────────────────────────────────────────── запуск
 
 
@@ -662,6 +723,7 @@ async def main() -> None:
         await refunds(conn, bot)
         await webhook_out(conn)
         await hook_marks(conn)
+        await wholesale_prices(conn)
     finally:
         await conn.close()
 

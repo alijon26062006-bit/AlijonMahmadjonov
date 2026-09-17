@@ -558,6 +558,14 @@ FIELDS: dict[str, tuple[str, str, str]] = {
                         "percent"),
     "margin_percent": ("📈 Наценка",
                        "Процент наценки к себестоимости. Например <code>30</code>:", "percent"),
+    "api_margin": ("💰 Наценка для разработчиков",
+                   "Процент к себестоимости для покупок через API.\n"
+                   "Например <code>8</code>: разработчик платит закупку "
+                   "плюс 8%.\n\n"
+                   "Он перепродаёт наш товар и на витринной цене бота "
+                   "заработать не сможет — потому цена у него своя.\n\n"
+                   "Пришлите <code>0</code>, чтобы продавать ему по ценам "
+                   "витрины:", "percent"),
     "reviews_channel": ("📣 Канал отзывов",
                         "Куда публиковать одобренные отзывы: <code>@kanal</code> "
                         "или числовой ID.\n\n"
@@ -648,6 +656,7 @@ FIELD_PARENT.update({
     "referral_percent": "pn:prices", "support_notice": "pn:home",
     "autostop_after": "pn:wallet",
     "games_timeout_min": "pn:games",
+    "api_margin": "pn:api",
     "fazer_webhook_secret": "pn:hook", "webhook_port": "pn:hook",
     "webhook_public_url": "pn:hook",
 })
@@ -5290,13 +5299,18 @@ async def cb_api(call: CallbackQuery, state: FSMContext,
                style=DANGER if on else SUCCESS))
     kb.row(btn("👥 Клиенты API", "pn:api_clients"),
            btn("📋 Запросы", "pn:api_log"))
-    kb.row(btn("⚡️ Лимит запросов", "pn:api_rate"))
+    kb.row(btn("⚡️ Лимит запросов", "pn:api_rate"),
+           btn("💰 Наценка", "pn:set:api_margin"))
     kb.row(btn("🌐 За обратным прокси: "
                + ("да" if runtime.get_bool("api_behind_proxy") else "нет"),
                "pn:api_proxy"))
     if url:
         kb.row(InlineKeyboardButton(text="📖 Документация", url=f"{url}/docs"))
     kb.row(btn(labeled("back", "Назад"), "pn:home"))
+
+    # Наценка для разработчиков: 0 — продаём им по витрине бота.
+    margin = runtime.api_margin_percent()
+    pricing_note = (f"себестоимость + {margin}%" if margin else "как в боте")
 
     trouble = ""
     if on and port <= 0:
@@ -5311,7 +5325,8 @@ async def cb_api(call: CallbackQuery, state: FSMContext,
         f"🧩 <b>API для разработчиков</b>\n"
         f"<code>{texts.LINE}</code>\n\n"
         f"Состояние: <b>{'🟢 включён' if on else '⚪️ выключен'}</b>\n"
-        f"Адрес: <code>{url or '—'}</code>\n\n"
+        f"Адрес: <code>{url or '—'}</code>\n"
+        f"Цены разработчикам: <b>{pricing_note}</b>\n\n"
         f"👥 <b>Клиенты</b>\n"
         f"├ Разработчиков: <b>{len(owners)}</b>\n"
         f"└ Живых ключей: <b>{live}</b> из {len(keys)}\n\n"

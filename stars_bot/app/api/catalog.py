@@ -16,6 +16,8 @@
 """
 from __future__ import annotations
 
+from decimal import ROUND_HALF_UP, Decimal
+
 from app import db, runtime
 from app.money import fmt, stars_cost, steam_cost
 
@@ -46,6 +48,7 @@ def _stars() -> dict | None:
         "max_quantity": hi,
         "unit_price": runtime.star_price_e4(),   # десятитысячные сомони
         "price_example": money(stars_cost(lo)) | {"quantity": lo},
+        "cost_unit_e4": runtime.star_cost_e4(),  # внутреннее: в ответ не уходит
         "customer": "Юзернейм получателя в Telegram, например @durov",
         "customer_required": True,
     }
@@ -66,6 +69,7 @@ def _premium() -> list[dict]:
             "quantity": months,
             "customer": "Юзернейм получателя в Telegram, например @durov",
             "customer_required": True,
+            "cost": runtime.cost_of("premium", months),   # внутреннее
             **money(int(plan["price"])),
         })
     return out
@@ -85,6 +89,7 @@ def _steam() -> list[dict]:
             "quantity": amount,
             "customer": "Логин аккаунта Steam",
             "customer_required": True,
+            "cost": runtime.cost_of("steam", amount),     # внутреннее
             **money(steam_cost(amount)),
         })
     return out
@@ -124,13 +129,77 @@ async def _games(conn, provider) -> list[dict]:
     return out
 
 
+#: Поля, которые наружу не уходят никогда: себестоимость и служебные
+#: пометки. Перечислены явно — новое внутреннее поле лучше пусть
+#: сломает проверку, чем однажды тихо уедет разработчику.
+HIDDEN = ("cost", "cost_unit_e4", "wholesale")
+
+
 def public(item: dict) -> dict:
     """Товар так, как его видит чужой разработчик.
 
     Себестоимость и внутренние поля не отдаём: сколько товар стоит нам —
     не его дело, и по этой цифре считается наша наценка.
     """
-    return {k: v for k, v in item.items() if k not in ("cost",)}
+    return {k: v for k, v in item.items() if k not in HIDDEN}
+
+
+def margin_percent() -> int:
+    """Наценка для разработчиков. 0 — продаём им по ценам витрины."""
+    return runtime.api_margin_percent()
+
+
+def _plus(value: int, percent: int) -> int:
+    """value плюс percent процентов, без дробных денег."""
+    return int((Decimal(value) * (100 + percent) / 100)
+               .to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def _stars_total(unit_e4: int, quantity: int) -> int:
+    """Цена за quantity звёзд из цены за штуку в десятитысячных."""
+    return (unit_e4 * quantity + 50) // 100
+
+
+def wholesale(item: dict) -> dict:
+    """Пересчитать цену от себестоимости, если задана наценка для API.
+
+    Разработчик перепродаёт наш товар, и на витринной цене бота ему
+    заработать нечем — он просто уйдёт. Поэтому у API своя цена:
+    закупка плюс заданный процент.
+
+    Витринные приглаживания (до 5 или 10 дирам) тут не применяем нарочно:
+    разработчик складывает цены у себя, и ему нужна ровно та сумма, что
+    спишется, а не красивая.
+
+    Там, где себестоимость неизвестна — поставщик её не отдал, цена
+    выставлена руками, — оставляем цену бота. Продать ниже закупки хуже,
+    чем продать дороже, чем хотелось.
+    """
+    percent = margin_percent()
+    if percent <= 0:
+        return item
+
+    if item["type"] == "stars":
+        cost_e4 = int(item.get("cost_unit_e4", 0))
+        if cost_e4 <= 0:
+            return item
+        item = dict(item)
+        item["unit_price"] = max(_plus(cost_e4, percent), cost_e4)
+        low = int(item["min_quantity"])
+        item["price_example"] = (money(_stars_total(item["unit_price"], low))
+                                 | {"quantity": low})
+        item["wholesale"] = True
+        return item
+
+    cost = int(item.get("cost", 0))
+    if cost <= 0:
+        return item
+    item = dict(item)
+    # max с себестоимостью — страховка от округления вниз на копеечных
+    # товарах: ниже закупки цена не опустится ни при каком проценте.
+    item.update(money(max(_plus(cost, percent), cost)))
+    item["wholesale"] = True
+    return item
 
 
 async def listing(conn, provider, kind: str = "") -> list[dict]:
@@ -142,6 +211,10 @@ async def listing(conn, provider, kind: str = "") -> list[dict]:
     items += _premium()
     items += _steam()
     items += await _games(conn, provider)
+    # Пересчёт здесь, а не в каждом сборщике: и каталог, и поиск товара,
+    # и списание при заказе идут через этот список — цена не разойдётся
+    # с той, что разработчик увидел секунду назад.
+    items = [wholesale(item) for item in items]
     return [item for item in items if not kind or item["type"] == kind]
 
 
@@ -155,8 +228,14 @@ async def find(conn, provider, product_id: str) -> dict | None:
 
 
 def price_of(item: dict, quantity: int) -> int:
-    """Во сколько обойдётся quantity этого товара, в дирамах."""
+    """Во сколько обойдётся quantity этого товара, в дирамах.
+
+    Считаем по цене самого товара, а не по витрине: товар пришёл из
+    listing(), где цена уже могла быть пересчитана под API.
+    """
     if item["type"] == "stars":
+        if item.get("wholesale"):
+            return _stars_total(int(item["unit_price"]), quantity)
         return stars_cost(quantity)
     return int(item["amount"])
 
