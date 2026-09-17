@@ -22,12 +22,16 @@ START = (
     "<b>Фармонҳо</b>\n"
     "/bet 100 — бозӣ бо сатҳи 100\n"
     "/mines 3 — шумораи минаҳо (1–24)\n"
-    "/balance — баланси ту\n"
-    "/bonus — тӯҳфаи ройгон\n"
-    "/send 100 — ба ҷавоб (reply) пул фиристодан\n"
-    "/top — беҳтаринҳо\n"
-    "/stats — омори ту\n"
-    "/help — ҳамин матн"
+    "/balance · /bonus · /top · /stats\n"
+    "/send 100 — ба ҷавоб (reply) пул фиристодан\n\n"
+    "<b>Бе «/» ҳам мешавад</b>\n"
+    "<code>100</code> — бозӣ бо сатҳи 100\n"
+    "<code>игра 100</code> — ҳамон\n"
+    "<code>б</code> — баланс\n"
+    "<code>п 100</code> — reply кун, пул мефиристад\n"
+    "<code>мина 5</code> — шумораи минаҳо\n"
+    "<code>катак 7</code> — катаки №7-ро мекушояд (1–25)\n"
+    "<code>бонус</code> · <code>топ</code>"
 )
 
 HELP = START
@@ -40,12 +44,14 @@ NOT_ENOUGH = "❌ Баланс кофӣ нест.\n💳 Дар ту: {balance}\n
 ALREADY_PLAYING = "⚠️ Ту аллакай бозӣ дорӣ. Аввал онро тамом кун."
 MINES_RANGE = "❌ Минаҳо аз 1 то 24 мешавад."
 MINES_SET = "💣 Минаҳо: <b>{mines}</b>. Ҳозир <code>/bet {bet}</code> зан."
+MINES_NOW = "💣 Ҳоло минаҳо: <b>{mines}</b>\n💡 <code>мина 5</code> — иваз кардан."
 
 GAME = (
     "💣 <b>MINES</b> · минаҳо: {mines}\n"
     "🎯 Сатҳ: {bet}\n"
     "📈 Зарб: <b>x{multiplier}</b>\n"
-    "💰 Гирифтанӣ: <b>{payout}</b>"
+    "💰 Гирифтанӣ: <b>{payout}</b>\n"
+    "🔢 Катакҳо 1–25 (аз чап ба рост): <code>катак 7</code>"
 )
 
 TAKEN = (
@@ -69,6 +75,8 @@ BOOM = (
 )
 
 NOT_YOUR_GAME = "❌ Ин бозии ту нест!"
+NO_GAME = "❌ Ҳоло бозӣ надорӣ.\n💡 <code>игра 100</code> ё <code>/bet 100</code>"
+CELL_HOW = "❌ Рақами катак аз 1 то 25.\n💡 Мисол: <code>катак 7</code>"
 GAME_OVER = "❌ Бозӣ тамом шудааст."
 CELL_TAKEN = "Ин катак кушода шудааст."
 NOTHING_TO_TAKE = "❌ Ҳоло бурд надорӣ — аввал як катак кушо."
@@ -78,7 +86,8 @@ BONUS_OK = "🎁 Тӯҳфа: <b>{amount}</b>\n💳 Баланс: <b>{balance}</b
 BONUS_WAIT = "⏳ Тӯҳфаи навбатӣ баъд аз <b>{minutes} дақиқа</b>.\n💳 Баланс: {balance}"
 
 SEND_HOW = (
-    "💸 Ба паёми одам <b>reply</b> кунед ва нависед: <code>/send 100</code>"
+    "💸 Ба паёми он одам <b>reply</b> кун ва нависед:\n"
+    "<code>п 100</code> ё <code>/send 100</code>"
 )
 SEND_TO_BOT = "❌ Ба бот пул намефиристанд."
 SEND_TO_SELF = "❌ Ба худат пул фиристода намешавад."

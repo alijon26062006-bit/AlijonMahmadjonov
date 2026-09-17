@@ -228,6 +228,116 @@ async def test_mines_out_of_range(app):
     assert "1 то 24" in update.effective_message.sent[0].text
 
 
+# ── слова и буквы без слэша ────────────────────────────────────────────────
+
+async def test_letter_b_shows_balance(app):
+    update = _update("б")
+    await handlers.text(update, FakeContext(app))
+    assert "Баланс" in update.effective_message.sent[0].text
+
+
+async def test_letter_p_sends_money(app, conn):
+    bot = FakeBot()
+    update = _update("п 300", reply_to=FakeMessage("салом", user=BEK))
+    await handlers.text(update, FakeContext(app, bot=bot))
+    assert db.balance(conn, ALI.id) == 700
+    assert db.balance(conn, BEK.id) == 1300
+
+
+async def test_letter_p_glued_to_number(app, conn):
+    update = _update("п300", reply_to=FakeMessage("салом", user=BEK))
+    await handlers.text(update, FakeContext(app, bot=FakeBot()))
+    assert db.balance(conn, ALI.id) == 700
+
+
+async def test_letter_p_without_reply_explains(app, conn):
+    update = _update("п 300")
+    await handlers.text(update, FakeContext(app))
+    assert "reply" in update.effective_message.sent[0].text
+    assert db.balance(conn, ALI.id) == 1000
+
+
+async def test_word_game_starts_game(app, conn):
+    update = _update("игра 150")
+    await handlers.text(update, FakeContext(app))
+    assert db.balance(conn, ALI.id) == 850
+    assert _game(conn).bet == 150
+
+
+async def test_word_mines_sets_count(app, conn):
+    context = FakeContext(app)
+    await handlers.text(_update("мина 5"), context)
+    assert context.user_data["mines"] == 5
+    assert db.balance(conn, ALI.id) == 1000        # настройка ничего не стоит
+
+
+async def test_word_mines_without_number_shows_current(app):
+    update = _update("мины")
+    await handlers.text(update, FakeContext(app))
+    assert "Ҳоло минаҳо" in update.effective_message.sent[0].text
+
+
+async def test_word_mines_with_big_number_is_a_bet(app, conn):
+    """«мины 100»: столько мин не бывает — значит человек назвал ставку."""
+
+    await handlers.text(_update("мины 100"), FakeContext(app))
+    assert _game(conn).bet == 100
+
+
+async def test_word_cell_opens_cell(app, conn):
+    bot = FakeBot()
+    await _bet(app)
+    game = _game(conn)
+    number = _cell(game, mine=False) + 1           # клетки для человека считаются с 1
+    update = _update(f"катак {number}")
+    await handlers.text(update, FakeContext(app, bot=bot))
+    assert _game(conn).opened == (number - 1,)
+    assert bot.edits and bot.edits[0][1] == game.message_id
+    assert "x1.10" in update.effective_message.sent[0].text
+
+
+async def test_word_cell_hits_mine(app, conn):
+    bot = FakeBot()
+    await _bet(app)
+    game = _game(conn)
+    update = _update(f"к {game.mine_cells[0] + 1}")
+    await handlers.text(update, FakeContext(app, bot=bot))
+    assert _game(conn) is None
+    assert "МИНА" in bot.edits[0][2]
+    assert db.balance(conn, ALI.id) == 900
+
+
+async def test_word_cell_twice_is_refused(app, conn):
+    await _bet(app)
+    game = _game(conn)
+    number = _cell(game, mine=False) + 1
+    for _ in range(2):
+        update = _update(f"катак {number}")
+        await handlers.text(update, FakeContext(app, bot=FakeBot()))
+    assert _game(conn).opened == (number - 1,)
+    assert "кушода шудааст" in update.effective_message.sent[0].text
+
+
+async def test_word_cell_without_game(app, conn):
+    update = _update("катак 7")
+    await handlers.text(update, FakeContext(app))
+    assert "бозӣ надорӣ" in update.effective_message.sent[0].text
+
+
+async def test_word_cell_out_of_range(app, conn):
+    await _bet(app)
+    update = _update("катак 99")
+    await handlers.text(update, FakeContext(app))
+    assert "аз 1 то 25" in update.effective_message.sent[0].text
+    assert _game(conn).opened == ()
+
+
+async def test_unknown_word_shows_help(app):
+    update = _update("салом чӣ хел?")
+    await handlers.text(update, FakeContext(app))
+    assert "MINES" in update.effective_message.sent[0].text
+
+
 def _query_update(query):
     """Update, у которого есть только callback_query."""
 

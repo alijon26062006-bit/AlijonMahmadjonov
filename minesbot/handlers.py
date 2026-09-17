@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import html
 import logging
+import re
 from collections import defaultdict
 
 from telegram import Update
@@ -106,15 +107,23 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def mines_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Сколько мин класть в следующей игре. Настройка живёт у игрока."""
+    """/mines 5 — сколько мин класть в следующей игре."""
+
+    await _set_mines(update, context, context.args[0] if context.args else None)
+
+
+async def _set_mines(update: Update, context: ContextTypes.DEFAULT_TYPE, raw) -> None:
+    """Настройка числа мин. Живёт у игрока и переживает игры."""
 
     cfg = _cfg(context)
     _register(update, context)
-    if not context.args:
-        await _reply(update, texts.NEED_NUMBER)
+    if raw is None or raw == "":
+        # Без числа — показываем текущее, а не ругаемся.
+        await _reply(update, texts.MINES_NOW.format(
+            mines=int(context.user_data.get("mines", cfg.default_mines))))
         return
     try:
-        count = int(context.args[0])
+        count = int(str(raw).strip())
     except ValueError:
         await _reply(update, texts.NEED_NUMBER)
         return
@@ -268,75 +277,114 @@ async def _cashout(query, conn, cfg: Config, game: db.Game) -> None:
     await query.answer()
 
 
-async def _open(query, conn, cfg: Config, game: db.Game, index: int) -> None:
+def _apply_open(conn, cfg: Config, game: db.Game, index: int):
+    """Сделать ход и вернуть (новый текст, клавиатура, короткий ответ).
+
+    Ядро одно на оба способа хода — кнопку и текст «катак 7»: правила не
+    должны расходиться в зависимости от того, как человек нажал.
+    Бросает GameError (клетка занята/нет такой) и db.NoGame (партия закрыта).
+    """
+
     board = Board(game.mine_cells, game.opened)
-    try:
-        hit_mine = check_move(index, board)
-    except GameError:
-        await query.answer(texts.CELL_TAKEN)
-        return
+    hit_mine = check_move(index, board)          # GameError — наверх
 
     if hit_mine:
-        # Мина: игру закрываем ДО отправки сообщения. Если Telegram не ответит,
-        # партия всё равно уже завершена и повторно сыграть её нельзя.
-        try:
-            db.open_cell(conn, game.game_id, index)
-            balance = db.finish_game(conn, game.game_id, "lost", 0)
-        except db.NoGame:
-            await query.answer(texts.GAME_OVER, show_alert=True)
-            return
+        # Мина: партию закрываем ДО отправки сообщения. Если Telegram не
+        # ответит, игра всё равно уже завершена и повторно сыграть её нельзя.
+        db.open_cell(conn, game.game_id, index)
+        balance = db.finish_game(conn, game.game_id, "lost", 0)
         opened = len(game.opened)
-        await query.edit_message_text(
-            texts.BOOM.format(
-                bet=game.bet,
-                stake=texts.money(game.bet),
-                opened=opened,
-                multiplier=f"{multiplier(opened, game.mines, edge=cfg.house_edge):.2f}",
-                balance=texts.money(balance),
-            ),
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboards.field(
-                game.game_id,
-                Board(game.mine_cells, game.opened + (index,), revealed=True),
-                game.bet, game.mines, edge=cfg.house_edge, dead=True,
-            ),
+        text_out = texts.BOOM.format(
+            bet=game.bet,
+            stake=texts.money(game.bet),
+            opened=opened,
+            multiplier=f"{multiplier(opened, game.mines, edge=cfg.house_edge):.2f}",
+            balance=texts.money(balance),
         )
-        await query.answer("💥 БУМ!")
-        return
+        markup = keyboards.field(
+            game.game_id,
+            Board(game.mine_cells, game.opened + (index,), revealed=True),
+            game.bet, game.mines, edge=cfg.house_edge, dead=True,
+        )
+        return text_out, markup, "💥 БУМ!"
 
-    try:
-        game = db.open_cell(conn, game.game_id, index)
-    except db.NoGame:
-        await query.answer(texts.CELL_TAKEN)
-        return
-
+    game = db.open_cell(conn, game.game_id, index)
     opened = len(game.opened)
     board = Board(game.mine_cells, game.opened)
     prize = payout(game.bet, opened, game.mines, edge=cfg.house_edge)
+    label = f"{multiplier(opened, game.mines, edge=cfg.house_edge):.2f}"
 
     if is_cleared(board):
-        # Открыты все безопасные клетки — дальше жать некуда, платим сами.
+        # Открыты все безопасные клетки — жать больше некуда, платим сами.
         balance = db.finish_game(conn, game.game_id, "cleared", prize)
-        await query.edit_message_text(
-            texts.CLEARED.format(
-                payout=texts.money(prize),
-                multiplier=f"{multiplier(opened, game.mines, edge=cfg.house_edge):.2f}",
-                balance=texts.money(balance),
-            ),
-            parse_mode=ParseMode.HTML,
-        )
-        await query.answer()
+        text_out = texts.CLEARED.format(
+            payout=texts.money(prize), multiplier=label, balance=texts.money(balance))
+        return text_out, None, "🏆"
+
+    return (
+        keyboards.caption(game.bet, game.mines, opened, edge=cfg.house_edge),
+        keyboards.field(game.game_id, board, game.bet, game.mines, edge=cfg.house_edge),
+        texts.CELL_WIN.format(multiplier=label, payout=texts.money(prize)),
+    )
+
+
+async def _open(query, conn, cfg: Config, game: db.Game, index: int) -> None:
+    """Ход кнопкой."""
+
+    try:
+        text_out, markup, toast = _apply_open(conn, cfg, game, index)
+    except GameError:
+        await query.answer(texts.CELL_TAKEN)
+        return
+    except db.NoGame:
+        await query.answer(texts.GAME_OVER, show_alert=True)
         return
 
-    await query.edit_message_text(
-        keyboards.caption(game.bet, game.mines, opened, edge=cfg.house_edge),
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboards.field(game.game_id, board, game.bet, game.mines, edge=cfg.house_edge),
-    )
-    await query.answer(texts.CELL_WIN.format(
-        multiplier=f"{multiplier(opened, game.mines, edge=cfg.house_edge):.2f}",
-        payout=texts.money(prize),
-    ))
+    await query.edit_message_text(text_out, parse_mode=ParseMode.HTML, reply_markup=markup)
+    await query.answer(toast)
+
+
+async def _open_by_text(update: Update, context: ContextTypes.DEFAULT_TYPE, raw) -> None:
+    """Ход словом: «катак 7». Клетки считаются 1–25, слева направо сверху вниз."""
+
+    cfg = _cfg(context)
+    conn = _conn(context)
+    user_id = update.effective_user.id
+    _register(update, context)
+
+    try:
+        number = int(str(raw).strip())
+    except (TypeError, ValueError):
+        await _reply(update, texts.CELL_HOW)
+        return
+    if not 1 <= number <= CELLS:
+        await _reply(update, texts.CELL_HOW)
+        return
+
+    async with _locks[user_id]:
+        game = db.active_game(conn, user_id)
+        if game is None:
+            await _reply(update, texts.NO_GAME)
+            return
+        try:
+            text_out, markup, toast = _apply_open(conn, cfg, game, number - 1)
+        except GameError:
+            await _reply(update, texts.CELL_TAKEN)
+            return
+        except db.NoGame:
+            await _reply(update, texts.GAME_OVER)
+            return
+
+    # Правим то самое сообщение с полем, чтобы картинка и текст не разъехались.
+    if game.message_id:
+        try:
+            await context.bot.edit_message_text(
+                chat_id=game.chat_id, message_id=game.message_id,
+                text=text_out, parse_mode=ParseMode.HTML, reply_markup=markup,
+            )
+        except BadRequest:
+            log.info("не смог обновить поле игры %s", game.game_id)
+    await _reply(update, toast)
 
 
 # ── переводы между игроками ────────────────────────────────────────────────
@@ -344,13 +392,17 @@ async def _open(query, conn, cfg: Config, game: db.Game, index: int) -> None:
 async def send(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/send 100 в ответ на сообщение — перевести монеты."""
 
+    await _do_send(update, context, context.args[0] if context.args else None)
+
+
+async def _do_send(update: Update, context: ContextTypes.DEFAULT_TYPE, raw) -> None:
     cfg = _cfg(context)
     message = update.effective_message
     sender = update.effective_user
     balance = _register(update, context)
 
     target = message.reply_to_message.from_user if message.reply_to_message else None
-    if target is None or not context.args:
+    if target is None or raw is None or str(raw).strip() == "":
         await _reply(update, texts.SEND_HOW)
         return
     if target.is_bot:
@@ -361,7 +413,7 @@ async def send(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     try:
-        amount = int(str(context.args[0]).replace(" ", "").replace("_", ""))
+        amount = int(str(raw).strip().replace(" ", "").replace("\u00a0", "").replace("_", ""))
     except ValueError:
         await _reply(update, texts.NEED_NUMBER)
         return
@@ -396,23 +448,56 @@ async def send(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ── свободный текст ────────────────────────────────────────────────────────
 
+# Короткие слова-команды. Буква — самый быстрый способ на телефоне.
+WORDS_BALANCE = {"б", "b", "баланс", "balans", "💳"}
+WORDS_BONUS = {"бонус", "bonus", "тӯҳфа", "тухфа", "🎁"}
+WORDS_TOP = {"топ", "top", "🏆"}
+WORDS_SEND = {"п", "p", "перевод", "перевести", "фиристодан", "send"}
+WORDS_GAME = {"игра", "играть", "бози", "бозӣ", "game"}
+WORDS_MINES = {"мины", "мина", "минҳо", "минхо", "mines", "м"}
+WORDS_CELL = {"клетка", "катак", "к", "cell", "открыть", "кушо"}
+
+# Первое слово (буквы) + остаток строки: «п 100», «п100», «катак 7».
+_WORD = re.compile(r"^([^\W\d_]+)\s*(.*)$", re.UNICODE | re.DOTALL)
+
+
 async def text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Просто число в чате = ставка. Слово «баланс» = баланс."""
+    """Слова и буквы без слэша: б, п 100, игра 100, мина 5, катак 7, просто число."""
 
     body = (update.effective_message.text or "").strip()
-    low = body.lower()
+    match = _WORD.match(body)
+    word = match.group(1).lower() if match else ""
+    rest = match.group(2).strip() if match else ""
 
-    if low in {"баланс", "balans", "💳"}:
+    if word in WORDS_BALANCE:
         await balance_cmd(update, context)
         return
-    if low in {"бонус", "bonus", "🎁"}:
+    if word in WORDS_BONUS:
         await bonus(update, context)
         return
-    if low in {"топ", "top", "🏆"}:
+    if word in WORDS_TOP:
         await top(update, context)
         return
+    if word in WORDS_SEND:
+        await _do_send(update, context, rest or None)
+        return
+    if word in WORDS_CELL:
+        await _open_by_text(update, context, rest)
+        return
+    if word in WORDS_GAME:
+        await _start_game(update, context, rest or None, _cfg(context))
+        return
+    if word in WORDS_MINES:
+        # «мина 5» — это число мин. «мины 100» — столько мин не бывает, значит
+        # человек назвал ставку. Спорное число всегда трактуем как мины:
+        # настройка бесплатна, а ставка списывает деньги.
+        if rest.isdigit() and int(rest) > CELLS - 1:
+            await _start_game(update, context, rest, _cfg(context))
+        else:
+            await _set_mines(update, context, rest or None)
+        return
 
-    digits = body.replace(" ", "").replace(" ", "").replace("_", "")
+    digits = body.replace(" ", "").replace("\u00a0", "").replace("_", "")
     if digits.isdigit():
         await _start_game(update, context, digits, _cfg(context))
         return

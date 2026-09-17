@@ -78,9 +78,13 @@ class FakeQuery:
 class FakeBot:
     def __init__(self):
         self.messages = []
+        self.edits = []
 
     async def send_message(self, chat_id, text, **kwargs):
         self.messages.append((chat_id, text))
+
+    async def edit_message_text(self, chat_id=None, message_id=None, text="", **kwargs):
+        self.edits.append((chat_id, message_id, text))
 
 
 class FakeApplication:
