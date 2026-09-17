@@ -115,7 +115,12 @@ async def key_safety(conn) -> None:
     check("сам ключ в хеше не лежит", raw not in stored, stored[:30])
     check("свой ключ проходит", apikeys.verify(raw, stored))
     check("чужой ключ не проходит", not apikeys.verify(apikeys.generate(), stored))
-    check("подделка хвоста не проходит", not apikeys.verify(raw[:-1] + "x", stored))
+    # Последний знак меняем на заведомо другой, а не на «x»: раз в шесть
+    # десятков ключей «x» там и стоял бы, подделка совпала бы с настоящим
+    # ключом и проверка падала бы без причины.
+    forged = raw[:-1] + ("y" if raw[-1] == "x" else "x")
+    check("подделка хвоста не проходит", not apikeys.verify(forged, stored),
+          f"{raw[-4:]} → {forged[-4:]}")
     check("битый хеш не пропускает", not apikeys.verify(raw, "мусор"))
     check("соль у двух хешей разная",
           apikeys.hash_key(raw) != apikeys.hash_key(raw))
