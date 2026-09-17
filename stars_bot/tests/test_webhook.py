@@ -260,6 +260,31 @@ async def switch(conn) -> None:
     await runtime.set_value(conn, "webhook_port", "0")
 
 
+async def root_page(conn) -> None:
+    """Корень адреса не должен выглядеть сломанным."""
+    from aiohttp import web
+
+    from app import runtime
+    from app.services import webhook as hook
+
+    class Req:
+        pass
+
+    await runtime.set_value(conn, "api_enabled", "1")
+    try:
+        await hook._root(Req())
+        check("с включённым API корень уводит на документацию", False,
+              "перенаправления не было")
+    except web.HTTPFound as moved:
+        check("с включённым API корень уводит на документацию",
+              moved.location.endswith("/api/v1/docs"), moved.location)
+
+    await runtime.set_value(conn, "api_enabled", "0")
+    answer = await hook._root(Req())
+    check("без API корень отвечает понятно, а не пустотой",
+          answer.status == 404 and "служебный" in answer.text, answer.text[:60])
+
+
 async def main() -> None:
     for sfx in ("", "-wal", "-shm"):
         Path(str(db.settings.db_file) + sfx).unlink(missing_ok=True)
@@ -271,6 +296,7 @@ async def main() -> None:
         await handling(conn)
         await http_layer(conn)
         await switch(conn)
+        await root_page(conn)
     finally:
         await conn.close()
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")

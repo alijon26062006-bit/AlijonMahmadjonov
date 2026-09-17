@@ -190,6 +190,23 @@ async def handle(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "result": result})
 
 
+async def _root(request: web.Request) -> web.Response:
+    """Что показать тому, кто открыл просто адрес, без пути.
+
+    Пустая страница выглядит как поломка, а открывают корень чаще, чем
+    кажется: адрес передают из рук в руки без пути. Поэтому уводим на
+    документацию — единственное, что тут интересно постороннему.
+    """
+    from app.api import server as api_server
+
+    if api_server.enabled():
+        raise web.HTTPFound(f"{api_server.PREFIX}/docs")
+    return web.Response(
+        text="Здесь нет страниц. Это служебный адрес бота.\n",
+        content_type="text/plain", charset="utf-8", status=404,
+    )
+
+
 async def serve(bot: Bot, provider) -> web.AppRunner | None:
     """Поднять HTTP-сервер. None — он никому не нужен и не запущен.
 
@@ -214,6 +231,7 @@ async def serve(bot: Bot, provider) -> web.AppRunner | None:
     app["bot"] = bot
     app["provider"] = provider
     app.router.add_get("/healthz", lambda _: web.json_response({"ok": True}))
+    app.router.add_get("/", _root)
     if take_hooks:
         app.router.add_post(PATH, handle)
     if take_api:
