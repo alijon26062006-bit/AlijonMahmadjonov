@@ -28,8 +28,11 @@ def base() -> str:
 
 ENDPOINTS = [
     ("GET", "/products", "Список товаров",
-     "Необязательный ?type=stars|premium|steam|game"),
+     "?type=stars|premium|steam|game, ?game=ID игры, "
+     "?limit=500&offset=0 — страницами, total в ответе"),
     ("GET", "/products/{id}", "Один товар", "id — из списка товаров"),
+    ("GET", "/games", "Список игр без пакетов",
+     "Названия, поля и число пакетов — по нему удобно листать каталог"),
     ("GET", "/balance", "Остаток на балансе", ""),
     ("GET", "/user", "Аккаунт, ключ, лимиты, вебхук", ""),
     ("GET", "/orders", "Список заказов", "?limit=20&offset=0"),

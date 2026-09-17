@@ -158,6 +158,7 @@ def build(bot, provider) -> web.Application:
     add("GET", "/docs", docs.page)
     add("GET", "/products", routes.products)
     add("GET", "/products/{product_id}", routes.product)
+    add("GET", "/games", routes.games)
     add("GET", "/balance", routes.balance)
     add("GET", "/user", routes.user)
     add("GET", "/orders", routes.orders)

@@ -25,6 +25,10 @@ log = logging.getLogger(__name__)
 #: Максимум записей на страницу. Больше отдавать незачем, и это ещё
 #: и защита: запрос на миллион строк положил бы бота.
 MAX_LIMIT = 100
+#: Каталог отдаётся страницами покрупнее: товары мелкие, а листать
+#: пять тысяч позиций по сто — двести запросов подряд.
+CATALOG_PAGE = 500
+CATALOG_MAX = 1000
 
 #: Тело POST больше этого не читаем.
 MAX_BODY = 32 * 1024
@@ -65,15 +69,61 @@ def _page(request: web.Request) -> tuple[int, int]:
     return max(1, number("limit", 20, MAX_LIMIT)), number("offset", 0, 1_000_000)
 
 
+def _page_of(request: web.Request, default: int, top: int) -> tuple[int, int]:
+    """То же, но со своими пределами: у каталога страница крупнее."""
+    def number(name: str, fallback: int, cap: int) -> int:
+        raw = request.query.get(name, "")
+        try:
+            value = int(raw) if raw else fallback
+        except ValueError:
+            value = fallback
+        return max(0, min(value, cap))
+
+    return max(1, number("limit", default, top)), number("offset", 0, 1_000_000)
+
+
 # ─────────────────────────────────────────────────────── товары
 
 
 async def products(request: web.Request) -> web.Response:
+    """Каталог страницами.
+
+    Когда отдаётся каталог поставщика целиком, товаров тысячи, и полный
+    ответ — это мегабайты на каждый запрос. Поэтому страница, а не всё
+    сразу: total говорит, сколько всего нашлось, и разработчик сам решает,
+    забирать ли остальное.
+    """
     items = await catalog.listing(
         request["conn"], request.app["provider"], request.query.get("type", "")
     )
-    return ok(count=len(items),
-          products=[catalog.public(i) for i in items])
+    game = request.query.get("game", "")
+    if game:
+        items = [item for item in items if item.get("game_id") == game]
+
+    total = len(items)
+    limit, offset = _page_of(request, CATALOG_PAGE, CATALOG_MAX)
+    page = items[offset:offset + limit]
+    return ok(count=len(page), total=total, limit=limit, offset=offset,
+              products=[catalog.public(item) for item in page])
+
+
+async def games(request: web.Request) -> web.Response:
+    """Список игр без пакетов: 297 названий вместо пяти тысяч строк.
+
+    С полным каталогом поставщика разобраться по /products тяжело —
+    разработчику сперва нужен список игр, а пакеты он заберёт по одной.
+    """
+    items = await catalog.listing(request["conn"], request.app["provider"],
+                                  "game")
+    found: dict[str, dict] = {}
+    for item in items:
+        row = found.setdefault(item["game_id"], {
+            "id": item["game_id"], "name": item["game"],
+            "fields": item["fields"], "packs": 0,
+        })
+        row["packs"] += 1
+    out = sorted(found.values(), key=lambda row: row["name"].lower())
+    return ok(count=len(out), games=out)
 
 
 async def product(request: web.Request) -> web.Response:

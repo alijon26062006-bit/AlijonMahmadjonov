@@ -789,6 +789,67 @@ async def full_supplier_catalog(conn) -> None:
     gsvc.forget_catalog()
 
 
+def gsvc_forget() -> None:
+    from app.services import games as gsvc
+
+    gsvc.forget_catalog()
+
+
+async def catalog_paging(conn, bot) -> None:
+    """Каталог страницами: пять тысяч позиций одним ответом не отдаём."""
+    supplier = GamesProvider()
+    await runtime.set_value(conn, "games_enabled", "1")
+    await runtime.set_value(conn, "api_all_games", "1")
+    await runtime.set_value(conn, "api_rate_per_min", "100000")
+    guard.forget_rate()
+    gsvc_forget()
+
+    app = web.Application()
+    app["bot"] = bot
+    app["provider"] = supplier
+    api_server.mount(app, bot, supplier)
+    runner = web.AppRunner(app, access_log=None)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    base = f"http://127.0.0.1:{runner.addresses[0][1]}{api_server.PREFIX}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            api = Client(base, session)
+            key = await make_key(conn, label="paging")
+
+            _, body, _ = await api.get("/products?type=game&limit=1", key=key)
+            check("страница отдаёт ровно столько, сколько просили",
+                  body.get("count") == 1, str(body.get("count")))
+            check("и говорит, сколько всего нашлось",
+                  body.get("total") == 2, str(body.get("total")))
+
+            _, second, _ = await api.get("/products?type=game&limit=1&offset=1",
+                                         key=key)
+            check("вторая страница — другой товар",
+                  second["products"][0]["id"] != body["products"][0]["id"],
+                  second["products"][0]["id"])
+
+            _, one, _ = await api.get("/products?game=not_in_bot", key=key)
+            check("каталог фильтруется по игре",
+                  [i["game_id"] for i in one["products"]] == ["not_in_bot"],
+                  str([i["game_id"] for i in one["products"]]))
+
+            _, glist, _ = await api.get("/games", key=key)
+            names = sorted(row["id"] for row in glist.get("games", []))
+            check("список игр отдаётся отдельно",
+                  names == ["in_bot", "not_in_bot"], str(names))
+            check("у игры видно, сколько у неё пакетов",
+                  all(row["packs"] >= 1 for row in glist.get("games", [])))
+    finally:
+        await runner.cleanup()
+
+    await runtime.set_value(conn, "api_all_games", "0")
+    await runtime.set_value(conn, "games_enabled", "0")
+    gsvc_forget()
+
+
 # ───────────────────────────────────────────────── запуск
 
 
@@ -815,6 +876,7 @@ async def main() -> None:
         await hook_marks(conn)
         await wholesale_prices(conn)
         await full_supplier_catalog(conn)
+        await catalog_paging(conn, bot)
     finally:
         await conn.close()
 
