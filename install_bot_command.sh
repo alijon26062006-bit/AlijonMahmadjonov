@@ -68,6 +68,7 @@ case "${1:-update}" in
   check)     exec bash "$ROOT/check_shop.sh" ;;
   admin)     shift; exec bash "$ROOT/add_admin.sh" "$@" ;;
   api)       shift; exec bash "$ROOT/check_api.sh" "$@" ;;
+  backup)    shift; exec bash "$ROOT/backup_bot.sh" "$@" ;;
   force)     FORCE=1 ;;
   update|"") FORCE=0 ;;
   *)
@@ -79,6 +80,7 @@ case "${1:-update}" in
     echo "  bot check      диагностика"
     echo "  bot admin ID   сделать админом"
     echo "  bot api        проверить поставщика"
+    echo "  bot backup     собрать архив со всеми данными"
     echo "  bot force      обновить, стерев свои правки в коде"
     exit 0 ;;
 esac
