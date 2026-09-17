@@ -376,6 +376,93 @@ case "\${1:-help}" in
         echo "   Дальше в боте: /panel → 🧩 API → Включить API"
         echo "   и там же «За обратным прокси: да», раз впереди nginx."
         ;;
+    caddy)
+        # Блок веб-сервера легко потерять: Caddyfile нередко лежит внутри
+        # git-репозитория соседнего проекта, и очередной git pull затирает его
+        # вместе с нашим доменом — API снаружи отваливается молча, а бот при
+        # этом работает и в логах чисто. Эта команда возвращает блок на место.
+        DOMAIN="\${2:-}"
+        if [ -z "\$DOMAIN" ]; then
+            echo "Использование: stars-bot caddy ДОМЕН [ФАЙЛ] [КОНТЕЙНЕР]"
+            echo "  ДОМЕН     — например vipstars.duckdns.org"
+            echo "  ФАЙЛ      — путь к Caddyfile; не указан — найдётся сам"
+            echo "  КОНТЕЙНЕР — имя контейнера Caddy; не указано — найдётся само"
+            echo ""
+            echo "  Возвращает блок домена, если его затёрло обновлением"
+            echo "  соседнего проекта, и перечитывает конфигурацию."
+            echo "  Целый блок не трогает — запускать можно хоть каждый день."
+            exit 1
+        fi
+        if ! command -v docker >/dev/null 2>&1; then
+            echo "❌ docker не найден — команда рассчитана на Caddy в контейнере."
+            exit 1
+        fi
+        CONT="\${4:-}"
+        [ -n "\$CONT" ] || CONT=\$(docker ps --format '{{.Names}}' | grep -i caddy | head -1)
+        if [ -z "\$CONT" ]; then
+            echo "❌ Контейнер Caddy не найден. Укажите его имя четвёртым словом,"
+            echo "   список: docker ps --format '{{.Names}}'"
+            exit 1
+        fi
+        CFILE="\${3:-}"
+        [ -n "\$CFILE" ] || CFILE=\$(docker inspect -f \
+            '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}' \
+            "\$CONT" 2>/dev/null)
+        if [ -z "\$CFILE" ] || [ ! -f "\$CFILE" ]; then
+            echo "❌ Caddyfile не нашёлся. Укажите путь к нему третьим словом."
+            exit 1
+        fi
+        if grep -qF "\$DOMAIN {" "\$CFILE"; then
+            echo "✅ Блок \$DOMAIN на месте, менять нечего"
+            echo "   Файл: \$CFILE"
+            exit 0
+        fi
+        # Куда проксировать — берём из настроек бота, а не вписываем на память:
+        # адрес с портом меняются командой stars-bot api, и разойтись им нельзя.
+        UPHOST=\$(sed -n 's/^WEBHOOK_HOST=//p' "\$APP/.env" | tail -1 | tr -d '"')
+        UPPORT=\$(sed -n 's/^WEBHOOK_PORT=//p' "\$APP/.env" | tail -1 | tr -d '"')
+        UPHOST="\${UPHOST:-127.0.0.1}"
+        UPPORT="\${UPPORT:-8443}"
+        # Из контейнера петля ведёт в сам контейнер, а не к нам: проксировать
+        # на 127.0.0.1 бессмысленно, получится тот же молчаливый 502.
+        if [ "\$UPHOST" = "127.0.0.1" ] || [ "\$UPHOST" = "::1" ]; then
+            echo "❌ Бот слушает \$UPHOST — из контейнера это сам контейнер."
+            echo "   Сначала переведите его на адрес шлюза Docker:"
+            echo "   stars-bot api https://\$DOMAIN \$UPPORT АДРЕС_ШЛЮЗА"
+            exit 1
+        fi
+        BAK="\$CFILE.bak-\$(date +%Y%m%d-%H%M%S)"
+        cp "\$CFILE" "\$BAK"
+        cat >> "\$CFILE" <<BLOCK
+
+\$DOMAIN {
+        encode zstd gzip
+
+        reverse_proxy \$UPHOST:\$UPPORT {
+                header_up X-Real-IP {remote_host}
+        }
+
+        log {
+                output stdout
+                format json
+        }
+}
+BLOCK
+        ERR=\$(docker exec "\$CONT" caddy validate --config /etc/caddy/Caddyfile 2>&1) || {
+            cp "\$BAK" "\$CFILE"
+            echo "❌ Caddy забраковал конфигурацию — файл вернул как был."
+            echo "\$ERR" | tail -5
+            exit 1
+        }
+        docker exec "\$CONT" caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 \
+            || docker restart "\$CONT" >/dev/null
+        echo "✅ Блок \$DOMAIN возвращён и применён"
+        echo "   Файл:       \$CFILE"
+        echo "   Проксирует: \$UPHOST:\$UPPORT"
+        echo "   Копия прежнего файла: \$BAK"
+        echo ""
+        echo "   Проверка: curl -s https://\$DOMAIN/api/v1/health"
+        ;;
     checker)
         # Ключ проверки ID: он показывает клиенту ник до оплаты.
         # Вписываем на сервере, а не в репозиторий: репозиторий открытый.
@@ -414,6 +501,9 @@ case "\${1:-help}" in
   stars-bot errors    последние ошибки
   stars-bot setup     изменить настройки и перезапустить
   stars-bot api АДРЕС задать адрес для API и вебхуков
+  stars-bot caddy ДОМЕН
+                      вернуть блок веб-сервера, если его затёрло
+                      обновлением соседнего проекта
   stars-bot userbot   приём оплат от банка (login/start/stop/logs)
   stars-bot games КЛЮЧ [КЛЮЧ_НИКОВ]
                       ключи второго поставщика: с него идут игры
