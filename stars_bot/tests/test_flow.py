@@ -199,7 +199,7 @@ async def run_scenario(conn) -> None:
           any("копировать" in b.lower() for b in buttons), str(buttons))
 
     call = FakeCallback("dep:paid", bot=bot)
-    await dep_h.cb_paid(call, state)
+    await dep_h.cb_paid(call, state, conn)
     # Чек больше не требуется: заявка уже заведена, и юзербот закроет её
     # сам, как только банк сообщит о переводе. Просить скриншот у каждого
     # — ровно та ручная работа, от которой мы уходили.
@@ -219,7 +219,7 @@ async def run_scenario(conn) -> None:
           call.last[:80])
 
     call = FakeCallback("dep:paid", bot=bot)
-    await dep_h.cb_paid(call, state)
+    await dep_h.cb_paid(call, state, conn)
 
     msg = FakeMessage("вот перевёл", bot=bot)
     await dep_h.on_receipt_wrong(msg)

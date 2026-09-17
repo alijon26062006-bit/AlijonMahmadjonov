@@ -5525,10 +5525,15 @@ async def cb_bank(call: CallbackQuery, state: FSMContext,
     rows = await db.list_bank_payments(conn, limit=10)
     open_count = sum(stats.get(key, 0) for key in BANK_OPEN)
 
+    senders = await db.list_senders(conn, limit=200)
+
     kb = InlineKeyboardBuilder()
     if open_count:
         kb.row(btn(f"⚠️ Требуют проверки ({open_count})", "pn:bank_open",
                    style=DANGER))
+    if senders:
+        kb.row(btn(f"🪪 Знакомые плательщики ({len(senders)})",
+                   "pn:bank_who"))
     kb.row(btn("📥 К заявкам", "pn:deposits", style=PRIMARY))
     kb.row(btn(labeled("back", "Назад"), "pn:home"))
 
@@ -5605,3 +5610,46 @@ async def cb_bank_open(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
         kb.as_markup(),
     )
     await call.answer()
+
+
+@router.callback_query(F.data == "pn:bank_who")
+async def cb_bank_senders(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    """Чьи счета мы уже узнаём.
+
+    Каждая строка — клиент, которому больше не нужен чек: его счёт банк
+    называет в каждом уведомлении, и мы его помним.
+    """
+    senders = await db.list_senders(conn, limit=25)
+
+    rows = []
+    kb = InlineKeyboardBuilder()
+    for item in senders:
+        user = await db.get_user(conn, item.user_id)
+        who = f"@{user.username}" if user and user.username else str(item.user_id)
+        rows.append(
+            f"├ <code>{esc(item.sender)}</code> → {esc(who)}\n"
+            f"│  <i>платежей: {item.payments}, последний "
+            f"{(item.last_at or '')[:10]}</i>"
+        )
+        kb.row(btn(f"🗑 {item.sender} — отвязать",
+                   f"pn:bank_cut:{item.sender}"))
+    kb.row(btn(labeled("back", "Назад"), "pn:bank"))
+
+    await safe_edit(
+        call,
+        f"🪪 <b>Знакомые плательщики</b>\n<code>{texts.LINE}</code>\n\n"
+        + ("\n".join(rows) if rows else "<i>Пока никого.</i>")
+        + "\n\n<blockquote>Эти клиенты платят без чека: их счёт банк "
+          "называет в каждом уведомлении, и мы его узнаём.\n\n"
+          "Отвязывайте, если клиент сменил карту или счёт попал не тому "
+          "— тогда он снова пришлёт чек один раз.</blockquote>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:bank_cut:"))
+async def cb_bank_unbind(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    await db.unbind_sender(conn, call.data.split(":", 2)[2])
+    await call.answer("Отвязано — в следующий раз попросим чек")
+    await cb_bank_senders(call, conn)

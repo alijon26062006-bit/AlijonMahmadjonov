@@ -118,16 +118,26 @@ def _requisites(amount: int, reference: str) -> tuple[str, object]:
 
 
 @router.callback_query(Deposit.receipt, F.data == "dep:paid")
-async def cb_paid(call: CallbackQuery, state: FSMContext) -> None:
-    """«Я оплатил» — теперь и только теперь просим чек."""
+async def cb_paid(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    """«Я оплатил».
+
+    Постоянному клиенту чек не нужен вовсе: его плательщика мы уже знаем
+    по прошлым переводам и узнаем этот. Просить у него скриншот каждый
+    раз — работа без пользы.
+    """
     data = await state.get_data()
     amount = data.get("amount")
     if not amount:
         await state.clear()
         await call.answer("Заявка потерялась, начните заново.", show_alert=True)
         return
+
+    known = bool(await db.senders_of(conn, call.from_user.id))
+    body = (texts.DEPOSIT_WAIT_KNOWN if known else texts.DEPOSIT_ASK_RECEIPT)
     await call.message.edit_text(
-        texts.DEPOSIT_ASK_RECEIPT.format(amount=fmt(amount)),
+        body.format(amount=fmt(amount)),
         reply_markup=keyboards.deposit_receipt(),
     )
     await call.answer()
@@ -228,6 +238,9 @@ async def _credit_if_paid(conn, bot, deposit) -> bool:
         conn, held.id, status=db.BANK_MATCHED, deposit_id=deposit.id,
         note="зачислено после чека",
     )
+    # Плательщик теперь знаком: в следующий раз чек у этого клиента
+    # спрашивать не будем — деньги зачислятся сразу.
+    await db.bind_sender(conn, held.sender, deposit.user_id)
     log.info("Заявка %s закрыта: пришёл чек к уже полученному переводу",
              deposit.id)
     return True

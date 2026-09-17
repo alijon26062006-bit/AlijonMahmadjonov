@@ -92,6 +92,27 @@ async def handle(
         conn, notice.amount, hours=runtime.get_int("deposit_match_hours", 6)
     )
 
+    # Знакомый плательщик решает всё. Банк называет отправителя в каждом
+    # уведомлении, и у человека он не меняется. Если этот отправитель уже
+    # платил и мы знаем, чей он, — его заявку видно без всяких чеков, и
+    # совпавшие суммы чужих клиентов больше не мешают.
+    known = await db.sender_owner(conn, notice.sender)
+    if known is not None:
+        his = [d for d in waiting if d.user_id == known.user_id]
+        if len(his) == 1:
+            return await _confirm(conn, bot, payment, his[0], notice,
+                                  trusted=True)
+        if len(his) > 1:
+            # Один и тот же человек оставил две заявки на одну сумму.
+            # Какую закрывать — неважно, деньги всё равно его.
+            return await _confirm(conn, bot, payment, his[0], notice,
+                                  trusted=True)
+        if not waiting:
+            return await _unknown(conn, bot, payment, notice)
+        # Заявки есть, но не его. Значит платил он, а ждут другие —
+        # отдавать чужую заявку нельзя.
+        return await _ambiguous(conn, bot, payment, waiting, notice)
+
     if len(waiting) == 1:
         return await _confirm(conn, bot, payment, waiting[0], notice)
 
@@ -101,20 +122,21 @@ async def handle(
     return await _unknown(conn, bot, payment, notice)
 
 
-async def _confirm(conn, bot, payment, deposit, notice) -> Result:
-    """Ровно одна подходящая заявка.
+async def _confirm(conn, bot, payment, deposit, notice, trusted=False) -> Result:
+    """Закрыть заявку и зачислить деньги.
 
-    Но зачисляем только если клиент уже прислал чек. Совпадения одной
+    trusted — плательщик уже знаком: он платил раньше, и мы знаем, чей
+    он. Тогда зачисляем сразу.
+
+    Незнакомого просим подтвердить чеком — один раз. Совпадения одной
     суммы мало, чтобы решить, чьи это деньги: заявку на 1 сомони мог
     оставить один человек, а заплатить в ту же минуту — другой, вообще
-    без заявки. Чек связывает перевод с тем, кто его просит.
-
-    Чека ещё нет — деньги ждут его. Заявка остаётся открытой, и владелец
-    в любой момент может закрыть её руками.
+    без заявки. Зато после первого раза плательщик становится знакомым,
+    и больше чек у этого клиента не спрашивают никогда.
     """
     from app.handlers.admin import _resolve_deposit
 
-    if not deposit.receipt_file_id:
+    if not trusted and not deposit.receipt_file_id:
         return await _hold(conn, bot, payment, deposit, notice)
 
     report = await _resolve_deposit(conn, bot, deposit.id, ROBOT, approved=True)
@@ -136,6 +158,10 @@ async def _confirm(conn, bot, payment, deposit, notice) -> Result:
         conn, payment.id, status=db.BANK_MATCHED, deposit_id=deposit.id,
         note=f"из поля {notice.source_field}",
     )
+    # Плательщик закрепляется за клиентом ровно здесь — после удачного
+    # зачисления, а не по приходу денег: закреплять того, кому мы ещё
+    # ничего не отдали, значит запомнить чужую связь по ошибке.
+    await db.bind_sender(conn, notice.sender, deposit.user_id)
     log.info("[USERBOT] Payment confirmed: %s", deposit.id)
     await _tell_owner(
         bot,
@@ -147,7 +173,11 @@ async def _confirm(conn, bot, payment, deposit, notice) -> Result:
            if notice.sender else "")
         + (f"├ Код банка: <code>{notice.op_code}</code>\n"
            if notice.op_code else "")
-        + f"└ {notice.bank_time or 'время не указано'}",
+        + f"└ {notice.bank_time or 'время не указано'}"
+        + ("\n\n<i>Плательщик знакомый — платил раньше с этого же "
+           "счёта.</i>" if trusted else
+           "\n\n<i>Первый платёж с этого счёта. Дальше зачисления этого "
+           "клиента пойдут без чека.</i>"),
     )
     return Result(status=db.BANK_MATCHED, amount=notice.amount,
                   deposit_id=deposit.id, note=report)

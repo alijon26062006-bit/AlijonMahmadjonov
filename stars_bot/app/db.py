@@ -342,6 +342,18 @@ CREATE TABLE IF NOT EXISTS api_transactions (
     created_at     TEXT NOT NULL
 );
 
+-- Чей это отправитель. Банк в каждом уведомлении называет плательщика,
+-- и он у человека не меняется. Один раз связав его с клиентом, дальше
+-- узнаём платежи этого клиента без всяких чеков — и не путаем с чужими,
+-- даже когда суммы совпали до копейки.
+CREATE TABLE IF NOT EXISTS bank_senders (
+    sender    TEXT PRIMARY KEY,
+    user_id   INTEGER NOT NULL,
+    payments  INTEGER NOT NULL DEFAULT 0,
+    bound_at  TEXT NOT NULL,
+    last_at   TEXT NOT NULL DEFAULT ''
+);
+
 -- Резерв ключа идемпотентности. Занимается ДО списания денег: если
 -- повторный запрос успеет прийти, пока первый ещё считает, он упрётся
 -- в первичный ключ и не создаст второй заказ.
@@ -386,6 +398,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_msg
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_code
     ON bank_payments(op_code) WHERE op_code IS NOT NULL AND op_code != '';
 CREATE INDEX IF NOT EXISTS idx_bank_status  ON bank_payments(status);
+CREATE INDEX IF NOT EXISTS idx_bsender_user ON bank_senders(user_id);
 CREATE INDEX IF NOT EXISTS idx_akeys_user    ON api_keys(user_id);
 CREATE INDEX IF NOT EXISTS idx_akeys_prefix  ON api_keys(prefix);
 CREATE INDEX IF NOT EXISTS idx_areq_key      ON api_requests(key_id);
@@ -2653,3 +2666,70 @@ async def held_bank_payment(
     ) as cur:
         row = await cur.fetchone()
     return _from_row(BankPayment, row) if row else None
+
+
+@dataclass
+class BankSender:
+    sender: str
+    user_id: int
+    payments: int
+    bound_at: str
+    last_at: str
+
+
+async def sender_owner(
+    conn: aiosqlite.Connection, sender: str
+) -> BankSender | None:
+    """Чей это плательщик. None — видим его впервые."""
+    if not sender.strip():
+        return None
+    async with conn.execute(
+        "SELECT * FROM bank_senders WHERE sender = ?", (sender.strip(),)
+    ) as cur:
+        row = await cur.fetchone()
+    return _from_row(BankSender, row) if row else None
+
+
+async def bind_sender(
+    conn: aiosqlite.Connection, sender: str, user_id: int
+) -> None:
+    """Закрепить плательщика за клиентом.
+
+    Второй раз тот же плательщик придёт уже узнанным, и чек у клиента
+    спрашивать будет незачем.
+    """
+    if not sender.strip():
+        return
+    now = _now()
+    await conn.execute(
+        """INSERT INTO bank_senders (sender, user_id, payments, bound_at, last_at)
+           VALUES (?, ?, 1, ?, ?)
+           ON CONFLICT(sender) DO UPDATE SET
+               payments = bank_senders.payments + 1, last_at = excluded.last_at""",
+        (sender.strip(), user_id, now, now),
+    )
+    await conn.commit()
+
+
+async def unbind_sender(conn: aiosqlite.Connection, sender: str) -> None:
+    await conn.execute("DELETE FROM bank_senders WHERE sender = ?", (sender,))
+    await conn.commit()
+
+
+async def senders_of(
+    conn: aiosqlite.Connection, user_id: int
+) -> list[BankSender]:
+    async with conn.execute(
+        "SELECT * FROM bank_senders WHERE user_id = ? ORDER BY payments DESC",
+        (user_id,),
+    ) as cur:
+        return [_from_row(BankSender, row) for row in await cur.fetchall()]
+
+
+async def list_senders(
+    conn: aiosqlite.Connection, limit: int = 20
+) -> list[BankSender]:
+    async with conn.execute(
+        "SELECT * FROM bank_senders ORDER BY last_at DESC LIMIT ?", (limit,)
+    ) as cur:
+        return [_from_row(BankSender, row) for row in await cur.fetchall()]
