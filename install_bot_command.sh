@@ -6,9 +6,13 @@ set -euo pipefail
 ROOT="$(dirname "$(readlink -f "$0")")"
 BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)"
 TARGET="/usr/local/bin/bot"
+# --no-run: танҳо худи фармонро нав мекунад ва иҷро намешавад.
+# Худи `bot` онро ҳангоми навсозӣ даъват мекунад.
+QUIET=0
+[ "${1:-}" = "--no-run" ] && QUIET=1
 
 # Повторный запуск безопасен: команда просто перезаписывается свежей.
-if [ -e "$TARGET" ]; then
+if [ -e "$TARGET" ] && [ "$QUIET" -eq 0 ]; then
   echo "ℹ️  Команда bot уже есть — обновляю её."
 fi
 
@@ -17,6 +21,11 @@ if [ "$(id -u)" -ne 0 ] && ! command -v sudo >/dev/null 2>&1; then
   exit 1
 fi
 SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+
+# Файли муваққатӣ: `install` якбора иваз мекунад, бинобар ин `bot`-и корӣ
+# ҳангоми навсозии худаш канда намешавад.
+STAGED="$(mktemp)"
+trap 'rm -f "$STAGED"' EXIT
 
 {
   echo '#!/usr/bin/env bash'
@@ -98,6 +107,13 @@ elif ! git checkout -B "$BRANCH" FETCH_HEAD >/dev/null 2>&1; then
 fi
 echo "     $(git log --oneline -1)"
 
+# Худи фармони `bot` берун аз репозиторий зиндагӣ мекунад, бинобар ин
+# онро низ нав мекунем — вагарна фармонҳои нав пайдо намешаванд.
+if [ -f "$ROOT/install_bot_command.sh" ]; then
+  bash "$ROOT/install_bot_command.sh" --no-run 2>/dev/null \
+    && echo "     команда bot обновлена"
+fi
+
 echo "2/4  Обновляю зависимости..."
 [ -x .venv/bin/pip ] || python3 -m venv .venv
 .venv/bin/pip install -q --upgrade pip
@@ -156,9 +172,15 @@ else
   exit 1
 fi
 BODY
-} | $SUDO tee "$TARGET" >/dev/null
+} > "$STAGED"
 
-$SUDO chmod +x "$TARGET"
+$SUDO install -m 755 "$STAGED" "$TARGET"
+rm -f "$STAGED"
+
+if [ "$QUIET" -eq 1 ]; then
+  exit 0
+fi
+
 echo "✅ Команда установлена: $TARGET"
 echo
 echo "Теперь из любой папки достаточно набрать:  bot"
