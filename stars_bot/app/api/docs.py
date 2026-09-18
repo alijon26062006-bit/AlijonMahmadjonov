@@ -35,7 +35,13 @@ ENDPOINTS = [
      "Названия, поля и число пакетов — по нему удобно листать каталог"),
     ("GET", "/balance", "Остаток на балансе", ""),
     ("GET", "/user", "Аккаунт, ключ, лимиты, вебхук", ""),
-    ("GET", "/orders", "Список заказов", "?limit=20&offset=0"),
+    ("GET", "/orders", "Список заказов",
+     "?period=today|yesterday|7d|30d|all или ?from=&to=, ?limit=&offset=, "
+     "?tz=смещение в минутах"),
+    ("GET", "/orders/summary", "Сводка за период",
+     "Сколько заказов, выполнено, возвратов, потрачено"),
+    ("GET", "/transactions", "Движение денег",
+     "Пополнения, списания, возвраты. Те же period, from, to"),
     ("GET", "/orders/{order_id}", "Один заказ", "order_id — ORD-000123"),
     ("POST", "/order/create", "Создать заказ", "product_id, quantity, customer"),
     ("GET", "/order/status", "Статус заказа", "?order_id=ORD-000123"),
@@ -421,6 +427,10 @@ def html() -> str:
 
 <div class="note"><b>Базовый адрес:</b> <code>{escape(url)}</code><br>
 Все запросы — по HTTPS. Ответ всегда JSON с полем <code>success</code>.</div>
+
+<div class="note"><b>Личный кабинет:</b> <a href="cabinet">{escape(url)}/cabinet</a><br>
+Вставьте там ключ — и увидите заказы за любой период, движение денег,
+каталог и состояние вебхука. Без регистрации.</div>
 
 <h2>Как начать</h2>
 <ol>

@@ -960,6 +960,105 @@ async def game_order(conn, bot) -> None:
     gsvc_forget()
 
 
+
+# ──────────────────────────────────── кабинет и периоды
+
+
+async def cabinet_view(conn, bot) -> None:
+    """Данные для кабинета: периоды, сводка, выписка, сама страница."""
+    from app.api import cabinet as cab
+
+    check("минус в сумме не ломает показ",
+          catalog.money(-779)["amount_text"] == "-7.79",
+          catalog.money(-779)["amount_text"])
+    check("ноль показывается как 0.00",
+          catalog.money(0)["amount_text"] == "0.00")
+
+    supplier = GamesProvider()
+    await runtime.set_value(conn, "games_enabled", "1")
+    await runtime.set_value(conn, "api_all_games", "0")
+    await runtime.set_value(conn, "api_rate_per_min", "100000")
+    guard.forget_rate()
+    gsvc_forget()
+    await db.credit(conn, BUYER, 100_000)
+
+    app = web.Application()
+    app["bot"] = bot
+    app["provider"] = supplier
+    api_server.mount(app, bot, supplier)
+    runner = web.AppRunner(app, access_log=None)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    base = f"http://127.0.0.1:{runner.addresses[0][1]}{api_server.PREFIX}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            api = Client(base, session)
+            key = await make_key(conn, label="cabinet")
+
+            _, before, _ = await api.get("/orders/summary?period=today", key=key)
+            was = before["orders"]
+
+            for _ in range(2):
+                await api.post("/order/create", key=key,
+                               body={"product_id": "game:one_field:p1",
+                                     "quantity": 1, "customer": "1724367212"})
+
+            _, now, _ = await api.get("/orders/summary?period=today", key=key)
+            check("сводка за сегодня видит новые заказы",
+                  now["orders"] == was + 2, f"{was} → {now['orders']}")
+            check("и считает выполненные",
+                  now["completed"] >= 2, str(now["completed"]))
+            check("потрачено показано суммой",
+                  now["spent"]["amount"] > 0, str(now["spent"]))
+
+            _, past, _ = await api.get("/orders/summary?period=yesterday", key=key)
+            check("во вчера сегодняшние заказы не попали",
+                  past["orders"] == 0, str(past["orders"]))
+
+            _, page, _ = await api.get("/orders?period=today&limit=1", key=key)
+            check("заказы отдаются страницами",
+                  len(page["orders"]) == 1 and page["total"] >= 2,
+                  f"{len(page['orders'])} из {page['total']}")
+
+            status, bad, _ = await api.get("/orders?period=позавчера", key=key)
+            check("непонятный период — понятный отказ, а не молчание",
+                  status == 400 and bad["error"]["code"] == "bad_period",
+                  str(bad)[:120])
+
+            _, txs, _ = await api.get("/transactions?period=today", key=key)
+            charges = [x for x in txs["transactions"] if x["kind"] == "charge"]
+            check("выписка показывает списания", len(charges) >= 2,
+                  str(len(charges)))
+            check("списание показано со знаком минус",
+                  charges[0]["amount"] < 0
+                  and charges[0]["amount_text"].startswith("-"),
+                  charges[0]["amount_text"])
+            check("у списания видно, к какому заказу оно",
+                  bool(charges[0]["order_id"]), charges[0]["order_id"])
+
+            # Часовой пояс клиента: в Душанбе день начинается на пять
+            # часов раньше UTC, и «сегодня» должно считаться по нему.
+            _, east, _ = await api.get(
+                "/orders/summary?period=today&tz=300", key=key)
+            check("часовой пояс учитывается", "orders" in east, str(east)[:80])
+
+            status, _, _ = await api.get("/cabinet", key="")
+            check("кабинет открывается без ключа", status == 200, str(status))
+    finally:
+        await runner.cleanup()
+
+    page = cab.html()
+    for mark in ('id="apikey"', 'data-tab="orders"', 'data-p="7d"',
+                 'id="periods"', "/orders/summary"):
+        check(f"в кабинете есть {mark}", mark in page)
+    check("кабинет не строит разметку строками", "innerHTML" not in cab.JS)
+
+    await runtime.set_value(conn, "games_enabled", "0")
+    gsvc_forget()
+
+
 # ───────────────────────────────────────────────── запуск
 
 
@@ -988,6 +1087,7 @@ async def main() -> None:
         await full_supplier_catalog(conn)
         await catalog_paging(conn, bot)
         await game_order(conn, bot)
+        await cabinet_view(conn, bot)
     finally:
         await conn.close()
 

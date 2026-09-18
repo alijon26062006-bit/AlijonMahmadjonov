@@ -25,7 +25,7 @@ import time
 from aiohttp import web
 
 from app import db, runtime
-from app.api import docs, guard, routes
+from app.api import cabinet, docs, guard, routes
 from app.api.guard import Denied
 
 log = logging.getLogger(__name__)
@@ -36,7 +36,8 @@ PREFIX = "/api/v1"
 #: Сверяем по самому обработчику, а не по концу адреса: товар с именем
 #: «health» иначе открыл бы дыру там, где её никто не искал.
 def _open(request: web.Request) -> bool:
-    return request.match_info.handler in (health, docs.page)
+    return request.match_info.handler in (health, docs.page,
+                                          cabinet.page)
 
 
 def _unrouted(request: web.Request) -> bool:
@@ -156,12 +157,15 @@ def build(bot, provider) -> web.Application:
     add = app.router.add_route
     add("GET", "/health", health)
     add("GET", "/docs", docs.page)
+    add("GET", "/cabinet", cabinet.page)
     add("GET", "/products", routes.products)
     add("GET", "/products/{product_id}", routes.product)
     add("GET", "/games", routes.games)
     add("GET", "/balance", routes.balance)
     add("GET", "/user", routes.user)
     add("GET", "/orders", routes.orders)
+    add("GET", "/orders/summary", routes.orders_summary)
+    add("GET", "/transactions", routes.transactions)
     add("GET", "/order/status", routes.order_status)
     add("GET", "/orders/{order_id}", routes.order_by_id)
     add("POST", "/order/create", routes.order_create)

@@ -2268,18 +2268,77 @@ async def api_order_by_idem(
     return dict(row) if row else None
 
 
+def _span_sql(column: str, since: str, until: str) -> tuple[str, list]:
+    """Кусок WHERE для отрезка времени и его значения.
+
+    Границы сравниваются строками: ISO-даты сортируются так же, как время,
+    поэтому индекс по created_at работает и без разбора дат. Пустая
+    граница означает «без ограничения» — так «за всё время» не требует
+    отдельного запроса.
+    """
+    sql, params = "", []
+    if since:
+        sql += f" AND {column} >= ?"
+        params.append(since)
+    if until:
+        sql += f" AND {column} < ?"
+        params.append(until)
+    return sql, params
+
+
 async def api_orders_of(
-    conn: aiosqlite.Connection, user_id: int, limit: int = 20, offset: int = 0
+    conn: aiosqlite.Connection, user_id: int, limit: int = 20, offset: int = 0,
+    since: str = "", until: str = "",
 ) -> list[dict[str, Any]]:
     """Заказы клиента вместе со статусом из основной таблицы."""
+    where, params = _span_sql("a.created_at", since, until)
     async with conn.execute(
-        """SELECT a.*, o.status, o.price, o.quantity, o.recipient, o.error,
-                  o.updated_at
-           FROM api_orders a JOIN orders o ON o.id = a.order_id
-           WHERE a.user_id = ? ORDER BY a.rowid DESC LIMIT ? OFFSET ?""",
-        (user_id, limit, offset),
+        f"""SELECT a.*, o.status, o.price, o.quantity, o.recipient, o.error,
+                   o.updated_at
+            FROM api_orders a JOIN orders o ON o.id = a.order_id
+            WHERE a.user_id = ?{where}
+            ORDER BY a.rowid DESC LIMIT ? OFFSET ?""",
+        (user_id, *params, limit, offset),
     ) as cur:
         return [dict(row) for row in await cur.fetchall()]
+
+
+async def api_orders_count(
+    conn: aiosqlite.Connection, user_id: int, since: str = "", until: str = ""
+) -> int:
+    where, params = _span_sql("created_at", since, until)
+    async with conn.execute(
+        f"SELECT COUNT(*) FROM api_orders WHERE user_id = ?{where}",
+        (user_id, *params),
+    ) as cur:
+        return int((await cur.fetchone())[0] or 0)
+
+
+async def api_summary(
+    conn: aiosqlite.Connection, user_id: int, since: str = "", until: str = ""
+) -> dict[str, int]:
+    """Сводка клиента за отрезок: сколько заказов и куда ушли деньги.
+
+    Считаем в базе, а не перебором заказов: за месяц их могут быть
+    тысячи, и тянуть их в память ради четырёх чисел незачем.
+    """
+    where, params = _span_sql("a.created_at", since, until)
+    async with conn.execute(
+        f"""SELECT COUNT(*)                                            AS orders,
+                   COALESCE(SUM(o.status = ?), 0)                      AS done,
+                   COALESCE(SUM(o.status = ?), 0)                      AS refunded,
+                   COALESCE(SUM(o.status IN (?, ?)), 0)                AS working,
+                   COALESCE(SUM(CASE WHEN o.status = ? THEN o.price END), 0)
+                                                                       AS spent,
+                   COALESCE(SUM(CASE WHEN o.status = ? THEN o.price END), 0)
+                                                                       AS returned
+            FROM api_orders a JOIN orders o ON o.id = a.order_id
+            WHERE a.user_id = ?{where}""",
+        (ORDER_DELIVERED, ORDER_REFUNDED, ORDER_DELIVERING, ORDER_FAILED,
+         ORDER_DELIVERED, ORDER_REFUNDED, user_id, *params),
+    ) as cur:
+        row = await cur.fetchone()
+    return {key: (row[key] or 0) for key in row.keys()}
 
 
 async def api_orders_to_notify(
@@ -2343,14 +2402,27 @@ async def add_api_tx(
 
 
 async def api_txs_of(
-    conn: aiosqlite.Connection, user_id: int, limit: int = 20, offset: int = 0
+    conn: aiosqlite.Connection, user_id: int, limit: int = 20, offset: int = 0,
+    since: str = "", until: str = "",
 ) -> list[dict[str, Any]]:
+    where, params = _span_sql("created_at", since, until)
     async with conn.execute(
-        "SELECT * FROM api_transactions WHERE user_id = ? "
+        f"SELECT * FROM api_transactions WHERE user_id = ?{where} "
         "ORDER BY id DESC LIMIT ? OFFSET ?",
-        (user_id, limit, offset),
+        (user_id, *params, limit, offset),
     ) as cur:
         return [dict(row) for row in await cur.fetchall()]
+
+
+async def api_txs_count(
+    conn: aiosqlite.Connection, user_id: int, since: str = "", until: str = ""
+) -> int:
+    where, params = _span_sql("created_at", since, until)
+    async with conn.execute(
+        f"SELECT COUNT(*) FROM api_transactions WHERE user_id = ?{where}",
+        (user_id, *params),
+    ) as cur:
+        return int((await cur.fetchone())[0] or 0)
 
 
 # ---- вебхук клиента -------------------------------------------------

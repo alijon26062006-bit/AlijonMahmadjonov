@@ -31,8 +31,15 @@ def currency() -> str:
 
 
 def money(diram: int) -> dict:
-    """Одна сумма в двух видах: для расчётов и для показа."""
-    return {"amount": diram, "amount_text": f"{diram // 100}.{diram % 100:02d}",
+    """Одна сумма в двух видах: для расчётов и для показа.
+
+    Знак выносим перед числом руками: у целочисленного деления в Python
+    −779 дирам превратились бы в «−8.21» вместо «−7.79», и списание в
+    выписке показывалось бы неверной суммой.
+    """
+    whole, part = divmod(abs(diram), 100)
+    sign = "-" if diram < 0 else ""
+    return {"amount": diram, "amount_text": f"{sign}{whole}.{part:02d}",
             "currency": currency()}
 
 

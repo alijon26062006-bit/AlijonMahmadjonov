@@ -5309,7 +5309,8 @@ async def cb_api(call: CallbackQuery, state: FSMContext,
                + ("да" if runtime.get_bool("api_behind_proxy") else "нет"),
                "pn:api_proxy"))
     if url:
-        kb.row(InlineKeyboardButton(text="📖 Документация", url=f"{url}/docs"))
+        kb.row(InlineKeyboardButton(text="🖥 Кабинет", url=f"{url}/cabinet"),
+               InlineKeyboardButton(text="📖 Документация", url=f"{url}/docs"))
     kb.row(btn(labeled("back", "Назад"), "pn:home"))
 
     # Наценка для разработчиков: 0 — продаём им по витрине бота.

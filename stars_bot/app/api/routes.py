@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
 
@@ -80,6 +81,71 @@ def _page_of(request: web.Request, default: int, top: int) -> tuple[int, int]:
         return max(0, min(value, cap))
 
     return max(1, number("limit", default, top)), number("offset", 0, 1_000_000)
+
+
+#: Названия периодов. Их же показывает кабинет вкладками.
+PERIODS = ("today", "yesterday", "7d", "30d", "all")
+#: Насколько далеко часовой пояс может отстоять от UTC, в минутах.
+TZ_LIMIT = 14 * 60
+
+
+def _tz(request: web.Request) -> timezone:
+    """Часовой пояс клиента. Без него «сегодня» считалось бы по UTC.
+
+    В Душанбе день начинается на пять часов раньше UTC, и утренние
+    заказы попадали бы во «вчера» — ровно там, где владелец их и стал бы
+    искать в первую очередь.
+    """
+    try:
+        minutes = int(request.query.get("tz", "0"))
+    except ValueError:
+        minutes = 0
+    return timezone(timedelta(minutes=max(-TZ_LIMIT, min(minutes, TZ_LIMIT))))
+
+
+def _span(request: web.Request) -> tuple[str, str, str] | None:
+    """Отрезок времени в UTC: (since, until, название). None — мусор в запросе.
+
+    Пустые границы означают «за всё время»: так самый частый случай не
+    тащит за собой лишних условий в запросе.
+    """
+    zone = _tz(request)
+    now = datetime.now(zone)
+    day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    def iso(moment: datetime) -> str:
+        return moment.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+    raw_from = (request.query.get("from") or "").strip()
+    raw_to = (request.query.get("to") or "").strip()
+    if raw_from or raw_to:
+        try:
+            start = (datetime.strptime(raw_from, "%Y-%m-%d").replace(tzinfo=zone)
+                     if raw_from else None)
+            end = (datetime.strptime(raw_to, "%Y-%m-%d").replace(tzinfo=zone)
+                   + timedelta(days=1) if raw_to else None)
+        except ValueError:
+            return None
+        if start and end and end <= start:
+            return None
+        return (iso(start) if start else "", iso(end) if end else "", "custom")
+
+    name = (request.query.get("period") or "all").strip().lower()
+    if name not in PERIODS:
+        return None
+    if name == "today":
+        return iso(day), iso(day + timedelta(days=1)), name
+    if name == "yesterday":
+        return iso(day - timedelta(days=1)), iso(day), name
+    if name in ("7d", "30d"):
+        days = 7 if name == "7d" else 30
+        return iso(day - timedelta(days=days - 1)), iso(day + timedelta(days=1)), name
+    return "", "", "all"
+
+
+BAD_SPAN = ("bad_period",
+            "period — today, yesterday, 7d, 30d или all; "
+            "from и to — даты вида 2026-09-18.")
 
 
 # ─────────────────────────────────────────────────────── товары
@@ -194,11 +260,64 @@ def order_view(row: dict) -> dict:
 
 
 async def orders(request: web.Request) -> web.Response:
+    span = _span(request)
+    if span is None:
+        return fail(400, *BAD_SPAN)
+    since, until, period = span
+
+    conn, user_id = request["conn"], caller_of(request).user_id
     limit, offset = _page(request)
-    rows = await db.api_orders_of(request["conn"], caller_of(request).user_id,
-                                  limit, offset)
-    return ok(count=len(rows), limit=limit, offset=offset,
-              orders=[order_view(row) for row in rows])
+    rows = await db.api_orders_of(conn, user_id, limit, offset, since, until)
+    total = await db.api_orders_count(conn, user_id, since, until)
+    return ok(count=len(rows), total=total, limit=limit, offset=offset,
+              period=period, orders=[order_view(row) for row in rows])
+
+
+async def orders_summary(request: web.Request) -> web.Response:
+    """Сводка за период: сколько заказов и куда ушли деньги."""
+    span = _span(request)
+    if span is None:
+        return fail(400, *BAD_SPAN)
+    since, until, period = span
+
+    data = await db.api_summary(request["conn"], caller_of(request).user_id,
+                                since, until)
+    return ok(period=period,
+              orders=data["orders"], completed=data["done"],
+              refunded=data["refunded"], processing=data["working"],
+              spent=catalog.money(data["spent"]),
+              returned=catalog.money(data["returned"]))
+
+
+#: Как назвать движение денег человеку. Знак суммы уже говорит сам за
+#: себя, но в таблице кабинета нужна и словесная подпись.
+TX_TITLES = {"deposit": "пополнение", "charge": "покупка",
+             "refund": "возврат", "adjust": "правка"}
+
+
+async def transactions(request: web.Request) -> web.Response:
+    """Движение денег: пополнения, списания, возвраты."""
+    span = _span(request)
+    if span is None:
+        return fail(400, *BAD_SPAN)
+    since, until, period = span
+
+    conn, user_id = request["conn"], caller_of(request).user_id
+    limit, offset = _page(request)
+    rows = await db.api_txs_of(conn, user_id, limit, offset, since, until)
+    total = await db.api_txs_count(conn, user_id, since, until)
+    return ok(count=len(rows), total=total, limit=limit, offset=offset,
+              period=period,
+              transactions=[{
+                  "transaction_id": row["tx_id"],
+                  "kind": row["kind"],
+                  "kind_text": TX_TITLES.get(row["kind"], row["kind"]),
+                  "order_id": row["order_ref"] or "",
+                  "note": row["note"] or "",
+                  "created_at": row["created_at"],
+                  "balance_after": row["balance_after"],
+                  **catalog.money(row["amount"]),
+              } for row in rows])
 
 
 async def _one_order(request: web.Request, ref: str) -> web.Response:
