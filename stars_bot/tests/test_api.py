@@ -738,7 +738,10 @@ class GamesProvider(Provider):
 
     async def order_game(self, **kw):
         self.ordered.append(kw)
-        return {"order_id": "SUP-1", "status": "completed"}
+        return {"order_id": "SUP-1", "status": "processing"}
+
+    async def order_status(self, external_id):
+        return {"status": "completed"}
 
 
 async def full_supplier_catalog(conn) -> None:
@@ -862,6 +865,101 @@ async def catalog_paging(conn, bot) -> None:
     gsvc_forget()
 
 
+
+# ──────────────────────────────────── покупка игры
+
+
+async def game_order(conn, bot) -> None:
+    """Покупка игрового пакета через API — весь путь целиком.
+
+    Этот путь не был закрыт проверками, и на нём жила настоящая поломка:
+    разбор ID вызывался не так, как объявлен, и любая покупка игры через
+    API падала внутренней ошибкой. Поэтому проверяем не кусок, а дорогу
+    от запроса до списания.
+    """
+    supplier = GamesProvider()
+    await runtime.set_value(conn, "games_enabled", "1")
+    await runtime.set_value(conn, "api_all_games", "0")
+    await runtime.set_value(conn, "api_rate_per_min", "100000")
+    guard.forget_rate()
+    gsvc_forget()
+
+    # Игра с одним полем и игра с парой чисел: у Magic Chess и Mobile
+    # Legends аккаунт задаётся ID и сервером, и разбор там другой.
+    await db.add_game(conn, category_id="one_field", title="Одно поле")
+    await db.update_game(conn, "one_field", enabled=1)
+    await db.add_game(conn, category_id="two_fields", title="Два поля",
+                      field="user_id,server_id")
+    await db.update_game(conn, "two_fields", enabled=1)
+
+    await db.credit(conn, BUYER, 100_000)
+
+    app = web.Application()
+    app["bot"] = bot
+    app["provider"] = supplier
+    api_server.mount(app, bot, supplier)
+    runner = web.AppRunner(app, access_log=None)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    base = f"http://127.0.0.1:{runner.addresses[0][1]}{api_server.PREFIX}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            api = Client(base, session)
+            key = await make_key(conn, label="games")
+
+            before = (await db.get_user(conn, BUYER)).balance
+            status, body, _ = await api.post(
+                "/order/create", key=key,
+                body={"product_id": "game:one_field:p1", "quantity": 1,
+                      "customer": "1724367212"},
+            )
+            check("покупка игры проходит", status == 200 and body.get("success"),
+                  str(body)[:200])
+            check("заказ получил номер", bool(body.get("order_id")),
+                  str(body.get("order_id")))
+            check("ID игрока ушёл поставщику как есть",
+                  supplier.ordered and
+                  supplier.ordered[-1]["fields"] == {"user_id": "1724367212"},
+                  str(supplier.ordered[-1]["fields"] if supplier.ordered else {}))
+
+            after = (await db.get_user(conn, BUYER)).balance
+            check("деньги списаны ровно на цену заказа",
+                  before - after == body.get("amount"),
+                  f"{before} - {after} vs {body.get('amount')}")
+
+            status, second, _ = await api.post(
+                "/order/create", key=key,
+                body={"product_id": "game:two_fields:p1", "quantity": 1,
+                      "customer": "1724367212 2001"},
+            )
+            check("игра с двумя полями тоже покупается",
+                  status == 200 and second.get("success"), str(second)[:200])
+            check("оба числа разошлись по своим полям",
+                  supplier.ordered[-1]["fields"] ==
+                  {"user_id": "1724367212", "server_id": "2001"},
+                  str(supplier.ordered[-1]["fields"]))
+
+            status, bad, _ = await api.post(
+                "/order/create", key=key,
+                body={"product_id": "game:two_fields:p1", "quantity": 1,
+                      "customer": "1724367212"},
+            )
+            check("без второго числа заказ отклонён с понятным ответом",
+                  status == 400 and bad["error"]["code"] == "bad_customer",
+                  str(bad)[:160])
+
+            paid = (await db.get_user(conn, BUYER)).balance
+            check("за отклонённый заказ денег не взяли", paid == after - second["amount"],
+                  f"{paid} vs {after - second['amount']}")
+    finally:
+        await runner.cleanup()
+
+    await runtime.set_value(conn, "games_enabled", "0")
+    gsvc_forget()
+
+
 # ───────────────────────────────────────────────── запуск
 
 
@@ -889,6 +987,7 @@ async def main() -> None:
         await wholesale_prices(conn)
         await full_supplier_catalog(conn)
         await catalog_paging(conn, bot)
+        await game_order(conn, bot)
     finally:
         await conn.close()
 

@@ -385,11 +385,16 @@ async def _place(request, caller, item, quantity, customer, idem) -> web.Respons
 
 
 def _game_fields(game, customer: str) -> dict[str, str] | None:
-    """Разобрать customer на поля аккаунта. None — данных не хватило."""
+    """Разобрать customer на поля аккаунта. None — данных не хватило.
+
+    Разбираем тем же кодом, что и ввод в боте: у части игр аккаунт задан
+    парой чисел, и два разных разбора разошлись бы на первой же такой
+    игре — в боте заказ проходил бы, через API нет.
+    """
     from app.handlers.games import parse_ids
 
-    values = parse_ids(customer)
     names = list(game.field_names)
-    if len(values) < len(names):
+    values = parse_ids(customer, len(names))
+    if values is None:
         return None
     return dict(zip(names, values))
