@@ -401,6 +401,22 @@ class ApiFragProvider(DeliveryProvider):
         return {"ok": True, "mode": "api", "steps": steps, "error": ""}
 
 
+#: Как владелец может назвать каждый режим в FRAGMENT_MODE. Списки живут
+#: здесь: и выбор провайдера, и отчёт о готовности, и выбор счёта для API
+#: спрашивают одно и то же — «какой это поставщик», — и расходиться им
+#: нельзя.
+FAZER_MODES = frozenset({"fazer", "fazercards", "fzr"})
+MYSTARS_MODES = frozenset({"mystars", "faas"})
+APIFRAG_MODES = frozenset({"api", "apifrag", "apifragment"})
+#: Режимы, при которых звёзды и Premium правда уходят клиенту.
+DELIVERY_MODES = FAZER_MODES | MYSTARS_MODES | APIFRAG_MODES
+
+
+def mode_now() -> str:
+    """Текущий режим выдачи, приведённый к сравнимому виду."""
+    return settings.fragment_mode.strip().lower()
+
+
 def build_provider(payer=None) -> DeliveryProvider:
     """Выбрать способ выдачи по FRAGMENT_MODE.
 
@@ -409,14 +425,14 @@ def build_provider(payer=None) -> DeliveryProvider:
     api     — прежний шлюз apifragment.online (хранит сид-фразу у себя);
     mock    — ничего не отправляет.
     """
-    mode = settings.fragment_mode.strip().lower()
+    mode = mode_now()
 
-    if mode in ("fazer", "fazercards", "fzr"):
+    if mode in FAZER_MODES:
         from app.services.fazer import FazerProvider
 
         return FazerProvider()
 
-    if mode in ("mystars", "faas"):
+    if mode in MYSTARS_MODES:
         # Импорт внутри: SDK нужен только в этом режиме.
         from app.services.mystars import MyStarsProvider
 
@@ -424,7 +440,7 @@ def build_provider(payer=None) -> DeliveryProvider:
             raise RuntimeError("Для режима mystars нужен способ оплаты заказов")
         return MyStarsProvider(payer)
 
-    if mode in ("api", "apifrag", "apifragment"):
+    if mode in APIFRAG_MODES:
         return ApiFragProvider()
 
     if mode != "mock":

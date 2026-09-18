@@ -50,6 +50,25 @@ def for_games(default: DeliveryProvider) -> DeliveryProvider:
     return client
 
 
+def for_api(default: DeliveryProvider) -> DeliveryProvider:
+    """Провайдер для заказов через API — со счёта игр, что бы ни заказали.
+
+    Разработчики покупают у нас всё подряд: игры, звёзды, Premium. Пусть
+    это будет один счёт — так владельцу видно, сколько API съело, одной
+    цифрой, а не разностью двух.
+
+    Подменяем, только если основная выдача сама на FazerCards. При
+    mystars звёзды уходят другим сервисом, и отдать их фазеровскому
+    ключу значило бы сменить поставщика молча — такое не делается
+    мимоходом.
+    """
+    from app.services.fragment import FAZER_MODES, mode_now
+
+    if mode_now() not in FAZER_MODES:
+        return default
+    return for_games(default)
+
+
 async def close_all() -> None:
     for client in _clients.values():
         await client.close()

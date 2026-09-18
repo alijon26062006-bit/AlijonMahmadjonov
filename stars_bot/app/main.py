@@ -22,7 +22,9 @@ from app.middlewares.emoji_guard import CustomEmojiGuard
 from app.middlewares.escape import CommandEscapeMiddleware
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.billing import make_sender
-from app.services.fragment import build_provider
+from app.services.fragment import (
+    DELIVERY_MODES, MYSTARS_MODES, build_provider, mode_now,
+)
 from app.services.games import watch_loop as games_watch
 from app.services.pricing import auto_price_loop
 
@@ -37,15 +39,6 @@ USER_COMMANDS = [
 ADMIN_COMMANDS = USER_COMMANDS + [
     BotCommand(command="panel", description="Админ-панель"),
 ]
-
-
-#: Режимы выдачи, при которых звёзды и Premium правда уходят клиенту.
-#: Пишутся как в build_provider — там же и разбираются их синонимы.
-DELIVERY_MODES = frozenset({
-    "fazer", "fazercards", "fzr",
-    "mystars", "faas",
-    "api", "apifrag", "apifragment",
-})
 
 
 def readiness() -> tuple[list[str], list[str]]:
@@ -69,8 +62,7 @@ def readiness() -> tuple[list[str], list[str]]:
     # api», а «не стоит ли пустышка». Иначе бот при живых продажах через
     # FazerCards уверяет владельца, что звёзды не отправляются, и зовёт
     # его на старый шлюз, хранящий сид-фразу у себя.
-    mode = settings.fragment_mode.strip().lower()
-    if mode not in DELIVERY_MODES:
+    if mode_now() not in DELIVERY_MODES:
         warnings.append(
             f"FRAGMENT_MODE={settings.fragment_mode!r} — бот работает, но "
             "звёзды и Premium НЕ отправляются. Рабочие режимы: "
@@ -133,7 +125,7 @@ async def main() -> None:
     # ManualPayer нужен только режиму mystars: он присылает владельцу
     # ссылку на оплату вместо того, чтобы подписывать перевод самому.
     payer = None
-    if settings.fragment_mode.strip().lower() in ("mystars", "faas"):
+    if mode_now() in MYSTARS_MODES:
         from app.services.mystars import ManualPayer
 
         payer = ManualPayer(make_sender(bot))

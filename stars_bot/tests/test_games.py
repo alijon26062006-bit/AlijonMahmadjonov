@@ -1875,8 +1875,29 @@ async def two_keys(conn) -> None:
     check("совпадающий ключ не считается отдельным",
           suppliers.has_own_games_key() is False)
 
+    # ---- заказы через API идут со счёта игр, что бы ни заказали ----
+    # Разработчик покупает у нас и игры, и звёзды. Пусть тратится один
+    # счёт: владельцу видно расход на API одной цифрой.
+    was_mode = db.settings.fragment_mode
+    suppliers.forget()
+    await runtime.set_value(conn, "fazer_games_key", "fc_partner_key")
+
+    db.settings.__dict__["fragment_mode"] = "fazer"
+    check("через API звёзды идут со счёта игр",
+          suppliers.for_api(main).api_key == "fc_partner_key")
+    check("регистр в названии режима не мешает",
+          (db.settings.__dict__.__setitem__("fragment_mode", "FaZeR")
+           or suppliers.for_api(main).api_key) == "fc_partner_key")
+
+    # А вот при mystars звёзды уходят другим сервисом — подменять счёт
+    # значило бы сменить поставщика молча.
+    db.settings.__dict__["fragment_mode"] = "mystars"
+    check("при mystars счёт не подменяется", suppliers.for_api(main) is main)
+    db.settings.__dict__["fragment_mode"] = was_mode
+
     await suppliers.close_all()
     await runtime.set_value(conn, "fazer_games_key", "")
+    suppliers.forget()
 
 
 async def key_balances(conn) -> None:

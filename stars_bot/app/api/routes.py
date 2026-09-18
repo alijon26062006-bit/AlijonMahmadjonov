@@ -638,7 +638,9 @@ async def _place(request, caller, item, quantity, customer, idem) -> web.Respons
             offer_id=catalog.offer_id_of(item), fields=fields, order=order,
         )
     else:
-        order = await delivery.run(bot, conn, provider, order)
+        # Звёзды и Premium через API — с того же счёта, что и игры:
+        # деньги разработчиков в одном месте.
+        order = await delivery.run(bot, conn, suppliers.for_api(provider), order)
 
     row = {"ref": ref, "product_id": item["id"], "customer": customer,
            "status": order.status, "price": order.price,
