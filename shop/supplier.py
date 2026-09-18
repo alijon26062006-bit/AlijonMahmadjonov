@@ -65,10 +65,13 @@ class OrderResult:
 class Supplier(Protocol):
     name: str
 
-    async def check(self, *, kind: str, sku: str, target: str, amount: int) -> CheckResult: ...
+    async def check(
+        self, *, kind: str, sku: str, target: str, amount: int, server: str = ""
+    ) -> CheckResult: ...
 
     async def place_order(
-        self, *, kind: str, sku: str, target: str, amount: int, order_id: str
+        self, *, kind: str, sku: str, target: str, amount: int, order_id: str,
+        server: str = "",
     ) -> OrderResult: ...
 
     async def order_status(self, external_id: str, *, by_external: bool = False) -> OrderResult: ...
@@ -83,12 +86,15 @@ class ManualSupplier:
 
     name = "manual"
 
-    async def check(self, *, kind: str, sku: str, target: str, amount: int) -> CheckResult:
+    async def check(
+        self, *, kind: str, sku: str, target: str, amount: int, server: str = ""
+    ) -> CheckResult:
         # Лақаб маълум нест — харидор худаш ID-и худро тасдиқ мекунад.
         return CheckResult(target=target, nickname=None, ok=True)
 
     async def place_order(
-        self, *, kind: str, sku: str, target: str, amount: int, order_id: str
+        self, *, kind: str, sku: str, target: str, amount: int, order_id: str,
+        server: str = "",
     ) -> OrderResult:
         return OrderResult(ok=True, external_id=None, status=None)
 
@@ -147,7 +153,9 @@ class FireLootSupplier:
         return table.get(code, f"{code or status}: {message}"), code
 
     # ── тафтиши ID / username ─────────────────────────────────────────
-    async def check(self, *, kind: str, sku: str, target: str, amount: int) -> CheckResult:
+    async def check(
+        self, *, kind: str, sku: str, target: str, amount: int, server: str = ""
+    ) -> CheckResult:
         if kind == "manual" or not self.base_url:
             return CheckResult(target=target, nickname=None, ok=True)
         try:
@@ -159,9 +167,10 @@ class FireLootSupplier:
                 )
                 nickname = data.get("name") or username
             else:
-                status, data = await self._request(
-                    "POST", "/validate", json={"sku": sku, "uid": str(target)},
-                )
+                payload: dict[str, Any] = {"sku": sku, "uid": str(target)}
+                if server:
+                    payload["server_id"] = str(server)
+                status, data = await self._request("POST", "/validate", json=payload)
                 nickname = data.get("player_name")
 
             if status == 200 and data.get("valid") is True and nickname:
@@ -174,7 +183,8 @@ class FireLootSupplier:
 
     # ── фиристодани фармоиш ───────────────────────────────────────────
     async def place_order(
-        self, *, kind: str, sku: str, target: str, amount: int, order_id: str
+        self, *, kind: str, sku: str, target: str, amount: int, order_id: str,
+        server: str = "",
     ) -> OrderResult:
         if kind == "manual" or not self.base_url:
             return OrderResult(ok=True, external_id=None, status=None)
@@ -189,14 +199,14 @@ class FireLootSupplier:
                     },
                 )
             else:
-                status, data = await self._request(
-                    "POST", "/order",
-                    json={
-                        "external_id": str(order_id),
-                        "sku": sku,
-                        "uid": str(target),
-                    },
-                )
+                order_payload: dict[str, Any] = {
+                    "external_id": str(order_id),
+                    "sku": sku,
+                    "uid": str(target),
+                }
+                if server:
+                    order_payload["server_id"] = str(server)
+                status, data = await self._request("POST", "/order", json=order_payload)
 
             if status in (200, 201):
                 external = data.get("order_id") or data.get("id")

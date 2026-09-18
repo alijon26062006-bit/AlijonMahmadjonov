@@ -288,10 +288,12 @@ class Database:
             for i, p in enumerate(catalog.DEFAULT_PRODUCTS):
                 self._conn.execute(
                     "INSERT OR IGNORE INTO products"
-                    "(code, category, title, amount, price, partner_price, group_code, "
-                    "sku, kind, sort, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+                    "(code, category, title, amount, price, partner_price, cost, "
+                    "group_code, sku, kind, sort, active) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (p.code, p.category, p.title, p.amount, p.price,
-                     p.partner_price or None, p.group, p.sku, p.kind, i),
+                     p.partner_price or None, p.cost or None, p.group, p.sku,
+                     p.kind, i, 1 if p.active else 0),
                 )
                 self._conn.execute(
                     "UPDATE products SET category = ?, title = ?, amount = ?, "
@@ -314,6 +316,14 @@ class Database:
                 self._conn.execute(
                     "INSERT INTO settings(key, value) VALUES ('partner_prices_seeded', '1')"
                 )
+
+            # Нархи харид аз каталог — танҳо ҳамчун қимати ибтидоӣ.
+            for p in catalog.DEFAULT_PRODUCTS:
+                if p.cost:
+                    self._conn.execute(
+                        "UPDATE products SET cost = ? WHERE code = ? AND cost IS NULL",
+                        (p.cost, p.code),
+                    )
 
             # Молҳое, ки дигар дар каталог нестанд, пинҳон карда мешаванд.
             known = tuple(p.code for p in catalog.DEFAULT_PRODUCTS)
@@ -342,6 +352,21 @@ class Database:
         return self._run(
             "UPDATE groups SET active = ? WHERE code = ?", (1 if active else 0, code)
         ).rowcount > 0
+
+    def active_count(self, category: str) -> int:
+        """Чанд моли фаъол дар бахш ҳаст — барои пинҳон кардани тугмаи холӣ."""
+        row = self._one(
+            "SELECT COUNT(*) FROM products WHERE category = ? AND active = 1", (category,)
+        )
+        return int(row[0]) if row else 0
+
+    def set_group_products_active(self, group_code: str, active: bool) -> int:
+        """Тамоми зербахшро якбора фаъол ё хомӯш мекунад."""
+        cur = self._run(
+            "UPDATE products SET active = ? WHERE group_code = ?",
+            (1 if active else 0, group_code),
+        )
+        return cur.rowcount
 
     def group_products(self, group_code: str, *, only_active: bool = True) -> list[sqlite3.Row]:
         sql = "SELECT * FROM products WHERE group_code = ?"

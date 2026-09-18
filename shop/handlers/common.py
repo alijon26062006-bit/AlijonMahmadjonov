@@ -9,7 +9,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
-from .. import keyboards, texts
+from .. import catalog, keyboards, texts
 from ..config import Config
 from ..db import Database, User
 
@@ -39,6 +39,18 @@ def clean_player_id(raw: str) -> str | None:
     return value if PLAYER_ID_RE.match(value) else None
 
 
+def clean_player_server(raw: str) -> tuple[str, str] | None:
+    """«123456789 1234» ё «123456789(1234)» → (ID, сервер)."""
+    value = re.sub(r"[()\[\]]", " ", (raw or "").strip())
+    parts = [p for p in re.split(r"[\s,;]+", value) if p]
+    if len(parts) != 2 or not all(p.isdigit() for p in parts):
+        return None
+    player, server = parts
+    if not 5 <= len(player) <= 12 or not 1 <= len(server) <= 6:
+        return None
+    return player, server
+
+
 async def safe_edit(
     cb: CallbackQuery, text: str, markup: InlineKeyboardMarkup | None = None
 ) -> None:
@@ -62,7 +74,9 @@ async def show_main_menu(
     balance = user.balance if user else 0
     text = texts.welcome(balance, cfg.currency, partner=db.is_partner(user_id))
     markup = keyboards.main_menu(
-        is_admin=cfg.is_admin(user_id), reviews_url=cfg.reviews_url
+        is_admin=cfg.is_admin(user_id),
+        reviews_url=cfg.reviews_url,
+        other_games=db.active_count(catalog.CAT_OTHER) > 0,
     )
     if isinstance(event, CallbackQuery) and edit:
         await safe_edit(event, text, markup)

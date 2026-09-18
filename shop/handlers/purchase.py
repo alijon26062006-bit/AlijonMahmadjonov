@@ -16,6 +16,7 @@ from ..states import Buy
 from ..supplier import Supplier
 from .common import (
     clean_player_id,
+    clean_player_server,
     clean_username,
     current_user,
     notify_admins,
@@ -25,6 +26,20 @@ from .common import (
 
 log = logging.getLogger(__name__)
 router = Router(name="purchase")
+
+
+def needs_server(row) -> bool:
+    """Mobile Legends ғайр аз ID рақами серверро низ талаб мекунад."""
+    group = row["group_code"] if "group_code" in row.keys() else ""
+    return group in catalog.SERVER_GROUPS
+
+
+def ask_text(row, info: catalog.Category, price: int, currency: str) -> str:
+    if needs_server(row):
+        return texts.ask_player_server(info, row["title"], price, currency)
+    if info.target == "username":
+        return texts.ask_username(info, row["title"], price, currency)
+    return texts.ask_player_id(info, row["title"], price, currency)
 
 
 async def _ask_target(message: Message, info: catalog.Category, row, cfg: Config) -> None:
@@ -53,11 +68,9 @@ async def cb_product(
     await state.set_state(Buy.waiting_target)
     await state.update_data(code=code)
     price = price_of(row, db.is_partner(cb.from_user.id))
-    if info.target == "username":
-        text = texts.ask_username(info, row["title"], price, cfg.currency)
-    else:
-        text = texts.ask_player_id(info, row["title"], price, cfg.currency)
-    await safe_edit(cb, text, keyboards.cancel_only())
+    await safe_edit(
+        cb, ask_text(row, info, price, cfg.currency), keyboards.cancel_only()
+    )
     await cb.answer()
 
 
@@ -77,7 +90,16 @@ async def got_target(
         return
     info = catalog.CATEGORY_INFO[row["category"]]
 
-    if info.target == "username":
+    server = ""
+    if needs_server(row):
+        pair = clean_player_server(message.text)
+        if pair is None:
+            await message.answer(
+                texts.BAD_PLAYER_SERVER, reply_markup=keyboards.cancel_only()
+            )
+            return
+        target, server = pair
+    elif info.target == "username":
         target = clean_username(message.text)
         if target is None:
             await message.answer(texts.BAD_USERNAME, reply_markup=keyboards.cancel_only())
@@ -91,16 +113,17 @@ async def got_target(
     kind = row["kind"] or "game"
     if kind == "manual":
         # Premium: API надорад — рост ба тасдиқи фармоиш меравем.
-        await state.update_data(target=target, nickname=None)
+        await state.update_data(target=target, nickname=None, server=server)
         await _show_confirm(message, state, db, cfg)
         return
 
     waiting = await message.answer("⏳ Дар ҳоли тафтиши аккаунт...")
     checked = await supplier.check(
-        kind=kind, sku=row["sku"] or "", target=target, amount=row["amount"]
+        kind=kind, sku=row["sku"] or "", target=target, amount=row["amount"],
+        server=server,
     )
     nickname = checked.nickname if checked.ok else None
-    await state.update_data(target=target, nickname=nickname)
+    await state.update_data(target=target, nickname=nickname, server=server)
     try:
         await waiting.edit_text(
             texts.confirm_target(info, target, nickname, checked.error),
@@ -131,7 +154,9 @@ async def _show_confirm(
             info,
             row["title"],
             price_of(row, partner),
-            data.get("target", ""),
+            data.get("target", "") + (
+                f" ({data['server']})" if data.get("server") else ""
+            ),
             data.get("nickname"),
             user.balance,
             cfg.currency,
@@ -160,10 +185,9 @@ async def cb_id_no(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Conf
         return
     info = catalog.CATEGORY_INFO[row["category"]]
     await state.set_state(Buy.waiting_target)
-    ask = texts.ask_username if info.target == "username" else texts.ask_player_id
     await safe_edit(
         cb,
-        ask(info, row["title"], price_of(row, db.is_partner(cb.from_user.id)), cfg.currency),
+        ask_text(row, info, price_of(row, db.is_partner(cb.from_user.id)), cfg.currency),
         keyboards.cancel_only(),
     )
     await cb.answer()
@@ -185,6 +209,7 @@ async def cb_buy(
         await cb.answer(texts.UNKNOWN, show_alert=True)
         return
 
+    server = data.get("server", "")
     user = current_user(cb, db)
     price = price_of(row, db.is_partner(user.id))
     if user.balance < price:
@@ -201,7 +226,7 @@ async def cb_buy(
             category=row["category"],
             title=row["title"],
             price=price,
-            target=target,
+            target=target + (f" ({server})" if server else ""),
             nickname=data.get("nickname"),
             sku=row["sku"] or "",
             kind=row["kind"] or "game",

@@ -131,7 +131,9 @@ async def cb_category(cb: CallbackQuery, state: FSMContext, db: Database, cfg: C
 
     user = current_user(cb, db)
     partner = db.is_partner(user.id)
-    group_rows = db.groups(code)
+    # Зербахши холӣ ба харидор нишон дода намешавад — вагарна экрани
+    # иловагӣ бо як тугма пайдо мешуд.
+    group_rows = [g for g in db.groups(code) if db.group_products(g["code"])]
 
     if len(group_rows) > 1:
         await safe_edit(

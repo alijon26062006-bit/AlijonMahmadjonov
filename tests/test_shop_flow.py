@@ -262,7 +262,7 @@ async def test_player_id_shows_verification_panel(db, cfg, state):
 
 async def test_verification_shows_nickname_from_supplier(db, cfg, state):
     class WithNick(ManualSupplier):
-        async def check(self, *, kind, sku, target, amount):
+        async def check(self, *, kind, sku, target, amount, server=""):
             return CheckResult(target=target, nickname="ProGamer")
 
     await buy_h.cb_product(FakeCallback(keyboards.CB_PRODUCT + "ffcis_341"), state, db, cfg)
@@ -547,10 +547,10 @@ class FakeSupplier(ManualSupplier):
         self._statuses = list(statuses or ["completed"])
         self.calls = []
 
-    async def check(self, *, kind, sku, target, amount):
+    async def check(self, *, kind, sku, target, amount, server=""):
         return CheckResult(target=target, nickname="Tester")
 
-    async def place_order(self, *, kind, sku, target, amount, order_id):
+    async def place_order(self, *, kind, sku, target, amount, order_id, server=""):
         self.calls.append((kind, sku, target, amount, order_id))
         return self._place
 
@@ -1163,3 +1163,150 @@ async def test_requisites_survive_restart(db, cfg, state, tmp_path):
     requisites.seed(again, cfg)                      # оғози нави бот
     assert requisites.get(again, cfg).card == "7777888899990000"
     again.close()
+
+
+# ── «Дигар бозиҳо» ────────────────────────────────────────────────────
+async def test_other_games_hidden_until_enabled(db, cfg, state):
+    """Раздел не показывается, пока админ не включил ни одной игры."""
+    message = FakeMessage("/start")
+    await menu_h.cmd_start(message, state, db, cfg)
+    assert not _has(message.last_markup, texts.BTN_OTHER)
+
+
+async def test_other_games_appears_after_enabling(db, cfg, state):
+    db.set_group_products_active("mlbb_all", True)
+    message = FakeMessage("/start")
+    await menu_h.cmd_start(message, state, db, cfg)
+    labels = _labels(message.last_markup)
+    assert texts.BTN_OTHER in labels
+    # Строго после PUBG
+    assert labels.index(texts.BTN_OTHER) == labels.index(texts.BTN_PUBG) + 1
+
+
+async def test_one_enabled_game_opens_prices_directly(db, cfg, state):
+    """Включена одна игра — лишний экран выбора не нужен."""
+    db.set_group_products_active("hok_all", True)
+    cb = FakeCallback(keyboards.CB_CAT + catalog.CAT_OTHER)
+    await menu_h.cb_category(cb, state, db, cfg)
+    labels = " ".join(_labels(cb.message.last_markup))
+    assert "токен" in labels                     # сразу прайс Honor of Kings
+    assert "Lattice" not in labels               # чужие игры не попали
+
+
+async def test_two_enabled_games_show_choice(db, cfg, state):
+    db.set_group_products_active("hok_all", True)
+    db.set_group_products_active("mr_all", True)
+    cb = FakeCallback(keyboards.CB_CAT + catalog.CAT_OTHER)
+    await menu_h.cb_category(cb, state, db, cfg)
+    labels = " ".join(_labels(cb.message.last_markup))
+    assert "Honor of Kings" in labels and "Marvel Rivals" in labels
+    assert "Mobile Legends" not in labels        # выключенная игра не показана
+
+
+async def test_pubg_still_opens_prices_directly(db, cfg, state):
+    """Prime выключен, значит лишнего экрана у PUBG быть не должно."""
+    cb = FakeCallback(keyboards.CB_CAT + catalog.CAT_PUBG)
+    await menu_h.cb_category(cb, state, db, cfg)
+    assert any("UC —" in x for x in _labels(cb.message.last_markup))
+
+
+async def test_pubg_shows_groups_when_prime_enabled(db, cfg, state):
+    db.set_group_products_active("pubg_extra", True)
+    cb = FakeCallback(keyboards.CB_CAT + catalog.CAT_PUBG)
+    await menu_h.cb_category(cb, state, db, cfg)
+    labels = " ".join(_labels(cb.message.last_markup))
+    assert "UC" in labels and "Prime" in labels
+
+
+# ── Mobile Legends: ID + сервер ───────────────────────────────────────
+async def test_mlbb_asks_for_id_and_server(db, cfg, state):
+    db.set_group_products_active("mlbb_all", True)
+    cb = FakeCallback(keyboards.CB_PRODUCT + "mlbb_diamonds_50")
+    await buy_h.cb_product(cb, state, db, cfg)
+    assert "сервер" in cb.message.last.lower()
+
+
+async def test_mlbb_refuses_id_without_server(db, cfg, state):
+    db.set_group_products_active("mlbb_all", True)
+    await buy_h.cb_product(FakeCallback(keyboards.CB_PRODUCT + "mlbb_diamonds_50"), state, db, cfg)
+    message = FakeMessage("123456789")
+    await buy_h.got_target(message, state, db, cfg, ManualSupplier())
+    assert "сервер" in message.last.lower()
+
+
+async def test_mlbb_accepts_id_and_server(db, cfg, state):
+    db.set_group_products_active("mlbb_all", True)
+    await buy_h.cb_product(FakeCallback(keyboards.CB_PRODUCT + "mlbb_diamonds_50"), state, db, cfg)
+    message = FakeMessage("123456789 1234")
+    await buy_h.got_target(message, state, db, cfg, ManualSupplier())
+    data = await state.get_data()
+    assert data["target"] == "123456789" and data["server"] == "1234"
+
+
+async def test_server_reaches_supplier(db, cfg_api, state, bot):
+    """Сервер обязан дойти до поставщика — иначе заказ уйдёт не туда."""
+    seen = {}
+
+    class Watcher(FakeSupplier):
+        async def place_order(self, *, kind, sku, target, amount, order_id, server=""):
+            seen["target"] = target
+            seen["server"] = server
+            return OrderResult(ok=True, external_id="FL-9")
+
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 50000, "topup")
+    row = db.product("mlbb_diamonds_50")
+    order_id = db.create_order(
+        user_id=USER_ID, product_code="mlbb_diamonds_50", category=row["category"],
+        title=row["title"], price=row["price"], target="123456789 (1234)",
+        nickname="Tester", sku=row["sku"], kind=row["kind"],
+    )
+    await deliver_order(bot, db, cfg_api, Watcher(), order_id)
+    assert seen == {"target": "123456789", "server": "1234"}
+
+
+async def test_plain_game_sends_no_server(db, cfg_api, state, bot):
+    seen = {}
+
+    class Watcher(FakeSupplier):
+        async def place_order(self, *, kind, sku, target, amount, order_id, server=""):
+            seen["target"], seen["server"] = target, server
+            return OrderResult(ok=True, external_id="FL-9")
+
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 50000, "topup")
+    order_id = _make_order(db)
+    await deliver_order(bot, db, cfg_api, Watcher(), order_id)
+    assert seen == {"target": "123456789", "server": ""}
+
+
+# ── включение раздела админом ─────────────────────────────────────────
+async def test_admin_enables_whole_group(db, cfg, state):
+    cb = FakeCallback("a:gon:hok_all", user_id=ADMIN_ID)
+    await admin_h.cb_group_toggle(cb, db, cfg)
+    items = db.group_products("hok_all", only_active=False)
+    assert all(i["active"] for i in items)
+
+
+async def test_admin_disables_whole_group(db, cfg, state):
+    db.set_group_products_active("hok_all", True)
+    cb = FakeCallback("a:goff:hok_all", user_id=ADMIN_ID)
+    await admin_h.cb_group_toggle(cb, db, cfg)
+    assert db.group_products("hok_all") == []
+
+
+async def test_new_games_start_disabled(db):
+    """Новые игры не должны продаваться, пока цены не проверены."""
+    for code in ("mlbb_diamonds_50", "hok_tokens_80", "bs_gold_100", "mr_lattice_100"):
+        assert db.product(code)["active"] == 0, code
+
+
+async def test_new_games_have_cost_and_margin(db):
+    """У каждой новой игры есть закупка, и цена выше неё."""
+    from shop.db import price_of
+
+    for code in ("mlbb_diamonds_50", "hok_tokens_80", "bs_gold_100", "mr_lattice_100"):
+        row = db.product(code)
+        assert row["cost"], code
+        in_somoni = round(row["cost"] / 1000 * 11.0 * 100)
+        assert row["price"] > in_somoni, f"{code}: цена ниже закупки"

@@ -47,6 +47,7 @@ BTN_TELEGRAM = "⭐️ Telegram Stars ва Premium"
 BTN_FF_CIS = "🔥 Free Fire"
 BTN_FF_ID = "🇮🇩 Free Fire (Индонезия)"
 BTN_PUBG = "🎯 PUBG Mobile"
+BTN_OTHER = "🎮 Дигар бозиҳо"
 BTN_TOPUP = "💳 Пур кардани ҳисоб"
 BTN_SUPPORT = "🎧 Дастгирӣ"
 BTN_TOP = "🏆 Беҳтарин харидорон"
@@ -154,6 +155,21 @@ BAD_USERNAME = (
     "ҳарфҳои лотинӣ, рақамҳо ва зери хат."
 )
 BAD_PLAYER_ID = "❌ ID нодуруст аст. Танҳо рақамҳо, аз 6 то 12 рақам."
+BAD_PLAYER_SERVER = (
+    "❌ Нодуруст аст.\n\n"
+    "ID ва рақами серверро бо фосила нависед:\n"
+    "<code>123456789 1234</code>\n\n"
+    "<i>Онҳоро дар бозӣ, дар профили худ мебинед: ID (сервер).</i>"
+)
+
+
+def ask_player_server(cat: catalog.Category, title: str, price: int, currency: str = CURRENCY) -> str:
+    return (
+        f"🛒 <b>{esc(title)}</b> — {money(price, currency)}\n\n"
+        "ID ва рақами серверро <b>бо фосила</b> нависед.\n\n"
+        "Намуна: <code>123456789 1234</code>\n"
+        "<i>Дар бозӣ дар профили худ чунин навишта шудааст: ID (сервер).</i>"
+    )
 
 
 def confirm_target(

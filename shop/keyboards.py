@@ -44,13 +44,20 @@ def _url(text: str, link: str, color: str | None = None) -> InlineKeyboardButton
     )
 
 
-def main_menu(*, is_admin: bool = False, reviews_url: str = "") -> InlineKeyboardMarkup:
+def main_menu(
+    *, is_admin: bool = False, reviews_url: str = "", other_games: bool = False
+) -> InlineKeyboardMarkup:
     """Менюи асосӣ — ҳамон тарҳбандии намуна."""
     rows: list[list[InlineKeyboardButton]] = [
         [_btn(texts.BTN_TELEGRAM, CB_TG_MENU, style.PRIMARY)],
         [_btn(texts.BTN_FF_CIS, CB_CAT + catalog.CAT_FF_CIS, style.PRIMARY)],
         [_btn(texts.BTN_FF_ID, CB_CAT + catalog.CAT_FF_ID, style.PRIMARY)],
         [_btn(texts.BTN_PUBG, CB_CAT + catalog.CAT_PUBG, style.PRIMARY)],
+    ]
+    # Тугмаи «Дигар бозиҳо» танҳо вақте пайдо мешавад, ки дар он мол ҳаст.
+    if other_games:
+        rows.append([_btn(texts.BTN_OTHER, CB_CAT + catalog.CAT_OTHER, style.PRIMARY)])
+    rows += [
         [_btn(texts.BTN_TOPUP, CB_TOPUP, style.SUCCESS)],
         [
             _btn(texts.BTN_SUPPORT, CB_SUPPORT, style.PRIMARY),
@@ -390,7 +397,10 @@ def admin_bc_confirm() -> InlineKeyboardMarkup:
 
 def admin_price_categories() -> InlineKeyboardMarkup:
     rows = [
-        [_btn(f"{c.icon} {c.title}", f"a:pcat:{c.code}", style.PRIMARY)]
+        [_btn(f"{c.icon} {c.title}",
+              # Бахши сербахш — аввал зербахшҳо, вагарна рост ба нархҳо.
+              f"a:pcat2:{c.code}" if len(catalog.groups_of(c.code)) > 1 else f"a:pcat:{c.code}",
+              style.PRIMARY)]
         for c in catalog.CATEGORY_INFO.values()
     ]
     rows.append([_btn(texts.ADM_BTN_COSTS, "a:costs", style.SUCCESS)])
@@ -398,8 +408,36 @@ def admin_price_categories() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def admin_group_list(rows: Sequence, counts: dict) -> InlineKeyboardMarkup:
+    """Зербахшҳои як бахш бо шумораи молҳои фаъол."""
+    buttons = []
+    for row in rows:
+        on, total = counts.get(row["code"], (0, 0))
+        mark = "✅" if on else "🚫"
+        buttons.append([
+            _btn(f"{mark} {row['title']} ({on}/{total})", f"a:pgroup:{row['code']}",
+                 style.PRIMARY if on else style.DANGER)
+        ])
+    buttons.append([_btn(texts.BTN_BACK, "a:prices")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def admin_group_screen(group_code: str, any_active: bool) -> InlineKeyboardMarkup:
+    toggle = (
+        _btn("🚫 Тамоми зербахшро хомӯш", f"a:goff:{group_code}", style.DANGER)
+        if any_active
+        else _btn("✅ Тамоми зербахшро фаъол", f"a:gon:{group_code}", style.SUCCESS)
+    )
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [toggle],
+        [_btn("💲 Нархҳои алоҳида", f"a:gprices:{group_code}", style.PRIMARY)],
+        [_btn(texts.BTN_BACK, "a:prices")],
+    ])
+
+
 def admin_price_list(
-    rows: Sequence, *, currency: str = texts.CURRENCY, rate: float = 11.0
+    rows: Sequence, *, currency: str = texts.CURRENCY, rate: float = 11.0,
+    back: str = "a:prices",
 ) -> InlineKeyboardMarkup:
     """Рӯйхати нархҳо. Моле, ки бо зарар фурӯхта мешавад, фавран нишон дода мешавад."""
     buttons: list[list[InlineKeyboardButton]] = []
@@ -419,7 +457,7 @@ def admin_price_list(
                 color,
             )
         ])
-    buttons.append([_btn(texts.BTN_BACK, "a:prices")])
+    buttons.append([_btn(texts.BTN_BACK, back)])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 

@@ -16,13 +16,15 @@ CAT_PREMIUM = "tg_premium"
 CAT_FF_CIS = "ff_cis"
 CAT_FF_ID = "ff_id"
 CAT_PUBG = "pubg"
+CAT_OTHER = "other_games"
 
-CATEGORIES = (CAT_STARS, CAT_PREMIUM, CAT_FF_CIS, CAT_FF_ID, CAT_PUBG)
+CATEGORIES = (CAT_STARS, CAT_PREMIUM, CAT_FF_CIS, CAT_FF_ID, CAT_PUBG, CAT_OTHER)
 
 # Чӣ тавр молро ба харидор мерасонем:
-#   "username" — ба @username-и Telegram
-#   "player"   — ба ID-и бозӣ
-TargetKind = Literal["username", "player"]
+#   "username"      — ба @username-и Telegram
+#   "player"        — ба ID-и бозӣ
+#   "player_server" — ID-и бозигар ва рақами сервер (Mobile Legends)
+TargetKind = Literal["username", "player", "player_server"]
 
 # Чӣ тавр фармоиш иҷро мешавад:
 #   "game"   — FireLoot: /validate + /order
@@ -82,7 +84,18 @@ CATEGORY_INFO: dict[str, Category] = {
         icon="🎯",
         hint="ID-и бозигари PUBG Mobile-ро нависед — танҳо рақамҳо.",
     ),
+    CAT_OTHER: Category(
+        code=CAT_OTHER,
+        title="Дигар бозиҳо",
+        unit="дона",
+        target="player",
+        icon="🎮",
+        hint="ID-и бозигарро нависед — танҳо рақамҳо.",
+    ),
 }
+
+#: Зербахшҳое, ки ID ва рақами сервер талаб мекунанд (Mobile Legends).
+SERVER_GROUPS = frozenset({"mlbb_all", "mlbbcis_all"})
 
 
 @dataclass(frozen=True)
@@ -102,6 +115,12 @@ DEFAULT_GROUPS: tuple[Group, ...] = (
     Group("ffid_diamonds", CAT_FF_ID, "💎 Алмосҳо"),
     Group("ffid_member", CAT_FF_ID, "🎟 Membership"),
     Group("pubg_uc", CAT_PUBG, "🎮 UC"),
+    Group("pubg_extra", CAT_PUBG, "👑 Prime ва Elite Pass"),
+    Group("mlbb_all", CAT_OTHER, "⚔️ Mobile Legends"),
+    Group("mlbbcis_all", CAT_OTHER, "⚔️ Mobile Legends (ИДМ)"),
+    Group("hok_all", CAT_OTHER, "👑 Honor of Kings"),
+    Group("bs_all", CAT_OTHER, "🩸 Blood Strike"),
+    Group("mr_all", CAT_OTHER, "🦸 Marvel Rivals"),
 )
 
 
@@ -120,6 +139,8 @@ class Product:
     kind: FulfillKind
     partner_price: int = 0   # дирам; 0 — шарик нархи оддиро мепардозад
     group: str = ""          # зербахш (Group.code)
+    cost: int = 0            # нархи харид дар ҳазорумҳои доллар (0.886 $ → 886)
+    active: bool = True      # моли нав хомӯш аст, то админ нархро тасдиқ кунад
 
 
 def _p(
@@ -132,11 +153,14 @@ def _p(
     kind: FulfillKind = "game",
     partner_somoni: float = 0,
     group: str = "",
+    cost_usd: float = 0,
+    active: bool = True,
 ) -> Product:
     """Нархҳо бо сомонӣ навишта мешаванд, дар база бо дирам нигоҳ дошта."""
     return Product(
         code, category, title, amount, round(price_somoni * 100),
         sku, kind, round(partner_somoni * 100), group,
+        round(cost_usd * 1000), active,
     )
 
 
@@ -194,6 +218,79 @@ DEFAULT_PRODUCTS: tuple[Product, ...] = (
     _p("pubg_24300", CAT_PUBG, "🎮 18 000 + 6 300 UC", 24300, 2700.00, "pubg_uc_24300", partner_somoni=2650.0, group="pubg_uc"),
     _p("pubg_32400", CAT_PUBG, "🎮 24 000 + 8 400 UC", 32400, 3700.00, "pubg_uc_32400", partner_somoni=3650.0, group="pubg_uc"),
     _p("pubg_40500", CAT_PUBG, "🎮 30 000 + 10 500 UC", 40500, 4500.00, "pubg_uc_40500", partner_somoni=4450.0, group="pubg_uc"),
+
+    # ── mlbb ──
+    _p("mlbb_diamonds_32", CAT_OTHER, "32 + 3 💎", 35, 7.5, "mlbb_diamonds_32", group="mlbb_all", cost_usd=0.62, active=False),
+    _p("mlbb_diamonds_50", CAT_OTHER, "50 + 5 💎", 55, 11.5, "mlbb_diamonds_50", group="mlbb_all", cost_usd=0.979, active=False),
+    _p("mlbb_diamonds_150", CAT_OTHER, "150 + 15 💎", 165, 34.0, "mlbb_diamonds_150", group="mlbb_all", cost_usd=2.937, active=False),
+    _p("mlbb_diamonds_250", CAT_OTHER, "250 + 25 💎", 275, 56.5, "mlbb_diamonds_250", group="mlbb_all", cost_usd=4.894, active=False),
+    _p("mlbb_diamonds_500", CAT_OTHER, "500 + 65 💎", 565, 113.5, "mlbb_diamonds_500", group="mlbb_all", cost_usd=9.844, active=False),
+    _p("mlbb_diamonds_1000", CAT_OTHER, "1000 + 155 💎", 1155, 227.5, "mlbb_diamonds_1000", group="mlbb_all", cost_usd=19.754, active=False),
+    _p("mlbb_diamonds_1500", CAT_OTHER, "1500 + 265 💎", 1765, 340.0, "mlbb_diamonds_1500", group="mlbb_all", cost_usd=29.541, active=False),
+    _p("mlbb_diamonds_2500", CAT_OTHER, "2500 + 475 💎", 2975, 567.0, "mlbb_diamonds_2500", group="mlbb_all", cost_usd=49.294, active=False),
+    _p("mlbb_diamonds_5000", CAT_OTHER, "5000 + 1000 💎", 6000, 1132.5, "mlbb_diamonds_5000", group="mlbb_all", cost_usd=98.473, active=False),
+    _p("mlbb_weekly", CAT_OTHER, "🎟 Weekly Pass", 0, 23.0, "mlbb_weekly", group="mlbb_all", cost_usd=1.966, active=False),
+    _p("mlbb_super_value_pass", CAT_OTHER, "🎟 Super Value Pass", 0, 13.0, "mlbb_super_value_pass", group="mlbb_all", cost_usd=1.102, active=False),
+
+    # ── mlbbcis ──
+    _p("mlbbcis_diamonds_50", CAT_OTHER, "50 + 5 💎", 55, 9.5, "mlbbcis_diamonds_50", group="mlbbcis_all", cost_usd=0.79, active=False),
+    _p("mlbbcis_diamonds_78", CAT_OTHER, "78 + 8 💎", 86, 14.5, "mlbbcis_diamonds_78", group="mlbbcis_all", cost_usd=1.251, active=False),
+    _p("mlbbcis_diamonds_150", CAT_OTHER, "150 + 15 💎", 165, 27.5, "mlbbcis_diamonds_150", group="mlbbcis_all", cost_usd=2.376, active=False),
+    _p("mlbbcis_diamonds_156", CAT_OTHER, "156 + 16 💎", 172, 28.5, "mlbbcis_diamonds_156", group="mlbbcis_all", cost_usd=2.477, active=False),
+    _p("mlbbcis_diamonds_234", CAT_OTHER, "234 + 23 💎", 257, 41.0, "mlbbcis_diamonds_234", group="mlbbcis_all", cost_usd=3.552, active=False),
+    _p("mlbbcis_diamonds_625", CAT_OTHER, "625 + 81 💎", 706, 112.5, "mlbbcis_diamonds_625", group="mlbbcis_all", cost_usd=9.748, active=False),
+    _p("mlbbcis_diamonds_1860", CAT_OTHER, "1860 + 335 💎", 2195, 339.5, "mlbbcis_diamonds_1860", group="mlbbcis_all", cost_usd=29.511, active=False),
+    _p("mlbbcis_diamonds_3099", CAT_OTHER, "3099 + 589 💎", 3688, 566.5, "mlbbcis_diamonds_3099", group="mlbbcis_all", cost_usd=49.224, active=False),
+    _p("mlbbcis_diamonds_4649", CAT_OTHER, "4649 + 883 💎", 5532, 855.0, "mlbbcis_diamonds_4649", group="mlbbcis_all", cost_usd=74.327, active=False),
+    _p("mlbbcis_diamonds_7740", CAT_OTHER, "7740 + 1548 💎", 9288, 1420.0, "mlbbcis_diamonds_7740", group="mlbbcis_all", cost_usd=123.449, active=False),
+    _p("mlbbcis_weekly", CAT_OTHER, "🎟 Weekly", 0, 18.0, "mlbbcis_weekly", group="mlbbcis_all", cost_usd=1.545, active=False),
+    _p("mlbbcis_weekly_elite_pack", CAT_OTHER, "🎟 Weekly Elite", 0, 9.5, "mlbbcis_weekly_elite_pack", group="mlbbcis_all", cost_usd=0.815, active=False),
+    _p("mlbbcis_monthly_elite_pack", CAT_OTHER, "🎟 Monthly Elite", 0, 46.5, "mlbbcis_monthly_elite_pack", group="mlbbcis_all", cost_usd=4.014, active=False),
+    _p("mlbbcis_twilight", CAT_OTHER, "🌙 Twilight", 0, 94.5, "mlbbcis_twilight", group="mlbbcis_all", cost_usd=8.178, active=False),
+
+    # ── hok ──
+    _p("hok_tokens_16", CAT_OTHER, "16 токен", 16, 2.5, "hok_tokens_16", group="hok_all", cost_usd=0.18, active=False),
+    _p("hok_tokens_80", CAT_OTHER, "80 токен", 80, 10.0, "hok_tokens_80", group="hok_all", cost_usd=0.865, active=False),
+    _p("hok_tokens_240", CAT_OTHER, "240 токен", 240, 30.5, "hok_tokens_240", group="hok_all", cost_usd=2.61, active=False),
+    _p("hok_tokens_400", CAT_OTHER, "400 токен", 400, 50.5, "hok_tokens_400", group="hok_all", cost_usd=4.364, active=False),
+    _p("hok_tokens_560", CAT_OTHER, "560 токен", 560, 70.5, "hok_tokens_560", group="hok_all", cost_usd=6.109, active=False),
+    _p("hok_tokens_800", CAT_OTHER, "800 + 30 токен", 830, 100.5, "hok_tokens_800", group="hok_all", cost_usd=8.735, active=False),
+    _p("hok_tokens_1200", CAT_OTHER, "1200 + 45 токен", 1245, 151.0, "hok_tokens_1200", group="hok_all", cost_usd=13.099, active=False),
+    _p("hok_tokens_2400", CAT_OTHER, "2400 + 108 токен", 2508, 301.5, "hok_tokens_2400", group="hok_all", cost_usd=26.213, active=False),
+    _p("hok_tokens_4000", CAT_OTHER, "4000 + 180 токен", 4180, 502.5, "hok_tokens_4000", group="hok_all", cost_usd=43.691, active=False),
+    _p("hok_tokens_8000", CAT_OTHER, "8000 + 360 токен", 8360, 1005.5, "hok_tokens_8000", group="hok_all", cost_usd=87.397, active=False),
+    _p("hok_weekly_card", CAT_OTHER, "🎟 Weekly Card", 0, 11.5, "hok_weekly_card", group="hok_all", cost_usd=0.971, active=False),
+    _p("hok_weekly_card_plus", CAT_OTHER, "🎟 Weekly Card Plus", 0, 33.0, "hok_weekly_card_plus", group="hok_all", cost_usd=2.855, active=False),
+    _p("hok_honor_point_value_pack", CAT_OTHER, "🎁 Honor Point Pack", 0, 3.5, "hok_honor_point_value_pack", group="hok_all", cost_usd=0.27, active=False),
+
+    # ── bs ──
+    _p("bs_gold_51", CAT_OTHER, "51 Gold", 51, 5.0, "bs_gold_51", group="bs_all", cost_usd=0.4, active=False),
+    _p("bs_gold_100", CAT_OTHER, "100 + 5 Gold", 105, 9.5, "bs_gold_100", group="bs_all", cost_usd=0.792, active=False),
+    _p("bs_gold_300", CAT_OTHER, "300 + 20 Gold", 320, 28.0, "bs_gold_300", group="bs_all", cost_usd=2.398, active=False),
+    _p("bs_gold_500", CAT_OTHER, "500 + 40 Gold", 540, 46.5, "bs_gold_500", group="bs_all", cost_usd=4.005, active=False),
+    _p("bs_gold_1000", CAT_OTHER, "1000 + 100 Gold", 1100, 92.5, "bs_gold_1000", group="bs_all", cost_usd=8.034, active=False),
+    _p("bs_gold_2000", CAT_OTHER, "2000 + 260 Gold", 2260, 185.0, "bs_gold_2000", group="bs_all", cost_usd=16.075, active=False),
+    _p("bs_gold_5000", CAT_OTHER, "5000 + 800 Gold", 5800, 463.5, "bs_gold_5000", group="bs_all", cost_usd=40.273, active=False),
+    _p("bs_level_up_pass", CAT_OTHER, "🎟 Level Up Pass", 0, 18.5, "bs_level_up_pass", group="bs_all", cost_usd=1.599, active=False),
+    _p("bs_strike_pass_elite", CAT_OTHER, "🎟 Strike Pass Elite", 0, 37.5, "bs_strike_pass_elite", group="bs_all", cost_usd=3.222, active=False),
+    _p("bs_strike_pass_premium", CAT_OTHER, "🎟 Strike Pass Premium", 0, 83.5, "bs_strike_pass_premium", group="bs_all", cost_usd=7.259, active=False),
+    _p("bs_value_season_pass", CAT_OTHER, "🎟 Value Season Pass", 0, 9.5, "bs_value_season_pass", group="bs_all", cost_usd=0.792, active=False),
+
+    # ── mr ──
+    _p("mr_lattice_100", CAT_OTHER, "100 Lattice", 100, 10.5, "mr_lattice_100", group="mr_all", cost_usd=0.906, active=False),
+    _p("mr_lattice_500", CAT_OTHER, "500 Lattice", 500, 52.0, "mr_lattice_500", group="mr_all", cost_usd=4.519, active=False),
+    _p("mr_lattice_1000", CAT_OTHER, "1000 Lattice", 1000, 104.0, "mr_lattice_1000", group="mr_all", cost_usd=9.029, active=False),
+    _p("mr_lattice_2180", CAT_OTHER, "2180 Lattice", 2180, 208.0, "mr_lattice_2180", group="mr_all", cost_usd=18.065, active=False),
+    _p("mr_lattice_5680", CAT_OTHER, "5680 Lattice", 5680, 519.5, "mr_lattice_5680", group="mr_all", cost_usd=45.159, active=False),
+    _p("mr_lattice_11680", CAT_OTHER, "11680 Lattice", 11680, 1039.0, "mr_lattice_11680", group="mr_all", cost_usd=90.325, active=False),
+
+    # ── pubg_extra ──
+    _p("pubg_prime_1m", CAT_PUBG, "👑 Prime — 1 моҳ", 1, 10.5, "pubg_prime_1m", group="pubg_extra", cost_usd=0.878, active=False),
+    _p("pubg_prime_3m", CAT_PUBG, "👑 Prime — 3 моҳ", 3, 30.5, "pubg_prime_3m", group="pubg_extra", cost_usd=2.635, active=False),
+    _p("pubg_prime_6m", CAT_PUBG, "👑 Prime — 6 моҳ", 6, 61.0, "pubg_prime_6m", group="pubg_extra", cost_usd=5.269, active=False),
+    _p("pubg_prime_12m", CAT_PUBG, "👑 Prime — 12 моҳ", 12, 121.5, "pubg_prime_12m", group="pubg_extra", cost_usd=10.539, active=False),
+    _p("pubg_elite_pass_50", CAT_PUBG, "🎟 Elite Pass LV1-50", 0, 61.0, "pubg_elite_pass_50", group="pubg_extra", cost_usd=5.289, active=False),
+    _p("pubg_elite_pass_100", CAT_PUBG, "🎟 Elite Pass LV1-100", 0, 123.0, "pubg_elite_pass_100", group="pubg_extra", cost_usd=10.669, active=False),
 )
 
 # Маблағҳои тайёр барои пур кардани ҳисоб (дирам).

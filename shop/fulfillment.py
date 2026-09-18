@@ -132,9 +132,14 @@ async def _deliver(
         return
 
     # ── ба таъминкунанда мефиристем ───────────────────────────────────
+    # Дар база «123456789 (1234)» нигоҳ дошта мешавад — ҷудо мекунем.
+    target_raw = row["target"] or ""
+    target, _, server_part = target_raw.partition(" (")
+    server = server_part.rstrip(")") if server_part else ""
+
     result = await supplier.place_order(
-        kind=kind, sku=sku, target=row["target"] or "", amount=amount,
-        order_id=str(order_id),
+        kind=kind, sku=sku, target=target.strip(), amount=amount,
+        order_id=str(order_id), server=server,
     )
 
     if not result.ok:

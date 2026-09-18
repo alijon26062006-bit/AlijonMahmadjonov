@@ -628,3 +628,86 @@ async def cmd_colors(message: Message, bot: Bot) -> None:
               "Дар <code>.env</code> нависед <code>SHOP_BUTTON_COLORS=0</code> "
               "ва ботро аз нав оғоз кунед."
         )
+
+
+# ── зербахшҳо дар нархҳо ──────────────────────────────────────────────
+@router.callback_query(F.data.startswith("a:pcat2:"))
+async def cb_price_groups(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    """Рӯйхати зербахшҳои бахш бо шумораи молҳои фаъол."""
+    code = cb.data.rsplit(":", 1)[1]
+    info = catalog.CATEGORY_INFO.get(code)
+    if info is None:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    groups = db.groups(code, only_active=False)
+    counts = {}
+    for group in groups:
+        items = db.group_products(group["code"], only_active=False)
+        counts[group["code"]] = (sum(1 for i in items if i["active"]), len(items))
+    await safe_edit(
+        cb,
+        f"{info.icon} <b>{texts.esc(info.title)}</b>\n\n"
+        "Зербахшро интихоб кунед.\n"
+        "✅ — фурӯхта мешавад · 🚫 — хомӯш",
+        keyboards.admin_group_list(groups, counts),
+    )
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("a:pgroup:"))
+async def cb_group_screen(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    code = cb.data.rsplit(":", 1)[1]
+    group = db.group(code)
+    if group is None:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    items = db.group_products(code, only_active=False)
+    on = sum(1 for i in items if i["active"])
+    rate = usd_rate(db)
+    losing = [
+        i for i in items
+        if i["cost"] and i["price"] < round(i["cost"] / 1000 * rate * 100)
+    ]
+    warn = (
+        f"\n🔴 <b>{len(losing)} мол бо зарор аст</b> — нархҳоро санҷед!"
+        if losing else ""
+    )
+    await safe_edit(
+        cb,
+        f"🗂 <b>{texts.esc(group['title'])}</b>\n\n"
+        f"📦 Молҳо: <b>{len(items)}</b>\n"
+        f"✅ Фурӯхта мешавад: <b>{on}</b>{warn}\n\n"
+        "<i>Нархҳо аз нархи харид ҳисоб шудаанд — онҳоро санҷед, "
+        "баъд зербахшро фаъол кунед.</i>",
+        keyboards.admin_group_screen(code, on > 0),
+    )
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("a:gon:") | F.data.startswith("a:goff:"))
+async def cb_group_toggle(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    action = cb.data.split(":")[1]
+    code = cb.data.rsplit(":", 1)[1]
+    changed = db.set_group_products_active(code, action == "gon")
+    await cb.answer(
+        f"{'✅ Фаъол' if action == 'gon' else '🚫 Хомӯш'}: {changed} мол"
+    )
+    await cb_group_screen(cb, db, cfg)
+
+
+@router.callback_query(F.data.startswith("a:gprices:"))
+async def cb_group_prices(cb: CallbackQuery, db: Database, cfg: Config) -> None:
+    code = cb.data.rsplit(":", 1)[1]
+    group = db.group(code)
+    if group is None:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    rows = db.group_products(code, only_active=False)
+    await safe_edit(
+        cb,
+        texts.admin_prices(rows, group["title"], cfg.currency),
+        keyboards.admin_price_list(
+            rows, currency=cfg.currency, rate=usd_rate(db), back=f"a:pgroup:{code}"
+        ),
+    )
+    await cb.answer()
