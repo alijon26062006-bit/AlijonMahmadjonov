@@ -28,6 +28,9 @@ class GameNew(StatesGroup):
 class Deposit(StatesGroup):
     amount = State()      # ждём сумму пополнения
     receipt = State()     # ждём скриншот чека
+    # Оплата из России: там сумму не назначаем мы, её называет клиент —
+    # ровно ту, что банк написал ему в чеке, вместе с копейками.
+    from_receipt = State()
 
 
 class Promo(StatesGroup):

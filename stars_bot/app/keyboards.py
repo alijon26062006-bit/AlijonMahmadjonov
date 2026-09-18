@@ -375,7 +375,7 @@ def deposit_methods() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn(labeled("deposit", "Перевод на карту"), "dep:card",
                style=SUCCESS, icon="deposit"))
-    kb.row(btn("🏦 Другой способ", "dep:soon"))
+    kb.row(btn("🇷🇺 Из России — Сбербанк, Тинькофф", "dep:ru"))
     kb.row(btn(labeled("back", "Назад"), "m:main"))
     return kb.as_markup()
 
@@ -399,6 +399,24 @@ def deposit_pay(link: str = "", card: str = "") -> InlineKeyboardMarkup:
             copy_text=CopyTextButton(text=card),
         ))
     kb.row(btn("✅ Я оплатил", "dep:paid", style=PRIMARY))
+    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    return kb.as_markup()
+
+
+def deposit_ru(card: str = "") -> InlineKeyboardMarkup:
+    """Реквизиты для перевода из России: карта та же, порядок другой.
+
+    Сумму здесь не называем — её назначает не бот, а банк при пересчёте
+    рублей в сомони. Поэтому и кнопка другая: не «я оплатил», а «я
+    отправил» — после неё спросим сумму из чека.
+    """
+    kb = InlineKeyboardBuilder()
+    if card:
+        kb.row(InlineKeyboardButton(
+            text="📋 Скопировать номер карты",
+            copy_text=CopyTextButton(text=card),
+        ))
+    kb.row(btn("✅ Я отправил", "dep:ru_sent", style=PRIMARY))
     kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
     return kb.as_markup()
 

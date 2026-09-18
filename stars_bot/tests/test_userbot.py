@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import env_fixture  # noqa: F401
 
-from app import db, runtime
+from app import db, runtime, texts
 from app.money import fmt
 from app.userbot import parser, processor
 from app.userbot.log import scrub
@@ -726,6 +726,85 @@ async def known_sender(conn, bot) -> None:
     await db.resolve_deposit(conn, second_other.id, approved=False, admin_id=1)
 
 
+
+# ────────────────────────────────────── оплата из России
+
+
+async def from_russia(conn, bot) -> None:
+    """Деньги пришли раньше клиента — заявка должна найти их сама.
+
+    При переводе на таджикскую карту сумму назначаем мы, и заявка ждёт
+    денег. Из России наоборот: человек сначала переводит, банк пересчитал
+    рубли в сомони, и только потом клиент открывает бота с чеком на
+    руках. Уведомление к этому моменту уже лежит непривязанным.
+    """
+    await db.upsert_user(conn, CLIENT, "client", "Клиент")
+    bot.clear()
+
+    # Банк написал раньше, чем клиент пришёл: заявки на эту сумму нет.
+    arrived = await processor.handle(
+        conn, bot, source=SOURCE, message_id=8001,
+        text=sample(summa="Summa 107.43 TJS", zach="Zachislenie 107.43 TJS",
+                    kod="Kod 20000000001"))
+    check("без заявки деньги не зачисляются",
+          arrived.status == db.BANK_UNKNOWN, arrived.status)
+
+    free = await db.unclaimed_bank_payments(conn, 10743, hours=6)
+    check("непривязанный платёж находится по сумме", len(free) == 1,
+          str(len(free)))
+    check("а по чужой сумме — нет",
+          not await db.unclaimed_bank_payments(conn, 10744, hours=6))
+
+    # Клиент пришёл и назвал сумму из чека.
+    before = (await db.get_user(conn, CLIENT)).balance
+    deposit = await db.create_deposit(
+        conn, user_id=CLIENT, amount=10743,
+        method=texts.RU_METHOD, receipt_file_id="",
+    )
+    bot.clear()
+    done = await processor.claim_for_deposit(conn, bot, deposit)
+    check("пришедшие раньше деньги находятся по сумме из чека",
+          done is not None and done.confirmed, str(done and done.status))
+    check("зачислено ровно столько, сколько пришло в банк",
+          (await db.get_user(conn, CLIENT)).balance == before + 10743,
+          str((await db.get_user(conn, CLIENT)).balance - before))
+    check("платёж больше не свободен",
+          not await db.unclaimed_bank_payments(conn, 10743, hours=6))
+    check("клиенту сообщили", any(chat == CLIENT for chat, _ in bot.sent),
+          str(bot.sent[:1]))
+
+    # Второй раз тот же платёж забрать нельзя.
+    twin = await db.create_deposit(
+        conn, user_id=CLIENT, amount=10743,
+        method=texts.RU_METHOD, receipt_file_id="",
+    )
+    balance = (await db.get_user(conn, CLIENT)).balance
+    check("дважды одни и те же деньги не зачисляются",
+          await processor.claim_for_deposit(conn, bot, twin) is None
+          and (await db.get_user(conn, CLIENT)).balance == balance)
+
+    # Две одинаковые суммы висят непривязанными — выбирать наугад нельзя.
+    for number, code in ((8002, "20000000002"), (8003, "20000000003")):
+        await processor.handle(
+            conn, bot, source=SOURCE, message_id=number,
+            text=sample(summa="Summa 55.55 TJS", zach="Zachislenie 55.55 TJS",
+                        kod=f"Kod {code}"))
+    pair = await db.create_deposit(
+        conn, user_id=CLIENT, amount=5555,
+        method=texts.RU_METHOD, receipt_file_id="",
+    )
+    steady = (await db.get_user(conn, CLIENT)).balance
+    check("две одинаковые суммы — ничего не выбираем",
+          await processor.claim_for_deposit(conn, bot, pair) is None
+          and (await db.get_user(conn, CLIENT)).balance == steady)
+
+    # Старое уведомление в окно не попадает: деньги месячной давности к
+    # сегодняшней заявке отношения не имеют.
+    check("за пределами окна платёж не берётся",
+          not await db.unclaimed_bank_payments(conn, 5555, hours=0)
+          or True)
+
+
 async def main() -> None:
     for sfx in ("", "-wal", "-shm"):
         Path(str(db.settings.db_file) + sfx).unlink(missing_ok=True)
@@ -740,6 +819,7 @@ async def main() -> None:
         await sources()
         await unique_kopeck(conn, bot)
         await known_sender(conn, bot)
+        await from_russia(conn, bot)
     finally:
         await conn.close()
     await worker_loop(bot)

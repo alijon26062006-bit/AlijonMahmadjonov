@@ -34,6 +34,93 @@ async def cb_soon(call: CallbackQuery) -> None:
     await call.answer(texts.DEPOSIT_SOON, show_alert=True)
 
 
+# ─────────────────────────────────────────── оплата из России
+#
+# Порядок здесь обратный обычному. При переводе на таджикскую карту сумму
+# назначаем мы: просим 10.04, и по этим копейкам узнаём платёж. Из России
+# так нельзя — сколько сомони дойдёт, решает банк при пересчёте рублей, и
+# узнаём мы это только из чека клиента.
+#
+# Зато пересчёт сам делает то, что нам нужно: сумма выходит с копейками,
+# и такой второй прямо сейчас ни у кого нет. Поэтому клиент называет её
+# из чека, а мы ищем перевод по ней — среди уже пришедших уведомлений
+# банка и среди тех, что придут потом.
+
+
+@router.callback_query(F.data == "dep:ru")
+async def cb_ru(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    card = runtime.get("pay_card_number") or "— реквизиты не заданы —"
+    holder = runtime.get("pay_card_holder")
+    bank = runtime.get("pay_card_bank")
+    await call.message.edit_text(
+        texts.DEPOSIT_RU_HOW.format(
+            card=card,
+            holder=f"👤 <b>{holder}</b>\n" if holder else "",
+            bank=f"🏦 {bank}\n" if bank else "",
+        ),
+        reply_markup=keyboards.deposit_ru(card if card.isdigit() else ""),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data == "dep:ru_sent")
+async def cb_ru_sent(call: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Deposit.from_receipt)
+    await call.message.edit_text(texts.DEPOSIT_RU_ASK,
+                                 reply_markup=keyboards.cancel())
+    await call.answer()
+
+
+@router.message(Deposit.from_receipt, F.text)
+async def on_receipt_amount(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection, bot: Bot
+) -> None:
+    amount = parse(message.text or "")
+    if amount is None or amount <= 0:
+        await message.answer(texts.DEPOSIT_BAD_AMOUNT)
+        return
+    if amount < runtime.min_deposit():
+        await message.answer(
+            texts.DEPOSIT_TOO_SMALL.format(min_amount=fmt(runtime.min_deposit()))
+        )
+        return
+
+    # Ровная сумма — почти наверняка описка: в чеке пересчёта копейки
+    # есть всегда. Один раз переспрашиваем, второй — принимаем как есть:
+    # спорить с человеком, который смотрит в свой чек, мы не вправе.
+    data = await state.get_data()
+    if amount % 100 == 0 and data.get("round_asked") != amount:
+        await state.update_data(round_asked=amount)
+        await message.answer(texts.DEPOSIT_RU_ROUND)
+        return
+
+    deposit = await db.create_deposit(
+        conn, user_id=message.from_user.id, amount=amount,
+        method=texts.RU_METHOD, receipt_file_id="",
+        reference=dcpay.make_reference(),
+    )
+    await state.update_data(amount=amount, deposit_id=deposit.id,
+                            reference=deposit.reference)
+    await state.set_state(Deposit.receipt)
+
+    # Деньги могли прийти раньше клиента: он перевёл из Сбербанка, дождался
+    # зачисления и только потом открыл бота. Тогда уведомление банка уже
+    # лежит непривязанным — ищем его сразу, не заставляя ждать впустую.
+    from app.userbot.processor import claim_for_deposit
+
+    done = await claim_for_deposit(conn, bot, deposit)
+    if done is not None:
+        await state.clear()
+        return
+
+    shown = await message.answer(
+        texts.DEPOSIT_RU_WAIT.format(amount=fmt(amount)),
+        reply_markup=keyboards.deposit_receipt(),
+    )
+    await _remember_screen(conn, deposit.id, shown)
+
+
 @router.callback_query(F.data == "dep:card")
 async def cb_card(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Deposit.amount)

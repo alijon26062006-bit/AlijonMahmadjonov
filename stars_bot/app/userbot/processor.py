@@ -113,6 +113,32 @@ async def handle(
     return await _unknown(conn, bot, payment, notice)
 
 
+async def claim_for_deposit(conn, bot, deposit) -> Result | None:
+    """Найти уже пришедшие деньги под эту заявку и закрыть её.
+
+    Обычный порядок такой: заявка ждёт денег. При оплате из России он
+    обратный — человек сначала переводит из Сбербанка, а в бота приходит
+    потом, уже с чеком на руках. Уведомление банка к этому моменту лежит
+    со статусом «заявки нет», и найти его надо по сумме из чека.
+
+    None — подходящих денег не нашлось: заявка просто ждёт дальше, как
+    обычная. Несколько одинаковых сумм тоже дают None: выбрать наугад,
+    чьи это деньги, хуже, чем подождать решения владельца.
+    """
+    hours = runtime.get_int("deposit_match_hours", 6)
+    found = await db.unclaimed_bank_payments(conn, deposit.amount, hours=hours)
+    if len(found) != 1:
+        return None
+
+    payment = found[0]
+    notice = parser.Notice(
+        amount=payment.amount, op_code=payment.op_code or "",
+        sender=payment.sender, card_tail=payment.card_tail,
+        bank_time=payment.bank_time, source_field="из ранее пришедшего",
+    )
+    return await _confirm(conn, bot, payment, deposit, notice)
+
+
 async def _by_sender(conn, bot, payment, waiting, notice) -> Result:
     """Заявок несколько. Спасает только знакомый плательщик."""
     known = await db.sender_owner(conn, notice.sender)

@@ -2923,6 +2923,26 @@ async def bank_payment_for_deposit(
     return _from_row(BankPayment, row) if row else None
 
 
+async def unclaimed_bank_payments(
+    conn: aiosqlite.Connection, amount: int, hours: int = 6
+) -> list[BankPayment]:
+    """Уведомления банка на такую сумму, которые ещё ни к чему не привязаны.
+
+    Нужны для оплаты из России: там деньги приходят ДО того, как клиент
+    пришёл в бота. Уведомление уже лежит со статусом «заявки нет», и
+    когда клиент называет сумму из чека — оно находится.
+    """
+    since = (datetime.now(timezone.utc)
+             - timedelta(hours=max(1, hours))).isoformat(timespec="seconds")
+    async with conn.execute(
+        """SELECT * FROM bank_payments
+           WHERE amount = ? AND deposit_id IS NULL AND status = ?
+             AND seen_at >= ? ORDER BY id DESC""",
+        (amount, BANK_UNKNOWN, since),
+    ) as cur:
+        return [_from_row(BankPayment, row) for row in await cur.fetchall()]
+
+
 async def held_bank_payment(
     conn: aiosqlite.Connection, deposit_id: int
 ) -> BankPayment | None:
