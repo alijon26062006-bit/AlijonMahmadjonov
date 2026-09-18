@@ -477,15 +477,23 @@ async def _place(request, caller, item, quantity, customer, idem) -> web.Respons
 
     cost = (int(item.get("cost", 0)) if item["type"] == "game"
             else runtime.cost_of(product_type, real_quantity))
-    order = await db.create_order(
-        conn, user_id=caller.user_id, product_type=product_type,
-        quantity=real_quantity, recipient=customer, price=price, cost=cost,
-    )
-    await db.link_api_order(
-        conn, ref=ref, order_id=order.id, key_id=caller.key.id,
-        user_id=caller.user_id, product_id=item["id"], customer=customer,
-        idem_key=idem,
-    )
+    # Деньги уже списаны. Если заказ не заведётся — база занята, диск
+    # кончился, — вернуть их надо здесь и сейчас: снаружи об этом узнают
+    # только по пропавшей сумме, а следа для разбора не останется.
+    try:
+        order = await db.create_order(
+            conn, user_id=caller.user_id, product_type=product_type,
+            quantity=real_quantity, recipient=customer, price=price, cost=cost,
+        )
+        await db.link_api_order(
+            conn, ref=ref, order_id=order.id, key_id=caller.key.id,
+            user_id=caller.user_id, product_id=item["id"], customer=customer,
+            idem_key=idem,
+        )
+    except Exception:
+        await db.credit_logged(conn, caller.user_id, price, kind="refund",
+                               order_ref=ref, note="заказ не создался")
+        raise
     if idem:
         await db.finish_idem(conn, caller.key.id, idem, ref)
 

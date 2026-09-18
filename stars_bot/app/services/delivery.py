@@ -90,12 +90,19 @@ async def purchase(
 
     # Себестоимость фиксируем в заказе: курс меняется, и без этого прибыль
     # за прошлые дни пересчитывалась бы задним числом.
-    order = await db.create_order(
-        conn, user_id=user_id, product_type=product_type, quantity=quantity,
-        recipient=recipient, price=price,
-        cost=runtime.cost_of(product_type, quantity),
-        promo=promo, discount=discount,
-    )
+    # Деньги уже списаны: если заказ не заведётся, вернуть их надо тут же.
+    # Иначе покупатель остался бы с пустым балансом и без единого следа
+    # о том, куда делись деньги.
+    try:
+        order = await db.create_order(
+            conn, user_id=user_id, product_type=product_type, quantity=quantity,
+            recipient=recipient, price=price,
+            cost=runtime.cost_of(product_type, quantity),
+            promo=promo, discount=discount,
+        )
+    except Exception:
+        await db.credit(conn, user_id, price)
+        raise
     log.info("Заказ %s: списано %s с пользователя %s", order.id, fmt(price), user_id)
     await _run_delivery(bot, conn, provider, order)
     refreshed = await db.get_order(conn, order.id)

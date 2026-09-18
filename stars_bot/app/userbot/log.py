@@ -25,7 +25,7 @@ SECRETS = (
     # api_hash и ему подобные: 32 знака hex
     (re.compile(r"\b[a-f0-9]{32}\b", re.IGNORECASE), "<хеш скрыт>"),
     # ключи с говорящей приставкой
-    (re.compile(r"\b(sk_live_|pk_live_|whsec_|fc_)[A-Za-z0-9_\-]{8,}"),
+    (re.compile(r"\b(sk_live_|pk_live_|whsec_|fc_|cab_)[A-Za-z0-9_\-]{8,}"),
      r"\1<скрыт>"),
     # строка сессии Telethon — длинная база64 с ведущей единицей
     (re.compile(r"\b1[A-Za-z0-9+/=_\-]{80,}"), "<сессия скрыта>"),
@@ -50,6 +50,21 @@ class Scrubber(logging.Filter):
             else:
                 record.args = tuple(scrub(str(a)) for a in record.args)
         return True
+
+
+def guard_root() -> None:
+    """Повесить чистку на корневой журнал — на все логи разом.
+
+    Фильтр стоял только на юзерботе, а ключи и пропуски проходят через
+    обычный бот и API. Достаточно одной строки с исключением, где в
+    сообщение попал токен, — и он навсегда в логах сервера.
+    """
+    root = logging.getLogger()
+    if not any(isinstance(f, Scrubber) for f in root.filters):
+        root.addFilter(Scrubber())
+    for handler in root.handlers:
+        if not any(isinstance(f, Scrubber) for f in handler.filters):
+            handler.addFilter(Scrubber())
 
 
 def get(name: str = "userbot") -> logging.Logger:

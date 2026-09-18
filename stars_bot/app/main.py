@@ -88,6 +88,12 @@ async def main() -> None:
         level=settings.log_level.upper(),
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     )
+    # Чистка секретов — до первой строки журнала. Через бота и API ходят
+    # ключи, пропуски и номера карт, и одной случайной строки с токеном
+    # хватит, чтобы он навсегда осел в логах сервера.
+    from app.userbot.log import guard_root
+
+    guard_root()
 
     bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     # Если премиум-эмодзи перестанут приниматься, бот не должен замолчать.

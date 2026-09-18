@@ -478,11 +478,18 @@ async def cb_buy(
         await call.answer()
         return
 
-    order = await db.create_order(
-        conn, user_id=call.from_user.id, product_type=game.product_type,
-        quantity=1, recipient=data["player"],
-        price=data["price"], cost=data.get("cost", 0),
-    )
+    # Деньги списаны строкой выше. Заказ может не завестись — занятая
+    # база, кончившийся диск, — и тогда клиент остался бы без денег и без
+    # заказа, а мы без следа. Возвращаем сразу.
+    try:
+        order = await db.create_order(
+            conn, user_id=call.from_user.id, product_type=game.product_type,
+            quantity=1, recipient=data["player"],
+            price=data["price"], cost=data.get("cost", 0),
+        )
+    except Exception:
+        await db.credit(conn, call.from_user.id, data["price"])
+        raise
     await call.answer()
 
     try:

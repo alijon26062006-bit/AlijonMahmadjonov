@@ -617,11 +617,16 @@ async def webhook_out(conn) -> None:
               payload["event"] == f"order.{payload['status']}", str(payload))
         check("ключа в событии нет", "sk_live_" not in body.decode())
 
-        signature = hooks.sign(body, secret)
+        stamp = "1789600000"
+        signature = hooks.sign(body, secret, stamp)
+        check("подпись со временем отличается от подписи без него",
+              hooks.sign(body, secret) != signature)
+        check("другое время — другая подпись",
+              hooks.sign(body, secret, "1789600001") != signature)
         check("клиент может проверить подпись",
-              hooks.sign(body, secret) == signature)
+              hooks.sign(body, secret, stamp) == signature)
         check("чужим секретом подпись не сходится",
-              hooks.sign(body, "whsec_other") != signature)
+              hooks.sign(body, "whsec_other", stamp) != signature)
     finally:
         await runner.cleanup()
 
@@ -1142,6 +1147,77 @@ async def cabinet_pass(conn, bot) -> None:
     check("и даёт выйти на устройстве", 'id="out"' in cab.html())
 
 
+
+# ──────────────────────────────────── деньги не пропадают
+
+
+async def money_never_vanishes(conn, bot) -> None:
+    """Заказ не завёлся после списания — деньги должны вернуться.
+
+    Между списанием и заведением заказа есть щель: занятая база,
+    кончившийся диск, любая ошибка записи. Раньше в этой щели деньги
+    исчезали молча — ни заказа, ни следа, только пропавшая сумма.
+    """
+    supplier = Provider()
+    await runtime.set_value(conn, "api_rate_per_min", "100000")
+    guard.forget_rate()
+    await db.credit(conn, BUYER, 100_000)
+
+    app = web.Application()
+    app["bot"] = bot
+    app["provider"] = supplier
+    api_server.mount(app, bot, supplier)
+    runner = web.AppRunner(app, access_log=None)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    base = f"http://127.0.0.1:{runner.addresses[0][1]}{api_server.PREFIX}"
+
+    real = db.create_order
+
+    async def broken(*a, **kw):
+        raise RuntimeError("база занята")
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            api = Client(base, session)
+            key = await make_key(conn, label="money")
+
+            before = (await db.get_user(conn, BUYER)).balance
+            db.create_order = broken
+            try:
+                status, body, _ = await api.post(
+                    "/order/create", key=key,
+                    body={"product_id": "stars", "quantity": 50,
+                          "customer": "@durov"},
+                )
+            finally:
+                db.create_order = real
+
+            check("поломка записи не притворяется удачей",
+                  status == 500 and not body.get("success"), str(status))
+            after = (await db.get_user(conn, BUYER)).balance
+            check("деньги вернулись на баланс", after == before,
+                  f"{before} → {after}")
+
+            txs = await db.api_txs_of(conn, BUYER, limit=2)
+            check("возврат записан в выписку, а не сделан молча",
+                  any(row["kind"] == "refund" for row in txs),
+                  ", ".join(row["kind"] for row in txs))
+
+            # А обычная покупка после этого должна проходить как ни в чём
+            # не бывало: откат не должен ломать следующий заказ.
+            status, good, _ = await api.post(
+                "/order/create", key=key,
+                body={"product_id": "stars", "quantity": 50,
+                      "customer": "@durov"},
+            )
+            check("следующий заказ проходит обычным порядком",
+                  status == 200 and good.get("success"), str(status))
+    finally:
+        await runner.cleanup()
+
+
 # ───────────────────────────────────────────────── запуск
 
 
@@ -1172,6 +1248,7 @@ async def main() -> None:
         await game_order(conn, bot)
         await cabinet_view(conn, bot)
         await cabinet_pass(conn, bot)
+        await money_never_vanishes(conn, bot)
     finally:
         await conn.close()
 

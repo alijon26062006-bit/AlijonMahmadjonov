@@ -191,6 +191,9 @@ RAW_URL="$RAW_INSTALLER"
 
 case "\${1:-help}" in
     update)
+        # Копия до обновления: если новая версия окажется хуже, вернуться
+        # будет к чему. Стоит секунду, а спасает всё.
+        "\$0" backup >/dev/null 2>&1 && echo "Копия базы сделана."
         echo "Обновляю бота…"
         # Берём установщик из репозитория: он мог измениться вместе с ботом,
         # а локальная копия — это версия с прошлого обновления.
@@ -484,9 +487,27 @@ BLOCK
         systemctl restart "\$SERVICE" && echo "✅ Режим проверки: звёзды не отправляются"
         ;;
     backup)
-        DEST="/root/stars-bot-backup-\$(date +%Y%m%d-%H%M%S).sqlite3"
-        cp "\$APP/data/bot.sqlite3" "\$DEST"
+        # Простым cp живую базу копировать нельзя: при WAL часть записей
+        # лежит в отдельном файле, и копия получается рваной — ровно в
+        # тот единственный раз, когда она понадобится. Поэтому просим
+        # сам SQLite сделать согласованный снимок.
+        DIR="/root/stars-bot-backups"
+        mkdir -p "\$DIR"
+        DEST="\$DIR/bot-\$(date +%Y%m%d-%H%M%S).sqlite3"
+        "\$APP/.venv/bin/python" - "\$APP/data/bot.sqlite3" "\$DEST" <<'PYBK'
+import sqlite3, sys
+src, dst = sys.argv[1], sys.argv[2]
+source = sqlite3.connect(f"file:{src}?mode=ro", uri=True)
+target = sqlite3.connect(dst)
+with target:
+    source.backup(target)
+source.close()
+target.close()
+PYBK
+        # Держим две недели: старше не нужно, а место на диске конечно.
+        ls -1t "\$DIR"/bot-*.sqlite3 2>/dev/null | tail -n +15 | xargs -r rm -f
         echo "✅ Копия базы: \$DEST"
+        echo "   Всего копий: \$(ls -1 "\$DIR"/bot-*.sqlite3 2>/dev/null | wc -l)"
         ;;
     *)
         cat <<TXT
@@ -532,6 +553,33 @@ TXT
 esac
 HELPER
 $SUDO chmod +x /usr/local/bin/stars-bot
+
+# Ежедневная копия базы. Без неё «сделаю потом» превращается в «не было
+# ни одной» — а узнают об этом в тот день, когда база уже потеряна.
+$SUDO tee /etc/systemd/system/stars-bot-backup.service >/dev/null <<UNIT
+[Unit]
+Description=Копия базы Telegram Stars Bot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/stars-bot backup
+UNIT
+
+$SUDO tee /etc/systemd/system/stars-bot-backup.timer >/dev/null <<UNIT
+[Unit]
+Description=Копия базы раз в сутки
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+$SUDO systemctl daemon-reload
+$SUDO systemctl enable --quiet --now stars-bot-backup.timer
+ok "База копируется каждую ночь, хранятся две недели"
 
 $SUDO systemctl daemon-reload
 $SUDO systemctl enable --quiet "$SERVICE"

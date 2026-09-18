@@ -30,6 +30,7 @@ import json
 import logging
 import secrets
 import socket
+import time
 from hashlib import sha256
 from urllib.parse import urlparse
 
@@ -62,8 +63,15 @@ def new_secret() -> str:
     return "whsec_" + secrets.token_hex(24)
 
 
-def sign(body: bytes, secret: str) -> str:
-    return hmac.new(secret.encode(), body, sha256).hexdigest()
+def sign(body: bytes, secret: str, stamp: str = "") -> str:
+    """Подпись уведомления.
+
+    Подписываем время вместе с телом. Без времени подпись остаётся верной
+    навсегда: кто однажды перехватил запрос, может повторять его сколько
+    угодно, и чужой сервер будет считать, что заказ выполнился снова.
+    """
+    signed = (stamp.encode() + b"." + body) if stamp else body
+    return hmac.new(secret.encode(), signed, sha256).hexdigest()
 
 
 def private_host(host: str) -> bool:
@@ -145,9 +153,11 @@ async def deliver(session: aiohttp.ClientSession, conn, row: dict) -> bool:
         return False
 
     body = json.dumps(payload_of(row), ensure_ascii=False).encode()
+    stamp = str(int(time.time()))
     headers = {
         "Content-Type": "application/json",
-        "X-Signature": sign(body, hook["secret"]),
+        "X-Timestamp": stamp,
+        "X-Signature": sign(body, hook["secret"], stamp),
         "X-Signature-Algorithm": "hmac-sha256",
         "X-Order-Id": row["ref"],
         "User-Agent": "StarsBot-Webhook/1",

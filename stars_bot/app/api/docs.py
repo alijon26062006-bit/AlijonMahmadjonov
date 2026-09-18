@@ -342,11 +342,21 @@ console.log(answer.order_id);   // ORD-000123"""
 
 def _hook_sample() -> str:
     check = """# Python — проверка подписи вебхука
-import hmac, hashlib
+import hmac, hashlib, time
 
-def genuine(body: bytes, header: str, secret: str) -> bool:
-    mine = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(mine, header)   # сравнение постоянное по времени"""
+def genuine(body: bytes, signature: str, stamp: str, secret: str) -> bool:
+    # Старое событие не принимаем: без этого перехваченный однажды
+    # запрос можно повторять сколько угодно, и подпись сойдётся.
+    if abs(time.time() - int(stamp)) > 300:
+        return False
+    signed = stamp.encode() + b"." + body
+    mine = hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(mine, signature)  # сравнение постоянное по времени
+
+# genuine(request.body,
+#         request.headers["X-Signature"],
+#         request.headers["X-Timestamp"],
+#         "whsec_…")"""
     return f"<pre><code>{escape(check)}</code></pre>"
 
 
@@ -500,15 +510,18 @@ def html() -> str:
 сообщим, когда статус заказа изменится. Опрашивать
 <code>/order/status</code> в цикле тогда не нужно.</p>
 <pre><code>POST ваш-адрес
+X-Timestamp: 1789600000
 X-Signature: 3b099d0edd…
 X-Signature-Algorithm: hmac-sha256
 
 {escape(hook_body)}</code></pre>
 
 <h3>Проверьте подпись</h3>
-<p>Подпись — HMAC-SHA256 от <b>сырого тела</b> запроса на вашем секрете
-<code>whsec_…</code>. Без проверки любой, кто узнает ваш адрес, сможет
-прислать «заказ выполнен».</p>
+<p>Подпись — HMAC-SHA256 на вашем секрете <code>whsec_…</code> от строки
+<code>X-Timestamp</code> + точка + <b>сырое тело</b> запроса. Без проверки
+любой, кто узнает ваш адрес, пришлёт «заказ выполнен» сам. Время в подписи
+затем, чтобы перехваченное однажды событие нельзя было повторять: считайте
+событие чужим, если <code>X-Timestamp</code> старше пяти минут.</p>
 {_hook_sample()}
 
 <div class="note">Отвечайте <code>200</code>, как только приняли событие.

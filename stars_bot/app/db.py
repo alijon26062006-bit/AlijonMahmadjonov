@@ -630,6 +630,11 @@ async def connect() -> aiosqlite.Connection:
     conn.row_factory = aiosqlite.Row
     await conn.execute("PRAGMA journal_mode=WAL")
     await conn.execute("PRAGMA foreign_keys=ON")
+    # Писать в базу могут разом бот, API и юзербот. При WAL два писателя
+    # не встают в очередь сами — второй получает «database is locked».
+    # Пятнадцати секунд хватает любой нашей записи, а падение на занятой
+    # базе посреди оплаты стоит дороже любого ожидания.
+    await conn.execute("PRAGMA busy_timeout=15000")
     return conn
 
 
