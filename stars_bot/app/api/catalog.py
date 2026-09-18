@@ -138,7 +138,10 @@ async def _games(conn, provider) -> list[dict]:
     out = []
     for game in await db.list_games(conn, only_enabled=True):
         try:
-            offers = await offers_of(suppliers.for_games(provider), game, conn)
+            # Из памяти: каталог просят часто, а у поставщика он меняется
+            # раз в дни. Живьём его тянет только владелец в панели.
+            offers = await offers_of(suppliers.for_games(provider), game, conn,
+                                      cached=True)
         except Exception:  # noqa: BLE001 — одна игра не должна гасить каталог
             continue
         out += [_game_item(game, offer) for offer in offers]

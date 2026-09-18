@@ -248,6 +248,9 @@ async def user(request: web.Request) -> web.Response:
 #: и помнится полчаса: один и тот же ID проверяют по нескольку раз подряд.
 CHECK_COST = 5.0
 CHECK_TTL = 30 * 60
+#: Сколько ответов помним. Ключей столько же, сколько разных игроков —
+#: за месяц их набегает больше, чем стоит держать в памяти.
+CHECK_KEEP = 5_000
 _checked: dict[tuple, tuple[float, dict]] = {}
 
 
@@ -312,6 +315,13 @@ async def check_id(request: web.Request) -> web.Response:
         "customer": customer,
     }
     if verdict == "ok":
+        if len(_checked) >= CHECK_KEEP:
+            stale = _time.time() - CHECK_TTL
+            for old_key, (seen, _) in list(_checked.items()):
+                if seen < stale:
+                    _checked.pop(old_key, None)
+            if len(_checked) >= CHECK_KEEP:      # свежих и так слишком много
+                _checked.clear()
         # Запоминаем только удачные ответы: «не нашли» через минуту
         # вполне может смениться на «нашли», и запомнить отказ значило бы
         # испортить проверку до перезапуска.

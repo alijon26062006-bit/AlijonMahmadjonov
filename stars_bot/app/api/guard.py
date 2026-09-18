@@ -116,6 +116,22 @@ def forget_rate(key_id: int = 0) -> None:
 #: адрес -> (сколько промахов, до какого времени закрыт)
 _bad: dict[str, tuple[int, float]] = {}
 
+#: Сколько адресов помним. Перебор идёт с тысяч адресов сразу, и без
+#: предела этот словарь растёт ровно столько, сколько длится нападение —
+#: то есть съедает память как раз тогда, когда она нужнее всего.
+BAD_KEEP = 10_000
+
+
+def _forget_stale(now: float) -> None:
+    """Выбросить отсидевших и, если всё равно много, самых старых."""
+    for ip, (_, until) in list(_bad.items()):
+        if until and until < now:
+            _bad.pop(ip, None)
+    if len(_bad) <= BAD_KEEP:
+        return
+    for ip, _ in sorted(_bad.items(), key=lambda item: item[1][1])[:len(_bad) // 2]:
+        _bad.pop(ip, None)
+
 
 def blocked(ip: str) -> float:
     """Сколько секунд адресу ещё нельзя. 0 — можно."""
@@ -125,6 +141,8 @@ def blocked(ip: str) -> float:
 
 
 def note_bad_key(ip: str) -> None:
+    if len(_bad) >= BAD_KEEP:
+        _forget_stale(time.monotonic())
     misses, until = _bad.get(ip, (0, 0.0))
     misses += 1
     if misses >= BAD_LIMIT:

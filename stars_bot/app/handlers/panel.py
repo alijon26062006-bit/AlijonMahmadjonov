@@ -5222,6 +5222,8 @@ async def cb_games_check(call: CallbackQuery, conn: aiosqlite.Connection, provid
         mark = "✅" if game.category_id in known else "⚠️"
         note = "" if game.category_id in known else " <i>— нет в каталоге</i>"
         try:
+            # Владельцу — живьём: он и смотрит затем, чтобы увидеть,
+            # что у поставщика прямо сейчас.
             offers = await offers_of(client, game, conn)
         except Exception as exc:  # noqa: BLE001
             lines.append(f"{mark} <b>{game.title}</b>{note}\n"

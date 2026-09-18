@@ -102,6 +102,43 @@ async def run(conn) -> None:
     await runtime.set_value(conn, "top_by", "purchases")
 
 
+async def cached_top(conn) -> None:
+    """Топ считается не на каждое нажатие.
+
+    Это публичная кнопка, а запрос складывает все выданные заказы разом.
+    Соединение с базой одно на весь бот, поэтому десяток нажатий в
+    секунду остановил бы бота для всех — не только для нажавших.
+    """
+    db.forget_top()
+    first = await db.top_clients(conn, limit=3)
+
+    # Новая покупка в память не попадёт — и это верно: рейтинг за пять
+    # минут не портится, а нагрузка от него исчезает.
+    await db.upsert_user(conn, 90_001, "новый", "Новый")
+    order = await db.create_order(
+        conn, user_id=90_001, product_type="stars", quantity=1,
+        recipient="@x", price=999_999, cost=1,
+    )
+    await db.transition_order(conn, order.id, expected=db.ORDER_DELIVERING,
+                              new=db.ORDER_DELIVERED)
+
+    again = await db.top_clients(conn, limit=3)
+    check("второй раз топ берётся из памяти",
+          [u.id for u, _ in again] == [u.id for u, _ in first],
+          str([u.id for u, _ in again]))
+
+    fresh = await db.top_clients(conn, limit=3, cached=False)
+    check("а если попросить заново — виден новый покупатель",
+          any(user.id == 90_001 for user, _ in fresh),
+          str([u.id for u, _ in fresh]))
+
+    db.forget_top()
+    after = await db.top_clients(conn, limit=3)
+    check("сброс памяти тоже показывает свежее",
+          any(user.id == 90_001 for user, _ in after),
+          str([u.id for u, _ in after]))
+
+
 async def main() -> None:
     for sfx in ("", "-wal", "-shm"):
         Path(str(db.settings.db_file) + sfx).unlink(missing_ok=True)
@@ -110,6 +147,7 @@ async def main() -> None:
         await db.init(conn)
         await runtime.load(conn)
         await run(conn)
+        await cached_top(conn)
     finally:
         await conn.close()
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")

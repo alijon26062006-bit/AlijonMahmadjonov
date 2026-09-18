@@ -851,15 +851,39 @@ async def all_user_ids(conn: aiosqlite.Connection) -> list[int]:
         return [row["id"] for row in await cur.fetchall()]
 
 
+#: Готовый топ и когда он посчитан. Это публичная кнопка: жмут её все,
+#: а запрос складывает все выданные заказы разом — на сотне тысяч это
+#: десятая доля секунды. Соединение с базой одно на весь бот, поэтому
+#: десяток нажатий в секунду остановил бы бота для всех сразу. Рейтинг
+#: за пять минут не портится, а нагрузка от него падает до нуля.
+_top_cache: dict[str, tuple[float, list]] = {}
+TOP_TTL = 5 * 60
+
+
+def forget_top() -> None:
+    _top_cache.clear()
+
+
 async def top_clients(
     conn: aiosqlite.Connection, limit: int = 10, by: str = "purchases",
+    cached: bool = True,
 ) -> list[tuple[User, int]]:
     """Топ клиентов: пары (клиент, сумма) по убыванию суммы.
 
     by="purchases" — сумма выданных заказов: отменённые и возвращённые
     в неё не попадают, поэтому рейтинг показывает реальных покупателей.
     by="deposits"  — сумма пополнений за всё время.
+
+    cached=False — посчитать заново, не заглядывая в память.
     """
+    import time as _time
+
+    key = f"{by}:{limit}"
+    if cached:
+        ready = _top_cache.get(key)
+        if ready and _time.time() - ready[0] < TOP_TTL:
+            return ready[1]
+
     if by == "deposits":
         query = """SELECT *, total_deposit AS amount FROM users
                    WHERE total_deposit > 0
@@ -873,7 +897,10 @@ async def top_clients(
                    ORDER BY amount DESC, u.id LIMIT ?"""
         params = (ORDER_DELIVERED, limit)
     async with conn.execute(query, params) as cur:
-        return [(_from_row(User, row), row["amount"]) for row in await cur.fetchall()]
+        rows = [(_from_row(User, row), row["amount"])
+                for row in await cur.fetchall()]
+    _top_cache[key] = (_time.time(), rows)
+    return rows
 
 
 # -------------------------------------------------------------- партнёры

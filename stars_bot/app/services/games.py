@@ -128,29 +128,51 @@ _offers_raw: dict[tuple[int, str], tuple[float, list[dict]]] = {}
 def forget_catalog() -> None:
     _catalog.clear()
     _offers_raw.clear()
+    _offers_lock.clear()
     # Готовый каталог API собран из этих же данных — он тоже устарел.
     from app.api import catalog as api_catalog
 
     api_catalog.forget_full()
 
 
+#: По одному замку на категорию. Нужен не ради порядка, а против
+#: лавины: пятьсот клиентов, открывших игру разом, промахиваются мимо
+#: памяти все сразу — она ещё пуста, — и уходят к поставщику пятьюстами
+#: запросами. Замок пропускает первого, остальные дожидаются его ответа
+#: и читают уже готовое.
+_offers_lock: dict[tuple[int, str], asyncio.Lock] = {}
+
+
 async def offers_raw(provider, category_id: str, cached: bool = False) -> list[dict]:
     """Пакеты категории у поставщика.
 
-    cached — отдать запомненное, если оно свежее CATALOG_TTL. Просят об
-    этом только там, где категорий много: в боте пакеты берутся живьём,
-    как и раньше.
+    cached — отдать запомненное, если оно свежее CATALOG_TTL. Просит об
+    этом витрина: пакеты у поставщика меняются раз в дни, а нажатий
+    бывают тысячи. Владельцу отдаём живьём — он затем и смотрит, чтобы
+    увидеть, что у поставщика прямо сейчас.
     """
     import time
 
     key = (id(provider), category_id)
-    if cached:
+    if not cached:
+        data = await provider.game_offers(category_id)
+        _offers_raw[key] = (time.time(), data)
+        return data
+
+    hit = _offers_raw.get(key)
+    if hit and time.time() - hit[0] < CATALOG_TTL:
+        return hit[1]
+
+    lock = _offers_lock.setdefault(key, asyncio.Lock())
+    async with lock:
+        # Пока стояли в очереди, ответ мог уже прийти — тогда спрашивать
+        # незачем. Ради этой проверки замок и нужен.
         hit = _offers_raw.get(key)
         if hit and time.time() - hit[0] < CATALOG_TTL:
             return hit[1]
-    data = await provider.game_offers(category_id)
-    _offers_raw[key] = (time.time(), data)
-    return data
+        data = await provider.game_offers(category_id)
+        _offers_raw[key] = (time.time(), data)
+        return data
 
 
 async def full_catalog(provider, cached: bool = False) -> list[dict]:

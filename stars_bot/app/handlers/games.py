@@ -155,7 +155,13 @@ async def cb_game(
     await call.answer("Смотрю пакеты…")
     provider = suppliers.for_games(provider)
     try:
-        offers = await offers_of(provider, game, conn)
+        # Из памяти, а не с новым запросом к поставщику на каждое
+        # нажатие. Пакеты у него меняются раз в дни, а клиентов может
+        # быть тысяча разом — столько запросов подряд он просто не
+        # выдержит, и вместе с ним встанет витрина. Свои цены и
+        # названия при этом читаются заново каждый раз: правка в панели
+        # видна клиенту сразу.
+        offers = await offers_of(provider, game, conn, cached=True)
     except (DeliveryError, DeliveryUncertain) as exc:
         log.info("Игры: пакеты %s не пришли — %s", category_id, exc)
         # Неверный код категории сам не пройдёт: ждать бесполезно, и

@@ -2556,6 +2556,47 @@ async def price_list(conn) -> None:
     await db.delete_game(conn, "pubg_mobile")
 
 
+async def crowd(conn) -> None:
+    """Тысяча клиентов, открывших игру разом, — один запрос к поставщику.
+
+    Память сама по себе от этого не спасает: все промахиваются мимо неё
+    одновременно, пока она ещё пуста, и уходят к поставщику толпой.
+    Поставщик такого не выдержит, а вместе с ним встанет витрина.
+    """
+    from app.handlers.games import offers_of
+    from app.services import games as gsvc
+
+    class Slow:
+        def __init__(self):
+            self.calls = 0
+
+        async def game_offers(self, category_id):
+            self.calls += 1
+            await asyncio.sleep(0.02)          # сеть
+            return [{"offer_id": "p1", "name": "100 💎",
+                     "usd": Decimal("1.00"), "raw": {}}]
+
+    await runtime.set_value(conn, "usd_rate_diram", "1090")
+    game = await db.add_game(conn, category_id="crowd_game", title="Толпа")
+
+    gsvc.forget_catalog()
+    alone = Slow()
+    await asyncio.gather(*[offers_of(alone, game, conn, cached=True)
+                           for _ in range(500)])
+    check("пятьсот нажатий разом — один запрос к поставщику",
+          alone.calls == 1, f"{alone.calls} запросов")
+
+    # А владельцу нужно живьём: он смотрит именно затем, чтобы увидеть,
+    # что у поставщика прямо сейчас.
+    fresh = Slow()
+    await offers_of(fresh, game, conn, for_owner=True)
+    await offers_of(fresh, game, conn, for_owner=True)
+    check("владельцу пакеты приходят живьём", fresh.calls == 2,
+          f"{fresh.calls} запросов")
+
+    gsvc.forget_catalog()
+
+
 async def main() -> None:
     for sfx in ("", "-wal", "-shm"):
         Path(str(db.settings.db_file) + sfx).unlink(missing_ok=True)
@@ -2578,6 +2619,7 @@ async def main() -> None:
         await wrong_code(conn)
         await two_fields(conn)
         await volsever_check(conn)
+        await crowd(conn)
         await nick_probe(conn)
         await verdict_reading(conn)
         await wrong_region(conn)
