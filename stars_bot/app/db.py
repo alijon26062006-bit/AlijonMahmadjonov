@@ -663,7 +663,30 @@ async def connect() -> aiosqlite.Connection:
     # Пятнадцати секунд хватает любой нашей записи, а падение на занятой
     # базе посреди оплаты стоит дороже любого ожидания.
     await conn.execute("PRAGMA busy_timeout=15000")
+    # При WAL база по умолчанию ждёт подтверждения диска после каждой
+    # записи. На обычном диске это миллисекунды простоя на каждой
+    # операции, и они складываются в ту самую очередь. NORMAL при WAL
+    # не рвёт базу: самое плохое, что бывает при выключении питания, —
+    # потеря последних секунд, а не порча файла.
+    await conn.execute("PRAGMA synchronous=NORMAL")
     return conn
+
+
+async def compact(conn: aiosqlite.Connection) -> None:
+    """Свернуть журнал WAL в базу и обнулить его.
+
+    Тихо: если кто-то держит базу (второй процесс ещё не умер), журнал
+    просто останется как был — это не повод не запускаться.
+    """
+    try:
+        async with conn.execute("PRAGMA wal_checkpoint(TRUNCATE)") as cur:
+            busy, pages, moved = await cur.fetchone()
+        if busy:
+            log.info("Журнал базы занят другим процессом, свернём в другой раз")
+        elif pages:
+            log.info("Журнал базы свёрнут: %d страниц", moved)
+    except Exception as exc:  # noqa: BLE001 — уборка не важнее запуска
+        log.warning("Журнал базы свернуть не вышло: %s", exc)
 
 
 #: Колонки, добавленные после первого выпуска. Ключ — таблица.
@@ -734,10 +757,20 @@ async def upsert_user(
     referrer_id: int | None = None,
 ) -> bool:
     """Создать или обновить пользователя. True — если пользователь новый."""
-    async with conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)) as cur:
-        exists = await cur.fetchone() is not None
+    async with conn.execute(
+        "SELECT username, first_name FROM users WHERE id = ?", (user_id,)
+    ) as cur:
+        row = await cur.fetchone()
 
-    if exists:
+    if row is not None:
+        # Эта проверка идёт на каждое нажатие каждой кнопки — самая
+        # частая запись во всей системе. А менять почти всегда нечего:
+        # имя и юзернейм те же, что секунду назад. Писать вхолостую
+        # нельзя: SQLite пускает к записи по одному, и пока тысяча
+        # человек переписывает свои же имена, юзербот не может
+        # зачислить оплату и получает «database is locked».
+        if row["username"] == username and row["first_name"] == first_name:
+            return False
         await conn.execute(
             "UPDATE users SET username = ?, first_name = ? WHERE id = ?",
             (username, first_name, user_id),

@@ -425,5 +425,29 @@ async def run(conn) -> None:
     check("в истории видны и плюс, и минус",
           "+25.00" in card and "−10.00" in card, card[-140:])
 
+    # ------------------- запись на каждое нажатие: её быть не должно
+    # Проверка пользователя срабатывает на каждое сообщение и каждую
+    # кнопку. Если она пишет в базу вхолостую, при тысяче человек
+    # очередь писателей встаёт колом и остальные получают
+    # «database is locked» — на этом бот однажды уже упал.
+    await db.upsert_user(conn, 950, "stalyi", "Стальной")
+    before = conn.total_changes
+    await db.upsert_user(conn, 950, "stalyi", "Стальной")
+    check("повторный вход ничего не пишет",
+          conn.total_changes == before,
+          f"записей: {conn.total_changes - before}")
+
+    await db.upsert_user(conn, 950, "novyi_nik", "Стальной")
+    check("смена юзернейма сохраняется",
+          (await db.get_user(conn, 950)).username == "novyi_nik")
+
+    await db.upsert_user(conn, 950, "novyi_nik", "Новое имя")
+    check("смена имени сохраняется",
+          (await db.get_user(conn, 950)).first_name == "Новое имя")
+
+    check("возврат «новый» не сбился",
+          await db.upsert_user(conn, 951, "svezhiy", "Свежий") is True
+          and await db.upsert_user(conn, 951, "svezhiy", "Свежий") is False)
+
 
 asyncio.run(main())
