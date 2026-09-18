@@ -148,6 +148,7 @@ async def main() -> None:
         await db.init(conn)
         await runtime.load(conn)
         await run_scenario(conn)
+        await cancel_under_photo(conn)
     finally:
         await conn.close()
 
@@ -155,6 +156,46 @@ async def main() -> None:
     if FAIL:
         print("ПРОВАЛЫ:", ", ".join(FAIL))
     sys.exit(1 if FAIL else 0)
+
+
+async def cancel_under_photo(conn) -> None:
+    """«Отмена» под картинкой должна работать.
+
+    Меню показывается правкой текста сообщения, а у фотографии текста
+    нет — Telegram такую правку отвергает. Для человека это выглядит
+    мёртвой кнопкой: нажал «Отмена» под примером чека, и ничего.
+    """
+    from app.handlers.menu import render_menu
+
+    class PhotoMessage(FakeMessage):
+        """Сообщение-фотография: правку текста отвергает, как Telegram."""
+
+        def __init__(self, **kw):
+            super().__init__(**kw)
+            self.text = None
+            self.deleted = False
+
+        async def edit_text(self, *args, **kwargs):
+            raise RuntimeError("у фотографии нет текста — правка невозможна")
+
+        async def delete(self):
+            self.deleted = True
+
+    call = FakeCallback("m:main")
+    call.message = PhotoMessage(user=call.from_user, bot=call.bot)
+
+    await render_menu(call, conn)
+    check("меню открывается и с экрана-картинки",
+          bool(call.message.replies), str(call.message.replies[:1]))
+    check("картинка при этом убирается", call.message.deleted)
+
+    # И обычный текстовый экран по-прежнему правится на месте, а не
+    # засыпает чат новыми сообщениями.
+    plain = FakeCallback("m:main")
+    plain.message.text = "старое меню"
+    await render_menu(plain, conn)
+    check("текстовый экран по-прежнему правится на месте",
+          bool(plain.message.replies), str(plain.message.replies[:1]))
 
 
 async def run_scenario(conn) -> None:

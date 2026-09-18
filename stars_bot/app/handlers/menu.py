@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import aiosqlite
 from aiogram import F, Router
+from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -28,13 +29,32 @@ async def main_markup(conn: aiosqlite.Connection):
 
 
 async def render_menu(target: Message | CallbackQuery, conn: aiosqlite.Connection) -> None:
-    """Показать меню. У Message берём отправителя, у CallbackQuery — нажавшего."""
+    """Показать меню. У Message берём отправителя, у CallbackQuery — нажавшего.
+
+    Правка текста годится не для всякого сообщения: у фотографии текста
+    нет, и Telegram такую правку отвергает. Для человека это выглядит
+    мёртвой кнопкой — нажал «Отмена» под картинкой, и ничего. Поэтому
+    сообщение без текста убираем и присылаем меню новым.
+    """
     text = await menu_text(conn, target.from_user.id)
     markup = await main_markup(conn)
-    if isinstance(target, CallbackQuery):
-        await target.message.edit_text(text, reply_markup=markup)
-    else:
+
+    # Различаем по тому, что у объекта есть, а не по его классу: у
+    # нажатия кнопки внутри лежит сообщение, у обычного сообщения —
+    # нет. Так же это работает и в проверках, где Telegram подставной.
+    message = getattr(target, "message", None)
+    if message is None:
         await target.answer(text, reply_markup=markup)
+        return
+
+    if getattr(message, "text", None) is None:
+        try:
+            await message.delete()
+        except TelegramAPIError:
+            pass          # удалить нельзя — не беда, меню всё равно придёт
+        await message.answer(text, reply_markup=markup)
+        return
+    await message.edit_text(text, reply_markup=markup)
 
 
 @router.message(CommandStart())
