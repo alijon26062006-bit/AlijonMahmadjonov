@@ -199,10 +199,15 @@ async def main() -> None:
 
     api_task = asyncio.create_task(api_hooks.loop(conn))
 
+    # Сводка за сутки тем, кто её включил.
+    from app.api import digest as api_digest
+
+    digest_task = asyncio.create_task(api_digest.loop(bot))
+
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
-        for task in (pricing_task, games_task, api_task):
+        for task in (pricing_task, games_task, api_task, digest_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task

@@ -83,6 +83,7 @@ def _home_kb(has_keys: bool, cabinet: str = "") -> InlineKeyboardBuilder:
     if has_keys:
         kb.row(btn("📦 Заказы", "api:orders"), btn("💳 Транзакции", "api:txs"))
         kb.row(btn("🔔 Вебхук", "api:hook"), btn("📊 Статистика", "api:stats"))
+        kb.row(btn("📣 Уведомления", "api:notify"))
     url = api_server.base_url()
     if url:
         kb.row(InlineKeyboardButton(text="📖 Документация", url=f"{url}/docs"))
@@ -137,6 +138,70 @@ async def cb_home(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connec
     await state.clear()
     await show_home(call, conn)
     await call.answer()
+
+
+MODE_TITLES = {
+    "off": "🔕 Ничего не присылать",
+    "problems": "⚠️ Только проблемы",
+    "all": "📬 Все заказы",
+}
+
+
+def _notify_kb(prefs: dict) -> InlineKeyboardBuilder:
+    kb = InlineKeyboardBuilder()
+    for mode, title in MODE_TITLES.items():
+        mark = "✅ " if prefs["notify"] == mode else ""
+        kb.row(btn(mark + title, f"api:notify_set:{mode}",
+                   style=SUCCESS if prefs["notify"] == mode else None))
+    kb.row(btn(("✅ " if prefs["digest"] else "⬜️ ") + "Сводка раз в сутки",
+               "api:digest"))
+    kb.row(btn(labeled("back", "Назад"), "api:home"))
+    return kb
+
+
+async def _show_notify(call: CallbackQuery, conn) -> None:
+    prefs = await db.api_prefs(conn, call.from_user.id)
+    await call.message.edit_text(
+        f"📣 <b>Уведомления</b>\n<code>{LINE}</code>\n\n"
+        "Это сообщения <b>вам в Telegram</b>. Вашей программе о заказах "
+        "сообщает вебхук — он работает отдельно и всегда.\n\n"
+        f"Сейчас: <b>{MODE_TITLES[prefs['notify']]}</b>\n"
+        f"Сводка за сутки: <b>{'да' if prefs['digest'] else 'нет'}</b>\n\n"
+        "<blockquote>«Только проблемы» — возврат и зависший заказ. "
+        "Это то, из-за чего теряются деньги.\n\n«Все заказы» на сотне "
+        "покупок в день — сотня сообщений: их перестают читать вместе "
+        "с важными.</blockquote>",
+        reply_markup=_notify_kb(prefs).as_markup(),
+    )
+
+
+@router.callback_query(F.data == "api:notify")
+async def cb_notify(call: CallbackQuery, state: FSMContext,
+                    conn: aiosqlite.Connection) -> None:
+    await state.clear()
+    await _show_notify(call, conn)
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("api:notify_set:"))
+async def cb_notify_set(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    mode = call.data.rsplit(":", 1)[1]
+    if mode not in db.NOTIFY_MODES:
+        await call.answer("Неизвестный режим.", show_alert=True)
+        return
+    await db.set_api_prefs(conn, call.from_user.id, notify=mode)
+    await _show_notify(call, conn)
+    await call.answer(MODE_TITLES[mode])
+
+
+@router.callback_query(F.data == "api:digest")
+async def cb_digest(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    prefs = await db.api_prefs(conn, call.from_user.id)
+    await db.set_api_prefs(conn, call.from_user.id,
+                           digest=0 if prefs["digest"] else 1)
+    await _show_notify(call, conn)
+    await call.answer("Сводка выключена" if prefs["digest"]
+                      else "Сводка будет приходить утром")
 
 
 @router.callback_query(F.data == "api:pass_off")

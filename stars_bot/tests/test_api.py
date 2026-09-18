@@ -544,9 +544,41 @@ async def refunds(conn, bot) -> None:
     check("журнал сходится по балансу",
           txs[0]["balance_after"] == before, str(txs[0]))
 
-    check("роботу в Telegram не написали",
-          not any(chat == BUYER for chat, _ in bot.sent), str(bot.sent[:2]))
+    # Возврат — это ровно то, ради чего разработчика и стоит будить: он
+    # теряет деньги и клиента. По умолчанию такие письма приходят, а
+    # «заказ выполнен» — нет: это проверяет отдельный раздел ниже.
+    check("о возврате разработчику сообщили",
+          any(chat == BUYER for chat, _ in bot.sent), str(bot.sent[:2]))
     check("владельцу о сбое сообщили", bool(bot.sent), str(len(bot.sent)))
+
+    # А если он просил тишины — молчим и на возврате тоже.
+    await db.set_api_prefs(conn, BUYER, notify="off")
+    bot.sent.clear()
+    quiet = await db.next_api_ref(conn)
+    await db.charge_logged(conn, BUYER, 1400, order_ref=quiet, note="звёзды")
+    silent = await db.create_order(
+        conn, user_id=BUYER, product_type="stars", quantity=100,
+        recipient="@durov", price=1400, cost=1000,
+    )
+    await db.link_api_order(conn, ref=quiet, order_id=silent.id,
+                            key_id=key_row.id, user_id=BUYER,
+                            product_id="stars", customer="@durov")
+    await delivery.run(bot, conn, provider, silent)
+    check("выключенные уведомления уважаются и при возврате",
+          not any(chat == BUYER for chat, _ in bot.sent), str(bot.sent[:2]))
+    await db.set_api_prefs(conn, BUYER, notify="problems")
+
+    # Три неудачи подряд — и бот сам гасит продажу, чтобы клиенты не
+    # платили за возвраты. Это верное поведение, но следующим разделам
+    # нужен рабочий магазин, поэтому счётчик сбрасываем.
+    check("подряд идущие неудачи гасят продажу",
+          runtime.get_bool("autostopped")
+          or runtime.get_int("fail_streak") > 0,
+          f"серия {runtime.get_int('fail_streak')}")
+    await runtime.set_value(conn, "fail_streak", "0")
+    await runtime.set_value(conn, "autostopped", "0")
+    await runtime.set_value(conn, "stars_enabled", "1")
+    await runtime.set_value(conn, "premium_enabled", "1")
 
     # заказ из бота — человеку писать надо
     bot.sent.clear()
@@ -1218,6 +1250,98 @@ async def money_never_vanishes(conn, bot) -> None:
         await runner.cleanup()
 
 
+
+# ──────────────────────────────────── уведомления и сводка
+
+
+class Told:
+    """Бот, который запоминает, кому что написал."""
+
+    def __init__(self):
+        self.sent = []
+
+    async def send_message(self, chat_id, text, **kw):
+        self.sent.append((chat_id, text))
+
+
+async def notifications(conn) -> None:
+    """Разработчику пишем ровно столько, сколько он просил."""
+    from app.api import digest
+    from app.services import delivery
+
+    bot = Told()
+    ref = await db.next_api_ref(conn)
+    order = await db.create_order(
+        conn, user_id=BUYER, product_type="stars", quantity=50,
+        recipient="@durov", price=1000, cost=800,
+    )
+    key = await make_key(conn, label="notify")
+    row = await db.api_keys_of(conn, BUYER)
+    await db.link_api_order(conn, ref=ref, order_id=order.id, key_id=row[0].id,
+                            user_id=BUYER, product_id="stars",
+                            customer="@durov", idem_key="")
+
+    check("по умолчанию только проблемы",
+          (await db.api_prefs(conn, BUYER))["notify"] == "problems")
+
+    # Заказ выполнен — это не проблема, и в личку идти не должно.
+    await db.transition_order(conn, order.id, expected=db.ORDER_DELIVERING,
+                              new=db.ORDER_DELIVERED)
+    await delivery.tell_buyer(bot, conn, order, "заказ выполнен")
+    check("на «выполнен» разработчика не будим", bot.sent == [], str(bot.sent))
+
+    # А возврат — будим.
+    await db.transition_order(conn, order.id, expected=db.ORDER_DELIVERED,
+                              new=db.ORDER_REFUNDED)
+    await delivery.tell_buyer(bot, conn, order, "деньги вернулись")
+    check("о возврате сообщаем", len(bot.sent) == 1, str(len(bot.sent)))
+
+    await db.set_api_prefs(conn, BUYER, notify="off")
+    await delivery.tell_buyer(bot, conn, order, "и об этом молчим")
+    check("выключено — значит тишина даже на возврате",
+          len(bot.sent) == 1, str(len(bot.sent)))
+
+    await db.set_api_prefs(conn, BUYER, notify="all")
+    await delivery.tell_buyer(bot, conn, order, "теперь обо всём")
+    check("«все заказы» — пишем и об удачных", len(bot.sent) == 2,
+          str(len(bot.sent)))
+
+    # Человеку из бота пишем всегда, что бы ни стояло у разработчика.
+    plain = await db.create_order(
+        conn, user_id=BUYER + 7, product_type="stars", quantity=10,
+        recipient="@someone", price=200, cost=100,
+    )
+    await db.upsert_user(conn, BUYER + 7, "human", "Человек")
+    await delivery.tell_buyer(bot, conn, plain, "обычному клиенту")
+    check("обычного покупателя настройки API не касаются",
+          len(bot.sent) == 3, str(len(bot.sent)))
+
+    # ---- сводка за сутки ----
+    await db.set_api_prefs(conn, BUYER, notify="off", digest=1, digest_on="")
+    bot.sent.clear()
+    from datetime import datetime, timedelta, timezone
+
+    tomorrow = datetime.now(timezone.utc) + timedelta(days=1)
+    sent = await digest.run_once(bot, conn, tomorrow)
+    check("сводка за прошедшие сутки уходит", sent == 1, str(sent))
+    check("в сводке видно заказы и возвраты",
+          "Сводка за сутки" in bot.sent[0][1], bot.sent[0][1][:60])
+
+    bot.sent.clear()
+    again = await digest.run_once(bot, conn, tomorrow)
+    check("дважды за день сводку не шлём", again == 0, str(again))
+
+    # Пустые сутки — молчим: «за сутки 0 заказов» каждое утро приучает
+    # не читать наши сообщения вовсе.
+    await db.set_api_prefs(conn, BUYER, digest_on="")
+    bot.sent.clear()
+    far = datetime.now(timezone.utc) + timedelta(days=40)
+    check("пустую сводку не присылаем",
+          await digest.run_once(bot, conn, far) == 0, str(bot.sent))
+
+    await db.set_api_prefs(conn, BUYER, notify="problems", digest=0)
+
+
 # ───────────────────────────────────────────────── запуск
 
 
@@ -1249,6 +1373,7 @@ async def main() -> None:
         await cabinet_view(conn, bot)
         await cabinet_pass(conn, bot)
         await money_never_vanishes(conn, bot)
+        await notifications(conn)
     finally:
         await conn.close()
 

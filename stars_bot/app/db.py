@@ -331,6 +331,15 @@ CREATE TABLE IF NOT EXISTS api_orders (
     created_at TEXT NOT NULL
 );
 
+-- Как разработчик хочет узнавать о своих заказах. Отдельно от вебхука:
+-- вебхук получает его программа, а это — он сам, в Telegram.
+CREATE TABLE IF NOT EXISTS api_prefs (
+    user_id     INTEGER PRIMARY KEY,
+    notify      TEXT NOT NULL DEFAULT 'problems',  -- off | problems | all
+    digest      INTEGER NOT NULL DEFAULT 0,        -- сводка раз в сутки
+    digest_on   TEXT NOT NULL DEFAULT ''           -- за какой день уже слали
+);
+
 -- Пропуск в кабинет по ссылке из бота. Ключ для этого не годится: он
 -- умеет тратить деньги, а ссылка живёт в адресной строке, в истории
 -- браузера и в пересланном сообщении. Поэтому пропуск — отдельная
@@ -2419,6 +2428,50 @@ async def add_api_tx(
     )
     await conn.commit()
     return tx_id
+
+
+# ---- как уведомлять разработчика ------------------------------------
+
+#: Что шлём в Telegram владельцу ключа. По умолчанию только проблемы:
+#: «заказ выполнен» на сотне заказов — это сто сообщений подряд, после
+#: которых их перестают читать вовсе, включая важные.
+NOTIFY_MODES = ("off", "problems", "all")
+
+
+async def api_prefs(conn: aiosqlite.Connection, user_id: int) -> dict[str, Any]:
+    async with conn.execute(
+        "SELECT * FROM api_prefs WHERE user_id = ?", (user_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    if row is None:
+        return {"user_id": user_id, "notify": "problems", "digest": 0,
+                "digest_on": ""}
+    return dict(row)
+
+
+async def set_api_prefs(conn: aiosqlite.Connection, user_id: int, **fields) -> None:
+    keep = {k: v for k, v in fields.items()
+            if k in ("notify", "digest", "digest_on")}
+    if not keep:
+        return
+    columns = ", ".join(keep)
+    marks = ", ".join("?" for _ in keep)
+    updates = ", ".join(f"{k} = excluded.{k}" for k in keep)
+    await conn.execute(
+        f"""INSERT INTO api_prefs (user_id, {columns}) VALUES (?, {marks})
+            ON CONFLICT(user_id) DO UPDATE SET {updates}""",
+        (user_id, *keep.values()),
+    )
+    await conn.commit()
+
+
+async def api_digest_targets(conn: aiosqlite.Connection, today: str) -> list[int]:
+    """Кому сегодня ещё не слали сводку."""
+    async with conn.execute(
+        "SELECT user_id FROM api_prefs WHERE digest = 1 AND digest_on != ?",
+        (today,),
+    ) as cur:
+        return [row[0] for row in await cur.fetchall()]
 
 
 # ---- пропуск в кабинет ----------------------------------------------

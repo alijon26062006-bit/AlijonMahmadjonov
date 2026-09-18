@@ -44,20 +44,38 @@ async def notify_admins(bot: Bot, text: str, **kwargs) -> None:
         await notify(bot, settings.orders_chat_id, text, **kwargs)
 
 
+#: Статусы, ради которых разработчика стоит будить в любом случае:
+#: на них он теряет деньги или клиента.
+TROUBLE = (db.ORDER_REFUNDED, db.ORDER_FAILED)
+
+
 async def tell_buyer(
     bot: Bot, conn: aiosqlite.Connection, order: db.Order, text: str, **kwargs
 ) -> None:
-    """Написать покупателю — если покупатель человек, а не программа.
+    """Написать покупателю. Человеку — всегда, разработчику — как просил.
 
-    Заказ, пришедший по API, сделал чужой бот. Его владельцу о статусе
-    сообщает вебхук, а сообщением в Telegram на каждый заказ мы завалили
-    бы ему личку на первой же сотне и упёрлись в лимиты Telegram.
+    Заказ, пришедший по API, сделал чужой бот, и его владельцу о статусе
+    сообщает вебхук. Писать ему в Telegram про каждый заказ значит
+    завалить личку на первой же сотне и упереться в лимиты Telegram —
+    поэтому по умолчанию он получает только проблемы: возврат и
+    зависший заказ. Полный поток и полную тишину он включает сам.
 
     Проверяем по базе, а не по флагу: статус заказа меняют пять разных
     путей, и забыть передать флаг в один из них — значит начать спамить.
     """
-    if await db.api_order_of(conn, order.id) is not None:
+    if await db.api_order_of(conn, order.id) is None:
+        await notify(bot, order.user_id, text, **kwargs)
         return
+
+    mode = (await db.api_prefs(conn, order.user_id))["notify"]
+    if mode == "off":
+        return
+    if mode == "problems":
+        # Статус берём из базы: сюда приходят и объекты, собранные до
+        # смены статуса, и по ним «проблема» не опозналась бы.
+        fresh = await db.get_order(conn, order.id)
+        if (fresh.status if fresh else order.status) not in TROUBLE:
+            return
     await notify(bot, order.user_id, text, **kwargs)
 
 
