@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS products (
     amount   INTEGER NOT NULL DEFAULT 0,
     price    INTEGER NOT NULL,
     partner_price INTEGER,
+    cost     INTEGER,
     group_code TEXT  NOT NULL DEFAULT '',
     sku      TEXT    NOT NULL DEFAULT '',
     kind     TEXT    NOT NULL DEFAULT 'game',
@@ -235,6 +236,7 @@ class Database:
 
     _NEW_COLUMNS = (
         ("products", "partner_price", "INTEGER"),
+        ("products", "cost", "INTEGER"),
         ("products", "group_code", "TEXT NOT NULL DEFAULT ''"),
         ("products", "sku", "TEXT NOT NULL DEFAULT ''"),
         ("products", "kind", "TEXT NOT NULL DEFAULT 'game'"),
@@ -396,6 +398,22 @@ class Database:
 
     def product(self, code: str) -> sqlite3.Row | None:
         return self._one("SELECT * FROM products WHERE code = ?", (code,))
+
+    def update_costs(self, prices: dict[str, float]) -> int:
+        """Нархи хариди таъминкунандаро нав мекунад. `prices`: SKU → доллар."""
+        updated = 0
+        with self._lock:
+            for sku, value in prices.items():
+                try:
+                    milli = round(float(value) * 1000)
+                except (TypeError, ValueError):
+                    continue
+                cur = self._conn.execute(
+                    "UPDATE products SET cost = ? WHERE sku = ?", (milli, sku)
+                )
+                updated += cur.rowcount
+            self._conn.commit()
+        return updated
 
     def set_partner_price(self, code: str, price: int | None) -> bool:
         """Нархи шарикӣ. `None` — шарик нархи оддиро мепардозад."""

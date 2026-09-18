@@ -454,3 +454,65 @@ async def cb_toggle_method(cb: CallbackQuery, db: Database, cfg: Config) -> None
     db.set_setting(key, "0" if turning_off else "1")
     await _show_requisites(cb, db, cfg)
     await cb.answer("🚫 Хомӯш шуд" if turning_off else "✅ Фаъол шуд")
+
+
+# ── курси доллар ва нархи харид ───────────────────────────────────────
+@router.callback_query(F.data == "a:rate")
+async def cb_rate(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
+    from .admin import usd_rate
+
+    await state.set_state(Admin.waiting_rate)
+    await safe_edit(
+        cb,
+        f"{texts.ADMIN_ASK_RATE}\n\nҲозир: <b>{usd_rate(db):g}</b> сомонӣ = 1 $",
+        keyboards.admin_back(),
+    )
+    await cb.answer()
+
+
+@router.message(Admin.waiting_rate, F.text)
+async def got_rate(message: Message, state: FSMContext, db: Database) -> None:
+    from .admin import RATE_KEY
+
+    raw = message.text.strip().replace(",", ".")
+    try:
+        rate = float(raw)
+    except ValueError:
+        rate = 0
+    if not 1 <= rate <= 100:
+        await message.answer("❌ Курс нодуруст аст. Намуна: <code>11</code>")
+        return
+    await state.clear()
+    db.set_setting(RATE_KEY, str(rate))
+    await message.answer(
+        f"✅ Курс: <b>{rate:g}</b> сомонӣ = 1 $\n\n"
+        "<i>Акнун дар экрани ҳар мол фоида дуруст ҳисоб мешавад.</i>",
+        reply_markup=keyboards.admin_settings(),
+    )
+
+
+@router.callback_query(F.data == "a:costs")
+async def cb_refresh_costs(cb: CallbackQuery, db: Database, cfg: Config, supplier) -> None:
+    """Нархи хариди ҳамаи молҳоро аз таъминкунанда мегирад."""
+    if not cfg.has_supplier:
+        await cb.answer("Таъминкунанда хомӯш аст", show_alert=True)
+        return
+    await safe_edit(cb, "⏳ Нархи харидро мегирам...", None)
+    await cb.answer()
+
+    live = await supplier.products()
+    if not live:
+        await cb.message.answer(
+            "⚠️ Каталоги таъминкунандаро гирифта натавонистам.",
+            reply_markup=keyboards.admin_price_categories(),
+        )
+        return
+
+    updated = db.update_costs({sku: item.get("price") for sku, item in live.items()})
+    await cb.message.answer(
+        f"✅ Нархи харид нав шуд.\n\n"
+        f"🏪 Дар таъминкунанда: <b>{len(live)}</b> мол\n"
+        f"🔄 Нав шуд: <b>{updated}</b> мол\n\n"
+        "<i>Акнун дар экрани ҳар мол нархи харид ва фоида дида мешавад.</i>",
+        reply_markup=keyboards.admin_price_categories(),
+    )

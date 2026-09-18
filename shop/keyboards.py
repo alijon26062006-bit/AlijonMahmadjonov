@@ -330,6 +330,7 @@ def admin_settings() -> InlineKeyboardMarkup:
             [_btn(texts.ADM_BTN_CHANNELS, "a:channels", style.PRIMARY)],
             [_btn(texts.ADM_BTN_REVIEW_CH, "a:revch", style.PRIMARY)],
             [_btn(texts.ADM_BTN_WHATSAPP, "a:wa", style.PRIMARY)],
+            [_btn(texts.ADM_BTN_RATE, "a:rate", style.PRIMARY)],
             [_btn(texts.ADM_BTN_GROUPS, "a:groups", style.PRIMARY)],
             [_btn(texts.BTN_BACK, "a:home")],
         ]
@@ -392,28 +393,32 @@ def admin_price_categories() -> InlineKeyboardMarkup:
         [_btn(f"{c.icon} {c.title}", f"a:pcat:{c.code}", style.PRIMARY)]
         for c in catalog.CATEGORY_INFO.values()
     ]
+    rows.append([_btn(texts.ADM_BTN_COSTS, "a:costs", style.SUCCESS)])
     rows.append([_btn(texts.BTN_BACK, "a:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def admin_price_list(rows: Sequence, *, currency: str = texts.CURRENCY) -> InlineKeyboardMarkup:
+def admin_price_list(
+    rows: Sequence, *, currency: str = texts.CURRENCY, rate: float = 11.0
+) -> InlineKeyboardMarkup:
+    """Рӯйхати нархҳо. Моле, ки бо зарар фурӯхта мешавад, фавран нишон дода мешавад."""
     buttons: list[list[InlineKeyboardButton]] = []
-    line: list[InlineKeyboardButton] = []
     for row in rows:
-        mark = "" if row["active"] else "🚫 "
-        line.append(
+        cost = row["cost"] if "cost" in row.keys() else None
+        losing = bool(cost) and row["price"] < round(cost / 1000 * rate * 100)
+        if not row["active"]:
+            mark, color = "🚫 ", style.DANGER
+        elif losing:
+            mark, color = "🔴 ", style.DANGER   # зарар
+        else:
+            mark, color = "", style.PRIMARY
+        buttons.append([
             _btn(
                 f"{mark}{row['title']} — {texts.money(row['price'], currency)}",
                 f"a:price:{row['code']}",
-                # Моли хомӯш сурх — фавран дар назар менамояд.
-                style.PRIMARY if row["active"] else style.DANGER,
+                color,
             )
-        )
-        if len(line) == 2:
-            buttons.append(line)
-            line = []
-    if line:
-        buttons.append(line)
+        ])
     buttons.append([_btn(texts.BTN_BACK, "a:prices")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

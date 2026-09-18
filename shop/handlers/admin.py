@@ -254,6 +254,18 @@ async def cb_topup_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bot
     await cb.answer("✅" if action == "tok" else "❌")
 
 
+RATE_KEY = "usd_rate"
+DEFAULT_RATE = 11.0
+
+
+def usd_rate(db: Database) -> float:
+    """Курси доллар барои ҳисоби нархи харид дар панел."""
+    try:
+        return float(db.setting(RATE_KEY) or DEFAULT_RATE)
+    except ValueError:
+        return DEFAULT_RATE
+
+
 # ── нархҳо ────────────────────────────────────────────────────────────
 @router.callback_query(F.data == "a:prices")
 async def cb_prices(cb: CallbackQuery, state: FSMContext) -> None:
@@ -273,7 +285,7 @@ async def cb_price_category(cb: CallbackQuery, db: Database, cfg: Config) -> Non
     await safe_edit(
         cb,
         texts.admin_prices(rows, info.title, cfg.currency),
-        keyboards.admin_price_list(rows, currency=cfg.currency),
+        keyboards.admin_price_list(rows, currency=cfg.currency, rate=usd_rate(db)),
     )
     await cb.answer()
 
@@ -292,13 +304,16 @@ async def cb_price_item(cb: CallbackQuery, db: Database, cfg: Config) -> None:
         if partner_price
         else "🤝 Нархи шарикӣ: <i>гузошта нашудааст</i> (шарик нархи оддиро медиҳад)"
     )
+    rate = usd_rate(db)
     await safe_edit(
         cb,
         f"📦 <b>{texts.esc(row['title'])}</b>\n\n"
+        f"{texts.cost_line(row['cost'], row['price'], rate, cfg.currency)}\n\n"
         f"💰 Нархи оддӣ: <b>{texts.money(row['price'], cfg.currency)}</b>\n"
         f"{partner_line}\n"
         f"📶 Ҳолат: {status}\n"
-        f"🔖 Код: <code>{texts.esc(code)}</code>",
+        f"🔖 Код: <code>{texts.esc(code)}</code>\n"
+        f"🏪 SKU: <code>{texts.esc(row['sku'] or '—')}</code>",
         keyboards.admin_price_item(code, bool(row["active"]), bool(partner_price)),
     )
     await cb.answer()

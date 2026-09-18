@@ -646,3 +646,61 @@ def test_cleared_partner_price_does_not_come_back(tmp_path):
     third = Database(path)
     assert third.product("pubg_660")["partner_price"] == 8500
     third.close()
+
+
+# ── нархи харид ва фоида ──────────────────────────────────────────────
+def test_costs_are_stored_and_read(db):
+    from shop.db import Database
+
+    assert db.update_costs({"pubg_uc_660": 8.893, "нест": 1.0}) == 1
+    assert db.product("pubg_660")["cost"] == 8893
+
+
+def test_cost_line_shows_profit():
+    line = texts.cost_line(886, 1000, 11.0)      # 0.886$ × 11 = 9.75 с., продаём 10.00
+    assert "0.886" in line and "Фоида" in line
+
+
+def test_cost_line_warns_about_loss():
+    line = texts.cost_line(8893, 9370, 11.0)     # закупка 97.82 с., продаём 93.70
+    assert "ЗАРАР" in line
+
+
+def test_cost_line_without_cost():
+    assert "номаълум" in texts.cost_line(None, 1000, 11.0)
+
+
+def test_rate_changes_profit_verdict():
+    """Тот же товар: при высоком курсе убыток, при низком — прибыль."""
+    assert "ЗАРАР" in texts.cost_line(8893, 9370, 11.0)
+    assert "Фоида" in texts.cost_line(8893, 9370, 10.0)
+
+
+def test_loss_making_product_is_marked_red(db):
+    from shop import style
+
+    db.update_costs({"pubg_uc_660": 8.893})
+    rows = [r for r in db.products(catalog.CAT_PUBG, only_active=False)
+            if r["code"] == "pubg_660"]
+    kb = keyboards.admin_price_list(rows, rate=11.0)
+    button = kb.inline_keyboard[0][0]
+    assert button.text.startswith("🔴")
+    assert button.style == style.DANGER
+
+
+def test_profitable_product_is_not_marked(db):
+    from shop import style
+
+    db.update_costs({"pubg_uc_660": 8.893})
+    rows = [r for r in db.products(catalog.CAT_PUBG, only_active=False)
+            if r["code"] == "pubg_660"]
+    button = keyboards.admin_price_list(rows, rate=10.0).inline_keyboard[0][0]
+    assert not button.text.startswith("🔴")
+    assert button.style == style.PRIMARY
+
+
+def test_price_list_is_one_per_row(db):
+    """Длинные кнопки: название и цена должны помещаться целиком."""
+    rows = db.products(catalog.CAT_PUBG, only_active=False)
+    kb = keyboards.admin_price_list(rows)
+    assert all(len(row) == 1 for row in kb.inline_keyboard)

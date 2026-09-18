@@ -562,6 +562,8 @@ ADM_BTN_REVIEW_CH = "💬 Канали шарҳҳо"
 ADM_BTN_WHATSAPP = "🟢 WhatsApp"
 ADM_BTN_GROUPS = "🗂 Номи зербахшҳо"
 ADM_BTN_REQUISITES = "💳 Реквизитҳо"
+ADM_BTN_COSTS = "🔄 Нархи харидро нав кардан"
+ADM_BTN_RATE = "💱 Курси доллар"
 ADM_BTN_ADD_PARTNER = "➕ Шарики нав"
 ADM_BTN_PARTNER_PRICE = "🤝 Нархи шарикӣ"
 ADM_BTN_PARTNER_OFF = "🗑 Нархи шарикиро бардоштан"
@@ -872,9 +874,40 @@ def admin_new_topup(row, user, currency: str = CURRENCY) -> str:
     return "🔔 <b>ПАРДОХТИ НАВ</b>\n\n" + admin_topup_card(row, user, currency)
 
 
+ADMIN_ASK_RATE = (
+    "💱 Курси доллар ба сомониро нависед.\n\n"
+    "Намуна: <code>11</code> ё <code>11.20</code>\n"
+    "<i>Он танҳо барои ҳисоби нархи харид дар панел истифода мешавад.</i>"
+)
+
+
+def cost_line(cost_milli: int | None, price: int, rate: float, currency: str = CURRENCY) -> str:
+    """Нархи харид, ҳамон дар сомонӣ ва фоидаи шумо."""
+    if not cost_milli:
+        return "🏷 Нархи харид: <i>номаълум</i> — тугмаи «🔄» -ро пахш кунед"
+    usd = cost_milli / 1000
+    in_somoni = round(usd * rate * 100)          # дирам
+    line = (
+        f"🏷 Нархи харид: <b>{usd:.3f} $</b> ≈ {money(in_somoni, currency)}"
+    )
+    if in_somoni <= 0:
+        return line
+    profit = price - in_somoni
+    percent = profit / in_somoni * 100
+    if profit < 0:
+        line += f"\n🔴 <b>ЗАРАР: {money(profit, currency)}</b> — нархро баланд кунед!"
+    else:
+        line += f"\n💚 Фоида: <b>{money(profit, currency)}</b> ({percent:+.0f}%)"
+    return line
+
+
 def admin_prices(rows: list, cat_title: str, currency: str = CURRENCY) -> str:
-    lines = [f"💲 <b>Нархҳо — {esc(cat_title)}</b>\n", "Молро барои иваз кардани нарх интихоб кунед."]
-    return "\n".join(lines)
+    return (
+        f"💲 <b>Нархҳо — {esc(cat_title)}</b>\n\n"
+        "Молро барои иваз кардани нарх интихоб кунед.\n\n"
+        "🔴 — бо зарар фурӯхта мешавад\n"
+        "🚫 — хомӯш"
+    )
 
 
 def admin_balance_changed(user, delta: int, currency: str = CURRENCY) -> str:
