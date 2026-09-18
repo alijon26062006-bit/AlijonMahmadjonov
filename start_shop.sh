@@ -24,9 +24,13 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! python3 -c 'import venv' >/dev/null 2>&1; then
+# Пакет называется по версии (python3.11-venv), общего имени может не быть.
+if ! python3 -c 'import ensurepip' >/dev/null 2>&1; then
   say "Ставлю python3-venv..."
-  $SUDO apt-get update -qq && $SUDO apt-get install -y -qq python3-venv
+  PYVER="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)"
+  $SUDO apt-get update -qq >/dev/null 2>&1
+  $SUDO apt-get install -y -qq "python${PYVER}-venv" >/dev/null 2>&1 \
+    || $SUDO apt-get install -y -qq python3-venv >/dev/null 2>&1
 fi
 
 # ── 2. Окружение и зависимости ────────────────────────────────────────

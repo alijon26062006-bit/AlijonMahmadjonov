@@ -117,7 +117,20 @@ if [ -f "$ROOT/install_bot_command.sh" ]; then
 fi
 
 echo "2/4  Обновляю зависимости..."
-[ -x .venv/bin/pip ] || python3 -m venv .venv
+if [ ! -x .venv/bin/pip ]; then
+  # На чистом Debian пакета python3-venv нет, и окружение не создаётся.
+  if ! python3 -c 'import ensurepip' >/dev/null 2>&1; then
+    echo "     ставлю python3-venv..."
+    PYVER="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)"
+    $SUDO apt-get update -qq >/dev/null 2>&1
+    $SUDO apt-get install -y -qq "python${PYVER}-venv" >/dev/null 2>&1 \
+      || $SUDO apt-get install -y -qq python3-venv >/dev/null 2>&1
+  fi
+  python3 -m venv .venv >/dev/null 2>&1 || {
+    echo "❌ Окружение не создалось. Выполните:  apt install -y python3-venv"
+    exit 1
+  }
+fi
 .venv/bin/pip install -q --upgrade pip
 .venv/bin/pip install -q -r requirements-shop.txt || { echo "❌ Зависимости не встали"; exit 1; }
 
