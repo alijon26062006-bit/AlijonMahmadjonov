@@ -140,42 +140,42 @@ async def transfer(conn) -> None:
         "──────────────────────────────────────────\n"
         "TELEGRAM ID   USERNAME    НОМ      ТЕЛЕФОН       ҲАМЁН   ХАРҶ  ФРМ\n"
         "──────────────────────────────────────────\n"
-        "7614804941    —           abuw.axxi   —          70.00    0.00    0\n"
-        "7664430907    @rutsiyax   uways   992107140706   60.50   58.50    8\n"
-        "8187133381    —           VIP     992400410505    6.91  192.59    7\n"
-        "5927541684    —           40205       —           1.00   36.00    4\n"
-        "6803799162    —           919046661   —           0.00    0.00    0\n"
-        "1607261985    @Sheix_80   Милый   992945829009    0.90 1087.10    5\n"
+        "1000000001    —           Клиент1   —          70.00    0.00    0\n"
+        "1000000002    @client_a   Клиент2   992000000001   60.50   58.50    8\n"
+        "1000000003    —           VIP     992000000002    6.91  192.59    7\n"
+        "1000000004    —           40205       —           1.00   36.00    4\n"
+        "1000000005    —           Клиент4   —           0.00    0.00    0\n"
+        "1000000006    @client_b   Клиент3   992000000003    0.90 1087.10    5\n"
     )
     rows, skipped = importer.parse_balances(table)
     money = {row["id"]: row["amount"] for row in rows}
     check("баланс взят, а не число заказов",
-          money.get(7614804941) == 7000, str(money.get(7614804941)))
+          money.get(1000000001) == 7000, str(money.get(1000000001)))
     check("потраченное за баланс не принято",
-          money.get(7664430907) == 6050, str(money.get(7664430907)))
-    check("копейки на месте", money.get(8187133381) == 691,
-          str(money.get(8187133381)))
+          money.get(1000000002) == 6050, str(money.get(1000000002)))
+    check("копейки на месте", money.get(1000000003) == 691,
+          str(money.get(1000000003)))
     check("ник из одних цифр не спутан с суммой",
-          money.get(5927541684) == 100, str(money.get(5927541684)))
+          money.get(1000000004) == 100, str(money.get(1000000004)))
     check("длинный ник-число тоже не спутан",
-          money.get(6803799162) == 0, str(money.get(6803799162)))
+          money.get(1000000005) == 0, str(money.get(1000000005)))
     check("большая трата не подменила баланс",
-          money.get(1607261985) == 90, str(money.get(1607261985)))
+          money.get(1000000006) == 90, str(money.get(1000000006)))
     check("телефон за баланс не принят",
           all(amount < 100_000 for amount in money.values()), str(money))
     check("шапка выгрузки в ошибки не попала", skipped == [], str(skipped))
     check("разобраны все строки с людьми", len(rows) == 6, str(len(rows)))
 
     names = {row["id"]: row["username"] for row in rows}
-    check("юзернейм подхвачен", names.get(7664430907) == "rutsiyax",
-          str(names.get(7664430907)))
-    check("без юзернейма поле пустое", names.get(7614804941) == "",
-          str(names.get(7614804941)))
+    check("юзернейм подхвачен", names.get(1000000002) == "client_a",
+          str(names.get(1000000002)))
+    check("без юзернейма поле пустое", names.get(1000000001) == "",
+          str(names.get(1000000001)))
 
     rich = importer.with_money(rows)
     check("нулевые отделены от денежных", len(rich) == 5, str(len(rich)))
     check("в предпросмотре сначала крупные",
-          importer.preview(rows)[0]["id"] == 7614804941,
+          importer.preview(rows)[0]["id"] == 1000000001,
           str(importer.preview(rows)[0]))
 
     # ---- предпросмотр ничего не применяет
@@ -222,21 +222,21 @@ async def transfer(conn) -> None:
 
     table = [
         ["TELEGRAM ID", "USERNAME", "НОМ", "ТЕЛЕФОН", "ҲАМЁН", "ХАРҶ", "ФРМ"],
-        ["7614804941", "", "abuw.axxi", "", "70.0", "0.0", "0"],
-        ["7664430907", "@rutsiyax", "uways", "992107140706", "60.5", "58.5", "8"],
-        ["5927541684", "", "40205", "", "1.0", "36.0", "4"],
+        ["1000000001", "", "Клиент1", "", "70.0", "0.0", "0"],
+        ["1000000002", "@client_a", "Клиент2", "992000000001", "60.5", "58.5", "8"],
+        ["1000000004", "", "40205", "", "1.0", "36.0", "4"],
         ["", "", "Ҳамагӣ", "", "131.5", "94.5", "12"],
     ]
     rows, skipped = importer.parse_rows(table)
     money = {r["id"]: r["amount"] for r in rows}
     check("колонка остатка найдена по заголовку",
-          money.get(7614804941) == 7000, str(money.get(7614804941)))
+          money.get(1000000001) == 7000, str(money.get(1000000001)))
     check("колонка «потрачено» не взята",
-          money.get(7664430907) == 6050, str(money.get(7664430907)))
+          money.get(1000000002) == 6050, str(money.get(1000000002)))
     check("ник из цифр в колонке не мешает",
-          money.get(5927541684) == 100, str(money.get(5927541684)))
+          money.get(1000000004) == 100, str(money.get(1000000004)))
     check("строка итогов без ID пропущена", len(rows) == 3, str(len(rows)))
-    check("юзернейм без собачки", rows[1]["username"] == "rutsiyax",
+    check("юзернейм без собачки", rows[1]["username"] == "client_a",
           rows[1]["username"])
     check("файл разобран без ошибок", skipped == [], str(skipped))
 
