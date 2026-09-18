@@ -208,7 +208,15 @@ case "\${1:-help}" in
     restart) systemctl restart "\$SERVICE" && echo "✅ Перезапущен" ;;
     stop)    systemctl stop "\$SERVICE"    && echo "⏹  Остановлен"  ;;
     start)   systemctl start "\$SERVICE"   && echo "▶️  Запущен"     ;;
-    status)  systemctl status "\$SERVICE" --no-pager ;;
+    status)
+        # Обе службы разом: спрашивают «как бот», а забывают про приём
+        # оплат — а это ровно та половина, молчание которой не видно.
+        systemctl status "\$SERVICE" --no-pager
+        echo
+        if systemctl list-unit-files | grep -q "\$SERVICE-userbot"; then
+            systemctl status "\$SERVICE-userbot" --no-pager || true
+        fi
+        ;;
     logs)    journalctl -u "\$SERVICE" -f ;;
     errors)  journalctl -u "\$SERVICE" -p err -n 50 --no-pager ;;
     setup)
@@ -585,6 +593,19 @@ $SUDO systemctl daemon-reload
 $SUDO systemctl enable --quiet "$SERVICE"
 $SUDO systemctl restart "$SERVICE"
 ok "Бот будет сам подниматься после перезагрузки и падений"
+
+# Юзербот — отдельная служба, и её тоже надо поднять на новый код.
+# Без этого бот обновляется, а приём оплат продолжает крутить старый до
+# перезагрузки сервера: расхождение, которое никак себя не проявляет,
+# пока однажды не разойдутся разбор уведомления и то, что ждёт бот.
+# Трогаем только если она уже работает: не настроен — нечего и запускать.
+if $SUDO systemctl is-active --quiet "$SERVICE-userbot"; then
+    $SUDO systemctl restart "$SERVICE-userbot"
+    ok "Приём оплат от банка перезапущен на новом коде"
+elif $SUDO systemctl is-enabled --quiet "$SERVICE-userbot" 2>/dev/null; then
+    $SUDO systemctl start "$SERVICE-userbot"
+    ok "Приём оплат от банка запущен"
+fi
 
 # ---------------------------------------------------------------- проверка
 
