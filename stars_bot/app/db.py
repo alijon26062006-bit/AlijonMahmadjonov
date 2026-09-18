@@ -331,6 +331,20 @@ CREATE TABLE IF NOT EXISTS api_orders (
     created_at TEXT NOT NULL
 );
 
+-- Просьба разработчика вернуть деньги за выполненный заказ. Именно
+-- просьба, а не возврат: решает владелец. Автоматический возврат по
+-- слову покупающей стороны — это «заказал, получил, вернул деньги».
+CREATE TABLE IF NOT EXISTS api_refunds (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    ref        TEXT NOT NULL,      -- наш номер заказа, ORD-...
+    user_id    INTEGER NOT NULL,
+    reason     TEXT NOT NULL DEFAULT '',
+    status     TEXT NOT NULL DEFAULT 'pending',   -- pending|approved|denied
+    answer     TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    decided_at TEXT
+);
+
 -- Как разработчик хочет узнавать о своих заказах. Отдельно от вебхука:
 -- вебхук получает его программа, а это — он сам, в Telegram.
 CREATE TABLE IF NOT EXISTS api_prefs (
@@ -427,6 +441,10 @@ CREATE INDEX IF NOT EXISTS idx_akeys_user    ON api_keys(user_id);
 CREATE INDEX IF NOT EXISTS idx_akeys_prefix  ON api_keys(prefix);
 CREATE INDEX IF NOT EXISTS idx_areq_key      ON api_requests(key_id);
 CREATE INDEX IF NOT EXISTS idx_areq_created  ON api_requests(created_at);
+-- Одна заявка на заказ: повторные просьбы не должны плодить строки,
+-- между которыми владельцу потом выбирать.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_arefund_ref ON api_refunds(ref);
+CREATE INDEX IF NOT EXISTS idx_arefund_status ON api_refunds(status);
 CREATE INDEX IF NOT EXISTS idx_pass_prefix  ON api_passes(prefix);
 CREATE INDEX IF NOT EXISTS idx_pass_user    ON api_passes(user_id);
 CREATE INDEX IF NOT EXISTS idx_atx_user      ON api_transactions(user_id);
@@ -2428,6 +2446,58 @@ async def add_api_tx(
     )
     await conn.commit()
     return tx_id
+
+
+# ---- заявки на возврат ----------------------------------------------
+
+
+async def ask_refund(
+    conn: aiosqlite.Connection, *, ref: str, user_id: int, reason: str
+) -> dict[str, Any]:
+    """Оставить заявку. Повторная просьба возвращает прежнюю, не плодя новых."""
+    await conn.execute(
+        """INSERT INTO api_refunds (ref, user_id, reason, created_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(ref) DO NOTHING""",
+        (ref, user_id, reason[:500], _now()),
+    )
+    await conn.commit()
+    return await refund_request(conn, ref)
+
+
+async def refund_request(conn: aiosqlite.Connection, ref: str) -> dict[str, Any]:
+    async with conn.execute(
+        "SELECT * FROM api_refunds WHERE ref = ?", (ref,)
+    ) as cur:
+        row = await cur.fetchone()
+    return dict(row) if row else {}
+
+
+async def refund_requests(
+    conn: aiosqlite.Connection, status: str = "pending", limit: int = 50
+) -> list[dict[str, Any]]:
+    async with conn.execute(
+        """SELECT r.*, o.price, o.status AS order_status, a.product_id
+           FROM api_refunds r
+           JOIN api_orders a ON a.ref = r.ref
+           JOIN orders o ON o.id = a.order_id
+           WHERE r.status = ? ORDER BY r.id DESC LIMIT ?""",
+        (status, limit),
+    ) as cur:
+        return [dict(row) for row in await cur.fetchall()]
+
+
+async def decide_refund(
+    conn: aiosqlite.Connection, ref: str, *, approved: bool, answer: str = ""
+) -> bool:
+    """Отметить решение владельца. False — заявку уже закрыли до нас."""
+    cur = await conn.execute(
+        """UPDATE api_refunds SET status = ?, answer = ?, decided_at = ?
+           WHERE ref = ? AND status = 'pending'""",
+        ("approved" if approved else "denied", answer[:300], _now(), ref),
+    )
+    await conn.commit()
+    return bool(cur.rowcount)
 
 
 # ---- как уведомлять разработчика ------------------------------------

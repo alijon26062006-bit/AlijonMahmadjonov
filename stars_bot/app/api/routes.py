@@ -19,6 +19,7 @@ from aiohttp import web
 
 from app import db, runtime
 from app.api import catalog, hooks
+from app.api import guard
 from app.api.guard import Denied
 
 log = logging.getLogger(__name__)
@@ -237,6 +238,124 @@ async def user(request: web.Request) -> web.Response:
             "url": (hook or {}).get("url") or "",
             "enabled": bool((hook or {}).get("enabled", 0)),
         },
+    })
+
+
+# ─────────────────────────────────────────── проверка ID игрока
+
+#: Проверка стоит запросов у сторонних справочников, а у бесплатного из
+#: них всего сотня в месяц. Поэтому она забирает из ведра больше обычной
+#: и помнится полчаса: один и тот же ID проверяют по нескольку раз подряд.
+CHECK_COST = 5.0
+CHECK_TTL = 30 * 60
+_checked: dict[tuple, tuple[float, dict]] = {}
+
+
+def forget_checks() -> None:
+    _checked.clear()
+
+
+async def check_id(request: web.Request) -> web.Response:
+    """Ник игрока по его ID — до покупки, чтобы не платить не туда."""
+    import time as _time
+
+    from app.handlers.games import _lookup
+    from app.services import suppliers
+
+    conn, caller = request["conn"], caller_of(request)
+    product_id = (request.query.get("product_id") or "").strip()
+    customer = (request.query.get("customer") or "").strip()
+    if not product_id or not customer:
+        return fail(400, "bad_query",
+                    "Нужны product_id и customer: ?product_id=…&customer=…")
+
+    item = await catalog.find(conn, request.app["provider"], product_id)
+    if item is None:
+        return fail(404, "product_not_found", "Такого товара нет или он снят.")
+    if item["type"] != "game":
+        return fail(400, "not_checkable",
+                    "Проверка ID есть только у игр. Для звёзд и Premium "
+                    "получатель — юзернейм, он проверяется при заказе.")
+
+    game = await db.get_game(conn, item["game_id"])
+    if game is None:
+        game = catalog._shadow_game({"category_id": item["game_id"],
+                                     "name": item["game"],
+                                     "fields": item.get("fields") or []})
+    fields = _game_fields(game, customer)
+    if fields is None:
+        return fail(400, "bad_customer",
+                    "Для этой игры нужно: "
+                    f"{', '.join(game.field_names)} — через пробел, "
+                    "запятую или знак минус.")
+
+    key = (item["game_id"], tuple(sorted(fields.items())))
+    hit = _checked.get(key)
+    if hit and _time.time() - hit[0] < CHECK_TTL:
+        return ok(**hit[1])
+
+    wait = guard.take(caller.key_id or -caller.user_id, cost=CHECK_COST)
+    if wait:
+        return fail(429, "rate_limited",
+                    "Проверка ID расходует чужие справочники и ограничена "
+                    "жёстче обычного. Повторите позже.",
+                    retry_after=int(wait) + 1)
+
+    name, verdict = await _lookup(suppliers.for_games(request.app["provider"]),
+                                  game, fields)
+    answer = {
+        "valid": verdict != "bad",
+        "verdict": verdict,          # ok | bad | unknown
+        "nickname": name or "",
+        "game": item["game"],
+        "product_id": product_id,
+        "customer": customer,
+    }
+    if verdict == "ok":
+        # Запоминаем только удачные ответы: «не нашли» через минуту
+        # вполне может смениться на «нашли», и запомнить отказ значило бы
+        # испортить проверку до перезапуска.
+        _checked[key] = (_time.time(), answer)
+    return ok(**answer)
+
+
+# ─────────────────────────────────────────── просьба о возврате
+
+
+async def order_refund(request: web.Request) -> web.Response:
+    """Оставить заявку на возврат. Решает владелец, не мы и не клиент."""
+    conn, caller = request["conn"], caller_of(request)
+    data = await _body(request)
+    ref = str(data.get("order_id") or "").strip()
+    reason = str(data.get("reason") or "").strip()
+    if not ref:
+        return fail(400, "missing_order_id", "Укажите order_id.")
+    if len(reason) < 5:
+        return fail(400, "missing_reason",
+                    "Опишите причину — без неё владельцу нечего решать.")
+
+    row = await db.api_order_by_ref(conn, ref)
+    if row is None or row["user_id"] != caller.user_id:
+        return fail(404, "order_not_found", "Заказ не найден.")
+
+    order = await db.get_order(conn, row["order_id"])
+    if order is None:
+        return fail(404, "order_not_found", "Заказ не найден.")
+    if order.status == db.ORDER_REFUNDED:
+        return fail(409, "already_refunded", "Деньги за этот заказ уже вернулись.")
+    if order.status != db.ORDER_DELIVERED:
+        return fail(409, "still_processing",
+                    "Заказ ещё в работе. Если он не пройдёт, деньги "
+                    "вернутся сами — заявка не нужна.")
+
+    ask = await db.ask_refund(conn, ref=ref, user_id=caller.user_id,
+                              reason=reason)
+    return ok(order_id=ref, refund={
+        "status": ask.get("status", "pending"),
+        "reason": ask.get("reason", ""),
+        "answer": ask.get("answer", ""),
+        "created_at": ask.get("created_at", ""),
+        "decided_at": ask.get("decided_at") or "",
     })
 
 

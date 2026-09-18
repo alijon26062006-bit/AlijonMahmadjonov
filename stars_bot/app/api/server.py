@@ -174,8 +174,10 @@ def build(bot, provider) -> web.Application:
     add("GET", "/orders/summary", routes.orders_summary)
     add("GET", "/transactions", routes.transactions)
     add("GET", "/order/status", routes.order_status)
+    add("GET", "/check-id", routes.check_id)
     add("GET", "/orders/{order_id}", routes.order_by_id)
     add("POST", "/order/create", routes.order_create)
+    add("POST", "/order/refund", routes.order_refund)
     return app
 
 

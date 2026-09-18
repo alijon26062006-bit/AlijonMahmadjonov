@@ -1342,6 +1342,152 @@ async def notifications(conn) -> None:
     await db.set_api_prefs(conn, BUYER, notify="problems", digest=0)
 
 
+
+# ──────────────────────────────────── проверка ID и заявки на возврат
+
+
+class Checker(GamesProvider):
+    """Поставщик, который умеет отвечать про ник игрока."""
+
+    def __init__(self, verdict="ok", name="AlijonTJ"):
+        super().__init__()
+        self.verdict, self.name = verdict, name
+        self.asked = []
+        self.looks = 0
+
+    async def validate_game_id(self, category_id, fields):
+        self.looks += 1
+        return (self.name if self.verdict == "ok" else None), self.verdict
+
+
+async def check_and_refund(conn, bot) -> None:
+    """Ник до покупки и просьба о возврате, которую решает владелец."""
+    from app.api import routes as api_routes
+
+    supplier = Checker()
+    await runtime.set_value(conn, "games_enabled", "1")
+    await runtime.set_value(conn, "api_all_games", "0")
+    await runtime.set_value(conn, "api_rate_per_min", "100000")
+    await runtime.set_value(conn, "volsever_key", "")
+    guard.forget_rate()
+    gsvc_forget()
+    api_routes.forget_checks()
+    await db.credit(conn, BUYER, 100_000)
+
+    await db.add_game(conn, category_id="one_field", title="Одно поле")
+    await db.update_game(conn, "one_field", enabled=1)
+
+    app = web.Application()
+    app["bot"] = bot
+    app["provider"] = supplier
+    api_server.mount(app, bot, supplier)
+    runner = web.AppRunner(app, access_log=None)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    base = f"http://127.0.0.1:{runner.addresses[0][1]}{api_server.PREFIX}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            api = Client(base, session)
+            key = await make_key(conn, label="проверка")
+
+            _, body, _ = await api.get(
+                "/check-id?product_id=game:one_field:p1&customer=1724367212",
+                key=key)
+            check("ник приходит до покупки",
+                  body.get("nickname") == "AlijonTJ" and body.get("valid"),
+                  str(body)[:120])
+
+            # Тот же ID второй раз не должен тратить чужой справочник:
+            # у бесплатного из них сотня запросов в месяц.
+            was = supplier.looks
+            await api.get(
+                "/check-id?product_id=game:one_field:p1&customer=1724367212",
+                key=key)
+            check("повтор берётся из памяти, а не из справочника",
+                  supplier.looks == was, f"{was} → {supplier.looks}")
+
+            status, bad, _ = await api.get(
+                "/check-id?product_id=stars&customer=@durov", key=key)
+            check("для звёзд проверка ID не предлагается",
+                  status == 400 and bad["error"]["code"] == "not_checkable",
+                  str(bad)[:100])
+
+            # ---- заявка на возврат ----
+            status, order, _ = await api.post(
+                "/order/create", key=key,
+                body={"product_id": "game:one_field:p1", "quantity": 1,
+                      "customer": "1724367212"})
+            ref = order.get("order_id")
+            check("заказ для проверки возврата создан",
+                  status == 200 and order.get("status") == "completed",
+                  str(order)[:100])
+
+            status, short, _ = await api.post(
+                "/order/refund", key=key, body={"order_id": ref, "reason": "нет"})
+            check("без внятной причины заявку не принимаем",
+                  status == 400 and short["error"]["code"] == "missing_reason",
+                  str(short)[:100])
+
+            status, ask, _ = await api.post(
+                "/order/refund", key=key,
+                body={"order_id": ref, "reason": "алмазы не пришли игроку"})
+            check("заявка принята и ждёт владельца",
+                  status == 200 and ask["refund"]["status"] == "pending",
+                  str(ask)[:120])
+
+            paid = (await db.get_user(conn, BUYER)).balance
+            status, again, _ = await api.post(
+                "/order/refund", key=key,
+                body={"order_id": ref, "reason": "ещё раз прошу"})
+            check("повторная просьба не плодит заявки",
+                  status == 200
+                  and len(await db.refund_requests(conn, "pending")) == 1,
+                  str(len(await db.refund_requests(conn, "pending"))))
+            check("сама заявка денег не возвращает",
+                  (await db.get_user(conn, BUYER)).balance == paid,
+                  f"{paid} → {(await db.get_user(conn, BUYER)).balance}")
+
+            status, foreign, _ = await api.post(
+                "/order/refund", key=key,
+                body={"order_id": "ORD-999999", "reason": "чужой заказ"})
+            check("на чужой заказ заявку не оставить",
+                  status == 404, str(status))
+
+            # ---- решение владельца ----
+            row = await db.api_order_by_ref(conn, ref)
+            before = (await db.get_user(conn, BUYER)).balance
+            check("решение записывается один раз",
+                  await db.decide_refund(conn, ref, approved=True)
+                  and not await db.decide_refund(conn, ref, approved=True))
+
+            order_row = await db.get_order(conn, row["order_id"])
+            await db.transition_order(conn, order_row.id,
+                                      expected=order_row.status,
+                                      new=db.ORDER_REFUNDED, error="по заявке")
+            from app.services import delivery
+
+            await delivery._give_back(conn,
+                                      await db.get_order(conn, order_row.id))
+            after = (await db.get_user(conn, BUYER)).balance
+            check("после согласия деньги вернулись",
+                  after == before + order_row.price,
+                  f"{before} → {after}")
+
+            status, done, _ = await api.post(
+                "/order/refund", key=key,
+                body={"order_id": ref, "reason": "уже вернули"})
+            check("за возвращённый заказ заявку не принимаем",
+                  status == 409 and done["error"]["code"] == "already_refunded",
+                  str(done)[:100])
+    finally:
+        await runner.cleanup()
+
+    await runtime.set_value(conn, "games_enabled", "0")
+    gsvc_forget()
+
+
 # ───────────────────────────────────────────────── запуск
 
 
@@ -1374,6 +1520,7 @@ async def main() -> None:
         await cabinet_pass(conn, bot)
         await money_never_vanishes(conn, bot)
         await notifications(conn)
+        await check_and_refund(conn, bot)
     finally:
         await conn.close()
 

@@ -5294,6 +5294,8 @@ async def cb_api(call: CallbackQuery, state: FSMContext,
     ) as cur:
         sales = dict(await cur.fetchone())
 
+    waiting = len(await db.refund_requests(conn, "pending", limit=99))
+
     kb = InlineKeyboardBuilder()
     kb.row(btn("🚫 Выключить API" if on else "✅ Включить API", "pn:api_toggle",
                style=DANGER if on else SUCCESS))
@@ -5301,6 +5303,8 @@ async def cb_api(call: CallbackQuery, state: FSMContext,
            btn("📋 Запросы", "pn:api_log"))
     kb.row(btn("⚡️ Лимит запросов", "pn:api_rate"),
            btn("💰 Наценка", "pn:set:api_margin"))
+    kb.row(btn("↩️ Заявки на возврат" + (f" ({waiting})" if waiting else ""),
+               "pn:refunds", style=DANGER if waiting else None))
     kb.row(btn("🎮 Каталог игр: "
                + ("весь у поставщика" if runtime.get_bool("api_all_games")
                   else "как в боте"),
@@ -5362,6 +5366,98 @@ async def cb_api_toggle(call: CallbackQuery, state: FSMContext,
         else "API выключен: запросы сразу получают отказ"
     )
     await cb_api(call, state, conn)
+
+
+@router.callback_query(F.data == "pn:refunds")
+async def cb_refunds(call: CallbackQuery, state: FSMContext,
+                     conn: aiosqlite.Connection) -> None:
+    """Просьбы разработчиков вернуть деньги за выполненный заказ."""
+    await state.clear()
+    rows = await db.refund_requests(conn, "pending", limit=20)
+
+    kb = InlineKeyboardBuilder()
+    for row in rows:
+        kb.row(btn(f"↩️ {row['ref']} — {fmt(row['price'])}",
+                   f"pn:refund:{row['ref']}"))
+    kb.row(btn(labeled("back", "Назад"), "pn:api"))
+
+    body = "\n\n".join(
+        f"<code>{row['ref']}</code> — <b>{fmt(row['price'])}</b>\n"
+        f"<i>{esc(row['product_id'])}</i>\n"
+        f"<blockquote expandable>{esc(row['reason'])}</blockquote>"
+        for row in rows
+    ) or "<i>Заявок нет.</i>"
+
+    await safe_edit(
+        call,
+        f"↩️ <b>Заявки на возврат</b>\n<code>{texts.LINE}</code>\n\n{body}\n\n"
+        "<blockquote>Это просьбы разработчиков вернуть деньги за уже "
+        "выполненный заказ. Товар поставщику мы оплатили, поэтому решение "
+        "ваше: «Вернуть» отдаёт деньги из вашего кармана.</blockquote>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:refund:"))
+async def cb_refund_card(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    ref = call.data.split(":", 2)[2]
+    ask = await db.refund_request(conn, ref)
+    if not ask:
+        await call.answer("Заявка не найдена.", show_alert=True)
+        return
+    row = await db.api_order_by_ref(conn, ref)
+    order = await db.get_order(conn, row["order_id"]) if row else None
+
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("✅ Вернуть деньги", f"pn:refund_ok:{ref}", style=SUCCESS),
+           btn("🚫 Отказать", f"pn:refund_no:{ref}", style=DANGER))
+    kb.row(btn(labeled("back", "К заявкам"), "pn:refunds"))
+
+    await safe_edit(
+        call,
+        f"↩️ <b>Заявка {esc(ref)}</b>\n<code>{texts.LINE}</code>\n\n"
+        f"├ Товар: <code>{esc(row['product_id'] if row else '—')}</code>\n"
+        f"├ Кому ушло: <code>{esc(row['customer'] if row else '—')}</code>\n"
+        f"├ Сумма: <b>{fmt(order.price if order else 0)}</b>\n"
+        f"└ Статус заказа: <b>{db.ORDER_TITLES.get(order.status if order else '', '—')}</b>\n\n"
+        f"<b>Причина:</b>\n<blockquote expandable>{esc(ask['reason'])}</blockquote>\n\n"
+        "<blockquote>Проверьте у поставщика, дошёл ли товар. Если дошёл — "
+        "возврат это подарок за ваш счёт.</blockquote>",
+        kb.as_markup(),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith(("pn:refund_ok:", "pn:refund_no:")))
+async def cb_refund_decide(call: CallbackQuery, state: FSMContext,
+                           conn: aiosqlite.Connection, bot=None) -> None:
+    action, ref = call.data.rsplit(":", 1)
+    approved = action.endswith("refund_ok")
+
+    if not await db.decide_refund(conn, ref, approved=approved):
+        await call.answer("Заявку уже закрыли.", show_alert=True)
+        await cb_refunds(call, state, conn)
+        return
+
+    if approved:
+        from app.services import delivery
+
+        row = await db.api_order_by_ref(conn, ref)
+        order = await db.get_order(conn, row["order_id"]) if row else None
+        # Возврат идёт общей дорогой: статус меняется под условием, деньги
+        # пишутся в выписку, вебхук уходит сам. Свой отдельный возврат
+        # здесь разошёлся бы с остальными пятью путями.
+        if order and await db.transition_order(
+            conn, order.id, expected=order.status, new=db.ORDER_REFUNDED,
+            error="возврат по заявке разработчика",
+        ):
+            await delivery._give_back(conn,
+                                      await db.get_order(conn, order.id) or order)
+
+    await cb_refunds(call, state, conn)
+    await call.answer("Деньги возвращены" if approved else "Отказано",
+                      show_alert=True)
 
 
 @router.callback_query(F.data == "pn:api_allgames")
