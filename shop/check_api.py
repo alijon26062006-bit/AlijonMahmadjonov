@@ -45,14 +45,52 @@ ARG_TO_CATEGORY = {
 }
 
 
-def parse_args(argv: list[str]) -> tuple[dict[str, str], str | None]:
-    """--ff-cis 123 --pubg 456 --tg name → ({категория: id}, username)"""
+def show_catalog(live: dict, db: Database) -> None:
+    """Печатает весь каталог поставщика — чтобы видеть, что ещё можно продавать."""
+    head("Полный каталог поставщика")
+    if not live:
+        bad("Каталог пуст или не получен")
+        return
+
+    ours = set()
+    for category in catalog.CATEGORIES:
+        for row in db.products(category, only_active=False):
+            if row["sku"]:
+                ours.add(row["sku"])
+
+    groups: dict[str, list] = {}
+    for sku, item in live.items():
+        key = str(item.get("category") or item.get("game") or sku.split("_")[0])
+        groups.setdefault(key, []).append((sku, item))
+
+    print(f"Всего у поставщика: {B}{len(live)}{E} товаров в {len(groups)} разделах")
+    print(f"Из них мы продаём: {B}{len(ours & set(live))}{E}\n")
+    print(f"{'✓':<2} {'SKU':<30} {'Название':<34} Цена")
+    print("─" * 78)
+    for key in sorted(groups):
+        print(f"\n{B}▼ {key}{E}  ({len(groups[key])})")
+        for sku, item in sorted(groups[key]):
+            mark = f"{G}✓{E}" if sku in ours else " "
+            name = str(item.get("name", ""))[:33]
+            price = item.get("price", "")
+            print(f"{mark}  {sku:<30} {name:<34} {price}")
+    print()
+    print(f"{G}✓{E} — уже продаётся в боте. Остальное можно добавить.")
+
+
+def parse_args(argv: list[str]) -> tuple[dict[str, str], str | None, bool]:
+    """--ff-cis 123 --pubg 456 --tg name --catalog → (игроки, username, каталог)"""
     players: dict[str, str] = {}
     username: str | None = None
+    want_catalog = False
     i = 0
     while i < len(argv):
         flag = argv[i]
         value = argv[i + 1] if i + 1 < len(argv) else None
+        if flag in ("--catalog", "--all", "--list"):
+            want_catalog = True
+            i += 1
+            continue
         if flag in ARG_TO_CATEGORY and value:
             players[ARG_TO_CATEGORY[flag]] = value
         elif flag in ("--tg", "--stars") and value:
@@ -62,7 +100,7 @@ def parse_args(argv: list[str]) -> tuple[dict[str, str], str | None]:
             i += 1
             continue
         i += 2
-    return players, username
+    return players, username, want_catalog
 
 
 async def check_balance(supplier) -> bool:
@@ -159,7 +197,7 @@ async def check_username(supplier, username: str) -> None:
 
 
 async def run(argv: list[str]) -> int:
-    players, username = parse_args(argv)
+    players, username, want_catalog = parse_args(argv)
 
     try:
         cfg = load_config()
@@ -178,7 +216,9 @@ async def run(argv: list[str]) -> int:
     try:
         if not await check_balance(supplier):
             return 1
-        await check_catalog(supplier, db)
+        live = await check_catalog(supplier, db)
+        if want_catalog:
+            show_catalog(live, db)
 
         head("3. Проверка ника по ID игрока")
         if not players and not username:
