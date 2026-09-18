@@ -50,16 +50,13 @@ async def cb_soon(call: CallbackQuery) -> None:
 @router.callback_query(F.data == "dep:ru")
 async def cb_ru(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    card = runtime.get("pay_card_number") or "— реквизиты не заданы —"
-    holder = runtime.get("pay_card_holder")
-    bank = runtime.get("pay_card_bank")
+    number = runtime.get("ru_pay_number")
+    if not number:
+        await call.answer(texts.DEPOSIT_SOON, show_alert=True)
+        return
     await call.message.edit_text(
-        texts.DEPOSIT_RU_HOW.format(
-            card=card,
-            holder=f"👤 <b>{holder}</b>\n" if holder else "",
-            bank=f"🏦 {bank}\n" if bank else "",
-        ),
-        reply_markup=keyboards.deposit_ru(card if card.isdigit() else ""),
+        texts.DEPOSIT_RU_HOW.format(number=number),
+        reply_markup=keyboards.deposit_ru(number),
     )
     await call.answer()
 
@@ -67,6 +64,24 @@ async def cb_ru(call: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "dep:ru_sent")
 async def cb_ru_sent(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Deposit.from_receipt)
+
+    # Картинка с примером чека, если владелец её задал. Показать, где
+    # искать сумму, короче любого объяснения словами — а ошибиться там
+    # легко: рядом стоят рубли, комиссия и зачисленные сомони.
+    example = runtime.get("ru_example_photo")
+    if example:
+        try:
+            shown = await call.message.answer_photo(
+                example, caption=texts.DEPOSIT_RU_ASK,
+                reply_markup=keyboards.cancel(),
+            )
+            await call.message.edit_reply_markup(reply_markup=None)
+            await state.update_data(**_where(shown))
+            await call.answer()
+            return
+        except TelegramAPIError:
+            pass      # картинка не отправилась — обойдёмся текстом
+
     await call.message.edit_text(texts.DEPOSIT_RU_ASK,
                                  reply_markup=keyboards.cancel())
     # Запоминаем этот экран: если деньги уже пришли, ответ встанет прямо

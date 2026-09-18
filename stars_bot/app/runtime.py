@@ -69,6 +69,12 @@ def _build_defaults() -> dict[str, str]:
         "referral_percent": str(settings.referral_percent),
         # реквизиты
         "pay_card_number": settings.pay_card_number,
+        # Из России переводят не на карту, а по номеру телефона через
+        # «Душанбе Сити» — это другой реквизит, и путать их нельзя.
+        "ru_pay_number": "",
+        # Картинка-пример: где в чеке Сбербанка искать сумму в сомони.
+        # Объяснять словами дольше, чем показать один раз.
+        "ru_example_photo": "",
         "pay_card_holder": settings.pay_card_holder,
         "pay_card_bank": settings.pay_card_bank,
         "pay_city": settings.pay_city,

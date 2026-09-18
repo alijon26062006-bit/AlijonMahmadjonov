@@ -73,6 +73,24 @@ for name in dir(texts):
             FAIL.append(f"{name}: осталась фигурная скобка")
             print(f"❌ {name}: подозрительная фигурная скобка")
 
+# Инструкция для оплаты из России. Человек делает перевод в чужом
+# приложении, и каждое пропущенное слово — это письмо в поддержку:
+# «а где найти», «а какую сумму». Поэтому проверяем, что ключевые
+# ориентиры на месте и названы так же, как в самом Сбербанке.
+MUST = {
+    "DEPOSIT_RU_HOW": ["Душанбе Сити", "за рубеж", "{number}",
+                       "Зачислено получателю", "в рублях"],
+    "DEPOSIT_RU_ASK": ["Зачислено получателю", "TJS", "копейками"],
+}
+for name, words in MUST.items():
+    template = getattr(texts, name, "")
+    lost = [word for word in words if word not in template]
+    if lost:
+        FAIL.append(f"{name}: пропали ориентиры {lost}")
+        print(f"❌ {name}: в инструкции нет {lost}")
+    else:
+        print(f"✅ {name}: все ориентиры на месте")
+
 print(f"\n{'=' * 46}")
 if FAIL:
     print("ПРОВАЛЫ:")

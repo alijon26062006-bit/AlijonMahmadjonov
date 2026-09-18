@@ -462,6 +462,11 @@ PAY_FIELDS = {
     "pay_city": ("🏙 Город", "Введите город:"),
     "pay_extra": ("📝 Примечание", "Введите примечание под реквизитами "
                                    "(или <code>-</code>, чтобы убрать):"),
+    "ru_pay_number": ("🇷🇺 Номер для России",
+                      "Номер, на который переводят из Сбербанка и Тинькофф "
+                      "через «Душанбе Сити» — например "
+                      "<code>+992000000000</code>.\n\n"
+                      "Пусто — способ «Из России» клиентам не показывается:"),
 }
 
 
@@ -469,6 +474,8 @@ def pay_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for key, (label, _) in PAY_FIELDS.items():
         kb.row(InlineKeyboardButton(text=label, callback_data=f"pn:set:{key}"))
+    kb.row(btn(("🖼 Пример чека: есть" if runtime.get("ru_example_photo")
+                else "🖼 Пример чека из России"), "pn:ru_photo"))
     kb.row(btn("👁 Как видит клиент", "pn:preview_pay", style=PRIMARY))
     kb.row(btn("🏙 Проверить кнопку оплаты", "pn:dctest"))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
@@ -5366,6 +5373,54 @@ async def cb_api_toggle(call: CallbackQuery, state: FSMContext,
         else "API выключен: запросы сразу получают отказ"
     )
     await cb_api(call, state, conn)
+
+
+@router.callback_query(F.data == "pn:ru_photo")
+async def cb_ru_photo(call: CallbackQuery, state: FSMContext) -> None:
+    """Картинка-пример: где в чеке Сбербанка искать сумму в сомони."""
+    await state.set_state(Panel.ru_photo)
+    has = runtime.get("ru_example_photo")
+    await safe_edit(
+        call,
+        f"🖼 <b>Пример чека из России</b>\n<code>{texts.LINE}</code>\n\n"
+        + ("Сейчас картинка задана — клиент видит её, когда бот просит "
+           "сумму.\n\n" if has else "Сейчас картинки нет.\n\n")
+        + "<blockquote>Пришлите скриншот чека Сбербанка, на котором "
+          "видно строку «Зачислено получателю» и сумму в TJS. Обведите "
+          "её — так человек не перепутает с рублями и комиссией.\n\n"
+          "Показать короче, чем объяснить: рядом в чеке стоят три разные "
+          "суммы, и ошибиться в них легко.</blockquote>\n\n"
+        + ("<i>Пришлите</i> <code>-</code><i>, чтобы убрать картинку.</i>"
+           if has else "<i>Пришлите картинку сообщением.</i>"),
+        back_kb("pn:pay", "❌ Отмена"),
+    )
+    await call.answer()
+
+
+@router.message(Panel.ru_photo, F.photo)
+async def on_ru_photo(message: Message, state: FSMContext,
+                      conn: aiosqlite.Connection) -> None:
+    await runtime.set_value(conn, "ru_example_photo",
+                            message.photo[-1].file_id)
+    await state.clear()
+    await message.answer(
+        "✅ <b>Картинка сохранена</b>\n\n"
+        "Теперь она показывается клиенту вместе с вопросом о сумме.",
+        reply_markup=back_kb("pn:pay", "‹ К оплате"),
+    )
+
+
+@router.message(Panel.ru_photo, F.text)
+async def on_ru_photo_text(message: Message, state: FSMContext,
+                           conn: aiosqlite.Connection) -> None:
+    if message.text.strip() != "-":
+        await message.answer("❌ Нужна картинка сообщением "
+                             "или <code>-</code>, чтобы убрать.")
+        return
+    await runtime.set_value(conn, "ru_example_photo", "")
+    await state.clear()
+    await message.answer("✅ Картинка убрана.",
+                         reply_markup=back_kb("pn:pay", "‹ К оплате"))
 
 
 @router.callback_query(F.data == "pn:refunds")

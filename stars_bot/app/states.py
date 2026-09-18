@@ -56,6 +56,7 @@ class Panel(StatesGroup):
     link = State()        # ждём название рекламной ссылки
     admin_add = State()   # ждём ID того, кому открыть панель
     game_find = State()   # ждём название игры для поиска по каталогу
+    ru_photo = State()    # ждём картинку-пример чека из Сбербанка
 
 
 class Review(StatesGroup):

@@ -403,18 +403,18 @@ def deposit_pay(link: str = "", card: str = "") -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def deposit_ru(card: str = "") -> InlineKeyboardMarkup:
-    """Реквизиты для перевода из России: карта та же, порядок другой.
+def deposit_ru(number: str = "") -> InlineKeyboardMarkup:
+    """Реквизиты для перевода из России: номер получателя и «я отправил».
 
     Сумму здесь не называем — её назначает не бот, а банк при пересчёте
     рублей в сомони. Поэтому и кнопка другая: не «я оплатил», а «я
     отправил» — после неё спросим сумму из чека.
     """
     kb = InlineKeyboardBuilder()
-    if card:
+    if number:
         kb.row(InlineKeyboardButton(
-            text="📋 Скопировать номер карты",
-            copy_text=CopyTextButton(text=card),
+            text="📋 Скопировать номер",
+            copy_text=CopyTextButton(text=number),
         ))
     kb.row(btn("✅ Я отправил", "dep:ru_sent", style=PRIMARY))
     kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
