@@ -199,6 +199,49 @@ def masking() -> None:
 # ────────────────────────────────────────────────── сопоставление
 
 
+#: Как выглядит уведомление о переводе из России. Отличий от обычного
+#: два, и оба ломали разбор: суммы зачисления отдельной строкой нет, и
+#: строки о комиссии нет вовсе — банк удержал своё на той стороне.
+SBER = """Zachislenie
+Summa 10.08 TJS
+Data 15:47 18.09.26
+Comment: Cбербанк
+Kod 19214356988
+Karta 9999000011112222
+Balans 2 805.06 TJS"""
+
+
+def sberbank() -> None:
+    """Перевод из России должен разбираться, а не отвергаться."""
+    notice = parser.parse(SBER)
+    check("уведомление Сбербанка разобрано", notice.ok, notice.error)
+    check("сумма взята из Summa", notice.amount == 1008, str(notice.amount))
+    check("видно, откуда сумма", notice.source_field == "summa",
+          notice.source_field)
+    check("приписка банка сохранена", notice.comment == "Cбербанк",
+          repr(notice.comment))
+    check("полного номера карты в разборе нет",
+          notice.card_tail == "2222", notice.card_tail)
+
+    # Комиссия названа — сумма зачисления снова неизвестна, и гадать
+    # нельзя: Summa тогда больше того, что легло на счёт.
+    with_fee = SBER.replace("Summa 10.08 TJS", "Summa 10.08 TJS\nKomis 0.50 TJS")
+    check("с комиссией по-прежнему отказ", not parser.parse(with_fee).ok,
+          parser.parse(with_fee).error)
+
+    zero_fee = SBER.replace("Summa 10.08 TJS", "Summa 10.08 TJS\nKomis 0.00 TJS")
+    check("нулевая комиссия не мешает", parser.parse(zero_fee).ok,
+          parser.parse(zero_fee).error)
+
+    # Латинская C в «Cбербанк» — прямо из настоящего чека. Глазом не
+    # отличить, для сравнения это разные строки.
+    check("латинские двойники букв не мешают опознать банк",
+          processor.from_russia("Cбербанк") and processor.from_russia("Тинькофф"),
+          "Cбербанк")
+    check("чужая приписка за Сбербанк не сходит",
+          not processor.from_russia("Perevod Dushanbe"))
+
+
 def log_filter() -> None:
     """Чистка секретов не должна ломать сами записи журнала.
 
@@ -850,6 +893,7 @@ async def main() -> None:
         await runtime.load(conn)
         parsing()
         masking()
+        sberbank()
         log_filter()
         await matching(conn, bot)
         await sources()

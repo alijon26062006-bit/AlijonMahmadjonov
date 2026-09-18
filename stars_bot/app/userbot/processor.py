@@ -64,6 +64,7 @@ async def handle(
         op_code=notice.op_code, amount=notice.amount, sender=notice.sender,
         card_tail=notice.card_tail, bank_time=notice.bank_time,
         status=db.BANK_FAILED, note=notice.error, body=body,
+        comment=notice.comment,
     )
     if payment is None:
         log.info("%s Duplicate ignored — сообщение %s уже обрабатывали",
@@ -139,14 +140,43 @@ async def claim_for_deposit(conn, bot, deposit) -> Result | None:
     return await _confirm(conn, bot, payment, deposit, notice)
 
 
+#: Что банк пишет в приписке у переводов из России. Буквы там бывают
+#: вперемешку — латинская C вместо русской С встречается прямо в чеках,
+#: поэтому сравниваем по огрублённой строке, а не по точному совпадению.
+RUSSIAN_MARKS = ("сбербанк", "тинькофф", "тинькоф", "sberbank", "tinkoff")
+
+#: Латинские двойники русских букв. В приписке «Cбербанк» первая буква
+#: латинская — глазом не отличить, для сравнения это разные строки.
+LOOKALIKE = str.maketrans("ACEHKMOPTXYacehkmoptxy",
+                          "АСЕНКМОРТХУасенкмортху")
+
+
+def from_russia(comment: str) -> bool:
+    """Похожа ли приписка банка на перевод из России."""
+    plain = (comment or "").strip().lower().translate(LOOKALIKE)
+    return any(mark in plain for mark in RUSSIAN_MARKS)
+
+
 async def _by_sender(conn, bot, payment, waiting, notice) -> Result:
-    """Заявок несколько. Спасает только знакомый плательщик."""
+    """Заявок несколько. Спасает знакомый плательщик или приписка банка."""
     known = await db.sender_owner(conn, notice.sender)
     if known is not None:
         his = [d for d in waiting if d.user_id == known.user_id]
         if his:
             return await _confirm(conn, bot, payment, his[0], notice,
                                   near=his[0].amount != notice.amount)
+
+    # Банк подписал перевод «Сбербанк» — значит из России. Если на эту
+    # сумму ждёт ровно одна заявка, заведённая этим же способом, она и
+    # есть: совпадение суммы и способа вдвоём уже не случайность.
+    if from_russia(notice.comment):
+        from app import texts
+
+        theirs = [d for d in waiting if d.method == texts.RU_METHOD]
+        if len(theirs) == 1:
+            return await _confirm(conn, bot, payment, theirs[0], notice,
+                                  near=theirs[0].amount != notice.amount)
+
     return await _ambiguous(conn, bot, payment, waiting, notice)
 
 
@@ -203,6 +233,8 @@ async def _confirm(conn, bot, payment, deposit, notice, near=False) -> Result:
         + f"├ Клиент: <code>{deposit.user_id}</code>\n"
         + (f"├ Отправитель: <code>{notice.sender}</code>\n"
            if notice.sender else "")
+        + (f"├ Приписка банка: <b>{notice.comment}</b>\n"
+           if notice.comment else "")
         + (f"├ Код банка: <code>{notice.op_code}</code>\n"
            if notice.op_code else "")
         + f"└ {notice.bank_time or 'время не указано'}",
@@ -256,6 +288,8 @@ async def _ambiguous(conn, bot, payment, waiting, notice) -> Result:
         f"├ Сумма: <b>{fmt(notice.amount)}</b>\n"
         + (f"├ Отправитель: <code>{notice.sender}</code>\n"
            if notice.sender else "")
+        + (f"├ Приписка банка: <b>{notice.comment}</b>\n"
+           if notice.comment else "")
         + f"└ Ждут той же суммы: <b>{len(waiting)}</b>\n\n"
         f"{rows}\n\n"
         "<blockquote>Деньги <b>не зачислены</b>. Выбирать наугад нельзя — "
@@ -277,6 +311,8 @@ async def _unknown(conn, bot, payment, notice) -> Result:
         f"├ Сумма: <b>{fmt(notice.amount)}</b>\n"
         + (f"├ Отправитель: <code>{notice.sender}</code>\n"
            if notice.sender else "")
+        + (f"├ Приписка банка: <b>{notice.comment}</b>\n"
+           if notice.comment else "")
         + (f"├ Код банка: <code>{notice.op_code}</code>\n"
            if notice.op_code else "")
         + f"└ {notice.bank_time or 'время не указано'}\n\n"

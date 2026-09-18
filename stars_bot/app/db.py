@@ -277,6 +277,7 @@ CREATE TABLE IF NOT EXISTS bank_payments (
     status     TEXT NOT NULL,              -- matched|ambiguous|unknown|failed
     deposit_id INTEGER,                    -- какая заявка закрыта
     note       TEXT NOT NULL DEFAULT '',
+    comment    TEXT NOT NULL DEFAULT '',   -- приписка банка: «Сбербанк» и пр.
     body       TEXT NOT NULL DEFAULT ''    -- текст уведомления, без карты
 );
 
@@ -684,6 +685,9 @@ MIGRATIONS: dict[str, dict[str, str]] = {
         "pay_msg": "INTEGER",
     },
     "users": {"source": "TEXT"},
+    # Приписка банка. У переводов из России там написано «Сбербанк» —
+    # по ней видно, откуда деньги, ещё до всякого сопоставления.
+    "bank_payments": {"comment": "TEXT NOT NULL DEFAULT ''"},
     # Код этой же игры у сервиса проверки ID — он свой, не как у
     # поставщика выдачи.
     "games": {
@@ -2798,12 +2802,14 @@ class BankPayment:
     deposit_id: int | None
     note: str
     body: str
+    comment: str = ""
 
 
 async def claim_bank_payment(
     conn: aiosqlite.Connection, *, source: str, message_id: int,
     op_code: str = "", amount: int = 0, sender: str = "", card_tail: str = "",
-    bank_time: str = "", status: str = BANK_FAILED, note: str = "", body: str = "",
+    bank_time: str = "", status: str = BANK_FAILED, note: str = "",
+    body: str = "", comment: str = "",
 ) -> BankPayment | None:
     """Записать уведомление. None — такое уже обрабатывали.
 
@@ -2814,11 +2820,12 @@ async def claim_bank_payment(
     try:
         cur = await conn.execute(
             """INSERT INTO bank_payments (source, message_id, op_code, amount,
-                   sender, card_tail, bank_time, seen_at, status, note, body)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   sender, card_tail, bank_time, seen_at, status, note, body,
+                   comment)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (source, message_id, op_code or None, amount, sender[:64],
              card_tail[:8], bank_time[:32], _now(), status, note[:190],
-             body[:2000]),
+             body[:2000], comment[:64]),
         )
         await conn.commit()
     except sqlite3.IntegrityError:

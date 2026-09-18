@@ -40,7 +40,7 @@ from dataclasses import dataclass
 
 #: Поля, которые мы понимаем. Всё остальное в сообщении пропускается.
 FIELDS = ("summa", "zachislenie", "komis", "data", "otpravitel", "kod",
-          "karta", "balans")
+          "karta", "balans", "comment")
 
 #: Слова, которыми банк называет приход денег.
 CREDIT = ("zachislenie", "зачисление", "postuplenie", "поступление")
@@ -78,6 +78,7 @@ class Notice:
     sender: str = ""
     card_tail: str = ""
     bank_time: str = ""
+    comment: str = ""               # приписка банка: «Сбербанк» и прочее
     source_field: str = ""          # из какого поля взята сумма
     error: str = ""                 # пусто — разобралось
 
@@ -210,14 +211,20 @@ def parse(text: str) -> Notice:
         sent = money(sent_raw[0])
         if sent is None:
             return Notice(error="сумму отправления не разобрал")
-        if not fee_raw:
-            return Notice(error="нет ни суммы зачисления, ни комиссии")
 
-        fees = [money(value, allow_zero=True) for value in fee_raw]
-        if any(fee is None for fee in fees):
-            return Notice(error="комиссию не разобрал")
-        if any(fee for fee in fees):
-            return Notice(error="есть комиссия, но нет суммы зачисления")
+        if fee_raw:
+            # Комиссия названа — значит она была, и зачисленное ей не
+            # равно. Складывать или вычитать наугад нельзя.
+            fees = [money(value, allow_zero=True) for value in fee_raw]
+            if any(fee is None for fee in fees):
+                return Notice(error="комиссию не разобрал")
+            if any(fee for fee in fees):
+                return Notice(error="есть комиссия, но нет суммы зачисления")
+        # Строки о комиссии нет вовсе — так приходят переводы из России
+        # (Сбербанк, Тинькофф): банк уже удержал своё на той стороне и
+        # пишет одну сумму, ту самую, что легла на счёт. Раньше мы такие
+        # уведомления отвергали целиком, и каждый платёж из России
+        # приходилось подтверждать руками.
         credited, source_field = sent, "summa"
 
     is_credit = ("zachislenie" in found
@@ -231,6 +238,7 @@ def parse(text: str) -> Notice:
         sender=mask_sender(_first(found.get("otpravitel"))),
         card_tail=mask_card(_first(found.get("karta"))),
         bank_time=_first(found.get("data"))[:32],
+        comment=_first(found.get("comment"))[:64],
         source_field=source_field,
     )
 
