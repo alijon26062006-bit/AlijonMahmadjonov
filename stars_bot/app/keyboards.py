@@ -421,6 +421,15 @@ def deposit_ru(number: str = "") -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def deposit_open(deposit_id: int) -> InlineKeyboardMarkup:
+    """Что делать с уже заведённой заявкой: прислать чек или отменить."""
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🧾 Прислать чек", "dep:paid", style=PRIMARY))
+    kb.row(btn("🗑 Отменить заявку", f"dep:drop:{deposit_id}", style=DANGER))
+    kb.row(btn(labeled("back", "В меню"), "m:main"))
+    return kb.as_markup()
+
+
 def deposit_receipt() -> InlineKeyboardMarkup:
     """Шаг чека: вернуться к реквизитам или выйти."""
     kb = InlineKeyboardBuilder()

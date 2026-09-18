@@ -149,6 +149,7 @@ async def main() -> None:
         await runtime.load(conn)
         await run_scenario(conn)
         await cancel_under_photo(conn)
+        await one_deposit_at_a_time(conn)
     finally:
         await conn.close()
 
@@ -156,6 +157,85 @@ async def main() -> None:
     if FAIL:
         print("ПРОВАЛЫ:", ", ".join(FAIL))
     sys.exit(1 if FAIL else 0)
+
+
+async def one_deposit_at_a_time(conn) -> None:
+    """Одна заявка на человека, и один чек на заявку.
+
+    На этом держится весь автоматический приём: платёж узнаётся по сумме
+    с копейками, и две открытые заявки дают две суммы, к которым
+    пришедшие деньги подходят обе. Выбрать наугад нельзя — платёж уходит
+    владельцу разбирать руками.
+    """
+    from app.handlers import deposit as dep_h
+
+    who = 60_001
+    await db.upsert_user(conn, who, "двойник", "Двойник")
+    storage = MemoryStorage()
+    bot = FakeBot()
+    state = FSMContext(storage=storage,
+                       key=StorageKey(bot_id=1, chat_id=who, user_id=who))
+    user = FakeUser(who)
+
+    # Первая заявка заводится обычным порядком.
+    call = FakeCallback("dep:card", user=user, bot=bot)
+    await dep_h.cb_card(call, state, conn)
+    msg = FakeMessage("100", user=user, bot=bot)
+    await dep_h.on_amount(msg, state, conn)
+    first = (await state.get_data())["deposit_id"]
+    check("первая заявка заводится", bool(first), str(first))
+
+    # Вторая — нет: вместо неё показывают первую.
+    again = FakeCallback("dep:card", user=user, bot=bot)
+    await dep_h.cb_card(again, state, conn)
+    check("вторую заявку завести нельзя",
+          "уже есть заявка" in again.last, again.last[:80])
+    check("и показана именно незакрытая",
+          fmt((await db.get_deposit(conn, first)).amount) in again.last,
+          again.last[:160])
+
+    # Из России — тем же ответом: способ другой, а правило одно.
+    ru = FakeCallback("dep:ru", user=user, bot=bot)
+    await dep_h.cb_ru(ru, state, conn)
+    check("из России вторую тоже не завести",
+          "уже есть заявка" in ru.last, ru.last[:80])
+
+    # Чек. Первый принимается, второй по той же заявке — нет.
+    await state.set_state("Deposit:receipt")
+    await state.update_data(amount=10001, deposit_id=first)
+    receipt = FakeMessage(user=user, photo=True, bot=bot)
+    await dep_h.on_receipt(receipt, state, conn, bot)
+    check("первый чек принят",
+          bool((await db.get_deposit(conn, first)).receipt_file_id))
+
+    await state.set_state("Deposit:receipt")
+    await state.update_data(amount=10001, deposit_id=first)
+    twice = FakeMessage(user=user, photo=True, bot=bot)
+    await dep_h.on_receipt(twice, state, conn, bot)
+    check("тот же чек второй раз не принимается",
+          "уже присылали" in twice.last or "уже получен" in twice.last,
+          twice.last[:80])
+
+    # Отмена освобождает человека: можно завести новую.
+    drop = FakeCallback(f"dep:drop:{first}", user=user, bot=bot)
+    await dep_h.cb_drop(drop, state, conn)
+    check("заявка отменяется", "отменена" in drop.last, drop.last[:60])
+    check("в базе она закрыта",
+          (await db.get_deposit(conn, first)).status != db.DEP_PENDING)
+
+    fresh = FakeCallback("dep:card", user=user, bot=bot)
+    await dep_h.cb_card(fresh, state, conn)
+    check("после отмены новая заявка заводится",
+          "Введите сумму" in fresh.last, fresh.last[:60])
+
+    # Чужую заявку по номеру не закрыть.
+    other = 60_002
+    await db.upsert_user(conn, other, "чужой", "Чужой")
+    mine = await db.create_deposit(conn, user_id=other, amount=12345,
+                                   method="карта", receipt_file_id="")
+    check("чужую заявку отменить нельзя",
+          not await db.cancel_deposit(conn, mine.id, who)
+          and (await db.get_deposit(conn, mine.id)).status == db.DEP_PENDING)
 
 
 async def cancel_under_photo(conn) -> None:
@@ -214,7 +294,7 @@ async def run_scenario(conn) -> None:
 
     # --------------------------------------------------------- пополнение
     call = FakeCallback("dep:card", bot=bot)
-    await dep_h.cb_card(call, state)
+    await dep_h.cb_card(call, state, conn)
     check("пополнение спрашивает сумму", "Введите сумму" in call.last)
 
     msg = FakeMessage("abc", bot=bot)

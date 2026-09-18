@@ -268,13 +268,32 @@ async def game_for(conn, item: dict):
 HIDDEN = ("cost", "cost_unit_e4", "wholesale", "shadow")
 
 
+def usd_rate() -> int:
+    """Курс доллара в дирамах. 0 — курс не задан."""
+    return runtime.usd_rate()
+
+
 def public(item: dict) -> dict:
     """Товар так, как его видит чужой разработчик.
 
     Себестоимость и внутренние поля не отдаём: сколько товар стоит нам —
     не его дело, и по этой цифре считается наша наценка.
+
+    Рядом с ценой в сомони кладём её же в долларах. Конкуренты
+    разработчика считают в долларах, и без этого он не может сравнить
+    наши цены со своими, не заводя себе калькулятор курса. Курс берётся
+    наш собственный — тот, по которому мы сами считаем.
     """
-    return {k: v for k, v in item.items() if k not in HIDDEN}
+    out = {k: v for k, v in item.items() if k not in HIDDEN}
+    rate = usd_rate()
+    if rate <= 0:
+        return out
+    if "amount" in out:
+        out["usd"] = round(out["amount"] / rate, 4)
+    elif out.get("unit_price"):
+        # Цена за штуку живёт в десятитысячных сомони, а курс — в дирамах.
+        out["usd_per_unit"] = round(out["unit_price"] / 100 / rate, 6)
+    return out
 
 
 def margin_percent() -> int:

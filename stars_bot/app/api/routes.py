@@ -170,7 +170,11 @@ async def products(request: web.Request) -> web.Response:
     total = len(items)
     limit, offset = _page_of(request, CATALOG_PAGE, CATALOG_MAX)
     page = items[offset:offset + limit]
+    # Курс отдаём рядом с товарами: по нему разработчик может пересчитать
+    # любую нашу сумму сам и сверить с ценами, которые ему называют в
+    # долларах.
     return ok(count=len(page), total=total, limit=limit, offset=offset,
+              usd_rate=catalog.money(catalog.usd_rate()),
               products=[catalog.public(item) for item in page])
 
 
@@ -198,7 +202,8 @@ async def product(request: web.Request) -> web.Response:
                               request.match_info["product_id"])
     if item is None:
         return fail(404, "product_not_found", "Такого товара нет.")
-    return ok(product=catalog.public(item))
+    return ok(product=catalog.public(item),
+              usd_rate=catalog.money(catalog.usd_rate()))
 
 
 # ─────────────────────────────────────────────────────── аккаунт

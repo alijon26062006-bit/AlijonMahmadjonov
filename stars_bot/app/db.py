@@ -1532,6 +1532,62 @@ async def create_deposit(
     return deposit
 
 
+async def open_deposit_of(
+    conn: aiosqlite.Connection, user_id: int
+) -> Deposit | None:
+    """Незавершённая заявка клиента, если она есть.
+
+    Одна заявка на человека — не придирка, а условие, на котором держится
+    весь автоматический приём. Узнаём платёж по сумме с копейками: две
+    открытые заявки одного человека дают две суммы, и пришедшие деньги
+    подходят к обеим. Выбрать наугад нельзя, и платёж уходит владельцу
+    разбирать руками — ровно то, от чего мы уходили.
+    """
+    async with conn.execute(
+        "SELECT * FROM deposits WHERE user_id = ? AND status = ? "
+        "ORDER BY id DESC LIMIT 1",
+        (user_id, DEP_PENDING),
+    ) as cur:
+        row = await cur.fetchone()
+    return _from_row(Deposit, row) if row else None
+
+
+async def cancel_deposit(
+    conn: aiosqlite.Connection, deposit_id: int, user_id: int
+) -> bool:
+    """Отменить свою заявку. False — она уже закрыта кем-то другим.
+
+    Проверяем владельца прямо в UPDATE: чужой номер заявки не должен
+    закрывать её, даже если его подобрали.
+    """
+    cur = await conn.execute(
+        "UPDATE deposits SET status = ?, updated_at = ? "
+        "WHERE id = ? AND user_id = ? AND status = ?",
+        (DEP_REJECTED, _now(), deposit_id, user_id, DEP_PENDING),
+    )
+    await conn.commit()
+    return bool(cur.rowcount)
+
+
+async def receipt_seen(
+    conn: aiosqlite.Connection, user_id: int, file_id: str
+) -> bool:
+    """Присылал ли этот человек такой чек раньше.
+
+    Один и тот же чек шлют по многу раз — иногда от беспокойства, иногда
+    чтобы получить второе зачисление за один перевод. Сравниваем по
+    отпечатку файла у Telegram: пересланная картинка сохраняет его.
+    """
+    if not file_id:
+        return False
+    async with conn.execute(
+        "SELECT 1 FROM deposits WHERE user_id = ? AND receipt_file_id = ? "
+        "LIMIT 1",
+        (user_id, file_id),
+    ) as cur:
+        return await cur.fetchone() is not None
+
+
 async def set_deposit_reference(
     conn: aiosqlite.Connection, deposit_id: int, reference: str,
 ) -> None:

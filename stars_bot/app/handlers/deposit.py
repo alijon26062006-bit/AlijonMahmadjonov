@@ -29,6 +29,47 @@ async def cb_methods(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
 
+async def _blocked_by_open(call, conn, state) -> bool:
+    """Показать открытую заявку вместо новой. True — дальше не идём.
+
+    Одна заявка на человека — условие, на котором держится весь
+    автоматический приём. Платёж узнаётся по сумме с копейками, и две
+    открытые заявки дают две суммы, к которым пришедшие деньги подходят
+    обе. Выбрать наугад нельзя — платёж уходит владельцу разбирать
+    руками, ровно то, от чего мы уходили.
+    """
+    open_one = await db.open_deposit_of(conn, call.from_user.id)
+    if open_one is None:
+        return False
+
+    await state.clear()
+    await call.message.edit_text(
+        texts.DEPOSIT_ALREADY.format(
+            amount=fmt(open_one.amount),
+            method=open_one.method or "перевод",
+            when=open_one.created_at[:16].replace("T", " "),
+        ),
+        reply_markup=keyboards.deposit_open(open_one.id),
+    )
+    await call.answer()
+    return True
+
+
+@router.callback_query(F.data.startswith("dep:drop:"))
+async def cb_drop(call: CallbackQuery, state: FSMContext,
+                  conn: aiosqlite.Connection) -> None:
+    """Отменить свою заявку — чтобы можно было завести новую."""
+    deposit_id = int(call.data.rsplit(":", 1)[1])
+    if not await db.cancel_deposit(conn, deposit_id, call.from_user.id):
+        await call.answer("Эта заявка уже закрыта.", show_alert=True)
+    await state.clear()
+    await call.message.edit_text(
+        texts.DEPOSIT_CANCELLED.format(support=texts.support()),
+        reply_markup=keyboards.deposit_methods(),
+    )
+    await call.answer()
+
+
 @router.callback_query(F.data == "dep:soon")
 async def cb_soon(call: CallbackQuery) -> None:
     await call.answer(texts.DEPOSIT_SOON, show_alert=True)
@@ -48,7 +89,10 @@ async def cb_soon(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data == "dep:ru")
-async def cb_ru(call: CallbackQuery, state: FSMContext) -> None:
+async def cb_ru(call: CallbackQuery, state: FSMContext,
+                conn: aiosqlite.Connection) -> None:
+    if await _blocked_by_open(call, conn, state):
+        return
     await state.clear()
     number = runtime.get("ru_pay_number")
     if not number:
@@ -152,7 +196,10 @@ async def on_receipt_amount(
 
 
 @router.callback_query(F.data == "dep:card")
-async def cb_card(call: CallbackQuery, state: FSMContext) -> None:
+async def cb_card(call: CallbackQuery, state: FSMContext,
+                  conn: aiosqlite.Connection) -> None:
+    if await _blocked_by_open(call, conn, state):
+        return
     await state.set_state(Deposit.amount)
     await call.message.edit_text(
         texts.DEPOSIT_ASK_AMOUNT.format(min_amount=fmt(runtime.min_deposit())),
@@ -339,6 +386,22 @@ async def on_receipt(
         return
 
     file_id = message.photo[-1].file_id if message.photo else message.document.file_id
+
+    # Тот же чек второй раз. Шлют его и от беспокойства, и затем, чтобы
+    # получить второе зачисление за один перевод. Отпечаток файла у
+    # Telegram переживает пересылку, поэтому сравниваем по нему.
+    if await db.receipt_seen(conn, message.from_user.id, file_id):
+        await message.answer(texts.DEPOSIT_RECEIPT_OLD)
+        return
+
+    # Чек по этой заявке уже есть — повтор ничего не ускоряет, а
+    # владельцу добавляет одинаковых картинок на разбор.
+    already = await db.get_deposit(conn, data.get("deposit_id") or 0)
+    if already is not None and already.receipt_file_id:
+        await message.answer(
+            texts.DEPOSIT_RECEIPT_TWICE.format(amount=fmt(already.amount))
+        )
+        return
 
     # Заявка уже создана на шаге суммы — чек к ней прикрепляется.
     # Заводить вторую нельзя: две заявки на одну сумму сделали бы платёж

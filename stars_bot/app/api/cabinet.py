@@ -379,9 +379,14 @@ JS = """
         id.appendChild(el('code', p.id));
         tr.appendChild(id);
         tr.appendChild(el('td', p.name));
-        tr.appendChild(el('td', p.amount_text
+        // Рядом с сомони — доллары. Разработчику называют цены в
+        // долларах, и без этого он не может сравнить наши со своими.
+        var price = p.amount_text
           ? p.amount_text + ' ' + p.currency
-          : (p.unit_price / 10000).toFixed(4) + ' за шт.', 'num'));
+          : (p.unit_price / 10000).toFixed(4) + ' за шт.';
+        if (p.usd) price += '  ≈ $' + p.usd.toFixed(2);
+        else if (p.usd_per_unit) price += '  ≈ $' + p.usd_per_unit.toFixed(5);
+        tr.appendChild(el('td', price, 'num'));
         tr.appendChild(el('td', p.customer || '—', 'hide'));
         body.appendChild(tr);
       });

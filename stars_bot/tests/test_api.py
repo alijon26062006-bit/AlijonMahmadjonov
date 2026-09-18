@@ -730,6 +730,23 @@ async def wholesale_prices(conn) -> None:
           catalog.price_of(api["stars"], 100) == 1080,
           str(catalog.price_of(api["stars"], 100)))
 
+    # Цена в долларах рядом с ценой в сомони: разработчику называют цены
+    # в долларах, и без пересчёта он не сравнит наши со своими.
+    await runtime.set_value(conn, "usd_rate_diram", "1090")
+    in_usd = catalog.public(api["premium:3"])
+    check("рядом с ценой есть доллары",
+          abs(in_usd["usd"] - api["premium:3"]["amount"] / 1090) < 0.001,
+          str(in_usd.get("usd")))
+    check("у звёзд доллары за штуку",
+          catalog.public(api["stars"]).get("usd_per_unit", 0) > 0,
+          str(catalog.public(api["stars"]).get("usd_per_unit")))
+
+    # Без курса не выдумываем: лучше не показать, чем показать неверное.
+    await runtime.set_value(conn, "usd_rate_diram", "0")
+    check("без курса долларов не показываем",
+          "usd" not in catalog.public(api["premium:3"]))
+    await runtime.set_value(conn, "usd_rate_diram", "1090")
+
     shown = catalog.public(api["premium:3"])
     check("себестоимость наружу не уходит",
           not any(key in shown for key in catalog.HIDDEN),
