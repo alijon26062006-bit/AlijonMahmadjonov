@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import asyncio
+import pathlib
 import sys
 
 from . import catalog
@@ -45,9 +46,28 @@ ARG_TO_CATEGORY = {
 }
 
 
+FAMILY_NAMES = {
+    "diamonds": "Free Fire (ИДМ)", "voucher": "Free Fire (ИДМ) — ваучеры",
+    "levelpass": "Free Fire (ИДМ) — пропуски",
+    "id": "Free Fire Индонезия", "br": "Free Fire Бразилия",
+    "latam": "Free Fire Латам", "mena": "Free Fire MENA", "eu": "Free Fire Европа",
+    "sg": "Free Fire Сингапур", "tw": "Free Fire Тайвань", "vn": "Free Fire Вьетнам",
+    "pk": "Free Fire Пакистан", "bd": "Free Fire Бангладеш",
+    "pubg": "PUBG Mobile", "mlbb": "Mobile Legends", "mlbbcis": "Mobile Legends СНГ",
+    "hok": "Honor of Kings", "bs": "Blood Strike", "mr": "Marvel Rivals",
+    "ab": "Arena Breakout", "abi": "Arena Breakout Infinite",
+    "stars": "Telegram Stars",
+}
+
+
+def family_of(sku: str) -> str:
+    head = sku.split("_")[0]
+    return head if head in FAMILY_NAMES else head
+
+
 def show_catalog(live: dict, db: Database) -> None:
-    """Печатает весь каталог поставщика — чтобы видеть, что ещё можно продавать."""
-    head("Полный каталог поставщика")
+    """Сводка по каталогу + полный список в файл (на экране он не помещается)."""
+    head("Каталог поставщика")
     if not live:
         bad("Каталог пуст или не получен")
         return
@@ -58,24 +78,37 @@ def show_catalog(live: dict, db: Database) -> None:
             if row["sku"]:
                 ours.add(row["sku"])
 
-    groups: dict[str, list] = {}
+    families: dict[str, list] = {}
     for sku, item in live.items():
-        key = str(item.get("category") or item.get("game") or sku.split("_")[0])
-        groups.setdefault(key, []).append((sku, item))
+        families.setdefault(family_of(sku), []).append((sku, item))
 
-    print(f"Всего у поставщика: {B}{len(live)}{E} товаров в {len(groups)} разделах")
-    print(f"Из них мы продаём: {B}{len(ours & set(live))}{E}\n")
-    print(f"{'✓':<2} {'SKU':<30} {'Название':<34} Цена")
+    # Полный список — в файл, чтобы ничего не обрезалось.
+    out = pathlib.Path("data/supplier-catalog.txt")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as fh:
+        fh.write(f"Каталог поставщика: {len(live)} товаров\n\n")
+        for fam in sorted(families):
+            title = FAMILY_NAMES.get(fam, fam)
+            fh.write(f"\n=== {fam}  ({title})  —  {len(families[fam])} шт ===\n")
+            for sku, item in sorted(families[fam]):
+                mark = "*" if sku in ours else " "
+                fh.write(f"{mark} {sku:<42} {str(item.get('name',''))[:40]:<42} {item.get('price','')}\n")
+
+    print(f"Всего у поставщика: {B}{len(live)}{E} товаров")
+    print(f"Из них продаём:     {B}{len(ours & set(live))}{E}\n")
+    print(f"{'Ключ':<12} {'Игра':<28} {'Всего':>6} {'Продаём':>8}  Цены поставщика")
     print("─" * 78)
-    for key in sorted(groups):
-        print(f"\n{B}▼ {key}{E}  ({len(groups[key])})")
-        for sku, item in sorted(groups[key]):
-            mark = f"{G}✓{E}" if sku in ours else " "
-            name = str(item.get("name", ""))[:33]
-            price = item.get("price", "")
-            print(f"{mark}  {sku:<30} {name:<34} {price}")
+    for fam in sorted(families, key=lambda f: -len(families[f])):
+        items = families[fam]
+        prices = [float(i.get("price") or 0) for _, i in items if i.get("price")]
+        have = sum(1 for sku, _ in items if sku in ours)
+        rng = f"{min(prices):.2f}–{max(prices):.2f} $" if prices else "—"
+        flag = f"{G}{have}{E}" if have else "—"
+        print(f"{fam:<12} {FAMILY_NAMES.get(fam, '—')[:28]:<28} {len(items):>6} {flag:>17}  {rng}")
     print()
-    print(f"{G}✓{E} — уже продаётся в боте. Остальное можно добавить.")
+    ok(f"Полный список сохранён: {out}")
+    print(f"   Посмотреть:  cat {out}")
+    print(f"   Одну игру:   grep '^.mlbb' {out}")
 
 
 def parse_args(argv: list[str]) -> tuple[dict[str, str], str | None, bool]:
