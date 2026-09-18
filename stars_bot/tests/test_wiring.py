@@ -195,6 +195,42 @@ async def open_every_screen(conn) -> int:
     return 0
 
 
+def check_delivery_modes() -> bool:
+    """Отчёт при запуске не должен пугать владельца на рабочем режиме.
+
+    Раньше проверка сравнивала режим с одним «api», и бот, честно
+    продающий через FazerCards, каждый запуск уверял владельца, что
+    звёзды не отправляются, и звал его на старый шлюз.
+    """
+    from app.config import settings
+    from app.main import DELIVERY_MODES, readiness
+
+    def warns(mode: str) -> bool:
+        settings.fragment_mode = mode
+        _, warnings = readiness()
+        return any("НЕ отправляются" in item for item in warnings)
+
+    was, bad = settings.fragment_mode, []
+    try:
+        for mode in sorted(DELIVERY_MODES):
+            if warns(mode):
+                bad.append(f"рабочий режим {mode!r} объявлен пустышкой")
+        for mode in ("mock", "", "фазер"):
+            if not warns(mode):
+                bad.append(f"про нерабочий режим {mode!r} не предупредили")
+        # Режим из настроек могут написать как угодно регистром.
+        if warns("FaZeR"):
+            bad.append("режим с другим регистром не распознан")
+    finally:
+        settings.fragment_mode = was
+
+    if bad:
+        print("\n❌ Отчёт о готовности врёт:", "; ".join(bad))
+        return True
+    print(f"✅ Все {len(DELIVERY_MODES)} рабочих режимов выдачи распознаются")
+    return False
+
+
 async def main() -> None:
     for suffix in ("", "-wal", "-shm"):
         Path(str(db.settings.db_file) + suffix).unlink(missing_ok=True)
@@ -228,6 +264,10 @@ async def main() -> None:
     print(f"\n✅ Все {len(declared_callbacks())} кнопок ведут в обработчики")
 
     if await open_every_screen(conn):
+        await conn.close()
+        sys.exit(1)
+
+    if check_delivery_modes():
         await conn.close()
         sys.exit(1)
     await conn.close()

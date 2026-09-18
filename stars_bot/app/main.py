@@ -39,6 +39,15 @@ ADMIN_COMMANDS = USER_COMMANDS + [
 ]
 
 
+#: Режимы выдачи, при которых звёзды и Premium правда уходят клиенту.
+#: Пишутся как в build_provider — там же и разбираются их синонимы.
+DELIVERY_MODES = frozenset({
+    "fazer", "fazercards", "fzr",
+    "mystars", "faas",
+    "api", "apifrag", "apifragment",
+})
+
+
 def readiness() -> tuple[list[str], list[str]]:
     """Что мешает работать (blockers) и что стоит доделать (warnings)."""
     blockers, warnings = [], []
@@ -56,10 +65,16 @@ def readiness() -> tuple[list[str], list[str]]:
     if runtime.star_price() <= 0:
         blockers.append("Цена звезды должна быть больше нуля (/panel → Цены).")
 
-    if settings.fragment_mode.lower() != "api":
+    # Рабочих режимов выдачи несколько, и проверять надо не «стоит ли
+    # api», а «не стоит ли пустышка». Иначе бот при живых продажах через
+    # FazerCards уверяет владельца, что звёзды не отправляются, и зовёт
+    # его на старый шлюз, хранящий сид-фразу у себя.
+    mode = settings.fragment_mode.strip().lower()
+    if mode not in DELIVERY_MODES:
         warnings.append(
-            "FRAGMENT_MODE=mock — бот работает, но звёзды НЕ отправляются. "
-            "Для реальных продаж поставьте api."
+            f"FRAGMENT_MODE={settings.fragment_mode!r} — бот работает, но "
+            "звёзды и Premium НЕ отправляются. Рабочие режимы: "
+            + ", ".join(sorted(DELIVERY_MODES)) + "."
         )
     if not settings.support_username:
         warnings.append("SUPPORT_USERNAME пуст — покупателям некуда писать при проблеме.")
