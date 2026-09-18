@@ -331,6 +331,19 @@ CREATE TABLE IF NOT EXISTS api_orders (
     created_at TEXT NOT NULL
 );
 
+-- Пропуск в кабинет по ссылке из бота. Ключ для этого не годится: он
+-- умеет тратить деньги, а ссылка живёт в адресной строке, в истории
+-- браузера и в пересланном сообщении. Поэтому пропуск — отдельная
+-- строка, и она даёт только смотреть.
+CREATE TABLE IF NOT EXISTS api_passes (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    prefix       TEXT NOT NULL,     -- видимое начало: по нему ищем кандидатов
+    token_hash   TEXT NOT NULL,     -- сам пропуск не храним нигде
+    created_at   TEXT NOT NULL,
+    last_used_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS api_transactions (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     tx_id          TEXT NOT NULL,
@@ -405,6 +418,8 @@ CREATE INDEX IF NOT EXISTS idx_akeys_user    ON api_keys(user_id);
 CREATE INDEX IF NOT EXISTS idx_akeys_prefix  ON api_keys(prefix);
 CREATE INDEX IF NOT EXISTS idx_areq_key      ON api_requests(key_id);
 CREATE INDEX IF NOT EXISTS idx_areq_created  ON api_requests(created_at);
+CREATE INDEX IF NOT EXISTS idx_pass_prefix  ON api_passes(prefix);
+CREATE INDEX IF NOT EXISTS idx_pass_user    ON api_passes(user_id);
 CREATE INDEX IF NOT EXISTS idx_atx_user      ON api_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_atx_created   ON api_transactions(created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_atx_id ON api_transactions(tx_id);
@@ -2399,6 +2414,54 @@ async def add_api_tx(
     )
     await conn.commit()
     return tx_id
+
+
+# ---- пропуск в кабинет ----------------------------------------------
+
+#: Сколько пропусков держим одному человеку: по одному на устройство,
+#: с запасом. Дальше самый старый вытесняется — иначе забытые пропуски
+#: копились бы годами, и каждый оставался бы рабочим.
+MAX_PASSES = 5
+
+
+async def add_api_pass(
+    conn: aiosqlite.Connection, *, user_id: int, prefix: str, token_hash: str
+) -> None:
+    await conn.execute(
+        """INSERT INTO api_passes (user_id, prefix, token_hash, created_at)
+           VALUES (?, ?, ?, ?)""",
+        (user_id, prefix, token_hash, _now()),
+    )
+    await conn.execute(
+        """DELETE FROM api_passes WHERE user_id = ? AND id NOT IN (
+               SELECT id FROM api_passes WHERE user_id = ?
+               ORDER BY id DESC LIMIT ?)""",
+        (user_id, user_id, MAX_PASSES),
+    )
+    await conn.commit()
+
+
+async def api_passes_by_prefix(
+    conn: aiosqlite.Connection, prefix: str
+) -> list[dict[str, Any]]:
+    async with conn.execute(
+        "SELECT * FROM api_passes WHERE prefix = ?", (prefix,)
+    ) as cur:
+        return [dict(row) for row in await cur.fetchall()]
+
+
+async def api_pass_used(conn: aiosqlite.Connection, pass_id: int) -> None:
+    await conn.execute("UPDATE api_passes SET last_used_at = ? WHERE id = ?",
+                       (_now(), pass_id))
+    await conn.commit()
+
+
+async def drop_api_passes(conn: aiosqlite.Connection, user_id: int) -> int:
+    """Отозвать все пропуски человека. Возвращает сколько убрали."""
+    cur = await conn.execute("DELETE FROM api_passes WHERE user_id = ?",
+                             (user_id,))
+    await conn.commit()
+    return cur.rowcount or 0
 
 
 async def api_txs_of(

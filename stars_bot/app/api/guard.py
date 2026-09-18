@@ -46,13 +46,22 @@ def rate_limit() -> int:
 
 @dataclass
 class Caller:
-    """Кто сделал запрос."""
-    key: db.ApiKey
+    """Кто сделал запрос.
+
+    key пуст, когда пришли не ключом, а пропуском в кабинет. Тогда
+    watch=True: смотреть можно всё своё, тратить деньги — нельзя.
+    """
+    key: db.ApiKey | None
     user: db.User
+    watch: bool = False
 
     @property
     def user_id(self) -> int:
         return self.user.id
+
+    @property
+    def key_id(self) -> int | None:
+        return self.key.id if self.key else None
 
 
 class Denied(Exception):
@@ -149,6 +158,52 @@ def bearer(header: str) -> str:
     return ""
 
 
+async def _by_pass(conn, token: str, ip: str) -> Caller:
+    """Вход по пропуску из бота. Даёт только смотреть своё.
+
+    Пропуск приходит ссылкой, а ссылка оседает в истории браузера и в
+    пересланном сообщении. Поэтому у него не может быть права тратить
+    деньги — на этом и держится вся его безопасность.
+
+    В кеше храним сразу владельца, а не номер пропуска: страница делает
+    по несколько запросов подряд, и второй заход в базу за тем же ответом
+    не нужен. Отзыв кеш чистит, поэтому отозванный пропуск не живёт лишнюю
+    минуту.
+    """
+    user_id = apikeys.cached_pass(token)
+    if user_id is None:
+        row = None
+        for candidate in await db.api_passes_by_prefix(
+            conn, apikeys.pass_prefix_of(token)
+        ):
+            if apikeys.verify(token, candidate["token_hash"]):
+                row = candidate
+                break
+        if row is None:
+            note_bad_key(ip)
+            raise Denied(401, "invalid_key", "Ключ не принят.")
+        user_id = row["user_id"]
+        apikeys.remember_pass(token, user_id)
+        await db.api_pass_used(conn, row["id"])
+
+    note_good_key(ip)
+
+    user = await db.get_user(conn, user_id)
+    if user is None:
+        raise Denied(403, "no_account", "Аккаунт не найден.")
+    if user.is_banned:
+        raise Denied(403, "account_blocked", "Доступ закрыт.")
+
+    # Ведро своё: у пропуска нет номера ключа, а мешать их счётчики
+    # значило бы, что открытая страница съедает лимит рабочего ключа.
+    wait = take(-user.id)
+    if wait:
+        raise Denied(429, "rate_limited",
+                     f"Слишком часто. Лимит — {rate_limit()} запросов в минуту.",
+                     int(wait) + 1)
+    return Caller(key=None, user=user, watch=True)
+
+
 async def identify(conn, token: str, ip: str = "") -> Caller:
     """Кто это. Бросает Denied, если пропускать нельзя.
 
@@ -159,6 +214,9 @@ async def identify(conn, token: str, ip: str = "") -> Caller:
     if wait:
         raise Denied(429, "too_many_attempts",
                      "Слишком много попыток с неверным ключом.", int(wait) + 1)
+
+    if token and apikeys.looks_like_pass(token):
+        return await _by_pass(conn, token, ip)
 
     if not token or not apikeys.looks_like(token):
         note_bad_key(ip)

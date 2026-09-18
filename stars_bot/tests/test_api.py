@@ -1065,6 +1065,83 @@ async def cabinet_view(conn, bot) -> None:
     gsvc_forget()
 
 
+
+# ──────────────────────────────────── вход по ссылке из бота
+
+
+async def cabinet_pass(conn, bot) -> None:
+    """Пропуск в кабинет: смотреть — можно, тратить — нет."""
+    from app.api import keys as ak
+
+    await runtime.set_value(conn, "api_rate_per_min", "100000")
+    guard.forget_rate()
+    guard.forget_bad()
+    ak.forget_passes()
+
+    token = ak.generate_pass()
+    check("пропуск отличается от ключа приставкой",
+          token.startswith("cab_") and not ak.looks_like(token), token[:8])
+    check("а ключ не сходит за пропуск",
+          not ak.looks_like_pass(ak.generate()))
+
+    await db.add_api_pass(conn, user_id=BUYER, prefix=ak.pass_prefix_of(token),
+                          token_hash=ak.hash_key(token))
+
+    app = web.Application()
+    app["bot"] = bot
+    app["provider"] = Provider()
+    api_server.mount(app, bot, app["provider"])
+    runner = web.AppRunner(app, access_log=None)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    base = f"http://127.0.0.1:{runner.addresses[0][1]}{api_server.PREFIX}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            api = Client(base, session)
+
+            status, body, _ = await api.get("/user", key=token)
+            check("по ссылке из бота кабинет открывается без ключа",
+                  status == 200 and body["user"]["id"] == BUYER, str(status))
+            check("и видно, что это только просмотр",
+                  body["user"]["read_only"] is True and body["user"]["key"] is None,
+                  str(body["user"].get("read_only")))
+
+            status, _, _ = await api.get("/orders?period=all", key=token)
+            check("история по ссылке видна", status == 200, str(status))
+
+            status, denied, _ = await api.post(
+                "/order/create", key=token,
+                body={"product_id": "stars", "quantity": 50,
+                      "customer": "@durov"},
+            )
+            check("но заказ по ссылке сделать нельзя",
+                  status == 403 and denied["error"]["code"] == "read_only",
+                  str(denied)[:140])
+
+            # Ссылка может утечь — пересылом, историей браузера, скриншотом.
+            # Поэтому её отзыв должен срабатывать сразу, а не через минуту
+            # жизни кеша.
+            await db.drop_api_passes(conn, BUYER)
+            ak.forget_passes()
+            status, _, _ = await api.get("/user", key=token)
+            check("отозванная ссылка перестаёт работать сразу",
+                  status == 401, str(status))
+
+            status, _, _ = await api.get("/user", key="cab_" + "x" * 32)
+            check("выдуманный пропуск не пускает", status == 401, str(status))
+    finally:
+        await runner.cleanup()
+        guard.forget_bad()
+
+    from app.api import cabinet as cab
+
+    check("страница умеет входить по ссылке", "t=" in cab.JS
+          and "history.replaceState" in cab.JS)
+    check("и даёт выйти на устройстве", 'id="out"' in cab.html())
+
+
 # ───────────────────────────────────────────────── запуск
 
 
@@ -1094,6 +1171,7 @@ async def main() -> None:
         await catalog_paging(conn, bot)
         await game_order(conn, bot)
         await cabinet_view(conn, bot)
+        await cabinet_pass(conn, bot)
     finally:
         await conn.close()
 

@@ -140,6 +140,7 @@ JS = """
     // Не пустило — значит на экране не должно остаться ничего от входа:
     // иначе видно вкладки и периоды при неработающем ключе.
     $('gate').hidden = false;
+    $('out').hidden = true;
     $('top').hidden = true;
     $('nav').hidden = true;
     $('periods').hidden = true;
@@ -147,6 +148,13 @@ JS = """
     $('stats').textContent = '';
     $('view').textContent = '';
     try { sessionStorage.removeItem('k'); } catch (e) {}
+  }
+
+  function forget(){
+    try { localStorage.removeItem('pass'); } catch (e) {}
+    key = '';
+    shut();
+    say('Вышли. Чтобы войти снова — кнопка «Открыть кабинет» в боте: /api.');
   }
 
   function enter(){
@@ -185,6 +193,7 @@ JS = """
       'Весь аккаунт целиком: заказы и деньги по всем вашим ключам. '
       + 'Вошли ключом ' + ((u.key && u.key.masked) || '—') + '.';
     $('whose').hidden = false;
+    $('out').hidden = false;
   }
 
   // ── вкладки ────────────────────────────────────────────────────────────
@@ -429,6 +438,7 @@ JS = """
 
   // ── запуск ─────────────────────────────────────────────────────────────
   $('show').addEventListener('click', enter);
+  $('out').addEventListener('click', forget);
   $('apikey').addEventListener('keydown', function(e){
     if (e.key === 'Enter') enter();
   });
@@ -439,11 +449,47 @@ JS = """
     b.addEventListener('click', function(){ pickPeriod(b.getAttribute('data-p')); });
   });
 
-  // Ключ из этой же вкладки: обновление страницы не должно выкидывать.
-  try {
-    var saved = sessionStorage.getItem('k');
-    if (saved) { $('apikey').value = saved; enter(); }
-  } catch (e) {}
+  // Вход по ссылке из бота. Пропуск приходит после решётки: такую часть
+  // адреса браузер не отправляет на сервер, поэтому она не оседает ни в
+  // нашем журнале, ни в чужом Referer. Из адресной строки убираем сразу.
+  function fromLink(){
+    var m = (location.hash || '').match(/[#&]t=([A-Za-z0-9_]+)/);
+    if (!m) return false;
+    var token = m[1];
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    try { localStorage.setItem('pass', token); } catch (e) {}
+    key = token;
+    say('Открываю кабинет…');
+    ask('/user').then(function(d){
+      say('');
+      $('gate').hidden = true;
+      $('top').hidden = false;
+      $('nav').hidden = false;
+      header(d.user);
+      open('orders');
+    }).catch(function(e){
+      try { localStorage.removeItem('pass'); } catch (x) {}
+      shut();
+      say(e.message + ' Откройте кабинет заново кнопкой в боте: /api.', true);
+    });
+    return true;
+  }
+
+  // Порядок такой: сначала свежая ссылка, потом запомненный пропуск,
+  // и только потом ключ, введённый руками в этой вкладке.
+  if (!fromLink()) {
+    var stored = null;
+    try { stored = localStorage.getItem('pass'); } catch (e) {}
+    if (stored) {
+      location.hash = 't=' + stored;
+      fromLink();
+    } else {
+      try {
+        var saved = sessionStorage.getItem('k');
+        if (saved) { $('apikey').value = saved; enter(); }
+      } catch (e) {}
+    }
+  }
 })();
 """
 
@@ -465,14 +511,16 @@ BODY = """<!doctype html>
  placeholder="sk_live_…">
 <button id="show" class="go">Войти</button>
 </div>
-<p class="hint">Ключ нужен только чтобы вас узнать — данные
-показываются по всему аккаунту, поэтому подойдёт <b>любой</b> ваш ключ.
-Создать или отозвать ключ: команда <code>/api</code> → «Ключи».
-Введённый ключ остаётся в этой вкладке и никуда не сохраняется.</p>
+<p class="hint"><b>Проще всего — не вводить ничего.</b> Откройте бота,
+команда <code>/api</code>, кнопка «🖥 Открыть кабинет» — она узнает вас
+сама и запомнит это устройство.<br><br>
+Поле выше — для тех, кто пришёл с рабочим ключом. Данные всё равно
+показываются по всему аккаунту, поэтому подойдёт <b>любой</b> ваш ключ.</p>
 </div>
 
 <p id="msg" class="hint"></p>
 <p id="whose" class="hint" hidden></p>
+<p><button id="out" class="more" hidden>Выйти на этом устройстве</button></p>
 <div id="top" class="cards" hidden></div>
 
 <nav id="nav" hidden>

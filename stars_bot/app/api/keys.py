@@ -88,6 +88,55 @@ def looks_like(key: str) -> bool:
     return all(ch in ALPHABET for ch in key[len(BRAND):])
 
 
+# ─────────────────────────────────────────── пропуск в кабинет
+
+#: С чего начинается пропуск. Приставка другая нарочно: по ней и человек,
+#: и код сразу видят, что это не ключ и денег им не потратить.
+PASS_BRAND = "cab_"
+PASS_HEAD = len(PASS_BRAND) + 6
+
+#: Проверенные пропуски держим в памяти так же, как ключи: страница
+#: кабинета делает по несколько запросов подряд, и гонять scrypt на
+#: каждый — терять по 20 мс на ровном месте.
+_PASSES: dict[str, tuple[int, float]] = {}
+
+
+def generate_pass() -> str:
+    body = "".join(secrets.choice(ALPHABET) for _ in range(BODY))
+    return PASS_BRAND + body
+
+
+def pass_prefix_of(token: str) -> str:
+    return token[:PASS_HEAD]
+
+
+def looks_like_pass(token: str) -> bool:
+    if not token.startswith(PASS_BRAND) or len(token) != len(PASS_BRAND) + BODY:
+        return False
+    return all(ch in ALPHABET for ch in token[len(PASS_BRAND):])
+
+
+def cached_pass(token: str) -> int | None:
+    hit = _PASSES.get(_token(token))
+    if hit is None:
+        return None
+    pass_id, until = hit
+    if until < time.monotonic():
+        _PASSES.pop(_token(token), None)
+        return None
+    return pass_id
+
+
+def remember_pass(token: str, pass_id: int) -> None:
+    _PASSES[_token(token)] = (pass_id, time.monotonic() + CACHE_TTL)
+
+
+def forget_passes() -> None:
+    """Забыть кеш пропусков — после отзыва. Пропусков у человека
+    единицы, поэтому чистим всё разом: искать нужный дороже."""
+    _PASSES.clear()
+
+
 def _token(key: str) -> str:
     """Чем ключ представлен в кеше. Сам ключ в память не кладём."""
     return sha256(key.encode()).hexdigest()

@@ -88,6 +88,13 @@ async def middleware(request: web.Request, handler):
     try:
         if not (_open(request) or _unrouted(request)):
             caller = await _authorize(request, conn)
+            # Пропуск в кабинет умеет только смотреть. Проверяем здесь,
+            # а не в каждой точке: забыть проверку в одной новой точке —
+            # значит отдать право тратить деньги ссылке из браузера.
+            if caller.watch and request.method != "GET":
+                raise Denied(403, "read_only",
+                             "Это ссылка на кабинет — ей можно только "
+                             "смотреть. Для заказов нужен ключ sk_live_.")
         response = await handler(request)
         status = response.status
     except Denied as denied:
@@ -115,14 +122,14 @@ async def middleware(request: web.Request, handler):
         try:
             await db.log_api_request(
                 conn, request_id=request_id,
-                key_id=(caller.key.id if caller else None),
+                key_id=(caller.key_id if caller else None),
                 user_id=(caller.user_id if caller else None),
                 method=request.method, path=request.path, status=status,
                 error=error, ip=client_ip(request),
                 user_agent=request.headers.get("User-Agent", ""), ms=ms,
             )
-            if caller:
-                await db.note_api_use(conn, caller.key.id, client_ip(request))
+            if caller and caller.key_id:
+                await db.note_api_use(conn, caller.key_id, client_ip(request))
         except Exception as exc:  # noqa: BLE001 — журнал не должен ронять ответ
             log.warning("API: запрос не записался в журнал — %s", exc)
         await conn.close()

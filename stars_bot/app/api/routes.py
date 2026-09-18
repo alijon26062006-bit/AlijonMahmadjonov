@@ -220,14 +220,17 @@ async def user(request: web.Request) -> web.Response:
         "username": (fresh.username if fresh else None),
         "balance": catalog.money(fresh.balance if fresh else 0),
         "created_at": fresh.created_at if fresh else None,
-        "key": {
+        # Пропуском в кабинет вошли без ключа — и рассказывать про
+        # чужой ключ тут нечего.
+        "key": ({
             "id": caller.key.id,
             "label": caller.key.label,
             "masked": caller.key.masked,
             "created_at": caller.key.created_at,
             "last_used_at": caller.key.last_used_at,
             "requests": caller.key.requests,
-        },
+        } if caller.key else None),
+        "read_only": caller.watch,
         "rate_limit_per_minute": runtime.get_int("api_rate_per_min", 60),
         "requests": stats,
         "webhook": {

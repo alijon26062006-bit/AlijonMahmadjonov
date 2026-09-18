@@ -39,19 +39,55 @@ MAX_KEYS = 10
 LINE = texts.LINE
 
 
-def _home_kb(has_keys: bool) -> InlineKeyboardBuilder:
+#: Готовая ссылка на кабинет — по человеку. Сам пропуск в базе лежит
+#: только хешем, восстановить его оттуда нельзя, поэтому держим строку
+#: в памяти процесса: иначе каждый заход на экран выдавал бы новый
+#: пропуск и ронял ссылку, открытую на другом устройстве.
+_links: dict[int, str] = {}
+
+
+async def cabinet_link(conn, user_id: int) -> str:
+    """Ссылка, которая открывает кабинет без ввода ключа.
+
+    Пропуск уезжает в решётке адреса (после #): такую часть браузер не
+    отправляет на сервер и не кладёт в Referer, поэтому она не попадёт
+    ни в наш журнал, ни в чужой.
+    """
+    url = api_server.base_url()
+    if not url:
+        return ""
+    ready = _links.get(user_id)
+    if ready:
+        return ready
+
+    token = apikeys.generate_pass()
+    await db.add_api_pass(conn, user_id=user_id,
+                          prefix=apikeys.pass_prefix_of(token),
+                          token_hash=apikeys.hash_key(token))
+    _links[user_id] = f"{url}/cabinet#t={token}"
+    return _links[user_id]
+
+
+def forget_link(user_id: int) -> None:
+    _links.pop(user_id, None)
+
+
+def _home_kb(has_keys: bool, cabinet: str = "") -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
+    if cabinet:
+        # Кабинет первым: там история за периоды, выписка и каталог — всё
+        # то, что в переписке Telegram читать неудобно. Ключ для входа не
+        # нужен, ссылка узнаёт человека сама.
+        kb.row(InlineKeyboardButton(text="🖥 Открыть кабинет", url=cabinet))
     kb.row(btn("🔑 Мои ключи", "api:keys", style=PRIMARY))
     if has_keys:
         kb.row(btn("📦 Заказы", "api:orders"), btn("💳 Транзакции", "api:txs"))
         kb.row(btn("🔔 Вебхук", "api:hook"), btn("📊 Статистика", "api:stats"))
     url = api_server.base_url()
     if url:
-        # Кабинет в браузере: там история за периоды, выписка и каталог —
-        # всё то, что в переписке Telegram читать неудобно.
-        kb.row(InlineKeyboardButton(text="🖥 Открыть кабинет",
-                                    url=f"{url}/cabinet"))
         kb.row(InlineKeyboardButton(text="📖 Документация", url=f"{url}/docs"))
+    if cabinet:
+        kb.row(btn("🔒 Закрыть доступ к кабинету", "api:pass_off"))
     kb.row(btn(labeled("back", "В меню"), "m:main"))
     return kb
 
@@ -82,7 +118,7 @@ async def show_home(target, conn, edit: bool = True) -> None:
     user_id = target.from_user.id
     keys = await db.api_keys_of(conn, user_id)
     text = await _home_text(conn, user_id)
-    markup = _home_kb(bool(keys)).as_markup()
+    markup = _home_kb(bool(keys), await cabinet_link(conn, user_id)).as_markup()
     message = target.message if isinstance(target, CallbackQuery) else target
     if edit and isinstance(target, CallbackQuery):
         await message.edit_text(text, reply_markup=markup)
@@ -101,6 +137,21 @@ async def cb_home(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connec
     await state.clear()
     await show_home(call, conn)
     await call.answer()
+
+
+@router.callback_query(F.data == "api:pass_off")
+async def cb_pass_off(call: CallbackQuery, state: FSMContext,
+                      conn: aiosqlite.Connection) -> None:
+    """Закрыть кабинет на всех устройствах и выдать новую ссылку."""
+    gone = await db.drop_api_passes(conn, call.from_user.id)
+    apikeys.forget_passes()
+    forget_link(call.from_user.id)
+    await state.clear()
+    await show_home(call, conn)
+    await call.answer(
+        f"Старые ссылки больше не работают ({gone}). Новая — в кнопке выше.",
+        show_alert=True,
+    )
 
 
 # ───────────────────────────────────────────────────────── ключи
