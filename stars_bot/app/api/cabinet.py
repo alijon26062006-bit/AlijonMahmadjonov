@@ -136,6 +136,19 @@ JS = """
   };
 
   // ── вход ───────────────────────────────────────────────────────────────
+  function shut(){
+    // Не пустило — значит на экране не должно остаться ничего от входа:
+    // иначе видно вкладки и периоды при неработающем ключе.
+    $('gate').hidden = false;
+    $('top').hidden = true;
+    $('nav').hidden = true;
+    $('periods').hidden = true;
+    $('top').textContent = '';
+    $('stats').textContent = '';
+    $('view').textContent = '';
+    try { sessionStorage.removeItem('k'); } catch (e) {}
+  }
+
   function enter(){
     key = ($('apikey').value || '').trim();
     if (!key) { say('Вставьте ключ.', true); return; }
@@ -148,14 +161,18 @@ JS = """
       $('nav').hidden = false;
       header(d.user);
       open('orders');
-    }).catch(function(e){ say(e.message, true); });
+    }).catch(function(e){
+      shut();
+      say(e.message + ' Подойдёт любой ваш ключ — данные всё равно '
+          + 'показываются по всему аккаунту.', true);
+    });
   }
 
   function header(u){
     var box = $('top');
     box.textContent = '';
     [['Баланс', money(u.balance)],
-     ['Ключ', (u.key && u.key.masked) || '—'],
+     ['Аккаунт', u.username ? '@' + u.username : String(u.id)],
      ['Запросов', String((u.requests && u.requests.total) || 0)],
      ['Лимит', (u.rate_limit_per_minute || 0) + ' /мин']
     ].forEach(function(pair){
@@ -164,6 +181,10 @@ JS = """
       card.appendChild(el('b', pair[1]));
       box.appendChild(card);
     });
+    $('whose').textContent =
+      'Весь аккаунт целиком: заказы и деньги по всем вашим ключам. '
+      + 'Вошли ключом ' + ((u.key && u.key.masked) || '—') + '.';
+    $('whose').hidden = false;
   }
 
   // ── вкладки ────────────────────────────────────────────────────────────
@@ -436,7 +457,7 @@ BODY = """<!doctype html>
 </head><body><div class="wrap">
 
 <h1>Кабинет</h1>
-<p class="lead">Заказы, деньги и каталог по вашему ключу. Регистрация не нужна.</p>
+<p class="lead">Заказы, деньги и каталог вашего аккаунта. Регистрация не нужна.</p>
 
 <div id="gate">
 <div class="row">
@@ -444,11 +465,14 @@ BODY = """<!doctype html>
  placeholder="sk_live_…">
 <button id="show" class="go">Войти</button>
 </div>
-<p class="hint">Ключ выдаёт владелец бота: команда <code>/api</code> →
-«Ключи». Он остаётся в этой вкладке и никуда не сохраняется.</p>
+<p class="hint">Ключ нужен только чтобы вас узнать — данные
+показываются по всему аккаунту, поэтому подойдёт <b>любой</b> ваш ключ.
+Создать или отозвать ключ: команда <code>/api</code> → «Ключи».
+Введённый ключ остаётся в этой вкладке и никуда не сохраняется.</p>
 </div>
 
 <p id="msg" class="hint"></p>
+<p id="whose" class="hint" hidden></p>
 <div id="top" class="cards" hidden></div>
 
 <nav id="nav" hidden>

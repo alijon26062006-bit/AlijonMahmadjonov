@@ -1051,9 +1051,15 @@ async def cabinet_view(conn, bot) -> None:
 
     page = cab.html()
     for mark in ('id="apikey"', 'data-tab="orders"', 'data-p="7d"',
-                 'id="periods"', "/orders/summary"):
+                 'id="periods"', 'id="whose"', "/orders/summary"):
         check(f"в кабинете есть {mark}", mark in page)
     check("кабинет не строит разметку строками", "innerHTML" not in cab.JS)
+    # Отказ должен убирать с экрана всё, что относится ко входу: иначе
+    # при непринятом ключе остаются вкладки и периоды, как будто пустило.
+    check("при отказе экран возвращается в исходное",
+          "function shut()" in cab.JS and "shut();" in cab.JS)
+    check("негодный ключ не остаётся во вкладке",
+          "removeItem('k')" in cab.JS)
 
     await runtime.set_value(conn, "games_enabled", "0")
     gsvc_forget()
