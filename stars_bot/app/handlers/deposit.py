@@ -69,6 +69,10 @@ async def cb_ru_sent(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Deposit.from_receipt)
     await call.message.edit_text(texts.DEPOSIT_RU_ASK,
                                  reply_markup=keyboards.cancel())
+    # Запоминаем этот экран: если деньги уже пришли, ответ встанет прямо
+    # на его место — вместе с кнопкой «Отмена», которой там больше не
+    # место.
+    await state.update_data(**_where(call.message))
     await call.answer()
 
 
@@ -104,6 +108,14 @@ async def on_receipt_amount(
                             reference=deposit.reference)
     await state.set_state(Deposit.receipt)
 
+    # Экран с вопросом о сумме — тот самый, что заменится на «оплата
+    # получена», если деньги уже ждут. Привязываем его к заявке ДО
+    # поиска: иначе ответ уйдёт отдельным сообщением, а вопрос с красной
+    # кнопкой останется висеть выше.
+    if data.get("ask_chat") and data.get("ask_msg"):
+        await db.set_deposit_screen(conn, deposit.id,
+                                    data["ask_chat"], data["ask_msg"])
+
     # Деньги могли прийти раньше клиента: он перевёл из Сбербанка, дождался
     # зачисления и только потом открыл бота. Тогда уведомление банка уже
     # лежит непривязанным — ищем его сразу, не заставляя ждать впустую.
@@ -114,6 +126,9 @@ async def on_receipt_amount(
         await state.clear()
         return
 
+    # Денег пока нет — ждём. Кнопки с вопроса убираем: отвечать на него
+    # больше нечего, а «Отмена» под ним теперь только сбивает.
+    await _drop_buttons(bot, data)
     shown = await message.answer(
         texts.DEPOSIT_RU_WAIT.format(amount=fmt(amount)),
         reply_markup=keyboards.deposit_receipt(),
@@ -128,12 +143,14 @@ async def cb_card(call: CallbackQuery, state: FSMContext) -> None:
         texts.DEPOSIT_ASK_AMOUNT.format(min_amount=fmt(runtime.min_deposit())),
         reply_markup=keyboards.cancel(),
     )
+    await state.update_data(**_where(call.message))
     await call.answer()
 
 
 @router.message(Deposit.amount, F.text)
 async def on_amount(
-    message: Message, state: FSMContext, conn: aiosqlite.Connection
+    message: Message, state: FSMContext, conn: aiosqlite.Connection,
+    bot: Bot | None = None,
 ) -> None:
     amount = parse(message.text or "")
     if amount is None or amount <= 0:
@@ -172,12 +189,42 @@ async def on_amount(
     await state.update_data(amount=amount, reference=reference,
                             deposit_id=deposit.id)
     await state.set_state(Deposit.receipt)
+
+    # Сумма названа — вопрос о ней отвечен, и «Отмена» под ним больше не
+    # нужна: нажатая позже, она отменяет уже идущую оплату.
+    if bot is not None:
+        await _drop_buttons(bot, await state.get_data())
+
     body, markup = _requisites(amount, reference)
     shown = await message.answer(body, reply_markup=markup)
 
     # Запоминаем, где показаны реквизиты: когда деньги придут, номер
     # карты надо будет убрать с экрана — платить по нему больше нечего.
     await _remember_screen(conn, deposit.id, shown)
+
+
+def _where(message) -> dict:
+    """Координаты сообщения: чтобы потом заменить его или убрать кнопки."""
+    chat = getattr(getattr(message, "chat", None), "id", None)
+    msg_id = getattr(message, "message_id", None)
+    return {"ask_chat": chat, "ask_msg": msg_id} if chat and msg_id else {}
+
+
+async def _drop_buttons(bot, data: dict) -> None:
+    """Убрать кнопки с экрана, на который уже ответили.
+
+    Красная «Отмена» под вопросом о сумме остаётся висеть и после того,
+    как сумма названа. Человек возвращается к ней и нажимает — отменяя
+    оплату, которая, может быть, уже прошла.
+    """
+    chat, msg_id = data.get("ask_chat"), data.get("ask_msg")
+    if not (chat and msg_id):
+        return
+    try:
+        await bot.edit_message_reply_markup(chat_id=chat, message_id=msg_id,
+                                            reply_markup=None)
+    except TelegramAPIError:
+        pass          # сообщение удалили или оно уже без кнопок
 
 
 async def _remember_screen(conn, deposit_id: int, shown) -> None:

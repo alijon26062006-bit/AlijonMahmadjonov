@@ -35,6 +35,7 @@ class FakeBot:
 
     def __init__(self):
         self.sent = []
+        self.edited = []
 
     async def send_message(self, chat_id, text, **kw):
         self.sent.append((chat_id, text))
@@ -42,8 +43,15 @@ class FakeBot:
     def last(self) -> str:
         return self.sent[-1][1] if self.sent else ""
 
+    async def edit_message_text(self, chat_id, message_id, text, **kw):
+        self.edited.append((chat_id, message_id, text))
+
+    async def edit_message_reply_markup(self, chat_id, message_id, **kw):
+        self.edited.append((chat_id, message_id, "<кнопки убраны>"))
+
     def clear(self) -> None:
         self.sent.clear()
+        self.edited.clear()
 
 
 # ────────────────────────────────────────────────── образцы сообщений
@@ -876,11 +884,28 @@ async def from_russia(conn, bot) -> None:
           await processor.claim_for_deposit(conn, bot, pair) is None
           and (await db.get_user(conn, CLIENT)).balance == steady)
 
-    # Старое уведомление в окно не попадает: деньги месячной давности к
-    # сегодняшней заявке отношения не имеют.
-    check("за пределами окна платёж не берётся",
-          not await db.unclaimed_bank_payments(conn, 5555, hours=0)
-          or True)
+    # Экран, на котором спрашивали сумму, должен смениться ответом.
+    # Иначе под ним остаётся красная «Отмена»: человек возвращается к
+    # ней и отменяет оплату, которая уже прошла.
+    await processor.handle(
+        conn, bot, source=SOURCE, message_id=8004,
+        text=sample(summa="Summa 77.77 TJS", zach="Zachislenie 77.77 TJS",
+                    kod="Kod 20000000004"))
+    screened = await db.create_deposit(
+        conn, user_id=CLIENT, amount=7777,
+        method=texts.RU_METHOD, receipt_file_id="",
+    )
+    await db.set_deposit_screen(conn, screened.id, CLIENT, 4242)
+    bot.clear()
+    ready = await processor.claim_for_deposit(
+        conn, bot, await db.get_deposit(conn, screened.id))
+    check("экран с вопросом о сумме заменяется ответом",
+          ready is not None and any(
+              chat == CLIENT and msg == 4242 for chat, msg, _ in bot.edited),
+          str(bot.edited[:2]))
+    check("и на нём написано про зачисление",
+          any("Оплата получена" in text for _, _, text in bot.edited),
+          str([text[:30] for _, _, text in bot.edited]))
 
 
 async def main() -> None:
