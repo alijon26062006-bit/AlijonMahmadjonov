@@ -199,6 +199,41 @@ def masking() -> None:
 # ────────────────────────────────────────────────── сопоставление
 
 
+def log_filter() -> None:
+    """Чистка секретов не должна ломать сами записи журнала.
+
+    Фильтр приводил все подставляемые значения к строке — и запись вида
+    «id=%d» с числом внутри переставала складываться: logging роняло её
+    с ошибкой формата, а вместе с ней и всё, что в ней было написано.
+    """
+    import io
+    import logging
+
+    from app.userbot.log import Scrubber
+
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.addFilter(Scrubber())
+    log = logging.getLogger("проверка-фильтра")
+    log.handlers = [handler]
+    log.setLevel(logging.INFO)
+    log.propagate = False
+
+    log.info("Run polling for bot @%s id=%d - %r", "mybot", 8651298254, "Имя")
+    written = stream.getvalue()
+    check("запись с числом складывается",
+          "id=8651298254" in written, written.strip()[:60])
+
+    log.info("ключ %s принят", "sk_live_" + "A" * 32)
+    check("а ключ из неё всё равно вычищен",
+          "sk_live_<скрыт>" in stream.getvalue(),
+          stream.getvalue().splitlines()[-1][:60])
+
+    log.info("сумма %.2f", 10.5)
+    check("дробное число тоже переживает чистку",
+          "10.50" in stream.getvalue(), stream.getvalue().splitlines()[-1][:40])
+
+
 async def matching(conn, bot) -> None:
     await db.upsert_user(conn, CLIENT, "client", "Клиент")
     await db.upsert_user(conn, OTHER, "other", "Второй")
@@ -815,6 +850,7 @@ async def main() -> None:
         await runtime.load(conn)
         parsing()
         masking()
+        log_filter()
         await matching(conn, bot)
         await sources()
         await unique_kopeck(conn, bot)

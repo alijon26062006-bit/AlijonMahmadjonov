@@ -39,16 +39,26 @@ def scrub(text: str) -> str:
 
 
 class Scrubber(logging.Filter):
-    """Чистит и само сообщение, и подставляемые в него значения."""
+    """Чистит и само сообщение, и подставляемые в него значения.
+
+    Тип значения не меняем. Раньше всё подряд приводилось к строке — и
+    запись вида «id=%d» с числом внутри переставала складываться вовсе:
+    logging роняло её с ошибкой формата, а вместе с ней и то, что в ней
+    было написано. Секреты бывают только в строках, поэтому и трогаем
+    только строки.
+    """
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.msg, str):
             record.msg = scrub(record.msg)
         if record.args:
             if isinstance(record.args, dict):
-                record.args = {k: scrub(str(v)) for k, v in record.args.items()}
+                record.args = {key: (scrub(value) if isinstance(value, str)
+                                     else value)
+                               for key, value in record.args.items()}
             else:
-                record.args = tuple(scrub(str(a)) for a in record.args)
+                record.args = tuple(scrub(one) if isinstance(one, str) else one
+                                    for one in record.args)
         return True
 
 
