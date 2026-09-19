@@ -149,7 +149,9 @@ async def to_moderation(bot: Bot, conn: aiosqlite.Connection, review: db.Review)
         author=author_of(user), user_id=review.user_id,
         text=review.text or "<i>без текста</i>",
     )
-    for admin_id in settings.admin_ids:
+    from app.services import access
+
+    for admin_id in access.admins():
         try:
             await bot.send_message(admin_id, text, reply_markup=moderate_kb(review.id))
         except TelegramAPIError as exc:

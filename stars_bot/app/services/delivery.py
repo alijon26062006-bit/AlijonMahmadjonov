@@ -38,7 +38,15 @@ async def notify(bot: Bot, chat_id: int, text: str, **kwargs) -> None:
 
 
 async def notify_admins(bot: Bot, text: str, **kwargs) -> None:
-    for admin_id in settings.admin_ids:
+    """Всем, у кого есть доступ, а не только владельцам из .env.
+
+    Админа, добавленного в панели, нет в настройках сервера. Пока здесь
+    стоял settings.admin_ids, он открывал панель, но не получал ни
+    заявок, ни чеков, ни тревог — то есть был админом только на словах.
+    """
+    from app.services import access
+
+    for admin_id in access.admins():
         await notify(bot, admin_id, text, **kwargs)
     if settings.orders_chat_id:
         await notify(bot, settings.orders_chat_id, text, **kwargs)

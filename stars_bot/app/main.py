@@ -164,8 +164,11 @@ async def main() -> None:
     try:
         me = await bot.me()
         await bot.set_my_commands(USER_COMMANDS)
-        # У админов в меню команд появляется /panel.
-        for admin_id in settings.admin_ids:
+        # У админов в меню команд появляется /panel. Список берём общий:
+        # добавленный в панели админ — такой же админ.
+        from app.services import access
+
+        for admin_id in access.admins():
             try:
                 await bot.set_my_commands(
                     ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id)

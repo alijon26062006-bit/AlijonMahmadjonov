@@ -144,7 +144,9 @@ async def _maybe_alert(bot: Bot, changed: list) -> None:
         for name, old, new, _ in changed
         if old > 0 and abs(new - old) * 100 / old >= ALERT_PERCENT
     ]
-    if not big or not settings.admin_ids:
+    from app.services import access
+
+    if not big or not access.admins():
         return
 
     lines = "\n".join(

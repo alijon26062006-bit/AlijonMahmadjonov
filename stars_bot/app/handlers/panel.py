@@ -2617,6 +2617,10 @@ async def on_admin_add(
         reply_markup=back_kb("pn:admins", "‹ К списку"),
     )
 
+    # Команда /panel должна появиться у него в меню сейчас, а не после
+    # ближайшего перезапуска бота.
+    await access.apply_menu(bot, user_id)
+
     # Человек должен узнать, что доступ у него есть, — иначе он о нём
     # просто не догадается.
     try:
@@ -2645,6 +2649,9 @@ async def cb_admin_del(call: CallbackQuery, state: FSMContext,
 
     user_id = int(call.data.split(":", 2)[2])
     if await access.revoke(conn, user_id):
+        # Убрать /panel из его меню команд: Telegram держит список у
+        # себя, и без этого команда осталась бы у снятого админа.
+        await access.apply_menu(call.bot, user_id)
         await call.answer(f"Доступ у {user_id} забран")
     else:
         await call.answer("У этого человека доступ снять нельзя.",

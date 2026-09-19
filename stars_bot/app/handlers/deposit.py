@@ -512,7 +512,9 @@ async def _send_receipt(message, conn, deposit, amount: int, paid: bool) -> None
         )
         markup = keyboards.admin_deposit(deposit.id)
 
-    targets = list(settings.admin_ids)
+    from app.services import access
+
+    targets = list(access.admins())
     if settings.orders_chat_id:
         targets.append(settings.orders_chat_id)
     for chat_id in targets:

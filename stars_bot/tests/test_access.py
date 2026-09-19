@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import sys
 from pathlib import Path
 
@@ -48,10 +49,11 @@ class FakeMessage:
 
 
 class FakeCallback:
-    def __init__(self, data, uid=OWNER):
+    def __init__(self, data, uid=OWNER, bot=None):
         self.data = data
         self.from_user = FakeUser(uid)
         self.message = FakeMessage(uid=uid)
+        self.bot = bot or FakeBot()
         self.alerts: list[str] = []
 
     async def answer(self, text="", **kw):
@@ -88,7 +90,11 @@ class FakeState:
 class FakeBot:
     def __init__(self, broken=False):
         self.sent: list[tuple[int, str]] = []
+        self.menus: list[tuple[int, int]] = []     # (кому, сколько команд)
         self.broken = broken
+
+    async def set_my_commands(self, commands, scope=None, **kw):
+        self.menus.append((getattr(scope, "chat_id", 0), len(commands)))
 
     async def send_message(self, chat_id, text, **kw):
         if self.broken:
@@ -96,6 +102,54 @@ class FakeBot:
 
             raise TelegramAPIError(method=None, message="bot was blocked")
         self.sent.append((chat_id, text))
+
+
+async def same_rights(conn) -> None:
+    """Добавленный админ получает то же, что и владелец.
+
+    Раньше рассылки брали список из .env, и админ из панели открывал
+    её, но не получал ни заявок, ни чеков, ни тревог: админ на словах.
+    """
+    import re
+
+    from app.services.delivery import notify_admins
+
+    await runtime.set_value(conn, "extra_admins", str(HELPER))
+    bot = FakeBot()
+
+    # Команда /panel должна появиться у него в меню сразу, а не после
+    # ближайшего перезапуска бота.
+    await access.apply_menu(bot, HELPER)
+    await access.apply_menu(bot, STRANGER)
+    check("админу в меню кладут команду больше",
+          bot.menus and bot.menus[0][1] > bot.menus[1][1], str(bot.menus))
+
+    await notify_admins(bot, "🔔 Заявка на пополнение")
+    got = {chat_id for chat_id, _ in bot.sent}
+    check("уведомление дошло владельцу", OWNER in got, str(got))
+    check("и добавленному админу тоже", HELPER in got, str(got))
+
+    await runtime.set_value(conn, "extra_admins", "")
+    bot = FakeBot()
+    await notify_admins(bot, "🔔 Ещё одна")
+    check("после снятия доступа не пишем",
+          HELPER not in {chat_id for chat_id, _ in bot.sent}, str(bot.sent))
+
+    # Чтобы это не отросло заново: ни одна рассылка не должна брать
+    # список получателей из .env в обход общего списка админов.
+    sites = ("app/services/delivery.py", "app/services/reviews.py",
+             "app/services/billing.py", "app/services/pricing.py",
+             "app/handlers/deposit.py", "app/main.py")
+    # Ищем именно использование списка как получателей: перебор или
+    # копию. Упоминания в пояснениях и проверка «задан ли он вообще»
+    # тут ни при чём.
+    used = re.compile(r"(?:for\s+\w+\s+in|list\()\s*settings\.admin_ids")
+    guilty = []
+    for path in sites:
+        for line in io.open(path, encoding="utf-8").read().split("\n"):
+            if used.search(line):
+                guilty.append(f"{path}: {line.strip()}")
+    check("рассылки не берут список из .env", not guilty, "; ".join(guilty))
 
 
 async def run(conn) -> None:
@@ -218,6 +272,7 @@ async def main() -> None:
         await db.init(conn)
         await runtime.load(conn)
         await run(conn)
+        await same_rights(conn)
     finally:
         await conn.close()
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")

@@ -55,7 +55,9 @@ def make_sender(bot: Bot):
         )
         markup = invoice_keyboard(links)
 
-        targets = list(settings.admin_ids)
+        from app.services import access
+
+        targets = list(access.admins())
         if settings.orders_chat_id:
             targets.append(settings.orders_chat_id)
 
