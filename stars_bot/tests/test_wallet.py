@@ -30,6 +30,21 @@ class FakeBot:
         self.messages.append((chat_id, text))
 
 
+class TogglePress:
+    """Нажатие переключателя в панели: коду нужны только data и ответы."""
+
+    class Screen:
+        async def edit_text(self, text, **kw):
+            return self
+
+    def __init__(self, data: str):
+        self.data = data
+        self.message = self.Screen()
+
+    async def answer(self, text: str = "", **kw) -> None:
+        pass
+
+
 class OkProvider(DeliveryProvider):
     async def deliver_stars(self, username, amount):
         return DeliveryResult(order_id="ok", raw={})
@@ -140,6 +155,29 @@ async def run(conn) -> None:
     check("показывает себестоимость выданного", "18.00" in text or "себестоимость" in text)
     check("настройки кошелька есть в панели",
           "autostop_after" in str(panel.wallet_kb().inline_keyboard))
+
+    # ---------------- включил продажу руками — тревога снова живая
+    # У владельца на сервере флаг автостопа пережил включение продажи
+    # руками. Из-за этого следующая поломка выключила бы продажу молча:
+    # защита решила бы, что уже предупреждала.
+    from app.handlers import panel as pnl
+
+    await runtime.set_value(conn, "stars_enabled", "0")
+    await runtime.set_value(conn, "autostopped", "1")
+    await pnl.cb_toggle(TogglePress("pn:toggle:stars_enabled"), conn)
+    check("панель включила звёзды", runtime.get_bool("stars_enabled"))
+    check("и сняла флаг автостопа", not runtime.get_bool("autostopped"))
+
+    # А теперь главное: тревога о новой поломке должна дойти.
+    await runtime.set_value(conn, "autostopped", "1")   # флаг «завис»
+    await runtime.set_value(conn, "premium_enabled", "1")
+    await runtime.set_value(conn, "fail_streak", "0")
+    before = len(bot.messages)
+    for _ in range(3):
+        await buy(bot, conn, broken)
+    fresh = [t for _, t in bot.messages[before:] if "выключена автоматически" in t]
+    check("при живой продаже тревога приходит, даже если флаг завис",
+          len(fresh) >= 1, f"сообщений: {len(fresh)}")
 
 
 asyncio.run(main())

@@ -328,7 +328,13 @@ async def _watch_failures(bot: Bot, conn: aiosqlite.Connection, reason: str) -> 
     if streak < limit:
         return
 
-    already_off = runtime.get_bool("autostopped")
+    # Молчим только если продажа и правда стояла выключенной — тогда
+    # владелец уже предупреждён. Один поднятый флаг основанием не
+    # считаем: он переживает включение продажи руками, и тревога о
+    # новой поломке ушла бы в никуда.
+    already_off = (runtime.get_bool("autostopped")
+                   and not runtime.get_bool("stars_enabled")
+                   and not runtime.get_bool("premium_enabled"))
     await runtime.autostop(conn)
     if already_off:
         return  # не повторяем тревогу на каждый следующий заказ

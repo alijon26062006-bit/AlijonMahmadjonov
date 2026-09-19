@@ -1069,7 +1069,13 @@ async def cb_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     if key not in ("stars_enabled", "premium_enabled", "deposit_enabled"):
         await call.answer("Неизвестный раздел.", show_alert=True)
         return
-    await runtime.set_value(conn, key, "0" if runtime.get_bool(key) else "1")
+    turning_on = not runtime.get_bool(key)
+    await runtime.set_value(conn, key, "1" if turning_on else "0")
+    # Владелец включил продажу руками — значит бот её больше не держит.
+    # Оставить флаг поднятым нельзя: по нему защита решает, что о поломке
+    # уже предупреждала, и следующее отключение пройдёт молча.
+    if turning_on and key in ("stars_enabled", "premium_enabled"):
+        await runtime.set_value(conn, "autostopped", "0")
     await call.answer("Готово")
     await safe_edit(call, toggles_text(), toggles_kb())
 
