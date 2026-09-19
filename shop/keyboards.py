@@ -337,7 +337,10 @@ def admin_settings() -> InlineKeyboardMarkup:
             [_btn(texts.ADM_BTN_CHANNELS, "a:channels", style.PRIMARY)],
             [_btn(texts.ADM_BTN_REVIEW_CH, "a:revch", style.PRIMARY)],
             [_btn(texts.ADM_BTN_WHATSAPP, "a:wa", style.PRIMARY)],
-            [_btn(texts.ADM_BTN_RATE, "a:rate", style.PRIMARY)],
+            [
+                _btn(texts.ADM_BTN_RATE, "a:rate", style.PRIMARY),
+                _btn(texts.ADM_BTN_MARKUP, "a:markup", style.PRIMARY),
+            ],
             [_btn(texts.ADM_BTN_GROUPS, "a:groups", style.PRIMARY)],
             [_btn(texts.BTN_BACK, "a:home")],
         ]
@@ -403,9 +406,20 @@ def admin_price_categories() -> InlineKeyboardMarkup:
               style.PRIMARY)]
         for c in catalog.CATEGORY_INFO.values()
     ]
-    rows.append([_btn(texts.ADM_BTN_COSTS, "a:costs", style.SUCCESS)])
+    rows.append([_btn(texts.ADM_BTN_ADDGAME, "a:addgame", style.SUCCESS)])
+    rows.append([_btn(texts.ADM_BTN_COSTS, "a:costs", style.PRIMARY)])
     rows.append([_btn(texts.BTN_BACK, "a:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def admin_add_game(families: Sequence) -> InlineKeyboardMarkup:
+    """Бозиҳои таъминкунанда, ки ҳанӯз дар бот нестанд."""
+    buttons = [
+        [_btn(f"{title}  ({count})", f"a:addfam:{fam}", style.PRIMARY)]
+        for fam, title, count in families
+    ]
+    buttons.append([_btn(texts.BTN_BACK, "a:prices")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def admin_group_list(rows: Sequence, counts: dict) -> InlineKeyboardMarkup:

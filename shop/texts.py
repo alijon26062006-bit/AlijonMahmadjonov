@@ -580,6 +580,8 @@ ADM_BTN_GROUPS = "🗂 Номи зербахшҳо"
 ADM_BTN_REQUISITES = "💳 Реквизитҳо"
 ADM_BTN_COSTS = "🔄 Нархи харидро нав кардан"
 ADM_BTN_RATE = "💱 Курси доллар"
+ADM_BTN_MARKUP = "📈 Фоизи нарх"
+ADM_BTN_ADDGAME = "➕ Бозии нав аз таъминкунанда"
 ADM_BTN_ADD_PARTNER = "➕ Шарики нав"
 ADM_BTN_PARTNER_PRICE = "🤝 Нархи шарикӣ"
 ADM_BTN_PARTNER_OFF = "🗑 Нархи шарикиро бардоштан"
@@ -915,6 +917,43 @@ def cost_line(cost_milli: int | None, price: int, rate: float, currency: str = C
     else:
         line += f"\n💚 Фоида: <b>{money(profit, currency)}</b> ({percent:+.0f}%)"
     return line
+
+
+ADMIN_ASK_MARKUP = (
+    "📈 Фоизи илова ба нархи харидро нависед.\n\n"
+    "Намуна: <code>20</code> — яъне нарх = харид + 20%\n"
+    "<i>Он ҳангоми илова кардани бозии нав истифода мешавад.</i>"
+)
+
+
+def admin_add_game(families: list, rate: float, markup: int) -> str:
+    """Экрани интихоби бозии нав аз каталоги таъминкунанда."""
+    if not families:
+        return (
+            "➕ <b>Бозии нав</b>\n\n"
+            "Ҳамаи бозиҳои таъминкунанда аллакай дар бот ҳастанд. 👍"
+        )
+    return (
+        "➕ <b>Бозии нав аз таъминкунанда</b>\n\n"
+        f"Ёфт шуд: <b>{len(families)}</b> бозӣ, ки ҳанӯз дар бот нест.\n\n"
+        f"💱 Курс: <b>{rate:g}</b> с. = 1 $\n"
+        f"📈 Фоиз: <b>+{markup}%</b>\n\n"
+        "Бозиро интихоб кунед — бот ҳамаи молҳои онро месозад ва нархҳоро "
+        "аз нархи харид ҳисоб мекунад.\n\n"
+        "<i>Молҳои нав хомӯш меоянд — аввал нархҳоро санҷед.</i>"
+    )
+
+
+def game_added(title: str, added: int, skipped: int, rate: float, markup: int) -> str:
+    extra = f"\n<i>{skipped} мол аллакай буд.</i>" if skipped else ""
+    return (
+        f"✅ <b>{esc(title)}</b> илова шуд!\n\n"
+        f"📦 Молҳои нав: <b>{added}</b>{extra}\n"
+        f"💰 Нархҳо: харид × {rate:g} + {markup}%\n\n"
+        "Ҳоло онҳо <b>хомӯш</b>-анд.\n"
+        "Нархҳоро санҷед ва зербахшро фаъол кунед — баъд харидорон "
+        "тугмаи «🎮 Дигар бозиҳо»-ро мебинанд."
+    )
 
 
 def admin_prices(rows: list, cat_title: str, currency: str = CURRENCY) -> str:

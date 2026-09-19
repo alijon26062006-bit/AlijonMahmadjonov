@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS products (
     partner_price INTEGER,
     cost     INTEGER,
     group_code TEXT  NOT NULL DEFAULT '',
+    custom   INTEGER NOT NULL DEFAULT 0,
     sku      TEXT    NOT NULL DEFAULT '',
     kind     TEXT    NOT NULL DEFAULT 'game',
     sort     INTEGER NOT NULL DEFAULT 0,
@@ -238,6 +239,7 @@ class Database:
         ("products", "partner_price", "INTEGER"),
         ("products", "cost", "INTEGER"),
         ("products", "group_code", "TEXT NOT NULL DEFAULT ''"),
+        ("products", "custom", "INTEGER NOT NULL DEFAULT 0"),
         ("products", "sku", "TEXT NOT NULL DEFAULT ''"),
         ("products", "kind", "TEXT NOT NULL DEFAULT 'game'"),
         ("orders", "sku", "TEXT NOT NULL DEFAULT ''"),
@@ -325,11 +327,15 @@ class Database:
                         (p.cost, p.code),
                     )
 
-            # Молҳое, ки дигар дар каталог нестанд, пинҳон карда мешаванд.
+            # Молҳои каталог, ки дигар нестанд, пинҳон мешаванд.
+            # Молҳои аз панел иловашуда (custom) ламс намешаванд — вагарна
+            # ҳар азнавоғозкунӣ бозиҳои админро хомӯш мекард.
             known = tuple(p.code for p in catalog.DEFAULT_PRODUCTS)
             marks = ", ".join("?" * len(known))
             self._conn.execute(
-                f"UPDATE products SET active = 0 WHERE code NOT IN ({marks})", known
+                f"UPDATE products SET active = 0 "
+                f"WHERE custom = 0 AND code NOT IN ({marks})",
+                known,
             )
             self._conn.commit()
 
@@ -373,6 +379,43 @@ class Database:
         if only_active:
             sql += " AND active = 1"
         return self._all(sql + " ORDER BY sort, price", (group_code,))
+
+    def add_custom_group(self, code: str, category: str, title: str) -> None:
+        """Зербахши нав, ки админ аз панел илова кардааст."""
+        row = self._one("SELECT MAX(sort) FROM groups")
+        nxt = int(row[0] or 0) + 1
+        self._run(
+            "INSERT INTO groups(code, category, title, sort, active) "
+            "VALUES (?, ?, ?, ?, 1) "
+            "ON CONFLICT(code) DO UPDATE SET title = excluded.title",
+            (code, category, title, nxt),
+        )
+
+    def add_custom_products(self, items: list[dict]) -> int:
+        """Молҳои нав аз каталоги таъминкунанда. Мавҷудаҳо ламс намешаванд."""
+        added = 0
+        with self._lock:
+            row = self._conn.execute("SELECT MAX(sort) FROM products").fetchone()
+            nxt = int(row[0] or 0) + 1
+            for item in items:
+                cur = self._conn.execute(
+                    "INSERT OR IGNORE INTO products"
+                    "(code, category, title, amount, price, cost, group_code, sku, "
+                    " kind, sort, active, custom) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)",
+                    (
+                        item["code"], item["category"], item["title"], item.get("amount", 0),
+                        item["price"], item.get("cost"), item["group"], item["sku"],
+                        item.get("kind", "game"), nxt,
+                    ),
+                )
+                added += cur.rowcount
+                nxt += 1
+            self._conn.commit()
+        return added
+
+    def known_skus(self) -> set[str]:
+        return {r["sku"] for r in self._all("SELECT sku FROM products WHERE sku != ''")}
 
     # ── каналҳои обунаи ҳатмӣ ─────────────────────────────────────────
     def add_channel(self, chat_id: str, title: str = "", link: str = "") -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 
 from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -515,4 +516,143 @@ async def cb_refresh_costs(cb: CallbackQuery, db: Database, cfg: Config, supplie
         f"🔄 Нав шуд: <b>{updated}</b> мол\n\n"
         "<i>Акнун дар экрани ҳар мол нархи харид ва фоида дида мешавад.</i>",
         reply_markup=keyboards.admin_price_categories(),
+    )
+
+
+# ── илова кардани бозии нав аз каталоги таъминкунанда ─────────────────
+MARKUP_KEY = "markup_percent"
+DEFAULT_MARKUP = 20
+
+
+def markup_percent(db: Database) -> int:
+    try:
+        return int(float(db.setting(MARKUP_KEY) or DEFAULT_MARKUP))
+    except ValueError:
+        return DEFAULT_MARKUP
+
+
+def price_from_cost(cost_usd: float, rate: float, markup: int) -> int:
+    """Нархи фурӯш аз нархи харид: то 0.50 боло мудаввар мешавад."""
+    somoni = cost_usd * rate * (1 + markup / 100)
+    return int(math.ceil(somoni * 2) / 2 * 100)      # дирам
+
+
+def new_families(live: dict, db: Database) -> list[tuple[str, str, int]]:
+    """Бозиҳои таъминкунанда, ки ҳанӯз дар бот нестанд."""
+    known = db.known_skus()
+    counts: dict[str, int] = {}
+    for sku in live:
+        if sku in known:
+            continue
+        counts[catalog.family_of(sku)] = counts.get(catalog.family_of(sku), 0) + 1
+    return sorted(
+        ((fam, catalog.family_title(fam), n) for fam, n in counts.items()),
+        key=lambda x: -x[2],
+    )
+
+
+@router.callback_query(F.data == "a:addgame")
+async def cb_add_game(cb: CallbackQuery, db: Database, cfg: Config, supplier) -> None:
+    from .admin import usd_rate
+
+    if not cfg.has_supplier:
+        await cb.answer("Таъминкунанда хомӯш аст", show_alert=True)
+        return
+    await safe_edit(cb, "⏳ Каталоги таъминкунандаро мегирам...", None)
+    await cb.answer()
+
+    live = await supplier.products()
+    if not live:
+        await cb.message.answer(
+            "⚠️ Каталогро гирифта натавонистам.",
+            reply_markup=keyboards.admin_price_categories(),
+        )
+        return
+
+    families = new_families(live, db)
+    await cb.message.answer(
+        texts.admin_add_game(families, usd_rate(db), markup_percent(db)),
+        reply_markup=keyboards.admin_add_game(families),
+    )
+
+
+@router.callback_query(F.data.startswith("a:addfam:"))
+async def cb_add_family(cb: CallbackQuery, db: Database, cfg: Config, supplier) -> None:
+    from .admin import usd_rate
+
+    family = cb.data.rsplit(":", 1)[1]
+    await safe_edit(cb, "⏳ Молҳоро месозам...", None)
+    await cb.answer()
+
+    live = await supplier.products()
+    if not live:
+        await cb.message.answer("⚠️ Каталогро гирифта натавонистам.")
+        return
+
+    rate, markup = usd_rate(db), markup_percent(db)
+    group_code = f"{family}_all"
+    title = catalog.family_title(family)
+    db.add_custom_group(group_code, catalog.CAT_OTHER, title)
+
+    known = db.known_skus()
+    items, skipped = [], 0
+    for sku, info in sorted(live.items()):
+        if catalog.family_of(sku) != family:
+            continue
+        if sku in known:
+            skipped += 1
+            continue
+        try:
+            cost = float(info.get("price") or 0)
+        except (TypeError, ValueError):
+            cost = 0
+        if cost <= 0:
+            skipped += 1
+            continue
+        items.append({
+            "code": sku,
+            "category": catalog.CAT_OTHER,
+            "title": str(info.get("name") or sku)[:60],
+            "amount": 0,
+            "price": price_from_cost(cost, rate, markup),
+            "cost": round(cost * 1000),
+            "group": group_code,
+            "sku": sku,
+            "kind": "game",
+        })
+
+    added = db.add_custom_products(items)
+    await cb.message.answer(
+        texts.game_added(title, added, skipped, rate, markup),
+        reply_markup=keyboards.admin_group_screen(group_code, False),
+    )
+
+
+@router.callback_query(F.data == "a:markup")
+async def cb_markup(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
+    await state.set_state(Admin.waiting_markup)
+    await safe_edit(
+        cb,
+        f"{texts.ADMIN_ASK_MARKUP}\n\nҲозир: <b>+{markup_percent(db)}%</b>",
+        keyboards.admin_back(),
+    )
+    await cb.answer()
+
+
+@router.message(Admin.waiting_markup, F.text)
+async def got_markup(message: Message, state: FSMContext, db: Database) -> None:
+    raw = message.text.strip().replace("%", "").replace(",", ".")
+    try:
+        value = int(float(raw))
+    except ValueError:
+        value = -1
+    if not 0 <= value <= 500:
+        await message.answer("❌ Фоиз нодуруст аст. Намуна: <code>20</code>")
+        return
+    await state.clear()
+    db.set_setting(MARKUP_KEY, str(value))
+    await message.answer(
+        f"✅ Фоиз: <b>+{value}%</b>\n\n"
+        "<i>Он ба бозиҳои нав татбиқ мешавад; нархҳои мавҷуда тағйир намеёбанд.</i>",
+        reply_markup=keyboards.admin_settings(),
     )

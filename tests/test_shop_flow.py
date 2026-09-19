@@ -1310,3 +1310,125 @@ async def test_new_games_have_cost_and_margin(db):
         assert row["cost"], code
         in_somoni = round(row["cost"] / 1000 * 11.0 * 100)
         assert row["price"] > in_somoni, f"{code}: цена ниже закупки"
+
+
+# ── добавление игры из панели ─────────────────────────────────────────
+class CatalogSupplier(FakeSupplier):
+    """Поставщик с заданным каталогом."""
+
+    def __init__(self, live):
+        super().__init__()
+        self._live = live
+
+    async def products(self):
+        return self._live
+
+
+FAKE_LIVE = {
+    "codm_cp_80": {"name": "Call of Duty 80 CP", "price": 0.99},
+    "codm_cp_400": {"name": "Call of Duty 400 CP", "price": 4.50},
+    "codm_cp_800": {"name": "Call of Duty 800 CP", "price": 8.90},
+    "pubg_uc_60": {"name": "60 UC", "price": 0.886},      # уже есть
+    "broken_item": {"name": "Без цены", "price": 0},      # пропустить
+}
+
+
+async def test_panel_lists_only_new_games(db, cfg_api, state):
+    from shop.handlers import settings as st
+
+    cb = FakeCallback("a:addgame", user_id=ADMIN_ID)
+    await st.cb_add_game(cb, db, cfg_api, CatalogSupplier(FAKE_LIVE))
+    labels = " ".join(_labels(cb.message.last_markup))
+    assert "codm" in labels
+    assert "PUBG" not in labels            # уже продаётся
+
+
+async def test_panel_adds_whole_game(db, cfg_api, state):
+    from shop.handlers import settings as st
+
+    cb = FakeCallback("a:addfam:codm", user_id=ADMIN_ID)
+    await st.cb_add_family(cb, db, cfg_api, CatalogSupplier(FAKE_LIVE))
+
+    items = db.group_products("codm_all", only_active=False)
+    assert len(items) == 3                                   # три товара CoD
+    assert all(i["custom"] for i in items)
+    assert all(not i["active"] for i in items)               # выключены
+    assert db.group("codm_all") is not None
+
+
+async def test_added_prices_include_markup(db, cfg_api, state):
+    from shop.handlers import settings as st
+
+    db.set_setting("usd_rate", "11")
+    db.set_setting("markup_percent", "20")
+    cb = FakeCallback("a:addfam:codm", user_id=ADMIN_ID)
+    await st.cb_add_family(cb, db, cfg_api, CatalogSupplier(FAKE_LIVE))
+
+    row = db.product("codm_cp_80")          # 0.99 $ × 11 × 1.2 = 13.07 → 13.50
+    assert row["cost"] == 990
+    assert row["price"] == 1350
+    assert row["price"] > round(row["cost"] / 1000 * 11 * 100)   # прибыль есть
+
+
+async def test_markup_setting_changes_result(db, cfg_api, state):
+    from shop.handlers import settings as st
+
+    db.set_setting("usd_rate", "11")
+    db.set_setting("markup_percent", "50")
+    cb = FakeCallback("a:addfam:codm", user_id=ADMIN_ID)
+    await st.cb_add_family(cb, db, cfg_api, CatalogSupplier(FAKE_LIVE))
+    assert db.product("codm_cp_80")["price"] == 1650     # 0.99×11×1.5 = 16.34 → 16.50
+
+
+async def test_adding_twice_does_not_duplicate(db, cfg_api, state):
+    from shop.handlers import settings as st
+
+    supplier = CatalogSupplier(FAKE_LIVE)
+    cb = FakeCallback("a:addfam:codm", user_id=ADMIN_ID)
+    await st.cb_add_family(cb, db, cfg_api, supplier)
+    await st.cb_add_family(FakeCallback("a:addfam:codm", user_id=ADMIN_ID), db, cfg_api, supplier)
+    assert len(db.group_products("codm_all", only_active=False)) == 3
+
+
+async def test_added_game_reaches_customer(db, cfg_api, state):
+    """Полный путь: добавили из панели → включили → покупатель видит."""
+    from shop.handlers import settings as st
+
+    await st.cb_add_family(FakeCallback("a:addfam:codm", user_id=ADMIN_ID),
+                           db, cfg_api, CatalogSupplier(FAKE_LIVE))
+    message = FakeMessage("/start")
+    await menu_h.cmd_start(message, state, db, cfg_api)
+    assert not _has(message.last_markup, texts.BTN_OTHER)     # ещё выключено
+
+    db.set_group_products_active("codm_all", True)
+    message2 = FakeMessage("/start")
+    await menu_h.cmd_start(message2, state, db, cfg_api)
+    assert _has(message2.last_markup, texts.BTN_OTHER)
+
+    cb = FakeCallback(keyboards.CB_CAT + catalog.CAT_OTHER)
+    await menu_h.cb_category(cb, state, db, cfg_api)
+    assert any("CP" in x for x in _labels(cb.message.last_markup))
+
+
+async def test_added_game_survives_restart(db, cfg_api, state, tmp_path):
+    from shop.db import Database
+    from shop.handlers import settings as st
+
+    await st.cb_add_family(FakeCallback("a:addfam:codm", user_id=ADMIN_ID),
+                           db, cfg_api, CatalogSupplier(FAKE_LIVE))
+    db.set_group_products_active("codm_all", True)
+    path = db.path
+    db.close()
+
+    again = Database(path)                       # перезапуск бота
+    assert again.active_count(catalog.CAT_OTHER) == 3
+    assert again.product("codm_cp_80") is not None
+    again.close()
+
+
+async def test_bad_markup_refused(db, cfg, state):
+    from shop.handlers import settings as st
+
+    message = FakeMessage("абв", user_id=ADMIN_ID)
+    await st.got_markup(message, state, db)
+    assert "нодуруст" in message.last

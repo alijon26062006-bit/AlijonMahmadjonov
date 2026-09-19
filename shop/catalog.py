@@ -97,6 +97,36 @@ CATEGORY_INFO: dict[str, Category] = {
 #: Зербахшҳое, ки ID ва рақами сервер талаб мекунанд (Mobile Legends).
 SERVER_GROUPS = frozenset({"mlbb_all", "mlbbcis_all"})
 
+#: Номи бозиҳо аз рӯи пешванди SKU — барои илова кардани бозии нав аз панел.
+FAMILY_NAMES: dict[str, str] = {
+    "diamonds": "Free Fire (ИДМ)", "voucher": "Free Fire — ваучерҳо",
+    "levelpass": "Free Fire — пропускҳо",
+    "id": "Free Fire Индонезия", "br": "Free Fire Бразилия",
+    "latam": "Free Fire Латино", "mena": "Free Fire MENA", "eu": "Free Fire Аврупо",
+    "sg": "Free Fire Сингапур", "tw": "Free Fire Тайван", "vn": "Free Fire Ветнам",
+    "pk": "Free Fire Покистон", "bd": "Free Fire Бангладеш",
+    "pubg": "PUBG Mobile", "mlbb": "Mobile Legends", "mlbbcis": "Mobile Legends (ИДМ)",
+    "hok": "Honor of Kings", "bs": "Blood Strike", "mr": "Marvel Rivals",
+    "ab": "Arena Breakout", "abi": "Arena Breakout Infinite",
+    "stars": "Telegram Stars",
+}
+
+#: Аломати бозиҳо барои тугмаҳо.
+FAMILY_ICONS: dict[str, str] = {
+    "mlbb": "⚔️", "mlbbcis": "⚔️", "hok": "👑", "bs": "🩸", "mr": "🦸",
+    "ab": "🔫", "abi": "🔫", "pubg": "🎯",
+}
+
+
+def family_of(sku: str) -> str:
+    """«mlbb_diamonds_50» → «mlbb»."""
+    return (sku or "").split("_")[0]
+
+
+def family_title(family: str) -> str:
+    icon = FAMILY_ICONS.get(family, "🎮")
+    return f"{icon} {FAMILY_NAMES.get(family, family)}"
+
 
 @dataclass(frozen=True)
 class Group:

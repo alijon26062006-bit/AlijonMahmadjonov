@@ -35,6 +35,7 @@ class Admin(StatesGroup):
     waiting_holder = State()
     waiting_alif = State()
     waiting_rate = State()
+    waiting_markup = State()
     waiting_bc_media = State()
     waiting_bc_text = State()
     waiting_bc_button = State()
