@@ -176,7 +176,7 @@ async def run(conn) -> None:
     check("предложена быстрая оплата",
           any("Душанбе Сити" in b for b in labels), str(labels))
     check("и подтверждение оплаты рядом",
-          any("оплатил" in b for b in labels), str(labels))
+          any("пардохт кардам" in b for b in labels), str(labels))
     check("код платежа показан клиенту",
           state.data.get("reference", "") in msg.last, str(state.data))
 

@@ -30,7 +30,7 @@ async def cb_profile(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Con
     await state.clear()
     user = await db.get_user(conn, call.from_user.id)
     if user is None:
-        await call.answer("Профиль не найден, нажмите /start", show_alert=True)
+        await call.answer("Профил ёфт нашуд, /start-ро пахш кунед", show_alert=True)
         return
 
     stats = await db.user_order_stats(conn, user.id)
@@ -58,7 +58,7 @@ async def cb_profile(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Con
 @router.callback_query(F.data == "p:history")
 async def cb_history(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     orders = await db.list_orders(conn, user_id=call.from_user.id, limit=10)
-    back = keyboards.back("m:profile", f"{em('back')} Назад")
+    back = keyboards.back("m:profile", f"{em('back')} Бозгашт")
 
     if not orders:
         await call.message.edit_text(texts.HISTORY_EMPTY, reply_markup=back)
@@ -79,9 +79,9 @@ async def cb_history(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
         # Возврат показываем отдельной строкой: человеку важно видеть,
         # что деньги за неудачный заказ вернулись, а не пропали.
         tail = (
-            f"\n└ {em('money')} <b>{fmt(order.price)}</b> вернулись на баланс"
+            f"\n└ {em('money')} <b>{fmt(order.price)}</b> ба баланс баргашт"
             if order.is_refunded else
-            f"\n└ Списано: <b>{fmt(order.price)}</b>"
+            f"\n└ Гирифта шуд: <b>{fmt(order.price)}</b>"
         )
         lines.append(
             f"<b>№{order.id}</b> · {order.status_title}\n"
@@ -101,7 +101,7 @@ async def cb_history(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
 async def cb_referral(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     user = await db.get_user(conn, call.from_user.id)
     if user is None:
-        await call.answer("Нажмите /start", show_alert=True)
+        await call.answer("/start-ро пахш кунед", show_alert=True)
         return
 
     bot_username = settings.bot_username or (await call.bot.me()).username

@@ -34,7 +34,8 @@ def parse_username(raw: str) -> str | None:
 
 
 def title_of(product_type: str, quantity: int) -> str:
-    return f"⭐️ {quantity} звёзд" if product_type == "stars" else f"👑 Premium {quantity} мес."
+    return (f"⭐️ {quantity} ситора" if product_type == "stars"
+            else f"👑 Premium {quantity} моҳ")
 
 
 # ------------------------------------------------------------------ звёзды
@@ -127,7 +128,7 @@ async def cb_stars_pack(
     """Готовый набор: количество уже известно, спрашивать нечего."""
     quantity = int(call.data.rsplit(":", 1)[1])
     if quantity not in runtime.star_packs():
-        await call.answer("Этого набора больше нет.", show_alert=True)
+        await call.answer("Ин маҷмӯа дигар нест.", show_alert=True)
         await call.message.edit_text(
             texts.STARS_ENTRY.format(rate=fmt4(runtime.star_price_e4())),
             reply_markup=keyboards.stars_entry(),
@@ -155,7 +156,7 @@ async def cb_premium_plan(
     months = int(call.data.split(":")[1])
     plan = runtime.find_premium(months)
     if plan is None:
-        await call.answer("Этого тарифа больше нет.", show_alert=True)
+        await call.answer("Ин таъриф дигар нест.", show_alert=True)
         return
 
     price = int(plan["price"])
@@ -198,7 +199,7 @@ async def _ask_recipient(
 async def cb_change_recipient(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     if not data.get("product_type"):
-        await call.answer("Начните заказ заново: /menu", show_alert=True)
+        await call.answer("Фармоишро аз нав сар кунед: /menu", show_alert=True)
         return
     await _ask_recipient(
         call, state, data["product_type"], data["quantity"], data["price"]
@@ -218,7 +219,7 @@ async def cb_buy_for_self(
         )
         await call.answer()
         return
-    await call.answer("Проверяю ваш аккаунт…")
+    await call.answer("Ҳисоби шуморо месанҷам…")
     await _check_and_confirm(call.message, state, provider, username,
                              buyer_username=username, edit=True)
 
@@ -362,7 +363,7 @@ async def cb_order_promo_off(
     had = bool((await state.get_data()).get("promo_percent"))
     await state.update_data(promo=None, promo_percent=0)
     await show_confirm(call.message, state, conn, call.from_user.id)
-    await call.answer("Промокод убран" if had else "")
+    await call.answer("Промокод гирифта шуд" if had else "")
 
 
 # ------------------------------------------------------------------ оплата
@@ -423,7 +424,7 @@ async def cb_pay(
 async def cb_steam(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     if not runtime.steam_on():
-        await call.answer("Раздел временно закрыт.", show_alert=True)
+        await call.answer("Бахш муваққатан баста аст.", show_alert=True)
         return
     await call.message.edit_text(
         texts.STEAM_ENTRY, reply_markup=keyboards.steam_menu()
@@ -437,7 +438,7 @@ async def cb_steam_amount(
 ) -> None:
     amount = int(call.data.split(":")[1])
     if amount not in runtime.steam_packs():
-        await call.answer("Этой суммы больше нет.", show_alert=True)
+        await call.answer("Ин маблағ дигар нест.", show_alert=True)
         await call.message.edit_text(
             texts.STEAM_ENTRY, reply_markup=keyboards.steam_menu()
         )

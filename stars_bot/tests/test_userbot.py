@@ -643,7 +643,7 @@ async def unique_kopeck(conn, bot) -> None:
     check("все начинаются с запрошенных 10",
           all(1000 < value <= 1010 for value in amounts), str(amounts))
     check("клиенту объяснили, зачем копейки",
-          "Копейки не убирайте" in ask.last, ask.last[-200:])
+          "Тангаҳоро нагиред" in ask.last, ask.last[-200:])
 
     saved = await db.get_deposit(conn, state.data["deposit_id"])
     check("бот запомнил, где показаны реквизиты",
@@ -681,8 +681,8 @@ async def unique_kopeck(conn, bot) -> None:
     check("реквизиты убраны с экрана", bool(watcher.edits), str(watcher.edits))
     screen = watcher.edits[0][2] if watcher.edits else ""
     check("на их месте — ответ об оплате",
-          "Оплата получена" in screen, screen[:80])
-    check("и новый баланс", "Текущий баланс" in screen, screen[:160])
+          "Пардохт гирифта шуд" in screen, screen[:80])
+    check("и новый баланс", "Баланси ҳозира" in screen, screen[:160])
     check("номера карты на экране больше нет",
           "9999000011112222" not in screen, screen[:160])
 
@@ -904,7 +904,7 @@ async def from_russia(conn, bot) -> None:
               chat == CLIENT and msg == 4242 for chat, msg, _ in bot.edited),
           str(bot.edited[:2]))
     check("и на нём написано про зачисление",
-          any("Оплата получена" in text for _, _, text in bot.edited),
+          any("Пардохт гирифта шуд" in text for _, _, text in bot.edited),
           str([text[:30] for _, _, text in bot.edited]))
 
 

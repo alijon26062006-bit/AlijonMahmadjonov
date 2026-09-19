@@ -189,7 +189,7 @@ async def one_deposit_at_a_time(conn) -> None:
     again = FakeCallback("dep:card", user=user, bot=bot)
     await dep_h.cb_card(again, state, conn)
     check("вторую заявку завести нельзя",
-          "уже есть заявка" in again.last, again.last[:80])
+          "аллакай дархост доред" in again.last, again.last[:80])
     check("и показана именно незакрытая",
           fmt((await db.get_deposit(conn, first)).amount) in again.last,
           again.last[:160])
@@ -198,7 +198,7 @@ async def one_deposit_at_a_time(conn) -> None:
     ru = FakeCallback("dep:ru", user=user, bot=bot)
     await dep_h.cb_ru(ru, state, conn)
     check("из России вторую тоже не завести",
-          "уже есть заявка" in ru.last, ru.last[:80])
+          "аллакай дархост доред" in ru.last, ru.last[:80])
 
     # Чек. Первый принимается, второй по той же заявке — нет.
     await state.set_state("Deposit:receipt")
@@ -213,20 +213,20 @@ async def one_deposit_at_a_time(conn) -> None:
     twice = FakeMessage(user=user, photo=True, bot=bot)
     await dep_h.on_receipt(twice, state, conn, bot)
     check("тот же чек второй раз не принимается",
-          "уже присылали" in twice.last or "уже получен" in twice.last,
+          "аллакай фиристода будед" in twice.last or "аллакай гирифта шуд" in twice.last,
           twice.last[:80])
 
     # Отмена освобождает человека: можно завести новую.
     drop = FakeCallback(f"dep:drop:{first}", user=user, bot=bot)
     await dep_h.cb_drop(drop, state, conn)
-    check("заявка отменяется", "отменена" in drop.last, drop.last[:60])
+    check("заявка отменяется", "бекор шуд" in drop.last, drop.last[:60])
     check("в базе она закрыта",
           (await db.get_deposit(conn, first)).status != db.DEP_PENDING)
 
     fresh = FakeCallback("dep:card", user=user, bot=bot)
     await dep_h.cb_card(fresh, state, conn)
     check("после отмены новая заявка заводится",
-          "Введите сумму" in fresh.last, fresh.last[:60])
+          "Маблағро бо сомонӣ нависед" in fresh.last, fresh.last[:60])
 
     # Чужую заявку по номеру не закрыть.
     other = 60_002
@@ -289,21 +289,21 @@ async def run_scenario(conn) -> None:
     # ---------------------------------------------------------------- /start
     msg = FakeMessage("/start", bot=bot)
     await menu_h.cmd_start(msg, state, conn)
-    check("/start показывает меню с балансом", "Добро пожаловать" in msg.last
+    check("/start показывает меню с балансом", "Хуш омадед" in msg.last
           and "0.00" in msg.last)
 
     # --------------------------------------------------------- пополнение
     call = FakeCallback("dep:card", bot=bot)
     await dep_h.cb_card(call, state, conn)
-    check("пополнение спрашивает сумму", "Введите сумму" in call.last)
+    check("пополнение спрашивает сумму", "Маблағро бо сомонӣ нависед" in call.last)
 
     msg = FakeMessage("abc", bot=bot)
     await dep_h.on_amount(msg, state, conn)
-    check("нечисловая сумма отклоняется", "Введите сумму числом" in msg.last)
+    check("нечисловая сумма отклоняется", "Маблағро бо рақам нависед" in msg.last)
 
     msg = FakeMessage("5", bot=bot)
     await dep_h.on_amount(msg, state, conn)
-    check("сумма ниже минимума отклоняется", "Минимальная сумма" in msg.last)
+    check("сумма ниже минимума отклоняется", "Камтарин маблағ" in msg.last)
 
     msg = FakeMessage("100", bot=bot)
     await dep_h.on_amount(msg, state, conn)
@@ -319,9 +319,9 @@ async def run_scenario(conn) -> None:
     check("экран реквизитов короткий", len(msg.last) < 420, str(len(msg.last)))
     buttons = [b.text for row in msg.markup.inline_keyboard for b in row]
     check("есть кнопка «я оплатил»",
-          any("оплатил" in b for b in buttons), str(buttons))
+          any("пардохт кардам" in b for b in buttons), str(buttons))
     check("номер карты можно скопировать",
-          any("копировать" in b.lower() for b in buttons), str(buttons))
+          any("нусхаи" in b.lower() for b in buttons), str(buttons))
 
     call = FakeCallback("dep:paid", bot=bot)
     await dep_h.cb_paid(call, state, conn)
@@ -329,18 +329,18 @@ async def run_scenario(conn) -> None:
     # сам, как только банк сообщит о переводе. Просить скриншот у каждого
     # — ровно та ручная работа, от которой мы уходили.
     check("после «я оплатил» обещают зачислить само",
-          "сам" in call.last, call.last[:160])
+          "худаш" in call.last, call.last[:160])
     check("чек всё-таки просят — он нужен для сверки",
-          "скриншот чека" in call.last, call.last[:240])
+          "скриншоти чекро" in call.last, call.last[:240])
     check("но зачисление обещано без него",
-          "пополнится <b>сам</b>" in call.last, call.last[:240])
+          "<b>худаш</b> пур мешавад" in call.last, call.last[:240])
     check("названа сумма к зачислению", fmt(paying) in call.last, call.last)
     check("состояние осталось прежним",
           await state.get_state() == "Deposit:receipt")
 
     call = FakeCallback("dep:back", bot=bot)
     await dep_h.cb_back_to_requisites(call, state, conn)
-    check("к реквизитам можно вернуться", "Переведите" in call.last,
+    check("к реквизитам можно вернуться", "гузаронед" in call.last,
           call.last[:80])
 
     call = FakeCallback("dep:paid", bot=bot)
@@ -370,15 +370,15 @@ async def run_scenario(conn) -> None:
     call = FakeCallback("stars:buy", bot=bot)
     await shop_h.cb_stars_buy(call, state, conn)
     check("показан курс и доступное количество",
-          "Введите количество" in call.last and "500</b> ⭐" in call.last)
+          "Шумораро бо рақам нависед" in call.last and "500</b> ⭐" in call.last)
 
     msg = FakeMessage("10", bot=bot)
     await shop_h.on_quantity(msg, state, conn)
-    check("количество ниже минимума отклоняется", "целое число" in msg.last)
+    check("количество ниже минимума отклоняется", "Рақами бутун" in msg.last)
 
     msg = FakeMessage("99999", bot=bot)
     await shop_h.on_quantity(msg, state, conn)
-    check("количество выше максимума отклоняется", "целое число" in msg.last)
+    check("количество выше максимума отклоняется", "Рақами бутун" in msg.last)
 
     msg = FakeMessage("100", bot=bot)
     await shop_h.on_quantity(msg, state, conn)
@@ -387,26 +387,26 @@ async def run_scenario(conn) -> None:
 
     msg = FakeMessage("не юзернейм!", bot=bot)
     await shop_h.on_recipient(msg, state, conn, provider)
-    check("кривой юзернейм отклоняется", "не похоже на юзернейм" in msg.last)
+    check("кривой юзернейм отклоняется", "ба юзернейм монанд нест" in msg.last)
 
     msg = FakeMessage("@notfound", bot=bot)
     await shop_h.on_recipient(msg, state, conn, provider)
-    check("несуществующий получатель отклоняется", "не найден" in msg.last)
+    check("несуществующий получатель отклоняется", "ёфт нашуд" in msg.last)
 
     msg = FakeMessage("https://t.me/target_user", bot=bot)
     await shop_h.on_recipient(msg, state, conn, provider)
     check("ссылка t.me распознаётся как юзернейм",
-          "Проверьте получателя" in msg.last and "@target_user" in msg.last)
+          "Гирандаро санҷед" in msg.last and "@target_user" in msg.last)
     check("показывается ИМЯ аккаунта, а не только юзернейм",
           "Target_user Test" in msg.last, msg.last.replace("\n", " ")[:110])
-    check("чужой аккаунт помечен предупреждением", "чужой" in msg.last)
+    check("чужой аккаунт помечен предупреждением", "бегона" in msg.last)
     check("состояние ждёт подтверждения получателя",
           await state.get_state() == "Buy:check_recipient")
 
     call = FakeCallback("order:recipient_ok", bot=bot)
     await shop_h.cb_recipient_ok(call, state, conn)
     check("после подтверждения показывается сводка заказа",
-          "Подтверждение заказа" in call.last)
+          "Тасдиқи фармоиш" in call.last)
     check("в сводке верная сумма и остаток",
           "20.00" in call.last and fmt(paying - 2000) in call.last,
           call.last.replace("\n", " ")[:100])
@@ -420,7 +420,7 @@ async def run_scenario(conn) -> None:
     check("баланс списан", user.balance == paying - 2000, fmt(user.balance))
     check("заказ выполнен", orders and orders[0].status == db.ORDER_DELIVERED)
     check("покупателю пришло подтверждение",
-          any("выполнен" in text for _, text in bot.messages))
+          any("иҷро шуд" in text for _, text in bot.messages))
 
     # ------------------------------------------------- покупка без денег
     call = FakeCallback("stars:buy", bot=bot)
@@ -428,13 +428,13 @@ async def run_scenario(conn) -> None:
     msg = FakeMessage("10000", bot=bot)
     await shop_h.on_quantity(msg, state, conn)
     check("покупка сверх баланса блокируется до списания",
-          "Не хватает средств" in msg.last)
+          "Маблағ намерасад" in msg.last)
 
     # ------------------------------------------------------------ профиль
     call = FakeCallback("m:profile", bot=bot)
     await prof_h.cb_profile(call, state, conn)
     check("профиль показывает баланс и статистику",
-          fmt(paying - 2000) in call.last and "Звёзд куплено" in call.last
+          fmt(paying - 2000) in call.last and "Ситора харида шуд" in call.last
           and "100" in call.last)
 
     call = FakeCallback("p:history", bot=bot)
@@ -457,19 +457,19 @@ async def run_scenario(conn) -> None:
     # ------------------------------------------------------------ поддержка
     call = FakeCallback("m:support", bot=bot)
     await sup_h.cb_support(call, state, conn)
-    check("раздел поддержки открывается", "Поддержка" in call.last)
+    check("раздел поддержки открывается", "Дастгирӣ" in call.last)
 
     call = FakeCallback("t:new", bot=bot)
     await sup_h.cb_new_ticket(call, state, conn)
     msg = FakeMessage("Не пришли звёзды по заказу 1", bot=bot)
     await sup_h.on_subject(msg, state, conn, bot)
     tickets = await db.list_tickets(conn, status=db.TICKET_OPEN)
-    check("тикет создан", len(tickets) == 1 and "Обращение №" in msg.last)
+    check("тикет создан", len(tickets) == 1 and "Муроҷиати №" in msg.last)
 
     call = FakeCallback("t:new", bot=bot)
     await sup_h.cb_new_ticket(call, state, conn)
     check("второй тикет при открытом первом не создаётся",
-          any("уже есть открытое" in alert for alert in call.alerts))
+          any("аллакай муроҷиати кушода доред" in alert for alert in call.alerts))
 
 
 asyncio.run(main())

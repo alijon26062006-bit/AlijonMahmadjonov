@@ -79,7 +79,7 @@ async def cb_games(
     if not runtime.get_bool("games_enabled"):
         games = []
     if not games and not runtime.steam_on():
-        await call.answer("Раздел временно закрыт.", show_alert=True)
+        await call.answer("Бахш муваққатан баста аст.", show_alert=True)
         return
     await call.message.edit_text(
         texts.GAMES_ENTRY, reply_markup=keyboards.games_menu(games)
@@ -132,7 +132,7 @@ async def cb_family(
     # СНГ первым: он нужен чаще всего, и листать до него не надо.
     items.sort(key=regions.sort_key)
     if not items:
-        await call.answer("Эта игра больше не продаётся.", show_alert=True)
+        await call.answer("Ин бозӣ дигар фурӯхта намешавад.", show_alert=True)
         return
     await call.message.edit_text(
         texts.GAME_REGION.format(title=items[0].title),
@@ -149,10 +149,10 @@ async def cb_game(
     category_id = call.data.split(":", 1)[1]
     game = await db.get_game(conn, category_id)
     if game is None or not game.enabled:
-        await call.answer("Эта игра больше не продаётся.", show_alert=True)
+        await call.answer("Ин бозӣ дигар фурӯхта намешавад.", show_alert=True)
         return
 
-    await call.answer("Смотрю пакеты…")
+    await call.answer("Маҷмӯаҳоро мебинам…")
     provider = suppliers.for_games(provider)
     try:
         # Из памяти, а не с новым запросом к поставщику на каждое
@@ -204,7 +204,7 @@ async def cb_pack(
     index = int(raw_index) if raw_index.isdigit() else -1
 
     if game is None or not 0 <= index < len(offers):
-        await call.answer("Пакет устарел, откройте игру заново.", show_alert=True)
+        await call.answer("Маҷмӯа кӯҳна шуд, бозиро аз нав кушоед.", show_alert=True)
         return
 
     offer = offers[index]
@@ -280,7 +280,7 @@ async def on_player_id(
     game = await db.get_game(conn, data.get("category_id", ""))
     if game is None:
         await state.clear()
-        await message.answer("Игра больше не продаётся. Откройте меню: /menu")
+        await message.answer("Ин бозӣ дигар фурӯхта намешавад. Менюро кушоед: /menu")
         return
 
     names = game.field_names
@@ -465,7 +465,7 @@ async def cb_buy(
     game = await db.get_game(conn, data.get("category_id", ""))
     if game is None:
         await state.clear()
-        await call.answer("Игра больше не продаётся.", show_alert=True)
+        await call.answer("Ин бозӣ дигар фурӯхта намешавад.", show_alert=True)
         return
     await state.clear()
     # Игры списываются с того счёта, чей ключ задан для игр.

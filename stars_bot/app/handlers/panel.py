@@ -29,7 +29,7 @@ from contextlib import suppress
 from html import escape as esc
 
 from app import db, emoji, links, reports, runtime, texts
-from app.handlers.menu import top_basis
+from app.handlers.menu import top_basis_ru
 from app.config import settings
 from app.services import access
 from app.emoji import substitute
@@ -1052,7 +1052,7 @@ def toggles_text() -> str:
         f"{'✅' if runtime.get_bool('stars_enabled') else '🚫'} Продажа звёзд\n"
         f"{'✅' if runtime.get_bool('premium_enabled') else '🚫'} Продажа Premium\n"
         f"{'✅' if runtime.get_bool('deposit_enabled') else '🚫'} Пополнение баланса\n\n"
-        f"🏆 Топ клиентов считается по сумме {top_basis(runtime.get('top_by'))}."
+        f"🏆 Топ клиентов считается по сумме {top_basis_ru(runtime.get('top_by'))}."
     )
 
 

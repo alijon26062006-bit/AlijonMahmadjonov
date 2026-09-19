@@ -206,15 +206,15 @@ async def flow(conn) -> None:
 
     call = call_of("m:steam")
     await shop.cb_steam(call, state)
-    check("экран Steam открывается", "Пополнение Steam" in call.last)
-    check("сказано, что пароль не нужен", "пароль" in call.last.lower())
+    check("экран Steam открывается", "Пур кардани Steam" in call.last)
+    check("сказано, что пароль не нужен", "парол" in call.last.lower())
     check("суммы показаны кнопками",
           "🎮 500 RUB — 70.00 с." in buttons(call.markup), str(buttons(call.markup)))
 
     call = call_of("steam:500")
     await shop.cb_steam_amount(call, state, conn)
-    check("бот просит логин", "Логин Steam" in call.last, call.last[:80])
-    check("предупреждает, что это не ник", "не ник" in call.last)
+    check("бот просит логин", "Логини Steam" in call.last, call.last[:80])
+    check("предупреждает, что это не ник", "дар профил ё почта нест" in call.last)
     check("ждём логин", await state.get_state() == "Steam:login")
     data = await state.get_data()
     check("сумма и цена сохранены",
@@ -222,12 +222,12 @@ async def flow(conn) -> None:
 
     bad = msg("а")
     await shop.on_steam_login(bad, state, conn, provider)
-    check("слишком короткий логин отклонён", "Такого аккаунта нет" in bad.last)
+    check("слишком короткий логин отклонён", "Чунин ҳисоб нест" in bad.last)
 
     unknown = msg("neznakomyi")
     await shop.on_steam_login(unknown, state, conn, provider)
     check("несуществующий логин отклонён",
-          "Такого аккаунта нет" in unknown.last, unknown.last[:60])
+          "Чунин ҳисоб нест" in unknown.last, unknown.last[:60])
     check("после отказа всё ещё ждём логин",
           await state.get_state() == "Steam:login")
     check("заказ при этом не создан",
@@ -236,7 +236,7 @@ async def flow(conn) -> None:
     # сервис не смог проверить — не продаём вслепую
     silent = msg("mypal")
     await shop.on_steam_login(silent, state, conn, SteamProvider(answer=False))
-    check("без проверки заказ не идёт", "Не удалось проверить" in silent.last,
+    check("без проверки заказ не идёт", "санҷида натавонистам" in silent.last,
           silent.last[:60])
     check("шаг закрыт, деньги не тронуты",
           (await db.get_user(conn, BUYER)).balance == 200_00)
@@ -247,15 +247,15 @@ async def flow(conn) -> None:
                             price=steam_cost(500))
     good = msg("mypal")
     await shop.on_steam_login(good, state, conn, provider)
-    check("аккаунт показан на подтверждение", "Проверьте аккаунт" in good.last)
+    check("аккаунт показан на подтверждение", "Ҳисобро санҷед" in good.last)
     check("видно имя аккаунта", "Mypal Player" in good.last, good.last[:200])
     check("видно логин", "<code>mypal</code>" in good.last)
     check("видно сумму", "500 RUB" in good.last)
     check("видно списание", "70.00 с." in good.last)
-    check("предупреждение о необратимости", "вернуть их будет" in good.last)
+    check("предупреждение о необратимости", "баргардонидани он мумкин нест" in good.last)
     check("ждём подтверждения", await state.get_state() == "Steam:confirm")
     check("есть кнопка смены логина",
-          any("Другой логин" in b for b in buttons(good.markup)))
+          any("Логини дигар" in b for b in buttons(good.markup)))
 
     call = call_of("steam:again")
     await shop.cb_steam_again(call, state)
@@ -280,7 +280,7 @@ async def flow(conn) -> None:
           str(order.profit))
     check("название заказа читаемое", "Steam 500 RUB" in order.title, order.title)
 
-    done = [t for _, t in bot.sent if "выполнен" in t]
+    done = [t for _, t in bot.sent if "иҷро шуд" in t]
     check("клиенту пришло своё сообщение о Steam", done and "Steam" in done[0],
           str(done[:1]))
     check("в нём логин, а не юзернейм Telegram", "mypal" in done[0])
@@ -290,7 +290,7 @@ async def flow(conn) -> None:
     await state.clear()
     call = call_of("steam:1000")
     await shop.cb_steam_amount(call, state, conn)
-    check("дорогая сумма упирается в баланс", "не хватает" in call.last.lower(),
+    check("дорогая сумма упирается в баланс", "намерасад" in call.last.lower(),
           call.last[:80])
 
     # ------------------------------------------------ исчезнувшая сумма
@@ -298,7 +298,7 @@ async def flow(conn) -> None:
     call = call_of("steam:500")
     await shop.cb_steam_amount(call, state, conn)
     check("снятая с продажи сумма отклоняется",
-          any("больше нет" in a for a in call.alerts), str(call.alerts))
+          any("дигар нест" in a for a in call.alerts), str(call.alerts))
     await runtime.set_value(conn, "steam_packs", "100,250,500,1000")
 
     # ------------------------------------------------ выключенный раздел
@@ -307,7 +307,7 @@ async def flow(conn) -> None:
           not any("Steam" in b for b in buttons(keyboards.main_menu())))
     call = call_of("m:steam")
     await shop.cb_steam(call, state)
-    check("и не открывается", any("закрыт" in a for a in call.alerts),
+    check("и не открывается", any("баста аст" in a for a in call.alerts),
           str(call.alerts))
     await runtime.set_value(conn, "steam_enabled", "1")
 

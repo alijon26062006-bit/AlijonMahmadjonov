@@ -118,12 +118,12 @@ async def run(conn) -> None:
     kb = keyboards.ask_recipient(has_username=True)
     labels = [b.text for row in kb.inline_keyboard for b in row]
     check("кнопка «Себе» показывается, если юзернейм есть",
-          any("Себе" in text for text in labels), str(labels))
+          any("Ба худам" in text for text in labels), str(labels))
 
     kb = keyboards.ask_recipient(has_username=False)
     labels = [b.text for row in kb.inline_keyboard for b in row]
     check("без юзернейма кнопки «Себе» нет",
-          not any("Себе" in text for text in labels), str(labels))
+          not any("Ба худам" in text for text in labels), str(labels))
 
     # --------------------------------------------------- покупка себе
     await state.set_state(shop_h.Buy.recipient)
@@ -135,7 +135,7 @@ async def run(conn) -> None:
           "@alijon" in call.last, call.last.replace("\n", " ")[:80])
     check("«Себе» показывает имя аккаунта",
           "Алиджон Махмаджонов" in call.last)
-    check("свой аккаунт помечен как ваш", "ваш аккаунт" in call.last)
+    check("свой аккаунт помечен как ваш", "ҳисоби шумост" in call.last)
     check("чужого предупреждения на своём аккаунте нет",
           "чужой" not in call.last)
 
@@ -148,7 +148,7 @@ async def run(conn) -> None:
     call = FakeCallback("order:self", user=FakeUser(uid=99, username=None))
     await shop_h.cb_buy_for_self(call, state, provider)
     check("без юзернейма объясняется, как его завести",
-          "не установлен юзернейм" in call.last and "Имя пользователя" in call.last)
+          "юзернейм надоред" in call.last and "Номи корбар" in call.last)
 
     # ------------------------------------------------ чужой получатель
     await state.set_state(shop_h.Buy.recipient)
@@ -156,7 +156,7 @@ async def run(conn) -> None:
     msg = FakeMessage("@friend")
     await shop_h.on_recipient(msg, state, conn, provider)
     check("чужой аккаунт показывает своё имя", "Дилшод" in msg.last)
-    check("чужой аккаунт помечен предупреждением", "чужой" in msg.last.lower())
+    check("чужой аккаунт помечен предупреждением", "бегона" in msg.last.lower())
     check("сначала идёт проверка, а не сразу оплата",
           await state.get_state() == "Buy:check_recipient")
 
@@ -165,7 +165,7 @@ async def run(conn) -> None:
     await state.update_data(product_type="stars", quantity=100, price=2000)
     msg = FakeMessage("@ghostaccount")
     await shop_h.on_recipient(msg, state, conn, provider)
-    check("несуществующий аккаунт отклоняется", "не найден" in msg.last)
+    check("несуществующий аккаунт отклоняется", "ёфт нашуд" in msg.last)
     check("к оплате не переходим", await state.get_state() == "Buy:recipient")
 
     # ------------------ шлюз не умеет проверять имя — говорим честно
@@ -180,7 +180,7 @@ async def run(conn) -> None:
     msg = FakeMessage("@unchecked")
     await shop_h.on_recipient(msg, state, conn, UnverifiedProvider())
     check("непроверенный аккаунт помечается честно",
-          "проверить нельзя" in msg.last, msg.last.replace("\n", " ")[:100])
+          "санҷида намешавад" in msg.last, msg.last.replace("\n", " ")[:100])
     check("предлагается открыть t.me для сверки", "t.me/unchecked" in msg.last)
     check("к оплате всё равно можно перейти",
           await state.get_state() == "Buy:check_recipient")

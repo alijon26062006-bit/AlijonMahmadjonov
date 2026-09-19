@@ -109,7 +109,7 @@ def reviews_link() -> str:
 def main_menu(games: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if runtime.get_bool("stars_enabled"):
-        kb.row(btn(labeled("stars", "Купить звёзды"), "m:stars",
+        kb.row(btn(labeled("stars", "Ситора харидан"), "m:stars",
                    style=PRIMARY, icon="stars"))
     if runtime.get_bool("premium_enabled"):
         kb.row(btn(labeled("premium", "Telegram Premium"), "m:premium",
@@ -120,20 +120,20 @@ def main_menu(games: bool = False) -> InlineKeyboardMarkup:
     if games or runtime.steam_on():
         kb.row(games_entry_btn())
 
-    deposit = btn(labeled("deposit", "Пополнить"), "m:deposit",
+    deposit = btn(labeled("deposit", "Пур кардан"), "m:deposit",
                   style=SUCCESS, icon="deposit")
-    profile = btn(labeled("profile", "Профиль"), "m:profile", icon="profile")
+    profile = btn(labeled("profile", "Профил"), "m:profile", icon="profile")
     kb.row(deposit, profile) if runtime.get_bool("deposit_enabled") else kb.row(profile)
 
     kb.row(
-        btn(labeled("support", "Поддержка"), "m:support", icon="support"),
-        btn(labeled("calc", "Калькулятор"), "m:calc", icon="calc"),
+        btn(labeled("support", "Дастгирӣ"), "m:support", icon="support"),
+        btn(labeled("calc", "Ҳисобкунак"), "m:calc", icon="calc"),
     )
-    kb.row(btn(labeled("info", "Информация"), "m:info", icon="info"))
+    kb.row(btn(labeled("info", "Маълумот"), "m:info", icon="info"))
     link = reviews_link()
     if link:
-        kb.row(btn(labeled("reviews", "Отзывы"), url=link, icon="reviews"))
-    kb.row(btn(labeled("top", "Топ клиентов"), "m:top", icon="top"))
+        kb.row(btn(labeled("reviews", "Шарҳҳо"), url=link, icon="reviews"))
+    kb.row(btn(labeled("top", "Беҳтарин мизоҷон"), "m:top", icon="top"))
     return kb.as_markup()
 
 
@@ -163,13 +163,13 @@ def games_entry_btn() -> InlineKeyboardButton:
 
 def back(target: str = "m:main", text: str = "") -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(btn(text or labeled("back", "В меню"), target))
+    kb.row(btn(text or labeled("back", "Ба меню"), target))
     return kb.as_markup()
 
 
 def cancel(text: str = "") -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(btn(text or labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    kb.row(btn(text or labeled("cancel", "Бекор"), "m:main", style=DANGER))
     return kb.as_markup()
 
 
@@ -186,8 +186,8 @@ def stars_entry() -> InlineKeyboardMarkup:
                 f"stars:pack:{quantity}", style=PRIMARY)
             for quantity in packs[left:left + 2]
         ])
-    kb.row(btn(labeled("edit", "Другое количество"), "stars:buy"))
-    kb.row(btn(labeled("back", "Назад"), "m:main"))
+    kb.row(btn(labeled("edit", "Шумораи дигар"), "stars:buy"))
+    kb.row(btn(labeled("back", "Бозгашт"), "m:main"))
     return kb.as_markup()
 
 
@@ -204,7 +204,7 @@ def games_menu(games: list) -> InlineKeyboardMarkup:
             kb.row(game_btn(items[0], f"g:{items[0].category_id}"))
         else:
             kb.row(game_btn(items[0], f"gf:{group['family']}", group["title"]))
-    kb.row(btn(labeled("back", "Назад"), "m:main"))
+    kb.row(btn(labeled("back", "Бозгашт"), "m:main"))
     return kb.as_markup()
 
 
@@ -214,7 +214,7 @@ def game_regions(games: list) -> InlineKeyboardMarkup:
     for game in games:
         kb.row(btn(regions.region_title(game), f"g:{game.category_id}",
                    style=PRIMARY))
-    kb.row(btn(labeled("back", "Назад"), "m:games"))
+    kb.row(btn(labeled("back", "Бозгашт"), "m:games"))
     return kb.as_markup()
 
 
@@ -262,7 +262,7 @@ def game_packs(game, offers: list) -> InlineKeyboardMarkup:
             kb.row(make(index))
             index += 1
 
-    kb.row(btn(labeled("back", "Назад"), "m:games"))
+    kb.row(btn(labeled("back", "Бозгашт"), "m:games"))
     return kb.as_markup()
 
 
@@ -272,7 +272,7 @@ def game_found_in(games: list) -> InlineKeyboardMarkup:
     for game in games:
         kb.row(btn(f"✅ {regions.region_title(game)}",
                    f"g:{game.category_id}", style=SUCCESS))
-    kb.row(btn(labeled("back", "К играм"), "m:games"))
+    kb.row(btn(labeled("back", "Ба бозиҳо"), "m:games"))
     return kb.as_markup()
 
 
@@ -283,19 +283,19 @@ def confirm_unverified(game, family_size: int = 1) -> InlineKeyboardMarkup:
     из-за неё покупку нельзя: пополнение идёт по ID, а не по проверке.
     """
     kb = InlineKeyboardBuilder()
-    kb.row(btn("⚠️ Всё равно купить", "g:ok", style=DANGER))
+    kb.row(btn("⚠️ Бо ҳамин ҳол харидан", "g:ok", style=DANGER))
     if family_size > 1:
-        kb.row(btn("🌍 Сменить регион", f"gf:{regions.family_of(game)}"))
-    kb.row(btn(labeled("edit", "Другой ID"), f"g:{game.category_id}"))
-    kb.row(btn(labeled("cancel", "Отмена"), "m:main"))
+        kb.row(btn("🌍 Минтақаро иваз кардан", f"gf:{regions.family_of(game)}"))
+    kb.row(btn(labeled("edit", "ID-и дигар"), f"g:{game.category_id}"))
+    kb.row(btn(labeled("cancel", "Бекор"), "m:main"))
     return kb.as_markup()
 
 
 def confirm_game(category_id: str) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(btn(labeled("confirm", "Да, это мой аккаунт"), "g:ok", style=SUCCESS))
-    kb.row(btn(labeled("edit", "Другой ID"), f"g:{category_id}"))
-    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    kb.row(btn(labeled("confirm", "Ҳа, ин ҳисоби ман аст"), "g:ok", style=SUCCESS))
+    kb.row(btn(labeled("edit", "ID-и дигар"), f"g:{category_id}"))
+    kb.row(btn(labeled("cancel", "Бекор"), "m:main", style=DANGER))
     return kb.as_markup()
 
 
@@ -310,15 +310,15 @@ def steam_menu() -> InlineKeyboardMarkup:
                 f"steam:{amount}", style=PRIMARY)
             for amount in packs[left:left + 2]
         ])
-    kb.row(btn(labeled("back", "Назад"), "m:main"))
+    kb.row(btn(labeled("back", "Бозгашт"), "m:main"))
     return kb.as_markup()
 
 
 def confirm_steam() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(btn(labeled("confirm", "Да, это мой аккаунт"), "steam:ok", style=SUCCESS))
-    kb.row(btn(labeled("edit", "Другой логин"), "steam:again"))
-    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    kb.row(btn(labeled("confirm", "Ҳа, ин ҳисоби ман аст"), "steam:ok", style=SUCCESS))
+    kb.row(btn(labeled("edit", "Логини дигар"), "steam:again"))
+    kb.row(btn(labeled("cancel", "Бекор"), "m:main", style=DANGER))
     return kb.as_markup()
 
 
@@ -326,44 +326,44 @@ def premium_menu() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for plan in runtime.premium_plans():
         kb.row(btn(
-            f"{em('premium')} {plan['months']} мес. — {fmt(plan['price'])}",
+            f"{em('premium')} {plan['months']} моҳ — {fmt(plan['price'])}",
             f"premium:{plan['months']}", style=PRIMARY, icon="premium",
         ))
-    kb.row(btn(labeled("back", "Назад"), "m:main"))
+    kb.row(btn(labeled("back", "Бозгашт"), "m:main"))
     return kb.as_markup()
 
 
 def ask_recipient(has_username: bool) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if has_username:
-        kb.row(btn(labeled("stars", "Себе"), "order:self", style=SUCCESS, icon="stars"))
-    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
+        kb.row(btn(labeled("stars", "Ба худам"), "order:self", style=SUCCESS, icon="stars"))
+    kb.row(btn(labeled("cancel", "Бекор"), "m:main", style=DANGER))
     return kb.as_markup()
 
 
 def confirm_recipient() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(btn(labeled("confirm", "Да, всё верно"), "order:recipient_ok", style=SUCCESS))
-    kb.row(btn(labeled("edit", "Другой юзернейм"), "order:again"))
-    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    kb.row(btn(labeled("confirm", "Ҳа, ҳама дуруст"), "order:recipient_ok", style=SUCCESS))
+    kb.row(btn(labeled("edit", "Юзернейми дигар"), "order:again"))
+    kb.row(btn(labeled("cancel", "Бекор"), "m:main", style=DANGER))
     return kb.as_markup()
 
 
 def confirm(has_promo: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(btn(labeled("confirm", "Оплатить"), "order:go", style=SUCCESS))
+    kb.row(btn(labeled("confirm", "Пардохт"), "order:go", style=SUCCESS))
     if has_promo:
-        kb.row(btn("✖️ Убрать промокод", "order:promo_off"))
+        kb.row(btn("✖️ Промокодро гирифтан", "order:promo_off"))
     else:
         kb.row(btn(labeled("promo", "Промокод"), "order:promo"))
-    kb.row(btn(labeled("edit", "Другой получатель"), "order:again"))
-    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    kb.row(btn(labeled("edit", "Гирандаи дигар"), "order:again"))
+    kb.row(btn(labeled("cancel", "Бекор"), "m:main", style=DANGER))
     return kb.as_markup()
 
 
 def cancel_order(order_id: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(btn(labeled("cancel", "Отменить заказ"), f"order:cancel:{order_id}",
+    kb.row(btn(labeled("cancel", "Фармоишро бекор кардан"), f"order:cancel:{order_id}",
                style=DANGER))
     return kb.as_markup()
 
@@ -381,8 +381,8 @@ def sponsor_gate(channels: list[str]) -> InlineKeyboardMarkup:
     for channel in channels:
         link = sponsor.link_of(channel)
         if link:
-            kb.row(btn(f"📢 Подписаться — {channel}", url=link))
-    kb.row(btn(labeled("confirm", "Я подписался"), "sub:check", style=SUCCESS))
+            kb.row(btn(f"📢 Обуна шудан — {channel}", url=link))
+    kb.row(btn(labeled("confirm", "Ман обуна шудам"), "sub:check", style=SUCCESS))
     return kb.as_markup()
 
 
@@ -393,8 +393,8 @@ def deposit_methods() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn(labeled("dcity", "Душанбе Сити"), "dep:card",
                style=SUCCESS, icon="dcity"))
-    kb.row(btn("🇷🇺 Из России — Сбербанк, Тинькофф", "dep:ru"))
-    kb.row(btn(labeled("back", "Назад"), "m:main"))
+    kb.row(btn("🇷🇺 Аз Русия — Сбербанк, Тинькофф", "dep:ru"))
+    kb.row(btn(labeled("back", "Бозгашт"), "m:main"))
     return kb.as_markup()
 
 
@@ -410,14 +410,14 @@ def deposit_pay(link: str = "", card: str = "") -> InlineKeyboardMarkup:
     """
     kb = InlineKeyboardBuilder()
     if link:
-        kb.row(btn("🏙 Оплатить в Душанбе Сити", url=link, style=SUCCESS))
+        kb.row(btn("🏙 Дар Душанбе Сити пардохт", url=link, style=SUCCESS))
     if card:
         kb.row(InlineKeyboardButton(
-            text="📋 Скопировать номер карты",
+            text="📋 Нусхаи рақами корт",
             copy_text=CopyTextButton(text=card),
         ))
-    kb.row(btn("✅ Я оплатил", "dep:paid", style=PRIMARY))
-    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    kb.row(btn("✅ Ман пардохт кардам", "dep:paid", style=PRIMARY))
+    kb.row(btn(labeled("cancel", "Бекор"), "m:main", style=DANGER))
     return kb.as_markup()
 
 
@@ -431,48 +431,48 @@ def deposit_ru(number: str = "") -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if number:
         kb.row(InlineKeyboardButton(
-            text="📋 Скопировать номер",
+            text="📋 Нусхаи рақам",
             copy_text=CopyTextButton(text=number),
         ))
-    kb.row(btn("✅ Я отправил", "dep:ru_sent", style=PRIMARY))
-    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    kb.row(btn("✅ Ман фиристодам", "dep:ru_sent", style=PRIMARY))
+    kb.row(btn(labeled("cancel", "Бекор"), "m:main", style=DANGER))
     return kb.as_markup()
 
 
 def deposit_open(deposit_id: int) -> InlineKeyboardMarkup:
     """Что делать с уже заведённой заявкой: прислать чек или отменить."""
     kb = InlineKeyboardBuilder()
-    kb.row(btn("🧾 Прислать чек", "dep:paid", style=PRIMARY))
-    kb.row(btn("🗑 Отменить заявку", f"dep:drop:{deposit_id}", style=DANGER))
-    kb.row(btn(labeled("back", "В меню"), "m:main"))
+    kb.row(btn("🧾 Чек фиристодан", "dep:paid", style=PRIMARY))
+    kb.row(btn("🗑 Дархостро бекор кардан", f"dep:drop:{deposit_id}", style=DANGER))
+    kb.row(btn(labeled("back", "Ба меню"), "m:main"))
     return kb.as_markup()
 
 
 def deposit_receipt() -> InlineKeyboardMarkup:
     """Шаг чека: вернуться к реквизитам или выйти."""
     kb = InlineKeyboardBuilder()
-    kb.row(btn("‹ Реквизиты", "dep:back"))
-    kb.row(btn(labeled("cancel", "Отмена"), "m:main", style=DANGER))
+    kb.row(btn("‹ Реквизитҳо", "dep:back"))
+    kb.row(btn(labeled("cancel", "Бекор"), "m:main", style=DANGER))
     return kb.as_markup()
 
 
 def profile() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(btn(labeled("history", "История покупок"), "p:history", icon="history"))
+    kb.row(btn(labeled("history", "Таърихи харидҳо"), "p:history", icon="history"))
     kb.row(btn(labeled("promo", "Промокод"), "p:promo", style=SUCCESS, icon="promo"))
-    kb.row(btn(labeled("referral", "Рефералы"), "p:ref", icon="referral"))
-    kb.row(btn(labeled("back", "В меню"), "m:main"))
+    kb.row(btn(labeled("referral", "Муаррифшудагон"), "p:ref", icon="referral"))
+    kb.row(btn(labeled("back", "Ба меню"), "m:main"))
     return kb.as_markup()
 
 
 def support_menu(has_open: bool) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if has_open:
-        kb.row(btn(labeled("edit", "Дописать в обращение"), "t:reply", style=PRIMARY))
+        kb.row(btn(labeled("edit", "Ба муроҷиат илова кардан"), "t:reply", style=PRIMARY))
     else:
-        kb.row(btn(labeled("support", "Написать в поддержку"), "t:new",
+        kb.row(btn(labeled("support", "Ба дастгирӣ навиштан"), "t:new",
                    style=PRIMARY, icon="support"))
-    kb.row(btn(labeled("back", "В меню"), "m:main"))
+    kb.row(btn(labeled("back", "Ба меню"), "m:main"))
     return kb.as_markup()
 
 

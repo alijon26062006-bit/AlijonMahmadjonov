@@ -46,7 +46,7 @@ async def _blocked_by_open(call, conn, state) -> bool:
     await call.message.edit_text(
         texts.DEPOSIT_ALREADY.format(
             amount=fmt(open_one.amount),
-            method=open_one.method or "перевод",
+            method=texts.method_title(open_one.method),
             when=open_one.created_at[:16].replace("T", " "),
         ),
         reply_markup=keyboards.deposit_open(open_one.id),
@@ -61,7 +61,7 @@ async def cb_drop(call: CallbackQuery, state: FSMContext,
     """Отменить свою заявку — чтобы можно было завести новую."""
     deposit_id = int(call.data.rsplit(":", 1)[1])
     if not await db.cancel_deposit(conn, deposit_id, call.from_user.id):
-        await call.answer("Эта заявка уже закрыта.", show_alert=True)
+        await call.answer("Ин дархост аллакай пӯшида шуд.", show_alert=True)
     await state.clear()
     await call.message.edit_text(
         texts.DEPOSIT_CANCELLED.format(support=texts.support()),
@@ -346,7 +346,7 @@ async def cb_paid(
     amount = data.get("amount")
     if not amount:
         await state.clear()
-        await call.answer("Заявка потерялась, начните заново.", show_alert=True)
+        await call.answer("Дархост гум шуд, аз нав сар кунед.", show_alert=True)
         return
 
     await call.message.edit_text(
@@ -365,7 +365,7 @@ async def cb_back_to_requisites(
     amount, reference = data.get("amount"), data.get("reference", "")
     if not amount:
         await state.clear()
-        await call.answer("Заявка потерялась, начните заново.", show_alert=True)
+        await call.answer("Дархост гум шуд, аз нав сар кунед.", show_alert=True)
         return
     body, markup = _requisites(amount, reference)
     await call.message.edit_text(body, reply_markup=markup)
@@ -382,7 +382,7 @@ async def on_receipt(
     amount = data.get("amount")
     if not amount:
         await state.clear()
-        await message.answer("Заявка потерялась. Начните заново: /menu")
+        await message.answer("Дархост гум шуд. Аз нав сар кунед: /menu")
         return
 
     file_id = message.photo[-1].file_id if message.photo else message.document.file_id

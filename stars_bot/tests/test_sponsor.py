@@ -131,14 +131,14 @@ async def run(conn) -> None:
     check("неподписанного дальше не пускаем",
           not await passes(gate, letter, bot, CLIENT))
     check("и показываем, куда подписаться",
-          letter.sent and "Подпишитесь" in letter.sent[0],
+          letter.sent and "обуна шавед" in letter.sent[0],
           str(letter.sent)[:80])
 
     press = Press("m:stars")
     check("нажатия тоже не проходят",
           not await passes(gate, press, bot, CLIENT))
     check("экран подписки показан и на нажатие",
-          press.message.sent and "Подпишитесь" in press.message.sent[0])
+          press.message.sent and "обуна шавед" in press.message.sent[0])
 
     # кнопка «я подписался» обязана проходить, иначе нажимать её незачем
     check("«я подписался» проходит защиту",

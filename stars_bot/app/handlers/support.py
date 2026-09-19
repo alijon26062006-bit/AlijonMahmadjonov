@@ -49,7 +49,7 @@ async def on_subject(
 ) -> None:
     text = (message.text or "").strip()
     if len(text) < 5:
-        await message.answer("❗️ Опишите проблему подробнее — минимум 5 символов.")
+        await message.answer("❗️ Мушкилотро муфассалтар нависед — камаш 5 аломат.")
         return
 
     ticket = await db.create_ticket(conn, message.from_user.id, text[:500])
@@ -77,7 +77,7 @@ async def cb_reply(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Conne
         conn, user_id=call.from_user.id, status=db.TICKET_OPEN, limit=1
     )
     if not tickets:
-        await call.answer("Открытых тикетов нет.", show_alert=True)
+        await call.answer("Муроҷиати кушода нест.", show_alert=True)
         return
     await state.set_state(Support.reply)
     await state.update_data(ticket_id=tickets[0].id)
@@ -97,7 +97,7 @@ async def on_reply(
     ticket = await db.get_ticket(conn, ticket_id) if ticket_id else None
     if ticket is None or ticket.user_id != message.from_user.id:
         await state.clear()
-        await message.answer("Тикет не найден.")
+        await message.answer("Муроҷиат ёфт нашуд.")
         return
 
     text = (message.text or "").strip()

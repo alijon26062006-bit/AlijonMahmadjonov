@@ -450,8 +450,8 @@ async def flow(conn) -> None:
 
     call = call_of("m:games")
     await gh.cb_games(call, state, conn)
-    check("раздел игр открывается", "Пополнение игр" in call.last)
-    check("сказано, что пароль не нужен", "пароль" in call.last.lower())
+    check("раздел игр открывается", "Пур кардани бозиҳо" in call.last)
+    check("сказано, что пароль не нужен", "пароли ҳисобро" in call.last.lower())
     check("игра показана кнопкой",
           any("Free Fire" in b for b in buttons(call.markup)),
           str(buttons(call.markup)))
@@ -486,7 +486,7 @@ async def flow(conn) -> None:
 
     call = call_of("g:free_fire_br")
     await gh.cb_game(call, state, conn, provider)
-    check("пакеты показаны", "Выберите пакет" in call.last, call.last[:80])
+    check("пакеты показаны", "Маҷмӯаро интихоб кунед" in call.last, call.last[:80])
     labels = buttons(call.markup)
     check("на кнопке пакет и цена в сомони",
           "100 алмазов — 14 с." in labels, str(labels))
@@ -538,19 +538,19 @@ async def flow(conn) -> None:
 
     call = call_of("gp:free_fire_br:0")
     await gh.cb_pack(call, state, conn)
-    check("бот просит ID", "ID игрока" in call.last, call.last[:80])
+    check("бот просит ID", "ID-и бозигар" in call.last, call.last[:80])
     check("ждём ID", await state.get_state() == "Game:player")
 
     bad = msg("abc")
     await gh.on_player_id(bad, state, conn, provider)
-    check("нечисловой ID отклонён", "не похоже на ID" in bad.last, bad.last[:80])
+    check("нечисловой ID отклонён", "ба ID монанд нест" in bad.last, bad.last[:80])
 
     good = msg("1724367212")
     await gh.on_player_id(good, state, conn, provider)
-    check("ник показан на подтверждение", "Проверьте аккаунт" in good.last)
+    check("ник показан на подтверждение", "Ҳисобро санҷед" in good.last)
     check("виден ник игрока", "Ник" in good.last, good.last[:200])
     check("виден ID", "1724367212" in good.last)
-    check("предупреждение о необратимости", "вернуть его будет" in good.last)
+    check("предупреждение о необратимости", "баргардонидани он мумкин нест" in good.last)
     check("ждём подтверждения", await state.get_state() == "Game:confirm")
 
     call = call_of("g:ok")
@@ -574,8 +574,8 @@ async def flow(conn) -> None:
     check("заказ ещё в работе", order.status == db.ORDER_DELIVERING, order.status)
     said = [t for t, _ in call.message._log]
     check("клиенту сказано, что заказ принят",
-          any("принят" in t for t in said), str(said[-2:]))
-    check("и что нужно подождать", any("меньше минуты" in t for t in said),
+          any("қабул шуд" in t for t in said), str(said[-2:]))
+    check("и что нужно подождать", any("камтар аз як дақиқа" in t for t in said),
           str(said[-1:]))
 
     # ------------------------------------------------ доглядчик доводит до конца
@@ -584,7 +584,7 @@ async def flow(conn) -> None:
     check("доглядчик видит выполнение", result == "done", result)
     order = await db.get_order(conn, order.id)
     check("заказ закрыт как выполненный", order.status == db.ORDER_DELIVERED)
-    done = [t for t in bot.to(BUYER) if "выполнен" in t]
+    done = [t for t in bot.to(BUYER) if "иҷро шуд" in t]
     check("клиенту пришло сообщение о выдаче", bool(done), str(bot.to(BUYER)))
     check("в нём ID игрока", done and "1724367212" in done[0])
 
@@ -602,7 +602,7 @@ async def flow(conn) -> None:
           (await db.get_user(conn, BUYER)).balance == before, fmt(before))
     check("владельцу сказали о нехватке баланса",
           any("INSUFFICIENT_BALANCE" in t for t in bot.to(ADMIN)), str(bot.to(ADMIN)))
-    check("клиенту сказали о возврате", "не выполнен" in call.last, call.last[:80])
+    check("клиенту сказали о возврате", "иҷро нашуд" in call.last, call.last[:80])
 
     # ------------------------------------------------ возврат по таймауту
     provider = GameProvider(status="processing")
@@ -668,10 +668,10 @@ async def unknown_nick(conn) -> None:
                                 pack="100 алмазов", price=1400, cost=1090)
         message = msg("5555555555")
         await gh.on_player_id(message, state, conn, provider)
-        check("без ника покупку не блокируем", "ID принят" in message.last,
+        check("без ника покупку не блокируем", "ID қабул шуд" in message.last,
               message.last[:80])
         check("но просим проверить ID самому",
-              "проверьте ID сами" in message.last, message.last)
+              "ID-ро худатон санҷед" in message.last, message.last)
         check("до подтверждения всё равно доходит",
               await state.get_state() == "Game:confirm")
 
@@ -682,8 +682,8 @@ async def unknown_nick(conn) -> None:
         await gh.on_player_id(message, state, conn, provider)
         # проверка не нашла ID — но покупку это не запирает
         check("непроверенный ID не запирает покупку",
-              "не подтвердился" in message.last, message.last[:80])
-        check("и подсказано про регион", "регион" in message.last.lower(),
+              "тасдиқ нашуд" in message.last, message.last[:80])
+        check("и подсказано про регион", "минтақа" in message.last.lower(),
               message.last)
         check("до подтверждения доходит и без проверки",
               await state.get_state() == "Game:confirm")
@@ -700,7 +700,7 @@ async def unknown_nick(conn) -> None:
                                 pack="100 алмазов", price=1400, cost=1090)
         message = msg("6666666666")
         await gh.on_player_id(message, state, conn, provider)
-        check("справочник ников покупку не рубит", "ID принят" in message.last,
+        check("справочник ников покупку не рубит", "ID қабул шуд" in message.last,
               message.last[:120])
         check("и до подтверждения доходит",
               await state.get_state() == "Game:confirm")
@@ -1014,12 +1014,12 @@ async def two_fields(conn) -> None:
 
     message = msg("123456789")
     await gh.on_player_id(message, state, conn, provider)
-    check("одного числа мало", "два числа" in message.last.lower(),
+    check("одного числа мало", "ду рақам лозим аст" in message.last.lower(),
           message.last[:120])
 
     message = msg("123456789 (1234)")
     await gh.on_player_id(message, state, conn, provider)
-    check("пара принята", "Проверьте аккаунт" in message.last, message.last[:120])
+    check("пара принята", "Ҳисобро санҷед" in message.last, message.last[:120])
     check("ник получен по паре", "ChessMan" in message.last, message.last[:200])
     check("в подтверждении видны оба числа",
           "123456789 (1234)" in message.last, message.last[:200])
@@ -1392,7 +1392,7 @@ async def wrong_region(conn) -> None:
         check("бот сам обошёл остальные регионы",
               "free_fire_br" in provider.asked, str(provider.asked))
         check("клиенту сказали, где аккаунт нашёлся",
-              "другом регионе" in message.last, message.last[:120])
+              "минтақаи дигар" in message.last, message.last[:120])
         check("назван нужный регион", "Бразилия" in message.last, message.last)
         check("и ник оттуда", "BrPlayer" in message.last, message.last)
         check("кнопка ведёт прямо в этот регион",
@@ -1409,7 +1409,7 @@ async def wrong_region(conn) -> None:
         message = msg("1234567890")
         await gh.on_player_id(message, state, conn, Nowhere())
         check("если нигде нет — честно предупреждаем",
-              "не подтвердился" in message.last, message.last[:80])
+              "тасдиқ нашуд" in message.last, message.last[:80])
         check("но купить всё равно даём",
               any(b.callback_data == "g:ok"
                   for row in message.markup.inline_keyboard for b in row),
@@ -1418,7 +1418,7 @@ async def wrong_region(conn) -> None:
               any(b.callback_data == "gf:free_fire"
                   for row in message.markup.inline_keyboard for b in row),
               str(message.markup))
-        check("сумма списания показана", "К списанию" in message.last,
+        check("сумма списания показана", "Барои пардохт" in message.last,
               message.last[:200])
 
         # и покупка после этого действительно проходит
@@ -1602,7 +1602,7 @@ async def fast_follow(conn) -> None:
     check("заказ закрыт",
           (await db.get_order(conn, order.id)).status == db.ORDER_DELIVERED)
     check("клиент получил сообщение сразу",
-          any("выполнен" in t for t in bot.to(BUYER)), str(bot.to(BUYER)))
+          any("иҷро шуд" in t for t in bot.to(BUYER)), str(bot.to(BUYER)))
 
     # уже закрытый заказ опрашивать незачем
     ticks["n"] = 0
@@ -2284,9 +2284,9 @@ async def region_step(conn) -> None:
 
     call = call_of("gf:free_fire")
     await gh.cb_family(call, state, conn)
-    check("экран региона открылся", "регион" in call.last.lower(), call.last[:120])
+    check("экран региона открылся", "минтақа" in call.last.lower(), call.last[:120])
     check("объяснено, зачем регион",
-          "не найдётся" in call.last or "не найдется" in call.last, call.last)
+          "ёфт намешавад" in call.last, call.last)
     picks = buttons(call.markup)
     check("предложены все три региона",
           all(any(name in b for b in picks)
@@ -2299,7 +2299,7 @@ async def region_step(conn) -> None:
 
     call = call_of("g:free_fire_id")
     await gh.cb_game(call, state, conn, GameProvider())
-    check("после региона показаны пакеты", "Выберите пакет" in call.last,
+    check("после региона показаны пакеты", "Маҷмӯаро интихоб кунед" in call.last,
           call.last[:120])
     check("регион виден в заголовке", "Индонезия" in call.last, call.last[:120])
 

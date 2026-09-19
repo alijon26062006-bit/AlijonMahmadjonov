@@ -257,19 +257,19 @@ async def purchase(conn) -> None:
 
     message = FakeMessage("ali10", user=buyer, bot=bot)
     await shop.on_order_promo(message, state, conn)
-    check("код принят", "применён" in message.replies[0])
+    check("код принят", "истифода шуд" in message.replies[0])
     check("показана экономия", "2.00" in message.replies[0], message.replies[0])
     check("в сводке зачёркнута старая цена", "<s>20.00 с.</s>" in message.last, message.last)
-    check("в сводке новая сумма", "К списанию: <b>18.00 с.</b>" in message.last)
-    check("в сводке остаток пересчитан", "Останется: <b>182.00 с.</b>" in message.last)
+    check("в сводке новая сумма", "Барои пардохт: <b>18.00 с.</b>" in message.last)
+    check("в сводке остаток пересчитан", "Мемонад: <b>182.00 с.</b>" in message.last)
     check("вернулись к подтверждению", await state.get_state() == "Buy:confirm")
     check("появилась кнопка снятия промокода",
-          "✖️ Убрать промокод" in texts_of(message.markup))
+          "✖️ Промокодро гирифтан" in texts_of(message.markup))
 
     # снять и вернуть
     call = FakeCallback("order:promo_off", user=buyer, bot=bot)
     await shop.cb_order_promo_off(call, state, conn)
-    check("без промокода полная цена", "К списанию: <b>20.00 с.</b>" in call.last)
+    check("без промокода полная цена", "Барои пардохт: <b>20.00 с.</b>" in call.last)
     check("кнопка снова предлагает промокод",
           any("Промокод" in t for t in texts_of(call.markup)))
 

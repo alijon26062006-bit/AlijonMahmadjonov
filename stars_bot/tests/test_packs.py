@@ -152,7 +152,7 @@ async def run(conn) -> None:
     check("количество взято из кнопки", data.get("quantity") == 100, str(data))
     check("цена посчитана", data.get("price") == 20_00, str(data))
     check("товар помечен как звёзды", data.get("product_type") == "stars")
-    check("сразу спрашивает получателя", "олучател" in call.last, call.last[:80])
+    check("сразу спрашивает получателя", "Ба кӣ мефиристем" in call.last, call.last[:80])
     check("вопроса о количестве нет", "Сколько звёзд" not in call.last)
     check("ждём получателя", await state.get_state() == "Buy:recipient")
 
@@ -160,7 +160,7 @@ async def run(conn) -> None:
     await state.clear()
     call = call_of("stars:pack:2500", user=buyer)
     await shop.cb_stars_pack(call, state, conn)
-    check("дорогой набор упирается в баланс", "не хватает" in call.last.lower(),
+    check("дорогой набор упирается в баланс", "намерасад" in call.last.lower(),
           call.last[:100])
     check("после отказа шаг закрыт", await state.get_state() is None)
 
@@ -169,7 +169,7 @@ async def run(conn) -> None:
     call = call_of("stars:pack:2500", user=buyer)
     await shop.cb_stars_pack(call, state, conn)
     check("исчезнувший набор отклоняется",
-          any("больше нет" in a for a in call.alerts), str(call.alerts))
+          any("дигар нест" in a for a in call.alerts), str(call.alerts))
     check("и показывается свежее меню", "Telegram Stars" in call.last)
 
     # ------------------------------------------ ручной ввод не сломался
@@ -184,7 +184,7 @@ async def run(conn) -> None:
     message = msg("7", user=buyer)
     await state.set_state(shop.Buy.quantity)
     await shop.on_quantity(message, state, conn)
-    check("меньше минимума не проходит", "от <code>50</code>" in message.last,
+    check("меньше минимума не проходит", "аз <code>50</code>" in message.last,
           message.last[:80])
     await state.clear()
 

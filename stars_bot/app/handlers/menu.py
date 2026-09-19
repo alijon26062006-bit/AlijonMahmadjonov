@@ -117,6 +117,12 @@ MEDALS = ["🥇", "🥈", "🥉"]
 
 
 def top_basis(by: str) -> str:
+    """По чему считается топ — подпись для клиента."""
+    return "харидҳо" if by != "deposits" else "пуркуниҳо"
+
+
+def top_basis_ru(by: str) -> str:
+    """То же самое для админ-панели: она остаётся на русском."""
     return "покупок" if by != "deposits" else "пополнений"
 
 

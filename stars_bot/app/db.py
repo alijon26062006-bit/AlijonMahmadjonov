@@ -23,11 +23,14 @@ ORDER_DELIVERED = "delivered"
 ORDER_FAILED = "failed"
 ORDER_REFUNDED = "refunded"
 
+#: Эти подписи видит и клиент в истории, и владелец в панели. Держать их
+#: на двух языках значит завести параллельный путь ради семи слов —
+#: поэтому они на языке клиента, и в панели читаются так же.
 ORDER_TITLES = {
-    ORDER_DELIVERING: "Выдаётся",
-    ORDER_DELIVERED: "Выполнен",
-    ORDER_FAILED: "Проверяется",
-    ORDER_REFUNDED: "Деньги возвращены",
+    ORDER_DELIVERING: "Дар интиқол",
+    ORDER_DELIVERED: "Иҷро шуд",
+    ORDER_FAILED: "Санҷида мешавад",
+    ORDER_REFUNDED: "Пул баргардонида шуд",
 }
 
 #: Ключ значка для каждого статуса — сами значки настраиваются в панели.
@@ -44,9 +47,9 @@ DEP_APPROVED = "approved"
 DEP_REJECTED = "rejected"
 
 DEP_TITLES = {
-    DEP_PENDING: "🔍 На проверке",
-    DEP_APPROVED: "✅ Зачислено",
-    DEP_REJECTED: "❌ Отклонено",
+    DEP_PENDING: "🔍 Дар санҷиш",
+    DEP_APPROVED: "✅ Гузаронида шуд",
+    DEP_REJECTED: "❌ Рад шуд",
 }
 
 # ---- статусы тикета ----
@@ -616,14 +619,14 @@ class Order:
     @property
     def title(self) -> str:
         if self.product_type == "stars":
-            return f"⭐ {self.quantity} звёзд"
+            return f"⭐ {self.quantity} ситора"
         if self.product_type == "steam":
             from app import runtime
 
             return f"🎮 Steam {self.quantity} {runtime.steam_currency()}"
         if self.product_type.startswith("game:"):
             return f"{product_title(self.product_type)} × {self.quantity}"
-        return f"👑 Premium {self.quantity} мес."
+        return f"👑 Premium {self.quantity} моҳ"
 
     @property
     def status_title(self) -> str:

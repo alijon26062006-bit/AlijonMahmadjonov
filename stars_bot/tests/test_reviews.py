@@ -141,7 +141,7 @@ async def run(conn) -> None:
     check("после выдачи бот предлагает оценить",
           await service.offer(bot, conn, order) is True)
     offered = bot.to(BUYER)[0]
-    check("предложение ушло покупателю", "Как всё прошло" in offered.text, offered.text[:60])
+    check("предложение ушло покупателю", "Ҳама чиз чӣ тавр гузашт" in offered.text, offered.text[:60])
     check("в предложении номер заказа", f"№{order.id}" in offered.text)
     check("пять кнопок оценки плюс отказ",
           len(buttons(offered.markup)) == 6, str(buttons(offered.markup)))
@@ -173,8 +173,8 @@ async def run(conn) -> None:
     review = await db.review_of_order(conn, order.id)
     check("отзыв создан", review is not None and review.rating == 5)
     check("создан со статусом «на проверке»", review.status == db.REVIEW_PENDING)
-    check("бот просит текст", "Напишите пару слов" in call.last, call.last[:80])
-    check("предупреждает, что имя будет видно", "имя будет видно" in call.last)
+    check("бот просит текст", "ду калима нависед" in call.last, call.last[:80])
+    check("предупреждает, что имя будет видно", "Номи шумо дар зери шарҳ дида мешавад" in call.last)
     check("ждём текст", await state.get_state() == "Review:text")
     check("можно отправить без текста",
           "Отправить без текста" in buttons(call.message.markup))
@@ -182,7 +182,7 @@ async def run(conn) -> None:
     # ------------------------------------------- повторная оценка того же заказа
     call = call_of(f"rv:rate:{order.id}:1")
     await rv.cb_rate(call, state, conn)
-    check("второй отзыв на заказ не создаётся", "уже есть" in call.last, call.last[:60])
+    check("второй отзыв на заказ не создаётся", "аллакай ҳаст" in call.last, call.last[:60])
     fresh = await db.review_of_order(conn, order.id)
     check("первая оценка не перезаписана", fresh.rating == 5, str(fresh.rating))
 
@@ -200,7 +200,7 @@ async def run(conn) -> None:
     await rv.on_review_text(message, state, conn, bot)
     saved = await db.get_review(conn, review.id)
     check("текст сохранён", saved.text == "Всё пришло за минуту, спасибо!", str(saved.text))
-    check("клиенту сказано спасибо", "Спасибо за отзыв" in message.last)
+    check("клиенту сказано спасибо", "Ташаккур барои шарҳ" in message.last)
     check("шаг закрыт", await state.get_state() is None)
 
     # ---------------------------------------------------- пришло админу
@@ -236,10 +236,10 @@ async def run(conn) -> None:
     check("отзыв ушёл в канал", len(posted) == 1, str(len(posted)))
     post = posted[0].text
     check("в канале оценка звёздами", post.startswith("⭐️⭐️⭐️⭐️⭐️"), post[:40])
-    check("в канале жирный заголовок", "<b>Отзыв о покупке</b>" in post)
+    check("в канале жирный заголовок", "<b>Шарҳи харид</b>" in post)
     check("текст отзыва в цитате",
           "<blockquote>Всё пришло за минуту, спасибо!</blockquote>" in post, post)
-    check("в канале виден товар", "100 звёзд" in post)
+    check("в канале виден товар", "100 ситора" in post)
     check("в канале виден автор", "@buyer" in post)
     published = await db.get_review(conn, review.id)
     check("статус стал «опубликован»", published.status == db.REVIEW_PUBLISHED)
@@ -287,7 +287,7 @@ async def run(conn) -> None:
     call = call_of(f"rv:ok:{review3.id}", uid=ADMIN)
     await rv.cb_publish(call, conn, bot)
     post = bot.to("@moi_otzyvy")[0].text
-    check("отзыв без текста тоже публикуется", "Отзыв о покупке" in post)
+    check("отзыв без текста тоже публикуется", "Шарҳи харид" in post)
     check("пустой цитаты в нём нет", "<blockquote>" not in post, post)
 
     # ------------------------------------------------------------- панель
@@ -315,7 +315,7 @@ async def run(conn) -> None:
           keyboards.reviews_link() == "https://t.me/moi_otzyvy",
           keyboards.reviews_link())
     check("кнопка «Отзывы» появилась",
-          any("Отзывы" in b.text for r in keyboards.main_menu().inline_keyboard for b in r))
+          any("Шарҳҳо" in b.text for r in keyboards.main_menu().inline_keyboard for b in r))
     await runtime.set_value(conn, "reviews_channel", "")
     check("без канала ссылки нет", keyboards.reviews_link() == "")
 
@@ -353,7 +353,7 @@ async def past_buyers(conn, storage) -> None:
     check("просьба ушла первому", bot.to(601), str(len(bot.to(601))))
     body = bot.to(601)[0].text
     check("в просьбе сказано, что человек уже покупал",
-          "Вы покупали у нас" in body, body[:60])
+          "Шумо аз мо харид кардед" in body, body[:60])
     check("в просьбе виден заказ", f"№{old_one.id}" in body, body)
     check("к просьбе приложены оценки",
           len(buttons(bot.to(601)[0].markup)) == 6)
@@ -369,7 +369,7 @@ async def past_buyers(conn, storage) -> None:
     await rv.cb_rate(call, state, conn)
     review = await db.review_of_order(conn, old_one.id)
     check("отзыв из рассылки создаётся", review is not None and review.rating == 4)
-    check("и просит текст", "Напишите пару слов" in call.last, call.last[:60])
+    check("и просит текст", "ду калима нависед" in call.last, call.last[:60])
 
     bot = FakeBot()
     message = msg("Брал год назад, всё дошло", uid=601)

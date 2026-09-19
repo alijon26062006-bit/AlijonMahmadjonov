@@ -255,10 +255,10 @@ async def _close_screen(bot, conn, deposit, notice) -> None:
 
     user = await db.get_user(conn, deposit.user_id)
     text = (
-        "🎉 <b>Оплата получена</b>\n"
+        "🎉 <b>Пардохт гирифта шуд</b>\n"
         "<code>━━━━━━━━━━━━━━━━━━━━</code>\n\n"
-        f"💰 <b>{fmt(deposit.amount)}</b> зачислены на баланс\n"
-        f"└ Текущий баланс: <b>{fmt(user.balance if user else 0)}</b>"
+        f"💰 <b>{fmt(deposit.amount)}</b> ба баланс гузаронида шуд\n"
+        f"└ Баланси ҳозира: <b>{fmt(user.balance if user else 0)}</b>"
     )
     try:
         await bot.edit_message_text(

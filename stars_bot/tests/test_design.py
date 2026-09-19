@@ -150,23 +150,23 @@ async def run(conn) -> None:
     text = call.last
 
     check("история показывает сводку по заказам",
-          "Выполнено: <b>1</b>" in text and "Возвращено: <b>1</b>" in text,
+          "Иҷро шуд: <b>1</b>" in text and "Баргардонида шуд: <b>1</b>" in text,
           text.replace("\n", " ")[:150])
     check("видно, сколько всего потрачено", "20.00" in text)
     check("у возврата написано, что деньги вернулись",
-          "вернулись на баланс" in text, text.replace("\n", " ")[-160:])
-    check("у выполненного написано, что списано", "Списано:" in text)
+          "ба баланс баргашт" in text, text.replace("\n", " ")[-160:])
+    check("у выполненного написано, что списано", "Гирифта шуд:" in text)
     check("получатель показан у каждого заказа",
           "@friend" in text and "@other" in text)
     check("статусы понятны человеку",
-          "Выполнен" in text and "Деньги возвращены" in text)
+          "Иҷро шуд" in text and "Пул баргардонида шуд" in text)
 
     # Пустая история тоже объясняет, что тут будет
     await db.upsert_user(conn, 322, "new", "Новичок")
     call = FakeCallback("p:history", FakeUser(322, "new", "Новичок"))
     await prof_h.cb_history(call, conn)
     check("пустая история объясняет, что появится",
-          "Пока пусто" in call.last and "<blockquote>" in call.last)
+          "Ҳоло холӣ" in call.last and "<blockquote>" in call.last)
 
     # ------------------------------------------- премиум-эмодзи
     from app.middlewares.emoji_guard import CustomEmojiGuard, strip_custom
@@ -255,14 +255,14 @@ async def run(conn) -> None:
 
     menu = styles_of(kb_mod.main_menu())
     check("главные действия синие",
-          any(st == "primary" and "звёзды" in t for st, t in menu), str(menu))
+          any(st == "primary" and "Ситора харидан" in t for st, t in menu), str(menu))
     check("пополнение зелёное",
-          any(st == "success" and "Пополнить" in t for st, t in menu), str(menu))
+          any(st == "success" and "Пур кардан" in t for st, t in menu), str(menu))
     check("навигация без цвета",
-          any(st is None and "Профиль" in t for st, t in menu), str(menu))
+          any(st is None and "Профил" in t for st, t in menu), str(menu))
 
     pay = styles_of(kb_mod.confirm())
-    check("оплата зелёная", ("success", f"{emoji.em('confirm')} Оплатить") in pay, str(pay))
+    check("оплата зелёная", ("success", f"{emoji.em('confirm')} Пардохт") in pay, str(pay))
     check("отмена красная",
           any(st == "danger" for st, _ in pay), str(pay))
 

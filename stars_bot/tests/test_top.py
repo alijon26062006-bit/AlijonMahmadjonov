@@ -78,12 +78,12 @@ async def run(conn) -> None:
     rows = await db.top_clients(conn)
     body = texts.TOP_CLIENTS.format(items=menu.top_lines(rows),
                                     basis=menu.top_basis("purchases"))
-    check("в тексте написано, что рейтинг по покупкам", "по сумме покупок" in body, body[-90:])
+    check("в тексте написано, что рейтинг по покупкам", "аз рӯи маблағи харидҳо" in body, body[-90:])
     check("медали проставлены", "🥇" in body and "🥈" in body)
     check("сумма показана в сомони", "55.00" in body, body)
 
     body = texts.TOP_CLIENTS.format(items="", basis=menu.top_basis("deposits"))
-    check("для пополнений подпись другая", "по сумме пополнений" in body)
+    check("для пополнений подпись другая", "аз рӯи маблағи пуркуниҳо" in body)
 
     # ------------------------------------------------- переключатель в панели
     check("по умолчанию считаем по покупкам", runtime.get("top_by") == "purchases")
