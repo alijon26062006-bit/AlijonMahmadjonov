@@ -20,6 +20,7 @@ from app.handlers import (
 )
 from app.middlewares.emoji_guard import CustomEmojiGuard
 from app.middlewares.escape import CommandEscapeMiddleware
+from app.middlewares.same_screen import SameScreenGuard
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.billing import make_sender
 from app.services.fragment import (
@@ -137,6 +138,9 @@ async def main() -> None:
     dp.message.outer_middleware(CommandEscapeMiddleware())
     dp.message.middleware(UserGuardMiddleware())
     dp.callback_query.middleware(UserGuardMiddleware())
+    # Снаружи всех: ловит «экран не изменился» из любого обработчика,
+    # даже если тот правит сообщение напрямую, без safe_edit.
+    dp.callback_query.outer_middleware(SameScreenGuard())
 
     # Админские роутеры первыми: их фильтр отсекает чужие апдейты
     # и пропускает их дальше по цепочке.

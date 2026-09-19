@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import re
 
@@ -213,6 +214,11 @@ def prices_kb() -> InlineKeyboardMarkup:
         callback_data="pn:round",
     ))
     kb.row(btn("💱 Обновить курс сейчас", "pn:rate", style=PRIMARY))
+    # Экран выше пишет, включены автоцены или нет, а кнопки к ним не было:
+    # обработчик есть, служба обновления крутится, включить нечем.
+    on = runtime.auto_price_on()
+    kb.row(btn(("🟢 Автоцены: включены" if on else "⚪️ Автоцены: выключены"),
+               "pn:autoprice", style=DANGER if on else SUCCESS))
     kb.row(
         InlineKeyboardButton(
             text=("🔄 Курс: авто" if runtime.get_bool("usd_auto") else "✋ Курс: вручную"),
@@ -1225,12 +1231,33 @@ def promos_text(rows: list) -> str:
     )
 
 
+#: Сколько промокодов показываем на экране. Кнопка удаления ищет код
+#: среди них же, поэтому число должно быть одно на обоих концах.
+PROMO_LIMIT = 15
+
+
+def promo_tag(code: str) -> str:
+    """Короткая метка кода для кнопки.
+
+    Раньше кнопка несла код целиком, и он же служил адресом. У Telegram
+    на callback_data 64 байта, а кириллица занимает два байта на букву:
+    код из двадцати шести русских букв выносил кнопку за предел. Такую
+    кнопку Telegram рисует как обычную, но нажатие до бота не доходит —
+    со стороны владельца она просто не работает.
+    """
+    return hashlib.sha1(code.encode()).hexdigest()[:16]
+
+
+def promo_del_data(code: str) -> str:
+    return f"pn:promo_del:{promo_tag(code)}"
+
+
 def promos_kb(rows: list) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn("➕ Создать промокод", "pn:promo_new", style=SUCCESS))
     for row in rows[:15]:
         kb.row(InlineKeyboardButton(
-            text=f"🗑 {row['code']}", callback_data=f"pn:promo_del:{row['code']}",
+            text=f"🗑 {row['code']}", callback_data=promo_del_data(row["code"]),
         ))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
     return kb.as_markup()
@@ -1246,10 +1273,15 @@ async def cb_promos(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Conn
 
 @router.callback_query(F.data.startswith("pn:promo_del:"))
 async def cb_promo_delete(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
-    code = call.data.split(":", 2)[2]
-    await db.delete_promo(conn, code)
-    await call.answer(f"{code} удалён")
-    rows = await db.list_promos(conn, limit=15)
+    tag = call.data.split(":", 2)[2]
+    rows = await db.list_promos(conn, limit=PROMO_LIMIT)
+    code = next((r["code"] for r in rows if promo_tag(r["code"]) == tag), "")
+    if not code:
+        await call.answer("Этот промокод уже удалили.", show_alert=True)
+    else:
+        await db.delete_promo(conn, code)
+        await call.answer(f"{code} удалён")
+        rows = await db.list_promos(conn, limit=PROMO_LIMIT)
     await safe_edit(call, promos_text(rows), promos_kb(rows))
 
 

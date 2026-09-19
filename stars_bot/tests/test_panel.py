@@ -204,6 +204,15 @@ async def run(conn) -> None:
 
     # --------------------------------------------------- включение разделов
     check("звёзды включены по умолчанию", runtime.get_bool("stars_enabled"))
+    # ----------------------------------- автоцены: кнопка была не нарисована
+    # Экран цен писал, включены автоцены или нет, служба обновления
+    # работала, обработчик был — а кнопки не было ни одной. Владелец не
+    # мог включить их вообще никак.
+    datas = [b.callback_data
+             for row in panel.prices_kb().inline_keyboard for b in row]
+    check("на экране цен есть кнопка автоцен", "pn:autoprice" in datas,
+          str(datas))
+
     await panel.cb_toggle(FakeCallback("pn:toggle:stars_enabled"), conn)
     check("раздел выключается", not runtime.get_bool("stars_enabled"))
     from app import keyboards

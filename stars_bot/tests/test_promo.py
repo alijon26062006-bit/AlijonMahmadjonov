@@ -385,6 +385,41 @@ async def limits(conn) -> None:
     check("удалённого кода нет", await db.get_promo(conn, "ODIN") is None)
 
 
+async def long_code_button(conn) -> None:
+    """Длинный кириллический код: кнопка удаления должна работать.
+
+    Раньше кнопка несла код целиком, а у Telegram на callback_data
+    64 байта и кириллица занимает два на букву. Кнопка рисовалась, но
+    нажатие до бота не доходило — для владельца она просто не работала.
+    """
+    from app.handlers import panel
+
+    code = "ПРОМОКОДНАНОВЫЙГОДДВАТЫСЯЧИ"        # 27 русских букв
+    await db.create_promo(conn, code, amount=0, max_uses=5,
+                          kind="discount", percent=10)
+
+    rows = await db.list_promos(conn, limit=panel.PROMO_LIMIT)
+    datas = [b.callback_data
+             for row in panel.promos_kb(rows).inline_keyboard for b in row]
+    ours = [d for d in datas if d.startswith("pn:promo_del:")]
+    check("кнопки удаления укладываются в предел Telegram",
+          all(len(d.encode()) <= 64 for d in ours),
+          str([(d, len(d.encode())) for d in ours if len(d.encode()) > 64]))
+
+    call = FakeCallback(panel.promo_del_data(code))
+    await panel.cb_promo_delete(call, conn)
+    check("длинный код удаляется нажатием",
+          await db.get_promo(conn, code) is None)
+    check("владельцу показали, что именно удалено",
+          any(code in alert for alert in call.alerts), str(call.alerts))
+
+    # Кнопка от уже удалённого кода не должна молча ничего не делать.
+    stale = FakeCallback(panel.promo_del_data("ЭТОГОКОДАНЕТ"))
+    await panel.cb_promo_delete(stale, conn)
+    check("устаревшая кнопка честно объясняется",
+          any("удалили" in alert for alert in stale.alerts), str(stale.alerts))
+
+
 async def main() -> None:
     arithmetic()
     for sfx in ("", "-wal", "-shm"):
@@ -397,6 +432,7 @@ async def main() -> None:
         await purchase(conn)
         await refund_keeps_activation(conn)
         await limits(conn)
+        await long_code_button(conn)
     finally:
         await conn.close()
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")

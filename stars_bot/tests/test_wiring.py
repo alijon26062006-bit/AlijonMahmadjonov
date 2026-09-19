@@ -195,6 +195,72 @@ async def open_every_screen(conn) -> int:
     return 0
 
 
+def check_callback_size() -> bool:
+    """У Telegram на callback_data 64 байта.
+
+    Кнопку длиннее он рисует как обычную, но нажатие до бота не
+    доставляет: со стороны она просто не работает. Кириллица занимает
+    два байта на букву, поэтому мерить надо байты, а не длину строки.
+    """
+    LIMIT = 64
+    big = [(data, len(data.encode()))
+           for data in declared_callbacks() if len(data.encode()) > LIMIT]
+    if big:
+        print("\n❌ Кнопки длиннее предела Telegram:")
+        for data, size in big:
+            print(f"   {size} байт — {data}")
+        return True
+    print(f"✅ Все {len(declared_callbacks())} кнопок влезают в {LIMIT} байт")
+    return False
+
+
+async def check_same_screen() -> bool:
+    """Повторное нажатие не должно выглядеть поломкой."""
+    from aiogram.exceptions import TelegramBadRequest
+
+    from app.middlewares.same_screen import SameScreenGuard
+
+    class Press:
+        def __init__(self):
+            self.answered = False
+
+        async def answer(self, text="", **kw):
+            self.answered = True
+
+    guard = SameScreenGuard()
+    bad = []
+
+    async def same(event, data):
+        raise TelegramBadRequest(
+            method=None, message="Bad Request: message is not modified")
+
+    press = Press()
+    try:
+        await guard(same, press, {})
+    except TelegramBadRequest:
+        bad.append("ошибка «экран не изменился» всё ещё роняет обработчик")
+    if not press.answered:
+        bad.append("часики у клиента не сняли")
+
+    # Всё остальное обязано всплывать: иначе настоящие поломки исчезнут
+    # из журнала, и чинить их станет нечего.
+    async def other(event, data):
+        raise TelegramBadRequest(
+            method=None, message="Bad Request: message to edit not found")
+
+    try:
+        await guard(other, Press(), {})
+        bad.append("чужая ошибка проглочена — поломки станут невидимыми")
+    except TelegramBadRequest:
+        pass
+
+    if bad:
+        print("\n❌ Защита от повторного нажатия: " + "; ".join(bad))
+        return True
+    print("✅ Повторное нажатие гасится, прочие ошибки всплывают")
+    return False
+
+
 def check_delivery_modes() -> bool:
     """Отчёт при запуске не должен пугать владельца на рабочем режиме.
 
@@ -268,6 +334,10 @@ async def main() -> None:
         sys.exit(1)
 
     if check_delivery_modes():
+        await conn.close()
+        sys.exit(1)
+
+    if check_callback_size() or await check_same_screen():
         await conn.close()
         sys.exit(1)
     await conn.close()
