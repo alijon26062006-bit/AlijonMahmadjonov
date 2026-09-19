@@ -21,6 +21,7 @@ from app.handlers import (
 from app.middlewares.emoji_guard import CustomEmojiGuard
 from app.middlewares.escape import CommandEscapeMiddleware
 from app.middlewares.same_screen import SameScreenGuard
+from app.middlewares.sponsor import SponsorGate
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.billing import make_sender
 from app.services.fragment import (
@@ -141,6 +142,10 @@ async def main() -> None:
     # Снаружи всех: ловит «экран не изменился» из любого обработчика,
     # даже если тот правит сообщение напрямую, без safe_edit.
     dp.callback_query.outer_middleware(SameScreenGuard())
+    # Обязательная подписка — снаружи всего: до неё клиент не должен
+    # попадать ни в один экран. Владельца и админов не трогает.
+    dp.message.outer_middleware(SponsorGate())
+    dp.callback_query.outer_middleware(SponsorGate())
 
     # Админские роутеры первыми: их фильтр отсекает чужие апдейты
     # и пропускает их дальше по цепочке.

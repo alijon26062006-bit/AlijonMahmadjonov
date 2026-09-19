@@ -368,13 +368,31 @@ def cancel_order(order_id: int) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def sponsor_gate(channels: list[str]) -> InlineKeyboardMarkup:
+    """Куда подписаться и чем подтвердить.
+
+    Канал без ссылки (задан числовым ID, а бот не смог узнать адрес)
+    кнопкой не рисуем: кнопка без адреса — это кнопка, которая никуда не
+    ведёт, и человек решит, что бот сломан.
+    """
+    from app.services import sponsor
+
+    kb = InlineKeyboardBuilder()
+    for channel in channels:
+        link = sponsor.link_of(channel)
+        if link:
+            kb.row(btn(f"📢 Подписаться — {channel}", url=link))
+    kb.row(btn(labeled("confirm", "Я подписался"), "sub:check", style=SUCCESS))
+    return kb.as_markup()
+
+
 # ══════════════════════════════════════════════════════════ пополнение
 
 
 def deposit_methods() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.row(btn(labeled("deposit", "Перевод на карту"), "dep:card",
-               style=SUCCESS, icon="deposit"))
+    kb.row(btn(labeled("dcity", "Душанбе Сити"), "dep:card",
+               style=SUCCESS, icon="dcity"))
     kb.row(btn("🇷🇺 Из России — Сбербанк, Тинькофф", "dep:ru"))
     kb.row(btn(labeled("back", "Назад"), "m:main"))
     return kb.as_markup()

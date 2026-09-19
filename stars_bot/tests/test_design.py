@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import re
 import sys
 from pathlib import Path
@@ -342,8 +343,19 @@ async def premium_ids(conn) -> None:
     """Премиум-эмодзи владельца прописаны заранее и снимаются насовсем."""
     from app.handlers import panel
 
-    check("ID прописаны для всех значков главного экрана",
-          len(emoji.PREMIUM_IDS) == 12, str(len(emoji.PREMIUM_IDS)))
+    # Раньше здесь стояло «длина словаря равна 12»: проверка падала от
+    # любого нового значка и не ловила ни одной настоящей ошибки.
+    # Настоящая здесь такая — опечатка в имени значка на кнопке. Она
+    # проходит молча: кнопка просто остаётся без значка, и заметить это
+    # можно только глазами, на живом боте.
+    import re
+
+    source = io.open("app/keyboards.py", encoding="utf-8").read()
+    named = set(re.findall(r'icon="(\w+)"', source))
+    named |= set(re.findall(r'labeled\("(\w+)"', source))
+    unknown = sorted(k for k in named if k not in emoji.DEFAULTS)
+    check("на кнопках нет значков с опечаткой в имени",
+          not unknown, f"неизвестные: {unknown}")
     check("все ключи существуют",
           all(key in emoji.DEFAULTS for key in emoji.PREMIUM_IDS),
           str([k for k in emoji.PREMIUM_IDS if k not in emoji.DEFAULTS]))

@@ -82,6 +82,29 @@ async def cb_main(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connec
     await call.answer()
 
 
+@router.callback_query(F.data == "sub:check")
+async def cb_sub_check(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+) -> None:
+    """«Я подписался». Проверяем заново, не заглядывая в память.
+
+    Память нужна, чтобы не ходить в Telegram на каждое нажатие, но
+    здесь она вредна: человек только что подписался, и старый ответ
+    «не подписан» держался бы ещё несколько минут.
+    """
+    from app.services import sponsor
+
+    sponsor.forget(call.from_user.id)
+    left = await sponsor.missing(call.bot, call.from_user.id)
+    if left:
+        await call.answer(texts.SPONSOR_NOT_YET, show_alert=True)
+        return
+
+    await call.answer(texts.SPONSOR_OK)
+    await state.clear()
+    await render_menu(call, conn)
+
+
 @router.callback_query(F.data == "m:info")
 async def cb_info(call: CallbackQuery) -> None:
     await call.message.edit_text(

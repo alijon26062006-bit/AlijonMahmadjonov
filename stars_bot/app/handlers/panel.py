@@ -96,6 +96,9 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="⭐️ Отзывы", callback_data="pn:reviews"),
     )
     kb.row(
+        InlineKeyboardButton(text="📢 Подписка на канал", callback_data="pn:sponsor"),
+    )
+    kb.row(
         InlineKeyboardButton(text="🎮 Steam", callback_data="pn:steam"),
         InlineKeyboardButton(text="🤝 Партнёры", callback_data="pn:partners"),
     )
@@ -579,6 +582,12 @@ FIELDS: dict[str, tuple[str, str, str]] = {
                    "заработать не сможет — потому цена у него своя.\n\n"
                    "Пришлите <code>0</code>, чтобы продавать ему по ценам "
                    "витрины:", "percent"),
+    "sponsor_channel": ("📢 Канал обязательной подписки",
+                        "Пришлите <code>@kanal</code>. Несколько — через "
+                        "пробел.\n\n"
+                        "Бот должен быть в канале администратором, иначе "
+                        "он не сможет проверить подписку.\n\n"
+                        "<code>-</code> — убрать проверку:", "text"),
     "reviews_channel": ("📣 Канал отзывов",
                         "Куда публиковать одобренные отзывы: <code>@kanal</code> "
                         "или числовой ID.\n\n"
@@ -660,6 +669,7 @@ FIELD_PARENT.update({
     "star_cost_e4": "pn:prices", "star_price_e4": "pn:prices",
     "margin_percent": "pn:prices", "min_stars": "pn:prices",
     "star_packs": "pn:prices", "reviews_channel": "pn:reviews",
+    "sponsor_channel": "pn:sponsor",
     "gameskinbo_key": "pn:games", "fazer_games_key": "pn:games",
     "ff_community_key": "pn:games", "volsever_key": "pn:checker",
     "steam_price_e4": "pn:steam", "steam_cost_e4": "pn:steam",
@@ -997,6 +1007,13 @@ async def on_field_value(
         from app.services import suppliers
 
         suppliers.forget()
+
+    if field == "sponsor_channel":
+        # Память о том, кто подписан, относится к прежним каналам.
+        # Оставить её — значит пускать без подписки на новый.
+        from app.services import sponsor
+
+        sponsor.forget()
     await state.clear()
 
     extra = note
@@ -3194,6 +3211,70 @@ async def show_reviews(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     waiting = len(await db.review_targets(conn))
     await safe_edit(call, reviews_text(stats, pending, waiting),
                     reviews_kb(pending, waiting))
+
+
+# ═══════════════════════════════════════ обязательная подписка на канал
+
+
+def sponsor_text() -> str:
+    from app.services import sponsor
+
+    names = sponsor.channels()
+    if not names:
+        where = "Канал не задан — проверка не работает, даже если включена."
+    else:
+        where = "Каналы:\n" + "\n".join(f"├ <code>{n}</code>" for n in names)
+
+    return (
+        "📢 <b>Обязательная подписка</b>\n"
+        f"<code>{texts.LINE}</code>\n\n"
+        f"Состояние: <b>{'🟢 включена' if sponsor.on() else '⚪️ выключена'}</b>\n\n"
+        f"{where}\n\n"
+        "<blockquote>Пока клиент не подписан, бот его не обслуживает: "
+        "вместо меню он видит кнопку «Подписаться».\n\n"
+        "Бот должен быть администратором канала — иначе проверить "
+        "подписку он не сможет. Если проверка не удаётся, клиентов "
+        "пропускаем: одна опечатка в настройке не должна закрывать "
+        "магазин для всех.</blockquote>"
+    )
+
+
+def sponsor_kb() -> InlineKeyboardMarkup:
+    from app.services import sponsor
+
+    on = sponsor.on()
+    kb = InlineKeyboardBuilder()
+    kb.row(btn(("🚫 Выключить проверку" if on else "✅ Включить проверку"),
+               "pn:sponsor_on", style=DANGER if on else SUCCESS))
+    kb.row(InlineKeyboardButton(text="📢 Задать канал",
+                                callback_data="pn:set:sponsor_channel"))
+    kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
+    return kb.as_markup()
+
+
+@router.callback_query(F.data == "pn:sponsor")
+async def cb_sponsor(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await safe_edit(call, sponsor_text(), sponsor_kb())
+    await call.answer()
+
+
+@router.callback_query(F.data == "pn:sponsor_on")
+async def cb_sponsor_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    from app.services import sponsor
+
+    if not runtime.get_bool("sponsor_on") and not sponsor.channels():
+        await call.answer("Сначала задайте канал.", show_alert=True)
+        return
+
+    was = runtime.get_bool("sponsor_on")
+    await runtime.set_value(conn, "sponsor_on", "0" if was else "1")
+    # Память о подписках держится несколько минут. После правки настроек
+    # она врёт, поэтому забываем всё: лучше лишний запрос в Telegram,
+    # чем клиент, которого пускают по старой памяти.
+    sponsor.forget()
+    await call.answer("Проверка выключена" if was else "Проверка включена")
+    await safe_edit(call, sponsor_text(), sponsor_kb())
 
 
 @router.callback_query(F.data == "pn:reviews")
