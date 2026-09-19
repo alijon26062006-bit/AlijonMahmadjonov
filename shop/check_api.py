@@ -105,6 +105,17 @@ def show_catalog(live: dict, db: Database) -> None:
         rng = f"{min(prices):.2f}–{max(prices):.2f} $" if prices else "—"
         flag = f"{G}{have}{E}" if have else "—"
         print(f"{fam:<12} {FAMILY_NAMES.get(fam, '—')[:28]:<28} {len(items):>6} {flag:>17}  {rng}")
+    # То же, что покажет панель в «➕ Бозии нав аз таъминкунанда»
+    from .handlers.settings import new_families
+
+    fresh = new_families(live, db)
+    print()
+    if fresh:
+        print(f"{B}➕ Панель предложит добавить:{E}")
+        for fam, title, n in fresh:
+            print(f"   [ {title}  ({n}) ]   ключ: {fam}")
+    else:
+        warn("Панели нечего предложить — все игры поставщика уже в боте.")
     print()
     ok(f"Полный список сохранён: {out}")
     print(f"   Посмотреть:  cat {out}")
