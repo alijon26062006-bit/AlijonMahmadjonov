@@ -134,7 +134,8 @@ async def api_parsing() -> None:
             self._base = "https://x"
             self._session = None
 
-        async def _request(self, method, path, payload=None, *, safe=False):
+        async def _request(self, method, path, payload=None, *, safe=False,
+                           **kw):
             self.last = (method, path, payload)
             if isinstance(self.reply, Exception):
                 raise self.reply

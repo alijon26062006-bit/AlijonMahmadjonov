@@ -208,9 +208,26 @@ class FazerProvider(DeliveryProvider):
         self, method: str, path: str, payload: dict | None = None, *,
         safe: bool = False, headers: dict | None = None,
         timeout: aiohttp.ClientTimeout | None = None,
+        urgent: bool = False,
     ) -> dict:
         """safe=True — запрос ничего не меняет, поэтому сетевой сбой можно
-        считать обычной ошибкой, а не неопределённым исходом."""
+        считать обычной ошибкой, а не неопределённым исходом.
+
+        urgent=True — за запросом стоит живой клиент: он пойдёт вперёд
+        фоновых опросов, когда к поставщику выстроилась очередь.
+        """
+        from app.services.ratelimit import Busy, for_key
+
+        try:
+            waited = await for_key(self.api_key).take(urgent=urgent)
+        except Busy as exc:
+            # Запрос не ушёл вовсе — значит исход определён, и деньги
+            # вернутся обычным путём, без разбирательств.
+            raise DeliveryError(str(exc)) from exc
+        if waited > 1:
+            log.info("Очередь к поставщику: ждали %.1f с (%s %s)",
+                     waited, method, path)
+
         session = await self._get_session()
         try:
             async with session.request(
@@ -281,7 +298,7 @@ class FazerProvider(DeliveryProvider):
         """Пакеты пополнения для игры: что и почём продаёт сервис."""
         data = await self._request(
             "GET", f"{TOPUP_OFFERS}?category_id={category_id}&include_ui=1",
-            safe=True,
+            safe=True, urgent=True,
         )
         offers = data.get("offers")
         if not isinstance(offers, list):
@@ -386,6 +403,7 @@ class FazerProvider(DeliveryProvider):
             data = await self._request(
                 "POST", TOPUP_VALIDATE,
                 {"category_id": category_id, "fields": fields}, safe=True,
+                urgent=True,
             )
         except DeliveryError as exc:
             text = str(exc).lower()
@@ -420,7 +438,7 @@ class FazerProvider(DeliveryProvider):
                 "category_id": category_id, "offer_id": offer_id,
                 "fields": fields, "quantity": quantity,
             },
-            headers={"Idempotency-Key": idempotency_key},
+            headers={"Idempotency-Key": idempotency_key}, urgent=True,
             timeout=ORDER_TIMEOUT,
         )
         order = data.get("order")
@@ -476,7 +494,7 @@ class FazerProvider(DeliveryProvider):
         """Проверить логин до оплаты. None — сервис ответить не смог."""
         try:
             data = await self._request(
-                "POST", STEAM_CHECK, {"login": login}, safe=True,
+                "POST", STEAM_CHECK, {"login": login}, safe=True, urgent=True,
             )
         except DeliveryError as exc:
             log.info("Steam: логин %s не проверился — %s", login, exc)
@@ -515,7 +533,7 @@ class FazerProvider(DeliveryProvider):
         })
 
     async def _buy(self, path: str, payload: dict) -> DeliveryResult:
-        data = await self._request("POST", path, payload)
+        data = await self._request("POST", path, payload, urgent=True)
         order = data.get("order")
         if not isinstance(order, dict):
             raise DeliveryUncertain(

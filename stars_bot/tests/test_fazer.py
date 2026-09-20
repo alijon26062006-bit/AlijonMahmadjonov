@@ -54,7 +54,7 @@ class FakeFazer(fz.FazerProvider):
         self.calls: list[str] = []
 
     async def _request(self, method, path, payload=None, *, safe=False,
-                       headers=None):
+                       headers=None, **kw):
         self.calls.append(f"{method} {path}")
         for key, exc in self.raise_on.items():
             if key in path:
@@ -194,11 +194,12 @@ async def main() -> None:
             super().__init__(buy=order("pending"), statuses=[order("completed")])
             self.first = True
 
-        async def _request(self, method, path, payload=None, *, safe=False):
+        async def _request(self, method, path, payload=None, *, safe=False,
+                           **kw):
             if "/orders/" in path and self.first:
                 self.first = False
                 raise DeliveryError("сеть моргнула")
-            return await super()._request(method, path, payload, safe=safe)
+            return await super()._request(method, path, payload, safe=safe, **kw)
 
     check("сбой одного опроса не роняет выдачу",
           (await Flaky().deliver_stars("durov", 100)).order_id == "555")
@@ -332,7 +333,8 @@ async def main() -> None:
 
     # ------------------- проверка связи реально проверяет чтение заказов
     class HealthApi(ShapedApi):
-        async def _request(self, method, path, payload=None, *, safe=False):
+        async def _request(self, method, path, payload=None, *, safe=False,
+                           **kw):
             if path == fz.STARS_QUOTE: return STARS_PRICE
             if path == fz.PREMIUM_QUOTE: return PREMIUM_PRICE
             raise AssertionError(path)

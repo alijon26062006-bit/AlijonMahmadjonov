@@ -594,6 +594,15 @@ FIELDS: dict[str, tuple[str, str, str]] = {
                         "Бот должен быть в канале администратором с правом "
                         "публиковать. Пришлите <code>-</code>, чтобы убрать:",
                         "text"),
+    "supplier_rate_per_min": ("⏱ Запросов к поставщику в минуту",
+                             "Сколько запросов в минуту разрешает поставщик "
+                             "на один ключ.\n\n"
+                             "Ставьте <b>чуть ниже</b> объявленного: в лимит "
+                             "идут и заказы, и проверки статуса, и каталог, "
+                             "а часы у поставщика с нашими не совпадают до "
+                             "секунды.\n\n"
+                             "При 60 разрешённых ставьте <code>55</code>:",
+                             "int"),
     "fazer_games_key": ("🔑 Ключ поставщика для игр",
                         "Ключ того, чей счёт тратится на игры. Оставьте "
                         "пустым — игры пойдут с основного счёта.\n"
@@ -671,6 +680,7 @@ FIELD_PARENT.update({
     "star_packs": "pn:prices", "reviews_channel": "pn:reviews",
     "sponsor_channel": "pn:sponsor",
     "gameskinbo_key": "pn:games", "fazer_games_key": "pn:games",
+    "supplier_rate_per_min": "pn:keys",
     "ff_community_key": "pn:games", "volsever_key": "pn:checker",
     "steam_price_e4": "pn:steam", "steam_cost_e4": "pn:steam",
     "steam_currency": "pn:steam", "steam_packs": "pn:steam",
@@ -5272,9 +5282,32 @@ async def cb_keys(call: CallbackQuery, provider) -> None:
           "Когда у игр свой ключ, они списываются с его счёта — так "
           "расходы партнёров не смешиваются.\n\nНики Free Fire тратят "
           "лимит только на новые ID: повторы полчаса берутся из памяти."
-          "</blockquote>",
-        back_kb("pn:home", "‹ В панель"),
+          "</blockquote>\n\n"
+        + _rate_line(),
+        keys_kb(),
     )
+
+
+def _rate_line() -> str:
+    """Темп обращений к поставщику: сколько разрешено и сколько занято."""
+    from app.services import ratelimit
+
+    limit = ratelimit.limit_now()
+    used = max((r.used for r in ratelimit._by_key.values()), default=0)
+    return (f"⏱ <b>Темп к поставщику</b>\n"
+            f"├ Разрешено: <b>{limit}</b> запросов в минуту\n"
+            f"└ Занято сейчас: <b>{used}</b>\n\n"
+            "<blockquote>Лишние запросы не теряются — они ждут очереди и "
+            "уходят следующей минутой. Заказы клиентов идут вперёд "
+            "проверок статуса.</blockquote>")
+
+
+def keys_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text="⏱ Запросов в минуту",
+                                callback_data="pn:set:supplier_rate_per_min"))
+    kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
+    return kb.as_markup()
 
 
 async def _balance_line(title: str, client) -> str:

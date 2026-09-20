@@ -40,8 +40,35 @@ TIMEOUT_MINUTES = 20
 # Сразу после оплаты заказ опрашивается часто: выдача обычно занимает
 # секунды, и ждать пятиминутного обхода незачем — клиент всё это время
 # сидит с сообщением «пополнение идёт».
+#
+# Но частота не может быть постоянной. У поставщика лимит в минуту, и
+# опрос раз в три секунды — это двадцать запросов в минуту на один
+# заказ: три заказа разом съедают весь лимит, и новые покупки встают в
+# очередь за проверками чужих.
+#
+# Поэтому шаг опроса зависит от того, сколько заказов сейчас на руках:
+# один опрашиваем часто, сотню — редко, а вместе они укладываются в
+# отведённую долю. Выдачу всё равно первым замечает вебхук; опрос —
+# страховка на случай, когда он не пришёл.
 FAST_EVERY = 3
 FAST_SECONDS = 3 * 60
+#: Дальше этого не разрежаем: пятиминутный шаг и так даёт общий обход.
+FAST_SLOWEST = 5 * 60
+#: Какую долю лимита поставщика отдаём под фоновые опросы. Остальное —
+#: живым клиентам: заказам, проверкам ID и каталогу.
+BACKGROUND_SHARE = 0.4
+
+#: Сколько заказов опрашивается прямо сейчас.
+_watching = 0
+
+
+def poll_every() -> float:
+    """Шаг опроса с оглядкой на лимит поставщика и число заказов."""
+    from app.services.ratelimit import WINDOW, limit_now
+
+    budget = max(1.0, limit_now() * BACKGROUND_SHARE)
+    share = max(1, _watching) * WINDOW / budget
+    return min(FAST_SLOWEST, max(FAST_EVERY, share))
 
 #: Метка причины возврата: по ней узнаём заказы, за которыми надо
 #: присмотреть и после возврата денег.
@@ -447,12 +474,16 @@ async def follow(bot: Bot, provider, order_id: int) -> str:
     Своё соединение с базой: задача живёт дольше обработчика, и его
     соединение к этому моменту уже закрыто.
     """
+    global _watching
+
     waited = 0
+    _watching += 1
     conn = await db.connect()
     try:
         while waited < FAST_SECONDS:
-            await asyncio.sleep(FAST_EVERY)
-            waited += FAST_EVERY
+            step = poll_every()
+            await asyncio.sleep(step)
+            waited += step
 
             order = await db.get_order(conn, order_id)
             if order is None or order.status not in (db.ORDER_DELIVERING,
@@ -469,6 +500,7 @@ async def follow(bot: Bot, provider, order_id: int) -> str:
                          order_id, waited, result)
                 return result
     finally:
+        _watching -= 1
         await conn.close()
     return "waiting"
 
