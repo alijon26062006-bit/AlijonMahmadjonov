@@ -77,6 +77,7 @@ case "${1:-update}" in
   check)     exec bash "$ROOT/check_shop.sh" ;;
   admin)     shift; exec bash "$ROOT/add_admin.sh" "$@" ;;
   api)       shift; exec bash "$ROOT/check_api.sh" "$@" ;;
+  nick)      shift; exec bash "$ROOT/start_nickapi.sh" "$@" ;;
   backup)    shift; exec bash "$ROOT/backup_bot.sh" "$@" ;;
   migrate)   shift; exec bash "$ROOT/migrate_bot.sh" "$@" ;;
   force)     FORCE=1 ;;
@@ -90,6 +91,7 @@ case "${1:-update}" in
     echo "  bot check      диагностика"
     echo "  bot admin ID   сделать админом"
     echo "  bot api        проверить поставщика"
+    echo "  bot nick       API проверки ника (--service, --test, --log, --stop)"
     echo "  bot backup     собрать архив со всеми данными"
     echo "  bot migrate IP переезд на другой сервер"
     echo "  bot force      обновить, стерев свои правки в коде"
