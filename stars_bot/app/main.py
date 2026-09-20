@@ -24,6 +24,7 @@ from app.middlewares.escape import CommandEscapeMiddleware
 from app.middlewares.same_screen import SameScreenGuard
 from app.middlewares.sponsor import SponsorGate
 from app.middlewares.stale_screen import StaleScreenGuard
+from app.middlewares.txn_guard import TxnGuard
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.billing import make_sender
 from app.services.fragment import (
@@ -143,6 +144,13 @@ async def main() -> None:
     dp.callback_query.middleware(UserGuardMiddleware())
     # Снаружи всех: ловит «экран не изменился» из любого обработчика,
     # даже если тот правит сообщение напрямую, без safe_edit.
+    # Самым внешним — первым по порядку: aiogram оборачивает прослойки
+    # в порядке подключения, и первая оказывается снаружи всех. Любая
+    # транзакция, пережившая обработчик или другую прослойку, снимается
+    # здесь. Без этого один ранний return после записи вешает замок на
+    # общее соединение, и все остальные получают «database is locked».
+    dp.message.outer_middleware(TxnGuard())
+    dp.callback_query.outer_middleware(TxnGuard())
     dp.callback_query.outer_middleware(SameScreenGuard())
     # Кнопка на сообщении старше двух суток: Telegram доставляет нажатие,
     # но само сообщение заменяет заглушкой без правки. Без этой проверки

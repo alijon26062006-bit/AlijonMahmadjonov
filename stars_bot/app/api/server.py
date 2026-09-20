@@ -119,6 +119,12 @@ async def middleware(request: web.Request, handler):
                                "Внутренняя ошибка. Повторите позже.")
     finally:
         ms = int((time.monotonic() - started) * 1000)
+        # Точка могла оставить транзакцию открытой (упавшая вставка,
+        # ранний выход). Снимаем до журнала: иначе журнал закоммитит
+        # чужие полузаписи вместе со своей строкой.
+        if await db.release(conn):
+            log.warning("API %s: точка оставила открытую транзакцию — снята",
+                        request_id)
         try:
             await db.log_api_request(
                 conn, request_id=request_id,

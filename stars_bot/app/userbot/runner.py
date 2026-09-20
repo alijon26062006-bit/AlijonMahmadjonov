@@ -92,6 +92,12 @@ async def _drain(queue: asyncio.Queue, bot) -> None:
                 # уведомление не должно останавливать остальные
                 log.exception("[USERBOT] Обработка сорвалась: %s", exc)
             finally:
+                # Соединение живёт часами. Транзакция, зависшая после
+                # упавшей вставки, держала бы замок до следующей оплаты —
+                # и всё это время бот не мог бы писать в базу.
+                if await db.release(conn):
+                    log.warning("[USERBOT] уведомление %s оставило "
+                                "открытую транзакцию — снята", message_id)
                 queue.task_done()
     finally:
         await conn.close()

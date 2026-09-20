@@ -675,6 +675,31 @@ async def connect() -> aiosqlite.Connection:
     return conn
 
 
+async def release(conn: aiosqlite.Connection) -> bool:
+    """Снять транзакцию, которую кто-то открыл и не закрыл.
+
+    Первая INSERT/UPDATE/DELETE открывает транзакцию и берёт замок на
+    запись. Если после неё функция вернулась, упала или бросила
+    исключение раньше commit — замок остаётся висеть на соединении до
+    следующего commit. Всё это время остальные соединения ждут свои
+    пятнадцать секунд и получают «database is locked».
+
+    Зовётся на выходе из каждого обработчика бота, каждого запроса API
+    и каждого уведомления юзербота. True — было что снимать: это
+    ошибка в коде, и о ней стоит написать в журнал.
+    """
+    if not conn.in_transaction:
+        return False
+    await conn.rollback()
+    return True
+
+
+async def _undo(conn: aiosqlite.Connection) -> None:
+    """Откатить упавшую вставку, чтобы не унести замок с собой."""
+    if conn.in_transaction:
+        await conn.rollback()
+
+
 async def compact(conn: aiosqlite.Connection) -> None:
     """Свернуть журнал WAL в базу и обнулить его.
 
@@ -1270,6 +1295,9 @@ async def create_review(
             (order_id, user_id, rating, REVIEW_PENDING, now, now),
         )
     except sqlite3.IntegrityError:
+        # Упавшая вставка уже взяла замок на запись — без отката он
+        # останется висеть до следующего commit на этом соединении.
+        await _undo(conn)
         return None
     await conn.commit()
     return await get_review(conn, cur.lastrowid)
@@ -1386,6 +1414,7 @@ async def create_link(conn: aiosqlite.Connection, code: str) -> Link | None:
             "INSERT INTO links (code, created_at) VALUES (?, ?)", (code, _now()),
         )
     except sqlite3.IntegrityError:
+        await _undo(conn)
         return None
     await conn.commit()
     return await get_link(conn, cur.lastrowid)
@@ -1903,6 +1932,7 @@ async def create_promo(
             (code.upper(), kind, amount, percent, max_uses, _now()),
         )
     except aiosqlite.IntegrityError:
+        await _undo(conn)
         return False
     await conn.commit()
     return True
@@ -2858,6 +2888,10 @@ async def reserve_idem(
         await conn.commit()
         return True, ""
     except sqlite3.IntegrityError:
+        # Повторный запрос с тем же ключом — обычное дело у разработчиков.
+        # Каждый такой повтор без отката вешал на соединение API замок
+        # на запись до следующего заказа, и весь бот ждал его.
+        await _undo(conn)
         async with conn.execute(
             "SELECT ref FROM api_idempotency WHERE key_id = ? AND idem_key = ?",
             (key_id, idem_key),
@@ -2948,6 +2982,7 @@ async def claim_bank_payment(
         )
         await conn.commit()
     except sqlite3.IntegrityError:
+        await _undo(conn)
         return None
     return await get_bank_payment(conn, cur.lastrowid)
 
