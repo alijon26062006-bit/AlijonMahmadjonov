@@ -11,8 +11,9 @@ from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramAPIError, TelegramNetworkError, TelegramUnauthorizedError
 from aiogram.types import BotCommand, BotCommandScopeChat
 
-from app import db, runtime
+from app import db, runtime, texts
 from app.config import settings
+from app.handlers import fallback
 from app.handlers import (
     api_cab,
     games, reviews,
@@ -22,6 +23,7 @@ from app.middlewares.emoji_guard import CustomEmojiGuard
 from app.middlewares.escape import CommandEscapeMiddleware
 from app.middlewares.same_screen import SameScreenGuard
 from app.middlewares.sponsor import SponsorGate
+from app.middlewares.stale_screen import StaleScreenGuard
 from app.middlewares.guard import UserGuardMiddleware
 from app.services.billing import make_sender
 from app.services.fragment import (
@@ -142,6 +144,10 @@ async def main() -> None:
     # Снаружи всех: ловит «экран не изменился» из любого обработчика,
     # даже если тот правит сообщение напрямую, без safe_edit.
     dp.callback_query.outer_middleware(SameScreenGuard())
+    # Кнопка на сообщении старше двух суток: Telegram доставляет нажатие,
+    # но само сообщение заменяет заглушкой без правки. Без этой проверки
+    # обработчик падает молча — снаружи это «кнопка не работает».
+    dp.callback_query.outer_middleware(StaleScreenGuard())
     # Обязательная подписка — снаружи всего: до неё клиент не должен
     # попадать ни в один экран. Владельца и админов не трогает.
     dp.message.outer_middleware(SponsorGate())
@@ -160,6 +166,26 @@ async def main() -> None:
     dp.include_router(reviews.router)
     dp.include_router(games.router)
     dp.include_router(api_cab.router)
+    # Последним: ловит нажатия, которые не взял никто, — чаще всего это
+    # кнопка из диалога, чьё состояние стёр перезапуск бота. Без него
+    # такое нажатие пропадает молча, и клиент видит сломанную кнопку.
+    dp.include_router(fallback.router)
+
+    async def on_error(event) -> bool:
+        """Поломка в обработчике не должна выглядеть мёртвой кнопкой.
+
+        Без этого любое исключение оставляет у клиента крутящиеся часики
+        до упора, а владелец узнаёт о поломке в лучшем случае из логов.
+        Отвечаем коротко, подробности — в журнал.
+        """
+        log.exception("Обработчик упал: %s", event.exception)
+        press = getattr(event.update, "callback_query", None)
+        if press is not None:
+            with suppress(Exception):
+                await press.answer(texts.SOMETHING_BROKE, show_alert=True)
+        return True
+
+    dp.errors.register(on_error)
 
     try:
         me = await bot.me()
