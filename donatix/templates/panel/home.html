@@ -1,61 +1,104 @@
 {% extends "panel/_layout.html" %}
 {% from "_icons.html" import icon, kind_icon %}
-{% block title %}Панель — {{ site_name }}{% endblock %}
+{% block title %}Профиль — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="page-hero">
-  <h1>Обзор</h1>
-  <div class="actions">
-    <a class="btn primary" href="/panel/balance">{{ icon('wallet', 18) }}Пополнить баланс</a>
-    <a class="btn" href="/panel/api">{{ icon('key', 18) }}API-ключи</a>
-  </div>
+<section class="profile-hero">
+  <h1>Профиль</h1>
+  <p>Баланс, заказы и API в одном месте.</p>
 </section>
 
-<div class="card">
-  <h2 style="margin:0;font-size:1.6rem">{{ user.login }}</h2>
-  <div class="muted">{{ user.email }}</div>
-  <div style="margin-top:16px"></div>
-  <div class="grid stats">
-    <div class="stat"><div class="label">Баланс</div><div class="value">${{ fmt(user.balance_micro) }}</div></div>
-    <div class="stat"><div class="label">Всего потрачено</div><div class="value">${{ fmt(summary.spent) }}</div></div>
-    <div class="stat"><div class="label">Всего заказов</div><div class="value">{{ summary.n }}</div></div>
-    <div class="stat ok">
-      <div class="label">Уровень</div>
-      <div class="value" style="text-transform:capitalize">{{ user.tier }}</div>
-      <div class="note">{% if user.status == 'active' %}<span class="badge ok">{{ icon('check', 14) }}Активен</span>{% else %}<span class="badge warn">{{ status_titles[user.status] }}</span>{% endif %}</div>
-    </div>
+<div class="card profile-card">
+  <div class="who-row">
+    <span class="avatar lg">{{ user.login[:2] | upper }}</span>
+    <div><h2>{{ user.login }}</h2><div class="muted">{{ user.email }}</div></div>
+  </div>
+  <div class="profile-links">
+    <a class="btn" href="/panel/orders">{{ icon('bag', 18) }}Заказы</a>
+    <a class="btn" href="/panel/balance">{{ icon('wallet', 18) }}Баланс</a>
+    <a class="btn" href="/panel/transactions">{{ icon('swap', 18) }}Транзакции</a>
+    {% if support_contact %}
+    <a class="btn" href="{{ 'https://t.me/' ~ support_contact[1:] if support_contact.startswith('@') else support_contact }}" target="_blank" rel="noopener">{{ icon('zap-send', 18) }}Поддержка</a>
+    {% else %}<a class="btn" href="/docs">{{ icon('book', 18) }}Документация</a>{% endif %}
   </div>
 </div>
 
-{% if not has_key and user.status == 'active' %}
-<div class="card" style="margin-top:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-  <div class="tile">{{ icon('code', 24) }}</div>
-  <div style="flex:1;min-width:220px"><h3 style="margin:0">Подключите свой сайт или бота</h3>
-    <div class="muted">Создайте API-ключ — и заказы будут идти автоматически.</div></div>
-  <a class="btn primary" href="/panel/api">Создать ключ</a>
-</div>
-{% endif %}
-
-<div class="section-title"><h2>Купить</h2></div>
-<div class="grid quick">
-  {% for href, kind, title in [
-    ('/panel/buy/steam-topup', 'steam_topup', 'Пополнить Steam'),
-    ('/panel/buy/steam-gift', 'steam_gift', 'Steam гифты'),
-    ('/panel/catalog?kind=telegram_stars', 'telegram_stars', kind_titles['telegram_stars']),
-    ('/panel/catalog?kind=telegram_premium', 'telegram_premium', kind_titles['telegram_premium']),
-    ('/panel/catalog?kind=topup', 'topup', kind_titles['topup']),
-    ('/panel/catalog?kind=gift_card', 'gift_card', kind_titles['gift_card']),
-  ] %}
-  <a class="quick-tile" href="{{ href }}"><span class="tile k-{{ kind }}">{{ kind_icon(kind, 20) }}</span><span>{{ title }}</span></a>
-  {% endfor %}
-</div>
-
-<div class="card" style="margin-top:16px">
-  <h3 style="margin-bottom:4px">Последние заказы</h3>
-  <a class="btn block" href="/panel/orders" style="margin-bottom:14px">Все заказы</a>
-  <div class="list">
-    {% for o in recent %}{% include "panel/_order_item.html" %}{% else %}
-    <div class="empty">Заказов пока нет. Начните с <a href="/panel/catalog">каталога</a>.</div>
-    {% endfor %}
+<div class="grid profile-stats">
+  <div class="pstat">
+    <div class="label">Баланс</div>
+    <div class="value">${{ fmt(user.balance_micro) }}</div>
+    <a class="more" href="/panel/balance">Пополнить {{ icon('arrow-right', 16) }}</a>
+  </div>
+  <div class="pstat">
+    <div class="label">Всего заказов</div>
+    <div class="value">{{ summary.n }}</div>
+    <a class="more" href="/panel/orders">К списку заказов {{ icon('arrow-right', 16) }}</a>
+  </div>
+  <div class="pstat">
+    <div class="label">Всего потрачено</div>
+    <div class="value">${{ fmt(summary.spent) }}</div>
+    <div class="note">За всё время</div>
   </div>
 </div>
+
+<div class="tier-card {{ 'ok' if user.status == 'active' else 'wait' }}">
+  <div class="label-caps">Уровень</div>
+  <div class="tier-name">{{ user.tier | capitalize }}</div>
+  <div class="tier-row">
+    <span class="tier-status">
+      <span class="status {{ 'completed' if user.status == 'active' else 'processing' }}">{{ icon('check' if user.status == 'active' else 'clock', 14) }}</span>
+      <span><b>{{ 'Активен' if user.status == 'active' else status_titles[user.status] }}</b>
+        <span class="sub">Наценка к цене поставщика: {{ markup }}%</span></span>
+    </span>
+  </div>
+</div>
+
+<div class="label-caps section-label">Аккаунт</div>
+<div class="list">
+  <div class="kv"><span class="k">Email</span><span class="v">{{ user.email }}</span></div>
+  <div class="kv"><span class="k">Валюта счёта</span><span class="v">USD</span></div>
+  <div class="kv"><span class="k">Регистрация</span><span class="v mono">{{ user.created_at[8:10] }}.{{ user.created_at[5:7] }}.{{ user.created_at[:4] }} {{ user.created_at[11:16] }}</span></div>
+  {% if user.project %}<div class="kv"><span class="k">Проект</span><span class="v">{{ user.project }}</span></div>{% endif %}
+  <a class="btn soft block lg" href="/panel/logins">{{ icon('clock', 18) }}История входов</a>
+</div>
+
+<div class="card key-card">
+  <h3>API ключ</h3>
+  <p class="muted">Ключ для подключения бота или сайта.</p>
+  {% if key %}
+  <div class="key-box">
+    <code id="key-val" data-full="{{ key.prefix }}…" class="mono">••••••••••••</code>
+    <button type="button" class="icon-btn" id="key-eye" aria-label="Показать ключ" title="Показать ключ">{{ icon('eye', 18) }}</button>
+  </div>
+  <div class="hint">Целиком ключ показывается один раз — при создании. Потеряли — создайте новый.
+    {% if key.last_used_at %}Последнее использование: {{ key.last_used_at[:16] | replace('T', ' ') }}.{% else %}Ещё не использовался.{% endif %}</div>
+  <div class="key-actions">
+    <a class="btn" href="/panel/api">{{ icon('key', 18) }}Управление ключами</a>
+  </div>
+  {% elif user.status == 'active' %}
+  <form method="post" action="/panel/api/keys" class="key-actions">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="name" value="Основной">
+    <button class="btn primary">{{ icon('plus', 18) }}Создать ключ</button>
+  </form>
+  {% else %}
+  <p class="hint">Ключ можно создать после активации аккаунта.</p>
+  {% endif %}
+
+  <div class="docs-callout">
+    <h3>Документация API</h3>
+    <p class="muted">Методы, примеры запросов и Swagger.</p>
+    <a class="btn" href="/docs">Открыть документацию</a>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var b = document.getElementById("key-eye"), v = document.getElementById("key-val");
+    if (!b) return;
+    b.addEventListener("click", function () {
+      var hidden = v.textContent.indexOf("•") === 0;
+      v.textContent = hidden ? v.dataset.full : "••••••••••••";
+      b.setAttribute("aria-label", hidden ? "Скрыть ключ" : "Показать ключ");
+    });
+  })();
+</script>
 {% endblock %}

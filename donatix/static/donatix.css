@@ -650,3 +650,44 @@ pre.hl { color: #c9d1d9; }
   background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: .82rem; }
 .avatar.sm { width: 28px; height: 28px; font-size: .7rem; }
 a.who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; }
+
+/* ── Профиль клиента ──────────────────────────────────────── */
+.profile-hero { margin: 18px 0 14px; padding: 22px; border: 1px solid var(--accent-line); border-radius: 14px;
+  background: linear-gradient(135deg, var(--accent-soft), var(--surface)); }
+.profile-hero h1 { margin: 0; }
+.profile-hero p { margin: 6px 0 0; color: var(--muted); }
+.profile-card .who-row { display: flex; align-items: center; gap: 14px; }
+.profile-card h2 { margin: 0; font-size: 1.45rem; }
+.avatar.lg { width: 52px; height: 52px; font-size: 1.05rem; }
+.profile-links { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.profile-links .btn { min-height: 50px; }
+@media (max-width: 700px) { .profile-links { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.grid.profile-stats { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-top: 14px; }
+.pstat { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.pstat .label { color: var(--muted); }
+.pstat .value { margin-top: 4px; font: 700 1.7rem/1.2 "JetBrains Mono", ui-monospace, monospace; }
+.pstat .note, .pstat .more { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--muted); font-weight: 600; }
+.pstat .more:hover { color: var(--accent); text-decoration: none; }
+.pstat .more .ico { transition: transform .2s var(--ease-out); }
+.pstat .more:hover .ico { transform: translateX(3px); }
+.tier-card { margin-top: 14px; padding: 18px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--line));
+  background: linear-gradient(135deg, var(--ok-soft), var(--surface)); }
+.tier-card.wait { border-color: color-mix(in srgb, var(--warn) 35%, var(--line)); background: linear-gradient(135deg, var(--warn-soft), var(--surface)); }
+.tier-name { margin: 2px 0 12px; font-size: 1.5rem; font-weight: 700; }
+.tier-status { display: inline-flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--surface); }
+.tier-status .status { width: 30px; height: 30px; }
+.tier-status .sub { display: block; font-size: .86rem; color: var(--muted); }
+.section-label { margin: 26px 0 10px; }
+.kv { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.kv .k { color: var(--muted); font-size: .9rem; }
+.kv .v { font-weight: 700; font-size: 1.05rem; overflow-wrap: anywhere; }
+.key-card { margin-top: 16px; }
+.key-card h3 { margin: 0; }
+.key-card > p { margin: 4px 0 12px; }
+.key-box { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px dashed var(--line-strong); border-radius: 10px; }
+.key-box code { flex: 1; min-width: 0; background: none; padding: 0; font-size: .95rem; overflow-wrap: anywhere; }
+.key-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.docs-callout { margin-top: 16px; padding: 18px; border-radius: 12px; border: 1px solid var(--accent-line); background: var(--accent-soft); }
+.docs-callout h3 { margin: 0; }
+.docs-callout p { margin: 4px 0 12px; }

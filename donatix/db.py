@@ -33,6 +33,14 @@ CREATE TABLE IF NOT EXISTS users (
     last_active_at  TEXT
 );
 
+CREATE TABLE IF NOT EXISTS logins (
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    ip         TEXT,
+    user_agent TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS logins_user ON logins(user_id, id);
 CREATE TABLE IF NOT EXISTS api_keys (
     id           INTEGER PRIMARY KEY,
     user_id      INTEGER NOT NULL REFERENCES users(id),

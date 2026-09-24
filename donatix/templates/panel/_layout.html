@@ -10,7 +10,7 @@
 {% block sidenav %}
 {% set current = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
 <h4>Обзор</h4>
-{{ nav_link('/panel', 'Главная', 'home', current) }}
+{{ nav_link('/panel', 'Профиль', 'home', current) }}
 {{ nav_link('/panel/orders', 'Заказы', 'bag', current) }}
 {{ nav_link('/panel/transactions', 'Транзакции', 'swap', current) }}
 <h4>Каталог</h4>

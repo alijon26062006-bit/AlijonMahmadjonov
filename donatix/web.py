@@ -9,7 +9,7 @@ import uuid
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from . import accounts, catalog, orders
+from . import accounts, catalog, db, orders
 from .config import PAY_METHODS, Config
 from .deps import LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
 from .money import apply_markup, fmt, order_total_micro, to_decimal
@@ -107,6 +107,7 @@ def register(
     except accounts.AccountError as exc:
         return render(request, "register.html", {"form": form, "error": str(exc)}, 400)
     request.session["user_id"] = user_id
+    _record_login(conn, request, user_id)
     from .tgbot import user_event
     from .worker import notify_event
     if config.require_approval:
@@ -137,7 +138,13 @@ def login(request: Request, email: str = Form(""), password: str = Form(""), con
         return render(request, "login.html", {"form": {"email": email}, "error": "Аккаунт заблокирован."}, 403)
     request.session.clear()
     request.session["user_id"] = user["id"]
+    _record_login(conn, request, user["id"])
     return _redirect("/admin" if user["role"] == "admin" else "/panel")
+
+
+def _record_login(conn, request: Request, user_id: int) -> None:
+    conn.execute("INSERT INTO logins (user_id, ip, user_agent, created_at) VALUES (?, ?, ?, ?)",
+                 (user_id, _ip(request)[:64], request.headers.get("user-agent", "")[:300], db.now()))
 
 
 @router.post("/logout", dependencies=[Depends(check_csrf)])
@@ -155,21 +162,27 @@ def _ip(request: Request) -> str:
 
 
 @router.get("/panel")
-def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+               config: Config = Depends(get_config)):
     summary = conn.execute(
         "SELECT COUNT(*) AS n, COALESCE(SUM(total_micro), 0) AS spent FROM orders "
         "WHERE user_id = ? AND status = 'completed'",
         (user["id"],),
     ).fetchone()
-    recent = conn.execute(
-        "SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5", (user["id"],)
-    ).fetchall()
-    has_key = conn.execute(
-        "SELECT 1 FROM api_keys WHERE user_id = ? AND revoked_at IS NULL", (user["id"],)
-    ).fetchone() is not None
+    key = conn.execute(
+        "SELECT prefix, created_at, last_used_at FROM api_keys WHERE user_id = ? AND revoked_at IS NULL "
+        "ORDER BY id DESC LIMIT 1", (user["id"],)
+    ).fetchone()
     return render(request, "panel/home.html", {
-        "user": user, "summary": summary, "recent": recent, "has_key": has_key, "kinds": KINDS,
+        "user": user, "summary": summary, "key": key, "kinds": KINDS,
+        "markup": accounts.markup_for(user, config),
     })
+
+
+@router.get("/panel/logins")
+def panel_logins(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    rows = conn.execute("SELECT * FROM logins WHERE user_id = ? ORDER BY id DESC LIMIT 30", (user["id"],)).fetchall()
+    return render(request, "panel/logins.html", {"user": user, "rows": rows})
 
 
 def _cents(value) -> str:

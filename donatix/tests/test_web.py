@@ -173,3 +173,21 @@ def test_api_account_check(app, config, conn):
     assert r["ok"] and r["supported"] and r["player_name"] == "Player_6789"
     r = client.get("/api/v1/products/topup-pubg-60", headers={"X-API-Key": key}).json()
     assert r["product"]["account_check"] is True
+
+
+def test_profile_and_login_history(app, config, conn):
+    from conftest import web_login
+    from fastapi.testclient import TestClient
+
+    from donatix import accounts
+
+    uid = accounts.create_user(conn, email="pr@example.com", login="profuser", password="password123",
+                               status="active", project="@my_bot")
+    client = TestClient(app)
+    web_login(client, "pr@example.com", "password123")
+    page = client.get("/panel").text
+    assert "Профиль" in page and "Всего потрачено" in page and "История входов" in page and "Создать ключ" in page
+    key = accounts.create_api_key(conn, uid, "bot")
+    page = client.get("/panel").text
+    assert key[:12] in page and key not in page  # целиком ключ не показываем
+    assert "testclient" in client.get("/panel/logins").text
