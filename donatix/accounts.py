@@ -9,7 +9,7 @@ from decimal import Decimal
 from . import db
 from .config import TIERS, Config
 from .money import MoneyError, to_decimal
-from .security import hash_api_key, hash_password, new_api_key, new_webhook_secret, verify_password
+from .security import hash_api_key, hash_password, new_api_key, new_webhook_secret, seal, unseal, verify_password
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 LOGIN_RE = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
@@ -129,7 +129,7 @@ def rotate_webhook_secret(conn: sqlite3.Connection, user_id: int) -> None:
 # ── API-ключи ────────────────────────────────────────────────
 
 
-def create_api_key(conn: sqlite3.Connection, user_id: int, name: str) -> str:
+def create_api_key(conn: sqlite3.Connection, user_id: int, name: str, secret: str = "") -> str:
     active = conn.execute(
         "SELECT COUNT(*) FROM api_keys WHERE user_id = ? AND revoked_at IS NULL", (user_id,)
     ).fetchone()[0]
@@ -137,10 +137,18 @@ def create_api_key(conn: sqlite3.Connection, user_id: int, name: str) -> str:
         raise AccountError("Не больше 10 активных ключей. Отзовите ненужные.")
     key, prefix, key_hash = new_api_key()
     conn.execute(
-        "INSERT INTO api_keys (user_id, name, prefix, key_hash, created_at) VALUES (?, ?, ?, ?, ?)",
-        (user_id, (name.strip() or "Ключ")[:64], prefix, key_hash, db.now()),
+        "INSERT INTO api_keys (user_id, name, prefix, key_hash, key_enc, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (user_id, (name.strip() or "Ключ")[:64], prefix, key_hash, seal(secret, key) if secret else None, db.now()),
     )
     return key
+
+
+def reveal_api_key(conn: sqlite3.Connection, user_id: int, key_id: int, secret: str) -> str | None:
+    row = conn.execute("SELECT key_enc FROM api_keys WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
+                       (key_id, user_id)).fetchone()
+    if row is None or not row["key_enc"]:
+        return None
+    return unseal(secret, row["key_enc"])
 
 
 def revoke_api_key(conn: sqlite3.Connection, user_id: int, key_id: int) -> None:

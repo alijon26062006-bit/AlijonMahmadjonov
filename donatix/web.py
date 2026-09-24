@@ -170,7 +170,8 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
         (user["id"],),
     ).fetchone()
     key = conn.execute(
-        "SELECT prefix, created_at, last_used_at FROM api_keys WHERE user_id = ? AND revoked_at IS NULL "
+        "SELECT id, prefix, created_at, last_used_at, key_enc IS NOT NULL AS can_show FROM api_keys "
+        "WHERE user_id = ? AND revoked_at IS NULL "
         "ORDER BY id DESC LIMIT 1", (user["id"],)
     ).fetchone()
     return render(request, "panel/home.html", {
@@ -431,12 +432,23 @@ def panel_api(request: Request, user=Depends(panel_user), conn=Depends(get_conn)
 @router.post("/panel/api/keys", dependencies=[Depends(check_csrf)])
 def panel_api_create(request: Request, name: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn)):
     try:
-        key = accounts.create_api_key(conn, user["id"], name)
+        key = accounts.create_api_key(conn, user["id"], name, request.app.state.config.secret_key)
     except accounts.AccountError as exc:
         flash(request, str(exc), "error")
         return _redirect("/panel/api")
     request.session["new_api_key"] = key
     return _redirect("/panel/api")
+
+
+@router.post("/panel/api/keys/{key_id}/reveal", dependencies=[Depends(check_csrf)])
+def panel_api_reveal(key_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    if request.app.state.limiter.hit("account", f"reveal{user['id']}") is not None:
+        return JSONResponse({"ok": False, "error": "Слишком часто. Подождите минуту."}, 429)
+    key = accounts.reveal_api_key(conn, user["id"], key_id, request.app.state.config.secret_key)
+    if key is None:
+        return JSONResponse({"ok": False, "error": "Этот ключ создан до обновления — его нельзя показать. "
+                                                  "Создайте новый в «Управление ключами»."}, 404)
+    return JSONResponse({"ok": True, "key": key}, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/panel/api/keys/{key_id}/revoke", dependencies=[Depends(check_csrf)])

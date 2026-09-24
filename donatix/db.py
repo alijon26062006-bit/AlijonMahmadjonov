@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
     name         TEXT NOT NULL,
     prefix       TEXT NOT NULL,
     key_hash     TEXT NOT NULL UNIQUE,
+    key_enc      TEXT,              -- ключ, зашифрованный ключом сайта (чтобы показать клиенту)
     created_at   TEXT NOT NULL,
     last_used_at TEXT,
     revoked_at   TEXT
@@ -186,6 +187,9 @@ def init(path: Path | str) -> None:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(products)")}
         if "image_url" not in cols:  # база, созданная до появления картинок
             conn.execute("ALTER TABLE products ADD COLUMN image_url TEXT")
+        key_cols = {r[1] for r in conn.execute("PRAGMA table_info(api_keys)")}
+        if "key_enc" not in key_cols:
+            conn.execute("ALTER TABLE api_keys ADD COLUMN key_enc TEXT")
         if "region" not in cols:
             conn.execute("ALTER TABLE products ADD COLUMN region TEXT")
     finally:

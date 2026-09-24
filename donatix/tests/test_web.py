@@ -187,7 +187,32 @@ def test_profile_and_login_history(app, config, conn):
     web_login(client, "pr@example.com", "password123")
     page = client.get("/panel").text
     assert "Профиль" in page and "Всего потрачено" in page and "История входов" in page and "Создать ключ" in page
-    key = accounts.create_api_key(conn, uid, "bot")
+    token = client.get("/panel").text.split('name="csrf" value="')[1].split('"')[0]
+    key = accounts.create_api_key(conn, uid, "bot", config.secret_key)
     page = client.get("/panel").text
-    assert key[:12] in page and key not in page  # целиком ключ не показываем
+    assert "Показать ключ" in page and key not in page  # ключа нет в коде страницы
+    kid = conn.execute("SELECT id FROM api_keys WHERE user_id = ?", (uid,)).fetchone()[0]
+    r = client.post(f"/panel/api/keys/{kid}/reveal", data={"csrf": token})
+    assert r.json() == {"ok": True, "key": key}
+    assert client.post(f"/panel/api/keys/{kid}/reveal", data={"csrf": "bad"}).status_code == 403
+    # старый ключ (без шифрованной копии) показать нельзя
+    accounts.create_api_key(conn, uid, "old")
+    old = conn.execute("SELECT MAX(id) FROM api_keys").fetchone()[0]
+    assert client.post(f"/panel/api/keys/{old}/reveal", data={"csrf": token}).json()["ok"] is False
+    # чужой ключ — тоже нет
+    other = accounts.create_user(conn, email="o@example.com", login="otheruser", password="password123",
+                                 status="active")
+    accounts.create_api_key(conn, other, "x", config.secret_key)
+    foreign = conn.execute("SELECT MAX(id) FROM api_keys").fetchone()[0]
+    assert client.post(f"/panel/api/keys/{foreign}/reveal", data={"csrf": token}).json()["ok"] is False
     assert "testclient" in client.get("/panel/logins").text
+
+
+def test_seal_roundtrip():
+    from donatix.security import seal, unseal
+
+    box = seal("site-secret", "dx_live_abc")
+    assert "dx_live" not in box and unseal("site-secret", box) == "dx_live_abc"
+    assert unseal("other-secret", box) is None
+    tampered = box[:-2] + ("00" if box[-2:] != "00" else "11")
+    assert unseal("site-secret", tampered) is None

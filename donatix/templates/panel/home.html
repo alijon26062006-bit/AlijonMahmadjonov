@@ -65,12 +65,11 @@
   <h3>API ключ</h3>
   <p class="muted">Ключ для подключения бота или сайта.</p>
   {% if key %}
-  <div class="key-box">
-    <code id="key-val" data-full="{{ key.prefix }}…" class="mono">••••••••••••</code>
-    <button type="button" class="icon-btn" id="key-eye" aria-label="Показать ключ" title="Показать ключ">{{ icon('eye', 18) }}</button>
-  </div>
-  <div class="hint">Целиком ключ показывается один раз — при создании. Потеряли — создайте новый.
-    {% if key.last_used_at %}Последнее использование: {{ key.last_used_at[:16] | replace('T', ' ') }}.{% else %}Ещё не использовался.{% endif %}</div>
+  <button type="button" class="key-eye" id="key-eye" data-id="{{ key.id }}" aria-label="Показать ключ">
+    {{ icon('eye', 22) }}<span class="tip">Показать ключ</span></button>
+  <div class="key-box"><code id="key-val" class="mono">•••••••••••</code>
+    <button type="button" class="icon-btn" id="key-copy" aria-label="Скопировать" hidden>{{ icon('copy', 18) }}</button></div>
+  <div class="hint" id="key-hint">{% if key.last_used_at %}Последнее использование: {{ key.last_used_at[:16] | replace('T', ' ') }}.{% else %}Ещё не использовался.{% endif %}</div>
   <div class="key-actions">
     <a class="btn" href="/panel/api">{{ icon('key', 18) }}Управление ключами</a>
   </div>
@@ -92,12 +91,25 @@
 
 <script>
   (function () {
-    var b = document.getElementById("key-eye"), v = document.getElementById("key-val");
-    if (!b) return;
-    b.addEventListener("click", function () {
-      var hidden = v.textContent.indexOf("•") === 0;
-      v.textContent = hidden ? v.dataset.full : "••••••••••••";
-      b.setAttribute("aria-label", hidden ? "Скрыть ключ" : "Показать ключ");
+    var eye = document.getElementById("key-eye"), val = document.getElementById("key-val"),
+        copy = document.getElementById("key-copy"), hint = document.getElementById("key-hint"), shown = null;
+    if (!eye) return;
+    var MASK = "•••••••••••";
+    eye.addEventListener("click", async function () {
+      var tip = eye.querySelector(".tip");
+      if (shown) { val.textContent = MASK; copy.hidden = true; shown = null; eye.classList.remove("on"); tip.textContent = "Показать ключ"; return; }
+      var body = new FormData(); body.append("csrf", "{{ csrf }}");
+      eye.disabled = true;
+      try {
+        var r = await fetch("/panel/api/keys/" + eye.dataset.id + "/reveal", { method: "POST", body: body });
+        var d = await r.json();
+        if (d.ok) { shown = d.key; val.textContent = d.key; copy.hidden = false; eye.classList.add("on"); tip.textContent = "Скрыть ключ"; }
+        else hint.textContent = d.error;
+      } catch (e) { hint.textContent = "Нет связи, попробуйте ещё раз."; }
+      eye.disabled = false;
+    });
+    copy.addEventListener("click", function () {
+      if (shown && navigator.clipboard) navigator.clipboard.writeText(shown).then(function () { hint.textContent = "Ключ скопирован."; });
     });
   })();
 </script>
