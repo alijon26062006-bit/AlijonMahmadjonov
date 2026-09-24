@@ -41,7 +41,7 @@ def test_topup_validation_and_reject(app, config, conn):
     assert "Выберите способ оплаты" in r.text
     r = client.post("/panel/balance", data={"csrf": token, "method": "alif", "amount": "1"})
     assert "Минимальная сумма" in r.text
-    client.post("/panel/balance", data={"csrf": token, "method": "usdt_trc20", "amount": "20"})
+    client.post("/panel/balance", data={"csrf": token, "method": "usdt_trc20", "amount": "50"})
     admin = TestClient(app)
     atoken = web_login(admin, "admin@example.com", "adminpass123")
     admin.post("/admin/payments/1/reject", data={"csrf": atoken, "reason": "Перевод не найден"})
@@ -75,10 +75,41 @@ def test_admin_sets_pay_details(app, config, conn):
 
     admin = TestClient(app)
     atoken = web_login(admin, "admin@example.com", "adminpass123")
-    r = admin.post("/admin/pay-settings", data={"csrf": atoken, "dc": "DC: 5058 **** 1234 (Али)",
-                                                "tjs_rate": "11", "min_usd": "2"})
+    page = admin.get("/admin/pay-settings").text
+    n = page.count('_code" value=')  - 1  # последняя строка — «новый способ»
+    data = {"csrf": atoken, "n": str(n), "tjs_rate": "11", "min_tjs": "500", "low_usd": "10"}
+    for i in range(n):  # стандартные способы оставляем выключенными, кроме DC
+        code = page.split(f'name="m{i}_code" value="')[1].split('"')[0]
+        data |= {f"m{i}_code": code, f"m{i}_title": code, f"m{i}_currency": "TJS"}
+        if code == "dc":
+            data |= {f"m{i}_details": "DC: 5058 **** 1234 (Али)", f"m{i}_enabled": "1"}
+    # свой новый способ
+    data |= {f"m{n}_title": "Humo", f"m{n}_currency": "TJS", f"m{n}_details": "Humo 9860 **** 55", f"m{n}_enabled": "1"}
+    r = admin.post("/admin/pay-settings", data=data)
     assert "Реквизиты сохранены" in r.text
     page = client.get("/panel/balance").text
-    assert "5058 **** 1234" in page and "Алиф (Alif Mobi)" not in page
-    r = client.post("/panel/balance", data={"csrf": token, "method": "dc", "amount": "3"})
-    assert "33.00 TJS" in r.text  # 3 × 11, минимум из админки
+    assert "5058 **** 1234" in page and "Humo 9860" in page and "Алиф (Alif Mobi)" not in page
+    assert "500 сомони" in page
+    # минимум 500 сомони: $40 × 11 = 440 — мало, $50 × 11 = 550 — можно
+    r = client.post("/panel/balance", data={"csrf": token, "method": "dc", "amount": "40"})
+    assert "Минимальная сумма пополнения — 500 сомони" in r.text
+    r = client.post("/panel/balance", data={"csrf": token, "method": "dc", "amount": "50"})
+    assert "550.00 TJS" in r.text
+
+
+def test_low_balance_warning(app, config, conn):
+    from donatix import db
+    uid, client, token = _setup(app, config, conn)
+    with db.tx(conn):
+        accounts.post_ledger(conn, uid, 120_000, "пополнение")
+    assert "осталось" not in client.get("/panel").text
+    with db.tx(conn):
+        accounts.post_ledger(conn, uid, -50_000, "заказ")  # $12 → $7, ниже порога $10
+    page = client.get("/panel").text
+    assert "На балансе осталось <b>$7.0000</b>" in page
+    notes = conn.execute("SELECT text FROM notifications WHERE user_id = ?", (uid,)).fetchall()
+    assert sum("пополните счёт" in n[0] for n in notes) == 1
+    with db.tx(conn):
+        accounts.post_ledger(conn, uid, -10_000, "заказ")  # уже ниже — второй раз не пишем
+    notes = conn.execute("SELECT text FROM notifications WHERE user_id = ?", (uid,)).fetchall()
+    assert sum("пополните счёт" in n[0] for n in notes) == 1

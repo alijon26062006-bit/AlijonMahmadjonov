@@ -196,7 +196,20 @@ def post_ledger(
         (user_id, "credit" if amount_micro >= 0 else "debit", amount_micro, before, after, note,
          order_id, created_by, db.now()),
     )
+    if amount_micro < 0:
+        _warn_low_balance(conn, user_id, before, after)
     return int(cur.lastrowid)
+
+
+def _warn_low_balance(conn: sqlite3.Connection, user_id: int, before: int, after: int) -> None:
+    """Клиенту — одно уведомление, когда баланс опустился ниже порога из админки."""
+    raw = db.get_setting(conn, "pay.low_balance_usd")
+    threshold = int(Decimal(raw) * 10_000) if raw else 100_000
+    if threshold and before >= threshold > after:
+        from .money import fmt
+        from .notify import notify
+        text = f"На балансе осталось ${fmt(after)} — пополните счёт, чтобы заказы не остановились."
+        notify(conn, None, user_id, text, "/panel/balance")
 
 
 def tx_public_id(tx_id: int) -> str:

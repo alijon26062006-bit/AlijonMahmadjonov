@@ -89,6 +89,9 @@ class Config:
     # Курс сомони за 1 USD — для способов оплаты в TJS.
     tjs_rate: Decimal = Decimal("10.9")
     pay_min_usd: Decimal = Decimal("5")
+    # Минимальное пополнение в сомони и порог «мало денег» на балансе клиента, $
+    pay_min_tjs: Decimal = Decimal("500")
+    low_balance_usd: Decimal = Decimal("10")
 
     # Почта для уведомлений клиентам (необязательно).
     smtp_host: str = ""
@@ -143,6 +146,8 @@ class Config:
             pay_methods=pay_methods,
             tjs_rate=Decimal(_env("DONATIX_TJS_RATE", "10.9")),
             pay_min_usd=Decimal(_env("DONATIX_PAY_MIN_USD", "5")),
+            pay_min_tjs=Decimal(_env("DONATIX_PAY_MIN_TJS", "500")),
+            low_balance_usd=Decimal(_env("DONATIX_LOW_BALANCE_USD", "10")),
             smtp_host=_env("DONATIX_SMTP_HOST"),
             smtp_port=int(_env("DONATIX_SMTP_PORT", "587")),
             smtp_user=_env("DONATIX_SMTP_USER"),

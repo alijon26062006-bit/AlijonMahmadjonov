@@ -378,7 +378,8 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
     conf = payments.settings(conn, config)
     return render(request, "panel/balance.html", {
         "user": user, "methods": payments.methods(conn, config), "payments": rows, "tjs_rate": conf["tjs_rate"],
-        "min_usd": conf["min_usd"], "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()},
+        "min_usd": conf["min_usd"], "min_tjs": conf["min_tjs"],
+        "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()} | {m["code"]: m["title"] for m in conf["all_methods"]},
     })
 
 
@@ -395,7 +396,7 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
         return _redirect("/panel/balance")
     row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
     from .tgbot import payment_event
-    notify_event(conn, config, payment_event(conn, pid))
+    notify_event(conn, config, payment_event(conn, pid, config))
     flash(request, f"Заявка #{pid} создана. Переведите {row['pay_amount']} {row['pay_currency']} по реквизитам — "
                    "после проверки баланс пополнится, вам придёт уведомление.")
     return _redirect("/panel/balance")

@@ -32,3 +32,19 @@ def test_period_totals_and_breakdown(conn):
     assert analytics.build(conn, "24h", user_id=uid)["series"][-1]["label"].endswith(":00")
     assert analytics.build(conn, "30d")["created"] == 6  # админ видит всех
     assert db.now().endswith("Z")
+
+
+def test_admin_finance_block(app, conn):
+    from conftest import web_login
+    from fastapi.testclient import TestClient
+
+    uid = accounts.create_user(conn, email="f@example.com", login="finuser", password="password123", status="active")
+    _order(conn, uid, "completed", 108_000)  # закупка 97 200
+    db.set_setting(conn, "supplier_balance", "50.0000")
+    with db.tx(conn):
+        accounts.post_ledger(conn, uid, 200_000, "Пополнение")
+    admin = TestClient(app)
+    web_login(admin, "admin@example.com", "adminpass123")
+    page = admin.get("/admin/stats?period=7d").text
+    assert "Ушло поставщику" in page and "$9.7200" in page and "$1.0800" in page  # закупка и прибыль
+    assert "$30.0000" in page  # свободно: 50 − 20 долг клиенту

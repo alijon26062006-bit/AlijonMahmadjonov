@@ -102,11 +102,14 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["flashes"] = request.session.pop("flash", [])
     ctx["path"] = request.url.path
     ctx["unread"] = 0
+    ctx["low_balance_micro"] = 0
     if ctx.get("user") is not None:
         from .notify import unread_count
         c = db.connect(config.db_path)
         try:
             ctx["unread"] = unread_count(c, ctx["user"]["id"])
+            low = db.get_setting(c, "pay.low_balance_usd") or str(config.low_balance_usd)
+            ctx["low_balance_micro"] = int(float(low) * 10_000)
         finally:
             c.close()
     return templates.TemplateResponse(request, name, ctx, status_code=status_code)

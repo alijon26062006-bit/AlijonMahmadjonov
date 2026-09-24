@@ -26,7 +26,10 @@
 <h4>Аккаунт</h4>
 {{ nav_link('/panel/api', 'API и webhook', 'key', current) }}
 {{ nav_link('/docs', 'Документация', 'book', current) }}
-{% if user.role == 'admin' %}{{ nav_link('/admin', 'Админка', 'shield', current) }}{% endif %}
+{% if user.role == 'admin' %}{{ nav_link('/admin', 'Админка', 'shield', current) }}{% elif low_balance_micro and user.balance_micro < low_balance_micro %}
+<div class="flash warn low-bal" role="status">{{ icon('alert', 20) }}<span>На балансе осталось <b>${{ fmt(user.balance_micro) }}</b> — пополните счёт, чтобы заказы не остановились.</span>
+  <a class="btn sm primary" href="/panel/balance">Пополнить</a></div>
+{% endif %}
 {% endblock %}
 {% block notice %}
 {% if user.status == 'pending' %}

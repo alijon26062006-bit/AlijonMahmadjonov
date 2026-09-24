@@ -48,10 +48,10 @@ class TelegramApi:
 # ── События, которые бот присылает сам ─────────────────────────
 
 
-def payment_event(conn: sqlite3.Connection, payment_id: int) -> tuple[str, Buttons]:
+def payment_event(conn: sqlite3.Connection, payment_id: int, config: Config | None = None) -> tuple[str, Buttons]:
     p = conn.execute("SELECT p.*, u.login FROM payments p JOIN users u ON u.id = p.user_id WHERE p.id = ?",
                      (payment_id,)).fetchone()
-    title = PAY_METHODS.get(p["method"], (p["method"],))[0]
+    title = payments.title_for(conn, config, p["method"]) if config else PAY_METHODS.get(p["method"], (p["method"],))[0]
     text = (f"💳 <b>Заявка на пополнение #{p['id']}</b>\n"
             f"Клиент: {_e(p['login'])}\nСпособ: {_e(title)}\n"
             f"К переводу: <b>{_e(p['pay_amount'])} {_e(p['pay_currency'])}</b> (${fmt(p['amount_micro'])})"
@@ -184,7 +184,7 @@ class AdminBot:
             self.send(summary(conn))
         elif cmd in ("/payments", "💳"):
             rows = conn.execute("SELECT id FROM payments WHERE status = 'pending' ORDER BY id LIMIT 10").fetchall()
-            self._list(conn, rows, payment_event, "Заявок на пополнение нет.")
+            self._list(conn, rows, lambda c, i: payment_event(c, i, self.config), "Заявок на пополнение нет.")
         elif cmd in ("/users", "👥"):
             rows = conn.execute("SELECT id FROM users WHERE status = 'pending' ORDER BY id LIMIT 10").fetchall()
             self._list(conn, rows, user_event, "Новых партнёров нет.")

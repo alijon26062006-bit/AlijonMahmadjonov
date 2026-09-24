@@ -1,18 +1,53 @@
 {% extends "admin/_layout.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Реквизиты — админка{% endblock %}
 {% block content %}
-<section class="page-hero"><h1>Реквизиты</h1><p>Пустой способ клиентам не показывается.</p></section>
-<form class="card" method="post" action="/admin/pay-settings" style="max-width:640px">
+<section class="page-hero"><h1>Реквизиты и пополнение</h1><p>Меняйте реквизиты, добавляйте свои способы. Выключенный способ клиенты не видят.</p></section>
+<form method="post" action="/admin/pay-settings" class="pay-form">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  {% for code, (title, currency) in methods.items() %}
-  <label for="{{ code }}">{{ title }} <span class="muted">· {{ currency }}</span></label>
-  <textarea id="{{ code }}" name="{{ code }}" rows="2" maxlength="1000"
-    placeholder="{{ 'Номер карты или телефона, имя получателя' if currency == 'TJS' else ('Адрес кошелька TRC20' if code == 'usdt_trc20' else 'Pay ID') }}">{{ conf.details.get(code, '') }}</textarea>
-  {% endfor %}
-  <div class="grid two" style="margin-top:4px">
-    <div><label for="tjs_rate">Курс: сомони за 1 $</label><input id="tjs_rate" name="tjs_rate" inputmode="decimal" required value="{{ conf.tjs_rate }}"></div>
-    <div><label for="min_usd">Минимум, $</label><input id="min_usd" name="min_usd" inputmode="decimal" required value="{{ conf.min_usd }}"></div>
+  <input type="hidden" name="n" value="{{ conf.all_methods | length }}">
+
+  <div class="card">
+    <h3>Условия</h3>
+    <div class="grid three" style="gap:12px">
+      <div><label for="min_tjs">Минимум пополнения, сомони</label>
+        <input id="min_tjs" name="min_tjs" inputmode="decimal" required value="{{ conf.min_tjs }}">
+        <div class="hint">≈ ${{ conf.min_usd }} по курсу</div></div>
+      <div><label for="tjs_rate">Курс: сомони за 1 $</label>
+        <input id="tjs_rate" name="tjs_rate" inputmode="decimal" required value="{{ conf.tjs_rate }}"></div>
+      <div><label for="low_usd">Предупреждать клиента, если на балансе меньше, $</label>
+        <input id="low_usd" name="low_usd" inputmode="decimal" value="{{ conf.low_usd }}">
+        <div class="hint">0 — не предупреждать</div></div>
+    </div>
   </div>
-  <button class="btn primary lg block" style="margin-top:18px">Сохранить</button>
+
+  <div class="section-title"><h2>Способы оплаты</h2></div>
+  <div class="list">
+    {% for m in conf.all_methods + [{'code': '', 'title': '', 'currency': 'TJS', 'details': '', 'enabled': True}] %}
+    {% set i = loop.index0 %}{% set new = not m.code %}
+    <div class="card pm {{ 'pm-new' if new }} {{ 'off' if not m.enabled and not new }}">
+      <input type="hidden" name="m{{ i }}_code" value="{{ m.code }}">
+      <div class="pm-head">
+        <span class="tile sm {{ 'g4' if m.currency == 'TJS' else 'g5' }}">{{ icon('plus' if new else 'wallet', 18) }}</span>
+        <b>{{ 'Новый способ оплаты' if new else m.title }}</b>
+        {% if not new %}
+        <label class="switch"><input type="checkbox" name="m{{ i }}_enabled" value="1" {{ 'checked' if m.enabled }}><span>Показывать</span></label>
+        {% else %}<input type="hidden" name="m{{ i }}_enabled" value="1">{% endif %}
+      </div>
+      <div class="pm-grid">
+        <div><label for="m{{ i }}_title">Название</label>
+          <input id="m{{ i }}_title" name="m{{ i }}_title" maxlength="60" value="{{ m.title }}" placeholder="{{ 'Например: Humo, Visa, Payeer' if new }}"></div>
+        <div><label for="m{{ i }}_currency">Валюта перевода</label>
+          <select id="m{{ i }}_currency" name="m{{ i }}_currency">
+            {% for c in currencies %}<option value="{{ c }}" {{ 'selected' if c == m.currency }}>{{ c }}{{ ' (по курсу)' if c == 'TJS' }}</option>{% endfor %}
+          </select></div>
+      </div>
+      <label for="m{{ i }}_details">Реквизиты — это увидит клиент</label>
+      <textarea id="m{{ i }}_details" name="m{{ i }}_details" rows="2" maxlength="1000" placeholder="Номер карты или телефона, имя получателя / адрес кошелька">{{ m.details }}</textarea>
+      {% if not new %}<label class="del"><input type="checkbox" name="m{{ i }}_delete" value="1"> Удалить способ</label>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <button class="btn primary lg block save-bar">Сохранить</button>
 </form>
 {% endblock %}

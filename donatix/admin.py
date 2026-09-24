@@ -8,7 +8,7 @@ import sqlite3
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 
-from . import accounts, catalog, db, orders, worker
+from . import accounts, catalog, db, orders, payments, worker
 from .config import PAY_METHODS, TIERS, Config
 from .deps import Forbidden, LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
 from .money import MoneyError, apply_markup, fmt, fmt_unit, to_decimal, to_micro
@@ -67,8 +67,18 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
 def stats_page(request: Request, period: str = "30d", admin=Depends(admin_user), conn=Depends(get_conn),
                config: Config = Depends(get_config)):
     from . import analytics
+    a = analytics.build(conn, period, tz_hours=config.tz_offset)
+    supplier = worker.supplier_balance_cached(conn)
+    owed = conn.execute("SELECT COALESCE(SUM(balance_micro), 0) FROM users WHERE role = 'client'").fetchone()[0]
+    supplier_micro = int(supplier * 10_000) if supplier is not None else None
     return render(request, "admin/stats.html", {
-        "user": admin, "a": analytics.build(conn, period, tz_hours=config.tz_offset),
+        "user": admin, "a": a,
+        "fin": {
+            "cost": a["turnover"] - a["profit"], "supplier": supplier_micro, "owed": owed,
+            # Свободно: деньги у поставщика сверх того, что вы должны клиентам
+            "free": supplier_micro - owed if supplier_micro is not None else None,
+            "margin": round(a["profit"] / a["turnover"] * 100, 1) if a["turnover"] else 0,
+        },
     })
 
 
@@ -260,7 +270,9 @@ def payments_list(request: Request, status: str = "pending", admin=Depends(admin
         f"SELECT p.*, u.login, u.balance_micro FROM payments p JOIN users u ON u.id = p.user_id WHERE {where} "
         f"ORDER BY p.id DESC LIMIT 200", args).fetchall()
     return render(request, "admin/payments.html", {
-        "user": admin, "rows": rows, "status": status, "titles": {k: v[0] for k, v in PAY_METHODS.items()},
+        "user": admin, "rows": rows, "status": status,
+        "titles": {k: v[0] for k, v in PAY_METHODS.items()}
+        | {m["code"]: m["title"] for m in payments.settings(conn, request.app.state.config)["all_methods"]},
     })
 
 
@@ -269,17 +281,22 @@ def pay_settings(request: Request, admin=Depends(admin_user), conn=Depends(get_c
                  config: Config = Depends(get_config)):
     from . import payments
     return render(request, "admin/pay_settings.html", {
-        "user": admin, "conf": payments.settings(conn, config), "methods": PAY_METHODS,
+        "user": admin, "conf": payments.settings(conn, config), "currencies": payments.CURRENCIES,
     })
 
 
 @router.post("/pay-settings", dependencies=[Depends(check_csrf)])
-async def pay_settings_save(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+async def pay_settings_save(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                            config: Config = Depends(get_config)):
     from . import payments
     form = await request.form()
-    details = {code: str(form.get(code, "")) for code in PAY_METHODS}
+    rows = []
+    for i in range(int(form.get("n", 0) or 0) + 1):  # +1 — строка «новый способ»
+        rows.append({k: str(form.get(f"m{i}_{k}", "")) for k in ("code", "title", "currency", "details")}
+                    | {"enabled": form.get(f"m{i}_enabled") == "1", "delete": form.get(f"m{i}_delete") == "1"})
     try:
-        payments.save_settings(conn, details, str(form.get("tjs_rate", "")), str(form.get("min_usd", "")))
+        payments.save_settings(conn, config, rows, str(form.get("tjs_rate", "")), str(form.get("min_tjs", "")),
+                               str(form.get("low_usd", "")))
     except payments.PaymentError as exc:
         flash(request, str(exc), "error")
     else:

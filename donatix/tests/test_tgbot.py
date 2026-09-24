@@ -36,12 +36,12 @@ def test_buttons_confirm_payment_and_approve_user(config, conn):
     _press(bot, conn, f"user:ok:{uid}")
     assert accounts.get_user(conn, uid)["status"] == "active"
 
-    pid = payments.create(conn, config, accounts.get_user(conn, uid), "alif", "20")
+    pid = payments.create(conn, config, accounts.get_user(conn, uid), "alif", "50")
     text, buttons = payment_event(conn, pid)
-    assert "218.00 TJS" in text
+    assert "545.00 TJS" in text
     _press(bot, conn, f"pay:ok:{pid}")
     _press(bot, conn, f"pay:ok:{pid}")  # повторное нажатие — без второго зачисления
-    assert balance(conn, uid) == 200_000
+    assert balance(conn, uid) == 500_000
     answers = [p["text"] for m, p in api.calls if m == "answerCallbackQuery"]
     assert answers[-2:] == ["Зачислено, клиент получил уведомление", "Заявка уже обработана"]
 
