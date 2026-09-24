@@ -16,6 +16,7 @@ from html import escape as esc
 
 import aiohttp
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -75,12 +76,17 @@ def _kb(*rows: list[tuple[str, str]]) -> InlineKeyboardMarkup:
 
 
 async def _show(target: Message | CallbackQuery, text: str, kb: InlineKeyboardMarkup | None = None) -> None:
+    """Нажатие кнопки правит тот же экран; новое сообщение — только если править нечего."""
     if isinstance(target, CallbackQuery):
         try:
             await target.message.edit_text(text, reply_markup=kb, disable_web_page_preview=True)
             return
-        except Exception:  # noqa: BLE001 — сообщение с фото и т.п.: просто пришлём новое
-            target = target.message
+        except TelegramBadRequest as exc:
+            if "not modified" in str(exc):
+                return  # экран и так такой — второе сообщение не шлём
+            if "no text" not in str(exc) and "can't be edited" not in str(exc):
+                raise
+        target = target.message  # у экрана с фото нет текста — пришлём новый
     await target.answer(text, reply_markup=kb, disable_web_page_preview=True)
 
 
@@ -215,3 +221,27 @@ async def got_receipt(message: Message, state: FSMContext, bot: Bot) -> None:
 @router.message(TopUp.receipt)
 async def receipt_wrong(message: Message) -> None:
     await message.answer("Пришлите чек фото или файлом PDF. Отменить — /donatix.")
+
+
+async def bootstrap(conn, provider) -> None:
+    """Первый запуск бота из конструктора: курс доллара и все игры — сами."""
+    import asyncio
+
+    from app import runtime
+    from app.services import autogames, suppliers
+    from app.services import games as gsvc
+
+    await asyncio.sleep(3)
+    try:
+        if runtime.usd_rate() <= 0:
+            rate = (await _call("GET", "/api/v1/payments/methods")).get("tjs_rate")
+            if rate:
+                await runtime.set_value(conn, "usd_rate_diram", str(round(float(rate) * 100)))
+                log.info("Donatix: курс доллара %s сомони", rate)
+        from app import db
+        if not await db.list_games(conn):
+            catalog = await gsvc.full_catalog(suppliers.for_games(provider))
+            added, enabled = await autogames.import_all(conn, catalog)
+            log.info("Donatix: добавлено игр %s, включено %s", added, enabled)
+    except Exception:  # noqa: BLE001 — бот работает и без этого, владелец добавит вручную
+        log.exception("Donatix: первичная настройка не удалась")

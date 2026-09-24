@@ -107,7 +107,7 @@ def home_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🤝 Партнёры", callback_data="pn:partners"),
     )
     kb.row(
-        InlineKeyboardButton(text="🧩 API", callback_data="pn:api"),
+        *([] if donatix.enabled() else [InlineKeyboardButton(text="🧩 API", callback_data="pn:api")]),
         InlineKeyboardButton(text="🏦 Оплаты банка", callback_data="pn:bank"),
     )
     kb.row(
@@ -3955,6 +3955,7 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
 
     kb = InlineKeyboardBuilder()
     kb.row(btn("➕ Добавить игру", "pn:game_new", style=SUCCESS))
+    kb.row(btn("⚡ Добавить все игры сразу", "pn:game_add_all", style=SUCCESS))
     kb.row(btn("🔎 Найти игру по названию", "pn:game_find", style=PRIMARY))
     kb.row(InlineKeyboardButton(text="📚 Взять из каталога поставщика",
                                 callback_data="pn:game_pick"))
@@ -4374,12 +4375,16 @@ async def on_game_find(
         return
 
     # Ищем по словам: «mobile legends» должно находить и там, где в
-    # названии между ними стоит что-то ещё.
-    words = [w for w in re.split(r"[^a-zа-я0-9]+", query) if w]
+    # названии между ними стоит что-то ещё. Русские названия игр («пабг»,
+    # «фри фаер») и регион по-русски («Индонезии») тоже находят.
+    from app.services import autogames
+
+    words = [w for w in re.split(r"[^a-zа-яё0-9]+", autogames.expand(query)) if w]
     found = []
     for item in catalog:
-        haystack = f"{item['category_id']} {item.get('name', '')}".lower()
-        if all(word in haystack for word in words):
+        region = reg.title_of(item["category_id"], item.get("name", ""))
+        haystack = f"{item['category_id']} {item.get('name', '')} {region}".lower()
+        if autogames.matches(words, haystack):
             found.append(item)
 
     if not found:
@@ -4478,6 +4483,27 @@ async def cb_game_codes(call: CallbackQuery, provider) -> None:
         text = text[:3800] + "\n\n<i>…список обрезан</i>"
 
     await safe_edit(call, text, back_kb("pn:games", "‹ К играм"))
+
+
+@router.callback_query(F.data == "pn:game_add_all")
+async def cb_game_add_all(call: CallbackQuery, conn: aiosqlite.Connection, provider) -> None:
+    """Все игры поставщика — в меню одним нажатием, со всеми регионами."""
+    await call.answer("Добавляю все игры…")
+    from app.services import autogames
+    from app.services import games as gsvc
+    from app.services import suppliers
+
+    try:
+        catalog = await gsvc.full_catalog(suppliers.for_games(provider))
+    except Exception as exc:  # noqa: BLE001
+        await call.answer(f"Каталог не пришёл: {str(exc)[:120]}", show_alert=True)
+        return
+    added, enabled = await autogames.import_all(conn, catalog)
+    note = (f"✅ Добавлено игр: <b>{added}</b>, включено в меню: <b>{enabled}</b>."
+            if added else "Все игры поставщика уже добавлены.")
+    if runtime.usd_rate() <= 0:
+        note += "\n\n⚠️ Курс доллара не задан — игры добавлены, но скрыты. Задайте курс в «Цены»."
+    await safe_edit(call, substitute(await games_text(conn)) + "\n\n" + note, await games_kb(conn))
 
 
 @router.callback_query(F.data.startswith("pn:game_add:"))

@@ -179,7 +179,10 @@ async def main() -> None:
     dp.include_router(support.router)
     dp.include_router(reviews.router)
     dp.include_router(games.router)
-    dp.include_router(api_cab.router)
+    if not donatix.enabled():
+        # Раздел «API для разработчиков» — только у самостоятельного бота:
+        # у бота из конструктора API даёт сам Donatix.
+        dp.include_router(api_cab.router)
     # Последним: ловит нажатия, которые не взял никто, — чаще всего это
     # кнопка из диалога, чьё состояние стёр перезапуск бота. Без него
     # такое нажатие пропадает молча, и клиент видит сломанную кнопку.
@@ -203,7 +206,8 @@ async def main() -> None:
 
     try:
         me = await bot.me()
-        await bot.set_my_commands(USER_COMMANDS)
+        await bot.set_my_commands(
+            [c for c in USER_COMMANDS if not (donatix.enabled() and c.command == "api")])
         # У админов в меню команд появляется /panel. Список берём общий:
         # добавленный в панели админ — такой же админ.
         from app.services import access
@@ -211,7 +215,9 @@ async def main() -> None:
         for admin_id in access.admins():
             try:
                 await bot.set_my_commands(
-                    ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id)
+                    [c for c in ADMIN_COMMANDS if not (donatix.enabled() and c.command == "api")]
+                    if donatix.enabled() else [c for c in ADMIN_COMMANDS if c.command != "donatix"],
+                    scope=BotCommandScopeChat(chat_id=admin_id)
                 )
             except TelegramAPIError:
                 log.debug("Не смог поставить команды админу %s", admin_id)
@@ -237,6 +243,9 @@ async def main() -> None:
 
     log.info("✅ Запущен @%s. Режим Fragment: %s", me.username, settings.fragment_mode)
     log.info("   Админы: %s", ", ".join(map(str, settings.admin_ids)))
+    if donatix.enabled():
+        # Бот из конструктора Donatix: курс и игры — сразу, без ручной настройки
+        asyncio.create_task(donatix.bootstrap(conn, provider))
 
     # Установили по токену, ID и ключу — пусть бот сам скажет владельцу,
     # что работает и что ещё задать в /panel.
