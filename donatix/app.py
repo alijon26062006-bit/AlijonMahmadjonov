@@ -44,6 +44,8 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     conn = db.connect(config.db_path)
     try:
         accounts.ensure_admin(conn, config)
+        from . import sitecfg
+        sitecfg.load(conn, config)  # наценки и прочее, что админ поменял в админке
     finally:
         conn.close()
 
@@ -55,7 +57,7 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
             bg.start()
             if config.alert_telegram_token and config.alert_telegram_chat_id:
                 from .tgbot import AdminBot
-                bot = AdminBot(config)
+                bot = AdminBot(config, supplier=supplier)
                 bot.start()
         runner = None
         if config.run_worker and config.run_bots:

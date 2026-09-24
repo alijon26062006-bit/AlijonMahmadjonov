@@ -1,0 +1,49 @@
+{% extends "admin/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Настройки — админка{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Настройки</h1><p>Всё, что раньше было только в .env, — здесь. Те же настройки меняются и в админ-боте.</p></section>
+<form method="post" action="/admin/settings" class="pay-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <div class="card">
+    <h3>Наценка, %</h3>
+    <div class="grid three" style="gap:12px">
+      {% for t, title in tier_titles.items() %}
+      <div><label for="markup_{{ t }}">{{ title }}</label>
+        <input id="markup_{{ t }}" name="markup_{{ t }}" inputmode="decimal" required value="{{ s.markups[t] }}"></div>
+      {% endfor %}
+    </div>
+    <div class="grid two" style="gap:12px;margin-top:4px">
+      {% for k, title in kind_titles.items() %}
+      <div><label for="markup_{{ k }}">{{ title }} <span class="muted">— отдельная наценка</span></label>
+        <input id="markup_{{ k }}" name="markup_{{ k }}" inputmode="decimal" value="{{ s.kind_markups[k] if s.kind_markups[k] is not none else '' }}" placeholder="пусто — как по уровню"></div>
+      {% endfor %}
+    </div>
+    <div class="hint">Личная наценка клиента (в карточке клиента) важнее всех этих.</div>
+  </div>
+
+  <div class="card">
+    <h3>Клиенты</h3>
+    <label class="switch"><input type="checkbox" name="reg_open" value="1" {{ 'checked' if s.reg_open }}><span>Регистрация открыта</span></label>
+    <label class="switch"><input type="checkbox" name="require_approval" value="1" {{ 'checked' if s.require_approval }}><span>Проверять новых клиентов вручную</span></label>
+    <label for="support" style="margin-top:12px">Контакт поддержки <span class="muted">— виден клиентам</span></label>
+    <input id="support" name="support" maxlength="100" value="{{ s.support }}" placeholder="@donatix_support">
+  </div>
+
+  <div class="card">
+    <h3>Конструктор ботов для клиентов</h3>
+    <label class="switch"><input type="checkbox" name="client_bots" value="1" {{ 'checked' if s.client_bots }}><span>Клиенты могут подключать своих ботов</span></label>
+    <label for="max_bots" style="margin-top:12px">Ботов на одного клиента</label>
+    <input id="max_bots" name="max_bots" inputmode="numeric" value="{{ s.max_bots }}" style="max-width:160px">
+  </div>
+
+  <div class="card">
+    <h3>Админ-бот в Telegram</h3>
+    {% if tg_on %}<p class="muted">Подключён. Откройте бота и нажмите /start — там меню со всеми разделами.</p>
+    {% else %}<p class="muted">Не подключён. На сервере: <span class="mono">sudo bash /home/donatix/app/donatix/deploy/telegram.sh</span></p>{% endif %}
+  </div>
+
+  <button class="btn primary lg">{{ icon('check', 18) }}Сохранить</button>
+</form>
+{% endblock %}

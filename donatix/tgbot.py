@@ -14,7 +14,7 @@ from typing import Any, Callable
 import httpx
 
 from . import accounts, db, orders, payments
-from .config import PAY_METHODS, Config
+from .config import PAY_METHODS, TIERS, Config
 from .money import fmt
 from .notify import notify
 
@@ -22,7 +22,8 @@ log = logging.getLogger(__name__)
 
 Buttons = list[list[tuple[str, str]]]  # ряды кнопок: (текст, callback_data)
 
-MENU = [["📊 Сводка", "💳 Заявки"], ["👥 Новые партнёры", "⚠️ Проблемные заказы"]]
+MENU = [["🏠 Меню", "📊 Сводка"], ["💳 Заявки", "👥 Новые партнёры"], ["⚠️ Проблемные заказы"]]
+Screen = tuple[str, "Buttons"]  # экран: текст и кнопки — правится в том же сообщении
 
 
 def keyboard(buttons: Buttons | None) -> dict[str, Any] | None:
@@ -109,8 +110,9 @@ def _e(value: Any) -> str:
 
 
 class AdminBot:
-    def __init__(self, config: Config, api: Callable[..., Any] | None = None):
+    def __init__(self, config: Config, api: Callable[..., Any] | None = None, supplier: Any = None):
         self.config = config
+        self.supplier = supplier
         self.chat_id = str(config.alert_telegram_chat_id).strip()
         self.api = api or TelegramApi(config.alert_telegram_token)
         self._stop = threading.Event()
@@ -134,10 +136,12 @@ class AdminBot:
         offset = int(db.get_setting(conn, "tg_offset", "0") or 0)
         try:
             self.api("setMyCommands", commands=[
-                {"command": "start", "description": "Меню"}, {"command": "stats", "description": "Сводка"},
+                {"command": "start", "description": "Меню"}, {"command": "menu", "description": "Все разделы"},
+                {"command": "stats", "description": "Сводка"},
                 {"command": "payments", "description": "Заявки на пополнение"},
                 {"command": "users", "description": "Новые партнёры"},
-                {"command": "orders", "description": "Проблемные заказы"}])
+                {"command": "orders", "description": "Проблемные заказы"},
+                {"command": "client", "description": "Клиент по логину: /client login"}])
         except Exception as exc:  # бот может быть ещё не настроен — не мешаем сайту
             log.warning("telegram-бот: %s", exc)
         try:
@@ -167,6 +171,20 @@ class AdminBot:
                 self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Нет доступа")
                 return
             result = self.on_button(conn, str(cq.get("data") or ""))
+            if isinstance(result, tuple):  # экран меню — правим то же сообщение
+                self.api("answerCallbackQuery", callback_query_id=cq["id"])
+                text, buttons = result
+                if msg.get("message_id") and "text" in msg:
+                    try:
+                        self.api("editMessageText", chat_id=self.chat_id, message_id=msg["message_id"],
+                                 parse_mode="HTML", text=text, reply_markup=keyboard(buttons),
+                                 disable_web_page_preview=True)
+                    except RuntimeError as exc:
+                        if "not modified" not in str(exc):
+                            raise
+                else:
+                    self.send(text, buttons)
+                return
             self.api("answerCallbackQuery", callback_query_id=cq["id"], text=result[:190])
             if msg.get("message_id"):
                 # Кнопки убираем, а под сообщением пишем, что сделано — видно в истории чата.
@@ -185,7 +203,14 @@ class AdminBot:
 
     def on_command(self, conn: sqlite3.Connection, text: str) -> None:
         cmd = text.split("@")[0].split()[0].lower() if text else ""
-        if cmd in ("/stats", "📊"):
+        if cmd in ("/menu", "🏠"):
+            self.send(*screen_home(conn, self.config))
+        elif cmd == "/client":
+            login = text.split(maxsplit=1)[1].strip() if len(text.split()) > 1 else ""
+            u = conn.execute("SELECT id FROM users WHERE login = ? OR email = ?", (login, login)).fetchone()
+            self.send(*screen_client(conn, self.config, u["id"]) if u else ("Клиент не найден. Пример: /client shop1",
+                                                                            [[("👤 Клиенты", "m:clients:0")]]))
+        elif cmd in ("/stats", "📊"):
             self.send(summary(conn))
         elif cmd in ("/payments", "💳"):
             rows = conn.execute("SELECT id FROM payments WHERE status = 'pending' ORDER BY id LIMIT 10").fetchall()
@@ -198,8 +223,9 @@ class AdminBot:
             self._list(conn, rows, order_event, "Проблемных заказов нет.")
         else:
             self.send(f"Бот админки {_e(self.config.site_name)}. Сюда приходят заявки и проблемы — "
-                      "отвечайте кнопками под сообщением.",
+                      "отвечайте кнопками под сообщением. Всё остальное — в «🏠 Меню».",
                       reply_markup={"keyboard": [[{"text": t} for t in row] for row in MENU], "resize_keyboard": True})
+            self.send(*screen_home(conn, self.config))
 
     def _list(self, conn, rows, make, empty: str) -> None:
         if not rows:
@@ -207,12 +233,14 @@ class AdminBot:
         for r in rows:
             self.send(*make(conn, r["id"]))
 
-    def on_button(self, conn: sqlite3.Connection, data: str) -> str:
+    def on_button(self, conn: sqlite3.Connection, data: str) -> str | Screen:
         try:
             what, action, raw_id = data.split(":")
             obj_id = int(raw_id)
         except ValueError:
             return "Неизвестная кнопка"
+        if what in MENU_HANDLERS:
+            return MENU_HANDLERS[what](self, conn, action, obj_id)
         admin_id = _admin_id(conn)
         if what == "pay":
             if action == "ok":
@@ -258,3 +286,220 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int) -> N
     text, buttons = payment_event(conn, payment_id, config)
     path = receipts_dir(config) / p["receipt_file"]
     notify_admin_file(config, text + "\n🧾 Чек приложен", buttons, path, photo=not p["receipt_file"].endswith(".pdf"))
+
+
+# ── Меню админа: все разделы сайта кнопками ────────────────
+
+
+def _dot(b: dict) -> str:
+    return "🟢 " if b.get("running") else ("🟡 " if b["enabled"] else "⚪ ")
+
+
+def _back(to: str = "m:home:0") -> list[tuple[str, str]]:
+    return [("‹ Назад", to)]
+
+
+def screen_home(conn: sqlite3.Connection, config: Config) -> Screen:
+    def one(sql: str) -> int:
+        return conn.execute(sql).fetchone()[0]
+    pays = one("SELECT COUNT(*) FROM payments WHERE status = 'pending'")
+    users = one("SELECT COUNT(*) FROM users WHERE status = 'pending'")
+    probs = one("SELECT COUNT(*) FROM orders WHERE status = 'attention'")
+    return (f"🏠 <b>Админка {_e(config.site_name)}</b>\nВсё управление сайтом и ботами — здесь.", [
+        [("📊 Сводка", "m:stats:0"), (f"💳 Заявки · {pays}", "m:pays:0")],
+        [(f"👥 Новые · {users}", "m:users:0"), (f"⚠️ Проблемы · {probs}", "m:orders:0")],
+        [("👤 Клиенты", "m:clients:0"), ("🤖 Боты клиентов", "m:bots:0")],
+        [("💱 Курс", "m:rate:0"), ("🔄 Каталог", "m:cat:0")],
+        [("⚙️ Настройки", "m:set:0")],
+    ])
+
+
+def screen_client(conn: sqlite3.Connection, config: Config, user_id: int) -> Screen:
+    u = accounts.get_user(conn, user_id)
+    if u is None:
+        return "Клиент не найден.", [_back("m:clients:0")]
+    n_orders = conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ?", (user_id,)).fetchone()[0]
+    n_bots = conn.execute("SELECT COUNT(*) FROM bots WHERE user_id = ?", (user_id,)).fetchone()[0]
+    status = {"active": "✅ активен", "pending": "⏳ на проверке", "blocked": "⛔ заблокирован"}[u["status"]]
+    markup = accounts.markup_for(u, config)
+    text = (f"👤 <b>{_e(u['login'])}</b> · {_e(u['email'])}\n"
+            + (f"Проект: {_e(u['project'])}\n" if u["project"] else "")
+            + f"Статус: {status}\nБаланс: <b>${fmt(u['balance_micro'])}</b>\n"
+            f"Уровень: {u['tier']} · наценка {markup}%\nЗаказов: {n_orders} · ботов: {n_bots}")
+    rows: Buttons = []
+    if u["role"] != "admin":
+        rows.append([("⛔ Заблокировать", f"cl:block:{user_id}") if u["status"] == "active"
+                     else ("✅ Активировать", f"cl:ok:{user_id}")])
+        rows.append([(("• " if u["tier"] == t else "") + t, f"cl:{t}:{user_id}") for t in TIERS])
+    rows.append(_back("m:clients:0"))
+    return text, rows
+
+
+def screen_bot(conn: sqlite3.Connection, bot_id: int) -> Screen:
+    from . import bots
+    b = next((x for x in bots.listing(conn) if x["id"] == bot_id), None)
+    if b is None:
+        return "Бот удалён.", [_back("m:bots:0")]
+    state = "🟢 работает" if b.get("running") else ("🟡 запускается" if b["enabled"] else "⚪ остановлен")
+    text = (f"🤖 <b>@{_e(b['username'])}</b>\n{state}\nКлиент: {_e(b['login'])} · баланс ${fmt(b['balance_micro'])}\n"
+            f"Админы бота: <code>{_e(b['admin_ids'])}</code>"
+            + ("\n⚠️ Токен запущен ещё где-то — бот отвечает дважды" if b.get("conflict") else ""))
+    rows: Buttons = [[("🔁 Перезапустить", f"bot:restart:{bot_id}"), ("⏸ Остановить", f"bot:stop:{bot_id}")]
+                     if b["enabled"] else [("▶️ Запустить", f"bot:start:{bot_id}")]]
+    rows.append(_back("m:bots:0"))
+    return text, rows
+
+
+def screen_rate(conn: sqlite3.Connection, config: Config) -> Screen:
+    from . import rates
+    st = rates.status(conn, config)
+    conf = payments.settings(conn, config)
+    age = f"{st['age_seconds'] // 60} мин назад" if st["age_seconds"] is not None else "ещё не обновлялся"
+    text = (f"💱 <b>Курс: 1 $ = {conf['tjs_rate']} сомони</b>\n"
+            + (f"Рынок {st['market']} + запас {st['margin_pct']}% · {_e(st['source'])} · {age}\n"
+               if st["auto"] and st["market"] else "")
+            + ("Автообновление: ✅ каждые 5 минут" if st["auto"] else "Автообновление: ⛔ курс вручную (в веб-админке)")
+            + (f"\n⚠️ {_e(st['error'][:200])}" if st["auto"] and st["error"] else ""))
+    return text, [
+        [("🔄 Обновить сейчас", "rate:refresh:0"), ("⛔ Выключить авто" if st["auto"] else "✅ Включить авто",
+                                                  "rate:auto:0")],
+        [("Запас −0.5%", "rate:margin:-5"), ("Запас +0.5%", "rate:margin:5")],
+        _back(),
+    ]
+
+
+def screen_settings(conn: sqlite3.Connection, config: Config) -> Screen:
+    from . import sitecfg
+    v = sitecfg.view(conn, config)
+    on = {True: "✅", False: "⛔"}
+    text = ("⚙️ <b>Настройки</b>\n"
+            "Наценка: " + " · ".join(f"{t} {v['markups'][t]}%" for t in TIERS) + "\n"
+            f"Регистрация: {on[v['reg_open']]} · проверка новых: {on[v['require_approval']]}\n"
+            f"Конструктор для клиентов: {on[v['client_bots']]} · до {v['max_bots']} ботов\n"
+            f"Поддержка: {_e(v['support'] or '—')}")
+    rows: Buttons = [[(f"{t} −0.5%", f"mk:{t}:-5"), (f"{t} +0.5%", f"mk:{t}:5")] for t in TIERS]
+    rows += [
+        [(f"{on[v['reg_open']]} Регистрация", "set:reg_open:0"),
+         (f"{on[v['require_approval']]} Проверка новых", "set:require_approval:0")],
+        [(f"{on[v['client_bots']]} Конструктор клиентам", "set:client_bots:0")],
+        _back(),
+    ]
+    return text, rows
+
+
+def _menu(bot: AdminBot, conn: sqlite3.Connection, action: str, _: int) -> str | Screen:
+    cfg = bot.config
+    if action == "home":
+        return screen_home(conn, cfg)
+    if action == "stats":
+        return summary(conn), [_back()]
+    if action in ("pays", "users", "orders"):
+        bot.on_command(conn, {"pays": "/payments", "users": "/users", "orders": "/orders"}[action])
+        return screen_home(conn, cfg)
+    if action == "clients":
+        rows = conn.execute("SELECT id, login, balance_micro, status FROM users WHERE role = 'client' "
+                            "ORDER BY balance_micro DESC, id DESC LIMIT 12").fetchall()
+        mark = {"active": "", "pending": "⏳ ", "blocked": "⛔ "}
+        return ("👤 <b>Клиенты</b> — по балансу. Найти любого: <code>/client логин</code>",
+                [[(f"{mark[r['status']]}{r['login']} · ${fmt(r['balance_micro'])}", f"cl:view:{r['id']}")]
+                 for r in rows] + [_back()])
+    if action == "bots":
+        from . import bots
+        items = bots.listing(conn)
+        return (f"🤖 <b>Боты клиентов</b> — {len(items)}" if items else "🤖 Ботов пока нет.",
+                [[(_dot(b) + f"@{b['username']} · {b['login']}", f"bot:view:{b['id']}")] for b in items[:15]]
+                + [_back()])
+    if action == "rate":
+        return screen_rate(conn, cfg)
+    if action == "cat":
+        from . import catalog_job
+        st = catalog_job.status()
+        synced = db.get_setting(conn, "catalog_synced_at") or "—"
+        n = conn.execute("SELECT COUNT(*) FROM products WHERE active = 1").fetchone()[0]
+        state = ("⏳ идёт загрузка…" if st.get("running") else
+                 f"последняя: {_e(synced[:16].replace('T', ' '))} UTC")
+        return (f"🔄 <b>Каталог</b>\nТоваров: {n}\nЗагрузка: {state}",
+                [[("🔄 Обновить каталог", "cat:sync:0"), ("🖼 + картинки", "cat:all:0")], _back()])
+    if action == "set":
+        return screen_settings(conn, cfg)
+    return "Неизвестная кнопка"
+
+
+def _client(bot: AdminBot, conn: sqlite3.Connection, action: str, user_id: int) -> str | Screen:
+    u = accounts.get_user(conn, user_id)
+    if u is None:
+        return "Клиент не найден"
+    if action != "view" and u["role"] != "admin":
+        status, tier = u["status"], u["tier"]
+        if action in ("ok", "block"):
+            status = "active" if action == "ok" else "blocked"
+        elif action in TIERS:
+            tier = action
+        accounts.update_user_admin(conn, user_id, status=status, tier=tier,
+                                   markup_override=str(u["markup_override"] or ""))
+        if status == "active" and u["status"] != "active":
+            notify(conn, bot.config, user_id, "Аккаунт активирован — можно пополнять баланс и делать заказы.", "/panel")
+    return screen_client(conn, bot.config, user_id)
+
+
+def _bot(bot: AdminBot, conn: sqlite3.Connection, action: str, bot_id: int) -> str | Screen:
+    from . import bots
+    if action in ("stop", "start", "restart"):
+        bots.set_enabled(conn, bot_id, action != "stop")
+        if bots.RUNNER:
+            bots.RUNNER.poke()
+    return screen_bot(conn, bot_id)
+
+
+def _rate(bot: AdminBot, conn: sqlite3.Connection, action: str, value: int) -> str | Screen:
+    from decimal import Decimal
+
+    from . import rates
+    cfg = bot.config
+    if action == "refresh":
+        if not rates.auto_enabled(conn, cfg):
+            return "Сначала включите автообновление"
+        rates.reset()
+        rates.refresh(conn, cfg, force=True)
+    elif action == "auto":
+        db.set_setting(conn, "pay.rate_auto", "0" if rates.auto_enabled(conn, cfg) else "1")
+        if rates.auto_enabled(conn, cfg):
+            rates.reset()
+            rates.refresh(conn, cfg, force=True)
+    elif action == "margin":
+        margin = max(Decimal("-5"), min(Decimal("20"), rates.margin_pct(conn, cfg) + Decimal(value) / 10))
+        db.set_setting(conn, "pay.rate_margin_pct", str(margin))
+        market = db.get_setting(conn, "pay.rate_market")
+        if rates.auto_enabled(conn, cfg) and market:
+            db.set_setting(conn, "pay.tjs_rate", str(rates.apply_margin(Decimal(market), margin)))
+    return screen_rate(conn, cfg)
+
+
+def _catalog(bot: AdminBot, conn: sqlite3.Connection, action: str, _: int) -> str | Screen:
+    from . import catalog_job
+    if bot.supplier is None:
+        return "Каталог обновляется только из веб-админки"
+    started = catalog_job.start(bot.config, bot.supplier, sync=True, images=action == "all")
+    text, rows = _menu(bot, conn, "cat", 0)
+    return (text + ("\n\n✅ Запустил. Статус — снова кнопкой «🔄 Каталог»." if started else "\n\nУже идёт.")), rows
+
+
+def _setting(bot: AdminBot, conn: sqlite3.Connection, key: str, _: int) -> str | Screen:
+    from . import sitecfg
+    if key in ("reg_open", "require_approval", "client_bots"):
+        sitecfg.toggle(conn, bot.config, key)
+    return screen_settings(conn, bot.config)
+
+
+def _markup(bot: AdminBot, conn: sqlite3.Connection, tier: str, delta: int) -> str | Screen:
+    from decimal import Decimal
+
+    from . import sitecfg
+    if tier in TIERS:
+        sitecfg.bump_markup(conn, bot.config, tier, Decimal(delta) / 10)
+    return screen_settings(conn, bot.config)
+
+
+MENU_HANDLERS: dict[str, Callable[..., str | Screen]] = {
+    "m": _menu, "cl": _client, "bot": _bot, "rate": _rate, "cat": _catalog, "set": _setting, "mk": _markup,
+}

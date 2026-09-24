@@ -112,9 +112,10 @@ def docs(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
 
 @router.get("/register")
 def register_form(request: Request, conn=Depends(get_conn)):
+    from . import sitecfg
     if session_user(request, conn):
         return _redirect("/panel")
-    return render(request, "register.html", {"form": {}})
+    return render(request, "register.html", {"form": {}, "closed": not sitecfg.registration_open(conn)})
 
 
 @router.post("/register", dependencies=[Depends(check_csrf)])
@@ -128,7 +129,11 @@ def register(
     conn=Depends(get_conn),
     config: Config = Depends(get_config),
 ):
+    from . import sitecfg
     form = {"email": email, "login": login, "project": project}
+    if not sitecfg.registration_open(conn):
+        return render(request, "register.html", {"form": form, "closed": True,
+                                                 "error": "Регистрация временно закрыта."}, 403)
     wait = request.app.state.limiter.hit("login", _ip(request))
     if wait is not None:
         return render(request, "register.html", {"form": form, "error": "Слишком много попыток. Подождите."}, 429)
@@ -447,24 +452,28 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
 
 @router.get("/panel/bots")
 def panel_bots(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
-    from . import bots
+    from . import bots, sitecfg
     return render(request, "panel/bots.html", {
-        "user": user, "bots": bots.listing(conn, user["id"]), "max_bots": bots.MAX_PER_CLIENT,
-        "ready": bots.RUNNER is not None and bots.TEMPLATE_DIR.exists(),
+        "user": user, "bots": bots.listing(conn, user["id"]), "max_bots": sitecfg.max_bots(conn),
+        "ready": bots.RUNNER is not None and bots.TEMPLATE_DIR.exists() and sitecfg.client_bots_enabled(conn),
     })
 
 
 @router.post("/panel/bots", dependencies=[Depends(check_csrf)])
 def panel_bots_add(request: Request, token: str = Form(""), admin_ids: str = Form(""),
                    user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
-    from . import bots
+    from . import bots, sitecfg
     from .worker import notify_admin
+    if not sitecfg.client_bots_enabled(conn):
+        flash(request, "Конструктор ботов сейчас выключен.", "error")
+        return _redirect("/panel/bots")
     if user["status"] != "active":
         flash(request, "Бот можно подключить после подтверждения аккаунта.", "error")
         return _redirect("/panel/bots")
     have = conn.execute("SELECT COUNT(*) FROM bots WHERE user_id = ?", (user["id"],)).fetchone()[0]
-    if have >= bots.MAX_PER_CLIENT:
-        flash(request, f"Можно подключить до {bots.MAX_PER_CLIENT} ботов. Удалите ненужного.", "error")
+    limit = sitecfg.max_bots(conn)
+    if have >= limit:
+        flash(request, f"Можно подключить до {limit} ботов. Удалите ненужного.", "error")
         return _redirect("/panel/bots")
     try:
         username = bots.check_token(token)

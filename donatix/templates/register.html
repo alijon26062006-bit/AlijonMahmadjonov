@@ -10,6 +10,9 @@
       <div class="tile g1">{{ icon("handshake", 24) }}</div>
       <div><h2>Стать партнёром</h2></div>
     </div>
+    {% if closed %}
+    <div class="flash warn" role="status">{{ icon('alert', 20) }}<span>Приём новых партнёров временно закрыт.{% if support_contact %} Напишите {{ support_contact }}.{% endif %}</span></div>
+    {% else %}
     {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
     <form method="post" action="/register">
       <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -27,6 +30,7 @@
       <input id="project" name="project" placeholder="Ссылка на канал, бота или сайт" value="{{ form.project or '' }}">
       <button class="btn primary lg block" style="margin-top:22px">Создать аккаунт</button>
     </form>
+    {% endif %}
     <p class="center muted" style="margin:18px 0 0">Уже есть аккаунт? <a href="/login">Войти</a></p>
     <div class="card tight" style="margin-top:22px;background:var(--surface-2);box-shadow:none">
       <div class="label-caps">Что входит</div>

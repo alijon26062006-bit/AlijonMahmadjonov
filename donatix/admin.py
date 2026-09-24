@@ -82,6 +82,34 @@ def stats_page(request: Request, period: str = "30d", admin=Depends(admin_user),
     })
 
 
+@router.get("/settings")
+def settings_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                  config: Config = Depends(get_config)):
+    from . import sitecfg
+    return render(request, "admin/settings.html", {
+        "user": admin, "s": sitecfg.view(conn, config), "tier_titles": sitecfg.TIER_TITLES,
+        "kind_titles": sitecfg.KIND_TITLES,
+        "tg_on": bool(config.alert_telegram_token and config.alert_telegram_chat_id),
+    })
+
+
+@router.post("/settings", dependencies=[Depends(check_csrf)])
+async def settings_save(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                        config: Config = Depends(get_config)):
+    from . import sitecfg
+    form = await request.form()
+    data = {k: str(v) for k, v in form.items() if k != "csrf"}
+    for flag in ("reg_open", "client_bots", "require_approval"):
+        data[flag] = "1" if form.get(flag) == "1" else "0"
+    try:
+        sitecfg.save(conn, config, data)
+    except sitecfg.SettingsError as exc:
+        flash(request, str(exc), "error")
+    else:
+        flash(request, "Настройки сохранены — уже действуют на сайте и в ботах.")
+    return _back("/admin/settings")
+
+
 @router.post("/sync", dependencies=[Depends(check_csrf)])
 def sync_now(request: Request, admin=Depends(admin_user), config: Config = Depends(get_config)):
     """Кнопка «Обновить каталог»: только запускает фоновую задачу — страница не ждёт поставщика."""
