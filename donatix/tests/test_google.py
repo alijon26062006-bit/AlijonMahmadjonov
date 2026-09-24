@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 
 from donatix import accounts, google_auth
 
+REAL_FETCH = google_auth.fetch_profile
+
 
 @pytest.fixture
 def gconf(config):
@@ -19,9 +21,8 @@ def _google(monkeypatch, profile):
         if req.url.host == "oauth2.googleapis.com":
             return httpx.Response(200, json={"access_token": "at"})
         return httpx.Response(200, json=profile)
-    real = google_auth.fetch_profile
     monkeypatch.setattr(google_auth, "fetch_profile",
-                        lambda config, code: real(config, code, transport=httpx.MockTransport(handler)))
+                        lambda config, code: REAL_FETCH(config, code, transport=httpx.MockTransport(handler)))
 
 
 def _login(client):
