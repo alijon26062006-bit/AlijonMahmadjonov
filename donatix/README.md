@@ -177,3 +177,17 @@ python -m pytest donatix/tests -q
 - Переход на PostgreSQL, когда заказов станет очень много.
 
 Документация поставщика: [`docs/fazercards/`](../docs/fazercards/).
+
+## Telegram-бот админки
+
+1. Создайте бота у @BotFather и скопируйте токен.
+2. Откройте своего бота и нажмите «Старт» (/start).
+3. На сервере:
+
+```
+curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/website-api-sales-96wxcs/donatix/deploy/telegram.sh | sudo TG_TOKEN='ТОКЕН_ОТ_BOTFATHER' bash
+```
+
+Скрипт сам найдёт ваш chat id, обновит код, перезапустит сайт и пришлёт проверочное сообщение.
+Бот присылает заявки на пополнение, новых партнёров и проблемные заказы с кнопками;
+команды: /stats, /payments, /users, /orders. Отвечает только вам.
