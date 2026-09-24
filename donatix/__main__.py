@@ -94,7 +94,8 @@ def main(argv: list[str] | None = None) -> int:
                     offers = detail.get(key, [])
                     head = {k: v for k, v in detail.items() if k != key}
                     print(f"== {sub_path}: поля ответа\n{json.dumps(head, ensure_ascii=False, indent=1)[:1500]}")
-                    print(f"== пакеты (2 из {len(offers)})\n{json.dumps(offers[:2], ensure_ascii=False, indent=1)[:1500]}")
+                    sample = json.dumps(offers[:2], ensure_ascii=False, indent=1)[:1500]
+                    print(f"== пакеты (2 из {len(offers)})\n{sample}")
             print("\nРегионы и картинки в каталоге:")
             catalog.sync_catalog(conn, supplier)
             for row in conn.execute("SELECT kind, category_name, COUNT(*) n, GROUP_CONCAT(DISTINCT region) r, "
