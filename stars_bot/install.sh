@@ -238,9 +238,9 @@ case "\${1:-help}" in
         # Токен, ID админа, ключ поставщика — и бот работает. Без трёх
         # значений спрашивает их по одному.
         if [ -n "\${4:-}" ]; then
-            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --quick "\$2" "\$3" "\$4"
+            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --quick --replace "\$2" "\$3" "\$4"
         else
-            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --quick
+            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --quick --replace
         fi
         systemctl restart "\$SERVICE"
         echo "✅ Бот активирован и перезапущен — он сам напишет вам в Telegram"

@@ -57,6 +57,21 @@ def wizard_checks() -> None:
                   and "FAZER_API_KEY=fc_key_12345" in written
                   and "FRAGMENT_MODE=fazer" in written)
 
+            other = "987654321:" + "B" * 35
+            check("чужой токен поверх работающего бота — отказ",
+                  wizard.quick([other, "111", "fc_key_12345"]) == 1
+                  and f"BOT_TOKEN={TOKEN}" in wizard.ENV.read_text(encoding="utf-8"))
+            check("stars-bot activate меняет токен сознательно",
+                  wizard.quick([other, "111", "fc_key_12345"], replace=True) == 0
+                  and f"BOT_TOKEN={other}" in wizard.ENV.read_text(encoding="utf-8"))
+            check("тот же токен повторно — можно (смена ключа или ID)",
+                  wizard.quick([other, "333", "fc_key_67890"]) == 0
+                  and "FAZER_API_KEY=fc_key_67890" in wizard.ENV.read_text(encoding="utf-8"))
+            written = wizard.ENV.read_text(encoding="utf-8")
+            check("заготовки владельца в новый бот не попадают",
+                  "PAY_CARD_NUMBER=\n" in written and "SUPPORT_USERNAME=\n" in written
+                  and "ALIJON" not in written)
+
             wizard.ENV.unlink()
             check("кривой токен — отказ, файл не создан",
                   wizard.quick(["не-токен", "111", "fc_key_12345"]) == 1

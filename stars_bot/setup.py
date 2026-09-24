@@ -247,8 +247,15 @@ def quick_values(token: str, admin: str, key: str) -> dict[str, str]:
     }
 
 
-def quick(argv: list[str]) -> int:
-    """Быстрая активация. Возвращает код выхода."""
+def quick(argv: list[str], *, replace: bool = False) -> int:
+    """Быстрая активация. Возвращает код выхода.
+
+    replace=False — отказ, если здесь уже стоит ДРУГОЙ бот. Установщик с
+    тремя значениями, запущенный на сервере, где бот уже работает, иначе
+    молча подменил бы его токен: работающий магазин пропал бы, а его
+    клиенты попали бы в новый. Сменить токен сознательно — stars-bot
+    activate, он передаёт replace=True.
+    """
     old = read_existing()
     given = [a.strip() for a in argv]
     if given and len(given) != 3:
@@ -271,6 +278,13 @@ def quick(argv: list[str]) -> int:
         admin = ask("ID админа", current=old.get("ADMIN_IDS", ""), validate=check_id)
         print("\n3) Ключ поставщика FazerCards (X-API-Key из кабинета)")
         key = ask("Ключ", current=old.get("FAZER_API_KEY", ""), validate=check_key)
+
+    current = old.get("BOT_TOKEN", "")
+    if current and current != token and not replace and check_token(current) is None:
+        print("❌ На этом сервере уже стоит другой бот — его токен не трогаю.")
+        print("   Второй бот ставьте на другой сервер.")
+        print("   Сменить токен у этого бота: sudo stars-bot activate")
+        return 1
 
     print()
     good, note = verify_token(token)
@@ -436,7 +450,9 @@ def main() -> None:
         if not EXAMPLE.exists():
             print("❌ Запускайте из папки stars_bot.")
             sys.exit(1)
-        sys.exit(quick(sys.argv[2:]))
+        rest = sys.argv[2:]
+        replace = "--replace" in rest
+        sys.exit(quick([a for a in rest if a != "--replace"], replace=replace))
 
     if len(sys.argv) > 1 and sys.argv[1] == "--set":
         if not EXAMPLE.exists():
