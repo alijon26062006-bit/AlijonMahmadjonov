@@ -45,11 +45,16 @@ class Config:
     supplier: str = "mock"
     fazer_api_key: str = ""
     fazer_base_url: str = "https://api.fzr.cards/api/v2"
+    # Скидка вашего тарифа FazerCards на пополнение Steam, %.
+    fazer_steam_discount: Decimal = Decimal("2.5")
 
     # Наценка в процентах поверх закупочной цены, по уровням клиентов.
     markups: dict[str, Decimal] = field(
         default_factory=lambda: {"bronze": Decimal("8"), "silver": Decimal("6"), "gold": Decimal("4")}
     )
+
+    # Своя наценка для вида товара (вместо наценки уровня). У Steam маржа тонкая.
+    kind_markups: dict[str, Decimal] = field(default_factory=lambda: {"steam_topup": Decimal("1.5")})
 
     # Первый админ создаётся при запуске, если таких пользователей ещё нет.
     admin_email: str = ""
@@ -82,6 +87,7 @@ class Config:
         markups = {}
         for tier, default in (("bronze", "8"), ("silver", "6"), ("gold", "4")):
             markups[tier] = Decimal(_env(f"DONATIX_MARKUP_{tier.upper()}", default))
+        kind_markups = {"steam_topup": Decimal(_env("DONATIX_MARKUP_STEAM", "1.5"))}
         return cls(
             secret_key=secret,
             db_path=Path(_env("DONATIX_DB", str(ROOT / "data" / "donatix.db"))),
@@ -90,7 +96,9 @@ class Config:
             supplier=_env("DONATIX_SUPPLIER", "mock").lower(),
             fazer_api_key=_env("FAZER_API_KEY"),
             fazer_base_url=_env("FAZER_BASE_URL", "https://api.fzr.cards/api/v2").rstrip("/"),
+            fazer_steam_discount=Decimal(_env("FAZER_STEAM_DISCOUNT", "2.5")),
             markups=markups,
+            kind_markups=kind_markups,
             admin_email=_env("DONATIX_ADMIN_EMAIL").lower(),
             admin_password=_env("DONATIX_ADMIN_PASSWORD"),
             run_worker=_flag("DONATIX_RUN_WORKER", True),

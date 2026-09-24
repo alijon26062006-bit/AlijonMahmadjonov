@@ -52,7 +52,7 @@
     <tr><td>GET</td><td><code>/transactions?page=1&amp;limit=20</code></td><td>Движение денег: списания и начисления.</td></tr>
     <tr><td>GET</td><td><code>/transactions/tx123</code></td><td>Одна транзакция.</td></tr>
     <tr><td>GET</td><td><code>/categories</code></td><td>Категории товаров (игры, бренды карт).</td></tr>
-    <tr><td>GET</td><td><code>/products?kind=&amp;category_id=&amp;q=</code></td><td>Товары с вашей ценой. kind: <code>telegram_stars</code>, <code>telegram_premium</code>, <code>topup</code>, <code>gift_card</code>.</td></tr>
+    <tr><td>GET</td><td><code>/products?kind=&amp;category_id=&amp;q=</code></td><td>Товары с вашей ценой. kind: <code>telegram_stars</code>, <code>telegram_premium</code>, <code>steam_topup</code>, <code>topup</code>, <code>gift_card</code>.</td></tr>
     <tr><td>GET</td><td><code>/products/{product_id}</code></td><td>Один товар.</td></tr>
     <tr><td>POST</td><td><code>/orders</code></td><td>Создать заказ: <code>product_id</code>, <code>quantity</code>, <code>fields</code>.</td></tr>
     <tr><td>GET</td><td><code>/orders?page=&amp;limit=&amp;status=</code></td><td>Ваши заказы.</td></tr>
@@ -68,6 +68,7 @@
     <li>Telegram Stars и Premium — <code>telegram_username</code> (например <code>@player</code>).</li>
     <li>Пополнения игр — обычно <code>player_id</code>, иногда ещё сервер или зона: смотрите <code>fields</code> товара.</li>
     <li>Подарочные карты — полей нет, укажите <code>quantity</code>.</li>
+    <li>Пополнение Steam (<code>steam-topup</code>) — <code>steam_login</code> (логин, не никнейм), <code>currency</code> (USD, RUB, KZT, UAH) и <code>amount</code> в этой валюте. Курсы — в поле <code>rates</code> товара. Логин проверяется до списания.</li>
   </ul>
   <p>Для Telegram Stars <code>quantity</code> — количество звёзд, цена указана за одну звезду.</p>
 </div>

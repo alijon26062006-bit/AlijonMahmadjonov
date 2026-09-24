@@ -6,11 +6,14 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Iterable, Protocol
 
-KINDS = ("telegram_stars", "telegram_premium", "topup", "gift_card")
+KINDS = ("telegram_stars", "telegram_premium", "steam_topup", "topup", "gift_card")
+
+STEAM_CURRENCIES = ("USD", "RUB", "KZT", "UAH")
 
 KIND_TITLES = {
     "telegram_stars": "Telegram Stars",
     "telegram_premium": "Telegram Premium",
+    "steam_topup": "Пополнение Steam",
     "topup": "Пополнение игр",
     "gift_card": "Подарочные карты",
 }
@@ -86,6 +89,10 @@ class Supplier(Protocol):
     def get_order(self, supplier_order_id: str) -> SupplierOrder: ...
 
     def balance(self) -> Decimal: ...
+
+    def check_steam_login(self, login: str) -> bool:
+        """Можно ли пополнить этот Steam-аккаунт."""
+        ...
 
     def is_idempotent(self, kind: str) -> bool:
         """Можно ли безопасно повторить создание заказа с тем же ключом."""

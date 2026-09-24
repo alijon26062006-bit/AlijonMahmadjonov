@@ -113,4 +113,16 @@ def public_view(product: dict[str, Any], markup: Decimal) -> dict[str, Any]:
         "max_quantity": product["max_qty"],
         "stock": product["stock"],
         "fields": product["fields"],
+        **(_steam_extra(product, price) if product["kind"] == "steam_topup" else {}),
+    }
+
+
+def _steam_extra(product: dict[str, Any], price: Decimal) -> dict[str, Any]:
+    ref = product["supplier_ref"]
+    return {
+        "rates": ref.get("rates", {}),
+        "min_usd": ref.get("min_usd"),
+        "max_usd": ref.get("max_usd"),
+        # Сколько клиент платит за 1 USD, зачисленный на Steam.
+        "discount_percent": fmt_unit((Decimal(1) - price) * 100) if price < 1 else "0.0000",
     }

@@ -327,6 +327,7 @@ details.faq p { margin: 0; padding: 0 22px 20px; color: var(--muted); }
 .summary { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
 .summary > div { display: flex; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
 .summary > div > span:first-child { color: var(--muted); }
+.summary > div > span:last-child { text-align: right; white-space: nowrap; }
 .summary > div:last-child { border-bottom: 0; }
 .summary > div.total { background: var(--accent-soft); font-weight: 800; font-size: 1.08rem; }
 .summary > div.total > span { color: var(--text); }
@@ -357,3 +358,23 @@ details.faq p { margin: 0; padding: 0 22px 20px; color: var(--muted); }
   opacity: 0; transform: translateY(12px); pointer-events: none; transition: opacity .2s var(--ease), transform .2s var(--ease);
 }
 .to-top.show { opacity: 1; transform: none; pointer-events: auto; }
+
+/* ── Пополнение Steam ──────────────────────────────────── */
+.auth-head .tile.steam-tile, .tile.steam-tile { background: #171a21; color: #fff; border-color: #171a21; }
+.steam-head { flex-wrap: wrap; }
+.steam-head .btn { margin-left: auto; }
+.btn.dashed { border-style: dashed; }
+.ok-text { color: var(--ok); font-weight: 700; }
+.flag { border-radius: 3px; flex: none; }
+.currencies { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 420px) { .currencies { grid-template-columns: repeat(2, 1fr); } }
+.cur {
+  display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0; min-height: 56px;
+  border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); cursor: pointer;
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.cur { position: relative; }
+.cur input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; opacity: 0; cursor: pointer; }
+.cur.on { border: 2px solid var(--accent); background: var(--accent-soft); }
+.cur:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.auth-head p.small { margin: 2px 0 0; }

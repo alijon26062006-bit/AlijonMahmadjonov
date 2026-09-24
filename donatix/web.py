@@ -150,8 +150,7 @@ def panel_catalog(
     request: Request, kind: str = "", q: str = "", category: str = "",
     user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config),
 ):
-    markup = accounts.markup_for(user, config)
-    items = [catalog.public_view(p, markup) for p in
+    items = [catalog.public_view(p, accounts.markup_for(user, config, p["kind"])) for p in
              catalog.list_products(conn, kind=kind if kind in KINDS else "", q=q[:100], category_id=category)]
     groups: dict[str, list] = {}
     for item in items:
@@ -168,7 +167,7 @@ def panel_buy_form(product_id: str, request: Request, user=Depends(panel_user), 
     if p is None:
         flash(request, "Товар недоступен.", "error")
         return _redirect("/panel/catalog")
-    view = catalog.public_view(p, accounts.markup_for(user, config))
+    view = catalog.public_view(p, accounts.markup_for(user, config, p["kind"]))
     return render(request, "panel/buy.html", {
         "user": user, "p": view, "form": {}, "idem": str(uuid.uuid4()),
     })
@@ -195,7 +194,7 @@ def panel_buy(product_id: str, request: Request, form: dict = Depends(_form), us
             client_idem_key="panel-" + str(form.get("idem", ""))[:64], source="panel",
         )
     except orders.OrderError as exc:
-        view = catalog.public_view(p, accounts.markup_for(user, config))
+        view = catalog.public_view(p, accounts.markup_for(user, config, p["kind"]))
         return render(request, "panel/buy.html", {
             "user": accounts.get_user(conn, user["id"]), "p": view, "error": str(exc),
             "form": {**fields, "quantity": form.get("quantity", "")}, "idem": str(uuid.uuid4()),

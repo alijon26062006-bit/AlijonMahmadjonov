@@ -210,7 +210,9 @@ def products(request: Request, kind: str = "", q: str = "", admin=Depends(admin_
              config: Config = Depends(get_config)):
     items = catalog.list_products(conn, kind=kind if kind in KINDS else "", q=q[:100], include_hidden=True)
     for p in items:
-        p["prices"] = {t: fmt_unit(apply_markup(to_decimal(p["base_price"]), m)) for t, m in config.markups.items()}
+        km = config.kind_markups.get(p["kind"])
+        p["prices"] = {t: fmt_unit(apply_markup(to_decimal(p["base_price"]), km if km is not None else m))
+                       for t, m in config.markups.items()}
     return render(request, "admin/products.html", {
         "user": admin, "items": items, "kind": kind, "q": q, "kinds": KINDS, "markups": config.markups,
     })

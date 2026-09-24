@@ -41,6 +41,7 @@
   <h3>Быстрые действия</h3>
   <div class="list">
     <a class="link-row" href="/panel/orders"><span class="grow">Заказы<span class="sub">История заказов и статусы обработки</span></span><span class="go">{{ icon('arrow-right', 18) }}</span></a>
+    <a class="link-row" href="/panel/buy/steam-topup"><span class="grow">Пополнить Steam<span class="sub">Пополнение по логину</span></span><span class="go">{{ icon('arrow-right', 18) }}</span></a>
     {% for kind, sub in [('telegram_stars', 'Звёзды по @username'), ('topup', 'Пополнение по ID игрока'), ('gift_card', 'Коды и ваучеры'), ('telegram_premium', 'Подписка на 3, 6 или 12 месяцев')] %}
     <a class="link-row" href="/panel/catalog?kind={{ kind }}"><span class="grow">{{ kind_titles[kind] }}<span class="sub">{{ sub }}</span></span><span class="go">{{ icon('arrow-right', 18) }}</span></a>
     {% endfor %}

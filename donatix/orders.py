@@ -17,12 +17,13 @@ import re
 import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any
 
 from . import accounts, db
 from .catalog import get_product
 from .config import Config
-from .money import apply_markup, fmt, fmt_unit, order_total_micro, to_decimal
+from .money import MoneyError, apply_markup, fmt, fmt_unit, order_total_micro, to_decimal
 from .suppliers import Supplier, SupplierRejected, SupplierUnavailable
 
 log = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ STUCK_HOURS = 24
 REFRESH_ON_READ_SECONDS = 5
 
 TG_USERNAME_RE = re.compile(r"^@?[A-Za-z][A-Za-z0-9_]{3,31}$")
+STEAM_LOGIN_RE = re.compile(r"^[A-Za-z0-9_.\-]{2,64}$")
 
 
 class OrderError(Exception):
@@ -59,8 +61,39 @@ def _clean_fields(product: dict[str, Any], raw: dict[str, Any] | None) -> dict[s
             if not TG_USERNAME_RE.match(value):
                 raise OrderError("Неверный Telegram username.", "invalid_field")
             value = "@" + value.lstrip("@")
+        elif key == "steam_login":
+            if not STEAM_LOGIN_RE.match(value):
+                raise OrderError("Неверный логин Steam.", "invalid_field")
+        elif key == "currency" and product["kind"] == "steam_topup":
+            value = value.upper()
+            if value not in product["supplier_ref"].get("rates", {}):
+                raise OrderError("Валюта: USD, RUB, KZT или UAH.", "invalid_field")
+        elif key == "amount":
+            try:
+                amount = to_decimal(value.replace(",", "."))
+            except MoneyError:
+                raise OrderError("Сумма — число.", "invalid_field") from None
+            if amount <= 0 or amount != amount.quantize(Decimal("0.01")):
+                raise OrderError("Сумма — положительное число, не больше 2 знаков после точки.", "invalid_field")
+            value = f"{amount:.2f}"
         result[key] = value
     return result
+
+
+def _units(product: dict[str, Any], qty: int, fields: dict[str, str]) -> Decimal:
+    """Сколько «единиц» закупаем: штук/звёзд, а для Steam — долларов, зачисляемых на аккаунт."""
+    if product["kind"] != "steam_topup":
+        return Decimal(qty)
+    ref = product["supplier_ref"]
+    rate = to_decimal(ref["rates"][fields["currency"]])
+    usd = to_decimal(fields["amount"]) / rate
+    lo, hi = to_decimal(ref.get("min_usd", "0.5")), to_decimal(ref.get("max_usd", "1000"))
+    if not lo <= usd <= hi:
+        cur = fields["currency"]
+        raise OrderError(
+            f"Сумма: от {lo * rate:.2f} до {hi * rate:.2f} {cur}.", "invalid_quantity"
+        )
+    return usd
 
 
 def _clean_quantity(product: dict[str, Any], quantity: Any) -> int:
@@ -82,9 +115,9 @@ def _clean_quantity(product: dict[str, Any], quantity: Any) -> int:
 # ── Создание ────────────────────────────────────────────────
 
 
-def quote(config: Config, user: sqlite3.Row, product: dict[str, Any], quantity: int) -> dict[str, Any]:
-    unit = apply_markup(to_decimal(product["base_price"]), accounts.markup_for(user, config))
-    return {"unit_price": unit, "total_micro": order_total_micro(unit, quantity)}
+def quote(config: Config, user: sqlite3.Row, product: dict[str, Any], units: Decimal | int) -> dict[str, Any]:
+    unit = apply_markup(to_decimal(product["base_price"]), accounts.markup_for(user, config, product["kind"]))
+    return {"unit_price": unit, "total_micro": order_total_micro(unit, units)}
 
 
 def create_order(
@@ -116,8 +149,11 @@ def create_order(
         if existing is not None:
             return _replay(existing, product_id, qty, fields_json), True
 
-    q = quote(config, user, product, qty)
-    cost_micro = order_total_micro(to_decimal(product["base_price"]), qty)
+    units = _units(product, qty, clean)
+    if product["kind"] == "steam_topup":
+        _check_steam_login(supplier, clean["steam_login"])
+    q = quote(config, user, product, units)
+    cost_micro = order_total_micro(to_decimal(product["base_price"]), units)
     ts = db.now()
     try:
         with db.tx(conn):
@@ -126,7 +162,7 @@ def create_order(
                        unit_price, total_micro, cost_micro, status, supplier_idem_key, idempotent_supply,
                        client_idem_key, source, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?, ?)""",
-                (user["id"], product["id"], product["kind"], _display_name(product, qty), qty, fields_json,
+                (user["id"], product["id"], product["kind"], _display_name(product, qty, clean), qty, fields_json,
                  fmt_unit(q["unit_price"]), q["total_micro"], cost_micro, f"dx-{uuid.uuid4()}",
                  1 if supplier.is_idempotent(product["kind"]) else 0, client_idem_key, source, ts, ts),
             )
@@ -151,7 +187,23 @@ def create_order(
     return get_order_row(conn, order_id), False
 
 
-def _display_name(product: dict[str, Any], qty: int) -> str:
+def _check_steam_login(supplier: Supplier, login: str) -> None:
+    """До списания денег: можно ли пополнить этот аккаунт."""
+    try:
+        ok = supplier.check_steam_login(login)
+    except SupplierRejected as exc:
+        raise OrderError(f"Проверка логина Steam: {exc}", "invalid_field") from None
+    except SupplierUnavailable:
+        raise OrderError("Не удалось проверить логин Steam. Попробуйте через минуту.", "supplier_unavailable",
+                         503) from None
+    if not ok:
+        raise OrderError("Этот аккаунт Steam нельзя пополнить. Проверьте логин (не никнейм).",
+                         "steam_login_invalid")
+
+
+def _display_name(product: dict[str, Any], qty: int, fields: dict[str, str] | None = None) -> str:
+    if product["kind"] == "steam_topup" and fields:
+        return f"Steam {fields['amount']} {fields['currency']}"
     if product["kind"] == "telegram_stars":
         return f"Telegram Stars {qty}"
     if product["kind"] == "gift_card" and qty > 1:

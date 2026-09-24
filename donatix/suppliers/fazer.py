@@ -28,7 +28,12 @@ log = logging.getLogger(__name__)
 # Для этих видов в документации заявлен Idempotency-Key: повтор с тем же ключом
 # не создаст второй заказ. Для Telegram-покупок заголовок не упомянут —
 # такие заказы при сбое сети не повторяем автоматически, а отдаём админу.
-_IDEMPOTENT_KINDS = {"topup", "gift_card"}
+_IDEMPOTENT_KINDS = {"topup", "gift_card", "steam_topup"}
+
+# Лимиты пополнения Steam в USD. Точных в документации нет — поставщик сам
+# отклонит сумму вне своих пределов, и деньги клиенту вернутся.
+STEAM_MIN_USD = Decimal("0.5")
+STEAM_MAX_USD = Decimal("1000")
 
 
 def _pid(prefix: str, *parts: str) -> str:
@@ -47,6 +52,7 @@ class FazerSupplier:
         transport: httpx.BaseTransport | None = None,
         catalog_pause: float = 0.6,
         timeout: float = 30.0,
+        steam_discount: Decimal = Decimal("0"),
     ):
         if not api_key:
             raise ValueError("FAZER_API_KEY не задан")
@@ -58,6 +64,8 @@ class FazerSupplier:
         )
         # Каталог читаем не чаще ~100 запросов в минуту (их лимит — 120).
         self._catalog_pause = catalog_pause
+        # Скидка вашего тарифа FazerCards на пополнение Steam, % (Bronze 2.5, Silver 3, Gold 3.55).
+        self._steam_discount = Decimal(steam_discount)
 
     # ── HTTP ──────────────────────────────────────────────────
 
@@ -116,6 +124,7 @@ class FazerSupplier:
 
     def fetch_catalog(self) -> Iterable[ProductData]:
         yield from self._telegram()
+        yield from self._steam_topup()
         yield from self._topups()
         yield from self._giftcards()
 
@@ -148,6 +157,29 @@ class FazerSupplier:
                 fields=[{"key": "telegram_username", "label": "Telegram @username", "type": "text"}],
                 supplier_ref={"months": months},
             )
+
+    def _steam_topup(self) -> Iterable[ProductData]:
+        data = self._catalog_get("/steam-topup/rates")
+        if not data:
+            return
+        rates = {str(k).upper(): str(v) for k, v in (data.get("rates") or {}).items()}
+        yield ProductData(
+            id="steam-topup",
+            kind="steam_topup",
+            category_id="steam",
+            category_name="Steam",
+            name="Пополнение Steam",
+            # Цена за 1 USD, зачисленный на аккаунт: номинал минус скидка тарифа.
+            base_price=(Decimal(1) - self._steam_discount / Decimal(100)),
+            unit="usd",
+            fields=[
+                {"key": "steam_login", "label": "Логин Steam", "type": "text"},
+                {"key": "currency", "label": "Валюта", "type": "select"},
+                {"key": "amount", "label": "Сумма", "type": "number"},
+            ],
+            supplier_ref={"rates": rates, "rates_updated_at": data.get("updated_at"),
+                          "min_usd": str(STEAM_MIN_USD), "max_usd": str(STEAM_MAX_USD)},
+        )
 
     def _topups(self) -> Iterable[ProductData]:
         for cat in list(self._paged("/topups")):
@@ -212,6 +244,12 @@ class FazerSupplier:
                 "telegram_username": fields["telegram_username"],
                 "months": ref["months"],
             }
+        elif kind == "steam_topup":
+            path, body = "/steam-topup/order", {
+                "steamLogin": fields["steam_login"],
+                "currency": fields["currency"],
+                "amount": fields["amount"],
+            }
         elif kind == "topup":
             path, body = "/topups/order", {
                 "category_id": ref["category_id"],
@@ -245,6 +283,10 @@ class FazerSupplier:
             delivery=payload if isinstance(payload, dict) else ({"payload": payload} if payload else None),
             message=str(order.get("error") or order.get("message") or ""),
         )
+
+    def check_steam_login(self, login: str) -> bool:
+        data = self._request("POST", "/steam-topup/check-login", json={"steamLogin": login})
+        return bool(data.get("can_refill"))
 
     def balance(self) -> Decimal:
         data = self._request("GET", "/balance")

@@ -85,9 +85,12 @@ def ensure_admin(conn: sqlite3.Connection, config: Config) -> None:
                 role="admin", status="active")
 
 
-def markup_for(user: sqlite3.Row, config: Config) -> Decimal:
+def markup_for(user: sqlite3.Row, config: Config, kind: str = "") -> Decimal:
+    """Наценка клиента: личная (если задана) → для вида товара → по уровню."""
     if user["markup_override"] not in (None, ""):
         return to_decimal(user["markup_override"])
+    if kind in config.kind_markups:
+        return config.kind_markups[kind]
     return config.markups.get(user["tier"], config.markups["bronze"])
 
 

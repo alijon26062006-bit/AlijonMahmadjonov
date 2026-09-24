@@ -48,8 +48,8 @@ def apply_markup(base: Decimal, markup_pct: Decimal) -> Decimal:
     return to_decimal(base) * (Decimal(100) + to_decimal(markup_pct)) / Decimal(100)
 
 
-def order_total_micro(unit_price: Decimal, quantity: int) -> int:
-    return to_micro_ceil(to_decimal(unit_price) * quantity)
+def order_total_micro(unit_price: Decimal, quantity) -> int:
+    return to_micro_ceil(to_decimal(unit_price) * to_decimal(quantity))
 
 
 def fmt_unit(value: Decimal) -> str:

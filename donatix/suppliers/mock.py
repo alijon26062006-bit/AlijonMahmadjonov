@@ -19,6 +19,13 @@ def demo_catalog() -> list[ProductData]:
         ProductData("tg-stars", "telegram_stars", "telegram", "Telegram", "Telegram Stars",
                     Decimal("0.015375"), unit="star", min_qty=50, max_qty=10000, fields=_TG_FIELD),
     ]
+    items.append(ProductData("steam-topup", "steam_topup", "steam", "Steam", "Пополнение Steam",
+                             Decimal("0.975"), unit="usd",
+                             fields=[{"key": "steam_login", "label": "Логин Steam", "type": "text"},
+                                     {"key": "currency", "label": "Валюта", "type": "select"},
+                                     {"key": "amount", "label": "Сумма", "type": "number"}],
+                             supplier_ref={"rates": {"USD": "1", "RUB": "92.5", "KZT": "520", "UAH": "41.2"},
+                                           "min_usd": "0.5", "max_usd": "1000"}))
     for months, price in ((3, "12.2898"), (6, "16.3898"), (12, "29.7148")):
         items.append(ProductData(f"tg-premium-{months}", "telegram_premium", "telegram", "Telegram",
                                  f"Telegram Premium — {months} мес.", Decimal(price),
@@ -56,7 +63,10 @@ class MockSupplier:
         return list(self._catalog)
 
     def is_idempotent(self, kind: str) -> bool:
-        return kind in ("topup", "gift_card")
+        return kind in ("topup", "gift_card", "steam_topup")
+
+    def check_steam_login(self, login: str) -> bool:
+        return not login.lower().startswith("bad")
 
     def create_order(self, product, quantity, fields, idem_key) -> SupplierOrder:
         with self._lock:

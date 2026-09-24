@@ -163,9 +163,9 @@ def products(
 ) -> dict[str, Any]:
     _limit(request, "catalog", str(user["id"]))
     limit = min(max(limit, 1), 500)
-    markup = accounts.markup_for(user, config)
     items = catalog.list_products(conn, kind=kind, category_id=category_id, q=q, limit=limit, offset=max(offset, 0))
-    return {"ok": True, "items": [catalog.public_view(p, markup) for p in items], "limit": limit, "offset": offset}
+    views = [catalog.public_view(p, accounts.markup_for(user, config, p["kind"])) for p in items]
+    return {"ok": True, "items": views, "limit": limit, "offset": offset}
 
 
 @router.get("/products/{product_id}")
@@ -175,7 +175,7 @@ def product(product_id: str, request: Request, user=Depends(api_user), conn=Depe
     p = catalog.get_product(conn, product_id)
     if p is None:
         raise ApiError("Товар не найден.", "product_not_found", 404)
-    return {"ok": True, "product": catalog.public_view(p, accounts.markup_for(user, config))}
+    return {"ok": True, "product": catalog.public_view(p, accounts.markup_for(user, config, p["kind"]))}
 
 
 # ── Заказы ───────────────────────────────────────────────────
