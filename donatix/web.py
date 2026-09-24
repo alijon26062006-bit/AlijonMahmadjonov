@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from . import accounts, catalog, orders
 from .config import PAY_METHODS, Config
 from .deps import LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
+from .money import apply_markup, fmt, order_total_micro, to_decimal
 from .suppliers import KINDS
 
 router = APIRouter(include_in_schema=False)
@@ -43,7 +44,30 @@ def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
         "by_kind": by_kind,
         "total_products": total,
         "markups": config.markups,
+        "examples": _price_examples(conn, config),
     })
+
+
+def _price_examples(conn, config: Config) -> list[tuple[str, str]]:
+    """Несколько реальных цен из каталога для главной (по базовой наценке)."""
+    rows = []
+    for pid, qty, label in (("tg-stars", 1000, "Telegram Stars, 1000 звёзд"),
+                            ("tg-premium-3", 1, "Telegram Premium, 3 месяца"),
+                            ("tg-premium-12", 1, "Telegram Premium, 12 месяцев")):
+        p = catalog.get_product(conn, pid)
+        if p is None:
+            continue
+        markup = config.kind_markups.get(p["kind"], config.markups["bronze"])
+        total = order_total_micro(apply_markup(to_decimal(p["base_price"]), markup), qty)
+        rows.append((label, fmt(total)))
+    for c in catalog.categories(conn):
+        if c["kind"] == "topup" and len(rows) < 5:
+            items = catalog.list_products(conn, category_id=c["category_id"], limit=1)
+            if items:
+                p = items[0]
+                total = order_total_micro(apply_markup(to_decimal(p["base_price"]), config.markups["bronze"]), 1)
+                rows.append((f"{p['category_name']} — {p['name']}", fmt(total)))
+    return rows
 
 
 @router.get("/docs")

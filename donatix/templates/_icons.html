@@ -48,7 +48,7 @@
 <span class="status {{ s }}" title="{{ status_titles[st] }}">{{ icon({'completed': 'check', 'failed': 'x', 'processing': 'clock'}.get(s, 'clock'), 16) }}<span class="sr">{{ status_titles[st] }}</span></span>
 {%- endmacro -%}
 
-{%- macro logo() -%}<svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="dxg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#6d28d9"/></linearGradient></defs><rect width="40" height="40" rx="12" fill="url(#dxg)"/><path d="M13 11h7.5a9 9 0 0 1 0 18H13Z" fill="none" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/><path d="m22.5 15.5-3.5 5h4l-3.5 5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>{%- endmacro -%}
+{%- macro logo() -%}<svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--accent)"/><path d="M10 8.5h6a7.5 7.5 0 0 1 0 15h-6Z" fill="none" stroke="var(--accent-ink)" stroke-width="2.6" stroke-linejoin="round"/></svg>{%- endmacro -%}
 
 {%- macro theme_button() -%}<button class="icon-btn theme-toggle" type="button" aria-label="Сменить тему" onclick="dxTheme()">{{ icon('moon', 20, 'moon') }}{{ icon('sun', 20, 'sun') }}</button>{%- endmacro -%}
 

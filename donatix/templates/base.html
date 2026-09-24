@@ -11,17 +11,15 @@
       try { t = localStorage.getItem("dx-theme"); } catch (e) {}
       if (!t) t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       document.documentElement.setAttribute("data-theme", t);
-      document.documentElement.classList.add("js");
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="/static/donatix.css">
   <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
 </head>
 <body>
-<div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
 {% block header %}
 <header class="top">
   <div class="wrap">
@@ -64,36 +62,12 @@
   <div class="wrap small" style="margin-top:24px">© {{ site_name }}</div>
 </footer>
 {% endblock %}
-<button class="to-top" type="button" aria-label="Наверх" onclick="scrollTo({top:0})">{{ icon('arrow-up', 22) }}</button>
 <script>
   function dxTheme() {
     var r = document.documentElement, t = r.getAttribute("data-theme") === "dark" ? "light" : "dark";
     r.setAttribute("data-theme", t);
     try { localStorage.setItem("dx-theme", t); } catch (e) {}
   }
-  (function () {
-    var els = document.querySelectorAll(".reveal");
-    if (!("IntersectionObserver" in window)) { els.forEach(function (e) { e.classList.add("in"); }); return; }
-    var io = new IntersectionObserver(function (list) {
-      list.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
-    }, { rootMargin: "0px 0px -8% 0px" });
-    els.forEach(function (e, i) { e.style.transitionDelay = (i % 4) * 70 + "ms"; io.observe(e); });
-  })();
-  (function () {
-    if (!matchMedia("(hover: hover)").matches) return;
-    document.querySelectorAll(".card, .item, .link-row, .product-card").forEach(function (el) {
-      el.classList.add("spot");
-      el.addEventListener("pointermove", function (e) {
-        var r = el.getBoundingClientRect();
-        el.style.setProperty("--mx", e.clientX - r.left + "px");
-        el.style.setProperty("--my", e.clientY - r.top + "px");
-      });
-    });
-  })();
-  (function () {
-    var b = document.querySelector(".to-top");
-    addEventListener("scroll", function () { b.classList.toggle("show", scrollY > 600); }, { passive: true });
-  })();
 </script>
 </body>
 </html>

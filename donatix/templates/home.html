@@ -1,47 +1,44 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon, kind_icon %}
-{% block title %}{{ site_name }} — Telegram Stars, пополнения игр и подарочные карты оптом{% endblock %}
+{% block title %}{{ site_name }} — Telegram Stars, пополнения игр и Steam оптом{% endblock %}
 {% block body %}
 <main>
   <div class="wrap">
     {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
     <section class="hero">
-      <div class="reveal">
-        <div class="hero-badge"><b>Новое</b><span class="live-dot"></span>Пополнение Steam и гифты уже в каталоге</div>
-        <h1>Продавайте донат своей аудитории <span class="grad">без закупки заранее</span></h1>
-        <p class="lead">Telegram Stars и Premium, Steam, пополнения PUBG, Free Fire и других игр, подарочные карты.
-          Подключите API к сайту или боту — или оформляйте заказы в панели.</p>
+      <div>
+        <h1>Telegram Stars, пополнения игр и&nbsp;Steam для&nbsp;вашего магазина</h1>
+        <p class="lead">Подключите свой сайт или Telegram-бота к {{ site_name }} через API — заказы выполняются автоматически.
+          Без программиста можно заказывать вручную в панели.</p>
         <div class="cta">
-          <a class="btn primary lg" href="/register">Стать партнёром {{ icon('arrow-right', 18) }}</a>
-          <a class="btn lg" href="/#catalog">Каталог</a>
+          <a class="btn primary lg" href="/register">Подать заявку</a>
+          <a class="btn lg" href="/docs">Документация API</a>
         </div>
-        <p class="small muted" style="margin-top:14px">{{ icon('shield', 16) }} Без абонентской платы. Возврат, если заказ не прошёл.</p>
+        <p class="small muted" style="margin-top:14px">Оплата с баланса в долларах. Если заказ не выполнен — деньги возвращаются автоматически.</p>
       </div>
-      <div class="hero-visual reveal" aria-hidden="true">
-        <div class="window">
-          <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">donatix · заказы</span></div>
-          <div class="body">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-              <b>Последние заказы</b><span class="badge ok"><span class="live-dot"></span>онлайн</span>
+      <div class="window" aria-label="Пример заказа через API">
+        <div class="chrome"><span class="url mono">POST /api/v1/orders</span><span class="badge ok">201</span></div>
+        <div class="body">
+<pre>{
+  "product_id": "tg-stars",
+  "quantity": 500,
+  "fields": {"telegram_username": "@player"}
+}</pre>
+          <div class="item">
+            <div class="tile sm k-telegram_stars">{{ kind_icon('telegram_stars', 18) }}</div>
+            <div class="grow">
+              <div class="head"><span class="title small">dx-1042 · Telegram Stars 500</span><span class="amount">$8.3025</span></div>
+              <div class="sub small">для @player</div>
             </div>
-            <div class="orders feed" id="feed"></div>
+          </div>
+          <div class="item" style="margin-top:8px">
+            <div class="tile sm k-topup">{{ kind_icon('topup', 18) }}</div>
+            <div class="grow">
+              <div class="head"><span class="title small">dx-1043 · PUBG Mobile — 660 UC</span><span class="amount">$10.1520</span></div>
+              <div class="sub small">Player ID 5123456789</div>
+            </div>
           </div>
         </div>
-        <div class="float-chip a"><span class="tile sm g4">{{ icon('check', 18) }}</span><span>Выдано за 0.8 c<small>Telegram Stars 500</small></span></div>
-        <div class="float-chip b"><span class="tile sm g1">{{ icon('wallet', 18) }}</span><span>+ $0.62<small>ваша прибыль с заказа</small></span></div>
-      </div>
-    </section>
-
-    <section class="section" style="padding-top:8px">
-      <div class="marquee" aria-hidden="true"><div class="track">
-        {% for _ in range(2) %}{% for name in ['Telegram Stars', 'Telegram Premium', 'Steam', 'PUBG Mobile', 'Free Fire', 'Mobile Legends', 'Genshin Impact', 'Roblox', 'App Store', 'Google Play', 'PlayStation', 'Xbox', 'Valorant', 'Steam Гифты'] %}
-        <span class="chip">{{ icon('bolt', 16) }}{{ name }}</span>{% endfor %}{% endfor %}
-      </div></div>
-      <div class="numbers" style="margin-top:28px">
-        <div class="stat reveal"><div class="n">{{ total_products or '100' }}+</div><div class="muted">позиций в каталоге</div></div>
-        <div class="stat reveal"><div class="n">5</div><div class="muted">видов товаров в одном API</div></div>
-        <div class="stat reveal"><div class="n">$0</div><div class="muted">абонентская плата</div></div>
-        <div class="stat reveal"><div class="n">24/7</div><div class="muted">автоматическая выдача</div></div>
       </div>
     </section>
   </div>
@@ -49,27 +46,26 @@
   <section class="section" id="catalog">
     <div class="wrap">
       <div class="section-head">
-        <div class="eyebrow">Каталог</div>
-        <h2>Что можно продавать</h2>
-        <p>Цены и наличие обновляются автоматически.</p>
+        <h2>Каталог</h2>
+        <p>{% if total_products %}{{ total_products }} позиций. {% endif %}Цены и наличие обновляются от поставщика каждые 15 минут.</p>
       </div>
       <div class="grid">
         {% set defaults = {
           "telegram_stars": ["от 50 до 10 000 звёзд"],
-          "telegram_premium": ["3 месяца", "6 месяцев", "12 месяцев"],
-          "topup": ["PUBG Mobile", "Free Fire", "Mobile Legends", "и другие"],
+          "telegram_premium": ["3, 6 и 12 месяцев"],
+          "topup": ["PUBG Mobile", "Free Fire", "Mobile Legends"],
           "gift_card": ["Steam", "App Store", "PlayStation", "Google Play"],
           "steam_topup": ["USD", "RUB", "KZT", "UAH"],
-          "steam_gift": ["ELDEN RING", "Cyberpunk 2077", "CS2", "12 000+ игр"],
+          "steam_gift": ["игры по ссылке-приглашению"],
         } %}
         {% for kind, title in kind_titles.items() %}
-        <div class="card feature reveal">
-          <div class="tile g{{ loop.index }}">{{ kind_icon(kind, 26) }}</div>
+        <div class="card feature">
+          <div class="tile k-{{ kind }}">{{ kind_icon(kind, 20) }}</div>
           <h3>{{ title }}</h3>
           <div class="chips">
-            {% if by_kind.get(kind) and kind not in ('telegram_stars', 'telegram_premium', 'steam_topup', 'steam_gift') %}
-              {% for c in by_kind[kind][:6] %}<span class="chip">{{ c.category_name }}</span>{% endfor %}
-              {% if by_kind[kind]|length > 6 %}<span class="chip">+{{ by_kind[kind]|length - 6 }}</span>{% endif %}
+            {% if by_kind.get(kind) and kind in ('topup', 'gift_card') %}
+              {% for c in by_kind[kind][:5] %}<span class="chip">{{ c.category_name }}</span>{% endfor %}
+              {% if by_kind[kind]|length > 5 %}<span class="chip">ещё {{ by_kind[kind]|length - 5 }}</span>{% endif %}
             {% else %}
               {% for d in defaults[kind] %}<span class="chip">{{ d }}</span>{% endfor %}
             {% endif %}
@@ -82,33 +78,14 @@
 
   <section class="section">
     <div class="wrap">
-      <div class="section-head"><div class="eyebrow">Почему {{ site_name }}</div><h2>Всё, чтобы продавать <span class="grad">без хлопот</span></h2></div>
-      <div class="grid three">
-        {% for ico, t, d in [
-          ('wallet', 'Без подписки', 'Никаких ежемесячных платежей. Небольшая наценка только на выполненные заказы.'),
-          ('shield', 'Деньги под защитой', 'Не прошёл заказ — сумма сама возвращается на баланс. Повтор запроса не спишет дважды.'),
-          ('code', 'Один простой API', 'Один метод для всех товаров. Примеры на curl, Python и Node.js, уведомления через webhook.'),
-          ('bolt', 'Выдача за секунды', 'Заказы выполняются автоматически круглые сутки. Статус — в панели и через API.'),
-          ('grid', 'Веб-панель', 'Можно без программиста: заказывайте вручную, смотрите историю и баланс.'),
-          ('handshake', 'Помощь с подключением', 'Поможем подключить бота или сайт и ответим в Telegram.'),
-        ] %}
-        <div class="card feature reveal"><div class="tile g{{ loop.index }}">{{ icon(ico, 24) }}</div><h3>{{ t }}</h3><p>{{ d }}</p></div>
-        {% endfor %}
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap">
-      <div class="section-head"><div class="eyebrow">Как это работает</div><h2>От заявки до первой продажи — один день</h2></div>
+      <div class="section-head"><h2>Как подключиться</h2></div>
       <div class="grid steps">
         {% for t, d in [
-          ('Регистрация', 'Создаёте аккаунт и рассказываете о проекте. Мы активируем доступ.'),
-          ('Баланс', 'Пополняете баланс в долларах — заказы списываются с него.'),
-          ('Подключение', 'Создаёте API-ключ и подключаете сайт или бота. Или заказываете в панели.'),
-          ('Продажи', 'Покупатель платит вам, заказ выполняется у нас. Разница — ваш доход.'),
+          ('Заявка', 'Регистрируетесь и указываете свой канал, бота или сайт. Доступ открываем после проверки.'),
+          ('Баланс', 'Пополняете баланс через Алиф, DC, Эсхату, USDT или Binance. Заказы списываются с него.'),
+          ('Подключение', 'Создаёте API-ключ в панели и подключаете бота или сайт. Или заказываете вручную.'),
         ] %}
-        <div class="card feature reveal"><div class="num">{{ loop.index }}</div><h3>{{ t }}</h3><p class="muted" style="margin:0">{{ d }}</p></div>
+        <div class="card feature"><div class="num">{{ loop.index }}</div><h3>{{ t }}</h3><p>{{ d }}</p></div>
         {% endfor %}
       </div>
     </div>
@@ -117,15 +94,14 @@
   <section class="section">
     <div class="wrap grid two" style="align-items:center;gap:32px">
       <div>
-        <div class="eyebrow">Для разработчиков</div>
-        <h2>Интеграция за вечер</h2>
+        <h2>Для разработчиков</h2>
         <ul class="checks">
-          <li>{{ icon('check', 18) }}<span><b>REST API</b> — баланс, каталог, заказы, история</span></li>
-          <li>{{ icon('check', 18) }}<span><b>Webhooks</b> с подписью — узнаёте о выполнении сразу</span></li>
-          <li>{{ icon('check', 18) }}<span><b>Idempotency-Key</b> — повтор запроса безопасен</span></li>
-          <li>{{ icon('check', 18) }}<span><b>Понятные ошибки</b> на русском с кодами</span></li>
+          <li>{{ icon('check', 16) }}<span>Один метод заказа для всех товаров, ответы в JSON</span></li>
+          <li>{{ icon('check', 16) }}<span>Webhook с подписью HMAC о смене статуса заказа</span></li>
+          <li>{{ icon('check', 16) }}<span>Idempotency-Key: повторный запрос не спишет деньги дважды</span></li>
+          <li>{{ icon('check', 16) }}<span>Коды ошибок и сообщения на русском</span></li>
         </ul>
-        <a class="btn soft" href="/docs">{{ icon('book', 18) }}Читать документацию</a>
+        <a class="btn" href="/docs">Открыть документацию</a>
       </div>
 <pre data-lang="python">import uuid, requests
 
@@ -136,44 +112,37 @@ r = requests.post(
     json={"product_id": "tg-stars", "quantity": 100,
           "fields": {"telegram_username": "@player"}},
 )
-print(r.json()["order"]["status"])  # processing → completed</pre>
+print(r.json()["order"]["status"])</pre>
     </div>
   </section>
 
   <section class="section" id="pricing">
     <div class="wrap">
-      <div class="section-head"><div class="eyebrow">Цены</div><h2>Платите только за заказы</h2>
-        <p>Наценка поверх оптовой цены. Чем больше оборот — тем она ниже.</p></div>
-      <div class="grid three">
-        {% for tier, title, note in [("bronze", "Старт", "Для новых партнёров"), ("silver", "Рост", "Для постоянных партнёров"), ("gold", "Партнёр", "Для крупных партнёров")] %}
-        <div class="card price-card reveal {{ 'featured' if tier == 'silver' }}">
-          {% if tier == 'silver' %}<span class="badge accent tag">Популярный</span>{% endif %}
-          <h3>{{ title }}</h3>
-          <div class="big">+{{ markups[tier] }}%</div>
-          <div class="muted">{{ note }}</div>
-          <ul class="checks">
-            <li>{{ icon('check', 18) }}Весь каталог</li>
-            <li>{{ icon('check', 18) }}API и webhooks</li>
-            <li>{{ icon('check', 18) }}Веб-панель</li>
-            <li>{{ icon('check', 18) }}{{ 'Персональная помощь' if tier == 'gold' else 'Помощь с интеграцией' }}</li>
-          </ul>
-          <a class="btn block {{ 'primary' if tier == 'silver' }}" href="/register">Начать</a>
-        </div>
-        {% endfor %}
+      <div class="section-head">
+        <h2>Цены</h2>
+        <p>Цена поставщика плюс {{ markups['bronze'] }}%. Абонентской платы нет. Для постоянных партнёров с большим оборотом — индивидуальные условия.</p>
+      </div>
+      <div class="card table-wrap" style="max-width:640px">
+        {% if examples %}
+        <table>
+          <tr><th>Пример</th><th class="num">Цена</th></tr>
+          {% for label, price in examples %}<tr><td>{{ label }}</td><td class="num mono">${{ price }}</td></tr>{% endfor %}
+        </table>
+        {% endif %}
+        <p class="small muted" style="margin:10px 0 0">Точные цены по всем позициям — в каталоге панели после регистрации.</p>
       </div>
     </div>
   </section>
 
   <section class="section" id="faq">
-    <div class="wrap" style="max-width:820px">
-      <div class="section-head"><h2>Частые вопросы</h2></div>
+    <div class="wrap" style="max-width:760px">
+      <div class="section-head"><h2>Вопросы</h2></div>
       {% for q, a in [
-        ('Как пополнить баланс?', 'После одобрения заявки напишите в поддержку' ~ (' (' ~ support_contact ~ ')' if support_contact else '') ~ ': принимаем переводы и USDT. Баланс ведётся в долларах.'),
-        ('Что если заказ не выполнится?', 'Деньги автоматически вернутся на баланс, а в заказе будет указана причина.'),
-        ('Нужен ли программист?', 'Нет. Все товары можно заказывать вручную в веб-панели. API нужен, чтобы продажи шли автоматически.'),
-        ('Подходит для Telegram-бота?', 'Да, это самый частый сценарий: бот принимает оплату от покупателя и делает заказ через наш API.'),
-        ('Как быстро выполняются заказы?', 'Обычно за секунды. Пополнения некоторых игр — до нескольких минут. Статус виден в панели и приходит на webhook.'),
-        ('Есть ли абонентская плата?', 'Нет. Вы платите только за выполненные заказы — наценка уже включена в цену.'),
+        ('Как пополнить баланс?', 'В панели: «Пополнить баланс» → способ оплаты → сумма. Переводите по реквизитам и отправляете заявку, после проверки баланс зачисляется, вам приходит уведомление.'),
+        ('Что если заказ не выполнится?', 'Деньги автоматически вернутся на баланс, в заказе будет указана причина.'),
+        ('Нужен ли программист?', 'Нет. Все товары можно заказывать вручную в панели. API нужен, чтобы продажи шли автоматически.'),
+        ('Подходит для Telegram-бота?', 'Да. Бот принимает оплату от покупателя и делает заказ через API.'),
+        ('Как быстро выполняются заказы?', 'Обычно за несколько секунд, пополнения некоторых игр — до нескольких минут. Статус виден в панели и приходит на webhook.'),
       ] %}
       <details class="faq"><summary>{{ q }}</summary><p>{{ a }}</p></details>
       {% endfor %}
@@ -183,39 +152,11 @@ print(r.json()["order"]["status"])  # processing → completed</pre>
   <section class="section">
     <div class="wrap">
       <div class="card cta-card">
-        <div class="tile" style="margin:0 auto 18px;width:64px;height:64px">{{ icon('handshake', 32) }}</div>
-        <h2>Готовы начать <span class="grad">продавать?</span></h2>
-        <p class="muted">Оставьте заявку — активируем доступ в течение дня.</p>
-        <a class="btn primary lg" href="/register">Стать партнёром</a>
+        <h2>Подключить свой проект</h2>
+        <p class="muted">Заявки рассматриваем в течение дня{% if support_contact %}. Вопросы — {{ support_contact }}{% endif %}.</p>
+        <a class="btn primary lg" href="/register">Подать заявку</a>
       </div>
     </div>
   </section>
 </main>
-<script>
-(function () {
-  var feed = document.getElementById("feed");
-  if (!feed) return;
-  var icons = {{ {'star': icon('star', 20), 'bolt': icon('bolt', 20), 'card': icon('card', 20), 'wallet': icon('wallet', 20), 'gift': icon('gift', 20), 'crown': icon('crown', 20)} | tojson }};
-  var data = [
-    ["star", "g1", "Telegram Stars 500", "@player_one", "8.30"], ["bolt", "g5", "PUBG Mobile — 660 UC", "ID 5123456789", "10.15"],
-    ["wallet", "g6", "Steam 1500 RUB", "alijon_steam", "16.05"], ["card", "g2", "Steam — $20", "код выдан", "22.57"],
-    ["gift", "g3", "Steam Gift — ELDEN RING", "регион KZ", "44.28"], ["crown", "g1", "Telegram Premium 3 мес.", "@anzikjon", "13.27"],
-    ["bolt", "g4", "Free Fire — 520 алмазов", "ID 99887766", "4.97"]
-  ];
-  var i = 0;
-  function row(d) {
-    var el = document.createElement("div");
-    el.className = "item";
-    el.innerHTML = '<div class="tile sm ' + d[1] + '">' + icons[d[0]] + '</div><div class="grow"><div class="title small">' + d[2] +
-      '</div><div class="sub small">' + d[3] + '</div></div><span class="badge ok">$' + d[4] + '</span>';
-    return el;
-  }
-  for (; i < 4; i++) feed.appendChild(row(data[i]));
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  setInterval(function () {
-    feed.insertBefore(row(data[i++ % data.length]), feed.firstChild);
-    if (feed.children.length > 4) feed.removeChild(feed.lastChild);
-  }, 2600);
-})();
-</script>
 {% endblock %}
