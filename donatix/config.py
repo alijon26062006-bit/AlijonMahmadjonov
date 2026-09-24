@@ -113,6 +113,9 @@ class Config:
     support_contact: str = ""
     # Код подтверждения сайта из Google Search Console и Яндекс Вебмастера (метатег)
     google_verify: str = ""
+    # Вход через Google (OAuth). Ключи — в Google Cloud Console → Credentials
+    google_client_id: str = ""
+    google_client_secret: str = ""
     yandex_verify: str = ""
     # Часовой пояс для аналитики, часы от UTC (Душанбе — 5)
     tz_offset: int = 5
@@ -161,6 +164,8 @@ class Config:
             cookie_secure=_flag("DONATIX_COOKIE_SECURE", False),
             support_contact=_env("DONATIX_SUPPORT_CONTACT"),
             google_verify=_env("DONATIX_GOOGLE_VERIFY"),
+            google_client_id=_env("DONATIX_GOOGLE_CLIENT_ID"),
+            google_client_secret=_env("DONATIX_GOOGLE_CLIENT_SECRET"),
             yandex_verify=_env("DONATIX_YANDEX_VERIFY"),
             tz_offset=int(_env("DONATIX_TZ_OFFSET") or 5),
             run_bots=_flag("DONATIX_RUN_BOTS", True),

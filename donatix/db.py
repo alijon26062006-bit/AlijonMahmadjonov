@@ -208,6 +208,10 @@ def init(path: Path | str) -> None:
             conn.execute("ALTER TABLE api_keys ADD COLUMN key_enc TEXT")
         if "region" not in cols:
             conn.execute("ALTER TABLE products ADD COLUMN region TEXT")
+        user_cols = {r[1] for r in conn.execute("PRAGMA table_info(users)")}
+        if "google_sub" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)")
     finally:
         conn.close()
 

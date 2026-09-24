@@ -182,6 +182,55 @@ def login(request: Request, email: str = Form(""), password: str = Form(""), con
     return _redirect("/admin" if user["role"] == "admin" else "/panel")
 
 
+@router.get("/auth/google")
+def google_start(request: Request, config: Config = Depends(get_config)):
+    from . import google_auth
+    if not google_auth.enabled(config):
+        flash(request, "Вход через Google не настроен.", "error")
+        return _redirect("/login")
+    state = uuid.uuid4().hex
+    request.session["g_state"] = state
+    return RedirectResponse(google_auth.auth_url(config, state), status_code=303)
+
+
+@router.get("/auth/google/callback")
+def google_callback(request: Request, code: str = "", state: str = "", error: str = "",
+                    conn=Depends(get_conn), config: Config = Depends(get_config)):
+    import secrets as _secrets
+
+    from . import google_auth, sitecfg
+    expected = request.session.pop("g_state", "")
+    if error or not code:
+        flash(request, "Вход через Google отменён.", "error")
+        return _redirect("/login")
+    if not expected or not _secrets.compare_digest(state, expected):
+        flash(request, "Ссылка входа устарела. Нажмите «Войти через Google» ещё раз.", "error")
+        return _redirect("/login")
+    try:
+        profile = google_auth.fetch_profile(config, code)
+        with db.tx(conn):
+            user, created = google_auth.find_or_create(conn, config, profile,
+                                                       allow_new=sitecfg.registration_open(conn))
+    except (google_auth.GoogleError, accounts.AccountError) as exc:
+        flash(request, str(exc), "error")
+        return _redirect("/login")
+    if user["status"] == "blocked":
+        flash(request, "Аккаунт заблокирован.", "error")
+        return _redirect("/login")
+    request.session.clear()
+    request.session["user_id"] = user["id"]
+    _record_login(conn, request, user["id"])
+    if created:
+        from .tgbot import user_event
+        from .worker import notify_event
+        if config.require_approval:
+            notify_event(conn, config, user_event(conn, user["id"]))
+            flash(request, "Аккаунт создан через Google. Мы проверим заявку и активируем доступ.")
+        else:
+            flash(request, "Добро пожаловать! Аккаунт создан через Google.")
+    return _redirect("/admin" if user["role"] == "admin" else "/panel")
+
+
 def _record_login(conn, request: Request, user_id: int) -> None:
     conn.execute("INSERT INTO logins (user_id, ip, user_agent, created_at) VALUES (?, ?, ?, ?)",
                  (user_id, _ip(request)[:64], request.headers.get("user-agent", "")[:300], db.now()))

@@ -134,6 +134,7 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["base_url"] = config.base_url
     ctx["google_verify"] = config.google_verify
     ctx["yandex_verify"] = config.yandex_verify
+    ctx["google_login"] = bool(config.google_client_id and config.google_client_secret)
     ctx["canonical"] = config.base_url + request.url.path
     # В поиск попадают только публичные страницы; кабинет, админка и ошибки — нет
     ctx["noindex"] = status_code >= 400 or request.url.path not in INDEXABLE
