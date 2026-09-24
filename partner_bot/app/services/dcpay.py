@@ -70,12 +70,13 @@ def account() -> str:
 def comment_prefix() -> str:
     """Подпись в комментарии. По умолчанию — юзернейм поддержки."""
     from app import runtime
-    from app.config import settings
 
     custom = (runtime.get("dc_comment") or "").strip()
     if custom:
         return custom
-    return f"@{settings.support_username}" if settings.support_username else ""
+    from app import texts
+    name = texts.support_username()
+    return f"@{name}" if name else ""
 
 
 def service() -> str:

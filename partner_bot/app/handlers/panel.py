@@ -73,6 +73,10 @@ def home_kb() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📥 Заявки клиентов", callback_data="pn:deposits"),
             InlineKeyboardButton(text="💳 Реквизиты", callback_data="pn:pay"),
         )
+        from app import texts as _t
+        contact = _t.support_username()
+        kb.row(InlineKeyboardButton(text=f"📞 Мой контакт · @{contact}" if contact else "📞 Мой контакт — не задан",
+                                    callback_data="pn:set:support_username"))
         return kb.as_markup()
     kb.row(btn("📣 Рассылка", "pn:cast", style=PRIMARY))
     kb.row(
@@ -662,6 +666,9 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "games_timeout_min": ("⏱ Ожидание выдачи (игры)",
                           "Сколько минут ждать пополнение, прежде чем "
                           "вернуть деньги клиенту. Обычно 20:", "int"),
+    "support_username": ("📞 Мой контакт для покупателей",
+                         "Ваш Telegram, куда покупатели пишут при проблемах.\n"
+                         "Пришлите <code>@username</code> (или ссылку t.me/username):", "username"),
     "support_notice": ("📝 Объявление в поддержке",
                        "Текст, который увидят клиенты в разделе «Поддержка» "
                        "(или <code>-</code>, чтобы убрать):", "text"),
@@ -698,7 +705,7 @@ FIELD_PARENT.update({
     "steam_currency": "pn:steam", "steam_packs": "pn:steam",
     "usd_rate_diram": "pn:prices", "usd_rate_spread": "pn:prices",
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
-    "referral_percent": "pn:prices", "support_notice": "pn:home",
+    "referral_percent": "pn:prices", "support_notice": "pn:home", "support_username": "pn:home",
     "autostop_after": "pn:wallet",
     "games_timeout_min": "pn:games",
     "api_margin": "pn:api",
@@ -969,6 +976,18 @@ async def on_field_value(
 
     kind = FIELDS[field][2]
     note = ""     # приписка к ответу: что-то приняли не целиком
+    if kind == "username":
+        name = re.sub(r"^(https?://)?(t\.me/|telegram\.me/)?@?", "", raw.strip()).split("?")[0].strip("/")
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{4,31}", name):
+            await message.answer("❌ Пришлите юзернейм Telegram, например <code>@my_support</code> "
+                                 "(5–32 символа: латиница, цифры, _).")
+            return
+        await runtime.set_value(conn, field, name)
+        await state.clear()
+        await message.answer(f"✅ Контакт для покупателей: <b>@{name}</b>\n"
+                             "Его увидят в разделе «Поддержка» и в сообщениях о проблемах с заказом.",
+                             reply_markup=back_kb("pn:home", "‹ В панель"))
+        return
     if kind == "price4":
         amount = parse4(raw)
         if amount is None or amount < 0:

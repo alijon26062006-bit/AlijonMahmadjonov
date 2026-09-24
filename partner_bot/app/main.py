@@ -78,8 +78,8 @@ def readiness() -> tuple[list[str], list[str]]:
             "звёзды и Premium НЕ отправляются. Рабочие режимы: "
             + ", ".join(sorted(DELIVERY_MODES)) + "."
         )
-    if not settings.support_username:
-        warnings.append("SUPPORT_USERNAME пуст — покупателям некуда писать при проблеме.")
+    if not texts.support_username():
+        warnings.append("Контакт поддержки не задан — владелец задаст его в /panel → 📞 Мой контакт.")
 
     return blockers, warnings
 

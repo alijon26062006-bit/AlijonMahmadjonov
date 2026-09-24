@@ -15,7 +15,6 @@ import logging
 from aiogram.exceptions import TelegramAPIError
 
 from app import runtime
-from app.config import settings
 
 log = logging.getLogger(__name__)
 
@@ -32,8 +31,9 @@ def todo() -> list[str]:
                      "   (пока их нет, пополнение картой у клиентов выключено)")
     if mode_now() not in DELIVERY_MODES:
         items.append("🔌 Ключ поставщика — без него звёзды и игры не выдаются")
-    if not settings.support_username:
-        items.append("💬 Юзернейм поддержки — sudo stars-bot links")
+    from app import texts
+    if not texts.support_username():
+        items.append("📞 Ваш контакт для покупателей — /panel → 📞 Мой контакт")
     return items
 
 

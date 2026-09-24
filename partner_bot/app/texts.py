@@ -15,8 +15,15 @@ from app.money import fmt
 LINE = "━━━━━━━━━━━━━━━━━━━━"
 
 
+def support_username() -> str:
+    """Контакт поддержки: свой у каждого бота (/panel → 📞 Контакт), иначе из настроек запуска."""
+    from app import runtime
+    return (runtime.get("support_username") or settings.support_username or "").strip().lstrip("@")
+
+
 def support() -> str:
-    return f"@{settings.support_username}" if settings.support_username else "поддержку"
+    name = support_username()
+    return f"@{name}" if name else "поддержку"
 
 
 _RAW: dict[str, str] = {}

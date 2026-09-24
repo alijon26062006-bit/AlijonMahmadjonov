@@ -161,7 +161,8 @@ def env_for(config: Config, row: sqlite3.Row, base_url: str) -> dict[str, str]:
         "DONATIX_URL": base_url,
         "DB_PATH": str(folder / "bot.sqlite3"),
         "USERBOT_SESSION": str(folder / "userbot.session"),
-        "SUPPORT_USERNAME": (config.support_contact or "").lstrip("@"),
+        # Контакт поддержки у каждого партнёра свой — он задаёт его в боте (/panel → 📞 Мой контакт)
+        "SUPPORT_USERNAME": "",
         "BOT_USERNAME": row["username"] or "",
         "PYTHONUNBUFFERED": "1",
     })
