@@ -11,6 +11,7 @@
       try { t = localStorage.getItem("dx-theme"); } catch (e) {}
       if (!t) t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       document.documentElement.setAttribute("data-theme", t);
+      document.documentElement.classList.add("js");
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,6 +21,7 @@
   <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
 </head>
 <body>
+<div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
 {% block header %}
 <header class="top">
   <div class="wrap">
@@ -69,6 +71,14 @@
     r.setAttribute("data-theme", t);
     try { localStorage.setItem("dx-theme", t); } catch (e) {}
   }
+  (function () {
+    var els = document.querySelectorAll(".reveal");
+    if (!("IntersectionObserver" in window)) { els.forEach(function (e) { e.classList.add("in"); }); return; }
+    var io = new IntersectionObserver(function (list) {
+      list.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
+    }, { rootMargin: "0px 0px -8% 0px" });
+    els.forEach(function (e, i) { e.style.transitionDelay = (i % 4) * 70 + "ms"; io.observe(e); });
+  })();
   (function () {
     var b = document.querySelector(".to-top");
     addEventListener("scroll", function () { b.classList.toggle("show", scrollY > 600); }, { passive: true });

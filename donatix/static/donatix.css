@@ -399,3 +399,125 @@ details.faq p { margin: 0; padding: 0 22px 20px; color: var(--muted); }
 .pick .cover { width: 120px; height: 56px; object-fit: cover; border-radius: 10px; flex: none; background: var(--surface-2); }
 @media (max-width: 420px) { .pick .cover { width: 92px; height: 43px; } }
 .summary > div > span.wrap-text { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+
+/* ══ Живой слой: анимированный фон, стекло, появление, подсветка ══════════ */
+:root { --glow-1: #a78bfa; --glow-2: #818cf8; --glow-3: #f0abfc; --glass: rgba(255, 255, 255, .72); }
+:root[data-theme="dark"] { --glow-1: #6d28d9; --glow-2: #4338ca; --glow-3: #a21caf; --glass: rgba(20, 21, 31, .72); }
+
+/* Мягкие фиолетовые переливы за всей страницей */
+.aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--bg); }
+.aurora span {
+  position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(80px); opacity: .45;
+  will-change: transform; animation: drift 26s ease-in-out infinite alternate;
+}
+:root[data-theme="dark"] .aurora span { opacity: .35; }
+.aurora span:nth-child(1) { background: var(--glow-1); top: -25vmax; left: -15vmax; }
+.aurora span:nth-child(2) { background: var(--glow-2); top: 10vmax; right: -25vmax; animation-duration: 32s; animation-delay: -8s; }
+.aurora span:nth-child(3) { background: var(--glow-3); bottom: -30vmax; left: 20vmax; opacity: .25; animation-duration: 38s; animation-delay: -16s; }
+.aurora::after {
+  content: ""; position: absolute; inset: 0;
+  background-image: linear-gradient(color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px),
+                    linear-gradient(90deg, color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
+}
+@keyframes drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(8vmax, 6vmax, 0) scale(1.15); }
+  100% { transform: translate3d(-6vmax, 10vmax, 0) scale(.95); }
+}
+body { background: transparent; }
+html { background: var(--bg); }
+
+/* Стеклянные карточки поверх фона */
+.card, .stat, .item, .link-row, .product-card, .pick, details.faq, .balance-card {
+  background: var(--glass); backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3);
+}
+.top { background: color-mix(in srgb, var(--surface) 75%, transparent); }
+
+/* Подсветка при наведении */
+@media (hover: hover) {
+  .card.feature, .product-card, a.item, .link-row, .price-card {
+    transition: transform .25s var(--ease), box-shadow .25s var(--ease), border-color .25s var(--ease);
+  }
+  .card.feature:hover, .product-card:hover, a.item:hover, .link-row:hover, .price-card:hover {
+    transform: translateY(-4px); border-color: var(--accent-line);
+    box-shadow: 0 18px 40px -18px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+}
+
+/* Блеск на главной кнопке */
+.btn.primary { position: relative; overflow: hidden; background-image: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+.btn.primary::after {
+  content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .35), transparent);
+  transform: skewX(-20deg); animation: shine 4.5s ease-in-out infinite;
+}
+@keyframes shine { 0%, 70% { left: -60%; } 100% { left: 130%; } }
+
+/* Градиентный текст и живая шапка страниц */
+.grad {
+  background: linear-gradient(90deg, #7c3aed, #6366f1, #c026d3, #7c3aed); background-size: 300% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: flow 8s linear infinite;
+}
+:root[data-theme="dark"] .grad { background-image: linear-gradient(90deg, #c4b5fd, #a5b4fc, #f0abfc, #c4b5fd); }
+@keyframes flow { to { background-position: 300% 0; } }
+.page-hero { position: relative; overflow: hidden; }
+.page-hero::before {
+  content: ""; position: absolute; width: 340px; height: 340px; right: -120px; top: -160px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 35%, transparent), transparent 70%);
+  animation: drift 18s ease-in-out infinite alternate; pointer-events: none;
+}
+.page-hero > * { position: relative; }
+
+/* Появление при прокрутке (только когда включён JS) */
+.js .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s var(--ease), transform .6s var(--ease); }
+.js .reveal.in { opacity: 1; transform: none; }
+
+/* Главная: первый экран */
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 999px;
+  background: var(--glass); border: 1px solid var(--accent-line); font-weight: 600; font-size: .9rem; margin-bottom: 18px;
+}
+.hero-badge b { background: var(--accent); color: var(--accent-ink); padding: 3px 10px; border-radius: 999px; font-size: .8rem; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 0 rgba(34, 197, 94, .6); animation: pulse 1.8s infinite; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+.hero-visual { position: relative; }
+.hero-visual .window { transform: perspective(1400px) rotateY(-7deg) rotateX(3deg); transition: transform .6s var(--ease); }
+.hero-visual:hover .window { transform: none; }
+@media (max-width: 900px) { .hero-visual .window { transform: none; } }
+.float-chip {
+  position: absolute; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px;
+  background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line);
+  box-shadow: 0 16px 40px -16px rgba(17, 18, 26, .35); font-weight: 700; font-size: .9rem; animation: bob 6s ease-in-out infinite;
+}
+.float-chip small { display: block; font-weight: 500; color: var(--muted); font-size: .78rem; }
+.float-chip.a { left: -22px; bottom: -26px; }
+.float-chip.b { right: -12px; top: -18px; animation-delay: -3s; }
+@media (max-width: 900px) { .float-chip.a { left: 8px; bottom: -22px; } .float-chip.b { right: 8px; top: -22px; } }
+@keyframes bob { 50% { transform: translateY(-10px); } }
+.feed .item { animation: slidein .5s var(--ease) both; }
+@keyframes slidein { from { opacity: 0; transform: translateY(-10px) scale(.98); } }
+
+/* Бегущая строка */
+.marquee { overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); padding: 6px 0; }
+.marquee .track { display: flex; gap: 12px; width: max-content; animation: scrollx 40s linear infinite; }
+.marquee:hover .track { animation-play-state: paused; }
+.marquee .chip { display: inline-flex; align-items: center; gap: 8px; background: var(--glass); white-space: nowrap; }
+@keyframes scrollx { to { transform: translateX(-50%); } }
+
+/* Цветные плитки иконок */
+.tile.g1 { background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #fff; border: 0; }
+.tile.g2 { background: linear-gradient(135deg, #38bdf8, #2563eb); color: #fff; border: 0; }
+.tile.g3 { background: linear-gradient(135deg, #f472b6, #c026d3); color: #fff; border: 0; }
+.tile.g4 { background: linear-gradient(135deg, #34d399, #059669); color: #fff; border: 0; }
+.tile.g5 { background: linear-gradient(135deg, #fbbf24, #ea580c); color: #fff; border: 0; }
+.tile.g6 { background: linear-gradient(135deg, #1f2937, #0b0f19); color: #fff; border: 0; }
+
+.numbers .stat { text-align: center; }
+.numbers .n { background: linear-gradient(135deg, #8b5cf6, #6366f1); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora span, .btn.primary::after, .grad, .page-hero::before, .float-chip, .marquee .track, .live-dot, .feed .item { animation: none !important; }
+  .js .reveal { opacity: 1; transform: none; }
+}

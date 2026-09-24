@@ -6,10 +6,10 @@
   <div class="wrap">
     {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
     <section class="hero">
-      <div>
-        <div class="eyebrow">Для каналов, ботов и магазинов</div>
-        <h1>Продавайте донат своей аудитории <span class="hl">без закупки заранее</span></h1>
-        <p class="lead">Telegram Stars и Premium, пополнения PUBG, Free Fire и других игр, подарочные карты.
+      <div class="reveal">
+        <div class="hero-badge"><b>Новое</b><span class="live-dot"></span>Пополнение Steam и гифты уже в каталоге</div>
+        <h1>Продавайте донат своей аудитории <span class="grad">без закупки заранее</span></h1>
+        <p class="lead">Telegram Stars и Premium, Steam, пополнения PUBG, Free Fire и других игр, подарочные карты.
           Подключите API к сайту или боту — или оформляйте заказы в панели.</p>
         <div class="cta">
           <a class="btn primary lg" href="/register">Стать партнёром {{ icon('arrow-right', 18) }}</a>
@@ -17,31 +17,31 @@
         </div>
         <p class="small muted" style="margin-top:14px">{{ icon('shield', 16) }} Без абонентской платы. Возврат, если заказ не прошёл.</p>
       </div>
-      <div class="window" aria-hidden="true">
-        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">api/v1/orders</span></div>
-        <div class="body">
-<pre>POST /api/v1/orders
-{"product_id": "tg-stars", "quantity": 500,
- "fields": {"telegram_username": "@player"}}</pre>
-          <div class="orders">
-            {% for k, name, sum, when in [('telegram_stars', 'Telegram Stars 500', '8.30', '0.8 c'), ('topup', 'PUBG Mobile — 660 UC', '10.15', '3 c'), ('gift_card', 'Steam — $20', '22.57', '1 c')] %}
-            <div class="item">
-              <div class="tile sm">{{ kind_icon(k, 20) }}</div>
-              <div class="grow"><div class="title small">{{ name }}</div><div class="sub small">выдано за {{ when }}</div></div>
-              <span class="badge ok">{{ icon('check', 14) }}${{ sum }}</span>
+      <div class="hero-visual reveal" aria-hidden="true">
+        <div class="window">
+          <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">donatix · заказы</span></div>
+          <div class="body">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <b>Последние заказы</b><span class="badge ok"><span class="live-dot"></span>онлайн</span>
             </div>
-            {% endfor %}
+            <div class="orders feed" id="feed"></div>
           </div>
         </div>
+        <div class="float-chip a"><span class="tile sm g4">{{ icon('check', 18) }}</span><span>Выдано за 0.8 c<small>Telegram Stars 500</small></span></div>
+        <div class="float-chip b"><span class="tile sm g1">{{ icon('wallet', 18) }}</span><span>+ $0.62<small>ваша прибыль с заказа</small></span></div>
       </div>
     </section>
 
-    <section class="section" style="padding-top:16px">
-      <div class="numbers">
-        <div class="stat"><div class="n">{{ total_products or '100' }}+</div><div class="muted">позиций в каталоге</div></div>
-        <div class="stat"><div class="n">4</div><div class="muted">вида товаров в одном API</div></div>
-        <div class="stat"><div class="n">$0</div><div class="muted">абонентская плата</div></div>
-        <div class="stat"><div class="n">24/7</div><div class="muted">автоматическая выдача</div></div>
+    <section class="section" style="padding-top:8px">
+      <div class="marquee" aria-hidden="true"><div class="track">
+        {% for _ in range(2) %}{% for name in ['Telegram Stars', 'Telegram Premium', 'Steam', 'PUBG Mobile', 'Free Fire', 'Mobile Legends', 'Genshin Impact', 'Roblox', 'App Store', 'Google Play', 'PlayStation', 'Xbox', 'Valorant', 'Steam Гифты'] %}
+        <span class="chip">{{ icon('bolt', 16) }}{{ name }}</span>{% endfor %}{% endfor %}
+      </div></div>
+      <div class="numbers" style="margin-top:28px">
+        <div class="stat reveal"><div class="n">{{ total_products or '100' }}+</div><div class="muted">позиций в каталоге</div></div>
+        <div class="stat reveal"><div class="n">5</div><div class="muted">видов товаров в одном API</div></div>
+        <div class="stat reveal"><div class="n">$0</div><div class="muted">абонентская плата</div></div>
+        <div class="stat reveal"><div class="n">24/7</div><div class="muted">автоматическая выдача</div></div>
       </div>
     </section>
   </div>
@@ -59,13 +59,15 @@
           "telegram_premium": ["3 месяца", "6 месяцев", "12 месяцев"],
           "topup": ["PUBG Mobile", "Free Fire", "Mobile Legends", "и другие"],
           "gift_card": ["Steam", "App Store", "PlayStation", "Google Play"],
+          "steam_topup": ["USD", "RUB", "KZT", "UAH"],
+          "steam_gift": ["ELDEN RING", "Cyberpunk 2077", "CS2", "12 000+ игр"],
         } %}
         {% for kind, title in kind_titles.items() %}
-        <div class="card feature">
-          <div class="tile">{{ kind_icon(kind, 26) }}</div>
+        <div class="card feature reveal">
+          <div class="tile g{{ loop.index }}">{{ kind_icon(kind, 26) }}</div>
           <h3>{{ title }}</h3>
           <div class="chips">
-            {% if by_kind.get(kind) and kind not in ('telegram_stars', 'telegram_premium') %}
+            {% if by_kind.get(kind) and kind not in ('telegram_stars', 'telegram_premium', 'steam_topup', 'steam_gift') %}
               {% for c in by_kind[kind][:6] %}<span class="chip">{{ c.category_name }}</span>{% endfor %}
               {% if by_kind[kind]|length > 6 %}<span class="chip">+{{ by_kind[kind]|length - 6 }}</span>{% endif %}
             {% else %}
@@ -80,7 +82,7 @@
 
   <section class="section">
     <div class="wrap">
-      <div class="section-head"><div class="eyebrow">Почему {{ site_name }}</div><h2>Всё, чтобы продавать без хлопот</h2></div>
+      <div class="section-head"><div class="eyebrow">Почему {{ site_name }}</div><h2>Всё, чтобы продавать <span class="grad">без хлопот</span></h2></div>
       <div class="grid three">
         {% for ico, t, d in [
           ('wallet', 'Без подписки', 'Никаких ежемесячных платежей. Небольшая наценка только на выполненные заказы.'),
@@ -90,7 +92,7 @@
           ('grid', 'Веб-панель', 'Можно без программиста: заказывайте вручную, смотрите историю и баланс.'),
           ('handshake', 'Помощь с подключением', 'Поможем подключить бота или сайт и ответим в Telegram.'),
         ] %}
-        <div class="card feature"><div class="tile">{{ icon(ico, 24) }}</div><h3>{{ t }}</h3><p>{{ d }}</p></div>
+        <div class="card feature reveal"><div class="tile g{{ loop.index }}">{{ icon(ico, 24) }}</div><h3>{{ t }}</h3><p>{{ d }}</p></div>
         {% endfor %}
       </div>
     </div>
@@ -106,7 +108,7 @@
           ('Подключение', 'Создаёте API-ключ и подключаете сайт или бота. Или заказываете в панели.'),
           ('Продажи', 'Покупатель платит вам, заказ выполняется у нас. Разница — ваш доход.'),
         ] %}
-        <div class="card"><div class="num">{{ loop.index }}</div><h3>{{ t }}</h3><p class="muted" style="margin:0">{{ d }}</p></div>
+        <div class="card feature reveal"><div class="num">{{ loop.index }}</div><h3>{{ t }}</h3><p class="muted" style="margin:0">{{ d }}</p></div>
         {% endfor %}
       </div>
     </div>
@@ -144,7 +146,7 @@ print(r.json()["order"]["status"])  # processing → completed</pre>
         <p>Наценка поверх оптовой цены. Чем больше оборот — тем она ниже.</p></div>
       <div class="grid three">
         {% for tier, title, note in [("bronze", "Старт", "Для новых партнёров"), ("silver", "Рост", "Для постоянных партнёров"), ("gold", "Партнёр", "Для крупных партнёров")] %}
-        <div class="card price-card {{ 'featured' if tier == 'silver' }}">
+        <div class="card price-card reveal {{ 'featured' if tier == 'silver' }}">
           {% if tier == 'silver' %}<span class="badge accent tag">Популярный</span>{% endif %}
           <h3>{{ title }}</h3>
           <div class="big">+{{ markups[tier] }}%</div>
@@ -182,11 +184,38 @@ print(r.json()["order"]["status"])  # processing → completed</pre>
     <div class="wrap">
       <div class="card cta-card">
         <div class="tile" style="margin:0 auto 18px;width:64px;height:64px">{{ icon('handshake', 32) }}</div>
-        <h2>Готовы начать продавать?</h2>
+        <h2>Готовы начать <span class="grad">продавать?</span></h2>
         <p class="muted">Оставьте заявку — активируем доступ в течение дня.</p>
         <a class="btn primary lg" href="/register">Стать партнёром</a>
       </div>
     </div>
   </section>
 </main>
+<script>
+(function () {
+  var feed = document.getElementById("feed");
+  if (!feed) return;
+  var icons = {{ {'star': icon('star', 20), 'bolt': icon('bolt', 20), 'card': icon('card', 20), 'wallet': icon('wallet', 20), 'gift': icon('gift', 20), 'crown': icon('crown', 20)} | tojson }};
+  var data = [
+    ["star", "g1", "Telegram Stars 500", "@player_one", "8.30"], ["bolt", "g5", "PUBG Mobile — 660 UC", "ID 5123456789", "10.15"],
+    ["wallet", "g6", "Steam 1500 RUB", "alijon_steam", "16.05"], ["card", "g2", "Steam — $20", "код выдан", "22.57"],
+    ["gift", "g3", "Steam Gift — ELDEN RING", "регион KZ", "44.28"], ["crown", "g1", "Telegram Premium 3 мес.", "@anzikjon", "13.27"],
+    ["bolt", "g4", "Free Fire — 520 алмазов", "ID 99887766", "4.97"]
+  ];
+  var i = 0;
+  function row(d) {
+    var el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML = '<div class="tile sm ' + d[1] + '">' + icons[d[0]] + '</div><div class="grow"><div class="title small">' + d[2] +
+      '</div><div class="sub small">' + d[3] + '</div></div><span class="badge ok">$' + d[4] + '</span>';
+    return el;
+  }
+  for (; i < 4; i++) feed.appendChild(row(data[i]));
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  setInterval(function () {
+    feed.insertBefore(row(data[i++ % data.length]), feed.firstChild);
+    if (feed.children.length > 4) feed.removeChild(feed.lastChild);
+  }, 2600);
+})();
+</script>
 {% endblock %}
