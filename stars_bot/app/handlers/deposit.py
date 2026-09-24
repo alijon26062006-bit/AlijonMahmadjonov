@@ -200,6 +200,13 @@ async def cb_card(call: CallbackQuery, state: FSMContext,
                   conn: aiosqlite.Connection) -> None:
     if await _blocked_by_open(call, conn, state):
         return
+    # Бот мог быть запущен без реквизитов: владелец ввёл токен, ID и ключ
+    # и нажал «активировать». Пускать клиента дальше незачем — он
+    # переведёт деньги в никуда. Пусть лучше увидит «скоро».
+    if not runtime.get("pay_card_number"):
+        await state.clear()
+        await call.answer(texts.DEPOSIT_SOON, show_alert=True)
+        return
     await state.set_state(Deposit.amount)
     await call.message.edit_text(
         texts.DEPOSIT_ASK_AMOUNT.format(min_amount=fmt(runtime.min_deposit())),

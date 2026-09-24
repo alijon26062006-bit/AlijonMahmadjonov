@@ -1,12 +1,17 @@
 """Мастер первой настройки: создаёт .env, ничего не спрашивая дважды.
 
 Запуск:  python setup.py
+         python setup.py --quick                  три вопроса и готово
+         python setup.py --quick ТОКЕН ID КЛЮЧ    то же без вопросов
 Работает на голом Python, ставить ничего не нужно.
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
@@ -175,6 +180,117 @@ def apply_values(pairs: list[str]) -> None:
 
 
 
+# --------------------------------------------------- быстрая активация
+#
+# Три вещи — токен, ID админа, ключ поставщика. Остальное (реквизиты,
+# цены, поддержка) бот берёт по умолчанию, а владелец правит в /panel.
+# Токен и ключ проверяем сразу вживую: опечатка здесь — самая частая
+# причина «нажал активировать, а бот молчит».
+
+FAZER_URL = "https://api.fzr.cards"
+
+
+def _http_json(url: str, headers: dict | None = None, timeout: int = 15):
+    """GET → (код, json). Код 0 — сети нет или сервер не ответил."""
+    request = urllib.request.Request(url, headers={"User-Agent": "stars-bot-setup",
+                                                   **(headers or {})})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:
+            code, raw = resp.status, resp.read()
+    except urllib.error.HTTPError as exc:
+        code, raw = exc.code, exc.read() or b""
+    except (urllib.error.URLError, OSError, ValueError):
+        return 0, {}
+    try:
+        data = json.loads(raw.decode("utf-8", "replace") or "{}")
+    except ValueError:
+        data = {}
+    return code, data if isinstance(data, dict) else {"data": data}
+
+
+def verify_token(token: str) -> tuple[bool, str]:
+    """(годится ли, пояснение). Нет сети — пропускаем, не отказываем."""
+    code, data = _http_json(f"https://api.telegram.org/bot{token}/getMe")
+    if code == 200 and data.get("ok"):
+        return True, "@" + str(data.get("result", {}).get("username", "?"))
+    if code in (401, 404):
+        return False, "Telegram не принял токен. Скопируйте его заново у @BotFather."
+    return True, "не проверил — нет связи с Telegram"
+
+
+def verify_supplier(key: str) -> tuple[bool, str]:
+    code, _ = _http_json(FAZER_URL + "/api/v2/balance", {"X-API-Key": key})
+    if code in (401, 403):
+        return False, "Поставщик не принял ключ. Проверьте, что скопирован целиком."
+    if 200 <= code < 300:
+        return True, "ключ принят"
+    return True, "не проверил — поставщик не ответил, проверьте потом в /panel"
+
+
+def check_key(value: str) -> str | None:
+    if len(value) < 8 or " " in value:
+        return "Ключ выглядит неправильно — скопируйте его целиком, без пробелов."
+    return None
+
+
+def quick_values(token: str, admin: str, key: str) -> dict[str, str]:
+    """Что пишется в .env при быстрой активации."""
+    admins = ",".join(p.strip() for p in admin.replace(";", ",").split(",") if p.strip())
+    return {
+        "BOT_TOKEN": token,
+        "ADMIN_IDS": admins,
+        # Один ключ на всё: звёзды, Premium, игры и API. Отдельный игровой
+        # ключ не пишем — пустой значит «тот же счёт».
+        "FRAGMENT_MODE": "fazer",
+        "FAZER_API_KEY": key,
+        "FAZER_BASE_URL": FAZER_URL,
+    }
+
+
+def quick(argv: list[str]) -> int:
+    """Быстрая активация. Возвращает код выхода."""
+    old = read_existing()
+    given = [a.strip() for a in argv]
+    if given and len(given) != 3:
+        print("Использование: setup.py --quick ТОКЕН ID_АДМИНА КЛЮЧ_ПОСТАВЩИКА")
+        return 1
+
+    if given:
+        token, admin, key = given
+        for problem in (check_token(token), check_id(admin), check_key(key)):
+            if problem:
+                print(f"❌ {problem}")
+                return 1
+    else:
+        print("=" * 58)
+        print("  Активация бота — три вопроса.")
+        print("=" * 58)
+        print("\n1) Токен бота — у @BotFather: /newbot или /mybots → API Token")
+        token = ask("Токен", current=old.get("BOT_TOKEN", ""), validate=check_token)
+        print("\n2) Ваш Telegram ID — у @userinfobot (только цифры)")
+        admin = ask("ID админа", current=old.get("ADMIN_IDS", ""), validate=check_id)
+        print("\n3) Ключ поставщика FazerCards (X-API-Key из кабинета)")
+        key = ask("Ключ", current=old.get("FAZER_API_KEY", ""), validate=check_key)
+
+    print()
+    good, note = verify_token(token)
+    print(("  ✅ Токен: " if good else "  ❌ ") + note)
+    if not good:
+        return 1
+    good, note = verify_supplier(key)
+    print(("  ✅ Поставщик: " if good else "  ❌ ") + note)
+    if not good:
+        return 1
+
+    values = dict(old)
+    values.update(quick_values(token, admin, key))
+    write_env(values)
+    print(f"\n  ✅ Сохранено в {ENV}")
+    print("  Реквизиты, цены и поддержку задайте потом прямо в боте: /panel")
+    return 0
+
+
+
 # ------------------------------------------------------ разделы настройки
 
 
@@ -316,6 +432,12 @@ ALL_SECTIONS = ("telegram", "pay", "prices", "delivery", "links")
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "--quick":
+        if not EXAMPLE.exists():
+            print("❌ Запускайте из папки stars_bot.")
+            sys.exit(1)
+        sys.exit(quick(sys.argv[2:]))
+
     if len(sys.argv) > 1 and sys.argv[1] == "--set":
         if not EXAMPLE.exists():
             print("❌ Запускайте из папки stars_bot.")

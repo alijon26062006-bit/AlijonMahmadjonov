@@ -18,6 +18,7 @@ for suite in tests/test_money.py tests/test_texts.py tests/test_wiring.py \
              tests/test_games.py tests/test_webhook.py \
              tests/test_api.py tests/test_userbot.py \
              tests/test_sponsor.py tests/test_stale.py tests/test_txn.py tests/test_rate.py \
+             tests/test_activate.py \
              tests/test_flow.py; do
     echo ""
     echo "═══ $suite ═══"

@@ -5,6 +5,10 @@
 #   bash <(curl -sSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/telegram-stars-sales-bot-caqst0/stars_bot/install.sh)
 #
 # Повторный запуск обновляет бота до последней версии, настройки не трогает.
+#
+# Активация без вопросов — токен, ID админа и ключ поставщика сразу:
+#
+#   bash install.sh ТОКЕН ID_АДМИНА КЛЮЧ_ПОСТАВЩИКА
 
 set -euo pipefail
 
@@ -92,15 +96,22 @@ ok "Библиотеки установлены"
 
 # ------------------------------------------------------------- настройка
 
-if [ ! -f "$APP/.env" ]; then
-    say "Настройка бота"
-    echo "  Понадобятся: токен от @BotFather и ваш ID от @userinfobot."
+# Три значения в командной строке — активация без вопросов, даже поверх
+# уже настроенного бота (так меняют токен или ключ одной строкой).
+if [ "$#" -ge 3 ]; then
+    say "Активация бота"
+    ( cd "$APP" && $SUDO "$APP/.venv/bin/python" "$APP/setup.py" --quick "$1" "$2" "$3" ) \
+        || die "Активация не прошла — исправьте то, что написано выше, и запустите снова."
+elif [ ! -f "$APP/.env" ]; then
+    say "Активация бота"
+    echo "  Понадобятся три вещи: токен от @BotFather, ваш ID от @userinfobot"
+    echo "  и ключ поставщика. Реквизиты и цены — потом, прямо в боте."
     echo ""
     if $HAS_TTY; then
-        $SUDO "$APP/.venv/bin/python" "$APP/setup.py" < /dev/tty
+        ( cd "$APP" && $SUDO "$APP/.venv/bin/python" "$APP/setup.py" --quick < /dev/tty )
     else
-        $SUDO "$APP/.venv/bin/python" "$APP/setup.py"
-    fi
+        ( cd "$APP" && $SUDO "$APP/.venv/bin/python" "$APP/setup.py" --quick )
+    fi || die "Активация не прошла — запустите установщик ещё раз."
 else
     ok "Настройки уже есть, не трогаю ($APP/.env)"
     echo "     Поменять: sudo $APP/.venv/bin/python $APP/setup.py"
@@ -222,6 +233,17 @@ case "\${1:-help}" in
     setup)
         sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py"
         systemctl restart "\$SERVICE" && echo "✅ Настройки применены"
+        ;;
+    activate)
+        # Токен, ID админа, ключ поставщика — и бот работает. Без трёх
+        # значений спрашивает их по одному.
+        if [ -n "\${4:-}" ]; then
+            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --quick "\$2" "\$3" "\$4"
+        else
+            sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py" --quick
+        fi
+        systemctl restart "\$SERVICE"
+        echo "✅ Бот активирован и перезапущен — он сам напишет вам в Telegram"
         ;;
     fazer|mystars|apifragment|delivery|pay|prices|telegram|links)
         # Без второго аргумента — обычный диалог: спрашивает по одному.
@@ -529,6 +551,8 @@ PYBK
   stars-bot logs      смотреть логи живьём (Ctrl+C — выйти)
   stars-bot errors    последние ошибки
   stars-bot setup     изменить настройки и перезапустить
+  stars-bot activate [ТОКЕН ID КЛЮЧ]
+                      активация: токен, ID админа, ключ поставщика
   stars-bot api АДРЕС задать адрес для API и вебхуков
   stars-bot caddy ДОМЕН
                       вернуть блок веб-сервера, если его затёрло
@@ -620,7 +644,8 @@ if $SUDO systemctl is-active --quiet "$SERVICE"; then
         printf "\033[1;32m  ✅ Бот запущен\033[0m\n"
     fi
     printf "\033[1;32m═══════════════════════════════════════════\033[0m\n\n"
-    echo "  Откройте своего бота в Telegram и нажмите /start"
+    echo "  Откройте своего бота в Telegram и нажмите /start —"
+    echo "  бот сам напишет, что ещё задать в /panel (реквизиты карты)."
     echo ""
     echo "  Управление — команда stars-bot:"
     echo ""
@@ -637,9 +662,8 @@ else
     printf "\n\033[1;31m❌ Бот не запустился. Последние строки лога:\033[0m\n\n"
     $SUDO journalctl -u "$SERVICE" -n 25 --no-pager | sed 's/^/    /'
     echo ""
-    echo "  Чаще всего причина — неверный токен или незаполненные реквизиты."
-    echo "  Исправить: sudo -u $RUN_USER $APP/.venv/bin/python $APP/setup.py"
-    echo "  Потом:     sudo systemctl restart $SERVICE"
+    echo "  Чаще всего причина — неверный токен или ID админа."
+    echo "  Исправить: sudo stars-bot activate"
     echo ""
     exit 1
 fi

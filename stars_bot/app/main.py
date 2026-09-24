@@ -55,10 +55,14 @@ def readiness() -> tuple[list[str], list[str]]:
             "ADMIN_IDS пуст — некому подтверждать пополнения, "
             "деньги будут зависать. Свой ID узнайте у @userinfobot."
         )
+    # Без реквизитов бот всё равно запускается: владелец задаёт их прямо
+    # в /panel, а до тех пор пополнение картой отвечает клиенту «скоро».
+    # Раньше это был отказ запускаться — и бот, только что «активированный»
+    # по токену, ID и ключу, молча не работал.
     if not runtime.get("pay_card_number"):
-        blockers.append(
-            "Не заданы реквизиты карты — покупателям некуда переводить деньги. "
-            "Задайте их в /panel → Реквизиты или в .env."
+        warnings.append(
+            "Не заданы реквизиты карты — пополнение картой пока выключено. "
+            "Задайте их в /panel → Реквизиты."
         )
     if runtime.star_price() <= 0:
         blockers.append("Цена звезды должна быть больше нуля (/panel → Цены).")
@@ -231,6 +235,13 @@ async def main() -> None:
 
     log.info("✅ Запущен @%s. Режим Fragment: %s", me.username, settings.fragment_mode)
     log.info("   Админы: %s", ", ".join(map(str, settings.admin_ids)))
+
+    # Установили по токену, ID и ключу — пусть бот сам скажет владельцу,
+    # что работает и что ещё задать в /panel.
+    from app.services import welcome
+
+    with suppress(Exception):
+        await welcome.greet_once(bot, conn, me.username, access.admins())
 
     # Автоцены держат наценку постоянной, пока курс гуляет.
     pricing_task = asyncio.create_task(auto_price_loop(provider, bot))
