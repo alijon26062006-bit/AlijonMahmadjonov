@@ -47,6 +47,20 @@ sudo -u "$APP_USER" python3 -m venv "$APP_DIR/.venv"
 sudo -u "$APP_USER" "$APP_DIR/.venv/bin/pip" install -q --upgrade pip
 sudo -u "$APP_USER" "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/donatix/requirements.txt"
 
+check_values() {
+  case "$DOMAIN$ADMIN_EMAIL$ADMIN_PASS$FAZER_KEY" in *ВАШ*|*ВАША*)
+    echo "✖ В команде остались шаблоны ВАША_ПОЧТА / ВАШ_ПАРОЛЬ / ВАШ_КЛЮЧ — замените их своими данными."; exit 1;; esac
+  if ! printf '%s' "$FAZER_KEY" | LC_ALL=C grep -q '^[[:print:]]*$'; then
+    echo "✖ Ключ FazerCards должен быть латиницей и цифрами — скопируйте его из панели FazerCards."; exit 1
+  fi
+}
+
+# Повторный запуск с новыми данными — переписываем настройки.
+if [ -f "$ENV_FILE" ] && [ -n "${FAZER_KEY:-}" ]; then
+  say "Обновляю настройки"
+  mv "$ENV_FILE" "$ENV_FILE.old"
+fi
+
 if [ ! -f "$ENV_FILE" ]; then
   say "Настройка (один раз)"
   DOMAIN="${DOMAIN:-$(ask "Домен сайта, например donatix.gg")}"
@@ -60,6 +74,7 @@ if [ ! -f "$ENV_FILE" ]; then
     [ -n "${!v}" ] || { echo "Не задано $v. Пример: sudo DOMAIN=donatix.duckdns.org ADMIN_EMAIL=you@mail.com ADMIN_PASS=... FAZER_KEY=... bash install.sh"; exit 1; }
   done
   [ ${#ADMIN_PASS} -ge 8 ] || { echo "Пароль админа — минимум 8 символов."; exit 1; }
+  check_values
   SECRET=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
   sudo -u "$APP_USER" cp "$APP_DIR/donatix/.env.example" "$ENV_FILE"
   SECRET="$SECRET" DOMAIN="$DOMAIN" ADMIN_EMAIL="$ADMIN_EMAIL" ADMIN_PASS="$ADMIN_PASS" FAZER_KEY="$FAZER_KEY" \
@@ -123,9 +138,17 @@ server {
 }
 NGINX
 ln -sf /etc/nginx/sites-available/donatix /etc/nginx/sites-enabled/donatix
-rm -f /etc/nginx/sites-enabled/default
-nginx -t -q && systemctl reload nginx
-ufw allow OpenSSH >/dev/null; ufw allow 'Nginx Full' >/dev/null; ufw --force enable >/dev/null
+if ! nginx -t -q; then
+  echo "✖ Ошибка в настройках nginx (см. выше). Сайт Donatix работает на 127.0.0.1:8000, но снаружи недоступен."; exit 1
+fi
+systemctl enable -q nginx
+if ! systemctl restart nginx; then
+  echo "✖ nginx не запускается. Скорее всего порт 80/443 занят другой программой:"
+  ss -tlnp | grep -E ':(80|443) ' || true
+  echo "Пришлите этот вывод — подскажу, как быть."; exit 1
+fi
+# Фаервол не включаем сами (на сервере могут быть другие сервисы) — только открываем порты, если он уже включён.
+if ufw status 2>/dev/null | grep -q "Status: active"; then ufw allow 'Nginx Full' >/dev/null; fi
 certbot --nginx -n --agree-tos --redirect -m "$(grep ^DONATIX_ADMIN_EMAIL= "$ENV_FILE" | cut -d= -f2)" \
   -d "$DOMAIN" || echo "⚠ HTTPS не получен: проверьте, что домен $DOMAIN указывает на IP этого сервера, и запустите скрипт ещё раз."
 
