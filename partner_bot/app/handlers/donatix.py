@@ -299,9 +299,16 @@ async def bootstrap(conn, provider) -> None:
             # Первый запуск: без наценки бот продавал бы по закупке — ставим 10%, владелец поменяет
             await runtime.set_value(conn, "margin_percent", "10")
         if not await db.list_games(conn):
+            # Сразу готово: Free Fire (СНГ и Индонезия) и PUBG. Остальное владелец добавит сам
             catalog = await gsvc.full_catalog(suppliers.for_games(provider))
-            added, enabled = await autogames.import_all(conn, catalog)
-            log.info("Donatix: добавлено игр %s, включено %s", added, enabled)
+            added, enabled = await autogames.import_starter(conn, catalog)
+            log.info("Donatix: стартовые игры — добавлено %s, включено %s", added, enabled)
+            await runtime.set_value(conn, "starter_games_v1", "1")
+        elif not runtime.get("starter_games_v1"):
+            # Бот создан раньше и получил все игры — оставляем в меню стартовые, остальные скрываем
+            hidden = await autogames.keep_only_starter(conn)
+            await runtime.set_value(conn, "starter_games_v1", "1")
+            log.info("Donatix: в меню оставлены Free Fire и PUBG, скрыто игр: %s", hidden)
     except Exception:  # noqa: BLE001 — бот работает и без этого, владелец добавит вручную
         log.exception("Donatix: первичная настройка не удалась")
     await rate_loop(conn, provider)

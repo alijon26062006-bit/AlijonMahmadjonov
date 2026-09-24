@@ -45,6 +45,41 @@ def matches(words: list[str], haystack: str) -> bool:
     return True
 
 
+def starter_kind(code: str, name: str = "") -> str:
+    """Стартовый набор бота из конструктора: «ff» (Free Fire СНГ и Индонезия), «pubg» или ""."""
+    from app.services import regions as reg
+
+    text = f"{code} {name}".lower().replace("_", " ").replace("-", " ")
+    words = set(text.split())
+    if "pubg" in text and "new state" not in text and "newstate" not in text and "lite" not in words:
+        return "pubg"
+    if ("free fire" in text or "freefire" in text) and "max" not in words:
+        region = reg.split(code, name)[1]
+        if region in ("cis", "ru", "id") or words & {"cis", "снг", "russia", "ru", "indonesia", "id", "idn",
+                                                          "индонезия"}:
+            return "ff"
+    return ""
+
+
+async def import_starter(conn: aiosqlite.Connection, catalog: list[dict]) -> tuple[int, int]:
+    """Добавить только стартовые игры: Free Fire (СНГ, Индонезия) и PUBG. Остальные владелец
+    добавит сам — поиском или кнопкой «Добавить все игры сразу»."""
+    picked = [item for item in catalog if starter_kind(item["category_id"], item.get("name", ""))]
+    return await import_all(conn, picked)
+
+
+async def keep_only_starter(conn: aiosqlite.Connection) -> int:
+    """Один раз для ботов, которым раньше добавились все игры: оставить в меню стартовые,
+    остальные скрыть (не удаляются — владелец включит их в «Игры и пакеты»)."""
+    hidden = 0
+    for game in await db.list_games(conn):
+        if game.enabled and not starter_kind(game.category_id, game.title):
+            await db.update_game(conn, game.category_id, enabled=0)
+            hidden += 1
+    await db.load_game_titles(conn)
+    return hidden
+
+
 async def import_all(conn: aiosqlite.Connection, catalog: list[dict]) -> tuple[int, int]:
     """Добавить все категории каталога. Возвращает (добавлено новых, включено)."""
     from app.services import regions as reg
