@@ -9,6 +9,9 @@
 # Активация без вопросов — токен, ID админа и ключ поставщика сразу:
 #
 #   bash install.sh ТОКЕН ID_АДМИНА КЛЮЧ_ПОСТАВЩИКА
+#
+# Из распакованного архива (папка с app/ и этим файлом) ставится то, что
+# лежит рядом, — GitHub не нужен. Так архив можно отдать другому человеку.
 
 set -euo pipefail
 
@@ -21,10 +24,22 @@ SERVICE="${SERVICE:-stars-bot}"
 RUN_USER="${RUN_USER:-starsbot}"
 RAW_INSTALLER="${RAW_INSTALLER:-https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/telegram-stars-sales-bot-caqst0/stars_bot/install.sh}"
 
+# Откуда брать код. Рядом с установщиком лежит сам бот и это не рабочая
+# копия git — значит, запустили из архива: ставим его, в сеть за кодом не
+# ходим. По конвейеру из curl рядом ничего нет — тогда берём из GitHub.
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
+LOCAL_SRC=""
+if [ -z "${FROM_GIT:-}" ] && [ -n "$SELF_DIR" ] && [ -d "$SELF_DIR/app" ] \
+        && [ -f "$SELF_DIR/requirements.txt" ] && [ ! -d "$SELF_DIR/../.git" ]; then
+    LOCAL_SRC="$SELF_DIR"
+    # Обновлять такой бот тоже из архива: чужой GitHub тут ни при чём.
+    RAW_INSTALLER=""
+fi
+
 # Ввод читаем из терминала, а не из stdin: скрипт мог прийти по конвейеру
 # из curl, и тогда stdin занят самим скриптом. Если терминала нет
 # (запуск из другого скрипта), остаёмся на обычном stdin.
-if [ -r /dev/tty ] && exec 3</dev/tty 2>/dev/null; then
+if [ -r /dev/tty ] && { exec 3</dev/tty; } 2>/dev/null; then
     exec 3<&-
     HAS_TTY=true
 else
@@ -71,7 +86,26 @@ if ! id "$RUN_USER" >/dev/null 2>&1; then
 fi
 
 UPDATING=false
-if [ -d "$DIR/.git" ]; then
+if [ -n "$LOCAL_SRC" ]; then
+    APP="$DIR/stars_bot"
+    if [ -d "$APP/app" ]; then
+        UPDATING=true
+        say "Обновляю код из архива"
+    else
+        say "Ставлю бота из архива"
+    fi
+    # Запуск из уже установленной папки (stars-bot update) — копировать
+    # нечего, только пересобрать и перезапустить.
+    if [ "$(realpath "$LOCAL_SRC")" != "$(realpath -m "$APP")" ]; then
+        $SUDO mkdir -p "$APP"
+        # Старый код убираем целиком: иначе удалённые в новой версии файлы
+        # остались бы лежать. Настройки, база и окружение не трогаются.
+        $SUDO rm -rf "$APP/app" "$APP/tests" "$APP/docs"
+        tar -C "$LOCAL_SRC" --exclude=./.env --exclude=./data --exclude=./.venv \
+            --exclude='*.sqlite3*' --exclude='*.session*' --exclude='__pycache__' -cf - . \
+            | $SUDO tar -C "$APP" -xf -
+    fi
+elif [ -d "$DIR/.git" ]; then
     UPDATING=true
     say "Обновляю код"
     $SUDO git -C "$DIR" fetch --quiet origin "$BRANCH"
@@ -202,6 +236,14 @@ RAW_URL="$RAW_INSTALLER"
 
 case "\${1:-help}" in
     update)
+        if [ -z "\$RAW_URL" ]; then
+            # Бот поставлен из архива — новая версия тоже приходит архивом.
+            echo "Бот поставлен из архива. Чтобы обновить:"
+            echo "  1) распакуйте новый архив"
+            echo "  2) в его папке: sudo bash install.sh"
+            echo "Настройки и база сохранятся."
+            exit 0
+        fi
         # Копия до обновления: если новая версия окажется хуже, вернуться
         # будет к чему. Стоит секунду, а спасает всё.
         "\$0" backup >/dev/null 2>&1 && echo "Копия базы сделана."
