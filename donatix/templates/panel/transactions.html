@@ -1,0 +1,37 @@
+{% extends "panel/_layout.html" %}
+{% block title %}Транзакции — {{ site_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Транзакции</h1><p>Движение баланса: пополнения, списания за заказы и возвраты.</p></div>
+<form class="card row" method="get">
+  <div><label for="type">Тип</label>
+    <select id="type" name="type">
+      <option value="">Все движения</option>
+      <option value="credit" {{ 'selected' if type == 'credit' }}>Начисления</option>
+      <option value="debit" {{ 'selected' if type == 'debit' }}>Списания</option>
+    </select></div>
+  <button class="btn">Показать</button>
+</form>
+<div class="list" style="margin-top:16px">
+  {% for t in rows %}
+  <div class="item">
+    <div class="icon">{{ '+' if t.amount_micro > 0 else '−' }}</div>
+    <div class="grow">
+      <div class="title">tx{{ t.id }}</div>
+      <div class="sub">{% if t.order_public %}<a href="/panel/orders/{{ t.order_public }}">{{ t.note }}</a>{% else %}{{ t.note }}{% endif %}
+        · {{ t.created_at[:16] | replace('T', ' ') }}</div>
+    </div>
+    <div class="right">
+      <div class="amount {{ 'plus' if t.amount_micro > 0 else 'minus' }}">{{ '+' if t.amount_micro > 0 }}${{ fmt(t.amount_micro) }}</div>
+      <div class="small muted">баланс ${{ fmt(t.balance_after) }}</div>
+    </div>
+  </div>
+  {% else %}<div class="card empty">Движений пока нет.</div>{% endfor %}
+</div>
+{% if pages > 1 %}
+<div class="pager">
+  {% if page > 1 %}<a class="btn sm" href="?type={{ type }}&page={{ page - 1 }}">←</a>{% endif %}
+  <span class="muted">{{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a class="btn sm" href="?type={{ type }}&page={{ page + 1 }}">→</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

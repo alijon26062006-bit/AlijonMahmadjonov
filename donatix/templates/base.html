@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ site_name }}{% endblock %}</title>
+  <meta name="description" content="{{ site_name }} — оптовые Telegram Stars, пополнения игр и подарочные карты для проектов через API и веб-панель.">
+  <link rel="stylesheet" href="/static/donatix.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23d9480f'/><text x='16' y='23' font-size='20' font-family='Arial' font-weight='900' fill='white' text-anchor='middle'>D</text></svg>">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="logo">D</span>{{ site_name }}</a>
+    <nav class="nav">
+      {% block nav %}
+      <a class="hide-sm" href="/#catalog">Каталог</a>
+      <a class="hide-sm" href="/#pricing">Цены</a>
+      <a class="hide-sm" href="/docs">API</a>
+      {% if user %}
+        <a class="btn sm primary" href="{{ '/admin' if user.role == 'admin' else '/panel' }}">Кабинет</a>
+      {% else %}
+        <a href="/login">Войти</a>
+        <a class="btn sm primary" href="/register">Начать</a>
+      {% endif %}
+      {% endblock %}
+    </nav>
+  </div>
+</header>
+{% block body %}
+<main class="wrap">
+  {% for f in flashes %}<div class="flash {{ f.kind }}">{{ f.text }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+</main>
+{% endblock %}
+<footer class="foot">
+  <div class="wrap">
+    <div><b>{{ site_name }}</b> — цифровые товары оптом для игровых проектов.</div>
+    <div>
+      <a href="/docs">Документация API</a> ·
+      <a href="/register">Стать партнёром</a>
+      {% if support_contact %} · Поддержка: {{ support_contact }}{% endif %}
+    </div>
+  </div>
+</footer>
+</body>
+</html>

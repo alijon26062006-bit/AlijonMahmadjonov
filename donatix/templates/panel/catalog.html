@@ -1,0 +1,38 @@
+{% extends "panel/_layout.html" %}
+{% block title %}Каталог — {{ site_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ kind_titles.get(kind, 'Каталог') }}</h1>
+  <p>Цены указаны для вас, в долларах.</p>
+</div>
+<form class="card row" method="get" action="/panel/catalog">
+  <div><label for="q">Поиск</label><input id="q" name="q" value="{{ q }}" placeholder="PUBG, Steam, Premium…"></div>
+  <div><label for="kind">Раздел</label>
+    <select id="kind" name="kind">
+      <option value="">Все</option>
+      {% for k in kinds %}<option value="{{ k }}" {{ 'selected' if k == kind }}>{{ kind_titles[k] }}</option>{% endfor %}
+    </select></div>
+  <button class="btn">Найти</button>
+</form>
+
+{% for group, items in groups.items() %}
+  <h3 style="margin-top:24px">{{ group }}</h3>
+  <div class="grid">
+    {% for p in items %}
+    <a class="item" href="/panel/buy/{{ p.product_id }}">
+      <div class="grow">
+        <div class="title">{{ p.name }}</div>
+        <div class="sub">
+          {% if p.unit == 'star' %}за 1 звезду · от {{ p.min_quantity }} до {{ p.max_quantity }}
+          {% elif p.max_quantity > 1 %}до {{ p.max_quantity }} шт. за заказ{% if p.stock is not none %} · в наличии {{ p.stock }}{% endif %}
+          {% else %}{{ p.fields | map(attribute='label') | join(', ') or 'Код' }}{% endif %}
+        </div>
+      </div>
+      <div class="amount">${{ p.price_usd }}</div>
+    </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty">Ничего не найдено. {% if not q %}Каталог ещё загружается от поставщика — загляните через минуту.{% endif %}</div>
+{% endfor %}
+{% endblock %}

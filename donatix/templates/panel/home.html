@@ -1,0 +1,49 @@
+{% extends "panel/_layout.html" %}
+{% block title %}Панель — {{ site_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="eyebrow">Панель партнёра</div>
+  <h1>Обзор</h1>
+  <p>{{ user.login }} · {{ user.email }}</p>
+</div>
+
+<div class="grid">
+  <div class="card stat"><div class="label">Баланс</div><div class="value">${{ fmt(user.balance_micro) }}</div>
+    <div class="small"><a href="/panel/balance">Пополнить</a></div></div>
+  <div class="card stat"><div class="label">Потрачено</div><div class="value">${{ fmt(summary.spent) }}</div>
+    <div class="small muted">на выполненные заказы</div></div>
+  <div class="card stat"><div class="label">Заказов</div><div class="value">{{ summary.n }}</div>
+    <div class="small muted">выполнено</div></div>
+  <div class="card stat"><div class="label">Уровень</div><div class="value" style="text-transform:capitalize">{{ user.tier }}</div>
+    <div class="small muted">чем больше оборот — тем ниже цены</div></div>
+</div>
+
+{% if not has_key and user.status == 'active' %}
+<div class="card" style="margin-top:16px">
+  <h3>Подключите свой сайт или бота</h3>
+  <p class="muted">Создайте API-ключ — и заказы будут идти автоматически.</p>
+  <a class="btn primary" href="/panel/api">Создать API-ключ</a> <a class="btn" href="/docs">Документация</a>
+</div>
+{% endif %}
+
+<h2 style="margin-top:28px">Быстрые действия</h2>
+<div class="grid">
+  {% for kind in kinds %}
+  <a class="item" href="/panel/catalog?kind={{ kind }}">
+    <div class="icon">{{ {'telegram_stars': '★', 'telegram_premium': 'P', 'topup': '⚡', 'gift_card': '▣'}[kind] }}</div>
+    <div class="grow"><div class="title">{{ kind_titles[kind] }}</div><div class="sub">Каталог и цены</div></div>
+    <span class="muted">→</span>
+  </a>
+  {% endfor %}
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:28px">
+  <h2 style="margin:0">Последние заказы</h2>
+  <a class="btn sm" href="/panel/orders">Все заказы</a>
+</div>
+<div class="list" style="margin-top:12px">
+  {% for o in recent %}{% include "panel/_order_item.html" %}{% else %}
+  <div class="card empty">Заказов пока нет. Начните с <a href="/panel/catalog">каталога</a>.</div>
+  {% endfor %}
+</div>
+{% endblock %}

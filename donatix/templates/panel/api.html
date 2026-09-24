@@ -1,0 +1,57 @@
+{% extends "panel/_layout.html" %}
+{% block title %}API — {{ site_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>API и webhook</h1><p>Подключите свой сайт или бота. <a href="/docs">Документация</a></p></div>
+
+{% if new_key %}
+<div class="card" style="border-color:var(--accent)">
+  <h3>Новый ключ создан</h3>
+  <p class="muted">Скопируйте его сейчас — позже увидеть ключ целиком будет нельзя.</p>
+  <pre class="keybox">{{ new_key }}</pre>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>API-ключи</h3>
+  {% if user.status != 'active' %}
+    <p class="muted">Ключи можно создать после активации аккаунта.</p>
+  {% else %}
+  <form class="row" method="post" action="/panel/api/keys">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div><label for="name">Название</label><input id="name" name="name" placeholder="Мой бот" maxlength="64"></div>
+    <button class="btn primary">Создать ключ</button>
+  </form>
+  {% endif %}
+  <div class="table-wrap" style="margin-top:16px"><table>
+    <tr><th>Название</th><th>Ключ</th><th>Создан</th><th>Использован</th><th></th></tr>
+    {% for k in keys %}
+    <tr>
+      <td>{{ k.name }}</td>
+      <td class="mono">{{ k.prefix }}…</td>
+      <td class="small">{{ k.created_at[:10] }}</td>
+      <td class="small">{{ (k.last_used_at or '—')[:16] | replace('T', ' ') }}</td>
+      <td class="right">
+        {% if k.revoked_at %}<span class="badge">отозван</span>{% else %}
+        <form class="inline" method="post" action="/panel/api/keys/{{ k.id }}/revoke" onsubmit="return confirm('Отозвать ключ? Всё, что его использует, перестанет работать.')">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm danger">Отозвать</button></form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="muted">Ключей нет.</td></tr>{% endfor %}
+  </table></div>
+</div>
+
+<div class="card">
+  <h3>Webhook</h3>
+  <p class="muted">Куда присылать уведомления, когда заказ выполнен или отменён. Необязательно.</p>
+  <form method="post" action="/panel/api/webhook">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="webhook_url">Адрес</label>
+    <input id="webhook_url" name="webhook_url" type="url" placeholder="https://your-site.com/donatix-hook" value="{{ user.webhook_url or '' }}">
+    <label>Секрет для проверки подписи</label>
+    <pre class="keybox">{{ user.webhook_secret }}</pre>
+    <label style="font-weight:400"><input type="checkbox" name="rotate" value="1" style="width:auto;min-height:0"> Выпустить новый секрет</label>
+    <button class="btn" style="margin-top:12px">Сохранить</button>
+  </form>
+</div>
+{% endblock %}

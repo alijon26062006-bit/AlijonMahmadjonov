@@ -1,0 +1,44 @@
+{% extends "panel/_layout.html" %}
+{% block title %}{{ view.order_id }} — {{ site_name }}{% endblock %}
+{% block content %}
+{% set st = view.status %}
+{% if st == 'processing' %}<meta http-equiv="refresh" content="5">{% endif %}
+<div class="page-head">
+  <a class="small" href="/panel/orders">← Все заказы</a>
+  <h1>Заказ {{ view.order_id }}</h1>
+  <span class="badge {{ {'completed': 'ok', 'failed': 'bad', 'processing': 'warn'}[st] }}">{{ status_titles[st] }}</span>
+</div>
+<div class="grid two">
+  <div class="card summary">
+    <div><span class="muted">Товар</span><span>{{ view.product_name }}</span></div>
+    {% for k, v in view.fields.items() %}<div><span class="muted">{{ k }}</span><span class="mono">{{ v }}</span></div>{% endfor %}
+    <div><span class="muted">Количество</span><span>{{ view.quantity }}</span></div>
+    <div><span class="muted">Цена за единицу</span><span>${{ view.unit_price_usd }}</span></div>
+    <div><span class="muted">Создан</span><span>{{ view.created_at[:19] | replace('T', ' ') }} UTC</span></div>
+    <div><span>Сумма</span><span>${{ view.total_usd }}</span></div>
+  </div>
+  <div class="card">
+    {% if st == 'processing' %}
+      <h3>Выполняется…</h3>
+      <p class="muted">Обычно это занимает несколько секунд. Страница обновится сама.</p>
+    {% elif st == 'failed' %}
+      <h3>Заказ не выполнен</h3>
+      <p>{{ view.error or 'Поставщик отклонил заказ.' }}</p>
+      <p class="muted">${{ view.total_usd }} вернулись на баланс.</p>
+    {% else %}
+      <h3>Готово</h3>
+      {% set d = view.delivery or {} %}
+      {% if d.codes %}
+        <p class="muted">Коды:</p>
+        {% for c in d.codes %}<pre class="keybox">{{ c }}</pre>{% endfor %}
+      {% elif d.message %}
+        <p>{{ d.message }}</p>
+      {% elif view.delivery %}
+        <pre class="keybox">{{ delivery_pretty }}</pre>
+      {% else %}
+        <p>Заказ выполнен.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

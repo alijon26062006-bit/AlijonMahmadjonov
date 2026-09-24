@@ -1,0 +1,16 @@
+{% set st = 'processing' if o.status == 'attention' else o.status %}
+<a class="item" href="/panel/orders/{{ o.public_id }}">
+  <div class="icon">{{ {'telegram_stars': '★', 'telegram_premium': 'P', 'topup': '⚡', 'gift_card': '▣'}.get(o.kind, '•') }}</div>
+  <div class="grow">
+    <div class="title">{{ o.public_id }} · {{ o.product_name }}</div>
+    <div class="sub">
+      {% set f = o.fields_json | fromjson %}
+      {% for k, v in f.items() %}{{ v }}{% if not loop.last %}, {% endif %}{% endfor %}
+      · {{ o.created_at[:16] | replace('T', ' ') }}
+    </div>
+  </div>
+  <div class="right">
+    <div class="amount">${{ fmt(o.total_micro) }}</div>
+    <span class="badge {{ {'completed': 'ok', 'failed': 'bad', 'processing': 'warn'}[st] }}">{{ status_titles[st] }}</span>
+  </div>
+</a>

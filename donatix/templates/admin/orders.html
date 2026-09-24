@@ -1,0 +1,14 @@
+{% extends "admin/_layout.html" %}
+{% block title %}Заказы — админка{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Заказы</h1></div>
+<form class="card row" method="get">
+  <div><label for="q">Поиск</label><input id="q" name="q" value="{{ q }}" placeholder="dx-…, ord-…, товар, клиент"></div>
+  <div><label for="status">Статус</label>
+    <select id="status" name="status"><option value="">Все</option>
+      {% for s in ['attention', 'processing', 'completed', 'failed'] %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ status_titles[s] }}</option>{% endfor %}
+    </select></div>
+  <button class="btn">Показать</button>
+</form>
+<div class="card table-wrap" style="margin-top:16px">{% include "admin/_orders_table.html" %}</div>
+{% endblock %}

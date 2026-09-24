@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}API — {{ site_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="eyebrow">Документация</div>
+  <h1>{{ site_name }} API</h1>
+  <p>Один API для всех товаров: Telegram Stars и Premium, пополнения игр, подарочные карты.</p>
+</div>
+
+<div class="grid two">
+  <div class="card"><div class="small muted">Базовый URL</div><code class="mono">{{ base_url }}/api/v1</code></div>
+  <div class="card"><div class="small muted">Аутентификация</div><code class="mono">X-API-Key: dx_live_…</code>
+    <div class="hint">Или <code>Authorization: Bearer dx_live_…</code>. Ключ создаётся в панели → API.</div></div>
+</div>
+
+<div class="card">
+  <h2>Быстрый старт</h2>
+  <p>1. Узнайте баланс:</p>
+<pre>curl -s {{ base_url }}/api/v1/balance -H "X-API-Key: $KEY"</pre>
+<pre>{"ok": true, "balance": "100.0000", "currency": "USD"}</pre>
+  <p>2. Найдите товар:</p>
+<pre>curl -s "{{ base_url }}/api/v1/products?kind=telegram_stars" -H "X-API-Key: $KEY"</pre>
+<pre>{"ok": true, "items": [{
+  "product_id": "tg-stars", "kind": "telegram_stars", "name": "Telegram Stars",
+  "unit": "star", "price_usd": "0.016605", "min_quantity": 50, "max_quantity": 10000,
+  "fields": [{"key": "telegram_username", "label": "Telegram @username", "type": "text"}]
+}]}</pre>
+  <p>3. Сделайте заказ. <b>Всегда</b> передавайте свой уникальный <code>Idempotency-Key</code> — тогда повтор запроса при обрыве связи не спишет деньги второй раз:</p>
+<pre>curl -s -X POST {{ base_url }}/api/v1/orders \
+  -H "X-API-Key: $KEY" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -H "Content-Type: application/json" \
+  -d '{"product_id": "tg-stars", "quantity": 100, "fields": {"telegram_username": "@player"}}'</pre>
+<pre>{"ok": true, "order": {
+  "order_id": "dx-1042", "status": "processing", "kind": "telegram_stars",
+  "product_name": "Telegram Stars 100", "quantity": 100,
+  "total_usd": "1.6605", "delivery": null, "error": null, ...}}</pre>
+  <p>4. Узнайте результат: <code>GET /orders/dx-1042</code> (или дождитесь webhook). Статусы:</p>
+  <table>
+    <tr><td><code>processing</code></td><td>В работе. Спрашивайте раз в 5–10 секунд.</td></tr>
+    <tr><td><code>completed</code></td><td>Выполнен. Коды карт — в поле <code>delivery</code>.</td></tr>
+    <tr><td><code>failed</code></td><td>Не выполнен, деньги уже вернулись на баланс. Причина — в <code>error</code>.</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Методы</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Метод</th><th>Путь</th><th>Что делает</th></tr>
+    <tr><td>GET</td><td><code>/me</code></td><td>Профиль, баланс, уровень, сколько потрачено.</td></tr>
+    <tr><td>GET</td><td><code>/balance</code></td><td>Баланс в USD.</td></tr>
+    <tr><td>GET</td><td><code>/transactions?page=1&amp;limit=20</code></td><td>Движение денег: списания и начисления.</td></tr>
+    <tr><td>GET</td><td><code>/transactions/tx123</code></td><td>Одна транзакция.</td></tr>
+    <tr><td>GET</td><td><code>/categories</code></td><td>Категории товаров (игры, бренды карт).</td></tr>
+    <tr><td>GET</td><td><code>/products?kind=&amp;category_id=&amp;q=</code></td><td>Товары с вашей ценой. kind: <code>telegram_stars</code>, <code>telegram_premium</code>, <code>topup</code>, <code>gift_card</code>.</td></tr>
+    <tr><td>GET</td><td><code>/products/{product_id}</code></td><td>Один товар.</td></tr>
+    <tr><td>POST</td><td><code>/orders</code></td><td>Создать заказ: <code>product_id</code>, <code>quantity</code>, <code>fields</code>.</td></tr>
+    <tr><td>GET</td><td><code>/orders?page=&amp;limit=&amp;status=</code></td><td>Ваши заказы.</td></tr>
+    <tr><td>GET</td><td><code>/orders/{order_id}</code></td><td>Один заказ со статусом и выдачей.</td></tr>
+  </table></div>
+  <p class="hint">Полная схема: <a href="/api/swagger">Swagger</a> · <a href="/api/openapi.json">OpenAPI JSON</a></p>
+</div>
+
+<div class="card">
+  <h2>Поля заказа</h2>
+  <p>У каждого товара есть список <code>fields</code> — что нужно передать в заказе:</p>
+  <ul>
+    <li>Telegram Stars и Premium — <code>telegram_username</code> (например <code>@player</code>).</li>
+    <li>Пополнения игр — обычно <code>player_id</code>, иногда ещё сервер или зона: смотрите <code>fields</code> товара.</li>
+    <li>Подарочные карты — полей нет, укажите <code>quantity</code>.</li>
+  </ul>
+  <p>Для Telegram Stars <code>quantity</code> — количество звёзд, цена указана за одну звезду.</p>
+</div>
+
+<div class="card">
+  <h2>Ошибки</h2>
+<pre>{"ok": false, "error": "Недостаточно средств: нужно $1.6605, на балансе $0.5000.", "code": "insufficient_balance"}</pre>
+  <div class="table-wrap"><table>
+    <tr><th>HTTP</th><th>code</th><th>Что значит</th></tr>
+    <tr><td>400</td><td><code>missing_field</code>, <code>invalid_field</code>, <code>invalid_quantity</code>, <code>validation_error</code></td><td>Неверные данные запроса.</td></tr>
+    <tr><td>401</td><td><code>unauthorized</code></td><td>Нет ключа или он отозван.</td></tr>
+    <tr><td>402</td><td><code>insufficient_balance</code></td><td>Пополните баланс.</td></tr>
+    <tr><td>403</td><td><code>account_inactive</code>, <code>account_blocked</code></td><td>Аккаунт ещё не одобрен или заблокирован.</td></tr>
+    <tr><td>404</td><td><code>product_not_found</code>, <code>not_found</code></td><td>Нет такого товара или заказа.</td></tr>
+    <tr><td>409</td><td><code>idempotency_key_reused</code>, <code>out_of_stock</code></td><td>Ключ уже использован для другого заказа / нет в наличии.</td></tr>
+    <tr><td>429</td><td><code>rate_limited</code></td><td>Слишком часто. Подождите <code>Retry-After</code> секунд.</td></tr>
+  </table></div>
+  <p class="hint">Лимиты: 60 заказов в минуту, 120 запросов каталога и статусов в минуту на аккаунт.</p>
+</div>
+
+<div class="card">
+  <h2>Webhook</h2>
+  <p>Укажите адрес в панели → API. Когда заказ выполнится или отменится, мы пришлём POST:</p>
+<pre>POST https://your-site.com/donatix-hook
+X-Donatix-Timestamp: 1767225600
+X-Donatix-Signature: 5d41402abc4b2a76b9719d911017c592...
+
+{"event": "order.updated", "order": {"order_id": "dx-1042", "status": "completed", ...}}</pre>
+  <p>Проверьте подпись: HMAC-SHA256 от строки <code>timestamp + "." + тело</code> вашим секретом из панели. Ответьте кодом 2xx — иначе повторим до 5 раз.</p>
+<pre>import hmac, hashlib
+
+def valid(secret: str, timestamp: str, body: bytes, signature: str) -> bool:
+    mac = hmac.new(secret.encode(), timestamp.encode() + b"." + body, hashlib.sha256)
+    return hmac.compare_digest(mac.hexdigest(), signature)</pre>
+</div>
+
+<div class="card">
+  <h2>Пример: Python</h2>
+<pre>import uuid, requests
+
+API = "{{ base_url }}/api/v1"
+H = {"X-API-Key": "dx_live_..."}
+
+def buy_stars(username: str, amount: int) -> dict:
+    r = requests.post(f"{API}/orders", headers={**H, "Idempotency-Key": str(uuid.uuid4())},
+                      json={"product_id": "tg-stars", "quantity": amount,
+                            "fields": {"telegram_username": username}}, timeout=30)
+    data = r.json()
+    if not data["ok"]:
+        raise RuntimeError(data["error"])
+    return data["order"]</pre>
+  <h2>Пример: Node.js</h2>
+<pre>const res = await fetch("{{ base_url }}/api/v1/orders", {
+  method: "POST",
+  headers: { "X-API-Key": process.env.DONATIX_KEY, "Idempotency-Key": crypto.randomUUID(),
+             "Content-Type": "application/json" },
+  body: JSON.stringify({ product_id: "tg-stars", quantity: 100,
+                         fields: { telegram_username: "@player" } }),
+});
+const data = await res.json();
+if (!data.ok) throw new Error(data.error);</pre>
+</div>
+{% endblock %}

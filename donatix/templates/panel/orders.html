@@ -1,0 +1,24 @@
+{% extends "panel/_layout.html" %}
+{% block title %}Заказы — {{ site_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Заказы</h1><p>История заказов и статусы. Всего: {{ total }}.</p></div>
+<form class="card row" method="get">
+  <div><label for="q">Поиск</label><input id="q" name="q" value="{{ q }}" placeholder="Номер, товар или получатель"></div>
+  <div><label for="status">Статус</label>
+    <select id="status" name="status">
+      <option value="">Все</option>
+      {% for s in ['processing', 'completed', 'failed'] %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ status_titles[s] }}</option>{% endfor %}
+    </select></div>
+  <button class="btn">Показать</button>
+</form>
+<div class="list" style="margin-top:16px">
+  {% for o in orders %}{% include "panel/_order_item.html" %}{% else %}<div class="card empty">Заказов нет.</div>{% endfor %}
+</div>
+{% if pages > 1 %}
+<div class="pager">
+  {% if page > 1 %}<a class="btn sm" href="?status={{ status }}&q={{ q|urlencode }}&page={{ page - 1 }}">←</a>{% endif %}
+  <span class="muted">{{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a class="btn sm" href="?status={{ status }}&q={{ q|urlencode }}&page={{ page + 1 }}">→</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
