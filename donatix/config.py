@@ -107,6 +107,9 @@ class Config:
 
     # Куда писать клиентам для пополнения баланса и поддержки (например, @donatix_support).
     support_contact: str = ""
+    # Код подтверждения сайта из Google Search Console и Яндекс Вебмастера (метатег)
+    google_verify: str = ""
+    yandex_verify: str = ""
     # Часовой пояс для аналитики, часы от UTC (Душанбе — 5)
     tz_offset: int = 5
     # Конструктор ботов: запускать ботов партнёров и по какому адресу они ходят в Donatix
@@ -153,6 +156,8 @@ class Config:
             require_approval=_flag("DONATIX_REQUIRE_APPROVAL", True),
             cookie_secure=_flag("DONATIX_COOKIE_SECURE", False),
             support_contact=_env("DONATIX_SUPPORT_CONTACT"),
+            google_verify=_env("DONATIX_GOOGLE_VERIFY"),
+            yandex_verify=_env("DONATIX_YANDEX_VERIFY"),
             tz_offset=int(_env("DONATIX_TZ_OFFSET") or 5),
             run_bots=_flag("DONATIX_RUN_BOTS", True),
             internal_url=_env("DONATIX_INTERNAL_URL") or "http://127.0.0.1:8000",

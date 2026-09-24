@@ -45,3 +45,11 @@ def test_memory_cache_expires_and_clears():
     cache.clear()
     assert cache.get_or_set("k", 60, make) == 2
     assert cache.get_or_set("z", -1, make) == 3 and cache.get_or_set("z", -1, make) == 4
+
+
+def test_search_console_verification_tag(client, app):
+    import dataclasses
+    app.state.config = dataclasses.replace(app.state.config, google_verify="abc123", yandex_verify="y777")
+    html = client.get("/").text
+    assert '<meta name="google-site-verification" content="abc123">' in html
+    assert '<meta name="yandex-verification" content="y777">' in html

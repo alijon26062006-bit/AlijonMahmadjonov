@@ -8,6 +8,8 @@
   {% if noindex %}<meta name="robots" content="noindex, nofollow">
   {% else %}<meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="{{ canonical }}">
+  {% if google_verify %}<meta name="google-site-verification" content="{{ google_verify }}">{% endif %}
+  {% if yandex_verify %}<meta name="yandex-verification" content="{{ yandex_verify }}">{% endif %}
   {% endif %}
   <meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">

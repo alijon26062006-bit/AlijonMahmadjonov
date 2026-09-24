@@ -132,6 +132,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["flashes"] = request.session.pop("flash", [])
     ctx["path"] = request.url.path
     ctx["base_url"] = config.base_url
+    ctx["google_verify"] = config.google_verify
+    ctx["yandex_verify"] = config.yandex_verify
     ctx["canonical"] = config.base_url + request.url.path
     # В поиск попадают только публичные страницы; кабинет, админка и ошибки — нет
     ctx["noindex"] = status_code >= 400 or request.url.path not in INDEXABLE
