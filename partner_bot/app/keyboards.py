@@ -391,6 +391,16 @@ def sponsor_gate(channels: list[str]) -> InlineKeyboardMarkup:
 
 def deposit_methods() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    from app.handlers import donatix
+    from app.services import paymethods
+    if donatix.enabled():
+        # Бот из конструктора: банки, которые владелец добавил в «Реквизитах»
+        for m in paymethods.enabled():
+            kb.row(btn(f"🏦 {m['bank']}", f"dep:pm:{m['id']}", style=SUCCESS))
+        if runtime.get("ru_pay_number"):
+            kb.row(btn("🇷🇺 Аз Русия — Сбербанк, Тинькофф", "dep:ru"))
+        kb.row(btn(labeled("back", "Бозгашт"), "m:main"))
+        return kb.as_markup()
     kb.row(btn(labeled("dcity", "Душанбе Сити"), "dep:card",
                style=SUCCESS, icon="dcity"))
     kb.row(btn("🇷🇺 Аз Русия — Сбербанк, Тинькофф", "dep:ru"))

@@ -17,7 +17,7 @@ from app.handlers import fallback
 from app.handlers import (
     api_cab,
     games, reviews,
-    admin, broadcast, deposit, donatix, menu, panel, profile, shop, support,
+    admin, broadcast, deposit, donatix, menu, panel, paymethods, profile, shop, support,
 )
 from app.middlewares.emoji_guard import CustomEmojiGuard
 from app.middlewares.escape import CommandEscapeMiddleware
@@ -169,6 +169,7 @@ async def main() -> None:
     # Админские роутеры первыми: их фильтр отсекает чужие апдейты
     # и пропускает их дальше по цепочке.
     dp.include_router(donatix.router)
+    dp.include_router(paymethods.router)
     dp.include_router(panel.router)
     dp.include_router(broadcast.router)
     dp.include_router(admin.router)

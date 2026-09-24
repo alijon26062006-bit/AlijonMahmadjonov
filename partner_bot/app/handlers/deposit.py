@@ -195,6 +195,29 @@ async def on_receipt_amount(
     await _remember_screen(conn, deposit.id, shown)
 
 
+@router.callback_query(F.data.startswith("dep:pm:"))
+async def cb_pick_method(call: CallbackQuery, state: FSMContext,
+                         conn: aiosqlite.Connection) -> None:
+    """Покупатель выбрал банк из тех, что владелец добавил в «Реквизитах»."""
+    from app.services import paymethods
+    if await _blocked_by_open(call, conn, state):
+        return
+    method = paymethods.get(call.data.split(":", 2)[2])
+    if method is None or not method.get("enabled", True):
+        await state.clear()
+        await call.answer(texts.DEPOSIT_SOON, show_alert=True)
+        return
+    await state.set_state(Deposit.amount)
+    await state.update_data(pm=method["id"])
+    await call.message.edit_text(
+        f"🏦 <b>{method['bank']}</b>\n\n"
+        + texts.DEPOSIT_ASK_AMOUNT.format(min_amount=fmt(runtime.min_deposit())),
+        reply_markup=keyboards.cancel(),
+    )
+    await state.update_data(**_where(call.message))
+    await call.answer()
+
+
 @router.callback_query(F.data == "dep:card")
 async def cb_card(call: CallbackQuery, state: FSMContext,
                   conn: aiosqlite.Connection) -> None:
@@ -251,9 +274,12 @@ async def on_amount(
     # приходилось подтверждать руками, ровно то, от чего мы уходим.
     #
     # Теперь порядок обратный: заявка ждёт денег, а не деньги ждут заявку.
+    from app.services import paymethods
+    chosen = paymethods.get((await state.get_data()).get("pm") or "")
     deposit = await db.create_deposit(
         conn, user_id=message.from_user.id, amount=amount,
-        method="Перевод на карту", receipt_file_id="", reference=reference,
+        method=f"Перевод · {chosen['bank']}" if chosen else "Перевод на карту",
+        receipt_file_id="", reference=reference,
     )
     await state.update_data(amount=amount, reference=reference,
                             deposit_id=deposit.id)
@@ -264,7 +290,7 @@ async def on_amount(
     if bot is not None:
         await _drop_buttons(bot, await state.get_data())
 
-    body, markup = _requisites(amount, reference)
+    body, markup = _requisites(amount, reference, chosen)
     shown = await message.answer(body, reply_markup=markup)
 
     # Запоминаем, где показаны реквизиты: когда деньги придут, номер
@@ -303,7 +329,7 @@ async def _remember_screen(conn, deposit_id: int, shown) -> None:
         await db.set_deposit_screen(conn, deposit_id, chat, msg_id)
 
 
-def _requisites(amount: int, reference: str) -> tuple[str, object]:
+def _requisites(amount: int, reference: str, method: dict | None = None) -> tuple[str, object]:
     """Экран реквизитов: один, короткий, с кнопками под рукой.
 
     Раньше на нём же просили прислать чек. Клиент этого ещё не сделал —
@@ -315,6 +341,8 @@ def _requisites(amount: int, reference: str) -> tuple[str, object]:
     bank = runtime.get("pay_card_bank")
     city = runtime.get("pay_city")
     note = runtime.get("pay_extra")
+    if method:  # способ, выбранный покупателем (бот из конструктора)
+        card, holder, bank, city, note = method["number"], method.get("holder"), method["bank"], "", ""
 
     where = " · ".join(part for part in (bank, city) if part)
     body = texts.DEPOSIT_REQUISITES.format(
