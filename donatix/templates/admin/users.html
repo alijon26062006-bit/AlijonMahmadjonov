@@ -14,7 +14,7 @@
   <tr><th>Логин</th><th>Email</th><th>Проект</th><th>Уровень</th><th class="num">Баланс</th><th class="num">Заказов</th><th>Статус</th></tr>
   {% for u in rows %}
   <tr>
-    <td><a href="/admin/users/{{ u.id }}">{{ u.login }}</a>{% if u.role == 'admin' %} <span class="badge accent">админ</span>{% endif %}</td>
+    <td><a class="who" href="/admin/users/{{ u.id }}"><span class="avatar sm">{{ u.login[:2] | upper }}</span>{{ u.login }}</a>{% if u.role == 'admin' %} <span class="badge accent">админ</span>{% endif %}</td>
     <td>{{ u.email }}</td>
     <td class="small">{{ u.project or '' }}</td>
     <td>{{ u.tier }}{% if u.markup_override %} <span class="small muted">({{ u.markup_override }}%)</span>{% endif %}</td>

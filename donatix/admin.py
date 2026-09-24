@@ -50,6 +50,8 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
         "counts": counts,
         "today": orders.stats(conn, 1),
         "month": orders.stats(conn, 30),
+        "days": orders.daily(conn, 14),
+        "top": orders.top_clients(conn),
         "supplier_balance": worker.supplier_balance_cached(conn),
         "supplier_balance_at": db.get_setting(conn, "supplier_balance_at"),
         "catalog_synced_at": db.get_setting(conn, "catalog_synced_at"),

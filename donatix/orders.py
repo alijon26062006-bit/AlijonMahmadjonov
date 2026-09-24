@@ -468,3 +468,30 @@ def stats(conn: sqlite3.Connection, since_days: int = 1) -> dict[str, Any]:
         (since,),
     ).fetchone()
     return {"orders": row["n"], "revenue": row["revenue"], "profit": row["profit"]}
+
+
+def daily(conn: sqlite3.Connection, days: int = 14) -> list[dict[str, Any]]:
+    """Выручка и прибыль по дням (UTC) за последние days дней, включая пустые дни."""
+    start = (datetime.now(timezone.utc) - timedelta(days=days - 1)).date()
+    rows = {
+        r["d"]: r for r in conn.execute(
+            "SELECT substr(created_at, 1, 10) AS d, COUNT(*) AS n, SUM(total_micro) AS revenue, "
+            "SUM(total_micro - cost_micro) AS profit FROM orders WHERE status = 'completed' AND created_at >= ? "
+            "GROUP BY d", (start.isoformat(),))
+    }
+    out = []
+    for i in range(days):
+        d = (start + timedelta(days=i)).isoformat()
+        r = rows.get(d)
+        out.append({"day": d, "orders": r["n"] if r else 0, "revenue": r["revenue"] if r else 0,
+                    "profit": r["profit"] if r else 0})
+    return out
+
+
+def top_clients(conn: sqlite3.Connection, days: int = 30, limit: int = 5) -> list[sqlite3.Row]:
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
+    return conn.execute(
+        "SELECT u.id, u.login, u.project, COUNT(*) AS n, SUM(o.total_micro) AS revenue, "
+        "SUM(o.total_micro - o.cost_micro) AS profit FROM orders o JOIN users u ON u.id = o.user_id "
+        "WHERE o.status = 'completed' AND o.created_at >= ? GROUP BY u.id ORDER BY revenue DESC LIMIT ?",
+        (since, limit)).fetchall()
