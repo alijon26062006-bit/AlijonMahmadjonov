@@ -141,7 +141,12 @@ async def main() -> None:
         payer = ManualPayer(make_sender(bot))
     provider = build_provider(payer)
 
-    dp = Dispatcher(conn=conn, provider=provider)
+    # Шаги диалогов — на диске: перезапуск бота не обрывает мастер на полпути
+    from pathlib import Path
+
+    from app.fsm_storage import SqliteStorage
+    storage = SqliteStorage(Path(settings.db_path).with_name("fsm.sqlite3"))
+    dp = Dispatcher(storage=storage, conn=conn, provider=provider)
     # Внешняя мидлварь — до фильтров: команда должна пробиваться
     # сквозь любой незакрытый шаг диалога.
     dp.message.outer_middleware(CommandEscapeMiddleware())
@@ -197,10 +202,22 @@ async def main() -> None:
         Отвечаем коротко, подробности — в журнал.
         """
         log.exception("Обработчик упал: %s", event.exception)
-        press = getattr(event.update, "callback_query", None)
-        if press is not None:
-            with suppress(Exception):
-                await press.answer(texts.SOMETHING_BROKE, show_alert=True)
+        from app.services import access
+
+        upd = event.update
+        press = getattr(upd, "callback_query", None)
+        message = getattr(upd, "message", None)
+        who = (press or message).from_user if (press or message) else None
+        admin = who is not None and access.is_admin(who.id)
+        # Владельцу — по-русски и с причиной: по ней видно, что чинить. Покупателю — коротко.
+        reason = f"{type(event.exception).__name__}: {event.exception}"[:150]
+        text = (f"⚠️ Не получилось: {reason}\n\nОткройте /panel и повторите. Если повторится — "
+                "перешлите это сообщение в поддержку Donatix." if admin else texts.SOMETHING_BROKE)
+        with suppress(Exception):
+            if press is not None:
+                await press.answer(text[:190], show_alert=True)
+            elif message is not None and admin:
+                await message.answer(text)
         return True
 
     dp.errors.register(on_error)

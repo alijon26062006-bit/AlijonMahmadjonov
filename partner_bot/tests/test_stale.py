@@ -180,7 +180,7 @@ async def crash_is_visible(conn) -> None:
     body = io.open("app/main.py", encoding="utf-8").read()
     check("перехват ошибок подключён", "dp.errors.register(on_error)" in body)
     check("он отвечает на нажатие",
-          "await press.answer(texts.SOMETHING_BROKE" in body)
+          "await press.answer(text[:190], show_alert=True)" in body and "texts.SOMETHING_BROKE" in body)
     check("и пишет причину в журнал", 'log.exception("Обработчик упал' in body)
 
 

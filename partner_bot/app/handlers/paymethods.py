@@ -72,7 +72,7 @@ def _card(m: dict) -> str:
 
 @router.callback_query(F.data == "pn:pay", _on)
 @router.callback_query(F.data == "pm:list", _on)
-async def show_list(call: CallbackQuery, state: FSMContext) -> None:
+async def show_list(call: CallbackQuery, state: FSMContext, toast: str = "") -> None:
     await state.clear()
     methods = pm.all_methods()
     if methods:
@@ -87,7 +87,7 @@ async def show_list(call: CallbackQuery, state: FSMContext) -> None:
     await _show(call, "💳 <b>Реквизиты для покупателей</b>\n\n" + body +
                 "\n\n<blockquote>Покупатель выбирает банк, вводит сумму и видит реквизиты "
                 "этого банка. ✅ — показывается, 🚫 — скрыт.</blockquote>", _kb(*rows))
-    await call.answer()
+    await call.answer(toast)
 
 
 # ── Мастер добавления ────────────────────────────────────────
@@ -186,8 +186,7 @@ async def save(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connectio
         await call.answer("Начните заново.", show_alert=True)
         return
     await pm.add(conn, data["bank"], data["number"], data.get("holder", ""))
-    await call.answer("Сохранено ✅")
-    await show_list(call, state)
+    await show_list(call, state, "Сохранено ✅")
 
 
 # ── Карточка способа ─────────────────────────────────────────
@@ -237,8 +236,7 @@ async def ask_delete(call: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("pm:delok:"), _on)
 async def delete(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
     await pm.delete(conn, call.data.split(":")[2])
-    await call.answer("Удалено")
-    await show_list(call, state)
+    await show_list(call, state, "Удалено")
 
 
 @router.callback_query(F.data.startswith("pm:ednum:"), _on)

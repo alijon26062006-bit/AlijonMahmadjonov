@@ -42,13 +42,15 @@ async def nobody_took_it(
     # Состояние уже не совпадает ни с чем — чистим, иначе следующий шаг
     # человека уедет в тот же тупик.
     await state.clear()
-    await call.answer(texts.STEP_LOST, show_alert=True)
+    from app.services import access
+
+    admin = access.is_admin(call.from_user.id)
+    await call.answer("Этот экран устарел — открываю панель заново. Повторите действие."
+                      if admin else texts.STEP_LOST, show_alert=True)
 
     # Владельцу возвращаем панель, а не витрину: он нажимал в панели, и
     # клиентское меню ему сейчас бесполезно.
-    from app.services import access
-
-    if access.is_admin(call.from_user.id):
+    if admin:
         from app.handlers.panel import show_home
 
         await show_home(call.message, conn)
