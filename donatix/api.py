@@ -298,3 +298,80 @@ def steam_gift_view(request: Request, conn: sqlite3.Connection, config: Config, 
         raise ApiError("Игра не найдена или поставщик не ответил.", "not_found", 404) from None
     return {"ok": True, "appid": appid, "name": steam_gifts.game_name(conn, appid), "product_id": "steam-gift",
             "cover": steam_gifts.cover_url(appid), "offers": items}
+
+
+# ── Пополнение баланса (для ботов и сайтов партнёров) ──────────
+
+
+class PaymentIn(BaseModel):
+    method: str = Field(max_length=32)
+    amount_usd: str = ""
+    amount_tjs: str = ""
+    reference: str = Field(default="", max_length=200)
+
+
+@router.get("/payments/methods")
+def payment_methods(request: Request, user=Depends(api_user), conn=Depends(get_conn),
+                    config: Config = Depends(get_config)) -> dict[str, Any]:
+    from . import payments
+    conf = payments.settings(conn, config)
+    return {"ok": True, "methods": payments.methods(conn, config), "tjs_rate": str(conf["tjs_rate"]),
+            "min_tjs": str(conf["min_tjs"]), "min_usd": str(conf["min_usd"])}
+
+
+@router.post("/payments", status_code=201)
+def payment_create(body: PaymentIn, request: Request, user=Depends(api_user), conn=Depends(get_conn),
+                   config: Config = Depends(get_config)):
+    """Заявка на пополнение: вернёт реквизиты и сумму к переводу. Потом — POST /payments/{id}/receipt с чеком."""
+    from . import payments
+    _limit(request, "account", str(user["id"]))
+    try:
+        pid = payments.create(conn, config, user, body.method, body.amount_usd, body.reference,
+                              amount_tjs=body.amount_tjs)
+    except payments.PaymentError as exc:
+        raise ApiError(str(exc), "invalid_payment") from None
+    row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
+    return JSONResponse({"ok": True, "payment": payments.public(conn, config, row)}, status_code=201)
+
+
+@router.post("/payments/{payment_id}/receipt")
+async def payment_receipt(payment_id: int, request: Request, user=Depends(api_user), conn=Depends(get_conn),
+                          config: Config = Depends(get_config)):
+    """Чек: multipart-поле file (фото или PDF) или сырое тело с Content-Type image/* / application/pdf."""
+    from . import payments
+    from .tgbot import send_receipt
+    _limit(request, "account", str(user["id"]))
+    ctype = request.headers.get("content-type", "")
+    if ctype.startswith("multipart/"):
+        form = await request.form()
+        up = form.get("file") or form.get("photo") or form.get("document")
+        if up is None or not hasattr(up, "read"):
+            raise ApiError("Приложите файл в поле file.", "missing_field")
+        data, ctype = await up.read(payments.MAX_RECEIPT_BYTES + 1), up.content_type or ""
+    else:
+        data = await request.body()
+    try:
+        payments.attach_receipt(conn, config, user["id"], payment_id, data, ctype)
+    except payments.PaymentError as exc:
+        raise ApiError(str(exc), "invalid_receipt") from None
+    send_receipt(conn, config, payment_id)
+    row = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    return {"ok": True, "payment": payments.public(conn, config, row)}
+
+
+@router.get("/payments")
+def payment_list(request: Request, user=Depends(api_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)) -> dict[str, Any]:
+    from . import payments
+    rows = conn.execute("SELECT * FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user["id"],)).fetchall()
+    return {"ok": True, "items": [payments.public(conn, config, r) for r in rows]}
+
+
+@router.get("/payments/{payment_id}")
+def payment_one(payment_id: int, user=Depends(api_user), conn=Depends(get_conn),
+                config: Config = Depends(get_config)) -> dict[str, Any]:
+    from . import payments
+    row = conn.execute("SELECT * FROM payments WHERE id = ? AND user_id = ?", (payment_id, user["id"])).fetchone()
+    if row is None:
+        raise ApiError("Заявка не найдена.", "not_found", 404)
+    return {"ok": True, "payment": payments.public(conn, config, row)}

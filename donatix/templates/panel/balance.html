@@ -9,7 +9,7 @@
     <div class="stat reveal"><div class="label">Доступно</div><div class="value">${{ fmt(user.balance_micro) }}</div>
       <div class="note">Курс для оплаты в сомони: 1 USD = {{ tjs_rate }} TJS</div></div>
 
-    <form class="card reveal" method="post" action="/panel/balance" id="payform">
+    <form class="card reveal" method="post" action="/panel/balance" id="payform" enctype="multipart/form-data">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <div class="step-head"><span class="n">1</span><h3>Способ оплаты</h3></div>
       {% if methods %}
@@ -34,6 +34,8 @@
         <pre class="keybox">{{ m.details }}</pre>
       </div>
       {% endfor %}
+      <label for="receipt">Чек об оплате <span class="muted">(фото или PDF — так проверим быстрее)</span></label>
+      <input id="receipt" name="receipt" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
       <label for="reference">Номер чека / хэш перевода <span class="muted">(желательно)</span></label>
       <input id="reference" name="reference" maxlength="200" placeholder="Например, 4821 или TX-хэш" autocomplete="off">
       <button class="btn primary lg block" style="margin-top:18px">Я оплатил — отправить заявку</button>

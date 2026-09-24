@@ -169,9 +169,14 @@ class AdminBot:
             result = self.on_button(conn, str(cq.get("data") or ""))
             self.api("answerCallbackQuery", callback_query_id=cq["id"], text=result[:190])
             if msg.get("message_id"):
-                # Кнопки убираем, а под сообщением пишем, что сделано — видно в истории чата
-                self.api("editMessageText", chat_id=self.chat_id, message_id=msg["message_id"], parse_mode="HTML",
-                         text=f"{_e(msg.get('text', ''))}\n\n<b>{_e(result)}</b>", disable_web_page_preview=True)
+                # Кнопки убираем, а под сообщением пишем, что сделано — видно в истории чата.
+                # У сообщения с чеком (фото/файл) вместо текста — подпись.
+                if "text" in msg:
+                    self.api("editMessageText", chat_id=self.chat_id, message_id=msg["message_id"], parse_mode="HTML",
+                             text=f"{_e(msg.get('text', ''))}\n\n<b>{_e(result)}</b>", disable_web_page_preview=True)
+                else:
+                    self.api("editMessageCaption", chat_id=self.chat_id, message_id=msg["message_id"],
+                             parse_mode="HTML", caption=f"{_e(msg.get('caption', ''))}\n\n<b>{_e(result)}</b>"[:1000])
             return
         msg = upd.get("message") or {}
         if str((msg.get("chat") or {}).get("id")) != self.chat_id:
@@ -241,3 +246,15 @@ class AdminBot:
 def _admin_id(conn: sqlite3.Connection) -> int:
     row = conn.execute("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1").fetchone()
     return int(row["id"]) if row else 0
+
+
+def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int) -> None:
+    """Заявка с приложенным чеком — админу фото/файлом с кнопками «Зачислить / Отклонить»."""
+    from .payments import receipts_dir
+    from .worker import notify_admin_file
+    p = conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    if not p or not p["receipt_file"]:
+        return
+    text, buttons = payment_event(conn, payment_id, config)
+    path = receipts_dir(config) / p["receipt_file"]
+    notify_admin_file(config, text + "\n🧾 Чек приложен", buttons, path, photo=not p["receipt_file"].endswith(".pdf"))

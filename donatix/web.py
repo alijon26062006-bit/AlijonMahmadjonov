@@ -6,7 +6,7 @@ import json
 import sqlite3
 import uuid
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from . import accounts, catalog, db, orders
@@ -402,18 +402,26 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
 
 @router.post("/panel/balance", dependencies=[Depends(check_csrf)])
 def panel_balance_request(request: Request, method: str = Form(""), amount: str = Form(""),
-                          reference: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn),
+                          reference: str = Form(""), receipt: UploadFile | None = File(None),
+                          user=Depends(panel_user), conn=Depends(get_conn),
                           config: Config = Depends(get_config)):
     from . import payments
+    from .tgbot import payment_event, send_receipt
     from .worker import notify_event
+    data = receipt.file.read(payments.MAX_RECEIPT_BYTES + 1) if receipt and receipt.filename else b""
     try:
-        pid = payments.create(conn, config, user, method, amount, reference)
+        with db.tx(conn):
+            pid = payments.create(conn, config, user, method, amount, reference)
+            if data:
+                payments.attach_receipt(conn, config, user["id"], pid, data, receipt.content_type or "")
     except payments.PaymentError as exc:
         flash(request, str(exc), "error")
         return _redirect("/panel/balance")
     row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
-    from .tgbot import payment_event
-    notify_event(conn, config, payment_event(conn, pid, config))
+    if data:
+        send_receipt(conn, config, pid)
+    else:
+        notify_event(conn, config, payment_event(conn, pid, config))
     flash(request, f"Заявка #{pid} создана. Переведите {row['pay_amount']} {row['pay_currency']} по реквизитам — "
                    "после проверки баланс пополнится, вам придёт уведомление.")
     return _redirect("/panel/balance")

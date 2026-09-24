@@ -40,6 +40,26 @@ def notify_event(conn, config: Config, event: tuple[str, list]) -> None:
     notify_admin(config, text, buttons, html=True)
 
 
+def notify_admin_file(config: Config, caption: str, buttons: list | None, path, *, photo: bool) -> None:
+    """Файл админу (чек об оплате) с подписью и кнопками. Без Telegram — только в лог."""
+    log.warning("ADMIN (файл %s): %s", path, caption)
+    if not (config.alert_telegram_token and config.alert_telegram_chat_id):
+        return
+    import json as _json
+
+    from .tgbot import keyboard
+    method, field = ("sendPhoto", "photo") if photo else ("sendDocument", "document")
+    data = {"chat_id": config.alert_telegram_chat_id, "caption": caption[:1000], "parse_mode": "HTML"}
+    if buttons:
+        data["reply_markup"] = _json.dumps(keyboard(buttons), ensure_ascii=False)
+    try:
+        with open(path, "rb") as fh:
+            httpx.post(f"https://api.telegram.org/bot{config.alert_telegram_token}/{method}",
+                       data=data, files={field: (path.name, fh)}, timeout=30)
+    except (httpx.HTTPError, OSError) as exc:
+        log.warning("не удалось отправить чек админу: %s", exc)
+
+
 def check_supplier_balance(conn, config: Config, supplier: Supplier) -> Decimal | None:
     try:
         balance = supplier.balance()

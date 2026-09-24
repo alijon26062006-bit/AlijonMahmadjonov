@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS payments (
     pay_amount    TEXT NOT NULL,                -- сколько перевести, в валюте способа
     pay_currency  TEXT NOT NULL,
     reference     TEXT,                         -- что указал клиент: номер чека, хэш и т.п.
+    receipt_file  TEXT,                         -- фото/PDF чека в data/receipts
     status        TEXT NOT NULL DEFAULT 'pending',  -- pending | paid | rejected | cancelled
     admin_note    TEXT,
     tx_id         INTEGER REFERENCES transactions(id),
@@ -187,6 +188,9 @@ def init(path: Path | str) -> None:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(products)")}
         if "image_url" not in cols:  # база, созданная до появления картинок
             conn.execute("ALTER TABLE products ADD COLUMN image_url TEXT")
+        pay_cols = {r[1] for r in conn.execute("PRAGMA table_info(payments)")}
+        if "receipt_file" not in pay_cols:
+            conn.execute("ALTER TABLE payments ADD COLUMN receipt_file TEXT")
         key_cols = {r[1] for r in conn.execute("PRAGMA table_info(api_keys)")}
         if "key_enc" not in key_cols:
             conn.execute("ALTER TABLE api_keys ADD COLUMN key_enc TEXT")

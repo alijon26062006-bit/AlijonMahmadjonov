@@ -17,6 +17,7 @@
       <div class="right"><div class="amount">${{ fmt(p.amount_micro) }}</div><div class="small muted">к переводу {{ p.pay_amount }} {{ p.pay_currency }}</div></div>
     </div>
     {% if p.reference %}<div class="small" style="margin-top:8px">Чек / хэш: <span class="mono">{{ p.reference }}</span></div>{% endif %}
+    {% if p.receipt_file %}<a class="btn sm" style="margin-top:8px" href="/admin/payments/{{ p.id }}/receipt" target="_blank" rel="noopener">🧾 Открыть чек</a>{% endif %}
     {% if p.status == 'pending' %}
     <div class="filters" style="margin-top:14px">
       <form method="post" action="/admin/payments/{{ p.id }}/confirm">

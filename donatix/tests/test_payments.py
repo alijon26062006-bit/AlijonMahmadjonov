@@ -113,3 +113,54 @@ def test_low_balance_warning(app, config, conn):
         accounts.post_ledger(conn, uid, -10_000, "заказ")  # уже ниже — второй раз не пишем
     notes = conn.execute("SELECT text FROM notifications WHERE user_id = ?", (uid,)).fetchall()
     assert sum("пополните счёт" in n[0] for n in notes) == 1
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+
+
+def test_api_topup_with_receipt(app, config, conn, monkeypatch):
+    from donatix import tgbot
+    config.pay_methods = {"alif": "Алиф: +992 90 000 00 00 (Али)"}
+    uid = accounts.create_user(conn, email="bot@example.com", login="botowner", password="password123",
+                               status="active")
+    key = accounts.create_api_key(conn, uid, "bot")
+    sent = []
+    monkeypatch.setattr("donatix.worker.notify_admin_file",
+                        lambda cfg, caption, buttons, path, photo: sent.append((caption, buttons, path, photo)))
+    api = TestClient(app)
+    h = {"X-API-Key": key}
+    m = api.get("/api/v1/payments/methods", headers=h).json()
+    assert m["ok"] and m["methods"][0]["code"] == "alif" and m["min_tjs"] == "500"
+    r = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "400"}).json()
+    assert not r["ok"] and "500 сомони" in r["error"]
+    r = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "545"}).json()
+    pay = r["payment"]
+    assert pay["pay_amount"] == "545.00" and pay["pay_currency"] == "TJS" and "+992" in pay["details"]
+    assert api.post(f"/api/v1/payments/{pay['id']}/receipt", headers=h, files={"file": ("a.txt", b"hi", "text/plain")}
+                    ).json()["ok"] is False
+    r = api.post(f"/api/v1/payments/{pay['id']}/receipt", headers=h, files={"file": ("chek.png", PNG, "image/png")})
+    assert r.json()["payment"]["receipt"] is True
+    caption, buttons, path, photo = sent[-1]
+    assert "Чек приложен" in caption and photo and path.read_bytes() == PNG
+    # админ жмёт «Зачислить» под фото — баланс пополнен, подпись обновлена
+    config.alert_telegram_chat_id = "777"
+    calls = []
+    bot = tgbot.AdminBot(config, api=lambda m, **p: calls.append((m, p)) or [])
+    bot.handle(conn, {"update_id": 1, "callback_query": {"id": "c", "data": buttons[0][0][1], "message": {
+        "message_id": 3, "chat": {"id": 777}, "caption": caption, "photo": [{}]}}})
+    assert balance(conn, uid) == 500_000
+    assert any(m == "editMessageCaption" for m, _ in calls)
+    assert api.get(f"/api/v1/payments/{pay['id']}", headers=h).json()["payment"]["status"] == "paid"
+    # админ может открыть чек в админке
+    admin = TestClient(app)
+    web_login(admin, "admin@example.com", "adminpass123")
+    assert admin.get(f"/admin/payments/{pay['id']}/receipt").content == PNG
+
+
+def test_panel_topup_with_receipt(app, config, conn, monkeypatch):
+    uid, client, token = _setup(app, config, conn)
+    sent = []
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: sent.append(a))
+    r = client.post("/panel/balance", data={"csrf": token, "method": "alif", "amount": "50"},
+                    files={"receipt": ("c.png", PNG, "image/png")})
+    assert "Заявка #1 создана" in r.text and len(sent) == 1

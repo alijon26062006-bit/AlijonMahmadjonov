@@ -105,14 +105,19 @@ def pay_amount(tjs_rate: Decimal, currency: str, usd: Decimal) -> tuple[str, str
 
 
 def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: str, amount: str,
-           reference: str = "") -> int:
+           reference: str = "", *, amount_tjs: str = "") -> int:
+    """Заявка на пополнение. Сумма — в долларах (amount) или в сомони (amount_tjs, пересчёт по курсу)."""
     conf = settings(conn, config)
     if method not in conf["details"]:
         raise PaymentError("Выберите способ оплаты.")
     try:
-        usd = to_decimal(amount.replace(",", ".").replace("$", "").strip())
+        if amount_tjs.strip():
+            tjs = to_decimal(amount_tjs.replace(",", ".").strip())
+            usd = (tjs / conf["tjs_rate"]).quantize(Decimal("0.0001"))
+        else:
+            usd = to_decimal(amount.replace(",", ".").replace("$", "").strip())
     except MoneyError:
-        raise PaymentError("Сумма — число в долларах, например 50.") from None
+        raise PaymentError("Сумма — число, например 50.") from None
     if usd * conf["tjs_rate"] < conf["min_tjs"] or usd > Decimal("100000"):
         raise PaymentError(f"Минимальная сумма пополнения — {conf['min_tjs']:f} сомони (${conf['min_usd']}).")
     open_n = conn.execute("SELECT COUNT(*) FROM payments WHERE user_id = ? AND status = 'pending'",
@@ -168,3 +173,61 @@ def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: 
 def cancel(conn: sqlite3.Connection, user_id: int, payment_id: int) -> None:
     conn.execute("UPDATE payments SET status = 'cancelled', resolved_at = ? "
                  "WHERE id = ? AND user_id = ? AND status = 'pending'", (db.now(), payment_id, user_id))
+
+
+# ── Чек об оплате ─────────────────────────────────────────────
+
+RECEIPT_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf"}
+MAX_RECEIPT_BYTES = 10 * 1024 * 1024
+
+
+def receipts_dir(config: Config):
+    from pathlib import Path
+    return Path(config.db_path).parent / "receipts"
+
+
+def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payment_id: int,
+                   data: bytes, content_type: str) -> str:
+    """Сохранить чек к своей заявке в ожидании. Возвращает имя файла."""
+    p = conn.execute("SELECT * FROM payments WHERE id = ? AND user_id = ?", (payment_id, user_id)).fetchone()
+    if p is None:
+        raise PaymentError("Заявка не найдена.")
+    if p["status"] != "pending":
+        raise PaymentError("Заявка уже обработана.")
+    ext = RECEIPT_TYPES.get((content_type or "").split(";")[0].strip().lower())
+    if ext is None:
+        ext = _sniff(data)
+    if ext is None:
+        raise PaymentError("Чек — фото (JPG, PNG, WEBP) или PDF.")
+    if not data or len(data) > MAX_RECEIPT_BYTES:
+        raise PaymentError("Файл чека пустой или больше 10 МБ.")
+    folder = receipts_dir(config)
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"{payment_id}-{secrets.token_hex(6)}.{ext}"
+    (folder / name).write_bytes(data)
+    conn.execute("UPDATE payments SET receipt_file = ? WHERE id = ?", (name, payment_id))
+    return name
+
+
+def _sniff(data: bytes) -> str | None:
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpg"
+    if data.startswith(b"\x89PNG"):
+        return "png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    if data.startswith(b"%PDF"):
+        return "pdf"
+    return None
+
+
+def public(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) -> dict[str, Any]:
+    """Заявка для API: без внутренних полей."""
+    details = settings(conn, config)["details"].get(p["method"], "")
+    return {
+        "id": p["id"], "status": p["status"], "method": p["method"],
+        "method_title": title_for(conn, config, p["method"]),
+        "amount_usd": fmt(p["amount_micro"]), "pay_amount": p["pay_amount"], "pay_currency": p["pay_currency"],
+        "details": details if p["status"] == "pending" else "", "receipt": bool(p["receipt_file"]),
+        "note": p["admin_note"] or "", "created_at": p["created_at"], "resolved_at": p["resolved_at"],
+    }

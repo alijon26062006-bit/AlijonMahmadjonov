@@ -329,6 +329,17 @@ async def pay_settings_save(request: Request, admin=Depends(admin_user), conn=De
     return _back("/admin/pay-settings")
 
 
+@router.get("/payments/{payment_id}/receipt")
+def payment_receipt_file(payment_id: int, admin=Depends(admin_user), conn=Depends(get_conn),
+                         config: Config = Depends(get_config)):
+    from fastapi.responses import FileResponse, Response
+    row = conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    if not row or not row["receipt_file"]:
+        return Response("Чека нет", status_code=404)
+    path = payments.receipts_dir(config) / row["receipt_file"]
+    return FileResponse(path, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
 @router.post("/payments/{payment_id}/confirm", dependencies=[Depends(check_csrf)])
 def payment_confirm(payment_id: int, request: Request, credit: str = Form(""), admin=Depends(admin_user),
                     conn=Depends(get_conn), config: Config = Depends(get_config)):
