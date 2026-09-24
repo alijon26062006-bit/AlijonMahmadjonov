@@ -875,3 +875,7 @@ a.who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; 
   background: var(--accent-soft); color: var(--accent); font-size: 13px; }
 .net-badge b { font-weight: 700; }
 .net-warn { margin-top: 8px; font-size: 13px; }
+
+/* Кабинет → Мой Telegram-бот */
+.bot-steps { margin: 10px 0 6px; padding-left: 20px; line-height: 1.7; }
+.bot-feats { margin: 8px 0; padding-left: 0; list-style: none; line-height: 1.9; }

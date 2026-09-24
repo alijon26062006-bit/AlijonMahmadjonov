@@ -114,3 +114,42 @@ def test_no_double_start_and_conflict_warning(config, conn, tmp_path, monkeypatc
         assert runner.state(bid)["conflict"] is True
     finally:
         runner.stop()
+
+
+def test_client_connects_own_bot(app, config, conn, monkeypatch):
+    monkeypatch.setattr(bots, "check_token", lambda token: token.split(":")[1][:6] + "_bot")
+    uid = accounts.create_user(conn, email="c@example.com", login="client1", password="password123", status="active")
+    other = accounts.create_user(conn, email="o@example.com", login="other1", password="password123",
+                                 status="active")
+    c = TestClient(app)
+    tok = web_login(c, "c@example.com", "password123")
+    assert "Мой Telegram-бот" in c.get("/panel").text
+    r = c.post("/panel/bots", data={"csrf": tok, "token": "1:AAAAAA", "admin_ids": "777"})
+    assert "Бот @AAAAAA_bot подключён" in r.text and "1:AAAAAA" not in r.text
+    row = conn.execute("SELECT * FROM bots").fetchone()
+    assert row["user_id"] == uid and row["admin_ids"] == "777"  # тратит баланс клиента, не админа
+
+    # чужого бота не видно и не тронуть
+    oid = bots.create(conn, config, user_id=other, token="2:BBBBBB", admin_ids="1", username="bbb_bot")
+    assert "bbb_bot" not in c.get("/panel/bots").text
+    r = c.post(f"/panel/bots/{oid}/delete", data={"csrf": tok})
+    assert "Бот не найден" in r.text and conn.execute("SELECT 1 FROM bots WHERE id = ?", (oid,)).fetchone()
+
+    # лимит
+    for i in range(2, 4):
+        c.post("/panel/bots", data={"csrf": tok, "token": f"{i}:CCCCC{i}", "admin_ids": "777"})
+    r = c.post("/panel/bots", data={"csrf": tok, "token": "9:DDDDDD", "admin_ids": "777"})
+    assert "Можно подключить до 3 ботов" in r.text
+
+    r = c.post(f"/panel/bots/{row['id']}/delete", data={"csrf": tok})
+    assert "Бот удалён" in r.text
+
+
+def test_pending_client_cannot_add_bot(app, conn, monkeypatch):
+    monkeypatch.setattr(bots, "check_token", lambda token: "x_bot")
+    accounts.create_user(conn, email="p@example.com", login="pend1", password="password123")
+    c = TestClient(app)
+    tok = web_login(c, "p@example.com", "password123")
+    r = c.post("/panel/bots", data={"csrf": tok, "token": "1:AAAAAA", "admin_ids": "777"})
+    assert "после подтверждения аккаунта" in r.text or r.url.path == "/login"
+    assert conn.execute("SELECT COUNT(*) FROM bots").fetchone()[0] == 0

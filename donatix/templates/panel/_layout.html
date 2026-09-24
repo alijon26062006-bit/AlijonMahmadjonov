@@ -25,6 +25,7 @@
 {{ nav_link('/panel/balance', 'Пополнить баланс', 'wallet', current) }}
 {{ nav_link('/panel/notifications', 'Уведомления', 'bell', current) }}
 <h4>Аккаунт</h4>
+{{ nav_link('/panel/bots', 'Мой Telegram-бот', 'zap-send', current) }}
 {{ nav_link('/panel/api', 'API и webhook', 'key', current) }}
 {{ nav_link('/docs', 'Документация', 'book', current) }}
 {% if user.role == 'admin' %}{{ nav_link('/admin', 'Админка', 'shield', current) }}{% elif low_balance_micro and user.balance_micro < low_balance_micro %}

@@ -126,10 +126,20 @@ def delete(conn: sqlite3.Connection, bot_id: int) -> None:
         conn.execute("DELETE FROM bots WHERE id = ?", (bot_id,))
 
 
-def listing(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    rows = conn.execute(
-        "SELECT b.*, u.login, u.balance_micro FROM bots b JOIN users u ON u.id = b.user_id ORDER BY b.id DESC"
-    ).fetchall()
+#: Сколько ботов может подключить один клиент в своём кабинете
+MAX_PER_CLIENT = 3
+
+
+def owned(conn: sqlite3.Connection, bot_id: int, user_id: int) -> bool:
+    return conn.execute("SELECT 1 FROM bots WHERE id = ? AND user_id = ?", (bot_id, user_id)).fetchone() is not None
+
+
+def listing(conn: sqlite3.Connection, user_id: int | None = None) -> list[dict[str, Any]]:
+    sql = "SELECT b.*, u.login, u.balance_micro FROM bots b JOIN users u ON u.id = b.user_id"
+    args: tuple = ()
+    if user_id is not None:
+        sql, args = sql + " WHERE b.user_id = ?", (user_id,)
+    rows = conn.execute(sql + " ORDER BY b.id DESC", args).fetchall()
     out = []
     for r in rows:
         st = RUNNER.state(r["id"]) if RUNNER else {}

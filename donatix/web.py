@@ -442,6 +442,69 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
     })
 
 
+# ── Свой Telegram-бот (конструктор) ──────────────────────────
+
+
+@router.get("/panel/bots")
+def panel_bots(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import bots
+    return render(request, "panel/bots.html", {
+        "user": user, "bots": bots.listing(conn, user["id"]), "max_bots": bots.MAX_PER_CLIENT,
+        "ready": bots.RUNNER is not None and bots.TEMPLATE_DIR.exists(),
+    })
+
+
+@router.post("/panel/bots", dependencies=[Depends(check_csrf)])
+def panel_bots_add(request: Request, token: str = Form(""), admin_ids: str = Form(""),
+                   user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import bots
+    from .worker import notify_admin
+    if user["status"] != "active":
+        flash(request, "Бот можно подключить после подтверждения аккаунта.", "error")
+        return _redirect("/panel/bots")
+    have = conn.execute("SELECT COUNT(*) FROM bots WHERE user_id = ?", (user["id"],)).fetchone()[0]
+    if have >= bots.MAX_PER_CLIENT:
+        flash(request, f"Можно подключить до {bots.MAX_PER_CLIENT} ботов. Удалите ненужного.", "error")
+        return _redirect("/panel/bots")
+    try:
+        username = bots.check_token(token)
+        bots.create(conn, config, user_id=user["id"], token=token, admin_ids=admin_ids, username=username)
+    except bots.BotError as exc:
+        flash(request, str(exc), "error")
+        return _redirect("/panel/bots")
+    if bots.RUNNER:
+        bots.RUNNER.poke()
+    notify_admin(config, f"🤖 Клиент {user['login']} подключил бота @{username} в конструкторе.")
+    flash(request, f"Бот @{username} подключён — запустится в течение минуты. Откройте его и нажмите /start, "
+                   "затем /panel — там игры, цены и реквизиты.")
+    return _redirect("/panel/bots")
+
+
+@router.post("/panel/bots/{bot_id}/{action}", dependencies=[Depends(check_csrf)])
+def panel_bots_action(bot_id: int, action: str, request: Request, admin_ids: str = Form(""),
+                      user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import bots
+    if not bots.owned(conn, bot_id, user["id"]):
+        flash(request, "Бот не найден.", "error")
+        return _redirect("/panel/bots")
+    try:
+        if action == "stop":
+            bots.set_enabled(conn, bot_id, False)
+        elif action in ("start", "restart"):
+            bots.set_enabled(conn, bot_id, True)  # updated_at меняется — процесс перезапустится
+        elif action == "admins":
+            bots.update_admins(conn, bot_id, admin_ids)
+            flash(request, "Админы бота обновлены.")
+        elif action == "delete":
+            bots.delete(conn, bot_id)
+            flash(request, "Бот удалён, его API-ключ отозван.")
+    except bots.BotError as exc:
+        flash(request, str(exc), "error")
+    if bots.RUNNER:
+        bots.RUNNER.poke()
+    return _redirect("/panel/bots")
+
+
 @router.get("/panel/data/rate")
 def panel_rate(user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
     """Страница оплаты спрашивает курс каждые 30 секунд."""
