@@ -1,16 +1,84 @@
 {% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Баланс — {{ site_name }}{% endblock %}
 {% block content %}
 <section class="page-hero"><h1>Баланс</h1><p>Все заказы оплачиваются с баланса в долларах.</p></section>
-<div class="grid two">
-  <div class="stat reveal"><div class="label">Доступно</div><div class="value">${{ fmt(user.balance_micro) }}</div></div>
+
+<div class="grid two" style="align-items:start">
+  <div class="stack">
+    <div class="stat reveal"><div class="label">Доступно</div><div class="value">${{ fmt(user.balance_micro) }}</div>
+      <div class="note">Курс для оплаты в сомони: 1 USD = {{ tjs_rate }} TJS</div></div>
+
+    <form class="card reveal" method="post" action="/panel/balance" id="payform">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="step-head"><span class="n">1</span><h3>Способ оплаты</h3></div>
+      {% if methods %}
+      <div class="paymethods">
+        {% for m in methods %}
+        <label class="paym {{ 'on' if loop.first }}">
+          <input type="radio" name="method" value="{{ m.code }}" data-cur="{{ m.currency }}" {{ 'checked' if loop.first }}>
+          <span class="tile sm {{ 'g4' if m.currency == 'TJS' else 'g5' }}">{{ icon('wallet' if m.currency == 'TJS' else 'bolt', 18) }}</span>
+          <span><b>{{ m.title }}</b><span class="sub">{{ m.currency }}</span></span>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="step-head" style="margin-top:22px"><span class="n">2</span><h3>Сумма</h3></div>
+      <label for="amount">Сколько зачислить, USD</label>
+      <input id="amount" name="amount" inputmode="decimal" required placeholder="Например, 50" autocomplete="off">
+      <div class="hint">Минимум ${{ min_usd }}. К переводу: <b id="topay">—</b></div>
+
+      <div class="step-head" style="margin-top:22px"><span class="n">3</span><h3>Переведите по реквизитам</h3></div>
+      {% for m in methods %}
+      <div class="details" data-for="{{ m.code }}" {{ 'hidden' if not loop.first }}>
+        <pre class="keybox">{{ m.details }}</pre>
+      </div>
+      {% endfor %}
+      <label for="reference">Номер чека / хэш перевода <span class="muted">(желательно)</span></label>
+      <input id="reference" name="reference" maxlength="200" placeholder="Например, 4821 или TX-хэш" autocomplete="off">
+      <button class="btn primary lg block" style="margin-top:18px">Я оплатил — отправить заявку</button>
+      <p class="hint center">{{ icon('shield', 16) }} После проверки поступления баланс зачислится, вам придёт уведомление.</p>
+      {% else %}
+      <p class="muted" style="margin-top:12px">Способы оплаты ещё не настроены.{% if support_contact %} Напишите {{ support_contact }}.{% endif %}</p>
+      {% endif %}
+    </form>
+  </div>
+
   <div class="card reveal">
-    <h3>Как пополнить</h3>
-    <ol>
-      <li>Напишите в поддержку{% if support_contact %}: <b>{{ support_contact }}</b>{% endif %} — укажите ваш логин <code>{{ user.login }}</code> и сумму.</li>
-      <li>Мы пришлём реквизиты: перевод или USDT.</li>
-      <li>После поступления баланс зачислится, операция появится в <a href="/panel/transactions">транзакциях</a>.</li>
-    </ol>
+    <h3>Мои заявки</h3>
+    <div class="list" style="margin-top:12px">
+      {% for p in payments %}
+      <div class="item">
+        <div class="tile sm {{ {'paid': 'ok', 'rejected': 'bad', 'cancelled': 'bad'}.get(p.status, 'g1') }}">{{ icon({'paid': 'check', 'rejected': 'x', 'cancelled': 'x'}.get(p.status, 'clock'), 18) }}</div>
+        <div class="grow">
+          <div class="head"><span class="title">#{{ p.id }} · {{ pay_titles.get(p.method, p.method) }}</span><span class="amount">${{ fmt(p.amount_micro) }}</span></div>
+          <div class="sub">{{ p.pay_amount }} {{ p.pay_currency }} · {{ p.created_at[:16] | replace('T', ' ') }}{% if p.admin_note %} · {{ p.admin_note }}{% endif %}</div>
+          <div class="meta">
+            <span class="badge {{ {'paid': 'ok', 'rejected': 'bad', 'cancelled': ''}.get(p.status, 'warn') }}">{{ {'pending': 'Проверяется', 'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено'}[p.status] }}</span>
+            {% if p.status == 'pending' %}
+            <form class="inline" method="post" action="/panel/balance/{{ p.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm">Отменить</button></form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% else %}<div class="empty small">Заявок пока нет.</div>{% endfor %}
+    </div>
   </div>
 </div>
+
+<script>
+(function () {
+  var f = document.getElementById("payform"); if (!f || !f.amount) return;
+  var rate = parseFloat("{{ tjs_rate }}");
+  function upd() {
+    var r = f.querySelector("input[name=method]:checked"); if (!r) return;
+    f.querySelectorAll(".paym").forEach(function (l) { l.classList.toggle("on", l.querySelector("input").checked); });
+    f.querySelectorAll(".details").forEach(function (d) { d.hidden = d.dataset.for !== r.value; });
+    var a = parseFloat((f.amount.value || "").replace(",", "."));
+    document.getElementById("topay").textContent = !a ? "—" :
+      (r.dataset.cur === "TJS" ? (Math.ceil(a * rate * 100) / 100).toFixed(2) + " TJS" : a.toFixed(2) + " " + r.dataset.cur);
+  }
+  f.addEventListener("input", upd); f.addEventListener("change", upd); upd();
+})();
+</script>
 {% endblock %}

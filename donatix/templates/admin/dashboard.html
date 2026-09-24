@@ -4,6 +4,7 @@
 <section class="page-hero"><div class="eyebrow">Админка</div><h1>Сводка</h1><p>Деньги, заказы и состояние поставщика.</p></section>
 
 {% if counts.attention %}<div class="flash error"><a href="/admin/orders?status=attention">Заказов, требующих внимания: {{ counts.attention }}</a> — проверьте их в панели FazerCards.</div>{% endif %}
+{% if counts.pending_payments %}<div class="flash warn"><a href="/admin/payments">Заявок на пополнение: {{ counts.pending_payments }}</a> — проверьте поступление и подтвердите.</div>{% endif %}
 {% if counts.pending_users %}<div class="flash warn"><a href="/admin/users?status=pending">Новых заявок: {{ counts.pending_users }}</a></div>{% endif %}
 
 <div class="grid">

@@ -661,3 +661,23 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 4px color-mix(in s
   .media { aspect-ratio: 4 / 3; padding: 8px; border-radius: 12px; }
   .media-title { font-size: .85rem; }
 }
+
+/* ── Уведомления и пополнение ─────────────────────────── */
+.bell { position: relative; }
+.dot-count {
+  position: absolute; top: -5px; right: -5px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
+  background: #ef4444; color: #fff; font-size: .72rem; font-weight: 800; display: grid; place-items: center;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.paymethods { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-top: 14px; }
+.paym {
+  position: relative; display: flex; align-items: center; gap: 10px; margin: 0; padding: 12px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--glass); font-weight: 500;
+}
+.paym input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; opacity: 0; cursor: pointer; }
+.paym .sub { display: block; color: var(--muted); font-size: .8rem; }
+.paym.on { border: 2px solid var(--accent); background: var(--accent-soft); padding: 11px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent); }
+.chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+a.chip { color: var(--text); }
+a.chip.on { color: var(--accent-ink); }

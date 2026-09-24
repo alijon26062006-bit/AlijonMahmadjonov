@@ -12,6 +12,16 @@ ROOT = Path(__file__).resolve().parent
 
 TIERS = ("bronze", "silver", "gold")
 
+# Способы пополнения баланса: код → (название, валюта перевода).
+PAY_METHODS = {
+    "alif": ("Алиф (Alif Mobi)", "TJS"),
+    "dc": ("Душанбе Сити (DC)", "TJS"),
+    "eskhata": ("Эсхата", "TJS"),
+    "korti_milli": ("Корти Милли", "TJS"),
+    "usdt_trc20": ("USDT TRC20", "USDT"),
+    "binance": ("Binance Pay", "USDT"),
+}
+
 
 def _load_dotenv(path: Path) -> None:
     """Мини-загрузчик .env: KEY=VALUE, комментарии через #. Окружение важнее файла."""
@@ -50,7 +60,7 @@ class Config:
 
     # Наценка в процентах поверх закупочной цены, по уровням клиентов.
     markups: dict[str, Decimal] = field(
-        default_factory=lambda: {"bronze": Decimal("8"), "silver": Decimal("6"), "gold": Decimal("4")}
+        default_factory=lambda: {"bronze": Decimal("8"), "silver": Decimal("8"), "gold": Decimal("8")}
     )
 
     # Своя наценка для вида товара (вместо наценки уровня). У Steam маржа тонкая.
@@ -74,6 +84,19 @@ class Config:
     require_approval: bool = True
     cookie_secure: bool = False
 
+    # Способы пополнения: код → реквизиты (показываются клиенту). Пустые не показываются.
+    pay_methods: dict[str, str] = field(default_factory=dict)
+    # Курс сомони за 1 USD — для способов оплаты в TJS.
+    tjs_rate: Decimal = Decimal("10.9")
+    pay_min_usd: Decimal = Decimal("5")
+
+    # Почта для уведомлений клиентам (необязательно).
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+
     # Куда писать клиентам для пополнения баланса и поддержки (например, @donatix_support).
     support_contact: str = ""
 
@@ -85,8 +108,10 @@ class Config:
             # Без ключа сессии слетают при каждом перезапуске — годится только для разработки.
             secret = secrets.token_urlsafe(32)
         markups = {}
-        for tier, default in (("bronze", "8"), ("silver", "6"), ("gold", "4")):
+        for tier, default in (("bronze", "8"), ("silver", "8"), ("gold", "8")):
             markups[tier] = Decimal(_env(f"DONATIX_MARKUP_{tier.upper()}", default))
+        pay_methods = {code: _env(f"DONATIX_PAY_{code.upper()}") for code in PAY_METHODS}
+        pay_methods = {k: v.replace("\\n", "\n") for k, v in pay_methods.items() if v}
         kind_markups = {"steam_topup": Decimal(_env("DONATIX_MARKUP_STEAM", "1.5"))}
         if _env("DONATIX_MARKUP_STEAM_GIFT"):
             kind_markups["steam_gift"] = Decimal(_env("DONATIX_MARKUP_STEAM_GIFT"))
@@ -112,4 +137,12 @@ class Config:
             require_approval=_flag("DONATIX_REQUIRE_APPROVAL", True),
             cookie_secure=_flag("DONATIX_COOKIE_SECURE", False),
             support_contact=_env("DONATIX_SUPPORT_CONTACT"),
+            pay_methods=pay_methods,
+            tjs_rate=Decimal(_env("DONATIX_TJS_RATE", "10.9")),
+            pay_min_usd=Decimal(_env("DONATIX_PAY_MIN_USD", "5")),
+            smtp_host=_env("DONATIX_SMTP_HOST"),
+            smtp_port=int(_env("DONATIX_SMTP_PORT", "587")),
+            smtp_user=_env("DONATIX_SMTP_USER"),
+            smtp_password=_env("DONATIX_SMTP_PASSWORD"),
+            smtp_from=_env("DONATIX_SMTP_FROM"),
         )

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 
 from . import accounts, catalog, db, orders, worker
-from .config import TIERS, Config
+from .config import PAY_METHODS, TIERS, Config
 from .deps import Forbidden, LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
 from .money import MoneyError, apply_markup, fmt, fmt_unit, to_decimal, to_micro
 from .suppliers import KINDS, SupplierError
@@ -38,6 +38,9 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
         "clients": conn.execute("SELECT COUNT(*) FROM users WHERE role = 'client'").fetchone()[0],
         "attention": conn.execute("SELECT COUNT(*) FROM orders WHERE status = 'attention'").fetchone()[0],
         "processing": conn.execute("SELECT COUNT(*) FROM orders WHERE status = 'processing'").fetchone()[0],
+        "pending_payments": conn.execute("SELECT COUNT(*) FROM payments WHERE status = 'pending'").fetchone()[0],
+        "failed_today": conn.execute("SELECT COUNT(*) FROM orders WHERE status = 'failed' AND created_at >= date('now')"
+                                     ).fetchone()[0],
         "products": conn.execute("SELECT COUNT(*) FROM products WHERE active = 1").fetchone()[0],
         "client_balances": conn.execute(
             "SELECT COALESCE(SUM(balance_micro), 0) FROM users WHERE role = 'client'").fetchone()[0],
@@ -112,9 +115,14 @@ def user_update(user_id: int, request: Request, status: str = Form(...), tier: s
     if user_id == admin["id"] and status != "active":
         flash(request, "Нельзя отключить самого себя.", "error")
         return _back(f"/admin/users/{user_id}")
+    before = accounts.get_user(conn, user_id)
     try:
         accounts.update_user_admin(conn, user_id, status=status, tier=tier, markup_override=markup_override)
         flash(request, "Сохранено.")
+        if before and before["status"] != "active" and status == "active":
+            from .notify import notify
+            notify(conn, request.app.state.config, user_id,
+                   "Аккаунт активирован — можно пополнять баланс и делать заказы.", "/panel")
     except accounts.AccountError as exc:
         flash(request, str(exc), "error")
     return _back(f"/admin/users/{user_id}")
@@ -138,6 +146,10 @@ def user_balance(user_id: int, request: Request, amount: str = Form(...), note: 
     except accounts.InsufficientBalance:
         flash(request, "Столько списать нельзя: баланс уйдёт в минус.", "error")
         return _back(f"/admin/users/{user_id}")
+    from .notify import notify
+    notify(conn, request.app.state.config, user_id,
+           (f"Баланс пополнен на ${fmt(micro)}" if micro > 0 else f"С баланса списано ${fmt(-micro)}") + f": {text}.",
+           "/panel/transactions")
     flash(request, f"Баланс изменён на ${fmt(micro)}.")
     return _back(f"/admin/users/{user_id}")
 
@@ -222,3 +234,55 @@ def products(request: Request, kind: str = "", q: str = "", admin=Depends(admin_
 def product_toggle(product_id: str, request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
     conn.execute("UPDATE products SET hidden = 1 - hidden WHERE id = ?", (product_id,))
     return _back(request.headers.get("referer") or "/admin/products")
+
+
+# ── Пополнения ───────────────────────────────────────────────
+
+
+@router.get("/payments")
+def payments_list(request: Request, status: str = "pending", admin=Depends(admin_user), conn=Depends(get_conn)):
+    where, args = "1=1", []
+    if status in ("pending", "paid", "rejected", "cancelled"):
+        where += " AND p.status = ?"
+        args.append(status)
+    rows = conn.execute(
+        f"SELECT p.*, u.login, u.balance_micro FROM payments p JOIN users u ON u.id = p.user_id WHERE {where} "
+        f"ORDER BY p.id DESC LIMIT 200", args).fetchall()
+    return render(request, "admin/payments.html", {
+        "user": admin, "rows": rows, "status": status, "titles": {k: v[0] for k, v in PAY_METHODS.items()},
+    })
+
+
+@router.post("/payments/{payment_id}/confirm", dependencies=[Depends(check_csrf)])
+def payment_confirm(payment_id: int, request: Request, credit: str = Form(""), admin=Depends(admin_user),
+                    conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import payments
+    try:
+        ok = payments.confirm(conn, config, payment_id, admin["id"], credit.strip() or None)
+    except payments.PaymentError as exc:
+        flash(request, str(exc), "error")
+        return _back("/admin/payments")
+    flash(request, "Баланс зачислен, клиент уведомлён." if ok else "Заявка уже обработана.", "ok" if ok else "error")
+    return _back("/admin/payments")
+
+
+@router.post("/payments/{payment_id}/reject", dependencies=[Depends(check_csrf)])
+def payment_reject(payment_id: int, request: Request, reason: str = Form(""), admin=Depends(admin_user),
+                   conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import payments
+    ok = payments.reject(conn, config, payment_id, admin["id"], reason)
+    flash(request, "Заявка отклонена, клиент уведомлён." if ok else "Заявка уже обработана.", "ok" if ok else "error")
+    return _back("/admin/payments")
+
+
+# ── Ошибки ───────────────────────────────────────────────────
+
+
+@router.get("/errors")
+def errors(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    rows = conn.execute(
+        "SELECT o.*, u.login FROM orders o JOIN users u ON u.id = o.user_id "
+        "WHERE o.status IN ('failed', 'attention') OR (o.status = 'processing' AND o.error IS NOT NULL) "
+        "OR o.webhook_state = 'failed' ORDER BY (o.status = 'attention') DESC, o.id DESC LIMIT 200"
+    ).fetchall()
+    return render(request, "admin/errors.html", {"user": admin, "rows": rows})

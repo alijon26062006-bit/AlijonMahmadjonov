@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from . import accounts, catalog, orders
-from .config import Config
+from .config import PAY_METHODS, Config
 from .deps import LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
 from .suppliers import KINDS
 
@@ -274,8 +274,49 @@ def panel_transactions(request: Request, type: str = "", page: int = 1,
 
 
 @router.get("/panel/balance")
-def panel_balance(request: Request, user=Depends(panel_user)):
-    return render(request, "panel/balance.html", {"user": user})
+def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                  config: Config = Depends(get_config)):
+    from . import payments
+    rows = conn.execute("SELECT * FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user["id"],)).fetchall()
+    return render(request, "panel/balance.html", {
+        "user": user, "methods": payments.methods(config), "payments": rows, "tjs_rate": config.tjs_rate,
+        "min_usd": config.pay_min_usd, "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()},
+    })
+
+
+@router.post("/panel/balance", dependencies=[Depends(check_csrf)])
+def panel_balance_request(request: Request, method: str = Form(""), amount: str = Form(""),
+                          reference: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn),
+                          config: Config = Depends(get_config)):
+    from . import payments
+    from .worker import notify_admin
+    try:
+        pid = payments.create(conn, config, user, method, amount, reference)
+    except payments.PaymentError as exc:
+        flash(request, str(exc), "error")
+        return _redirect("/panel/balance")
+    row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
+    notify_admin(config, f"заявка на пополнение #{pid} от {user['login']}: {row['pay_amount']} {row['pay_currency']} "
+                         f"({PAY_METHODS[method][0]}). Проверьте поступление в админке → Пополнения.")
+    flash(request, f"Заявка #{pid} создана. Переведите {row['pay_amount']} {row['pay_currency']} по реквизитам — "
+                   "после проверки баланс пополнится, вам придёт уведомление.")
+    return _redirect("/panel/balance")
+
+
+@router.post("/panel/balance/{payment_id}/cancel", dependencies=[Depends(check_csrf)])
+def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import payments
+    payments.cancel(conn, user["id"], payment_id)
+    flash(request, "Заявка отменена.")
+    return _redirect("/panel/balance")
+
+
+@router.get("/panel/notifications")
+def panel_notifications(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import notify
+    rows = notify.latest(conn, user["id"])
+    notify.mark_read(conn, user["id"])
+    return render(request, "panel/notifications.html", {"user": user, "rows": rows})
 
 
 @router.get("/panel/api")

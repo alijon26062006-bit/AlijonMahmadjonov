@@ -91,4 +91,12 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["csrf"] = csrf_token(request)
     ctx["flashes"] = request.session.pop("flash", [])
     ctx["path"] = request.url.path
+    ctx["unread"] = 0
+    if ctx.get("user") is not None:
+        from .notify import unread_count
+        c = db.connect(config.db_path)
+        try:
+            ctx["unread"] = unread_count(c, ctx["user"]["id"])
+        finally:
+            c.close()
     return templates.TemplateResponse(request, name, ctx, status_code=status_code)

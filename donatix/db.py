@@ -116,6 +116,33 @@ CREATE TABLE IF NOT EXISTS steam_gift_games (
     name_lc TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS payments (
+    id            INTEGER PRIMARY KEY,
+    user_id       INTEGER NOT NULL REFERENCES users(id),
+    method        TEXT NOT NULL,
+    amount_micro  INTEGER NOT NULL,             -- сколько зачислить, USD
+    pay_amount    TEXT NOT NULL,                -- сколько перевести, в валюте способа
+    pay_currency  TEXT NOT NULL,
+    reference     TEXT,                         -- что указал клиент: номер чека, хэш и т.п.
+    status        TEXT NOT NULL DEFAULT 'pending',  -- pending | paid | rejected | cancelled
+    admin_note    TEXT,
+    tx_id         INTEGER REFERENCES transactions(id),
+    created_at    TEXT NOT NULL,
+    resolved_at   TEXT,
+    resolved_by   INTEGER REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS payments_status ON payments(status, id DESC);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    text       TEXT NOT NULL,
+    link       TEXT,
+    created_at TEXT NOT NULL,
+    read_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS notifications_user ON notifications(user_id, id DESC);
+
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL

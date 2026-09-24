@@ -307,6 +307,10 @@ def fail_and_refund(conn: sqlite3.Connection, order_id: int, reason: str, *, by_
             conn, order["user_id"], order["total_micro"], f"Возврат за {order['public_id']}",
             order_id=order_id, created_by=by_admin,
         )
+        from .notify import notify
+        notify(conn, None, order["user_id"],
+               f"Заказ {order['public_id']} не выполнен, ${fmt(order['total_micro'])} вернулись на баланс.",
+               f"/panel/orders/{order['public_id']}")
     return True
 
 

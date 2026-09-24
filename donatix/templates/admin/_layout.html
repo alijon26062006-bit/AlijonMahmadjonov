@@ -5,7 +5,8 @@
 <h4>Админка</h4>
 {{ nav_link('/admin', 'Сводка', 'chart', current) }}
 {{ nav_link('/admin/orders', 'Заказы', 'bag', current) }}
-{{ nav_link('/admin/orders?status=attention', 'Требуют внимания', 'alert', current) }}
+{{ nav_link('/admin/payments', 'Пополнения', 'wallet', current) }}
+{{ nav_link('/admin/errors', 'Ошибки', 'alert', current) }}
 {{ nav_link('/admin/users', 'Клиенты', 'users', current) }}
 {{ nav_link('/admin/users?status=pending', 'Заявки', 'handshake', current) }}
 {{ nav_link('/admin/products', 'Каталог', 'grid', current) }}
