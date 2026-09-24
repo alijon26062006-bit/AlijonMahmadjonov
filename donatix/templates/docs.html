@@ -81,7 +81,7 @@
         <div class="ep"><span class="method {{ m | lower }}">{{ m }}</span><code>{{ path }}</code><span class="what">{{ what }}</span></div>
         {% endfor %}
       </div>
-      <p class="hint">kind: <code>telegram_stars</code> <code>telegram_premium</code> <code>steam_topup</code> <code>steam_gift</code> <code>topup</code> <code>gift_card</code></p>
+      <p class="hint">kind: <code>telegram_stars</code> <code>telegram_premium</code> <code>steam_topup</code> <code>steam_gift</code> <code>topup</code> <code>gift_card</code> <code>game_key</code></p>
     </section>
 
     <section id="fields" class="doc-sec">
@@ -91,7 +91,7 @@
         <tr><th>Товар</th><th>fields</th></tr>
         <tr><td>Telegram Stars, Premium</td><td><code>telegram_username</code></td></tr>
         <tr><td>Пополнения игр</td><td><code>player_id</code>, иногда сервер или зона</td></tr>
-        <tr><td>Подарочные карты</td><td>нет, только <code>quantity</code></td></tr>
+        <tr><td>Подарочные карты, ключи игр</td><td>нет, только <code>quantity</code></td></tr>
         <tr><td>Пополнение Steam</td><td><code>steam_login</code> <code>currency</code> <code>amount</code></td></tr>
         <tr><td>Steam-гифт</td><td><code>app_id</code> <code>sub_id</code> <code>region</code> <code>invite_url</code></td></tr>
       </table></div>

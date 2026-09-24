@@ -805,3 +805,9 @@ a.who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; 
 .job-nums b { font-family: "JetBrains Mono", ui-monospace, monospace; }
 @media (max-width: 560px) { .job-nums { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .job-log { margin: 14px 0 0; max-height: 260px; overflow-y: auto; font-size: .78rem; background: var(--code-bg); color: #9fb3c8; white-space: pre-wrap; }
+
+/* Ключи игр */
+.key-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.regions-box { margin-top: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.regions-box .chip { font-size: .8rem; padding: 3px 9px; }
+.chips.off .chip { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 30%, var(--line)); text-decoration: line-through; }

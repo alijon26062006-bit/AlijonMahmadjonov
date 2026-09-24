@@ -203,7 +203,7 @@ def _cents(value) -> str:
 
 
 # Разделы, где товары сгруппированы по играм/сервисам: сначала выбирают игру, потом пакет
-_BY_GAME = ("topup", "gift_card")
+_BY_GAME = ("topup", "gift_card", "game_key")
 
 
 @router.get("/panel/catalog")
@@ -297,6 +297,15 @@ def panel_check_account(product_id: str, request: Request, user=Depends(panel_us
         return {"ok": True, **account_check_view(request.app.state.supplier, p, fields)}
     except ApiError as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, exc.http_status)
+
+
+@router.get("/panel/data/gamekey-regions/{product_id}")
+def panel_gamekey_regions(product_id: str, request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import gamekeys
+    p = catalog.get_product(conn, product_id)
+    if p is None or p["kind"] != "game_key":
+        return JSONResponse({"ok": False, "error": "Товар не найден."}, 404)
+    return {"ok": True, **gamekeys.regions(request.app.state.supplier, p["supplier_ref"]["game_id"])}
 
 
 @router.get("/panel/data/steam-gifts/games")

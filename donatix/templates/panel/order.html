@@ -29,9 +29,10 @@
     {% else %}
       <h3>Готово</h3>
       {% set d = view.delivery or {} %}
-      {% if d.codes %}
-        <p class="muted">Коды:</p>
-        {% for c in d.codes %}<pre class="keybox">{{ c }}</pre>{% endfor %}
+      {% set codes = d.get('codes') or d.get('keys') or [] %}
+      {% if codes %}
+        <p class="muted">{{ 'Ключи' if view.kind == 'game_key' else 'Коды' }}:</p>
+        {% for c in codes %}<pre class="keybox">{{ (c.get('key') or c.get('code') or c) if c is mapping else c }}</pre>{% endfor %}
       {% elif d.message %}
         <p>{{ d.message }}</p>
       {% elif view.delivery %}

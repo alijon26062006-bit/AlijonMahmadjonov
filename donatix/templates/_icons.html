@@ -44,7 +44,7 @@
 {%- endmacro -%}
 
 {%- macro kind_icon(kind, size=20) -%}
-{{ icon({'telegram_stars': 'star', 'telegram_premium': 'crown', 'steam_topup': 'wallet', 'steam_gift': 'gift', 'topup': 'bolt', 'gift_card': 'card'}.get(kind, 'grid'), size) }}
+{{ icon({'telegram_stars': 'star', 'telegram_premium': 'crown', 'steam_topup': 'wallet', 'steam_gift': 'gift', 'topup': 'bolt', 'gift_card': 'card', 'game_key': 'key'}.get(kind, 'grid'), size) }}
 {%- endmacro -%}
 
 {#- Значок пакета: алмаз для игровой валюты, монета для UC/Coins, иначе — значок раздела -#}

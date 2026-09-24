@@ -44,6 +44,17 @@ def demo_catalog() -> list[ProductData]:
         items.append(ProductData(f"gc-steam-{usd}", "gift_card", "steam_usd", "Steam USD",
                                  f"Steam — ${usd}", Decimal(price), max_qty=10, stock=50,
                                  supplier_ref={"category_id": "steam_usd", "card_id": f"s{usd}"}))
+    for game_id, title, appid, keys in (
+        ("elden-ring", "Elden Ring", 1245620, (("Elden Ring — Steam Key (Global)", "GLOBAL", "39.90"),
+                                               ("Elden Ring — Steam Key (RU/CIS)", "CIS", "24.50"))),
+        ("cs2-prime", "Counter-Strike 2 Prime", 730, (("CS2 Prime Status Upgrade", "GLOBAL", "13.20"),)),
+    ):
+        for name, region, price in keys:
+            items.append(ProductData(f"gk-{game_id}-{region.lower()}", "game_key", game_id, title, name, Decimal(price),
+                                     max_qty=5, stock=20, region=region,
+                                     image_url=f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg",
+                                     supplier_ref={"game_id": game_id, "key_id": f"{game_id}-{region}",
+                                                   "platform": "Steam", "region_restriction": region != "GLOBAL"}))
     return items
 
 
@@ -96,6 +107,12 @@ class MockSupplier:
             return {"valid": False, "message": "Аккаунт не найден"}
         return {"valid": True, "player_name": f"Player_{pid[-4:]}", "region": "GLOBAL"}
 
+    def gamekey_regions(self, game_id: str) -> dict[str, Any]:
+        return {"region_type": "CIS", "has_availability": True,
+                "available": [{"code": c, "name": n} for c, n in (("RU", "Russia"), ("KZ", "Kazakhstan"),
+                                                                    ("TJ", "Tajikistan"), ("UZ", "Uzbekistan"))],
+                "unavailable": [{"code": "US", "name": "United States"}, {"code": "DE", "name": "Germany"}]}
+
     def check_steam_login(self, login: str) -> bool:
         return not login.lower().startswith("bad")
 
@@ -128,7 +145,7 @@ class MockSupplier:
             if order["polls"] < self.polls_to_complete:
                 return SupplierOrder(supplier_order_id, "processing", "processing")
             product = order["product"]
-            if product["kind"] == "gift_card":
+            if product["kind"] in ("gift_card", "game_key"):
                 codes = [f"DEMO-{secrets.token_hex(4).upper()}-{secrets.token_hex(4).upper()}"
                          for _ in range(order["quantity"])]
                 delivery = {"codes": codes}

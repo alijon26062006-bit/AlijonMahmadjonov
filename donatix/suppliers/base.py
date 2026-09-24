@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Iterable, Protocol
 
-KINDS = ("telegram_stars", "telegram_premium", "steam_topup", "steam_gift", "topup", "gift_card")
+KINDS = ("telegram_stars", "telegram_premium", "steam_topup", "steam_gift", "topup", "gift_card", "game_key")
 
 STEAM_CURRENCIES = ("USD", "RUB", "KZT", "UAH")
 
@@ -18,6 +18,7 @@ KIND_TITLES = {
     "steam_gift": "Steam Гифты",
     "topup": "Пополнение сервисов",
     "gift_card": "Подарочные карты",
+    "game_key": "Ключи игр",
 }
 
 
@@ -87,13 +88,13 @@ _DONE = {"completed", "complete", "success", "succeeded", "delivered", "done", "
 _FAILED = {"failed", "fail", "error", "cancelled", "canceled", "rejected", "refunded", "declined", "expired"}
 
 
-_IMAGE_KEYS = ("image", "image_url", "imageUrl", "cover", "cover_url", "coverUrl", "logo", "logo_url",
+_IMAGE_KEYS = ("imageurl", "image", "image_url", "imageUrl", "cover", "cover_url", "coverUrl", "logo", "logo_url",
                "icon", "icon_url", "banner", "picture", "img", "thumbnail")
 
 
-def pick_image(*sources: Any) -> str | None:
-    """Найти ссылку на картинку в ответе поставщика. Точное имя поля в документации
-    не указано, поэтому смотрим типичные варианты, в том числе во вложенном "ui"."""
+def pick_image(*sources: Any, base: str = "") -> str | None:
+    """Найти ссылку на картинку в ответе поставщика. FazerCards с include_ui=1 отдаёт поле
+    imageurl — путь к обложке; относительный путь дополняем адресом поставщика (base)."""
     for src in sources:
         if not isinstance(src, dict):
             continue
@@ -104,9 +105,27 @@ def pick_image(*sources: Any) -> str | None:
                 val = obj.get(key)
                 if isinstance(val, dict):
                     val = val.get("url") or val.get("src")
-                if isinstance(val, str) and val.startswith(("https://", "http://")):
+                if not isinstance(val, str) or not val.strip():
+                    continue
+                val = val.strip()
+                if val.startswith(("https://", "http://")):
                     return val
+                if val.startswith("//"):
+                    return "https:" + val
+                if base and val.startswith("/") and not val.startswith("/\\"):
+                    return base.rstrip("/") + val
+                if base and re.fullmatch(r"[\w./-]+\.(?:png|jpe?g|webp|gif|avif)", val, re.I):
+                    return base.rstrip("/") + "/" + val.lstrip("./")
     return None
+
+
+def steam_cover(appid: Any) -> str | None:
+    """Обложка из Steam по appid — запасной вариант, если у поставщика картинки нет."""
+    try:
+        n = int(appid)
+    except (TypeError, ValueError):
+        return None
+    return f"https://cdn.cloudflare.steamstatic.com/steam/apps/{n}/header.jpg" if n > 0 else None
 
 
 # Регионы: код → как показываем клиенту. Незнакомый код показываем как есть.
@@ -204,6 +223,10 @@ class Supplier(Protocol):
 
     def validate_account(self, category_id: str, fields: dict[str, str]) -> dict[str, Any]:
         """{"valid", "player_name", "region", "message"}."""
+        ...
+
+    def gamekey_regions(self, game_id: str) -> dict[str, Any]:
+        """Страны, где активируется ключ игры."""
         ...
 
     def check_steam_login(self, login: str) -> bool:

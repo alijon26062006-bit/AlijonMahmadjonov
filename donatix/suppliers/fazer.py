@@ -19,6 +19,7 @@ from .base import (
     ProductData,
     pick_image,
     pick_region,
+    steam_cover,
     steam_gift_product,
     SupplierOrder,
     SupplierRejected,
@@ -31,7 +32,7 @@ log = logging.getLogger(__name__)
 # Для этих видов в документации заявлен Idempotency-Key: повтор с тем же ключом
 # не создаст второй заказ. Для Telegram-покупок заголовок не упомянут —
 # такие заказы при сбое сети не повторяем автоматически, а отдаём админу.
-_IDEMPOTENT_KINDS = {"topup", "gift_card", "steam_topup", "steam_gift"}
+_IDEMPOTENT_KINDS = {"topup", "gift_card", "steam_topup", "steam_gift", "game_key"}
 
 # Лимиты пополнения Steam в USD. Точных в документации нет — поставщик сам
 # отклонит сумму вне своих пределов, и деньги клиенту вернутся.
@@ -56,6 +57,7 @@ class FazerSupplier:
         catalog_pause: float = 0.6,
         timeout: float = 30.0,
         steam_discount: Decimal = Decimal("0"),
+        image_base: str = "",
     ):
         if not api_key:
             raise ValueError("FAZER_API_KEY не задан")
@@ -67,6 +69,9 @@ class FazerSupplier:
         )
         # Каталог читаем не чаще ~100 запросов в минуту (их лимит — 120).
         self._catalog_pause = catalog_pause
+        # Откуда брать картинки, если поставщик отдал путь без домена (imageurl: "/uploads/…")
+        origin = httpx.URL(base_url)
+        self._image_base = (image_base or f"{origin.scheme}://{origin.host}").rstrip("/")
         # Скидка вашего тарифа FazerCards на пополнение Steam, % (Bronze 2.5, Silver 3, Gold 3.55).
         self._steam_discount = Decimal(steam_discount)
 
@@ -132,6 +137,7 @@ class FazerSupplier:
             yield steam_gift_product()
         yield from self._topups()
         yield from self._giftcards()
+        yield from self._gamekeys()
 
     def _telegram(self) -> Iterable[ProductData]:
         stars = self._catalog_get("/telegram/stars")
@@ -207,9 +213,18 @@ class FazerSupplier:
                     fields=fields,
                     supplier_ref={"category_id": cat_id, "offer_id": str(offer["offer_id"])},
                     # Картинка — обложка игры; у пакетов («25 алмазов») свои картинки не берём
-                    image_url=pick_image(cat, data),
+                    image_url=self._image(cat, data),
                     region=pick_region(str(offer["name"]), offer, data, cat),
                 )
+
+    def _image(self, *sources: Any) -> str | None:
+        img = pick_image(*sources, base=self._image_base)
+        if img:
+            return img
+        for src in sources:
+            if isinstance(src, dict) and src.get("appid"):
+                return steam_cover(src["appid"])
+        return None
 
     def _giftcards(self) -> Iterable[ProductData]:
         for cat in list(self._paged("/giftcards")):
@@ -229,8 +244,43 @@ class FazerSupplier:
                     max_qty=min(int(offer.get("max_order_quantity") or 1), 100),
                     stock=int(offer["stock"]) if offer.get("stock") is not None else None,
                     supplier_ref={"category_id": cat_id, "card_id": str(offer["card_id"])},
-                    image_url=pick_image(cat, data),
+                    image_url=self._image(cat, data),
                     region=pick_region(str(offer["name"]), offer, data, cat),
+                )
+
+    def _gamekeys(self) -> Iterable[ProductData]:
+        """Ключи игр: GET /gamekeys → игры, GET /gamekeys/keys?game_id → ключи с ценой и наличием."""
+        for game in list(self._paged("/gamekeys")):
+            game_id = str(game.get("game_id") or "")
+            if not game_id:
+                continue
+            data = self._catalog_get("/gamekeys/keys", game_id=game_id, include_ui=1)
+            if not data:
+                continue
+            title = str(data.get("GameName") or data.get("game_name") or game.get("name") or game_id)
+            region = data.get("region") or game.get("region")
+            platform = str(data.get("platform") or game.get("platform") or "")
+            restricted = bool(data.get("region_restriction", game.get("region_restriction")))
+            for key in data.get("keys") or []:
+                if not key.get("key_id"):  # без key_id заказать нельзя
+                    continue
+                stock = key.get("stock")
+                if stock is not None and int(stock) <= 0:
+                    continue
+                yield ProductData(
+                    id=_pid("gk", game_id, str(key["key_id"])),
+                    kind="game_key",
+                    category_id=game_id,
+                    category_name=title,
+                    name=str(key.get("name") or title),
+                    base_price=Decimal(str(key["price_usd"])),
+                    min_qty=max(int(key.get("min_order_quantity") or 1), 1),
+                    max_qty=min(int(key.get("max_order_quantity") or 1), 100),
+                    stock=int(stock) if stock is not None else None,
+                    supplier_ref={"game_id": game_id, "key_id": str(key["key_id"]), "platform": platform,
+                                  "region_restriction": restricted, "appid": data.get("appid") or game.get("appid")},
+                    image_url=self._image(data, game),
+                    region=pick_region(str(key.get("name") or ""), {"region": region} if region else {}),
                 )
 
     # ── Заказы ────────────────────────────────────────────────
@@ -277,6 +327,12 @@ class FazerSupplier:
             path, body = "/giftcards/order", {
                 "category_id": ref["category_id"],
                 "card_id": ref["card_id"],
+                "quantity": quantity,
+            }
+        elif kind == "game_key":
+            path, body = "/gamekeys/order", {
+                "game_id": ref["game_id"],
+                "key_id": ref["key_id"],
                 "quantity": quantity,
             }
         else:
@@ -332,6 +388,12 @@ class FazerSupplier:
             "region": body.get("region"),
             "message": body.get("message") or "",
         }
+
+    def gamekey_regions(self, game_id: str) -> dict[str, Any]:
+        """Где ключ активируется: {"region_type", "available": [{code, name}], "unavailable": [...]}."""
+        data = self._request("GET", "/gamekeys/region-restriction", params={"game_id": game_id})
+        return {"region_type": data.get("region_type") or "", "available": data.get("available") or [],
+                "unavailable": data.get("unavailable") or [], "has_availability": bool(data.get("has_availability"))}
 
     def check_steam_login(self, login: str) -> bool:
         data = self._request("POST", "/steam-topup/check-login", json={"steamLogin": login})

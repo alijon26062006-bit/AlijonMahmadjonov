@@ -216,3 +216,24 @@ def test_seal_roundtrip():
     assert unseal("other-secret", box) is None
     tampered = box[:-2] + ("00" if box[-2:] != "00" else "11")
     assert unseal("site-secret", tampered) is None
+
+
+def test_game_keys_in_panel(app, config, conn):
+    from conftest import web_login
+    from fastapi.testclient import TestClient
+
+    from donatix import accounts, catalog
+
+    catalog.sync_catalog(conn, app.state.supplier)
+    uid = accounts.create_user(conn, email="gk@example.com", login="keybuyer", password="password123", status="active")
+    accounts.post_ledger(conn, uid, 1_000_000_000, "test")
+    client = TestClient(app)
+    token = web_login(client, "gk@example.com", "password123")
+    page = client.get("/panel/catalog?kind=game_key").text
+    assert "Elden Ring" in page and "game-card" in page
+    page = client.get("/panel/buy/gk-elden-ring-cis").text
+    assert "gk-regions" in page and "Steam" in page
+    r = client.get("/panel/data/gamekey-regions/gk-elden-ring-cis").json()
+    assert r["ok"] and {"code": "TJ", "name": "Tajikistan"} in r["available"]
+    r = client.post("/panel/buy/gk-elden-ring-cis", data={"csrf": token, "idem": "g1", "quantity": "2"})
+    assert r.status_code == 200 and "× 2" in r.text

@@ -100,12 +100,10 @@ $3.99 / $6.99 / $9.99 в месяц. **Реальные цены уточнят�
 
 ## Картинки каталога
 
-У поставщика можно получать обложки товаров и категорий (например, PUBG Mobile) —
-мы, как реселлер, используем их в своём каталоге. В списках категорий параметр
-`include_ui` добавляет обложки. Точное имя поля с картинкой в документации не
-показано; Donatix ищет его среди типичных (`image`, `cover`, `logo`, `icon`, в том
-числе внутри `ui`) — см. `donatix/suppliers/base.py: pick_image`. Когда увидим
-настоящий ответ API, имя поля можно зафиксировать.
+С параметром `include_ui=1` (или `true`) списки категорий и ответы с товарами получают поля
+`imageurl` — путь к обложке (может быть без домена, тогда дописываем домен API или
+`FAZER_IMAGE_BASE`) и `appid` — Steam AppID. Если картинки нет, а `appid` есть, берём обложку
+из Steam CDN (`/steam/apps/{appid}/header.jpg`). См. `donatix/suppliers/base.py: pick_image`.
 
 ## Игровые пополнения (по ID игрока)
 
@@ -132,9 +130,13 @@ Free Fire, Mobile Legends…) поставщик умеет проверить �
 
 ## Ключи игр
 
-1. `GET /gamekeys?limit=50` — name, game_id, region, platform, region_restriction.
-2. `GET /gamekeys/keys?game_id=…` — keys[]: key_id, name, price_usd, stock, min/max (поле `GameName` с большой буквы).
-3. `GET /gamekeys/region-restriction?game_id=…` — available[] / unavailable[] страны.
+1. `GET /gamekeys?limit=200&include_ui=1` — только категории, где есть что продать (stock > 0).
+   items[]: name, game_id, region, platform, region_restriction, appid, imageurl. Курсор: meta.next_cursor / has_more. limit до 500.
+2. `GET /gamekeys/keys?game_id=…&include_ui=1` — GameName (с большой буквы), region, platform,
+   region_restriction, appid, imageurl; keys[]: key_id (может быть null — такой не продаём), name,
+   price_usd, stock, min_order_quantity, max_order_quantity.
+3. `GET /gamekeys/region-restriction?game_id=…` — region_type, has_availability,
+   available[] / unavailable[]: {code (ISO), name (англ.)}.
 4. `POST /gamekeys/order` — `{"game_id","key_id","quantity"}`.
 
 ## Steam

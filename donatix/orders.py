@@ -236,7 +236,7 @@ def _display_name(product: dict[str, Any], qty: int, fields: dict[str, str] | No
         return f"Steam {fields['amount']} {fields['currency']}"
     if product["kind"] == "telegram_stars":
         return f"Telegram Stars {qty}"
-    if product["kind"] == "gift_card" and qty > 1:
+    if product["kind"] in ("gift_card", "game_key") and qty > 1:
         return f"{product['name']} × {qty}"
     if product["category_name"] and product["category_name"] not in product["name"]:
         return f"{product['category_name']} — {product['name']}"

@@ -18,7 +18,8 @@ def make_supplier(config: Config) -> Supplier:
     if config.supplier == "fazer":
         from .fazer import FazerSupplier
 
-        return FazerSupplier(config.fazer_api_key, config.fazer_base_url, steam_discount=config.fazer_steam_discount)
+        return FazerSupplier(config.fazer_api_key, config.fazer_base_url, steam_discount=config.fazer_steam_discount,
+                             image_base=config.fazer_image_base)
     if config.supplier == "mock":
         from .mock import MockSupplier
 

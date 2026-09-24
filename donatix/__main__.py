@@ -85,12 +85,15 @@ def main(argv: list[str] | None = None) -> int:
                 print("Работает только с DONATIX_SUPPLIER=fazer.")
                 return 1
             for path, sub_path, key in (("/topups", "/topups/offers", "offers"),
-                                        ("/giftcards", "/giftcards/cards", "offers")):
+                                        ("/giftcards", "/giftcards/cards", "offers"),
+                                        ("/gamekeys", "/gamekeys/keys", "keys")):
                 data = supplier._catalog_get(path, limit=3, include_ui=1) or {}
                 cats = data.get("items", [])
                 print(f"== {path}: пример категории\n{json.dumps(cats[:1], ensure_ascii=False, indent=1)[:1500]}")
                 if cats:
-                    detail = supplier._catalog_get(sub_path, category_id=cats[0]["category_id"], include_ui=1) or {}
+                    ident = {"game_id": cats[0]["game_id"]} if "game_id" in cats[0] else \
+                        {"category_id": cats[0]["category_id"]}
+                    detail = supplier._catalog_get(sub_path, include_ui=1, **ident) or {}
                     offers = detail.get(key, [])
                     head = {k: v for k, v in detail.items() if k != key}
                     print(f"== {sub_path}: поля ответа\n{json.dumps(head, ensure_ascii=False, indent=1)[:1500]}")
@@ -99,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
             print("\nРегионы и картинки в каталоге:")
             catalog.sync_catalog(conn, supplier)
             for row in conn.execute("SELECT kind, category_name, COUNT(*) n, GROUP_CONCAT(DISTINCT region) r, "
-                                    "MAX(image_url) img FROM products WHERE kind IN ('topup', 'gift_card') "
+                                    "MAX(image_url) img FROM products WHERE kind IN ('topup', 'gift_card', 'game_key') "
                                     "GROUP BY kind, category_id ORDER BY kind, category_name LIMIT 40"):
                 print(f"  {row['category_name'][:30]:<30} пакетов {row['n']:>3}  регионы: {row['r'] or '—':<20} "
                       f"картинка: {'есть' if row['img'] else 'нет'}")

@@ -148,3 +148,42 @@ def test_pick_region():
     assert pick_region("60 UC", {"country": {"code": "KZ"}}) == "KZ"
     assert pick_region("Player ID top-up (fast)") is None
     assert region_title("TR") == "Турция" and region_title("XYZ") == "XYZ"
+
+
+def test_gamekeys_catalog_order_and_images():
+    seen = {}
+
+    def handler(req: httpx.Request):
+        p = req.url.path.removeprefix("/api/v2")
+        if p == "/gamekeys":
+            assert req.url.params.get("include_ui") == "1"
+            return httpx.Response(200, json={"ok": True, "kind": "game_key", "items": [
+                {"name": "Elden Ring", "game_id": "g1", "region": "GLOBAL", "platform": "Steam",
+                 "region_restriction": False, "appid": 1245620, "imageurl": "/covers/elden.jpg"}],
+                "meta": {"has_more": False, "next_cursor": None}})
+        if p == "/gamekeys/keys":
+            return httpx.Response(200, json={"ok": True, "game_id": "g1", "GameName": "Elden Ring", "region": "GLOBAL",
+                                             "platform": "Steam", "appid": 1245620, "imageurl": "/covers/elden.jpg",
+                                             "keys": [{"key_id": "k1", "name": "Elden Ring Key", "price_usd": "39.90",
+                                                       "stock": 3, "min_order_quantity": 1, "max_order_quantity": 5},
+                                                      {"key_id": None, "name": "broken", "price_usd": "1", "stock": 1},
+                                                      {"key_id": "k0", "name": "sold out", "price_usd": "1",
+                                                       "stock": 0}]})
+        if p == "/gamekeys/order":
+            seen["body"] = json.loads(req.content)
+            return httpx.Response(200, json={"ok": True, "order": {"id": "o9", "status": "processing"}})
+        return httpx.Response(403, json={"ok": False, "error": "no"})
+
+    s = make(handler)
+    items = [i for i in s.fetch_catalog() if i.kind == "game_key"]
+    assert [i.name for i in items] == ["Elden Ring Key"]
+    k = items[0]
+    assert k.image_url == "https://api.fzr.cards/covers/elden.jpg" and k.region == "GLOBAL" and k.max_qty == 5
+    o = s.create_order({"kind": "game_key", "supplier_ref": k.supplier_ref}, 2, {}, "idem-1")
+    assert seen["body"] == {"game_id": "g1", "key_id": "k1", "quantity": 2} and o.order_id == "o9"
+
+
+def test_steam_cover_fallback():
+    from donatix.suppliers.base import steam_cover
+
+    assert steam_cover(730).endswith("/730/header.jpg") and steam_cover(None) is None

@@ -146,6 +146,9 @@ def public_view(product: dict[str, Any], markup: Decimal) -> dict[str, Any]:
         "region": product.get("region"),
         "region_title": region_title(product.get("region")),
         **(_steam_extra(product, price) if product["kind"] == "steam_topup" else {}),
+        **({"platform": product["supplier_ref"].get("platform") or "",
+            "region_restriction": bool(product["supplier_ref"].get("region_restriction"))}
+           if product["kind"] == "game_key" else {}),
     }
 
 

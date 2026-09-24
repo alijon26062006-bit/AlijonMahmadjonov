@@ -53,6 +53,7 @@
           "telegram_premium": ["3, 6 и 12 месяцев"],
           "topup": ["PUBG Mobile", "Free Fire", "Mobile Legends"],
           "gift_card": ["Steam", "App Store", "PlayStation", "Google Play"],
+          "game_key": ["Steam", "Xbox", "PlayStation"],
           "steam_topup": ["USD", "RUB", "KZT", "UAH"],
           "steam_gift": ["игры по ссылке-приглашению"],
         } %}
@@ -61,7 +62,7 @@
           <div class="tile k-{{ kind }}">{{ kind_icon(kind, 20) }}</div>
           <h3>{{ title }}</h3>
           <div class="chips">
-            {% if by_kind.get(kind) and kind in ('topup', 'gift_card') %}
+            {% if by_kind.get(kind) and kind in ('topup', 'gift_card', 'game_key') %}
               {% for c in by_kind[kind][:5] %}<span class="chip">{{ c.category_name }}</span>{% endfor %}
               {% if by_kind[kind]|length > 5 %}<span class="chip">ещё {{ by_kind[kind]|length - 5 }}</span>{% endif %}
             {% else %}

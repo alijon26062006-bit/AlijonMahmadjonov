@@ -22,8 +22,17 @@
       <input id="f_{{ f.key }}" name="field_{{ f.key }}" required value="{{ form.get(f.key, '') }}"
              {% if f.key == 'telegram_username' %}placeholder="@username" autocapitalize="off" autocomplete="off" spellcheck="false"{% endif %}>
     {% else %}
-      <p class="muted" style="margin-top:14px">Данные получателя не нужны — после оплаты вы получите код.</p>
+      <p class="muted" style="margin-top:14px">Данные получателя не нужны — после оплаты вы получите {{ 'ключ' if p.kind == 'game_key' else 'код' }}.</p>
     {% endfor %}
+    {% if p.kind == 'game_key' %}
+      <div class="key-meta">
+        {% if p.platform %}<span class="badge accent">{{ icon('grid', 14) }}{{ p.platform }}</span>{% endif %}
+        {% if p.region %}<span class="badge">{{ p.region_title }}</span>{% endif %}
+      </div>
+      <div class="regions-box" id="gk-regions" data-url="/panel/data/gamekey-regions/{{ p.product_id | urlencode }}">
+        <div class="muted small">Проверяем, где активируется ключ…</div>
+      </div>
+    {% endif %}
     {% if can_check and p.fields %}
       <div class="acc-check">
         <button type="button" class="btn soft" id="acc-btn">{{ icon('shield', 18) }}Проверить аккаунт</button>
@@ -52,8 +61,8 @@
   <div class="card reveal">
     <h3>Сводка</h3>
     <div class="summary">
-      <div><span>Товар</span><span>{{ p.name }}</span></div>
-      <div><span>Получатель</span><span id="s-to">—</span></div>
+      <div><span>Товар</span><span class="wrap-text">{{ p.name }}</span></div>
+      {% if p.fields %}<div><span>Получатель</span><span id="s-to">—</span></div>{% endif %}
       {% if can_check %}<div><span>Игрок</span><span id="s-player" class="wrap-text">—</span></div>{% endif %}
       {% if multi %}<div><span>Количество</span><span id="s-qty">—</span></div>{% endif %}
       <div><span>Цена</span><span>${{ p.price_usd }}</span></div>
@@ -87,6 +96,20 @@
   }
   form.addEventListener("input", upd);
   packs.forEach(b => b.addEventListener("click", () => { qty.value = b.dataset.qty; upd(); }));
+  // Ключи игр: страны, где ключ активируется
+  const gk = document.getElementById("gk-regions");
+  if (gk) {
+    fetch(gk.dataset.url).then(r => r.json()).then(d => {
+      const esc = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+      if (!d.ok || !d.known) { gk.innerHTML = '<div class="muted small">Список стран сейчас недоступен — уточните у поддержки.</div>'; return; }
+      const chips = list => list.map(c => '<span class="chip">' + esc(c.name || c.code) + '</span>').join("");
+      let html = "";
+      if (d.available.length) html += '<div class="label-caps">Активируется в странах</div><div class="chips">' + chips(d.available.slice(0, 40)) +
+        (d.available.length > 40 ? '<span class="chip">ещё ' + (d.available.length - 40) + '</span>' : "") + "</div>";
+      if (d.unavailable.length) html += '<div class="label-caps" style="margin-top:10px">Не работает в</div><div class="chips off">' + chips(d.unavailable.slice(0, 20)) + "</div>";
+      gk.innerHTML = html || '<div class="muted small">Ограничений по странам нет.</div>';
+    }).catch(() => { gk.innerHTML = ""; });
+  }
   // Проверка аккаунта у поставщика: показываем ник до оплаты
   const accBtn = document.getElementById("acc-btn");
   if (accBtn) {

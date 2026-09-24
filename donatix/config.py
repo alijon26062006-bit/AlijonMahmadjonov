@@ -57,6 +57,8 @@ class Config:
     fazer_base_url: str = "https://api.fzr.cards/api/v2"
     # Скидка вашего тарифа FazerCards на пополнение Steam, %.
     fazer_steam_discount: Decimal = Decimal("2.5")
+    # Адрес, к которому дописываются пути картинок поставщика (пусто — домен из FAZER_BASE_URL)
+    fazer_image_base: str = ""
 
     # Наценка в процентах поверх закупочной цены, по уровням клиентов.
     markups: dict[str, Decimal] = field(
@@ -129,6 +131,7 @@ class Config:
             fazer_api_key=_env("FAZER_API_KEY"),
             fazer_base_url=_env("FAZER_BASE_URL", "https://api.fzr.cards/api/v2").rstrip("/"),
             fazer_steam_discount=Decimal(_env("FAZER_STEAM_DISCOUNT", "2.5")),
+            fazer_image_base=_env("FAZER_IMAGE_BASE"),
             markups=markups,
             kind_markups=kind_markups,
             admin_email=_env("DONATIX_ADMIN_EMAIL").lower(),
