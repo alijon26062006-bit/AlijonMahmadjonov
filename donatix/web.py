@@ -81,10 +81,21 @@ def _price_examples(conn, config: Config) -> list[tuple[str, str]]:
     return rows
 
 
+@router.get("/privacy")
+def privacy(request: Request, conn=Depends(get_conn)):
+    return render(request, "legal.html", {"user": session_user(request, conn), "page": "privacy"})
+
+
+@router.get("/terms")
+def terms(request: Request, conn=Depends(get_conn)):
+    return render(request, "legal.html", {"user": session_user(request, conn), "page": "terms"})
+
+
 @router.get("/robots.txt")
 def robots(config: Config = Depends(get_config)):
     body = ("User-agent: *\n"
-            "Allow: /$\nAllow: /docs\nAllow: /register\nAllow: /static/\nAllow: /media/\n"
+            "Allow: /$\nAllow: /docs\nAllow: /privacy\nAllow: /terms\nAllow: /register\n"
+            "Allow: /static/\nAllow: /media/\n"
             "Disallow: /panel\nDisallow: /admin\nDisallow: /api/\nDisallow: /login\n\n"
             f"Sitemap: {config.base_url}/sitemap.xml\n")
     return PlainTextResponse(body)

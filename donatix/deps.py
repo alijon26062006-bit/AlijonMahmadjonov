@@ -119,7 +119,8 @@ def flash(request: Request, message: str, kind: str = "ok") -> None:
 
 
 #: Страницы для поисковиков (они же в sitemap.xml)
-INDEXABLE = {"/": ("daily", "1.0"), "/docs": ("weekly", "0.8"), "/register": ("monthly", "0.5")}
+INDEXABLE = {"/": ("daily", "1.0"), "/docs": ("weekly", "0.8"), "/register": ("monthly", "0.5"),
+              "/privacy": ("yearly", "0.2"), "/terms": ("yearly", "0.2")}
 
 
 def render(request: Request, name: str, ctx: dict[str, Any] | None = None, status_code: int = 200):

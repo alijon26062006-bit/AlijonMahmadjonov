@@ -24,7 +24,7 @@ def test_robots_and_sitemap(client):
     assert "Disallow: /panel" in r.text and "Sitemap:" in r.text
     s = client.get("/sitemap.xml")
     assert s.headers["content-type"].startswith("application/xml")
-    assert s.text.count("<url>") == 3 and "/docs</loc>" in s.text
+    assert s.text.count("<url>") == 5 and "/docs</loc>" in s.text
 
 
 def test_cache_headers_and_gzip(client):
@@ -53,3 +53,9 @@ def test_search_console_verification_tag(client, app):
     html = client.get("/").text
     assert '<meta name="google-site-verification" content="abc123">' in html
     assert '<meta name="yandex-verification" content="y777">' in html
+
+
+def test_legal_pages(client):
+    assert "Политика конфиденциальности" in client.get("/privacy").text
+    assert "Условия использования" in client.get("/terms").text
+    assert 'href="/privacy"' in client.get("/").text
