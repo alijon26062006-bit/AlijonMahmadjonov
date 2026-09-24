@@ -269,15 +269,20 @@ pre[data-lang]::before { content: attr(data-lang); position: absolute; top: 6px;
 .drawer-head { display: none; }
 @media (max-width: 860px) {
   .shell { grid-template-columns: minmax(0, 1fr); padding-top: 0; }
-  .side { position: fixed; inset: 0; z-index: 60; max-height: none; padding: 0 16px 32px; background: var(--bg);
-    transform: translateX(-100%); transition: transform .22s var(--ease); }
-  .side.open { transform: none; }
-  .drawer-head { display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 1;
-    height: 58px; margin: 0 -16px 6px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
+  /* Меню на телефоне: шапка стоит, список прокручивается сам по себе (iOS прокручивает
+     только внутренний блок с явной высотой, а не весь fixed-контейнер) */
+  .side { position: fixed; top: 0; left: 0; right: 0; height: 100vh; height: 100dvh; z-index: 60; max-height: none;
+    display: flex; flex-direction: column; overflow: hidden; padding: 0; background: var(--bg);
+    transform: translateX(-100%); visibility: hidden; transition: transform .22s var(--ease), visibility 0s .22s; }
+  .side.open { transform: none; visibility: visible; transition: transform .22s var(--ease); }
+  .side-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    touch-action: pan-y; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); }
+  .drawer-head { display: flex; flex: none; align-items: center; justify-content: space-between;
+    height: 58px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
   .side a.nav-item { padding: 12px; font-size: 1rem; }
   .side a.nav-item .chev { display: block; margin-left: auto; }
   .side .balance-card { display: none; }
-  body.menu-open { overflow: hidden; }
+  html.menu-open, body.menu-open { overflow: hidden; }
 }
 
 /* ── Главная ──────────────────────────────────────────── */

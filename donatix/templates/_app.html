@@ -25,8 +25,10 @@
       <a class="brand" href="/">{{ logo() }}{{ site_name }}</a>
       <button class="icon-btn" type="button" aria-label="Закрыть меню" onclick="dxMenu(false)">{{ icon('x') }}</button>
     </div>
-    {% block side_top %}{% endblock %}
-    <nav aria-label="Разделы">{% block sidenav %}{% endblock %}</nav>
+    <div class="side-scroll">
+      {% block side_top %}{% endblock %}
+      <nav aria-label="Разделы">{% block sidenav %}{% endblock %}</nav>
+    </div>
   </aside>
   <main id="main">
     {% block notice %}{% endblock %}
@@ -37,6 +39,7 @@
 <script>
   function dxMenu(open) {
     document.getElementById("side").classList.toggle("open", open);
+    document.documentElement.classList.toggle("menu-open", open);
     document.body.classList.toggle("menu-open", open);
   }
 </script>
