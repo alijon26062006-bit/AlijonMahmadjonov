@@ -1054,6 +1054,12 @@ async def on_field_value(
     await state.clear()
 
     extra = note
+    if field == "margin_percent":
+        # Наценка сразу поднимает цены: звёзды, Premium и все игры без своей наценки
+        changes = await pricing.apply_margin_now(conn, provider)
+        extra += ("\n\n📈 Цены пересчитаны:\n" + "\n".join(f"├ {c}" for c in changes[:8])
+                  if changes else "\n\n📈 Цены уже по этой наценке.")
+        extra += "\n🕹 Игры — по новой наценке сразу (кроме игр со своей наценкой)."
     if field == "star_cost_diram" and runtime.margin_percent() > 0:
         extra = (f"\n\nПо наценке {runtime.margin_percent()}% цена продажи должна быть "
                  f"<b>{fmt(runtime.price_from_margin())}</b> — нажмите «Пересчитать по наценке».")

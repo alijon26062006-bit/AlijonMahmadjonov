@@ -115,6 +115,50 @@ async def refresh_once(
     return report
 
 
+async def apply_margin_now(conn: aiosqlite.Connection, provider=None) -> list[str]:
+    """Наценку поменяли — цены поднимаются сразу, а не при следующем автообновлении.
+
+    Сначала пробуем свежие закупочные цены у сервиса выдачи; не вышло —
+    пересчитываем от последних известных. Игры считаются от наценки при
+    каждом показе, им достаточно сбросить память о пакетах.
+    """
+    from app.services import games as gsvc
+
+    lines: list[str] = []
+    fresh = False
+    if provider is not None:
+        try:
+            report = await refresh_once(conn, provider)
+            fresh = bool(report.get("ok"))
+            for name, old, new, _cost in report.get("changed", []):
+                show = fmt4 if name == "Звезда" else fmt
+                lines.append(f"{name}: {show(old)} → {show(new)}")
+        except Exception as exc:  # noqa: BLE001 — пересчитаем по сохранённым ценам
+            log.info("Свежие цены не пришли: %s", exc)
+    if not fresh:
+        margin = runtime.margin_percent()
+        old = runtime.star_price_e4()
+        new = runtime.price_from_margin_e4()
+        if runtime.star_cost_e4() > 0 and new != old:
+            await runtime.set_value(conn, "star_price_e4", str(new))
+            lines.append(f"Звезда: {fmt4(old)} → {fmt4(new)}")
+        costs = dict(runtime.premium_costs())
+        plans = runtime.premium_plans()
+        changed = False
+        for plan in plans:
+            cost = costs.get(int(plan["months"]))
+            if cost:
+                wanted = _with_margin(cost, margin)
+                if wanted != int(plan["price"]):
+                    lines.append(f"Premium {plan['months']} мес.: {fmt(int(plan['price']))} → {fmt(wanted)}")
+                    plan["price"] = wanted
+                    changed = True
+        if changed:
+            await runtime.save_premium_plans(conn, plans)
+    gsvc._offers_raw.clear()
+    return lines
+
+
 def _to_diram(usd: Decimal, rate_diram: int) -> int:
     return int((usd * rate_diram).to_integral_value(rounding=ROUND_HALF_UP))
 

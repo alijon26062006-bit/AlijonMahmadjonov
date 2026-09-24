@@ -268,14 +268,20 @@ async def sync_rate(conn, max_age: float = RATE_BACKGROUND) -> bool:
     return True
 
 
-async def rate_loop(conn) -> None:
+async def rate_loop(conn, provider=None) -> None:
+    """Раз в 5 минут: курс и цены. Поменял админ Donatix наценку или курс —
+    цены в боте догонят сами, наценка владельца бота сохраняется."""
     import asyncio
+
+    from app.services import pricing
     while True:
         await asyncio.sleep(RATE_BACKGROUND)
         try:
             await sync_rate(conn, RATE_BACKGROUND - 5)
+            if provider is not None:
+                await pricing.apply_margin_now(conn, provider)
         except Exception:  # noqa: BLE001 — фон не должен падать
-            log.exception("Donatix: курс")
+            log.exception("Donatix: курс и цены")
 
 
 async def bootstrap(conn, provider) -> None:
@@ -288,11 +294,14 @@ async def bootstrap(conn, provider) -> None:
     await asyncio.sleep(3)
     try:
         await sync_rate(conn, 0)
-        from app import db
+        from app import db, runtime
+        if runtime.margin_percent() <= 0 and not await db.list_games(conn):
+            # Первый запуск: без наценки бот продавал бы по закупке — ставим 10%, владелец поменяет
+            await runtime.set_value(conn, "margin_percent", "10")
         if not await db.list_games(conn):
             catalog = await gsvc.full_catalog(suppliers.for_games(provider))
             added, enabled = await autogames.import_all(conn, catalog)
             log.info("Donatix: добавлено игр %s, включено %s", added, enabled)
     except Exception:  # noqa: BLE001 — бот работает и без этого, владелец добавит вручную
         log.exception("Donatix: первичная настройка не удалась")
-    await rate_loop(conn)
+    await rate_loop(conn, provider)
