@@ -18,7 +18,8 @@ PAY_METHODS = {
     "dc": ("Душанбе Сити (DC)", "TJS"),
     "eskhata": ("Эсхата", "TJS"),
     "korti_milli": ("Корти Милли", "TJS"),
-    "usdt_trc20": ("USDT TRC20", "USDT"),
+    "usdt_trc20": ("USDT TRC20 (Tron)", "USDT"),
+    "usdt_bep20": ("USDT BEP20 (BNB Chain)", "USDT"),
     "binance": ("Binance Pay", "USDT"),
 }
 

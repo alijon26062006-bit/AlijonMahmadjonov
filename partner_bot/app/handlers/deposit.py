@@ -10,7 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, texts
-from app.services import dcpay
+from app.services import dcpay, paymethods
 from app import runtime
 from app.config import settings
 from app.money import fmt, parse
@@ -341,8 +341,16 @@ def _requisites(amount: int, reference: str, method: dict | None = None) -> tupl
     bank = runtime.get("pay_card_bank")
     city = runtime.get("pay_city")
     note = runtime.get("pay_extra")
+    crypto = None
     if method:  # способ, выбранный покупателем (бот из конструктора)
         card, holder, bank, city, note = method["number"], method.get("holder"), method["bank"], "", ""
+        crypto = paymethods.crypto(bank)
+        if crypto:
+            bank = f"{bank} · шабака / сеть <b>{crypto[1]}</b>"
+            rate = runtime.usd_rate()
+            usdt = f"≈ <b>{amount / rate:.2f} USDT</b>\n" if rate > 0 else ""
+            note = (usdt + f"⚠️ Танҳо дар шабакаи <b>{crypto[0]}</b>! / Только в сети <b>{crypto[0]}</b> — "
+                    "в другой сети деньги не дойдут.")
 
     where = " · ".join(part for part in (bank, city) if part)
     body = texts.DEPOSIT_REQUISITES.format(
@@ -364,6 +372,8 @@ def _requisites(amount: int, reference: str, method: dict | None = None) -> tupl
     # Копировать даём только настоящий номер: владелец мог записать
     # реквизиты словами, и кнопка «скопировать» скопировала бы фразу.
     digits = "".join(ch for ch in card if ch.isdigit())
+    if crypto:
+        return body, keyboards.deposit_pay(link, card)
     return body, keyboards.deposit_pay(link, digits if len(digits) >= 8 else "")
 
 

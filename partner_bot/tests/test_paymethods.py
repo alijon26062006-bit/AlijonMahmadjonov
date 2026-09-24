@@ -55,6 +55,20 @@ async def main() -> None:
     check("реквизиты выбранного банка", "+992900123456" in body and "Алиф" in body)
     await pm.delete(conn, b["id"])
     check("удаление", pm.get(b["id"]) is None)
+
+    trc = "TXyzABCDEFGHJKLMNPQRSTUVWXYZabcdef"
+    check("адрес TRC20", pm.clean_wallet("USDT TRC20", trc) == trc)
+    check("чужая сеть не проходит", pm.clean_wallet("USDT TRC20", "0x" + "a" * 40) is None)
+    check("адрес BEP20", pm.clean_wallet("USDT BEP20", "0x" + "a" * 40) == "0x" + "a" * 40)
+    check("банк — не крипта", pm.crypto("Алиф") is None)
+    c = await pm.add(conn, "USDT TRC20", trc, "")
+    kb = [b_.text for row in deposit_methods().inline_keyboard for b_ in row]
+    check("кнопка USDT", "💎 USDT TRC20" in kb, str(kb))
+    await runtime.set_value(conn, "usd_rate_diram", "1090")
+    body, markup = _requisites(109000, "R2", pm.get(c["id"]))
+    check("сеть и сумма в USDT", "Tron (TRC20)" in body and "100.00 USDT" in body and "Только в сети" in body, body)
+    copy = [b_ for row in markup.inline_keyboard for b_ in row if b_.copy_text]
+    check("копируется адрес", copy and copy[0].copy_text.text == trc)
     await conn.close()
 
 

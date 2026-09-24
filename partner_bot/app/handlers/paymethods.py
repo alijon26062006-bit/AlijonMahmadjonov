@@ -57,6 +57,11 @@ async def _show(target: Message | CallbackQuery, text: str, kb: InlineKeyboardMa
 
 
 def _card(m: dict) -> str:
+    net = pm.crypto(m["bank"])
+    if net:
+        return (f"💎 <b>{esc(m['bank'])}</b> · сеть <b>{esc(net[1])}</b>\n"
+                f"<code>{esc(m['number'])}</code>\n"
+                f"⚠️ <i>{esc(pm.network_warning(m['bank']))}</i>\n")
     return (f"🏦 <b>{esc(m['bank'])}</b>\n"
             f"<code>{esc(m['number'])}</code>\n"
             + (f"👤 {esc(m['holder'])}\n" if m.get("holder") else ""))
@@ -95,7 +100,7 @@ async def step_bank(call: CallbackQuery, state: FSMContext) -> None:
     banks = [[(b, f"pm:bank:{i}") for i, b in enumerate(pm.BANKS[j:j + 2], start=j)]
              for j in range(0, len(pm.BANKS), 2)]
     await _show(call, "➕ <b>Новый способ оплаты</b> · шаг 1 из 3\n\n"
-                      "Выберите банк или напишите его название сообщением.",
+                      "Выберите банк или USDT-кошелёк, либо напишите название банка сообщением.",
                 _kb(*banks, [("‹ Отмена", "pm:list")]))
     await call.answer()
 
@@ -103,6 +108,13 @@ async def step_bank(call: CallbackQuery, state: FSMContext) -> None:
 async def _ask_number(target, state: FSMContext, bank: str) -> None:
     await state.update_data(bank=bank)
     await state.set_state(PayWizard.number)
+    net = pm.crypto(bank)
+    if net:
+        await _show(target, f"💎 <b>{esc(bank)}</b> · шаг 2 из 2\n\n"
+                            f"Отправьте <b>адрес кошелька в сети {esc(net[1])}</b>.\n"
+                            f"<i>Адрес {net[3]}. Проверьте сеть: перевод в другой сети не дойдёт.</i>",
+                    _kb([("‹ Назад", "pm:new"), ("Отмена", "pm:list")]))
+        return
     await _show(target, f"➕ <b>{esc(bank)}</b> · шаг 2 из 3\n\n"
                         "Отправьте <b>номер карты</b> или <b>телефона</b>, на который переводить.\n"
                         "<i>Например: 5058 2700 1234 5678 или +992 900 00 00 00</i>",
@@ -126,6 +138,20 @@ async def typed_bank(message: Message, state: FSMContext) -> None:
 
 @router.message(PayWizard.number, F.text)
 async def typed_number(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    net = pm.crypto(data.get("bank", ""))
+    if net:
+        wallet = pm.clean_wallet(data["bank"], message.text)
+        if not wallet:
+            await message.answer(f"❌ Это не адрес сети {esc(net[1])} — он {net[3]}. Отправьте ещё раз.")
+            return
+        await state.update_data(number=wallet, holder="")
+        await state.set_state(PayWizard.holder)
+        await message.answer("👀 <b>Проверьте — так увидит покупатель:</b>\n\n"
+                             + _card({"bank": data["bank"], "number": wallet}),
+                             reply_markup=_kb([("✅ Сохранить", "pm:save")], [("✏️ Заново", "pm:new"),
+                                                                            ("Отмена", "pm:list")]))
+        return
     number = pm.clean_number(message.text)
     if not number:
         await message.answer("❌ Не похоже на номер карты или телефона. Карта — 16 цифр, "
@@ -155,10 +181,11 @@ async def typed_holder(message: Message, state: FSMContext) -> None:
 @router.callback_query(PayWizard.holder, F.data == "pm:save")
 async def save(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
     data = await state.get_data()
-    if not all(data.get(k) for k in ("bank", "number", "holder")):
+    need = ("bank", "number") if pm.crypto(data.get("bank", "")) else ("bank", "number", "holder")
+    if not all(data.get(k) for k in need):
         await call.answer("Начните заново.", show_alert=True)
         return
-    await pm.add(conn, data["bank"], data["number"], data["holder"])
+    await pm.add(conn, data["bank"], data["number"], data.get("holder", ""))
     await call.answer("Сохранено ✅")
     await show_list(call, state)
 
@@ -180,6 +207,7 @@ async def _render_method(call: CallbackQuery, state: FSMContext, mid: str) -> No
     on = m.get("enabled", True)
     await _show(call, _card(m) + ("\n✅ Показывается покупателям" if on else "\n🚫 Скрыт от покупателей"),
                 _kb([("🚫 Скрыть" if on else "✅ Показывать", f"pm:toggle:{m['id']}")],
+                    [("✏️ Адрес кошелька", f"pm:ednum:{m['id']}")] if pm.crypto(m["bank"]) else
                     [("✏️ Номер", f"pm:ednum:{m['id']}"), ("✏️ Владелец", f"pm:edhold:{m['id']}")],
                     [("🗑 Удалить", f"pm:del:{m['id']}")], [("‹ К реквизитам", "pm:list")]))
     await call.answer()
@@ -215,19 +243,25 @@ async def delete(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connect
 
 @router.callback_query(F.data.startswith("pm:ednum:"), _on)
 async def edit_number(call: CallbackQuery, state: FSMContext) -> None:
+    mid = call.data.split(":")[2]
     await state.set_state(PayWizard.edit_number)
-    await state.update_data(edit_id=call.data.split(":")[2])
-    await _show(call, "Отправьте новый номер карты или телефона.", _kb([("‹ Отмена", "pm:list")]))
+    await state.update_data(edit_id=mid)
+    net = pm.crypto((pm.get(mid) or {}).get("bank", ""))
+    await _show(call, f"Отправьте новый адрес кошелька в сети {esc(net[1])}." if net else
+                "Отправьте новый номер карты или телефона.", _kb([("‹ Отмена", "pm:list")]))
     await call.answer()
 
 
 @router.message(PayWizard.edit_number, F.text)
 async def edited_number(message: Message, state: FSMContext, conn: aiosqlite.Connection) -> None:
-    number = pm.clean_number(message.text)
-    if not number:
-        await message.answer("❌ Не похоже на номер карты или телефона. Отправьте ещё раз.")
-        return
     mid = (await state.get_data()).get("edit_id")
+    m = pm.get(mid) or {}
+    net = pm.crypto(m.get("bank", ""))
+    number = pm.clean_wallet(m["bank"], message.text) if net else pm.clean_number(message.text)
+    if not number:
+        await message.answer(f"❌ Это не адрес сети {esc(net[1])} — он {net[3]}. Отправьте ещё раз." if net else
+                             "❌ Не похоже на номер карты или телефона. Отправьте ещё раз.")
+        return
     await pm.update(conn, mid, number=number)
     await state.clear()
     await message.answer("✅ Номер обновлён.", reply_markup=_kb([("‹ К реквизитам", "pm:list")]))

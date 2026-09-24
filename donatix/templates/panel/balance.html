@@ -18,7 +18,7 @@
         <label class="paym {{ 'on' if loop.first }}">
           <input type="radio" name="method" value="{{ m.code }}" data-cur="{{ m.currency }}" {{ 'checked' if loop.first }}>
           <span class="tile sm {{ 'g4' if m.currency == 'TJS' else 'g5' }}">{{ icon('wallet' if m.currency == 'TJS' else 'bolt', 18) }}</span>
-          <span><b>{{ m.title }}</b><span class="sub">{{ m.currency }}</span></span>
+          <span><b>{{ m.title }}</b><span class="sub">{{ m.currency }}{% if m.network %} · сеть {{ m.network }}{% endif %}</span></span>
         </label>
         {% endfor %}
       </div>
@@ -31,7 +31,9 @@
       <div class="step-head" style="margin-top:22px"><span class="n">3</span><h3>Переведите по реквизитам</h3></div>
       {% for m in methods %}
       <div class="details" data-for="{{ m.code }}" {{ 'hidden' if not loop.first }}>
+        {% if m.network %}<div class="net-badge">Сеть: <b>{{ m.network_title }}</b></div>{% endif %}
         <pre class="keybox">{{ m.details }}</pre>
+        {% if m.network_note %}<div class="flash error net-warn" role="note">⚠️ {{ m.network_note }}</div>{% endif %}
       </div>
       {% endfor %}
       <label for="receipt">Чек об оплате <span class="muted">(фото или PDF — так проверим быстрее)</span></label>

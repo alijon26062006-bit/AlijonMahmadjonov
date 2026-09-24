@@ -127,6 +127,11 @@ async def home(event: Message | CallbackQuery, state: FSMContext) -> None:
 # ── Пополнение ───────────────────────────────────────────────
 
 
+def _method_label(m: dict) -> str:
+    net = m.get("network") or ""
+    return f"{m['title']} · {m['currency']}" + (f" · {net}" if net and net not in m["title"] else "")
+
+
 @router.callback_query(F.data == "dx:methods")
 async def methods(call: CallbackQuery, state: FSMContext) -> None:
     try:
@@ -141,7 +146,7 @@ async def methods(call: CallbackQuery, state: FSMContext) -> None:
         await call.answer()
         return
     await state.update_data(dx_min=data.get("min_tjs"), dx_rate=data.get("tjs_rate"))
-    rows = [[(f"{m['title']} · {m['currency']}", f"dx:m:{m['code']}")] for m in ms]
+    rows = [[(_method_label(m), f"dx:m:{m['code']}")] for m in ms]
     rows.append([("‹ Назад", "dx:home")])
     await _show(call, f"💳 <b>Пополнение счёта Donatix</b>\n\nВыберите способ оплаты.\n"
                       f"Минимум — <b>{esc(str(data.get('min_tjs')))} сомони</b>.", _kb(*rows))
@@ -174,8 +179,10 @@ async def got_amount(message: Message, state: FSMContext) -> None:
         f"🧾 <b>Заявка #{p['id']}</b> · {esc(p['method_title'])}\n\n"
         f"Переведите ровно <b>{esc(p['pay_amount'])} {esc(p['pay_currency'])}</b>\n"
         f"Будет зачислено: <b>${esc(p['amount_usd'])}</b>\n\n"
-        f"<b>Реквизиты:</b>\n<code>{esc(p['details'])}</code>\n\n"
-        "После перевода нажмите «Я оплатил» и пришлите чек.",
+        + (f"Сеть: <b>{esc(p['network'])}</b>\n" if p.get("network") else "")
+        + f"<b>Реквизиты:</b>\n<code>{esc(p['details'])}</code>\n\n"
+        + (f"⚠️ {esc(p['network_note'])}\n\n" if p.get("network_note") else "")
+        + "После перевода нажмите «Я оплатил» и пришлите чек.",
         reply_markup=_kb([("✅ Я оплатил", f"dx:paid:{p['id']}")], [("‹ Отмена", "dx:home")]),
     )
 

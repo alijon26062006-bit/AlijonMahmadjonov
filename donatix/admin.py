@@ -367,7 +367,7 @@ def pay_settings(request: Request, admin=Depends(admin_user), conn=Depends(get_c
                  config: Config = Depends(get_config)):
     from . import payments
     return render(request, "admin/pay_settings.html", {
-        "user": admin, "conf": payments.settings(conn, config), "currencies": payments.CURRENCIES,
+        "user": admin, "conf": payments.settings(conn, config), "currencies": payments.CURRENCY_CHOICES,
     })
 
 

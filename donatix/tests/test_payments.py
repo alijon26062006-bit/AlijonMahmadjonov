@@ -167,3 +167,27 @@ def test_panel_topup_with_receipt(app, config, conn, monkeypatch):
     r = client.post("/panel/balance", data={"csrf": token, "method": "alif", "amount": "50"},
                     files={"receipt": ("c.png", PNG, "image/png")})
     assert "Заявка #1 создана" in r.text and len(sent) == 1
+
+
+def test_usdt_network_shown_and_saved(app, config, conn):
+    from donatix import payments
+    uid, client, token = _setup(app, config, conn)
+    page = client.get("/panel/balance").text
+    assert "сеть TRC20" in page and "только в сети Tron (TRC20)" in page
+
+    admin = TestClient(app)
+    atoken = web_login(admin, "admin@example.com", "adminpass123")
+    page = admin.get("/admin/pay-settings").text
+    assert "USDT · BNB Smart Chain (BEP20)" in page
+    n = page.count('_code" value=') - 1
+    data = {"csrf": atoken, "n": str(n), "tjs_rate": "11", "min_tjs": "500", "low_usd": "10",
+            f"m{n}_title": "USDT BEP20", f"m{n}_currency": "USDT:BEP20",
+            f"m{n}_details": "0x1234567890abcdef1234567890abcdef12345678", f"m{n}_enabled": "1"}
+    admin.post("/admin/pay-settings", data=data)
+    ms = payments.methods(conn, config)
+    assert [m["network"] for m in ms] == ["BEP20"]
+    assert "BNB Smart Chain (BEP20)" in ms[0]["network_note"]
+    r = client.post("/panel/balance", data={"csrf": token, "method": ms[0]["code"], "amount": "50"})
+    assert "50.00 USDT" in r.text
+    p = conn.execute("SELECT * FROM payments ORDER BY id DESC LIMIT 1").fetchone()
+    assert payments.public(conn, config, p)["network"] == "BEP20"

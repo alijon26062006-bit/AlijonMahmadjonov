@@ -23,7 +23,7 @@
 
   <div class="section-title"><h2>Способы оплаты</h2></div>
   <div class="list">
-    {% for m in conf.all_methods + [{'code': '', 'title': '', 'currency': 'TJS', 'details': '', 'enabled': True}] %}
+    {% for m in conf.all_methods + [{'code': '', 'title': '', 'currency': 'TJS', 'choice': 'TJS', 'details': '', 'enabled': True}] %}
     {% set i = loop.index0 %}{% set new = not m.code %}
     <div class="card pm {{ 'pm-new' if new }} {{ 'off' if not m.enabled and not new }}">
       <input type="hidden" name="m{{ i }}_code" value="{{ m.code }}">
@@ -37,13 +37,14 @@
       <div class="pm-grid">
         <div><label for="m{{ i }}_title">Название</label>
           <input id="m{{ i }}_title" name="m{{ i }}_title" maxlength="60" value="{{ m.title }}" placeholder="{{ 'Например: Humo, Visa, Payeer' if new }}"></div>
-        <div><label for="m{{ i }}_currency">Валюта перевода</label>
+        <div><label for="m{{ i }}_currency">Валюта и сеть</label>
           <select id="m{{ i }}_currency" name="m{{ i }}_currency">
-            {% for c in currencies %}<option value="{{ c }}" {{ 'selected' if c == m.currency }}>{{ c }}{{ ' (по курсу)' if c == 'TJS' }}</option>{% endfor %}
+            {% for c, t in currencies %}<option value="{{ c }}" {{ 'selected' if c == m.choice }}>{{ t }}</option>{% endfor %}
           </select></div>
       </div>
       <label for="m{{ i }}_details">Реквизиты — это увидит клиент</label>
       <textarea id="m{{ i }}_details" name="m{{ i }}_details" rows="2" maxlength="1000" placeholder="Номер карты или телефона, имя получателя / адрес кошелька">{{ m.details }}</textarea>
+      <div class="hint">Для USDT выберите сеть: клиент увидит её крупно и предупреждение «только в этой сети». TRC20 — адрес начинается с T, BEP20 — с 0x.</div>
       {% if not new %}<label class="del"><input type="checkbox" name="m{{ i }}_delete" value="1"> Удалить способ</label>{% endif %}
     </div>
     {% endfor %}

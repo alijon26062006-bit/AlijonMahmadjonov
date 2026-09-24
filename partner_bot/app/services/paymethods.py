@@ -21,7 +21,30 @@ KEY = "pay_methods_json"
 
 #: Банки для кнопок мастера. «Другой» — ввести название самому.
 BANKS = ["Душанбе Сити", "Алиф", "Эсхата", "Корти Милли", "Спитамен", "Амонатбонк",
-         "Humo", "Ориёнбонк", "Арванд", "Tcell / Babilon"]
+         "Humo", "Ориёнбонк", "Арванд", "Tcell / Babilon", "USDT TRC20", "USDT BEP20"]
+
+#: Криптовалюта: название → (сеть, как её показать, как выглядит адрес).
+#: Перевод в чужой сети теряется, поэтому сеть видна везде и адрес проверяется.
+CRYPTO = {
+    "USDT TRC20": ("TRC20", "Tron (TRC20)", r"T[1-9A-HJ-NP-Za-km-z]{33}", "начинается с T, 34 символа"),
+    "USDT BEP20": ("BEP20", "BNB Smart Chain (BEP20)", r"0x[0-9a-fA-F]{40}", "начинается с 0x, 42 символа"),
+}
+
+
+def crypto(bank: str) -> tuple[str, str, str, str] | None:
+    """Сеть криптоспособа или None для банка."""
+    return CRYPTO.get((bank or "").strip())
+
+
+def clean_wallet(bank: str, text: str) -> str | None:
+    net = crypto(bank)
+    raw = (text or "").strip()
+    return raw if net and re.fullmatch(net[2], raw) else None
+
+
+def network_warning(bank: str) -> str:
+    net = crypto(bank)
+    return f"Отправляйте USDT только в сети {net[1]} — в другой сети деньги не дойдут." if net else ""
 
 
 def all_methods() -> list[dict]:

@@ -396,7 +396,8 @@ def deposit_methods() -> InlineKeyboardMarkup:
     if donatix.enabled():
         # Бот из конструктора: банки, которые владелец добавил в «Реквизитах»
         for m in paymethods.enabled():
-            kb.row(btn(f"🏦 {m['bank']}", f"dep:pm:{m['id']}", style=SUCCESS))
+            kb.row(btn(("💎 " if paymethods.crypto(m["bank"]) else "🏦 ") + m["bank"], f"dep:pm:{m['id']}",
+                       style=SUCCESS))
         if runtime.get("ru_pay_number"):
             kb.row(btn("🇷🇺 Аз Русия — Сбербанк, Тинькофф", "dep:ru"))
         kb.row(btn(labeled("back", "Бозгашт"), "m:main"))

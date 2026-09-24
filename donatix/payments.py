@@ -25,6 +25,37 @@ class PaymentError(ValueError):
 
 CURRENCIES = ("TJS", "USDT", "USD")
 
+#: Сети USDT: перевод в чужой сети не дойдёт — клиент должен видеть сеть явно
+NETWORKS = {
+    "TRC20": "Tron (TRC20)",
+    "BEP20": "BNB Smart Chain (BEP20)",
+    "ERC20": "Ethereum (ERC20)",
+    "TON": "TON",
+}
+#: Варианты в админке: валюта и сеть одним списком
+CURRENCY_CHOICES = [("TJS", "TJS (сомони, по курсу)"), ("USD", "USD")] + [
+    (f"USDT:{n}", f"USDT · {t}") for n, t in NETWORKS.items()] + [("USDT", "USDT (без сети — Binance Pay и т.п.)")]
+_DEFAULT_NETWORK = {"usdt_trc20": "TRC20", "usdt_bep20": "BEP20"}
+
+
+def guess_network(m: dict[str, Any]) -> str:
+    """Сеть способа: указана явно, иначе по коду/названию (старые настройки без поля)."""
+    if m.get("currency") != "USDT":
+        return ""
+    if m.get("network") in NETWORKS:
+        return m["network"]
+    if "network" in m:
+        return ""
+    text = f"{m.get('code', '')} {m.get('title', '')}".upper()
+    return next((n for n in NETWORKS if n in text), _DEFAULT_NETWORK.get(m.get("code", ""), ""))
+
+
+def network_note(network: str) -> str:
+    if network not in NETWORKS:
+        return ""
+    return (f"Отправляйте USDT только в сети {NETWORKS[network]}. "
+            "Перевод в другой сети не дойдёт, и вернуть его нельзя.")
+
 
 def _default_methods(conn: sqlite3.Connection, config: Config) -> list[dict[str, Any]]:
     """Первый запуск: стандартные способы с реквизитами из старых настроек или .env."""
@@ -42,6 +73,9 @@ def settings(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
     """Способы оплаты, курс, минимум (в сомони) и порог «мало денег». Всё меняется в админке."""
     raw = db.get_setting(conn, "pay.methods_json")
     all_methods = json.loads(raw) if raw else _default_methods(conn, config)
+    for m in all_methods:
+        m["network"] = guess_network(m)
+        m["choice"] = f"USDT:{m['network']}" if m["network"] else m["currency"]
     rate = Decimal(db.get_setting(conn, "pay.tjs_rate") or config.tjs_rate)
     min_tjs = Decimal(db.get_setting(conn, "pay.min_tjs") or config.pay_min_tjs)
     low = Decimal(db.get_setting(conn, "pay.low_balance_usd") or config.low_balance_usd)
@@ -75,9 +109,11 @@ def save_settings(conn: sqlite3.Connection, config: Config, methods_in: list[dic
         if code in seen:
             code = "m" + secrets.token_hex(3)
         seen.add(code)
-        currency = m.get("currency") if m.get("currency") in CURRENCIES else "TJS"
-        clean.append({"code": code, "title": title, "currency": currency, "details": details,
-                      "enabled": bool(m.get("enabled"))})
+        currency, _, network = str(m.get("currency") or "").partition(":")
+        currency = currency if currency in CURRENCIES else "TJS"
+        network = network if currency == "USDT" and network in NETWORKS else ""
+        clean.append({"code": code, "title": title, "currency": currency, "network": network,
+                      "details": details, "enabled": bool(m.get("enabled"))})
     with db.tx(conn):
         db.set_setting(conn, "pay.methods_json", json.dumps(clean, ensure_ascii=False))
         db.set_setting(conn, "pay.tjs_rate", str(rate))
@@ -94,7 +130,9 @@ def title_for(conn: sqlite3.Connection, config: Config, code: str) -> str:
 
 def methods(conn: sqlite3.Connection, config: Config) -> list[dict[str, str]]:
     conf = settings(conn, config)
-    return [{"code": m["code"], "title": m["title"], "currency": m["currency"], "details": m["details"]}
+    return [{"code": m["code"], "title": m["title"], "currency": m["currency"], "details": m["details"],
+             "network": m["network"], "network_title": NETWORKS.get(m["network"], ""),
+             "network_note": network_note(m["network"])}
             for m in conf["all_methods"] if m["code"] in conf["details"]]
 
 
@@ -226,11 +264,14 @@ def _sniff(data: bytes) -> str | None:
 
 def public(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) -> dict[str, Any]:
     """Заявка для API: без внутренних полей."""
-    details = settings(conn, config)["details"].get(p["method"], "")
+    conf = settings(conn, config)
+    details = conf["details"].get(p["method"], "")
+    network = next((m["network"] for m in conf["all_methods"] if m["code"] == p["method"]), "")
     return {
         "id": p["id"], "status": p["status"], "method": p["method"],
         "method_title": title_for(conn, config, p["method"]),
         "amount_usd": fmt(p["amount_micro"]), "pay_amount": p["pay_amount"], "pay_currency": p["pay_currency"],
         "details": details if p["status"] == "pending" else "", "receipt": bool(p["receipt_file"]),
+        "network": network, "network_note": network_note(network) if p["status"] == "pending" else "",
         "note": p["admin_note"] or "", "created_at": p["created_at"], "resolved_at": p["resolved_at"],
     }

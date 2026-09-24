@@ -869,3 +869,9 @@ a.who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; 
 .bot-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .bot-admins { display: flex; gap: 8px; margin-top: 10px; }
 .bot-admins input { min-height: 34px; padding: 6px 10px; font-size: .9rem; }
+
+/* Сеть USDT на странице пополнения */
+.net-badge { display: inline-block; margin: 0 0 8px; padding: 4px 10px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); font-size: 13px; }
+.net-badge b { font-weight: 700; }
+.net-warn { margin-top: 8px; font-size: 13px; }
