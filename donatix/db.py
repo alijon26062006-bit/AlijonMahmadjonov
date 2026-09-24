@@ -33,6 +33,18 @@ CREATE TABLE IF NOT EXISTS users (
     last_active_at  TEXT
 );
 
+CREATE TABLE IF NOT EXISTS bots (
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id),   -- чей баланс в Donatix тратит бот
+    token_enc    TEXT NOT NULL,                           -- токен бота, зашифрован ключом сайта
+    username     TEXT,
+    admin_ids    TEXT NOT NULL,                           -- Telegram ID админов бота через запятую
+    api_key_id   INTEGER REFERENCES api_keys(id),
+    key_enc      TEXT,                                    -- API-ключ Donatix для бота, зашифрован
+    enabled      INTEGER NOT NULL DEFAULT 1,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS logins (
     id         INTEGER PRIMARY KEY,
     user_id    INTEGER NOT NULL REFERENCES users(id),

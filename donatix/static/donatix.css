@@ -856,3 +856,16 @@ a.who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; 
   .buy-bar .btn { min-width: 140px; }
   .pack-pick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Конструктор ботов */
+.bot-new .pm-head { margin-bottom: 4px; }
+.bot-head { display: flex; align-items: center; gap: 12px; }
+.bot-head .grow { flex: 1; min-width: 0; }
+.status-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--line-strong); }
+.status-dot.on { background: var(--ok); box-shadow: 0 0 0 4px var(--ok-soft); animation: pulse 2s ease-in-out infinite; }
+.status-dot.wait { background: var(--warn); }
+@keyframes pulse { 50% { box-shadow: 0 0 0 7px transparent; } }
+.bot-meta { margin: 10px 0; }
+.bot-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.bot-admins { display: flex; gap: 8px; margin-top: 10px; }
+.bot-admins input { min-height: 34px; padding: 6px 10px; font-size: .9rem; }

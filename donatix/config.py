@@ -106,6 +106,9 @@ class Config:
     support_contact: str = ""
     # Часовой пояс для аналитики, часы от UTC (Душанбе — 5)
     tz_offset: int = 5
+    # Конструктор ботов: запускать ботов партнёров и по какому адресу они ходят в Donatix
+    run_bots: bool = True
+    internal_url: str = "http://127.0.0.1:8000"
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -146,6 +149,8 @@ class Config:
             cookie_secure=_flag("DONATIX_COOKIE_SECURE", False),
             support_contact=_env("DONATIX_SUPPORT_CONTACT"),
             tz_offset=int(_env("DONATIX_TZ_OFFSET") or 5),
+            run_bots=_flag("DONATIX_RUN_BOTS", True),
+            internal_url=_env("DONATIX_INTERNAL_URL") or "http://127.0.0.1:8000",
             pay_methods=pay_methods,
             tjs_rate=Decimal(_env("DONATIX_TJS_RATE", "10.9")),
             pay_min_usd=Decimal(_env("DONATIX_PAY_MIN_USD", "5")),

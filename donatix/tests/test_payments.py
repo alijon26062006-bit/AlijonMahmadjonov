@@ -133,6 +133,9 @@ def test_api_topup_with_receipt(app, config, conn, monkeypatch):
     assert m["ok"] and m["methods"][0]["code"] == "alif" and m["min_tjs"] == "500"
     r = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "400"}).json()
     assert not r["ok"] and "500 сомони" in r["error"]
+    odd = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "600"}).json()["payment"]
+    assert odd["pay_amount"] == "600.00" and odd["amount_usd"] == "55.0458"  # 600 / 10.9, вниз
+    api.post(f"/api/v1/payments/{odd['id']}/receipt", headers=h, files={"file": ("x.png", PNG, "image/png")})
     r = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "545"}).json()
     pay = r["payment"]
     assert pay["pay_amount"] == "545.00" and pay["pay_currency"] == "TJS" and "+992" in pay["details"]

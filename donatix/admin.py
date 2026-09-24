@@ -90,6 +90,65 @@ def sync_now(request: Request, admin=Depends(admin_user), config: Config = Depen
     return _back("/admin/catalog-sync")
 
 
+@router.get("/bots")
+def bots_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import bots
+    clients = conn.execute(
+        "SELECT id, login, email, project FROM users WHERE status = 'active' ORDER BY login").fetchall()
+    return render(request, "admin/bots.html", {
+        "user": admin, "bots": bots.listing(conn), "clients": clients,
+        "runner": bots.RUNNER is not None, "template_ok": bots.TEMPLATE_DIR.exists(),
+    })
+
+
+@router.post("/bots", dependencies=[Depends(check_csrf)])
+def bots_add(request: Request, token: str = Form(""), admin_ids: str = Form(""), user_id: int = Form(0),
+             admin=Depends(admin_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import bots
+    try:
+        username = bots.check_token(token)
+        bots.create(conn, config, user_id=user_id or admin["id"], token=token, admin_ids=admin_ids, username=username)
+    except bots.BotError as exc:
+        flash(request, str(exc), "error")
+        return _back("/admin/bots")
+    if bots.RUNNER:
+        bots.RUNNER.poke()
+    flash(request, f"Бот @{username} подключён — запустится в течение минуты. "
+                   "Откройте его в Telegram и нажмите /start.")
+    return _back("/admin/bots")
+
+
+@router.post("/bots/{bot_id}/{action}", dependencies=[Depends(check_csrf)])
+def bots_action(bot_id: int, action: str, request: Request, admin_ids: str = Form(""), admin=Depends(admin_user),
+                conn=Depends(get_conn)):
+    from . import bots
+    try:
+        if action == "stop":
+            bots.set_enabled(conn, bot_id, False)
+        elif action == "start":
+            bots.set_enabled(conn, bot_id, True)
+        elif action == "restart":
+            bots.set_enabled(conn, bot_id, True)  # updated_at меняется — процесс перезапустится
+        elif action == "admins":
+            bots.update_admins(conn, bot_id, admin_ids)
+        elif action == "delete":
+            bots.delete(conn, bot_id)
+    except bots.BotError as exc:
+        flash(request, str(exc), "error")
+    if bots.RUNNER:
+        bots.RUNNER.poke()
+    return _back("/admin/bots")
+
+
+@router.get("/bots/{bot_id}/log")
+def bots_log(bot_id: int, admin=Depends(admin_user), config: Config = Depends(get_config)):
+    from fastapi.responses import PlainTextResponse
+
+    from . import bots
+    return PlainTextResponse(bots.log_tail(config, bot_id, 200) or "Лог пока пуст.",
+                             headers={"Cache-Control": "no-store"})
+
+
 @router.get("/catalog-sync")
 def catalog_sync_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
     from . import catalog_job

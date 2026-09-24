@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import secrets
 import sqlite3
-from decimal import ROUND_UP, Decimal
+from decimal import ROUND_DOWN, ROUND_UP, Decimal
 from typing import Any
 
 from . import accounts, db
@@ -113,7 +113,7 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
     try:
         if amount_tjs.strip():
             tjs = to_decimal(amount_tjs.replace(",", ".").strip())
-            usd = (tjs / conf["tjs_rate"]).quantize(Decimal("0.0001"))
+            usd = (tjs / conf["tjs_rate"]).quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
         else:
             usd = to_decimal(amount.replace(",", ".").replace("$", "").strip())
     except MoneyError:
@@ -126,6 +126,9 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
         raise PaymentError("У вас уже 3 заявки в ожидании. Дождитесь их проверки.")
     currency = next(m["currency"] for m in conf["all_methods"] if m["code"] == method)
     pay, cur = pay_amount(conf["tjs_rate"], currency, usd)
+    if amount_tjs.strip() and currency == "TJS":
+        # Сумму назвали в сомони — ровно её и переводят, без копейки от пересчёта туда-обратно
+        pay = str(to_decimal(amount_tjs.replace(",", ".").strip()).quantize(Decimal("0.01")))
     c = conn.execute(
         "INSERT INTO payments (user_id, method, amount_micro, pay_amount, pay_currency, reference, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
