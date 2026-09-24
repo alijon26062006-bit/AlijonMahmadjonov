@@ -825,6 +825,21 @@ async def on_field_value(
         await message.answer(_price_preview(game, plan), reply_markup=kb.as_markup())
         return
 
+    # Своё название игры — так её увидят покупатели в меню.
+    if field.startswith("game_title:"):
+        code = field.split(":", 1)[1]
+        title = raw.strip()[:48]
+        if len(title) < 2:
+            await message.answer("Название — хотя бы две буквы. Пришлите ещё раз.")
+            return
+        await db.update_game(conn, code, title=title)
+        await db.load_game_titles(conn)
+        await state.clear()
+        fresh = await db.get_game(conn, code)
+        await message.answer(f"✅ Теперь игра называется <b>{title}</b>",
+                             reply_markup=game_kb(fresh) if fresh else back_kb("pn:games", "‹ К играм"))
+        return
+
     # Своё название пакета: у поставщика они часто безликие.
     if field.startswith("pack_name:"):
         _, code, offer_id = field.split(":", 2)
@@ -4422,10 +4437,16 @@ async def on_game_find(
 
     for family, item in list(families.items())[:8]:
         name = reg.clean_title(item["category_id"], item.get("name", ""))
-        kb.row(InlineKeyboardButton(
-            text=f"➕ Добавить {name}"[:60],
-            callback_data=f"pn:game_add:{family}",
-        ))
+        regions_found = [i for i in found if reg.family_of(i["category_id"], i.get("name", "")) == family]
+        if all(i["category_id"] in have for i in regions_found):
+            # уже добавлена — сразу кнопки регионов: открыть и править пакеты
+            for i in regions_found[:12]:
+                region = reg.title_of(i["category_id"], i.get("name", "")) or "без региона"
+                kb.row(InlineKeyboardButton(text=f"🕹 {name} · {region}"[:60],
+                                            callback_data=f"pn:game:{i['category_id']}"))
+            continue
+        kb.row(btn(f"➕ Добавить {name} · регионов: {len(regions_found)}"[:60],
+                   f"pn:game_add:{family}", style=SUCCESS))
     kb.row(InlineKeyboardButton(text="🔎 Искать снова",
                                 callback_data="pn:game_find"))
     kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
@@ -4567,6 +4588,10 @@ async def cb_game_add_family(
     kb = InlineKeyboardBuilder()
     kb.row(btn(f"✅ Показать все {len(items)} региона в меню",
                f"pn:game_all_on:{family}", style=SUCCESS))
+    for item in items[:12]:
+        region = reg.title_of(item["category_id"], item.get("name", "")) or "без региона"
+        kb.row(InlineKeyboardButton(text=f"🕹 {region} — пакеты и цены"[:60],
+                                    callback_data=f"pn:game:{item['category_id']}"))
     kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
 
     await safe_edit(
@@ -4649,8 +4674,10 @@ def game_kb(game: db.Game) -> InlineKeyboardMarkup:
     kb.row(btn("🚫 Убрать из меню" if game.enabled else "✅ Показать в меню",
                f"pn:game_on:{game.category_id}",
                style=DANGER if game.enabled else SUCCESS))
-    kb.row(btn("📦 Проверить пакеты", f"pn:game_packs:{game.category_id}",
+    kb.row(btn("📦 Пакеты: цены и названия", f"pn:game_packs:{game.category_id}",
                style=PRIMARY))
+    kb.row(InlineKeyboardButton(text="✏️ Название игры",
+                                callback_data=f"pn:game_rename:{game.category_id}"))
     kb.row(
         InlineKeyboardButton(text="🔤 Поля для ID",
                              callback_data=f"pn:game_field:{game.category_id}"),
@@ -4662,6 +4689,26 @@ def game_kb(game: db.Game) -> InlineKeyboardMarkup:
     kb.row(btn("🗑 Удалить игру", f"pn:game_del:{game.category_id}", style=DANGER))
     kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
     return kb.as_markup()
+
+
+@router.callback_query(F.data.startswith("pn:game_rename:"))
+async def cb_game_rename(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    code = call.data.split(":", 2)[2]
+    game = await db.get_game(conn, code)
+    if game is None:
+        await call.answer("Игра не найдена.", show_alert=True)
+        return
+    await state.set_state(Panel.value)
+    await state.update_data(field=f"game_title:{code}")
+    await safe_edit(
+        call,
+        f"✏️ <b>Название игры</b>\n<code>{texts.LINE}</code>\n\n"
+        f"Сейчас: <b>{game.title}</b>\n\n"
+        "<blockquote>Пришлите новое — так игру увидят покупатели в меню.\n"
+        "Например: <code>🔥 Free Fire Индонезия</code></blockquote>",
+        back_kb(f"pn:game:{code}", "❌ Отмена"),
+    )
+    await call.answer()
 
 
 @router.callback_query(F.data.startswith("pn:game_on:"))
