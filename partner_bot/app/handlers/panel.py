@@ -64,8 +64,16 @@ def home_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     from app.handlers import donatix
     if donatix.enabled():
-        # Бот запущен через конструктор Donatix: счёт у поставщика — первым делом
+        # Бот из конструктора Donatix: только то, что нужно продавцу. Ключи, связь с
+        # поставщиком, кошелёк и прочее ведёт сам Donatix.
         kb.row(btn("🏦 Счёт Donatix · пополнить", "dx:home", style=SUCCESS))
+        kb.row(btn("🕹 Игры и пакеты", "pn:games", style=PRIMARY))
+        kb.row(InlineKeyboardButton(text="💵 Цены и наценка", callback_data="pn:prices"))
+        kb.row(
+            InlineKeyboardButton(text="📥 Заявки клиентов", callback_data="pn:deposits"),
+            InlineKeyboardButton(text="💳 Реквизиты", callback_data="pn:pay"),
+        )
+        return kb.as_markup()
     kb.row(btn("📣 Рассылка", "pn:cast", style=PRIMARY))
     kb.row(
         InlineKeyboardButton(text="💵 Цены и наценка", callback_data="pn:prices"),
@@ -3962,8 +3970,10 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
     kb.row(btn("🪪 Проверка ID игрока", "pn:checker", style=PRIMARY))
     kb.row(InlineKeyboardButton(text="📋 Все категории поставщика",
                                 callback_data="pn:game_codes"))
-    kb.row(InlineKeyboardButton(text="🔔 Мгновенные отчёты (вебхук)",
-                                callback_data="pn:hook"))
+    from app.handlers import donatix
+    if not donatix.enabled():  # у бота из конструктора статусы приходят от Donatix
+        kb.row(InlineKeyboardButton(text="🔔 Мгновенные отчёты (вебхук)",
+                                    callback_data="pn:hook"))
     for game in await db.list_games(conn):
         kb.row(InlineKeyboardButton(
             text=("✅ " if game.enabled else "🚫 ") + game.title,
