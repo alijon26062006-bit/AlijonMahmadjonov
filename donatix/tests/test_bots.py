@@ -77,3 +77,30 @@ def test_admin_bots_page(app, config, conn, monkeypatch):
     (bots.bot_dir(config, 1)).mkdir(parents=True, exist_ok=True)
     (bots.bot_dir(config, 1) / "bot.log").write_text(f"start with {TOKEN}\n")
     assert TOKEN not in admin.get("/admin/bots/1/log").text
+
+
+def test_no_double_start_and_conflict_warning(config, conn, tmp_path, monkeypatch):
+    import threading
+    tpl = tmp_path / "tpl2"
+    (tpl / "app").mkdir(parents=True)
+    (tpl / "app" / "__init__.py").write_text("")
+    (tpl / "app" / "main.py").write_text("import time\ntime.sleep(60)\n")
+    monkeypatch.setattr(bots, "TEMPLATE_DIR", tpl)
+    uid = accounts.create_user(conn, email="d@example.com", login="dbl", password="password123", status="active")
+    bid = bots.create(conn, config, user_id=uid, token=TOKEN, admin_ids="1", username="dbl_bot")
+    runner = bots.BotRunner(config, "http://x", python=sys.executable)
+    spawned = []
+    real = runner._spawn
+    monkeypatch.setattr(runner, "_spawn", lambda py, row: (spawned.append(row["id"]), real(py, row)))
+    try:
+        ts = [threading.Thread(target=runner.sync) for _ in range(5)]  # кнопка + фоновая проверка разом
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
+        assert spawned == [bid]
+        (bots.bot_dir(config, bid) / "bot.log").write_text(
+            "aiogram.exceptions.TelegramConflictError: Conflict: terminated by other getUpdates request\n")
+        assert runner.state(bid)["conflict"] is True
+    finally:
+        runner.stop()

@@ -161,6 +161,7 @@ class BotRunner:
         self.venv_state = "ok" if python else "unknown"
         self._stop = threading.Event()
         self._lock = threading.Lock()
+        self._sync_lock = threading.Lock()  # одна проверка за раз — иначе бот мог запуститься дважды
         self._thread: threading.Thread | None = None
 
     # окружение с aiogram и прочим — отдельно от сайта, чтобы версии не мешали друг другу
@@ -210,7 +211,8 @@ class BotRunner:
             p = self.procs.get(bot_id)
             m = dict(self.meta.get(bot_id, {}))
         running = p is not None and p.poll() is None
-        return {"running": running, "pid": p.pid if running else None, "started_at": m.get("started_at"),
+        return {"running": running, "conflict": _token_conflict(self.config, bot_id),
+                "pid": p.pid if running else None, "started_at": m.get("started_at"),
                 "restarts": m.get("restarts", 0), "last_exit": m.get("last_exit"), "venv": self.venv_state}
 
     def _run(self) -> None:
@@ -222,6 +224,10 @@ class BotRunner:
             self._stop.wait(self.check_every)
 
     def sync(self) -> None:
+        with self._sync_lock:
+            self._sync()
+
+    def _sync(self) -> None:
         conn = db.connect(self.config.db_path)
         try:
             rows = {r["id"]: r for r in conn.execute("SELECT * FROM bots")}
@@ -241,6 +247,9 @@ class BotRunner:
             return
         with self._lock:
             for row in wanted:
+                p = self.procs.get(row["id"])
+                if p is not None and p.poll() is None:
+                    continue  # уже работает — второй копии не будет
                 m = self.meta.setdefault(row["id"], {"restarts": 0})
                 if time.time() < m.get("retry_at", 0):
                     continue
@@ -249,6 +258,7 @@ class BotRunner:
     def _spawn(self, py: str, row: sqlite3.Row) -> None:
         folder = bot_dir(self.config, row["id"])
         folder.mkdir(parents=True, exist_ok=True)
+        _kill_stale(folder / "bot.pid")
         logfile = folder / "bot.log"
         if logfile.exists() and logfile.stat().st_size > LOG_LIMIT:
             logfile.replace(folder / "bot.log.1")
@@ -260,6 +270,7 @@ class BotRunner:
                              stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
         out.close()
         self.procs[row["id"]] = p
+        (folder / "bot.pid").write_text(str(p.pid))
         m = self.meta.setdefault(row["id"], {"restarts": 0})
         m.update(started_at=time.time(), version=row["updated_at"])
         threading.Thread(target=self._watch, args=(row["id"], p), daemon=True).start()
@@ -288,6 +299,32 @@ class BotRunner:
             p.wait(timeout=10)
         except subprocess.TimeoutExpired:
             p.kill()
+
+
+def _kill_stale(pidfile: Path) -> None:
+    """Копия бота от прошлого запуска сайта ещё жива — остановить, иначе ответы придут дважды."""
+    try:
+        pid = int(pidfile.read_text().strip())
+        cmd = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except (OSError, ValueError):
+        return
+    if b"app.main" not in cmd:
+        return
+    import signal
+    try:
+        os.kill(pid, signal.SIGTERM)
+        for _ in range(50):
+            time.sleep(0.1)
+            os.kill(pid, 0)
+        os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
+
+
+def _token_conflict(config: Config, bot_id: int) -> bool:
+    """Telegram пишет Conflict, когда тот же токен опрашивает ещё одна программа."""
+    tail = log_tail(config, bot_id, 40)
+    return "Conflict" in tail and "getUpdates" in tail
 
 
 RUNNER: BotRunner | None = None

@@ -40,6 +40,10 @@
       <span class="badge {{ 'ok' if b.running else ('warn' if b.enabled else '') }}">
         {{ 'работает' if b.running else ('запускается…' if b.enabled else 'остановлен') }}</span>
     </div>
+    {% if b.conflict %}
+    <div class="flash error" style="margin:10px 0 0">{{ icon('alert', 20) }}<span><b>Этот токен работает ещё в одной программе</b> — поэтому бот отвечает дважды.
+      Остановите другую копию (например, старый бот на сервере) или создайте для конструктора новый бот у @BotFather.</span></div>
+    {% endif %}
     <div class="bot-meta small muted">
       Админы: <span class="mono">{{ b.admin_ids }}</span>
       {% if b.restarts %} · перезапусков: {{ b.restarts }}{% endif %}
