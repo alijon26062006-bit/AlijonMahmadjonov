@@ -1,47 +1,78 @@
-<!doctype html>
+{% from "_icons.html" import icon, logo, theme_button %}<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}{{ site_name }}{% endblock %}</title>
   <meta name="description" content="{{ site_name }} — оптовые Telegram Stars, пополнения игр и подарочные карты для проектов через API и веб-панель.">
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("dx-theme"); } catch (e) {}
+      if (!t) t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/static/donatix.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23d9480f'/><text x='16' y='23' font-size='20' font-family='Arial' font-weight='900' fill='white' text-anchor='middle'>D</text></svg>">
+  <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
 </head>
 <body>
+{% block header %}
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="/"><span class="logo">D</span>{{ site_name }}</a>
+    <a class="brand" href="/">{{ logo() }}{{ site_name }}</a>
     <nav class="nav">
-      {% block nav %}
       <a class="hide-sm" href="/#catalog">Каталог</a>
       <a class="hide-sm" href="/#pricing">Цены</a>
-      <a class="hide-sm" href="/docs">API</a>
+      <a class="hide-sm" href="/docs">Документация</a>
+      <a class="hide-sm" href="/#faq">FAQ</a>
+      {{ theme_button() }}
       {% if user %}
-        <a class="btn sm primary" href="{{ '/admin' if user.role == 'admin' else '/panel' }}">Кабинет</a>
+        <a class="btn sm primary" href="{{ '/admin' if user.role == 'admin' else '/panel' }}">Панель</a>
       {% else %}
-        <a href="/login">Войти</a>
+        <a class="btn sm hide-sm" href="/login">Войти</a>
         <a class="btn sm primary" href="/register">Начать</a>
       {% endif %}
-      {% endblock %}
     </nav>
   </div>
 </header>
+{% endblock %}
 {% block body %}
 <main class="wrap">
-  {% for f in flashes %}<div class="flash {{ f.kind }}">{{ f.text }}</div>{% endfor %}
+  {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
   {% block content %}{% endblock %}
 </main>
 {% endblock %}
+{% block footer %}
 <footer class="foot">
-  <div class="wrap">
-    <div><b>{{ site_name }}</b> — цифровые товары оптом для игровых проектов.</div>
-    <div>
-      <a href="/docs">Документация API</a> ·
-      <a href="/register">Стать партнёром</a>
-      {% if support_contact %} · Поддержка: {{ support_contact }}{% endif %}
+  <div class="wrap cols">
+    <div style="max-width:380px">
+      <div class="brandline">{{ site_name }}</div>
+      <p style="margin-top:8px">Telegram Stars, пополнения игр и подарочные карты оптом — для каналов, ботов и магазинов.</p>
+    </div>
+    <div class="links">
+      <a href="/#catalog">Каталог</a><a href="/#pricing">Цены</a><a href="/docs">Документация API</a>
+      <a href="/#faq">FAQ</a><a href="/register">Стать партнёром</a><a href="/login">Вход в панель</a>
+      {% if support_contact %}<span>Поддержка: {{ support_contact }}</span>{% endif %}
     </div>
   </div>
+  <div class="wrap small" style="margin-top:24px">© {{ site_name }}</div>
 </footer>
+{% endblock %}
+<button class="to-top" type="button" aria-label="Наверх" onclick="scrollTo({top:0})">{{ icon('arrow-up', 22) }}</button>
+<script>
+  function dxTheme() {
+    var r = document.documentElement, t = r.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    r.setAttribute("data-theme", t);
+    try { localStorage.setItem("dx-theme", t); } catch (e) {}
+  }
+  (function () {
+    var b = document.querySelector(".to-top");
+    addEventListener("scroll", function () { b.classList.toggle("show", scrollY > 600); }, { passive: true });
+  })();
+</script>
 </body>
 </html>

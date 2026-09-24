@@ -1,21 +1,22 @@
 {% extends "panel/_layout.html" %}
 {% block title %}{{ view.order_id }} — {{ site_name }}{% endblock %}
 {% block content %}
+{% from "_icons.html" import icon, kind_icon, status %}
 {% set st = view.status %}
 {% if st == 'processing' %}<meta http-equiv="refresh" content="5">{% endif %}
-<div class="page-head">
-  <a class="small" href="/panel/orders">← Все заказы</a>
+<section class="page-hero">
+  <a class="back" href="/panel/orders">{{ icon('arrow-left', 18) }}Все заказы</a>
   <h1>Заказ {{ view.order_id }}</h1>
-  <span class="badge {{ {'completed': 'ok', 'failed': 'bad', 'processing': 'warn'}[st] }}">{{ status_titles[st] }}</span>
-</div>
-<div class="grid two">
-  <div class="card summary">
+  <p style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">{{ status(st) }}<span class="badge {{ {'completed': 'ok', 'failed': 'bad', 'processing': 'warn'}[st] }}">{{ status_titles[st] }}</span></p>
+</section>
+<div class="grid two" style="align-items:start">
+  <div class="summary card" style="padding:0">
     <div><span class="muted">Товар</span><span>{{ view.product_name }}</span></div>
     {% for k, v in view.fields.items() %}<div><span class="muted">{{ k }}</span><span class="mono">{{ v }}</span></div>{% endfor %}
     <div><span class="muted">Количество</span><span>{{ view.quantity }}</span></div>
     <div><span class="muted">Цена за единицу</span><span>${{ view.unit_price_usd }}</span></div>
     <div><span class="muted">Создан</span><span>{{ view.created_at[:19] | replace('T', ' ') }} UTC</span></div>
-    <div><span>Сумма</span><span>${{ view.total_usd }}</span></div>
+    <div class="total"><span>Сумма</span><span>${{ view.total_usd }}</span></div>
   </div>
   <div class="card">
     {% if st == 'processing' %}

@@ -1,27 +1,27 @@
 {% extends "admin/_layout.html" %}
 {% block title %}Админка — {{ site_name }}{% endblock %}
 {% block content %}
-<div class="page-head"><div class="eyebrow">Админка</div><h1>Сводка</h1></div>
+<section class="page-hero"><div class="eyebrow">Админка</div><h1>Сводка</h1><p>Деньги, заказы и состояние поставщика.</p></section>
 
 {% if counts.attention %}<div class="flash error"><a href="/admin/orders?status=attention">Заказов, требующих внимания: {{ counts.attention }}</a> — проверьте их в панели FazerCards.</div>{% endif %}
 {% if counts.pending_users %}<div class="flash warn"><a href="/admin/users?status=pending">Новых заявок: {{ counts.pending_users }}</a></div>{% endif %}
 
 <div class="grid">
-  <div class="card stat">
+  <div class="stat">
     <div class="label">Баланс у поставщика ({{ supplier_name }})</div>
     <div class="value" style="{{ 'color:var(--bad)' if supplier_balance is not none and supplier_balance < low }}">
       {% if supplier_balance is not none %}${{ supplier_balance }}{% else %}—{% endif %}</div>
     <div class="small muted">{{ (supplier_balance_at or 'ещё не проверяли')[:16] | replace('T', ' ') }}</div>
   </div>
-  <div class="card stat"><div class="label">Балансы клиентов</div><div class="value">${{ fmt(counts.client_balances) }}</div>
+  <div class="stat"><div class="label">Балансы клиентов</div><div class="value">${{ fmt(counts.client_balances) }}</div>
     <div class="small muted">должно быть покрыто балансом у поставщика</div></div>
-  <div class="card stat"><div class="label">Сегодня</div><div class="value">{{ today.orders }}</div>
+  <div class="stat"><div class="label">Сегодня</div><div class="value">{{ today.orders }}</div>
     <div class="small muted">выручка ${{ fmt(today.revenue) }} · прибыль ${{ fmt(today.profit) }}</div></div>
-  <div class="card stat"><div class="label">30 дней</div><div class="value">{{ month.orders }}</div>
+  <div class="stat"><div class="label">30 дней</div><div class="value">{{ month.orders }}</div>
     <div class="small muted">выручка ${{ fmt(month.revenue) }} · прибыль ${{ fmt(month.profit) }}</div></div>
-  <div class="card stat"><div class="label">Клиенты</div><div class="value">{{ counts.clients }}</div>
+  <div class="stat"><div class="label">Клиенты</div><div class="value">{{ counts.clients }}</div>
     <div class="small muted">в работе заказов: {{ counts.processing }}</div></div>
-  <div class="card stat"><div class="label">Товаров в каталоге</div><div class="value">{{ counts.products }}</div>
+  <div class="stat"><div class="label">Товаров в каталоге</div><div class="value">{{ counts.products }}</div>
     <div class="small muted">обновлён {{ (catalog_synced_at or 'никогда')[:16] | replace('T', ' ') }}</div>
     <form method="post" action="/admin/sync" style="margin-top:8px"><input type="hidden" name="csrf" value="{{ csrf }}">
       <button class="btn sm">Обновить сейчас</button></form></div>

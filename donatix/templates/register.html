@@ -1,28 +1,41 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Регистрация — {{ site_name }}{% endblock %}
 {% block body %}
 <main class="auth">
   <div class="card">
-    <h2>Стать партнёром</h2>
-    <p class="muted">После регистрации мы проверим заявку и активируем доступ.</p>
-    {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+    <a class="back" href="/">{{ icon('arrow-left', 18) }}На главную</a>
+    <div class="auth-head">
+      <div class="tile">{{ icon('handshake', 26) }}</div>
+      <div><h2>Стать партнёром</h2><p>Без абонентской платы — только за заказы</p></div>
+    </div>
+    {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
     <form method="post" action="/register">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <label for="email">Email</label>
-      <input id="email" name="email" type="email" required autocomplete="email" value="{{ form.email or '' }}">
+      <input id="email" name="email" type="email" required autocomplete="email" placeholder="your@email.com" value="{{ form.email or '' }}">
       <label for="login">Имя пользователя</label>
       <input id="login" name="login" required minlength="3" maxlength="32" autocomplete="username"
-             pattern="[A-Za-z0-9_.\-]{3,32}" value="{{ form.login or '' }}">
+             pattern="[A-Za-z0-9_.\-]{3,32}" placeholder="Выберите имя пользователя" value="{{ form.login or '' }}">
       <div class="hint">Латиница, цифры, _ . -</div>
       <label for="password">Пароль</label>
-      <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password">
+      <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="Мин. 8 символов">
       <label for="password2">Повторите пароль</label>
-      <input id="password2" name="password2" type="password" required minlength="8" autocomplete="new-password">
+      <input id="password2" name="password2" type="password" required minlength="8" autocomplete="new-password" placeholder="Подтвердите пароль">
       <label for="project">Ваш проект <span class="muted">(необязательно)</span></label>
       <input id="project" name="project" placeholder="Ссылка на канал, бота или сайт" value="{{ form.project or '' }}">
-      <div style="margin-top:20px"><button class="btn primary block">Создать аккаунт</button></div>
+      <button class="btn primary lg block" style="margin-top:22px">Создать аккаунт</button>
     </form>
-    <p class="small muted" style="margin-top:16px">Уже есть аккаунт? <a href="/login">Войти</a></p>
+    <p class="center muted" style="margin:18px 0 0">Уже есть аккаунт? <a href="/login">Войти</a></p>
+    <div class="card tight" style="margin-top:22px;background:var(--surface-2);box-shadow:none">
+      <div class="label-caps">Что входит</div>
+      <ul class="checks" style="margin:6px 0 0">
+        <li>{{ icon('check', 18) }}Весь каталог по оптовым ценам</li>
+        <li>{{ icon('check', 18) }}API, webhooks и веб-панель</li>
+        <li>{{ icon('check', 18) }}Автоматический возврат, если заказ не прошёл</li>
+        <li>{{ icon('check', 18) }}Помощь с подключением сайта или бота</li>
+      </ul>
+    </div>
   </div>
 </main>
 {% endblock %}

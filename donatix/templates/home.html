@@ -1,55 +1,73 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon, kind_icon %}
 {% block title %}{{ site_name }} — Telegram Stars, пополнения игр и подарочные карты оптом{% endblock %}
 {% block body %}
 <main>
   <div class="wrap">
-    {% for f in flashes %}<div class="flash {{ f.kind }}">{{ f.text }}</div>{% endfor %}
+    {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
     <section class="hero">
       <div>
-        <div class="eyebrow">Для игровых проектов и магазинов</div>
-        <h1>Продавайте донат своей аудитории — мы берём на себя доставку</h1>
+        <div class="eyebrow">Для каналов, ботов и магазинов</div>
+        <h1>Продавайте донат своей аудитории <span class="hl">без закупки заранее</span></h1>
         <p class="lead">Telegram Stars и Premium, пополнения PUBG, Free Fire и других игр, подарочные карты.
-          Подключите наш API к своему сайту или боту, или оформляйте заказы вручную в панели.</p>
+          Подключите API к сайту или боту — или оформляйте заказы в панели.</p>
         <div class="cta">
-          <a class="btn primary" href="/register">Подключиться</a>
-          <a class="btn" href="/docs">Документация API</a>
+          <a class="btn primary lg" href="/register">Стать партнёром {{ icon('arrow-right', 18) }}</a>
+          <a class="btn lg" href="/#catalog">Каталог</a>
         </div>
-        <p class="small muted" style="margin-top:14px">Без абонентской платы. Платите только за заказы.</p>
+        <p class="small muted" style="margin-top:14px">{{ icon('shield', 16) }} Без абонентской платы. Возврат, если заказ не прошёл.</p>
       </div>
-      <div class="card">
-        <div class="small muted" style="margin-bottom:8px">Заказ в одну строку</div>
-<pre>curl -X POST {{ request.base_url }}api/v1/orders \
-  -H "X-API-Key: dx_live_…" \
-  -H "Idempotency-Key: 7f3c…" \
-  -d '{"product_id": "tg-stars",
-       "quantity": 500,
-       "fields": {"telegram_username": "@player"}}'</pre>
-<pre>{"ok": true, "order": {
-  "order_id": "dx-1042",
-  "status": "completed",
-  "total_usd": "8.3025" }}</pre>
+      <div class="window" aria-hidden="true">
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">api/v1/orders</span></div>
+        <div class="body">
+<pre>POST /api/v1/orders
+{"product_id": "tg-stars", "quantity": 500,
+ "fields": {"telegram_username": "@player"}}</pre>
+          <div class="orders">
+            {% for k, name, sum, when in [('telegram_stars', 'Telegram Stars 500', '8.30', '0.8 c'), ('topup', 'PUBG Mobile — 660 UC', '10.15', '3 c'), ('gift_card', 'Steam — $20', '22.57', '1 c')] %}
+            <div class="item">
+              <div class="tile sm">{{ kind_icon(k, 20) }}</div>
+              <div class="grow"><div class="title small">{{ name }}</div><div class="sub small">выдано за {{ when }}</div></div>
+              <span class="badge ok">{{ icon('check', 14) }}${{ sum }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:16px">
+      <div class="numbers">
+        <div class="stat"><div class="n">{{ total_products or '100' }}+</div><div class="muted">позиций в каталоге</div></div>
+        <div class="stat"><div class="n">4</div><div class="muted">вида товаров в одном API</div></div>
+        <div class="stat"><div class="n">$0</div><div class="muted">абонентская плата</div></div>
+        <div class="stat"><div class="n">24/7</div><div class="muted">автоматическая выдача</div></div>
       </div>
     </section>
   </div>
 
   <section class="section" id="catalog">
     <div class="wrap">
-      <h2>Что можно продавать</h2>
-      <p class="muted">{% if total_products %}{{ total_products }} позиций в каталоге, цены обновляются автоматически.{% else %}Каталог обновляется автоматически от поставщика.{% endif %}</p>
+      <div class="section-head">
+        <div class="eyebrow">Каталог</div>
+        <h2>Что можно продавать</h2>
+        <p>Цены и наличие обновляются автоматически.</p>
+      </div>
       <div class="grid">
         {% set defaults = {
-          "telegram_stars": ["Stars от 50 до 10 000 штук"],
-          "telegram_premium": ["3, 6 и 12 месяцев"],
-          "topup": ["PUBG Mobile UC", "Free Fire", "Mobile Legends", "и другие игры по ID игрока"],
-          "gift_card": ["Steam", "App Store & iTunes", "PlayStation", "Google Play"],
+          "telegram_stars": ["от 50 до 10 000 звёзд"],
+          "telegram_premium": ["3 месяца", "6 месяцев", "12 месяцев"],
+          "topup": ["PUBG Mobile", "Free Fire", "Mobile Legends", "и другие"],
+          "gift_card": ["Steam", "App Store", "PlayStation", "Google Play"],
         } %}
         {% for kind, title in kind_titles.items() %}
-        <div class="card">
+        <div class="card feature">
+          <div class="tile">{{ kind_icon(kind, 26) }}</div>
           <h3>{{ title }}</h3>
           <div class="chips">
-            {% if by_kind.get(kind) %}
-              {% for c in by_kind[kind][:8] %}<span class="chip">{{ c.category_name }}</span>{% endfor %}
-              {% if by_kind[kind]|length > 8 %}<span class="chip">+{{ by_kind[kind]|length - 8 }}</span>{% endif %}
+            {% if by_kind.get(kind) and kind not in ('telegram_stars', 'telegram_premium') %}
+              {% for c in by_kind[kind][:6] %}<span class="chip">{{ c.category_name }}</span>{% endfor %}
+              {% if by_kind[kind]|length > 6 %}<span class="chip">+{{ by_kind[kind]|length - 6 }}</span>{% endif %}
             {% else %}
               {% for d in defaults[kind] %}<span class="chip">{{ d }}</span>{% endfor %}
             {% endif %}
@@ -62,63 +80,111 @@
 
   <section class="section">
     <div class="wrap">
-      <h2>Как это работает</h2>
-      <p class="muted">От заявки до первой продажи — один день.</p>
-      <div class="grid steps">
-        <div class="card"><h3>Заявка</h3><p class="muted">Регистрируетесь и рассказываете о проекте. Мы активируем доступ.</p></div>
-        <div class="card"><h3>Баланс</h3><p class="muted">Пополняете баланс в долларах. Заказы списываются с него — никаких долгов.</p></div>
-        <div class="card"><h3>Подключение</h3><p class="muted">Создаёте API-ключ и подключаете сайт или Telegram-бота. Или заказываете в панели.</p></div>
-        <div class="card"><h3>Продажи</h3><p class="muted">Покупатель платит вам, вы делаете заказ у нас — доставка за секунды. Разница — ваш доход.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap">
-      <h2>Почему {{ site_name }}</h2>
-      <div class="grid">
-        <div class="card"><h3>Без подписки</h3><p class="muted">Не нужно платить каждый месяц. Небольшая наценка только на выполненные заказы.</p></div>
-        <div class="card"><h3>Деньги не теряются</h3><p class="muted">Если заказ не прошёл — сумма автоматически возвращается на баланс. Повторный запрос не спишет деньги дважды.</p></div>
-        <div class="card"><h3>Простой API</h3><p class="muted">Один метод для всех товаров. Примеры на curl, Python и Node.js. Уведомления о статусе через webhook.</p></div>
-        <div class="card"><h3>Поддержка рядом</h3><p class="muted">Помогаем подключить бота или сайт и отвечаем в Telegram.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="pricing">
-    <div class="wrap">
-      <h2>Цены</h2>
-      <p class="muted">Наценка поверх оптовой цены. Чем больше оборот — тем ниже наценка.</p>
-      <div class="grid">
-        {% for tier, title, note in [("bronze", "Старт", "Для новых партнёров"), ("silver", "Рост", "Для постоянных партнёров"), ("gold", "Партнёр", "Для крупных партнёров")] %}
-        <div class="card price-card">
-          <div class="eyebrow">{{ title }}</div>
-          <div class="big">+{{ markups[tier] }}%</div>
-          <div class="muted">{{ note }}</div>
-          <ul><li>Весь каталог</li><li>API и webhooks</li><li>Веб-панель</li></ul>
-        </div>
+      <div class="section-head"><div class="eyebrow">Почему {{ site_name }}</div><h2>Всё, чтобы продавать без хлопот</h2></div>
+      <div class="grid three">
+        {% for ico, t, d in [
+          ('wallet', 'Без подписки', 'Никаких ежемесячных платежей. Небольшая наценка только на выполненные заказы.'),
+          ('shield', 'Деньги под защитой', 'Не прошёл заказ — сумма сама возвращается на баланс. Повтор запроса не спишет дважды.'),
+          ('code', 'Один простой API', 'Один метод для всех товаров. Примеры на curl, Python и Node.js, уведомления через webhook.'),
+          ('bolt', 'Выдача за секунды', 'Заказы выполняются автоматически круглые сутки. Статус — в панели и через API.'),
+          ('grid', 'Веб-панель', 'Можно без программиста: заказывайте вручную, смотрите историю и баланс.'),
+          ('handshake', 'Помощь с подключением', 'Поможем подключить бота или сайт и ответим в Telegram.'),
+        ] %}
+        <div class="card feature"><div class="tile">{{ icon(ico, 24) }}</div><h3>{{ t }}</h3><p>{{ d }}</p></div>
         {% endfor %}
       </div>
     </div>
   </section>
 
   <section class="section">
+    <div class="wrap">
+      <div class="section-head"><div class="eyebrow">Как это работает</div><h2>От заявки до первой продажи — один день</h2></div>
+      <div class="grid steps">
+        {% for t, d in [
+          ('Регистрация', 'Создаёте аккаунт и рассказываете о проекте. Мы активируем доступ.'),
+          ('Баланс', 'Пополняете баланс в долларах — заказы списываются с него.'),
+          ('Подключение', 'Создаёте API-ключ и подключаете сайт или бота. Или заказываете в панели.'),
+          ('Продажи', 'Покупатель платит вам, заказ выполняется у нас. Разница — ваш доход.'),
+        ] %}
+        <div class="card"><div class="num">{{ loop.index }}</div><h3>{{ t }}</h3><p class="muted" style="margin:0">{{ d }}</p></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap grid two" style="align-items:center;gap:32px">
+      <div>
+        <div class="eyebrow">Для разработчиков</div>
+        <h2>Интеграция за вечер</h2>
+        <ul class="checks">
+          <li>{{ icon('check', 18) }}<span><b>REST API</b> — баланс, каталог, заказы, история</span></li>
+          <li>{{ icon('check', 18) }}<span><b>Webhooks</b> с подписью — узнаёте о выполнении сразу</span></li>
+          <li>{{ icon('check', 18) }}<span><b>Idempotency-Key</b> — повтор запроса безопасен</span></li>
+          <li>{{ icon('check', 18) }}<span><b>Понятные ошибки</b> на русском с кодами</span></li>
+        </ul>
+        <a class="btn soft" href="/docs">{{ icon('book', 18) }}Читать документацию</a>
+      </div>
+<pre data-lang="python">import uuid, requests
+
+r = requests.post(
+    "{{ request.base_url }}api/v1/orders",
+    headers={"X-API-Key": KEY,
+             "Idempotency-Key": str(uuid.uuid4())},
+    json={"product_id": "tg-stars", "quantity": 100,
+          "fields": {"telegram_username": "@player"}},
+)
+print(r.json()["order"]["status"])  # processing → completed</pre>
+    </div>
+  </section>
+
+  <section class="section" id="pricing">
+    <div class="wrap">
+      <div class="section-head"><div class="eyebrow">Цены</div><h2>Платите только за заказы</h2>
+        <p>Наценка поверх оптовой цены. Чем больше оборот — тем она ниже.</p></div>
+      <div class="grid three">
+        {% for tier, title, note in [("bronze", "Старт", "Для новых партнёров"), ("silver", "Рост", "Для постоянных партнёров"), ("gold", "Партнёр", "Для крупных партнёров")] %}
+        <div class="card price-card {{ 'featured' if tier == 'silver' }}">
+          {% if tier == 'silver' %}<span class="badge accent tag">Популярный</span>{% endif %}
+          <h3>{{ title }}</h3>
+          <div class="big">+{{ markups[tier] }}%</div>
+          <div class="muted">{{ note }}</div>
+          <ul class="checks">
+            <li>{{ icon('check', 18) }}Весь каталог</li>
+            <li>{{ icon('check', 18) }}API и webhooks</li>
+            <li>{{ icon('check', 18) }}Веб-панель</li>
+            <li>{{ icon('check', 18) }}{{ 'Персональная помощь' if tier == 'gold' else 'Помощь с интеграцией' }}</li>
+          </ul>
+          <a class="btn block {{ 'primary' if tier == 'silver' }}" href="/register">Начать</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="faq">
     <div class="wrap" style="max-width:820px">
-      <h2>Вопросы</h2>
-      <details class="faq"><summary>Как пополнить баланс?</summary><p>После одобрения заявки напишите в поддержку{% if support_contact %} ({{ support_contact }}){% endif %}: принимаем переводы и USDT. Баланс зачисляется в долларах.</p></details>
-      <details class="faq"><summary>Что если заказ не выполнится?</summary><p>Деньги автоматически вернутся на баланс, а в заказе будет указана причина.</p></details>
-      <details class="faq"><summary>Можно без программиста?</summary><p>Да. Все товары можно заказывать вручную в веб-панели. API нужен, чтобы продажи шли автоматически.</p></details>
-      <details class="faq"><summary>Подходит для Telegram-бота?</summary><p>Да, это самый частый сценарий: бот принимает оплату от покупателя и делает заказ через наш API.</p></details>
-      <details class="faq"><summary>Как быстро выполняются заказы?</summary><p>Обычно за секунды. Пополнения некоторых игр — до нескольких минут. Статус виден в панели и приходит на webhook.</p></details>
+      <div class="section-head"><h2>Частые вопросы</h2></div>
+      {% for q, a in [
+        ('Как пополнить баланс?', 'После одобрения заявки напишите в поддержку' ~ (' (' ~ support_contact ~ ')' if support_contact else '') ~ ': принимаем переводы и USDT. Баланс ведётся в долларах.'),
+        ('Что если заказ не выполнится?', 'Деньги автоматически вернутся на баланс, а в заказе будет указана причина.'),
+        ('Нужен ли программист?', 'Нет. Все товары можно заказывать вручную в веб-панели. API нужен, чтобы продажи шли автоматически.'),
+        ('Подходит для Telegram-бота?', 'Да, это самый частый сценарий: бот принимает оплату от покупателя и делает заказ через наш API.'),
+        ('Как быстро выполняются заказы?', 'Обычно за секунды. Пополнения некоторых игр — до нескольких минут. Статус виден в панели и приходит на webhook.'),
+        ('Есть ли абонентская плата?', 'Нет. Вы платите только за выполненные заказы — наценка уже включена в цену.'),
+      ] %}
+      <details class="faq"><summary>{{ q }}</summary><p>{{ a }}</p></details>
+      {% endfor %}
     </div>
   </section>
 
   <section class="section">
     <div class="wrap">
-      <div class="card" style="text-align:center;padding:40px 20px">
-        <h2>Готовы продавать?</h2>
+      <div class="card cta-card">
+        <div class="tile" style="margin:0 auto 18px;width:64px;height:64px">{{ icon('handshake', 32) }}</div>
+        <h2>Готовы начать продавать?</h2>
         <p class="muted">Оставьте заявку — активируем доступ в течение дня.</p>
-        <a class="btn primary" href="/register">Подключиться</a>
+        <a class="btn primary lg" href="/register">Стать партнёром</a>
       </div>
     </div>
   </section>

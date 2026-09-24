@@ -1,37 +1,38 @@
 {% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon, kind_icon %}
 {% block title %}{{ p.name }} — {{ site_name }}{% endblock %}
 {% block content %}
 {% set multi = p.max_quantity > 1 %}
-<div class="page-head">
-  <div class="eyebrow">{{ p.kind_title }} · {{ p.category_name }}</div>
+<section class="page-hero">
+  <a class="back" href="/panel/catalog?kind={{ p.kind }}">{{ icon('arrow-left', 18) }}{{ p.kind_title }}</a>
   <h1>{{ p.name }}</h1>
-  <p>{% if p.unit == 'star' %}${{ p.price_usd }} за звезду{% else %}${{ p.price_usd }}{% if multi %} за штуку{% endif %}{% endif %}</p>
-</div>
-{% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+  <p>{{ p.category_name }} · {% if p.unit == 'star' %}${{ p.price_usd }} за звезду{% else %}${{ p.price_usd }}{% if multi %} за штуку{% endif %}{% endif %}</p>
+</section>
+{% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
 
-<form method="post" action="/panel/buy/{{ p.product_id }}" class="grid two" id="buy">
+<form method="post" action="/panel/buy/{{ p.product_id }}" class="grid two" id="buy" style="align-items:start">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="idem" value="{{ idem }}">
   <div class="card">
-    <h3>1. Получатель</h3>
+    <div class="step-head"><span class="n">1</span><h3>Получатель</h3></div>
     {% for f in p.fields %}
-      <label for="f_{{ f.key }}">{{ f.label }}</label>
+      <label for="f_{{ f.key }}">{{ f.label }} <span class="muted" aria-hidden="true">*</span></label>
       <input id="f_{{ f.key }}" name="field_{{ f.key }}" required value="{{ form.get(f.key, '') }}"
-             {% if f.key == 'telegram_username' %}placeholder="@username" autocapitalize="off"{% endif %}>
+             {% if f.key == 'telegram_username' %}placeholder="@username" autocapitalize="off" autocomplete="off" spellcheck="false"{% endif %}>
     {% else %}
-      <p class="muted">Данные получателя не нужны — после оплаты вы получите код.</p>
+      <p class="muted" style="margin-top:14px">Данные получателя не нужны — после оплаты вы получите код.</p>
     {% endfor %}
 
     {% if multi %}
-      <h3 style="margin-top:20px">2. Количество</h3>
-      <label for="quantity">{{ 'Звёзд' if p.unit == 'star' else 'Штук' }}</label>
+      <div class="step-head" style="margin-top:28px"><span class="n">2</span><h3>{{ 'Выберите пакет' if p.unit == 'star' else 'Количество' }}</h3></div>
+      <label for="quantity">{{ 'Количество звёзд' if p.unit == 'star' else 'Штук' }}</label>
       <input id="quantity" name="quantity" type="number" inputmode="numeric" required
              min="{{ p.min_quantity }}" max="{{ p.max_quantity }}" value="{{ form.get('quantity') or p.min_quantity }}">
-      <div class="hint">От {{ p.min_quantity }} до {{ p.max_quantity }}{% if p.stock is not none %} · в наличии {{ p.stock }}{% endif %}</div>
+      <div class="hint">Мин. {{ p.min_quantity }} · Макс. {{ p.max_quantity }}{% if p.stock is not none %} · в наличии {{ p.stock }}{% endif %}</div>
       {% if p.unit == 'star' %}
       <div class="packs">
         {% for n in [50, 100, 250, 500, 1000, 2500, 5000, 10000] if p.min_quantity <= n <= p.max_quantity %}
-          <button type="button" class="btn sm" data-qty="{{ n }}">{{ n }} ★</button>
+          <button type="button" class="pack" data-qty="{{ n }}"><b>{{ n }} {{ icon('star', 16) }}</b><span class="pack-price"></span></button>
         {% endfor %}
       </div>
       {% endif %}
@@ -42,15 +43,17 @@
 
   <div class="card">
     <h3>Сводка</h3>
+    <p class="muted small">Цифры обновляются при вводе.</p>
     <div class="summary">
-      <div><span class="muted">Товар</span><span>{{ p.name }}</span></div>
-      {% if multi %}<div><span class="muted">Количество</span><span id="s-qty">—</span></div>{% endif %}
-      <div><span class="muted">Цена</span><span>${{ p.price_usd }}</span></div>
-      <div><span class="muted">Баланс</span><span>${{ fmt(user.balance_micro) }}</span></div>
-      <div><span>К оплате</span><span id="s-total">${{ p.price_usd }}</span></div>
+      <div><span>Товар</span><span>{{ p.name }}</span></div>
+      <div><span>Получатель</span><span id="s-to">—</span></div>
+      {% if multi %}<div><span>Количество</span><span id="s-qty">—</span></div>{% endif %}
+      <div><span>Цена</span><span>${{ p.price_usd }}</span></div>
+      <div><span>Ваш баланс</span><span>${{ fmt(user.balance_micro) }}</span></div>
+      <div class="total"><span>К оплате</span><span id="s-total">${{ p.price_usd }}</span></div>
     </div>
-    <button class="btn primary block" style="margin-top:16px" {{ 'disabled' if user.status != 'active' }}>Оплатить с баланса</button>
-    <p class="hint">Если заказ не выполнится, деньги автоматически вернутся на баланс.</p>
+    <button class="btn primary lg block" style="margin-top:18px" {{ 'disabled' if user.status != 'active' }}>Продолжить</button>
+    <p class="hint center">{{ icon('shield', 16) }} Если заказ не выполнится, деньги вернутся на баланс.</p>
   </div>
 </form>
 
@@ -60,15 +63,22 @@
   const qty = document.getElementById("quantity");
   const total = document.getElementById("s-total");
   const sQty = document.getElementById("s-qty");
+  const sTo = document.getElementById("s-to");
   const form = document.getElementById("buy");
+  const money = n => "$" + (Math.ceil(unit * n * 10000 - 1e-6) / 10000).toFixed(4);
+  const packs = document.querySelectorAll(".pack");
+  packs.forEach(b => { b.querySelector(".pack-price").textContent = money(+b.dataset.qty); });
   function upd() {
+    const first = form.querySelector("input[name^='field_']");
+    if (sTo) sTo.textContent = first && first.value.trim() ? first.value.trim() : "—";
     if (!qty) return;
     const n = parseInt(qty.value || "0", 10) || 0;
     if (sQty) sQty.textContent = n;
-    total.textContent = "$" + (Math.ceil(unit * n * 10000 - 1e-6) / 10000).toFixed(4);
+    total.textContent = money(n);
+    packs.forEach(b => b.classList.toggle("on", +b.dataset.qty === n));
   }
-  if (qty) qty.addEventListener("input", upd);
-  document.querySelectorAll("[data-qty]").forEach(b => b.addEventListener("click", () => { qty.value = b.dataset.qty; upd(); }));
+  form.addEventListener("input", upd);
+  packs.forEach(b => b.addEventListener("click", () => { qty.value = b.dataset.qty; upd(); }));
   form.addEventListener("submit", () => { const b = form.querySelector("button.primary"); b.disabled = true; b.textContent = "Отправляем…"; });
   upd();
 })();

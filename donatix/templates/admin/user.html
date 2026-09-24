@@ -1,11 +1,12 @@
 {% extends "admin/_layout.html" %}
 {% block title %}{{ c.login }} — админка{% endblock %}
 {% block content %}
-<div class="page-head">
-  <a class="small" href="/admin/users">← Клиенты</a>
+{% from "_icons.html" import icon %}
+<section class="page-hero">
+  <a class="back" href="/admin/users">{{ icon('arrow-left', 18) }}Клиенты</a>
   <h1>{{ c.login }}</h1>
   <p>{{ c.email }} · с {{ c.created_at[:10] }}{% if c.project %} · {{ c.project }}{% endif %}</p>
-</div>
+</section>
 <div class="grid two">
   <div class="card">
     <h3>Доступ и цены</h3>

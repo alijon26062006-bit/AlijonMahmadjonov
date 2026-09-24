@@ -1,9 +1,9 @@
 {% extends "panel/_layout.html" %}
 {% block title %}Баланс — {{ site_name }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>Баланс</h1><p>Все заказы оплачиваются с баланса в долларах.</p></div>
+<section class="page-hero"><h1>Баланс</h1><p>Все заказы оплачиваются с баланса в долларах.</p></section>
 <div class="grid two">
-  <div class="card stat"><div class="label">Доступно</div><div class="value">${{ fmt(user.balance_micro) }}</div></div>
+  <div class="stat"><div class="label">Доступно</div><div class="value">${{ fmt(user.balance_micro) }}</div></div>
   <div class="card">
     <h3>Как пополнить</h3>
     <ol>

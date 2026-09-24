@@ -1,21 +1,33 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Вход — {{ site_name }}{% endblock %}
 {% block body %}
 <main class="auth">
   <div class="card">
-    <h2>Вход в панель</h2>
-    {% for f in flashes %}<div class="flash {{ f.kind }}">{{ f.text }}</div>{% endfor %}
-    {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+    <a class="back" href="/">{{ icon('arrow-left', 18) }}На главную</a>
+    <div class="auth-head">
+      <div class="tile">{{ icon('grid', 26) }}</div>
+      <div><h2>Вход в панель</h2><p>Введите почту и пароль для доступа</p></div>
+    </div>
+    {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
+    {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
     <form method="post" action="/login">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <label for="email">Email или имя пользователя</label>
-      <input id="email" name="email" required autocomplete="username" value="{{ form.email or '' }}">
+      <input id="email" name="email" required autocomplete="username" placeholder="your@email.com" value="{{ form.email or '' }}">
       <label for="password">Пароль</label>
-      <input id="password" name="password" type="password" required autocomplete="current-password">
-      <div style="margin-top:20px"><button class="btn primary block">Войти</button></div>
+      <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="Ваш пароль">
+      {% if support_contact %}<div class="hint right">Забыли пароль? Напишите {{ support_contact }}</div>{% endif %}
+      <button class="btn primary lg block" style="margin-top:22px">Войти</button>
     </form>
-    <p class="small muted" style="margin-top:16px">Нет аккаунта? <a href="/register">Подключиться</a>
-      {% if support_contact %}<br>Забыли пароль? Напишите {{ support_contact }}{% endif %}</p>
+    <p class="center muted" style="margin:18px 0 0">Нет аккаунта? <a href="/register">Стать партнёром</a></p>
+    <div class="label-caps" style="margin-top:24px">В панели вам доступны</div>
+    <ul class="checks" style="margin:8px 0 0">
+      <li>{{ icon('check', 18) }}Каталог Telegram Stars, игр и подарочных карт</li>
+      <li>{{ icon('check', 18) }}Доступ к API и webhooks</li>
+      <li>{{ icon('check', 18) }}Заказы, баланс и история операций</li>
+      <li>{{ icon('check', 18) }}Документация и примеры кода</li>
+    </ul>
   </div>
 </main>
 {% endblock %}

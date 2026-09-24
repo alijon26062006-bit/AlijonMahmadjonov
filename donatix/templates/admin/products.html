@@ -1,15 +1,15 @@
 {% extends "admin/_layout.html" %}
 {% block title %}Каталог — админка{% endblock %}
 {% block content %}
-<div class="page-head"><h1>Каталог</h1><p>Закупочные цены у поставщика и цены для клиентов по уровням. Скрытые товары клиенты не видят.</p></div>
-<form class="card row" method="get">
-  <div><label for="q">Поиск</label><input id="q" name="q" value="{{ q }}"></div>
-  <div><label for="kind">Раздел</label>
+<section class="page-hero"><h1>Каталог</h1><p>Закупочные цены у поставщика и цены для клиентов по уровням. Скрытые товары клиенты не видят.</p></section>
+<form class="card" method="get"><div class="filters">
+  <div class="full"><input type="search" aria-label="Поиск" placeholder="Поиск по каталогу" id="q" name="q" value="{{ q }}"></div>
+  <div><label class="label-caps" for="kind">Раздел</label>
     <select id="kind" name="kind"><option value="">Все</option>
       {% for k in kinds %}<option value="{{ k }}" {{ 'selected' if k == kind }}>{{ kind_titles[k] }}</option>{% endfor %}
     </select></div>
-  <button class="btn">Показать</button>
-</form>
+  <div style="display:flex;align-items:end"><button class="btn block">Показать</button></div>
+</div></form>
 <div class="card table-wrap" style="margin-top:16px"><table>
   <tr><th>Товар</th><th>ID</th><th class="num">Закупка</th>
     {% for t, m in markups.items() %}<th class="num">{{ t }} +{{ m }}%</th>{% endfor %}<th></th></tr>

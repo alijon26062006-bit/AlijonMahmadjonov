@@ -1,7 +1,7 @@
 {% extends "panel/_layout.html" %}
 {% block title %}API — {{ site_name }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>API и webhook</h1><p>Подключите свой сайт или бота. <a href="/docs">Документация</a></p></div>
+<section class="page-hero"><h1>API и webhook</h1><p>Подключите свой сайт или бота. <a href="/docs">Документация</a></p></section>
 
 {% if new_key %}
 <div class="card" style="border-color:var(--accent)">
@@ -16,10 +16,10 @@
   {% if user.status != 'active' %}
     <p class="muted">Ключи можно создать после активации аккаунта.</p>
   {% else %}
-  <form class="row" method="post" action="/panel/api/keys">
+  <form class="filters" method="post" action="/panel/api/keys">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div><label for="name">Название</label><input id="name" name="name" placeholder="Мой бот" maxlength="64"></div>
-    <button class="btn primary">Создать ключ</button>
+    <div style="display:flex;align-items:end"><button class="btn primary block">Создать ключ</button></div>
   </form>
   {% endif %}
   <div class="table-wrap" style="margin-top:16px"><table>

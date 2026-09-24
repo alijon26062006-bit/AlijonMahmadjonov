@@ -1,14 +1,15 @@
 {% extends "admin/_layout.html" %}
 {% block title %}{{ o.public_id }} — админка{% endblock %}
 {% block content %}
-<div class="page-head">
-  <a class="small" href="/admin/orders">← Заказы</a>
+{% from "_icons.html" import icon %}
+<section class="page-hero">
+  <a class="back" href="/admin/orders">{{ icon('arrow-left', 18) }}Заказы</a>
   <h1>{{ o.public_id }}</h1>
   <span class="badge {{ {'completed': 'ok', 'failed': 'bad', 'processing': 'warn', 'attention': 'bad'}[o.status] }}">{{ status_titles[o.status] }}</span>
-</div>
+</section>
 {% if o.error %}<div class="flash {{ 'error' if o.status in ('attention', 'failed') else 'warn' }}">{{ o.error }}</div>{% endif %}
-<div class="grid two">
-  <div class="card summary">
+<div class="grid two" style="align-items:start">
+  <div class="summary card" style="padding:0">
     <div><span class="muted">Клиент</span><span><a href="/admin/users/{{ o.user_id }}">{{ o.login }}</a></span></div>
     <div><span class="muted">Товар</span><span>{{ o.product_name }} <span class="mono small muted">{{ o.product_id }}</span></span></div>
     {% for k, v in fields.items() %}<div><span class="muted">{{ k }}</span><span class="mono">{{ v }}</span></div>{% endfor %}
@@ -20,7 +21,7 @@
     <div><span class="muted">Webhook</span><span>{{ o.webhook_state }}</span></div>
     <div><span class="muted">Создан / обновлён</span><span class="small">{{ o.created_at[:19] }} / {{ o.updated_at[:19] }}</span></div>
     <div><span class="muted">Закупка</span><span>${{ fmt(o.cost_micro) }}</span></div>
-    <div><span>Клиент заплатил</span><span>${{ fmt(o.total_micro) }}</span></div>
+    <div class="total"><span>Клиент заплатил</span><span>${{ fmt(o.total_micro) }}</span></div>
   </div>
   <div>
     {% if delivery_pretty %}<div class="card"><h3>Выдача</h3><pre class="keybox">{{ delivery_pretty }}</pre></div>{% endif %}
