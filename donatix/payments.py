@@ -20,33 +20,66 @@ class PaymentError(ValueError):
     pass
 
 
-def methods(config: Config) -> list[dict[str, str]]:
+def settings(conn: sqlite3.Connection, config: Config) -> dict:
+    """Реквизиты, курс и минимум. Что задано в админке — важнее, чем .env."""
+    details = {}
+    for code in PAY_METHODS:
+        value = db.get_setting(conn, f"pay.{code}")
+        if value is None:
+            value = config.pay_methods.get(code, "")
+        if value.strip():
+            details[code] = value.strip()
+    rate = db.get_setting(conn, "pay.tjs_rate")
+    min_usd = db.get_setting(conn, "pay.min_usd")
+    return {
+        "details": details,
+        "tjs_rate": Decimal(rate) if rate else config.tjs_rate,
+        "min_usd": Decimal(min_usd) if min_usd else config.pay_min_usd,
+    }
+
+
+def save_settings(conn: sqlite3.Connection, details: dict[str, str], tjs_rate: str, min_usd: str) -> None:
+    try:
+        rate, minimum = to_decimal(tjs_rate.replace(",", ".")), to_decimal(min_usd.replace(",", "."))
+    except MoneyError:
+        raise PaymentError("Курс и минимум — числа.") from None
+    if rate <= 0 or minimum <= 0:
+        raise PaymentError("Курс и минимум должны быть больше нуля.")
+    with db.tx(conn):
+        for code in PAY_METHODS:
+            db.set_setting(conn, f"pay.{code}", details.get(code, "").strip()[:1000])
+        db.set_setting(conn, "pay.tjs_rate", str(rate))
+        db.set_setting(conn, "pay.min_usd", str(minimum))
+
+
+def methods(conn: sqlite3.Connection, config: Config) -> list[dict[str, str]]:
     return [{"code": c, "title": PAY_METHODS[c][0], "currency": PAY_METHODS[c][1], "details": d}
-            for c, d in config.pay_methods.items() if c in PAY_METHODS]
+            for c, d in settings(conn, config)["details"].items()]
 
 
-def pay_amount(config: Config, method: str, usd: Decimal) -> tuple[str, str]:
+def pay_amount(tjs_rate: Decimal, method: str, usd: Decimal) -> tuple[str, str]:
     currency = PAY_METHODS[method][1]
     if currency == "TJS":
-        return str((usd * config.tjs_rate).quantize(Decimal("0.01"), rounding=ROUND_UP)), "TJS"
+        return str((usd * tjs_rate).quantize(Decimal("0.01"), rounding=ROUND_UP)), "TJS"
     return str(usd.quantize(Decimal("0.01"), rounding=ROUND_UP)), currency
 
 
 def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: str, amount: str,
            reference: str = "") -> int:
-    if method not in config.pay_methods:
+    conf = settings(conn, config)
+    if method not in conf["details"]:
         raise PaymentError("Выберите способ оплаты.")
     try:
         usd = to_decimal(amount.replace(",", ".").replace("$", "").strip())
     except MoneyError:
         raise PaymentError("Сумма — число в долларах, например 50.") from None
-    if usd < config.pay_min_usd or usd > Decimal("100000"):
-        raise PaymentError(f"Минимальная сумма пополнения — ${config.pay_min_usd}.")
+    if usd < conf["min_usd"] or usd > Decimal("100000"):
+        raise PaymentError(f"Минимальная сумма пополнения — ${conf['min_usd']}.")
     open_n = conn.execute("SELECT COUNT(*) FROM payments WHERE user_id = ? AND status = 'pending'",
                           (user["id"],)).fetchone()[0]
     if open_n >= 3:
         raise PaymentError("У вас уже 3 заявки в ожидании. Дождитесь их проверки.")
-    pay, cur = pay_amount(config, method, usd)
+    pay, cur = pay_amount(conf["tjs_rate"], method, usd)
     c = conn.execute(
         "INSERT INTO payments (user_id, method, amount_micro, pay_amount, pay_currency, reference, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",

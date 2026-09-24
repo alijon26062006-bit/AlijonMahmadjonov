@@ -2,7 +2,7 @@
 {% from "_icons.html" import icon %}
 {% block title %}Пополнения — админка{% endblock %}
 {% block content %}
-<section class="page-hero"><h1>Пополнения</h1><p>Заявки клиентов. Сверьте поступление в банке или кошельке и подтвердите — баланс зачислится сам.</p></section>
+<section class="page-hero"><h1>Пополнения</h1><p>Сверьте поступление и подтвердите. <a href="/admin/pay-settings">Реквизиты</a></p></section>
 <div class="chips" style="margin-bottom:14px">
   {% for s, t in [('pending', 'Ждут проверки'), ('paid', 'Зачислено'), ('rejected', 'Отклонено'), ('cancelled', 'Отменено'), ('all', 'Все')] %}
   <a class="chip {{ 'on' if s == status }}" href="/admin/payments?status={{ s }}">{{ t }}</a>

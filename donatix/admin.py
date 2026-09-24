@@ -253,6 +253,29 @@ def payments_list(request: Request, status: str = "pending", admin=Depends(admin
     })
 
 
+@router.get("/pay-settings")
+def pay_settings(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
+    from . import payments
+    return render(request, "admin/pay_settings.html", {
+        "user": admin, "conf": payments.settings(conn, config), "methods": PAY_METHODS,
+    })
+
+
+@router.post("/pay-settings", dependencies=[Depends(check_csrf)])
+async def pay_settings_save(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import payments
+    form = await request.form()
+    details = {code: str(form.get(code, "")) for code in PAY_METHODS}
+    try:
+        payments.save_settings(conn, details, str(form.get("tjs_rate", "")), str(form.get("min_usd", "")))
+    except payments.PaymentError as exc:
+        flash(request, str(exc), "error")
+    else:
+        flash(request, "Реквизиты сохранены — клиенты уже видят их на странице пополнения.")
+    return _back("/admin/pay-settings")
+
+
 @router.post("/payments/{payment_id}/confirm", dependencies=[Depends(check_csrf)])
 def payment_confirm(payment_id: int, request: Request, credit: str = Form(""), admin=Depends(admin_user),
                     conn=Depends(get_conn), config: Config = Depends(get_config)):

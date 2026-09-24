@@ -65,3 +65,20 @@ def test_errors_page(client, conn, shop, supplier):
     page = client.get("/admin/errors").text
     assert "dx-1" in page and "Деньги возвращены" in page
     assert token and orders
+
+
+def test_admin_sets_pay_details(app, config, conn):
+    config.pay_methods = {}
+    uid, client, token = _setup(app, config, conn)
+    config.pay_methods = {}
+    assert "ещё не настроены" in client.get("/panel/balance").text
+
+    admin = TestClient(app)
+    atoken = web_login(admin, "admin@example.com", "adminpass123")
+    r = admin.post("/admin/pay-settings", data={"csrf": atoken, "dc": "DC: 5058 **** 1234 (Али)",
+                                                "tjs_rate": "11", "min_usd": "2"})
+    assert "Реквизиты сохранены" in r.text
+    page = client.get("/panel/balance").text
+    assert "5058 **** 1234" in page and "Алиф (Alif Mobi)" not in page
+    r = client.post("/panel/balance", data={"csrf": token, "method": "dc", "amount": "3"})
+    assert "33.00 TJS" in r.text  # 3 × 11, минимум из админки

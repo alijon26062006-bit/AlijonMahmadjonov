@@ -1,0 +1,18 @@
+{% extends "admin/_layout.html" %}
+{% block title %}Реквизиты — админка{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Реквизиты</h1><p>Пустой способ клиентам не показывается.</p></section>
+<form class="card" method="post" action="/admin/pay-settings" style="max-width:640px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% for code, (title, currency) in methods.items() %}
+  <label for="{{ code }}">{{ title }} <span class="muted">· {{ currency }}</span></label>
+  <textarea id="{{ code }}" name="{{ code }}" rows="2" maxlength="1000"
+    placeholder="{{ 'Номер карты или телефона, имя получателя' if currency == 'TJS' else ('Адрес кошелька TRC20' if code == 'usdt_trc20' else 'Pay ID') }}">{{ conf.details.get(code, '') }}</textarea>
+  {% endfor %}
+  <div class="grid two" style="margin-top:4px">
+    <div><label for="tjs_rate">Курс: сомони за 1 $</label><input id="tjs_rate" name="tjs_rate" inputmode="decimal" required value="{{ conf.tjs_rate }}"></div>
+    <div><label for="min_usd">Минимум, $</label><input id="min_usd" name="min_usd" inputmode="decimal" required value="{{ conf.min_usd }}"></div>
+  </div>
+  <button class="btn primary lg block" style="margin-top:18px">Сохранить</button>
+</form>
+{% endblock %}

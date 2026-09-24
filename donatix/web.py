@@ -302,9 +302,10 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
                   config: Config = Depends(get_config)):
     from . import payments
     rows = conn.execute("SELECT * FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user["id"],)).fetchall()
+    conf = payments.settings(conn, config)
     return render(request, "panel/balance.html", {
-        "user": user, "methods": payments.methods(config), "payments": rows, "tjs_rate": config.tjs_rate,
-        "min_usd": config.pay_min_usd, "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()},
+        "user": user, "methods": payments.methods(conn, config), "payments": rows, "tjs_rate": conf["tjs_rate"],
+        "min_usd": conf["min_usd"], "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()},
     })
 
 
