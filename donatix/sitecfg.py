@@ -44,6 +44,12 @@ def max_bots(conn: sqlite3.Connection) -> int:
 
 def load(conn: sqlite3.Connection, config: Config) -> None:
     """Наложить сохранённое на config (при старте и после каждого изменения)."""
+    if db.get_setting(conn, "migr.min_tjs_100") is None:
+        # Минимум пополнения стал 100 сомони. Прежний 500 по умолчанию меняем один раз;
+        # другой, заданный админом вручную, не трогаем.
+        if db.get_setting(conn, "pay.min_tjs") in ("500", "500.00"):
+            db.set_setting(conn, "pay.min_tjs", "100")
+        db.set_setting(conn, "migr.min_tjs_100", "1")
     for tier in TIERS:
         value = db.get_setting(conn, f"markup.{tier}")
         if value:

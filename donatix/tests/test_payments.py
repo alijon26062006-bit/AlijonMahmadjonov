@@ -130,9 +130,9 @@ def test_api_topup_with_receipt(app, config, conn, monkeypatch):
     api = TestClient(app)
     h = {"X-API-Key": key}
     m = api.get("/api/v1/payments/methods", headers=h).json()
-    assert m["ok"] and m["methods"][0]["code"] == "alif" and m["min_tjs"] == "500"
-    r = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "400"}).json()
-    assert not r["ok"] and "500 сомони" in r["error"]
+    assert m["ok"] and m["methods"][0]["code"] == "alif" and m["min_tjs"] == "100"
+    r = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "90"}).json()
+    assert not r["ok"] and "100 сомони" in r["error"]
     odd = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "600"}).json()["payment"]
     assert odd["pay_amount"] == "600.00" and odd["amount_usd"] == "55.0458"  # 600 / 10.9, вниз
     api.post(f"/api/v1/payments/{odd['id']}/receipt", headers=h, files={"file": ("x.png", PNG, "image/png")})
@@ -191,3 +191,14 @@ def test_usdt_network_shown_and_saved(app, config, conn):
     assert "50.00 USDT" in r.text
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC LIMIT 1").fetchone()
     assert payments.public(conn, config, p)["network"] == "BEP20"
+
+
+def test_old_500_minimum_becomes_100(app, config, conn):
+    from donatix import db, payments, sitecfg
+    db.set_setting(conn, "pay.min_tjs", "500")
+    conn.execute("DELETE FROM settings WHERE key = 'migr.min_tjs_100'")  # как на старом сервере
+    sitecfg.load(conn, config)
+    assert payments.settings(conn, config)["min_tjs"] == 100
+    db.set_setting(conn, "pay.min_tjs", "300")  # админ задал своё — больше не трогаем
+    sitecfg.load(conn, config)
+    assert payments.settings(conn, config)["min_tjs"] == 300
