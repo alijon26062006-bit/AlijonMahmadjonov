@@ -258,7 +258,7 @@ pre[data-lang]::before { content: attr(data-lang); position: absolute; top: 8px;
 .balance-card b { display: block; font-size: 1.5rem; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin: 2px 0 10px; }
 .drawer-head { display: none; }
 @media (max-width: 860px) {
-  .shell { grid-template-columns: 1fr; padding-top: 0; }
+  .shell { grid-template-columns: minmax(0, 1fr); padding-top: 0; }
   .side {
     position: fixed; inset: 0; z-index: 60; max-height: none; background: var(--bg); padding: 0 16px 32px;
     transform: translateX(-102%); transition: transform .25s var(--ease); overflow-y: auto;
@@ -378,3 +378,24 @@ details.faq p { margin: 0; padding: 0 22px 20px; color: var(--muted); }
 .cur.on { border: 2px solid var(--accent); background: var(--accent-soft); }
 .cur:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .auth-head p.small { margin: 2px 0 0; }
+
+/* ── Выбор по шагам (Steam Гифты) ──────────────────────── */
+.gift-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .gift-grid { grid-template-columns: minmax(0, 1fr); } }
+.sticky-summary { position: sticky; top: 84px; }
+@media (max-width: 900px) { .sticky-summary { position: static; } }
+.step-head .grow-title { flex: 1; text-align: right; }
+.pick-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; max-height: 460px; overflow-y: auto; padding: 2px; }
+.pick {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 14px 16px; min-height: 64px;
+  border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: var(--text);
+  font: inherit; cursor: pointer; transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.pick:hover { border-color: var(--accent-line); }
+.pick.on { border: 2px solid var(--accent); background: var(--accent-soft); padding: 13px 15px; }
+.pick .grow { flex: 1; min-width: 0; }
+.pick b { display: block; }
+.pick .sub { display: block; color: var(--muted); font-size: .9rem; margin-top: 2px; }
+.pick .cover { width: 120px; height: 56px; object-fit: cover; border-radius: 10px; flex: none; background: var(--surface-2); }
+@media (max-width: 420px) { .pick .cover { width: 92px; height: 43px; } }
+.summary > div > span.wrap-text { white-space: normal; overflow-wrap: anywhere; min-width: 0; }

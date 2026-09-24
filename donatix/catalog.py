@@ -11,7 +11,7 @@ from typing import Any
 
 from . import db
 from .money import apply_markup, fmt_unit, to_decimal
-from .suppliers import KIND_TITLES, Supplier
+from .suppliers import KIND_TITLES, Supplier, SupplierError
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +47,14 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier) -> dict[str, int]
             f"UPDATE products SET active = 0 WHERE active = 1 AND id NOT IN ({placeholders})",
             tuple(seen),
         ).rowcount
+    if "steam-gift" in seen:
+        from . import steam_gifts
+        try:
+            n = steam_gifts.sync_games(conn, supplier)
+            log.info("steam-гифты: %s игр", n)
+        except SupplierError as exc:
+            log.warning("steam-гифты: каталог игр не обновлён: %s", exc)
+        steam_gifts.clear_cache()
     db.set_setting(conn, "catalog_synced_at", db.now())
     log.info("каталог: %s товаров, выключено %s", len(seen), disabled)
     return {"products": len(seen), "disabled": disabled}

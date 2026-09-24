@@ -7,7 +7,7 @@ import sqlite3
 import uuid
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from . import accounts, catalog, orders
 from .config import Config
@@ -200,6 +200,22 @@ def panel_buy(product_id: str, request: Request, form: dict = Depends(_form), us
             "form": {**fields, "quantity": form.get("quantity", "")}, "idem": str(uuid.uuid4()),
         }, 400)
     return _redirect(f"/panel/orders/{order['public_id']}")
+
+
+@router.get("/panel/data/steam-gifts/games")
+def panel_gift_games(q: str = "", user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import steam_gifts
+    return {"ok": True, "items": steam_gifts.search(conn, q[:100])}
+
+
+@router.get("/panel/data/steam-gifts/games/{appid}")
+def panel_gift_game(appid: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                    config: Config = Depends(get_config)):
+    from .api import ApiError, steam_gift_view
+    try:
+        return steam_gift_view(request, conn, config, user, appid)
+    except ApiError as exc:
+        return JSONResponse({"ok": False, "error": str(exc), "code": exc.code}, status_code=exc.http_status)
 
 
 @router.get("/panel/orders")

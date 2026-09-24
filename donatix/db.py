@@ -109,6 +109,12 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 CREATE INDEX IF NOT EXISTS tx_user ON transactions(user_id, id DESC);
 
+CREATE TABLE IF NOT EXISTS steam_gift_games (
+    appid   INTEGER PRIMARY KEY,
+    name    TEXT NOT NULL,
+    name_lc TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL

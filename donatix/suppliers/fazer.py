@@ -17,6 +17,7 @@ import httpx
 
 from .base import (
     ProductData,
+    steam_gift_product,
     SupplierOrder,
     SupplierRejected,
     SupplierUnavailable,
@@ -28,7 +29,7 @@ log = logging.getLogger(__name__)
 # Для этих видов в документации заявлен Idempotency-Key: повтор с тем же ключом
 # не создаст второй заказ. Для Telegram-покупок заголовок не упомянут —
 # такие заказы при сбое сети не повторяем автоматически, а отдаём админу.
-_IDEMPOTENT_KINDS = {"topup", "gift_card", "steam_topup"}
+_IDEMPOTENT_KINDS = {"topup", "gift_card", "steam_topup", "steam_gift"}
 
 # Лимиты пополнения Steam в USD. Точных в документации нет — поставщик сам
 # отклонит сумму вне своих пределов, и деньги клиенту вернутся.
@@ -125,6 +126,8 @@ class FazerSupplier:
     def fetch_catalog(self) -> Iterable[ProductData]:
         yield from self._telegram()
         yield from self._steam_topup()
+        if self._catalog_get("/steam-gifts/games", limit=1):  # раздел доступен вашему тарифу
+            yield steam_gift_product()
         yield from self._topups()
         yield from self._giftcards()
 
@@ -250,6 +253,13 @@ class FazerSupplier:
                 "currency": fields["currency"],
                 "amount": fields["amount"],
             }
+        elif kind == "steam_gift":
+            path, body = "/steam-gifts/order", {
+                "invite_url": fields["invite_url"],
+                "sub_id": int(fields["sub_id"]),
+                "app_id": int(fields["app_id"]),
+                "region": fields["region"],
+            }
         elif kind == "topup":
             path, body = "/topups/order", {
                 "category_id": ref["category_id"],
@@ -283,6 +293,15 @@ class FazerSupplier:
             delivery=payload if isinstance(payload, dict) else ({"payload": payload} if payload else None),
             message=str(order.get("error") or order.get("message") or ""),
         )
+
+    def steam_gift_games(self) -> list[dict[str, Any]]:
+        # Каталог большой (~12 000 игр); просим сразу много, поставщик может обрезать.
+        data = self._request("GET", "/steam-gifts/games", params={"limit": 20000})
+        return [{"appid": int(g["appid"]), "name": str(g["name"])} for g in data.get("games", []) if g.get("appid")]
+
+    def steam_gift_offers(self, appid: int) -> list[dict[str, Any]]:
+        data = self._request("GET", f"/steam-gifts/games/{int(appid)}")
+        return list(data.get("offers") or [])
 
     def check_steam_login(self, login: str) -> bool:
         data = self._request("POST", "/steam-topup/check-login", json={"steamLogin": login})

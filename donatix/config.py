@@ -88,6 +88,8 @@ class Config:
         for tier, default in (("bronze", "8"), ("silver", "6"), ("gold", "4")):
             markups[tier] = Decimal(_env(f"DONATIX_MARKUP_{tier.upper()}", default))
         kind_markups = {"steam_topup": Decimal(_env("DONATIX_MARKUP_STEAM", "1.5"))}
+        if _env("DONATIX_MARKUP_STEAM_GIFT"):
+            kind_markups["steam_gift"] = Decimal(_env("DONATIX_MARKUP_STEAM_GIFT"))
         return cls(
             secret_key=secret,
             db_path=Path(_env("DONATIX_DB", str(ROOT / "data" / "donatix.db"))),

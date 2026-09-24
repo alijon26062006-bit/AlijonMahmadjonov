@@ -2,7 +2,7 @@
 {% from "_icons.html" import icon, kind_icon %}
 {% block title %}{{ p.name }} — {{ site_name }}{% endblock %}
 {% block content %}
-{% if p.kind == 'steam_topup' %}{% include "panel/_buy_steam.html" %}{% else %}
+{% if p.kind == 'steam_topup' %}{% include "panel/_buy_steam.html" %}{% elif p.kind == 'steam_gift' %}{% include "panel/_buy_gift.html" %}{% else %}
 {% set multi = p.max_quantity > 1 %}
 <section class="page-hero">
   <a class="back" href="/panel/catalog?kind={{ p.kind }}">{{ icon('arrow-left', 18) }}{{ p.kind_title }}</a>

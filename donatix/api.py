@@ -236,3 +236,36 @@ def get_order(order_id: str, request: Request, user=Depends(api_user), conn=Depe
         raise ApiError("Заказ не найден.", "not_found", 404)
     row = orders.refresh_if_stale(conn, request.app.state.supplier, row)
     return {"ok": True, "order": orders.public_view(row)}
+
+
+# ── Steam-гифты ──────────────────────────────────────────────
+
+
+@router.get("/steam-gifts/games")
+def steam_gift_games(request: Request, q: str = Query(default="", max_length=100), limit: int = 30,
+                     user=Depends(api_user), conn=Depends(get_conn)) -> dict[str, Any]:
+    _limit(request, "catalog", str(user["id"]))
+    from . import steam_gifts
+    return {"ok": True, "items": steam_gifts.search(conn, q, min(max(limit, 1), 100))}
+
+
+@router.get("/steam-gifts/games/{appid}")
+def steam_gift_game(appid: int, request: Request, user=Depends(api_user), conn=Depends(get_conn),
+                    config: Config = Depends(get_config)) -> dict[str, Any]:
+    _limit(request, "catalog", str(user["id"]))
+    return steam_gift_view(request, conn, config, user, appid)
+
+
+def steam_gift_view(request: Request, conn: sqlite3.Connection, config: Config, user, appid: int) -> dict[str, Any]:
+    from . import steam_gifts
+    from .suppliers import SupplierError
+
+    if catalog.get_product(conn, "steam-gift") is None:
+        raise ApiError("Steam-гифты сейчас недоступны.", "product_not_found", 404)
+    try:
+        items = steam_gifts.client_offers(request.app.state.supplier, appid,
+                                          accounts.markup_for(user, config, "steam_gift"))
+    except SupplierError:
+        raise ApiError("Игра не найдена или поставщик не ответил.", "not_found", 404) from None
+    return {"ok": True, "appid": appid, "name": steam_gifts.game_name(conn, appid), "product_id": "steam-gift",
+            "cover": steam_gifts.cover_url(appid), "offers": items}

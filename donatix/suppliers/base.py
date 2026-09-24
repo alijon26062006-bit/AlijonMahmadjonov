@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Iterable, Protocol
 
-KINDS = ("telegram_stars", "telegram_premium", "steam_topup", "topup", "gift_card")
+KINDS = ("telegram_stars", "telegram_premium", "steam_topup", "steam_gift", "topup", "gift_card")
 
 STEAM_CURRENCIES = ("USD", "RUB", "KZT", "UAH")
 
@@ -14,7 +14,8 @@ KIND_TITLES = {
     "telegram_stars": "Telegram Stars",
     "telegram_premium": "Telegram Premium",
     "steam_topup": "Пополнение Steam",
-    "topup": "Пополнение игр",
+    "steam_gift": "Steam Гифты",
+    "topup": "Пополнение сервисов",
     "gift_card": "Подарочные карты",
 }
 
@@ -42,6 +43,21 @@ class SupplierOrder:
     raw_status: str = ""
     delivery: dict[str, Any] | None = None
     message: str = ""
+
+
+def steam_gift_product() -> ProductData:
+    """Один «товар» на все Steam-гифты: цена берётся у поставщика по изданию и региону.
+    base_price = 1 — платим поставщику ровно его цену в USD."""
+    return ProductData(
+        id="steam-gift", kind="steam_gift", category_id="steam", category_name="Steam",
+        name="Steam Гифты", base_price=Decimal(1), unit="usd",
+        fields=[
+            {"key": "app_id", "label": "App ID", "type": "number"},
+            {"key": "sub_id", "label": "ID пакета", "type": "number"},
+            {"key": "region", "label": "Регион", "type": "text"},
+            {"key": "invite_url", "label": "Steam Invite ссылка", "type": "url"},
+        ],
+    )
 
 
 class SupplierError(Exception):
@@ -89,6 +105,14 @@ class Supplier(Protocol):
     def get_order(self, supplier_order_id: str) -> SupplierOrder: ...
 
     def balance(self) -> Decimal: ...
+
+    def steam_gift_games(self) -> list[dict[str, Any]]:
+        """Каталог игр для Steam-гифтов: [{"appid": 730, "name": "Counter-Strike 2"}, ...]."""
+        ...
+
+    def steam_gift_offers(self, appid: int) -> list[dict[str, Any]]:
+        """Издания игры: [{"sub_id", "name", "regions": [{"region", "price"}]}]."""
+        ...
 
     def check_steam_login(self, login: str) -> bool:
         """Можно ли пополнить этот Steam-аккаунт."""

@@ -8,7 +8,7 @@ import threading
 from decimal import Decimal
 from typing import Any, Iterable
 
-from .base import ProductData, SupplierOrder, SupplierRejected, SupplierUnavailable
+from .base import ProductData, SupplierOrder, SupplierRejected, SupplierUnavailable, steam_gift_product
 
 _TG_FIELD = [{"key": "telegram_username", "label": "Telegram @username", "type": "text"}]
 _PLAYER_FIELD = [{"key": "player_id", "label": "Player ID", "type": "text"}]
@@ -26,6 +26,7 @@ def demo_catalog() -> list[ProductData]:
                                      {"key": "amount", "label": "Сумма", "type": "number"}],
                              supplier_ref={"rates": {"USD": "1", "RUB": "92.5", "KZT": "520", "UAH": "41.2"},
                                            "min_usd": "0.5", "max_usd": "1000"}))
+    items.append(steam_gift_product())
     for months, price in ((3, "12.2898"), (6, "16.3898"), (12, "29.7148")):
         items.append(ProductData(f"tg-premium-{months}", "telegram_premium", "telegram", "Telegram",
                                  f"Telegram Premium — {months} мес.", Decimal(price),
@@ -63,7 +64,27 @@ class MockSupplier:
         return list(self._catalog)
 
     def is_idempotent(self, kind: str) -> bool:
-        return kind in ("topup", "gift_card", "steam_topup")
+        return kind in ("topup", "gift_card", "steam_topup", "steam_gift")
+
+    GIFT_GAMES = {
+        730: ("Counter-Strike 2", [(54029, "Counter-Strike 2 Prime Status Upgrade",
+                                    {"CIS": "11.2000", "KZ": "12.4000", "TR": "9.8000"})]),
+        570: ("Dota 2", [(197846, "Dota 2 — Dota Plus 3 мес.", {"CIS": "7.9000", "KZ": "8.3000"})]),
+        1245620: ("ELDEN RING", [(354151, "ELDEN RING", {"CIS": "38.5000", "KZ": "41.0000", "TR": "29.9000"}),
+                                  (354152, "ELDEN RING Deluxe Edition", {"CIS": "49.9000", "KZ": "53.0000"})]),
+        1091500: ("Cyberpunk 2077", [(347800, "Cyberpunk 2077", {"CIS": "27.0000", "KZ": "28.5000"}),
+                                     (347801, "Cyberpunk 2077: Ultimate Edition", {"CIS": "44.0000"})]),
+    }
+
+    def steam_gift_games(self) -> list[dict[str, Any]]:
+        return [{"appid": a, "name": n} for a, (n, _) in self.GIFT_GAMES.items()]
+
+    def steam_gift_offers(self, appid: int) -> list[dict[str, Any]]:
+        game = self.GIFT_GAMES.get(int(appid))
+        if not game:
+            raise SupplierRejected("game not found", http_status=404)
+        return [{"sub_id": s, "name": n, "regions": [{"region": r, "price": p} for r, p in regs.items()]}
+                for s, n, regs in game[1]]
 
     def check_steam_login(self, login: str) -> bool:
         return not login.lower().startswith("bad")

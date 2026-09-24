@@ -68,6 +68,17 @@ def _clean_fields(product: dict[str, Any], raw: dict[str, Any] | None) -> dict[s
             value = value.upper()
             if value not in product["supplier_ref"].get("rates", {}):
                 raise OrderError("Валюта: USD, RUB, KZT или UAH.", "invalid_field")
+        elif key == "invite_url":
+            from .steam_gifts import INVITE_RE
+            if not INVITE_RE.match(value):
+                raise OrderError("Ссылка-приглашение Steam должна быть вида https://s.team/p/…/…", "invalid_field")
+        elif key in ("app_id", "sub_id"):
+            if not value.isdigit():
+                raise OrderError(f"{key} — число.", "invalid_field")
+        elif key == "region" and product["kind"] == "steam_gift":
+            from .steam_gifts import REGION_RE
+            if not REGION_RE.match(value):
+                raise OrderError("Неверный регион.", "invalid_field")
         elif key == "amount":
             try:
                 amount = to_decimal(value.replace(",", "."))
@@ -149,7 +160,13 @@ def create_order(
         if existing is not None:
             return _replay(existing, product_id, qty, fields_json), True
 
-    units = _units(product, qty, clean)
+    display = _display_name(product, qty, clean)
+    if product["kind"] == "steam_gift":
+        from . import steam_gifts
+        edition, units = steam_gifts.resolve(supplier, clean)
+        display = f"Steam Gift — {edition} ({clean['region']})"
+    else:
+        units = _units(product, qty, clean)
     if product["kind"] == "steam_topup":
         _check_steam_login(supplier, clean["steam_login"])
     q = quote(config, user, product, units)
@@ -162,7 +179,7 @@ def create_order(
                        unit_price, total_micro, cost_micro, status, supplier_idem_key, idempotent_supply,
                        client_idem_key, source, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?, ?)""",
-                (user["id"], product["id"], product["kind"], _display_name(product, qty, clean), qty, fields_json,
+                (user["id"], product["id"], product["kind"], display, qty, fields_json,
                  fmt_unit(q["unit_price"]), q["total_micro"], cost_micro, f"dx-{uuid.uuid4()}",
                  1 if supplier.is_idempotent(product["kind"]) else 0, client_idem_key, source, ts, ts),
             )
