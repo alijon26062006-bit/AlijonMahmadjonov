@@ -20,6 +20,14 @@ templates.env.globals.update(fmt=fmt, fmt_unit=fmt_unit, kind_titles=KIND_TITLES
 templates.env.filters["fromjson"] = json.loads
 
 
+def _img(url):
+    from .catalog_job import local_url
+    return local_url(url)
+
+
+templates.env.filters["img"] = _img
+
+
 def _asset_version() -> str:
     """Метка версии стилей: меняется с файлом, и браузер не держит старый CSS из кеша."""
     import hashlib

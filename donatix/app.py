@@ -66,6 +66,10 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
         https_only=config.cookie_secure,
     )
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
+    # Картинки каталога, скачанные с поставщика к себе (админка → Загрузка каталога)
+    from . import catalog_job
+    catalog_job.load_image_index(config)
+    app.mount("/media", StaticFiles(directory=str(catalog_job.images_dir(config))), name="media")
     app.include_router(api.router)
     app.include_router(web.router)
     app.include_router(admin.router)

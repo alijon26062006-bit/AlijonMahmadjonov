@@ -12,7 +12,7 @@ from . import accounts, catalog, db, orders, payments, worker
 from .config import PAY_METHODS, TIERS, Config
 from .deps import Forbidden, LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
 from .money import MoneyError, apply_markup, fmt, fmt_unit, to_decimal, to_micro
-from .suppliers import KINDS, SupplierError
+from .suppliers import KINDS
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -83,15 +83,40 @@ def stats_page(request: Request, period: str = "30d", admin=Depends(admin_user),
 
 
 @router.post("/sync", dependencies=[Depends(check_csrf)])
-def sync_now(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
-             config: Config = Depends(get_config)):
-    try:
-        result = catalog.sync_catalog(conn, request.app.state.supplier)
-        worker.check_supplier_balance(conn, config, request.app.state.supplier)
-        flash(request, f"Каталог обновлён: {result['products']} товаров, выключено {result['disabled']}.")
-    except SupplierError as exc:
-        flash(request, f"Поставщик не ответил: {exc}", "error")
-    return _back("/admin")
+def sync_now(request: Request, admin=Depends(admin_user), config: Config = Depends(get_config)):
+    """Кнопка «Обновить каталог»: только запускает фоновую задачу — страница не ждёт поставщика."""
+    from . import catalog_job
+    catalog_job.start(config, request.app.state.supplier, sync=True, images=False)
+    return _back("/admin/catalog-sync")
+
+
+@router.get("/catalog-sync")
+def catalog_sync_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import catalog_job
+    counts = conn.execute(
+        "SELECT COUNT(*) AS products, COUNT(DISTINCT category_id) AS categories, "
+        "COUNT(DISTINCT image_url) AS images FROM products WHERE active = 1").fetchone()
+    return render(request, "admin/catalog_sync.html", {
+        "user": admin, "job": catalog_job.status(), "counts": counts,
+        "synced_at": db.get_setting(conn, "catalog_synced_at"),
+    })
+
+
+@router.post("/catalog-sync/start", dependencies=[Depends(check_csrf)])
+def catalog_sync_start(request: Request, mode: str = Form("all"), admin=Depends(admin_user),
+                       config: Config = Depends(get_config)):
+    from . import catalog_job
+    started = catalog_job.start(config, request.app.state.supplier,
+                                sync=mode in ("all", "catalog"), images=mode in ("all", "images"))
+    if not started:
+        flash(request, "Загрузка уже идёт — прогресс ниже.", "warn")
+    return _back("/admin/catalog-sync")
+
+
+@router.get("/catalog-sync/status")
+def catalog_sync_status(admin=Depends(admin_user)):
+    from . import catalog_job
+    return catalog_job.status()
 
 
 # ── Клиенты ──────────────────────────────────────────────────

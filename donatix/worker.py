@@ -92,7 +92,12 @@ class Worker:
                 now = time.monotonic()
                 try:
                     if now - last_sync >= self.config.catalog_sync_minutes * 60 or last_sync == 0:
-                        catalog.sync_catalog(conn, self.supplier)
+                        # Если каталог сейчас грузит админка — пропускаем, возьмём в следующий раз
+                        if catalog.SYNC_LOCK.acquire(blocking=False):
+                            try:
+                                catalog.sync_catalog(conn, self.supplier)
+                            finally:
+                                catalog.SYNC_LOCK.release()
                         last_sync = now
                 except Exception:
                     log.exception("обновление каталога")

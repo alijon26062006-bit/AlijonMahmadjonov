@@ -6,8 +6,9 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import threading
 from decimal import Decimal
-from typing import Any
+from typing import Any, Callable
 
 from . import db
 from .money import apply_markup, fmt_unit, to_decimal
@@ -16,13 +17,20 @@ from .suppliers import KIND_TITLES, Supplier, SupplierError, region_title
 log = logging.getLogger(__name__)
 
 
-def sync_catalog(conn: sqlite3.Connection, supplier: Supplier) -> dict[str, int]:
+# Одно обновление каталога за раз: фоновый воркер и кнопка в админке не мешают друг другу
+SYNC_LOCK = threading.Lock()
+
+
+def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
+                 progress: Callable[[int, str], None] | None = None) -> dict[str, int]:
     """Забрать каталог у поставщика. Пропавшие товары выключаются, а не удаляются:
-    на них ссылаются старые заказы."""
+    на них ссылаются старые заказы. progress(сколько товаров, текущая категория) — для экрана прогресса."""
     started = db.now()
     seen: set[str] = set()
     for p in supplier.fetch_catalog():
         seen.add(p.id)
+        if progress:
+            progress(len(seen), p.category_name)
         conn.execute(
             """
             INSERT INTO products (id, kind, category_id, category_name, name, base_price, unit,
@@ -44,10 +52,10 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier) -> dict[str, int]
         )
     disabled = 0
     if seen:
-        placeholders = ",".join("?" * len(seen))
+        # Все пришедшие товары получили updated_at = started; остальные — пропали у поставщика.
+        # (Не «id NOT IN (…тысячи id…)»: старые SQLite не принимают больше 999 параметров.)
         disabled = conn.execute(
-            f"UPDATE products SET active = 0 WHERE active = 1 AND id NOT IN ({placeholders})",
-            tuple(seen),
+            "UPDATE products SET active = 0 WHERE active = 1 AND updated_at <> ?", (started,)
         ).rowcount
     if "steam-gift" in seen:
         from . import steam_gifts
