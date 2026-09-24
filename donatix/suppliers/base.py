@@ -34,6 +34,7 @@ class ProductData:
     stock: int | None = None
     fields: list[dict[str, str]] = field(default_factory=list)
     supplier_ref: dict[str, Any] = field(default_factory=dict)
+    image_url: str | None = None
 
 
 @dataclass
@@ -82,6 +83,28 @@ class SupplierUnavailable(SupplierError):
 # поэтому незнакомый статус считаем «ещё в работе».
 _DONE = {"completed", "complete", "success", "succeeded", "delivered", "done", "fulfilled"}
 _FAILED = {"failed", "fail", "error", "cancelled", "canceled", "rejected", "refunded", "declined", "expired"}
+
+
+_IMAGE_KEYS = ("image", "image_url", "imageUrl", "cover", "cover_url", "coverUrl", "logo", "logo_url",
+               "icon", "icon_url", "banner", "picture", "img", "thumbnail")
+
+
+def pick_image(*sources: Any) -> str | None:
+    """Найти ссылку на картинку в ответе поставщика. Точное имя поля в документации
+    не указано, поэтому смотрим типичные варианты, в том числе во вложенном "ui"."""
+    for src in sources:
+        if not isinstance(src, dict):
+            continue
+        for obj in (src, src.get("ui"), src.get("media"), src.get("images")):
+            if not isinstance(obj, dict):
+                continue
+            for key in _IMAGE_KEYS:
+                val = obj.get(key)
+                if isinstance(val, dict):
+                    val = val.get("url") or val.get("src")
+                if isinstance(val, str) and val.startswith(("https://", "http://")):
+                    return val
+    return None
 
 
 def normalize_status(raw: str | None) -> str:

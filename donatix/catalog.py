@@ -26,19 +26,21 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier) -> dict[str, int]
         conn.execute(
             """
             INSERT INTO products (id, kind, category_id, category_name, name, base_price, unit,
-                                  min_qty, max_qty, stock, fields_json, supplier_ref_json, active, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+                                  min_qty, max_qty, stock, fields_json, supplier_ref_json, active, updated_at,
+                                  image_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 kind = excluded.kind, category_id = excluded.category_id,
                 category_name = excluded.category_name, name = excluded.name,
                 base_price = excluded.base_price, unit = excluded.unit,
                 min_qty = excluded.min_qty, max_qty = excluded.max_qty, stock = excluded.stock,
                 fields_json = excluded.fields_json, supplier_ref_json = excluded.supplier_ref_json,
-                active = 1, updated_at = excluded.updated_at
+                active = 1, updated_at = excluded.updated_at,
+                image_url = COALESCE(excluded.image_url, products.image_url)
             """,
             (p.id, p.kind, p.category_id, p.category_name, p.name, str(p.base_price), p.unit,
              p.min_qty, max(p.max_qty, p.min_qty), p.stock, json.dumps(p.fields, ensure_ascii=False),
-             json.dumps(p.supplier_ref, ensure_ascii=False), started),
+             json.dumps(p.supplier_ref, ensure_ascii=False), started, p.image_url),
         )
     disabled = 0
     if seen:
@@ -99,7 +101,8 @@ def list_products(
 
 def categories(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT kind, category_id, category_name, COUNT(*) AS n, MIN(CAST(base_price AS REAL)) AS from_price "
+        "SELECT kind, category_id, category_name, COUNT(*) AS n, MIN(CAST(base_price AS REAL)) AS from_price, "
+        "MAX(image_url) AS image_url "
         "FROM products WHERE active = 1 AND hidden = 0 GROUP BY kind, category_id, category_name "
         "ORDER BY kind, category_name"
     ).fetchall()
@@ -121,6 +124,7 @@ def public_view(product: dict[str, Any], markup: Decimal) -> dict[str, Any]:
         "max_quantity": product["max_qty"],
         "stock": product["stock"],
         "fields": product["fields"],
+        "image_url": product.get("image_url"),
         **(_steam_extra(product, price) if product["kind"] == "steam_topup" else {}),
     }
 

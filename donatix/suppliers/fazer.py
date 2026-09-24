@@ -17,6 +17,7 @@ import httpx
 
 from .base import (
     ProductData,
+    pick_image,
     steam_gift_product,
     SupplierOrder,
     SupplierRejected,
@@ -109,7 +110,7 @@ class FazerSupplier:
     def _paged(self, path: str) -> Iterable[dict[str, Any]]:
         cursor = None
         while True:
-            params: dict[str, Any] = {"limit": 50}
+            params: dict[str, Any] = {"limit": 50, "include_ui": 1}  # include_ui — обложки категорий
             if cursor:
                 params["cursor"] = cursor
             data = self._catalog_get(path, **params)
@@ -187,7 +188,7 @@ class FazerSupplier:
     def _topups(self) -> Iterable[ProductData]:
         for cat in list(self._paged("/topups")):
             cat_id = str(cat["category_id"])
-            data = self._catalog_get("/topups/offers", category_id=cat_id)
+            data = self._catalog_get("/topups/offers", category_id=cat_id, include_ui=1)
             if not data:
                 continue
             fields = [
@@ -204,12 +205,13 @@ class FazerSupplier:
                     base_price=Decimal(str(offer["price_usd"])),
                     fields=fields,
                     supplier_ref={"category_id": cat_id, "offer_id": str(offer["offer_id"])},
+                    image_url=pick_image(offer, data, cat),
                 )
 
     def _giftcards(self) -> Iterable[ProductData]:
         for cat in list(self._paged("/giftcards")):
             cat_id = str(cat["category_id"])
-            data = self._catalog_get("/giftcards/cards", category_id=cat_id)
+            data = self._catalog_get("/giftcards/cards", category_id=cat_id, include_ui=1)
             if not data:
                 continue
             for offer in data.get("offers", []):
@@ -224,6 +226,7 @@ class FazerSupplier:
                     max_qty=min(int(offer.get("max_order_quantity") or 1), 100),
                     stock=int(offer["stock"]) if offer.get("stock") is not None else None,
                     supplier_ref={"category_id": cat_id, "card_id": str(offer["card_id"])},
+                    image_url=pick_image(offer, data, cat),
                 )
 
     # ── Заказы ────────────────────────────────────────────────

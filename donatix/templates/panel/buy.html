@@ -1,9 +1,10 @@
 {% extends "panel/_layout.html" %}
-{% from "_icons.html" import icon, kind_icon %}
+{% from "_icons.html" import icon, kind_icon, media %}
 {% block title %}{{ p.name }} — {{ site_name }}{% endblock %}
 {% block content %}
 {% if p.kind == 'steam_topup' %}{% include "panel/_buy_steam.html" %}{% elif p.kind == 'steam_gift' %}{% include "panel/_buy_gift.html" %}{% else %}
 {% set multi = p.max_quantity > 1 %}
+{% if p.image_url %}{{ media(p.image_url, p.category_name, p.kind, 'banner') }}{% endif %}
 <section class="page-hero">
   <a class="back" href="/panel/catalog?kind={{ p.kind }}">{{ icon('arrow-left', 18) }}{{ p.kind_title }}</a>
   <h1>{{ p.name }}</h1>

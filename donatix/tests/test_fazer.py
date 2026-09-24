@@ -109,3 +109,26 @@ def test_get_order_and_balance():
     o = s.get_order("ord-9001")
     assert o.status == "completed" and o.delivery == {"codes": ["AAA"]}
     assert str(s.balance()) == "100.0000"
+
+
+def test_catalog_images_are_picked_up():
+    from donatix.suppliers.base import pick_image
+
+    assert pick_image({"ui": {"cover": "https://cdn.fzr.cards/pubg.png"}}) == "https://cdn.fzr.cards/pubg.png"
+    assert pick_image({"image": {"url": "https://x/y.webp"}}) == "https://x/y.webp"
+    assert pick_image({"name": "no image"}, {"logo": "javascript:alert(1)"}) is None
+
+    def handler(req: httpx.Request):
+        p = req.url.path.removeprefix("/api/v2")
+        assert req.url.params.get("include_ui") == "1" or p not in ("/topups", "/topups/offers")
+        if p == "/topups":
+            return httpx.Response(200, json={"ok": True, "items": [
+                {"category_id": "pubg", "name": "PUBG Mobile", "image": "https://cdn.example/pubg.jpg"}],
+                "meta": {"has_more": False}})
+        if p == "/topups/offers":
+            return httpx.Response(200, json={"ok": True, "name": "PUBG Mobile", "fields": [],
+                                             "offers": [{"offer_id": "o1", "name": "60 UC", "price_usd": "0.99"}]})
+        return httpx.Response(403, json={"ok": False, "error": "no"})
+
+    items = list(make(handler).fetch_catalog())
+    assert items[0].image_url == "https://cdn.example/pubg.jpg"

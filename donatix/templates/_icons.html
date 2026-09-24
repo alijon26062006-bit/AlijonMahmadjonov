@@ -63,3 +63,11 @@
 {%- else -%}<rect width="28" height="20" rx="3" fill="#fff" stroke="#ddd"/><path d="M0 3h28M0 7.4h28M0 11.8h28M0 16.2h28" stroke="#b22234" stroke-width="2.2"/><rect width="12" height="10.5" rx="2" fill="#3c3b6e"/>
 {%- endif -%}</svg>
 {%- endmacro -%}
+
+{#- Место под обложку из каталога поставщика; без картинки — цветная заглушка с названием -#}
+{%- macro media(url, title, kind, cls='') -%}
+<div class="media k-{{ kind }} {{ cls }}">
+  {%- if url %}<img src="{{ url }}" alt="{{ title }}" loading="lazy" decoding="async" onerror="this.remove()">{% endif -%}
+  <span class="media-title">{{ title }}</span>
+</div>
+{%- endmacro -%}
