@@ -8,13 +8,11 @@
     <section class="hero">
       <div>
         <h1>Telegram Stars, пополнения игр и&nbsp;Steam для&nbsp;вашего магазина</h1>
-        <p class="lead">Подключите свой сайт или Telegram-бота к {{ site_name }} через API — заказы выполняются автоматически.
-          Без программиста можно заказывать вручную в панели.</p>
+        <p class="lead">API для ботов и сайтов. Заказы выполняются автоматически.</p>
         <div class="cta">
           <a class="btn primary lg" href="/register">Подать заявку</a>
           <a class="btn lg" href="/docs">Документация API</a>
         </div>
-        <p class="small muted" style="margin-top:14px">Оплата с баланса в долларах. Если заказ не выполнен — деньги возвращаются автоматически.</p>
       </div>
       <div class="window" aria-label="Пример заказа через API">
         <div class="chrome"><span class="url mono">POST /api/v1/orders</span><span class="badge ok">201</span></div>
@@ -43,11 +41,11 @@
     </section>
   </div>
 
-  <section class="section" id="catalog">
+  <section class="section" data-reveal id="catalog">
     <div class="wrap">
       <div class="section-head">
         <h2>Каталог</h2>
-        <p>{% if total_products %}{{ total_products }} позиций. {% endif %}Цены и наличие обновляются от поставщика каждые 15 минут.</p>
+        {% if total_products %}<p>{{ total_products }} позиций</p>{% endif %}
       </div>
       <div class="grid">
         {% set defaults = {
@@ -76,14 +74,14 @@
     </div>
   </section>
 
-  <section class="section">
+  <section class="section" data-reveal>
     <div class="wrap">
       <div class="section-head"><h2>Как подключиться</h2></div>
       <div class="grid steps">
         {% for t, d in [
-          ('Заявка', 'Регистрируетесь и указываете свой канал, бота или сайт. Доступ открываем после проверки.'),
-          ('Баланс', 'Пополняете баланс через Алиф, DC, Эсхату, USDT или Binance. Заказы списываются с него.'),
-          ('Подключение', 'Создаёте API-ключ в панели и подключаете бота или сайт. Или заказываете вручную.'),
+          ('Заявка', 'Регистрация и проверка проекта'),
+          ('Баланс', 'Алиф, DC, Эсхата, USDT, Binance'),
+          ('Подключение', 'API-ключ или заказы в панели'),
         ] %}
         <div class="card feature"><div class="num">{{ loop.index }}</div><h3>{{ t }}</h3><p>{{ d }}</p></div>
         {% endfor %}
@@ -91,15 +89,14 @@
     </div>
   </section>
 
-  <section class="section">
+  <section class="section" data-reveal>
     <div class="wrap grid two" style="align-items:center;gap:32px">
       <div>
         <h2>Для разработчиков</h2>
         <ul class="checks">
-          <li>{{ icon('check', 16) }}<span>Один метод заказа для всех товаров, ответы в JSON</span></li>
-          <li>{{ icon('check', 16) }}<span>Webhook с подписью HMAC о смене статуса заказа</span></li>
-          <li>{{ icon('check', 16) }}<span>Idempotency-Key: повторный запрос не спишет деньги дважды</span></li>
-          <li>{{ icon('check', 16) }}<span>Коды ошибок и сообщения на русском</span></li>
+          <li>{{ icon('check', 16) }}<span>Один метод для всех товаров</span></li>
+          <li>{{ icon('check', 16) }}<span>Webhook с подписью HMAC</span></li>
+          <li>{{ icon('check', 16) }}<span>Защита от двойного списания</span></li>
         </ul>
         <a class="btn" href="/docs">Открыть документацию</a>
       </div>
@@ -116,11 +113,11 @@ print(r.json()["order"]["status"])</pre>
     </div>
   </section>
 
-  <section class="section" id="pricing">
+  <section class="section" data-reveal id="pricing">
     <div class="wrap">
       <div class="section-head">
         <h2>Цены</h2>
-        <p>Цена поставщика плюс {{ markups['bronze'] }}%. Абонентской платы нет. Для постоянных партнёров с большим оборотом — индивидуальные условия.</p>
+        <p>Без абонентской платы. Для крупных партнёров — скидки.</p>
       </div>
       <div class="card table-wrap" style="max-width:640px">
         {% if examples %}
@@ -129,31 +126,28 @@ print(r.json()["order"]["status"])</pre>
           {% for label, price in examples %}<tr><td>{{ label }}</td><td class="num mono">${{ price }}</td></tr>{% endfor %}
         </table>
         {% endif %}
-        <p class="small muted" style="margin:10px 0 0">Точные цены по всем позициям — в каталоге панели после регистрации.</p>
       </div>
     </div>
   </section>
 
-  <section class="section" id="faq">
+  <section class="section" data-reveal id="faq">
     <div class="wrap" style="max-width:760px">
       <div class="section-head"><h2>Вопросы</h2></div>
       {% for q, a in [
-        ('Как пополнить баланс?', 'В панели: «Пополнить баланс» → способ оплаты → сумма. Переводите по реквизитам и отправляете заявку, после проверки баланс зачисляется, вам приходит уведомление.'),
-        ('Что если заказ не выполнится?', 'Деньги автоматически вернутся на баланс, в заказе будет указана причина.'),
-        ('Нужен ли программист?', 'Нет. Все товары можно заказывать вручную в панели. API нужен, чтобы продажи шли автоматически.'),
-        ('Подходит для Telegram-бота?', 'Да. Бот принимает оплату от покупателя и делает заказ через API.'),
-        ('Как быстро выполняются заказы?', 'Обычно за несколько секунд, пополнения некоторых игр — до нескольких минут. Статус виден в панели и приходит на webhook.'),
+        ('Что если заказ не выполнится?', 'Деньги сразу вернутся на баланс.'),
+        ('Нужен ли программист?', 'Нет, заказывать можно вручную в панели.'),
+        ('Как быстро выполняются заказы?', 'Обычно за несколько секунд.'),
       ] %}
       <details class="faq"><summary>{{ q }}</summary><p>{{ a }}</p></details>
       {% endfor %}
     </div>
   </section>
 
-  <section class="section">
+  <section class="section" data-reveal>
     <div class="wrap">
       <div class="card cta-card">
         <h2>Подключить свой проект</h2>
-        <p class="muted">Заявки рассматриваем в течение дня{% if support_contact %}. Вопросы — {{ support_contact }}{% endif %}.</p>
+        {% if support_contact %}<p class="muted">Вопросы — {{ support_contact }}</p>{% endif %}
         <a class="btn primary lg" href="/register">Подать заявку</a>
       </div>
     </div>

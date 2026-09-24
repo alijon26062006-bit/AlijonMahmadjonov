@@ -2,7 +2,6 @@
 {% set cur = form.get('currency') or 'RUB' %}
 <section class="page-hero">
   <h1>Пополнить Steam</h1>
-  <p>Пополнение Steam по логину. Выберите валюту и сумму.</p>
 </section>
 {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
 
@@ -13,7 +12,7 @@
   <div class="card reveal">
     <div class="auth-head steam-head">
       <div class="tile steam-tile">{{ icon('wallet', 26) }}</div>
-      <div style="flex:1;min-width:150px"><h3 style="margin:0">Данные пополнения</h3><p class="small">Логин аккаунта и сумма в выбранной валюте.</p></div>
+      <div style="flex:1;min-width:150px"><h3 style="margin:0">Данные пополнения</h3></div>
       <button type="button" class="btn sm dashed" onclick="document.getElementById('rates').toggleAttribute('hidden')">{{ icon('alert', 16) }}Курсы</button>
     </div>
     <div id="rates" class="summary" hidden style="margin-top:14px">
@@ -39,7 +38,6 @@
 
   <div class="card reveal">
     <h3 style="margin-bottom:4px">Сводка</h3>
-    <p class="muted small">Цифры обновляются при вводе суммы.</p>
     <div class="summary">
       <div><span>Скидка</span><span class="ok-text">{{ p.discount_percent | float | round(2) }}%</span></div>
       <div><span>Получит на аккаунт</span><span id="s-get">—</span></div>

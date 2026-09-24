@@ -2,7 +2,7 @@
 {% from "_icons.html" import icon %}
 {% block title %}Уведомления — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="page-hero"><h1>Уведомления</h1><p>Пополнения баланса, возвраты и важные события аккаунта.</p></section>
+<section class="page-hero"><h1>Уведомления</h1></section>
 <div class="list">
   {% for n in rows %}
   <a class="item reveal" href="{{ n.link or '#' }}">

@@ -4,7 +4,7 @@
 {% block content %}
 <section class="page-hero">
   <h1>{{ kind_titles.get(kind, 'Каталог') }}</h1>
-  <p>Цены указаны для вашего аккаунта, в долларах. Найдено: {{ count }}.</p>
+  <p>Найдено: {{ count }}</p>
 </section>
 <form class="card" method="get" action="/panel/catalog">
   <div class="filters">

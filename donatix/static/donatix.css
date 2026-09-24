@@ -86,8 +86,10 @@ code, pre { font-size: .86em; }
 .ico { flex: none; vertical-align: middle; }
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.reveal { /* раньше — анимация появления; оставлен как пустой класс */ }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
 
 /* ── Шапка ────────────────────────────────────────────── */
 .top { position: sticky; top: 0; z-index: 40; background: var(--surface); border-bottom: 1px solid var(--line); }
@@ -323,9 +325,6 @@ details.faq p { margin: 0 0 16px; color: var(--muted); }
 .window pre { margin: 0 0 12px; font-size: .78rem; }
 .window .orders { display: flex; flex-direction: column; gap: 8px; }
 .window .orders .item { padding: 10px 12px; align-items: center; }
-.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
-.feed .item { animation: rowin .35s var(--ease) both; }
-@keyframes rowin { from { opacity: 0; transform: translateY(-4px); } }
 
 /* ── Покупка ──────────────────────────────────────────── */
 .step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
@@ -412,4 +411,86 @@ details.faq p { margin: 0 0 16px; color: var(--muted); }
 .auth-head h2 { margin: 0; font-size: 1.3rem; }
 .auth-head p { margin: 2px 0 0; color: var(--muted); }
 
-.to-top { display: none; }
+
+/* ── Движение ─────────────────────────────────────────────
+   Короткие, мягкие переходы: появление страницы, подъём карточек под курсором,
+   плавное раскрытие FAQ и смена темы. Всё отключается при prefers-reduced-motion. */
+:root { --ease-out: cubic-bezier(.16, 1, .3, 1); interpolate-size: allow-keywords; }
+
+/* Переход между страницами: шапка и меню стоят, меняется только содержимое */
+@view-transition { navigation: auto; }
+.top { view-transition-name: top; }
+@media (min-width: 861px) { .side { view-transition-name: side; } }
+::view-transition-old(root) { animation: vt-out .16s ease both; }
+::view-transition-new(root) { animation: vt-in .28s var(--ease-out) both; }
+@keyframes vt-out { to { opacity: 0; } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* Появление блоков страницы по очереди */
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+.shell > main > *, .auth > .card, .hero > * { animation: rise .5s var(--ease-out) backwards; }
+.shell > main > :nth-child(2), .hero > :nth-child(2) { animation-delay: .06s; }
+.shell > main > :nth-child(3) { animation-delay: .12s; }
+.shell > main > :nth-child(4) { animation-delay: .18s; }
+.shell > main > :nth-child(n+5) { animation-delay: .24s; }
+.grid > *, .list > * { animation: rise .45s var(--ease-out) backwards; }
+.grid > :nth-child(2), .list > :nth-child(2) { animation-delay: .04s; }
+.grid > :nth-child(3), .list > :nth-child(3) { animation-delay: .08s; }
+.grid > :nth-child(4), .list > :nth-child(4) { animation-delay: .12s; }
+.grid > :nth-child(5), .list > :nth-child(5) { animation-delay: .16s; }
+.grid > :nth-child(n+6), .list > :nth-child(n+6) { animation-delay: .2s; }
+
+/* Главная: секции проявляются при прокрутке (без JS остаются видимыми) */
+.js [data-reveal] { opacity: 0; transform: translateY(18px); transition: opacity .6s var(--ease-out), transform .6s var(--ease-out); }
+.js [data-reveal].in { opacity: 1; transform: none; }
+.js [data-reveal] .grid > * { animation-name: none; }
+.js [data-reveal].in .grid > * { animation-name: rise; }
+.window .item { animation: rise .5s var(--ease-out) .45s backwards; }
+.window .item + .item { animation-delay: .7s; }
+
+/* Карточки и ссылки поднимаются под курсором */
+.product-card, .quick-tile, a.item, .link-row, .card.feature, .stat {
+  transition: transform .22s var(--ease-out), box-shadow .22s var(--ease-out), border-color .22s var(--ease-out);
+}
+@media (hover: hover) {
+  .product-card:hover, .quick-tile:hover, a.item:hover, .link-row:hover, .card.feature:hover {
+    transform: translateY(-2px); box-shadow: 0 8px 24px -12px rgb(20 22 40 / .25);
+  }
+  .product-card:hover .media img { transform: scale(1.04); }
+  .link-row:hover .go { transform: translateX(3px); color: var(--accent); }
+}
+.media img { transition: transform .5s var(--ease-out); }
+.link-row .go { transition: transform .2s var(--ease-out), color .2s; }
+
+.btn { transition: background .15s var(--ease), border-color .15s var(--ease), transform .12s var(--ease), box-shadow .2s var(--ease); }
+.btn:active:not([disabled]), .icon-btn:active { transform: scale(.97); }
+.btn.primary:hover { box-shadow: 0 6px 18px -8px var(--accent); }
+.icon-btn { transition: background .15s var(--ease), transform .12s var(--ease); }
+.theme-toggle .ico { transition: transform .4s var(--ease-out); }
+.theme-toggle:hover .ico { transform: rotate(-20deg); }
+.side a.nav-item { transition: background .18s var(--ease), color .18s var(--ease); }
+.side a.nav-item:hover .ico { color: var(--text); }
+.pack, .pick, .cur, .paym { transition: border-color .15s var(--ease), background .15s var(--ease), transform .12s var(--ease); }
+.pack:active, .pick:active, .cur:active, .paym:active { transform: scale(.98); }
+.flash { animation: flash-in .4s var(--ease-out) backwards; }
+@keyframes flash-in { from { opacity: 0; transform: translateY(-6px); } }
+.dot-count { animation: pop .4s var(--ease-out) backwards; }
+@keyframes pop { from { transform: scale(0); } 60% { transform: scale(1.15); } }
+
+/* FAQ раскрывается по высоте; плюс поворачивается в крестик */
+details.faq::details-content { height: 0; overflow: clip; transition: height .3s var(--ease-out), content-visibility .3s allow-discrete; }
+details.faq[open]::details-content { height: auto; }
+details.faq summary::after, details.faq[open] summary::after { content: "+"; transition: transform .25s var(--ease-out); }
+details.faq[open] summary::after { transform: rotate(45deg); }
+
+/* Быстрые действия в кабинете */
+.grid.quick { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.quick-tile { display: flex; flex-direction: column; gap: 10px; padding: 14px; color: var(--text); font-weight: 600;
+  border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.quick-tile:hover { color: var(--text); text-decoration: none; border-color: var(--line-strong); }
+@media (max-width: 480px) { .grid.quick { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Смена темы — плавный переход цветов */
+.theme-fade::view-transition-old(root) { animation: vt-out .3s ease both; }
+.theme-fade::view-transition-new(root) { animation: vt-fade-in .3s ease both; }
+@keyframes vt-fade-in { from { opacity: 0; } }

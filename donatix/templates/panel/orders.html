@@ -1,7 +1,7 @@
 {% extends "panel/_layout.html" %}
 {% block title %}Заказы — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="page-hero"><h1>Заказы</h1><p>История заказов и статусы обработки. Всего: {{ total }}.</p></section>
+<section class="page-hero"><h1>Заказы</h1><p>Всего: {{ total }}</p></section>
 <form class="card" method="get"><div class="filters">
   <div class="full"><input id="q" name="q" type="search" value="{{ q }}" placeholder="Поиск заказов (номер, товар или получатель)" aria-label="Поиск"></div>
   <div><label class="label-caps" for="status">Статус</label>

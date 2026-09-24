@@ -1,7 +1,7 @@
 {% extends "admin/_layout.html" %}
 {% block title %}Админка — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="page-hero"><div class="eyebrow">Админка</div><h1>Сводка</h1><p>Деньги, заказы и состояние поставщика.</p></section>
+<section class="page-hero"><div class="eyebrow">Админка</div><h1>Сводка</h1></section>
 
 {% if counts.attention %}<div class="flash error"><a href="/admin/orders?status=attention">Заказов, требующих внимания: {{ counts.attention }}</a> — проверьте их в панели FazerCards.</div>{% endif %}
 {% if counts.pending_payments %}<div class="flash warn"><a href="/admin/payments">Заявок на пополнение: {{ counts.pending_payments }}</a> — проверьте поступление и подтвердите.</div>{% endif %}

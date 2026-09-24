@@ -11,6 +11,7 @@
       try { t = localStorage.getItem("dx-theme"); } catch (e) {}
       if (!t) t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       document.documentElement.setAttribute("data-theme", t);
+      document.documentElement.classList.add("js");
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,7 +52,6 @@
   <div class="wrap cols">
     <div style="max-width:380px">
       <div class="brandline">{{ site_name }}</div>
-      <p style="margin-top:8px">Telegram Stars, пополнения игр и подарочные карты оптом — для каналов, ботов и магазинов.</p>
     </div>
     <div class="links">
       <a href="/#catalog">Каталог</a><a href="/#pricing">Цены</a><a href="/docs">Документация API</a>
@@ -63,11 +63,49 @@
 </footer>
 {% endblock %}
 <script>
+  var dxCalm = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
   function dxTheme() {
     var r = document.documentElement, t = r.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    r.setAttribute("data-theme", t);
+    var apply = function () { r.setAttribute("data-theme", t); };
+    if (document.startViewTransition && !dxCalm) {
+      r.classList.add("theme-fade");
+      document.startViewTransition(apply).finished.finally(function () { r.classList.remove("theme-fade"); });
+    } else apply();
     try { localStorage.setItem("dx-theme", t); } catch (e) {}
   }
+
+  // Секции главной проявляются, когда до них докрутили
+  (function () {
+    var els = document.querySelectorAll("[data-reveal]");
+    if (!("IntersectionObserver" in window) || dxCalm) {
+      els.forEach(function (el) { el.classList.add("in"); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+      });
+    }, { rootMargin: "0px 0px -8% 0px" });
+    els.forEach(function (el) { io.observe(el); });
+  })();
+
+  // Суммы в карточках-счётчиках плавно набегают от нуля
+  (function () {
+    if (dxCalm || !window.requestAnimationFrame) return;
+    document.querySelectorAll(".stat .value, .balance-card b").forEach(function (el) {
+      var m = el.textContent.trim().match(/^(\$?)(\d+)(?:\.(\d+))?$/);
+      if (!m) return;
+      var prefix = m[1], digits = (m[3] || "").length, target = parseFloat(m[2] + "." + (m[3] || "0"));
+      if (!target) return;
+      var start = performance.now(), dur = 700;
+      (function step(now) {
+        var k = Math.min(1, (now - start) / dur), v = target * (1 - Math.pow(1 - k, 3));
+        el.textContent = prefix + v.toFixed(digits);
+        if (k < 1) requestAnimationFrame(step);
+      })(start);
+    });
+  })();
 </script>
 </body>
 </html>

@@ -3,9 +3,7 @@
 {% block title %}Панель — {{ site_name }}{% endblock %}
 {% block content %}
 <section class="page-hero">
-  <div class="eyebrow">Панель партнёра</div>
   <h1>Обзор</h1>
-  <p>Ключевые показатели и недавняя активность.</p>
   <div class="actions">
     <a class="btn primary" href="/panel/balance">{{ icon('wallet', 18) }}Пополнить баланс</a>
     <a class="btn" href="/panel/api">{{ icon('key', 18) }}API-ключи</a>
@@ -15,11 +13,11 @@
 <div class="card">
   <h2 style="margin:0;font-size:1.6rem">{{ user.login }}</h2>
   <div class="muted">{{ user.email }}</div>
-  <div class="label-caps" style="margin-top:22px">Краткая сводка</div>
+  <div style="margin-top:16px"></div>
   <div class="grid stats">
-    <div class="stat"><div class="label">Баланс</div><div class="value">${{ fmt(user.balance_micro) }}</div><div class="note">Доступно сейчас</div></div>
-    <div class="stat"><div class="label">Всего потрачено</div><div class="value">${{ fmt(summary.spent) }}</div><div class="note">За всё время</div></div>
-    <div class="stat"><div class="label">Всего заказов</div><div class="value">{{ summary.n }}</div><div class="note">Выполнено</div></div>
+    <div class="stat"><div class="label">Баланс</div><div class="value">${{ fmt(user.balance_micro) }}</div></div>
+    <div class="stat"><div class="label">Всего потрачено</div><div class="value">${{ fmt(summary.spent) }}</div></div>
+    <div class="stat"><div class="label">Всего заказов</div><div class="value">{{ summary.n }}</div></div>
     <div class="stat ok">
       <div class="label">Уровень</div>
       <div class="value" style="text-transform:capitalize">{{ user.tier }}</div>
@@ -37,20 +35,22 @@
 </div>
 {% endif %}
 
-<div class="card" style="margin-top:16px">
-  <h3>Быстрые действия</h3>
-  <div class="list">
-    <a class="link-row" href="/panel/orders"><span class="grow">Заказы<span class="sub">История заказов и статусы обработки</span></span><span class="go">{{ icon('arrow-right', 18) }}</span></a>
-    <a class="link-row" href="/panel/buy/steam-topup"><span class="grow">Пополнить Steam<span class="sub">Пополнение по логину</span></span><span class="go">{{ icon('arrow-right', 18) }}</span></a>
-    {% for kind, sub in [('telegram_stars', 'Звёзды по @username'), ('topup', 'Пополнение по ID игрока'), ('gift_card', 'Коды и ваучеры'), ('telegram_premium', 'Подписка на 3, 6 или 12 месяцев')] %}
-    <a class="link-row" href="/panel/catalog?kind={{ kind }}"><span class="grow">{{ kind_titles[kind] }}<span class="sub">{{ sub }}</span></span><span class="go">{{ icon('arrow-right', 18) }}</span></a>
-    {% endfor %}
-  </div>
+<div class="section-title"><h2>Купить</h2></div>
+<div class="grid quick">
+  {% for href, kind, title in [
+    ('/panel/buy/steam-topup', 'steam_topup', 'Пополнить Steam'),
+    ('/panel/buy/steam-gift', 'steam_gift', 'Steam гифты'),
+    ('/panel/catalog?kind=telegram_stars', 'telegram_stars', kind_titles['telegram_stars']),
+    ('/panel/catalog?kind=telegram_premium', 'telegram_premium', kind_titles['telegram_premium']),
+    ('/panel/catalog?kind=topup', 'topup', kind_titles['topup']),
+    ('/panel/catalog?kind=gift_card', 'gift_card', kind_titles['gift_card']),
+  ] %}
+  <a class="quick-tile" href="{{ href }}"><span class="tile k-{{ kind }}">{{ kind_icon(kind, 20) }}</span><span>{{ title }}</span></a>
+  {% endfor %}
 </div>
 
 <div class="card" style="margin-top:16px">
   <h3 style="margin-bottom:4px">Последние заказы</h3>
-  <p class="muted">Статусы и суммы последних операций</p>
   <a class="btn block" href="/panel/orders" style="margin-bottom:14px">Все заказы</a>
   <div class="list">
     {% for o in recent %}{% include "panel/_order_item.html" %}{% else %}
