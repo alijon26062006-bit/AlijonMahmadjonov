@@ -3947,20 +3947,19 @@ async def games_text(conn: aiosqlite.Connection) -> str:
     items = await db.list_games(conn)
     if not items:
         body = (
-            "<blockquote>Игр пока нет. Нажмите «Добавить игру» и пришлите "
-            "её код у поставщика с названием — например\n"
-            "<code>free_fire_br 🔥 Free Fire</code></blockquote>"
+            "<blockquote>Игр пока нет. Нажмите «Найти игру по названию» — например "
+            "<code>free fire</code> — или «Добавить все игры сразу».</blockquote>"
         )
     else:
-        body = "\n".join(
-            f"{'✅' if game.enabled else '🚫'} <b>{game.title}</b>\n"
-            f"├ Код: <code>{game.category_id}</code>\n"
-            f"├ Поле: <code>{game.field}</code>"
-            + (f" · регион {game.region}" if game.region else "")
-            + f"\n└ Наценка: <b>{game.margin or runtime.margin_percent()}%</b>"
-            + ("" if game.margin else " <i>(общая)</i>")
-            for game in items
-        )
+        # Коротко: список всех игр поставщика не влезает в одно сообщение Telegram
+        on = [g for g in items if g.enabled]
+        off = len(items) - len(on)
+        shown = on[:25]
+        body = (f"В меню: <b>{len(on)}</b>" + (f" · скрыто: <b>{off}</b>" if off else "")
+                + f" · общая наценка <b>{runtime.margin_percent()}%</b>\n\n"
+                + ("\n".join(f"✅ {g.title}" + (f" · <i>{g.margin}%</i>" if g.margin else "") for g in shown)
+                   if on else "<i>В меню пока ни одной игры — включите нужные в «Скрытые игры».</i>")
+                + (f"\n<i>…и ещё {len(on) - len(shown)}</i>" if len(on) > len(shown) else ""))
 
     rate = runtime.usd_rate()
     warn = ""
@@ -3982,24 +3981,35 @@ async def games_text(conn: aiosqlite.Connection) -> str:
 async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
     from app.services import games as gsvc
 
-    kb = InlineKeyboardBuilder()
-    kb.row(btn("➕ Добавить игру", "pn:game_new", style=SUCCESS))
-    kb.row(btn("⚡ Добавить все игры сразу", "pn:game_add_all", style=SUCCESS))
-    kb.row(btn("🔎 Найти игру по названию", "pn:game_find", style=PRIMARY))
-    kb.row(InlineKeyboardButton(text="📚 Взять из каталога поставщика",
-                                callback_data="pn:game_pick"))
-    kb.row(btn("🪪 Проверка ID игрока", "pn:checker", style=PRIMARY))
-    kb.row(InlineKeyboardButton(text="📋 Все категории поставщика",
-                                callback_data="pn:game_codes"))
     from app.handlers import donatix
+
+    kb = InlineKeyboardBuilder()
+    if donatix.enabled():
+        # Бот из конструктора: найти игру по названию или добавить все — без кодов поставщика
+        kb.row(btn("🔎 Найти и добавить игру", "pn:game_find", style=SUCCESS))
+        kb.row(btn("⚡ Добавить все игры сразу", "pn:game_add_all", style=PRIMARY))
+    else:
+        kb.row(btn("➕ Добавить игру", "pn:game_new", style=SUCCESS))
+        kb.row(btn("⚡ Добавить все игры сразу", "pn:game_add_all", style=SUCCESS))
+        kb.row(btn("🔎 Найти игру по названию", "pn:game_find", style=PRIMARY))
+        kb.row(InlineKeyboardButton(text="📚 Взять из каталога поставщика",
+                                    callback_data="pn:game_pick"))
+        kb.row(btn("🪪 Проверка ID игрока", "pn:checker", style=PRIMARY))
+        kb.row(InlineKeyboardButton(text="📋 Все категории поставщика",
+                                    callback_data="pn:game_codes"))
     if not donatix.enabled():  # у бота из конструктора статусы приходят от Donatix
         kb.row(InlineKeyboardButton(text="🔔 Мгновенные отчёты (вебхук)",
                                     callback_data="pn:hook"))
-    for game in await db.list_games(conn):
-        kb.row(InlineKeyboardButton(
-            text=("✅ " if game.enabled else "🚫 ") + game.title,
-            callback_data=f"pn:game:{game.category_id}",
-        ))
+    games_all = await db.list_games(conn)
+    for game in [g for g in games_all if g.enabled][:40]:
+        kb.row(InlineKeyboardButton(text="✅ " + game.title, callback_data=f"pn:game:{game.category_id}"))
+    off = sum(1 for g in games_all if not g.enabled)
+    if off:
+        kb.row(InlineKeyboardButton(text=f"🚫 Скрытые игры · {off}", callback_data="pn:games_off:0"))
+    if donatix.enabled():
+        # Бот из конструктора: ключи поставщика и проверку связи ведёт сам Donatix
+        kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
+        return kb.as_markup()
     kb.row(btn("🔌 Проверить поставщика игр", "pn:games_check", style=PRIMARY))
     kb.row(InlineKeyboardButton(
         text=f"⏱ Ожидание выдачи · {gsvc.timeout_minutes()} мин",
@@ -4018,6 +4028,38 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
 async def cb_games(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
     await state.clear()
     await safe_edit(call, substitute(await games_text(conn)), await games_kb(conn))
+    await call.answer()
+
+
+GAMES_PAGE = 20
+
+
+@router.callback_query(F.data.startswith("pn:games_off:"))
+async def cb_games_off(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    """Скрытые игры — по страницам: их у поставщика сотни, в один экран не влезают."""
+    await state.clear()
+    raw = call.data.rsplit(":", 1)[1]
+    page = int(raw) if raw.isdigit() else 0
+    off = [g for g in await db.list_games(conn) if not g.enabled]
+    pages = max(1, -(-len(off) // GAMES_PAGE))
+    page = min(page, pages - 1)
+    kb = InlineKeyboardBuilder()
+    for game in off[page * GAMES_PAGE:(page + 1) * GAMES_PAGE]:
+        kb.row(InlineKeyboardButton(text="🚫 " + game.title, callback_data=f"pn:game:{game.category_id}"))
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="‹", callback_data=f"pn:games_off:{page - 1}"))
+    if pages > 1:
+        nav.append(InlineKeyboardButton(text=f"{page + 1} / {pages}", callback_data="pn:games_off:" + str(page)))
+    if page < pages - 1:
+        nav.append(InlineKeyboardButton(text="›", callback_data=f"pn:games_off:{page + 1}"))
+    if nav:
+        kb.row(*nav)
+    kb.row(btn("🔎 Найти игру по названию", "pn:game_find", style=PRIMARY))
+    kb.row(InlineKeyboardButton(text="‹ К играм", callback_data="pn:games"))
+    await safe_edit(call, f"🚫 <b>Скрытые игры</b> · {len(off)}\n\n"
+                          "Покупатели их не видят. Откройте игру и нажмите «Показать в меню».",
+                    kb.as_markup())
     await call.answer()
 
 

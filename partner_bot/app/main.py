@@ -115,6 +115,10 @@ async def main() -> None:
     bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     # Если премиум-эмодзи перестанут приниматься, бот не должен замолчать.
     bot.session.middleware(CustomEmojiGuard())
+    # Слишком длинный экран не должен падать ошибкой «text is too long»
+    from app.middlewares.length_guard import LengthGuard
+
+    bot.session.middleware(LengthGuard())
     conn = await db.connect()
     await db.init(conn)
     # Журнал WAL сворачивается в базу сам, но только когда её никто не
