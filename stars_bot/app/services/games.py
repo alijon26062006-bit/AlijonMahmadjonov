@@ -322,9 +322,18 @@ def status_of(order: dict | None) -> str:
 
 async def place(
     provider, *, game: db.Game, offer_id: str, fields: dict[str, str],
-    quantity: int, order_id: int,
+    quantity: int, order_id: int, conn: aiosqlite.Connection | None = None,
 ) -> str:
-    """Отправить заказ поставщику. Возвращает его номер заказа."""
+    """Отправить заказ поставщику. Возвращает его номер заказа.
+
+    С conn запрос запоминается до отправки: если ответ не дойдёт, по нему
+    потом узнаем номер заказа (см. recover).
+    """
+    if conn is not None:
+        await db.save_game_request(
+            conn, order_id, category_id=game.category_id, offer_id=offer_id,
+            fields=fields, quantity=quantity,
+        )
     order = await provider.order_game(
         category_id=game.category_id, offer_id=offer_id,
         fields=fields, quantity=quantity,
@@ -354,7 +363,13 @@ async def check(
     from app.services import delivery
 
     if not order.fragment_order_id:
-        return "waiting"
+        found = await recover(bot, conn, provider, order)
+        if found is None:
+            if _minutes_waiting(order) >= timeout_minutes():
+                await _refund_nameless(bot, conn, order)
+                return "timeout"
+            return "waiting"
+        order = found
 
     remote = await provider.order_status(order.fragment_order_id)
     status = status_of(remote)
@@ -388,6 +403,80 @@ async def check(
         return "timeout"
 
     return "waiting"
+
+
+#: Метка возврата заказа, так и не получившего номер у поставщика.
+NAMELESS_MARK = "без номера:"
+
+
+async def recover(
+    bot: Bot, conn: aiosqlite.Connection, provider, order: db.Order,
+) -> db.Order | None:
+    """Узнать номер заказа, ответ на который не дошёл.
+
+    Чаще всего поставщик просто ответил дольше 20 секунд: заказ у него
+    есть, а номера у нас нет — и следить за ним нечем. Повторяем тот же
+    запрос с тем же ключом от дублей: по документации поставщика второй
+    раз он деньги не спишет, а вернёт уже созданный заказ. Если первый
+    запрос до него не дошёл вовсе — заказ создастся сейчас, клиент ведь
+    заплатил.
+
+    Отказ на повторе деньги не возвращает: «тот же ключ ещё выполняется»
+    тоже приходит отказом. Возврат — только по общему таймауту.
+    """
+    request = await db.get_game_request(conn, order.id)
+    if request is None:
+        return None
+    try:
+        remote = await provider.order_game(
+            category_id=request["category_id"], offer_id=request["offer_id"],
+            fields=request["fields"], quantity=request["quantity"],
+            idempotency_key=idempotency_key(order.id),
+        )
+    except (DeliveryError, DeliveryUncertain) as exc:
+        log.info("Игры: номер заказа %s пока не узнали — %s", order.id, exc)
+        return None
+    external = str((remote or {}).get("order_id") or (remote or {}).get("id") or "")
+    if not external:
+        return None
+
+    await db.update_order(conn, order.id, fragment_order_id=external)
+    if order.status == db.ORDER_FAILED:
+        await db.transition_order(conn, order.id, expected=db.ORDER_FAILED,
+                                  new=db.ORDER_DELIVERING, error=None)
+    log.info("Игры: заказ %s нашёлся у поставщика — %s", order.id, external)
+    from app.services import delivery
+
+    await delivery.notify_admins(
+        bot,
+        "✅ <b>Номер заказа нашёлся</b>\n"
+        f"├ Наш номер: <code>{order.id}</code>\n"
+        f"└ У поставщика: <code>{external}</code>\n\n"
+        "Дальше бот следит за ним сам — делать ничего не нужно.",
+    )
+    return await db.get_order(conn, order.id)
+
+
+async def _refund_nameless(
+    bot: Bot, conn: aiosqlite.Connection, order: db.Order,
+) -> None:
+    """Номера так и нет, время вышло — вернуть деньги, как обещали."""
+    from app.services import delivery
+
+    await _refund(bot, conn, order,
+                  f"{NAMELESS_MARK} поставщик так и не дал номер заказа")
+    await delivery.notify_admins(
+        bot,
+        "⚠️ <b>Игровой заказ без номера — деньги вернули</b>\n"
+        f"├ Наш номер: <code>{order.id}</code>\n"
+        f"├ ID игрока: <code>{order.recipient}</code>\n"
+        f"└ Клиенту вернули <b>{fmt(order.price)}</b>\n\n"
+        "<blockquote>Поставщик за "
+        f"{timeout_minutes()} мин так и не подтвердил заказ. Найдите в его "
+        "кабинете заказ на этот ID игрока: если алмазы всё-таки дошли, "
+        "спишите деньги обратно — панель → 👥 Клиенты → "
+        f"<code>{order.user_id}</code> → ➖ Списать.</blockquote>",
+    )
 
 
 def timeout_minutes() -> int:
@@ -586,7 +675,9 @@ async def hold_place(
         f"├ ID игрока: <code>{player}</code>\n"
         f"└ Списано: <b>{fmt(order.price)}</b>\n\n"
         f"<blockquote expandable>{str(exc)[:600]}</blockquote>\n\n"
-        "<blockquote>Отследить его бот не может. Проверьте кабинет "
+        "<blockquote>Скорее всего, поставщик ответил слишком долго. Бот "
+        "сам переспросит его раз в 5 минут и, если заказ там есть, дальше "
+        "будет следить за ним сам.\n\nМожно решить и руками — кабинет "
         f"поставщика: дошло → <code>/done {order.id}</code>, "
         f"нет → <code>/refund {order.id}</code>.\n\nБез решения деньги "
         f"вернутся клиенту сами через {timeout_minutes()} мин."
@@ -607,7 +698,7 @@ async def order_now(
     try:
         external = await place(
             provider, game=game, offer_id=offer_id, fields=fields,
-            quantity=1, order_id=order.id,
+            quantity=1, order_id=order.id, conn=conn,
         )
     except DeliveryError as exc:
         await refund_place(bot, conn, order, game, exc)

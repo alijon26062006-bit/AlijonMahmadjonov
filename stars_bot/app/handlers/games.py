@@ -502,7 +502,7 @@ async def cb_buy(
         external = await svc.place(
             provider, game=game, offer_id=data["offer_id"],
             fields=data.get("fields") or {game.field_names[0]: data["player"]},
-            quantity=1, order_id=order.id,
+            quantity=1, order_id=order.id, conn=conn,
         )
     except DeliveryError as exc:
         # Явный отказ — выдачи не было. Возврат, починка поля и письмо

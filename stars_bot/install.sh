@@ -271,6 +271,12 @@ case "\${1:-help}" in
         fi
         ;;
     logs)    journalctl -u "\$SERVICE" -f ;;
+    orders)
+        # Игровые заказы: что у нас и что говорит поставщик. Только читает.
+        shift
+        ( cd "\$APP" && sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" \
+            -m app.tools.game_orders "\$@" )
+        ;;
     errors)  journalctl -u "\$SERVICE" -p err -n 50 --no-pager ;;
     setup)
         sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" "\$APP/setup.py"
@@ -592,6 +598,8 @@ PYBK
   stars-bot status    работает ли
   stars-bot logs      смотреть логи живьём (Ctrl+C — выйти)
   stars-bot errors    последние ошибки
+  stars-bot orders [ИГРА]
+                      игровые заказы и их статус у поставщика
   stars-bot setup     изменить настройки и перезапустить
   stars-bot activate [ТОКЕН ID КЛЮЧ]
                       активация: токен, ID админа, ключ поставщика

@@ -1562,8 +1562,58 @@ async def no_supplier_number(conn) -> None:
     check("заказ помечен зависшим", order.status == db.ORDER_FAILED, order.status)
     check("номера у поставщика и правда нет", not order.fragment_order_id)
 
-    waiting = await svc.check(bot, conn, GameProvider(), order)
-    check("без номера доглядчик не выдумывает статус", waiting == "waiting", waiting)
+    request = await db.get_game_request(conn, order.id)
+    check("запрос к поставщику запомнен до отправки",
+          request is not None and request["offer_id"] == "off_1"
+          and request["fields"].get("player_id") == "1724367212", str(request))
+
+    # Поставщик всё ещё молчит — ждём, денег не трогаем.
+    still = await svc.check(bot, conn, Nameless(), order)
+    fresh = await db.get_order(conn, order.id)
+    check("пока номера нет и время не вышло — ждём",
+          still == "waiting" and fresh.status == db.ORDER_FAILED, still)
+
+    # Переспросили с тем же ключом — поставщик вернул уже созданный заказ.
+    answering = GameProvider()
+    waiting = await svc.check(bot, conn, answering, order)
+    fresh = await db.get_order(conn, order.id)
+    check("номер узнан повтором с тем же ключом",
+          fresh.fragment_order_id == "ord-906267"
+          and answering.idempotency == [svc.idempotency_key(order.id)],
+          str(answering.idempotency))
+    check("заказ снова в работе и под присмотром",
+          fresh.status == db.ORDER_DELIVERING and waiting == "waiting",
+          f"{fresh.status} {waiting}")
+    check("владельцу сказали, что номер нашёлся",
+          any("Номер заказа нашёлся" in t for t in bot.to(ADMIN)))
+
+    # Второй заказ: номер так и не пришёл, а время вышло — деньги назад.
+    await state.set_state(gh.Game.confirm)
+    await state.update_data(category_id="free_fire_br", offer_id="off_1",
+                            pack="100 алмазов", price=1400, cost=1090,
+                            player="1724367212", player_name="Ник")
+    await db.credit(conn, BUYER, 1400)
+    await gh.cb_buy(call_of("g:ok"), state, conn, Nameless(), bot)
+    lost = (await db.last_game_orders(conn))[0]
+    await conn.execute("UPDATE orders SET created_at = '2020-01-01T00:00:00+00:00' "
+                       "WHERE id = ?", (lost.id,))
+    await conn.commit()
+    lost = await db.get_order(conn, lost.id)
+    before = (await db.get_user(conn, BUYER)).balance
+
+    class Silent(GameProvider):
+        async def order_game(self, **kw):
+            raise DeliveryUncertain("Нет связи с FazerCards: timeout")
+
+    result = await svc.check(bot, conn, Silent(), lost)
+    after = await db.get_order(conn, lost.id)
+    check("время вышло без номера — деньги вернулись, как обещали",
+          result == "timeout" and after.status == db.ORDER_REFUNDED
+          and (await db.get_user(conn, BUYER)).balance == before + 1400,
+          f"{result} {after.status}")
+    check("владельцу сказали проверить кабинет по ID игрока",
+          any("без номера — деньги вернули" in t and "1724367212" in t
+              for t in bot.to(ADMIN)))
 
 
 async def fast_follow(conn) -> None:

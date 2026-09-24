@@ -192,6 +192,17 @@ CREATE TABLE IF NOT EXISTS partners (
 -- минус — забрал себе.
 -- Какой товар чей. Прибыль с товара идёт его владельцу; что никому
 -- не отдано — делится по долям.
+-- Что именно ушло поставщику по игровому заказу. Нужно, когда номер
+-- заказа не пришёл (поставщик ответил дольше 20 секунд): тот же запрос
+-- с тем же ключом от дублей возвращает уже созданный заказ, а не новый.
+CREATE TABLE IF NOT EXISTS game_requests (
+    order_id    INTEGER PRIMARY KEY,
+    category_id TEXT NOT NULL,
+    offer_id    TEXT NOT NULL,
+    fields      TEXT NOT NULL,
+    quantity    INTEGER NOT NULL DEFAULT 1
+);
+
 -- Игры, которые владелец открыл к продаже. Каждая игра — отдельный
 -- товар: её можно закрепить за партнёром и увидеть в отчётах отдельно.
 CREATE TABLE IF NOT EXISTS games (
@@ -1783,6 +1794,39 @@ async def transition_order(
         if order and order.promo:
             await use_promo(conn, order.promo, order.user_id)
     return True
+
+
+async def save_game_request(
+    conn: aiosqlite.Connection, order_id: int, *, category_id: str,
+    offer_id: str, fields: dict, quantity: int,
+) -> None:
+    import json
+
+    await conn.execute(
+        """INSERT OR REPLACE INTO game_requests
+           (order_id, category_id, offer_id, fields, quantity)
+           VALUES (?, ?, ?, ?, ?)""",
+        (order_id, category_id, offer_id,
+         json.dumps(fields, ensure_ascii=False), quantity),
+    )
+    await conn.commit()
+
+
+async def get_game_request(conn: aiosqlite.Connection, order_id: int) -> dict | None:
+    import json
+
+    async with conn.execute(
+        "SELECT * FROM game_requests WHERE order_id = ?", (order_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    if row is None:
+        return None
+    try:
+        fields = json.loads(row["fields"])
+    except ValueError:
+        return None
+    return {"category_id": row["category_id"], "offer_id": row["offer_id"],
+            "fields": fields, "quantity": row["quantity"]}
 
 
 async def refunded_game_orders(
