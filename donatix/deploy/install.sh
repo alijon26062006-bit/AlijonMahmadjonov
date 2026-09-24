@@ -16,14 +16,21 @@ APP_DIR="/home/${APP_USER}/app"
 ENV_FILE="${APP_DIR}/donatix/.env"
 
 say() { printf '\n\033[1;35m▶ %s\033[0m\n' "$*"; }
-ask() { local q="$1" def="${2:-}" v; read -r -p "$q${def:+ [$def]}: " v </dev/tty; echo "${v:-$def}"; }
-ask_secret() { local q="$1" v; read -r -s -p "$q: " v </dev/tty; echo >&2; echo "$v"; }
+# Данные можно передать заранее (тогда вопросов не будет):
+#   sudo DOMAIN=... ADMIN_EMAIL=... ADMIN_PASS=... FAZER_KEY=... bash install.sh
+ask() {
+  local q="$1" def="${2:-}" v
+  if [ ! -r /dev/tty ]; then echo "$def"; return; fi
+  read -r -p "$q${def:+ [$def]}: " v </dev/tty || true; echo "${v:-$def}"
+}
+ask_secret() { local q="$1" v; [ -r /dev/tty ] || { echo ""; return; }; read -r -s -p "$q: " v </dev/tty || true; echo >&2; echo "$v"; }
+export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
 
 [ "$(id -u)" = 0 ] || { echo "Запустите через sudo."; exit 1; }
 
 say "Устанавливаю пакеты"
 apt-get update -qq
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3 python3-venv python3-pip git nginx certbot \
+apt-get install -y -qq python3 python3-venv python3-pip git nginx certbot \
   python3-certbot-nginx sqlite3 ufw >/dev/null
 
 id "$APP_USER" >/dev/null 2>&1 || useradd -m -s /bin/bash "$APP_USER"
@@ -42,14 +49,17 @@ sudo -u "$APP_USER" "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/donatix/req
 
 if [ ! -f "$ENV_FILE" ]; then
   say "Настройка (один раз)"
-  DOMAIN=$(ask "Домен сайта, например donatix.gg")
-  ADMIN_EMAIL=$(ask "Email админа (ваш)")
-  ADMIN_PASS=$(ask_secret "Пароль админа (мин. 8 символов)")
-  FAZER_KEY=$(ask_secret "API-ключ FazerCards (Панель → Профиль)")
-  SUPPORT=$(ask "Контакт поддержки для клиентов" "@donatix_support")
-  TG_TOKEN=$(ask "Токен Telegram-бота для уведомлений вам (Enter — пропустить)" "")
-  TG_CHAT=""
-  [ -n "$TG_TOKEN" ] && TG_CHAT=$(ask "Ваш Telegram chat id (@userinfobot)")
+  DOMAIN="${DOMAIN:-$(ask "Домен сайта, например donatix.gg")}"
+  ADMIN_EMAIL="${ADMIN_EMAIL:-$(ask "Email админа (ваш)")}"
+  ADMIN_PASS="${ADMIN_PASS:-$(ask_secret "Пароль админа (мин. 8 символов)")}"
+  FAZER_KEY="${FAZER_KEY:-$(ask_secret "API-ключ FazerCards (Панель → Профиль)")}"
+  SUPPORT="${SUPPORT:-$(ask "Контакт поддержки для клиентов" "@donatix_support")}"
+  TG_TOKEN="${TG_TOKEN:-}"
+  TG_CHAT="${TG_CHAT:-}"
+  for v in DOMAIN ADMIN_EMAIL ADMIN_PASS FAZER_KEY; do
+    [ -n "${!v}" ] || { echo "Не задано $v. Пример: sudo DOMAIN=donatix.duckdns.org ADMIN_EMAIL=you@mail.com ADMIN_PASS=... FAZER_KEY=... bash install.sh"; exit 1; }
+  done
+  [ ${#ADMIN_PASS} -ge 8 ] || { echo "Пароль админа — минимум 8 символов."; exit 1; }
   SECRET=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
   sudo -u "$APP_USER" cp "$APP_DIR/donatix/.env.example" "$ENV_FILE"
   SECRET="$SECRET" DOMAIN="$DOMAIN" ADMIN_EMAIL="$ADMIN_EMAIL" ADMIN_PASS="$ADMIN_PASS" FAZER_KEY="$FAZER_KEY" \
