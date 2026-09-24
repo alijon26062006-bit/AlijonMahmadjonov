@@ -18,7 +18,7 @@
     <div><span class="muted">Создан</span><span>{{ view.created_at[:19] | replace('T', ' ') }} UTC</span></div>
     <div class="total"><span>Сумма</span><span>${{ view.total_usd }}</span></div>
   </div>
-  <div class="card">
+  <div class="card reveal">
     {% if st == 'processing' %}
       <h3>Выполняется…</h3>
       <p class="muted">Обычно это занимает несколько секунд. Страница обновится сама.</p>

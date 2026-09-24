@@ -14,7 +14,7 @@
 <form method="post" action="/panel/buy/{{ p.product_id }}" class="grid two" id="buy" style="align-items:start">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="idem" value="{{ idem }}">
-  <div class="card">
+  <div class="card reveal">
     <div class="step-head"><span class="n">1</span><h3>Получатель</h3></div>
     {% for f in p.fields %}
       <label for="f_{{ f.key }}">{{ f.label }} <span class="muted" aria-hidden="true">*</span></label>
@@ -42,7 +42,7 @@
     {% endif %}
   </div>
 
-  <div class="card">
+  <div class="card reveal">
     <h3>Сводка</h3>
     <p class="muted small">Цифры обновляются при вводе.</p>
     <div class="summary">

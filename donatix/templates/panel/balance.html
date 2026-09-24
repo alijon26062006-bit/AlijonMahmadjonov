@@ -3,8 +3,8 @@
 {% block content %}
 <section class="page-hero"><h1>Баланс</h1><p>Все заказы оплачиваются с баланса в долларах.</p></section>
 <div class="grid two">
-  <div class="stat"><div class="label">Доступно</div><div class="value">${{ fmt(user.balance_micro) }}</div></div>
-  <div class="card">
+  <div class="stat reveal"><div class="label">Доступно</div><div class="value">${{ fmt(user.balance_micro) }}</div></div>
+  <div class="card reveal">
     <h3>Как пополнить</h3>
     <ol>
       <li>Напишите в поддержку{% if support_contact %}: <b>{{ support_contact }}</b>{% endif %} — укажите ваш логин <code>{{ user.login }}</code> и сумму.</li>

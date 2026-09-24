@@ -24,9 +24,9 @@
     <div class="total"><span>Клиент заплатил</span><span>${{ fmt(o.total_micro) }}</span></div>
   </div>
   <div>
-    {% if delivery_pretty %}<div class="card"><h3>Выдача</h3><pre class="keybox">{{ delivery_pretty }}</pre></div>{% endif %}
+    {% if delivery_pretty %}<div class="card reveal"><h3>Выдача</h3><pre class="keybox">{{ delivery_pretty }}</pre></div>{% endif %}
     {% if o.status in ('processing', 'attention') %}
-    <div class="card">
+    <div class="card reveal">
       <h3>Действия</h3>
       <p class="muted small">Сначала проверьте заказ в панели FazerCards
         {% if o.supplier_order_id %}(номер <b class="mono">{{ o.supplier_order_id }}</b>){% else %}(ищите по получателю и времени){% endif %}.</p>

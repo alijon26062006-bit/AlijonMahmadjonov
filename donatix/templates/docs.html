@@ -8,12 +8,12 @@
 </section>
 
 <div class="grid two">
-  <div class="card"><div class="small muted">Базовый URL</div><code class="mono">{{ base_url }}/api/v1</code></div>
-  <div class="card"><div class="small muted">Аутентификация</div><code class="mono">X-API-Key: dx_live_…</code>
+  <div class="card reveal"><div class="small muted">Базовый URL</div><code class="mono">{{ base_url }}/api/v1</code></div>
+  <div class="card reveal"><div class="small muted">Аутентификация</div><code class="mono">X-API-Key: dx_live_…</code>
     <div class="hint">Или <code>Authorization: Bearer dx_live_…</code>. Ключ создаётся в панели → API.</div></div>
 </div>
 
-<div class="card">
+<div class="card reveal">
   <h2>Быстрый старт</h2>
   <p>1. Узнайте баланс:</p>
 <pre>curl -s {{ base_url }}/api/v1/balance -H "X-API-Key: $KEY"</pre>
@@ -43,7 +43,7 @@
   </table>
 </div>
 
-<div class="card">
+<div class="card reveal">
   <h2>Методы</h2>
   <div class="table-wrap"><table>
     <tr><th>Метод</th><th>Путь</th><th>Что делает</th></tr>
@@ -63,7 +63,7 @@
   <p class="hint">Полная схема: <a href="/api/swagger">Swagger</a> · <a href="/api/openapi.json">OpenAPI JSON</a></p>
 </div>
 
-<div class="card">
+<div class="card reveal">
   <h2>Поля заказа</h2>
   <p>У каждого товара есть список <code>fields</code> — что нужно передать в заказе:</p>
   <ul>
@@ -76,7 +76,7 @@
   <p>Для Telegram Stars <code>quantity</code> — количество звёзд, цена указана за одну звезду.</p>
 </div>
 
-<div class="card">
+<div class="card reveal">
   <h2>Ошибки</h2>
 <pre>{"ok": false, "error": "Недостаточно средств: нужно $1.6605, на балансе $0.5000.", "code": "insufficient_balance"}</pre>
   <div class="table-wrap"><table>
@@ -92,7 +92,7 @@
   <p class="hint">Лимиты: 60 заказов в минуту, 120 запросов каталога и статусов в минуту на аккаунт.</p>
 </div>
 
-<div class="card">
+<div class="card reveal">
   <h2>Webhook</h2>
   <p>Укажите адрес в панели → API. Когда заказ выполнится или отменится, мы пришлём POST:</p>
 <pre>POST https://your-site.com/donatix-hook
@@ -108,7 +108,7 @@ def valid(secret: str, timestamp: str, body: bytes, signature: str) -> bool:
     return hmac.compare_digest(mac.hexdigest(), signature)</pre>
 </div>
 
-<div class="card">
+<div class="card reveal">
   <h2>Пример: Python</h2>
 <pre>import uuid, requests
 

@@ -3,10 +3,10 @@
 {% block title %}Регистрация — {{ site_name }}{% endblock %}
 {% block body %}
 <main class="auth">
-  <div class="card">
+  <div class="card reveal">
     <a class="back" href="/">{{ icon('arrow-left', 18) }}На главную</a>
     <div class="auth-head">
-      <div class="tile">{{ icon('handshake', 26) }}</div>
+      <div class="tile g1">{{ icon("handshake", 24) }}</div>
       <div><h2>Стать партнёром</h2><p>Без абонентской платы — только за заказы</p></div>
     </div>
     {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}

@@ -1,6 +1,6 @@
 {% from "_icons.html" import kind_icon, status %}
 <a class="item" href="/panel/orders/{{ o.public_id }}">
-  <div class="tile">{{ kind_icon(o.kind, 24) }}</div>
+  <div class="tile k-{{ o.kind }}">{{ kind_icon(o.kind, 22) }}</div>
   <div class="grow">
     <div class="head"><span class="title">{{ o.public_id }}</span><span class="amount">${{ fmt(o.total_micro) }}</span></div>
     {% set f = o.fields_json | fromjson %}

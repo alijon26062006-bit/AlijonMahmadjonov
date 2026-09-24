@@ -8,7 +8,7 @@
   <p>{{ c.email }} · с {{ c.created_at[:10] }}{% if c.project %} · {{ c.project }}{% endif %}</p>
 </section>
 <div class="grid two">
-  <div class="card">
+  <div class="card reveal">
     <h3>Доступ и цены</h3>
     <form method="post" action="/admin/users/{{ c.id }}">
       <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -26,7 +26,7 @@
       <button class="btn primary" style="margin-top:12px">Сохранить</button>
     </form>
   </div>
-  <div class="card">
+  <div class="card reveal">
     <h3>Баланс: ${{ fmt(c.balance_micro) }}</h3>
     <form method="post" action="/admin/users/{{ c.id }}/balance">
       <input type="hidden" name="csrf" value="{{ csrf }}">

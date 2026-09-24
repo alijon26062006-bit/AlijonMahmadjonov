@@ -80,6 +80,17 @@
     els.forEach(function (e, i) { e.style.transitionDelay = (i % 4) * 70 + "ms"; io.observe(e); });
   })();
   (function () {
+    if (!matchMedia("(hover: hover)").matches) return;
+    document.querySelectorAll(".card, .item, .link-row, .product-card").forEach(function (el) {
+      el.classList.add("spot");
+      el.addEventListener("pointermove", function (e) {
+        var r = el.getBoundingClientRect();
+        el.style.setProperty("--mx", e.clientX - r.left + "px");
+        el.style.setProperty("--my", e.clientY - r.top + "px");
+      });
+    });
+  })();
+  (function () {
     var b = document.querySelector(".to-top");
     addEventListener("scroll", function () { b.classList.toggle("show", scrollY > 600); }, { passive: true });
   })();

@@ -521,3 +521,110 @@ html { background: var(--bg); }
   .aurora span, .btn.primary::after, .grad, .page-hero::before, .float-chip, .marquee .track, .live-dot, .feed .item { animation: none !important; }
   .js .reveal { opacity: 1; transform: none; }
 }
+
+/* ══ Компактнее и с блеском ═══════════════════════════════════════════════ */
+body { font-size: 15px; }
+h1 { font-size: clamp(1.7rem, 4.2vw, 2.6rem); }
+h2 { font-size: clamp(1.25rem, 2.8vw, 1.75rem); }
+h3 { font-size: 1.02rem; }
+.hero { padding: 40px 0 16px; }
+.hero h1 { font-size: clamp(1.9rem, 4.6vw, 3rem); line-height: 1.08; }
+.hero .lead { font-size: 1.02rem; }
+.page-hero { padding: 20px; margin: 16px 0; }
+.page-hero h1 { font-size: clamp(1.45rem, 3.4vw, 1.9rem); }
+.page-hero p { font-size: .95rem; }
+.card { padding: 18px; border-radius: 18px; }
+.stat { padding: 16px; }
+.stat .value { font-size: 1.5rem; }
+.btn { min-height: 44px; padding: 10px 18px; border-radius: 12px; font-size: .95rem; }
+.btn.lg { min-height: 50px; font-size: 1rem; padding: 12px 22px; }
+.btn.sm { min-height: 36px; padding: 7px 12px; font-size: .88rem; }
+input, select, textarea { min-height: 46px; padding: 11px 14px; border-radius: 12px; }
+.icon-btn { width: 40px; height: 40px; border-radius: 12px; }
+.top .wrap, .top .bar { height: 60px; }
+.logo { width: 34px; height: 34px; }
+.tile { width: 44px; height: 44px; border-radius: 12px; }
+.tile.sm { width: 36px; height: 36px; border-radius: 10px; }
+.item { padding: 13px 14px; border-radius: 16px; }
+.link-row { padding: 13px 16px; }
+.link-row .go { width: 34px; height: 34px; border-radius: 10px; }
+.side a.nav-item { padding: 9px 12px; }
+.summary > div { padding: 12px 14px; }
+.pack { min-height: 62px; padding: 11px 14px; }
+.cur { min-height: 48px; }
+.pick { min-height: 56px; padding: 11px 14px; }
+.status { width: 26px; height: 26px; }
+.section { padding: 36px 0; }
+.price-card .big { font-size: 2.4rem; }
+.numbers .n { font-size: 1.9rem; }
+@media (max-width: 860px) { .side a.nav-item { padding: 13px 14px; font-size: 1rem; } }
+
+/* Глянцевый блик на стеклянных поверхностях */
+.card, .stat, .item, .link-row, .product-card, .pick, .balance-card, .page-hero {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 1px 2px rgba(17, 18, 26, .04), 0 10px 30px -12px rgba(76, 29, 149, .18);
+}
+:root[data-theme="dark"] .card, :root[data-theme="dark"] .stat, :root[data-theme="dark"] .item,
+:root[data-theme="dark"] .link-row, :root[data-theme="dark"] .product-card, :root[data-theme="dark"] .pick,
+:root[data-theme="dark"] .balance-card, :root[data-theme="dark"] .page-hero {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 10px 30px -12px rgba(0, 0, 0, .6);
+}
+
+/* Светящаяся переливающаяся рамка */
+@property --ang { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.shine-border, .page-hero, .price-card.featured, .balance-card, .summary > div.total, .stat.ok {
+  border: 1px solid transparent !important;
+  background:
+    linear-gradient(var(--glass), var(--glass)) padding-box,
+    conic-gradient(from var(--ang), #a78bfa, #60a5fa, #f0abfc, #818cf8, #a78bfa) border-box !important;
+  animation: spin-border 6s linear infinite;
+}
+.summary > div.total { background:
+    linear-gradient(var(--accent-soft), var(--accent-soft)) padding-box,
+    conic-gradient(from var(--ang), #a78bfa, #60a5fa, #f0abfc, #818cf8, #a78bfa) border-box !important; }
+@keyframes spin-border { to { --ang: 360deg; } }
+
+/* Блестящие цифры */
+.stat .value, .balance-card b, .amount:not(.plus):not(.minus), .product-card .price, .price-card .big {
+  background: linear-gradient(100deg, var(--text) 0%, var(--text) 40%, #a78bfa 50%, var(--text) 60%, var(--text) 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: glint 5s ease-in-out infinite;
+}
+.product-card .price, .price-card .big { background-image: linear-gradient(100deg, #7c3aed 0%, #7c3aed 40%, #f0abfc 50%, #7c3aed 60%, #7c3aed 100%); }
+@keyframes glint { 0%, 60% { background-position: 100% 0; } 100% { background-position: -150% 0; } }
+
+/* Прожектор под курсором на карточках */
+@media (hover: hover) {
+  .card, .item, .link-row, .product-card, .pick { position: relative; }
+  .spot::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .3s;
+    background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%);
+  }
+  .spot:hover::before { opacity: 1; }
+}
+
+/* Активный пункт меню — градиент со свечением */
+.side a.nav-item.on {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #fff; border-color: transparent;
+  box-shadow: 0 8px 22px -8px rgba(124, 58, 237, .7);
+}
+.side a.nav-item.on .ico, .side a.nav-item.on .chev { color: #fff; opacity: 1; }
+
+/* Иконки товаров в цвете по виду */
+.tile.k-telegram_stars, .tile.k-telegram_premium { background: linear-gradient(135deg, #38bdf8, #2563eb); color: #fff; border: 0; }
+.tile.k-steam_topup, .tile.k-steam_gift { background: linear-gradient(135deg, #334155, #0b0f19); color: #fff; border: 0; }
+.tile.k-topup { background: linear-gradient(135deg, #fbbf24, #ea580c); color: #fff; border: 0; }
+.tile.k-gift_card { background: linear-gradient(135deg, #f472b6, #c026d3); color: #fff; border: 0; }
+.tile.ok { background: linear-gradient(135deg, #34d399, #059669); color: #fff; border: 0; }
+.tile.bad { background: linear-gradient(135deg, #fb7185, #e11d48); color: #fff; border: 0; }
+
+/* Выбранные элементы — со свечением */
+.pack.on, .cur.on, .pick.on { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent), 0 10px 24px -12px rgba(124, 58, 237, .6); }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent), 0 8px 20px -10px rgba(124, 58, 237, .5); }
+
+@media (prefers-reduced-motion: reduce) {
+  .shine-border, .page-hero, .price-card.featured, .balance-card, .summary > div.total, .stat.ok,
+  .stat .value, .balance-card b, .amount, .product-card .price, .price-card .big { animation: none !important; }
+}
+.grid.stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.grid.stats .stat .value { font-size: 1.3rem; }
+.pack b .ico { color: #f59e0b; fill: #fde68a; }

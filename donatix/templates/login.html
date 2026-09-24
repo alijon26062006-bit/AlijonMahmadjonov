@@ -3,10 +3,10 @@
 {% block title %}Вход — {{ site_name }}{% endblock %}
 {% block body %}
 <main class="auth">
-  <div class="card">
+  <div class="card reveal">
     <a class="back" href="/">{{ icon('arrow-left', 18) }}На главную</a>
     <div class="auth-head">
-      <div class="tile">{{ icon('grid', 26) }}</div>
+      <div class="tile g1">{{ icon("grid", 24) }}</div>
       <div><h2>Вход в панель</h2><p>Введите почту и пароль для доступа</p></div>
     </div>
     {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}

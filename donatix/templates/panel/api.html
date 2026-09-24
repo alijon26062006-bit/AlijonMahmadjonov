@@ -4,14 +4,14 @@
 <section class="page-hero"><h1>API и webhook</h1><p>Подключите свой сайт или бота. <a href="/docs">Документация</a></p></section>
 
 {% if new_key %}
-<div class="card" style="border-color:var(--accent)">
+<div class="card reveal" style="border-color:var(--accent)">
   <h3>Новый ключ создан</h3>
   <p class="muted">Скопируйте его сейчас — позже увидеть ключ целиком будет нельзя.</p>
   <pre class="keybox">{{ new_key }}</pre>
 </div>
 {% endif %}
 
-<div class="card">
+<div class="card reveal">
   <h3>API-ключи</h3>
   {% if user.status != 'active' %}
     <p class="muted">Ключи можно создать после активации аккаунта.</p>
@@ -41,7 +41,7 @@
   </table></div>
 </div>
 
-<div class="card">
+<div class="card reveal">
   <h3>Webhook</h3>
   <p class="muted">Куда присылать уведомления, когда заказ выполнен или отменён. Необязательно.</p>
   <form method="post" action="/panel/api/webhook">

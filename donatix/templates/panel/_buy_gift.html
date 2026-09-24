@@ -14,22 +14,22 @@
   <input type="hidden" name="field_region" id="h-region" value="{{ form.get('region', '') }}">
 
   <div class="stack">
-    <div class="card">
+    <div class="card reveal">
       <label for="g-q" style="margin-top:0">Поиск игры по названию или ID</label>
       <input id="g-q" type="search" placeholder="Введите название или AppID…" autocomplete="off">
     </div>
 
-    <div class="card">
+    <div class="card reveal">
       <div class="step-head"><span class="n">1</span><h3 class="grow-title">Игры</h3></div>
       <div class="pick-list" id="g-games" aria-live="polite"><div class="empty">Загрузка…</div></div>
     </div>
 
-    <div class="card">
+    <div class="card reveal">
       <div class="step-head"><span class="n">2</span><h3 class="grow-title">Издание</h3></div>
       <div class="pick-list" id="g-editions"><div class="empty small">Выберите игру, чтобы увидеть издания</div></div>
     </div>
 
-    <div class="card">
+    <div class="card reveal">
       <div class="step-head"><span class="n">3</span><h3 class="grow-title">Регион и цена</h3></div>
       <label for="g-rq" class="label-caps" style="margin-top:14px">Поиск региона</label>
       <input id="g-rq" type="search" placeholder="Страна или код ISO (KZ, UZ)…" autocomplete="off">
