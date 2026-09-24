@@ -368,7 +368,14 @@ def pay_settings(request: Request, admin=Depends(admin_user), conn=Depends(get_c
     from . import payments
     return render(request, "admin/pay_settings.html", {
         "user": admin, "conf": payments.settings(conn, config), "currencies": payments.CURRENCY_CHOICES,
+        "rate": _rate_status(conn, config),
     })
+
+
+def _rate_status(conn, config: Config) -> dict:
+    from . import rates
+    rates.refresh(conn, config, rates.WORKER_SECONDS)
+    return rates.status(conn, config)
 
 
 @router.post("/pay-settings", dependencies=[Depends(check_csrf)])
@@ -382,7 +389,11 @@ async def pay_settings_save(request: Request, admin=Depends(admin_user), conn=De
                     | {"enabled": form.get(f"m{i}_enabled") == "1", "delete": form.get(f"m{i}_delete") == "1"})
     try:
         payments.save_settings(conn, config, rows, str(form.get("tjs_rate", "")), str(form.get("min_tjs", "")),
-                               str(form.get("low_usd", "")))
+                               str(form.get("low_usd", "")), rate_auto=form.get("rate_auto") == "1",
+                               margin_pct=str(form.get("rate_margin", "")))
+        from . import rates
+        if form.get("rate_auto") == "1":
+            rates.refresh(conn, config, force=True)
     except payments.PaymentError as exc:
         flash(request, str(exc), "error")
     else:

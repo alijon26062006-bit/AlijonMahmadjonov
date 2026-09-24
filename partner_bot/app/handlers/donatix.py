@@ -230,21 +230,64 @@ async def receipt_wrong(message: Message) -> None:
     await message.answer("Пришлите чек фото или файлом PDF. Отменить — /donatix.")
 
 
+RATE_BACKGROUND = 300  # фоном — раз в 5 минут
+RATE_PAYMENT = 30      # когда покупатель платит или смотрит цены — не старше 30 секунд
+_rate_at = 0.0
+
+
+async def sync_rate(conn, max_age: float = RATE_BACKGROUND) -> bool:
+    """Курс доллара — тот же, что у Donatix: по нему владелец платит за товары.
+
+    Свой поиск курса у бота при этом выключается, иначе два курса спорили бы
+    и цены в сомони уходили бы в минус. Donatix не ответил — остаётся прежний.
+    """
+    import time
+    from datetime import datetime, timezone
+
+    from app import runtime
+    global _rate_at
+    if not enabled() or time.monotonic() - _rate_at < max_age:
+        return False
+    _rate_at = time.monotonic()
+    try:
+        rate = (await _call("GET", "/api/v1/payments/methods")).get("tjs_rate")
+        diram = round(float(rate) * 100)
+    except (DonatixError, TypeError, ValueError) as exc:
+        log.info("Donatix: курс не обновлён: %s", exc)
+        return False
+    if diram <= 0:
+        return False
+    if runtime.get_bool("usd_auto"):
+        await runtime.set_value(conn, "usd_auto", "0")
+    if diram == runtime.usd_rate():
+        return False
+    await runtime.set_value(conn, "usd_rate_diram", str(diram))
+    await runtime.set_value(conn, "usd_rate_source", "Donatix")
+    await runtime.set_value(conn, "usd_rate_at", datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    log.info("Donatix: курс %s сомони", rate)
+    return True
+
+
+async def rate_loop(conn) -> None:
+    import asyncio
+    while True:
+        await asyncio.sleep(RATE_BACKGROUND)
+        try:
+            await sync_rate(conn, RATE_BACKGROUND - 5)
+        except Exception:  # noqa: BLE001 — фон не должен падать
+            log.exception("Donatix: курс")
+
+
 async def bootstrap(conn, provider) -> None:
     """Первый запуск бота из конструктора: курс доллара и все игры — сами."""
     import asyncio
 
-    from app import runtime
     from app.services import autogames, suppliers
     from app.services import games as gsvc
 
     await asyncio.sleep(3)
     try:
-        if runtime.usd_rate() <= 0:
-            rate = (await _call("GET", "/api/v1/payments/methods")).get("tjs_rate")
-            if rate:
-                await runtime.set_value(conn, "usd_rate_diram", str(round(float(rate) * 100)))
-                log.info("Donatix: курс доллара %s сомони", rate)
+        await sync_rate(conn, 0)
         from app import db
         if not await db.list_games(conn):
             catalog = await gsvc.full_catalog(suppliers.for_games(provider))
@@ -252,3 +295,4 @@ async def bootstrap(conn, provider) -> None:
             log.info("Donatix: добавлено игр %s, включено %s", added, enabled)
     except Exception:  # noqa: BLE001 — бот работает и без этого, владелец добавит вручную
         log.exception("Donatix: первичная настройка не удалась")
+    await rate_loop(conn)

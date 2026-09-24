@@ -123,6 +123,11 @@ class Worker:
                     log.exception("обновление каталога")
                     last_sync = now  # не долбим поставщика при ошибке
                 try:
+                    from . import rates
+                    rates.refresh(conn, self.config, rates.WORKER_SECONDS)
+                except Exception:
+                    log.exception("курс")
+                try:
                     orders.process_pending(conn, self.supplier)
                     webhooks.deliver_pending(conn)
                     if now - last_balance >= 300 or last_balance == 0:

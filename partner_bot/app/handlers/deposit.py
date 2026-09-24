@@ -254,6 +254,9 @@ async def on_amount(
         )
         return
 
+    from app.handlers import donatix
+    await donatix.sync_rate(conn, donatix.RATE_PAYMENT)  # сумма в USDT — по свежему курсу
+
     # Код платежа нужен, чтобы найти перевод в выписке, даже если чек
     # придёт позже или не придёт вовсе.
     reference = dcpay.make_reference()

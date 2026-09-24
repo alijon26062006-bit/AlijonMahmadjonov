@@ -313,7 +313,8 @@ class PaymentIn(BaseModel):
 @router.get("/payments/methods")
 def payment_methods(request: Request, user=Depends(api_user), conn=Depends(get_conn),
                     config: Config = Depends(get_config)) -> dict[str, Any]:
-    from . import payments
+    from . import payments, rates
+    rates.refresh(conn, config, rates.PAYMENT_SECONDS)
     conf = payments.settings(conn, config)
     return {"ok": True, "methods": payments.methods(conn, config), "tjs_rate": str(conf["tjs_rate"]),
             "min_tjs": str(conf["min_tjs"]), "min_usd": str(conf["min_usd"])}
@@ -323,8 +324,9 @@ def payment_methods(request: Request, user=Depends(api_user), conn=Depends(get_c
 def payment_create(body: PaymentIn, request: Request, user=Depends(api_user), conn=Depends(get_conn),
                    config: Config = Depends(get_config)):
     """Заявка на пополнение: вернёт реквизиты и сумму к переводу. Потом — POST /payments/{id}/receipt с чеком."""
-    from . import payments
+    from . import payments, rates
     _limit(request, "account", str(user["id"]))
+    rates.refresh(conn, config, rates.PAYMENT_SECONDS)
     try:
         pid = payments.create(conn, config, user, body.method, body.amount_usd, body.reference,
                               amount_tjs=body.amount_tjs)

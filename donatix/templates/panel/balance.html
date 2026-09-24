@@ -7,7 +7,7 @@
 <div class="grid two" style="align-items:start">
   <div class="stack">
     <div class="stat reveal"><div class="label">Доступно</div><div class="value">${{ fmt(user.balance_micro) }}</div>
-      <div class="note">Курс для оплаты в сомони: 1 USD = {{ tjs_rate }} TJS</div></div>
+      <div class="note">Курс для оплаты в сомони: 1 USD = <b id="rate">{{ tjs_rate }}</b> TJS <span class="muted small" id="rate-at">· обновляется каждые 30 с</span></div></div>
 
     <form class="card reveal" method="post" action="/panel/balance" id="payform" enctype="multipart/form-data">
       <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -83,6 +83,16 @@
       (r.dataset.cur === "TJS" ? (Math.ceil(a * rate * 100) / 100).toFixed(2) + " TJS" : a.toFixed(2) + " " + r.dataset.cur);
   }
   f.addEventListener("input", upd); f.addEventListener("change", upd); upd();
+  // Курс меняется — пока клиент на странице, берём свежий каждые 30 секунд
+  setInterval(function () {
+    if (document.hidden) return;
+    fetch("/panel/data/rate", {credentials: "same-origin"}).then(function (r) { return r.json(); }).then(function (d) {
+      var nr = parseFloat(d.tjs_rate); if (!nr) return;
+      rate = nr; document.getElementById("rate").textContent = d.tjs_rate;
+      var t = new Date(); document.getElementById("rate-at").textContent = "· обновлён в " + t.toLocaleTimeString("ru-RU");
+      upd();
+    }).catch(function () {});
+  }, 30000);
 })();
 </script>
 {% endblock %}

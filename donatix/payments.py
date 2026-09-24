@@ -88,15 +88,23 @@ def settings(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
 
 
 def save_settings(conn: sqlite3.Connection, config: Config, methods_in: list[dict[str, Any]], tjs_rate: str,
-                  min_tjs: str, low_usd: str) -> None:
+                  min_tjs: str, low_usd: str, *, rate_auto: bool | None = None, margin_pct: str = "") -> None:
+    from . import rates
     try:
         rate = to_decimal(tjs_rate.replace(",", "."))
         minimum = to_decimal(min_tjs.replace(",", "."))
         low = to_decimal(low_usd.replace(",", ".") or "0")
+        margin = to_decimal(margin_pct.replace(",", ".")) if margin_pct.strip() else rates.margin_pct(conn, config)
     except MoneyError:
-        raise PaymentError("Курс, минимум и порог — числа.") from None
+        raise PaymentError("Курс, минимум, запас и порог — числа.") from None
     if rate <= 0 or minimum <= 0 or low < 0:
         raise PaymentError("Курс и минимум должны быть больше нуля.")
+    if not Decimal("-5") <= margin <= Decimal("20"):
+        raise PaymentError("Запас к курсу — от -5 до 20 %.")
+    auto = rates.auto_enabled(conn, config) if rate_auto is None else rate_auto
+    market = db.get_setting(conn, "pay.rate_market")
+    if auto and market:
+        rate = rates.apply_margin(Decimal(market), margin)  # курс считает автоматика, поле только показывает
     clean, seen = [], set()
     for m in methods_in:
         title = str(m.get("title", "")).strip()[:60]
@@ -119,6 +127,10 @@ def save_settings(conn: sqlite3.Connection, config: Config, methods_in: list[dic
         db.set_setting(conn, "pay.tjs_rate", str(rate))
         db.set_setting(conn, "pay.min_tjs", str(minimum))
         db.set_setting(conn, "pay.low_balance_usd", str(low))
+        db.set_setting(conn, "pay.rate_auto", "1" if auto else "0")
+        db.set_setting(conn, "pay.rate_margin_pct", str(margin))
+        if auto and not market:
+            db.set_setting(conn, "pay.rate_ts", "0")  # взять курс при первом же запросе
 
 
 def title_for(conn: sqlite3.Connection, config: Config, code: str) -> str:

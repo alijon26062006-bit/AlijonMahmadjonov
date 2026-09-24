@@ -41,6 +41,9 @@ async def offers_of(
     for_owner — показать и скрытые: в панели их надо видеть, чтобы
     вернуть обратно.
     """
+    if conn is not None:
+        from app.handlers import donatix
+        await donatix.sync_rate(conn, donatix.RATE_PAYMENT)  # цена в сомони — по курсу не старше 30 с
     raw = await svc.offers_raw(provider, game.category_id, cached)
     margin = svc.margin_of(game)
     setup = await db.game_offers_setup(conn, game.category_id) if conn else {}

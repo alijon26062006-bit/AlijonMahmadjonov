@@ -14,7 +14,13 @@
         <input id="min_tjs" name="min_tjs" inputmode="decimal" required value="{{ conf.min_tjs }}">
         <div class="hint">≈ ${{ conf.min_usd }} по курсу</div></div>
       <div><label for="tjs_rate">Курс: сомони за 1 $</label>
-        <input id="tjs_rate" name="tjs_rate" inputmode="decimal" required value="{{ conf.tjs_rate }}"></div>
+        <input id="tjs_rate" name="tjs_rate" inputmode="decimal" required value="{{ conf.tjs_rate }}" {{ 'readonly' if rate.auto and rate.market }}>
+        <div class="hint">{% if rate.auto and rate.market %}Рынок {{ rate.market }} + запас {{ rate.margin_pct }}% · {{ rate.source }}{% if rate.age_seconds is not none %} · {{ rate.age_seconds // 60 }} мин назад{% endif %}{% elif rate.auto %}Курс ещё не получен — пока действует этот{% else %}Задаётся вручную{% endif %}</div>
+        {% if rate.auto and rate.error %}<div class="hint" style="color:var(--bad, #c0392b)">⚠️ Последнее обновление не удалось, держим прежний курс</div>{% endif %}</div>
+      <div><label for="rate_margin">Запас к курсу, %</label>
+        <input id="rate_margin" name="rate_margin" inputmode="decimal" value="{{ rate.margin_pct }}">
+        <label class="switch" style="margin-top:8px"><input type="checkbox" name="rate_auto" value="1" {{ 'checked' if rate.auto }}><span>Курс автоматически (каждые 5 мин)</span></label>
+        <div class="hint">Запас покрывает разницу с курсом банков — чтобы не уйти в минус</div></div>
       <div><label for="low_usd">Предупреждать клиента, если на балансе меньше, $</label>
         <input id="low_usd" name="low_usd" inputmode="decimal" value="{{ conf.low_usd }}">
         <div class="hint">0 — не предупреждать</div></div>

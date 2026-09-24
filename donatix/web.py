@@ -431,7 +431,8 @@ def panel_transactions(request: Request, type: str = "", page: int = 1,
 @router.get("/panel/balance")
 def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
                   config: Config = Depends(get_config)):
-    from . import payments
+    from . import payments, rates
+    rates.refresh(conn, config, rates.PAYMENT_SECONDS)
     rows = conn.execute("SELECT * FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user["id"],)).fetchall()
     conf = payments.settings(conn, config)
     return render(request, "panel/balance.html", {
@@ -439,6 +440,17 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
         "min_usd": conf["min_usd"], "min_tjs": conf["min_tjs"],
         "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()} | {m["code"]: m["title"] for m in conf["all_methods"]},
     })
+
+
+@router.get("/panel/data/rate")
+def panel_rate(user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Страница оплаты спрашивает курс каждые 30 секунд."""
+    from . import payments, rates
+    rates.refresh(conn, config, rates.PAYMENT_SECONDS)
+    conf = payments.settings(conn, config)
+    st = rates.status(conn, config)
+    return JSONResponse({"tjs_rate": str(conf["tjs_rate"]), "min_usd": str(conf["min_usd"]),
+                         "auto": st["auto"], "age_seconds": st["age_seconds"]})
 
 
 @router.post("/panel/balance", dependencies=[Depends(check_csrf)])
@@ -449,7 +461,9 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     from . import payments
     from .tgbot import payment_event, send_receipt
     from .worker import notify_event
+    from . import rates
     data = receipt.file.read(payments.MAX_RECEIPT_BYTES + 1) if receipt and receipt.filename else b""
+    rates.refresh(conn, config, rates.PAYMENT_SECONDS)  # сумма к переводу — по свежему курсу
     try:
         with db.tx(conn):
             pid = payments.create(conn, config, user, method, amount, reference)

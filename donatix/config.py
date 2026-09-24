@@ -94,6 +94,9 @@ class Config:
     pay_methods: dict[str, str] = field(default_factory=dict)
     # Курс сомони за 1 USD — для способов оплаты в TJS.
     tjs_rate: Decimal = Decimal("10.9")
+    # Курс берётся сам из открытых источников (каждые 5 минут, на странице оплаты — каждые 30 с)
+    rate_auto: bool = True
+    rate_margin_pct: Decimal = Decimal("1")
     pay_min_usd: Decimal = Decimal("5")
     # Минимальное пополнение в сомони и порог «мало денег» на балансе клиента, $
     pay_min_tjs: Decimal = Decimal("500")
@@ -164,6 +167,8 @@ class Config:
             internal_url=_env("DONATIX_INTERNAL_URL") or "http://127.0.0.1:8000",
             pay_methods=pay_methods,
             tjs_rate=Decimal(_env("DONATIX_TJS_RATE", "10.9")),
+            rate_auto=_env("DONATIX_RATE_AUTO", "1") not in ("0", "false", "no"),
+            rate_margin_pct=Decimal(_env("DONATIX_RATE_MARGIN", "1")),
             pay_min_usd=Decimal(_env("DONATIX_PAY_MIN_USD", "5")),
             pay_min_tjs=Decimal(_env("DONATIX_PAY_MIN_TJS", "500")),
             low_balance_usd=Decimal(_env("DONATIX_LOW_BALANCE_USD", "10")),

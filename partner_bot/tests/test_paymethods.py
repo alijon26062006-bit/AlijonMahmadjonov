@@ -69,6 +69,20 @@ async def main() -> None:
     check("сеть и сумма в USDT", "Tron (TRC20)" in body and "100.00 USDT" in body and "Только в сети" in body, body)
     copy = [b_ for row in markup.inline_keyboard for b_ in row if b_.copy_text]
     check("копируется адрес", copy and copy[0].copy_text.text == trc)
+
+    # Курс — тот же, что у Donatix; свой поиск курса выключается
+    from app.handlers import donatix
+    calls = []
+
+    async def fake_call(method, path, **kw):
+        calls.append(path)
+        return {"ok": True, "tjs_rate": "10.75"}
+    donatix._call, real_call = fake_call, donatix._call
+    await runtime.set_value(conn, "usd_auto", "1")
+    check("курс взят у Donatix", await donatix.sync_rate(conn, 0) and runtime.usd_rate() == 1075)
+    check("свой поиск курса выключен", not runtime.get_bool("usd_auto"))
+    check("не чаще, чем раз в 30 с", not await donatix.sync_rate(conn, donatix.RATE_PAYMENT) and len(calls) == 1)
+    donatix._call = real_call
     await conn.close()
 
 

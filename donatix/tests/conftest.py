@@ -24,6 +24,7 @@ def config(tmp_path):
         admin_password="adminpass123",
         run_worker=False,
         base_url="http://testserver",
+        rate_auto=False,
     )
 
 
@@ -86,7 +87,8 @@ def web_login(client, email, password):
 
 @pytest.fixture(autouse=True)
 def _reset_account_check():
-    from donatix import account_check, cache
+    from donatix import account_check, cache, rates
     account_check.reset()
     cache.clear()
+    rates.reset()
     yield
