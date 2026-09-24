@@ -342,12 +342,20 @@ case "\${1:-help}" in
         case "\${2:-help}" in
             login)
                 # Первый вход делается руками: Telegram пришлёт код.
+                # Служба на это время стоит: два процесса на одном файле
+                # сеанса мешают друг другу, и вход срывается.
+                WAS_ON=false
+                systemctl is-active --quiet "\$UB" && WAS_ON=true
+                systemctl stop "\$UB" 2>/dev/null || true
                 echo "Telegram пришлёт код в ваш же Telegram. Введите его здесь."
                 # Запускать обязательно из папки бота: «python -m app...»
                 # ищет пакет в текущем каталоге, а службы выше спасает
                 # WorkingDirectory в unit-файле — здесь его нет.
                 ( cd "\$APP" && sudo -u "\$RUN_USER" \
-                    "\$APP/.venv/bin/python" -m app.userbot.login )
+                    "\$APP/.venv/bin/python" -m app.userbot.login ) || true
+                if \$WAS_ON || systemctl is-enabled --quiet "\$UB" 2>/dev/null; then
+                    systemctl start "\$UB" && echo "✅ Юзербот снова запущен"
+                fi
                 ;;
             start)   systemctl enable --now "\$UB" && echo "✅ Юзербот запущен" ;;
             stop)    systemctl disable --now "\$UB" && echo "⏹  Юзербот остановлен" ;;
