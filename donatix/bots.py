@@ -63,7 +63,20 @@ def check_token(token: str, transport: httpx.BaseTransport | None = None) -> str
         raise BotError("Не удалось связаться с Telegram, попробуйте ещё раз.") from exc
     if not data.get("ok"):
         raise BotError("Telegram не принял токен — скопируйте его у @BotFather ещё раз.")
-    return str(data["result"].get("username") or "")
+    username = str(data["result"].get("username") or "")
+    # Этот бот уже где-то запущен? Тогда Telegram отвечает Conflict, и две программы
+    # будут отвечать клиентам дважды. limit=1 без offset — чужие сообщения не забираем.
+    try:
+        with httpx.Client(timeout=15, transport=transport) as c:
+            r = c.get(f"https://api.telegram.org/bot{token}/getUpdates", params={"limit": 1, "timeout": 0})
+        busy = r.status_code == 409
+    except httpx.HTTPError:
+        busy = False
+    if busy:
+        raise BotError(f"Бот @{username} уже запущен в другой программе (например, старый бот на сервере). "
+                       "Остановите её или создайте для конструктора новый бот у @BotFather — иначе он будет "
+                       "отвечать дважды.")
+    return username
 
 
 def parse_admin_ids(raw: str) -> str:

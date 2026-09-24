@@ -19,6 +19,16 @@ def _tg(ok=True):
     return httpx.MockTransport(lambda req: httpx.Response(200, json=body))
 
 
+def test_token_already_running_elsewhere():
+    def handler(req):
+        if req.url.path.endswith("/getMe"):
+            return httpx.Response(200, json={"ok": True, "result": {"username": "busy_bot"}})
+        body = {"ok": False, "description": "Conflict: terminated by other getUpdates request"}
+        return httpx.Response(409, json=body)
+    with pytest.raises(bots.BotError, match="уже запущен"):
+        bots.check_token(TOKEN, transport=httpx.MockTransport(handler))
+
+
 def test_check_token():
     assert bots.check_token(TOKEN, transport=_tg()) == "shop_test_bot"
     with pytest.raises(bots.BotError):
