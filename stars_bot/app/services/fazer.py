@@ -94,8 +94,9 @@ ORDER_TIMEOUT = aiohttp.ClientTimeout(total=20, connect=6)
 # а незнакомое считаем «ещё в работе»: соврать клиенту дороже, чем подождать.
 DONE = {"completed", "complete", "done", "delivered", "success", "successful",
         "fulfilled", "finished", "paid", "ok"}
-FAILED = {"failed", "fail", "error", "cancelled", "canceled", "rejected",
-          "declined", "refunded", "expired"}
+FAILED = {"failed", "fail", "error", "cancelled", "canceled", "cancel",
+          "rejected", "declined", "refund", "refunded", "refunding",
+          "returned", "reversed", "expired", "void", "voided"}
 PENDING = {"pending", "processing", "in_progress", "inprogress", "queued",
            "new", "created", "accepted", "waiting", "running", "fulfilling"}
 

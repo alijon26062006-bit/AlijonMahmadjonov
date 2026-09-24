@@ -78,8 +78,12 @@ TIMEOUT_MARK = "таймаут:"
 AFTER_REFUND_HOURS = 6
 
 DONE = {"completed", "complete", "done", "delivered", "success", "fulfilled"}
-FAILED = {"failed", "fail", "error", "cancelled", "canceled", "rejected",
-          "refunded", "expired"}
+# «refund» — так FazerCards помечает заказ, который отменил сам и вернул
+# деньги на счёт. Без этого слова бот считал такой заказ «в работе» и
+# держал клиента 20 минут до возврата по таймауту.
+FAILED = {"failed", "fail", "error", "cancelled", "canceled", "cancel",
+          "rejected", "declined", "refund", "refunded", "refunding",
+          "returned", "reversed", "expired", "void", "voided"}
 
 
 def offer_price(usd: Decimal, margin: int) -> int:
@@ -384,7 +388,21 @@ async def check(
         return "done"
 
     if status in FAILED:
-        await _refund(bot, conn, order, f"поставщик вернул статус {status}")
+        why = _reason_of(remote)
+        if await _refund(bot, conn, order, f"поставщик вернул статус {status}"
+                         + (f": {why}" if why else "")):
+            await delivery.notify_admins(
+                bot,
+                "⚠️ <b>Поставщик отменил игровой заказ</b>\n"
+                f"├ Заказ: <code>{order.id}</code> — {order.title}\n"
+                f"├ У поставщика: <code>{order.fragment_order_id}</code> · {status}\n"
+                f"├ ID игрока: <code>{order.recipient}</code>\n"
+                f"└ Клиенту вернули <b>{fmt(order.price)}</b>\n"
+                + (f"\n<blockquote>{why[:300]}</blockquote>\n" if why else "")
+                + "\n<blockquote>Если так отменяются все заказы этой игры — "
+                "проблема у поставщика: напишите ему с номерами заказов, а "
+                "пока уберите игру из меню (панель → 🕹 Игры).</blockquote>",
+            )
         return "failed"
 
     if _minutes_waiting(order) >= timeout_minutes():
@@ -536,9 +554,23 @@ def _minutes_waiting(order: db.Order) -> int:
     return int((datetime.now(timezone.utc) - created).total_seconds() // 60)
 
 
+def _reason_of(remote) -> str:
+    """Причину отмены поставщик кладёт в разные поля — берём первую."""
+    if not isinstance(remote, dict):
+        return ""
+    for key in ("error", "reason", "message", "comment", "note"):
+        value = remote.get(key)
+        if isinstance(value, dict):
+            value = value.get("message") or value.get("code")
+        if value:
+            return str(value).strip()
+    return ""
+
+
 async def _refund(
     bot: Bot, conn: aiosqlite.Connection, order: db.Order, reason: str,
-) -> None:
+) -> bool:
+    """Вернуть деньги. False — заказ уже закрыл кто-то другой."""
     from app import texts
     from app.services import delivery
 
@@ -546,7 +578,7 @@ async def _refund(
         conn, order.id, expected=order.status, new=db.ORDER_REFUNDED,
         error=reason[:1000],
     ):
-        return
+        return False
     await delivery._give_back(conn, await db.get_order(conn, order.id) or order)
     await delivery.tell_buyer(
         bot, conn, order,
@@ -555,6 +587,7 @@ async def _refund(
         ),
     )
     log.warning("Игры: заказ %s возвращён — %s", order.id, reason)
+    return True
 
 
 async def follow(bot: Bot, provider, order_id: int) -> str:

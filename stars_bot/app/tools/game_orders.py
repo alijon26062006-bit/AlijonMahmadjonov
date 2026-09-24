@@ -56,7 +56,14 @@ def short(remote) -> str:
     if not isinstance(remote, dict):
         return str(remote)[:200]
     parts = [f"{k}={str(remote[k])[:120]}" for k in SHOW if remote.get(k) not in (None, "")]
-    return " · ".join(parts) or ("поля: " + ", ".join(list(remote)[:15]))
+    # Остальное — коротко: причина отмены может лежать в поле, которого
+    # мы не ждали, и без него разбор упирается в «status=refund».
+    rest = [f"{k}={str(v)[:60]}" for k, v in remote.items()
+            if k not in SHOW and k not in ("order_id", "id") and v not in (None, "", [], {})]
+    line = " · ".join(parts) or "статуса нет"
+    if rest:
+        line += "\n      ещё: " + " · ".join(rest[:12])
+    return line
 
 
 async def main(word: str, limit: int) -> None:

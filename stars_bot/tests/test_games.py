@@ -1616,6 +1616,38 @@ async def no_supplier_number(conn) -> None:
               for t in bot.to(ADMIN)))
 
 
+async def supplier_refund(conn) -> None:
+    """Поставщик сам отменил заказ (status=refund) — деньги сразу назад."""
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage,
+                       key=StorageKey(bot_id=1, chat_id=BUYER, user_id=BUYER))
+
+    class Refunding(GameProvider):
+        async def order_status(self, order_id):
+            return {"order_id": order_id, "status": "refund",
+                    "reason": "Out of stock"}
+
+    await db.credit(conn, BUYER, 1400)
+    before = (await db.get_user(conn, BUYER)).balance
+    bot = FakeBot()
+    await state.set_state(gh.Game.confirm)
+    await state.update_data(category_id="free_fire_br", offer_id="off_1",
+                            pack="100 алмазов", price=1400, cost=1090,
+                            player="1724367212", player_name="Ник")
+    await gh.cb_buy(call_of("g:ok"), state, conn, Refunding(), bot)
+    order = (await db.last_game_orders(conn))[0]
+    check("статус refund — возврат сразу, без 20 минут ожидания",
+          order.status == db.ORDER_REFUNDED, order.status)
+    check("деньги вернулись на баланс",
+          (await db.get_user(conn, BUYER)).balance == before, "")
+    told = [t for t in bot.to(ADMIN) if "Поставщик отменил" in t]
+    check("владельцу сказали, что отменил поставщик, и почему",
+          told and "Out of stock" in told[0] and "1724367212" in told[0],
+          str(bot.to(ADMIN))[:200])
+    for word in ("refund", "refunded", "cancelled", "declined"):
+        check(f"«{word}» — это отказ", word in svc.FAILED)
+
+
 async def fast_follow(conn) -> None:
     """Свежий заказ опрашивается часто, а не раз в пять минут."""
     check("быстрый опрос чаще общего обхода",
@@ -2681,6 +2713,7 @@ async def main() -> None:
         await unknown_nick(conn)
         await panel_screens(conn)
         await after_refund(conn)
+        await supplier_refund(conn)
         await timeout_setting(conn)
         await gorder_command(conn)
         await game_icons(conn)
