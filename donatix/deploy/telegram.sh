@@ -26,15 +26,26 @@ BOT_NAME="$(printf '%s' "$ME" | python3 -c 'import json,sys; print(json.load(sys
 echo "Бот: @$BOT_NAME"
 
 if [ -z "$TG_CHAT" ]; then
-  say "Ищу ваш chat id (вы должны были написать боту /start)"
-  # Сайт мог уже забирать сообщения бота — на время поиска останавливаем его
+  say "Жду ваше сообщение боту"
+  echo "Откройте в Telegram https://t.me/$BOT_NAME и нажмите «Старт» (или отправьте любое сообщение)."
+  # Сайт мог уже забирать сообщения бота — на время поиска останавливаем его; вебхук мешает getUpdates
   systemctl stop donatix 2>/dev/null || true
-  TG_CHAT="$(curl -fsS "https://api.telegram.org/bot$TG_TOKEN/getUpdates?timeout=5" | python3 -c '
+  curl -fsS -o /dev/null "https://api.telegram.org/bot$TG_TOKEN/deleteWebhook" || true
+  for _ in $(seq 1 6); do
+    TG_CHAT="$(curl -sS "https://api.telegram.org/bot$TG_TOKEN/getUpdates?timeout=20" | python3 -c '
 import json, sys
-chats = [u["message"]["chat"]["id"] for u in json.load(sys.stdin).get("result", [])
-         if u.get("message", {}).get("chat", {}).get("type") == "private"]
-print(chats[-1] if chats else "")')"
-  [ -n "$TG_CHAT" ] || { systemctl start donatix || true; die "Не нашёл сообщений. Откройте @$BOT_NAME, нажмите «Старт» (/start) и запустите команду ещё раз."; }
+try:
+    data = json.load(sys.stdin)
+except ValueError:
+    data = {}
+chats = [u[k]["chat"]["id"] for u in data.get("result", []) for k in ("message", "edited_message")
+         if k in u and u[k].get("chat", {}).get("type") == "private"]
+print(chats[-1] if chats else "")')" || TG_CHAT=""
+    [ -n "$TG_CHAT" ] && break
+    printf '.'
+  done
+  echo
+  [ -n "$TG_CHAT" ] || { systemctl start donatix || true; die "За 2 минуты сообщение не пришло. Напишите боту /start и запустите команду ещё раз — или укажите id сами: TG_CHAT=ваш_id (его покажет @userinfobot)."; }
 fi
 [[ "$TG_CHAT" =~ ^-?[0-9]+$ ]] || die "TG_CHAT должен быть числом."
 echo "Chat id: $TG_CHAT"
