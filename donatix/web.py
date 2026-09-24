@@ -107,7 +107,10 @@ def register(
     except accounts.AccountError as exc:
         return render(request, "register.html", {"form": form, "error": str(exc)}, 400)
     request.session["user_id"] = user_id
+    from .tgbot import user_event
+    from .worker import notify_event
     if config.require_approval:
+        notify_event(conn, config, user_event(conn, user_id))
         flash(request, "Аккаунт создан. Мы проверим заявку и активируем доступ — обычно в течение дня.")
     else:
         flash(request, "Аккаунт создан. Добро пожаловать!")
@@ -361,15 +364,15 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
                           reference: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn),
                           config: Config = Depends(get_config)):
     from . import payments
-    from .worker import notify_admin
+    from .worker import notify_event
     try:
         pid = payments.create(conn, config, user, method, amount, reference)
     except payments.PaymentError as exc:
         flash(request, str(exc), "error")
         return _redirect("/panel/balance")
     row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
-    notify_admin(config, f"заявка на пополнение #{pid} от {user['login']}: {row['pay_amount']} {row['pay_currency']} "
-                         f"({PAY_METHODS[method][0]}). Проверьте поступление в админке → Пополнения.")
+    from .tgbot import payment_event
+    notify_event(conn, config, payment_event(conn, pid))
     flash(request, f"Заявка #{pid} создана. Переведите {row['pay_amount']} {row['pay_currency']} по реквизитам — "
                    "после проверки баланс пополнится, вам придёт уведомление.")
     return _redirect("/panel/balance")

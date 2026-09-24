@@ -17,19 +17,27 @@ from .suppliers import Supplier, SupplierError
 log = logging.getLogger(__name__)
 
 
-def notify_admin(config: Config, text: str) -> None:
-    """Сообщение админу в Telegram, если настроено. Иначе — только в лог."""
+def notify_admin(config: Config, text: str, buttons: list | None = None, *, html: bool = False) -> None:
+    """Сообщение админу в Telegram, если настроено (с кнопками — ответ прямо из чата). Иначе — только в лог."""
     log.warning("ADMIN: %s", text)
     if not (config.alert_telegram_token and config.alert_telegram_chat_id):
         return
+    from .tgbot import keyboard
+    payload = {"chat_id": config.alert_telegram_chat_id, "text": text if html else f"{config.site_name}: {text}",
+               "disable_web_page_preview": True}
+    if html:
+        payload["parse_mode"] = "HTML"
+    if buttons:
+        payload["reply_markup"] = keyboard(buttons)
     try:
-        httpx.post(
-            f"https://api.telegram.org/bot{config.alert_telegram_token}/sendMessage",
-            json={"chat_id": config.alert_telegram_chat_id, "text": f"{config.site_name}: {text}"},
-            timeout=10,
-        )
+        httpx.post(f"https://api.telegram.org/bot{config.alert_telegram_token}/sendMessage", json=payload, timeout=10)
     except httpx.HTTPError as exc:
         log.warning("не удалось отправить уведомление: %s", exc)
+
+
+def notify_event(conn, config: Config, event: tuple[str, list]) -> None:
+    text, buttons = event
+    notify_admin(config, text, buttons, html=True)
 
 
 def check_supplier_balance(conn, config: Config, supplier: Supplier) -> Decimal | None:
@@ -49,11 +57,15 @@ def check_supplier_balance(conn, config: Config, supplier: Supplier) -> Decimal 
 
 
 def attention_alert(conn, config: Config) -> None:
-    n = conn.execute("SELECT COUNT(*) FROM orders WHERE status = 'attention'").fetchone()[0]
-    last = int(db.get_setting(conn, "attention_alerted", "0") or 0)
-    if n > last:
-        notify_admin(config, f"заказов, требующих внимания: {n}. Откройте админку → Заказы.")
-    db.set_setting(conn, "attention_alerted", str(n))
+    """Каждый новый проблемный заказ — отдельным сообщением с кнопками."""
+    from .tgbot import order_event
+    last = int(db.get_setting(conn, "attention_alerted_id", "0") or 0)
+    rows = conn.execute("SELECT id FROM orders WHERE status = 'attention' AND id > ? ORDER BY id LIMIT 20",
+                        (last,)).fetchall()
+    for r in rows:
+        notify_event(conn, config, order_event(conn, r["id"]))
+        last = r["id"]
+    db.set_setting(conn, "attention_alerted_id", str(last))
 
 
 class Worker:

@@ -31,11 +31,17 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        bg = None
+        bg = bot = None
         if config.run_worker:
             bg = Worker(config, supplier)
             bg.start()
+            if config.alert_telegram_token and config.alert_telegram_chat_id:
+                from .tgbot import AdminBot
+                bot = AdminBot(config)
+                bot.start()
         yield
+        if bot:
+            bot.stop()
         if bg:
             bg.stop()
 
