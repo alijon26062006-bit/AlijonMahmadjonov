@@ -1,34 +1,59 @@
 {% extends "panel/_layout.html" %}
-{% from "_icons.html" import icon, kind_icon, media %}
+{% from "_icons.html" import icon, kind_icon, media, pack_icon %}
 {% block title %}{{ p.name }} — {{ site_name }}{% endblock %}
 {% block content %}
 {% if p.kind == 'steam_topup' %}{% include "panel/_buy_steam.html" %}{% elif p.kind == 'steam_gift' %}{% include "panel/_buy_gift.html" %}{% else %}
 {% set multi = p.max_quantity > 1 %}
-{% if p.image_url %}{{ media(p.image_url, p.category_name, p.kind, 'banner') }}{% endif %}
-<section class="page-hero">
-  <a class="back" href="/panel/catalog?kind={{ p.kind }}">{{ icon('arrow-left', 18) }}{{ p.kind_title }}</a>
-  <h1>{{ p.name }}</h1>
-  <p>{{ p.category_name }}{% if p.region %} · {{ p.region_title }}{% endif %} · {% if p.unit == 'star' %}${{ p.price_usd }} за звезду{% else %}${{ p.price_usd }}{% if multi %} за штуку{% endif %}{% endif %}</p>
-</section>
+<a class="back" href="/panel/catalog?kind={{ p.kind }}" style="margin-top:14px">{{ icon('arrow-left', 18) }}{{ p.kind_title }}</a>
+<div class="buy-head">
+  {{ media(p.image_url, p.category_name, p.kind, 'cover') }}
+  <div class="grow">
+    <div class="bh-kind">{{ p.kind_title }}</div>
+    <h1>{{ p.category_name if siblings else p.name }}</h1>
+    <div class="bh-tags">
+      {% if p.region %}<span class="badge">{{ p.region_title }}</span>{% endif %}
+      {% if p.platform %}<span class="badge accent">{{ p.platform }}</span>{% endif %}
+      {% if can_check %}<span class="badge ok">{{ icon('shield', 13) }}Проверка ID</span>{% endif %}
+    </div>
+  </div>
+</div>
 {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
 
-<form method="post" action="/panel/buy/{{ p.product_id }}" class="grid two" id="buy" style="align-items:start">
+<form method="post" action="/panel/buy/{{ p.product_id }}" class="buy-grid" id="buy">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="idem" value="{{ idem }}">
-  <div class="card reveal">
-    <div class="step-head"><span class="n">1</span><h3>Получатель</h3></div>
+  <div class="buy-main">
+  {% set step = namespace(n=0) %}
+  {% if siblings | length > 1 %}
+    {% set step.n = step.n + 1 %}
+    <div class="card">
+      <div class="step-head"><span class="n">{{ step.n }}</span><h3>Выберите пакет</h3></div>
+      <div class="pack-pick" role="list">
+        {% for s in siblings %}
+        <a role="listitem" class="pp {{ 'on' if s.product_id == p.product_id }}" href="/panel/buy/{{ s.product_id | urlencode }}"
+           {% if s.product_id == p.product_id %}aria-current="true"{% endif %}>
+          <span class="pp-ico k-{{ s.kind }}">{{ pack_icon(s.kind, s.name, 18) }}</span>
+          <span class="pp-name">{{ s.name }}</span>
+          {% if s.region and regions_many is not defined %}<span class="pp-reg">{{ s.region_title }}</span>{% endif %}
+          <span class="pp-price">${{ s.price_usd | price(s.unit) }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+    {% set step.n = step.n + 1 %}
+    <div class="card">
+      <div class="step-head"><span class="n">{{ step.n }}</span><h3>{{ 'Получатель' if p.fields else 'Что вы получите' }}</h3></div>
     {% for f in p.fields %}
-      <label for="f_{{ f.key }}">{{ f.label }} <span class="muted" aria-hidden="true">*</span></label>
-      <input id="f_{{ f.key }}" name="field_{{ f.key }}" required value="{{ form.get(f.key, '') }}"
-             {% if f.key == 'telegram_username' %}placeholder="@username" autocapitalize="off" autocomplete="off" spellcheck="false"{% endif %}>
+      <label for="f_{{ f.key }}">{{ f.label }}</label>
+      <input id="f_{{ f.key }}" name="field_{{ f.key }}" required value="{{ form.get(f.key, '') }}" autocomplete="off"
+             {% if f.key == 'telegram_username' %}placeholder="@username" autocapitalize="off" spellcheck="false"
+             {% else %}placeholder="Например, 5123456789"{% endif %}>
     {% else %}
-      <p class="muted" style="margin-top:14px">Данные получателя не нужны — после оплаты вы получите {{ 'ключ' if p.kind == 'game_key' else 'код' }}.</p>
+      <p class="muted" style="margin:10px 0 0">После оплаты {{ 'ключ' if p.kind == 'game_key' else 'код' }} появится на странице заказа и придёт на ваш webhook.</p>
     {% endfor %}
     {% if p.kind == 'game_key' %}
-      <div class="key-meta">
-        {% if p.platform %}<span class="badge accent">{{ icon('grid', 14) }}{{ p.platform }}</span>{% endif %}
-        {% if p.region %}<span class="badge">{{ p.region_title }}</span>{% endif %}
-      </div>
       <div class="regions-box" id="gk-regions" data-url="/panel/data/gamekey-regions/{{ p.product_id | urlencode }}">
         <div class="muted small">Проверяем, где активируется ключ…</div>
       </div>
@@ -41,11 +66,14 @@
     {% endif %}
 
     {% if multi %}
-      <div class="step-head" style="margin-top:28px"><span class="n">2</span><h3>{{ 'Выберите пакет' if p.unit == 'star' else 'Количество' }}</h3></div>
-      <label for="quantity">{{ 'Количество звёзд' if p.unit == 'star' else 'Штук' }}</label>
-      <input id="quantity" name="quantity" type="number" inputmode="numeric" required
-             min="{{ p.min_quantity }}" max="{{ p.max_quantity }}" value="{{ form.get('quantity') or p.min_quantity }}">
-      <div class="hint">Мин. {{ p.min_quantity }} · Макс. {{ p.max_quantity }}{% if p.stock is not none %} · в наличии {{ p.stock }}{% endif %}</div>
+      <label for="quantity" style="margin-top:20px">{{ 'Количество звёзд' if p.unit == 'star' else 'Количество' }}</label>
+      <div class="qty-row">
+        {% if p.unit != 'star' %}<button type="button" class="icon-btn" data-step="-1" aria-label="Меньше">{{ icon('minus', 18) }}</button>{% endif %}
+        <input id="quantity" name="quantity" type="number" inputmode="numeric" required
+               min="{{ p.min_quantity }}" max="{{ p.max_quantity }}" value="{{ form.get('quantity') or p.min_quantity }}">
+        {% if p.unit != 'star' %}<button type="button" class="icon-btn" data-step="1" aria-label="Больше">{{ icon('plus', 18) }}</button>{% endif %}
+      </div>
+      <div class="hint">От {{ p.min_quantity }} до {{ p.max_quantity }}{% if p.stock is not none %} · в наличии {{ p.stock }}{% endif %}</div>
       {% if p.unit == 'star' %}
       <div class="packs">
         {% for n in [50, 100, 250, 500, 1000, 2500, 5000, 10000] if p.min_quantity <= n <= p.max_quantity %}
@@ -56,21 +84,29 @@
     {% else %}
       <input type="hidden" name="quantity" value="1">
     {% endif %}
+    </div>
   </div>
 
-  <div class="card reveal">
-    <h3>Сводка</h3>
-    <div class="summary">
-      <div><span>Товар</span><span class="wrap-text">{{ p.name }}</span></div>
-      {% if p.fields %}<div><span>Получатель</span><span id="s-to">—</span></div>{% endif %}
-      {% if can_check %}<div><span>Игрок</span><span id="s-player" class="wrap-text">—</span></div>{% endif %}
-      {% if multi %}<div><span>Количество</span><span id="s-qty">—</span></div>{% endif %}
-      <div><span>Цена</span><span>${{ p.price_usd }}</span></div>
-      <div><span>Ваш баланс</span><span>${{ fmt(user.balance_micro) }}</span></div>
-      <div class="total"><span>К оплате</span><span id="s-total">${{ p.price_usd }}</span></div>
+  <aside class="buy-side">
+    <div class="card">
+      <h3>Сводка</h3>
+      <div class="summary">
+        <div><span>Товар</span><span class="wrap-text">{{ p.name }}</span></div>
+        {% if p.fields %}<div><span>Получатель</span><span id="s-to" class="wrap-text">—</span></div>{% endif %}
+        {% if can_check %}<div><span>Игрок</span><span id="s-player" class="wrap-text">—</span></div>{% endif %}
+        {% if multi %}<div><span>Количество</span><span id="s-qty">—</span></div>{% endif %}
+        <div><span>Цена{{ ' за звезду' if p.unit == 'star' else (' за шт.' if multi) }}</span><span>${{ p.price_usd | price(p.unit) }}</span></div>
+        <div><span>Ваш баланс</span><span>${{ fmt(user.balance_micro) }}</span></div>
+        <div class="total"><span>К оплате</span><span id="s-total">${{ p.price_usd | price }}</span></div>
+      </div>
+      <button class="btn primary lg block buy-btn" {{ 'disabled' if user.status != 'active' }}>Купить</button>
+      <p class="hint center">{{ icon('shield', 16) }} Не выполнится — деньги вернутся на баланс.</p>
     </div>
-    <button class="btn primary lg block" style="margin-top:18px" {{ 'disabled' if user.status != 'active' }}>Продолжить</button>
-    <p class="hint center">{{ icon('shield', 16) }} Если заказ не выполнится, деньги вернутся на баланс.</p>
+  </aside>
+
+  <div class="buy-bar" aria-hidden="true">
+    <div><span class="muted small">К оплате</span><b id="bar-total">${{ p.price_usd | price }}</b></div>
+    <button type="submit" class="btn primary lg" tabindex="-1" {{ 'disabled' if user.status != 'active' }}>Купить</button>
   </div>
 </form>
 
@@ -92,9 +128,22 @@
     const n = parseInt(qty.value || "0", 10) || 0;
     if (sQty) sQty.textContent = n;
     total.textContent = money(n);
+    const bar = document.getElementById("bar-total");
+    if (bar) bar.textContent = money(n);
     packs.forEach(b => b.classList.toggle("on", +b.dataset.qty === n));
   }
   form.addEventListener("input", upd);
+  // − / + у количества
+  document.querySelectorAll(".qty-row [data-step]").forEach(b => b.addEventListener("click", () => {
+    const v = (parseInt(qty.value || "0", 10) || 0) + (+b.dataset.step);
+    qty.value = Math.min(+qty.max, Math.max(+qty.min, v)); upd();
+  }));
+  // Смена пакета: введённый ID игрока переносим на страницу другого пакета
+  document.querySelectorAll(".pack-pick a").forEach(a => a.addEventListener("click", e => {
+    const params = new URLSearchParams();
+    form.querySelectorAll("input[name^='field_']").forEach(i => { if (i.value.trim()) params.set(i.name, i.value.trim()); });
+    if ([...params].length) { e.preventDefault(); location.href = a.getAttribute("href") + "?" + params; }
+  }));
   packs.forEach(b => b.addEventListener("click", () => { qty.value = b.dataset.qty; upd(); }));
   // Ключи игр: страны, где ключ активируется
   const gk = document.getElementById("gk-regions");
@@ -142,7 +191,7 @@
       i.addEventListener("input", () => { box.textContent = ""; box.className = "acc-result"; if (sPlayer) sPlayer.textContent = "—"; last = ""; });
     });
   }
-  form.addEventListener("submit", () => { const b = form.querySelector("button.primary"); b.disabled = true; b.textContent = "Отправляем…"; });
+  form.addEventListener("submit", () => { form.querySelectorAll("button.primary").forEach(b => { b.disabled = true; b.textContent = "Отправляем…"; }); });
   upd();
 })();
 </script>

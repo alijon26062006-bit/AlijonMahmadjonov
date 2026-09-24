@@ -28,6 +28,17 @@ def _img(url):
 templates.env.filters["img"] = _img
 
 
+def _price(value, unit: str = "item") -> str:
+    """Цена для витрины: у звёзд — как есть (доли цента), у остального — 4 знака, округление вверх,
+    как при списании."""
+    from decimal import ROUND_CEILING, Decimal
+    d = Decimal(str(value))
+    return str(d) if unit == "star" else str(d.quantize(Decimal("0.0001"), rounding=ROUND_CEILING))
+
+
+templates.env.filters["price"] = _price
+
+
 def _asset_version() -> str:
     """Метка версии стилей: меняется с файлом, и браузер не держит старый CSS из кеша."""
     import hashlib

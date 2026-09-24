@@ -247,12 +247,22 @@ def panel_buy_form(product_id: str, request: Request, user=Depends(panel_user), 
     if p is None:
         flash(request, "Товар недоступен.", "error")
         return _redirect("/panel/catalog")
-    view = catalog.public_view(p, accounts.markup_for(user, config, p["kind"]))
+    form = {k[6:]: v[:100] for k, v in request.query_params.items() if k.startswith("field_")}
+    return render(request, "panel/buy.html", _buy_ctx(request, conn, config, user, p, form=form))
+
+
+def _buy_ctx(request: Request, conn, config: Config, user, p: dict, **extra) -> dict:
+    """Всё для страницы покупки: товар, другие пакеты этой игры, можно ли проверить аккаунт."""
     from . import account_check
-    return render(request, "panel/buy.html", {
-        "user": user, "p": view, "form": {}, "idem": str(uuid.uuid4()),
-        "can_check": account_check.can_check(request.app.state.supplier, p),
-    })
+    markup = accounts.markup_for(user, config, p["kind"])
+    siblings = []
+    if p["kind"] in _BY_GAME:
+        siblings = [catalog.public_view(s, markup) for s in
+                    catalog.list_products(conn, kind=p["kind"], category_id=p["category_id"], limit=200)]
+    return {
+        "user": user, "p": catalog.public_view(p, markup), "siblings": siblings, "idem": str(uuid.uuid4()),
+        "can_check": account_check.can_check(request.app.state.supplier, p), "form": {}, **extra,
+    }
 
 
 async def _form(request: Request) -> dict[str, str]:
@@ -276,11 +286,9 @@ def panel_buy(product_id: str, request: Request, form: dict = Depends(_form), us
             client_idem_key="panel-" + str(form.get("idem", ""))[:64], source="panel",
         )
     except orders.OrderError as exc:
-        view = catalog.public_view(p, accounts.markup_for(user, config, p["kind"]))
-        return render(request, "panel/buy.html", {
-            "user": accounts.get_user(conn, user["id"]), "p": view, "error": str(exc),
-            "form": {**fields, "quantity": form.get("quantity", "")}, "idem": str(uuid.uuid4()),
-        }, 400)
+        return render(request, "panel/buy.html", _buy_ctx(
+            request, conn, config, accounts.get_user(conn, user["id"]), p, error=str(exc),
+            form={**fields, "quantity": form.get("quantity", "")}), 400)
     return _redirect(f"/panel/orders/{order['public_id']}")
 
 

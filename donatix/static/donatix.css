@@ -811,3 +811,48 @@ a.who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; 
 .regions-box { margin-top: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
 .regions-box .chip { font-size: .8rem; padding: 3px 9px; }
 .chips.off .chip { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 30%, var(--line)); text-decoration: line-through; }
+
+/* ── Страница покупки ─────────────────────────────────────── */
+.buy-head { display: flex; align-items: center; gap: 16px; margin: 8px 0 18px; }
+.buy-head .media.cover { width: 84px; height: 84px; aspect-ratio: 1; flex: none; border-radius: 16px; padding: 6px;
+  box-shadow: 0 8px 24px -14px rgb(0 0 0 / .5); }
+.buy-head .media.cover .media-initials { font-size: 1.4rem; }
+.buy-head h1 { margin: 2px 0 6px; font-size: clamp(1.35rem, 5vw, 1.8rem); }
+.bh-kind { font-size: .8rem; font-weight: 600; color: var(--muted); }
+.bh-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.buy-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.buy-main { display: flex; flex-direction: column; gap: 14px; }
+.buy-main .card + .card { margin-top: 0; }
+.buy-side { position: sticky; top: 74px; }
+.buy-btn { margin-top: 16px; }
+.pack-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; }
+.pp { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; color: var(--text);
+  border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface);
+  transition: border-color .15s, background .15s, transform .12s var(--ease); }
+.pp:hover { color: var(--text); text-decoration: none; border-color: var(--accent-line); }
+.pp:active { transform: scale(.98); }
+.pp.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.pp.on::after { content: "✓"; position: absolute; top: 8px; right: 10px; width: 20px; height: 20px; display: grid; place-items: center;
+  border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: .72rem; font-weight: 700; }
+.pp-ico { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: var(--game-soft); color: var(--game); }
+.pp-ico.k-gift_card { background: var(--card-soft); color: var(--card); }
+.pp-ico.k-game_key { background: var(--steam-soft); color: var(--steam); }
+.pp-name { font-weight: 600; font-size: .92rem; line-height: 1.25; overflow-wrap: anywhere; }
+.pp-reg { font-size: .74rem; color: var(--muted); }
+.pp-price { margin-top: auto; font: 600 .95rem/1.2 "JetBrains Mono", ui-monospace, monospace; color: var(--accent); }
+.qty-row { display: flex; gap: 8px; align-items: center; }
+.qty-row input { text-align: center; font-weight: 600; }
+.qty-row .icon-btn { width: 44px; height: 44px; flex: none; }
+.buy-bar { display: none; }
+@media (max-width: 900px) {
+  .buy-grid { grid-template-columns: minmax(0, 1fr); padding-bottom: 76px; }
+  .buy-side { position: static; }
+  .buy-side .buy-btn { display: none; }
+  .buy-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 24px -16px rgb(0 0 0 / .35); }
+  .buy-bar > div { flex: 1; display: flex; flex-direction: column; }
+  .buy-bar b { font: 700 1.15rem/1.2 "JetBrains Mono", ui-monospace, monospace; color: var(--accent); }
+  .buy-bar .btn { min-width: 140px; }
+  .pack-pick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
