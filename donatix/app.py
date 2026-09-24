@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import accounts, admin, api, db, web
@@ -17,6 +18,23 @@ from .deps import Forbidden, LoginRequired, render
 from .ratelimit import RateLimiter
 from .suppliers import Supplier, make_supplier
 from .worker import Worker
+
+
+def cache_policy(path: str, query: str, status: int) -> str:
+    """Как долго браузер и прокси держат ответ у себя."""
+    if status >= 400:
+        return "no-store"
+    if path.startswith("/static/"):
+        # Файлы с ?v=хеш меняют адрес при каждом изменении — можно хранить год
+        return "public, max-age=31536000, immutable" if "v=" in query else "public, max-age=86400"
+    if path.startswith("/media/"):
+        return "public, max-age=2592000, stale-while-revalidate=86400"
+    if path in ("/robots.txt", "/sitemap.xml"):
+        return "public, max-age=3600"
+    if path.startswith(("/panel", "/admin", "/api", "/login", "/register", "/logout")):
+        return "private, no-store"
+    # Публичные страницы: всегда сверяться с сервером (шапка зависит от входа)
+    return "private, no-cache"
 
 
 def create_app(config: Config | None = None, supplier: Supplier | None = None) -> FastAPI:
@@ -72,6 +90,15 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
         same_site="lax",
         https_only=config.cookie_secure,
     )
+    @app.middleware("http")
+    async def _cache_headers(request: Request, call_next):
+        response = await call_next(request)
+        if "cache-control" not in response.headers:
+            response.headers["Cache-Control"] = cache_policy(request.url.path, request.url.query,
+                                                             response.status_code)
+        return response
+
+    app.add_middleware(GZipMiddleware, minimum_size=800, compresslevel=6)
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
     # Картинки каталога, скачанные с поставщика к себе (админка → Загрузка каталога)
     from . import catalog_job

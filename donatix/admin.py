@@ -338,6 +338,8 @@ def products(request: Request, kind: str = "", q: str = "", admin=Depends(admin_
 @router.post("/products/{product_id}/toggle", dependencies=[Depends(check_csrf)])
 def product_toggle(product_id: str, request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
     conn.execute("UPDATE products SET hidden = 1 - hidden WHERE id = ?", (product_id,))
+    from . import cache
+    cache.clear()
     return _back(request.headers.get("referer") or "/admin/products")
 
 

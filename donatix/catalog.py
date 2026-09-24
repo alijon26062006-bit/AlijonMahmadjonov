@@ -10,7 +10,7 @@ import threading
 from decimal import Decimal
 from typing import Any, Callable
 
-from . import db
+from . import cache, db
 from .money import apply_markup, fmt_unit, to_decimal
 from .suppliers import KIND_TITLES, Supplier, SupplierError, region_title
 
@@ -66,6 +66,7 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
             log.warning("steam-гифты: каталог игр не обновлён: %s", exc)
         steam_gifts.clear_cache()
     db.set_setting(conn, "catalog_synced_at", db.now())
+    cache.clear()
     log.info("каталог: %s товаров, выключено %s", len(seen), disabled)
     return {"products": len(seen), "disabled": disabled}
 

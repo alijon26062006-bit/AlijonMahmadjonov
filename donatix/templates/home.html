@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon, kind_icon %}
 {% block title %}{{ site_name }} — Telegram Stars, пополнения игр и Steam оптом{% endblock %}
+{% block jsonld %}
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org",
+  "@graph": [
+    {"@type": "Organization", "@id": base_url ~ "/#org", "name": site_name, "url": base_url ~ "/",
+     "logo": base_url ~ "/static/og-icon.png"},
+    {"@type": "WebSite", "@id": base_url ~ "/#site", "name": site_name, "url": base_url ~ "/",
+     "inLanguage": "ru", "publisher": {"@id": base_url ~ "/#org"}},
+    {"@type": "FAQPage", "mainEntity": faq | map('faq_item') | list},
+  ]
+} | tojson }}</script>
+{% endblock %}
 {% block body %}
 <main>
   <div class="wrap">
@@ -134,11 +146,7 @@ print(r.json()["order"]["status"])</pre>
   <section class="section" data-reveal id="faq">
     <div class="wrap" style="max-width:760px">
       <div class="section-head"><h2>Вопросы</h2></div>
-      {% for q, a in [
-        ('Что если заказ не выполнится?', 'Деньги сразу вернутся на баланс.'),
-        ('Нужен ли программист?', 'Нет, заказывать можно вручную в панели.'),
-        ('Как быстро выполняются заказы?', 'Обычно за несколько секунд.'),
-      ] %}
+      {% for q, a in faq %}
       <details class="faq"><summary>{{ q }}</summary><p>{{ a }}</p></details>
       {% endfor %}
     </div>

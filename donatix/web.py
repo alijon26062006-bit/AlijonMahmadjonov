@@ -7,11 +7,11 @@ import sqlite3
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
 
-from . import accounts, catalog, db, orders
+from . import accounts, cache, catalog, db, orders
 from .config import PAY_METHODS, Config
-from .deps import LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
+from .deps import INDEXABLE, LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
 from .money import apply_markup, fmt, order_total_micro, to_decimal
 from .suppliers import KINDS, region_title
 
@@ -34,18 +34,29 @@ def panel_user(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -
 
 @router.get("/")
 def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
-    cats = catalog.categories(conn)
-    by_kind: dict[str, list] = {}
-    for c in cats:
-        by_kind.setdefault(c["kind"], []).append(c)
-    total = sum(c["n"] for c in cats)
+    def build():
+        cats = [dict(c) for c in catalog.categories(conn)]
+        by_kind: dict[str, list] = {}
+        for c in cats:
+            by_kind.setdefault(c["kind"], []).append(c)
+        return by_kind, sum(c["n"] for c in cats), _price_examples(conn, config)
+
+    by_kind, total, examples = cache.get_or_set("home", 120, build)
     return render(request, "home.html", {
         "user": session_user(request, conn),
         "by_kind": by_kind,
         "total_products": total,
         "markups": config.markups,
-        "examples": _price_examples(conn, config),
+        "examples": examples,
+        "faq": FAQ,
     })
+
+
+FAQ = [
+    ("Что если заказ не выполнится?", "Деньги сразу вернутся на баланс."),
+    ("Нужен ли программист?", "Нет, заказывать можно вручную в панели."),
+    ("Как быстро выполняются заказы?", "Обычно за несколько секунд."),
+]
 
 
 def _price_examples(conn, config: Config) -> list[tuple[str, str]]:
@@ -68,6 +79,30 @@ def _price_examples(conn, config: Config) -> list[tuple[str, str]]:
                 total = order_total_micro(apply_markup(to_decimal(p["base_price"]), config.markups["bronze"]), 1)
                 rows.append((f"{p['category_name']} — {p['name']}", fmt(total)))
     return rows
+
+
+@router.get("/robots.txt")
+def robots(config: Config = Depends(get_config)):
+    body = ("User-agent: *\n"
+            "Allow: /$\nAllow: /docs\nAllow: /register\nAllow: /static/\nAllow: /media/\n"
+            "Disallow: /panel\nDisallow: /admin\nDisallow: /api/\nDisallow: /login\n\n"
+            f"Sitemap: {config.base_url}/sitemap.xml\n")
+    return PlainTextResponse(body)
+
+
+@router.get("/sitemap.xml")
+def sitemap(conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from xml.sax.saxutils import escape
+
+    synced = (db.get_setting(conn, "catalog_synced_at") or db.now())[:10]
+    urls = "".join(
+        f"<url><loc>{escape(config.base_url + path)}</loc><lastmod>{synced}</lastmod>"
+        f"<changefreq>{freq}</changefreq><priority>{prio}</priority></url>"
+        for path, (freq, prio) in INDEXABLE.items()
+    )
+    return Response('<?xml version="1.0" encoding="UTF-8"?>\n'
+                    f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>',
+                    media_type="application/xml")
 
 
 @router.get("/docs")
@@ -206,6 +241,11 @@ def _cents(value) -> str:
 _BY_GAME = ("topup", "gift_card", "game_key")
 
 
+def _cached(key: str, q: str, make):
+    """Каталог без поиска меняется только при загрузке — держим его минуту в памяти."""
+    return make() if q else cache.get_or_set(key, 60, make)
+
+
 @router.get("/panel/catalog")
 def panel_catalog(
     request: Request, kind: str = "", q: str = "", category: str = "", region: str = "",
@@ -219,13 +259,14 @@ def panel_catalog(
             {**dict(c), "regions": sorted(filter(None, (c["regions"] or "").split(","))),
              "from_price": _cents(apply_markup(to_decimal(str(c["from_price"])),
                                                accounts.markup_for(user, config, c["kind"])))}
-            for c in catalog.categories(conn, kind=kind, q=q)
+            for c in _cached(f"cats:{kind}", q, lambda: [dict(c) for c in catalog.categories(conn, kind=kind, q=q)])
         ]
         return render(request, "panel/catalog.html", {
             "user": user, "games": games, "kind": kind, "q": q, "kinds": KINDS, "count": len(games),
             "region_title": region_title,
         })
-    products = catalog.list_products(conn, kind=kind, q=q, category_id=category)
+    products = _cached(f"products:{kind}:{category}", q,
+                       lambda: catalog.list_products(conn, kind=kind, q=q, category_id=category))
     regions = sorted({p["region"] for p in products if p.get("region")})
     game = products[0] if category and products else None
     if region:

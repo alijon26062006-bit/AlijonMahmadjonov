@@ -86,6 +86,7 @@ def web_login(client, email, password):
 
 @pytest.fixture(autouse=True)
 def _reset_account_check():
-    from donatix import account_check
+    from donatix import account_check, cache
     account_check.reset()
+    cache.clear()
     yield

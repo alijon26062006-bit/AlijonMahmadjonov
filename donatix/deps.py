@@ -18,6 +18,8 @@ from .suppliers import KIND_TITLES
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
 templates.env.globals.update(fmt=fmt, fmt_unit=fmt_unit, kind_titles=KIND_TITLES)
 templates.env.filters["fromjson"] = json.loads
+templates.env.filters["faq_item"] = lambda qa: {
+    "@type": "Question", "name": qa[0], "acceptedAnswer": {"@type": "Answer", "text": qa[1]}}
 
 
 def _img(url):
@@ -43,7 +45,12 @@ def _asset_version() -> str:
     """Метка версии стилей: меняется с файлом, и браузер не держит старый CSS из кеша."""
     import hashlib
 
-    return hashlib.sha1((ROOT / "static" / "donatix.css").read_bytes()).hexdigest()[:10]
+    h = hashlib.sha1()
+    for name in ("donatix.css", "code.js", "logo.svg"):
+        path = ROOT / "static" / name
+        if path.exists():
+            h.update(path.read_bytes())
+    return h.hexdigest()[:10]
 
 
 templates.env.globals["asset_v"] = _asset_version()
@@ -111,6 +118,10 @@ def flash(request: Request, message: str, kind: str = "ok") -> None:
     request.session.setdefault("flash", []).append({"kind": kind, "text": message})
 
 
+#: Страницы для поисковиков (они же в sitemap.xml)
+INDEXABLE = {"/": ("daily", "1.0"), "/docs": ("weekly", "0.8"), "/register": ("monthly", "0.5")}
+
+
 def render(request: Request, name: str, ctx: dict[str, Any] | None = None, status_code: int = 200):
     ctx = dict(ctx or {})
     config: Config = request.app.state.config
@@ -120,6 +131,10 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["csrf"] = csrf_token(request)
     ctx["flashes"] = request.session.pop("flash", [])
     ctx["path"] = request.url.path
+    ctx["base_url"] = config.base_url
+    ctx["canonical"] = config.base_url + request.url.path
+    # В поиск попадают только публичные страницы; кабинет, админка и ошибки — нет
+    ctx["noindex"] = status_code >= 400 or request.url.path not in INDEXABLE
     ctx["unread"] = 0
     ctx["low_balance_micro"] = 0
     if ctx.get("user") is not None:
