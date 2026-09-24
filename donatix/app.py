@@ -71,6 +71,8 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     catalog_job.load_image_index(config)
     app.mount("/media", StaticFiles(directory=str(catalog_job.images_dir(config))), name="media")
     app.include_router(api.router)
+    from . import compat
+    app.include_router(compat.router)
     app.include_router(web.router)
     app.include_router(admin.router)
 
