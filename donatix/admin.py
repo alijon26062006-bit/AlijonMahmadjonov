@@ -63,6 +63,15 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
     })
 
 
+@router.get("/stats")
+def stats_page(request: Request, period: str = "30d", admin=Depends(admin_user), conn=Depends(get_conn),
+               config: Config = Depends(get_config)):
+    from . import analytics
+    return render(request, "admin/stats.html", {
+        "user": admin, "a": analytics.build(conn, period, tz_hours=config.tz_offset),
+    })
+
+
 @router.post("/sync", dependencies=[Depends(check_csrf)])
 def sync_now(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
              config: Config = Depends(get_config)):

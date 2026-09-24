@@ -1,0 +1,7 @@
+{% extends "admin/_layout.html" %}
+{% block title %}Аналитика — админка{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Аналитика</h1><p>Все клиенты</p></section>
+{% set base = "/admin/stats" %}{% set show_profit = true %}
+{% include "_stats.html" %}
+{% endblock %}

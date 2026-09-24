@@ -691,3 +691,47 @@ a.who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; 
 .docs-callout { margin-top: 16px; padding: 18px; border-radius: 12px; border: 1px solid var(--accent-line); background: var(--accent-soft); }
 .docs-callout h3 { margin: 0; }
 .docs-callout p { margin: 4px 0 12px; }
+
+/* ── Аналитика ────────────────────────────────────────────── */
+:root { --c-created: #6d4aff; --c-done: #16a34a; --c-ref: #e5484d; }
+:root[data-theme="dark"] { --c-created: #9b87ff; --c-done: #4ade80; --c-ref: #ff6b6f; }
+.periods { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2);
+  max-width: 100%; overflow-x: auto; }
+.periods a { padding: 9px 16px; border-radius: 9px; color: var(--muted); font-weight: 600; white-space: nowrap;
+  transition: background .2s var(--ease-out), color .2s, box-shadow .2s; }
+.periods a:hover { color: var(--text); text-decoration: none; }
+.periods a.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / .1); }
+.tz { margin: 8px 0 14px; }
+.grid.scards { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+@media (max-width: 560px) { .grid.scards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+.scard { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.scard .label { color: var(--muted); font-weight: 500; }
+.scard .value { margin: 6px 0 4px; font: 700 clamp(1.3rem, 4.5vw, 1.8rem)/1.15 "JetBrains Mono", ui-monospace, monospace; overflow-wrap: anywhere; }
+.scard .note { font-size: .86rem; color: var(--muted); }
+.value.c-created, .c-created { color: var(--c-created); }
+.value.c-done, .c-done { color: var(--c-done); }
+.value.c-ref, .c-ref { color: var(--c-ref); }
+.chart-card, .kinds-card { margin-top: 14px; }
+.legend.big { gap: 16px; flex-wrap: wrap; margin: -4px 0 10px; font-size: .9rem; }
+.legend.big span { display: inline-flex; align-items: center; gap: 7px; }
+.legend.big i { width: 11px; height: 11px; border-radius: 50%; margin: 0; background: currentColor; }
+.line-chart { display: block; width: 100%; height: 260px; overflow: visible; }
+.line-chart .gridline { stroke: var(--line); stroke-width: 1; }
+.chart-wrap { --axw: 34px; position: relative; padding-left: var(--axw); }
+.chart-wrap .ax { position: absolute; font: 500 .7rem/1 "JetBrains Mono", ui-monospace, monospace; color: var(--muted); pointer-events: none; }
+.chart-wrap .ax.y { left: 0; width: calc(var(--axw) - 6px); text-align: right; transform: translateY(-50%); }
+.chart-wrap .ax.x { bottom: 2px; transform: translateX(-50%); white-space: nowrap; }
+.line-chart .ln { fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
+  stroke-dasharray: 3000; stroke-dashoffset: 3000; animation: draw 1.2s var(--ease-out) forwards; }
+.line-chart .ln.c-created { stroke: var(--c-created); }
+.line-chart .ln.c-done { stroke: var(--c-done); animation-delay: .15s; }
+.line-chart .ln.c-ref { stroke: var(--c-ref); animation-delay: .3s; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .line-chart .ln { stroke-dasharray: none; stroke-dashoffset: 0; } }
+.kinds-head, .kr-top { display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px 64px; gap: 8px; align-items: center; }
+.kinds-head { padding: 0 16px 10px; border-bottom: 1px dashed var(--line-strong); font-size: .78rem; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.kinds-head span:not(:first-child), .kr-top span { text-align: right; font-family: "JetBrains Mono", ui-monospace, monospace; }
+.kind-row { margin-top: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+.kr-sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-strong); }
+.kr-sum b { font: 700 1.15rem/1.2 "JetBrains Mono", ui-monospace, monospace; }

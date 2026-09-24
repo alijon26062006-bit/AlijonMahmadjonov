@@ -179,6 +179,15 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
     })
 
 
+@router.get("/panel/stats")
+def panel_stats(request: Request, period: str = "30d", user=Depends(panel_user), conn=Depends(get_conn),
+                config: Config = Depends(get_config)):
+    from . import analytics
+    return render(request, "panel/stats.html", {
+        "user": user, "a": analytics.build(conn, period, user_id=user["id"], tz_hours=config.tz_offset),
+    })
+
+
 @router.get("/panel/logins")
 def panel_logins(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
     rows = conn.execute("SELECT * FROM logins WHERE user_id = ? ORDER BY id DESC LIMIT 30", (user["id"],)).fetchall()

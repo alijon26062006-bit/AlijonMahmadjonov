@@ -99,6 +99,8 @@ class Config:
 
     # Куда писать клиентам для пополнения баланса и поддержки (например, @donatix_support).
     support_contact: str = ""
+    # Часовой пояс для аналитики, часы от UTC (Душанбе — 5)
+    tz_offset: int = 5
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -137,6 +139,7 @@ class Config:
             require_approval=_flag("DONATIX_REQUIRE_APPROVAL", True),
             cookie_secure=_flag("DONATIX_COOKIE_SECURE", False),
             support_contact=_env("DONATIX_SUPPORT_CONTACT"),
+            tz_offset=int(_env("DONATIX_TZ_OFFSET") or 5),
             pay_methods=pay_methods,
             tjs_rate=Decimal(_env("DONATIX_TJS_RATE", "10.9")),
             pay_min_usd=Decimal(_env("DONATIX_PAY_MIN_USD", "5")),
