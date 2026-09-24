@@ -115,6 +115,15 @@ $3.99 / $6.99 / $9.99 в месяц. **Реальные цены уточнят�
    `{"category_id":"pubg_mobile","fields":{"player_id":"…"}}` → valid, player_name, region.
 4. `POST /topups/order` — `{"category_id","offer_id","fields":{…}}`.
 
+### Поля и проверка аккаунта — у каждой игры и сервиса свои
+
+У каждой игры/сервиса свой набор полей для получателя: Player ID, иногда ещё
+сервер/зона, username, логин и т.п. Их список приходит в `fields` оффера — форма
+заказа строится по нему (в Donatix это уже так). Для части игр (PUBG Mobile,
+Free Fire, Mobile Legends…) поставщик умеет проверить аккаунт до оплаты:
+`GET /topups/validate-id` — список игр с проверкой, `POST /topups/validate-id` —
+вернёт `valid` и `player_name`. Нужно показывать клиенту ник игрока перед оплатой.
+
 ## Подарочные карты
 
 1. `GET /giftcards?limit=50` — категории.
