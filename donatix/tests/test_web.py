@@ -125,7 +125,7 @@ def test_catalog_games_and_regions(app, config, conn):
     page = client.get("/panel/catalog?kind=topup").text
     assert "game-card" in page and "Free Fire" in page and "Регионов: 2" in page
     assert "pack-card" not in page  # сначала выбирают игру
-    assert "от $0.9612" in page and "$0.89<" not in page  # 0.89 + 8%, закупку не видно
+    assert "от $0.97" in page and "$0.89<" not in page  # 0.89 + 8%, закупку не видно
     page = client.get("/panel/catalog?kind=topup&category=free_fire").text
     assert page.count("pack-card\"") == 4 and "Турция" in page and "Все регионы" in page
     page = client.get("/panel/catalog?kind=topup&category=free_fire&region=TR").text

@@ -19,6 +19,16 @@ templates = Jinja2Templates(directory=str(ROOT / "templates"))
 templates.env.globals.update(fmt=fmt, fmt_unit=fmt_unit, kind_titles=KIND_TITLES)
 templates.env.filters["fromjson"] = json.loads
 
+
+def _asset_version() -> str:
+    """Метка версии стилей: меняется с файлом, и браузер не держит старый CSS из кеша."""
+    import hashlib
+
+    return hashlib.sha1((ROOT / "static" / "donatix.css").read_bytes()).hexdigest()[:10]
+
+
+templates.env.globals["asset_v"] = _asset_version()
+
 STATUS_TITLES = {
     "processing": "В обработке",
     "completed": "Выполнен",

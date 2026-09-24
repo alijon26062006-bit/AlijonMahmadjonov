@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from . import accounts, catalog, orders
 from .config import PAY_METHODS, Config
 from .deps import LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
-from .money import apply_markup, fmt, fmt_unit, order_total_micro, to_decimal
+from .money import apply_markup, fmt, order_total_micro, to_decimal
 from .suppliers import KINDS, region_title
 
 router = APIRouter(include_in_schema=False)
@@ -169,6 +169,13 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
     })
 
 
+def _cents(value) -> str:
+    """Цена «от» для витрины: до центов, вверх — чтобы не обещать меньше реальной."""
+    from decimal import ROUND_CEILING, Decimal
+
+    return str(value.quantize(Decimal("0.01"), rounding=ROUND_CEILING))
+
+
 # Разделы, где товары сгруппированы по играм/сервисам: сначала выбирают игру, потом пакет
 _BY_GAME = ("topup", "gift_card")
 
@@ -184,8 +191,8 @@ def panel_catalog(
         # Цена «от» — уже с наценкой клиента, закупочную не показываем
         games = [
             {**dict(c), "regions": sorted(filter(None, (c["regions"] or "").split(","))),
-             "from_price": fmt_unit(apply_markup(to_decimal(str(c["from_price"])),
-                                                 accounts.markup_for(user, config, c["kind"])))}
+             "from_price": _cents(apply_markup(to_decimal(str(c["from_price"])),
+                                               accounts.markup_for(user, config, c["kind"])))}
             for c in catalog.categories(conn, kind=kind, q=q)
         ]
         return render(request, "panel/catalog.html", {
