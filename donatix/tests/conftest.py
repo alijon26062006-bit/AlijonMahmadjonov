@@ -82,3 +82,10 @@ def web_login(client, email, password):
     r = client.post("/login", data={"csrf": token, "email": email, "password": password}, follow_redirects=False)
     assert r.status_code == 303, r.text
     return csrf_of(client.get("/panel").text)
+
+
+@pytest.fixture(autouse=True)
+def _reset_account_check():
+    from donatix import account_check
+    account_check.reset()
+    yield

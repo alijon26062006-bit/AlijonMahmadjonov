@@ -169,6 +169,8 @@ def create_order(
         units = _units(product, qty, clean)
     if product["kind"] == "steam_topup":
         _check_steam_login(supplier, clean["steam_login"])
+    if product["kind"] == "topup":
+        _check_account(supplier, product, clean)
     q = quote(config, user, product, units)
     cost_micro = order_total_micro(to_decimal(product["base_price"]), units)
     ts = db.now()
@@ -216,6 +218,17 @@ def _check_steam_login(supplier: Supplier, login: str) -> None:
     if not ok:
         raise OrderError("Этот аккаунт Steam нельзя пополнить. Проверьте логин (не никнейм).",
                          "steam_login_invalid")
+
+
+def _check_account(supplier: Supplier, product: dict[str, Any], fields: dict[str, str]) -> None:
+    """До списания денег: существует ли аккаунт игрока. Если поставщик не ответил — не мешаем заказу."""
+    from . import account_check
+    if not fields or not account_check.can_check(supplier, product):
+        return
+    result = account_check.check(supplier, product, fields)
+    if result["valid"] is False:
+        raise OrderError(f"Аккаунт не найден — проверьте ID. {result.get('message') or ''}".strip(),
+                         "account_not_found")
 
 
 def _display_name(product: dict[str, Any], qty: int, fields: dict[str, str] | None = None) -> str:

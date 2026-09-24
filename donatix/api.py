@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from . import accounts, catalog, orders
+from . import account_check, accounts, catalog, orders
 from .config import Config
 from .deps import get_config, get_conn
 from .money import fmt
@@ -175,7 +175,36 @@ def product(product_id: str, request: Request, user=Depends(api_user), conn=Depe
     p = catalog.get_product(conn, product_id)
     if p is None:
         raise ApiError("Товар не найден.", "product_not_found", 404)
-    return {"ok": True, "product": catalog.public_view(p, accounts.markup_for(user, config, p["kind"]))}
+    view = catalog.public_view(p, accounts.markup_for(user, config, p["kind"]))
+    view["account_check"] = account_check.can_check(request.app.state.supplier, p)
+    return {"ok": True, "product": view}
+
+
+class AccountCheckIn(BaseModel):
+    product_id: str = Field(max_length=64)
+    fields: dict[str, str] = Field(default_factory=dict)
+
+
+@router.post("/accounts/check")
+def check_account(body: AccountCheckIn, request: Request, user=Depends(api_user), conn=Depends(get_conn)):
+    """Проверить аккаунт игрока до заказа: вернёт ник, если поставщик умеет проверять эту игру."""
+    _limit(request, "status", str(user["id"]))
+    p = catalog.get_product(conn, body.product_id)
+    if p is None:
+        raise ApiError("Товар не найден.", "product_not_found", 404)
+    return {"ok": True, **account_check_view(request.app.state.supplier, p, body.fields)}
+
+
+def account_check_view(supplier, product: dict[str, Any], fields: dict[str, str]) -> dict[str, Any]:
+    if not account_check.can_check(supplier, product):
+        return {"supported": False, "valid": None, "player_name": None}
+    keys = [f["key"] for f in product["fields"]]
+    clean = {k: str(fields.get(k, "")).strip()[:100] for k in keys}
+    if not all(clean.values()):
+        raise ApiError("Заполните все поля получателя.", "invalid_field")
+    r = account_check.check(supplier, product, clean)
+    return {"supported": True, "valid": r["valid"], "player_name": r["player_name"], "region": r["region"],
+            "message": r["message"]}
 
 
 # ── Заказы ───────────────────────────────────────────────────

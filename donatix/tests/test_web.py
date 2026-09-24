@@ -130,3 +130,46 @@ def test_catalog_games_and_regions(app, config, conn):
     assert page.count("pack-card\"") == 4 and "Турция" in page and "Все регионы" in page
     page = client.get("/panel/catalog?kind=topup&category=free_fire&region=TR").text
     assert page.count("pack-card\"") == 2
+
+
+def test_account_check_before_order(app, config, conn):
+    from conftest import web_login
+    from fastapi.testclient import TestClient
+
+    from donatix import accounts, catalog
+
+    catalog.sync_catalog(conn, app.state.supplier)
+    uid = accounts.create_user(conn, email="p@example.com", login="player1", password="password123", status="active")
+    accounts.post_ledger(conn, uid, 100_000_000, "test")
+    client = TestClient(app)
+    token = web_login(client, "p@example.com", "password123")
+    pid = "topup-pubg-60"
+    fkey = catalog.get_product(conn, pid)["fields"][0]["key"]
+    assert "Проверить аккаунт" in client.get(f"/panel/buy/{pid}").text
+    r = client.get(f"/panel/data/check-account/{pid}", params={f"field_{fkey}": "5123456789"}).json()
+    assert r["valid"] is True and r["player_name"] == "Player_6789"
+    r = client.get(f"/panel/data/check-account/{pid}", params={f"field_{fkey}": "12"}).json()
+    assert r["valid"] is False
+    # неверный ID — заказ не создаётся, деньги не списываются
+    r = client.post(f"/panel/buy/{pid}", data={"csrf": token, "idem": "x1", f"field_{fkey}": "12", "quantity": "1"})
+    assert "Аккаунт не найден" in r.text
+    assert conn.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 0
+    # в Telegram Stars проверки нет
+    assert "Проверить аккаунт" not in client.get("/panel/buy/tg-stars").text
+
+
+def test_api_account_check(app, config, conn):
+    from fastapi.testclient import TestClient
+
+    from donatix import accounts, catalog
+
+    catalog.sync_catalog(conn, app.state.supplier)
+    uid = accounts.create_user(conn, email="k@example.com", login="keyuser", password="password123", status="active")
+    key = accounts.create_api_key(conn, uid, "bot")
+    client = TestClient(app)
+    fkey = catalog.get_product(conn, "topup-pubg-60")["fields"][0]["key"]
+    r = client.post("/api/v1/accounts/check", headers={"X-API-Key": key},
+                    json={"product_id": "topup-pubg-60", "fields": {fkey: "5123456789"}}).json()
+    assert r["ok"] and r["supported"] and r["player_name"] == "Player_6789"
+    r = client.get("/api/v1/products/topup-pubg-60", headers={"X-API-Key": key}).json()
+    assert r["product"]["account_check"] is True

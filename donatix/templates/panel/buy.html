@@ -24,6 +24,12 @@
     {% else %}
       <p class="muted" style="margin-top:14px">Данные получателя не нужны — после оплаты вы получите код.</p>
     {% endfor %}
+    {% if can_check and p.fields %}
+      <div class="acc-check">
+        <button type="button" class="btn soft" id="acc-btn">{{ icon('shield', 18) }}Проверить аккаунт</button>
+        <div class="acc-result" id="acc-result" role="status" aria-live="polite"></div>
+      </div>
+    {% endif %}
 
     {% if multi %}
       <div class="step-head" style="margin-top:28px"><span class="n">2</span><h3>{{ 'Выберите пакет' if p.unit == 'star' else 'Количество' }}</h3></div>
@@ -48,6 +54,7 @@
     <div class="summary">
       <div><span>Товар</span><span>{{ p.name }}</span></div>
       <div><span>Получатель</span><span id="s-to">—</span></div>
+      {% if can_check %}<div><span>Игрок</span><span id="s-player" class="wrap-text">—</span></div>{% endif %}
       {% if multi %}<div><span>Количество</span><span id="s-qty">—</span></div>{% endif %}
       <div><span>Цена</span><span>${{ p.price_usd }}</span></div>
       <div><span>Ваш баланс</span><span>${{ fmt(user.balance_micro) }}</span></div>
@@ -80,6 +87,38 @@
   }
   form.addEventListener("input", upd);
   packs.forEach(b => b.addEventListener("click", () => { qty.value = b.dataset.qty; upd(); }));
+  // Проверка аккаунта у поставщика: показываем ник до оплаты
+  const accBtn = document.getElementById("acc-btn");
+  if (accBtn) {
+    const box = document.getElementById("acc-result"), sPlayer = document.getElementById("s-player");
+    let last = "";
+    const inputs = () => [...form.querySelectorAll("input[name^='field_']")];
+    async function check() {
+      const params = new URLSearchParams(inputs().map(i => [i.name, i.value.trim()]));
+      if (inputs().some(i => !i.value.trim())) { box.className = "acc-result bad"; box.textContent = "Заполните все поля."; return; }
+      if (params.toString() === last) return;
+      last = params.toString();
+      box.className = "acc-result wait"; box.textContent = "Проверяем…"; accBtn.disabled = true;
+      try {
+        const r = await fetch("/panel/data/check-account/{{ p.product_id | urlencode }}?" + params);
+        const d = await r.json();
+        if (!d.ok) { box.className = "acc-result bad"; box.textContent = d.error; last = ""; }
+        else if (d.valid) {
+          box.className = "acc-result ok"; box.textContent = "Найден: " + (d.player_name || "аккаунт существует");
+          if (sPlayer) sPlayer.textContent = d.player_name || "найден";
+        } else if (d.valid === false) {
+          box.className = "acc-result bad"; box.textContent = "Аккаунт не найден. Проверьте ID.";
+          if (sPlayer) sPlayer.textContent = "не найден";
+        } else { box.className = "acc-result wait"; box.textContent = d.message || "Проверка недоступна, заказ всё равно можно оформить."; last = ""; }
+      } catch (e) { box.className = "acc-result bad"; box.textContent = "Нет связи. Попробуйте ещё раз."; last = ""; }
+      accBtn.disabled = false;
+    }
+    accBtn.addEventListener("click", check);
+    inputs().forEach(i => {
+      i.addEventListener("change", check);
+      i.addEventListener("input", () => { box.textContent = ""; box.className = "acc-result"; if (sPlayer) sPlayer.textContent = "—"; last = ""; });
+    });
+  }
   form.addEventListener("submit", () => { const b = form.querySelector("button.primary"); b.disabled = true; b.textContent = "Отправляем…"; });
   upd();
 })();

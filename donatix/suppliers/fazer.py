@@ -310,6 +310,29 @@ class FazerSupplier:
         data = self._request("GET", f"/steam-gifts/games/{int(appid)}")
         return list(data.get("offers") or [])
 
+    def validate_id_categories(self) -> list[str]:
+        """Игры, где поставщик проверяет аккаунт по ID (GET /topups/validate-id)."""
+        data = self._catalog_get("/topups/validate-id") or {}
+        items = next((data[k] for k in ("items", "categories", "games", "data", "supported")
+                      if isinstance(data.get(k), list)), [])
+        out = []
+        for it in items:
+            if isinstance(it, str):
+                out.append(it)
+            elif isinstance(it, dict) and (it.get("category_id") or it.get("id")):
+                out.append(str(it.get("category_id") or it.get("id")))
+        return out
+
+    def validate_account(self, category_id: str, fields: dict[str, str]) -> dict[str, Any]:
+        data = self._request("POST", "/topups/validate-id", json={"category_id": category_id, "fields": fields})
+        body = data.get("data") if isinstance(data.get("data"), dict) else data
+        return {
+            "valid": bool(body.get("valid")),
+            "player_name": body.get("player_name") or body.get("nickname") or body.get("username"),
+            "region": body.get("region"),
+            "message": body.get("message") or "",
+        }
+
     def check_steam_login(self, login: str) -> bool:
         data = self._request("POST", "/steam-topup/check-login", json={"steamLogin": login})
         return bool(data.get("can_refill"))

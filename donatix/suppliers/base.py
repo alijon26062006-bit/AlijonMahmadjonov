@@ -198,6 +198,14 @@ class Supplier(Protocol):
         """Издания игры: [{"sub_id", "name", "regions": [{"region", "price"}]}]."""
         ...
 
+    def validate_id_categories(self) -> list[str]:
+        """category_id игр, где можно проверить аккаунт по ID до оплаты."""
+        ...
+
+    def validate_account(self, category_id: str, fields: dict[str, str]) -> dict[str, Any]:
+        """{"valid", "player_name", "region", "message"}."""
+        ...
+
     def check_steam_login(self, login: str) -> bool:
         """Можно ли пополнить этот Steam-аккаунт."""
         ...

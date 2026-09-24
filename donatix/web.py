@@ -222,8 +222,10 @@ def panel_buy_form(product_id: str, request: Request, user=Depends(panel_user), 
         flash(request, "Товар недоступен.", "error")
         return _redirect("/panel/catalog")
     view = catalog.public_view(p, accounts.markup_for(user, config, p["kind"]))
+    from . import account_check
     return render(request, "panel/buy.html", {
         "user": user, "p": view, "form": {}, "idem": str(uuid.uuid4()),
+        "can_check": account_check.can_check(request.app.state.supplier, p),
     })
 
 
@@ -254,6 +256,21 @@ def panel_buy(product_id: str, request: Request, form: dict = Depends(_form), us
             "form": {**fields, "quantity": form.get("quantity", "")}, "idem": str(uuid.uuid4()),
         }, 400)
     return _redirect(f"/panel/orders/{order['public_id']}")
+
+
+@router.get("/panel/data/check-account/{product_id}")
+def panel_check_account(product_id: str, request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    from .api import ApiError, account_check_view
+    p = catalog.get_product(conn, product_id)
+    if p is None:
+        return JSONResponse({"ok": False, "error": "Товар не найден."}, 404)
+    if request.app.state.limiter.hit("status", f"web{user['id']}") is not None:
+        return JSONResponse({"ok": False, "error": "Слишком часто. Подождите минуту."}, 429)
+    fields = {k[6:]: v for k, v in request.query_params.items() if k.startswith("field_")}
+    try:
+        return {"ok": True, **account_check_view(request.app.state.supplier, p, fields)}
+    except ApiError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, exc.http_status)
 
 
 @router.get("/panel/data/steam-gifts/games")

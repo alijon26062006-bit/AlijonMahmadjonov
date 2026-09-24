@@ -87,6 +87,15 @@ class MockSupplier:
         return [{"sub_id": s, "name": n, "regions": [{"region": r, "price": p} for r, p in regs.items()]}
                 for s, n, regs in game[1]]
 
+    def validate_id_categories(self) -> list[str]:
+        return ["pubg_mobile", "free_fire"]
+
+    def validate_account(self, category_id: str, fields: dict[str, str]) -> dict[str, Any]:
+        pid = next(iter(fields.values()), "")
+        if not pid.isdigit() or len(pid) < 5:
+            return {"valid": False, "message": "Аккаунт не найден"}
+        return {"valid": True, "player_name": f"Player_{pid[-4:]}", "region": "GLOBAL"}
+
     def check_steam_login(self, login: str) -> bool:
         return not login.lower().startswith("bad")
 

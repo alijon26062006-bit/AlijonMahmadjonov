@@ -538,3 +538,12 @@ details.faq[open] summary::after { transform: rotate(45deg); }
   .grid.games, .grid.packs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .game-head .media.cover { width: 64px; height: 64px; }
 }
+
+/* Проверка аккаунта игрока */
+.acc-check { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.acc-result { font-weight: 600; font-size: .92rem; }
+.acc-result:empty { display: none; }
+.acc-result.ok { color: var(--ok); }
+.acc-result.bad { color: var(--bad); }
+.acc-result.wait { color: var(--muted); }
+.acc-result.ok::before { content: "✓ "; }
