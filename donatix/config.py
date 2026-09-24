@@ -59,6 +59,9 @@ class Config:
     fazer_steam_discount: Decimal = Decimal("2.5")
     # Адрес, к которому дописываются пути картинок поставщика (пусто — домен из FAZER_BASE_URL)
     fazer_image_base: str = ""
+    # Пауза между запросами каталога, сек. Больше — медленнее загрузка, но другим ботам на том же ключе
+    # остаётся больше лимита FazerCards.
+    fazer_catalog_pause: float = 2.0
 
     # Наценка в процентах поверх закупочной цены, по уровням клиентов.
     markups: dict[str, Decimal] = field(
@@ -74,7 +77,7 @@ class Config:
 
     # Фоновый обработчик (проверка заказов, обновление каталога) внутри веб-процесса.
     run_worker: bool = True
-    catalog_sync_minutes: int = 15
+    catalog_sync_minutes: int = 60
     order_poll_seconds: int = 20
 
     # Предупреждение, когда баланс у поставщика меньше этой суммы (USD).
@@ -135,12 +138,14 @@ class Config:
             fazer_base_url=_env("FAZER_BASE_URL", "https://api.fzr.cards/api/v2").rstrip("/"),
             fazer_steam_discount=Decimal(_env("FAZER_STEAM_DISCOUNT", "2.5")),
             fazer_image_base=_env("FAZER_IMAGE_BASE"),
+            fazer_catalog_pause=float(_env("FAZER_CATALOG_PAUSE") or 2.0),
             markups=markups,
             kind_markups=kind_markups,
             admin_email=_env("DONATIX_ADMIN_EMAIL").lower(),
             admin_password=_env("DONATIX_ADMIN_PASSWORD"),
             run_worker=_flag("DONATIX_RUN_WORKER", True),
-            catalog_sync_minutes=int(_env("DONATIX_CATALOG_SYNC_MINUTES", "15")),
+            # не чаще раза в 30 минут: полная загрузка каталога съедает лимит ключа FazerCards
+            catalog_sync_minutes=max(30, int(_env("DONATIX_CATALOG_SYNC_MINUTES", "60"))),
             order_poll_seconds=int(_env("DONATIX_ORDER_POLL_SECONDS", "20")),
             supplier_low_balance=Decimal(_env("DONATIX_SUPPLIER_LOW_BALANCE", "50")),
             alert_telegram_token=_env("DONATIX_ALERT_TELEGRAM_TOKEN"),

@@ -54,7 +54,7 @@ class FazerSupplier:
         base_url: str = "https://api.fzr.cards/api/v2",
         *,
         transport: httpx.BaseTransport | None = None,
-        catalog_pause: float = 0.6,
+        catalog_pause: float = 2.0,
         timeout: float = 30.0,
         steam_discount: Decimal = Decimal("0"),
         image_base: str = "",
@@ -67,7 +67,8 @@ class FazerSupplier:
             timeout=timeout,
             transport=transport,
         )
-        # Каталог читаем не чаще ~100 запросов в минуту (их лимит — 120).
+        # Каталог читаем не чаще ~30 запросов в минуту: у ключа FazerCards общий лимит (~60/мин),
+        # и им же могут пользоваться другие ваши боты — оставляем им половину.
         self._catalog_pause = catalog_pause
         # Откуда брать картинки, если поставщик отдал путь без домена (imageurl: "/uploads/…")
         origin = httpx.URL(base_url)
