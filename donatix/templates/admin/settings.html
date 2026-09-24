@@ -39,6 +39,14 @@
   </div>
 
   <div class="card">
+    <h3>Очередь запросов к FazerCards</h3>
+    <label for="supplier_rate">Не больше запросов в минуту <span class="muted">— на весь проект: сайт, API и все боты</span></label>
+    <input id="supplier_rate" name="supplier_rate" inputmode="numeric" value="{{ s.supplier_rate.per_minute }}" style="max-width:160px">
+    <div class="hint">Сейчас: {{ s.supplier_rate.last_minute }} за последнюю минуту · в очереди {{ s.supplier_rate.waiting }}.
+      Лишние запросы не отклоняются — ждут своей очереди. Покупки и проверка ID идут первыми, загрузка каталога — фоном.</div>
+  </div>
+
+  <div class="card">
     <h3>Админ-бот в Telegram</h3>
     {% if tg_on %}<p class="muted">Подключён. Откройте бота и нажмите /start — там меню со всеми разделами.</p>
     {% else %}<p class="muted">Не подключён. На сервере: <span class="mono">sudo bash /home/donatix/app/donatix/deploy/telegram.sh</span></p>{% endif %}

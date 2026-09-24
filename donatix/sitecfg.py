@@ -63,6 +63,9 @@ def load(conn: sqlite3.Connection, config: Config) -> None:
     support = db.get_setting(conn, "site.support")
     if support is not None:
         config.support_contact = support
+    rate = db.get_setting(conn, "supplier.rate_per_min")
+    from .throttle import SUPPLIER
+    SUPPLIER.configure(int(rate) if rate and rate.isdigit() else config.supplier_rate_per_min)
     approval = db.get_setting(conn, "site.require_approval")
     if approval in ("0", "1"):
         config.require_approval = approval == "1"
@@ -77,7 +80,13 @@ def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
         "reg_open": registration_open(conn),
         "client_bots": client_bots_enabled(conn),
         "max_bots": max_bots(conn),
+        "supplier_rate": _throttle_status(),
     }
+
+
+def _throttle_status() -> dict[str, int]:
+    from .throttle import SUPPLIER
+    return SUPPLIER.status()
 
 
 def _pct(raw: str, what: str, allow_empty: bool = False) -> str:
@@ -106,6 +115,14 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
     for key in ("reg_open", "client_bots", "require_approval"):
         if key in data:
             values[f"site.{key}"] = "1" if data[key] in (True, "1", "on") else "0"
+    if "supplier_rate" in data:
+        try:
+            rate = int(str(data["supplier_rate"]).strip())
+        except ValueError:
+            raise SettingsError("Запросов в минуту — целое число.") from None
+        if not 5 <= rate <= 600:
+            raise SettingsError("Запросов к поставщику в минуту — от 5 до 600.")
+        values["supplier.rate_per_min"] = str(rate)
     if "max_bots" in data:
         try:
             n = int(str(data["max_bots"]).strip())

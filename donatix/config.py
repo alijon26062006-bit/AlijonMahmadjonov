@@ -96,6 +96,8 @@ class Config:
     tjs_rate: Decimal = Decimal("10.9")
     # Курс берётся сам из открытых источников (каждые 5 минут, на странице оплаты — каждые 30 с)
     rate_auto: bool = True
+    # Не больше стольких запросов к поставщику в минуту на весь проект (очередь, не отказ)
+    supplier_rate_per_min: int = 50
     rate_margin_pct: Decimal = Decimal("1")
     pay_min_usd: Decimal = Decimal("5")
     # Минимальное пополнение в сомони и порог «мало денег» на балансе клиента, $
@@ -173,6 +175,7 @@ class Config:
             pay_methods=pay_methods,
             tjs_rate=Decimal(_env("DONATIX_TJS_RATE", "10.9")),
             rate_auto=_env("DONATIX_RATE_AUTO", "1") not in ("0", "false", "no"),
+            supplier_rate_per_min=int(_env("DONATIX_SUPPLIER_RATE", "50") or 50),
             rate_margin_pct=Decimal(_env("DONATIX_RATE_MARGIN", "1")),
             pay_min_usd=Decimal(_env("DONATIX_PAY_MIN_USD", "5")),
             pay_min_tjs=Decimal(_env("DONATIX_PAY_MIN_TJS", "100")),

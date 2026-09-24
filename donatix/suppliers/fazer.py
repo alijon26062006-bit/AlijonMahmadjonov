@@ -78,8 +78,16 @@ class FazerSupplier:
 
     # ── HTTP ──────────────────────────────────────────────────
 
-    def _request(self, method: str, path: str, *, retry_429: bool = True, **kwargs) -> dict[str, Any]:
+    def _request(self, method: str, path: str, *, retry_429: bool = True, background: bool = False,
+                 wait: float | None = None, **kwargs) -> dict[str, Any]:
+        from ..throttle import SUPPLIER, QueueTimeout
         for attempt in range(3):
+            try:
+                # Общая очередь: не больше N запросов в минуту на весь проект (админка → Настройки)
+                limit = wait if wait is not None else (600 if background else 25)
+                SUPPLIER.acquire(background=background, max_wait=limit)
+            except QueueTimeout as exc:
+                raise SupplierUnavailable(str(exc)) from exc
             try:
                 resp = self._client.request(method, path, **kwargs)
             except httpx.HTTPError as exc:
@@ -107,7 +115,7 @@ class FazerSupplier:
         """GET каталога; недоступные тарифу разделы (403) пропускаем."""
         time.sleep(self._catalog_pause)
         try:
-            return self._request("GET", path, params=params)
+            return self._request("GET", path, params=params, background=True)
         except SupplierRejected as exc:
             if exc.http_status in (403, 404):
                 log.info("fazer: %s недоступен (%s)", path, exc)
@@ -360,7 +368,7 @@ class FazerSupplier:
 
     def steam_gift_games(self) -> list[dict[str, Any]]:
         # Каталог большой (~12 000 игр); просим сразу много, поставщик может обрезать.
-        data = self._request("GET", "/steam-gifts/games", params={"limit": 20000})
+        data = self._request("GET", "/steam-gifts/games", params={"limit": 20000}, background=True)
         return [{"appid": int(g["appid"]), "name": str(g["name"])} for g in data.get("games", []) if g.get("appid")]
 
     def steam_gift_offers(self, appid: int) -> list[dict[str, Any]]:
@@ -401,5 +409,5 @@ class FazerSupplier:
         return bool(data.get("can_refill"))
 
     def balance(self) -> Decimal:
-        data = self._request("GET", "/balance")
+        data = self._request("GET", "/balance", background=True, wait=20)  # воркер не должен ждать
         return Decimal(str(data["balance"]))
