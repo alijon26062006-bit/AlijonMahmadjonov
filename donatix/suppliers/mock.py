@@ -35,10 +35,11 @@ def demo_catalog() -> list[ProductData]:
         items.append(ProductData(f"topup-pubg-{uc}", "topup", "pubg_mobile", "PUBG Mobile",
                                  f"{uc} UC", Decimal(price), fields=_PLAYER_FIELD,
                                  supplier_ref={"category_id": "pubg_mobile", "offer_id": f"uc{uc}"}))
-    for dm, price in ((100, "0.95"), (520, "4.60")):
-        items.append(ProductData(f"topup-ff-{dm}", "topup", "free_fire", "Free Fire",
-                                 f"{dm} алмазов", Decimal(price), fields=_PLAYER_FIELD,
-                                 supplier_ref={"category_id": "free_fire", "offer_id": f"d{dm}"}))
+    for dm, price, region in ((100, "0.95", "GLOBAL"), (520, "4.60", "GLOBAL"), (100, "0.89", "TR"),
+                              (520, "4.35", "TR")):
+        items.append(ProductData(f"topup-ff-{region.lower()}-{dm}", "topup", "free_fire", "Free Fire",
+                                 f"{dm} алмазов", Decimal(price), fields=_PLAYER_FIELD, region=region,
+                                 supplier_ref={"category_id": "free_fire", "offer_id": f"d{dm}{region}"}))
     for usd, price in ((5, "5.2500"), (10, "10.5000"), (20, "20.9000")):
         items.append(ProductData(f"gc-steam-{usd}", "gift_card", "steam_usd", "Steam USD",
                                  f"Steam — ${usd}", Decimal(price), max_qty=10, stock=50,

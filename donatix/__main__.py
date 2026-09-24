@@ -24,6 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("sync")
     sub.add_parser("check")
     sub.add_parser("prices")
+    sub.add_parser("inspect")
     admin = sub.add_parser("create-admin")
     admin.add_argument("email")
     args = parser.parse_args(argv)
@@ -75,6 +76,32 @@ def main(argv: list[str] | None = None) -> int:
                 cols = ["$" + fmt_unit(v) for v in (base, mine, mine - base)]
                 print(f"{name:<46} {cols[0]:>14} {cols[1]:>12} {cols[2]:>10}")
             print("\nSteam-гифты: цена берётся у поставщика на каждый заказ + наценка.")
+        elif args.cmd == "inspect":
+            # Показать, какие поля отдаёт поставщик у категорий и пакетов (для регионов и картинок)
+            import json
+
+            supplier = make_supplier(config)
+            if not hasattr(supplier, "_catalog_get"):
+                print("Работает только с DONATIX_SUPPLIER=fazer.")
+                return 1
+            for path, sub_path, key in (("/topups", "/topups/offers", "offers"),
+                                        ("/giftcards", "/giftcards/cards", "offers")):
+                data = supplier._catalog_get(path, limit=3, include_ui=1) or {}
+                cats = data.get("items", [])
+                print(f"== {path}: пример категории\n{json.dumps(cats[:1], ensure_ascii=False, indent=1)[:1500]}")
+                if cats:
+                    detail = supplier._catalog_get(sub_path, category_id=cats[0]["category_id"], include_ui=1) or {}
+                    offers = detail.get(key, [])
+                    head = {k: v for k, v in detail.items() if k != key}
+                    print(f"== {sub_path}: поля ответа\n{json.dumps(head, ensure_ascii=False, indent=1)[:1500]}")
+                    print(f"== пакеты (2 из {len(offers)})\n{json.dumps(offers[:2], ensure_ascii=False, indent=1)[:1500]}")
+            print("\nРегионы и картинки в каталоге:")
+            catalog.sync_catalog(conn, supplier)
+            for row in conn.execute("SELECT kind, category_name, COUNT(*) n, GROUP_CONCAT(DISTINCT region) r, "
+                                    "MAX(image_url) img FROM products WHERE kind IN ('topup', 'gift_card') "
+                                    "GROUP BY kind, category_id ORDER BY kind, category_name LIMIT 40"):
+                print(f"  {row['category_name'][:30]:<30} пакетов {row['n']:>3}  регионы: {row['r'] or '—':<20} "
+                      f"картинка: {'есть' if row['img'] else 'нет'}")
         elif args.cmd == "create-admin":
             password = getpass.getpass("Пароль (мин. 8 символов): ")
             login = args.email.split("@")[0][:32]

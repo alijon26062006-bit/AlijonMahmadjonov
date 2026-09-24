@@ -1,45 +1,66 @@
 {% extends "panel/_layout.html" %}
-{% from "_icons.html" import icon, kind_icon, media %}
-{% block title %}Каталог — {{ site_name }}{% endblock %}
+{% from "_icons.html" import icon, kind_icon, pack_icon, media %}
+{% block title %}{{ game.category_name if game else kind_titles.get(kind, 'Каталог') }} — {{ site_name }}{% endblock %}
 {% block content %}
+{% if game %}
+<section class="page-hero">
+  <a class="back" href="/panel/catalog?kind={{ game.kind }}">{{ icon('arrow-left', 18) }}{{ kind_titles[game.kind] }}</a>
+</section>
+<div class="game-head">
+  {{ media(game.image_url, game.category_name, game.kind, 'cover') }}
+  <div>
+    <h1>{{ game.category_name }}</h1>
+    <p class="muted">{{ count }} {{ 'пакетов' if count != 1 else 'пакет' }}</p>
+  </div>
+</div>
+{% if regions|length > 1 %}
+<div class="chips regions" role="group" aria-label="Регион">
+  <a class="chip {{ 'on' if not region }}" href="?kind={{ kind }}&category={{ category }}">Все регионы</a>
+  {% for r in regions %}<a class="chip {{ 'on' if r == region }}" href="?kind={{ kind }}&category={{ category }}&region={{ r }}">{{ region_title(r) }}</a>{% endfor %}
+</div>
+{% endif %}
+{% else %}
 <section class="page-hero">
   <h1>{{ kind_titles.get(kind, 'Каталог') }}</h1>
-  <p>Найдено: {{ count }}</p>
 </section>
-<form class="card" method="get" action="/panel/catalog">
-  <div class="filters">
-    <div class="full"><label class="label-caps" for="q">Поиск по каталогу</label>
-      <input id="q" name="q" value="{{ q }}" placeholder="PUBG, Steam, Premium…" type="search"></div>
-    <div><label class="label-caps" for="kind">Раздел</label>
-      <select id="kind" name="kind" onchange="this.form.submit()">
-        <option value="">Все</option>
-        {% for k in kinds %}<option value="{{ k }}" {{ 'selected' if k == kind }}>{{ kind_titles[k] }}</option>{% endfor %}
-      </select></div>
-    <div style="display:flex;align-items:end"><button class="btn block">Найти</button></div>
-  </div>
+<form class="search" method="get" action="/panel/catalog" role="search">
+  {% if kind %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
+  {{ icon('grid', 18) }}
+  <input name="q" value="{{ q }}" placeholder="{{ 'Найти игру или сервис' if games is defined else 'Поиск' }}" type="search" aria-label="Поиск">
 </form>
+{% endif %}
 
+{% if games is defined %}
+<div class="grid games">
+  {% for g in games %}
+  <a class="game-card" href="/panel/catalog?kind={{ g.kind }}&category={{ g.category_id | urlencode }}">
+    {{ media(g.image_url, g.category_name, g.kind) }}
+    <div class="game-name">{{ g.category_name }}</div>
+    <div class="game-meta">
+      <span>от ${{ g.from_price }}</span>
+      {% if g.regions|length > 1 %}<span>Регионов: {{ g.regions|length }}</span>
+      {% elif g.regions %}<span>{{ region_title(g.regions[0]) }}</span>{% endif %}
+    </div>
+  </a>
+  {% else %}
+  <div class="card empty">Ничего не найдено.</div>
+  {% endfor %}
+</div>
+{% else %}
 {% for group, items in groups.items() %}
-  <div class="section-title"><h2>{{ group }}</h2></div>
-  <div class="grid products">
+  {% if not game %}<div class="section-title"><h2>{{ group }}</h2></div>{% endif %}
+  <div class="grid packs-grid">
     {% for p in items %}
-    <a class="product-card has-media" href="/panel/buy/{{ p.product_id }}">
-      {{ media(p.image_url, p.category_name, p.kind) }}
-      <div style="display:flex;gap:12px;align-items:center">
-        <div class="tile sm k-{{ p.kind }}">{{ kind_icon(p.kind, 18) }}</div>
-        <div class="title" style="font-weight:700">{{ p.name }}</div>
-      </div>
-      <div class="muted small">
-        {% if p.unit == 'star' %}Цена за 1 звезду · от {{ p.min_quantity }} до {{ p.max_quantity }}
-        {% elif p.max_quantity > 1 %}До {{ p.max_quantity }} шт. за заказ{% if p.stock is not none %} · в наличии {{ p.stock }}{% endif %}
-        {% elif p.fields %}Нужно: {{ p.fields | map(attribute='label') | join(', ') }}
-        {% else %}Выдаётся код{% endif %}
-      </div>
-      <div class="row2"><span class="price">${{ p.price_usd }}</span><span class="go btn sm soft">Купить</span></div>
+    <a class="pack-card" href="/panel/buy/{{ p.product_id }}">
+      <span class="tile k-{{ p.kind }}">{{ pack_icon(p.kind, p.name, 20) }}</span>
+      <span class="pack-name">{{ p.name }}</span>
+      {% if p.region %}<span class="badge">{{ p.region_title }}</span>{% endif %}
+      <span class="pack-price">${{ p.price_usd }}{% if p.unit == 'star' %}<small> / звезда</small>{% endif %}</span>
     </a>
     {% endfor %}
   </div>
 {% else %}
-  <div class="card empty" style="margin-top:16px">Ничего не найдено. {% if not q %}Каталог ещё загружается от поставщика — загляните через минуту.{% endif %}</div>
+  <div class="card empty" style="margin-top:16px">Ничего не найдено.</div>
 {% endfor %}
+{% endif %}
 {% endblock %}

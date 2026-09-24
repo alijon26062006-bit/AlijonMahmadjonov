@@ -11,7 +11,7 @@ from typing import Any
 
 from . import db
 from .money import apply_markup, fmt_unit, to_decimal
-from .suppliers import KIND_TITLES, Supplier, SupplierError
+from .suppliers import KIND_TITLES, Supplier, SupplierError, region_title
 
 log = logging.getLogger(__name__)
 
@@ -27,8 +27,8 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier) -> dict[str, int]
             """
             INSERT INTO products (id, kind, category_id, category_name, name, base_price, unit,
                                   min_qty, max_qty, stock, fields_json, supplier_ref_json, active, updated_at,
-                                  image_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                                  image_url, region)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 kind = excluded.kind, category_id = excluded.category_id,
                 category_name = excluded.category_name, name = excluded.name,
@@ -36,11 +36,11 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier) -> dict[str, int]
                 min_qty = excluded.min_qty, max_qty = excluded.max_qty, stock = excluded.stock,
                 fields_json = excluded.fields_json, supplier_ref_json = excluded.supplier_ref_json,
                 active = 1, updated_at = excluded.updated_at,
-                image_url = COALESCE(excluded.image_url, products.image_url)
+                image_url = excluded.image_url, region = excluded.region
             """,
             (p.id, p.kind, p.category_id, p.category_name, p.name, str(p.base_price), p.unit,
              p.min_qty, max(p.max_qty, p.min_qty), p.stock, json.dumps(p.fields, ensure_ascii=False),
-             json.dumps(p.supplier_ref, ensure_ascii=False), started, p.image_url),
+             json.dumps(p.supplier_ref, ensure_ascii=False), started, p.image_url, p.region),
         )
     disabled = 0
     if seen:
@@ -78,8 +78,8 @@ def get_product(conn: sqlite3.Connection, product_id: str, *, for_sale: bool = T
 
 
 def list_products(
-    conn: sqlite3.Connection, *, kind: str = "", q: str = "", category_id: str = "", include_hidden: bool = False,
-    limit: int = 500, offset: int = 0,
+    conn: sqlite3.Connection, *, kind: str = "", q: str = "", category_id: str = "", region: str = "",
+    include_hidden: bool = False, limit: int = 500, offset: int = 0,
 ) -> list[dict[str, Any]]:
     sql = "SELECT * FROM products WHERE active = 1"
     args: list[Any] = []
@@ -91,6 +91,9 @@ def list_products(
     if category_id:
         sql += " AND category_id = ?"
         args.append(category_id)
+    if region:
+        sql += " AND region = ?"
+        args.append(region)
     if q:
         sql += " AND (name LIKE ? OR category_name LIKE ?)"
         args += [f"%{q}%", f"%{q}%"]
@@ -99,13 +102,20 @@ def list_products(
     return [load_product(r) for r in conn.execute(sql, args)]
 
 
-def categories(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    return conn.execute(
-        "SELECT kind, category_id, category_name, COUNT(*) AS n, MIN(CAST(base_price AS REAL)) AS from_price, "
-        "MAX(image_url) AS image_url "
-        "FROM products WHERE active = 1 AND hidden = 0 GROUP BY kind, category_id, category_name "
-        "ORDER BY kind, category_name"
-    ).fetchall()
+def categories(conn: sqlite3.Connection, kind: str = "", q: str = "") -> list[sqlite3.Row]:
+    """Игры и сервисы: одна строка на категорию, с обложкой и списком регионов."""
+    sql = ("SELECT kind, category_id, category_name, COUNT(*) AS n, MIN(CAST(base_price AS REAL)) AS from_price, "
+           "MAX(image_url) AS image_url, GROUP_CONCAT(DISTINCT region) AS regions "
+           "FROM products WHERE active = 1 AND hidden = 0")
+    args: list[Any] = []
+    if kind:
+        sql += " AND kind = ?"
+        args.append(kind)
+    if q:
+        sql += " AND (name LIKE ? OR category_name LIKE ?)"
+        args += [f"%{q}%", f"%{q}%"]
+    sql += " GROUP BY kind, category_id, category_name ORDER BY kind, category_name"
+    return conn.execute(sql, args).fetchall()
 
 
 def public_view(product: dict[str, Any], markup: Decimal) -> dict[str, Any]:
@@ -125,6 +135,8 @@ def public_view(product: dict[str, Any], markup: Decimal) -> dict[str, Any]:
         "stock": product["stock"],
         "fields": product["fields"],
         "image_url": product.get("image_url"),
+        "region": product.get("region"),
+        "region_title": region_title(product.get("region")),
         **(_steam_extra(product, price) if product["kind"] == "steam_topup" else {}),
     }
 

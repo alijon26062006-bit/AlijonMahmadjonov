@@ -10,6 +10,7 @@ from .base import (
     SupplierOrder,
     SupplierRejected,
     SupplierUnavailable,
+    region_title,
 )
 
 
@@ -35,4 +36,5 @@ __all__ = [
     "SupplierRejected",
     "SupplierUnavailable",
     "make_supplier",
+    "region_title",
 ]

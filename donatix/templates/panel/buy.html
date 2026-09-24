@@ -8,7 +8,7 @@
 <section class="page-hero">
   <a class="back" href="/panel/catalog?kind={{ p.kind }}">{{ icon('arrow-left', 18) }}{{ p.kind_title }}</a>
   <h1>{{ p.name }}</h1>
-  <p>{{ p.category_name }} · {% if p.unit == 'star' %}${{ p.price_usd }} за звезду{% else %}${{ p.price_usd }}{% if multi %} за штуку{% endif %}{% endif %}</p>
+  <p>{{ p.category_name }}{% if p.region %} · {{ p.region_title }}{% endif %} · {% if p.unit == 'star' %}${{ p.price_usd }} за звезду{% else %}${{ p.price_usd }}{% if multi %} за штуку{% endif %}{% endif %}</p>
 </section>
 {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
 

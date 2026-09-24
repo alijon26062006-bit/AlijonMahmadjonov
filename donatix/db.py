@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS products (
     max_qty           INTEGER NOT NULL DEFAULT 1,
     stock             INTEGER,           -- NULL — без ограничения
     image_url         TEXT,              -- обложка из каталога поставщика
+    region            TEXT,              -- код региона (TR, GLOBAL…), если есть
     fields_json       TEXT NOT NULL DEFAULT '[]',
     supplier_ref_json TEXT NOT NULL DEFAULT '{}',
     active            INTEGER NOT NULL DEFAULT 1,
@@ -177,6 +178,8 @@ def init(path: Path | str) -> None:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(products)")}
         if "image_url" not in cols:  # база, созданная до появления картинок
             conn.execute("ALTER TABLE products ADD COLUMN image_url TEXT")
+        if "region" not in cols:
+            conn.execute("ALTER TABLE products ADD COLUMN region TEXT")
     finally:
         conn.close()
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Iterable, Protocol
@@ -35,6 +36,7 @@ class ProductData:
     fields: list[dict[str, str]] = field(default_factory=list)
     supplier_ref: dict[str, Any] = field(default_factory=dict)
     image_url: str | None = None
+    region: str | None = None
 
 
 @dataclass
@@ -105,6 +107,65 @@ def pick_image(*sources: Any) -> str | None:
                 if isinstance(val, str) and val.startswith(("https://", "http://")):
                     return val
     return None
+
+
+# Регионы: код → как показываем клиенту. Незнакомый код показываем как есть.
+REGION_TITLES = {
+    "GLOBAL": "Глобальный", "WW": "Глобальный", "CIS": "СНГ", "RU": "Россия", "KZ": "Казахстан",
+    "UA": "Украина", "BY": "Беларусь", "UZ": "Узбекистан", "TJ": "Таджикистан", "KG": "Киргизия",
+    "TR": "Турция", "EU": "Европа", "US": "США", "UK": "Великобритания", "GB": "Великобритания",
+    "DE": "Германия", "PL": "Польша", "FR": "Франция", "IN": "Индия", "ID": "Индонезия",
+    "PH": "Филиппины", "MY": "Малайзия", "SG": "Сингапур", "TH": "Таиланд", "VN": "Вьетнам",
+    "BR": "Бразилия", "LATAM": "Лат. Америка", "MENA": "Ближний Восток", "AE": "ОАЭ", "SA": "Сауд. Аравия",
+    "AR": "Аргентина", "MX": "Мексика", "JP": "Япония", "KR": "Корея", "CN": "Китай", "TW": "Тайвань",
+    "ASIA": "Азия", "SEA": "Юго-Вост. Азия", "NA": "Сев. Америка",
+}
+_REGION_WORDS = {
+    "global": "GLOBAL", "глобал": "GLOBAL", "worldwide": "GLOBAL", "россия": "RU", "russia": "RU",
+    "турция": "TR", "turkey": "TR", "türkiye": "TR", "казахстан": "KZ", "kazakhstan": "KZ",
+    "europe": "EU", "европа": "EU", "снг": "CIS", "usa": "US", "indonesia": "ID", "индонезия": "ID",
+    "philippines": "PH", "malaysia": "MY", "brazil": "BR", "india": "IN", "ukraine": "UA", "украина": "UA",
+}
+_REGION_KEYS = ("region", "region_code", "regionCode", "country", "country_code", "countryCode", "server_region")
+
+
+def region_title(code: str | None) -> str:
+    return REGION_TITLES.get((code or "").upper(), code or "")
+
+
+def pick_region(name: str = "", *sources: Any) -> str | None:
+    """Регион товара: из полей ответа поставщика, иначе — из названия («… (TR)», «Global»)."""
+    for src in sources:
+        if not isinstance(src, dict):
+            continue
+        for key in _REGION_KEYS:
+            val = src.get(key)
+            if isinstance(val, dict):
+                val = val.get("code") or val.get("name")
+            if isinstance(val, str) and val.strip():
+                return _norm_region(val)
+        regions = src.get("regions")
+        if isinstance(regions, list) and len(regions) == 1 and isinstance(regions[0], str):
+            return _norm_region(regions[0])
+    for token in re.findall(r"[\(\[]([^\)\]]{2,20})[\)\]]", name):
+        code = _norm_region(token, strict=True)
+        if code:
+            return code
+    for word in re.findall(r"[\wÀ-ž]+", name.lower()):
+        if word in _REGION_WORDS:
+            return _REGION_WORDS[word]
+    return None
+
+
+def _norm_region(value: str, strict: bool = False) -> str | None:
+    v = value.strip()
+    if v.lower() in _REGION_WORDS:
+        return _REGION_WORDS[v.lower()]
+    if v.upper() in REGION_TITLES:
+        return v.upper()
+    if strict:
+        return None
+    return v[:20]
 
 
 def normalize_status(raw: str | None) -> str:

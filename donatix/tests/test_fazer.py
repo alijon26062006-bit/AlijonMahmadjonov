@@ -127,8 +127,24 @@ def test_catalog_images_are_picked_up():
                 "meta": {"has_more": False}})
         if p == "/topups/offers":
             return httpx.Response(200, json={"ok": True, "name": "PUBG Mobile", "fields": [],
-                                             "offers": [{"offer_id": "o1", "name": "60 UC", "price_usd": "0.99"}]})
+                                             "offers": [{"offer_id": "o1", "name": "60 UC (TR)", "price_usd": "0.99",
+                                                         "image": "https://cdn.example/60uc.png"},
+                                                        {"offer_id": "o2", "name": "325 UC", "price_usd": "4.75",
+                                                         "region": "Global"}]})
         return httpx.Response(403, json={"ok": False, "error": "no"})
 
     items = list(make(handler).fetch_catalog())
-    assert items[0].image_url == "https://cdn.example/pubg.jpg"
+    # у пакета своя картинка («60 UC»), но показываем обложку игры
+    assert [i.image_url for i in items] == ["https://cdn.example/pubg.jpg"] * 2
+    assert [i.region for i in items] == ["TR", "GLOBAL"]
+
+
+def test_pick_region():
+    from donatix.suppliers.base import pick_region, region_title
+
+    assert pick_region("100 алмазов", {"region": "tr"}) == "TR"
+    assert pick_region("100 Diamonds [Indonesia]") == "ID"
+    assert pick_region("Steam Wallet 10 USD Global") == "GLOBAL"
+    assert pick_region("60 UC", {"country": {"code": "KZ"}}) == "KZ"
+    assert pick_region("Player ID top-up (fast)") is None
+    assert region_title("TR") == "Турция" and region_title("XYZ") == "XYZ"

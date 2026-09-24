@@ -110,3 +110,23 @@ def test_admin_refunds_attention_order(client, conn, app, shop, supplier, monkey
     assert balance(conn, shop["id"]) == 1_000_000
     client.post(f"/admin/orders/{oid['id']}/refund", data={"csrf": token, "reason": "ещё раз"})
     assert balance(conn, shop["id"]) == 1_000_000
+
+
+def test_catalog_games_and_regions(app, config, conn):
+    from conftest import web_login
+    from fastapi.testclient import TestClient
+
+    from donatix import accounts, catalog
+
+    catalog.sync_catalog(conn, app.state.supplier)
+    accounts.create_user(conn, email="g@example.com", login="gamer", password="password123", status="active")
+    client = TestClient(app)
+    web_login(client, "g@example.com", "password123")
+    page = client.get("/panel/catalog?kind=topup").text
+    assert "game-card" in page and "Free Fire" in page and "Регионов: 2" in page
+    assert "pack-card" not in page  # сначала выбирают игру
+    assert "от $0.9612" in page and "$0.89<" not in page  # 0.89 + 8%, закупку не видно
+    page = client.get("/panel/catalog?kind=topup&category=free_fire").text
+    assert page.count("pack-card\"") == 4 and "Турция" in page and "Все регионы" in page
+    page = client.get("/panel/catalog?kind=topup&category=free_fire&region=TR").text
+    assert page.count("pack-card\"") == 2

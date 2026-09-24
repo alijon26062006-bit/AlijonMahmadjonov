@@ -18,6 +18,7 @@ import httpx
 from .base import (
     ProductData,
     pick_image,
+    pick_region,
     steam_gift_product,
     SupplierOrder,
     SupplierRejected,
@@ -205,7 +206,9 @@ class FazerSupplier:
                     base_price=Decimal(str(offer["price_usd"])),
                     fields=fields,
                     supplier_ref={"category_id": cat_id, "offer_id": str(offer["offer_id"])},
-                    image_url=pick_image(offer, data, cat),
+                    # Картинка — обложка игры; у пакетов («25 алмазов») свои картинки не берём
+                    image_url=pick_image(cat, data),
+                    region=pick_region(str(offer["name"]), offer, data, cat),
                 )
 
     def _giftcards(self) -> Iterable[ProductData]:
@@ -226,7 +229,8 @@ class FazerSupplier:
                     max_qty=min(int(offer.get("max_order_quantity") or 1), 100),
                     stock=int(offer["stock"]) if offer.get("stock") is not None else None,
                     supplier_ref={"category_id": cat_id, "card_id": str(offer["card_id"])},
-                    image_url=pick_image(offer, data, cat),
+                    image_url=pick_image(cat, data),
+                    region=pick_region(str(offer["name"]), offer, data, cat),
                 )
 
     # ── Заказы ────────────────────────────────────────────────

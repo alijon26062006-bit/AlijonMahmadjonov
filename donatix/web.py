@@ -12,8 +12,8 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from . import accounts, catalog, orders
 from .config import PAY_METHODS, Config
 from .deps import LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
-from .money import apply_markup, fmt, order_total_micro, to_decimal
-from .suppliers import KINDS
+from .money import apply_markup, fmt, fmt_unit, order_total_micro, to_decimal
+from .suppliers import KINDS, region_title
 
 router = APIRouter(include_in_schema=False)
 
@@ -169,18 +169,41 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
     })
 
 
+# Разделы, где товары сгруппированы по играм/сервисам: сначала выбирают игру, потом пакет
+_BY_GAME = ("topup", "gift_card")
+
+
 @router.get("/panel/catalog")
 def panel_catalog(
-    request: Request, kind: str = "", q: str = "", category: str = "",
+    request: Request, kind: str = "", q: str = "", category: str = "", region: str = "",
     user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config),
 ):
-    items = [catalog.public_view(p, accounts.markup_for(user, config, p["kind"])) for p in
-             catalog.list_products(conn, kind=kind if kind in KINDS else "", q=q[:100], category_id=category)]
+    kind = kind if kind in KINDS else ""
+    q = q[:100]
+    if kind in _BY_GAME and not category:
+        # Цена «от» — уже с наценкой клиента, закупочную не показываем
+        games = [
+            {**dict(c), "regions": sorted(filter(None, (c["regions"] or "").split(","))),
+             "from_price": fmt_unit(apply_markup(to_decimal(str(c["from_price"])),
+                                                 accounts.markup_for(user, config, c["kind"])))}
+            for c in catalog.categories(conn, kind=kind, q=q)
+        ]
+        return render(request, "panel/catalog.html", {
+            "user": user, "games": games, "kind": kind, "q": q, "kinds": KINDS, "count": len(games),
+            "region_title": region_title,
+        })
+    products = catalog.list_products(conn, kind=kind, q=q, category_id=category)
+    regions = sorted({p["region"] for p in products if p.get("region")})
+    game = products[0] if category and products else None
+    if region:
+        products = [p for p in products if p.get("region") == region]
+    items = [catalog.public_view(p, accounts.markup_for(user, config, p["kind"])) for p in products]
     groups: dict[str, list] = {}
     for item in items:
         groups.setdefault(f"{item['kind_title']} · {item['category_name']}", []).append(item)
     return render(request, "panel/catalog.html", {
         "user": user, "groups": groups, "kind": kind, "q": q, "kinds": KINDS, "count": len(items),
+        "category": category, "game": game, "regions": regions, "region": region, "region_title": region_title,
     })
 
 
