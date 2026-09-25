@@ -852,6 +852,63 @@ async def find_user(conn: aiosqlite.Connection, query: str) -> User | None:
     return _from_row(User, row) if row else None
 
 
+async def search_users(conn: aiosqlite.Connection, query: str, limit: int = 10) -> list[User]:
+    """Клиенты по ID, @нику или имени — сначала точные совпадения, потом похожие."""
+    q = (query or "").strip().lstrip("@")
+    if not q:
+        return []
+    found: list[User] = []
+    if q.isdigit():
+        user = await get_user(conn, int(q))
+        if user:
+            found.append(user)
+    like = f"%{q.lower()}%"
+    # SQLite lower() не знает кириллицу — «алиджон» не нашёл бы «Алиджон»
+    await conn.create_function("ulower", 1, lambda v: (v or "").lower(), deterministic=True)
+    async with conn.execute(
+        """SELECT * FROM users
+           WHERE ulower(username) LIKE ? OR ulower(first_name) LIKE ?
+                 OR CAST(id AS TEXT) LIKE ?
+           ORDER BY (ulower(username) = ?) DESC, total_deposit DESC LIMIT ?""",
+        (like, like, f"{q}%", q.lower(), limit),
+    ) as cur:
+        for row in await cur.fetchall():
+            user = _from_row(User, row)
+            if all(u.id != user.id for u in found):
+                found.append(user)
+    return found[:limit]
+
+
+async def user_timeline(conn: aiosqlite.Connection, user_id: int, limit: int = 10,
+                        offset: int = 0) -> tuple[list[dict], int]:
+    """Всё по клиенту одной лентой, новое сверху: пополнения, покупки, ручные правки баланса."""
+    sql = """
+        SELECT 'deposit' AS kind, id, amount AS amount, method AS what, '' AS extra, status, created_at
+          FROM deposits WHERE user_id = :u
+        UNION ALL
+        SELECT 'order', id, price, product_type, recipient || '|' || quantity, status, created_at
+          FROM orders WHERE user_id = :u
+        UNION ALL
+        SELECT 'adjust', id, amount, coalesce(reason, ''), '', '', created_at
+          FROM adjustments WHERE user_id = :u
+    """
+    async with conn.execute(f"SELECT COUNT(*) FROM ({sql})", {"u": user_id}) as cur:
+        total = (await cur.fetchone())[0]
+    async with conn.execute(f"{sql} ORDER BY created_at DESC, id DESC LIMIT :l OFFSET :o",
+                            {"u": user_id, "l": limit, "o": offset}) as cur:
+        rows = [dict(zip([c[0] for c in cur.description], r)) for r in await cur.fetchall()]
+    return rows, total
+
+
+async def user_spent(conn: aiosqlite.Connection, user_id: int) -> tuple[int, str]:
+    """Сколько потратил на выполненные заказы и когда была последняя покупка."""
+    async with conn.execute(
+        "SELECT COALESCE(SUM(CASE WHEN status = ? THEN price END), 0), MAX(created_at) FROM orders "
+        "WHERE user_id = ?", (ORDER_DELIVERED, user_id)) as cur:
+        spent, last = await cur.fetchone()
+    return int(spent or 0), last or ""
+
+
 @dataclass
 class Adjustment:
     id: int

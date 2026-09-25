@@ -73,6 +73,7 @@ def home_kb() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📥 Заявки клиентов", callback_data="pn:deposits"),
             InlineKeyboardButton(text="💳 Реквизиты", callback_data="pn:pay"),
         )
+        kb.row(btn("👥 Мои клиенты · поиск и история", "pn:users", style=PRIMARY))
         from app import texts as _t
         contact = _t.support_username()
         kb.row(InlineKeyboardButton(text=f"📞 Мой контакт · @{contact}" if contact else "📞 Мой контакт — не задан",
@@ -2489,7 +2490,7 @@ async def cb_dc_test(call: CallbackQuery) -> None:
 # ═════════════════════════════════════════════════════════════ клиенты
 
 
-def user_card(user: db.User, stats: dict, history: list) -> str:
+def user_card(user: db.User, stats: dict, history: list, spent: int = 0, last: str = "") -> str:
     name = f"@{user.username}" if user.username else (user.first_name or "без имени")
     lines = "\n".join(
         f"├ {'+' if adj.amount > 0 else '−'}{fmt(abs(adj.amount))}"
@@ -2506,10 +2507,12 @@ def user_card(user: db.User, stats: dict, history: list) -> str:
         f"└ Пришёл: <b>{user.source or 'сам'}</b>\n\n"
         f"[[money]] <b>Финансы</b>\n"
         f"├ Баланс: <b>{fmt(user.balance)}</b>\n"
-        f"└ Пополнено всего: <b>{fmt(user.total_deposit)}</b>\n\n"
+        f"├ Пополнено всего: <b>{fmt(user.total_deposit)}</b>\n"
+        f"└ Потрачено на покупки: <b>{fmt(spent)}</b>\n\n"
         f"📦 <b>Заказы</b>\n"
         f"├ Всего: <b>{stats['total']}</b>, выполнено: <b>{stats['done']}</b>\n"
-        f"└ Звёзд куплено: <b>{stats['stars']}</b>\n\n"
+        f"├ Звёзд куплено: <b>{stats['stars']}</b>\n"
+        f"└ Последняя покупка: <b>{_when(last) if last else '—'}</b>\n\n"
         + (f"[[block]] <b>Заблокирован</b>" if user.is_banned else "")
         + manual
     )
@@ -2521,6 +2524,7 @@ def user_kb(user: db.User) -> InlineKeyboardMarkup:
         btn("➕ Начислить", f"pn:give:{user.id}", style=SUCCESS),
         btn("➖ Списать", f"pn:take:{user.id}", style=DANGER),
     )
+    kb.row(btn("📜 Вся история: пополнения и покупки", f"pn:uhist:{user.id}:0", style=PRIMARY))
     kb.row(btn(
         "✅ Разблокировать" if user.is_banned else "🚫 Заблокировать",
         f"pn:ban:{user.id}",
@@ -2538,7 +2542,8 @@ async def show_user(call: CallbackQuery, conn: aiosqlite.Connection, user_id: in
         return
     stats = await db.user_order_stats(conn, user_id)
     history = await db.list_adjustments(conn, user_id=user_id)
-    await safe_edit(call, substitute(user_card(user, stats, history)), user_kb(user))
+    spent, last = await db.user_spent(conn, user_id)
+    await safe_edit(call, substitute(user_card(user, stats, history, spent, last)), user_kb(user))
 
 
 @router.callback_query(F.data == "pn:users")
@@ -2562,8 +2567,8 @@ async def cb_users(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Conne
     await safe_edit(
         call,
         "👥 <b>Клиенты</b>\n\n"
-        "<blockquote>Пришлите <b>ID</b> или <b>@username</b> — покажу карточку "
-        "с балансом и кнопками начисления и списания.</blockquote>" + tail,
+        "<blockquote>Пришлите <b>имя</b>, <b>@ник</b> или <b>ID</b> клиента — покажу карточку: "
+        "баланс, все пополнения и покупки, кнопки «Начислить», «Списать», «Заблокировать».</blockquote>" + tail,
         kb.as_markup(),
     )
     await call.answer()
@@ -2898,21 +2903,102 @@ async def cb_transfer_go(
 async def on_user_search(
     message: Message, state: FSMContext, conn: aiosqlite.Connection
 ) -> None:
-    user = await db.find_user(conn, message.text or "")
-    if user is None:
+    found = await db.search_users(conn, message.text or "")
+    if not found:
         await message.answer(
-            "❌ Такого клиента нет.\n\n"
-            "<blockquote>Он появится в базе только после того, как хотя бы "
+            "❌ Никого не нашёл. Пришлите имя, @ник или ID ещё раз.\n\n"
+            "<blockquote>Клиент появляется в базе после того, как хотя бы "
             "раз напишет боту.</blockquote>"
         )
         return
+    if len(found) > 1:
+        kb = InlineKeyboardBuilder()
+        for u in found:
+            name = f"@{u.username}" if u.username else (u.first_name or "без имени")
+            kb.row(InlineKeyboardButton(text=f"👤 {name} · {u.id} · {fmt(u.balance)}",
+                                        callback_data=f"pn:user:{u.id}"))
+        kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
+        await message.answer(f"👥 Нашёл: <b>{len(found)}</b>. Выберите клиента "
+                             "(или пришлите запрос точнее):", reply_markup=kb.as_markup())
+        return
 
+    user = found[0]
     await state.clear()
     stats = await db.user_order_stats(conn, user.id)
     history = await db.list_adjustments(conn, user_id=user.id)
+    spent, last = await db.user_spent(conn, user.id)
     await message.answer(
-        substitute(user_card(user, stats, history)), reply_markup=user_kb(user)
+        substitute(user_card(user, stats, history, spent, last)), reply_markup=user_kb(user)
     )
+
+
+def _when(stamp: str) -> str:
+    """2026-09-25T14:03:11 → 25.09 14:03 (время по Душанбе)."""
+    from datetime import datetime, timedelta, timezone
+    try:
+        dt = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return stamp[:16]
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return (dt.astimezone(timezone(timedelta(hours=5)))).strftime("%d.%m.%y %H:%M")
+
+
+HIST_PAGE = 10
+DEP_STATUS = {"pending": "⏳", "approved": "✅", "rejected": "❌"}
+ORD_STATUS = {"delivered": "✅", "delivering": "⏳", "failed": "🔍", "refunded": "↩️"}
+
+
+def _hist_line(row: dict) -> str:
+    when = _when(row["created_at"])
+    if row["kind"] == "deposit":
+        return (f"{DEP_STATUS.get(row['status'], '•')} <b>+{fmt(row['amount'])}</b> пополнение"
+                f" · {row['what']}\n    <i>{when}</i>")
+    if row["kind"] == "adjust":
+        sign = "+" if row["amount"] > 0 else "−"
+        return (f"✍️ <b>{sign}{fmt(abs(row['amount']))}</b> вручную"
+                + (f" · {row['what']}" if row["what"] else "") + f"\n    <i>{when}</i>")
+    recipient, _, qty = (row["extra"] or "").rpartition("|")
+    if row["what"] == "stars":
+        title = f"⭐ {qty} звёзд"
+    elif row["what"] == "premium":
+        title = f"👑 Premium {qty} мес."
+    elif row["what"] == "steam":
+        title = f"🎮 Steam {qty}"
+    else:
+        title = db.product_title(row["what"]) + (f" × {qty}" if qty and qty != "1" else "")
+    return (f"{ORD_STATUS.get(row['status'], '•')} <b>−{fmt(row['amount'])}</b> {title}"
+            + (f" → <code>{recipient[:40]}</code>" if recipient else "") + f"\n    <i>{when}</i>")
+
+
+@router.callback_query(F.data.startswith("pn:uhist:"))
+async def cb_user_history(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection) -> None:
+    """Вся история клиента по страницам: пополнения, покупки, ручные правки — новое сверху."""
+    await state.clear()
+    _, _, raw_id, raw_page = call.data.split(":")
+    user_id, page = int(raw_id), max(int(raw_page), 0)
+    user = await db.get_user(conn, user_id)
+    if user is None:
+        await call.answer("Клиент не найден.", show_alert=True)
+        return
+    rows, total = await db.user_timeline(conn, user_id, HIST_PAGE, page * HIST_PAGE)
+    pages = max(1, -(-total // HIST_PAGE))
+    name = f"@{user.username}" if user.username else (user.first_name or str(user.id))
+    body = "\n".join(_hist_line(r) for r in rows) if rows else "<i>Пока ничего: ни пополнений, ни покупок.</i>"
+    kb = InlineKeyboardBuilder()
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="‹ Новее", callback_data=f"pn:uhist:{user_id}:{page - 1}"))
+    if page < pages - 1:
+        nav.append(InlineKeyboardButton(text="Старее ›", callback_data=f"pn:uhist:{user_id}:{page + 1}"))
+    if nav:
+        kb.row(*nav)
+    kb.row(btn("👤 Карточка клиента", f"pn:user:{user_id}"))
+    await safe_edit(call, f"📜 <b>История {name}</b> · {total} записей · стр. {page + 1}/{pages}\n"
+                          f"<code>{texts.LINE}</code>\n\n{body}\n\n"
+                          "<i>✅ выполнено · ⏳ в процессе · ❌ отклонено · ↩️ деньги возвращены</i>",
+                    kb.as_markup())
+    await call.answer()
 
 
 @router.callback_query(F.data.startswith(("pn:give:", "pn:take:")))
