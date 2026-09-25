@@ -122,6 +122,9 @@ class Config:
     binance_pay_key: str = ""
     binance_pay_secret: str = ""
     trongrid_key: str = ""
+    # Bybit: ключ API вашего аккаунта «только чтение» (Wallet/Asset) — видеть входящие USDT
+    bybit_key: str = ""
+    bybit_secret: str = ""
     yandex_verify: str = ""
     # Часовой пояс для аналитики, часы от UTC (Душанбе — 5)
     tz_offset: int = 5
@@ -175,6 +178,8 @@ class Config:
             binance_pay_key=_env("DONATIX_BINANCE_PAY_KEY"),
             binance_pay_secret=_env("DONATIX_BINANCE_PAY_SECRET"),
             trongrid_key=_env("DONATIX_TRONGRID_KEY"),
+            bybit_key=_env("DONATIX_BYBIT_KEY"),
+            bybit_secret=_env("DONATIX_BYBIT_SECRET"),
             yandex_verify=_env("DONATIX_YANDEX_VERIFY"),
             tz_offset=int(_env("DONATIX_TZ_OFFSET") or 5),
             run_bots=_flag("DONATIX_RUN_BOTS", True),

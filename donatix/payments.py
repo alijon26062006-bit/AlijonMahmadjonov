@@ -108,12 +108,16 @@ def clean_methods(methods_in: list[dict[str, Any]]) -> list[dict[str, Any]]:
         icon = str(m.get("icon") or "")
         icon = icon if ICON_NAME_RE.fullmatch(icon) else ""
         auto = str(m.get("auto") or "")
-        auto = auto if auto in ("trc20", "binance") else ""
+        auto = auto if auto in ("trc20", "binance", "bybit") else ""
         if auto == "trc20":
             from .cryptopay import tron_address
             currency, network = "USDT", "TRC20"
             if not tron_address(details):
                 raise PaymentError(f"«{title}»: для автозачисления TRC20 в реквизитах нужен адрес кошелька (T…).")
+        elif auto == "bybit":
+            currency, network = "USDT", ""
+            if not re.search(r"\d{5,12}", details):
+                raise PaymentError(f"«{title}»: для автозачисления Bybit в реквизитах нужен ваш Bybit UID (цифры).")
         elif auto == "binance":
             currency, network = "USDT", ""
             details = details or "Оплата через Binance Pay — кнопка появится после ввода суммы"
@@ -218,7 +222,7 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
     chosen = next(m for m in conf["all_methods"] if m["code"] == method)
     currency = chosen["currency"]
     pay, cur = pay_amount(conf["tjs_rate"], currency, usd)
-    if chosen.get("auto") == "trc20":
+    if chosen.get("auto") in ("trc20", "bybit"):
         from .cryptopay import CryptoPayError, unique_amount
         try:
             pay, cur = str(unique_amount(conn, usd)), "USDT"  # по «хвосту» суммы узнаём перевод в блокчейне
@@ -371,6 +375,9 @@ def public(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) -> dict[str
         "address": (p["pay_address"] or "") if p["status"] == "pending" else "",
         "auto_note": ("Переведите ровно эту сумму USDT (TRC20) — баланс пополнится сам за 1–3 минуты, чек не нужен."
                       if p["auto_kind"] == "trc20" else
+                      "Переведите в Bybit ровно эту сумму USDT по UID (Активы → Перевод → по UID) — "
+                      "баланс пополнится сам за 1–3 минуты, чек не нужен."
+                      if p["auto_kind"] == "bybit" else
                       "Оплатите по ссылке в Binance — баланс пополнится сам, чек не нужен."
                       if p["auto_kind"] == "binance" else ""),
     }

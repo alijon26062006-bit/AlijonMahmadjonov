@@ -199,6 +199,10 @@ def _auto_text(p: dict) -> str:
         head += (f"<b>Адрес USDT · сеть TRC20:</b>\n<code>{esc(p.get('address', ''))}</code>\n\n"
                  f"⚠️ Переведите <b>ровно {esc(p['pay_amount'])} USDT</b> — по последним цифрам суммы "
                  "мы узнаём ваш перевод. Другая сумма или сеть сама не зачислится.\n\n")
+    elif p["auto"] == "bybit":
+        head += (f"<b>Bybit UID получателя:</b> <code>{esc(p.get('address', ''))}</code>\n\n"
+                 f"В Bybit: Активы → Перевод → <b>По UID</b>, USDT, ровно <b>{esc(p['pay_amount'])}</b> — "
+                 "по последним цифрам суммы мы узнаём ваш перевод.\n\n")
     return head + "Баланс пополнится сам за 1–3 минуты — чек присылать не нужно."
 
 

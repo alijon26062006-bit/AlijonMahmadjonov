@@ -94,3 +94,27 @@ def test_binance_error_cancels(app, config, conn, monkeypatch):
     r = c.post("/panel/balance", data={"csrf": token, "method": "usdt", "amount": "20"})
     assert "invalid key" in r.text
     assert conn.execute("SELECT status FROM payments").fetchone()[0] == "cancelled"
+
+
+def test_bybit_uid_auto_credit(app, config, conn, monkeypatch):
+    config.bybit_key, config.bybit_secret = "k", "s"
+    _method(conn, config, "bybit", "Bybit UID 123456789")
+    uid, c, token = _client(app, conn)
+    r = c.post("/panel/balance", data={"csrf": token, "method": "usdt", "amount": "30"}, follow_redirects=False)
+    p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
+    assert p["auto_kind"] == "bybit" and p["pay_address"] == "123456789"
+    assert "По UID" in c.get(r.headers["location"]).text
+    ts = cryptopay._ms(p["created_at"]) + 3000
+    internal = [{"id": "555", "amount": p["pay_amount"], "status": 2, "createdTime": str(ts), "coin": "USDT"}]
+
+    def fake(cfg, path, params):
+        return {"rows": internal if "internal" in path else []}
+    monkeypatch.setattr(cryptopay, "_bybit_get", fake)
+    assert cryptopay.check_all(conn, config) == 1
+    assert balance(conn, uid) == 300_000
+
+
+def test_bybit_needs_uid(conn, config):
+    import pytest
+    with pytest.raises(payments.PaymentError):
+        _method(conn, config, "bybit", "без номера")
