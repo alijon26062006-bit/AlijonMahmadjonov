@@ -133,6 +133,7 @@ def check_trc20(conn: sqlite3.Connection, config: Config) -> int:
                              (t["tx"], t["tx"][:200], r["id"]))
                 if payments.confirm(conn, config, r["id"], _admin_id(conn)):
                     done += 1
+                    _tell_admin(conn, config, r["id"], "USDT TRC20")
                     log.info("trc20: заявка #%s оплачена, tx %s", r["id"], t["tx"])
                 break
     return done
@@ -206,6 +207,7 @@ def check_bybit(conn: sqlite3.Connection, config: Config) -> int:
                          (t["tx"], t["tx"][:200], r["id"]))
             if payments.confirm(conn, config, r["id"], _admin_id(conn)):
                 done += 1
+                _tell_admin(conn, config, r["id"], "Bybit")
                 log.info("bybit: заявка #%s оплачена (%s)", r["id"], t["tx"])
             break
     return done
@@ -278,9 +280,14 @@ def check_binance(conn: sqlite3.Connection, config: Config, only_id: int | None 
         if status == "PAID":
             if payments.confirm(conn, config, r["id"], _admin_id(conn)):
                 done += 1
+                _tell_admin(conn, config, r["id"], "Binance Pay")
         elif status in ("EXPIRED", "CANCELED", "CANCELLED", "ERROR"):
-            conn.execute("UPDATE payments SET status = 'cancelled', admin_note = ?, resolved_at = ? "
-                         "WHERE id = ? AND status = 'pending'", (f"Binance Pay: {status}", db.now(), r["id"]))
+            if conn.execute("UPDATE payments SET status = 'cancelled', admin_note = ?, resolved_at = ? "
+                            "WHERE id = ? AND status = 'pending'",
+                            (f"Binance Pay: {status}", db.now(), r["id"])).rowcount:
+                from .notify import notify
+                notify(conn, config, r["user_id"], f"Заявка #{r['id']} отменена: ссылка Binance Pay истекла "
+                                                   "или оплата отменена. Создайте новую.", "/panel/balance")
     return done
 
 
@@ -319,6 +326,16 @@ def check_all(conn: sqlite3.Connection, config: Config, min_interval: float = 20
 def reset() -> None:
     global _last_check
     _last_check = 0.0
+
+
+def _tell_admin(conn: sqlite3.Connection, config: Config, payment_id: int, how: str) -> None:
+    from .money import fmt
+    from .worker import notify_admin
+    p = conn.execute("SELECT p.amount_micro, u.login FROM payments p JOIN users u ON u.id = p.user_id "
+                     "WHERE p.id = ?", (payment_id,)).fetchone()
+    if p:
+        notify_admin(config, f"⚡️ Автоплатёж {how}: заявка #{payment_id}, клиент {p['login']}, "
+                             f"зачислено ${fmt(p['amount_micro'])}.")
 
 
 def _admin_id(conn: sqlite3.Connection) -> int:

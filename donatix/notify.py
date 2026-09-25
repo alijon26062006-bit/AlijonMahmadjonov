@@ -19,10 +19,44 @@ def notify(conn: sqlite3.Connection, config: Config | None, user_id: int, text: 
         "INSERT INTO notifications (user_id, text, link, created_at) VALUES (?, ?, ?, ?)",
         (user_id, text[:500], link or None, db.now()),
     )
+    if config:
+        _push_to_bots(conn, config, user_id, text, link)
     if config and config.smtp_host:
         row = conn.execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
         if row:
             threading.Thread(target=_send_email, args=(config, row["email"], text, link), daemon=True).start()
+
+
+def _push_to_bots(conn: sqlite3.Connection, config: Config, user_id: int, text: str, link: str) -> None:
+    """Клиент работает через бота из конструктора — пишем ему в Telegram через его же бота.
+
+    В кабинет сайта владелец бота может и не заходить: без этого он не узнал бы,
+    что пополнение зачислено или отклонено.
+    """
+    from .security import unseal
+    rows = conn.execute("SELECT token_enc, admin_ids FROM bots WHERE user_id = ? AND enabled = 1",
+                        (user_id,)).fetchall()
+    for row in rows:
+        token = unseal(config.secret_key, row["token_enc"])
+        chats = [c for c in str(row["admin_ids"] or "").replace(" ", "").split(",") if c.lstrip("-").isdigit()]
+        if token and chats:
+            body = f"🔔 <b>{config.site_name}</b>\n{_esc(text)}" + (f"\n{config.base_url}{link}" if link else "")
+            threading.Thread(target=_send_telegram, args=(token, chats, body), daemon=True).start()
+
+
+def _esc(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _send_telegram(token: str, chats: list[str], text: str) -> None:
+    import httpx
+    for chat in chats:
+        try:
+            httpx.post(f"https://api.telegram.org/bot{token}/sendMessage", timeout=15,
+                       json={"chat_id": int(chat), "text": text, "parse_mode": "HTML",
+                             "disable_web_page_preview": True})
+        except httpx.HTTPError as exc:
+            log.warning("уведомление в бота %s: %s", chat, exc)
 
 
 def _send_email(config: Config, to: str, text: str, link: str) -> None:

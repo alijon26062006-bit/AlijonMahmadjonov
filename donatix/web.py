@@ -694,9 +694,10 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
 
 
 @router.post("/panel/balance/{payment_id}/cancel", dependencies=[Depends(check_csrf)])
-def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                         config: Config = Depends(get_config)):
     from . import payments
-    payments.cancel(conn, user["id"], payment_id)
+    payments.cancel(conn, user["id"], payment_id, config)
     flash(request, "Заявка отменена.")
     return _redirect("/panel/balance")
 
