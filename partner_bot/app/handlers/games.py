@@ -66,7 +66,7 @@ async def offers_of(
             "cost": svc.offer_cost(item["usd"]),
         })
 
-    offers = [o for o in offers if o["price"] > 0]
+    offers = svc.sort_packs([o for o in offers if o["price"] > 0])
     if not for_owner:
         offers = [o for o in offers if not o["hidden"]]
     _offers[game.category_id] = offers

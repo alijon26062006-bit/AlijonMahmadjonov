@@ -98,6 +98,37 @@ def offer_cost(usd: Decimal) -> int:
     return int((usd * rate).to_integral_value(rounding=ROUND_HALF_UP)) if rate else 0
 
 
+#: Порядок пакетов на витрине: сначала валюта игры (алмазы, UC), потом ваучеры и пропуски,
+#: потом прокачки, остальное в конце. Внутри группы — от дешёвых к дорогим.
+PACK_GROUPS: list[tuple[str, tuple[str, ...]]] = [
+    ("прокачка", ("level up", "levelup", "level-up", "прокач", "evo", "upgrade", "апгрейд", "уровн")),
+    ("ваучер", ("voucher", "ваучер", "weekly", "monthly", "membership", "недел", "месяч", "подпис",
+                "pass", "пропуск", "booyah", "prime", "card", "карта", "bundle", "набор")),
+    ("валюта", ("diamond", "алмаз", "💎", "uc", "unknown cash", "gem", "кристал", "dm")),
+]
+
+
+def pack_group(name: str) -> int:
+    """0 — алмазы/UC, 1 — ваучеры и пропуски, 2 — прокачки, 3 — прочее."""
+    text = f" {(name or '').lower()} "
+    words = set(text.replace("+", " ").replace("-", " ").split())
+    order = {"валюта": 0, "ваучер": 1, "прокачка": 2}
+    for group, keys in PACK_GROUPS:  # прокачку проверяем первой: «Level Up Pass» — это прокачка
+        for key in keys:
+            if (len(key) <= 3 and key in words) or (len(key) > 3 and key in text):
+                return order[group]
+    # «100 + 10» и просто число — это количество валюты
+    if any(ch.isdigit() for ch in text) and not any(ch.isalpha() for ch in text.replace("x", "")):
+        return 0
+    return 3
+
+
+def sort_packs(offers: list[dict]) -> list[dict]:
+    """Алмазы/UC → ваучеры → прокачки → прочее; в каждой группе от дешёвых к дорогим."""
+    return sorted(offers, key=lambda o: (pack_group(o.get("supplier_name") or o.get("name", "")),
+                                         o.get("price") or 0))
+
+
 def margin_of(game: db.Game) -> int:
     return game.margin or runtime.margin_percent()
 
