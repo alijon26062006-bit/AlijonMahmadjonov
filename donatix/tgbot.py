@@ -34,8 +34,18 @@ def keyboard(buttons: Buttons | None) -> dict[str, Any] | None:
 
 class TelegramApi:
     def __init__(self, token: str, transport: httpx.BaseTransport | None = None):
+        self._token = token
         self._client = httpx.Client(base_url=f"https://api.telegram.org/bot{token}/", timeout=40,
                                     transport=transport)
+
+    def download(self, file_id: str, max_bytes: int = 5 * 1024 * 1024) -> bytes:
+        """Скачать присланный файл (фото иконки)."""
+        info = self("getFile", file_id=file_id) or {}
+        if int(info.get("file_size") or 0) > max_bytes:
+            raise RuntimeError("файл слишком большой")
+        resp = self._client.get(f"https://api.telegram.org/file/bot{self._token}/{info.get('file_path', '')}")
+        resp.raise_for_status()
+        return resp.content
 
     def __call__(self, method: str, **payload: Any) -> Any:
         payload = {k: v for k, v in payload.items() if v is not None}
@@ -113,6 +123,7 @@ class AdminBot:
     def __init__(self, config: Config, api: Callable[..., Any] | None = None, supplier: Any = None):
         self.config = config
         self.supplier = supplier
+        self.wizard: dict[str, Any] | None = None   # шаги добавления реквизитов в боте
         self.chat_id = str(config.alert_telegram_chat_id).strip()
         self.api = api or TelegramApi(config.alert_telegram_token)
         self._stop = threading.Event()
@@ -199,7 +210,12 @@ class AdminBot:
         msg = upd.get("message") or {}
         if str((msg.get("chat") or {}).get("id")) != self.chat_id:
             return
-        self.on_command(conn, (msg.get("text") or "").strip())
+        text = (msg.get("text") or "").strip()
+        if self.wizard and not text.startswith("/") and text.split(" ")[0] not in ("🏠", "📊", "💳", "👥", "⚠️"):
+            self.send(*wizard_step(self, conn, msg))
+            return
+        self.wizard = None
+        self.on_command(conn, text)
 
     def on_command(self, conn: sqlite3.Connection, text: str) -> None:
         cmd = text.split("@")[0].split()[0].lower() if text else ""
@@ -239,6 +255,8 @@ class AdminBot:
             obj_id = int(raw_id)
         except ValueError:
             return "Неизвестная кнопка"
+        if what != "pm":
+            self.wizard = None  # ушли в другой раздел — незаконченное добавление реквизитов сбрасываем
         if what in MENU_HANDLERS:
             return MENU_HANDLERS[what](self, conn, action, obj_id)
         admin_id = _admin_id(conn)
@@ -310,7 +328,7 @@ def screen_home(conn: sqlite3.Connection, config: Config) -> Screen:
         [(f"👥 Новые · {users}", "m:users:0"), (f"⚠️ Проблемы · {probs}", "m:orders:0")],
         [("👤 Клиенты", "m:clients:0"), ("🤖 Боты клиентов", "m:bots:0")],
         [("💱 Курс", "m:rate:0"), ("🔄 Каталог", "m:cat:0")],
-        [("⚙️ Настройки", "m:set:0")],
+        [("💳 Реквизиты", "pm:list:0"), ("⚙️ Настройки", "m:set:0")],
     ])
 
 
@@ -501,5 +519,171 @@ def _markup(bot: AdminBot, conn: sqlite3.Connection, tier: str, delta: int) -> s
 
 
 MENU_HANDLERS: dict[str, Callable[..., str | Screen]] = {
+    "pm": lambda bot, conn, action, i: _paymethods(bot, conn, action, i),
     "m": _menu, "cl": _client, "bot": _bot, "rate": _rate, "cat": _catalog, "set": _setting, "mk": _markup,
 }
+
+
+# ── Реквизиты в админ-боте: список, вкл/выкл, добавление по шагам с иконкой ──
+
+
+def _methods(conn: sqlite3.Connection, config: Config) -> list[dict[str, Any]]:
+    return payments.settings(conn, config)["all_methods"]
+
+
+def _as_rows(methods: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Как хранить обратно: валюта вместе с сетью (USDT:TRC20)."""
+    return [{**m, "currency": m.get("choice") or m["currency"]} for m in methods]
+
+
+def screen_pay_list(conn: sqlite3.Connection, config: Config) -> Screen:
+    ms = _methods(conn, config)
+    rows: Buttons = [[(("✅ " if m.get("enabled") else "🚫 ") + ("🖼 " if m.get("icon") else "") + m["title"]
+                       + f" · {m['currency']}" + (f" {m['network']}" if m.get("network") else ""),
+                       f"pm:view:{i}")] for i, m in enumerate(ms)]
+    rows.append([("➕ Добавить способ оплаты", "pm:new:0")])
+    rows.append(_back())
+    return ("💳 <b>Реквизиты для пополнения</b>\nЭто видят клиенты на сайте и владельцы ботов. "
+            "✅ — показывается, 🚫 — скрыт, 🖼 — есть иконка." if ms else
+            "💳 <b>Реквизиты</b>\nСпособов оплаты пока нет — добавьте первый."), rows
+
+
+def screen_pay_view(conn: sqlite3.Connection, config: Config, i: int) -> Screen:
+    ms = _methods(conn, config)
+    if not 0 <= i < len(ms):
+        return screen_pay_list(conn, config)
+    m = ms[i]
+    text = (f"💳 <b>{_e(m['title'])}</b> · {m['currency']}" + (f" · сеть {m['network']}" if m.get("network") else "")
+            + f"\n<code>{_e(m['details'] or '— реквизиты не заданы —')}</code>\n\n"
+            + ("✅ Показывается клиентам" if m.get("enabled") else "🚫 Скрыт")
+            + (" · 🖼 иконка есть" if m.get("icon") else " · без иконки"))
+    return text, [
+        [("🚫 Скрыть" if m.get("enabled") else "✅ Показывать", f"pm:tog:{i}")],
+        [("✏️ Реквизиты", f"pm:det:{i}"), ("🖼 Иконка", f"pm:icon:{i}")],
+        [("🗑 Удалить", f"pm:del:{i}")],
+        _back("pm:list:0"),
+    ]
+
+
+def _paymethods(bot: AdminBot, conn: sqlite3.Connection, action: str, i: int) -> str | Screen:
+    cfg = bot.config
+    ms = _methods(conn, cfg)
+    if action == "list":
+        bot.wizard = None
+        return screen_pay_list(conn, cfg)
+    if action == "view":
+        bot.wizard = None
+        return screen_pay_view(conn, cfg, i)
+    if action == "new":
+        bot.wizard = {"step": "title", "data": {"enabled": True}}
+        return ("➕ <b>Новый способ оплаты</b> · шаг 1 из 4\n\nНапишите <b>название</b>, как увидит клиент: "
+                "<i>Душанбе Сити</i>, <i>Алиф</i>, <i>USDT TRC20</i>…", [[("Отмена", "pm:list:0")]])
+    if action == "cur" and bot.wizard and bot.wizard["step"] == "currency":
+        choices = payments.CURRENCY_CHOICES
+        if 0 <= i < len(choices):
+            bot.wizard["data"]["currency"] = choices[i][0]
+            bot.wizard["step"] = "details"
+            usdt = choices[i][0].startswith("USDT:")
+            return (f"➕ <b>{_e(bot.wizard['data']['title'])}</b> · {_e(choices[i][1])} · шаг 3 из 4\n\n"
+                    + ("Пришлите <b>адрес кошелька</b> в этой сети." if usdt else
+                       "Пришлите <b>реквизиты</b>: номер карты или телефона и имя получателя.\n"
+                       "<i>Например: 5058 2700 1234 5678 · Алиджон М.</i>"), [[("Отмена", "pm:list:0")]])
+    if action == "skip" and bot.wizard and bot.wizard["step"] == "icon":
+        return _pay_preview(bot)
+    if action == "save" and bot.wizard and bot.wizard["step"] == "confirm":
+        data = bot.wizard["data"]
+        payments.save_methods(conn, _as_rows(ms) + [data])
+        bot.wizard = None
+        text, rows = screen_pay_list(conn, cfg)
+        return "✅ Способ оплаты добавлен — клиенты уже видят его.\n\n" + text, rows
+    if not 0 <= i < len(ms):
+        return screen_pay_list(conn, cfg)
+    if action == "tog":
+        ms[i]["enabled"] = not ms[i].get("enabled")
+        payments.save_methods(conn, _as_rows(ms))
+        return screen_pay_view(conn, cfg, i)
+    if action == "det":
+        bot.wizard = {"step": "edit_details", "index": i}
+        return f"✏️ Пришлите новые реквизиты для <b>{_e(ms[i]['title'])}</b>.", [[("Отмена", f"pm:view:{i}")]]
+    if action == "icon":
+        bot.wizard = {"step": "edit_icon", "index": i}
+        return (f"🖼 Пришлите <b>фото иконки</b> для <b>{_e(ms[i]['title'])}</b> (квадратная картинка, логотип банка).",
+                [[("Убрать иконку", f"pm:noicon:{i}")], [("Отмена", f"pm:view:{i}")]])
+    if action == "noicon":
+        ms[i]["icon"] = ""
+        payments.save_methods(conn, _as_rows(ms))
+        bot.wizard = None
+        return screen_pay_view(conn, cfg, i)
+    if action == "del":
+        return (f"Удалить способ <b>{_e(ms[i]['title'])}</b>? Клиенты перестанут его видеть.",
+                [[("🗑 Да, удалить", f"pm:delok:{i}"), ("Нет", f"pm:view:{i}")]])
+    if action == "delok":
+        payments.save_methods(conn, _as_rows(ms[:i] + ms[i + 1:]))
+        return screen_pay_list(conn, cfg)
+    return screen_pay_list(conn, cfg)
+
+
+def _pay_preview(bot: AdminBot) -> Screen:
+    d = bot.wizard["data"]
+    bot.wizard["step"] = "confirm"
+    label = dict(payments.CURRENCY_CHOICES).get(d.get("currency", "TJS"), d.get("currency"))
+    return (f"👀 <b>Проверьте</b>\n\n💳 <b>{_e(d['title'])}</b> · {_e(label)}\n<code>{_e(d['details'])}</code>\n"
+            + ("🖼 Иконка загружена" if d.get("icon") else "Без иконки — будет стандартный значок"),
+            [[("✅ Сохранить", "pm:save:0")], [("Отмена", "pm:list:0")]])
+
+
+def _photo_bytes(bot: AdminBot, msg: dict[str, Any]) -> tuple[bytes, str] | None:
+    """Фото или картинка файлом → (байты, тип)."""
+    if msg.get("photo"):
+        return bot.api.download(msg["photo"][-1]["file_id"]), "image/jpeg"
+    doc = msg.get("document") or {}
+    if doc.get("mime_type") in payments.ICON_TYPES:
+        return bot.api.download(doc["file_id"]), doc["mime_type"]
+    return None
+
+
+def wizard_step(bot: AdminBot, conn: sqlite3.Connection, msg: dict[str, Any]) -> Screen:
+    w = bot.wizard or {}
+    text = (msg.get("text") or "").strip()
+    step = w.get("step")
+    try:
+        if step == "title":
+            if not 2 <= len(text) <= 60:
+                return "Название — от 2 до 60 символов. Напишите ещё раз.", [[("Отмена", "pm:list:0")]]
+            w["data"]["title"] = text
+            w["step"] = "currency"
+            return (f"➕ <b>{_e(text)}</b> · шаг 2 из 4\n\nВыберите <b>валюту</b> (для USDT — сеть):",
+                    [[(label, f"pm:cur:{i}")] for i, (_, label) in enumerate(payments.CURRENCY_CHOICES)]
+                    + [[("Отмена", "pm:list:0")]])
+        if step in ("details", "edit_details"):
+            if not 4 <= len(text) <= 1000:
+                return "Пришлите реквизиты текстом (номер, имя или адрес кошелька).", [[("Отмена", "pm:list:0")]]
+            if step == "edit_details":
+                ms = _methods(conn, bot.config)
+                ms[w["index"]]["details"] = text
+                payments.save_methods(conn, _as_rows(ms))
+                bot.wizard = None
+                return screen_pay_view(conn, bot.config, w["index"])
+            w["data"]["details"] = text
+            w["step"] = "icon"
+            return ("🖼 Шаг 4 из 4 — пришлите <b>фото иконки</b> (логотип банка, квадрат). "
+                    "Можно пропустить.", [[("Пропустить", "pm:skip:0")], [("Отмена", "pm:list:0")]])
+        if step in ("icon", "edit_icon"):
+            got = _photo_bytes(bot, msg)
+            if got is None:
+                return "Нужна картинка: пришлите фото или файл PNG/JPG.", [[("Отмена", "pm:list:0")]]
+            name = payments.save_icon(bot.config, got[0], got[1])
+            if step == "edit_icon":
+                ms = _methods(conn, bot.config)
+                ms[w["index"]]["icon"] = name
+                payments.save_methods(conn, _as_rows(ms))
+                bot.wizard = None
+                return screen_pay_view(conn, bot.config, w["index"])
+            w["data"]["icon"] = name
+            return _pay_preview(bot)
+    except payments.PaymentError as exc:
+        return f"⚠️ {_e(str(exc))}", [[("Отмена", "pm:list:0")]]
+    except RuntimeError as exc:
+        return f"⚠️ Не удалось скачать файл: {_e(str(exc))}", [[("Отмена", "pm:list:0")]]
+    bot.wizard = None
+    return screen_pay_list(conn, bot.config)

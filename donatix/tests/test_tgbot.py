@@ -127,3 +127,47 @@ def test_web_settings_page(app, config, conn):
     assert config.support_contact == "@help"
     r = TestClient(app).get("/register")
     assert "временно закрыт" in r.text  # reg_open не отмечен
+
+
+def test_admin_bot_adds_pay_method_with_icon(config, conn):
+    bot, api = _bot(config)
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+    bot.api.download = lambda file_id, max_bytes=0: png
+
+    def say(text=None, photo=False):
+        msg = {"message_id": 9, "chat": {"id": 777}}
+        if photo:
+            msg["photo"] = [{"file_id": "small"}, {"file_id": "big"}]
+        else:
+            msg["text"] = text
+        bot.handle(conn, {"update_id": 2, "message": msg})
+
+    _press(bot, conn, "pm:list:0")
+    assert "pm:new:0" in _last_screen(api)[1]
+    _press(bot, conn, "pm:new:0")
+    say("Душанбе Сити")
+    text, cbs = _last_screen(api)
+    assert "шаг 2 из 4" in text and "pm:cur:0" in cbs
+    _press(bot, conn, "pm:cur:0")                      # TJS
+    say("5058 2700 1234 5678 · Алиджон М.")
+    assert "иконки" in _last_screen(api)[0]
+    say(photo=True)
+    text, cbs = _last_screen(api)
+    assert "Иконка загружена" in text and "pm:save:0" in cbs
+    _press(bot, conn, "pm:save:0")
+    m = payments.methods(conn, config)[0]
+    assert m["title"] == "Душанбе Сити" and m["icon_url"].endswith(".png") and "5058" in m["details"]
+
+    # USDT с сетью, без иконки; потом скрыть
+    _press(bot, conn, "pm:new:0")
+    say("USDT TRC20")
+    idx = [c for c, _ in payments.CURRENCY_CHOICES].index("USDT:TRC20")
+    _press(bot, conn, f"pm:cur:{idx}")
+    say("TXyzABCDEFGHJKLMNPQRSTUVWXYZabcdef")
+    _press(bot, conn, "pm:skip:0")
+    _press(bot, conn, "pm:save:0")
+    ms = payments.methods(conn, config)
+    assert ms[1]["network"] == "TRC20" and ms[1]["icon_url"] == ""
+    idx = [m["title"] for m in payments.settings(conn, config)["all_methods"]].index("USDT TRC20")
+    _press(bot, conn, f"pm:tog:{idx}")
+    assert [m["title"] for m in payments.methods(conn, config)] == ["Душанбе Сити"]

@@ -88,24 +88,8 @@ def settings(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
     }
 
 
-def save_settings(conn: sqlite3.Connection, config: Config, methods_in: list[dict[str, Any]], tjs_rate: str,
-                  min_tjs: str, low_usd: str, *, rate_auto: bool | None = None, margin_pct: str = "") -> None:
-    from . import rates
-    try:
-        rate = to_decimal(tjs_rate.replace(",", "."))
-        minimum = to_decimal(min_tjs.replace(",", "."))
-        low = to_decimal(low_usd.replace(",", ".") or "0")
-        margin = to_decimal(margin_pct.replace(",", ".")) if margin_pct.strip() else rates.margin_pct(conn, config)
-    except MoneyError:
-        raise PaymentError("Курс, минимум, запас и порог — числа.") from None
-    if rate <= 0 or minimum <= 0 or low < 0:
-        raise PaymentError("Курс и минимум должны быть больше нуля.")
-    if not Decimal("-5") <= margin <= Decimal("20"):
-        raise PaymentError("Запас к курсу — от -5 до 20 %.")
-    auto = rates.auto_enabled(conn, config) if rate_auto is None else rate_auto
-    market = db.get_setting(conn, "pay.rate_market")
-    if auto and market:
-        rate = rates.apply_margin(Decimal(market), margin)  # курс считает автоматика, поле только показывает
+def clean_methods(methods_in: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Способы оплаты из формы/бота → как хранятся: проверенные поля, уникальные коды."""
     clean, seen = [], set()
     for m in methods_in:
         title = str(m.get("title", "")).strip()[:60]
@@ -125,6 +109,33 @@ def save_settings(conn: sqlite3.Connection, config: Config, methods_in: list[dic
         icon = icon if ICON_NAME_RE.fullmatch(icon) else ""
         clean.append({"code": code, "title": title, "currency": currency, "network": network,
                       "details": details, "enabled": bool(m.get("enabled")), "icon": icon})
+    return clean
+
+
+def save_methods(conn: sqlite3.Connection, methods_in: list[dict[str, Any]]) -> None:
+    """Только способы оплаты (курс и минимум не трогаем) — для админ-бота."""
+    db.set_setting(conn, "pay.methods_json", json.dumps(clean_methods(methods_in), ensure_ascii=False))
+
+
+def save_settings(conn: sqlite3.Connection, config: Config, methods_in: list[dict[str, Any]], tjs_rate: str,
+                  min_tjs: str, low_usd: str, *, rate_auto: bool | None = None, margin_pct: str = "") -> None:
+    from . import rates
+    try:
+        rate = to_decimal(tjs_rate.replace(",", "."))
+        minimum = to_decimal(min_tjs.replace(",", "."))
+        low = to_decimal(low_usd.replace(",", ".") or "0")
+        margin = to_decimal(margin_pct.replace(",", ".")) if margin_pct.strip() else rates.margin_pct(conn, config)
+    except MoneyError:
+        raise PaymentError("Курс, минимум, запас и порог — числа.") from None
+    if rate <= 0 or minimum <= 0 or low < 0:
+        raise PaymentError("Курс и минимум должны быть больше нуля.")
+    if not Decimal("-5") <= margin <= Decimal("20"):
+        raise PaymentError("Запас к курсу — от -5 до 20 %.")
+    auto = rates.auto_enabled(conn, config) if rate_auto is None else rate_auto
+    market = db.get_setting(conn, "pay.rate_market")
+    if auto and market:
+        rate = rates.apply_margin(Decimal(market), margin)  # курс считает автоматика, поле только показывает
+    clean = clean_methods(methods_in)
     with db.tx(conn):
         db.set_setting(conn, "pay.methods_json", json.dumps(clean, ensure_ascii=False))
         db.set_setting(conn, "pay.tjs_rate", str(rate))
@@ -252,8 +263,9 @@ def icons_dir(config: Config):
 
 def save_icon(config: Config, data: bytes, content_type: str) -> str:
     """Иконка способа оплаты (логотип банка, USDT): PNG/JPG/WebP до 1 МБ. Возвращает имя файла."""
-    ext = ICON_TYPES.get((content_type or "").split(";")[0].strip().lower())
-    if ext is None or not _looks_like(data, ext):
+    # Тип — по содержимому файла: заявленному типу (из формы или Telegram) верить нельзя
+    ext = next((e for e in ("png", "jpg", "webp") if _looks_like(data, e)), None)
+    if ext is None:
         raise PaymentError("Иконка — картинка PNG, JPG или WebP.")
     if len(data) > MAX_ICON_BYTES:
         raise PaymentError("Иконка больше 1 МБ — возьмите поменьше (хватит 200×200).")
