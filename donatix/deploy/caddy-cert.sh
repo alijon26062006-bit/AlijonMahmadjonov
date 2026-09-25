@@ -6,9 +6,11 @@
 # Продление — автоматически (certbot.timer + deploy-hook).
 #
 #   sudo DOMAIN=donatix.duckdns.org EMAIL=you@mail.com bash caddy-cert.sh
+#   ALIASES="www.donatix.tj donatix.duckdns.org" — домены, которые переадресуются на DOMAIN
 set -euo pipefail
 
 DOMAIN="${DOMAIN:?укажите DOMAIN=...}"
+ALIASES="${ALIASES:-}"
 EMAIL="${EMAIL:?укажите EMAIL=...}"
 C="${CADDY_CONTAINER:-averix-caddy-1}"
 APP_PORT="${APP_PORT:-8000}"
@@ -24,16 +26,18 @@ echo "Caddyfile: $CF   адрес сервера для контейнера: $G
 command -v certbot >/dev/null || { apt-get update -qq && apt-get install -y -qq certbot >/dev/null; }
 
 write_block() {  # $1 = with_https (0/1)
-  python3 - "$CF" "$DOMAIN" "$GW" "$APP_PORT" "$ACME_PORT" "$1" <<'PY'
+  python3 - "$CF" "$DOMAIN" "$GW" "$APP_PORT" "$ACME_PORT" "$1" "$ALIASES" <<'PY'
 import re, sys
-path, domain, gw, app, acme, https = sys.argv[1:]
+path, domain, gw, app, acme, https, aliases = sys.argv[1:]
+aliases = [a for a in aliases.split() if a and a != domain]
+names = " ".join(f"http://{d}" for d in [domain, *aliases])
 s = open(path, encoding="utf-8").read()
 # убрать прежние блоки Donatix (с маркерами и старый блок без них)
 s = re.sub(r"\n?# donatix-begin.*?# donatix-end\n?", "\n", s, flags=re.S)
 s = re.sub(r"\n?" + re.escape(domain) + r" \{\n\treverse_proxy [^\n]*\n\}\n?", "\n", s)
 block = f"""
 # donatix-begin
-http://{domain} {{
+{names} {{
 \thandle /.well-known/acme-challenge/* {{
 \t\treverse_proxy {gw}:{acme}
 \t}}
@@ -46,6 +50,12 @@ if https == "1":
     block += f"""https://{domain} {{
 \ttls /data/donatix/fullchain.pem /data/donatix/privkey.pem
 \treverse_proxy {gw}:{app}
+}}
+"""
+    if aliases:  # старые и www-адреса ведут на основной домен
+        block += f"""{" ".join("https://" + a for a in aliases)} {{
+\ttls /data/donatix/fullchain.pem /data/donatix/privkey.pem
+\tredir https://{domain}{{uri}} permanent
 }}
 """
 block += "# donatix-end\n"
@@ -64,8 +74,11 @@ write_block 0
 reload_caddy
 
 say "Получаю сертификат Let's Encrypt для $DOMAIN"
-certbot certonly --standalone --non-interactive --agree-tos -m "$EMAIL" -d "$DOMAIN" \
-  --http-01-address "$GW" --http-01-port "$ACME_PORT" --keep-until-expiring
+D_ARGS=(-d "$DOMAIN")
+for a in $ALIASES; do D_ARGS+=(-d "$a"); done
+# --cert-name: сертификат всегда лежит в live/$DOMAIN, даже когда в нём несколько доменов
+certbot certonly --standalone --non-interactive --agree-tos -m "$EMAIL" --cert-name "$DOMAIN" "${D_ARGS[@]}" \
+  --http-01-address "$GW" --http-01-port "$ACME_PORT" --keep-until-expiring --expand
 
 say "Передаю сертификат в Caddy"
 HOOK=/etc/letsencrypt/renewal-hooks/deploy/donatix-caddy.sh
