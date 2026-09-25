@@ -139,6 +139,14 @@ CREATE TABLE IF NOT EXISTS promo_uses (
     PRIMARY KEY (code, user_id)
 );
 
+-- Код на скидку, введённый заранее (в профиле). Применяется сам к
+-- следующей покупке; одна строка на клиента — новый код заменяет старый.
+CREATE TABLE IF NOT EXISTS promo_saved (
+    user_id    INTEGER PRIMARY KEY,
+    code       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS adjustments (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER NOT NULL,
@@ -2020,10 +2028,41 @@ async def check_discount(
         if await cur.fetchone():
             return "already_used"
 
+    # Код ещё висит на незавершённом заказе этого же клиента — второй
+    # заказ с тем же кодом не даём: скидка по коду одна на человека, а
+    # активация спишется только после выдачи первого.
+    async with conn.execute(
+        "SELECT 1 FROM orders WHERE promo = ? AND user_id = ? AND status IN (?, ?)",
+        (promo["code"], user_id, ORDER_DELIVERING, ORDER_FAILED),
+    ) as cur:
+        if await cur.fetchone():
+            return "in_use"
+
     left = promo["max_uses"] - promo["used_count"] - await promo_reserved(conn, promo["code"])
     if left <= 0:
         return "exhausted"
     return promo
+
+
+async def save_promo_for(conn: aiosqlite.Connection, user_id: int, code: str) -> None:
+    await conn.execute(
+        "INSERT OR REPLACE INTO promo_saved (user_id, code, created_at) VALUES (?, ?, ?)",
+        (user_id, code.upper().strip(), _now()),
+    )
+    await conn.commit()
+
+
+async def saved_promo_code(conn: aiosqlite.Connection, user_id: int) -> str:
+    async with conn.execute(
+        "SELECT code FROM promo_saved WHERE user_id = ?", (user_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    return row["code"] if row else ""
+
+
+async def forget_saved_promo(conn: aiosqlite.Connection, user_id: int) -> None:
+    await conn.execute("DELETE FROM promo_saved WHERE user_id = ?", (user_id,))
+    await conn.commit()
 
 
 async def use_promo(conn: aiosqlite.Connection, code: str, user_id: int) -> bool:

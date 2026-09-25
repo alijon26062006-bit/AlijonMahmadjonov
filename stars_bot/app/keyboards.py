@@ -276,7 +276,16 @@ def game_found_in(games: list) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def confirm_unverified(game, family_size: int = 1) -> InlineKeyboardMarkup:
+def _promo_row(kb, has_promo: bool, prefix: str) -> None:
+    """Одна и та же кнопка промокода на каждом экране подтверждения."""
+    if has_promo:
+        kb.row(btn("✖️ Промокодро гирифтан", f"{prefix}promo_off"))
+    else:
+        kb.row(btn(labeled("promo", "Промокод"), f"{prefix}promo"))
+
+
+def confirm_unverified(game, family_size: int = 1,
+                       has_promo: bool = False) -> InlineKeyboardMarkup:
     """Купить без подтверждённого ID — под свою ответственность.
 
     Проверка ID работает не у всех регионов и не у всех игр. Запирать
@@ -284,6 +293,7 @@ def confirm_unverified(game, family_size: int = 1) -> InlineKeyboardMarkup:
     """
     kb = InlineKeyboardBuilder()
     kb.row(btn("⚠️ Бо ҳамин ҳол харидан", "g:ok", style=DANGER))
+    _promo_row(kb, has_promo, "g")
     if family_size > 1:
         kb.row(btn("🌍 Минтақаро иваз кардан", f"gf:{regions.family_of(game)}"))
     kb.row(btn(labeled("edit", "ID-и дигар"), f"g:{game.category_id}"))
@@ -291,9 +301,10 @@ def confirm_unverified(game, family_size: int = 1) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def confirm_game(category_id: str) -> InlineKeyboardMarkup:
+def confirm_game(category_id: str, has_promo: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn(labeled("confirm", "Ҳа, ин ҳисоби ман аст"), "g:ok", style=SUCCESS))
+    _promo_row(kb, has_promo, "g")
     kb.row(btn(labeled("edit", "ID-и дигар"), f"g:{category_id}"))
     kb.row(btn(labeled("cancel", "Бекор"), "m:main", style=DANGER))
     return kb.as_markup()
@@ -314,9 +325,10 @@ def steam_menu() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def confirm_steam() -> InlineKeyboardMarkup:
+def confirm_steam(has_promo: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(btn(labeled("confirm", "Ҳа, ин ҳисоби ман аст"), "steam:ok", style=SUCCESS))
+    _promo_row(kb, has_promo, "s")
     kb.row(btn(labeled("edit", "Логини дигар"), "steam:again"))
     kb.row(btn(labeled("cancel", "Бекор"), "m:main", style=DANGER))
     return kb.as_markup()

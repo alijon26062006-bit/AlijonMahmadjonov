@@ -7,12 +7,14 @@ import re
 
 import aiosqlite
 from aiogram import Bot, F, Router
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app import db, keyboards, runtime, texts
 from app.money import fmt
 from app.services import games as svc
+from app.services import promo as promos
 from app.services import suppliers
 from app.services import nicknames
 from app.services import regions
@@ -320,34 +322,95 @@ async def on_player_id(
         # Нигде не нашли — но запирать покупку нельзя: проверка работает
         # не у всех серверов, а пополнение идёт по ID. Предупреждаем и
         # оставляем решение за клиентом.
-        user = await db.get_user(conn, message.from_user.id)
-        balance = user.balance if user else 0
-        price = data["price"]
-        await state.update_data(player=player, player_name="", fields=fields)
-        await state.set_state(Game.confirm)
-        await notice.edit_text(
-            texts.GAME_UNVERIFIED.format(
-                player=player, pack=data["pack"], price=fmt(price),
-                rest=fmt(max(balance - price, 0)),
-            ),
-            reply_markup=keyboards.confirm_unverified(game, len(others) + 1),
-        )
+        await state.update_data(player=player, player_name="", fields=fields,
+                                screen="unverified", family=len(others) + 1)
+        await show_confirm(notice, state, conn, message.from_user.id)
         return
 
-    user = await db.get_user(conn, message.from_user.id)
-    balance = user.balance if user else 0
-    price = data["price"]
-    await state.update_data(player=player, player_name=name or "", fields=fields)
-    await state.set_state(Game.confirm)
+    await state.update_data(player=player, player_name=name or "", fields=fields,
+                            screen="confirm" if name else "noname")
+    await show_confirm(notice, state, conn, message.from_user.id)
 
-    template = texts.GAME_CONFIRM if name else texts.GAME_NO_NAME
-    await notice.edit_text(
-        template.format(
-            name=name or "—", player=player, pack=data["pack"],
-            price=fmt(price), rest=fmt(max(balance - price, 0)),
-        ),
-        reply_markup=keyboards.confirm_game(game.category_id),
+
+async def show_confirm(
+    target: Message, state: FSMContext, conn: aiosqlite.Connection, user_id: int,
+) -> None:
+    """Экран подтверждения игры — с учётом промокода.
+
+    Один на все три вида (ник найден, ника нет, ID не подтверждён): иначе
+    после ввода промокода пришлось бы помнить, какой из них был.
+    """
+    data = await state.get_data()
+    game = await db.get_game(conn, data.get("category_id", ""))
+    if game is None:
+        await state.clear()
+        await target.edit_text("Ин бозӣ дигар фурӯхта намешавад.",
+                               reply_markup=keyboards.back())
+        return
+
+    await promos.autofill(state, conn, user_id)
+    data = await state.get_data()
+    _, discount, total = promos.totals(data)
+    user = await db.get_user(conn, user_id)
+    balance = user.balance if user else 0
+    block, price, rest = promos.block(data), fmt(total), fmt(max(balance - total, 0))
+
+    await state.set_state(Game.confirm)
+    if data.get("screen") == "unverified":
+        await target.edit_text(
+            texts.GAME_UNVERIFIED.format(
+                player=data["player"], pack=data["pack"], discount=block,
+                price=price, rest=rest,
+            ),
+            reply_markup=keyboards.confirm_unverified(
+                game, int(data.get("family") or 1), has_promo=bool(discount)),
+        )
+        return
+    if data.get("player_name"):
+        text = texts.GAME_CONFIRM.format(
+            name=data["player_name"], player=data["player"], pack=data["pack"],
+            discount=block, price=price, rest=rest,
+        )
+    else:
+        text = texts.GAME_NO_NAME.format(
+            player=data["player"], pack=data["pack"], discount=block,
+            price=price, rest=rest,
+        )
+    await target.edit_text(
+        text,
+        reply_markup=keyboards.confirm_game(game.category_id, has_promo=bool(discount)),
     )
+
+
+@router.callback_query(Game.confirm, F.data == "gpromo")
+async def cb_game_promo(call: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Game.promo)
+    await call.message.edit_text(
+        texts.ORDER_PROMO_ASK,
+        reply_markup=keyboards.back("gpromo_off", "‹ Ба фармоиш"),
+    )
+    await call.answer()
+
+
+@router.message(Game.promo, F.text)
+async def on_game_promo(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection,
+) -> None:
+    ok, reply = await promos.enter(conn, state, message.text or "", message.from_user.id)
+    notice = await message.answer(reply)
+    if ok:
+        await show_confirm(notice, state, conn, message.from_user.id)
+
+
+@router.callback_query(StateFilter(Game.confirm, Game.promo), F.data == "gpromo_off")
+async def cb_game_promo_off(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection,
+) -> None:
+    had = bool((await state.get_data()).get("promo_percent"))
+    if had:
+        await promos.drop(state)
+    await show_confirm(call.message, state, conn, call.from_user.id)
+    await call.answer("Промокод гирифта шуд" if had else "")
 
 
 async def _other_regions(conn, game: db.Game) -> list[db.Game]:
@@ -467,17 +530,25 @@ async def cb_buy(
         await state.clear()
         await call.answer("Ин бозӣ дигар фурӯхта намешавад.", show_alert=True)
         return
+    # Код мог кончиться, пока клиент думал: тогда показываем полную цену
+    # ещё раз, а не списываем молча больше, чем было на экране.
+    if not await promos.still_valid(conn, data, call.from_user.id):
+        await promos.drop(state)
+        await show_confirm(call.message, state, conn, call.from_user.id)
+        await call.answer(texts.PROMO_GONE, show_alert=True)
+        return
     await state.clear()
     # Игры списываются с того счёта, чей ключ задан для игр.
     provider = suppliers.for_games(provider)
+    _, discount, total = promos.totals(data)
 
-    if not await db.charge(conn, call.from_user.id, data["price"]):
+    if not await db.charge(conn, call.from_user.id, total):
         user = await db.get_user(conn, call.from_user.id)
         balance = user.balance if user else 0
         await call.message.edit_text(
             texts.STARS_NOT_ENOUGH.format(
-                need=fmt(data["price"]), balance=fmt(balance),
-                missing=fmt(data["price"] - balance),
+                need=fmt(total), balance=fmt(balance),
+                missing=fmt(total - balance),
             ),
             reply_markup=keyboards.deposit_methods(),
         )
@@ -491,10 +562,11 @@ async def cb_buy(
         order = await db.create_order(
             conn, user_id=call.from_user.id, product_type=game.product_type,
             quantity=1, recipient=data["player"],
-            price=data["price"], cost=data.get("cost", 0),
+            price=total, cost=data.get("cost", 0),
+            promo=data.get("promo") if discount else None, discount=discount,
         )
     except Exception:
-        await db.credit(conn, call.from_user.id, data["price"])
+        await db.credit(conn, call.from_user.id, total)
         raise
     await call.answer()
 

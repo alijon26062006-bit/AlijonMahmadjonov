@@ -121,7 +121,7 @@ async def cb_referral(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
 async def cb_promo(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Promo.code)
     await call.message.edit_text(
-        texts.PROMO_ASK, reply_markup=keyboards.back("m:profile", "‹ Назад")
+        texts.PROMO_ASK, reply_markup=keyboards.back("m:profile", "‹ Бозгашт")
     )
     await call.answer()
 
@@ -129,8 +129,20 @@ async def cb_promo(call: CallbackQuery, state: FSMContext) -> None:
 @router.message(Promo.code, F.text)
 async def on_promo(message: Message, state: FSMContext, conn: aiosqlite.Connection) -> None:
     result = await db.redeem_promo(conn, message.text or "", message.from_user.id)
+    if result == "not_for_balance":
+        # Код на скидку: запоминаем и подставим сами в следующую покупку —
+        # так клиенту не надо искать поле для него в самый нужный момент.
+        promo = await db.check_discount(conn, message.text or "", message.from_user.id)
+        if isinstance(promo, str):
+            await message.answer(texts.PROMO_ERRORS.get(promo, texts.PROMO_ERRORS["not_found"]))
+            return
+        await db.save_promo_for(conn, message.from_user.id, promo["code"])
+        await state.clear()
+        await message.answer(texts.PROMO_SAVED.format(percent=promo["percent"]),
+                             reply_markup=keyboards.back())
+        return
     if isinstance(result, str):
-        await message.answer(texts.PROMO_ERRORS.get(result, "❌ Промокод не принят."))
+        await message.answer(texts.PROMO_ERRORS.get(result, texts.PROMO_ERRORS["not_found"]))
         return
 
     await state.clear()

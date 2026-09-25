@@ -14,9 +14,10 @@ from app import db, keyboards, texts
 from app import runtime
 from app.handlers.menu import main_markup, menu_text
 from app.money import (
-    affordable_stars, discount_of, fmt, fmt4, stars_cost, steam_cost,
+    affordable_stars, fmt, fmt4, stars_cost, steam_cost,
 )
 from app.services import delivery
+from app.services import promo as promos
 from app.services.fragment import DeliveryProvider, Recipient
 from app.states import Buy, Steam
 
@@ -280,15 +281,14 @@ async def _check_and_confirm(
 
 def totals(data: dict) -> tuple[int, int, int]:
     """(полная цена, скидка, к списанию) для текущего заказа."""
-    price = int(data.get("price") or 0)
-    discount = discount_of(price, int(data.get("promo_percent") or 0))
-    return price, discount, price - discount
+    return promos.totals(data)
 
 
 async def show_confirm(
     target: Message, state: FSMContext, conn: aiosqlite.Connection, user_id: int
 ) -> None:
     """Итоговая сводка заказа — с учётом промокода, если он введён."""
+    await promos.autofill(state, conn, user_id)
     data = await state.get_data()
     user = await db.get_user(conn, user_id)
     balance = user.balance if user else 0
@@ -341,18 +341,10 @@ async def cb_order_promo(call: CallbackQuery, state: FSMContext) -> None:
 async def on_order_promo(
     message: Message, state: FSMContext, conn: aiosqlite.Connection
 ) -> None:
-    promo = await db.check_discount(conn, message.text or "", message.from_user.id)
-    if isinstance(promo, str):
-        await message.answer(texts.PROMO_ERRORS.get(promo, "❌ Промокод не принят."))
-        return
-
-    await state.update_data(promo=promo["code"], promo_percent=promo["percent"])
-    data = await state.get_data()
-    _, discount, _ = totals(data)
-    notice = await message.answer(texts.ORDER_PROMO_OK.format(
-        code=promo["code"], percent=promo["percent"], saved=fmt(discount),
-    ))
-    await show_confirm(notice, state, conn, message.from_user.id)
+    ok, reply = await promos.enter(conn, state, message.text or "", message.from_user.id)
+    notice = await message.answer(reply)
+    if ok:
+        await show_confirm(notice, state, conn, message.from_user.id)
 
 
 @router.callback_query(StateFilter(Buy.confirm, Buy.promo),
@@ -361,7 +353,8 @@ async def cb_order_promo_off(
     call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
 ) -> None:
     had = bool((await state.get_data()).get("promo_percent"))
-    await state.update_data(promo=None, promo_percent=0)
+    if had:
+        await promos.drop(state)
     await show_confirm(call.message, state, conn, call.from_user.id)
     await call.answer("Промокод гирифта шуд" if had else "")
 
@@ -375,6 +368,11 @@ async def cb_pay(
     provider: DeliveryProvider, bot: Bot,
 ) -> None:
     data = await state.get_data()
+    if not await promos.still_valid(conn, data, call.from_user.id):
+        await promos.drop(state)
+        await show_confirm(call.message, state, conn, call.from_user.id)
+        await call.answer(texts.PROMO_GONE, show_alert=True)
+        return
     await state.clear()
 
     title = title_of(data["product_type"], data["quantity"])
@@ -515,21 +513,61 @@ async def _confirm_steam(
         await state.set_state(Steam.login)
         return
 
+    await state.update_data(recipient=login, recipient_name=account.display)
+    await show_steam(target, state, conn, user_id)
+
+
+async def show_steam(
+    target: Message, state: FSMContext, conn: aiosqlite.Connection, user_id: int,
+) -> None:
+    """Подтверждение Steam — с учётом промокода."""
+    await promos.autofill(state, conn, user_id)
     data = await state.get_data()
+    _, discount, total = promos.totals(data)
     user = await db.get_user(conn, user_id)
     balance = user.balance if user else 0
-    price = data["price"]
 
-    await state.update_data(recipient=login, recipient_name=account.display)
     await state.set_state(Steam.confirm)
     await target.edit_text(
         texts.STEAM_CONFIRM.format(
-            name=account.display, login=login,
+            name=data["recipient_name"], login=data["recipient"],
             amount=data["quantity"], currency=runtime.steam_currency(),
-            price=fmt(price), rest=fmt(max(balance - price, 0)),
+            discount=promos.block(data),
+            price=fmt(total), rest=fmt(max(balance - total, 0)),
         ),
-        reply_markup=keyboards.confirm_steam(),
+        reply_markup=keyboards.confirm_steam(has_promo=bool(discount)),
     )
+
+
+@router.callback_query(Steam.confirm, F.data == "spromo")
+async def cb_steam_promo(call: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Steam.promo)
+    await call.message.edit_text(
+        texts.ORDER_PROMO_ASK,
+        reply_markup=keyboards.back("spromo_off", "‹ Ба фармоиш"),
+    )
+    await call.answer()
+
+
+@router.message(Steam.promo, F.text)
+async def on_steam_promo(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection,
+) -> None:
+    ok, reply = await promos.enter(conn, state, message.text or "", message.from_user.id)
+    notice = await message.answer(reply)
+    if ok:
+        await show_steam(notice, state, conn, message.from_user.id)
+
+
+@router.callback_query(StateFilter(Steam.confirm, Steam.promo), F.data == "spromo_off")
+async def cb_steam_promo_off(
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection,
+) -> None:
+    had = bool((await state.get_data()).get("promo_percent"))
+    if had:
+        await promos.drop(state)
+    await show_steam(call.message, state, conn, call.from_user.id)
+    await call.answer("Промокод гирифта шуд" if had else "")
 
 
 @router.callback_query(Steam.confirm, F.data == "steam:ok")
@@ -538,7 +576,13 @@ async def cb_steam_pay(
     provider: DeliveryProvider, bot: Bot,
 ) -> None:
     data = await state.get_data()
+    if not await promos.still_valid(conn, data, call.from_user.id):
+        await promos.drop(state)
+        await show_steam(call.message, state, conn, call.from_user.id)
+        await call.answer(texts.PROMO_GONE, show_alert=True)
+        return
     await state.clear()
+    _, discount, total = promos.totals(data)
 
     await call.message.edit_text(
         texts.PROCESSING_SLOW.format(
@@ -555,15 +599,17 @@ async def cb_steam_pay(
             product_type="steam",
             quantity=data["quantity"],
             recipient=data["recipient"],
-            price=data["price"],
+            price=total,
+            promo=data.get("promo") if discount else None,
+            discount=discount,
         )
     except delivery.NotEnoughFunds:
         user = await db.get_user(conn, call.from_user.id)
         balance = user.balance if user else 0
         await call.message.answer(
             texts.STARS_NOT_ENOUGH.format(
-                need=fmt(data["price"]), balance=fmt(balance),
-                missing=fmt(data["price"] - balance),
+                need=fmt(total), balance=fmt(balance),
+                missing=fmt(total - balance),
             ),
             reply_markup=keyboards.deposit_methods(),
         )

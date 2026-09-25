@@ -245,15 +245,21 @@ async def purchase(conn) -> None:
 
     message = FakeMessage("NETAKOGO", user=buyer, bot=bot)
     await shop.on_order_promo(message, state, conn)
-    check("несуществующий код отклонён", "не существует" in message.last)
+    check("несуществующий код отклонён", "вуҷуд надорад" in message.last)
     check("после отказа всё ещё ждём код", await state.get_state() == "Buy:promo")
 
-    # код на баланс к заказу не применяется
+    # код на баланс, введённый при покупке, сразу зачисляется — искать
+    # для него другое место клиенту не надо
     await db.create_promo(conn, "BONUS50", amount=50_00, max_uses=10)
     message = FakeMessage("BONUS50", user=buyer, bot=bot)
     await shop.on_order_promo(message, state, conn)
-    check("код на пополнение к заказу не липнет",
-          "пополнение баланса" in message.last, message.last[:120])
+    check("код на пополнение при покупке зачислен на баланс",
+          "50.00" in message.replies[0]
+          and (await db.get_user(conn, BUYER_ID)).balance == 250_00,
+          message.replies[0][:120])
+    check("скидки от бонусного кода нет",
+          not (await state.get_data()).get("promo_percent"))
+    await state.set_state(shop.Buy.promo)
 
     message = FakeMessage("ali10", user=buyer, bot=bot)
     await shop.on_order_promo(message, state, conn)
@@ -261,7 +267,7 @@ async def purchase(conn) -> None:
     check("показана экономия", "2.00" in message.replies[0], message.replies[0])
     check("в сводке зачёркнута старая цена", "<s>20.00 с.</s>" in message.last, message.last)
     check("в сводке новая сумма", "Барои пардохт: <b>18.00 с.</b>" in message.last)
-    check("в сводке остаток пересчитан", "Мемонад: <b>182.00 с.</b>" in message.last)
+    check("в сводке остаток пересчитан", "Мемонад: <b>232.00 с.</b>" in message.last)
     check("вернулись к подтверждению", await state.get_state() == "Buy:confirm")
     check("появилась кнопка снятия промокода",
           "✖️ Промокодро гирифтан" in texts_of(message.markup))
@@ -286,7 +292,7 @@ async def purchase(conn) -> None:
     await shop.cb_pay(call, state, conn, provider, bot)
 
     user = await db.get_user(conn, BUYER_ID)
-    check("списана сумма со скидкой", user.balance == 182_00, fmt(user.balance))
+    check("списана сумма со скидкой", user.balance == 232_00, fmt(user.balance))
     orders = await db.list_orders(conn, user_id=BUYER_ID)
     order = orders[0]
     check("в заказе цена со скидкой", order.price == 18_00)
@@ -305,7 +311,7 @@ async def purchase(conn) -> None:
     message = FakeMessage("ALI10", user=buyer, bot=bot)
     await shop.on_order_promo(message, state, conn)
     check("повторно тем же клиентом код не берётся",
-          "уже использовали" in message.last, message.last[:120])
+          "аллакай истифода" in message.last, message.last[:120])
     await state.clear()
 
 
@@ -420,6 +426,143 @@ async def long_code_button(conn) -> None:
           any("удалили" in alert for alert in stale.alerts), str(stale.alerts))
 
 
+# ─────────────────────────── промокод в играх и заранее, из профиля
+
+
+class GameOk(DeliveryProvider):
+    """Поставщик игр, выдающий сразу."""
+
+    def __init__(self):
+        self.orders = []
+
+    async def order_game(self, *, category_id, offer_id, fields, quantity,
+                         idempotency_key):
+        self.orders.append(offer_id)
+        return {"order_id": f"ord-{len(self.orders)}", "status": "completed"}
+
+    async def order_status(self, order_id):
+        return {"order_id": order_id, "status": "completed"}
+
+
+def game_state(uid: int) -> FSMContext:
+    return FSMContext(storage=MemoryStorage(),
+                      key=StorageKey(bot_id=1, chat_id=uid, user_id=uid))
+
+
+async def game_data(state: FSMContext) -> None:
+    from app.states import Game
+
+    await state.set_state(Game.confirm)
+    await state.update_data(category_id="ff_promo", offer_id="off_1",
+                            pack="100 алмаз", price=20_00, cost=15_00,
+                            player="12345", player_name="Ник", screen="confirm",
+                            fields={"user_id": "12345"})
+
+
+async def anywhere(conn) -> None:
+    from app.handlers import games, profile
+    from app.services import promo as promos
+    from app.states import Promo
+
+    uid = 901
+    user = FakeUser(uid, "gamer")
+    bot = FakeBot()
+    await db.upsert_user(conn, uid, "gamer", "Игрок")
+    await db.credit(conn, uid, 100_00, as_deposit=True)
+    await conn.execute(
+        "INSERT OR IGNORE INTO games (category_id, title, field, region, margin, "
+        "enabled, created_at) VALUES ('ff_promo', 'Free Fire', 'user_id', '', 0, 1, "
+        "'2026-01-01T00:00:00+00:00')")
+    await conn.commit()
+    await db.create_promo(conn, "GAME15", 0, 10, kind="discount", percent=15)
+
+    # Код на скидку в профиле больше не отвергается — он запоминается.
+    state = game_state(uid)
+    await state.set_state(Promo.code)
+    message = FakeMessage("game15", user=user, bot=bot)
+    await profile.on_promo(message, state, conn)
+    check("в профиле код на скидку запомнен", "нигоҳ дошта шуд" in message.last,
+          message.last[:80])
+    check("и лежит в базе", await db.saved_promo_code(conn, uid) == "GAME15")
+
+    # В игре он подставился сам.
+    state = game_state(uid)
+    await game_data(state)
+    screen = FakeMessage(user=user, bot=bot)
+    await games.show_confirm(screen, state, conn, uid)
+    check("в игре сохранённый код подставился сам",
+          "<s>20.00 с.</s>" in screen.last and "Барои пардохт: <b>17.00 с.</b>" in screen.last,
+          screen.last)
+    check("есть кнопка снять промокод",
+          any("Промокодро гирифтан" in t for t in texts_of(screen.markup)))
+
+    call = FakeCallback("gpromo_off", user=user, bot=bot)
+    await games.cb_game_promo_off(call, state, conn)
+    check("снятый код обратно сам не липнет",
+          "Барои пардохт: <b>20.00 с.</b>" in call.last, call.last)
+    check("появилась кнопка «Промокод»",
+          any(t.endswith("Промокод") for t in texts_of(call.markup)), str(texts_of(call.markup)))
+
+    # Ввели руками прямо на экране покупки.
+    call = FakeCallback("gpromo", user=user, bot=bot)
+    await games.cb_game_promo(call, state)
+    check("экран покупки просит код", await state.get_state() == "Game:promo")
+    message = FakeMessage("GAME15", user=user, bot=bot)
+    await games.on_game_promo(message, state, conn)
+    check("код из поля покупки принят", "17.00 с." in message.last, message.last)
+
+    provider = GameOk()
+    call = FakeCallback("g:ok", user=user, bot=bot)
+    await games.cb_buy(call, state, conn, provider, bot)
+    check("за игру списано со скидкой",
+          (await db.get_user(conn, uid)).balance == 83_00,
+          fmt((await db.get_user(conn, uid)).balance))
+    order = (await db.last_game_orders(conn))[0]
+    check("в заказе цена со скидкой и код",
+          order.price == 17_00 and order.promo == "GAME15" and order.discount == 3_00,
+          f"{order.price} {order.promo} {order.discount}")
+    check("после выдачи активация списана",
+          (await db.get_promo(conn, "GAME15"))["used_count"] == 1)
+
+    # Второй раз — нет: ни сам, ни руками.
+    state = game_state(uid)
+    await game_data(state)
+    screen = FakeMessage(user=user, bot=bot)
+    await games.show_confirm(screen, state, conn, uid)
+    check("второй раз код сам не подставляется",
+          "Барои пардохт: <b>20.00 с.</b>" in screen.last)
+    check("сохранённый код забыт", await db.saved_promo_code(conn, uid) == "")
+    await state.set_state(games.Game.promo)
+    message = FakeMessage("GAME15", user=user, bot=bot)
+    await games.on_game_promo(message, state, conn)
+    check("руками второй раз тоже нельзя", "аллакай истифода" in message.last)
+
+    # Пока первый заказ с кодом идёт, второй с тем же кодом не оформить.
+    await db.create_promo(conn, "ONCE10", 0, 10, kind="discount", percent=10)
+    await db.upsert_user(conn, 902, "two", "Два")
+    await db.create_order(conn, user_id=902, product_type="stars", quantity=50,
+                          recipient="two", price=9_00, promo="ONCE10", discount=1_00)
+    check("код на идущем заказе — второй раз не даём",
+          await db.check_discount(conn, "ONCE10", 902) == "in_use")
+
+    # Код кончился, пока клиент думал: полную цену показываем ещё раз.
+    await db.create_promo(conn, "LAST1", 0, 1, kind="discount", percent=50)
+    uid3, user3 = 903, FakeUser(903, "late")
+    await db.upsert_user(conn, uid3, "late", "Поздний")
+    await db.credit(conn, uid3, 100_00, as_deposit=True)
+    state = game_state(uid3)
+    await game_data(state)
+    ok, _ = await promos.enter(conn, state, "LAST1", uid3)
+    check("последний код взят", ok)
+    await db.use_promo(conn, "LAST1", 904)          # его забрал другой
+    call = FakeCallback("g:ok", user=user3, bot=bot)
+    await games.cb_buy(call, state, conn, GameOk(), bot)
+    check("код кончился — деньги не списаны, клиент предупреждён",
+          (await db.get_user(conn, uid3)).balance == 100_00
+          and any("бе тахфиф" in a for a in call.alerts), str(call.alerts))
+    check("и снова видит полную цену", "Барои пардохт: <b>20.00 с.</b>" in call.last)
+
+
 async def main() -> None:
     arithmetic()
     for sfx in ("", "-wal", "-shm"):
@@ -433,6 +576,7 @@ async def main() -> None:
         await refund_keeps_activation(conn)
         await limits(conn)
         await long_code_button(conn)
+        await anywhere(conn)
     finally:
         await conn.close()
     print(f"\n{'=' * 52}\nПройдено: {len(PASS)}   Провалено: {len(FAIL)}")

@@ -13,11 +13,13 @@ class Buy(StatesGroup):
 class Steam(StatesGroup):
     login = State()         # ждём логин Steam
     confirm = State()       # показали аккаунт, ждём подтверждения
+    promo = State()         # ждём промокод
 
 
 class Game(StatesGroup):
     player = State()        # ждём ID игрока
     confirm = State()       # показали ник, ждём подтверждения
+    promo = State()         # ждём промокод
 
 
 class GameNew(StatesGroup):
