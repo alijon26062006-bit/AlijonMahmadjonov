@@ -7,37 +7,30 @@
   <p>Баланс, заказы и API в одном месте.</p>
 </section>
 
-<div class="card profile-card">
-  <div class="who-row">
-    <span class="avatar lg">{{ user.login[:2] | upper }}</span>
-    <div><h2>{{ user.login }}</h2><div class="muted">{{ user.email }}</div></div>
-  </div>
-  <div class="profile-links">
-    <a class="btn" href="/panel/orders">{{ icon('bag', 18) }}Заказы</a>
-    <a class="btn" href="/panel/balance">{{ icon('wallet', 18) }}Баланс</a>
-    <a class="btn" href="/panel/transactions">{{ icon('swap', 18) }}Транзакции</a>
-    {% if support_contact %}
-    <a class="btn" href="{{ 'https://t.me/' ~ support_contact[1:] if support_contact.startswith('@') else support_contact }}" target="_blank" rel="noopener">{{ icon('zap-send', 18) }}Поддержка</a>
-    {% else %}<a class="btn" href="/docs">{{ icon('book', 18) }}Документация</a>{% endif %}
+<div class="bal-hero">
+  <div class="bal-amount">${{ fmt(user.balance_micro) }}</div>
+  <div class="bal-sub">Доступно</div>
+  <a class="btn primary block bal-btn" href="/panel/balance">Пополнить</a>
+  <div class="bal-tiles">
+    <div class="bal-tile"><div class="t-label">Всего потрачено</div><div class="t-value">${{ fmt(summary.spent) }}</div><div class="t-note">За всё время</div></div>
+    <a class="bal-tile" href="/panel/orders"><div class="t-label">Всего заказов</div><div class="t-value">{{ summary.n }}</div><div class="t-note">Создано</div></a>
   </div>
 </div>
 
-<div class="grid profile-stats">
-  <div class="pstat">
-    <div class="label">Баланс</div>
-    <div class="value">${{ fmt(user.balance_micro) }}</div>
-    <a class="more" href="/panel/balance">Пополнить {{ icon('arrow-right', 16) }}</a>
+<div class="card quick">
+  <div class="who-row">
+    <span class="avatar">{{ user.login[:2] | upper }}</span>
+    <div class="who"><b>{{ user.login }}</b><span class="muted">{{ user.email }}</span></div>
   </div>
-  <div class="pstat">
-    <div class="label">Всего заказов</div>
-    <div class="value">{{ summary.n }}</div>
-    <a class="more" href="/panel/orders">К списку заказов {{ icon('arrow-right', 16) }}</a>
-  </div>
-  <div class="pstat">
-    <div class="label">Всего потрачено</div>
-    <div class="value">${{ fmt(summary.spent) }}</div>
-    <div class="note">За всё время</div>
-  </div>
+  <h3 class="quick-title">Быстрые действия</h3>
+  <p class="quick-sub">Заказы, движения и поддержка</p>
+  <a class="qrow" href="/panel/orders"><span><b>Заказы</b><small>История и статусы</small></span>{{ icon('chevron', 16) }}</a>
+  <a class="qrow" href="/panel/transactions"><span><b>Транзакции</b><small>Все движения баланса</small></span>{{ icon('chevron', 16) }}</a>
+  <a class="qrow" href="/panel/stats"><span><b>Аналитика</b><small>Расходы и заказы по дням</small></span>{{ icon('chevron', 16) }}</a>
+  {% if support_contact %}
+  <a class="qrow" href="{{ 'https://t.me/' ~ support_contact[1:] if support_contact.startswith('@') else support_contact }}" target="_blank" rel="noopener"><span><b>Поддержка</b><small>Написать в Telegram</small></span>{{ icon('chevron', 16) }}</a>
+  {% endif %}
+  <a class="qrow" href="/panel/logins"><span><b>История входов</b><small>Данные и безопасность</small></span>{{ icon('chevron', 16) }}</a>
 </div>
 
 <div class="tier-card {{ 'ok' if user.status == 'active' else 'wait' }}">
@@ -58,7 +51,6 @@
   <div class="kv"><span class="k">Валюта счёта</span><span class="v">USD</span></div>
   <div class="kv"><span class="k">Регистрация</span><span class="v mono">{{ user.created_at[8:10] }}.{{ user.created_at[5:7] }}.{{ user.created_at[:4] }} {{ user.created_at[11:16] }}</span></div>
   {% if user.project %}<div class="kv"><span class="k">Проект</span><span class="v">{{ user.project }}</span></div>{% endif %}
-  <a class="btn soft block lg" href="/panel/logins">{{ icon('clock', 18) }}История входов</a>
 </div>
 
 <div class="card key-card">

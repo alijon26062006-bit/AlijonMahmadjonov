@@ -886,3 +886,54 @@ a.who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; 
 .google-btn:hover { border-color: var(--accent); }
 .or-line { display: flex; align-items: center; gap: 12px; margin: 16px 0 4px; color: var(--muted, #888); font-size: 13px; }
 .or-line::before, .or-line::after { content: ""; flex: 1; height: 1px; background: var(--line, #ddd); }
+
+/* ── Компактный вид (как у FazerCards): меньше размеры, аккуратнее ── */
+h1 { font-size: clamp(1.35rem, 3vw, 1.75rem); }
+h2 { font-size: clamp(1.08rem, 2vw, 1.3rem); }
+.btn { min-height: 38px; padding: 8px 14px; font-size: .93rem; }
+.btn.lg { min-height: 44px; font-size: .97rem; }
+.btn.sm { min-height: 32px; font-size: .85rem; }
+.card { padding: 16px; border-radius: 14px; }
+.page-hero, .profile-hero { margin: 14px 0 12px; }
+.profile-hero { padding: 18px; }
+.profile-hero h1 { font-size: 1.5rem; }
+.profile-hero p, .page-hero p { font-size: .93rem; }
+.stat .value, .kpi .value { font-size: 1.25rem; }
+.pstat { padding: 14px; }
+.pstat .value { font-size: 1.3rem; }
+.tier-card { padding: 14px; }
+.tier-card .tier-name { font-size: 1.25rem; }
+.kv { padding: 10px 12px; font-size: .93rem; }
+.label-caps { font-size: .72rem; }
+
+.bal-hero { margin-top: 12px; padding: 18px; border-radius: 16px; border: 1px solid var(--accent-line);
+  background: linear-gradient(160deg, var(--accent-soft), color-mix(in srgb, var(--accent-soft) 45%, var(--surface))); }
+.bal-amount { font: 800 1.9rem/1.1 "Onest", system-ui, sans-serif; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.bal-sub { margin-top: 4px; color: var(--muted); font-size: .95rem; }
+.bal-btn { margin-top: 14px; min-height: 44px; border-radius: 12px; box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 28%, transparent); }
+.bal-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+@media (max-width: 520px) { .bal-tiles { grid-template-columns: minmax(0, 1fr); } }
+.bal-tile { display: block; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); color: var(--text); }
+a.bal-tile:hover { text-decoration: none; border-color: var(--accent-line); }
+.bal-tile .t-label { color: var(--muted); font-size: .9rem; }
+.bal-tile .t-value { margin-top: 2px; font: 800 1.3rem/1.2 "Onest", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.bal-tile .t-note { margin-top: 2px; color: var(--muted); font-size: .8rem; }
+
+.quick { margin-top: 12px; }
+.quick .who-row { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.quick .who { display: flex; flex-direction: column; min-width: 0; }
+.quick .who b { font-size: 1rem; }
+.quick .who .muted { font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quick-title { margin: 14px 0 2px; font-size: 1.05rem; }
+.quick-sub { margin: 0 0 10px; color: var(--muted); font-size: .85rem; }
+.qrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px; color: var(--text); background: var(--surface);
+  transition: border-color .15s var(--ease), background .15s var(--ease); }
+.qrow:hover { text-decoration: none; border-color: var(--accent-line); background: var(--surface-2); color: var(--text); }
+.qrow span { display: flex; flex-direction: column; }
+.qrow b { font-size: .97rem; }
+.qrow small { color: var(--muted); font-size: .82rem; }
+.qrow .ico { flex: none; width: 28px; height: 28px; padding: 6px; border-radius: 50%; background: var(--surface-2); color: var(--muted); }
+.kv .k { font-size: .85rem; }
+.kv .v { font-size: .95rem; font-weight: 600; word-break: break-word; }
+.tier-card .tier-status { padding: 10px 12px; }
