@@ -2,6 +2,7 @@
 # Перевести Donatix на новый домен одной командой:
 #
 #   curl -fsSL https://raw.githubusercontent.com/alijon26062006-bit/AlijonMahmadjonov/claude/website-api-sales-96wxcs/donatix/deploy/domain.sh | sudo DOMAIN=donatix.tj bash
+#   DROP_OLD=1 — старый адрес (duckdns) отключить совсем, без переадресации
 #
 # Перед запуском у регистратора домена запись A (для «@» и «www») должна указывать на IP этого сервера.
 # Скрипт: проверит DNS, выпустит HTTPS-сертификат, старый адрес (duckdns) и www будут
@@ -42,7 +43,10 @@ ok "DNS в порядке"
 ALIASES=""
 if [ "$(resolve "www.$DOMAIN" || true)" = "$MY_IP" ]; then ALIASES="www.$DOMAIN"; ok "www.$DOMAIN тоже работает"
 else echo "www.$DOMAIN не указывает на сервер — без www (можно добавить позже, запустив скрипт ещё раз)"; fi
-if [ -n "$OLD" ] && [ "$OLD" != "$DOMAIN" ] && [ "$(resolve "$OLD" || true)" = "$MY_IP" ]; then
+# DROP_OLD=1 — старый адрес не переадресовывать, а отключить совсем
+if [ "${DROP_OLD:-0}" = "1" ]; then
+  echo "Старые адреса отключаются — работать будет только $DOMAIN${ALIASES:+ (и $ALIASES)}"
+elif [ -n "$OLD" ] && [ "$OLD" != "$DOMAIN" ] && [ "$(resolve "$OLD" || true)" = "$MY_IP" ]; then
   ALIASES="$ALIASES $OLD"; ok "старый адрес $OLD будет переадресовывать на $DOMAIN"
 fi
 
@@ -77,9 +81,16 @@ systemctl restart donatix
 sleep 3
 code=$(curl -s -o /dev/null -w "%{http_code}" "https://$DOMAIN/" || true)
 [ "$code" = "200" ] && ok "https://$DOMAIN открывается" || echo "⚠ https://$DOMAIN ответил кодом $code — пришлите вывод выше."
-if [ -n "$OLD" ] && [ "$OLD" != "$DOMAIN" ]; then
+if [ -n "$OLD" ] && [ "$OLD" != "$DOMAIN" ] && [ "${DROP_OLD:-0}" != "1" ]; then
   loc=$(curl -s -o /dev/null -w "%{redirect_url}" "https://$OLD/login" || true)
   echo "Старый адрес https://$OLD/login → ${loc:-нет переадресации}"
+fi
+if [ "${DROP_OLD:-0}" = "1" ]; then
+  for d in donatix.duckdns.org $OLD; do
+    [ "$d" = "$DOMAIN" ] && continue
+    c=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "https://$d/" || true)
+    echo "Старый адрес $d → ${c:-нет ответа} (должен не открываться)"
+  done
 fi
 
 cat <<TXT
