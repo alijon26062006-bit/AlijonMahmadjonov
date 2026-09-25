@@ -109,7 +109,7 @@
     $("s-sub").textContent = st.edition ? st.edition.sub_id : "—";
     $("s-ed").textContent = st.edition ? st.edition.name : "—";
     $("s-reg").textContent = st.region || "—";
-    $("s-price").textContent = "$" + (st.price || "0.0000");
+    $("s-price").textContent = dxMoney(parseFloat(st.price || "0"));
     $("s-inv").textContent = inv ? inv.replace(/^https?:\/\//, "") : "—";
     $("h-app").value = st.game ? st.game.appid : "";
     $("h-sub").value = st.edition ? st.edition.sub_id : "";

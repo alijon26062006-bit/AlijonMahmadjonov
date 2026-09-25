@@ -35,7 +35,7 @@
           <span class="pp-ico k-{{ s.kind }}">{{ pack_icon(s.kind, s.name, 18) }}</span>
           <span class="pp-name">{{ s.name }}</span>
           {% if s.region and regions_many is not defined %}<span class="pp-reg">{{ s.region_title }}</span>{% endif %}
-          <span class="pp-price">${{ s.price_usd | price(s.unit) }}</span>
+          <span class="pp-price">{{ money(s.price_usd | price(s.unit)) }}</span>
         </a>
         {% endfor %}
       </div>
@@ -95,9 +95,9 @@
         {% if p.fields %}<div><span>Получатель</span><span id="s-to" class="wrap-text">—</span></div>{% endif %}
         {% if can_check %}<div><span>Игрок</span><span id="s-player" class="wrap-text">—</span></div>{% endif %}
         {% if multi %}<div><span>Количество</span><span id="s-qty">—</span></div>{% endif %}
-        <div><span>Цена{{ ' за звезду' if p.unit == 'star' else (' за шт.' if multi) }}</span><span>${{ p.price_usd | price(p.unit) }}</span></div>
-        <div><span>Ваш баланс</span><span>${{ fmt(user.balance_micro) }}</span></div>
-        <div class="total"><span>К оплате</span><span id="s-total">${{ p.price_usd | price }}</span></div>
+        <div><span>Цена{{ ' за звезду' if p.unit == 'star' else (' за шт.' if multi) }}</span><span>{{ money(p.price_usd | price(p.unit)) }}</span></div>
+        <div><span>Ваш баланс</span><span>{{ money(user.balance_micro) }}</span></div>
+        <div class="total"><span>К оплате</span><span id="s-total">{{ money(p.price_usd | price) }}</span></div>
       </div>
       <button class="btn primary lg block buy-btn" {{ 'disabled' if user.status != 'active' }}>Купить</button>
       <p class="hint center">{{ icon('shield', 16) }} Не выполнится — деньги вернутся на баланс.</p>
@@ -105,7 +105,7 @@
   </aside>
 
   <div class="buy-bar" aria-hidden="true">
-    <div><span class="muted small">К оплате</span><b id="bar-total">${{ p.price_usd | price }}</b></div>
+    <div><span class="muted small">К оплате</span><b id="bar-total">{{ money(p.price_usd | price) }}</b></div>
     <button type="submit" class="btn primary lg" tabindex="-1" {{ 'disabled' if user.status != 'active' }}>Купить</button>
   </div>
 </form>
@@ -118,7 +118,7 @@
   const sQty = document.getElementById("s-qty");
   const sTo = document.getElementById("s-to");
   const form = document.getElementById("buy");
-  const money = n => "$" + (Math.ceil(unit * n * 10000 - 1e-6) / 10000).toFixed(4);
+  const money = n => dxMoney(Math.ceil(unit * n * 10000 - 1e-6) / 10000);
   const packs = document.querySelectorAll(".pack");
   packs.forEach(b => { b.querySelector(".pack-price").textContent = money(+b.dataset.qty); });
   function upd() {

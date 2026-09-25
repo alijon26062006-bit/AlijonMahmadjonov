@@ -9,6 +9,7 @@ from typing import Any, Iterator
 
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
+from jinja2 import pass_context
 
 from . import accounts, db
 from .config import ROOT, Config
@@ -39,6 +40,29 @@ def _price(value, unit: str = "item") -> str:
 
 
 templates.env.filters["price"] = _price
+
+
+@pass_context
+def _money(ctx, value, digits: int | None = None):
+    """Сумма в валюте, которую выбрал клиент (USD или TJS). Внутри всё в долларах — это только показ.
+
+    value — микро-доллары (int) или доллары строкой/Decimal. В сомони — по тому же курсу,
+    по которому считаются оплаты; при наведении видна точная сумма в долларах.
+    """
+    from decimal import ROUND_HALF_UP, Decimal
+
+    from markupsafe import Markup, escape
+    usd = Decimal(int(value)) / 10_000 if isinstance(value, int) else Decimal(str(value or 0))
+    usd_text = fmt(int(value)) if isinstance(value, int) else str(value)
+    if ctx.get("cur_code") != "TJS" or not ctx.get("cur_rate"):
+        return f"${usd_text}"
+    tjs = usd * Decimal(str(ctx["cur_rate"]))
+    places = Decimal("0.0001") if digits == 4 or (digits is None and 0 < abs(tjs) < 1) else Decimal("0.01")
+    shown = tjs.quantize(places, rounding=ROUND_HALF_UP)
+    return Markup(f'<span class="cur-tjs" title="${escape(usd_text)}">{shown} с.</span>')
+
+
+templates.env.globals["money"] = _money
 
 
 def _asset_version() -> str:
@@ -141,6 +165,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["noindex"] = status_code >= 400 or request.url.path not in INDEXABLE
     ctx["unread"] = 0
     ctx["low_balance_micro"] = 0
+    ctx["cur_code"] = "TJS" if request.cookies.get("dx_cur") == "TJS" else "USD"
+    ctx["cur_rate"] = None
     if ctx.get("user") is not None:
         from .notify import unread_count
         c = db.connect(config.db_path)
@@ -148,6 +174,9 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
             ctx["unread"] = unread_count(c, ctx["user"]["id"])
             low = db.get_setting(c, "pay.low_balance_usd") or str(config.low_balance_usd)
             ctx["low_balance_micro"] = int(float(low) * 10_000)
+            if ctx["cur_code"] == "TJS":
+                from .payments import settings as pay_settings
+                ctx["cur_rate"] = pay_settings(c, config)["tjs_rate"]
         finally:
             c.close()
     return templates.TemplateResponse(request, name, ctx, status_code=status_code)

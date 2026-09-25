@@ -8,11 +8,11 @@
 </section>
 
 <div class="bal-hero">
-  <div class="bal-amount">${{ fmt(user.balance_micro) }}</div>
+  <div class="bal-amount">{{ money(user.balance_micro) }}</div>
   <div class="bal-sub">Доступно</div>
   <a class="btn primary block bal-btn" href="/panel/balance">Пополнить</a>
   <div class="bal-tiles">
-    <div class="bal-tile"><div class="t-label">Всего потрачено</div><div class="t-value">${{ fmt(summary.spent) }}</div><div class="t-note">За всё время</div></div>
+    <div class="bal-tile"><div class="t-label">Всего потрачено</div><div class="t-value">{{ money(summary.spent) }}</div><div class="t-note">За всё время</div></div>
     <a class="bal-tile" href="/panel/orders"><div class="t-label">Всего заказов</div><div class="t-value">{{ summary.n }}</div><div class="t-note">Создано</div></a>
   </div>
 </div>

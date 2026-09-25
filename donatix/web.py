@@ -631,6 +631,20 @@ async def binance_webhook(request: Request, conn=Depends(get_conn), config: Conf
     return JSONResponse({"returnCode": "SUCCESS", "returnMessage": None})
 
 
+@router.get("/currency/{code}")
+def set_currency(code: str, request: Request):
+    """Переключатель USD / TJS: только показ сумм, запоминается в браузере на год."""
+    code = "TJS" if code.upper() == "TJS" else "USD"
+    from urllib.parse import urlsplit
+    ref = urlsplit(request.headers.get("referer") or "")
+    back = (ref.path or "/panel") + (f"?{ref.query}" if ref.query else "")
+    if not back.startswith("/") or back.startswith("//"):
+        back = "/panel"  # только свои страницы — никаких переходов на чужие сайты
+    resp = _redirect(back)
+    resp.set_cookie("dx_cur", code, max_age=365 * 86400, samesite="lax", httponly=True)
+    return resp
+
+
 @router.get("/panel/data/rate")
 def panel_rate(user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
     """Страница оплаты спрашивает курс каждые 30 секунд."""
@@ -644,6 +658,7 @@ def panel_rate(user=Depends(panel_user), conn=Depends(get_conn), config: Config 
 
 @router.post("/panel/balance", dependencies=[Depends(check_csrf)])
 def panel_balance_request(request: Request, method: str = Form(""), amount: str = Form(""),
+                          amount_tjs: str = Form(""),
                           reference: str = Form(""), receipt: UploadFile | None = File(None),
                           user=Depends(panel_user), conn=Depends(get_conn),
                           config: Config = Depends(get_config)):
@@ -655,7 +670,7 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     rates.refresh(conn, config, rates.PAYMENT_SECONDS)  # сумма к переводу — по свежему курсу
     try:
         with db.tx(conn):
-            pid = payments.create(conn, config, user, method, amount, reference)
+            pid = payments.create(conn, config, user, method, amount, reference, amount_tjs=amount_tjs)
             if data:
                 payments.attach_receipt(conn, config, user["id"], pid, data, receipt.content_type or "")
     except payments.PaymentError as exc:

@@ -6,7 +6,7 @@
 
 <div class="card autopay" id="autopay" data-id="{{ p.id }}" data-status="{{ p.status }}">
   {% if p.status == 'paid' %}
-  <div class="ap-done">✅ Оплата получена — баланс пополнен на ${{ p.amount_usd }}.</div>
+  <div class="ap-done">✅ Оплата получена — баланс пополнен на {{ money(p.amount_usd) }}.</div>
   <a class="btn primary block" href="/panel">В профиль</a>
   {% elif p.status != 'pending' %}
   <div class="flash error">Заявка закрыта{% if p.note %}: {{ p.note }}{% endif %}.</div>
@@ -15,7 +15,7 @@
   <div class="ap-label">К оплате</div>
   <div class="ap-amount"><span id="ap-sum">{{ p.pay_amount }}</span> {{ p.pay_currency }}
     <button type="button" class="icon-btn" data-copy="{{ p.pay_amount }}" aria-label="Скопировать сумму">{{ icon('copy', 18) }}</button></div>
-  <div class="ap-sub">Будет зачислено: <b>${{ p.amount_usd }}</b></div>
+  <div class="ap-sub">Будет зачислено: <b>{{ money(p.amount_usd) }}</b></div>
 
   {% if p.auto == 'trc20' %}
   <div class="ap-label" style="margin-top:14px">Адрес USDT · сеть Tron (TRC20)</div>

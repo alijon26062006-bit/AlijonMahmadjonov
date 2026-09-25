@@ -2,7 +2,7 @@
 <a class="item" href="/panel/orders/{{ o.public_id }}">
   <div class="tile k-{{ o.kind }}">{{ kind_icon(o.kind, 22) }}</div>
   <div class="grow">
-    <div class="head"><span class="title">{{ o.public_id }}</span><span class="amount">${{ fmt(o.total_micro) }}</span></div>
+    <div class="head"><span class="title">{{ o.public_id }}</span><span class="amount">{{ money(o.total_micro) }}</span></div>
     {% set f = o.fields_json | fromjson %}
     <div class="sub">{{ kind_titles.get(o.kind, '') }} • {{ o.product_name }}{% for k, v in f.items() %} для {{ v }}{% endfor %}</div>
     <div class="meta">{{ status(o.status) }}<span class="pill">{{ o.created_at[8:10] }}.{{ o.created_at[5:7] }}.{{ o.created_at[:4] }} {{ o.created_at[11:16] }}</span></div>

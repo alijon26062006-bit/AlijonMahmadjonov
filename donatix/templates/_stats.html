@@ -8,8 +8,8 @@
   <div class="scard"><div class="label">Создано заказов</div><div class="value c-created">{{ '{:,}'.format(a.created).replace(',', ' ') }}</div><div class="note">За период</div></div>
   <div class="scard"><div class="label">Выполнено</div><div class="value c-done">{{ '{:,}'.format(a.done).replace(',', ' ') }}</div><div class="note">Успешные заказы</div></div>
   <div class="scard"><div class="label">Возвраты</div><div class="value c-ref">{{ '{:,}'.format(a.refunded).replace(',', ' ') }}</div><div class="note">Деньги вернулись на баланс</div></div>
-  <div class="scard"><div class="label">Сумма выполненных</div><div class="value">${{ fmt(a.turnover) }}</div><div class="note">{% if show_profit %}Прибыль ${{ fmt(a.profit) }}{% else %}Потрачено на выполненные{% endif %}</div></div>
-  <div class="scard"><div class="label">Пополнено</div><div class="value">${{ fmt(a.topped) }}</div><div class="note">Зачислено на баланс</div></div>
+  <div class="scard"><div class="label">Сумма выполненных</div><div class="value">{{ money(a.turnover) }}</div><div class="note">{% if show_profit %}Прибыль {{ money(a.profit) }}{% else %}Потрачено на выполненные{% endif %}</div></div>
+  <div class="scard"><div class="label">Пополнено</div><div class="value">{{ money(a.topped) }}</div><div class="note">Зачислено на баланс</div></div>
 </div>
 
 <div class="card chart-card">
@@ -39,7 +39,7 @@
   {% for k in a.by_kind %}
   <div class="kind-row">
     <div class="kr-top"><b>{{ k.title }}</b><span>{{ k.created }}</span><span class="c-done">{{ k.done or 0 }}</span><span class="c-ref">{{ k.refunded or 0 }}</span></div>
-    <div class="kr-sum"><span class="muted small">Оборот</span><b>${{ fmt(k.turnover) }}</b></div>
+    <div class="kr-sum"><span class="muted small">Оборот</span><b>{{ money(k.turnover) }}</b></div>
   </div>
   {% else %}<div class="empty small">За этот период заказов нет.</div>{% endfor %}
 </div>

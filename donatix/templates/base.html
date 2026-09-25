@@ -35,6 +35,14 @@
       document.documentElement.setAttribute("data-theme", t);
       document.documentElement.classList.add("js");
     })();
+    // Валюта показа: USD или TJS по курсу оплат. Внутри всё в долларах — это только вывод.
+    window.DX_CUR = {code: "{{ cur_code }}", rate: {{ cur_rate or 0 }}};
+    window.dxMoney = function (usd, digits) {
+      var c = window.DX_CUR;
+      if (c.code !== "TJS" || !c.rate) return "$" + usd.toFixed(digits || 4);
+      var t = usd * c.rate, d = (t > 0 && t < 1) ? 4 : 2, k = Math.pow(10, d);
+      return (Math.round(t * k + 1e-9) / k).toFixed(d) + " с.";
+    };
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

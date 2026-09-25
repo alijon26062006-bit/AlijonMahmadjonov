@@ -19,7 +19,7 @@
     <div class="tile {{ 'ok' if plus else 'bad' }}">{{ icon('wallet' if plus else 'swap', 24) }}</div>
     <div class="grow">
       <div class="head"><span class="title">tx{{ t.id }}</span>
-        <span class="amount {{ 'plus' if plus else 'minus' }}">{{ '+' if plus else '−' }}${{ fmt(t.amount_micro | abs) }}</span></div>
+        <span class="amount {{ 'plus' if plus else 'minus' }}">{{ '+' if plus else '−' }}{{ money(t.amount_micro | abs) }}</span></div>
       <div class="sub">{% if t.order_public %}<a href="/panel/orders/{{ t.order_public }}">{{ t.note }}</a>{% else %}{{ t.note }}{% endif %}</div>
       <div class="meta">{{ status('completed') }}<span class="pill">{{ 'Начисление' if plus else 'Списание' }}</span>
         <span class="pill">{{ t.created_at[8:10] }}.{{ t.created_at[5:7] }}.{{ t.created_at[:4] }} {{ t.created_at[11:16] }}</span></div>

@@ -953,3 +953,10 @@ a.bal-tile:hover { text-decoration: none; border-color: var(--accent-line); }
 .autopay .ap-done { font-weight: 700; margin-bottom: 12px; }
 .spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--accent); animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Переключатель валюты USD / TJS */
+.cur-switch { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.cur-switch a { padding: 5px 9px; border-radius: 7px; font-size: .78rem; font-weight: 700; color: var(--muted); line-height: 1; }
+.cur-switch a.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.cur-switch a:hover { text-decoration: none; color: var(--text); }
+.cur-tjs { font-variant-numeric: tabular-nums; }

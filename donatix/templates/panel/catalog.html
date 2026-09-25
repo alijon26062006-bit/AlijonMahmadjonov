@@ -37,7 +37,7 @@
     {{ media(g.image_url, g.category_name, g.kind) }}
     <div class="game-name">{{ g.category_name }}</div>
     <div class="game-meta">
-      <span>от ${{ g.from_price }}</span>
+      <span>от {{ money(g.from_price) }}</span>
       {% if g.regions|length > 1 %}<span>Регионов: {{ g.regions|length }}</span>
       {% elif g.regions %}<span>{{ region_title(g.regions[0]) }}</span>{% endif %}
     </div>
@@ -55,7 +55,7 @@
       <span class="tile k-{{ p.kind }}">{{ pack_icon(p.kind, p.name, 20) }}</span>
       <span class="pack-name">{{ p.name }}</span>
       {% if p.region %}<span class="badge">{{ p.region_title }}</span>{% endif %}
-      <span class="pack-price">${{ p.price_usd }}{% if p.unit == 'star' %}<small> / звезда</small>{% endif %}</span>
+      <span class="pack-price">{{ money(p.price_usd) }}{% if p.unit == 'star' %}<small> / звезда</small>{% endif %}</span>
     </a>
     {% endfor %}
   </div>

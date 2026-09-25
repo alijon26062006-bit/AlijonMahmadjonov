@@ -6,7 +6,7 @@
 
 <div class="grid two" style="align-items:start">
   <div class="stack">
-    <div class="stat reveal"><div class="label">Доступно</div><div class="value">${{ fmt(user.balance_micro) }}</div>
+    <div class="stat reveal"><div class="label">Доступно</div><div class="value">{{ money(user.balance_micro) }}</div>
       <div class="note">Курс для оплаты в сомони: 1 USD = <b id="rate">{{ tjs_rate }}</b> TJS <span class="muted small" id="rate-at">· обновляется каждые 30 с</span></div></div>
 
     <form class="card reveal" method="post" action="/panel/balance" id="payform" enctype="multipart/form-data">
@@ -25,9 +25,14 @@
       </div>
 
       <div class="step-head" style="margin-top:22px"><span class="n">2</span><h3>Сумма</h3></div>
+      {% if cur_code == 'TJS' %}
+      <label for="amount">Сколько пополнить, сомони</label>
+      <input id="amount" name="amount_tjs" inputmode="decimal" required placeholder="Например, 500" autocomplete="off">
+      {% else %}
       <label for="amount">Сколько зачислить, USD</label>
       <input id="amount" name="amount" inputmode="decimal" required placeholder="Например, 50" autocomplete="off">
-      <div class="hint">{% if min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони (≈ ${{ min_usd }}). {% else %}Любая сумма. {% endif %}К переводу: <b id="topay">—</b></div>
+      {% endif %}
+      <div class="hint">{% if min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони (≈ {{ money(min_usd) }}). {% else %}Любая сумма. {% endif %}К переводу: <b id="topay">—</b></div>
 
       <div class="step-head" style="margin-top:22px"><span class="n">3</span><h3>Переведите по реквизитам</h3></div>
       {% for m in methods %}
@@ -56,7 +61,7 @@
       <div class="item">
         <div class="tile sm {{ {'paid': 'ok', 'rejected': 'bad', 'cancelled': 'bad'}.get(p.status, 'g1') }}">{{ icon({'paid': 'check', 'rejected': 'x', 'cancelled': 'x'}.get(p.status, 'clock'), 18) }}</div>
         <div class="grow">
-          <div class="head"><span class="title">#{{ p.id }} · {{ pay_titles.get(p.method, p.method) }}</span><span class="amount">${{ fmt(p.amount_micro) }}</span></div>
+          <div class="head"><span class="title">#{{ p.id }} · {{ pay_titles.get(p.method, p.method) }}</span><span class="amount">{{ money(p.amount_micro) }}</span></div>
           <div class="sub">{{ p.pay_amount }} {{ p.pay_currency }} · {{ p.created_at[:16] | replace('T', ' ') }}{% if p.admin_note %} · {{ p.admin_note }}{% endif %}</div>
           <div class="meta">
             <span class="badge {{ {'paid': 'ok', 'rejected': 'bad', 'cancelled': ''}.get(p.status, 'warn') }}">{{ {'pending': 'Проверяется', 'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено'}[p.status] }}</span>
@@ -73,15 +78,23 @@
 
 <script>
 (function () {
-  var f = document.getElementById("payform"); if (!f || !f.amount) return;
-  var rate = parseFloat("{{ tjs_rate }}");
+  var f = document.getElementById("payform"), inp = document.getElementById("amount");
+  if (!f || !inp) return;
+  var rate = parseFloat("{{ tjs_rate }}"), inTjs = {{ 'true' if cur_code == 'TJS' else 'false' }};
   function upd() {
     var r = f.querySelector("input[name=method]:checked"); if (!r) return;
     f.querySelectorAll(".paym").forEach(function (l) { l.classList.toggle("on", l.querySelector("input").checked); });
     f.querySelectorAll(".details").forEach(function (d) { d.hidden = d.dataset.for !== r.value; });
-    var a = parseFloat((f.amount.value || "").replace(",", "."));
-    document.getElementById("topay").textContent = !a ? "—" :
-      (r.dataset.cur === "TJS" ? (Math.ceil(a * rate * 100) / 100).toFixed(2) + " TJS" : a.toFixed(2) + " " + r.dataset.cur);
+    var a = parseFloat((inp.value || "").replace(",", "."));
+    var out = "—";
+    if (a > 0 && inTjs) {        // ввели сомони: к переводу ровно они; зачислится по курсу
+      var usd = Math.floor(a / rate * 10000) / 10000;
+      out = r.dataset.cur === "TJS" ? a.toFixed(2) + " TJS (зачислится " + dxMoney(usd, 2) + ")"
+                                    : (Math.ceil(usd * 100) / 100).toFixed(2) + " " + r.dataset.cur;
+    } else if (a > 0) {
+      out = r.dataset.cur === "TJS" ? (Math.ceil(a * rate * 100) / 100).toFixed(2) + " TJS" : a.toFixed(2) + " " + r.dataset.cur;
+    }
+    document.getElementById("topay").textContent = out;
   }
   f.addEventListener("input", upd); f.addEventListener("change", upd); upd();
   // Курс меняется — пока клиент на странице, берём свежий каждые 30 секунд

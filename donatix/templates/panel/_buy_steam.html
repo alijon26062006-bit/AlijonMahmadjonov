@@ -67,7 +67,7 @@
     const usd = a / rate;
     $("s-get").textContent = a.toFixed(2) + " " + c;
     $("s-usd").textContent = "$" + usd.toFixed(2);
-    $("s-total").textContent = "$" + (Math.ceil(usd * perUsd * 10000 - 1e-6) / 10000).toFixed(4);
+    $("s-total").textContent = dxMoney(Math.ceil(usd * perUsd * 10000 - 1e-6) / 10000);
   }
   form.addEventListener("input", upd);
   form.addEventListener("change", upd);
