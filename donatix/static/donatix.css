@@ -944,3 +944,12 @@ a.bal-tile:hover { text-decoration: none; border-color: var(--accent-line); }
 .pm-icon-row { margin-top: 10px; }
 .pm-icon-row input[type=file] { min-height: 0; padding: 8px; font-size: .88rem; }
 .paym { gap: 10px; }
+
+/* Автоплатёж (TRC20 / Binance Pay) */
+.autopay .ap-label { color: var(--muted); font-size: .85rem; }
+.autopay .ap-amount { display: flex; align-items: center; gap: 8px; font: 800 1.7rem/1.2 "Onest", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.autopay .ap-sub { color: var(--muted); font-size: .9rem; margin-top: 2px; }
+.autopay .ap-wait { display: flex; align-items: center; gap: 10px; margin-top: 16px; color: var(--muted); font-size: .9rem; }
+.autopay .ap-done { font-weight: 700; margin-bottom: 12px; }
+.spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--accent); animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -82,6 +82,14 @@ async def main() -> None:
     check("курс взят у Donatix", await donatix.sync_rate(conn, 0) and runtime.usd_rate() == 1075)
     check("свой поиск курса выключен", not runtime.get_bool("usd_auto"))
     check("не чаще, чем раз в 30 с", not await donatix.sync_rate(conn, donatix.RATE_PAYMENT) and len(calls) == 1)
+    from app.handlers.donatix import _auto_kb, _auto_text
+    trc = {"id": 7, "method_title": "USDT", "pay_amount": "20.0037", "pay_currency": "USDT", "amount_usd": "20.0000",
+           "auto": "trc20", "address": "TXyzABCDEFGHJKLMNPQRSTUVWXYZabcdef", "pay_url": ""}
+    text = _auto_text(trc)
+    check("автоплатёж TRC20: точная сумма и адрес", "20.0037" in text and "TXyz" in text and "чек присылать не нужно" in text)
+    bn = dict(trc, auto="binance", pay_url="https://pay.binance.com/x", address="")
+    urls = [b.url for row in _auto_kb(bn).inline_keyboard for b in row if b.url]
+    check("Binance Pay: кнопка оплаты", urls == ["https://pay.binance.com/x"])
     donatix._call = real_call
     await conn.close()
 

@@ -53,6 +53,14 @@
       <textarea id="m{{ i }}_details" name="m{{ i }}_details" rows="2" maxlength="1000" placeholder="Номер карты или телефона, имя получателя / адрес кошелька">{{ m.details }}</textarea>
       <div class="hint">Для USDT выберите сеть: клиент увидит её крупно и предупреждение «только в этой сети». TRC20 — адрес начинается с T, BEP20 — с 0x.</div>
       <div class="pm-icon-row">
+        <label for="m{{ i }}_auto">Автозачисление <span class="muted">— баланс пополнится сам, без чека</span></label>
+        <select id="m{{ i }}_auto" name="m{{ i }}_auto">
+          <option value="" {{ 'selected' if not m.auto }}>Нет — вручную по чеку</option>
+          <option value="trc20" {{ 'selected' if m.auto == 'trc20' }}>USDT TRC20 — сайт сам видит перевод в блокчейне (адрес T… в реквизитах)</option>
+          <option value="binance" {{ 'selected' if m.auto == 'binance' }}>Binance Pay{{ '' if binance_ready else ' — сначала добавьте ключи мерчанта' }}</option>
+        </select>
+      </div>
+      <div class="pm-icon-row">
         <label for="m{{ i }}_icon">Иконка / логотип <span class="muted">— PNG, JPG или WebP, лучше квадрат 200×200</span></label>
         <input id="m{{ i }}_icon" name="m{{ i }}_icon" type="file" accept="image/png,image/jpeg,image/webp">
         {% if m.icon %}<label class="del"><input type="checkbox" name="m{{ i }}_icon_del" value="1"> Убрать иконку</label>{% endif %}

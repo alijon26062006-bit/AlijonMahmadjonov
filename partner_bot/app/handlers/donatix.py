@@ -175,6 +175,9 @@ async def got_amount(message: Message, state: FSMContext) -> None:
     p = res["payment"]
     await state.update_data(dx_payment=p["id"])
     await state.set_state(None)
+    if p.get("auto"):
+        await message.answer(_auto_text(p), reply_markup=_auto_kb(p), disable_web_page_preview=True)
+        return
     await message.answer(
         f"🧾 <b>Заявка #{p['id']}</b> · {esc(p['method_title'])}\n\n"
         f"Переведите ровно <b>{esc(p['pay_amount'])} {esc(p['pay_currency'])}</b>\n"
@@ -185,6 +188,46 @@ async def got_amount(message: Message, state: FSMContext) -> None:
         + "После перевода нажмите «Я оплатил» и пришлите чек.",
         reply_markup=_kb([("✅ Я оплатил", f"dx:paid:{p['id']}")], [("‹ Отмена", "dx:home")]),
     )
+
+
+def _auto_text(p: dict) -> str:
+    """Автоплатёж (USDT TRC20 по блокчейну или Binance Pay): чек не нужен, зачислится само."""
+    head = (f"⚡️ <b>Заявка #{p['id']}</b> · {esc(p['method_title'])}\n\n"
+            f"К оплате: <b>{esc(p['pay_amount'])} {esc(p['pay_currency'])}</b>\n"
+            f"Будет зачислено: <b>${esc(p['amount_usd'])}</b>\n\n")
+    if p["auto"] == "trc20":
+        head += (f"<b>Адрес USDT · сеть TRC20:</b>\n<code>{esc(p.get('address', ''))}</code>\n\n"
+                 f"⚠️ Переведите <b>ровно {esc(p['pay_amount'])} USDT</b> — по последним цифрам суммы "
+                 "мы узнаём ваш перевод. Другая сумма или сеть сама не зачислится.\n\n")
+    return head + "Баланс пополнится сам за 1–3 минуты — чек присылать не нужно."
+
+
+def _auto_kb(p: dict):
+    kb = InlineKeyboardBuilder()
+    if p.get("pay_url"):
+        kb.row(InlineKeyboardButton(text="💳 Оплатить в Binance", url=p["pay_url"]))
+    kb.row(InlineKeyboardButton(text="🔄 Проверить оплату", callback_data=f"dx:chk:{p['id']}"))
+    kb.row(InlineKeyboardButton(text="‹ Счёт Donatix", callback_data="dx:home"))
+    return kb.as_markup()
+
+
+@router.callback_query(F.data.startswith("dx:chk:"))
+async def check_auto(call: CallbackQuery) -> None:
+    pid = call.data.split(":")[2]
+    try:
+        p = (await _call("GET", f"/api/v1/payments/{pid}"))["payment"]
+    except DonatixError as exc:
+        await call.answer(str(exc)[:190], show_alert=True)
+        return
+    if p["status"] == "paid":
+        await call.answer(f"✅ Оплата получена — зачислено ${p['amount_usd']}", show_alert=True)
+        await _show(call, f"✅ <b>Заявка #{p['id']}</b> оплачена — баланс пополнен на <b>${esc(p['amount_usd'])}</b>.",
+                    _kb([("🏦 Счёт Donatix", "dx:home")]))
+        return
+    if p["status"] != "pending":
+        await call.answer("Заявка закрыта: " + (p.get("note") or p["status"]), show_alert=True)
+        return
+    await call.answer("⏳ Пока не пришло. Проверим ещё раз через минуту — или нажмите снова.", show_alert=True)
 
 
 @router.callback_query(F.data.startswith("dx:paid:"))

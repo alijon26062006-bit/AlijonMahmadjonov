@@ -330,6 +330,7 @@ def payment_create(body: PaymentIn, request: Request, user=Depends(api_user), co
     try:
         pid = payments.create(conn, config, user, body.method, body.amount_usd, body.reference,
                               amount_tjs=body.amount_tjs)
+        payments.start_auto(conn, config, pid)  # TRC20 / Binance Pay — ссылка или адрес для оплаты
     except payments.PaymentError as exc:
         raise ApiError(str(exc), "invalid_payment") from None
     row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
@@ -376,4 +377,8 @@ def payment_one(payment_id: int, user=Depends(api_user), conn=Depends(get_conn),
     row = conn.execute("SELECT * FROM payments WHERE id = ? AND user_id = ?", (payment_id, user["id"])).fetchone()
     if row is None:
         raise ApiError("Заявка не найдена.", "not_found", 404)
+    if row["status"] == "pending" and row["auto_kind"]:
+        from . import cryptopay
+        cryptopay.check_all(conn, config)  # автоплатёж: проверить поступление (не чаще раза в 20 с)
+        row = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
     return {"ok": True, "payment": payments.public(conn, config, row)}

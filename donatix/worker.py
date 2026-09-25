@@ -126,6 +126,11 @@ class Worker:
                     self._start_sync()
                     last_sync = now
                 try:
+                    from . import cryptopay
+                    cryptopay.check_all(conn, self.config, min_interval=60)  # автоплатежи TRC20 / Binance
+                except Exception:
+                    log.exception("автоплатежи")
+                try:
                     from . import rates
                     rates.refresh(conn, self.config, rates.WORKER_SECONDS)
                 except Exception:

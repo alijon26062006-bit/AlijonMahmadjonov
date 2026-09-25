@@ -107,8 +107,18 @@ def clean_methods(methods_in: list[dict[str, Any]]) -> list[dict[str, Any]]:
         network = network if currency == "USDT" and network in NETWORKS else ""
         icon = str(m.get("icon") or "")
         icon = icon if ICON_NAME_RE.fullmatch(icon) else ""
+        auto = str(m.get("auto") or "")
+        auto = auto if auto in ("trc20", "binance") else ""
+        if auto == "trc20":
+            from .cryptopay import tron_address
+            currency, network = "USDT", "TRC20"
+            if not tron_address(details):
+                raise PaymentError(f"«{title}»: для автозачисления TRC20 в реквизитах нужен адрес кошелька (T…).")
+        elif auto == "binance":
+            currency, network = "USDT", ""
+            details = details or "Оплата через Binance Pay — кнопка появится после ввода суммы"
         clean.append({"code": code, "title": title, "currency": currency, "network": network,
-                      "details": details, "enabled": bool(m.get("enabled")), "icon": icon})
+                      "details": details, "enabled": bool(m.get("enabled")), "icon": icon, "auto": auto})
     return clean
 
 
@@ -147,6 +157,21 @@ def save_settings(conn: sqlite3.Connection, config: Config, methods_in: list[dic
             db.set_setting(conn, "pay.rate_ts", "0")  # взять курс при первом же запросе
 
 
+def start_auto(conn: sqlite3.Connection, config: Config, payment_id: int) -> None:
+    """Автоплатёж по способу заявки (TRC20 / Binance Pay). Не вышло — заявка отменяется и ошибка наверх."""
+    from . import cryptopay
+    p = conn.execute("SELECT method FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    method = next((m for m in settings(conn, config)["all_methods"] if m["code"] == p["method"]), {})
+    if not method.get("auto"):
+        return
+    try:
+        cryptopay.start(conn, config, payment_id, method)
+    except cryptopay.CryptoPayError as exc:
+        conn.execute("UPDATE payments SET status = 'cancelled', admin_note = ?, resolved_at = ? WHERE id = ?",
+                     (str(exc)[:300], db.now(), payment_id))
+        raise PaymentError(str(exc)) from None
+
+
 def title_for(conn: sqlite3.Connection, config: Config, code: str) -> str:
     for m in settings(conn, config)["all_methods"]:
         if m["code"] == code:
@@ -158,6 +183,7 @@ def methods(conn: sqlite3.Connection, config: Config) -> list[dict[str, str]]:
     conf = settings(conn, config)
     return [{"code": m["code"], "title": m["title"], "currency": m["currency"], "details": m["details"],
              "icon_url": f"{config.base_url}/pay-icons/{m['icon']}" if m.get("icon") else "",
+             "auto": m.get("auto") or "",
              "network": m["network"], "network_title": NETWORKS.get(m["network"], ""),
              "network_note": network_note(m["network"])}
             for m in conf["all_methods"] if m["code"] in conf["details"]]
@@ -189,8 +215,15 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
                           (user["id"],)).fetchone()[0]
     if open_n >= 3:
         raise PaymentError("У вас уже 3 заявки в ожидании. Дождитесь их проверки.")
-    currency = next(m["currency"] for m in conf["all_methods"] if m["code"] == method)
+    chosen = next(m for m in conf["all_methods"] if m["code"] == method)
+    currency = chosen["currency"]
     pay, cur = pay_amount(conf["tjs_rate"], currency, usd)
+    if chosen.get("auto") == "trc20":
+        from .cryptopay import CryptoPayError, unique_amount
+        try:
+            pay, cur = str(unique_amount(conn, usd)), "USDT"  # по «хвосту» суммы узнаём перевод в блокчейне
+        except CryptoPayError as exc:
+            raise PaymentError(str(exc)) from None
     if amount_tjs.strip() and currency == "TJS":
         # Сумму назвали в сомони — ровно её и переводят, без копейки от пересчёта туда-обратно
         pay = str(to_decimal(amount_tjs.replace(",", ".").strip()).quantize(Decimal("0.01")))
@@ -334,4 +367,10 @@ def public(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) -> dict[str
         "details": details if p["status"] == "pending" else "", "receipt": bool(p["receipt_file"]),
         "network": network, "network_note": network_note(network) if p["status"] == "pending" else "",
         "note": p["admin_note"] or "", "created_at": p["created_at"], "resolved_at": p["resolved_at"],
+        "auto": p["auto_kind"] or "", "pay_url": (p["pay_url"] or "") if p["status"] == "pending" else "",
+        "address": (p["pay_address"] or "") if p["status"] == "pending" else "",
+        "auto_note": ("Переведите ровно эту сумму USDT (TRC20) — баланс пополнится сам за 1–3 минуты, чек не нужен."
+                      if p["auto_kind"] == "trc20" else
+                      "Оплатите по ссылке в Binance — баланс пополнится сам, чек не нужен."
+                      if p["auto_kind"] == "binance" else ""),
     }

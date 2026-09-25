@@ -203,6 +203,9 @@ def init(path: Path | str) -> None:
         pay_cols = {r[1] for r in conn.execute("PRAGMA table_info(payments)")}
         if "receipt_file" not in pay_cols:
             conn.execute("ALTER TABLE payments ADD COLUMN receipt_file TEXT")
+        for col in ("auto_kind", "ext_id", "pay_url", "pay_address"):  # автоплатёж: TRC20 / Binance Pay
+            if col not in pay_cols:
+                conn.execute(f"ALTER TABLE payments ADD COLUMN {col} TEXT")
         key_cols = {r[1] for r in conn.execute("PRAGMA table_info(api_keys)")}
         if "key_enc" not in key_cols:
             conn.execute("ALTER TABLE api_keys ADD COLUMN key_enc TEXT")

@@ -588,6 +588,49 @@ def pay_icon(name: str, config: Config = Depends(get_config)):
                                        "X-Content-Type-Options": "nosniff"})
 
 
+@router.get("/panel/balance/{payment_id}/pay")
+def panel_auto_pay(payment_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                   config: Config = Depends(get_config)):
+    """Экран автоплатежа: сумма, адрес или кнопка Binance, статус обновляется сам."""
+    from . import payments
+    row = conn.execute("SELECT * FROM payments WHERE id = ? AND user_id = ?", (payment_id, user["id"])).fetchone()
+    if row is None or not row["auto_kind"]:
+        return _redirect("/panel/balance")
+    return render(request, "panel/auto_pay.html", {"user": user, "p": payments.public(conn, config, row)})
+
+
+@router.get("/panel/data/payment/{payment_id}")
+def panel_payment_status(payment_id: int, user=Depends(panel_user), conn=Depends(get_conn),
+                         config: Config = Depends(get_config)):
+    from . import cryptopay
+    row = conn.execute("SELECT status, auto_kind FROM payments WHERE id = ? AND user_id = ?",
+                       (payment_id, user["id"])).fetchone()
+    if row is None:
+        return JSONResponse({"status": "missing"}, status_code=404)
+    if row["status"] == "pending" and row["auto_kind"]:
+        cryptopay.check_all(conn, config)  # не чаще раза в 20 секунд на весь сайт
+        row = conn.execute("SELECT status FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    return JSONResponse({"status": row["status"]}, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/pay/binance/webhook")
+async def binance_webhook(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Уведомление Binance Pay. Телу не верим: по номеру заказа сами спрашиваем статус у Binance."""
+    from . import cryptopay
+    try:
+        body = await request.json()
+        data = body.get("data")
+        data = json.loads(data) if isinstance(data, str) else (data or {})
+        trade_no = str(data.get("merchantTradeNo") or "")
+    except (ValueError, AttributeError):
+        trade_no = ""
+    row = conn.execute("SELECT id FROM payments WHERE ext_id = ? AND auto_kind = 'binance'",
+                       (trade_no,)).fetchone() if trade_no else None
+    if row:
+        cryptopay.check_binance(conn, config, only_id=row["id"])
+    return JSONResponse({"returnCode": "SUCCESS", "returnMessage": None})
+
+
 @router.get("/panel/data/rate")
 def panel_rate(user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
     """Страница оплаты спрашивает курс каждые 30 секунд."""
@@ -618,7 +661,14 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     except payments.PaymentError as exc:
         flash(request, str(exc), "error")
         return _redirect("/panel/balance")
+    try:
+        payments.start_auto(conn, config, pid)
+    except payments.PaymentError as exc:
+        flash(request, str(exc), "error")
+        return _redirect("/panel/balance")
     row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
+    if row["auto_kind"]:
+        return _redirect(f"/panel/balance/{pid}/pay")  # автоплатёж: чек и админ не нужны
     if data:
         send_receipt(conn, config, pid)
     else:

@@ -118,6 +118,10 @@ class Config:
     # Вход через Google (OAuth). Ключи — в Google Cloud Console → Credentials
     google_client_id: str = ""
     google_client_secret: str = ""
+    # Автоплатёж криптой: Binance Pay (ключи мерчанта) и TronGrid (необязательный ключ — выше лимиты)
+    binance_pay_key: str = ""
+    binance_pay_secret: str = ""
+    trongrid_key: str = ""
     yandex_verify: str = ""
     # Часовой пояс для аналитики, часы от UTC (Душанбе — 5)
     tz_offset: int = 5
@@ -168,6 +172,9 @@ class Config:
             google_verify=_env("DONATIX_GOOGLE_VERIFY"),
             google_client_id=_env("DONATIX_GOOGLE_CLIENT_ID"),
             google_client_secret=_env("DONATIX_GOOGLE_CLIENT_SECRET"),
+            binance_pay_key=_env("DONATIX_BINANCE_PAY_KEY"),
+            binance_pay_secret=_env("DONATIX_BINANCE_PAY_SECRET"),
+            trongrid_key=_env("DONATIX_TRONGRID_KEY"),
             yandex_verify=_env("DONATIX_YANDEX_VERIFY"),
             tz_offset=int(_env("DONATIX_TZ_OFFSET") or 5),
             run_bots=_flag("DONATIX_RUN_BOTS", True),

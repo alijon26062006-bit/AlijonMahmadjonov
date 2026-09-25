@@ -409,6 +409,7 @@ def pay_settings(request: Request, admin=Depends(admin_user), conn=Depends(get_c
     from . import payments
     return render(request, "admin/pay_settings.html", {
         "user": admin, "conf": payments.settings(conn, config), "currencies": payments.CURRENCY_CHOICES,
+        "binance_ready": bool(config.binance_pay_key and config.binance_pay_secret),
         "rate": _rate_status(conn, config),
     })
 
@@ -428,7 +429,7 @@ async def pay_settings_save(request: Request, admin=Depends(admin_user), conn=De
     rows = []
     try:
         for i in range(int(form.get("n", 0) or 0) + 1):  # +1 — строка «новый способ»
-            row = ({k: str(form.get(f"m{i}_{k}", "")) for k in ("code", "title", "currency", "details")}
+            row = ({k: str(form.get(f"m{i}_{k}", "")) for k in ("code", "title", "currency", "details", "auto")}
                    | {"enabled": form.get(f"m{i}_enabled") == "1", "delete": form.get(f"m{i}_delete") == "1"})
             row["icon"] = "" if form.get(f"m{i}_icon_del") == "1" else old_icons.get(row["code"], "")
             upload = form.get(f"m{i}_icon")
