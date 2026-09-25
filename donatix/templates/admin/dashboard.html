@@ -22,6 +22,9 @@
     <div class="label">Баланс FazerCards</div>
     <div class="value">{% if supplier_balance is not none %}${{ supplier_balance }}{% else %}—{% endif %}</div>
     <div class="note">клиентам должны ${{ fmt(counts.client_balances) }}</div>
+    {% if supplier_balance_error %}<div class="note" style="color:var(--bad)">⚠️ {{ supplier_balance_error[:140] }}</div>{% endif %}
+    <form method="post" action="/admin/supplier-balance" style="margin-top:6px"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn sm">{{ icon('refresh', 14) }}Обновить сейчас</button></form>
   </div>
   <div class="kpi">
     <span class="tile ok">{{ icon('chart', 20) }}</span>

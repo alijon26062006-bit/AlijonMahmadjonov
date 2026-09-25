@@ -171,3 +171,39 @@ def test_admin_bot_adds_pay_method_with_icon(config, conn):
     idx = [m["title"] for m in payments.settings(conn, config)["all_methods"]].index("USDT TRC20")
     _press(bot, conn, f"pm:tog:{idx}")
     assert [m["title"] for m in payments.methods(conn, config)] == ["Душанбе Сити"]
+
+
+def test_stars_and_premium_markup(app, config, conn):
+    from decimal import Decimal
+
+    from conftest import web_login
+    from fastapi.testclient import TestClient
+
+    from donatix import accounts as acc
+    admin = TestClient(app)
+    tok = web_login(admin, "admin@example.com", "adminpass123")
+    admin.post("/admin/settings", data={"csrf": tok, "markup_bronze": "8", "markup_silver": "6", "markup_gold": "4",
+                                        "markup_telegram_stars": "12", "markup_telegram_premium": "",
+                                        "markup_steam_topup": "", "markup_steam_gift": "", "reg_open": "1"})
+    uid = acc.create_user(conn, email="s@example.com", login="shop9", password="password123", status="active")
+    u = acc.get_user(conn, uid)
+    assert acc.markup_for(u, config, "telegram_stars") == Decimal("12")
+    assert acc.markup_for(u, config, "telegram_premium") == Decimal("8")   # пусто — как по уровню
+    bot, api = _bot(config)
+    _press(bot, conn, "mk:telegram_premium:5")
+    assert acc.markup_for(u, config, "telegram_premium") == Decimal("8.5")
+
+
+def test_admin_balance_refresh_shows_reason(app, config, conn, monkeypatch):
+    from conftest import web_login
+    from fastapi.testclient import TestClient
+
+    from donatix.suppliers.base import SupplierUnavailable
+
+    def broken():
+        raise SupplierUnavailable("GET /balance: HTTP 401")
+    monkeypatch.setattr(app.state.supplier, "balance", broken)
+    admin = TestClient(app)
+    tok = web_login(admin, "admin@example.com", "adminpass123")
+    r = admin.post("/admin/supplier-balance", data={"csrf": tok})
+    assert "HTTP 401" in r.text

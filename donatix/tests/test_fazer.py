@@ -187,3 +187,17 @@ def test_steam_cover_fallback():
     from donatix.suppliers.base import steam_cover
 
     assert steam_cover(730).endswith("/730/header.jpg") and steam_cover(None) is None
+
+
+def test_parse_balance_shapes():
+    from decimal import Decimal
+
+    import pytest
+
+    from donatix.suppliers.base import SupplierRejected
+    from donatix.suppliers.fazer import parse_balance
+    assert parse_balance({"ok": True, "balance": "57.4221"}) == Decimal("57.4221")
+    assert parse_balance({"ok": True, "balance": {"amount": 12.5, "currency": "USD"}}) == Decimal("12.5")
+    assert parse_balance({"ok": True, "data": {"balance": "1,234.50"}}) == Decimal("1234.50")
+    with pytest.raises(SupplierRejected):
+        parse_balance({"ok": True, "user": {}})

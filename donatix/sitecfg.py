@@ -13,8 +13,9 @@ from typing import Any
 from . import cache, db
 from .config import TIERS, Config
 
-KIND_KEYS = ("steam_topup", "steam_gift")
-KIND_TITLES = {"steam_topup": "Пополнение Steam", "steam_gift": "Steam Гифты"}
+KIND_KEYS = ("telegram_stars", "telegram_premium", "steam_topup", "steam_gift")
+KIND_TITLES = {"telegram_stars": "⭐ Telegram Stars", "telegram_premium": "👑 Telegram Premium",
+               "steam_topup": "Пополнение Steam", "steam_gift": "Steam Гифты"}
 TIER_TITLES = {"bronze": "Bronze (по умолчанию)", "silver": "Silver", "gold": "Gold"}
 
 

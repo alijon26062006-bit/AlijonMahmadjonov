@@ -74,6 +74,10 @@ def home_kb() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="💳 Реквизиты", callback_data="pn:pay"),
         )
         kb.row(btn("👥 Мои клиенты · поиск и история", "pn:users", style=PRIMARY))
+        kb.row(
+            InlineKeyboardButton(text="📢 Обязательная подписка", callback_data="pn:sponsor"),
+            InlineKeyboardButton(text="⭐️ Канал отзывов", callback_data="pn:reviews"),
+        )
         from app import texts as _t
         contact = _t.support_username()
         kb.row(InlineKeyboardButton(text=f"📞 Мой контакт · @{contact}" if contact else "📞 Мой контакт — не задан",

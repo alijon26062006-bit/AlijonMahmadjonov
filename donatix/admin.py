@@ -54,6 +54,7 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
         "top": orders.top_clients(conn),
         "supplier_balance": worker.supplier_balance_cached(conn),
         "supplier_balance_at": db.get_setting(conn, "supplier_balance_at"),
+        "supplier_balance_error": db.get_setting(conn, "supplier_balance_error") or "",
         "catalog_synced_at": db.get_setting(conn, "catalog_synced_at"),
         "supplier_name": config.supplier,
         "low": config.supplier_low_balance,
@@ -108,6 +109,18 @@ async def settings_save(request: Request, admin=Depends(admin_user), conn=Depend
     else:
         flash(request, "Настройки сохранены — уже действуют на сайте и в ботах.")
     return _back("/admin/settings")
+
+
+@router.post("/supplier-balance", dependencies=[Depends(check_csrf)])
+def supplier_balance_refresh(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                             config: Config = Depends(get_config)):
+    """Кнопка «Обновить» у баланса FazerCards: спросить прямо сейчас и показать причину, если не вышло."""
+    bal = worker.check_supplier_balance(conn, config, request.app.state.supplier)
+    if bal is None:
+        flash(request, "Баланс не пришёл: " + (db.get_setting(conn, "supplier_balance_error") or "нет ответа"), "error")
+    else:
+        flash(request, f"Баланс FazerCards: ${bal}")
+    return _back("/admin")
 
 
 @router.post("/sync", dependencies=[Depends(check_csrf)])

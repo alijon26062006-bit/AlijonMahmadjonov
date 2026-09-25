@@ -45,6 +45,23 @@ def _pid(prefix: str, *parts: str) -> str:
     return f"{prefix}-{digest}"
 
 
+def parse_balance(data: dict[str, Any]) -> Decimal:
+    """Баланс из ответа: {"balance": "57.42"}, {"balance": {"amount": …}}, {"data": {"balance": …}} и т.п."""
+    for holder in (data, data.get("data") or {}, data.get("result") or {}):
+        if not isinstance(holder, dict):
+            continue
+        for key in ("balance", "balance_usd", "available", "amount"):
+            value = holder.get(key)
+            if isinstance(value, dict):
+                value = value.get("amount") or value.get("available") or value.get("balance") or value.get("usd")
+            if value is not None and str(value).strip() not in ("", "None"):
+                try:
+                    return Decimal(str(value).replace(",", "").replace("$", "").strip())
+                except ArithmeticError:
+                    continue
+    raise SupplierRejected(f"в ответе /balance нет баланса: {str(data)[:200]}")
+
+
 class FazerSupplier:
     name = "fazer"
 
@@ -410,4 +427,4 @@ class FazerSupplier:
 
     def balance(self) -> Decimal:
         data = self._request("GET", "/balance", background=True, wait=20)  # воркер не должен ждать
-        return Decimal(str(data["balance"]))
+        return parse_balance(data)

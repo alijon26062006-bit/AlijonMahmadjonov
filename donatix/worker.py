@@ -12,7 +12,7 @@ import httpx
 from . import catalog, db, orders, webhooks
 from .config import Config
 from .money import to_decimal
-from .suppliers import Supplier, SupplierError
+from .suppliers import Supplier
 
 log = logging.getLogger(__name__)
 
@@ -63,9 +63,11 @@ def notify_admin_file(config: Config, caption: str, buttons: list | None, path, 
 def check_supplier_balance(conn, config: Config, supplier: Supplier) -> Decimal | None:
     try:
         balance = supplier.balance()
-    except SupplierError as exc:
+    except Exception as exc:  # noqa: BLE001 — причину покажем в админке, а не только в журнале
         log.warning("баланс поставщика: %s", exc)
+        db.set_setting(conn, "supplier_balance_error", f"{type(exc).__name__}: {exc}"[:300])
         return None
+    db.set_setting(conn, "supplier_balance_error", "")
     db.set_setting(conn, "supplier_balance", str(balance))
     db.set_setting(conn, "supplier_balance_at", db.now())
     was_low = db.get_setting(conn, "supplier_balance_low") == "1"
@@ -111,17 +113,18 @@ class Worker:
             while not self._stop.is_set():
                 now = time.monotonic()
                 try:
-                    if now - last_sync >= self.config.catalog_sync_minutes * 60 or last_sync == 0:
-                        # Если каталог сейчас грузит админка — пропускаем, возьмём в следующий раз
-                        if catalog.SYNC_LOCK.acquire(blocking=False):
-                            try:
-                                catalog.sync_catalog(conn, self.supplier)
-                            finally:
-                                catalog.SYNC_LOCK.release()
-                        last_sync = now
+                    # Баланс поставщика — первым делом: раньше он ждал, пока загрузится весь каталог
+                    if now - last_balance >= 300 or last_balance == 0:
+                        check_supplier_balance(conn, self.config, self.supplier)
+                        attention_alert(conn, self.config)
+                        last_balance = now
                 except Exception:
-                    log.exception("обновление каталога")
-                    last_sync = now  # не долбим поставщика при ошибке
+                    log.exception("баланс поставщика")
+                    last_balance = now
+                if now - last_sync >= self.config.catalog_sync_minutes * 60 or last_sync == 0:
+                    # Каталог грузится в своём потоке: сотни запросов не должны держать заказы и баланс
+                    self._start_sync()
+                    last_sync = now
                 try:
                     from . import rates
                     rates.refresh(conn, self.config, rates.WORKER_SECONDS)
@@ -130,15 +133,26 @@ class Worker:
                 try:
                     orders.process_pending(conn, self.supplier)
                     webhooks.deliver_pending(conn)
-                    if now - last_balance >= 300 or last_balance == 0:
-                        check_supplier_balance(conn, self.config, self.supplier)
-                        attention_alert(conn, self.config)
-                        last_balance = now
                 except Exception:
                     log.exception("воркер")
                 self._stop.wait(self.config.order_poll_seconds)
         finally:
             conn.close()
+
+    def _start_sync(self) -> None:
+        def run() -> None:
+            # Если каталог сейчас грузит админка — пропускаем, возьмём в следующий раз
+            if not catalog.SYNC_LOCK.acquire(blocking=False):
+                return
+            c = db.connect(self.config.db_path)
+            try:
+                catalog.sync_catalog(c, self.supplier)
+            except Exception:
+                log.exception("обновление каталога")
+            finally:
+                c.close()
+                catalog.SYNC_LOCK.release()
+        threading.Thread(target=run, name="donatix-catalog-sync", daemon=True).start()
 
 
 def supplier_balance_cached(conn) -> Decimal | None:

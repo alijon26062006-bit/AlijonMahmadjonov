@@ -392,10 +392,16 @@ def screen_settings(conn: sqlite3.Connection, config: Config) -> Screen:
     on = {True: "✅", False: "⛔"}
     text = ("⚙️ <b>Настройки</b>\n"
             "Наценка: " + " · ".join(f"{t} {v['markups'][t]}%" for t in TIERS) + "\n"
+            + "⭐ Stars: " + (f"{v['kind_markups']['telegram_stars']}%" if v["kind_markups"]["telegram_stars"]
+                             is not None else "как по уровню")
+            + " · 👑 Premium: " + (f"{v['kind_markups']['telegram_premium']}%"
+                                  if v["kind_markups"]["telegram_premium"] is not None else "как по уровню") + "\n"
             f"Регистрация: {on[v['reg_open']]} · проверка новых: {on[v['require_approval']]}\n"
             f"Конструктор для клиентов: {on[v['client_bots']]} · до {v['max_bots']} ботов\n"
             f"Поддержка: {_e(v['support'] or '—')}")
     rows: Buttons = [[(f"{t} −0.5%", f"mk:{t}:-5"), (f"{t} +0.5%", f"mk:{t}:5")] for t in TIERS]
+    for kind, short in (("telegram_stars", "⭐ Stars"), ("telegram_premium", "👑 Premium")):
+        rows.append([(f"{short} −0.5%", f"mk:{kind}:-5"), (f"{short} +0.5%", f"mk:{kind}:5")])
     rows += [
         [(f"{on[v['reg_open']]} Регистрация", "set:reg_open:0"),
          (f"{on[v['require_approval']]} Проверка новых", "set:require_approval:0")],
@@ -515,6 +521,10 @@ def _markup(bot: AdminBot, conn: sqlite3.Connection, tier: str, delta: int) -> s
     from . import sitecfg
     if tier in TIERS:
         sitecfg.bump_markup(conn, bot.config, tier, Decimal(delta) / 10)
+    elif tier in ("telegram_stars", "telegram_premium"):
+        base = bot.config.kind_markups.get(tier, bot.config.markups["bronze"])
+        value = max(Decimal("0"), min(Decimal("100"), base + Decimal(delta) / 10))
+        sitecfg.save(conn, bot.config, {f"markup_{tier}": str(value)})
     return screen_settings(conn, bot.config)
 
 
