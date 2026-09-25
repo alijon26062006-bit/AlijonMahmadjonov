@@ -574,6 +574,20 @@ def panel_bots_action(bot_id: int, action: str, request: Request, admin_ids: str
     return _redirect("/panel/bots")
 
 
+@router.get("/pay-icons/{name}")
+def pay_icon(name: str, config: Config = Depends(get_config)):
+    """Иконки способов оплаты — видны клиентам и ботам, поэтому без входа."""
+    from fastapi.responses import FileResponse
+
+    from . import payments
+    path = payments.icons_dir(config) / name
+    if not payments.ICON_NAME_RE.fullmatch(name) or not path.is_file():
+        from fastapi import HTTPException
+        raise HTTPException(404)
+    return FileResponse(path, headers={"Cache-Control": "public, max-age=2592000, immutable",
+                                       "X-Content-Type-Options": "nosniff"})
+
+
 @router.get("/panel/data/rate")
 def panel_rate(user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
     """Страница оплаты спрашивает курс каждые 30 секунд."""

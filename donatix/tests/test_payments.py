@@ -202,3 +202,33 @@ def test_old_500_minimum_becomes_100(app, config, conn):
     db.set_setting(conn, "pay.min_tjs", "300")  # админ задал своё — больше не трогаем
     sitecfg.load(conn, config)
     assert payments.settings(conn, config)["min_tjs"] == 300
+
+
+def test_admin_uploads_method_icon(app, config, conn):
+    from donatix import payments
+    uid, client, token = _setup(app, config, conn)
+    admin = TestClient(app)
+    atoken = web_login(admin, "admin@example.com", "adminpass123")
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+    data = {"csrf": atoken, "n": "0", "tjs_rate": "11", "min_tjs": "100", "low_usd": "10",
+            "m0_title": "Душанбе Сити", "m0_currency": "TJS", "m0_details": "DC 5058 **** 1", "m0_enabled": "1"}
+    r = admin.post("/admin/pay-settings", data=data, files={"m0_icon": ("dc.png", png, "image/png")})
+    assert "Реквизиты сохранены" in r.text
+    m = payments.methods(conn, config)[0]
+    assert m["icon_url"].endswith(".png")
+    icon = m["icon_url"].rsplit("/", 1)[1]
+    assert f'/pay-icons/{icon}' in client.get("/panel/balance").text
+    got = TestClient(app).get(f"/pay-icons/{icon}")
+    assert got.status_code == 200 and got.content == png
+    assert TestClient(app).get("/pay-icons/../t.db").status_code == 404
+
+    # иконка сохраняется при следующем сохранении без файла
+    page = admin.get("/admin/pay-settings").text
+    code = page.split('name="m0_code" value="')[1].split('"')[0]
+    admin.post("/admin/pay-settings", data=data | {"n": "1", "m0_code": code, "m1_title": ""})
+    assert payments.methods(conn, config)[0]["icon_url"].endswith(icon)
+
+    # не картинка — отказ
+    r = admin.post("/admin/pay-settings", data=data | {"n": "1", "m0_code": code},
+                   files={"m0_icon": ("x.png", b"hello", "image/png")})
+    assert "PNG, JPG или WebP" in r.text

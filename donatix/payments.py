@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import sqlite3
 from decimal import ROUND_DOWN, ROUND_UP, Decimal
@@ -120,8 +121,10 @@ def save_settings(conn: sqlite3.Connection, config: Config, methods_in: list[dic
         currency, _, network = str(m.get("currency") or "").partition(":")
         currency = currency if currency in CURRENCIES else "TJS"
         network = network if currency == "USDT" and network in NETWORKS else ""
+        icon = str(m.get("icon") or "")
+        icon = icon if ICON_NAME_RE.fullmatch(icon) else ""
         clean.append({"code": code, "title": title, "currency": currency, "network": network,
-                      "details": details, "enabled": bool(m.get("enabled"))})
+                      "details": details, "enabled": bool(m.get("enabled")), "icon": icon})
     with db.tx(conn):
         db.set_setting(conn, "pay.methods_json", json.dumps(clean, ensure_ascii=False))
         db.set_setting(conn, "pay.tjs_rate", str(rate))
@@ -143,6 +146,7 @@ def title_for(conn: sqlite3.Connection, config: Config, code: str) -> str:
 def methods(conn: sqlite3.Connection, config: Config) -> list[dict[str, str]]:
     conf = settings(conn, config)
     return [{"code": m["code"], "title": m["title"], "currency": m["currency"], "details": m["details"],
+             "icon_url": f"{config.base_url}/pay-icons/{m['icon']}" if m.get("icon") else "",
              "network": m["network"], "network_title": NETWORKS.get(m["network"], ""),
              "network_note": network_note(m["network"])}
             for m in conf["all_methods"] if m["code"] in conf["details"]]
@@ -232,6 +236,38 @@ def cancel(conn: sqlite3.Connection, user_id: int, payment_id: int) -> None:
 
 RECEIPT_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf"}
 MAX_RECEIPT_BYTES = 10 * 1024 * 1024
+
+
+ICON_NAME_RE = re.compile(r"[a-f0-9]{12}\.(png|jpg|webp)")
+ICON_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
+MAX_ICON_BYTES = 1024 * 1024
+
+
+def icons_dir(config: Config):
+    from pathlib import Path
+    folder = Path(config.db_path).parent / "pay_icons"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def save_icon(config: Config, data: bytes, content_type: str) -> str:
+    """Иконка способа оплаты (логотип банка, USDT): PNG/JPG/WebP до 1 МБ. Возвращает имя файла."""
+    ext = ICON_TYPES.get((content_type or "").split(";")[0].strip().lower())
+    if ext is None or not _looks_like(data, ext):
+        raise PaymentError("Иконка — картинка PNG, JPG или WebP.")
+    if len(data) > MAX_ICON_BYTES:
+        raise PaymentError("Иконка больше 1 МБ — возьмите поменьше (хватит 200×200).")
+    name = f"{secrets.token_hex(6)}.{ext}"
+    (icons_dir(config) / name).write_bytes(data)
+    return name
+
+
+def _looks_like(data: bytes, ext: str) -> bool:
+    if ext == "png":
+        return data.startswith(b"\x89PNG")
+    if ext == "jpg":
+        return data.startswith(b"\xff\xd8")
+    return data[:4] == b"RIFF" and data[8:12] == b"WEBP"
 
 
 def receipts_dir(config: Config):

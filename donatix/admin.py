@@ -411,10 +411,22 @@ async def pay_settings_save(request: Request, admin=Depends(admin_user), conn=De
                             config: Config = Depends(get_config)):
     from . import payments
     form = await request.form()
+    old_icons = {m["code"]: m.get("icon", "") for m in payments.settings(conn, config)["all_methods"]}
     rows = []
-    for i in range(int(form.get("n", 0) or 0) + 1):  # +1 — строка «новый способ»
-        rows.append({k: str(form.get(f"m{i}_{k}", "")) for k in ("code", "title", "currency", "details")}
-                    | {"enabled": form.get(f"m{i}_enabled") == "1", "delete": form.get(f"m{i}_delete") == "1"})
+    try:
+        for i in range(int(form.get("n", 0) or 0) + 1):  # +1 — строка «новый способ»
+            row = ({k: str(form.get(f"m{i}_{k}", "")) for k in ("code", "title", "currency", "details")}
+                   | {"enabled": form.get(f"m{i}_enabled") == "1", "delete": form.get(f"m{i}_delete") == "1"})
+            row["icon"] = "" if form.get(f"m{i}_icon_del") == "1" else old_icons.get(row["code"], "")
+            upload = form.get(f"m{i}_icon")
+            if upload is not None and getattr(upload, "filename", ""):
+                data = await upload.read(payments.MAX_ICON_BYTES + 1)
+                if data:
+                    row["icon"] = payments.save_icon(config, data, upload.content_type or "")
+            rows.append(row)
+    except payments.PaymentError as exc:
+        flash(request, str(exc), "error")
+        return _back("/admin/pay-settings")
     try:
         payments.save_settings(conn, config, rows, str(form.get("tjs_rate", "")), str(form.get("min_tjs", "")),
                                str(form.get("low_usd", "")), rate_auto=form.get("rate_auto") == "1",

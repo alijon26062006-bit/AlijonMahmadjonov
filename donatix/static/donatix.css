@@ -937,3 +937,10 @@ a.bal-tile:hover { text-decoration: none; border-color: var(--accent-line); }
 .kv .k { font-size: .85rem; }
 .kv .v { font-size: .95rem; font-weight: 600; word-break: break-word; }
 .tier-card .tier-status { padding: 10px 12px; }
+
+/* Иконки способов оплаты (логотипы банков, USDT) */
+.pm-logo { width: 36px; height: 36px; flex: none; border-radius: 10px; object-fit: cover; background: var(--surface-2);
+  border: 1px solid var(--line); }
+.pm-icon-row { margin-top: 10px; }
+.pm-icon-row input[type=file] { min-height: 0; padding: 8px; font-size: .88rem; }
+.paym { gap: 10px; }
