@@ -149,7 +149,8 @@ async def methods(call: CallbackQuery, state: FSMContext) -> None:
     rows = [[(_method_label(m), f"dx:m:{m['code']}")] for m in ms]
     rows.append([("‹ Назад", "dx:home")])
     await _show(call, f"💳 <b>Пополнение счёта Donatix</b>\n\nВыберите способ оплаты.\n"
-                      f"Минимум — <b>{esc(str(data.get('min_tjs')))} сомони</b>.", _kb(*rows))
+                      + (f"Минимум — <b>{esc(str(data.get('min_tjs')))} сомони</b>."
+                         if float(data.get("min_tjs") or 0) > 0 else "Можно любую сумму."), _kb(*rows))
     await call.answer()
 
 
@@ -158,7 +159,9 @@ async def pick_method(call: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(dx_method=call.data[5:])
     await state.set_state(TopUp.amount)
     data = await state.get_data()
-    await _show(call, f"Сколько сомони хотите пополнить?\nНапишите число, минимум <b>{esc(str(data.get('dx_min')))}</b>.",
+    minimum = float(data.get("dx_min") or 0)
+    await _show(call, "Сколько сомони хотите пополнить?\nНапишите число"
+                      + (f", минимум <b>{esc(str(data.get('dx_min')))}</b>." if minimum > 0 else " — любая сумма."),
                 _kb([("‹ Отмена", "dx:home")]))
     await call.answer()
 

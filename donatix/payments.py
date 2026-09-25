@@ -141,8 +141,8 @@ def save_settings(conn: sqlite3.Connection, config: Config, methods_in: list[dic
         margin = to_decimal(margin_pct.replace(",", ".")) if margin_pct.strip() else rates.margin_pct(conn, config)
     except MoneyError:
         raise PaymentError("Курс, минимум, запас и порог — числа.") from None
-    if rate <= 0 or minimum <= 0 or low < 0:
-        raise PaymentError("Курс и минимум должны быть больше нуля.")
+    if rate <= 0 or minimum < 0 or low < 0:
+        raise PaymentError("Курс — больше нуля, минимум — 0 или больше (0 — без минимума).")
     if not Decimal("-5") <= margin <= Decimal("20"):
         raise PaymentError("Запас к курсу — от -5 до 20 %.")
     auto = rates.auto_enabled(conn, config) if rate_auto is None else rate_auto
@@ -213,7 +213,9 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
             usd = to_decimal(amount.replace(",", ".").replace("$", "").strip())
     except MoneyError:
         raise PaymentError("Сумма — число, например 50.") from None
-    if usd * conf["tjs_rate"] < conf["min_tjs"] or usd > Decimal("100000"):
+    if usd < Decimal("0.01") or usd > Decimal("100000"):
+        raise PaymentError("Укажите сумму больше нуля.")
+    if conf["min_tjs"] > 0 and usd * conf["tjs_rate"] < conf["min_tjs"]:
         raise PaymentError(f"Минимальная сумма пополнения — {conf['min_tjs']:f} сомони (${conf['min_usd']}).")
     open_n = conn.execute("SELECT COUNT(*) FROM payments WHERE user_id = ? AND status = 'pending'",
                           (user["id"],)).fetchone()[0]

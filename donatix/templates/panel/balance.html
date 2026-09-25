@@ -27,7 +27,7 @@
       <div class="step-head" style="margin-top:22px"><span class="n">2</span><h3>Сумма</h3></div>
       <label for="amount">Сколько зачислить, USD</label>
       <input id="amount" name="amount" inputmode="decimal" required placeholder="Например, 50" autocomplete="off">
-      <div class="hint">Минимум {{ min_tjs | string | replace(".00", "") }} сомони (≈ ${{ min_usd }}). К переводу: <b id="topay">—</b></div>
+      <div class="hint">{% if min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони (≈ ${{ min_usd }}). {% else %}Любая сумма. {% endif %}К переводу: <b id="topay">—</b></div>
 
       <div class="step-head" style="margin-top:22px"><span class="n">3</span><h3>Переведите по реквизитам</h3></div>
       {% for m in methods %}

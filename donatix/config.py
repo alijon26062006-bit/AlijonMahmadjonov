@@ -101,7 +101,7 @@ class Config:
     rate_margin_pct: Decimal = Decimal("1")
     pay_min_usd: Decimal = Decimal("5")
     # Минимальное пополнение в сомони и порог «мало денег» на балансе клиента, $
-    pay_min_tjs: Decimal = Decimal("100")
+    pay_min_tjs: Decimal = Decimal("0")
     low_balance_usd: Decimal = Decimal("10")
 
     # Почта для уведомлений клиентам (необязательно).
@@ -190,7 +190,7 @@ class Config:
             supplier_rate_per_min=int(_env("DONATIX_SUPPLIER_RATE", "50") or 50),
             rate_margin_pct=Decimal(_env("DONATIX_RATE_MARGIN", "1")),
             pay_min_usd=Decimal(_env("DONATIX_PAY_MIN_USD", "5")),
-            pay_min_tjs=Decimal(_env("DONATIX_PAY_MIN_TJS", "100")),
+            pay_min_tjs=Decimal(_env("DONATIX_PAY_MIN_TJS", "0")),
             low_balance_usd=Decimal(_env("DONATIX_LOW_BALANCE_USD", "10")),
             smtp_host=_env("DONATIX_SMTP_HOST"),
             smtp_port=int(_env("DONATIX_SMTP_PORT", "587")),

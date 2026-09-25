@@ -12,7 +12,7 @@
     <div class="grid three" style="gap:12px">
       <div><label for="min_tjs">Минимум пополнения, сомони</label>
         <input id="min_tjs" name="min_tjs" inputmode="decimal" required value="{{ conf.min_tjs }}">
-        <div class="hint">≈ ${{ conf.min_usd }} по курсу</div></div>
+        <div class="hint">0 — без минимума, любая сумма{% if conf.min_tjs > 0 %} · сейчас ≈ ${{ conf.min_usd }}{% endif %}</div></div>
       <div><label for="tjs_rate">Курс: сомони за 1 $</label>
         <input id="tjs_rate" name="tjs_rate" inputmode="decimal" required value="{{ conf.tjs_rate }}" {{ 'readonly' if rate.auto and rate.market }}>
         <div class="hint">{% if rate.auto and rate.market %}Рынок {{ rate.market }} + запас {{ rate.margin_pct }}% · {{ rate.source }}{% if rate.age_seconds is not none %} · {{ rate.age_seconds // 60 }} мин назад{% endif %}{% elif rate.auto %}Курс ещё не получен — пока действует этот{% else %}Задаётся вручную{% endif %}</div>

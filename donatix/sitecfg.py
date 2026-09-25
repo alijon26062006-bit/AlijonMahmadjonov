@@ -51,6 +51,10 @@ def load(conn: sqlite3.Connection, config: Config) -> None:
         if db.get_setting(conn, "pay.min_tjs") in ("500", "500.00"):
             db.set_setting(conn, "pay.min_tjs", "100")
         db.set_setting(conn, "migr.min_tjs_100", "1")
+    if db.get_setting(conn, "migr.min_tjs_0") is None:
+        # Минимум пополнения убран: любая сумма. Один раз ставим 0 (в админке можно вернуть)
+        db.set_setting(conn, "pay.min_tjs", "0")
+        db.set_setting(conn, "migr.min_tjs_0", "1")
     for tier in TIERS:
         value = db.get_setting(conn, f"markup.{tier}")
         if value:

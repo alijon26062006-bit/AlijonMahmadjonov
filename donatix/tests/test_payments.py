@@ -39,8 +39,8 @@ def test_topup_validation_and_reject(app, config, conn):
     uid, client, token = _setup(app, config, conn)
     r = client.post("/panel/balance", data={"csrf": token, "method": "binance", "amount": "50"})
     assert "Выберите способ оплаты" in r.text
-    r = client.post("/panel/balance", data={"csrf": token, "method": "alif", "amount": "1"})
-    assert "Минимальная сумма" in r.text
+    r = client.post("/panel/balance", data={"csrf": token, "method": "alif", "amount": "0"})
+    assert "больше нуля" in r.text
     client.post("/panel/balance", data={"csrf": token, "method": "usdt_trc20", "amount": "50"})
     admin = TestClient(app)
     atoken = web_login(admin, "admin@example.com", "adminpass123")
@@ -130,9 +130,11 @@ def test_api_topup_with_receipt(app, config, conn, monkeypatch):
     api = TestClient(app)
     h = {"X-API-Key": key}
     m = api.get("/api/v1/payments/methods", headers=h).json()
-    assert m["ok"] and m["methods"][0]["code"] == "alif" and m["min_tjs"] == "100"
-    r = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "90"}).json()
-    assert not r["ok"] and "100 сомони" in r["error"]
+    assert m["ok"] and m["methods"][0]["code"] == "alif" and m["min_tjs"] == "0"
+    small = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "5"}).json()
+    assert small["ok"] and small["payment"]["pay_amount"] == "5.00"   # без минимума — любая сумма
+    api.post(f"/api/v1/payments/{small['payment']['id']}/cancel", headers=h)
+    conn.execute("UPDATE payments SET status = 'cancelled' WHERE id = ?", (small["payment"]["id"],))
     odd = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "600"}).json()["payment"]
     assert odd["pay_amount"] == "600.00" and odd["amount_usd"] == "55.0458"  # 600 / 10.9, вниз
     api.post(f"/api/v1/payments/{odd['id']}/receipt", headers=h, files={"file": ("x.png", PNG, "image/png")})
