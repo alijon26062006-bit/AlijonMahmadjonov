@@ -203,6 +203,14 @@ def init(path: Path | str) -> None:
         pay_cols = {r[1] for r in conn.execute("PRAGMA table_info(payments)")}
         if "receipt_file" not in pay_cols:
             conn.execute("ALTER TABLE payments ADD COLUMN receipt_file TEXT")
+        order_cols = {r[1] for r in conn.execute("PRAGMA table_info(orders)")}
+        if "api_key_id" not in order_cols:  # какой ключ (бот) сделал заказ — для учёта продаж бота
+            conn.execute("ALTER TABLE orders ADD COLUMN api_key_id INTEGER")
+        bot_cols = {r[1] for r in conn.execute("PRAGMA table_info(bots)")}
+        for col, kind in (("warn_count", "INTEGER NOT NULL DEFAULT 0"), ("last_warn_at", "TEXT"),
+                          ("active_since", "TEXT"), ("disabled_reason", "TEXT")):
+            if col not in bot_cols:  # неактивные боты: предупреждения и автоотключение
+                conn.execute(f"ALTER TABLE bots ADD COLUMN {col} {kind}")
         for col in ("auto_kind", "ext_id", "pay_url", "pay_address"):  # автоплатёж: TRC20 / Binance Pay
             if col not in pay_cols:
                 conn.execute(f"ALTER TABLE payments ADD COLUMN {col} TEXT")

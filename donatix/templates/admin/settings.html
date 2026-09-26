@@ -34,8 +34,23 @@
   <div class="card">
     <h3>Конструктор ботов для клиентов</h3>
     <label class="switch"><input type="checkbox" name="client_bots" value="1" {{ 'checked' if s.client_bots }}><span>Клиенты могут подключать своих ботов</span></label>
-    <label for="max_bots" style="margin-top:12px">Ботов на одного клиента</label>
-    <input id="max_bots" name="max_bots" inputmode="numeric" value="{{ s.max_bots }}" style="max-width:160px">
+    <div class="grid two" style="gap:12px;margin-top:12px">
+      <div><label for="max_bots">Ботов на одного клиента</label>
+        <input id="max_bots" name="max_bots" inputmode="numeric" value="{{ s.max_bots }}"></div>
+      <div><label for="max_bots_total">Всего ботов на сервере <span class="muted">— 0 без предела</span></label>
+        <input id="max_bots_total" name="max_bots_total" inputmode="numeric" value="{{ s.max_bots_total }}"></div>
+    </div>
+    <h3 style="margin-top:18px">Боты без продаж</h3>
+    <label class="switch"><input type="checkbox" name="watch_on" value="1" {{ 'checked' if s.watch.on }}><span>Предупреждать и отключать автоматически</span></label>
+    <div class="grid three" style="gap:12px;margin-top:8px">
+      <div><label for="inactive_days">Дней без продаж до 1-го предупреждения</label>
+        <input id="inactive_days" name="inactive_days" inputmode="numeric" value="{{ s.watch.days }}"></div>
+      <div><label for="warnings">Предупреждений до отключения</label>
+        <input id="warnings" name="warnings" inputmode="numeric" value="{{ s.watch.warnings }}"></div>
+      <div><label for="warn_every_days">Дней между предупреждениями</label>
+        <input id="warn_every_days" name="warn_every_days" inputmode="numeric" value="{{ s.watch.every }}"></div>
+    </div>
+    <div class="hint">Бот не удаляется — отключается; партнёр может включить его снова, и отсчёт начнётся заново. Любая продажа снимает предупреждения. Ваши боты не трогаются.</div>
   </div>
 
   <div class="card">

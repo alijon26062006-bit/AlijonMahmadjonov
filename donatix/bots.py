@@ -95,19 +95,27 @@ def create(conn: sqlite3.Connection, config: Config, *, user_id: int, token: str
     for row in conn.execute("SELECT token_enc FROM bots"):
         if unseal(config.secret_key, row["token_enc"]) == token:
             raise BotError("Этот бот уже подключён.")
+    from . import sitecfg
+    limit = sitecfg.max_bots_total(conn)
+    if limit and conn.execute("SELECT COUNT(*) FROM bots WHERE enabled = 1").fetchone()[0] >= limit:
+        raise BotError(f"На сервере уже {limit} ботов — это предел. Напишите администратору.")
     with db.tx(conn):
         key = accounts.create_api_key(conn, user_id, f"Бот @{username}"[:64], config.secret_key)
         key_id = conn.execute("SELECT MAX(id) FROM api_keys WHERE user_id = ?", (user_id,)).fetchone()[0]
         cur = conn.execute(
             "INSERT INTO bots (user_id, token_enc, username, admin_ids, api_key_id, key_enc, enabled, created_at, "
-            "updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
+            "updated_at, active_since) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
             (user_id, seal(config.secret_key, token), username, admins, key_id, seal(config.secret_key, key),
-             db.now(), db.now()))
+             db.now(), db.now(), db.now()))
     return int(cur.lastrowid)
 
 
 def set_enabled(conn: sqlite3.Connection, bot_id: int, enabled: bool) -> None:
+    was = conn.execute("SELECT enabled FROM bots WHERE id = ?", (bot_id,)).fetchone()
     conn.execute("UPDATE bots SET enabled = ?, updated_at = ? WHERE id = ?", (int(enabled), db.now(), bot_id))
+    if enabled and was is not None and not was["enabled"]:  # перезапуск работающего бота отсчёт не сбрасывает
+        from . import bot_watch
+        bot_watch.mark_enabled(conn, bot_id)  # включили — отсчёт «без продаж» заново
 
 
 def update_admins(conn: sqlite3.Connection, bot_id: int, admin_ids: str) -> None:

@@ -38,6 +38,11 @@
       <span class="badge {{ 'ok' if b.running else ('warn' if b.enabled else '') }}">
         {{ 'работает' if b.running else ('запускается…' if b.enabled else 'остановлен') }}</span>
     </div>
+    {% if b.warn_count and b.enabled %}
+    <div class="flash warn" style="margin:10px 0 0">{{ icon('alert', 20) }}<span>Предупреждение {{ b.warn_count }}: в боте давно нет продаж. Если продаж не будет, бот отключится автоматически. Любая продажа снимает предупреждение.</span></div>
+    {% elif b.disabled_reason == 'inactive' %}
+    <div class="flash warn" style="margin:10px 0 0">{{ icon('alert', 20) }}<span>Бот отключён автоматически: долго не было продаж. Нажмите «Запустить» — отсчёт начнётся заново.</span></div>
+    {% endif %}
     {% if b.conflict %}
     <div class="flash error" style="margin:10px 0 0">{{ icon('alert', 20) }}<span>Этот токен запущен ещё где-то — бот будет отвечать дважды. Остановите другую копию или создайте нового бота.</span></div>
     {% endif %}

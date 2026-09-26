@@ -43,6 +43,14 @@ def max_bots(conn: sqlite3.Connection) -> int:
         return 3
 
 
+def max_bots_total(conn: sqlite3.Connection) -> int:
+    """Сколько всего ботов может работать на сервере (0 — без предела)."""
+    try:
+        return max(0, int(db.get_setting(conn, "site.max_bots_total") or 0))
+    except ValueError:
+        return 0
+
+
 def load(conn: sqlite3.Connection, config: Config) -> None:
     """Наложить сохранённое на config (при старте и после каждого изменения)."""
     if db.get_setting(conn, "migr.min_tjs_100") is None:
@@ -85,8 +93,15 @@ def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
         "reg_open": registration_open(conn),
         "client_bots": client_bots_enabled(conn),
         "max_bots": max_bots(conn),
+        "max_bots_total": max_bots_total(conn),
+        "watch": _watch_rules(conn),
         "supplier_rate": _throttle_status(),
     }
+
+
+def _watch_rules(conn: sqlite3.Connection) -> dict:
+    from .bot_watch import rules
+    return rules(conn)
 
 
 def _throttle_status() -> dict[str, int]:
@@ -128,6 +143,20 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
         if not 5 <= rate <= 600:
             raise SettingsError("Запросов к поставщику в минуту — от 5 до 600.")
         values["supplier.rate_per_min"] = str(rate)
+    for key, lo, hi, what in (("max_bots_total", 0, 1000, "Всего ботов на сервере"),
+                              ("inactive_days", 1, 365, "Дней без продаж"),
+                              ("warn_every_days", 1, 60, "Дней между предупреждениями"),
+                              ("warnings", 1, 10, "Предупреждений")):
+        if key in data:
+            try:
+                n = int(str(data[key]).strip())
+            except ValueError:
+                raise SettingsError(f"{what} — целое число.") from None
+            if not lo <= n <= hi:
+                raise SettingsError(f"{what} — от {lo} до {hi}.")
+            values[("site." if key == "max_bots_total" else "bots.") + key] = str(n)
+    if "watch_on" in data:
+        values["bots.watch_on"] = "1" if data["watch_on"] in (True, "1", "on") else "0"
     if "max_bots" in data:
         try:
             n = int(str(data["max_bots"]).strip())

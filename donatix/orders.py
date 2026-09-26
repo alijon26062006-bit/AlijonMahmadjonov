@@ -179,11 +179,12 @@ def create_order(
             cur = conn.execute(
                 """INSERT INTO orders (user_id, product_id, kind, product_name, quantity, fields_json,
                        unit_price, total_micro, cost_micro, status, supplier_idem_key, idempotent_supply,
-                       client_idem_key, source, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?, ?)""",
+                       client_idem_key, source, created_at, updated_at, api_key_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?, ?, ?)""",
                 (user["id"], product["id"], product["kind"], display, qty, fields_json,
                  fmt_unit(q["unit_price"]), q["total_micro"], cost_micro, f"dx-{uuid.uuid4()}",
-                 1 if supplier.is_idempotent(product["kind"]) else 0, client_idem_key, source, ts, ts),
+                 1 if supplier.is_idempotent(product["kind"]) else 0, client_idem_key, source, ts, ts,
+                 user["api_key_id"] if "api_key_id" in user.keys() else None),
             )
             order_id = int(cur.lastrowid)
             public_id = f"dx-{order_id}"

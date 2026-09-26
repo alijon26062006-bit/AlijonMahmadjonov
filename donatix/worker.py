@@ -107,7 +107,7 @@ class Worker:
             self._thread.join(timeout=5)
 
     def _run(self) -> None:
-        last_sync = last_balance = 0.0
+        last_sync = last_balance = last_watch = 0.0
         conn = db.connect(self.config.db_path)
         try:
             while not self._stop.is_set():
@@ -125,6 +125,13 @@ class Worker:
                     # Каталог грузится в своём потоке: сотни запросов не должны держать заказы и баланс
                     self._start_sync()
                     last_sync = now
+                if now - last_watch >= 3600 or last_watch == 0:
+                    try:
+                        from . import bot_watch
+                        bot_watch.check(conn, self.config)  # боты без продаж: предупредить / отключить
+                    except Exception:
+                        log.exception("проверка ботов")
+                    last_watch = now
                 try:
                     from . import cryptopay
                     cryptopay.check_all(conn, self.config, min_interval=60)  # автоплатежи TRC20 / Binance

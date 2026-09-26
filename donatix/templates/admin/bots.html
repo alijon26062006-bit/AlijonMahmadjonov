@@ -46,6 +46,8 @@
     {% endif %}
     <div class="bot-meta small muted">
       Админы: <span class="mono">{{ b.admin_ids }}</span>
+      {% if b.warn_count %} · ⚠️ предупреждений: {{ b.warn_count }}{% endif %}
+      {% if b.disabled_reason == 'inactive' %} · ⛔️ отключён: нет продаж{% endif %}
       {% if b.restarts %} · перезапусков: {{ b.restarts }}{% endif %}
       {% if b.last_exit is not none and not b.running %} · код выхода {{ b.last_exit }}{% endif %}
       {% if b.venv and b.venv != 'ok' %} · библиотеки: {{ 'ставятся…' if b.venv == 'installing' else b.venv }}{% endif %}
