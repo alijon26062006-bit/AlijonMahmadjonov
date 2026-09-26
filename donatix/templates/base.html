@@ -126,15 +126,16 @@
   // Суммы в карточках-счётчиках плавно набегают от нуля
   (function () {
     if (dxCalm || !window.requestAnimationFrame) return;
-    document.querySelectorAll(".stat .value, .balance-card b").forEach(function (el) {
-      var m = el.textContent.trim().match(/^(\$?)(\d+)(?:\.(\d+))?$/);
+    document.querySelectorAll(".stat .value, .balance-card b, .bal-amount, .bal-tile .t-value").forEach(function (el) {
+      el = el.querySelector(".cur-tjs") || el;   // сумма в сомони — внутри своего span (с подсказкой в $)
+      var m = el.textContent.trim().match(/^(\$?)(\d+)(?:\.(\d+))?(\s*с\.)?$/);
       if (!m) return;
-      var prefix = m[1], digits = (m[3] || "").length, target = parseFloat(m[2] + "." + (m[3] || "0"));
+      var prefix = m[1], suffix = m[4] || "", digits = (m[3] || "").length, target = parseFloat(m[2] + "." + (m[3] || "0"));
       if (!target) return;
       var start = performance.now(), dur = 700;
       (function step(now) {
         var k = Math.min(1, (now - start) / dur), v = target * (1 - Math.pow(1 - k, 3));
-        el.textContent = prefix + v.toFixed(digits);
+        el.textContent = prefix + v.toFixed(digits) + suffix;
         if (k < 1) requestAnimationFrame(step);
       })(start);
     });

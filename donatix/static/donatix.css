@@ -960,3 +960,32 @@ a.bal-tile:hover { text-decoration: none; border-color: var(--accent-line); }
 .cur-switch a.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .cur-switch a:hover { text-decoration: none; color: var(--text); }
 .cur-tjs { font-variant-numeric: tabular-nums; }
+
+/* ── Мягкие движения: новые блоки кабинета ─────────────────────
+   Лёгкий подъём при наведении, мягкое нажатие, плавная прокрутка,
+   появление уведомлений. Всё выключается при prefers-reduced-motion. */
+html { scroll-behavior: smooth; }
+.bal-hero { animation: rise .5s var(--ease-out) backwards; }
+.bal-btn, .qrow, .bal-tile, .paym, .cur-switch a, .pm-logo, .key-box, .autopay .btn {
+  transition: transform .22s var(--ease-out), box-shadow .22s var(--ease-out), border-color .2s var(--ease),
+              background .2s var(--ease), color .2s var(--ease); }
+@media (hover: hover) {
+  .qrow:hover, a.bal-tile:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(20, 22, 27, .07); }
+  .bal-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 34%, transparent); }
+  .qrow:hover .ico { transform: translateX(3px); }
+}
+.qrow .ico { transition: transform .22s var(--ease-out); }
+.qrow:active, .bal-tile:active, .bal-btn:active, .paym:active { transform: scale(.985); }
+.quick .qrow { animation: rise .45s var(--ease-out) backwards; }
+.quick .qrow:nth-of-type(2) { animation-delay: .04s; } .quick .qrow:nth-of-type(3) { animation-delay: .08s; }
+.quick .qrow:nth-of-type(4) { animation-delay: .12s; } .quick .qrow:nth-of-type(5) { animation-delay: .16s; }
+.flash { animation: flash-in .35s var(--ease-out) backwards; }
+@keyframes flash-in { from { opacity: 0; transform: translateY(-6px); } }
+.cur-switch a.on { animation: pop .25s var(--ease-out); }
+@keyframes pop { from { transform: scale(.9); } }
+.autopay .ap-done { animation: rise .5s var(--ease-out) backwards; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .bal-hero, .quick .qrow, .flash, .cur-switch a.on, .autopay .ap-done { animation: none !important; }
+  .qrow:hover, a.bal-tile:hover, .bal-btn:hover { transform: none; }
+}
