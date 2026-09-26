@@ -271,6 +271,12 @@ case "\${1:-help}" in
         fi
         ;;
     logs)    journalctl -u "\$SERVICE" -f ;;
+    onekey)
+        # Всё на игровой ключ: звёзды, Premium, игры, Steam и API.
+        ( cd "\$APP" && sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" \
+            -m app.tools.one_key ) && systemctl restart "\$SERVICE" \
+            && echo "✅ Бот перезапущен. Проверьте: /panel → 💳 Балансы ключей"
+        ;;
     orders)
         # Игровые заказы: что у нас и что говорит поставщик. Только читает.
         shift
@@ -606,6 +612,7 @@ PYBK
   stars-bot status    работает ли
   stars-bot logs      смотреть логи живьём (Ctrl+C — выйти)
   stars-bot errors    последние ошибки
+  stars-bot onekey     всё (звёзды, Premium, игры) — на игровой ключ
   stars-bot orders [ИГРА]
                       игровые заказы и их статус у поставщика
   stars-bot setup     изменить настройки и перезапустить
