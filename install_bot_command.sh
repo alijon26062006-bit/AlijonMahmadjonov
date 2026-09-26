@@ -150,7 +150,8 @@ echo "3/4  Перезапускаю бота..."
 # Запоминаем момент перезапуска: «Бот омода» от ПРЕЖНЕГО запуска не должен
 # засчитываться, иначе упавший бот показал бы «✅ ГОТОВО».
 SINCE="$(date '+%Y-%m-%d %H:%M:%S')"
-LOG_START="$(wc -l < "$LOGFILE" 2>/dev/null || echo 0)"
+LOG_START=0
+[ -f "$LOGFILE" ] && LOG_START="$(wc -l < "$LOGFILE")"
 if has_systemd; then
   if systemctl list-units --all --type=service 2>/dev/null | grep -q "${SERVICE}.service"; then
     $SUDO systemctl restart "$SERVICE"
