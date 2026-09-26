@@ -18,7 +18,7 @@ def test_order_names_and_prices(conn, config):
     _ff(conn)
     data = pricelist.build(conn, config)
     ff = next(s for s in data["sections"] if s["key"] == "ff_cis")
-    assert [p["short"] for p in ff["packs"]] == ["100 💎", "520 💎", "Ваучер · неделя", "Ваучер · месяц",
+    assert [p["short"] for p in ff["packs"]] == ["100 💎", "520 💎", "На неделю", "На месяц",
                                                  "Прокачка уровня"]
     rate, markup = data["rate"], data["markup"]
     assert ff["packs"][0]["tjs"] == pricelist.tjs_price("0.95", markup, rate)
@@ -30,5 +30,6 @@ def test_admin_page(client, conn):
     _ff(conn)
     web_login(client, "admin@example.com", "adminpass123")
     page = client.get("/admin/pricelist?show=ff_cis&fmt=story").text
-    assert "Скачать PNG" in page and "Free Fire" in page and "100 💎" in page and "1080×1920" in page
+    assert "Скачать PNG" in page and "Free Fire" in page and "1080×1920" in page
+    assert '"fmt": "story"' in page and '"single": true' in page and "ff_cis" in page
     assert "PUBG" in client.get("/admin/pricelist").text

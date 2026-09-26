@@ -107,6 +107,10 @@ def pricelist_page(request: Request, show: str = "all", fmt: str = "post", admin
     today = datetime.now(timezone(timedelta(hours=config.tz_offset))).strftime("%d.%m.%Y")
     return render(request, "admin/pricelist.html", {
         "user": admin, "data": data, "sections": sections, "show": show, "fmt": "story" if fmt == "story" else "post",
+        # для рисования в браузере — только то, что попадёт на картинку
+        "cards": [{"key": s["key"], "game": s["game"], "sub": s["sub"],
+                   "packs": [{"short": p["short"], "price": p["price"], "group": p["group"]} for p in s["packs"]]}
+                  for s in sections],
         "today": today, "site_host": config.base_url.split("://")[-1].rstrip("/"),
     })
 

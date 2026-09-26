@@ -50,8 +50,8 @@ def _categories(conn: sqlite3.Connection) -> dict[str, tuple[str, str | None, st
 
 
 _SHORT = ((re.compile(r"\s*(алмаз(ов|а)?|diamonds?)\b", re.I), " 💎"),
-          (re.compile(r"ваучер на неделю|weekly (membership|voucher)", re.I), "Ваучер · неделя"),
-          (re.compile(r"ваучер на месяц|monthly (membership|voucher)", re.I), "Ваучер · месяц"),
+          (re.compile(r"ваучер на неделю|weekly (membership|voucher)", re.I), "На неделю"),
+          (re.compile(r"ваучер на месяц|monthly (membership|voucher)", re.I), "На месяц"),
           (re.compile(r"\s*\((.*?)\)"), ""))
 
 
