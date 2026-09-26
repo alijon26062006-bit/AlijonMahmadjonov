@@ -364,6 +364,8 @@ def panel_catalog(
     request: Request, kind: str = "", q: str = "", category: str = "", region: str = "",
     user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config),
 ):
+    if kind == "telegram":
+        return render(request, "panel/telegram.html", {"user": user, "options": _telegram_options(conn, config, user)})
     kind = kind if kind in KINDS else ""
     q = q[:100]
     if kind in _BY_GAME and not category:
@@ -392,6 +394,20 @@ def panel_catalog(
         "user": user, "groups": groups, "kind": kind, "q": q, "kinds": KINDS, "count": len(items),
         "category": category, "game": game, "regions": regions, "region": region, "region_title": region_title,
     })
+
+
+def _telegram_options(conn, config: Config, user) -> list[dict]:
+    """Раздел «Telegram»: звёзды и Premium — две кнопки, внутри каждой свои цены."""
+    out = []
+    for kind, title, note in (("telegram_stars", "Telegram Stars", "Звёзды на любой аккаунт по @username"),
+                              ("telegram_premium", "Telegram Premium", "Подписка на 3, 6 или 12 месяцев")):
+        items = [catalog.public_view(p, accounts.markup_for(user, config, kind))
+                 for p in catalog.list_products(conn, kind=kind)]
+        cheapest = min(items, key=lambda i: to_decimal(i["price_usd"]), default=None)
+        out.append({"kind": kind, "title": title, "note": note, "count": len(items),
+                    "from_price": cheapest["price_usd"] if cheapest else None,
+                    "per_star": bool(cheapest and cheapest["unit"] == "star")})
+    return out
 
 
 @router.get("/panel/buy/{product_id}")

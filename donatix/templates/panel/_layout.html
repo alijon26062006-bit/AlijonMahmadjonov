@@ -9,6 +9,7 @@
 {% endblock %}
 {% block sidenav %}
 {% set current = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
+{% if current.startswith('/panel/catalog?kind=telegram') %}{% set current = '/panel/catalog?kind=telegram' %}{% endif %}
 <h4>Обзор</h4>
 {{ nav_link('/panel', 'Профиль', 'home', current) }}
 {{ nav_link('/panel/orders', 'Заказы', 'bag', current) }}
@@ -17,7 +18,7 @@
 <h4>Каталог</h4>
 {{ nav_link('/panel/buy/steam-topup', 'Пополнить Steam', 'wallet', current) }}
 {{ nav_link('/panel/buy/steam-gift', 'Steam Гифты (игры)', 'gift', current) }}
-{{ nav_link('/panel/catalog?kind=telegram_stars', 'Telegram звёзды', 'zap-send', current) }}
+{{ nav_link('/panel/catalog?kind=telegram', 'Telegram', 'zap-send', current) }}
 {{ nav_link('/panel/catalog?kind=gift_card', 'Подарочные карты', 'card', current) }}
 {{ nav_link('/panel/catalog?kind=game_key', 'Ключи игр', 'key', current) }}
 {{ nav_link('/panel/catalog?kind=topup', 'Пополнение сервисов', 'bolt', current) }}

@@ -1,0 +1,25 @@
+{% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon, kind_icon %}
+{% block title %}Telegram — {{ site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero">
+  <h1>Telegram</h1>
+  <p class="muted">Выберите, что купить</p>
+</section>
+<div class="tg-pick">
+  {% for o in options %}
+  <a class="tg-option k-{{ o.kind }}" href="/panel/catalog?kind={{ o.kind }}">
+    <span class="tile k-{{ o.kind }}">{{ kind_icon(o.kind, 26) }}</span>
+    <span class="tg-text">
+      <b>{{ o.title }}</b>
+      <small class="muted">{{ o.note }}</small>
+    </span>
+    <span class="tg-price">
+      {% if o.from_price %}от {{ money(o.from_price) }}{% if o.per_star %}<small> / звезда</small>{% endif %}
+      {% else %}<small class="muted">нет в наличии</small>{% endif %}
+    </span>
+    {{ icon('chevron', 20, 'chev') }}
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

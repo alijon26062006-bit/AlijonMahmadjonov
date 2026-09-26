@@ -989,3 +989,19 @@ html { scroll-behavior: smooth; }
   .bal-hero, .quick .qrow, .flash, .cur-switch a.on, .autopay .ap-done { animation: none !important; }
   .qrow:hover, a.bal-tile:hover, .bal-btn:hover { transform: none; }
 }
+
+/* Раздел «Telegram»: две большие кнопки — Stars и Premium */
+.tg-pick { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 8px; }
+.tg-option { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--line);
+  border-radius: var(--r); background: var(--surface); color: var(--text); text-decoration: none; }
+.tg-option:hover { color: var(--text); text-decoration: none; border-color: var(--accent-line); }
+.tg-option .tile { width: 52px; height: 52px; flex: none; }
+.tg-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.tg-text b { font-size: 16px; }
+.tg-price { font-weight: 700; white-space: nowrap; }
+.tg-price small { font-weight: 500; }
+.tg-option .chev { flex: none; opacity: .5; }
+@media (prefers-reduced-motion: no-preference) {
+  .tg-option { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .tg-option:hover { transform: translateY(-2px); box-shadow: 0 8px 24px -12px rgb(20 22 40 / .25); }
+}

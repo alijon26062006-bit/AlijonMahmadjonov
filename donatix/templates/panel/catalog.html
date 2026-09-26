@@ -21,6 +21,7 @@
 {% endif %}
 {% else %}
 <section class="page-hero">
+  {% if kind in ('telegram_stars', 'telegram_premium') %}<a class="back" href="/panel/catalog?kind=telegram">{{ icon('arrow-left', 18) }}Telegram</a>{% endif %}
   <h1>{{ kind_titles.get(kind, 'Каталог') }}</h1>
 </section>
 <form class="search" method="get" action="/panel/catalog" role="search">
