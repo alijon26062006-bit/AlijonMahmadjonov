@@ -512,28 +512,43 @@ async def got_rate(message: Message, state: FSMContext, db: Database) -> None:
 
 @router.callback_query(F.data == "a:costs")
 async def cb_refresh_costs(cb: CallbackQuery, db: Database, cfg: Config, supplier) -> None:
-    """Нархи хариди ҳамаи молҳоро аз таъминкунанда мегирад."""
-    if not cfg.has_supplier:
+    """Нархи хариди ҳамаи молҳоро аз таъминкунандаҳо мегирад."""
+    telegram = getattr(supplier, "telegram", None)
+    if not cfg.has_supplier and telegram is None:
         await cb.answer("Таъминкунанда хомӯш аст", show_alert=True)
         return
     await safe_edit(cb, "⏳ Нархи харидро мегирам...", None)
     await cb.answer()
 
-    live = await supplier.products()
-    if not live:
-        await cb.message.answer(
-            "⚠️ Каталоги таъминкунандаро гирифта натавонистам.",
-            reply_markup=keyboards.admin_price_categories(),
-        )
-        return
+    lines = ["✅ Нархи харид нав шуд.\n"]
+    if cfg.has_supplier:
+        live = await supplier.products()
+        if live:
+            updated = db.update_costs({sku: item.get("price") for sku, item in live.items()})
+            lines.append(f"🎮 FireLoot: <b>{len(live)}</b> мол, нав шуд: <b>{updated}</b>")
+        else:
+            lines.append("⚠️ Каталоги FireLoot гирифта нашуд.")
 
-    updated = db.update_costs({sku: item.get("price") for sku, item in live.items()})
+    if telegram is not None:
+        # Stars ва Premium аз Donatix харида мешаванд — нархашон аз он ҷо.
+        updated = missing = 0
+        for category, kind in ((catalog.CAT_STARS, "stars"), (catalog.CAT_PREMIUM, "premium")):
+            for row in db.products(category, only_active=False):
+                if row["kind"] != kind:
+                    continue
+                cost = await telegram.cost_usd(kind, row["amount"])
+                if cost is None:
+                    missing += 1
+                    continue
+                db.set_cost(row["code"], round(cost * 1000))
+                updated += 1
+        lines.append(f"⭐️ Donatix (Stars, Premium): нав шуд: <b>{updated}</b>")
+        if missing:
+            lines.append(f"⚠️ Дар Donatix мол нест: <b>{missing}</b>")
+
+    lines.append("\n<i>Акнун дар экрани ҳар мол нархи харид ва фоида дида мешавад.</i>")
     await cb.message.answer(
-        f"✅ Нархи харид нав шуд.\n\n"
-        f"🏪 Дар таъминкунанда: <b>{len(live)}</b> мол\n"
-        f"🔄 Нав шуд: <b>{updated}</b> мол\n\n"
-        "<i>Акнун дар экрани ҳар мол нархи харид ва фоида дида мешавад.</i>",
-        reply_markup=keyboards.admin_price_categories(),
+        "\n".join(lines), reply_markup=keyboards.admin_price_categories()
     )
 
 

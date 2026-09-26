@@ -29,9 +29,10 @@ TargetKind = Literal["username", "player", "player_server"]
 
 # Чӣ тавр фармоиш иҷро мешавад:
 #   "game"   — FireLoot: /validate + /order
-#   "stars"  — FireLoot: /telegram/check + /telegram/order
+#   "stars"  — Donatix, агар калид бошад; вагарна FireLoot /telegram/*
+#   "premium"— Donatix; бе калиди Donatix — админ дастӣ
 #   "manual" — API надорад, админ дастӣ иҷро мекунад
-FulfillKind = Literal["game", "stars", "manual"]
+FulfillKind = Literal["game", "stars", "premium", "manual"]
 
 
 @dataclass(frozen=True)
@@ -219,9 +220,9 @@ DEFAULT_PRODUCTS: tuple[Product, ...] = (
     _p("stars_2500", CAT_STARS, "⭐ 2500 Stars", 2500, 425.00, "stars_2500", "stars", group="stars_all"),
 
     # ── Telegram Premium (дастӣ — дар FireLoot нест) ──────────────────
-    _p("prem_3", CAT_PREMIUM, "👑 Premium — 3 моҳ", 3, 165.00, "", "manual", group="prem_all"),
-    _p("prem_6", CAT_PREMIUM, "👑 Premium — 6 моҳ", 6, 225.00, "", "manual", group="prem_all"),
-    _p("prem_12", CAT_PREMIUM, "👑 Premium — 12 моҳ", 12, 390.00, "", "manual", group="prem_all"),
+    _p("prem_3", CAT_PREMIUM, "👑 Premium — 3 моҳ", 3, 165.00, "", "premium", group="prem_all"),
+    _p("prem_6", CAT_PREMIUM, "👑 Premium — 6 моҳ", 6, 225.00, "", "premium", group="prem_all"),
+    _p("prem_12", CAT_PREMIUM, "👑 Premium — 12 моҳ", 12, 390.00, "", "premium", group="prem_all"),
 
     # ── Free Fire ИДМ — алмосҳо ──────────────────────────────────────
     _p("ffcis_110", CAT_FF_CIS, "💎 110 Алмаз", 110, 9.00, "diamonds_110", partner_somoni=8.4, group="ffcis_diamonds"),

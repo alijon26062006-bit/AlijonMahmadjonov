@@ -212,6 +212,24 @@ async def _lookup(supplier: Supplier, order_id: int) -> tuple[str, OrderResult]:
     return "unknown", found
 
 
+def pick_supplier(cfg: Config, supplier: Supplier, kind: str, sku: str) -> Supplier | None:
+    """Кӣ ин молро худкор иҷро мекунад. None — фармоиш ба админ меравад.
+
+    RouterSupplier худаш медонад (Stars/Premium → Donatix, бозиҳо → FireLoot).
+    Таъминкунандаи оддӣ — танҳо бозиҳо ва Stars, агар API фаъол бошад.
+    """
+    route = getattr(supplier, "for_kind", None)
+    if route is not None:
+        return route(kind, sku)
+    if kind in ("manual", "premium") or not sku or not cfg.has_supplier:
+        return None
+    return supplier
+
+
+def _title(sup: Supplier) -> str:
+    return "Donatix" if getattr(sup, "name", "") == "donatix" else "FireLoot"
+
+
 async def _deliver(
     bot: Bot, db: Database, cfg: Config, supplier: Supplier, order_id: int
 ) -> None:
@@ -223,9 +241,10 @@ async def _deliver(
     sku = row["sku"] or ""
     product = db.product(row["product_code"])
     amount = product["amount"] if product else 0
+    sup = pick_supplier(cfg, supplier, kind, sku)
 
     # ── моли дастӣ ё таъминкунанда хомӯш ──────────────────────────────
-    if kind == "manual" or not sku or not cfg.has_supplier:
+    if sup is None:
         await _tell(bot, row["user_id"], texts.order_pending_admin(order_id))
         await _tell_admins(
             bot,
@@ -242,34 +261,51 @@ async def _deliver(
     target, _, server_part = target_raw.partition(" (")
     server = server_part.rstrip(")") if server_part else ""
 
-    result = await supplier.place_order(
-        kind=kind, sku=sku, target=target.strip(), amount=amount,
-        order_id=str(order_id), server=server,
-    )
+    async def place() -> OrderResult:
+        return await sup.place_order(
+            kind=kind, sku=sku, target=target.strip(), amount=amount,
+            order_id=str(order_id), server=server,
+        )
+
+    result = await place()
 
     if not result.ok and result.uncertain:
         # Ҷавоб наомад — шояд фармоиш қабул шуда бошад. Пулро фавран
         # баргардонидан хатарнок аст: харидор ҳам мол ва ҳам пулро мегирифт.
         log.warning("Фармоиши #%s: ҷавоби номуайян (%s), месанҷем", order_id, result.error)
         await asyncio.sleep(UNCERTAIN_DELAY)
-        state, found = await _lookup(supplier, order_id)
-        if state == "found":
-            db.set_order_status(order_id, ORDER_SENT)
-            await _finish(bot, db, cfg, supplier, order_id, str(order_id), by_external=True)
-            return
-        if state == "absent" and result.code != "duplicate_order":
-            await _refund(bot, cfg, db, order_id, result.error)
-            return
+        if getattr(sup, "idempotent", False):
+            # Ҳамон калиди такрор: агар фармоиш сохта шуда бошад, ҳамонро
+            # бармегардонад; агар не — ҳозир месозад. Пул дубора намеравад.
+            again = await place()
+            if again.ok or not again.uncertain:
+                await _after_place(bot, db, cfg, sup, order_id, again)
+                return
+        else:
+            state, _ = await _lookup(sup, order_id)
+            if state == "found":
+                db.set_order_status(order_id, ORDER_SENT)
+                await _finish(bot, db, cfg, sup, order_id, str(order_id), by_external=True)
+                return
+            if state == "absent" and result.code != "duplicate_order":
+                await _refund(bot, cfg, db, order_id, result.error)
+                return
         db.set_order_status(order_id, ORDER_SENT)
         await _to_admin(
             bot, cfg, db, order_id,
             f"⚠️ <b>Фармоиши #{order_id}</b>: таъминкунанда ҷавоб надод "
             f"(<code>{texts.esc(result.error or '—')}</code>).\n"
-            "Шояд фармоиш қабул шуда бошад — дар кабинети FireLoot санҷед, "
+            f"Шояд фармоиш қабул шуда бошад — дар кабинети {_title(sup)} санҷед, "
             "баъд «иҷро» ё «рад»-ро пахш кунед.",
         )
         return
 
+    await _after_place(bot, db, cfg, sup, order_id, result)
+
+
+async def _after_place(
+    bot: Bot, db: Database, cfg: Config, sup: Supplier, order_id: int, result: OrderResult
+) -> None:
     if not result.ok:
         # Таъминкунанда аниқ рад кард — пулро фавран бармегардонем.
         log.warning("Фармоиши #%s қабул нашуд: %s", order_id, result.error)
@@ -279,11 +315,18 @@ async def _deliver(
     if not result.external_id:
         # Ҷавоб омад, аммо рақами фармоиш нест — бо рақами худамон месанҷем.
         db.set_order_status(order_id, ORDER_SENT)
-        await _finish(bot, db, cfg, supplier, order_id, str(order_id), by_external=True)
+        await _finish(bot, db, cfg, sup, order_id, str(order_id), by_external=True)
         return
 
     db.set_order_status(order_id, ORDER_SENT, external_id=result.external_id)
-    await _finish(bot, db, cfg, supplier, order_id, result.external_id, by_external=False)
+    if result.status in ("completed", "failed", "refunded"):
+        # Таъминкунанда фавран ҷавоби ниҳоӣ дод — интизор шудан лозим нест.
+        if result.status == "completed":
+            await _complete(bot, cfg, db, order_id)
+        else:
+            await _refund(bot, cfg, db, order_id, result.status)
+        return
+    await _finish(bot, db, cfg, sup, order_id, result.external_id, by_external=False)
 
 
 def _spawn(coro) -> asyncio.Task:
@@ -312,7 +355,7 @@ def _age(row) -> timedelta:
 
 
 async def _resume_one(
-    bot: Bot, db: Database, cfg: Config, supplier: Supplier, row
+    bot: Bot, db: Database, cfg: Config, supplier: Supplier, sup: Supplier, row
 ) -> str:
     order_id = row["id"]
     if order_id in _BUSY:
@@ -320,12 +363,17 @@ async def _resume_one(
     _BUSY.add(order_id)
     try:
         if row["status"] == ORDER_SENT and row["external_id"]:
-            await _finish(bot, db, cfg, supplier, order_id, row["external_id"], by_external=False)
+            await _finish(bot, db, cfg, sup, order_id, row["external_id"], by_external=False)
             return "resumed"
-        state, _ = await _lookup(supplier, order_id)
+        if getattr(sup, "idempotent", False):
+            # Ҳамон калиди такрор — фармоиши мавҷударо бармегардонад ё месозад.
+            _BUSY.discard(order_id)
+            await deliver_order(bot, db, cfg, supplier, order_id)
+            return "resent"
+        state, _ = await _lookup(sup, order_id)
         if state == "found":
             db.set_order_status(order_id, ORDER_SENT)
-            await _finish(bot, db, cfg, supplier, order_id, str(order_id), by_external=True)
+            await _finish(bot, db, cfg, sup, order_id, str(order_id), by_external=True)
             return "resumed"
         if state == "absent" and row["status"] == ORDER_NEW:
             # Ба таъминкунанда нарасида буд — ҳоло мефиристем.
@@ -335,7 +383,7 @@ async def _resume_one(
         await _to_admin(
             bot, cfg, db, order_id,
             f"⚠️ Фармоиши #{order_id} ҳангоми азнавоғозкунии бот нимкора монд. "
-            "Дар FireLoot санҷед ва «иҷро» ё «рад»-ро пахш кунед.",
+            f"Дар {_title(sup)} санҷед ва «иҷро» ё «рад»-ро пахш кунед.",
             tell_user=False,
         )
         return "admin"
@@ -357,15 +405,14 @@ async def resume_open_orders(
     лаҳза иҷро мешуд, то абад «дар коркард» мемонд, пул аз харидор гирифта.
     """
     counts: dict[str, int] = {}
-    if not cfg.has_supplier:
-        return counts
     for row in db.open_orders(200):
-        if (row["kind"] or "game") == "manual" or not row["sku"]:
+        sup = pick_supplier(cfg, supplier, row["kind"] or "game", row["sku"] or "")
+        if sup is None:
             continue          # фармоишҳои дастӣ — кори админ
         if _age(row) > RESUME_MAX_AGE:
             counts["old"] = counts.get("old", 0) + 1
             continue
-        outcome = await _resume_one(bot, db, cfg, supplier, row)
+        outcome = await _resume_one(bot, db, cfg, supplier, sup, row)
         counts[outcome] = counts.get(outcome, 0) + 1
     if counts:
         log.info("Фармоишҳои нимкора пас аз оғоз: %s", counts)

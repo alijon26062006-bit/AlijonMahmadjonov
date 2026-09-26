@@ -240,6 +240,64 @@ async def check_username(supplier, username: str) -> None:
         bad(f"Имя не получено: {result.error}")
 
 
+async def check_donatix(cfg, db: Database, username: str | None) -> bool:
+    """Donatix: ключ, товары Stars/Premium и то, как их понимает бот."""
+    from .donatix import KIND_PREMIUM, KIND_STARS, DonatixSupplier
+
+    head("Donatix — Telegram Stars и Premium")
+    dx = DonatixSupplier(cfg.donatix_key, cfg.donatix_url, key_prefix="check")
+    try:
+        data = await dx.balance()
+        if not data.get("ok"):
+            bad(f"Ключ Donatix не принят или сеть недоступна: {data.get('error')}")
+            return False
+        ok(f"Ключ рабочий. Баланс: {B}{data.get('balance')} {data.get('currency')}{E}")
+
+        for kind in (KIND_STARS, KIND_PREMIUM):
+            items = await dx.items(kind)
+            print(f"\n{B}{kind}{E}: товаров {len(items)}")
+            for item in items:
+                print(
+                    f"   {item.get('product_id')}  «{item.get('name')}»  "
+                    f"unit={item.get('unit')}  {item.get('min_quantity')}–{item.get('max_quantity')}  "
+                    f"${item.get('price_usd')}"
+                )
+
+        print(f"\n{B}Как бот будет продавать{E}")
+        all_ok = True
+        for category, kind in ((catalog.CAT_STARS, "stars"), (catalog.CAT_PREMIUM, "premium")):
+            for row in db.products(category, only_active=False):
+                if row["kind"] != kind:
+                    continue
+                found = await dx.resolve(kind, row["amount"])
+                price = row["price"] / 100
+                if found is None:
+                    all_ok = False
+                    bad(f"{row['title']:<28} → у Donatix нет подходящего товара")
+                    continue
+                item, qty = found
+                cost = await dx.cost_usd(kind, row["amount"])
+                ok(
+                    f"{row['title']:<28} → {item['product_id']} × {qty}"
+                    f"   закупка ${cost}   продажа {price:.2f} с."
+                )
+        if not all_ok:
+            warn("Эти товары бот через Donatix не продаст — заказ вернёт деньги покупателю.")
+
+        if username:
+            print(f"\n{B}Проверка username{E} @{username.lstrip('@')}")
+            result = await dx.check(kind="stars", sku="", target=username, amount=50)
+            if result.ok and result.nickname:
+                ok(f"Аккаунт найден: {B}{result.nickname}{E}")
+            elif result.ok:
+                warn("Donatix не проверяет username для Stars — покупатель подтверждает сам")
+            else:
+                bad(f"Не прошла: {result.error}")
+        return all_ok
+    finally:
+        await dx.close()
+
+
 async def run(argv: list[str]) -> int:
     players, username, want_catalog = parse_args(argv)
 
@@ -251,11 +309,18 @@ async def run(argv: list[str]) -> int:
 
     print(f"{B}Проверка API поставщика{E}")
     print(f"Режим: {cfg.supplier} | адрес: {cfg.supplier_url or '—'}")
-    if not cfg.has_supplier:
+    print(f"Donatix (Stars, Premium): {'включён' if cfg.has_donatix else 'выключен'}")
+    if not cfg.has_supplier and not cfg.has_donatix:
         bad("Поставщик выключен: нужны SHOP_SUPPLIER=fireloot, SHOP_SUPPLIER_URL и ключ.")
         return 1
 
     db = Database(cfg.db_path)
+    if not cfg.has_supplier:
+        try:
+            return 0 if await check_donatix(cfg, db, username) else 1
+        finally:
+            db.close()
+
     supplier = build_supplier(cfg.supplier, cfg.supplier_url, cfg.supplier_key)
     try:
         if not await check_balance(supplier):
@@ -270,8 +335,11 @@ async def run(argv: list[str]) -> int:
             print("     Пример: bash check_api.sh --pubg 5123456789 --ff-cis 123456789")
         for category, player_id in players.items():
             await check_player(supplier, db, category, player_id)
-        if username:
+        if username and not cfg.has_donatix:
             await check_username(supplier, username)
+
+        if cfg.has_donatix:
+            await check_donatix(cfg, db, username)
 
         head("Итог")
         print("Заказы не создавались — деньги не потрачены.")

@@ -11,7 +11,7 @@ from aiogram.types import CallbackQuery, Message
 from .. import catalog, keyboards, texts
 from ..config import Config
 from ..db import Database, NotEnoughMoney, price_of
-from ..fulfillment import deliver_in_background
+from ..fulfillment import deliver_in_background, pick_supplier
 from ..states import Buy
 from ..supplier import Supplier
 from .common import (
@@ -102,8 +102,10 @@ async def got_target(
             return
 
     kind = row["kind"] or "game"
-    if kind == "manual":
-        # Premium: API надорад — рост ба тасдиқи фармоиш меравем.
+    if kind == "manual" or (
+        kind == "premium" and pick_supplier(cfg, supplier, kind, row["sku"] or "") is None
+    ):
+        # Premium бе API — санҷидан имкон надорад, рост ба тасдиқи фармоиш.
         await state.update_data(target=target, nickname=None, server=server)
         await _show_confirm(message, state, db, cfg)
         return

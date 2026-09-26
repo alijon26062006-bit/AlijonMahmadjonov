@@ -556,8 +556,9 @@ async def cb_review_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bo
 # ── таъминкунанда (FireLoot) ──────────────────────────────────────────
 @router.message(Command("balance", "hisob"))
 async def cmd_supplier_balance(message: Message, cfg: Config, supplier) -> None:
-    """Баланси таъминкунанда — то донем, ки барои чанд фармоиш пул ҳаст."""
-    if not cfg.has_supplier:
+    """Баланси таъминкунандаҳо — то донем, ки барои чанд фармоиш пул ҳаст."""
+    telegram = getattr(supplier, "telegram", None)
+    if not cfg.has_supplier and telegram is None:
         await message.answer(
             "ℹ️ Таъминкунанда хомӯш аст (реҷаи дастӣ).\n"
             "Барои фаъол кардан дар <code>.env</code>: "
@@ -565,22 +566,31 @@ async def cmd_supplier_balance(message: Message, cfg: Config, supplier) -> None:
         )
         return
     waiting = await message.answer("⏳ Дар ҳоли пурсиши баланс...")
-    data = await supplier.balance()
-    if not data.get("ok"):
-        await waiting.edit_text(f"❌ Хатогӣ: <code>{texts.esc(data.get('error'))}</code>")
-        return
-    stars = data.get("stars_balance")
-    lines = [
-        "💰 <b>Баланси таъминкунанда</b>\n",
-        f"💵 Асосӣ: <b>{texts.esc(data.get('balance'))} {texts.esc(data.get('currency'))}</b>",
-    ]
-    if stars is not None:
-        lines.append(f"⭐️ Stars: <b>{texts.esc(stars)}</b>")
-    if data.get("telegram_active") is not None:
-        lines.append(
-            "📶 Telegram Stars: "
-            + ("✅ фаъол" if data.get("telegram_active") else "🚫 хомӯш")
-        )
+    lines = ["💰 <b>Баланси таъминкунанда</b>\n"]
+
+    if cfg.has_supplier:
+        data = await supplier.balance()
+        if data.get("ok"):
+            lines.append(
+                f"🎮 FireLoot: <b>{texts.esc(data.get('balance'))} "
+                f"{texts.esc(data.get('currency'))}</b>"
+            )
+            stars = data.get("stars_balance")
+            if stars is not None:
+                lines.append(f"   ⭐️ Stars: <b>{texts.esc(stars)}</b>")
+        else:
+            lines.append(f"🎮 FireLoot: ❌ <code>{texts.esc(data.get('error'))}</code>")
+
+    if telegram is not None:
+        data = await telegram.balance()
+        if data.get("ok"):
+            lines.append(
+                f"⭐️ Donatix (Stars, Premium): <b>{texts.esc(data.get('balance'))} "
+                f"{texts.esc(data.get('currency'))}</b>"
+            )
+        else:
+            lines.append(f"⭐️ Donatix: ❌ <code>{texts.esc(data.get('error'))}</code>")
+
     await waiting.edit_text("\n".join(lines))
 
 
@@ -621,9 +631,15 @@ async def cmd_check_sku(message: Message, db: Database, cfg: Config, supplier) -
 @router.callback_query(F.data == "a:supplier")
 async def cb_supplier(cb: CallbackQuery, cfg: Config, supplier) -> None:
     mode = "🔌 FireLoot (худкор)" if cfg.has_supplier else "✋ Дастӣ (API хомӯш)"
+    telegram = getattr(supplier, "telegram", None)
+    tg_mode = (
+        "🔌 Donatix (худкор)" if telegram is not None
+        else ("🔌 FireLoot" if cfg.has_supplier else "✋ Дастӣ") + " · Premium дастӣ"
+    )
     text = (
         "🔌 <b>Таъминкунанда</b>\n\n"
-        f"📶 Реҷа: <b>{mode}</b>\n"
+        f"🎮 Бозиҳо: <b>{mode}</b>\n"
+        f"⭐️ Stars ва Premium: <b>{tg_mode}</b>\n"
         f"🌐 Суроға: <code>{texts.esc(cfg.supplier_url or '—')}</code>\n\n"
         "Фармонҳо:\n"
         "• /balance — баланси таъминкунанда\n"

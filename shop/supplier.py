@@ -104,6 +104,9 @@ class ManualSupplier:
     async def order_status(self, external_id: str, *, by_external: bool = False) -> OrderResult:
         return OrderResult(ok=False, error="manual")
 
+    async def wait_until_done(self, external_id: str, **kwargs) -> OrderResult:
+        return OrderResult(ok=False, error="manual")
+
     async def balance(self) -> dict[str, Any]:
         return {"ok": False, "error": "Реҷаи дастӣ — баланс нест"}
 
@@ -303,3 +306,66 @@ def build_supplier(kind: str, url: str = "", key: str = "") -> Supplier:
     if kind in ("fireloot", "http") and url and key:
         return FireLootSupplier(url, key)
     return ManualSupplier()
+
+
+class RouterSupplier:
+    """Ду таъминкунанда якҷоя: Stars ва Premium — Donatix, бозиҳо — FireLoot.
+
+    Барои фармонҳои админ (/balance, /sku, илова кардани бозӣ) ҳамчун FireLoot
+    рафтор мекунад. Барои иҷрои фармоиш ``for_kind`` таъминкунандаи дурустро медиҳад.
+    """
+
+    def __init__(self, main: Supplier, telegram: Supplier | None = None) -> None:
+        self.main = main
+        self.telegram = telegram
+        self.name = main.name + (f"+{telegram.name}" if telegram else "")
+
+    @property
+    def has_telegram(self) -> bool:
+        return self.telegram is not None
+
+    def for_kind(self, kind: str, sku: str = "") -> Supplier | None:
+        """Кӣ ин навъи молро худкор иҷро мекунад. None — админ дастӣ."""
+        if kind == "premium":
+            return self.telegram
+        if kind == "stars" and self.telegram is not None:
+            return self.telegram
+        if kind == "manual" or not sku or getattr(self.main, "name", "") == "manual":
+            return None
+        return self.main
+
+    async def check(
+        self, *, kind: str, sku: str, target: str, amount: int, server: str = ""
+    ) -> CheckResult:
+        target_supplier = self.for_kind(kind, sku)
+        if target_supplier is None:
+            return CheckResult(target=target, nickname=None, ok=True)
+        return await target_supplier.check(
+            kind=kind, sku=sku, target=target, amount=amount, server=server
+        )
+
+    async def place_order(
+        self, *, kind: str, sku: str, target: str, amount: int, order_id: str,
+        server: str = "",
+    ) -> OrderResult:
+        target_supplier = self.for_kind(kind, sku) or ManualSupplier()
+        return await target_supplier.place_order(
+            kind=kind, sku=sku, target=target, amount=amount, order_id=order_id, server=server
+        )
+
+    async def order_status(self, external_id: str, *, by_external: bool = False) -> OrderResult:
+        return await self.main.order_status(external_id, by_external=by_external)
+
+    async def wait_until_done(self, external_id: str, **kwargs) -> OrderResult:
+        return await self.main.wait_until_done(external_id, **kwargs)
+
+    async def balance(self) -> dict[str, Any]:
+        return await self.main.balance()
+
+    async def products(self) -> dict[str, dict]:
+        return await self.main.products()
+
+    async def close(self) -> None:
+        await self.main.close()
+        if self.telegram is not None:
+            await self.telegram.close()

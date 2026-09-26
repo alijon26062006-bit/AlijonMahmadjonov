@@ -25,6 +25,7 @@ DEFAULT_PAY_LINK = "http://pay.dc.tj/?A={card}&s={amount}&c={comment}&f1=133&FIE
 DEFAULT_ALIF_LINK = "https://alifmobi.page.link/providers?id=124&amount={amount}&account={account}"
 
 FIRELOOT_BASE = "https://partner.firelootshop.com/api/v1"
+DONATIX_BASE = "https://donatix.tj/api/v1"
 
 
 def _ids(raw: str) -> tuple[int, ...]:
@@ -67,10 +68,17 @@ class Config:
     supplier_url: str
     supplier_key: str
     log_level: str
+    # Donatix — танҳо Telegram Stars ва Premium. Холӣ — Stars аз FireLoot, Premium дастӣ.
+    donatix_key: str = ""
+    donatix_url: str = DONATIX_BASE
 
     @property
     def has_supplier(self) -> bool:
         return self.supplier == "fireloot" and bool(self.supplier_url and self.supplier_key)
+
+    @property
+    def has_donatix(self) -> bool:
+        return bool(self.donatix_key and self.donatix_url)
 
     @property
     def has_pay_link(self) -> bool:
@@ -113,4 +121,6 @@ def load_config(env_file: str | os.PathLike[str] | None = None) -> Config:
         supplier_url=os.getenv("SHOP_SUPPLIER_URL", FIRELOOT_BASE),
         supplier_key=os.getenv("SHOP_SUPPLIER_KEY", os.getenv("FIRELOOT_KEY", "")),
         log_level=os.getenv("SHOP_LOG_LEVEL", "INFO").upper(),
+        donatix_key=os.getenv("SHOP_DONATIX_KEY", "").strip(),
+        donatix_url=(os.getenv("SHOP_DONATIX_URL", "").strip() or DONATIX_BASE),
     )

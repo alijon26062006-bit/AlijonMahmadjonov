@@ -483,6 +483,12 @@ class Database:
             self._conn.commit()
         return updated
 
+    def set_cost(self, code: str, milli_usd: int) -> bool:
+        """Нархи хариди як мол (милли-доллар) — барои Stars/Premium аз Donatix."""
+        return self._run(
+            "UPDATE products SET cost = ? WHERE code = ?", (milli_usd, code)
+        ).rowcount > 0
+
     def set_partner_price(self, code: str, price: int | None) -> bool:
         """Нархи шарикӣ. `None` — шарик нархи оддиро мепардозад."""
         cur = self._run(

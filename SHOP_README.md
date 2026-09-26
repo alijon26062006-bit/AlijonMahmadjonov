@@ -29,6 +29,7 @@ bash install_bot_command.sh
 | `bot admin 123456789` | сделать человека админом |
 | `bot api --pubg 5123456789` | проверить поставщика |
 | `bot nick --service` | API проверки ника для других проектов ([описание](NICKAPI_README.md)) |
+| `bot donatix` | подключить Donatix: Stars и Premium продаются через него, игры — через FireLoot |
 | `bot backup` | собрать архив со всеми данными |
 | `bot migrate 1.2.3.4` | переезд на другой сервер |
 | `bot force` | обновить, стерев свои правки в коде |
