@@ -1,11 +1,14 @@
 {% extends "_app.html" %}
-{% from "_icons.html" import icon, nav_link, media, kind_icon %}
+{% from "_icons.html" import icon, nav_link, media, kind_icon, tg_logo %}
 {% block side_top %}
 <div class="balance-card">
   <div class="label-caps">Баланс</div>
   <b>{{ money(user.balance_micro) }}</b>
   <a class="btn sm soft block" href="/panel/balance">{{ icon('plus', 18) }}Пополнить</a>
 </div>
+{% if tg_channel %}
+<a class="side-tg" href="{{ tg_channel }}" target="_blank" rel="noopener">{{ tg_logo(34) }}<span><b>Наш канал</b><small>уроки, акции, новости</small></span>{{ icon('arrow-right', 16) }}</a>
+{% endif %}
 {% endblock %}
 {% block sidenav %}
 {% set current = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}

@@ -1,4 +1,4 @@
-{% from "_icons.html" import icon, logo, theme_button %}<!doctype html>
+{% from "_icons.html" import icon, logo, theme_button, tg_logo %}<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
@@ -61,6 +61,7 @@
       <a class="hide-sm" href="/#pricing">Цены</a>
       <a class="hide-sm" href="/docs">Документация</a>
       <a class="hide-sm" href="/#faq">FAQ</a>
+      {% if tg_channel %}<a class="nav-tg" href="{{ tg_channel }}" target="_blank" rel="noopener" aria-label="Наш Telegram-канал">{{ tg_logo(22) }}<span class="hide-sm">Канал</span></a>{% endif %}
       {{ theme_button() }}
       {% if user %}
         <a class="btn sm primary" href="{{ '/admin' if user.role == 'admin' else '/panel' }}">Панель</a>
@@ -87,12 +88,28 @@
     <div class="links">
       <a href="/#catalog">Каталог</a><a href="/#pricing">Цены</a><a href="/docs">Документация API</a>
       <a href="/#faq">FAQ</a><a href="/register">Стать партнёром</a><a href="/login">Вход в панель</a>
+      {% if tg_channel %}<a href="{{ tg_channel }}" target="_blank" rel="noopener">Telegram-канал</a>{% endif %}
       <a href="/privacy">Конфиденциальность</a><a href="/terms">Соглашение</a>
       {% if support_contact %}<span>Поддержка: {{ support_contact }}</span>{% endif %}
     </div>
   </div>
   <div class="wrap small" style="margin-top:24px">© {{ site_name }}</div>
 </footer>
+{% endblock %}
+{% block fab %}
+{% if tg_channel and not path.startswith('/admin') and not path.startswith('/panel') %}
+<a class="tg-fab" href="{{ tg_channel }}" target="_blank" rel="noopener" aria-label="Наш Telegram-канал: уроки и акции">
+  <span class="tg-fab-ring" aria-hidden="true"></span>{{ tg_logo(56) }}<span class="tg-fab-label">Уроки и акции<small>в нашем канале</small></span>
+</a>
+<script>
+  // Один раз за визит подпись выезжает сама — чтобы кнопку заметили и на телефоне
+  (function () {
+    var fab = document.querySelector(".tg-fab"); if (!fab) return;
+    try { if (sessionStorage.getItem("dx_fab")) return; sessionStorage.setItem("dx_fab", "1"); } catch (e) {}
+    setTimeout(function () { fab.classList.add("open"); setTimeout(function () { fab.classList.remove("open"); }, 4000); }, 2500);
+  })();
+</script>
+{% endif %}
 {% endblock %}
 <script src="/static/code.js?v={{ asset_v }}" defer></script>
 <script>

@@ -29,6 +29,8 @@
     <label class="switch"><input type="checkbox" name="require_approval" value="1" {{ 'checked' if s.require_approval }}><span>Проверять новых клиентов вручную</span></label>
     <label for="support" style="margin-top:12px">Контакт поддержки <span class="muted">— виден клиентам</span></label>
     <input id="support" name="support" maxlength="100" value="{{ s.support }}" placeholder="@donatix_support">
+    <label for="tg_channel" style="margin-top:12px">Официальный Telegram-канал <span class="muted">— баннер на главной и кнопка на сайте; пусто — скрыть</span></label>
+    <input id="tg_channel" name="tg_channel" maxlength="140" value="{{ s.tg_channel }}" placeholder="https://t.me/…">
   </div>
 
   <div class="card">

@@ -153,6 +153,7 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx.setdefault("user", None)
     ctx["site_name"] = config.site_name
     ctx["support_contact"] = config.support_contact
+    ctx["tg_channel"] = config.tg_channel
     ctx["csrf"] = csrf_token(request)
     ctx["flashes"] = request.session.pop("flash", [])
     ctx["path"] = request.url.path

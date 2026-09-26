@@ -1149,3 +1149,88 @@ html { scroll-behavior: smooth; }
 .pl-stage { width: 100%; max-width: 760px; }
 .pl-stage img { display: block; width: 100%; height: auto; border-radius: 14px; box-shadow: 0 12px 40px -18px rgb(0 0 0 / .45); }
 .pl-stage .pl-wait { padding: 60px 20px; text-align: center; border-radius: 14px; background: var(--surface-2); color: var(--muted); }
+
+/* ── Официальный Telegram-канал: баннер на главной, плавающая кнопка, ссылки ── */
+.nav-tg { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.nav-tg .tg-logo { flex: none; }
+.tg-sec { padding-top: 8px; }
+.tg-banner { position: relative; display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 28px; align-items: center;
+  padding: 32px; border-radius: 24px; overflow: hidden; color: #fff; text-decoration: none; isolation: isolate;
+  background: linear-gradient(125deg, #1c93d8 0%, #2a6fdb 45%, #4338ca 100%); box-shadow: 0 24px 60px -28px rgb(37 99 235 / .7); }
+.tg-banner::before { content: ""; position: absolute; inset: -40% -10% auto auto; width: 520px; height: 520px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(255 255 255 / .22), rgb(255 255 255 / 0)); z-index: -1; }
+.tg-banner:hover { color: #fff; text-decoration: none; }
+.tgb-art { position: relative; height: 240px; display: grid; place-items: center; }
+.tgb-logo { position: relative; z-index: 2; filter: drop-shadow(0 16px 30px rgb(0 0 0 / .3)); }
+.tgb-logo .tg-logo { display: block; }
+.tgb-orbit { position: absolute; border-radius: 50%; border: 2px dashed rgb(255 255 255 / .35); }
+.tgb-orbit.o1 { width: 180px; height: 180px; }
+.tgb-orbit.o2 { width: 250px; height: 250px; border-style: solid; border-color: rgb(255 255 255 / .16); }
+.tgb-float { position: absolute; z-index: 3; display: grid; place-items: center; width: 50px; height: 50px; border-radius: 16px;
+  background: rgb(255 255 255 / .18); backdrop-filter: blur(6px); font-size: 26px; box-shadow: 0 8px 20px -8px rgb(0 0 0 / .35); }
+.tgb-float.f1 { top: 6px; left: 30px; } .tgb-float.f2 { top: 22px; right: 18px; }
+.tgb-float.f3 { bottom: 16px; left: 12px; } .tgb-float.f4 { bottom: 4px; right: 40px; }
+.tgb-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: rgb(255 255 255 / .18);
+  font-size: .85rem; font-weight: 600; }
+.tgb-badge i { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+.tgb-text h2 { margin: 12px 0 14px; color: #fff; font-size: clamp(1.45rem, 3.2vw, 2.1rem); line-height: 1.15; }
+.tgb-list { list-style: none; margin: 0 0 20px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tgb-list li { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 14px; background: rgb(255 255 255 / .12); }
+.tgb-list b { font-size: 1rem; }
+.tgb-list span { font-size: .9rem; color: rgb(255 255 255 / .85); line-height: 1.35; }
+.tgb-btn { display: inline-flex; align-items: center; gap: 10px; background: #fff; color: #1c6fd8; border: 0; font-weight: 700;
+  box-shadow: 0 10px 24px -10px rgb(0 0 0 / .45); }
+.tg-banner:hover .tgb-btn { background: #f0f7ff; }
+@media (max-width: 760px) {
+  .tg-banner { grid-template-columns: minmax(0, 1fr); padding: 22px 18px; gap: 6px; text-align: left; }
+  .tgb-art { height: 170px; }
+  .tgb-logo .tg-logo { width: 88px; height: 88px; }
+  .tgb-orbit.o1 { width: 130px; height: 130px; } .tgb-orbit.o2 { width: 180px; height: 180px; }
+  .tgb-float { width: 40px; height: 40px; font-size: 20px; border-radius: 12px; }
+  .tgb-float.f1 { left: 16%; } .tgb-float.f2 { right: 16%; } .tgb-float.f3 { left: 22%; } .tgb-float.f4 { right: 24%; }
+  .tgb-list { grid-template-columns: minmax(0, 1fr); }
+  .tgb-btn { width: 100%; justify-content: center; }
+}
+
+/* Плавающая кнопка канала — всегда под рукой на публичных страницах */
+.tg-fab { position: fixed; right: 18px; bottom: 18px; z-index: 40; display: flex; align-items: center; gap: 0; padding: 0;
+  border-radius: 999px; background: #fff; color: var(--text); text-decoration: none; box-shadow: 0 12px 32px -10px rgb(28 111 216 / .65); }
+.tg-fab:hover { color: var(--text); text-decoration: none; }
+.tg-fab .tg-logo { position: relative; z-index: 1; display: block; border-radius: 50%; }
+.tg-fab-ring { position: absolute; left: 0; top: 0; width: 56px; height: 56px; border-radius: 50%; background: #29a9eb; z-index: 0; }
+.tg-fab-label { display: flex; flex-direction: column; max-width: 0; overflow: hidden; white-space: nowrap; font-weight: 700; font-size: .92rem;
+  line-height: 1.2; transition: max-width .35s var(--ease-out, ease), padding .35s var(--ease-out, ease); }
+.tg-fab-label small { font-weight: 500; color: var(--muted); font-size: .78rem; }
+.tg-fab:hover .tg-fab-label, .tg-fab:focus-visible .tg-fab-label, .tg-fab.open .tg-fab-label { max-width: 200px; padding: 0 18px 0 12px; }
+:root[data-theme="dark"] .tg-fab { background: var(--surface); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tg-fab { background: var(--surface); } }
+@media (max-width: 860px) { body:has(.buy-bar) .tg-fab { bottom: 92px; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .tgb-logo { animation: tgb-bob 4s ease-in-out infinite; }
+  .tgb-orbit.o1 { animation: tgb-spin 22s linear infinite; }
+  .tgb-orbit.o2 { animation: tgb-pulse 3.2s ease-in-out infinite; }
+  .tgb-float { animation: tgb-float 5s ease-in-out infinite; }
+  .tgb-float.f2 { animation-delay: -1.2s; } .tgb-float.f3 { animation-delay: -2.4s; } .tgb-float.f4 { animation-delay: -3.6s; }
+  .tgb-badge i { animation: tgb-blink 1.6s ease-in-out infinite; }
+  .tg-banner { transition: transform .3s var(--ease-out, ease), box-shadow .3s var(--ease-out, ease); }
+  .tg-banner:hover { transform: translateY(-3px); box-shadow: 0 30px 70px -28px rgb(37 99 235 / .8); }
+  .tgb-btn .ico { transition: transform .25s var(--ease-out, ease); }
+  .tg-banner:hover .tgb-btn .ico { transform: translateX(4px); }
+  .tg-fab-ring { animation: tg-ring 2.4s ease-out infinite; }
+  .tg-fab { animation: tg-fab-in .6s .8s var(--ease-out, ease) both; }
+}
+@keyframes tgb-bob { 50% { transform: translateY(-10px) rotate(-3deg); } }
+@keyframes tgb-spin { to { transform: rotate(360deg); } }
+@keyframes tgb-pulse { 50% { transform: scale(1.06); opacity: .6; } }
+@keyframes tgb-float { 50% { transform: translateY(-12px); } }
+@keyframes tgb-blink { 50% { opacity: .35; } }
+@keyframes tg-ring { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(1.7); opacity: 0; } }
+@keyframes tg-fab-in { from { transform: translateY(30px) scale(.6); opacity: 0; } }
+
+/* Кабинет: карточка канала под балансом */
+.side-tg { display: flex; align-items: center; gap: 10px; margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px; color: #fff;
+  background: linear-gradient(120deg, #1c93d8, #2a6fdb); text-decoration: none; }
+.side-tg:hover { color: #fff; text-decoration: none; filter: brightness(1.06); }
+.side-tg span { flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
+.side-tg small { opacity: .85; font-size: .78rem; }

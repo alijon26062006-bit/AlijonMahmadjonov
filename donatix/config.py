@@ -113,6 +113,8 @@ class Config:
 
     # Куда писать клиентам для пополнения баланса и поддержки (например, @donatix_support).
     support_contact: str = ""
+    # Официальный Telegram-канал: баннер на главной, плавающая кнопка, шапка и кабинет
+    tg_channel: str = "https://t.me/+NdkoYArkuCw4NzBi"
     # Код подтверждения сайта из Google Search Console и Яндекс Вебмастера (метатег)
     google_verify: str = ""
     # Вход через Google (OAuth). Ключи — в Google Cloud Console → Credentials
@@ -172,6 +174,7 @@ class Config:
             require_approval=_flag("DONATIX_REQUIRE_APPROVAL", True),
             cookie_secure=_flag("DONATIX_COOKIE_SECURE", False),
             support_contact=_env("DONATIX_SUPPORT_CONTACT"),
+            tg_channel=_env("DONATIX_TG_CHANNEL") or "https://t.me/+NdkoYArkuCw4NzBi",
             google_verify=_env("DONATIX_GOOGLE_VERIFY"),
             google_client_id=_env("DONATIX_GOOGLE_CLIENT_ID"),
             google_client_secret=_env("DONATIX_GOOGLE_CLIENT_SECRET"),

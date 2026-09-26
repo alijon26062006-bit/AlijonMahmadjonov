@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -82,6 +83,9 @@ def load(conn: sqlite3.Connection, config: Config) -> None:
     support = db.get_setting(conn, "site.support")
     if support is not None:
         config.support_contact = support
+    channel = db.get_setting(conn, "site.tg_channel")
+    if channel is not None:
+        config.tg_channel = channel
     rate = db.get_setting(conn, "supplier.rate_per_min")
     from .throttle import SUPPLIER
     SUPPLIER.configure(int(rate) if rate and rate.isdigit() else config.supplier_rate_per_min)
@@ -95,6 +99,7 @@ def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
         "markups": {t: config.markups.get(t) for t in TIERS},
         "kind_markups": {k: config.kind_markups.get(k) for k in KIND_KEYS},
         "support": config.support_contact,
+        "tg_channel": config.tg_channel,
         "require_approval": config.require_approval,
         "reg_open": registration_open(conn),
         "client_bots": client_bots_enabled(conn),
@@ -130,6 +135,19 @@ def _pct(raw: str, what: str, allow_empty: bool = False) -> str:
     return str(int(value)) if value == value.to_integral() else str(value)
 
 
+def clean_channel(raw: str) -> str:
+    """Ссылка на канал: https://t.me/…, @name или t.me/… → https://t.me/…; пусто — канал не показываем."""
+    raw = raw.strip()
+    if not raw:
+        return ""
+    if raw.startswith("@"):
+        raw = "https://t.me/" + raw[1:]
+    raw = re.sub(r"^(https?://)?(www\.)?(t\.me|telegram\.me)/", "https://t.me/", raw)
+    if not re.fullmatch(r"https://t\.me/[+A-Za-z0-9_/-]{3,120}", raw):
+        raise SettingsError("Канал: ссылка вида https://t.me/… или @имя_канала.")
+    return raw
+
+
 def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None:
     values: dict[str, str] = {}
     for tier in TIERS:
@@ -140,6 +158,8 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
             values[f"markup.{kind}"] = _pct(data[f"markup_{kind}"], KIND_TITLES[kind], allow_empty=True)
     if "support" in data:
         values["site.support"] = str(data["support"]).strip()[:100]
+    if "tg_channel" in data:
+        values["site.tg_channel"] = clean_channel(str(data["tg_channel"]))
     for key in ("reg_open", "client_bots", "require_approval", "admin_2fa"):
         if key in data:
             values[f"site.{key}"] = "1" if data[key] in (True, "1", "on") else "0"

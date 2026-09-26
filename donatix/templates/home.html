@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_icons.html" import icon, kind_icon, media %}
+{% from "_icons.html" import icon, kind_icon, media, tg_logo %}
 {% block title %}{{ site_name }} — донат Free Fire, PUBG, Telegram Stars оптом и свой бот-магазин{% endblock %}
 {% block jsonld %}
 <script type="application/ld+json">{{ {
@@ -57,6 +57,31 @@
       </div>
     </section>
   </div>
+
+  {% if tg_channel %}
+  <section class="section tg-sec" id="channel">
+    <div class="wrap">
+      <a class="tg-banner" href="{{ tg_channel }}" target="_blank" rel="noopener">
+        <div class="tgb-art" aria-hidden="true">
+          <span class="tgb-orbit o1"></span><span class="tgb-orbit o2"></span>
+          <span class="tgb-float f1">💎</span><span class="tgb-float f2">🎮</span><span class="tgb-float f3">🎁</span><span class="tgb-float f4">📚</span>
+          <span class="tgb-logo">{{ tg_logo(120) }}</span>
+        </div>
+        <div class="tgb-text">
+          <span class="tgb-badge"><i></i>Официальный канал {{ site_name }}</span>
+          <h2>Уроки, акции и новости — в нашем Telegram</h2>
+          <ul class="tgb-list">
+            <li><b>📚 Уроки</b><span>как пополнить Free Fire, PUBG и Telegram Stars по ID — пошагово</span></li>
+            <li><b>🎁 Акции</b><span>промокоды, скидки и розыгрыши — только для подписчиков</span></li>
+            <li><b>🔥 Новости</b><span>новые игры и цены — узнаёте первыми</span></li>
+            {% if client_bots %}<li><b>🤖 Свой бот</b><span>как открыть магазин доната в Telegram и зарабатывать</span></li>{% endif %}
+          </ul>
+          <span class="btn lg tgb-btn">{{ tg_logo(22) }}Подписаться на канал{{ icon('arrow-right', 18) }}</span>
+        </div>
+      </a>
+    </div>
+  </section>
+  {% endif %}
 
   {% if popular %}
   <section class="section" data-reveal id="popular">
