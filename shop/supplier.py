@@ -60,6 +60,9 @@ class OrderResult:
     status: str | None = None
     error: str | None = None
     code: str | None = None
+    # Ҷавоб наомад (шабака, таймаут, 5xx): фармоиш шояд ҚАБУЛ ШУДА бошад.
+    # Дар ин ҳолат пулро худкор баргардонидан мумкин нест — аввал месанҷем.
+    uncertain: bool = False
 
 
 class Supplier(Protocol):
@@ -216,10 +219,13 @@ class FireLootSupplier:
                     status=data.get("status"),
                 )
             message, code = self._error(data, status, ORDER_ERRORS)
-            return OrderResult(ok=False, error=message, code=code)
+            # 5xx ё ҷавоби бе коди хато — сервер шояд фармоишро аллакай сабт кардааст.
+            unsure = status >= 500 or status == 0 or not code or code == "duplicate_order"
+            return OrderResult(ok=False, error=message, code=code, uncertain=unsure)
         except Exception as exc:
-            log.warning("Фармоиши %s фиристода нашуд: %s", order_id, exc)
-            return OrderResult(ok=False, error=f"Хатои шабака: {exc}")
+            # Таймаут ё канда шудани пайваст: дархост шояд ба сервер расида бошад.
+            log.warning("Фармоиши %s — ҷавоб наомад: %s", order_id, exc)
+            return OrderResult(ok=False, error=f"Хатои шабака: {exc}", uncertain=True)
 
     # ── санҷиши ҳолат ─────────────────────────────────────────────────
     async def order_status(self, external_id: str, *, by_external: bool = False) -> OrderResult:

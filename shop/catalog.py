@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Literal
 
@@ -121,6 +122,21 @@ FAMILY_ICONS: dict[str, str] = {
 def family_of(sku: str) -> str:
     """«mlbb_diamonds_50» → «mlbb»."""
     return (sku or "").split("_")[0]
+
+
+#: Дарозии ҳадди аксари коди мол. Telegram дар тугма зиёда аз 64 байт
+#: намепазирад, ва «a:setprice:» + код бояд ҷо шавад — вагарна тамоми
+#: рӯйхати нархҳо нишон дода намешуд.
+MAX_CODE_BYTES = 40
+
+
+def product_code_for(sku: str) -> str:
+    """Коди моли нав аз SKU. SKU-и дароз кӯтоҳ мешавад, вале беҳамто мемонад."""
+    if len(sku.encode()) <= MAX_CODE_BYTES and sku.isascii():
+        return sku
+    digest = hashlib.sha1(sku.encode()).hexdigest()[:8]
+    head = "".join(ch for ch in sku if ch.isascii())[: MAX_CODE_BYTES - 9]
+    return f"{head}_{digest}"
 
 
 def family_title(family: str) -> str:

@@ -19,7 +19,6 @@ from .common import (
     clean_player_server,
     clean_username,
     current_user,
-    notify_admins,
     safe_edit,
     show_main_menu,
 )
@@ -40,14 +39,6 @@ def ask_text(row, info: catalog.Category, price: int, currency: str) -> str:
     if info.target == "username":
         return texts.ask_username(info, row["title"], price, currency)
     return texts.ask_player_id(info, row["title"], price, currency)
-
-
-async def _ask_target(message: Message, info: catalog.Category, row, cfg: Config) -> None:
-    if info.target == "username":
-        text = texts.ask_username(info, row["title"], row["price"], cfg.currency)
-    else:
-        text = texts.ask_player_id(info, row["title"], row["price"], cfg.currency)
-    await message.answer(text, reply_markup=keyboards.cancel_only())
 
 
 @router.callback_query(F.data.startswith(keyboards.CB_PRODUCT))
@@ -193,8 +184,32 @@ async def cb_id_no(cb: CallbackQuery, state: FSMContext, db: Database, cfg: Conf
     await cb.answer()
 
 
+# Харидороне, ки ҳоло харид мекунанд. Пахши дуюми «Тасдиқ» дар ҳамин лаҳза
+# фармоиши дуюм намесозад ва пулро ду бор намегирад.
+_BUYING: set[int] = set()
+
+
 @router.callback_query(F.data == keyboards.CB_BUY_OK)
 async def cb_buy(
+    cb: CallbackQuery,
+    state: FSMContext,
+    db: Database,
+    cfg: Config,
+    bot: Bot,
+    supplier: Supplier,
+) -> None:
+    uid = cb.from_user.id
+    if uid in _BUYING:
+        await cb.answer("⏳")
+        return
+    _BUYING.add(uid)
+    try:
+        await _buy(cb, state, db, cfg, bot, supplier)
+    finally:
+        _BUYING.discard(uid)
+
+
+async def _buy(
     cb: CallbackQuery,
     state: FSMContext,
     db: Database,
@@ -207,6 +222,12 @@ async def cb_buy(
     target = data.get("target")
     if row is None or not target:
         await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    if not row["active"]:
+        # Админ молро дар ҳамин вақт хомӯш кард — фурӯхтан мумкин нест.
+        await state.clear()
+        await safe_edit(cb, texts.EMPTY_CATEGORY, keyboards.back_home())
+        await cb.answer()
         return
 
     server = data.get("server", "")

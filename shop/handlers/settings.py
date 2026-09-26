@@ -7,6 +7,7 @@ import logging
 import math
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramRetryAfter
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.fsm.context import FSMContext
 
@@ -124,8 +125,8 @@ async def got_review_channel(
     message: Message, state: FSMContext, db: Database, bot: Bot
 ) -> None:
     raw = message.text.strip()
-    await state.clear()
     if raw in SKIP:
+        await state.clear()
         db.set_setting(REVIEW_CHANNEL_KEY, "")
         await message.answer("✅ Канали шарҳҳо хомӯш шуд.", reply_markup=keyboards.admin_settings())
         return
@@ -135,10 +136,11 @@ async def got_review_channel(
     except Exception as exc:
         await message.answer(
             f"❌ Ба канал навишта натавонистам: <code>{texts.esc(exc)}</code>\n\n"
-            "Ботро дар канал <b>админ</b> кунед.",
+            "Ботро дар канал <b>админ</b> кунед ва каналро аз нав нависед.",
             reply_markup=keyboards.admin_back(),
         )
         return
+    await state.clear()
     db.set_setting(REVIEW_CHANNEL_KEY, raw)
     await message.answer(
         f"✅ Шарҳҳо ба <b>{texts.esc(chat.title or raw)}</b> мераванд.",
@@ -162,15 +164,17 @@ async def cb_whatsapp(cb: CallbackQuery, state: FSMContext, db: Database) -> Non
 @router.message(Admin.waiting_whatsapp, F.text)
 async def got_whatsapp(message: Message, state: FSMContext, db: Database) -> None:
     raw = message.text.strip()
-    await state.clear()
     if raw in SKIP:
+        await state.clear()
         db.set_setting(WHATSAPP_KEY, "")
         await message.answer("✅ WhatsApp бардошта шуд.", reply_markup=keyboards.admin_settings())
         return
     digits = "".join(ch for ch in raw if ch.isdigit())
-    if len(digits) < 9:
+    if not 9 <= len(digits) <= 15:
+        # Ҳолат нигоҳ дошта мешавад — админ рақамро фавран аз нав менависад.
         await message.answer("❌ Рақам нодуруст аст. Намуна: <code>992939880805</code>")
         return
+    await state.clear()
     db.set_setting(WHATSAPP_KEY, digits)
     await message.answer(
         f"✅ WhatsApp: <code>{digits}</code>\nhttps://wa.me/{digits}",
@@ -316,6 +320,11 @@ async def cb_broadcast_send(
     await state.clear()
     media_id = data.get("media_id")
     body_id = data.get("body_id")
+    if not media_id and not body_id:
+        # Тугма дубора пахш шуд ё эълон аллакай рафт. Бе ин санҷиш бот ба
+        # ҳеҷ кас чизе намефиристод, вале «ба ҳама расид» мегуфт.
+        await cb.answer("Эълон аллакай фиристода шуд ё холӣ аст", show_alert=True)
+        return
     source = data.get("source_chat", cb.from_user.id)
     saved = data.get("buttons") or []
     markup = (
@@ -332,21 +341,30 @@ async def cb_broadcast_send(
     await safe_edit(cb, "📤 Мефиристам...", None)
     await cb.answer()
 
+    async def deliver(user_id: int) -> None:
+        if media_id:
+            # Тугмаҳо ба паёми охирин мечаспанд.
+            await bot.copy_message(
+                user_id, source, media_id,
+                reply_markup=None if body_id else markup,
+            )
+        if body_id:
+            await bot.copy_message(user_id, source, body_id, reply_markup=markup)
+
     sent = failed = 0
     for user_id in db.all_user_ids():
         try:
-            if media_id:
-                # Тугмаҳо ба паёми охирин мечаспанд.
-                await bot.copy_message(
-                    user_id, source, media_id,
-                    reply_markup=None if body_id else markup,
-                )
-            if body_id:
-                await bot.copy_message(user_id, source, body_id, reply_markup=markup)
+            try:
+                await deliver(user_id)
+            except TelegramRetryAfter as exc:
+                # Telegram гуфт «сабр кун» — сабр мекунем ва боз мефиристем,
+                # вагарна қисми харидорон эълонро намегирифтанд.
+                await asyncio.sleep(exc.retry_after + 1)
+                await deliver(user_id)
             sent += 1
         except Exception:
             failed += 1
-        await asyncio.sleep(0.05)   # то ба маҳдудияти Telegram нарасем
+        await asyncio.sleep(0.07)   # то ба маҳдудияти Telegram нарасем
 
     await cb.message.answer(
         texts.broadcast_result(sent, failed), reply_markup=keyboards.admin_home()
@@ -522,6 +540,7 @@ async def cb_refresh_costs(cb: CallbackQuery, db: Database, cfg: Config, supplie
 # ── илова кардани бозии нав аз каталоги таъминкунанда ─────────────────
 MARKUP_KEY = "markup_percent"
 DEFAULT_MARKUP = 20
+MAX_FAMILY_LEN = 24     # «a:gprices:» + калид + «_all» ≤ 64 байт
 
 
 def markup_percent(db: Database) -> int:
@@ -544,7 +563,12 @@ def new_families(live: dict, db: Database) -> list[tuple[str, str, int]]:
     for sku in live:
         if sku in known:
             continue
-        counts[catalog.family_of(sku)] = counts.get(catalog.family_of(sku), 0) + 1
+        family = catalog.family_of(sku)
+        # Калиди дароз тугмаро аз 64 байт зиёд мекард ва Telegram тамоми
+        # рӯйхатро рад мекард — чунин бозӣ нишон дода намешавад.
+        if not family or not family.isascii() or len(family) > MAX_FAMILY_LEN:
+            continue
+        counts[family] = counts.get(family, 0) + 1
     return sorted(
         ((fam, catalog.family_title(fam), n) for fam, n in counts.items()),
         key=lambda x: -x[2],
@@ -610,7 +634,7 @@ async def cb_add_family(cb: CallbackQuery, db: Database, cfg: Config, supplier) 
             skipped += 1
             continue
         items.append({
-            "code": sku,
+            "code": catalog.product_code_for(sku),
             "category": catalog.CAT_OTHER,
             "title": str(info.get("name") or sku)[:60],
             "amount": 0,

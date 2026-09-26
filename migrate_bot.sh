@@ -50,7 +50,14 @@ stop_bot() {
   if has_systemd; then
     $SUDO systemctl stop "$SERVICE" >/dev/null 2>&1
   elif [ -f "$PIDFILE" ]; then
-    kill "$(cat "$PIDFILE")" 2>/dev/null
+    OLD_PID="$(cat "$PIDFILE")"
+    kill "$OLD_PID" 2>/dev/null
+    # Копию снимаем только когда процесс точно вышел — иначе он успел бы
+    # записать в базу покупку уже после копии, и она потерялась бы.
+    for _ in $(seq 1 15); do
+      kill -0 "$OLD_PID" 2>/dev/null || break
+      sleep 1
+    done
     rm -f "$PIDFILE"
   fi
 }

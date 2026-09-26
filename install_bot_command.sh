@@ -54,7 +54,15 @@ bot_alive() {
 }
 
 plain_stop() {
-  bot_alive && kill "$(cat "$PIDFILE")" 2>/dev/null
+  if bot_alive; then
+    OLD_PID="$(cat "$PIDFILE")"
+    kill "$OLD_PID" 2>/dev/null
+    # Ждём, пока старый процесс выйдет: два бота с одним токеном мешают друг другу.
+    for _ in $(seq 1 10); do
+      kill -0 "$OLD_PID" 2>/dev/null || break
+      sleep 1
+    done
+  fi
   rm -f "$PIDFILE"
 }
 
@@ -137,6 +145,10 @@ fi
 .venv/bin/pip install -q -r requirements-shop.txt || { echo "❌ Зависимости не встали"; exit 1; }
 
 echo "3/4  Перезапускаю бота..."
+# Запоминаем момент перезапуска: «Бот омода» от ПРЕЖНЕГО запуска не должен
+# засчитываться, иначе упавший бот показал бы «✅ ГОТОВО».
+SINCE="$(date '+%Y-%m-%d %H:%M:%S')"
+LOG_START="$(wc -l < "$LOGFILE" 2>/dev/null || echo 0)"
 if has_systemd; then
   if systemctl list-units --all --type=service 2>/dev/null | grep -q "${SERVICE}.service"; then
     $SUDO systemctl restart "$SERVICE"
@@ -154,10 +166,10 @@ echo "4/4  Проверяю, что бот действительно подня
 # а не просто «процесс ещё жив» — упасть он может и через пару секунд.
 ready_marker() {
   if has_systemd; then
-    $SUDO journalctl -u "$SERVICE" --since "-60 seconds" --no-pager 2>/dev/null \
+    $SUDO journalctl -u "$SERVICE" --since "$SINCE" --no-pager 2>/dev/null \
       | grep -q "Бот омода"
   else
-    tail -n 60 "$LOGFILE" 2>/dev/null | grep -q "Бот омода"
+    tail -n "+$((LOG_START + 1))" "$LOGFILE" 2>/dev/null | grep -q "Бот омода"
   fi
 }
 

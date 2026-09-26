@@ -16,6 +16,8 @@ from aiogram.types import BotCommand, BotCommandScopeChat
 from . import catalog, requisites
 from .config import Config, load_config
 from .db import Database
+from .fulfillment import resume_in_background
+from .fulfillment import shutdown as fulfillment_shutdown
 from .handlers import build_router
 from .middlewares import ButtonStyleFallback, ErrorGuardMiddleware, GuardMiddleware
 from .supplier import build_supplier
@@ -117,9 +119,13 @@ async def run() -> None:
                 log.warning("Фармонҳои админ барои %s танзим нашуданд: %s", admin_id, exc)
 
         await bot.delete_webhook(drop_pending_updates=True)
+        # Фармоишҳое, ки ҳангоми хомӯшшавии қаблӣ нимкора монданд, то охир
+        # расонида мешаванд — дар паси парда, то бот фавран ҷавоб диҳад.
+        resume_in_background(bot, db, cfg, supplier)
         await dp.start_polling(bot)
     finally:
         # Ҳатто ҳангоми хатогӣ ҳама чиз тоза баста мешавад.
+        await fulfillment_shutdown()
         await supplier.close()
         await bot.session.close()
         db.close()

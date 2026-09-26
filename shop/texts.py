@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from html import escape
 
@@ -18,6 +19,9 @@ from .db import (
 
 CURRENCY = "с."
 
+#: Ҳадди болоии ҳар маблағе, ки дастӣ ворид мешавад (сомонӣ).
+MAX_SUM_SOMONI = 10_000_000
+
 
 def money(diram: int, currency: str = CURRENCY) -> str:
     """1250 → «12.50 с.»"""
@@ -28,13 +32,17 @@ def money(diram: int, currency: str = CURRENCY) -> str:
 
 def to_diram(text: str) -> int | None:
     """«12,5» ё «12.50» ё «12» → дирам. Агар нодуруст бошад — None."""
-    cleaned = text.strip().replace(" ", "").replace(",", ".")
+    cleaned = (text or "").strip().replace(" ", "").replace(",", ".")
     if not cleaned:
         return None
     try:
-        value = round(float(cleaned) * 100)
+        number = float(cleaned)
     except ValueError:
         return None
+    # «inf», «nan», «1e20» — бот меафтод ё ба ҳисоб рақами бемаъно менавишт.
+    if not math.isfinite(number) or number > MAX_SUM_SOMONI:
+        return None
+    value = round(number * 100)
     return value if value > 0 else None
 
 

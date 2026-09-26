@@ -1432,3 +1432,448 @@ async def test_bad_markup_refused(db, cfg, state):
     message = FakeMessage("абв", user_id=ADMIN_ID)
     await st.got_markup(message, state, db)
     assert "нодуруст" in message.last
+
+
+# ══ Аудит: пул ду бор ҳаракат намекунад ═══════════════════════════════
+@pytest.fixture
+def no_wait(monkeypatch):
+    """Паузаи санҷиши фармоиши номуайянро дар тестҳо хомӯш мекунем."""
+    from shop import fulfillment
+
+    monkeypatch.setattr(fulfillment, "UNCERTAIN_DELAY", 0)
+
+
+class LookupSupplier(FakeSupplier):
+    """Таъминкунанда, ки ба «фармоиш ҳаст?» ҷавоби идорашаванда медиҳад."""
+
+    def __init__(self, place, lookup, statuses=None):
+        super().__init__(place=place, statuses=statuses)
+        self._lookup = lookup
+        self.lookups = []
+
+    async def order_status(self, external_id, *, by_external=False):
+        if by_external:
+            self.lookups.append(external_id)
+            if self._lookup is not None:
+                return self._lookup
+        return await super().order_status(external_id)
+
+    async def wait_until_done(self, external_id, *, by_external=False, **kwargs):
+        return await super().order_status(external_id)
+
+
+def _paid_order(db, balance=20000):
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, balance, "topup")
+    return _make_order(db)
+
+
+async def test_timeout_but_order_exists_is_delivered_not_refunded(db, cfg_api, bot, no_wait):
+    """Ҷавоб наомад, вале таъминкунанда фармоишро гирифт — пулро БАРНАМЕГАРДОНЕМ."""
+    order_id = _paid_order(db)
+    supplier = LookupSupplier(
+        place=OrderResult(ok=False, error="Хатои шабака: timeout", uncertain=True),
+        lookup=OrderResult(ok=True, external_id="x", status="processing"),
+        statuses=["completed"],
+    )
+    await deliver_order(bot, db, cfg_api, supplier, order_id)
+
+    assert db.order(order_id)["status"] == ORDER_DONE
+    assert db.user(USER_ID).balance == 20000 - 9370      # пул барнагашт
+    assert "баргардонида шуд" not in bot.to(USER_ID)
+    assert supplier.lookups == [str(order_id)]
+
+
+async def test_timeout_and_order_absent_is_refunded(db, cfg_api, bot, no_wait):
+    order_id = _paid_order(db)
+    supplier = LookupSupplier(
+        place=OrderResult(ok=False, error="Хатои шабака", uncertain=True),
+        lookup=OrderResult(ok=False, code="order_not_found", error="Фармоиш пайдо нашуд"),
+    )
+    await deliver_order(bot, db, cfg_api, supplier, order_id)
+
+    assert db.order(order_id)["status"] == ORDER_REJECTED
+    assert db.user(USER_ID).balance == 20000
+
+
+async def test_timeout_and_lookup_fails_goes_to_admin_without_refund(db, cfg_api, bot, no_wait):
+    order_id = _paid_order(db)
+    supplier = LookupSupplier(
+        place=OrderResult(ok=False, error="HTTP 502", uncertain=True),
+        lookup=OrderResult(ok=False, error="шабака нест"),
+    )
+    await deliver_order(bot, db, cfg_api, supplier, order_id)
+
+    assert db.order(order_id)["status"] == ORDER_SENT
+    assert db.user(USER_ID).balance == 20000 - 9370
+    assert "FireLoot санҷед" in bot.to(ADMIN_ID)
+    assert "баргардонида шуд" not in bot.to(USER_ID)
+
+
+async def test_duplicate_order_is_never_refunded(db, cfg_api, bot, no_wait):
+    """«duplicate_order» — фармоиш аллакай ҳаст; баргардонидан хатост."""
+    order_id = _paid_order(db)
+    supplier = LookupSupplier(
+        place=OrderResult(ok=False, code="duplicate_order", error="dup", uncertain=True),
+        lookup=OrderResult(ok=False, code="order_not_found", error="нест"),
+    )
+    await deliver_order(bot, db, cfg_api, supplier, order_id)
+
+    assert db.order(order_id)["status"] == ORDER_SENT
+    assert db.user(USER_ID).balance == 20000 - 9370
+
+
+async def test_supplier_failure_after_admin_done_does_not_refund(db, cfg_api, bot):
+    """Админ «иҷро» пахш кард, баъд таъминкунанда «failed» гуфт — пул намеравад."""
+    order_id = _paid_order(db)
+
+    class AdminFirst(FakeSupplier):
+        async def wait_until_done(self, external_id, **kwargs):
+            db.set_order_status(order_id, ORDER_DONE)      # админ дар ҳамин вақт
+            return OrderResult(ok=True, external_id=external_id, status="failed")
+
+    await deliver_order(bot, db, cfg_api, AdminFirst(), order_id)
+
+    assert db.order(order_id)["status"] == ORDER_DONE
+    assert db.user(USER_ID).balance == 20000 - 9370
+    assert "баргардонида шуд" not in bot.to(USER_ID)
+
+
+async def test_completed_after_admin_refund_alerts_admin(db, cfg_api, bot):
+    """Админ пулро баргардонд, вале таъминкунанда молро расонд — админ медонад."""
+    order_id = _paid_order(db)
+
+    class AdminFirst(FakeSupplier):
+        async def wait_until_done(self, external_id, **kwargs):
+            db.set_order_status(order_id, ORDER_REJECTED)
+            return OrderResult(ok=True, external_id=external_id, status="completed")
+
+    await deliver_order(bot, db, cfg_api, AdminFirst(), order_id)
+
+    assert db.order(order_id)["status"] == ORDER_REJECTED
+    assert db.user(USER_ID).balance == 20000                # танҳо як бор баргашт
+    assert "ЧЕКИ ХАРИД" not in bot.to(USER_ID)
+    assert "иҷро кард" in bot.to(ADMIN_ID)
+
+
+async def test_admin_cannot_reopen_refunded_order(db, cfg, bot):
+    """«Иҷро» пас аз «рад» — ҳолат ва пул иваз намешаванд, харидор хабари дуюм намегирад."""
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 10000, "topup")
+    order_id = db.create_order(
+        user_id=USER_ID, product_code="stars_100", category=catalog.CAT_STARS,
+        title="100 ⭐️", price=2100, target="@ali", nickname=None,
+    )
+    await admin_h.cb_order_action(FakeCallback(f"a:orej:{order_id}", user_id=ADMIN_ID), db, cfg, bot)
+    told = len(bot.messages)
+
+    cb = FakeCallback(f"a:odone:{order_id}", user_id=ADMIN_ID)
+    await admin_h.cb_order_action(cb, db, cfg, bot)
+
+    assert db.order(order_id)["status"] == ORDER_REJECTED
+    assert db.user(USER_ID).balance == 10000
+    assert len(bot.messages) == told                        # харидор хабар нагирифт
+    assert "Аллакай" in (cb.answers[-1] or "")
+
+
+async def test_admin_reject_after_done_keeps_money_honest(db, cfg, bot):
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 10000, "topup")
+    order_id = db.create_order(
+        user_id=USER_ID, product_code="stars_100", category=catalog.CAT_STARS,
+        title="100 ⭐️", price=2100, target="@ali", nickname=None,
+    )
+    await admin_h.cb_order_action(FakeCallback(f"a:odone:{order_id}", user_id=ADMIN_ID), db, cfg, bot)
+    await admin_h.cb_order_action(FakeCallback(f"a:orej:{order_id}", user_id=ADMIN_ID), db, cfg, bot)
+
+    assert db.order(order_id)["status"] == ORDER_DONE
+    # Қаблан харидор «пул баргардонида шуд» мегирифт, ҳарчанд пул барнагашта буд.
+    assert "баргардонида шуд" not in bot.to(USER_ID)
+
+
+async def test_topup_confirmed_twice_credits_and_tells_once(db, cfg, bot):
+    db.touch_user(USER_ID)
+    topup_id = db.create_topup(USER_ID, 20000, "1234")
+    for _ in range(2):
+        await admin_h.cb_topup_action(FakeCallback(f"a:tok:{topup_id}", user_id=ADMIN_ID), db, cfg, bot)
+
+    assert db.user(USER_ID).balance == 20000
+    assert bot.to(USER_ID).count("Ҳисоб пур шуд") == 1
+
+
+async def test_rejected_topup_cannot_be_reported_as_paid(db, cfg, bot):
+    """«Тасдиқ» пас аз «рад» — харидор паёми бардурӯғи «пур шуд» намегирад."""
+    db.touch_user(USER_ID)
+    topup_id = db.create_topup(USER_ID, 20000, "1234")
+    await admin_h.cb_topup_action(FakeCallback(f"a:trej:{topup_id}", user_id=ADMIN_ID), db, cfg, bot)
+    await admin_h.cb_topup_action(FakeCallback(f"a:tok:{topup_id}", user_id=ADMIN_ID), db, cfg, bot)
+
+    assert db.user(USER_ID).balance == 0
+    assert "Ҳисоб пур шуд" not in bot.to(USER_ID)
+
+
+async def test_review_is_published_only_once(db, cfg, bot):
+    db.touch_user(USER_ID, "ali", "Alijon")
+    db.set_setting("review_channel", "@reviews")
+    review_id = db.create_review(USER_ID, "Ҳамааш аъло буд!")
+    for _ in range(2):
+        await admin_h.cb_review_action(
+            FakeCallback(f"a:revok:{review_id}", user_id=ADMIN_ID), db, cfg, bot
+        )
+    assert bot.to("@reviews").count("Шарҳи харидор") == 1
+
+
+async def test_review_double_tap_while_publishing(db, cfg):
+    """Пахши дуюм ҳангоми нашр — дар канал танҳо як паём."""
+    db.touch_user(USER_ID, "ali", "Alijon")
+    db.set_setting("review_channel", "@reviews")
+    review_id = db.create_review(USER_ID, "Ҳамааш аъло буд!")
+
+    class SlowBot(FakeBot):
+        async def send_message(self, chat_id, text, reply_markup=None, **kwargs):
+            await asyncio.sleep(0.01)
+            await super().send_message(chat_id, text, reply_markup)
+
+    slow = SlowBot()
+    await asyncio.gather(*(
+        admin_h.cb_review_action(
+            FakeCallback(f"a:revok:{review_id}", user_id=ADMIN_ID), db, cfg, slow
+        )
+        for _ in range(2)
+    ))
+    assert slow.to("@reviews").count("Шарҳи харидор") == 1
+
+
+async def test_buy_double_tap_charges_once(db, cfg, state, bot):
+    """Ду пахши «Тасдиқ» дар як лаҳза — як фармоиш, як пардохт."""
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 50000, "topup")
+    await state.set_state(Buy.confirming)
+    await state.update_data(code="stars_100", target="@ali", nickname="Ali")
+
+    class SlowCb(FakeCallback):
+        async def answer(self, text=None, show_alert=False, **kwargs):
+            await asyncio.sleep(0.01)
+            await super().answer(text, show_alert)
+
+    class SlowMessage(FakeMessage):
+        async def edit_text(self, text, reply_markup=None, **kwargs):
+            await asyncio.sleep(0.01)
+            return await super().edit_text(text, reply_markup)
+
+    await asyncio.gather(*(
+        buy_h.cb_buy(SlowCb(keyboards.CB_BUY_OK, message=SlowMessage()), state, db, cfg, bot, ManualSupplier())
+        for _ in range(2)
+    ))
+    await asyncio.sleep(0.05)
+    assert len(db.user_orders(USER_ID)) == 1
+    assert db.user(USER_ID).balance == 50000 - db.product("stars_100")["price"]
+
+
+async def test_disabled_product_cannot_be_bought(db, cfg, state, bot):
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 50000, "topup")
+    await state.set_state(Buy.confirming)
+    await state.update_data(code="stars_100", target="@ali")
+    db.set_active("stars_100", False)                      # админ хомӯш кард
+
+    await buy_h.cb_buy(FakeCallback(keyboards.CB_BUY_OK), state, db, cfg, bot, ManualSupplier())
+
+    assert db.user_orders(USER_ID) == []
+    assert db.user(USER_ID).balance == 50000
+
+
+async def test_broadcast_double_tap_does_not_fake_success(db, state):
+    from shop.handlers import settings as st
+
+    db.touch_user(USER_ID)
+    bot = FakeBot()
+    await state.set_data({"body_id": 7, "source_chat": ADMIN_ID})
+    first = FakeCallback("a:bcgo", user_id=ADMIN_ID)
+    await st.cb_broadcast_send(first, state, db, bot)
+    delivered = len(bot.messages)
+
+    second = FakeCallback("a:bcgo", user_id=ADMIN_ID)
+    await st.cb_broadcast_send(second, state, db, bot)
+
+    assert len(bot.messages) == delivered                  # паём дубора нарафт
+    assert "Эълон фиристода шуд" not in second.message.all_text()
+
+
+async def test_broadcast_waits_on_flood_limit(db, state, monkeypatch):
+    """Telegram «сабр кун» гуфт — эълон гум намешавад."""
+    from aiogram.exceptions import TelegramRetryAfter
+    from shop.handlers import settings as st
+
+    db.touch_user(USER_ID)
+
+    class Flood(FakeBot):
+        tries = 0
+
+        async def copy_message(self, chat_id, *args, **kwargs):
+            Flood.tries += 1
+            if Flood.tries == 1:
+                raise TelegramRetryAfter(method=None, message="flood", retry_after=0)
+            self.messages.append((chat_id, "ok"))
+
+    bot = Flood()
+    await state.set_data({"body_id": 7, "source_chat": ADMIN_ID})
+    cb = FakeCallback("a:bcgo", user_id=ADMIN_ID)
+    await st.cb_broadcast_send(cb, state, db, bot)
+    assert bot.to(USER_ID) == "ok"
+    assert "Нарасид: 0" in cb.message.all_text()
+
+
+# ══ Аудит: фармоишҳо пас аз азнавоғозкунӣ ═════════════════════════════
+async def test_resume_finishes_sent_order(db, cfg_api, bot):
+    from shop.fulfillment import resume_open_orders
+
+    order_id = _paid_order(db)
+    db.set_order_status(order_id, ORDER_SENT, external_id="FL-9")
+
+    counts = await resume_open_orders(bot, db, cfg_api, FakeSupplier(statuses=["completed"]))
+
+    assert counts == {"resumed": 1}
+    assert db.order(order_id)["status"] == ORDER_DONE
+    assert "ЧЕКИ ХАРИД" in bot.to(USER_ID)
+
+
+async def test_resume_refunds_failed_order(db, cfg_api, bot):
+    from shop.fulfillment import resume_open_orders
+
+    order_id = _paid_order(db)
+    db.set_order_status(order_id, ORDER_SENT, external_id="FL-9")
+
+    await resume_open_orders(bot, db, cfg_api, FakeSupplier(statuses=["failed"]))
+
+    assert db.order(order_id)["status"] == ORDER_REJECTED
+    assert db.user(USER_ID).balance == 20000
+
+
+async def test_resume_sends_order_that_never_reached_supplier(db, cfg_api, bot):
+    from shop.fulfillment import resume_open_orders
+
+    order_id = _paid_order(db)                             # ҳолат: new
+    supplier = LookupSupplier(
+        place=OrderResult(ok=True, external_id="FL-2"),
+        lookup=OrderResult(ok=False, code="order_not_found", error="нест"),
+        statuses=["completed"],
+    )
+    counts = await resume_open_orders(bot, db, cfg_api, supplier)
+
+    assert counts == {"resent": 1}
+    assert len(supplier.calls) == 1
+    assert db.order(order_id)["status"] == ORDER_DONE
+
+
+async def test_resume_does_not_resend_order_supplier_already_has(db, cfg_api, bot):
+    from shop.fulfillment import resume_open_orders
+
+    order_id = _paid_order(db)
+    supplier = LookupSupplier(
+        place=OrderResult(ok=True, external_id="FL-2"),
+        lookup=OrderResult(ok=True, external_id=str(order_id), status="completed"),
+    )
+    counts = await resume_open_orders(bot, db, cfg_api, supplier)
+
+    assert counts == {"resumed": 1}
+    assert supplier.calls == []                            # дубора нафиристодем
+    assert db.order(order_id)["status"] == ORDER_DONE
+
+
+async def test_resume_skips_manual_and_old_orders(db, cfg_api, bot):
+    from shop.fulfillment import resume_open_orders
+
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 90000, "topup")
+    manual = _make_order(db, code="prem_3", price=16500, target="@ali")
+    old = _make_order(db)
+    with db._lock:
+        db._conn.execute(
+            "UPDATE orders SET updated_at = '2020-01-01T00:00:00+00:00' WHERE id = ?", (old,)
+        )
+        db._conn.commit()
+    supplier = FakeSupplier()
+
+    counts = await resume_open_orders(bot, db, cfg_api, supplier)
+
+    assert counts == {"old": 1}
+    assert supplier.calls == []
+    assert db.order(manual)["status"] == ORDER_NEW
+    assert db.order(old)["status"] == ORDER_NEW
+
+
+async def test_resume_does_nothing_without_supplier(db, cfg, bot):
+    from shop.fulfillment import resume_open_orders
+
+    _paid_order(db)
+    assert await resume_open_orders(bot, db, cfg, FakeSupplier()) == {}
+
+
+async def test_background_task_is_kept_alive(db, cfg_api, bot):
+    """Вазифаи паси парда истинод дорад — Python онро нест намекунад."""
+    from shop import fulfillment
+
+    order_id = _paid_order(db)
+    task = fulfillment.deliver_in_background(bot, db, cfg_api, FakeSupplier(), order_id)
+    assert task in fulfillment._TASKS
+    await task
+    assert task not in fulfillment._TASKS
+    assert db.order(order_id)["status"] == ORDER_DONE
+
+
+async def test_shutdown_leaves_order_for_resume(db, cfg_api, bot):
+    from shop import fulfillment
+
+    order_id = _paid_order(db)
+
+    class Hanging(FakeSupplier):
+        async def wait_until_done(self, external_id, **kwargs):
+            await asyncio.sleep(3600)
+
+    fulfillment.deliver_in_background(bot, db, cfg_api, Hanging(), order_id)
+    await asyncio.sleep(0.01)
+    await fulfillment.shutdown()
+
+    assert db.order(order_id)["status"] == ORDER_SENT       # пул ҷои худ, фармоиш кушода
+    assert db.user(USER_ID).balance == 20000 - 9370
+    assert "баргардонида шуд" not in bot.to(USER_ID)
+
+
+# ══ Аудит: тугмаҳои аз 64 байт дарозтар ═══════════════════════════════
+def test_long_supplier_sku_gets_short_unique_code():
+    long_a = "abi_" + "super_mega_premium_bundle_" * 3 + "a"
+    long_b = "abi_" + "super_mega_premium_bundle_" * 3 + "b"
+    code_a, code_b = catalog.product_code_for(long_a), catalog.product_code_for(long_b)
+    assert code_a != code_b
+    assert len(f"a:setprice:{code_a}".encode()) <= 64
+    assert catalog.product_code_for("pubg_uc_60") == "pubg_uc_60"   # кӯтоҳ — бе тағйир
+
+
+async def test_added_game_with_long_skus_renders_price_buttons(db, cfg):
+    from shop.handlers import settings as st
+
+    long_sku = "ab_" + "x" * 70
+    live = {long_sku: {"sku": long_sku, "name": "Big pack", "price": 1.5}}
+
+    class Catalog(FakeSupplier):
+        async def products(self):
+            return live
+
+    cb = FakeCallback("a:addfam:ab", user_id=ADMIN_ID)
+    await st.cb_add_family(cb, db, cfg, Catalog())
+
+    rows = db.group_products("ab_all", only_active=False)
+    assert len(rows) == 1 and rows[0]["sku"] == long_sku
+    markup = keyboards.admin_price_item(rows[0]["code"], False, False)
+    for row in markup.inline_keyboard:
+        for button in row:
+            assert len(button.callback_data.encode()) <= 64
+
+
+def test_family_with_huge_prefix_is_not_offered(db):
+    from shop.handlers import settings as st
+
+    live = {"x" * 40: {}, "ab_1": {}}
+    families = [fam for fam, _, _ in st.new_families(live, db)]
+    assert families == ["ab"]

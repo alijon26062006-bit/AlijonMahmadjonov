@@ -704,6 +704,10 @@ class Database:
 
         `done` — ҳисоби «харҷкарда» зиёд мешавад.
         `rejected` — пул ба харидор бармегардад.
+
+        Фармоиши анҷомёфта (`done` ё `rejected`) дигар иваз намешавад.
+        Вагарна «рад» пас аз «иҷро» ҳолатро бе баргардонидани пул иваз мекард,
+        ва «иҷро» пас аз «рад» — харидор ҳам пул ва ҳам молро мегирифт.
         """
         if status not in ORDER_STATUSES:
             raise ValueError(f"status номаълум: {status}")
@@ -712,10 +716,23 @@ class Database:
             row = self._conn.execute(
                 "SELECT * FROM orders WHERE id = ?", (order_id,)
             ).fetchone()
-            if row is None or row["status"] == status:
-                self._conn.commit()
+            if row is None:
+                return None
+            if row["status"] == status:
+                # Ҳолат ҳамон аст — танҳо рақами таъминкунандаро нигоҳ медорем.
+                if external_id and external_id != row["external_id"]:
+                    self._conn.execute(
+                        "UPDATE orders SET external_id = ?, updated_at = ? WHERE id = ?",
+                        (external_id, stamp, order_id),
+                    )
+                    self._conn.commit()
+                    return self._conn.execute(
+                        "SELECT * FROM orders WHERE id = ?", (order_id,)
+                    ).fetchone()
                 return row
-            was_open = row["status"] in ORDER_OPEN
+            if row["status"] not in ORDER_OPEN:
+                return row
+            was_open = True
             self._conn.execute(
                 "UPDATE orders SET status = ?, updated_at = ?, "
                 "external_id = COALESCE(?, external_id), note = COALESCE(?, note) WHERE id = ?",
@@ -770,22 +787,32 @@ class Database:
         )
 
     def confirm_topup(self, topup_id: int, admin_id: int) -> sqlite3.Row | None:
-        """Пардохтро тасдиқ мекунад ва пулро ба ҳисоб мегузорад."""
+        """Пардохтро тасдиқ мекунад ва пулро ба ҳисоб мегузорад.
+
+        Ҳолат ва пул дар ЯК амалиёт навишта мешаванд: агар бот дар байн
+        афтад, пардохт «тасдиқшуда» бе пул дар ҳисоб намемонад.
+        """
         with self._lock:
             row = self._conn.execute(
                 "SELECT * FROM topups WHERE id = ?", (topup_id,)
             ).fetchone()
             if row is None or row["status"] != TOPUP_WAITING:
                 return row
-            self._conn.execute(
-                "UPDATE topups SET status = ?, admin_id = ?, updated_at = ? WHERE id = ?",
-                (TOPUP_PAID, admin_id, now(), topup_id),
-            )
-            self._conn.commit()
-        self.change_balance(
-            row["user_id"], row["amount"], f"topup#{topup_id}", admin_id=admin_id
-        )
-        return self.topup(topup_id)
+            try:
+                self._conn.execute(
+                    "UPDATE topups SET status = ?, admin_id = ?, updated_at = ? WHERE id = ?",
+                    (TOPUP_PAID, admin_id, now(), topup_id),
+                )
+                # change_balance худаш commit мекунад — ҳарду якҷоя сабт мешаванд.
+                self.change_balance(
+                    row["user_id"], row["amount"], f"topup#{topup_id}", admin_id=admin_id
+                )
+            except Exception:
+                self._conn.rollback()
+                raise
+            return self._conn.execute(
+                "SELECT * FROM topups WHERE id = ?", (topup_id,)
+            ).fetchone()
 
     def reject_topup(self, topup_id: int, admin_id: int) -> sqlite3.Row | None:
         with self._lock:

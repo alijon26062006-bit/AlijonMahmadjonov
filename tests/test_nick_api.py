@@ -257,3 +257,56 @@ def test_rate_limit_answers_429(live):
     base, _ = live
     fetch(f"{base}/nick?game=ff&id=1")
     assert fetch(f"{base}/nick?game=ff&id=1")[0] == 429
+
+
+# ── аудит: защита ────────────────────────────────────────────────────
+def _handler_from(peer: str, headers: dict):
+    handler = type("H", (server.Handler,), {"service": make_service((200, {}))})
+    fake = handler.__new__(handler)
+    fake.client_address = (peer, 5555)
+    fake.headers = headers
+    return fake
+
+
+def test_forged_forwarded_header_does_not_bypass_limit():
+    """Снаружи подставной X-Forwarded-For игнорируется — лимит не обойти."""
+    assert _handler_from("203.0.113.5", {"X-Forwarded-For": "1.2.3.4"})._who() == "203.0.113.5"
+
+
+def test_forwarded_header_trusted_from_local_proxy():
+    """За nginx на этом же сервере настоящий адрес клиента берётся из заголовка."""
+    assert _handler_from("127.0.0.1", {"X-Forwarded-For": "1.2.3.4, 10.0.0.1"})._who() == "1.2.3.4"
+
+
+def test_options_answers_without_body(live):
+    import http.client
+
+    base, _ = live
+    host, port = base.replace("http://", "").split(":")
+    conn = http.client.HTTPConnection(host, int(port), timeout=5)
+    conn.request("OPTIONS", "/nick")
+    resp = conn.getresponse()
+    assert resp.status == 204
+    assert resp.read() == b""
+    # То же соединение продолжает работать — мусора после 204 нет.
+    conn.request("GET", "/health")
+    assert conn.getresponse().status == 200
+    conn.close()
+
+
+def test_huge_body_is_refused(live):
+    base, _ = live
+    request = urllib.request.Request(
+        f"{base}/nick", data=b"{" + b" " * (server.MAX_BODY + 10) + b"}", method="POST"
+    )
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(request, timeout=5)
+    assert exc.value.code == 413
+
+
+def test_access_key_is_not_written_to_log(caplog):
+    fake = _handler_from("203.0.113.5", {})
+    with caplog.at_level("INFO", logger="nickapi"):
+        fake.log_message('"%s" %s', "GET /nick?game=ff&key=supersecret&id=1", "200")
+    assert "supersecret" not in caplog.text
+    assert "key=***" in caplog.text

@@ -9,8 +9,10 @@ from shop.db import (
     ORDER_DONE,
     ORDER_NEW,
     ORDER_REJECTED,
+    ORDER_SENT,
     TOPUP_PAID,
     TOPUP_REJECTED,
+    TOPUP_WAITING,
 )
 from shop.handlers.common import clean_player_id, clean_username
 
@@ -38,7 +40,9 @@ def test_to_diram_ok(raw, expected):
     assert texts.to_diram(raw) == expected
 
 
-@pytest.mark.parametrize("raw", ["", "abc", "-5", "0", "  "])
+@pytest.mark.parametrize(
+    "raw", ["", "abc", "-5", "0", "  ", "inf", "-inf", "nan", "1e20", "99999999999"]
+)
 def test_to_diram_bad(raw):
     assert texts.to_diram(raw) is None
 
@@ -191,6 +195,43 @@ def test_done_then_rejected_does_not_double_refund(db):
     db.set_order_status(order_id, ORDER_DONE)
     db.set_order_status(order_id, ORDER_REJECTED)
     assert db.user(1).balance == 3900  # фармоиши иҷрошуда баргардонида намешавад
+    assert db.order(order_id)["status"] == ORDER_DONE   # ҳолат ҳам иваз нашуд
+
+
+def test_refunded_order_cannot_become_done(db):
+    """«Иҷро» пас аз «рад»: харидор пулро гирифт — фармоиш «иҷрошуда» намешавад."""
+    db.touch_user(1)
+    db.change_balance(1, 5000, "topup")
+    order_id = _order(db)
+    db.set_order_status(order_id, ORDER_REJECTED)
+    db.set_order_status(order_id, ORDER_DONE)
+    user = db.user(1)
+    assert db.order(order_id)["status"] == ORDER_REJECTED
+    assert user.balance == 5000 and user.spent == 0 and user.orders_done == 0
+
+
+def test_same_status_still_saves_supplier_number(db):
+    db.touch_user(1)
+    db.change_balance(1, 5000, "topup")
+    order_id = _order(db)
+    db.set_order_status(order_id, ORDER_SENT)
+    db.set_order_status(order_id, ORDER_SENT, external_id="FL-7")
+    assert db.order(order_id)["external_id"] == "FL-7"
+
+
+def test_topup_confirm_is_atomic(db, monkeypatch):
+    """Агар гузоштани пул афтад — пардохт «тасдиқшуда» бе пул намемонад."""
+    db.touch_user(1)
+    topup_id = db.create_topup(1, 10000, "1234")
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("диск пур шуд")
+
+    monkeypatch.setattr(db, "change_balance", boom)
+    with pytest.raises(RuntimeError):
+        db.confirm_topup(topup_id, admin_id=99)
+    assert db.topup(topup_id)["status"] == TOPUP_WAITING
+    assert db.user(1).balance == 0
 
 
 def test_open_orders_list(db):

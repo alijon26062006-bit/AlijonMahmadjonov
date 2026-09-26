@@ -12,9 +12,11 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import os
+import re
 import pathlib
 import threading
 import time
@@ -30,6 +32,8 @@ from . import games
 log = logging.getLogger("nickapi")
 
 FIRELOOT_URL = "https://partner.firelootshop.com/api/v1"
+MAX_BODY = 16 * 1024
+_KEY_IN_URL = re.compile(r"([?&]key=)[^&\s]+")
 
 # Понятный текст вместо кода поставщика.
 ERRORS: dict[str, str] = {
@@ -263,9 +267,11 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── ответы ──
     def _send(self, status: int, payload: dict) -> None:
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        # У 204 тела быть не должно — иначе клиент на keep-alive прочтёт мусор.
+        body = b"" if status == 204 else json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        if body:
+            self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         if self.service.settings.cors:
             self.send_header("Access-Control-Allow-Origin", "*")
@@ -274,7 +280,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, fmt: str, *args: Any) -> None:   # тише стандартного
-        log.info("%s %s", self.address_string(), fmt % args)
+        # Ключ из ?key=... в журнал не пишем.
+        log.info("%s %s", self._who(), _KEY_IN_URL.sub(r"\1***", fmt % args))
 
     # ── доступ ──
     def _authorized(self, query: dict[str, list[str]]) -> bool:
@@ -287,11 +294,19 @@ class Handler(BaseHTTPRequestHandler):
             given = auth[7:] if auth.lower().startswith("bearer ") else ""
         if not given:
             given = (query.get("key") or [""])[0]
-        return given == token
+        # Сравнение за постоянное время: ключ нельзя подобрать по задержке ответа.
+        return hmac.compare_digest(given.encode(), token.encode())
 
     def _who(self) -> str:
-        forwarded = (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
-        return forwarded or self.client_address[0]
+        # X-Forwarded-For верим только от своего же сервера (nginx перед сервисом).
+        # Иначе любой обходил бы лимит, подставляя в заголовок новый адрес.
+        peer = self.client_address[0]
+        headers = getattr(self, "headers", None)
+        if peer in ("127.0.0.1", "::1") and headers is not None:
+            forwarded = (headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+            if forwarded:
+                return forwarded
+        return peer
 
     # ── маршруты ──
     def do_OPTIONS(self) -> None:          # noqa: N802 — имя задано базовым классом
@@ -304,8 +319,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:             # noqa: N802
         parsed = urlparse(self.path)
-        length = int(self.headers.get("Content-Length") or 0)
-        raw = self.rfile.read(min(length, 64 * 1024)) if length > 0 else b""
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length < 0 or length > MAX_BODY:
+            # Недочитанное тело сломало бы следующий запрос в этом соединении.
+            self.close_connection = True
+            self._send(413, {"ok": False, "code": "bad_body", "error": "Тело запроса слишком большое"})
+            return
+        raw = self.rfile.read(length) if length else b""
         try:
             body = json.loads(raw.decode("utf-8") or "{}")
         except ValueError:

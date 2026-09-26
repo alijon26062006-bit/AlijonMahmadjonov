@@ -15,7 +15,10 @@ from ..db import (
     Database,
     NotEnoughMoney,
     ORDER_DONE,
+    ORDER_OPEN,
     ORDER_REJECTED,
+    REVIEW_PENDING,
+    TOPUP_WAITING,
 )
 from ..states import Admin
 from .common import notify_user, safe_edit
@@ -195,8 +198,23 @@ async def cb_order_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bot
     action = cb.data.split(":")[1]
     order_id = int(cb.data.rsplit(":", 1)[1])
     status = ORDER_DONE if action == "odone" else ORDER_REJECTED
+    before = db.order(order_id)
+    if before is None:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    if before["status"] not in ORDER_OPEN:
+        # Фармоиш аллакай баста шудааст (худкор ё админи дигар). Ҳолати
+        # анҷомёфта иваз намешавад ва харидор хабари дуюм намегирад.
+        await safe_edit(
+            cb,
+            texts.admin_order_card(before, db.user(before["user_id"]), cfg.currency)
+            + "\n\n<i>Ин фармоиш аллакай баста шудааст — ҳеҷ чиз иваз нашуд.</i>",
+            keyboards.admin_back(),
+        )
+        await cb.answer("Аллакай баста шудааст", show_alert=True)
+        return
     row = db.set_order_status(order_id, status)
-    if row is None:
+    if row is None or row["status"] != status:
         await cb.answer(texts.UNKNOWN, show_alert=True)
         return
     await safe_edit(
@@ -234,6 +252,21 @@ async def cb_topups(cb: CallbackQuery, db: Database, cfg: Config) -> None:
 async def cb_topup_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bot) -> None:
     action = cb.data.split(":")[1]
     topup_id = int(cb.data.rsplit(":", 1)[1])
+    before = db.topup(topup_id)
+    if before is None:
+        await cb.answer(texts.UNKNOWN, show_alert=True)
+        return
+    if before["status"] != TOPUP_WAITING:
+        # Дубора пахш шуд ё админи дигар аллакай ҳал кард. Бе ин санҷиш
+        # харидор паёми «ҳисоб пур шуд»-ро мегирифт, ҳарчанд пул наомада буд.
+        await safe_edit(
+            cb,
+            texts.admin_topup_card(before, db.user(before["user_id"]), cfg.currency)
+            + "\n\n<i>Ин пардохт аллакай ҳал шудааст — ҳеҷ чиз иваз нашуд.</i>",
+            keyboards.admin_back(),
+        )
+        await cb.answer("Аллакай ҳал шудааст", show_alert=True)
+        return
     if action == "tok":
         row = db.confirm_topup(topup_id, cb.from_user.id)
     else:
@@ -473,6 +506,10 @@ async def cb_del_partner_price(cb: CallbackQuery, db: Database, cfg: Config) -> 
 
 
 # ── шарҳҳо ────────────────────────────────────────────────────────────
+# Шарҳҳое, ки ҳоло нашр мешаванд — пахши дуюм дар ин вақт рад мешавад.
+_REVIEWS_BUSY: set[int] = set()
+
+
 @router.callback_query(F.data.startswith("a:revok:") | F.data.startswith("a:revno:"))
 async def cb_review_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bot) -> None:
     from ..db import REVIEW_PUBLISHED, REVIEW_REJECTED
@@ -484,6 +521,11 @@ async def cb_review_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bo
     if row is None:
         await cb.answer(texts.UNKNOWN, show_alert=True)
         return
+    if row["status"] != REVIEW_PENDING or review_id in _REVIEWS_BUSY:
+        # Дубора пахш шуд ё админи дигар аллакай ҳал кард — шарҳ дар канал
+        # набояд ду бор нашр шавад.
+        await cb.answer("Аллакай ҳал шудааст", show_alert=True)
+        return
 
     if action == "revno":
         db.set_review_status(review_id, REVIEW_REJECTED)
@@ -492,7 +534,13 @@ async def cb_review_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bo
         await cb.answer("❌")
         return
 
-    published, reason = await publish_review(bot, db, review_id)
+    _REVIEWS_BUSY.add(review_id)
+    try:
+        published, reason = await publish_review(bot, db, review_id)
+        if published:
+            db.set_review_status(review_id, REVIEW_PUBLISHED)
+    finally:
+        _REVIEWS_BUSY.discard(review_id)
     if not published:
         await cb.answer("⚠️", show_alert=False)
         await cb.message.answer(
@@ -500,7 +548,6 @@ async def cb_review_action(cb: CallbackQuery, db: Database, cfg: Config, bot: Bo
             "Канали шарҳҳоро дар панел гузоред ва ботро ба он админ кунед."
         )
         return
-    db.set_review_status(review_id, REVIEW_PUBLISHED)
     await safe_edit(cb, f"✅ Шарҳи #{review_id} нашр шуд.", keyboards.admin_back())
     await notify_user(bot, row["user_id"], texts.REVIEW_PUBLISHED_NOTE)
     await cb.answer("✅")
