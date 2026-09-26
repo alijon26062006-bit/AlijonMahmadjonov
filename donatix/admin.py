@@ -100,7 +100,7 @@ async def settings_save(request: Request, admin=Depends(admin_user), conn=Depend
     from . import sitecfg
     form = await request.form()
     data = {k: str(v) for k, v in form.items() if k != "csrf"}
-    for flag in ("reg_open", "client_bots", "require_approval", "watch_on"):
+    for flag in ("reg_open", "client_bots", "require_approval", "watch_on", "admin_2fa", "daily_report"):
         data[flag] = "1" if form.get(flag) == "1" else "0"
     try:
         sitecfg.save(conn, config, data)

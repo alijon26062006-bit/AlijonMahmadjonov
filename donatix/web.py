@@ -187,10 +187,57 @@ def login(request: Request, email: str = Form(""), password: str = Form(""), con
         return render(request, "login.html", {"form": {"email": email}, "error": "Неверный email или пароль."}, 400)
     if user["status"] == "blocked":
         return render(request, "login.html", {"form": {"email": email}, "error": "Аккаунт заблокирован."}, 403)
+    return _finish_login(request, conn, user)
+
+
+def _finish_login(request: Request, conn, user) -> RedirectResponse:
+    """Вход после пароля или Google. Админу — ещё код из админ-бота в Telegram (если включено)."""
+    from . import sitecfg
+    config = request.app.state.config
     request.session.clear()
+    if user["role"] == "admin" and sitecfg.admin_2fa_active(conn, config):
+        import hashlib
+        import secrets as _secrets
+        import time as _time
+
+        from .worker import notify_admin
+        code = f"{_secrets.randbelow(1_000_000):06d}"
+        request.session["pending_2fa"] = {"uid": user["id"], "exp": _time.time() + 300, "tries": 0,
+                                          "hash": hashlib.sha256(code.encode()).hexdigest()}
+        notify_admin(config, f"🔐 Код входа в админку: {code}\nДействует 5 минут. IP: {_ip(request)}. "
+                             "Если это не вы — смените пароль.")
+        return _redirect("/login/code")
     request.session["user_id"] = user["id"]
     _record_login(conn, request, user["id"])
     return _redirect("/admin" if user["role"] == "admin" else "/panel")
+
+
+@router.get("/login/code")
+def login_code_form(request: Request):
+    if not request.session.get("pending_2fa"):
+        return _redirect("/login")
+    return render(request, "login_code.html", {})
+
+
+@router.post("/login/code", dependencies=[Depends(check_csrf)])
+def login_code(request: Request, code: str = Form(""), conn=Depends(get_conn)):
+    import hashlib
+    import secrets as _secrets
+    import time as _time
+    pending = request.session.get("pending_2fa")
+    if not pending or _time.time() > pending["exp"] or pending["tries"] >= 5:
+        request.session.pop("pending_2fa", None)
+        flash(request, "Код устарел. Войдите ещё раз — пришлём новый.", "error")
+        return _redirect("/login")
+    pending["tries"] += 1
+    request.session["pending_2fa"] = pending
+    given = hashlib.sha256(code.strip().encode()).hexdigest()
+    if not _secrets.compare_digest(given, pending["hash"]):
+        return render(request, "login_code.html", {"error": "Неверный код."}, 400)
+    request.session.clear()
+    request.session["user_id"] = pending["uid"]
+    _record_login(conn, request, pending["uid"])
+    return _redirect("/admin")
 
 
 @router.get("/auth/google")
@@ -228,9 +275,6 @@ def google_callback(request: Request, code: str = "", state: str = "", error: st
     if user["status"] == "blocked":
         flash(request, "Аккаунт заблокирован.", "error")
         return _redirect("/login")
-    request.session.clear()
-    request.session["user_id"] = user["id"]
-    _record_login(conn, request, user["id"])
     if created:
         from .tgbot import user_event
         from .worker import notify_event
@@ -239,7 +283,11 @@ def google_callback(request: Request, code: str = "", state: str = "", error: st
             flash(request, "Аккаунт создан через Google. Мы проверим заявку и активируем доступ.")
         else:
             flash(request, "Добро пожаловать! Аккаунт создан через Google.")
-    return _redirect("/admin" if user["role"] == "admin" else "/panel")
+    notes = request.session.get("flash", [])
+    resp = _finish_login(request, conn, user)
+    if notes:
+        request.session["flash"] = notes  # сообщения о новом аккаунте переживают очистку сессии
+    return resp
 
 
 def _record_login(conn, request: Request, user_id: int) -> None:

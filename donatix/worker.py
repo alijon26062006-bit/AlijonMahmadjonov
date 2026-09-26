@@ -125,6 +125,11 @@ class Worker:
                     # Каталог грузится в своём потоке: сотни запросов не должны держать заказы и баланс
                     self._start_sync()
                     last_sync = now
+                try:
+                    from . import reports
+                    reports.maybe_send(conn, self.config)  # утренний отчёт в админ-бот
+                except Exception:
+                    log.exception("утренний отчёт")
                 if now - last_watch >= 3600 or last_watch == 0:
                     try:
                         from . import bot_watch

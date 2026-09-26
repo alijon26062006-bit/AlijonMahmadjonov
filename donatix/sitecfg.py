@@ -43,6 +43,12 @@ def max_bots(conn: sqlite3.Connection) -> int:
         return 3
 
 
+def admin_2fa_active(conn: sqlite3.Connection, config: Config) -> bool:
+    """Код из Telegram при входе в админку: включён в настройках и админ-бот подключён."""
+    on = (db.get_setting(conn, "site.admin_2fa") or "1") == "1"
+    return on and bool(config.alert_telegram_token and config.alert_telegram_chat_id)
+
+
 def max_bots_total(conn: sqlite3.Connection) -> int:
     """Сколько всего ботов может работать на сервере (0 — без предела)."""
     try:
@@ -95,6 +101,8 @@ def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
         "max_bots": max_bots(conn),
         "max_bots_total": max_bots_total(conn),
         "watch": _watch_rules(conn),
+        "admin_2fa": (db.get_setting(conn, "site.admin_2fa") or "1") == "1",
+        "daily_report": (db.get_setting(conn, "report.daily_on") or "1") == "1",
         "supplier_rate": _throttle_status(),
     }
 
@@ -132,7 +140,7 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
             values[f"markup.{kind}"] = _pct(data[f"markup_{kind}"], KIND_TITLES[kind], allow_empty=True)
     if "support" in data:
         values["site.support"] = str(data["support"]).strip()[:100]
-    for key in ("reg_open", "client_bots", "require_approval"):
+    for key in ("reg_open", "client_bots", "require_approval", "admin_2fa"):
         if key in data:
             values[f"site.{key}"] = "1" if data[key] in (True, "1", "on") else "0"
     if "supplier_rate" in data:
@@ -155,6 +163,8 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
             if not lo <= n <= hi:
                 raise SettingsError(f"{what} — от {lo} до {hi}.")
             values[("site." if key == "max_bots_total" else "bots.") + key] = str(n)
+    if "daily_report" in data:
+        values["report.daily_on"] = "1" if data["daily_report"] in (True, "1", "on") else "0"
     if "watch_on" in data:
         values["bots.watch_on"] = "1" if data["watch_on"] in (True, "1", "on") else "0"
     if "max_bots" in data:

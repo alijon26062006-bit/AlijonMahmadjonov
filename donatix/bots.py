@@ -321,6 +321,26 @@ class BotRunner:
             quick = time.time() - m.get("started_at", 0) < 60
             m["retry_at"] = time.time() + (min(300, 10 * 2 ** min(m["restarts"], 5)) if quick else 5)
         log.warning("боты: бот %s завершился с кодом %s", bot_id, code)
+        self._alert_crash(bot_id, code, m)
+
+    def _alert_crash(self, bot_id: int, code: int, meta: dict) -> None:
+        """Бот падает снова и снова — сказать админу (не чаще раза в час на бота)."""
+        if meta.get("restarts", 0) < 3 or time.time() - meta.get("alerted_at", 0) < 3600:
+            return
+        meta["alerted_at"] = time.time()
+        try:
+            conn = db.connect(self.config.db_path)
+            try:
+                row = conn.execute("SELECT b.username, u.login FROM bots b JOIN users u ON u.id = b.user_id "
+                                   "WHERE b.id = ?", (bot_id,)).fetchone()
+            finally:
+                conn.close()
+            from .worker import notify_admin
+            name = f"@{row['username']} (клиент {row['login']})" if row else f"#{bot_id}"
+            notify_admin(self.config, f"🔴 Бот {name} падает: код {code}, перезапусков {meta['restarts']}. "
+                                      f"Лог: {self.config.base_url}/admin/bots/{bot_id}/log")
+        except Exception:  # noqa: BLE001 — оповещение не должно ронять наблюдателя
+            log.exception("боты: не удалось оповестить о падении")
 
     def _kill(self, bot_id: int) -> None:
         p = self.procs.pop(bot_id, None)

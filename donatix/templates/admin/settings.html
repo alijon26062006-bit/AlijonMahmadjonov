@@ -63,6 +63,8 @@
 
   <div class="card">
     <h3>Админ-бот в Telegram</h3>
+    <label class="switch"><input type="checkbox" name="admin_2fa" value="1" {{ 'checked' if s.admin_2fa }}><span>Код из Telegram при входе в админку</span></label>
+    <label class="switch"><input type="checkbox" name="daily_report" value="1" {{ 'checked' if s.daily_report }}><span>Отчёт за вчера каждое утро в 9:00</span></label>
     {% if tg_on %}<p class="muted">Подключён. Откройте бота и нажмите /start — там меню со всеми разделами.</p>
     {% else %}<p class="muted">Не подключён. На сервере: <span class="mono">sudo bash /home/donatix/app/donatix/deploy/telegram.sh</span></p>{% endif %}
   </div>
