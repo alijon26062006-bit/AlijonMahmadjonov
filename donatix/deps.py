@@ -172,6 +172,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
         c = db.connect(config.db_path)
         try:
             ctx["unread"] = unread_count(c, ctx["user"]["id"])
+            from .popular import services as popular_services
+            ctx["popular"] = popular_services(c)
             low = db.get_setting(c, "pay.low_balance_usd") or str(config.low_balance_usd)
             ctx["low_balance_micro"] = int(float(low) * 10_000)
             if ctx["cur_code"] == "TJS":

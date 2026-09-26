@@ -990,18 +990,44 @@ html { scroll-behavior: smooth; }
   .qrow:hover, a.bal-tile:hover, .bal-btn:hover { transform: none; }
 }
 
-/* Раздел «Telegram»: две большие кнопки — Stars и Premium */
-.tg-pick { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 8px; }
-.tg-option { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--line);
-  border-radius: var(--r); background: var(--surface); color: var(--text); text-decoration: none; }
-.tg-option:hover { color: var(--text); text-decoration: none; border-color: var(--accent-line); }
-.tg-option .tile { width: 52px; height: 52px; flex: none; }
-.tg-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.tg-text b { font-size: 16px; }
-.tg-price { font-weight: 700; white-space: nowrap; }
-.tg-price small { font-weight: 500; }
-.tg-option .chev { flex: none; opacity: .5; }
+/* Раздел «Telegram»: вкладки Звёзды / Premium и карточки планов, как у FazerCards */
+.tg-tabs-card { padding: 8px; margin-bottom: 12px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: var(--r); background: var(--bg);
+  border: 1px solid var(--line); }
+.seg a { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 12px; border-radius: var(--r-sm);
+  color: var(--muted); font-weight: 600; text-decoration: none; }
+.seg a:hover { color: var(--text); text-decoration: none; }
+.seg a.on { background: var(--accent); color: #fff; box-shadow: 0 6px 16px -8px var(--accent); }
+.seg a.on .ico { color: #fff; }
+.tg-plans { display: grid; gap: 10px; margin-top: 12px; }
+.tg-plan { position: relative; display: grid; gap: 2px; padding: 14px 16px; border: 1.5px solid var(--line); border-radius: var(--r);
+  background: var(--surface); cursor: pointer; margin: 0; }
+.tg-plan input { position: absolute; opacity: 0; pointer-events: none; }
+.tg-plan .tp-name { font-weight: 700; font-size: 1.05rem; color: var(--text); }
+.tg-plan .tp-sub { color: var(--muted); font-size: .9rem; }
+.tg-plan .tp-price { margin-top: 8px; font: 700 1.05rem/1.2 "JetBrains Mono", ui-monospace, monospace; color: var(--text); }
+.tg-plan.on, .tg-plan:has(input:checked) { border-color: var(--accent); background: var(--accent-soft, var(--surface)); }
+.tg-plan:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (min-width: 720px) { .tg-plans { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: no-preference) {
-  .tg-option { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
-  .tg-option:hover { transform: translateY(-2px); box-shadow: 0 8px 24px -12px rgb(20 22 40 / .25); }
+  .seg a { transition: background .2s var(--ease-out), color .2s var(--ease-out); }
+  .tg-plan { transition: border-color .18s var(--ease-out), background .18s var(--ease-out), transform .18s var(--ease-out); }
+  .tg-plan:hover { transform: translateY(-1px); }
 }
+
+/* «Популярное» в меню: маленькая обложка игры вместо значка */
+.side a.nav-item.pop .pop-img { width: 22px; height: 22px; flex: none; border-radius: 6px; overflow: hidden; aspect-ratio: 1 / 1; }
+.side a.nav-item.pop .pop-img img { width: 100%; height: 100%; object-fit: cover; }
+.side a.nav-item.pop .pop-img .media-initials { font-size: 9px; }
+.side a.nav-item.pop .tile.pop-img { display: grid; place-items: center; }
+.side a.nav-item.pop .tile.pop-img .ico { width: 14px; height: 14px; }
+
+/* Главная: пункты под заголовком, «Популярное», шаги конструктора */
+.hero-points { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 6px; color: var(--muted); font-size: .95rem; }
+.hero-points li { display: flex; align-items: center; gap: 8px; }
+.hero-points .ico { color: var(--ok, var(--accent)); flex: none; }
+.pop-grid .pop-tile { display: grid; place-items: center; aspect-ratio: 1 / 1; }
+.con-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 520px) { .con-steps { grid-template-columns: 1fr; } }
+/* На телефоне пример API на главной не нужен — сразу «Популярное» и конструктор */
+@media (max-width: 640px) { .hero .window { display: none; } }

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% from "_icons.html" import icon, kind_icon %}
-{% block title %}{{ site_name }} — Telegram Stars, пополнения игр и Steam оптом{% endblock %}
+{% from "_icons.html" import icon, kind_icon, media %}
+{% block title %}{{ site_name }} — донат Free Fire, PUBG, Telegram Stars оптом и свой бот-магазин{% endblock %}
 {% block jsonld %}
 <script type="application/ld+json">{{ {
   "@context": "https://schema.org",
@@ -19,12 +19,17 @@
     {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
     <section class="hero">
       <div>
-        <h1>Telegram Stars, пополнения игр и&nbsp;Steam для&nbsp;вашего магазина</h1>
-        <p class="lead">API для ботов и сайтов. Заказы выполняются автоматически.</p>
+        <h1>Алмазы Free Fire, UC PUBG и&nbsp;Telegram Stars оптом</h1>
+        <p class="lead">{% if client_bots %}Откройте свой Telegram-бот-магазин за 5 минут без программиста — или подключите сайт по API.{% else %}Для ботов, сайтов и магазинов. Заказы выполняются автоматически.{% endif %}</p>
         <div class="cta">
-          <a class="btn primary lg" href="/register">Подать заявку</a>
-          <a class="btn lg" href="/docs">Документация API</a>
+          <a class="btn primary lg" href="/register">{{ 'Создать своего бота' if client_bots else 'Подать заявку' }}</a>
+          <a class="btn lg" href="{{ '#constructor' if client_bots else '/docs' }}">{{ 'Как это работает' if client_bots else 'Документация API' }}</a>
         </div>
+        <ul class="hero-points">
+          <li>{{ icon('check', 16) }}Выполнение за секунды, 24/7</li>
+          <li>{{ icon('check', 16) }}Пополнение любой суммой: Алиф, DC, USDT</li>
+          <li>{{ icon('check', 16) }}Не выполнился заказ — деньги сразу на баланс</li>
+        </ul>
       </div>
       <div class="window" aria-label="Пример заказа через API">
         <div class="chrome"><span class="url mono">POST /api/v1/orders</span><span class="badge ok">201</span></div>
@@ -52,6 +57,53 @@
       </div>
     </section>
   </div>
+
+  {% if popular %}
+  <section class="section" data-reveal id="popular">
+    <div class="wrap">
+      <div class="section-head"><h2>Популярное</h2><p>Чаще всего покупают</p></div>
+      <div class="grid games pop-grid">
+        {% for s in popular %}
+        <a class="game-card" href="{{ s.href if user else '/register' }}">
+          {% if s.image_url %}{{ media(s.image_url, s.title, s.kind) }}{% else %}<div class="media k-{{ s.kind }} pop-tile">{{ kind_icon(s.kind, 34) }}</div>{% endif %}
+          <div class="game-name">{{ s.title }}</div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if client_bots %}
+  <section class="section" data-reveal id="constructor">
+    <div class="wrap grid two" style="align-items:center;gap:32px">
+      <div>
+        <span class="badge accent">Конструктор ботов</span>
+        <h2 style="margin-top:10px">Свой бот-магазин доната в Telegram</h2>
+        <p class="lead" style="font-size:1.05rem">Клиенты покупают у вас — заказы выполняются автоматически, а наценку вы ставите сами.</p>
+        <ul class="checks">
+          <li>{{ icon('check', 16) }}<span>Готовые игры сразу: Free Fire СНГ и Индонезия, PUBG Mobile</span></li>
+          <li>{{ icon('check', 16) }}<span>Своя наценка — цены в боте поднимаются автоматически</span></li>
+          <li>{{ icon('check', 16) }}<span>Оплата на ваши реквизиты: карта, Душанбе Сити, USDT</span></li>
+          <li>{{ icon('check', 16) }}<span>Ваш контакт поддержки, ваши клиенты и их история</span></li>
+          <li>{{ icon('check', 16) }}<span>Обязательная подписка на канал и канал отзывов</span></li>
+          <li>{{ icon('check', 16) }}<span>Подключение бесплатно — без программиста</span></li>
+        </ul>
+        <a class="btn primary lg" href="/register">Создать бота бесплатно</a>
+      </div>
+      <div class="grid steps con-steps">
+        {% for t, d in [
+          ('Регистрация', 'Аккаунт на Donatix за минуту'),
+          ('Бот в @BotFather', 'Создайте бота и скопируйте токен'),
+          ('Вставьте токен', 'В кабинете: «Мой Telegram-бот»'),
+          ('Продавайте', 'Реквизиты, наценка — и бот готов'),
+        ] %}
+        <div class="card feature"><div class="num">{{ loop.index }}</div><h3>{{ t }}</h3><p>{{ d }}</p></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
 
   <section class="section" data-reveal id="catalog">
     <div class="wrap">
@@ -155,9 +207,9 @@ print(r.json()["order"]["status"])</pre>
   <section class="section" data-reveal>
     <div class="wrap">
       <div class="card cta-card">
-        <h2>Подключить свой проект</h2>
+        <h2>{{ 'Запустите свой бот-магазин сегодня' if client_bots else 'Подключить свой проект' }}</h2>
         {% if support_contact %}<p class="muted">Вопросы — {{ support_contact }}</p>{% endif %}
-        <a class="btn primary lg" href="/register">Подать заявку</a>
+        <a class="btn primary lg" href="/register">{{ 'Создать бота бесплатно' if client_bots else 'Подать заявку' }}</a>
       </div>
     </div>
   </section>

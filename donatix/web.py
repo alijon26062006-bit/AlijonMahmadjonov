@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
 
-from . import accounts, cache, catalog, db, orders
+from . import accounts, cache, catalog, db, orders, popular, sitecfg
 from .config import PAY_METHODS, Config
 from .deps import INDEXABLE, LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
 from .money import apply_markup, fmt, order_total_micro, to_decimal
@@ -48,14 +49,34 @@ def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
         "total_products": total,
         "markups": config.markups,
         "examples": examples,
-        "faq": FAQ,
+        "faq": FAQ + (BOT_FAQ if sitecfg.client_bots_enabled(conn) else []),
+        "popular": popular.services(conn),
+        "client_bots": sitecfg.client_bots_enabled(conn),
     })
 
 
 FAQ = [
     ("Что если заказ не выполнится?", "Деньги сразу вернутся на баланс."),
-    ("Нужен ли программист?", "Нет, заказывать можно вручную в панели."),
+    ("Нужен ли программист?", "Нет. Заказывать можно вручную в панели, а свой Telegram-бот собирается "
+                              "в конструкторе без кода."),
     ("Как быстро выполняются заказы?", "Обычно за несколько секунд."),
+    ("Как пополнить баланс?", "Картами Алиф, Душанбе Сити, Эсхата или криптовалютой USDT (TRC20, BEP20) — "
+                              "на любую сумму."),
+]
+
+BOT_FAQ = [
+    ("Что такое конструктор ботов?", "Это ваш собственный Telegram-бот-магазин. Клиенты покупают у вас алмазы "
+                                     "Free Fire, UC для PUBG Mobile, Telegram Stars и Premium, а заказы "
+                                     "выполняются автоматически с вашего баланса Donatix."),
+    ("Сколько стоит конструктор?", "Подключение бесплатное. Вы платите только за проданные товары по нашей "
+                                   "цене, а наценку в боте ставите сами — разница ваш заработок."),
+    ("Как создать своего бота?", "Зарегистрируйтесь, откройте в кабинете «Мой Telegram-бот», создайте бота "
+                                 "в @BotFather и вставьте его токен. Бот запустится сразу с готовыми играми: "
+                                 "Free Fire СНГ и Индонезия, PUBG Mobile."),
+    ("Как клиенты платят в моём боте?", "На ваши реквизиты: карта, Душанбе Сити, USDT. Вы подтверждаете оплату "
+                                        "в боте, и баланс клиента пополняется. Контакт поддержки тоже ваш."),
+    ("Что будет, если в боте нет продаж?", "Если продаж долго нет, бот трижды предупредит вас, а потом "
+                                           "отключится. Включить его снова можно в кабинете в один клик."),
 ]
 
 
@@ -123,7 +144,7 @@ def docs(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
 
 @router.get("/register")
 def register_form(request: Request, conn=Depends(get_conn)):
-    from . import sitecfg
+
     if session_user(request, conn):
         return _redirect("/panel")
     return render(request, "register.html", {"form": {}, "closed": not sitecfg.registration_open(conn)})
@@ -140,7 +161,7 @@ def register(
     conn=Depends(get_conn),
     config: Config = Depends(get_config),
 ):
-    from . import sitecfg
+
     form = {"email": email, "login": login, "project": project}
     if not sitecfg.registration_open(conn):
         return render(request, "register.html", {"form": form, "closed": True,
@@ -192,7 +213,7 @@ def login(request: Request, email: str = Form(""), password: str = Form(""), con
 
 def _finish_login(request: Request, conn, user) -> RedirectResponse:
     """Вход после пароля или Google. Админу — ещё код из админ-бота в Telegram (если включено)."""
-    from . import sitecfg
+
     config = request.app.state.config
     request.session.clear()
     if user["role"] == "admin" and sitecfg.admin_2fa_active(conn, config):
@@ -365,7 +386,10 @@ def panel_catalog(
     user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config),
 ):
     if kind == "telegram":
-        return render(request, "panel/telegram.html", {"user": user, "options": _telegram_options(conn, config, user)})
+        return render(request, "panel/telegram.html",
+                      _telegram_ctx(conn, config, user, request.query_params.get("tab", "")))
+    if kind in ("telegram_stars", "telegram_premium") and not q:
+        return _redirect("/panel/catalog?kind=telegram" + ("&tab=premium" if kind == "telegram_premium" else ""))
     kind = kind if kind in KINDS else ""
     q = q[:100]
     if kind in _BY_GAME and not category:
@@ -396,18 +420,50 @@ def panel_catalog(
     })
 
 
-def _telegram_options(conn, config: Config, user) -> list[dict]:
-    """Раздел «Telegram»: звёзды и Premium — две кнопки, внутри каждой свои цены."""
-    out = []
-    for kind, title, note in (("telegram_stars", "Telegram Stars", "Звёзды на любой аккаунт по @username"),
-                              ("telegram_premium", "Telegram Premium", "Подписка на 3, 6 или 12 месяцев")):
-        items = [catalog.public_view(p, accounts.markup_for(user, config, kind))
-                 for p in catalog.list_products(conn, kind=kind)]
-        cheapest = min(items, key=lambda i: to_decimal(i["price_usd"]), default=None)
-        out.append({"kind": kind, "title": title, "note": note, "count": len(items),
-                    "from_price": cheapest["price_usd"] if cheapest else None,
-                    "per_star": bool(cheapest and cheapest["unit"] == "star")})
-    return out
+async def _form(request: Request) -> dict[str, str]:
+    return {k: str(v) for k, v in (await request.form()).items()}
+
+
+def _telegram_ctx(conn, config: Config, user, tab: str, **extra) -> dict:
+    """Одна страница «Telegram», как у FazerCards: вкладки Звёзды / Premium, получатель, пакет."""
+    def view(kind: str) -> list[dict]:
+        markup = accounts.markup_for(user, config, kind)
+        return [catalog.public_view(p, markup) for p in catalog.list_products(conn, kind=kind)]
+    stars = next(iter(view("telegram_stars")), None)
+    plans = sorted(view("telegram_premium"), key=lambda p: to_decimal(p["price_usd"]))
+    for pl in plans:
+        m = re.search(r"(\d+)", pl["name"])
+        n = int(m.group(1)) if m else 0
+        word = "месяц" if n % 10 == 1 and n % 100 != 11 else (
+            "месяца" if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else "месяцев")
+        pl["plan_title"] = f"{n} {word}" if n else pl["name"]
+    tab = "premium" if tab == "premium" or (not stars and plans) else "stars"
+    return {"user": user, "tab": tab, "stars": stars, "plans": plans, "idem": str(uuid.uuid4()), "form": {},
+            "error": None, **extra}
+
+
+@router.post("/panel/telegram", dependencies=[Depends(check_csrf)])
+def panel_telegram_buy(request: Request, form: dict = Depends(_form), user=Depends(panel_user),
+                       conn=Depends(get_conn), config: Config = Depends(get_config)):
+    p = catalog.get_product(conn, str(form.get("product_id", "")))
+    tab = "premium" if p and p["kind"] == "telegram_premium" else "stars"
+    username = str(form.get("field_telegram_username", "")).strip()
+    if p is None or p["kind"] not in ("telegram_stars", "telegram_premium"):
+        error = "Выберите план Premium." if form.get("tab") == "premium" else "Товар недоступен."
+        return render(request, "panel/telegram.html", _telegram_ctx(
+            conn, config, user, str(form.get("tab", "")), error=error, form={"telegram_username": username}), 400)
+    try:
+        order, _ = orders.create_order(
+            conn, config, request.app.state.supplier, user, product_id=p["id"],
+            quantity=form.get("quantity", 1) if tab == "stars" else 1,
+            fields={f["key"]: username for f in p["fields"]},
+            client_idem_key="panel-" + str(form.get("idem", ""))[:64], source="panel",
+        )
+    except orders.OrderError as exc:
+        return render(request, "panel/telegram.html", _telegram_ctx(
+            conn, config, accounts.get_user(conn, user["id"]), tab, error=str(exc),
+            form={"telegram_username": username, "quantity": form.get("quantity", ""), "product_id": p["id"]}), 400)
+    return _redirect(f"/panel/orders/{order['public_id']}")
 
 
 @router.get("/panel/buy/{product_id}")
@@ -417,6 +473,8 @@ def panel_buy_form(product_id: str, request: Request, user=Depends(panel_user), 
     if p is None:
         flash(request, "Товар недоступен.", "error")
         return _redirect("/panel/catalog")
+    if p["kind"] in ("telegram_stars", "telegram_premium"):
+        return _redirect("/panel/catalog?kind=telegram" + ("&tab=premium" if p["kind"] == "telegram_premium" else ""))
     form = {k[6:]: v[:100] for k, v in request.query_params.items() if k.startswith("field_")}
     return render(request, "panel/buy.html", _buy_ctx(request, conn, config, user, p, form=form))
 
@@ -433,10 +491,6 @@ def _buy_ctx(request: Request, conn, config: Config, user, p: dict, **extra) -> 
         "user": user, "p": catalog.public_view(p, markup), "siblings": siblings, "idem": str(uuid.uuid4()),
         "can_check": account_check.can_check(request.app.state.supplier, p), "form": {}, **extra,
     }
-
-
-async def _form(request: Request) -> dict[str, str]:
-    return {k: str(v) for k, v in (await request.form()).items()}
 
 
 @router.post("/panel/buy/{product_id}", dependencies=[Depends(check_csrf)])
