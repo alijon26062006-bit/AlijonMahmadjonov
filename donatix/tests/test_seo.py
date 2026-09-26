@@ -57,5 +57,6 @@ def test_search_console_verification_tag(client, app):
 
 def test_legal_pages(client):
     assert "Политика конфиденциальности" in client.get("/privacy").text
-    assert "Условия использования" in client.get("/terms").text
+    terms = client.get("/terms").text
+    assert "Пользовательское соглашение" in terms and "Коротко о главном" in terms and "Возвраты" in terms
     assert 'href="/privacy"' in client.get("/").text

@@ -1031,3 +1031,27 @@ html { scroll-behavior: smooth; }
 @media (max-width: 520px) { .con-steps { grid-template-columns: 1fr; } }
 /* На телефоне пример API на главной не нужен — сразу «Популярное» и конструктор */
 @media (max-width: 640px) { .hero .window { display: none; } }
+
+/* Соглашение и политика: короткая выжимка, оглавление, таблица возвратов */
+.legal h2 { margin-top: 32px; scroll-margin-top: 80px; }
+.legal li { margin: 6px 0; line-height: 1.6; }
+.legal p { line-height: 1.65; }
+.legal-short { margin: 20px 0; background: var(--accent-soft); border-color: var(--accent-line); }
+.legal-short h2 { margin-top: 0; }
+.legal-short .checks li { align-items: flex-start; }
+.legal-short .checks .ico { margin-top: 4px; flex: none; }
+.legal-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.legal-toc a { padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: .9rem; color: var(--text);
+  background: var(--surface); text-decoration: none; }
+.legal-toc a:hover { border-color: var(--accent-line); color: var(--accent); }
+.legal-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: .95rem; }
+.legal-table th, .legal-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.legal-table th { color: var(--muted); font-weight: 600; }
+@media (max-width: 520px) {
+  .legal-table, .legal-table tbody, .legal-table tr, .legal-table td { display: block; width: 100%; }
+  .legal-table tr:first-child { display: none; }
+  .legal-table tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .legal-table td { border: 0; padding: 2px 0; }
+  .legal-table td:first-child { font-weight: 600; }
+}
+.legal-short .checks .ico.warn-ico { color: var(--warn, #d97706); }
