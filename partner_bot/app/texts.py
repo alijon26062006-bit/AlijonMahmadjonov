@@ -512,6 +512,41 @@ _RAW["DEPOSIT_WAITING"] = (
     "фиристед — дастӣ ҳал мекунем.</blockquote>"
 )
 
+# Боты без юзербота (из конструктора): платёж проверяет владелец по чеку.
+# Там нельзя обещать «баланс пополнится сам» и «чек не нужен» — клиент
+# поверит, чек не пришлёт, и заявка повиснет. Эти тексты подставляются
+# вместо обычных сами (см. __getattr__).
+_RAW["DEPOSIT_REQUISITES_MANUAL"] = (
+    "[[deposit]] <b>{amount} гузаронед</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "<code>{card}</code>\n"
+    "{holder}{bank}"
+    "{extra}"
+    "<blockquote>[[warn]] Маблағ — <b>маҳз {amount}</b>.\n"
+    "Пас аз пардохт «Ман пардохт кардам»-ро пахш кунед.\n{dc_block}</blockquote>\n\n"
+    "<i>[[ok]] Пардохтро месанҷем ва балансро пур мекунем</i>"
+)
+
+_RAW["DEPOSIT_WAITING_MANUAL"] = (
+    "[[wait]] <b>Скриншоти чекро фиристед</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "Барои пуркунии <b>{amount}</b> акс ё скриншоти чекро ҳамин ҷо "
+    "фиристед.\n\n"
+    "<blockquote>[[ok]] Чекро месанҷем ва балансро пур мекунем — ҳамин ки "
+    "шуд, менависам.</blockquote>"
+)
+
+_RAW["DEPOSIT_ALREADY_MANUAL"] = (
+    "[[warn]] <b>Шумо аллакай дархост доред</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Маблағ: <b>{amount}</b>\n"
+    "├ Тарз: {method}\n"
+    "└ Кушода шуд: {when}\n\n"
+    "<blockquote>Агар пардохт карда бошед — «Чек фиристодан»-ро пахш кунед "
+    "ва скриншоти чекро фиристед. Агар не — дархостро бекор кунед ва "
+    "навашро кушоед.</blockquote>"
+)
+
 _RAW["DEPOSIT_NEED_PHOTO"] = (
     "📸 Агар баланс худаш пур нашуда бошад — <b>акс ё скриншоти</b> чекро "
     "фиристед. Аз рӯи матн пардохтро санҷидан мумкин нест."
@@ -939,8 +974,15 @@ def money_stats(data: dict) -> str:
     )
 
 
+_MANUAL = ("DEPOSIT_REQUISITES", "DEPOSIT_WAITING", "DEPOSIT_ALREADY")
+
+
 def __getattr__(name: str) -> str:
     """Отдать шаблон с уже подставленными значками."""
+    if name in _MANUAL:
+        from app.config import settings
+        if not settings.userbot_ready:
+            name += "_MANUAL"
     try:
         return substitute(_RAW[name])
     except KeyError:

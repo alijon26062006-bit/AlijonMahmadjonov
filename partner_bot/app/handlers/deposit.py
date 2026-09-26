@@ -384,42 +384,62 @@ def _requisites(amount: int, reference: str, method: dict | None = None) -> tupl
     return body, keyboards.deposit_pay(link, digits if len(digits) >= 8 else "")
 
 
-@router.callback_query(Deposit.receipt, F.data == "dep:paid")
+async def _restore(call: CallbackQuery, state: FSMContext, conn) -> dict | None:
+    """Данные заявки для шага чека.
+
+    Обычно они в состоянии. Но экран «У вас уже есть заявка» состояние
+    очищает, да и после перезапуска бота его может не быть — а кнопка
+    «Чек фиристодан» на экране остаётся. Тогда берём открытую заявку из базы,
+    иначе нажатие упиралось в «экран устарел».
+    """
+    data = await state.get_data()
+    if data.get("amount"):
+        return data
+    open_one = await db.open_deposit_of(conn, call.from_user.id)
+    if open_one is None:
+        await state.clear()
+        await call.answer("Дархост гум шуд, аз нав сар кунед.", show_alert=True)
+        return None
+    pm = next((m["id"] for m in paymethods.all_methods()
+               if open_one.method == f"Перевод · {m['bank']}"), "")
+    await state.set_state(Deposit.receipt)
+    await state.update_data(amount=open_one.amount, reference=open_one.reference or "",
+                            deposit_id=open_one.id, pm=pm)
+    return await state.get_data()
+
+
+@router.callback_query(F.data == "dep:paid")
 async def cb_paid(
     call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
 ) -> None:
-    """«Я оплатил».
+    """«Я оплатил» / «Чек фиристодан».
 
     Постоянному клиенту чек не нужен вовсе: его плательщика мы уже знаем
     по прошлым переводам и узнаем этот. Просить у него скриншот каждый
     раз — работа без пользы.
     """
-    data = await state.get_data()
-    amount = data.get("amount")
-    if not amount:
-        await state.clear()
-        await call.answer("Дархост гум шуд, аз нав сар кунед.", show_alert=True)
+    data = await _restore(call, state, conn)
+    if data is None:
         return
 
     await call.message.edit_text(
-        texts.DEPOSIT_WAITING.format(amount=fmt(amount)),
+        texts.DEPOSIT_WAITING.format(amount=fmt(data["amount"])),
         reply_markup=keyboards.deposit_receipt(),
     )
     await call.answer()
 
 
-@router.callback_query(Deposit.receipt, F.data == "dep:back")
+@router.callback_query(F.data == "dep:back")
 async def cb_back_to_requisites(
     call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
 ) -> None:
     """Вернуться к реквизитам: клиент мог закрыть банк, не заплатив."""
-    data = await state.get_data()
-    amount, reference = data.get("amount"), data.get("reference", "")
-    if not amount:
-        await state.clear()
-        await call.answer("Дархост гум шуд, аз нав сар кунед.", show_alert=True)
+    data = await _restore(call, state, conn)
+    if data is None:
         return
-    body, markup = _requisites(amount, reference)
+    # Реквизиты — того банка, который выбрал покупатель, а не первые попавшиеся
+    body, markup = _requisites(data["amount"], data.get("reference", ""),
+                               paymethods.get(data.get("pm") or ""))
     await call.message.edit_text(body, reply_markup=markup)
     if data.get("deposit_id"):
         await _remember_screen(conn, data["deposit_id"], call.message)
