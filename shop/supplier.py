@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 log = logging.getLogger(__name__)
@@ -63,6 +63,8 @@ class OrderResult:
     # Ҷавоб наомад (шабака, таймаут, 5xx): фармоиш шояд ҚАБУЛ ШУДА бошад.
     # Дар ин ҳолат пулро худкор баргардонидан мумкин нест — аввал месанҷем.
     uncertain: bool = False
+    # Ҷавоби хоми таъминкунанда — то санҷем, ки фармоиш ҳамон аст, на бегона.
+    details: dict = field(default_factory=dict, compare=False)
 
 
 class Supplier(Protocol):
@@ -220,6 +222,7 @@ class FireLootSupplier:
                     ok=True,
                     external_id=str(external) if external else None,
                     status=data.get("status"),
+                    details=data,
                 )
             message, code = self._error(data, status, ORDER_ERRORS)
             # 5xx ё ҷавоби бе коди хато — сервер шояд фармоишро аллакай сабт кардааст.
@@ -239,7 +242,8 @@ class FireLootSupplier:
             status, data = await self._request("GET", path)
             if status == 200:
                 return OrderResult(
-                    ok=True, external_id=str(external_id), status=data.get("status")
+                    ok=True, external_id=str(external_id), status=data.get("status"),
+                    details=data,
                 )
             message, code = self._error(data, status, ORDER_ERRORS)
             return OrderResult(ok=False, error=message, code=code)

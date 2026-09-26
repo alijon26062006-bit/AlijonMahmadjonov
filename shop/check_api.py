@@ -5,6 +5,7 @@
     bash check_api.sh --ff-id 123456789        + Free Fire Индонезия
     bash check_api.sh --pubg 5123456789        + PUBG Mobile
     bash check_api.sh --tg alijon              + Telegram Stars по username
+    bash check_api.sh --orders                 последние заказы: бот против поставщика
 
 Заказы НЕ создаются — только запросы на чтение, денег не тратит.
 """
@@ -122,8 +123,12 @@ def show_catalog(live: dict, db: Database) -> None:
     print(f"   Одну игру:   grep '^.mlbb' {out}")
 
 
+WANT_ORDERS = False
+
+
 def parse_args(argv: list[str]) -> tuple[dict[str, str], str | None, bool]:
-    """--ff-cis 123 --pubg 456 --tg name --catalog → (игроки, username, каталог)"""
+    """--ff-cis 123 --pubg 456 --tg name --catalog --orders → (игроки, username, каталог)"""
+    global WANT_ORDERS
     players: dict[str, str] = {}
     username: str | None = None
     want_catalog = False
@@ -133,6 +138,10 @@ def parse_args(argv: list[str]) -> tuple[dict[str, str], str | None, bool]:
         value = argv[i + 1] if i + 1 < len(argv) else None
         if flag in ("--catalog", "--all", "--list"):
             want_catalog = True
+            i += 1
+            continue
+        if flag in ("--orders", "--zakaz"):
+            WANT_ORDERS = True
             i += 1
             continue
         if flag in ARG_TO_CATEGORY and value:
@@ -298,6 +307,47 @@ async def check_donatix(cfg, db: Database, username: str | None) -> bool:
         await dx.close()
 
 
+async def check_orders(cfg, db: Database, limit: int = 15) -> None:
+    """Последние заказы: что записал бот и что на самом деле говорит поставщик."""
+    from .main import build_shop_supplier
+
+    head(f"Последние {limit} заказов — бот и поставщик")
+    rows = db._all("SELECT * FROM orders ORDER BY id DESC LIMIT ?", (limit,))
+    if not rows:
+        warn("Заказов нет.")
+        return
+    router = build_shop_supplier(cfg, db)
+    try:
+        for row in rows:
+            ref = row["supplier_ref"] or str(row["id"])
+            print(
+                f"\n{B}#{row['id']}{E} {row['created_at'][:16].replace('T', ' ')}  "
+                f"{row['title']}  → {row['target']}\n"
+                f"   бот: {B}{row['status']}{E}  kind={row['kind']}  "
+                f"наш номер у поставщика: {ref}  номер поставщика: {row['external_id'] or '—'}"
+            )
+            if row["note"]:
+                print(f"   заметка: {row['note']}")
+            sup = router.for_kind(row["kind"] or "game", row["sku"] or "")
+            if sup is None:
+                print("   поставщик: — (ручной заказ)")
+                continue
+            if row["external_id"]:
+                res = await sup.order_status(row["external_id"])
+            else:
+                res = await sup.order_status(ref, by_external=True)
+            if res.ok:
+                print(f"   {sup.name}: {B}{res.status}{E}  {res.details}")
+                if row["status"] == "done" and res.status != "completed":
+                    bad("   БОТ СЧИТАЕТ ВЫПОЛНЕННЫМ, А У ПОСТАВЩИКА НЕТ!")
+            else:
+                print(f"   {sup.name}: не найден ({res.error})")
+                if row["status"] == "done":
+                    bad("   БОТ СЧИТАЕТ ВЫПОЛНЕННЫМ, А У ПОСТАВЩИКА ЗАКАЗА НЕТ!")
+    finally:
+        await router.close()
+
+
 async def run(argv: list[str]) -> int:
     players, username, want_catalog = parse_args(argv)
 
@@ -315,6 +365,13 @@ async def run(argv: list[str]) -> int:
         return 1
 
     db = Database(cfg.db_path)
+    if WANT_ORDERS:
+        try:
+            await check_orders(cfg, db)
+            print("\nЗаказы не создавались — только чтение.")
+            return 0
+        finally:
+            db.close()
     if not cfg.has_supplier:
         try:
             return 0 if await check_donatix(cfg, db, username) else 1

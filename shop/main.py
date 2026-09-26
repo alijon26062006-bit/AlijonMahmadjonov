@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import secrets
 import sys
 
 from aiogram import Bot, Dispatcher
@@ -41,21 +40,15 @@ ADMIN_COMMANDS = COMMANDS + [
 ]
 
 
-ORDER_KEY_PREFIX = "order_key_prefix"
-
-
 def build_shop_supplier(cfg: Config, db: Database) -> RouterSupplier:
     """FireLoot барои бозиҳо, Donatix барои Stars ва Premium (агар калид бошад)."""
     main = build_supplier(cfg.supplier, cfg.supplier_url, cfg.supplier_key)
     telegram = None
     if cfg.has_donatix:
-        # Пешванди калиди такрор барои ҳамин база. Бе он пас аз базаи нав
-        # фармоиши №1 бо калиди фармоиши кӯҳнаи №1 мехӯрд.
-        prefix = db.setting(ORDER_KEY_PREFIX)
-        if not prefix:
-            prefix = "almaz-" + secrets.token_hex(4)
-            db.set_setting(ORDER_KEY_PREFIX, prefix)
-        telegram = DonatixSupplier(cfg.donatix_key, cfg.donatix_url, key_prefix=prefix)
+        # Рақами фармоиш аллакай беҳамтост (пешванди база + рақам), ниг. fulfillment.
+        telegram = DonatixSupplier(
+            cfg.donatix_key, cfg.donatix_url, key_prefix=db.order_key_prefix()
+        )
     return RouterSupplier(main, telegram)
 
 

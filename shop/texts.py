@@ -247,13 +247,15 @@ def not_enough(price: int, balance: int, currency: str = CURRENCY) -> str:
 
 def order_created(order_id: int, title: str, target: str, price: int, currency: str = CURRENCY) -> str:
     return (
-        "✅ <b>Фармоиш қабул шуд!</b>\n\n"
+        # Ин ҳанӯз чек нест: мол ҳоло харида нашудааст. Чек танҳо пас аз
+        # тасдиқи таъминкунанда меояд.
+        "🕐 <b>Фармоиш сабт шуд — ҳанӯз иҷро нашудааст.</b>\n\n"
         f"🧾 Рақами фармоиш: <code>#{order_id}</code>\n"
         f"📦 Мол: <b>{esc(title)}</b>\n"
         f"🎯 Гиранда: <code>{esc(target)}</code>\n"
         f"💰 Пардохт: {money(price, currency)}\n\n"
-        "⏳ <b>Фармоиш ба коркард рафт.</b>\n"
-        "Каме сабр кунед — натиҷаро ҳамин ҷо менависем."
+        "⏳ <b>Фармоиш ба таъминкунанда фиристода мешавад.</b>\n"
+        "Вақте мол воқеан расид, чеки харид ҳамин ҷо меояд."
     )
 
 

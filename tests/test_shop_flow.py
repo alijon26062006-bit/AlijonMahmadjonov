@@ -312,7 +312,8 @@ async def test_successful_purchase_creates_order_and_takes_money(db, cfg, state,
     cb = FakeCallback(keyboards.CB_BUY_OK)
     await buy_h.cb_buy(cb, state, db, cfg, bot, ManualSupplier())
 
-    assert "Фармоиш қабул шуд" in cb.message.last
+    assert "Фармоиш сабт шуд" in cb.message.last
+    assert "ЧЕКИ ХАРИД" not in cb.message.last          # ин ҳанӯз чек нест
     orders = db.user_orders(USER_ID)
     assert len(orders) == 1
     assert orders[0]["target"] == "@Alijon_26"
@@ -594,7 +595,8 @@ async def test_supplier_gets_right_sku_and_amount(db, cfg_api, bot):
     await deliver_order(bot, db, cfg_api, supplier, order_id)
     kind, sku, target, amount, ext = supplier.calls[0]
     assert (kind, sku, target, amount) == ("game", "pubg_uc_660", "123456789", 660)
-    assert ext == str(order_id)
+    # Рақам беҳамто: пешванди база + рақами фармоиш, на танҳо «283».
+    assert ext == db.order(order_id)["supplier_ref"] == f"{db.order_key_prefix()}-{order_id}"
 
 
 async def test_rejected_order_is_refunded_at_once(db, cfg_api, bot):
@@ -1481,7 +1483,7 @@ async def test_timeout_but_order_exists_is_delivered_not_refunded(db, cfg_api, b
     assert db.order(order_id)["status"] == ORDER_DONE
     assert db.user(USER_ID).balance == 20000 - 9370      # пул барнагашт
     assert "баргардонида шуд" not in bot.to(USER_ID)
-    assert supplier.lookups == [str(order_id)]
+    assert supplier.lookups == [db.order(order_id)["supplier_ref"]]
 
 
 async def test_timeout_and_order_absent_is_refunded(db, cfg_api, bot, no_wait):
@@ -1877,3 +1879,119 @@ def test_family_with_huge_prefix_is_not_offered(db):
     live = {"x" * 40: {}, "ab_1": {}}
     families = [fam for fam, _, _ in st.new_families(live, db)]
     assert families == ["ab"]
+
+
+# ══ Чеки бардурӯғ: таъминкунанда фармоиши бегонаро баргардонд ══════════
+async def test_order_numbers_are_unique_per_database(tmp_path):
+    """Ду база (сервери кӯҳна ва нав) рақами якхела ба таъминкунанда намефиристанд."""
+    first, second = Database(tmp_path / "a.sqlite3"), Database(tmp_path / "b.sqlite3")
+    try:
+        assert first.order_key_prefix() != second.order_key_prefix()
+        assert first.order_key_prefix() == first.order_key_prefix()      # доимӣ
+    finally:
+        first.close()
+        second.close()
+
+
+async def test_duplicate_that_is_someone_elses_order_gives_no_receipt(db, cfg_api, bot, no_wait):
+    """Таъминкунанда «duplicate» гуфт ва фармоиши кӯҳнаи БЕГОНА (completed)-ро
+    нишон дод — чек намеравад, пул намегардад, админ медонад."""
+    order_id = _paid_order(db)
+    foreign = OrderResult(
+        ok=True, external_id="283", status="completed",
+        details={"external_id": "283", "sku": "pubg_uc_60", "uid": "999999999", "status": "completed"},
+    )
+    supplier = LookupSupplier(
+        place=OrderResult(ok=False, code="duplicate_order", error="dup", uncertain=True),
+        lookup=foreign,
+    )
+    await deliver_order(bot, db, cfg_api, supplier, order_id)
+
+    assert db.order(order_id)["status"] == ORDER_SENT
+    assert "ЧЕКИ ХАРИД" not in bot.to(USER_ID)
+    assert db.user(USER_ID).balance == 20000 - 9370
+    assert "FireLoot санҷед" in bot.to(ADMIN_ID)
+
+
+async def test_supplier_answering_with_other_order_gives_no_receipt(db, cfg_api, bot):
+    """Ҷавоби «200 completed», вале барои фармоиши дигар — чек намеравад."""
+    order_id = _paid_order(db)
+    other = OrderResult(
+        ok=True, external_id="FL-OLD", status="completed",
+        details={"external_id": "legacy-1", "sku": "pubg_uc_660", "uid": "123456789"},
+    )
+    await deliver_order(bot, db, cfg_api, FakeSupplier(place=other), order_id)
+
+    assert db.order(order_id)["status"] == ORDER_SENT
+    assert "ЧЕКИ ХАРИД" not in bot.to(USER_ID)
+    assert "дигареро" in bot.to(ADMIN_ID)
+
+
+async def test_final_status_of_wrong_recipient_gives_no_receipt(db, cfg_api, bot):
+    order_id = _paid_order(db)
+
+    class WrongPlayer(FakeSupplier):
+        async def wait_until_done(self, external_id, **kwargs):
+            return OrderResult(ok=True, external_id=external_id, status="completed",
+                               details={"uid": "111111111"})
+
+    await deliver_order(bot, db, cfg_api, WrongPlayer(), order_id)
+
+    assert db.order(order_id)["status"] == ORDER_SENT
+    assert "ЧЕКИ ХАРИД" not in bot.to(USER_ID)
+
+
+async def test_matching_details_still_complete_normally(db, cfg_api, bot):
+    order_id = _paid_order(db)
+
+    class Honest(FakeSupplier):
+        async def wait_until_done(self, external_id, **kwargs):
+            ref = db.order(order_id)["supplier_ref"]
+            return OrderResult(ok=True, external_id=external_id, status="completed",
+                               details={"external_id": ref, "sku": "pubg_uc_660", "uid": "123456789"})
+
+    await deliver_order(bot, db, cfg_api, Honest(), order_id)
+
+    assert db.order(order_id)["status"] == ORDER_DONE
+    assert "ЧЕКИ ХАРИД" in bot.to(USER_ID)
+
+
+async def test_username_case_does_not_count_as_foreign(db, cfg_api, bot):
+    db.touch_user(USER_ID)
+    db.change_balance(USER_ID, 20000, "topup")
+    order_id = _make_order(db, code="stars_100", price=2100, target="@Ali_2006")
+
+    class Lower(FakeSupplier):
+        async def wait_until_done(self, external_id, **kwargs):
+            return OrderResult(ok=True, external_id=external_id, status="completed",
+                               details={"username": "ali_2006"})
+
+    await deliver_order(bot, db, cfg_api, Lower(), order_id)
+    assert db.order(order_id)["status"] == ORDER_DONE
+
+
+async def test_legacy_order_is_looked_up_by_old_number(db, cfg_api, bot):
+    """Фармоиши пеш аз навсозӣ бо рақами оддӣ фиристода шуда буд — бо ҳамон меҷӯем."""
+    from shop.fulfillment import resume_open_orders
+
+    order_id = _paid_order(db)                       # supplier_ref холӣ — фармоиши кӯҳна
+    supplier = LookupSupplier(
+        place=OrderResult(ok=True, external_id="FL-2"),
+        lookup=OrderResult(ok=True, external_id=str(order_id), status="completed",
+                           details={"external_id": str(order_id)}),
+    )
+    counts = await resume_open_orders(bot, db, cfg_api, supplier)
+
+    assert counts == {"resumed": 1}
+    assert supplier.lookups == [str(order_id)]
+    assert supplier.calls == []
+
+
+async def test_orders_report_runs_without_supplier(db, cfg, capsys):
+    """«bot api --orders» — танҳо хондан, бе таъминкунанда низ намеафтад."""
+    from shop.check_api import check_orders
+
+    _paid_order(db)
+    await check_orders(cfg, db)
+    out = capsys.readouterr().out
+    assert "ручной заказ" in out and "#1" in out

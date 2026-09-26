@@ -298,7 +298,8 @@ async def test_donatix_silence_never_refunds(db, cfg, bot, monkeypatch):
     assert db.user(USER_ID).balance == 100000 - 2100
     assert "Donatix санҷед" in bot.to(ADMIN_ID)
     # Ҳамаи кӯшишҳо бо ҳамон калид — ҳатто агар ҳамааш расида бошад, як фармоиш.
-    assert {r["headers"]["Idempotency-Key"] for r in dx.orders_sent()} == {f"pfx-order-{order_id}"}
+    ref = db.order(order_id)["supplier_ref"]
+    assert {r["headers"]["Idempotency-Key"] for r in dx.orders_sent()} == {f"pfx-order-{ref}"}
 
 
 async def test_immediate_completed_answer_skips_waiting(db, cfg, bot):
@@ -320,7 +321,8 @@ async def test_resume_resends_with_same_key(db, cfg, bot):
 
     assert counts == {"resent": 1}
     assert db.order(order_id)["status"] == ORDER_DONE
-    assert dx.orders_sent()[0]["headers"]["Idempotency-Key"] == f"pfx-order-{order_id}"
+    ref = db.order(order_id)["supplier_ref"]
+    assert dx.orders_sent()[0]["headers"]["Idempotency-Key"] == f"pfx-order-{ref}"
 
 
 async def test_old_manual_premium_orders_stay_manual(db, cfg, bot):

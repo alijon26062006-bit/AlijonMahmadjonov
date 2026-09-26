@@ -124,6 +124,9 @@ class DonatixSupplier:
         return ERRORS.get(code or "", message or f"HTTP {status}"), code
 
     def idempotency_key(self, order_id: str) -> str:
+        # Бот рақами беҳамтои «пешванд-рақам» медиҳад — ҳамонро истифода мебарем.
+        if order_id.startswith(self.key_prefix):
+            return order_id
         return f"{self.key_prefix}-order-{order_id}"
 
     # ── каталог ───────────────────────────────────────────────────────
@@ -271,6 +274,7 @@ class DonatixSupplier:
                     ok=True,
                     external_id=str(order.get("order_id") or "") or None,
                     status=order.get("status"),
+                    details=order,
                 )
             message, code = self._error(data, status)
             if status == 429 and attempt < RETRIES:
@@ -300,7 +304,7 @@ class DonatixSupplier:
         if status == 200 and order:
             return OrderResult(
                 ok=True, external_id=str(external_id), status=order.get("status"),
-                error=order.get("error"),
+                error=order.get("error"), details=order,
             )
         message, code = self._error(data, status)
         return OrderResult(ok=False, error=message, code=code)

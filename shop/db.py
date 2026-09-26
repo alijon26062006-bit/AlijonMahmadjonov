@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 import sqlite3
 import threading
 from dataclasses import dataclass
@@ -244,6 +245,7 @@ class Database:
         ("products", "kind", "TEXT NOT NULL DEFAULT 'game'"),
         ("orders", "sku", "TEXT NOT NULL DEFAULT ''"),
         ("orders", "kind", "TEXT NOT NULL DEFAULT 'game'"),
+        ("orders", "supplier_ref", "TEXT"),
     )
 
     def _add_missing_columns(self) -> None:
@@ -690,6 +692,32 @@ class Database:
             f"SELECT * FROM orders WHERE status IN ({marks}) ORDER BY id ASC LIMIT ?",
             (*ORDER_OPEN, limit),
         )
+
+    def order_key_prefix(self) -> str:
+        """Пешванди беҳамтои ин база барои рақами фармоиш дар таъминкунанда.
+
+        Бе он фармоиши №283 бо рақами «283» мерафт. Агар ягон вақт базаи дигар
+        (сервери дигар, насби пешина, нусхаи дуюми бот) бо ҳамин калиди API
+        аллакай «283»-ро фиристода бошад, таъминкунанда фармоиши навро
+        намехарид ва бот фармоиши кӯҳнаи бегонаро «иҷрошуда» мешуморид.
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT value FROM settings WHERE key = 'order_key_prefix'"
+            ).fetchone()
+            if row and row["value"]:
+                return row["value"]
+            prefix = "almaz-" + secrets.token_hex(4)
+            self._conn.execute(
+                "INSERT INTO settings(key, value) VALUES ('order_key_prefix', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (prefix,),
+            )
+            self._conn.commit()
+            return prefix
+
+    def set_supplier_ref(self, order_id: int, ref: str) -> None:
+        self._run("UPDATE orders SET supplier_ref = ? WHERE id = ?", (ref, order_id))
 
     def set_order_note(self, order_id: int, note: str) -> None:
         """Эзоҳро нигоҳ медорад — ҳолати фармоишро тағйир намедиҳад."""
