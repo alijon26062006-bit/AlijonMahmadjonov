@@ -307,9 +307,9 @@ async def run_scenario(conn) -> None:
 
     msg = FakeMessage("100", bot=bot)
     await dep_h.on_amount(msg, state, conn)
-    # Сумма получает хвост в копейках: по нему узнаётся перевод.
+    # Без юзербота (чек проверяет владелец) сумма ровная — никаких копеек.
     paying = (await state.get_data())["amount"]
-    check("к сумме добавлен хвост", 10000 < paying <= 10010, str(paying))
+    check("сумма без копеек", paying == 10000, str(paying))
     check("выдаются реквизиты Душанбе",
           "Душанбе" in msg.last and fmt(paying) in msg.last, msg.last[:200])
     check("состояние ждёт чек", await state.get_state() == "Deposit:receipt")

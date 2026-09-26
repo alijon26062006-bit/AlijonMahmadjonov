@@ -18,6 +18,10 @@ from app import db, runtime, texts
 from app.money import fmt
 from app.userbot import parser, processor
 from app.userbot.log import scrub
+from app.config import settings as _settings
+
+# Здесь бот читает уведомления банка — только тогда к сумме добавляются копейки
+_settings.tg_api_id, _settings.tg_api_hash, _settings.bank_bot = 1, "x" * 32, "bank_test_bot"
 
 CLIENT = 901
 OTHER = 902

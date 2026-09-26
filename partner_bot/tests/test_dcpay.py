@@ -165,11 +165,10 @@ async def run(conn) -> None:
     msg = FakeMessage("120")
     await dep_h.on_amount(msg, state, conn)
 
-    # Сумма получает уникальный хвост в копейках — по нему бот узнаёт
-    # именно этот перевод. Клиент просил 120, платит 120.0X.
+    # Юзербота нет — оплату проверяет владелец по чеку, сумма ровная.
     shown = state.data["amount"]
-    check("к сумме добавлен хвост в копейках",
-          12000 < shown <= 12010, str(shown))
+    check("клиент платит ровно столько, сколько просил",
+          shown == 12000, str(shown))
     check("сумма принята и показаны реквизиты",
           fmt(shown) in msg.last, msg.last[:200])
     labels = [b.text for row in msg.markups[-1].inline_keyboard for b in row]
