@@ -87,6 +87,7 @@ case "${1:-update}" in
   api)       shift; exec bash "$ROOT/check_api.sh" "$@" ;;
   nick)      shift; exec bash "$ROOT/start_nickapi.sh" "$@" ;;
   donatix)   shift; exec bash "$ROOT/setup_donatix.sh" "$@" ;;
+  token)     shift; exec bash "$ROOT/setup_token.sh" "$@" ;;
   doctor)
     shift
     PY="$ROOT/.venv/bin/python"; [ -x "$PY" ] || PY="python3"
@@ -107,6 +108,7 @@ case "${1:-update}" in
     echo "  bot nick       API проверки ника (--service, --test, --log, --stop)"
     echo "  bot donatix    подключить Donatix для Stars и Premium (off — отключить)"
     echo "  bot doctor     найти все копии бота на сервере (--fix — выключить лишние)"
+    echo "  bot token      новый токен из @BotFather — все чужие копии сразу отключатся"
     echo "  bot backup     собрать архив со всеми данными"
     echo "  bot migrate IP переезд на другой сервер"
     echo "  bot force      обновить, стерев свои правки в коде"

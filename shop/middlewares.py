@@ -133,21 +133,44 @@ class ConflictWatch(BaseRequestMiddleware):
 
     Telegram ба ду нусхае, ки бо як токен навсозӣ мегиранд, «Conflict» мегӯяд.
     Қулфи файл танҳо дар як сервер кор мекунад; ин муҳофиз — байни серверҳо.
+
+    Пас аз ҳар азнавоғозкунӣ дархости кӯҳнаи getUpdates то 30 сония зинда
+    мемонад ва чанд «Conflict» медиҳад — ин нусхаи дуюм нест. Бинобар ин
+    тревога танҳо вақте меравад, ки конфликт аз ``min_span`` сония дарозтар бошад.
     """
 
-    def __init__(self, notify, every: float = 900.0) -> None:
+    def __init__(
+        self, notify, every: float = 900.0, min_span: float = 90.0, min_hits: int = 5,
+        quiet_gap: float = 120.0,
+    ) -> None:
         self.notify = notify
         self.every = every
-        self._last = -every
+        self.min_span = min_span
+        self.min_hits = min_hits
+        self.quiet_gap = quiet_gap
+        self._last_alert = -every
+        self._streak_start: float | None = None
+        self._last_hit = 0.0
+        self._hits = 0
         self._tasks: set = set()
+
+    def _hit(self, now: float) -> bool:
+        """Конфликти навбатӣ. True — вақти тревога аст."""
+        if self._streak_start is None or now - self._last_hit > self.quiet_gap:
+            self._streak_start, self._hits = now, 0
+        self._hits += 1
+        self._last_hit = now
+        lasting = now - self._streak_start >= self.min_span and self._hits >= self.min_hits
+        if lasting and now - self._last_alert >= self.every:
+            self._last_alert = now
+            return True
+        return False
 
     async def __call__(self, make_request, bot, method):
         try:
             return await make_request(bot, method)
         except TelegramConflictError:
-            now = time.monotonic()
-            if now - self._last >= self.every:
-                self._last = now
+            if self._hit(time.monotonic()):
                 log.error("Нусхаи дигари бот бо ҳамин токен кор мекунад!")
                 task = asyncio.create_task(self.notify(bot))
                 self._tasks.add(task)

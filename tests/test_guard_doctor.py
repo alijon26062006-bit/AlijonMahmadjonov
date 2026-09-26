@@ -64,7 +64,33 @@ def test_main_exits_with_no_restart_code(monkeypatch, capsys):
 
 
 # ── тревога: ҳамин бот дар сервери дигар ──────────────────────────────
-async def test_conflict_alerts_admin_once():
+def test_restart_conflicts_do_not_alarm():
+    """Пас аз азнавоғозкунӣ чанд «Conflict» дар 30 сония — ин нусхаи дуюм нест."""
+    from shop.middlewares import ConflictWatch
+
+    watch = ConflictWatch(lambda bot: None)
+    assert not any(watch._hit(t) for t in (0, 2, 5, 9, 15, 22, 30))
+
+
+def test_lasting_conflict_alarms_once_per_period():
+    from shop.middlewares import ConflictWatch
+
+    watch = ConflictWatch(lambda bot: None, every=900)
+    alarms = [t for t in range(0, 600, 5) if watch._hit(t)]
+    assert alarms == [90]                        # як бор, баъд то 15 дақиқа хомӯш
+
+
+def test_quiet_gap_starts_a_new_streak():
+    from shop.middlewares import ConflictWatch
+
+    watch = ConflictWatch(lambda bot: None)
+    for t in (0, 5, 10):
+        watch._hit(t)
+    # 10 дақиқа ором, баъд боз чанд конфликт — ин аз нав ҳисоб мешавад.
+    assert not any(watch._hit(t) for t in (610, 615, 620, 630))
+
+
+async def test_conflict_sends_alert_to_admin():
     from aiogram.exceptions import TelegramConflictError
     from shop.middlewares import ConflictWatch
 
@@ -73,7 +99,7 @@ async def test_conflict_alerts_admin_once():
     async def notify(bot):
         alerts.append(bot)
 
-    watch = ConflictWatch(notify, every=900)
+    watch = ConflictWatch(notify, min_span=0, min_hits=1)
 
     async def conflict(bot, method):
         raise TelegramConflictError(method=None, message="Conflict: terminated by other getUpdates")
@@ -82,7 +108,7 @@ async def test_conflict_alerts_admin_once():
         with pytest.raises(TelegramConflictError):
             await watch(conflict, "bot", None)
     await asyncio.sleep(0)
-    assert alerts == ["bot"]                     # як бор, на ҳар 3 сония
+    assert alerts == ["bot"]
 
 
 async def test_normal_requests_pass_through():
