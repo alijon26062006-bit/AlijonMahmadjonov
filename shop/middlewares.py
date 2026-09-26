@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramConflictError
 from aiogram.types import TelegramObject, Update
 
 from . import keyboards, style, texts
@@ -124,3 +126,30 @@ class ButtonStyleFallback(BaseRequestMiddleware):
             if not style.strip(markup):
                 raise
             return await make_request(bot, method)
+
+
+class ConflictWatch(BaseRequestMiddleware):
+    """Нусхаи дигари ҳамин бот дар ҷои дигар кор мекунад — админ фавран медонад.
+
+    Telegram ба ду нусхае, ки бо як токен навсозӣ мегиранд, «Conflict» мегӯяд.
+    Қулфи файл танҳо дар як сервер кор мекунад; ин муҳофиз — байни серверҳо.
+    """
+
+    def __init__(self, notify, every: float = 900.0) -> None:
+        self.notify = notify
+        self.every = every
+        self._last = -every
+        self._tasks: set = set()
+
+    async def __call__(self, make_request, bot, method):
+        try:
+            return await make_request(bot, method)
+        except TelegramConflictError:
+            now = time.monotonic()
+            if now - self._last >= self.every:
+                self._last = now
+                log.error("Нусхаи дигари бот бо ҳамин токен кор мекунад!")
+                task = asyncio.create_task(self.notify(bot))
+                self._tasks.add(task)
+                task.add_done_callback(self._tasks.discard)
+            raise

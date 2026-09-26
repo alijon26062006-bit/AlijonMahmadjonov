@@ -81,6 +81,9 @@ WorkingDirectory=$ROOT
 ExecStart=$VENV/bin/python -m shop.main
 Restart=always
 RestartSec=5
+# Код 3 — бот сам отказался стартовать (вторая копия или сервер после переезда).
+# Перезапускать такое бессмысленно.
+RestartPreventExitStatus=3
 
 [Install]
 WantedBy=multi-user.target

@@ -161,6 +161,15 @@ fi
 
 # ── 5. Что делать дальше ──────────────────────────────────────────────
 RESTORE_ON_FAIL=0
+
+# Старый бот не должен ожить: ни после перезагрузки, ни от случайного `bot`.
+# Две копии с одной базой делят покупателей и шлют поставщику одинаковые номера.
+if has_systemd; then
+  $SUDO systemctl disable "$SERVICE" >/dev/null 2>&1
+fi
+echo "$HOST $(date '+%Y-%m-%d %H:%M')" > "$ROOT/data/MOVED_TO"
+ok "Старый бот выключен насовсем (автозапуск снят)"
+
 BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)"
 REPO="$(git -C "$ROOT" remote get-url origin 2>/dev/null)"
 NAME="$(basename "$ARCHIVE")"
@@ -172,9 +181,11 @@ echo "Скопируйте эти две команды по очереди:"
 echo
 printf '\033[1;33m  ssh %s\033[0m\n' "$TARGET"
 echo
-printf '\033[1;33m  cd ~ && git clone -b %s %s AlijonMahmadjonov && cd AlijonMahmadjonov && bash restore_bot.sh ~/%s\033[0m\n' \
-  "$BRANCH" "$REPO" "$NAME"
+# Папка может уже быть (прошлая попытка) — тогда не клонируем, а обновляем.
+printf '\033[1;33m  apt-get install -y -qq git python3-venv >/dev/null; cd ~ && { [ -d AlijonMahmadjonov ] || git clone -b %s %s AlijonMahmadjonov; } && cd AlijonMahmadjonov && git fetch origin %s && git checkout -f -B %s FETCH_HEAD && bash restore_bot.sh ~/%s\033[0m\n' \
+  "$BRANCH" "$REPO" "$BRANCH" "$BRANCH" "$NAME"
 echo
-warn "Старый бот сейчас ВЫКЛЮЧЕН — так данные не разойдутся."
-echo "   Если переезд не получится:  bot start  — и старый снова работает."
+warn "Старый бот ВЫКЛЮЧЕН насовсем — так данные не разойдутся."
+echo "   Если переезд не получится, вернуть старый:"
+echo "   rm $ROOT/data/MOVED_TO && systemctl enable $SERVICE; bot start"
 echo

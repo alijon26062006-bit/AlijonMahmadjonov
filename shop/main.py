@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 import sys
 
@@ -13,13 +14,18 @@ from aiogram.exceptions import TelegramNetworkError, TelegramUnauthorizedError
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, BotCommandScopeChat
 
-from . import catalog, requisites
-from .config import Config, load_config
+from . import catalog, guard, requisites
+from .config import ROOT, Config, load_config
 from .db import Database
 from .fulfillment import resume_in_background
 from .fulfillment import shutdown as fulfillment_shutdown
 from .handlers import build_router
-from .middlewares import ButtonStyleFallback, ErrorGuardMiddleware, GuardMiddleware
+from .middlewares import (
+    ButtonStyleFallback,
+    ConflictWatch,
+    ErrorGuardMiddleware,
+    GuardMiddleware,
+)
 from .donatix import DonatixSupplier
 from .supplier import RouterSupplier, build_supplier
 
@@ -107,12 +113,55 @@ async def _check_donatix(db: Database, supplier) -> None:
         log.error("Donatix барои ин молҳо мол надорад: %s", ", ".join(missing))
 
 
+HOST_KEY = "last_host"
+
+
+async def _tell_admins(bot: Bot, cfg: Config, text: str) -> None:
+    for admin_id in cfg.admin_ids:
+        try:
+            await bot.send_message(admin_id, text)
+        except Exception as exc:
+            log.warning("Ба админ %s нарасид: %s", admin_id, exc)
+
+
+def _conflict_notifier(cfg: Config, here: str):
+    async def notify(bot: Bot) -> None:
+        await _tell_admins(
+            bot, cfg,
+            "🚨 <b>Ҳамин бот дар ҷои дигар низ кор мекунад!</b>\n\n"
+            "Telegram гуфт: бо ин токен ду нусха навсозӣ мегиранд. Харидорон байни "
+            "онҳо тақсим мешаванд ва пули як қисм дар базаи дигар менависад.\n\n"
+            f"🖥 Ин нусха: <code>{html.escape(here)}</code>\n\n"
+            "Нусхаи дигарро фавран хомӯш кунед. Дар ҳар сервер санҷед:  "
+            "<code>bot doctor</code>",
+        )
+    return notify
+
+
+async def _announce_host(bot: Bot, db: Database, cfg: Config, here: str) -> None:
+    """Агар бот дар сервер ё папкаи нав сар шуда бошад — ба админ хабар медиҳем."""
+    before = db.setting(HOST_KEY)
+    db.set_setting(HOST_KEY, here)
+    if before and before != here:
+        await _tell_admins(
+            bot, cfg,
+            "🟢 <b>Бот дар ҷои нав оғоз шуд.</b>\n\n"
+            f"🖥 Ҳозир: <code>{html.escape(here)}</code>\n"
+            f"🗄 Пештар: <code>{html.escape(before)}</code>\n\n"
+            "Агар ин кӯчидан набуд — нусхаи дуюм кор мекунад. Нусхаи кӯҳнаро хомӯш кунед.",
+        )
+
+
 async def run() -> None:
     cfg = load_config()
     logging.basicConfig(
         level=getattr(logging, cfg.log_level, logging.INFO),
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     )
+    # Пеш аз ҳама: дар ин ҷо бот бояд танҳо як бор ва танҳо дар сервери ҷорӣ кор кунад.
+    guard.check_not_moved(cfg.db_path.parent)
+    instance_lock = guard.acquire_instance_lock(cfg.token, ROOT)
+    here = f"{guard.host_label()} {ROOT}"
     if not cfg.admin_ids:
         log.warning(
             "SHOP_ADMIN_IDS холӣ аст — панели админ дастрас намешавад. "
@@ -128,6 +177,7 @@ async def run() -> None:
     )
     # Агар Telegram рангҳоро нашиносад — бот кор карданашро давом медиҳад.
     bot.session.middleware(ButtonStyleFallback())
+    bot.session.middleware(ConflictWatch(_conflict_notifier(cfg, here)))
     dp = build_dispatcher(db, cfg, supplier)
 
     try:
@@ -139,7 +189,8 @@ async def run() -> None:
                 "Токенро аз @BotFather бо /mybots санҷед."
             ) from None
 
-        log.info("Бот омода: @%s (таъминкунанда: %s)", me.username, supplier.name)
+        log.info("Бот омода: @%s (таъминкунанда: %s) — %s", me.username, supplier.name, here)
+        await _announce_host(bot, db, cfg, here)
         await _check_skus(db, cfg, supplier)
         await _check_donatix(db, supplier)
 
@@ -163,11 +214,16 @@ async def run() -> None:
         await supplier.close()
         await bot.session.close()
         db.close()
+        instance_lock.close()
 
 
 def main() -> None:
     try:
         asyncio.run(run())
+    except guard.StartRefused as exc:
+        logging.getLogger("shop").error("%s", exc)
+        print(f"❌ {exc}", file=sys.stderr)
+        sys.exit(guard.EXIT_REFUSED)
     except (KeyboardInterrupt, SystemExit):
         print("\nБот хомӯш шуд.")
     except RuntimeError as exc:

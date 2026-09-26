@@ -42,6 +42,8 @@ if [ -f "$TMP/data/shop.sqlite3" ]; then
   rm -f "$ROOT/data/shop.sqlite3-wal" "$ROOT/data/shop.sqlite3-shm"
   cp "$TMP/data/shop.sqlite3" "$ROOT/data/shop.sqlite3"
 fi
+# Нишонаи «кӯчида» ба сервери нав тааллуқ надорад.
+rm -f "$ROOT/data/MOVED_TO"
 ok "Данные на месте"
 
 PYBIN="$ROOT/.venv/bin/python"; [ -x "$PYBIN" ] || PYBIN="python3"
