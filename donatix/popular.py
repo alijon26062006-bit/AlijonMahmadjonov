@@ -66,7 +66,8 @@ def _pinned(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         else:
             continue
         found.setdefault(key, {"title": title, "href": _link("topup", r["category_id"], reg), "kind": "topup",
-                               "image_url": r["image_url"], "key": key, "cat": f"topup:{r['category_id']}"})
+                               "image_url": r["image_url"], "key": key, "cat": f"topup:{r['category_id']}",
+                               "category_id": r["category_id"], "region": reg})
     out = [found[k] for k in ("ff_cis", "ff_id", "pubg") if k in found]
     if conn.execute("SELECT 1 FROM products WHERE active = 1 AND hidden = 0 "
                     "AND kind IN ('telegram_stars', 'telegram_premium') LIMIT 1").fetchone():

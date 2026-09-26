@@ -1142,3 +1142,47 @@ html { scroll-behavior: smooth; }
   background: var(--text); color: var(--bg); font-size: .82rem; pointer-events: none; box-shadow: 0 8px 24px -8px rgb(0 0 0 / .35);
   max-width: 260px; }
 .dx-tip b { font-size: .85rem; }
+
+/* ── Админка → Прайс-лист картинкой (постер всегда в фирменных цветах, без темы сайта) ── */
+.pl-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+.pl-tools .periods { margin: 0; }
+.pl-stage { position: relative; width: 100%; max-width: 760px; overflow: hidden; border-radius: 14px; }
+.pl-poster { position: absolute; top: 0; left: 0; transform-origin: 0 0; overflow: hidden; box-sizing: border-box;
+  padding: 56px 56px 44px; display: flex; flex-direction: column; color: #fff;
+  font-family: "Onest", system-ui, sans-serif; background: linear-gradient(160deg, #1e1b4b 0%, #14161b 55%, #0f1020 100%); }
+.pl-poster * { box-sizing: border-box; }
+.pl-glow { position: absolute; width: 900px; height: 900px; right: -380px; top: -420px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(99 102 241 / .55), rgb(99 102 241 / 0)); pointer-events: none; }
+.pl-head { position: relative; display: flex; justify-content: space-between; align-items: center; }
+.pl-brand { display: flex; align-items: center; gap: 14px; font-size: 38px; font-weight: 700; letter-spacing: -.01em; }
+.pl-brand .logo { width: 56px; height: 56px; --accent: #4f46e5; --accent-ink: #fff; }
+.pl-date { padding: 10px 20px; border: 1px solid rgb(255 255 255 / .18); border-radius: 999px; font-size: 22px; color: #c7d2fe; }
+.pl-title { position: relative; margin: 34px 0 26px; }
+.pl-title h2 { margin: 0; font-size: 64px; line-height: 1.05; font-weight: 700; letter-spacing: -.02em; color: #fff; }
+.pl-title h2 em { font-style: normal; color: #a5b4fc; }
+.pl-title p { margin: 12px 0 0; font-size: 26px; color: #c7d2fe; }
+.pl-cols { position: relative; flex: 1; min-height: 0; display: grid; gap: 20px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pl-poster.single .pl-cols { grid-template-columns: minmax(0, 1fr); }
+.pl-card { display: flex; flex-direction: column; min-height: 0; padding: 20px 20px 16px; border-radius: 24px;
+  background: rgb(255 255 255 / .06); border: 1px solid rgb(255 255 255 / .12); }
+.pl-card-head { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; margin-bottom: 8px; border-bottom: 1px solid rgb(255 255 255 / .12); }
+.pl-card-head img { width: 60px; height: 60px; border-radius: 14px; object-fit: cover; }
+.pl-card-head b { display: block; font-size: 28px; line-height: 1.1; }
+.pl-tag { display: inline-block; margin-top: 6px; padding: 3px 12px; border-radius: 999px; background: #4f46e5; font-size: 18px; font-weight: 600; }
+.pl-rows { display: flex; flex-direction: column; }
+.pl-poster.single .pl-rows { display: grid; grid-template-columns: 1fr 1fr; column-gap: 36px; }
+.pl-row { display: flex; align-items: baseline; gap: 8px; padding: 8px 0; font-size: 21px; line-height: 1.25; }
+.pl-poster.single .pl-row { font-size: 27px; padding: 11px 0; }
+.pl-poster.story .pl-row { padding: 11px 0; }
+.pl-name { min-width: 0; color: #e0e7ff; overflow-wrap: anywhere; }
+.pl-dots { flex: 1; min-width: 12px; border-bottom: 2px dotted rgb(255 255 255 / .22); transform: translateY(-5px); }
+.pl-price { flex: none; font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 700; color: #fff; }
+.pl-price small { font-size: .7em; color: #a5b4fc; font-weight: 600; }
+.pl-group { grid-column: 1 / -1; margin-top: 10px; padding: 6px 0 2px; font-size: 16px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: #a5b4fc; }
+.pl-more { margin-top: auto; padding-top: 10px; font-size: 18px; color: #a5b4fc; }
+.pl-foot { position: relative; margin-top: 26px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.pl-steps { display: flex; gap: 10px; flex-wrap: wrap; }
+.pl-steps span { padding: 10px 16px; border-radius: 14px; background: rgb(255 255 255 / .08); font-size: 20px; color: #e0e7ff; }
+.pl-site { font-size: 30px; font-weight: 700; color: #fff; }
+.pl-site span { font-size: 22px; font-weight: 500; color: #c7d2fe; }

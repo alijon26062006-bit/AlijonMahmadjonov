@@ -94,6 +94,23 @@ def traffic_page(request: Request, period: str = "7d", admin=Depends(admin_user)
     })
 
 
+@router.get("/pricelist")
+def pricelist_page(request: Request, show: str = "all", fmt: str = "post", admin=Depends(admin_user),
+                   conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from datetime import datetime, timedelta, timezone
+
+    from . import pricelist
+    data = pricelist.build(conn, config)
+    keys = [s["key"] for s in data["sections"]]
+    show = show if show in keys else "all"
+    sections = data["sections"] if show == "all" else [s for s in data["sections"] if s["key"] == show]
+    today = datetime.now(timezone(timedelta(hours=config.tz_offset))).strftime("%d.%m.%Y")
+    return render(request, "admin/pricelist.html", {
+        "user": admin, "data": data, "sections": sections, "show": show, "fmt": "story" if fmt == "story" else "post",
+        "today": today, "site_host": config.base_url.split("://")[-1].rstrip("/"),
+    })
+
+
 @router.get("/settings")
 def settings_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
                   config: Config = Depends(get_config)):

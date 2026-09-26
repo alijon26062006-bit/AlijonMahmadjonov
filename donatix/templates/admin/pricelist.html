@@ -1,0 +1,107 @@
+{% extends "admin/_layout.html" %}
+{% from "_icons.html" import icon, logo %}
+{% block title %}Прайс-лист картинкой — админка{% endblock %}
+{% block content %}
+<section class="page-hero">
+  <h1>Прайс-лист картинкой</h1>
+  <p>Цены продажи в сомони — прямо из каталога: наценка сайта {{ data.markup }}%, курс {{ data.rate }} с. за $1. Скачайте PNG и публикуйте.</p>
+</section>
+
+<div class="pl-tools card">
+  <div class="periods" role="tablist" aria-label="Что показать">
+    <a class="{{ 'on' if show == 'all' }}" href="?show=all&fmt={{ fmt }}">Все игры</a>
+    {% for s in data.sections %}<a class="{{ 'on' if show == s.key }}" href="?show={{ s.key }}&fmt={{ fmt }}">{{ s.game }} {{ s.sub if s.key != 'pubg' else '' }}</a>{% endfor %}
+  </div>
+  <div class="periods" role="tablist" aria-label="Формат">
+    <a class="{{ 'on' if fmt == 'post' }}" href="?show={{ show }}&fmt=post">Пост 1080×1350</a>
+    <a class="{{ 'on' if fmt == 'story' }}" href="?show={{ show }}&fmt=story">Сторис 1080×1920</a>
+  </div>
+  <button class="btn primary lg" type="button" id="pl-download" {{ 'disabled' if not sections }}>{{ icon('arrow-up', 18) }}Скачать PNG</button>
+</div>
+
+{% if not sections %}
+<div class="card empty">В каталоге пока нет Free Fire СНГ / Индонезия и PUBG Mobile. Загрузите каталог: Админка → Загрузка каталога.</div>
+{% else %}
+{% set single = sections | length == 1 %}
+{% set W, H = 1080, (1920 if fmt == 'story' else 1350) %}
+{# сколько строк влезает в колонку — чтобы ничего не обрезалось посередине #}
+{% set cap = (44 if fmt == 'story' else 28) if single else (31 if fmt == 'story' else 19) %}
+{% set group_names = ['', 'Ваучеры и пропуска', 'Прокачка'] %}
+<div class="pl-stage" id="pl-stage" style="--W: {{ W }}; --H: {{ H }}">
+<div class="pl-poster {{ 'single' if single else 'multi' }} {{ fmt }}" id="pl-poster" style="width: {{ W }}px; height: {{ H }}px">
+  <div class="pl-glow"></div>
+  <header class="pl-head">
+    <div class="pl-brand">{{ logo() }}<span>Donatix</span></div>
+    <div class="pl-date">Цены на {{ today }}</div>
+  </header>
+  <div class="pl-title">
+    <h2>{% if single %}{{ sections[0].game }}{% if sections[0].key != 'pubg' %} <em>{{ sections[0].sub }}</em>{% endif %}{% else %}Донат по лучшим ценам{% endif %}</h2>
+    <p>{{ 'Алмазы, ваучеры и прокачка — моментально на ваш ID' if single and sections[0].key != 'pubg' else ('UC на ваш ID за секунды' if single else 'Алмазы Free Fire и UC PUBG Mobile — моментально на ваш ID') }}</p>
+  </div>
+
+  <div class="pl-cols">
+    {% for s in sections %}
+    <section class="pl-card">
+      <div class="pl-card-head">
+        {% if s.image %}<img src="{{ s.image | img }}" alt="" crossorigin="anonymous" onerror="this.remove()">{% endif %}
+        <div><b>{{ s.game }}</b><span class="pl-tag">{{ s.sub }}</span></div>
+      </div>
+      {% set rows = namespace(n=0, g=0, items=0) %}
+      <div class="pl-rows">
+        {% for i in s.packs %}
+          {% if rows.n < cap %}
+            {% if i.group != rows.g and i.group > 0 %}{% set rows.g = i.group %}{% set rows.n = rows.n + 1 %}
+              {% if rows.n < cap %}<div class="pl-group">{{ group_names[i.group] }}</div>{% endif %}
+            {% endif %}
+            {% if rows.n < cap %}{% set rows.n = rows.n + 1 %}{% set rows.items = rows.items + 1 %}
+            <div class="pl-row"><span class="pl-name">{{ i.short }}</span><span class="pl-dots"></span><b class="pl-price">{{ i.price }} <small>с.</small></b></div>
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% if rows.items < s.packs | length %}<div class="pl-more">+ ещё {{ s.packs | length - rows.items }} — на сайте</div>{% endif %}
+    </section>
+    {% endfor %}
+  </div>
+
+  <footer class="pl-foot">
+    <div class="pl-steps"><span>① ID игрока</span><span>② Оплата: Алиф · DC · USDT</span><span>③ Донат за секунды</span></div>
+    <div class="pl-site">{{ site_host }}{% if support_contact %}<span> · {{ support_contact }}</span>{% endif %}</div>
+  </footer>
+</div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+<script>
+(function () {
+  const stage = document.getElementById("pl-stage"), poster = document.getElementById("pl-poster");
+  if (!stage) return;
+  const W = +getComputedStyle(stage).getPropertyValue("--W"), H = +getComputedStyle(stage).getPropertyValue("--H");
+  function fit() {
+    const k = Math.min(1, stage.clientWidth / W);
+    poster.style.transform = "scale(" + k + ")";
+    stage.style.height = (H * k) + "px";
+  }
+  fit(); addEventListener("resize", fit);
+  const btn = document.getElementById("pl-download");
+  btn.addEventListener("click", async () => {
+    const label = btn.innerHTML;
+    btn.disabled = true; btn.textContent = "Готовим картинку…";
+    try {
+      await document.fonts.ready;
+      const url = await htmlToImage.toPng(poster, {
+        width: W, height: H, pixelRatio: 1, cacheBust: true,
+        style: {transform: "none"},
+        imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+      });
+      const a = document.createElement("a");
+      a.href = url; a.download = "donatix-{{ show }}-{{ fmt }}-{{ today }}.png"; a.click();
+    } catch (e) {
+      alert("Не получилось собрать картинку. Обновите страницу и попробуйте ещё раз.");
+    }
+    btn.disabled = false; btn.innerHTML = label;
+  });
+})();
+</script>
+{% endblock %}
