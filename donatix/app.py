@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -18,6 +21,8 @@ from .deps import Forbidden, LoginRequired, render
 from .ratelimit import RateLimiter
 from .suppliers import Supplier, make_supplier
 from .worker import Worker
+
+log = logging.getLogger(__name__)
 
 
 def cache_policy(path: str, query: str, status: int) -> str:
@@ -83,6 +88,19 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     app.state.config = config
     app.state.supplier = supplier
     app.state.limiter = RateLimiter()
+
+    # Посещаемость. Стоит ДО SessionMiddleware в коде — значит, внутри неё и видит сессию (кто вошёл)
+    @app.middleware("http")
+    async def _traffic(request: Request, call_next):
+        response = await call_next(request)
+        try:
+            from . import traffic
+            traffic.track(request, response, request.session.get("user_id") if "session" in request.scope else None)
+            if time.monotonic() - traffic._last_flush >= 2:
+                await run_in_threadpool(traffic.flush, config.db_path)
+        except Exception:  # noqa: BLE001 — статистика не должна ломать страницу
+            log.exception("посещаемость: не удалось записать просмотр")
+        return response
 
     app.add_middleware(
         SessionMiddleware,

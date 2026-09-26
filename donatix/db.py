@@ -170,6 +170,28 @@ CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+-- Посещаемость сайта: одна строка — один просмотр страницы (см. traffic.py)
+CREATE TABLE IF NOT EXISTS visits (
+    id           INTEGER PRIMARY KEY,
+    ts           TEXT NOT NULL,        -- UTC, YYYY-MM-DDTHH:MM:SS
+    visitor      TEXT NOT NULL,        -- случайный id из cookie, не личные данные
+    session      TEXT NOT NULL,        -- визит: обрывается после 30 минут тишины
+    user_id      INTEGER,
+    path         TEXT NOT NULL,
+    source       TEXT NOT NULL DEFAULT '',   -- откуда пришёл визит (Google, Telegram, …)
+    referrer     TEXT,
+    utm_source   TEXT,
+    utm_medium   TEXT,
+    utm_campaign TEXT,
+    device       TEXT,
+    browser      TEXT,
+    os           TEXT,
+    is_new       INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS visits_ts ON visits(ts);
+CREATE INDEX IF NOT EXISTS visits_session ON visits(session, ts);
+CREATE INDEX IF NOT EXISTS visits_user ON visits(user_id) WHERE user_id IS NOT NULL;
 """
 
 

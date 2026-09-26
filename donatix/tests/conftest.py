@@ -87,11 +87,12 @@ def web_login(client, email, password):
 
 @pytest.fixture(autouse=True)
 def _reset_account_check():
-    from donatix import account_check, cache, cryptopay, rates, throttle
+    from donatix import account_check, cache, cryptopay, rates, throttle, traffic
     throttle.SUPPLIER.configure(100_000)  # тесты не ждут очереди поставщика
     throttle.SUPPLIER.reset()
     account_check.reset()
     cryptopay.reset()
     cache.clear()
     rates.reset()
+    traffic.reset()
     yield

@@ -83,6 +83,17 @@ def stats_page(request: Request, period: str = "30d", admin=Depends(admin_user),
     })
 
 
+@router.get("/traffic")
+def traffic_page(request: Request, period: str = "7d", admin=Depends(admin_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
+    from . import traffic
+    traffic.flush(config.db_path, force=True)  # свежие просмотры — сразу в отчёт
+    return render(request, "admin/traffic.html", {
+        "user": admin, "t": traffic.report(conn, period, tz_hours=config.tz_offset),
+        "page_title": traffic.page_title, "duration": traffic.duration,
+    })
+
+
 @router.get("/settings")
 def settings_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
                   config: Config = Depends(get_config)):

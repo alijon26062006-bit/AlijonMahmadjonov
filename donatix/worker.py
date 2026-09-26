@@ -126,6 +126,11 @@ class Worker:
                     self._start_sync()
                     last_sync = now
                 try:
+                    from . import traffic
+                    traffic.flush(self.config.db_path)  # просмотры, накопленные в памяти
+                except Exception:
+                    log.exception("посещаемость")
+                try:
                     from . import reports
                     reports.maybe_send(conn, self.config)  # утренний отчёт в админ-бот
                 except Exception:

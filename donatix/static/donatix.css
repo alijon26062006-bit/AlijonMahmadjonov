@@ -1055,3 +1055,90 @@ html { scroll-behavior: smooth; }
   .legal-table td:first-child { font-weight: 600; }
 }
 .legal-short .checks .ico.warn-ico { color: var(--warn, #d97706); }
+
+/* ── Админка → Посещаемость ─────────────────────────────── */
+.tr-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.online { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--line);
+  border-radius: 999px; background: var(--surface); font-size: .92rem; }
+.online i { width: 9px; height: 9px; border-radius: 50%; background: var(--ok, #16a34a); box-shadow: 0 0 0 0 rgb(22 163 74 / .5);
+  animation: pulse 2s infinite; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 8px rgb(22 163 74 / 0); } 100% { box-shadow: 0 0 0 0 rgb(22 163 74 / 0); } }
+@media (prefers-reduced-motion: reduce) { .online i { animation: none; } }
+.dlt { display: inline-block; margin-right: 4px; padding: 1px 6px; border-radius: 6px; font-size: .78rem; font-weight: 700; }
+.dlt.good { color: var(--ok, #15803d); background: var(--ok-soft, #e8f7ee); }
+.dlt.bad { color: var(--bad); background: var(--bad-soft, #fdecec); }
+.tr-two { margin-top: 14px; }
+.tr-two > .card { margin-top: 0; }
+.insights { margin-top: 14px; }
+.insights h3 { display: flex; align-items: center; gap: 8px; }
+.ins-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-top: 6px; }
+.ins { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); }
+.ins-label { font-size: .8rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.ins b { font-size: 1.05rem; }
+
+/* Посетители по дням: один ряд, один цвет */
+.vbars { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 2px; align-items: end; height: 200px;
+  padding-top: 6px; border-bottom: 1px solid var(--line); }
+.vb { height: 100%; display: flex; align-items: flex-end; justify-content: center; cursor: default; outline: none; }
+.vb-bar { width: 100%; max-width: 26px; height: max(var(--h), 2px); border-radius: 4px 4px 0 0; background: var(--accent);
+  opacity: .85; transition: opacity .15s; }
+.vb:hover .vb-bar, .vb:focus-visible .vb-bar { opacity: 1; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent-line); }
+.vbars-x { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); gap: 2px; margin-top: 6px; }
+
+.vbars-x span { font: 500 .68rem/1 "JetBrains Mono", ui-monospace, monospace; color: var(--muted); white-space: nowrap; overflow: visible; }
+
+/* Заходы и покупки по часам — одинаковая ось, два графика рядом */
+.hbars { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; align-items: end; height: 130px;
+  border-bottom: 1px solid var(--line); margin-top: 6px; }
+.hb { height: 100%; display: flex; align-items: flex-end; outline: none; }
+.hb span { width: 100%; height: max(var(--h), 2px); border-radius: 3px 3px 0 0; background: var(--accent); opacity: .85; }
+.hbars.buys .hb span { background: var(--c-done, var(--accent)); }
+.hb:hover span, .hb:focus-visible span { opacity: 1; }
+.hbars-x { display: flex; justify-content: space-between; margin-top: 6px; font: 500 .68rem/1 "JetBrains Mono", ui-monospace, monospace; color: var(--muted); }
+
+/* Тепловая карта: один цвет, от бледного к насыщенному */
+.heat { display: grid; gap: 2px; margin-top: 8px; overflow-x: auto; }
+.heat-row { display: grid; grid-template-columns: 26px repeat(24, minmax(9px, 1fr)); gap: 2px; align-items: center; }
+.heat-hours span { font: 500 .62rem/1 "JetBrains Mono", ui-monospace, monospace; color: var(--muted); text-align: left; }
+.heat-day { font-size: .75rem; color: var(--muted); font-weight: 600; }
+.hc { display: block; aspect-ratio: 1 / 1; min-height: 9px; border-radius: 3px; outline: none; }
+.hc.l0 { background: var(--surface-2); }
+.hc.l1 { background: color-mix(in oklab, var(--accent) 16%, var(--surface)); }
+.hc.l2 { background: color-mix(in oklab, var(--accent) 32%, var(--surface)); }
+.hc.l3 { background: color-mix(in oklab, var(--accent) 52%, var(--surface)); }
+.hc.l4 { background: color-mix(in oklab, var(--accent) 74%, var(--surface)); }
+.hc.l5 { background: var(--accent); }
+.heat .hc:hover, .heat .hc:focus-visible { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--text); }
+.heat-legend { display: flex; align-items: center; justify-content: flex-end; gap: 3px; margin-top: 8px; font-size: .75rem; color: var(--muted); }
+.heat-legend i { width: 12px; height: 12px; }
+.heat-legend span { margin: 0 4px; }
+
+/* Воронка */
+.funnel { display: grid; gap: 10px; margin-top: 8px; }
+.fn-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 70px 100px; gap: 10px; align-items: center; }
+.fn-t { font-weight: 600; }
+.fn-track { height: 14px; border-radius: 7px; background: var(--surface-2); overflow: hidden; }
+.fn-bar { height: 100%; width: var(--w); border-radius: 7px; background: var(--accent); }
+.fn-n { text-align: right; font-family: "JetBrains Mono", ui-monospace, monospace; }
+@media (max-width: 600px) {
+  .fn-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .fn-track { grid-column: 1 / -1; order: 3; }
+  .fn-c { grid-column: 1 / -1; order: 4; margin-top: -6px; }
+}
+
+/* Списки «топ»: подложка-полоска длиной по доле */
+.tl-row { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-top: 4px; border-radius: 8px; }
+.tl-bar { position: absolute; inset: 0 auto 0 0; width: var(--w); border-radius: 8px; background: var(--accent-soft); z-index: 0; }
+.tl-name, .tl-n { position: relative; z-index: 1; }
+.tl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-n { font-family: "JetBrains Mono", ui-monospace, monospace; }
+.utm-help { margin-top: 12px; }
+.utm-help summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+.utm-code { display: block; margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); font-size: .8rem;
+  overflow-wrap: anywhere; }
+
+/* Подсказка при наведении */
+.dx-tip { position: fixed; z-index: 100; display: flex; flex-direction: column; gap: 2px; padding: 8px 11px; border-radius: 10px;
+  background: var(--text); color: var(--bg); font-size: .82rem; pointer-events: none; box-shadow: 0 8px 24px -8px rgb(0 0 0 / .35);
+  max-width: 260px; }
+.dx-tip b { font-size: .85rem; }
