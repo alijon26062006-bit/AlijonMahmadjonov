@@ -462,8 +462,8 @@ async def flow(conn) -> None:
     entries = [b for row in keyboards.main_menu(games=True).inline_keyboard
                for b in row if b.callback_data == "m:games"]
     check("в меню один вход на игры и Steam", len(entries) == 1, str(entries))
-    check("на кнопке только значки, без слов",
-          entries and not any(ch.isalpha() for ch in entries[0].text),
+    check("на кнопке понятная подпись «Бозиҳо»",
+          entries and "Бозиҳо" in entries[0].text,
           entries[0].text if entries else "")
     check("отдельной кнопки Steam в меню нет",
           not any(b.strip().endswith("Пополнить Steam")

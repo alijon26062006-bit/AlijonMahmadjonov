@@ -143,22 +143,19 @@ BLANK = "\u3164"
 
 
 def games_entry_btn() -> InlineKeyboardButton:
-    """Вход в игры: один значок и ничего больше.
+    """Вход в игры: значок и понятная подпись «Бозиҳо».
 
-    Премиум-значок на кнопке может быть только один: поле под него у
-    Telegram одно. Ставить вторым обычный эмодзи — плохо: рядом с живой
-    иконкой игры он выглядит чужеродной картинкой. Поэтому значок один.
-
-    Когда премиум-эмодзи выключены, в подписи стоят обычные: пустой
-    кнопки у клиента быть не должно.
+    Одни значки (🔥🎯) покупатели не понимали — кнопку пропускали.
+    Премиум-значок у кнопки может быть только один (поле у Telegram одно),
+    поэтому с ним — подпись без обычного эмодзи, без него — обычный эмодзи.
     """
     emoji_id = custom_id("game")
     if emoji_id and premium_on():
         return InlineKeyboardButton(
-            text=BLANK, callback_data="m:games",
+            text="Бозиҳо", callback_data="m:games",
             style=PRIMARY, icon_custom_emoji_id=emoji_id,
         )
-    return btn(f"{em('game')} {em('pubg')}".strip(), "m:games", style=PRIMARY)
+    return btn(labeled("game", "Бозиҳо"), "m:games", style=PRIMARY)
 
 
 def back(target: str = "m:main", text: str = "") -> InlineKeyboardMarkup:
