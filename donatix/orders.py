@@ -155,8 +155,19 @@ def create_order(
     if client_idem_key is not None:
         client_idem_key = client_idem_key.strip()[:255] or None
 
+    # Ключ повтора живёт в пространстве своего API-ключа: у клиента может быть хоть сто ботов,
+    # и у каждого свой «заказ №1» — чужие ключи не должны сталкиваться («idempotency_key_reused»).
+    api_key_id = user["api_key_id"] if "api_key_id" in user.keys() else None
+    raw_key = client_idem_key
+    if client_idem_key and api_key_id:
+        client_idem_key = f"k{api_key_id}:{client_idem_key}"[:255]
+
     if client_idem_key:
         existing = _by_client_key(conn, user["id"], client_idem_key)
+        if existing is None and raw_key != client_idem_key:
+            # Заказ, созданный до разделения ключей, — повтор того же бота находит его по-старому
+            existing = conn.execute("SELECT * FROM orders WHERE user_id = ? AND client_idem_key = ? "
+                                    "AND api_key_id = ?", (user["id"], raw_key, api_key_id)).fetchone()
         if existing is not None:
             return _replay(existing, product_id, qty, fields_json), True
 
@@ -184,7 +195,7 @@ def create_order(
                 (user["id"], product["id"], product["kind"], display, qty, fields_json,
                  fmt_unit(q["unit_price"]), q["total_micro"], cost_micro, f"dx-{uuid.uuid4()}",
                  1 if supplier.is_idempotent(product["kind"]) else 0, client_idem_key, source, ts, ts,
-                 user["api_key_id"] if "api_key_id" in user.keys() else None),
+                 api_key_id),
             )
             order_id = int(cur.lastrowid)
             public_id = f"dx-{order_id}"

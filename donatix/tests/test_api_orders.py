@@ -62,6 +62,26 @@ def test_idempotency_same_key_charges_once(client, conn, shop):
     assert c.status_code == 409 and c.json()["code"] == "idempotency_key_reused"
 
 
+def test_same_key_from_two_bots_of_one_client(client, conn, shop):
+    """У каждого бота свой API-ключ и свой «заказ №1» — ключи не сталкиваются."""
+    from donatix import accounts
+    second = accounts.create_api_key(conn, shop["id"], "Бот @second", "")
+    a = _stars(client, shop["h"], key="bot-1-abc")
+    b = _stars(client, {"X-API-Key": second}, qty=200, key="bot-1-abc")
+    assert a.status_code == 201 and b.status_code == 201
+    assert a.json()["order"]["order_id"] != b.json()["order"]["order_id"]
+    again = _stars(client, {"X-API-Key": second}, qty=200, key="bot-1-abc")   # повтор второго бота
+    assert again.status_code == 200 and again.json()["order"]["order_id"] == b.json()["order"]["order_id"]
+
+
+def test_retry_finds_order_made_before_key_scoping(client, conn, shop):
+    a = _stars(client, shop["h"], key="legacy-key-1")
+    oid = int(a.json()["order"]["order_id"].split("-")[1])
+    conn.execute("UPDATE orders SET client_idem_key = 'legacy-key-1' WHERE id = ?", (oid,))  # как было раньше
+    b = _stars(client, shop["h"], key="legacy-key-1")
+    assert b.status_code == 200 and b.json()["order"]["order_id"] == a.json()["order"]["order_id"]
+
+
 def test_insufficient_balance(client, conn):
     uid, key = make_client(conn, "poor", balance="1")
     r = _stars(client, {"X-API-Key": key}, qty=100)

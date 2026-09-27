@@ -173,6 +173,16 @@ async def pricing(conn) -> None:
     check("ключ идемпотентности уникален на заказ", len(keys) == 50)
     check("ключ одного заказа не меняется",
           svc.idempotency_key(7) == svc.idempotency_key(7))
+    check("у заказа №1 в пересозданном боте другой ключ",
+          svc.idempotency_key(1, "2026-01-01 10:00:00") != svc.idempotency_key(1, "2026-02-01 12:00:00"))
+    from app.config import settings as _st
+    _old = _st.bot_token
+    try:
+        a = svc.idempotency_key(1, "2026-01-01 10:00:00")
+        object.__setattr__(_st, "bot_token", "999:AAA")
+        check("у заказа №1 второго бота другой ключ", svc.idempotency_key(1, "2026-01-01 10:00:00") != a)
+    finally:
+        object.__setattr__(_st, "bot_token", _old)
 
 
 # ────────────────────────────────────────────────────────── ники

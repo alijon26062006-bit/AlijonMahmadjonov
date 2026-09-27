@@ -133,10 +133,24 @@ def margin_of(game: db.Game) -> int:
     return game.margin or runtime.margin_percent()
 
 
-def idempotency_key(order_id: int) -> str:
+def _bot_id() -> str:
+    from app.config import settings
+    head = str(getattr(settings, "bot_token", "") or "").split(":", 1)[0]
+    return head if head.isdigit() else "0"
+
+
+def idempotency_key(order_id: int, created_at: str = "") -> str:
     """Уникальный ключ заказа. Один заказ бота — один ключ, поэтому повтор
-    запроса не спишет у поставщика деньги дважды."""
-    return f"bot-{order_id}-{uuid.uuid5(uuid.NAMESPACE_URL, str(order_id)).hex[:12]}"
+    запроса не спишет у поставщика деньги дважды.
+
+    Номер заказа сам по себе не уникален: у каждого бота своя база и свой
+    заказ №1, а ботов на одном счёте Donatix может быть много (и бота могут
+    пересоздать с чистой базой). Поэтому в ключе ещё id бота и время создания
+    заказа — иначе второй бот получал «idempotency_key_reused» на первом же заказе.
+    """
+    bot_id = _bot_id()
+    seed = f"{bot_id}:{order_id}:{created_at}"
+    return f"bot{bot_id}-{order_id}-{uuid.uuid5(uuid.NAMESPACE_URL, seed).hex[:16]}"
 
 
 #: Из отказа вида Field "player_id" is required достаём имя поля.
@@ -353,13 +367,13 @@ def status_of(order: dict | None) -> str:
 
 async def place(
     provider, *, game: db.Game, offer_id: str, fields: dict[str, str],
-    quantity: int, order_id: int,
+    quantity: int, order_id: int, created_at: str = "",
 ) -> str:
     """Отправить заказ поставщику. Возвращает его номер заказа."""
     order = await provider.order_game(
         category_id=game.category_id, offer_id=offer_id,
         fields=fields, quantity=quantity,
-        idempotency_key=idempotency_key(order_id),
+        idempotency_key=idempotency_key(order_id, created_at),
     )
     external = str(order.get("order_id") or order.get("id") or "")
     status = status_of(order)
@@ -638,7 +652,7 @@ async def order_now(
     try:
         external = await place(
             provider, game=game, offer_id=offer_id, fields=fields,
-            quantity=1, order_id=order.id,
+            quantity=1, order_id=order.id, created_at=order.created_at,
         )
     except DeliveryError as exc:
         await refund_place(bot, conn, order, game, exc)
