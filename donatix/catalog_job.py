@@ -93,10 +93,52 @@ def _download(client: httpx.Client, folder: Path, url: str) -> str:
 # ── Фоновая задача ──────────────────────────────────────────
 
 
-def status() -> dict[str, Any]:
+_shared = {"path": None, "at": 0.0}
+STALE = 60   # ведущий не отмечался минуту — значит, задача не идёт (процесс перезапустился)
+
+
+def _persist(force: bool = False) -> None:
+    """Прогресс — в базу (не чаще раза в 1,5 с): страницу прогресса может открыть другой процесс сайта."""
+    import json
+    now = time.monotonic()
+    if not _shared["path"] or (not force and now - _shared["at"] < 1.5):
+        return
+    _shared["at"] = now
     with _lock:
-        s = dict(_state)
-        s["log"] = list(_state.get("log", []))[-40:]
+        snap = {k: v for k, v in _state.items() if k != "log"}
+        snap["log"] = list(_state.get("log", []))[-40:]
+    snap["beat"] = time.time()
+    try:
+        c = db.connect(_shared["path"])
+        try:
+            db.set_setting(c, "catalog_job.state", json.dumps(snap, ensure_ascii=False, default=str))
+        finally:
+            c.close()
+    except Exception:  # noqa: BLE001 — прогресс не должен ломать загрузку
+        log.debug("каталог: не удалось сохранить прогресс", exc_info=True)
+
+
+def _shared_state(conn: Any) -> dict[str, Any] | None:
+    import json
+    raw = db.get_setting(conn, "catalog_job.state") if conn is not None else None
+    if not raw:
+        return None
+    try:
+        snap = json.loads(raw)
+    except ValueError:
+        return None
+    if snap.get("running") and time.time() - float(snap.get("beat") or 0) > STALE:
+        snap["running"] = False
+    return snap
+
+
+def status(conn: Any = None) -> dict[str, Any]:
+    with _lock:
+        local_running = bool(_state.get("running"))
+    shared = None if local_running else _shared_state(conn)
+    with _lock:
+        s = dict(shared) if shared and (shared.get("running") or not _state.get("started_at")) else dict(_state)
+        s["log"] = list(s.get("log", []))[-40:]
     if s.get("started_at"):
         s["seconds"] = int((s.get("finished_at") or time.time()) - s["started_at"])
     s["images_local"] = len(_images)
@@ -108,15 +150,25 @@ def _say(line: str) -> None:
         _state.setdefault("log", []).append(time.strftime("%H:%M:%S ") + line)
         _state["log"] = _state["log"][-200:]
     log.info("каталог: %s", line)
+    _persist()
 
 
 def _set(**kw: Any) -> None:
     with _lock:
         _state.update(kw)
+    _persist(force="running" in kw or "stage" in kw)
 
 
 def start(config: Config, supplier: Supplier, *, sync: bool = True, images: bool = True) -> bool:
-    """False — задача уже идёт."""
+    """False — задача уже идёт (в этом или другом процессе сайта)."""
+    _shared["path"] = config.db_path
+    c = db.connect(config.db_path)
+    try:
+        other = _shared_state(c)
+    finally:
+        c.close()
+    if other and other.get("running") and not _state.get("running"):
+        return False
     with _lock:
         if _state.get("running"):
             return False
@@ -124,6 +176,7 @@ def start(config: Config, supplier: Supplier, *, sync: bool = True, images: bool
         _state.update(running=True, stage="start", started_at=time.time(), finished_at=None, products=0,
                       category="", images_total=0, images_done=0, images_ok=0, images_failed=0,
                       error=None, result=None, log=[], sync=sync, images=images)
+    _persist(force=True)
     threading.Thread(target=_run, args=(config, supplier, sync, images), name="donatix-catalog", daemon=True).start()
     return True
 

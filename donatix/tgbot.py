@@ -440,7 +440,7 @@ def _menu(bot: AdminBot, conn: sqlite3.Connection, action: str, _: int) -> str |
         return screen_rate(conn, cfg)
     if action == "cat":
         from . import catalog_job
-        st = catalog_job.status()
+        st = catalog_job.status(conn)
         synced = db.get_setting(conn, "catalog_synced_at") or "—"
         n = conn.execute("SELECT COUNT(*) FROM products WHERE active = 1").fetchone()[0]
         state = ("⏳ идёт загрузка…" if st.get("running") else

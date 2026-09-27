@@ -12,6 +12,7 @@ API (/api/v2): цены уже с наценкой владельца, зака�
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -218,10 +219,25 @@ def listing(conn: sqlite3.Connection, user_id: int | None = None) -> list[dict[s
         sql, args = sql + " WHERE b.user_id = ?", (user_id,)
     rows = conn.execute(sql + " ORDER BY b.id DESC", args).fetchall()
     out = []
+    shared = {} if RUNNER else _shared_state(conn).get("bots", {})
     for r in rows:
-        st = RUNNER.state(r["id"]) if RUNNER else {}
+        st = RUNNER.state(r["id"]) if RUNNER else shared.get(str(r["id"]), {})
         out.append({**dict(r), **st})
     return out
+
+
+def _shared_state(conn: sqlite3.Connection) -> dict[str, Any]:
+    try:
+        return json.loads(db.get_setting(conn, "bots.state") or "{}")
+    except ValueError:
+        return {}
+
+
+def runner_alive(conn: sqlite3.Connection) -> bool:
+    """Запускатель ботов работает — в этом процессе или в ведущем (отмечается каждые 10 с)."""
+    if RUNNER is not None:
+        return True
+    return time.time() - float(_shared_state(conn).get("beat") or 0) < 90
 
 
 def env_for(config: Config, row: sqlite3.Row, base_url: str) -> dict[str, str]:
@@ -327,6 +343,20 @@ class BotRunner:
     def sync(self) -> None:
         with self._sync_lock:
             self._sync()
+            try:
+                self._publish()
+            except Exception:  # noqa: BLE001
+                log.debug("боты: не удалось сохранить состояние", exc_info=True)
+
+    def _publish(self) -> None:
+        """Состояние ботов — в базу: сайт работает в нескольких процессах, а ботами управляет один."""
+        conn = db.connect(self.config.db_path)
+        try:
+            ids = [r[0] for r in conn.execute("SELECT id FROM bots")]
+            snap = {str(i): self.state(i) for i in ids}
+            db.set_setting(conn, "bots.state", json.dumps({"beat": time.time(), "bots": snap}, default=str))
+        finally:
+            conn.close()
 
     def _sync(self) -> None:
         conn = db.connect(self.config.db_path)

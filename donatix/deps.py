@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import secrets
 import sqlite3
 from typing import Any, Iterator
@@ -126,9 +127,15 @@ def get_config(request: Request) -> Config:
 
 
 def get_conn(request: Request) -> Iterator[sqlite3.Connection]:
-    pool = db.pool(request.app.state.config.db_path)
+    config = request.app.state.config
+    pool = db.pool(config.db_path)
     conn = pool.acquire()
     try:
+        from .sitecfg import refresh
+        try:
+            refresh(conn, config)   # настройки из админки — во всех процессах сайта
+        except Exception:  # noqa: BLE001 — не мешаем запросу, попробуем в следующий раз
+            logging.getLogger(__name__).exception("настройки: не удалось перечитать")
         yield conn
     finally:
         pool.release(conn)

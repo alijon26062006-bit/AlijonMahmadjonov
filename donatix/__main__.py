@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import logging
+import os
 import sys
 
 
@@ -42,8 +43,17 @@ def main(argv: list[str] | None = None) -> int:
 
         from .app import create_app
 
-        uvicorn.run(create_app(config), host=args.host, port=args.port, proxy_headers=True,
-                    forwarded_allow_ips="127.0.0.1")
+        # Несколько процессов — сайт работает на всех ядрах. По умолчанию: ядер − 1, от 1 до 4.
+        cores = os.cpu_count() or 1
+        raw = os.environ.get("DONATIX_WEB_WORKERS", "").strip()
+        workers = int(raw) if raw.isdigit() and int(raw) > 0 else max(1, min(4, cores - 1))
+        if workers > 1:
+            logging.getLogger("donatix").info("сайт: %s процесса(ов)", workers)
+            uvicorn.run("donatix.app:factory", factory=True, workers=workers, host=args.host, port=args.port,
+                        proxy_headers=True, forwarded_allow_ips="127.0.0.1")
+        else:
+            uvicorn.run(create_app(config), host=args.host, port=args.port, proxy_headers=True,
+                        forwarded_allow_ips="127.0.0.1")
         return 0
 
     db.init(config.db_path)

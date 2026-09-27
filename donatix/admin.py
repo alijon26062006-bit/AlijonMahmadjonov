@@ -195,7 +195,7 @@ def bots_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
         "SELECT id, login, email, project FROM users WHERE status = 'active' ORDER BY login").fetchall()
     return render(request, "admin/bots.html", {
         "user": admin, "bots": bots.listing(conn), "clients": clients,
-        "runner": bots.RUNNER is not None, "template_ok": bots.TEMPLATE_DIR.exists(),
+        "runner": bots.runner_alive(conn), "template_ok": bots.TEMPLATE_DIR.exists(),
     })
 
 
@@ -257,7 +257,7 @@ def catalog_sync_page(request: Request, admin=Depends(admin_user), conn=Depends(
         "SELECT COUNT(*) AS products, COUNT(DISTINCT category_id) AS categories, "
         "COUNT(DISTINCT image_url) AS images FROM products WHERE active = 1").fetchone()
     return render(request, "admin/catalog_sync.html", {
-        "user": admin, "job": catalog_job.status(), "counts": counts,
+        "user": admin, "job": catalog_job.status(conn), "counts": counts,
         "synced_at": db.get_setting(conn, "catalog_synced_at"),
     })
 
@@ -274,9 +274,9 @@ def catalog_sync_start(request: Request, mode: str = Form("all"), admin=Depends(
 
 
 @router.get("/catalog-sync/status")
-def catalog_sync_status(admin=Depends(admin_user)):
+def catalog_sync_status(admin=Depends(admin_user), conn=Depends(get_conn)):
     from . import catalog_job
-    return catalog_job.status()
+    return catalog_job.status(conn)
 
 
 # ── Клиенты ──────────────────────────────────────────────────
@@ -440,7 +440,7 @@ def products(request: Request, kind: str = "", q: str = "", admin=Depends(admin_
 def product_toggle(product_id: str, request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
     conn.execute("UPDATE products SET hidden = 1 - hidden WHERE id = ?", (product_id,))
     from . import cache
-    cache.clear()
+    cache.clear_everywhere(conn)
     return _back(request.headers.get("referer") or "/admin/products")
 
 

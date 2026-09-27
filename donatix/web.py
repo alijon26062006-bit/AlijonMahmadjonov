@@ -670,7 +670,7 @@ def panel_bots(request: Request, user=Depends(panel_user), conn=Depends(get_conn
     return render(request, "panel/bots.html", {
         "user": user, "bots": bots.listing(conn, user["id"]), "max_bots": sitecfg.max_bots(conn),
         "elig": bots.eligibility(conn, user),
-        "ready": bots.RUNNER is not None and bots.TEMPLATE_DIR.exists() and sitecfg.client_bots_enabled(conn),
+        "ready": bots.runner_alive(conn) and bots.TEMPLATE_DIR.exists() and sitecfg.client_bots_enabled(conn),
     })
 
 

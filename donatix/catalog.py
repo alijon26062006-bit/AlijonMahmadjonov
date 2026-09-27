@@ -6,11 +6,11 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-import threading
 from decimal import Decimal
 from typing import Any, Callable
 
 from . import cache, db
+from .leader import FileLock
 from .money import apply_markup, fmt_unit, to_decimal
 from .suppliers import KIND_TITLES, Supplier, SupplierError, region_title
 
@@ -18,7 +18,8 @@ log = logging.getLogger(__name__)
 
 
 # Одно обновление каталога за раз: фоновый воркер и кнопка в админке не мешают друг другу
-SYNC_LOCK = threading.Lock()
+# (замок и между процессами сайта — после bind(config) при запуске)
+SYNC_LOCK = FileLock("catalog")
 
 
 _UPSERT = """
@@ -79,7 +80,7 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
             log.warning("steam-гифты: каталог игр не обновлён: %s", exc)
         steam_gifts.clear_cache()
     db.set_setting(conn, "catalog_synced_at", db.now())
-    cache.clear()
+    cache.clear_everywhere(conn)
     log.info("каталог: %s товаров, выключено %s", len(seen), disabled)
     return {"products": len(seen), "disabled": disabled}
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -40,6 +41,13 @@ class _SelectiveGZip:
             await self.plain(scope, receive, send)
         else:
             await self.gzip(scope, receive, send)
+
+
+def factory() -> FastAPI:
+    """Для запуска в нескольких процессах: каждый процесс сам собирает приложение из .env."""
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    return create_app()
 
 
 class _CookieJar:
@@ -153,33 +161,45 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        bg = bot = None
-        if config.run_worker:
+        import threading
+
+        from . import leader
+        started: list = []
+        stop_event = threading.Event()
+
+        def start_background() -> None:
+            # Только в «ведущем» процессе: заказы, боты, загрузка каталога — ровно по одному экземпляру
+            log.info("фоновые задачи: этот процесс ведущий (pid %s)", os.getpid())
+            from . import catalog
+            catalog.SYNC_LOCK.bind(config)
             bg = Worker(config, supplier)
             bg.start()
+            started.append(bg)
             if config.alert_telegram_token and config.alert_telegram_chat_id:
                 from .tgbot import AdminBot
                 bot = AdminBot(config, supplier=supplier)
                 bot.start()
-        support = None
-        if config.run_worker and config.support_bot_token and config.openai_api_key:
-            from .supportbot import SupportBot
-            support = SupportBot(config)
-            support.start()
-        runner = None
-        if config.run_worker and config.run_bots:
-            from . import bots
-            runner = bots.RUNNER = bots.BotRunner(config, config.internal_url)
-            runner.start()
+                started.append(bot)
+            if config.support_bot_token and config.openai_api_key:
+                from .supportbot import SupportBot
+                support = SupportBot(config)
+                support.start()
+                started.append(support)
+            if config.run_bots:
+                from . import bots
+                runner = bots.RUNNER = bots.BotRunner(config, config.internal_url)
+                runner.start()
+                started.append(runner)
+
+        if config.run_worker:
+            from . import catalog
+            catalog.SYNC_LOCK.bind(config)
+            leader.become_leader(config, start_background, stop_event)
         yield
-        if support:
-            support.stop()
-        if runner:
-            runner.stop()
-        if bot:
-            bot.stop()
-        if bg:
-            bg.stop()
+        stop_event.set()
+        for part in reversed(started):
+            part.stop()
+        leader.release("leader")
 
     app = FastAPI(
         title=f"{config.site_name} API",

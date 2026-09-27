@@ -213,7 +213,7 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
         for key, value in values.items():
             db.set_setting(conn, key, value)
     load(conn, config)
-    cache.clear()
+    cache.clear_everywhere(conn)
 
 
 def toggle(conn: sqlite3.Connection, config: Config, key: str) -> bool:
@@ -226,3 +226,19 @@ def bump_markup(conn: sqlite3.Connection, config: Config, tier: str, delta: Deci
     value = max(Decimal("0"), min(Decimal("100"), config.markups[tier] + delta))
     save(conn, config, {f"markup_{tier}": str(value)})
     return config.markups[tier]
+
+
+_refreshed = {"at": 0.0}
+REFRESH_EVERY = 3.0
+
+
+def refresh(conn: sqlite3.Connection, config: Config) -> None:
+    """Раз в несколько секунд перечитать настройки и отметку кеша: сайт работает в нескольких
+    процессах, и правка в админке (наценка, курс, флаги) должна дойти до всех."""
+    import time
+    now = time.monotonic()
+    if now - _refreshed["at"] < REFRESH_EVERY:
+        return
+    _refreshed["at"] = now
+    load(conn, config)
+    cache.sync_epoch(conn)

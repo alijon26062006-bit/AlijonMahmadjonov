@@ -63,3 +63,47 @@ def test_api_key_activity_written_at_most_once_a_minute(client, conn):
     first = conn.execute("SELECT last_used_at FROM api_keys").fetchone()[0]
     client.get("/api/v1/balance", headers={"X-API-Key": key})
     assert conn.execute("SELECT last_used_at FROM api_keys").fetchone()[0] == first
+
+
+def test_admin_change_reaches_other_processes(config, conn):
+    """Сайт в нескольких процессах: наценка, поменянная в одном, доходит до другого."""
+    import dataclasses
+    from decimal import Decimal
+
+    from donatix import sitecfg
+    other = dataclasses.replace(config, markups=dict(config.markups))     # «второй процесс»
+    cache.get_or_set("t:stale", 600, lambda: "old")
+    cache.sync_epoch(conn)
+    sitecfg.save(conn, config, {"markup_bronze": "33"})
+    cache._store["t:stale"] = (time.monotonic() + 600, "old")              # кеш второго процесса
+    cache._epoch["seen"] = "до правки"
+    sitecfg._refreshed["at"] = 0
+    sitecfg.refresh(conn, other)
+    assert other.markups["bronze"] == Decimal("33")
+    assert cache.get_or_set("t:stale", 600, lambda: "new") == "new"        # кеш сброшен по отметке
+
+
+def test_leader_lock_single_owner(config):
+    from donatix import leader
+    assert leader.try_lock(config, "t-lead")
+    import subprocess
+    import sys
+    code = ("import sys; sys.path.insert(0, %r); from donatix import leader\n"
+            "class C: db_path = %r\n"
+            "print(leader.try_lock(C, 't-lead'))") % (str(__import__('pathlib').Path(__file__).parents[2]),
+                                                     str(config.db_path))
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True).stdout.strip()
+    assert out == "False"                                 # другой процесс замок не получит
+    leader.release("t-lead")
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True).stdout.strip()
+    assert out == "True"
+
+
+def test_bots_state_shared_between_processes(conn):
+    import json
+
+    from donatix import bots
+    assert bots.RUNNER is None
+    assert not bots.runner_alive(conn)
+    db.set_setting(conn, "bots.state", json.dumps({"beat": time.time(), "bots": {"5": {"running": True}}}))
+    assert bots.runner_alive(conn)

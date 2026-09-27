@@ -64,3 +64,27 @@ def clear(prefix: str = "") -> None:
     with _lock:
         for key in [k for k in _store if k.startswith(prefix)]:
             del _store[key]
+
+
+# ── Несколько процессов сайта ──────────────────────────────────
+# Каталог обновили или админ поменял настройки в одном процессе — остальные узнают
+# по отметке в базе и тоже сбрасывают свой кеш (проверка раз в несколько секунд).
+_epoch = {"seen": None}
+
+
+def clear_everywhere(conn: Any) -> None:
+    from . import db
+    clear()
+    value = str(time.time_ns())
+    db.set_setting(conn, "cache.epoch", value)
+    _epoch["seen"] = value
+
+
+def sync_epoch(conn: Any) -> None:
+    from . import db
+    value = db.get_setting(conn, "cache.epoch")
+    if _epoch["seen"] is None:
+        _epoch["seen"] = value
+    elif value != _epoch["seen"]:
+        _epoch["seen"] = value
+        clear()

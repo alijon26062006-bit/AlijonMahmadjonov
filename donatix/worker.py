@@ -110,6 +110,18 @@ class Worker:
         last_sync = last_balance = last_watch = last_recheck = 0.0
         conn = db.connect(self.config.db_path)
         try:
+            # Каталог недавно загружен (сайт просто перезапустили) — не грузим сразу заново:
+            # тысячи товаров при каждом перезапуске нагружали сервер впустую
+            try:
+                synced = db.get_setting(conn, "catalog_synced_at")
+                if synced:
+                    from datetime import datetime, timezone
+                    age = (datetime.now(timezone.utc)
+                           - datetime.fromisoformat(synced.replace("Z", "+00:00"))).total_seconds()
+                    if 0 <= age < self.config.catalog_sync_minutes * 60:
+                        last_sync = time.monotonic() - age or 1.0
+            except (ValueError, TypeError):
+                pass
             while not self._stop.is_set():
                 now = time.monotonic()
                 try:
