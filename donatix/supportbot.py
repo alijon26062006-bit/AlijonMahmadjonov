@@ -210,8 +210,13 @@ class Tools:
         user = self.conn.execute("SELECT * FROM users WHERE lower(email) = ? AND role = 'client'",
                                  (email,)).fetchone()
         # Ответ одинаковый, есть такой email или нет — по боту нельзя узнать, кто у нас клиент
-        answer = {"ok": True, "message": "Если аккаунт с таким email есть, код отправлен на почту и в "
-                                         "уведомления кабинета на сайте. Действует 15 минут."}
+        site = self.config.base_url.rstrip("/")
+        where = (f"на почту и в уведомления кабинета ({site}/panel/notifications — колокольчик 🔔)"
+                 if self.config.smtp_host else
+                 f"в уведомления личного кабинета: войдите на {site} и откройте колокольчик 🔔 "
+                 f"(«Уведомления», {site}/panel/notifications)")
+        answer = {"ok": True, "message": f"Если аккаунт с таким email есть, код отправлен {where}. "
+                                         "Действует 15 минут. Скажи клиенту точно, где искать код."}
         if user is None or user["status"] == "blocked":
             return answer
         code = f"{secrets.randbelow(1_000_000):06d}"
@@ -221,8 +226,10 @@ class Tools:
             (self.tg_id, user["id"], _hash(code), now + CODE_TTL, 1 if fresh else prev["sent"] + 1,
              now if fresh else prev["sent_at"]))
         from .notify import notify
+        bot_name = f" @{self.bot.username}" if self.bot.username else ""
         notify(self.conn, self.config, user["id"],
-               f"Код для бота поддержки: {code}. Никому его не сообщайте — только боту поддержки.", "/panel")
+               f"🔐 Код для бота поддержки: {code} — отправьте его боту{bot_name}. "
+               "Действует 15 минут. Никому другому не сообщайте.", "/panel/notifications")
         return answer
 
     def t_verify_login_code(self, code: str) -> dict[str, Any]:
