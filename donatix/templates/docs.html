@@ -5,7 +5,7 @@
 <div class="docs">
   <aside class="docs-nav" aria-label="Разделы документации">
     <div class="label-caps">API v1</div>
-    {% for id, t in [('start', 'Быстрый старт'), ('auth', 'Ключ и адрес'), ('methods', 'Методы'), ('fields', 'Поля заказа'),
+    {% for id, t in [('start', 'Быстрый старт'), ('auth', 'Ключ и адрес'), ('methods', 'Методы'), ('ids', 'ID товаров'), ('fields', 'Поля заказа'),
                      ('check', 'Проверка аккаунта'), ('errors', 'Ошибки'), ('webhook', 'Webhook'), ('examples', 'Примеры')] %}
     <a href="#{{ id }}">{{ t }}</a>
     {% endfor %}
@@ -83,6 +83,56 @@
         {% endfor %}
       </div>
       <p class="hint">kind: <code>telegram_stars</code> <code>telegram_premium</code> <code>steam_topup</code> <code>steam_gift</code> <code>topup</code> <code>gift_card</code> <code>game_key</code></p>
+    </section>
+
+    <section id="ids" class="doc-sec">
+      <h2>ID товаров</h2>
+      <p>Каждый товар и каждый пакет имеет свой <code>product_id</code> — его вы передаёте в <code>POST /orders</code>.
+        По виду ID сразу понятно, что это за товар:</p>
+      <div class="table-wrap card"><table>
+        <tr><th>Товар</th><th>product_id</th><th>Пример</th></tr>
+        <tr><td>Пополнения игр (Free Fire, PUBG Mobile и др.)</td><td><code>topup-</code> + 10 знаков</td><td><code>topup-3f9a1c2b7d</code></td></tr>
+        <tr><td>Подарочные карты</td><td><code>gc-</code> + 10 знаков</td><td><code>gc-8b21e0d4a6</code></td></tr>
+        <tr><td>Ключи игр</td><td><code>gk-</code> + 10 знаков</td><td><code>gk-5c0f7a9e13</code></td></tr>
+        <tr><td>Telegram Stars</td><td>постоянный</td><td><code>tg-stars</code></td></tr>
+        <tr><td>Telegram Premium</td><td>по сроку, в месяцах</td><td><code>tg-premium-3</code> <code>tg-premium-6</code> <code>tg-premium-12</code></td></tr>
+        <tr><td>Пополнение Steam</td><td>постоянный</td><td><code>steam-topup</code></td></tr>
+      </table></div>
+      <p>Примеры <code>topup-…</code> выше — условные. У каждой игры и каждого пакета (100 алмазов, 310 алмазов,
+        недельный ваучер…) свой ID; настоящие берите из <code>GET /products</code>. ID не меняется, пока пакет есть в продаже, —
+        его можно сохранить у себя и не запрашивать каталог перед каждым заказом.</p>
+
+      <h3><span class="step-n">1</span>Найти игру</h3>
+<pre data-lang="bash">curl -s "{{ base_url }}/api/v1/categories" -H "X-API-Key: $KEY"</pre>
+      <p>В ответе у каждой игры есть <code>category_id</code> — по нему удобно брать только её пакеты.</p>
+
+      <h3><span class="step-n">2</span>Получить пакеты и их ID</h3>
+<pre data-lang="bash">curl -s "{{ base_url }}/api/v1/products?kind=topup&q=free%20fire" -H "X-API-Key: $KEY"</pre>
+<pre data-lang="json" data-title="ответ">{"ok": true, "items": [{
+  "product_id": "topup-3f9a1c2b7d",
+  "kind": "topup", "category_id": "free_fire", "category_name": "Free Fire",
+  "region": "CIS", "region_title": "СНГ",
+  "name": "100 Diamonds", "title": "100 алмазов", "emoji": "💎",
+  "price_usd": "0.9900",
+  "fields": [{"key": "player_id", "label": "ID игрока", "type": "text"}]
+}]}</pre>
+      <p><b>Смотрите на <code>region</code>:</b> у одной игры бывают пакеты для разных регионов (например, Free Fire СНГ и
+        Индонезия) — у них разные ID, и пакет другого региона на аккаунт не зачислится.</p>
+
+      <h3><span class="step-n">3</span>Заказать пакет по его ID</h3>
+<pre data-lang="bash">curl -s -X POST {{ base_url }}/api/v1/orders \
+  -H "X-API-Key: $KEY" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -H "Content-Type: application/json" \
+  -d '{"product_id": "topup-3f9a1c2b7d", "fields": {"player_id": "1234567890"}}'</pre>
+
+      <div class="card hint">
+        <b>Бот в формате FazerCards (API v2).</b> Там пакет передаётся как <code>offer_id</code> — в него ставится тот же
+        <code>product_id</code> (<code>topup-…</code>), а в <code>category_id</code> — <code>category_id</code> игры:
+        <code>POST /api/v2/topups/order</code> с телом
+        <code>{"category_id": "free_fire", "offer_id": "topup-3f9a1c2b7d", "fields": {"player_id": "1234567890"}}</code>.
+        Список пакетов в этом формате — <code>GET /api/v2/topups/offers?category_id=…</code>.
+      </div>
     </section>
 
     <section id="fields" class="doc-sec">

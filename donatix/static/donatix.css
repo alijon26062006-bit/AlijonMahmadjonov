@@ -1265,3 +1265,7 @@ html { scroll-behavior: smooth; }
   padding: 6px 14px; border-radius: 10px; background: var(--card, #fff); border: 1px dashed var(--accent-line);
   user-select: all; -webkit-user-select: all; }
 [data-copy].copied { background: #16a34a; border-color: #16a34a; color: #fff; }
+.api-id { margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.api-id code { font-size: 12px; padding: 2px 6px; border-radius: 6px; background: var(--accent-soft); }
+.link-btn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; }
+.link-btn.copied { background: none; color: #16a34a; }

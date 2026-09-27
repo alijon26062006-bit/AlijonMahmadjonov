@@ -252,3 +252,8 @@ def test_old_pending_clients_activated_once(config, conn):
     db.set_setting(conn, "site.require_approval", "1")            # админ включил проверку снова —
     sitecfg.load(conn, config)                                      # решение сохраняется
     assert config.require_approval is True
+
+
+def test_docs_explain_product_ids(client):
+    page = client.get("/docs").text
+    assert 'id="ids"' in page and "topup-" in page and "tg-premium-12" in page and "offer_id" in page

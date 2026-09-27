@@ -15,6 +15,9 @@
       {% if p.platform %}<span class="badge accent">{{ p.platform }}</span>{% endif %}
       {% if can_check %}<span class="badge ok">{{ icon('shield', 13) }}Проверка ID</span>{% endif %}
     </div>
+    <div class="api-id muted small">ID для API: <code>{{ p.product_id }}</code>
+      <button class="link-btn" type="button" data-copy="{{ p.product_id }}">Копировать</button>
+      · <a href="/docs#ids">что это?</a></div>
   </div>
 </div>
 {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
