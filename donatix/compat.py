@@ -121,6 +121,11 @@ def _fields_out(p: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def _categories(conn, supplier, only_checkable: bool = False) -> list[dict[str, Any]]:
+    from . import cache
+    return cache.get_or_set(f"compat:cats:{only_checkable}", 60, lambda: _categories_now(conn, supplier, only_checkable))
+
+
+def _categories_now(conn, supplier, only_checkable: bool = False) -> list[dict[str, Any]]:
     checkable = account_check.supported(supplier)
     out, seen = [], set()
     for p in catalog.list_products(conn, kind="topup", limit=10000):

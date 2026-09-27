@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -229,6 +230,15 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 );
 CREATE INDEX IF NOT EXISTS visits_session ON visits(session, ts);
 CREATE INDEX IF NOT EXISTS visits_user ON visits(user_id) WHERE user_id IS NOT NULL;
+-- Быстрые отчёты: продажи/деньги за период, посещаемость без чтения всей таблицы
+CREATE INDEX IF NOT EXISTS products_cat ON products(category_id, active, hidden);
+CREATE INDEX IF NOT EXISTS orders_user_status ON orders(user_id, status);
+CREATE INDEX IF NOT EXISTS orders_status_created ON orders(status, created_at);
+CREATE INDEX IF NOT EXISTS orders_created ON orders(created_at);
+CREATE INDEX IF NOT EXISTS payments_resolved ON payments(status, resolved_at);
+CREATE INDEX IF NOT EXISTS users_role_created ON users(role, created_at);
+CREATE INDEX IF NOT EXISTS tx_created ON transactions(created_at);
+CREATE INDEX IF NOT EXISTS visits_ts_cover ON visits(ts, visitor, session, user_id);
 """
 
 
@@ -246,7 +256,61 @@ def connect(path: Path | str) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=15000")
+    # Скорость: в режиме WAL «NORMAL» не ждёт записи на диск после каждой мелкой операции
+    # (база остаётся целой; при внезапном отключении питания могут пропасть последние
+    # доли секунды). Временные таблицы — в памяти, файл базы читается через mmap.
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA temp_store=MEMORY")
+    conn.execute("PRAGMA mmap_size=268435456")
     return conn
+
+
+class Pool:
+    """Готовые соединения с базой для запросов сайта.
+
+    Открывать SQLite на каждый запрос (файл + настройки) стоило четверть процессорного
+    времени сервера. Соединение берётся из пула на время запроса и возвращается обратно;
+    одновременно им пользуется только один запрос. Недописанная транзакция при возврате
+    откатывается, чтобы следующий запрос начал с чистого листа.
+    """
+
+    def __init__(self, path: Path | str, keep: int = 32):
+        self.path = Path(path)
+        self.keep = keep
+        self._free: list[sqlite3.Connection] = []
+        self._lock = threading.Lock()
+
+    def acquire(self) -> sqlite3.Connection:
+        with self._lock:
+            if self._free:
+                return self._free.pop()
+        return connect(self.path)
+
+    def release(self, conn: sqlite3.Connection) -> None:
+        try:
+            if conn.in_transaction:
+                conn.execute("ROLLBACK")
+        except sqlite3.Error:
+            conn.close()
+            return
+        with self._lock:
+            if len(self._free) < self.keep:
+                self._free.append(conn)
+                return
+        conn.close()
+
+
+_pools: dict[str, Pool] = {}
+_pools_lock = threading.Lock()
+
+
+def pool(path: Path | str) -> Pool:
+    key = str(Path(path).resolve())
+    with _pools_lock:
+        p = _pools.get(key)
+        if p is None:
+            p = _pools[key] = Pool(path)
+        return p
 
 
 def init(path: Path | str) -> None:
@@ -282,6 +346,7 @@ def init(path: Path | str) -> None:
         if "google_sub" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)")
+        conn.execute("PRAGMA optimize")   # статистика для планировщика запросов — чтобы брал индексы
     finally:
         conn.close()
 

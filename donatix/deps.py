@@ -126,11 +126,12 @@ def get_config(request: Request) -> Config:
 
 
 def get_conn(request: Request) -> Iterator[sqlite3.Connection]:
-    conn = db.connect(request.app.state.config.db_path)
+    pool = db.pool(request.app.state.config.db_path)
+    conn = pool.acquire()
     try:
         yield conn
     finally:
-        conn.close()
+        pool.release(conn)
 
 
 def session_user(request: Request, conn: sqlite3.Connection) -> sqlite3.Row | None:
@@ -194,7 +195,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["tz"], ctx["tz_choice"] = timez.resolve(None, None, request.cookies.get("dx_tz"))
     if ctx.get("user") is not None:
         from .notify import unread_count
-        c = db.connect(config.db_path)
+        pool = db.pool(config.db_path)
+        c = pool.acquire()
         try:
             ctx["tz"], ctx["tz_choice"] = timez.resolve(c, ctx["user"], request.cookies.get("dx_tz"))
             ctx["unread"] = unread_count(c, ctx["user"]["id"])
@@ -206,7 +208,7 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
                 from .payments import settings as pay_settings
                 ctx["cur_rate"] = pay_settings(c, config)["tjs_rate"]
         finally:
-            c.close()
+            pool.release(c)
     ctx["tz_label"] = timez.label(ctx["tz"])
     from datetime import datetime, timezone
     ctx["now_utc"] = datetime.now(timezone.utc)

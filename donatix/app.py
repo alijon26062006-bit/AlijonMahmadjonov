@@ -25,6 +25,103 @@ from .worker import Worker
 log = logging.getLogger(__name__)
 
 
+SLOW_MS = 1500
+
+
+class _SelectiveGZip:
+    """GZip для страниц и API, но не для картинок: JPEG/PNG/WebP уже сжаты — только трата процессора."""
+
+    def __init__(self, app, **kw):
+        self.plain = app
+        self.gzip = GZipMiddleware(app, **kw)
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("path", "").startswith("/media/"):
+            await self.plain(scope, receive, send)
+        else:
+            await self.gzip(scope, receive, send)
+
+
+class _CookieJar:
+    """Ответ глазами traffic.track: статус, тип и куда дописать cookie — без лишних обёрток Starlette."""
+
+    def __init__(self, status: int, raw: list):
+        self.status_code = status
+        self._raw = raw
+        self.headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in raw}
+
+    def set_cookie(self, key: str, value: str, max_age: int, httponly: bool = True, samesite: str = "lax",
+                   secure: bool = False) -> None:
+        cookie = f"{key}={value}; Max-Age={max_age}; Path=/; SameSite={samesite}"
+        cookie += "; HttpOnly" if httponly else ""
+        cookie += "; Secure" if secure else ""
+        self._raw.append((b"set-cookie", cookie.encode("latin-1")))
+
+
+class _Traffic:
+    """Учёт просмотров страниц. Чистый ASGI: API, картинки и админку пропускает сразу, без затрат."""
+
+    def __init__(self, app, db_path):
+        self.app = app
+        self.db_path = db_path
+
+    async def __call__(self, scope, receive, send):
+        from . import traffic
+        if (scope["type"] != "http" or scope.get("method") != "GET"
+                or scope.get("path", "").startswith(traffic.SKIP_PREFIXES)):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                try:
+                    raw = list(message.get("headers") or [])
+                    jar = _CookieJar(message["status"], raw)
+                    session = scope.get("session") or {}
+                    traffic.track(Request(scope), jar, session.get("user_id"))
+                    message = {**message, "headers": raw}
+                except Exception:  # noqa: BLE001 — статистика не должна ломать страницу
+                    log.exception("посещаемость: не удалось записать просмотр")
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+        if time.monotonic() - traffic._last_flush >= 2:
+            try:
+                await run_in_threadpool(traffic.flush, self.db_path)
+            except Exception:  # noqa: BLE001
+                log.exception("посещаемость: запись в базу")
+
+
+class _CacheAndTiming:
+    """Cache-Control по адресу + журнал медленных запросов. Чистый ASGI — без лишних задач на каждый запрос."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        started = time.monotonic()
+        path = scope.get("path", "")
+        query = scope.get("query_string", b"").decode("latin-1")
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers") or [])
+                if not any(k.lower() == b"cache-control" for k, _ in headers):
+                    headers.append((b"cache-control", cache_policy(path, query, message["status"]).encode()))
+                    message = {**message, "headers": headers}
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        finally:
+            ms = (time.monotonic() - started) * 1000
+            if ms >= SLOW_MS:   # journalctl -u donatix | grep медленно
+                log.warning("медленно: %s %s — %.0f мс", scope.get("method"), path, ms)
+
+
 def cache_policy(path: str, query: str, status: int) -> str:
     """Как долго браузер и прокси держат ответ у себя."""
     if status >= 400:
@@ -96,18 +193,8 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     app.state.supplier = supplier
     app.state.limiter = RateLimiter()
 
-    # Посещаемость. Стоит ДО SessionMiddleware в коде — значит, внутри неё и видит сессию (кто вошёл)
-    @app.middleware("http")
-    async def _traffic(request: Request, call_next):
-        response = await call_next(request)
-        try:
-            from . import traffic
-            traffic.track(request, response, request.session.get("user_id") if "session" in request.scope else None)
-            if time.monotonic() - traffic._last_flush >= 2:
-                await run_in_threadpool(traffic.flush, config.db_path)
-        except Exception:  # noqa: BLE001 — статистика не должна ломать страницу
-            log.exception("посещаемость: не удалось записать просмотр")
-        return response
+    # Посещаемость. Добавлена ДО SessionMiddleware — значит, внутри неё и видит сессию (кто вошёл)
+    app.add_middleware(_Traffic, db_path=config.db_path)
 
     app.add_middleware(
         SessionMiddleware,
@@ -117,15 +204,8 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
         same_site="lax",
         https_only=config.cookie_secure,
     )
-    @app.middleware("http")
-    async def _cache_headers(request: Request, call_next):
-        response = await call_next(request)
-        if "cache-control" not in response.headers:
-            response.headers["Cache-Control"] = cache_policy(request.url.path, request.url.query,
-                                                             response.status_code)
-        return response
-
-    app.add_middleware(GZipMiddleware, minimum_size=800, compresslevel=6)
+    app.add_middleware(_CacheAndTiming)
+    app.add_middleware(_SelectiveGZip, minimum_size=800, compresslevel=5)
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
     # Картинки каталога, скачанные с поставщика к себе (админка → Загрузка каталога)
     from . import catalog_job

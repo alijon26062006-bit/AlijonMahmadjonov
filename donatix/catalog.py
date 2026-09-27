@@ -21,35 +21,48 @@ log = logging.getLogger(__name__)
 SYNC_LOCK = threading.Lock()
 
 
+_UPSERT = """
+    INSERT INTO products (id, kind, category_id, category_name, name, base_price, unit,
+                          min_qty, max_qty, stock, fields_json, supplier_ref_json, active, updated_at,
+                          image_url, region)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+        kind = excluded.kind, category_id = excluded.category_id,
+        category_name = excluded.category_name, name = excluded.name,
+        base_price = excluded.base_price, unit = excluded.unit,
+        min_qty = excluded.min_qty, max_qty = excluded.max_qty, stock = excluded.stock,
+        fields_json = excluded.fields_json, supplier_ref_json = excluded.supplier_ref_json,
+        active = 1, updated_at = excluded.updated_at,
+        image_url = excluded.image_url, region = excluded.region
+"""
+
+
 def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
                  progress: Callable[[int, str], None] | None = None) -> dict[str, int]:
     """Забрать каталог у поставщика. Пропавшие товары выключаются, а не удаляются:
     на них ссылаются старые заказы. progress(сколько товаров, текущая категория) — для экрана прогресса."""
     started = db.now()
     seen: set[str] = set()
+    batch: list[tuple] = []
+
+    def write() -> None:
+        # Пачкой в одной транзакции: раньше каждый товар был отдельной записью на диск,
+        # и ежечасная загрузка тысяч товаров тормозила весь сайт
+        if batch:
+            with db.tx(conn):
+                conn.executemany(_UPSERT, batch)
+            batch.clear()
+
     for p in supplier.fetch_catalog():
         seen.add(p.id)
         if progress:
             progress(len(seen), p.category_name)
-        conn.execute(
-            """
-            INSERT INTO products (id, kind, category_id, category_name, name, base_price, unit,
-                                  min_qty, max_qty, stock, fields_json, supplier_ref_json, active, updated_at,
-                                  image_url, region)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                kind = excluded.kind, category_id = excluded.category_id,
-                category_name = excluded.category_name, name = excluded.name,
-                base_price = excluded.base_price, unit = excluded.unit,
-                min_qty = excluded.min_qty, max_qty = excluded.max_qty, stock = excluded.stock,
-                fields_json = excluded.fields_json, supplier_ref_json = excluded.supplier_ref_json,
-                active = 1, updated_at = excluded.updated_at,
-                image_url = excluded.image_url, region = excluded.region
-            """,
-            (p.id, p.kind, p.category_id, p.category_name, p.name, str(p.base_price), p.unit,
-             p.min_qty, max(p.max_qty, p.min_qty), p.stock, json.dumps(p.fields, ensure_ascii=False),
-             json.dumps(p.supplier_ref, ensure_ascii=False), started, p.image_url, p.region),
-        )
+        batch.append((p.id, p.kind, p.category_id, p.category_name, p.name, str(p.base_price), p.unit,
+                      p.min_qty, max(p.max_qty, p.min_qty), p.stock, json.dumps(p.fields, ensure_ascii=False),
+                      json.dumps(p.supplier_ref, ensure_ascii=False), started, p.image_url, p.region))
+        if len(batch) >= 300:
+            write()
+    write()
     disabled = 0
     if seen:
         # Все пришедшие товары получили updated_at = started; остальные — пропали у поставщика.
@@ -108,7 +121,11 @@ def list_products(
         args += [f"%{q}%", f"%{q}%"]
     sql += " ORDER BY kind, category_name, CAST(base_price AS REAL), name LIMIT ? OFFSET ?"
     args += [limit, offset]
-    return [load_product(r) for r in conn.execute(sql, args)]
+    # Каталог меняется раз в час (загрузка у поставщика сбрасывает кеш сразу) — а спрашивают его боты
+    # партнёров постоянно. Держим готовый список минуту; копия — чтобы вызывающий не испортил кеш.
+    key = "lp:" + "\x1f".join(map(str, (kind, q, category_id, region, include_hidden, limit, offset)))
+    rows = cache.get_or_set(key, 60, lambda: [load_product(r) for r in conn.execute(sql, args)])
+    return [dict(p) for p in rows]
 
 
 def categories(conn: sqlite3.Connection, kind: str = "", q: str = "") -> list[sqlite3.Row]:
@@ -124,7 +141,7 @@ def categories(conn: sqlite3.Connection, kind: str = "", q: str = "") -> list[sq
         sql += " AND (name LIKE ? OR category_name LIKE ?)"
         args += [f"%{q}%", f"%{q}%"]
     sql += " GROUP BY kind, category_id, category_name ORDER BY kind, category_name"
-    return conn.execute(sql, args).fetchall()
+    return cache.get_or_set(f"cats:{kind}\x1f{q}", 60, lambda: conn.execute(sql, args).fetchall())
 
 
 def public_view(product: dict[str, Any], markup: Decimal) -> dict[str, Any]:

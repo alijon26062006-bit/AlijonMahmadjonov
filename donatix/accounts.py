@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from . import db
@@ -160,15 +161,23 @@ def revoke_api_key(conn: sqlite3.Connection, user_id: int, key_id: int) -> None:
 
 def user_by_api_key(conn: sqlite3.Connection, key: str) -> sqlite3.Row | None:
     row = conn.execute(
-        "SELECT u.*, k.id AS api_key_id FROM api_keys k JOIN users u ON u.id = k.user_id "
-        "WHERE k.key_hash = ? AND k.revoked_at IS NULL",
+        "SELECT u.*, k.id AS api_key_id, k.last_used_at AS key_used_at FROM api_keys k "
+        "JOIN users u ON u.id = k.user_id WHERE k.key_hash = ? AND k.revoked_at IS NULL",
         (hash_api_key(key),),
     ).fetchone()
     if row is not None:
+        # Боты зовут API много раз в минуту — отметку «был активен» пишем не чаще раза в минуту,
+        # иначе каждый запрос превращается в две записи на диск и очередь к базе.
         ts = db.now()
-        conn.execute("UPDATE api_keys SET last_used_at = ? WHERE id = ?", (ts, row["api_key_id"]))
-        conn.execute("UPDATE users SET last_active_at = ? WHERE id = ?", (ts, row["id"]))
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=ACTIVITY_EVERY)).strftime("%Y-%m-%dT%H:%M:%S")
+        if (row["key_used_at"] or "") < cutoff or (row["last_active_at"] or "") < cutoff:
+            with db.tx(conn):
+                conn.execute("UPDATE api_keys SET last_used_at = ? WHERE id = ?", (ts, row["api_key_id"]))
+                conn.execute("UPDATE users SET last_active_at = ? WHERE id = ?", (ts, row["id"]))
     return row
+
+
+ACTIVITY_EVERY = 60
 
 
 # ── Журнал денег ─────────────────────────────────────────────

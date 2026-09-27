@@ -8,7 +8,7 @@ import sqlite3
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 
-from . import accounts, catalog, db, orders, payments, worker
+from . import accounts, cache, catalog, db, orders, payments, worker
 from .config import PAY_METHODS, TIERS, Config
 from .deps import Forbidden, LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
 from .money import MoneyError, apply_markup, fmt, fmt_unit, to_decimal, to_micro
@@ -49,9 +49,10 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
         "user": admin,
         "counts": counts,
         "today": orders.stats(conn, 1),
-        "month": orders.stats(conn, 30),
-        "days": orders.daily(conn, 14),
-        "top": orders.top_clients(conn),
+        # Тяжёлые сводки за месяц/две недели — из кеша на минуту: админка не тормозит сайт клиентам
+        "month": cache.get_or_set("admin:month", 60, lambda: orders.stats(conn, 30)),
+        "days": cache.get_or_set("admin:days", 60, lambda: orders.daily(conn, 14)),
+        "top": cache.get_or_set("admin:top", 60, lambda: orders.top_clients(conn)),
         "supplier_balance": worker.supplier_balance_cached(conn),
         "supplier_balance_at": db.get_setting(conn, "supplier_balance_at"),
         "supplier_balance_error": db.get_setting(conn, "supplier_balance_error") or "",
@@ -68,7 +69,7 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
 def stats_page(request: Request, period: str = "30d", admin=Depends(admin_user), conn=Depends(get_conn),
                config: Config = Depends(get_config)):
     from . import analytics
-    a = analytics.build(conn, period, tz_hours=config.tz_offset)
+    a = cache.get_or_set(f"admin:stats:{period}", 60, lambda: analytics.build(conn, period, tz_hours=config.tz_offset))
     supplier = worker.supplier_balance_cached(conn)
     owed = conn.execute("SELECT COALESCE(SUM(balance_micro), 0) FROM users WHERE role = 'client'").fetchone()[0]
     supplier_micro = int(supplier * 10_000) if supplier is not None else None
@@ -87,7 +88,7 @@ def stats_page(request: Request, period: str = "30d", admin=Depends(admin_user),
 def finance_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
                  config: Config = Depends(get_config)):
     from . import finance, timez
-    days = finance.history(conn, config, 14)
+    days = cache.get_or_set("admin:finance", 30, lambda: finance.history(conn, config, 14))
     return render(request, "admin/finance.html", {
         "user": admin, "now": days[0], "days": days, "cutoff": finance.cutoff_hour(conn),
         "site_tz": timez.label(timez.site_zone_name(conn)), "tjs": finance.tjs, "usd": finance.usd,
@@ -112,7 +113,8 @@ def traffic_page(request: Request, period: str = "7d", admin=Depends(admin_user)
     from . import traffic
     traffic.flush(config.db_path, force=True)  # свежие просмотры — сразу в отчёт
     return render(request, "admin/traffic.html", {
-        "user": admin, "t": traffic.report(conn, period, tz_hours=config.tz_offset),
+        "user": admin, "t": cache.get_or_set(f"admin:traffic:{period}", 60,
+                                              lambda: traffic.report(conn, period, tz_hours=config.tz_offset)),
         "page_title": traffic.page_title, "duration": traffic.duration,
     })
 
