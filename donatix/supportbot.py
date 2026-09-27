@@ -1,0 +1,518 @@
+"""Бот поддержки клиентов Donatix с AI (OpenAI).
+
+Клиент пишет в Telegram: «заказ не пришёл», «почему не пополнился баланс». AI:
+1) просит email от аккаунта → бот шлёт 6-значный код (на почту, а если почта на
+   сервере не настроена — в уведомления кабинета) → клиент вводит код, и этот
+   Telegram привязывается к аккаунту;
+2) спрашивает номер заказа (dx-…) или заявки на пополнение (#N), сам смотрит,
+   что с ними, и отвечает на языке клиента — по-таджикски или по-русски;
+3) не может решить сам — передаёт обращение админу, ответ админа приходит клиенту
+   в этот же чат.
+
+Что AI видит: только то, что отдают функции ниже, и только по своему аккаунту.
+Поставщик, закупочные цены, наценки, служебные ошибки и чужие данные в эти
+функции не попадают — поэтому AI не может их выдать, даже если его попросят.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+import logging
+import re
+import secrets
+import sqlite3
+import threading
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
+
+import httpx
+
+from . import accounts, db
+from .config import Config
+from .money import fmt
+
+log = logging.getLogger(__name__)
+
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+PROMPT_FILE = Path(__file__).with_name("support_prompt.txt")   # инструкции для AI — править можно без кода
+HISTORY_TURNS = 16            # сколько последних сообщений помнит бот
+MAX_TOOL_ROUNDS = 6           # шагов «спросил базу → подумал» на один ответ
+CODE_TTL = 15 * 60            # код входа живёт 15 минут
+CODE_TRIES = 5
+CODES_PER_HOUR = 3
+MSG_LIMIT = (20, 600)         # не больше 20 сообщений за 10 минут от одного человека
+MAX_INPUT = 1500
+
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_ORDER = re.compile(r"(dx-[0-9a-f-]{6,})", re.I)
+
+
+# ─────────────────────────────────────────── данные для AI (только своё и без внутренностей)
+
+
+def _linked_user(conn: sqlite3.Connection, tg_id: int) -> sqlite3.Row | None:
+    row = conn.execute("SELECT user_id FROM support_links WHERE tg_id = ?", (tg_id,)).fetchone()
+    return accounts.get_user(conn, row["user_id"]) if row else None
+
+
+def _order_reason(error: str | None) -> str:
+    """Причина неудачи — категорией, без текста поставщика и служебных подробностей."""
+    text = (error or "").lower()
+    if any(w in text for w in ("player", "игрок", "user id", "uid", "invalid id", "not found user", "аккаунт",
+                               "username", "account")):
+        return "wrong_recipient"          # неверный ID игрока / @username
+    if any(w in text for w in ("balance", "баланс", "insufficient", "stock", "недоступ", "unavailable",
+                               "out of", "нет в наличии")):
+        return "temporarily_unavailable"  # товар временно недоступен
+    if any(w in text for w in ("region", "регион", "country", "стран")):
+        return "wrong_region"
+    return "not_completed"
+
+
+def _minutes_since(ts: str | None) -> int | None:
+    if not ts:
+        return None
+    try:
+        dt = datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return int((datetime.now(timezone.utc) - dt).total_seconds() // 60)
+
+
+def _order_for_ai(o: sqlite3.Row) -> dict[str, Any]:
+    from .deps import _pack_title
+    from .orders import client_status
+    status = client_status(o["status"])
+    fields = json.loads(o["fields_json"] or "{}")
+    refunded = status == "failed"
+    return {
+        "order_id": o["public_id"],
+        "status": {"processing": "в обработке", "completed": "выполнен", "failed": "не выполнен"}.get(status, status),
+        "product": _pack_title(o["product_name"], o["kind"]),
+        "quantity": o["quantity"],
+        "recipient": fields,
+        "price_usd": fmt(o["total_micro"]),
+        "created_at_utc": o["created_at"][:16].replace("T", " "),
+        "minutes_since_created": _minutes_since(o["created_at"]),
+        "money_returned_to_balance": refunded,
+        "failure_reason": _order_reason(o["error"]) if refunded else None,
+        "has_code_or_key": bool(o["delivery_json"]) and o["kind"] in ("gift_card", "game_key") and
+        status == "completed",
+        "page": f"/panel/orders/{o['public_id']}",
+    }
+
+
+def _payment_for_ai(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) -> dict[str, Any]:
+    from .payments import title_for
+    return {
+        "payment_id": p["id"],
+        "status": {"pending": "на проверке", "paid": "зачислено", "rejected": "отклонено",
+                   "cancelled": "отменено"}.get(p["status"], p["status"]),
+        "method": title_for(conn, config, p["method"]),
+        "amount_usd": fmt(p["amount_micro"]),
+        "to_pay": f"{p['pay_amount']} {p['pay_currency']}",
+        "receipt_attached": bool(p["receipt_file"]),
+        "automatic_crypto": bool(p["auto_kind"]),
+        "reject_reason": p["admin_note"] if p["status"] in ("rejected", "cancelled") else None,
+        "created_at_utc": p["created_at"][:16].replace("T", " "),
+        "minutes_since_created": _minutes_since(p["created_at"]),
+    }
+
+
+# ─────────────────────────────────────────── функции, которые может вызвать AI
+
+TOOLS = [
+    {"type": "function", "function": {
+        "name": "send_login_code",
+        "description": "Отправить 6-значный код входа для аккаунта с этим email. Код приходит на почту и в "
+                       "уведомления кабинета на сайте. Вызывай, когда клиент назвал email, а аккаунт ещё не "
+                       "подтверждён.",
+        "parameters": {"type": "object", "properties": {"email": {"type": "string"}}, "required": ["email"],
+                       "additionalProperties": False}}},
+    {"type": "function", "function": {
+        "name": "verify_login_code",
+        "description": "Проверить 6-значный код, который прислал клиент. После успеха доступны его заказы, "
+                       "баланс и пополнения.",
+        "parameters": {"type": "object", "properties": {"code": {"type": "string"}}, "required": ["code"],
+                       "additionalProperties": False}}},
+    {"type": "function", "function": {
+        "name": "get_my_account",
+        "description": "Аккаунт клиента: логин, статус, баланс, число заказов. Только после подтверждения кода.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}},
+    {"type": "function", "function": {
+        "name": "get_order",
+        "description": "Заказ клиента по номеру вида dx-… Только его собственные заказы.",
+        "parameters": {"type": "object", "properties": {"order_id": {"type": "string"}}, "required": ["order_id"],
+                       "additionalProperties": False}}},
+    {"type": "function", "function": {
+        "name": "list_my_orders",
+        "description": "Последние заказы клиента (до 10). status: all | processing | failed | completed.",
+        "parameters": {"type": "object", "properties": {"status": {"type": "string",
+                       "enum": ["all", "processing", "failed", "completed"]}}, "additionalProperties": False}}},
+    {"type": "function", "function": {
+        "name": "get_payment",
+        "description": "Заявка клиента на пополнение баланса по номеру (#N).",
+        "parameters": {"type": "object", "properties": {"payment_id": {"type": "integer"}},
+                       "required": ["payment_id"], "additionalProperties": False}}},
+    {"type": "function", "function": {
+        "name": "list_my_payments",
+        "description": "Последние заявки клиента на пополнение (до 10).",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}},
+    {"type": "function", "function": {
+        "name": "escalate_to_admin",
+        "description": "Передать обращение живому админу. Только если сам решить не можешь: деньги списаны, но "
+                       "заказ не выполнен дольше 30 минут; заявка на пополнение висит дольше 2 часов с чеком; "
+                       "спор; клиент настаивает на человеке. summary — кратко по-русски: суть, номера, что уже "
+                       "проверено.",
+        "parameters": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"],
+                       "additionalProperties": False}}},
+]
+
+
+class Tools:
+    """Исполнение функций AI для одного Telegram-пользователя."""
+
+    def __init__(self, bot: "SupportBot", conn: sqlite3.Connection, tg_id: int, tg_name: str):
+        self.bot, self.conn, self.config = bot, conn, bot.config
+        self.tg_id, self.tg_name = tg_id, tg_name
+
+    def run(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        fn = getattr(self, f"t_{name}", None)
+        if fn is None:
+            return {"error": "unknown_tool"}
+        try:
+            return fn(**args)
+        except TypeError:
+            return {"error": "bad_arguments"}
+
+    def _user(self) -> sqlite3.Row | None:
+        return _linked_user(self.conn, self.tg_id)
+
+    def t_send_login_code(self, email: str) -> dict[str, Any]:
+        email = (email or "").strip().lower()
+        if not _EMAIL.match(email):
+            return {"ok": False, "error": "invalid_email"}
+        prev = self.conn.execute("SELECT sent, sent_at FROM support_codes WHERE tg_id = ?", (self.tg_id,)).fetchone()
+        now = time.time()
+        fresh = prev is None or now - prev["sent_at"] >= 3600      # новый час — счёт заново
+        if not fresh and prev["sent"] >= CODES_PER_HOUR:
+            return {"ok": False, "error": "too_many_codes_try_later"}
+        user = self.conn.execute("SELECT * FROM users WHERE lower(email) = ? AND role = 'client'",
+                                 (email,)).fetchone()
+        # Ответ одинаковый, есть такой email или нет — по боту нельзя узнать, кто у нас клиент
+        answer = {"ok": True, "message": "Если аккаунт с таким email есть, код отправлен на почту и в "
+                                         "уведомления кабинета на сайте. Действует 15 минут."}
+        if user is None or user["status"] == "blocked":
+            return answer
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        self.conn.execute(
+            "INSERT OR REPLACE INTO support_codes (tg_id, user_id, code_hash, expires_at, tries, sent, sent_at) "
+            "VALUES (?, ?, ?, ?, 0, ?, ?)",
+            (self.tg_id, user["id"], _hash(code), now + CODE_TTL, 1 if fresh else prev["sent"] + 1,
+             now if fresh else prev["sent_at"]))
+        from .notify import notify
+        notify(self.conn, self.config, user["id"],
+               f"Код для бота поддержки: {code}. Никому его не сообщайте — только боту поддержки.", "/panel")
+        return answer
+
+    def t_verify_login_code(self, code: str) -> dict[str, Any]:
+        code = re.sub(r"\D", "", code or "")
+        row = self.conn.execute("SELECT * FROM support_codes WHERE tg_id = ?", (self.tg_id,)).fetchone()
+        if row is None or row["expires_at"] < time.time():
+            return {"ok": False, "error": "no_active_code_ask_email_again"}
+        if row["tries"] >= CODE_TRIES:
+            return {"ok": False, "error": "too_many_tries_ask_email_again"}
+        if not hmac.compare_digest(row["code_hash"], _hash(code)):
+            self.conn.execute("UPDATE support_codes SET tries = tries + 1 WHERE tg_id = ?", (self.tg_id,))
+            return {"ok": False, "error": "wrong_code", "tries_left": CODE_TRIES - row["tries"] - 1}
+        self.conn.execute("INSERT INTO support_links (tg_id, user_id, linked_at) VALUES (?, ?, ?) "
+                          "ON CONFLICT(tg_id) DO UPDATE SET user_id = excluded.user_id, linked_at = excluded.linked_at",
+                          (self.tg_id, row["user_id"], db.now()))
+        self.conn.execute("DELETE FROM support_codes WHERE tg_id = ?", (self.tg_id,))
+        u = accounts.get_user(self.conn, row["user_id"])
+        return {"ok": True, "login": u["login"]}
+
+    def _need_user(self) -> sqlite3.Row | dict[str, Any]:
+        u = self._user()
+        return u if u is not None else {"error": "not_verified_ask_email"}
+
+    def t_get_my_account(self) -> dict[str, Any]:
+        u = self._need_user()
+        if isinstance(u, dict):
+            return u
+        n = self.conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ?", (u["id"],)).fetchone()[0]
+        return {"login": u["login"], "email": u["email"],
+                "status": {"active": "активен", "pending": "ждёт одобрения", "blocked": "заблокирован"}.get(
+                    u["status"], u["status"]),
+                "balance_usd": fmt(u["balance_micro"]), "orders_total": n}
+
+    def t_get_order(self, order_id: str) -> dict[str, Any]:
+        u = self._need_user()
+        if isinstance(u, dict):
+            return u
+        m = _ORDER.search(order_id or "")
+        pid = m.group(1).lower() if m else (order_id or "").strip()
+        o = self.conn.execute("SELECT * FROM orders WHERE user_id = ? AND public_id = ?", (u["id"], pid)).fetchone()
+        return _order_for_ai(o) if o else {"error": "order_not_found_in_this_account"}
+
+    def t_list_my_orders(self, status: str = "all") -> dict[str, Any]:
+        u = self._need_user()
+        if isinstance(u, dict):
+            return u
+        sql, args = "SELECT * FROM orders WHERE user_id = ?", [u["id"]]
+        if status == "processing":
+            sql += " AND status IN ('processing', 'attention')"
+        elif status in ("failed", "completed"):
+            sql += " AND status = ?"
+            args.append(status)
+        rows = self.conn.execute(sql + " ORDER BY id DESC LIMIT 10", args).fetchall()
+        return {"orders": [_order_for_ai(o) for o in rows]}
+
+    def t_get_payment(self, payment_id: int) -> dict[str, Any]:
+        u = self._need_user()
+        if isinstance(u, dict):
+            return u
+        p = self.conn.execute("SELECT * FROM payments WHERE user_id = ? AND id = ?", (u["id"], int(payment_id))
+                              ).fetchone()
+        return _payment_for_ai(self.conn, self.config, p) if p else {"error": "payment_not_found_in_this_account"}
+
+    def t_list_my_payments(self) -> dict[str, Any]:
+        u = self._need_user()
+        if isinstance(u, dict):
+            return u
+        rows = self.conn.execute("SELECT * FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 10",
+                                 (u["id"],)).fetchall()
+        return {"payments": [_payment_for_ai(self.conn, self.config, p) for p in rows]}
+
+    def t_escalate_to_admin(self, summary: str) -> dict[str, Any]:
+        u = self._user()
+        cur = self.conn.execute("INSERT INTO support_tickets (tg_id, user_id, summary, created_at) VALUES "
+                                "(?, ?, ?, ?)", (self.tg_id, u["id"] if u else None, summary[:1500], db.now()))
+        ticket = int(cur.lastrowid)
+        self.bot.alert_admin(ticket, self.tg_id, self.tg_name, u, summary[:1500])
+        return {"ok": True, "ticket": ticket}
+
+
+def _hash(code: str) -> str:
+    return hashlib.sha256(("donatix-support:" + code).encode()).hexdigest()
+
+
+# ─────────────────────────────────────────── что AI знает о сервисе
+
+
+def system_prompt(conn: sqlite3.Connection, config: Config) -> str:
+    from . import payments, sitecfg
+    methods = [m for m in payments.methods(conn, config)]
+    manual = ", ".join(m["title"] for m in methods if not m["auto"]) or "—"
+    auto = ", ".join(m["title"] for m in methods if m["auto"]) or "—"
+    min_tjs = payments.settings(conn, config)["min_tjs"]
+    bots = sitecfg.client_bots_enabled(conn)
+    site = config.base_url.rstrip("/")
+    return PROMPT_FILE.read_text(encoding="utf-8").format(
+        site_name=config.site_name, site=site, manual=manual, auto=auto,
+        bots_line=" или через свой Telegram-бот из конструктора" if bots else "",
+        min_line=f" (минимум {min_tjs} сомони)" if min_tjs and float(min_tjs) > 0 else "",
+    ).strip()
+
+
+# ─────────────────────────────────────────── AI
+
+
+class OpenAIChat:
+    def __init__(self, api_key: str, model: str, transport: httpx.BaseTransport | None = None):
+        self.model = model
+        self._client = httpx.Client(timeout=60, transport=transport,
+                                    headers={"Authorization": f"Bearer {api_key}"})
+
+    def __call__(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+        resp = self._client.post(OPENAI_URL, json={"model": self.model, "messages": messages, "tools": TOOLS,
+                                                   "tool_choice": "auto", "temperature": 0.3})
+        if resp.status_code >= 400:
+            raise RuntimeError(f"openai {resp.status_code}: {resp.text[:300]}")
+        return resp.json()["choices"][0]["message"]
+
+
+def answer(conn: sqlite3.Connection, config: Config, chat: Callable[[list[dict[str, Any]]], dict[str, Any]],
+           tools: Tools, text: str) -> str:
+    """Один ответ AI: история + новое сообщение, с вызовами функций по дороге."""
+    history = conn.execute(
+        "SELECT role, content FROM (SELECT * FROM support_history WHERE tg_id = ? ORDER BY id DESC LIMIT ?) "
+        "ORDER BY id", (tools.tg_id, HISTORY_TURNS)).fetchall()
+    verified = _linked_user(conn, tools.tg_id)
+    state = (f"[Статус: аккаунт подтверждён — логин {verified['login']}]" if verified else
+             "[Статус: аккаунт не подтверждён]")
+    messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(conn, config)}]
+    messages += [{"role": r["role"], "content": r["content"]} for r in history]
+    messages.append({"role": "system", "content": state})
+    messages.append({"role": "user", "content": text})
+    reply = ""
+    for _ in range(MAX_TOOL_ROUNDS):
+        msg = chat(messages)
+        calls = msg.get("tool_calls") or []
+        if not calls:
+            reply = (msg.get("content") or "").strip()
+            break
+        messages.append({"role": "assistant", "content": msg.get("content"), "tool_calls": calls})
+        for call in calls:
+            fn = call.get("function") or {}
+            try:
+                args = json.loads(fn.get("arguments") or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            result = tools.run(str(fn.get("name")), args if isinstance(args, dict) else {})
+            messages.append({"role": "tool", "tool_call_id": call.get("id"),
+                             "content": json.dumps(result, ensure_ascii=False)})
+    if not reply:
+        reply = ("Не получилось ответить сразу — передал ваш вопрос администратору, ответ придёт сюда. / "
+                 "Ҷавоб додан нашуд — саволи шумо ба админ фиристода шуд.")
+    now = db.now()
+    conn.execute("INSERT INTO support_history (tg_id, role, content, created_at) VALUES (?, 'user', ?, ?)",
+                 (tools.tg_id, text, now))
+    conn.execute("INSERT INTO support_history (tg_id, role, content, created_at) VALUES (?, 'assistant', ?, ?)",
+                 (tools.tg_id, reply, now))
+    return reply
+
+
+# ─────────────────────────────────────────── Telegram
+
+
+class SupportBot:
+    def __init__(self, config: Config, api: Callable[..., Any] | None = None,
+                 chat: Callable[[list[dict[str, Any]]], dict[str, Any]] | None = None):
+        from .tgbot import TelegramApi
+        self.config = config
+        self.api = api or TelegramApi(config.support_bot_token)
+        self.chat = chat or OpenAIChat(config.openai_api_key, config.support_model)
+        self.admin_chat = str(config.alert_telegram_chat_id or "").strip()
+        self.username = ""
+        self._hits: dict[int, list[float]] = {}
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._run, name="donatix-support", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def _run(self) -> None:
+        conn = db.connect(self.config.db_path)
+        offset = int(db.get_setting(conn, "support.tg_offset", "0") or 0)
+        try:
+            me = self.api("getMe") or {}
+            self.username = me.get("username") or ""
+            if self.username:
+                # Контакт поддержки на сайте — этот бот, а не личный аккаунт админа
+                self.config.support_contact = "@" + self.username
+                db.set_setting(conn, "support.bot_username", self.username)
+            self.api("setMyCommands", commands=[{"command": "start", "description": "Начать / Оғоз"},
+                                                {"command": "logout", "description": "Выйти из аккаунта"}])
+        except Exception as exc:
+            log.warning("бот поддержки: %s", exc)
+        try:
+            while not self._stop.is_set():
+                try:
+                    updates = self.api("getUpdates", offset=offset, timeout=25, allowed_updates=["message"]) or []
+                except Exception as exc:
+                    log.warning("бот поддержки: %s", exc)
+                    self._stop.wait(10)
+                    continue
+                for upd in updates:
+                    offset = max(offset, int(upd["update_id"]) + 1)
+                    try:
+                        self.handle(conn, upd)
+                    except Exception:
+                        log.exception("бот поддержки: сообщение %s", upd.get("update_id"))
+                db.set_setting(conn, "support.tg_offset", str(offset))
+        finally:
+            conn.close()
+
+    def send(self, chat_id: int | str, text: str) -> None:
+        for i in range(0, len(text), 4000):  # длинный ответ — частями
+            self.api("sendMessage", chat_id=chat_id, text=text[i:i + 4000], disable_web_page_preview=True)
+
+    def _limited(self, tg_id: int) -> bool:
+        count, window = MSG_LIMIT
+        now = time.time()
+        hits = [t for t in self._hits.get(tg_id, []) if now - t < window]
+        hits.append(now)
+        self._hits[tg_id] = hits
+        return len(hits) > count
+
+    def handle(self, conn: sqlite3.Connection, upd: dict[str, Any]) -> None:
+        msg = upd.get("message") or {}
+        chat = msg.get("chat") or {}
+        if chat.get("type") != "private":
+            return
+        tg_id = int(chat.get("id"))
+        user = msg.get("from") or {}
+        name = ("@" + user["username"]) if user.get("username") else (user.get("first_name") or str(tg_id))
+        text = (msg.get("text") or msg.get("caption") or "").strip()
+
+        # Ответ админа: reply на обращение → уходит клиенту
+        if self.admin_chat and str(tg_id) == self.admin_chat:
+            self._admin_reply(conn, msg, text)
+            return
+        if text.startswith("/start"):
+            self.send(tg_id, "Салом! Ман ёрдамчии Donatix ҳастам. Саволи худро нависед — масалан, «фармоиш "
+                             "нарасид» ё «баланс пур нашуд».\n\nЗдравствуйте! Я помощник Donatix. Напишите "
+                             "вопрос — например, «заказ не пришёл» или «баланс не пополнился».")
+            return
+        if text.startswith("/logout"):
+            conn.execute("DELETE FROM support_links WHERE tg_id = ?", (tg_id,))
+            conn.execute("DELETE FROM support_history WHERE tg_id = ?", (tg_id,))
+            self.send(tg_id, "Вы вышли из аккаунта. / Шумо аз ҳисоб баромадед.")
+            return
+        if not text:
+            self.send(tg_id, "Напишите вопрос текстом. / Саволро бо матн нависед.")
+            return
+        if self._limited(tg_id):
+            self.send(tg_id, "Слишком много сообщений — подождите несколько минут. / Каме сабр кунед.")
+            return
+        try:
+            self.api("sendChatAction", chat_id=tg_id, action="typing")
+        except Exception:
+            pass
+        try:
+            reply = answer(conn, self.config, self.chat, Tools(self, conn, tg_id, name), text[:MAX_INPUT])
+        except Exception:
+            log.exception("бот поддержки: AI")
+            reply = ("Сейчас не могу ответить — попробуйте через минуту. / Ҳоло ҷавоб дода наметавонам — "
+                     "пас аз як дақиқа боз нависед.")
+        self.send(tg_id, reply)
+
+    def alert_admin(self, ticket: int, tg_id: int, tg_name: str, user: sqlite3.Row | None, summary: str) -> None:
+        who = f"{user['login']} · {user['email']}" if user else "аккаунт не подтверждён"
+        text = (f"🆘 Обращение #{ticket} · tg{tg_id}\nКлиент: {tg_name} ({who})\n\n{summary}\n\n"
+                f"Ответить: сделайте reply на это сообщение в боте @{self.username or 'поддержки'} — ответ уйдёт "
+                "клиенту.")
+        sent = False
+        if self.admin_chat:
+            try:
+                self.api("sendMessage", chat_id=self.admin_chat, text=text)
+                sent = True
+            except Exception as exc:  # админ ещё не нажал /start в боте поддержки
+                log.warning("бот поддержки: админу не доставлено: %s", exc)
+        if not sent:
+            from .worker import notify_admin
+            notify_admin(self.config, text + "\n\n(Нажмите /start в боте поддержки, чтобы отвечать клиентам.)")
+
+    def _admin_reply(self, conn: sqlite3.Connection, msg: dict[str, Any], text: str) -> None:
+        original = (msg.get("reply_to_message") or {}).get("text") or ""
+        m = re.search(r"tg(\d+)", original)
+        if not m or not text:
+            self.send(self.admin_chat, "Чтобы ответить клиенту, сделайте reply на его обращение (🆘 …).")
+            return
+        client_id = int(m.group(1))
+        self.send(client_id, f"👤 Ответ администратора / Ҷавоби админ:\n{text}")
+        conn.execute("INSERT INTO support_history (tg_id, role, content, created_at) VALUES (?, 'assistant', ?, ?)",
+                     (client_id, f"[Ответ администратора] {text}", db.now()))
+        t = re.search(r"#(\d+)", original)
+        if t:
+            conn.execute("UPDATE support_tickets SET status = 'answered' WHERE id = ?", (int(t.group(1)),))
+        self.send(self.admin_chat, "✅ Отправлено клиенту.")

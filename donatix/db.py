@@ -190,6 +190,38 @@ CREATE TABLE IF NOT EXISTS visits (
     is_new       INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS visits_ts ON visits(ts);
+
+-- Бот поддержки: чей это Telegram, коды входа, переписка, обращения к админу
+CREATE TABLE IF NOT EXISTS support_links (
+    tg_id     INTEGER PRIMARY KEY,
+    user_id   INTEGER NOT NULL REFERENCES users(id),
+    linked_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS support_codes (
+    tg_id      INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    code_hash  TEXT NOT NULL,
+    expires_at REAL NOT NULL,
+    tries      INTEGER NOT NULL DEFAULT 0,
+    sent       INTEGER NOT NULL DEFAULT 1,
+    sent_at    REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS support_history (
+    id         INTEGER PRIMARY KEY,
+    tg_id      INTEGER NOT NULL,
+    role       TEXT NOT NULL,
+    content    TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS support_history_tg ON support_history(tg_id, id);
+CREATE TABLE IF NOT EXISTS support_tickets (
+    id         INTEGER PRIMARY KEY,
+    tg_id      INTEGER NOT NULL,
+    user_id    INTEGER,
+    summary    TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'open',
+    created_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS visits_session ON visits(session, ts);
 CREATE INDEX IF NOT EXISTS visits_user ON visits(user_id) WHERE user_id IS NOT NULL;
 """

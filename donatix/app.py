@@ -64,12 +64,19 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
                 from .tgbot import AdminBot
                 bot = AdminBot(config, supplier=supplier)
                 bot.start()
+        support = None
+        if config.run_worker and config.support_bot_token and config.openai_api_key:
+            from .supportbot import SupportBot
+            support = SupportBot(config)
+            support.start()
         runner = None
         if config.run_worker and config.run_bots:
             from . import bots
             runner = bots.RUNNER = bots.BotRunner(config, config.internal_url)
             runner.start()
         yield
+        if support:
+            support.stop()
         if runner:
             runner.stop()
         if bot:

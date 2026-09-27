@@ -105,6 +105,10 @@ class Config:
     low_balance_usd: Decimal = Decimal("10")
 
     # Почта для уведомлений клиентам (необязательно).
+    # Бот поддержки с AI (OpenAI): токен бота, ключ и модель
+    support_bot_token: str = ""
+    openai_api_key: str = ""
+    support_model: str = "gpt-4o-mini"
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
@@ -195,6 +199,9 @@ class Config:
             pay_min_usd=Decimal(_env("DONATIX_PAY_MIN_USD", "5")),
             pay_min_tjs=Decimal(_env("DONATIX_PAY_MIN_TJS", "0")),
             low_balance_usd=Decimal(_env("DONATIX_LOW_BALANCE_USD", "10")),
+            support_bot_token=_env("DONATIX_SUPPORT_BOT_TOKEN"),
+            openai_api_key=_env("DONATIX_OPENAI_API_KEY") or _env("OPENAI_API_KEY"),
+            support_model=_env("DONATIX_SUPPORT_MODEL") or "gpt-4o-mini",
             smtp_host=_env("DONATIX_SMTP_HOST"),
             smtp_port=int(_env("DONATIX_SMTP_PORT", "587")),
             smtp_user=_env("DONATIX_SMTP_USER"),
