@@ -441,7 +441,7 @@ class SupportBot:
         self.config = config
         self.api = api or TelegramApi(config.support_bot_token)
         self.chat = chat or OpenAIChat(config.openai_api_key, config.support_model)
-        self.admin_chat = str(config.alert_telegram_chat_id or "").strip()
+        self.admin_chat = str(config.support_admin_id or config.alert_telegram_chat_id or "").strip()
         self.username = ""
         self._hits: dict[int, list[float]] = {}
         self._stop = threading.Event()
