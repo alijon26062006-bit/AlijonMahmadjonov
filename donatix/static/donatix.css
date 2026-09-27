@@ -1257,3 +1257,5 @@ html { scroll-behavior: smooth; }
 .sc-code { display: flex; align-items: center; gap: 10px; margin: 10px 0 6px; flex-wrap: wrap; }
 .sc-code code { padding: 10px 16px; border-radius: 10px; background: var(--surface-2); font: 700 1.3rem/1 "JetBrains Mono", ui-monospace, monospace;
   letter-spacing: .08em; }
+.notif-code { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px;
+  border-color: var(--accent-line); background: var(--accent-soft); }

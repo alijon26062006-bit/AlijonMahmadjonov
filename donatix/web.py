@@ -836,10 +836,20 @@ def panel_support(request: Request, user=Depends(panel_user), conn=Depends(get_c
                   config: Config = Depends(get_config)):
     """Поддержка в Telegram: одноразовый код — бот узнаёт клиента без email и без AI."""
     from . import supportbot
-    bot = db.get_setting(conn, "support.bot_username") or ""
-    code = supportbot.make_link_code(conn, user["id"]) if bot else ""
+    bot = supportbot.bot_username(conn, config)
+    code = supportbot.make_link_code(conn, user["id"])
     return render(request, "panel/support.html", {"user": user, "bot": bot, "code": code,
                                                    "minutes": supportbot.LINK_TTL // 60})
+
+
+@router.post("/panel/support/code", dependencies=[Depends(check_csrf)])
+def panel_support_code(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                       config: Config = Depends(get_config)):
+    """Кнопка «Получить код для бота поддержки»: код приходит в уведомления."""
+    from . import supportbot
+    supportbot.send_code_notification(conn, config, user["id"])
+    flash(request, "Код отправлен — он первым в списке уведомлений. Отправьте его боту поддержки.")
+    return _redirect("/panel/notifications")
 
 
 @router.get("/panel/notifications")

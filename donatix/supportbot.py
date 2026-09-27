@@ -273,8 +273,9 @@ LINK_TTL = 15 * 60
 LINK_TRIES_PER_HOUR = 10
 _LINK = re.compile(r"\bDX[-\s]?([A-HJ-NP-Z2-9]{8})\b", re.I)
 LINK_HOWTO = ("Чтобы я увидел ваши заказы и баланс, подтвердите аккаунт: войдите на {site}, откройте "
-              "«Поддержка в Telegram» ({site}/panel/support) и нажмите «Открыть бота» — или отправьте сюда код "
-              "с той страницы (вид DX-XXXXXXXX).")
+              "«Уведомления» 🔔 ({site}/panel/notifications) и нажмите «Получить код для бота поддержки» — код "
+              "придёт в уведомления, отправьте его сюда (вид DX-XXXXXXXX). Или откройте {site}/panel/support "
+              "и нажмите «Открыть бота».")
 
 
 def make_link_code(conn: sqlite3.Connection, user_id: int) -> str:
@@ -282,6 +283,34 @@ def make_link_code(conn: sqlite3.Connection, user_id: int) -> str:
     conn.execute("DELETE FROM support_link_codes WHERE user_id = ? OR expires_at < ?", (user_id, time.time()))
     conn.execute("INSERT INTO support_link_codes (code_hash, user_id, expires_at) VALUES (?, ?, ?)",
                  (_hash(code), user_id, time.time() + LINK_TTL))
+    return code
+
+
+def bot_username(conn: sqlite3.Connection, config: Config) -> str:
+    """Имя бота поддержки: из базы, а если бот ещё не записал его — спросить Telegram по токену."""
+    name = db.get_setting(conn, "support.bot_username") or ""
+    if name or not config.support_bot_token:
+        return name
+    try:
+        from .tgbot import TelegramApi
+        name = (TelegramApi(config.support_bot_token)("getMe") or {}).get("username") or ""
+    except Exception as exc:
+        log.warning("бот поддержки: getMe: %s", exc)
+        return ""
+    if name:
+        db.set_setting(conn, "support.bot_username", name)
+    return name
+
+
+def send_code_notification(conn: sqlite3.Connection, config: Config, user_id: int) -> str:
+    """Новый код входа — в уведомления кабинета (и в почту/своего бота, если они есть)."""
+    from .notify import notify
+    code = make_link_code(conn, user_id)
+    bot = bot_username(conn, config)
+    where = f"боту @{bot}" if bot else "боту поддержки"
+    notify(conn, config, user_id, f"🔐 Код для бота поддержки: DX-{code} — отправьте его {where}. "
+                                  f"Действует {LINK_TTL // 60} минут. Никому другому не сообщайте.",
+           "/panel/support")
     return code
 
 

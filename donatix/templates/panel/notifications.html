@@ -3,6 +3,12 @@
 {% block title %}Уведомления — {{ site_name }}{% endblock %}
 {% block content %}
 <section class="page-hero"><h1>Уведомления</h1></section>
+<form class="card notif-code" method="post" action="/panel/support/code">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div><b>🔐 Бот поддержки в Telegram</b>
+    <div class="muted small">Нажмите — код придёт сюда, в уведомления. Отправьте его боту, и он увидит ваши заказы и баланс.</div></div>
+  <button class="btn primary">Получить код для бота поддержки</button>
+</form>
 <div class="list">
   {% for n in rows %}
   <a class="item reveal" href="{{ n.link or '#' }}">

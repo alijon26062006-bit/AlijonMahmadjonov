@@ -1,4 +1,5 @@
 import json
+import re
 
 from conftest import make_client
 
@@ -80,6 +81,33 @@ def test_cabinet_support_page_shows_code(client, conn):
     web_login(client, "shop1@example.com", "password123")
     page = client.get("/panel/support").text
     assert "https://t.me/donatix_help_bot?start=" in page and "DX-" in page
+
+
+def test_code_arrives_in_notifications(client, conn, config):
+    from conftest import csrf_of, web_login
+    from donatix import db
+    uid, _ = make_client(conn)
+    db.set_setting(conn, "support.bot_username", "donatix_help_bot")
+    web_login(client, "shop1@example.com", "password123")
+    page = client.get("/panel/notifications").text
+    assert "Получить код для бота поддержки" in page
+    r = client.post("/panel/support/code", data={"csrf": csrf_of(page)}, follow_redirects=False)
+    assert r.status_code in (302, 303)
+    page = client.get("/panel/notifications").text
+    m = re.search(r"DX-([A-Z0-9]{8})", page)
+    assert m and "@donatix_help_bot" in page
+    bot = _bot(config)
+    bot.handle(conn, {"message": {"chat": {"id": 777, "type": "private"}, "from": {"id": 777},
+                                  "text": "DX-" + m.group(1)}})
+    assert conn.execute("SELECT user_id FROM support_links WHERE tg_id = 777").fetchone()["user_id"] == uid
+
+
+def test_support_page_code_without_known_bot_name(client, conn):
+    from conftest import web_login
+    make_client(conn)
+    web_login(client, "shop1@example.com", "password123")
+    page = client.get("/panel/support").text
+    assert "DX-" in page and "ещё не подключён" not in page
 
 
 def test_ai_loop_uses_tools_and_remembers(config, conn):
