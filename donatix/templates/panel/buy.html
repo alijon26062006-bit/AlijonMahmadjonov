@@ -1,6 +1,6 @@
 {% extends "panel/_layout.html" %}
 {% from "_icons.html" import icon, kind_icon, media, pack_icon %}
-{% block title %}{{ p.name }} — {{ site_name }}{% endblock %}
+{% block title %}{{ p.title }} — {{ site_name }}{% endblock %}
 {% block content %}
 {% if p.kind == 'steam_topup' %}{% include "panel/_buy_steam.html" %}{% elif p.kind == 'steam_gift' %}{% include "panel/_buy_gift.html" %}{% else %}
 {% set multi = p.max_quantity > 1 %}
@@ -9,7 +9,7 @@
   {{ media(p.image_url, p.category_name, p.kind, 'cover') }}
   <div class="grow">
     <div class="bh-kind">{{ p.kind_title }}</div>
-    <h1>{{ p.category_name if siblings else p.name }}</h1>
+    <h1>{{ p.category_name if siblings else p.title }}</h1>
     <div class="bh-tags">
       {% if p.region %}<span class="badge">{{ p.region_title }}</span>{% endif %}
       {% if p.platform %}<span class="badge accent">{{ p.platform }}</span>{% endif %}
@@ -32,8 +32,9 @@
         {% for s in siblings %}
         <a role="listitem" class="pp {{ 'on' if s.product_id == p.product_id }}" href="/panel/buy/{{ s.product_id | urlencode }}"
            {% if s.product_id == p.product_id %}aria-current="true"{% endif %}>
-          <span class="pp-ico k-{{ s.kind }}">{{ pack_icon(s.kind, s.name, 18) }}</span>
-          <span class="pp-name">{{ s.name }}</span>
+          {% if s.emoji %}<span class="pp-ico emoji-tile" aria-hidden="true">{{ s.emoji }}</span>
+          {% else %}<span class="pp-ico k-{{ s.kind }}">{{ pack_icon(s.kind, s.name, 18) }}</span>{% endif %}
+          <span class="pp-name">{{ s.title }}</span>
           {% if s.region and regions_many is not defined %}<span class="pp-reg">{{ s.region_title }}</span>{% endif %}
           <span class="pp-price">{{ money(s.price_usd | price(s.unit)) }}</span>
         </a>
@@ -91,7 +92,7 @@
     <div class="card">
       <h3>Сводка</h3>
       <div class="summary">
-        <div><span>Товар</span><span class="wrap-text">{{ p.name }}</span></div>
+        <div><span>Товар</span><span class="wrap-text">{{ (p.emoji ~ ' ' if p.emoji else '') ~ p.title }}</span></div>
         {% if p.fields %}<div><span>Получатель</span><span id="s-to" class="wrap-text">—</span></div>{% endif %}
         {% if can_check %}<div><span>Игрок</span><span id="s-player" class="wrap-text">—</span></div>{% endif %}
         {% if multi %}<div><span>Количество</span><span id="s-qty">—</span></div>{% endif %}

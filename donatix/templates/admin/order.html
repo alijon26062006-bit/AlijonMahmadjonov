@@ -11,7 +11,7 @@
 <div class="grid two" style="align-items:start">
   <div class="summary card" style="padding:0">
     <div><span class="muted">Клиент</span><span><a href="/admin/users/{{ o.user_id }}">{{ o.login }}</a></span></div>
-    <div><span class="muted">Товар</span><span>{{ o.product_name }} <span class="mono small muted">{{ o.product_id }}</span></span></div>
+    <div><span class="muted">Товар</span><span>{{ o.product_name | pack_title(o.kind) }} <span class="mono small muted">{{ o.product_id }}</span></span></div>
     {% for k, v in fields.items() %}<div><span class="muted">{{ k }}</span><span class="mono">{{ v }}</span></div>{% endfor %}
     <div><span class="muted">Количество</span><span>{{ o.quantity }}</span></div>
     <div><span class="muted">Источник</span><span>{{ o.source }}</span></div>

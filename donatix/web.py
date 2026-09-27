@@ -412,8 +412,16 @@ def panel_catalog(
         products = [p for p in products if p.get("region") == region]
     items = [catalog.public_view(p, accounts.markup_for(user, config, p["kind"])) for p in products]
     groups: dict[str, list] = {}
-    for item in items:
-        groups.setdefault(f"{item['kind_title']} · {item['category_name']}", []).append(item)
+    if game and game["kind"] == "topup":
+        # Пакеты одной игры: 💎 алмазы → 🎟 ваучеры и пропуска → ⚡ прокачка
+        from . import packs
+        items.sort(key=lambda i: packs.order_key(i["name"], float(i["price_usd"])))
+        for item in items:
+            groups.setdefault(f"{packs.GROUP_EMOJI[item['group']]} {packs.GROUP_TITLES[item['group']]}",
+                              []).append(item)
+    else:
+        for item in items:
+            groups.setdefault(f"{item['kind_title']} · {item['category_name']}", []).append(item)
     return render(request, "panel/catalog.html", {
         "user": user, "groups": groups, "kind": kind, "q": q, "kinds": KINDS, "count": len(items),
         "category": category, "game": game, "regions": regions, "region": region, "region_title": region_title,
@@ -487,6 +495,9 @@ def _buy_ctx(request: Request, conn, config: Config, user, p: dict, **extra) -> 
     if p["kind"] in _BY_GAME:
         siblings = [catalog.public_view(s, markup) for s in
                     catalog.list_products(conn, kind=p["kind"], category_id=p["category_id"], limit=200)]
+        if p["kind"] == "topup":
+            from . import packs
+            siblings.sort(key=lambda i: packs.order_key(i["name"], float(i["price_usd"])))
     return {
         "user": user, "p": catalog.public_view(p, markup), "siblings": siblings, "idem": str(uuid.uuid4()),
         "can_check": account_check.can_check(request.app.state.supplier, p), "form": {}, **extra,

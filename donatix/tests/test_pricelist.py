@@ -18,8 +18,8 @@ def test_order_names_and_prices(conn, config):
     _ff(conn)
     data = pricelist.build(conn, config)
     ff = next(s for s in data["sections"] if s["key"] == "ff_cis")
-    assert [p["short"] for p in ff["packs"]] == ["100 💎", "520 💎", "На неделю", "На месяц",
-                                                 "Прокачка уровня"]
+    assert [p["short"] for p in ff["packs"]] == ["💎 100 алмазов", "💎 520 алмазов", "🎫 Ваучер на неделю",
+                                                 "🎫 Ваучер на месяц", "🚀 Прокачка уровня"]
     rate, markup = data["rate"], data["markup"]
     assert ff["packs"][0]["tjs"] == pricelist.tjs_price("0.95", markup, rate)
     assert pricelist.tjs_price("1", Decimal("10"), Decimal("10.5")) == Decimal("11.55")

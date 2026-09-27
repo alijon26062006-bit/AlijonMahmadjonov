@@ -8,7 +8,7 @@
   <tr>
     <td><a href="/admin/orders/{{ o.id }}">{{ o.public_id }}</a></td>
     <td><a href="/admin/users/{{ o.user_id }}">{{ o.login }}</a></td>
-    <td>{{ o.product_name }}</td>
+    <td>{{ o.product_name | pack_title(o.kind) }}</td>
     <td class="num">${{ fmt(o.total_micro) }}</td>
     <td><span class="badge {{ {'failed': 'bad', 'attention': 'bad', 'processing': 'warn', 'completed': 'ok'}[o.status] }}">{{ status_titles[o.status] }}</span></td>
     <td class="small">{{ o.error or ('Webhook клиента не отвечает' if o.webhook_state == 'failed' else '') }}</td>

@@ -53,7 +53,7 @@
 <div class="card table-wrap"><table>
   <tr><th>Заказ</th><th>Товар</th><th class="num">Сумма</th><th>Статус</th><th>Создан</th></tr>
   {% for o in orders %}
-  <tr><td><a href="/admin/orders/{{ o.id }}">{{ o.public_id }}</a></td><td>{{ o.product_name }}</td>
+  <tr><td><a href="/admin/orders/{{ o.id }}">{{ o.public_id }}</a></td><td>{{ o.product_name | pack_title(o.kind) }}</td>
     <td class="num">${{ fmt(o.total_micro) }}</td>
     <td><span class="badge {{ {'completed': 'ok', 'failed': 'bad', 'processing': 'warn', 'attention': 'bad'}[o.status] }}">{{ status_titles[o.status] }}</span></td>
     <td class="small">{{ o.created_at[:16] | replace('T', ' ') }}</td></tr>

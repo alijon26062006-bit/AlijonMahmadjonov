@@ -8,58 +8,21 @@
 
 from __future__ import annotations
 
-import re
 import sqlite3
 from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 from typing import Any
 
-from . import popular
+from . import packs, popular
 from .config import Config
 from .money import apply_markup, to_decimal
 
 SECTIONS = (("ff_cis", "Free Fire", "СНГ"), ("ff_id", "Free Fire", "Индонезия"), ("pubg", "PUBG Mobile", "UC"))
-
-_LEVEL = re.compile(r"прокач|level|уров|evo|эволюц|upgrade", re.I)
-_PASS = re.compile(r"ваучер|voucher|member|пропуск|pass|недел|месяч|week|month|booyah|подпис|card|карт", re.I)
-_NUM = re.compile(r"(\d[\d\s.,]*)")
-
-
-def _amount(name: str) -> float:
-    m = _NUM.search(name)
-    if not m:
-        return 0
-    try:
-        return float(m.group(1).replace(" ", "").replace(",", ""))
-    except ValueError:
-        return 0
-
-
-def pack_order(name: str) -> tuple[int, float, str]:
-    """Сначала алмазы/UC по количеству, потом ваучеры и пропуска, в конце прокачки."""
-    group = 2 if _LEVEL.search(name) else 1 if _PASS.search(name) else 0
-    amount = _amount(name)
-    if group == 1 and not amount:  # ваучеры: неделя раньше месяца
-        amount = 7 if re.search(r"недел|week", name, re.I) else 30 if re.search(r"месяц|month", name, re.I) else 0
-    return group, amount, name
 
 
 def _categories(conn: sqlite3.Connection) -> dict[str, tuple[str, str | None, str | None]]:
     """key → (category_id, регион или None, обложка) — те же игры, что в «Популярном»."""
     return {p["key"]: (p["category_id"], p["region"], p["image_url"])
             for p in popular._pinned(conn) if p["key"] in ("ff_cis", "ff_id", "pubg")}
-
-
-_SHORT = ((re.compile(r"\s*(алмаз(ов|а)?|diamonds?)\b", re.I), " 💎"),
-          (re.compile(r"ваучер на неделю|weekly (membership|voucher)", re.I), "На неделю"),
-          (re.compile(r"ваучер на месяц|monthly (membership|voucher)", re.I), "На месяц"),
-          (re.compile(r"\s*\((.*?)\)"), ""))
-
-
-def short_name(name: str) -> str:
-    """Короче для картинки: «100 алмазов» → «100 💎», скобки с пояснениями убираем."""
-    for rx, repl in _SHORT:
-        name = rx.sub(repl, name)
-    return name.strip()
 
 
 def tjs_price(base: Any, markup: Decimal, rate: Decimal) -> Decimal:
@@ -85,12 +48,13 @@ def build(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
             sql += " AND region = ?"
             args.append(region)
         rows = conn.execute(sql, args).fetchall()
+        # Тот же перевод и порядок, что на сайте: 💎 алмазы → 🎫 ваучеры → 🚀 прокачка
         items = sorted(({"name": r["name"], "tjs": tjs_price(r["base_price"], markup, rate)} for r in rows),
-                        key=lambda i: pack_order(i["name"]))
+                        key=lambda i: packs.order_key(i["name"], float(i["tjs"])))
         for i in items:
-            i["group"] = pack_order(i["name"])[0]
+            i["group"] = packs.group(i["name"])
             i["price"] = f"{i['tjs']:.2f}"
-            i["short"] = short_name(i["name"])
+            i["short"] = packs.full(i["name"])
         if items:
             sections.append({"key": key, "game": game, "sub": sub, "image": image, "packs": items})
     return {"sections": sections, "rate": rate, "markup": markup}

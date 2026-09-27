@@ -31,6 +31,18 @@ def _img(url):
 templates.env.filters["img"] = _img
 
 
+def _pack_title(name: str, kind: str = "topup") -> str:
+    """Название пакета игры по-русски со значком; «Free Fire — 100 Diamonds» → «Free Fire — 💎 100 алмазов»."""
+    from .packs import full
+    if kind != "topup" or not name:
+        return name
+    head, sep, tail = str(name).rpartition(" — ")
+    return f"{head}{sep}{full(tail)}" if sep else full(str(name))
+
+
+templates.env.filters["pack_title"] = _pack_title
+
+
 def _price(value, unit: str = "item") -> str:
     """Цена для витрины: у звёзд — как есть (доли цента), у остального — 4 знака, округление вверх,
     как при списании."""

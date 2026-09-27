@@ -137,6 +137,7 @@ def public_view(product: dict[str, Any], markup: Decimal) -> dict[str, Any]:
         "category_id": product["category_id"],
         "category_name": product["category_name"],
         "name": product["name"],
+        **_pack_view(product),
         "unit": product["unit"],
         "price_usd": fmt_unit(price),
         "min_quantity": product["min_qty"],
@@ -151,6 +152,15 @@ def public_view(product: dict[str, Any], markup: Decimal) -> dict[str, Any]:
             "region_restriction": bool(product["supplier_ref"].get("region_restriction"))}
            if product["kind"] == "game_key" else {}),
     }
+
+
+def _pack_view(product: dict[str, Any]) -> dict[str, Any]:
+    """Для витрины: «💎 100 алмазов» вместо «100 Diamonds» у пакетов игр."""
+    from . import packs
+    if product["kind"] != "topup":
+        return {"title": product["name"], "emoji": "", "group": None}
+    return {"title": packs.label(product["name"]), "emoji": packs.emoji(product["name"]),
+            "group": packs.group(product["name"])}
 
 
 def _steam_extra(product: dict[str, Any], price: Decimal) -> dict[str, Any]:

@@ -4,7 +4,7 @@
   <tr>
     <td><a href="/admin/orders/{{ o.id }}">{{ o.public_id }}</a><div class="small muted mono">{{ o.supplier_order_id or '' }}</div></td>
     <td>{{ o.login }}</td>
-    <td>{{ o.product_name }}</td>
+    <td>{{ o.product_name | pack_title(o.kind) }}</td>
     <td class="num">${{ fmt(o.total_micro) }}</td>
     <td class="num">{% if o.status == 'completed' %}${{ fmt(o.total_micro - o.cost_micro) }}{% else %}—{% endif %}</td>
     <td><span class="badge {{ {'completed': 'ok', 'failed': 'bad', 'processing': 'warn', 'attention': 'bad'}[o.status] }}">{{ status_titles[o.status] }}</span></td>

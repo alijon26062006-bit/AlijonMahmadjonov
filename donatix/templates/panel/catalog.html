@@ -49,12 +49,14 @@
 </div>
 {% else %}
 {% for group, items in groups.items() %}
-  {% if not game %}<div class="section-title"><h2>{{ group }}</h2></div>{% endif %}
+  {% if not game %}<div class="section-title"><h2>{{ group }}</h2></div>
+  {% elif game.kind == 'topup' and groups | length > 1 %}<div class="section-title pack-group-title"><h2>{{ group }}</h2><span class="muted small">{{ items | length }}</span></div>{% endif %}
   <div class="grid packs-grid">
     {% for p in items %}
     <a class="pack-card" href="/panel/buy/{{ p.product_id }}">
-      <span class="tile k-{{ p.kind }}">{{ pack_icon(p.kind, p.name, 20) }}</span>
-      <span class="pack-name">{{ p.name }}</span>
+      {% if p.emoji %}<span class="tile emoji-tile" aria-hidden="true">{{ p.emoji }}</span>
+      {% else %}<span class="tile k-{{ p.kind }}">{{ pack_icon(p.kind, p.name, 20) }}</span>{% endif %}
+      <span class="pack-name">{{ p.title }}</span>
       {% if p.region %}<span class="badge">{{ p.region_title }}</span>{% endif %}
       <span class="pack-price">{{ money(p.price_usd) }}{% if p.unit == 'star' %}<small> / звезда</small>{% endif %}</span>
     </a>

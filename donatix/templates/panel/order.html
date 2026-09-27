@@ -11,7 +11,7 @@
 </section>
 <div class="grid two" style="align-items:start">
   <div class="summary card" style="padding:0">
-    <div><span class="muted">Товар</span><span>{{ view.product_name }}</span></div>
+    <div><span class="muted">Товар</span><span>{{ view.product_name | pack_title(view.kind) }}</span></div>
     {% for k, v in view.fields.items() %}<div><span class="muted">{{ k }}</span><span class="mono">{{ v }}</span></div>{% endfor %}
     <div><span class="muted">Количество</span><span>{{ view.quantity }}</span></div>
     <div><span class="muted">Цена за единицу</span><span>{{ money(view.unit_price_usd) }}</span></div>
