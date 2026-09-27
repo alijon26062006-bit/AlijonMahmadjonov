@@ -10,12 +10,21 @@ die() { printf '\n\033[1;31m✖ %s\033[0m\n' "$*"; exit 1; }
 [ "$(id -u)" = 0 ] || die "Запустите через sudo"
 [ -f "$SITE" ] || die "Не нашёл $SITE — пришлите вывод: ls /etc/nginx/sites-available"
 
+# Снять все прежние блокировки: прошлая версия могла заблокировать обычных посетителей
+command -v fail2ban-client >/dev/null && fail2ban-client unban --all >/dev/null 2>&1 && echo "все блокировки fail2ban сняты"
+
 say "1/4 Ограничения nginx: не больше 15 запросов в секунду с одного IP (всплеск до 100)"
 BACKUP="/root/nginx-backup-$(date +%F-%H%M%S)"; mkdir -p "$BACKUP"; cp -a /etc/nginx "$BACKUP/"
 echo "копия настроек: $BACKUP"
 cat > /etc/nginx/conf.d/donatix-limits.conf <<'CONF'
-# Donatix: зоны учёта запросов по IP посетителя
-limit_req_zone  $binary_remote_addr zone=dx_req:20m   rate=15r/s;
+# Donatix: зоны учёта запросов по IP посетителя.
+# Картинки и файлы оформления не считаем: страница каталога грузит их десятками сразу.
+map $uri $dx_limit_key {
+    ~^/(static|media|pay-icons)/  "";
+    ~^/favicon                    "";
+    default                       $binary_remote_addr;
+}
+limit_req_zone  $dx_limit_key       zone=dx_req:20m   rate=15r/s;
 limit_req_zone  $binary_remote_addr zone=dx_auth:10m  rate=12r/m;
 limit_conn_zone $binary_remote_addr zone=dx_conn:10m;
 limit_req_status  429;
@@ -24,7 +33,7 @@ CONF
 mkdir -p /etc/nginx/snippets
 cat > /etc/nginx/snippets/donatix-protect.conf <<'CONF'
 # Donatix: защита от флуда. Подключается внутри server { } сайта.
-limit_conn dx_conn 60;
+limit_conn dx_conn 120;
 limit_req  zone=dx_req burst=100 nodelay;
 client_header_timeout 10s;
 client_body_timeout   15s;
@@ -64,13 +73,13 @@ ignoreip = 127.0.0.1/8 ::1 ${MYIP}
 bantime.increment = true
 bantime.maxtime = 1d
 
-# Флуд: nginx уже отказывал этому IP (limit_req) 60+ раз за минуту — блок на 10 минут, повторно — дольше
+# Флуд: nginx отказал этому IP 400+ раз за минуту (человек так не может) — блок на 10 минут, повторно — дольше
 [nginx-limit-req]
 enabled  = true
 port     = http,https
 logpath  = /var/log/nginx/error.log
 findtime = 60
-maxretry = 60
+maxretry = 400
 bantime  = 600
 
 # Подбор паролей к SSH
@@ -84,6 +93,8 @@ fail2ban-client status 2>/dev/null | sed -n '1,3p'
 
 say "3/4 Проверка: сайт отвечает"
 for i in 1 2 3; do curl -s -o /dev/null -w "%{http_code} %{time_total}s  " -H "Host: $(grep -m1 -oP 'server_name\s+\K[^ ;]+' "$SITE")" http://127.0.0.1/; done; echo
+
+echo "Сайт изнутри: $(curl -s -o /dev/null -m 15 -w '%{http_code} за %{time_total}s' http://127.0.0.1:8000/robots.txt)   служба: $(systemctl is-active donatix)"
 
 say "4/4 Безопасность сервера — посмотрите сами"
 echo "Последние входы по SSH:"; last -n 8 -a 2>/dev/null | head -9
