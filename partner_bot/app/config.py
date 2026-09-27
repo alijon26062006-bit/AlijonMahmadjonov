@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     star_price_diram: int = 20
     min_stars: int = 50
     max_stars: int = 10_000
-    min_deposit_diram: int = 1000
+    min_deposit_diram: int = 100          # 1 сомони
     referral_percent: int = 5
 
     # ---- реквизиты для пополнения ----

@@ -3,14 +3,25 @@
 {% block title %}Уведомления — {{ site_name }}{% endblock %}
 {% block content %}
 <section class="page-hero"><h1>Уведомления</h1></section>
-<form class="card notif-code" method="post" action="/panel/support/code">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
+{% if bot_username %}<div class="card notif-code">
   <div><b>🔐 Бот поддержки в Telegram</b>
-    <div class="muted small">Нажмите — код придёт сюда, в уведомления. Отправьте его боту, и он увидит ваши заказы и баланс.</div></div>
-  <button class="btn primary">Получить код для бота поддержки</button>
-</form>
+    <div class="muted small">Напишите боту свой email — код придёт сюда. Нажмите «Копировать» и отправьте код боту.</div></div>
+  <a class="btn primary" href="https://t.me/{{ bot_username }}" target="_blank" rel="noopener">Открыть @{{ bot_username }}</a>
+</div>{% endif %}
 <div class="list">
   {% for n in rows %}
+  {% if n.code %}
+  <div class="item reveal notif-with-code">
+    <div class="tile sm {{ 'g1' if not n.read_at else '' }}">🔐</div>
+    <div class="grow">
+      <div class="title">Код для бота поддержки</div>
+      <div class="code-row"><span class="big-code">{{ n.code }}</span>
+        <button class="btn primary sm" type="button" data-copy="{{ n.code }}">{{ icon('copy', 16) }}Копировать</button></div>
+      <div class="sub">{{ n.text.split('\n')[1:] | join(' ') }}</div>
+      <div class="sub">{{ n.created_at[8:10] }}.{{ n.created_at[5:7] }}.{{ n.created_at[:4] }} {{ n.created_at[11:16] }}{% if not n.read_at %} · <b>новое</b>{% endif %}</div>
+    </div>
+  </div>
+  {% else %}
   <a class="item reveal" href="{{ n.link or '#' }}">
     <div class="tile sm {{ 'g1' if not n.read_at else '' }}">{{ icon('bell', 18) }}</div>
     <div class="grow">
@@ -18,6 +29,7 @@
       <div class="sub">{{ n.created_at[8:10] }}.{{ n.created_at[5:7] }}.{{ n.created_at[:4] }} {{ n.created_at[11:16] }}{% if not n.read_at %} · <b>новое</b>{% endif %}</div>
     </div>
   </a>
+  {% endif %}
   {% else %}<div class="card empty">Уведомлений пока нет.</div>{% endfor %}
 </div>
 {% endblock %}

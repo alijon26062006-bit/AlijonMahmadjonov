@@ -855,9 +855,16 @@ def panel_support_code(request: Request, user=Depends(panel_user), conn=Depends(
 @router.get("/panel/notifications")
 def panel_notifications(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
     from . import notify
-    rows = notify.latest(conn, user["id"])
+    rows = []
+    for r in notify.latest(conn, user["id"]):
+        row = dict(r)
+        # Код входа в бот поддержки — крупно и с кнопкой «Копировать»
+        m = re.search(r"\b(DX-[A-Z2-9]{8}|\d{6})\b", row["text"]) if row["text"].startswith("🔐") else None
+        row["code"] = m.group(1) if m else ""
+        rows.append(row)
     notify.mark_read(conn, user["id"])
-    return render(request, "panel/notifications.html", {"user": user, "rows": rows})
+    return render(request, "panel/notifications.html", {"user": user, "rows": rows,
+                                                        "bot_username": db.get_setting(conn, "support.bot_username")})
 
 
 @router.get("/panel/api")

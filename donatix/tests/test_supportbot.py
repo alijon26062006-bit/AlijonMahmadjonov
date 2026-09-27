@@ -39,7 +39,7 @@ def test_login_only_via_cabinet_and_only_own_data(config, conn):
     bot = _bot(config)
     t = supportbot.Tools(bot, conn, 555, "@client")
     assert t.run("get_order", {"order_id": "dx-aaa111"})["error"] == "not_verified"
-    assert "/panel/support" in t.run("get_order", {"order_id": "dx-aaa111"})["how"]
+    assert "email" in t.run("get_order", {"order_id": "dx-aaa111"})["how"]
 
     def say(text):
         bot.handle(conn, {"message": {"chat": {"id": 555, "type": "private"}, "from": {"id": 555}, "text": text}})
@@ -83,23 +83,42 @@ def test_cabinet_support_page_shows_code(client, conn):
     assert "https://t.me/donatix_help_bot?start=" in page and "DX-" in page
 
 
-def test_code_arrives_in_notifications(client, conn, config):
-    from conftest import csrf_of, web_login
+def test_email_code_via_notifications(client, conn, config):
+    from conftest import web_login
     from donatix import db
     uid, _ = make_client(conn)
     db.set_setting(conn, "support.bot_username", "donatix_help_bot")
+    bot = _bot(config)
+    chat = {"chat": {"id": 777, "type": "private"}, "from": {"id": 777, "username": "ali"}}
+
+    def say(text):
+        bot.handle(conn, {"message": {**chat, "text": text}})
+        return bot.api.sent[-1][1]
+
+    assert "email" in say("/start")
+    assert "Сначала пришлите email" in say("123456")
+    assert "не найден" in say("nobody@example.com")
+    assert "Код отправлен" in say("Мой email: Shop1@Example.com")
     web_login(client, "shop1@example.com", "password123")
     page = client.get("/panel/notifications").text
-    assert "Получить код для бота поддержки" in page
-    r = client.post("/panel/support/code", data={"csrf": csrf_of(page)}, follow_redirects=False)
-    assert r.status_code in (302, 303)
-    page = client.get("/panel/notifications").text
-    m = re.search(r"DX-([A-Z0-9]{8})", page)
-    assert m and "@donatix_help_bot" in page
-    bot = _bot(config)
-    bot.handle(conn, {"message": {"chat": {"id": 777, "type": "private"}, "from": {"id": 777},
-                                  "text": "DX-" + m.group(1)}})
+    m = re.search(r'data-copy="(\d{6})"', page)
+    assert m and "big-code" in page and "@ali" in page
+    wrong = "000000" if m.group(1) != "000000" else "111111"
+    assert "неверный" in say(wrong)
+    assert "Аккаунт подтверждён" in say(m.group(1)[:3] + " " + m.group(1)[3:])
     assert conn.execute("SELECT user_id FROM support_links WHERE tg_id = 777").fetchone()["user_id"] == uid
+    assert "Сначала пришлите email" in say(m.group(1))       # код одноразовый
+
+
+def test_email_code_locks_after_wrong_tries(config, conn):
+    make_client(conn)
+    result, code = supportbot.request_email_code(conn, config, 5, "@x", "shop1@example.com")
+    assert result == "sent"
+    wrong = "000000" if code != "000000" else "111111"
+    for _ in range(supportbot.EMAIL_CODE_TRIES):
+        supportbot.check_email_code(conn, 5, wrong)
+    assert supportbot.check_email_code(conn, 5, code)[0] == "locked"
+    assert supportbot.check_email_code(conn, 6, code)[0] == "none"     # чужой Telegram код не подойдёт
 
 
 def test_support_page_code_without_known_bot_name(client, conn):
@@ -171,7 +190,7 @@ def test_connect_bot_in_chat_token_never_reaches_ai(config, conn, monkeypatch):
     msg = {"message": {"chat": {"id": 555, "type": "private"}, "from": {"id": 555}, "text": f"вот {token}"}}
 
     bot.handle(conn, msg)                                     # аккаунт не подтверждён
-    assert "подтвердите аккаунт" in bot.api.sent[-1][1]
+    assert "пришлите сюда email" in bot.api.sent[-1][1]
     uid, _ = make_client(conn)
     conn.execute("INSERT INTO support_links (tg_id, user_id, linked_at) VALUES (555, ?, 'x')", (uid,))
     bot.handle(conn, msg)                                     # заказов меньше 5
