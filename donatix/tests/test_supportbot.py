@@ -189,13 +189,22 @@ def test_connect_bot_in_chat_token_never_reaches_ai(config, conn, monkeypatch):
     assert token not in stored and "[клиент прислал токен бота]" in stored
 
 
-def test_admin_start_and_test_mode(config, conn):
+def test_admin_start_and_codes(config, conn):
     bot = _bot(config)
     admin = {"chat": {"id": 999, "type": "private"}, "from": {"id": 999}}
     bot.handle(conn, {"message": {**admin, "text": "/start"}})
     assert "Вы — админ поддержки" in bot.api.sent[-1][1]
-    bot.handle(conn, {"message": {**admin, "text": "/test"}})
     bot.handle(conn, {"message": {**admin, "text": "салом"}})
-    assert bot.api.sent[-1] == ("999", "ok")          # в режиме проверки отвечает AI
-    bot.handle(conn, {"message": {**admin, "text": "/admin"}})
-    assert "Вы — админ поддержки" in bot.api.sent[-1][1]
+    assert bot.api.sent[-1] == ("999", "ok")          # админу тоже отвечает AI
+    uid, _ = make_client(conn)
+    code = supportbot.make_link_code(conn, uid)
+    bot.handle(conn, {"message": {**admin, "text": f"🔐 Код для бота поддержки: DX-{code} — отправьте его"}})
+    assert "Аккаунт подтверждён" in bot.api.sent[-1][1]
+
+
+def test_find_code_forgiving():
+    f = supportbot.find_code
+    assert f("DX-ABCD2345") == f("dx abcd2345") == f("Dx - ABCD 2345") == f("ABCD2345") == "ABCD2345"
+    assert f("DХ-АВСD2345") == "ABCD2345"                # кириллица вместо латиницы
+    assert f("/start ABCD2345") == "ABCD2345"
+    assert f("balances") is None and f("заказ не пришёл") is None

@@ -272,6 +272,24 @@ LINK_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 LINK_TTL = 15 * 60
 LINK_TRIES_PER_HOUR = 10
 _LINK = re.compile(r"\bDX[-\s]?([A-HJ-NP-Z2-9]{8})\b", re.I)
+# Кириллица, похожая на латиницу: клиент перепечатал код с телефона — «DХ-АВС…» тоже поймём
+_LOOKALIKE = str.maketrans("АВЕКМНРСТХУаеросхукмнвт", "ABEKMHPCTXYAEPOCXYKMHBT")
+
+
+def find_code(text: str) -> str | None:
+    """Код входа из сообщения: «DX-ABCD2345», «dx abcd 2345», пересланное уведомление, просто «ABCD2345»."""
+    text = (text or "").translate(_LOOKALIKE)
+    m = re.match(r"/start\s+([A-Za-z0-9]{8})$", text) or _LINK.search(text)
+    if m:
+        return m.group(1).upper()
+    m = re.search(r"\bDX[\s:–—-]*((?:[A-HJ-NP-Z2-9][\s-]?){8})(?![A-Z0-9])", text, re.I)
+    if m:
+        return re.sub(r"[\s-]", "", m.group(1)).upper()
+    bare = re.sub(r"[\s-]", "", text)
+    # Одно слово из 8 знаков — код, если в нём есть цифра или оно набрано заглавными (не «balances»)
+    if re.fullmatch(r"[A-HJ-NP-Z2-9]{8}", bare, re.I) and (re.search(r"\d", bare) or bare.isupper()):
+        return bare.upper()
+    return None
 LINK_HOWTO = ("Чтобы я увидел ваши заказы и баланс, подтвердите аккаунт: войдите на {site}, откройте "
               "«Уведомления» 🔔 ({site}/panel/notifications) и нажмите «Получить код для бота поддержки» — код "
               "придёт в уведомления, отправьте его сюда (вид DX-XXXXXXXX). Или откройте {site}/panel/support "
@@ -449,7 +467,6 @@ class SupportBot:
         self.chat = chat or OpenAIChat(config.openai_api_key, config.support_model)
         self.admin_chat = str(config.support_admin_id or config.alert_telegram_chat_id or "").strip()
         self.username = ""
-        self.admin_testing = False
         self._link_fails: dict[int, list[float]] = {}
         self._hits: dict[int, list[float]] = {}
         self._stop = threading.Event()
@@ -521,29 +538,22 @@ class SupportBot:
         name = ("@" + user["username"]) if user.get("username") else (user.get("first_name") or str(tg_id))
         text = (msg.get("text") or msg.get("caption") or "").strip()
 
-        # Админ: reply на обращение уходит клиенту; /test — проверить бота как клиент, /admin — обратно
+        # Админ: reply на обращение уходит клиенту; всё остальное бот понимает как от обычного клиента
         is_admin = bool(self.admin_chat) and str(tg_id) == self.admin_chat
-        if is_admin:
-            if msg.get("reply_to_message"):
-                self._admin_reply(conn, msg, text)
-                return
-            if text.startswith("/test"):
-                self.admin_testing = True
-                self.send(tg_id, "🧪 Режим проверки: теперь бот отвечает вам как клиенту. /admin — вернуться.")
-                return
-            if text.startswith("/admin") or (text.startswith("/start") and not self.admin_testing):
-                self.admin_testing = False
-                self.send(tg_id, "👋 Вы — админ поддержки. Обращения клиентов (🆘) будут приходить сюда; чтобы "
-                                 "ответить, сделайте reply на обращение.\n/test — проверить бота как клиент.")
-                return
-            if not self.admin_testing:
-                self.send(tg_id, "Чтобы ответить клиенту — reply на его обращение (🆘). Проверить бота как "
-                                 "клиент — /test.")
-                return
-        m = re.match(r"/start\s+([A-Za-z0-9]{8})$", text) or _LINK.search(text)
-        if m:
-            self._link(conn, tg_id, m.group(1))
+        if is_admin and msg.get("reply_to_message"):
+            self._admin_reply(conn, msg, text)
             return
+        code = find_code(text)
+        if code:
+            self._link(conn, tg_id, code)
+            return
+        if is_admin and (text.startswith("/admin") or text == "/start"):
+            self.send(tg_id, "👋 Вы — админ поддержки. Обращения клиентов (🆘) приходят сюда; чтобы ответить, "
+                             "сделайте reply на обращение. Остальные ваши сообщения бот понимает как от клиента — "
+                             "можно проверить его: пришлите код из уведомлений или задайте вопрос.")
+            return
+        if text in ("/test", "/admin"):
+            text = "/start"
         if text.startswith("/start"):
             self.send(tg_id, "Салом! Ман ёрдамчии Donatix ҳастам. Саволи худро нависед — масалан, «фармоиш "
                              "нарасид» ё «баланс пур нашуд».\n\nЗдравствуйте! Я помощник Donatix. Напишите "
@@ -591,8 +601,10 @@ class SupportBot:
         user = link_by_code(conn, tg_id, code)
         if user is None:
             self._link_fails[tg_id] = fails + [now]
-            self.send(tg_id, "Код неверный или устарел. Откройте в кабинете «Поддержка в Telegram» и нажмите кнопку "
-                             "ещё раз. / Код нодуруст ё кӯҳна аст — аз кабинет аз нав кушоед.")
+            self.send(tg_id, "Код неверный или устарел (живёт 15 минут, работает один раз). На сайте откройте "
+                             f"🔔 Уведомления → «Получить код для бота поддержки» и пришлите новый код сюда.\n{self.config.base_url}"
+                             "/panel/notifications\n\nКод нодуруст ё кӯҳна аст. Дар сайт 🔔 → «Получить код» "
+                             "пахш кунед ва коди навро ин ҷо фиристед.")
             return
         self.send(tg_id, f"✅ Аккаунт подтверждён: {user['login']}. Теперь напишите вопрос — вижу ваши заказы, "
                          "пополнения и баланс.\n\n✅ Ҳисоб тасдиқ шуд. Акнун саволи худро нависед.")
