@@ -83,6 +83,29 @@ def stats_page(request: Request, period: str = "30d", admin=Depends(admin_user),
     })
 
 
+@router.get("/finance")
+def finance_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
+    from . import finance, timez
+    days = finance.history(conn, config, 14)
+    return render(request, "admin/finance.html", {
+        "user": admin, "now": days[0], "days": days, "cutoff": finance.cutoff_hour(conn),
+        "site_tz": timez.label(timez.site_zone_name(conn)), "tjs": finance.tjs, "usd": finance.usd,
+    })
+
+
+@router.post("/finance/send", dependencies=[Depends(check_csrf)])
+def finance_send(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
+    """Прислать отчёт за последние закрытые сутки в админ-бот прямо сейчас."""
+    from . import finance
+    from .worker import notify_admin
+    start, end = finance.window(conn, days_back=1)
+    notify_admin(config, finance.report_text(finance.summary(conn, config, start, end)), html=True)
+    flash(request, "Отчёт отправлен в админ-бот.")
+    return RedirectResponse("/admin/finance", status_code=303)
+
+
 @router.get("/traffic")
 def traffic_page(request: Request, period: str = "7d", admin=Depends(admin_user), conn=Depends(get_conn),
                  config: Config = Depends(get_config)):

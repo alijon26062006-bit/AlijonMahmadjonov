@@ -49,7 +49,16 @@
 <div class="list">
   <div class="kv"><span class="k">Email</span><span class="v">{{ user.email }}</span></div>
   <div class="kv"><span class="k">Валюта счёта</span><span class="v">USD</span></div>
-  <div class="kv"><span class="k">Регистрация</span><span class="v mono">{{ user.created_at[8:10] }}.{{ user.created_at[5:7] }}.{{ user.created_at[:4] }} {{ user.created_at[11:16] }}</span></div>
+  <div class="kv"><span class="k">Регистрация</span><span class="v mono">{{ user.created_at | dt }}</span></div>
+  <form class="kv tz-row" method="post" action="/panel/timezone">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <span class="k">Часовой пояс</span>
+    <span class="v"><select name="tz" aria-label="Часовой пояс" onchange="this.form.submit()">
+      <option value="auto" {{ 'selected' if tz_choice == 'auto' }}>Автоматически — {{ tz_label if tz_choice == 'auto' else 'по устройству' }}</option>
+      {% for z, title in tz_zones %}<option value="{{ z }}" {{ 'selected' if tz_choice == z }}>{{ title }}</option>{% endfor %}
+    </select><noscript><button class="btn sm">Сохранить</button></noscript>
+    <span class="muted small tz-now">Сейчас у вас: <b>{{ now_utc | dt('%H:%M') }}</b></span></span>
+  </form>
   {% if user.project %}<div class="kv"><span class="k">Проект</span><span class="v">{{ user.project }}</span></div>{% endif %}
 </div>
 
@@ -61,7 +70,7 @@
     {{ icon('eye', 22) }}<span class="tip">Показать ключ</span></button>
   <div class="key-box"><code id="key-val" class="mono">•••••••••••</code>
     <button type="button" class="icon-btn" id="key-copy" aria-label="Скопировать" hidden>{{ icon('copy', 18) }}</button></div>
-  <div class="hint" id="key-hint">{% if key.last_used_at %}Последнее использование: {{ key.last_used_at[:16] | replace('T', ' ') }}.{% else %}Ещё не использовался.{% endif %}</div>
+  <div class="hint" id="key-hint">{% if key.last_used_at %}Последнее использование: {{ key.last_used_at | dt }}.{% else %}Ещё не использовался.{% endif %}</div>
   <div class="key-actions">
     <a class="btn" href="/panel/api">{{ icon('key', 18) }}Управление ключами</a>
   </div>

@@ -6,6 +6,7 @@ import json
 import re
 import sqlite3
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
@@ -351,12 +352,34 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
     })
 
 
+def _tz_hours(conn: sqlite3.Connection, user: Any, cookie: str | None) -> int:
+    """Сдвиг пояса клиента в часах — для графиков «по часам»."""
+    from datetime import datetime as _dt
+    from datetime import timezone as _tzu
+
+    from . import timez
+    name, _ = timez.resolve(conn, user, cookie)
+    offset = _dt.now(_tzu.utc).astimezone(timez.zone(name)).utcoffset()
+    return int(offset.total_seconds() // 3600) if offset else 0
+
+
+@router.post("/panel/timezone", dependencies=[Depends(check_csrf)])
+def panel_timezone(request: Request, tz: str = Form("auto"), user=Depends(panel_user), conn=Depends(get_conn)):
+    """Часовой пояс клиента: «автоматически» (по устройству) или выбранный — на всех его устройствах."""
+    from . import timez
+    timez.set_user_choice(conn, user["id"], tz)
+    flash(request, "Часовой пояс сохранён: " + (timez.label(tz) if tz != timez.AUTO else "автоматически, по устройству")
+          + ".")
+    return _redirect("/panel")
+
+
 @router.get("/panel/stats")
 def panel_stats(request: Request, period: str = "30d", user=Depends(panel_user), conn=Depends(get_conn),
                 config: Config = Depends(get_config)):
     from . import analytics
     return render(request, "panel/stats.html", {
-        "user": user, "a": analytics.build(conn, period, user_id=user["id"], tz_hours=config.tz_offset),
+        "user": user, "a": analytics.build(conn, period, user_id=user["id"],
+                                           tz_hours=_tz_hours(conn, user, request.cookies.get("dx_tz"))),
     })
 
 

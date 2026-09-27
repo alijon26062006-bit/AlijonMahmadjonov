@@ -5,7 +5,7 @@
 <section class="page-hero">
   <a class="back" href="/admin/users">{{ icon('arrow-left', 18) }}Клиенты</a>
   <h1>{{ c.login }}</h1>
-  <p>{{ c.email }} · с {{ c.created_at[:10] }}{% if c.project %} · {{ c.project }}{% endif %}</p>
+  <p>{{ c.email }} · с {{ c.created_at | dt('%d.%m.%Y') }}{% if c.project %} · {{ c.project }}{% endif %}</p>
 </section>
 <div class="grid two">
   <div class="card reveal">
@@ -45,7 +45,7 @@
   {% for t in txs %}
   <tr><td>tx{{ t.id }}</td><td>{{ t.note }}</td>
     <td class="num amount {{ 'plus' if t.amount_micro > 0 else 'minus' }}">${{ fmt(t.amount_micro) }}</td>
-    <td class="num">${{ fmt(t.balance_after) }}</td><td class="small">{{ t.created_at[:16] | replace('T', ' ') }}</td></tr>
+    <td class="num">${{ fmt(t.balance_after) }}</td><td class="small">{{ t.created_at | dt }}</td></tr>
   {% else %}<tr><td colspan="5" class="muted">Нет движений.</td></tr>{% endfor %}
 </table></div>
 
@@ -56,7 +56,7 @@
   <tr><td><a href="/admin/orders/{{ o.id }}">{{ o.public_id }}</a></td><td>{{ o.product_name | pack_title(o.kind) }}</td>
     <td class="num">${{ fmt(o.total_micro) }}</td>
     <td><span class="badge {{ {'completed': 'ok', 'failed': 'bad', 'processing': 'warn', 'attention': 'bad'}[o.status] }}">{{ status_titles[o.status] }}</span></td>
-    <td class="small">{{ o.created_at[:16] | replace('T', ' ') }}</td></tr>
+    <td class="small">{{ o.created_at | dt }}</td></tr>
   {% else %}<tr><td colspan="5" class="muted">Заказов нет.</td></tr>{% endfor %}
 </table></div>
 {% endblock %}

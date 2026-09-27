@@ -35,6 +35,21 @@
       document.documentElement.setAttribute("data-theme", t);
       document.documentElement.classList.add("js");
     })();
+    // Часовой пояс устройства → cookie: сервер показывает время так, как у человека на часах.
+    // Если выбран «автоматически» и пояс поменялся (поездка, другой телефон) — один раз обновляем страницу.
+    (function () {
+      try {
+        var z = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!z) return;
+        var had = document.cookie.match(/(?:^|; )dx_tz=([^;]*)/);
+        if (had && decodeURIComponent(had[1]) === z) return;
+        document.cookie = "dx_tz=" + encodeURIComponent(z) + "; path=/; max-age=31536000; samesite=lax";
+        if ("{{ tz_choice }}" === "auto" && "{{ tz }}" !== z && !sessionStorage.getItem("dx-tz-r")) {
+          sessionStorage.setItem("dx-tz-r", "1");
+          location.reload();
+        }
+      } catch (e) {}
+    })();
     // Валюта показа: USD или TJS по курсу оплат. Внутри всё в долларах — это только вывод.
     window.DX_CUR = {code: "{{ cur_code }}", rate: {{ cur_rate or 0 }}};
     window.dxMoney = function (usd, digits) {

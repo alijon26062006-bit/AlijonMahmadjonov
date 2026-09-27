@@ -133,6 +133,8 @@ class Worker:
                 try:
                     from . import reports
                     reports.maybe_send(conn, self.config)  # утренний отчёт в админ-бот
+                    from . import finance
+                    finance.maybe_send(conn, self.config)  # в 12:00 — деньги за сутки 12:00 → 12:00
                 except Exception:
                     log.exception("утренний отчёт")
                 if now - last_watch >= 3600 or last_watch == 0:

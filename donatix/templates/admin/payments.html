@@ -13,7 +13,7 @@
   <div class="card reveal">
     <div class="head" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div><b>#{{ p.id }} · <a href="/admin/users/{{ p.user_id }}">{{ p.login }}</a></b>
-        <div class="muted small">{{ titles.get(p.method, p.method) }} · {{ p.created_at[:16] | replace('T', ' ') }} · баланс сейчас ${{ fmt(p.balance_micro) }}</div></div>
+        <div class="muted small">{{ titles.get(p.method, p.method) }} · {{ p.created_at | dt }} · баланс сейчас ${{ fmt(p.balance_micro) }}</div></div>
       <div class="right"><div class="amount">${{ fmt(p.amount_micro) }}</div><div class="small muted">к переводу {{ p.pay_amount }} {{ p.pay_currency }}</div></div>
     </div>
     {% if p.reference %}<div class="small" style="margin-top:8px">Чек / хэш: <span class="mono">{{ p.reference }}</span></div>{% endif %}

@@ -12,7 +12,7 @@
     <td class="num">${{ fmt(o.total_micro) }}</td>
     <td><span class="badge {{ {'failed': 'bad', 'attention': 'bad', 'processing': 'warn', 'completed': 'ok'}[o.status] }}">{{ status_titles[o.status] }}</span></td>
     <td class="small">{{ o.error or ('Webhook клиента не отвечает' if o.webhook_state == 'failed' else '') }}</td>
-    <td class="small nowrap">{{ o.updated_at[:16] | replace('T', ' ') }}</td>
+    <td class="small nowrap">{{ o.updated_at | dt }}</td>
   </tr>
   {% else %}<tr><td colspan="7" class="muted">Ошибок нет.</td></tr>{% endfor %}
 </table></div>

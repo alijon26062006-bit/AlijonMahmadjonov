@@ -18,7 +18,7 @@
       <div class="code-row"><span class="big-code">{{ n.code }}</span>
         <button class="btn primary sm" type="button" data-copy="{{ n.code }}">{{ icon('copy', 16) }}Копировать</button></div>
       <div class="sub">{{ n.text.split('\n')[1:] | join(' ') }}</div>
-      <div class="sub">{{ n.created_at[8:10] }}.{{ n.created_at[5:7] }}.{{ n.created_at[:4] }} {{ n.created_at[11:16] }}{% if not n.read_at %} · <b>новое</b>{% endif %}</div>
+      <div class="sub">{{ n.created_at | dt }}{% if not n.read_at %} · <b>новое</b>{% endif %}</div>
     </div>
   </div>
   {% else %}
@@ -26,7 +26,7 @@
     <div class="tile sm {{ 'g1' if not n.read_at else '' }}">{{ icon('bell', 18) }}</div>
     <div class="grow">
       <div class="title">{{ n.text }}</div>
-      <div class="sub">{{ n.created_at[8:10] }}.{{ n.created_at[5:7] }}.{{ n.created_at[:4] }} {{ n.created_at[11:16] }}{% if not n.read_at %} · <b>новое</b>{% endif %}</div>
+      <div class="sub">{{ n.created_at | dt }}{% if not n.read_at %} · <b>новое</b>{% endif %}</div>
     </div>
   </a>
   {% endif %}

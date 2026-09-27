@@ -18,6 +18,16 @@ from .suppliers import KIND_TITLES
 
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
 templates.env.globals.update(fmt=fmt, fmt_unit=fmt_unit, kind_titles=KIND_TITLES)
+
+
+@pass_context
+def _dt(ctx: Any, value: Any, fmt: str = "%d.%m.%Y %H:%M") -> str:
+    """Время из базы (UTC) → местное время человека: {{ o.created_at | dt }}."""
+    from .timez import local
+    return local(value, ctx.get("tz"), fmt)
+
+
+templates.env.filters["dt"] = _dt
 templates.env.filters["fromjson"] = json.loads
 templates.env.filters["faq_item"] = lambda qa: {
     "@type": "Question", "name": qa[0], "acceptedAnswer": {"@type": "Answer", "text": qa[1]}}
@@ -180,10 +190,13 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["low_balance_micro"] = 0
     ctx["cur_code"] = "TJS" if request.cookies.get("dx_cur") == "TJS" else "USD"
     ctx["cur_rate"] = None
+    from . import timez
+    ctx["tz"], ctx["tz_choice"] = timez.resolve(None, None, request.cookies.get("dx_tz"))
     if ctx.get("user") is not None:
         from .notify import unread_count
         c = db.connect(config.db_path)
         try:
+            ctx["tz"], ctx["tz_choice"] = timez.resolve(c, ctx["user"], request.cookies.get("dx_tz"))
             ctx["unread"] = unread_count(c, ctx["user"]["id"])
             from .popular import services as popular_services
             ctx["popular"] = popular_services(c)
@@ -194,4 +207,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
                 ctx["cur_rate"] = pay_settings(c, config)["tjs_rate"]
         finally:
             c.close()
+    ctx["tz_label"] = timez.label(ctx["tz"])
+    from datetime import datetime, timezone
+    ctx["now_utc"] = datetime.now(timezone.utc)
+    ctx["tz_zones"] = timez.ZONES
     return templates.TemplateResponse(request, name, ctx, status_code=status_code)

@@ -28,7 +28,7 @@
     <tr>
       <td>{{ k.name }}</td>
       <td class="mono">{{ k.prefix }}…</td>
-      <td class="small">{{ k.created_at[:10] }}</td>
+      <td class="small">{{ k.created_at | dt('%d.%m.%Y') }}</td>
       <td class="small">{{ (k.last_used_at or '—')[:16] | replace('T', ' ') }}</td>
       <td class="right">
         {% if k.revoked_at %}<span class="badge">отозван</span>{% else %}
