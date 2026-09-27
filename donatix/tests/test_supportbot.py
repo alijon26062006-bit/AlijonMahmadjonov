@@ -1,5 +1,4 @@
 import json
-import re
 
 from conftest import make_client
 
@@ -31,21 +30,24 @@ def _order(conn, uid, public_id, status, error=None):
                  (public_id, uid, status, "k-" + public_id, error))
 
 
-def test_login_by_email_code_and_only_own_data(config, conn):
+def test_login_only_via_cabinet_and_only_own_data(config, conn):
     uid, _ = make_client(conn)
     other, _ = make_client(conn, login="shop2")
     _order(conn, uid, "dx-aaa111", "failed", "Поставщик FazerCards: insufficient balance $0.37")
     _order(conn, other, "dx-bbb222", "completed")
     bot = _bot(config)
     t = supportbot.Tools(bot, conn, 555, "@client")
+    assert t.run("get_order", {"order_id": "dx-aaa111"})["error"] == "not_verified"
+    assert "/panel/support" in t.run("get_order", {"order_id": "dx-aaa111"})["how"]
 
-    assert t.run("get_order", {"order_id": "dx-aaa111"}) == {"error": "not_verified_ask_email"}
-    same = t.run("send_login_code", {"email": "nobody@example.com"})
-    assert same == t.run("send_login_code", {"email": "shop1@example.com"})   # не выдаём, есть ли такой email
-    note = conn.execute("SELECT text FROM notifications WHERE user_id = ? ORDER BY id DESC", (uid,)).fetchone()[0]
-    code = re.search(r"(\d{6})", note).group(1)
-    assert t.run("verify_login_code", {"code": "000000" if code != "000000" else "111111"})["error"] == "wrong_code"
-    assert t.run("verify_login_code", {"code": code}) == {"ok": True, "login": "shop1"}
+    def say(text):
+        bot.handle(conn, {"message": {"chat": {"id": 555, "type": "private"}, "from": {"id": 555}, "text": text}})
+        return bot.api.sent[-1][1]
+
+    assert "неверный" in say("DX-ABCDEFGH")                        # чужой/выдуманный код не подходит
+    code = supportbot.make_link_code(conn, uid)
+    assert "Аккаунт подтверждён: shop1" in say(f"/start {code}")   # кнопка из кабинета
+    assert "неверный" in say(f"/start {code}")                      # одноразовый
 
     mine = t.run("get_order", {"order_id": "DX-AAA111"})
     assert mine["status"] == "не выполнен" and mine["money_returned_to_balance"] is True
@@ -54,6 +56,30 @@ def test_login_by_email_code_and_only_own_data(config, conn):
     assert "cost" not in json.dumps(mine) and "9000" not in json.dumps(mine)  # закупка не видна
     assert t.run("get_order", {"order_id": "dx-bbb222"}) == {"error": "order_not_found_in_this_account"}
     assert t.run("get_my_account", {})["balance_usd"] == "100.0000"
+
+    # код вручную (Telegram на другом устройстве) — тоже работает, другой Telegram
+    code2 = supportbot.make_link_code(conn, other)
+    bot.handle(conn, {"message": {"chat": {"id": 777, "type": "private"}, "from": {"id": 777},
+                                  "text": f"мой код dx-{code2.lower()}"}})
+    assert "Аккаунт подтверждён: shop2" in bot.api.sent[-1][1]
+
+
+def test_link_code_bruteforce_limited(config, conn):
+    bot = _bot(config)
+    for _ in range(12):
+        bot.handle(conn, {"message": {"chat": {"id": 5, "type": "private"}, "from": {"id": 5},
+                                      "text": "DX-ZZZZZZZZ"}})
+    assert "Слишком много неверных кодов" in bot.api.sent[-1][1]
+
+
+def test_cabinet_support_page_shows_code(client, conn):
+    from conftest import web_login
+    from donatix import db
+    make_client(conn)
+    db.set_setting(conn, "support.bot_username", "donatix_help_bot")
+    web_login(client, "shop1@example.com", "password123")
+    page = client.get("/panel/support").text
+    assert "https://t.me/donatix_help_bot?start=" in page and "DX-" in page
 
 
 def test_ai_loop_uses_tools_and_remembers(config, conn):

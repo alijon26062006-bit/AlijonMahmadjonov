@@ -831,6 +831,17 @@ def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_u
     return _redirect("/panel/balance")
 
 
+@router.get("/panel/support")
+def panel_support(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                  config: Config = Depends(get_config)):
+    """Поддержка в Telegram: одноразовый код — бот узнаёт клиента без email и без AI."""
+    from . import supportbot
+    bot = db.get_setting(conn, "support.bot_username") or ""
+    code = supportbot.make_link_code(conn, user["id"]) if bot else ""
+    return render(request, "panel/support.html", {"user": user, "bot": bot, "code": code,
+                                                   "minutes": supportbot.LINK_TTL // 60})
+
+
 @router.get("/panel/notifications")
 def panel_notifications(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
     from . import notify

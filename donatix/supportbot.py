@@ -1,9 +1,8 @@
 """Бот поддержки клиентов Donatix с AI (OpenAI).
 
 Клиент пишет в Telegram: «заказ не пришёл», «почему не пополнился баланс». AI:
-1) просит email от аккаунта → бот шлёт 6-значный код (на почту, а если почта на
-   сервере не настроена — в уведомления кабинета) → клиент вводит код, и этот
-   Telegram привязывается к аккаунту;
+1) узнаёт клиента только через личный кабинет: «Поддержка в Telegram» → кнопка
+   «Открыть бота» (или код DX-XXXXXXXX с той страницы) — и Telegram привязан к аккаунту;
 2) спрашивает номер заказа (dx-…) или заявки на пополнение (#N), сам смотрит,
    что с ними, и отвечает на языке клиента — по-таджикски или по-русски;
 3) не может решить сам — передаёт обращение админу, ответ админа приходит клиенту
@@ -17,7 +16,6 @@
 from __future__ import annotations
 
 import hashlib
-import hmac
 import json
 import logging
 import re
@@ -41,13 +39,9 @@ OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 PROMPT_FILE = Path(__file__).with_name("support_prompt.txt")   # инструкции для AI — править можно без кода
 HISTORY_TURNS = 16            # сколько последних сообщений помнит бот
 MAX_TOOL_ROUNDS = 6           # шагов «спросил базу → подумал» на один ответ
-CODE_TTL = 15 * 60            # код входа живёт 15 минут
-CODE_TRIES = 5
-CODES_PER_HOUR = 3
 MSG_LIMIT = (20, 600)         # не больше 20 сообщений за 10 минут от одного человека
 MAX_INPUT = 1500
 
-_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _ORDER = re.compile(r"(dx-[0-9a-f-]{6,})", re.I)
 _TOKEN = re.compile(r"\b\d{6,12}:[A-Za-z0-9_-]{30,}\b")
 
@@ -128,21 +122,9 @@ def _payment_for_ai(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) ->
 
 TOOLS = [
     {"type": "function", "function": {
-        "name": "send_login_code",
-        "description": "Отправить 6-значный код входа для аккаунта с этим email. Код приходит на почту и в "
-                       "уведомления кабинета на сайте. Вызывай, когда клиент назвал email, а аккаунт ещё не "
-                       "подтверждён.",
-        "parameters": {"type": "object", "properties": {"email": {"type": "string"}}, "required": ["email"],
-                       "additionalProperties": False}}},
-    {"type": "function", "function": {
-        "name": "verify_login_code",
-        "description": "Проверить 6-значный код, который прислал клиент. После успеха доступны его заказы, "
-                       "баланс и пополнения.",
-        "parameters": {"type": "object", "properties": {"code": {"type": "string"}}, "required": ["code"],
-                       "additionalProperties": False}}},
-    {"type": "function", "function": {
         "name": "get_my_account",
-        "description": "Аккаунт клиента: логин, статус, баланс, число заказов. Только после подтверждения кода.",
+        "description": "Аккаунт клиента: логин, статус, баланс, число заказов. Только после подтверждения "
+                       "через кабинет.",
         "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}},
     {"type": "function", "function": {
         "name": "get_order",
@@ -198,60 +180,11 @@ class Tools:
     def _user(self) -> sqlite3.Row | None:
         return _linked_user(self.conn, self.tg_id)
 
-    def t_send_login_code(self, email: str) -> dict[str, Any]:
-        email = (email or "").strip().lower()
-        if not _EMAIL.match(email):
-            return {"ok": False, "error": "invalid_email"}
-        prev = self.conn.execute("SELECT sent, sent_at FROM support_codes WHERE tg_id = ?", (self.tg_id,)).fetchone()
-        now = time.time()
-        fresh = prev is None or now - prev["sent_at"] >= 3600      # новый час — счёт заново
-        if not fresh and prev["sent"] >= CODES_PER_HOUR:
-            return {"ok": False, "error": "too_many_codes_try_later"}
-        user = self.conn.execute("SELECT * FROM users WHERE lower(email) = ? AND role = 'client'",
-                                 (email,)).fetchone()
-        # Ответ одинаковый, есть такой email или нет — по боту нельзя узнать, кто у нас клиент
-        site = self.config.base_url.rstrip("/")
-        where = (f"на почту и в уведомления кабинета ({site}/panel/notifications — колокольчик 🔔)"
-                 if self.config.smtp_host else
-                 f"в уведомления личного кабинета: войдите на {site} и откройте колокольчик 🔔 "
-                 f"(«Уведомления», {site}/panel/notifications)")
-        answer = {"ok": True, "message": f"Если аккаунт с таким email есть, код отправлен {where}. "
-                                         "Действует 15 минут. Скажи клиенту точно, где искать код."}
-        if user is None or user["status"] == "blocked":
-            return answer
-        code = f"{secrets.randbelow(1_000_000):06d}"
-        self.conn.execute(
-            "INSERT OR REPLACE INTO support_codes (tg_id, user_id, code_hash, expires_at, tries, sent, sent_at) "
-            "VALUES (?, ?, ?, ?, 0, ?, ?)",
-            (self.tg_id, user["id"], _hash(code), now + CODE_TTL, 1 if fresh else prev["sent"] + 1,
-             now if fresh else prev["sent_at"]))
-        from .notify import notify
-        bot_name = f" @{self.bot.username}" if self.bot.username else ""
-        notify(self.conn, self.config, user["id"],
-               f"🔐 Код для бота поддержки: {code} — отправьте его боту{bot_name}. "
-               "Действует 15 минут. Никому другому не сообщайте.", "/panel/notifications")
-        return answer
-
-    def t_verify_login_code(self, code: str) -> dict[str, Any]:
-        code = re.sub(r"\D", "", code or "")
-        row = self.conn.execute("SELECT * FROM support_codes WHERE tg_id = ?", (self.tg_id,)).fetchone()
-        if row is None or row["expires_at"] < time.time():
-            return {"ok": False, "error": "no_active_code_ask_email_again"}
-        if row["tries"] >= CODE_TRIES:
-            return {"ok": False, "error": "too_many_tries_ask_email_again"}
-        if not hmac.compare_digest(row["code_hash"], _hash(code)):
-            self.conn.execute("UPDATE support_codes SET tries = tries + 1 WHERE tg_id = ?", (self.tg_id,))
-            return {"ok": False, "error": "wrong_code", "tries_left": CODE_TRIES - row["tries"] - 1}
-        self.conn.execute("INSERT INTO support_links (tg_id, user_id, linked_at) VALUES (?, ?, ?) "
-                          "ON CONFLICT(tg_id) DO UPDATE SET user_id = excluded.user_id, linked_at = excluded.linked_at",
-                          (self.tg_id, row["user_id"], db.now()))
-        self.conn.execute("DELETE FROM support_codes WHERE tg_id = ?", (self.tg_id,))
-        u = accounts.get_user(self.conn, row["user_id"])
-        return {"ok": True, "login": u["login"]}
-
     def _need_user(self) -> sqlite3.Row | dict[str, Any]:
         u = self._user()
-        return u if u is not None else {"error": "not_verified_ask_email"}
+        if u is not None:
+            return u
+        return {"error": "not_verified", "how": LINK_HOWTO.format(site=self.config.base_url.rstrip("/"))}
 
     def t_get_my_account(self) -> dict[str, Any]:
         u = self._need_user()
@@ -326,6 +259,43 @@ class Tools:
         ticket = int(cur.lastrowid)
         self.bot.alert_admin(ticket, self.tg_id, self.tg_name, u, summary[:1500])
         return {"ok": True, "ticket": ticket}
+
+
+# ─────────────────────────────────────────── вход только через кабинет
+#
+# Код делает сайт, а не AI: в кабинете «Поддержка в Telegram» кнопка открывает бота со
+# ссылкой t.me/бот?start=КОД, а для другого устройства там же виден сам код — его можно
+# просто отправить боту. Код одноразовый, живёт 15 минут, подобрать его нельзя (8 знаков,
+# 10 неудачных попыток в час на Telegram-аккаунт).
+
+LINK_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+LINK_TTL = 15 * 60
+LINK_TRIES_PER_HOUR = 10
+_LINK = re.compile(r"\bDX[-\s]?([A-HJ-NP-Z2-9]{8})\b", re.I)
+LINK_HOWTO = ("Чтобы я увидел ваши заказы и баланс, подтвердите аккаунт: войдите на {site}, откройте "
+              "«Поддержка в Telegram» ({site}/panel/support) и нажмите «Открыть бота» — или отправьте сюда код "
+              "с той страницы (вид DX-XXXXXXXX).")
+
+
+def make_link_code(conn: sqlite3.Connection, user_id: int) -> str:
+    code = "".join(secrets.choice(LINK_ALPHABET) for _ in range(8))
+    conn.execute("DELETE FROM support_link_codes WHERE user_id = ? OR expires_at < ?", (user_id, time.time()))
+    conn.execute("INSERT INTO support_link_codes (code_hash, user_id, expires_at) VALUES (?, ?, ?)",
+                 (_hash(code), user_id, time.time() + LINK_TTL))
+    return code
+
+
+def link_by_code(conn: sqlite3.Connection, tg_id: int, code: str) -> sqlite3.Row | None:
+    """Привязать Telegram к аккаунту по коду из кабинета. None — код неверный или устарел."""
+    row = conn.execute("SELECT user_id FROM support_link_codes WHERE code_hash = ? AND expires_at >= ?",
+                       (_hash(code.upper()), time.time())).fetchone()
+    if row is None:
+        return None
+    conn.execute("DELETE FROM support_link_codes WHERE code_hash = ?", (_hash(code.upper()),))
+    conn.execute("INSERT INTO support_links (tg_id, user_id, linked_at) VALUES (?, ?, ?) "
+                 "ON CONFLICT(tg_id) DO UPDATE SET user_id = excluded.user_id, linked_at = excluded.linked_at",
+                 (tg_id, row["user_id"], db.now()))
+    return accounts.get_user(conn, row["user_id"])
 
 
 def _hash(code: str) -> str:
@@ -420,8 +390,8 @@ def connect_bot(conn: sqlite3.Connection, config: Config, tg_id: int, token: str
     from .worker import notify_admin
     user = _linked_user(conn, tg_id)
     if user is None:
-        return ("Сначала подтвердите аккаунт: напишите email, с которым вы зарегистрированы на сайте, — пришлю код. "
-                "Токен после этого отправьте ещё раз.\n\nАввал ҳисобро тасдиқ кунед: email-и худро нависед.")
+        return (LINK_HOWTO.format(site=config.base_url.rstrip("/")) + " Токен после этого отправьте ещё раз."
+                "\n\nАввал ҳисобро тасдиқ кунед: дар кабинет «Поддержка в Telegram»-ро кушоед.")
     e = bots.eligibility(conn, user)
     if not e["ok"]:
         return e["reason"]
@@ -451,6 +421,7 @@ class SupportBot:
         self.admin_chat = str(config.support_admin_id or config.alert_telegram_chat_id or "").strip()
         self.username = ""
         self.admin_testing = False
+        self._link_fails: dict[int, list[float]] = {}
         self._hits: dict[int, list[float]] = {}
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -540,6 +511,10 @@ class SupportBot:
                 self.send(tg_id, "Чтобы ответить клиенту — reply на его обращение (🆘). Проверить бота как "
                                  "клиент — /test.")
                 return
+        m = re.match(r"/start\s+([A-Za-z0-9]{8})$", text) or _LINK.search(text)
+        if m:
+            self._link(conn, tg_id, m.group(1))
+            return
         if text.startswith("/start"):
             self.send(tg_id, "Салом! Ман ёрдамчии Donatix ҳастам. Саволи худро нависед — масалан, «фармоиш "
                              "нарасид» ё «баланс пур нашуд».\n\nЗдравствуйте! Я помощник Donatix. Напишите "
@@ -577,6 +552,21 @@ class SupportBot:
             if is_admin:   # админу — настоящая причина (ключ, лимит, модель)
                 reply += f"\n\n⚙️ Для админа: {str(exc)[:500]}"
         self.send(tg_id, reply)
+
+    def _link(self, conn: sqlite3.Connection, tg_id: int, code: str) -> None:
+        now = time.time()
+        fails = [t for t in self._link_fails.get(tg_id, []) if now - t < 3600]
+        if len(fails) >= LINK_TRIES_PER_HOUR:
+            self.send(tg_id, "Слишком много неверных кодов — попробуйте через час. / Пас аз як соат кӯшиш кунед.")
+            return
+        user = link_by_code(conn, tg_id, code)
+        if user is None:
+            self._link_fails[tg_id] = fails + [now]
+            self.send(tg_id, "Код неверный или устарел. Откройте в кабинете «Поддержка в Telegram» и нажмите кнопку "
+                             "ещё раз. / Код нодуруст ё кӯҳна аст — аз кабинет аз нав кушоед.")
+            return
+        self.send(tg_id, f"✅ Аккаунт подтверждён: {user['login']}. Теперь напишите вопрос — вижу ваши заказы, "
+                         "пополнения и баланс.\n\n✅ Ҳисоб тасдиқ шуд. Акнун саволи худро нависед.")
 
     def alert_admin(self, ticket: int, tg_id: int, tg_name: str, user: sqlite3.Row | None, summary: str) -> None:
         who = f"{user['login']} · {user['email']}" if user else "аккаунт не подтверждён"

@@ -1247,3 +1247,13 @@ html { scroll-behavior: smooth; }
 .bot-lock { border-style: dashed; }
 .lock-progress { height: 10px; margin: 14px 0 6px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
 .lock-progress div { height: 100%; width: var(--w); border-radius: 5px; background: var(--accent); }
+
+/* Кабинет → Поддержка в Telegram */
+.support-card { display: grid; gap: 18px; max-width: 640px; }
+.sc-step { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; }
+.sc-step .n { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft);
+  color: var(--accent); font-weight: 700; }
+.sc-open { margin-top: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+.sc-code { display: flex; align-items: center; gap: 10px; margin: 10px 0 6px; flex-wrap: wrap; }
+.sc-code code { padding: 10px 16px; border-radius: 10px; background: var(--surface-2); font: 700 1.3rem/1 "JetBrains Mono", ui-monospace, monospace;
+  letter-spacing: .08em; }

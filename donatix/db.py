@@ -206,6 +206,11 @@ CREATE TABLE IF NOT EXISTS support_codes (
     sent       INTEGER NOT NULL DEFAULT 1,
     sent_at    REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS support_link_codes (
+    code_hash  TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    expires_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS support_history (
     id         INTEGER PRIMARY KEY,
     tg_id      INTEGER NOT NULL,
