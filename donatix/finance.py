@@ -1,4 +1,4 @@
-"""Деньги за «рабочие сутки» — с 12:00 до 12:00 следующего дня (по времени Душанбе).
+"""Деньги за сутки — с 00:00 до 00:00 следующего дня (по времени Душанбе).
 
 Для владельца: сколько за сутки перевели на карты и в крипте, сколько из этого —
 его прибыль (продажи минус закупка у поставщика) и сколько можно отправить
@@ -20,7 +20,7 @@ from typing import Any
 from . import db, timez
 from .config import Config
 
-CUTOFF_HOUR = 12
+CUTOFF_HOUR = 0   # сутки с 00:00 до 00:00 следующего дня (по времени Душанбе)
 
 
 def cutoff_hour(conn: sqlite3.Connection) -> int:
@@ -29,7 +29,7 @@ def cutoff_hour(conn: sqlite3.Connection) -> int:
 
 
 def window(conn: sqlite3.Connection, now: datetime | None = None, days_back: int = 0) -> tuple[datetime, datetime]:
-    """Сутки 12:00 → 12:00 (местное время). days_back=0 — текущие (ещё идут), 1 — прошлые закрытые."""
+    """Сутки 00:00 → 00:00 (местное время). days_back=0 — текущие (ещё идут), 1 — прошлые закрытые."""
     tz = timez.zone(timez.site_zone_name(conn))
     local = (now or datetime.now(timezone.utc)).astimezone(tz)
     hour = cutoff_hour(conn)
@@ -119,7 +119,7 @@ def report_text(s: dict[str, Any]) -> str:
     def fmt(micro: int) -> str:
         return usd(micro)
 
-    lines = [f"💰 <b>Деньги за {s['start']:%d.%m %H:%M} — {s['end']:%d.%m %H:%M}</b>", ""]
+    lines = [f"💰 <b>Деньги за {s['start']:%d.%m.%Y}</b> (сутки 00:00 → 00:00)", ""]
     lines.append(f"📥 Поступило: <b>{both(s['received'])}</b> ({s['payments']} пополн.)")
     for m in s["methods"]:
         lines.append(f"   • {m['title']}: {m['paid']:.2f} {m['currency']} · {m['count']} шт.")
@@ -139,7 +139,7 @@ def report_text(s: dict[str, Any]) -> str:
 
 
 def maybe_send(conn: sqlite3.Connection, config: Config, now: datetime | None = None) -> bool:
-    """Каждый день в 12:00 — итог прошедших суток 12:00 → 12:00 в админ-бот."""
+    """Раз в сутки в 00:00 — итог прошедших суток 00:00 → 00:00 в админ-бот."""
     from .worker import notify_admin
     if (db.get_setting(conn, "report.daily_on") or "1") != "1":
         return False

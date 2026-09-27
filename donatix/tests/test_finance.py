@@ -20,23 +20,23 @@ def _order(conn, uid, n, total, cost, when, status="completed"):
                  (f"dx-f{n}", uid, total * 10_000, cost * 10_000, status, f"k{n}", when, when, when))
 
 
-def test_day_is_noon_to_noon_dushanbe(conn):
-    # 11:59 по Душанбе (06:59 UTC) — ещё прошлые сутки; 12:00 (07:00 UTC) — уже новые
-    start, end = finance.window(conn, datetime(2026, 9, 27, 6, 59, tzinfo=UTC))
-    assert (start.day, start.hour, end.day, end.hour) == (26, 12, 27, 12)
-    start, _ = finance.window(conn, datetime(2026, 9, 27, 7, 0, tzinfo=UTC))
-    assert (start.day, start.hour) == (27, 12)
+def test_day_is_midnight_to_midnight_dushanbe(conn):
+    # 23:59 по Душанбе (18:59 UTC) — ещё сегодняшние сутки; 00:00 (19:00 UTC) — уже новые
+    start, end = finance.window(conn, datetime(2026, 9, 26, 18, 59, tzinfo=UTC))
+    assert (start.day, start.hour, end.day, end.hour) == (26, 0, 27, 0)
+    start, _ = finance.window(conn, datetime(2026, 9, 26, 19, 0, tzinfo=UTC))
+    assert (start.day, start.hour) == (27, 0)
 
 
 def test_profit_and_amount_for_supplier(config, conn):
     uid, _ = make_client(conn)
-    _pay(conn, uid, 100, "1100.00", "TJS", "2026-09-26T08:00:00")          # 13:00 Душанбе — в сутках
-    _pay(conn, uid, 50, "550.00", "TJS", "2026-09-27T06:30:00")            # 11:30 — ещё в сутках
+    _pay(conn, uid, 100, "1100.00", "TJS", "2026-09-26T08:00:00")          # 13:00 Душанбе 26.09 — в сутках
+    _pay(conn, uid, 50, "550.00", "TJS", "2026-09-26T18:30:00")            # 23:30 26.09 — ещё в сутках
     _pay(conn, uid, 20, "20", "USDT", "2026-09-26T10:00:00", "usdt", "trc20")
-    _pay(conn, uid, 999, "1", "TJS", "2026-09-27T07:00:00")                # 12:00 — уже следующие
+    _pay(conn, uid, 999, "1", "TJS", "2026-09-26T19:00:00")                # 00:00 27.09 — уже следующие
     _order(conn, uid, 1, 60, 50, "2026-09-26T09:00:00")
-    _order(conn, uid, 2, 40, 35, "2026-09-26T20:00:00")
-    _order(conn, uid, 3, 30, 25, "2026-09-26T21:00:00", status="failed")   # возвращён — не считается
+    _order(conn, uid, 2, 40, 35, "2026-09-26T15:00:00")
+    _order(conn, uid, 3, 30, 25, "2026-09-26T16:00:00", status="failed")   # возвращён — не считается
     start, end = finance.window(conn, datetime(2026, 9, 27, 8, 0, tzinfo=UTC), days_back=1)
     s = finance.summary(conn, config, start, end)
     assert s["received"] == 1_700_000 and s["to_card"] == 1_500_000 and s["crypto"] == 200_000
@@ -50,11 +50,11 @@ def test_profit_and_amount_for_supplier(config, conn):
 def test_finance_report_sent_once_a_day(config, conn, monkeypatch):
     sent = []
     monkeypatch.setattr("donatix.worker.notify_admin", lambda cfg, text, *a, **k: sent.append(text))
-    noon = datetime(2026, 9, 27, 7, 1, tzinfo=UTC)
-    assert finance.maybe_send(conn, config, noon)
-    assert not finance.maybe_send(conn, config, noon.replace(hour=15))
-    assert "26.09 12:00 — 27.09 12:00" in sent[-1]
-    assert finance.maybe_send(conn, config, noon.replace(day=28))
+    midnight = datetime(2026, 9, 26, 19, 1, tzinfo=UTC)         # 00:01 27.09 по Душанбе
+    assert finance.maybe_send(conn, config, midnight)
+    assert not finance.maybe_send(conn, config, midnight.replace(hour=22))
+    assert "Деньги за 26.09.2026" in sent[-1]
+    assert finance.maybe_send(conn, config, midnight + __import__("datetime").timedelta(days=1))
 
 
 def test_admin_finance_page(app, conn):
@@ -62,7 +62,7 @@ def test_admin_finance_page(app, conn):
     admin = TestClient(app)
     web_login(admin, "admin@example.com", "adminpass123")
     page = admin.get("/admin/finance").text
-    assert "Отправить поставщику" in page and "Ваша прибыль" in page and "12:00" in page
+    assert "Отправить поставщику" in page and "Ваша прибыль" in page and "00:00" in page
 
 
 def test_times_shown_in_visitor_timezone(client, conn):
