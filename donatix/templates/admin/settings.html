@@ -41,6 +41,8 @@
         <input id="max_bots" name="max_bots" inputmode="numeric" value="{{ s.max_bots }}"></div>
       <div><label for="max_bots_total">Всего ботов на сервере <span class="muted">— 0 без предела</span></label>
         <input id="max_bots_total" name="max_bots_total" inputmode="numeric" value="{{ s.max_bots_total }}"></div>
+      <div><label for="min_orders">Выполненных заказов до своего бота <span class="muted">— 0 без условия</span></label>
+        <input id="min_orders" name="min_orders" inputmode="numeric" value="{{ s.min_orders }}"></div>
     </div>
     <h3 style="margin-top:18px">Боты без продаж</h3>
     <label class="switch"><input type="checkbox" name="watch_on" value="1" {{ 'checked' if s.watch.on }}><span>Предупреждать и отключать автоматически</span></label>

@@ -9,7 +9,21 @@
 {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
 {% if not ready %}<div class="flash warn">{{ icon('alert', 20) }}<span>Конструктор сейчас недоступен. Напишите в поддержку{{ ' ' ~ support_contact if support_contact }}.</span></div>{% endif %}
 
-{% if bots | length < max_bots %}
+{% if not elig.ok %}
+<div class="card bot-lock reveal">
+  <div class="pm-head"><span class="tile">{{ icon('shield', 20) }}</span><h3 style="margin:0">Свой бот пока закрыт</h3></div>
+  <p style="margin:10px 0 0">{{ elig.reason }}</p>
+  {% if not elig.blocked and elig.done < elig.need %}
+  <div class="lock-progress" role="progressbar" aria-valuemin="0" aria-valuemax="{{ elig.need }}" aria-valuenow="{{ elig.done }}">
+    <div style="--w: {{ (elig.done / elig.need * 100) | round(1) if elig.need else 100 }}%"></div>
+  </div>
+  <div class="muted small">Выполнено заказов: <b>{{ elig.done }} из {{ elig.need }}</b></div>
+  <a class="btn primary" style="margin-top:12px" href="/panel/catalog?kind=topup">{{ icon('bag', 18) }}Сделать заказ</a>
+  {% elif elig.blocked and support_contact %}
+  <a class="btn primary" style="margin-top:12px" href="https://t.me/{{ support_contact | replace('@', '') }}" target="_blank" rel="noopener">Написать в поддержку</a>
+  {% endif %}
+</div>
+{% elif bots | length < max_bots %}
 <form class="card bot-new reveal" method="post" action="/panel/bots">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="pm-head"><span class="tile">{{ icon('plus', 20) }}</span><h3 style="margin:0">Подключить бота</h3></div>
@@ -41,14 +55,14 @@
     {% if b.warn_count and b.enabled %}
     <div class="flash warn" style="margin:10px 0 0">{{ icon('alert', 20) }}<span>Предупреждение {{ b.warn_count }}: в боте давно нет продаж. Если продаж не будет, бот отключится автоматически. Любая продажа снимает предупреждение.</span></div>
     {% elif b.disabled_reason == 'inactive' %}
-    <div class="flash warn" style="margin:10px 0 0">{{ icon('alert', 20) }}<span>Бот отключён автоматически: долго не было продаж. Нажмите «Запустить» — отсчёт начнётся заново.</span></div>
+    <div class="flash warn" style="margin:10px 0 0">{{ icon('alert', 20) }}<span>Бот отключён автоматически: долго не было продаж. Включить снова может только администратор — напишите в поддержку{{ ' ' ~ support_contact if support_contact }}.</span></div>
     {% endif %}
     {% if b.conflict %}
     <div class="flash error" style="margin:10px 0 0">{{ icon('alert', 20) }}<span>Этот токен запущен ещё где-то — бот будет отвечать дважды. Остановите другую копию или создайте нового бота.</span></div>
     {% endif %}
     <div class="bot-actions">
       <a class="btn sm primary" href="https://t.me/{{ b.username }}" target="_blank" rel="noopener">Открыть в Telegram</a>
-      {% for action, title in ([('restart', 'Перезапустить'), ('stop', 'Остановить')] if b.enabled else [('start', 'Запустить')]) %}
+      {% for action, title in ([('restart', 'Перезапустить'), ('stop', 'Остановить')] if b.enabled else ([] if b.disabled_reason == 'inactive' else [('start', 'Запустить')])) %}
       <form class="inline" method="post" action="/panel/bots/{{ b.id }}/{{ action }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm">{{ title }}</button></form>
       {% endfor %}
       <form class="inline" method="post" action="/panel/bots/{{ b.id }}/delete" onsubmit="return confirm('Удалить бота @{{ b.username }}? Он перестанет работать.')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm danger">Удалить</button></form>

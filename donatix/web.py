@@ -70,13 +70,15 @@ BOT_FAQ = [
                                      "выполняются автоматически с вашего баланса Donatix."),
     ("Сколько стоит конструктор?", "Подключение бесплатное. Вы платите только за проданные товары по нашей "
                                    "цене, а наценку в боте ставите сами — разница ваш заработок."),
-    ("Как создать своего бота?", "Зарегистрируйтесь, откройте в кабинете «Мой Telegram-бот», создайте бота "
-                                 "в @BotFather и вставьте его токен. Бот запустится сразу с готовыми играми: "
-                                 "Free Fire СНГ и Индонезия, PUBG Mobile."),
+    ("Как создать своего бота?", "Сделайте 5 заказов на сайте — после этого откроется «Мой Telegram-бот». "
+                                 "Создайте бота в @BotFather и вставьте токен в кабинете или отправьте его нашему "
+                                 "боту поддержки. Бот запустится сразу с готовыми играми: Free Fire СНГ и "
+                                 "Индонезия, PUBG Mobile."),
     ("Как клиенты платят в моём боте?", "На ваши реквизиты: карта, Душанбе Сити, USDT. Вы подтверждаете оплату "
                                         "в боте, и баланс клиента пополняется. Контакт поддержки тоже ваш."),
     ("Что будет, если в боте нет продаж?", "Если продаж долго нет, бот трижды предупредит вас, а потом "
-                                           "отключится. Включить его снова можно в кабинете в один клик."),
+                                           "отключится. Включить его снова или подключить нового может только "
+                                           "администратор — напишите в поддержку."),
 ]
 
 
@@ -644,6 +646,7 @@ def panel_bots(request: Request, user=Depends(panel_user), conn=Depends(get_conn
     from . import bots, sitecfg
     return render(request, "panel/bots.html", {
         "user": user, "bots": bots.listing(conn, user["id"]), "max_bots": sitecfg.max_bots(conn),
+        "elig": bots.eligibility(conn, user),
         "ready": bots.RUNNER is not None and bots.TEMPLATE_DIR.exists() and sitecfg.client_bots_enabled(conn),
     })
 
@@ -651,18 +654,11 @@ def panel_bots(request: Request, user=Depends(panel_user), conn=Depends(get_conn
 @router.post("/panel/bots", dependencies=[Depends(check_csrf)])
 def panel_bots_add(request: Request, token: str = Form(""), admin_ids: str = Form(""),
                    user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
-    from . import bots, sitecfg
+    from . import bots
     from .worker import notify_admin
-    if not sitecfg.client_bots_enabled(conn):
-        flash(request, "Конструктор ботов сейчас выключен.", "error")
-        return _redirect("/panel/bots")
-    if user["status"] != "active":
-        flash(request, "Бот можно подключить после подтверждения аккаунта.", "error")
-        return _redirect("/panel/bots")
-    have = conn.execute("SELECT COUNT(*) FROM bots WHERE user_id = ?", (user["id"],)).fetchone()[0]
-    limit = sitecfg.max_bots(conn)
-    if have >= limit:
-        flash(request, f"Можно подключить до {limit} ботов. Удалите ненужного.", "error")
+    elig = bots.eligibility(conn, user)   # 5 заказов, запрет после автоотключения, лимит
+    if not elig["ok"]:
+        flash(request, elig["reason"], "error")
         return _redirect("/panel/bots")
     try:
         username = bots.check_token(token)
@@ -689,6 +685,11 @@ def panel_bots_action(bot_id: int, action: str, request: Request, admin_ids: str
         if action == "stop":
             bots.set_enabled(conn, bot_id, False)
         elif action in ("start", "restart"):
+            enabled = conn.execute("SELECT enabled FROM bots WHERE id = ?", (bot_id,)).fetchone()["enabled"]
+            ok, why = bots.can_enable(conn, bot_id)
+            if not enabled and not ok:   # отключённого за отсутствие продаж включает только админ
+                flash(request, why, "error")
+                return _redirect("/panel/bots")
             bots.set_enabled(conn, bot_id, True)  # updated_at меняется — процесс перезапустится
         elif action == "admins":
             bots.update_admins(conn, bot_id, admin_ids)

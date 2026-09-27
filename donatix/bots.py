@@ -136,6 +136,75 @@ def delete(conn: sqlite3.Connection, bot_id: int) -> None:
 
 #: Сколько ботов может подключить один клиент в своём кабинете
 MAX_PER_CLIENT = 3
+MIN_ORDERS_DEFAULT = 5
+
+
+# ── Кто может подключать ботов ───────────────────────────────
+#
+# Правила строгие, и одни для кабинета и для бота поддержки:
+# 1) свой бот — только после N выполненных заказов на сайте (по умолчанию 5);
+# 2) бот, отключённый алгоритмом за отсутствие продаж, клиент сам не включит, и нового
+#    не подключит — даже удалив старого: запрет висит на клиенте, снимает его только админ.
+
+
+def min_orders(conn: sqlite3.Connection) -> int:
+    try:
+        return max(0, int(db.get_setting(conn, "bots.min_orders") or MIN_ORDERS_DEFAULT))
+    except ValueError:
+        return MIN_ORDERS_DEFAULT
+
+
+def completed_orders(conn: sqlite3.Connection, user_id: int) -> int:
+    return conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ? AND status = 'completed'",
+                        (user_id,)).fetchone()[0]
+
+
+def blocked_for_inactivity(conn: sqlite3.Connection, user_id: int) -> bool:
+    return bool(db.get_setting(conn, f"bots.block.{user_id}"))
+
+
+def block_user(conn: sqlite3.Connection, user_id: int) -> None:
+    db.set_setting(conn, f"bots.block.{user_id}", db.now())
+
+
+def unblock_user(conn: sqlite3.Connection, user_id: int) -> None:
+    conn.execute("DELETE FROM settings WHERE key = ?", (f"bots.block.{user_id}",))
+
+
+BLOCKED_TEXT = ("Ваш бот был отключён автоматически: долго не было продаж. Включить бота или подключить "
+                "нового может только администратор — напишите в поддержку.")
+
+
+def eligibility(conn: sqlite3.Connection, user: sqlite3.Row) -> dict[str, Any]:
+    """Можно ли клиенту подключить ещё бота, и если нет — почему (текст для человека)."""
+    from . import sitecfg
+    done, need = completed_orders(conn, user["id"]), min_orders(conn)
+    have = conn.execute("SELECT COUNT(*) FROM bots WHERE user_id = ?", (user["id"],)).fetchone()[0]
+    limit = sitecfg.max_bots(conn)
+    reason = ""
+    if not sitecfg.client_bots_enabled(conn):
+        reason = "Конструктор ботов сейчас выключен."
+    elif user["status"] != "active":
+        reason = "Бот можно подключить после подтверждения аккаунта."
+    elif blocked_for_inactivity(conn, user["id"]):
+        reason = BLOCKED_TEXT
+    elif done < need:
+        reason = (f"Свой бот открывается после {need} выполненных заказов на сайте. "
+                  f"У вас {done} из {need} — осталось {need - done}.")
+    elif have >= limit:
+        reason = f"Можно подключить до {limit} ботов. Удалите ненужного."
+    return {"ok": not reason, "reason": reason, "done": done, "need": need, "have": have, "limit": limit,
+            "blocked": blocked_for_inactivity(conn, user["id"])}
+
+
+def can_enable(conn: sqlite3.Connection, bot_id: int) -> tuple[bool, str]:
+    """Клиент сам включает бота. Отключённого за отсутствие продаж — нельзя."""
+    row = conn.execute("SELECT user_id, disabled_reason FROM bots WHERE id = ?", (bot_id,)).fetchone()
+    if row is None:
+        return False, "Бот не найден."
+    if row["disabled_reason"] == "inactive" or blocked_for_inactivity(conn, row["user_id"]):
+        return False, BLOCKED_TEXT
+    return True, ""
 
 
 def owned(conn: sqlite3.Connection, bot_id: int, user_id: int) -> bool:

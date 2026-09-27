@@ -49,6 +49,7 @@ MAX_INPUT = 1500
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _ORDER = re.compile(r"(dx-[0-9a-f-]{6,})", re.I)
+_TOKEN = re.compile(r"\b\d{6,12}:[A-Za-z0-9_-]{30,}\b")
 
 
 # ─────────────────────────────────────────── данные для AI (только своё и без внутренностей)
@@ -161,6 +162,11 @@ TOOLS = [
     {"type": "function", "function": {
         "name": "list_my_payments",
         "description": "Последние заявки клиента на пополнение (до 10).",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}},
+    {"type": "function", "function": {
+        "name": "my_bots_status",
+        "description": "Свой Telegram-бот клиента (конструктор): можно ли подключить (и почему нет — сколько "
+                       "заказов не хватает или запрет), и список его ботов с состоянием.",
         "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}},
     {"type": "function", "function": {
         "name": "escalate_to_admin",
@@ -288,6 +294,24 @@ class Tools:
                                  (u["id"],)).fetchall()
         return {"payments": [_payment_for_ai(self.conn, self.config, p) for p in rows]}
 
+    def t_my_bots_status(self) -> dict[str, Any]:
+        from . import bots
+        u = self._need_user()
+        if isinstance(u, dict):
+            return u
+        e = bots.eligibility(self.conn, u)
+        rows = self.conn.execute("SELECT username, enabled, disabled_reason, warn_count FROM bots WHERE user_id = ?",
+                                 (u["id"],)).fetchall()
+        return {
+            "can_connect_new_bot": e["ok"], "why_not": e["reason"] or None,
+            "completed_orders": e["done"], "orders_needed": e["need"],
+            "bots": [{"username": "@" + (b["username"] or ""),
+                      "state": "работает" if b["enabled"] else (
+                          "отключён за отсутствие продаж — включает только админ" if b["disabled_reason"] == "inactive"
+                          else "остановлен владельцем"),
+                      "warnings_no_sales": b["warn_count"] if b["enabled"] else 0} for b in rows],
+        }
+
     def t_escalate_to_admin(self, summary: str) -> dict[str, Any]:
         u = self._user()
         cur = self.conn.execute("INSERT INTO support_tickets (tg_id, user_id, summary, created_at) VALUES "
@@ -304,6 +328,11 @@ def _hash(code: str) -> str:
 # ─────────────────────────────────────────── что AI знает о сервисе
 
 
+def _min_orders(conn: sqlite3.Connection) -> int:
+    from .bots import min_orders
+    return min_orders(conn)
+
+
 def system_prompt(conn: sqlite3.Connection, config: Config) -> str:
     from . import payments, sitecfg
     methods = [m for m in payments.methods(conn, config)]
@@ -316,6 +345,7 @@ def system_prompt(conn: sqlite3.Connection, config: Config) -> str:
         site_name=config.site_name, site=site, manual=manual, auto=auto,
         bots_line=" или через свой Telegram-бот из конструктора" if bots else "",
         min_line=f" (минимум {min_tjs} сомони)" if min_tjs and float(min_tjs) > 0 else "",
+        min_orders=_min_orders(conn),
     ).strip()
 
 
@@ -375,6 +405,30 @@ def answer(conn: sqlite3.Connection, config: Config, chat: Callable[[list[dict[s
     conn.execute("INSERT INTO support_history (tg_id, role, content, created_at) VALUES (?, 'assistant', ?, ?)",
                  (tools.tg_id, reply, now))
     return reply
+
+
+def connect_bot(conn: sqlite3.Connection, config: Config, tg_id: int, token: str) -> str:
+    """Подключить бота клиента по токену из чата. Правила — те же, что в кабинете."""
+    from . import bots
+    from .worker import notify_admin
+    user = _linked_user(conn, tg_id)
+    if user is None:
+        return ("Сначала подтвердите аккаунт: напишите email, с которым вы зарегистрированы на сайте, — пришлю код. "
+                "Токен после этого отправьте ещё раз.\n\nАввал ҳисобро тасдиқ кунед: email-и худро нависед.")
+    e = bots.eligibility(conn, user)
+    if not e["ok"]:
+        return e["reason"]
+    try:
+        username = bots.check_token(token)
+        bots.create(conn, config, user_id=user["id"], token=token, admin_ids=str(tg_id), username=username)
+    except bots.BotError as exc:
+        return f"Не получилось подключить: {exc}"
+    if bots.RUNNER:
+        bots.RUNNER.poke()
+    notify_admin(config, f"🤖 Клиент {user['login']} подключил бота @{username} через бота поддержки.")
+    return (f"✅ Бот @{username} подключён и запустится в течение минуты. Вы — его админ.\n"
+            f"Откройте @{username}, нажмите /start, затем /panel — там игры, цены и реквизиты.\n\n"
+            f"✅ Бот @{username} пайваст шуд. Онро кушоед, /start ва баъд /panel-ро пахш кунед.")
 
 
 # ─────────────────────────────────────────── Telegram
@@ -470,6 +524,14 @@ class SupportBot:
             return
         if not text:
             self.send(tg_id, "Напишите вопрос текстом. / Саволро бо матн нависед.")
+            return
+        if _TOKEN.search(text):
+            # Токен бота в AI и в историю не уходит: подключаем сами, по тем же правилам, что в кабинете
+            reply = connect_bot(conn, self.config, tg_id, _TOKEN.search(text).group(0))
+            conn.execute("INSERT INTO support_history (tg_id, role, content, created_at) VALUES "
+                         "(?, 'user', '[клиент прислал токен бота]', ?), (?, 'assistant', ?, ?)",
+                         (tg_id, db.now(), tg_id, reply, db.now()))
+            self.send(tg_id, reply)
             return
         if self._limited(tg_id):
             self.send(tg_id, "Слишком много сообщений — подождите несколько минут. / Каме сабр кунед.")

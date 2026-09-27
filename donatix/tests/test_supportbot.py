@@ -100,3 +100,36 @@ def test_start_and_rate_limit(config, conn):
     for _ in range(25):
         bot.handle(conn, {"message": {"chat": {"id": 7, "type": "private"}, "from": {"id": 7}, "text": "?"}})
     assert "подождите" in bot.api.sent[-1][1]
+
+
+def test_connect_bot_in_chat_token_never_reaches_ai(config, conn, monkeypatch):
+    from donatix import bots
+    monkeypatch.setattr(bots, "check_token", lambda token: "shop_bot")
+    monkeypatch.setattr("donatix.worker.notify_admin", lambda *a, **k: None)
+    seen = []
+
+    def chat(messages):
+        seen.append(json.dumps(messages, ensure_ascii=False))
+        return {"content": "ok"}
+
+    bot = _bot(config, chat)
+    token = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw12"
+    msg = {"message": {"chat": {"id": 555, "type": "private"}, "from": {"id": 555}, "text": f"вот {token}"}}
+
+    bot.handle(conn, msg)                                     # аккаунт не подтверждён
+    assert "подтвердите аккаунт" in bot.api.sent[-1][1]
+    uid, _ = make_client(conn)
+    conn.execute("INSERT INTO support_links (tg_id, user_id, linked_at) VALUES (555, ?, 'x')", (uid,))
+    bot.handle(conn, msg)                                     # заказов меньше 5
+    assert "после 5 выполненных заказов" in bot.api.sent[-1][1]
+    for i in range(5):
+        _order(conn, uid, f"dx-c{i:05d}", "completed")
+    status = supportbot.Tools(bot, conn, 555, "@c").run("my_bots_status", {})
+    assert status["can_connect_new_bot"] is True and status["completed_orders"] == 5
+    bot.handle(conn, msg)
+    assert "@shop_bot подключён" in bot.api.sent[-1][1]
+    row = conn.execute("SELECT user_id, admin_ids FROM bots").fetchone()
+    assert row["user_id"] == uid and row["admin_ids"] == "555"   # админ бота — этот Telegram
+    assert not seen                                              # токен в AI не отправлялся
+    stored = " ".join(r[0] for r in conn.execute("SELECT content FROM support_history").fetchall())
+    assert token not in stored and "[клиент прислал токен бота]" in stored

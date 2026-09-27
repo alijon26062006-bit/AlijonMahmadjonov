@@ -1242,3 +1242,8 @@ html { scroll-behavior: smooth; }
 .pack-group-title { display: flex; align-items: baseline; gap: 10px; margin-top: 22px; }
 .pack-group-title h2 { font-size: 1.15rem; }
 .pack-group-title .muted { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+/* Свой бот закрыт: прогресс до нужного числа заказов */
+.bot-lock { border-style: dashed; }
+.lock-progress { height: 10px; margin: 14px 0 6px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+.lock-progress div { height: 100%; width: var(--w); border-radius: 5px; background: var(--accent); }

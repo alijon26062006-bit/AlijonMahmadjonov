@@ -124,6 +124,12 @@ def test_client_connects_own_bot(app, config, conn, monkeypatch):
     c = TestClient(app)
     tok = web_login(c, "c@example.com", "password123")
     assert "Мой Telegram-бот" in c.get("/panel").text
+    # До 5 выполненных заказов свой бот закрыт
+    page = c.get("/panel/bots").text
+    assert "Свой бот пока закрыт" in page and "0 из 5" in page
+    r = c.post("/panel/bots", data={"csrf": tok, "token": "1:AAAAAA", "admin_ids": "777"})
+    assert "после 5 выполненных заказов" in r.text and conn.execute("SELECT COUNT(*) FROM bots").fetchone()[0] == 0
+    _completed_orders(conn, uid, 5)
     r = c.post("/panel/bots", data={"csrf": tok, "token": "1:AAAAAA", "admin_ids": "777"})
     assert "Бот @AAAAAA_bot подключён" in r.text and "1:AAAAAA" not in r.text
     row = conn.execute("SELECT * FROM bots").fetchone()
@@ -153,3 +159,39 @@ def test_pending_client_cannot_add_bot(app, conn, monkeypatch):
     r = c.post("/panel/bots", data={"csrf": tok, "token": "1:AAAAAA", "admin_ids": "777"})
     assert "после подтверждения аккаунта" in r.text or r.url.path == "/login"
     assert conn.execute("SELECT COUNT(*) FROM bots").fetchone()[0] == 0
+
+
+
+def _completed_orders(conn, uid, n):
+    for i in range(n):
+        conn.execute("INSERT INTO orders (public_id, user_id, product_id, kind, product_name, quantity, unit_price, "
+                     "total_micro, cost_micro, status, supplier_idem_key, created_at, updated_at) VALUES "
+                     "(?, ?, 'p', 'topup', 'x', 1, '1', 1, 1, 'completed', ?, '2026-01-01T00:00:00.000Z', "
+                     "'2026-01-01T00:00:00.000Z')", (f"dx-t{uid}-{i}", uid, f"k{uid}-{i}"))
+
+
+def test_inactive_disabled_bot_blocks_client(app, config, conn, monkeypatch):
+    """Бот отключён алгоритмом — клиент сам не включит и нового не подключит; админ снимает запрет."""
+    from donatix import bot_watch
+    monkeypatch.setattr(bots, "check_token", lambda token: token.split(":")[1][:6] + "_bot")
+    monkeypatch.setattr("donatix.worker.notify_admin", lambda *a, **k: None)
+    uid = accounts.create_user(conn, email="c@example.com", login="client1", password="password123", status="active")
+    _completed_orders(conn, uid, 5)
+    bid = bots.create(conn, config, user_id=uid, token="1:AAAAAA", admin_ids="777", username="aaa_bot")
+    conn.execute("UPDATE bots SET created_at = '2020-01-01T00:00:00.000Z', active_since = '2020-01-01T00:00:00.000Z', "
+                 "warn_count = 3, last_warn_at = '2020-01-01T00:00:00+00:00' WHERE id = ?", (bid,))
+    bot_watch.check(conn, config)
+    assert conn.execute("SELECT enabled, disabled_reason FROM bots WHERE id = ?", (bid,)).fetchone()[1] == "inactive"
+
+    c = TestClient(app)
+    tok = web_login(c, "c@example.com", "password123")
+    r = c.post(f"/panel/bots/{bid}/start", data={"csrf": tok})
+    assert "только администратор" in r.text
+    assert conn.execute("SELECT enabled FROM bots WHERE id = ?", (bid,)).fetchone()[0] == 0
+    c.post(f"/panel/bots/{bid}/delete", data={"csrf": tok})          # удалить и подключить нового — тоже нельзя
+    r = c.post("/panel/bots", data={"csrf": tok, "token": "2:BBBBBB", "admin_ids": "777"})
+    assert "только администратор" in r.text and conn.execute("SELECT COUNT(*) FROM bots").fetchone()[0] == 0
+
+    bots.unblock_user(conn, uid)                                        # админ снял запрет
+    r = c.post("/panel/bots", data={"csrf": tok, "token": "2:BBBBBB", "admin_ids": "777"})
+    assert "подключён" in r.text

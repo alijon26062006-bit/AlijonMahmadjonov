@@ -50,6 +50,11 @@ def admin_2fa_active(conn: sqlite3.Connection, config: Config) -> bool:
     return on and bool(config.alert_telegram_token and config.alert_telegram_chat_id)
 
 
+def _min_orders(conn: sqlite3.Connection) -> int:
+    from .bots import min_orders
+    return min_orders(conn)
+
+
 def max_bots_total(conn: sqlite3.Connection) -> int:
     """Сколько всего ботов может работать на сервере (0 — без предела)."""
     try:
@@ -105,6 +110,7 @@ def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
         "client_bots": client_bots_enabled(conn),
         "max_bots": max_bots(conn),
         "max_bots_total": max_bots_total(conn),
+        "min_orders": _min_orders(conn),
         "watch": _watch_rules(conn),
         "admin_2fa": (db.get_setting(conn, "site.admin_2fa") or "1") == "1",
         "daily_report": (db.get_setting(conn, "report.daily_on") or "1") == "1",
@@ -172,6 +178,7 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
             raise SettingsError("Запросов к поставщику в минуту — от 5 до 600.")
         values["supplier.rate_per_min"] = str(rate)
     for key, lo, hi, what in (("max_bots_total", 0, 1000, "Всего ботов на сервере"),
+                              ("min_orders", 0, 1000, "Заказов до своего бота"),
                               ("inactive_days", 1, 365, "Дней без продаж"),
                               ("warn_every_days", 1, 60, "Дней между предупреждениями"),
                               ("warnings", 1, 10, "Предупреждений")):

@@ -199,7 +199,10 @@ def bots_action(bot_id: int, action: str, request: Request, admin_ids: str = For
         if action == "stop":
             bots.set_enabled(conn, bot_id, False)
         elif action == "start":
+            owner = conn.execute("SELECT user_id FROM bots WHERE id = ?", (bot_id,)).fetchone()
             bots.set_enabled(conn, bot_id, True)
+            if owner:
+                bots.unblock_user(conn, owner["user_id"])   # админ включил — запрет с клиента снят
         elif action == "restart":
             bots.set_enabled(conn, bot_id, True)  # updated_at меняется — процесс перезапустится
         elif action == "admins":

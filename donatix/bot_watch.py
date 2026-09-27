@@ -108,9 +108,11 @@ def check(conn: sqlite3.Connection, config: Config, now: datetime | None = None)
         else:
             conn.execute("UPDATE bots SET enabled = 0, disabled_reason = 'inactive', updated_at = ? WHERE id = ?",
                          (db.now(), b["id"]))
+            from .bots import block_user
+            block_user(conn, b["user_id"])   # новый бот вместо отключённого — тоже только через админа
             _tell(conn, config, b,
                   f"⛔️ <b>Бот @{b['username']} отключён</b> — {idle} дн. без продаж после "
-                  f"{r['warnings']} предупреждений. Включить снова можно в кабинете: «Мой Telegram-бот».")
+                  f"{r['warnings']} предупреждений. Включить снова может только администратор — напишите в поддержку.")
             notify_admin(config, f"⛔️ Бот @{b['username']} (клиент {b['login']}) отключён автоматически: "
                                  f"{idle} дн. без продаж.")
             stats["disabled"] += 1
