@@ -133,3 +133,15 @@ def test_connect_bot_in_chat_token_never_reaches_ai(config, conn, monkeypatch):
     assert not seen                                              # токен в AI не отправлялся
     stored = " ".join(r[0] for r in conn.execute("SELECT content FROM support_history").fetchall())
     assert token not in stored and "[клиент прислал токен бота]" in stored
+
+
+def test_admin_start_and_test_mode(config, conn):
+    bot = _bot(config)
+    admin = {"chat": {"id": 999, "type": "private"}, "from": {"id": 999}}
+    bot.handle(conn, {"message": {**admin, "text": "/start"}})
+    assert "Вы — админ поддержки" in bot.api.sent[-1][1]
+    bot.handle(conn, {"message": {**admin, "text": "/test"}})
+    bot.handle(conn, {"message": {**admin, "text": "салом"}})
+    assert bot.api.sent[-1] == ("999", "ok")          # в режиме проверки отвечает AI
+    bot.handle(conn, {"message": {**admin, "text": "/admin"}})
+    assert "Вы — админ поддержки" in bot.api.sent[-1][1]

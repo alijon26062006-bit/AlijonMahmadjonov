@@ -443,6 +443,7 @@ class SupportBot:
         self.chat = chat or OpenAIChat(config.openai_api_key, config.support_model)
         self.admin_chat = str(config.support_admin_id or config.alert_telegram_chat_id or "").strip()
         self.username = ""
+        self.admin_testing = False
         self._hits: dict[int, list[float]] = {}
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -458,8 +459,13 @@ class SupportBot:
         conn = db.connect(self.config.db_path)
         offset = int(db.get_setting(conn, "support.tg_offset", "0") or 0)
         try:
+            try:   # webhook от прежнего использования токена не даёт получать сообщения — снимаем
+                self.api("deleteWebhook", drop_pending_updates=False)
+            except Exception as exc:
+                log.warning("бот поддержки: deleteWebhook: %s", exc)
             me = self.api("getMe") or {}
             self.username = me.get("username") or ""
+            log.info("бот поддержки запущен: @%s, модель %s", self.username, self.config.support_model)
             if self.username:
                 # Контакт поддержки на сайте — этот бот, а не личный аккаунт админа
                 self.config.support_contact = "@" + self.username
@@ -508,10 +514,25 @@ class SupportBot:
         name = ("@" + user["username"]) if user.get("username") else (user.get("first_name") or str(tg_id))
         text = (msg.get("text") or msg.get("caption") or "").strip()
 
-        # Ответ админа: reply на обращение → уходит клиенту
-        if self.admin_chat and str(tg_id) == self.admin_chat:
-            self._admin_reply(conn, msg, text)
-            return
+        # Админ: reply на обращение уходит клиенту; /test — проверить бота как клиент, /admin — обратно
+        is_admin = bool(self.admin_chat) and str(tg_id) == self.admin_chat
+        if is_admin:
+            if msg.get("reply_to_message"):
+                self._admin_reply(conn, msg, text)
+                return
+            if text.startswith("/test"):
+                self.admin_testing = True
+                self.send(tg_id, "🧪 Режим проверки: теперь бот отвечает вам как клиенту. /admin — вернуться.")
+                return
+            if text.startswith("/admin") or (text.startswith("/start") and not self.admin_testing):
+                self.admin_testing = False
+                self.send(tg_id, "👋 Вы — админ поддержки. Обращения клиентов (🆘) будут приходить сюда; чтобы "
+                                 "ответить, сделайте reply на обращение.\n/test — проверить бота как клиент.")
+                return
+            if not self.admin_testing:
+                self.send(tg_id, "Чтобы ответить клиенту — reply на его обращение (🆘). Проверить бота как "
+                                 "клиент — /test.")
+                return
         if text.startswith("/start"):
             self.send(tg_id, "Салом! Ман ёрдамчии Donatix ҳастам. Саволи худро нависед — масалан, «фармоиш "
                              "нарасид» ё «баланс пур нашуд».\n\nЗдравствуйте! Я помощник Donatix. Напишите "
@@ -542,10 +563,12 @@ class SupportBot:
             pass
         try:
             reply = answer(conn, self.config, self.chat, Tools(self, conn, tg_id, name), text[:MAX_INPUT])
-        except Exception:
+        except Exception as exc:
             log.exception("бот поддержки: AI")
             reply = ("Сейчас не могу ответить — попробуйте через минуту. / Ҳоло ҷавоб дода наметавонам — "
                      "пас аз як дақиқа боз нависед.")
+            if is_admin:   # админу — настоящая причина (ключ, лимит, модель)
+                reply += f"\n\n⚙️ Для админа: {str(exc)[:500]}"
         self.send(tg_id, reply)
 
     def alert_admin(self, ticket: int, tg_id: int, tg_name: str, user: sqlite3.Row | None, summary: str) -> None:
