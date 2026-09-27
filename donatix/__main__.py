@@ -31,6 +31,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    for name in ("httpx", "httpcore"):   # в адресах Telegram API — токены ботов, в журнал им нельзя
+        logging.getLogger(name).setLevel(logging.WARNING)
 
     from . import accounts, catalog, db
     from .config import Config

@@ -47,7 +47,15 @@ def factory() -> FastAPI:
     """Для запуска в нескольких процессах: каждый процесс сам собирает приложение из .env."""
     if not logging.getLogger().handlers:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    quiet_http_logs()
     return create_app()
+
+
+def quiet_http_logs() -> None:
+    """httpx пишет каждый запрос с полным адресом — а в адресе Telegram API токен бота.
+    Токены не должны попадать в журнал сервера: оставляем только предупреждения и ошибки."""
+    for name in ("httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.WARNING)
 
 
 class _CookieJar:

@@ -20,6 +20,14 @@ say "Настоящий IP посетителя из заголовка Cloudfla
 
 LOCKF=/etc/nginx/conf.d/donatix-cf-only.conf
 if [ "${LOCK:-}" = "1" ]; then
+  # Защита от ошибки: если домен ещё смотрит прямо на сервер, «только Cloudflare» отрежет всех посетителей
+  DOMAIN=$(grep -m1 -oP 'server_name\s+\K[^ ;]+' /etc/nginx/sites-available/donatix)
+  DIP=$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}')
+  if ! python3 -c "import ipaddress,sys; ip=ipaddress.ip_address(sys.argv[1]); nets=[ipaddress.ip_network(n) for n in sys.argv[2].split()]; sys.exit(0 if any(ip in n for n in nets) else 1)" "${DIP:-0.0.0.0}" "$V4" 2>/dev/null; then
+    rm -f /etc/nginx/conf.d/donatix-cf-only.conf; sed -i '/dx_not_cf/d' /etc/nginx/snippets/donatix-protect.conf 2>/dev/null
+    nginx -t -q && systemctl reload nginx
+    die "Домен $DOMAIN ещё указывает прямо на сервер ($DIP), а не на Cloudflare. «Только через Cloudflare» НЕ включаю — иначе сайт станет недоступен. Сначала смените DNS у регистратора и дождитесь «Active» в Cloudflare."
+  fi
   say "Пускать на сайт только через Cloudflare"
   { echo "# Donatix: прямые заходы на IP сервера (не через Cloudflare) — отказ"
     echo "geo \$realip_remote_addr \$dx_not_cf {"; echo "    default 1;"
