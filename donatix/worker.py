@@ -107,7 +107,7 @@ class Worker:
             self._thread.join(timeout=5)
 
     def _run(self) -> None:
-        last_sync = last_balance = last_watch = 0.0
+        last_sync = last_balance = last_watch = last_recheck = 0.0
         conn = db.connect(self.config.db_path)
         try:
             while not self._stop.is_set():
@@ -157,6 +157,13 @@ class Worker:
                     webhooks.deliver_pending(conn)
                 except Exception:
                     log.exception("воркер")
+                if now - last_recheck >= 300:
+                    # «На проверке» у нас, а у поставщика уже возврат/выполнено — довести до конца
+                    last_recheck = now
+                    try:
+                        orders.recheck_attention(conn, self.supplier)
+                    except Exception:
+                        log.exception("перепроверка заказов")
                 self._stop.wait(self.config.order_poll_seconds)
         finally:
             conn.close()

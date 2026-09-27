@@ -177,3 +177,31 @@ def test_fields_stored_as_json(client, conn, shop):
     row = conn.execute("SELECT fields_json, quantity FROM orders").fetchone()
     assert json.loads(row["fields_json"]) == {"player_id": "5123456789"}
     assert row["quantity"] == 1
+
+
+def test_supplier_refund_words_are_recognized():
+    from donatix.suppliers.base import normalize_status
+    for raw in ("refunded", "refund", "Refunded_to_balance", "canceled_by_system", "returned", "expired",
+                "Отменён", "Возврат"):
+        assert normalize_status(raw) == "failed", raw
+    for raw in ("completed", "success", "delivered", "Выполнен"):
+        assert normalize_status(raw) == "completed", raw
+    for raw in ("processing", "pending", "in_progress", ""):
+        assert normalize_status(raw) == "processing", raw
+
+
+def test_attention_order_refunded_when_supplier_refunds(client, conn, shop, supplier):
+    """Заказ ушёл «на проверку» (долго висел), потом поставщик вернул деньги — возвращаем и мы."""
+    from donatix.suppliers.base import SupplierOrder
+    r = _stars(client, shop["h"])
+    oid = r.json()["order"]["order_id"]
+    conn.execute("UPDATE orders SET status = 'attention', supplier_order_id = 'fz-77' WHERE public_id = ?", (oid,))
+    assert client.get(f"/api/v1/orders/{oid}", headers=shop["h"]).json()["order"]["status"] == "processing"
+
+    supplier.get_order = lambda sid: SupplierOrder(order_id=sid, status="failed", raw_status="refunded")
+    assert orders.recheck_attention(conn, supplier) == 1
+    assert client.get(f"/api/v1/orders/{oid}", headers=shop["h"]).json()["order"]["status"] == "failed"
+    assert balance(conn, shop["id"]) == 1_000_000
+    assert orders.recheck_attention(conn, supplier) == 0            # второй раз — ничего, возврат один
+    refunds = conn.execute("SELECT COUNT(*) FROM transactions WHERE note LIKE 'Возврат%'").fetchone()[0]
+    assert refunds == 1

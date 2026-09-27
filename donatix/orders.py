@@ -397,6 +397,36 @@ def refresh_if_stale(conn: sqlite3.Connection, supplier: Supplier, order: sqlite
     return order
 
 
+def recheck_attention(conn: sqlite3.Connection, supplier: Supplier, limit: int = 20) -> int:
+    """Заказы «на проверке» с номером у поставщика — спросить ещё раз.
+
+    Раньше они ждали админа вечно: поставщик уже вернул деньги, а клиент видел
+    «в обработке». Теперь: у поставщика возврат — возвращаем и мы, выполнен — выполняем.
+    """
+    rows = conn.execute(
+        "SELECT * FROM orders WHERE status = 'attention' AND supplier_order_id IS NOT NULL "
+        "ORDER BY updated_at LIMIT ?", (limit,)).fetchall()
+    done = 0
+    for order in rows:
+        try:
+            result = supplier.get_order(order["supplier_order_id"])
+        except (SupplierRejected, SupplierUnavailable):
+            conn.execute("UPDATE orders SET updated_at = ? WHERE id = ?", (db.now(), order["id"]))
+            continue
+        except Exception:
+            log.exception("перепроверка: заказ %s", order["public_id"])
+            continue
+        conn.execute("UPDATE orders SET supplier_status = ?, updated_at = ? WHERE id = ?",
+                     (result.raw_status, db.now(), order["id"]))
+        if result.status == "completed":
+            complete(conn, order["id"], result.delivery, result.raw_status)
+            done += 1
+        elif result.status == "failed":
+            fail_and_refund(conn, order["id"], result.message or f"Поставщик: {result.raw_status}")
+            done += 1
+    return done
+
+
 def process_pending(conn: sqlite3.Connection, supplier: Supplier, limit: int = 50) -> int:
     rows = conn.execute(
         "SELECT * FROM orders WHERE status = 'processing' ORDER BY updated_at LIMIT ?", (limit,)

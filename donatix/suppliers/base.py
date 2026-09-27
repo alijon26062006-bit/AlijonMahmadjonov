@@ -187,12 +187,25 @@ def _norm_region(value: str, strict: bool = False) -> str | None:
     return v[:20]
 
 
+# Поставщик пишет статус по-разному: «refunded», «refund», «canceled_by_system», «returned»,
+# «Отменён»… Точного совпадения мало — ищем корень слова. Возврат важнее «done»:
+# «refund_done» — это возврат, а не выполнение.
+_FAILED_ROOTS = ("refund", "cancel", "fail", "reject", "error", "expire", "return", "revers", "declin", "void",
+                 "chargeback", "timeout", "not_found", "unsuccess", "abort", "denied",
+                 "возврат", "возвращ", "отмен", "ошибк", "отклон", "неудач")
+_DONE_ROOTS = ("complet", "success", "succeed", "deliver", "fulfil", "done", "paid_out", "выполн", "доставл", "успеш")
+
+
 def normalize_status(raw: str | None) -> str:
     value = (raw or "").strip().lower()
     if value in _DONE:
         return "completed"
     if value in _FAILED:
         return "failed"
+    if any(root in value for root in _FAILED_ROOTS):
+        return "failed"
+    if any(root in value for root in _DONE_ROOTS):
+        return "completed"
     return "processing"
 
 

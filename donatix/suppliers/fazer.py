@@ -372,8 +372,11 @@ class FazerSupplier:
 
     def get_order(self, supplier_order_id: str) -> SupplierOrder:
         data = self._request("GET", f"/orders/{supplier_order_id}")
-        order = data.get("order") or {}
-        raw = str(order.get("status") or "")
+        order = data.get("order") if isinstance(data.get("order"), dict) else data
+        # Статус ищем везде, где поставщик может его написать
+        raw = str(order.get("status") or order.get("state") or data.get("status") or data.get("state") or "")
+        if order.get("refunded") is True or data.get("refunded") is True:
+            raw = raw or "refunded"
         payload = order.get("payload")
         return SupplierOrder(
             order_id=supplier_order_id,
