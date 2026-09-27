@@ -1,6 +1,6 @@
 """Бот админки: кнопки выполняют действия, чужие чаты игнорируются."""
 
-from conftest import balance
+from conftest import add_receipt, balance
 
 from donatix import accounts, payments
 from donatix.tgbot import AdminBot, payment_event, summary, user_event
@@ -37,6 +37,9 @@ def test_buttons_confirm_payment_and_approve_user(config, conn):
     assert accounts.get_user(conn, uid)["status"] == "active"
 
     pid = payments.create(conn, config, accounts.get_user(conn, uid), "alif", "50")
+    _press(bot, conn, f"pay:ok:{pid}")                     # без чека — не зачисляется
+    assert conn.execute("SELECT status FROM payments WHERE id = ?", (pid,)).fetchone()[0] == "pending"
+    add_receipt(conn, pid)
     text, buttons = payment_event(conn, pid)
     assert "545.00 TJS" in text
     _press(bot, conn, f"pay:ok:{pid}")

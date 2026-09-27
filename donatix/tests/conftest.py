@@ -96,3 +96,12 @@ def _reset_account_check():
     rates.reset()
     traffic.reset()
     yield
+
+
+RECEIPT_PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+RECEIPT = {"receipt": ("chek.png", RECEIPT_PNG, "image/png")}
+
+
+def add_receipt(conn, pid: int) -> None:
+    """Заявке, созданной напрямую, — чек в базе: без него зачислить нельзя."""
+    conn.execute("UPDATE payments SET receipt_file = 'test.png' WHERE id = ?", (pid,))

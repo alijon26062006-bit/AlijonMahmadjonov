@@ -54,12 +54,20 @@ async def cmd_pending(message: Message, conn: aiosqlite.Connection) -> None:
     await message.answer("🔍 <b>Пополнения на проверке</b>\n\n" + "\n\n".join(lines))
 
 
+NO_RECEIPT = ("У заявки №{deposit_id} нет чека — зачислить нельзя. "
+              "Дождитесь скриншота от клиента или отклоните заявку.")
+
+
 async def _resolve_deposit(
     conn: aiosqlite.Connection, bot: Bot, deposit_id: int, admin_id: int, approved: bool
 ) -> str:
     deposit = await db.get_deposit(conn, deposit_id)
     if deposit is None:
         return "Пополнение не найдено."
+    # Без чека вручную не зачисляем: сверять не с чем. Юзербот (ROBOT = 0) зачисляет по
+    # уведомлению банка — там деньги подтвердил сам банк.
+    if approved and admin_id != 0 and not deposit.receipt_file_id:
+        return NO_RECEIPT.format(deposit_id=deposit.id)
     if not await db.resolve_deposit(conn, deposit_id, approved=approved, admin_id=admin_id):
         return texts.ADMIN_ALREADY_HANDLED
 
@@ -100,9 +108,11 @@ async def _pay_referral(
 
 @router.callback_query(F.data.startswith("a:dep_ok:"))
 async def cb_dep_ok(call: CallbackQuery, conn: aiosqlite.Connection, bot: Bot) -> None:
-    report = await _resolve_deposit(
-        conn, bot, int(call.data.rsplit(":", 1)[1]), call.from_user.id, approved=True
-    )
+    deposit_id = int(call.data.rsplit(":", 1)[1])
+    report = await _resolve_deposit(conn, bot, deposit_id, call.from_user.id, approved=True)
+    if report == NO_RECEIPT.format(deposit_id=deposit_id):
+        await call.answer(report[:190], show_alert=True)   # кнопки оставляем: можно отклонить
+        return
     await call.answer(report[:190])
     await _strip(call)
     await call.message.reply(report)

@@ -16,7 +16,7 @@
       <div class="paymethods">
         {% for m in methods %}
         <label class="paym {{ 'on' if loop.first }}">
-          <input type="radio" name="method" value="{{ m.code }}" data-cur="{{ m.currency }}" {{ 'checked' if loop.first }}>
+          <input type="radio" name="method" value="{{ m.code }}" data-cur="{{ m.currency }}" data-auto="{{ '1' if m.auto else '' }}" {{ 'checked' if loop.first }}>
           {% if m.icon_url %}<img class="pm-logo" src="{{ m.icon_url }}" alt="" width="36" height="36" loading="lazy">
           {% else %}<span class="tile sm {{ 'g4' if m.currency == 'TJS' else 'g5' }}">{{ icon('wallet' if m.currency == 'TJS' else 'bolt', 18) }}</span>{% endif %}
           <span><b>{{ m.title }}</b><span class="sub">{{ m.currency }}{% if m.network %} · сеть {{ m.network }}{% endif %}</span></span>
@@ -42,8 +42,11 @@
         {% if m.network_note %}<div class="flash error net-warn" role="note">⚠️ {{ m.network_note }}</div>{% endif %}
       </div>
       {% endfor %}
-      <label for="receipt">Чек об оплате <span class="muted">(фото или PDF — так проверим быстрее)</span></label>
-      <input id="receipt" name="receipt" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
+      <div id="receipt-box">
+      <label for="receipt">Чек об оплате <b class="req">— обязательно</b> <span class="muted">(скриншот или PDF)</span></label>
+      <input id="receipt" name="receipt" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf">
+      <div class="hint">Без чека заявку не проверить — отправить её не получится.</div>
+      </div>
       <label for="reference">Номер чека / хэш перевода <span class="muted">(желательно)</span></label>
       <input id="reference" name="reference" maxlength="200" placeholder="Например, 4821 или TX-хэш" autocomplete="off">
       <button class="btn primary lg block" style="margin-top:18px">Я оплатил — отправить заявку</button>
@@ -85,6 +88,9 @@
     var r = f.querySelector("input[name=method]:checked"); if (!r) return;
     f.querySelectorAll(".paym").forEach(function (l) { l.classList.toggle("on", l.querySelector("input").checked); });
     f.querySelectorAll(".details").forEach(function (d) { d.hidden = d.dataset.for !== r.value; });
+    // Автоплатёж (крипта) проверяется сам — там чек не нужен; для переводов — обязателен
+    var box = document.getElementById("receipt-box"), rc = document.getElementById("receipt");
+    if (box && rc) { box.hidden = !!r.dataset.auto; rc.required = !r.dataset.auto; }
     var a = parseFloat((inp.value || "").replace(",", "."));
     var out = "—";
     if (a > 0 && inTjs) {        // ввели сомони: к переводу ровно они; зачислится по курсу

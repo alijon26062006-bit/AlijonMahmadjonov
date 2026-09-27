@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from conftest import balance, web_login
+from conftest import RECEIPT, balance, csrf_of, web_login
 
 from donatix import accounts, orders
 
@@ -16,7 +16,8 @@ def test_topup_request_confirm_notify(app, config, conn):
     uid, client, token = _setup(app, config, conn)
     page = client.get("/panel/balance").text
     assert "Алиф (Alif Mobi)" in page and "+992 90 000 00 00" in page
-    r = client.post("/panel/balance", data={"csrf": token, "method": "alif", "amount": "50", "reference": "4821"})
+    r = client.post("/panel/balance", data={"csrf": token, "method": "alif", "amount": "50", "reference": "4821"},
+                    files=RECEIPT)
     assert "Заявка #1 создана" in r.text and "545.00 TJS" in r.text  # 50 × 10.9
 
     admin = TestClient(app)
@@ -37,11 +38,11 @@ def test_topup_request_confirm_notify(app, config, conn):
 
 def test_topup_validation_and_reject(app, config, conn):
     uid, client, token = _setup(app, config, conn)
-    r = client.post("/panel/balance", data={"csrf": token, "method": "binance", "amount": "50"})
+    r = client.post("/panel/balance", data={"csrf": token, "method": "binance", "amount": "50"}, files=RECEIPT)
     assert "Выберите способ оплаты" in r.text
-    r = client.post("/panel/balance", data={"csrf": token, "method": "alif", "amount": "0"})
+    r = client.post("/panel/balance", data={"csrf": token, "method": "alif", "amount": "0"}, files=RECEIPT)
     assert "больше нуля" in r.text
-    client.post("/panel/balance", data={"csrf": token, "method": "usdt_trc20", "amount": "50"})
+    client.post("/panel/balance", data={"csrf": token, "method": "usdt_trc20", "amount": "50"}, files=RECEIPT)
     admin = TestClient(app)
     atoken = web_login(admin, "admin@example.com", "adminpass123")
     admin.post("/admin/payments/1/reject", data={"csrf": atoken, "reason": "Перевод не найден"})
@@ -91,9 +92,9 @@ def test_admin_sets_pay_details(app, config, conn):
     assert "5058 **** 1234" in page and "Humo 9860" in page and "Алиф (Alif Mobi)" not in page
     assert "500 сомони" in page
     # минимум 500 сомони: $40 × 11 = 440 — мало, $50 × 11 = 550 — можно
-    r = client.post("/panel/balance", data={"csrf": token, "method": "dc", "amount": "40"})
+    r = client.post("/panel/balance", data={"csrf": token, "method": "dc", "amount": "40"}, files=RECEIPT)
     assert "Минимальная сумма пополнения — 500 сомони" in r.text
-    r = client.post("/panel/balance", data={"csrf": token, "method": "dc", "amount": "50"})
+    r = client.post("/panel/balance", data={"csrf": token, "method": "dc", "amount": "50"}, files=RECEIPT)
     assert "550.00 TJS" in r.text
 
 
@@ -189,7 +190,7 @@ def test_usdt_network_shown_and_saved(app, config, conn):
     ms = payments.methods(conn, config)
     assert [m["network"] for m in ms] == ["BEP20"]
     assert "BNB Smart Chain (BEP20)" in ms[0]["network_note"]
-    r = client.post("/panel/balance", data={"csrf": token, "method": ms[0]["code"], "amount": "50"})
+    r = client.post("/panel/balance", data={"csrf": token, "method": ms[0]["code"], "amount": "50"}, files=RECEIPT)
     assert "50.00 USDT" in r.text
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC LIMIT 1").fetchone()
     assert payments.public(conn, config, p)["network"] == "BEP20"
@@ -234,3 +235,16 @@ def test_admin_uploads_method_icon(app, config, conn):
     r = admin.post("/admin/pay-settings", data=data | {"n": "1", "m0_code": code},
                    files={"m0_icon": ("x.png", b"hello", "image/png")})
     assert "PNG, JPG или WebP" in r.text
+
+
+
+def test_receipt_is_required(client, conn, config):
+    config.pay_methods = {"alif": "Алиф: +992 90 000 00 00"}
+    from conftest import make_client
+    make_client(conn, balance="0")
+    web_login(client, "shop1@example.com", "password123")
+    token = csrf_of(client.get("/panel/balance").text)
+    page = client.post("/panel/balance", data={"csrf": token, "method": "alif", "amount": "50"}).text
+    assert "Прикрепите чек" in page
+    assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 0
+    assert 'name="receipt" type="file" required' in client.get("/panel/balance").text

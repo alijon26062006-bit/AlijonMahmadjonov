@@ -781,10 +781,12 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
                           user=Depends(panel_user), conn=Depends(get_conn),
                           config: Config = Depends(get_config)):
     from . import payments
-    from .tgbot import payment_event, send_receipt
-    from .worker import notify_event
+    from .tgbot import send_receipt
     from . import rates
     data = receipt.file.read(payments.MAX_RECEIPT_BYTES + 1) if receipt and receipt.filename else b""
+    if not data and not payments.is_auto(conn, config, method):
+        flash(request, "Прикрепите чек об оплате — фото или PDF. Без чека заявку не проверить.", "error")
+        return _redirect("/panel/balance")
     rates.refresh(conn, config, rates.PAYMENT_SECONDS)  # сумма к переводу — по свежему курсу
     try:
         with db.tx(conn):
@@ -802,10 +804,7 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
     if row["auto_kind"]:
         return _redirect(f"/panel/balance/{pid}/pay")  # автоплатёж: чек и админ не нужны
-    if data:
-        send_receipt(conn, config, pid)
-    else:
-        notify_event(conn, config, payment_event(conn, pid, config))
+    send_receipt(conn, config, pid)
     flash(request, f"Заявка #{pid} создана. Переведите {row['pay_amount']} {row['pay_currency']} по реквизитам — "
                    "после проверки баланс пополнится, вам придёт уведомление.")
     return _redirect("/panel/balance")

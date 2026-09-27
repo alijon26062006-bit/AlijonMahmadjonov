@@ -176,6 +176,11 @@ def start_auto(conn: sqlite3.Connection, config: Config, payment_id: int) -> Non
         raise PaymentError(str(exc)) from None
 
 
+def is_auto(conn: sqlite3.Connection, config: Config, code: str) -> bool:
+    """Способ с автоплатежом (крипта): чек не нужен, поступление проверяется само."""
+    return any(m["code"] == code and m.get("auto") for m in settings(conn, config)["all_methods"])
+
+
 def title_for(conn: sqlite3.Connection, config: Config, code: str) -> str:
     for m in settings(conn, config)["all_methods"]:
         if m["code"] == code:
@@ -248,6 +253,10 @@ def confirm(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id:
         p = conn.execute("SELECT * FROM payments WHERE id = ? AND status = 'pending'", (payment_id,)).fetchone()
         if p is None:
             return False
+        # Перевод по реквизитам без чека не зачисляем: сверять не с чем. Автоплатёж проверен блокчейном/Binance.
+        if not p["auto_kind"] and not p["receipt_file"]:
+            raise PaymentError(f"У заявки #{payment_id} нет чека — зачислить нельзя. "
+                               "Дождитесь чека от клиента или отклоните заявку.")
         micro = p["amount_micro"]
         if credit_usd:
             try:

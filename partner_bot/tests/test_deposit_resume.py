@@ -93,6 +93,16 @@ async def main() -> None:
     check("«‹ Реквизитҳо» — реквизиты выбранного банка", "+992900123456" in body and "Алиф" in body, body[:300])
     check("а не первого в списке", "5058 2700" not in body)
 
+    # Без чека владелец зачислить не может — заявка остаётся ждать
+    from app.handlers.admin import NO_RECEIPT, _resolve_deposit
+
+    class Bot:
+        async def send_message(self, *a, **kw):
+            return None
+    report = await _resolve_deposit(conn, Bot(), d.id, 111, approved=True)
+    check("без чека не зачисляется", report == NO_RECEIPT.format(deposit_id=d.id), report)
+    check("заявка всё ещё ждёт", (await db.get_deposit(conn, d.id)).status == db.DEP_PENDING)
+
     await db.cancel_deposit(conn, d.id, UID)
     state = State()
     call = Call("dep:paid")

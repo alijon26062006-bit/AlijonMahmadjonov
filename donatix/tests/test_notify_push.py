@@ -1,4 +1,4 @@
-from conftest import web_login
+from conftest import add_receipt, web_login
 from fastapi.testclient import TestClient
 
 from donatix import accounts, bots, notify, payments
@@ -25,6 +25,7 @@ def test_payment_events_reach_bot_owner_in_telegram(app, config, conn, monkeypat
     user = accounts.get_user(conn, uid)
 
     pid = payments.create(conn, config, user, "alif", "20")
+    add_receipt(conn, pid)
     payments.confirm(conn, config, pid, 1)
     assert sent and sent[-1][0] == "1:AAAAAA" and sent[-1][1] == ["777", "888"]
     assert "Баланс пополнен на $20" in sent[-1][2]

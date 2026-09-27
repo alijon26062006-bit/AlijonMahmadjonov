@@ -262,7 +262,10 @@ class AdminBot:
         admin_id = _admin_id(conn)
         if what == "pay":
             if action == "ok":
-                ok = payments.confirm(conn, self.config, obj_id, admin_id)
+                try:
+                    ok = payments.confirm(conn, self.config, obj_id, admin_id)
+                except payments.PaymentError as exc:
+                    return str(exc)[:190]   # всплывающее окно Telegram — до 200 символов
                 return "Зачислено, клиент получил уведомление" if ok else "Заявка уже обработана"
             ok = payments.reject(conn, self.config, obj_id, admin_id, "Перевод не найден")
             return "Отклонено" if ok else "Заявка уже обработана"

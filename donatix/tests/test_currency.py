@@ -1,4 +1,4 @@
-from conftest import web_login
+from conftest import RECEIPT, web_login
 from fastapi.testclient import TestClient
 
 from donatix import accounts, db
@@ -17,7 +17,7 @@ def test_currency_switch_shows_exact_tjs(app, config, conn):
     page = c.get("/panel").text
     assert "533.34 с." in page and 'title="$48.9302"' in page    # 48.9302 × 10.9 = 533.339…
     assert 'name="amount_tjs"' in c.get("/panel/balance").text
-    r = c.post("/panel/balance", data={"csrf": token, "method": "alif", "amount_tjs": "109"})
+    r = c.post("/panel/balance", data={"csrf": token, "method": "alif", "amount_tjs": "109"}, files=RECEIPT)
     assert "Переведите 109.00 TJS" in r.text
     p = conn.execute("SELECT amount_micro FROM payments").fetchone()
     assert p[0] == 100_000                                        # 109 / 10.9 = $10 ровно
