@@ -87,7 +87,7 @@ class Config:
     alert_telegram_chat_id: str = ""
 
     # Новые клиенты ждут одобрения админа.
-    require_approval: bool = True
+    require_approval: bool = False   # новые клиенты активны сразу; админ проверяет только чеки
     cookie_secure: bool = False
 
     # Способы пополнения: код → реквизиты (показываются клиенту). Пустые не показываются.
@@ -176,7 +176,7 @@ class Config:
             supplier_low_balance=Decimal(_env("DONATIX_SUPPLIER_LOW_BALANCE", "50")),
             alert_telegram_token=_env("DONATIX_ALERT_TELEGRAM_TOKEN"),
             alert_telegram_chat_id=_env("DONATIX_ALERT_TELEGRAM_CHAT_ID"),
-            require_approval=_flag("DONATIX_REQUIRE_APPROVAL", True),
+            require_approval=_flag("DONATIX_REQUIRE_APPROVAL", False),
             cookie_secure=_flag("DONATIX_COOKIE_SECURE", False),
             support_contact=_env("DONATIX_SUPPORT_CONTACT"),
             tg_channel=_env("DONATIX_TG_CHANNEL") or "https://t.me/+NdkoYArkuCw4NzBi",

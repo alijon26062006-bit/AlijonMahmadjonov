@@ -94,6 +94,13 @@ def load(conn: sqlite3.Connection, config: Config) -> None:
     rate = db.get_setting(conn, "supplier.rate_per_min")
     from .throttle import SUPPLIER
     SUPPLIER.configure(int(rate) if rate and rate.isdigit() else config.supplier_rate_per_min)
+    if db.get_setting(conn, "migr.auto_approve") is None:
+        # Одобрение новых клиентов больше не нужно: включаем автоматический доступ один раз
+        # и активируем тех, кто уже ждал (заблокированных не трогаем). Админ может снова
+        # включить проверку в настройках — это решение сохранится.
+        db.set_setting(conn, "site.require_approval", "0")
+        conn.execute("UPDATE users SET status = 'active' WHERE status = 'pending' AND role = 'client'")
+        db.set_setting(conn, "migr.auto_approve", "1")
     approval = db.get_setting(conn, "site.require_approval")
     if approval in ("0", "1"):
         config.require_approval = approval == "1"

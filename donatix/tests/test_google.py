@@ -44,7 +44,7 @@ def test_new_user_created_and_existing_matched(gconf, app, conn, monkeypatch):
     r = _login(c)
     assert r.status_code == 303 and r.headers["location"] == "/panel"
     u = conn.execute("SELECT * FROM users WHERE email = 'ali.shop@gmail.com'").fetchone()
-    assert u["google_sub"] == "g1" and u["login"] == "ali.shop" and u["status"] == "pending"
+    assert u["google_sub"] == "g1" and u["login"] == "ali.shop" and u["status"] == "active"
     # второй вход — тот же аккаунт
     r = _login(TestClient(app))
     assert conn.execute("SELECT COUNT(*) FROM users WHERE role = 'client'").fetchone()[0] == 1

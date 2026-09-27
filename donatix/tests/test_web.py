@@ -28,17 +28,16 @@ def test_csrf_required(client):
     assert r.status_code == 403
 
 
-def test_register_then_admin_approves_and_credits(client, conn, app):
+def test_register_active_at_once_admin_credits(client, conn, app):
     r = _register(client)
     assert r.status_code == 303 and r.headers["location"] == "/panel"
-    assert "ждёт одобрения" in client.get("/panel").text
+    assert "ждёт одобрения" not in client.get("/panel").text     # одобрение не нужно
     uid = conn.execute("SELECT id, status, project FROM users WHERE login = 'newshop'").fetchone()
-    assert uid["status"] == "pending" and uid["project"] == "t.me/newshop"
+    assert uid["status"] == "active" and uid["project"] == "t.me/newshop"
 
     from fastapi.testclient import TestClient
     admin = TestClient(app)
     token = web_login(admin, "admin@example.com", "adminpass123")
-    assert "Новых заявок: 1" in admin.get("/admin").text
     r = admin.post(f"/admin/users/{uid['id']}", data={"csrf": token, "status": "active", "tier": "silver",
                                                      "markup_override": ""}, follow_redirects=False)
     assert r.status_code == 303
@@ -237,3 +236,19 @@ def test_game_keys_in_panel(app, config, conn):
     assert r["ok"] and {"code": "TJ", "name": "Tajikistan"} in r["available"]
     r = client.post("/panel/buy/gk-elden-ring-cis", data={"csrf": token, "idem": "g1", "quantity": "2"})
     assert r.status_code == 200 and "× 2" in r.text
+
+
+def test_old_pending_clients_activated_once(config, conn):
+    from donatix import accounts, db, sitecfg
+    conn.execute("DELETE FROM settings WHERE key = 'migr.auto_approve'")
+    uid = accounts.create_user(conn, email="w@example.com", login="waiting", password="password123",
+                               status="pending")
+    blocked = accounts.create_user(conn, email="b@example.com", login="bad", password="password123",
+                                   status="blocked")
+    sitecfg.load(conn, config)
+    assert accounts.get_user(conn, uid)["status"] == "active"
+    assert accounts.get_user(conn, blocked)["status"] == "blocked"
+    assert config.require_approval is False
+    db.set_setting(conn, "site.require_approval", "1")            # админ включил проверку снова —
+    sitecfg.load(conn, config)                                      # решение сохраняется
+    assert config.require_approval is True
