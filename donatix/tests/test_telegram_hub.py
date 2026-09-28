@@ -79,3 +79,18 @@ def test_popular_pins_standoff2_when_in_catalog(conn):
     so = [i for i in items if i["key"] == "standoff2"]
     assert so and so[0]["title"] == "Standoff 2"
     assert so[0]["href"] == "/panel/catalog?kind=topup&category=cd_standoff-2"
+
+
+def test_popular_pins_clash_of_clans_not_royale(conn):
+    cache.clear()
+    now = "2026-01-01T00:00:00+00:00"
+    for pid, cat, name in (("coc-1", "clash_of_clans", "Clash of Clans"),
+                           ("cr-1", "clash_royale", "Clash Royale")):
+        conn.execute("INSERT INTO products (id, kind, category_id, category_name, name, base_price, updated_at) "
+                     "VALUES (?, 'topup', ?, ?, '80 Gems', '1', ?)", (pid, cat, name, now))
+    items = popular.compute(conn)
+    keys = [i["key"] for i in items]
+    assert "coc" in keys
+    coc = next(i for i in items if i["key"] == "coc")
+    assert coc["title"] == "Clash of Clans" and coc["href"].endswith("category=clash_of_clans")
+    assert not any(i.get("title") == "Clash Royale" and i["key"] == "coc" for i in items)
