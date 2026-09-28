@@ -18,13 +18,23 @@ def make_supplier(config: Config) -> Supplier:
     if config.supplier == "fazer":
         from .fazer import FazerSupplier
 
-        return FazerSupplier(config.fazer_api_key, config.fazer_base_url, steam_discount=config.fazer_steam_discount,
-                             image_base=config.fazer_image_base, catalog_pause=config.fazer_catalog_pause)
-    if config.supplier == "mock":
+        primary: Supplier = FazerSupplier(
+            config.fazer_api_key, config.fazer_base_url, steam_discount=config.fazer_steam_discount,
+            image_base=config.fazer_image_base, catalog_pause=config.fazer_catalog_pause)
+    elif config.supplier == "mock":
         from .mock import MockSupplier
 
-        return MockSupplier()
-    raise ValueError(f"DONATIX_SUPPLIER: неизвестный поставщик {config.supplier!r} (fazer или mock)")
+        primary = MockSupplier()
+    else:
+        raise ValueError(f"DONATIX_SUPPLIER: неизвестный поставщик {config.supplier!r} (fazer или mock)")
+
+    if config.coindrop_api_key:
+        from .coindrop import CoinDropSupplier
+        from .multi import MultiSupplier
+        games = [g for g in config.coindrop_games.split(",") if g.strip()]
+        extra = CoinDropSupplier(config.coindrop_api_key, config.coindrop_base_url, only_games=games)
+        return MultiSupplier(primary, [extra])
+    return primary
 
 
 __all__ = [

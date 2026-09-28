@@ -194,7 +194,7 @@ def create_order(
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?, ?, ?)""",
                 (user["id"], product["id"], product["kind"], display, qty, fields_json,
                  fmt_unit(q["unit_price"]), q["total_micro"], cost_micro, f"dx-{uuid.uuid4()}",
-                 1 if supplier.is_idempotent(product["kind"]) else 0, client_idem_key, source, ts, ts,
+                 _supply_idempotent(supplier, product), client_idem_key, source, ts, ts,
                  api_key_id),
             )
             order_id = int(cur.lastrowid)
@@ -255,6 +255,13 @@ def _display_name(product: dict[str, Any], qty: int, fields: dict[str, str] | No
     return product["name"]
 
 
+def _supply_idempotent(supplier: Supplier, product: dict[str, Any]) -> int:
+    """1 — создание заказа можно безопасно повторить (тот же ключ у поставщика). У CoinDrop нельзя."""
+    if (product.get("supplier_ref") or {}).get("provider") == "coindrop":
+        return 0
+    return 1 if supplier.is_idempotent(product["kind"]) else 0
+
+
 def _by_client_key(conn: sqlite3.Connection, user_id: int, key: str) -> sqlite3.Row | None:
     return conn.execute(
         "SELECT * FROM orders WHERE user_id = ? AND client_idem_key = ?", (user_id, key)
@@ -305,6 +312,8 @@ def _send_to_supplier(
         _to_attention(conn, order["id"], "Поставщик принял заказ, но не вернул его номер.")
     elif result.status == "failed":
         fail_and_refund(conn, order["id"], result.message or "Поставщик отклонил заказ.")
+    elif result.status == "completed":
+        complete(conn, order["id"], result.delivery, result.raw_status)   # CoinDrop часто выдаёт сразу
 
 
 def _client_error(exc: SupplierRejected) -> str:
@@ -371,7 +380,7 @@ def refresh(conn: sqlite3.Connection, supplier: Supplier, order: sqlite3.Row, *,
         if not order["idempotent_supply"]:
             _to_attention(
                 conn, order["id"],
-                "Связь с поставщиком прервалась при создании. Проверьте заказ в панели FazerCards: "
+                "Связь с поставщиком прервалась при создании. Проверьте заказ в кабинете поставщика: "
                 "если он там есть — отметьте выполненным, если нет — верните деньги.",
             )
             return

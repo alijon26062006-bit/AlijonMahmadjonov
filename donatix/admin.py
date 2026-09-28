@@ -57,12 +57,20 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
         "supplier_balance_at": db.get_setting(conn, "supplier_balance_at"),
         "supplier_balance_error": db.get_setting(conn, "supplier_balance_error") or "",
         "catalog_synced_at": db.get_setting(conn, "catalog_synced_at"),
+        "extra_balances": _extra_balances(request.app.state.supplier),
         "supplier_name": config.supplier,
         "low": config.supplier_low_balance,
         "recent": conn.execute(
             "SELECT o.*, u.login FROM orders o JOIN users u ON u.id = o.user_id ORDER BY o.id DESC LIMIT 10"
         ).fetchall(),
     })
+
+
+def _extra_balances(supplier) -> list:
+    """Балансы дополнительных поставщиков (CoinDrop) для сводки — раз в 5 минут, чтобы не ловить их лимит."""
+    if not hasattr(supplier, "extra_balances"):
+        return []
+    return cache.get_or_set("admin:extra_balances", 300, supplier.extra_balances)
 
 
 @router.get("/stats")

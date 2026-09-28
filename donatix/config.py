@@ -63,6 +63,10 @@ class Config:
     # Пауза между запросами каталога, сек. Больше — медленнее загрузка, но другим ботам на том же ключе
     # остаётся больше лимита FazerCards.
     fazer_catalog_pause: float = 2.0
+    # CoinDrop (coindrop.uz) — второй поставщик, игры по ID (Standoff 2 и др.). Пусто — выключен.
+    coindrop_api_key: str = ""
+    coindrop_base_url: str = "https://coindrop.uz/api/v1"
+    coindrop_games: str = ""          # список game_key через запятую; пусто — все игры-пополнения
 
     # Наценка в процентах поверх закупочной цены, по уровням клиентов.
     markups: dict[str, Decimal] = field(
@@ -165,6 +169,9 @@ class Config:
             fazer_steam_discount=Decimal(_env("FAZER_STEAM_DISCOUNT", "2.5")),
             fazer_image_base=_env("FAZER_IMAGE_BASE"),
             fazer_catalog_pause=float(_env("FAZER_CATALOG_PAUSE") or 2.0),
+            coindrop_api_key=_env("DONATIX_COINDROP_API_KEY"),
+            coindrop_base_url=_env("DONATIX_COINDROP_BASE_URL", "https://coindrop.uz/api/v1").rstrip("/"),
+            coindrop_games=_env("DONATIX_COINDROP_GAMES"),
             markups=markups,
             kind_markups=kind_markups,
             admin_email=_env("DONATIX_ADMIN_EMAIL").lower(),

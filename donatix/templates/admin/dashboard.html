@@ -26,6 +26,15 @@
     <form method="post" action="/admin/supplier-balance" style="margin-top:6px"><input type="hidden" name="csrf" value="{{ csrf }}">
       <button class="btn sm">{{ icon('refresh', 14) }}Обновить сейчас</button></form>
   </div>
+  {% for b in extra_balances %}
+  <div class="kpi">
+    <span class="tile {{ 'bad' if b.error }}">{{ icon('shield', 20) }}</span>
+    <div class="label">Баланс {{ b.name }}</div>
+    <div class="value">{% if b.balance is not none %}${{ b.balance }}{% else %}—{% endif %}</div>
+    {% if b.error %}<div class="note" style="color:var(--bad)">⚠️ {{ b.error[:120] }}</div>
+    {% else %}<div class="note">второй поставщик (игры по ID)</div>{% endif %}
+  </div>
+  {% endfor %}
   <div class="kpi">
     <span class="tile ok">{{ icon('chart', 20) }}</span>
     <div class="label">Прибыль за 30 дней</div>
