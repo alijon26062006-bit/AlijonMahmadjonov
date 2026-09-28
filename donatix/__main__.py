@@ -62,8 +62,28 @@ def main(argv: list[str] | None = None) -> int:
     conn = db.connect(config.db_path)
     try:
         if args.cmd == "sync":
-            result = catalog.sync_catalog(conn, make_supplier(config))
-            print(f"Готово: {result['products']} товаров, выключено {result['disabled']}.")
+            import time as _t
+            catalog.SYNC_LOCK.bind(config)   # не столкнуться с фоновой загрузкой сайта (тот же замок)
+            if not catalog.SYNC_LOCK.acquire(timeout=900):
+                print("Каталог уже загружается на сайте — подождите пару минут и повторите.")
+                return 1
+            _last = [0.0]
+
+            def _progress(n: int, category: str) -> None:
+                if _t.monotonic() - _last[0] > 2:
+                    _last[0] = _t.monotonic()
+                    print(f"  {n} товаров… сейчас: {category}", flush=True)
+
+            try:
+                print(f"Поставщик: {make_supplier(config).name}. Загружаю весь каталог…", flush=True)
+                result = catalog.sync_catalog(conn, make_supplier(config), _progress)
+            finally:
+                catalog.SYNC_LOCK.release()
+            cd = conn.execute("SELECT COUNT(*) FROM products WHERE active = 1 AND id LIKE 'cd-%'").fetchone()[0]
+            total = conn.execute("SELECT COUNT(*) FROM products WHERE active = 1").fetchone()[0]
+            print(f"Готово и сохранено в базу: всего {total} активных товаров "
+                  f"(из них CoinDrop {cd}); за этот раз загружено {result['products']}, "
+                  f"выключено пропавших {result['disabled']}.", flush=True)
         elif args.cmd == "check":
             supplier = make_supplier(config)
             try:
