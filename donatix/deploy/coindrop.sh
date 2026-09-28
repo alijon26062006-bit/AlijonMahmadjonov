@@ -34,6 +34,40 @@ HTTP=$(curl -s -o /tmp/cd.json -w '%{http_code}' -H "X-API-Key: $KEY" https://co
 if [ "$HTTP" = "200" ]; then echo "✔ Ключ работает. Баланс: $(cat /tmp/cd.json)"; else
   echo "⚠ CoinDrop ответил HTTP $HTTP: $(head -c 200 /tmp/cd.json). Ключ всё равно сохранён — проверьте в профиле CoinDrop, включён ли API."; fi
 rm -f /tmp/cd.json
+echo "Ищу Standoff 2 в каталоге CoinDrop…"
+curl -s -m 30 -H "X-API-Key: $KEY" https://coindrop.uz/api/v1/games -o /tmp/cdg.json
+KEY="$KEY" python3 - <<'PY' || true
+import json, os, urllib.request
+try:
+    d = json.load(open("/tmp/cdg.json"))
+except Exception:
+    print("⚠ список игр не прочитался:", open("/tmp/cdg.json").read()[:200]); raise SystemExit
+def lst(x, *keys):
+    if isinstance(x, list): return x
+    for k in keys + ("data", "items", "results"):
+        v = x.get(k) if isinstance(x, dict) else None
+        if isinstance(v, list): return v
+        if isinstance(v, dict):
+            r = lst(v, *keys)
+            if r: return r
+    return []
+games = lst(d, "games")
+print(f"игр у CoinDrop: {len(games)}")
+so = [g for g in games if "standoff" in json.dumps(g).lower()]
+for g in so:
+    key = g.get("game_key") or g.get("key") or g.get("slug")
+    print(f"✔ Standoff: game_key={key}  id_type={g.get('id_type')}  amount_based={g.get('amount_based')}")
+    req = urllib.request.Request(f"https://coindrop.uz/api/v1/games/{key}/products", headers={"X-API-Key": os.environ["KEY"]})
+    try:
+        prods = lst(json.load(urllib.request.urlopen(req, timeout=30)), "products")
+        print(f"  пакетов: {len(prods)}; например: " + "; ".join(
+            f"{p.get('name')} — ${p.get('price_usd', p.get('price'))}" for p in prods[:3]))
+    except Exception as e:
+        print("  ⚠ пакеты не прочитались:", e)
+if not so:
+    print("⚠ Standoff 2 в списке не найден. Первые игры:", ", ".join(str(g.get('game_key') or g.get('key')) for g in games[:15]))
+PY
+rm -f /tmp/cdg.json
 systemctl restart donatix; sleep 4
 printf '\033[1;32m✔ CoinDrop подключён.\033[0m\n'
 echo "1) В админке → «Загрузка каталога» нажмите обновить — появятся игры CoinDrop (Standoff 2 и др.)."

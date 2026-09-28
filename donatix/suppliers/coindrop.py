@@ -69,10 +69,28 @@ class CoinDropSupplier:
         raise last or SupplierUnavailable(f"{method} {path}")
 
     # ── Каталог ─────────────────────────────────────────────
+    @staticmethod
+    def _list(data: Any, *keys: str) -> list[dict[str, Any]]:
+        """Список из ответа: сам список или первый список под одним из ключей (games/data/items…)."""
+        if isinstance(data, list):
+            return [x for x in data if isinstance(x, dict)]
+        if isinstance(data, dict):
+            for k in keys + ("data", "items", "results"):
+                v = data.get(k)
+                if isinstance(v, list):
+                    return [x for x in v if isinstance(x, dict)]
+                if isinstance(v, dict):
+                    inner = CoinDropSupplier._list(v, *keys)
+                    if inner:
+                        return inner
+        return []
+
+    def games(self) -> list[dict[str, Any]]:
+        return self._list(self._request("GET", "/games"), "games")
+
     def fetch_catalog(self) -> Iterable[ProductData]:
-        games = self._request("GET", "/games").get("games") or []
-        for g in games:
-            key = str(g.get("game_key") or g.get("key") or "").strip()
+        for g in self.games():
+            key = str(g.get("game_key") or g.get("key") or g.get("slug") or "").strip()
             if not key:
                 continue
             if self._only and key not in self._only:
@@ -92,13 +110,13 @@ class CoinDropSupplier:
                 fields.append({"key": "server_id", "label": server_label, "type": "text"})
             time.sleep(self._pause)
             try:
-                products = self._request("GET", f"/games/{key}/products").get("products") or []
+                products = self._list(self._request("GET", f"/games/{key}/products"), "products")
             except SupplierRejected as exc:
                 log.warning("CoinDrop: пропускаю игру %s: %s", key, exc)
                 continue
             for p in products:
                 pid = str(p.get("product_id") or p.get("id") or "").strip()
-                price = p.get("price_usd")
+                price = p.get("price_usd") if p.get("price_usd") is not None else p.get("price")
                 if not pid or price is None:
                     continue
                 try:

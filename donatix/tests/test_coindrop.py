@@ -106,3 +106,12 @@ def test_multi_routes_by_provider_and_order_id():
     ids = {p.id for p in multi.fetch_catalog()}
     assert "cd-standoff-2-so100" in ids and any(not i.startswith("cd-") for i in ids)
     assert multi.is_idempotent("topup") is True   # у mock topup идемпотентен
+
+
+def test_list_parsing_variants():
+    L = CoinDropSupplier._list
+    assert L([{"a": 1}]) == [{"a": 1}]
+    assert L({"games": [{"a": 1}]}, "games") == [{"a": 1}]
+    assert L({"data": [{"a": 1}]}, "games") == [{"a": 1}]
+    assert L({"data": {"products": [{"a": 1}]}}, "products") == [{"a": 1}]
+    assert L({"detail": "x"}, "games") == []
