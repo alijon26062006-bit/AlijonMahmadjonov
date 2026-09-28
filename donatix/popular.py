@@ -1,7 +1,7 @@
 """«Популярное» в меню кабинета и на главной.
 
 Сначала закреплённые — то, ради чего к нам приходят: Free Fire СНГ,
-Free Fire Индонезия, PUBG Mobile и Telegram. Дальше алгоритм добавляет сам
+Free Fire Индонезия, PUBG Mobile, Standoff 2 (как только он есть в каталоге) и Telegram. Дальше алгоритм добавляет сам
 игры и сервисы, которые чаще всего покупали за последние 30 дней (выполненные
 заказы). Список считается раз в 10 минут, так что меню не нагружает базу.
 """
@@ -35,6 +35,8 @@ def _game(name: str, cat_id: str) -> str:
         return "pubg"
     if ("free fire" in text or "freefire" in text) and "max" not in words:
         return "ff"
+    if "standoff" in text:
+        return "standoff"
     return ""
 
 
@@ -59,6 +61,8 @@ def _pinned(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         words = _words(f"{r['category_name']} {r['category_id']}")
         if game == "pubg":
             key, title, reg = "pubg", "PUBG Mobile", None
+        elif game == "standoff":
+            key, title, reg = "standoff2", "Standoff 2", None
         elif region in ("CIS", "RU") or words & _CIS:
             key, title, reg = "ff_cis", "Free Fire СНГ", r["region"] if region in ("CIS", "RU") else None
         elif region == "ID" or words & _ID:
@@ -68,7 +72,7 @@ def _pinned(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         found.setdefault(key, {"title": title, "href": _link("topup", r["category_id"], reg), "kind": "topup",
                                "image_url": r["image_url"], "key": key, "cat": f"topup:{r['category_id']}",
                                "category_id": r["category_id"], "region": reg})
-    out = [found[k] for k in ("ff_cis", "ff_id", "pubg") if k in found]
+    out = [found[k] for k in ("ff_cis", "ff_id", "pubg", "standoff2") if k in found]
     if conn.execute("SELECT 1 FROM products WHERE active = 1 AND hidden = 0 "
                     "AND kind IN ('telegram_stars', 'telegram_premium') LIMIT 1").fetchone():
         out.append({"title": "Telegram Stars и Premium", "href": "/panel/catalog?kind=telegram",

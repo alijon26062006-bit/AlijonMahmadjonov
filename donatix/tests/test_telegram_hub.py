@@ -67,3 +67,15 @@ def test_popular_pins_free_fire_regions_first(conn):
     assert [i["title"] for i in items[:3]] == ["Free Fire СНГ", "Free Fire Индонезия", "PUBG Mobile"]
     assert items[0]["href"] == "/panel/catalog?kind=topup&category=ff_cis"
     assert items[1]["href"] == "/panel/catalog?kind=topup&category=free_fire_global&region=ID"
+
+
+def test_popular_pins_standoff2_when_in_catalog(conn):
+    cache.clear()
+    now = "2026-01-01T00:00:00+00:00"
+    conn.execute("INSERT INTO products (id, kind, category_id, category_name, name, base_price, updated_at) "
+                 "VALUES ('cd-standoff-2-so100', 'topup', 'cd_standoff-2', 'Standoff 2', '100 Gold', '0.9', ?)",
+                 (now,))
+    items = popular.compute(conn)
+    so = [i for i in items if i["key"] == "standoff2"]
+    assert so and so[0]["title"] == "Standoff 2"
+    assert so[0]["href"] == "/panel/catalog?kind=topup&category=cd_standoff-2"
