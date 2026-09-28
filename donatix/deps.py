@@ -180,6 +180,11 @@ INDEXABLE = {"/": ("daily", "1.0"), "/docs": ("weekly", "0.8"), "/register": ("m
 def render(request: Request, name: str, ctx: dict[str, Any] | None = None, status_code: int = 200):
     ctx = dict(ctx or {})
     config: Config = request.app.state.config
+    ref = request.query_params.get("ref")
+    if ref:   # пришёл по реферальной ссылке — запомним до регистрации
+        from .referrals import clean_code
+        if clean_code(ref) and "user_id" not in request.session:
+            request.session["ref"] = clean_code(ref)
     ctx.setdefault("user", None)
     ctx["site_name"] = config.site_name
     ctx["support_contact"] = config.support_contact

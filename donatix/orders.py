@@ -355,6 +355,12 @@ def complete(conn: sqlite3.Connection, order_id: int, delivery: dict[str, Any] |
         "WHERE id = ? AND status IN ('processing', 'attention')",
         (json.dumps(delivery or {}, ensure_ascii=False), raw_status or "completed", db.now(), db.now(), order_id),
     ).rowcount
+    if changed:
+        try:
+            from . import referrals
+            referrals.award(conn, order_id)   # бонус пригласившему — раз за заказ
+        except Exception:  # noqa: BLE001 — бонус не должен ломать выдачу заказа
+            log.exception("реферальный бонус за заказ %s", order_id)
     return bool(changed)
 
 

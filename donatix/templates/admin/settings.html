@@ -37,6 +37,8 @@
     <h3>Конструктор ботов для клиентов</h3>
     <label class="switch"><input type="checkbox" name="client_bots" value="1" {{ 'checked' if s.client_bots }}><span>Клиенты могут подключать своих ботов</span></label>
     <div class="grid two" style="gap:12px;margin-top:12px">
+      <div><label for="referral_percent">Реферальный бонус, % от нашей прибыли <span class="muted">— 0 выключено</span></label>
+        <input id="referral_percent" name="referral_percent" inputmode="numeric" value="{{ s.referral_percent }}"></div>
       <div><label for="max_bots">Ботов на одного клиента</label>
         <input id="max_bots" name="max_bots" inputmode="numeric" value="{{ s.max_bots }}"></div>
       <div><label for="max_bots_total">Всего ботов на сервере <span class="muted">— 0 без предела</span></label>

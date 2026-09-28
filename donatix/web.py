@@ -181,6 +181,8 @@ def register(
         )
     except accounts.AccountError as exc:
         return render(request, "register.html", {"form": form, "error": str(exc)}, 400)
+    from . import referrals
+    referrals.attach(conn, user_id, request.session.pop("ref", None))
     request.session["user_id"] = user_id
     _record_login(conn, request, user_id)
     from .tgbot import user_event
@@ -300,6 +302,8 @@ def google_callback(request: Request, code: str = "", state: str = "", error: st
         flash(request, "Аккаунт заблокирован.", "error")
         return _redirect("/login")
     if created:
+        from . import referrals
+        referrals.attach(conn, user["id"], request.session.pop("ref", None))
         from .tgbot import user_event
         from .worker import notify_event
         if config.require_approval:
@@ -873,6 +877,17 @@ def panel_support_code(request: Request, user=Depends(panel_user), conn=Depends(
     supportbot.send_code_notification(conn, config, user["id"])
     flash(request, "Код отправлен — он первым в списке уведомлений. Отправьте его боту поддержки.")
     return _redirect("/panel/notifications")
+
+
+@router.get("/panel/referrals")
+def panel_referrals(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                    config: Config = Depends(get_config)):
+    from . import referrals
+    code = referrals.code_for(conn, user["id"])
+    return render(request, "panel/referrals.html", {
+        "user": user, "link": f"{config.base_url}/register?ref={code}", "percent": referrals.percent(conn),
+        "s": referrals.stats(conn, user["id"]),
+    })
 
 
 @router.get("/panel/notifications")

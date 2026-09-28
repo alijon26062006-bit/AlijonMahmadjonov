@@ -228,6 +228,15 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     status     TEXT NOT NULL DEFAULT 'open',
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS referral_rewards (
+    id           INTEGER PRIMARY KEY,
+    order_id     INTEGER NOT NULL UNIQUE REFERENCES orders(id),   -- за один заказ — один раз
+    referrer_id  INTEGER NOT NULL REFERENCES users(id),
+    referred_id  INTEGER NOT NULL REFERENCES users(id),
+    amount_micro INTEGER NOT NULL,
+    created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS referral_rewards_referrer ON referral_rewards(referrer_id, id DESC);
 CREATE INDEX IF NOT EXISTS visits_session ON visits(session, ts);
 CREATE INDEX IF NOT EXISTS visits_user ON visits(user_id) WHERE user_id IS NOT NULL;
 -- Быстрые отчёты: продажи/деньги за период, посещаемость без чтения всей таблицы
@@ -343,6 +352,11 @@ def init(path: Path | str) -> None:
         if "region" not in cols:
             conn.execute("ALTER TABLE products ADD COLUMN region TEXT")
         user_cols = {r[1] for r in conn.execute("PRAGMA table_info(users)")}
+        if "ref_code" not in user_cols:   # реферальная программа
+            conn.execute("ALTER TABLE users ADD COLUMN ref_code TEXT")
+            conn.execute("ALTER TABLE users ADD COLUMN referred_by INTEGER")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_ref_code ON users(ref_code)")
+        conn.execute("CREATE INDEX IF NOT EXISTS users_referred_by ON users(referred_by)")
         if "google_sub" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)")

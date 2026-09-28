@@ -1276,3 +1276,7 @@ html { scroll-behavior: smooth; }
 .fin-kpis { margin-bottom: 14px; }
 .fin-send { border-color: var(--accent-line); background: var(--accent-soft); }
 .fin-table .fin-cur td { background: var(--accent-soft); }
+.ref-card { margin-bottom: 14px; }
+.ref-link { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.ref-link code { padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); word-break: break-all; }
+.ref-kpis { margin-bottom: 14px; }

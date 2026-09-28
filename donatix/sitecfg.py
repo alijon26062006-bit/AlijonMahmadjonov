@@ -106,6 +106,11 @@ def load(conn: sqlite3.Connection, config: Config) -> None:
         config.require_approval = approval == "1"
 
 
+def _referral_percent(conn: sqlite3.Connection) -> int:
+    from .referrals import percent
+    return percent(conn)
+
+
 def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
     return {
         "markups": {t: config.markups.get(t) for t in TIERS},
@@ -121,6 +126,7 @@ def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
         "watch": _watch_rules(conn),
         "admin_2fa": (db.get_setting(conn, "site.admin_2fa") or "1") == "1",
         "daily_report": (db.get_setting(conn, "report.daily_on") or "1") == "1",
+        "referral_percent": _referral_percent(conn),
         "supplier_rate": _throttle_status(),
     }
 
@@ -197,6 +203,14 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
             if not lo <= n <= hi:
                 raise SettingsError(f"{what} — от {lo} до {hi}.")
             values[("site." if key == "max_bots_total" else "bots.") + key] = str(n)
+    if "referral_percent" in data:
+        try:
+            n = int(str(data["referral_percent"]).strip())
+        except ValueError:
+            raise SettingsError("Реферальный процент — целое число.") from None
+        if not 0 <= n <= 50:
+            raise SettingsError("Реферальный процент — от 0 до 50.")
+        values["referral.percent"] = str(n)
     if "daily_report" in data:
         values["report.daily_on"] = "1" if data["daily_report"] in (True, "1", "on") else "0"
     if "watch_on" in data:
