@@ -28,6 +28,7 @@ CATEGORY_PREFIX = "cd_"           # category_id игр CoinDrop, чтобы не
 
 class CoinDropSupplier:
     name = "CoinDrop"
+    id_prefix = f"{PREFIX}-"     # все товары CoinDrop начинаются с "cd-" — для частичной загрузки
 
     def __init__(self, api_key: str, base_url: str = "https://coindrop.uz/api/v1", *,
                  catalog_pause: float = 0.6, only_games: list[str] | None = None):

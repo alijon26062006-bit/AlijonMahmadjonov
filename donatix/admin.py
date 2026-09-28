@@ -267,6 +267,7 @@ def catalog_sync_page(request: Request, admin=Depends(admin_user), conn=Depends(
     return render(request, "admin/catalog_sync.html", {
         "user": admin, "job": catalog_job.status(conn), "counts": counts,
         "synced_at": db.get_setting(conn, "catalog_synced_at"),
+        "providers": request.app.state.supplier.providers() if hasattr(request.app.state.supplier, "providers") else [],
     })
 
 
@@ -274,8 +275,12 @@ def catalog_sync_page(request: Request, admin=Depends(admin_user), conn=Depends(
 def catalog_sync_start(request: Request, mode: str = Form("all"), admin=Depends(admin_user),
                        config: Config = Depends(get_config)):
     from . import catalog_job
-    started = catalog_job.start(config, request.app.state.supplier,
-                                sync=mode in ("all", "catalog"), images=mode in ("all", "images"))
+    if mode.startswith("provider:"):
+        started = catalog_job.start(config, request.app.state.supplier, sync=True, images=False,
+                                    provider=mode.split(":", 1)[1])
+    else:
+        started = catalog_job.start(config, request.app.state.supplier,
+                                    sync=mode in ("all", "catalog"), images=mode in ("all", "images"))
     if not started:
         flash(request, "Загрузка уже идёт — прогресс ниже.", "warn")
     return _back("/admin/catalog-sync")

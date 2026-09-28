@@ -115,3 +115,29 @@ def test_list_parsing_variants():
     assert L({"data": [{"a": 1}]}, "games") == [{"a": 1}]
     assert L({"data": {"products": [{"a": 1}]}}, "products") == [{"a": 1}]
     assert L({"detail": "x"}, "games") == []
+
+
+def test_partial_sync_only_touches_coindrop(app, conn):
+    """Загрузка только CoinDrop не выключает товары FazerCards."""
+    from donatix import catalog
+    now = "2026-01-01T00:00:00+00:00"
+    # уже есть: один товар FazerCards и один старый CoinDrop, которого больше нет в выдаче
+    conn.execute("INSERT INTO products (id, kind, category_id, category_name, name, base_price, active, updated_at) "
+                 "VALUES ('topup-fazer1', 'topup', 'ff_cis', 'Free Fire', '100', '1', 1, ?)", (now,))
+    conn.execute("INSERT INTO products (id, kind, category_id, category_name, name, base_price, active, updated_at) "
+                 "VALUES ('cd-standoff-2-old', 'topup', 'cd_standoff-2', 'Standoff 2', 'old', '1', 1, ?)", (now,))
+
+    class OneGame:
+        name = "CoinDrop"
+        id_prefix = "cd-"
+        def fetch_catalog(self):
+            from donatix.suppliers.base import ProductData
+            from decimal import Decimal
+            yield ProductData(id="cd-standoff-2-so100", kind="topup", category_id="cd_standoff-2",
+                              category_name="Standoff 2", name="100 Gold", base_price=Decimal("0.9"))
+
+    catalog.sync_catalog(conn, OneGame(), id_prefix="cd-")
+    active = {r[0] for r in conn.execute("SELECT id FROM products WHERE active = 1")}
+    assert "topup-fazer1" in active            # FazerCards не тронут
+    assert "cd-standoff-2-so100" in active     # новый CoinDrop появился
+    assert "cd-standoff-2-old" not in active   # пропавший CoinDrop выключен

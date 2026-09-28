@@ -39,9 +39,12 @@ _UPSERT = """
 
 
 def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
-                 progress: Callable[[int, str], None] | None = None) -> dict[str, int]:
+                 progress: Callable[[int, str], None] | None = None, *, id_prefix: str = "") -> dict[str, int]:
     """Забрать каталог у поставщика. Пропавшие товары выключаются, а не удаляются:
-    на них ссылаются старые заказы. progress(сколько товаров, текущая категория) — для экрана прогресса."""
+    на них ссылаются старые заказы. progress(сколько товаров, текущая категория) — для экрана прогресса.
+
+    id_prefix — частичная загрузка только одного поставщика (например "cd-" для CoinDrop):
+    берём его товары и выключаем только его пропавшие, каталог остальных не трогаем."""
     started = db.now()
     seen: set[str] = set()
     batch: list[tuple] = []
@@ -68,10 +71,14 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
     if seen:
         # Все пришедшие товары получили updated_at = started; остальные — пропали у поставщика.
         # (Не «id NOT IN (…тысячи id…)»: старые SQLite не принимают больше 999 параметров.)
-        disabled = conn.execute(
-            "UPDATE products SET active = 0 WHERE active = 1 AND updated_at <> ?", (started,)
-        ).rowcount
-    if "steam-gift" in seen:
+        if id_prefix:
+            disabled = conn.execute(
+                "UPDATE products SET active = 0 WHERE active = 1 AND updated_at <> ? AND id LIKE ?",
+                (started, id_prefix + "%")).rowcount
+        else:
+            disabled = conn.execute(
+                "UPDATE products SET active = 0 WHERE active = 1 AND updated_at <> ?", (started,)).rowcount
+    if not id_prefix and "steam-gift" in seen:
         from . import steam_gifts
         try:
             n = steam_gifts.sync_games(conn, supplier)

@@ -38,6 +38,19 @@ class MultiSupplier:
                 return e
         return self.primary
 
+    def providers(self) -> list[dict[str, str]]:
+        """Доп. поставщики для частичной загрузки: имя и префикс id их товаров."""
+        out = []
+        for e in self.extras:
+            out.append({"name": e.name, "id_prefix": getattr(e, "PREFIX_ID", getattr(e, "id_prefix", "")) or ""})
+        return out
+
+    def get_extra(self, name: str):
+        for e in self.extras:
+            if e.name.lower() == name.lower():
+                return e
+        return None
+
     def fetch_catalog(self) -> Iterable[ProductData]:
         yield from self.primary.fetch_catalog()
         for e in self.extras:

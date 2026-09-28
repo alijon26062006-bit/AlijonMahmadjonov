@@ -159,7 +159,8 @@ def _set(**kw: Any) -> None:
     _persist(force="running" in kw or "stage" in kw)
 
 
-def start(config: Config, supplier: Supplier, *, sync: bool = True, images: bool = True) -> bool:
+def start(config: Config, supplier: Supplier, *, sync: bool = True, images: bool = True,
+          provider: str = "") -> bool:
     """False — задача уже идёт (в этом или другом процессе сайта)."""
     _shared["path"] = config.db_path
     c = db.connect(config.db_path)
@@ -175,18 +176,29 @@ def start(config: Config, supplier: Supplier, *, sync: bool = True, images: bool
         _state.clear()
         _state.update(running=True, stage="start", started_at=time.time(), finished_at=None, products=0,
                       category="", images_total=0, images_done=0, images_ok=0, images_failed=0,
-                      error=None, result=None, log=[], sync=sync, images=images)
+                      error=None, result=None, log=[], sync=sync, images=images, provider=provider)
     _persist(force=True)
-    threading.Thread(target=_run, args=(config, supplier, sync, images), name="donatix-catalog", daemon=True).start()
+    threading.Thread(target=_run, args=(config, supplier, sync, images, provider),
+                     name="donatix-catalog", daemon=True).start()
     return True
 
 
-def _run(config: Config, supplier: Supplier, sync: bool, images: bool) -> None:
+def _run(config: Config, supplier: Supplier, sync: bool, images: bool, provider: str = "") -> None:
     conn = db.connect(config.db_path)
+    id_prefix = ""
+    if provider and hasattr(supplier, "get_extra"):
+        extra = supplier.get_extra(provider)
+        if extra is None:
+            _set(stage="error", error=f"поставщик {provider} не подключён", running=False,
+                 finished_at=time.time())
+            conn.close()
+            return
+        supplier = extra
+        id_prefix = getattr(extra, "id_prefix", "")
     try:
         if sync:
             _set(stage="catalog")
-            _say("Загружаю каталог у поставщика…")
+            _say(f"Загружаю каталог{' — ' + provider if provider else ''}…")
             if not catalog.SYNC_LOCK.acquire(timeout=600):
                 raise RuntimeError("каталог уже обновляется фоновым процессом — попробуйте через пару минут")
             try:
@@ -198,7 +210,7 @@ def _run(config: Config, supplier: Supplier, sync: bool, images: bool) -> None:
                         last[0] = time.monotonic()
                         _say(f"{n} товаров… сейчас: {category}")
 
-                result = catalog.sync_catalog(conn, supplier, progress)
+                result = catalog.sync_catalog(conn, supplier, progress, id_prefix=id_prefix)
             finally:
                 catalog.SYNC_LOCK.release()
             _set(result=result)

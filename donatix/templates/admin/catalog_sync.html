@@ -26,6 +26,11 @@
   <button class="sync-btn" name="mode" value="images" {{ 'disabled' if job.running }}>
     <span class="tile ok">{{ icon('card', 22) }}</span>
     <span><b>Только картинки</b><span class="sub">Скачать недостающие</span></span></button>
+  {% for prov in providers %}
+  <button class="sync-btn" name="mode" value="provider:{{ prov.name }}" {{ 'disabled' if job.running }}>
+    <span class="tile g5">{{ icon('zap-send', 22) }}</span>
+    <span><b>Только {{ prov.name }}</b><span class="sub">Игры второго поставщика, FazerCards не трогаем</span></span></button>
+  {% endfor %}
 </form>
 
 <div class="card job-card" id="job" data-running="{{ 'true' if job.running else 'false' }}">
