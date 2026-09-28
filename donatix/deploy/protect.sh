@@ -62,6 +62,21 @@ else
   die "nginx не принял настройки — вернул как было. Пришлите вывод выше."
 fi
 
+say "Ядро Linux: защита от SYN-флуда и подменённых адресов"
+cat > /etc/sysctl.d/99-donatix-ddos.conf <<'CONF'
+# Donatix: устойчивость к флуду соединений (SYN flood) и подмене адресов
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_max_syn_backlog = 8192
+net.ipv4.tcp_synack_retries = 2
+net.core.somaxconn = 8192
+net.core.netdev_max_backlog = 8192
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.tcp_fin_timeout = 15
+CONF
+sysctl -q --system >/dev/null 2>&1 && echo "ядро: защита включена (syncookies=$(sysctl -n net.ipv4.tcp_syncookies))"
+
 say "2/4 fail2ban: кто продолжает флуд — блокируется на уровне сервера"
 if ! command -v fail2ban-client >/dev/null; then
   apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fail2ban >/dev/null || die "fail2ban не установился"
