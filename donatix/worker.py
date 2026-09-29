@@ -156,6 +156,11 @@ class Worker:
                 except Exception:
                     log.exception("курс")
                 try:
+                    from . import supplier_queue
+                    supplier_queue.dispatch(conn, self.config, self.supplier)   # очередь «нет денег у поставщика»
+                except Exception:
+                    log.exception("очередь заказов")
+                try:
                     orders.process_pending(conn, self.supplier)
                     webhooks.deliver_pending(conn)
                 except Exception:

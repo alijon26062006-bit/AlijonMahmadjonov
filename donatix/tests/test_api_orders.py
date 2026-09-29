@@ -108,11 +108,11 @@ def test_validation(client, shop):
 
 
 def test_supplier_rejects_refund(client, conn, shop, supplier):
-    supplier.fail_next = "reject"
+    supplier.fail_next = "reject_other"          # поставщик отказал (не из-за денег) — возврат
     r = _stars(client, shop["h"])
     order = r.json()["order"]
     assert order["status"] == "failed"
-    assert "Деньги возвращены" in order["error"]  # не выдаём, что у нас кончились деньги у поставщика
+    assert "Игрок не найден" in order["error"]
     assert balance(conn, shop["id"]) == 1_000_000
 
 

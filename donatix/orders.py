@@ -277,13 +277,20 @@ def _replay(existing: sqlite3.Row, product_id: str, qty: int, fields_json: str) 
 
 
 def _send_to_supplier(
-    conn: sqlite3.Connection, supplier: Supplier, order: sqlite3.Row, product: dict[str, Any] | None = None
+    conn: sqlite3.Connection, supplier: Supplier, order: sqlite3.Row, product: dict[str, Any] | None = None,
+    *, from_queue: bool = False,
 ) -> None:
+    from . import supplier_queue
     if product is None:
         product = get_product(conn, order["product_id"], for_sale=False)
         if product is None:
             _to_attention(conn, order["id"], "Товар пропал из каталога — проверьте вручную.")
             return
+    provider = supplier_queue.provider_for(supplier, product)
+    if not from_queue and supplier_queue.should_queue(conn, provider):
+        # У поставщика нет денег (или перед нами очередь) — запрос не отправляем, заказ ждёт своей очереди
+        supplier_queue.enqueue(conn, order["id"], provider)
+        return
     conn.execute(
         "UPDATE orders SET supplier_attempts = supplier_attempts + 1, updated_at = ? WHERE id = ?",
         (db.now(), order["id"]),
@@ -293,6 +300,12 @@ def _send_to_supplier(
             product, order["quantity"], json.loads(order["fields_json"]), order["supplier_idem_key"]
         )
     except SupplierRejected as exc:
+        if supplier_queue.is_no_funds(exc):
+            # Кончились деньги у поставщика — заказ не отменяем: в очередь, уйдёт, когда пополним
+            log.warning("поставщик %s: нет денег, %s в очередь", provider, order["public_id"])
+            supplier_queue.start_hold(conn, provider)
+            supplier_queue.enqueue(conn, order["id"], provider)
+            return
         log.warning("поставщик отказал по %s: %s", order["public_id"], exc)
         fail_and_refund(conn, order["id"], _client_error(exc))
         return
@@ -380,6 +393,8 @@ def refresh(conn: sqlite3.Connection, supplier: Supplier, order: sqlite3.Row, *,
     """Довести заказ до конца: доотправить поставщику или спросить статус."""
     if order["status"] != "processing":
         return
+    if (order["supplier_status"] or "").startswith("queued_funds"):
+        return   # ждёт денег у поставщика — отправит очередь (supplier_queue.dispatch)
     if order["supplier_order_id"] is None:
         if not from_worker or _age_seconds(order["updated_at"]) < IN_FLIGHT_SECONDS:
             return
@@ -455,7 +470,8 @@ def recheck_attention(conn: sqlite3.Connection, supplier: Supplier, limit: int =
 
 def process_pending(conn: sqlite3.Connection, supplier: Supplier, limit: int = 50) -> int:
     rows = conn.execute(
-        "SELECT * FROM orders WHERE status = 'processing' ORDER BY updated_at LIMIT ?", (limit,)
+        "SELECT * FROM orders WHERE status = 'processing' AND COALESCE(supplier_status, '') NOT LIKE 'queued_funds%' "
+        "ORDER BY updated_at LIMIT ?", (limit,)
     ).fetchall()
     for order in rows:
         try:

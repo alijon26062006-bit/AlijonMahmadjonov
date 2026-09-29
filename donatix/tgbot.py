@@ -13,7 +13,7 @@ from typing import Any, Callable
 
 import httpx
 
-from . import accounts, cashiers, db, orders, payments
+from . import accounts, cashiers, db, orders, payments, supplier_queue
 from .config import PAY_METHODS, TIERS, Config
 from .money import fmt
 from .notify import notify
@@ -109,6 +109,7 @@ def summary(conn: sqlite3.Connection) -> str:
         f"Сегодня (с 00:00): {today['orders']} заказов, прибыль ${fmt(today['profit'])}\n"
         f"30 дней: {month['orders']} заказов, выручка ${fmt(month['revenue'])}, прибыль ${fmt(month['profit'])}\n\n"
         f"Заявок на пополнение: {pays}\nНовых партнёров: {users}\nПроблемных заказов: {problems}"
+        + supplier_queue.summary_line(conn)
     )
 
 

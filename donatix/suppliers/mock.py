@@ -68,7 +68,7 @@ class MockSupplier:
         self._by_idem: dict[str, str] = {}
         self._lock = threading.Lock()
         # Для тестов: следующий create_order упадёт так, как задано.
-        self.fail_next: str | None = None  # "reject" | "unavailable" | "unavailable_after_create"
+        self.fail_next: str | None = None  # "reject" (нет денег) | "reject_other" | "unavailable" | …
         self.fail_on_poll = False
         self.polls_to_complete = 1
 
@@ -122,6 +122,8 @@ class MockSupplier:
             if mode == "reject":
                 raise SupplierRejected("Недостаточно средств у поставщика", code="insufficient_balance",
                                        http_status=400)
+            if mode == "reject_other":
+                raise SupplierRejected("Игрок не найден", code="invalid_player", http_status=400)
             if mode == "unavailable":
                 raise SupplierUnavailable("timeout")
             if idem_key in self._by_idem:

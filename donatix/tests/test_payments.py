@@ -51,7 +51,7 @@ def test_topup_validation_and_reject(app, config, conn):
 
 
 def test_refund_and_admin_credit_notify(client, conn, shop, supplier, app):
-    supplier.fail_next = "reject"
+    supplier.fail_next = "reject_other"
     client.post("/api/v1/orders", headers=shop["h"],
                 json={"product_id": "tg-stars", "quantity": 50, "fields": {"telegram_username": "@player_one"}})
     rows = conn.execute("SELECT text FROM notifications WHERE user_id = ?", (shop["id"],)).fetchall()
@@ -59,12 +59,12 @@ def test_refund_and_admin_credit_notify(client, conn, shop, supplier, app):
 
 
 def test_errors_page(client, conn, shop, supplier):
-    supplier.fail_next = "reject"
+    supplier.fail_next = "reject_other"
     client.post("/api/v1/orders", headers=shop["h"],
                 json={"product_id": "tg-stars", "quantity": 50, "fields": {"telegram_username": "@player_one"}})
     token = web_login(client, "admin@example.com", "adminpass123")
     page = client.get("/admin/errors").text
-    assert "dx-1" in page and "Деньги возвращены" in page
+    assert "dx-1" in page and "Игрок не найден" in page
     assert token and orders
 
 
