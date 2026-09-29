@@ -173,6 +173,10 @@ async def got_amount(message: Message, state: FSMContext) -> None:
     try:
         res = await _call("POST", "/api/v1/payments", json={"method": data.get("dx_method", ""), "amount_tjs": amount})
     except DonatixError as exc:
+        if "на проверке" in str(exc) or "ждёт оплаты" in str(exc):   # одна заявка за раз — ждём решения админа
+            await state.set_state(None)
+            await message.answer(f"⏳ {esc(str(exc))}", reply_markup=_kb([("🏦 Счёт Donatix", "dx:home")]))
+            return
         await message.answer(f"⚠️ {esc(str(exc))}\n\nВведите сумму ещё раз.", reply_markup=_kb([("‹ Отмена", "dx:home")]))
         return
     p = res["payment"]

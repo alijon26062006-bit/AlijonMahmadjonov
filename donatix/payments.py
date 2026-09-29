@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import secrets
@@ -222,10 +223,13 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
         raise PaymentError("Укажите сумму больше нуля.")
     if conf["min_tjs"] > 0 and usd * conf["tjs_rate"] < conf["min_tjs"]:
         raise PaymentError(f"Минимальная сумма пополнения — {conf['min_tjs']:f} сомони (${conf['min_usd']}).")
-    open_n = conn.execute("SELECT COUNT(*) FROM payments WHERE user_id = ? AND status = 'pending'",
-                          (user["id"],)).fetchone()[0]
-    if open_n >= 3:
-        raise PaymentError("У вас уже 3 заявки в ожидании. Дождитесь их проверки.")
+    blocking = open_request(conn, user["id"])
+    if blocking is not None:
+        raise PaymentError(waiting_text(blocking))
+    # Заявка без чека, брошенная на полпути (бот создал, а чек не прислали), новой не мешает — закрываем её
+    conn.execute("UPDATE payments SET status = 'cancelled', resolved_at = ?, resolved_who = 'заменена новой' "
+                 "WHERE user_id = ? AND status = 'pending' AND receipt_file IS NULL "
+                 "AND COALESCE(auto_kind, '') = ''", (db.now(), user["id"]))
     chosen = next(m for m in conf["all_methods"] if m["code"] == method)
     currency = chosen["currency"]
     pay, cur = pay_amount(conf["tjs_rate"], currency, usd)
@@ -246,8 +250,35 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
     return int(c.lastrowid)
 
 
+def open_request(conn: sqlite3.Connection, user_id: int) -> sqlite3.Row | None:
+    """Заявка, пока которая открыта, новую создать нельзя: с чеком — ждёт админа, крипта — ждёт оплаты.
+
+    Один клиент — одна заявка за раз: иначе один и тот же чек приходил админу по 10 раз."""
+    return conn.execute("SELECT * FROM payments WHERE user_id = ? AND status = 'pending' "
+                        "AND (receipt_file IS NOT NULL OR COALESCE(auto_kind, '') != '') ORDER BY id LIMIT 1",
+                        (user_id,)).fetchone()
+
+
+def waiting_text(p: sqlite3.Row) -> str:
+    if p["auto_kind"]:
+        return (f"Заявка #{p['id']} ждёт оплаты. Оплатите её или отмените — потом можно создать новую.")
+    return (f"Заявка #{p['id']} на проверке — дождитесь решения администратора. "
+            "Новую заявку можно отправить сразу после проверки.")
+
+
+def who_label(p: sqlite3.Row) -> str:
+    """Кто решил заявку — для админа."""
+    if p["resolved_who"]:
+        return p["resolved_who"]
+    if p["status"] == "pending":
+        return ""
+    if p["status"] == "cancelled":
+        return "клиент"
+    return "автоматически" if p["auto_kind"] else "админ"
+
+
 def confirm(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: int,
-            credit_usd: str | None = None) -> bool:
+            credit_usd: str | None = None, *, who: str = "") -> bool:
     """Подтвердить поступление и зачислить баланс. Ровно один раз."""
     with db.tx(conn):
         p = conn.execute("SELECT * FROM payments WHERE id = ? AND status = 'pending'", (payment_id,)).fetchone()
@@ -269,20 +300,22 @@ def confirm(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id:
         tx_id = accounts.post_ledger(conn, p["user_id"], micro, f"Пополнение: {title}, заявка #{p['id']}",
                                      created_by=admin_id)
         conn.execute("UPDATE payments SET status = 'paid', amount_micro = ?, tx_id = ?, resolved_at = ?, "
-                     "resolved_by = ? WHERE id = ?", (micro, tx_id, db.now(), admin_id, payment_id))
+                     "resolved_by = ?, resolved_who = ? WHERE id = ?",
+                     (micro, tx_id, db.now(), admin_id, who or None, payment_id))
         notify(conn, config, p["user_id"], f"Баланс пополнен на ${fmt(micro)} ({title}).", "/panel/transactions")
     return True
 
 
-def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: int, reason: str) -> bool:
+def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: int, reason: str,
+           *, who: str = "") -> bool:
     """Отклонить заявку. Ровно один раз: админ и кассир могут нажать одновременно."""
     with db.tx(conn):
         p = conn.execute("SELECT * FROM payments WHERE id = ? AND status = 'pending'", (payment_id,)).fetchone()
         if p is None:
             return False
-        conn.execute("UPDATE payments SET status = 'rejected', admin_note = ?, resolved_at = ?, resolved_by = ? "
-                     "WHERE id = ? AND status = 'pending'",
-                     (reason.strip()[:300] or None, db.now(), admin_id, payment_id))
+        conn.execute("UPDATE payments SET status = 'rejected', admin_note = ?, resolved_at = ?, resolved_by = ?, "
+                     "resolved_who = ? WHERE id = ? AND status = 'pending'",
+                     (reason.strip()[:300] or None, db.now(), admin_id, who or None, payment_id))
     notify(conn, config, p["user_id"],
            f"Заявка на пополнение #{payment_id} отклонена" + (f": {reason.strip()}" if reason.strip() else "."),
            "/panel/balance")
@@ -290,8 +323,8 @@ def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: 
 
 
 def cancel(conn: sqlite3.Connection, user_id: int, payment_id: int, config: Config | None = None) -> bool:
-    done = conn.execute("UPDATE payments SET status = 'cancelled', resolved_at = ? "
-                        "WHERE id = ? AND user_id = ? AND status = 'pending'",
+    done = conn.execute("UPDATE payments SET status = 'cancelled', resolved_at = ?, resolved_who = 'клиент' "
+                        "WHERE id = ? AND user_id = ? AND status = 'pending' AND receipt_file IS NULL",
                         (db.now(), payment_id, user_id)).rowcount > 0
     if done and config is not None:
         notify(conn, config, user_id, f"Заявка на пополнение #{payment_id} отменена.", "/panel/balance")
@@ -356,6 +389,8 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
         raise PaymentError("Заявка не найдена.")
     if p["status"] != "pending":
         raise PaymentError("Заявка уже обработана.")
+    if p["receipt_file"]:
+        raise PaymentError(f"Чек к заявке #{payment_id} уже отправлен — дождитесь проверки.")
     ext = RECEIPT_TYPES.get((content_type or "").split(";")[0].strip().lower())
     if ext is None:
         ext = _sniff(data)
@@ -363,11 +398,21 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
         raise PaymentError("Чек — фото (JPG, PNG, WEBP) или PDF.")
     if not data or len(data) > MAX_RECEIPT_BYTES:
         raise PaymentError("Файл чека пустой или больше 10 МБ.")
+    digest = hashlib.sha256(data).hexdigest()
+    dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? AND status IN ('pending', 'paid')",
+                       (digest, payment_id)).fetchone()
+    if dup:
+        raise PaymentError(f"Этот чек уже отправлен (заявка #{dup['id']}). Один чек — одна заявка.")
     folder = receipts_dir(config)
     folder.mkdir(parents=True, exist_ok=True)
     name = f"{payment_id}-{secrets.token_hex(6)}.{ext}"
     (folder / name).write_bytes(data)
-    conn.execute("UPDATE payments SET receipt_file = ? WHERE id = ?", (name, payment_id))
+    # receipt_file IS NULL — два одновременных запроса с чеком: пройдёт только первый
+    done = conn.execute("UPDATE payments SET receipt_file = ?, receipt_hash = ? WHERE id = ? AND receipt_file IS NULL",
+                        (name, digest, payment_id)).rowcount
+    if not done:
+        (folder / name).unlink(missing_ok=True)
+        raise PaymentError(f"Чек к заявке #{payment_id} уже отправлен — дождитесь проверки.")
     return name
 
 

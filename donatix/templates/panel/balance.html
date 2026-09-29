@@ -9,6 +9,25 @@
     <div class="stat reveal"><div class="label">Доступно</div><div class="value">{{ money(user.balance_micro) }}</div>
       <div class="note">Курс для оплаты в сомони: 1 USD = <b id="rate">{{ tjs_rate }}</b> TJS <span class="muted small" id="rate-at">· обновляется каждые 30 с</span></div></div>
 
+    {% if waiting %}
+    <div class="card reveal wait-card" id="wait" data-id="{{ waiting.id }}" role="status" aria-live="polite">
+      <div class="wait-spin" aria-hidden="true"><span class="ring"></span><span class="clock">{{ icon('clock', 22) }}</span></div>
+      <div class="grow">
+        <h3>{% if waiting.auto_kind %}Заявка #{{ waiting.id }} ждёт оплаты{% else %}Заявка #{{ waiting.id }} на проверке{% endif %}</h3>
+        <p class="muted small">{{ money(waiting.amount_micro) }} · {{ waiting.pay_amount }} {{ waiting.pay_currency }} · {{ pay_titles.get(waiting.method, waiting.method) }} · {{ waiting.created_at | dt }}</p>
+        {% if waiting.auto_kind %}
+        <p>Переведите точную сумму — баланс пополнится сам. Новую заявку можно создать после оплаты или отмены этой.</p>
+        <div class="row-actions">
+          <a class="btn primary" href="/panel/balance/{{ waiting.id }}/pay">Открыть оплату</a>
+          <form class="inline" method="post" action="/panel/balance/{{ waiting.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Отменить</button></form>
+        </div>
+        {% else %}
+        <p>Чек получен ✅ Администратор проверяет поступление — обычно до 1 часа. Как только проверит, баланс пополнится и придёт уведомление 🔔.</p>
+        <p class="hint">Новую заявку можно отправить сразу после проверки этой. Страница обновится сама.</p>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
     <form class="card reveal" method="post" action="/panel/balance" id="payform" enctype="multipart/form-data">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <div class="step-head"><span class="n">1</span><h3>Способ оплаты</h3></div>
@@ -49,12 +68,13 @@
       </div>
       <label for="reference">Номер чека / хэш перевода <span class="muted">(желательно)</span></label>
       <input id="reference" name="reference" maxlength="200" placeholder="Например, 4821 или TX-хэш" autocomplete="off">
-      <button class="btn primary lg block" style="margin-top:18px">Я оплатил — отправить заявку</button>
+      <button class="btn primary lg block" style="margin-top:18px" id="paysend">Я оплатил — отправить заявку</button>
       <p class="hint center">{{ icon('shield', 16) }} После проверки поступления баланс зачислится, вам придёт уведомление.</p>
       {% else %}
       <p class="muted" style="margin-top:12px">Способы оплаты ещё не настроены.{% if support_contact %} Напишите {{ support_contact }}.{% endif %}</p>
       {% endif %}
     </form>
+    {% endif %}
   </div>
 
   <div class="card reveal">
@@ -68,8 +88,9 @@
           <div class="sub">{{ p.pay_amount }} {{ p.pay_currency }} · {{ p.created_at | dt }}{% if p.admin_note %} · {{ p.admin_note }}{% endif %}</div>
           <div class="meta">
             <span class="badge {{ {'paid': 'ok', 'rejected': 'bad', 'cancelled': ''}.get(p.status, 'warn') }}">{{ {'pending': 'Проверяется', 'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено'}[p.status] }}</span>
-            {% if p.status == 'pending' %}
+            {% if p.status == 'pending' and not p.receipt_file %}
             <form class="inline" method="post" action="/panel/balance/{{ p.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm">Отменить</button></form>
+            {% elif p.status == 'pending' %}<span class="spin-dot" aria-hidden="true"></span>
             {% endif %}
           </div>
         </div>
@@ -80,6 +101,22 @@
 </div>
 
 <script>
+(function () {
+  // Заявка на проверке: как только админ решит — страница обновится сама
+  var w = document.getElementById("wait");
+  if (w) {
+    setInterval(function () {
+      if (document.hidden) return;
+      fetch("/panel/data/payment/" + w.dataset.id, {credentials: "same-origin"}).then(function (r) { return r.json(); })
+        .then(function (d) { if (d.status && d.status !== "pending") location.reload(); }).catch(function () {});
+    }, 8000);
+  }
+  // Двойное нажатие не отправит заявку дважды
+  var pf = document.getElementById("payform"), ps = document.getElementById("paysend");
+  if (pf && ps) pf.addEventListener("submit", function () {
+    setTimeout(function () { ps.disabled = true; ps.innerHTML = '<span class="spin-dot"></span> Отправляем…'; }, 0);
+  });
+})();
 (function () {
   var f = document.getElementById("payform"), inp = document.getElementById("amount");
   if (!f || !inp) return;

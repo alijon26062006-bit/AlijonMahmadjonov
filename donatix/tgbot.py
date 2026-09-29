@@ -257,13 +257,14 @@ class AdminBot:
                         tg_id: int | None = None) -> str:
         """Зачислить или отклонить — один раз. Итог сразу видят все: админ и кассиры."""
         admin_id = _admin_id(conn)
+        label = f"кассир {who}" if tg_id is not None else "админ (Telegram)"
         if approve:
             try:
-                ok = payments.confirm(conn, self.config, payment_id, admin_id)
+                ok = payments.confirm(conn, self.config, payment_id, admin_id, who=label)
             except payments.PaymentError as exc:
                 return str(exc)[:190]   # всплывающее окно Telegram — до 200 символов
         else:
-            ok = payments.reject(conn, self.config, payment_id, admin_id, "Перевод не найден")
+            ok = payments.reject(conn, self.config, payment_id, admin_id, "Перевод не найден", who=label)
         if not ok:
             return "Заявка уже обработана"
         if tg_id is not None:
@@ -479,6 +480,14 @@ def screen_client(conn: sqlite3.Connection, config: Config, user_id: int) -> Scr
             + (f"Проект: {_e(u['project'])}\n" if u["project"] else "")
             + f"Статус: {status}\nБаланс: <b>${fmt(u['balance_micro'])}</b>\n"
             f"Уровень: {u['tier']} · наценка {markup}%\nЗаказов: {n_orders} · ботов: {n_bots}")
+    pays = conn.execute("SELECT * FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 5", (user_id,)).fetchall()
+    if pays:
+        mark = {"pending": "⏳", "paid": "✅", "rejected": "❌", "cancelled": "↩️"}
+        text += "\n\n💳 <b>Пополнения</b>\n" + "\n".join(
+            f"{mark[p['status']]} #{p['id']} · ${fmt(p['amount_micro'])} · "
+            f"{_e(payments.title_for(conn, config, p['method']))}"
+            + (f" — {_e(payments.who_label(p))}" if p["status"] != "pending" else " — ждёт проверки")
+            for p in pays)
     rows: Buttons = []
     if u["role"] != "admin":
         rows.append([("⛔ Заблокировать", f"cl:block:{user_id}") if u["status"] == "active"

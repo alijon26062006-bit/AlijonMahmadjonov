@@ -131,7 +131,7 @@ def check_trc20(conn: sqlite3.Connection, config: Config) -> int:
                     continue  # этот перевод уже засчитан другой заявке
                 conn.execute("UPDATE payments SET ext_id = ?, reference = ? WHERE id = ? AND status = 'pending'",
                              (t["tx"], t["tx"][:200], r["id"]))
-                if payments.confirm(conn, config, r["id"], _admin_id(conn)):
+                if payments.confirm(conn, config, r["id"], _admin_id(conn), who="автоматически"):
                     done += 1
                     _tell_admin(conn, config, r["id"], "USDT TRC20")
                     log.info("trc20: заявка #%s оплачена, tx %s", r["id"], t["tx"])
@@ -205,7 +205,7 @@ def check_bybit(conn: sqlite3.Connection, config: Config) -> int:
                 continue
             conn.execute("UPDATE payments SET ext_id = ?, reference = ? WHERE id = ? AND status = 'pending'",
                          (t["tx"], t["tx"][:200], r["id"]))
-            if payments.confirm(conn, config, r["id"], _admin_id(conn)):
+            if payments.confirm(conn, config, r["id"], _admin_id(conn), who="автоматически"):
                 done += 1
                 _tell_admin(conn, config, r["id"], "Bybit")
                 log.info("bybit: заявка #%s оплачена (%s)", r["id"], t["tx"])
@@ -278,7 +278,7 @@ def check_binance(conn: sqlite3.Connection, config: Config, only_id: int | None 
             log.warning("binance: заявка #%s: %s", r["id"], exc)
             continue
         if status == "PAID":
-            if payments.confirm(conn, config, r["id"], _admin_id(conn)):
+            if payments.confirm(conn, config, r["id"], _admin_id(conn), who="автоматически"):
                 done += 1
                 _tell_admin(conn, config, r["id"], "Binance Pay")
         elif status in ("EXPIRED", "CANCELED", "CANCELLED", "ERROR"):

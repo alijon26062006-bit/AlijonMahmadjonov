@@ -139,6 +139,13 @@ def test_api_topup_with_receipt(app, config, conn, monkeypatch):
     odd = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "600"}).json()["payment"]
     assert odd["pay_amount"] == "600.00" and odd["amount_usd"] == "55.0458"  # 600 / 10.9, вниз
     api.post(f"/api/v1/payments/{odd['id']}/receipt", headers=h, files={"file": ("x.png", PNG, "image/png")})
+    again = api.post(f"/api/v1/payments/{odd['id']}/receipt", headers=h, files={"file": ("y.png", PNG + b"1",
+                                                                                          "image/png")}).json()
+    assert again["ok"] is False and "уже отправлен" in again["error"]      # второй чек к той же заявке — нет
+    blocked = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "545"}).json()
+    assert blocked["ok"] is False and f"#{odd['id']} на проверке" in blocked["error"]   # одна заявка за раз
+    assert len(sent) == 1                                                    # админу чек пришёл один раз
+    conn.execute("UPDATE payments SET status = 'rejected' WHERE id = ?", (odd["id"],))   # админ решил — можно снова
     r = api.post("/api/v1/payments", headers=h, json={"method": "alif", "amount_tjs": "545"}).json()
     pay = r["payment"]
     assert pay["pay_amount"] == "545.00" and pay["pay_currency"] == "TJS" and "+992" in pay["details"]

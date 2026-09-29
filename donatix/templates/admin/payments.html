@@ -34,8 +34,9 @@
       </form>
     </div>
     {% else %}
-    <div style="margin-top:10px"><span class="badge {{ {'paid': 'ok', 'rejected': 'bad'}.get(p.status, '') }}">{{ {'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено клиентом'}[p.status] }}</span>
-      {% if p.admin_note %}<span class="small muted"> {{ p.admin_note }}</span>{% endif %}</div>
+    <div style="margin-top:10px"><span class="badge {{ {'paid': 'ok', 'rejected': 'bad'}.get(p.status, '') }}">{{ {'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено'}[p.status] }}</span>
+      <span class="small"> · решил: <b>{{ p.who }}</b>{% if p.resolved_at %} · {{ p.resolved_at | dt }}{% endif %}</span>
+      {% if p.admin_note %}<span class="small muted"> · {{ p.admin_note }}</span>{% endif %}</div>
     {% endif %}
   </div>
   {% else %}<div class="card empty">Заявок нет.</div>{% endfor %}

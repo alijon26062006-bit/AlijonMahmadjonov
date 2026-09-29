@@ -390,6 +390,13 @@ def init(path: Path | str) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS users_referred_by ON users(referred_by)")
         if "resolved_tg" not in pay_cols:   # кто решил заявку в Telegram (кассир)
             conn.execute("ALTER TABLE payments ADD COLUMN resolved_tg TEXT")
+        if "receipt_hash" not in pay_cols:  # один чек — одна заявка: тот же файл второй раз не примем
+            conn.execute("ALTER TABLE payments ADD COLUMN receipt_hash TEXT")
+        if "resolved_who" not in pay_cols:  # кто решил: «кассир Али», «админ (сайт)», «автоматически»…
+            conn.execute("ALTER TABLE payments ADD COLUMN resolved_who TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS payments_receipt_hash ON payments(receipt_hash) "
+                     "WHERE receipt_hash IS NOT NULL")
+        conn.execute("CREATE INDEX IF NOT EXISTS payments_user ON payments(user_id, status)")
         if "google_sub" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)")

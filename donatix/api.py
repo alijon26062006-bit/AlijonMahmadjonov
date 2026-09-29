@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from . import account_check, accounts, catalog, orders
+from . import account_check, accounts, catalog, db, orders
 from .config import Config
 from .deps import get_config, get_conn
 from .money import fmt
@@ -328,8 +328,9 @@ def payment_create(body: PaymentIn, request: Request, user=Depends(api_user), co
     _limit(request, "account", str(user["id"]))
     rates.refresh(conn, config, rates.PAYMENT_SECONDS)
     try:
-        pid = payments.create(conn, config, user, body.method, body.amount_usd, body.reference,
-                              amount_tjs=body.amount_tjs)
+        with db.tx(conn):   # 10 одновременных запросов — создастся одна заявка
+            pid = payments.create(conn, config, user, body.method, body.amount_usd, body.reference,
+                                  amount_tjs=body.amount_tjs)
         payments.start_auto(conn, config, pid)  # TRC20 / Binance Pay — ссылка или адрес для оплаты
     except payments.PaymentError as exc:
         raise ApiError(str(exc), "invalid_payment") from None

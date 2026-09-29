@@ -1335,3 +1335,19 @@ html { scroll-behavior: smooth; }
   .rg-coin, .rg-c1, .rg-c2 { opacity: 1; transform: none; }
   .rg-spark { opacity: .9; }
 }
+
+/* ── Заявка на проверке: крутится, пока админ не решит ─────────── */
+.wait-card { display: flex; gap: 16px; align-items: flex-start; border: 1px solid var(--accent-line);
+  background: linear-gradient(135deg, var(--accent-soft), var(--surface) 70%); }
+.wait-card h3 { margin: 2px 0 4px; }
+.wait-card p { margin: 6px 0 0; }
+.wait-card .row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.wait-spin { position: relative; flex: none; width: 52px; height: 52px; display: grid; place-items: center;
+  color: var(--accent); }
+.wait-spin .ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--accent-line);
+  border-top-color: var(--accent); animation: dx-spin 1s linear infinite; }
+.spin-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; vertical-align: -2px;
+  border: 2px solid var(--accent-line); border-top-color: var(--accent); animation: dx-spin .9s linear infinite; }
+@keyframes dx-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wait-spin .ring, .spin-dot { animation-duration: 3s; } }
+

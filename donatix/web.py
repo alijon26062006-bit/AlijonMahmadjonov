@@ -662,7 +662,7 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
     conf = payments.settings(conn, config)
     return render(request, "panel/balance.html", {
         "user": user, "methods": payments.methods(conn, config), "payments": rows, "tjs_rate": conf["tjs_rate"],
-        "min_usd": conf["min_usd"], "min_tjs": conf["min_tjs"],
+        "min_usd": conf["min_usd"], "min_tjs": conf["min_tjs"], "waiting": payments.open_request(conn, user["id"]),
         "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()} | {m["code"]: m["title"] for m in conf["all_methods"]},
     })
 
@@ -855,8 +855,10 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
 def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
                          config: Config = Depends(get_config)):
     from . import payments
-    payments.cancel(conn, user["id"], payment_id, config)
-    flash(request, "Заявка отменена.")
+    if payments.cancel(conn, user["id"], payment_id, config):
+        flash(request, "Заявка отменена.")
+    else:
+        flash(request, "Чек уже отправлен — заявку проверяет администратор, отменить её нельзя.", "error")
     return _redirect("/panel/balance")
 
 

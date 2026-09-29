@@ -325,7 +325,23 @@ def user_detail(user_id: int, request: Request, admin=Depends(admin_user), conn=
                             (user_id,)).fetchall(),
         "orders": conn.execute("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 20",
                                (user_id,)).fetchall(),
+        "pays": _pays_with_who(conn, "WHERE p.user_id = ? ORDER BY p.id DESC LIMIT 30", (user_id,)),
+        "pay_titles": _pay_titles(conn, config),
     })
+
+
+def _pays_with_who(conn, where: str, args: tuple) -> list[dict]:
+    """Заявки на пополнение с «кто решил» — админ, кассир по имени, автоматически, клиент."""
+    from .payments import who_label
+    rows = conn.execute(f"SELECT p.*, u.login, u.balance_micro FROM payments p JOIN users u ON u.id = p.user_id "
+                        f"{where}", args).fetchall()
+    return [{**dict(r), "who": who_label(r)} for r in rows]
+
+
+def _pay_titles(conn, config: Config) -> dict[str, str]:
+    from .payments import settings
+    return ({k: v[0] for k, v in PAY_METHODS.items()}
+            | {m["code"]: m["title"] for m in settings(conn, config)["all_methods"]})
 
 
 @router.post("/users/{user_id}", dependencies=[Depends(check_csrf)])
@@ -466,9 +482,7 @@ def payments_list(request: Request, status: str = "pending", admin=Depends(admin
     if status in ("pending", "paid", "rejected", "cancelled"):
         where += " AND p.status = ?"
         args.append(status)
-    rows = conn.execute(
-        f"SELECT p.*, u.login, u.balance_micro FROM payments p JOIN users u ON u.id = p.user_id WHERE {where} "
-        f"ORDER BY p.id DESC LIMIT 200", args).fetchall()
+    rows = _pays_with_who(conn, f"WHERE {where} ORDER BY p.id DESC LIMIT 200", tuple(args))
     return render(request, "admin/payments.html", {
         "user": admin, "rows": rows, "status": status,
         "titles": {k: v[0] for k, v in PAY_METHODS.items()}
@@ -545,7 +559,8 @@ def payment_confirm(payment_id: int, request: Request, credit: str = Form(""), a
                     conn=Depends(get_conn), config: Config = Depends(get_config)):
     from . import payments
     try:
-        ok = payments.confirm(conn, config, payment_id, admin["id"], credit.strip() or None)
+        ok = payments.confirm(conn, config, payment_id, admin["id"], credit.strip() or None,
+                              who=f"админ (сайт: {admin['login']})")
     except payments.PaymentError as exc:
         flash(request, str(exc), "error")
         return _back("/admin/payments")
@@ -562,7 +577,7 @@ def payment_confirm(payment_id: int, request: Request, credit: str = Form(""), a
 def payment_reject(payment_id: int, request: Request, reason: str = Form(""), admin=Depends(admin_user),
                    conn=Depends(get_conn), config: Config = Depends(get_config)):
     from . import payments
-    ok = payments.reject(conn, config, payment_id, admin["id"], reason)
+    ok = payments.reject(conn, config, payment_id, admin["id"], reason, who=f"админ (сайт: {admin['login']})")
     if ok:
         from .cashiers import settle
         settle(conn, config, payment_id, "❌ Отклонено — админ (сайт)")
