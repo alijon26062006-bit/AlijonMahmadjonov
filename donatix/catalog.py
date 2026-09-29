@@ -197,3 +197,17 @@ def _steam_extra(product: dict[str, Any], price: Decimal) -> dict[str, Any]:
         # Сколько клиент платит за 1 USD, зачисленный на Steam.
         "discount_percent": fmt_unit((Decimal(1) - price) * 100) if price < 1 else "0.0000",
     }
+
+
+# Сроки выдачи, которые называет поставщик, — показываем клиенту до оплаты, чтобы не писал в поддержку раньше времени
+DELIVERY_NOTES = (
+    ("clash of clans", "⏱ Выдача через вход в аккаунт: обычно 20–90 минут, с 09:00 до 21:00 (МСК). "
+                       "Заказ, оформленный ночью, выполнят утром."),
+    ("standoff", "⏱ Выдаётся автоматически по ID — обычно за несколько минут, максимум до 30 минут."),
+)
+
+
+def delivery_note(category_name: str | None) -> str:
+    name = (category_name or "").lower()
+    return next((note for key, note in DELIVERY_NOTES if key in name), "")
+

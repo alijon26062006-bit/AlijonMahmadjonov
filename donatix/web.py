@@ -531,7 +531,8 @@ def _buy_ctx(request: Request, conn, config: Config, user, p: dict, **extra) -> 
             siblings.sort(key=lambda i: packs.order_key(i["name"], float(i["price_usd"])))
     return {
         "user": user, "p": catalog.public_view(p, markup), "siblings": siblings, "idem": str(uuid.uuid4()),
-        "can_check": account_check.can_check(request.app.state.supplier, p), "form": {}, **extra,
+        "can_check": account_check.can_check(request.app.state.supplier, p), "form": {},
+        "delivery_note": catalog.delivery_note(p.get("category_name")), **extra,
     }
 
 

@@ -111,6 +111,7 @@
         <div class="total"><span>К оплате</span><span id="s-total">{{ money(p.price_usd | price) }}</span></div>
       </div>
       <button class="btn primary lg block buy-btn" {{ 'disabled' if user.status != 'active' }}>Купить</button>
+      {% if delivery_note %}<p class="hint center delivery-note">{{ delivery_note }}</p>{% endif %}
       <p class="hint center">{{ icon('shield', 16) }} Не выполнится — деньги вернутся на баланс.</p>
     </div>
   </aside>

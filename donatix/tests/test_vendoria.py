@@ -112,3 +112,10 @@ def test_popular_prefers_vendoria_for_standoff_and_coc(conn):
     pins = {p["key"]: p for p in popular._pinned(conn)}
     assert pins["standoff2"]["category_id"] == "vd_1"       # у CoinDrop пакетов больше, но берём Vendoria
     assert pins["coc"]["category_id"] == "vd_2"
+
+
+def test_delivery_time_notes():
+    from donatix import catalog
+    assert "до 30 минут" in catalog.delivery_note("Standoff 2")
+    assert "20–90 минут" in catalog.delivery_note("Clash of Clans") and "утром" in catalog.delivery_note("Clash of Clans")
+    assert catalog.delivery_note("Free Fire") == ""
