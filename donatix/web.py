@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
 
-from . import accounts, cache, catalog, db, orders, popular, sitecfg
+from . import accounts, cache, catalog, db, orders, popular, referrals, sitecfg
 from .config import PAY_METHODS, Config
 from .deps import INDEXABLE, LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
 from .money import apply_markup, fmt, order_total_micro, to_decimal
@@ -53,6 +53,7 @@ def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
         "faq": FAQ + (BOT_FAQ if sitecfg.client_bots_enabled(conn) else []),
         "popular": popular.services(conn),
         "client_bots": sitecfg.client_bots_enabled(conn),
+        "ref_percent": referrals.percent(conn),
     })
 
 
@@ -353,6 +354,7 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
     return render(request, "panel/home.html", {
         "user": user, "summary": summary, "key": key, "kinds": KINDS,
         "markup": accounts.markup_for(user, config),
+        "ref_percent": referrals.percent(conn),
     })
 
 

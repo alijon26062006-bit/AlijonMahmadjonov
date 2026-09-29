@@ -1,0 +1,11 @@
+{# Небольшой анимированный баннер реферальной программы. Нужны: ref_percent, ref_href. #}
+{% if ref_percent and ref_percent > 0 %}
+<a class="ref-promo" href="{{ ref_href }}">
+  <span class="ref-gift" aria-hidden="true">🎁<span class="spark s1">✨</span><span class="spark s2">✨</span></span>
+  <span class="ref-text">
+    <b>Приглашайте друзей — получайте бонус<span class="ref-new">NEW</span></b>
+    <span>{{ ref_percent }}% с нашей прибыли от каждого их заказа — навсегда, прямо на баланс</span>
+  </span>
+  <span class="ref-go">{{ ref_cta or 'Получить ссылку' }} <span class="arr">→</span></span>
+</a>
+{% endif %}
