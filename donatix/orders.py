@@ -517,36 +517,53 @@ def public_view(order: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def _local_start(conn: sqlite3.Connection, days: int) -> tuple[str, Any]:
+    """Начало периода: 00:00 по местному времени, days суток назад включая сегодня (1 — сегодня)."""
+    from . import periods, timez
+    tz = timez.zone(timez.site_zone_name(conn))
+    start = periods.midnight(tz) - timedelta(days=max(days, 1) - 1)
+    start = datetime(start.year, start.month, start.day, tzinfo=tz)   # полночь, даже если между — смена часов
+    return periods.iso(start), tz
+
+
 def stats(conn: sqlite3.Connection, since_days: int = 1) -> dict[str, Any]:
-    since = (datetime.now(timezone.utc) - timedelta(days=since_days)).strftime("%Y-%m-%dT%H:%M:%S")
+    """Выполненные заказы с 00:00 (местное время): 1 — сегодня, 30 — сегодня и 29 суток до него.
+    В полночь «сегодня» начинается с нуля."""
+    since, _ = _local_start(conn, since_days)
     row = conn.execute(
         "SELECT COUNT(*) AS n, COALESCE(SUM(total_micro),0) AS revenue, COALESCE(SUM(total_micro - cost_micro),0) "
-        "AS profit FROM orders WHERE status = 'completed' AND created_at >= ?",
+        "AS profit FROM orders WHERE status = 'completed' AND COALESCE(completed_at, created_at) >= ?",
         (since,),
     ).fetchone()
     return {"orders": row["n"], "revenue": row["revenue"], "profit": row["profit"]}
 
 
 def daily(conn: sqlite3.Connection, days: int = 14) -> list[dict[str, Any]]:
-    """Выручка и прибыль по дням (UTC) за последние days дней, включая пустые дни."""
-    start = (datetime.now(timezone.utc) - timedelta(days=days - 1)).date()
-    rows = {
-        r["d"]: r for r in conn.execute(
-            "SELECT substr(created_at, 1, 10) AS d, COUNT(*) AS n, SUM(total_micro) AS revenue, "
-            "SUM(total_micro - cost_micro) AS profit FROM orders WHERE status = 'completed' AND created_at >= ? "
-            "GROUP BY d", (start.isoformat(),))
-    }
+    """Выручка и прибыль по дням (сутки 00:00 → 23:59 по местному времени), включая пустые дни."""
+    since, tz = _local_start(conn, days)
+    buckets: dict[str, dict[str, int]] = {}
+    for r in conn.execute(
+            "SELECT COALESCE(completed_at, created_at) AS t, total_micro, cost_micro FROM orders "
+            "WHERE status = 'completed' AND COALESCE(completed_at, created_at) >= ?", (since,)):
+        try:
+            ts = datetime.strptime(r["t"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        b = buckets.setdefault(ts.astimezone(tz).date().isoformat(), {"n": 0, "revenue": 0, "profit": 0})
+        b["n"] += 1
+        b["revenue"] += r["total_micro"]
+        b["profit"] += r["total_micro"] - r["cost_micro"]
+    start = datetime.strptime(since, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc).astimezone(tz).date()
     out = []
     for i in range(days):
         d = (start + timedelta(days=i)).isoformat()
-        r = rows.get(d)
-        out.append({"day": d, "orders": r["n"] if r else 0, "revenue": r["revenue"] if r else 0,
-                    "profit": r["profit"] if r else 0})
+        b = buckets.get(d, {"n": 0, "revenue": 0, "profit": 0})
+        out.append({"day": d, "orders": b["n"], "revenue": b["revenue"], "profit": b["profit"]})
     return out
 
 
 def top_clients(conn: sqlite3.Connection, days: int = 30, limit: int = 5) -> list[sqlite3.Row]:
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
+    since, _ = _local_start(conn, days)
     return conn.execute(
         "SELECT u.id, u.login, u.project, COUNT(*) AS n, SUM(o.total_micro) AS revenue, "
         "SUM(o.total_micro - o.cost_micro) AS profit FROM orders o JOIN users u ON u.id = o.user_id "

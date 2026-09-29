@@ -106,7 +106,7 @@ def summary(conn: sqlite3.Connection) -> str:
         "📊 <b>Сводка</b>\n"
         f"Баланс FazerCards: <b>{'$' + str(bal) if bal is not None else '—'}</b>\n"
         f"Балансы клиентов: ${fmt(owed)}\n\n"
-        f"Сегодня: {today['orders']} заказов, прибыль ${fmt(today['profit'])}\n"
+        f"Сегодня (с 00:00): {today['orders']} заказов, прибыль ${fmt(today['profit'])}\n"
         f"30 дней: {month['orders']} заказов, выручка ${fmt(month['revenue'])}, прибыль ${fmt(month['profit'])}\n\n"
         f"Заявок на пополнение: {pays}\nНовых партнёров: {users}\nПроблемных заказов: {problems}"
     )

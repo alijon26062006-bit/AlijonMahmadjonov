@@ -1351,3 +1351,6 @@ html { scroll-behavior: smooth; }
 @keyframes dx-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .wait-spin .ring, .spin-dot { animation-duration: 3s; } }
 
+/* Фильтр периода: Сегодня / Вчера / … / с даты по дату */
+.period-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.period-kpis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }

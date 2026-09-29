@@ -11,10 +11,11 @@ from typing import Any
 
 from .suppliers import KIND_TITLES
 
-PERIODS = {"24h": ("24 часа", 1), "7d": ("7 дней", 7), "30d": ("30 дней", 30), "all": ("Всё время", None)}
+PERIODS = {"today": ("Сегодня", 1), "7d": ("7 дней", 7), "30d": ("30 дней", 30), "all": ("Всё время", None)}
 
 
 def build(conn: sqlite3.Connection, period: str, *, user_id: int | None = None, tz_hours: int = 5) -> dict[str, Any]:
+    period = "today" if period == "24h" else period   # старые ссылки «24 часа» → «Сегодня»
     period = period if period in PERIODS else "30d"
     days = PERIODS[period][1]
     now = datetime.now(timezone.utc)
@@ -25,7 +26,9 @@ def build(conn: sqlite3.Connection, period: str, *, user_id: int | None = None, 
         where += " AND user_id = ?"
         args.append(user_id)
     if days:
-        since = (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
+        # целые сутки 00:00 → 23:59 по местному времени: сегодня и days−1 суток до него
+        local_midnight = (now + timedelta(hours=tz_hours)).replace(hour=0, minute=0, second=0, microsecond=0)
+        since = (local_midnight - timedelta(days=days - 1, hours=tz_hours)).strftime("%Y-%m-%dT%H:%M:%S")
         where += " AND created_at >= ?"
         args.append(since)
     else:
@@ -47,7 +50,7 @@ def build(conn: sqlite3.Connection, period: str, *, user_id: int | None = None, 
     topped = conn.execute(f"SELECT COALESCE(SUM(amount_micro), 0) FROM transactions WHERE {tw}", targs).fetchone()[0]
 
     # Динамика: по часам за сутки, иначе по дням; пустые интервалы тоже показываем
-    hourly = period == "24h"
+    hourly = period == "today"
     fmt = "%Y-%m-%d %H" if hourly else "%Y-%m-%d"
     rows = {r["b"]: r for r in conn.execute(
         f"SELECT strftime('{fmt}', created_at, '{shift}') AS b, COUNT(*) AS created, "

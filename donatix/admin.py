@@ -393,8 +393,14 @@ def user_balance(user_id: int, request: Request, amount: str = Form(...), note: 
 
 
 @router.get("/orders")
-def orders_list(request: Request, status: str = "", q: str = "", admin=Depends(admin_user), conn=Depends(get_conn)):
-    where, args = "1=1", []
+def orders_list(request: Request, status: str = "", q: str = "", period: str = "", date_from: str = "",
+                date_to: str = "", admin=Depends(admin_user), conn=Depends(get_conn)):
+    from urllib.parse import urlencode
+
+    from . import periods, timez
+    pr = periods.resolve(timez.zone(timez.site_zone_name(conn)), period, date_from, date_to)
+    cond, where_args = pr.sql("o.created_at")
+    where, args = cond, list(where_args)
     if status in ("processing", "completed", "failed", "attention"):
         where += " AND o.status = ?"
         args.append(status)
@@ -405,7 +411,15 @@ def orders_list(request: Request, status: str = "", q: str = "", admin=Depends(a
         f"SELECT o.*, u.login FROM orders o JOIN users u ON u.id = o.user_id WHERE {where} "
         f"ORDER BY (o.status = 'attention') DESC, o.id DESC LIMIT 200", args
     ).fetchall()
-    return render(request, "admin/orders.html", {"user": admin, "rows": rows, "status": status, "q": q})
+    totals = conn.execute(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(o.status = 'completed'), 0) AS done, "
+        "COALESCE(SUM(o.status = 'failed'), 0) AS failed, "
+        "COALESCE(SUM(CASE WHEN o.status = 'completed' THEN o.total_micro END), 0) AS revenue, "
+        "COALESCE(SUM(CASE WHEN o.status = 'completed' THEN o.total_micro - o.cost_micro END), 0) AS profit "
+        f"FROM orders o JOIN users u ON u.id = o.user_id WHERE {where}", args).fetchone()
+    return render(request, "admin/orders.html", {
+        "user": admin, "rows": rows, "status": status, "q": q, "pr": pr, "presets": periods.PRESETS,
+        "keep": urlencode({"status": status, "q": q}), "totals": totals})
 
 
 @router.get("/orders/{order_id}")

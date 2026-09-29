@@ -599,11 +599,17 @@ def panel_gift_game(appid: int, request: Request, user=Depends(panel_user), conn
 
 
 @router.get("/panel/orders")
-def panel_orders(request: Request, status: str = "", q: str = "", page: int = 1,
-                 user=Depends(panel_user), conn=Depends(get_conn)):
+def panel_orders(request: Request, status: str = "", q: str = "", page: int = 1, period: str = "",
+                 date_from: str = "", date_to: str = "", user=Depends(panel_user), conn=Depends(get_conn)):
+    from urllib.parse import urlencode
+
+    from . import periods, timez
     per = 30
     page = max(page, 1)
-    where, args = "user_id = ?", [user["id"]]
+    tz_name, _ = timez.resolve(conn, user, request.cookies.get("dx_tz"))   # сутки — по часам клиента
+    pr = periods.resolve(timez.zone(tz_name), period, date_from, date_to)
+    cond, cond_args = pr.sql("created_at")
+    where, args = "user_id = ? AND " + cond, [user["id"], *cond_args]
     if status == "processing":
         where += " AND status IN ('processing', 'attention')"
     elif status in ("completed", "failed"):
@@ -612,12 +618,21 @@ def panel_orders(request: Request, status: str = "", q: str = "", page: int = 1,
     if q:
         where += " AND (public_id LIKE ? OR product_name LIKE ? OR fields_json LIKE ?)"
         args += [f"%{q}%"] * 3
-    total = conn.execute(f"SELECT COUNT(*) FROM orders WHERE {where}", args).fetchone()[0]
+    totals = conn.execute(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(status = 'completed'), 0) AS done, "
+        "COALESCE(SUM(status = 'failed'), 0) AS failed, "
+        f"COALESCE(SUM(CASE WHEN status = 'completed' THEN total_micro END), 0) AS spent FROM orders WHERE {where}",
+        args).fetchone()
+    total = totals["n"]
     rows = conn.execute(f"SELECT * FROM orders WHERE {where} ORDER BY id DESC LIMIT ? OFFSET ?",
                         [*args, per, (page - 1) * per]).fetchall()
+    keep = urlencode({"status": status, "q": q})
     return render(request, "panel/orders.html", {
         "user": user, "orders": rows, "status": status, "q": q, "page": page,
-        "pages": max(1, -(-total // per)), "total": total,
+        "pages": max(1, -(-total // per)), "total": total, "totals": totals, "pr": pr, "presets": periods.PRESETS,
+        "keep": keep, "keep_all": keep + "&" + urlencode({"period": pr.key if pr.key != "custom" else "",
+                                                          "date_from": pr.date_from if pr.key == "custom" else "",
+                                                          "date_to": pr.date_to if pr.key == "custom" else ""}),
     })
 
 
