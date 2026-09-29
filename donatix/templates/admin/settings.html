@@ -20,7 +20,7 @@
         <input id="markup_{{ k }}" name="markup_{{ k }}" inputmode="decimal" value="{{ s.kind_markups[k] if s.kind_markups[k] is not none else '' }}" placeholder="пусто — как по уровню"></div>
       {% endfor %}
     </div>
-    <div class="hint">Личная наценка клиента (в карточке клиента) важнее всех этих.</div>
+    <div class="hint">Отдельная наценка (Stars, Premium, Steam) действует на весь проект — для всех клиентов, даже с личной наценкой. Пусто — считается по личной наценке клиента или по уровню.</div>
   </div>
 
   <div class="card">

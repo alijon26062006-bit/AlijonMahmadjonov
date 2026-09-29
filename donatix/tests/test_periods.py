@@ -70,3 +70,16 @@ def test_orders_filter_by_period_and_dates(app, conn):
     page = client.get("/panel/orders?period=today").text
     assert "dx-p1" in page and "dx-p3" not in page and "Сегодня: 2" in page
     assert "dx-p4" in client.get("/panel/orders?period=30d").text
+
+
+def test_stars_markup_applies_to_whole_project(config, conn):
+    from decimal import Decimal
+
+    from donatix import accounts, sitecfg
+    uid, _ = make_client(conn, login="vipshop")
+    conn.execute("UPDATE users SET markup_override = '3' WHERE id = ?", (uid,))   # личная наценка 3%
+    user = accounts.get_user(conn, uid)
+    assert accounts.markup_for(user, config, "telegram_stars") == Decimal("3")
+    sitecfg.save(conn, config, {"markup_telegram_stars": "50"})
+    assert accounts.markup_for(user, config, "telegram_stars") == Decimal("50")    # звёзды — для всех 50%
+    assert accounts.markup_for(user, config, "topup") == Decimal("3")              # остальное — по личной

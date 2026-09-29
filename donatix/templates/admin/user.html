@@ -20,7 +20,7 @@
       <select id="tier" name="tier">
         {% for t in tiers %}<option value="{{ t }}" {{ 'selected' if t == c.tier }}>{{ t }} (+{{ markups[t] }}%)</option>{% endfor %}
       </select>
-      <label for="markup_override">Своя наценка, % <span class="muted">(пусто — по уровню)</span></label>
+      <label for="markup_override">Своя наценка, % <span class="muted">(пусто — по уровню; Stars, Premium и Steam — по отдельной наценке из настроек, если она задана)</span></label>
       <input id="markup_override" name="markup_override" value="{{ c.markup_override or '' }}" placeholder="например 5">
       <div class="hint">Сейчас действует: +{{ effective_markup }}%</div>
       <button class="btn primary" style="margin-top:12px">Сохранить</button>
