@@ -22,7 +22,8 @@
       <div class="label">Поступило переводами</div><div class="value">{{ both(s.received, s) }}</div>
       <div class="note">{{ s.payments }} пополн. · на карты ${{ usd(s.to_card) }}{% if s.crypto %} · крипта ${{ usd(s.crypto) }}{% endif %}</div></div>
     <div class="kpi"><span class="tile ok">{{ icon('chart', 20) }}</span>
-      <div class="label">Ваша прибыль</div><div class="value">{{ both(s.profit, s) }}</div>
+      <div class="label">Ваша прибыль{% if s.referral %} (чистая){% endif %}</div><div class="value">{{ both(s.profit, s) }}</div>
+      {% if s.referral %}<div class="note">с продаж ${{ usd(s.gross_profit) }} − бонусы рефералам ${{ usd(s.referral) }}</div>{% endif %}
       <div class="note">продано {{ s.orders }} заказов на ${{ usd(s.revenue) }} · закупка ${{ usd(s.cost) }}</div></div>
     <div class="kpi fin-send"><span class="tile">{{ icon('arrow-right', 20) }}</span>
       <div class="label">Отправить поставщику</div><div class="value">{{ both(s.to_supplier, s) }}</div>

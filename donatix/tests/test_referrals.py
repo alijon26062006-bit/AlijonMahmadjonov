@@ -35,10 +35,10 @@ def test_register_by_link_and_bonus_once(app, client, conn):
     oid = _order(conn, friend["id"], 1, total=120_000, cost=100_000)      # прибыль $2
     assert orders.complete(conn, oid, {}, "completed")
     bal = conn.execute("SELECT balance_micro FROM users WHERE id = ?", (inviter,)).fetchone()[0]
-    assert bal == 4_000                                                   # 20% от $2 = $0.40
+    assert bal == 2_000                                                   # 10% от $2 = $0.20
     orders.complete(conn, oid, {}, "completed")                           # повтор — второй раз не начисляется
     assert referrals.award(conn, oid) == 0
-    assert conn.execute("SELECT balance_micro FROM users WHERE id = ?", (inviter,)).fetchone()[0] == 4_000
+    assert conn.execute("SELECT balance_micro FROM users WHERE id = ?", (inviter,)).fetchone()[0] == 2_000
 
 
 def test_no_bonus_without_profit_or_when_off(conn):
@@ -68,3 +68,19 @@ def test_referrals_page(client, conn):
     web_login(client, "shop1@example.com", "password123")
     page = client.get("/panel/referrals").text
     assert "Пригласить друзей" in page and re.search(r"/register\?ref=[a-z0-9]{8}", page)
+
+
+def test_finance_shows_net_profit_after_referral(config, conn):
+    from datetime import datetime, timedelta, timezone
+
+    from donatix import finance
+    inviter, _ = make_client(conn, "inv9", balance="0")
+    friend, _ = make_client(conn, "fr9", balance="0")
+    conn.execute("UPDATE users SET referred_by = ? WHERE id = ?", (inviter, friend))
+    oid = _order(conn, friend, 9, total=108_000, cost=100_000)          # наценка 8%: прибыль $0.80
+    orders.complete(conn, oid, {}, "completed")
+    now = datetime.now(timezone.utc)
+    s = finance.summary(conn, config, now - timedelta(hours=1), now + timedelta(hours=1))
+    assert s["gross_profit"] == 8_000 and s["referral"] == 800 and s["profit"] == 7_200   # 10% по умолчанию
+    assert s["profit"] > 0
+    assert "Бонусы рефералам" in finance.report_text(s)

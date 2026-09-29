@@ -106,6 +106,17 @@ def load(conn: sqlite3.Connection, config: Config) -> None:
         config.require_approval = approval == "1"
 
 
+def _referral_example(conn: sqlite3.Connection, config: Config) -> str:
+    """Пример на текущей наценке: сколько с заказа $10 получит друг и сколько останется вам."""
+    from decimal import Decimal
+    pct = Decimal(_referral_percent(conn))
+    markup = Decimal(str(config.kind_markups.get("topup", config.markups["bronze"])))
+    profit = Decimal("10") * markup / 100
+    bonus = profit * pct / 100
+    return (f"Пример при наценке {markup.normalize()}%: заказ с закупкой $10 → ваша прибыль ${profit:.2f}, "
+            f"другу ${bonus:.2f}, вам остаётся ${profit - bonus:.2f}. В минус уйти нельзя: бонус — доля от прибыли.")
+
+
 def _referral_percent(conn: sqlite3.Connection) -> int:
     from .referrals import percent
     return percent(conn)
@@ -127,6 +138,7 @@ def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
         "admin_2fa": (db.get_setting(conn, "site.admin_2fa") or "1") == "1",
         "daily_report": (db.get_setting(conn, "report.daily_on") or "1") == "1",
         "referral_percent": _referral_percent(conn),
+        "referral_example": _referral_example(conn, config),
         "supplier_rate": _throttle_status(),
     }
 

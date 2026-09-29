@@ -71,6 +71,11 @@ def summary(conn: sqlite3.Connection, config: Config, start: datetime, end: date
         "AND COALESCE(completed_at, created_at) < ?", (a, b)).fetchone()
     revenue, cost = int(o["revenue"]), int(o["cost"])
     profit = revenue - cost
+    # Реферальные бонусы — наш расход: вычитаем, чтобы видеть чистую прибыль
+    referral = int(conn.execute(
+        "SELECT COALESCE(SUM(amount_micro), 0) FROM referral_rewards WHERE created_at >= ? AND created_at < ?",
+        (a, b)).fetchone()[0])
+    net = profit - referral
     manual = int(conn.execute(
         "SELECT COALESCE(SUM(amount_micro), 0) FROM transactions WHERE amount_micro > 0 AND order_id IS NULL "
         "AND created_by IS NOT NULL AND note NOT LIKE 'Пополнение:%' AND created_at >= ? AND created_at < ?",
@@ -82,8 +87,9 @@ def summary(conn: sqlite3.Connection, config: Config, start: datetime, end: date
         "start": start, "end": end, "rate": rate,
         "methods": methods, "received": received, "to_card": to_card, "crypto": received - to_card,
         "by_currency": by_currency, "payments": sum(m["count"] for m in methods),
-        "orders": int(o["n"]), "revenue": revenue, "cost": cost, "profit": profit,
-        "to_supplier": max(received - profit, 0), "manual_credit": manual,
+        "orders": int(o["n"]), "revenue": revenue, "cost": cost, "gross_profit": profit,
+        "referral": referral, "profit": net,
+        "to_supplier": max(received - net, 0), "manual_credit": manual,
         "clients_balance": clients, "supplier_balance": supplier,
     }
 
@@ -128,6 +134,8 @@ def report_text(s: dict[str, Any]) -> str:
     lines += ["",
               f"🛒 Продано: {s['orders']} {plural(s['orders'], 'заказ', 'заказа', 'заказов')} на {both(s['revenue'])}",
               f"🏭 Закупка у поставщика: {both(s['cost'])}",
+              *([f"📈 Прибыль с продаж: {both(s['gross_profit'])}",
+                 f"🎁 Бонусы рефералам: −{both(s['referral'])}"] if s.get("referral") else []),
               f"📈 <b>Ваша прибыль: {both(s['profit'])}</b>",
               "",
               f"➡️ <b>Отправить поставщику: {both(s['to_supplier'])}</b>",

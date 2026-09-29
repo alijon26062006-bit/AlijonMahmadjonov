@@ -21,7 +21,7 @@ from .money import fmt
 
 log = logging.getLogger(__name__)
 
-DEFAULT_PERCENT = 20
+DEFAULT_PERCENT = 10   # от НАШЕЙ прибыли: при наценке 8% это 0.8% от заказа, вам остаётся 7.2%
 _ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
 CODE_RE = re.compile(r"^[a-z0-9]{4,32}$")
 
