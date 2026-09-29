@@ -65,7 +65,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "sync":
             import time as _t
             catalog.SYNC_LOCK.bind(config)   # не столкнуться с фоновой загрузкой сайта (тот же замок)
-            if not catalog.SYNC_LOCK.acquire(timeout=900):
+            # Одного поставщика не ждём: если идёт полная загрузка сайта, он загрузится в ней сам
+            if not catalog.SYNC_LOCK.acquire(timeout=0 if args.provider else 900):
+                if args.provider:
+                    print(f"Сейчас сайт сам загружает весь каталог — {args.provider} загрузится в нём "
+                          "автоматически (в самом конце). Ждать не нужно.", flush=True)
+                    return 0
                 print("Каталог уже загружается на сайте — подождите пару минут и повторите.")
                 return 1
             _last = [0.0]
