@@ -220,6 +220,20 @@ CREATE TABLE IF NOT EXISTS support_history (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS support_history_tg ON support_history(tg_id, id);
+-- Долгая память бота поддержки о клиенте (как в ChatGPT): факты, которые AI решил запомнить
+CREATE TABLE IF NOT EXISTS support_memory (
+    id         INTEGER PRIMARY KEY,
+    tg_id      INTEGER NOT NULL,
+    fact       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS support_memory_tg ON support_memory(tg_id, id);
+-- Чему админ научил бота командой /learn — важнее общей базы знаний
+CREATE TABLE IF NOT EXISTS support_knowledge (
+    id         INTEGER PRIMARY KEY,
+    text       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS support_tickets (
     id         INTEGER PRIMARY KEY,
     tg_id      INTEGER NOT NULL,

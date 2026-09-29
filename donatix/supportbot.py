@@ -37,7 +37,11 @@ log = logging.getLogger(__name__)
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 PROMPT_FILE = Path(__file__).with_name("support_prompt.txt")   # инструкции для AI — править можно без кода
+KNOWLEDGE_FILE = Path(__file__).with_name("support_knowledge.md")   # всё о сервисе: разделы, кнопки, правила
 HISTORY_TURNS = 16            # сколько последних сообщений помнит бот
+MEMORY_LIMIT = 40             # долгая память: сколько фактов о клиенте храним (старые вытесняются)
+FACT_MAX = 200
+LEARN_LIMIT = 200             # сколько правил от админа (/learn)
 MAX_TOOL_ROUNDS = 6           # шагов «спросил базу → подумал» на один ответ
 MSG_LIMIT = (20, 600)         # не больше 20 сообщений за 10 минут от одного человека
 MAX_INPUT = 1500
@@ -151,6 +155,20 @@ TOOLS = [
                        "заказов не хватает или запрет), и список его ботов с состоянием.",
         "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}},
     {"type": "function", "function": {
+        "name": "save_memory",
+        "description": "Запомнить надолго полезный факт о клиенте, чтобы в следующих разговорах не спрашивать "
+                       "снова: язык общения, ID игрока и игра, @username для Stars, чем обычно пополняет, какие "
+                       "товары берёт, прошлая проблема и чем кончилась, просьбы («отвечать коротко»). Кратко, "
+                       "одной фразой по-русски. НЕЛЬЗЯ: пароли, коды входа, токены, номера карт.",
+        "parameters": {"type": "object", "properties": {"fact": {"type": "string"}}, "required": ["fact"],
+                       "additionalProperties": False}}},
+    {"type": "function", "function": {
+        "name": "forget_memory",
+        "description": "Удалить факт из памяти по его номеру из блока «Память о клиенте» — если он устарел или "
+                       "клиент просит забыть. number=0 — забыть всё.",
+        "parameters": {"type": "object", "properties": {"number": {"type": "integer"}}, "required": ["number"],
+                       "additionalProperties": False}}},
+    {"type": "function", "function": {
         "name": "escalate_to_admin",
         "description": "Передать обращение живому админу. Только если сам решить не можешь: деньги списаны, но "
                        "заказ не выполнен дольше 30 минут; заявка на пополнение висит дольше 2 часов с чеком; "
@@ -251,6 +269,12 @@ class Tools:
                           else "остановлен владельцем"),
                       "warnings_no_sales": b["warn_count"] if b["enabled"] else 0} for b in rows],
         }
+
+    def t_save_memory(self, fact: str) -> dict[str, Any]:
+        return remember(self.conn, self.tg_id, fact)
+
+    def t_forget_memory(self, number: int) -> dict[str, Any]:
+        return forget(self.conn, self.tg_id, int(number))
 
     def t_escalate_to_admin(self, summary: str) -> dict[str, Any]:
         u = self._user()
@@ -418,6 +442,70 @@ def _hash(code: str) -> str:
     return hashlib.sha256(("donatix-support:" + code).encode()).hexdigest()
 
 
+# ─────────────────────────────────────────── долгая память о клиенте и уроки от админа
+
+_SECRET = re.compile(r"\b\d{6,12}:[A-Za-z0-9_-]{20,}|\bDX[-\s]?[A-Z0-9]{8}\b|(?<!\d)\d{6}(?!\d)|"
+                     r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)|парол|password|пароль|cvv|pin", re.I)
+
+
+def memories(conn: sqlite3.Connection, tg_id: int) -> list[sqlite3.Row]:
+    return conn.execute("SELECT id, fact FROM support_memory WHERE tg_id = ? ORDER BY id", (tg_id,)).fetchall()
+
+
+def remember(conn: sqlite3.Connection, tg_id: int, fact: str) -> dict[str, Any]:
+    fact = " ".join(str(fact or "").split())[:FACT_MAX]
+    if len(fact) < 3:
+        return {"error": "empty"}
+    if _SECRET.search(fact):
+        return {"error": "secret_not_saved", "hint": "пароли, коды, токены и номера карт не запоминаем"}
+    if any(r["fact"].lower() == fact.lower() for r in memories(conn, tg_id)):
+        return {"ok": True, "already_known": True}
+    conn.execute("INSERT INTO support_memory (tg_id, fact, created_at) VALUES (?, ?, ?)", (tg_id, fact, db.now()))
+    conn.execute("DELETE FROM support_memory WHERE tg_id = ? AND id NOT IN (SELECT id FROM support_memory "
+                 "WHERE tg_id = ? ORDER BY id DESC LIMIT ?)", (tg_id, tg_id, MEMORY_LIMIT))
+    return {"ok": True}
+
+
+def forget(conn: sqlite3.Connection, tg_id: int, number: int) -> dict[str, Any]:
+    rows = memories(conn, tg_id)
+    if number == 0:
+        conn.execute("DELETE FROM support_memory WHERE tg_id = ?", (tg_id,))
+        return {"ok": True, "forgot": "all"}
+    if not 1 <= number <= len(rows):
+        return {"error": "no_such_number"}
+    conn.execute("DELETE FROM support_memory WHERE id = ?", (rows[number - 1]["id"],))
+    return {"ok": True}
+
+
+def memory_block(conn: sqlite3.Connection, tg_id: int) -> str:
+    rows = memories(conn, tg_id)
+    if not rows:
+        return ("[Память о клиенте: пусто. Узнаешь что-то полезное надолго (язык, ID игрока, игры, прошлые "
+                "проблемы) — сохрани через save_memory.]")
+    return ("[Память о клиенте — из прошлых разговоров. Используй, не переспрашивай то, что уже знаешь; "
+            "устарело — forget_memory]\n" + "\n".join(f"{i}. {r['fact']}" for i, r in enumerate(rows, 1)))
+
+
+def lessons(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute("SELECT id, text FROM support_knowledge ORDER BY id").fetchall()
+
+
+def learn(conn: sqlite3.Connection, text: str) -> int:
+    text = text.strip()[:1500]
+    conn.execute("INSERT INTO support_knowledge (text, created_at) VALUES (?, ?)", (text, db.now()))
+    conn.execute("DELETE FROM support_knowledge WHERE id NOT IN (SELECT id FROM support_knowledge "
+                 "ORDER BY id DESC LIMIT ?)", (LEARN_LIMIT,))
+    return len(lessons(conn))
+
+
+def unlearn(conn: sqlite3.Connection, number: int) -> bool:
+    rows = lessons(conn)
+    if not 1 <= number <= len(rows):
+        return False
+    conn.execute("DELETE FROM support_knowledge WHERE id = ?", (rows[number - 1]["id"],))
+    return True
+
+
 # ─────────────────────────────────────────── что AI знает о сервисе
 
 
@@ -434,12 +522,18 @@ def system_prompt(conn: sqlite3.Connection, config: Config) -> str:
     min_tjs = payments.settings(conn, config)["min_tjs"]
     bots = sitecfg.client_bots_enabled(conn)
     site = config.base_url.rstrip("/")
-    return PROMPT_FILE.read_text(encoding="utf-8").format(
+    knowledge = KNOWLEDGE_FILE.read_text(encoding="utf-8").strip() if KNOWLEDGE_FILE.exists() else ""
+    learned = lessons(conn)
+    extra = ("\n\nУРОКИ ОТ АДМИНИСТРАТОРА (главнее базы знаний — если противоречит, верь этому):\n"
+             + "\n".join(f"- {r['text']}" for r in learned)) if learned else ""
+    rules = PROMPT_FILE.read_text(encoding="utf-8").format(
         site_name=config.site_name, site=site, manual=manual, auto=auto,
         bots_line=" или через свой Telegram-бот из конструктора" if bots else "",
         min_line=f" (минимум {min_tjs} сомони)" if min_tjs and float(min_tjs) > 0 else "",
         min_orders=_min_orders(conn),
     ).strip()
+    base = f"БАЗА ЗНАНИЙ О СЕРВИСЕ (отвечай по ней):\n{knowledge}\n\n" if knowledge else ""
+    return (base + rules + extra).strip()
 
 
 # ─────────────────────────────────────────── AI
@@ -453,7 +547,8 @@ class OpenAIChat:
 
     def __call__(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
         resp = self._client.post(OPENAI_URL, json={"model": self.model, "messages": messages, "tools": TOOLS,
-                                                   "tool_choice": "auto", "temperature": 0.3})
+                                                   "tool_choice": "auto", "temperature": 0.2,
+                                                   "max_tokens": 700})   # короче ответ — быстрее приходит
         if resp.status_code >= 400:
             raise RuntimeError(f"openai {resp.status_code}: {resp.text[:300]}")
         return resp.json()["choices"][0]["message"]
@@ -470,7 +565,7 @@ def answer(conn: sqlite3.Connection, config: Config, chat: Callable[[list[dict[s
              "[Статус: аккаунт не подтверждён]")
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(conn, config)}]
     messages += [{"role": r["role"], "content": r["content"]} for r in history]
-    messages.append({"role": "system", "content": state})
+    messages.append({"role": "system", "content": state + "\n" + memory_block(conn, tools.tg_id)})
     messages.append({"role": "user", "content": text})
     reply = ""
     for _ in range(MAX_TOOL_ROUNDS):
@@ -524,6 +619,100 @@ def connect_bot(conn: sqlite3.Connection, config: Config, tg_id: int, token: str
             f"✅ Бот @{username} пайваст шуд. Онро кушоед, /start ва баъд /panel-ро пахш кунед.")
 
 
+# ─────────────────────────────────────────── быстрые кнопки: ответ сразу, без AI
+
+QUICK = [
+    [("📦 Мои заказы · Фармоишҳо", "orders"), ("💰 Баланс · Тавозун", "balance")],
+    [("💳 Пополнить · Пур кардан", "topup"), ("🛒 Как купить · Харид", "buy")],
+    [("🎁 Бонус за друзей · Бонус", "ref"), ("🤖 Свой бот · Боти худ", "bot")],
+    [("👤 Оператор · Оператор", "human")],
+]
+_QUICK_BY_TEXT = {label: key for row in QUICK for label, key in row}
+
+
+def quick_keyboard() -> dict[str, Any]:
+    return {"keyboard": [[{"text": label} for label, _ in row] for row in QUICK], "resize_keyboard": True,
+            "is_persistent": True}
+
+
+def _tj(lang: str) -> bool:
+    return lang.lower().startswith("tg")
+
+
+def quick_orders(conn: sqlite3.Connection, config: Config, tg_id: int, lang: str) -> str:
+    u = _linked_user(conn, tg_id)
+    if u is None:
+        return LINK_HOWTO.format(site=config.base_url.rstrip("/"))
+    rows = conn.execute("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5", (u["id"],)).fetchall()
+    if not rows:
+        return "Фармоиш ҳоло нест." if _tj(lang) else "Заказов пока нет."
+    icon = {"выполнен": "✅", "не выполнен": "↩️", "в обработке": "⏳"}
+    lines = []
+    for o in rows:
+        a = _order_for_ai(o)
+        line = f"{icon.get(a['status'], '•')} {a['order_id']} · {a['product']} · ${a['price_usd']} — {a['status']}"
+        if a["money_returned_to_balance"]:
+            line += " (деньги на балансе)" if not _tj(lang) else " (пул ба тавозун баргашт)"
+        lines.append(line)
+    tail = ("\n\nНомери фармоишро фиристед — муфассал месанҷам." if _tj(lang) else
+            "\n\nПришлите номер заказа — проверю подробно.")
+    return ("Фармоишҳои охирин:\n" if _tj(lang) else "Последние заказы:\n") + "\n".join(lines) + tail
+
+
+def quick_balance(conn: sqlite3.Connection, config: Config, tg_id: int, lang: str) -> str:
+    u = _linked_user(conn, tg_id)
+    if u is None:
+        return LINK_HOWTO.format(site=config.base_url.rstrip("/"))
+    text = (f"💰 Тавозун: ${fmt(u['balance_micro'])}" if _tj(lang) else f"💰 Баланс: ${fmt(u['balance_micro'])}")
+    pend = conn.execute("SELECT * FROM payments WHERE user_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 5",
+                        (u["id"],)).fetchall()
+    for p in pend:
+        a = _payment_for_ai(conn, config, p)
+        text += (f"\n⏳ #{a['payment_id']} · {a['to_pay']} ({a['method']}) — "
+                 + ("на проверке" if a["receipt_attached"] or a["automatic_crypto"] else "ждём чек — прикрепите его"))
+    return text
+
+
+def quick_text(conn: sqlite3.Connection, config: Config, key: str, lang: str) -> str:
+    from . import payments, referrals
+    site = config.base_url.rstrip("/")
+    methods = payments.methods(conn, config)
+    manual = ", ".join(m["title"] for m in methods if not m["auto"]) or "—"
+    auto = ", ".join(m["title"] for m in methods if m["auto"])
+    tj = _tj(lang)
+    if key == "topup":
+        return (("💳 Пур кардани тавозун:\n1. {site}/panel/balance кушоед\n2. Усул ва маблағро интихоб кунед\n"
+                 "3. Ба реквизитҳо пул гузаронед ва ЧЕКРО замима кунед — бе чек ҳисоб намешавад\n"
+                 "4. Одатан то 1 соат месанҷем\n\nБо корт/бонк: {manual}" + ("\nАвтоматӣ (бе чек): {auto}" if auto
+                                                                              else "")) if tj else
+                ("💳 Пополнение баланса:\n1. Откройте {site}/panel/balance\n2. Выберите способ и сумму\n"
+                 "3. Переведите по реквизитам и ОБЯЗАТЕЛЬНО прикрепите чек — без чека не зачисляем\n"
+                 "4. Проверка обычно до 1 часа, о зачислении придёт уведомление\n\nПереводом: {manual}"
+                 + ("\nАвтоматически, без чека: {auto} — сумма и сеть должны совпадать точно" if auto else ""))
+                ).format(site=site, manual=manual, auto=auto)
+    if key == "buy":
+        return (("🛒 Харид:\n1. {site}/panel → каталог, бозиро интихоб кунед\n2. Бастаро интихоб кунед\n"
+                 "3. ID-и бозингар (ё @username барои Stars)-ро дуруст нависед\n4. Пардохт аз тавозун — "
+                 "одатан дар чанд сония иҷро мешавад\nАгар иҷро нашавад — пул худкор ба тавозун бармегардад.")
+                if tj else
+                ("🛒 Как купить:\n1. Откройте {site}/panel → каталог, выберите игру\n2. Выберите пакет\n"
+                 "3. Точно укажите ID игрока (для Stars — @username)\n4. Оплата с баланса — обычно выполняется "
+                 "за секунды\nНе выполнился заказ — деньги сами вернутся на баланс.")).format(site=site)
+    if key == "ref":
+        pct = referrals.percent(conn)
+        return ((f"🎁 Дӯстонро даъват кунед: {site}/panel/referrals — ҳаволаи худро гиред. Аз ҳар фармоиши онҳо "
+                 f"{pct}% аз фоидаи мо ба тавозуни шумо меояд — то абад.") if tj else
+                (f"🎁 Приглашайте друзей: {site}/panel/referrals — там ваша личная ссылка. С каждого их заказа "
+                 f"вам на баланс {pct}% от нашей прибыли — навсегда."))
+    if key == "bot":
+        need = _min_orders(conn)
+        return ((f"🤖 Боти мағозаи худ: шарт — камаш {need} фармоиши иҷрошуда. @BotFather → /newbot → токенро "
+                 "ба ин ҷо фиристед, худам пайваст мекунам.") if tj else
+                (f"🤖 Свой бот-магазин: нужно не меньше {need} выполненных заказов. В @BotFather: /newbot → "
+                 "пришлите токен сюда — подключу сам. Потом в своём боте /panel — цены и реквизиты."))
+    return ""
+
+
 # ─────────────────────────────────────────── Telegram
 
 
@@ -565,6 +754,7 @@ class SupportBot:
                 self.config.support_contact = "@" + self.username
                 db.set_setting(conn, "support.bot_username", self.username)
             self.api("setMyCommands", commands=[{"command": "start", "description": "Начать / Оғоз"},
+                                                {"command": "forget", "description": "Забыть всё обо мне"},
                                                 {"command": "logout", "description": "Выйти из аккаунта"}])
         except Exception as exc:
             log.warning("бот поддержки: %s", exc)
@@ -625,10 +815,17 @@ class SupportBot:
         if six:
             self._email_code(conn, tg_id, six)
             return
+        if is_admin and text.split(maxsplit=1)[0].lower() in ("/learn", "/knowledge", "/unlearn"):
+            self._admin_learn(conn, tg_id, text)
+            return
         if is_admin and (text.startswith("/admin") or text == "/start"):
             self.send(tg_id, "👋 Вы — админ поддержки. Обращения клиентов (🆘) приходят сюда; чтобы ответить, "
                              "сделайте reply на обращение. Остальные ваши сообщения бот понимает как от клиента — "
                              "можно проверить его: пришлите код из уведомлений или задайте вопрос.")
+            return
+        quick = _QUICK_BY_TEXT.get(text)
+        if quick:
+            self.on_quick(conn, tg_id, name, quick, str(user.get("language_code") or ""))
             return
         if text in ("/test", "/admin"):
             text = "/start"
@@ -641,12 +838,20 @@ class SupportBot:
             else:
                 hello += ("📧 Чтобы я видел ваши заказы и баланс, пришлите email от аккаунта Donatix. / "
                           "Email-и ҳисоби Donatix-ро фиристед.\n\nОбщий вопрос можно задать и без входа.")
-            self.send(tg_id, hello)
+            hello += "\n\n👇 Частые вопросы — кнопками, ответ сразу. Или просто напишите."
+            self.api("sendMessage", chat_id=tg_id, text=hello, reply_markup=quick_keyboard(),
+                     disable_web_page_preview=True)
             return
         if text.startswith("/logout"):
             conn.execute("DELETE FROM support_links WHERE tg_id = ?", (tg_id,))
             conn.execute("DELETE FROM support_history WHERE tg_id = ?", (tg_id,))
+            conn.execute("DELETE FROM support_memory WHERE tg_id = ?", (tg_id,))
             self.send(tg_id, "Вы вышли из аккаунта. / Шумо аз ҳисоб баромадед.")
+            return
+        if text.startswith("/forget"):
+            conn.execute("DELETE FROM support_memory WHERE tg_id = ?", (tg_id,))
+            conn.execute("DELETE FROM support_history WHERE tg_id = ?", (tg_id,))
+            self.send(tg_id, "Готово: я забыл всё, что помнил о вас. / Ҳама чизро фаромӯш кардам.")
             return
         if not text:
             self.send(tg_id, "Напишите вопрос текстом. / Саволро бо матн нависед.")
@@ -675,6 +880,49 @@ class SupportBot:
             if is_admin:   # админу — настоящая причина (ключ, лимит, модель)
                 reply += f"\n\n⚙️ Для админа: {str(exc)[:500]}"
         self.send(tg_id, reply)
+
+    def on_quick(self, conn: sqlite3.Connection, tg_id: int, name: str, key: str, lang: str) -> None:
+        """Кнопка частого вопроса: отвечаем сами за миллисекунды, AI не нужен."""
+        if key == "orders":
+            reply = quick_orders(conn, self.config, tg_id, lang)
+        elif key == "balance":
+            reply = quick_balance(conn, self.config, tg_id, lang)
+        elif key == "human":
+            last = conn.execute("SELECT content FROM support_history WHERE tg_id = ? AND role = 'user' "
+                                "ORDER BY id DESC LIMIT 3", (tg_id,)).fetchall()
+            summary = "Клиент нажал «Оператор»." + (
+                " Последние сообщения: " + " | ".join(r["content"][:200] for r in reversed(last)) if last else "")
+            Tools(self, conn, tg_id, name).t_escalate_to_admin(summary)
+            reply = ("👤 Оператор хабардор шуд — ҷавоб ба ҳамин ҷо меояд. Саволатонро нависед." if _tj(lang) else
+                     "👤 Позвал оператора — ответ придёт в этот чат. Опишите вопрос подробнее, пока ждёте.")
+        else:
+            reply = quick_text(conn, self.config, key, lang)
+        now = db.now()   # в историю — чтобы AI знал, о чём уже говорили
+        conn.execute("INSERT INTO support_history (tg_id, role, content, created_at) VALUES (?, 'user', ?, ?), "
+                     "(?, 'assistant', ?, ?)", (tg_id, f"[кнопка: {key}]", now, tg_id, reply, now))
+        self.send(tg_id, reply)
+
+    def _admin_learn(self, conn: sqlite3.Connection, tg_id: int, text: str) -> None:
+        """Админ учит бота прямо в чате: /learn правило · /knowledge — список · /unlearn N — удалить."""
+        cmd, _, rest = text.partition(" ")
+        cmd, rest = cmd.lower(), rest.strip()
+        if cmd == "/learn":
+            if len(rest) < 5:
+                self.send(tg_id, "Напишите правило после команды. Пример:\n/learn Заказы Free Fire выполняются "
+                                 "до 5 минут. Если дольше 15 минут — передавай админу.")
+                return
+            n = learn(conn, rest)
+            self.send(tg_id, f"✅ Запомнил (урок №{n}). Бот уже отвечает с учётом этого. Все уроки — /knowledge")
+            return
+        if cmd == "/unlearn":
+            ok = rest.isdigit() and unlearn(conn, int(rest))
+            self.send(tg_id, "🗑 Удалил." if ok else "Нет такого номера. Список — /knowledge")
+            return
+        rows = lessons(conn)
+        self.send(tg_id, ("📚 Уроки для бота (важнее базы знаний):\n"
+                          + "\n".join(f"{i}. {r['text']}" for i, r in enumerate(rows, 1))
+                          + "\n\nДобавить — /learn текст · удалить — /unlearn номер") if rows else
+                  "Уроков пока нет. Научите бота: /learn текст правила")
 
     def _email(self, conn: sqlite3.Connection, tg_id: int, tg_name: str, email: str) -> None:
         now = time.time()
