@@ -79,6 +79,16 @@ def _clean_fields(product: dict[str, Any], raw: dict[str, Any] | None) -> dict[s
             from .steam_gifts import REGION_RE
             if not REGION_RE.match(value):
                 raise OrderError("Неверный регион.", "invalid_field")
+        elif spec.get("options"):
+            if value not in spec["options"]:
+                raise OrderError(f"Поле «{spec.get('label') or key}»: выберите один из вариантов.", "invalid_field")
+        elif spec.get("regex"):
+            try:
+                ok = re.search(spec["regex"], value) is not None
+            except re.error:
+                ok = True   # формат от поставщика не разобрали — не мешаем заказу, проверит поставщик
+            if not ok:
+                raise OrderError(f"Поле «{spec.get('label') or key}» заполнено в неверном формате.", "invalid_field")
         elif key == "amount":
             try:
                 amount = to_decimal(value.replace(",", "."))

@@ -67,6 +67,10 @@ class Config:
     coindrop_api_key: str = ""
     coindrop_base_url: str = "https://coindrop.uz/api/v1"
     coindrop_games: str = ""          # список game_key через запятую; пусто — все игры-пополнения
+    # Vendoria (vendoria.amadeustech.dev) — ещё один поставщик игр; берём только перечисленные игры
+    vendoria_token: str = ""
+    vendoria_base_url: str = "https://vendoria.amadeustech.dev"
+    vendoria_games: str = "Standoff 2,Clash of Clans"
 
     # Наценка в процентах поверх закупочной цены, по уровням клиентов.
     markups: dict[str, Decimal] = field(
@@ -172,6 +176,9 @@ class Config:
             coindrop_api_key=_env("DONATIX_COINDROP_API_KEY"),
             coindrop_base_url=_env("DONATIX_COINDROP_BASE_URL", "https://coindrop.uz/api/v1").rstrip("/"),
             coindrop_games=_env("DONATIX_COINDROP_GAMES"),
+            vendoria_token=_env("DONATIX_VENDORIA_TOKEN"),
+            vendoria_base_url=_env("DONATIX_VENDORIA_BASE_URL", "https://vendoria.amadeustech.dev").rstrip("/"),
+            vendoria_games=_env("DONATIX_VENDORIA_GAMES", "Standoff 2,Clash of Clans"),
             markups=markups,
             kind_markups=kind_markups,
             admin_email=_env("DONATIX_ADMIN_EMAIL").lower(),

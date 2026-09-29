@@ -22,7 +22,8 @@ def main(argv: list[str] | None = None) -> int:
     serve = sub.add_parser("serve")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
-    sub.add_parser("sync")
+    sync = sub.add_parser("sync")
+    sync.add_argument("--provider", default="", help="загрузить только этого доп. поставщика (CoinDrop, Vendoria)")
     sub.add_parser("check")
     sub.add_parser("prices")
     sub.add_parser("inspect")
@@ -75,10 +76,22 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"  {n} товаров… сейчас: {category}", flush=True)
 
             try:
-                print(f"Поставщик: {make_supplier(config).name}. Загружаю весь каталог…", flush=True)
-                result = catalog.sync_catalog(conn, make_supplier(config), _progress)
+                supplier = make_supplier(config)
+                if args.provider:
+                    extra = getattr(supplier, "get_extra", lambda _n: None)(args.provider)
+                    if extra is None:
+                        print(f"Поставщик {args.provider} не подключён (нет ключа в .env).", flush=True)
+                        return 1
+                    print(f"Поставщик: {extra.name}. Загружаю только его каталог…", flush=True)
+                    result = catalog.sync_catalog(conn, extra, _progress, id_prefix=extra.id_prefix)
+                else:
+                    print(f"Поставщик: {supplier.name}. Загружаю весь каталог…", flush=True)
+                    result = catalog.sync_catalog(conn, supplier, _progress)
             finally:
                 catalog.SYNC_LOCK.release()
+            vd = conn.execute("SELECT COUNT(*) FROM products WHERE active = 1 AND id LIKE 'vd-%'").fetchone()[0]
+            if vd:
+                print(f"Vendoria: {vd} активных товаров.", flush=True)
             cd = conn.execute("SELECT COUNT(*) FROM products WHERE active = 1 AND id LIKE 'cd-%'").fetchone()[0]
             total = conn.execute("SELECT COUNT(*) FROM products WHERE active = 1").fetchone()[0]
             print(f"Готово и сохранено в базу: всего {total} активных товаров "

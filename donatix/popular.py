@@ -74,9 +74,13 @@ def _pinned(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             key, title, reg = "ff_id", "Free Fire Индонезия", r["region"] if region == "ID" else None
         else:
             continue
-        found.setdefault(key, {"title": title, "href": _link("topup", r["category_id"], reg), "kind": "topup",
-                               "image_url": r["image_url"], "key": key, "cat": f"topup:{r['category_id']}",
-                               "category_id": r["category_id"], "region": reg})
+        entry = {"title": title, "href": _link("topup", r["category_id"], reg), "kind": "topup",
+                 "image_url": r["image_url"], "key": key, "cat": f"topup:{r['category_id']}",
+                 "category_id": r["category_id"], "region": reg}
+        if key in ("standoff2", "coc") and str(r["category_id"]).startswith("vd_"):
+            found[key] = entry   # Standoff 2 и Clash of Clans — от Vendoria, если она подключена
+        else:
+            found.setdefault(key, entry)
     out = [found[k] for k in ("ff_cis", "ff_id", "pubg", "standoff2", "coc") if k in found]
     if conn.execute("SELECT 1 FROM products WHERE active = 1 AND hidden = 0 "
                     "AND kind IN ('telegram_stars', 'telegram_premium') LIMIT 1").fetchone():

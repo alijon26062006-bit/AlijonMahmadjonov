@@ -28,12 +28,18 @@ def make_supplier(config: Config) -> Supplier:
     else:
         raise ValueError(f"DONATIX_SUPPLIER: неизвестный поставщик {config.supplier!r} (fazer или mock)")
 
+    extras: list = []
     if config.coindrop_api_key:
         from .coindrop import CoinDropSupplier
-        from .multi import MultiSupplier
         games = [g for g in config.coindrop_games.split(",") if g.strip()]
-        extra = CoinDropSupplier(config.coindrop_api_key, config.coindrop_base_url, only_games=games)
-        return MultiSupplier(primary, [extra])
+        extras.append(CoinDropSupplier(config.coindrop_api_key, config.coindrop_base_url, only_games=games))
+    if config.vendoria_token:
+        from .vendoria import VendoriaSupplier
+        games = [g for g in config.vendoria_games.split(",") if g.strip()]
+        extras.append(VendoriaSupplier(config.vendoria_token, config.vendoria_base_url, only_games=games))
+    if extras:
+        from .multi import MultiSupplier
+        return MultiSupplier(primary, extras)
     return primary
 
 

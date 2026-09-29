@@ -116,7 +116,8 @@ def premium_buy(body: PremiumIn, request: Request, idempotency_key: str | None =
 
 
 def _fields_out(p: dict[str, Any]) -> list[dict[str, str]]:
-    return [{"name": f["key"], "key": f["key"], "label": f.get("label") or f["key"], "type": f.get("type") or "text"}
+    return [{"name": f["key"], "key": f["key"], "label": f.get("label") or f["key"],
+             "type": f.get("type") or "text", **({"options": f["options"]} if f.get("options") else {})}
             for f in p["fields"]]
 
 

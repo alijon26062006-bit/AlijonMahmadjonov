@@ -51,9 +51,16 @@
       <div class="step-head"><span class="n">{{ step.n }}</span><h3>{{ 'Получатель' if p.fields else 'Что вы получите' }}</h3></div>
     {% for f in p.fields %}
       <label for="f_{{ f.key }}">{{ f.label }}</label>
+      {% if f.options %}
+      <select id="f_{{ f.key }}" name="field_{{ f.key }}" required>
+        <option value="">— выберите —</option>
+        {% for o in f.options %}<option value="{{ o }}" {{ 'selected' if form.get(f.key) == o }}>{{ o }}</option>{% endfor %}
+      </select>
+      {% else %}
       <input id="f_{{ f.key }}" name="field_{{ f.key }}" required value="{{ form.get(f.key, '') }}" autocomplete="off"
              {% if f.key == 'telegram_username' %}placeholder="@username" autocapitalize="off" spellcheck="false"
              {% else %}placeholder="Например, 5123456789"{% endif %}>
+      {% endif %}
     {% else %}
       <p class="muted" style="margin:10px 0 0">После оплаты {{ 'ключ' if p.kind == 'game_key' else 'код' }} появится на странице заказа и придёт на ваш webhook.</p>
     {% endfor %}
