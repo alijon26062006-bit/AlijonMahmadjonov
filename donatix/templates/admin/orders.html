@@ -17,6 +17,6 @@
   <div class="kpi"><div class="label">Продано на</div><div class="value">${{ fmt(totals.revenue) }}</div></div>
   <div class="kpi"><div class="label">Прибыль</div><div class="value">${{ fmt(totals.profit) }}</div></div>
 </div>
-<div class="card table-wrap" style="margin-top:16px">{% include "admin/_orders_table.html" %}
-  {% if totals.n > rows | length %}<p class="muted small" style="padding:10px 14px">Показаны последние {{ rows | length }} из {{ totals.n }} — итоги выше за весь период.</p>{% endif %}</div>
+<div style="margin-top:16px">{% include "admin/_orders_table.html" %}
+  {% if totals.n > rows | length %}<p class="muted small" style="padding:10px 4px">Показаны последние {{ rows | length }} из {{ totals.n }} — итоги выше за весь период.</p>{% endif %}</div>
 {% endblock %}

@@ -626,6 +626,7 @@ def panel_orders(request: Request, status: str = "", q: str = "", page: int = 1,
     total = totals["n"]
     rows = conn.execute(f"SELECT * FROM orders WHERE {where} ORDER BY id DESC LIMIT ? OFFSET ?",
                         [*args, per, (page - 1) * per]).fetchall()
+    rows = orders.with_images(conn, rows)   # картинка игры для карточек
     keep = urlencode({"status": status, "q": q})
     return render(request, "panel/orders.html", {
         "user": user, "orders": rows, "status": status, "q": q, "page": page,

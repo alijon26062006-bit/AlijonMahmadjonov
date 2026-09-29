@@ -1374,3 +1374,24 @@ html { scroll-behavior: smooth; }
 /* Фильтр периода: Сегодня / Вчера / … / с даты по дату */
 .period-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .period-kpis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+/* ── Заказы карточками: картинка игры, номер, сумма, строка товара, статус и дата ── */
+.order-cards { gap: 10px; }
+.order-card { align-items: center; padding: 14px 16px; border-radius: 18px; transition: border-color .2s var(--ease), transform .2s var(--ease); }
+a.order-card:hover { transform: translateY(-1px); }
+.order-card.attention { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); }
+.order-card .oc-img { flex: none; width: 56px; height: 56px; border-radius: 14px; overflow: hidden; align-self: flex-start;
+  box-shadow: 0 0 0 1px var(--line); }
+.order-card .oc-img img { width: 100%; height: 100%; object-fit: cover; }
+.order-card .title { font-size: 1.02rem; }
+.order-card .amount { font-size: 1.02rem; }
+.order-card .oc-who { margin-top: 1px; display: flex; justify-content: space-between; gap: 10px; font-size: .8rem;
+  color: var(--muted); }
+.order-card .oc-ids { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.order-card .oc-line { margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.order-card .meta { flex-wrap: wrap; row-gap: 8px; margin-top: 10px; }
+.order-card .meta .status { width: 30px; height: 30px; }
+.order-card .meta .pill { padding: 5px 10px; border-radius: 999px; font-size: .82rem; white-space: nowrap; }
+.order-card .oc-alert { margin-left: auto; white-space: nowrap; }
+.order-card .oc-profit { flex: none; color: var(--ok); font-weight: 700; white-space: nowrap; }
+

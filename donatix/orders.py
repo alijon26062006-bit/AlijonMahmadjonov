@@ -569,3 +569,27 @@ def top_clients(conn: sqlite3.Connection, days: int = 30, limit: int = 5) -> lis
         "SUM(o.total_micro - o.cost_micro) AS profit FROM orders o JOIN users u ON u.id = o.user_id "
         "WHERE o.status = 'completed' AND o.created_at >= ? GROUP BY u.id ORDER BY revenue DESC LIMIT ?",
         (since, limit)).fetchall()
+
+
+def with_images(conn: sqlite3.Connection, rows: list) -> list[dict[str, Any]]:
+    """Заказы для списков-карточек: картинка игры, название игры и получатель одной строкой."""
+    ids = list({r["product_id"] for r in rows})
+    pics: dict[str, sqlite3.Row] = {}
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        for p in conn.execute(f"SELECT id, image_url, category_name FROM products WHERE id IN "
+                              f"({','.join('?' * len(chunk))})", chunk):
+            pics[p["id"]] = p
+    out = []
+    for r in rows:
+        d, p = dict(r), pics.get(r["product_id"])
+        d["image_url"] = p["image_url"] if p else None
+        d["game"] = p["category_name"] if p else ""
+        try:
+            fields = json.loads(r["fields_json"] or "{}")
+        except (ValueError, TypeError):
+            fields = {}
+        d["recipient"] = ", ".join(str(v) for v in fields.values() if v not in (None, ""))
+        out.append(d)
+    return out
+
