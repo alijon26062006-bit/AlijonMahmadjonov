@@ -44,6 +44,24 @@ def _iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
 
+def _sales(conn: sqlite3.Connection, a: str, b: str) -> tuple[sqlite3.Row, int]:
+    o = conn.execute(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(total_micro), 0) AS revenue, COALESCE(SUM(cost_micro), 0) AS cost "
+        "FROM orders WHERE status = 'completed' AND COALESCE(completed_at, created_at) >= ? "
+        "AND COALESCE(completed_at, created_at) < ?", (a, b)).fetchone()
+    # Реферальные бонусы — наш расход: вычитаем, чтобы видеть чистую прибыль
+    referral = int(conn.execute(
+        "SELECT COALESCE(SUM(amount_micro), 0) FROM referral_rewards WHERE created_at >= ? AND created_at < ?",
+        (a, b)).fetchone()[0])
+    return o, referral
+
+
+def net_profit(conn: sqlite3.Connection, a: str, b: str) -> int:
+    """Чистая прибыль за [a, b): продажи − закупка − реферальные бонусы."""
+    o, referral = _sales(conn, a, b)
+    return int(o["revenue"]) - int(o["cost"]) - referral
+
+
 def summary(conn: sqlite3.Connection, config: Config, start: datetime, end: datetime) -> dict[str, Any]:
     from .payments import settings as pay_settings
     from .payments import title_for
@@ -65,17 +83,14 @@ def summary(conn: sqlite3.Connection, config: Config, start: datetime, end: date
     for m in methods:
         by_currency[m["currency"]] = by_currency.get(m["currency"], Decimal(0)) + m["paid"]
 
-    o = conn.execute(
-        "SELECT COUNT(*) AS n, COALESCE(SUM(total_micro), 0) AS revenue, COALESCE(SUM(cost_micro), 0) AS cost "
-        "FROM orders WHERE status = 'completed' AND COALESCE(completed_at, created_at) >= ? "
-        "AND COALESCE(completed_at, created_at) < ?", (a, b)).fetchone()
+    o, referral = _sales(conn, a, b)
     revenue, cost = int(o["revenue"]), int(o["cost"])
     profit = revenue - cost
-    # Реферальные бонусы — наш расход: вычитаем, чтобы видеть чистую прибыль
-    referral = int(conn.execute(
-        "SELECT COALESCE(SUM(amount_micro), 0) FROM referral_rewards WHERE created_at >= ? AND created_at < ?",
-        (a, b)).fetchone()[0])
     net = profit - referral
+    # Доли кассиров — из чистой прибыли; остальное владельцу
+    from . import cashiers
+    staff = [c for c in cashiers.shares(conn, config, a, b, net) if c["share"] or c["active"]]
+    staff_total = sum(c["share"] for c in staff)
     manual = int(conn.execute(
         "SELECT COALESCE(SUM(amount_micro), 0) FROM transactions WHERE amount_micro > 0 AND order_id IS NULL "
         "AND created_by IS NOT NULL AND note NOT LIKE 'Пополнение:%' AND created_at >= ? AND created_at < ?",
@@ -89,6 +104,7 @@ def summary(conn: sqlite3.Connection, config: Config, start: datetime, end: date
         "by_currency": by_currency, "payments": sum(m["count"] for m in methods),
         "orders": int(o["n"]), "revenue": revenue, "cost": cost, "gross_profit": profit,
         "referral": referral, "profit": net,
+        "cashiers": staff, "cashiers_total": staff_total, "owner_profit": net - staff_total,
         "to_supplier": max(received - net, 0), "manual_credit": manual,
         "clients_balance": clients, "supplier_balance": supplier,
     }
@@ -136,7 +152,11 @@ def report_text(s: dict[str, Any]) -> str:
               f"🏭 Закупка у поставщика: {both(s['cost'])}",
               *([f"📈 Прибыль с продаж: {both(s['gross_profit'])}",
                  f"🎁 Бонусы рефералам: −{both(s['referral'])}"] if s.get("referral") else []),
-              f"📈 <b>Ваша прибыль: {both(s['profit'])}</b>",
+              *([f"📈 Прибыль: {both(s['profit'])}",
+                 *(f"👤 Кассир {c['name']} ({c['percent']}%, его банки ${usd(c['received'])}): "
+                   f"−{both(c['share'])}" for c in s["cashiers"]),
+                 f"💼 <b>Вам: {both(s['owner_profit'])}</b>"] if s.get("cashiers") else
+                [f"📈 <b>Ваша прибыль: {both(s['profit'])}</b>"]),
               "",
               f"➡️ <b>Отправить поставщику: {both(s['to_supplier'])}</b>",
               "<i>= поступило − прибыль. Прибыль забираете себе.</i>",
@@ -157,4 +177,6 @@ def maybe_send(conn: sqlite3.Connection, config: Config, now: datetime | None = 
         return False
     db.set_setting(conn, "finance.last_day", key)
     notify_admin(config, report_text(summary(conn, config, start, end)), html=True)
+    from .cashiers import daily_reports
+    daily_reports(conn, config, start, end)
     return True

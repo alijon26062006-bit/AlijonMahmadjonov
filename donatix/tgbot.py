@@ -13,7 +13,7 @@ from typing import Any, Callable
 
 import httpx
 
-from . import accounts, db, orders, payments
+from . import accounts, cashiers, db, orders, payments
 from .config import PAY_METHODS, TIERS, Config
 from .money import fmt
 from .notify import notify
@@ -179,9 +179,14 @@ class AdminBot:
             cq = upd["callback_query"]
             msg = cq.get("message") or {}
             if str((msg.get("chat") or {}).get("id")) != self.chat_id:
-                self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Нет доступа")
+                cashier = self._cashier(conn, msg, cq.get("from"))
+                if cashier is None:
+                    self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Нет доступа")
+                    return
+                self.on_cashier_button(conn, cq, cashier)
                 return
-            result = self.on_button(conn, str(cq.get("data") or ""))
+            data = str(cq.get("data") or "")
+            result = self.on_button(conn, data)
             if isinstance(result, tuple):  # экран меню — правим то же сообщение
                 self.api("answerCallbackQuery", callback_query_id=cq["id"])
                 text, buttons = result
@@ -197,6 +202,8 @@ class AdminBot:
                     self.send(text, buttons)
                 return
             self.api("answerCallbackQuery", callback_query_id=cq["id"], text=result[:190])
+            if data.startswith("pay:") and cashiers.is_tracked(conn, self.chat_id, msg.get("message_id")):
+                return   # чек с копиями у кассиров — все копии уже поправил settle()
             if msg.get("message_id"):
                 # Кнопки убираем, а под сообщением пишем, что сделано — видно в истории чата.
                 # У сообщения с чеком (фото/файл) вместо текста — подпись.
@@ -209,6 +216,7 @@ class AdminBot:
             return
         msg = upd.get("message") or {}
         if str((msg.get("chat") or {}).get("id")) != self.chat_id:
+            self.on_stranger(conn, msg)
             return
         text = (msg.get("text") or "").strip()
         if self.wizard and not text.startswith("/") and text.split(" ")[0] not in ("🏠", "📊", "💳", "👥", "⚠️"):
@@ -243,6 +251,123 @@ class AdminBot:
                       reply_markup={"keyboard": [[{"text": t} for t in row] for row in MENU], "resize_keyboard": True})
             self.send(*screen_home(conn, self.config))
 
+    # ── Заявки на пополнение: решение админа или кассира ──
+
+    def resolve_payment(self, conn: sqlite3.Connection, payment_id: int, approve: bool, who: str,
+                        tg_id: int | None = None) -> str:
+        """Зачислить или отклонить — один раз. Итог сразу видят все: админ и кассиры."""
+        admin_id = _admin_id(conn)
+        if approve:
+            try:
+                ok = payments.confirm(conn, self.config, payment_id, admin_id)
+            except payments.PaymentError as exc:
+                return str(exc)[:190]   # всплывающее окно Telegram — до 200 символов
+        else:
+            ok = payments.reject(conn, self.config, payment_id, admin_id, "Перевод не найден")
+        if not ok:
+            return "Заявка уже обработана"
+        if tg_id is not None:
+            conn.execute("UPDATE payments SET resolved_tg = ? WHERE id = ?", (str(tg_id), payment_id))
+        if approve:
+            amount = conn.execute("SELECT amount_micro FROM payments WHERE id = ?", (payment_id,)).fetchone()[0]
+            cashiers.settle(conn, self.config, payment_id, f"✅ Зачислено ${fmt(amount)} — {who}", api=self.api)
+            return "Зачислено, клиент получил уведомление"
+        cashiers.settle(conn, self.config, payment_id, f"❌ Отклонено — {who}", api=self.api)
+        return "Отклонено"
+
+    # ── Кассиры: чеки по своим банкам и свой доход ──
+
+    def _cashier(self, conn: sqlite3.Connection, msg: dict[str, Any], sender: dict[str, Any] | None):
+        """Кассир — только в личке с ботом и только сам (не пересланное, не группа)."""
+        chat = msg.get("chat") or {}
+        if chat.get("type", "private") != "private" or not sender:
+            return None
+        if str(chat.get("id")) != str(sender.get("id")):
+            return None
+        try:
+            return cashiers.active(conn, int(sender["id"]))
+        except (TypeError, ValueError):
+            return None
+
+    def send_to(self, chat_id: int | str, text: str, buttons: Buttons | None = None) -> None:
+        self.api("sendMessage", chat_id=str(chat_id), text=text, parse_mode="HTML",
+                 reply_markup=keyboard(buttons), disable_web_page_preview=True)
+
+    def on_stranger(self, conn: sqlite3.Connection, msg: dict[str, Any]) -> None:
+        cashier = self._cashier(conn, msg, msg.get("from"))
+        if cashier is not None:
+            self.send_to(cashier["tg_id"], *screen_cashier_home(conn, self.config, cashier))
+            return
+        chat = msg.get("chat") or {}
+        if chat.get("type") == "private" and (msg.get("text") or "").startswith("/start"):
+            self.send_to(chat["id"], f"Это служебный бот {_e(self.config.site_name)}.\n"
+                                     f"Ваш Telegram ID: <code>{chat['id']}</code>\n"
+                                     "Передайте его администратору, чтобы получить доступ.")
+
+    def on_cashier_button(self, conn: sqlite3.Connection, cq: dict[str, Any], cashier: sqlite3.Row) -> None:
+        msg = cq.get("message") or {}
+        chat_id = cashier["tg_id"]
+        try:
+            what, action, raw_id = str(cq.get("data") or "").split(":")
+            obj_id = int(raw_id)
+        except ValueError:
+            self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Неизвестная кнопка")
+            return
+        if what == "pay" and action in ("ok", "no"):
+            p = conn.execute("SELECT method FROM payments WHERE id = ?", (obj_id,)).fetchone()
+            if p is None or not cashiers.handles(conn, self.config, cashier, p["method"]):
+                self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Этот банк вам не назначен")
+                return
+            result = self.resolve_payment(conn, obj_id, action == "ok", cashier["name"], tg_id=chat_id)
+            self.api("answerCallbackQuery", callback_query_id=cq["id"], text=result[:190])
+            if msg.get("message_id") and not cashiers.is_tracked(conn, chat_id, msg["message_id"]):
+                self.api("editMessageReplyMarkup", chat_id=str(chat_id), message_id=msg["message_id"],
+                         reply_markup={"inline_keyboard": []})
+            return
+        if what == "cs":
+            if action == "pays":
+                n = self.send_cashier_payments(conn, cashier)
+                self.api("answerCallbackQuery", callback_query_id=cq["id"],
+                         text=f"Прислал заявок: {n}" if n else "Новых заявок по вашим банкам нет")
+                return
+            self.api("answerCallbackQuery", callback_query_id=cq["id"])
+            text, buttons = screen_cashier_home(conn, self.config, cashier)
+            if msg.get("message_id") and "text" in msg:
+                try:
+                    self.api("editMessageText", chat_id=str(chat_id), message_id=msg["message_id"],
+                             parse_mode="HTML", text=text, reply_markup=keyboard(buttons))
+                except RuntimeError as exc:
+                    if "not modified" not in str(exc):
+                        raise
+            else:
+                self.send_to(chat_id, text, buttons)
+            return
+        self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Нет доступа")
+
+    def send_cashier_payments(self, conn: sqlite3.Connection, cashier: sqlite3.Row) -> int:
+        """Ожидающие заявки с чеком по банкам кассира — заново, с кнопками."""
+        rows = conn.execute("SELECT id, method FROM payments WHERE status = 'pending' AND receipt_file IS NOT NULL "
+                            "ORDER BY id LIMIT 30").fetchall()
+        mine = [r["id"] for r in rows if cashiers.handles(conn, self.config, cashier, r["method"])][:10]
+        for pid in mine:
+            send_receipt(conn, self.config, pid, only_chat=cashier["tg_id"])
+        return len(mine)
+
+    def greet_cashier(self, conn: sqlite3.Connection, tg_id: int) -> bool:
+        """Первое сообщение новому кассиру. False — он ещё не нажал /start в боте."""
+        c = cashiers.get(conn, tg_id)
+        if c is None:
+            return False
+        try:
+            self.send_to(tg_id, f"👋 Вам открыт доступ кассира в {_e(self.config.site_name)}.\n\n"
+                                "Сюда будут приходить чеки о пополнении по вашим банкам. Проверьте, что деньги "
+                                "пришли, и нажмите «✅ Зачислить» или «❌ Отклонить».")
+            self.send_to(tg_id, *screen_cashier_home(conn, self.config, c))
+            return True
+        except Exception as exc:  # noqa: BLE001 — человек не открыл бота: скажем админу
+            log.info("кассир %s: %s", tg_id, exc)
+            return False
+
     def _list(self, conn, rows, make, empty: str) -> None:
         if not rows:
             self.send(empty)
@@ -261,14 +386,7 @@ class AdminBot:
             return MENU_HANDLERS[what](self, conn, action, obj_id)
         admin_id = _admin_id(conn)
         if what == "pay":
-            if action == "ok":
-                try:
-                    ok = payments.confirm(conn, self.config, obj_id, admin_id)
-                except payments.PaymentError as exc:
-                    return str(exc)[:190]   # всплывающее окно Telegram — до 200 символов
-                return "Зачислено, клиент получил уведомление" if ok else "Заявка уже обработана"
-            ok = payments.reject(conn, self.config, obj_id, admin_id, "Перевод не найден")
-            return "Отклонено" if ok else "Заявка уже обработана"
+            return self.resolve_payment(conn, obj_id, action == "ok", "админ")
         if what == "user":
             u = accounts.get_user(conn, obj_id)
             if u is None or u["role"] == "admin":
@@ -297,16 +415,29 @@ def _admin_id(conn: sqlite3.Connection) -> int:
     return int(row["id"]) if row else 0
 
 
-def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int) -> None:
-    """Заявка с приложенным чеком — админу фото/файлом с кнопками «Зачислить / Отклонить»."""
+def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
+                 only_chat: int | None = None) -> None:
+    """Заявка с приложенным чеком — фото/файлом с кнопками «Зачислить / Отклонить»:
+    админу и кассирам, которым назначен этот банк. Все копии запоминаем, чтобы после
+    решения поправить каждую (only_chat — прислать заново одному кассиру)."""
+    from . import cashiers
     from .payments import receipts_dir
     from .worker import notify_admin_file
-    p = conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    p = conn.execute("SELECT method, receipt_file FROM payments WHERE id = ?", (payment_id,)).fetchone()
     if not p or not p["receipt_file"]:
         return
     text, buttons = payment_event(conn, payment_id, config)
+    caption = text + "\n🧾 Чек приложен"
     path = receipts_dir(config) / p["receipt_file"]
-    notify_admin_file(config, text + "\n🧾 Чек приложен", buttons, path, photo=not p["receipt_file"].endswith(".pdf"))
+    photo = not p["receipt_file"].endswith(".pdf")
+    if only_chat is None:
+        mid = notify_admin_file(config, caption, buttons, path, photo=photo)
+        cashiers.remember(conn, payment_id, str(config.alert_telegram_chat_id).strip(), mid, caption)
+    for c in cashiers.targets(conn, config, p["method"]):
+        if only_chat is not None and c["tg_id"] != only_chat:
+            continue
+        mid = cashiers.send_file(config, c["tg_id"], caption, buttons, path, photo=photo)
+        cashiers.remember(conn, payment_id, c["tg_id"], mid, caption)
 
 
 # ── Меню админа: все разделы сайта кнопками ────────────────
@@ -332,6 +463,7 @@ def screen_home(conn: sqlite3.Connection, config: Config) -> Screen:
         [("👤 Клиенты", "m:clients:0"), ("🤖 Боты клиентов", "m:bots:0")],
         [("💱 Курс", "m:rate:0"), ("🔄 Каталог", "m:cat:0")],
         [("💳 Реквизиты", "pm:list:0"), ("⚙️ Настройки", "m:set:0")],
+        [(f"🧾 Кассиры · {len(cashiers.listing(conn))}", "ks:list:0")],
     ])
 
 
@@ -531,9 +663,133 @@ def _markup(bot: AdminBot, conn: sqlite3.Connection, tier: str, delta: int) -> s
     return screen_settings(conn, bot.config)
 
 
+# ── Кассиры: кабинет кассира и управление ими в админ-боте ──
+
+
+def screen_cashier_home(conn: sqlite3.Connection, config: Config, c: sqlite3.Row) -> Screen:
+    pending = conn.execute("SELECT method FROM payments WHERE status = 'pending' AND receipt_file IS NOT NULL"
+                           ).fetchall()
+    n = sum(1 for r in pending if cashiers.handles(conn, config, c, r["method"]))
+    text = (f"🧾 <b>Кассир {_e(c['name'])}</b>\n"
+            f"Ваши банки: {_e(cashiers.banks_label(conn, config, c))}\n"
+            f"Ваша доля: <b>{c['percent']}%</b> прибыли с пополнений через ваши банки\n\n"
+            + cashiers.income_text(conn, config, c["tg_id"])
+            + "\n\n<i>Чеки приходят сюда сами. Решение сразу видит администратор — второй раз заявку не примут.</i>")
+    return text, [[(f"💳 Заявки · {n}", "cs:pays:0"), ("🔄 Обновить", "cs:home:0")]]
+
+
+def screen_cashiers(conn: sqlite3.Connection, config: Config) -> Screen:
+    rows = cashiers.listing(conn)
+    text = ("🧾 <b>Кассиры</b>\nПроверяют чеки по своим банкам и получают долю прибыли с них. "
+            "Остальное — вам.\n\nЧтобы добавить: человек пишет боту /start, бот покажет ему ID — "
+            "он присылает ID вам.")
+    buttons: Buttons = [[(("🟢 " if r["active"] else "⏸ ") + f"{r['name']} · {r['percent']}%",
+                          f"ks:view:{r['tg_id']}")] for r in rows]
+    buttons += [[("➕ Добавить кассира", "ks:new:0")], _back()]
+    return text, buttons
+
+
+def screen_cashier(conn: sqlite3.Connection, config: Config, tg_id: int, note: str = "") -> Screen:
+    c = cashiers.get(conn, tg_id)
+    if c is None:
+        return screen_cashiers(conn, config)
+    text = (note + f"🧾 <b>{_e(c['name'])}</b> · ID <code>{c['tg_id']}</code>\n"
+            f"Статус: {'🟢 работает' if c['active'] else '⏸ отключён — чеки не приходят'}\n"
+            f"Банки: {_e(cashiers.banks_label(conn, config, c))}\n"
+            f"Доля: <b>{c['percent']}%</b> · вам {100 - c['percent']}%\n\n"
+            + cashiers.income_text(conn, config, tg_id))
+    return text, [
+        [("🏦 Банки", f"ks:banks:{tg_id}")],
+        [("−5%", f"ks:pdn:{tg_id}"), (f"{c['percent']}%", f"ks:view:{tg_id}"), ("+5%", f"ks:pup:{tg_id}")],
+        [("⏸ Отключить" if c["active"] else "▶️ Включить", f"ks:tog:{tg_id}"), ("🗑 Удалить", f"ks:del:{tg_id}")],
+        _back("ks:list:0"),
+    ]
+
+
+def screen_cashier_banks(conn: sqlite3.Connection, config: Config, tg_id: int) -> Screen:
+    c = cashiers.get(conn, tg_id)
+    if c is None:
+        return screen_cashiers(conn, config)
+    codes = cashiers.codes_of(c)
+    rows: Buttons = [[(("✅ " if codes is None else "▫️ ") + "Все банки (и новые тоже)", f"ks:all:{tg_id}")]]
+    for i, m in enumerate(cashiers.bank_methods(conn, config)):
+        on = codes is None or m["code"] in codes
+        rows.append([(("✅ " if on else "▫️ ") + m["title"], f"ks:b{i}:{tg_id}")])
+    rows.append(_back(f"ks:view:{tg_id}"))
+    return (f"🏦 <b>Банки кассира {_e(c['name'])}</b>\nЧеки по отмеченным банкам приходят ему. "
+            "Вы получаете все чеки в любом случае."), rows
+
+
+def _cashiers(bot: AdminBot, conn: sqlite3.Connection, action: str, tg_id: int) -> str | Screen:
+    cfg = bot.config
+    if action == "list":
+        return screen_cashiers(conn, cfg)
+    if action == "new":
+        bot.wizard = {"step": "cashier_id"}
+        return ("➕ <b>Новый кассир</b> · шаг 1 из 2\n\nПришлите его <b>Telegram ID</b> (только цифры) "
+                "или перешлите сюда любое его сообщение.\n<i>ID он увидит, если напишет этому боту /start.</i>",
+                [[("Отмена", "ks:list:0")]])
+    if cashiers.get(conn, tg_id) is None:
+        return screen_cashiers(conn, cfg)
+    if action in ("pup", "pdn"):
+        cashiers.bump_percent(conn, tg_id, 5 if action == "pup" else -5)
+    elif action == "tog":
+        c = cashiers.get(conn, tg_id)
+        cashiers.set_active(conn, tg_id, not c["active"])
+    elif action == "del":
+        return ("Удалить кассира? Чеки ему приходить перестанут. Уже принятые заявки останутся как есть.",
+                [[("🗑 Да, удалить", f"ks:delok:{tg_id}"), ("Нет", f"ks:view:{tg_id}")]])
+    elif action == "delok":
+        cashiers.delete(conn, tg_id)
+        return screen_cashiers(conn, cfg)
+    elif action == "banks":
+        return screen_cashier_banks(conn, cfg, tg_id)
+    elif action == "all":
+        cashiers.toggle_all(conn, tg_id)
+        return screen_cashier_banks(conn, cfg, tg_id)
+    elif action.startswith("b") and action[1:].isdigit():
+        ms = cashiers.bank_methods(conn, cfg)
+        i = int(action[1:])
+        if 0 <= i < len(ms):
+            cashiers.toggle_method(conn, cfg, tg_id, ms[i]["code"])
+        return screen_cashier_banks(conn, cfg, tg_id)
+    return screen_cashier(conn, cfg, tg_id)
+
+
+def cashier_wizard_step(bot: AdminBot, conn: sqlite3.Connection, msg: dict[str, Any]) -> Screen:
+    w = bot.wizard or {}
+    text = (msg.get("text") or "").strip()
+    cancel = [[("Отмена", "ks:list:0")]]
+    try:
+        if w.get("step") == "cashier_id":
+            fwd = (msg.get("forward_from") or {}).get("id")
+            tg_id = int(fwd) if fwd else cashiers.parse_id(text)
+            if cashiers.get(conn, tg_id):
+                raise cashiers.CashierError("Этот человек уже в списке кассиров.")
+            if str(tg_id) == bot.chat_id:
+                raise cashiers.CashierError("Это ваш собственный ID — вы и так получаете все чеки.")
+            name = " ".join(filter(None, [(msg.get("forward_from") or {}).get("first_name")]))
+            w.update(step="cashier_name", tg_id=tg_id)
+            return (f"➕ ID <code>{tg_id}</code> · шаг 2 из 2\n\nКак его назвать? Имя видно вам в отчётах "
+                    "и на чеках: «✅ Зачислено — Али»." + (f"\nНапример: <i>{_e(name)}</i>" if name else ""), cancel)
+        if w.get("step") == "cashier_name":
+            cashiers.add(conn, w["tg_id"], text, bot.chat_id)
+            bot.wizard = None
+            greeted = bot.greet_cashier(conn, w["tg_id"])
+            note = ("✅ Кассир добавлен. Сейчас он получает чеки по всем банкам — поменять можно в «🏦 Банки».\n"
+                    + ("" if greeted else "⚠️ Бот не смог ему написать: пусть откроет этого бота и нажмёт "
+                                          "Start — иначе чеки до него не дойдут.\n") + "\n")
+            return screen_cashier(conn, bot.config, w["tg_id"], note)
+    except cashiers.CashierError as exc:
+        return f"⚠️ {_e(str(exc))}", cancel
+    bot.wizard = None
+    return screen_cashiers(conn, bot.config)
+
+
 MENU_HANDLERS: dict[str, Callable[..., str | Screen]] = {
     "pm": lambda bot, conn, action, i: _paymethods(bot, conn, action, i),
     "m": _menu, "cl": _client, "bot": _bot, "rate": _rate, "cat": _catalog, "set": _setting, "mk": _markup,
+    "ks": _cashiers,
 }
 
 
@@ -657,6 +913,8 @@ def _photo_bytes(bot: AdminBot, msg: dict[str, Any]) -> tuple[bytes, str] | None
 
 def wizard_step(bot: AdminBot, conn: sqlite3.Connection, msg: dict[str, Any]) -> Screen:
     w = bot.wizard or {}
+    if str(w.get("step", "")).startswith("cashier_"):
+        return cashier_wizard_step(bot, conn, msg)
     text = (msg.get("text") or "").strip()
     step = w.get("step")
     try:

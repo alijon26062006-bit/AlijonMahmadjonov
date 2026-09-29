@@ -24,7 +24,9 @@
     <div class="kpi"><span class="tile ok">{{ icon('chart', 20) }}</span>
       <div class="label">Ваша прибыль{% if s.referral %} (чистая){% endif %}</div><div class="value">{{ both(s.profit, s) }}</div>
       {% if s.referral %}<div class="note">с продаж ${{ usd(s.gross_profit) }} − бонусы рефералам ${{ usd(s.referral) }}</div>{% endif %}
-      <div class="note">продано {{ s.orders }} заказов на ${{ usd(s.revenue) }} · закупка ${{ usd(s.cost) }}</div></div>
+      <div class="note">продано {{ s.orders }} заказов на ${{ usd(s.revenue) }} · закупка ${{ usd(s.cost) }}</div>
+      {% for c in s.cashiers %}<div class="note">кассир {{ c.name }} ({{ c.percent }}%, его банки ${{ usd(c.received) }}): −${{ usd(c.share) }}</div>{% endfor %}
+      {% if s.cashiers %}<div class="note"><b>вам: {{ both(s.owner_profit, s) }}</b></div>{% endif %}</div>
     <div class="kpi fin-send"><span class="tile">{{ icon('arrow-right', 20) }}</span>
       <div class="label">Отправить поставщику</div><div class="value">{{ both(s.to_supplier, s) }}</div>
       <div class="note">= поступило − прибыль. Прибыль забираете себе.</div></div>

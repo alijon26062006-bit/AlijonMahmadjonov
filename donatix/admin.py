@@ -549,6 +549,11 @@ def payment_confirm(payment_id: int, request: Request, credit: str = Form(""), a
     except payments.PaymentError as exc:
         flash(request, str(exc), "error")
         return _back("/admin/payments")
+    if ok:
+        from .cashiers import settle
+        from .money import fmt
+        amount = conn.execute("SELECT amount_micro FROM payments WHERE id = ?", (payment_id,)).fetchone()[0]
+        settle(conn, config, payment_id, f"✅ Зачислено ${fmt(amount)} — админ (сайт)")
     flash(request, "Баланс зачислен, клиент уведомлён." if ok else "Заявка уже обработана.", "ok" if ok else "error")
     return _back("/admin/payments")
 
@@ -558,6 +563,9 @@ def payment_reject(payment_id: int, request: Request, reason: str = Form(""), ad
                    conn=Depends(get_conn), config: Config = Depends(get_config)):
     from . import payments
     ok = payments.reject(conn, config, payment_id, admin["id"], reason)
+    if ok:
+        from .cashiers import settle
+        settle(conn, config, payment_id, "❌ Отклонено — админ (сайт)")
     flash(request, "Заявка отклонена, клиент уведомлён." if ok else "Заявка уже обработана.", "ok" if ok else "error")
     return _back("/admin/payments")
 

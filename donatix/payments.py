@@ -275,11 +275,14 @@ def confirm(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id:
 
 
 def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: int, reason: str) -> bool:
-    p = conn.execute("SELECT * FROM payments WHERE id = ? AND status = 'pending'", (payment_id,)).fetchone()
-    if p is None:
-        return False
-    conn.execute("UPDATE payments SET status = 'rejected', admin_note = ?, resolved_at = ?, resolved_by = ? "
-                 "WHERE id = ?", (reason.strip()[:300] or None, db.now(), admin_id, payment_id))
+    """Отклонить заявку. Ровно один раз: админ и кассир могут нажать одновременно."""
+    with db.tx(conn):
+        p = conn.execute("SELECT * FROM payments WHERE id = ? AND status = 'pending'", (payment_id,)).fetchone()
+        if p is None:
+            return False
+        conn.execute("UPDATE payments SET status = 'rejected', admin_note = ?, resolved_at = ?, resolved_by = ? "
+                     "WHERE id = ? AND status = 'pending'",
+                     (reason.strip()[:300] or None, db.now(), admin_id, payment_id))
     notify(conn, config, p["user_id"],
            f"Заявка на пополнение #{payment_id} отклонена" + (f": {reason.strip()}" if reason.strip() else "."),
            "/panel/balance")
@@ -296,6 +299,8 @@ def cancel(conn: sqlite3.Connection, user_id: int, payment_id: int, config: Conf
         login = conn.execute("SELECT login FROM users WHERE id = ?", (user_id,)).fetchone()
         notify_admin(config, f"↩️ Клиент {login['login'] if login else user_id} отменил заявку на пополнение "
                              f"#{payment_id}.")
+        from .cashiers import settle
+        settle(conn, config, payment_id, "↩️ Клиент отменил заявку")
     return done
 
 

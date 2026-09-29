@@ -237,6 +237,23 @@ CREATE TABLE IF NOT EXISTS referral_rewards (
     created_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS referral_rewards_referrer ON referral_rewards(referrer_id, id DESC);
+-- Кассиры: проверяют чеки по своим банкам в Telegram и получают долю прибыли
+CREATE TABLE IF NOT EXISTS cashiers (
+    tg_id      INTEGER PRIMARY KEY,
+    name       TEXT NOT NULL,
+    methods    TEXT NOT NULL DEFAULT '*',   -- '*' — все банки, иначе JSON-список кодов способов оплаты
+    percent    INTEGER NOT NULL DEFAULT 20,
+    active     INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+-- Куда ушёл чек (админу и кассирам): после решения правим все копии, чтобы не приняли дважды
+CREATE TABLE IF NOT EXISTS payment_msgs (
+    payment_id INTEGER NOT NULL REFERENCES payments(id),
+    chat_id    TEXT NOT NULL,
+    message_id INTEGER NOT NULL,
+    caption    TEXT NOT NULL,
+    PRIMARY KEY (payment_id, chat_id, message_id)
+);
 CREATE INDEX IF NOT EXISTS visits_session ON visits(session, ts);
 CREATE INDEX IF NOT EXISTS visits_user ON visits(user_id) WHERE user_id IS NOT NULL;
 -- Быстрые отчёты: продажи/деньги за период, посещаемость без чтения всей таблицы
@@ -357,6 +374,8 @@ def init(path: Path | str) -> None:
             conn.execute("ALTER TABLE users ADD COLUMN referred_by INTEGER")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_ref_code ON users(ref_code)")
         conn.execute("CREATE INDEX IF NOT EXISTS users_referred_by ON users(referred_by)")
+        if "resolved_tg" not in pay_cols:   # кто решил заявку в Telegram (кассир)
+            conn.execute("ALTER TABLE payments ADD COLUMN resolved_tg TEXT")
         if "google_sub" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)")
