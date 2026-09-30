@@ -4083,7 +4083,8 @@ async def games_text(conn: aiosqlite.Connection) -> str:
         "<blockquote>Цена пакета считается сама: себестоимость поставщика "
         "в долларах по курсу плюс наценка. Заказы почти всегда уходят "
         "«в обработку», бот следит за ними и возвращает деньги, если "
-        f"пополнение не дошло за {gsvc.timeout_minutes()} мин.</blockquote>"
+        f"пополнение не дошло за {gsvc.timeout_minutes()} мин. Standoff 2 и Clash of Clans "
+        "выдаются до 90 минут (ночные заказы — утром), по ним бот ждёт до суток.</blockquote>"
     )
 
 
@@ -5657,7 +5658,7 @@ async def cb_games_check(call: CallbackQuery, conn: aiosqlite.Connection, provid
                         "пришло — проверьте адрес в кабинете поставщика</i>"))
 
     lines.append(f"⏱ Ожидание выдачи: <b>{gsvc.timeout_minutes()} мин</b>, "
-                 "потом деньги возвращаются клиенту")
+                 "потом деньги возвращаются клиенту (Standoff 2 и Clash of Clans — до суток)")
 
     # ---- 4. чем кончились последние заказы
     recent = await db.last_game_orders(conn)

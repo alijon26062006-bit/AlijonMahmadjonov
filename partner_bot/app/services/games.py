@@ -417,7 +417,7 @@ async def check(
         await _refund(bot, conn, order, f"поставщик вернул статус {status}")
         return "failed"
 
-    if _minutes_waiting(order) >= timeout_minutes():
+    if _minutes_waiting(order) >= await _timeout_for(conn, order):
         await _refund(bot, conn, order,
                       f"{TIMEOUT_MARK} не выполнился за отведённое время")
         await delivery.notify_admins(
@@ -433,6 +433,38 @@ async def check(
         return "timeout"
 
     return "waiting"
+
+
+# Игры, которые поставщик выдаёт долго (до 90 минут, ночные заказы — утром).
+# По ним не возвращаем деньги через 20 минут: заказ всё равно дойдёт, и товар ушёл бы бесплатно.
+SLOW_GAMES = ("standoff", "clash of clans")
+SLOW_TIMEOUT_MINUTES = 24 * 60
+
+
+def slow_game(title: str | None) -> str:
+    """'standoff' / 'clash of clans' для медленных игр, иначе ''."""
+    name = (title or "").lower()
+    return next((g for g in SLOW_GAMES if g in name), "")
+
+
+def wait_text(title: str | None) -> str:
+    """Что написать клиенту о сроке выдачи этой игры."""
+    from app import texts
+    game = slow_game(title)
+    if game == "standoff":
+        return texts.GAME_WAIT_STANDOFF
+    if game == "clash of clans":
+        return texts.GAME_WAIT_COC
+    return texts.GAME_WAIT_FAST
+
+
+async def _timeout_for(conn: aiosqlite.Connection, order: db.Order) -> int:
+    minutes = timeout_minutes()
+    if order.product_type.startswith("game:"):
+        game = await db.get_game(conn, order.product_type.split(":", 1)[1])
+        if game and slow_game(game.title):
+            minutes = max(minutes, SLOW_TIMEOUT_MINUTES)
+    return minutes
 
 
 def timeout_minutes() -> int:

@@ -526,7 +526,7 @@ async def cb_buy(
         await call.message.edit_text(
             texts.GAME_ACCEPTED.format(
                 order_id=order.id, pack=data["pack"],
-                player=data["player"], price=fmt(order.price),
+                player=data["player"], price=fmt(order.price), wait=svc.wait_text(game.title),
             )
         )
         return
@@ -535,7 +535,7 @@ async def cb_buy(
     await call.message.edit_text(
         texts.GAME_ACCEPTED.format(
             order_id=order.id, pack=data["pack"],
-            player=data["player"], price=fmt(order.price),
+            player=data["player"], price=fmt(order.price), wait=svc.wait_text(game.title),
         )
     )
 
