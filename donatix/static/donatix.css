@@ -1490,3 +1490,11 @@ a.order-card:hover { transform: translateY(-1px); }
 .dc-card .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .dc-card b { font: 700 1.05rem/1.2 var(--font-num); font-variant-numeric: tabular-nums; }
 .dc-card small { color: var(--muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Листание и масштаб графика пальцами */
+.dc-canvas-wrap canvas { cursor: grab; }
+.dc-canvas-wrap canvas:active { cursor: grabbing; }
+.dc-now { position: absolute; left: 10px; top: 10px; z-index: 2; display: inline-flex; align-items: center; gap: 4px;
+  min-height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: #3b82f6; color: #fff;
+  font: 600 .78rem var(--font); cursor: pointer; box-shadow: 0 6px 16px -6px rgb(59 130 246 / .7);
+  animation: dc-tick .3s var(--ease-out); }
+.dc-hint { padding: 2px 12px 6px 0; color: #6b7386; font-size: .72rem; text-align: center; }

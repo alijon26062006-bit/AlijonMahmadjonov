@@ -933,10 +933,10 @@ def panel_dcoin(request: Request, user=Depends(panel_user), conn=Depends(get_con
 
 
 @router.get("/panel/data/dcoin")
-def panel_dcoin_data(tf: str = "1m", user=Depends(panel_user), conn=Depends(get_conn)):
+def panel_dcoin_data(tf: str = "1m", n: int = 80, user=Depends(panel_user), conn=Depends(get_conn)):
     """Свечи и цифры для живого графика — страница спрашивает каждые несколько секунд."""
     from . import dcoin
-    data = dcoin.candles(conn, tf)
+    data = dcoin.candles(conn, tf, n)
     d = dcoin.summary(conn, user["id"])
     # копилку и число монет не отдаём: их видит только админ
     data.update({"price": d["price"], "change": d["change"], "balance": d["balance_text"]})

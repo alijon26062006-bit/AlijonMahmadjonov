@@ -199,3 +199,11 @@ def test_price_follows_previous_purchase(conn):
     assert p1 > p0 and p2 < p1 and p3 > p2
     for a, b in ((p0, p1), (p1, p2), (p2, p3)):
         assert 0.0099 <= abs(b - a) / a <= 0.0301                        # от 1% до 3% — видно, но мягко
+
+
+def test_history_for_scrolling_back(conn):
+    uid = _user(conn)
+    _buy(conn, uid, 10_000)
+    assert len(dcoin.candles(conn, "1m", 300)["candles"]) == 300          # есть что листать назад
+    assert len(dcoin.candles(conn, "1m", 10_000)["candles"]) == dcoin.MAX_CANDLES
+    assert dcoin.candles(conn, "1s", 50)["candles"][-1][4] == dcoin.price(conn)

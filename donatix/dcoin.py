@@ -35,6 +35,7 @@ EXCHANGE_FEE_PCT = 5              # остаются в копилке — це�
 MIN_EXCHANGE = 10_000             # от $1 (микро-доллары)
 TIMEFRAMES = {"1s": 1, "5s": 5, "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86400}
 CANDLES = 80
+MAX_CANDLES = 400               # сколько свечей можно пролистать назад
 
 
 # ── Настройки ───────────────────────────────────────────────────
@@ -300,29 +301,30 @@ def exchange(conn: sqlite3.Connection, user_id: int, units: int, now: datetime |
 
 
 # ── График: свечи ───────────────────────────────────────────────
-def candles(conn: sqlite3.Connection, tf: str = "5m", now: datetime | None = None) -> dict[str, Any]:
-    """Свечи [время_мс, открытие, максимум, минимум, закрытие] за последние CANDLES интервалов.
-    Пустой интервал — ровная свеча по последней цене."""
+def candles(conn: sqlite3.Connection, tf: str = "5m", count: int = CANDLES,
+            now: datetime | None = None) -> dict[str, Any]:
+    """Свечи [время_мс, открытие, максимум, минимум, закрытие] за последние count интервалов
+    (график листается назад — поэтому отдаём с запасом). Пустой интервал — ровная свеча."""
     tf = tf if tf in TIMEFRAMES else "5m"
     step = TIMEFRAMES[tf]
+    count = max(10, min(MAX_CANDLES, int(count)))
     now = now or _now()
     end = int(now.timestamp()) // step * step
-    start = end - (CANDLES - 1) * step
-    since = datetime.fromtimestamp(start, timezone.utc)
-    before = conn.execute("SELECT price FROM dcoin_points WHERE ts < ? ORDER BY id DESC LIMIT 1",
-                          (_iso(since),)).fetchone()
+    start = end - (count - 1) * step
+    since = _iso(datetime.fromtimestamp(start, timezone.utc))
+    before = conn.execute("SELECT price FROM dcoin_points WHERE ts < ? ORDER BY id DESC LIMIT 1", (since,)).fetchone()
     last = float(before["price"]) if before else 0.0
-    rows = conn.execute("SELECT ts, price FROM dcoin_points WHERE ts >= ? ORDER BY id", (_iso(since),)).fetchall()
-    buckets: dict[int, list[float]] = {}
-    for r in rows:
-        t = int(_parse(r["ts"]).timestamp()) // step * step
-        buckets.setdefault(t, []).append(float(r["price"]))
+    # свечи считает база: мин/макс и последняя цена в каждом интервале — не тянем все точки
+    rows = conn.execute(
+        "SELECT g.b, g.lo, g.hi, p.price AS close FROM (SELECT CAST(strftime('%s', substr(ts, 1, 19)) AS INTEGER) / ? "
+        "AS b, MIN(price) AS lo, MAX(price) AS hi, MAX(id) AS last_id FROM dcoin_points WHERE ts >= ? GROUP BY b) g "
+        "JOIN dcoin_points p ON p.id = g.last_id", (step, since)).fetchall()
+    buckets = {int(r["b"]) * step: (float(r["lo"]), float(r["hi"]), float(r["close"])) for r in rows}
     out = []
     for t in range(start, end + step, step):
-        vals = buckets.get(t, [])
         o = last
-        c = vals[-1] if vals else last
-        out.append([t * 1000, o, max([o, *vals]), min([o, *vals]), c])
+        lo, hi, c = buckets.get(t, (o, o, o))
+        out.append([t * 1000, o, max(o, hi), min(o, lo), c])
         last = c
     return {"tf": tf, "step": step, "candles": out}
 
