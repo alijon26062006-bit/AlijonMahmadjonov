@@ -43,18 +43,10 @@
     <div class="dc-stat"><span>За покупку</span><b>$1 = {{ d.per_usd }} D</b><small>$0.50 = {{ d.per_usd // 2 }} D</small></div>
   </section>
 
-  <section class="card dc-how">
-    <h3>Как растёт цена</h3>
-    <ul class="checks">
-      <li>{{ icon('check', 18) }}<span>За каждую выполненную покупку — D-коины: <b>{{ d.per_usd }} D за $1</b>.</span></li>
-      <li>{{ icon('check', 18) }}<span>Цену двигают покупки на сайте: крупные поднимают, мелкие немного опускают. Больше покупок — выше график.</span></li>
-      <li>{{ icon('check', 18) }}<span>Монеты можно обменять на баланс сайта по текущей цене (комиссия {{ d.fee_pct }}%).</span></li>
-    </ul>
-    <p class="muted small">D-коины — бонусные: их нельзя купить или вывести на карту, только получить за покупки и обменять на баланс Donatix.</p>
-  </section>
 
   <section class="card dc-ex">
     <h3>Обменять на баланс</h3>
+    <p class="muted small">D-коины — бонусные: их нельзя купить или вывести на карту, только обменять на баланс Donatix.</p>
     {% if d.open %}
     <form method="post" action="/panel/dcoin/exchange" class="dc-ex-form">
       <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -64,10 +56,10 @@
         <button class="btn soft" type="button" data-all="{{ d.free / 100 }}">Все</button>
         <button class="btn primary" type="submit">Обменять</button>
       </div>
-      <div class="hint">От $1 по текущей цене, раз в сутки. Сейчас все ваши монеты ≈ {{ money(d.worth_micro) }}.</div>
+      <div class="hint">От $1 по текущей цене, раз в сутки, комиссия {{ d.fee_pct }}%. Сейчас все ваши монеты ≈ {{ money(d.worth_micro) }}.</div>
     </form>
     {% else %}
-    <div class="dc-lock">{{ icon('clock', 20) }}<span>Обмен откроется <b>{{ d.opens | dt }}</b>. Пока копим — копите монеты, цена растёт вместе с покупками.</span></div>
+    <div class="dc-lock">{{ icon('clock', 20) }}<span>Обмен откроется <b>{{ d.opens | dt }}</b>. Пока копите монеты.</span></div>
     {% endif %}
   </section>
 

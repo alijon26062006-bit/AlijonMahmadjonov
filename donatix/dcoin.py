@@ -338,7 +338,7 @@ def exchange(conn: sqlite3.Connection, user_id: int, units: int, now: datetime |
     """Обменять монеты на баланс сайта. Возвращает зачисленное (микро)."""
     now = now or _now()
     if not exchange_open(conn, now):
-        raise ExchangeError(f"Обмен откроется {exchange_opens(conn):%d.%m.%Y} — пока копим, цена растёт.")
+        raise ExchangeError(f"Обмен откроется {exchange_opens(conn):%d.%m.%Y}.")
     with db.tx(conn):
         row = conn.execute("SELECT dcoin FROM users WHERE id = ?", (user_id,)).fetchone()
         have = (int(row["dcoin"]) if row else 0) - waiting(conn, user_id)   # за невыполненные заказы — нельзя

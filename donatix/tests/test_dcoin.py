@@ -149,6 +149,8 @@ def test_fixed_rate_and_pool_is_hidden(app, conn):
     web_login(client, "coiner@example.com", "password123")
     page = client.get("/panel/dcoin").text
     assert "Копилка" not in page and "копилк" not in page and "Всего монет" not in page
+    for secret in ("Как растёт цена", "поднимают", "опускают", "цена растёт"):
+        assert secret not in page                                     # как двигается цена — не рассказываем
     j = client.get("/panel/data/dcoin?tf=1s").json()
     assert j["tf"] == "1s" and j["step"] == 1
     assert "pool_micro" not in j and "supply" not in j               # конкурентам не видно
