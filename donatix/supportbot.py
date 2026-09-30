@@ -674,7 +674,7 @@ def quick_balance(conn: sqlite3.Connection, config: Config, tg_id: int, lang: st
 
 
 def quick_text(conn: sqlite3.Connection, config: Config, key: str, lang: str) -> str:
-    from . import payments, referrals
+    from . import payments
     site = config.base_url.rstrip("/")
     methods = payments.methods(conn, config)
     manual = ", ".join(m["title"] for m in methods if not m["auto"]) or "—"
@@ -699,11 +699,10 @@ def quick_text(conn: sqlite3.Connection, config: Config, key: str, lang: str) ->
                  "3. Точно укажите ID игрока (для Stars — @username)\n4. Оплата с баланса — обычно выполняется "
                  "за секунды\nНе выполнился заказ — деньги сами вернутся на баланс.")).format(site=site)
     if key == "ref":
-        pct = referrals.percent(conn)
         return ((f"🎁 Дӯстонро даъват кунед: {site}/panel/referrals — ҳаволаи худро гиред. Аз ҳар фармоиши онҳо "
-                 f"{pct}% аз фоидаи мо ба тавозуни шумо меояд — то абад.") if tj else
+                 "бонус ба тавозуни шумо меояд — то абад.") if tj else
                 (f"🎁 Приглашайте друзей: {site}/panel/referrals — там ваша личная ссылка. С каждого их заказа "
-                 f"вам на баланс {pct}% от нашей прибыли — навсегда."))
+                 "вам на баланс бонус — навсегда."))
     if key == "bot":
         need = _min_orders(conn)
         return ((f"🤖 Боти мағозаи худ: шарт — камаш {need} фармоиши иҷрошуда. @BotFather → /newbot → токенро "
