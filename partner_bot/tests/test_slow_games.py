@@ -1,4 +1,5 @@
-"""Standoff 2 и Clash of Clans выдаются долго: клиенту — срок, и без возврата через 20 минут."""
+"""Standoff 2 и Clash of Clans выдаются долго: клиенту — срок. По таймауту денег не возвращаем никогда —
+ждём ответа поставщика (отменил — возврат, выполнил — выдано)."""
 from __future__ import annotations
 
 import asyncio
@@ -62,7 +63,22 @@ async def main() -> None:
     slow = await svc.check(bot, conn, provider, orders["vd_1"])
     check("Standoff 2 через 45 минут — ждём, деньги не возвращаем", slow == "waiting", slow)
     fast = await svc.check(bot, conn, provider, orders["free_fire_br"])
-    check("быстрая игра через 45 минут — возврат, как раньше", fast == "timeout", fast)
+    check("быстрая игра через 45 минут — тоже ждём, без возврата", fast == "waiting", fast)
+    row = await db.get_order(conn, orders["free_fire_br"].id)
+    check("деньги не вернули, заказ в обработке", row.status == orders["free_fire_br"].status, row.status)
+    check("владельцу одно предупреждение «долго в обработке»",
+          bool(bot.sent) and all("долго в обработке" in t and "НЕ возвращали" in t for t in bot.sent), bot.sent)
+    told = len(bot.sent)
+    again = await svc.check(bot, conn, provider, row)
+    check("повторно не предупреждаем", again == "waiting" and len(bot.sent) == told, len(bot.sent))
+
+    class Cancelled:
+        async def order_status(self, order_id):
+            return {"order_id": order_id, "status": "cancelled"}
+    gone = await svc.check(bot, conn, Cancelled(), row)
+    after = await db.get_order(conn, row.id)
+    check("поставщик отменил — сразу отмена и возврат", gone == "failed" and after.status != row.status,
+          f"{gone} {after.status}")
 
     await conn.close()
 

@@ -614,7 +614,7 @@ async def flow(conn) -> None:
           any("INSUFFICIENT_BALANCE" in t for t in bot.to(ADMIN)), str(bot.to(ADMIN)))
     check("клиенту сказали о возврате", "иҷро нашуд" in call.last, call.last[:80])
 
-    # ------------------------------------------------ возврат по таймауту
+    # ------------------------------------------------ таймаут: не возвращаем, ждём поставщика
     provider = GameProvider(status="processing")
     bot = FakeBot()
     stuck = await db.create_order(
@@ -629,12 +629,12 @@ async def flow(conn) -> None:
 
     before = (await db.get_user(conn, BUYER)).balance
     result = await svc.check(bot, conn, provider, stuck)
-    check("зависший заказ закрывается возвратом", result == "timeout", result)
-    check("деньги вернулись клиенту",
-          (await db.get_user(conn, BUYER)).balance == before + 1400)
-    check("заказ помечен возвращённым",
-          (await db.get_order(conn, stuck.id)).status == db.ORDER_REFUNDED)
-    warn = [t for t in bot.to(ADMIN) if "висел" in t]
+    check("долгий заказ продолжает ждать ответа поставщика", result == "waiting", result)
+    check("деньги клиенту сами не возвращаются",
+          (await db.get_user(conn, BUYER)).balance == before)
+    check("заказ остаётся в обработке",
+          (await db.get_order(conn, stuck.id)).status == db.ORDER_DELIVERING)
+    warn = [t for t in bot.to(ADMIN) if "долго в обработке" in t]
     check("владельца предупредили", bool(warn), str(bot.to(ADMIN)))
     check("в предупреждении номер у поставщика",
           warn and "ord-old" in warn[0], str(warn[:1]))
@@ -1565,8 +1565,8 @@ async def no_supplier_number(conn) -> None:
     check("владельцу сказали сразу", bool(told), str(bot.to(ADMIN)))
     check("в сообщении есть ID игрока", told and "1724367212" in told[0])
     check("подсказаны команды", told and "/done" in told[0] and "/refund" in told[0])
-    check("предупреждён автоматический возврат",
-          told and f"{svc.timeout_minutes()} мин" in told[0], str(told[:1]))
+    check("сказано, что без решения заказ так и ждёт",
+          told and "останется в обработке" in told[0], str(told[:1]))
 
     order = (await db.last_game_orders(conn))[0]
     check("заказ помечен зависшим", order.status == db.ORDER_FAILED, order.status)
@@ -2085,7 +2085,7 @@ async def timeout_setting(conn) -> None:
           any("5 мин" in b for b in buttons(call.markup)), str(buttons(call.markup)))
     check("и оно же в пояснении", "5 мин" in call.last, call.last[-200:])
 
-    # заказ закрывается по новому сроку, а не по старому
+    # предупреждение приходит по новому сроку, а не по старому
     bot = FakeBot()
     order = await db.create_order(
         conn, user_id=BUYER, product_type="game:free_fire_br", quantity=1,
@@ -2098,7 +2098,8 @@ async def timeout_setting(conn) -> None:
     await conn.commit()
     result = await svc.check(bot, conn, GameProvider(status="processing"),
                              await db.get_order(conn, order.id))
-    check("укороченное ожидание работает", result == "timeout", result)
+    check("укороченное ожидание работает",
+          result == "waiting" and any("долго в обработке" in t for t in bot.to(ADMIN)), result)
 
     await runtime.set_value(conn, "games_timeout_min", "20")
 

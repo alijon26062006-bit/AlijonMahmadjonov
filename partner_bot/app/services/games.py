@@ -34,8 +34,10 @@ log = logging.getLogger(__name__)
 
 #: Как часто добирать заказы, оставшиеся в работе.
 WATCH_EVERY = 5 * 60
-#: Сколько ждём выполнения, прежде чем вернуть деньги.
+#: Через сколько минут без ответа поставщика предупредить владельца (денег сами НЕ возвращаем).
 TIMEOUT_MINUTES = 20
+#: Метка «владелец уже предупреждён, что заказ долго в обработке» — чтобы не писать на каждом круге.
+SLOW_NOTICE_MARK = "долго:"
 
 # Сразу после оплаты заказ опрашивается часто: выдача обычно занимает
 # секунды, и ждать пятиминутного обхода незачем — клиент всё это время
@@ -394,7 +396,7 @@ async def check(
 ) -> str:
     """Спросить статус и закрыть заказ, если он решился.
 
-    Возвращает: done | failed | waiting | timeout.
+    Возвращает: done | failed | waiting (по таймауту денег не возвращаем).
     """
     from app.services import delivery
 
@@ -417,21 +419,21 @@ async def check(
         await _refund(bot, conn, order, f"поставщик вернул статус {status}")
         return "failed"
 
-    if _minutes_waiting(order) >= await _timeout_for(conn, order):
-        await _refund(bot, conn, order,
-                      f"{TIMEOUT_MARK} не выполнился за отведённое время")
+    # Денег по таймауту НЕ возвращаем: ждём окончательного ответа поставщика. Отменит —
+    # вернём (выше, status in FAILED); выполнит — закроем. Раньше возврат через 20 минут
+    # приводил к тому, что заказ потом всё равно выполнялся, и товар уходил бесплатно.
+    if (_minutes_waiting(order) >= await _timeout_for(conn, order)
+            and not (order.error or "").startswith(SLOW_NOTICE_MARK)):
+        await db.update_order(conn, order.id, error=f"{SLOW_NOTICE_MARK} ждём ответ поставщика")
         await delivery.notify_admins(
             bot,
-            "⚠️ <b>Игровой заказ висел слишком долго</b>\n"
+            "⏳ <b>Игровой заказ долго в обработке</b>\n"
             f"├ Наш номер: <code>{order.id}</code>\n"
             f"├ У поставщика: <code>{order.fragment_order_id}</code>\n"
-            f"└ Клиенту вернули <b>{fmt(order.price)}</b>\n\n"
-            "<blockquote>Проверьте кабинет поставщика: если заказ всё-таки "
-            "прошёл, товар ушёл бесплатно — списать деньги обратно можно "
-            "в разделе «Клиенты».</blockquote>",
+            f"└ Оплачено: <b>{fmt(order.price)}</b>\n\n"
+            "<blockquote>Деньги клиенту НЕ возвращали — ждём ответа поставщика. "
+            "Отменит — бот сам вернёт деньги, выполнит — закроет заказ.</blockquote>",
         )
-        return "timeout"
-
     return "waiting"
 
 
@@ -665,8 +667,8 @@ async def hold_place(
         f"<blockquote expandable>{str(exc)[:600]}</blockquote>\n\n"
         "<blockquote>Отследить его бот не может. Проверьте кабинет "
         f"поставщика: дошло → <code>/done {order.id}</code>, "
-        f"нет → <code>/refund {order.id}</code>.\n\nБез решения деньги "
-        f"вернутся клиенту сами через {timeout_minutes()} мин."
+        f"нет → <code>/refund {order.id}</code>.\n\nБез вашего решения заказ так "
+        "и останется в обработке."
         "</blockquote>",
     )
 
