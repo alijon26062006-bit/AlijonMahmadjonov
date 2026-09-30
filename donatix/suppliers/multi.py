@@ -52,13 +52,17 @@ class MultiSupplier:
         return None
 
     def fetch_catalog(self) -> Iterable[ProductData]:
+        # Кто из доп. поставщиков не ответил: их товары при загрузке НЕ выключаем (catalog.sync_catalog)
+        self.failed_prefixes: set[str] = set()
         yield from self.primary.fetch_catalog()
         for e in self.extras:
             try:
                 yield from e.fetch_catalog()
-            except SupplierError as exc:
-                # Доп. поставщик недоступен — не рушим весь каталог, его товары обновим в следующий раз
-                log.warning("каталог %s недоступен, пропускаю: %s", getattr(e, "name", "extra"), exc)
+            except Exception as exc:  # noqa: BLE001 — доп. поставщик упал: не рушим весь каталог
+                log.warning("каталог %s недоступен, его товары не трогаю: %s", getattr(e, "name", "extra"), exc)
+                prefix = getattr(e, "id_prefix", "")
+                if prefix:
+                    self.failed_prefixes.add(prefix)
 
     def create_order(self, product: dict[str, Any], quantity: int, fields: dict[str, str],
                      idem_key: str) -> SupplierOrder:

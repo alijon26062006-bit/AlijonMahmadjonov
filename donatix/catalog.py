@@ -38,6 +38,9 @@ _UPSERT = """
 """
 
 
+MAX_DISABLE_SHARE = 0.3   # больше 30% каталога «пропало» за одну загрузку — это сбой, а не изменения
+
+
 def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
                  progress: Callable[[int, str], None] | None = None, *, id_prefix: str = "") -> dict[str, int]:
     """Забрать каталог у поставщика. Пропавшие товары выключаются, а не удаляются:
@@ -71,13 +74,24 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
     if seen:
         # Все пришедшие товары получили updated_at = started; остальные — пропали у поставщика.
         # (Не «id NOT IN (…тысячи id…)»: старые SQLite не принимают больше 999 параметров.)
+        where, args = "active = 1 AND updated_at <> ?", [started]
         if id_prefix:
-            disabled = conn.execute(
-                "UPDATE products SET active = 0 WHERE active = 1 AND updated_at <> ? AND id LIKE ?",
-                (started, id_prefix + "%")).rowcount
+            where += " AND id LIKE ?"
+            args.append(id_prefix + "%")
+        for prefix in sorted(getattr(supplier, "failed_prefixes", set())):
+            where += " AND id NOT LIKE ?"          # поставщик не ответил — его товары не «пропали»
+            args.append(prefix + "%")
+        gone = conn.execute(f"SELECT COUNT(*) FROM products WHERE {where}", args).fetchone()[0]
+        active = conn.execute("SELECT COUNT(*) FROM products WHERE active = 1" +
+                              (" AND id LIKE ?" if id_prefix else ""),
+                              [id_prefix + "%"] if id_prefix else []).fetchone()[0]
+        if active >= 50 and gone > active * MAX_DISABLE_SHARE:
+            # Поставщик ответил не полностью (сбой, лимит) — не выключаем разом пол-каталога
+            log.warning("каталог: пропало %s из %s товаров — похоже на сбой у поставщика, не выключаю", gone, active)
+            db.set_setting(conn, "catalog_sync_warning",
+                           f"{db.now()}: пропало {gone} из {active} товаров — не выключено (сбой поставщика?)")
         else:
-            disabled = conn.execute(
-                "UPDATE products SET active = 0 WHERE active = 1 AND updated_at <> ?", (started,)).rowcount
+            disabled = conn.execute(f"UPDATE products SET active = 0 WHERE {where}", args).rowcount
     if not id_prefix and "steam-gift" in seen:
         from . import steam_gifts
         try:
