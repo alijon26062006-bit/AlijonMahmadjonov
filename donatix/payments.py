@@ -266,6 +266,48 @@ def waiting_text(p: sqlite3.Row) -> str:
             "Новую заявку можно отправить сразу после проверки.")
 
 
+BOOST_AFTER = 10 * 60   # через сколько секунд ожидания появляется «Ускорить» (и как часто можно нажимать)
+
+
+def _age(ts: str | None) -> float:
+    from datetime import datetime, timezone
+    if not ts:
+        return 1e9
+    try:
+        dt = datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return 1e9
+    return (datetime.now(timezone.utc) - dt).total_seconds()
+
+
+def boost_wait(p: sqlite3.Row) -> int:
+    """Сколько секунд до кнопки «Ускорить»; 0 — можно нажимать."""
+    since = min(_age(p["created_at"]), _age(p["boosted_at"]))
+    return max(0, int(BOOST_AFTER - since))
+
+
+def boost(conn: sqlite3.Connection, config: Config, user_id: int, payment_id: int) -> int:
+    """Клиент ждёт дольше 10 минут и просит ускорить: заявка заново приходит в Telegram админу
+    и кассирам (новым сообщением внизу), а старые сообщения с ней удаляются. Вернёт, сколько минут ждёт."""
+    p = conn.execute("SELECT * FROM payments WHERE id = ? AND user_id = ?", (payment_id, user_id)).fetchone()
+    if p is None or p["status"] != "pending" or not p["receipt_file"]:
+        raise PaymentError("Заявка уже проверена или без чека.")
+    wait = boost_wait(p)
+    if wait > 0:
+        raise PaymentError(f"Ускорить можно через {wait // 60 + 1} мин.")
+    done = conn.execute("UPDATE payments SET boosted_at = ? WHERE id = ? AND status = 'pending' "
+                        "AND COALESCE(boosted_at, '') = COALESCE(?, '')",
+                        (db.now(), payment_id, p["boosted_at"])).rowcount
+    if not done:   # две вкладки нажали одновременно — отправит одна
+        raise PaymentError("Уже отправлено — администратор получил напоминание.")
+    from . import cashiers
+    from .tgbot import send_receipt
+    minutes = int(_age(p["created_at"]) // 60)
+    cashiers.drop_messages(conn, config, payment_id)
+    send_receipt(conn, config, payment_id, note=f"⚡ <b>Клиент просит ускорить</b> — ждёт {minutes} мин.")
+    return minutes
+
+
 def who_label(p: sqlite3.Row) -> str:
     """Кто решил заявку — для админа."""
     if p["resolved_who"]:

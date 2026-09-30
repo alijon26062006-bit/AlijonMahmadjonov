@@ -82,3 +82,33 @@ def test_admin_sees_who_decided_each_request(app, config, conn, monkeypatch):
     assert "Заявки на пополнение" in page and "кассир Исом" in page and "Зачислено" in page
     text, _ = tgbot.screen_client(conn, config, uid)                      # и в админ-боте в карточке клиента
     assert "✅ #1" in text and "кассир Исом" in text
+
+
+def test_boost_after_10_minutes_resends_and_drops_old_message(app, config, conn, monkeypatch):
+    sent, dropped = [], []
+    monkeypatch.setattr("donatix.worker.notify_admin_file",
+                        lambda cfg, caption, buttons, path, photo: sent.append(caption) or 100 + len(sent))
+    real_drop = cashiers.drop_messages
+
+    def drop(c, cfg, pid):
+        dropped.append([r["message_id"] for r in c.execute(
+            "SELECT message_id FROM payment_msgs WHERE payment_id = ?", (pid,))])
+        return real_drop(c, cfg, pid)
+    monkeypatch.setattr("donatix.cashiers.drop_messages", drop)
+    config.alert_telegram_chat_id = "777"
+    uid, client, token = _client(app, config, conn)
+    _send(client, token)
+    page = client.get("/panel/balance").text
+    assert "появится кнопка «⚡ Ускорить»" in page and "boost-btn" not in page     # рано — только подсказка
+    r = client.post("/panel/balance/1/boost", data={"csrf": token})
+    assert "Ускорить можно через" in r.text and len(sent) == 1
+
+    conn.execute("UPDATE payments SET created_at = '2026-01-01T00:00:00.000Z' WHERE id = 1")   # ждёт давно
+    assert "boost-btn" in client.get("/panel/balance").text
+    r = client.post("/panel/balance/1/boost", data={"csrf": token})
+    assert "Напомнили администратору" in r.text
+    assert len(sent) == 2 and "Клиент просит ускорить" in sent[-1]                 # пришла заново, с пометкой
+    assert dropped == [[101]]                                                     # старое сообщение удалено
+    assert [r[0] for r in conn.execute("SELECT message_id FROM payment_msgs WHERE payment_id = 1")] == [102]
+    r = client.post("/panel/balance/1/boost", data={"csrf": token})
+    assert "Ускорить можно через" in r.text and len(sent) == 2                   # снова — только через 10 минут

@@ -298,3 +298,23 @@ def daily_reports(conn: sqlite3.Connection, config: Config, start: datetime, end
                        json={"chat_id": s["tg_id"], "text": text, "parse_mode": "HTML"}, timeout=10)
         except httpx.HTTPError as exc:
             log.warning("отчёт кассиру %s: %s", s["tg_id"], exc)
+
+
+def drop_messages(conn: sqlite3.Connection, config: Config, payment_id: int) -> int:
+    """Удалить из Telegram прошлые сообщения с этой заявкой (у админа и кассиров) — перед повторной отправкой."""
+    rows = [dict(r) for r in conn.execute(
+        "SELECT chat_id, message_id FROM payment_msgs WHERE payment_id = ?", (payment_id,)).fetchall()]
+    conn.execute("DELETE FROM payment_msgs WHERE payment_id = ?", (payment_id,))
+    if not rows or not config.alert_telegram_token:
+        return len(rows)
+    url = f"https://api.telegram.org/bot{config.alert_telegram_token}/deleteMessage"
+
+    def run() -> None:
+        for r in rows:
+            try:
+                httpx.post(url, json={"chat_id": r["chat_id"], "message_id": r["message_id"]}, timeout=10)
+            except httpx.HTTPError as exc:
+                log.info("чек #%s: старое сообщение не удалено: %s", payment_id, exc)
+    threading.Thread(target=run, name="donatix-drop", daemon=True).start()
+    return len(rows)
+

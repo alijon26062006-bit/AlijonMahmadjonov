@@ -23,6 +23,15 @@
         </div>
         {% else %}
         <p>Чек получен ✅ Администратор проверяет поступление — обычно до 1 часа. Как только проверит, баланс пополнится и придёт уведомление 🔔.</p>
+        {% if boost_wait == 0 %}
+        <form method="post" action="/panel/balance/{{ waiting.id }}/boost" class="boost-form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn primary boost-btn">⚡ Ускорить проверку</button>
+        </form>
+        <p class="hint">Заявка ещё раз придёт администратору — наверх списка.</p>
+        {% else %}
+        <p class="hint" id="boost-soon" data-left="{{ boost_wait }}">Если проверка затянется, через {{ boost_wait // 60 + 1 }} мин. здесь появится кнопка «⚡ Ускорить».</p>
+        {% endif %}
         <p class="hint">Новую заявку можно отправить сразу после проверки этой. Страница обновится сама.</p>
         {% endif %}
       </div>
@@ -111,6 +120,9 @@
         .then(function (d) { if (d.status && d.status !== "pending") location.reload(); }).catch(function () {});
     }, 8000);
   }
+  // Кнопка «Ускорить» появится сама, когда подойдёт время
+  var soon = document.getElementById("boost-soon");
+  if (soon) setTimeout(function () { location.reload(); }, (parseInt(soon.dataset.left, 10) + 2) * 1000);
   // Двойное нажатие не отправит заявку дважды
   var pf = document.getElementById("payform"), ps = document.getElementById("paysend");
   if (pf && ps) pf.addEventListener("submit", function () {

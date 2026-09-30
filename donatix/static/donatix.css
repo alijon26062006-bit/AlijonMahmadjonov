@@ -1402,3 +1402,8 @@ a.order-card:hover { transform: translateY(-1px); }
 .date-field input[type=date]::-webkit-date-and-time-value { text-align: left; margin: 0; }
 .date-field input[type=date]::-webkit-calendar-picker-indicator { opacity: .7; cursor: pointer; }
 
+/* «⚡ Ускорить проверку» — в карточке ожидания */
+.boost-form { margin-top: 12px; }
+.boost-btn { animation: rp-pulse 2.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .boost-btn { animation: none; } }
+

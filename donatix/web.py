@@ -678,9 +678,11 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
     rates.refresh(conn, config, rates.PAYMENT_SECONDS)
     rows = conn.execute("SELECT * FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user["id"],)).fetchall()
     conf = payments.settings(conn, config)
+    waiting = payments.open_request(conn, user["id"])
     return render(request, "panel/balance.html", {
         "user": user, "methods": payments.methods(conn, config), "payments": rows, "tjs_rate": conf["tjs_rate"],
-        "min_usd": conf["min_usd"], "min_tjs": conf["min_tjs"], "waiting": payments.open_request(conn, user["id"]),
+        "min_usd": conf["min_usd"], "min_tjs": conf["min_tjs"], "waiting": waiting,
+        "boost_wait": payments.boost_wait(waiting) if waiting is not None else None,
         "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()} | {m["code"]: m["title"] for m in conf["all_methods"]},
     })
 
@@ -866,6 +868,20 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     send_receipt(conn, config, pid)
     flash(request, f"Заявка #{pid} создана. Переведите {row['pay_amount']} {row['pay_currency']} по реквизитам — "
                    "после проверки баланс пополнится, вам придёт уведомление.")
+    return _redirect("/panel/balance")
+
+
+@router.post("/panel/balance/{payment_id}/boost", dependencies=[Depends(check_csrf)])
+def panel_balance_boost(payment_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                        config: Config = Depends(get_config)):
+    """«⚡ Ускорить»: заявка заново уходит админу и кассирам, старое сообщение в Telegram удаляется."""
+    from . import payments
+    try:
+        payments.boost(conn, config, user["id"], payment_id)
+        flash(request, "⚡ Напомнили администратору — заявка снова наверху списка. Обычно проверяют в течение "
+                       "нескольких минут.")
+    except payments.PaymentError as exc:
+        flash(request, str(exc), "error")
     return _redirect("/panel/balance")
 
 

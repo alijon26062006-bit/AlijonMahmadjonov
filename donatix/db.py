@@ -392,6 +392,8 @@ def init(path: Path | str) -> None:
             conn.execute("ALTER TABLE payments ADD COLUMN resolved_tg TEXT")
         if "receipt_hash" not in pay_cols:  # один чек — одна заявка: тот же файл второй раз не примем
             conn.execute("ALTER TABLE payments ADD COLUMN receipt_hash TEXT")
+        if "boosted_at" not in pay_cols:   # клиент нажал «Ускорить» — когда (не чаще раза в 10 минут)
+            conn.execute("ALTER TABLE payments ADD COLUMN boosted_at TEXT")
         if "resolved_who" not in pay_cols:  # кто решил: «кассир Али», «админ (сайт)», «автоматически»…
             conn.execute("ALTER TABLE payments ADD COLUMN resolved_who TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS payments_receipt_hash ON payments(receipt_hash) "

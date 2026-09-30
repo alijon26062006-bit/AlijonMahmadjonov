@@ -418,7 +418,7 @@ def _admin_id(conn: sqlite3.Connection) -> int:
 
 
 def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
-                 only_chat: int | None = None) -> None:
+                 only_chat: int | None = None, note: str = "") -> None:
     """Заявка с приложенным чеком — фото/файлом с кнопками «Зачислить / Отклонить»:
     админу и кассирам, которым назначен этот банк. Все копии запоминаем, чтобы после
     решения поправить каждую (only_chat — прислать заново одному кассиру)."""
@@ -429,7 +429,7 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
     if not p or not p["receipt_file"]:
         return
     text, buttons = payment_event(conn, payment_id, config)
-    caption = text + "\n🧾 Чек приложен"
+    caption = (note + "\n\n" if note else "") + text + "\n🧾 Чек приложен"
     path = receipts_dir(config) / p["receipt_file"]
     photo = not p["receipt_file"].endswith(".pdf")
     if only_chat is None:
