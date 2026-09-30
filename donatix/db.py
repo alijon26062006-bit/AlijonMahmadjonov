@@ -268,6 +268,27 @@ CREATE TABLE IF NOT EXISTS payment_msgs (
     caption    TEXT NOT NULL,
     PRIMARY KEY (payment_id, chat_id, message_id)
 );
+-- D-коин: монеты за покупки и копилка из части прибыли (см. dcoin.py)
+CREATE TABLE IF NOT EXISTS dcoin_ledger (
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    amount     INTEGER NOT NULL,            -- сотые доли монеты; минус — обмен
+    pool_micro INTEGER NOT NULL DEFAULT 0,  -- сколько добавилось в копилку (минус — выплачено)
+    reason     TEXT NOT NULL,
+    order_id   INTEGER UNIQUE REFERENCES orders(id),   -- за один заказ — один раз
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dcoin_ledger_user ON dcoin_ledger(user_id, id DESC);
+-- Точки графика: состояние копилки и монет после каждой покупки/обмена
+CREATE TABLE IF NOT EXISTS dcoin_points (
+    id     INTEGER PRIMARY KEY,
+    ts     TEXT NOT NULL,
+    pool   INTEGER NOT NULL,
+    supply INTEGER NOT NULL,
+    price  REAL NOT NULL,
+    reason TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dcoin_points_ts ON dcoin_points(ts);
 CREATE INDEX IF NOT EXISTS visits_session ON visits(session, ts);
 CREATE INDEX IF NOT EXISTS visits_user ON visits(user_id) WHERE user_id IS NOT NULL;
 -- Быстрые отчёты: продажи/деньги за период, посещаемость без чтения всей таблицы
@@ -399,6 +420,8 @@ def init(path: Path | str) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS payments_receipt_hash ON payments(receipt_hash) "
                      "WHERE receipt_hash IS NOT NULL")
         conn.execute("CREATE INDEX IF NOT EXISTS payments_user ON payments(user_id, status)")
+        if "dcoin" not in user_cols:   # D-коины клиента, сотые доли
+            conn.execute("ALTER TABLE users ADD COLUMN dcoin INTEGER NOT NULL DEFAULT 0")
         if "google_sub" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)")

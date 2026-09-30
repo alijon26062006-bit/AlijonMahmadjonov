@@ -59,7 +59,13 @@ def _sales(conn: sqlite3.Connection, a: str, b: str) -> tuple[sqlite3.Row, int]:
 def net_profit(conn: sqlite3.Connection, a: str, b: str) -> int:
     """Чистая прибыль за [a, b): продажи − закупка − реферальные бонусы."""
     o, referral = _sales(conn, a, b)
-    return int(o["revenue"]) - int(o["cost"]) - referral
+    return int(o["revenue"]) - int(o["cost"]) - referral - _dcoin(conn, a, b)
+
+
+def _dcoin(conn: sqlite3.Connection, a: str, b: str) -> int:
+    """Доля прибыли, отложенная в копилку D-коина, — тоже наш расход."""
+    from . import dcoin
+    return dcoin.pool_added(conn, a, b)
 
 
 def summary(conn: sqlite3.Connection, config: Config, start: datetime, end: datetime) -> dict[str, Any]:
@@ -86,7 +92,8 @@ def summary(conn: sqlite3.Connection, config: Config, start: datetime, end: date
     o, referral = _sales(conn, a, b)
     revenue, cost = int(o["revenue"]), int(o["cost"])
     profit = revenue - cost
-    net = profit - referral
+    dcoin_pool = _dcoin(conn, a, b)
+    net = profit - referral - dcoin_pool
     # Доли кассиров — из чистой прибыли; остальное владельцу
     from . import cashiers
     staff = [c for c in cashiers.shares(conn, config, a, b, net) if c["share"] or c["active"]]
@@ -103,9 +110,9 @@ def summary(conn: sqlite3.Connection, config: Config, start: datetime, end: date
         "methods": methods, "received": received, "to_card": to_card, "crypto": received - to_card,
         "by_currency": by_currency, "payments": sum(m["count"] for m in methods),
         "orders": int(o["n"]), "revenue": revenue, "cost": cost, "gross_profit": profit,
-        "referral": referral, "profit": net,
+        "referral": referral, "dcoin": dcoin_pool, "profit": net,
         "cashiers": staff, "cashiers_total": staff_total, "owner_profit": net - staff_total,
-        "to_supplier": max(received - net, 0), "manual_credit": manual,
+        "to_supplier": max(received - net - dcoin_pool, 0), "manual_credit": manual,
         "clients_balance": clients, "supplier_balance": supplier,
     }
 
@@ -150,8 +157,9 @@ def report_text(s: dict[str, Any]) -> str:
     lines += ["",
               f"🛒 Продано: {s['orders']} {plural(s['orders'], 'заказ', 'заказа', 'заказов')} на {both(s['revenue'])}",
               f"🏭 Закупка у поставщика: {both(s['cost'])}",
-              *([f"📈 Прибыль с продаж: {both(s['gross_profit'])}",
-                 f"🎁 Бонусы рефералам: −{both(s['referral'])}"] if s.get("referral") else []),
+              *([f"📈 Прибыль с продаж: {both(s['gross_profit'])}"] if s.get("referral") or s.get("dcoin") else []),
+              *([f"🎁 Бонусы рефералам: −{both(s['referral'])}"] if s.get("referral") else []),
+              *([f"🪙 В копилку D-коина (отложить): −{both(s['dcoin'])}"] if s.get("dcoin") else []),
               *([f"📈 Прибыль: {both(s['profit'])}",
                  *(f"👤 Кассир {c['name']} ({c['percent']}%, его банки ${usd(c['received'])}): "
                    f"−{both(c['share'])}" for c in s["cashiers"]),

@@ -139,8 +139,16 @@ def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
         "daily_report": (db.get_setting(conn, "report.daily_on") or "1") == "1",
         "referral_percent": _referral_percent(conn),
         "referral_example": _referral_example(conn, config),
+        **_dcoin_view(conn),
         "supplier_rate": _throttle_status(),
     }
+
+
+def _dcoin_view(conn: sqlite3.Connection) -> dict[str, Any]:
+    from . import dcoin
+    st = dcoin.state(conn)
+    return {"dcoin_per_usd": dcoin.per_usd(conn), "dcoin_pool_pct": dcoin.pool_pct(conn),
+            "dcoin_open_days": dcoin.open_days(conn), "dcoin_pool": st["pool"], "dcoin_supply": dcoin.fmt_d(st["supply"])}
 
 
 def _watch_rules(conn: sqlite3.Connection) -> dict:
@@ -223,6 +231,17 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
         if not 0 <= n <= 50:
             raise SettingsError("Реферальный процент — от 0 до 50.")
         values["referral.percent"] = str(n)
+    for key, what, lo, hi in (("dcoin_per_usd", "D-коинов за $1", 0, 10_000),
+                              ("dcoin_pool_pct", "Процент прибыли в копилку D-коина", 0, 25),
+                              ("dcoin_open_days", "Дней до открытия обмена D-коинов", 0, 365)):
+        if key in data:
+            try:
+                n = int(str(data[key]).strip())
+            except ValueError:
+                raise SettingsError(f"{what} — целое число.") from None
+            if not lo <= n <= hi:
+                raise SettingsError(f"{what} — от {lo} до {hi}.")
+            values["dcoin." + key.removeprefix("dcoin_")] = str(n)
     if "daily_report" in data:
         values["report.daily_on"] = "1" if data["daily_report"] in (True, "1", "on") else "0"
     if "watch_on" in data:

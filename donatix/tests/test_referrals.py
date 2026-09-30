@@ -81,6 +81,7 @@ def test_finance_shows_net_profit_after_referral(config, conn):
     orders.complete(conn, oid, {}, "completed")
     now = datetime.now(timezone.utc)
     s = finance.summary(conn, config, now - timedelta(hours=1), now + timedelta(hours=1))
-    assert s["gross_profit"] == 8_000 and s["referral"] == 800 and s["profit"] == 7_200   # 10% по умолчанию
+    assert s["gross_profit"] == 8_000 and s["referral"] == 800 and s["dcoin"] == 800   # по 10% по умолчанию
+    assert s["profit"] == 6_400                                          # минус рефералу и копилка D-коина
     assert s["profit"] > 0
     assert "Бонусы рефералам" in finance.report_text(s)

@@ -384,6 +384,11 @@ def complete(conn: sqlite3.Connection, order_id: int, delivery: dict[str, Any] |
             referrals.award(conn, order_id)   # бонус пригласившему — раз за заказ
         except Exception:  # noqa: BLE001 — бонус не должен ломать выдачу заказа
             log.exception("реферальный бонус за заказ %s", order_id)
+        try:
+            from . import dcoin
+            dcoin.award(conn, order_id)       # D-коины клиенту и доля прибыли в копилку
+        except Exception:  # noqa: BLE001
+            log.exception("D-коины за заказ %s", order_id)
     return bool(changed)
 
 

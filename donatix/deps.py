@@ -88,6 +88,21 @@ def _money(ctx, value, digits: int | None = None):
 templates.env.globals["money"] = _money
 
 
+@pass_context
+def _dprice(ctx, usd: float) -> str:
+    """Цена D-коина (доли цента) в валюте клиента: 4 значащие цифры, как на бирже."""
+    import math
+    value, sign = float(usd or 0), "$"
+    if ctx.get("cur_code") == "TJS" and ctx.get("cur_rate"):
+        value, sign = value * float(ctx["cur_rate"]), " с."
+    places = 4 if value <= 0 else max(4, min(10, 3 - math.floor(math.log10(value))))
+    text = f"{value:.{places}f}"
+    return f"${text}" if sign == "$" else f"{text}{sign}"
+
+
+templates.env.globals["dprice"] = _dprice
+
+
 def _asset_version() -> str:
     """Метка версии стилей: меняется с файлом, и браузер не держит старый CSS из кеша."""
     import hashlib

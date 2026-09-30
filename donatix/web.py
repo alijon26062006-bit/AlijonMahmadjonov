@@ -355,7 +355,13 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
         "user": user, "summary": summary, "key": key, "kinds": KINDS,
         "markup": accounts.markup_for(user, config),
         "ref_percent": referrals.percent(conn),
+        "dc": _dcoin_card(conn, user["id"]),
     })
+
+
+def _dcoin_card(conn: sqlite3.Connection, user_id: int) -> dict[str, Any] | None:
+    from . import dcoin
+    return dcoin.summary(conn, user_id) if dcoin.enabled(conn) else None
 
 
 def _tz_hours(conn: sqlite3.Connection, user: Any, cookie: str | None) -> int:
@@ -915,6 +921,47 @@ def panel_support_code(request: Request, user=Depends(panel_user), conn=Depends(
     supportbot.send_code_notification(conn, config, user["id"])
     flash(request, "Код отправлен — он первым в списке уведомлений. Отправьте его боту поддержки.")
     return _redirect("/panel/notifications")
+
+
+@router.get("/panel/dcoin")
+def panel_dcoin(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import dcoin
+    return render(request, "panel/dcoin.html", {
+        "user": user, "d": dcoin.summary(conn, user["id"]), "history": dcoin.history(conn, user["id"], 10),
+        "top": dcoin.top(conn), "tfs": list(dcoin.TIMEFRAMES),
+    })
+
+
+@router.get("/panel/data/dcoin")
+def panel_dcoin_data(tf: str = "1m", user=Depends(panel_user), conn=Depends(get_conn)):
+    """Свечи и цифры для живого графика — страница спрашивает каждые несколько секунд."""
+    from . import dcoin
+    data = dcoin.candles(conn, tf)
+    d = dcoin.summary(conn, user["id"])
+    data.update({"price": d["price"], "change": d["change"], "balance": d["balance_text"],
+                 "worth_micro": d["worth_micro"], "supply": d["supply_text"], "pool_micro": d["pool_micro"]})
+    return JSONResponse(data, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/panel/dcoin/exchange", dependencies=[Depends(check_csrf)])
+def panel_dcoin_exchange(request: Request, amount: str = Form(""), user=Depends(panel_user),
+                         conn=Depends(get_conn)):
+    from . import dcoin
+    from .money import fmt
+    try:
+        raw = amount.replace(" ", "").replace(",", ".")
+        units = dcoin.balance(conn, user["id"]) if raw.lower() in ("all", "все", "всё") \
+            else int(round(float(raw) * dcoin.UNIT))
+    except ValueError:
+        flash(request, "Укажите, сколько D-коинов обменять.", "error")
+        return _redirect("/panel/dcoin")
+    try:
+        pay = dcoin.exchange(conn, user["id"], units)
+    except dcoin.ExchangeError as exc:
+        flash(request, str(exc), "error")
+    else:
+        flash(request, f"Обменяли {dcoin.fmt_d(units)} D — на баланс зачислено ${fmt(pay)}.")
+    return _redirect("/panel/dcoin")
 
 
 @router.get("/panel/referrals")

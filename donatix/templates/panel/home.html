@@ -17,6 +17,14 @@
   </div>
 </div>
 
+{% if dc %}
+<a class="dc-card" href="/panel/dcoin">
+  <span class="dc-card-coin">D</span>
+  <span class="grow"><b>{{ dc.balance_text }} D</b><small>≈ {{ money(dc.worth_micro) }} · 1 D = {{ dprice(dc.price) }}</small></span>
+  <span class="dc-chg {{ 'up' if dc.change >= 0 else 'down' }}">{{ '+' if dc.change >= 0 }}{{ dc.change }}%</span>
+  {{ icon('chevron', 18) }}
+</a>
+{% endif %}
 {% set ref_href = "/panel/referrals" %}{% include "_ref_promo.html" %}
 
 <div class="card quick">
