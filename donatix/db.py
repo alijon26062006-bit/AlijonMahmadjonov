@@ -276,6 +276,7 @@ CREATE TABLE IF NOT EXISTS dcoin_ledger (
     pool_micro INTEGER NOT NULL DEFAULT 0,  -- сколько добавилось в копилку (минус — выплачено)
     reason     TEXT NOT NULL,
     order_id   INTEGER UNIQUE REFERENCES orders(id),   -- за один заказ — один раз
+    pending    INTEGER NOT NULL DEFAULT 0,  -- 1 — заказ ещё выполняется, 2 — не выполнен (монеты списаны)
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS dcoin_ledger_user ON dcoin_ledger(user_id, id DESC);
@@ -421,6 +422,9 @@ def init(path: Path | str) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS payments_receipt_hash ON payments(receipt_hash) "
                      "WHERE receipt_hash IS NOT NULL")
         conn.execute("CREATE INDEX IF NOT EXISTS payments_user ON payments(user_id, status)")
+        ledger_cols = {r[1] for r in conn.execute("PRAGMA table_info(dcoin_ledger)")}
+        if "pending" not in ledger_cols:
+            conn.execute("ALTER TABLE dcoin_ledger ADD COLUMN pending INTEGER NOT NULL DEFAULT 0")
         point_cols = {r[1] for r in conn.execute("PRAGMA table_info(dcoin_points)")}
         if "reserve" not in point_cols:
             conn.execute("ALTER TABLE dcoin_points ADD COLUMN reserve INTEGER NOT NULL DEFAULT 0")

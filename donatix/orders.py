@@ -223,6 +223,11 @@ def create_order(
             raise
         return _replay(existing, product_id, qty, fields_json), True
 
+    try:
+        from . import dcoin
+        dcoin.on_created(conn, order_id)      # D-коины сразу в истории — «ждут выполнения»
+    except Exception:  # noqa: BLE001 — монеты не должны мешать заказу
+        log.exception("D-коины при покупке %s", order_id)
     order = get_order_row(conn, order_id)
     _send_to_supplier(conn, supplier, order, product)
     return get_order_row(conn, order_id), False

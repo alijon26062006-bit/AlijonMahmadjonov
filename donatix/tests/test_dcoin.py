@@ -229,3 +229,65 @@ def test_refund_drops_price_by_setting(conn):
     assert dcoin.price(conn) == p1
     db.set_setting(conn, "dcoin.refund_pct", "0")
     assert dcoin.on_refund(conn, cur.lastrowid) is False                # 0 — цена не падает
+
+
+def _processing(conn, uid, total):
+    n = conn.execute("SELECT COUNT(*) FROM orders").fetchone()[0]
+    ts = db.now()
+    cur = conn.execute(
+        "INSERT INTO orders (public_id, user_id, product_id, kind, product_name, quantity, unit_price, total_micro, "
+        "cost_micro, status, supplier_idem_key, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (f"dx-{n}", uid, "p", "topup", "x", 1, "1", total, int(total * 0.92), "processing", f"k{n}", ts, ts))
+    dcoin.on_created(conn, cur.lastrowid)                               # как при оформлении покупки
+    return cur.lastrowid, f"dx-{n}"
+
+
+def test_history_keeps_credits_and_refund_debits(conn):
+    uid = _user(conn)
+    _buy(conn, uid, 10_000)
+    oid, pid = _processing(conn, uid, 30_000)                           # $3 → +300 D сразу
+    assert dcoin.balance(conn, uid) == 400 * dcoin.UNIT
+    assert dcoin.waiting(conn, uid) == 300 * dcoin.UNIT                 # но ждут выполнения
+    orders.fail_and_refund(conn, oid, "поставщик отклонил")
+    assert dcoin.balance(conn, uid) == 100 * dcoin.UNIT and dcoin.waiting(conn, uid) == 0
+    h = dcoin.history(conn, uid)
+    assert h[0]["reason"] == f"Заказ {pid} не выполнен — возврат" and h[0]["amount"] == "-300.00" and not h[0]["plus"]
+    assert [x["reason"] for x in h[1:]] == [f"Заказ {pid}", "Заказ dx-0"]    # зачисления остались в истории
+    orders.fail_and_refund(conn, oid, "ещё раз")
+    assert dcoin.balance(conn, uid) == 100 * dcoin.UNIT                  # второй раз не списывает
+
+
+def test_coins_given_at_purchase_become_real_on_completion(conn):
+    uid = _user(conn)
+    _buy(conn, uid, 10_000)
+    pool = dcoin.state(conn)["pool"]
+    oid, _ = _processing(conn, uid, 20_000)
+    assert orders.complete(conn, oid, {})
+    assert dcoin.balance(conn, uid) == 300 * dcoin.UNIT                 # не начислено дважды
+    assert dcoin.waiting(conn, uid) == 0 and dcoin.state(conn)["pool"] > pool
+    assert len(dcoin.history(conn, uid)) == 2
+
+
+def test_waiting_coins_cannot_be_exchanged(conn, monkeypatch):
+    monkeypatch.setattr(dcoin, "START_PRICE", 1.0)
+    uid = _user(conn)
+    for _ in range(5):
+        _buy(conn, uid, 1_000_000, cost=500_000)
+    _processing(conn, uid, 1_000_000)
+    later = datetime.now(timezone.utc) + timedelta(days=31)
+    try:
+        dcoin.exchange(conn, uid, dcoin.balance(conn, uid), now=later)
+        raise AssertionError("монеты за невыполненный заказ обменивать нельзя")
+    except dcoin.ExchangeError as exc:
+        assert "ждёт выполнения" in str(exc)
+
+
+def test_real_order_rejected_by_supplier_shows_refund_in_history(client, conn, shop, supplier):
+    supplier.fail_next = "reject_other"
+    r = client.post("/api/v1/orders", headers=shop["h"],
+                    json={"product_id": "tg-stars", "quantity": 100, "fields": {"telegram_username": "@player_one"}})
+    pid = r.json()["order"]["order_id"]
+    h = dcoin.history(conn, shop["id"])
+    assert h[0]["reason"] == f"Заказ {pid} не выполнен — возврат" and not h[0]["plus"]
+    assert h[1]["reason"] == f"Заказ {pid}" and h[1]["plus"]
+    assert dcoin.balance(conn, shop["id"]) == 0

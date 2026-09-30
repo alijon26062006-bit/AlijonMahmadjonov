@@ -1498,3 +1498,4 @@ a.order-card:hover { transform: translateY(-1px); }
   font: 600 .78rem var(--font); cursor: pointer; box-shadow: 0 6px 16px -6px rgb(59 130 246 / .7);
   animation: dc-tick .3s var(--ease-out); }
 .dc-hint { padding: 2px 12px 6px 0; color: #6b7386; font-size: .72rem; text-align: center; }
+.dc-row b.wait { color: var(--muted); }

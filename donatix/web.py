@@ -927,7 +927,7 @@ def panel_support_code(request: Request, user=Depends(panel_user), conn=Depends(
 def panel_dcoin(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
     from . import dcoin
     return render(request, "panel/dcoin.html", {
-        "user": user, "d": dcoin.summary(conn, user["id"]), "history": dcoin.history(conn, user["id"], 10),
+        "user": user, "d": dcoin.summary(conn, user["id"]), "history": dcoin.history(conn, user["id"], 30),
         "top": dcoin.top(conn), "tfs": list(dcoin.TIMEFRAMES),
     })
 

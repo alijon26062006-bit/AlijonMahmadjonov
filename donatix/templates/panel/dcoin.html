@@ -39,7 +39,7 @@
   </section>
 
   <section class="dc-stats">
-    <div class="dc-stat main"><span>У вас</span><b id="dc-bal">{{ d.balance_text }} D</b><small id="dc-worth">≈ {{ money(d.worth_micro) }}</small></div>
+    <div class="dc-stat main"><span>У вас</span><b id="dc-bal">{{ d.balance_text }} D</b><small id="dc-worth">≈ {{ money(d.worth_micro) }}{% if d.waiting %} · {{ d.waiting_text }} D ждут выполнения заказов{% endif %}</small></div>
     <div class="dc-stat"><span>За покупку</span><b>$1 = {{ d.per_usd }} D</b><small>$0.50 = {{ d.per_usd // 2 }} D</small></div>
   </section>
 
@@ -61,7 +61,7 @@
       <label for="dc-amount">Сколько D</label>
       <div class="dc-ex-row">
         <input id="dc-amount" name="amount" inputmode="decimal" placeholder="{{ d.balance_text }}" autocomplete="off">
-        <button class="btn soft" type="button" data-all="{{ d.balance / 100 }}">Все</button>
+        <button class="btn soft" type="button" data-all="{{ d.free / 100 }}">Все</button>
         <button class="btn primary" type="submit">Обменять</button>
       </div>
       <div class="hint">От $1 по текущей цене, раз в сутки. Сейчас все ваши монеты ≈ {{ money(d.worth_micro) }}.</div>
@@ -73,11 +73,11 @@
 
   <div class="grid two dc-lists">
     <section class="card">
-      <h3>Мои D-коины</h3>
+      <h3>История D-коинов</h3>
       <div class="list tight">
         {% for h in history %}
-        <div class="dc-row"><span class="grow">{{ h.reason }}<small>{{ h.created_at | dt }}</small></span>
-          <b class="{{ 'plus' if h.plus else 'minus' }}">{{ '+' if h.plus }}{{ h.amount }} D</b></div>
+        <div class="dc-row"><span class="grow">{{ h.reason }}<small>{{ h.created_at | dt }}{% if h.wait %} · ждёт выполнения заказа{% endif %}</small></span>
+          <b class="{{ 'wait' if h.wait else ('plus' if h.plus else 'minus') }}">{{ '+' if h.plus }}{{ h.amount }} D</b></div>
         {% else %}<div class="empty">Сделайте покупку — первые D-коины появятся здесь.</div>{% endfor %}
       </div>
     </section>

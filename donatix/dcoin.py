@@ -167,21 +167,55 @@ def reward_units(conn: sqlite3.Connection, usd: float) -> int:
     return int(usd * per_usd(conn) * UNIT)
 
 
+def on_created(conn: sqlite3.Connection, order_id: int) -> int:
+    """Покупка оформлена — монеты сразу в истории и на счету, но «ждут выполнения»: обменять их
+    нельзя, пока заказ не выполнен. Не выполнится — спишутся с пометкой «возврат»."""
+    if not enabled(conn):
+        return 0
+    row = conn.execute("SELECT public_id, user_id, total_micro FROM orders WHERE id = ?", (order_id,)).fetchone()
+    if row is None or row["total_micro"] <= 0:
+        return 0
+    units = reward_units(conn, row["total_micro"] / 10_000)
+    if units <= 0:
+        return 0
+    added = conn.execute(
+        "INSERT OR IGNORE INTO dcoin_ledger (user_id, amount, pool_micro, reason, order_id, pending, created_at) "
+        "VALUES (?, ?, 0, ?, ?, 1, ?)", (row["user_id"], units, f"Заказ {row['public_id']}", order_id, db.now())).rowcount
+    if added:
+        conn.execute("UPDATE users SET dcoin = dcoin + ? WHERE id = ?", (units, row["user_id"]))
+    return units if added else 0
+
+
+def on_cancel(conn: sqlite3.Connection, order_id: int) -> int:
+    """Заказ не выполнен — монеты за него списываются, в истории строка «не выполнен — возврат»."""
+    row = conn.execute("SELECT l.id, l.user_id, l.amount, o.public_id FROM dcoin_ledger l JOIN orders o "
+                       "ON o.id = l.order_id WHERE l.order_id = ? AND l.pending = 1", (order_id,)).fetchone()
+    if row is None:
+        return 0
+    if not conn.execute("UPDATE dcoin_ledger SET pending = 2 WHERE id = ? AND pending = 1", (row["id"],)).rowcount:
+        return 0
+    conn.execute("UPDATE users SET dcoin = dcoin - ? WHERE id = ?", (row["amount"], row["user_id"]))
+    conn.execute("INSERT INTO dcoin_ledger (user_id, amount, pool_micro, reason, created_at) VALUES (?, ?, 0, ?, ?)",
+                 (row["user_id"], -row["amount"], f"Заказ {row['public_id']} не выполнен — возврат", db.now()))
+    return int(row["amount"])
+
+
 def award(conn: sqlite3.Connection, order_id: int) -> int:
-    """За выполненный заказ: монеты клиенту и часть прибыли в копилку. Один раз за заказ.
-    Возвращает начисленные монеты (сотые) или 0."""
+    """За выполненный заказ: монеты клиенту (или подтверждение уже выданных при покупке) и часть
+    прибыли в копилку. Один раз за заказ. Возвращает монеты (сотые) или 0."""
     if not enabled(conn):
         return 0
     row = conn.execute("SELECT id, public_id, user_id, total_micro, cost_micro, status FROM orders WHERE id = ?",
                        (order_id,)).fetchone()
     if row is None or row["status"] != "completed" or row["total_micro"] <= 0:
         return 0
-    if conn.execute("SELECT 1 FROM dcoin_ledger WHERE order_id = ?", (order_id,)).fetchone():
+    given = conn.execute("SELECT id, amount, pending FROM dcoin_ledger WHERE order_id = ?", (order_id,)).fetchone()
+    if given is not None and given["pending"] != 1:
         return 0
     started_at(conn)
     usd = row["total_micro"] / 10_000
     cur = state(conn)
-    units = reward_units(conn, usd)
+    units = int(given["amount"]) if given is not None else reward_units(conn, usd)
     if units <= 0:
         return 0
     profit = max(0, int(row["total_micro"]) - int(row["cost_micro"] or 0))
@@ -190,13 +224,18 @@ def award(conn: sqlite3.Connection, order_id: int) -> int:
     to_pool = int(profit * pool_pct(conn) / 100 * max(MIN_SHARE, min(MAX_SHARE, math.sqrt(ratio))))
     cap = profit * pool_pct(conn) * 2 // 100                      # никогда больше 2× процента прибыли
     to_pool, reserve = steer(cur, units, min(to_pool, cap), cap, prev_ratio(conn, usd, order_id))
-    added = conn.execute(
-        "INSERT OR IGNORE INTO dcoin_ledger (user_id, amount, pool_micro, reason, order_id, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (row["user_id"], units, to_pool, f"Заказ {row['public_id']}", order_id, db.now())).rowcount
-    if not added:
-        return 0
-    conn.execute("UPDATE users SET dcoin = dcoin + ? WHERE id = ?", (units, row["user_id"]))
+    if given is not None:   # монеты уже на счету с момента покупки — теперь они настоящие
+        if not conn.execute("UPDATE dcoin_ledger SET pending = 0, pool_micro = ? WHERE id = ? AND pending = 1",
+                            (to_pool, given["id"])).rowcount:
+            return 0
+    else:
+        added = conn.execute(
+            "INSERT OR IGNORE INTO dcoin_ledger (user_id, amount, pool_micro, reason, order_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (row["user_id"], units, to_pool, f"Заказ {row['public_id']}", order_id, db.now())).rowcount
+        if not added:
+            return 0
+        conn.execute("UPDATE users SET dcoin = dcoin + ? WHERE id = ?", (units, row["user_id"]))
     _point(conn, cur["pool"] + to_pool, cur["supply"] + units, "buy", reserve=reserve)
     return units
 
@@ -266,8 +305,9 @@ def smooth(pool: int, coins: int, units: int, to_pool: int, cap: int) -> int:
 
 
 def on_refund(conn: sqlite3.Connection, order_id: int) -> bool:
-    """Заказ отменён, деньги вернулись — цена падает на refund_pct%. Через запас сайта:
-    ни копилка, ни монеты людей не меняются. Зовётся один раз — там, где делается возврат."""
+    """Заказ отменён, деньги вернулись: монеты за него списываются, цена падает на refund_pct%
+    (через запас сайта — копилка и монеты остальных не меняются). Зовётся там, где делается возврат."""
+    on_cancel(conn, order_id)
     pct = refund_pct(conn)
     s = state(conn)
     coins = s["supply"] + s["reserve"]
@@ -301,9 +341,10 @@ def exchange(conn: sqlite3.Connection, user_id: int, units: int, now: datetime |
         raise ExchangeError(f"Обмен откроется {exchange_opens(conn):%d.%m.%Y} — пока копим, цена растёт.")
     with db.tx(conn):
         row = conn.execute("SELECT dcoin FROM users WHERE id = ?", (user_id,)).fetchone()
-        have = int(row["dcoin"]) if row else 0
+        have = (int(row["dcoin"]) if row else 0) - waiting(conn, user_id)   # за невыполненные заказы — нельзя
         if units <= 0 or units > have:
-            raise ExchangeError("Столько D-коинов у вас нет.")
+            raise ExchangeError("Столько D-коинов у вас нет." if units > (int(row["dcoin"]) if row else 0)
+                                else "Часть монет ждёт выполнения заказов — их можно обменять позже.")
         last = conn.execute("SELECT created_at FROM dcoin_ledger WHERE user_id = ? AND amount < 0 "
                             "ORDER BY id DESC LIMIT 1", (user_id,)).fetchone()
         if last and now - _parse(last["created_at"]) < timedelta(hours=24):
@@ -369,9 +410,10 @@ def balance(conn: sqlite3.Connection, user_id: int) -> int:
 
 
 def summary(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
-    bal = balance(conn, user_id)
+    bal, wait = balance(conn, user_id), waiting(conn, user_id)
     s = state(conn)
     return {"balance": bal, "balance_text": fmt_d(bal), "worth_micro": quote(conn, bal),
+            "waiting": wait, "waiting_text": fmt_d(wait), "free": max(0, bal - wait),
             "price": price_of(s["pool"], s["supply"], s["reserve"]), "change": change_24h(conn),
             "per_usd": per_usd(conn), "pool_pct": pool_pct(conn),
             "fee_pct": EXCHANGE_FEE_PCT, "open": exchange_open(conn), "opens": exchange_opens(conn),
@@ -379,10 +421,17 @@ def summary(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
 
 
 def history(conn: sqlite3.Connection, user_id: int, limit: int = 20) -> list[dict[str, Any]]:
+    """Все зачисления и списания: покупки, возвраты, обмены — ничего не пропадает."""
     return [{"amount": fmt_d(r["amount"]), "plus": r["amount"] > 0, "reason": r["reason"],
-             "created_at": r["created_at"]}
-            for r in conn.execute("SELECT amount, reason, created_at FROM dcoin_ledger WHERE user_id = ? "
+             "created_at": r["created_at"], "wait": r["pending"] == 1}
+            for r in conn.execute("SELECT amount, reason, created_at, pending FROM dcoin_ledger WHERE user_id = ? "
                                   "ORDER BY id DESC LIMIT ?", (user_id, limit))]
+
+
+def waiting(conn: sqlite3.Connection, user_id: int) -> int:
+    """Монеты за заказы, которые ещё выполняются: на счету, но обменять их пока нельзя."""
+    return int(conn.execute("SELECT COALESCE(SUM(amount), 0) FROM dcoin_ledger WHERE user_id = ? AND pending = 1",
+                            (user_id,)).fetchone()[0])
 
 
 def top(conn: sqlite3.Connection, limit: int = 10) -> list[dict[str, Any]]:
