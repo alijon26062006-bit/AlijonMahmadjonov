@@ -100,12 +100,16 @@ def fmt_d(units: int) -> str:
 
 # ── Копилка и монеты ────────────────────────────────────────────
 # Старт с нуля: у сайта есть стартовый запас монет, которых нет ни у кого на руках. Цена считается
-# на все монеты вместе с запасом, поэтому сначала она почти 0.0000. Каждая покупка сжигает долю
-# запаса (выдали людям TAU монет — запас меньше в e≈2.7 раза), поэтому цена растёт ровно:
-# каждые ~$3 200 покупок — примерно в 2.7 раза, пока запас не станет меньше монет у людей.
+# на все монеты вместе с запасом, поэтому сначала она почти 0.0000. Каждая покупка двигает цену
+# через запас сайта: крупнее обычной — вверх, мельче — вниз, от MIN_MOVE до MAX_STEP, плюс
+# небольшой общий рост DRIFT. Запас не принадлежит людям, поэтому сколько бы его ни сжигали или
+# ни добавляли, каждый получит не больше своей доли копилки.
 # Доля копилки, которая «приходится» на запас, никому не выплачивается — она остаётся сайту.
 RESERVE0 = 1_000_000_000 * UNIT   # стартовый запас: 1 млрд D
-TAU = 322_000 * UNIT               # ≈ $3 200 покупок: за это время запас уменьшается в e раз
+MIN_MOVE = 0.004                  # каждая покупка заметно двигает график: хотя бы на 0.4%
+DRIFT = 0.005                     # общий рост на покупку, пока цена растёт с нуля
+SIZE_MOVE = 0.012                 # вдвое крупнее обычного заказа — ещё +1.2%, вдвое мельче — −1.2%
+KEEP = 0.10                       # держим запас около 10% всех монет — чтобы было чем двигать график
 
 
 def _launch(conn: sqlite3.Connection) -> None:
@@ -148,17 +152,6 @@ def reward_units(conn: sqlite3.Connection, usd: float) -> int:
     return int(usd * per_usd(conn) * UNIT)
 
 
-def share_factor(conn: sqlite3.Connection, usd: float, order_id: int) -> float:
-    """Крупнее обычного — больше в копилку, мельче — меньше. Обычный = средний заказ за сутки."""
-    since = _iso(_now() - timedelta(days=1))
-    row = conn.execute("SELECT AVG(total_micro) FROM orders WHERE status = 'completed' AND id != ? "
-                       "AND COALESCE(completed_at, created_at) >= ?", (order_id, since)).fetchone()
-    usual = (row[0] or 0) / 10_000
-    if usual <= 0 or usd <= 0:
-        return 1.0
-    return max(MIN_SHARE, min(MAX_SHARE, math.sqrt(usd / usual)))
-
-
 def award(conn: sqlite3.Connection, order_id: int) -> int:
     """За выполненный заказ: монеты клиенту и часть прибыли в копилку. Один раз за заказ.
     Возвращает начисленные монеты (сотые) или 0."""
@@ -177,10 +170,11 @@ def award(conn: sqlite3.Connection, order_id: int) -> int:
     if units <= 0:
         return 0
     profit = max(0, int(row["total_micro"]) - int(row["cost_micro"] or 0))
-    to_pool = int(profit * pool_pct(conn) / 100 * share_factor(conn, usd, order_id))
+    ratio = share_ratio(conn, usd, order_id)
+    # крупнее обычного — больше в копилку (до ×2), мельче — меньше (до ×0.5)
+    to_pool = int(profit * pool_pct(conn) / 100 * max(MIN_SHARE, min(MAX_SHARE, math.sqrt(ratio))))
     cap = profit * pool_pct(conn) * 2 // 100                      # никогда больше 2× процента прибыли
-    to_pool, burn = smooth(cur["pool"], cur["supply"] + cur["reserve"], units, min(to_pool, cap), cap,
-                           min(cur["reserve"], cur["reserve"] * units // TAU))
+    to_pool, reserve = steer(cur, units, min(to_pool, cap), cap, ratio)
     added = conn.execute(
         "INSERT OR IGNORE INTO dcoin_ledger (user_id, amount, pool_micro, reason, order_id, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?)",
@@ -188,29 +182,65 @@ def award(conn: sqlite3.Connection, order_id: int) -> int:
     if not added:
         return 0
     conn.execute("UPDATE users SET dcoin = dcoin + ? WHERE id = ?", (units, row["user_id"]))
-    _point(conn, cur["pool"] + to_pool, cur["supply"] + units, "buy", reserve=cur["reserve"] - burn)
+    _point(conn, cur["pool"] + to_pool, cur["supply"] + units, "buy", reserve=reserve)
     return units
 
 
-def smooth(pool: int, coins: int, units: int, to_pool: int, cap: int, burn: int = 0) -> tuple[int, int]:
-    """Мягкий график: одна покупка двигает цену не больше чем на ±MAX_STEP.
-    coins — все монеты вместе с запасом, burn — сколько запаса сгорит. Рост сильнее — в копилку
-    кладём меньше (экономия сайта), а если и этого мало — сжигаем меньше запаса; падение сильнее —
-    добавляем в копилку, но не больше cap (потолок доли прибыли), так что минуса не бывает."""
+def share_ratio(conn: sqlite3.Connection, usd: float, order_id: int) -> float:
+    """Во сколько раз заказ крупнее обычного. Обычный — типичный заказ последних суток (среднее
+    геометрическое: пара крупных заказов не делает все остальные «мелкими»). Нет истории — 1."""
+    since = _iso(_now() - timedelta(days=1))
+    rows = conn.execute("SELECT total_micro FROM orders WHERE status = 'completed' AND id != ? AND total_micro > 0 "
+                        "AND COALESCE(completed_at, created_at) >= ? ORDER BY id DESC LIMIT 500",
+                        (order_id, since)).fetchall()
+    if not rows or usd <= 0:
+        return 1.0
+    usual = math.exp(sum(math.log(r[0]) for r in rows) / len(rows)) / 10_000
+    return usd / usual
+
+
+def move_for(ratio: float, reserve_share: float = 1.0) -> float:
+    """На сколько сдвинуть цену: крупнее обычного — вверх, мельче — вниз, всегда заметно.
+    Общий рост тем меньше, чем меньше осталось запаса: цена подходит к «настоящей» плавно и
+    не упирается в неё, так что запаса хватает, чтобы график шевелился от каждой покупки."""
+    m = DRIFT * (reserve_share - KEEP) / (1 - KEEP) + SIZE_MOVE * math.log2(max(ratio, 1e-6))
+    if abs(m) < MIN_MOVE:
+        m = MIN_MOVE if m >= 0 else -MIN_MOVE
+    return max(-MAX_STEP, min(MAX_STEP, m))
+
+
+def steer(cur: dict[str, int], units: int, to_pool: int, cap: int, ratio: float) -> tuple[int, int]:
+    """Копилка и запас после покупки. Цена идёт на move_for(ratio) через запас сайта;
+    если запаса уже нет — работает обычное сглаживание через копилку."""
+    pool, supply, reserve = cur["pool"], cur["supply"], cur["reserve"]
+    coins = supply + reserve
     if pool <= 0 or coins <= 0:
-        return to_pool, burn                            # первая покупка — старт почти с нуля
-    total = coins + units - burn
+        return to_pool, reserve                         # первая покупка — старт почти с нуля
+    target = pool / coins * (1 + move_for(ratio, reserve / coins))
+    new_reserve = int((pool + to_pool) / target) - (supply + units)
+    if new_reserve >= 0:
+        limit = max(RESERVE0, supply) * 4               # запас не раздувается без предела
+        if new_reserve <= limit:
+            return to_pool, new_reserve
+        # копилка растёт быстрее, чем запас успевает сдержать цену, — кладём меньше (экономия сайта)
+        return max(0, min(to_pool, int(target * (supply + units + limit)) - pool)), limit
+    return smooth(pool, supply, units, to_pool, cap), 0
+
+
+def smooth(pool: int, coins: int, units: int, to_pool: int, cap: int) -> int:
+    """Когда запаса нет: одна покупка двигает цену не больше чем на ±MAX_STEP.
+    Рост сильнее — в копилку кладём меньше (экономия сайта); падение сильнее — добавляем,
+    но не больше cap (потолок доли прибыли), так что минуса не бывает."""
+    if pool <= 0 or coins <= 0:
+        return to_pool
+    total = coins + units
     hi = int(pool * (1 + MAX_STEP) * total / coins) - pool
-    if hi < 0:                                          # запас сгорает слишком быстро — жжём меньше
-        burn = max(0, min(burn, coins + units - math.ceil(coins / (1 + MAX_STEP))))
-        total = coins + units - burn
-        hi = max(0, int(pool * (1 + MAX_STEP) * total / coins) - pool)
     lo = math.ceil(pool * (1 - MAX_STEP) * total / coins) - pool
     if to_pool > hi:
-        return hi, burn
+        return max(0, hi)
     if to_pool < lo:
-        return max(to_pool, min(lo, cap)), burn
-    return to_pool, burn
+        return max(to_pool, min(lo, cap))
+    return to_pool
 
 
 class ExchangeError(Exception):
