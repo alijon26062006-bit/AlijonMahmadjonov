@@ -118,6 +118,7 @@ MIN_MOVE = 0.01                   # каждая покупка двигает �
 DRIFT = 0.005                     # общий рост на покупку, пока цена растёт с нуля
 SIZE_MOVE = 0.012                 # вдвое больше предыдущей покупки — ещё +1.2%, вдвое меньше — −1.2%
 KEEP = 0.10                       # держим запас около 10% всех монет — чтобы было чем двигать график
+WICK = 0.4                        # тень свечи: цена «простреливает» на 40% дальше и откатывается назад
 
 
 def _launch(conn: sqlite3.Connection) -> None:
@@ -236,6 +237,7 @@ def award(conn: sqlite3.Connection, order_id: int) -> int:
         if not added:
             return 0
         conn.execute("UPDATE users SET dcoin = dcoin + ? WHERE id = ?", (units, row["user_id"]))
+    _wick(conn, cur, cur["pool"] + to_pool, cur["supply"] + units, reserve)
     _point(conn, cur["pool"] + to_pool, cur["supply"] + units, "buy", reserve=reserve)
     return units
 
@@ -304,6 +306,21 @@ def smooth(pool: int, coins: int, units: int, to_pool: int, cap: int) -> int:
     return to_pool
 
 
+def _wick(conn: sqlite3.Connection, before: dict[str, int], pool: int, supply: int, reserve: int) -> None:
+    """Тень свечи, как на бирже: при покупке цена на миг уходит на WICK дальше и откатывается
+    к новой цене. Точка «peak» даёт свече максимум (или минимум при падении); цена после — обычная.
+    Тоже через запас сайта, поэтому и в этот миг каждому — не больше своей доли копилки."""
+    old = price_of(before["pool"], before["supply"], before["reserve"])
+    new = price_of(pool, supply, reserve)
+    if old <= 0 or new <= 0 or pool <= 0:
+        return
+    peak = new + (new - old) * WICK
+    per_unit = peak * 10_000 / UNIT                     # микро-доллары за сотую долю монеты
+    peak_reserve = int(pool / per_unit) - supply if per_unit > 0 else -1
+    if 0 <= peak_reserve <= max(RESERVE0, supply) * 4:
+        _point(conn, pool, supply, "peak", reserve=peak_reserve)
+
+
 def on_refund(conn: sqlite3.Connection, order_id: int) -> bool:
     """Заказ отменён, деньги вернулись: монеты за него списываются, цена падает на refund_pct%
     (через запас сайта — копилка и монеты остальных не меняются). Зовётся там, где делается возврат."""
@@ -317,6 +334,7 @@ def on_refund(conn: sqlite3.Connection, order_id: int) -> bool:
     reserve = min(int(s["pool"] / target) - s["supply"], max(RESERVE0, s["supply"]) * 4)
     if reserve <= s["reserve"]:
         return False
+    _wick(conn, s, s["pool"], s["supply"], reserve)
     _point(conn, s["pool"], s["supply"], "refund", reserve=reserve)
     return True
 

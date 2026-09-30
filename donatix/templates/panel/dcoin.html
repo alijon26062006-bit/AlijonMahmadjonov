@@ -192,8 +192,9 @@
       if (o <= 0) { o = cl; l = Math.min(l > 0 ? l : cl, cl); }
       var still = Math.abs(cl - o) < (hi - lo) * 0.002 && Math.abs(h - l) < (hi - lo) * 0.002;
       var col = still ? flat : (cl >= o ? up : down);
-      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, Y(h)); ctx.lineTo(Math.round(x) + .5, Y(l)); ctx.stroke();
+      // тень (фитиль): верх — максимум за свечу, низ — минимум
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = clamp(bw * 0.14, 1, 2.2); ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(x, Y(h)); ctx.lineTo(x, Y(l)); ctx.stroke();
       var top = Y(Math.max(o, cl)), bot = Y(Math.min(o, cl));
       ctx.globalAlpha = j === hover || hover < 0 ? 1 : .55;
       roundRect(x - w / 2, top, w, Math.max(still ? 1.5 : 2, bot - top), Math.min(2, w / 4));

@@ -134,7 +134,7 @@ def test_each_purchase_moves_price_softly(conn):
     uid = _user(conn)
     for total, cost in ((10_000, 9_900), (500_000, 200_000), (3_000, 2_990), (90_000, 60_000), (1_000, 1_000)):
         _buy(conn, uid, total, cost)
-    prices = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
+    prices = [r[0] for r in conn.execute("SELECT price FROM dcoin_points WHERE reason != 'peak' ORDER BY id")]
     for a, b in pairwise(prices[1:]):                          # после первой покупки — шаги не больше 3%
         assert abs(b - a) / a <= 0.0301, (a, b)
     profit = conn.execute("SELECT SUM(total_micro - cost_micro) FROM orders").fetchone()[0]
@@ -293,3 +293,14 @@ def test_real_order_rejected_by_supplier_shows_refund_in_history(client, conn, s
     assert h[0]["reason"] == f"Заказ {pid} не выполнен — возврат" and not h[0]["plus"]
     assert h[1]["reason"] == f"Заказ {pid}" and h[1]["plus"]
     assert dcoin.balance(conn, shop["id"]) == 0
+
+
+def test_candles_have_wicks_like_an_exchange(conn):
+    uid = _user(conn)
+    for total in (30_000, 30_000, 60_000):                              # последняя — больше предыдущей: вверх
+        _buy(conn, uid, total)
+    k = dcoin.candles(conn, "1d", 10)["candles"][-1]                    # [время, откр., макс., мин., закр.]
+    body_top = max(k[1], k[4])
+    assert k[2] > body_top                                               # верхняя тень выше тела
+    assert k[4] == dcoin.price(conn)                                     # закрытие — текущая цена, без «прострела»
+    assert conn.execute("SELECT COUNT(*) FROM dcoin_points WHERE reason = 'peak'").fetchone()[0] >= 2
