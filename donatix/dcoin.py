@@ -30,6 +30,7 @@ DEFAULT_PER_USD = 100             # D за $1 в самом начале
 DEFAULT_POOL_PCT = 10             # % прибыли обычного заказа — в копилку
 MIN_SHARE, MAX_SHARE = 0.5, 2.0   # мелкий заказ — ×0.5 (5%), крупный — ×2 (20%)
 MAX_STEP = 0.03                   # одна покупка двигает цену не больше чем на 3% — график мягкий
+DEFAULT_REFUND_PCT = 2           # возврат денег за заказ — цена вниз на 2%
 DEFAULT_OPEN_DAYS = 30            # обмен открывается через месяц после запуска
 EXCHANGE_FEE_PCT = 5              # остаются в копилке — цена растёт для остальных
 MIN_EXCHANGE = 10_000             # от $1 (микро-доллары)
@@ -53,6 +54,11 @@ def per_usd(conn: sqlite3.Connection) -> int:
 
 def pool_pct(conn: sqlite3.Connection) -> int:
     return _int_setting(conn, "dcoin.pool_pct", DEFAULT_POOL_PCT, 0, 25)
+
+
+def refund_pct(conn: sqlite3.Connection) -> int:
+    """На сколько % падает цена, когда заказ отменён и деньги вернулись. 0 — не падает."""
+    return _int_setting(conn, "dcoin.refund_pct", DEFAULT_REFUND_PCT, 0, 10)
 
 
 def open_days(conn: sqlite3.Connection) -> int:
@@ -257,6 +263,22 @@ def smooth(pool: int, coins: int, units: int, to_pool: int, cap: int) -> int:
     if to_pool < lo:
         return max(to_pool, min(lo, cap))
     return to_pool
+
+
+def on_refund(conn: sqlite3.Connection, order_id: int) -> bool:
+    """Заказ отменён, деньги вернулись — цена падает на refund_pct%. Через запас сайта:
+    ни копилка, ни монеты людей не меняются. Зовётся один раз — там, где делается возврат."""
+    pct = refund_pct(conn)
+    s = state(conn)
+    coins = s["supply"] + s["reserve"]
+    if pct <= 0 or s["pool"] <= 0 or coins <= 0:
+        return False
+    target = s["pool"] / coins * (1 - pct / 100)
+    reserve = min(int(s["pool"] / target) - s["supply"], max(RESERVE0, s["supply"]) * 4)
+    if reserve <= s["reserve"]:
+        return False
+    _point(conn, s["pool"], s["supply"], "refund", reserve=reserve)
+    return True
 
 
 class ExchangeError(Exception):

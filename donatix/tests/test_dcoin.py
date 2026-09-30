@@ -207,3 +207,25 @@ def test_history_for_scrolling_back(conn):
     assert len(dcoin.candles(conn, "1m", 300)["candles"]) == 300          # есть что листать назад
     assert len(dcoin.candles(conn, "1m", 10_000)["candles"]) == dcoin.MAX_CANDLES
     assert dcoin.candles(conn, "1s", 50)["candles"][-1][4] == dcoin.price(conn)
+
+
+def test_refund_drops_price_by_setting(conn):
+    uid = _user(conn)
+    for total in (30_000, 30_000):
+        _buy(conn, uid, total)
+    s0, p0 = dcoin.state(conn), dcoin.price(conn)
+    n = conn.execute("SELECT COUNT(*) FROM orders").fetchone()[0]
+    ts = db.now()
+    cur = conn.execute(
+        "INSERT INTO orders (public_id, user_id, product_id, kind, product_name, quantity, unit_price, total_micro, "
+        "cost_micro, status, supplier_idem_key, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (f"dx-{n}", uid, "p", "topup", "x", 1, "1", 30_000, 27_600, "processing", f"k{n}", ts, ts))
+    assert orders.fail_and_refund(conn, cur.lastrowid, "не выполнен")
+    p1 = dcoin.price(conn)
+    assert abs(p1 / p0 - 0.98) < 0.001                                  # по умолчанию −2%
+    s1 = dcoin.state(conn)
+    assert (s1["pool"], s1["supply"]) == (s0["pool"], s0["supply"])    # копилка и монеты людей — как были
+    assert not orders.fail_and_refund(conn, cur.lastrowid, "ещё раз")   # второй раз — ни возврата, ни падения
+    assert dcoin.price(conn) == p1
+    db.set_setting(conn, "dcoin.refund_pct", "0")
+    assert dcoin.on_refund(conn, cur.lastrowid) is False                # 0 — цена не падает

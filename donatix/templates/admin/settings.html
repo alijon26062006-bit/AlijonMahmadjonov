@@ -58,6 +58,8 @@
         <input id="dcoin_pool_pct" name="dcoin_pool_pct" inputmode="numeric" value="{{ s.dcoin_pool_pct }}"></div>
       <div><label for="dcoin_open_days">Обмен на баланс откроется через, дней после запуска</label>
         <input id="dcoin_open_days" name="dcoin_open_days" inputmode="numeric" value="{{ s.dcoin_open_days }}"></div>
+      <div><label for="dcoin_refund_pct">Возврат денег за заказ — цена вниз, % <span class="muted">— 0 не падает, до 10</span></label>
+        <input id="dcoin_refund_pct" name="dcoin_refund_pct" inputmode="numeric" value="{{ s.dcoin_refund_pct }}"></div>
     </div>
     <h3 style="margin-top:18px">Боты без продаж</h3>
     <label class="switch"><input type="checkbox" name="watch_on" value="1" {{ 'checked' if s.watch.on }}><span>Предупреждать и отключать автоматически</span></label>

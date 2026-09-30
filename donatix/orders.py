@@ -368,6 +368,11 @@ def fail_and_refund(conn: sqlite3.Connection, order_id: int, reason: str, *, by_
         notify(conn, None, order["user_id"],
                f"Заказ {order['public_id']} не выполнен, ${fmt(order['total_micro'])} вернулись на баланс.",
                f"/panel/orders/{order['public_id']}")
+    try:
+        from . import dcoin
+        dcoin.on_refund(conn, order_id)   # возврат — цена D-коина чуть вниз
+    except Exception:  # noqa: BLE001 — график не должен мешать возврату
+        log.exception("D-коин: возврат %s", order_id)
     return True
 
 

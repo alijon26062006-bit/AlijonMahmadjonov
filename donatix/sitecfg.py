@@ -148,7 +148,8 @@ def _dcoin_view(conn: sqlite3.Connection) -> dict[str, Any]:
     from . import dcoin
     st = dcoin.state(conn)
     return {"dcoin_per_usd": dcoin.per_usd(conn), "dcoin_pool_pct": dcoin.pool_pct(conn),
-            "dcoin_open_days": dcoin.open_days(conn), "dcoin_pool": st["pool"], "dcoin_supply": dcoin.fmt_d(st["supply"])}
+            "dcoin_open_days": dcoin.open_days(conn), "dcoin_refund_pct": dcoin.refund_pct(conn),
+            "dcoin_pool": st["pool"], "dcoin_supply": dcoin.fmt_d(st["supply"])}
 
 
 def _watch_rules(conn: sqlite3.Connection) -> dict:
@@ -233,7 +234,8 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
         values["referral.percent"] = str(n)
     for key, what, lo, hi in (("dcoin_per_usd", "D-коинов за $1", 0, 10_000),
                               ("dcoin_pool_pct", "Процент прибыли в копилку D-коина", 0, 25),
-                              ("dcoin_open_days", "Дней до открытия обмена D-коинов", 0, 365)):
+                              ("dcoin_open_days", "Дней до открытия обмена D-коинов", 0, 365),
+                              ("dcoin_refund_pct", "Падение цены D-коина при возврате, %", 0, 10)):
         if key in data:
             try:
                 n = int(str(data[key]).strip())
