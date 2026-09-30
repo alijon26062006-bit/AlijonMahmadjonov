@@ -1,10 +1,18 @@
 from datetime import datetime, timedelta, timezone
 from itertools import pairwise
 
+import pytest
 from conftest import balance, web_login
 from fastapi.testclient import TestClient
 
 from donatix import accounts, db, dcoin, finance, orders
+
+
+@pytest.fixture(autouse=True)
+def _no_launch_reserve(request, monkeypatch):
+    """Большинство проверок — про саму формулу цены, без стартового запаса."""
+    if "launch" not in request.node.name:
+        monkeypatch.setattr(dcoin, "RESERVE0", 0)
 
 
 def _buy(conn, uid, total, cost=None):
@@ -150,3 +158,34 @@ def test_fixed_rate_and_pool_is_hidden(app, conn):
     j = client.get("/panel/data/dcoin?tf=1s").json()
     assert j["tf"] == "1s" and j["step"] == 1
     assert "pool_micro" not in j and "supply" not in j               # конкурентам не видно
+
+
+def test_launch_price_starts_near_zero_and_grows_softly(conn):
+    uid = _user(conn)
+    assert dcoin.price(conn) == 0.0
+    _buy(conn, uid, 10_000)
+    first = dcoin.price(conn)
+    assert 0 < first < 1e-9                                            # показывается как 0.0000…
+    for _ in range(300):
+        _buy(conn, uid, 100_000)                                       # $10 каждая
+    prices = [r[0] for r in conn.execute("SELECT price FROM dcoin_points WHERE reason = 'buy' ORDER BY id")]
+    assert prices[-1] > first * 100                                   # растёт по мере покупок
+    for a, b in pairwise(prices[1:]):
+        assert abs(b - a) / a <= 0.0301                                 # и мягко, без скачков
+    s = dcoin.state(conn)
+    assert s["reserve"] < dcoin.RESERVE0
+    everything = dcoin.quote(conn, s["supply"])
+    assert everything <= s["pool"]                                     # людям — не больше копилки
+
+
+def test_launch_keeps_coins_of_existing_holders(conn, monkeypatch):
+    uid = _user(conn)
+    monkeypatch.setattr(dcoin, "RESERVE0", 0)
+    db.set_setting(conn, "dcoin.launch", "old")                        # как было до обновления
+    _buy(conn, uid, 10_000)
+    before = dcoin.price(conn)
+    conn.execute("DELETE FROM settings WHERE key = 'dcoin.launch'")
+    monkeypatch.setattr(dcoin, "RESERVE0", 1_000_000_000 * dcoin.UNIT)
+    assert dcoin.price(conn) < before / 1000                            # график начался заново с нуля
+    assert dcoin.balance(conn, uid) == 100 * dcoin.UNIT                 # монеты у людей на месте
+    assert conn.execute("SELECT COUNT(*) FROM dcoin_points").fetchone()[0] == 1

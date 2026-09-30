@@ -285,6 +285,7 @@ CREATE TABLE IF NOT EXISTS dcoin_points (
     ts     TEXT NOT NULL,
     pool   INTEGER NOT NULL,
     supply INTEGER NOT NULL,
+    reserve INTEGER NOT NULL DEFAULT 0,   -- стартовый запас сайта (ни у кого на руках)
     price  REAL NOT NULL,
     reason TEXT NOT NULL
 );
@@ -420,6 +421,9 @@ def init(path: Path | str) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS payments_receipt_hash ON payments(receipt_hash) "
                      "WHERE receipt_hash IS NOT NULL")
         conn.execute("CREATE INDEX IF NOT EXISTS payments_user ON payments(user_id, status)")
+        point_cols = {r[1] for r in conn.execute("PRAGMA table_info(dcoin_points)")}
+        if "reserve" not in point_cols:
+            conn.execute("ALTER TABLE dcoin_points ADD COLUMN reserve INTEGER NOT NULL DEFAULT 0")
         if "dcoin" not in user_cols:   # D-коины клиента, сотые доли
             conn.execute("ALTER TABLE users ADD COLUMN dcoin INTEGER NOT NULL DEFAULT 0")
         if "google_sub" not in user_cols:

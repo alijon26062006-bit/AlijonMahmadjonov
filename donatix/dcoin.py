@@ -99,24 +99,48 @@ def fmt_d(units: int) -> str:
 
 
 # ── Копилка и монеты ────────────────────────────────────────────
-def state(conn: sqlite3.Connection) -> dict[str, int]:
+# Старт с нуля: у сайта есть стартовый запас монет, которых нет ни у кого на руках. Цена считается
+# на все монеты вместе с запасом, поэтому сначала она почти 0.0000. Каждая покупка сжигает долю
+# запаса (выдали людям TAU монет — запас меньше в e≈2.7 раза), поэтому цена растёт ровно:
+# каждые ~$3 200 покупок — примерно в 2.7 раза, пока запас не станет меньше монет у людей.
+# Доля копилки, которая «приходится» на запас, никому не выплачивается — она остаётся сайту.
+RESERVE0 = 1_000_000_000 * UNIT   # стартовый запас: 1 млрд D
+TAU = 322_000 * UNIT               # ≈ $3 200 покупок: за это время запас уменьшается в e раз
+
+
+def _launch(conn: sqlite3.Connection) -> None:
+    """Один раз: включить стартовый запас. Монеты клиентов и копилка сохраняются, график — с нуля."""
+    if db.get_setting(conn, "dcoin.launch"):
+        return
+    db.set_setting(conn, "dcoin.launch", db.now())
     row = conn.execute("SELECT pool, supply FROM dcoin_points ORDER BY id DESC LIMIT 1").fetchone()
-    return {"pool": int(row["pool"]), "supply": int(row["supply"])} if row else {"pool": 0, "supply": 0}
+    conn.execute("DELETE FROM dcoin_points")
+    _point(conn, int(row["pool"]) if row else 0, int(row["supply"]) if row else 0, "launch", reserve=RESERVE0)
 
 
-def price_of(pool: int, supply: int) -> float:
-    """$ за 1 D. pool — микро-доллары, supply — сотые доли монеты. До первой покупки — 0."""
-    return (pool / 10_000) / (supply / UNIT) if supply > 0 else 0.0
+def state(conn: sqlite3.Connection) -> dict[str, int]:
+    _launch(conn)
+    row = conn.execute("SELECT pool, supply, reserve FROM dcoin_points ORDER BY id DESC LIMIT 1").fetchone()
+    if row is None:
+        return {"pool": 0, "supply": 0, "reserve": 0}
+    return {"pool": int(row["pool"]), "supply": int(row["supply"]), "reserve": int(row["reserve"])}
+
+
+def price_of(pool: int, supply: int, reserve: int = 0) -> float:
+    """$ за 1 D. pool — микро-доллары, supply и reserve — сотые доли монеты. До первой покупки — 0."""
+    total = supply + reserve
+    return (pool / 10_000) / (total / UNIT) if total > 0 else 0.0
 
 
 def price(conn: sqlite3.Connection) -> float:
     s = state(conn)
-    return price_of(s["pool"], s["supply"])
+    return price_of(s["pool"], s["supply"], s["reserve"])
 
 
-def _point(conn: sqlite3.Connection, pool: int, supply: int, reason: str, when: str | None = None) -> None:
-    conn.execute("INSERT INTO dcoin_points (ts, pool, supply, price, reason) VALUES (?, ?, ?, ?, ?)",
-                 (when or db.now(), pool, supply, price_of(pool, supply), reason))
+def _point(conn: sqlite3.Connection, pool: int, supply: int, reason: str, when: str | None = None,
+           *, reserve: int = 0) -> None:
+    conn.execute("INSERT INTO dcoin_points (ts, pool, supply, reserve, price, reason) VALUES (?, ?, ?, ?, ?, ?)",
+                 (when or db.now(), pool, supply, reserve, price_of(pool, supply, reserve), reason))
 
 
 def reward_units(conn: sqlite3.Connection, usd: float) -> int:
@@ -155,7 +179,8 @@ def award(conn: sqlite3.Connection, order_id: int) -> int:
     profit = max(0, int(row["total_micro"]) - int(row["cost_micro"] or 0))
     to_pool = int(profit * pool_pct(conn) / 100 * share_factor(conn, usd, order_id))
     cap = profit * pool_pct(conn) * 2 // 100                      # никогда больше 2× процента прибыли
-    to_pool = smooth(cur["pool"], cur["supply"], units, min(to_pool, cap), cap)
+    to_pool, burn = smooth(cur["pool"], cur["supply"] + cur["reserve"], units, min(to_pool, cap), cap,
+                           min(cur["reserve"], cur["reserve"] * units // TAU))
     added = conn.execute(
         "INSERT OR IGNORE INTO dcoin_ledger (user_id, amount, pool_micro, reason, order_id, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?)",
@@ -163,24 +188,29 @@ def award(conn: sqlite3.Connection, order_id: int) -> int:
     if not added:
         return 0
     conn.execute("UPDATE users SET dcoin = dcoin + ? WHERE id = ?", (units, row["user_id"]))
-    _point(conn, cur["pool"] + to_pool, cur["supply"] + units, "buy")
+    _point(conn, cur["pool"] + to_pool, cur["supply"] + units, "buy", reserve=cur["reserve"] - burn)
     return units
 
 
-def smooth(pool: int, supply: int, units: int, to_pool: int, cap: int) -> int:
+def smooth(pool: int, coins: int, units: int, to_pool: int, cap: int, burn: int = 0) -> tuple[int, int]:
     """Мягкий график: одна покупка двигает цену не больше чем на ±MAX_STEP.
-    Рост сильнее — в копилку кладём меньше (экономия сайта); падение сильнее — добавляем,
-    но не больше cap (потолок доли прибыли), так что минуса не бывает."""
-    if pool <= 0 or supply <= 0:
-        return to_pool                                  # первая покупка задаёт стартовую цену
-    total = supply + units
-    hi = int(pool * (1 + MAX_STEP) * total / supply) - pool
-    lo = math.ceil(pool * (1 - MAX_STEP) * total / supply) - pool
+    coins — все монеты вместе с запасом, burn — сколько запаса сгорит. Рост сильнее — в копилку
+    кладём меньше (экономия сайта), а если и этого мало — сжигаем меньше запаса; падение сильнее —
+    добавляем в копилку, но не больше cap (потолок доли прибыли), так что минуса не бывает."""
+    if pool <= 0 or coins <= 0:
+        return to_pool, burn                            # первая покупка — старт почти с нуля
+    total = coins + units - burn
+    hi = int(pool * (1 + MAX_STEP) * total / coins) - pool
+    if hi < 0:                                          # запас сгорает слишком быстро — жжём меньше
+        burn = max(0, min(burn, coins + units - math.ceil(coins / (1 + MAX_STEP))))
+        total = coins + units - burn
+        hi = max(0, int(pool * (1 + MAX_STEP) * total / coins) - pool)
+    lo = math.ceil(pool * (1 - MAX_STEP) * total / coins) - pool
     if to_pool > hi:
-        return max(0, hi)
+        return hi, burn
     if to_pool < lo:
-        return max(to_pool, min(lo, cap))
-    return to_pool
+        return max(to_pool, min(lo, cap)), burn
+    return to_pool, burn
 
 
 class ExchangeError(Exception):
@@ -190,9 +220,10 @@ class ExchangeError(Exception):
 def quote(conn: sqlite3.Connection, units: int) -> int:
     """Сколько микро-долларов дадут за units монет сейчас (с комиссией, округление в пользу копилки)."""
     s = state(conn)
-    if units <= 0 or s["supply"] <= 0:
+    coins = s["supply"] + s["reserve"]
+    if units <= 0 or coins <= 0:
         return 0
-    return units * s["pool"] * (100 - EXCHANGE_FEE_PCT) // (s["supply"] * 100)
+    return units * s["pool"] * (100 - EXCHANGE_FEE_PCT) // (coins * 100)
 
 
 def exchange(conn: sqlite3.Connection, user_id: int, units: int, now: datetime | None = None) -> int:
@@ -218,7 +249,7 @@ def exchange(conn: sqlite3.Connection, user_id: int, units: int, now: datetime |
         conn.execute("UPDATE users SET dcoin = dcoin - ? WHERE id = ?", (units, user_id))
         conn.execute("INSERT INTO dcoin_ledger (user_id, amount, pool_micro, reason, created_at) "
                      "VALUES (?, ?, ?, ?, ?)", (user_id, -units, -pay, "Обмен на баланс", _iso(now)))
-        _point(conn, s["pool"] - pay, s["supply"] - units, "exchange")
+        _point(conn, s["pool"] - pay, s["supply"] - units, "exchange", reserve=s["reserve"])
         accounts.post_ledger(conn, user_id, pay, f"Обмен {fmt_d(units)} D-коинов на баланс")
     return pay
 
@@ -272,7 +303,7 @@ def summary(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
     bal = balance(conn, user_id)
     s = state(conn)
     return {"balance": bal, "balance_text": fmt_d(bal), "worth_micro": quote(conn, bal),
-            "price": price_of(s["pool"], s["supply"]), "change": change_24h(conn),
+            "price": price_of(s["pool"], s["supply"], s["reserve"]), "change": change_24h(conn),
             "per_usd": per_usd(conn), "pool_pct": pool_pct(conn),
             "fee_pct": EXCHANGE_FEE_PCT, "open": exchange_open(conn), "opens": exchange_opens(conn),
             "enabled": enabled(conn)}
