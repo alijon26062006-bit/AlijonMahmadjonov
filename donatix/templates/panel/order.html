@@ -21,7 +21,8 @@
   <div class="card reveal">
     {% if st == 'processing' %}
       <h3>Выполняется…</h3>
-      <p class="muted">Обычно это занимает несколько секунд. Страница обновится сама.</p>
+      {% if delivery_note %}<p class="muted">{{ delivery_note }} Страница обновится сама.</p>
+      {% else %}<p class="muted">Обычно это занимает несколько секунд. Страница обновится сама.</p>{% endif %}
     {% elif st == 'failed' %}
       <h3>Заказ не выполнен</h3>
       <p>{{ view.error or 'Поставщик отклонил заказ.' }}</p>

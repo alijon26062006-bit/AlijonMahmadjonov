@@ -648,6 +648,7 @@ def panel_order(public_id: str, request: Request, user=Depends(panel_user), conn
     return render(request, "panel/order.html", {
         "user": user, "o": row, "view": orders.public_view(row),
         "delivery_pretty": json.dumps(orders.public_view(row)["delivery"], ensure_ascii=False, indent=2),
+        "delivery_note": catalog.delivery_note(row["product_name"]),   # срок выдачи для Standoff 2 / CoC
     })
 
 

@@ -121,3 +121,15 @@ def test_delivery_time_notes():
     coc = catalog.delivery_note("Clash of Clans")
     assert "20–90 минут" in coc and "утром" in coc
     assert catalog.delivery_note("Free Fire") == ""
+
+
+def test_order_page_shows_delivery_time(client, conn, shop):
+    from conftest import web_login
+    conn.execute("INSERT INTO orders (public_id, user_id, product_id, kind, product_name, quantity, fields_json, "
+                 "unit_price, total_micro, cost_micro, status, supplier_idem_key, created_at, updated_at) VALUES "
+                 "('dx-so1', ?, 'vd-100-5', 'topup', 'Standoff 2 — Золото · 100 Золота', 1, '{}', '1', 10000, 9000, "
+                 "'processing', 'kso1', '2026-09-30T04:21:09.000Z', '2026-09-30T04:21:09.000Z')", (shop["id"],))
+    web_login(client, "shop1@example.com", "password123")
+    page = client.get("/panel/orders/dx-so1").text
+    assert "до 90 минут" in page and "11:00 до 23:00 по Душанбе" in page and "несколько секунд" not in page
+
