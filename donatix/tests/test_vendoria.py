@@ -116,6 +116,8 @@ def test_popular_prefers_vendoria_for_standoff_and_coc(conn):
 
 def test_delivery_time_notes():
     from donatix import catalog
-    assert "до 30 минут" in catalog.delivery_note("Standoff 2")
-    assert "20–90 минут" in catalog.delivery_note("Clash of Clans") and "утром" in catalog.delivery_note("Clash of Clans")
+    so = catalog.delivery_note("Standoff 2")
+    assert "до 90 минут" in so and "11:00 до 23:00 по Душанбе" in so and "утром" in so
+    coc = catalog.delivery_note("Clash of Clans")
+    assert "20–90 минут" in coc and "утром" in coc
     assert catalog.delivery_note("Free Fire") == ""
