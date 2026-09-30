@@ -155,16 +155,16 @@
     if (!rng) rng = [lo, hi]; else { rng[0] += (lo - rng[0]) * 0.2; rng[1] += (hi - rng[1]) * 0.2; }
     lo = rng[0]; hi = rng[1];
 
-    ctx.font = "600 11px " + css("--font-num");
+    ctx.font = "700 12px " + css("--font-num");
     var gstep = conv((hi - lo) / 4), last = c[n - 1][4];
     axisPlaces = Math.max(places(conv(last || hi)), gstep > 0 ? Math.min(12, 1 - Math.floor(Math.log10(gstep))) : 4);
-    R = Math.max(56, Math.ceil(Math.max(ctx.measureText(axis(hi)).width, ctx.measureText(axis(last)).width)) + 22);
+    R = Math.max(62, Math.ceil(Math.max(ctx.measureText(axis(hi)).width, ctx.measureText(axis(last)).width)) + 26);
     var pw = W - R, ph = H - B - T, bw = pw / cnt;
     var X = function (idx) { return (idx - s) * bw + bw / 2; };
     var Y = function (v) { return T + (hi - v) / (hi - lo || 1) * ph; };
     ctx.clearRect(0, 0, W, H);
 
-    ctx.font = "500 11px " + css("--font-num"); ctx.textBaseline = "middle";
+    ctx.font = "500 12px " + css("--font-num"); ctx.textBaseline = "middle";
     for (var g = 0; g <= 4; g++) {
       var v = lo + (hi - lo) * g / 4, y = Y(v);
       ctx.strokeStyle = css("--dc-grid"); ctx.lineWidth = 1;
@@ -185,7 +185,8 @@
       ctx.fillStyle = css("--dc-axis"); ctx.fillText(lbl, X(li), H - 8);
     }
     // свечи
-    var up = css("--dc-up"), down = css("--dc-down"), flat = css("--dc-flat"), w = Math.max(1.5, bw * .64);
+    // Как в Quotex: яркие прямоугольные тела во всю свечу, тонкая чёткая тень того же цвета
+    var up = css("--dc-up"), down = css("--dc-down"), flat = css("--dc-flat"), w = Math.max(2, Math.round(bw * .72));
     for (var j = i0; j <= i1; j++) {
       var o = c[j][1], h = c[j][2], l = c[j][3], cl = c[j][4], x = X(j);
       if (h <= 0) continue;                  // до первой покупки цены ещё нет
@@ -193,12 +194,12 @@
       var still = Math.abs(cl - o) < (hi - lo) * 0.002 && Math.abs(h - l) < (hi - lo) * 0.002;
       var col = still ? flat : (cl >= o ? up : down);
       // тень (фитиль): верх — максимум за свечу, низ — минимум
-      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = clamp(bw * 0.14, 1, 2.2); ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(x, Y(h)); ctx.lineTo(x, Y(l)); ctx.stroke();
-      var top = Y(Math.max(o, cl)), bot = Y(Math.min(o, cl));
-      ctx.globalAlpha = j === hover || hover < 0 ? 1 : .55;
-      roundRect(x - w / 2, top, w, Math.max(still ? 1.5 : 2, bot - top), Math.min(2, w / 4));
-      ctx.globalAlpha = 1;
+      var cx = Math.round(x);
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = bw > 14 ? 2 : 1; ctx.lineCap = "butt";
+      ctx.beginPath(); ctx.moveTo(cx + (bw > 14 ? 0 : .5), Math.round(Y(h))); ctx.lineTo(cx + (bw > 14 ? 0 : .5), Math.round(Y(l)));
+      ctx.stroke();
+      var top = Math.round(Y(Math.max(o, cl))), bot = Math.round(Y(Math.min(o, cl)));
+      ctx.fillRect(cx - Math.floor(w / 2), top, w, Math.max(still ? 1 : 2, bot - top));
     }
     // перекрестие под пальцем
     if (hover >= i0 && hover <= i1) {
@@ -209,18 +210,19 @@
     ctx.restore();
     // линия текущей цены и «таблетка» справа — видна, даже когда пролистали назад
     var ly = clamp(Y(last), T, T + ph);
-    ctx.setLineDash([5, 5]); ctx.strokeStyle = css("--dc-line"); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(pw, ly); ctx.stroke(); ctx.setLineDash([]);
+    ctx.setLineDash([6, 5]); ctx.strokeStyle = css("--dc-now-line"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, Math.round(ly) + .5); ctx.lineTo(pw, Math.round(ly) + .5); ctx.stroke(); ctx.setLineDash([]);
     if (view.offset < 0.5) {
       var pulse = reduce ? 0 : (Math.sin(now / 420) + 1) / 2, lx = X(n - 1);
       ctx.fillStyle = css("--dc-line"); ctx.globalAlpha = .25 + .25 * pulse;
       ctx.beginPath(); ctx.arc(lx, ly, 5 + 5 * pulse, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
       ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, 7); ctx.fill();
     }
-    var lastC = conv(last), txt = lastC.toFixed(places(lastC)), tw = ctx.measureText(txt).width + 14;
+    ctx.font = "700 12px " + css("--font-num");
+    var lastC = conv(last), txt = lastC.toFixed(places(lastC)), tw = ctx.measureText(txt).width + 18;
     ctx.fillStyle = css("--dc-line");
-    roundRect(pw + 2, ly - 11, Math.min(tw, R - 4), 22, 11);
-    ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, pw + 9, ly + .5);
+    roundRect(pw + 2, ly - 12, Math.min(tw, R - 2), 24, 12);
+    ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, pw + 11, ly + .5);
     view.bw = bw; view.s = s; view.pw = pw;
   }
   function roundRect(x, y, w, h, r) {

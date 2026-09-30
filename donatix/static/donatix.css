@@ -1405,8 +1405,8 @@ a.order-card:hover { transform: translateY(-1px); }
 
 
 /* ── D-коин: экран как в приложении — ничего не выделяется, график живой ── */
-.dc-app { --dc-up: #22c55e; --dc-down: #ef4444; --dc-flat: #64748b; --dc-line: #3b82f6;
-  --dc-grid: rgb(148 163 184 / .14); --dc-axis: #8b93a7;
+.dc-app { --dc-up: #1fd46b; --dc-down: #ff4b3e; --dc-flat: #7c869c; --dc-line: #1e8cff; --dc-now-line: rgb(255 255 255 / .75);
+  --dc-grid: rgb(255 255 255 / .07); --dc-axis: #c3c9d6;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 .dc-app input { -webkit-user-select: text; user-select: text; }
 .dc-app button, .dc-app a { touch-action: manipulation; }
@@ -1430,7 +1430,7 @@ a.order-card:hover { transform: translateY(-1px); }
 
 /* Карточка графика — всегда тёмная, как в торговом приложении */
 .dc-chart-card { position: relative; padding: 12px 0 6px 12px; border-radius: var(--r-lg); overflow: hidden;
-  background: linear-gradient(180deg, #171b27, #121520); color: #e5e7eb; box-shadow: var(--shadow-2);
+  background: #1d2231; color: #e5e7eb; box-shadow: var(--shadow-2);
   border: 1px solid rgb(255 255 255 / .06); }
 .dc-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-right: 12px; margin-bottom: 6px; }
 .dc-tfs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgb(255 255 255 / .06); }
