@@ -73,6 +73,7 @@
       <div id="receipt-box">
       <label for="receipt">Чек об оплате <b class="req">— обязательно</b> <span class="muted">(скриншот или PDF)</span></label>
       <input id="receipt" name="receipt" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf">
+      <div class="hint" id="receipt-state" role="status"></div>
       <div class="hint">Без чека заявку не проверить — отправить её не получится.</div>
       </div>
       <label for="reference">Номер чека / хэш перевода <span class="muted">(желательно)</span></label>
@@ -123,10 +124,66 @@
   // Кнопка «Ускорить» появится сама, когда подойдёт время
   var soon = document.getElementById("boost-soon");
   if (soon) setTimeout(function () { location.reload(); }, (parseInt(soon.dataset.left, 10) + 2) * 1000);
-  // Двойное нажатие не отправит заявку дважды
+  // Чек сразу копируем в память. На Android (особенно внутри Instagram/Telegram) выбранный файл
+  // к моменту отправки часто уже недоступен — ERR_UPLOAD_FILE_CHANGED. Копия в памяти не пропадёт.
   var pf = document.getElementById("payform"), ps = document.getElementById("paysend");
-  if (pf && ps) pf.addEventListener("submit", function () {
-    setTimeout(function () { ps.disabled = true; ps.innerHTML = '<span class="spin-dot"></span> Отправляем…'; }, 0);
+  var rc = document.getElementById("receipt"), rs = document.getElementById("receipt-state");
+  var copy = null, reading = null;
+  function state(text, bad) { if (rs) { rs.textContent = text; rs.style.color = bad ? "var(--bad)" : ""; } }
+  function shrink(file) {   // большое фото — уменьшаем, чтобы быстро ушло с мобильного интернета
+    return new Promise(function (resolve) {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 2.5e6 || !window.createImageBitmap) {
+        return resolve(file);
+      }
+      createImageBitmap(file).then(function (img) {
+        var k = Math.min(1, 2000 / Math.max(img.width, img.height));
+        var c = document.createElement("canvas");
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(function (b) {
+          resolve(b && b.size < file.size ? new File([b], file.name.replace(/\.\w+$/, "") + ".jpg",
+                                                     {type: "image/jpeg"}) : file);
+        }, "image/jpeg", 0.85);
+      }).catch(function () { resolve(file); });
+    });
+  }
+  if (rc) rc.addEventListener("change", function () {
+    copy = null;
+    var file = rc.files && rc.files[0];
+    if (!file) { state(""); return; }
+    state("Загружаем чек…");
+    reading = file.arrayBuffer().then(function (buf) {
+      return shrink(new File([buf], file.name || "chek.jpg", {type: file.type || "image/jpeg"}));
+    }).then(function (f) {
+      copy = f;
+      state("✅ Чек загружен: " + f.name + " (" + Math.max(1, Math.round(f.size / 1024)) + " КБ)");
+    }).catch(function () {
+      rc.value = "";
+      state("Не получилось прочитать фото. Выберите чек ещё раз — из Галереи или Файлов.", true);
+    }).then(function () { reading = null; });
+  });
+  if (pf && ps) pf.addEventListener("submit", function (e) {
+    var auto = rc && rc.required === false;
+    if (reading) { e.preventDefault(); state("Секунду — чек ещё загружается…"); return; }
+    if (!copy || auto || !window.fetch || !window.FormData) {
+      // Двойное нажатие не отправит заявку дважды
+      setTimeout(function () { ps.disabled = true; ps.innerHTML = '<span class="spin-dot"></span> Отправляем…'; }, 0);
+      return;
+    }
+    e.preventDefault();
+    var fd = new FormData(pf);
+    fd.set("receipt", copy, copy.name);
+    ps.disabled = true; ps.innerHTML = '<span class="spin-dot"></span> Отправляем…';
+    fetch(pf.action, {method: "POST", body: fd, credentials: "same-origin"}).then(function (r) {
+      return r.text().then(function (html) {
+        // показываем ответ сайта как есть — с сообщением «Заявка создана» или ошибкой
+        try { history.replaceState(null, "", r.url || "/panel/balance"); } catch (err) {}
+        document.open(); document.write(html); document.close();
+      });
+    }).catch(function () {
+      ps.disabled = false; ps.textContent = "Я оплатил — отправить заявку";
+      state("Нет связи — проверьте интернет и нажмите ещё раз. Чек выбирать заново не нужно.", true);
+    });
   });
 })();
 (function () {
