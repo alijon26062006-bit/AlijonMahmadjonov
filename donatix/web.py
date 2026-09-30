@@ -938,8 +938,8 @@ def panel_dcoin_data(tf: str = "1m", user=Depends(panel_user), conn=Depends(get_
     from . import dcoin
     data = dcoin.candles(conn, tf)
     d = dcoin.summary(conn, user["id"])
-    data.update({"price": d["price"], "change": d["change"], "balance": d["balance_text"],
-                 "worth_micro": d["worth_micro"], "supply": d["supply_text"], "pool_micro": d["pool_micro"]})
+    # копилку и число монет не отдаём: их видит только админ
+    data.update({"price": d["price"], "change": d["change"], "balance": d["balance_text"]})
     return JSONResponse(data, headers={"Cache-Control": "no-store"})
 
 

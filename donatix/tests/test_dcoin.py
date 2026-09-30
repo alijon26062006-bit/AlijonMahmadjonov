@@ -137,3 +137,16 @@ def test_each_purchase_moves_price_softly(conn):
         assert abs(b - a) / a <= 0.0301, (a, b)
     profit = conn.execute("SELECT SUM(total_micro - cost_micro) FROM orders").fetchone()[0]
     assert dcoin.state(conn)["pool"] <= profit * 20 // 100
+
+
+def test_fixed_rate_and_pool_is_hidden(app, conn):
+    uid = _user(conn)
+    _buy(conn, uid, 5_000)                                            # $0.50 → ровно 50 D
+    assert dcoin.balance(conn, uid) == 50 * dcoin.UNIT
+    client = TestClient(app)
+    web_login(client, "coiner@example.com", "password123")
+    page = client.get("/panel/dcoin").text
+    assert "Копилка" not in page and "копилк" not in page and "Всего монет" not in page
+    j = client.get("/panel/data/dcoin?tf=1s").json()
+    assert j["tf"] == "1s" and j["step"] == 1
+    assert "pool_micro" not in j and "supply" not in j               # конкурентам не видно

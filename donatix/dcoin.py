@@ -1,9 +1,8 @@
 """D-коин — бонусная монета Donatix. Всё зависит только от покупок.
 
 Как устроено и почему сайт никогда не уходит в минус:
-  • Монеты. За каждый выполненный заказ клиент получает D-коины: в начале 100 D за $1.
-    Чем больше монет уже роздано, тем чуть меньше их дают за $1 (каждые HALVING — вдвое),
-    поэтому цена со временем растёт, а ранние покупатели получают больше.
+  • Монеты. За каждый выполненный заказ клиент получает D-коины ровно по сумме заказа:
+    100 D за $1, за $0.50 — 50 D.
   • Копилка. С того же заказа в копилку идёт часть НАШЕЙ ПРИБЫЛИ с него: обычный заказ — 10%,
     заказ крупнее обычного — больше (до 20%), мельче — меньше (от 5%). «Обычный» — средний
     заказ за последние сутки. Заказ без прибыли копилку не пополняет.
@@ -31,11 +30,10 @@ DEFAULT_PER_USD = 100             # D за $1 в самом начале
 DEFAULT_POOL_PCT = 10             # % прибыли обычного заказа — в копилку
 MIN_SHARE, MAX_SHARE = 0.5, 2.0   # мелкий заказ — ×0.5 (5%), крупный — ×2 (20%)
 MAX_STEP = 0.03                   # одна покупка двигает цену не больше чем на 3% — график мягкий
-HALVING = 10_000_000 * UNIT       # каждые 10 млн розданных D — за $1 дают вдвое меньше
 DEFAULT_OPEN_DAYS = 30            # обмен открывается через месяц после запуска
 EXCHANGE_FEE_PCT = 5              # остаются в копилке — цена растёт для остальных
 MIN_EXCHANGE = 10_000             # от $1 (микро-доллары)
-TIMEFRAMES = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86400}
+TIMEFRAMES = {"1s": 1, "5s": 5, "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86400}
 CANDLES = 80
 
 
@@ -121,9 +119,9 @@ def _point(conn: sqlite3.Connection, pool: int, supply: int, reason: str, when: 
                  (when or db.now(), pool, supply, price_of(pool, supply), reason))
 
 
-def reward_units(conn: sqlite3.Connection, usd: float, supply: int) -> int:
-    """Сколько монет (сотые) дать за покупку на usd, когда уже роздано supply."""
-    return int(usd * per_usd(conn) * UNIT * 0.5 ** (supply / HALVING))
+def reward_units(conn: sqlite3.Connection, usd: float) -> int:
+    """Сколько монет (сотые) дать за покупку на usd: 100 D за $1, за $0.50 — 50 D."""
+    return int(usd * per_usd(conn) * UNIT)
 
 
 def share_factor(conn: sqlite3.Connection, usd: float, order_id: int) -> float:
@@ -151,7 +149,7 @@ def award(conn: sqlite3.Connection, order_id: int) -> int:
     started_at(conn)
     usd = row["total_micro"] / 10_000
     cur = state(conn)
-    units = reward_units(conn, usd, cur["supply"])
+    units = reward_units(conn, usd)
     if units <= 0:
         return 0
     profit = max(0, int(row["total_micro"]) - int(row["cost_micro"] or 0))
@@ -275,8 +273,7 @@ def summary(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
     s = state(conn)
     return {"balance": bal, "balance_text": fmt_d(bal), "worth_micro": quote(conn, bal),
             "price": price_of(s["pool"], s["supply"]), "change": change_24h(conn),
-            "pool_micro": s["pool"], "supply": s["supply"], "supply_text": fmt_d(s["supply"]),
-            "per_usd_now": round(reward_units(conn, 1, s["supply"]) / UNIT, 2), "pool_pct": pool_pct(conn),
+            "per_usd": per_usd(conn), "pool_pct": pool_pct(conn),
             "fee_pct": EXCHANGE_FEE_PCT, "open": exchange_open(conn), "opens": exchange_opens(conn),
             "enabled": enabled(conn)}
 

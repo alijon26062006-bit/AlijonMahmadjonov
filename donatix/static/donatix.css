@@ -1449,7 +1449,7 @@ a.order-card:hover { transform: translateY(-1px); }
 .dc-empty { position: absolute; inset: 0 70px 26px 0; display: grid; place-items: center; text-align: center; padding: 20px;
   color: #9aa3b5; font-weight: 600; pointer-events: none; }
 
-.dc-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+.dc-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
 .dc-stat { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: var(--r); background: var(--surface);
   border: 1px solid var(--line); box-shadow: var(--shadow-1); min-width: 0; }
 .dc-stat span { color: var(--muted); font-size: .82rem; }
@@ -1459,7 +1459,7 @@ a.order-card:hover { transform: translateY(-1px); }
   border-color: color-mix(in srgb, #f5b52e 35%, var(--line)); }
 .dc-stat b.tick, .dc-price.tick { animation: dc-tick .5s var(--ease-out); }
 @keyframes dc-tick { from { opacity: .35; transform: translateY(3px); } }
-@media (max-width: 720px) { .dc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .dc-tfs button { min-width: 34px; padding: 0 7px; } .dc-live { font-size: 0; gap: 0; } }
 .dc-how .checks { margin: 10px 0 8px; }
 .dc-ex-row { display: flex; gap: 8px; }
 .dc-ex-row input { flex: 1; min-width: 0; }

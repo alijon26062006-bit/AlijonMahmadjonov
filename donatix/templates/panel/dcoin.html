@@ -9,7 +9,7 @@
 </svg>
 {%- endmacro %}
 {% block content %}
-<div class="dc-app" id="dc" data-tf="1m" data-cur="{{ cur_code }}" data-rate="{{ cur_rate or '' }}">
+<div class="dc-app" id="dc" data-tf="5s" data-cur="{{ cur_code }}" data-rate="{{ cur_rate or '' }}">
   <section class="dc-head">
     {{ coin(52) }}
     <div class="dc-title">
@@ -25,7 +25,7 @@
   <section class="dc-chart-card">
     <div class="dc-bar">
       <div class="dc-tfs" role="tablist" aria-label="Масштаб графика">
-        {% for tf in tfs %}<button type="button" role="tab" data-tf="{{ tf }}" class="{{ 'on' if tf == '1m' }}">{{ tf }}</button>{% endfor %}
+        {% for tf in tfs %}<button type="button" role="tab" data-tf="{{ tf }}" class="{{ 'on' if tf == '5s' }}">{{ tf }}</button>{% endfor %}
       </div>
       <span class="dc-live"><i></i>LIVE</span>
     </div>
@@ -38,18 +38,15 @@
 
   <section class="dc-stats">
     <div class="dc-stat main"><span>У вас</span><b id="dc-bal">{{ d.balance_text }} D</b><small id="dc-worth">≈ {{ money(d.worth_micro) }}</small></div>
-    <div class="dc-stat"><span>За $1 покупки</span><b>{{ d.per_usd_now }} D</b><small>ранним — больше</small></div>
-    <div class="dc-stat"><span>Всего монет</span><b id="dc-supply">{{ d.supply_text }}</b><small>у всех людей</small></div>
-    <div class="dc-stat"><span>Копилка</span><b id="dc-pool">{{ money(d.pool_micro) }}</b><small>из прибыли сайта</small></div>
+    <div class="dc-stat"><span>За покупку</span><b>$1 = {{ d.per_usd }} D</b><small>$0.50 = {{ d.per_usd // 2 }} D</small></div>
   </section>
 
   <section class="card dc-how">
     <h3>Как растёт цена</h3>
     <ul class="checks">
-      <li>{{ icon('check', 18) }}<span>За каждую выполненную покупку — D-коины: сейчас <b>{{ d.per_usd_now }} D за $1</b>.</span></li>
-      <li>{{ icon('check', 18) }}<span>С каждой покупки часть прибыли сайта идёт в копилку. <b>Цена 1 D = копилка ÷ все монеты</b> — ничего не подкручено.</span></li>
-      <li>{{ icon('check', 18) }}<span>Покупка крупнее обычной поднимает цену, мельче — немного опускает. Больше покупок — выше график.</span></li>
-      <li>{{ icon('check', 18) }}<span>Монеты можно обменять на баланс сайта по текущей цене (комиссия {{ d.fee_pct }}% остаётся в копилке — цена для остальных растёт).</span></li>
+      <li>{{ icon('check', 18) }}<span>За каждую выполненную покупку — D-коины: <b>{{ d.per_usd }} D за $1</b>.</span></li>
+      <li>{{ icon('check', 18) }}<span>Цену двигают покупки на сайте: крупные поднимают, мелкие немного опускают. Больше покупок — выше график.</span></li>
+      <li>{{ icon('check', 18) }}<span>Монеты можно обменять на баланс сайта по текущей цене (комиссия {{ d.fee_pct }}%).</span></li>
     </ul>
     <p class="muted small">D-коины — бонусные: их нельзя купить или вывести на карту, только получить за покупки и обменять на баланс Donatix.</p>
   </section>
@@ -68,7 +65,7 @@
       <div class="hint">От $1 по текущей цене, раз в сутки. Сейчас все ваши монеты ≈ {{ money(d.worth_micro) }}.</div>
     </form>
     {% else %}
-    <div class="dc-lock">{{ icon('clock', 20) }}<span>Обмен откроется <b>{{ d.opens | dt }}</b>. Пока копим — с каждой покупкой копилка растёт.</span></div>
+    <div class="dc-lock">{{ icon('clock', 20) }}<span>Обмен откроется <b>{{ d.opens | dt }}</b>. Пока копим — копите монеты, цена растёт вместе с покупками.</span></div>
     {% endif %}
   </section>
 
@@ -100,7 +97,7 @@
   var ctx = cv.getContext("2d"), tip = document.getElementById("dc-tip");
   var CUR = root.dataset.cur, RATE = parseFloat(root.dataset.rate) || 0;
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var tf = "1m", shown = null, target = null, from = null, t0 = 0, DUR = reduce ? 1 : 700;
+  var tf = "5s", shown = null, target = null, from = null, t0 = 0, DUR = reduce ? 1 : 700;
   var hover = -1, W = 0, H = 0, dpr = 1, timer = null, lastPrice = null;
   var R = 70, B = 26, T = 12;   // поля: справа шкала цены, снизу время
 
@@ -168,10 +165,13 @@
     }
     // время снизу
     ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    for (var i = 0; i < n; i += Math.ceil(n / 5)) {
+    var labelW = ctx.measureText(target.step < 60 ? "00:00:00" : "00:00").width + 18;
+    var every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(pw / labelW))));
+    for (var i = 0; i < n; i += every) {
       var d = new Date(c[i][0]);
       var lbl = target.step >= 86400 ? d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })
-        : d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", hour12: false });
+        : d.toLocaleTimeString("ru-RU", target.step < 60 ? { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }
+          : { hour: "2-digit", minute: "2-digit", hour12: false });
       var lx = Math.min(Math.max(i * bw + bw / 2, ctx.measureText(lbl).width / 2 + 2), pw - ctx.measureText(lbl).width / 2);
       ctx.fillStyle = css("--dc-axis"); ctx.fillText(lbl, lx, H - 8);
     }
@@ -239,12 +239,12 @@
         chg.textContent = (d.change >= 0 ? "+" : "") + d.change + "%";
         chg.className = "dc-chg " + (d.change >= 0 ? "up" : "down");
         setText("dc-bal", d.balance + " D");
-        setText("dc-supply", d.supply);
         var empty = document.getElementById("dc-empty");
         if (empty && d.price > 0) empty.hidden = true;
       }).catch(function () {});
   }
-  function loop() { clearTimeout(timer); if (!document.hidden) load(); timer = setTimeout(loop, 4000); }
+  // 1s/5s — спрашиваем каждую секунду, остальные масштабы — раз в 3 секунды
+  function loop() { clearTimeout(timer); if (!document.hidden) load(); timer = setTimeout(loop, tf === "1s" || tf === "5s" ? 1000 : 3000); }
 
   root.querySelectorAll(".dc-tfs button").forEach(function (b) {
     b.addEventListener("click", function () {
@@ -260,7 +260,8 @@
     if (hover < 0) { tip.hidden = true; return; }
     var c = target.candles[hover], d = new Date(c[0]);
     var when = target.step >= 86400 ? d.toLocaleDateString("ru-RU")
-      : d.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+      : d.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+          second: target.step < 60 ? "2-digit" : undefined, hour12: false });
     tip.innerHTML = "<b>" + when + "</b>" + (c[2] <= 0 ? "<span>До первой покупки</span>"
       : "<span>Откр. " + fmt(c[1] > 0 ? c[1] : c[4]) + "</span><span>Макс. " + fmt(c[2]) + "</span><span>Мин. " + fmt(c[3] > 0 ? c[3] : c[4]) +
         "</span><span>Закр. " + fmt(c[4]) + "</span>");
