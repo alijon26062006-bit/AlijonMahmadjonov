@@ -99,27 +99,35 @@ def fmt_d(units: int) -> str:
 
 
 # ── Копилка и монеты ────────────────────────────────────────────
-# Старт с нуля: у сайта есть стартовый запас монет, которых нет ни у кого на руках. Цена считается
-# на все монеты вместе с запасом, поэтому сначала она почти 0.0000. Каждая покупка двигает цену
+# Старт почти с нуля: у сайта есть запас монет, которых нет ни у кого на руках. Цена считается на
+# все монеты вместе с запасом, и первая цена — START_PRICE (≈ 0.00001 с.). Каждая покупка двигает цену
 # через запас сайта: крупнее обычной — вверх, мельче — вниз, от MIN_MOVE до MAX_STEP, плюс
 # небольшой общий рост DRIFT. Запас не принадлежит людям, поэтому сколько бы его ни сжигали или
 # ни добавляли, каждый получит не больше своей доли копилки.
 # Доля копилки, которая «приходится» на запас, никому не выплачивается — она остаётся сайту.
-RESERVE0 = 1_000_000_000 * UNIT   # стартовый запас: 1 млрд D
-MIN_MOVE = 0.004                  # каждая покупка заметно двигает график: хотя бы на 0.4%
+START_PRICE = 0.000001            # $ за 1 D на старте (≈ 0.0000109 с.) — коротко и видно каждое движение
+RESERVE0 = 1_000_000_000 * UNIT   # от этого считается предел запаса
+MIN_MOVE = 0.01                   # каждая покупка двигает цену хотя бы на 1% — меняется последняя цифра
 DRIFT = 0.005                     # общий рост на покупку, пока цена растёт с нуля
 SIZE_MOVE = 0.012                 # вдвое крупнее обычного заказа — ещё +1.2%, вдвое мельче — −1.2%
 KEEP = 0.10                       # держим запас около 10% всех монет — чтобы было чем двигать график
 
 
 def _launch(conn: sqlite3.Connection) -> None:
-    """Один раз: включить стартовый запас. Монеты клиентов и копилка сохраняются, график — с нуля."""
+    """Один раз: цена — со старта. Монеты клиентов и копилка сохраняются, график — заново."""
     if db.get_setting(conn, "dcoin.launch"):
         return
     db.set_setting(conn, "dcoin.launch", db.now())
     row = conn.execute("SELECT pool, supply FROM dcoin_points ORDER BY id DESC LIMIT 1").fetchone()
     conn.execute("DELETE FROM dcoin_points")
-    _point(conn, int(row["pool"]) if row else 0, int(row["supply"]) if row else 0, "launch", reserve=RESERVE0)
+    pool, supply = (int(row["pool"]), int(row["supply"])) if row else (0, 0)
+    _point(conn, pool, supply, "launch", reserve=_start_reserve(pool, supply))
+
+
+def _start_reserve(pool: int, coins: int) -> int:
+    """Сколько запаса нужно, чтобы цена была START_PRICE (если копилка уже больше — 0)."""
+    per_unit = START_PRICE * 10_000 / UNIT             # микро-доллары за сотую долю монеты
+    return max(0, int(pool / per_unit) - coins) if pool > 0 else 0
 
 
 def state(conn: sqlite3.Connection) -> dict[str, int]:
@@ -214,8 +222,8 @@ def steer(cur: dict[str, int], units: int, to_pool: int, cap: int, ratio: float)
     если запаса уже нет — работает обычное сглаживание через копилку."""
     pool, supply, reserve = cur["pool"], cur["supply"], cur["reserve"]
     coins = supply + reserve
-    if pool <= 0 or coins <= 0:
-        return to_pool, reserve                         # первая покупка — старт почти с нуля
+    if pool <= 0 or coins <= 0:                         # первая покупка — цена START_PRICE
+        return to_pool, _start_reserve(to_pool, supply + units)
     target = pool / coins * (1 + move_for(ratio, reserve / coins))
     new_reserve = int((pool + to_pool) / target) - (supply + units)
     if new_reserve >= 0:

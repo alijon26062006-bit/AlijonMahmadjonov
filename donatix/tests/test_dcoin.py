@@ -32,7 +32,7 @@ def test_price_starts_at_zero_and_coins_come_from_purchases(conn):
     assert dcoin.balance(conn, uid) == 100 * dcoin.UNIT             # 100 D за $1
     s = dcoin.state(conn)
     assert s["pool"] == 80                                          # 10% прибыли = 0.8 цента
-    assert 0 < dcoin.price(conn) < 1e-9                             # старт почти с нуля
+    assert abs(dcoin.price(conn) - dcoin.START_PRICE) < 1e-9          # старт почти с нуля: $0.000001
     orders.complete(conn, oid, {})                                  # повторно — ничего
     assert dcoin.balance(conn, uid) == 100 * dcoin.UNIT
     conn.execute("UPDATE orders SET status = 'completed' WHERE id = ?", (oid,))
@@ -71,7 +71,7 @@ def test_zero_profit_order_gives_coins_but_not_money(conn):
 
 
 def test_exchange_opens_later_and_keeps_fee_in_pool(conn, monkeypatch):
-    monkeypatch.setattr(dcoin, "RESERVE0", 0)                         # цена сразу «взрослая» — есть что менять
+    monkeypatch.setattr(dcoin, "START_PRICE", 1.0)                    # без запаса: цена сразу «взрослая»
     uid = _user(conn)
     for _ in range(20):
         _buy(conn, uid, 1_000_000, cost=500_000)                    # $100 с прибылью $50
@@ -159,7 +159,7 @@ def test_launch_price_starts_near_zero_and_grows_softly(conn):
     assert dcoin.price(conn) == 0.0
     _buy(conn, uid, 10_000)
     first = dcoin.price(conn)
-    assert 0 < first < 1e-9                                            # показывается как 0.0000…
+    assert abs(first - dcoin.START_PRICE) < 1e-9                      # 0.0000109 с. — коротко
     for _ in range(300):
         _buy(conn, uid, 100_000)                                       # $10 каждая
     prices = [r[0] for r in conn.execute("SELECT price FROM dcoin_points WHERE reason = 'buy' ORDER BY id")]
@@ -173,12 +173,12 @@ def test_launch_price_starts_near_zero_and_grows_softly(conn):
 
 def test_launch_keeps_coins_of_existing_holders(conn, monkeypatch):
     uid = _user(conn)
-    monkeypatch.setattr(dcoin, "RESERVE0", 0)
+    monkeypatch.setattr(dcoin, "START_PRICE", 1.0)
     db.set_setting(conn, "dcoin.launch", "old")                        # как было до обновления
     _buy(conn, uid, 10_000)
     before = dcoin.price(conn)
     conn.execute("DELETE FROM settings WHERE key = 'dcoin.launch'")
-    monkeypatch.setattr(dcoin, "RESERVE0", 1_000_000_000 * dcoin.UNIT)
-    assert dcoin.price(conn) < before / 1000                            # график начался заново с нуля
+    monkeypatch.setattr(dcoin, "START_PRICE", 0.000001)
+    assert abs(dcoin.price(conn) - 0.000001) < 1e-9 < before            # график начался заново со старта
     assert dcoin.balance(conn, uid) == 100 * dcoin.UNIT                 # монеты у людей на месте
     assert conn.execute("SELECT COUNT(*) FROM dcoin_points").fetchone()[0] == 1

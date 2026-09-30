@@ -104,11 +104,15 @@
   function conv(v) { return CUR === "TJS" && RATE ? v * RATE : v; }
   function fmt(v) {
     v = conv(v);
-    var p = v <= 0 ? 4 : Math.max(4, Math.min(10, 3 - Math.floor(Math.log10(v))));
+    var p = places(v);
     var s = v.toFixed(p);
     return CUR === "TJS" && RATE ? s + " с." : "$" + s;
   }
-  function axis(v) { v = conv(v); var p = v <= 0 ? 4 : Math.max(4, Math.min(10, 3 - Math.floor(Math.log10(v)))); return v.toFixed(p); }
+  // Цена — 3 значащие цифры: коротко, и каждая покупка (шаг от 1%) меняет последнюю цифру
+  function places(v) { return v <= 0 ? 4 : Math.max(2, Math.min(12, 2 - Math.floor(Math.log10(v)))); }
+  // На шкале — столько знаков, чтобы соседние линии сетки не совпадали
+  var axisPlaces = 4;
+  function axis(v) { v = conv(v); return v.toFixed(axisPlaces); }
   function css(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
   function ease(x) { return 1 - Math.pow(1 - x, 3); }
 
@@ -150,6 +154,8 @@
     shown = blend(ease(k));
     var c = shown.candles, lo = shown.lo, hi = shown.hi, n = c.length;
     ctx.font = "600 11px " + css("--font-num");
+    var gstep = conv((hi - lo) / 4);
+    axisPlaces = Math.max(places(conv(c[n - 1][4] || hi)), gstep > 0 ? Math.min(12, 1 - Math.floor(Math.log10(gstep))) : 4);
     R = Math.max(56, Math.ceil(Math.max(ctx.measureText(axis(hi)).width, ctx.measureText(axis(c[n - 1][4])).width)) + 22);
     var pw = W - R, ph = H - B - T, bw = pw / n;
     var Y = function (v) { return T + (hi - v) / (hi - lo || 1) * ph; };
@@ -198,7 +204,7 @@
     ctx.fillStyle = css("--dc-line"); ctx.globalAlpha = .25 + .25 * pulse;
     ctx.beginPath(); ctx.arc((n - .5) * bw, ly, 5 + 5 * pulse, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
     ctx.beginPath(); ctx.arc((n - .5) * bw, ly, 3.5, 0, 7); ctx.fill();
-    var txt = axis(last), tw = ctx.measureText(txt).width + 14;
+    var lastC = conv(last), txt = lastC.toFixed(places(lastC)), tw = ctx.measureText(txt).width + 14;
     ctx.fillStyle = css("--dc-line");
     roundRect(pw + 2, ly - 11, Math.min(tw, R - 4), 22, 11);
     ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, pw + 9, ly + .5);

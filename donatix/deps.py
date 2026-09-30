@@ -90,12 +90,12 @@ templates.env.globals["money"] = _money
 
 @pass_context
 def _dprice(ctx, usd: float) -> str:
-    """Цена D-коина (доли цента) в валюте клиента: 4 значащие цифры, как на бирже."""
+    """Цена D-коина (доли цента) в валюте клиента: 3 значащие цифры — коротко и видно каждое движение."""
     import math
     value, sign = float(usd or 0), "$"
     if ctx.get("cur_code") == "TJS" and ctx.get("cur_rate"):
         value, sign = value * float(ctx["cur_rate"]), " с."
-    places = 4 if value <= 0 else max(4, min(10, 3 - math.floor(math.log10(value))))
+    places = 4 if value <= 0 else max(2, min(12, 2 - math.floor(math.log10(value))))
     text = f"{value:.{places}f}"
     return f"${text}" if sign == "$" else f"{text}{sign}"
 
