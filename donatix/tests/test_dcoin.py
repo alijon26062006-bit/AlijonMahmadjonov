@@ -32,7 +32,7 @@ def test_price_starts_at_zero_and_coins_come_from_purchases(conn):
     assert dcoin.balance(conn, uid) == 100 * dcoin.UNIT             # 100 D за $1
     s = dcoin.state(conn)
     assert s["pool"] == 80                                          # 10% прибыли = 0.8 цента
-    assert abs(dcoin.price(conn) - dcoin.START_PRICE) < 1e-9          # старт почти с нуля: $0.000001
+    assert 0 < dcoin.price(conn) <= dcoin.START_PRICE                 # старт: не дороже 0.00109 с.
     orders.complete(conn, oid, {})                                  # повторно — ничего
     assert dcoin.balance(conn, uid) == 100 * dcoin.UNIT
     conn.execute("UPDATE orders SET status = 'completed' WHERE id = ?", (oid,))
@@ -154,7 +154,8 @@ def test_fixed_rate_and_pool_is_hidden(app, conn):
     assert "pool_micro" not in j and "supply" not in j               # конкурентам не видно
 
 
-def test_launch_price_starts_near_zero_and_grows_softly(conn):
+def test_launch_price_starts_near_zero_and_grows_softly(conn, monkeypatch):
+    monkeypatch.setattr(dcoin, "START_PRICE", 0.000001)
     uid = _user(conn)
     assert dcoin.price(conn) == 0.0
     _buy(conn, uid, 10_000)
@@ -182,3 +183,19 @@ def test_launch_keeps_coins_of_existing_holders(conn, monkeypatch):
     assert abs(dcoin.price(conn) - 0.000001) < 1e-9 < before            # график начался заново со старта
     assert dcoin.balance(conn, uid) == 100 * dcoin.UNIT                 # монеты у людей на месте
     assert conn.execute("SELECT COUNT(*) FROM dcoin_points").fetchone()[0] == 1
+
+
+def test_price_follows_previous_purchase(conn):
+    uid = _user(conn)
+    for total in (30_000, 30_000, 30_000):
+        _buy(conn, uid, total)
+    p0 = dcoin.price(conn)
+    _buy(conn, uid, 50_000)                                            # $5 после $3 — вверх
+    p1 = dcoin.price(conn)
+    _buy(conn, uid, 40_000)                                            # $4 после $5 — вниз
+    p2 = dcoin.price(conn)
+    _buy(conn, uid, 60_000)                                            # $6 после $4 — снова вверх
+    p3 = dcoin.price(conn)
+    assert p1 > p0 and p2 < p1 and p3 > p2
+    for a, b in ((p0, p1), (p1, p2), (p2, p3)):
+        assert 0.0099 <= abs(b - a) / a <= 0.0301                        # от 1% до 3% — видно, но мягко
