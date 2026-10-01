@@ -154,3 +154,16 @@ def test_group_member_is_not_admin(app, config, conn):
     bot.handle(conn, {"update_id": 1, "message": {"chat": {"id": -100500, "type": "supergroup"},
                                                    "from": {"id": 42}, "text": "/payments"}})
     assert calls == ["getChatMember"]                              # не админ группы — бот молчит
+
+
+def test_history_shows_balance_before_and_after(app, conn):
+    from donatix import db
+    uid = accounts.create_user(conn, email="h@example.com", login="hist1", password="password123", status="active")
+    with db.tx(conn):
+        accounts.post_ledger(conn, uid, 500_000, "Пополнение: тест")
+        accounts.post_ledger(conn, uid, -120_000, "Заказ: тест")
+    c = TestClient(app)
+    web_login(c, "h@example.com", "password123")
+    page = c.get("/panel/transactions").text
+    assert page.count("tx-bal") == 2 and "Было" in page and "стало" in page
+    assert re.search(r"Было <b>[^<]*50[.,]00[^<]*</b>.*?стало <b>[^<]*38[.,]00", page, re.S)

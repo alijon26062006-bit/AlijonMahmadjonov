@@ -55,12 +55,13 @@
 
 <h2 style="margin-top:28px">Транзакции</h2>
 <div class="card table-wrap"><table>
-  <tr><th>ID</th><th>Комментарий</th><th class="num">Сумма</th><th class="num">Баланс после</th><th>Когда</th></tr>
+  <tr><th>ID</th><th>Комментарий</th><th class="num">Было</th><th class="num">Сумма</th><th class="num">Осталось</th><th>Когда</th></tr>
   {% for t in txs %}
   <tr><td>tx{{ t.id }}</td><td>{{ t.note }}</td>
+    <td class="num">${{ fmt(t.balance_before) }}</td>
     <td class="num amount {{ 'plus' if t.amount_micro > 0 else 'minus' }}">${{ fmt(t.amount_micro) }}</td>
     <td class="num">${{ fmt(t.balance_after) }}</td><td class="small">{{ t.created_at | dt }}</td></tr>
-  {% else %}<tr><td colspan="5" class="muted">Нет движений.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="6" class="muted">Нет движений.</td></tr>{% endfor %}
 </table></div>
 
 <h2 style="margin-top:28px">Заказы</h2>
