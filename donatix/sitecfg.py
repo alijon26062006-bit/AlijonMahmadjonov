@@ -124,8 +124,8 @@ def _referral_percent(conn: sqlite3.Connection) -> int:
 
 def _personal(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     """Клиенты с личной наценкой: для них общая наценка уровня не действует."""
-    return conn.execute("SELECT login, markup_override FROM users WHERE role = 'client' AND markup_override IS NOT NULL "
-                        "AND markup_override != '' ORDER BY login").fetchall()
+    return conn.execute("SELECT login, markup_override FROM users WHERE role = 'client' "
+                        "AND markup_override IS NOT NULL AND markup_override != '' ORDER BY login").fetchall()
 
 
 def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:

@@ -36,5 +36,6 @@ def test_nine_percent_for_everyone(app, config, conn):
         c = TestClient(app)
         web_login(c, email, "password123")
         expected = f"{float(pid['base_price']) * 1.09:.4f}"
-        assert any(abs(float(p) - float(expected)) < 0.0002 for p in _price(c, pid["id"])), (email, _price(c, pid["id"]))
+        shown = _price(c, pid["id"])
+        assert any(abs(float(p) - float(expected)) < 0.0002 for p in shown), (email, shown)
     assert "клиент Bronze платит <b>$10.90" in admin.get("/admin/settings").text
