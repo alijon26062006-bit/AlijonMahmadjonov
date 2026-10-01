@@ -304,3 +304,22 @@ def test_candles_have_wicks_like_an_exchange(conn):
     assert k[2] > body_top                                               # верхняя тень выше тела
     assert k[4] == dcoin.price(conn)                                     # закрытие — текущая цена, без «прострела»
     assert conn.execute("SELECT COUNT(*) FROM dcoin_points WHERE reason = 'peak'").fetchone()[0] >= 2
+
+
+def test_too_many_zeros_rebased_once_with_history(conn, monkeypatch):
+    uid = _user(conn)
+    db.set_setting(conn, "dcoin.rebase1", "skip")                       # как было на сервере: цена в нулях
+    monkeypatch.setattr(dcoin, "START_PRICE", 1e-11)
+    for total in (30_000, 50_000, 40_000):
+        _buy(conn, uid, total)
+    before = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
+    assert dcoin.price(conn) < 1e-9
+    monkeypatch.setattr(dcoin, "START_PRICE", 0.000002)
+    conn.execute("DELETE FROM settings WHERE key = 'dcoin.rebase1'")
+    p = dcoin.price(conn)
+    assert 0.0000002 <= p <= 0.00002                                     # ≈ 0.0000197 с., а не 0.000000000197
+    after = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")]
+    factor = after[-1] / before[-1]
+    assert all(abs(a / b - factor) < 1e-6 for a, b in zip(after, before) if b)   # вся история сдвинута одинаково
+    assert dcoin.quote(conn, dcoin.state(conn)["supply"]) <= dcoin.state(conn)["pool"]   # минуса нет
+    assert dcoin.price(conn) == p                                         # второй раз не двигает

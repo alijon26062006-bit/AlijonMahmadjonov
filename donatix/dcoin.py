@@ -107,12 +107,12 @@ def fmt_d(units: int) -> str:
 
 # ── Копилка и монеты ────────────────────────────────────────────
 # Старт почти с нуля: у сайта есть запас монет, которых нет ни у кого на руках. Цена считается на
-# все монеты вместе с запасом, и первая цена — не выше START_PRICE (≈ 0.00109 с.). Каждая покупка двигает
+# все монеты вместе с запасом, и первая цена — не выше START_PRICE (≈ 0.0000218 с.). Каждая покупка двигает
 # цену через запас сайта: больше предыдущей — вверх, меньше — вниз, от MIN_MOVE до MAX_STEP, плюс
 # небольшой общий рост DRIFT. Запас не принадлежит людям, поэтому сколько бы его ни сжигали или
 # ни добавляли, каждый получит не больше своей доли копилки.
 # Доля копилки, которая «приходится» на запас, никому не выплачивается — она остаётся сайту.
-START_PRICE = 0.0001              # $ за 1 D на старте (≈ 0.00109 с.) — коротко и видно каждое движение
+START_PRICE = 0.000002            # $ за 1 D на старте (≈ 0.0000218 с.) — коротко и видно каждое движение
 RESERVE0 = 1_000_000_000 * UNIT   # от этого считается предел запаса
 MIN_MOVE = 0.01                   # каждая покупка двигает цену хотя бы на 1% — меняется последняя цифра
 DRIFT = 0.005                     # общий рост на покупку, пока цена растёт с нуля
@@ -138,8 +138,31 @@ def _start_reserve(pool: int, coins: int) -> int:
     return max(0, int(pool / per_unit) - coins) if pool > 0 else 0
 
 
+def _rebase(conn: sqlite3.Connection) -> None:
+    """Один раз: если цена ушла слишком далеко в нули (0.000000000197 с.), поднять её к START_PRICE
+    ровно в 10^k раз — вместе со всей историей графика, чтобы рост и падения остались теми же.
+    Цена поднимается через запас сайта; выше «настоящей» (копилка ÷ монеты людей) — никогда."""
+    if db.get_setting(conn, "dcoin.rebase1"):
+        return
+    db.set_setting(conn, "dcoin.rebase1", db.now())
+    row = conn.execute("SELECT id, pool, supply, reserve FROM dcoin_points ORDER BY id DESC LIMIT 1").fetchone()
+    if row is None:
+        return
+    now_price = price_of(int(row["pool"]), int(row["supply"]), int(row["reserve"]))
+    if now_price <= 0 or now_price * 100 > START_PRICE:
+        return
+    factor = 10 ** round(math.log10(START_PRICE / now_price))
+    per_unit = now_price * factor * 10_000 / UNIT
+    reserve = int(int(row["pool"]) / per_unit) - int(row["supply"])
+    if reserve < 0:
+        return
+    conn.execute("UPDATE dcoin_points SET price = price * ?", (factor,))
+    conn.execute("UPDATE dcoin_points SET reserve = ? WHERE id = ?", (reserve, row["id"]))
+
+
 def state(conn: sqlite3.Connection) -> dict[str, int]:
     _launch(conn)
+    _rebase(conn)
     row = conn.execute("SELECT pool, supply, reserve FROM dcoin_points ORDER BY id DESC LIMIT 1").fetchone()
     if row is None:
         return {"pool": 0, "supply": 0, "reserve": 0}
@@ -267,7 +290,12 @@ def move_for(ratio: float, reserve_share: float = 1.0) -> float:
     Общий рост тем меньше, чем меньше осталось запаса: цена подходит к «настоящей» плавно и
     не упирается в неё, так что запаса хватает, чтобы график шевелился от каждой покупки."""
     m = DRIFT * (reserve_share - KEEP) / (1 - KEEP) + SIZE_MOVE * math.log2(max(ratio, 1e-6))
-    if abs(m) < MIN_MOVE:
+    # направление — всегда по сравнению с предыдущей покупкой; общий рост меняет только величину шага
+    if ratio > 1.0001:
+        m = max(m, MIN_MOVE)
+    elif ratio < 0.9999:
+        m = min(m, -MIN_MOVE)
+    elif abs(m) < MIN_MOVE:
         m = MIN_MOVE if m >= 0 else -MIN_MOVE
     return max(-MAX_STEP, min(MAX_STEP, m))
 
