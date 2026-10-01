@@ -16,7 +16,8 @@ from urllib.parse import urlencode
 
 import httpx
 
-from . import accounts
+from . import accounts, db
+from .security import hash_password
 from .config import Config
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -81,10 +82,13 @@ def find_or_create(conn: sqlite3.Connection, config: Config, profile: dict[str, 
     if user is None:
         user = conn.execute("SELECT * FROM users WHERE email = ?", (profile["email"],)).fetchone()
         if user is not None:
-            # Сами не привязываем: при регистрации по паролю email не подтверждается. Кто-то мог заранее
-            # завести аккаунт на чужой email — и владелец, войдя через Google, попал бы в аккаунт с чужим
-            # паролем и чужими API-ключами, а пополнения достались бы тому, кто его завёл.
-            raise GoogleError("Аккаунт с этим email уже есть — войдите по email и паролю.")
+            # Человек подтвердил через Google, что почта его, — привязываем и пускаем.
+            # Но пароль при регистрации почту не подтверждал: аккаунт мог заранее завести чужой.
+            # Поэтому его пароль и все открытые сессии гасим — войти дальше может только владелец почты.
+            conn.execute("UPDATE users SET google_sub = ?, password_hash = ? WHERE id = ?",
+                         (profile["sub"], hash_password(secrets.token_urlsafe(32)), user["id"]))
+            conn.execute("UPDATE logins SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL",
+                         (db.now(), user["id"]))
     if user is not None:
         return user, False
     if not allow_new:

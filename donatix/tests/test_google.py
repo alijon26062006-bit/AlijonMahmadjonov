@@ -1,3 +1,4 @@
+from conftest import web_login
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -49,15 +50,21 @@ def test_new_user_created_and_existing_matched(gconf, app, conn, monkeypatch):
     r = _login(TestClient(app))
     assert conn.execute("SELECT COUNT(*) FROM users WHERE role = 'client'").fetchone()[0] == 1
 
-    # клиент с паролем, та же почта в Google — сами не привязываем: email при регистрации не подтверждён,
-    # аккаунт мог завести чужой человек заранее (захват аккаунта владельца почты)
+    # клиент с паролем, та же почта в Google — входит в свой аккаунт, Google запоминается.
+    # Пароль, заданный без подтверждения почты, гасим: аккаунт мог заранее завести чужой
     uid = accounts.create_user(conn, email="old@example.com", login="oldshop", password="password123",
                                status="active")
+    squatter = TestClient(app)
+    web_login(squatter, "old@example.com", "password123")
     _google(monkeypatch, {"sub": "g2", "email": "old@example.com", "email_verified": True})
     c2 = TestClient(app)
     _login(c2)
-    assert accounts.get_user(conn, uid)["google_sub"] is None
-    assert "oldshop" not in c2.get("/panel", follow_redirects=False).text
+    assert accounts.get_user(conn, uid)["google_sub"] == "g2"
+    assert "oldshop" in c2.get("/panel").text
+    assert accounts.authenticate(conn, "old@example.com", "password123") is None
+    assert squatter.get("/panel", follow_redirects=False).status_code in (302, 303)
+    c3 = TestClient(app)                                   # следующий вход через Google — сразу в аккаунт
+    assert _login(c3).headers["location"] == "/panel"
 
 
 def test_rejects_bad_state_and_unverified(gconf, app, conn, monkeypatch):
