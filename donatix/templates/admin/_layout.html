@@ -4,6 +4,7 @@
 {% set current = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
 <h4>Админка</h4>
 {{ nav_link('/admin', 'Сводка', 'home', current) }}
+{{ nav_link('/admin/money', 'Учёт денег', 'chart', current) }}
 {{ nav_link('/admin/finance', 'Деньги за сутки', 'wallet', current) }}
 {{ nav_link('/admin/stats', 'Аналитика продаж', 'chart', current) }}
 {{ nav_link('/admin/traffic', 'Посещаемость', 'eye', current) }}

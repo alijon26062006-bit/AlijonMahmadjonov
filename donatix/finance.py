@@ -188,3 +188,71 @@ def maybe_send(conn: sqlite3.Connection, config: Config, now: datetime | None = 
     from .cashiers import daily_reports
     daily_reports(conn, config, start, end)
     return True
+
+
+# ── Учёт денег за любой период: всё в одном месте ───────────────
+MAX_DAY_ROWS = 62   # дольше — строки по месяцам
+
+
+def _extras(conn: sqlite3.Connection, a: str, b: str) -> dict[str, int]:
+    """Что не входит в сводку суток: возвраты, обмен D-коинов на баланс."""
+    ref = conn.execute(
+        "SELECT COUNT(*), COALESCE(SUM(total_micro), 0) FROM orders WHERE status = 'failed' "
+        "AND COALESCE(completed_at, updated_at) >= ? AND COALESCE(completed_at, updated_at) < ?", (a, b)).fetchone()
+    exch = conn.execute(
+        "SELECT COUNT(*), COALESCE(SUM(-pool_micro), 0) FROM dcoin_ledger WHERE amount < 0 AND pool_micro < 0 "
+        "AND created_at >= ? AND created_at < ?", (a, b)).fetchone()
+    return {"refunds": int(ref[0]), "refunded": int(ref[1]), "exchanges": int(exch[0]), "exchanged": int(exch[1])}
+
+
+def flow(s: dict[str, Any]) -> list[dict[str, Any]]:
+    """Куда ушли деньги от продаж: поставщику, рефералам, в копилку D-коина, кассирам, вам."""
+    parts = [("cost", "Поставщику (закупка)", s["cost"]), ("ref", "Рефералам", s["referral"]),
+             ("dcoin", "Копилка D-коина", s["dcoin"]), ("cash", "Кассирам", s["cashiers_total"]),
+             ("own", "Вам", s["owner_profit"])]
+    total = sum(max(0, v) for _, _, v in parts) or 1
+    return [{"key": k, "label": t, "micro": v, "pct": round(max(0, v) * 100 / total, 1)} for k, t, v in parts]
+
+
+def _first_day(conn: sqlite3.Connection) -> datetime | None:
+    row = conn.execute("SELECT MIN(t) FROM (SELECT MIN(created_at) AS t FROM orders "
+                       "UNION ALL SELECT MIN(created_at) FROM payments)").fetchone()
+    return timez.parse(row[0]) if row and row[0] else None
+
+
+def ledger(conn: sqlite3.Connection, config: Config, pr: Any, now: datetime | None = None) -> dict[str, Any]:
+    """Отчёт за период pr (periods.Period): итог, куда ушли деньги и строки по дням (или месяцам)."""
+    tz = timez.zone(timez.site_zone_name(conn))
+    now = now or datetime.now(timezone.utc)
+    today = now.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    end = pr.end or today + timedelta(days=1)
+    start = pr.start
+    if start is None:
+        first = _first_day(conn)
+        start = (first or now).astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    end = min(end, today + timedelta(days=1))
+    total = summary(conn, config, start, end)
+    total.update(_extras(conn, _iso(start), _iso(end)))
+    by_month = (end - start).days > MAX_DAY_ROWS
+    rows: list[dict[str, Any]] = []
+    cur = start
+    while cur < end:
+        if by_month:
+            nxt = (cur.replace(day=1) + timedelta(days=32)).replace(day=1)
+        else:
+            nxt = cur + timedelta(days=1)
+        nxt = min(nxt, end)
+        s = summary(conn, config, cur, nxt)
+        s.update(_extras(conn, _iso(cur), _iso(nxt)))
+        s["label"] = cur.strftime("%m.%Y") if by_month else cur.strftime("%d.%m.%Y")
+        s["shares"] = {c["tg_id"]: c["share"] for c in s["cashiers"]}
+        rows.append(s)
+        cur = nxt
+    rows.reverse()                                   # свежие сверху
+    names = {c["tg_id"]: c["name"] for c in total["cashiers"]}
+    from . import dcoin
+    st = dcoin.state(conn)
+    return {"total": total, "flow": flow(total), "rows": rows, "by_month": by_month,
+            "cashiers": [{"tg_id": k, "name": v} for k, v in names.items()],
+            "dcoin_pool": st["pool"], "dcoin_coins": dcoin.fmt_d(st["supply"]),
+            "start": start, "end": end}

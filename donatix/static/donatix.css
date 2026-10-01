@@ -1499,3 +1499,28 @@ a.order-card:hover { transform: translateY(-1px); }
   animation: dc-tick .3s var(--ease-out); }
 .dc-hint { padding: 2px 12px 6px 0; color: #6b7386; font-size: .72rem; text-align: center; }
 .dc-row b.wait { color: var(--muted); }
+
+/* ── Админка → Учёт денег ─────────────────────────────── */
+.money-filter { margin-bottom: 14px; }
+.money-kpis { margin-bottom: 14px; }
+.money-own { border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); background: linear-gradient(135deg, var(--ok-soft), var(--surface)); }
+.money-own .value { color: var(--ok); }
+.mf-bar { display: flex; height: 18px; border-radius: 9px; overflow: hidden; background: var(--surface-2); }
+.mf-bar span { height: 100%; transition: width .5s var(--ease-out); }
+.mf-bar span + span { box-shadow: -2px 0 0 var(--surface); }
+.mf-cost { background: #94a3b8; } .mf-ref { background: #f59e0b; } .mf-dcoin { background: #eab308; }
+.mf-cash { background: #8b5cf6; } .mf-own { background: var(--ok); }
+.mf-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 16px; margin-top: 14px; }
+.mf-item { display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 8px; font-size: .92rem; }
+.mf-item i { width: 12px; height: 12px; border-radius: 4px; }
+.mf-item b { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.mf-item small { color: var(--muted); min-width: 42px; text-align: right; }
+.money-flow, .money-side, .money-days { margin-top: 14px; }
+.money-side .card { margin-top: 0; }
+.money-table { font-size: .9rem; }
+.money-table td, .money-table th { white-space: nowrap; }
+.money-table tfoot th { border-top: 2px solid var(--line-strong); color: var(--text); font-size: .85rem; }
+.money-table b.bad { color: var(--bad); }
+.kpi-tjs { display: block; margin-top: 4px; font: 500 .82rem var(--font); color: var(--muted); }
+.fin-rows.exp .total b { color: var(--text); }
+.money-table th:first-child, .money-table td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); }

@@ -92,6 +92,20 @@ def stats_page(request: Request, period: str = "30d", admin=Depends(admin_user),
     })
 
 
+@router.get("/money")
+def money_page(request: Request, period: str = "", date_from: str = "", date_to: str = "",
+               admin=Depends(admin_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Учёт денег: все движения за период на одной странице — откуда пришли и куда ушли."""
+    from . import finance, periods, timez
+    pr = periods.resolve(timez.zone(timez.site_zone_name(conn)), period, date_from, date_to, default="30d")
+    m = cache.get_or_set(f"admin:money:{pr.key}:{pr.date_from}:{pr.date_to}", 30,
+                         lambda: finance.ledger(conn, config, pr))
+    return render(request, "admin/money.html", {
+        "user": admin, "m": m, "s": m["total"], "pr": pr, "presets": periods.PRESETS, "keep": "",
+        "site_tz": timez.label(timez.site_zone_name(conn)), "tjs": finance.tjs, "usd": finance.usd,
+    })
+
+
 @router.get("/finance")
 def finance_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
                  config: Config = Depends(get_config)):
