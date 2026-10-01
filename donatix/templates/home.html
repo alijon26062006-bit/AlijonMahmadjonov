@@ -22,7 +22,8 @@
         <h1>Алмазы Free Fire, UC PUBG и&nbsp;Telegram Stars оптом</h1>
         <p class="lead">{% if client_bots %}Откройте свой Telegram-бот-магазин за 5 минут без программиста — или подключите сайт по API.{% else %}Для ботов, сайтов и магазинов. Заказы выполняются автоматически.{% endif %}</p>
         <div class="cta">
-          <a class="btn primary lg" href="/register">{{ 'Создать своего бота' if client_bots else 'Подать заявку' }}</a>
+          <a class="btn primary lg" href="/panel/catalog">Каталог и цены</a>
+          <a class="btn lg" href="/register">{{ 'Создать своего бота' if client_bots else 'Подать заявку' }}</a>
           <a class="btn lg" href="{{ '#constructor' if client_bots else '/docs' }}">{{ 'Как это работает' if client_bots else 'Документация API' }}</a>
         </div>
         <ul class="hero-points">
@@ -148,8 +149,10 @@
           "steam_topup": ["USD", "RUB", "KZT", "UAH"],
           "steam_gift": ["игры по ссылке-приглашению"],
         } %}
+        {% set links = {"telegram_stars": "/panel/catalog?kind=telegram", "telegram_premium": "/panel/catalog?kind=telegram&tab=premium",
+                        "steam_topup": "/panel/buy/steam-topup", "steam_gift": "/panel/buy/steam-gift"} %}
         {% for kind, title in kind_titles.items() %}
-        <div class="card feature">
+        <a class="card feature catalog-link" href="{{ links.get(kind, '/panel/catalog?kind=' ~ kind) }}">
           <div class="tile k-{{ kind }}">{{ kind_icon(kind, 20) }}</div>
           <h3>{{ title }}</h3>
           <div class="chips">
@@ -160,7 +163,8 @@
               {% for d in defaults[kind] %}<span class="chip">{{ d }}</span>{% endfor %}
             {% endif %}
           </div>
-        </div>
+          <span class="catalog-go">Смотреть цены {{ icon('arrow-right', 14) }}</span>
+        </a>
         {% endfor %}
       </div>
     </div>

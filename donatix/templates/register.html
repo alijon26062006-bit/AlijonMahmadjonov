@@ -10,6 +10,9 @@
       <div class="tile g1">{{ icon("handshake", 24) }}</div>
       <div><h2>Стать партнёром</h2></div>
     </div>
+    {% if next and not closed %}
+    <div class="flash" role="status">{{ icon('bag', 20) }}<span>Чтобы купить — зарегистрируйтесь. Сразу после регистрации вернём вас к товару.</span></div>
+    {% endif %}
     {% if closed %}
     <div class="flash warn" role="status">{{ icon('alert', 20) }}<span>Приём новых партнёров временно закрыт.{% if support_contact %} Напишите {{ support_contact }}.{% endif %}</span></div>
     {% else %}

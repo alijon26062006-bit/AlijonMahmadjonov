@@ -72,17 +72,17 @@
       <div class="summary">
         <div><span>Получатель</span><span id="s-to" class="wrap-text">—</span></div>
         <div><span>Товар</span><span id="s-what" class="wrap-text">—</span></div>
-        <div><span>Ваш баланс</span><span>{{ money(user.balance_micro) }}</span></div>
+        {% if not user.guest %}<div><span>Ваш баланс</span><span>{{ money(user.balance_micro) }}</span></div>{% endif %}
         <div class="total"><span>К оплате</span><span id="s-total">—</span></div>
       </div>
-      <button class="btn primary lg block buy-btn" {{ 'disabled' if user.status != 'active' }}>Купить</button>
+      {% if user.guest %}<a class="btn primary lg block buy-btn" href="/register?next={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}">Зарегистрироваться и купить</a>{% else %}<button class="btn primary lg block buy-btn" {{ 'disabled' if user.status != 'active' }}>Купить</button>{% endif %}
       <p class="hint center">{{ icon('shield', 16) }} Не выполнится — деньги вернутся на баланс.</p>
     </div>
   </aside>
 
   <div class="buy-bar" aria-hidden="true">
     <div><span class="muted small">К оплате</span><b id="bar-total">—</b></div>
-    <button type="submit" class="btn primary lg" tabindex="-1" {{ 'disabled' if user.status != 'active' }}>Купить</button>
+    {% if user.guest %}<a class="btn primary lg" href="/register?next={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}">Купить</a>{% else %}<button type="submit" class="btn primary lg" tabindex="-1" {{ 'disabled' if user.status != 'active' }}>Купить</button>{% endif %}
   </div>
 </form>
 

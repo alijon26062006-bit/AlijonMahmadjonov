@@ -27,8 +27,31 @@ def _redirect(url: str) -> RedirectResponse:
 def panel_user(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> sqlite3.Row:
     user = session_user(request, conn)
     if user is None:
+        if request.method == "GET":
+            query = "?" + request.url.query if request.url.query else ""
+            request.session["next"] = _safe_next(request.url.path + query)
         raise LoginRequired()
     return user
+
+
+class Guest(dict):
+    """Гость: смотрит каталог и цены без входа. Купить или пополнить — после регистрации."""
+
+
+def _guest() -> Guest:
+    return Guest(id=0, login="Гость", email="", role="guest", status="active", balance_micro=0, tier="bronze",
+                 markup_override=None, dcoin=0, guest=True)
+
+
+def viewer(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Кто смотрит страницу каталога: клиент или гость."""
+    return session_user(request, conn) or _guest()
+
+
+def _safe_next(url: str) -> str:
+    """Куда вернуть после входа/регистрации: только свои страницы кабинета."""
+    url = (url or "").strip()
+    return url if url.startswith("/panel") and not url.startswith("//") and len(url) < 500 else ""
 
 
 # ── Публичные страницы ───────────────────────────────────────
@@ -151,7 +174,11 @@ def register_form(request: Request, conn=Depends(get_conn)):
 
     if session_user(request, conn):
         return _redirect("/panel")
-    return render(request, "register.html", {"form": {}, "closed": not sitecfg.registration_open(conn)})
+    nxt = _safe_next(request.query_params.get("next", ""))
+    if nxt:
+        request.session["next"] = nxt
+    return render(request, "register.html", {"form": {}, "closed": not sitecfg.registration_open(conn),
+                                             "next": request.session.get("next", "")})
 
 
 @router.post("/register", dependencies=[Depends(check_csrf)])
@@ -193,14 +220,17 @@ def register(
         flash(request, "Аккаунт создан. Мы проверим заявку и активируем доступ — обычно в течение дня.")
     else:
         flash(request, "Аккаунт создан. Добро пожаловать!")
-    return _redirect("/panel")
+    return _redirect(_safe_next(request.session.pop("next", "")) or "/panel")
 
 
 @router.get("/login")
 def login_form(request: Request, conn=Depends(get_conn)):
     if session_user(request, conn):
         return _redirect("/panel")
-    return render(request, "login.html", {"form": {}})
+    nxt = _safe_next(request.query_params.get("next", ""))
+    if nxt:
+        request.session["next"] = nxt
+    return render(request, "login.html", {"form": {}, "next": request.session.get("next", "")})
 
 
 @router.post("/login", dependencies=[Depends(check_csrf)])
@@ -221,6 +251,7 @@ def _finish_login(request: Request, conn, user) -> RedirectResponse:
     """Вход после пароля или Google. Админу — ещё код из админ-бота в Telegram (если включено)."""
 
     config = request.app.state.config
+    nxt = _safe_next(request.session.get("next", ""))   # вернуть туда, где человек хотел купить
     request.session.clear()
     if user["role"] == "admin" and sitecfg.admin_2fa_active(conn, config):
         import hashlib
@@ -236,7 +267,7 @@ def _finish_login(request: Request, conn, user) -> RedirectResponse:
         return _redirect("/login/code")
     request.session["user_id"] = user["id"]
     _record_login(conn, request, user["id"])
-    return _redirect("/admin" if user["role"] == "admin" else "/panel")
+    return _redirect("/admin" if user["role"] == "admin" else (nxt or "/panel"))
 
 
 @router.get("/login/code")
@@ -420,7 +451,7 @@ def _cached(key: str, q: str, make):
 @router.get("/panel/catalog")
 def panel_catalog(
     request: Request, kind: str = "", q: str = "", category: str = "", region: str = "",
-    user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config),
+    user=Depends(viewer), conn=Depends(get_conn), config: Config = Depends(get_config),
 ):
     if kind == "telegram":
         return render(request, "panel/telegram.html",
@@ -512,7 +543,7 @@ def panel_telegram_buy(request: Request, form: dict = Depends(_form), user=Depen
 
 
 @router.get("/panel/buy/{product_id}")
-def panel_buy_form(product_id: str, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+def panel_buy_form(product_id: str, request: Request, user=Depends(viewer), conn=Depends(get_conn),
                    config: Config = Depends(get_config)):
     p = catalog.get_product(conn, product_id)
     if p is None:
@@ -566,8 +597,10 @@ def panel_buy(product_id: str, request: Request, form: dict = Depends(_form), us
 
 
 @router.get("/panel/data/check-account/{product_id}")
-def panel_check_account(product_id: str, request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+def panel_check_account(product_id: str, request: Request, user=Depends(viewer), conn=Depends(get_conn)):
     from .api import ApiError, account_check_view
+    if isinstance(user, Guest):
+        return JSONResponse({"ok": False, "error": "Зарегистрируйтесь, чтобы проверить аккаунт."}, 401)
     p = catalog.get_product(conn, product_id)
     if p is None:
         return JSONResponse({"ok": False, "error": "Товар не найден."}, 404)
@@ -581,7 +614,7 @@ def panel_check_account(product_id: str, request: Request, user=Depends(panel_us
 
 
 @router.get("/panel/data/gamekey-regions/{product_id}")
-def panel_gamekey_regions(product_id: str, request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+def panel_gamekey_regions(product_id: str, request: Request, user=Depends(viewer), conn=Depends(get_conn)):
     from . import gamekeys
     p = catalog.get_product(conn, product_id)
     if p is None or p["kind"] != "game_key":
@@ -590,13 +623,13 @@ def panel_gamekey_regions(product_id: str, request: Request, user=Depends(panel_
 
 
 @router.get("/panel/data/steam-gifts/games")
-def panel_gift_games(q: str = "", user=Depends(panel_user), conn=Depends(get_conn)):
+def panel_gift_games(q: str = "", user=Depends(viewer), conn=Depends(get_conn)):
     from . import steam_gifts
     return {"ok": True, "items": steam_gifts.search(conn, q[:100])}
 
 
 @router.get("/panel/data/steam-gifts/games/{appid}")
-def panel_gift_game(appid: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+def panel_gift_game(appid: int, request: Request, user=Depends(viewer), conn=Depends(get_conn),
                     config: Config = Depends(get_config)):
     from .api import ApiError, steam_gift_view
     try:

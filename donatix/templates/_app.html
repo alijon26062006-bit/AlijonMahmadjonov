@@ -6,6 +6,14 @@
     <button class="icon-btn only-sm" type="button" aria-label="Открыть меню" onclick="dxMenu(true)">{{ icon('menu') }}</button>
     <a class="brand" href="/">{{ logo() }}<span class="hide-sm">{{ site_name }}</span></a>
     <nav class="nav">
+      {% if user.guest %}
+      {% set here = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
+      <span class="cur-switch" role="group" aria-label="Валюта">
+        <a href="/currency/USD" class="{{ 'on' if cur_code != 'TJS' }}">USD</a><a href="/currency/TJS" class="{{ 'on' if cur_code == 'TJS' }}">TJS</a>
+      </span>
+      <a class="btn sm hide-sm" href="/login?next={{ here | urlencode }}">Войти</a>
+      <a class="btn sm primary" href="/register?next={{ here | urlencode }}">Регистрация</a>
+      {% else %}
       <span class="hide-sm muted small" style="margin-right:6px">{{ user.login }}</span>
       <a class="icon-btn bell" href="/panel/notifications" aria-label="Уведомления{{ ': ' ~ unread if unread }}">{{ icon('bell') }}{% if unread %}<span class="dot-count">{{ unread if unread < 100 else '99+' }}</span>{% endif %}</a>
       <span class="cur-switch" role="group" aria-label="Валюта">
@@ -16,6 +24,7 @@
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <button class="icon-btn" aria-label="Выйти" title="Выйти">{{ icon('logout') }}</button>
       </form>
+      {% endif %}
     </nav>
   </div>
 </header>

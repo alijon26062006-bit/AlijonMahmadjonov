@@ -1,11 +1,20 @@
 {% extends "_app.html" %}
 {% from "_icons.html" import icon, nav_link, media, kind_icon, tg_logo, ig_logo %}
 {% block side_top %}
+{% if user.guest %}
+<div class="balance-card guest-card">
+  <div class="label-caps">Добро пожаловать</div>
+  <p class="small muted" style="margin:4px 0 10px">Смотрите игры и цены свободно. Чтобы купить или пополнить счёт — зарегистрируйтесь, это минута.</p>
+  <a class="btn sm primary block" href="/register?next={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}">Регистрация</a>
+  <a class="btn sm block" style="margin-top:6px" href="/login?next={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}">Войти</a>
+</div>
+{% else %}
 <div class="balance-card">
   <div class="label-caps">Баланс</div>
   <b>{{ money(user.balance_micro) }}</b>
   <a class="btn sm soft block" href="/panel/balance">{{ icon('plus', 18) }}Пополнить</a>
 </div>
+{% endif %}
 {% endblock %}
 {% block sidenav %}
 {% set current = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
@@ -40,7 +49,7 @@
 {{ nav_link('/panel/bots', 'Мой Telegram-бот', 'zap-send', current) }}
 {{ nav_link('/panel/api', 'API и webhook', 'key', current) }}
 {{ nav_link('/docs', 'Документация', 'book', current) }}
-{% if user.role == 'admin' %}{{ nav_link('/admin', 'Админка', 'shield', current) }}{% elif low_balance_micro and user.balance_micro < low_balance_micro %}
+{% if user.role == 'admin' %}{{ nav_link('/admin', 'Админка', 'shield', current) }}{% elif not user.guest and low_balance_micro and user.balance_micro < low_balance_micro %}
 <div class="flash warn low-bal" role="status">{{ icon('alert', 20) }}<span>На балансе осталось <b>{{ money(user.balance_micro) }}</b> — пополните счёт, чтобы заказы не остановились.</span>
   <a class="btn sm primary" href="/panel/balance">Пополнить</a></div>
 {% endif %}
@@ -51,7 +60,7 @@
 </div>
 {% endblock %}
 {% block notice %}
-{% if user.status == 'pending' %}
+{% if user.status == 'pending' and not user.guest %}
 <div class="flash warn" role="status">{{ icon('clock', 20) }}<span>Аккаунт ждёт одобрения. Каталог уже можно смотреть, заказы откроются после активации{% if support_contact %} — напишите {{ support_contact }}{% endif %}.</span></div>
 {% endif %}
 {% endblock %}
