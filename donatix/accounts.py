@@ -123,6 +123,9 @@ def set_webhook(conn: sqlite3.Connection, user_id: int, url: str) -> None:
     url = url.strip()
     if url and not re.match(r"^https?://[^\s]+$", url):
         raise AccountError("Адрес webhook должен начинаться с http:// или https://")
+    from .webhooks import public_target
+    if url and not public_target(url):
+        raise AccountError("Адрес webhook должен быть доступен из интернета (не локальный и не внутренний).")
     conn.execute("UPDATE users SET webhook_url = ? WHERE id = ?", (url or None, user_id))
 
 

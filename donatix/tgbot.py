@@ -10,6 +10,7 @@ import json
 import logging
 import sqlite3
 import threading
+import time
 from typing import Any, Callable
 
 import httpx
@@ -130,6 +131,7 @@ class AdminBot:
         self.api = api or TelegramApi(config.alert_telegram_token)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._admins: dict[str, tuple[float, bool]] = {}   # кто админ в группе-чате админки (кэш на 5 мин)
 
     # отправка
     def send(self, text: str, buttons: Buttons | None = None, **extra: Any) -> None:
@@ -176,10 +178,35 @@ class AdminBot:
         finally:
             conn.close()
 
+    def _trusted(self, chat: dict[str, Any], sender: dict[str, Any] | None) -> bool:
+        """Чат админки — личка владельца или группа. В группе слушаем только её админов,
+        иначе любой участник группы мог бы зачислять деньги и менять реквизиты."""
+        if chat.get("type", "private") == "private":
+            return True
+        uid = str((sender or {}).get("id") or "")
+        if not uid:
+            return False
+        now = time.monotonic()
+        cached = self._admins.get(uid)
+        if cached and now - cached[0] < 300:
+            return cached[1]
+        try:
+            member = self.api("getChatMember", chat_id=self.chat_id, user_id=int(uid)) or {}
+            ok = member.get("status") in ("creator", "administrator")
+        except Exception as exc:  # noqa: BLE001 — не проверили — не пускаем
+            log.warning("telegram-бот: проверка админа %s: %s", uid, exc)
+            return False
+        self._admins[uid] = (now, ok)
+        return ok
+
     def handle(self, conn: sqlite3.Connection, upd: dict[str, Any]) -> None:
         if "callback_query" in upd:
             cq = upd["callback_query"]
             msg = cq.get("message") or {}
+            if str((msg.get("chat") or {}).get("id")) == self.chat_id and \
+                    not self._trusted(msg.get("chat") or {}, cq.get("from")):
+                self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Нет доступа")
+                return
             if str((msg.get("chat") or {}).get("id")) != self.chat_id:
                 cashier = self._cashier(conn, msg, cq.get("from"))
                 if cashier is None:
@@ -220,6 +247,8 @@ class AdminBot:
         if str((msg.get("chat") or {}).get("id")) != self.chat_id:
             self.on_stranger(conn, msg)
             return
+        if not self._trusted(msg.get("chat") or {}, msg.get("from")):
+            return   # участник группы, но не админ — молчим
         text = (msg.get("text") or "").strip()
         if self.wizard and not text.startswith("/") and text.split(" ")[0] not in ("🏠", "📊", "💳", "👥", "⚠️"):
             self.send(*wizard_step(self, conn, msg))
@@ -317,9 +346,22 @@ class AdminBot:
             self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Неизвестная кнопка")
             return
         if what == "pay" and action in ("ok", "no"):
-            p = conn.execute("SELECT method FROM payments WHERE id = ?", (obj_id,)).fetchone()
+            p = conn.execute("SELECT method, user_id FROM payments WHERE id = ?", (obj_id,)).fetchone()
             if p is None or not cashiers.handles(conn, self.config, cashier, p["method"]):
                 self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Этот банк вам не назначен")
+                return
+            # Кнопка — только под настоящим сообщением с этим чеком (подделанную кнопку не принимаем)
+            sent = conn.execute("SELECT 1 FROM payment_msgs WHERE payment_id = ? AND chat_id = ? AND message_id = ?",
+                                (obj_id, str(chat_id), int(msg.get("message_id") or 0))).fetchone()
+            if sent is None:
+                self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Нет доступа")
+                return
+            # Свою же заявку (аккаунт, привязанный к этому Telegram) кассир не решает — только админ
+            own = conn.execute("SELECT 1 FROM support_links WHERE tg_id = ? AND user_id = ?",
+                               (int(chat_id), p["user_id"])).fetchone()
+            if own is not None:
+                self.api("answerCallbackQuery", callback_query_id=cq["id"],
+                         text="Это ваша заявка — её проверяет админ")
                 return
             result = self.resolve_payment(conn, obj_id, action == "ok", cashier["name"], tg_id=chat_id)
             self.api("answerCallbackQuery", callback_query_id=cq["id"], text=result[:190])
@@ -435,7 +477,7 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
     from . import receipt_ai
     if receipt_ai.enabled(config):   # что прочитал ИИ и совпадает ли сумма
         seen = json.loads(p["receipt_ai"]) if p["receipt_ai"] else None
-        caption += "\n" + receipt_ai.summary(seen, p["pay_amount"], p["pay_currency"] or "")
+        caption += "\n" + _e(receipt_ai.summary(seen, p["pay_amount"], p["pay_currency"] or ""))
     path = receipts_dir(config) / p["receipt_file"]
     photo = not p["receipt_file"].endswith(".pdf")
     if only_chat is None:
@@ -620,7 +662,7 @@ def _client(bot: AdminBot, conn: sqlite3.Connection, action: str, user_id: int) 
 def _bot(bot: AdminBot, conn: sqlite3.Connection, action: str, bot_id: int) -> str | Screen:
     from . import bots
     if action in ("stop", "start", "restart"):
-        bots.set_enabled(conn, bot_id, action != "stop")
+        bots.set_enabled(conn, bot_id, action != "stop", by_admin=True)
         if bots.RUNNER:
             bots.RUNNER.poke()
     return screen_bot(conn, bot_id)

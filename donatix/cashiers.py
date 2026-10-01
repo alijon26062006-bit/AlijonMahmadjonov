@@ -129,8 +129,10 @@ def toggle_method(conn: sqlite3.Connection, config: Config, tg_id: int, code: st
 def handles(conn: sqlite3.Connection, config: Config, row: sqlite3.Row | None, method: str) -> bool:
     if row is None or not row["active"]:
         return False
+    if _is_auto(conn, config, method):   # автоплатежи (крипта) проверяет блокчейн — кассиру их не решать
+        return False
     codes = codes_of(row)
-    return not _is_auto(conn, config, method) if codes is None else method in codes
+    return codes is None or method in codes
 
 
 def _is_auto(conn: sqlite3.Connection, config: Config, method: str) -> bool:

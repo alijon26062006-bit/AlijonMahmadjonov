@@ -9,6 +9,7 @@ import sqlite3
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -346,19 +347,36 @@ async def payment_receipt(payment_id: int, request: Request, user=Depends(api_us
     from .tgbot import send_receipt
     _limit(request, "account", str(user["id"]))
     ctype = request.headers.get("content-type", "")
+    limit = payments.MAX_RECEIPT_BYTES + 64 * 1024
+    try:
+        declared = int(request.headers.get("content-length") or 0)
+    except ValueError:
+        declared = 0
+    if declared > limit:
+        raise ApiError("Файл чека пустой или больше 10 МБ.", "invalid_receipt")
     if ctype.startswith("multipart/"):
         form = await request.form()
         up = form.get("file") or form.get("photo") or form.get("document")
         if up is None or not hasattr(up, "read"):
             raise ApiError("Приложите файл в поле file.", "missing_field")
-        data, ctype = await up.read(payments.MAX_RECEIPT_BYTES + 1), up.content_type or ""
+        data = await up.read(payments.MAX_RECEIPT_BYTES + 1)
     else:
-        data = await request.body()
+        chunks, size = [], 0
+        async for chunk in request.stream():   # без Content-Length тело тоже не больше лимита
+            size += len(chunk)
+            if size > limit:
+                raise ApiError("Файл чека пустой или больше 10 МБ.", "invalid_receipt")
+            chunks.append(chunk)
+        data = b"".join(chunks)
+
+    def attach() -> None:   # ИИ и Telegram — в отдельном потоке, чтобы не стоял весь сервер
+        payments.attach_receipt(conn, config, user["id"], payment_id, data)
+        send_receipt(conn, config, payment_id)
+
     try:
-        payments.attach_receipt(conn, config, user["id"], payment_id, data, ctype)
+        await run_in_threadpool(attach)
     except payments.PaymentError as exc:
         raise ApiError(str(exc), "invalid_receipt") from None
-    send_receipt(conn, config, payment_id)
     row = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
     return {"ok": True, "payment": payments.public(conn, config, row)}
 

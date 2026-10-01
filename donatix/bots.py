@@ -111,9 +111,11 @@ def create(conn: sqlite3.Connection, config: Config, *, user_id: int, token: str
     return int(cur.lastrowid)
 
 
-def set_enabled(conn: sqlite3.Connection, bot_id: int, enabled: bool) -> None:
+def set_enabled(conn: sqlite3.Connection, bot_id: int, enabled: bool, *, by_admin: bool = False) -> None:
     was = conn.execute("SELECT enabled FROM bots WHERE id = ?", (bot_id,)).fetchone()
     conn.execute("UPDATE bots SET enabled = ?, updated_at = ? WHERE id = ?", (int(enabled), db.now(), bot_id))
+    if not enabled and by_admin:   # остановил админ — клиент сам обратно не включит
+        conn.execute("UPDATE bots SET disabled_reason = 'admin' WHERE id = ?", (bot_id,))
     if enabled and was is not None and not was["enabled"]:  # перезапуск работающего бота отсчёт не сбрасывает
         from . import bot_watch
         bot_watch.mark_enabled(conn, bot_id)  # включили — отсчёт «без продаж» заново
@@ -205,6 +207,8 @@ def can_enable(conn: sqlite3.Connection, bot_id: int) -> tuple[bool, str]:
         return False, "Бот не найден."
     if row["disabled_reason"] == "inactive" or blocked_for_inactivity(conn, row["user_id"]):
         return False, BLOCKED_TEXT
+    if row["disabled_reason"] == "admin":
+        return False, "Бота остановил администратор — напишите в поддержку."
     return True, ""
 
 

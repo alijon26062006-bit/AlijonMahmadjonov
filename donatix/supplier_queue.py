@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import sqlite3
 import time
 import uuid
@@ -54,11 +55,26 @@ def mark(provider: str) -> str:
     return f"{QUEUED}:{provider}"
 
 
+_NO_FUNDS = re.compile(r"insufficient[ _-]*(balance|funds)|not enough (balance|funds|money)|low balance"
+                       r"|недостаточно (средств|денег)|не хватает (средств|денег)|баланс[а-я]* недостаточ")
+
+
 def is_no_funds(exc: Exception) -> bool:
-    """Поставщик отказал из-за нехватки денег у нас на счету."""
-    text = str(exc).lower()
-    return getattr(exc, "code", "") == "insufficient_balance" or "balance" in text or "баланс" in text \
-        or "средств" in text or "funds" in text
+    """Поставщик отказал из-за нехватки денег у нас на счету.
+
+    Только точный код или фраза: клиент не должен уметь «включить» паузу словом balance
+    в своём логине/юзернейме или ошибкой вроде «лимит баланса кошелька Steam».
+    """
+    return getattr(exc, "code", "") == "insufficient_balance" or bool(_NO_FUNDS.search(str(exc).lower()))
+
+
+def has_funds_for(supplier: Any, provider: str, order: Any) -> bool:
+    """Отказ похож на «нет денег» только по тексту, а баланс на этот заказ есть — значит, отказ не про деньги."""
+    try:
+        balance = _supplier_named(supplier, provider).balance()
+    except Exception:  # noqa: BLE001 — не узнали баланс: верим отказу, заказ ждёт в очереди
+        return False
+    return balance * SCALE >= order["cost_micro"] > 0
 
 
 def on_hold(conn: sqlite3.Connection, provider: str) -> bool:

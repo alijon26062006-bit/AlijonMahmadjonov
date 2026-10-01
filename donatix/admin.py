@@ -244,7 +244,7 @@ def bots_action(bot_id: int, action: str, request: Request, admin_ids: str = For
     from . import bots
     try:
         if action == "stop":
-            bots.set_enabled(conn, bot_id, False)
+            bots.set_enabled(conn, bot_id, False, by_admin=True)
         elif action == "start":
             owner = conn.execute("SELECT user_id FROM bots WHERE id = ?", (bot_id,)).fetchone()
             bots.set_enabled(conn, bot_id, True)

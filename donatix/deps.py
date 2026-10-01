@@ -161,7 +161,10 @@ def session_user(request: Request, conn: sqlite3.Connection) -> sqlite3.Row | No
     if not user_id:
         return None
     user = accounts.get_user(conn, int(user_id))
-    if user is None or user["status"] == "blocked":
+    sid = request.session.get("sid")
+    live = sid and conn.execute("SELECT 1 FROM logins WHERE sid = ? AND user_id = ? AND ended_at IS NULL",
+                                (sid, user["id"] if user else 0)).fetchone()
+    if user is None or user["status"] == "blocked" or not live:
         request.session.clear()
         return None
     return user

@@ -64,13 +64,17 @@ def test_draft_without_receipt_does_not_block(config, conn):
 
 def test_admin_sees_who_decided_each_request(app, config, conn, monkeypatch):
     monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
-    monkeypatch.setattr("donatix.cashiers.send_file", lambda *a, **k: None)
+    monkeypatch.setattr("donatix.cashiers.send_file", lambda *a, **k: 5)
+    cashiers.add(conn, 5550001, "Исом")
     uid, client, token = _client(app, config, conn)
     _send(client, token)
-    cashiers.add(conn, 5550001, "Исом")
     config.alert_telegram_chat_id = "777"
     calls = []
     bot = tgbot.AdminBot(config, api=lambda m, **p: calls.append((m, p)) or {})
+    bot.handle(conn, {"update_id": 1, "callback_query": {                 # подделанная кнопка — не под чеком
+        "id": "c", "data": "pay:ok:1", "from": {"id": 5550001},
+        "message": {"message_id": 99, "chat": {"id": 5550001, "type": "private"}, "text": "любое"}}})
+    assert balance(conn, uid) == 0
     bot.handle(conn, {"update_id": 1, "callback_query": {
         "id": "c", "data": "pay:ok:1", "from": {"id": 5550001},
         "message": {"message_id": 5, "chat": {"id": 5550001, "type": "private"}, "caption": "чек", "photo": [{}]}}})

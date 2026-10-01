@@ -152,9 +152,12 @@ def test_api_topup_with_receipt(app, config, conn, monkeypatch):
     assert api.post(f"/api/v1/payments/{pay['id']}/receipt", headers=h, files={"file": ("a.txt", b"hi", "text/plain")}
                     ).json()["ok"] is False
     r = api.post(f"/api/v1/payments/{pay['id']}/receipt", headers=h, files={"file": ("chek.png", PNG, "image/png")})
+    assert r.json()["ok"] is False      # чек отклонённой заявки — повтор, второй раз не проходит
+    r = api.post(f"/api/v1/payments/{pay['id']}/receipt", headers=h,
+                 files={"file": ("chek.png", PNG + b"2", "image/png")})
     assert r.json()["payment"]["receipt"] is True
     caption, buttons, path, photo = sent[-1]
-    assert "Чек приложен" in caption and photo and path.read_bytes() == PNG
+    assert "Чек приложен" in caption and photo and path.read_bytes() == PNG + b"2"
     # админ жмёт «Зачислить» под фото — баланс пополнен, подпись обновлена
     config.alert_telegram_chat_id = "777"
     calls = []
@@ -167,7 +170,7 @@ def test_api_topup_with_receipt(app, config, conn, monkeypatch):
     # админ может открыть чек в админке
     admin = TestClient(app)
     web_login(admin, "admin@example.com", "adminpass123")
-    assert admin.get(f"/admin/payments/{pay['id']}/receipt").content == PNG
+    assert admin.get(f"/admin/payments/{pay['id']}/receipt").content == PNG + b"2"
 
 
 def test_panel_topup_with_receipt(app, config, conn, monkeypatch):

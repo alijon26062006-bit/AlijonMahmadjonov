@@ -17,9 +17,11 @@ from .suppliers import Supplier
 log = logging.getLogger(__name__)
 
 
-def notify_admin(config: Config, text: str, buttons: list | None = None, *, html: bool = False) -> None:
-    """Сообщение админу в Telegram, если настроено (с кнопками — ответ прямо из чата). Иначе — только в лог."""
-    log.warning("ADMIN: %s", text)
+def notify_admin(config: Config, text: str, buttons: list | None = None, *, html: bool = False,
+                 secret: bool = False) -> None:
+    """Сообщение админу в Telegram, если настроено (с кнопками — ответ прямо из чата). Иначе — только в лог.
+    secret — в сообщении код входа: в журнал сервера его не пишем."""
+    log.warning("ADMIN: %s", "(код входа — только в Telegram)" if secret else text)
     if not (config.alert_telegram_token and config.alert_telegram_chat_id):
         return
     from .tgbot import keyboard
@@ -162,7 +164,7 @@ class Worker:
                     log.exception("очередь заказов")
                 try:
                     orders.process_pending(conn, self.supplier)
-                    webhooks.deliver_pending(conn)
+                    self._start_webhooks()   # свой поток: медленный адрес клиента не держит заказы
                 except Exception:
                     log.exception("воркер")
                 if now - last_recheck >= 300:
@@ -175,6 +177,23 @@ class Worker:
                 self._stop.wait(self.config.order_poll_seconds)
         finally:
             conn.close()
+
+    _webhook_lock = threading.Lock()
+
+    def _start_webhooks(self) -> None:
+        if not self._webhook_lock.acquire(blocking=False):
+            return   # прошлая рассылка ещё идёт
+
+        def run() -> None:
+            c = db.connect(self.config.db_path)
+            try:
+                webhooks.deliver_pending(c)
+            except Exception:
+                log.exception("webhooks")
+            finally:
+                c.close()
+                self._webhook_lock.release()
+        threading.Thread(target=run, name="donatix-webhooks", daemon=True).start()
 
     def _start_sync(self) -> None:
         def run() -> None:

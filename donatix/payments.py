@@ -423,9 +423,51 @@ def receipts_dir(config: Config):
     return Path(config.db_path).parent / "receipts"
 
 
+_UNREAD = object()
+
+
+def receipt_kind(data: bytes) -> str | None:
+    """Тип чека — по содержимому файла: заявленному типу (форма, API) верить нельзя."""
+    return _sniff(data) if data else None
+
+
+def read_receipt(config: Config, data: bytes) -> dict | None:
+    """ИИ читает чек. Вызывать ДО транзакции: запрос к OpenAI идёт до 25 с, базу держать нельзя."""
+    from . import receipt_ai
+    ext = receipt_kind(data)
+    return receipt_ai.read(config, data, ext) if ext and len(data) <= MAX_RECEIPT_BYTES else None
+
+
 def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payment_id: int,
-                   data: bytes, content_type: str) -> str:
-    """Сохранить чек к своей заявке в ожидании. Возвращает имя файла."""
+                   data: bytes, content_type: str = "", seen: Any = _UNREAD) -> str:
+    """Сохранить чек к своей заявке в ожидании. Возвращает имя файла.
+
+    seen — что ИИ прочитал в чеке (read_receipt), если уже прочитано вне транзакции.
+    """
+    if not data or len(data) > MAX_RECEIPT_BYTES:
+        raise PaymentError("Файл чека пустой или больше 10 МБ.")
+    ext = receipt_kind(data)
+    if ext is None:
+        raise PaymentError("Чек — фото (JPG, PNG, WEBP) или PDF.")
+    if seen is _UNREAD:
+        seen = read_receipt(config, data)
+    own_tx = not conn.in_transaction
+    if own_tx:   # проверка повтора и запись — под одной блокировкой, иначе два одинаковых чека пройдут разом
+        conn.execute("BEGIN IMMEDIATE")
+    try:
+        name = _attach_locked(conn, config, user_id, payment_id, data, ext, seen)
+    except BaseException:
+        if own_tx:
+            conn.execute("ROLLBACK")
+        raise
+    if own_tx:
+        conn.execute("COMMIT")
+    return name
+
+
+def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payment_id: int,
+                   data: bytes, ext: str, seen: dict | None) -> str:
+    from . import receipt_ai
     p = conn.execute("SELECT * FROM payments WHERE id = ? AND user_id = ?", (payment_id, user_id)).fetchone()
     if p is None:
         raise PaymentError("Заявка не найдена.")
@@ -433,25 +475,14 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
         raise PaymentError("Заявка уже обработана.")
     if p["receipt_file"]:
         raise PaymentError(f"Чек к заявке #{payment_id} уже отправлен — дождитесь проверки.")
-    ext = RECEIPT_TYPES.get((content_type or "").split(";")[0].strip().lower())
-    if ext is None:
-        ext = _sniff(data)
-    if ext is None:
-        raise PaymentError("Чек — фото (JPG, PNG, WEBP) или PDF.")
-    if not data or len(data) > MAX_RECEIPT_BYTES:
-        raise PaymentError("Файл чека пустой или больше 10 МБ.")
+    if p["auto_kind"] or is_auto(conn, config, p["method"]):
+        raise PaymentError("Эта заявка проверяется автоматически — чек не нужен.")
     digest = hashlib.sha256(data).hexdigest()
-    dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? AND status IN ('pending', 'paid')",
-                       (digest, payment_id)).fetchone()
-    if dup:
+    # Отклонённые тоже считаем: тот же чек не должен пройти со второй попытки у другого проверяющего
+    dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? "
+                       "AND status IN ('pending', 'paid', 'rejected')", (digest, payment_id)).fetchone()
+    if dup or (seen and receipt_ai.duplicate(conn, payment_id, seen)):
         raise PaymentError("Чек не прошёл проверку. Если это ошибка — напишите в поддержку.")
-    # ИИ читает чек: номер операции, сумму, время — и ищет тот же перевод в базе
-    from . import receipt_ai
-    seen = receipt_ai.read(config, data, ext)
-    if seen:
-        again = receipt_ai.duplicate(conn, payment_id, seen)
-        if again:
-            raise PaymentError("Чек не прошёл проверку. Если это ошибка — напишите в поддержку.")
     folder = receipts_dir(config)
     folder.mkdir(parents=True, exist_ok=True)
     name = f"{payment_id}-{secrets.token_hex(6)}.{ext}"

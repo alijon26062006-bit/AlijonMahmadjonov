@@ -224,7 +224,7 @@ def on_cancel(conn: sqlite3.Connection, order_id: int) -> int:
     return int(row["amount"])
 
 
-def award(conn: sqlite3.Connection, order_id: int) -> int:
+def _award(conn: sqlite3.Connection, order_id: int) -> int:
     """За выполненный заказ: монеты клиенту (или подтверждение уже выданных при покупке) и часть
     прибыли в копилку. Один раз за заказ. Возвращает монеты (сотые) или 0."""
     if not enabled(conn):
@@ -349,7 +349,7 @@ def _wick(conn: sqlite3.Connection, before: dict[str, int], pool: int, supply: i
         _point(conn, pool, supply, "peak", reserve=peak_reserve)
 
 
-def on_refund(conn: sqlite3.Connection, order_id: int) -> bool:
+def _on_refund(conn: sqlite3.Connection, order_id: int) -> bool:
     """Заказ отменён, деньги вернулись: монеты за него списываются, цена падает на refund_pct%
     (через запас сайта — копилка и монеты остальных не меняются). Зовётся там, где делается возврат."""
     on_cancel(conn, order_id)
@@ -527,3 +527,28 @@ def pool_added(conn: sqlite3.Connection, a: str, b: str) -> int:
     """Сколько прибыли ушло в копилку за [a, b) — для отчёта о финансах."""
     return int(conn.execute("SELECT COALESCE(SUM(pool_micro), 0) FROM dcoin_ledger WHERE pool_micro > 0 "
                             "AND created_at >= ? AND created_at < ?", (a, b)).fetchone()[0])
+
+
+def _atomic(conn: sqlite3.Connection, fn, order_id: int):
+    """Прочитать состояние графика и записать новую точку — под одной блокировкой.
+    Иначе два заказа, выполненные одновременно в разных процессах, затёрли бы монеты друг друга."""
+    if conn.in_transaction:
+        return fn(conn, order_id)
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        result = fn(conn, order_id)
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
+    return result
+
+
+def award(conn: sqlite3.Connection, order_id: int) -> int:
+    """За выполненный заказ: монеты клиенту и доля прибыли в копилку (см. _award)."""
+    return _atomic(conn, _award, order_id)
+
+
+def on_refund(conn: sqlite3.Connection, order_id: int) -> bool:
+    """Возврат за заказ: монеты списываются, цена чуть вниз (см. _on_refund)."""
+    return _atomic(conn, _on_refund, order_id)

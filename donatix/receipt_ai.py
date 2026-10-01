@@ -72,7 +72,8 @@ def read(config: Config, data: bytes, ext: str, transport: httpx.BaseTransport |
 def clean(raw: dict[str, Any]) -> dict[str, Any]:
     """Привести ответ модели к одному виду."""
     def s(key: str) -> str:
-        return str(raw.get(key) or "").strip()[:120]
+        # Одна строка: текст на картинке не должен дописывать строки в сообщение админу
+        return re.sub(r"\s+", " ", str(raw.get(key) or "")).strip()[:120]
     try:
         amount = round(float(str(raw.get("amount") or 0).replace(" ", "").replace(",", ".")), 2)
     except ValueError:
@@ -102,12 +103,12 @@ def duplicate(conn: sqlite3.Connection, payment_id: int, d: dict[str, Any]) -> s
     key, fp = txn_key(d), fingerprint(d)
     if key:
         row = conn.execute("SELECT id, status FROM payments WHERE receipt_txn = ? AND id != ? "
-                           "AND status IN ('pending', 'paid')", (key, payment_id)).fetchone()
+                           "AND status IN ('pending', 'paid', 'rejected')", (key, payment_id)).fetchone()
         if row:
             return row
     if fp:
         return conn.execute("SELECT id, status FROM payments WHERE receipt_fp = ? AND id != ? "
-                            "AND status IN ('pending', 'paid')", (fp, payment_id)).fetchone()
+                            "AND status IN ('pending', 'paid', 'rejected')", (fp, payment_id)).fetchone()
     return None
 
 

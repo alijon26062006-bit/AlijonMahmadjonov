@@ -254,16 +254,20 @@ def _finish_login(request: Request, conn, user) -> RedirectResponse:
     nxt = _safe_next(request.session.get("next", ""))   # вернуть туда, где человек хотел купить
     request.session.clear()
     if user["role"] == "admin" and sitecfg.admin_2fa_active(conn, config):
-        import hashlib
         import secrets as _secrets
         import time as _time
 
         from .worker import notify_admin
         code = f"{_secrets.randbelow(1_000_000):06d}"
-        request.session["pending_2fa"] = {"uid": user["id"], "exp": _time.time() + 300, "tries": 0,
-                                          "hash": hashlib.sha256(code.encode()).hexdigest()}
+        # Код, срок и попытки — на сервере. В cookie только случайный номер попытки входа:
+        # cookie подписан, но не зашифрован — хеш кода из него подобрали бы за секунду.
+        nonce = _secrets.token_urlsafe(24)
+        _clean_2fa(conn)
+        db.set_setting(conn, f"2fa.{nonce}", json.dumps(
+            {"uid": user["id"], "exp": _time.time() + 300, "tries": 0, "hash": _code_hash(config, nonce, code)}))
+        request.session["pending_2fa"] = nonce
         notify_admin(config, f"🔐 Код входа в админку: {code}\nДействует 5 минут. IP: {_ip(request)}. "
-                             "Если это не вы — смените пароль.")
+                             "Если это не вы — смените пароль.", secret=True)
         return _redirect("/login/code")
     request.session["user_id"] = user["id"]
     _record_login(conn, request, user["id"])
@@ -277,21 +281,46 @@ def login_code_form(request: Request):
     return render(request, "login_code.html", {})
 
 
-@router.post("/login/code", dependencies=[Depends(check_csrf)])
-def login_code(request: Request, code: str = Form(""), conn=Depends(get_conn)):
+def _code_hash(config: Config, nonce: str, code: str) -> str:
     import hashlib
+    import hmac
+    return hmac.new(config.secret_key.encode(), f"{nonce}:{code}".encode(), hashlib.sha256).hexdigest()
+
+
+def _clean_2fa(conn) -> None:
+    import time as _time
+    for row in conn.execute("SELECT key, value FROM settings WHERE key LIKE '2fa.%'").fetchall():
+        try:
+            if json.loads(row["value"])["exp"] < _time.time():
+                conn.execute("DELETE FROM settings WHERE key = ?", (row["key"],))
+        except (ValueError, KeyError, TypeError):
+            conn.execute("DELETE FROM settings WHERE key = ?", (row["key"],))
+
+
+@router.post("/login/code", dependencies=[Depends(check_csrf)])
+def login_code(request: Request, code: str = Form(""), conn=Depends(get_conn),
+               config: Config = Depends(get_config)):
     import secrets as _secrets
     import time as _time
-    pending = request.session.get("pending_2fa")
-    if not pending or _time.time() > pending["exp"] or pending["tries"] >= 5:
+    nonce = request.session.get("pending_2fa")
+    key = f"2fa.{nonce}" if isinstance(nonce, str) and nonce else ""
+    with db.tx(conn):   # попытки считает сервер — повтор старого cookie их не сбросит
+        raw = db.get_setting(conn, key) if key else None
+        pending = json.loads(raw) if raw else None
+        if not pending or _time.time() > pending["exp"] or pending["tries"] >= 5:
+            if key:
+                conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+            pending = None
+        else:
+            pending["tries"] += 1
+            db.set_setting(conn, key, json.dumps(pending))
+    if pending is None:
         request.session.pop("pending_2fa", None)
         flash(request, "Код устарел. Войдите ещё раз — пришлём новый.", "error")
         return _redirect("/login")
-    pending["tries"] += 1
-    request.session["pending_2fa"] = pending
-    given = hashlib.sha256(code.strip().encode()).hexdigest()
-    if not _secrets.compare_digest(given, pending["hash"]):
+    if not _secrets.compare_digest(_code_hash(config, nonce, code.strip()), pending["hash"]):
         return render(request, "login_code.html", {"error": "Неверный код."}, 400)
+    conn.execute("DELETE FROM settings WHERE key = ?", (key,))
     request.session.clear()
     request.session["user_id"] = pending["uid"]
     _record_login(conn, request, pending["uid"])
@@ -351,19 +380,26 @@ def google_callback(request: Request, code: str = "", state: str = "", error: st
 
 
 def _record_login(conn, request: Request, user_id: int) -> None:
-    conn.execute("INSERT INTO logins (user_id, ip, user_agent, created_at) VALUES (?, ?, ?, ?)",
-                 (user_id, _ip(request)[:64], request.headers.get("user-agent", "")[:300], db.now()))
+    import secrets as _secrets
+    sid = _secrets.token_urlsafe(24)
+    conn.execute("INSERT INTO logins (user_id, ip, user_agent, created_at, sid) VALUES (?, ?, ?, ?, ?)",
+                 (user_id, _ip(request)[:64], request.headers.get("user-agent", "")[:300], db.now(), sid))
+    request.session["sid"] = sid
 
 
 @router.post("/logout", dependencies=[Depends(check_csrf)])
-def logout(request: Request):
+def logout(request: Request, conn=Depends(get_conn)):
+    sid = request.session.get("sid")
+    if sid:   # сессия закрыта на сервере: копия cookie после выхода уже не войдёт
+        conn.execute("UPDATE logins SET ended_at = ? WHERE sid = ? AND ended_at IS NULL", (db.now(), sid))
     request.session.clear()
     return _redirect("/")
 
 
 def _ip(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for", "")
-    return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "?")
+    # Настоящий адрес уже подставил uvicorn (proxy_headers от nginx на 127.0.0.1).
+    # Первое значение X-Forwarded-For пишет сам клиент — по нему лимит входа обходился бы.
+    return request.client.host if request.client else "?"
 
 
 # ── Кабинет ──────────────────────────────────────────────────
@@ -887,12 +923,15 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     if not data and not payments.is_auto(conn, config, method):
         flash(request, "Прикрепите чек об оплате — фото или PDF. Без чека заявку не проверить.", "error")
         return _redirect("/panel/balance")
+    if payments.is_auto(conn, config, method):
+        data = b""   # крипту проверяет блокчейн — чек не нужен и не принимаем
     rates.refresh(conn, config, rates.PAYMENT_SECONDS)  # сумма к переводу — по свежему курсу
+    seen = payments.read_receipt(config, data) if data else None   # ИИ — до транзакции, базу не держим
     try:
         with db.tx(conn):
             pid = payments.create(conn, config, user, method, amount, reference, amount_tjs=amount_tjs)
             if data:
-                payments.attach_receipt(conn, config, user["id"], pid, data, receipt.content_type or "")
+                payments.attach_receipt(conn, config, user["id"], pid, data, seen=seen)
     except payments.PaymentError as exc:
         flash(request, str(exc), "error")
         return _redirect("/panel/balance")
@@ -985,7 +1024,7 @@ def panel_dcoin_exchange(request: Request, amount: str = Form(""), user=Depends(
         raw = amount.replace(" ", "").replace(",", ".")
         units = dcoin.balance(conn, user["id"]) if raw.lower() in ("all", "все", "всё") \
             else int(round(float(raw) * dcoin.UNIT))
-    except ValueError:
+    except (ValueError, OverflowError):
         flash(request, "Укажите, сколько D-коинов обменять.", "error")
         return _redirect("/panel/dcoin")
     try:

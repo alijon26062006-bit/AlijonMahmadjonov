@@ -315,7 +315,14 @@ def _send_to_supplier(
             product, order["quantity"], json.loads(order["fields_json"]), order["supplier_idem_key"]
         )
     except SupplierRejected as exc:
-        if supplier_queue.is_no_funds(exc):
+        if exc.http_status == 409 or "duplicate" in str(exc).lower():
+            # Конфликт/дубликат: заказ у поставщика, возможно, уже создан прошлой попыткой.
+            # Деньги не возвращаем вслепую — иначе клиент получит и товар, и возврат.
+            _to_attention(conn, order["id"], f"Поставщик ответил «конфликт/дубликат»: {exc}. Проверьте заказ в "
+                                             "кабинете поставщика: есть — отметьте выполненным, нет — верните деньги.")
+            return
+        if supplier_queue.is_no_funds(exc) and (exc.code == "insufficient_balance"
+                                                or not supplier_queue.has_funds_for(supplier, provider, order)):
             # Кончились деньги у поставщика — заказ не отменяем: в очередь, уйдёт, когда пополним
             log.warning("поставщик %s: нет денег, %s в очередь", provider, order["public_id"])
             supplier_queue.start_hold(conn, provider)
@@ -338,6 +345,8 @@ def _send_to_supplier(
     )
     if result.order_id is None:
         _to_attention(conn, order["id"], "Поставщик принял заказ, но не вернул его номер.")
+    elif result.status == "partial":
+        _to_attention(conn, order["id"], f"Поставщик выполнил заказ частично ({result.raw_status}) — проверьте.")
     elif result.status == "failed":
         fail_and_refund(conn, order["id"], result.message or "Поставщик отклонил заказ.")
     elif result.status == "completed":
@@ -448,6 +457,8 @@ def refresh(conn: sqlite3.Connection, supplier: Supplier, order: sqlite3.Row, *,
     )
     if result.status == "completed":
         complete(conn, order["id"], result.delivery, result.raw_status)
+    elif result.status == "partial":
+        _to_attention(conn, order["id"], f"Поставщик выполнил заказ частично ({result.raw_status}) — проверьте.")
     elif result.status == "failed":
         fail_and_refund(conn, order["id"], result.message or f"Поставщик: {result.raw_status}")
     elif _age_seconds(order["created_at"]) > STUCK_HOURS * 3600:

@@ -82,7 +82,7 @@ def incoming_usdt(config: Config, address: str, since_ms: int) -> list[dict[str,
     if config.trongrid_key:
         headers["TRON-PRO-API-KEY"] = config.trongrid_key
     data = _get_json(f"{TRONGRID}/v1/accounts/{address}/transactions/trc20",
-                     {"only_to": "true", "limit": 200, "contract_address": USDT_TRC20,
+                     {"only_to": "true", "only_confirmed": "true", "limit": 200, "contract_address": USDT_TRC20,
                       "min_timestamp": since_ms}, headers)
     out = []
     for t in data.get("data") or []:

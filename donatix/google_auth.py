@@ -81,7 +81,10 @@ def find_or_create(conn: sqlite3.Connection, config: Config, profile: dict[str, 
     if user is None:
         user = conn.execute("SELECT * FROM users WHERE email = ?", (profile["email"],)).fetchone()
         if user is not None:
-            conn.execute("UPDATE users SET google_sub = ? WHERE id = ?", (profile["sub"], user["id"]))
+            # Сами не привязываем: при регистрации по паролю email не подтверждается. Кто-то мог заранее
+            # завести аккаунт на чужой email — и владелец, войдя через Google, попал бы в аккаунт с чужим
+            # паролем и чужими API-ключами, а пополнения достались бы тому, кто его завёл.
+            raise GoogleError("Аккаунт с этим email уже есть — войдите по email и паролю.")
     if user is not None:
         return user, False
     if not allow_new:

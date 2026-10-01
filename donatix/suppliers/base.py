@@ -198,6 +198,8 @@ _DONE_ROOTS = ("complet", "success", "succeed", "deliver", "fulfil", "done", "pa
 
 def normalize_status(raw: str | None) -> str:
     value = (raw or "").strip().lower()
+    if "partial" in value or "частичн" in value:
+        return "partial"   # часть выдана, часть возвращена — решает админ, полный возврат нельзя
     if value in _DONE:
         return "completed"
     if value in _FAILED:

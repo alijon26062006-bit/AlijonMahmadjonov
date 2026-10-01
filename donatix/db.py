@@ -438,6 +438,11 @@ def init(path: Path | str) -> None:
         if "google_sub" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)")
+        login_cols = {r[1] for r in conn.execute("PRAGMA table_info(logins)")}
+        if "sid" not in login_cols:   # номер сессии: выход или блок обрывают именно её, украденный cookie не живёт
+            conn.execute("ALTER TABLE logins ADD COLUMN sid TEXT")
+            conn.execute("ALTER TABLE logins ADD COLUMN ended_at TEXT")
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS logins_sid ON logins(sid) WHERE sid IS NOT NULL")
         conn.execute("PRAGMA optimize")   # статистика для планировщика запросов — чтобы брал индексы
     finally:
         conn.close()
