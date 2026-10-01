@@ -1548,3 +1548,4 @@ a.order-card:hover { transform: translateY(-1px); }
 a.catalog-link { color: var(--text); text-decoration: none; display: flex; flex-direction: column; }
 a.catalog-link:hover { color: var(--text); text-decoration: none; border-color: var(--accent-line); }
 .catalog-go { display: inline-flex; align-items: center; gap: 6px; margin-top: auto; padding-top: 12px; color: var(--accent); font-weight: 600; font-size: .9rem; }
+.markup-example { margin-top: 12px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--accent-soft); font-size: .9rem; }

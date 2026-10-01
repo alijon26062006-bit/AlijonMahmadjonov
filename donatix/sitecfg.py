@@ -122,8 +122,20 @@ def _referral_percent(conn: sqlite3.Connection) -> int:
     return percent(conn)
 
 
+def _personal(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Клиенты с личной наценкой: для них общая наценка уровня не действует."""
+    return conn.execute("SELECT login, markup_override FROM users WHERE role = 'client' AND markup_override IS NOT NULL "
+                        "AND markup_override != '' ORDER BY login").fetchall()
+
+
 def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
+    from decimal import Decimal
+
+    from .money import apply_markup
+    personal = _personal(conn)
     return {
+        "personal": [{"login": r["login"], "markup": r["markup_override"]} for r in personal],
+        "example_price": f"{apply_markup(Decimal('10'), config.markups.get('bronze', Decimal('0'))):.2f}",
         "markups": {t: config.markups.get(t) for t in TIERS},
         "kind_markups": {k: config.kind_markups.get(k) for k in KIND_KEYS},
         "support": config.support_contact,
@@ -256,9 +268,14 @@ def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None
         if not 0 <= n <= 50:
             raise SettingsError("Лимит ботов — от 0 до 50.")
         values["site.max_bots"] = str(n)
+    if str(data.get("same_for_all", "")) == "1" and "markup.bronze" in values:
+        for tier in TIERS:                       # одна наценка для всех уровней — как у Bronze
+            values[f"markup.{tier}"] = values["markup.bronze"]
     with db.tx(conn):
         for key, value in values.items():
             db.set_setting(conn, key, value)
+        if str(data.get("reset_personal", "")) == "1":   # личные наценки больше не перебивают общую
+            conn.execute("UPDATE users SET markup_override = NULL WHERE role = 'client'")
     load(conn, config)
     cache.clear_everywhere(conn)
 

@@ -21,6 +21,14 @@
       {% endfor %}
     </div>
     <div class="hint">Отдельная наценка (Stars, Premium, Steam) действует на весь проект — для всех клиентов, даже с личной наценкой. Пусто — считается по личной наценке клиента или по уровню.</div>
+    <div class="markup-example">Сейчас: товар за <b>$10.00</b> у поставщика → клиент Bronze платит <b>${{ s.example_price }}</b>.
+      Новая наценка действует сразу после «Сохранить» — на сайте, в API и в ботах (в ботах — до 10 минут).</div>
+    <label class="switch" style="margin-top:10px"><input type="checkbox" name="same_for_all" value="1"><span>Одна наценка для всех уровней — как у Bronze</span></label>
+    {% if s.personal %}
+    <div class="flash warn" style="margin-top:10px">{{ icon('alert', 20) }}<span>У {{ s.personal | length }} клиент(ов) личная наценка — для них наценка уровня <b>не действует</b>:
+      {% for p in s.personal[:8] %}{{ p.login }} ({{ p.markup }}%){{ ', ' if not loop.last }}{% endfor %}{% if s.personal | length > 8 %} и ещё {{ s.personal | length - 8 }}{% endif %}.</span></div>
+    <label class="switch"><input type="checkbox" name="reset_personal" value="1"><span>Убрать личные наценки — всем клиентам наценка по уровню</span></label>
+    {% endif %}
   </div>
 
   <div class="card">
