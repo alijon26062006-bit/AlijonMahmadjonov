@@ -18,7 +18,7 @@
         <b class="dc-price" id="dc-price">{{ dprice(d.price) }}</b>
         <span class="dc-chg {{ 'up' if d.change >= 0 else 'down' }}" id="dc-chg">{{ '+' if d.change >= 0 }}{{ d.change }}%</span>
       </div>
-      <span class="muted small">цена 1 D · за 24 часа</span>
+      <span class="muted small">цена 1 D · за сегодня (с 00:00)</span>
     </div>
   </section>
 
@@ -62,6 +62,22 @@
     <div class="dc-lock">{{ icon('clock', 20) }}<span>Обмен откроется <b>{{ d.opens | dt }}</b>. Пока копите монеты.</span></div>
     {% endif %}
   </section>
+
+  {% if days %}
+  <section class="card dc-days">
+    <h3>Прошлые дни</h3>
+    <p class="muted small">Каждый день с 00:00 до 24:00: на сколько цена поднялась или опустилась.</p>
+    <div class="dc-days-list">
+      {% for x in days %}
+      <div class="dc-day">
+        <span class="dc-day-date">{{ x.day.strftime('%d.%m') }}</span>
+        <span class="dc-chg {{ 'up' if x.change >= 0 else 'down' }}">{{ '+' if x.change >= 0 }}{{ x.change }}%</span>
+        <span class="dc-day-range"><small>макс.</small> {{ dprice(x.high) }}<br><small>мин.</small> {{ dprice(x.low) }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 
   <div class="grid two dc-lists">
     <section class="card">

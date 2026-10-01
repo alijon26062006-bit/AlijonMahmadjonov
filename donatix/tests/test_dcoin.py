@@ -323,3 +323,23 @@ def test_too_many_zeros_rebased_once_with_history(conn, monkeypatch):
     assert all(abs(a / b - factor) < 1e-6 for a, b in zip(after, before) if b)   # вся история сдвинута одинаково
     assert dcoin.quote(conn, dcoin.state(conn)["supply"]) <= dcoin.state(conn)["pool"]   # минуса нет
     assert dcoin.price(conn) == p                                         # второй раз не двигает
+
+
+def test_change_resets_at_midnight_and_past_days_kept(conn):
+    from donatix import timez
+    uid = _user(conn)
+    tz = timez.zone(timez.site_zone_name(conn))
+    today = datetime.now(timezone.utc).astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    for total in (30_000, 50_000, 60_000):
+        _buy(conn, uid, total)
+    # первые две покупки — «вчера» (до полуночи), последняя — сегодня
+    ids = [r[0] for r in conn.execute("SELECT id FROM dcoin_points ORDER BY id")]
+    yesterday = (today - timedelta(hours=3)).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    conn.execute(f"UPDATE dcoin_points SET ts = ? WHERE id IN ({','.join('?' * (len(ids) - 2))})",
+                 (yesterday, *ids[:-2]))
+    open_today = [r[0] for r in conn.execute("SELECT price FROM dcoin_points ORDER BY id")][-3]
+    now_p = dcoin.price(conn)
+    assert dcoin.change_today(conn) == round((now_p - open_today) / open_today * 100, 2)   # только с 00:00
+    past = dcoin.days(conn)
+    assert past and past[0]["day"].date() == (today - timedelta(days=1)).date()           # вчера в истории
+    assert past[0]["high"] >= past[0]["close"] and past[0]["low"] <= past[0]["open"]

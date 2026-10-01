@@ -438,15 +438,51 @@ def candles(conn: sqlite3.Connection, tf: str = "5m", count: int = CANDLES,
     return {"tf": tf, "step": step, "candles": out}
 
 
-def change_24h(conn: sqlite3.Connection) -> float:
-    since = _iso(_now() - timedelta(days=1))
-    row = conn.execute("SELECT price FROM dcoin_points WHERE ts < ? ORDER BY id DESC LIMIT 1", (since,)).fetchone()
-    if row is None:
-        row = conn.execute("SELECT price FROM dcoin_points ORDER BY id LIMIT 1").fetchone()
-    first, now_p = (float(row["price"]) if row else 0.0), price(conn)
-    if first <= 0:
-        return 0.0
-    return round((now_p - first) / first * 100, 2)
+def _site_midnight(conn: sqlite3.Connection, now: datetime | None = None) -> datetime:
+    from . import timez
+    local = (now or _now()).astimezone(timez.zone(timez.site_zone_name(conn)))
+    return local.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _day_stats(conn: sqlite3.Connection, start: datetime, end: datetime) -> dict[str, Any] | None:
+    """Сутки 00:00 → 24:00: цена на открытии, закрытии, максимум, минимум и изменение в %."""
+    a, b = _iso(start.astimezone(timezone.utc)), _iso(end.astimezone(timezone.utc))
+    before = conn.execute("SELECT price FROM dcoin_points WHERE ts < ? ORDER BY id DESC LIMIT 1", (a,)).fetchone()
+    row = conn.execute("SELECT MIN(price) AS lo, MAX(price) AS hi, COUNT(*) AS n FROM dcoin_points "
+                       "WHERE ts >= ? AND ts < ? AND price > 0", (a, b)).fetchone()
+    last = conn.execute("SELECT price FROM dcoin_points WHERE ts < ? ORDER BY id DESC LIMIT 1", (b,)).fetchone()
+    first_today = conn.execute("SELECT price FROM dcoin_points WHERE ts >= ? AND ts < ? AND price > 0 "
+                               "ORDER BY id LIMIT 1", (a, b)).fetchone()
+    if before and before["price"] > 0:
+        open_p = float(before["price"])
+    else:
+        open_p = float(first_today["price"]) if first_today else 0.0
+    close_p = float(last["price"]) if last else 0.0
+    if open_p <= 0 or close_p <= 0:
+        return None
+    hi = max(open_p, float(row["hi"] or 0))
+    lo = min(open_p, float(row["lo"] or open_p))
+    return {"day": start, "open": open_p, "close": close_p, "high": hi, "low": lo, "trades": int(row["n"] or 0),
+            "change": round((close_p - open_p) / open_p * 100, 2)}
+
+
+def change_today(conn: sqlite3.Connection, now: datetime | None = None) -> float:
+    """Изменение цены за сегодня: в 00:00 (по времени сайта) счёт начинается с 0%."""
+    start = _site_midnight(conn, now)
+    d = _day_stats(conn, start, start + timedelta(days=1))
+    return d["change"] if d else 0.0
+
+
+def days(conn: sqlite3.Connection, n: int = 14, now: datetime | None = None) -> list[dict[str, Any]]:
+    """Итоги прошлых дней: на сколько поднялась и опустилась цена с 00:00 до 24:00. Свежие сверху."""
+    today = _site_midnight(conn, now)
+    out = []
+    for back in range(1, n + 1):
+        start = today - timedelta(days=back)
+        d = _day_stats(conn, start, start + timedelta(days=1))
+        if d:
+            out.append(d)
+    return out
 
 
 # ── Для страниц ─────────────────────────────────────────────────
@@ -460,7 +496,7 @@ def summary(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
     s = state(conn)
     return {"balance": bal, "balance_text": fmt_d(bal), "worth_micro": quote(conn, bal),
             "waiting": wait, "waiting_text": fmt_d(wait), "free": max(0, bal - wait),
-            "price": price_of(s["pool"], s["supply"], s["reserve"]), "change": change_24h(conn),
+            "price": price_of(s["pool"], s["supply"], s["reserve"]), "change": change_today(conn),
             "per_usd": per_usd(conn), "pool_pct": pool_pct(conn),
             "fee_pct": EXCHANGE_FEE_PCT, "open": exchange_open(conn), "opens": exchange_opens(conn),
             "enabled": enabled(conn)}

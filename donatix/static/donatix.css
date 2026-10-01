@@ -1524,3 +1524,12 @@ a.order-card:hover { transform: translateY(-1px); }
 .kpi-tjs { display: block; margin-top: 4px; font: 500 .82rem var(--font); color: var(--muted); }
 .fin-rows.exp .total b { color: var(--text); }
 .money-table th:first-child, .money-table td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); }
+/* D-коин: итоги прошлых дней */
+.dc-days { margin-top: 14px; }
+.dc-days-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 10px; }
+.dc-day { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px 10px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); }
+.dc-day-date { font-weight: 700; }
+.dc-day .dc-chg { justify-self: end; }
+.dc-day-range { grid-column: 1 / -1; font: 500 .78rem/1.5 var(--font-num); font-variant-numeric: tabular-nums; color: var(--muted); }
+.dc-day-range small { display: inline-block; min-width: 34px; }
