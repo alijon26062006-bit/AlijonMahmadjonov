@@ -79,6 +79,16 @@
       <label for="reference">Номер чека / хэш перевода <span class="muted">(желательно)</span></label>
       <input id="reference" name="reference" maxlength="200" placeholder="Например, 4821 или TX-хэш" autocomplete="off">
       <button class="btn primary lg block" style="margin-top:18px" id="paysend">Я оплатил — отправить заявку</button>
+      <div class="rc-check" id="rc-check" hidden role="status" aria-live="polite">
+        <div class="rcc-card">
+          <div class="rcc-icon">🧾</div>
+          <b>Проверяем чек</b>
+          <div class="rcc-step">Загружаем чек…</div>
+          <div class="rcc-bar"><i></i></div>
+          <div class="rcc-pct">0%</div>
+          <small>Не закрывайте страницу — обычно 5–15 секунд</small>
+        </div>
+      </div>
       <p class="hint center">{{ icon('shield', 16) }} После проверки поступления баланс зачислится, вам придёт уведомление.</p>
       {% else %}
       <p class="muted" style="margin-top:12px">Способы оплаты ещё не настроены.{% if support_contact %} Напишите {{ support_contact }}.{% endif %}</p>
@@ -162,6 +172,31 @@
       state("Не получилось прочитать фото. Выберите чек ещё раз — из Галереи или Файлов.", true);
     }).then(function () { reading = null; });
   });
+  // Окно «Проверяем чек»: шкала до 100% и этапы, пока сайт читает чек и ищет его в базе
+  function checking() {
+    var box = document.getElementById("rc-check"), bar = box.querySelector(".rcc-bar i"),
+        pct = box.querySelector(".rcc-pct"), step = box.querySelector(".rcc-step"), v = 0, t0 = Date.now(), timer;
+    var stages = [[0, "Загружаем чек…"], [22, "Читаем чек: банк, сумма, время, номер операции…"],
+                  [58, "Проверяем в базе — не использовался ли этот чек раньше…"], [88, "Почти готово…"]];
+    function paint() {
+      bar.style.width = v + "%"; pct.textContent = Math.round(v) + "%";
+      for (var i = stages.length - 1; i >= 0; i--) if (v >= stages[i][0]) { step.textContent = stages[i][1]; break; }
+    }
+    box.hidden = false; document.body.classList.add("rcc-open");
+    timer = setInterval(function () {      // плавно к 95%, дальше ждём ответ сайта
+      var sec = (Date.now() - t0) / 1000;
+      v = Math.min(95, 95 * (1 - Math.exp(-sec / 4)));
+      paint();
+    }, 120);
+    paint();
+    return {
+      done: function (then) {
+        clearInterval(timer); v = 100; paint(); step.textContent = "Готово ✓";
+        box.classList.add("ok"); setTimeout(then, 450);
+      },
+      stop: function () { clearInterval(timer); box.hidden = true; document.body.classList.remove("rcc-open"); }
+    };
+  }
   if (pf && ps) pf.addEventListener("submit", function (e) {
     var auto = rc && rc.required === false;
     if (reading) { e.preventDefault(); state("Секунду — чек ещё загружается…"); return; }
@@ -174,13 +209,17 @@
     var fd = new FormData(pf);
     fd.set("receipt", copy, copy.name);
     ps.disabled = true; ps.innerHTML = '<span class="spin-dot"></span> Отправляем…';
+    var check = checking();
     fetch(pf.action, {method: "POST", body: fd, credentials: "same-origin"}).then(function (r) {
       return r.text().then(function (html) {
-        // показываем ответ сайта как есть — с сообщением «Заявка создана» или ошибкой
-        try { history.replaceState(null, "", r.url || "/panel/balance"); } catch (err) {}
-        document.open(); document.write(html); document.close();
+        // 100% — и показываем ответ сайта как есть: «Заявка создана» или «чек уже использован»
+        check.done(function () {
+          try { history.replaceState(null, "", r.url || "/panel/balance"); } catch (err) {}
+          document.open(); document.write(html); document.close();
+        });
       });
     }).catch(function () {
+      check.stop();
       ps.disabled = false; ps.textContent = "Я оплатил — отправить заявку";
       state("Нет связи — проверьте интернет и нажмите ещё раз. Чек выбирать заново не нужно.", true);
     });

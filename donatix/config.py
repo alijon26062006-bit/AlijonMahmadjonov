@@ -117,6 +117,7 @@ class Config:
     support_bot_token: str = ""
     openai_api_key: str = ""
     support_model: str = "gpt-4o-mini"
+    receipt_model: str = "gpt-4o-mini"      # читает чеки пополнений (модель с «зрением»)
     support_admin_id: str = ""   # Telegram ID, куда бот поддержки шлёт обращения (по умолчанию — чат админ-бота)
     smtp_host: str = ""
     smtp_port: int = 587
@@ -217,6 +218,7 @@ class Config:
             support_bot_token=_env("DONATIX_SUPPORT_BOT_TOKEN"),
             openai_api_key=_env("DONATIX_OPENAI_API_KEY") or _env("OPENAI_API_KEY"),
             support_model=_env("DONATIX_SUPPORT_MODEL") or "gpt-4o-mini",
+            receipt_model=_env("DONATIX_RECEIPT_MODEL") or "gpt-4o-mini",
             support_admin_id=_env("DONATIX_SUPPORT_ADMIN_ID"),
             smtp_host=_env("DONATIX_SMTP_HOST"),
             smtp_port=int(_env("DONATIX_SMTP_PORT", "587")),

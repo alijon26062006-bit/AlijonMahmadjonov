@@ -445,13 +445,25 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
                        (digest, payment_id)).fetchone()
     if dup:
         raise PaymentError(f"Этот чек уже отправлен (заявка #{dup['id']}). Один чек — одна заявка.")
+    # ИИ читает чек: номер операции, сумму, время — и ищет тот же перевод в базе
+    from . import receipt_ai
+    seen = receipt_ai.read(config, data, ext)
+    if seen:
+        again = receipt_ai.duplicate(conn, payment_id, seen)
+        if again:
+            raise PaymentError(f"Этот чек уже использован (заявка #{again['id']}). Один перевод — одно пополнение. "
+                               "Если это ошибка — напишите в поддержку.")
     folder = receipts_dir(config)
     folder.mkdir(parents=True, exist_ok=True)
     name = f"{payment_id}-{secrets.token_hex(6)}.{ext}"
     (folder / name).write_bytes(data)
     # receipt_file IS NULL — два одновременных запроса с чеком: пройдёт только первый
-    done = conn.execute("UPDATE payments SET receipt_file = ?, receipt_hash = ? WHERE id = ? AND receipt_file IS NULL",
-                        (name, digest, payment_id)).rowcount
+    done = conn.execute(
+        "UPDATE payments SET receipt_file = ?, receipt_hash = ?, receipt_ai = ?, receipt_txn = ?, receipt_fp = ? "
+        "WHERE id = ? AND receipt_file IS NULL",
+        (name, digest, json.dumps(seen, ensure_ascii=False) if seen else None,
+         (receipt_ai.txn_key(seen) or None) if seen else None, (receipt_ai.fingerprint(seen) or None) if seen else None,
+         payment_id)).rowcount
     if not done:
         (folder / name).unlink(missing_ok=True)
         raise PaymentError(f"Чек к заявке #{payment_id} уже отправлен — дождитесь проверки.")

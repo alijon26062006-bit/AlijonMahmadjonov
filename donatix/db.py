@@ -417,6 +417,11 @@ def init(path: Path | str) -> None:
             conn.execute("ALTER TABLE payments ADD COLUMN receipt_hash TEXT")
         if "boosted_at" not in pay_cols:   # клиент нажал «Ускорить» — когда (не чаще раза в 10 минут)
             conn.execute("ALTER TABLE payments ADD COLUMN boosted_at TEXT")
+        for col in ("receipt_ai", "receipt_txn", "receipt_fp"):   # что прочитал ИИ в чеке — от повторных чеков
+            if col not in pay_cols:
+                conn.execute(f"ALTER TABLE payments ADD COLUMN {col} TEXT")
+        for col in ("receipt_txn", "receipt_fp"):
+            conn.execute(f"CREATE INDEX IF NOT EXISTS payments_{col} ON payments({col}) WHERE {col} IS NOT NULL")
         if "resolved_who" not in pay_cols:  # кто решил: «кассир Али», «админ (сайт)», «автоматически»…
             conn.execute("ALTER TABLE payments ADD COLUMN resolved_who TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS payments_receipt_hash ON payments(receipt_hash) "

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import html
+import json
 import logging
 import sqlite3
 import threading
@@ -425,11 +426,16 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
     from . import cashiers
     from .payments import receipts_dir
     from .worker import notify_admin_file
-    p = conn.execute("SELECT method, receipt_file FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    p = conn.execute("SELECT method, receipt_file, receipt_ai, pay_amount, pay_currency FROM payments WHERE id = ?",
+                     (payment_id,)).fetchone()
     if not p or not p["receipt_file"]:
         return
     text, buttons = payment_event(conn, payment_id, config)
     caption = (note + "\n\n" if note else "") + text + "\n🧾 Чек приложен"
+    from . import receipt_ai
+    if receipt_ai.enabled(config):   # что прочитал ИИ и совпадает ли сумма
+        seen = json.loads(p["receipt_ai"]) if p["receipt_ai"] else None
+        caption += "\n" + receipt_ai.summary(seen, p["pay_amount"], p["pay_currency"] or "")
     path = receipts_dir(config) / p["receipt_file"]
     photo = not p["receipt_file"].endswith(".pdf")
     if only_chat is None:

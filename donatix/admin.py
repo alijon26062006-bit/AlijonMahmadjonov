@@ -349,7 +349,12 @@ def _pays_with_who(conn, where: str, args: tuple) -> list[dict]:
     from .payments import who_label
     rows = conn.execute(f"SELECT p.*, u.login, u.balance_micro FROM payments p JOIN users u ON u.id = p.user_id "
                         f"{where}", args).fetchall()
-    return [{**dict(r), "who": who_label(r)} for r in rows]
+    import json
+
+    from .receipt_ai import summary
+    return [{**dict(r), "who": who_label(r),
+             "ai": summary(json.loads(r["receipt_ai"]), r["pay_amount"], r["pay_currency"] or "")
+             if r["receipt_ai"] else ""} for r in rows]
 
 
 def _pay_titles(conn, config: Config) -> dict[str, str]:
