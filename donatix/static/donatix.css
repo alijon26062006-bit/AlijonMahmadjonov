@@ -1533,3 +1533,13 @@ a.order-card:hover { transform: translateY(-1px); }
 .dc-day .dc-chg { justify-self: end; }
 .dc-day-range { grid-column: 1 / -1; font: 500 .78rem/1.5 var(--font-num); font-variant-numeric: tabular-nums; color: var(--muted); }
 .dc-day-range small { display: inline-block; min-width: 34px; }
+/* Соцсети внизу меню кабинета: Telegram и Instagram */
+.side-social { display: grid; gap: 8px; margin: 6px 0 12px; }
+.side-social .side-tg { margin: 0; }
+.side-ig { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; color: #fff; text-decoration: none;
+  background: linear-gradient(115deg, #f58529 0%, #dd2a7b 45%, #8134af 75%, #515bd4 100%);
+  box-shadow: 0 8px 20px -12px rgb(221 42 123 / .8); transition: filter .2s var(--ease), transform .2s var(--ease-out); }
+.side-ig:hover { color: #fff; text-decoration: none; filter: brightness(1.06); transform: translateY(-1px); }
+.side-ig span { flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
+.side-ig small { opacity: .9; font-size: .78rem; }
+.side-ig .ig-logo { flex: none; border-radius: 10px; box-shadow: 0 0 0 2px rgb(255 255 255 / .35); }
