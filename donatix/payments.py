@@ -444,15 +444,14 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
     dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? AND status IN ('pending', 'paid')",
                        (digest, payment_id)).fetchone()
     if dup:
-        raise PaymentError(f"Этот чек уже отправлен (заявка #{dup['id']}). Один чек — одна заявка.")
+        raise PaymentError("Чек не прошёл проверку. Если это ошибка — напишите в поддержку.")
     # ИИ читает чек: номер операции, сумму, время — и ищет тот же перевод в базе
     from . import receipt_ai
     seen = receipt_ai.read(config, data, ext)
     if seen:
         again = receipt_ai.duplicate(conn, payment_id, seen)
         if again:
-            raise PaymentError(f"Этот чек уже использован (заявка #{again['id']}). Один перевод — одно пополнение. "
-                               "Если это ошибка — напишите в поддержку.")
+            raise PaymentError("Чек не прошёл проверку. Если это ошибка — напишите в поддержку.")
     folder = receipts_dir(config)
     folder.mkdir(parents=True, exist_ok=True)
     name = f"{payment_id}-{secrets.token_hex(6)}.{ext}"

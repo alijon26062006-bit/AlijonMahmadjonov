@@ -32,7 +32,7 @@ def test_same_transfer_cannot_be_used_twice(app, config, conn, monkeypatch):
     assert row["receipt_txn"] == "AB1234567" and row["receipt_fp"] and json.loads(row["receipt_ai"])["bank"] == "Алиф"
     b, tb = _client(app, config, conn, 2)
     r = _send(b, tb, RECEIPT_PNG + b"other-screenshot")                 # другой файл, тот же перевод
-    assert "Этот чек уже использован (заявка #1)" in r.text
+    assert "Чек не прошёл проверку" in r.text and "заявка" not in r.text.split("Чек не прошёл")[1][:80]
     assert conn.execute("SELECT COUNT(*) FROM payments WHERE receipt_file IS NOT NULL").fetchone()[0] == 1
 
 
@@ -43,7 +43,7 @@ def test_same_amount_time_bank_without_number_is_caught(app, config, conn, monke
     a, ta = _client(app, config, conn, 1)
     _send(a, ta, RECEIPT_PNG)
     b, tb = _client(app, config, conn, 2)
-    assert "уже использован" in _send(b, tb, RECEIPT_PNG + b"x").text
+    assert "Чек не прошёл проверку" in _send(b, tb, RECEIPT_PNG + b"x").text
 
 
 def test_new_receipt_goes_to_admin_with_what_ai_read(app, config, conn, monkeypatch):
@@ -80,3 +80,11 @@ def test_amount_check_and_reading_via_openai():
     assert url.startswith("data:image/png;base64,")
     assert receipt_ai.read(cfg, b"%PDF-1.4", "pdf") is None                 # PDF не читаем — проверит админ
     assert receipt_ai.read(Config(secret_key="x", db_path="x"), RECEIPT_PNG, "png") is None   # без ключа
+
+
+def test_client_page_tells_nothing_about_how_receipts_are_checked(app, config, conn):
+    a, _ = _client(app, config, conn, 1)
+    page = a.get("/panel/balance").text
+    assert "Проверяем чек" in page
+    for secret in ("ИИ", "в базе", "номер операции", "Читаем чек", "OpenAI", "ChatGPT"):
+        assert secret not in page, secret

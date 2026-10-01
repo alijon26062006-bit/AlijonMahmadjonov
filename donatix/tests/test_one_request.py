@@ -47,7 +47,7 @@ def test_same_receipt_cannot_be_used_twice(app, config, conn, monkeypatch):
     _send(client, token)
     _, other, otoken = _client(app, config, conn, "d@example.com", "client2")
     r = _send(other, otoken)                                             # тот же файл чека с другого аккаунта
-    assert "Этот чек уже отправлен (заявка #1)" in r.text
+    assert "Чек не прошёл проверку" in r.text
     assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 1
 
 

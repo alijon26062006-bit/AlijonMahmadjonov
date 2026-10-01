@@ -83,10 +83,10 @@
         <div class="rcc-card">
           <div class="rcc-icon">🧾</div>
           <b>Проверяем чек</b>
-          <div class="rcc-step">Загружаем чек…</div>
+          <div class="rcc-step">Подождите…</div>
           <div class="rcc-bar"><i></i></div>
           <div class="rcc-pct">0%</div>
-          <small>Не закрывайте страницу — обычно 5–15 секунд</small>
+          <small>Не закрывайте страницу</small>
         </div>
       </div>
       <p class="hint center">{{ icon('shield', 16) }} После проверки поступления баланс зачислится, вам придёт уведомление.</p>
@@ -172,12 +172,11 @@
       state("Не получилось прочитать фото. Выберите чек ещё раз — из Галереи или Файлов.", true);
     }).then(function () { reading = null; });
   });
-  // Окно «Проверяем чек»: шкала до 100% и этапы, пока сайт читает чек и ищет его в базе
+  // Окно «Проверяем чек»: шкала до 100%
   function checking() {
     var box = document.getElementById("rc-check"), bar = box.querySelector(".rcc-bar i"),
         pct = box.querySelector(".rcc-pct"), step = box.querySelector(".rcc-step"), v = 0, t0 = Date.now(), timer;
-    var stages = [[0, "Загружаем чек…"], [22, "Читаем чек: банк, сумма, время, номер операции…"],
-                  [58, "Проверяем в базе — не использовался ли этот чек раньше…"], [88, "Почти готово…"]];
+    var stages = [[0, "Подождите…"]];
     function paint() {
       bar.style.width = v + "%"; pct.textContent = Math.round(v) + "%";
       for (var i = stages.length - 1; i >= 0; i--) if (v >= stages[i][0]) { step.textContent = stages[i][1]; break; }
@@ -212,7 +211,7 @@
     var check = checking();
     fetch(pf.action, {method: "POST", body: fd, credentials: "same-origin"}).then(function (r) {
       return r.text().then(function (html) {
-        // 100% — и показываем ответ сайта как есть: «Заявка создана» или «чек уже использован»
+        // 100% — и показываем ответ сайта как есть
         check.done(function () {
           try { history.replaceState(null, "", r.url || "/panel/balance"); } catch (err) {}
           document.open(); document.write(html); document.close();
