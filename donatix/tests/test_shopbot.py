@@ -267,3 +267,21 @@ def test_admin_renames_and_hides_games_and_packs(app, config, conn, supplier):
     config.shop_admin_ids = ""
     bot.handle(conn, press("g:games:0"))
     assert not any("PUBG" in b["text"] for b in bot.api.last_buttons())
+
+
+def test_flags_in_pack_names_split_games_by_region(app, config, conn, supplier):
+    now = "2026-01-01T00:00:00.000Z"
+    for i, (flag_, n) in enumerate((("🇮🇩", 5), ("🇮🇩", 10), ("🇵🇭", 20), ("🇻🇳", 25))):
+        conn.execute("INSERT INTO products (id, kind, category_id, category_name, name, base_price, fields_json, "
+                     "updated_at) VALUES (?, 'topup', 'ffx', 'Free Fire X', ?, '0.5', '[]', ?)",
+                     (f"ffx-{i}", f"{flag_} {n} 💎", now))
+    bot = _bot(config, supplier)
+    _start(bot, conn)
+    bot.handle(conn, msg("Free Fire X"))
+    ffx = [b for b in bot.api.last_buttons() if b["text"].startswith("Free Fire X")]
+    assert {b["text"] for b in ffx} == {"Free Fire X 🇮🇩 Индонезия", "Free Fire X 🇵🇭 Филиппины",
+                                        "Free Fire X 🇻🇳 Вьетнам"}
+    bot.handle(conn, press(next(b["callback_data"] for b in ffx if "Индонезия" in b["text"])))
+    packs_ = [b["text"] for b in bot.api.last_buttons() if b["callback_data"].startswith("p:")]
+    assert len(packs_) == 2 and packs_[0].startswith("5 💎 — ") and "🇮🇩" not in packs_[0]
+    assert "━━━" in bot.api.last_text()

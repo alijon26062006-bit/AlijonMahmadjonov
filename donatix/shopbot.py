@@ -89,11 +89,13 @@ T: dict[str, tuple[str, str]] = {
     "search_ask": ("🔎 Напишите название игры, например <i>PUBG</i>.",
                    "🔎 Номи бозиро нависед, масалан <i>PUBG</i>."),
     "nothing": ("Ничего не нашлось. Попробуйте другое название.", "Ҳеҷ чиз ёфт нашуд. Номи дигарро санҷед."),
-    "pick_game": ("<b>{title}</b>\nВыберите:", "<b>{title}</b>\nИнтихоб кунед:"),
+    "pick_game": ("<b>{title}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\nВыберите игру 👇",
+                  "<b>{title}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\nБозиро интихоб кунед 👇"),
     "hits_title": ("🔥 <b>Хиты недели</b> — что покупают чаще всего:",
                    "🔥 <b>Хитҳои ҳафта</b> — чизе ки бештар мехаранд:"),
     "pick_region": ("<b>{game}</b>\nВыберите регион:", "<b>{game}</b>\nМинтақаро интихоб кунед:"),
-    "pick_pack": ("<b>{game}</b>\nВыберите пакет:", "<b>{game}</b>\nБастаро интихоб кунед:"),
+    "pick_pack": ("<b>{game}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\nВыберите пакет — потом спрошу ID игрока 👇",
+                  "<b>{game}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\nБастаро интихоб кунед — баъд ID-и бозигарро мепурсам 👇"),
     "ask_field": ("<b>{product}</b>\n\n✍️ Введите: <b>{label}</b>", "<b>{product}</b>\n\n✍️ Ворид кунед: <b>{label}</b>"),
     "pick_field": ("<b>{product}</b>\n\nВыберите: <b>{label}</b>", "<b>{product}</b>\n\nИнтихоб кунед: <b>{label}</b>"),
     "saved": ("💾 {value}", "💾 {value}"),
@@ -265,8 +267,18 @@ def base_name(category_name: str) -> str:
     return name
 
 
+_FLAG_RE = re.compile("[\U0001F1E6-\U0001F1FF]{2}")
+
+
+def flag_code(text: str) -> str:
+    """Флаг в названии пакета («🇮🇩 5 💎») → код страны (ID)."""
+    m = _FLAG_RE.search(text or "")
+    return "".join(chr(ord(c) - 0x1F1E6 + ord("A")) for c in m.group(0)) if m else ""
+
+
 def region_of(p: dict[str, Any]) -> str:
-    return (p.get("region") or pick_region(p.get("category_name") or "") or "").upper()
+    return (p.get("region") or flag_code(p.get("name") or "") or pick_region(p.get("category_name") or "")
+            or "").upper()
 
 
 _FLAG_SPECIAL = {"CIS": "🇷🇺", "GLOBAL": "🌐", "WW": "🌐", "EU": "🇪🇺", "UK": "🇬🇧", "LATAM": "🌎", "MENA": "🌍",
@@ -323,13 +335,20 @@ def apply_names(conn: sqlite3.Connection, games: list[dict[str, Any]], show_hidd
     return out
 
 
+# Флаг страны в начале названия пакета («🇮🇩 5 💎») — тоже регион: такие пакеты разносим по кнопкам
+_HEAD = ("CASE WHEN unicode(substr(p.name, 1, 1)) BETWEEN 127462 AND 127487 "
+         "THEN substr(p.name, 1, 2) ELSE '' END")
+
+
 def _dedupe(rows: list[sqlite3.Row], limit: int | None = None, split: bool = True) -> list[dict[str, Any]]:
     """Кнопки игр. Игра в нескольких регионах — отдельная кнопка на каждый регион:
     «Free Fire 🇷🇺 СНГ», «Free Fire 🇮🇩 Индонезия» — нажал и сразу пакеты. split=False — одна на игру."""
     games: dict[str, dict[str, Any]] = {}
     for r in rows:
         name = base_name(r["category_name"])
-        reg = ((r["region"] if "region" in r.keys() else "") or pick_region(r["category_name"]) or "").upper()
+        keys = r.keys()
+        reg = ((r["region"] if "region" in keys else "") or (flag_code(r["head"]) if "head" in keys else "")
+               or pick_region(r["category_name"]) or "").upper()
         g = games.setdefault(name.lower(), {"name": name, "rid": r["rid"], "regions": {}})
         g["regions"].setdefault(reg, r["rid"])
     out = []
@@ -349,7 +368,7 @@ def _dedupe(rows: list[sqlite3.Row], limit: int | None = None, split: bool = Tru
 def game_list(conn: sqlite3.Connection, group: str, q: str = "", split: bool = True) -> list[dict[str, Any]]:
     """Игры раздела: сначала популярные (заказы за 30 дней), потом по алфавиту. rid — для кнопок."""
     where, args = _kinds_sql(group)
-    sql = (f"SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, p.region, "
+    sql = (f"SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, p.region, {_HEAD} AS head, "
            f"(SELECT COUNT(*) FROM orders o JOIN products x ON x.id = o.product_id "
            f" WHERE x.category_id = p.category_id "
            f" AND o.created_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-30 day')) AS pop "
@@ -357,25 +376,27 @@ def game_list(conn: sqlite3.Connection, group: str, q: str = "", split: bool = T
     if q:
         sql += " AND (p.category_name LIKE ? OR p.name LIKE ?)"
         args += [f"%{q}%", f"%{q}%"]
-    sql += " GROUP BY p.category_id, p.region ORDER BY pop DESC, p.category_name, p.region"
+    sql += " GROUP BY p.category_id, p.region, head ORDER BY pop DESC, p.category_name, p.region, head"
     return _dedupe(conn.execute(sql, args).fetchall(), split=split)
 
 
 def search_all(conn: sqlite3.Connection, q: str) -> list[dict[str, Any]]:
     kinds = sorted({k for ks in GROUPS.values() for k in ks})
-    sql = ("SELECT MIN(rowid) AS rid, category_id, category_name, region FROM products "
+    sql = ("SELECT MIN(rowid) AS rid, category_id, category_name, region, " + _HEAD.replace("p.", "") + " AS head "
+           "FROM products "
            "WHERE active = 1 AND hidden = 0 "
            "AND kind IN (" + ",".join("?" * len(kinds)) + ") AND (category_name LIKE ? OR name LIKE ?) "
-           "GROUP BY category_id, region ORDER BY category_name, region LIMIT 60")
+           "GROUP BY category_id, region, head ORDER BY category_name, region, head LIMIT 80")
     return _dedupe(conn.execute(sql, [*kinds, f"%{q}%", f"%{q}%"]).fetchall(), 20)
 
 
 def hits(conn: sqlite3.Connection, days: int = 7, limit: int = 8) -> list[dict[str, Any]]:
     return _dedupe(conn.execute(
-        "SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, p.region, COUNT(o.id) AS n FROM orders o "
+        f"SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, p.region, {_HEAD} AS head, "
+        "COUNT(o.id) AS n FROM orders o "
         "JOIN products p ON p.id = o.product_id WHERE o.status = 'completed' AND p.active = 1 AND p.hidden = 0 "
         "AND o.created_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ?) "
-        "GROUP BY p.category_id, p.region ORDER BY n DESC LIMIT ?",
+        "GROUP BY p.category_id, p.region, head ORDER BY n DESC LIMIT ?",
         (f"-{days} days", limit * 2)).fetchall(), limit)
 
 
@@ -419,7 +440,7 @@ def pack_hidden(conn: sqlite3.Connection, p: dict[str, Any]) -> bool:
 def pack_button(p: dict[str, Any]) -> tuple[str, bool]:
     """Текст кнопки пакета, как в игровых ботах: «110 💎», «💵 Прокачка уровня», «♻️ Ваучер на неделю ♻️».
     Второе — короткая ли кнопка (валюту ставим по две в ряд)."""
-    name = p["name"]
+    name = _FLAG_RE.sub("", p["name"]).strip()   # флаг уже в названии кнопки игры
     if p["kind"] != "topup":
         return name[:40], False
     g, text = packs_mod.group(name), packs_mod.label(name)
