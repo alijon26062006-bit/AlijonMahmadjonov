@@ -189,3 +189,21 @@ def test_admin_page_and_broadcast(app, config, conn, supplier, monkeypatch):
     sent2 = FakeApi()
     shopbot.broadcast(config, "Ещё", api=sent2).join(5)
     assert sent2.calls == []
+
+
+def test_admin_panel_only_for_admin(app, config, conn, supplier):
+    bot = _bot(config, supplier)
+    _start(bot, conn)
+    assert "adm" not in [b["callback_data"] for b in bot.api.last_buttons()]
+    bot.handle(conn, press("adm"))
+    assert "Админ-панель" not in bot.api.last_text()
+    config.shop_admin_ids = str(TG)
+    bot.handle(conn, press("h"))
+    assert "adm" in [b["callback_data"] for b in bot.api.last_buttons()]
+    bot.handle(conn, press("adm"))
+    assert "Продажи через бот" in bot.api.last_text()
+    bot.handle(conn, press("bc"))
+    bot.handle(conn, msg("Скидка <b>сегодня</b>"))
+    assert "Так увидят 1" in bot.api.last_text()
+    bot.handle(conn, press("bcgo"))
+    assert "Рассылка пошла" in bot.api.last_text()

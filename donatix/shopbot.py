@@ -24,6 +24,7 @@ from typing import Any, Callable
 from . import accounts, db, orders, payments
 from .catalog import get_product
 from .config import Config
+from .money import fmt
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +59,27 @@ T: dict[str, tuple[str, str]] = {
     "orders": ("📦 Мои заказы", "📦 Фармоишҳои ман"),
     "support": ("🆘 Поддержка", "🆘 Дастгирӣ"),
     "lang": ("🌐 Язык", "🌐 Забон"),
+    "admin": ("👑 Админ-панель", "👑 Панели админ"),
+    "admin_title": ("👑 <b>Админ-панель бота</b>\n\n"
+                    "🛍 Продажи через бот:\n"
+                    "• сегодня: <b>{t_n}</b> заказов · ${t_r} · прибыль ${t_p}\n"
+                    "• 7 дней: <b>{w_n}</b> · ${w_r} · прибыль ${w_p}\n"
+                    "• 30 дней: <b>{m_n}</b> · ${m_r} · прибыль ${m_p}\n\n"
+                    "👥 Людей в боте: <b>{users}</b> · купили: {buyers} · новых сегодня: {new}\n"
+                    "🔔 Получают новости: {subs}\n\n🔥 Топ за 30 дней:\n{top}",
+                    "👑 <b>Панели админ</b>\n\n"
+                    "🛍 Фурӯш тавассути бот:\n"
+                    "• имрӯз: <b>{t_n}</b> фармоиш · ${t_r} · фоида ${t_p}\n"
+                    "• 7 рӯз: <b>{w_n}</b> · ${w_r} · фоида ${w_p}\n"
+                    "• 30 рӯз: <b>{m_n}</b> · ${m_r} · фоида ${m_p}\n\n"
+                    "👥 Одамон дар бот: <b>{users}</b> · хариданд: {buyers} · навҳо имрӯз: {new}\n"
+                    "🔔 Хабар мегиранд: {subs}\n\n🔥 Беҳтаринҳо дар 30 рӯз:\n{top}"),
+    "bc": ("📣 Рассылка", "📣 Паём ба ҳама"),
+    "bc_ask": ("📣 Напишите текст рассылки одним сообщением — перед отправкой покажу, как выглядит.",
+               "📣 Матни паёмро бо як паём нависед — пеш аз фиристодан нишон медиҳам."),
+    "bc_preview": ("👀 Так увидят {n} человек:\n\n{text}", "👀 {n} нафар чунин мебинанд:\n\n{text}"),
+    "bc_send": ("✅ Отправить всем", "✅ Ба ҳама фиристодан"),
+    "bc_started": ("🚀 Рассылка пошла. Итог — в админке сайта.", "🚀 Паём фиристода мешавад."),
     "back": ("‹ Назад", "‹ Бозгашт"),
     "home": ("🏠 Меню", "🏠 Меню"),
     "search": ("🔎 Поиск игры", "🔎 Ҷустуҷӯи бозӣ"),
@@ -488,6 +510,10 @@ class ShopBot:
             if start:
                 self.state[tg_id] = {"after_lang": start}
             self.show(tg_id, tr("", "lang_pick"), [[("🇷🇺 Русский", "l:ru"), ("🇹🇯 Тоҷикӣ", "l:tj")]])
+        elif cmd == "/id":
+            self.show(tg_id, f"🆔 Ваш Telegram ID: <code>{tg_id}</code>")
+        elif cmd == "/admin" and self.is_admin(tg_id):
+            self.screen_admin(conn, su)
         elif cmd == "/balance":
             self.screen_balance(conn, su)
         elif cmd == "/orders":
@@ -513,6 +539,24 @@ class ShopBot:
     def _user(self, conn: sqlite3.Connection, su: sqlite3.Row) -> sqlite3.Row:
         return accounts.get_user(conn, su["user_id"])
 
+    def is_admin(self, tg_id: int) -> bool:
+        """Админ — тот, чей Telegram ID указан для админ-бота / поддержки или в DONATIX_SHOP_ADMIN_IDS."""
+        raw = ",".join(str(x) for x in (self.config.alert_telegram_chat_id, self.config.support_admin_id,
+                                        self.config.shop_admin_ids))
+        return str(tg_id) in {x.strip() for x in raw.split(",") if x.strip().lstrip("-").isdigit()}
+
+    def screen_admin(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
+        lang = su["lang"]
+        o = overview(conn)
+        t, w, m = o["today"], o["week"], o["month"]
+        top = "\n".join(f"{i + 1}. {_e(r['name'])} — {r['n']}" for i, r in enumerate(o["top"][:5])) or "—"
+        text = tr(lang, "admin_title", t_n=t["orders"], t_r=fmt(t["revenue"]), t_p=fmt(t["profit"]),
+                  w_n=w["orders"], w_r=fmt(w["revenue"]), w_p=fmt(w["profit"]),
+                  m_n=m["orders"], m_r=fmt(m["revenue"]), m_p=fmt(m["profit"]),
+                  users=o["users"], buyers=o["buyers"], new=t["new_users"], subs=o["subscribed"], top=top)
+        self.show(su["tg_id"], text, [[(tr(lang, "bc"), "bc", "primary")], [("🔄", "adm"), (tr(lang, "home"), "h")]],
+                  edit=edit)
+
     def screen_home(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
         lang, user = su["lang"], self._user(conn, su)
         text = tr(lang, "hello", name=_e(su["name"] or "👋"), site=_e(self.config.site_name),
@@ -522,6 +566,8 @@ class ShopBot:
                 [(tr(lang, "hits"), "hit"), (tr(lang, "steam"), "g:steam:0")],
                 [(tr(lang, "balance"), "b", "success"), (tr(lang, "orders"), "my:0")],
                 [(tr(lang, "support"), "sup"), (tr(lang, "lang"), "lang")]]
+        if self.is_admin(su["tg_id"]):
+            rows.append([(tr(lang, "admin"), "adm", "primary")])
         self.show(su["tg_id"], text, rows, edit=edit)
 
     def screen_games(self, conn: sqlite3.Connection, su: sqlite3.Row, group: str, page: int,
@@ -702,6 +748,11 @@ class ShopBot:
         elif step == "amount":
             st["msg"] = None
             self.create_topup(conn, su, text)
+        elif step == "bc" and self.is_admin(tg_id):
+            n = conn.execute("SELECT COUNT(*) FROM shop_users WHERE subscribed = 1").fetchone()[0]
+            self.state[tg_id] = {"step": "bc_ready", "text": _e(text[:3500])}
+            self.show(tg_id, tr(lang, "bc_preview", n=n, text=_e(text[:3500])),
+                      [[(tr(lang, "bc_send"), "bcgo", "success")], [(tr(lang, "cancel"), "adm", "danger")]])
         elif step == "search":
             self.state.pop(tg_id, None)
             self.screen_games(conn, su, "games", 0, q=text[:40])
@@ -796,6 +847,16 @@ class ShopBot:
             name = support_name(conn, self.config)
             contact = f"@{name}" if name else _e(self.config.support_contact or self.config.site_name)
             self.show(tg_id, tr(lang, "support_text", contact=contact), [[(tr(lang, "home"), "h")]], edit=mid)
+        elif head == "adm" and self.is_admin(tg_id):
+            self.state.pop(tg_id, None)
+            self.screen_admin(conn, su, mid)
+        elif head == "bc" and self.is_admin(tg_id):
+            self.state[tg_id] = {"step": "bc"}
+            self.show(tg_id, tr(lang, "bc_ask"), [[(tr(lang, "cancel"), "adm", "danger")]], edit=mid)
+        elif head == "bcgo" and self.is_admin(tg_id) and st and st.get("step") == "bc_ready":
+            self.state.pop(tg_id, None)
+            broadcast(self.config, st["text"], api=self.api)
+            self.show(tg_id, tr(lang, "bc_started"), [[(tr(lang, "admin"), "adm"), (tr(lang, "home"), "h")]], edit=mid)
         elif head == "unsub":
             conn.execute("UPDATE shop_users SET subscribed = 0 WHERE tg_id = ?", (tg_id,))
             self.show(tg_id, tr(lang, "unsubbed"), [[(tr(lang, "home"), "h")]], edit=mid)
