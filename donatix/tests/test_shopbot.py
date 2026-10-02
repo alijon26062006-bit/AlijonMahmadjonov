@@ -82,7 +82,7 @@ def test_buy_game_by_buttons_saves_player_id_and_counts_in_stats(app, config, co
     _fund(conn, su["user_id"])
     bot.handle(conn, press("g:games:0"))
     bot.handle(conn, press(bot.api.button("PUBG")))
-    assert "PUBG Mobile" in bot.api.last_text() and "смн" in bot.api.last_buttons()[0]["text"]
+    assert "PUBG Mobile" in bot.api.last_text() and " с." in bot.api.last_buttons()[0]["text"]
     bot.handle(conn, press(bot.api.last_buttons()[0]["callback_data"]))
     assert "✍️" in bot.api.last_text()
     bot.handle(conn, msg("5123456789"))
@@ -159,7 +159,7 @@ def test_deep_link_opens_game(app, config, conn, supplier):
     _start(bot, conn)
     rid = conn.execute("SELECT MIN(rowid) FROM products WHERE category_id = 'free_fire'").fetchone()[0]
     bot.handle(conn, msg(f"/start g{rid}"))
-    assert "Free Fire" in bot.api.last_text()
+    assert "Free Fire" in bot.api.last_text() and "регион" in bot.api.last_text()
 
 
 def test_cannot_see_other_users_order(app, config, conn, supplier, shop):
@@ -207,3 +207,30 @@ def test_admin_panel_only_for_admin(app, config, conn, supplier):
     assert "Так увидят 1" in bot.api.last_text()
     bot.handle(conn, press("bcgo"))
     assert "Рассылка пошла" in bot.api.last_text()
+
+
+def test_free_fire_one_button_then_regions_with_flags_and_packs_like_game_bots(app, config, conn, supplier):
+    bot = _bot(config, supplier)
+    _start(bot, conn)
+    bot.handle(conn, press("g:games:0"))
+    names = [b["text"] for b in bot.api.last_buttons()]
+    assert names.count("Free Fire") == 1
+    bot.handle(conn, press(bot.api.button("Free Fire")))
+    regions = [b["text"] for b in bot.api.last_buttons() if b["callback_data"].startswith("r:")]
+    assert len(regions) >= 2 and all(t[0] in "🇦🇧🇨🇩🇪🇫🇬🇭🇮🇯🇰🇱🇲🇳🇴🇵🇶🇷🇸🇹🇺🇻🇼🇽🇾🇿🌐🌍🌎🌏" for t in regions)
+    bot.handle(conn, press(next(b["callback_data"] for b in bot.api.last_buttons()
+                                if b["callback_data"].startswith("r:"))))
+    packs_ = [b["text"] for b in bot.api.last_buttons() if b["callback_data"].startswith("p:")]
+    assert packs_ and all("💎 — " in t and t.endswith(" с.") for t in packs_)
+    rows = bot.api.calls[-1][1]["reply_markup"]["inline_keyboard"]
+    assert len(rows[0]) == 2                                    # алмазы — по две в ряд
+
+
+def test_pack_labels():
+    from donatix.shopbot import base_name, flag, pack_button
+    assert pack_button({"kind": "topup", "name": "110 Diamonds"}) == ("110 💎", True)
+    assert pack_button({"kind": "topup", "name": "Weekly Membership"})[0] == "♻️ Ваучер на неделю ♻️"
+    assert pack_button({"kind": "topup", "name": "Level Up Pass"})[0].startswith("💵 ")
+    assert base_name("Free Fire (Indonesia)") == "Free Fire" and base_name("Free Fire — СНГ") == "Free Fire"
+    assert base_name("Mobile Legends") == "Mobile Legends"
+    assert flag("TR") == "🇹🇷" and flag("CIS") == "🇷🇺" and flag("ID") == "🇮🇩"

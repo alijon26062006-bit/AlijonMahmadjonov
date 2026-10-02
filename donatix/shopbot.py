@@ -14,6 +14,7 @@ from __future__ import annotations
 import html
 import json
 import logging
+import re
 import secrets
 import sqlite3
 import threading
@@ -22,15 +23,17 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Callable
 
 from . import accounts, db, orders, payments
+from . import packs as packs_mod
 from .catalog import get_product
 from .config import Config
 from .money import fmt
+from .suppliers.base import pick_region, region_title
 
 log = logging.getLogger(__name__)
 
 SOURCE = "shopbot"
 PAGE = 8                      # кнопок-игр на странице
-PACKS = 10                    # пакетов на странице
+PACKS = 24                    # пакетов на странице
 MSG_LIMIT = (30, 10)          # не больше 30 действий за 10 секунд
 WATCH_EVERY = 4               # как часто проверять статусы заказов и пополнений, сек
 FINAL = ("completed", "failed", "cancelled", "refunded")
@@ -89,6 +92,7 @@ T: dict[str, tuple[str, str]] = {
     "pick_game": ("<b>{title}</b>\nВыберите:", "<b>{title}</b>\nИнтихоб кунед:"),
     "hits_title": ("🔥 <b>Хиты недели</b> — что покупают чаще всего:",
                    "🔥 <b>Хитҳои ҳафта</b> — чизе ки бештар мехаранд:"),
+    "pick_region": ("<b>{game}</b>\nВыберите регион:", "<b>{game}</b>\nМинтақаро интихоб кунед:"),
     "pick_pack": ("<b>{game}</b>\nВыберите пакет:", "<b>{game}</b>\nБастаро интихоб кунед:"),
     "ask_field": ("<b>{product}</b>\n\n✍️ Введите: <b>{label}</b>", "<b>{product}</b>\n\n✍️ Ворид кунед: <b>{label}</b>"),
     "pick_field": ("<b>{product}</b>\n\nВыберите: <b>{label}</b>", "<b>{product}</b>\n\nИнтихоб кунед: <b>{label}</b>"),
@@ -232,8 +236,10 @@ def tjs_rate(conn: sqlite3.Connection, config: Config) -> Decimal:
 
 
 def money(micro: int, rate: Decimal) -> str:
+    """Сумма в сомони, коротко: «9 с.», «9.5 с.», «12.35 с.»."""
     tjs = (Decimal(micro) / 10_000 * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    return f"{tjs:f} смн"
+    text = f"{tjs:f}".rstrip("0").rstrip(".") if "." in f"{tjs:f}" else f"{tjs:f}"
+    return f"{text} с."
 
 
 def unit_price_micro(config: Config, user: sqlite3.Row, product: dict[str, Any]) -> int:
@@ -247,8 +253,54 @@ def _kinds_sql(group: str) -> tuple[str, list[str]]:
     return "kind IN (" + ",".join("?" * len(kinds)) + ")", kinds
 
 
-def game_list(conn: sqlite3.Connection, group: str, q: str = "") -> list[sqlite3.Row]:
-    """Игры раздела: сначала популярные (заказы за 30 дней), потом по алфавиту. rowid — для кнопок."""
+_REGION_TAIL = re.compile(r"\s*[\(\[][^\)\]]{2,20}[\)\]]\s*$|\s*[-—–|/]\s*[^-—–|/]{2,20}$")
+
+
+def base_name(category_name: str) -> str:
+    """«Free Fire (Indonesia)», «Free Fire — СНГ» → «Free Fire»: одна кнопка на игру, регион — внутри."""
+    name = (category_name or "").strip()
+    m = _REGION_TAIL.search(name)
+    if m and pick_region(m.group(0)):
+        return name[:m.start()].strip() or name
+    return name
+
+
+def region_of(p: dict[str, Any]) -> str:
+    return (p.get("region") or pick_region(p.get("category_name") or "") or "").upper()
+
+
+_FLAG_SPECIAL = {"CIS": "🇷🇺", "GLOBAL": "🌐", "WW": "🌐", "EU": "🇪🇺", "UK": "🇬🇧", "LATAM": "🌎", "MENA": "🌍",
+                 "ASIA": "🌏", "SEA": "🌏", "NA": "🇺🇸", "": "🌐"}
+
+
+def flag(code: str) -> str:
+    code = (code or "").upper()
+    if code in _FLAG_SPECIAL:
+        return _FLAG_SPECIAL[code]
+    if len(code) == 2 and code.isalpha():
+        return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in code)
+    return "🌐"
+
+
+def region_name(code: str, lang: str = "") -> str:
+    if not code:
+        return "Другие" if lang != "tj" else "Дигар"
+    return region_title(code)
+
+
+def _dedupe(rows: list[sqlite3.Row], limit: int | None = None) -> list[dict[str, Any]]:
+    """Одна кнопка на игру: категории разных регионов одной игры склеиваем."""
+    seen: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        name = base_name(r["category_name"])
+        if name.lower() not in seen:
+            seen[name.lower()] = {"rid": r["rid"], "category_name": name}
+    out = list(seen.values())
+    return out[:limit] if limit else out
+
+
+def game_list(conn: sqlite3.Connection, group: str, q: str = "") -> list[dict[str, Any]]:
+    """Игры раздела: сначала популярные (заказы за 30 дней), потом по алфавиту. rid — для кнопок."""
     where, args = _kinds_sql(group)
     sql = (f"SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, "
            f"(SELECT COUNT(*) FROM orders o JOIN products x ON x.id = o.product_id "
@@ -259,23 +311,23 @@ def game_list(conn: sqlite3.Connection, group: str, q: str = "") -> list[sqlite3
         sql += " AND (p.category_name LIKE ? OR p.name LIKE ?)"
         args += [f"%{q}%", f"%{q}%"]
     sql += " GROUP BY p.category_id ORDER BY pop DESC, p.category_name"
-    return conn.execute(sql, args).fetchall()
+    return _dedupe(conn.execute(sql, args).fetchall())
 
 
-def search_all(conn: sqlite3.Connection, q: str) -> list[sqlite3.Row]:
+def search_all(conn: sqlite3.Connection, q: str) -> list[dict[str, Any]]:
     kinds = sorted({k for ks in GROUPS.values() for k in ks})
     sql = ("SELECT MIN(rowid) AS rid, category_id, category_name FROM products WHERE active = 1 AND hidden = 0 "
            "AND kind IN (" + ",".join("?" * len(kinds)) + ") AND (category_name LIKE ? OR name LIKE ?) "
-           "GROUP BY category_id ORDER BY category_name LIMIT 20")
-    return conn.execute(sql, [*kinds, f"%{q}%", f"%{q}%"]).fetchall()
+           "GROUP BY category_id ORDER BY category_name LIMIT 40")
+    return _dedupe(conn.execute(sql, [*kinds, f"%{q}%", f"%{q}%"]).fetchall(), 20)
 
 
-def hits(conn: sqlite3.Connection, days: int = 7, limit: int = 8) -> list[sqlite3.Row]:
-    return conn.execute(
+def hits(conn: sqlite3.Connection, days: int = 7, limit: int = 8) -> list[dict[str, Any]]:
+    return _dedupe(conn.execute(
         "SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, COUNT(o.id) AS n FROM orders o "
         "JOIN products p ON p.id = o.product_id WHERE o.status = 'completed' AND p.active = 1 AND p.hidden = 0 "
         "AND o.created_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ?) GROUP BY p.category_id ORDER BY n DESC LIMIT ?",
-        (f"-{days} days", limit)).fetchall()
+        (f"-{days} days", limit * 2)).fetchall(), limit)
 
 
 def product_by_rid(conn: sqlite3.Connection, rid: Any) -> dict[str, Any] | None:
@@ -286,16 +338,45 @@ def product_by_rid(conn: sqlite3.Connection, rid: Any) -> dict[str, Any] | None:
     return get_product(conn, row["id"]) if row else None
 
 
-def packs(conn: sqlite3.Connection, category_id: str) -> list[dict[str, Any]]:
+def packs(conn: sqlite3.Connection, rid: Any) -> list[dict[str, Any]]:
+    """Все пакеты игры (всех её регионов): по кнопке игры — rowid любого её товара."""
     from .catalog import load_product
-    rows = conn.execute("SELECT rowid AS rid, * FROM products WHERE category_id = ? AND active = 1 AND hidden = 0 "
-                        "ORDER BY CAST(base_price AS REAL), name", (category_id,)).fetchall()
+    first = product_by_rid(conn, rid)
+    if first is None:
+        return []
+    name = base_name(first["category_name"]).lower()
+    kinds = GROUPS[_group_of(first["kind"])]
+    rows = conn.execute(
+        "SELECT rowid AS rid, * FROM products WHERE active = 1 AND hidden = 0 AND kind IN ("
+        + ",".join("?" * len(kinds)) + ") AND (category_id = ? OR category_name LIKE ?)",
+        (*kinds, first["category_id"], f"{base_name(first['category_name'])}%")).fetchall()
     out = []
     for r in rows:
+        if r["category_id"] != first["category_id"] and base_name(r["category_name"]).lower() != name:
+            continue
         p = load_product(r)
         p["rid"] = r["rid"]
         out.append(p)
+    out.sort(key=lambda p: packs_mod.order_key(p["name"], float(p["base_price"] or 0)))
     return out
+
+
+def pack_button(p: dict[str, Any]) -> tuple[str, bool]:
+    """Текст кнопки пакета, как в игровых ботах: «110 💎», «💵 Прокачка уровня», «♻️ Ваучер на неделю ♻️».
+    Второе — короткая ли кнопка (валюту ставим по две в ряд)."""
+    name = p["name"]
+    if p["kind"] != "topup":
+        return name[:40], False
+    g, text = packs_mod.group(name), packs_mod.label(name)
+    if g == packs_mod.CURRENCY:
+        num = re.match(r"[\d\s+]+", text)
+        amount = (num.group(0).strip() if num else text)
+        return (f"{amount} UC" if "UC" in text else f"{amount} 💎"), True
+    if g == packs_mod.LEVEL:
+        return f"💵 {text}", False
+    if g == packs_mod.PASS and "аучер" in text:
+        return f"♻️ {text} ♻️", False
+    return f"{packs_mod.emoji(name)} {text}", False
 
 
 def delivery_text(order: sqlite3.Row) -> str:
@@ -531,7 +612,7 @@ class ShopBot:
         if start.startswith("g") and start[1:].isdigit():
             p = product_by_rid(conn, start[1:])
             if p:
-                self.screen_packs(conn, su, p["category_id"], 0, edit)
+                self.screen_packs(conn, su, start[1:], 0, edit)
                 return
         self.screen_home(conn, su, edit)
 
@@ -602,31 +683,59 @@ class ShopBot:
         rows.append([(tr(lang, "home"), "h")])
         self.show(su["tg_id"], tr(lang, "hits_title"), rows, edit=edit)
 
-    def screen_packs(self, conn: sqlite3.Connection, su: sqlite3.Row, category_id: str, page: int,
-                     edit: int | None = None) -> None:
+    def screen_packs(self, conn: sqlite3.Connection, su: sqlite3.Row, rid: Any, page: int,
+                     edit: int | None = None, region: str | None = None) -> None:
         lang, user = su["lang"], self._user(conn, su)
-        items = packs(conn, category_id)
+        items = packs(conn, rid)
         if not items:
             self.screen_home(conn, su, edit)
             return
+        rid = items[0]["rid"]
+        game = base_name(items[0]["category_name"])
+        back = (tr(lang, "back"), f"g:{_group_of(items[0]['kind'])}:0")
+        regions = list(dict.fromkeys(region_of(p) for p in items))
+        if len(regions) > 1 and region is None:   # сначала регион: 🇷🇺 СНГ, 🇹🇷 Турция, 🇮🇩 Индонезия…
+            buttons = [(f"{flag(r)} {region_name(r, lang)}", f"r:{rid}:{r or '-'}") for r in regions]
+            rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+            rows.append([back, (tr(lang, "home"), "h")])
+            self.show(su["tg_id"], tr(lang, "pick_region", game=_e(game)), rows, edit=edit)
+            return
+        if region is not None:
+            items = [p for p in items if region_of(p) == region]
+            game += f" · {flag(region)} {region_name(region, lang)}"
+            back = (tr(lang, "back"), f"c:{rid}:0")
         rate = tjs_rate(conn, self.config)
         part = items[page * PACKS:(page + 1) * PACKS]
         rows: list[list[Btn]] = []
+        short: list[Btn] = []
         for p in part:
+            label, is_short = pack_button(p)
             price = money(unit_price_micro(self.config, user, p), rate)
             if p["max_qty"] > 1 or p["kind"] == "steam_topup":
-                price = "от " + price if lang != "tj" else "аз " + price
-            rows.append([(f"{p['name'][:34]} — {price}", f"p:{p['rid']}")])
+                price = ("от " if lang != "tj" else "аз ") + price
+            btn = (f"{label} — {price}", f"p:{p['rid']}")
+            if is_short:
+                short.append(btn)
+                if len(short) == 2:
+                    rows.append(short)
+                    short = []
+                continue
+            if short:
+                rows.append(short)
+                short = []
+            rows.append([btn])
+        if short:
+            rows.append(short)
+        tail = f":{region or '-'}" if region is not None else ""
         nav: list[Btn] = []
-        rid = items[0]["rid"]
         if page > 0:
-            nav.append(("‹", f"c:{rid}:{page - 1}"))
+            nav.append(("‹", f"c:{rid}:{page - 1}{tail}"))
         if (page + 1) * PACKS < len(items):
-            nav.append((tr(lang, "more"), f"c:{rid}:{page + 1}"))
+            nav.append((tr(lang, "more"), f"c:{rid}:{page + 1}{tail}"))
         if nav:
             rows.append(nav)
-        rows.append([(tr(lang, "back"), f"g:{_group_of(items[0]['kind'])}:0"), (tr(lang, "home"), "h")])
-        self.show(su["tg_id"], tr(lang, "pick_pack", game=_e(items[0]["category_name"])), rows, edit=edit)
+        rows.append([back, (tr(lang, "home"), "h")])
+        self.show(su["tg_id"], tr(lang, "pick_pack", game=_e(game)), rows, edit=edit)
 
     # покупка: поля → количество → подтверждение
     def start_product(self, conn: sqlite3.Connection, su: sqlite3.Row, rid: str, edit: int | None) -> None:
@@ -788,10 +897,11 @@ class ShopBot:
         elif head == "s":
             self.state[tg_id] = {"step": "search"}
             self.show(tg_id, tr(lang, "search_ask"), [[(tr(lang, "home"), "h")]], edit=mid)
-        elif head == "c" and len(parts) == 3 and parts[2].isdigit():
-            p = product_by_rid(conn, parts[1])
-            if p:
-                self.screen_packs(conn, su, p["category_id"], int(parts[2]), mid)
+        elif head == "c" and len(parts) in (3, 4) and parts[2].isdigit():
+            region = (None if len(parts) == 3 else ("" if parts[3] == "-" else parts[3][:8].upper()))
+            self.screen_packs(conn, su, parts[1], int(parts[2]), mid, region)
+        elif head == "r" and len(parts) == 3:
+            self.screen_packs(conn, su, parts[1], 0, mid, "" if parts[2] == "-" else parts[2][:8].upper())
         elif head == "p" and len(parts) == 2:
             self.start_product(conn, su, parts[1], mid)
         elif head == "o" and st and st.get("step") == "field" and len(parts) == 3:
