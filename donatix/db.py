@@ -438,6 +438,29 @@ def init(path: Path | str) -> None:
         if "google_sub" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)")
+        conn.executescript("""
+CREATE TABLE IF NOT EXISTS shop_users (       -- покупатели из бота-магазина
+    tg_id       INTEGER PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    name        TEXT,
+    lang        TEXT NOT NULL DEFAULT '',
+    saved_json  TEXT,                           -- сохранённые ID игроков по играм
+    start_param TEXT,                           -- откуда пришёл: ссылка ?start=
+    subscribed  INTEGER NOT NULL DEFAULT 1,     -- получает новости и скидки
+    created_at  TEXT NOT NULL,
+    last_seen   TEXT
+);
+CREATE TABLE IF NOT EXISTS shop_watch (       -- заказы и пополнения, о которых бот напишет покупателю
+    id          INTEGER PRIMARY KEY,
+    kind        TEXT NOT NULL,
+    obj_id      INTEGER NOT NULL,
+    chat_id     INTEGER NOT NULL,
+    message_id  INTEGER,
+    last_status TEXT,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS orders_source ON orders(source, status);
+""")
         login_cols = {r[1] for r in conn.execute("PRAGMA table_info(logins)")}
         if "sid" not in login_cols:   # номер сессии: выход или блок обрывают именно её, украденный cookie не живёт
             conn.execute("ALTER TABLE logins ADD COLUMN sid TEXT")

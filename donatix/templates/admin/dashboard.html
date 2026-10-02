@@ -47,6 +47,12 @@
     <div class="value">{{ today.orders }}</div>
     <div class="note">прибыль ${{ fmt(today.profit) }} · в работе {{ counts.processing }}</div>
   </div>
+  <a class="kpi" href="/admin/shopbot">
+    <span class="tile g2">{{ icon('zap-send', 20) }}</span>
+    <div class="label">Через бот-магазин <span class="muted small">сегодня</span></div>
+    <div class="value">{{ shop.orders }}</div>
+    <div class="note">выручка ${{ fmt(shop.revenue) }} · прибыль ${{ fmt(shop.profit) }}</div>
+  </a>
   <div class="kpi">
     <span class="tile g5">{{ icon('users', 20) }}</span>
     <div class="label">Клиентов</div>

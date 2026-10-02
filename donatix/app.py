@@ -193,6 +193,11 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
                 support = SupportBot(config)
                 support.start()
                 started.append(support)
+            if config.shop_bot_token:
+                from .shopbot import ShopBot
+                shop = ShopBot(config, supplier)
+                shop.start()
+                started.append(shop)
             if config.run_bots:
                 from . import bots
                 runner = bots.RUNNER = bots.BotRunner(config, config.internal_url)

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import html
 import json
 import sqlite3
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 
-from . import accounts, cache, catalog, db, orders, payments, worker
+from . import accounts, cache, catalog, db, orders, payments, shopbot, worker
 from .config import PAY_METHODS, TIERS, Config
 from .deps import Forbidden, LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
 from .money import MoneyError, apply_markup, fmt, fmt_unit, to_decimal, to_micro
@@ -49,6 +50,7 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
         "user": admin,
         "counts": counts,
         "today": orders.stats(conn, 1),
+        "shop": shopbot.stats(conn, 1),
         # Тяжёлые сводки за месяц/две недели — из кеша на минуту: админка не тормозит сайт клиентам
         "month": cache.get_or_set("admin:month", 60, lambda: orders.stats(conn, 30)),
         "days": cache.get_or_set("admin:days", 60, lambda: orders.daily(conn, 14)),
@@ -630,3 +632,30 @@ def errors(request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
         "OR o.webhook_state = 'failed' ORDER BY (o.status = 'attention') DESC, o.id DESC LIMIT 200"
     ).fetchall()
     return render(request, "admin/errors.html", {"user": admin, "rows": rows})
+
+
+# ── Бот-магазин проекта ──
+
+@router.get("/shopbot")
+def shopbot_page(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
+    games = conn.execute(
+        "SELECT MIN(rowid) AS rid, category_name AS name FROM products WHERE active = 1 AND hidden = 0 "
+        "AND kind IN ('topup', 'game_key', 'telegram_stars', 'telegram_premium', 'gift_card', 'steam_topup') "
+        "GROUP BY category_id ORDER BY category_name").fetchall()
+    last = db.get_setting(conn, "shop.last_broadcast")
+    return render(request, "admin/shopbot.html", {
+        "user": admin, "on": bool(config.shop_bot_token), "name": shopbot.bot_username(conn),
+        "o": shopbot.overview(conn), "games": games, "last": json.loads(last) if last else None})
+
+
+@router.post("/shopbot/broadcast", dependencies=[Depends(check_csrf)])
+def shopbot_broadcast(request: Request, text: str = Form(""), admin=Depends(admin_user),
+                      config: Config = Depends(get_config)):
+    text = text.strip()
+    if not config.shop_bot_token or not text:
+        flash(request, "Напишите текст. Бот-магазин должен быть подключён.", "error")
+        return RedirectResponse("/admin/shopbot", status_code=303)
+    shopbot.broadcast(config, html.escape(text[:3500], quote=False))
+    flash(request, "Рассылка пошла — по 20 сообщений в секунду. Итог появится на этой странице.")
+    return RedirectResponse("/admin/shopbot", status_code=303)

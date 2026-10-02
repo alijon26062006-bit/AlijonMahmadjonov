@@ -36,12 +36,17 @@ def daily_text(conn: sqlite3.Connection, config: Config, day: datetime) -> str:
     pending = _one(conn, "SELECT COUNT(*) FROM payments WHERE status = 'pending'")
     bots_on = _one(conn, "SELECT COUNT(*) FROM bots WHERE enabled = 1")
     warned = _one(conn, "SELECT COUNT(*) FROM bots WHERE enabled = 1 AND warn_count > 0")
+    shop_n = _one(conn, f"SELECT COUNT(*) FROM orders WHERE source = 'shopbot' AND status = 'completed' AND {rng}",
+                  (a, b))
+    shop_sum = _one(conn, f"SELECT SUM(total_micro) FROM orders WHERE source = 'shopbot' AND status = 'completed' "
+                          f"AND {rng}", (a, b))
     supplier = db.get_setting(conn, "supplier_balance")
     from . import traffic
     visitors = traffic.visitors_between(conn, a, b)
     return (f"🌅 <b>Отчёт за {day.strftime('%d.%m.%Y')}</b>\n\n"
             f"👀 Посетителей сайта: <b>{visitors}</b>\n"
             f"🛒 Заказов выполнено: <b>{n}</b>" + (f" · проблемных: {failed}" if failed else "") + "\n"
+            + (f"🛍 Из них через бот-магазин: <b>{shop_n}</b> на ${fmt(shop_sum)}\n" if shop_n else "") +
             f"💵 Выручка: <b>${fmt(revenue)}</b>\n"
             f"📈 Прибыль: <b>${fmt(profit)}</b>\n"
             f"💳 Пополнений: <b>{paid_n}</b> на ${fmt(paid)}"
