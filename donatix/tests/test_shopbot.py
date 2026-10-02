@@ -159,7 +159,7 @@ def test_deep_link_opens_game(app, config, conn, supplier):
     _start(bot, conn)
     rid = conn.execute("SELECT MIN(rowid) FROM products WHERE category_id = 'free_fire'").fetchone()[0]
     bot.handle(conn, msg(f"/start g{rid}"))
-    assert "Free Fire" in bot.api.last_text() and "регион" in bot.api.last_text()
+    assert "Free Fire" in bot.api.last_text()
 
 
 def test_cannot_see_other_users_order(app, config, conn, supplier, shop):
@@ -209,17 +209,14 @@ def test_admin_panel_only_for_admin(app, config, conn, supplier):
     assert "Рассылка пошла" in bot.api.last_text()
 
 
-def test_free_fire_one_button_then_regions_with_flags_and_packs_like_game_bots(app, config, conn, supplier):
+def test_free_fire_separate_button_per_region_opens_packs_directly(app, config, conn, supplier):
     bot = _bot(config, supplier)
     _start(bot, conn)
     bot.handle(conn, press("g:games:0"))
-    names = [b["text"] for b in bot.api.last_buttons()]
-    assert names.count("Free Fire") == 1
-    bot.handle(conn, press(bot.api.button("Free Fire")))
-    regions = [b["text"] for b in bot.api.last_buttons() if b["callback_data"].startswith("r:")]
-    assert len(regions) >= 2 and all(t[0] in "🇦🇧🇨🇩🇪🇫🇬🇭🇮🇯🇰🇱🇲🇳🇴🇵🇶🇷🇸🇹🇺🇻🇼🇽🇾🇿🌐🌍🌎🌏" for t in regions)
-    bot.handle(conn, press(next(b["callback_data"] for b in bot.api.last_buttons()
-                                if b["callback_data"].startswith("r:"))))
+    ff = [b for b in bot.api.last_buttons() if b["text"].startswith("Free Fire")]
+    assert len(ff) >= 2 and all(b["text"] != "Free Fire" for b in ff)      # «Free Fire 🇷🇺 СНГ», «Free Fire 🇮🇩 …»
+    bot.handle(conn, press(ff[0]["callback_data"]))
+    assert ff[0]["text"].split(" ", 2)[2] in bot.api.last_text()           # сразу пакеты этого региона
     packs_ = [b["text"] for b in bot.api.last_buttons() if b["callback_data"].startswith("p:")]
     assert packs_ and all("💎 — " in t and t.endswith(" с.") for t in packs_)
     rows = bot.api.calls[-1][1]["reply_markup"]["inline_keyboard"]

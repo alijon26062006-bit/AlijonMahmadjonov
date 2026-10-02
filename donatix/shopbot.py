@@ -316,27 +316,40 @@ def apply_names(conn: sqlite3.Connection, games: list[dict[str, Any]], show_hidd
         row = custom.get(g["key"])
         if row is not None and row["hidden"] and not show_hidden:
             continue
-        title = (row["title"] if row is not None and row["title"] else g["category_name"])
+        base = row["title"] if row is not None and row["title"] else g.get("base", g["category_name"])
+        title = base + g.get("suffix", "")
         out.append({**g, "category_name": ("🙈 " if row is not None and row["hidden"] else "") + title
                     if show_hidden else title, "title": title})
     return out
 
 
-def _dedupe(rows: list[sqlite3.Row], limit: int | None = None) -> list[dict[str, Any]]:
-    """Одна кнопка на игру: категории разных регионов одной игры склеиваем."""
-    seen: dict[str, dict[str, Any]] = {}
+def _dedupe(rows: list[sqlite3.Row], limit: int | None = None, split: bool = True) -> list[dict[str, Any]]:
+    """Кнопки игр. Игра в нескольких регионах — отдельная кнопка на каждый регион:
+    «Free Fire 🇷🇺 СНГ», «Free Fire 🇮🇩 Индонезия» — нажал и сразу пакеты. split=False — одна на игру."""
+    games: dict[str, dict[str, Any]] = {}
     for r in rows:
         name = base_name(r["category_name"])
-        if name.lower() not in seen:
-            seen[name.lower()] = {"rid": r["rid"], "category_name": name, "key": "g:" + name.lower()[:120]}
-    out = list(seen.values())
+        reg = ((r["region"] if "region" in r.keys() else "") or pick_region(r["category_name"]) or "").upper()
+        g = games.setdefault(name.lower(), {"name": name, "rid": r["rid"], "regions": {}})
+        g["regions"].setdefault(reg, r["rid"])
+    out = []
+    for g in games.values():
+        key = "g:" + g["name"].lower()[:120]
+        if split and len(g["regions"]) > 1:
+            for reg, rid in g["regions"].items():
+                suffix = f" {flag(reg)} {region_name(reg)}"
+                out.append({"rid": rid, "base": g["name"], "suffix": suffix, "category_name": g["name"] + suffix,
+                            "key": key, "cb": f"c:{rid}:0:{reg or '-'}"})
+        else:
+            out.append({"rid": g["rid"], "base": g["name"], "suffix": "", "category_name": g["name"],
+                        "key": key, "cb": f"c:{g['rid']}:0"})
     return out[:limit] if limit else out
 
 
-def game_list(conn: sqlite3.Connection, group: str, q: str = "") -> list[dict[str, Any]]:
+def game_list(conn: sqlite3.Connection, group: str, q: str = "", split: bool = True) -> list[dict[str, Any]]:
     """Игры раздела: сначала популярные (заказы за 30 дней), потом по алфавиту. rid — для кнопок."""
     where, args = _kinds_sql(group)
-    sql = (f"SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, "
+    sql = (f"SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, p.region, "
            f"(SELECT COUNT(*) FROM orders o JOIN products x ON x.id = o.product_id "
            f" WHERE x.category_id = p.category_id "
            f" AND o.created_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-30 day')) AS pop "
@@ -344,23 +357,25 @@ def game_list(conn: sqlite3.Connection, group: str, q: str = "") -> list[dict[st
     if q:
         sql += " AND (p.category_name LIKE ? OR p.name LIKE ?)"
         args += [f"%{q}%", f"%{q}%"]
-    sql += " GROUP BY p.category_id ORDER BY pop DESC, p.category_name"
-    return _dedupe(conn.execute(sql, args).fetchall())
+    sql += " GROUP BY p.category_id, p.region ORDER BY pop DESC, p.category_name, p.region"
+    return _dedupe(conn.execute(sql, args).fetchall(), split=split)
 
 
 def search_all(conn: sqlite3.Connection, q: str) -> list[dict[str, Any]]:
     kinds = sorted({k for ks in GROUPS.values() for k in ks})
-    sql = ("SELECT MIN(rowid) AS rid, category_id, category_name FROM products WHERE active = 1 AND hidden = 0 "
+    sql = ("SELECT MIN(rowid) AS rid, category_id, category_name, region FROM products "
+           "WHERE active = 1 AND hidden = 0 "
            "AND kind IN (" + ",".join("?" * len(kinds)) + ") AND (category_name LIKE ? OR name LIKE ?) "
-           "GROUP BY category_id ORDER BY category_name LIMIT 40")
+           "GROUP BY category_id, region ORDER BY category_name, region LIMIT 60")
     return _dedupe(conn.execute(sql, [*kinds, f"%{q}%", f"%{q}%"]).fetchall(), 20)
 
 
 def hits(conn: sqlite3.Connection, days: int = 7, limit: int = 8) -> list[dict[str, Any]]:
     return _dedupe(conn.execute(
-        "SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, COUNT(o.id) AS n FROM orders o "
+        "SELECT MIN(p.rowid) AS rid, p.category_id, p.category_name, p.region, COUNT(o.id) AS n FROM orders o "
         "JOIN products p ON p.id = o.product_id WHERE o.status = 'completed' AND p.active = 1 AND p.hidden = 0 "
-        "AND o.created_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ?) GROUP BY p.category_id ORDER BY n DESC LIMIT ?",
+        "AND o.created_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ?) "
+        "GROUP BY p.category_id, p.region ORDER BY n DESC LIMIT ?",
         (f"-{days} days", limit * 2)).fetchall(), limit)
 
 
@@ -687,7 +702,7 @@ class ShopBot:
 
     def screen_vlist(self, conn: sqlite3.Connection, su: sqlite3.Row, group: str, page: int,
                      edit: int | None = None) -> None:
-        games = apply_names(conn, game_list(conn, group), show_hidden=True)
+        games = apply_names(conn, game_list(conn, group, split=False), show_hidden=True)
         part = games[page * 16:(page + 1) * 16]
         rows = [[(g["category_name"][:30], f"vg:{g['rid']}") for g in part[i:i + 2]] for i in range(0, len(part), 2)]
         nav = ([("‹", f"vl:{group}:{page - 1}")] if page else []) + \
@@ -777,7 +792,7 @@ class ShopBot:
         part = rows_all[page * PAGE:(page + 1) * PAGE]
         rows: list[list[Btn]] = []
         for i in range(0, len(part), 2):
-            rows.append([(r["category_name"][:30], f"c:{r['rid']}:0") for r in part[i:i + 2]])
+            rows.append([(r["category_name"][:34], r["cb"]) for r in part[i:i + 2]])
         nav: list[Btn] = []
         if page > 0:
             nav.append(("‹", f"g:{group}:{page - 1}"))
@@ -794,7 +809,7 @@ class ShopBot:
     def screen_hits(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
         lang = su["lang"]
         top = apply_names(conn, hits(conn)) or apply_names(conn, game_list(conn, "games"))[:PAGE]
-        rows = [[(("🔥 " if i < 3 else "") + r["category_name"][:30], f"c:{r['rid']}:0")] for i, r in enumerate(top)]
+        rows = [[(("🔥 " if i < 3 else "") + r["category_name"][:34], r["cb"])] for i, r in enumerate(top)]
         rows.append([(tr(lang, "home"), "h")])
         self.show(su["tg_id"], tr(lang, "hits_title"), rows, edit=edit)
 
@@ -827,7 +842,6 @@ class ShopBot:
         if region is not None:
             items = [p for p in items if region_of(p) == region]
             game += f" · {flag(region)} {region_name(region, lang)}"
-            back = (tr(lang, "back"), f"c:{rid}:0")
         rate = tjs_rate(conn, self.config)
         part = items[page * PACKS:(page + 1) * PACKS]
         rows: list[list[Btn]] = []
