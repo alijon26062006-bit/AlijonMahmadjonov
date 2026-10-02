@@ -288,13 +288,47 @@ def region_name(code: str, lang: str = "") -> str:
     return region_title(code)
 
 
+# ── Витрина: админ меняет надписи и скрывает игры/пакеты (только в боте) ──
+
+def names(conn: sqlite3.Connection) -> dict[str, sqlite3.Row]:
+    return {r["key"]: r for r in conn.execute("SELECT * FROM shop_names")}
+
+
+def game_key(category_name: str) -> str:
+    return "g:" + base_name(category_name).lower()[:120]
+
+
+def set_title(conn: sqlite3.Connection, key: str, title: str | None) -> None:
+    conn.execute("INSERT INTO shop_names (key, title, hidden) VALUES (?, ?, 0) "
+                 "ON CONFLICT(key) DO UPDATE SET title = excluded.title", (key, (title or "").strip()[:60] or None))
+
+
+def toggle_hidden(conn: sqlite3.Connection, key: str) -> bool:
+    conn.execute("INSERT INTO shop_names (key, hidden) VALUES (?, 1) "
+                 "ON CONFLICT(key) DO UPDATE SET hidden = 1 - hidden", (key,))
+    return bool(conn.execute("SELECT hidden FROM shop_names WHERE key = ?", (key,)).fetchone()[0])
+
+
+def apply_names(conn: sqlite3.Connection, games: list[dict[str, Any]], show_hidden: bool = False) -> list[dict]:
+    """Свои названия игр и скрытые игры. show_hidden — для админа в редакторе (скрытые помечены 🙈)."""
+    custom, out = names(conn), []
+    for g in games:
+        row = custom.get(g["key"])
+        if row is not None and row["hidden"] and not show_hidden:
+            continue
+        title = (row["title"] if row is not None and row["title"] else g["category_name"])
+        out.append({**g, "category_name": ("🙈 " if row is not None and row["hidden"] else "") + title
+                    if show_hidden else title, "title": title})
+    return out
+
+
 def _dedupe(rows: list[sqlite3.Row], limit: int | None = None) -> list[dict[str, Any]]:
     """Одна кнопка на игру: категории разных регионов одной игры склеиваем."""
     seen: dict[str, dict[str, Any]] = {}
     for r in rows:
         name = base_name(r["category_name"])
         if name.lower() not in seen:
-            seen[name.lower()] = {"rid": r["rid"], "category_name": name}
+            seen[name.lower()] = {"rid": r["rid"], "category_name": name, "key": "g:" + name.lower()[:120]}
     out = list(seen.values())
     return out[:limit] if limit else out
 
@@ -359,6 +393,12 @@ def packs(conn: sqlite3.Connection, rid: Any) -> list[dict[str, Any]]:
         out.append(p)
     out.sort(key=lambda p: packs_mod.order_key(p["name"], float(p["base_price"] or 0)))
     return out
+
+
+def pack_hidden(conn: sqlite3.Connection, p: dict[str, Any]) -> bool:
+    row = conn.execute("SELECT hidden FROM shop_names WHERE key IN (?, ?) AND hidden = 1",
+                       ("p:" + p["id"], game_key(p["category_name"]))).fetchone()
+    return row is not None
 
 
 def pack_button(p: dict[str, Any]) -> tuple[str, bool]:
@@ -635,8 +675,83 @@ class ShopBot:
                   w_n=w["orders"], w_r=fmt(w["revenue"]), w_p=fmt(w["profit"]),
                   m_n=m["orders"], m_r=fmt(m["revenue"]), m_p=fmt(m["profit"]),
                   users=o["users"], buyers=o["buyers"], new=t["new_users"], subs=o["subscribed"], top=top)
-        self.show(su["tg_id"], text, [[(tr(lang, "bc"), "bc", "primary")], [("🔄", "adm"), (tr(lang, "home"), "h")]],
-                  edit=edit)
+        self.show(su["tg_id"], text, [[(tr(lang, "bc"), "bc", "primary")], [("🛠 Витрина: названия и показ", "ve")],
+                                      [("🔄", "adm"), (tr(lang, "home"), "h")]], edit=edit)
+
+    # Витрина: что видят покупатели (только админ)
+    def screen_vitrine(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
+        rows = [[(f"{tr('', g)}", f"vl:{g}:0")] for g in GROUPS]
+        rows.append([("‹ Админ-панель", "adm")])
+        self.show(su["tg_id"], "🛠 <b>Витрина</b>\nВыберите раздел — дальше игру или пакет: можно поменять "
+                                "надпись или скрыть/показать. 🙈 — скрыто от покупателей.", rows, edit=edit)
+
+    def screen_vlist(self, conn: sqlite3.Connection, su: sqlite3.Row, group: str, page: int,
+                     edit: int | None = None) -> None:
+        games = apply_names(conn, game_list(conn, group), show_hidden=True)
+        part = games[page * 16:(page + 1) * 16]
+        rows = [[(g["category_name"][:30], f"vg:{g['rid']}") for g in part[i:i + 2]] for i in range(0, len(part), 2)]
+        nav = ([("‹", f"vl:{group}:{page - 1}")] if page else []) + \
+              ([("Ещё ›", f"vl:{group}:{page + 1}")] if (page + 1) * 16 < len(games) else [])
+        if nav:
+            rows.append(nav)
+        rows.append([("‹ Разделы", "ve")])
+        self.show(su["tg_id"], f"🛠 <b>{_e(tr('', group))}</b> — выберите игру:", rows, edit=edit)
+
+    def screen_vgame(self, conn: sqlite3.Connection, su: sqlite3.Row, rid: Any, edit: int | None = None) -> None:
+        items = packs(conn, rid)
+        if not items:
+            self.screen_vitrine(conn, su, edit)
+            return
+        key = game_key(items[0]["category_name"])
+        row = names(conn).get(key)
+        hidden = bool(row is not None and row["hidden"])
+        title = row["title"] if row is not None and row["title"] else base_name(items[0]["category_name"])
+        text = (f"🛠 <b>{_e(title)}</b>\nОригинал: {_e(base_name(items[0]['category_name']))}\n"
+                f"Пакетов: {len(items)}\nСтатус: {'🙈 скрыта от покупателей' if hidden else '👁 показывается'}")
+        rows = [[("✏️ Изменить название", f"vgn:{items[0]['rid']}")],
+                [("👁 Показать" if hidden else "🙈 Скрыть", f"vgt:{items[0]['rid']}",
+                  "success" if hidden else "danger")],
+                [("📦 Пакеты", f"vp:{items[0]['rid']}:0")]]
+        if row is not None and row["title"]:
+            rows.append([("↩️ Вернуть оригинальное название", f"vgr:{items[0]['rid']}")])
+        rows.append([("‹ Назад", f"vl:{_group_of(items[0]['kind'])}:0")])
+        self.show(su["tg_id"], text, rows, edit=edit)
+
+    def screen_vpacks(self, conn: sqlite3.Connection, su: sqlite3.Row, rid: Any, page: int,
+                      edit: int | None = None) -> None:
+        items, custom = packs(conn, rid), names(conn)
+        part = items[page * 20:(page + 1) * 20]
+        rows = []
+        for p in part:
+            own = custom.get("p:" + p["id"])
+            label = own["title"] if own is not None and own["title"] else pack_button(p)[0]
+            mark = "🙈 " if own is not None and own["hidden"] else ""
+            reg = region_of(p)
+            rows.append([(f"{mark}{flag(reg) + ' ' if reg else ''}{label}"[:40], f"vpp:{p['rid']}")])
+        nav = ([("‹", f"vp:{rid}:{page - 1}")] if page else []) + \
+              ([("Ещё ›", f"vp:{rid}:{page + 1}")] if (page + 1) * 20 < len(items) else [])
+        if nav:
+            rows.append(nav)
+        rows.append([("‹ Игра", f"vg:{rid}")])
+        self.show(su["tg_id"], "📦 Выберите пакет:", rows, edit=edit)
+
+    def screen_vpack(self, conn: sqlite3.Connection, su: sqlite3.Row, rid: Any, edit: int | None = None) -> None:
+        p = product_by_rid(conn, rid)
+        if p is None:
+            self.screen_vitrine(conn, su, edit)
+            return
+        own = names(conn).get("p:" + p["id"])
+        hidden = bool(own is not None and own["hidden"])
+        label = own["title"] if own is not None and own["title"] else pack_button(p)[0]
+        text = (f"📦 <b>{_e(label)}</b>\nОригинал: {_e(p['name'])}\n"
+                f"Статус: {'🙈 скрыт от покупателей' if hidden else '👁 показывается'}")
+        rows = [[("✏️ Изменить надпись", f"vpn:{rid}")],
+                [("👁 Показать" if hidden else "🙈 Скрыть", f"vpt:{rid}", "success" if hidden else "danger")]]
+        if own is not None and own["title"]:
+            rows.append([("↩️ Вернуть как было", f"vpr:{rid}")])
+        first = packs(conn, rid)
+        rows.append([("‹ Пакеты", f"vp:{first[0]['rid'] if first else rid}:0")])
+        self.show(su["tg_id"], text, rows, edit=edit)
 
     def screen_home(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
         lang, user = su["lang"], self._user(conn, su)
@@ -654,7 +769,7 @@ class ShopBot:
     def screen_games(self, conn: sqlite3.Connection, su: sqlite3.Row, group: str, page: int,
                      edit: int | None = None, q: str = "") -> None:
         lang = su["lang"]
-        rows_all = search_all(conn, q) if q else game_list(conn, group)
+        rows_all = apply_names(conn, search_all(conn, q) if q else game_list(conn, group))
         if not rows_all:
             self.show(su["tg_id"], tr(lang, "nothing"), [[(tr(lang, "search"), "s")], [(tr(lang, "home"), "h")]],
                       edit=edit)
@@ -678,7 +793,7 @@ class ShopBot:
 
     def screen_hits(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
         lang = su["lang"]
-        top = hits(conn) or game_list(conn, "games")[:PAGE]
+        top = apply_names(conn, hits(conn)) or apply_names(conn, game_list(conn, "games"))[:PAGE]
         rows = [[(("🔥 " if i < 3 else "") + r["category_name"][:30], f"c:{r['rid']}:0")] for i, r in enumerate(top)]
         rows.append([(tr(lang, "home"), "h")])
         self.show(su["tg_id"], tr(lang, "hits_title"), rows, edit=edit)
@@ -691,7 +806,16 @@ class ShopBot:
             self.screen_home(conn, su, edit)
             return
         rid = items[0]["rid"]
-        game = base_name(items[0]["category_name"])
+        custom = names(conn)
+        grow = custom.get(game_key(items[0]["category_name"]))
+        if grow is not None and grow["hidden"]:
+            self.screen_home(conn, su, edit)
+            return
+        items = [p for p in items if not (custom.get("p:" + p["id"]) and custom["p:" + p["id"]]["hidden"])]
+        if not items:
+            self.screen_home(conn, su, edit)
+            return
+        game = (grow["title"] if grow is not None and grow["title"] else base_name(items[0]["category_name"]))
         back = (tr(lang, "back"), f"g:{_group_of(items[0]['kind'])}:0")
         regions = list(dict.fromkeys(region_of(p) for p in items))
         if len(regions) > 1 and region is None:   # сначала регион: 🇷🇺 СНГ, 🇹🇷 Турция, 🇮🇩 Индонезия…
@@ -710,6 +834,9 @@ class ShopBot:
         short: list[Btn] = []
         for p in part:
             label, is_short = pack_button(p)
+            own = custom.get("p:" + p["id"])
+            if own is not None and own["title"]:
+                label, is_short = own["title"], is_short and len(own["title"]) <= 14
             price = money(unit_price_micro(self.config, user, p), rate)
             if p["max_qty"] > 1 or p["kind"] == "steam_topup":
                 price = ("от " if lang != "tj" else "аз ") + price
@@ -740,7 +867,7 @@ class ShopBot:
     # покупка: поля → количество → подтверждение
     def start_product(self, conn: sqlite3.Connection, su: sqlite3.Row, rid: str, edit: int | None) -> None:
         p = product_by_rid(conn, rid)
-        if p is None:
+        if p is None or (pack_hidden(conn, p) and not self.is_admin(su["tg_id"])):
             self.screen_home(conn, su, edit)
             return
         self.state[su["tg_id"]] = {"step": "field", "rid": int(rid), "fields": {}, "fi": 0, "qty": 1,
@@ -857,6 +984,13 @@ class ShopBot:
         elif step == "amount":
             st["msg"] = None
             self.create_topup(conn, su, text)
+        elif step in ("vgn", "vpn") and self.is_admin(tg_id):
+            p = product_by_rid(conn, st["rid"])
+            self.state.pop(tg_id, None)
+            if p is not None:
+                key = game_key(p["category_name"]) if step == "vgn" else "p:" + p["id"]
+                set_title(conn, key, text)
+                (self.screen_vgame if step == "vgn" else self.screen_vpack)(conn, su, st["rid"])
         elif step == "bc" and self.is_admin(tg_id):
             n = conn.execute("SELECT COUNT(*) FROM shop_users WHERE subscribed = 1").fetchone()[0]
             self.state[tg_id] = {"step": "bc_ready", "text": _e(text[:3500])}
@@ -960,6 +1094,9 @@ class ShopBot:
         elif head == "adm" and self.is_admin(tg_id):
             self.state.pop(tg_id, None)
             self.screen_admin(conn, su, mid)
+        elif head in ("ve", "vl", "vg", "vgt", "vgn", "vgr", "vp", "vpp", "vpt", "vpn", "vpr") \
+                and self.is_admin(tg_id):
+            self.on_vitrine(conn, su, head, parts[1:], mid)
         elif head == "bc" and self.is_admin(tg_id):
             self.state[tg_id] = {"step": "bc"}
             self.show(tg_id, tr(lang, "bc_ask"), [[(tr(lang, "cancel"), "adm", "danger")]], edit=mid)
@@ -970,6 +1107,42 @@ class ShopBot:
         elif head == "unsub":
             conn.execute("UPDATE shop_users SET subscribed = 0 WHERE tg_id = ?", (tg_id,))
             self.show(tg_id, tr(lang, "unsubbed"), [[(tr(lang, "home"), "h")]], edit=mid)
+
+    def on_vitrine(self, conn: sqlite3.Connection, su: sqlite3.Row, head: str, args: list[str],
+                   mid: int | None) -> None:
+        tg_id = su["tg_id"]
+        self.state.pop(tg_id, None)
+        arg = args[0] if args else ""
+        p = product_by_rid(conn, arg) if arg.isdigit() else None
+        if head == "ve":
+            self.screen_vitrine(conn, su, mid)
+        elif head == "vl" and arg in GROUPS and len(args) > 1 and args[1].isdigit():
+            self.screen_vlist(conn, su, arg, int(args[1]), mid)
+        elif p is None:
+            self.screen_vitrine(conn, su, mid)
+        elif head == "vg":
+            self.screen_vgame(conn, su, arg, mid)
+        elif head == "vgt":
+            toggle_hidden(conn, game_key(p["category_name"]))
+            self.screen_vgame(conn, su, arg, mid)
+        elif head == "vgr":
+            set_title(conn, game_key(p["category_name"]), None)
+            self.screen_vgame(conn, su, arg, mid)
+        elif head == "vp":
+            self.screen_vpacks(conn, su, arg, int(args[1]) if len(args) > 1 and args[1].isdigit() else 0, mid)
+        elif head == "vpp":
+            self.screen_vpack(conn, su, arg, mid)
+        elif head == "vpt":
+            toggle_hidden(conn, "p:" + p["id"])
+            self.screen_vpack(conn, su, arg, mid)
+        elif head == "vpr":
+            set_title(conn, "p:" + p["id"], None)
+            self.screen_vpack(conn, su, arg, mid)
+        elif head in ("vgn", "vpn"):
+            self.state[tg_id] = {"step": head, "rid": int(arg)}
+            what = "игры" if head == "vgn" else "пакета (например: 110 💎)"
+            self.show(tg_id, f"✏️ Напишите новое название {what} одним сообщением.",
+                      [[("❌ Отмена", f"vg:{arg}" if head == "vgn" else f"vpp:{arg}", "danger")]], edit=mid)
 
     # баланс и пополнение
     def screen_balance(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:

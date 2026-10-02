@@ -234,3 +234,39 @@ def test_pack_labels():
     assert base_name("Free Fire (Indonesia)") == "Free Fire" and base_name("Free Fire — СНГ") == "Free Fire"
     assert base_name("Mobile Legends") == "Mobile Legends"
     assert flag("TR") == "🇹🇷" and flag("CIS") == "🇷🇺" and flag("ID") == "🇮🇩"
+
+
+def test_admin_renames_and_hides_games_and_packs(app, config, conn, supplier):
+    config.shop_admin_ids = str(TG)
+    bot = _bot(config, supplier)
+    _start(bot, conn)
+    bot.handle(conn, press("adm"))
+    bot.handle(conn, press("ve"))
+    bot.handle(conn, press("vl:games:0"))
+    bot.handle(conn, press(bot.api.button("PUBG")))
+    bot.handle(conn, press(bot.api.button("Изменить название")))
+    bot.handle(conn, msg("🔫 PUBG Mobile UC"))
+    assert "🔫 PUBG Mobile UC" in bot.api.last_text()
+    bot.handle(conn, press(bot.api.button("Пакеты")))
+    bot.handle(conn, press(bot.api.last_buttons()[0]["callback_data"]))
+    pack_rid = bot.api.button("Скрыть").split(":")[1]
+    bot.handle(conn, press(bot.api.button("Скрыть")))
+    assert "скрыт" in bot.api.last_text()
+
+    config.shop_admin_ids = ""                                        # покупатель
+    bot.handle(conn, press("g:games:0"))
+    assert "🔫 PUBG Mobile UC" in [b["text"] for b in bot.api.last_buttons()]
+    bot.handle(conn, press(bot.api.button("PUBG")))
+    assert f"p:{pack_rid}" not in [b["callback_data"] for b in bot.api.last_buttons()]
+    bot.handle(conn, press(f"p:{pack_rid}"))                         # по старой кнопке тоже нельзя
+    assert "Баланс" in bot.api.last_text()
+    bot.handle(conn, press("ve"))                                    # и редактор не открыть
+    assert "Витрина" not in bot.api.last_text()
+
+    config.shop_admin_ids = str(TG)                                   # скрыть всю игру
+    bot.handle(conn, press("vl:games:0"))
+    bot.handle(conn, press(bot.api.button("PUBG")))
+    bot.handle(conn, press(bot.api.button("Скрыть")))
+    config.shop_admin_ids = ""
+    bot.handle(conn, press("g:games:0"))
+    assert not any("PUBG" in b["text"] for b in bot.api.last_buttons())

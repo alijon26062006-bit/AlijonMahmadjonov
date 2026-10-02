@@ -460,6 +460,11 @@ CREATE TABLE IF NOT EXISTS shop_watch (       -- заказы и пополне�
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS orders_source ON orders(source, status);
+CREATE TABLE IF NOT EXISTS shop_names (       -- витрина бота: свои надписи и скрытые игры/пакеты
+    key    TEXT PRIMARY KEY,                    -- g:<игра> или p:<id товара>
+    title  TEXT,
+    hidden INTEGER NOT NULL DEFAULT 0
+);
 """)
         login_cols = {r[1] for r in conn.execute("PRAGMA table_info(logins)")}
         if "sid" not in login_cols:   # номер сессии: выход или блок обрывают именно её, украденный cookie не живёт
