@@ -460,6 +460,18 @@ CREATE TABLE IF NOT EXISTS shop_watch (       -- заказы и пополне�
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS orders_source ON orders(source, status);
+CREATE TABLE IF NOT EXISTS player_names (     -- ник по ID игрока: проверили раз — помним
+    game        TEXT NOT NULL,
+    uid         TEXT NOT NULL,
+    server      TEXT NOT NULL DEFAULT '',
+    valid       INTEGER NOT NULL,
+    player_name TEXT,
+    region      TEXT,
+    strict      INTEGER NOT NULL DEFAULT 1,
+    checked_at  REAL NOT NULL,
+    hits        INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (game, uid, server)
+);
 CREATE TABLE IF NOT EXISTS shop_names (       -- витрина бота: свои надписи и скрытые игры/пакеты
     key    TEXT PRIMARY KEY,                    -- g:<игра> или p:<id товара>
     title  TEXT,
