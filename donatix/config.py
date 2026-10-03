@@ -115,6 +115,8 @@ class Config:
     # Почта для уведомлений клиентам (необязательно).
     # Бот поддержки с AI (OpenAI): токен бота, ключ и модель
     support_bot_token: str = ""
+    flashtopup_api_id: str = ""     # FlashTopup — только поиск ника по ID игрока
+    flashtopup_api_key: str = ""
     shop_admin_ids: str = ""        # кому в боте-магазине видна админ-панель (через запятую)
     shop_bot_token: str = ""        # бот-магазин проекта (покупки кнопками в Telegram)
     openai_api_key: str = ""
@@ -220,6 +222,8 @@ class Config:
             support_bot_token=_env("DONATIX_SUPPORT_BOT_TOKEN"),
             shop_bot_token=_env("DONATIX_SHOP_BOT_TOKEN"),
             shop_admin_ids=_env("DONATIX_SHOP_ADMIN_IDS"),
+            flashtopup_api_id=_env("DONATIX_FLASHTOPUP_API_ID"),
+            flashtopup_api_key=_env("DONATIX_FLASHTOPUP_API_KEY"),
             openai_api_key=_env("DONATIX_OPENAI_API_KEY") or _env("OPENAI_API_KEY"),
             support_model=_env("DONATIX_SUPPORT_MODEL") or "gpt-4o-mini",
             receipt_model=_env("DONATIX_RECEIPT_MODEL") or "gpt-4o-mini",

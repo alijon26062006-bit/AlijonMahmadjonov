@@ -253,7 +253,7 @@ def _check_account(supplier: Supplier, product: dict[str, Any], fields: dict[str
     if not fields or not account_check.can_check(supplier, product):
         return
     result = account_check.check(supplier, product, fields)
-    if result["valid"] is False:
+    if result["valid"] is False and result.get("strict", True):
         raise OrderError(f"Аккаунт не найден — проверьте ID. {result.get('message') or ''}".strip(),
                          "account_not_found")
 

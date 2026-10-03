@@ -130,11 +130,14 @@ def _categories_now(conn, supplier, only_checkable: bool = False) -> list[dict[s
     checkable = account_check.supported(supplier)
     out, seen = [], set()
     for p in catalog.list_products(conn, kind="topup", limit=10000):
-        if p["category_id"] in seen or (only_checkable and p["category_id"] not in checkable):
+        if p["category_id"] in seen:
+            continue
+        can = p["category_id"] in checkable or account_check.can_check(supplier, p)
+        if only_checkable and not can:
             continue
         seen.add(p["category_id"])
         out.append({"category_id": p["category_id"], "name": p["category_name"], "fields": _fields_out(p),
-                    "imageurl": p.get("image_url"), "validate": p["category_id"] in checkable})
+                    "imageurl": p.get("image_url"), "validate": can})
     return out
 
 

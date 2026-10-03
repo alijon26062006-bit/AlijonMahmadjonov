@@ -137,6 +137,8 @@ T: dict[str, tuple[str, str]] = {
                           "📸 Чек гирифтам! Акнун нависед, чанд сомонӣ гузарондед, масалан <b>100</b>."),
     "receipt_failed": ("⚠️ Не получилось получить фото. Отправьте чек ещё раз — как фото или файл (JPG, PNG, PDF).",
                        "⚠️ Аксро гирифта натавонистам. Чекро боз фиристед — ҳамчун акс ё файл."),
+    "nick_ok": ("👤 Ник в игре: <b>{name}</b> ✅", "👤 Ник дар бозӣ: <b>{name}</b> ✅"),
+    "nick_bad": ("⚠️ Игрок с таким ID не найден — проверьте ID.", "⚠️ Бозигар бо ин ID ёфт нашуд — ID-ро санҷед."),
     "checking": ("⏳ <b>Проверяем чек</b>\nПодождите, как только проверим — напишу.",
                  "⏳ <b>Чекро месанҷем</b>\nИнтизор шавед, баъди санҷиш менависам."),
     "paid": ("✅ <b>Баланс пополнен на {amount}</b>\nТеперь на балансе: {balance}",
@@ -971,6 +973,7 @@ class ShopBot:
         name = p["name"] + (f" × {qty}" if qty > 1 else "")
         lines = "\n".join(f"• {_e(s.get('label') or s['key'])}: <b>{_e(fields.get(s['key'], ''))}</b>"
                           for s in p["fields"])
+        lines += self.nick_line(p, fields, lang)
         text = tr(lang, "confirm", product=f"<b>{_e(name)}</b>", fields=lines, total=money(total, rate),
                   balance=money(user["balance_micro"], rate))
         if user["balance_micro"] < total:
@@ -980,6 +983,22 @@ class ShopBot:
         else:
             rows = [[(tr(lang, "pay"), "ok", "success")], [(tr(lang, "cancel"), "x", "danger")]]
         st["msg"] = self.show(tg_id, text, rows, edit=st.get("msg"))
+
+    def nick_line(self, p: dict[str, Any], fields: dict[str, str], lang: str) -> str:
+        """Ник игрока по ID — чтобы человек убедился, что донат уйдёт на его аккаунт."""
+        from . import account_check
+        try:
+            if not fields or not account_check.can_check(self.supplier, p):
+                return ""
+            r = account_check.check(self.supplier, p, fields)
+        except Exception:  # noqa: BLE001 — проверка — подсказка, покупке не мешает
+            log.exception("бот-магазин: проверка ника")
+            return ""
+        if r.get("valid") and r.get("player_name"):
+            return "\n" + tr(lang, "nick_ok", name=_e(r["player_name"]))
+        if r.get("valid") is False:
+            return "\n" + tr(lang, "nick_bad")
+        return ""
 
     def buy(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None) -> None:
         tg_id, lang = su["tg_id"], su["lang"]

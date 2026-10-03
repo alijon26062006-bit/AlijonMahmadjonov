@@ -158,6 +158,8 @@ def cache_policy(path: str, query: str, status: int) -> str:
 def create_app(config: Config | None = None, supplier: Supplier | None = None) -> FastAPI:
     config = config or Config.from_env()
     supplier = supplier or make_supplier(config)
+    from . import account_check
+    account_check.configure(config)   # FlashTopup: ник игрока по ID, если ключи есть в .env
     db.init(config.db_path)
     conn = db.connect(config.db_path)
     try:
