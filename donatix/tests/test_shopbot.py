@@ -285,3 +285,38 @@ def test_flags_in_pack_names_split_games_by_region(app, config, conn, supplier):
     packs_ = [b["text"] for b in bot.api.last_buttons() if b["callback_data"].startswith("p:")]
     assert len(packs_) == 2 and packs_[0].startswith("5 💎 — ") and "🇮🇩" not in packs_[0]
     assert "━━━" in bot.api.last_text()
+
+
+def _photo(fid="f1"):
+    return {"update_id": 3, "message": {"chat": {"id": TG, "type": "private"}, "from": {"id": TG},
+                                        "photo": [{"file_id": fid}]}}
+
+
+def test_receipt_sent_before_request_is_not_lost(app, config, conn, supplier, monkeypatch):
+    monkeypatch.setattr("donatix.tgbot.send_receipt", lambda *a, **k: None)
+    config.pay_methods = {"alif": "102208383"}
+    api = FakeApi(photo=RECEIPT_PNG)
+    bot = _bot(config, supplier, api)
+    su = _start(bot, conn)
+    bot.handle(conn, _photo())                                     # сначала перевёл и сразу прислал чек
+    assert "Чек получил" in api.last_text()
+    bot.handle(conn, press(api.button("Ал")))
+    bot.handle(conn, msg("100"))
+    assert "Проверяем чек" in api.last_text()
+    p = conn.execute("SELECT * FROM payments WHERE user_id = ?", (su["user_id"],)).fetchone()
+    assert p["receipt_file"] and p["pay_amount"] == "100.00"
+
+
+def test_receipt_instead_of_amount(app, config, conn, supplier, monkeypatch):
+    monkeypatch.setattr("donatix.tgbot.send_receipt", lambda *a, **k: None)
+    config.pay_methods = {"alif": "102208383"}
+    api = FakeApi(photo=RECEIPT_PNG)
+    bot = _bot(config, supplier, api)
+    su = _start(bot, conn)
+    bot.handle(conn, press("t"))
+    bot.handle(conn, press(api.button("Ал")))
+    bot.handle(conn, _photo())                                     # прислал чек вместо суммы
+    assert "сколько сомони" in api.last_text()
+    bot.handle(conn, msg("50"))
+    p = conn.execute("SELECT * FROM payments WHERE user_id = ?", (su["user_id"],)).fetchone()
+    assert p["receipt_file"] and p["pay_amount"] == "50.00"

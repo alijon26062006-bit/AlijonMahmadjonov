@@ -131,6 +131,12 @@ T: dict[str, tuple[str, str]] = {
                     "📸 Баъд <b>акси чек</b>-ро ба ин ҷо фиристед."),
     "pay_auto": ("🧾 <b>Заявка #{id}</b>\n\nПереведите ровно <b>{amount}</b>\n<code>{address}</code>\n\n{note}",
                  "🧾 <b>Дархост #{id}</b>\n\nМаҳз <b>{amount}</b> гузаронед\n<code>{address}</code>\n\n{note}"),
+    "photo_kept_method": ("📸 Чек получил! Куда вы переводили? Выберите способ — потом сумму.",
+                          "📸 Чек гирифтам! Ба куҷо пул гузарондед? Усулро интихоб кунед — баъд маблағ."),
+    "photo_kept_amount": ("📸 Чек получил! Теперь напишите, сколько сомони вы перевели, например <b>100</b>.",
+                          "📸 Чек гирифтам! Акнун нависед, чанд сомонӣ гузарондед, масалан <b>100</b>."),
+    "receipt_failed": ("⚠️ Не получилось получить фото. Отправьте чек ещё раз — как фото или файл (JPG, PNG, PDF).",
+                       "⚠️ Аксро гирифта натавонистам. Чекро боз фиристед — ҳамчун акс ё файл."),
     "checking": ("⏳ <b>Проверяем чек</b>\nПодождите, как только проверим — напишу.",
                  "⏳ <b>Чекро месанҷем</b>\nИнтизор шавед, баъди санҷиш менависам."),
     "paid": ("✅ <b>Баланс пополнен на {amount}</b>\nТеперь на балансе: {balance}",
@@ -1212,11 +1218,13 @@ class ShopBot:
         if not methods:
             self.show(tg_id, tr(lang, "no_methods"), [[(tr(lang, "home"), "h")]], edit=edit)
             return
-        resume = (self.state.get(tg_id) or {}) if (self.state.get(tg_id) or {}).get("resume") else None
-        self.state[tg_id] = {"step": "method", "resume": resume}
+        prev = self.state.get(tg_id) or {}
+        resume = prev if prev.get("resume") else None
+        self.state[tg_id] = {"step": "method", "resume": resume, "photo": prev.get("photo")}
         rows = [[(m["title"][:40], f"tm:{m['code']}")] for m in methods]
         rows.append([(tr(lang, "home"), "h")])
-        self.show(tg_id, tr(lang, "pick_method"), rows, edit=edit)
+        text = tr(lang, "photo_kept_method") if prev.get("photo") else tr(lang, "pick_method")
+        self.show(tg_id, text, rows, edit=edit)
 
     def pick_method(self, conn: sqlite3.Connection, su: sqlite3.Row, code: str, edit: int | None) -> None:
         tg_id, lang = su["tg_id"], su["lang"]
@@ -1225,7 +1233,8 @@ class ShopBot:
             self.screen_methods(conn, su, edit)
             return
         prev = self.state.get(tg_id) or {}
-        self.state[tg_id] = {"step": "amount", "method": code, "msg": edit, "resume": prev.get("resume")}
+        self.state[tg_id] = {"step": "amount", "method": code, "msg": edit, "resume": prev.get("resume"),
+                             "photo": prev.get("photo")}
         rows = [[(f"{v} смн", f"ta:{v}") for v in (20, 50, 100)], [(f"{v} смн", f"ta:{v}") for v in (200, 500, 1000)],
                 [(tr(lang, "cancel"), "x", "danger")]]
         self.show(tg_id, tr(lang, "ask_amount", method=_e(method["title"])), rows, edit=edit)
@@ -1257,6 +1266,9 @@ class ShopBot:
             self.watch_add(conn, "pay", pid, tg_id, mid, "pending")
             return
         self.state[tg_id] = {"step": "receipt", "pid": pid, "resume": st.get("resume")}
+        if st.get("photo"):   # чек прислали раньше заявки — прикрепляем его сразу, второй раз не просим
+            self.attach_photo(conn, su, pid, st["photo"], st.get("resume"))
+            return
         text = tr(lang, "pay_details", id=pid, amount=amount_text, method=_e(view["method_title"]),
                   details=_e(view["details"]))
         if view["network_note"]:
@@ -1266,35 +1278,53 @@ class ShopBot:
     def on_receipt(self, conn: sqlite3.Connection, su: sqlite3.Row, msg: dict[str, Any]) -> None:
         tg_id, lang = su["tg_id"], su["lang"]
         st = self.state.get(tg_id) or {}
+        file_id = (msg["photo"][-1]["file_id"] if msg.get("photo") else (msg.get("document") or {}).get("file_id"))
+        if not file_id:
+            return
         pid = st.get("pid") if st.get("step") == "receipt" else None
         if pid is None:
             p = conn.execute("SELECT id FROM payments WHERE user_id = ? AND status = 'pending' "
                              "AND receipt_file IS NULL AND COALESCE(auto_kind, '') = '' ORDER BY id DESC LIMIT 1",
                              (su["user_id"],)).fetchone()
-            if p is None:
-                self.screen_home(conn, su)
+            pid = p["id"] if p else None
+        if pid is None:
+            # Чек прислали без заявки (сначала перевели, потом пришли в бот) или вместо суммы.
+            # Не теряем его: запоминаем и спрашиваем, чего не хватает — способ и сумму.
+            if st.get("step") == "amount" and st.get("method"):
+                st["photo"], st["msg"] = file_id, None
+                self.show(tg_id, tr(lang, "photo_kept_amount"), [[(tr(lang, "cancel"), "x", "danger")]])
                 return
-            pid = p["id"]
-        file_id = (msg["photo"][-1]["file_id"] if msg.get("photo") else (msg.get("document") or {}).get("file_id"))
-        try:
-            data = self.api.download(file_id, max_bytes=payments.MAX_RECEIPT_BYTES)
-        except Exception as exc:  # noqa: BLE001
-            self.show(tg_id, tr(lang, "error", text=_e(exc)))
+            waiting = payments.open_request(conn, su["user_id"])
+            if waiting is not None:
+                self.show(tg_id, tr(lang, "error", text=_e(payments.waiting_text(waiting))),
+                          [[(tr(lang, "home"), "h")]])
+                return
+            self.state[tg_id] = {**st, "photo": file_id}
+            self.screen_methods(conn, su)
             return
+        self.attach_photo(conn, su, pid, file_id, st.get("resume"))
+
+    def attach_photo(self, conn: sqlite3.Connection, su: sqlite3.Row, pid: int, file_id: str,
+                     resume: dict[str, Any] | None) -> None:
+        tg_id, lang = su["tg_id"], su["lang"]
         mid = self.show(tg_id, tr(lang, "checking"))
         try:
+            data = self.api.download(file_id, max_bytes=payments.MAX_RECEIPT_BYTES)
             payments.attach_receipt(conn, self.config, su["user_id"], pid, data)
         except payments.PaymentError as exc:
             self.show(tg_id, tr(lang, "error", text=_e(exc)), [[(tr(lang, "home"), "h")]], edit=mid)
+            return
+        except Exception as exc:  # noqa: BLE001 — не скачался файл из Telegram
+            log.warning("бот-магазин: чек %s не скачан: %s", pid, exc)
+            self.show(tg_id, tr(lang, "receipt_failed"), [[(tr(lang, "home"), "h")]], edit=mid)
             return
         from .tgbot import send_receipt
         try:
             send_receipt(conn, self.config, pid)
         except Exception:  # noqa: BLE001 — чек сохранён, админ увидит его на сайте
             log.exception("бот-магазин: чек %s админу", pid)
-        resume = st.get("resume")
         self.state.pop(tg_id, None)
-        if resume and resume.get("rid"):
+        if resume and isinstance(resume, dict) and resume.get("rid"):
             self.state[tg_id] = {**resume, "msg": None, "resume": None, "after_pay": True}
         self.watch_add(conn, "pay", pid, tg_id, mid, "pending")
 
