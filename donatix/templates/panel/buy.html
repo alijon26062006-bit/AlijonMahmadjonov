@@ -175,7 +175,7 @@
   const accBtn = document.getElementById("acc-btn");
   if (accBtn) {
     const box = document.getElementById("acc-result"), sPlayer = document.getElementById("s-player");
-    let last = "";
+    let last = "", timer = null;
     const inputs = () => [...form.querySelectorAll("input[name^='field_']")];
     async function check() {
       const params = new URLSearchParams(inputs().map(i => [i.name, i.value.trim()]));
@@ -200,7 +200,12 @@
     accBtn.addEventListener("click", check);
     inputs().forEach(i => {
       i.addEventListener("change", check);
-      i.addEventListener("input", () => { box.textContent = ""; box.className = "acc-result"; if (sPlayer) sPlayer.textContent = "—"; last = ""; });
+      i.addEventListener("input", () => {
+        box.textContent = ""; box.className = "acc-result"; if (sPlayer) sPlayer.textContent = "—"; last = "";
+        // Ник ищем сам, как только человек перестал печатать ID (без нажатия кнопки)
+        clearTimeout(timer);
+        if (inputs().every(x => x.value.trim().length >= 4)) timer = setTimeout(check, 900);
+      });
     });
   }
   form.addEventListener("submit", () => { form.querySelectorAll("button.primary").forEach(b => { b.disabled = true; b.textContent = "Отправляем…"; }); });
