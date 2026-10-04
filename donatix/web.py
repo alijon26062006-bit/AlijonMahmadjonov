@@ -926,7 +926,8 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     if payments.is_auto(conn, config, method):
         data = b""   # крипту проверяет блокчейн — чек не нужен и не принимаем
     rates.refresh(conn, config, rates.PAYMENT_SECONDS)  # сумма к переводу — по свежему курсу
-    seen = payments.read_receipt(config, data) if data else None   # ИИ — до транзакции, базу не держим
+    details = payments.settings(conn, config)["details"].get(method, "")
+    seen = payments.read_receipt(config, data, details) if data else None   # ИИ — до транзакции, базу не держим
     try:
         with db.tx(conn):
             pid = payments.create(conn, config, user, method, amount, reference, amount_tjs=amount_tjs)

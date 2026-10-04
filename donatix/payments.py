@@ -460,11 +460,37 @@ def receipt_kind(data: bytes) -> str | None:
     return _sniff(data) if data else None
 
 
-def read_receipt(config: Config, data: bytes) -> dict | None:
-    """ИИ читает чек. Вызывать ДО транзакции: запрос к OpenAI идёт до 25 с, базу держать нельзя."""
+def read_receipt(config: Config, data: bytes, our_details: str = "") -> dict | None:
+    """ИИ читает чек. Вызывать ДО транзакции: запрос к OpenAI идёт до 25 с, базу держать нельзя.
+    our_details — наши реквизиты этого способа: ИИ сверит с ними получателя."""
     from . import receipt_ai
     ext = receipt_kind(data)
-    return receipt_ai.read(config, data, ext) if ext and len(data) <= MAX_RECEIPT_BYTES else None
+    if not ext or len(data) > MAX_RECEIPT_BYTES:
+        return None
+    return receipt_ai.read(config, data, ext, our_details=our_details)
+
+
+class ReceiptRejected(PaymentError):
+    """Чек не принят: чужие реквизиты, подделка, не чек. Клиенту — общая фраза, админу — причины."""
+
+    def __init__(self, reasons: list[str]):
+        super().__init__(REJECTED_TEXT)
+        self.reasons = reasons
+
+
+REJECTED_TEXT = "Чек не прошёл проверку. Если это ошибка — напишите в поддержку."
+
+
+def _report_rejected(conn: sqlite3.Connection, config: Config, user_id: int, payment_id: int,
+                     reasons: list[str]) -> None:
+    """Админу — в отдельном потоке: Telegram не должен держать базу."""
+    import threading
+    from .worker import notify_admin
+    row = conn.execute("SELECT login FROM users WHERE id = ?", (user_id,)).fetchone()
+    who = row["login"] if row else f"#{user_id}"
+    text = (f"🚫 Чек к заявке #{payment_id} от {who} НЕ принят:\n• " + "\n• ".join(reasons)
+            + "\nЗаявка без чека не зачислится. Если чек настоящий — клиент напишет в поддержку.")
+    threading.Thread(target=notify_admin, args=(config, text), daemon=True).start()
 
 
 def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payment_id: int,
@@ -478,16 +504,26 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
     ext = receipt_kind(data)
     if ext is None:
         raise PaymentError("Чек — фото (JPG, PNG, WEBP) или PDF.")
+    from . import receipt_ai
+    p = conn.execute("SELECT method, created_at FROM payments WHERE id = ? AND user_id = ?",
+                     (payment_id, user_id)).fetchone()
+    details = settings(conn, config)["details"].get(p["method"], "") if p else ""
     if seen is _UNREAD:
-        seen = read_receipt(config, data)
+        seen = read_receipt(config, data, details)
+    _, warns = receipt_ai.file_marks(data, ext)
+    if seen and warns:
+        seen = {**seen, "file_marks": warns}
+    reasons = receipt_ai.verdict(seen, data, ext, details, p["created_at"] if p else None) if p else []
     own_tx = not conn.in_transaction
     if own_tx:   # проверка повтора и запись — под одной блокировкой, иначе два одинаковых чека пройдут разом
         conn.execute("BEGIN IMMEDIATE")
     try:
-        name = _attach_locked(conn, config, user_id, payment_id, data, ext, seen)
-    except BaseException:
+        name = _attach_locked(conn, config, user_id, payment_id, data, ext, seen, reasons)
+    except BaseException as exc:
         if own_tx:
             conn.execute("ROLLBACK")
+        if isinstance(exc, ReceiptRejected):
+            _report_rejected(conn, config, user_id, payment_id, exc.reasons)
         raise
     if own_tx:
         conn.execute("COMMIT")
@@ -495,7 +531,7 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
 
 
 def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payment_id: int,
-                   data: bytes, ext: str, seen: dict | None) -> str:
+                   data: bytes, ext: str, seen: dict | None, reasons: list[str] | None = None) -> str:
     from . import receipt_ai
     p = conn.execute("SELECT * FROM payments WHERE id = ? AND user_id = ?", (payment_id, user_id)).fetchone()
     if p is None:
@@ -511,7 +547,9 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
     dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? "
                        "AND status IN ('pending', 'paid', 'rejected')", (digest, payment_id)).fetchone()
     if dup or (seen and receipt_ai.duplicate(conn, payment_id, seen)):
-        raise PaymentError("Чек не прошёл проверку. Если это ошибка — напишите в поддержку.")
+        raise PaymentError(REJECTED_TEXT)
+    if reasons:   # чужие реквизиты, подделка, не чек — не принимаем вовсе
+        raise ReceiptRejected(reasons)
     folder = receipts_dir(config)
     folder.mkdir(parents=True, exist_ok=True)
     name = f"{payment_id}-{secrets.token_hex(6)}.{ext}"
