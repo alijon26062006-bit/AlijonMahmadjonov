@@ -1571,3 +1571,20 @@ a.catalog-link:hover { color: var(--text); text-decoration: none; border-color: 
 .rc-check.ok .rcc-bar i { background: #22c55e; }
 .rc-check.ok .rcc-icon { background: color-mix(in srgb, #22c55e 18%, transparent); }
 body.rcc-open { overflow: hidden; }
+
+/* Корзина: несколько пакетов одной игры на один ID */
+.pp-cell { position: relative; display: flex; }
+.pp-cell > .pp { flex: 1; padding-right: 44px; }
+.pp-add { position: absolute; right: 8px; bottom: 8px; width: 32px; height: 32px; display: grid; place-items: center;
+  border-radius: 10px; border: 1px solid var(--accent-line); background: var(--surface, transparent); color: var(--accent);
+  cursor: pointer; z-index: 1; }
+.pp-add:hover { background: var(--accent-soft); }
+.pp-add.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.pp-add.on::after { content: attr(data-n); position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px;
+  padding: 0 4px; border-radius: 9px; background: var(--text); color: var(--bg, #fff); font: 700 .7rem/18px var(--font-num); }
+.cart-card { margin-top: 16px; }
+.cart-list { display: grid; gap: 8px; margin: 12px 0 6px; }
+.cart-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line, #ddd); border-radius: 10px; }
+.cart-row .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: 600; font-size: .92rem; }
+.cart-n { min-width: 22px; text-align: center; font-family: var(--font-num); }
+.cart-sum { min-width: 64px; text-align: right; font: 600 .92rem/1.2 var(--font-num); color: var(--accent); }

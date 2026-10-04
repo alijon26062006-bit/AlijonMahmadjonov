@@ -632,6 +632,79 @@ def panel_buy(product_id: str, request: Request, form: dict = Depends(_form), us
     return _redirect(f"/panel/orders/{order['public_id']}")
 
 
+CART_MAX = 20   # пакетов за один раз — каждый уходит поставщику отдельным заказом
+
+
+@router.post("/panel/buy-many/{product_id}", dependencies=[Depends(check_csrf)])
+def panel_buy_many(product_id: str, request: Request, form: dict = Depends(_form), user=Depends(panel_user),
+                   conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Несколько пакетов одной игры на один ID: сначала проверяем, хватит ли денег на всё,
+    потом оформляем заказы по очереди — каждый отдельно уходит поставщику."""
+    p = catalog.get_product(conn, product_id)
+    if p is None:
+        flash(request, "Товар недоступен.", "error")
+        return _redirect("/panel/catalog")
+    fields = {k[6:]: str(v) for k, v in form.items() if k.startswith("field_")}
+
+    def fail(text: str):
+        return render(request, "panel/buy.html", _buy_ctx(
+            request, conn, config, accounts.get_user(conn, user["id"]), p, error=text, form=fields), 400)
+
+    cart: list[tuple[dict, int]] = []
+    for key, value in form.items():
+        if not key.startswith("item_"):
+            continue
+        item = catalog.get_product(conn, key[5:])
+        try:
+            n = int(value)
+        except ValueError:
+            n = 0
+        if (item is None or item["category_id"] != p["category_id"] or item["kind"] != p["kind"]
+                or (item.get("region") or "") != (p.get("region") or "")):   # один ID — один регион
+            return fail("Один из пакетов недоступен — уберите его из корзины.")
+        if n > 0:
+            cart.append((item, n))
+    count = sum(n for _, n in cart)
+    if not cart:
+        return fail("Корзина пуста — нажмите «+» у нужных пакетов.")
+    if count > CART_MAX:
+        return fail(f"За один раз — не больше {CART_MAX} пакетов.")
+    try:
+        total = sum(orders.quote(config, user, item, 1)["total_micro"] * n for item, n in cart)
+    except orders.OrderError as exc:
+        return fail(str(exc))
+    have = accounts.get_user(conn, user["id"])["balance_micro"]
+    if have + orders.ROUNDING_MICRO < total:
+        return fail(f"Не хватает ${fmt(total - have)} — пополните баланс. Нужно ${fmt(total)}, "
+                    f"на балансе ${fmt(have)}.")
+    idem = str(form.get("idem", ""))[:64]
+    made: list[str] = []
+    error = ""
+    step = 0
+    for item, n in cart:
+        for _ in range(n):
+            step += 1
+            try:
+                order, _ = orders.create_order(
+                    conn, config, request.app.state.supplier, accounts.get_user(conn, user["id"]),
+                    product_id=item["id"], quantity=1,
+                    fields={f["key"]: fields.get(f["key"], "") for f in item["fields"]},
+                    client_idem_key=f"panel-{idem}-{step}", source="panel")
+            except orders.OrderError as exc:
+                error = str(exc)
+                break
+            made.append(order["public_id"])
+        if error:
+            break
+    if not made:
+        return fail(error or "Заказ не оформлен.")
+    if error:
+        flash(request, f"Оформлено {len(made)} из {count}. Остальные не оформлены: {error}", "error")
+    else:
+        flash(request, f"Оформлено заказов: {len(made)}. Они выполняются по очереди — статус каждого ниже.")
+    return _redirect("/panel/orders")
+
+
 @router.get("/panel/data/check-account/{product_id}")
 def panel_check_account(product_id: str, request: Request, user=Depends(viewer), conn=Depends(get_conn)):
     from .api import ApiError, account_check_view
