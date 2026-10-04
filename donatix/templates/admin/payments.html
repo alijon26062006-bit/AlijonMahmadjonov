@@ -4,7 +4,7 @@
 {% block content %}
 <section class="page-hero"><h1>Пополнения</h1><p>Сверьте поступление и подтвердите. <a href="/admin/pay-settings">Реквизиты</a></p></section>
 <div class="chips" style="margin-bottom:14px">
-  {% for s, t in [('pending', 'Ждут проверки'), ('paid', 'Зачислено'), ('rejected', 'Отклонено'), ('cancelled', 'Отменено'), ('all', 'Все')] %}
+  {% for s, t in [('pending', 'Ждут проверки'), ('paid', 'Зачислено'), ('rejected', 'Отклонено'), ('fake', 'Поддельные'), ('cancelled', 'Отменено'), ('all', 'Все')] %}
   <a class="chip {{ 'on' if s == status }}" href="/admin/payments?status={{ s }}">{{ t }}</a>
   {% endfor %}
 </div>
@@ -35,9 +35,16 @@
       </form>
     </div>
     {% else %}
-    <div style="margin-top:10px"><span class="badge {{ {'paid': 'ok', 'rejected': 'bad'}.get(p.status, '') }}">{{ {'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено'}[p.status] }}</span>
+    <div style="margin-top:10px"><span class="badge {{ {'paid': 'ok', 'rejected': 'bad', 'fake': 'bad'}.get(p.status, '') }}">{{ {'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено', 'fake': '🚨 Поддельный чек'}.get(p.status, p.status) }}</span>
       <span class="small"> · решил: <b>{{ p.who }}</b>{% if p.resolved_at %} · {{ p.resolved_at | dt }}{% endif %}</span>
       {% if p.admin_note %}<span class="small muted"> · {{ p.admin_note }}</span>{% endif %}</div>
+    {% if p.status == 'paid' and not p.auto_kind %}
+    <form method="post" action="/admin/payments/{{ p.id }}/fake" style="margin-top:10px"
+          onsubmit="return confirm('Деньги по заявке #{{ p.id }} не пришли? Сумма ${{ fmt(p.amount_micro) }} будет списана с баланса клиента (можно в минус — долг закроется из следующего пополнения).')">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn sm danger">🚨 Чек поддельный — списать сумму</button>
+    </form>
+    {% endif %}
     {% endif %}
   </div>
   {% else %}<div class="card empty">Заявок нет.</div>{% endfor %}

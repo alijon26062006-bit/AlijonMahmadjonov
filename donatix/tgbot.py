@@ -62,13 +62,17 @@ class TelegramApi:
 
 
 def payment_event(conn: sqlite3.Connection, payment_id: int, config: Config | None = None) -> tuple[str, Buttons]:
-    p = conn.execute("SELECT p.*, u.login FROM payments p JOIN users u ON u.id = p.user_id WHERE p.id = ?",
-                     (payment_id,)).fetchone()
+    p = conn.execute("SELECT p.*, u.login, u.fraud_count, u.balance_micro FROM payments p "
+                     "JOIN users u ON u.id = p.user_id WHERE p.id = ?", (payment_id,)).fetchone()
     title = payments.title_for(conn, config, p["method"]) if config else PAY_METHODS.get(p["method"], (p["method"],))[0]
     text = (f"💳 <b>Заявка на пополнение #{p['id']}</b>\n"
             f"Клиент: {_e(p['login'])}\nСпособ: {_e(title)}\n"
             f"К переводу: <b>{_e(p['pay_amount'])} {_e(p['pay_currency'])}</b> (${fmt(p['amount_micro'])})"
             + (f"\nЧек / хэш: <code>{_e(p['reference'])}</code>" if p["reference"] else ""))
+    if p["fraud_count"]:
+        text = (f"🚨 <b>ВНИМАНИЕ: этот клиент уже присылал поддельный чек ({p['fraud_count']} раз)</b>"
+                + (f"\nДолг ${fmt(-p['balance_micro'])} — спишется из этого пополнения автоматически"
+                   if p["balance_micro"] < 0 else "") + "\nПроверьте поступление по выписке банка!\n\n" + text)
     return text, [[(f"✅ Зачислить ${fmt(p['amount_micro'])}", f"pay:ok:{p['id']}"),
                    ("❌ Отклонить", f"pay:no:{p['id']}")]]
 
@@ -265,6 +269,18 @@ class AdminBot:
             u = conn.execute("SELECT id FROM users WHERE login = ? OR email = ?", (login, login)).fetchone()
             self.send(*screen_client(conn, self.config, u["id"]) if u else ("Клиент не найден. Пример: /client shop1",
                                                                             [[("👤 Клиенты", "m:clients:0")]]))
+        elif cmd == "/fake":   # /fake 123 — чек по заявке оказался поддельным
+            arg = text.split()[1] if len(text.split()) > 1 else ""
+            if not arg.isdigit():
+                self.send("Напишите номер заявки: <code>/fake 123</code> — сумма спишется с баланса клиента.")
+                return
+            try:
+                debt = payments.mark_fake(conn, self.config, int(arg), _admin_id(conn), who="админ (Telegram)")
+            except payments.PaymentError as exc:
+                self.send(_e(str(exc)))
+                return
+            self.send(f"🚨 Заявка #{arg}: сумма списана, клиент помечен."
+                      + (f" Долг ${fmt(debt)} спишется из следующего пополнения." if debt else ""))
         elif cmd in ("/stats", "📊"):
             self.send(summary(conn))
         elif cmd in ("/payments", "💳"):
@@ -468,7 +484,8 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
     from . import cashiers
     from .payments import receipts_dir
     from .worker import notify_admin_file
-    p = conn.execute("SELECT method, receipt_file, receipt_ai, pay_amount, pay_currency FROM payments WHERE id = ?",
+    p = conn.execute("SELECT method, receipt_file, receipt_ai, pay_amount, pay_currency, created_at FROM payments "
+                     "WHERE id = ?",
                      (payment_id,)).fetchone()
     if not p or not p["receipt_file"]:
         return
@@ -477,7 +494,9 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
     from . import receipt_ai
     if receipt_ai.enabled(config):   # что прочитал ИИ и совпадает ли сумма
         seen = json.loads(p["receipt_ai"]) if p["receipt_ai"] else None
-        caption += "\n" + _e(receipt_ai.summary(seen, p["pay_amount"], p["pay_currency"] or ""))
+        details = payments.settings(conn, config)["details"].get(p["method"], "")
+        caption += "\n" + _e(receipt_ai.summary(seen, p["pay_amount"], p["pay_currency"] or "",
+                                                our_details=details, created_at=p["created_at"]))
     path = receipts_dir(config) / p["receipt_file"]
     photo = not p["receipt_file"].endswith(".pdf")
     if only_chat is None:

@@ -433,6 +433,8 @@ def init(path: Path | str) -> None:
         point_cols = {r[1] for r in conn.execute("PRAGMA table_info(dcoin_points)")}
         if "reserve" not in point_cols:
             conn.execute("ALTER TABLE dcoin_points ADD COLUMN reserve INTEGER NOT NULL DEFAULT 0")
+        if "fraud_count" not in user_cols:   # сколько раз присылал поддельный чек
+            conn.execute("ALTER TABLE users ADD COLUMN fraud_count INTEGER NOT NULL DEFAULT 0")
         if "dcoin" not in user_cols:   # D-коины клиента, сотые доли
             conn.execute("ALTER TABLE users ADD COLUMN dcoin INTEGER NOT NULL DEFAULT 0")
         if "google_sub" not in user_cols:

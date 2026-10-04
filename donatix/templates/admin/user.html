@@ -46,7 +46,7 @@
   <tr><td>#{{ p.id }}{% if p.receipt_file %} · <a href="/admin/payments/{{ p.id }}/receipt" target="_blank" rel="noopener">🧾 чек</a>{% endif %}</td>
     <td>{{ pay_titles.get(p.method, p.method) }}</td>
     <td class="num">${{ fmt(p.amount_micro) }}<div class="small muted">{{ p.pay_amount }} {{ p.pay_currency }}</div></td>
-    <td><span class="badge {{ {'paid': 'ok', 'rejected': 'bad', 'pending': 'warn'}.get(p.status, '') }}">{{ {'pending': 'Ждёт проверки', 'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено'}[p.status] }}</span>
+    <td><span class="badge {{ {'paid': 'ok', 'rejected': 'bad', 'pending': 'warn', 'fake': 'bad'}.get(p.status, '') }}">{{ {'pending': 'Ждёт проверки', 'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено', 'fake': '🚨 Поддельный чек'}.get(p.status, p.status) }}</span>
       {% if p.admin_note %}<div class="small muted">{{ p.admin_note }}</div>{% endif %}</td>
     <td>{{ p.who or '—' }}</td>
     <td class="small">{{ p.created_at | dt }}</td><td class="small">{{ p.resolved_at | dt if p.resolved_at else '—' }}</td></tr>

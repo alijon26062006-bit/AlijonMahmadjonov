@@ -102,12 +102,12 @@
     <div class="list" style="margin-top:12px">
       {% for p in payments %}
       <div class="item">
-        <div class="tile sm {{ {'paid': 'ok', 'rejected': 'bad', 'cancelled': 'bad'}.get(p.status, 'g1') }}">{{ icon({'paid': 'check', 'rejected': 'x', 'cancelled': 'x'}.get(p.status, 'clock'), 18) }}</div>
+        <div class="tile sm {{ {'paid': 'ok', 'rejected': 'bad', 'cancelled': 'bad', 'fake': 'bad'}.get(p.status, 'g1') }}">{{ icon({'paid': 'check', 'rejected': 'x', 'cancelled': 'x', 'fake': 'x'}.get(p.status, 'clock'), 18) }}</div>
         <div class="grow">
           <div class="head"><span class="title">#{{ p.id }} · {{ pay_titles.get(p.method, p.method) }}</span><span class="amount">{{ money(p.amount_micro) }}</span></div>
           <div class="sub">{{ p.pay_amount }} {{ p.pay_currency }} · {{ p.created_at | dt }}{% if p.admin_note %} · {{ p.admin_note }}{% endif %}</div>
           <div class="meta">
-            <span class="badge {{ {'paid': 'ok', 'rejected': 'bad', 'cancelled': ''}.get(p.status, 'warn') }}">{{ {'pending': 'Проверяется', 'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено'}[p.status] }}</span>
+            <span class="badge {{ {'paid': 'ok', 'rejected': 'bad', 'cancelled': '', 'fake': 'bad'}.get(p.status, 'warn') }}">{{ {'pending': 'Проверяется', 'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено', 'fake': 'Перевод не поступил'}.get(p.status, p.status) }}</span>
             {% if p.status == 'pending' and not p.receipt_file %}
             <form class="inline" method="post" action="/panel/balance/{{ p.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm">Отменить</button></form>
             {% elif p.status == 'pending' %}<span class="spin-dot" aria-hidden="true"></span>

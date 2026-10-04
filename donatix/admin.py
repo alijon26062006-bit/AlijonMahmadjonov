@@ -515,7 +515,7 @@ def product_toggle(product_id: str, request: Request, admin=Depends(admin_user),
 @router.get("/payments")
 def payments_list(request: Request, status: str = "pending", admin=Depends(admin_user), conn=Depends(get_conn)):
     where, args = "1=1", []
-    if status in ("pending", "paid", "rejected", "cancelled"):
+    if status in ("pending", "paid", "rejected", "cancelled", "fake"):
         where += " AND p.status = ?"
         args.append(status)
     rows = _pays_with_who(conn, f"WHERE {where} ORDER BY p.id DESC LIMIT 200", tuple(args))
@@ -607,6 +607,21 @@ def payment_confirm(payment_id: int, request: Request, credit: str = Form(""), a
         settle(conn, config, payment_id, f"✅ Зачислено ${fmt(amount)} — админ (сайт)")
     flash(request, "Баланс зачислен, клиент уведомлён." if ok else "Заявка уже обработана.", "ok" if ok else "error")
     return _back("/admin/payments")
+
+
+@router.post("/payments/{payment_id}/fake", dependencies=[Depends(check_csrf)])
+def payment_fake(payment_id: int, request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
+    from . import payments
+    from .money import fmt
+    try:
+        debt = payments.mark_fake(conn, config, payment_id, admin["id"], who=f"админ (сайт: {admin['login']})")
+    except payments.PaymentError as exc:
+        flash(request, str(exc), "error")
+        return _back("/admin/payments?status=paid")
+    flash(request, "Сумма списана, клиент помечен." + (f" Долг ${fmt(debt)} спишется из следующего пополнения."
+                                                        if debt else ""))
+    return _back("/admin/payments?status=fake")
 
 
 @router.post("/payments/{payment_id}/reject", dependencies=[Depends(check_csrf)])

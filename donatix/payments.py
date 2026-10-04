@@ -344,8 +344,37 @@ def confirm(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id:
         conn.execute("UPDATE payments SET status = 'paid', amount_micro = ?, tx_id = ?, resolved_at = ?, "
                      "resolved_by = ?, resolved_who = ? WHERE id = ?",
                      (micro, tx_id, db.now(), admin_id, who or None, payment_id))
-        notify(conn, config, p["user_id"], f"Баланс пополнен на ${fmt(micro)} ({title}).", "/panel/transactions")
+        after = conn.execute("SELECT balance_micro FROM users WHERE id = ?", (p["user_id"],)).fetchone()[0]
+        debt = min(micro, max(0, micro - after))   # часть суммы ушла на долг за поддельный чек
+        notify(conn, config, p["user_id"],
+               f"Баланс пополнен на ${fmt(micro)} ({title})."
+               + (f" Из них ${fmt(debt)} — погашение долга за непоступивший перевод." if debt else ""),
+               "/panel/transactions")
     return True
+
+
+def mark_fake(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: int, *, who: str = "") -> int:
+    """Зачислили по чеку, а денег на счёте нет (чек подделали). Сумму списываем обратно — даже в минус:
+    долг закроется сам из следующего настоящего пополнения. Клиент помечен — следующие его чеки
+    админ видит с предупреждением. Возвращает долг клиента в микро-долларах (0 — долга нет)."""
+    with db.tx(conn):
+        p = conn.execute("SELECT * FROM payments WHERE id = ? AND status = 'paid'", (payment_id,)).fetchone()
+        if p is None:
+            raise PaymentError("Отметить поддельным можно только зачисленную заявку.")
+        if p["auto_kind"]:
+            raise PaymentError("Автоплатёж проверен блокчейном/Binance — поддельным он быть не может.")
+        accounts.post_ledger(conn, p["user_id"], -p["amount_micro"],
+                             f"Списание: перевод по заявке #{payment_id} не поступил (поддельный чек)",
+                             created_by=admin_id, allow_negative=True)
+        conn.execute("UPDATE payments SET status = 'fake', resolved_who = COALESCE(?, resolved_who), "
+                     "admin_note = 'Поддельный чек — сумма списана' WHERE id = ?", (who or None, payment_id))
+        conn.execute("UPDATE users SET fraud_count = fraud_count + 1 WHERE id = ?", (p["user_id"],))
+        balance = conn.execute("SELECT balance_micro FROM users WHERE id = ?", (p["user_id"],)).fetchone()[0]
+    notify(conn, config, p["user_id"],
+           f"Заявка #{payment_id}: перевод не поступил на наш счёт. ${fmt(p['amount_micro'])} списаны с баланса."
+           + (f" Долг ${fmt(-balance)} спишется из следующего пополнения." if balance < 0 else ""),
+           "/panel/transactions")
+    return max(0, -balance)
 
 
 def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: int, reason: str,

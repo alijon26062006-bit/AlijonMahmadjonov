@@ -125,7 +125,37 @@ def amount_matches(d: dict[str, Any], pay_amount: Any, pay_currency: str) -> boo
     return abs(d["amount"] - want) <= max(0.01, want * 0.005)
 
 
-def summary(d: dict[str, Any] | None, pay_amount: Any = None, pay_currency: str = "") -> str:
+def recipient_matches(d: dict[str, Any], our_details: str) -> bool | None:
+    """Совпадает ли получатель в чеке с нашими реквизитами: сравниваем последние 4 цифры
+    номера карты/телефона. None — сравнить нечем."""
+    seen = re.sub(r"\D", "", d.get("recipient") or "")
+    ours = [re.sub(r"\D", "", x) for x in re.findall(r"[\d][\d\s-]{5,}\d", our_details or "")]
+    ours = [x for x in ours if len(x) >= 6]
+    if len(seen) < 4 or not ours:
+        return None
+    return any(x[-4:] == seen[-4:] for x in ours)
+
+
+def time_problem(d: dict[str, Any], created_at: str | None, tz_hours: int = 5) -> str:
+    """Чек сделан задолго ДО заявки — частый признак старого или чужого чека."""
+    raw = re.sub(r"[^0-9]", "", d.get("datetime") or "")
+    if len(raw) < 12 or not created_at:
+        return ""
+    from datetime import datetime, timedelta
+    try:
+        when = datetime.strptime(raw[:12], "%Y%m%d%H%M") - timedelta(hours=tz_hours)   # местное → UTC
+        made = datetime.strptime(created_at[:16], "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return ""
+    if when < made - timedelta(hours=2):
+        return f"⚠️ Чек сделан раньше заявки ({d.get('datetime')}) — возможно, старый или чужой"
+    if when > made + timedelta(days=2):
+        return "⚠️ Дата в чеке в будущем — возможно, чек изменён"
+    return ""
+
+
+def summary(d: dict[str, Any] | None, pay_amount: Any = None, pay_currency: str = "",
+            our_details: str = "", created_at: str | None = None) -> str:
     """Строка для админа: что прочитал ИИ и совпадает ли сумма."""
     if not d:
         return "🤖 Чек не прочитан автоматически — проверьте вручную."
@@ -141,4 +171,13 @@ def summary(d: dict[str, Any] | None, pay_amount: Any = None, pay_currency: str 
         line += "\n⚠️ Похоже, это не чек"
     if d["status"] == "failed":
         line += "\n⚠️ В чеке перевод не прошёл"
+    if d.get("recipient"):
+        rm = recipient_matches(d, our_details)
+        if rm is False:
+            line += f"\n🚨 Получатель в чеке ({d['recipient']}) НЕ наши реквизиты"
+        elif rm is True:
+            line += "\n✅ Получатель — наши реквизиты"
+    problem = time_problem(d, created_at)
+    if problem:
+        line += "\n" + problem
     return line
