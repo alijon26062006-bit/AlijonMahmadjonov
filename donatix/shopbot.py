@@ -1077,7 +1077,7 @@ class ShopBot:
         lines += self.nick_line(p, fields, lang)
         text = tr(lang, "confirm", product=f"<b>{_e(name)}</b>", fields=lines, total=money(total, rate),
                   balance=money(user["balance_micro"], rate))
-        if user["balance_micro"] < total:
+        if user["balance_micro"] < total and not orders.rounding_gap(user["balance_micro"], total, "shopbot"):
             text += tr(lang, "no_money", need=money(total - user["balance_micro"], rate))
             rows = [[(tr(lang, "topup"), "t", "success")], [(tr(lang, "cancel"), "x", "danger")]]
             st["resume"] = True

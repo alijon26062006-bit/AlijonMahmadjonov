@@ -141,6 +141,18 @@ def quote(config: Config, user: sqlite3.Row, product: dict[str, Any], units: Dec
     return {"unit_price": unit, "total_micro": order_total_micro(unit, units)}
 
 
+# Сомони → доллары при пополнении и смена курса дают «копеечную» нехватку: на экране 15.61 с. и цена 15.61 с.,
+# а в долларах не хватает сотой цента. Такую разницу (до 1 цента ≈ 0.1 с.) покрываем сами — только сайт и бот.
+ROUNDING_MICRO = 100
+ROUNDING_SOURCES = ("panel", "shopbot")
+
+
+def rounding_gap(balance_micro: int, total_micro: int, source: str) -> int:
+    """Сколько добавить на баланс, чтобы хватило (0 — не нужно или нехватка настоящая)."""
+    gap = total_micro - balance_micro
+    return gap if source in ROUNDING_SOURCES and 0 < gap <= ROUNDING_MICRO else 0
+
+
 def create_order(
     conn: sqlite3.Connection,
     config: Config,
@@ -210,6 +222,10 @@ def create_order(
             order_id = int(cur.lastrowid)
             public_id = f"dx-{order_id}"
             conn.execute("UPDATE orders SET public_id = ? WHERE id = ?", (public_id, order_id))
+            balance = conn.execute("SELECT balance_micro FROM users WHERE id = ?", (user["id"],)).fetchone()[0]
+            gap = rounding_gap(balance, q["total_micro"], source)
+            if gap:
+                accounts.post_ledger(conn, user["id"], gap, "Округление курса сомони", order_id=order_id)
             accounts.post_ledger(conn, user["id"], -q["total_micro"], f"Заказ {public_id}", order_id=order_id)
     except accounts.InsufficientBalance as exc:
         raise OrderError(

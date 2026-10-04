@@ -387,3 +387,19 @@ def test_must_subscribe_to_sponsor_channel(app, config, conn, supplier):
     assert "Баланс" in api.last_text()                               # подписался — меню
     bot.handle(conn, press("g:games:0"))
     assert "Выберите игру" in api.last_text()
+
+
+def test_kopeck_shortfall_from_somoni_rounding_is_covered(app, config, conn, supplier):
+    from conftest import make_client
+    uid, _ = make_client(conn, login="kopeck", balance="")
+    user = accounts.get_user(conn, uid)
+    total = orders.quote(config, user, orders.get_product(conn, "tg-stars"), 50)["total_micro"]
+    with db.tx(conn):
+        accounts.post_ledger(conn, uid, total - 3, "Пополнение")       # не хватает сотой цента
+    orders.create_order(conn, config, supplier, accounts.get_user(conn, uid), product_id="tg-stars",
+                        quantity=50, fields={"telegram_username": "@x_user"}, source="shopbot")
+    assert conn.execute("SELECT balance_micro FROM users WHERE id = ?", (uid,)).fetchone()[0] in (0, total)
+    assert conn.execute("SELECT note FROM transactions WHERE user_id = ? AND amount_micro = 3",
+                        (uid,)).fetchone()["note"] == "Округление курса сомони"
+    assert orders.rounding_gap(0, 500, "shopbot") == 0                       # настоящая нехватка — нет
+    assert orders.rounding_gap(total - 3, total, "api") == 0                 # API партнёров — в долларах, без этого
