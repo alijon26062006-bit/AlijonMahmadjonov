@@ -156,31 +156,58 @@ def targets(conn: sqlite3.Connection, config: Config, method: str) -> list[sqlit
 # ── Отправка чека и правка всех копий после решения ────────
 
 
+CAPTION_MAX = 1024   # предел Telegram для подписи к фото/файлу
+
+
+def safe_caption(caption: str) -> str:
+    """Подпись не длиннее 1024 символов. Обрезать HTML посередине тега нельзя — Telegram
+    тогда вообще не отправит сообщение. Длинную подпись сокращаем по строкам с конца."""
+    if len(caption) <= CAPTION_MAX:
+        return caption
+    lines = caption.split("\n")
+    while lines and len("\n".join(lines)) > CAPTION_MAX - 2:
+        lines.pop()
+    return "\n".join(lines) + "\n…"
+
+
+def _plain(caption: str) -> str:
+    import html as _html
+    import re as _re
+    return _html.unescape(_re.sub(r"<[^>]+>", "", caption))[:CAPTION_MAX]
+
+
 def send_file(config: Config, chat_id: str | int, caption: str, buttons: list | None, path, *,
               photo: bool) -> int | None:
-    """Файл с кнопками в любой чат админ-бота. Вернёт message_id, чтобы потом поправить."""
+    """Файл с кнопками в любой чат админ-бота. Вернёт message_id, чтобы потом поправить или удалить.
+    Не принял HTML — повторяем простым текстом: заявка не должна теряться."""
     if not config.alert_telegram_token:
         return None
     from .tgbot import keyboard
     method, field = ("sendPhoto", "photo") if photo else ("sendDocument", "document")
-    data = {"chat_id": str(chat_id), "caption": caption[:1000], "parse_mode": "HTML"}
+    base = {"chat_id": str(chat_id)}
     if buttons:
-        data["reply_markup"] = json.dumps(keyboard(buttons), ensure_ascii=False)
-    try:
-        with open(path, "rb") as fh:
-            resp = httpx.post(f"https://api.telegram.org/bot{config.alert_telegram_token}/{method}",
-                              data=data, files={field: (path.name, fh)}, timeout=30)
-        return int(((resp.json() or {}).get("result") or {}).get("message_id") or 0) or None
-    except (httpx.HTTPError, OSError, ValueError) as exc:
-        log.warning("не удалось отправить чек в чат %s: %s", chat_id, exc)
-        return None
+        base["reply_markup"] = json.dumps(keyboard(buttons), ensure_ascii=False)
+    attempts = [{**base, "caption": safe_caption(caption), "parse_mode": "HTML"}, {**base, "caption": _plain(caption)}]
+    for data in attempts:
+        try:
+            with open(path, "rb") as fh:
+                resp = httpx.post(f"https://api.telegram.org/bot{config.alert_telegram_token}/{method}",
+                                  data=data, files={field: (path.name, fh)}, timeout=30)
+            body = resp.json() or {}
+        except (httpx.HTTPError, OSError, ValueError) as exc:
+            log.warning("не удалось отправить чек в чат %s: %s", chat_id, exc)
+            return None
+        if body.get("ok"):
+            return int((body.get("result") or {}).get("message_id") or 0) or None
+        log.warning("чек в чат %s не принят Telegram: %s", chat_id, body.get("description"))
+    return None
 
 
 def remember(conn: sqlite3.Connection, payment_id: int, chat_id: str | int, message_id: int | None,
              caption: str) -> None:
     if message_id:
         conn.execute("INSERT OR IGNORE INTO payment_msgs (payment_id, chat_id, message_id, caption) "
-                     "VALUES (?, ?, ?, ?)", (payment_id, str(chat_id), int(message_id), caption[:1000]))
+                     "VALUES (?, ?, ?, ?)", (payment_id, str(chat_id), int(message_id), caption[:4000]))
 
 
 def is_tracked(conn: sqlite3.Connection, chat_id: str | int, message_id: int | None) -> bool:
@@ -199,25 +226,39 @@ def settle(conn: sqlite3.Connection, config: Config, payment_id: int, result: st
     if not rows:
         return
     edits = [{"chat_id": r["chat_id"], "message_id": r["message_id"], "parse_mode": "HTML",
-              "caption": f"{r['caption']}\n\n<b>{_e(result)}</b>"[:1000]} for r in rows]
-    if api is not None:
+              "caption": safe_caption(f"{r['caption']}\n\n<b>{_e(result)}</b>")} for r in rows]
+    def one(post) -> None:
         for e in edits:
+            # Чек — фото с подписью; копия из списка /payments — обычный текст. Пробуем оба.
+            if post("editMessageCaption", e):
+                continue
+            text = {k: v for k, v in e.items() if k != "caption"}
+            if not post("editMessageText", {**text, "text": e["caption"]}):
+                post("editMessageReplyMarkup", {"chat_id": e["chat_id"], "message_id": e["message_id"],
+                                                "reply_markup": {"inline_keyboard": []}})
+
+    if api is not None:
+        def via_api(method: str, payload: dict) -> bool:
             try:
-                api("editMessageCaption", **e)
+                api(method, **payload)
+                return True
             except Exception as exc:  # noqa: BLE001 — сообщение могли удалить; остальные всё равно правим
-                log.info("чек #%s: не удалось поправить сообщение: %s", payment_id, exc)
+                log.info("чек #%s: %s: %s", payment_id, method, exc)
+                return False
+        one(via_api)
         return
     if not config.alert_telegram_token:
         return
-    url = f"https://api.telegram.org/bot{config.alert_telegram_token}/editMessageCaption"
 
-    def run() -> None:
-        for e in edits:
-            try:
-                httpx.post(url, json=e, timeout=10)
-            except httpx.HTTPError as exc:
-                log.info("чек #%s: не удалось поправить сообщение: %s", payment_id, exc)
-    threading.Thread(target=run, name="donatix-settle", daemon=True).start()
+    def via_http(method: str, payload: dict) -> bool:
+        try:
+            resp = httpx.post(f"https://api.telegram.org/bot{config.alert_telegram_token}/{method}",
+                              json=payload, timeout=10)
+            return bool((resp.json() or {}).get("ok"))
+        except (httpx.HTTPError, ValueError) as exc:
+            log.info("чек #%s: %s: %s", payment_id, method, exc)
+            return False
+    threading.Thread(target=one, args=(via_http,), name="donatix-settle", daemon=True).start()
 
 
 def _e(value: Any) -> str:
@@ -302,21 +343,46 @@ def daily_reports(conn: sqlite3.Connection, config: Config, start: datetime, end
             log.warning("отчёт кассиру %s: %s", s["tg_id"], exc)
 
 
-def drop_messages(conn: sqlite3.Connection, config: Config, payment_id: int) -> int:
-    """Удалить из Telegram прошлые сообщения с этой заявкой (у админа и кассиров) — перед повторной отправкой."""
+def drop_messages(conn: sqlite3.Connection, config: Config, payment_id: int, api: Any = None) -> int:
+    """Убрать прошлые сообщения с этой заявкой (у админа и кассиров) — ДО повторной отправки.
+
+    Удаляем сразу (не в фоне), чтобы старое исчезло раньше, чем придёт новое. Telegram не даёт
+    боту удалять сообщения старше 48 часов — такое сообщение правим: убираем кнопки и пишем,
+    что заявка отправлена заново ниже. Так старых кнопок «Зачислить» не остаётся нигде."""
     rows = [dict(r) for r in conn.execute(
-        "SELECT chat_id, message_id FROM payment_msgs WHERE payment_id = ?", (payment_id,)).fetchall()]
+        "SELECT chat_id, message_id, caption FROM payment_msgs WHERE payment_id = ?", (payment_id,)).fetchall()]
     conn.execute("DELETE FROM payment_msgs WHERE payment_id = ?", (payment_id,))
     if not rows or not config.alert_telegram_token:
         return len(rows)
-    url = f"https://api.telegram.org/bot{config.alert_telegram_token}/deleteMessage"
 
-    def run() -> None:
-        for r in rows:
+    def call(method: str, **payload: Any) -> bool:
+        if api is not None:
             try:
-                httpx.post(url, json={"chat_id": r["chat_id"], "message_id": r["message_id"]}, timeout=10)
-            except httpx.HTTPError as exc:
-                log.info("чек #%s: старое сообщение не удалено: %s", payment_id, exc)
-    threading.Thread(target=run, name="donatix-drop", daemon=True).start()
-    return len(rows)
+                api(method, **payload)
+                return True
+            except Exception as exc:  # noqa: BLE001
+                log.info("чек #%s: %s не вышел: %s", payment_id, method, exc)
+                return False
+        try:
+            resp = httpx.post(f"https://api.telegram.org/bot{config.alert_telegram_token}/{method}",
+                              json=payload, timeout=8)
+            ok = bool((resp.json() or {}).get("ok"))
+            if not ok:
+                log.info("чек #%s: %s не вышел: %s", payment_id, method, resp.text[:200])
+            return ok
+        except (httpx.HTTPError, ValueError) as exc:
+            log.info("чек #%s: %s не вышел: %s", payment_id, method, exc)
+            return False
+
+    removed = 0
+    for r in rows:
+        target = {"chat_id": r["chat_id"], "message_id": r["message_id"]}
+        if call("deleteMessage", **target):
+            removed += 1
+            continue
+        # Удалить нельзя (старше 48 ч) — хотя бы снять кнопки, чтобы не нажали на старую копию
+        note = f"{r['caption']}\n\n<b>♻️ Заявка отправлена заново — смотрите ниже</b>"
+        if not call("editMessageCaption", **target, caption=safe_caption(note), parse_mode="HTML"):
+            call("editMessageReplyMarkup", **target, reply_markup={"inline_keyboard": []})
+    return removed
 

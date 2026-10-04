@@ -245,7 +245,8 @@ class AdminBot:
                              text=f"{_e(msg.get('text', ''))}\n\n<b>{_e(result)}</b>", disable_web_page_preview=True)
                 else:
                     self.api("editMessageCaption", chat_id=self.chat_id, message_id=msg["message_id"],
-                             parse_mode="HTML", caption=f"{_e(msg.get('caption', ''))}\n\n<b>{_e(result)}</b>"[:1000])
+                             parse_mode="HTML",
+                             caption=cashiers.safe_caption(f"{_e(msg.get('caption', ''))}\n\n<b>{_e(result)}</b>"))
             return
         msg = upd.get("message") or {}
         if str((msg.get("chat") or {}).get("id")) != self.chat_id:
@@ -285,7 +286,14 @@ class AdminBot:
             self.send(summary(conn))
         elif cmd in ("/payments", "💳"):
             rows = conn.execute("SELECT id FROM payments WHERE status = 'pending' ORDER BY id LIMIT 10").fetchall()
-            self._list(conn, rows, lambda c, i: payment_event(c, i, self.config), "Заявок на пополнение нет.")
+            if not rows:
+                self.send("Заявок на пополнение нет.")
+            for r in rows:   # запоминаем — при «Ускорить» эти копии тоже удалятся
+                text_, buttons_ = payment_event(conn, r["id"], self.config)
+                res = self.api("sendMessage", chat_id=self.chat_id, text=text_, parse_mode="HTML",
+                               reply_markup=keyboard(buttons_), disable_web_page_preview=True) or {}
+                if isinstance(res, dict) and res.get("message_id"):
+                    cashiers.remember(conn, r["id"], self.chat_id, res["message_id"], text_)
         elif cmd in ("/users", "👥"):
             rows = conn.execute("SELECT id FROM users WHERE status = 'pending' ORDER BY id LIMIT 10").fetchall()
             self._list(conn, rows, user_event, "Новых партнёров нет.")

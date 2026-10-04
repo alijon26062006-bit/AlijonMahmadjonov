@@ -116,3 +116,48 @@ def test_boost_after_10_minutes_resends_and_drops_old_message(app, config, conn,
     assert [r[0] for r in conn.execute("SELECT message_id FROM payment_msgs WHERE payment_id = 1")] == [102]
     r = client.post("/panel/balance/1/boost", data={"csrf": token})
     assert "Ускорить можно через" in r.text and len(sent) == 2                   # снова — только через 10 минут
+
+
+class _Resp:
+    def __init__(self, ok, result=None):
+        self._b = {"ok": ok, "result": result or {}, "description": "" if ok else "bad"}
+        self.text = str(self._b)
+
+    def json(self):
+        return self._b
+
+
+def test_boost_deletes_every_copy_first_then_sends(app, config, conn, monkeypatch):
+    """Ускорить: все старые копии (чек у админа, у кассира, из списка /payments) удаляются ДО новой."""
+    config.alert_telegram_token, config.alert_telegram_chat_id = "T", "777"
+    log = []
+
+    def post(url, **kw):
+        method = url.rsplit("/", 1)[1]
+        body = kw.get("json") or kw.get("data") or {}
+        log.append((method, str(body.get("message_id", ""))))
+        if method == "deleteMessage":
+            return _Resp(body["message_id"] != 12)               # 12 — старше 48 ч, удалить нельзя
+        if method in ("sendPhoto", "sendDocument"):
+            return _Resp(True, {"message_id": 50 + len(log)})
+        return _Resp(True)
+    monkeypatch.setattr("donatix.cashiers.httpx.post", post)
+    uid, client, token = _client(app, config, conn)
+    _send(client, token)
+    cashiers.remember(conn, 1, "777", 11, "копия из /payments")
+    cashiers.remember(conn, 1, "5550001", 12, "копия у кассира")
+    conn.execute("UPDATE payments SET created_at = '2026-01-01T00:00:00.000Z' WHERE id = 1")
+    log.clear()
+    payments.boost(conn, config, uid, 1)
+    deletes = [m for m, _ in log if m == "deleteMessage"]
+    first_send = next(i for i, (m, _) in enumerate(log) if m in ("sendPhoto", "sendDocument"))
+    assert len(deletes) == 3 and all(m != "sendPhoto" for m, _ in log[:3])   # сначала удаление
+    assert any(m == "editMessageCaption" and mid == "12" for m, mid in log[:first_send])  # не удалилось — сняли кнопки
+    left = [r[0] for r in conn.execute("SELECT message_id FROM payment_msgs WHERE payment_id = 1")]
+    assert 11 not in left and 12 not in left and len(left) == 1
+
+
+def test_long_caption_never_breaks_html():
+    long = "<b>Заявка</b>\n" + "\n".join(f"строка <code>{i}</code>" for i in range(200))
+    cut = cashiers.safe_caption(long)
+    assert len(cut) <= 1024 and cut.count("<code>") == cut.count("</code>")
