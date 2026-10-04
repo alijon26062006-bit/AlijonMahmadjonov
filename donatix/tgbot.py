@@ -8,6 +8,7 @@ from __future__ import annotations
 import html
 import json
 import logging
+import re
 import sqlite3
 import threading
 import time
@@ -24,7 +25,7 @@ log = logging.getLogger(__name__)
 
 Buttons = list[list[tuple[str, str]]]  # ряды кнопок: (текст, callback_data)
 
-MENU = [["🏠 Меню", "📊 Сводка"], ["💳 Заявки", "👥 Новые партнёры"], ["⚠️ Проблемные заказы"]]
+MENU = [["🧾 Проверка чеков"], ["🏠 Меню", "📊 Сводка"], ["💳 Заявки", "👥 Новые партнёры"], ["⚠️ Проблемные заказы"]]
 Screen = tuple[str, "Buttons"]  # экран: текст и кнопки — правится в том же сообщении
 
 
@@ -157,6 +158,8 @@ class AdminBot:
             self.api("setMyCommands", commands=[
                 {"command": "start", "description": "Меню"}, {"command": "menu", "description": "Все разделы"},
                 {"command": "stats", "description": "Сводка"},
+                {"command": "queue", "description": "Проверка чеков по одному"},
+                {"command": "find", "description": "Найти заявку: /find 125"},
                 {"command": "payments", "description": "Заявки на пополнение"},
                 {"command": "users", "description": "Новые партнёры"},
                 {"command": "orders", "description": "Проблемные заказы"},
@@ -219,6 +222,9 @@ class AdminBot:
                 self.on_cashier_button(conn, cq, cashier)
                 return
             data = str(cq.get("data") or "")
+            if data.startswith("q:"):
+                self.on_queue(conn, cq, self.chat_id)
+                return
             result = self.on_button(conn, data)
             if isinstance(result, tuple):  # экран меню — правим то же сообщение
                 self.api("answerCallbackQuery", callback_query_id=cq["id"])
@@ -255,7 +261,7 @@ class AdminBot:
         if not self._trusted(msg.get("chat") or {}, msg.get("from")):
             return   # участник группы, но не админ — молчим
         text = (msg.get("text") or "").strip()
-        if self.wizard and not text.startswith("/") and text.split(" ")[0] not in ("🏠", "📊", "💳", "👥", "⚠️"):
+        if self.wizard and not text.startswith("/") and text.split(" ")[0] not in ("🏠", "📊", "💳", "👥", "⚠️", "🧾"):
             self.send(*wizard_step(self, conn, msg))
             return
         self.wizard = None
@@ -282,6 +288,16 @@ class AdminBot:
                 return
             self.send(f"🚨 Заявка #{arg}: сумма списана, клиент помечен."
                       + (f" Долг ${fmt(debt)} спишется из следующего пополнения." if debt else ""))
+        elif cmd in ("/queue", "🧾"):
+            current = db.get_setting(conn, self._queue_key(self.chat_id)) or ""
+            self.show_queue(conn, self.chat_id, replace=int(current) if current.isdigit() else None)
+        elif cmd in ("/find", "/pay") or (text and not text.startswith("/") and re.search(r"\d", text)
+                                          and text.split(" ")[0] not in ("🏠", "📊", "💳", "👥", "⚠️", "🧾")):
+            query = text.split(maxsplit=1)[1] if cmd in ("/find", "/pay") and len(text.split()) > 1 else text
+            if cmd in ("/find", "/pay") and query == text:
+                self.send("🔎 Пример: <code>/find 125</code> или просто напишите номер заявки.")
+            else:
+                self.find(conn, self.chat_id, query)
         elif cmd in ("/stats", "📊"):
             self.send(summary(conn))
         elif cmd in ("/payments", "💳"):
@@ -352,6 +368,10 @@ class AdminBot:
     def on_stranger(self, conn: sqlite3.Connection, msg: dict[str, Any]) -> None:
         cashier = self._cashier(conn, msg, msg.get("from"))
         if cashier is not None:
+            text = (msg.get("text") or "").strip()
+            if text and not text.startswith("/") and re.search(r"\d", text):   # номер заявки или операции
+                self.find(conn, cashier["tg_id"], text, cashier)
+                return
             self.send_to(cashier["tg_id"], *screen_cashier_home(conn, self.config, cashier))
             return
         chat = msg.get("chat") or {}
@@ -393,6 +413,9 @@ class AdminBot:
                 self.api("editMessageReplyMarkup", chat_id=str(chat_id), message_id=msg["message_id"],
                          reply_markup={"inline_keyboard": []})
             return
+        if what == "q":
+            self.on_queue(conn, cq, chat_id, cashier)
+            return
         if what == "cs":
             if action == "pays":
                 n = self.send_cashier_payments(conn, cashier)
@@ -421,6 +444,120 @@ class AdminBot:
         for pid in mine:
             send_receipt(conn, self.config, pid, only_chat=cashier["tg_id"])
         return len(mine)
+
+    # ── Проверка чеков по одному: «Принять / Отклонить / Следующая» ──
+
+    def _queue_key(self, chat_id: int | str) -> str:
+        return f"queue.msg.{chat_id}"
+
+    def _drop(self, chat_id: int | str, message_id: int | None) -> None:
+        if not message_id:
+            return
+        try:
+            self.api("deleteMessage", chat_id=str(chat_id), message_id=int(message_id))
+        except Exception as exc:  # noqa: BLE001 — старше 48 часов: просто убираем кнопки
+            log.info("очередь чеков: не удалилось %s: %s", message_id, exc)
+            try:
+                self.api("editMessageReplyMarkup", chat_id=str(chat_id), message_id=int(message_id),
+                         reply_markup={"inline_keyboard": []})
+            except Exception:  # noqa: BLE001
+                pass
+
+    def show_queue(self, conn: sqlite3.Connection, chat_id: int | str, cashier: sqlite3.Row | None = None,
+                   after: int = 0, replace: int | None = None) -> None:
+        """Следующий чек после `after` (по кругу). Старую карточку убираем — на экране всегда один чек."""
+        from .payments import receipts_dir
+        ids = queue_ids(conn, self.config, cashier)
+        self._drop(chat_id, replace)
+        if not ids:
+            res = self.api("sendMessage", chat_id=str(chat_id), parse_mode="HTML",
+                           text="✅ <b>Все чеки проверены</b> — очередь пуста.\nНовые чеки придут сюда сами.",
+                           reply_markup=keyboard([[("🔄 Проверить ещё раз", "q:start:0")]])) or {}
+            db.set_setting(conn, self._queue_key(chat_id), str(res.get("message_id") or ""))
+            return
+        pid = next((i for i in ids if i > after), ids[0])
+        p = conn.execute("SELECT receipt_file, amount_micro FROM payments WHERE id = ?", (pid,)).fetchone()
+        caption = (f"🧾 <b>Проверка чеков · {ids.index(pid) + 1} из {len(ids)}</b>\n\n"
+                   + receipt_text(conn, self.config, pid))
+        buttons: Buttons = [[(f"✅ Принять ${fmt(p['amount_micro'])}", f"q:ok:{pid}"), ("❌ Отклонить", f"q:no:{pid}")],
+                            [("⏭ Следующая" if len(ids) > 1 else "🔄 Обновить", f"q:next:{pid}")]]
+        path = receipts_dir(self.config) / p["receipt_file"]
+        mid = cashiers.send_file(self.config, chat_id, caption, buttons, path,
+                                 photo=not p["receipt_file"].endswith(".pdf")) if path.exists() else None
+        if mid is None:   # файл не дошёл — заявка всё равно видна текстом
+            res = self.api("sendMessage", chat_id=str(chat_id), parse_mode="HTML", reply_markup=keyboard(buttons),
+                           text=caption + "\n\n⚠️ Файл чека не открылся — посмотрите в админке сайта.") or {}
+            mid = res.get("message_id")
+        db.set_setting(conn, self._queue_key(chat_id), str(mid or ""))
+
+    def on_queue(self, conn: sqlite3.Connection, cq: dict[str, Any], chat_id: int | str,
+                 cashier: sqlite3.Row | None = None) -> None:
+        msg = cq.get("message") or {}
+        mid = msg.get("message_id")
+        try:
+            _, action, raw = str(cq.get("data") or "").split(":")
+            pid = int(raw)
+        except ValueError:
+            self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Неизвестная кнопка")
+            return
+        if action == "start":
+            self.api("answerCallbackQuery", callback_query_id=cq["id"])
+            current = db.get_setting(conn, self._queue_key(chat_id)) or ""
+            self.show_queue(conn, chat_id, cashier, replace=int(current) if current.isdigit() else None)
+            return
+        if action == "find":
+            self.api("answerCallbackQuery", callback_query_id=cq["id"])
+            self.send_to(chat_id, "🔎 Напишите сюда <b>номер заявки</b> (например, <code>125</code>) или номер "
+                                  "операции из чека — покажу чек и чем всё закончилось.")
+            return
+        # Кнопки работают только на текущей карточке очереди — старую или подделанную не принимаем
+        if str(mid or "") != (db.get_setting(conn, self._queue_key(chat_id)) or ""):
+            self.api("answerCallbackQuery", callback_query_id=cq["id"],
+                     text="Карточка устарела — откройте очередь заново")
+            return
+        if action in ("ok", "no"):
+            if pid not in queue_ids(conn, self.config, cashier) and conn.execute(
+                    "SELECT 1 FROM payments WHERE id = ? AND status = 'pending'", (pid,)).fetchone():
+                self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Этот чек вам не назначен")
+                return
+            if cashier is None:
+                result = self.resolve_payment(conn, pid, action == "ok", "админ")
+            else:
+                result = self.resolve_payment(conn, pid, action == "ok", cashier["name"], tg_id=cashier["tg_id"])
+            self.api("answerCallbackQuery", callback_query_id=cq["id"], text=result[:190])
+        elif action == "next":
+            self.api("answerCallbackQuery", callback_query_id=cq["id"])
+        else:
+            self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Неизвестная кнопка")
+            return
+        self.show_queue(conn, chat_id, cashier, after=pid, replace=mid)
+
+    def find(self, conn: sqlite3.Connection, chat_id: int | str, query: str,
+             cashier: sqlite3.Row | None = None) -> None:
+        """Поиск заявки: чек, все данные и чем закончилось. Ждёт решения — с кнопками."""
+        from .payments import receipts_dir
+        ids = find_payments(conn, self.config, query, cashier)
+        if not ids:
+            self.send_to(chat_id, f"🔎 Заявку «{_e(query[:40])}» не нашёл"
+                                  + (" среди ваших банков." if cashier is not None else ".")
+                                  + "\nНапишите номер заявки, например <code>125</code>.")
+            return
+        for pid in ids:
+            p = conn.execute("SELECT status, receipt_file FROM payments WHERE id = ?", (pid,)).fetchone()
+            caption = receipt_text(conn, self.config, pid) + "\n\n" + status_line(conn, self.config, pid)
+            buttons = payment_event(conn, pid, self.config)[1] if p["status"] == "pending" and p["receipt_file"] \
+                else None
+            path = receipts_dir(self.config) / p["receipt_file"] if p["receipt_file"] else None
+            mid = None
+            if path is not None and path.exists():
+                mid = cashiers.send_file(self.config, chat_id, caption, buttons, path,
+                                         photo=not p["receipt_file"].endswith(".pdf"))
+            if mid is None:
+                res = self.api("sendMessage", chat_id=str(chat_id), text=caption, parse_mode="HTML",
+                               reply_markup=keyboard(buttons), disable_web_page_preview=True) or {}
+                mid = res.get("message_id") if isinstance(res, dict) else None
+            if buttons and mid:   # решение отсюда тоже поправит все копии
+                cashiers.remember(conn, pid, chat_id, mid, caption)
 
     def greet_cashier(self, conn: sqlite3.Connection, tg_id: int) -> bool:
         """Первое сообщение новому кассиру. False — он ещё не нажал /start в боте."""
@@ -497,14 +634,8 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
                      (payment_id,)).fetchone()
     if not p or not p["receipt_file"]:
         return
-    text, buttons = payment_event(conn, payment_id, config)
-    caption = (note + "\n\n" if note else "") + text + "\n🧾 Чек приложен"
-    from . import receipt_ai
-    if receipt_ai.enabled(config):   # что прочитал ИИ и совпадает ли сумма
-        seen = json.loads(p["receipt_ai"]) if p["receipt_ai"] else None
-        details = payments.settings(conn, config)["details"].get(p["method"], "")
-        caption += "\n" + _e(receipt_ai.summary(seen, p["pay_amount"], p["pay_currency"] or "",
-                                                our_details=details, created_at=p["created_at"]))
+    _, buttons = payment_event(conn, payment_id, config)
+    caption = (note + "\n\n" if note else "") + receipt_text(conn, config, payment_id)
     path = receipts_dir(config) / p["receipt_file"]
     photo = not p["receipt_file"].endswith(".pdf")
     if only_chat is None:
@@ -515,6 +646,73 @@ def send_receipt(conn: sqlite3.Connection, config: Config, payment_id: int,
             continue
         mid = cashiers.send_file(config, c["tg_id"], caption, buttons, path, photo=photo)
         cashiers.remember(conn, payment_id, c["tg_id"], mid, caption)
+
+
+def receipt_text(conn: sqlite3.Connection, config: Config, payment_id: int) -> str:
+    """Всё о заявке с чеком: клиент, сумма, способ и что прочитано в чеке."""
+    from . import receipt_ai
+    p = conn.execute("SELECT method, receipt_file, receipt_ai, pay_amount, pay_currency, created_at FROM payments "
+                     "WHERE id = ?", (payment_id,)).fetchone()
+    text = payment_event(conn, payment_id, config)[0] + ("\n🧾 Чек приложен" if p["receipt_file"] else "")
+    if p["receipt_file"] and receipt_ai.enabled(config):   # что прочитал ИИ и совпадает ли сумма
+        seen = json.loads(p["receipt_ai"]) if p["receipt_ai"] else None
+        details = payments.settings(conn, config)["details"].get(p["method"], "")
+        text += "\n" + _e(receipt_ai.summary(seen, p["pay_amount"], p["pay_currency"] or "",
+                                             our_details=details, created_at=p["created_at"]))
+    return text
+
+
+# ── Проверка чеков по очереди и поиск заявки ───────────────
+
+STATUS_TEXT = {"pending": "⏳ Ждёт проверки", "paid": "✅ Принята", "rejected": "❌ Отклонена",
+               "fake": "🚨 Поддельный чек — сумма списана", "cancelled": "🚫 Отменена клиентом"}
+
+
+def local_time(config: Config, iso: str | None) -> str:
+    """Время из базы (UTC) — по-местному, коротко: «04.10 16:43»."""
+    from datetime import datetime, timedelta
+    if not iso:
+        return ""
+    try:
+        return (datetime.fromisoformat(iso[:19]) + timedelta(hours=config.tz_offset)).strftime("%d.%m %H:%M")
+    except ValueError:
+        return iso[:16]
+
+
+def status_line(conn: sqlite3.Connection, config: Config, payment_id: int) -> str:
+    p = conn.execute("SELECT status, resolved_who, resolved_at, admin_note, receipt_file, created_at "
+                     "FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    line = f"<b>{STATUS_TEXT.get(p['status'], p['status'])}</b>"
+    if p["status"] == "pending":
+        line += "" if p["receipt_file"] else " · чек ещё не прислан"
+    else:
+        line += "".join(f" · {_e(x)}" for x in (p["resolved_who"], local_time(config, p["resolved_at"])) if x)
+        if p["admin_note"] and p["status"] in ("rejected", "fake"):
+            line += f"\nПричина: {_e(p['admin_note'])}"
+    return f"Статус: {line}\nСоздана: {local_time(config, p['created_at'])}"
+
+
+def queue_ids(conn: sqlite3.Connection, config: Config, cashier: sqlite3.Row | None = None) -> list[int]:
+    """Чеки, которые ждут решения: админу — все, кассиру — по его банкам и не свои."""
+    rows = conn.execute("SELECT id, method, user_id FROM payments WHERE status = 'pending' "
+                        "AND receipt_file IS NOT NULL ORDER BY id").fetchall()
+    if cashier is None:
+        return [r["id"] for r in rows]
+    own = {r[0] for r in conn.execute("SELECT user_id FROM support_links WHERE tg_id = ?", (int(cashier["tg_id"]),))}
+    return [r["id"] for r in rows if r["user_id"] not in own and cashiers.handles(conn, config, cashier, r["method"])]
+
+
+def find_payments(conn: sqlite3.Connection, config: Config, query: str,
+                  cashier: sqlite3.Row | None = None) -> list[int]:
+    """Номер заявки, номер операции из чека или то, что клиент написал в «номер чека»."""
+    q = query.strip().lstrip("#№ ").strip()
+    if not q:
+        return []
+    key = re.sub(r"[^0-9A-Za-z]", "", q).upper()
+    rows = conn.execute(
+        "SELECT id, method FROM payments WHERE id = ? OR (receipt_txn = ? AND ? != '') OR reference = ? "
+        "ORDER BY id DESC LIMIT 5", (int(q) if q.isdigit() and len(q) < 12 else -1, key, key, q)).fetchall()
+    return [r["id"] for r in rows if cashier is None or cashiers.handles(conn, config, cashier, r["method"])]
 
 
 # ── Меню админа: все разделы сайта кнопками ────────────────
@@ -532,9 +730,11 @@ def screen_home(conn: sqlite3.Connection, config: Config) -> Screen:
     def one(sql: str) -> int:
         return conn.execute(sql).fetchone()[0]
     pays = one("SELECT COUNT(*) FROM payments WHERE status = 'pending'")
+    checks = one("SELECT COUNT(*) FROM payments WHERE status = 'pending' AND receipt_file IS NOT NULL")
     users = one("SELECT COUNT(*) FROM users WHERE status = 'pending'")
     probs = one("SELECT COUNT(*) FROM orders WHERE status = 'attention'")
     return (f"🏠 <b>Админка {_e(config.site_name)}</b>\nВсё управление сайтом и ботами — здесь.", [
+        [(f"🧾 Проверка чеков · {checks}", "q:start:0"), ("🔎 Найти заявку", "q:find:0")],
         [("📊 Сводка", "m:stats:0"), (f"💳 Заявки · {pays}", "m:pays:0")],
         [(f"👥 Новые · {users}", "m:users:0"), (f"⚠️ Проблемы · {probs}", "m:orders:0")],
         [("👤 Клиенты", "m:clients:0"), ("🤖 Боты клиентов", "m:bots:0")],
@@ -752,15 +952,15 @@ def _markup(bot: AdminBot, conn: sqlite3.Connection, tier: str, delta: int) -> s
 
 
 def screen_cashier_home(conn: sqlite3.Connection, config: Config, c: sqlite3.Row) -> Screen:
-    pending = conn.execute("SELECT method FROM payments WHERE status = 'pending' AND receipt_file IS NOT NULL"
-                           ).fetchall()
-    n = sum(1 for r in pending if cashiers.handles(conn, config, c, r["method"]))
+    n = len(queue_ids(conn, config, c))
     text = (f"🧾 <b>Кассир {_e(c['name'])}</b>\n"
             f"Ваши банки: {_e(cashiers.banks_label(conn, config, c))}\n"
             f"Ваша доля: <b>{c['percent']}%</b> прибыли с пополнений через ваши банки\n\n"
             + cashiers.income_text(conn, config, c["tg_id"])
-            + "\n\n<i>Чеки приходят сюда сами. Решение сразу видит администратор — второй раз заявку не примут.</i>")
-    return text, [[(f"💳 Заявки · {n}", "cs:pays:0"), ("🔄 Обновить", "cs:home:0")]]
+            + "\n\n<i>Чеки приходят сюда сами. Решение сразу видит администратор — второй раз заявку не примут.</i>"
+            + "\n🔎 Найти заявку — просто напишите её номер.")
+    return text, [[(f"🧾 Проверка чеков · {n}", "q:start:0")],
+                  [(f"💳 Все заявки · {n}", "cs:pays:0"), ("🔄 Обновить", "cs:home:0")]]
 
 
 def screen_cashiers(conn: sqlite3.Connection, config: Config) -> Screen:
