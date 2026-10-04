@@ -106,9 +106,16 @@ def sync_catalog(conn: sqlite3.Connection, supplier: Supplier,
     return {"products": len(seen), "disabled": disabled}
 
 
+# Пополнение игры всегда идёт на чей-то аккаунт. Если поставщик не прислал поля (бывает у PUBG и др.),
+# без этого сайт и бот не спрашивали ID игрока — и заказ уходил без получателя.
+DEFAULT_TOPUP_FIELDS = [{"key": "player_id", "label": "ID игрока", "type": "text"}]
+
+
 def load_product(row: sqlite3.Row) -> dict[str, Any]:
     product = dict(row)
     product["fields"] = json.loads(row["fields_json"] or "[]")
+    if product.get("kind") == "topup" and not product["fields"]:
+        product["fields"] = [dict(f) for f in DEFAULT_TOPUP_FIELDS]
     product["supplier_ref"] = json.loads(row["supplier_ref_json"] or "{}")
     return product
 

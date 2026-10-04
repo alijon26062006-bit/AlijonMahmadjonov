@@ -320,3 +320,21 @@ def test_receipt_instead_of_amount(app, config, conn, supplier, monkeypatch):
     bot.handle(conn, msg("50"))
     p = conn.execute("SELECT * FROM payments WHERE user_id = ?", (su["user_id"],)).fetchone()
     assert p["receipt_file"] and p["pay_amount"] == "50.00"
+
+
+def test_topup_without_supplier_fields_still_asks_player_id(app, config, conn, supplier):
+    conn.execute("UPDATE products SET fields_json = '[]' WHERE category_id = 'pubg_mobile'")
+    from donatix import cache
+    cache.clear_everywhere(conn)
+    bot = _bot(config, supplier)
+    su = _start(bot, conn)
+    _fund(conn, su["user_id"])
+    rid = conn.execute("SELECT MIN(rowid) FROM products WHERE category_id = 'pubg_mobile'").fetchone()[0]
+    bot.handle(conn, press(f"p:{rid}"))
+    assert "ID игрока" in bot.api.last_text()                       # ID спрашиваем всегда
+    bot.handle(conn, press("ok"))                                     # оплатить без ID нельзя
+    assert conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ?", (su["user_id"],)).fetchone()[0] == 0
+    bot.handle(conn, msg("5123456789"))
+    bot.handle(conn, press("ok"))
+    o = conn.execute("SELECT fields_json FROM orders WHERE user_id = ?", (su["user_id"],)).fetchone()
+    assert "5123456789" in o["fields_json"]

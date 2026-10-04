@@ -1401,8 +1401,10 @@ class ShopBot:
             self.screen_home(conn, su, edit)
             return
         p = get_product(conn, o["product_id"])
-        self.state[su["tg_id"]] = {"step": "field", "rid": row["rid"], "fields": json.loads(o["fields_json"] or "{}"),
-                                   "fi": len(p["fields"]), "qty": o["quantity"], "qty_set": True, "msg": edit,
+        old = json.loads(o["fields_json"] or "{}")
+        complete = all(str(old.get(f["key"]) or "").strip() for f in p["fields"])
+        self.state[su["tg_id"]] = {"step": "field", "rid": row["rid"], "fields": old if complete else {},
+                                   "fi": len(p["fields"]) if complete else 0,   # чего-то нет — спросим заново "qty": o["quantity"], "qty_set": True, "msg": edit,
                                    "nonce": secrets.token_hex(6)}
         self.next_step(conn, su)
 
