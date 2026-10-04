@@ -550,6 +550,8 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
         raise PaymentError(REJECTED_TEXT)
     if reasons:   # чужие реквизиты, подделка, не чек — не принимаем вовсе
         raise ReceiptRejected(reasons)
+    if seen:
+        seen = _fix_amount_by_receipt(conn, p, seen)
     folder = receipts_dir(config)
     folder.mkdir(parents=True, exist_ok=True)
     name = f"{payment_id}-{secrets.token_hex(6)}.{ext}"
@@ -565,6 +567,26 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
         (folder / name).unlink(missing_ok=True)
         raise PaymentError(f"Чек к заявке #{payment_id} уже отправлен — дождитесь проверки.")
     return name
+
+
+def _fix_amount_by_receipt(conn: sqlite3.Connection, p: sqlite3.Row, seen: dict) -> dict:
+    """Клиент ошибся суммой (например, хотел 21 сомони, а ввёл $21) — в чеке другая сумма в той же валюте.
+    Исправляем заявку по чеку, по тому же курсу, что был в заявке; админ видит «было → стало»."""
+    from . import receipt_ai
+    try:
+        old_pay = to_decimal(str(p["pay_amount"]))
+        new_pay = to_decimal(str(seen.get("amount") or 0)).quantize(Decimal("0.01"))
+    except MoneyError:
+        return seen
+    cur = (p["pay_currency"] or "").upper()
+    if (new_pay <= 0 or old_pay <= 0 or p["auto_kind"] or (seen.get("currency") or cur) != cur
+            or receipt_ai.amount_matches(seen, str(old_pay), cur) is not False):
+        return seen
+    micro = int(Decimal(p["amount_micro"]) * new_pay / old_pay)
+    if micro <= 0:
+        return seen
+    conn.execute("UPDATE payments SET pay_amount = ?, amount_micro = ? WHERE id = ?", (str(new_pay), micro, p["id"]))
+    return {**seen, "fixed_from": f"{old_pay} {cur}", "fixed_usd_from": p["amount_micro"]}
 
 
 def _sniff(data: bytes) -> str | None:

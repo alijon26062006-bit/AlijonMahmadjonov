@@ -296,7 +296,10 @@ def summary(d: dict[str, Any] | None, pay_amount: Any = None, pay_currency: str 
                          d["datetime"], f"№ {d['txn_id']}" if d["txn_id"] else "") if p]
     line = "🤖 Чек: " + (" · ".join(parts) or "данных не видно")
     match = amount_matches(d, pay_amount, pay_currency)
-    if match is True:
+    if d.get("fixed_from"):
+        line += (f"\n✏️ Клиент ошибся суммой — заявка исправлена по чеку: было {d['fixed_from']}, "
+                 f"стало {pay_amount} {pay_currency}. Сверьте поступление в банке")
+    elif match is True:
         line += "\n✅ Сумма совпадает с заявкой"
     elif match is False:
         line += f"\n⚠️ Сумма НЕ совпадает с заявкой ({pay_amount} {pay_currency})"

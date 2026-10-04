@@ -1018,8 +1018,15 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     if row["auto_kind"]:
         return _redirect(f"/panel/balance/{pid}/pay")  # автоплатёж: чек и админ не нужны
     send_receipt(conn, config, pid)
-    flash(request, f"Заявка #{pid} создана. Переведите {row['pay_amount']} {row['pay_currency']} по реквизитам — "
-                   "после проверки баланс пополнится, вам придёт уведомление.")
+    seen_now = json.loads(row["receipt_ai"]) if row["receipt_ai"] else {}
+    if seen_now.get("fixed_from"):
+        flash(request, f"Заявка #{pid} создана. В чеке {row['pay_amount']} {row['pay_currency']}, а в заявке было "
+                       f"{seen_now['fixed_from']} — мы исправили сумму по чеку: зачислится "
+                       f"${fmt(row['amount_micro'])}. "
+                       "После проверки придёт уведомление.")
+    else:
+        flash(request, f"Заявка #{pid} создана. Переведите {row['pay_amount']} {row['pay_currency']} по реквизитам — "
+                       "после проверки баланс пополнится, вам придёт уведомление.")
     return _redirect("/panel/balance")
 
 

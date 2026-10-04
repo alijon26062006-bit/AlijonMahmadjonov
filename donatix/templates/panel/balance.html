@@ -53,13 +53,13 @@
       </div>
 
       <div class="step-head" style="margin-top:22px"><span class="n">2</span><h3>Сумма</h3></div>
-      {% if cur_code == 'TJS' %}
-      <label for="amount">Сколько пополнить, сомони</label>
+      <div class="amt-cur" role="radiogroup" aria-label="Валюта суммы">
+        <label><input type="radio" name="amount_cur" value="TJS" checked> сомони</label>
+        <label><input type="radio" name="amount_cur" value="USD"> $ доллары</label>
+      </div>
+      <label for="amount" id="amount-label">Сколько пополнить, сомони</label>
       <input id="amount" name="amount_tjs" inputmode="decimal" required placeholder="Например, 500" autocomplete="off">
-      {% else %}
-      <label for="amount">Сколько зачислить, USD</label>
-      <input id="amount" name="amount" inputmode="decimal" required placeholder="Например, 50" autocomplete="off">
-      {% endif %}
+      <div class="flash warn usd-warn" id="usd-warn" hidden role="alert"></div>
       <div class="hint">{% if min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони (≈ {{ money(min_usd) }}). {% else %}Любая сумма. {% endif %}К переводу: <b id="topay">—</b></div>
 
       <div class="step-head" style="margin-top:22px"><span class="n">3</span><h3>Переведите по реквизитам</h3></div>
@@ -227,7 +227,21 @@
 (function () {
   var f = document.getElementById("payform"), inp = document.getElementById("amount");
   if (!f || !inp) return;
-  var rate = parseFloat("{{ tjs_rate }}"), inTjs = {{ 'true' if cur_code == 'TJS' else 'false' }};
+  var rate = parseFloat("{{ tjs_rate }}"), inTjs = true;
+  var warn = document.getElementById("usd-warn"), label = document.getElementById("amount-label");
+  function setCur(tjs) {
+    inTjs = tjs;
+    inp.name = tjs ? "amount_tjs" : "amount";
+    inp.placeholder = tjs ? "Например, 500" : "Например, 50";
+    label.textContent = tjs ? "Сколько пополнить, сомони" : "Сколько зачислить, долларов ($)";
+    f.querySelectorAll("input[name=amount_cur]").forEach(function (x) { x.checked = (x.value === "TJS") === tjs; });
+  }
+  f.querySelectorAll("input[name=amount_cur]").forEach(function (x) {
+    x.addEventListener("change", function () { setCur(x.value === "TJS"); upd(); });
+  });
+  warn.addEventListener("click", function (e) {
+    if (e.target.closest("[data-to-tjs]")) { setCur(true); upd(); inp.focus(); }
+  });
   function upd() {
     var r = f.querySelector("input[name=method]:checked"); if (!r) return;
     f.querySelectorAll(".paym").forEach(function (l) { l.classList.toggle("on", l.querySelector("input").checked); });
@@ -245,6 +259,14 @@
       out = r.dataset.cur === "TJS" ? (Math.ceil(a * rate * 100) / 100).toFixed(2) + " TJS" : a.toFixed(2) + " " + r.dataset.cur;
     }
     document.getElementById("topay").textContent = out;
+    // Ввёл доллары, а переводит сомони — частая ошибка: «20» хотел сомони, а получилось $20 = 216 сомони
+    var wrong = a > 0 && !inTjs && r.dataset.cur === "TJS";
+    warn.hidden = !wrong;
+    if (wrong) {
+      var tjs = (Math.ceil(a * rate * 100) / 100).toFixed(2);
+      warn.innerHTML = "⚠️ Вы ввели сумму в <b>долларах</b>: $" + a + " = <b>" + tjs + " сомони</b> к переводу. " +
+        "Хотели " + a + " сомони? <button type=\"button\" class=\"btn soft sm\" data-to-tjs>Да, " + a + " сомони</button>";
+    }
   }
   f.addEventListener("input", upd); f.addEventListener("change", upd); upd();
   // Курс меняется — пока клиент на странице, берём свежий каждые 30 секунд

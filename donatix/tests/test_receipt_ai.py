@@ -178,3 +178,19 @@ def test_prompt_carries_our_requisites():
     assert "102208383" in sent["messages"][0]["content"][0]["text"]
     assert got["forgery"] == "fake" and got["signs"] == ["шрифт"] and got["recipient_ok"] == "no"
     assert "🚨 Чек изменён / ненастоящий: шрифт" in receipt_ai.summary(got)
+
+
+def test_wrong_currency_in_request_is_fixed_by_receipt(app, config, conn, monkeypatch):
+    """Ввёл $20, а перевёл 20 сомони — заявка исправляется на 20 сомони, зачислится ровно столько."""
+    captions = []
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda cfg, caption, *a, **k: captions.append(caption))
+    config.openai_api_key = "sk-test"
+    config.alert_telegram_chat_id = "777"
+    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean({**SEEN, "amount": 20}))
+    a, ta = _client(app, config, conn, 1)
+    r = a.post("/panel/balance", data={"csrf": ta, "method": "alif", "amount": "20"},
+               files={"receipt": ("chek.png", RECEIPT_PNG, "image/png")})
+    assert "Заявка #1 создана" in r.text
+    p = conn.execute("SELECT pay_amount, amount_micro FROM payments WHERE id = 1").fetchone()
+    assert p["pay_amount"] == "20.00" and p["amount_micro"] < 30_000          # ≈ $1.9, а не $20
+    assert "заявка исправлена по чеку: было" in captions[-1]
