@@ -63,6 +63,13 @@ T: dict[str, tuple[str, str]] = {
     "support": ("🆘 Поддержка", "🆘 Дастгирӣ"),
     "lang": ("🌐 Язык", "🌐 Забон"),
     "admin": ("👑 Админ-панель", "👑 Панели админ"),
+    "sub_need": ("📢 <b>Чтобы пользоваться ботом, подпишитесь на наш канал</b>\n\n"
+                 "Там скидки, акции и новости. Подпишитесь и нажмите «✅ Я подписался».",
+                 "📢 <b>Барои истифодаи бот ба канали мо обуна шавед</b>\n\n"
+                 "Дар он ҷо тахфифҳо, аксияҳо ва хабарҳо. Обуна шавед ва «✅ Обуна шудам»-ро пахш кунед."),
+    "sub_btn": ("✅ Я подписался", "✅ Обуна шудам"),
+    "sub_still": ("Подписка не найдена — подпишитесь на все каналы выше.",
+                  "Обуна ёфт нашуд — ба ҳамаи каналҳо обуна шавед."),
     "admin_title": ("👑 <b>Админ-панель бота</b>\n\n"
                     "🛍 Продажи через бот:\n"
                     "• сегодня: <b>{t_n}</b> заказов · ${t_r} · прибыль ${t_p}\n"
@@ -511,6 +518,14 @@ def overview(conn: sqlite3.Connection) -> dict[str, Any]:
             "today": stats(conn, 1), "week": stats(conn, 7), "month": stats(conn, 30)}
 
 
+def sponsors(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """Каналы, на которые нужно подписаться, чтобы пользоваться ботом: [{chat_id, title, url}]."""
+    try:
+        return json.loads(db.get_setting(conn, "shop.sponsors") or "[]")
+    except ValueError:
+        return []
+
+
 def bot_username(conn: sqlite3.Connection) -> str:
     return db.get_setting(conn, "shop.bot_username") or ""
 
@@ -559,6 +574,8 @@ class ShopBot:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_watch = 0.0
+        self._subbed: dict[int, float] = {}   # tg_id → когда последний раз видели подписку
+        self.bot_id: int | None = None
 
     # цикл
     def start(self) -> None:
@@ -574,6 +591,7 @@ class ShopBot:
         try:
             self.api("deleteWebhook", drop_pending_updates=False)
             me = self.api("getMe") or {}
+            self.bot_id = me.get("id")
             if me.get("username"):
                 db.set_setting(conn, "shop.bot_username", me["username"])
             self.api("setMyCommands", commands=[{"command": "start", "description": "Меню / Меню"},
@@ -645,8 +663,20 @@ class ShopBot:
                 self.api("answerCallbackQuery", callback_query_id=cq["id"], text=tr("", "slow"))
                 return
             su = ensure_user(conn, tg_id, sender.get("first_name") or "")
+            data = str(cq.get("data") or "")
+            if data == "sub":   # «Я подписался» — проверяем сразу
+                if self.subscribed(conn, tg_id, force=True):
+                    self.api("answerCallbackQuery", callback_query_id=cq["id"])
+                    self.screen_home(conn, su, msg.get("message_id"))
+                else:
+                    self.api("answerCallbackQuery", callback_query_id=cq["id"], text=tr(su["lang"], "sub_still"),
+                             show_alert=True)
+                return
             self.api("answerCallbackQuery", callback_query_id=cq["id"])
-            self.on_button(conn, su, str(cq.get("data") or ""), msg.get("message_id"))
+            if not data.startswith(("l:", "lang")) and not self.subscribed(conn, tg_id):
+                self.screen_subscribe(conn, su, msg.get("message_id"))
+                return
+            self.on_button(conn, su, data, msg.get("message_id"))
             return
         msg = upd.get("message") or {}
         chat = msg.get("chat") or {}
@@ -659,6 +689,10 @@ class ShopBot:
         text = (msg.get("text") or "").strip()
         start = text.split(maxsplit=1)[1] if text.startswith("/start ") else ""
         su = ensure_user(conn, tg_id, sender.get("first_name") or "", start)
+        need_lang = text.startswith(("/start", "/lang")) and not su["lang"] or text.startswith("/lang")
+        if not need_lang and not self.subscribed(conn, tg_id):
+            self.screen_subscribe(conn, su)
+            return
         if text.startswith("/"):
             self.on_command(conn, su, text, start)
             return
@@ -704,6 +738,72 @@ class ShopBot:
     def _user(self, conn: sqlite3.Connection, su: sqlite3.Row) -> sqlite3.Row:
         return accounts.get_user(conn, su["user_id"])
 
+    # ── Обязательная подписка на канал (спонсоры) ──
+
+    def subscribed(self, conn: sqlite3.Connection, tg_id: int, force: bool = False) -> bool:
+        """Подписан ли на все каналы-спонсоры. Админа не проверяем. Подписку помним 10 минут."""
+        chans = sponsors(conn)
+        if not chans or self.is_admin(tg_id):
+            return True
+        if not force and time.monotonic() - self._subbed.get(tg_id, -1e9) < 600:
+            return True
+        for ch in chans:
+            try:
+                m = self.api("getChatMember", chat_id=ch["chat_id"], user_id=tg_id) or {}
+            except Exception as exc:  # noqa: BLE001 — бот не админ в канале: покупателей не блокируем
+                log.warning("бот-магазин: подписка на %s не проверена: %s", ch["chat_id"], exc)
+                continue
+            if m.get("status") not in ("creator", "administrator", "member") and not m.get("is_member"):
+                self._subbed.pop(tg_id, None)
+                return False
+        self._subbed[tg_id] = time.monotonic()
+        return True
+
+    def screen_subscribe(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
+        lang = su["lang"]
+        rows = [[(f"📢 {c['title'][:40]}", None, c["url"])] for c in sponsors(conn) if c.get("url")]
+        rows.append([(tr(lang, "sub_btn"), "sub", "success")])
+        self.show(su["tg_id"], tr(lang, "sub_need"), rows, edit=edit)
+
+    def screen_sponsors(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
+        chans = sponsors(conn)
+        lines = ["📢 <b>Обязательная подписка</b>",
+                 "Покупатель сначала подписывается на эти каналы, потом пользуется ботом.", ""]
+        lines += [f"• {_e(c['title'])} ({_e(c['chat_id'])})" for c in chans] or ["Каналов нет — подписка не нужна."]
+        lines += ["", "⚠️ Бот должен быть <b>админом</b> в канале — иначе он не видит подписчиков."]
+        rows = [[(f"❌ {c['title'][:30]}", f"spd:{i}", "danger")] for i, c in enumerate(chans)]
+        rows.append([("➕ Добавить канал", "spa", "success")])
+        rows.append([("‹ Админ-панель", "adm")])
+        self.show(su["tg_id"], "\n".join(lines), rows, edit=edit)
+
+    def add_sponsor(self, conn: sqlite3.Connection, su: sqlite3.Row, text: str) -> None:
+        """@channel, t.me/channel или «-100… https://t.me/+ссылка» для закрытого канала."""
+        tg_id = su["tg_id"]
+        parts = text.split()
+        ref = parts[0].strip()
+        link = next((p for p in parts[1:] if p.startswith("http")), "")
+        m = re.match(r"(?:https?://)?t\.me/([A-Za-z0-9_]{4,})/?$", ref)
+        chat_id = "@" + m.group(1) if m else ref if ref.startswith(("@", "-100")) else "@" + ref.lstrip("@")
+        try:
+            info = self.api("getChat", chat_id=chat_id) or {}
+            if self.bot_id:
+                me = self.api("getChatMember", chat_id=chat_id, user_id=self.bot_id) or {}
+                if me.get("status") not in ("administrator", "creator"):
+                    raise RuntimeError("бот не админ в канале")
+        except Exception as exc:  # noqa: BLE001
+            self.state[tg_id] = {"step": "spa"}
+            self.show(tg_id, f"⚠️ Не получилось: {_e(exc)}\n\nДобавьте бота <b>админом</b> в канал и пришлите "
+                             "@юзернейм канала ещё раз.", [[("‹ Назад", "sp")]])
+            return
+        username = info.get("username")
+        url = link or (f"https://t.me/{username}" if username else info.get("invite_link") or "")
+        chans = [c for c in sponsors(conn) if str(c["chat_id"]) != str(info.get("id") or chat_id)]
+        chans.append({"chat_id": info.get("id") or chat_id, "title": info.get("title") or chat_id, "url": url})
+        db.set_setting(conn, "shop.sponsors", json.dumps(chans, ensure_ascii=False))
+        self._subbed.clear()
+        self.state.pop(tg_id, None)
+        self.screen_sponsors(conn, su)
+
     def is_admin(self, tg_id: int) -> bool:
         """Админ — тот, чей Telegram ID указан для админ-бота / поддержки или в DONATIX_SHOP_ADMIN_IDS."""
         raw = ",".join(str(x) for x in (self.config.alert_telegram_chat_id, self.config.support_admin_id,
@@ -720,6 +820,7 @@ class ShopBot:
                   m_n=m["orders"], m_r=fmt(m["revenue"]), m_p=fmt(m["profit"]),
                   users=o["users"], buyers=o["buyers"], new=t["new_users"], subs=o["subscribed"], top=top)
         self.show(su["tg_id"], text, [[(tr(lang, "bc"), "bc", "primary")], [("🛠 Витрина: названия и показ", "ve")],
+                                      [("📢 Обязательная подписка", "sp")],
                                       [("🔄", "adm"), (tr(lang, "home"), "h")]], edit=edit)
 
     # Витрина: что видят покупатели (только админ)
@@ -1044,6 +1145,8 @@ class ShopBot:
         elif step == "amount":
             st["msg"] = None
             self.create_topup(conn, su, text)
+        elif step == "spa" and self.is_admin(tg_id):
+            self.add_sponsor(conn, su, text)
         elif step in ("vgn", "vpn") and self.is_admin(tg_id):
             p = product_by_rid(conn, st["rid"])
             self.state.pop(tg_id, None)
@@ -1078,6 +1181,9 @@ class ShopBot:
             su = shop_user(conn, tg_id)
             after = (st or {}).get("after_lang")
             self.state.pop(tg_id, None)
+            if not self.subscribed(conn, tg_id):
+                self.screen_subscribe(conn, su, mid)
+                return
             self.open_deep_link(conn, su, after, mid) if after else self.screen_home(conn, su, mid)
         elif head == "lang":
             self.show(tg_id, tr("", "lang_pick"), [[("🇷🇺 Русский", "l:ru"), ("🇹🇯 Тоҷикӣ", "l:tj")]], edit=mid)
@@ -1157,6 +1263,20 @@ class ShopBot:
         elif head in ("ve", "vl", "vg", "vgt", "vgn", "vgr", "vp", "vpp", "vpt", "vpn", "vpr") \
                 and self.is_admin(tg_id):
             self.on_vitrine(conn, su, head, parts[1:], mid)
+        elif head == "sp" and self.is_admin(tg_id):
+            self.state.pop(tg_id, None)
+            self.screen_sponsors(conn, su, mid)
+        elif head == "spa" and self.is_admin(tg_id):
+            self.state[tg_id] = {"step": "spa"}
+            self.show(tg_id, "📢 Пришлите @юзернейм канала (или ссылку t.me/…).\n"
+                             "Для закрытого канала: <code>-100ID ссылка-приглашение</code>.\n\n"
+                             "Сначала добавьте этого бота в канал <b>админом</b>.", [[("‹ Назад", "sp")]], edit=mid)
+        elif head == "spd" and len(parts) == 2 and parts[1].isdigit() and self.is_admin(tg_id):
+            chans = sponsors(conn)
+            if int(parts[1]) < len(chans):
+                chans.pop(int(parts[1]))
+                db.set_setting(conn, "shop.sponsors", json.dumps(chans, ensure_ascii=False))
+            self.screen_sponsors(conn, su, mid)
         elif head == "bc" and self.is_admin(tg_id):
             self.state[tg_id] = {"step": "bc"}
             self.show(tg_id, tr(lang, "bc_ask"), [[(tr(lang, "cancel"), "adm", "danger")]], edit=mid)

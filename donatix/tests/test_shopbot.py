@@ -338,3 +338,52 @@ def test_topup_without_supplier_fields_still_asks_player_id(app, config, conn, s
     bot.handle(conn, press("ok"))
     o = conn.execute("SELECT fields_json FROM orders WHERE user_id = ?", (su["user_id"],)).fetchone()
     assert "5123456789" in o["fields_json"]
+
+
+class SubApi(FakeApi):
+    def __init__(self):
+        super().__init__()
+        self.member = False
+
+    def __call__(self, method, **p):
+        if method == "getChat":
+            self.calls.append((method, p))
+            return {"id": -100777, "title": "Donatix News", "username": "donatix_news"}
+        if method == "getChatMember":
+            self.calls.append((method, p))
+            if p.get("user_id") == 999:            # сам бот
+                return {"status": "administrator"}
+            return {"status": "member" if self.member else "left"}
+        return super().__call__(method, **p)
+
+
+def test_must_subscribe_to_sponsor_channel(app, config, conn, supplier):
+    api = SubApi()
+    bot = _bot(config, supplier, api)
+    bot.bot_id = 999
+    config.shop_admin_ids = "555"
+    admin = {"update_id": 1, "message": {"chat": {"id": 555, "type": "private"}, "from": {"id": 555}}}
+    def admin_msg(text):
+        return {**admin, "message": {**admin["message"], "text": text}}
+    def admin_press(data):
+        return {"update_id": 1, "callback_query": {"id": "q", "data": data, "from": {"id": 555},
+                "message": {"message_id": 1, "chat": {"id": 555, "type": "private"}}}}
+    bot.handle(conn, admin_msg("/start"))
+    bot.handle(conn, admin_press("l:ru"))
+    bot.handle(conn, admin_press("sp"))
+    bot.handle(conn, admin_press("spa"))
+    bot.handle(conn, admin_msg("@donatix_news"))
+    assert "Donatix News" in api.last_text()
+
+    _start(bot, conn)                                                # покупатель не подписан
+    assert "подпишитесь" in api.last_text()
+    assert any(b.get("url") == "https://t.me/donatix_news" for b in api.last_buttons())
+    bot.handle(conn, press("g:games:0"))
+    assert "подпишитесь" in api.last_text()                          # дальше не пускает
+    bot.handle(conn, press("sub"))
+    assert any(m == "answerCallbackQuery" and p.get("show_alert") for m, p in api.calls)
+    api.member = True
+    bot.handle(conn, press("sub"))
+    assert "Баланс" in api.last_text()                               # подписался — меню
+    bot.handle(conn, press("g:games:0"))
+    assert "Выберите игру" in api.last_text()
