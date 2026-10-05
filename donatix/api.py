@@ -50,11 +50,12 @@ def api_user(
     key = (x_api_key or "").strip()
     if not key and authorization and authorization.lower().startswith("bearer "):
         key = authorization[7:].strip()
+    key = key.strip('"\'').strip()   # ключ, вставленный вместе с кавычками, тоже подходит
     if not key:
         raise ApiError("Нет API-ключа. Передайте заголовок X-API-Key.", "unauthorized", 401)
     user = accounts.user_by_api_key(conn, key)
     if user is None:
-        raise ApiError("Неверный или отозванный API-ключ.", "unauthorized", 401)
+        raise ApiError(accounts.api_key_problem(conn, key), "unauthorized", 401)
     if user["status"] == "blocked":
         raise ApiError("Аккаунт заблокирован.", "account_blocked", 403)
     return user

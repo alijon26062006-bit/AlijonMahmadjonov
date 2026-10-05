@@ -167,3 +167,16 @@ def test_history_shows_balance_before_and_after(app, conn):
     page = c.get("/panel/transactions").text
     assert page.count("tx-bal") == 2 and "Было" in page and "стало" in page
     assert re.search(r"Было <b>[^<]*50[.,]00[^<]*</b>.*?стало <b>[^<]*38[.,]00", page, re.S)
+
+
+def test_api_key_errors_explain_what_is_wrong(client, conn, shop):
+    from donatix import accounts
+    key = shop["key"]
+    assert client.get("/api/v1/me", headers={"X-API-Key": f'"{key}"'}).status_code == 200   # с кавычками — тоже
+    short = client.get("/api/v1/me", headers={"X-API-Key": key[:14] + "..."}).json()["error"]
+    assert "только начало ключа" in short
+    assert "Это не ключ" in client.get("/api/v1/me", headers={"X-API-Key": "abc123"}).json()["error"]
+    assert "Неверный API-ключ" in client.get("/api/v1/me", headers={"X-API-Key": key + "x"}).json()["error"]
+    kid = conn.execute("SELECT id FROM api_keys WHERE user_id = ?", (shop["id"],)).fetchone()[0]
+    accounts.revoke_api_key(conn, shop["id"], kid)
+    assert "отозван" in client.get("/api/v1/me", headers={"X-API-Key": key}).json()["error"]

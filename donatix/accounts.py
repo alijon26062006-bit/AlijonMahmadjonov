@@ -186,6 +186,22 @@ def user_by_api_key(conn: sqlite3.Connection, key: str) -> sqlite3.Row | None:
 ACTIVITY_EVERY = 60
 
 
+def api_key_problem(conn: sqlite3.Connection, key: str) -> str:
+    """Почему ключ не подошёл — понятно для человека, который его вставлял."""
+    from .security import API_KEY_PREFIX
+    key = key.strip().strip('"\'')
+    if key.endswith(("…", "...")) or (key.startswith(API_KEY_PREFIX) and len(key) < 30):
+        return ("Передано только начало ключа. Полный ключ — около 50 символов: в кабинете «API» нажмите "
+                "«Показать» и «Скопировать».")
+    if not key.startswith(API_KEY_PREFIX):
+        return f"Это не ключ {API_KEY_PREFIX}… Скопируйте ключ в кабинете, раздел «API»."
+    revoked = conn.execute("SELECT 1 FROM api_keys WHERE key_hash = ? AND revoked_at IS NOT NULL",
+                           (hash_api_key(key),)).fetchone()
+    if revoked:
+        return "Этот ключ отозван. Возьмите действующий в кабинете, раздел «API»."
+    return "Неверный API-ключ. Скопируйте его заново в кабинете, раздел «API» (кнопка «Скопировать»)."
+
+
 # ── Журнал денег ─────────────────────────────────────────────
 
 
