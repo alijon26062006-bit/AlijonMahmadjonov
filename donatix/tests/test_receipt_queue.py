@@ -93,3 +93,25 @@ def test_search_shows_receipt_and_outcome(config, conn):
     assert msg["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == f"pay:ok:{a}"
     _say(bot, conn, int(ADMIN_CHAT), "/find 99999")
     assert "не нашёл" in calls[-1][1]["text"]
+
+
+def test_cashier_finds_any_request_by_button_but_decides_only_own_bank(config, conn):
+    uid, _ = make_client(conn, balance="0")
+    cashiers.add(conn, ALI, "Али")
+    conn.execute("UPDATE cashiers SET methods = '[\"dc\"]' WHERE tg_id = ?", (ALI,))
+    alif = _payment(conn, uid, "alif")
+    dc = _payment(conn, uid, "dc")
+    calls = []
+    bot = _bot(config, calls)
+    bot.api = _api(calls)
+    _press(bot, conn, ALI, "q:find:0")                                    # кнопка, а не команда
+    assert "Поиск заявки" in calls[-1][1]["text"]
+    _say(bot, conn, ALI, f"#{alif}")                                      # чужой банк — видно, но без кнопок
+    msg = calls[-1][1]
+    assert f"#{alif}" in msg["text"] and "⏳ Ждёт проверки" in msg["text"] and msg.get("reply_markup") is None
+    assert "решает кассир другого банка" in msg["text"]
+    _say(bot, conn, ALI, f"#{dc}")                                        # свой банк — с кнопками
+    assert calls[-1][1]["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == f"pay:ok:{dc}"
+    _press(bot, conn, ALI, "cs:home:0")
+    home = [p for m, p in calls if m in ("sendMessage", "editMessageText")][-1]
+    assert any(b["callback_data"] == "q:find:0" for row in home["reply_markup"]["inline_keyboard"] for b in row)
