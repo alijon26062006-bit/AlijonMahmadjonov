@@ -22,6 +22,8 @@ import time
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Callable
 
+import httpx
+
 from . import accounts, db, orders, payments
 from . import packs as packs_mod
 from .catalog import get_product
@@ -124,6 +126,12 @@ T: dict[str, tuple[str, str]] = {
     "failed": ("❌ <b>Заказ {id} не выполнен</b>\n{product}\n{reason}\n\n{total} вернулись на баланс.",
                "❌ <b>Фармоиш {id} иҷро нашуд</b>\n{product}\n{reason}\n\n{total} ба баланс баргашт."),
     "repeat": ("🔁 Повторить", "🔁 Такрор"),
+    "manual_topup": ("💰 <b>Баланс пополнен на {amount}</b>\nТеперь на балансе: <b>{balance}</b>\n\n"
+                     "Спасибо! Можно покупать 👇",
+                     "💰 <b>Баланс {amount} пур карда шуд</b>\nАкнун дар баланс: <b>{balance}</b>\n\n"
+                     "Ташаккур! Харид кардан мумкин 👇"),
+    "manual_minus": ("💰 С баланса списано {amount}\nТеперь на балансе: <b>{balance}</b>",
+                     "💰 Аз баланс {amount} гирифта шуд\nАкнун дар баланс: <b>{balance}</b>"),
     "balance_screen": ("💰 <b>Ваш баланс: {balance}</b>\n\nПополните — и покупайте в одно нажатие.",
                        "💰 <b>Баланси шумо: {balance}</b>\n\nПур кунед — ва бо як пахш харед."),
     "pick_method": ("➕ <b>Пополнение</b>\nВыберите способ оплаты:",
@@ -170,6 +178,25 @@ T: dict[str, tuple[str, str]] = {
 }
 
 
+def tell_buyer(conn: sqlite3.Connection, config: Config, tg_id: int, delta_micro: int) -> bool:
+    """Покупателю в бот-магазин: баланс изменил админ. Из админ-бота — прямым запросом к Telegram."""
+    su = shop_user(conn, tg_id)
+    if su is None or not config.shop_bot_token:
+        return False
+    rate = tjs_rate(conn, config)
+    bal = conn.execute("SELECT balance_micro FROM users WHERE id = ?", (su["user_id"],)).fetchone()[0]
+    text = tr(su["lang"], "manual_topup" if delta_micro > 0 else "manual_minus",
+              amount=money(abs(delta_micro), rate), balance=money(bal, rate))
+    try:
+        resp = httpx.post(f"https://api.telegram.org/bot{config.shop_bot_token}/sendMessage", timeout=10, json={
+            "chat_id": tg_id, "text": text, "parse_mode": "HTML",
+            "reply_markup": {"inline_keyboard": [[{"text": tr(su["lang"], "home"), "callback_data": "h"}]]}})
+        return bool((resp.json() or {}).get("ok"))
+    except (httpx.HTTPError, ValueError) as exc:
+        log.info("бот-магазин: покупателю %s не отправлено: %s", tg_id, exc)
+        return False
+
+
 def tr(lang: str, key: str, **kw: Any) -> str:
     pair = T[key]
     text = pair[1] if lang == "tj" else pair[0]
@@ -205,12 +232,15 @@ def shop_user(conn: sqlite3.Connection, tg_id: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM shop_users WHERE tg_id = ?", (tg_id,)).fetchone()
 
 
-def ensure_user(conn: sqlite3.Connection, tg_id: int, name: str = "", start: str = "") -> sqlite3.Row:
-    """Аккаунт сайта для этого Telegram — создаётся при первом /start, дальше тот же."""
+def ensure_user(conn: sqlite3.Connection, tg_id: int, name: str = "", start: str = "",
+                username: str = "") -> sqlite3.Row:
+    """Аккаунт сайта для этого Telegram — создаётся при первом /start, дальше тот же.
+    @username запоминаем каждый раз (человек может сменить или убрать его) — по нему админ найдёт покупателя."""
+    username = (username or "").lstrip("@")[:64]
     row = shop_user(conn, tg_id)
     if row is not None:
-        conn.execute("UPDATE shop_users SET last_seen = ?, name = COALESCE(NULLIF(?, ''), name) WHERE tg_id = ?",
-                     (db.now(), name[:64], tg_id))
+        conn.execute("UPDATE shop_users SET last_seen = ?, name = COALESCE(NULLIF(?, ''), name), username = ? "
+                     "WHERE tg_id = ?", (db.now(), name[:64], username or None, tg_id))
         return shop_user(conn, tg_id)
     with db.tx(conn):
         row = shop_user(conn, tg_id)
@@ -224,8 +254,9 @@ def ensure_user(conn: sqlite3.Connection, tg_id: int, name: str = "", start: str
             uid = accounts.create_user(conn, email=f"tg{tg_id}@telegram.user", login=f"tg{tg_id}",
                                        password=secrets.token_urlsafe(24), status="active",
                                        project="Покупатель из Telegram-бота")
-        conn.execute("INSERT INTO shop_users (tg_id, user_id, name, lang, start_param, created_at, last_seen) "
-                     "VALUES (?, ?, ?, '', ?, ?, ?)", (tg_id, uid, name[:64], start[:64] or None, db.now(), db.now()))
+        conn.execute("INSERT INTO shop_users (tg_id, user_id, name, lang, start_param, created_at, last_seen, "
+                     "username) VALUES (?, ?, ?, '', ?, ?, ?, ?)",
+                     (tg_id, uid, name[:64], start[:64] or None, db.now(), db.now(), username or None))
     return shop_user(conn, tg_id)
 
 
@@ -662,7 +693,7 @@ class ShopBot:
             if self._limited(tg_id):
                 self.api("answerCallbackQuery", callback_query_id=cq["id"], text=tr("", "slow"))
                 return
-            su = ensure_user(conn, tg_id, sender.get("first_name") or "")
+            su = ensure_user(conn, tg_id, sender.get("first_name") or "", username=sender.get("username") or "")
             data = str(cq.get("data") or "")
             if data == "sub":   # «Я подписался» — проверяем сразу
                 if self.subscribed(conn, tg_id, force=True):
@@ -688,7 +719,7 @@ class ShopBot:
         sender = msg.get("from") or {}
         text = (msg.get("text") or "").strip()
         start = text.split(maxsplit=1)[1] if text.startswith("/start ") else ""
-        su = ensure_user(conn, tg_id, sender.get("first_name") or "", start)
+        su = ensure_user(conn, tg_id, sender.get("first_name") or "", start, username=sender.get("username") or "")
         need_lang = text.startswith(("/start", "/lang")) and not su["lang"] or text.startswith("/lang")
         if not need_lang and not self.subscribed(conn, tg_id):
             self.screen_subscribe(conn, su)

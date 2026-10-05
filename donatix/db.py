@@ -480,6 +480,10 @@ CREATE TABLE IF NOT EXISTS shop_names (       -- витрина бота: сво
     hidden INTEGER NOT NULL DEFAULT 0
 );
 """)
+        shop_cols = {r[1] for r in conn.execute("PRAGMA table_info(shop_users)")}
+        if "username" not in shop_cols:   # @username покупателя — найти его в админ-боте
+            conn.execute("ALTER TABLE shop_users ADD COLUMN username TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS shop_users_username ON shop_users(lower(username))")
         login_cols = {r[1] for r in conn.execute("PRAGMA table_info(logins)")}
         if "sid" not in login_cols:   # номер сессии: выход или блок обрывают именно её, украденный cookie не живёт
             conn.execute("ALTER TABLE logins ADD COLUMN sid TEXT")
