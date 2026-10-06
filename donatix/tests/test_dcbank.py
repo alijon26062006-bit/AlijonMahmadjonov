@@ -148,6 +148,16 @@ def test_receipt_fallback(app, dc, conn):
     assert _handle(conn, dc, notice("40.01", "9"), 30)["status"] == "matched"
 
 
+def test_phone_in_details_does_not_filter_cards(app, config, conn):
+    config.tg_api_id, config.tg_api_hash, config.bank_bot = 1, "x" * 32, "dc_next_bot"
+    payments.save_methods(conn, [{"code": "dc", "title": "Сити (DC)", "details": "+992102208383",
+                                  "enabled": True, "auto": "dcbank"}])
+    assert dcbank.our_cards(conn, config) == set()
+    uid, c, token = _client(app, conn)
+    _pay(c, token, "20")
+    assert _handle(conn, config, notice("20.01", "77"), 40)["status"] == "matched"
+
+
 def test_without_userbot_it_is_a_normal_method(app, config, conn):
     payments.save_methods(conn, [{"code": "dc", "title": "Душанбе Сити", "details": f"Карта {CARD}",
                                   "enabled": True, "auto": "dcbank"}])

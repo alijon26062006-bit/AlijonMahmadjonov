@@ -68,9 +68,11 @@ def our_cards(conn: sqlite3.Connection, config: Config) -> set[str]:
     out = set()
     for m in settings(conn, config)["all_methods"]:
         if m.get("auto") == KIND:
+            # Только номера карт (16–19 цифр). Телефон кошелька (+992…) — не карта: в уведомлении
+            # «Karta» будет номер карты, и фильтр по телефону отбросил бы все наши оплаты.
             for chunk in re.findall(r"\d[\d \-]{8,}\d", m.get("details") or ""):
                 digits = re.sub(r"\D", "", chunk)
-                if len(digits) >= 10:
+                if 16 <= len(digits) <= 19:
                     out.add(digits[-4:])
     return out
 
