@@ -158,6 +158,16 @@ T: dict[str, tuple[str, str]] = {
                  "⏳ <b>Чекро месанҷем</b>\nИнтизор шавед, баъди санҷиш менависам."),
     "paid": ("✅ <b>Баланс пополнен на {amount}</b>\nТеперь на балансе: {balance}",
              "✅ <b>Баланс {amount} пур шуд</b>\nҲоло дар баланс: {balance}"),
+    "paid_bought": ("✅ <b>Баланс пополнен на {amount}</b>\n\n🚀 Ваш заказ <b>{id}</b> отправлен автоматически:\n"
+                    "{product}\nСписано: {total}\n\nКак только будет готово — напишу.",
+                    "✅ <b>Баланс {amount} пур шуд</b>\n\n🚀 Фармоиши шумо <b>{id}</b> худкор фиристода шуд:\n"
+                    "{product}\nПардохт: {total}\n\nВақте тайёр шавад — менависам."),
+    "paid_not_bought": ("✅ <b>Баланс пополнен на {amount}</b>\n\n⚠️ Заказ сам не оформился: {reason}\n"
+                        "Проверьте и нажмите «Оплатить» 👇",
+                        "✅ <b>Баланс {amount} пур шуд</b>\n\n⚠️ Фармоиш худ ба худ нашуд: {reason}\n"
+                        "Санҷед ва «Пардохт»-ро пахш кунед 👇"),
+    "will_buy": ("\n\n🚀 Как только оплату подтвердят — <b>{product}</b> отправится на ваш аккаунт автоматически.",
+                 "\n\n🚀 Баъди тасдиқи пардохт <b>{product}</b> худкор ба аккаунти шумо фиристода мешавад."),
     "rejected": ("❌ <b>Заявка #{id} отклонена</b>\n{reason}", "❌ <b>Дархост #{id} рад шуд</b>\n{reason}"),
     "need_receipt": ("📸 Пришлите фото чека к заявке #{id}.", "📸 Акси чекро барои дархост #{id} фиристед."),
     "no_orders": ("Заказов пока нет. Выберите игру в меню 👇", "Ҳоло фармоиш нест. Бозиро аз меню интихоб кунед 👇"),
@@ -1112,6 +1122,7 @@ class ShopBot:
             text += tr(lang, "no_money", need=money(total - user["balance_micro"], rate))
             rows = [[(tr(lang, "topup"), "t", "success")], [(tr(lang, "cancel"), "x", "danger")]]
             st["resume"] = True
+            st["need"] = total - user["balance_micro"]
         else:
             rows = [[(tr(lang, "pay"), "ok", "success")], [(tr(lang, "cancel"), "x", "danger")]]
         st["msg"] = self.show(tg_id, text, rows, edit=st.get("msg"))
@@ -1407,6 +1418,12 @@ class ShopBot:
                              "photo": prev.get("photo")}
         rows = [[(f"{v} смн", f"ta:{v}") for v in (20, 50, 100)], [(f"{v} смн", f"ta:{v}") for v in (200, 500, 1000)],
                 [(tr(lang, "cancel"), "x", "danger")]]
+        need = (prev.get("resume") or {}).get("need") if isinstance(prev.get("resume"), dict) else None
+        if need:   # пополняет ради покупки — первой кнопкой ровно то, чего не хватает (не меньше минимума)
+            import math
+            conf = payments.settings(conn, self.config)
+            tjs = max(math.ceil(Decimal(need) / 10_000 * conf["tjs_rate"]), math.ceil(conf["min_tjs"] or 0), 1)
+            rows.insert(0, [(f"✅ {tjs} смн", f"ta:{tjs}", "success")])
         self.show(tg_id, tr(lang, "ask_amount", method=_e(method["title"])), rows, edit=edit)
 
     def create_topup(self, conn: sqlite3.Connection, su: sqlite3.Row, amount: str) -> None:
@@ -1431,9 +1448,12 @@ class ShopBot:
                 rows.insert(0, [("💳 Binance Pay", None, view["pay_url"])])
             text = tr(lang, "pay_auto", id=pid, amount=amount_text, address=_e(view["address"] or view["details"]),
                       note=_e(view["auto_note"]))
+            intent = self.intent(conn, st.get("resume"))
+            if intent:
+                text += tr(lang, "will_buy", product=_e(intent["name"]))
             self.state.pop(tg_id, None)
             mid = self.show(tg_id, text, [[(tr(lang, "home"), "h")]] + rows[:-1], edit=st.get("msg"))
-            self.watch_add(conn, "pay", pid, tg_id, mid, "pending")
+            self.watch_add(conn, "pay", pid, tg_id, mid, "pending", intent)
             return
         self.state[tg_id] = {"step": "receipt", "pid": pid, "resume": st.get("resume")}
         if st.get("photo"):   # чек прислали раньше заявки — прикрепляем его сразу, второй раз не просим
@@ -1494,9 +1514,23 @@ class ShopBot:
         except Exception:  # noqa: BLE001 — чек сохранён, админ увидит его на сайте
             log.exception("бот-магазин: чек %s админу", pid)
         self.state.pop(tg_id, None)
-        if resume and isinstance(resume, dict) and resume.get("rid"):
-            self.state[tg_id] = {**resume, "msg": None, "resume": None, "after_pay": True}
-        self.watch_add(conn, "pay", pid, tg_id, mid, "pending")
+        intent = self.intent(conn, resume)
+        if intent:   # заказ сохраняем в базе: оформим сами, как только пополнение подтвердят
+            self.show(tg_id, tr(lang, "checking") + tr(lang, "will_buy", product=_e(intent["name"])),
+                      [[(tr(lang, "home"), "h")]], edit=mid)
+        self.watch_add(conn, "pay", pid, tg_id, mid, "pending", intent)
+
+    def intent(self, conn: sqlite3.Connection, resume: Any) -> dict[str, Any] | None:
+        """Что покупатель выбрал до пополнения: товар, ID игрока, количество."""
+        if not isinstance(resume, dict) or not resume.get("rid") or resume.get("step") != "confirm":
+            return None   # заказ должен быть собран до конца: товар, ID, количество
+        p = product_by_rid(conn, resume["rid"])
+        if p is None:
+            return None
+        qty = resume.get("qty") or 1
+        return {"product_id": p["id"], "rid": resume["rid"], "fields": resume.get("fields") or {}, "qty": qty,
+                "nonce": resume.get("nonce") or secrets.token_hex(6),
+                "name": p["name"] + (f" × {qty}" if qty > 1 else "")}
 
     # заказы
     def screen_orders(self, conn: sqlite3.Connection, su: sqlite3.Row, page: int, edit: int | None = None) -> None:
@@ -1563,9 +1597,10 @@ class ShopBot:
 
     # статусы: бот сам пишет, когда заказ готов и баланс пополнен
     def watch_add(self, conn: sqlite3.Connection, kind: str, obj_id: int, chat: int, mid: int | None,
-                  status: str) -> None:
-        conn.execute("INSERT INTO shop_watch (kind, obj_id, chat_id, message_id, last_status, created_at) "
-                     "VALUES (?, ?, ?, ?, ?, ?)", (kind, obj_id, chat, mid, status, db.now()))
+                  status: str, intent: dict[str, Any] | None = None) -> None:
+        conn.execute("INSERT INTO shop_watch (kind, obj_id, chat_id, message_id, last_status, created_at, intent) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?)", (kind, obj_id, chat, mid, status, db.now(),
+                                                      json.dumps(intent, ensure_ascii=False) if intent else None))
 
     def watch(self, conn: sqlite3.Connection, force: bool = False) -> int:
         now = time.monotonic()
@@ -1604,17 +1639,47 @@ class ShopBot:
             self.show(chat, tr(lang, "rejected", id=p["id"], reason=_e(p["admin_note"] or "")),
                       [[(tr(lang, "topup"), "t"), (tr(lang, "home"), "h")]])
             return
+        try:
+            intent = json.loads(w["intent"]) if w["intent"] else None
+        except ValueError:
+            intent = None
+        if intent and self.auto_buy(conn, w, p, intent):
+            return
         user = accounts.get_user(conn, w["user_id"])
         self.show(chat, tr(lang, "paid", amount=money(p["amount_micro"], rate),
                            balance=money(user["balance_micro"], rate)), [[(tr(lang, "home"), "h")]])
-        st = self.state.get(chat) or {}
-        if st.get("after_pay"):   # пополнял, чтобы купить, — сразу к подтверждению заказа
-            su = shop_user(conn, chat)
-            st["after_pay"] = False
-            st["msg"] = None
-            p_ = product_by_rid(conn, st.get("rid"))
+
+    def auto_buy(self, conn: sqlite3.Connection, w: sqlite3.Row, pay: sqlite3.Row, intent: dict[str, Any]) -> bool:
+        """Пополнение подтвердили — то, что человек выбрал до оплаты, сразу уходит поставщику.
+        Не получилось (цена выросла, товар пропал) — показываем заказ с кнопкой «Оплатить»."""
+        lang, chat = w["lang"], w["chat_id"]
+        rate = tjs_rate(conn, self.config)
+        su = shop_user(conn, chat)
+        product = get_product(conn, str(intent.get("product_id") or ""))
+        if su is None or product is None:
+            return False
+        try:
+            order, _ = orders.create_order(conn, self.config, self.supplier, self._user(conn, su),
+                                           product_id=product["id"], quantity=intent.get("qty") or 1,
+                                           fields=intent.get("fields") or {},
+                                           client_idem_key=f"shopbot-{chat}-{intent.get('nonce')}", source=SOURCE)
+        except orders.OrderError as exc:
+            self.state[chat] = {"step": "confirm", "rid": intent.get("rid"), "fields": intent.get("fields") or {},
+                                "qty": intent.get("qty") or 1, "qty_set": True, "fi": 0, "msg": None,
+                                "nonce": secrets.token_hex(6)}
+            self.show(chat, tr(lang, "paid_not_bought", amount=money(pay["amount_micro"], rate), reason=_e(exc)))
+            p_ = product_by_rid(conn, intent.get("rid"))
             if p_:
                 self.screen_confirm(conn, su, p_)
+            return True
+        remember_fields(conn, chat, product["category_id"],
+                        {k: str(v) for k, v in (intent.get("fields") or {}).items()})
+        mid = self.show(chat, tr(lang, "paid_bought", amount=money(pay["amount_micro"], rate), id=order["public_id"],
+                                 product=_e(order["product_name"]), total=money(order["total_micro"], rate)),
+                        [[(tr(lang, "orders"), "my:0"), (tr(lang, "home"), "h")]])
+        self.watch_add(conn, "order", order["id"], chat, mid, order["status"])
+        log.info("бот-магазин: после пополнения #%s сам оформил заказ %s", pay["id"], order["public_id"])
+        return True
 
 
 def _group_of(kind: str) -> str:

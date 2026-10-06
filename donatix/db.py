@@ -480,6 +480,9 @@ CREATE TABLE IF NOT EXISTS shop_names (       -- витрина бота: сво
     hidden INTEGER NOT NULL DEFAULT 0
 );
 """)
+        watch_cols = {r[1] for r in conn.execute("PRAGMA table_info(shop_watch)")}
+        if "intent" not in watch_cols:   # что покупатель выбрал до пополнения — купим сами, когда деньги придут
+            conn.execute("ALTER TABLE shop_watch ADD COLUMN intent TEXT")
         shop_cols = {r[1] for r in conn.execute("PRAGMA table_info(shop_users)")}
         if "username" not in shop_cols:   # @username покупателя — найти его в админ-боте
             conn.execute("ALTER TABLE shop_users ADD COLUMN username TEXT")

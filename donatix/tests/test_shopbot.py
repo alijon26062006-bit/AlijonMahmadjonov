@@ -139,13 +139,44 @@ def test_not_enough_money_topup_with_receipt_then_buy(app, config, conn, supplie
     assert "+992" in api.last_text() and "фото чека" in api.last_text()
     bot.handle(conn, {"update_id": 2, "message": {"chat": {"id": TG, "type": "private"}, "from": {"id": TG},
                                                   "photo": [{"file_id": "f1"}]}})
-    assert "Проверяем чек" in api.last_text()
+    assert "Проверяем чек" in api.last_text() and "отправится на ваш аккаунт автоматически" in api.last_text()
     p = conn.execute("SELECT * FROM payments WHERE user_id = ?", (su["user_id"],)).fetchone()
     assert p["receipt_file"] and p["pay_amount"] == "100.00"
+    assert conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ?", (su["user_id"],)).fetchone()[0] == 0
+    bot.state.clear()                                               # бот перезапускался — выбор хранится в базе
     payments.confirm(conn, config, p["id"], 1)
     bot.watch(conn, force=True)
-    assert "Проверьте заказ" in api.last_text()                     # после пополнения — сразу к покупке
-    assert any("Баланс пополнен" in pp.get("text", "") for m, pp in api.calls)
+    o = conn.execute("SELECT * FROM orders WHERE user_id = ?", (su["user_id"],)).fetchone()
+    assert o is not None and "5123456789" in o["fields_json"] and o["source"] == "shopbot"
+    assert "Баланс пополнен" in api.last_text() and "отправлен автоматически" in api.last_text()
+    assert o["public_id"] in api.last_text()
+    bot.watch(conn, force=True)                                     # второй раз заказ не создаётся
+    assert conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ?", (su["user_id"],)).fetchone()[0] == 1
+
+
+def test_topup_offers_exact_missing_amount_and_failed_auto_buy_asks(app, config, conn, supplier, monkeypatch):
+    monkeypatch.setattr("donatix.tgbot.send_receipt", lambda *a, **k: None)
+    config.pay_methods = {"alif": "Алиф: +992 90 000 00 00"}
+    api = FakeApi(photo=RECEIPT_PNG)
+    bot = _bot(config, supplier, api)
+    su = _start(bot, conn)
+    rid = conn.execute("SELECT rowid FROM products WHERE kind = 'topup' AND fields_json LIKE '%player%' "
+                       "ORDER BY rowid LIMIT 1").fetchone()[0]
+    bot.handle(conn, press(f"p:{rid}"))
+    bot.handle(conn, msg("5123456789"))
+    bot.handle(conn, press("t"))
+    bot.handle(conn, press(api.button("Ал")))
+    exact = api.last_buttons()[0]
+    assert exact["text"].startswith("✅") and exact["callback_data"].startswith("ta:")   # ровно недостающее
+    bot.handle(conn, press("ta:1"))                                 # заплатил слишком мало
+    bot.handle(conn, {"update_id": 2, "message": {"chat": {"id": TG, "type": "private"}, "from": {"id": TG},
+                                                  "photo": [{"file_id": "f1"}]}})
+    p = conn.execute("SELECT * FROM payments WHERE user_id = ?", (su["user_id"],)).fetchone()
+    payments.confirm(conn, config, p["id"], 1)
+    bot.watch(conn, force=True)
+    assert conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ?", (su["user_id"],)).fetchone()[0] == 0
+    texts = [pp.get("text", "") for m, pp in api.calls]
+    assert any("Заказ сам не оформился" in t for t in texts) and "Проверьте заказ" in api.last_text()
 
 
 def test_tajik_language(app, config, conn, supplier):
