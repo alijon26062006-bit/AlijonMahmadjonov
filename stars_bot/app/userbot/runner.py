@@ -189,6 +189,17 @@ async def run(bot=None) -> None:
                 # Всё, что не от банка, не читаем и не пишем никуда:
                 # это чужая личная переписка.
                 if not _from_source(event.message, wanted_ids, wanted_names):
+                    # Сообщение от ДРУГОГО бота в личке — пишем в журнал,
+                    # кто это (имя и id, без текста). Так сразу видно, если
+                    # банк пишет не с того адреса, что задан в BANK_BOT.
+                    if getattr(event, "is_private", False):
+                        with contextlib.suppress(Exception):
+                            sender = await event.get_sender()
+                            if getattr(sender, "bot", False):
+                                log.info("[USERBOT] Сообщение от другого бота: "
+                                         "@%s id=%s — не банк из BANK_BOT",
+                                         getattr(sender, "username", "") or "—",
+                                         sender.id)
                     return
                 log.info("[USERBOT] New bank message")
                 try:
@@ -206,7 +217,8 @@ async def run(bot=None) -> None:
                     raise RuntimeError("сеанс завершён в Telegram — нужен "
                                        "новый вход: stars-bot userbot login")
                 me = await client.get_me()
-                log.info("[USERBOT] Подключён как @%s", me.username or me.id)
+                log.info("[USERBOT] Подключён как @%s (id %s)",
+                         me.username or "—", me.id)
                 # Список чатов подгружает в кэш их юзернеймы и id — без него
                 # Telegram не находит часть ботов по имени.
                 with contextlib.suppress(Exception):
