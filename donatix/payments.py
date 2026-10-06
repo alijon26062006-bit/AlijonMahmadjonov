@@ -109,8 +109,14 @@ def clean_methods(methods_in: list[dict[str, Any]]) -> list[dict[str, Any]]:
         icon = str(m.get("icon") or "")
         icon = icon if ICON_NAME_RE.fullmatch(icon) else ""
         auto = str(m.get("auto") or "")
-        auto = auto if auto in ("trc20", "binance", "bybit") else ""
-        if auto == "trc20":
+        auto = auto if auto in ("trc20", "binance", "bybit", "dcbank") else ""
+        if auto == "dcbank":
+            from .dcbank import account_of
+            currency, network = "TJS", ""
+            if not account_of(details):
+                raise PaymentError(f"«{title}»: для автозачисления «Душанбе Сити» в реквизитах нужен номер карты "
+                                   "или счёта (10+ цифр).")
+        elif auto == "trc20":
             from .cryptopay import tron_address
             currency, network = "USDT", "TRC20"
             if not tron_address(details):
@@ -169,6 +175,11 @@ def start_auto(conn: sqlite3.Connection, config: Config, payment_id: int) -> Non
     method = next((m for m in settings(conn, config)["all_methods"] if m["code"] == p["method"]), {})
     if not method.get("auto"):
         return
+    if method["auto"] == "dcbank":
+        from . import dcbank
+        if dcbank.ready(config):   # без юзербота — обычная заявка с чеком
+            dcbank.start(conn, config, payment_id, method)
+        return
     try:
         cryptopay.start(conn, config, payment_id, method)
     except cryptopay.CryptoPayError as exc:
@@ -178,8 +189,11 @@ def start_auto(conn: sqlite3.Connection, config: Config, payment_id: int) -> Non
 
 
 def is_auto(conn: sqlite3.Connection, config: Config, code: str) -> bool:
-    """Способ с автоплатежом (крипта): чек не нужен, поступление проверяется само."""
-    return any(m["code"] == code and m.get("auto") for m in settings(conn, config)["all_methods"])
+    """Способ с автоплатежом (крипта, «Душанбе Сити»): чек не нужен, поступление проверяется само.
+    «Душанбе Сити» — только когда юзербот настроен, иначе это обычный перевод с чеком."""
+    from .dcbank import ready
+    return any(m["code"] == code and m.get("auto") and (m["auto"] != "dcbank" or ready(config))
+               for m in settings(conn, config)["all_methods"])
 
 
 def title_for(conn: sqlite3.Connection, config: Config, code: str) -> str:
@@ -190,10 +204,11 @@ def title_for(conn: sqlite3.Connection, config: Config, code: str) -> str:
 
 
 def methods(conn: sqlite3.Connection, config: Config) -> list[dict[str, str]]:
+    from .dcbank import ready
     conf = settings(conn, config)
     return [{"code": m["code"], "title": m["title"], "currency": m["currency"], "details": m["details"],
              "icon_url": f"{config.base_url}/pay-icons/{m['icon']}" if m.get("icon") else "",
-             "auto": m.get("auto") or "",
+             "auto": (m.get("auto") or "") if m.get("auto") != "dcbank" or ready(config) else "",
              "network": m["network"], "network_title": NETWORKS.get(m["network"], ""),
              "network_note": network_note(m["network"])}
             for m in conf["all_methods"] if m["code"] in conf["details"]]
@@ -223,6 +238,11 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
         raise PaymentError("Укажите сумму больше нуля.")
     if conf["min_tjs"] > 0 and usd * conf["tjs_rate"] < conf["min_tjs"]:
         raise PaymentError(f"Минимальная сумма пополнения — {conf['min_tjs']:f} сомони (${conf['min_usd']}).")
+    # Заявка «Душанбе Сити», которую так и не оплатили за окно ожидания, новой не мешает
+    from .dcbank import _since, window_hours
+    conn.execute("UPDATE payments SET status = 'cancelled', resolved_at = ?, resolved_who = 'истекла' "
+                 "WHERE user_id = ? AND status = 'pending' AND auto_kind = 'dcbank' AND receipt_file IS NULL "
+                 "AND created_at < ?", (db.now(), user["id"], _since(window_hours(conn))))
     blocking = open_request(conn, user["id"])
     if blocking is not None:
         raise PaymentError(waiting_text(blocking))
@@ -242,6 +262,13 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
     if amount_tjs.strip() and currency == "TJS":
         # Сумму назвали в сомони — ровно её и переводят, без копейки от пересчёта туда-обратно
         pay = str(to_decimal(amount_tjs.replace(",", ".").strip()).quantize(Decimal("0.01")))
+    if chosen.get("auto") == "dcbank" and is_auto(conn, config, method):
+        from . import dcbank
+        # Уникальные копейки: 100 → 100.03 — по ним уведомление банка узнаёт этот перевод
+        exact = dcbank.unique_amount(conn, Decimal(pay),
+                                     [m["code"] for m in conf["all_methods"] if m.get("auto") == "dcbank"])
+        pay, cur = str(exact), "TJS"
+        usd = (exact / conf["tjs_rate"]).quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
     c = conn.execute(
         "INSERT INTO payments (user_id, method, amount_micro, pay_amount, pay_currency, reference, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -540,8 +567,9 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
         raise PaymentError("Заявка уже обработана.")
     if p["receipt_file"]:
         raise PaymentError(f"Чек к заявке #{payment_id} уже отправлен — дождитесь проверки.")
-    if p["auto_kind"] or is_auto(conn, config, p["method"]):
+    if p["auto_kind"] != "dcbank" and (p["auto_kind"] or is_auto(conn, config, p["method"])):
         raise PaymentError("Эта заявка проверяется автоматически — чек не нужен.")
+    # «Душанбе Сити»: чек — запасной путь, когда деньги не совпали с заявкой (другая сумма, банк опоздал)
     digest = hashlib.sha256(data).hexdigest()
     # Отклонённые тоже считаем: тот же чек не должен пройти со второй попытки у другого проверяющего
     dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? "
@@ -621,5 +649,8 @@ def public(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) -> dict[str
                       "баланс пополнится сам за 1–3 минуты, чек не нужен."
                       if p["auto_kind"] == "bybit" else
                       "Оплатите по ссылке в Binance — баланс пополнится сам, чек не нужен."
-                      if p["auto_kind"] == "binance" else ""),
+                      if p["auto_kind"] == "binance" else
+                      f"Переведите ровно {p['pay_amount']} сомони — с копейками. По ним мы узнаём ваш перевод: "
+                      "баланс пополнится сам за минуту, чек не нужен."
+                      if p["auto_kind"] == "dcbank" else ""),
     }

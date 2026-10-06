@@ -149,6 +149,14 @@ class Config:
     # Bybit: ключ API вашего аккаунта «только чтение» (Wallet/Asset) — видеть входящие USDT
     bybit_key: str = ""
     bybit_secret: str = ""
+    # Автоплатёж «Душанбе Сити»: юзербот читает уведомления банковского бота в Telegram владельца.
+    # api_id/api_hash — с my.telegram.org; bank_bot — юзернейм или id бота банка; bank_card — последние
+    # 4 цифры карты (уведомления по другим картам не трогаем). Файл сеанса — полный доступ к Telegram.
+    tg_api_id: int = 0
+    tg_api_hash: str = ""
+    bank_bot: str = ""
+    bank_card: str = ""
+    bank_session: str = ""
     yandex_verify: str = ""
     # Часовой пояс для аналитики, часы от UTC (Душанбе — 5)
     tz_offset: int = 5
@@ -212,6 +220,11 @@ class Config:
             trongrid_key=_env("DONATIX_TRONGRID_KEY"),
             bybit_key=_env("DONATIX_BYBIT_KEY"),
             bybit_secret=_env("DONATIX_BYBIT_SECRET"),
+            tg_api_id=int(_env("DONATIX_TG_API_ID") or 0) if _env("DONATIX_TG_API_ID").isdigit() else 0,
+            tg_api_hash=_env("DONATIX_TG_API_HASH"),
+            bank_bot=_env("DONATIX_BANK_BOT").lstrip("@"),
+            bank_card=_env("DONATIX_BANK_CARD")[-4:],
+            bank_session=_env("DONATIX_BANK_SESSION"),
             yandex_verify=_env("DONATIX_YANDEX_VERIFY"),
             tz_offset=int(_env("DONATIX_TZ_OFFSET") or 5),
             run_bots=_flag("DONATIX_RUN_BOTS", True),

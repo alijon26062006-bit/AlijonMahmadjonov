@@ -208,6 +208,17 @@ async def matching(conn, bot) -> None:
           str(await balance(conn, A) - a0))
     check("платёж помечен «закрыли раньше»", r.status == db.BANK_AMBIGUOUS and "раньше" in r.note, r.note)
 
+    # уведомление по другой карте (карта сайта) — бот его не трогает
+    await fresh(conn)
+    d = await dep(conn, A, 60001)
+    settings.bank_card = "1234"
+    try:
+        r = await handle(conn, bot, notice("600.01"))
+    finally:
+        settings.bank_card = ""
+    check("чужая карта → не трогаем", r.status == "other"
+          and (await db.get_deposit(conn, d.id)).status == db.DEP_PENDING, r.status)
+
     # заявка старше окна
     await fresh(conn)
     d = await dep(conn, A, 50001)

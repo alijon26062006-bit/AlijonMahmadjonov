@@ -504,6 +504,24 @@ CREATE TABLE IF NOT EXISTS tg_logins (          -- вход на сайт чер
     ip           TEXT,
     link_user_id INTEGER                       -- привязка Telegram к уже открытому аккаунту
 );
+CREATE TABLE IF NOT EXISTS bank_notices (       -- уведомления банка «Душанбе Сити» (юзербот): автоплатёж
+    id          INTEGER PRIMARY KEY,
+    source      TEXT NOT NULL,
+    message_id  INTEGER NOT NULL,
+    op_code     TEXT,                          -- код операции банка: один перевод — одно зачисление
+    amount      INTEGER NOT NULL DEFAULT 0,    -- дирамы (1 сомони = 100), фактически зачислено
+    sender      TEXT NOT NULL DEFAULT '',      -- счёт отправителя, скрытый банком: 9990000***1111
+    card_tail   TEXT NOT NULL DEFAULT '',      -- только последние 4 цифры карты
+    bank_time   TEXT NOT NULL DEFAULT '',
+    comment     TEXT NOT NULL DEFAULT '',
+    seen_at     TEXT NOT NULL,
+    status      TEXT NOT NULL,                 -- matched · ambiguous · unknown · failed · other
+    payment_id  INTEGER,
+    note        TEXT NOT NULL DEFAULT '',
+    body        TEXT NOT NULL DEFAULT ''       -- текст без номеров карт
+);
+CREATE UNIQUE INDEX IF NOT EXISTS bank_notices_msg ON bank_notices(source, message_id);
+CREATE UNIQUE INDEX IF NOT EXISTS bank_notices_code ON bank_notices(op_code) WHERE op_code IS NOT NULL AND op_code != '';
 """)
         if "phone" not in {r[1] for r in conn.execute("PRAGMA table_info(users)")}:
             conn.execute("ALTER TABLE users ADD COLUMN phone TEXT")   # номер из Telegram (поделился сам)

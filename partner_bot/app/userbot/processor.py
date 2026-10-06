@@ -71,6 +71,14 @@ async def handle(
                  "[USERBOT]", message_id)
         return Result(status="duplicate", note="повтор")
 
+    # Чужая карта (тот же Telegram получает уведомления и по карте сайта) — не наше, молчим
+    from app.config import settings
+    wanted = "".join(ch for ch in (settings.bank_card or "") if ch.isdigit())[-4:]
+    if wanted and notice.card_tail and notice.card_tail != wanted:
+        await db.close_bank_payment(conn, payment.id, status=db.BANK_FAILED,
+                                    note=f"другая карта *{notice.card_tail}")
+        return Result(status="other", note="другая карта")
+
     if not notice.ok:
         log.warning("[USERBOT] Parser error — %s (сообщение %s)",
                     notice.error, message_id)

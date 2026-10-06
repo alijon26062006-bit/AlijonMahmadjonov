@@ -27,6 +27,19 @@
   <div class="key-box"><code class="mono">{{ p.address }}</code>
     <button type="button" class="icon-btn" data-copy="{{ p.address }}" aria-label="Скопировать UID">{{ icon('copy', 18) }}</button></div>
   <div class="flash error net-warn">⚠️ В приложении Bybit: <b>Активы → Перевод → По UID</b>, монета USDT, сумма <b>ровно {{ p.pay_amount }}</b>. По последним цифрам суммы мы узнаём ваш перевод.</div>
+  {% elif p.auto == 'dcbank' %}
+  {% if p.pay_url %}<a class="btn primary block lg dc-pay" href="{{ p.pay_url }}" target="_blank" rel="noopener" style="margin-top:14px">🏙 Оплатить в «Душанбе Сити»</a>{% endif %}
+  <div class="ap-label" style="margin-top:14px">Номер карты / счёта</div>
+  <div class="key-box"><code class="mono">{{ p.address }}</code>
+    <button type="button" class="icon-btn" data-copy="{{ p.address }}" aria-label="Скопировать номер">{{ icon('copy', 18) }}</button></div>
+  <div class="flash error net-warn">⚠️ Переведите <b>ровно {{ p.pay_amount }} сомони — с копейками</b>. По ним мы узнаём ваш перевод: баланс пополнится сам за минуту, чек не нужен. Кнопка выше откроет приложение с уже подставленной суммой.</div>
+  <form class="dc-receipt" id="dc-receipt" method="post" action="/panel/balance/{{ p.id }}/receipt" enctype="multipart/form-data" {{ '' if receipt_now else 'hidden' }} data-after="{{ receipt_wait }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <p><b>Перевод пока не найден.</b> Возможно, вы перевели другую сумму или банк задержал уведомление — пришлите чек, проверим вручную.</p>
+    <input type="file" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf" required>
+    <button class="btn block" style="margin-top:8px">📎 Отправить чек</button>
+  </form>
+  <form class="inline" method="post" action="/panel/balance/{{ p.id }}/cancel" style="margin-top:10px"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link-btn muted small">Отменить заявку</button></form>
   {% elif p.auto == 'binance' %}
   <a class="btn primary block lg" href="{{ p.pay_url }}" target="_blank" rel="noopener" style="margin-top:14px">Оплатить в Binance</a>
   {% endif %}
@@ -42,6 +55,8 @@
     b.addEventListener("click", function () { if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy); });
   });
   if (!box || box.dataset.status !== "pending") return;
+  var rc = document.getElementById("dc-receipt");
+  if (rc && rc.hidden) setTimeout(function () { rc.hidden = false; }, (+rc.dataset.after || 300) * 1000);
   setInterval(function () {
     if (document.hidden) return;
     fetch("/panel/data/payment/" + box.dataset.id, {credentials: "same-origin"})

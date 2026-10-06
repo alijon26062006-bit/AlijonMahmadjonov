@@ -58,6 +58,7 @@
           <option value="" {{ 'selected' if not m.auto }}>Нет — вручную по чеку</option>
           <option value="trc20" {{ 'selected' if m.auto == 'trc20' }}>USDT TRC20 — сайт сам видит перевод в блокчейне (адрес T… в реквизитах)</option>
           <option value="bybit" {{ 'selected' if m.auto == 'bybit' }}>Bybit — перевод по UID, сайт сам видит поступление (UID в реквизитах{{ '' if bybit_ready else ', сначала ключ Bybit' }})</option>
+          <option value="dcbank" {{ 'selected' if m.auto == 'dcbank' }}>Душанбе Сити — сайт сам видит перевод по уведомлению банка (номер карты в реквизитах{{ '' if dcbank_ready else ', сначала подключите юзербот' }})</option>
           <option value="binance" {{ 'selected' if m.auto == 'binance' }}>Binance Pay{{ '' if binance_ready else ' — сначала добавьте ключи мерчанта' }}</option>
         </select>
       </div>

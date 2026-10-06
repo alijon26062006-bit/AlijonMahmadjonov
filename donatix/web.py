@@ -1187,7 +1187,31 @@ def panel_auto_pay(payment_id: int, request: Request, user=Depends(panel_user), 
     row = conn.execute("SELECT * FROM payments WHERE id = ? AND user_id = ?", (payment_id, user["id"])).fetchone()
     if row is None or not row["auto_kind"]:
         return _redirect("/panel/balance")
-    return render(request, "panel/auto_pay.html", {"user": user, "p": payments.public(conn, config, row)})
+    from . import dcbank
+    wait = dcbank.receipt_after_min(conn) * 60
+    age = payments._age(row["created_at"])
+    return render(request, "panel/auto_pay.html", {
+        "user": user, "p": payments.public(conn, config, row),
+        "receipt_now": row["auto_kind"] == "dcbank" and not row["receipt_file"] and age >= wait,
+        "receipt_wait": max(1, int(wait - age))})
+
+
+@router.post("/panel/balance/{payment_id}/receipt", dependencies=[Depends(check_csrf)])
+def panel_balance_receipt(payment_id: int, request: Request, receipt: UploadFile | None = File(None),
+                          user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """«Душанбе Сити»: перевод не совпал с заявкой — клиент присылает чек, админ проверит вручную."""
+    from . import payments
+    from .tgbot import send_receipt
+    data = receipt.file.read(payments.MAX_RECEIPT_BYTES + 1) if receipt and receipt.filename else b""
+    try:
+        payments.attach_receipt(conn, config, user["id"], payment_id, data)
+    except payments.PaymentError as exc:
+        flash(request, str(exc), "error")
+        return _redirect(f"/panel/balance/{payment_id}/pay")
+    send_receipt(conn, config, payment_id)
+    flash(request, f"Чек к заявке #{payment_id} получен — проверим и пополним баланс. "
+                   "Если перевод придёт раньше, баланс пополнится сам.")
+    return _redirect("/panel/balance")
 
 
 @router.get("/panel/data/payment/{payment_id}")

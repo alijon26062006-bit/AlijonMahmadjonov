@@ -534,6 +534,7 @@ def pay_settings(request: Request, admin=Depends(admin_user), conn=Depends(get_c
         "user": admin, "conf": payments.settings(conn, config), "currencies": payments.CURRENCY_CHOICES,
         "binance_ready": bool(config.binance_pay_key and config.binance_pay_secret),
         "bybit_ready": bool(config.bybit_key and config.bybit_secret),
+        "dcbank_ready": bool(config.tg_api_id and config.tg_api_hash and config.bank_bot),
         "rate": _rate_status(conn, config),
     })
 

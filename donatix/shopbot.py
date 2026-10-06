@@ -1534,7 +1534,8 @@ class ShopBot:
         rows = [[(tr(lang, "cancel"), "x", "danger")]]
         if p["auto_kind"]:
             if view["pay_url"]:
-                rows.insert(0, [("💳 Binance Pay", None, view["pay_url"])])
+                label = "🏙 Оплатить в «Душанбе Сити»" if p["auto_kind"] == "dcbank" else "💳 Binance Pay"
+                rows.insert(0, [(label, None, view["pay_url"])])
             text = tr(lang, "pay_auto", id=pid, amount=amount_text, address=_e(view["address"] or view["details"]),
                       note=_e(view["auto_note"]))
             intent = self.intent(conn, st.get("resume"))

@@ -5,6 +5,8 @@
     python -m donatix create-admin EMAIL                     создать админа (пароль спросит)
     python -m donatix check                                  проверить ключ поставщика и баланс
     python -m donatix prices                                 цены поставщика и ваши цены с наценкой
+    python -m donatix bank-login                             вход юзербота автоплатежа «Душанбе Сити»
+    python -m donatix bank-listen                            слушать уведомления банка (служба)
 """
 
 from __future__ import annotations
@@ -27,6 +29,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("check")
     sub.add_parser("prices")
     sub.add_parser("inspect")
+    sub.add_parser("bank-login")
+    sub.add_parser("bank-listen")
     admin = sub.add_parser("create-admin")
     admin.add_argument("email")
     args = parser.parse_args(argv)
@@ -57,6 +61,20 @@ def main(argv: list[str] | None = None) -> int:
         else:
             uvicorn.run(create_app(config), host=args.host, port=args.port, proxy_headers=True,
                         forwarded_allow_ips="127.0.0.1")
+        return 0
+
+    if args.cmd in ("bank-login", "bank-listen"):
+        import asyncio
+
+        from . import bankbot
+        logging.getLogger("telethon").setLevel(logging.WARNING)
+        db.init(config.db_path)
+        if args.cmd == "bank-login":
+            return asyncio.run(bankbot.login(config))
+        try:
+            asyncio.run(bankbot.run(config))
+        except KeyboardInterrupt:
+            pass
         return 0
 
     db.init(config.db_path)
