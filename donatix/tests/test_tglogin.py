@@ -10,6 +10,7 @@ from donatix import accounts, db, shopbot
 
 def _setup(app, config, conn, supplier):
     config.shop_bot_token = "t"
+    config.tg_login = True
     db.set_setting(conn, "shop.bot_username", "DonatixShopBot")
     return shopbot.ShopBot(config, supplier, api=FakeApi())
 
@@ -132,3 +133,18 @@ def test_password_change_needs_old_password_without_reset(app, config, conn):
     r = c.post("/panel/password", data={"csrf": csrf_of(form), "old": "wrong", "new": "newpass123",
                                         "new2": "newpass123"})
     assert r.status_code == 400 and "Старый пароль неверный" in r.text
+
+
+def test_telegram_login_off_by_default(app, config, conn, supplier):
+    config.shop_bot_token = "t"
+    db.set_setting(conn, "shop.bot_username", "DonatixShopBot")
+    config.google_client_id, config.google_client_secret = "x", "y"
+    c = TestClient(app)
+    assert "Войти через Telegram" not in c.get("/login").text
+    forgot = c.get("/forgot").text
+    assert "Восстановить через Google" in forgot and "через Telegram" not in forgot
+    assert c.get("/auth/telegram", follow_redirects=False).headers["location"] == "/login"
+    make_client(conn, login="onlyg")
+    web_login(c, "onlyg@example.com", "password123")
+    page = c.get("/panel/telegram").text
+    assert "Привязать Google" in page and "Привязать Telegram" not in page

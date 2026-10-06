@@ -507,7 +507,7 @@ def panel_password(request: Request, old: str = Form(""), new: str = Form(""), n
 def tg_login_start(request: Request, link: int = 0, reset: int = 0, conn=Depends(get_conn)):
     from . import tglogin
     bot = tglogin.bot_username(conn)
-    if not bot:
+    if not bot or not request.app.state.config.tg_login:
         flash(request, "Вход через Telegram пока не настроен.", "error")
         return _redirect("/login")
     if request.app.state.limiter.hit("account", f"tglogin{_ip(request)}") is not None:

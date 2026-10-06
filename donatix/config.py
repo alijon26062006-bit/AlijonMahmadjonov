@@ -140,6 +140,8 @@ class Config:
     # Вход через Google (OAuth). Ключи — в Google Cloud Console → Credentials
     google_client_id: str = ""
     google_client_secret: str = ""
+    # Вход, регистрация и восстановление пароля через Telegram-бота. По умолчанию выключено — только Google
+    tg_login: bool = False
     # Автоплатёж криптой: Binance Pay (ключи мерчанта) и TronGrid (необязательный ключ — выше лимиты)
     binance_pay_key: str = ""
     binance_pay_secret: str = ""
@@ -204,6 +206,7 @@ class Config:
             google_verify=_env("DONATIX_GOOGLE_VERIFY"),
             google_client_id=_env("DONATIX_GOOGLE_CLIENT_ID"),
             google_client_secret=_env("DONATIX_GOOGLE_CLIENT_SECRET"),
+            tg_login=_flag("DONATIX_TG_LOGIN", False),
             binance_pay_key=_env("DONATIX_BINANCE_PAY_KEY"),
             binance_pay_secret=_env("DONATIX_BINANCE_PAY_SECRET"),
             trongrid_key=_env("DONATIX_TRONGRID_KEY"),

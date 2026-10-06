@@ -130,7 +130,8 @@ def linked(conn: sqlite3.Connection, user_id: int) -> bool:
 
 def methods(conn: sqlite3.Connection, config: Any) -> dict[str, bool]:
     """Чем можно защитить аккаунт и восстановить пароль на этом сайте."""
-    return {"telegram": bool(getattr(config, "shop_bot_token", "") and bot_username(conn)),
+    return {"telegram": bool(getattr(config, "tg_login", False) and getattr(config, "shop_bot_token", "")
+                             and bot_username(conn)),
             "google": bool(getattr(config, "google_client_id", "") and getattr(config, "google_client_secret", ""))}
 
 

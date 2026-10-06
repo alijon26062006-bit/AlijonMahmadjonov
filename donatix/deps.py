@@ -219,7 +219,7 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["yandex_verify"] = config.yandex_verify
     ctx["google_login"] = bool(config.google_client_id and config.google_client_secret)
     ctx["tg_login"] = ""
-    if request.url.path in ("/login", "/register") and config.shop_bot_token:   # «Войти через Telegram»
+    if request.url.path in ("/login", "/register") and config.shop_bot_token and config.tg_login:   # «Войти через Telegram»
         _pool = db.pool(config.db_path)
         _c = _pool.acquire()
         try:
