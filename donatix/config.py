@@ -118,6 +118,8 @@ class Config:
     flashtopup_api_id: str = ""     # FlashTopup — только поиск ника по ID игрока
     flashtopup_api_key: str = ""
     shop_admin_ids: str = ""        # кому в боте-магазине видна админ-панель (через запятую)
+    android_package: str = ""       # приложение для Android (TWA): имя пакета, например tj.donatix.app
+    android_sha256: str = ""        # отпечатки ключа подписи APK через запятую — для /.well-known/assetlinks.json
     shop_bot_token: str = ""        # бот-магазин проекта (покупки кнопками в Telegram)
     openai_api_key: str = ""
     support_model: str = "gpt-4o-mini"
@@ -222,6 +224,8 @@ class Config:
             support_bot_token=_env("DONATIX_SUPPORT_BOT_TOKEN"),
             shop_bot_token=_env("DONATIX_SHOP_BOT_TOKEN"),
             shop_admin_ids=_env("DONATIX_SHOP_ADMIN_IDS"),
+            android_package=_env("DONATIX_ANDROID_PACKAGE"),
+            android_sha256=_env("DONATIX_ANDROID_SHA256"),
             flashtopup_api_id=_env("DONATIX_FLASHTOPUP_API_ID"),
             flashtopup_api_key=_env("DONATIX_FLASHTOPUP_API_KEY"),
             openai_api_key=_env("DONATIX_OPENAI_API_KEY") or _env("OPENAI_API_KEY"),

@@ -180,3 +180,22 @@ def test_api_key_errors_explain_what_is_wrong(client, conn, shop):
     kid = conn.execute("SELECT id FROM api_keys WHERE user_id = ?", (shop["id"],)).fetchone()[0]
     accounts.revoke_api_key(conn, shop["id"], kid)
     assert "отозван" in client.get("/api/v1/me", headers={"X-API-Key": key}).json()["error"]
+
+
+def test_app_ready_manifest_service_worker_offline_assetlinks(client, config):
+    m = client.get("/manifest.webmanifest")
+    assert m.status_code == 200 and m.headers["content-type"].startswith("application/manifest+json")
+    data = m.json()
+    assert data["display"] == "standalone" and data["start_url"].startswith("/panel")
+    assert {i["purpose"] for i in data["icons"]} == {"any", "maskable"}
+    for i in data["icons"]:
+        assert client.get(i["src"]).status_code == 200
+    sw = client.get("/sw.js")
+    assert sw.status_code == 200 and "javascript" in sw.headers["content-type"] and "/offline" in sw.text
+    assert "Нет интернета" in client.get("/offline").text
+    assert client.get("/.well-known/assetlinks.json").json() == []          # пока APK не подписан — пусто
+    config.android_package, config.android_sha256 = "tj.donatix.app", "aa:bb"
+    target = client.get("/.well-known/assetlinks.json").json()[0]["target"]
+    assert target["package_name"] == "tj.donatix.app" and target["sha256_cert_fingerprints"] == ["AA:BB"]
+    page = client.get("/panel/catalog").text
+    assert 'rel="manifest"' in page and 'class="tabbar"' in page

@@ -1598,3 +1598,31 @@ body.rcc-open { overflow: hidden; }
 .amt-cur label:has(input:checked) { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .usd-warn { margin-top: 10px; display: block; }
 .usd-warn .btn { margin-top: 8px; }
+
+/* ── Режим приложения (APK / «на экран домой»): нижнее меню, как в мобильных приложениях ── */
+.tabbar { display: none; }
+.offline { min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 24px;
+  text-align: center; }
+.offline img { border-radius: 18px; }
+.is-app body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+.is-app .btn, .is-app .tabbar, .is-app .nav-item { -webkit-user-select: none; user-select: none; }
+.is-app header.top { padding-top: env(safe-area-inset-top); }
+.is-webview .google-btn, .is-webview .or-line { display: none !important; }
+@media (max-width: 900px) {
+  .is-app .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid;
+    grid-template-columns: repeat(5, 1fr); padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px -18px rgb(0 0 0 / .4); }
+  .is-app .tabbar a, .is-app .tabbar button { display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 4px 2px; border: 0; background: none; color: var(--muted); font: 600 .7rem/1.1 inherit;
+    text-decoration: none; cursor: pointer; border-radius: 12px; height: 52px; justify-content: center; }
+  .is-app .tabbar .on { color: var(--accent); }
+  .is-app .tabbar .tab-main svg { width: 34px; height: 34px; padding: 7px; border-radius: 12px; margin-top: -14px;
+    background: var(--accent); color: #fff; box-shadow: 0 6px 16px -6px var(--accent); }
+  .is-app main#main { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .is-app .buy-bar { bottom: calc(65px + env(safe-area-inset-bottom)); padding-bottom: 10px; }
+  .is-app .buy-grid { padding-bottom: 150px; }
+  .is-app .only-sm[aria-label="Открыть меню"] { display: none; }
+}
+/* Форма покупки только проявляется, без сдвига: иначе закреплённая снизу кнопка «Купить» прыгает при открытии */
+@keyframes fade-only { from { opacity: 0; } }
+.shell > main > .buy-grid { animation-name: fade-only; }

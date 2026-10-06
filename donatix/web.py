@@ -139,6 +139,78 @@ def terms(request: Request, conn=Depends(get_conn)):
     return render(request, "legal.html", {"user": session_user(request, conn), "page": "terms"})
 
 
+# ── Приложение для телефона (Android APK / «Установить на экран») ──
+
+APP_SHORTCUTS = [("Каталог", "/panel/catalog"), ("Пополнить баланс", "/panel/balance"), ("Мои заказы", "/panel/orders")]
+
+
+@router.get("/manifest.webmanifest")
+def web_manifest(config: Config = Depends(get_config)):
+    """Описание приложения: по нему APK (TWA) и «Установить приложение» берут имя, иконки и цвета."""
+    icons = [{"src": f"/static/app/{n}", "sizes": s, "type": "image/png", "purpose": purpose}
+             for n, s, purpose in (("icon-192.png", "192x192", "any"), ("icon-512.png", "512x512", "any"),
+                                   ("maskable-192.png", "192x192", "maskable"),
+                                   ("maskable-512.png", "512x512", "maskable"))]
+    body = {
+        "id": "/panel", "name": config.site_name, "short_name": config.site_name,
+        "description": "Алмазы, UC, Telegram Stars, Steam — пополнение за секунды",
+        "lang": "ru", "dir": "ltr", "start_url": "/panel?source=app", "scope": "/",
+        "display": "standalone", "display_override": ["standalone", "minimal-ui"], "orientation": "portrait",
+        "background_color": "#0e1016", "theme_color": "#4338ca", "categories": ["shopping", "games"],
+        "icons": icons,
+        "shortcuts": [{"name": n, "url": u + "?source=app", "icons": [icons[0]]} for n, u in APP_SHORTCUTS],
+    }
+    return JSONResponse(body, media_type="application/manifest+json", headers={"Cache-Control": "public, max-age=3600"})
+
+
+SERVICE_WORKER = """// Donatix: страницы всегда свежие из сети; без интернета — экран «Нет связи».
+const CACHE = "dx-v1";
+const OFFLINE = "/offline";
+self.addEventListener("install", e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll([OFFLINE, "/static/app/icon-192.png", "/static/logo.svg"])));
+  self.skipWaiting();
+});
+self.addEventListener("activate", e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener("fetch", e => {
+  const r = e.request;
+  if (r.method !== "GET" || new URL(r.url).origin !== location.origin) return;
+  if (r.mode === "navigate") {           // страницы: только сеть (баланс и заказы не должны быть старыми)
+    e.respondWith(fetch(r).catch(() => caches.match(OFFLINE)));
+  } else if (r.url.includes("/static/")) {   // css, js, иконки: из кэша, обновляем в фоне
+    e.respondWith(caches.open(CACHE).then(c => c.match(r).then(hit => {
+      const net = fetch(r).then(resp => { if (resp.ok) c.put(r, resp.clone()); return resp; }).catch(() => hit);
+      return hit || net;
+    })));
+  }
+});
+"""
+
+
+@router.get("/sw.js")
+def service_worker():
+    return Response(SERVICE_WORKER, media_type="text/javascript",
+                    headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+
+@router.get("/offline")
+def offline_page(request: Request):
+    return render(request, "offline.html", {"user": None, "noindex": True})
+
+
+@router.get("/.well-known/assetlinks.json")
+def asset_links(config: Config = Depends(get_config)):
+    """Связь сайта с APK (Trusted Web Activity): без неё в приложении сверху видна адресная строка."""
+    prints = [x.strip().upper() for x in config.android_sha256.split(",") if x.strip()]
+    if not config.android_package or not prints:
+        return JSONResponse([])
+    return JSONResponse([{"relation": ["delegate_permission/common.handle_all_urls"],
+                          "target": {"namespace": "android_app", "package_name": config.android_package,
+                                     "sha256_cert_fingerprints": prints}}])
+
+
 @router.get("/robots.txt")
 def robots(config: Config = Depends(get_config)):
     body = ("User-agent: *\n"

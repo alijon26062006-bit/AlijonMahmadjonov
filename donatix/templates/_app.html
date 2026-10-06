@@ -48,6 +48,14 @@
     {% block content %}{% endblock %}
   </main>
 </div>
+{% set tab = request.url.path %}
+<nav class="tabbar" aria-label="Быстрые разделы">
+  <a href="/panel" class="{{ 'on' if tab == '/panel' }}">{{ icon('home', 22) }}<span>Главная</span></a>
+  <a href="/panel/catalog" class="{{ 'on' if tab.startswith('/panel/catalog') or tab.startswith('/panel/buy') }}">{{ icon('grid', 22) }}<span>Каталог</span></a>
+  <a href="/panel/balance" class="tab-main {{ 'on' if tab.startswith('/panel/balance') }}">{{ icon('plus', 24) }}<span>Пополнить</span></a>
+  <a href="/panel/orders" class="{{ 'on' if tab.startswith('/panel/orders') }}">{{ icon('bag', 22) }}<span>Заказы</span></a>
+  <button type="button" onclick="dxMenu(true)">{{ icon('menu', 22) }}<span>Ещё</span></button>
+</nav>
 <script>
   function dxMenu(open) {
     document.getElementById("side").classList.toggle("open", open);
