@@ -59,6 +59,22 @@ def ready(config: Config) -> bool:
     return bool(config.tg_api_id and config.tg_api_hash and config.bank_bot)
 
 
+def our_cards(conn: sqlite3.Connection, config: Config) -> set[str]:
+    """Последние 4 цифры наших карт: из DONATIX_BANK_CARD или из реквизитов способов «Душанбе Сити · авто»
+    в админке. Уведомления по другим картам (например, карте бота-магазина в том же Telegram) не трогаем."""
+    if config.bank_card:
+        return {config.bank_card}
+    from .payments import settings
+    out = set()
+    for m in settings(conn, config)["all_methods"]:
+        if m.get("auto") == KIND:
+            for chunk in re.findall(r"\d[\d \-]{8,}\d", m.get("details") or ""):
+                digits = re.sub(r"\D", "", chunk)
+                if len(digits) >= 10:
+                    out.add(digits[-4:])
+    return out
+
+
 def account_of(details: str) -> str:
     """Счёт/карта для ссылки — первая цепочка из 10+ цифр в реквизитах (пробелы и дефисы не мешают)."""
     for chunk in re.findall(r"\d[\d \-]{8,}\d", details or ""):
@@ -146,7 +162,8 @@ def handle(conn: sqlite3.Connection, config: Config, *, source: str, message_id:
         return {"status": "duplicate"}
     nid = int(cur.lastrowid)
 
-    if config.bank_card and notice.card_tail and notice.card_tail != config.bank_card:
+    cards = our_cards(conn, config)
+    if cards and notice.card_tail and notice.card_tail not in cards:
         _close(conn, nid, "other", note=f"другая карта *{notice.card_tail}")
         return {"status": "other"}
 

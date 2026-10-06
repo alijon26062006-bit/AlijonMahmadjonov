@@ -5,9 +5,8 @@
 #
 # 1. обновляет сайт и ставит telethon;
 # 2. пишет ключи в donatix/.env (не в репозиторий);
-# 3. спрашивает номер карты для приёма и добавляет способ «Душанбе Сити · авто» (если его ещё нет);
-# 4. входит в Telegram, куда приходят уведомления банка (номер и код вводите здесь);
-# 5. запускает службу donatix-bankbot — работает 24/7 и сама поднимается после перезагрузки.
+# 3. входит в Telegram, куда приходят уведомления банка (номер и код вводите здесь);
+# 4. запускает службу donatix-bankbot — работает 24/7 и сама поднимается после перезагрузки.
 set -euo pipefail
 APP_DIR="/home/donatix/app"; ENV_FILE="$APP_DIR/donatix/.env"; BRANCH="${DONATIX_BRANCH:-claude/website-api-sales-96wxcs}"
 UNIT=/etc/systemd/system/donatix-bankbot.service
@@ -36,32 +35,6 @@ open(path, "w", encoding="utf-8").write(s)
 PY
 chown donatix:donatix "$ENV_FILE"; chmod 600 "$ENV_FILE"
 ok "Ключи Telegram записаны в .env"
-
-# Способ оплаты «Душанбе Сити · авто»
-HAS=$(cd "$APP_DIR" && sudo -u donatix .venv/bin/python -c "
-from donatix import db, payments; from donatix.config import Config
-c = Config.from_env(); db.init(c.db_path); conn = db.connect(c.db_path)
-print(1 if any(m.get('auto') == 'dcbank' for m in payments.settings(conn, c)['all_methods']) else 0)")
-if [ "$HAS" = 0 ]; then
-    printf 'Номер карты «Душанбе Сити», на которую клиенты переводят (видят его): '; read -r CARD < /dev/tty
-    printf 'Имя получателя (Enter — пропустить): '; read -r HOLDER < /dev/tty
-    (cd "$APP_DIR" && CARD="$CARD" HOLDER="$HOLDER" sudo -E -u donatix .venv/bin/python -c "
-import os
-from donatix import db, payments; from donatix.config import Config
-c = Config.from_env(); conn = db.connect(c.db_path)
-ms = payments.settings(conn, c)['all_methods']
-details = 'Карта ' + os.environ['CARD'].strip() + ((', ' + os.environ['HOLDER'].strip()) if os.environ['HOLDER'].strip() else '')
-ms.insert(0, {'code': 'dcauto', 'title': 'Душанбе Сити · авто', 'currency': 'TJS', 'details': details,
-              'enabled': True, 'auto': 'dcbank'})
-payments.save_methods(conn, ms)
-print('✔ Способ «Душанбе Сити · авто» добавлен первым в списке')") || die "Номер карты не подошёл — нужно 10+ цифр."
-    # Уведомления по другим картам (например, карте бота-магазина) сайт не трогает
-    TAIL=$(echo "$CARD" | tr -cd '0-9' | tail -c 4)
-    sed -i '/^DONATIX_BANK_CARD=/d' "$ENV_FILE"; echo "DONATIX_BANK_CARD=$TAIL" >> "$ENV_FILE"
-    ok "Сайт слушает только карту *$TAIL"
-else
-    ok "Способ с автозачислением «Душанбе Сити» уже есть"
-fi
 
 systemctl restart donatix
 ok "Сайт перезапущен"
@@ -93,7 +66,9 @@ if (cd "$APP_DIR" && sudo -u donatix .venv/bin/python -m donatix bank-login) < /
     systemctl enable -q --now donatix-bankbot
     sleep 6
     journalctl -u donatix-bankbot -n 8 --no-pager | grep -E 'Слушаю|Подключён|сорвалось' || true
-    ok "Готово: автоплатёж «Душанбе Сити» работает 24/7. Смотреть живьём: journalctl -u donatix-bankbot -f"
+    ok "Готово: служба автоплатежа работает 24/7. Смотреть живьём: journalctl -u donatix-bankbot -f"
+    echo "Дальше: админка → Реквизиты → «Добавить способ»: название «Душанбе Сити · авто», номер карты,"
+    echo "        «Автозачисление» → «Душанбе Сити», сохранить."
 else
     die "Вход не завершён. Сайт работает, «Душанбе Сити» пока подтверждается по чеку. Повторите эту же команду."
 fi

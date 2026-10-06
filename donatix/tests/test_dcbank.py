@@ -119,6 +119,8 @@ def test_old_request_other_card_and_race(app, dc, conn):
 
     conn.execute("UPDATE payments SET created_at = ? WHERE id = ?", (datetime.now(timezone.utc)
                  .strftime("%Y-%m-%dT%H:%M:%S"), p["id"]))
+    # карта из реквизитов в админке — *5678; уведомление по другой карте (бота-магазина) не наше
+    assert _handle(conn, dc, notice("70.01", "51", card="9999000011112222"), 23)["status"] == "other"
     dc.bank_card = "1234"
     assert _handle(conn, dc, notice("70.01", "5"), 21)["status"] == "other"     # чужая карта — не трогаем
     dc.bank_card = ""
