@@ -410,7 +410,8 @@ async def _restore(call: CallbackQuery, state: FSMContext, conn) -> dict | None:
 
 @router.callback_query(F.data == "dep:paid")
 async def cb_paid(
-    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
+    call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection,
+    bot: Bot | None = None,
 ) -> None:
     """«Я оплатил» / «Чек фиристодан».
 
@@ -437,8 +438,108 @@ async def cb_paid(
         await call.answer()
         return
 
+    if not settings.userbot_ready:       # платежи проверяет владелец — нужен чек
+        await call.message.edit_text(
+            texts.DEPOSIT_WAITING.format(amount=fmt(data["amount"])),
+            reply_markup=keyboards.deposit_receipt(),
+        )
+        await call.answer()
+        return
+
+    # Юзербот слушает банк: чек не нужен. Ждём уведомление, а если за
+    # отведённое время деньги так и не совпали — сами попросим чек.
+    minutes = _receipt_wait()
     await call.message.edit_text(
-        texts.DEPOSIT_WAITING.format(amount=fmt(data["amount"])),
+        texts.DEPOSIT_WAITING.format(amount=fmt(data["amount"]), minutes=minutes),
+        reply_markup=keyboards.deposit_checking(),
+    )
+    await call.answer()
+    if bot is not None and deposit is not None:
+        _later(_ask_receipt_later(bot, deposit.id, call.message.chat.id, minutes))
+
+
+def _receipt_wait() -> int:
+    return max(1, runtime.get_int("receipt_wait_min", 5))
+
+
+#: Живые напоминания: без ссылки на задачу asyncio может собрать её мусорщиком.
+_reminders: set = set()
+
+
+def _later(coro) -> None:
+    import asyncio
+
+    task = asyncio.create_task(coro)
+    _reminders.add(task)
+    task.add_done_callback(_reminders.discard)
+
+
+async def _ask_receipt_later(bot, deposit_id: int, chat_id: int, minutes: int) -> None:
+    """Через N минут: деньги так и не совпали — попросить чек.
+
+    Своё соединение с базой: соединение обработчика к этому времени уже
+    закрыто. Если заявку за это время зачислили, отменили или чек уже
+    прислали — молчим.
+    """
+    import asyncio
+
+    await asyncio.sleep(minutes * 60)
+    conn = await db.connect()
+    try:
+        deposit = await db.get_deposit(conn, deposit_id)
+        if deposit is None or deposit.status != db.DEP_PENDING or deposit.receipt_file_id:
+            return
+        await bot.send_message(
+            chat_id, texts.DEPOSIT_ASK_RECEIPT.format(amount=fmt(deposit.amount)),
+            reply_markup=keyboards.deposit_receipt(),
+        )
+    except Exception as exc:  # noqa: BLE001 — напоминание не важнее работы бота
+        log.info("Напоминание о чеке по заявке %s не ушло: %s", deposit_id, exc)
+    finally:
+        await conn.close()
+
+
+@router.callback_query(F.data == "dep:check")
+async def cb_check(call: CallbackQuery, state: FSMContext,
+                   conn: aiosqlite.Connection) -> None:
+    """«Проверить»: пришли ли деньги. Нет — подождать; долго нет — чек."""
+    data = await _restore(call, state, conn)
+    if data is None:
+        return
+    deposit = await db.get_deposit(conn, data.get("deposit_id") or 0)
+    if deposit is not None and deposit.status == db.DEP_APPROVED:
+        await state.clear()
+        user = await db.get_user(conn, call.from_user.id)
+        await call.message.edit_text(
+            texts.DEPOSIT_APPROVED.format(amount=fmt(deposit.amount),
+                                          balance=fmt(user.balance if user else 0)),
+            reply_markup=keyboards.back(),
+        )
+        await call.answer()
+        return
+    from datetime import datetime, timedelta, timezone
+
+    waited = deposit is not None and datetime.fromisoformat(deposit.created_at) < (
+        datetime.now(timezone.utc) - timedelta(minutes=_receipt_wait()))
+    if waited:
+        await call.message.edit_text(
+            texts.DEPOSIT_ASK_RECEIPT.format(amount=fmt(data["amount"])),
+            reply_markup=keyboards.deposit_receipt(),
+        )
+        await call.answer()
+        return
+    await call.answer(texts.DEPOSIT_NOT_YET, show_alert=True)
+
+
+@router.callback_query(F.data == "dep:askrc")
+async def cb_ask_receipt(call: CallbackQuery, state: FSMContext,
+                         conn: aiosqlite.Connection) -> None:
+    """Клиент сам хочет отправить чек — не мешаем."""
+    data = await _restore(call, state, conn)
+    if data is None:
+        return
+    await call.message.edit_text(
+        texts.DEPOSIT_ASK_RECEIPT.format(amount=fmt(data["amount"])),
         reply_markup=keyboards.deposit_receipt(),
     )
     await call.answer()

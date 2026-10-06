@@ -262,6 +262,104 @@ async def foreign_message() -> None:
           runner.accept(Msg(5, "bank_test_bot"), queue, 0, "bank_test_bot") and queue.qsize() == 1)
 
 
+# ───────────────────────────────────────────── «Я оплатил» без чека
+
+
+class _Msg:
+    def __init__(self, uid):
+        self.texts, self.markups = [], []
+        self.chat, self.message_id = type("C", (), {"id": uid})(), 7
+
+    async def edit_text(self, text, reply_markup=None, **kw):
+        self.texts.append(text)
+        self.markups.append(reply_markup)
+
+
+class _Call:
+    def __init__(self, data, uid):
+        self.data, self.message, self.alerts = data, _Msg(uid), []
+        self.from_user = type("U", (), {"id": uid, "username": "c", "first_name": "К"})()
+
+    async def answer(self, text="", **kw):
+        if text:
+            self.alerts.append(text)
+
+
+class _State:
+    def __init__(self, **data):
+        self.data, self.state = dict(data), None
+
+    async def set_state(self, v):
+        self.state = v
+
+    async def update_data(self, **kw):
+        self.data.update(kw)
+
+    async def get_data(self):
+        return dict(self.data)
+
+    async def clear(self):
+        self.data.clear()
+
+
+def _buttons(markup) -> list[str]:
+    return [b.callback_data for row in markup.inline_keyboard for b in row] if markup else []
+
+
+async def no_receipt(conn, bot) -> None:
+    from app.handlers import deposit as dp
+
+    await fresh(conn)
+    d = await dep(conn, A, 2503)
+    call = _Call("dep:paid", A)
+    real_sleep = asyncio.sleep
+    waits = []
+
+    async def quick(seconds):
+        waits.append(seconds)
+        await real_sleep(0)
+
+    asyncio.sleep = quick
+    bot.clear()
+    try:
+        await dp.cb_paid(call, _State(amount=2503, deposit_id=d.id), conn, bot)
+        shown = call.message.texts[-1]
+        check("«Я оплатил» — чек не просим, ждём банк",
+              "лозим нест" in shown and "скриншоти чекро фиристед" not in shown, shown[:160])
+        check("есть «Проверить» и «Отправить чек»",
+              {"dep:check", "dep:askrc"} <= set(_buttons(call.message.markups[-1])))
+
+        c2 = _Call("dep:check", A)
+        await dp.cb_check(c2, _State(amount=2503, deposit_id=d.id), conn)
+        check("«Проверить» до денег — «ҳоло нарасид»", c2.alerts and "нарасид" in c2.alerts[-1], str(c2.alerts))
+
+        await asyncio.gather(*list(dp._reminders))
+        asked = [t for chat, t in bot.sent if chat == A and "чекро" in t]
+        check("деньги не совпали за 5 мин → бот сам просит чек", asked and waits == [300], f"{waits} {bot.sent[-1:]}")
+
+        # совпало — чек не просим
+        d2 = await dep(conn, B, 2604)
+        bot.clear()
+        bank_done = asyncio.Event()
+
+        async def after_bank(seconds):          # 5 минут проходят только после уведомления банка
+            await bank_done.wait()
+
+        asyncio.sleep = after_bank
+        await dp.cb_paid(_Call("dep:paid", B), _State(amount=2604, deposit_id=d2.id), conn, bot)
+        await handle(conn, bot, notice("26.04"))
+        bank_done.set()
+        await asyncio.gather(*list(dp._reminders))
+        check("деньги совпали → зачислено, чек не просили",
+              (await db.get_deposit(conn, d2.id)).status == db.DEP_APPROVED
+              and not [t for chat, t in bot.sent if chat == B and "скриншоти чекро" in t])
+        c3 = _Call("dep:check", B)
+        await dp.cb_check(c3, _State(amount=2604, deposit_id=d2.id), conn)
+        check("«Проверить» после зачисления — «пур шуд»", "пур шуд" in c3.message.texts[-1])
+    finally:
+        asyncio.sleep = real_sleep
+
+
 # ───────────────────────────────────────────── вход юзербота
 
 
@@ -363,6 +461,7 @@ async def main() -> None:
         parsing()
         await kopecks(conn)
         await matching(conn, bot)
+        await no_receipt(conn, bot)
     finally:
         await conn.close()
     await foreign_message()

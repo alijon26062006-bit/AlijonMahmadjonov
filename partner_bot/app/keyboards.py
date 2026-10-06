@@ -456,6 +456,16 @@ def deposit_open(deposit_id: int) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def deposit_checking() -> InlineKeyboardMarkup:
+    """После «Я оплатил»: проверить ещё раз или сразу отправить чек."""
+    kb = InlineKeyboardBuilder()
+    kb.row(btn("🔄 Санҷидан", "dep:check", style=PRIMARY))
+    kb.row(btn("📎 Чек фиристодан", "dep:askrc"))
+    kb.row(btn("‹ Реквизитҳо", "dep:back"))
+    kb.row(btn(labeled("cancel", "Бекор"), "m:main", style=DANGER))
+    return kb.as_markup()
+
+
 def deposit_receipt() -> InlineKeyboardMarkup:
     """Шаг чека: вернуться к реквизитам или выйти."""
     kb = InlineKeyboardBuilder()
