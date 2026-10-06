@@ -1626,3 +1626,5 @@ body.rcc-open { overflow: hidden; }
 /* Форма покупки только проявляется, без сдвига: иначе закреплённая снизу кнопка «Купить» прыгает при открытии */
 @keyframes fade-only { from { opacity: 0; } }
 .shell > main > .buy-grid { animation-name: fade-only; }
+/* В приложении нет подвала сайта и плавающей кнопки канала: место занимает нижнее меню */
+.is-app footer.foot, .is-app .tg-fab { display: none !important; }
