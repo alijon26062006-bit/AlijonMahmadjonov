@@ -204,20 +204,23 @@
       })(start);
     });
   })();
-  // Заставка приложения: прячем, как только страница готова (не раньше 1,8 с — анимация доигрывает, не позже 10 с)
+  // Заставка при входе: 3–5 секунд — не меньше 3 с (анимация и название), прячем, как только страница готова, не позже 5 с
   (function () {
     var d = document.documentElement;
     if (!d.classList.contains("splash-on")) return;
     var t0 = window.performance && performance.timing ? performance.timing.navigationStart || Date.now() : Date.now();
+    var done = false;
     function hide() {
+      if (done) return;
+      done = true;
       setTimeout(function () {
         d.classList.add("splash-out");
         try { sessionStorage.setItem("dx-splash", "1"); } catch (e) {}
         setTimeout(function () { d.classList.remove("splash-on", "splash-out"); }, 450);
-      }, Math.max(0, 1800 - (Date.now() - t0)));
+      }, Math.max(0, 3000 - (Date.now() - t0)));
     }
     if (document.readyState === "complete") hide(); else window.addEventListener("load", hide);
-    setTimeout(hide, 10000);
+    setTimeout(hide, Math.max(3000, 5000 - (Date.now() - t0)));   // медленный интернет: не дольше 5 с
   })();
 
   // Переход между страницами: тонкая полоска сверху сразу после нажатия — видно, что приложение работает

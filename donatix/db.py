@@ -480,6 +480,18 @@ CREATE TABLE IF NOT EXISTS shop_names (       -- витрина бота: сво
     hidden INTEGER NOT NULL DEFAULT 0
 );
 """)
+        conn.executescript("""
+CREATE TABLE IF NOT EXISTS push_subs (          -- push-уведомления: подписка каждого устройства
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    endpoint   TEXT NOT NULL UNIQUE,
+    p256dh     TEXT NOT NULL,
+    auth       TEXT NOT NULL,
+    ua         TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs(user_id);
+""")
         watch_cols = {r[1] for r in conn.execute("PRAGMA table_info(shop_watch)")}
         if "intent" not in watch_cols:   # что покупатель выбрал до пополнения — купим сами, когда деньги придут
             conn.execute("ALTER TABLE shop_watch ADD COLUMN intent TEXT")

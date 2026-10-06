@@ -7,6 +7,11 @@
   <p>Баланс, заказы и API в одном месте.</p>
 </section>
 <div class="app-hello only-app">Салом, <b>{{ user.login }}</b> 👋</div>
+<div class="install-app install-card" role="region" aria-label="Приложение">
+  <span style="font-size:1.6rem">📲</span>
+  <span class="grow"><b>Приложение Donatix</b><small>Покупки в одно касание и уведомления о заказах</small></span>
+  <button class="btn sm" type="button" data-install>Установить</button>
+</div>
 
 <div class="bal-hero">
   <div class="bal-amount">{{ money(user.balance_micro) }}</div>

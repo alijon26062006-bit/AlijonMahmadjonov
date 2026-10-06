@@ -21,6 +21,11 @@ def notify(conn: sqlite3.Connection, config: Config | None, user_id: int, text: 
     )
     if config:
         _push_to_bots(conn, config, user_id, text, link)
+        try:   # на телефон/компьютер, даже если сайт закрыт
+            from . import webpush
+            webpush.send(conn, config, user_id, text, link)
+        except Exception:  # noqa: BLE001 — уведомление не должно мешать зачислению или заказу
+            log.exception("push-уведомление")
     if config and config.smtp_host:
         row = conn.execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
         if row:

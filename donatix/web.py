@@ -163,8 +163,8 @@ def web_manifest(config: Config = Depends(get_config)):
     return JSONResponse(body, media_type="application/manifest+json", headers={"Cache-Control": "public, max-age=3600"})
 
 
-SERVICE_WORKER = """// Donatix: страницы всегда свежие из сети; без интернета — экран «Нет связи».
-const CACHE = "dx-v1";
+SERVICE_WORKER = """// Donatix: страницы всегда свежие из сети; без интернета — экран «Нет связи»; push-уведомления.
+const CACHE = "dx-v2";
 const OFFLINE = "/offline";
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll([OFFLINE, "/static/app/icon-192.png", "/static/logo.svg"])));
@@ -185,6 +185,24 @@ self.addEventListener("fetch", e => {
       return hit || net;
     })));
   }
+});
+self.addEventListener("push", e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(d.title || "Donatix", {
+    body: d.body || "", tag: d.tag, renotify: true, data: { url: d.url || "/panel/notifications" },
+    icon: "/static/app/icon-192.png", badge: "/static/app/badge-96.png", vibrate: [80, 40, 80],
+  }));
+});
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || "/panel", location.origin).href;
+  e.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
+    for (const w of list) {
+      if (w.url.startsWith(location.origin) && "focus" in w) { w.navigate(url); return w.focus(); }
+    }
+    return clients.openWindow(url);
+  }));
 });
 """
 
@@ -209,6 +227,42 @@ def asset_links(config: Config = Depends(get_config)):
     return JSONResponse([{"relation": ["delegate_permission/common.handle_all_urls"],
                           "target": {"namespace": "android_app", "package_name": config.android_package,
                                      "sha256_cert_fingerprints": prints}}])
+
+
+@router.get("/panel/push/key")
+def push_key(user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import webpush
+    pair = webpush.keys(conn)
+    return JSONResponse({"ok": bool(pair), "key": pair[1] if pair else "", "devices": webpush.count(conn, user["id"])})
+
+
+@router.post("/panel/push/subscribe", dependencies=[Depends(check_csrf)])
+def push_subscribe(request: Request, endpoint: str = Form(""), p256dh: str = Form(""), auth: str = Form(""),
+                   user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import webpush
+    try:
+        webpush.subscribe(conn, user["id"], endpoint, p256dh, auth, request.headers.get("user-agent", ""))
+    except ValueError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, 400)
+    return JSONResponse({"ok": True})
+
+
+@router.post("/panel/push/unsubscribe", dependencies=[Depends(check_csrf)])
+def push_unsubscribe(endpoint: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import webpush
+    webpush.unsubscribe(conn, user["id"], endpoint)
+    return JSONResponse({"ok": True})
+
+
+@router.post("/panel/push/test", dependencies=[Depends(check_csrf)])
+def push_test(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+              config: Config = Depends(get_config)):
+    from . import webpush
+    if request.app.state.limiter.hit("account", f"pushtest{user['id']}") is not None:
+        return JSONResponse({"ok": False, "error": "Слишком часто. Подождите минуту."}, 429)
+    n = webpush.send(conn, config, user["id"], "Уведомления работают! Так придёт сообщение о заказе и пополнении.",
+                     "/panel")
+    return JSONResponse({"ok": bool(n), "devices": n})
 
 
 @router.get("/robots.txt")

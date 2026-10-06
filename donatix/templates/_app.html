@@ -40,6 +40,7 @@
     <div class="side-scroll">
       {% block side_top %}{% endblock %}
       <nav aria-label="Разделы">{% block sidenav %}{% endblock %}</nav>
+      <button class="nav-item install-app" type="button" data-install style="width:100%;border:0;background:none;font:inherit;cursor:pointer;gap:10px;align-items:center">📲 <span>Установить приложение</span></button>
       {% if user and not user.guest %}
       <form class="side-logout" method="post" action="/logout" onsubmit="return confirm('Выйти из аккаунта?')">
         <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -49,6 +50,14 @@
     </div>
   </aside>
   <main id="main">
+    {% if user and not user.guest %}
+    <div class="push-ask" id="push-ask" hidden role="region" aria-label="Уведомления">
+      <span class="pa-ico">🔔</span>
+      <span class="grow"><b>Включите уведомления</b><small>Сразу узнаете, когда заказ выполнен и баланс пополнен — даже если приложение закрыто.</small></span>
+      <button class="btn primary sm" type="button" data-push-on>Включить</button>
+      <button class="icon-btn pa-x" type="button" aria-label="Не сейчас" data-push-later>{{ icon('x', 18) }}</button>
+    </div>
+    {% endif %}
     {% block notice %}{% endblock %}
     {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
     {% block content %}{% endblock %}
@@ -63,6 +72,108 @@
   <button type="button" onclick="dxMenu(true)">{{ icon('menu', 22) }}<span>Ещё</span></button>
 </nav>
 <script>
+  // Push-уведомления: подписка этого устройства (телефон, приложение, компьютер)
+  window.dxPush = (function () {
+    var csrf = "{{ csrf }}", ok = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window
+      && location.protocol === "https:";
+    function key(b64) {
+      var pad = "=".repeat((4 - b64.length % 4) % 4), raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+      return Uint8Array.from(raw, function (c) { return c.charCodeAt(0); });
+    }
+    function post(url, data) {
+      var body = new FormData(); body.append("csrf", csrf);
+      Object.keys(data || {}).forEach(function (k) { body.append(k, data[k]); });
+      return fetch(url, { method: "POST", body: body, credentials: "same-origin" }).then(function (r) { return r.json(); });
+    }
+    async function subscribe() {
+      var reg = await navigator.serviceWorker.ready;
+      var info = await (await fetch("/panel/push/key", { credentials: "same-origin" })).json();
+      if (!info.ok) throw new Error("Уведомления на сервере ещё не включены");
+      var sub = await reg.pushManager.getSubscription() ||
+        await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key(info.key) });
+      var j = sub.toJSON();
+      return post("/panel/push/subscribe", { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth });
+    }
+    async function enable() {
+      if (!ok) throw new Error("Этот браузер не поддерживает уведомления. Откройте сайт в Chrome или приложении.");
+      var perm = await Notification.requestPermission();
+      if (perm !== "granted") throw new Error("Уведомления запрещены. Разрешите их в настройках телефона для Donatix.");
+      return subscribe();
+    }
+    async function disable() {
+      var reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+      if (sub) { await post("/panel/push/unsubscribe", { endpoint: sub.endpoint }); await sub.unsubscribe(); }
+    }
+    async function state() {
+      if (!ok) return "unsupported";
+      if (Notification.permission === "denied") return "denied";
+      var reg = await navigator.serviceWorker.getRegistration();
+      var sub = reg && await reg.pushManager.getSubscription();
+      return sub && Notification.permission === "granted" ? "on" : "off";
+    }
+    // Разрешение уже дано — тихо обновляем подписку этого устройства раз за сессию
+    if (ok && Notification.permission === "granted") {
+      try { if (!sessionStorage.getItem("dx-push-sync")) { sessionStorage.setItem("dx-push-sync", "1"); subscribe().catch(function () {}); } } catch (e) {}
+    }
+    // Плашка «Включите уведомления»: показываем, если ещё не спрашивали и человек не нажал «Не сейчас» (на 7 дней)
+    var ask = document.getElementById("push-ask");
+    if (ask && ok && Notification.permission === "default") {
+      var later = 0; try { later = +localStorage.getItem("dx-push-later") || 0; } catch (e) {}
+      if (Date.now() - later > 7 * 864e5) ask.hidden = false;
+      ask.addEventListener("click", function (e) {
+        if (e.target.closest("[data-push-later]")) {
+          ask.hidden = true; try { localStorage.setItem("dx-push-later", String(Date.now())); } catch (er) {}
+        } else if (e.target.closest("[data-push-on]")) {
+          enable().then(function () { ask.innerHTML = "<span class='pa-ico'>✅</span><b>Уведомления включены</b>"; setTimeout(function () { ask.hidden = true; }, 2500); })
+            .catch(function (err) { ask.querySelector("small").textContent = err.message; });
+        }
+      });
+    }
+    return { supported: ok, enable: enable, disable: disable, state: state, test: function () { return post("/panel/push/test"); } };
+  })();
+
+  // «Установить приложение»: Chrome сам предлагает поставить сайт как приложение — показываем кнопку
+  (function () {
+    var prompt = null, d = document.documentElement;
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault(); prompt = e;
+      if (!d.classList.contains("is-app")) d.classList.add("can-install");
+    });
+    window.addEventListener("appinstalled", function () { d.classList.remove("can-install"); prompt = null; });
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest("[data-install]") || !prompt) return;
+      prompt.prompt();
+      prompt.userChoice.finally(function () { prompt = null; d.classList.remove("can-install"); });
+    });
+  })();
+
+  // Потянуть вниз — обновить (в приложении нет кнопки «обновить», а статус заказа хочется проверить)
+  (function () {
+    var d = document.documentElement;
+    if (!d.classList.contains("is-app") || !("ontouchstart" in window)) return;
+    var ind = document.createElement("div"), y0 = null, dy = 0;
+    ind.className = "ptr";
+    ind.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
+    document.body.appendChild(ind);
+    window.addEventListener("touchstart", function (e) {
+      y0 = window.scrollY <= 0 && !d.classList.contains("menu-open") ? e.touches[0].clientY : null; dy = 0;
+    }, { passive: true });
+    window.addEventListener("touchmove", function (e) {
+      if (y0 === null) return;
+      dy = Math.max(0, Math.min(120, e.touches[0].clientY - y0));
+      ind.style.transition = "none";
+      ind.style.transform = "translateY(" + (dy * 0.8 - 50) + "px)";
+      ind.classList.toggle("ready", dy > 80);
+    }, { passive: true });
+    window.addEventListener("touchend", function () {
+      if (y0 === null) return;
+      ind.style.transition = "";
+      if (dy > 80) { ind.classList.add("spin"); ind.style.transform = "translateY(24px)"; location.reload(); }
+      else { ind.style.transform = "translateY(-50px)"; }
+      y0 = null;
+    });
+  })();
+
   function dxMenu(open) {
     document.getElementById("side").classList.toggle("open", open);
     document.documentElement.classList.toggle("menu-open", open);
