@@ -6,7 +6,9 @@
   <div class="card tg-auth">
     <a class="back hide-in-app" href="/login">{{ icon('arrow-left', 18) }}Назад</a>
     <div class="tg-auth-logo">{{ tg_logo(64) }}</div>
-    <h2>{{ 'Привязать Telegram' if link else 'Вход через Telegram' }}</h2>
+    <h2>{{ 'Привязать Telegram' if link else ('Восстановление пароля' if reset else 'Вход через Telegram') }}</h2>
+    {% if reset %}<p class="muted">Подтвердите в Telegram, что это вы, — и сразу зададите новый пароль.
+      Работает, если Telegram уже привязан к аккаунту.</p>{% endif %}
     <ol class="tg-steps">
       <li>Нажмите кнопку — откроется наш бот <b>@{{ bot }}</b></li>
       <li>Нажмите <b>«Запустить» / Start</b></li>

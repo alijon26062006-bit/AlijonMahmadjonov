@@ -1781,3 +1781,12 @@ body.rcc-open { overflow: hidden; }
 .tg-wait { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 16px 0 6px; color: var(--muted); }
 .tg-dot { width: 10px; height: 10px; border-radius: 50%; background: #229ED9; animation: tg-pulse 1.2s ease-in-out infinite; }
 @keyframes tg-pulse { 50% { opacity: .25; transform: scale(.7); } }
+.tg-reg-note { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; padding: 12px 14px; border-radius: 14px;
+  background: color-mix(in srgb, #229ED9 12%, transparent); border: 1px solid color-mix(in srgb, #229ED9 35%, transparent); }
+.tg-reg-note span { color: var(--muted); font-size: .9rem; line-height: 1.4; }
+.email-reg { margin-top: 14px; }
+.email-reg summary { cursor: pointer; color: var(--accent); font-weight: 600; text-align: center; padding: 8px 0; }
+.tg-why { list-style: none; padding: 0; margin: 16px 0 18px; text-align: left; display: grid; gap: 10px; }
+.tg-why li { display: flex; gap: 12px; align-items: flex-start; line-height: 1.4; }
+.tg-why li > span:first-child { font-size: 1.3rem; }
+.tg-require { max-width: 520px; margin: 10px auto; }

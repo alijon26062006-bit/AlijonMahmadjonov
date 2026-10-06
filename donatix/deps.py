@@ -133,6 +133,10 @@ class LoginRequired(Exception):
     pass
 
 
+class TelegramRequired(Exception):
+    """Клиент вошёл, но ещё не привязал Telegram с номером — сначала привязка."""
+
+
 class Forbidden(Exception):
     pass
 

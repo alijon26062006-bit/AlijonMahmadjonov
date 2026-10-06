@@ -13,7 +13,8 @@ from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse,
 
 from . import accounts, cache, catalog, db, orders, popular, referrals, sitecfg
 from .config import PAY_METHODS, Config
-from .deps import INDEXABLE, LoginRequired, check_csrf, flash, get_config, get_conn, render, session_user
+from .deps import (INDEXABLE, LoginRequired, TelegramRequired, check_csrf, flash, get_config, get_conn, render,
+                   session_user)
 from .money import apply_markup, fmt, order_total_micro, to_decimal
 from .suppliers import KINDS, region_title
 
@@ -31,7 +32,13 @@ def panel_user(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -
             query = "?" + request.url.query if request.url.query else ""
             request.session["next"] = _safe_next(request.url.path + query)
         raise LoginRequired()
+    from . import tglogin
+    if request.url.path not in TG_FREE and tglogin.required(conn, request.app.state.config, user):
+        raise TelegramRequired()
     return user
+
+
+TG_FREE = {"/panel/telegram", "/panel/password"}   # открываются и без привязки Telegram
 
 
 class Guest(dict):
@@ -453,10 +460,50 @@ def login_code(request: Request, code: str = Form(""), conn=Depends(get_conn),
     return _redirect("/admin")
 
 
+@router.get("/panel/telegram")
+def panel_telegram_required(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import tglogin
+    if tglogin.linked(conn, user["id"]):
+        return _redirect("/panel")
+    return render(request, "panel/telegram_link.html", {"user": user, "bot": tglogin.bot_username(conn)})
+
+
+@router.get("/panel/password")
+def panel_password_form(request: Request, user=Depends(panel_user)):
+    import time as _time
+    free = request.session.get("pw_reset_until", 0) > _time.time()
+    return render(request, "panel/password.html", {"user": user, "reset": free})
+
+
+@router.post("/panel/password", dependencies=[Depends(check_csrf)])
+def panel_password(request: Request, old: str = Form(""), new: str = Form(""), new2: str = Form(""),
+                   user=Depends(panel_user), conn=Depends(get_conn)):
+    import time as _time
+
+    from .security import hash_password, verify_password
+    free = request.session.get("pw_reset_until", 0) > _time.time()   # только что подтвердили личность в Telegram
+    error = ""
+    if not free and not verify_password(old, user["password_hash"]):
+        error = "Старый пароль неверный. Забыли его? Выйдите и нажмите «Забыли пароль?» на странице входа."
+    elif len(new) < 8:
+        error = "Новый пароль — не меньше 8 символов."
+    elif new != new2:
+        error = "Пароли не совпадают."
+    if error:
+        return render(request, "panel/password.html", {"user": user, "reset": free, "error": error}, 400)
+    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(new), user["id"]))
+    sid = request.session.get("sid")   # остальные входы закрываем: старый пароль мог знать кто-то ещё
+    conn.execute("UPDATE logins SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL AND sid != ?",
+                 (db.now(), user["id"], sid or ""))
+    request.session.pop("pw_reset_until", None)
+    flash(request, "✅ Пароль изменён. Остальные устройства вышли из аккаунта.")
+    return _redirect("/panel")
+
+
 # ── Вход через Telegram (бот-магазин): номер один раз, дальше — одна кнопка ──
 
 @router.get("/auth/telegram")
-def tg_login_start(request: Request, link: int = 0, conn=Depends(get_conn)):
+def tg_login_start(request: Request, link: int = 0, reset: int = 0, conn=Depends(get_conn)):
     from . import tglogin
     bot = tglogin.bot_username(conn)
     if not bot:
@@ -469,8 +516,10 @@ def tg_login_start(request: Request, link: int = 0, conn=Depends(get_conn)):
     token = tglogin.create(conn, request.headers.get("user-agent", ""), _ip(request),
                            link_user_id=me["id"] if me else None)
     request.session["tg_login"] = token
+    request.session["tg_reset"] = bool(reset and not me)
     return render(request, "auth_telegram.html", {"tg_url": f"https://t.me/{bot}?start=login_{token}",
-                                                  "bot": bot, "link": bool(me), "noindex": True})
+                                                  "bot": bot, "link": bool(me), "reset": bool(reset and not me),
+                                                  "noindex": True})
 
 
 @router.get("/auth/telegram/status")
@@ -493,11 +542,18 @@ def tg_login_finish(request: Request, conn=Depends(get_conn)):
     if row["link_user_id"]:
         flash(request, "✅ Telegram привязан. Теперь можно входить одной кнопкой «Войти через Telegram».")
         return _redirect("/panel")
+    reset = request.session.pop("tg_reset", False)
     user = accounts.get_user(conn, uid)
     if user is None or user["status"] == "blocked":
         flash(request, "Аккаунт заблокирован.", "error")
         return _redirect("/login")
-    return _finish_login(request, conn, user)
+    resp = _finish_login(request, conn, user)
+    if reset and user["role"] != "admin":   # «Забыли пароль?» — личность подтверждена в Telegram: новый пароль
+        import time as _time
+        request.session["pw_reset_until"] = _time.time() + 900
+        flash(request, "✅ Личность подтверждена через Telegram. Придумайте новый пароль.")
+        return _redirect("/panel/password")
+    return resp
 
 
 @router.get("/auth/google")

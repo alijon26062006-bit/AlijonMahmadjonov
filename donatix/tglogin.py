@@ -119,3 +119,19 @@ def status(conn: sqlite3.Connection, token: str) -> dict[str, Any]:
     if row is None:
         return {"state": "expired"}
     return {"state": row["status"]}
+
+
+def linked(conn: sqlite3.Connection, user_id: int) -> bool:
+    """Telegram привязан и номер есть."""
+    row = conn.execute("SELECT u.phone FROM users u JOIN shop_users s ON s.user_id = u.id WHERE u.id = ? LIMIT 1",
+                       (user_id,)).fetchone()
+    return bool(row and row["phone"])
+
+
+def required(conn: sqlite3.Connection, config: Any, user: Any) -> bool:
+    """Клиента просим привязать Telegram с номером. Админа, гостя и сайт без бота — нет."""
+    if user is None or (isinstance(user, dict) and user.get("guest")):
+        return False
+    if user["role"] != "client" or not getattr(config, "shop_bot_token", "") or not bot_username(conn):
+        return False
+    return not linked(conn, user["id"])

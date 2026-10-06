@@ -796,7 +796,8 @@ class ShopBot:
             self.show(su["tg_id"], LOGIN_EXPIRED)
             return
         user = self._user(conn, su)
-        if not row["link_user_id"] and not (user["phone"] or ""):
+        target = accounts.get_user(conn, int(row["link_user_id"])) if row["link_user_id"] else None
+        if not (user["phone"] or (target["phone"] if target else "")):   # номер нужен один раз — и для привязки
             self.login_wait[su["tg_id"]] = token
             self.api("sendMessage", chat_id=su["tg_id"], parse_mode="HTML", text=LOGIN_ASK_PHONE,
                      reply_markup={"keyboard": [[{"text": "📱 Поделиться номером / Рақамро фиристодан",
