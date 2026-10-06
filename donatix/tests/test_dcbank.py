@@ -185,3 +185,31 @@ def test_listener_ignores_strangers(caplog):
     assert ids == {1996047418} and names == {"dc_next_bot"}
     assert bankbot.accept(Msg(42, None), q, ids, names, sender=type("S", (), {"username": "DC_next_bot"})())
     assert not bankbot.accept(Msg(43, None), q, ids, names, sender=type("S", (), {"username": "x", "bot": True})())
+
+
+def test_shop_bot_replaces_requisites_with_paid(app, dc, conn, supplier):
+    """Бот-магазин: после автозачисления реквизиты заменяются ответом «оплата получена» — даже если
+    соединение бота застряло в старой транзакции и не видело подтверждения."""
+    from test_shopbot import _bot, _start, msg, press
+
+    from donatix import db
+
+    bot = _bot(dc, supplier)
+    _start(bot, conn, "tj")
+    bot.handle(conn, press("t"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
+    bot.handle(conn, msg("1"))
+    shown = next(p for m, p in reversed(bot.api.calls) if "1.01" in (p.get("text") or ""))
+    req_mid = bot.api.mid if "message_id" not in shown else shown["message_id"]
+    p = conn.execute("SELECT * FROM payments").fetchone()
+
+    conn.execute("BEGIN")                                   # бот держит старый снимок базы
+    conn.execute("SELECT status FROM payments WHERE id = ?", (p["id"],)).fetchone()
+    other = db.connect(dc.db_path)                          # банк подтверждает из своей службы
+    assert _handle(other, dc, notice("1.01", "8801"), 50)["status"] == "matched"
+    other.close()
+
+    bot.watch(conn, force=True)
+    method, last = bot.api.calls[-1]
+    assert method == "editMessageText" and last["message_id"] == req_mid
+    assert "Пардохт гирифта шуд" in last["text"] and "1.01" in last["text"]

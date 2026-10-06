@@ -156,8 +156,8 @@ T: dict[str, tuple[str, str]] = {
     "nick_bad": ("⚠️ Игрок с таким ID не найден — проверьте ID.", "⚠️ Бозигар бо ин ID ёфт нашуд — ID-ро санҷед."),
     "checking": ("⏳ <b>Проверяем чек</b>\nПодождите, как только проверим — напишу.",
                  "⏳ <b>Чекро месанҷем</b>\nИнтизор шавед, баъди санҷиш менависам."),
-    "paid": ("✅ <b>Баланс пополнен на {amount}</b>\nТеперь на балансе: {balance}",
-             "✅ <b>Баланс {amount} пур шуд</b>\nҲоло дар баланс: {balance}"),
+    "paid": ("🎉 <b>Оплата получена!</b>\n\n✅ Баланс пополнен на <b>{amount}</b>\n💰 Теперь на балансе: <b>{balance}</b>",
+             "🎉 <b>Пардохт гирифта шуд!</b>\n\n✅ Баланс ба <b>{amount}</b> пур шуд\n💰 Ҳоло дар баланс: <b>{balance}</b>"),
     "paid_bought": ("✅ <b>Баланс пополнен на {amount}</b>\n\n🚀 Ваш заказ <b>{id}</b> отправлен автоматически:\n"
                     "{product}\nСписано: {total}\n\nКак только будет готово — напишу.",
                     "✅ <b>Баланс {amount} пур шуд</b>\n\n🚀 Фармоиши шумо <b>{id}</b> худкор фиристода шуд:\n"
@@ -1697,6 +1697,11 @@ class ShopBot:
         if not force and now - self._last_watch < WATCH_EVERY:
             return 0
         self._last_watch = now
+        if conn.in_transaction:
+            # Соединение бота живёт всё время работы. Незакрытая транзакция держит старый снимок базы —
+            # бот не видит, что заявку уже подтвердили (автоплатёж, кассир), и молчит.
+            log.warning("бот-магазин: незакрытая транзакция — снимаю, чтобы видеть свежие статусы")
+            conn.execute("ROLLBACK")
         done = 0
         rows = conn.execute("SELECT w.*, s.lang, s.user_id FROM shop_watch w JOIN shop_users s ON s.tg_id = w.chat_id "
                             "ORDER BY w.id LIMIT 100").fetchall()
@@ -1727,7 +1732,7 @@ class ShopBot:
         rate = tjs_rate(conn, self.config)
         if p["status"] != "paid":
             self.show(chat, tr(lang, "rejected", id=p["id"], reason=_e(p["admin_note"] or "")),
-                      [[(tr(lang, "topup"), "t"), (tr(lang, "home"), "h")]])
+                      [[(tr(lang, "topup"), "t"), (tr(lang, "home"), "h")]], edit=w["message_id"])
             return
         try:
             intent = json.loads(w["intent"]) if w["intent"] else None
@@ -1736,8 +1741,10 @@ class ShopBot:
         if intent and self.auto_buy(conn, w, p, intent):
             return
         user = accounts.get_user(conn, w["user_id"])
+        # Реквизиты больше не нужны — на их месте ответ «оплата получена», а не ещё одно сообщение ниже
         self.show(chat, tr(lang, "paid", amount=money(p["amount_micro"], rate),
-                           balance=money(user["balance_micro"], rate)), [[(tr(lang, "home"), "h")]])
+                           balance=money(user["balance_micro"], rate)), [[(tr(lang, "home"), "h")]],
+                  edit=w["message_id"])
 
     def auto_buy(self, conn: sqlite3.Connection, w: sqlite3.Row, pay: sqlite3.Row, intent: dict[str, Any]) -> bool:
         """Пополнение подтвердили — то, что человек выбрал до оплаты, сразу уходит поставщику.
