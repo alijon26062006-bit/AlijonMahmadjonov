@@ -9,3 +9,5 @@ venv/
 # не должно никогда, даже если файл лежит не в data/.
 *.session
 *.session-journal
+*.session*.old
+*.session*.old-journal

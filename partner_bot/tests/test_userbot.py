@@ -509,7 +509,7 @@ async def reconnect(bot) -> None:
         def on(self, _event):
             return lambda fn: fn
 
-        async def start(self):
+        async def connect(self):
             raise ConnectionError("сеанс завершён")
 
         async def disconnect(self):

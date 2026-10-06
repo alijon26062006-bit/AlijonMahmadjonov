@@ -422,6 +422,21 @@ async def cb_paid(
     if data is None:
         return
 
+    # Деньги могли прийти раньше, чем человек нажал кнопку: юзербот уже
+    # зачислил их по уведомлению банка. Тогда «ждите» — неправда.
+    deposit = await db.get_deposit(conn, data.get("deposit_id") or 0)
+    if deposit is not None and deposit.status == db.DEP_APPROVED:
+        await state.clear()
+        user = await db.get_user(conn, call.from_user.id)
+        await call.message.edit_text(
+            texts.DEPOSIT_APPROVED.format(
+                amount=fmt(deposit.amount), balance=fmt(user.balance if user else 0)
+            ),
+            reply_markup=keyboards.back(),
+        )
+        await call.answer()
+        return
+
     await call.message.edit_text(
         texts.DEPOSIT_WAITING.format(amount=fmt(data["amount"])),
         reply_markup=keyboards.deposit_receipt(),

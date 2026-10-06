@@ -264,6 +264,7 @@ def prices_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="💵 Мин. пополнение", callback_data="pn:set:min_deposit_diram"),
         InlineKeyboardButton(text="👥 Реф. %", callback_data="pn:set:referral_percent"),
     )
+    kb.row(InlineKeyboardButton(text="⏳ Окно автоплатежа", callback_data="pn:set:deposit_match_hours"))
     kb.row(InlineKeyboardButton(text="‹ Назад", callback_data="pn:home"))
     return kb.as_markup()
 
@@ -308,6 +309,7 @@ def prices_text() -> str:
            "⚪️ Автоцены выключены — цена держится, пока не поменяете вручную.\n\n")
         + f"📏 Заказ: от <b>{runtime.min_stars()}</b> до <b>{runtime.max_stars()}</b> звёзд\n"
         f"💵 Мин. пополнение: <b>{fmt(runtime.min_deposit())}</b>\n"
+        f"⏳ Окно автоплатежа: <b>{runtime.get_int('deposit_match_hours', 6)} ч</b>\n"
         f"👥 Реферальный процент: <b>{runtime.referral_percent()}%</b>\n"
         + rate_line()
     )
@@ -653,6 +655,10 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "max_stars": ("⬆️ Максимум звёзд", "Максимум звёзд в одном заказе:", "int"),
     "min_deposit_diram": ("💵 Минимальное пополнение",
                           "Минимальная сумма пополнения в сомони:", "money"),
+    "deposit_match_hours": ("⏳ Окно автоплатежа",
+                            "Сколько часов заявка ждёт перевод. Уведомление банка "
+                            "сравнивается только со свежими заявками — старые, "
+                            "брошенные клиентами, не мешают. Обычно 6:", "int"),
     "referral_percent": ("👥 Реферальный процент",
                          "Сколько процентов получает пригласивший "
                          "с каждого пополнения:", "percent"),
@@ -711,7 +717,7 @@ FIELD_PARENT.update({
     "steam_currency": "pn:steam", "steam_packs": "pn:steam",
     "usd_rate_diram": "pn:prices", "usd_rate_spread": "pn:prices",
     "max_stars": "pn:prices", "min_deposit_diram": "pn:prices",
-    "referral_percent": "pn:prices", "support_notice": "pn:home", "support_username": "pn:home",
+    "referral_percent": "pn:prices", "deposit_match_hours": "pn:prices", "support_notice": "pn:home", "support_username": "pn:home",
     "autostop_after": "pn:wallet",
     "games_timeout_min": "pn:games",
     "api_margin": "pn:api",

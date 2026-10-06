@@ -108,6 +108,19 @@ async def main() -> None:
     call = Call("dep:paid")
     await dep.cb_paid(call, state, conn)
     check("заявки нет — понятное сообщение", call.alerts and "аз нав сар кунед" in call.alerts[-1], str(call.alerts))
+
+    # Деньги пришли раньше, чем человек нажал «Я оплатил», — пишем «зачислено», а не «ждите»
+    await db.upsert_user(conn, UID, "buyer", "Покупатель")
+    d = await db.create_deposit(conn, user_id=UID, amount=1503, method="Перевод на карту",
+                                receipt_file_id="", reference="TOP2222")
+    await _resolve_deposit(conn, Bot(), d.id, 0, approved=True)
+    state = State()
+    state.data.update(amount=1503, deposit_id=d.id)
+    call = Call("dep:paid")
+    await dep.cb_paid(call, state, conn)
+    shown = (call.message.texts or [""])[-1]
+    check("«Я оплатил» после зачисления — «зачислено», а не «ждите»",
+          "пур шуд" in shown and "скриншоти" not in shown, shown[:120])
     await conn.close()
 
 

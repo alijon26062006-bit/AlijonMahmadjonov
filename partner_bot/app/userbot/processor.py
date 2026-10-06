@@ -199,7 +199,14 @@ async def _confirm(conn, bot, payment, deposit, notice, near=False) -> Result:
     report = await _resolve_deposit(conn, bot, deposit.id, ROBOT, approved=True)
     fresh = await db.get_deposit(conn, deposit.id)
 
-    if fresh is None or fresh.status != db.DEP_APPROVED:
+    from app import texts
+
+    # Зачислили ли МЫ. Статус approved сам по себе ничего не говорит: его
+    # мог поставить владелец кнопкой за долю секунды до нас — тогда деньги
+    # уже у клиента от него, а этот платёж к заявке привязывать нельзя.
+    ours = (fresh is not None and fresh.status == db.DEP_APPROVED
+            and report != texts.ADMIN_ALREADY_HANDLED and fresh.reviewed_by == ROBOT)
+    if not ours:
         # Кто-то успел раньше — владелец руками или второй процесс.
         # Деньги уже зачислены им, второй раз не начисляем.
         log.warning("[USERBOT] Заявку %s закрыли раньше нас — не трогаем",

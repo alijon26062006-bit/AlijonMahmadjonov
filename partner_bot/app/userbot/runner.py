@@ -71,6 +71,27 @@ def _from_source(message, wanted_id: int, wanted_name: str) -> bool:
     return False
 
 
+def accept(message, queue: asyncio.Queue, wanted_id: int, wanted_name: str) -> bool:
+    """Положить уведомление банка в очередь. True — это банк и оно в очереди.
+
+    Всё, что не от банка, не читаем и не пишем никуда — ни в очередь, ни в
+    журнал: это чужая личная переписка.
+    """
+    if not _from_source(message, wanted_id, wanted_name):
+        return False
+    log.info("[USERBOT] New bank message")
+    try:
+        queue.put_nowait((message.id, message.message or ""))
+    except asyncio.QueueFull:
+        log.error("[USERBOT] Очередь переполнена, уведомление %s пропущено", message.id)
+        return False
+    return True
+
+
+class SessionDead(Exception):
+    """Файл сеанса есть, но Telegram его не признаёт — нужен новый вход."""
+
+
 async def _drain(queue: asyncio.Queue, bot) -> None:
     """Разбирает очередь по одному уведомлению за раз.
 
@@ -158,19 +179,15 @@ async def run(bot=None) -> None:
 
             @client.on(events.NewMessage(incoming=True))
             async def on_message(event) -> None:      # noqa: ANN001
-                # Всё, что не от банка, не читаем и не пишем никуда:
-                # это чужая личная переписка.
-                if not _from_source(event.message, wanted_id, wanted_name):
-                    return
-                log.info("[USERBOT] New bank message")
-                try:
-                    queue.put_nowait((event.message.id, event.message.message or ""))
-                except asyncio.QueueFull:
-                    log.error("[USERBOT] Очередь переполнена, уведомление "
-                              "%s пропущено", event.message.id)
+                accept(event.message, queue, wanted_id, wanted_name)
 
             try:
-                await client.start()
+                # Не client.start(): без живого сеанса он стал бы спрашивать
+                # номер и код у службы, где никто не ответит. Сеанс мёртв —
+                # говорим об этом и ждём нового входа руками.
+                await client.connect()
+                if not await client.is_user_authorized():
+                    raise SessionDead("сеанс завершён в Telegram — нужен новый вход")
                 me = await client.get_me()
                 log.info("[USERBOT] Подключён как @%s", me.username or me.id)
                 if told:
