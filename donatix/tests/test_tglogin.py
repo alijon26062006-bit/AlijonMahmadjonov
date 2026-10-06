@@ -103,7 +103,8 @@ def test_forgot_password_via_telegram(app, config, conn, supplier):
     conn.execute("INSERT INTO shop_users (tg_id, user_id, name, lang, created_at) "
                  "VALUES (?, ?, 'А', 'ru', '2026-01-01')", (TG, uid))
     c = TestClient(app)
-    assert "Восстановить через Telegram" in c.get("/login").text
+    assert 'href="/forgot"' in c.get("/login").text
+    assert "Восстановить через Telegram" in c.get("/forgot").text
     page = c.get("/auth/telegram?reset=1")
     assert "Восстановление пароля" in page.text
     token = re.search(r"start=login_([A-Za-z0-9]+)", page.text).group(1)

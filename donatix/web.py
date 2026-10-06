@@ -463,9 +463,10 @@ def login_code(request: Request, code: str = Form(""), conn=Depends(get_conn),
 @router.get("/panel/telegram")
 def panel_telegram_required(request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
     from . import tglogin
-    if tglogin.linked(conn, user["id"]):
+    if not tglogin.required(conn, request.app.state.config, user):
         return _redirect("/panel")
-    return render(request, "panel/telegram_link.html", {"user": user, "bot": tglogin.bot_username(conn)})
+    return render(request, "panel/telegram_link.html", {"user": user, "bot": tglogin.bot_username(conn),
+                                                        "ways": tglogin.methods(conn, request.app.state.config)})
 
 
 @router.get("/panel/password")
@@ -557,13 +558,17 @@ def tg_login_finish(request: Request, conn=Depends(get_conn)):
 
 
 @router.get("/auth/google")
-def google_start(request: Request, config: Config = Depends(get_config)):
+def google_start(request: Request, link: int = 0, reset: int = 0, conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
     from . import google_auth
     if not google_auth.enabled(config):
         flash(request, "Вход через Google не настроен.", "error")
         return _redirect("/login")
     state = uuid.uuid4().hex
     request.session["g_state"] = state
+    me = session_user(request, conn) if link else None
+    request.session["g_link"] = me["id"] if me else 0          # привязать Google к открытому аккаунту
+    request.session["g_reset"] = bool(reset and not me)         # «Забыли пароль?» через Google
     return RedirectResponse(google_auth.auth_url(config, state), status_code=303)
 
 
@@ -580,6 +585,22 @@ def google_callback(request: Request, code: str = "", state: str = "", error: st
     if not expected or not _secrets.compare_digest(state, expected):
         flash(request, "Ссылка входа устарела. Нажмите «Войти через Google» ещё раз.", "error")
         return _redirect("/login")
+    link_to = request.session.pop("g_link", 0)
+    reset = request.session.pop("g_reset", False)
+    if link_to:
+        me = session_user(request, conn)
+        if me is None or me["id"] != link_to:
+            flash(request, "Сессия устарела. Войдите и привяжите Google ещё раз.", "error")
+            return _redirect("/login")
+        try:
+            profile = google_auth.fetch_profile(config, code)
+            with db.tx(conn):
+                google_auth.link(conn, me["id"], profile)
+        except google_auth.GoogleError as exc:
+            flash(request, str(exc), "error")
+            return _redirect("/panel/telegram")
+        flash(request, f"✅ Google ({profile['email']}) привязан. Забудете пароль — войдите через Google.")
+        return _redirect("/panel")
     try:
         profile = google_auth.fetch_profile(config, code)
         with db.tx(conn):
@@ -605,7 +626,18 @@ def google_callback(request: Request, code: str = "", state: str = "", error: st
     resp = _finish_login(request, conn, user)
     if notes:
         request.session["flash"] = notes  # сообщения о новом аккаунте переживают очистку сессии
+    if reset and not created and user["role"] != "admin":   # личность подтверждена Google — задаём новый пароль
+        import time as _time
+        request.session["pw_reset_until"] = _time.time() + 900
+        flash(request, "✅ Личность подтверждена через Google. Придумайте новый пароль.")
+        return _redirect("/panel/password")
     return resp
+
+
+@router.get("/forgot")
+def forgot_password(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import tglogin
+    return render(request, "forgot.html", {"ways": tglogin.methods(conn, config), "noindex": True})
 
 
 def _record_login(conn, request: Request, user_id: int) -> None:

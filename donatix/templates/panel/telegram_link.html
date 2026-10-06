@@ -1,24 +1,31 @@
 {% extends "panel/_layout.html" %}
-{% from "_icons.html" import icon, tg_logo %}
+{% from "_icons.html" import icon, tg_logo, google_logo %}
 {% block title %}Привяжите Telegram — {{ site_name }}{% endblock %}
 {% block content %}
 <div class="card tg-auth tg-require">
   <div class="tg-auth-logo">{{ tg_logo(72) }}</div>
-  <h2>Последний шаг — привяжите Telegram</h2>
+  <h2>Последний шаг — {{ "привяжите Telegram или Google" if ways.google and ways.telegram else ("привяжите Google" if ways.google else "привяжите Telegram") }}</h2>
   <p class="muted">Это нужно один раз и займёт 20 секунд. Без этого кабинет не откроется.</p>
   <ul class="tg-why">
     <li><span>🔐</span><span><b>Вход одной кнопкой</b> — без пароля, с любого телефона</span></li>
-    <li><span>🔑</span><span><b>Забыли пароль?</b> Восстановите через Telegram за минуту</span></li>
+    <li><span>🔑</span><span><b>Забыли пароль?</b> Восстановите за минуту{% if ways.google and ways.telegram %} — достаточно одного из двух{% endif %}</span></li>
     <li><span>🔔</span><span><b>Уведомления</b> — заказ выполнен, баланс пополнен</span></li>
     <li><span>🛡</span><span><b>Защита</b> — без вашего Telegram никто не войдёт</span></li>
   </ul>
+  {% if ways.google %}
+  <a class="btn lg block google-btn" href="/auth/google?link=1">{{ google_logo(20) }}Привязать Google</a>
+  <p class="hint">Выберите свою Google-почту — и всё. Забудете пароль — войдёте через Google.</p>
+  {% endif %}
+  {% if ways.google and ways.telegram %}<div class="or-line"><span>или</span></div>{% endif %}
+  {% if ways.telegram %}
   <a class="btn lg block tg-btn" href="/auth/telegram?link=1">{{ tg_logo(22) }}Привязать Telegram</a>
   <ol class="tg-steps small">
     <li>Откроется бот <b>@{{ bot }}</b> → нажмите <b>Start</b></li>
     <li><b>«📱 Поделиться номером»</b> → <b>«✅ Да, войти»</b></li>
     <li>Вернитесь сюда — всё готово</li>
   </ol>
-  <p class="hint center">Ваш баланс, заказы и пароль останутся прежними. Номер виден только администрации Donatix.</p>
+  {% endif %}
+  <p class="hint center">Ваш баланс, заказы и пароль останутся прежними. Номер и почта видны только администрации Donatix.</p>
   <form method="post" action="/logout" class="center"><input type="hidden" name="csrf" value="{{ csrf }}">
     <button class="link-btn muted small">Выйти из аккаунта</button></form>
 </div>

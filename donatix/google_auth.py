@@ -100,3 +100,15 @@ def find_or_create(conn: sqlite3.Connection, config: Config, profile: dict[str, 
     )
     conn.execute("UPDATE users SET google_sub = ? WHERE id = ?", (profile["sub"], uid))
     return accounts.get_user(conn, uid), True
+
+
+def link(conn: sqlite3.Connection, user_id: int, profile: dict[str, Any]) -> None:
+    """Привязать Google к аккаунту, в который уже вошли. Аккаунт без настоящей почты (из Telegram) получает её."""
+    other = conn.execute("SELECT id FROM users WHERE google_sub = ? AND id != ?", (profile["sub"], user_id)).fetchone()
+    if other is not None:
+        raise GoogleError("Этот Google уже привязан к другому аккаунту Donatix.")
+    conn.execute("UPDATE users SET google_sub = ? WHERE id = ?", (profile["sub"], user_id))
+    u = conn.execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
+    busy = conn.execute("SELECT 1 FROM users WHERE email = ? AND id != ?", (profile["email"], user_id)).fetchone()
+    if u and u["email"].endswith("@telegram.user") and not busy:
+        conn.execute("UPDATE users SET email = ? WHERE id = ?", (profile["email"], user_id))

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, tg_logo, google_logo %}
+{% block title %}Восстановление пароля — {{ site_name }}{% endblock %}
+{% block body %}
+<main class="auth">
+  <div class="card tg-auth">
+    <a class="back hide-in-app" href="/login">{{ icon('arrow-left', 18) }}Назад</a>
+    <h2>Забыли пароль?</h2>
+    {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
+    <p class="muted">Подтвердите, что аккаунт ваш, — и сразу придумаете новый пароль. Баланс и заказы останутся.</p>
+    {% if ways.google %}
+    <a class="btn lg block google-btn" href="/auth/google?reset=1">{{ google_logo(20) }}Восстановить через Google</a>
+    <p class="hint">Выберите Google-почту, на которую зарегистрирован аккаунт (или которую вы привязали).</p>
+    {% endif %}
+    {% if ways.telegram %}
+    <a class="btn lg block tg-btn" href="/auth/telegram?reset=1">{{ tg_logo(22) }}Восстановить через Telegram</a>
+    <p class="hint">Если к аккаунту привязан Telegram — подтвердите в боте одной кнопкой.</p>
+    {% endif %}
+    {% if not ways.google and not ways.telegram %}<p>Напишите в поддержку{% if support_contact %}: {{ support_contact }}{% endif %}.</p>{% endif %}
+    {% if support_contact and (ways.google or ways.telegram) %}<p class="hint center">Не получается? Напишите {{ support_contact }}</p>{% endif %}
+  </div>
+</main>
+{% endblock %}

@@ -25,7 +25,7 @@
       <input id="email" name="email" required autocomplete="username" placeholder="your@email.com" value="{{ form.email or '' }}">
       <label for="password">Пароль</label>
       <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="Ваш пароль">
-      <div class="hint right">{% if tg_login %}<a href="/auth/telegram?reset=1">Забыли пароль? Восстановить через Telegram</a>{% elif support_contact %}Забыли пароль? Напишите {{ support_contact }}{% endif %}</div>
+      <div class="hint right">{% if tg_login %}<a href="/forgot">Забыли пароль?</a>{% elif google_login %}<a href="/forgot">Забыли пароль?</a>{% elif support_contact %}Забыли пароль? Напишите {{ support_contact }}{% endif %}</div>
       <button class="btn primary lg block" style="margin-top:22px">Войти</button>
     </form>
     <p class="center muted" style="margin:18px 0 0">Нет аккаунта? <a href="/register">Стать партнёром</a></p>

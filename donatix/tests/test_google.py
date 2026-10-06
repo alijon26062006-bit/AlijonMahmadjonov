@@ -26,8 +26,8 @@ def _google(monkeypatch, profile):
                         lambda config, code: REAL_FETCH(config, code, transport=httpx.MockTransport(handler)))
 
 
-def _login(client):
-    r = client.get("/auth/google", follow_redirects=False)
+def _login(client, q=""):
+    r = client.get("/auth/google" + q, follow_redirects=False)
     q = parse_qs(urlparse(r.headers["location"]).query)
     assert q["redirect_uri"] == ["http://testserver/auth/google/callback"] and q["client_id"]
     return client.get(f"/auth/google/callback?code=abc&state={q['state'][0]}", follow_redirects=False)
@@ -75,3 +75,40 @@ def test_rejects_bad_state_and_unverified(gconf, app, conn, monkeypatch):
     r = _login(c)
     assert r.headers["location"] == "/login"
     assert conn.execute("SELECT COUNT(*) FROM users WHERE email = 'x@gmail.com'").fetchone()[0] == 0
+
+
+def test_forgot_password_via_google(gconf, app, conn, monkeypatch):
+    from conftest import csrf_of, make_client
+    make_client(conn, login="gforgot")
+    _google(monkeypatch, {"sub": "g9", "email": "gforgot@example.com", "email_verified": True, "name": "G"})
+    c = TestClient(app)
+    assert "Восстановить через Google" in c.get("/forgot").text
+    r = _login(c, "?reset=1")
+    assert r.headers["location"] == "/panel/password"
+    form = c.get("/panel/password").text
+    assert 'name="old"' not in form
+    c.post("/panel/password", data={"csrf": csrf_of(form), "new": "brandnew123", "new2": "brandnew123"})
+    web_login(TestClient(app), "gforgot@example.com", "brandnew123")
+
+
+def test_link_google_satisfies_requirement(gconf, app, conn, monkeypatch):
+    from conftest import make_client
+    uid, _ = make_client(conn, login="glink")
+    c = TestClient(app)
+    web_login(c, "glink@example.com", "password123")
+    assert c.get("/panel", follow_redirects=False).headers["location"] == "/panel/telegram"   # нужна привязка
+    assert "Привязать Google" in c.get("/panel/telegram").text
+    _google(monkeypatch, {"sub": "g10", "email": "other.mail@gmail.com", "email_verified": True, "name": "G"})
+    r = _login(c, "?link=1")
+    assert r.headers["location"] == "/panel"
+    assert accounts.get_user(conn, uid)["google_sub"] == "g10"
+    assert c.get("/panel", follow_redirects=False).status_code == 200
+    # этот Google уже занят — другой аккаунт привязать его не может
+    uid2, _ = make_client(conn, login="glink2")
+    c2 = TestClient(app)
+    web_login(c2, "glink2@example.com", "password123")
+    assert _login(c2, "?link=1").headers["location"] == "/panel/telegram"
+    assert accounts.get_user(conn, uid2)["google_sub"] is None
+    # забыл пароль — входит через привязанный Google (почта другая)
+    c3 = TestClient(app)
+    assert _login(c3, "?reset=1").headers["location"] == "/panel/password"

@@ -128,10 +128,24 @@ def linked(conn: sqlite3.Connection, user_id: int) -> bool:
     return bool(row and row["phone"])
 
 
+def methods(conn: sqlite3.Connection, config: Any) -> dict[str, bool]:
+    """Чем можно защитить аккаунт и восстановить пароль на этом сайте."""
+    return {"telegram": bool(getattr(config, "shop_bot_token", "") and bot_username(conn)),
+            "google": bool(getattr(config, "google_client_id", "") and getattr(config, "google_client_secret", ""))}
+
+
+def google_linked(user: Any) -> bool:
+    return bool(user["google_sub"]) if "google_sub" in user.keys() else False
+
+
 def required(conn: sqlite3.Connection, config: Any, user: Any) -> bool:
-    """Клиента просим привязать Telegram с номером. Админа, гостя и сайт без бота — нет."""
+    """Клиента просим привязать Telegram (с номером) или Google — чем восстановить доступ, если забудет пароль.
+    Достаточно одного. Админа, гостя и сайт, где ни того ни другого нет, — не трогаем."""
     if user is None or (isinstance(user, dict) and user.get("guest")):
         return False
-    if user["role"] != "client" or not getattr(config, "shop_bot_token", "") or not bot_username(conn):
+    if user["role"] != "client":
         return False
-    return not linked(conn, user["id"])
+    m = methods(conn, config)
+    if not (m["telegram"] or m["google"]):
+        return False
+    return not ((m["telegram"] and linked(conn, user["id"])) or google_linked(user))
