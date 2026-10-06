@@ -67,6 +67,14 @@
   <link rel="icon" href="/static/logo.svg?v={{ asset_v }}" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/app/icon-192.png?v={{ asset_v }}">
   <link rel="manifest" href="/manifest.webmanifest">
+  <!-- Быстрые переходы: Chrome начинает грузить страницу в момент касания ссылки, а не после.
+       Не трогаем страницы, которые что-то меняют при открытии (уведомления, новый API-ключ, вход, выход). -->
+  <script type="speculationrules">
+  {"prefetch": [{"where": {"and": [{"href_matches": "/*"},
+      {"not": {"href_matches": ["/logout", "/auth/*", "/api/*", "/currency/*", "/admin*", "/panel/notifications*",
+                                "/panel/api*", "/login*", "/register*"]}}]},
+    "eagerness": "conservative"}]}
+  </script>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="{{ site_name }}">

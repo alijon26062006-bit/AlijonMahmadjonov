@@ -174,6 +174,38 @@
     });
   })();
 
+  // Как в приложении: шапка прячется при прокрутке вниз, лёгкая вибрация на вкладках, шторка «Ещё» смахивается вниз
+  (function () {
+    var d = document.documentElement;
+    if (!d.classList.contains("app-ui")) return;
+    var lastY = window.scrollY, ticking = false;
+    window.addEventListener("scroll", function () {
+      if (ticking) return; ticking = true;
+      requestAnimationFrame(function () {
+        var y = window.scrollY, down = y > lastY + 4, up = y < lastY - 4;
+        if (down && y > 80) d.classList.add("hdr-hide"); else if (up || y < 40) d.classList.remove("hdr-hide");
+        lastY = y; ticking = false;
+      });
+    }, { passive: true });
+    document.addEventListener("click", function (e) {
+      if (e.target.closest(".tabbar a, .tabbar button, .btn.primary") && navigator.vibrate) { try { navigator.vibrate(8); } catch (er) {} }
+      if (d.classList.contains("menu-open") && !e.target.closest("#side") && !e.target.closest(".tabbar")) dxMenu(false);
+    });
+    var side = document.getElementById("side"), head = side && side.querySelector(".drawer-head"), y0 = null;
+    if (head) {
+      head.addEventListener("touchstart", function (e) { y0 = e.touches[0].clientY; side.classList.add("dragging"); }, { passive: true });
+      head.addEventListener("touchmove", function (e) {
+        if (y0 === null) return;
+        side.style.setProperty("--sheet-drag", Math.max(0, e.touches[0].clientY - y0) + "px");
+      }, { passive: true });
+      head.addEventListener("touchend", function (e) {
+        var dy = (e.changedTouches[0] || {}).clientY - y0; y0 = null;
+        side.classList.remove("dragging"); side.style.removeProperty("--sheet-drag");
+        if (dy > 90) dxMenu(false);
+      });
+    }
+  })();
+
   function dxMenu(open) {
     document.getElementById("side").classList.toggle("open", open);
     document.documentElement.classList.toggle("menu-open", open);

@@ -83,7 +83,8 @@ class _Traffic:
 
     async def __call__(self, scope, receive, send):
         from . import traffic
-        if (scope["type"] != "http" or scope.get("method") != "GET"
+        prefetch = any(k == b"sec-purpose" and b"prefetch" in v for k, v in scope.get("headers") or [])
+        if (scope["type"] != "http" or scope.get("method") != "GET" or prefetch   # предзагрузка Chrome — не визит
                 or scope.get("path", "").startswith(traffic.SKIP_PREFIXES)):
             await self.app(scope, receive, send)
             return
