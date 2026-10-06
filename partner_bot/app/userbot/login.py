@@ -230,18 +230,19 @@ async def main() -> int:
 
 
 async def _check_bank(client) -> None:
+    from app.userbot.runner import wanted
+
     if not settings.bank_bot:
         print("⚠️ BANK_BOT в .env пуст — юзербот не будет знать, кого слушать.")
         return
-    try:
-        entity = await client.get_entity(settings.bank_bot)
-        print(f"✅ Банковский бот найден: id={entity.id} @{getattr(entity, 'username', '—')}")
-        if not str(settings.bank_bot).lstrip("-").isdigit():
-            print(f"   Впишите в BANK_BOT его id ({entity.id}) — он надёжнее юзернейма.")
-    except Exception as exc:  # noqa: BLE001 — это подсказка, не работа
-        print(f"⚠️ Не нашёл {settings.bank_bot}: {exc}")
-        print("   Проверьте, что переписка с этим ботом у вас есть.")
-
+    _, names = wanted(settings.bank_bot)
+    for name in sorted(names):
+        try:
+            entity = await client.get_entity(name)
+            print(f"✅ Банковский бот @{name}: id={entity.id}")
+        except Exception as exc:  # noqa: BLE001 — это подсказка, не работа
+            print(f"⚠️ Не нашёл @{name}: {exc}")
+            print("   Проверьте, что переписка с этим ботом у вас есть.")
 
 if __name__ == "__main__":
     raise SystemExit(asyncio.run(main()))
