@@ -7,7 +7,11 @@
 - **Нет Chrome:** своё окно (WebView) — вход, покупки, фото чека из галереи/камеры, «Назад», ссылки в Telegram.
 - Иконка и заставка Donatix, ссылки `https://donatix.tj/...` открываются в приложении.
 
-## Подписать готовый APK (2 минуты, нужен Android SDK build-tools)
+## Для Google Play
+Google Play принимает **AAB** (не APK), targetSdk 36. Проще всего — PWABuilder (см. КАК_ВЫЛОЖИТЬ.md в архиве для Play Market)
+или Android Studio: новый проект `tj.donatix.app`, перенести `src/`, `res/`, `AndroidManifest.xml` → Build → Generate Signed Bundle.
+
+## Подписать APK вручную (нужен Android SDK build-tools)
 
 ```bash
 # 1. Один раз создать ключ подписи. ХРАНИТЬ ФАЙЛ И ПАРОЛЬ — без них нельзя выпустить обновление.

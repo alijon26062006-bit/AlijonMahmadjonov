@@ -32,7 +32,8 @@ public class WebActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.WHITE);
+        root.setBackgroundColor(0xFF4338CA);       // под строкой состояния — цвет Donatix
+        root.setFitsSystemWindows(true);           // Android 15+: экран от края до края — не залезаем под часы и кнопки
         web = new WebView(this);
         root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
