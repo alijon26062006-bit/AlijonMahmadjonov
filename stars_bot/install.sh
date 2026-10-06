@@ -368,6 +368,14 @@ case "\${1:-help}" in
             restart) systemctl restart "\$UB" && echo "✅ Перезапущен" ;;
             logs)    journalctl -u "\$UB" -f ;;
             status)  systemctl status "\$UB" --no-pager ;;
+            findbank)
+                # Кто из чатов присылает уведомления о зачислении. Службу на
+                # время останавливаем: два процесса на одном сеансе нельзя.
+                systemctl stop "\$UB" 2>/dev/null || true
+                ( cd "\$APP" && sudo -u "\$RUN_USER" "\$APP/.venv/bin/python" \
+                    -m app.tools.find_bank \${3:-} ) || true
+                systemctl start "\$UB" && echo "✅ Юзербот снова запущен"
+                ;;
             bank)
                 if [ -z "\${3:-}" ]; then
                     echo "Использование: stars-bot userbot bank ЮЗЕРНЕЙМ_ИЛИ_ID"
@@ -414,6 +422,7 @@ case "\${1:-help}" in
                 echo "stars-bot userbot login     первый вход в Telegram"
                 echo "stars-bot userbot keys ID HASH   ключи с my.telegram.org"
                 echo "stars-bot userbot bank ИМЯ  чей уведомления слушать"
+                echo "stars-bot userbot findbank [--set]  найти банк среди чатов"
                 echo "stars-bot userbot start     включить и запустить"
                 echo "stars-bot userbot stop      остановить"
                 echo "stars-bot userbot logs      смотреть работу живьём"

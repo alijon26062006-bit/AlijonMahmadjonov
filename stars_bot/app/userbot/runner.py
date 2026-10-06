@@ -207,6 +207,10 @@ async def run(bot=None) -> None:
                                        "новый вход: stars-bot userbot login")
                 me = await client.get_me()
                 log.info("[USERBOT] Подключён как @%s", me.username or me.id)
+                # Список чатов подгружает в кэш их юзернеймы и id — без него
+                # Telegram не находит часть ботов по имени.
+                with contextlib.suppress(Exception):
+                    await client.get_dialogs(limit=100)
                 # id банка по юзернейму: по id узнавать надёжнее, а у
                 # отправителя новых сообщений юзернейм бывает не подгружен.
                 for name in sorted(wanted_names):
