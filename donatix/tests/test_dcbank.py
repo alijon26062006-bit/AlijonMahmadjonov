@@ -69,7 +69,8 @@ def test_auto_credit_without_receipt(app, dc, conn):
     assert p["auto_kind"] == "dcbank" and p["pay_amount"] == "100.01" and p["pay_address"] == "5058270012345678"
     assert "pay.dc.tj" in p["pay_url"] and "s=100.01" in p["pay_url"] and f"%23{p['id']}" in p["pay_url"]
     page = c.get(r.headers["location"]).text
-    assert "Оплатить в «Душанбе Сити»" in page and "100.01" in page
+    assert "Пардохт дар «Душанбе Сити»" in page and "100.01" in page and "5058 2700 1234 5678" in page
+    assert "Алиджон" in page and "⚡ АВТО" in page
     assert "Открыть оплату" in c.get("/panel/balance").text
 
     uid2, c2, token2 = _client(app, conn, 2)

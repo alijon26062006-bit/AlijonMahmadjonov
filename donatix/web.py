@@ -1190,8 +1190,19 @@ def panel_auto_pay(payment_id: int, request: Request, user=Depends(panel_user), 
     from . import dcbank
     wait = dcbank.receipt_after_min(conn) * 60
     age = payments._age(row["created_at"])
+    dc = None
+    if row["auto_kind"] == "dcbank":   # карточка способа: логотип, номер группами по 4, получатель
+        import re as _re
+        method = next((m for m in payments.methods(conn, config) if m["code"] == row["method"]), {})
+        account = row["pay_address"] or ""
+        details = method.get("details", "")
+        holder = _re.sub(r"\d[\d \-]{8,}\d", " ", details)
+        holder = _re.sub(r"(?i)\b(карта|корт|счёт|счет|рақам|номер|card)\b[:.]?", " ", holder)
+        holder = _re.sub(r"\s+", " ", holder).strip(" ,;:—-")
+        dc = {"title": method.get("title") or "Душанбе Сити", "icon_url": method.get("icon_url", ""),
+              "card": " ".join(account[i:i + 4] for i in range(0, len(account), 4)), "holder": holder[:60]}
     return render(request, "panel/auto_pay.html", {
-        "user": user, "p": payments.public(conn, config, row),
+        "user": user, "p": payments.public(conn, config, row), "dc": dc,
         "receipt_now": row["auto_kind"] == "dcbank" and not row["receipt_file"] and age >= wait,
         "receipt_wait": max(1, int(wait - age))})
 

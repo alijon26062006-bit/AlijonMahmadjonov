@@ -1790,3 +1790,64 @@ body.rcc-open { overflow: hidden; }
 .tg-why li { display: flex; gap: 12px; align-items: flex-start; line-height: 1.4; }
 .tg-why li > span:first-child { font-size: 1.3rem; }
 .tg-require { max-width: 520px; margin: 10px auto; }
+
+/* ── Оплата «Душанбе Сити · авто»: один экран — сумма, корт, кнопка, таймер ── */
+.dcp { max-width: 520px; margin: 0 auto; display: grid; gap: 14px; }
+.dcp-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.dcp-top form { margin: 0; }
+.dcp-back { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 4px 0; color: var(--accent); font: 600 .95rem var(--font); cursor: pointer; }
+.dcp-id { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.dcp-hero { position: relative; overflow: hidden; display: flex; align-items: center; gap: 14px; padding: 18px; border-radius: var(--r-lg);
+  color: #fff; background: linear-gradient(120deg, #ff7a45 0%, #f0443a 55%, #d92a4f 100%); box-shadow: 0 14px 30px -14px rgba(217, 42, 79, .55); }
+.dcp-hero::after { content: ""; position: absolute; right: -60px; top: -60px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255, 255, 255, .12); pointer-events: none; }
+.dcp-hero b { display: block; font-size: 1.35rem; line-height: 1.2; }
+.dcp-hero span { font-size: .9rem; opacity: .92; }
+.dcp-logo { flex: none; width: 60px; height: 60px; border-radius: 16px; background: #fff; display: grid; place-items: center; font-size: 30px; box-shadow: 0 4px 12px rgba(0, 0, 0, .15); }
+.dcp-logo img { width: 52px; height: 52px; object-fit: contain; border-radius: 10px; }
+.dcp-badge { position: relative; z-index: 1; align-self: flex-start; flex: none; padding: 5px 12px; border-radius: 999px; background: #ffd23f; color: #8a1c00; font: 800 .8rem var(--font); letter-spacing: .04em; }
+.dcp-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; text-align: center; box-shadow: var(--shadow, 0 1px 2px rgba(0,0,0,.04)); }
+.dcp-cap { display: block; color: var(--muted); font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.dcp-sum { display: inline-flex; align-items: center; gap: 10px; margin-top: 8px; padding: 4px 8px; border: 0; background: none; color: var(--text); cursor: pointer; border-radius: var(--r-sm); }
+.dcp-num { font: 800 2.6rem/1.05 var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.dcp-cur { font: 800 1.35rem var(--font); color: var(--accent); }
+.dcp-copy { flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); transition: transform .15s var(--ease), background .2s; }
+.dcp-sum:active .dcp-copy, .dcp-acc:active .dcp-copy { transform: scale(.9); }
+.copied .dcp-copy { background: var(--ok-soft); color: var(--ok); }
+.dcp-hint { color: var(--muted); font-size: .85rem; margin-top: 2px; }
+.dcp-sum.copied + .dcp-hint { color: var(--ok); }
+.dcp-sum.copied + .dcp-hint::before { content: attr(data-copied); }
+.dcp-sum.copied + .dcp-hint { font-size: 0; }
+.dcp-sum.copied + .dcp-hint::before { font-size: .85rem; }
+.dcp-acc { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 14px; padding: 14px 16px; text-align: left; cursor: pointer;
+  background: var(--field); border: 1px solid var(--line); border-radius: var(--r); color: var(--text); font: inherit; }
+.dcp-cardno { display: block; margin-top: 4px; font: 800 clamp(1.02rem, 5.2vw, 1.3rem) var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: .01em; white-space: nowrap; }
+.dcp-mono { font: 900 1.35rem var(--font); letter-spacing: -.04em; background: linear-gradient(135deg, #1f4fb8, #f0443a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.dcp-holder { display: block; margin-top: 2px; color: var(--muted); font-size: .9rem; font-weight: 600; }
+.dcp-credit { margin-top: 12px; color: var(--muted); font-size: .88rem; }
+.dcp-auto { padding: 14px 16px; border-radius: var(--r); background: var(--ok-soft); border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); text-align: center; }
+.dcp-auto b { color: var(--ok); font-size: 1.02rem; }
+.dcp-auto p { margin: 4px 0 0; color: var(--muted); font-size: .92rem; }
+.dcp-auto p b { color: var(--text); font-size: inherit; }
+.dcp-pay { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 58px; padding: 14px 18px; border-radius: var(--r);
+  background: linear-gradient(135deg, #12a26a, #0b7a50); color: #fff; font: 800 1.12rem var(--font); text-decoration: none;
+  box-shadow: 0 12px 26px -12px rgba(11, 122, 80, .7); transition: transform .15s var(--ease), filter .2s; }
+.dcp-pay:hover { filter: brightness(1.06); color: #fff; }
+.dcp-pay:active { transform: scale(.98); }
+.dcp-under { margin: -4px 0 0; text-align: center; color: var(--muted); font-size: .88rem; }
+.dcp-wait { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
+.dcp-wait .spinner { border-top-color: var(--ok); }
+.dcp-timer { color: var(--warn); font-variant-numeric: tabular-nums; }
+.dcp-receipt { padding: 16px; border-radius: var(--r); background: var(--warn-soft); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); display: grid; gap: 8px; }
+.dcp-receipt p { margin: 0; color: var(--muted); font-size: .92rem; }
+.dcp-file { display: flex; align-items: center; justify-content: center; padding: 14px; border: 1.5px dashed var(--line-strong); border-radius: var(--r-sm); background: var(--surface); cursor: pointer; font-weight: 600; }
+.dcp-file input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.dcp-file:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dcp-guide { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 4px 16px; }
+.dcp-guide summary { display: flex; align-items: center; gap: 12px; padding: 10px 0; cursor: pointer; list-style: none; font-weight: 700; color: var(--accent); }
+.dcp-guide summary::-webkit-details-marker { display: none; }
+.dcp-guide summary::after { content: "›"; margin-left: auto; font-size: 1.4rem; color: var(--muted); transition: transform .2s var(--ease); }
+.dcp-guide[open] summary::after { transform: rotate(90deg); }
+.dcp-play { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-size: .85rem; }
+.dcp-guide ol { margin: 4px 0 8px; padding-left: 20px; display: grid; gap: 6px; }
+@media (max-width: 380px) { .dcp-num { font-size: 2.1rem; } }
+@media (prefers-reduced-motion: reduce) { .dcp-pay, .dcp-copy { transition: none; } }

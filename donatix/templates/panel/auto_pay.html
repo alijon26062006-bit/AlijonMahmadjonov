@@ -2,6 +2,72 @@
 {% from "_icons.html" import icon %}
 {% block title %}Оплата #{{ p.id }} — {{ site_name }}{% endblock %}
 {% block content %}
+{% if dc and p.status == 'pending' %}
+<div class="dcp" id="autopay" data-id="{{ p.id }}" data-status="{{ p.status }}">
+  <div class="dcp-top">
+    <form method="post" action="/panel/balance/{{ p.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="dcp-back">{{ icon('arrow-left', 16) }}Иваз кардани усул</button></form>
+    <span class="dcp-id">Дархост #{{ p.id }}</span>
+  </div>
+
+  <div class="dcp-hero">
+    <div class="dcp-logo">{% if dc.icon_url %}<img src="{{ dc.icon_url }}" alt="" width="52" height="52">{% else %}<span class="dcp-mono">DC</span>{% endif %}</div>
+    <div class="grow"><b>{{ dc.title }}</b><span>Тез, бехатар, бе чек</span></div>
+    <span class="dcp-badge">⚡ АВТО</span>
+  </div>
+
+  <div class="dcp-card">
+    <div class="dcp-cap">Ба ин корт гузаронед</div>
+    <button type="button" class="dcp-sum" data-copy="{{ p.pay_amount }}" aria-label="Нусха гирифтани маблағ">
+      <span class="dcp-num">{{ p.pay_amount }}</span><span class="dcp-cur">сомонӣ</span>
+      <span class="dcp-copy">{{ icon('copy', 18) }}</span>
+    </button>
+    <div class="dcp-hint" data-copied="✓ Нусха гирифта шуд">Барои нусха гирифтан пахш кунед</div>
+    {% if dc.card %}
+    <button type="button" class="dcp-acc" data-copy="{{ p.address }}" aria-label="Нусха гирифтани рақами корт">
+      <span class="grow"><span class="dcp-cap">Рақами корт</span><b class="dcp-cardno">{{ dc.card }}</b>
+        {% if dc.holder %}<span class="dcp-holder">{{ dc.holder }}</span>{% endif %}</span>
+      <span class="dcp-copy">{{ icon('copy', 18) }}</span>
+    </button>
+    {% endif %}
+    <div class="dcp-credit">Ба баланс: <b>{{ money(p.amount_usd) }}</b></div>
+  </div>
+
+  <div class="dcp-auto">
+    <b>⚡ Тасдиқи худкор</b>
+    <p>Маҳз <b>{{ p.pay_amount }} сомонӣ</b>-ро бо дирамҳояш гузаронед — бо онҳо мо интиқоли шуморо мешиносем. Чек лозим нест: баланс худаш пур мешавад.</p>
+  </div>
+
+  {% if p.pay_url %}
+  <a class="dcp-pay" href="{{ p.pay_url }}" target="_blank" rel="noopener">📲 Пардохт дар «Душанбе Сити»</a>
+  <p class="dcp-under">Барнома худаш кушода мешавад — корт ва маблағ тайёранд, фақат <b>тасдиқ</b> кунед.</p>
+  {% endif %}
+
+  <div class="dcp-wait" role="status" aria-live="polite">
+    <span class="spinner"></span><span>Интизори пардохт…</span>
+    <b class="dcp-timer" id="dcp-timer" data-left="{{ 0 if receipt_now else receipt_wait }}"></b>
+  </div>
+
+  <form class="dcp-receipt" id="dc-receipt" method="post" action="/panel/balance/{{ p.id }}/receipt" enctype="multipart/form-data" {{ '' if receipt_now else 'hidden' }} data-after="{{ receipt_wait }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <b>Пардохт ҳоло наёфт шуд</b>
+    <p>Шояд маблағи дигар гузаронидед ё бонк дер кард. Акси чекро фиристед — дастӣ месанҷем ва балансро пур мекунем.</p>
+    <label class="dcp-file"><input type="file" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf" required><span>📎 Интихоби акси чек</span></label>
+    <button class="btn primary block">Чекро фиристед</button>
+  </form>
+
+  <details class="dcp-guide">
+    <summary><span class="dcp-play">▶</span>Дастурро бинед</summary>
+    <ol>
+      <li>Тугмаи <b>«Пардохт дар «Душанбе Сити»»</b>-ро пахш кунед — барнома кушода мешавад.</li>
+      <li>Корт ва маблағ <b>{{ p.pay_amount }}</b> аллакай навишта шудаанд — тафтиш кунед.</li>
+      <li>Пардохтро тасдиқ кунед ва ба ин саҳифа баргардед.</li>
+      <li>Баланс худаш пур мешавад, одатан дар 1 дақиқа. Саҳифа худаш нав мешавад.</li>
+    </ol>
+    <p class="muted small">Дастӣ гузаронидан ҳам мумкин: рақами кортро нусха гиред ва <b>маҳз {{ p.pay_amount }}</b> гузаронед. Агар то {{ (receipt_wait // 60) + 1 if not receipt_now else 5 }} дақиқа пур нашавад — тугмаи «Чекро фиристед» пайдо мешавад.</p>
+  </details>
+</div>
+{% else %}
 <section class="page-hero"><h1>Оплата #{{ p.id }}</h1><p>{{ p.method_title }} · зачислится автоматически</p></section>
 
 <div class="card autopay" id="autopay" data-id="{{ p.id }}" data-status="{{ p.status }}">
@@ -27,19 +93,6 @@
   <div class="key-box"><code class="mono">{{ p.address }}</code>
     <button type="button" class="icon-btn" data-copy="{{ p.address }}" aria-label="Скопировать UID">{{ icon('copy', 18) }}</button></div>
   <div class="flash error net-warn">⚠️ В приложении Bybit: <b>Активы → Перевод → По UID</b>, монета USDT, сумма <b>ровно {{ p.pay_amount }}</b>. По последним цифрам суммы мы узнаём ваш перевод.</div>
-  {% elif p.auto == 'dcbank' %}
-  {% if p.pay_url %}<a class="btn primary block lg dc-pay" href="{{ p.pay_url }}" target="_blank" rel="noopener" style="margin-top:14px">🏙 Оплатить в «Душанбе Сити»</a>{% endif %}
-  <div class="ap-label" style="margin-top:14px">Номер карты / счёта</div>
-  <div class="key-box"><code class="mono">{{ p.address }}</code>
-    <button type="button" class="icon-btn" data-copy="{{ p.address }}" aria-label="Скопировать номер">{{ icon('copy', 18) }}</button></div>
-  <div class="flash error net-warn">⚠️ Переведите <b>ровно {{ p.pay_amount }} сомони — с копейками</b>. По ним мы узнаём ваш перевод: баланс пополнится сам за минуту, чек не нужен. Кнопка выше откроет приложение с уже подставленной суммой.</div>
-  <form class="dc-receipt" id="dc-receipt" method="post" action="/panel/balance/{{ p.id }}/receipt" enctype="multipart/form-data" {{ '' if receipt_now else 'hidden' }} data-after="{{ receipt_wait }}">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <p><b>Перевод пока не найден.</b> Возможно, вы перевели другую сумму или банк задержал уведомление — пришлите чек, проверим вручную.</p>
-    <input type="file" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf" required>
-    <button class="btn block" style="margin-top:8px">📎 Отправить чек</button>
-  </form>
-  <form class="inline" method="post" action="/panel/balance/{{ p.id }}/cancel" style="margin-top:10px"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link-btn muted small">Отменить заявку</button></form>
   {% elif p.auto == 'binance' %}
   <a class="btn primary block lg" href="{{ p.pay_url }}" target="_blank" rel="noopener" style="margin-top:14px">Оплатить в Binance</a>
   {% endif %}
@@ -47,16 +100,29 @@
   <div class="ap-wait"><span class="spinner"></span> Ждём поступление — страница обновится сама.</div>
   {% endif %}
 </div>
+{% endif %}
 
 <script>
 (function () {
   var box = document.getElementById("autopay");
   document.querySelectorAll("[data-copy]").forEach(function (b) {
-    b.addEventListener("click", function () { if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy); });
+    b.addEventListener("click", function () {
+      if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy);
+      b.classList.add("copied");
+      setTimeout(function () { b.classList.remove("copied"); }, 1500);
+    });
   });
   if (!box || box.dataset.status !== "pending") return;
-  var rc = document.getElementById("dc-receipt");
-  if (rc && rc.hidden) setTimeout(function () { rc.hidden = false; }, (+rc.dataset.after || 300) * 1000);
+  var rc = document.getElementById("dc-receipt"), tm = document.getElementById("dcp-timer");
+  if (rc && tm) {
+    var left = +tm.dataset.left || 0;
+    var tick = function () {
+      if (left <= 0) { rc.hidden = false; tm.textContent = ""; return; }
+      tm.textContent = Math.floor(left / 60) + ":" + ("0" + left % 60).slice(-2);
+      left -= 1; setTimeout(tick, 1000);
+    };
+    tick();
+  } else if (rc && rc.hidden) setTimeout(function () { rc.hidden = false; }, (+rc.dataset.after || 300) * 1000);
   setInterval(function () {
     if (document.hidden) return;
     fetch("/panel/data/payment/" + box.dataset.id, {credentials: "same-origin"})
