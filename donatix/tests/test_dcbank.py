@@ -180,3 +180,7 @@ def test_listener_ignores_strangers(caplog):
     assert q.empty() and not caplog.records
     assert bankbot.accept(Msg(1996047418, "dc_next_bot"), q, 1996047418, "1996047418") and q.qsize() == 1
     assert bankbot.accept(Msg(7, "dc_next_bot"), q, 0, "dc_next_bot")
+    ids, names = bankbot.wanted("dc_next_bot, 1996047418")
+    assert ids == {1996047418} and names == {"dc_next_bot"}
+    assert bankbot.accept(Msg(42, None), q, ids, names, sender=type("S", (), {"username": "DC_next_bot"})())
+    assert not bankbot.accept(Msg(43, None), q, ids, names, sender=type("S", (), {"username": "x", "bot": True})())

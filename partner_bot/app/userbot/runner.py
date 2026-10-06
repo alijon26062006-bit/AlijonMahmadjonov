@@ -52,7 +52,19 @@ def source_name() -> str:
     return (settings.bank_bot or "").strip().lstrip("@")
 
 
-def _from_source(message, wanted_id: int, wanted_name: str) -> bool:
+def wanted(raw: str) -> tuple[set[int], set[str]]:
+    """BANK_BOT: юзернейм и/или id через запятую — «dc_next_bot,1996047418»."""
+    ids, names = set(), set()
+    for part in (raw or "").replace(";", ",").split(","):
+        part = part.strip().lstrip("@")
+        if part.lstrip("-").isdigit():
+            ids.add(int(part))
+        elif part:
+            names.add(part.lower())
+    return ids, names
+
+
+def _from_source(message, wanted_id, wanted_name, sender=None) -> bool:
     """Это точно наш банковский бот?
 
     Сверяем и по id, и по юзернейму: id надёжнее (юзернейм можно
@@ -60,24 +72,25 @@ def _from_source(message, wanted_id: int, wanted_name: str) -> bool:
     юзернейм. Совпасть должно хоть что-то, и ничего не должно
     противоречить.
     """
-    sender_id = getattr(message, "sender_id", None)
-    if wanted_id and sender_id == wanted_id:
+    ids = wanted_id if isinstance(wanted_id, set) else ({wanted_id} if wanted_id else set())
+    names = wanted_name if isinstance(wanted_name, set) else ({wanted_name.lower()} if wanted_name else set())
+    if getattr(message, "sender_id", None) in ids:
         return True
-    if wanted_name:
-        sender = getattr(message, "sender", None)
-        name = (getattr(sender, "username", "") or "").lower()
-        if name and name == wanted_name.lower():
-            return True
-    return False
+    who = sender if sender is not None else getattr(message, "sender", None)
+    name = (getattr(who, "username", "") or "").lower()
+    return bool(name) and name in names
 
 
-def accept(message, queue: asyncio.Queue, wanted_id: int, wanted_name: str) -> bool:
+def accept(message, queue: asyncio.Queue, wanted_id, wanted_name, sender=None) -> bool:
     """Положить уведомление банка в очередь. True — это банк и оно в очереди.
 
     Всё, что не от банка, не читаем и не пишем никуда — ни в очередь, ни в
     журнал: это чужая личная переписка.
     """
-    if not _from_source(message, wanted_id, wanted_name):
+    if not _from_source(message, wanted_id, wanted_name, sender):
+        if getattr(sender, "bot", False):   # другой БОТ — не личная переписка: id и имя видны в журнале
+            log.info("[USERBOT] Сообщение от бота id=%s @%s — это не банк из BANK_BOT, пропускаю",
+                     getattr(message, "sender_id", "?"), getattr(sender, "username", "") or "—")
         return False
     log.info("[USERBOT] New bank message")
     try:
@@ -155,9 +168,8 @@ async def run(bot=None) -> None:
         )
         return
 
-    wanted_name = source_name()
-    wanted_id = int(wanted_name) if wanted_name.isdigit() else 0
-    log.info("[USERBOT] Слушаю уведомления от: %s", wanted_name)
+    ids, names = wanted(source_name())
+    log.info("[USERBOT] Слушаю уведомления от: %s", source_name())
 
     settings.session_file.parent.mkdir(parents=True, exist_ok=True)
     own_bot = bot is None
@@ -179,7 +191,13 @@ async def run(bot=None) -> None:
 
             @client.on(events.NewMessage(incoming=True))
             async def on_message(event) -> None:      # noqa: ANN001
-                accept(event.message, queue, wanted_id, wanted_name)
+                if not event.is_private:
+                    return
+                sender = None
+                if getattr(event.message, "sender_id", None) not in ids:
+                    with contextlib.suppress(Exception):   # юзернейм — только у подгруженного отправителя
+                        sender = await event.get_sender()
+                accept(event.message, queue, ids, names, sender)
 
             try:
                 # Не client.start(): без живого сеанса он стал бы спрашивать
@@ -190,6 +208,11 @@ async def run(bot=None) -> None:
                     raise SessionDead("сеанс завершён в Telegram — нужен новый вход")
                 me = await client.get_me()
                 log.info("[USERBOT] Подключён как @%s", me.username or me.id)
+                for nm in names:   # id банка по юзернейму — по id надёжнее
+                    with contextlib.suppress(Exception):
+                        ent = await client.get_entity(nm)
+                        ids.add(ent.id)
+                        log.info("[USERBOT] Банк @%s → id %s", nm, ent.id)
                 if told:
                     await _tell(bot, "✅ <b>Юзербот снова на связи</b>\n\n"
                                      "<i>Оплаты опять подтверждаются сами.</i>")

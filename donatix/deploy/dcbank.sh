@@ -18,7 +18,7 @@ ok() { printf '\033[1;32m✔ %s\033[0m\n' "$*"; }
 API_ID="${1:-}"; API_HASH="${2:-}"; BANK="${3:-}"; BANK="${BANK#@}"
 echo "$API_ID" | grep -qE '^[0-9]{5,12}$' || die "API_ID — число с my.telegram.org, например 12345678."
 echo "$API_HASH" | grep -qiE '^[a-f0-9]{32}$' || die "API_HASH — 32 знака (цифры и a-f) с my.telegram.org."
-echo "$BANK" | grep -qE '^[A-Za-z0-9_]{4,32}$' || die "BANK_BOT — юзернейм бота банка без @ (dc_next_bot) или его id."
+echo "$BANK" | grep -qE '^[A-Za-z0-9_,]{4,80}$' || die "BANK_BOT — юзернейм бота банка без @ (dc_next_bot) и/или id через запятую."
 
 sudo -u donatix git -C "$APP_DIR" pull -q --ff-only origin "$BRANCH" || true
 sudo -u donatix "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/donatix/requirements.txt"

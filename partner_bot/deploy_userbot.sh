@@ -24,7 +24,7 @@ die() { echo "❌ $*"; exit 1; }
 echo "$API_ID" | grep -qE '^[0-9]{5,12}$' || die "API_ID — число, например 12345678."
 echo "$API_HASH" | grep -qiE '^[a-f0-9]{32}$' || die "API_HASH — 32 знака (цифры и a-f)."
 BANK="${BANK#@}"
-echo "$BANK" | grep -qE '^[A-Za-z0-9_]{4,32}$' || die "BANK_BOT — юзернейм без @ или числовой id."
+echo "$BANK" | grep -qE '^[A-Za-z0-9_,]{4,80}$' || die "BANK_BOT — юзернейм без @ и/или id через запятую."
 [ -f "$APP/.env" ] || die "Не нашёл бота в $APP (нет .env)."
 [ -d "$SRC/app" ] || die "Рядом со скриптом нет папки app."
 

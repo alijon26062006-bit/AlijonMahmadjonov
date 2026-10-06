@@ -42,21 +42,36 @@ def session_path(config: Config) -> Path:
     return path if path.suffix == ".session" else path.with_name(path.name + ".session")
 
 
-def from_bank(message, wanted_id: int, wanted_name: str) -> bool:
-    """Это точно бот банка? id надёжнее юзернейма."""
-    sender_id = getattr(message, "sender_id", None)
-    if wanted_id and sender_id == wanted_id:
+def wanted(bank_bot: str) -> tuple[set[int], set[str]]:
+    """DONATIX_BANK_BOT: юзернейм и/или id через запятую — «dc_next_bot,1996047418»."""
+    ids, names = set(), set()
+    for part in (bank_bot or "").replace(";", ",").split(","):
+        part = part.strip().lstrip("@")
+        if part.lstrip("-").isdigit():
+            ids.add(int(part))
+        elif part:
+            names.add(part.lower())
+    return ids, names
+
+
+def from_bank(message, ids, names, sender=None) -> bool:
+    """Это точно бот банка? Совпал id или юзернейм (sender — подгруженный отправитель)."""
+    if isinstance(ids, int):          # старый вызов: (message, id, name)
+        ids, names = ({ids} if ids else set()), ({str(names).lower()} if names and not ids else set())
+    if getattr(message, "sender_id", None) in ids:
         return True
-    if wanted_name and not wanted_id:
-        sender = getattr(message, "sender", None)
-        name = (getattr(sender, "username", "") or "").lower()
-        return bool(name) and name == wanted_name.lower()
-    return False
+    who = sender if sender is not None else getattr(message, "sender", None)
+    name = (getattr(who, "username", "") or "").lower()
+    return bool(name) and name in names
 
 
-def accept(message, queue: asyncio.Queue, wanted_id: int, wanted_name: str) -> bool:
-    """Положить уведомление банка в очередь. Чужое — молча мимо, без журнала."""
-    if not from_bank(message, wanted_id, wanted_name):
+def accept(message, queue: asyncio.Queue, ids, names, sender=None) -> bool:
+    """Положить уведомление банка в очередь. Чужое — мимо; личную переписку в журнал не пишем,
+    а про другого БОТА пишем только его id и имя — чтобы было видно, если банк назван неверно."""
+    if not from_bank(message, ids, names, sender):
+        if getattr(sender, "bot", False):
+            log.info("Сообщение от бота id=%s @%s — это не банк из DONATIX_BANK_BOT, пропускаю",
+                     getattr(message, "sender_id", "?"), getattr(sender, "username", "") or "—")
         return False
     log.info("Новое уведомление банка")
     try:
@@ -107,9 +122,8 @@ async def run(config: Config, client_factory=None) -> None:
 
     from telethon import events
 
-    name = config.bank_bot.lstrip("@")
-    wanted_id = int(name) if name.lstrip("-").isdigit() else 0
-    log.info("Слушаю уведомления от: %s", name)
+    ids, names = wanted(config.bank_bot)
+    log.info("Слушаю уведомления от: %s", config.bank_bot)
     queue: asyncio.Queue = asyncio.Queue(maxsize=QUEUE)
     worker = asyncio.create_task(_drain(queue, config))
     pause, misses, told = RETRY_MIN, 0, False
@@ -119,7 +133,13 @@ async def run(config: Config, client_factory=None) -> None:
 
             @client.on(events.NewMessage(incoming=True))
             async def on_message(event) -> None:  # noqa: ANN001
-                accept(event.message, queue, wanted_id, name)
+                if not event.is_private:
+                    return
+                sender = None
+                if getattr(event.message, "sender_id", None) not in ids:
+                    with contextlib.suppress(Exception):   # юзернейм — только у подгруженного отправителя
+                        sender = await event.get_sender()
+                accept(event.message, queue, ids, names, sender)
 
             try:
                 await client.connect()
@@ -127,6 +147,11 @@ async def run(config: Config, client_factory=None) -> None:
                     raise SessionDead("сеанс завершён в Telegram — нужен новый вход")
                 me = await client.get_me()
                 log.info("Подключён как @%s", getattr(me, "username", None) or getattr(me, "id", "?"))
+                for nm in names:   # узнать id банка по юзернейму — по id надёжнее
+                    with contextlib.suppress(Exception):
+                        ent = await client.get_entity(nm)
+                        ids.add(ent.id)
+                        log.info("Банк @%s → id %s", nm, ent.id)
                 if told:
                     notify_admin(config, "✅ Автоплатёж «Душанбе Сити» снова на связи — оплаты подтверждаются сами.")
                 pause, misses, told = RETRY_MIN, 0, False
@@ -173,13 +198,13 @@ async def login(config: Config) -> int:
         me = await client.get_me()
         print(f"\n✅ Вошли как @{me.username or me.id} ({me.first_name}). Файл сеанса: {session}")
         print("   Никому не передавайте этот файл — это доступ к вашему Telegram.")
-        if config.bank_bot:
+        _, names = wanted(config.bank_bot)
+        for nm in sorted(names) or ["dc_next_bot"]:
             try:
-                entity = await client.get_entity(int(config.bank_bot) if config.bank_bot.isdigit()
-                                                 else config.bank_bot)
-                print(f"✅ Банковский бот найден: id={entity.id} @{getattr(entity, 'username', '—')}")
+                entity = await client.get_entity(nm)
+                print(f"✅ Банковский бот @{nm}: id={entity.id}")
             except Exception as exc:  # noqa: BLE001 — подсказка, не работа
-                print(f"⚠️ Не нашёл {config.bank_bot}: {exc}. Нужна переписка с этим ботом в этом аккаунте.")
+                print(f"⚠️ Не нашёл @{nm}: {exc}. Нужна переписка с этим ботом в этом аккаунте.")
         return 0
     except LoginFailed as exc:
         print(f"\n❌ {exc}")
