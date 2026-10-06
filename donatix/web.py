@@ -492,6 +492,7 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
     ).fetchone()
     return render(request, "panel/home.html", {
         "user": user, "summary": summary, "key": key, "kinds": KINDS,
+        "orders_all": conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ?", (user["id"],)).fetchone()[0],
         "markup": accounts.markup_for(user, config),
         "ref_percent": referrals.percent(conn),
         "dc": _dcoin_card(conn, user["id"]),

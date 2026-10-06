@@ -61,7 +61,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+  <!-- Шрифты не держат показ страницы: пока грузятся (медленный мобильный интернет), текст — системным шрифтом -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="/static/donatix.css?v={{ asset_v }}">
   <link rel="icon" href="/static/logo.svg?v={{ asset_v }}" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/app/icon-192.png?v={{ asset_v }}">
@@ -78,10 +79,24 @@
       var saved = null; try { if (q) localStorage.setItem("dx-app", "1"); saved = localStorage.getItem("dx-app"); } catch (e) {}
       if (q || standalone || saved === "1" || /DonatixApp/i.test(ua)) d.classList.add("is-app");
       if (/; wv\)|DonatixApp/i.test(ua)) d.classList.add("is-webview");
+      // Заставка — только в приложении и только при первом открытии (не на каждой странице)
+      var seen = null; try { seen = sessionStorage.getItem("dx-splash"); } catch (e) {}
+      if (d.classList.contains("is-app") && !seen) d.classList.add("splash-on");
     })();
   </script>
 </head>
 <body>
+<div class="splash" id="splash" aria-hidden="true">
+  <div class="splash-logo">
+    <span class="splash-ring"></span>
+    <svg viewBox="0 0 32 32" width="96" height="96"><rect width="32" height="32" rx="8" fill="#4338ca"/>
+      <path class="splash-d" d="M10 8.5h6a7.5 7.5 0 0 1 0 15h-6Z" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/></svg>
+  </div>
+  <div class="splash-name">{{ site_name }}</div>
+  <div class="splash-tag">💎 Алмазы · UC · ⭐ Stars · Steam<br><span>пополнение за секунды</span></div>
+  <div class="splash-bar"><i></i></div>
+</div>
+<div class="nav-progress" id="nav-progress" aria-hidden="true"></div>
 {% block header %}
 <header class="top">
   <div class="wrap">
@@ -91,13 +106,13 @@
       <a class="hide-sm" href="/#pricing">Цены</a>
       <a class="hide-sm" href="/docs">Документация</a>
       <a class="hide-sm" href="/#faq">FAQ</a>
-      {% if tg_channel %}<a class="nav-tg" href="{{ tg_channel }}" target="_blank" rel="noopener" aria-label="Наш Telegram-канал">{{ tg_logo(22) }}<span class="hide-sm">Канал</span></a>{% endif %}
+      {% if tg_channel %}<a class="nav-tg hide-app" href="{{ tg_channel }}" target="_blank" rel="noopener" aria-label="Наш Telegram-канал">{{ tg_logo(22) }}<span class="hide-sm">Канал</span></a>{% endif %}
       {{ theme_button() }}
       {% if user %}
         <a class="btn sm primary" href="{{ '/admin' if user.role == 'admin' else '/panel' }}">Панель</a>
       {% else %}
         <a class="btn sm hide-sm" href="/login">Войти</a>
-        <a class="btn sm primary" href="/register">Начать</a>
+        <a class="btn sm primary hide-app" href="/register">Начать</a>
       {% endif %}
     </nav>
   </div>
@@ -187,6 +202,39 @@
       })(start);
     });
   })();
+  // Заставка приложения: прячем, как только страница готова (не раньше 1,8 с — анимация доигрывает, не позже 10 с)
+  (function () {
+    var d = document.documentElement;
+    if (!d.classList.contains("splash-on")) return;
+    var t0 = window.performance && performance.timing ? performance.timing.navigationStart || Date.now() : Date.now();
+    function hide() {
+      setTimeout(function () {
+        d.classList.add("splash-out");
+        try { sessionStorage.setItem("dx-splash", "1"); } catch (e) {}
+        setTimeout(function () { d.classList.remove("splash-on", "splash-out"); }, 450);
+      }, Math.max(0, 1800 - (Date.now() - t0)));
+    }
+    if (document.readyState === "complete") hide(); else window.addEventListener("load", hide);
+    setTimeout(hide, 10000);
+  })();
+
+  // Переход между страницами: тонкая полоска сверху сразу после нажатия — видно, что приложение работает
+  (function () {
+    var bar = document.getElementById("nav-progress");
+    if (!bar) return;
+    function go() { bar.classList.remove("done"); void bar.offsetWidth; bar.classList.add("go"); }
+    document.addEventListener("click", function (e) {
+      var a = e.target.closest("a[href]");
+      if (!a || e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey || a.target === "_blank" || a.hasAttribute("download")) return;
+      var href = a.getAttribute("href");
+      if (!href || href.charAt(0) === "#" || /^(mailto:|tel:|tg:|javascript:)/i.test(href)) return;
+      if (a.origin && a.origin !== location.origin) return;
+      go();
+    });
+    document.addEventListener("submit", function (e) { if (!e.defaultPrevented && e.target.method !== "dialog") go(); });
+    window.addEventListener("pageshow", function () { bar.classList.remove("go"); bar.classList.add("done"); });
+  })();
+
   // Офлайн-экран и «Установить приложение» — нужен service worker
   if ("serviceWorker" in navigator && location.protocol === "https:") {
     window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () {}); });

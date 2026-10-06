@@ -1628,3 +1628,79 @@ body.rcc-open { overflow: hidden; }
 .shell > main > .buy-grid { animation-name: fade-only; }
 /* В приложении нет подвала сайта и плавающей кнопки канала: место занимает нижнее меню */
 .is-app footer.foot, .is-app .tg-fab { display: none !important; }
+
+/* ── Заставка приложения: логотип рисуется, кольцо пульсирует, снизу бегущая полоса ── */
+.splash { display: none; }
+.splash-on .splash { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 14px; padding: 24px; text-align: center; color: #fff;
+  background: radial-gradient(120% 80% at 50% 30%, #4f46e5 0%, #312e81 45%, #0e1016 100%); }
+.splash-on body { overflow: hidden; }
+.splash-out .splash { opacity: 0; transform: scale(1.04); transition: opacity .4s ease, transform .4s ease; }
+.splash-logo { position: relative; width: 96px; height: 96px; animation: sp-pop .6s cubic-bezier(.2, 1.4, .4, 1) both; }
+.splash-logo svg { position: relative; border-radius: 24px; box-shadow: 0 18px 50px -12px rgb(0 0 0 / .6); }
+.splash-d { stroke-dasharray: 60; stroke-dashoffset: 60; animation: sp-draw .9s .25s ease-out forwards; }
+.splash-ring { position: absolute; inset: -14px; border-radius: 32px; border: 2px solid rgb(255 255 255 / .35);
+  animation: sp-ring 1.6s .4s ease-out infinite; }
+.splash-name { font: 700 2rem/1 var(--font, sans-serif); letter-spacing: .5px; animation: sp-up .5s .45s ease-out both; }
+.splash-tag { font-size: .95rem; opacity: .85; line-height: 1.5; animation: sp-up .5s .6s ease-out both; }
+.splash-tag span { opacity: .7; font-size: .85rem; }
+.splash-bar { position: absolute; bottom: calc(48px + env(safe-area-inset-bottom)); width: 120px; height: 4px;
+  border-radius: 4px; background: rgb(255 255 255 / .18); overflow: hidden; }
+.splash-bar i { position: absolute; inset: 0; width: 40%; border-radius: 4px; background: #fff;
+  animation: sp-run 1s ease-in-out infinite; }
+@keyframes sp-pop { from { opacity: 0; transform: scale(.6); } }
+@keyframes sp-draw { to { stroke-dashoffset: 0; } }
+@keyframes sp-ring { 0% { opacity: .9; transform: scale(.9); } 100% { opacity: 0; transform: scale(1.35); } }
+@keyframes sp-up { from { opacity: 0; transform: translateY(10px); } }
+@keyframes sp-run { from { left: -40%; } to { left: 100%; } }
+
+/* ── Полоска загрузки при переходе между страницами ── */
+.nav-progress { position: fixed; top: 0; left: 0; height: 3px; width: 0; z-index: 999; pointer-events: none;
+  background: linear-gradient(90deg, var(--accent), #a78bfa); box-shadow: 0 0 10px var(--accent); opacity: 0; }
+.nav-progress.go { opacity: 1; width: 85%; transition: width 8s cubic-bezier(.1, .7, .2, 1); }
+.nav-progress.done { opacity: 0; width: 100%; transition: opacity .3s ease .1s, width .2s ease; }
+
+/* ── Режим приложения: что показывать, что прятать ── */
+.only-app { display: none; }
+.is-app .only-app { display: block; }
+.is-app .hide-app { display: none !important; }
+.app-hello { margin: 4px 2px 12px; font-size: 1.15rem; }
+
+/* Выход — в конце меню (в приложении его нет в шапке) */
+.side-logout { margin: 18px 0 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.side-logout .nav-item { width: 100%; border: 0; background: none; font: inherit; color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; gap: 10px; text-align: left; }
+
+/* «Купить быстро»: популярные игры плитками, листаются пальцем */
+.pop-quick { margin: 16px 0; }
+.pop-quick h3 { margin: 0 0 10px; font-size: 1rem; }
+.pop-row { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.pop-row::-webkit-scrollbar { display: none; }
+.pop-tile { flex: 0 0 92px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 6px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); color: var(--text);
+  text-align: center; font-size: .78rem; font-weight: 600; line-height: 1.2; text-decoration: none; }
+.pop-tile:hover { text-decoration: none; border-color: var(--accent-line); }
+.pop-tile:active { transform: scale(.96); }
+.pop-tile-img { width: 48px; height: 48px; border-radius: 14px; object-fit: cover; display: grid; place-items: center; }
+
+/* Заказы: поиск сверху, остальные фильтры свёрнуты */
+.search-row { display: flex; gap: 8px; }
+.search-row input { flex: 1; min-width: 0; }
+.more-filters { margin-top: 10px; }
+.more-filters summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: .9rem; padding: 4px 0; }
+.more-filters[open] summary { margin-bottom: 10px; }
+
+/* Чек: большая понятная кнопка вместо системного «Choose file» */
+.file-drop { position: relative; display: flex; align-items: center; gap: 14px; margin: 6px 0 4px; padding: 16px;
+  border: 2px dashed var(--accent-line); border-radius: 16px; background: var(--accent-soft); cursor: pointer; }
+.file-drop input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.file-drop .fd-ico { font-size: 1.8rem; line-height: 1; }
+.file-drop .fd-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.file-drop .fd-text small { color: var(--muted); overflow-wrap: anywhere; }
+.file-drop.has-file { border-style: solid; border-color: var(--ok, #1a7f4b); background: color-mix(in srgb, var(--ok, #1a7f4b) 10%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .splash *, .nav-progress { animation: none !important; transition: none !important; }
+  .splash-d { stroke-dashoffset: 0; }
+}

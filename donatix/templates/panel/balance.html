@@ -72,7 +72,10 @@
       {% endfor %}
       <div id="receipt-box">
       <label for="receipt">Чек об оплате <b class="req">— обязательно</b> <span class="muted">(скриншот или PDF)</span></label>
-      <input id="receipt" name="receipt" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf">
+      <label class="file-drop" for="receipt">
+        <input id="receipt" name="receipt" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf">
+        <span class="fd-ico">📷</span><span class="fd-text"><b>Прикрепить чек</b><small>Скриншот из банка или PDF</small></span>
+      </label>
       <div class="hint" id="receipt-state" role="status"></div>
       <div class="hint">Без чека заявку не проверить — отправить её не получится.</div>
       </div>
@@ -139,6 +142,14 @@
   var pf = document.getElementById("payform"), ps = document.getElementById("paysend");
   var rc = document.getElementById("receipt"), rs = document.getElementById("receipt-state");
   var copy = null, reading = null;
+  if (rc) rc.addEventListener("change", function () {   // имя выбранного файла — прямо на кнопке
+    var drop = rc.closest(".file-drop"), f = rc.files && rc.files[0];
+    if (!drop) return;
+    drop.classList.toggle("has-file", !!f);
+    drop.querySelector(".fd-ico").textContent = f ? "✅" : "📷";
+    drop.querySelector(".fd-text b").textContent = f ? "Чек выбран" : "Прикрепить чек";
+    drop.querySelector(".fd-text small").textContent = f ? f.name + " · нажмите, чтобы заменить" : "Скриншот из банка или PDF";
+  });
   function state(text, bad) { if (rs) { rs.textContent = text; rs.style.color = bad ? "var(--bad)" : ""; } }
   function shrink(file) {   // большое фото — уменьшаем, чтобы быстро ушло с мобильного интернета
     return new Promise(function (resolve) {

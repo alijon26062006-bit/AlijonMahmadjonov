@@ -185,7 +185,7 @@ def test_profile_and_login_history(app, config, conn):
     client = TestClient(app)
     web_login(client, "pr@example.com", "password123")
     page = client.get("/panel").text
-    assert "Профиль" in page and "Всего потрачено" in page and "История входов" in page and "Создать ключ" in page
+    assert "Профиль" in page and "Выполнено заказов" in page and "История входов" in page and "Создать ключ" in page
     token = client.get("/panel").text.split('name="csrf" value="')[1].split('"')[0]
     key = accounts.create_api_key(conn, uid, "bot", config.secret_key)
     page = client.get("/panel").text
