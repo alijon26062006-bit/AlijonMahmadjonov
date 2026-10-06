@@ -189,13 +189,17 @@ async def main() -> None:
         print("   Дальше: stars-bot userbot start\n")
 
         if settings.bank_bot:
-            try:
-                entity = await client.get_entity(settings.bank_bot)
-                print(f"✅ Банковский бот найден: id={entity.id} "
-                      f"@{getattr(entity, 'username', '—')}")
-            except Exception as exc:  # noqa: BLE001 — это подсказка, не работа
-                print(f"⚠️ Не нашёл {settings.bank_bot}: {exc}")
-                print("   Проверьте, что переписка с этим ботом у вас есть.")
+            from app.userbot.runner import sources
+
+            ids, names = sources()
+            for target in [*sorted(names), *sorted(ids)]:
+                try:
+                    entity = await client.get_entity(target)
+                    print(f"✅ Банковский бот найден: id={entity.id} "
+                          f"@{getattr(entity, 'username', '—')}")
+                except Exception as exc:  # noqa: BLE001 — это подсказка, не работа
+                    print(f"⚠️ Не нашёл {target}: {exc}")
+                    print("   Проверьте, что переписка с этим ботом у вас есть.")
         else:
             print("⚠️ BANK_BOT в .env пуст — юзербот не будет знать, кого слушать.")
     finally:

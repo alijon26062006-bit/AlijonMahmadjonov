@@ -459,6 +459,20 @@ async def sources() -> None:
     check("без отправителя не принят",
           not runner._from_source(Msg(), 12345, "bank_bot"))
 
+    # BANK_BOT «имя,id» — так его записал скрипт партнёрского бота, и
+    # прежний разбор не узнавал банк вовсе.
+    ids, names = runner.sources("dc_next_bot,1996047418")
+    check("«имя,id» разбирается на имя и id",
+          ids == {1996047418} and names == {"dc_next_bot"}, f"{ids} {names}")
+    check("банк узнан по id из «имя,id»",
+          runner._from_source(Msg(sender_id=1996047418), ids, names))
+    check("банк узнан по имени из «имя,id»",
+          runner._from_source(Msg(username="DC_Next_Bot"), ids, names))
+    check("чужой при «имя,id» не проходит",
+          not runner._from_source(Msg(sender_id=5, username="other"), ids, names))
+    check("«@bank, 123» тоже понимается",
+          runner.sources("@bank_bot, 123") == ({123}, {"bank_bot"}))
+
 
 async def worker_loop(bot) -> None:
     """Очередь: строго по одному, и одно кривое сообщение не валит поток."""

@@ -374,7 +374,7 @@ case "\${1:-help}" in
                     echo "  Уведомления от кого-либо ещё разбираться не будут."
                     exit 1
                 fi
-                if ! echo "\${3#@}" | grep -qE '^[A-Za-z0-9_]{4,32}$'; then
+                if ! echo "\${3#@}" | grep -qE '^[A-Za-z0-9_,@]{4,80}$'; then
                     echo "❌ Это не похоже на юзернейм или id: \$3"
                     echo "   Нужно вроде bank_notify_bot или числовой id."
                     exit 1

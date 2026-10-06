@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import re
 
 from app import db
 from app.config import settings
@@ -52,21 +53,49 @@ def source_name() -> str:
     return (settings.bank_bot or "").strip().lstrip("@")
 
 
-def _from_source(message, wanted_id: int, wanted_name: str) -> bool:
+def sources(raw: str | None = None) -> tuple[set[int], set[str]]:
+    """BANK_BOT → (числовые id, юзернеймы).
+
+    Пишут его по-разному: «dc_next_bot», «@dc_next_bot», «1996047418» или
+    сразу «dc_next_bot,1996047418». Последний вариант раньше читался как
+    один юзернейм с запятой — такого бота нет, и юзербот молча пропускал
+    все уведомления банка, хотя был подключён и выглядел исправным.
+    """
+    ids, names = set(), set()
+    text = settings.bank_bot if raw is None else raw
+    for part in re.split(r"[\s,;]+", text or ""):
+        part = part.strip().lstrip("@")
+        if not part:
+            continue
+        if part.lstrip("-").isdigit():
+            ids.add(int(part))
+        else:
+            names.add(part.lower())
+    return ids, names
+
+
+def _from_source(message, wanted_ids, wanted_names) -> bool:
     """Это точно наш банковский бот?
 
     Сверяем и по id, и по юзернейму: id надёжнее (юзернейм можно
     перехватить, если банк его освободит), но задать в настройках проще
-    юзернейм. Совпасть должно хоть что-то, и ничего не должно
-    противоречить.
+    юзернейм. Совпасть должно хоть что-то.
+
+    Для совместимости принимает и одиночные значения: id числом и имя
+    строкой.
     """
+    if isinstance(wanted_ids, int):
+        wanted_ids = {wanted_ids} if wanted_ids else set()
+    if isinstance(wanted_names, str):
+        wanted_ids_extra, wanted_names = sources(wanted_names)
+        wanted_ids = set(wanted_ids) | wanted_ids_extra
     sender_id = getattr(message, "sender_id", None)
-    if wanted_id and sender_id == wanted_id:
+    if sender_id is not None and sender_id in wanted_ids:
         return True
-    if wanted_name:
+    if wanted_names:
         sender = getattr(message, "sender", None)
         name = (getattr(sender, "username", "") or "").lower()
-        if name and name == wanted_name.lower():
+        if name and name in wanted_names:
             return True
     return False
 
@@ -134,9 +163,8 @@ async def run(bot=None) -> None:
         )
         return
 
-    wanted_name = source_name()
-    wanted_id = int(wanted_name) if wanted_name.isdigit() else 0
-    log.info("[USERBOT] Слушаю уведомления от: %s", wanted_name)
+    wanted_ids, wanted_names = sources()
+    log.info("[USERBOT] Слушаю уведомления от: %s", source_name())
 
     settings.session_file.parent.mkdir(parents=True, exist_ok=True)
     own_bot = bot is None
@@ -160,7 +188,7 @@ async def run(bot=None) -> None:
             async def on_message(event) -> None:      # noqa: ANN001
                 # Всё, что не от банка, не читаем и не пишем никуда:
                 # это чужая личная переписка.
-                if not _from_source(event.message, wanted_id, wanted_name):
+                if not _from_source(event.message, wanted_ids, wanted_names):
                     return
                 log.info("[USERBOT] New bank message")
                 try:
@@ -170,9 +198,26 @@ async def run(bot=None) -> None:
                               "%s пропущено", event.message.id)
 
             try:
-                await client.start()
+                # Не client.start(): без живого сеанса он стал бы спрашивать
+                # номер у службы, где никто не ответит («EOF when reading a
+                # line»). Сеанс мёртв — так и говорим и ждём входа руками.
+                await client.connect()
+                if not await client.is_user_authorized():
+                    raise RuntimeError("сеанс завершён в Telegram — нужен "
+                                       "новый вход: stars-bot userbot login")
                 me = await client.get_me()
                 log.info("[USERBOT] Подключён как @%s", me.username or me.id)
+                # id банка по юзернейму: по id узнавать надёжнее, а у
+                # отправителя новых сообщений юзернейм бывает не подгружен.
+                for name in sorted(wanted_names):
+                    try:
+                        entity = await client.get_entity(name)
+                        wanted_ids.add(entity.id)
+                        log.info("[USERBOT] Банк @%s → id %s", name, entity.id)
+                    except Exception as exc:  # noqa: BLE001
+                        log.warning("[USERBOT] Банк @%s не найден: %s", name, exc)
+                if not wanted_ids and not wanted_names:
+                    log.error("[USERBOT] BANK_BOT пуст — слушать некого")
                 if told:
                     await _tell(bot, "✅ <b>Юзербот снова на связи</b>\n\n"
                                      "<i>Оплаты опять подтверждаются сами.</i>")
