@@ -492,6 +492,21 @@ CREATE TABLE IF NOT EXISTS push_subs (          -- push-уведомления: 
 );
 CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs(user_id);
 """)
+        conn.executescript("""
+CREATE TABLE IF NOT EXISTS tg_logins (          -- вход на сайт через Telegram-бот: одноразовые токены
+    token        TEXT PRIMARY KEY,
+    created_at   TEXT NOT NULL,
+    expires_at   REAL NOT NULL,
+    status       TEXT NOT NULL,                -- new · ok · used · denied
+    user_id      INTEGER,
+    tg_id        INTEGER,
+    ua           TEXT,
+    ip           TEXT,
+    link_user_id INTEGER                       -- привязка Telegram к уже открытому аккаунту
+);
+""")
+        if "phone" not in {r[1] for r in conn.execute("PRAGMA table_info(users)")}:
+            conn.execute("ALTER TABLE users ADD COLUMN phone TEXT")   # номер из Telegram (поделился сам)
         watch_cols = {r[1] for r in conn.execute("PRAGMA table_info(shop_watch)")}
         if "intent" not in watch_cols:   # что покупатель выбрал до пополнения — купим сами, когда деньги придут
             conn.execute("ALTER TABLE shop_watch ADD COLUMN intent TEXT")

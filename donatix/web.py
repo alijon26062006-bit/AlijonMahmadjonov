@@ -453,6 +453,53 @@ def login_code(request: Request, code: str = Form(""), conn=Depends(get_conn),
     return _redirect("/admin")
 
 
+# ── Вход через Telegram (бот-магазин): номер один раз, дальше — одна кнопка ──
+
+@router.get("/auth/telegram")
+def tg_login_start(request: Request, link: int = 0, conn=Depends(get_conn)):
+    from . import tglogin
+    bot = tglogin.bot_username(conn)
+    if not bot:
+        flash(request, "Вход через Telegram пока не настроен.", "error")
+        return _redirect("/login")
+    if request.app.state.limiter.hit("account", f"tglogin{_ip(request)}") is not None:
+        flash(request, "Слишком часто. Подождите минуту.", "error")
+        return _redirect("/login")
+    me = session_user(request, conn) if link else None
+    token = tglogin.create(conn, request.headers.get("user-agent", ""), _ip(request),
+                           link_user_id=me["id"] if me else None)
+    request.session["tg_login"] = token
+    return render(request, "auth_telegram.html", {"tg_url": f"https://t.me/{bot}?start=login_{token}",
+                                                  "bot": bot, "link": bool(me), "noindex": True})
+
+
+@router.get("/auth/telegram/status")
+def tg_login_status(request: Request, conn=Depends(get_conn)):
+    from . import tglogin
+    token = request.session.get("tg_login") or ""
+    return JSONResponse(tglogin.status(conn, token) if token else {"state": "expired"},
+                        headers={"Cache-Control": "no-store"})
+
+
+@router.get("/auth/telegram/finish")
+def tg_login_finish(request: Request, conn=Depends(get_conn)):
+    from . import tglogin
+    token = request.session.pop("tg_login", "") or ""
+    row = tglogin.get(conn, token) if token else None
+    uid = tglogin.consume(conn, token) if token else None
+    if not uid or row is None:
+        flash(request, "Вход не подтверждён или ссылка устарела. Нажмите «Войти через Telegram» ещё раз.", "error")
+        return _redirect("/login")
+    if row["link_user_id"]:
+        flash(request, "✅ Telegram привязан. Теперь можно входить одной кнопкой «Войти через Telegram».")
+        return _redirect("/panel")
+    user = accounts.get_user(conn, uid)
+    if user is None or user["status"] == "blocked":
+        flash(request, "Аккаунт заблокирован.", "error")
+        return _redirect("/login")
+    return _finish_login(request, conn, user)
+
+
 @router.get("/auth/google")
 def google_start(request: Request, config: Config = Depends(get_config)):
     from . import google_auth
@@ -547,6 +594,8 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
     return render(request, "panel/home.html", {
         "user": user, "summary": summary, "key": key, "kinds": KINDS,
         "orders_all": conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ?", (user["id"],)).fetchone()[0],
+        "tg_linked": conn.execute("SELECT 1 FROM shop_users WHERE user_id = ?", (user["id"],)).fetchone() is not None,
+        "tg_bot": db.get_setting(conn, "shop.bot_username") or "",
         "markup": accounts.markup_for(user, config),
         "ref_percent": referrals.percent(conn),
         "dc": _dcoin_card(conn, user["id"]),

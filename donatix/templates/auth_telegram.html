@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, tg_logo %}
+{% block title %}Вход через Telegram — {{ site_name }}{% endblock %}
+{% block body %}
+<main class="auth">
+  <div class="card tg-auth">
+    <a class="back hide-in-app" href="/login">{{ icon('arrow-left', 18) }}Назад</a>
+    <div class="tg-auth-logo">{{ tg_logo(64) }}</div>
+    <h2>{{ 'Привязать Telegram' if link else 'Вход через Telegram' }}</h2>
+    <ol class="tg-steps">
+      <li>Нажмите кнопку — откроется наш бот <b>@{{ bot }}</b></li>
+      <li>Нажмите <b>«Запустить» / Start</b></li>
+      <li>Первый раз — <b>«📱 Поделиться номером»</b>, затем <b>«✅ Войти»</b></li>
+      <li>Вернитесь сюда — вход выполнится сам</li>
+    </ol>
+    <a class="btn lg block tg-btn" id="tg-open" href="{{ tg_url }}" target="_blank" rel="noopener">{{ tg_logo(22) }}Открыть Telegram</a>
+    <div class="tg-wait" id="tg-wait" role="status" aria-live="polite"><span class="tg-dot"></span>Ждём подтверждения в Telegram…</div>
+    <p class="hint center">Ссылка действует 10 минут. Пароль не нужен — регистрация и вход одной кнопкой.</p>
+  </div>
+</main>
+<script>
+(function () {
+  var box = document.getElementById("tg-wait"), done = false, timer = null;
+  async function check() {
+    if (done) return;
+    try {
+      var r = await fetch("/auth/telegram/status", { credentials: "same-origin", cache: "no-store" });
+      var d = await r.json();
+      if (d.state === "ok") { done = true; box.innerHTML = "✅ Подтверждено! Входим…"; location.href = "/auth/telegram/finish"; return; }
+      if (d.state === "denied") { done = true; box.innerHTML = "🛡 Вход отменён в Telegram."; return; }
+      if (d.state === "expired") { done = true; box.innerHTML = "⌛ Ссылка устарела. <a href='/auth/telegram'>Начать заново</a>"; return; }
+    } catch (e) {}
+  }
+  timer = setInterval(check, 2000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
+  window.addEventListener("focus", check);
+})();
+</script>
+{% endblock %}

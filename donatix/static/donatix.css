@@ -1769,3 +1769,15 @@ body.rcc-open { overflow: hidden; }
     animation: sheet-dim .3s ease both; }
 }
 @keyframes sheet-dim { from { opacity: 0; } }
+
+/* Вход через Telegram */
+.tg-btn { background: #229ED9; color: #fff; border-color: #229ED9; gap: 10px; margin-bottom: 10px; }
+.tg-btn:hover { background: #1c8ec4; color: #fff; text-decoration: none; }
+.tg-auth { text-align: center; }
+.tg-auth .back { display: flex; justify-content: flex-start; text-align: left; }
+.tg-auth-logo { display: grid; place-items: center; margin: 6px 0 10px; }
+.tg-steps { text-align: left; margin: 14px 0 18px; padding-left: 22px; line-height: 1.55; }
+.tg-steps li { margin: 4px 0; }
+.tg-wait { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 16px 0 6px; color: var(--muted); }
+.tg-dot { width: 10px; height: 10px; border-radius: 50%; background: #229ED9; animation: tg-pulse 1.2s ease-in-out infinite; }
+@keyframes tg-pulse { 50% { opacity: .25; transform: scale(.7); } }

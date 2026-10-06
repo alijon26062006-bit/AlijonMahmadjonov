@@ -214,6 +214,14 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["google_verify"] = config.google_verify
     ctx["yandex_verify"] = config.yandex_verify
     ctx["google_login"] = bool(config.google_client_id and config.google_client_secret)
+    ctx["tg_login"] = ""
+    if request.url.path in ("/login", "/register") and config.shop_bot_token:   # «Войти через Telegram»
+        _pool = db.pool(config.db_path)
+        _c = _pool.acquire()
+        try:
+            ctx["tg_login"] = db.get_setting(_c, "shop.bot_username") or ""
+        finally:
+            _pool.release(_c)
     ctx["canonical"] = config.base_url + request.url.path
     # В поиск попадают только публичные страницы; кабинет, админка и ошибки — нет
     ctx["noindex"] = status_code >= 400 or request.url.path not in INDEXABLE

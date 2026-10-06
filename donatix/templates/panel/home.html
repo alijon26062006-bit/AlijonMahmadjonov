@@ -51,6 +51,9 @@
     <span class="avatar">{{ user.login[:2] | upper }}</span>
     <div class="who"><b>{{ user.login }}</b><span class="muted">{{ user.email }}</span></div>
   </div>
+  {% if tg_bot and not tg_linked %}
+  <a class="btn block tg-btn" href="/auth/telegram?link=1" style="margin:12px 0 0">Привязать Telegram — вход одной кнопкой</a>
+  {% endif %}
   <h3 class="quick-title">Быстрые действия</h3>
   <p class="quick-sub">Заказы, движения и поддержка</p>
   <a class="qrow" href="/panel/orders"><span><b>Заказы</b><small>История и статусы</small></span>{{ icon('chevron', 16) }}</a>

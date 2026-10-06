@@ -188,6 +188,15 @@ T: dict[str, tuple[str, str]] = {
 }
 
 
+LOGIN_EXPIRED = ("⌛ Ссылка входа устарела. На сайте или в приложении нажмите «Войти через Telegram» ещё раз.\n"
+                 "⌛ Пайванд кӯҳна шуд — боз «Ворид шудан тавассути Telegram»-ро пахш кунед.")
+LOGIN_ASK_PHONE = ("📱 <b>Вход в Donatix</b>\nНажмите кнопку ниже — Telegram отправит ваш номер. "
+                   "Это нужно один раз, дальше вход в одно нажатие.\n\n"
+                   "📱 Тугмаи поёнро пахш кунед — рақами шумо фиристода мешавад (як маротиба).")
+LOGIN_DONE = ("✅ <b>Готово!</b> Вернитесь в приложение или на сайт Donatix — вход выполнится сам.\n"
+              "✅ Ба барнома баргардед — воридшавӣ худ ба худ мешавад.")
+
+
 def tell_buyer(conn: sqlite3.Connection, config: Config, tg_id: int, delta_micro: int) -> bool:
     """Покупателю в бот-магазин: баланс изменил админ. Из админ-бота — прямым запросом к Telegram."""
     su = shop_user(conn, tg_id)
@@ -616,6 +625,7 @@ class ShopBot:
         self._thread: threading.Thread | None = None
         self._last_watch = 0.0
         self._subbed: dict[int, float] = {}   # tg_id → когда последний раз видели подписку
+        self.login_wait: dict[int, str] = {}  # вход на сайт: ждём номер телефона (tg_id → токен)
         self.bot_id: int | None = None
 
     # цикл
@@ -705,6 +715,10 @@ class ShopBot:
                 return
             su = ensure_user(conn, tg_id, sender.get("first_name") or "", username=sender.get("username") or "")
             data = str(cq.get("data") or "")
+            if data.startswith(("lg:", "lgno:")):   # вход на сайт — без проверки подписки на каналы
+                self.api("answerCallbackQuery", callback_query_id=cq["id"])
+                self.login_answer(conn, su, data, msg.get("message_id"))
+                return
             if data == "sub":   # «Я подписался» — проверяем сразу
                 if self.subscribed(conn, tg_id, force=True):
                     self.api("answerCallbackQuery", callback_query_id=cq["id"])
@@ -729,6 +743,13 @@ class ShopBot:
         sender = msg.get("from") or {}
         text = (msg.get("text") or "").strip()
         start = text.split(maxsplit=1)[1] if text.startswith("/start ") else ""
+        if start.startswith("login_") or (msg.get("contact") and tg_id in self.login_wait):
+            su = ensure_user(conn, tg_id, sender.get("first_name") or "", username=sender.get("username") or "")
+            if start:
+                self.login_start(conn, su, start[6:])
+            else:
+                self.login_contact(conn, su, msg["contact"])
+            return
         su = ensure_user(conn, tg_id, sender.get("first_name") or "", start, username=sender.get("username") or "")
         need_lang = text.startswith(("/start", "/lang")) and not su["lang"] or text.startswith("/lang")
         if not need_lang and not self.subscribed(conn, tg_id):
@@ -765,6 +786,73 @@ class ShopBot:
             self.open_deep_link(conn, su, start)
         else:
             self.screen_home(conn, su)
+
+    # ── Вход на сайт и в приложение через Telegram ──
+
+    def login_start(self, conn: sqlite3.Connection, su: sqlite3.Row, token: str) -> None:
+        from . import tglogin
+        row = tglogin.get(conn, token)
+        if row is None or row["status"] != "new":
+            self.show(su["tg_id"], LOGIN_EXPIRED)
+            return
+        user = self._user(conn, su)
+        if not row["link_user_id"] and not (user["phone"] or ""):
+            self.login_wait[su["tg_id"]] = token
+            self.api("sendMessage", chat_id=su["tg_id"], parse_mode="HTML", text=LOGIN_ASK_PHONE,
+                     reply_markup={"keyboard": [[{"text": "📱 Поделиться номером / Рақамро фиристодан",
+                                                  "request_contact": True}]],
+                                   "resize_keyboard": True, "one_time_keyboard": True})
+            return
+        self.login_confirm(conn, su, token)
+
+    def login_contact(self, conn: sqlite3.Connection, su: sqlite3.Row, contact: dict[str, Any]) -> None:
+        from . import tglogin
+        tg_id = su["tg_id"]
+        if int(contact.get("user_id") or 0) != tg_id:   # чужой контакт не принимаем — только свой номер
+            self.api("sendMessage", chat_id=tg_id, text="Нажмите кнопку «📱 Поделиться номером» — нужен ваш номер.")
+            return
+        token = self.login_wait.pop(tg_id, "")
+        tglogin.save_phone(conn, su["user_id"], str(contact.get("phone_number") or ""))
+        self.api("sendMessage", chat_id=tg_id, text="✅ Номер сохранён.", reply_markup={"remove_keyboard": True})
+        self.login_confirm(conn, su, token)
+
+    def login_confirm(self, conn: sqlite3.Connection, su: sqlite3.Row, token: str) -> None:
+        from . import tglogin
+        row = tglogin.get(conn, token)
+        if row is None or row["status"] != "new":
+            self.show(su["tg_id"], LOGIN_EXPIRED)
+            return
+        if row["link_user_id"]:
+            target = accounts.get_user(conn, int(row["link_user_id"]))
+            head = f"🔗 <b>Привязать этот Telegram к аккаунту {_e(target['login'] if target else '')}?</b>"
+        else:
+            head = "🔐 <b>Вход в Donatix</b>"
+        text = (f"{head}\n\n📱 Устройство: <b>{_e(tglogin.device(row['ua'] or ''))}</b>\n"
+                f"🌐 IP: {_e(row['ip'] or '')}\n\n"
+                "Это вы сейчас входите? Если вы ничего не открывали — нажмите «Это не я».")
+        self.show(su["tg_id"], text, [[("✅ Да, войти / Ворид шудан", f"lg:{token}", "success")],
+                                      [("❌ Это не я", f"lgno:{token}", "danger")]])
+
+    def login_answer(self, conn: sqlite3.Connection, su: sqlite3.Row, data: str, mid: int | None) -> None:
+        from . import tglogin
+        action, token = data.split(":", 1)
+        if action == "lgno":
+            tglogin.deny(conn, token)
+            self.show(su["tg_id"], "🛡 Вход отменён. Никто не вошёл в ваш аккаунт.",
+                      [[(tr(su["lang"], "home"), "h")]], edit=mid)
+            return
+        phone = self._user(conn, su)["phone"]
+        ok, why = tglogin.approve(conn, token, su["tg_id"])
+        if ok:
+            row = tglogin.get(conn, token)
+            if row is not None and phone:   # привязка: номер переносим на аккаунт сайта, если там его нет
+                conn.execute("UPDATE users SET phone = COALESCE(phone, ?) WHERE id = ?", (phone, row["user_id"]))
+            self.show(su["tg_id"], LOGIN_DONE, [[("📲 Открыть Donatix", None, f"{self.config.base_url}/panel")]],
+                      edit=mid)
+            return
+        text = {"busy": "Этот Telegram уже привязан к другому аккаунту Donatix с покупками. Напишите в поддержку.",
+                "blocked": "Аккаунт заблокирован. Напишите в поддержку."}.get(why, LOGIN_EXPIRED)
+        self.show(su["tg_id"], text, edit=mid)
 
     def open_deep_link(self, conn: sqlite3.Connection, su: sqlite3.Row, start: str, edit: int | None = None) -> None:
         """t.me/бот?start=g123 — сразу нужная игра (ссылки для постов в канале)."""
