@@ -1605,29 +1605,35 @@ body.rcc-open { overflow: hidden; }
   text-align: center; }
 .offline img { border-radius: 18px; }
 .is-app body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
-.is-app .btn, .is-app .tabbar, .is-app .nav-item { -webkit-user-select: none; user-select: none; }
-.is-app header.top { padding-top: env(safe-area-inset-top); }
+.app-ui .btn, .app-ui .tabbar, .app-ui .nav-item { -webkit-user-select: none; user-select: none; }
+.app-ui header.top { padding-top: env(safe-area-inset-top); }
 .is-webview .google-btn, .is-webview .or-line { display: none !important; }
 @media (max-width: 900px) {
-  .is-app .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid;
+  .app-ui .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid;
     grid-template-columns: repeat(5, 1fr); padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
     background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px -18px rgb(0 0 0 / .4); }
-  .is-app .tabbar a, .is-app .tabbar button { display: flex; flex-direction: column; align-items: center; gap: 3px;
+  .app-ui .tabbar a, .app-ui .tabbar button { display: flex; flex-direction: column; align-items: center; gap: 3px;
     padding: 4px 2px; border: 0; background: none; color: var(--muted); font: 600 .7rem/1.1 inherit;
     text-decoration: none; cursor: pointer; border-radius: 12px; height: 52px; justify-content: center; }
-  .is-app .tabbar .on { color: var(--accent); }
-  .is-app .tabbar .tab-main svg { width: 34px; height: 34px; padding: 7px; border-radius: 12px; margin-top: -14px;
+  .app-ui .tabbar .on { color: var(--accent); }
+  .app-ui .tabbar .tab-main svg { width: 34px; height: 34px; padding: 7px; border-radius: 12px; margin-top: -14px;
     background: var(--accent); color: #fff; box-shadow: 0 6px 16px -6px var(--accent); }
-  .is-app main#main { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
-  .is-app .buy-bar { bottom: calc(65px + env(safe-area-inset-bottom)); padding-bottom: 10px; }
-  .is-app .buy-grid { padding-bottom: 150px; }
-  .is-app .only-sm[aria-label="Открыть меню"] { display: none; }
+  .app-ui main#main { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .app-ui .buy-bar { bottom: calc(65px + env(safe-area-inset-bottom)); padding-bottom: 10px; }
+  .app-ui .buy-grid { padding-bottom: 150px; }
+  .app-ui .only-sm[aria-label="Открыть меню"] { display: none; }
 }
 /* Форма покупки только проявляется, без сдвига: иначе закреплённая снизу кнопка «Купить» прыгает при открытии */
 @keyframes fade-only { from { opacity: 0; } }
 .shell > main > .buy-grid { animation-name: fade-only; }
 /* В приложении нет подвала сайта и плавающей кнопки канала: место занимает нижнее меню */
-.is-app footer.foot, .is-app .tg-fab { display: none !important; }
+.is-app footer.foot, .is-app .tg-fab, .is-app .hide-in-app { display: none !important; }
+/* Сайт с телефона: подвал остаётся (условия, политика), но не под нижним меню; кнопка канала — над меню */
+@media (max-width: 900px) {
+  .app-ui body:has(.tabbar) footer.foot { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+  .app-ui body:has(.tabbar) .tg-fab { bottom: calc(80px + env(safe-area-inset-bottom)) !important; }
+  .app-ui body:has(.buy-bar) .tg-fab { display: none; }
+}
 
 /* ── Заставка приложения: логотип рисуется, кольцо пульсирует, снизу бегущая полоса ── */
 .splash { display: none; }
@@ -1662,8 +1668,8 @@ body.rcc-open { overflow: hidden; }
 
 /* ── Режим приложения: что показывать, что прятать ── */
 .only-app { display: none; }
-.is-app .only-app { display: block; }
-.is-app .hide-app { display: none !important; }
+.app-ui .only-app { display: block; }
+.app-ui .hide-app { display: none !important; }
 .app-hello { margin: 4px 2px 12px; font-size: 1.15rem; }
 
 /* Выход — в конце меню (в приложении его нет в шапке) */

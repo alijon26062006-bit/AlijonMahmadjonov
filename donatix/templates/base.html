@@ -79,9 +79,11 @@
       var saved = null; try { if (q) localStorage.setItem("dx-app", "1"); saved = localStorage.getItem("dx-app"); } catch (e) {}
       if (q || standalone || saved === "1" || /DonatixApp/i.test(ua)) d.classList.add("is-app");
       if (/; wv\)|DonatixApp/i.test(ua)) d.classList.add("is-webview");
-      // Заставка — только в приложении и только при первом открытии (не на каждой странице)
+      // Мобильный вид как в приложении (нижнее меню и т.д.) — в приложении и на сайте с телефона
+      if (d.classList.contains("is-app") || (window.matchMedia && matchMedia("(max-width: 900px)").matches)) d.classList.add("app-ui");
+      // Заставка — при первом открытии (в приложении и на сайте), не на каждой странице; поисковым роботам — нет
       var seen = null; try { seen = sessionStorage.getItem("dx-splash"); } catch (e) {}
-      if (d.classList.contains("is-app") && !seen) d.classList.add("splash-on");
+      if (!seen && !/bot|crawl|spider|lighthouse|headless|preview/i.test(ua)) d.classList.add("splash-on");
     })();
   </script>
 </head>
@@ -106,13 +108,13 @@
       <a class="hide-sm" href="/#pricing">Цены</a>
       <a class="hide-sm" href="/docs">Документация</a>
       <a class="hide-sm" href="/#faq">FAQ</a>
-      {% if tg_channel %}<a class="nav-tg hide-app" href="{{ tg_channel }}" target="_blank" rel="noopener" aria-label="Наш Telegram-канал">{{ tg_logo(22) }}<span class="hide-sm">Канал</span></a>{% endif %}
+      {% if tg_channel %}<a class="nav-tg hide-in-app" href="{{ tg_channel }}" target="_blank" rel="noopener" aria-label="Наш Telegram-канал">{{ tg_logo(22) }}<span class="hide-sm">Канал</span></a>{% endif %}
       {{ theme_button() }}
       {% if user %}
         <a class="btn sm primary" href="{{ '/admin' if user.role == 'admin' else '/panel' }}">Панель</a>
       {% else %}
         <a class="btn sm hide-sm" href="/login">Войти</a>
-        <a class="btn sm primary hide-app" href="/register">Начать</a>
+        <a class="btn sm primary hide-in-app" href="/register">Начать</a>
       {% endif %}
     </nav>
   </div>
