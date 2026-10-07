@@ -33,6 +33,9 @@
         <p class="hint" id="boost-soon" data-left="{{ boost_wait }}">Если проверка затянется, через {{ boost_wait // 60 + 1 }} мин. здесь появится кнопка «⚡ Ускорить».</p>
         {% endif %}
         <p class="hint">Новую заявку можно отправить сразу после проверки этой. Страница обновится сама.</p>
+        <form class="inline" method="post" action="/panel/balance/{{ waiting.id }}/cancel"
+              onsubmit="return confirm('Отменить заявку #{{ waiting.id }}? Если вы уже перевели деньги — не отменяйте, дождитесь проверки.')">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm">❌ Отменить заявку</button></form>
         {% endif %}
       </div>
     </div>
@@ -130,9 +133,10 @@
           <div class="sub">{{ p.pay_amount }} {{ p.pay_currency }} · {{ p.created_at | dt }}{% if p.admin_note %} · {{ p.admin_note }}{% endif %}</div>
           <div class="meta">
             <span class="badge {{ {'paid': 'ok', 'rejected': 'bad', 'cancelled': '', 'fake': 'bad'}.get(p.status, 'warn') }}">{{ {'pending': 'Проверяется', 'paid': 'Зачислено', 'rejected': 'Отклонено', 'cancelled': 'Отменено', 'fake': 'Перевод не поступил'}.get(p.status, p.status) }}</span>
-            {% if p.status == 'pending' and not p.receipt_file %}
-            <form class="inline" method="post" action="/panel/balance/{{ p.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm">Отменить</button></form>
-            {% elif p.status == 'pending' %}<span class="spin-dot" aria-hidden="true"></span>
+            {% if p.status == 'pending' %}
+            {% if p.receipt_file %}<span class="spin-dot" aria-hidden="true"></span>{% endif %}
+            <form class="inline" method="post" action="/panel/balance/{{ p.id }}/cancel"
+                  onsubmit="return confirm('Отменить заявку #{{ p.id }}?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm">Отменить</button></form>
             {% endif %}
           </div>
         </div>

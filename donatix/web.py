@@ -1404,7 +1404,7 @@ def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_u
     if payments.cancel(conn, user["id"], payment_id, config):
         flash(request, "Заявка отменена.")
     else:
-        flash(request, "Чек уже отправлен — заявку проверяет администратор, отменить её нельзя.", "error")
+        flash(request, "Заявка уже проверена — отменить её нельзя.", "error")
     return _redirect("/panel/balance")
 
 

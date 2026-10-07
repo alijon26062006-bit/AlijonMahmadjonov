@@ -353,3 +353,30 @@ def test_builtin_animated_guide_by_default(app, dc, conn, supplier):
     assert "встроенная анимация" in page and "/static/app/dc-guide.mp4" in page
     adm.post("/admin/dc-video", data={"csrf": csrf_of(page), "kind": "site", "off": "1"})
     assert dcvideo.get(conn, "site") is None
+
+
+def test_cancel_pending_with_receipt_and_in_bot(app, dc, conn, supplier):
+    """Заявку в ожидании можно отменить — и на сайте (даже с чеком), и кнопкой в боте."""
+    from test_shopbot import _bot, _start, msg, press
+
+    uid, c, token = _client(app, conn)
+    r = _pay(c, token, "40")
+    pid = int(r.headers["location"].split("/")[-2])
+    conn.execute("UPDATE payments SET receipt_file = 'r.png' WHERE id = ?", (pid,))
+    c.post(f"/panel/balance/{pid}/cancel", data={"csrf": token})
+    assert conn.execute("SELECT status FROM payments WHERE id = ?", (pid,)).fetchone()[0] == "cancelled"
+    assert _handle(conn, dc, notice("40.01", "7001"), 70)["status"] == "unknown"   # отменённую не зачисляем
+
+    bot = _bot(dc, supplier)
+    _start(bot, conn, "tj")
+    bot.handle(conn, press("t"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
+    bot.handle(conn, msg("3"))
+    p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
+    assert any(b.get("callback_data") == f"pc:{p['id']}" for b in bot.api.last_buttons())
+    bot.handle(conn, press(f"pc:{p['id']}"))
+    assert "бекор шуд" in bot.api.last_text()
+    assert conn.execute("SELECT status FROM payments WHERE id = ?", (p["id"],)).fetchone()[0] == "cancelled"
+    assert conn.execute("SELECT COUNT(*) FROM shop_watch WHERE obj_id = ?", (p["id"],)).fetchone()[0] == 0
+    bot.handle(conn, press(f"pc:{p['id']}"))                                        # второй раз — уже нельзя
+    assert "мумкин нест" in bot.api.last_text()

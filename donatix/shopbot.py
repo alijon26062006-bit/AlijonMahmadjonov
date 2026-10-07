@@ -116,6 +116,10 @@ T: dict[str, tuple[str, str]] = {
                 "💰 Дар баланс: {balance}"),
     "pay": ("✅ Оплатить", "✅ Пардохт"),
     "cancel": ("❌ Отмена", "❌ Бекор"),
+    "pay_cancel": ("❌ Отменить заявку", "❌ Бекор кардани дархост"),
+    "pay_cancelled": ("❌ <b>Заявка #{id} отменена</b>\nМожно создать новую.",
+                      "❌ <b>Дархост #{id} бекор шуд</b>\nМетавонед дархости нав созед."),
+    "pay_cancel_late": ("Заявка уже проверена — отменить нельзя.", "Дархост аллакай санҷида шуд — бекор кардан мумкин нест."),
     "no_money": ("\n\n⚠️ Не хватает <b>{need}</b>. Пополните баланс — и заказ в одно нажатие.",
                  "\n\n⚠️ <b>{need}</b> намерасад. Балансро пур кунед — фармоиш бо як пахш."),
     "topup": ("➕ Пополнить", "➕ Пур кардан"),
@@ -1374,6 +1378,15 @@ class ShopBot:
             self.next_step(conn, su)
         elif head == "ok":
             self.buy(conn, su, mid)
+        elif head == "pc" and len(parts) == 2 and parts[1].isdigit():   # отменить свою заявку на пополнение
+            pid = int(parts[1])
+            conn.execute("DELETE FROM shop_watch WHERE kind = 'pay' AND obj_id = ? AND chat_id = ?", (pid, tg_id))
+            if payments.cancel(conn, su["user_id"], pid, self.config):
+                self.state.pop(tg_id, None)
+                self.show(tg_id, tr(lang, "pay_cancelled", id=pid), [[(tr(lang, "topup"), "t"), (tr(lang, "home"), "h")]],
+                          edit=mid)
+            else:
+                self.show(tg_id, tr(lang, "pay_cancel_late"), [[(tr(lang, "home"), "h")]], edit=mid)
         elif head == "x":
             self.state.pop(tg_id, None)
             self.screen_home(conn, su, mid)
@@ -1606,7 +1619,8 @@ class ShopBot:
             if intent:
                 text += tr(lang, "will_buy", product=_e(intent["name"]))
             self.state.pop(tg_id, None)
-            mid = self.show(tg_id, text, [[(tr(lang, "home"), "h")]] + rows[:-1], edit=st.get("msg"))
+            mid = self.show(tg_id, text, [[(tr(lang, "home"), "h")]] + rows[:-1]
+                            + [[(tr(lang, "pay_cancel"), f"pc:{pid}", "danger")]], edit=st.get("msg"))
             self.watch_add(conn, "pay", pid, tg_id, mid, "pending", intent)
             return
         self.state[tg_id] = {"step": "receipt", "pid": pid, "resume": st.get("resume")}
@@ -1669,9 +1683,12 @@ class ShopBot:
             log.exception("бот-магазин: чек %s админу", pid)
         self.state.pop(tg_id, None)
         intent = self.intent(conn, resume)
+        cancel_row = [[(tr(lang, "home"), "h")], [(tr(lang, "pay_cancel"), f"pc:{pid}", "danger")]]
         if intent:   # заказ сохраняем в базе: оформим сами, как только пополнение подтвердят
             self.show(tg_id, tr(lang, "checking") + tr(lang, "will_buy", product=_e(intent["name"])),
-                      [[(tr(lang, "home"), "h")]], edit=mid)
+                      cancel_row, edit=mid)
+        else:
+            self.show(tg_id, tr(lang, "checking"), cancel_row, edit=mid)
         self.watch_add(conn, "pay", pid, tg_id, mid, "pending", intent)
 
     def intent(self, conn: sqlite3.Connection, resume: Any) -> dict[str, Any] | None:

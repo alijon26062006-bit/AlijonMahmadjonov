@@ -435,7 +435,7 @@ def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: 
 
 def cancel(conn: sqlite3.Connection, user_id: int, payment_id: int, config: Config | None = None) -> bool:
     done = conn.execute("UPDATE payments SET status = 'cancelled', resolved_at = ?, resolved_who = 'клиент' "
-                        "WHERE id = ? AND user_id = ? AND status = 'pending' AND receipt_file IS NULL",
+                        "WHERE id = ? AND user_id = ? AND status = 'pending'",
                         (db.now(), payment_id, user_id)).rowcount > 0
     if done and config is not None:
         notify(conn, config, user_id, f"Заявка на пополнение #{payment_id} отменена.", "/panel/balance")
