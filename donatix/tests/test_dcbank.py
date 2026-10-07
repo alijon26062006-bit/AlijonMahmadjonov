@@ -380,3 +380,25 @@ def test_cancel_pending_with_receipt_and_in_bot(app, dc, conn, supplier):
     assert conn.execute("SELECT COUNT(*) FROM shop_watch WHERE obj_id = ?", (p["id"],)).fetchone()[0] == 0
     bot.handle(conn, press(f"pc:{p['id']}"))                                        # второй раз — уже нельзя
     assert "мумкин нест" in bot.api.last_text()
+
+
+def test_bot_cancel_from_balance_and_topup_screens(app, dc, conn, supplier):
+    """Ушёл в меню и вернулся — отменить заявку можно из «Баланса» и из «Пополнить»."""
+    from test_shopbot import _bot, _start, msg, press
+
+    bot = _bot(dc, supplier)
+    _start(bot, conn, "tj")
+    bot.handle(conn, press("t"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
+    bot.handle(conn, msg("4"))
+    p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
+    bot.handle(conn, press("h"))
+    bot.handle(conn, press("t"))                                   # снова «Пополнить» — заявка уже есть
+    assert f"Дархост #{p['id']}" in bot.api.last_text()
+    assert any(b.get("callback_data") == f"pc:{p['id']}" for b in bot.api.last_buttons())
+    bot.handle(conn, press("b"))                                   # «Баланс» — тоже видно и можно отменить
+    assert any(b.get("callback_data") == f"pc:{p['id']}" for b in bot.api.last_buttons())
+    bot.handle(conn, press(f"pc:{p['id']}"))
+    assert conn.execute("SELECT status FROM payments WHERE id = ?", (p["id"],)).fetchone()[0] == "cancelled"
+    bot.handle(conn, press("b"))
+    assert not any((b.get("callback_data") or "").startswith("pc:") for b in bot.api.last_buttons())

@@ -117,6 +117,8 @@ T: dict[str, tuple[str, str]] = {
     "pay": ("✅ Оплатить", "✅ Пардохт"),
     "cancel": ("❌ Отмена", "❌ Бекор"),
     "pay_cancel": ("❌ Отменить заявку", "❌ Бекор кардани дархост"),
+    "pay_open": ("⏳ <b>Заявка #{id}</b> на {amount} ждёт оплаты или проверки.\nПередумали — отмените её кнопкой ниже.",
+                 "⏳ <b>Дархост #{id}</b> ба {amount} интизори пардохт ё санҷиш аст.\nФикратон дигар шуд — бо тугмаи поён бекор кунед."),
     "pay_cancelled": ("❌ <b>Заявка #{id} отменена</b>\nМожно создать новую.",
                       "❌ <b>Дархост #{id} бекор шуд</b>\nМетавонед дархости нав созед."),
     "pay_cancel_late": ("Заявка уже проверена — отменить нельзя.", "Дархост аллакай санҷида шуд — бекор кардан мумкин нест."),
@@ -1489,9 +1491,15 @@ class ShopBot:
     def screen_balance(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
         lang, user = su["lang"], self._user(conn, su)
         rate = tjs_rate(conn, self.config)
-        self.show(su["tg_id"], tr(lang, "balance_screen", balance=money(user["balance_micro"], rate)),
-                  [[(tr(lang, "topup"), "t", "success")], [(tr(lang, "history"), "hist")],
-                   [(tr(lang, "home"), "h")]], edit=edit)
+        text = tr(lang, "balance_screen", balance=money(user["balance_micro"], rate))
+        rows = [[(tr(lang, "topup"), "t", "success")], [(tr(lang, "history"), "hist")], [(tr(lang, "home"), "h")]]
+        waiting = conn.execute("SELECT * FROM payments WHERE user_id = ? AND status = 'pending' ORDER BY id DESC "
+                               "LIMIT 1", (su["user_id"],)).fetchone()
+        if waiting is not None:   # заявка ждёт — видно здесь же, и отменить можно в одно нажатие
+            text += "\n\n" + tr(lang, "pay_open", id=waiting["id"],
+                                  amount=_e(f"{waiting['pay_amount']} {waiting['pay_currency']}"))
+            rows.insert(0, [(tr(lang, "pay_cancel"), f"pc:{waiting['id']}", "danger")])
+        self.show(su["tg_id"], text, rows, edit=edit)
 
     def screen_history(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
         lang = su["lang"]
@@ -1510,9 +1518,11 @@ class ShopBot:
     def screen_methods(self, conn: sqlite3.Connection, su: sqlite3.Row, edit: int | None = None) -> None:
         tg_id, lang = su["tg_id"], su["lang"]
         waiting = payments.open_request(conn, su["user_id"])
-        if waiting is not None:
-            self.show(tg_id, tr(lang, "error", text=_e(payments.waiting_text(waiting))),
-                      [[(tr(lang, "home"), "h")]], edit=edit)
+        if waiting is not None:   # уже есть заявка — сразу дать её отменить, а не тупик
+            self.show(tg_id, tr(lang, "pay_open", id=waiting["id"],
+                                amount=_e(f"{waiting['pay_amount']} {waiting['pay_currency']}")),
+                      [[(tr(lang, "pay_cancel"), f"pc:{waiting['id']}", "danger")], [(tr(lang, "home"), "h")]],
+                      edit=edit)
             return
         methods = payments.methods(conn, self.config)
         if not methods:
