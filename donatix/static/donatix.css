@@ -1851,3 +1851,19 @@ body.rcc-open { overflow: hidden; }
 .dcp-guide ol { margin: 4px 0 8px; padding-left: 20px; display: grid; gap: 6px; }
 @media (max-width: 380px) { .dcp-num { font-size: 2.1rem; } }
 @media (prefers-reduced-motion: reduce) { .dcp-pay, .dcp-copy { transition: none; } }
+
+/* ── Видео-инструкция «Душанбе Сити»: сначала смотрят, потом платят ── */
+.dcv { margin-top: 18px; padding: 16px; border-radius: var(--r-lg); border: 1px solid var(--accent-line); background: var(--accent-soft); display: grid; gap: 12px; }
+.dcv-head { display: flex; align-items: center; gap: 12px; }
+.dcv-head b { display: block; font-size: 1.05rem; }
+.dcv-head span { color: var(--muted); font-size: .88rem; }
+.dcv-ico { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; background: var(--surface); }
+.dcv-frame { position: relative; border-radius: var(--r); overflow: hidden; background: #000; }
+.dcv-frame iframe, .dcv-frame video { display: block; width: 100%; aspect-ratio: 9 / 16; max-height: 70vh; border: 0; background: #000; }
+.dcv-frame iframe { aspect-ratio: 16 / 9; }
+.dcv-frame .btn { margin: 0; border-radius: 0; }
+.dcv-agree { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: var(--r-sm); background: var(--surface); border: 1px solid var(--line); cursor: pointer; font-weight: 500; }
+.dcv-agree input { flex: none; width: 22px; height: 22px; margin-top: 1px; accent-color: var(--accent); }
+.dcv-agree input:disabled + span { opacity: .55; }
+.dcv-agree small { display: block; margin-top: 4px; color: var(--muted); font-size: .82rem; }
+.dcp-guide .dcv-frame { margin: 6px 0 10px; }

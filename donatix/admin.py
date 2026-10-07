@@ -535,6 +535,7 @@ def pay_settings(request: Request, admin=Depends(admin_user), conn=Depends(get_c
         "binance_ready": bool(config.binance_pay_key and config.binance_pay_secret),
         "bybit_ready": bool(config.bybit_key and config.bybit_secret),
         "dcbank_ready": bool(config.tg_api_id and config.tg_api_hash and config.bank_bot),
+        "dc_videos": {k: _video_view(conn, config, k) for k in ("site", "bot")},
         "rate": _rate_status(conn, config),
     })
 
@@ -578,6 +579,38 @@ async def pay_settings_save(request: Request, admin=Depends(admin_user), conn=De
     else:
         flash(request, "Реквизиты сохранены — клиенты уже видят их на странице пополнения.")
     return _back("/admin/pay-settings")
+
+
+def _video_view(conn: sqlite3.Connection, config: Config, kind: str) -> dict | None:
+    from . import dcvideo
+    video = dcvideo.get(conn, kind)
+    if video is None:
+        return None
+    dcvideo._ensure_table(conn)
+    seen = conn.execute("SELECT COUNT(*) FROM dc_video_ack WHERE kind = ? AND version = ?",
+                        (kind, video["version"])).fetchone()[0]
+    return {**video, "src": dcvideo.src(config, video), "seen": seen}
+
+
+@router.post("/dc-video", dependencies=[Depends(check_csrf)])
+async def dc_video_save(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                        config: Config = Depends(get_config)):
+    """Видео-инструкция «Душанбе Сити»: отдельно для сайта и для бота — файл или ссылка."""
+    from . import dcvideo
+    form = await request.form()
+    kind = str(form.get("kind", ""))
+    upload = form.get("file")
+    data = await upload.read(dcvideo.MAX_BYTES + 1) if upload is not None and getattr(upload, "filename", "") else b""
+    try:
+        dcvideo.set_video(conn, config, kind, data=data, content_type=getattr(upload, "content_type", "") or "",
+                          url=str(form.get("url", "")), delete=form.get("delete") == "1")
+    except dcvideo.VideoError as exc:
+        flash(request, str(exc), "error")
+    else:
+        where = "сайта" if kind == "site" else "бота"
+        flash(request, f"Видео для {where} убрано." if form.get("delete") == "1" else
+              f"Видео для {where} сохранено — каждый клиент посмотрит его перед первой оплатой «Душанбе Сити».")
+    return _back("/admin/pay-settings#dc-video")
 
 
 @router.get("/payments/{payment_id}/receipt")

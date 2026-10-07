@@ -52,6 +52,17 @@ class TelegramApi:
         resp.raise_for_status()
         return resp.content
 
+    def upload(self, method: str, field: str, path, **payload: Any) -> Any:
+        """Отправить файл с диска (видео-инструкция): multipart, длинный таймаут."""
+        data = {k: (json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else str(v))
+                for k, v in payload.items() if v is not None}
+        with open(path, "rb") as fh:
+            resp = self._client.post(method, data=data, files={field: (path.name, fh)}, timeout=180)
+        body = resp.json()
+        if not body.get("ok"):
+            raise RuntimeError(f"telegram {method}: {body.get('description')}")
+        return body.get("result")
+
     def __call__(self, method: str, **payload: Any) -> Any:
         payload = {k: v for k, v in payload.items() if v is not None}
         resp = self._client.post(method, json=payload)

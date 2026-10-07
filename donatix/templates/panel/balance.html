@@ -41,10 +41,12 @@
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <div class="step-head"><span class="n">1</span><h3>Способ оплаты</h3></div>
       {% if methods %}
+      {% set codes = methods | map(attribute='code') | list %}
+      {% set pre = pre_method if pre_method in codes else codes[0] %}
       <div class="paymethods">
         {% for m in methods %}
-        <label class="paym {{ 'on' if loop.first }}">
-          <input type="radio" name="method" value="{{ m.code }}" data-cur="{{ m.currency }}" data-auto="{{ '1' if m.auto else '' }}" {{ 'checked' if loop.first }}>
+        <label class="paym {{ 'on' if m.code == pre }}">
+          <input type="radio" name="method" value="{{ m.code }}" data-cur="{{ m.currency }}" data-auto="{{ '1' if m.auto else '' }}" data-dcv="{{ '1' if dcv and m.auto == 'dcbank' else '' }}" {{ 'checked' if m.code == pre }}>
           {% if m.icon_url %}<img class="pm-logo" src="{{ m.icon_url }}" alt="" width="36" height="36" loading="lazy">
           {% else %}<span class="tile sm {{ 'g4' if m.currency == 'TJS' else 'g5' }}">{{ icon('wallet' if m.currency == 'TJS' else 'bolt', 18) }}</span>{% endif %}
           <span><b>{{ m.title }}</b><span class="sub">{{ m.currency }}{% if m.network %} · сеть {{ m.network }}{% endif %}{% if m.auto %} · <span class="auto-badge">⚡ авто</span>{% endif %}</span></span>
@@ -52,6 +54,21 @@
         {% endfor %}
       </div>
 
+      {% if dcv %}
+      <div class="dcv" id="dcv" hidden>
+        <div class="dcv-head"><span class="dcv-ico">🎬</span><div><b>Аввал видеоро бинед</b><span>Сначала посмотрите короткое видео — как платить без ошибок</span></div></div>
+        <div class="dcv-frame">
+          {% if dcv.youtube %}<iframe src="https://www.youtube-nocookie.com/embed/{{ dcv.youtube }}?rel=0&playsinline=1" title="Видео-инструкция" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>
+          {% elif dcv.file or dcv_src.endswith(('.mp4', '.webm', '.mov')) %}<video id="dcv-video" src="{{ dcv_src }}" controls playsinline preload="metadata"></video>
+          {% else %}<a class="btn block" href="{{ dcv_src }}" target="_blank" rel="noopener">▶ Видеоро кушоед / Открыть видео</a>{% endif %}
+        </div>
+        <label class="dcv-agree"><input type="checkbox" name="agree" value="1" id="dcv-agree">
+          <span>Ман видеоро дидам. Агар маблағ ё рақамро хато гузаронам — <b>худам ҷавобгар ҳастам</b>.<small>Я посмотрел видео. Если переведу неверно — отвечаю сам.</small></span></label>
+        <div class="hint" id="dcv-note" hidden>Видеоро то охир бинед — баъд қайд кардан мумкин мешавад.</div>
+        <button class="btn primary lg block" id="dcv-ok" formaction="/panel/dc-video/ack" formnovalidate disabled>✅ Дидам ва розӣ ҳастам</button>
+      </div>
+      {% endif %}
+      <div id="pay-rest">
       <div class="step-head" style="margin-top:22px"><span class="n">2</span><h3>Сумма</h3></div>
       <div class="amt-cur" role="radiogroup" aria-label="Валюта суммы">
         <label><input type="radio" name="amount_cur" value="TJS" checked> сомони</label>
@@ -64,7 +81,7 @@
 
       <div class="step-head" style="margin-top:22px"><span class="n">3</span><h3>Переведите по реквизитам</h3></div>
       {% for m in methods %}
-      <div class="details" data-for="{{ m.code }}" {{ 'hidden' if not loop.first }}>
+      <div class="details" data-for="{{ m.code }}" {{ 'hidden' if m.code != pre }}>
         {% if m.network %}<div class="net-badge">Сеть: <b>{{ m.network_title }}</b></div>{% endif %}
         <pre class="keybox">{{ m.details }}</pre>
         {% if m.network_note %}<div class="flash error net-warn" role="note">⚠️ {{ m.network_note }}</div>{% endif %}
@@ -93,6 +110,7 @@
         </div>
       </div>
       <p class="hint center">{{ icon('shield', 16) }} После проверки поступления баланс зачислится, вам придёт уведомление.</p>
+      </div>
       {% else %}
       <p class="muted" style="margin-top:12px">Способы оплаты ещё не настроены.{% if support_contact %} Напишите {{ support_contact }}.{% endif %}</p>
       {% endif %}
@@ -260,6 +278,10 @@
     // Автоплатёж (крипта) проверяется сам — там чек не нужен; для переводов — обязателен
     var box = document.getElementById("receipt-box"), rc = document.getElementById("receipt");
     if (box && rc) { box.hidden = !!r.dataset.auto; rc.required = !r.dataset.auto; }
+    // «Душанбе Сити · авто»: пока видео не посмотрено — вместо суммы и реквизитов видео и согласие
+    var dcv = document.getElementById("dcv"), rest = document.getElementById("pay-rest");
+    if (dcv && rest) { var gate = !!r.dataset.dcv; dcv.hidden = !gate; rest.hidden = gate;
+      inp.required = !gate; if (rc) rc.required = !gate && !r.dataset.auto; }
     var a = parseFloat((inp.value || "").replace(",", "."));
     var out = "—";
     if (a > 0 && inTjs) {        // ввели сомони: к переводу ровно они; зачислится по курсу
@@ -290,6 +312,18 @@
       upd();
     }).catch(function () {});
   }, 30000);
+})();
+(function () {   // видео «Душанбе Сити»: галочка — после просмотра, кнопка — после галочки
+  var ok = document.getElementById("dcv-ok"), agree = document.getElementById("dcv-agree");
+  if (!ok || !agree) return;
+  var v = document.getElementById("dcv-video"), note = document.getElementById("dcv-note"), seen = !v;
+  function sync() { agree.disabled = !seen; if (note) note.hidden = seen; ok.disabled = !(seen && agree.checked); }
+  if (v) v.addEventListener("timeupdate", function () {
+    if (!seen && v.duration && v.currentTime / v.duration > 0.9) { seen = true; sync(); }
+  });
+  if (v) v.addEventListener("ended", function () { seen = true; sync(); });
+  agree.addEventListener("change", sync);
+  sync();
 })();
 </script>
 {% endblock %}

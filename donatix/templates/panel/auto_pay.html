@@ -57,7 +57,14 @@
   </form>
 
   <details class="dcp-guide">
-    <summary><span class="dcp-play">▶</span>Дастурро бинед</summary>
+    <summary><span class="dcp-play">▶</span>{{ 'Видео ва дастур' if dc.video else 'Дастурро бинед' }}</summary>
+    {% if dc.video %}
+    <div class="dcv-frame">
+      {% if dc.video.youtube %}<iframe src="https://www.youtube-nocookie.com/embed/{{ dc.video.youtube }}?rel=0&playsinline=1" title="Видео-инструкция" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>
+      {% elif dc.video.file or dc.video_src.endswith(('.mp4', '.webm', '.mov')) %}<video src="{{ dc.video_src }}" controls playsinline preload="none"></video>
+      {% else %}<a class="btn block" href="{{ dc.video_src }}" target="_blank" rel="noopener">▶ Видеоро кушоед</a>{% endif %}
+    </div>
+    {% endif %}
     <ol>
       <li>Тугмаи <b>«Пардохт дар «Душанбе Сити»»</b>-ро пахш кунед — барнома кушода мешавад.</li>
       <li>Корт ва маблағ <b>{{ p.pay_amount }}</b> аллакай навишта шудаанд — тафтиш кунед.</li>

@@ -73,4 +73,33 @@
   </div>
   <button class="btn primary lg block save-bar">Сохранить</button>
 </form>
+
+<section class="card dcv-admin" id="dc-video" style="margin-top:20px">
+  <h3>🎬 Видео-инструкция «Душанбе Сити · авто»</h3>
+  <p class="muted small">Перед первой оплатой через «Душанбе Сити» клиент обязательно смотрит видео и ставит галочку
+    «Посмотрел — за ошибку в переводе отвечаю сам». Потом видео доступно по кнопке. Загрузили новое видео —
+    смотреть нужно заново. Сайт и бот — отдельные видео. Файл MP4/WebM/MOV до 50 МБ или ссылка (YouTube, прямая на MP4).</p>
+  {% for kind, label in (('site', '🌐 Сайт'), ('bot', '🤖 Бот-магазин')) %}
+  {% set v = dc_videos[kind] %}
+  <form method="post" action="/admin/dc-video" enctype="multipart/form-data" class="dcv-admin-row">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="{{ kind }}">
+    <b>{{ label }}</b>
+    {% if v %}
+    <div class="dcv-frame" style="max-width:260px">
+      {% if v.youtube %}<iframe src="https://www.youtube-nocookie.com/embed/{{ v.youtube }}" title="Видео" allowfullscreen loading="lazy"></iframe>
+      {% elif v.file or v.src.endswith(('.mp4', '.webm', '.mov')) %}<video src="{{ v.src }}" controls preload="metadata"></video>
+      {% else %}<a class="btn block" href="{{ v.src }}" target="_blank" rel="noopener">Открыть ссылку</a>{% endif %}
+    </div>
+    <div class="hint">Посмотрели и согласились: <b>{{ v.seen }}</b> клиент(ов)</div>
+    {% else %}<div class="hint">Видео нет — клиенты платят без него.</div>{% endif %}
+    <label>Файл видео <input type="file" name="file" accept="video/mp4,video/webm,video/quicktime"></label>
+    <label>или ссылка <input name="url" placeholder="https://youtube.com/shorts/… или https://…/video.mp4" value="{{ '' if not v or v.file else v.url }}"></label>
+    <div class="row-actions">
+      <button class="btn primary">Сохранить</button>
+      {% if v %}<button class="btn" name="delete" value="1" onclick="return confirm('Убрать видео?')">Убрать</button>{% endif %}
+    </div>
+  </form>
+  {% endfor %}
+</section>
+<style>.dcv-admin-row{display:grid;gap:8px;padding:14px 0;border-top:1px solid var(--line)}.dcv-admin-row label{display:grid;gap:4px}</style>
 {% endblock %}

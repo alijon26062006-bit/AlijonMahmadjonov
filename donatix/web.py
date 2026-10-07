@@ -1091,7 +1091,11 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
     rows = conn.execute("SELECT * FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user["id"],)).fetchall()
     conf = payments.settings(conn, config)
     waiting = payments.open_request(conn, user["id"])
+    from . import dcvideo
+    dcv = dcvideo.needed(conn, user["id"], "site")
     return render(request, "panel/balance.html", {
+        "dcv": dcv, "dcv_src": dcvideo.src(config, dcv) if dcv else "",
+        "pre_method": request.query_params.get("m", ""),
         "user": user, "methods": payments.methods(conn, config), "payments": rows, "tjs_rate": conf["tjs_rate"],
         "min_usd": conf["min_usd"], "min_tjs": conf["min_tjs"], "waiting": waiting,
         "boost_wait": payments.boost_wait(waiting) if waiting is not None else None,
@@ -1199,12 +1203,41 @@ def panel_auto_pay(payment_id: int, request: Request, user=Depends(panel_user), 
         holder = _re.sub(r"\d[\d \-]{8,}\d", " ", details)
         holder = _re.sub(r"(?i)\b(карта|корт|счёт|счет|рақам|номер|card)\b[:.]?", " ", holder)
         holder = _re.sub(r"\s+", " ", holder).strip(" ,;:—-")
-        dc = {"title": method.get("title") or "Душанбе Сити", "icon_url": method.get("icon_url", ""),
+        from . import dcvideo
+        video = dcvideo.get(conn, "site")
+        dc = {"video": video, "video_src": dcvideo.src(config, video) if video else "",
+              "title": method.get("title") or "Душанбе Сити", "icon_url": method.get("icon_url", ""),
               "card": " ".join(account[i:i + 4] for i in range(0, len(account), 4)), "holder": holder[:60]}
     return render(request, "panel/auto_pay.html", {
         "user": user, "p": payments.public(conn, config, row), "dc": dc,
         "receipt_now": row["auto_kind"] == "dcbank" and not row["receipt_file"] and age >= wait,
         "receipt_wait": max(1, int(wait - age))})
+
+
+@router.post("/panel/dc-video/ack", dependencies=[Depends(check_csrf)])
+def panel_dc_video_ack(request: Request, method: str = Form(""), agree: str = Form(""), user=Depends(panel_user),
+                       conn=Depends(get_conn)):
+    """«Посмотрел видео — за ошибку в переводе отвечаю сам». Дальше — сумма и реквизиты."""
+    from . import dcvideo
+    if agree != "1":
+        flash(request, "Отметьте галочку: вы посмотрели видео и согласны.", "error")
+    else:
+        dcvideo.ack(conn, user["id"], "site")
+        flash(request, "✅ Спасибо! Теперь введите сумму — видео всегда можно открыть снова по кнопке.")
+    return _redirect("/panel/balance" + (f"?m={method}" if re.fullmatch(r"[A-Za-z0-9_-]{1,40}", method) else ""))
+
+
+@router.get("/pay-videos/{name}")
+def pay_video(name: str, config: Config = Depends(get_config)):
+    """Видео-инструкции — без входа (их открывает и Telegram при отправке ботом)."""
+    from fastapi import HTTPException
+    from fastapi.responses import FileResponse
+
+    from . import dcvideo
+    path = dcvideo.videos_dir(config) / name
+    if not dcvideo.NAME_RE.fullmatch(name) or not path.is_file():
+        raise HTTPException(404)
+    return FileResponse(path, headers={"Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff"})
 
 
 @router.post("/panel/balance/{payment_id}/receipt", dependencies=[Depends(check_csrf)])
@@ -1297,6 +1330,11 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
         return _redirect("/panel/balance")
     if payments.is_auto(conn, config, method):
         data = b""   # крипту проверяет блокчейн — чек не нужен и не принимаем
+        from . import dcvideo
+        chosen = next((m for m in payments.methods(conn, config) if m["code"] == method), {})
+        if chosen.get("auto") == "dcbank" and dcvideo.needed(conn, user["id"], "site"):
+            flash(request, "Сначала посмотрите видео-инструкцию и отметьте, что поняли, — потом оплата.", "error")
+            return _redirect(f"/panel/balance?m={method}")
     rates.refresh(conn, config, rates.PAYMENT_SECONDS)  # сумма к переводу — по свежему курсу
     details = payments.settings(conn, config)["details"].get(method, "")
     seen = payments.read_receipt(config, data, details) if data else None   # ИИ — до транзакции, базу не держим

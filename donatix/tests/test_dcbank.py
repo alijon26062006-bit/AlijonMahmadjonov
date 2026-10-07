@@ -213,3 +213,71 @@ def test_shop_bot_replaces_requisites_with_paid(app, dc, conn, supplier):
     method, last = bot.api.calls[-1]
     assert method == "editMessageText" and last["message_id"] == req_mid
     assert "Пардохт гирифта шуд" in last["text"] and "1.01" in last["text"]
+
+
+MP4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 64
+
+
+def _admin(app):
+    c = TestClient(app)
+    web_login(c, "admin@example.com", "adminpass123")
+    return c
+
+
+def test_video_required_on_site_before_paying(app, dc, conn):
+    from donatix import dcvideo
+    adm = _admin(app)
+    page = adm.get("/admin/pay-settings").text
+    assert "Видео-инструкция «Душанбе Сити" in page
+    r = adm.post("/admin/dc-video", data={"csrf": csrf_of(page), "kind": "site"},
+                 files={"file": ("how.mp4", MP4, "video/mp4")}, follow_redirects=False)
+    assert r.status_code == 303 and dcvideo.get(conn, "site")["file"].endswith(".mp4")
+    name = dcvideo.get(conn, "site")["file"]
+    assert TestClient(app).get(f"/pay-videos/{name}").content == MP4      # видео открывается без входа
+
+    uid, c, token = _client(app, conn)
+    page = c.get("/panel/balance").text
+    assert 'id="dcv"' in page and "худам ҷавобгар" in page and f"/pay-videos/{name}" in page
+    r = _pay(c, token)                                                     # без просмотра оплату не создать
+    assert r.headers["location"] == "/panel/balance?m=dc"
+    assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 0
+    r = c.post("/panel/dc-video/ack", data={"csrf": token, "method": "dc"}, follow_redirects=False)
+    assert dcvideo.needed(conn, uid, "site")                               # без галочки не засчитано
+    c.post("/panel/dc-video/ack", data={"csrf": token, "method": "dc", "agree": "1"})
+    assert dcvideo.needed(conn, uid, "site") is None
+    assert 'id="dcv"' not in c.get("/panel/balance").text                 # больше не мешает
+    r = _pay(c, token)
+    assert r.headers["location"].endswith("/pay")
+    assert f"/pay-videos/{name}" in c.get(r.headers["location"]).text      # видео снова — по кнопке
+
+    # новое видео — смотреть заново
+    page = adm.get("/admin/pay-settings").text
+    adm.post("/admin/dc-video", data={"csrf": csrf_of(page), "kind": "site",
+                                      "url": "https://youtube.com/shorts/AbCdEf12345"})
+    assert dcvideo.needed(conn, uid, "site")["youtube"] == "AbCdEf12345"
+    assert not (dcvideo.videos_dir(dc) / name).exists()                    # старый файл удалён
+
+
+def test_video_required_in_shop_bot(app, dc, conn, supplier):
+    from test_shopbot import _bot, _start, msg, press
+
+    from donatix import dcvideo
+    dcvideo.set_video(conn, dc, "bot", data=MP4, content_type="video/mp4")
+    bot = _bot(dc, supplier)
+    sent = []
+    bot.api.upload = lambda method, field, path, **p: (sent.append((method, p)) or {"video": {"file_id": "FID1"}})
+    su = _start(bot, conn, "tj")
+    bot.handle(conn, press("t"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
+    assert sent and sent[0][0] == "sendVideo" and "ҷавобгаред" in sent[0][1]["caption"]
+    ok = sent[0][1]["reply_markup"]["inline_keyboard"][0][0]
+    assert ok["callback_data"] == "dv:ok:dc"
+    bot.handle(conn, msg("1"))                                             # сумму без видео не принимаем
+    assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 0
+    bot.handle(conn, press("dv:ok:dc"))
+    assert dcvideo.needed(conn, su["user_id"], "bot") is None
+    bot.handle(conn, msg("1"))
+    assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 1
+    assert any(b.get("callback_data") == "dv:show" for b in bot.api.last_buttons())
+    bot.handle(conn, press("dv:show"))                                     # повтор — по file_id, без загрузки
+    assert ("sendVideo", "FID1") in [(m, p.get("video")) for m, p in bot.api.calls]

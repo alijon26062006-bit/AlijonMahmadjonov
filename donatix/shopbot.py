@@ -156,6 +156,17 @@ T: dict[str, tuple[str, str]] = {
     "nick_bad": ("⚠️ Игрок с таким ID не найден — проверьте ID.", "⚠️ Бозигар бо ин ID ёфт нашуд — ID-ро санҷед."),
     "checking": ("⏳ <b>Проверяем чек</b>\nПодождите, как только проверим — напишу.",
                  "⏳ <b>Чекро месанҷем</b>\nИнтизор шавед, баъди санҷиш менависам."),
+    "dc_video": ("🎬 <b>Сначала посмотрите видео</b>\n\nКак пополнить через «Душанбе Сити» без ошибок: точная сумма "
+                 "с копейками, правильная карта.\n\nПосмотрите до конца и нажмите кнопку ниже. Нажимая, вы "
+                 "подтверждаете: <b>если переведёте неверно — отвечаете сами</b>.",
+                 "🎬 <b>Аввал видеоро бинед</b>\n\nЧӣ тавр бо «Душанбе Сити» бе хато пур кардан: маблағи дақиқ бо "
+                 "дирам, корти дуруст.\n\nТо охир бинед ва тугмаи поёнро пахш кунед. Бо пахш кардан шумо тасдиқ "
+                 "мекунед: <b>агар хато гузаронед — худатон ҷавобгаред</b>."),
+    "dc_video_again": ("🎬 Видео-инструкция: как пополнить через «Душанбе Сити».",
+                       "🎬 Видео-дастур: чӣ тавр бо «Душанбе Сити» пур кардан."),
+    "dc_video_ok": ("✅ Посмотрел, согласен", "✅ Дидам ва розӣ ҳастам"),
+    "dc_video_btn": ("🎬 Видео-инструкция", "🎬 Видео-дастур"),
+    "dc_video_open": ("▶ Открыть видео", "▶ Видеоро кушоед"),
     "paid": ("🎉 <b>Оплата получена!</b>\n\n✅ Баланс пополнен на <b>{amount}</b>\n💰 Теперь на балансе: <b>{balance}</b>",
              "🎉 <b>Пардохт гирифта шуд!</b>\n\n✅ Баланс ба <b>{amount}</b> пур шуд\n💰 Ҳоло дар баланс: <b>{balance}</b>"),
     "paid_bought": ("✅ <b>Баланс пополнен на {amount}</b>\n\n🚀 Ваш заказ <b>{id}</b> отправлен автоматически:\n"
@@ -1374,6 +1385,12 @@ class ShopBot:
             self.screen_methods(conn, su, mid)
         elif head == "tm" and len(parts) == 2:
             self.pick_method(conn, su, parts[1], mid)
+        elif head == "dv" and len(parts) == 3 and parts[1] == "ok":   # посмотрел видео «Душанбе Сити» и согласен
+            from . import dcvideo
+            dcvideo.ack(conn, su["user_id"], "bot")
+            self.pick_method(conn, su, parts[2], None)
+        elif head == "dv" and len(parts) == 2 and parts[1] == "show":
+            self.send_dc_video(conn, su, None)
         elif head == "ta" and len(parts) == 2 and st and st.get("step") == "amount":
             st["msg"] = mid
             self.create_topup(conn, su, parts[1])
@@ -1502,6 +1519,10 @@ class ShopBot:
         if method is None:
             self.screen_methods(conn, su, edit)
             return
+        from . import dcvideo
+        if method.get("auto") == "dcbank" and dcvideo.needed(conn, su["user_id"], "bot"):
+            self.send_dc_video(conn, su, code)   # сначала видео и согласие, потом сумма
+            return
         prev = self.state.get(tg_id) or {}
         self.state[tg_id] = {"step": "amount", "method": code, "msg": edit, "resume": prev.get("resume"),
                              "photo": prev.get("photo")}
@@ -1514,6 +1535,44 @@ class ShopBot:
             tjs = max(math.ceil(Decimal(need) / 10_000 * conf["tjs_rate"]), math.ceil(conf["min_tjs"] or 0), 1)
             rows.insert(0, [(f"✅ {tjs} смн", f"ta:{tjs}", "success")])
         self.show(tg_id, tr(lang, "ask_amount", method=_e(method["title"])), rows, edit=edit)
+
+    def send_dc_video(self, conn: sqlite3.Connection, su: sqlite3.Row, code: str | None) -> None:
+        """Видео-инструкция «Душанбе Сити». code — способ, к которому вернуться после «Посмотрел»;
+        None — просто посмотреть ещё раз."""
+        from . import dcvideo
+        tg_id, lang = su["tg_id"], su["lang"]
+        video = dcvideo.get(conn, "bot")
+        if video is None:
+            return
+        caption = tr(lang, "dc_video") if code else tr(lang, "dc_video_again")
+        rows = ([[(tr(lang, "dc_video_ok"), f"dv:ok:{code}", "success")], [(tr(lang, "cancel"), "x", "danger")]]
+                if code else [[(tr(lang, "home"), "h")]])
+        markup = kb(rows)
+        try:
+            if video["file"]:
+                fid = db.get_setting(conn, "pay.dc_video_bot_fid") or ""
+                if fid:
+                    self.api("sendVideo", chat_id=tg_id, video=fid, caption=caption, parse_mode="HTML",
+                             reply_markup=markup, supports_streaming=True)
+                    return
+                path = dcvideo.videos_dir(self.config) / video["file"]
+                upload = getattr(self.api, "upload", None)
+                res = (upload("sendVideo", "video", path, chat_id=tg_id, caption=caption, parse_mode="HTML",
+                              reply_markup=markup, supports_streaming=True) if upload else
+                       self.api("sendVideo", chat_id=tg_id, video=str(path), caption=caption, parse_mode="HTML",
+                                reply_markup=markup))
+                got = ((res or {}).get("video") or {}).get("file_id") if isinstance(res, dict) else None
+                if got:   # дальше — без повторной загрузки, по file_id
+                    db.set_setting(conn, "pay.dc_video_bot_fid", got)
+                return
+            if video["url"].lower().split("?")[0].endswith((".mp4", ".mov", ".webm")):
+                self.api("sendVideo", chat_id=tg_id, video=video["url"], caption=caption, parse_mode="HTML",
+                         reply_markup=markup, supports_streaming=True)
+                return
+        except Exception as exc:  # noqa: BLE001 — видео не ушло: дадим ссылку текстом, оплату не блокируем навсегда
+            log.warning("бот-магазин: видео-инструкция не отправилась: %s", exc)
+        link = dcvideo.src(self.config, video)
+        self.show(tg_id, caption + f"\n\n▶ {link}", [[(tr(lang, "dc_video_open"), None, link)]] + rows)
 
     def create_topup(self, conn: sqlite3.Connection, su: sqlite3.Row, amount: str) -> None:
         tg_id, lang = su["tg_id"], su["lang"]
@@ -1536,6 +1595,10 @@ class ShopBot:
             if view["pay_url"]:
                 label = "🏙 Оплатить в «Душанбе Сити»" if p["auto_kind"] == "dcbank" else "💳 Binance Pay"
                 rows.insert(0, [(label, None, view["pay_url"])])
+            if p["auto_kind"] == "dcbank":
+                from . import dcvideo
+                if dcvideo.get(conn, "bot"):
+                    rows.insert(len(rows) - 1, [(tr(lang, "dc_video_btn"), "dv:show")])
             text = tr(lang, "pay_auto", id=pid, amount=amount_text, address=_e(view["address"] or view["details"]),
                       note=_e(view["auto_note"]))
             intent = self.intent(conn, st.get("resume"))
