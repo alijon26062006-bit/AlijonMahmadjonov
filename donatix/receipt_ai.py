@@ -290,11 +290,11 @@ def verdict(d: dict[str, Any] | None, data: bytes, ext: str, our_details: str = 
         reasons.append("это не чек о переводе")
     if d.get("status") == "failed":
         reasons.append("в чеке перевод не прошёл")
-    rm = recipient_matches(d, our_details)
-    if rm is False:
+    # Отклоняем только по НОМЕРУ (карта/телефон в чеке точно чужие). Одно имя получателя — не повод:
+    # ИИ сравнивает имена ненадёжно (латиница/кириллица, сокращения, в реквизитах имени может не быть),
+    # и настоящие чеки отклонялись. Такой чек уходит админу с предупреждением (см. summary).
+    if recipient_matches(d, our_details) is False:
         reasons.append(f"получатель «{d.get('recipient')}» — не наши реквизиты")
-    elif rm is None and d.get("recipient_ok") == "no" and d.get("recipient"):
-        reasons.append(f"получатель «{d.get('recipient')}» не похож на наши реквизиты")
     if d.get("forgery") == "fake":
         signs = "; ".join(d.get("signs") or [])
         reasons.append("чек изменён или ненастоящий" + (f": {signs}" if signs else ""))

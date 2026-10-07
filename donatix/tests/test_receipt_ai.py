@@ -140,8 +140,11 @@ def test_verdict_rules():
     assert receipt_ai.verdict(ok, RECEIPT_PNG, "png", ours, "2026-10-01T09:40") == []
     assert receipt_ai.verdict(receipt_ai.clean({**SEEN, "is_receipt": False}), b"", "png", ours)
     assert receipt_ai.verdict(receipt_ai.clean({**SEEN, "status": "failed"}), b"", "png", ours)
-    by_name = receipt_ai.clean({**SEEN, "recipient": "Иван П.", "recipient_ok": "no"})
-    assert "не похож на наши" in receipt_ai.verdict(by_name, b"", "png", ours)[0]
+    by_name = receipt_ai.clean({**SEEN, "recipient": "Исомиддин Х.", "recipient_ok": "no"})
+    assert receipt_ai.verdict(by_name, b"", "png", ours) == []          # одно имя — не отклоняем, решает админ
+    assert "не похож на наши" in receipt_ai.summary(by_name, 545, "TJS", ours)
+    by_card = receipt_ai.clean({**SEEN, "recipient": "**** 7777", "recipient_ok": "no"})
+    assert "не наши реквизиты" in receipt_ai.verdict(by_card, b"", "png", ours)[0]   # чужой номер — отклоняем
     assert receipt_ai.verdict(receipt_ai.clean({**SEEN, "recipient": "Иван П."}), b"", "png", ours) == []
     old = receipt_ai.verdict(ok, b"", "png", ours, "2026-10-09T10:00")
     assert old and "старый" in old[0]
