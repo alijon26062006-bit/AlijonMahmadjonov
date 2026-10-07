@@ -1785,7 +1785,12 @@ class ShopBot:
                     if p is None or w["created_at"] < _ago(3 * 86400):
                         conn.execute("DELETE FROM shop_watch WHERE id = ?", (w["id"],))
                     continue
+                # Забираем запись первой: о заявке пишет кто-то один — этот цикл или payment_push
+                if not conn.execute("DELETE FROM shop_watch WHERE id = ?", (w["id"],)).rowcount:
+                    continue
                 self.payment_result(conn, w, p)
+                done += 1
+                continue
             conn.execute("DELETE FROM shop_watch WHERE id = ?", (w["id"],))
             done += 1
         return done
@@ -1840,6 +1845,58 @@ class ShopBot:
         self.watch_add(conn, "order", order["id"], chat, mid, order["status"])
         log.info("бот-магазин: после пополнения #%s сам оформил заказ %s", pay["id"], order["public_id"])
         return True
+
+
+def payment_text(conn: sqlite3.Connection, config: Config, lang: str, p: sqlite3.Row, user_id: int) -> str:
+    rate = tjs_rate(conn, config)
+    if p["status"] != "paid":
+        return tr(lang, "rejected", id=p["id"], reason=_e(p["admin_note"] or ""))
+    user = accounts.get_user(conn, user_id)
+    return tr(lang, "paid", amount=money(p["amount_micro"], rate), balance=money(user["balance_micro"], rate))
+
+
+def payment_push(conn: sqlite3.Connection, config: Config, payment_id: int, api: Any = None) -> int:
+    """Заявку решили — сразу написать покупателю в бот-магазин. Вызывается из любого процесса
+    (служба автоплатежа, кассир, админка). Вернёт, скольким сообщениям ответили.
+
+    Сообщение с реквизитами заменяется ответом. Запись в shop_watch удаляется ПЕРЕД отправкой: если цикл
+    бота заметит заявку в ту же секунду, он увидит, что запись уже забрали, и второй раз не напишет.
+    Заявки «пополнить и сразу купить» (intent) оставляем боту — заказ оформляет он."""
+    if not config.shop_bot_token:
+        return 0
+    p = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
+    if p is None or p["status"] == "pending":
+        return 0
+    rows = conn.execute("SELECT w.*, s.lang, s.user_id FROM shop_watch w JOIN shop_users s ON s.tg_id = w.chat_id "
+                        "WHERE w.kind = 'pay' AND w.obj_id = ?", (payment_id,)).fetchall()
+    if any(w["intent"] for w in rows):
+        return 0
+    from .tgbot import TelegramApi
+    api = api or TelegramApi(config.shop_bot_token)
+    sent = 0
+    for w in rows:
+        if not conn.execute("DELETE FROM shop_watch WHERE id = ?", (w["id"],)).rowcount:
+            continue   # уже ответил бот
+        lang = w["lang"]
+        text = payment_text(conn, config, lang, p, w["user_id"])
+        rows_kb = ([[(tr(lang, "home"), "h")]] if p["status"] == "paid"
+                   else [[(tr(lang, "topup"), "t"), (tr(lang, "home"), "h")]])
+        markup = kb(rows_kb)
+        try:
+            if w["message_id"]:
+                try:
+                    api("editMessageText", chat_id=w["chat_id"], message_id=w["message_id"], text=text,
+                        parse_mode="HTML", reply_markup=markup, disable_web_page_preview=True)
+                    sent += 1
+                    continue
+                except Exception:  # noqa: BLE001 — сообщение удалили или не текст: пришлём новое
+                    pass
+            api("sendMessage", chat_id=w["chat_id"], text=text, parse_mode="HTML", reply_markup=markup,
+                disable_web_page_preview=True)
+            sent += 1
+        except Exception as exc:  # noqa: BLE001
+            log.warning("бот-магазин: не написал о заявке #%s: %s", payment_id, exc)
+    return sent
 
 
 def _group_of(kind: str) -> str:

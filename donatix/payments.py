@@ -377,7 +377,19 @@ def confirm(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id:
                f"Баланс пополнен на ${fmt(micro)} ({title})."
                + (f" Из них ${fmt(debt)} — погашение долга за непоступивший перевод." if debt else ""),
                "/panel/transactions")
+    _tell_shop_buyer(conn, config, payment_id)
     return True
+
+
+def _tell_shop_buyer(conn: sqlite3.Connection, config: Config, payment_id: int) -> None:
+    """Покупатель из бота-магазина узнаёт о решении сразу, кто бы и откуда ни подтвердил заявку
+    (автоплатёж «Душанбе Сити», кассир, админ) — не дожидаясь, пока бот сам заметит."""
+    try:
+        from .shopbot import payment_push
+        payment_push(conn, config, payment_id)
+    except Exception:  # noqa: BLE001 — сообщение в бот не должно мешать зачислению
+        import logging
+        logging.getLogger(__name__).exception("бот-магазин: уведомление о заявке #%s", payment_id)
 
 
 def mark_fake(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: int, *, who: str = "") -> int:
@@ -417,6 +429,7 @@ def reject(conn: sqlite3.Connection, config: Config, payment_id: int, admin_id: 
     notify(conn, config, p["user_id"],
            f"Заявка на пополнение #{payment_id} отклонена" + (f": {reason.strip()}" if reason.strip() else "."),
            "/panel/balance")
+    _tell_shop_buyer(conn, config, payment_id)
     return True
 
 

@@ -281,3 +281,37 @@ def test_video_required_in_shop_bot(app, dc, conn, supplier):
     assert any(b.get("callback_data") == "dv:show" for b in bot.api.last_buttons())
     bot.handle(conn, press("dv:show"))                                     # повтор — по file_id, без загрузки
     assert ("sendVideo", "FID1") in [(m, p.get("video")) for m, p in bot.api.calls]
+
+
+def test_paid_push_reaches_bot_instantly_and_once(app, dc, conn, supplier, monkeypatch):
+    """Подтвердили (автоплатёж, кассир, админ — из любого процесса) — покупатель сразу получает ответ
+    на месте реквизитов. Цикл бота второй раз не пишет."""
+    from test_shopbot import FakeApi, _bot, _start, msg, press
+
+    from donatix import tgbot
+    pushed = FakeApi()
+    monkeypatch.setattr(tgbot, "TelegramApi", lambda token: pushed)
+    dc.shop_bot_token = "t"
+    bot = _bot(dc, supplier)
+    _start(bot, conn, "tj")
+    bot.handle(conn, press("t"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
+    bot.handle(conn, msg("1"))
+    req_mid = bot.api.mid
+    p = conn.execute("SELECT * FROM payments").fetchone()
+
+    assert _handle(conn, dc, notice(p["pay_amount"], "9901"), 60)["status"] == "matched"
+    edits = [c for m, c in pushed.calls if m == "editMessageText"]
+    assert len(edits) == 1 and edits[0]["message_id"] == req_mid and "Пардохт гирифта шуд" in edits[0]["text"]
+
+    before = len(bot.api.calls)
+    bot.watch(conn, force=True)                                   # бот уже не дублирует
+    assert len(bot.api.calls) == before
+
+    # отклонение кассиром — тоже сразу
+    bot.handle(conn, press("t"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
+    bot.handle(conn, msg("2"))
+    p2 = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
+    payments.reject(conn, dc, p2["id"], 1, "перевод не найден")
+    assert "перевод не найден" in pushed.last_text()
