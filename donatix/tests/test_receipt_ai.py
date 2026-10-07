@@ -194,3 +194,44 @@ def test_wrong_currency_in_request_is_fixed_by_receipt(app, config, conn, monkey
     p = conn.execute("SELECT pay_amount, amount_micro FROM payments WHERE id = 1").fetchone()
     assert p["pay_amount"] == "20.00" and p["amount_micro"] < 30_000          # ≈ $1.9, а не $20
     assert "заявка исправлена по чеку: было" in captions[-1]
+
+
+def test_resent_receipt_caught_even_if_bank_read_differently(app, config, conn, monkeypatch):
+    """Тот же чек второй раз: ИИ прочитал банк иначе («DC» вместо «Алиф») и номер не разглядел — всё равно повтор."""
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
+    reads = [receipt_ai.clean(SEEN), receipt_ai.clean({**SEEN, "bank": "Dushanbe City", "txn_id": ""})]
+    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: reads.pop(0))
+    a, ta = _client(app, config, conn, 1)
+    assert "Заявка #1 создана" in _send(a, ta, RECEIPT_PNG).text
+    b, tb = _client(app, config, conn, 2)
+    assert "Чек не прошёл проверку" in _send(b, tb, RECEIPT_PNG + b"cropped").text
+
+
+def test_two_real_transfers_same_minute_and_sum_both_accepted(app, config, conn, monkeypatch):
+    """Два НАСТОЯЩИХ перевода на одну сумму в одну минуту, но с разными номерами операций — оба принимаются."""
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
+    reads = [receipt_ai.clean(SEEN), receipt_ai.clean({**SEEN, "txn_id": "ZZ-7654321"})]
+    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: reads.pop(0))
+    a, ta = _client(app, config, conn, 1)
+    assert "Заявка #1 создана" in _send(a, ta, RECEIPT_PNG).text
+    b, tb = _client(app, config, conn, 2)
+    assert "Заявка #2 создана" in _send(b, tb, RECEIPT_PNG + b"another").text
+
+
+def test_receipt_of_fake_payment_cannot_be_reused(app, config, conn, monkeypatch):
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
+    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(SEEN))
+    a, ta = _client(app, config, conn, 1)
+    _send(a, ta, RECEIPT_PNG)
+    conn.execute("UPDATE payments SET status = 'fake' WHERE id = 1")
+    b, tb = _client(app, config, conn, 2)
+    assert "Чек не прошёл проверку" in _send(b, tb, RECEIPT_PNG + b"x").text
+
+
+def test_fresh_receipt_rule_and_admin_setting():
+    ours = "Алиф: +992 90 000 00 00"
+    ok = receipt_ai.clean({**SEEN, "datetime": "2026-10-01 14:32"})
+    assert receipt_ai.verdict(ok, b"", "png", ours, "2026-10-01T09:40") == []           # перевели и сразу заявка
+    assert receipt_ai.verdict(ok, b"", "png", ours, "2026-10-02T08:00") == []           # заявка через 23 часа
+    assert "старый" in receipt_ai.verdict(ok, b"", "png", ours, "2026-10-02T12:00")[0]  # через 31 час — нет
+    assert receipt_ai.verdict(ok, b"", "png", ours, "2026-10-02T12:00", max_age_hours=48) == []

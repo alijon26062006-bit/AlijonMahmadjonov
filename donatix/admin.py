@@ -536,6 +536,7 @@ def pay_settings(request: Request, admin=Depends(admin_user), conn=Depends(get_c
         "bybit_ready": bool(config.bybit_key and config.bybit_secret),
         "dcbank_ready": bool(config.tg_api_id and config.tg_api_hash and config.bank_bot),
         "dc_videos": {k: _video_view(conn, config, k) for k in ("site", "bot")},
+        "receipt_max_age_h": db.get_setting(conn, "pay.receipt_max_age_h") or "24",
         "rate": _rate_status(conn, config),
     })
 
@@ -571,6 +572,11 @@ async def pay_settings_save(request: Request, admin=Depends(admin_user), conn=De
         payments.save_settings(conn, config, rows, str(form.get("tjs_rate", "")), str(form.get("min_tjs", "")),
                                str(form.get("low_usd", "")), rate_auto=form.get("rate_auto") == "1",
                                margin_pct=str(form.get("rate_margin", "")))
+        age = str(form.get("receipt_max_age_h", "")).strip()
+        if age:
+            if not age.isdigit() or not 1 <= int(age) <= 720:
+                raise payments.PaymentError("«Чек не старше» — число часов от 1 до 720.")
+            db.set_setting(conn, "pay.receipt_max_age_h", age)
         from . import rates
         if form.get("rate_auto") == "1":
             rates.refresh(conn, config, force=True)

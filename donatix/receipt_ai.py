@@ -126,17 +126,39 @@ def fingerprint(d: dict[str, Any]) -> str:
     return f"{d['amount']:.2f}|{d.get('currency') or ''}|{when[:12]}|{bank}"
 
 
+def loose_fingerprint(d: dict[str, Any]) -> str:
+    """Тот же перевод без названия банка: сумма + валюта + дата и время до минуты.
+    ИИ читает банк по-разному («Душанбе Сити», «DC», «Dushanbe City») — повтор не должен проскочить."""
+    when = re.sub(r"[^0-9]", "", d.get("datetime") or "")
+    if not d.get("amount") or len(when) < 12:
+        return ""
+    return f"{d['amount']:.2f}|{d.get('currency') or ''}|{when[:12]}"
+
+
+#: Чек этих заявок уже «использован»: ждёт проверки, зачислен, отклонён или признан поддельным.
+#: Отменённые клиентом — нет: по ним денег не давали, тот же чек можно приложить к новой заявке.
+USED = "('pending', 'paid', 'rejected', 'fake')"
+
+
 def duplicate(conn: sqlite3.Connection, payment_id: int, d: dict[str, Any]) -> sqlite3.Row | None:
-    """Заявка с тем же чеком (ждёт проверки или уже зачислена)."""
-    key, fp = txn_key(d), fingerprint(d)
+    """Заявка с тем же чеком. Сравниваем по номеру операции, потом по сумме + дате-времени (+ банку).
+
+    Чтобы не отклонить настоящий чек: если у обоих чеков есть номера операций и они РАЗНЫЕ — это два разных
+    перевода, даже если сумма и минута совпали."""
+    key, fp, loose = txn_key(d), fingerprint(d), loose_fingerprint(d)
     if key:
-        row = conn.execute("SELECT id, status FROM payments WHERE receipt_txn = ? AND id != ? "
-                           "AND status IN ('pending', 'paid', 'rejected')", (key, payment_id)).fetchone()
+        row = conn.execute(f"SELECT id, status FROM payments WHERE receipt_txn = ? AND id != ? AND status IN {USED}",
+                           (key, payment_id)).fetchone()
         if row:
             return row
-    if fp:
-        return conn.execute("SELECT id, status FROM payments WHERE receipt_fp = ? AND id != ? "
-                            "AND status IN ('pending', 'paid', 'rejected')", (fp, payment_id)).fetchone()
+    for column, value in (("receipt_fp", fp), ("receipt_fp2", loose)):
+        if not value:
+            continue
+        for row in conn.execute(f"SELECT id, status, receipt_txn FROM payments WHERE {column} = ? AND id != ? "
+                                f"AND status IN {USED}", (value, payment_id)).fetchall():
+            if key and row["receipt_txn"] and row["receipt_txn"] != key:
+                continue   # номера операций разные — разные переводы
+            return row
     return None
 
 
@@ -254,8 +276,12 @@ def file_marks(data: bytes, ext: str) -> tuple[list[str], list[str]]:
     return reject, warn
 
 
+#: Чек должен быть свежим: сделан не раньше, чем за столько часов до заявки (настройка pay.receipt_max_age_h)
+MAX_AGE_HOURS = 24
+
+
 def verdict(d: dict[str, Any] | None, data: bytes, ext: str, our_details: str = "",
-            created_at: str | None = None, tz_hours: int = 5) -> list[str]:
+            created_at: str | None = None, tz_hours: int = 5, max_age_hours: int = MAX_AGE_HOURS) -> list[str]:
     """Почему чек НЕЛЬЗЯ принимать (пусто — можно). Причины — для админа, клиенту их не показываем."""
     reasons, _ = file_marks(data, ext)
     if not d:
@@ -282,8 +308,9 @@ def verdict(d: dict[str, Any] | None, data: bytes, ext: str, our_details: str = 
             return reasons
         if when > made + timedelta(days=1):
             reasons.append(f"дата в чеке в будущем ({d.get('datetime')})")
-        elif when < made - timedelta(days=3):
-            reasons.append(f"чек старый ({d.get('datetime')})")
+        elif when < made - timedelta(hours=max(1, max_age_hours)):
+            reasons.append(f"чек старый ({d.get('datetime')}) — сделан раньше заявки больше чем на "
+                           f"{max(1, max_age_hours)} ч")
     return reasons
 
 

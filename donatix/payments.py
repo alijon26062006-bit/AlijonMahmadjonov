@@ -553,7 +553,12 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
     _, warns = receipt_ai.file_marks(data, ext)
     if seen and warns:
         seen = {**seen, "file_marks": warns}
-    reasons = receipt_ai.verdict(seen, data, ext, details, p["created_at"] if p else None) if p else []
+    try:
+        max_age = int(db.get_setting(conn, "pay.receipt_max_age_h") or receipt_ai.MAX_AGE_HOURS)
+    except ValueError:
+        max_age = receipt_ai.MAX_AGE_HOURS
+    reasons = (receipt_ai.verdict(seen, data, ext, details, p["created_at"], max_age_hours=max_age)
+               if p else [])
     own_tx = not conn.in_transaction
     if own_tx:   # проверка повтора и запись — под одной блокировкой, иначе два одинаковых чека пройдут разом
         conn.execute("BEGIN IMMEDIATE")
@@ -586,7 +591,7 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
     digest = hashlib.sha256(data).hexdigest()
     # Отклонённые тоже считаем: тот же чек не должен пройти со второй попытки у другого проверяющего
     dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? "
-                       "AND status IN ('pending', 'paid', 'rejected')", (digest, payment_id)).fetchone()
+                       f"AND status IN {receipt_ai.USED}", (digest, payment_id)).fetchone()
     if dup or (seen and receipt_ai.duplicate(conn, payment_id, seen)):
         raise PaymentError(REJECTED_TEXT)
     if reasons:   # чужие реквизиты, подделка, не чек — не принимаем вовсе
@@ -599,11 +604,11 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
     (folder / name).write_bytes(data)
     # receipt_file IS NULL — два одновременных запроса с чеком: пройдёт только первый
     done = conn.execute(
-        "UPDATE payments SET receipt_file = ?, receipt_hash = ?, receipt_ai = ?, receipt_txn = ?, receipt_fp = ? "
-        "WHERE id = ? AND receipt_file IS NULL",
+        "UPDATE payments SET receipt_file = ?, receipt_hash = ?, receipt_ai = ?, receipt_txn = ?, receipt_fp = ?, "
+        "receipt_fp2 = ? WHERE id = ? AND receipt_file IS NULL",
         (name, digest, json.dumps(seen, ensure_ascii=False) if seen else None,
          (receipt_ai.txn_key(seen) or None) if seen else None, (receipt_ai.fingerprint(seen) or None) if seen else None,
-         payment_id)).rowcount
+         (receipt_ai.loose_fingerprint(seen) or None) if seen else None, payment_id)).rowcount
     if not done:
         (folder / name).unlink(missing_ok=True)
         raise PaymentError(f"Чек к заявке #{payment_id} уже отправлен — дождитесь проверки.")
