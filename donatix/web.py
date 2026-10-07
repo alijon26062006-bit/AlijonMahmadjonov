@@ -1227,6 +1227,22 @@ def panel_dc_video_ack(request: Request, method: str = Form(""), agree: str = Fo
     return _redirect("/panel/balance" + (f"?m={method}" if re.fullmatch(r"[A-Za-z0-9_-]{1,40}", method) else ""))
 
 
+@router.get("/dc-guide")
+def dc_guide(request: Request, rec: int = 0, loop: int = 1, conn=Depends(get_conn),
+             config: Config = Depends(get_config)):
+    """Анимированная инструкция «Душанбе Сити · авто»: телефон по шагам, подписи на таджикском.
+    Встроена в сайт (если админ не загрузил своё видео); rec=1 — один проход для записи в MP4."""
+    from . import payments
+    card = ""
+    if not rec:
+        m = next((m for m in payments.methods(conn, config) if m.get("auto") == "dcbank"), None)
+        digits = re.sub(r"\D", "", (m or {}).get("details", ""))
+        hit = re.search(r"\d{16,19}", digits)
+        card = " ".join(hit.group(0)[i:i + 4] for i in range(0, 16, 4)) if hit else ""
+    return render(request, "dc_guide.html", {"base": "100", "tail": "03", "rec": bool(rec), "loop": bool(loop),
+                                             "card": card or "9762 •••• •••• ••••"})
+
+
 @router.get("/pay-videos/{name}")
 def pay_video(name: str, config: Config = Depends(get_config)):
     """Видео-инструкции — без входа (их открывает и Telegram при отправке ботом)."""

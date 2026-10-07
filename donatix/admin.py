@@ -603,12 +603,13 @@ async def dc_video_save(request: Request, admin=Depends(admin_user), conn=Depend
     data = await upload.read(dcvideo.MAX_BYTES + 1) if upload is not None and getattr(upload, "filename", "") else b""
     try:
         dcvideo.set_video(conn, config, kind, data=data, content_type=getattr(upload, "content_type", "") or "",
-                          url=str(form.get("url", "")), delete=form.get("delete") == "1")
+                          url=str(form.get("url", "")), delete=form.get("delete") == "1", off=form.get("off") == "1")
     except dcvideo.VideoError as exc:
         flash(request, str(exc), "error")
     else:
         where = "сайта" if kind == "site" else "бота"
-        flash(request, f"Видео для {where} убрано." if form.get("delete") == "1" else
+        flash(request, f"Видео для {where} отключено." if form.get("off") == "1" else
+              f"Для {where} снова встроенная анимация." if form.get("delete") == "1" else
               f"Видео для {where} сохранено — каждый клиент посмотрит его перед первой оплатой «Душанбе Сити».")
     return _back("/admin/pay-settings#dc-video")
 

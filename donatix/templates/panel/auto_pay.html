@@ -60,7 +60,8 @@
     <summary><span class="dcp-play">▶</span>{{ 'Видео ва дастур' if dc.video else 'Дастурро бинед' }}</summary>
     {% if dc.video %}
     <div class="dcv-frame">
-      {% if dc.video.youtube %}<iframe src="https://www.youtube-nocookie.com/embed/{{ dc.video.youtube }}?rel=0&playsinline=1" title="Видео-инструкция" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>
+      {% if dc.video.builtin %}<iframe class="dcv-anim" src="/dc-guide" title="Как оплатить через «Душанбе Сити»" loading="lazy"></iframe>
+      {% elif dc.video.youtube %}<iframe src="https://www.youtube-nocookie.com/embed/{{ dc.video.youtube }}?rel=0&playsinline=1" title="Видео-инструкция" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>
       {% elif dc.video.file or dc.video_src.endswith(('.mp4', '.webm', '.mov')) %}<video src="{{ dc.video_src }}" controls playsinline preload="none"></video>
       {% else %}<a class="btn block" href="{{ dc.video_src }}" target="_blank" rel="noopener">▶ Видеоро кушоед</a>{% endif %}
     </div>

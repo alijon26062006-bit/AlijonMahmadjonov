@@ -22,6 +22,9 @@ def dc(config, conn):
     config.tg_api_id, config.tg_api_hash, config.bank_bot = 1, "x" * 32, "dc_next_bot"
     payments.save_methods(conn, [{"code": "dc", "title": "Душанбе Сити", "currency": "TJS",
                                   "details": f"Карта {CARD}, Алиджон", "enabled": True, "auto": "dcbank"}])
+    from donatix import db
+    for kind in ("site", "bot"):   # видео-инструкцию проверяют отдельные тесты
+        db.set_setting(conn, f"pay.dc_video_{kind}", "off")
     return config
 
 
@@ -154,6 +157,8 @@ def test_phone_in_details_does_not_filter_cards(app, config, conn):
     payments.save_methods(conn, [{"code": "dc", "title": "Сити (DC)", "details": "+992102208383",
                                   "enabled": True, "auto": "dcbank"}])
     assert dcbank.our_cards(conn, config) == set()
+    from donatix import db
+    db.set_setting(conn, "pay.dc_video_site", "off")
     uid, c, token = _client(app, conn)
     _pay(c, token, "20")
     assert _handle(conn, config, notice("20.01", "77"), 40)["status"] == "matched"
@@ -315,3 +320,36 @@ def test_paid_push_reaches_bot_instantly_and_once(app, dc, conn, supplier, monke
     p2 = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
     payments.reject(conn, dc, p2["id"], 1, "перевод не найден")
     assert "перевод не найден" in pushed.last_text()
+
+
+def test_builtin_animated_guide_by_default(app, dc, conn, supplier):
+    """Своё видео не загружено — клиент смотрит встроенную анимацию; бот шлёт встроенный MP4."""
+    from test_shopbot import _bot, _start, press
+
+    from donatix import db, dcvideo
+    for kind in ("site", "bot"):
+        db.set_setting(conn, f"pay.dc_video_{kind}", "")
+    guide = TestClient(app).get("/dc-guide")
+    assert guide.status_code == 200 and "dcguide:done" in guide.text and "5058 2700 1234 5678" in guide.text
+    assert TestClient(app).get("/static/app/dc-guide.mp4").status_code == 200
+
+    uid, c, token = _client(app, conn)
+    page = c.get("/panel/balance").text
+    assert 'id="dcv-guide"' in page and 'src="/dc-guide"' in page
+    assert _pay(c, token).headers["location"] == "/panel/balance?m=dc"
+    c.post("/panel/dc-video/ack", data={"csrf": token, "method": "dc", "agree": "1"})
+    assert _pay(c, token).headers["location"].endswith("/pay")
+
+    bot = _bot(dc, supplier)
+    sent = []
+    bot.api.upload = lambda method, field, path, **p: (sent.append(path) or {"video": {"file_id": "B1"}})
+    _start(bot, conn, "tj")
+    bot.handle(conn, press("t"))
+    bot.handle(conn, press(bot.api.button("Душанбе")))
+    assert sent == [dcvideo.BUILTIN_FILE]
+
+    adm = _admin(app)
+    page = adm.get("/admin/pay-settings").text
+    assert "встроенная анимация" in page and "/static/app/dc-guide.mp4" in page
+    adm.post("/admin/dc-video", data={"csrf": csrf_of(page), "kind": "site", "off": "1"})
+    assert dcvideo.get(conn, "site") is None

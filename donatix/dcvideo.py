@@ -42,25 +42,37 @@ def _ensure_table(conn: sqlite3.Connection) -> None:
                  "version TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (user_id, kind))")
 
 
+#: Встроенная инструкция — пока админ не загрузил своё видео: анимация на сайте (/dc-guide) и тот же
+#: ролик файлом для бота. Новая версия ролика — поменять номер, и клиенты посмотрят заново.
+BUILTIN_VERSION = "builtin-1"
+BUILTIN_FILE = Path(__file__).resolve().parent / "static" / "app" / "dc-guide.mp4"
+
+
 def get(conn: sqlite3.Connection, kind: str) -> dict[str, Any] | None:
-    """Видео для сайта или бота: {"file": имя файла | "", "url": ссылка | "", "youtube": id | "", "version"}."""
+    """Видео для сайта или бота: {"file": имя файла | "", "url": ссылка | "", "youtube": id | "",
+    "builtin": встроенная анимация, "version"}. None — видео отключено («off»)."""
     raw = (db.get_setting(conn, f"pay.dc_video_{kind}") or "").strip()
-    if not raw:
+    if raw == "off":
         return None
+    if not raw:
+        return {"file": "", "url": "", "youtube": "", "builtin": True, "version": BUILTIN_VERSION}
     version = db.get_setting(conn, f"pay.dc_video_{kind}_v") or "1"
     if NAME_RE.fullmatch(raw):
-        return {"file": raw, "url": "", "youtube": "", "version": version}
+        return {"file": raw, "url": "", "youtube": "", "builtin": False, "version": version}
     yt = YOUTUBE_RE.search(raw)
-    return {"file": "", "url": raw, "youtube": yt.group(1) if yt else "", "version": version}
+    return {"file": "", "url": raw, "youtube": yt.group(1) if yt else "", "builtin": False, "version": version}
 
 
 def set_video(conn: sqlite3.Connection, config: Config, kind: str, *, data: bytes = b"", content_type: str = "",
-              url: str = "", delete: bool = False) -> None:
-    """Загрузить файл, задать ссылку или убрать видео. Новое видео — новая версия: смотреть заново."""
+              url: str = "", delete: bool = False, off: bool = False) -> None:
+    """Загрузить файл, задать ссылку, вернуть встроенную инструкцию (delete) или отключить видео (off).
+    Новое видео — новая версия: смотреть заново."""
     if kind not in KINDS:
         raise VideoError("Неизвестное место для видео.")
     old = get(conn, kind)
-    if delete:
+    if off:
+        value = "off"
+    elif delete:
         value = ""
     elif data:
         if len(data) > MAX_BYTES:
@@ -115,4 +127,6 @@ def ack(conn: sqlite3.Connection, user_id: int, kind: str) -> None:
 
 def src(config: Config, video: dict[str, Any]) -> str:
     """Адрес видео для страницы."""
+    if video.get("builtin"):
+        return f"{config.base_url}/dc-guide"
     return f"{config.base_url}/pay-videos/{video['file']}" if video["file"] else video["url"]

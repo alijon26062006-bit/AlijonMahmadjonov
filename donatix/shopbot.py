@@ -1549,13 +1549,14 @@ class ShopBot:
                 if code else [[(tr(lang, "home"), "h")]])
         markup = kb(rows)
         try:
-            if video["file"]:
+            if video["file"] or video.get("builtin"):
                 fid = db.get_setting(conn, "pay.dc_video_bot_fid") or ""
                 if fid:
                     self.api("sendVideo", chat_id=tg_id, video=fid, caption=caption, parse_mode="HTML",
                              reply_markup=markup, supports_streaming=True)
                     return
-                path = dcvideo.videos_dir(self.config) / video["file"]
+                path = (dcvideo.BUILTIN_FILE if video.get("builtin")
+                        else dcvideo.videos_dir(self.config) / video["file"])
                 upload = getattr(self.api, "upload", None)
                 res = (upload("sendVideo", "video", path, chat_id=tg_id, caption=caption, parse_mode="HTML",
                               reply_markup=markup, supports_streaming=True) if upload else

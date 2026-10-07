@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="tg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Пардохт бо «Душанбе Сити» — {{ site_name }}</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root { --ink: #121521; --muted: #5e6577; --accent: #4f46e5; --soft: #eef0ff; --ok: #12a26a; --line: #e7e9f0; }
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: var(--ink);
+  background: radial-gradient(120% 80% at 50% 0%, #6d5dfc 0%, #4338ca 45%, #1e1b4b 100%); overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.2vh; padding: 2vh 0; }
+.cap { width: min(92vw, 560px); text-align: center; color: #fff; height: 17vh; display: flex; flex-direction: column; justify-content: flex-end; }
+.cap .num { display: inline-flex; align-self: center; align-items: center; justify-content: center; width: 5.4vh; height: 5.4vh; border-radius: 50%;
+  background: #ffd23f; color: #3b1d00; font-weight: 900; font-size: 2.8vh; margin-bottom: 1vh; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.cap b { display: block; font-size: 3.3vh; line-height: 1.2; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.cap small { display: block; margin-top: .6vh; font-size: 2vh; opacity: .8; }
+.cap.swap { animation: capin .5s cubic-bezier(.2,.7,.2,1); }
+@keyframes capin { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.dots { display: flex; gap: .8vh; }
+.dots i { width: 1vh; height: 1vh; border-radius: 50%; background: rgba(255,255,255,.35); transition: all .3s; }
+.dots i.on { width: 3vh; border-radius: 1vh; background: #ffd23f; }
+
+/* телефон */
+.phone { position: relative; height: 66vh; aspect-ratio: 9 / 18.5; border-radius: 5.2vh; background: #0b0d14; padding: 1.1vh;
+  box-shadow: 0 30px 60px -20px rgba(0,0,0,.6), inset 0 0 0 .3vh #2b2f3c; }
+.phone::before { content: ""; position: absolute; top: 1.9vh; left: 50%; transform: translateX(-50%); width: 30%; height: 2.6vh;
+  border-radius: 2vh; background: #0b0d14; z-index: 5; }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 4.3vh; overflow: hidden; background: #f5f6fa; font-size: 1.75vh; }
+.view { position: absolute; inset: 0; padding: 5.5vh 2vh 2vh; display: flex; flex-direction: column; gap: 1.4vh; background: #f5f6fa;
+  opacity: 0; transform: translateX(10%); z-index: 1; transition: opacity .4s, transform .45s cubic-bezier(.2,.7,.2,1); }
+.view.on { opacity: 1; transform: none; z-index: 3; }
+.view.out { opacity: 0; transform: translateX(-10%); z-index: 2; transition-duration: .25s; }
+.bar { display: flex; align-items: center; justify-content: space-between; }
+.logo { width: 4.2vh; height: 4.2vh; border-radius: 1.1vh; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 900; font-size: 2.4vh; }
+.pill { padding: .6vh 1.3vh; border-radius: 99px; background: #fff; border: 1px solid var(--line); font-weight: 700; font-size: 1.5vh; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 2vh; padding: 1.6vh; }
+.h { font-weight: 800; font-size: 2.2vh; }
+.mut { color: var(--muted); font-size: 1.5vh; }
+.tabbar { position: absolute; left: 0; right: 0; bottom: 0; height: 7.5vh; background: #fff; border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-around; font-size: 1.3vh; color: var(--muted); }
+.tabbar span { display: grid; justify-items: center; gap: .3vh; }
+.tabbar .plus { width: 5.4vh; height: 5.4vh; border-radius: 1.6vh; background: var(--accent); color: #fff; font-size: 3.2vh;
+  display: grid; place-items: center; margin-top: -3vh; box-shadow: 0 8px 18px -6px rgba(79,70,229,.7); }
+.hero { border-radius: 2vh; padding: 2vh; color: #fff; background: linear-gradient(135deg, #6d5dfc, #4338ca); }
+.hero b { font-size: 3.2vh; display: block; }
+.m { display: flex; align-items: center; gap: 1.2vh; padding: 1.4vh; border-radius: 1.6vh; background: #fff; border: 1.5px solid var(--line); transition: all .3s; }
+.m .ic { width: 4.4vh; height: 4.4vh; border-radius: 1.1vh; display: grid; place-items: center; font-weight: 900; font-size: 1.6vh; background: #f1f2f6; }
+.m b { display: block; }
+.m.dc .ic { background: #fff; border: 1px solid var(--line); color: #1f4fb8; }
+.m.sel { border-color: var(--accent); background: var(--soft); box-shadow: 0 0 0 .3vh rgba(79,70,229,.2); }
+.badge { padding: .3vh .9vh; border-radius: 99px; background: #ffd23f; color: #8a1c00; font-weight: 800; font-size: 1.2vh; margin-left: auto; }
+.inp { height: 5.6vh; border-radius: 1.4vh; border: 1.5px solid var(--line); background: #fff; display: flex; align-items: center; padding: 0 1.6vh;
+  font-size: 2.6vh; font-weight: 800; }
+.inp.focus { border-color: var(--accent); box-shadow: 0 0 0 .3vh rgba(79,70,229,.2); }
+.caret { width: .25vh; height: 3vh; background: var(--accent); margin-left: .2vh; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.btn { height: 5.8vh; border-radius: 1.6vh; display: grid; place-items: center; font-weight: 800; color: #fff; background: var(--accent); font-size: 1.75vh; transition: transform .15s; white-space: nowrap; }
+.btn.green { background: linear-gradient(135deg, #12a26a, #0b7a50); }
+.dchero { border-radius: 2vh; padding: 1.6vh; color: #fff; display: flex; align-items: center; gap: 1.2vh; background: linear-gradient(120deg, #ff7a45, #f0443a 55%, #d92a4f); }
+.dchero .ic { width: 5vh; height: 5vh; border-radius: 1.3vh; background: #fff; color: #1f4fb8; display: grid; place-items: center; font-weight: 900; }
+.sum { text-align: center; }
+.sum .big { font-size: 4.6vh; font-weight: 900; letter-spacing: -.03em; white-space: nowrap; }
+.sum .big em { font-style: normal; color: var(--accent); font-size: 2.2vh; margin-left: .8vh; }
+.sum .big .tail { color: #e5243b; display: inline-block; }
+.sum .big .tail.pulse { animation: pulse 1s ease-in-out 3; }
+@keyframes pulse { 50% { transform: scale(1.35); text-shadow: 0 0 1.5vh rgba(229,36,59,.5); } }
+.acc { margin-top: 1vh; padding: 1.2vh; border-radius: 1.4vh; background: #f7f8fb; border: 1px solid var(--line); text-align: left; }
+.acc b { font-size: 2.1vh; letter-spacing: .03em; }
+.note { padding: 1.2vh; border-radius: 1.4vh; background: #e8f6ee; color: #157347; font-weight: 700; text-align: center; font-size: 1.55vh; }
+.warn { padding: 1.2vh; border-radius: 1.4vh; background: #fdeeee; color: #c42b2b; font-weight: 700; text-align: center; font-size: 1.55vh; }
+/* приложение банка */
+.view.dcapp { background: linear-gradient(180deg, #1f4fb8 0, #1f4fb8 22%, #f3f5fb 22%); }
+.dcapp .top { color: #fff; font-weight: 800; font-size: 2.2vh; display: flex; align-items: center; gap: 1vh; }
+.dcapp .top .ic { width: 4vh; height: 4vh; border-radius: 1vh; background: #fff; color: #f0443a; display: grid; place-items: center; font-weight: 900; font-size: 1.5vh; }
+.row { display: flex; justify-content: space-between; padding: 1.1vh 0; border-bottom: 1px dashed var(--line); }
+.row:last-child { border: 0; }
+.row b.hl { color: #1f4fb8; }
+.ok { align-items: center; justify-content: center; text-align: center; }
+.okc { width: 13vh; height: 13vh; border-radius: 50%; background: #e8f6ee; box-shadow: 0 0 0 1.2vh #f5f6fa; display: grid; place-items: center; font-size: 7vh; margin: 0 auto;
+  animation: pop .6s cubic-bezier(.2,1.4,.4,1); }
+@keyframes pop { from { transform: scale(.3); opacity: 0; } }
+.conf { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; opacity: .85; }
+.ok > :not(.conf) { position: relative; z-index: 1; }
+.conf i { position: absolute; top: -2vh; width: 1vh; height: 1.6vh; border-radius: .3vh; animation: fall 2.4s linear forwards; }
+@keyframes fall { to { transform: translateY(80vh) rotate(540deg); } }
+.final { justify-content: center; gap: 1.6vh; }
+.tick { display: flex; gap: 1.2vh; align-items: center; padding: 1.4vh; border-radius: 1.4vh; background: #fff; border: 1px solid var(--line); font-weight: 700; }
+.tick span { font-size: 2.6vh; }
+/* палец */
+.finger { position: absolute; z-index: 20; width: 5vh; height: 5vh; border-radius: 50%; background: rgba(255,255,255,.5);
+  border: .35vh solid #fff; box-shadow: 0 4px 14px rgba(0,0,0,.35); transform: translate(-50%, -50%); opacity: 0;
+  transition: left .7s cubic-bezier(.4,0,.2,1), top .7s cubic-bezier(.4,0,.2,1), opacity .3s; pointer-events: none; }
+.finger.tap::after { content: ""; position: absolute; inset: -.35vh; border-radius: 50%; border: .35vh solid #fff; animation: ring .6s ease-out; }
+@keyframes ring { to { transform: scale(2.2); opacity: 0; } }
+.pressed { transform: scale(.95); }
+.replay { position: fixed; right: 2vh; bottom: 2vh; padding: 1vh 1.8vh; border-radius: 99px; border: 0; background: rgba(255,255,255,.18);
+  color: #fff; font: 700 1.8vh "Onest", sans-serif; cursor: pointer; display: none; }
+body.done .replay { display: block; }
+body.rec .replay { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .view, .finger { transition-duration: .01s; } }
+</style>
+</head>
+<body class="{{ 'rec' if rec else '' }}">
+<div class="cap" id="cap"><span class="num" id="num">1</span><b id="title"></b><small id="sub"></small></div>
+
+<div class="phone"><div class="screen" id="screen">
+  <!-- 1: главная -->
+  <div class="view" data-v="home">
+    <div class="bar"><span class="logo">D</span><span class="pill">TJS</span></div>
+    <div class="hero"><span class="mut" style="color:#e0e3ff">Баланс</span><b>0.00 с.</b></div>
+    <div class="card"><div class="h">🎮 Free Fire · PUBG</div><div class="mut">Алмаз ва UC — зуд</div></div>
+    <div class="card"><div class="h">⭐ Telegram Stars</div><div class="mut">Арзон ва бехатар</div></div>
+    <div class="tabbar"><span>🏠<br>Асосӣ</span><span>▦<br>Каталог</span><span><i class="plus" id="t-plus">+</i>Пур кардан</span><span>🛍<br>Фармоиш</span><span>☰<br>Боз</span></div>
+  </div>
+  <!-- 2: способ -->
+  <div class="view" data-v="method">
+    <div class="h">Пур кардани баланс</div>
+    <div class="mut">Усули пардохтро интихоб кунед</div>
+    <div class="m"><span class="ic">алиф</span><span><b>Алиф Mobi</b><span class="mut">TJS · бо чек</span></span></div>
+    <div class="m dc" id="t-dc"><span class="ic">DC</span><span><b>Душанбе Сити</b><span class="mut">TJS</span></span><span class="badge">⚡ АВТО</span></div>
+    <div class="m"><span class="ic">₮</span><span><b>USDT</b><span class="mut">TRC20</span></span></div>
+  </div>
+  <!-- 3: сумма -->
+  <div class="view" data-v="amount">
+    <div class="m dc sel"><span class="ic">DC</span><span><b>Душанбе Сити</b><span class="mut">TJS</span></span><span class="badge">⚡ АВТО</span></div>
+    <div class="h" style="margin-top:1vh">Чанд сомонӣ?</div>
+    <div class="inp" id="t-inp"><span id="typed"></span><i class="caret"></i></div>
+    <div class="mut">Масалан: 50, 100, 500</div>
+    <div class="btn" id="t-next" style="margin-top:auto">Идома →</div>
+  </div>
+  <!-- 4: реквизиты -->
+  <div class="view" data-v="pay">
+    <div class="dchero"><span class="ic">DC</span><span style="flex:1"><b style="font-size:2.2vh">Душанбе Сити</b><br><span style="font-size:1.4vh;opacity:.9">Тез, бехатар, бе чек</span></span><span class="badge">⚡ АВТО</span></div>
+    <div class="card sum"><div class="mut" style="font-weight:800;letter-spacing:.08em">БА ИН КОРТ ГУЗАРОНЕД</div>
+      <div class="big">{{ base }}<span class="tail" id="tail">.{{ tail }}</span><em>сомонӣ</em></div>
+      <div class="acc"><div class="mut">РАҚАМИ КОРТ</div><b>{{ card }}</b></div></div>
+    <div class="warn" id="t-warn">⚠️ Маҳз {{ base }}.{{ tail }} — бо дирам!</div>
+    <div class="btn green" id="t-pay" style="font-size:1.55vh">📲 Пардохт дар «Душанбе Сити»</div>
+  </div>
+  <!-- 5: приложение банка -->
+  <div class="view dcapp" data-v="bank">
+    <div class="top"><span class="ic">DC</span>Душанбе Сити</div>
+    <div class="card" style="margin-top:2vh">
+      <div class="h" style="margin-bottom:.6vh">Интиқол ба корт</div>
+      <div class="row"><span class="mut">Корт</span><b>{{ card }}</b></div>
+      <div class="row"><span class="mut">Маблағ</span><b class="hl">{{ base }}.{{ tail }} TJS</b></div>
+      <div class="row"><span class="mut">Шарҳ</span><b>Donatix #2346</b></div>
+    </div>
+    <div class="note">✓ Корт ва маблағ худаш навишта шуданд</div>
+    <div class="btn" id="t-confirm" style="margin-top:auto;background:#1f4fb8">Тасдиқ кардан</div>
+  </div>
+  <!-- 6: готово -->
+  <div class="view ok" data-v="done">
+    <div class="conf" id="conf"></div>
+    <div class="okc">✅</div>
+    <div class="h" style="font-size:2.8vh;background:#f5f6fa;padding:.4vh 1vh;border-radius:1vh">Пардохт гирифта шуд!</div>
+    <div class="mut" style="font-size:1.9vh">Баланс ба <b style="color:var(--ink)">{{ base }}.{{ tail }} с.</b> пур шуд</div>
+    <div class="note" style="margin-top:1vh">⚡ Худкор · бе чек · ~1 дақиқа</div>
+  </div>
+  <!-- 7: итог -->
+  <div class="view final" data-v="final">
+    <div class="h" style="text-align:center;font-size:2.6vh">Дар хотир доред</div>
+    <div class="tick"><span>🎯</span>Маҳз маблағи дақиқ — бо дирам</div>
+    <div class="tick"><span>📲</span>Тугмаи сабз — барнома худаш кушода мешавад</div>
+    <div class="tick"><span>🧾</span>Чек лозим нест</div>
+    <div class="tick"><span>⚠️</span>Хато гузаронед — худатон ҷавобгаред</div>
+  </div>
+  <div class="finger" id="finger"></div>
+</div></div>
+
+<div class="dots" id="dots"></div>
+<button class="replay" id="replay">↻ Аз нав</button>
+
+<script>
+(function () {
+  var REC = {{ 'true' if rec else 'false' }}, LOOP = {{ 'true' if loop else 'false' }};
+  var BASE = "{{ base }}";
+  var steps = [
+    ["home",   "«Пур кардан»-ро пахш кунед",              "Нажмите «Пополнить»"],
+    ["method", "«Душанбе Сити ⚡ АВТО»-ро интихоб кунед",  "Выберите «Душанбе Сити · авто»"],
+    ["amount", "Маблағро нависед",                         "Введите сумму в сомони"],
+    ["pay",    "Маҳз ҳамин маблағ — бо дирам!",            "Сайт добавит копейки — переведите ровно эту сумму"],
+    ["bank",   "Тугмаи сабз → барнома кушода мешавад",     "Карта и сумма уже стоят — только подтвердите"],
+    ["done",   "Тайёр! Баланс худаш пур шуд",              "Чек не нужен — за минуту, автоматически"],
+    ["final",  "Ҳамин тавр осон!",                          "Так просто"]
+  ];
+  var screen = document.getElementById("screen"), finger = document.getElementById("finger");
+  var views = {}; screen.querySelectorAll(".view").forEach(function (v) { views[v.dataset.v] = v; });
+  var dots = document.getElementById("dots");
+  steps.forEach(function () { dots.appendChild(document.createElement("i")); });
+  var timers = [];
+  function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
+  function show(name) {
+    Object.keys(views).forEach(function (k) {
+      var v = views[k];
+      if (k === name) { v.classList.remove("out"); v.classList.add("on"); }
+      else if (v.classList.contains("on")) { v.classList.remove("on"); v.classList.add("out"); setTimeout(function () { v.classList.remove("out"); }, 500); }
+    });
+  }
+  function caption(i) {
+    var cap = document.getElementById("cap");
+    document.getElementById("num").textContent = i + 1;
+    document.getElementById("title").textContent = steps[i][1];
+    document.getElementById("sub").textContent = steps[i][2];
+    cap.classList.remove("swap"); void cap.offsetWidth; cap.classList.add("swap");
+    dots.querySelectorAll("i").forEach(function (d, j) { d.classList.toggle("on", j === i); });
+  }
+  function point(id) {
+    var el = document.getElementById(id); if (!el) return;
+    var s = screen.getBoundingClientRect(), r = el.getBoundingClientRect();
+    finger.style.opacity = 1;
+    finger.style.left = (r.left - s.left + r.width / 2) + "px";
+    finger.style.top = (r.top - s.top + r.height / 2) + "px";
+  }
+  function tap(id) {
+    var el = document.getElementById(id);
+    finger.classList.remove("tap"); void finger.offsetWidth; finger.classList.add("tap");
+    if (el) { el.classList.add("pressed"); setTimeout(function () { el.classList.remove("pressed"); }, 220); }
+  }
+  function hideFinger() { finger.style.opacity = 0; }
+  function confetti() {
+    var c = document.getElementById("conf"), colors = ["#ffd23f", "#12a26a", "#4f46e5", "#f0443a", "#38bdf8"];
+    c.innerHTML = "";
+    for (var i = 0; i < 40; i++) {
+      var p = document.createElement("i");
+      p.style.left = Math.random() * 100 + "%"; p.style.background = colors[i % colors.length];
+      p.style.animationDelay = (Math.random() * .8) + "s"; c.appendChild(p);
+    }
+  }
+  function run() {
+    timers.forEach(clearTimeout); timers = []; document.body.classList.remove("done");
+    var t = 0;
+    // 1 — главная
+    at(t, function () { caption(0); show("home"); hideFinger(); finger.style.left = "50%"; finger.style.top = "60%"; });
+    at(t + 1200, function () { point("t-plus"); }); at(t + 2300, function () { tap("t-plus"); });
+    t += 3600;
+    // 2 — способ
+    at(t, function () { caption(1); show("method"); });
+    at(t + 1000, function () { point("t-dc"); });
+    at(t + 2100, function () { tap("t-dc"); document.getElementById("t-dc").classList.add("sel"); });
+    t += 4200;
+    // 3 — сумма
+    at(t, function () { caption(2); show("amount"); document.getElementById("typed").textContent = ""; document.getElementById("t-dc").classList.remove("sel"); });
+    at(t + 700, function () { point("t-inp"); }); at(t + 1500, function () { tap("t-inp"); document.getElementById("t-inp").classList.add("focus"); });
+    BASE.split("").forEach(function (ch, i) { at(t + 2000 + i * 380, function () { document.getElementById("typed").textContent += ch; }); });
+    at(t + 2000 + BASE.length * 380 + 500, function () { point("t-next"); });
+    at(t + 2000 + BASE.length * 380 + 1400, function () { tap("t-next"); document.getElementById("t-inp").classList.remove("focus"); });
+    t += 2000 + BASE.length * 380 + 2200;
+    // 4 — реквизиты, акцент на копейках
+    at(t, function () { caption(3); show("pay"); hideFinger(); });
+    at(t + 900, function () { var x = document.getElementById("tail"); x.classList.remove("pulse"); void x.offsetWidth; x.classList.add("pulse"); });
+    at(t + 4200, function () { point("t-pay"); }); at(t + 5200, function () { tap("t-pay"); });
+    t += 6200;
+    // 5 — банк
+    at(t, function () { caption(4); show("bank"); hideFinger(); });
+    at(t + 2600, function () { point("t-confirm"); }); at(t + 3700, function () { tap("t-confirm"); });
+    t += 4700;
+    // 6 — готово
+    at(t, function () { caption(5); show("done"); hideFinger(); confetti(); });
+    t += 4600;
+    // 7 — итог
+    at(t, function () { caption(6); show("final"); });
+    t += 5200;
+    at(t, function () {
+      document.body.classList.add("done"); window.guideDone = true;
+      try { parent.postMessage("dcguide:done", "*"); } catch (e) {}
+      if (LOOP && !REC) at(1500, run);
+    });
+  }
+  document.getElementById("replay").addEventListener("click", run);
+  run();
+})();
+</script>
+</body>
+</html>

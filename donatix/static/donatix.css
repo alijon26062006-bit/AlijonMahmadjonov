@@ -1861,6 +1861,7 @@ body.rcc-open { overflow: hidden; }
 .dcv-frame { position: relative; border-radius: var(--r); overflow: hidden; background: #000; }
 .dcv-frame iframe, .dcv-frame video { display: block; width: 100%; aspect-ratio: 9 / 16; max-height: 70vh; border: 0; background: #000; }
 .dcv-frame iframe { aspect-ratio: 16 / 9; }
+.dcv-frame iframe.dcv-anim { aspect-ratio: 9 / 16; max-height: 78vh; }
 .dcv-frame .btn { margin: 0; border-radius: 0; }
 .dcv-agree { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: var(--r-sm); background: var(--surface); border: 1px solid var(--line); cursor: pointer; font-weight: 500; }
 .dcv-agree input { flex: none; width: 22px; height: 22px; margin-top: 1px; accent-color: var(--accent); }

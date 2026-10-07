@@ -58,7 +58,8 @@
       <div class="dcv" id="dcv" hidden>
         <div class="dcv-head"><span class="dcv-ico">🎬</span><div><b>Аввал видеоро бинед</b><span>Сначала посмотрите короткое видео — как платить без ошибок</span></div></div>
         <div class="dcv-frame">
-          {% if dcv.youtube %}<iframe src="https://www.youtube-nocookie.com/embed/{{ dcv.youtube }}?rel=0&playsinline=1" title="Видео-инструкция" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>
+          {% if dcv.builtin %}<iframe id="dcv-guide" class="dcv-anim" src="/dc-guide" title="Как оплатить через «Душанбе Сити»" loading="lazy"></iframe>
+          {% elif dcv.youtube %}<iframe src="https://www.youtube-nocookie.com/embed/{{ dcv.youtube }}?rel=0&playsinline=1" title="Видео-инструкция" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>
           {% elif dcv.file or dcv_src.endswith(('.mp4', '.webm', '.mov')) %}<video id="dcv-video" src="{{ dcv_src }}" controls playsinline preload="metadata"></video>
           {% else %}<a class="btn block" href="{{ dcv_src }}" target="_blank" rel="noopener">▶ Видеоро кушоед / Открыть видео</a>{% endif %}
         </div>
@@ -316,7 +317,12 @@
 (function () {   // видео «Душанбе Сити»: галочка — после просмотра, кнопка — после галочки
   var ok = document.getElementById("dcv-ok"), agree = document.getElementById("dcv-agree");
   if (!ok || !agree) return;
-  var v = document.getElementById("dcv-video"), note = document.getElementById("dcv-note"), seen = !v;
+  var v = document.getElementById("dcv-video"), g = document.getElementById("dcv-guide"),
+      note = document.getElementById("dcv-note"), seen = !v && !g;
+  // встроенная анимация сообщает, что досмотрена до конца
+  if (g) window.addEventListener("message", function (e) {
+    if (e.data === "dcguide:done" && e.source === g.contentWindow && !seen) { seen = true; sync(); }
+  });
   function sync() { agree.disabled = !seen; if (note) note.hidden = seen; ok.disabled = !(seen && agree.checked); }
   if (v) v.addEventListener("timeupdate", function () {
     if (!seen && v.duration && v.currentTime / v.duration > 0.9) { seen = true; sync(); }
