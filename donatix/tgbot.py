@@ -866,7 +866,7 @@ def screen_buyers(conn: sqlite3.Connection, config: Config) -> Screen:
                         "JOIN users u ON u.id = s.user_id ORDER BY s.last_seen DESC LIMIT 12").fetchall()
     total = conn.execute("SELECT COUNT(*) FROM shop_users").fetchone()[0]
     text = (f"🛒 <b>Покупатели бота-магазина</b> — {total}\n"
-            "Найти любого: напишите <b>@username</b> или <b>Telegram ID</b>.\n"
+            "Найти любого: напишите <b>@username</b> или <b>Telegram ID</b> — там же вся его история.\n"
             "Пополнить сразу: <code>/topup @username 50</code>\n\nПоследние, кто заходил:")
     return text, [[(f"{r['name'] or 'без имени'}" + (f" @{r['username']}" if r["username"] else f" · {r['tg_id']}")
                     + f" · {shopbot.money(r['balance_micro'], rate)}", f"tb:view:{r['tg_id']}")] for r in rows] \
@@ -893,11 +893,92 @@ def screen_buyer(conn: sqlite3.Connection, config: Config, tg_id: int, note: str
     if pays:
         text += "\n\n💳 " + " · ".join(f"#{p['id']} {_e(p['pay_amount'])} {_e(p['pay_currency'])} "
                                        f"{STATUS_TEXT.get(p['status'], p['status']).split(' ')[0]}" for p in pays)
+    bought = conn.execute("SELECT public_id, product_name, total_micro, status, created_at FROM orders "
+                          "WHERE user_id = ? ORDER BY id DESC LIMIT 7", (u["id"],)).fetchall()
+    spent = conn.execute("SELECT COALESCE(SUM(total_micro), 0) FROM orders WHERE user_id = ? AND status = 'completed'",
+                         (u["id"],)).fetchone()[0]
+    mark = {"completed": "✅", "processing": "⏳", "attention": "⚠️", "failed": "↩️"}
+    text += (f"\n\n🛒 <b>На что тратил</b> — всего {shopbot.money(spent, rate)} (${fmt(spent)})\n"
+             + ("\n".join(f"{mark.get(o['status'], '•')} {local_time(config, o['created_at'])} · "
+                          f"{_e(o['product_name'][:45])} — {shopbot.money(o['total_micro'], rate)}" for o in bought)
+                if bought else "Покупок пока нет."))
+    if n_orders > len(bought):
+        text += f"\n… ещё {n_orders - len(bought)} — в «Вся история»"
     return text, [
         [(f"+{n} с.", f"tb:a{n}:{tg_id}") for n in (10, 20, 50, 100)],
         [("✍️ Другая сумма", f"tb:custom:{tg_id}"), ("➖ Списать", f"tb:minus:{tg_id}")],
+        [("📜 Вся история: куда тратил деньги", f"hy:0:{u['id']}")],
         [("🔄 Обновить", f"tb:view:{tg_id}"), ("‹ Покупатели", "tb:list:0")],
     ]
+
+
+HISTORY_PAGE = 10
+
+
+def screen_history(conn: sqlite3.Connection, config: Config, user_id: int, page: int = 0) -> Screen:
+    """Для админа: вся история денег клиента — что идёт сейчас и всё прошлое, постранично до первой операции."""
+    from . import shopbot
+    u = accounts.get_user(conn, user_id)
+    if u is None:
+        return "Клиент не найден.", [_back("tb:list:0")]
+    rate = shopbot.tjs_rate(conn, config)
+    su = buyer_of(conn, user_id)
+    back = (f"tb:view:{su['tg_id']}" if su is not None else f"cl:view:{user_id}")
+
+    def m(micro: int) -> str:
+        return f"{shopbot.money(micro, rate)} (${fmt(micro)})"
+
+    lines = [f"📜 <b>История клиента</b>\n{tg_who(su) if su is not None else _e(u['login'])}"]
+    if page == 0:
+        got = conn.execute("SELECT COALESCE(SUM(amount_micro), 0) FROM transactions WHERE user_id = ? "
+                           "AND amount_micro > 0 AND note LIKE 'Пополнение%'", (user_id,)).fetchone()[0]
+        spent, n_done = conn.execute("SELECT COALESCE(SUM(total_micro), 0), COUNT(*) FROM orders "
+                                     "WHERE user_id = ? AND status = 'completed'", (user_id,)).fetchone()
+        lines += [f"💰 Сейчас на балансе: <b>{m(u['balance_micro'])}</b>",
+                  f"➕ Всего пополнил: {m(got)}",
+                  f"🛒 Всего потратил на покупки: {m(spent)} · заказов: {n_done}"]
+        now_pay = conn.execute("SELECT * FROM payments WHERE user_id = ? AND status = 'pending' ORDER BY id DESC",
+                               (user_id,)).fetchall()
+        now_ord = conn.execute("SELECT * FROM orders WHERE user_id = ? AND status IN ('processing', 'attention') "
+                               "ORDER BY id DESC LIMIT 10", (user_id,)).fetchall()
+        lines.append("\n⏳ <b>Сейчас</b>")
+        for p in now_pay:
+            lines.append(f"💳 Заявка #{p['id']}: {_e(p['pay_amount'])} {_e(p['pay_currency'])} — ждёт "
+                         + ("проверки чека" if p["receipt_file"] else "оплаты")
+                         + f" · {local_time(config, p['created_at'])}")
+        for o in now_ord:
+            lines.append(f"🛒 {_e(o['public_id'])} {_e(o['product_name'][:40])} — {m(o['total_micro'])} · "
+                         + ("⚠️ проблема" if o["status"] == "attention" else "выполняется"))
+        if not now_pay and not now_ord:
+            lines.append("— ничего не ждёт")
+    total = conn.execute("SELECT COUNT(*) FROM transactions WHERE user_id = ?", (user_id,)).fetchone()[0]
+    rows = conn.execute("SELECT t.*, o.product_name, o.public_id, o.status AS order_status FROM transactions t "
+                        "LEFT JOIN orders o ON o.id = t.order_id WHERE t.user_id = ? "
+                        "ORDER BY t.id DESC LIMIT ? OFFSET ?",
+                        (user_id, HISTORY_PAGE, page * HISTORY_PAGE)).fetchall()
+    first = page * HISTORY_PAGE + 1
+    lines.append(f"\n📒 <b>Все операции</b> ({first}–{first + len(rows) - 1} из {total})" if rows
+                 else "\n📒 Операций пока нет.")
+    for t in rows:
+        amount, note = t["amount_micro"], t["note"] or ""
+        if t["product_name"] and amount < 0:
+            icon, what = "🛒", f"{t['public_id']} · {t['product_name']}"
+        elif t["product_name"]:
+            icon, what = "↩️", f"Возврат {t['public_id']} · {t['product_name']}"
+        elif amount > 0 and note.startswith("Пополнение"):
+            icon, what = "💳", note
+        else:
+            icon, what = ("➕" if amount > 0 else "➖"), note
+        lines.append(f"{icon} <b>{'+' if amount > 0 else '−'}{m(abs(amount))}</b> · {_e(what[:70])}\n"
+                     f"     🕒 {local_time(config, t['created_at'])} · "
+                     f"{shopbot.money(t['balance_before'], rate)} → {shopbot.money(t['balance_after'], rate)}")
+    nav = ([("◀️ Новее", f"hy:{page - 1}:{user_id}")] if page > 0 else []) \
+        + ([("Старее ▶️", f"hy:{page + 1}:{user_id}")] if first - 1 + len(rows) < total else [])
+    return "\n".join(lines), ([nav] if nav else []) + [[("🔄 Обновить", f"hy:{page}:{user_id}")], _back(back)]
+
+
+def _history(bot: AdminBot, conn: sqlite3.Connection, action: str, user_id: int) -> str | Screen:
+    return screen_history(conn, bot.config, user_id, min(int(action), 10_000) if action.isdigit() else 0)
 
 
 def screen_topup_confirm(conn: sqlite3.Connection, config: Config, tg_id: int, micro: int) -> Screen:
@@ -978,7 +1059,7 @@ def screen_client(conn: sqlite3.Connection, config: Config, user_id: int) -> Scr
     if pays:
         mark = {"pending": "⏳", "paid": "✅", "rejected": "❌", "cancelled": "↩️"}
         text += "\n\n💳 <b>Пополнения</b>\n" + "\n".join(
-            f"{mark[p['status']]} #{p['id']} · ${fmt(p['amount_micro'])} · "
+            f"{mark.get(p['status'], '🚫')} #{p['id']} · ${fmt(p['amount_micro'])} · "
             f"{_e(payments.title_for(conn, config, p['method']))}"
             + (f" — {_e(payments.who_label(p))}" if p["status"] != "pending" else " — ждёт проверки")
             for p in pays)
@@ -989,6 +1070,7 @@ def screen_client(conn: sqlite3.Connection, config: Config, user_id: int) -> Scr
         rows.append([(("• " if u["tier"] == t else "") + t, f"cl:{t}:{user_id}") for t in TIERS])
     if su is not None:
         rows.append([("🛒 Пополнить как покупателя бота", f"tb:view:{su['tg_id']}")])
+    rows.append([("📜 Вся история: куда тратил деньги", f"hy:0:{user_id}")])
     rows.append(_back("m:clients:0"))
     return text, rows
 
@@ -1294,7 +1376,7 @@ def cashier_wizard_step(bot: AdminBot, conn: sqlite3.Connection, msg: dict[str, 
 MENU_HANDLERS: dict[str, Callable[..., str | Screen]] = {
     "pm": lambda bot, conn, action, i: _paymethods(bot, conn, action, i),
     "m": _menu, "cl": _client, "bot": _bot, "rate": _rate, "cat": _catalog, "set": _setting, "mk": _markup,
-    "ks": _cashiers, "tb": _buyers,
+    "ks": _cashiers, "tb": _buyers, "hy": _history,
 }
 
 
