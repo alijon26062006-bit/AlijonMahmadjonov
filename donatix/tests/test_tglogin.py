@@ -79,9 +79,8 @@ def test_link_telegram_to_existing_email_account(app, config, conn, supplier):
     c = TestClient(app)
     web_login(c, "emailuser@example.com", "password123")
     r = c.get("/panel", follow_redirects=False)                                    # без Telegram кабинет закрыт
-    assert r.status_code == 303 and r.headers["location"] == "/panel/telegram"
-    assert c.get("/panel/orders", follow_redirects=False).headers["location"] == "/panel/telegram"
-    assert "Последний шаг — привяжите Telegram" in c.get("/panel/telegram").text
+    assert r.status_code == 200                                                    # кабинет открыт без привязки
+    assert c.get("/panel/orders", follow_redirects=False).status_code == 200
     page = c.get("/auth/telegram?link=1")
     token = re.search(r"start=login_([A-Za-z0-9]+)", page.text).group(1)
     bot.handle(conn, msg(f"/start login_{token}"))
@@ -146,5 +145,4 @@ def test_telegram_login_off_by_default(app, config, conn, supplier):
     assert c.get("/auth/telegram", follow_redirects=False).headers["location"] == "/login"
     make_client(conn, login="onlyg")
     web_login(c, "onlyg@example.com", "password123")
-    page = c.get("/panel/telegram").text
-    assert "Привязать Google" in page and "Привязать Telegram" not in page
+    assert c.get("/panel", follow_redirects=False).status_code == 200            # без обязательной привязки

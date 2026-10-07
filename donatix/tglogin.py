@@ -140,13 +140,6 @@ def google_linked(user: Any) -> bool:
 
 
 def required(conn: sqlite3.Connection, config: Any, user: Any) -> bool:
-    """Клиента просим привязать Telegram (с номером) или Google — чем восстановить доступ, если забудет пароль.
-    Достаточно одного. Админа, гостя и сайт, где ни того ни другого нет, — не трогаем."""
-    if user is None or (isinstance(user, dict) and user.get("guest")):
-        return False
-    if user["role"] != "client":
-        return False
-    m = methods(conn, config)
-    if not (m["telegram"] or m["google"]):
-        return False
-    return not ((m["telegram"] and linked(conn, user["id"])) or google_linked(user))
+    """Обязательная привязка Google/Telegram отключена: она мешала людям попасть в кабинет
+    (особенно из Instagram и TikTok, где вход через Google не работает). Привязать можно по желанию."""
+    return False

@@ -96,8 +96,8 @@ def test_link_google_satisfies_requirement(gconf, app, conn, monkeypatch):
     uid, _ = make_client(conn, login="glink")
     c = TestClient(app)
     web_login(c, "glink@example.com", "password123")
-    assert c.get("/panel", follow_redirects=False).headers["location"] == "/panel/telegram"   # нужна привязка
-    assert "Привязать Google" in c.get("/panel/telegram").text
+    assert c.get("/panel", follow_redirects=False).status_code == 200   # кабинет открыт сразу, привязка — по желанию
+    assert c.get("/panel/telegram", follow_redirects=False).headers["location"] == "/panel"
     _google(monkeypatch, {"sub": "g10", "email": "other.mail@gmail.com", "email_verified": True, "name": "G"})
     r = _login(c, "?link=1")
     assert r.headers["location"] == "/panel"
