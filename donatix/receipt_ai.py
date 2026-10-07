@@ -340,6 +340,8 @@ def summary(d: dict[str, Any] | None, pay_amount: Any = None, pay_currency: str 
             line += f"\n🚨 Получатель в чеке ({d['recipient']}) НЕ наши реквизиты"
         elif rm is True:
             line += "\n✅ Получатель — наши реквизиты"
+        elif d.get("recipient_ok") == "no":
+            line += f"\n⚠️ Получатель «{d['recipient']}» не похож на наши реквизиты — проверьте, ваш ли это"
     elif d.get("recipient_ok") == "no":
         line += "\n🚨 Получатель в чеке не похож на наши реквизиты"
     problem = time_problem(d, created_at)
