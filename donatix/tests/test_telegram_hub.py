@@ -52,7 +52,7 @@ def test_popular_in_menu_and_home(client, conn):
     web_login(client, "shop1@example.com", "password123")
     assert "Популярное" in client.get("/panel").text
     home = client.get("/").text
-    assert "Популярное" in home and "Конструктор ботов" in home and "Что такое конструктор ботов?" in home
+    assert "Выберите игру" in home and "Свой бот-магазин" in home and "Что такое конструктор ботов?" in home
 
 
 def test_popular_pins_free_fire_regions_first(conn):

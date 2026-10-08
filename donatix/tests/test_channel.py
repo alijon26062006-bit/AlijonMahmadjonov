@@ -8,7 +8,7 @@ CH = "https://t.me/+NdkoYArkuCw4NzBi"
 
 def test_channel_everywhere_on_site(client, conn):
     home = client.get("/").text
-    assert 'id="channel"' in home and "Уроки, акции и новости" in home
+    assert 'id="channel"' in home and "Наш Telegram-канал" in home
     assert home.count(f'href="{CH}"') >= 4          # шапка, баннер, подвал, плавающая кнопка
     assert 'class="tg-fab"' in client.get("/terms").text
     make_client(conn)

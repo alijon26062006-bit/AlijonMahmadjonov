@@ -16,7 +16,8 @@ def test_guest_sees_catalog_and_prices(app, conn):
     assert buy.status_code == 200
     assert "Зарегистрироваться и купить" not in buy.text and " с.</span>" in buy.text   # цена в сомони, купить сразу
     assert guest.get("/panel/catalog?kind=telegram").status_code == 200
-    assert "Каталог и цены" in guest.get("/").text
+    home = guest.get("/").text
+    assert "Выберите игру" in home and "Без регистрации" in home
 
 
 def test_guest_buys_without_registration(app, config, conn, monkeypatch):

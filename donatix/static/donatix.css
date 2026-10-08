@@ -1920,3 +1920,32 @@ body.rcc-open { overflow: hidden; }
   background: color-mix(in srgb, var(--warn, #f59e0b) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn, #f59e0b) 35%, var(--line)); }
 .save-acc .grow b { display: block; }
 .save-acc .grow span { display: block; color: var(--muted); font-size: .85rem; }
+
+/* ── Главная для игрока: как купить, канал, блок для бизнеса ── */
+.how-buy { display: grid; gap: 10px; align-self: center; }
+.hb-step { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 18px; background: var(--surface);
+  border: 1px solid var(--line); box-shadow: var(--shadow-1); }
+.hb-step b { display: block; font-size: 1.02rem; }
+.hb-step span:not(.hb-n) { display: block; color: var(--muted); font-size: .88rem; }
+.hb-n { flex: none; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-weight: 800;
+  color: #fff; background: var(--accent); }
+.tg-strip { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 20px; text-decoration: none; color: var(--text);
+  background: linear-gradient(135deg, color-mix(in srgb, #229ed9 12%, var(--surface)), var(--surface)); border: 1px solid var(--line); }
+.tg-strip:hover { text-decoration: none; }
+.tg-strip .grow b { display: block; }
+.tg-strip .grow span { display: block; color: var(--muted); font-size: .88rem; }
+.biz-card { padding: 24px; }
+.biz-card h2 { margin: 10px 0 6px; }
+.biz-card .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+@media (max-width: 640px) {
+  .how-buy { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .hb-step { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; border-radius: 16px; }
+  .hb-step span:not(.hb-n) { display: none; }
+  .hb-step b { font-size: .9rem; }
+  .hb-n { width: 30px; height: 30px; border-radius: 10px; font-size: .9rem; }
+  #catalog .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  #catalog .catalog-link { padding: 14px; }
+  #catalog .catalog-link h3 { font-size: .95rem; margin-top: 10px; }
+  #catalog .catalog-link .chips { display: none; }
+  #catalog .catalog-go { font-size: .82rem; }
+}
