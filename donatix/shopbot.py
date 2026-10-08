@@ -38,6 +38,8 @@ PAGE = 8                      # кнопок-игр на странице
 PACKS = 24                    # пакетов на странице
 MSG_LIMIT = (30, 10)          # не больше 30 действий за 10 секунд
 WATCH_EVERY = 4               # как часто проверять статусы заказов и пополнений, сек
+POLL_SECONDS = 25             # долгий опрос Telegram: новое сообщение приходит сразу, без пустых запросов
+HANDLERS = 8                  # сколько покупателей обслуживаем одновременно
 FINAL = ("completed", "failed", "cancelled", "refunded")
 
 GROUPS = {   # раздел меню → виды товаров
@@ -644,14 +646,56 @@ class ShopBot:
         self._subbed: dict[int, float] = {}   # tg_id → когда последний раз видели подписку
         self.login_wait: dict[int, str] = {}  # вход на сайт: ждём номер телефона (tg_id → токен)
         self.bot_id: int | None = None
+        self._local = threading.local()
+        self._chat_locks: dict[int, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
 
     # цикл
     def start(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+        # Сообщения разных покупателей — параллельно: пока один ждёт проверку чека (ИИ) или ответ
+        # поставщика, остальные не стоят в очереди. Сообщения одного покупателя — строго по порядку.
+        self._pool = ThreadPoolExecutor(max_workers=HANDLERS, thread_name_prefix="donatix-shop")
         self._thread = threading.Thread(target=self._run, name="donatix-shopbot", daemon=True)
         self._thread.start()
+        threading.Thread(target=self._watch_loop, name="donatix-shop-watch", daemon=True).start()
 
     def stop(self) -> None:
         self._stop.set()
+        pool = getattr(self, "_pool", None)
+        if pool is not None:
+            pool.shutdown(wait=False, cancel_futures=True)
+
+    def _thread_conn(self) -> sqlite3.Connection:
+        """Своё соединение с базой у каждого потока-обработчика."""
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = self._local.conn = db.connect(self.config.db_path)
+        elif conn.in_transaction:   # незакрытая транзакция держит старый снимок базы
+            conn.execute("ROLLBACK")
+        return conn
+
+    def _process(self, upd: dict[str, Any]) -> None:
+        chat = ((upd.get("callback_query") or {}).get("message") or upd.get("message") or {}).get("chat") or {}
+        with self._locks_guard:
+            lock = self._chat_locks.setdefault(int(chat.get("id") or 0), threading.Lock())
+        with lock:
+            try:
+                self.handle(self._thread_conn(), upd)
+            except Exception:
+                log.exception("бот-магазин: обработка %s", upd.get("update_id"))
+
+    def _watch_loop(self) -> None:
+        """Статусы заказов и пополнений — в своём потоке: не ждут сообщений и не задерживают их."""
+        conn = db.connect(self.config.db_path)
+        try:
+            while not self._stop.wait(WATCH_EVERY):
+                try:
+                    self.watch(conn, force=True)
+                except Exception:
+                    log.exception("бот-магазин: статусы")
+        finally:
+            conn.close()
 
     def _run(self) -> None:
         conn = db.connect(self.config.db_path)
@@ -672,7 +716,7 @@ class ShopBot:
         try:
             while not self._stop.is_set():
                 try:
-                    updates = self.api("getUpdates", offset=offset, timeout=WATCH_EVERY,
+                    updates = self.api("getUpdates", offset=offset, timeout=POLL_SECONDS,
                                        allowed_updates=["message", "callback_query"]) or []
                 except Exception as exc:
                     log.warning("бот-магазин: %s", exc)
@@ -680,16 +724,9 @@ class ShopBot:
                     continue
                 for upd in updates:
                     offset = max(offset, int(upd["update_id"]) + 1)
-                    try:
-                        self.handle(conn, upd)
-                    except Exception:
-                        log.exception("бот-магазин: обработка %s", upd.get("update_id"))
+                    self._pool.submit(self._process, upd)
                 if updates:
                     db.set_setting(conn, "shop.tg_offset", str(offset))
-                try:
-                    self.watch(conn)
-                except Exception:
-                    log.exception("бот-магазин: статусы")
         finally:
             conn.close()
 

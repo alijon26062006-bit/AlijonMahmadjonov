@@ -434,3 +434,33 @@ def test_kopeck_shortfall_from_somoni_rounding_is_covered(app, config, conn, sup
                         (uid,)).fetchone()["note"] == "Округление курса сомони"
     assert orders.rounding_gap(0, 500, "shopbot") == 0                       # настоящая нехватка — нет
     assert orders.rounding_gap(total - 3, total, "api") == 0                 # API партнёров — в долларах, без этого
+
+
+def test_buyers_are_served_in_parallel_but_each_in_order(config, supplier, monkeypatch):
+    """Один покупатель ждёт проверку чека (медленно) — другие в это время получают ответ сразу.
+    Сообщения одного покупателя — строго по очереди."""
+    import threading
+    import time as _time
+    from concurrent.futures import ThreadPoolExecutor
+    bot = shopbot.ShopBot(config, supplier, api=FakeApi())
+    bot._pool = ThreadPoolExecutor(max_workers=4)
+    done: list[tuple[int, str]] = []
+    slow_started = threading.Event()
+
+    def handle(conn, upd):
+        chat, text = upd["message"]["chat"]["id"], upd["message"]["text"]
+        if text == "slow":
+            slow_started.set()
+            _time.sleep(0.6)
+        done.append((chat, text))
+
+    monkeypatch.setattr(bot, "handle", handle)
+    up = lambda chat, text: {"update_id": 1, "message": {"chat": {"id": chat, "type": "private"}, "text": text}}
+    jobs = [bot._pool.submit(bot._process, up(1, "slow")), bot._pool.submit(bot._process, up(1, "after"))]
+    slow_started.wait(2)
+    jobs.append(bot._pool.submit(bot._process, up(2, "fast")))
+    for j in jobs:
+        j.result(timeout=5)
+    assert done.index((2, "fast")) < done.index((1, "slow"))          # второй не ждал первого
+    assert done.index((1, "slow")) < done.index((1, "after"))         # у одного — по порядку
+    bot._pool.shutdown()
