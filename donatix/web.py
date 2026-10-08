@@ -1518,15 +1518,32 @@ def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_u
 
 
 @router.get("/panel/support")
-def panel_support(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
-                  config: Config = Depends(get_config)):
-    """Поддержка — только тикетами: мои обращения и новое обращение."""
-    from . import tickets
+def panel_support(request: Request, user=Depends(viewer), conn=Depends(get_conn)):
+    """Поддержка как у FazerCards: поиск по базе знаний, разделы, мои заявки, «+ Новая заявка»."""
+    from . import support_kb, tickets
+    items = [] if isinstance(user, Guest) else tickets.listing(conn, user["id"])
+    return render(request, "panel/support.html", {
+        "user": user, "items": items, "statuses": tickets.STATUS, "topics": support_kb.TOPICS,
+        "topic_titles": support_kb.TOPIC_TITLES, "kb": support_kb.KB, "kb_index": support_kb.kb_index()})
+
+
+@router.get("/panel/support/kb/{slug}")
+def panel_support_kb(slug: str, request: Request, user=Depends(viewer)):
+    from . import support_kb
+    section = support_kb.kb_section(slug)
+    if section is None:
+        return _redirect("/panel/support")
+    return render(request, "panel/support_kb.html", {"user": user, "s": section})
+
+
+@router.get("/panel/support/new")
+def panel_support_new_form(request: Request, topic: str = "other", user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import support_kb
+    t = next((x for x in support_kb.TOPICS if x[0] == topic), support_kb.TOPICS[-1])
     recent = conn.execute("SELECT public_id, product_name FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 10",
                           (user["id"],)).fetchall()
-    return render(request, "panel/support.html", {
-        "user": user, "items": tickets.listing(conn, user["id"]), "topics": tickets.TOPICS,
-        "statuses": tickets.STATUS, "recent": recent, "pre_order": request.query_params.get("order", "")[:40]})
+    return render(request, "panel/support_new.html", {
+        "user": user, "t": t, "recent": recent, "pre_order": request.query_params.get("order", "")[:40]})
 
 
 @router.post("/panel/support", dependencies=[Depends(check_csrf)])
@@ -1539,8 +1556,8 @@ def panel_support_new(request: Request, subject: str = Form(""), topic: str = Fo
         tid = tickets.create(conn, config, user["id"], subject, topic, order_ref, text, data)
     except tickets.TicketError as exc:
         flash(request, str(exc), "error")
-        return _redirect("/panel/support")
-    flash(request, f"Обращение #{tid} отправлено. Ответ придёт сюда и уведомлением — обычно в течение часа.")
+        return _redirect(f"/panel/support/new?topic={topic}")
+    flash(request, f"Заявка #{tid} отправлена. Ответ придёт сюда и уведомлением — обычно в течение часа.")
     return _redirect(f"/panel/support/{tid}")
 
 

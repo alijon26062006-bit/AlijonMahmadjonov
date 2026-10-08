@@ -19,7 +19,7 @@ from .config import Config
 
 log = logging.getLogger(__name__)
 
-TOPICS = {"order": "Заказ", "payment": "Пополнение", "account": "Аккаунт", "other": "Другое"}
+from .support_kb import TOPIC_TITLES as TOPICS  # noqa: E402 — темы и тексты в одном месте
 STATUS = {"open": "Ждёт ответа", "answered": "Есть ответ", "closed": "Закрыт"}
 MAX_TEXT = 3000
 MAX_FILE = 5 * 1024 * 1024
@@ -239,14 +239,17 @@ def app_url(config: Config, ticket_id: int | None = None) -> str:
 def alert_admin(conn: sqlite3.Connection, config: Config, ticket_id: int, new: bool = False) -> None:
     """Админу в бот поддержки: сообщение с кнопкой «📂 Открыть» — открывается мини-приложение с перепиской."""
     text = alert_text(conn, config, ticket_id, new)
+    t = get(conn, ticket_id)
+    reply_to = t["admin_msg"] if t is not None and "admin_msg" in t.keys() else None
     import threading   # Telegram отвечает не мгновенно — клиент не ждёт, его сообщение уже сохранено
-    threading.Thread(target=_deliver, args=(config, ticket_id, text), daemon=True).start()
+    threading.Thread(target=_deliver, args=(config, ticket_id, text, reply_to), daemon=True).start()
 
 
 _menu_set: set[str] = set()
 
 
-def _deliver(config: Config, ticket_id: int, text: str) -> None:
+def _deliver(config: Config, ticket_id: int, text: str, reply_to: int | None = None) -> None:
+    """Каждый человек — своя ветка: первое сообщение тикета, следующие приходят ответом (reply) на него."""
     chat = admin_chat(config)
     try:
         if config.support_bot_token and chat:
@@ -259,9 +262,18 @@ def _deliver(config: Config, ticket_id: int, text: str) -> None:
                     _menu_set.add(chat)
                 except Exception as exc:  # noqa: BLE001
                     log.warning("тикеты: кнопка меню не поставлена: %s", exc)
-            api("sendMessage", chat_id=chat, text=text, parse_mode="HTML", disable_web_page_preview=True,
-                reply_markup={"inline_keyboard": [[{"text": "💬 Открыть чат",
-                                                    "web_app": {"url": app_url(config, ticket_id)}}]]})
+            markup = {"inline_keyboard": [[{"text": "💬 Открыть чат", "web_app": {"url": app_url(config, ticket_id)}}]]}
+            extra = ({"reply_parameters": {"message_id": reply_to, "allow_sending_without_reply": True}}
+                     if reply_to else {})
+            sent = api("sendMessage", chat_id=chat, text=text, parse_mode="HTML", disable_web_page_preview=True,
+                       reply_markup=markup, **extra) or {}
+            if not reply_to and sent.get("message_id"):
+                c = db.connect(config.db_path)
+                try:
+                    c.execute("UPDATE tickets SET admin_msg = ? WHERE id = ? AND admin_msg IS NULL",
+                              (sent["message_id"], ticket_id))
+                finally:
+                    c.close()
             return
         from .worker import notify_admin   # бот поддержки не подключён — хотя бы сообщение в админ-бот
         notify_admin(config, text + "\n\n⚠️ Бот поддержки не подключён (DONATIX_SUPPORT_BOT_TOKEN) — отвечать "

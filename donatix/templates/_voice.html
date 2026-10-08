@@ -1,10 +1,10 @@
 {# Кнопка «🎤»: записывает голосовое в браузере и кладёт его в поле файла формы (input[name=file]), потом отправляет форму. #}
-<button type="button" class="btn sm tk-mic" data-voice title="Голосовое сообщение">🎤</button>
+{% from "_icons.html" import icon %}<button type="button" class="btn tk-mic" data-voice title="Голосовое сообщение" aria-label="Записать голосовое">{{ icon('mic', 20) }}</button>
 <script>
 (function () {
   var btn = document.currentScript.previousElementSibling, form = btn.closest("form");
   if (!navigator.mediaDevices || !window.MediaRecorder) { btn.hidden = true; return; }
-  var rec = null, chunks = [], started = 0, tick = null;
+  var rec = null, chunks = [], started = 0, tick = null, icon = btn.innerHTML;
   btn.addEventListener("click", function () {
     if (rec) { rec.stop(); return; }
     navigator.mediaDevices.getUserMedia({audio: true}).then(function (stream) {
@@ -12,7 +12,7 @@
       rec.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
       rec.onstop = function () {
         stream.getTracks().forEach(function (t) { t.stop(); });
-        clearInterval(tick); btn.classList.remove("rec"); btn.textContent = "🎤";
+        clearInterval(tick); btn.classList.remove("rec"); btn.innerHTML = icon;
         var type = rec.mimeType || "audio/webm", blob = new Blob(chunks, {type: type}); rec = null;
         if (Date.now() - started < 800 || !blob.size) return;     // случайное нажатие — не отправляем
         var input = form.querySelector('input[name="file"]'), dt = new DataTransfer();

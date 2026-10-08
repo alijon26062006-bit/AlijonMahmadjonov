@@ -1,56 +1,91 @@
 {% extends "panel/_layout.html" %}
-{% from "_icons.html" import icon, tg_logo %}
+{% from "_icons.html" import icon %}
 {% block title %}Поддержка — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="fc-hero"><h1>Поддержка</h1><p>Опишите проблему — ответим здесь и уведомлением, обычно в течение часа.</p></section>
+<section class="sp-hero">
+  <h1>Чем мы можем помочь?</h1>
+  <p>Найдите ответ в базе знаний или создайте заявку — мы на связи</p>
+  <label class="sp-search">{{ icon('search', 22) }}
+    <input id="kb-q" type="search" placeholder="Поиск по базе знаний: «пополнение не пришло»" autocomplete="off" aria-label="Поиск по базе знаний"></label>
+  <div class="sp-results" id="kb-results" hidden></div>
+</section>
 
+<h2 class="sp-h">База знаний</h2>
+<div class="sp-cards">
+  {% for slug, ico, color, title, sub, items in kb %}
+  <a class="sp-card" href="/panel/support/kb/{{ slug }}">
+    <span class="sp-ico c-{{ color }}">{{ icon(ico, 24) }}</span>
+    <b>{{ title }}</b><span>{{ sub }}</span>
+  </a>
+  {% endfor %}
+</div>
+
+<h2 class="sp-h">Ваши заявки</h2>
+<button type="button" class="btn primary lg block sp-new" data-sheet-open>{{ icon('plus', 22) }}Новая заявка</button>
 {% if items %}
-<div class="fc-box" style="margin-bottom:14px">
-  <div class="list fc-list">
-    {% for t in items %}
-    <a class="item tk-row {{ 'closed' if t.status == 'closed' }}" href="/panel/support/{{ t.id }}">
-      <span class="tk-ico {{ t.status }}">{{ '✅' if t.status == 'closed' else ('💬' if t.status == 'answered' else '⏳') }}</span>
-      <div class="grow">
-        <div class="head"><span class="title">#{{ t.id }} · {{ t.subject }}</span>{% if t.new_for_client %}<span class="badge accent">новый ответ</span>{% endif %}</div>
-        <div class="sub oc-line">{{ statuses[t.status] }} · {{ t.updated_at | dt }}{% if t.last_text %} · {{ t.last_text[:60] }}{% endif %}</div>
-      </div>
-    </a>
-    {% endfor %}
-  </div>
+<div class="sp-tickets">
+  {% for t in items %}
+  <a class="sp-ticket" href="/panel/support/{{ t.id }}">
+    <div class="grow">
+      <small>{{ t.updated_at | dt('%d.%m.%Y') }}</small>
+      <b>{{ t.subject }}</b>
+      <code>#{{ t.id }}</code>
+    </div>
+    {% if t.new_for_client %}<span class="sp-pill new">Новый ответ</span>
+    {% else %}<span class="sp-pill {{ t.status }}">{{ {'open': 'Ожидает ответа', 'answered': 'Есть ответ', 'closed': 'Закрыт'}[t.status] }}</span>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="sp-empty">
+  <span class="sp-empty-ico">{{ icon('chat', 30) }}</span>
+  <b>У вас пока нет заявок</b>
+  <p>Если возник вопрос — создайте заявку, мы разберёмся и ответим прямо здесь.</p>
+  <button type="button" class="btn primary lg" data-sheet-open>Создать первую заявку</button>
 </div>
 {% endif %}
 
-<form class="card tk-new" method="post" action="/panel/support" enctype="multipart/form-data" id="tk-new">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h3 style="margin-top:0">{{ 'Новое обращение' if items else 'Открыть обращение' }}</h3>
-  <div class="fc-selects">
-    <div><label class="label-caps" for="topic">О чём</label>
-      <select id="topic" name="topic">{% for k, v in topics.items() %}<option value="{{ k }}" {{ 'selected' if (pre_order and k == 'order') }}>{{ v }}</option>{% endfor %}</select></div>
-    <div><label class="label-caps" for="order_ref">Номер заказа</label>
-      <input id="order_ref" name="order_ref" list="my-orders" value="{{ pre_order }}" placeholder="dx-123 или #45" autocomplete="off">
-      <datalist id="my-orders">{% for o in recent %}<option value="{{ o.public_id }}">{{ o.product_name }}</option>{% endfor %}</datalist></div>
+<div class="sheet" id="topic-sheet" hidden>
+  <div class="sheet-back" data-sheet-close></div>
+  <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="sheet-head"><h3 id="sheet-title">С чем нужна помощь?</h3>
+      <button type="button" class="sheet-x" data-sheet-close aria-label="Закрыть">{{ icon('x', 26) }}</button></div>
+    <div class="sheet-list">
+      {% for key, ico, color, title, sub, need_order in topics %}
+      <a class="sp-topic" href="{{ ('/panel/support/new?topic=' ~ key) if not user.guest else ('/login?next=' ~ ('/panel/support/new?topic=' ~ key) | urlencode) }}">
+        <span class="sp-ico sm">{{ icon(ico, 22) }}</span>
+        <span class="grow"><b>{{ title }}</b><small>{{ sub }}</small></span>
+        {{ icon('chevron', 20, 'sp-chev') }}
+      </a>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn lg block sheet-cancel" data-sheet-close>Отмена</button>
   </div>
-  <label for="subject">Тема</label>
-  <input id="subject" name="subject" maxlength="120" placeholder="Например: алмазы не пришли">
-  <label for="text">Сообщение</label>
-  <textarea id="text" name="text" rows="5" maxlength="3000" required placeholder="Что случилось? Укажите ID игрока, сумму, время — так ответим быстрее."></textarea>
-  <label class="file-drop" for="file" style="margin-top:10px">
-    <input id="file" name="file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
-    <span class="fd-ico">📎</span><span class="fd-text"><b>Приложить скриншот или чек</b><small>необязательно · JPG, PNG или PDF</small></span>
-  </label>
-  <button class="btn primary lg block" style="margin-top:14px">Отправить обращение</button>
-</form>
+</div>
 
 <script>
-  (function () {
-    var f = document.getElementById("file"); if (!f) return;
-    f.addEventListener("change", function () {
-      var drop = f.closest(".file-drop"), x = f.files && f.files[0];
-      drop.classList.toggle("has-file", !!x);
-      drop.querySelector(".fd-ico").textContent = x ? "✅" : "📎";
-      drop.querySelector(".fd-text b").textContent = x ? "Скриншот приложен" : "Приложить скриншот";
-      drop.querySelector(".fd-text small").textContent = x ? x.name : "необязательно · JPG, PNG или PDF";
-    });
-  })();
+(function () {
+  var sheet = document.getElementById("topic-sheet");
+  function open() { sheet.hidden = false; requestAnimationFrame(function () { sheet.classList.add("on"); }); document.body.style.overflow = "hidden"; }
+  function close() { sheet.classList.remove("on"); document.body.style.overflow = ""; setTimeout(function () { sheet.hidden = true; }, 220); }
+  document.querySelectorAll("[data-sheet-open]").forEach(function (b) { b.addEventListener("click", open); });
+  sheet.querySelectorAll("[data-sheet-close]").forEach(function (b) { b.addEventListener("click", close); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !sheet.hidden) close(); });
+  if (location.hash === "#new") open();
+
+  var KB = {{ kb_index | tojson }}, q = document.getElementById("kb-q"), box = document.getElementById("kb-results");
+  function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+  q.addEventListener("input", function () {
+    var words = q.value.toLowerCase().split(/\s+/).filter(function (w) { return w.length > 1; });
+    if (!words.length) { box.hidden = true; return; }
+    var hits = KB.filter(function (a) { var t = (a.q + " " + a.a + " " + a.title).toLowerCase();
+      return words.every(function (w) { return t.indexOf(w.slice(0, Math.max(3, w.length - 2))) >= 0; }); }).slice(0, 6);
+    box.innerHTML = hits.length ? hits.map(function (a) {
+      return '<a class="sp-hit" href="/panel/support/kb/' + a.section + '#' + encodeURIComponent(a.q) + '"><b>' + esc(a.q) + '</b><span>' + esc(a.a.slice(0, 110)) + '…</span></a>'; }).join("")
+      : '<div class="sp-hit none">Ничего не нашли — <a href="#" data-new>создайте заявку</a>, ответим.</div>';
+    box.hidden = false;
+    var n = box.querySelector("[data-new]"); if (n) n.addEventListener("click", function (e) { e.preventDefault(); open(); });
+  });
+})();
 </script>
 {% endblock %}

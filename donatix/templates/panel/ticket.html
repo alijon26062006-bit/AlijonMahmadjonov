@@ -1,8 +1,9 @@
 {% extends "panel/_layout.html" %}
 {% block title %}Обращение #{{ t.id }} — {{ site_name }}{% endblock %}
+{% from "_icons.html" import icon %}
 {% block content %}
 <section class="page-hero">
-  <a class="back" href="/panel/support">← Все обращения</a>
+  <a class="sp-back" href="/panel/support">{{ icon('arrow-left', 18) }}Все заявки</a>
   <h1>#{{ t.id }} · {{ t.subject }}</h1>
   <p>{{ topics.get(t.topic, '') }}{% if t.order_ref %} · {{ t.order_ref }}{% endif %} · <b>{{ statuses[t.status] }}</b></p>
 </section>
@@ -13,10 +14,10 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <textarea name="text" rows="2" maxlength="3000" placeholder="{{ 'Напишите — обращение откроется снова' if t.status == 'closed' else 'Ваше сообщение…' }}"></textarea>
     <div class="tk-reply-row">
-      <label class="btn sm" title="Скриншот или чек">📎<input type="file" name="file" accept="image/jpeg,image/png,image/webp,application/pdf,audio/*" hidden></label>
+      <label class="btn tk-mic" title="Скриншот или чек" aria-label="Приложить файл">{{ icon('clip', 20) }}<input type="file" name="file" accept="image/jpeg,image/png,image/webp,application/pdf,audio/*" hidden></label>
       {% include "_voice.html" %}
       <button class="btn primary">Отправить</button>
-      {% if t.status != 'closed' %}<button class="btn sm" name="action" value="close" formnovalidate style="margin-left:auto">✅ Проблема решена</button>{% endif %}
+      {% if t.status != 'closed' %}<button class="btn sm" name="action" value="close" formnovalidate style="margin-left:auto">{{ icon('check', 16) }}Проблема решена</button>{% endif %}
     </div>
   </form>
 </div>

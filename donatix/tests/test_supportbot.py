@@ -81,7 +81,7 @@ def test_cabinet_support_page_is_only_tickets(client, conn):
     db.set_setting(conn, "support.bot_username", "donatix_help_bot")
     web_login(client, "shop1@example.com", "password123")
     page = client.get("/panel/support").text
-    assert "Открыть обращение" in page and "t.me/donatix_help_bot" not in page and "DX-" not in page
+    assert "Новая заявка" in page and "t.me/donatix_help_bot" not in page and "DX-" not in page
 
 
 def test_email_code_via_notifications(client, conn, config):

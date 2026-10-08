@@ -1,0 +1,23 @@
+{% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ s.title }} — поддержка {{ site_name }}{% endblock %}
+{% block content %}
+<a class="sp-back" href="/panel/support">{{ icon('arrow-left', 18) }}Поддержка</a>
+<section class="sp-kb-head">
+  <span class="sp-ico c-{{ s.color }}">{{ icon(s.icon, 24) }}</span>
+  <div><h1>{{ s.title }}</h1><p>{{ s.sub }}</p></div>
+</section>
+<div class="sp-faq">
+  {% for q, a in s.faq %}
+  <details class="sp-q" id="{{ q }}"><summary>{{ q }}{{ icon('chevron', 18, 'sp-chev') }}</summary><p>{{ a }}</p></details>
+  {% endfor %}
+</div>
+<div class="sp-empty" style="margin-top:18px">
+  <b>Не нашли ответ?</b>
+  <p>Создайте заявку — разберёмся и ответим прямо в ней.</p>
+  <a class="btn primary lg" href="/panel/support#new">Создать заявку</a>
+</div>
+<script>
+  (function () { var id = decodeURIComponent(location.hash.slice(1)); var d = id && document.getElementById(id); if (d) { d.open = true; d.scrollIntoView({block: "center"}); } })();
+</script>
+{% endblock %}

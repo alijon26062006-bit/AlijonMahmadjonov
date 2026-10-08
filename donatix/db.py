@@ -433,6 +433,9 @@ def init(path: Path | str) -> None:
                     continue
                 if fp2:
                     conn.execute("UPDATE payments SET receipt_fp2 = ? WHERE id = ?", (fp2, r["id"]))
+        tk_cols = {r[1] for r in conn.execute("PRAGMA table_info(tickets)")}
+        if tk_cols and "admin_msg" not in tk_cols:   # первое сообщение тикета у админа — остальные ответом на него
+            conn.execute("ALTER TABLE tickets ADD COLUMN admin_msg INTEGER")
         for col in ("intent", "intent_order"):   # покупка без регистрации: что купить после оплаты и какой заказ вышел
             if col not in pay_cols:
                 conn.execute(f"ALTER TABLE payments ADD COLUMN {col} TEXT")
@@ -528,7 +531,8 @@ CREATE TABLE IF NOT EXISTS tickets (            -- поддержка на са�
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL,
     client_seen_at  TEXT,
-    admin_seen_at   TEXT
+    admin_seen_at   TEXT,
+    admin_msg       INTEGER                          -- сообщение о тикете в боте поддержки: ветка одного человека
 );
 CREATE INDEX IF NOT EXISTS tickets_user ON tickets(user_id, id);
 CREATE INDEX IF NOT EXISTS tickets_status ON tickets(status, updated_at);

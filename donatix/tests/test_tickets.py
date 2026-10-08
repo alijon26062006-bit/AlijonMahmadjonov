@@ -37,7 +37,7 @@ def test_client_ticket_admin_answers_in_mini_app(app, config, conn, monkeypatch)
     c = TestClient(app)
     web_login(c, "shop1@example.com", "password123")
     page = c.get("/panel/support").text
-    assert "Открыть обращение" in page
+    assert "Новая заявка" in page
     r = c.post("/panel/support", data={"csrf": csrf_of(page), "topic": "order", "order_ref": "dx-77",
                                       "subject": "Алмазы не пришли", "text": "ID 123456789, оплатил в 14:00"},
                files={"file": ("s.png", RECEIPT_PNG, "image/png")})
@@ -230,4 +230,42 @@ def test_support_buttons_lead_to_tickets_not_telegram(app, config, conn, monkeyp
     assert guest.post("/support-app/me/login", json={"init": _init(str(TG), token="1:wrong")}).status_code == 403
     r = guest.post("/support-app/me/login", json={"init": _init(str(TG), token="777:shop-token")})
     assert r.json()["next"] == "/panel/support"
-    assert "Открыть обращение" in guest.get("/panel/support").text
+    assert "Новая заявка" in guest.get("/panel/support").text
+
+
+def test_support_page_like_fazercards_and_thread_per_person(app, config, conn, monkeypatch):
+    """Поиск и база знаний, «С чем нужна помощь?» → форма по теме; в боте у каждого тикета своя ветка."""
+    _setup(config)
+    make_client(conn)
+    c = TestClient(app)
+    web_login(c, "shop1@example.com", "password123")
+    page = c.get("/panel/support").text
+    for text in ("Чем мы можем помочь?", "База знаний", "Платежи и баланс", "Ваши заявки", "У вас пока нет заявок",
+                 "С чем нужна помощь?", "Пополнение не зачислилось", "/panel/support/new?topic=order_missing"):
+        assert text in page, text
+    assert "Сколько ждать зачисления?" in c.get("/panel/support/kb/payments").text
+    form = c.get("/panel/support/new?topic=order_missing").text
+    assert "Алмазы или товар не пришли" in form and 'name="order_ref"' in form
+    assert 'name="order_ref"' not in c.get("/panel/support/new?topic=account").text
+
+    calls = []
+
+    class Api:
+        def __init__(self, token):
+            pass
+
+        def __call__(self, method, **p):
+            calls.append((method, p))
+            return {"message_id": 900 + len(calls)} if method == "sendMessage" else {}
+
+    monkeypatch.setattr("donatix.tgbot.TelegramApi", Api)
+    threads = []
+    monkeypatch.setattr("threading.Thread", lambda target, args, daemon: threads.append((target, args)) or
+                        type("T", (), {"start": lambda self: target(*args)})())
+    r = c.post("/panel/support", data={"csrf": csrf_of(form), "topic": "order_missing", "subject": "x",
+                                       "order_ref": "dx-5", "text": "Не пришли"})
+    first = [p for m, p in calls if m == "sendMessage"][-1]
+    assert "reply_parameters" not in first and tickets.get(conn, 1)["admin_msg"]
+    c.post("/panel/support/1", data={"csrf": csrf_of(r.text), "text": "Ещё жду"})
+    second = [p for m, p in calls if m == "sendMessage"][-1]
+    assert second["reply_parameters"]["message_id"] == tickets.get(conn, 1)["admin_msg"]   # та же ветка

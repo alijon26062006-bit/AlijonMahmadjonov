@@ -1,0 +1,45 @@
+{% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% set key, ico, color, title, sub, need_order = t %}
+{% block title %}Новая заявка — {{ site_name }}{% endblock %}
+{% block content %}
+<a class="sp-back" href="/panel/support">{{ icon('arrow-left', 18) }}Поддержка</a>
+<section class="sp-kb-head">
+  <span class="sp-ico c-{{ color }}">{{ icon(ico, 24) }}</span>
+  <div><h1>{{ title }}</h1><p>{{ sub }}</p></div>
+</section>
+<form class="sp-form" method="post" action="/panel/support" enctype="multipart/form-data">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="topic" value="{{ key }}">
+  <input type="hidden" name="subject" value="{{ title }}">
+  {% if need_order %}
+  <label for="order_ref">Номер заказа</label>
+  <input id="order_ref" name="order_ref" list="my-orders" value="{{ pre_order }}" placeholder="Например, dx-1042" autocomplete="off">
+  <datalist id="my-orders">{% for o in recent %}<option value="{{ o.public_id }}">{{ o.product_name }}</option>{% endfor %}</datalist>
+  {% if recent %}<div class="sp-chips">{% for o in recent[:4] %}<button type="button" class="sp-chip" data-order="{{ o.public_id }}">{{ o.public_id }}</button>{% endfor %}</div>{% endif %}
+  {% endif %}
+  <label for="text">Опишите проблему</label>
+  <textarea id="text" name="text" rows="6" maxlength="3000" required placeholder="Что случилось? Укажите ID игрока, сумму и время — так ответим быстрее."></textarea>
+  <label class="file-drop" for="file">
+    <input id="file" name="file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,audio/*">
+    <span class="fd-ico">{{ icon('clip', 22) }}</span><span class="fd-text"><b>Приложить скриншот или чек</b><small>необязательно · JPG, PNG, PDF</small></span>
+  </label>
+  <div class="sp-actions">
+    <button class="btn primary lg grow">Отправить заявку</button>
+    {% include "_voice.html" %}
+  </div>
+  <p class="hint">Ответим здесь и пришлём уведомление — обычно в течение часа.</p>
+</form>
+<script>
+  (function () {
+    document.querySelectorAll("[data-order]").forEach(function (b) { b.onclick = function () { document.getElementById("order_ref").value = b.dataset.order; }; });
+    var f = document.getElementById("file");
+    f.addEventListener("change", function () {
+      var drop = f.closest(".file-drop"), x = f.files && f.files[0];
+      drop.classList.toggle("has-file", !!x);
+      drop.querySelector(".fd-text b").textContent = x ? "Файл приложен" : "Приложить скриншот или чек";
+      drop.querySelector(".fd-text small").textContent = x ? x.name : "необязательно · JPG, PNG, PDF";
+    });
+  })();
+</script>
+{% endblock %}
