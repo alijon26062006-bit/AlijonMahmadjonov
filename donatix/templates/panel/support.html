@@ -5,7 +5,7 @@
 <section class="sp-hero">
   <h1>Чем мы можем помочь?</h1>
   <p>Найдите ответ в базе знаний или создайте заявку — мы на связи</p>
-  <label class="sp-search">{{ icon('search', 22) }}
+  <label class="sp-search">{{ icon('search', 18) }}
     <input id="kb-q" type="search" placeholder="Поиск по базе знаний: «пополнение не пришло»" autocomplete="off" aria-label="Поиск по базе знаний"></label>
   <div class="sp-results" id="kb-results" hidden></div>
 </section>
@@ -14,14 +14,15 @@
 <div class="sp-cards">
   {% for slug, ico, color, title, sub, items in kb %}
   <a class="sp-card" href="/panel/support/kb/{{ slug }}">
-    <span class="sp-ico c-{{ color }}">{{ icon(ico, 24) }}</span>
-    <b>{{ title }}</b><span>{{ sub }}</span>
+    <span class="sp-ico c-{{ color }}">{{ icon(ico, 20) }}</span>
+    <span class="grow"><b>{{ title }}</b><small>{{ sub }}</small></span>
+    {{ icon('chevron', 18, 'sp-chev') }}
   </a>
   {% endfor %}
 </div>
 
 <h2 class="sp-h">Ваши заявки</h2>
-<button type="button" class="btn primary lg block sp-new" data-sheet-open>{{ icon('plus', 22) }}Новая заявка</button>
+<button type="button" class="btn primary lg block sp-new" data-sheet-open>{{ icon('plus', 18) }}Новая заявка</button>
 {% if items %}
 <div class="sp-tickets">
   {% for t in items %}
@@ -38,7 +39,7 @@
 </div>
 {% else %}
 <div class="sp-empty">
-  <span class="sp-empty-ico">{{ icon('chat', 30) }}</span>
+  <span class="sp-empty-ico">{{ icon('chat', 22) }}</span>
   <b>У вас пока нет заявок</b>
   <p>Если возник вопрос — создайте заявку, мы разберёмся и ответим прямо здесь.</p>
   <button type="button" class="btn primary lg" data-sheet-open>Создать первую заявку</button>
@@ -53,7 +54,7 @@
     <div class="sheet-list">
       {% for key, ico, color, title, sub, need_order in topics %}
       <a class="sp-topic" href="{{ ('/panel/support/new?topic=' ~ key) if not user.guest else ('/login?next=' ~ ('/panel/support/new?topic=' ~ key) | urlencode) }}">
-        <span class="sp-ico sm">{{ icon(ico, 22) }}</span>
+        <span class="sp-ico sm">{{ icon(ico, 20) }}</span>
         <span class="grow"><b>{{ title }}</b><small>{{ sub }}</small></span>
         {{ icon('chevron', 20, 'sp-chev') }}
       </a>

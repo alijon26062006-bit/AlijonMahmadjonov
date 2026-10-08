@@ -2062,3 +2062,50 @@ body.rcc-open { overflow: hidden; }
 .sp-actions { display: flex; gap: 10px; margin-top: 16px; }
 .sp-actions .grow { flex: 1; }
 .sp-actions .tk-mic { width: 52px; height: 52px; padding: 0; border-radius: 14px; }
+/* Поддержка — компактно: тонкие строки вместо больших карточек */
+.sp-hero { padding: 18px 14px 16px; margin-bottom: 12px; border-radius: 18px; }
+.sp-hero h1 { font-size: 1.35rem; }
+.sp-hero p { margin: 6px auto 12px; font-size: .9rem; }
+.sp-search { height: 44px; border-radius: 12px; padding: 0 12px; gap: 8px; box-shadow: 0 2px 10px rgba(20, 22, 40, .05); }
+.sp-search input { font-size: .95rem; }
+.sp-h { margin: 18px 2px 10px; font-size: 1.05rem; }
+.sp-cards { grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 860px) { .sp-cards { grid-template-columns: 1fr 1fr; } }
+.sp-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; box-shadow: none; }
+.sp-card:hover { transform: none; box-shadow: none; border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
+.sp-card b { margin: 0; font-size: .95rem; font-weight: 700; }
+.sp-card small { display: block; margin-top: 1px; color: var(--muted); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-card .grow { min-width: 0; }
+.sp-card .sp-chev { color: var(--muted); flex: none; }
+.sp-ico { width: 38px; height: 38px; border-radius: 11px; }
+.sp-ico.sm { width: 38px; height: 38px; border-radius: 11px; }
+.sp-new { height: 46px; border-radius: 12px; font-size: .95rem; }
+.sp-empty { padding: 20px 16px; border-radius: 16px; }
+.sp-empty-ico { width: 48px; height: 48px; border-radius: 14px; }
+.sp-empty b { margin-top: 10px; font-size: 1rem; }
+.sp-empty p { margin: 6px auto 12px; font-size: .88rem; }
+.sp-empty .btn { min-height: 42px; }
+.sp-tickets { gap: 8px; }
+.sp-ticket { padding: 10px 12px; border-radius: 14px; }
+.sp-ticket b { font-size: .92rem; margin: 1px 0 2px; }
+.sp-ticket small, .sp-ticket code { font-size: .75rem; }
+.sp-pill { font-size: .65rem; padding: 3px 8px; }
+.sheet-panel { padding: 16px 14px calc(14px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; }
+.sheet-head { margin-bottom: 10px; }
+.sheet-head h3 { font-size: 1.1rem; }
+.sheet-x { width: 40px; height: 40px; }
+.sheet-list { gap: 6px; }
+.sp-topic { gap: 12px; padding: 9px 12px; border-radius: 13px; }
+.sp-topic b { font-size: .92rem; }
+.sp-topic small { font-size: .78rem; margin-top: 1px; }
+.sheet-cancel { height: 44px; margin-top: 10px; border-radius: 12px; }
+.sp-kb-head { gap: 12px; margin-bottom: 12px; }
+.sp-kb-head h1 { font-size: 1.15rem; }
+.sp-kb-head p { font-size: .85rem; margin-top: 2px; }
+.sp-faq { gap: 6px; }
+.sp-q { border-radius: 13px; }
+.sp-q summary { padding: 11px 14px; font-size: .92rem; }
+.sp-q p { padding: 0 14px 12px; font-size: .88rem; }
+.sp-form { padding: 14px; border-radius: 16px; }
+.sp-actions .tk-mic { width: 46px; height: 46px; border-radius: 12px; }
+.sp-card .grow, .sp-topic .grow { flex: 1; min-width: 0; }
