@@ -191,9 +191,11 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
                 bot = AdminBot(config, supplier=supplier)
                 bot.start()
                 started.append(bot)
-            if config.support_bot_token and config.openai_api_key:
-                from .supportbot import SupportBot
-                support = SupportBot(config)
+            if config.support_bot_token:
+                # Бот поддержки — только для тикетов с сайта: админу сообщения клиентов и мини-приложение,
+                # клиентам — ссылка на поддержку на сайте
+                from .ticketbot import TicketBot
+                support = TicketBot(config)
                 support.start()
                 started.append(support)
             if config.shop_bot_token:

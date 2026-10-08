@@ -124,3 +124,82 @@ def test_check_init_signature():
     assert user and user["id"] == int(ADMIN)
     assert support_app.check_init(_init(ADMIN), "1:wrong") is None
     assert support_app.check_init(_init(ADMIN).replace("q1", "q2"), TOKEN) is None   # подделали данные
+
+
+OGG = b"OggS" + b"\0" * 60          # голосовое из Telegram / браузера
+WEBM = b"\x1a\x45\xdf\xa3" + b"\0" * 60
+
+
+def test_voice_and_receipt_in_ticket_and_client_history(app, config, conn, monkeypatch):
+    """Голосовое и чек — с обеих сторон; во вкладке «История» — только посмотреть: куда тратил, какие заказы."""
+    from donatix import accounts, db
+    _setup(config)
+    monkeypatch.setattr(tickets, "alert_admin", lambda *a, **k: None)
+    uid, _ = make_client(conn)
+    with db.tx(conn):
+        oid = conn.execute("INSERT INTO orders (public_id, user_id, product_id, kind, product_name, quantity, unit_price, "
+                           "total_micro, cost_micro, status, supplier_idem_key, fields_json, created_at, updated_at) "
+                           "VALUES ('dx-9', ?, 'p', 'topup', 'Free Fire 100', 1, '1', 10000, 9000, 'completed', 'k9', "
+                           "'{\"player_id\": \"123456789\"}', '2026-10-08T08:00:00', '2026-10-08T08:00:00')",
+                           (uid,)).lastrowid
+        accounts.post_ledger(conn, uid, -10_000, "Заказ dx-9", order_id=oid)
+    c = TestClient(app)
+    web_login(c, "shop1@example.com", "password123")
+    page = c.get("/panel/support").text
+    c.post("/panel/support", data={"csrf": csrf_of(page), "topic": "order", "text": "Слушайте голосовое"},
+           files={"file": ("voice.webm", WEBM, "audio/webm")})
+    m = tickets.messages(conn, 1)[0]
+    assert m["file"].endswith(".webm") and tickets.file_kind(m["file"]) == "audio"
+    chat = c.get("/panel/support/1").text
+    assert '<audio class="tk-audio"' in chat
+    assert c.get(f"/panel/ticket-files/{m['file']}").headers["content-type"].startswith("audio/webm")
+
+    h = {"X-Tg-Init": _init(ADMIN)}
+    admin = TestClient(app)
+    t = admin.post("/support-app/api/ticket", json={"id": 1}, headers=h).json()
+    assert t["messages"][0]["kind"] == "audio" and t["name"].startswith("shop1")
+    r = admin.post("/support-app/api/reply", data={"id": "1", "text": "Вот чек"}, headers=h,
+                   files={"file": ("chek.png", RECEIPT_PNG, "image/png")})
+    assert r.json()["ok"] and tickets.messages(conn, 1)[-1]["file"].endswith(".png")
+    admin.post("/support-app/api/reply", data={"id": "1", "text": ""}, headers=h,
+               files={"file": ("voice.ogg", OGG, "audio/ogg")})
+    assert tickets.messages(conn, 1)[-1]["file"].endswith(".ogg")
+    note = conn.execute("SELECT text FROM notifications WHERE user_id = ? ORDER BY id DESC", (uid,)).fetchone()["text"]
+    assert "голосовое" in note
+
+    hist = admin.post("/support-app/api/history", json={"id": 1}, headers=h).json()
+    assert hist["spent"] == "1.0000" and hist["orders"][0]["id"] == "dx-9" and hist["orders"][0]["to"] == "123456789"
+    assert any("dx-9 · Free Fire 100" in o["what"] and not o["plus"] for o in hist["ops"])
+    assert "balance" in hist and "topup" not in str(hist)             # только просмотр — ни пополнить, ни списать
+    assert admin.post("/support-app/api/history", json={"id": 1}, headers={"X-Tg-Init": _init("999")}).status_code == 403
+
+
+def test_support_bot_is_only_for_tickets(config, conn, monkeypatch):
+    """Клиент пишет боту — его отправляют на сайт. Админ отвечает reply — текстом или голосовым — в тикет."""
+    from donatix import ticketbot
+    _setup(config)
+    monkeypatch.setattr(tickets, "alert_admin", lambda *a, **k: None)
+    uid, _ = make_client(conn)
+    tid = tickets.create(conn, config, uid, "Вопрос", "payment", "#5", "баланс не пополнился")
+    sent = []
+
+    class Api:
+        def __call__(self, method, **p):
+            sent.append((method, p))
+
+        def download(self, file_id, max_bytes=0):
+            assert file_id == "voice-1"
+            return OGG
+
+    bot = ticketbot.TicketBot(config, api=Api())
+    bot.handle(conn, {"message": {"chat": {"id": 42, "type": "private"}, "text": "помогите"}})
+    assert "/panel/support" in sent[-1][1]["text"] and sent[-1][1]["chat_id"] == "42"
+    alert = tickets.alert_text(conn, config, tid, new=True)
+    assert alert.startswith("👤 <b>shop1</b>") and "Новый тикет #1" in alert
+    bot.handle(conn, {"message": {"chat": {"id": int(ADMIN), "type": "private"}, "text": "Зачислили",
+                                  "reply_to_message": {"text": "👤 shop1\n🎫 Новый тикет #1 · Пополнение"}}})
+    bot.handle(conn, {"message": {"chat": {"id": int(ADMIN), "type": "private"}, "voice": {"file_id": "voice-1"},
+                                  "reply_to_message": {"text": "👤 shop1\n💬 Тикет #1 · Пополнение"}}})
+    msgs = tickets.messages(conn, tid)
+    assert msgs[-2]["text"] == "Зачислили" and msgs[-1]["file"].endswith(".ogg") and msgs[-1]["author"] == "admin"
+    assert "Отправлено клиенту в тикет #1" in sent[-1][1]["text"]

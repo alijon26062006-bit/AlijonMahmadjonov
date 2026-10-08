@@ -45,6 +45,27 @@
   .btn { flex: 1; padding: 10px; border: 0; border-radius: 12px; font: inherit; font-weight: 600; background: var(--bg2); color: var(--text); }
   .btn.main { background: var(--accent); color: var(--accent-text); }
   .back { border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; padding: 0 0 6px; }
+  .seg { display: flex; gap: 6px; margin-top: 10px; }
+  .seg button { flex: 1; padding: 8px; border: 0; border-radius: 10px; background: var(--bg2); color: var(--text); font: inherit; font-weight: 600; font-size: 13px; }
+  .seg button.on { background: var(--accent); color: var(--accent-text); }
+  .msg audio { display: block; width: 230px; max-width: 100%; height: 38px; margin-top: 6px; }
+  .tools { display: flex; gap: 6px; align-items: center; }
+  .tools .ic { flex: none; width: 44px; height: 44px; border: 0; border-radius: 12px; background: var(--bg2); font-size: 20px; color: var(--text); }
+  .tools .ic.rec { background: var(--bad); color: #fff; width: auto; padding: 0 12px; font-size: 15px; font-weight: 700; }
+  .tools textarea { flex: 1; }
+  .pending { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .hist { padding: 12px 12px 30px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { background: var(--bg); border-radius: 14px; padding: 10px 12px; }
+  .stat small { display: block; color: var(--muted); font-size: 12px; }
+  .stat b { font-size: 17px; }
+  .sect { margin: 16px 2px 8px; font-weight: 700; }
+  .op { display: flex; gap: 10px; align-items: center; background: var(--bg); border-radius: 12px; padding: 9px 12px; margin-bottom: 6px; }
+  .op .grow { flex: 1; min-width: 0; }
+  .op .grow div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .op small { color: var(--muted); font-size: 12px; }
+  .amt { font-weight: 700; white-space: nowrap; }
+  .amt.plus { color: var(--ok); }
 </style>
 </head>
 <body>
@@ -89,34 +110,96 @@
   function bubble(m) {
     return '<div class="msg ' + (m.author === "admin" ? "me" : "them") + '"><div class="who">' + (m.author === "admin" ? "🛟 " + esc(m.who || "Поддержка") : "👤 Клиент") +
       ' · ' + when(m.at) + '</div>' + (m.text ? '<div class="txt">' + esc(m.text) + '</div>' : "") +
-      (m.file ? (m.file.indexOf(".pdf") > 0 ? '<a href="' + esc(m.file) + '" target="_blank">📎 PDF</a>' : '<a href="' + esc(m.file) + '" target="_blank"><img src="' + esc(m.file) + '" alt=""></a>') : "") + '</div>';
+      (m.file ? (m.kind === "audio" ? '<audio controls preload="none" src="' + esc(m.file) + '"></audio>' :
+        (m.kind === "pdf" ? '<a href="' + esc(m.file) + '" target="_blank">📎 PDF</a>' : '<a href="' + esc(m.file) + '" target="_blank"><img src="' + esc(m.file) + '" alt=""></a>')) : "") + '</div>';
   }
 
-  function openTicket(id) {
-    clearInterval(state.timer);
+  function openTicket(id, view) {
+    clearInterval(state.timer); view = view || "chat";
     api("ticket", {id: id}).then(function (t) {
       state.ticket = t.id; state.last = t.messages.length ? t.messages[t.messages.length - 1].id : 0;
       if (tg) { tg.BackButton.show(); }
       var closed = t.status === "closed";
-      app.innerHTML = '<div class="head"><button class="back" id="back">‹ Все тикеты</button><b>#' + t.id + ' · ' + esc(t.subject) + '</b><div class="sub">' +
-        esc(t.client) + ' · ' + esc(t.topic) + (t.order_ref ? ' · ' + esc(t.order_ref) : '') + ' · баланс $' + esc(t.balance) + ' · <b>' + esc(t.status_title) + '</b></div>' +
-        (t.orders.length ? '<div class="chips">' + t.orders.map(function (o) { return '<span class="chip">' + esc(o.id) + ' · ' + esc(o.name.slice(0, 26)) + ' · ' + esc(o.status) + '</span>'; }).join("") + '</div>' : '') +
-        '</div><div class="chat" id="chat">' + t.messages.map(bubble).join("") + '</div>' +
-        '<div class="compose"><textarea id="txt" placeholder="Ответ клиенту…"></textarea><div class="actions">' +
+      var head = '<div class="head"><button class="back" id="back">‹ Все тикеты</button><b>👤 ' + esc(t.name) + '</b><div class="sub">#' + t.id + ' · ' +
+        esc(t.subject) + ' · ' + esc(t.topic) + (t.order_ref ? ' · ' + esc(t.order_ref) : '') + ' · <b>' + esc(t.status_title) + '</b></div>' +
+        '<div class="seg"><button data-v="chat" class="' + (view === "chat" ? "on" : "") + '">💬 Чат</button><button data-v="hist" class="' +
+        (view === "hist" ? "on" : "") + '">📜 История клиента</button></div></div>';
+      if (view === "hist") { app.innerHTML = head + '<div class="hist" id="hist"><div class="empty">Загрузка…</div></div>'; wire(t); history(t.id); return; }
+      app.innerHTML = head + '<div class="chat" id="chat">' + t.messages.map(bubble).join("") + '</div>' +
+        '<div class="compose"><div class="tools"><button class="ic" id="clip" title="Чек, скриншот, файл">📎</button>' +
+        '<input type="file" id="file" accept="image/*,application/pdf,audio/*" hidden>' +
+        '<textarea id="txt" placeholder="Ответ клиенту…"></textarea><button class="ic" id="mic" title="Голосовое">🎤</button></div>' +
+        '<div class="pending" id="pending" hidden></div><div class="actions">' +
         '<button class="btn main" id="send">Отправить</button><button class="btn" id="sendclose">Ответить и закрыть</button>' +
         '<button class="btn" id="toggle">' + (closed ? "↩️ Открыть" : "✅ Закрыть") + '</button></div></div>';
       window.scrollTo(0, document.body.scrollHeight);
-      document.getElementById("back").onclick = showList;
-      function send(close) {
-        var box = document.getElementById("txt"), text = box.value.trim();
-        if (!text) { box.focus(); return; }
-        api("reply", {id: t.id, text: text, close: close}).then(function () { haptic(); box.value = ""; close ? showList() : poll(); }).catch(function (e) { alert(e.message); });
+      wire(t);
+      var file = document.getElementById("file"), pending = document.getElementById("pending"), attached = null;
+      function attach(f, label) { attached = f; pending.hidden = !f; pending.textContent = f ? label + " — нажмите «Отправить»" : ""; }
+      document.getElementById("clip").onclick = function () { file.click(); };
+      file.onchange = function () { var f = file.files[0]; if (f) attach(f, (f.type.indexOf("audio") === 0 ? "🎤 " : "📎 ") + f.name); };
+      function send(close, voice) {
+        var box = document.getElementById("txt"), text = box.value.trim(), f = voice || attached;
+        if (!text && !f) { box.focus(); return; }
+        var fd = new FormData(); fd.append("id", t.id); fd.append("text", text); if (close) fd.append("close", "1"); if (f) fd.append("file", f, f.name || "file");
+        pending.hidden = false; pending.textContent = "Отправляем…";
+        fetch("/support-app/api/reply", {method: "POST", headers: {"X-Tg-Init": init}, body: fd})
+          .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "Ошибка"); }); })
+          .then(function () { haptic(); box.value = ""; attach(null); file.value = ""; close ? showList() : poll(); })
+          .catch(function (e) { pending.textContent = "⚠️ " + e.message; });
       }
       document.getElementById("send").onclick = function () { send(false); };
       document.getElementById("sendclose").onclick = function () { send(true); };
       document.getElementById("toggle").onclick = function () { api("status", {id: t.id, closed: !closed}).then(function () { haptic(); openTicket(t.id); }); };
+      voiceButton(document.getElementById("mic"), function (f) { send(false, f); });
       state.timer = setInterval(poll, 5000);
     }).catch(fail);
+  }
+
+  function wire(t) {
+    document.getElementById("back").onclick = showList;
+    app.querySelectorAll(".seg button").forEach(function (b) { b.onclick = function () { openTicket(t.id, b.dataset.v); }; });
+  }
+
+  var ORDER = {completed: "✅", processing: "⏳", attention: "⚠️", failed: "↩️"};
+  var PAY = {paid: "✅", pending: "⏳", rejected: "❌", cancelled: "🚫", fake: "🚨"};
+  function history(id) {
+    api("history", {id: id}).then(function (h) {
+      var html = '<div class="stats"><div class="stat"><small>Баланс</small><b>$' + esc(h.balance) + '</b></div>' +
+        '<div class="stat"><small>Всего пополнил</small><b>$' + esc(h.topped) + '</b></div>' +
+        '<div class="stat"><small>Потратил на покупки</small><b>$' + esc(h.spent) + '</b></div>' +
+        '<div class="stat"><small>Выполнено заказов</small><b>' + h.orders_done + '</b></div></div>';
+      html += '<div class="sect">🛒 Заказы</div>' + (h.orders.length ? h.orders.map(function (o) {
+        return '<div class="op"><span>' + (ORDER[o.status] || "•") + '</span><div class="grow"><div><b>' + esc(o.id) + '</b> · ' + esc(o.name) + '</div><small>' +
+          (o.to ? esc(o.to) + " · " : "") + when(o.at) + '</small></div><span class="amt">$' + esc(o.total) + '</span></div>'; }).join("") : '<div class="empty">Заказов нет</div>');
+      html += '<div class="sect">📒 Куда уходили деньги</div>' + (h.ops.length ? h.ops.map(function (o) {
+        return '<div class="op"><div class="grow"><div>' + esc(o.what) + '</div><small>' + when(o.at) + ' · остаток $' + esc(o.after) + '</small></div><span class="amt ' +
+          (o.plus ? "plus" : "") + '">' + (o.plus ? "+" : "−") + '$' + esc(o.amount) + '</span></div>'; }).join("") : '<div class="empty">Операций нет</div>');
+      html += '<div class="sect">💳 Заявки на пополнение</div>' + (h.pays.length ? h.pays.map(function (p) {
+        return '<div class="op"><span>' + (PAY[p.status] || "•") + '</span><div class="grow"><div>#' + p.id + ' · ' + esc(p.amount) + '</div><small>' + when(p.at) + '</small></div></div>'; }).join("") : '<div class="empty">Заявок нет</div>');
+      document.getElementById("hist").innerHTML = html;
+    }).catch(function (e) { document.getElementById("hist").innerHTML = '<div class="err">' + esc(e.message) + '</div>'; });
+  }
+
+  function voiceButton(btn, done) {
+    if (!navigator.mediaDevices || !window.MediaRecorder) { btn.hidden = true; return; }
+    var rec = null, chunks = [], started = 0, tick = null;
+    btn.onclick = function () {
+      if (rec) { rec.stop(); return; }
+      navigator.mediaDevices.getUserMedia({audio: true}).then(function (stream) {
+        chunks = []; rec = new MediaRecorder(stream); started = Date.now();
+        rec.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
+        rec.onstop = function () {
+          stream.getTracks().forEach(function (x) { x.stop(); });
+          clearInterval(tick); btn.classList.remove("rec"); btn.textContent = "🎤";
+          var type = rec.mimeType || "audio/webm", blob = new Blob(chunks, {type: type}); rec = null;
+          if (Date.now() - started < 800 || !blob.size) return;
+          done(new File([blob], "voice." + (type.indexOf("mp4") >= 0 ? "m4a" : (type.indexOf("ogg") >= 0 ? "ogg" : "webm")), {type: type}));
+        };
+        rec.start(); btn.classList.add("rec"); haptic();
+        tick = setInterval(function () { var s = Math.floor((Date.now() - started) / 1000); btn.textContent = "⏹ " + Math.floor(s / 60) + ":" + ("0" + s % 60).slice(-2); }, 300);
+      }).catch(function () { alert("Нет доступа к микрофону. Можно ответить голосовым прямо в боте: reply на сообщение клиента."); });
+    };
   }
 
   function poll() {

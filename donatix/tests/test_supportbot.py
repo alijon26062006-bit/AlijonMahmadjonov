@@ -73,14 +73,15 @@ def test_link_code_bruteforce_limited(config, conn):
     assert "Слишком много неверных кодов" in bot.api.sent[-1][1]
 
 
-def test_cabinet_support_page_shows_code(client, conn):
+def test_cabinet_support_page_is_only_tickets(client, conn):
+    """Поддержка — только тикетом на сайте: ссылки и кода для Telegram-бота на странице нет."""
     from conftest import web_login
     from donatix import db
     make_client(conn)
     db.set_setting(conn, "support.bot_username", "donatix_help_bot")
     web_login(client, "shop1@example.com", "password123")
     page = client.get("/panel/support").text
-    assert "https://t.me/donatix_help_bot?start=" in page and "DX-" in page
+    assert "Открыть обращение" in page and "t.me/donatix_help_bot" not in page and "DX-" not in page
 
 
 def test_email_code_via_notifications(client, conn, config):
@@ -119,18 +120,6 @@ def test_email_code_locks_after_wrong_tries(config, conn):
         supportbot.check_email_code(conn, 5, wrong)
     assert supportbot.check_email_code(conn, 5, code)[0] == "locked"
     assert supportbot.check_email_code(conn, 6, code)[0] == "none"     # чужой Telegram код не подойдёт
-
-
-def test_support_page_is_tickets_with_telegram_bot_as_extra(client, conn):
-    from conftest import web_login
-    from donatix import db
-    make_client(conn)
-    web_login(client, "shop1@example.com", "password123")
-    page = client.get("/panel/support").text
-    assert "Открыть обращение" in page and "DX-" not in page            # бот неизвестен — только тикеты
-    db.set_setting(conn, "support.bot_username", "dx_help_bot")
-    page = client.get("/panel/support").text
-    assert "Открыть обращение" in page and "@dx_help_bot" in page and "DX-" in page   # бот — запасным путём
 
 
 def test_ai_loop_uses_tools_and_remembers(config, conn):

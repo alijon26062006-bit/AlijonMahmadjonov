@@ -1,0 +1,29 @@
+{# Кнопка «🎤»: записывает голосовое в браузере и кладёт его в поле файла формы (input[name=file]), потом отправляет форму. #}
+<button type="button" class="btn sm tk-mic" data-voice title="Голосовое сообщение">🎤</button>
+<script>
+(function () {
+  var btn = document.currentScript.previousElementSibling, form = btn.closest("form");
+  if (!navigator.mediaDevices || !window.MediaRecorder) { btn.hidden = true; return; }
+  var rec = null, chunks = [], started = 0, tick = null;
+  btn.addEventListener("click", function () {
+    if (rec) { rec.stop(); return; }
+    navigator.mediaDevices.getUserMedia({audio: true}).then(function (stream) {
+      chunks = []; rec = new MediaRecorder(stream); started = Date.now();
+      rec.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
+      rec.onstop = function () {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        clearInterval(tick); btn.classList.remove("rec"); btn.textContent = "🎤";
+        var type = rec.mimeType || "audio/webm", blob = new Blob(chunks, {type: type}); rec = null;
+        if (Date.now() - started < 800 || !blob.size) return;     // случайное нажатие — не отправляем
+        var input = form.querySelector('input[name="file"]'), dt = new DataTransfer();
+        dt.items.add(new File([blob], "voice." + (type.indexOf("mp4") >= 0 ? "m4a" : (type.indexOf("ogg") >= 0 ? "ogg" : "webm")), {type: type}));
+        input.files = dt.files;
+        var txt = form.querySelector("textarea"); if (txt) txt.removeAttribute("required");
+        form.submit();
+      };
+      rec.start(); btn.classList.add("rec");
+      tick = setInterval(function () { var s = Math.floor((Date.now() - started) / 1000); btn.textContent = "⏹ " + Math.floor(s / 60) + ":" + ("0" + s % 60).slice(-2); }, 300);
+    }).catch(function () { alert("Нет доступа к микрофону — разрешите его в настройках браузера."); });
+  });
+})();
+</script>

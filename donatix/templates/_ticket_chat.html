@@ -1,10 +1,17 @@
-{# Переписка тикета как чат. Нужны: msgs, mine ('client' — смотрит клиент, 'admin' — админ), data_url. #}
+{# Переписка тикета как чат. Нужны: msgs, mine ('client' — смотрит клиент), data_url. #}
+{% macro attach(m) -%}
+{%- if m.file -%}
+{%- if m.kind == 'audio' %}<audio class="tk-audio" controls preload="none" src="{{ m.file }}"></audio>
+{%- elif m.kind == 'pdf' %}<a class="tk-file" href="{{ m.file }}" target="_blank" rel="noopener">📎 PDF</a>
+{%- else %}<a class="tk-file" href="{{ m.file }}" target="_blank" rel="noopener"><img src="{{ m.file }}" alt="Скриншот" loading="lazy"></a>{% endif -%}
+{%- endif -%}
+{%- endmacro %}
 <div class="tk-chat" id="tk-chat" data-url="{{ data_url }}" data-mine="{{ mine }}" data-last="{{ msgs[-1].id if msgs else 0 }}">
   {% for m in msgs %}
   <div class="tk-msg {{ 'me' if m.author == mine else 'them' }}" data-id="{{ m.id }}">
     <div class="tk-who">{% if m.author == 'admin' %}🛟 {{ m.who or 'Поддержка' }}{% else %}👤 {{ 'Вы' if mine == 'client' else 'Клиент' }}{% endif %} · <span>{{ m.at | dt }}</span></div>
     {% if m.text %}<div class="tk-text">{{ m.text }}</div>{% endif %}
-    {% if m.file %}<a class="tk-file" href="{{ m.file }}" target="_blank" rel="noopener">{% if m.file.endswith('.pdf') %}📎 PDF{% else %}<img src="{{ m.file }}" alt="Скриншот" loading="lazy">{% endif %}</a>{% endif %}
+    {{ attach(m) }}
   </div>
   {% endfor %}
   <span id="end"></span>
@@ -13,6 +20,12 @@
 (function () {
   var box = document.getElementById("tk-chat"); if (!box) return;
   function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+  function file(m) {
+    if (!m.file) return "";
+    if (m.kind === "audio") return '<audio class="tk-audio" controls preload="none" src="' + esc(m.file) + '"></audio>';
+    if (m.kind === "pdf") return '<a class="tk-file" href="' + esc(m.file) + '" target="_blank" rel="noopener">📎 PDF</a>';
+    return '<a class="tk-file" href="' + esc(m.file) + '" target="_blank" rel="noopener"><img src="' + esc(m.file) + '" alt="Скриншот"></a>';
+  }
   box.scrollTop = box.scrollHeight;
   setInterval(function () {
     if (document.hidden) return;
@@ -23,8 +36,7 @@
           el.className = "tk-msg " + (mine ? "me" : "them");
           var who = m.author === "admin" ? "🛟 " + (m.who || "Поддержка") : (box.dataset.mine === "client" ? "👤 Вы" : "👤 Клиент");
           el.innerHTML = '<div class="tk-who">' + esc(who) + ' · <span>сейчас</span></div>' +
-            (m.text ? '<div class="tk-text">' + esc(m.text) + '</div>' : "") +
-            (m.file ? '<a class="tk-file" href="' + esc(m.file) + '" target="_blank" rel="noopener"><img src="' + esc(m.file) + '" alt="Скриншот"></a>' : "");
+            (m.text ? '<div class="tk-text">' + esc(m.text) + '</div>' : "") + file(m);
           box.insertBefore(el, document.getElementById("end"));
           box.dataset.last = m.id;
         });

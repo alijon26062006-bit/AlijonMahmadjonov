@@ -36,15 +36,50 @@ def files_dir(config: Config) -> Path:
     return path
 
 
+AUDIO = ("webm", "ogg", "mp3", "m4a", "wav")
+MAX_AUDIO = 15 * 1024 * 1024
+
+
+def _kind(data: bytes) -> str | None:
+    """Тип файла по содержимому: картинка, PDF или голосовое (запись в браузере — webm/ogg/m4a)."""
+    from .payments import receipt_kind
+    ext = receipt_kind(data)
+    if ext:
+        return ext
+    if data[:4] == b"\x1a\x45\xdf\xa3":
+        return "webm"
+    if data[:4] == b"OggS":
+        return "ogg"
+    if data[:3] == b"ID3" or data[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
+        return "mp3"
+    if data[4:8] == b"ftyp":
+        return "m4a"
+    if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
+        return "wav"
+    return None
+
+
+def file_kind(name: str | None) -> str:
+    """image | pdf | audio — как показывать вложение."""
+    ext = (name or "").rsplit(".", 1)[-1]
+    return "audio" if ext in AUDIO else ("pdf" if ext == "pdf" else "image")
+
+
+def media_type(name: str) -> str:
+    ext = name.rsplit(".", 1)[-1]
+    return {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp", "pdf": "application/pdf",
+            "webm": "audio/webm", "ogg": "audio/ogg", "mp3": "audio/mpeg", "m4a": "audio/mp4",
+            "wav": "audio/wav"}.get(ext, "application/octet-stream")
+
+
 def _save_file(config: Config, data: bytes) -> str | None:
     if not data:
         return None
-    if len(data) > MAX_FILE:
-        raise TicketError("Скриншот больше 5 МБ — уменьшите его.")
-    from .payments import receipt_kind
-    ext = receipt_kind(data)
+    ext = _kind(data)
     if ext is None:
-        raise TicketError("Можно приложить картинку (JPG, PNG, WEBP) или PDF.")
+        raise TicketError("Можно приложить картинку (JPG, PNG, WEBP), PDF или голосовое сообщение.")
+    if len(data) > (MAX_AUDIO if ext in AUDIO else MAX_FILE):
+        raise TicketError("Файл слишком большой: картинка — до 5 МБ, голосовое — до 15 МБ.")
     name = f"{secrets.token_hex(10)}.{ext}"
     (files_dir(config) / name).write_bytes(data)
     return name
@@ -139,7 +174,8 @@ def add(conn: sqlite3.Connection, config: Config, ticket_id: int, author: str, t
         alert_admin(conn, config, ticket_id)
     else:
         from .notify import notify
-        notify(conn, config, t["user_id"], f"💬 Ответ поддержки по обращению #{ticket_id}: {text[:200]}",
+        notify(conn, config, t["user_id"], f"💬 Ответ поддержки по обращению #{ticket_id}: "
+                                           + (text[:200] or attach_label(name)),
                f"/panel/support/{ticket_id}")
     return mid
 
@@ -164,18 +200,32 @@ def open_count(conn: sqlite3.Connection) -> int:
 
 # ── Админу в Telegram ──────────────────────────────────────────
 
+def who_is(conn: sqlite3.Connection, user_id: int) -> str:
+    """Имя клиента для поддержки: имя из Telegram (если покупал в боте), логин или «Гость G-…»."""
+    from .tgbot import buyer_of, client_name
+    u = conn.execute("SELECT login FROM users WHERE id = ?", (user_id,)).fetchone()
+    name = client_name(conn, user_id, u["login"] if u else "?")
+    su = buyer_of(conn, user_id)
+    if su is not None and su["name"]:
+        name = f"{su['name']} ({name})"
+    return name
+
+
+def attach_label(name: str | None) -> str:
+    return {"audio": "🎤 голосовое", "pdf": "📎 PDF", "image": "🖼 скриншот"}[file_kind(name)] if name else ""
+
+
 def alert_text(conn: sqlite3.Connection, config: Config, ticket_id: int, new: bool = False) -> str:
-    from .tgbot import _e, client_name
+    from .tgbot import _e
     t = get(conn, ticket_id)
-    u = conn.execute("SELECT login FROM users WHERE id = ?", (t["user_id"],)).fetchone()
     last = conn.execute("SELECT * FROM ticket_messages WHERE ticket_id = ? AND author = 'client' ORDER BY id DESC "
                         "LIMIT 1", (ticket_id,)).fetchone()
-    head = "🎫 <b>Новый тикет" if new else "💬 <b>Сообщение в тикете"
-    return (f"{head} #{ticket_id}</b> · {_e(TOPICS.get(t['topic'], ''))}"
-            + (f" · {_e(t['order_ref'])}" if t["order_ref"] else "")
-            + f"\nКлиент: {_e(client_name(conn, t['user_id'], u['login'] if u else '?'))}"
-            + f"\nТема: {_e(t['subject'])}\n\n{_e((last['text'] if last else '')[:1500])}"
-            + ("\n📎 приложен скриншот" if last and last["file"] else ""))
+    body = _e((last["text"] if last else "")[:1200])
+    extra = attach_label(last["file"]) if last else ""
+    return (f"👤 <b>{_e(who_is(conn, t['user_id']))}</b>\n"
+            + ("🎫 Новый тикет" if new else "💬 Тикет") + f" #{ticket_id} · {_e(TOPICS.get(t['topic'], ''))}"
+            + (f" · {_e(t['order_ref'])}" if t["order_ref"] else "") + f"\n<i>{_e(t['subject'])}</i>\n\n"
+            + (body or "") + (f"\n{extra}" if extra else ""))
 
 
 def admin_chat(config: Config) -> str:
@@ -210,7 +260,7 @@ def _deliver(config: Config, ticket_id: int, text: str) -> None:
                 except Exception as exc:  # noqa: BLE001
                     log.warning("тикеты: кнопка меню не поставлена: %s", exc)
             api("sendMessage", chat_id=chat, text=text, parse_mode="HTML", disable_web_page_preview=True,
-                reply_markup={"inline_keyboard": [[{"text": "📂 Открыть и ответить",
+                reply_markup={"inline_keyboard": [[{"text": "💬 Открыть чат",
                                                     "web_app": {"url": app_url(config, ticket_id)}}]]})
             return
         from .worker import notify_admin   # бот поддержки не подключён — хотя бы сообщение в админ-бот

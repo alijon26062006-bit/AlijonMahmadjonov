@@ -72,7 +72,7 @@ async def api_list(request: Request, conn=Depends(get_conn), config: Config = De
     items = tickets.listing(conn, status=str(body.get("status") or "active"))
     return {"items": [{"id": t["id"], "subject": t["subject"], "status": t["status"],
                        "status_title": tickets.STATUS[t["status"]], "topic": tickets.TOPICS.get(t["topic"], ""),
-                       "order_ref": t["order_ref"] or "", "client": client_name(conn, t["user_id"], t["login"]),
+                       "order_ref": t["order_ref"] or "", "client": tickets.who_is(conn, t["user_id"]),
                        "last": (t["last_text"] or "")[:90], "last_author": t["last_author"],
                        "new": t["new_for_admin"], "at": t["updated_at"]} for t in items],
             "open": tickets.open_count(conn)}
@@ -91,12 +91,13 @@ async def api_ticket(request: Request, conn=Depends(get_conn), config: Config = 
     u = accounts.get_user(conn, t["user_id"])
     after = int(body.get("after") or 0)
     msgs = [{"id": m["id"], "author": m["author"], "who": m["who"] or "", "text": m["text"], "at": m["created_at"],
-             "file": (f"/support-app/file/{m['file']}?s={_file_sig(config, m['file'])}" if m["file"] else "")}
+             "file": (f"/support-app/file/{m['file']}?s={_file_sig(config, m['file'])}" if m["file"] else ""),
+             "kind": tickets.file_kind(m["file"])}
             for m in tickets.messages(conn, t["id"], after)]
     tickets.seen(conn, t["id"], "admin")
     orders = conn.execute("SELECT public_id, product_name, status, total_micro FROM orders WHERE user_id = ? "
                           "ORDER BY id DESC LIMIT 5", (t["user_id"],)).fetchall()
-    return {"id": t["id"], "subject": t["subject"], "status": t["status"],
+    return {"id": t["id"], "subject": t["subject"], "status": t["status"], "name": tickets.who_is(conn, t["user_id"]),
             "status_title": tickets.STATUS[t["status"]], "topic": tickets.TOPICS.get(t["topic"], ""),
             "order_ref": t["order_ref"] or "", "client": client_name(conn, t["user_id"], u["login"] if u else "?"),
             "balance": fmt(u["balance_micro"]) if u else "0", "messages": msgs,
@@ -106,17 +107,64 @@ async def api_ticket(request: Request, conn=Depends(get_conn), config: Config = 
 
 @router.post("/api/reply")
 async def api_reply(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Ответ клиенту: текст, голосовое или файл (чек, скриншот). Форма (с файлом) или JSON."""
     if not _admin(request, config):
         return _deny()
-    body = await request.json()
+    data = b""
+    if request.headers.get("content-type", "").startswith("multipart/"):
+        form = await request.form()
+        body = {k: form.get(k) for k in ("id", "text", "close")}
+        up = form.get("file")
+        if up is not None and getattr(up, "filename", ""):
+            data = await up.read()
+    else:
+        body = await request.json()
     tid = int(body.get("id") or 0)
     try:
-        tickets.add(conn, config, tid, "admin", str(body.get("text") or ""), who="поддержка")
-        if body.get("close"):
+        tickets.add(conn, config, tid, "admin", str(body.get("text") or ""), data, who="поддержка")
+        if body.get("close") in (True, "1", "true"):
             tickets.set_status(conn, tid, closed=True)
     except tickets.TicketError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     return {"ok": True}
+
+
+@router.post("/api/history")
+async def api_history(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """История клиента — только посмотреть: баланс, пополнения, куда тратил, какие заказы."""
+    if not _admin(request, config):
+        return _deny()
+    body = await request.json()
+    t = tickets.get(conn, int(body.get("id") or 0))
+    if t is None:
+        return JSONResponse({"error": "Тикет не найден."}, status_code=404)
+    from .money import fmt
+    uid = t["user_id"]
+    u = accounts.get_user(conn, uid)
+    got = conn.execute("SELECT COALESCE(SUM(amount_micro), 0) FROM transactions WHERE user_id = ? "
+                       "AND amount_micro > 0 AND note LIKE 'Пополнение%'", (uid,)).fetchone()[0]
+    spent, n_done = conn.execute("SELECT COALESCE(SUM(total_micro), 0), COUNT(*) FROM orders WHERE user_id = ? "
+                                 "AND status = 'completed'", (uid,)).fetchone()
+    ops = conn.execute("SELECT t.amount_micro, t.note, t.balance_after, t.created_at, o.product_name, o.public_id "
+                       "FROM transactions t LEFT JOIN orders o ON o.id = t.order_id WHERE t.user_id = ? "
+                       "ORDER BY t.id DESC LIMIT 100", (uid,)).fetchall()
+    orders = conn.execute("SELECT public_id, product_name, status, total_micro, fields_json, created_at FROM orders "
+                          "WHERE user_id = ? ORDER BY id DESC LIMIT 50", (uid,)).fetchall()
+    pays = conn.execute("SELECT id, status, pay_amount, pay_currency, created_at FROM payments WHERE user_id = ? "
+                        "ORDER BY id DESC LIMIT 30", (uid,)).fetchall()
+    return {
+        "name": tickets.who_is(conn, uid), "balance": fmt(u["balance_micro"]) if u else "0",
+        "topped": fmt(got), "spent": fmt(spent), "orders_done": n_done,
+        "ops": [{"amount": fmt(abs(o["amount_micro"])), "plus": o["amount_micro"] > 0,
+                 "what": (f"{o['public_id']} · {o['product_name']}" if o["product_name"] else o["note"] or ""),
+                 "after": fmt(o["balance_after"]), "at": o["created_at"]} for o in ops],
+        "orders": [{"id": o["public_id"], "name": o["product_name"], "status": o["status"],
+                    "total": fmt(o["total_micro"]),
+                    "to": ", ".join(str(v) for v in json.loads(o["fields_json"] or "{}").values()),
+                    "at": o["created_at"]} for o in orders],
+        "pays": [{"id": p["id"], "status": p["status"], "amount": f"{p['pay_amount']} {p['pay_currency']}",
+                  "at": p["created_at"]} for p in pays],
+    }
 
 
 @router.post("/api/status")
@@ -135,8 +183,8 @@ async def api_status(request: Request, conn=Depends(get_conn), config: Config = 
 def app_file(name: str, s: str = "", config: Config = Depends(get_config)):
     """Скриншот из тикета — по подписанной ссылке (картинка в <img> не может нести подпись Telegram)."""
     path = tickets.files_dir(config) / name
-    if (not re.fullmatch(r"[0-9a-f]{20}\.(jpg|png|webp|pdf)", name) or not hmac.compare_digest(s, _file_sig(config, name))
+    if (not re.fullmatch(r"[0-9a-f]{20}\.(jpg|png|webp|pdf|webm|ogg|mp3|m4a|wav)", name) or not hmac.compare_digest(s, _file_sig(config, name))
             or not path.is_file()):
         return JSONResponse({"error": "not found"}, status_code=404)
-    return FileResponse(path, headers={"Cache-Control": "private, max-age=86400"})
+    return FileResponse(path, media_type=tickets.media_type(name), headers={"Cache-Control": "private, max-age=86400"})
 
