@@ -8,13 +8,14 @@ CH = "https://t.me/+NdkoYArkuCw4NzBi"
 
 def test_channel_everywhere_on_site(client, conn):
     home = client.get("/").text
-    assert 'id="channel"' in home and "Наш Telegram-канал" in home
-    assert home.count(f'href="{CH}"') >= 4          # шапка, баннер, подвал, плавающая кнопка
-    assert 'class="tg-fab"' in client.get("/terms").text
+    # Канал — только маленькой ссылкой (шапка, подвал): больших баннеров и плавающей кнопки на главной нет
+    assert 'id="channel"' not in home and 'class="tg-fab"' not in home and 'ref-promo' not in home
+    assert home.count(f'href="{CH}"') >= 2
+    assert 'class="tg-fab"' not in client.get("/terms").text
     make_client(conn)
     web_login(client, "shop1@example.com", "password123")
     panel = client.get("/panel").text
-    assert 'class="side-tg"' in panel and 'class="tg-fab"' not in panel   # в кабинете — карточка, без кнопки
+    assert 'class="side-tg"' in panel and 'ref-promo' not in panel   # в кабинете — ссылка в меню, без баннеров
 
 
 def test_clean_channel_and_hide(client, conn, config):

@@ -150,21 +150,7 @@
   <div class="wrap small" style="margin-top:24px">© {{ site_name }}</div>
 </footer>
 {% endblock %}
-{% block fab %}
-{% if tg_channel and not path.startswith('/admin') and not path.startswith('/panel') %}
-<a class="tg-fab" href="{{ tg_channel }}" target="_blank" rel="noopener" aria-label="Наш Telegram-канал: уроки и акции">
-  <span class="tg-fab-ring" aria-hidden="true"></span>{{ tg_logo(56) }}<span class="tg-fab-label">Уроки и акции<small>в нашем канале</small></span>
-</a>
-<script>
-  // Один раз за визит подпись выезжает сама — чтобы кнопку заметили и на телефоне
-  (function () {
-    var fab = document.querySelector(".tg-fab"); if (!fab) return;
-    try { if (sessionStorage.getItem("dx_fab")) return; sessionStorage.setItem("dx_fab", "1"); } catch (e) {}
-    setTimeout(function () { fab.classList.add("open"); setTimeout(function () { fab.classList.remove("open"); }, 4000); }, 2500);
-  })();
-</script>
-{% endif %}
-{% endblock %}
+{% block fab %}{% endblock %}
 <script src="/static/code.js?v={{ asset_v }}" defer></script>
 <script>
   var dxCalm = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
