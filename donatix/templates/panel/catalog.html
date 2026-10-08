@@ -55,6 +55,7 @@
     {% for p in items %}
     <a class="pack-card" href="/panel/buy/{{ p.product_id }}">
       {% if p.emoji %}<span class="tile emoji-tile" aria-hidden="true">{{ p.emoji }}</span>
+      {% elif kind_cover(p.kind, p.image_url) %}{{ media(kind_cover(p.kind, p.image_url), p.title, p.kind, 'pack-img') }}
       {% else %}<span class="tile k-{{ p.kind }}">{{ pack_icon(p.kind, p.name, 20) }}</span>{% endif %}
       <span class="pack-name">{{ p.title }}</span>
       {% if p.region %}<span class="badge">{{ p.region_title }}</span>{% endif %}

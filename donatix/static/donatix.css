@@ -2257,3 +2257,8 @@ input, select, textarea { font-size: .95rem; }
 
 /* Обложки разделов в «Весь каталог»: картинка поставщика или наша (Telegram, Steam) вместо значка */
 #catalog .media.cat-cover { width: 52px; aspect-ratio: 1; border-radius: 14px; flex: none; }
+
+/* Картинка товара в списке каталога (ключи, карты) — от поставщика, маленькая WebP-копия */
+.pack-card .media.pack-img { width: 44px; height: 44px; aspect-ratio: 1; border-radius: 11px; flex: none; }
+.pack-card .media.pack-img .media-initials { font-size: .8rem; }
+@media (max-width: 860px) { .pack-card .media.pack-img { width: 38px; height: 38px; } }
