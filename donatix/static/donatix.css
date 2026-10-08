@@ -2210,3 +2210,47 @@ input, select, textarea { font-size: .95rem; }
 .fc-list .order-card .meta .status { width: 20px; height: 20px; }
 .fc-list .order-card .meta .status .ico { width: 11px; height: 11px; }
 .fc-list .order-card .meta .pill { font-size: .7rem; padding: 2px 8px; }
+
+/* ══ Админка — тот же тонкий стиль ══ */
+.kpi { padding: 12px; border-radius: 14px; }
+.kpi .tile { top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 10px; }
+.kpi .tile .ico { width: 16px; height: 16px; }
+.kpi .label { font-size: .74rem; padding-right: 36px; }
+.kpi .value { margin-top: 6px; font-size: 1.1rem; }
+.kpi .note { margin-top: 3px; font-size: .74rem; }
+.kpi .btn.sm { min-height: 32px; padding: 4px 10px; font-size: .8rem; margin-top: 8px; }
+@media (max-width: 640px) {
+  .grid.kpis, .grid.period-kpis, .grid.stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .filters { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .filters > div:has(input[type=search]), .filters .full { grid-column: 1 / -1; }
+}
+.dash-hero h1 { font-size: 1.25rem; }
+.dash-hero .btn { min-height: 36px; padding: 6px 12px; font-size: .85rem; }
+.todo { gap: 6px; margin-bottom: 10px; }
+.todo-item { padding: 9px 12px; border-radius: 12px; font-size: .88rem; }
+.card-head h3 { font-size: .95rem; }
+.chart { height: 120px; gap: 4px; }
+.chart .bar span { font-size: .68rem; }
+.legend { font-size: .78rem; }
+.person { padding: 6px 4px; gap: 10px; }
+.person .avatar { width: 32px; height: 32px; font-size: .72rem; }
+.person b { font-size: .88rem; }
+.person .sub { font-size: .74rem; }
+.person .amount { font-size: .88rem; }
+.section-title { margin: 16px 0 8px; }
+.section-title h2 { font-size: 1.05rem; }
+.section-title .btn.sm { min-height: 32px; padding: 4px 12px; font-size: .82rem; }
+.chip { padding: 4px 10px; font-size: .8rem; }
+.date-field input, .filters input, .filters select { height: 40px; }
+/* Карточки заказов везде (кабинет и админка) — компактные */
+.order-card { padding: 9px 10px; border-radius: 14px; gap: 10px; }
+.order-card .oc-img { width: 40px; height: 40px; border-radius: 10px; }
+.order-card .title, .order-card .amount { font-size: .88rem; }
+.order-card .oc-who { font-size: .72rem; margin-top: 1px; }
+.order-card .oc-line { font-size: .75rem; margin-top: 2px; }
+.order-card .meta { margin-top: 5px; gap: 6px; }
+.order-card .meta .status { width: 20px; height: 20px; }
+.order-card .meta .status .ico { width: 11px; height: 11px; }
+.order-card .meta .pill { font-size: .7rem; padding: 2px 8px; }
+.order-card .oc-profit { font-size: .78rem; }
+.order-cards { gap: 6px; }
