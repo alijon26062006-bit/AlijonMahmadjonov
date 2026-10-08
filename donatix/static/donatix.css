@@ -2109,3 +2109,81 @@ body.rcc-open { overflow: hidden; }
 .sp-form { padding: 14px; border-radius: 16px; }
 .sp-actions .tk-mic { width: 46px; height: 46px; border-radius: 12px; }
 .sp-card .grow, .sp-topic .grow { flex: 1; min-width: 0; }
+
+/* ══ Тонкий стиль на всём сайте (как «Поддержка» / FazerCards): меньше отступов, строки вместо больших карточек ══ */
+.card { padding: 14px; border-radius: 16px; }
+.card + .card, .stack > * + * { margin-top: 10px; }
+.page-hero { margin: 10px 0 10px; }
+.page-hero h1 { font-size: 1.3rem; }
+.page-hero p { font-size: .88rem; }
+.section-label { margin: 18px 0 8px; }
+.btn.lg { min-height: 44px; font-size: .95rem; border-radius: 12px; }
+input, select, textarea { font-size: .95rem; }
+.step-head { padding-bottom: 8px; gap: 8px; }
+.step-head h3 { font-size: .95rem; }
+.step-head .n { width: 22px; height: 22px; font-size: .8rem; }
+.summary > div { padding: 8px 12px; font-size: .9rem; }
+.stat { padding: 12px; border-radius: 14px; }
+.stat .value { font-size: 1.15rem; }
+.stat .note { font-size: .8rem; }
+.paym { padding: 8px 12px; border-radius: 12px; }
+.file-drop { padding: 12px; gap: 12px; border-radius: 14px; }
+.file-drop .fd-ico { font-size: 1.4rem; }
+.item { padding: 10px 12px; }
+
+/* Профиль: баланс в одну строку, плитки рядом, быстрые действия — тонкие строки */
+.app-hello { font-size: 1rem; margin: 2px 2px 8px; }
+.bal-hero { margin-top: 8px; padding: 14px; border-radius: 16px; display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; }
+.bal-hero .bal-amount { font-size: 1.5rem; }
+.bal-hero .bal-sub { grid-column: 1; font-size: .8rem; }
+.bal-hero .bal-btn { grid-column: 2; grid-row: 1 / span 2; width: auto; min-height: 40px; margin: 0; padding: 8px 16px; }
+.bal-hero .bal-tiles { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.bal-tile { padding: 10px 12px; border-radius: 12px; }
+.bal-tile .t-label { font-size: .72rem; }
+.bal-tile .t-value { font-size: 1.05rem; }
+.bal-tile .t-note { font-size: .72rem; }
+.pop-quick h3 { font-size: .95rem; }
+.pop-tile { flex-basis: 76px; padding: 8px 6px; font-size: .75rem; border-radius: 14px; }
+.pop-tile .pop-tile-img { width: 40px; height: 40px; border-radius: 12px; }
+.dc-card { padding: 10px 12px; border-radius: 14px; }
+.dc-card-coin { width: 34px; height: 34px; }
+.quick .who-row { padding-bottom: 10px; }
+.quick-title { font-size: .95rem; margin-top: 12px; }
+.quick-sub { font-size: .8rem; }
+.qrow { margin-top: 6px; padding: 9px 12px; border-radius: 12px; }
+.qrow b { font-size: .92rem; }
+.qrow small { font-size: .78rem; }
+.tier-card { margin-top: 10px; padding: 12px; border-radius: 14px; }
+.tier-card .tier-name { font-size: 1.05rem; }
+.tier-card .tier-status { padding: 8px 10px; }
+.kv { padding: 8px 12px; border-radius: 12px; }
+.kv .k { font-size: .78rem; }
+.kv .v { font-size: .9rem; }
+.list { gap: 6px; }
+
+/* Каталог: товары списком — тонкие строки: иконка, название, цена */
+@media (max-width: 640px) {
+  .grid.packs-grid { grid-template-columns: 1fr; gap: 6px; }
+  .pack-card { flex-direction: row; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 13px; }
+  .pack-card .tile { width: 38px; height: 38px; border-radius: 11px; flex: none; }
+  .pack-card .pack-name { flex: 1; min-width: 0; font-size: .9rem; }
+  .pack-card .pack-name + .badge, .pack-card .badge { font-size: .7rem; }
+  .pack-card .pack-price { margin: 0 0 0 auto; font-size: .92rem; white-space: nowrap; }
+  .grid.games { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .game-card { padding: 6px 6px 8px; border-radius: 14px; }
+  .game-name { font-size: .8rem; }
+  .section-title { margin: 14px 0 8px; }
+  .section-title h2, h2.section-title { font-size: 1rem; }
+}
+/* Страница покупки — компактная шапка и пакеты */
+.buy-head { gap: 12px; margin: 6px 0 12px; }
+.buy-head .media.cover { width: 60px; height: 60px; border-radius: 14px; padding: 4px; }
+.buy-head .media.cover .media-initials { font-size: 1.05rem; }
+.buy-head h1 { margin: 1px 0 4px; font-size: 1.2rem; }
+.buy-head .bh-kind { font-size: .78rem; }
+.back { margin-top: 8px !important; font-size: .88rem; }
+.pack { padding: 8px 10px; border-radius: 12px; }
+.pp { padding: 8px 10px !important; gap: 4px !important; border-radius: 12px !important; }
+.pp-ico { width: 24px; height: 24px; border-radius: 7px; }
+.pp-name { font-size: .88rem; }
+.pp-price { font-size: .9rem; }
