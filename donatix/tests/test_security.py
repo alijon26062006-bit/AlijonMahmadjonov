@@ -163,6 +163,7 @@ def test_history_shows_balance_before_and_after(app, conn):
         accounts.post_ledger(conn, uid, 500_000, "Пополнение: тест")
         accounts.post_ledger(conn, uid, -120_000, "Заказ: тест")
     c = TestClient(app)
+    c.cookies.set("dx_cur", "USD")   # суммы в долларах (по умолчанию сомони)
     web_login(c, "h@example.com", "password123")
     page = c.get("/panel/transactions").text
     assert page.count("tx-bal") == 2 and "Было" in page and "стало" in page

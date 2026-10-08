@@ -14,7 +14,7 @@ def test_guest_sees_catalog_and_prices(app, conn):
     pid = _product(conn)
     buy = guest.get(f"/panel/buy/{pid}")
     assert buy.status_code == 200
-    assert "Зарегистрироваться и купить" not in buy.text and "$" in buy.text       # цена видна, купить сразу
+    assert "Зарегистрироваться и купить" not in buy.text and " с.</span>" in buy.text   # цена в сомони, купить сразу
     assert guest.get("/panel/catalog?kind=telegram").status_code == 200
     assert "Каталог и цены" in guest.get("/").text
 

@@ -101,6 +101,7 @@ def test_admin_sets_pay_details(app, config, conn):
 def test_low_balance_warning(app, config, conn):
     from donatix import db
     uid, client, token = _setup(app, config, conn)
+    client.cookies.set("dx_cur", "USD")   # суммы в долларах (по умолчанию сомони)
     with db.tx(conn):
         accounts.post_ledger(conn, uid, 120_000, "пополнение")
     assert "осталось" not in client.get("/panel").text

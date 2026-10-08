@@ -123,6 +123,7 @@ def test_catalog_games_and_regions(app, config, conn):
     catalog.sync_catalog(conn, app.state.supplier)
     accounts.create_user(conn, email="g@example.com", login="gamer", password="password123", status="active")
     client = TestClient(app)
+    client.cookies.set("dx_cur", "USD")   # суммы в долларах (по умолчанию сомони)
     web_login(client, "g@example.com", "password123")
     page = client.get("/panel/catalog?kind=topup").text
     assert "game-card" in page and "Free Fire" in page and "Регионов: 2" in page

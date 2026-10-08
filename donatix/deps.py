@@ -239,7 +239,7 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["noindex"] = status_code >= 400 or request.url.path not in INDEXABLE
     ctx["unread"] = 0
     ctx["low_balance_micro"] = 0
-    ctx["cur_code"] = "TJS" if request.cookies.get("dx_cur") == "TJS" else "USD"
+    ctx["cur_code"] = "USD" if request.cookies.get("dx_cur") == "USD" else "TJS"   # по умолчанию сомони
     ctx["cur_rate"] = None
     from . import timez
     ctx["tz"], ctx["tz_choice"] = timez.resolve(None, None, request.cookies.get("dx_tz"))
@@ -257,6 +257,14 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
             if ctx["cur_code"] == "TJS":
                 from .payments import settings as pay_settings
                 ctx["cur_rate"] = pay_settings(c, config)["tjs_rate"]
+        finally:
+            pool.release(c)
+    if ctx["cur_code"] == "TJS" and ctx["cur_rate"] is None:   # и без входа — цены в сомони
+        from .payments import settings as pay_settings
+        pool = db.pool(config.db_path)
+        c = pool.acquire()
+        try:
+            ctx["cur_rate"] = pay_settings(c, config)["tjs_rate"]
         finally:
             pool.release(c)
     ctx["tz_label"] = timez.label(ctx["tz"])
