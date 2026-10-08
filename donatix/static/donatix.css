@@ -2307,3 +2307,56 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .an-s { font-size: .7rem; }
 .an-th { font-size: .62rem; letter-spacing: 0; }
 @media (max-width: 560px) { .an-tr { grid-template-columns: minmax(0, 1fr) 30px 30px 30px minmax(64px, auto); gap: 5px; } }
+
+/* ══ Админка целиком — один тонкий размер, как в кабинете (FazerCards): поля, кнопки, таблицы, карточки ══ */
+.adm main { font-size: .9rem; }
+.adm .page-hero { margin-bottom: 10px; }
+.adm .page-hero h1 { font-size: 1.2rem; margin-bottom: 2px; }
+.adm .page-hero p { font-size: .8rem; line-height: 1.45; margin: 0; }
+.adm .card { padding: 12px 14px; border-radius: 14px; }
+.adm .card + .card, .adm .grid + .card, .adm .card + .grid { margin-top: 10px; }
+.adm .card-head { margin-bottom: 8px; }
+.adm .card h3, .adm .card-head h3 { font-size: .92rem; }
+.adm .grid { gap: 8px; }
+.adm label, .adm .field > span, .adm .label-caps { font-size: .78rem; }
+.adm input:not([type=checkbox]):not([type=radio]), .adm select, .adm textarea {
+  min-height: 38px; padding: 7px 11px; font-size: .88rem; border-radius: 10px; }
+.adm textarea { min-height: 70px; }
+.adm form .field, .adm form > label, .adm form > div { margin-bottom: 8px; }
+.adm .hint, .adm .note, .adm small, .adm .muted.small { font-size: .74rem; }
+.adm .btn { min-height: 36px; padding: 7px 14px; font-size: .86rem; border-radius: 10px; }
+.adm .btn.sm { min-height: 30px; padding: 4px 10px; font-size: .78rem; }
+.adm .btn.lg { min-height: 40px; font-size: .9rem; }
+.adm table { font-size: .8rem; }
+.adm th { font-size: .64rem; padding: 6px 8px; }
+.adm td { padding: 7px 8px; }
+.adm .chip, .adm .filters .chip { padding: 4px 10px; font-size: .78rem; }
+.adm .badge { font-size: .68rem; padding: 2px 7px; }
+.adm .flash { padding: 9px 12px; font-size: .82rem; border-radius: 12px; }
+.adm .scard { padding: 10px 12px; border-radius: 12px; }
+.adm .scard .label { font-size: .74rem; }
+.adm .scard .value { margin: 3px 0 2px; font-size: 1.1rem; }
+.adm .scard .note { font-size: .72rem; }
+.adm .link-row, .adm .item { padding: 9px 12px; border-radius: 12px; }
+.adm .link-row .tile, .adm .item .tile { width: 34px; height: 34px; border-radius: 10px; }
+.adm .switch { font-size: .84rem; }
+.adm pre, .adm code.block, .adm .keybox { font-size: .76rem; }
+.adm label { margin: 8px 0 4px; }
+.adm .grid.two, .adm .grid.three { gap: 0 10px !important; }
+.adm .hint { margin-top: 4px; }
+.adm .markup-example { padding: 9px 12px; font-size: .8rem; border-radius: 10px; }
+.adm .ins-grid { gap: 8px; }
+.adm .ins { padding: 9px 12px; gap: 2px; border-radius: 10px; }
+.adm .ins-label { font-size: .64rem; }
+.adm .ins b { font-size: .92rem; }
+.adm .ins span { font-size: .74rem; }
+/* заказы в админке — как в кабинете */
+.adm .order-card { padding: 9px 10px; border-radius: 14px; gap: 10px; }
+.adm .order-card .oc-img { width: 40px; height: 40px; border-radius: 10px; }
+.adm .order-card .title, .adm .order-card .amount { font-size: .88rem; }
+.adm .order-card .oc-line { font-size: .75rem; margin-top: 2px; }
+.adm .order-card .meta { margin-top: 5px; gap: 6px; }
+.adm .order-card .meta .status { width: 20px; height: 20px; }
+.adm .order-card .meta .pill { font-size: .7rem; padding: 2px 8px; }
+/* таблицы: длинные ID не ломают строку на 5 строчек */
+.adm td.mono, .adm td code, .adm td .mono { font-size: .72rem; word-break: break-all; }

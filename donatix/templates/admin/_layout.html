@@ -1,4 +1,5 @@
 {% extends "_app.html" %}
+{% block body_class %}adm{% endblock %}
 {% from "_icons.html" import icon, nav_link %}
 {% block sidenav %}
 {% set current = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
