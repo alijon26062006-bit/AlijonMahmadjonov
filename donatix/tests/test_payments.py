@@ -152,8 +152,6 @@ def test_api_topup_with_receipt(app, config, conn, monkeypatch):
     assert pay["pay_amount"] == "545.00" and pay["pay_currency"] == "TJS" and "+992" in pay["details"]
     assert api.post(f"/api/v1/payments/{pay['id']}/receipt", headers=h, files={"file": ("a.txt", b"hi", "text/plain")}
                     ).json()["ok"] is False
-    r = api.post(f"/api/v1/payments/{pay['id']}/receipt", headers=h, files={"file": ("chek.png", PNG, "image/png")})
-    assert r.json()["ok"] is False      # чек отклонённой заявки — повтор, второй раз не проходит
     r = api.post(f"/api/v1/payments/{pay['id']}/receipt", headers=h,
                  files={"file": ("chek.png", PNG + b"2", "image/png")})
     assert r.json()["payment"]["receipt"] is True

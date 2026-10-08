@@ -317,11 +317,16 @@ def verdict(d: dict[str, Any] | None, data: bytes, ext: str, our_details: str = 
 def summary(d: dict[str, Any] | None, pay_amount: Any = None, pay_currency: str = "",
             our_details: str = "", created_at: str | None = None) -> str:
     """Строка для админа: что прочитал ИИ и совпадает ли сумма."""
-    if not d:
-        return "🤖 Чек не прочитан автоматически — проверьте вручную."
+    dup = (f"⚠️⚠️ ЭТОТ ЧЕК УЖЕ БЫЛ — заявка #{d['dup_of']}. Сверьте поступление в банке!\n"
+           if d and d.get("dup_of") else "")
+    if not d or "bank" not in d:
+        return dup + "🤖 Чек не прочитан автоматически — проверьте вручную."
     parts = [p for p in (d["bank"], f"{d['amount']:g} {d['currency']}".strip() if d["amount"] else "",
                          d["datetime"], f"№ {d['txn_id']}" if d["txn_id"] else "") if p]
-    line = "🤖 Чек: " + (" · ".join(parts) or "данных не видно")
+    line = dup + "🤖 Чек: " + (" · ".join(parts) or "данных не видно")
+    for why in d.get("checks") or []:   # не отклонено, но подозрительно — решает админ
+        if not why.startswith(("получатель", "чек изменён", "в чеке перевод")):   # эти — ниже, своими строками
+            line += f"\n🚨 {why[:1].upper() + why[1:]}"
     match = amount_matches(d, pay_amount, pay_currency)
     if d.get("fixed_from"):
         line += (f"\n✏️ Клиент ошибся суммой — заявка исправлена по чеку: было {d['fixed_from']}, "

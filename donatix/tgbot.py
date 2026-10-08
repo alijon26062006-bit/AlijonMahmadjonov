@@ -763,8 +763,10 @@ def receipt_text(conn: sqlite3.Connection, config: Config, payment_id: int) -> s
     p = conn.execute("SELECT method, receipt_file, receipt_ai, pay_amount, pay_currency, created_at FROM payments "
                      "WHERE id = ?", (payment_id,)).fetchone()
     text = payment_event(conn, payment_id, config)[0] + ("\n🧾 Чек приложен" if p["receipt_file"] else "")
+    seen = json.loads(p["receipt_ai"]) if p["receipt_ai"] else None
+    if p["receipt_file"] and not receipt_ai.enabled(config) and seen and seen.get("dup_of"):
+        text += f"\n⚠️⚠️ ЭТОТ ЧЕК УЖЕ БЫЛ — заявка #{seen['dup_of']}. Сверьте поступление в банке!"
     if p["receipt_file"] and receipt_ai.enabled(config):   # что прочитал ИИ и совпадает ли сумма
-        seen = json.loads(p["receipt_ai"]) if p["receipt_ai"] else None
         details = payments.settings(conn, config)["details"].get(p["method"], "")
         text += "\n" + _e(receipt_ai.summary(seen, p["pay_amount"], p["pay_currency"] or "",
                                              our_details=details, created_at=p["created_at"]))

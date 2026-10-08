@@ -42,14 +42,19 @@ def test_one_request_at_a_time_with_waiting_spinner(app, config, conn, monkeypat
     assert "решил: <b>админ (сайт: admin)</b>" in admin.get("/admin/payments?status=paid").text
 
 
-def test_same_receipt_cannot_be_used_twice(app, config, conn, monkeypatch):
+def test_same_receipt_is_accepted_but_flagged(app, config, conn, monkeypatch):
+    """Тот же файл чека второй раз не отклоняется — админ видит в заявке «ЭТОТ ЧЕК УЖЕ БЫЛ»."""
+    import json
     monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
     uid, client, token = _client(app, config, conn)
     _send(client, token)
     _, other, otoken = _client(app, config, conn, "d@example.com", "client2")
     r = _send(other, otoken)                                             # тот же файл чека с другого аккаунта
-    assert "Чек не прошёл проверку" in r.text
-    assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 1
+    assert "создана" in r.text
+    second = conn.execute("SELECT * FROM payments ORDER BY id DESC LIMIT 1").fetchone()
+    assert second["receipt_file"] and json.loads(second["receipt_ai"])["dup_of"] == 1
+    from donatix import tgbot
+    assert "ЭТОТ ЧЕК УЖЕ БЫЛ — заявка #1" in tgbot.receipt_text(conn, config, second["id"])
 
 
 def test_draft_without_receipt_does_not_block(config, conn):

@@ -20,6 +20,11 @@ def _client(app, config, conn, n):
     return c, web_login(c, f"r{n}@example.com", "password123")
 
 
+def _flags(conn) -> dict:
+    """Что записано о последнем чеке для админа: повтор (dup_of), подозрения (checks)."""
+    return json.loads(conn.execute("SELECT receipt_ai FROM payments ORDER BY id DESC LIMIT 1").fetchone()[0])
+
+
 def _send(c, token, body):
     return c.post("/panel/balance", data={"csrf": token, "method": "alif", "amount": "50"},
                   files={"receipt": ("chek.png", body, "image/png")})
@@ -34,8 +39,7 @@ def test_same_transfer_cannot_be_used_twice(app, config, conn, monkeypatch):
     assert row["receipt_txn"] == "AB1234567" and row["receipt_fp"] and json.loads(row["receipt_ai"])["bank"] == "Алиф"
     b, tb = _client(app, config, conn, 2)
     r = _send(b, tb, RECEIPT_PNG + b"other-screenshot")                 # другой файл, тот же перевод
-    assert "Чек не прошёл проверку" in r.text and "заявка" not in r.text.split("Чек не прошёл")[1][:80]
-    assert conn.execute("SELECT COUNT(*) FROM payments WHERE receipt_file IS NOT NULL").fetchone()[0] == 1
+    assert "создана" in r.text and _flags(conn)["dup_of"] == 1           # не отклонён — помечен для админа
 
 
 def test_same_amount_time_bank_without_number_is_caught(app, config, conn, monkeypatch):
@@ -45,7 +49,7 @@ def test_same_amount_time_bank_without_number_is_caught(app, config, conn, monke
     a, ta = _client(app, config, conn, 1)
     _send(a, ta, RECEIPT_PNG)
     b, tb = _client(app, config, conn, 2)
-    assert "Чек не прошёл проверку" in _send(b, tb, RECEIPT_PNG + b"x").text
+    assert "создана" in _send(b, tb, RECEIPT_PNG + b"x").text and _flags(conn)["dup_of"] == 1
 
 
 def test_new_receipt_goes_to_admin_with_what_ai_read(app, config, conn, monkeypatch):
@@ -108,14 +112,10 @@ def test_foreign_requisites_are_not_accepted_and_admin_gets_reasons(app, config,
     monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(foreign))
     a, ta = _client(app, config, conn, 1)
     r = _send(a, ta, RECEIPT_PNG)
-    assert "Чек не прошёл проверку" in r.text and "реквизит" not in r.text.split("Чек не прошёл")[1][:200]
-    assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 0
-    import time
-    for _ in range(50):
-        if alerts:
-            break
-        time.sleep(0.02)
-    assert alerts and "не наши реквизиты" in alerts[0] and "3253" in alerts[0]
+    assert "создана" in r.text                                          # не отклонён — решает админ
+    flags = _flags(conn)
+    assert any("не наши реквизиты" in c and "3253" in c for c in flags["checks"])
+    assert "НЕ наши реквизиты" in receipt_ai.summary(flags, "545", "TJS", our_details="Алиф: +992 90 000 00 00")
 
 
 def test_ai_says_fake_is_rejected_and_suspicious_goes_to_admin(app, config, conn, monkeypatch):
@@ -127,10 +127,12 @@ def test_ai_says_fake_is_rejected_and_suspicious_goes_to_admin(app, config, conn
     fake = {**SEEN, "forgery": "fake", "signs": ["сумма другим шрифтом"]}
     monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(fake))
     a, ta = _client(app, config, conn, 1)
-    assert "Чек не прошёл проверку" in _send(a, ta, RECEIPT_PNG).text
-    odd = {**SEEN, "forgery": "suspicious", "signs": ["размытие вокруг суммы"]}
+    assert "создана" in _send(a, ta, RECEIPT_PNG).text                 # не отклонён — админ видит причину
+    assert "🚨 Чек изменён / ненастоящий: сумма другим шрифтом" in captions[-1]
+    conn.execute("UPDATE payments SET status = 'rejected'")
+    odd = {**SEEN, "forgery": "suspicious", "signs": ["размытие вокруг суммы"], "txn_id": "QQ-7654321"}
     monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(odd))
-    assert "создана" in _send(a, ta, RECEIPT_PNG).text
+    assert "создана" in _send(a, ta, RECEIPT_PNG + b"2").text
     assert "Есть признаки правки чека: размытие вокруг суммы" in captions[-1]
 
 
@@ -207,7 +209,7 @@ def test_resent_receipt_caught_even_if_bank_read_differently(app, config, conn, 
     a, ta = _client(app, config, conn, 1)
     assert "Заявка #1 создана" in _send(a, ta, RECEIPT_PNG).text
     b, tb = _client(app, config, conn, 2)
-    assert "Чек не прошёл проверку" in _send(b, tb, RECEIPT_PNG + b"cropped").text
+    assert "создана" in _send(b, tb, RECEIPT_PNG + b"cropped").text and _flags(conn)["dup_of"] == 1
 
 
 def test_two_real_transfers_same_minute_and_sum_both_accepted(app, config, conn, monkeypatch):
@@ -228,7 +230,7 @@ def test_receipt_of_fake_payment_cannot_be_reused(app, config, conn, monkeypatch
     _send(a, ta, RECEIPT_PNG)
     conn.execute("UPDATE payments SET status = 'fake' WHERE id = 1")
     b, tb = _client(app, config, conn, 2)
-    assert "Чек не прошёл проверку" in _send(b, tb, RECEIPT_PNG + b"x").text
+    assert "создана" in _send(b, tb, RECEIPT_PNG + b"x").text and _flags(conn)["dup_of"] == 1
 
 
 def test_fresh_receipt_rule_and_admin_setting():
@@ -238,3 +240,61 @@ def test_fresh_receipt_rule_and_admin_setting():
     assert receipt_ai.verdict(ok, b"", "png", ours, "2026-10-02T08:00") == []           # заявка через 23 часа
     assert "старый" in receipt_ai.verdict(ok, b"", "png", ours, "2026-10-02T12:00")[0]  # через 31 час — нет
     assert receipt_ai.verdict(ok, b"", "png", ours, "2026-10-02T12:00", max_age_hours=48) == []
+
+
+def test_guest_receipt_only_must_be_a_receipt(app, config, conn, monkeypatch):
+    """Покупатель без регистрации: отклоняется только «не чек». Повтор не отклоняется — админ видит пометку."""
+    from donatix import payments, quickbuy, tgbot
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
+    config.pay_methods = {"alif": "Алиф: +992 90 000 00 00"}
+    c, token = _client(app, config, conn, 90)
+    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(SEEN))
+    _send(c, token, RECEIPT_PNG)                                   # обычный клиент: чек принят
+    first = conn.execute("SELECT id FROM payments ORDER BY id DESC LIMIT 1").fetchone()["id"]
+    payments.confirm(conn, config, first, 1)
+
+    gid = quickbuy.new_guest(conn)
+    guest = accounts.get_user(conn, gid)
+    def new_pay():
+        return payments.create(conn, config, guest, "alif", "5", for_purchase=True)
+    pid = new_pay()                                                # тот же чек у гостя — не отклоняется
+    payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG)
+    row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
+    assert row["receipt_file"] and json.loads(row["receipt_ai"])["dup_of"] == first
+    assert f"ЭТОТ ЧЕК УЖЕ БЫЛ — заявка #{first}" in tgbot.receipt_text(conn, config, pid)
+    payments.cancel(conn, gid, pid, config)
+
+    old = {**SEEN, "txn_id": "ZZ-1", "datetime": "2020-01-01 10:00", "amount": 7}   # старый чек — гостю можно
+    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(old))
+    pid = new_pay()
+    payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG + b"2")
+    payments.cancel(conn, gid, pid, config)
+
+    photo = {**SEEN, "is_receipt": False, "txn_id": "", "amount": 0}                 # не чек — нельзя
+    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(photo))
+    pid = new_pay()
+    try:
+        payments.attach_receipt(conn, config, gid, pid, RECEIPT_PNG + b"3")
+        raise AssertionError("фото без чека принято")
+    except payments.PaymentError:
+        pass
+    assert conn.execute("SELECT receipt_file FROM payments WHERE id = ?", (pid,)).fetchone()[0] is None
+
+
+def test_old_receipt_is_accepted_and_admin_sees_why(app, config, conn, monkeypatch):
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
+    old = {**SEEN, "datetime": "2020-01-01 10:00"}
+    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(old))
+    a, ta = _client(app, config, conn, 1)
+    assert "создана" in _send(a, ta, RECEIPT_PNG).text
+    assert "🚨 Чек старый" in receipt_ai.summary(_flags(conn), "545", "TJS")
+
+
+def test_photo_that_is_not_a_receipt_is_rejected(app, config, conn, monkeypatch):
+    monkeypatch.setattr("donatix.worker.notify_admin_file", lambda *a, **k: None)
+    monkeypatch.setattr("donatix.worker.notify_admin", lambda *a, **k: None)
+    photo = {**SEEN, "is_receipt": False, "txn_id": "", "amount": 0}
+    monkeypatch.setattr(receipt_ai, "read", lambda cfg, data, ext, **k: receipt_ai.clean(photo))
+    a, ta = _client(app, config, conn, 1)
+    assert "Чек не прошёл проверку" in _send(a, ta, RECEIPT_PNG).text
+    assert conn.execute("SELECT COUNT(*) FROM payments WHERE receipt_file IS NOT NULL").fetchone()[0] == 0

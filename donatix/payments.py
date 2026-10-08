@@ -560,6 +560,12 @@ def attach_receipt(conn: sqlite3.Connection, config: Config, user_id: int, payme
         max_age = receipt_ai.MAX_AGE_HOURS
     reasons = (receipt_ai.verdict(seen, data, ext, details, p["created_at"], max_age_hours=max_age)
                if p else [])
+    # Отсекаем только «не чек» (другое фото). Возраст, получатель, признаки правки, повтор — не повод
+    # отклонить: админ видит это в заявке крупно и решает сам.
+    not_receipt = "это не чек о переводе"
+    if seen and reasons:
+        seen = {**seen, "checks": [r for r in reasons if r != not_receipt]}
+    reasons = [not_receipt] if not_receipt in reasons else []
     own_tx = not conn.in_transaction
     if own_tx:   # проверка повтора и запись — под одной блокировкой, иначе два одинаковых чека пройдут разом
         conn.execute("BEGIN IMMEDIATE")
@@ -593,8 +599,9 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
     # Отклонённые тоже считаем: тот же чек не должен пройти со второй попытки у другого проверяющего
     dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? "
                        f"AND status IN {receipt_ai.USED}", (digest, payment_id)).fetchone()
-    if dup or (seen and receipt_ai.duplicate(conn, payment_id, seen)):
-        raise PaymentError(REJECTED_TEXT)
+    twin = dup or (receipt_ai.duplicate(conn, payment_id, seen) if seen else None)
+    if twin:   # повтор не отклоняем — админ видит в заявке «ЭТОТ ЧЕК УЖЕ БЫЛ»
+        seen = {**(seen or {}), "dup_of": twin["id"]}
     if reasons:   # чужие реквизиты, подделка, не чек — не принимаем вовсе
         raise ReceiptRejected(reasons)
     if seen:
