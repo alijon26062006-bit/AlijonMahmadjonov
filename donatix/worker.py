@@ -140,6 +140,11 @@ class Worker:
                     finance.maybe_send(conn, self.config)  # в 12:00 — деньги за сутки 12:00 → 12:00
                 except Exception:
                     log.exception("утренний отчёт")
+                try:
+                    from . import housekeeping
+                    housekeeping.maybe_run(conn, self.config.tz_offset)   # в 4 утра — убрать служебный мусор
+                except Exception:
+                    log.exception("уборка")
                 if now - last_watch >= 3600 or last_watch == 0:
                     try:
                         from . import bot_watch
