@@ -2187,3 +2187,26 @@ input, select, textarea { font-size: .95rem; }
 .pp-ico { width: 24px; height: 24px; border-radius: 7px; }
 .pp-name { font-size: .88rem; }
 .pp-price { font-size: .9rem; }
+/* Заказы — ещё компактнее */
+.fc-hero { padding: 14px 16px; margin: 8px 0 10px; border-radius: 16px; }
+.fc-hero h1 { font-size: 1.25rem; }
+.fc-hero p { font-size: .85rem; margin-top: 4px; }
+.fc-box { padding: 10px; border-radius: 18px; }
+.fc-filter { padding: 10px; border-radius: 14px; }
+.fc-filter input[type=search], .fc-selects select { height: 40px; border-radius: 12px; font-size: .9rem; }
+.fc-selects { gap: 8px; margin-top: 8px; }
+.fc-selects .label-caps { margin-bottom: 4px; font-size: .68rem; }
+.fc-dates { margin-top: 8px; }
+.fc-pager { margin-top: 8px; padding-top: 8px; gap: 6px; }
+.fc-pg { min-width: 32px; height: 32px; border-radius: 10px; font-size: .85rem; }
+.fc-sep { margin: 10px 4px; }
+.fc-list { gap: 6px; }
+.fc-list .order-card { padding: 9px 10px; border-radius: 14px; gap: 10px; }
+.fc-list .order-card .oc-img { width: 40px; height: 40px; border-radius: 10px; }
+.fc-list .order-card .title { font-size: .88rem; }
+.fc-list .order-card .amount { font-size: .88rem; }
+.fc-list .order-card .oc-line { font-size: .75rem; margin-top: 2px; }
+.fc-list .order-card .meta { margin-top: 5px; gap: 6px; }
+.fc-list .order-card .meta .status { width: 20px; height: 20px; }
+.fc-list .order-card .meta .status .ico { width: 11px; height: 11px; }
+.fc-list .order-card .meta .pill { font-size: .7rem; padding: 2px 8px; }
