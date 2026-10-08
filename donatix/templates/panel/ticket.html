@@ -1,0 +1,22 @@
+{% extends "panel/_layout.html" %}
+{% block title %}Обращение #{{ t.id }} — {{ site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero">
+  <a class="back" href="/panel/support">← Все обращения</a>
+  <h1>#{{ t.id }} · {{ t.subject }}</h1>
+  <p>{{ topics.get(t.topic, '') }}{% if t.order_ref %} · {{ t.order_ref }}{% endif %} · <b>{{ statuses[t.status] }}</b></p>
+</section>
+<div class="card tk-card">
+  {% set mine = 'client' %}{% set data_url = '/panel/data/ticket/' ~ t.id %}
+  {% include "_ticket_chat.html" %}
+  <form class="tk-reply" method="post" action="/panel/support/{{ t.id }}" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <textarea name="text" rows="2" maxlength="3000" placeholder="{{ 'Напишите — обращение откроется снова' if t.status == 'closed' else 'Ваше сообщение…' }}"></textarea>
+    <div class="tk-reply-row">
+      <label class="btn sm" title="Скриншот">📎<input type="file" name="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden></label>
+      <button class="btn primary">Отправить</button>
+      {% if t.status != 'closed' %}<button class="btn sm" name="action" value="close" formnovalidate style="margin-left:auto">✅ Проблема решена</button>{% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

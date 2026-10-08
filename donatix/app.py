@@ -265,6 +265,8 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     app.include_router(compat.router)
     app.include_router(web.router)
     app.include_router(admin.router)
+    from . import support_app
+    app.include_router(support_app.router)
 
     @app.exception_handler(api.ApiError)
     async def _api_error(request: Request, exc: api.ApiError):

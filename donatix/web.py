@@ -1520,12 +1520,98 @@ def panel_balance_cancel(payment_id: int, request: Request, user=Depends(panel_u
 @router.get("/panel/support")
 def panel_support(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
                   config: Config = Depends(get_config)):
-    """Поддержка в Telegram: одноразовый код — бот узнаёт клиента без email и без AI."""
-    from . import supportbot
+    """Поддержка: мои обращения (тикеты) и новое обращение; Telegram-бот поддержки — запасным путём."""
+    from . import supportbot, tickets
     bot = supportbot.bot_username(conn, config)
-    code = supportbot.make_link_code(conn, user["id"])
-    return render(request, "panel/support.html", {"user": user, "bot": bot, "code": code,
-                                                   "minutes": supportbot.LINK_TTL // 60})
+    recent = conn.execute("SELECT public_id, product_name FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 10",
+                          (user["id"],)).fetchall()
+    return render(request, "panel/support.html", {
+        "user": user, "items": tickets.listing(conn, user["id"]), "topics": tickets.TOPICS,
+        "statuses": tickets.STATUS, "recent": recent, "bot": bot,
+        "code": supportbot.make_link_code(conn, user["id"]) if bot else "",
+        "minutes": supportbot.LINK_TTL // 60, "pre_order": request.query_params.get("order", "")[:40]})
+
+
+@router.post("/panel/support", dependencies=[Depends(check_csrf)])
+def panel_support_new(request: Request, subject: str = Form(""), topic: str = Form("other"),
+                      order_ref: str = Form(""), text: str = Form(""), file: UploadFile | None = File(None),
+                      user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import tickets
+    data = file.file.read(tickets.MAX_FILE + 1) if file and file.filename else b""
+    try:
+        tid = tickets.create(conn, config, user["id"], subject, topic, order_ref, text, data)
+    except tickets.TicketError as exc:
+        flash(request, str(exc), "error")
+        return _redirect("/panel/support")
+    flash(request, f"Обращение #{tid} отправлено. Ответ придёт сюда и уведомлением — обычно в течение часа.")
+    return _redirect(f"/panel/support/{tid}")
+
+
+def _ticket_view(conn, ticket_id: int, base: str) -> list[dict]:
+    from . import tickets
+    return [{"id": m["id"], "author": m["author"], "who": m["who"] or "", "text": m["text"],
+             "file": f"{base}/{m['file']}" if m["file"] else "", "at": m["created_at"]}
+            for m in tickets.messages(conn, ticket_id)]
+
+
+@router.get("/panel/support/{ticket_id:int}")
+def panel_ticket(ticket_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn)):
+    from . import tickets
+    t = tickets.get(conn, ticket_id, user["id"])
+    if t is None:
+        flash(request, "Обращение не найдено.", "error")
+        return _redirect("/panel/support")
+    tickets.seen(conn, ticket_id, "client")
+    return render(request, "panel/ticket.html", {
+        "user": user, "t": t, "msgs": _ticket_view(conn, ticket_id, "/panel/ticket-files"),
+        "topics": tickets.TOPICS, "statuses": tickets.STATUS})
+
+
+@router.post("/panel/support/{ticket_id:int}", dependencies=[Depends(check_csrf)])
+def panel_ticket_reply(ticket_id: int, request: Request, text: str = Form(""), action: str = Form(""),
+                       file: UploadFile | None = File(None), user=Depends(panel_user), conn=Depends(get_conn),
+                       config: Config = Depends(get_config)):
+    from . import tickets
+    if tickets.get(conn, ticket_id, user["id"]) is None:
+        return _redirect("/panel/support")
+    if action == "close":
+        tickets.set_status(conn, ticket_id, closed=True)
+        flash(request, "Обращение закрыто. Если проблема вернётся — напишите сюда же, оно откроется снова.")
+        return _redirect(f"/panel/support/{ticket_id}")
+    data = file.file.read(tickets.MAX_FILE + 1) if file and file.filename else b""
+    try:
+        tickets.add(conn, config, ticket_id, "client", text, data)
+    except tickets.TicketError as exc:
+        flash(request, str(exc), "error")
+    return _redirect(f"/panel/support/{ticket_id}#end")
+
+
+@router.get("/panel/data/ticket/{ticket_id}")
+def panel_ticket_data(ticket_id: int, after: int = 0, user=Depends(panel_user), conn=Depends(get_conn)):
+    """Новые сообщения тикета — страница чата спрашивает раз в несколько секунд."""
+    from . import tickets
+    t = tickets.get(conn, ticket_id, user["id"])
+    if t is None:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    msgs = [m for m in _ticket_view(conn, ticket_id, "/panel/ticket-files") if m["id"] > after]
+    if any(m["author"] == "admin" for m in msgs):
+        tickets.seen(conn, ticket_id, "client")
+    return JSONResponse({"status": t["status"], "messages": msgs}, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/panel/ticket-files/{name}")
+def panel_ticket_file(name: str, user=Depends(panel_user), conn=Depends(get_conn),
+                      config: Config = Depends(get_config)):
+    """Скриншот из тикета — только хозяину тикета."""
+    from fastapi.responses import FileResponse
+
+    from . import tickets
+    row = conn.execute("SELECT 1 FROM ticket_messages m JOIN tickets t ON t.id = m.ticket_id "
+                       "WHERE m.file = ? AND t.user_id = ?", (name, user["id"])).fetchone()
+    path = tickets.files_dir(config) / name
+    if row is None or not path.is_file():
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return FileResponse(path, headers={"Cache-Control": "private, max-age=86400"})
 
 
 @router.post("/panel/support/code", dependencies=[Depends(check_csrf)])

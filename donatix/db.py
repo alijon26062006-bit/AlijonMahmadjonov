@@ -518,6 +518,30 @@ CREATE TABLE IF NOT EXISTS tg_logins (          -- вход на сайт чер
     ip           TEXT,
     link_user_id INTEGER                       -- привязка Telegram к уже открытому аккаунту
 );
+CREATE TABLE IF NOT EXISTS tickets (            -- поддержка на сайте: обращение клиента, переписка как чат
+    id              INTEGER PRIMARY KEY,
+    user_id         INTEGER NOT NULL REFERENCES users(id),
+    subject         TEXT NOT NULL,
+    topic           TEXT NOT NULL DEFAULT 'other',   -- order | payment | account | other
+    order_ref       TEXT,                            -- dx-123 или #45 — о чём обращение
+    status          TEXT NOT NULL DEFAULT 'open',    -- open (ждёт ответа) | answered | closed
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
+    client_seen_at  TEXT,
+    admin_seen_at   TEXT
+);
+CREATE INDEX IF NOT EXISTS tickets_user ON tickets(user_id, id);
+CREATE INDEX IF NOT EXISTS tickets_status ON tickets(status, updated_at);
+CREATE TABLE IF NOT EXISTS ticket_messages (
+    id          INTEGER PRIMARY KEY,
+    ticket_id   INTEGER NOT NULL REFERENCES tickets(id),
+    author      TEXT NOT NULL,                   -- client | admin
+    who         TEXT,                            -- кто из поддержки ответил
+    text        TEXT NOT NULL DEFAULT '',
+    file        TEXT,                            -- скриншот: имя файла в data/tickets
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ticket_messages_ticket ON ticket_messages(ticket_id, id);
 CREATE TABLE IF NOT EXISTS guest_keys (         -- покупка без регистрации: код покупателя и «запомнить браузер»
     user_id     INTEGER PRIMARY KEY REFERENCES users(id),
     code        TEXT NOT NULL UNIQUE,              -- G-7K3M9Q: его видит покупатель, по нему ищет админ

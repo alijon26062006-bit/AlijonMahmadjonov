@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Тикеты поддержки</title>
+<meta name="robots" content="noindex">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff); --bg2: var(--tg-theme-secondary-bg-color, #f1f2f7);
+    --text: var(--tg-theme-text-color, #14161f); --muted: var(--tg-theme-hint-color, #8a8f9e);
+    --accent: var(--tg-theme-button-color, #4f46e5); --accent-text: var(--tg-theme-button-text-color, #ffffff);
+    --line: color-mix(in srgb, var(--muted) 25%, transparent); --bad: #e5484d; --ok: #30a46c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg2); color: var(--text); font: 15px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; gap: 6px; padding: 10px 12px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .tab { flex: 1; padding: 8px 6px; border: 0; border-radius: 10px; background: var(--bg2); color: var(--text); font: inherit; font-weight: 600; font-size: 13px; }
+  .tab.on { background: var(--accent); color: var(--accent-text); }
+  .list { padding: 10px 12px 24px; display: flex; flex-direction: column; gap: 8px; }
+  .row { display: flex; gap: 10px; padding: 12px; border-radius: 14px; background: var(--bg); text-decoration: none; color: inherit; }
+  .row .ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--bg2); }
+  .row .grow { flex: 1; min-width: 0; }
+  .row b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .sub { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); align-self: center; flex: none; }
+  .empty, .err { padding: 40px 16px; text-align: center; color: var(--muted); }
+  .err { color: var(--bad); }
+  .head { padding: 12px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .head b { display: block; font-size: 16px; }
+  .head .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; }
+  .chip { flex: none; padding: 4px 9px; border-radius: 999px; background: var(--bg2); font-size: 12px; white-space: nowrap; }
+  .chat { padding: 12px 12px 140px; display: flex; flex-direction: column; gap: 8px; }
+  .msg { max-width: 84%; padding: 9px 12px; border-radius: 16px; background: var(--bg); }
+  .msg.me { align-self: flex-end; background: var(--accent); color: var(--accent-text); border-bottom-right-radius: 6px; }
+  .msg.them { align-self: flex-start; border-bottom-left-radius: 6px; }
+  .msg .who { font-size: 11px; opacity: .7; margin-bottom: 3px; }
+  .msg .txt { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg img { display: block; max-width: 220px; max-height: 260px; border-radius: 10px; margin-top: 6px; }
+  .compose { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); }
+  .compose textarea { width: 100%; min-height: 44px; max-height: 140px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg2); color: var(--text); font: inherit; resize: none; }
+  .actions { display: flex; gap: 6px; margin-top: 6px; }
+  .btn { flex: 1; padding: 10px; border: 0; border-radius: 12px; font: inherit; font-weight: 600; background: var(--bg2); color: var(--text); }
+  .btn.main { background: var(--accent); color: var(--accent-text); }
+  .back { border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; padding: 0 0 6px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="empty">Загрузка…</div></div>
+<script>
+(function () {
+  var tg = window.Telegram && Telegram.WebApp, app = document.getElementById("app");
+  if (tg) { tg.ready(); tg.expand(); }
+  var init = tg ? tg.initData : "";
+  var state = {status: "active", ticket: null, last: 0, timer: null};
+  var start = new URLSearchParams(location.search).get("t") || (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param);
+
+  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+  function when(iso) { try { var d = new Date(iso.replace(/\.\d+Z$/, "Z")); return d.toLocaleString("ru-RU", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"}); } catch (e) { return ""; } }
+  function api(path, body) {
+    return fetch("/support-app/api/" + path, {method: "POST", headers: {"Content-Type": "application/json", "X-Tg-Init": init},
+      body: JSON.stringify(body || {})}).then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "Ошибка"); return d; }); });
+  }
+  function fail(e) { app.innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }
+  function haptic() { try { tg.HapticFeedback.impactOccurred("light"); } catch (e) {} }
+
+  function showList() {
+    clearInterval(state.timer); state.ticket = null;
+    if (tg) tg.BackButton.hide();
+    api("list", {status: state.status}).then(function (d) {
+      var tabs = [["active", "Открытые"], ["open", "Ждут · " + d.open], ["closed", "Закрытые"], ["all", "Все"]];
+      var html = '<div class="bar">' + tabs.map(function (t) {
+        return '<button class="tab ' + (t[0] === state.status ? "on" : "") + '" data-s="' + t[0] + '">' + esc(t[1]) + '</button>'; }).join("") + '</div><div class="list">';
+      if (!d.items.length) html += '<div class="empty">Тикетов нет 🎉</div>';
+      d.items.forEach(function (t) {
+        var ico = t.status === "closed" ? "✅" : (t.status === "answered" ? "💬" : "⏳");
+        html += '<a class="row" href="#" data-id="' + t.id + '"><span class="ico">' + ico + '</span><div class="grow"><b>#' + t.id + ' · ' + esc(t.subject) +
+          '</b><div class="sub">' + esc(t.client) + (t.order_ref ? " · " + esc(t.order_ref) : "") + " · " + when(t.at) + '</div><div class="sub">' +
+          (t.last_author === "admin" ? "🛟 " : "👤 ") + esc(t.last) + '</div></div>' + (t.new ? '<span class="dot"></span>' : "") + '</a>';
+      });
+      app.innerHTML = html + '</div>';
+      app.querySelectorAll(".tab").forEach(function (b) { b.onclick = function () { state.status = b.dataset.s; showList(); }; });
+      app.querySelectorAll(".row").forEach(function (a) { a.onclick = function (e) { e.preventDefault(); openTicket(+a.dataset.id); }; });
+    }).catch(fail);
+  }
+
+  function bubble(m) {
+    return '<div class="msg ' + (m.author === "admin" ? "me" : "them") + '"><div class="who">' + (m.author === "admin" ? "🛟 " + esc(m.who || "Поддержка") : "👤 Клиент") +
+      ' · ' + when(m.at) + '</div>' + (m.text ? '<div class="txt">' + esc(m.text) + '</div>' : "") +
+      (m.file ? (m.file.indexOf(".pdf") > 0 ? '<a href="' + esc(m.file) + '" target="_blank">📎 PDF</a>' : '<a href="' + esc(m.file) + '" target="_blank"><img src="' + esc(m.file) + '" alt=""></a>') : "") + '</div>';
+  }
+
+  function openTicket(id) {
+    clearInterval(state.timer);
+    api("ticket", {id: id}).then(function (t) {
+      state.ticket = t.id; state.last = t.messages.length ? t.messages[t.messages.length - 1].id : 0;
+      if (tg) { tg.BackButton.show(); }
+      var closed = t.status === "closed";
+      app.innerHTML = '<div class="head"><button class="back" id="back">‹ Все тикеты</button><b>#' + t.id + ' · ' + esc(t.subject) + '</b><div class="sub">' +
+        esc(t.client) + ' · ' + esc(t.topic) + (t.order_ref ? ' · ' + esc(t.order_ref) : '') + ' · баланс $' + esc(t.balance) + ' · <b>' + esc(t.status_title) + '</b></div>' +
+        (t.orders.length ? '<div class="chips">' + t.orders.map(function (o) { return '<span class="chip">' + esc(o.id) + ' · ' + esc(o.name.slice(0, 26)) + ' · ' + esc(o.status) + '</span>'; }).join("") + '</div>' : '') +
+        '</div><div class="chat" id="chat">' + t.messages.map(bubble).join("") + '</div>' +
+        '<div class="compose"><textarea id="txt" placeholder="Ответ клиенту…"></textarea><div class="actions">' +
+        '<button class="btn main" id="send">Отправить</button><button class="btn" id="sendclose">Ответить и закрыть</button>' +
+        '<button class="btn" id="toggle">' + (closed ? "↩️ Открыть" : "✅ Закрыть") + '</button></div></div>';
+      window.scrollTo(0, document.body.scrollHeight);
+      document.getElementById("back").onclick = showList;
+      function send(close) {
+        var box = document.getElementById("txt"), text = box.value.trim();
+        if (!text) { box.focus(); return; }
+        api("reply", {id: t.id, text: text, close: close}).then(function () { haptic(); box.value = ""; close ? showList() : poll(); }).catch(function (e) { alert(e.message); });
+      }
+      document.getElementById("send").onclick = function () { send(false); };
+      document.getElementById("sendclose").onclick = function () { send(true); };
+      document.getElementById("toggle").onclick = function () { api("status", {id: t.id, closed: !closed}).then(function () { haptic(); openTicket(t.id); }); };
+      state.timer = setInterval(poll, 5000);
+    }).catch(fail);
+  }
+
+  function poll() {
+    if (!state.ticket || document.hidden) return;
+    api("ticket", {id: state.ticket, after: state.last}).then(function (t) {
+      if (!t.messages.length) return;
+      var chat = document.getElementById("chat"); if (!chat) return;
+      t.messages.forEach(function (m) { chat.insertAdjacentHTML("beforeend", bubble(m)); state.last = m.id; });
+      window.scrollTo(0, document.body.scrollHeight);
+    }).catch(function () {});
+  }
+
+  if (tg) tg.BackButton.onClick(showList);
+  if (!init) { fail(new Error("Откройте это из бота поддержки в Telegram.")); return; }
+  start ? openTicket(+start) : showList();
+})();
+</script>
+</body>
+</html>

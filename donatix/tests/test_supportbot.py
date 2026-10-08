@@ -121,12 +121,16 @@ def test_email_code_locks_after_wrong_tries(config, conn):
     assert supportbot.check_email_code(conn, 6, code)[0] == "none"     # чужой Telegram код не подойдёт
 
 
-def test_support_page_code_without_known_bot_name(client, conn):
+def test_support_page_is_tickets_with_telegram_bot_as_extra(client, conn):
     from conftest import web_login
+    from donatix import db
     make_client(conn)
     web_login(client, "shop1@example.com", "password123")
     page = client.get("/panel/support").text
-    assert "DX-" in page and "ещё не подключён" not in page
+    assert "Открыть обращение" in page and "DX-" not in page            # бот неизвестен — только тикеты
+    db.set_setting(conn, "support.bot_username", "dx_help_bot")
+    page = client.get("/panel/support").text
+    assert "Открыть обращение" in page and "@dx_help_bot" in page and "DX-" in page   # бот — запасным путём
 
 
 def test_ai_loop_uses_tools_and_remembers(config, conn):

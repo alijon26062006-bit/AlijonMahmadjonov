@@ -994,6 +994,16 @@ class SupportBot:
 
     def _admin_reply(self, conn: sqlite3.Connection, msg: dict[str, Any], text: str) -> None:
         original = (msg.get("reply_to_message") or {}).get("text") or ""
+        tk = re.search(r"(?:Новый тикет|Сообщение в тикете) #(\d+)", original)
+        if tk and text:   # reply на тикет с сайта — ответ уходит в тикет, клиент видит его на сайте
+            from . import tickets
+            try:
+                tickets.add(conn, self.config, int(tk.group(1)), "admin", text, who="поддержка (Telegram)")
+            except tickets.TicketError as exc:
+                self.send(self.admin_chat, str(exc))
+                return
+            self.send(self.admin_chat, f"✅ Ответ добавлен в тикет #{tk.group(1)} — клиент увидит его на сайте.")
+            return
         m = re.search(r"tg(\d+)", original)
         if not m or not text:
             self.send(self.admin_chat, "Чтобы ответить клиенту, сделайте reply на его обращение (🆘 …).")

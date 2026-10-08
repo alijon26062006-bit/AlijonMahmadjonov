@@ -1,26 +1,64 @@
 {% extends "panel/_layout.html" %}
 {% from "_icons.html" import icon, tg_logo %}
-{% block title %}Поддержка в Telegram — {{ site_name }}{% endblock %}
+{% block title %}Поддержка — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="page-hero">
-  <h1>Поддержка в Telegram</h1>
-  <p>Помощник отвечает сразу, по-таджикски и по-русски: заказы, пополнения, баланс, свой бот.</p>
-</section>
-{% if not code %}
-<div class="card empty">Бот поддержки ещё не подключён.</div>
-{% else %}
-<div class="card support-card">
-  <div class="sc-step"><span class="n">1</span><div>
-    <b>Нажмите кнопку</b> — откроется бот, и он сразу узнает ваш аккаунт.
-    {% if bot %}<a class="btn primary lg block sc-open" href="https://t.me/{{ bot }}?start={{ code }}" target="_blank" rel="noopener">{{ tg_logo(22) }}Открыть бота @{{ bot }}</a>{% endif %}
-  </div></div>
-  <div class="sc-step"><span class="n">2</span><div>
-    <b>Или напишите боту свой email</b> — код придёт в 🔔 Уведомления. Ещё можно открыть {% if bot %}<a href="https://t.me/{{ bot }}" target="_blank" rel="noopener">@{{ bot }}</a>{% else %}бота поддержки{% endif %} и отправьте этот код:
-    <div class="sc-code"><code id="sc-code">DX-{{ code }}</code>
-      <button class="btn sm" type="button" data-copy="DX-{{ code }}">{{ icon('copy', 16) }}Копировать</button></div>
-    <div class="muted small">Код одноразовый, действует {{ minutes }} минут. Нужен новый — обновите страницу.</div>
-  </div></div>
-  <p class="hint">{{ icon('shield', 16) }} Никому не пересылайте код: с ним видны ваши заказы и баланс.</p>
+<section class="fc-hero"><h1>Поддержка</h1><p>Опишите проблему — ответим здесь и уведомлением, обычно в течение часа.</p></section>
+
+{% if items %}
+<div class="fc-box" style="margin-bottom:14px">
+  <div class="list fc-list">
+    {% for t in items %}
+    <a class="item tk-row {{ 'closed' if t.status == 'closed' }}" href="/panel/support/{{ t.id }}">
+      <span class="tk-ico {{ t.status }}">{{ '✅' if t.status == 'closed' else ('💬' if t.status == 'answered' else '⏳') }}</span>
+      <div class="grow">
+        <div class="head"><span class="title">#{{ t.id }} · {{ t.subject }}</span>{% if t.new_for_client %}<span class="badge accent">новый ответ</span>{% endif %}</div>
+        <div class="sub oc-line">{{ statuses[t.status] }} · {{ t.updated_at | dt }}{% if t.last_text %} · {{ t.last_text[:60] }}{% endif %}</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
 </div>
 {% endif %}
+
+<form class="card tk-new" method="post" action="/panel/support" enctype="multipart/form-data" id="tk-new">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h3 style="margin-top:0">{{ 'Новое обращение' if items else 'Открыть обращение' }}</h3>
+  <div class="fc-selects">
+    <div><label class="label-caps" for="topic">О чём</label>
+      <select id="topic" name="topic">{% for k, v in topics.items() %}<option value="{{ k }}" {{ 'selected' if (pre_order and k == 'order') }}>{{ v }}</option>{% endfor %}</select></div>
+    <div><label class="label-caps" for="order_ref">Номер заказа</label>
+      <input id="order_ref" name="order_ref" list="my-orders" value="{{ pre_order }}" placeholder="dx-123 или #45" autocomplete="off">
+      <datalist id="my-orders">{% for o in recent %}<option value="{{ o.public_id }}">{{ o.product_name }}</option>{% endfor %}</datalist></div>
+  </div>
+  <label for="subject">Тема</label>
+  <input id="subject" name="subject" maxlength="120" placeholder="Например: алмазы не пришли">
+  <label for="text">Сообщение</label>
+  <textarea id="text" name="text" rows="5" maxlength="3000" required placeholder="Что случилось? Укажите ID игрока, сумму, время — так ответим быстрее."></textarea>
+  <label class="file-drop" for="file" style="margin-top:10px">
+    <input id="file" name="file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
+    <span class="fd-ico">📎</span><span class="fd-text"><b>Приложить скриншот</b><small>необязательно · JPG, PNG или PDF</small></span>
+  </label>
+  <button class="btn primary lg block" style="margin-top:14px">Отправить обращение</button>
+</form>
+
+{% if bot %}
+<details class="card tk-tg">
+  <summary>{{ tg_logo(20) }} Или напишите в Telegram-бот поддержки @{{ bot }}</summary>
+  <p class="muted small">Нажмите кнопку — бот сразу узнает ваш аккаунт.</p>
+  <a class="btn block" href="https://t.me/{{ bot }}?start={{ code }}" target="_blank" rel="noopener">{{ tg_logo(20) }}Открыть @{{ bot }}</a>
+  <p class="muted small">Или отправьте боту код <code>DX-{{ code }}</code> — действует {{ minutes }} минут.</p>
+</details>
+{% endif %}
+<script>
+  (function () {
+    var f = document.getElementById("file"); if (!f) return;
+    f.addEventListener("change", function () {
+      var drop = f.closest(".file-drop"), x = f.files && f.files[0];
+      drop.classList.toggle("has-file", !!x);
+      drop.querySelector(".fd-ico").textContent = x ? "✅" : "📎";
+      drop.querySelector(".fd-text b").textContent = x ? "Скриншот приложен" : "Приложить скриншот";
+      drop.querySelector(".fd-text small").textContent = x ? x.name : "необязательно · JPG, PNG или PDF";
+    });
+  })();
+</script>
 {% endblock %}

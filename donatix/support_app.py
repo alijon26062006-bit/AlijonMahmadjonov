@@ -1,0 +1,142 @@
+"""Мини-приложение бота поддержки: тикеты с сайта — список, переписка как чат, ответ клиенту.
+
+Открывается кнопкой «📂 Открыть и ответить» под уведомлением о тикете или кнопкой «Тикеты» у поля ввода
+в боте поддержки. Кто открыл — узнаём по подписи Telegram (initData, подписана токеном бота): пускаем
+только админа поддержки (DONATIX_SUPPORT_ADMIN_ID, иначе — чат админ-бота).
+"""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+import re
+import time
+from typing import Any
+from urllib.parse import parse_qsl
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import FileResponse, JSONResponse
+
+from . import accounts, tickets
+from .config import Config
+from .deps import get_config, get_conn, templates
+
+router = APIRouter(prefix="/support-app", include_in_schema=False)
+
+INIT_TTL = 24 * 3600
+
+
+def check_init(init_data: str, bot_token: str, now: float | None = None) -> dict[str, Any] | None:
+    """Подпись Telegram WebApp: вернёт пользователя или None, если подпись чужая или старая."""
+    if not init_data or not bot_token:
+        return None
+    pairs = dict(parse_qsl(init_data, keep_blank_values=True))
+    got = pairs.pop("hash", "")
+    check = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+    secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    if not hmac.compare_digest(hmac.new(secret, check.encode(), hashlib.sha256).hexdigest(), got):
+        return None
+    try:
+        if (now or time.time()) - int(pairs.get("auth_date", "0")) > INIT_TTL:
+            return None
+        return json.loads(pairs.get("user") or "{}")
+    except ValueError:
+        return None
+
+
+def _admin(request: Request, config: Config) -> bool:
+    user = check_init(request.headers.get("x-tg-init", ""), config.support_bot_token)
+    return bool(user) and str(user.get("id")) == tickets.admin_chat(config)
+
+
+def _deny() -> JSONResponse:
+    return JSONResponse({"error": "Откройте из бота поддержки (доступ только админу)."}, status_code=403)
+
+
+def _file_sig(config: Config, name: str) -> str:
+    return hmac.new(config.secret_key.encode(), f"tk-file:{name}".encode(), hashlib.sha256).hexdigest()[:24]
+
+
+@router.get("")
+def app_page(request: Request):
+    return templates.TemplateResponse(request, "support_app.html", {})
+
+
+@router.post("/api/list")
+async def api_list(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    if not _admin(request, config):
+        return _deny()
+    body = await request.json()
+    from .tgbot import client_name
+    items = tickets.listing(conn, status=str(body.get("status") or "active"))
+    return {"items": [{"id": t["id"], "subject": t["subject"], "status": t["status"],
+                       "status_title": tickets.STATUS[t["status"]], "topic": tickets.TOPICS.get(t["topic"], ""),
+                       "order_ref": t["order_ref"] or "", "client": client_name(conn, t["user_id"], t["login"]),
+                       "last": (t["last_text"] or "")[:90], "last_author": t["last_author"],
+                       "new": t["new_for_admin"], "at": t["updated_at"]} for t in items],
+            "open": tickets.open_count(conn)}
+
+
+@router.post("/api/ticket")
+async def api_ticket(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    if not _admin(request, config):
+        return _deny()
+    body = await request.json()
+    t = tickets.get(conn, int(body.get("id") or 0))
+    if t is None:
+        return JSONResponse({"error": "Тикет не найден."}, status_code=404)
+    from .money import fmt
+    from .tgbot import client_name
+    u = accounts.get_user(conn, t["user_id"])
+    after = int(body.get("after") or 0)
+    msgs = [{"id": m["id"], "author": m["author"], "who": m["who"] or "", "text": m["text"], "at": m["created_at"],
+             "file": (f"/support-app/file/{m['file']}?s={_file_sig(config, m['file'])}" if m["file"] else "")}
+            for m in tickets.messages(conn, t["id"], after)]
+    tickets.seen(conn, t["id"], "admin")
+    orders = conn.execute("SELECT public_id, product_name, status, total_micro FROM orders WHERE user_id = ? "
+                          "ORDER BY id DESC LIMIT 5", (t["user_id"],)).fetchall()
+    return {"id": t["id"], "subject": t["subject"], "status": t["status"],
+            "status_title": tickets.STATUS[t["status"]], "topic": tickets.TOPICS.get(t["topic"], ""),
+            "order_ref": t["order_ref"] or "", "client": client_name(conn, t["user_id"], u["login"] if u else "?"),
+            "balance": fmt(u["balance_micro"]) if u else "0", "messages": msgs,
+            "orders": [{"id": o["public_id"], "name": o["product_name"], "status": o["status"],
+                        "total": fmt(o["total_micro"])} for o in orders]}
+
+
+@router.post("/api/reply")
+async def api_reply(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    if not _admin(request, config):
+        return _deny()
+    body = await request.json()
+    tid = int(body.get("id") or 0)
+    try:
+        tickets.add(conn, config, tid, "admin", str(body.get("text") or ""), who="поддержка")
+        if body.get("close"):
+            tickets.set_status(conn, tid, closed=True)
+    except tickets.TicketError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return {"ok": True}
+
+
+@router.post("/api/status")
+async def api_status(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    if not _admin(request, config):
+        return _deny()
+    body = await request.json()
+    tid = int(body.get("id") or 0)
+    if tickets.get(conn, tid) is None:
+        return JSONResponse({"error": "Тикет не найден."}, status_code=404)
+    tickets.set_status(conn, tid, closed=bool(body.get("closed")))
+    return {"ok": True}
+
+
+@router.get("/file/{name}")
+def app_file(name: str, s: str = "", config: Config = Depends(get_config)):
+    """Скриншот из тикета — по подписанной ссылке (картинка в <img> не может нести подпись Telegram)."""
+    path = tickets.files_dir(config) / name
+    if (not re.fullmatch(r"[0-9a-f]{20}\.(jpg|png|webp|pdf)", name) or not hmac.compare_digest(s, _file_sig(config, name))
+            or not path.is_file()):
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return FileResponse(path, headers={"Cache-Control": "private, max-age=86400"})
+
