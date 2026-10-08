@@ -14,7 +14,7 @@
       <a class="btn sm hide-sm" href="/login?next={{ here | urlencode }}">Войти</a>
       <a class="btn sm primary" href="/register?next={{ here | urlencode }}">Регистрация</a>
       {% else %}
-      <span class="hide-sm hide-app muted small" style="margin-right:6px">{{ user.login }}</span>
+      <span class="hide-sm hide-app muted small" style="margin-right:6px">{{ 'Гость' if is_guest_account(user) else user.login }}</span>
       <a class="icon-btn bell" href="/panel/notifications" aria-label="Уведомления{{ ': ' ~ unread if unread }}">{{ icon('bell') }}{% if unread %}<span class="dot-count">{{ unread if unread < 100 else '99+' }}</span>{% endif %}</a>
       <span class="cur-switch" role="group" aria-label="Валюта">
         <a href="/currency/USD" class="{{ 'on' if cur_code != 'TJS' }}">USD</a><a href="/currency/TJS" class="{{ 'on' if cur_code == 'TJS' }}">TJS</a>
@@ -44,7 +44,7 @@
       {% if user and not user.guest %}
       <form class="side-logout" method="post" action="/logout" onsubmit="return confirm('Выйти из аккаунта?')">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button class="nav-item" type="submit">{{ icon('logout', 18) }}<span>Выйти · {{ user.login }}</span></button>
+        <button class="nav-item" type="submit">{{ icon('logout', 18) }}<span>Выйти · {{ 'Гость' if is_guest_account(user) else user.login }}</span></button>
       </form>
       {% endif %}
     </div>

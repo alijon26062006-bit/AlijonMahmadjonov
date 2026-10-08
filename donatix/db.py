@@ -433,6 +433,9 @@ def init(path: Path | str) -> None:
                     continue
                 if fp2:
                     conn.execute("UPDATE payments SET receipt_fp2 = ? WHERE id = ?", (fp2, r["id"]))
+        for col in ("intent", "intent_order"):   # покупка без регистрации: что купить после оплаты и какой заказ вышел
+            if col not in pay_cols:
+                conn.execute(f"ALTER TABLE payments ADD COLUMN {col} TEXT")
         if "resolved_who" not in pay_cols:  # кто решил: «кассир Али», «админ (сайт)», «автоматически»…
             conn.execute("ALTER TABLE payments ADD COLUMN resolved_who TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS payments_receipt_hash ON payments(receipt_hash) "

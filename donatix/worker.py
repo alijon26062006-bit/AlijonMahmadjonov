@@ -148,6 +148,11 @@ class Worker:
                         log.exception("проверка ботов")
                     last_watch = now
                 try:
+                    from . import quickbuy
+                    quickbuy.run_pending(conn, self.config, self.supplier)   # оплатили покупку — оформить заказ
+                except Exception:
+                    log.exception("покупка после оплаты")
+                try:
                     from . import cryptopay
                     cryptopay.check_all(conn, self.config, min_interval=60)  # автоплатежи TRC20 / Binance
                 except Exception:

@@ -2,12 +2,12 @@
 {% from "_icons.html" import icon %}
 {% block title %}Баланс — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="page-hero"><h1>Баланс</h1></section>
+<section class="page-hero"><h1>{{ 'Оплата покупки' if buy else 'Баланс' }}</h1></section>
 
 <div class="grid two" style="align-items:start">
   <div class="stack">
-    <div class="stat reveal"><div class="label">Доступно</div><div class="value">{{ money(user.balance_micro) }}</div>
-      <div class="note">Курс для оплаты в сомони: 1 USD = <b id="rate">{{ tjs_rate }}</b> TJS <span class="muted small" id="rate-at">· обновляется каждые 30 с</span></div></div>
+    {% if not buy %}<div class="stat reveal"><div class="label">Доступно</div><div class="value">{{ money(user.balance_micro) }}</div>
+      <div class="note">Курс для оплаты в сомони: 1 USD = <b id="rate">{{ tjs_rate }}</b> TJS <span class="muted small" id="rate-at">· обновляется каждые 30 с</span></div></div>{% endif %}
 
     {% if waiting %}
     <div class="card reveal wait-card" id="wait" data-id="{{ waiting.id }}" role="status" aria-live="polite">
@@ -42,6 +42,15 @@
     {% else %}
     <form class="card reveal" method="post" action="/panel/balance" id="payform" enctype="multipart/form-data">
       <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if buy %}
+      <input type="hidden" name="buy" value="1">
+      <div class="buy-pay">
+        <span class="bp-ico">🛒</span>
+        <div class="grow"><b>Оплата покупки</b><span>{{ buy.title }}</span></div>
+        <div class="bp-sum"><small>К оплате</small><b>{{ buy.tjs }} с.</b></div>
+      </div>
+      <p class="hint" style="margin:8px 0 14px">После оплаты заказ оформится сам — регистрироваться не нужно.</p>
+      {% endif %}
       <div class="step-head"><span class="n">1</span><h3>Способ оплаты</h3></div>
       {% if methods %}
       {% set codes = methods | map(attribute='code') | list %}
@@ -74,14 +83,14 @@
       {% endif %}
       <div id="pay-rest">
       <div class="step-head" style="margin-top:22px"><span class="n">2</span><h3>Сумма</h3></div>
-      <div class="amt-cur" role="radiogroup" aria-label="Валюта суммы">
+      <div class="amt-cur" role="radiogroup" aria-label="Валюта суммы" {{ 'hidden' if buy }}>
         <label><input type="radio" name="amount_cur" value="TJS" checked> сомони</label>
         <label><input type="radio" name="amount_cur" value="USD"> $ доллары</label>
       </div>
-      <label for="amount" id="amount-label">Сколько пополнить, сомони</label>
-      <input id="amount" name="amount_tjs" inputmode="decimal" required placeholder="Например, 500" autocomplete="off">
+      <label for="amount" id="amount-label">{{ 'Сумма покупки, сомони' if buy else 'Сколько пополнить, сомони' }}</label>
+      <input id="amount" name="amount_tjs" inputmode="decimal" required placeholder="Например, 500" autocomplete="off" {% if buy %}value="{{ buy.tjs }}" readonly{% endif %}>
       <div class="flash warn usd-warn" id="usd-warn" hidden role="alert"></div>
-      <div class="hint">{% if min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони (≈ {{ money(min_usd) }}). {% else %}Любая сумма. {% endif %}К переводу: <b id="topay">—</b></div>
+      <div class="hint">{% if buy %}{% elif min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони (≈ {{ money(min_usd) }}). {% else %}Любая сумма. {% endif %}К переводу: <b id="topay">—</b></div>
 
       <div class="step-head" style="margin-top:22px"><span class="n">3</span><h3>Переведите по реквизитам</h3></div>
       {% for m in methods %}
@@ -113,7 +122,7 @@
           <small>Не закрывайте страницу</small>
         </div>
       </div>
-      <p class="hint center">{{ icon('shield', 16) }} После проверки поступления баланс зачислится, вам придёт уведомление.</p>
+      <p class="hint center">{{ icon('shield', 16) }} {{ 'После проверки оплаты заказ оформится сам — придёт уведомление.' if buy else 'После проверки поступления баланс зачислится, вам придёт уведомление.' }}</p>
       </div>
       {% else %}
       <p class="muted" style="margin-top:12px">Способы оплаты ещё не настроены.{% if support_contact %} Напишите {{ support_contact }}.{% endif %}</p>
@@ -122,7 +131,7 @@
     {% endif %}
   </div>
 
-  <div class="card reveal">
+  {% if payments or not buy %}<div class="card reveal">
     <h3>Мои заявки</h3>
     <div class="list" style="margin-top:12px">
       {% for p in payments %}
@@ -143,7 +152,7 @@
       </div>
       {% else %}<div class="empty small">Заявок пока нет.</div>{% endfor %}
     </div>
-  </div>
+  </div>{% endif %}
 </div>
 
 <script>
@@ -154,7 +163,10 @@
     setInterval(function () {
       if (document.hidden) return;
       fetch("/panel/data/payment/" + w.dataset.id, {credentials: "same-origin"}).then(function (r) { return r.json(); })
-        .then(function (d) { if (d.status && d.status !== "pending") location.reload(); }).catch(function () {});
+        .then(function (d) {
+          if (d.order) location.href = "/panel/orders/" + d.order;   // оплатили покупку — сразу к заказу
+          else if (d.status && d.status !== "pending") location.reload();
+        }).catch(function () {});
     }, 8000);
   }
   // Кнопка «Ускорить» появится сама, когда подойдёт время

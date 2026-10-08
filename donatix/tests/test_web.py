@@ -79,7 +79,10 @@ def test_panel_buy_error_shown(client, conn):
     token = web_login(client, "z@example.com", "password123")
     r = client.post("/panel/buy/tg-stars", data={"csrf": token, "idem": "x", "field_telegram_username": "@buyer_one",
                                                 "quantity": "50"})
-    assert r.status_code == 400 and "Недостаточно средств" in r.text
+    assert "Оплата покупки" in r.text            # денег нет — сразу оплата этой покупки, а не ошибка
+    r = client.post("/panel/buy/tg-stars", data={"csrf": token, "idem": "y", "field_telegram_username": "",
+                                                "quantity": "50"})
+    assert r.status_code == 400
 
 
 def test_api_key_lifecycle(client, conn):

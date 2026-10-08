@@ -1,0 +1,18 @@
+{% extends "panel/_layout.html" %}
+{% block title %}Сохранить аккаунт — {{ site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Сохранить аккаунт</h1>
+  <p>Вы купили без регистрации — заказы и баланс сейчас видны только в этом браузере. Укажите почту и пароль, и входите с любого телефона.</p></section>
+<form class="card" method="post" action="/panel/save" style="max-width:520px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if error %}<div class="flash error" role="alert">{{ error }}</div>{% endif %}
+  <label for="email">Email</label>
+  <input id="email" name="email" type="email" autocomplete="email" required value="{{ form.email }}" placeholder="you@gmail.com">
+  <label for="login">Имя пользователя</label>
+  <input id="login" name="login" autocomplete="username" required value="{{ form.login }}" placeholder="Латиница и цифры, например ali_2006">
+  <label for="password">Пароль</label>
+  <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required placeholder="Не меньше 8 символов">
+  <button class="btn primary lg block" style="margin-top:18px">Сохранить</button>
+  {% if google %}<a class="btn block" style="margin-top:10px" href="/auth/google?link=1">Или привязать Google</a>{% endif %}
+</form>
+{% endblock %}

@@ -501,6 +501,31 @@ def panel_password(request: Request, old: str = Form(""), new: str = Form(""), n
     return _redirect("/panel")
 
 
+@router.get("/panel/save")
+def panel_save_form(request: Request, user=Depends(panel_user), config: Config = Depends(get_config)):
+    from . import google_auth, quickbuy
+    if not quickbuy.is_guest(user):
+        return _redirect("/panel")
+    return render(request, "panel/save.html", {"user": user, "form": {"email": "", "login": ""},
+                                               "google": google_auth.enabled(config)})
+
+
+@router.post("/panel/save", dependencies=[Depends(check_csrf)])
+def panel_save(request: Request, email: str = Form(""), login: str = Form(""), password: str = Form(""),
+               user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    """Гость, купивший без регистрации, сохраняет аккаунт: почта, имя и пароль."""
+    from . import google_auth, quickbuy
+    if not quickbuy.is_guest(user):
+        return _redirect("/panel")
+    try:
+        quickbuy.save_account(conn, user["id"], email, login, password)
+    except accounts.AccountError as exc:
+        return render(request, "panel/save.html", {"user": user, "error": str(exc), "google": google_auth.enabled(config),
+                                                   "form": {"email": email, "login": login}}, 400)
+    flash(request, "✅ Аккаунт сохранён. Теперь входите по почте и паролю с любого устройства.")
+    return _redirect("/panel")
+
+
 # ── Вход через Telegram (бот-магазин): номер один раз, дальше — одна кнопка ──
 
 @router.get("/auth/telegram")
@@ -819,7 +844,7 @@ def _telegram_ctx(conn, config: Config, user, tab: str, **extra) -> dict:
 
 
 @router.post("/panel/telegram", dependencies=[Depends(check_csrf)])
-def panel_telegram_buy(request: Request, form: dict = Depends(_form), user=Depends(panel_user),
+def panel_telegram_buy(request: Request, form: dict = Depends(_form), user=Depends(viewer),
                        conn=Depends(get_conn), config: Config = Depends(get_config)):
     p = catalog.get_product(conn, str(form.get("product_id", "")))
     tab = "premium" if p and p["kind"] == "telegram_premium" else "stars"
@@ -828,16 +853,25 @@ def panel_telegram_buy(request: Request, form: dict = Depends(_form), user=Depen
         error = "Выберите план Premium." if form.get("tab") == "premium" else "Товар недоступен."
         return render(request, "panel/telegram.html", _telegram_ctx(
             conn, config, user, str(form.get("tab", "")), error=error, form={"telegram_username": username}), 400)
+    from . import quickbuy
+    qty = form.get("quantity", 1) if tab == "stars" else 1
+    fields = {f["key"]: username for f in p["fields"]}
+    supplier = request.app.state.supplier
     try:
+        if isinstance(user, Guest):   # без регистрации: сначала проверяем поля, потом заводим аккаунт
+            quickbuy.precheck(supplier, p, qty, fields)
+            user = _start_guest(request, conn)
         order, _ = orders.create_order(
-            conn, config, request.app.state.supplier, user, product_id=p["id"],
-            quantity=form.get("quantity", 1) if tab == "stars" else 1,
-            fields={f["key"]: username for f in p["fields"]},
+            conn, config, supplier, user, product_id=p["id"], quantity=qty, fields=fields,
             client_idem_key="panel-" + str(form.get("idem", ""))[:64], source="panel",
         )
     except orders.OrderError as exc:
+        if exc.code == "insufficient_balance":
+            need = quickbuy.need_micro(config, supplier, user, p, qty, fields)
+            return _checkout(request, conn, config, user, [{"product_id": p["id"], "quantity": qty, "fields": fields}],
+                             quickbuy.product_title(p, fields) + (f" × {qty}" if tab == "stars" else ""), need)
         return render(request, "panel/telegram.html", _telegram_ctx(
-            conn, config, accounts.get_user(conn, user["id"]), tab, error=str(exc),
+            conn, config, user if isinstance(user, Guest) else accounts.get_user(conn, user["id"]), tab, error=str(exc),
             form={"telegram_username": username, "quantity": form.get("quantity", ""), "product_id": p["id"]}), 400)
     return _redirect(f"/panel/orders/{order['public_id']}")
 
@@ -873,26 +907,58 @@ def _buy_ctx(request: Request, conn, config: Config, user, p: dict, **extra) -> 
     }
 
 
+def _start_guest(request: Request, conn) -> sqlite3.Row:
+    """Купить без регистрации: заводим аккаунт-гость и входим в него в этом браузере."""
+    from . import quickbuy, referrals
+    if not sitecfg.registration_open(conn):
+        raise orders.OrderError("Покупка без входа сейчас недоступна — войдите в аккаунт.", "guest_closed", 403)
+    if request.app.state.limiter.hit("guest", _ip(request)) is not None:
+        raise orders.OrderError("Слишком много покупок с этого устройства. Подождите или войдите в аккаунт.",
+                                "rate_limited", 429)
+    uid = quickbuy.new_guest(conn)
+    referrals.attach(conn, uid, request.session.pop("ref", None))
+    request.session["user_id"] = uid
+    _record_login(conn, request, uid)
+    return accounts.get_user(conn, uid)
+
+
+def _checkout(request: Request, conn, config: Config, user, items: list[dict], title: str, need: int):
+    """Денег не хватает — запоминаем покупку и ведём на оплату ровно недостающего."""
+    from . import quickbuy
+    quickbuy.remember(request.session, items, title, need)
+    return _redirect("/panel/balance?buy=1")
+
+
 @router.post("/panel/buy/{product_id}", dependencies=[Depends(check_csrf)])
-def panel_buy(product_id: str, request: Request, form: dict = Depends(_form), user=Depends(panel_user),
+def panel_buy(product_id: str, request: Request, form: dict = Depends(_form), user=Depends(viewer),
               conn=Depends(get_conn), config: Config = Depends(get_config)):
     # Обычная (не async) функция: FastAPI выполнит её в отдельном потоке,
     # и ожидание ответа поставщика не остановит остальной сайт.
+    from . import quickbuy
     p = catalog.get_product(conn, product_id)
     if p is None:
         flash(request, "Товар недоступен.", "error")
         return _redirect("/panel/catalog")
     fields = {f["key"]: str(form.get(f"field_{f['key']}", "")) for f in p["fields"]}
+    supplier = request.app.state.supplier
     try:
+        if isinstance(user, Guest):   # без регистрации: сначала проверяем ID, потом заводим аккаунт
+            quickbuy.precheck(supplier, p, form.get("quantity", 1), fields)
+            user = _start_guest(request, conn)
         order, _ = orders.create_order(
-            conn, config, request.app.state.supplier, user,
+            conn, config, supplier, user,
             product_id=product_id, quantity=form.get("quantity", 1), fields=fields,
             client_idem_key="panel-" + str(form.get("idem", ""))[:64], source="panel",
         )
     except orders.OrderError as exc:
+        if exc.code == "insufficient_balance":
+            need = quickbuy.need_micro(config, supplier, user, p, form.get("quantity", 1), fields)
+            return _checkout(request, conn, config, user,
+                             [{"product_id": product_id, "quantity": form.get("quantity", 1), "fields": fields}],
+                             quickbuy.product_title(p, fields), need)
         return render(request, "panel/buy.html", _buy_ctx(
-            request, conn, config, accounts.get_user(conn, user["id"]), p, error=str(exc),
-            form={**fields, "quantity": form.get("quantity", "")}), 400)
+            request, conn, config, user if isinstance(user, Guest) else accounts.get_user(conn, user["id"]), p,
+            error=str(exc), form={**fields, "quantity": form.get("quantity", "")}), 400)
     return _redirect(f"/panel/orders/{order['public_id']}")
 
 
@@ -900,7 +966,7 @@ CART_MAX = 20   # пакетов за один раз — каждый уход�
 
 
 @router.post("/panel/buy-many/{product_id}", dependencies=[Depends(check_csrf)])
-def panel_buy_many(product_id: str, request: Request, form: dict = Depends(_form), user=Depends(panel_user),
+def panel_buy_many(product_id: str, request: Request, form: dict = Depends(_form), user=Depends(viewer),
                    conn=Depends(get_conn), config: Config = Depends(get_config)):
     """Несколько пакетов одной игры на один ID: сначала проверяем, хватит ли денег на всё,
     потом оформляем заказы по очереди — каждый отдельно уходит поставщику."""
@@ -911,8 +977,8 @@ def panel_buy_many(product_id: str, request: Request, form: dict = Depends(_form
     fields = {k[6:]: str(v) for k, v in form.items() if k.startswith("field_")}
 
     def fail(text: str):
-        return render(request, "panel/buy.html", _buy_ctx(
-            request, conn, config, accounts.get_user(conn, user["id"]), p, error=text, form=fields), 400)
+        who = user if isinstance(user, Guest) else accounts.get_user(conn, user["id"])
+        return render(request, "panel/buy.html", _buy_ctx(request, conn, config, who, p, error=text, form=fields), 400)
 
     cart: list[tuple[dict, int]] = []
     for key, value in form.items():
@@ -933,14 +999,24 @@ def panel_buy_many(product_id: str, request: Request, form: dict = Depends(_form
         return fail("Корзина пуста — нажмите «+» у нужных пакетов.")
     if count > CART_MAX:
         return fail(f"За один раз — не больше {CART_MAX} пакетов.")
+    from . import quickbuy
     try:
+        if isinstance(user, Guest):   # без регистрации: сначала проверяем ID, потом заводим аккаунт
+            first = cart[0][0]
+            quickbuy.precheck(request.app.state.supplier, first,
+                              1, {f["key"]: fields.get(f["key"], "") for f in first["fields"]})
+            user = _start_guest(request, conn)
         total = sum(orders.quote(config, user, item, 1)["total_micro"] * n for item, n in cart)
     except orders.OrderError as exc:
         return fail(str(exc))
     have = accounts.get_user(conn, user["id"])["balance_micro"]
-    if have + orders.ROUNDING_MICRO < total:
-        return fail(f"Не хватает ${fmt(total - have)} — пополните баланс. Нужно ${fmt(total)}, "
-                    f"на балансе ${fmt(have)}.")
+    if have + orders.ROUNDING_MICRO < total:   # не хватает — оплата ровно недостающего, заказы оформятся сами
+        items = [{"product_id": item["id"], "quantity": 1,
+                  "fields": {f["key"]: fields.get(f["key"], "") for f in item["fields"]}}
+                 for item, n in cart for _ in range(n)]
+        who = ", ".join(v for v in fields.values() if v)
+        title = f"{p.get('category_name') or p['name']} — {count} шт." + (f" · {who}" if who else "")
+        return _checkout(request, conn, config, user, items, title, total)
     idem = str(form.get("idem", ""))[:64]
     made: list[str] = []
     error = ""
@@ -1094,9 +1170,17 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
     rows = conn.execute("SELECT * FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user["id"],)).fetchall()
     conf = payments.settings(conn, config)
     waiting = payments.open_request(conn, user["id"])
-    from . import dcvideo
+    from . import dcvideo, quickbuy
     dcv = dcvideo.needed(conn, user["id"], "site")
+    buy = quickbuy.pending(request.session)
+    if buy is not None:   # оплата покупки: ровно недостающее, в сомони
+        buy = {**buy, "tjs": quickbuy.to_pay_tjs(conn, config, buy["need"], user["balance_micro"])}
+        if buy["tjs"] <= 0:
+            request.session.pop("buy_intent", None)
+            flash(request, "На балансе уже хватает денег — вернитесь к товару и нажмите «Купить».")
+            buy = None
     return render(request, "panel/balance.html", {
+        "buy": buy,
         "dcv": dcv, "dcv_src": dcvideo.src(config, dcv) if dcv else "",
         "pre_method": request.query_params.get("m", ""),
         "user": user, "methods": payments.methods(conn, config), "payments": rows, "tjs_rate": conf["tjs_rate"],
@@ -1211,8 +1295,9 @@ def panel_auto_pay(payment_id: int, request: Request, user=Depends(panel_user), 
         dc = {"video": video, "video_src": dcvideo.src(config, video) if video else "",
               "title": method.get("title") or "Душанбе Сити", "icon_url": method.get("icon_url", ""),
               "card": " ".join(account[i:i + 4] for i in range(0, len(account), 4)), "holder": holder[:60]}
+    from . import quickbuy
     return render(request, "panel/auto_pay.html", {
-        "user": user, "p": payments.public(conn, config, row), "dc": dc,
+        "user": user, "p": payments.public(conn, config, row), "dc": dc, "buy": quickbuy.describe(conn, payment_id),
         "receipt_now": row["auto_kind"] == "dcbank" and not row["receipt_file"] and age >= wait,
         "receipt_wait": max(1, int(wait - age))})
 
@@ -1278,7 +1363,7 @@ def panel_balance_receipt(payment_id: int, request: Request, receipt: UploadFile
 
 
 @router.get("/panel/data/payment/{payment_id}")
-def panel_payment_status(payment_id: int, user=Depends(panel_user), conn=Depends(get_conn),
+def panel_payment_status(payment_id: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
                          config: Config = Depends(get_config)):
     from . import cryptopay
     row = conn.execute("SELECT status, auto_kind FROM payments WHERE id = ? AND user_id = ?",
@@ -1288,7 +1373,13 @@ def panel_payment_status(payment_id: int, user=Depends(panel_user), conn=Depends
     if row["status"] == "pending" and row["auto_kind"]:
         cryptopay.check_all(conn, config)  # не чаще раза в 20 секунд на весь сайт
         row = conn.execute("SELECT status FROM payments WHERE id = ?", (payment_id,)).fetchone()
-    return JSONResponse({"status": row["status"]}, headers={"Cache-Control": "no-store"})
+    from . import quickbuy
+    buy = quickbuy.describe(conn, payment_id)
+    if buy is not None and row["status"] == "paid" and not buy["order"]:   # оплатили покупку — заказ сразу
+        quickbuy.run_pending(conn, config, request.app.state.supplier, payment_id)
+        buy = quickbuy.describe(conn, payment_id)
+    order = buy["order"].split(",")[0] if buy and buy["order"] and not buy["order"].startswith("!") else ""
+    return JSONResponse({"status": row["status"], "order": order}, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/pay/binance/webhook")
@@ -1336,7 +1427,7 @@ def panel_rate(user=Depends(panel_user), conn=Depends(get_conn), config: Config 
 
 @router.post("/panel/balance", dependencies=[Depends(check_csrf)])
 def panel_balance_request(request: Request, method: str = Form(""), amount: str = Form(""),
-                          amount_tjs: str = Form(""),
+                          amount_tjs: str = Form(""), buy: str = Form(""),
                           reference: str = Form(""), receipt: UploadFile | None = File(None),
                           user=Depends(panel_user), conn=Depends(get_conn),
                           config: Config = Depends(get_config)):
@@ -1355,11 +1446,18 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
             flash(request, "Сначала посмотрите видео-инструкцию и отметьте, что поняли, — потом оплата.", "error")
             return _redirect(f"/panel/balance?m={method}")
     rates.refresh(conn, config, rates.PAYMENT_SECONDS)  # сумма к переводу — по свежему курсу
+    from . import quickbuy
+    intent = quickbuy.pending(request.session) if buy == "1" else None
+    if intent is not None:   # оплата покупки — сумму считаем сами, а не берём из формы
+        amount, amount_tjs = "", str(quickbuy.to_pay_tjs(conn, config, intent["need"], user["balance_micro"]))
     details = payments.settings(conn, config)["details"].get(method, "")
     seen = payments.read_receipt(config, data, details) if data else None   # ИИ — до транзакции, базу не держим
     try:
         with db.tx(conn):
-            pid = payments.create(conn, config, user, method, amount, reference, amount_tjs=amount_tjs)
+            pid = payments.create(conn, config, user, method, amount, reference, amount_tjs=amount_tjs,
+                                  for_purchase=intent is not None)
+            if intent is not None:
+                quickbuy.attach(conn, pid, intent)
             if data:
                 payments.attach_receipt(conn, config, user["id"], pid, data, seen=seen)
     except payments.PaymentError as exc:
@@ -1370,6 +1468,8 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
     except payments.PaymentError as exc:
         flash(request, str(exc), "error")
         return _redirect("/panel/balance")
+    if intent is not None:
+        request.session.pop("buy_intent", None)
     row = conn.execute("SELECT * FROM payments WHERE id = ?", (pid,)).fetchone()
     if row["auto_kind"]:
         return _redirect(f"/panel/balance/{pid}/pay")  # автоплатёж: чек и админ не нужны
@@ -1380,6 +1480,8 @@ def panel_balance_request(request: Request, method: str = Form(""), amount: str 
                        f"{seen_now['fixed_from']} — мы исправили сумму по чеку: зачислится "
                        f"${fmt(row['amount_micro'])}. "
                        "После проверки придёт уведомление.")
+    elif intent is not None:
+        flash(request, f"Чек получен ✅ Как только проверим оплату, заказ оформится сам — придёт уведомление.")
     else:
         flash(request, f"Заявка #{pid} создана. Переведите {row['pay_amount']} {row['pay_currency']} по реквизитам — "
                        "после проверки баланс пополнится, вам придёт уведомление.")

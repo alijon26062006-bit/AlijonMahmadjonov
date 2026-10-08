@@ -49,7 +49,8 @@ def test_cart_checks_money_for_everything_first(app, conn):
     page = c.get(f"/panel/buy/{a}")
     r = c.post(f"/panel/buy-many/{a}", data={"csrf": csrf_of(page.text), "idem": "x2", **_fields(conn, a),
                                              f"item_{a}": "3"})
-    assert r.status_code == 400 and "Не хватает" in r.text
+    # Не хватает на всё — ни одного заказа, сразу оплата ровно недостающего за всю корзину
+    assert "Оплата покупки" in r.text and "3 шт." in r.text
     assert conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ?", (uid,)).fetchone()[0] == 0
 
 

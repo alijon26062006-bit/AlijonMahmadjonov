@@ -50,7 +50,7 @@
       <div class="total"><span>Цена</span><span id="s-price">$0.0000</span></div>
       <div><span>Ссылка invite</span><span id="s-inv" class="wrap-text">—</span></div>
     </div>
-    {% if user.guest %}<a class="btn primary lg block" style="margin-top:18px" href="/register?next={{ request.url.path | urlencode }}">Зарегистрироваться и купить</a>{% else %}<button class="btn primary lg block" id="g-go" style="margin-top:18px" disabled>Продолжить</button>{% endif %}
+    <button class="btn primary lg block" id="g-go" style="margin-top:18px" disabled>Продолжить</button>
     <p class="hint center">{{ icon('shield', 16) }} Если гифт не отправится, деньги вернутся на баланс.</p>
   </div>
 </form>

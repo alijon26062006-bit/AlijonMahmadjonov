@@ -221,8 +221,9 @@ def pay_amount(tjs_rate: Decimal, currency: str, usd: Decimal) -> tuple[str, str
 
 
 def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: str, amount: str,
-           reference: str = "", *, amount_tjs: str = "") -> int:
-    """Заявка на пополнение. Сумма — в долларах (amount) или в сомони (amount_tjs, пересчёт по курсу)."""
+           reference: str = "", *, amount_tjs: str = "", for_purchase: bool = False) -> int:
+    """Заявка на пополнение. Сумма — в долларах (amount) или в сомони (amount_tjs, пересчёт по курсу).
+    for_purchase — оплата конкретной покупки: минимум пополнения к ней не применяется."""
     conf = settings(conn, config)
     if method not in conf["details"]:
         raise PaymentError("Выберите способ оплаты.")
@@ -236,7 +237,7 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
         raise PaymentError("Сумма — число, например 50.") from None
     if usd < Decimal("0.01") or usd > Decimal("100000"):
         raise PaymentError("Укажите сумму больше нуля.")
-    if conf["min_tjs"] > 0 and usd * conf["tjs_rate"] < conf["min_tjs"]:
+    if conf["min_tjs"] > 0 and usd * conf["tjs_rate"] < conf["min_tjs"] and not for_purchase:
         raise PaymentError(f"Минимальная сумма пополнения — {conf['min_tjs']:f} сомони (${conf['min_usd']}).")
     # Заявка «Душанбе Сити», которую так и не оплатили за окно ожидания, новой не мешает
     from .dcbank import _since, window_hours

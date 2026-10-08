@@ -44,7 +44,7 @@
       <div><span>Получит в USD</span><span id="s-usd">—</span></div>
       <div class="total"><span>К оплате</span><span id="s-total">—</span></div>
     </div>
-    {% if user.guest %}<a class="btn primary lg block" style="margin-top:18px" href="/register?next={{ request.url.path | urlencode }}">Зарегистрироваться и купить</a>{% else %}<button class="btn primary lg block" style="margin-top:18px" {{ 'disabled' if user.status != 'active' }}>Продолжить</button>{% endif %}
+    <button class="btn primary lg block" style="margin-top:18px" {{ 'disabled' if user.status != 'active' }}>Продолжить</button>
     <p class="hint center">{{ icon('shield', 16) }} Логин проверяется до оплаты. Если пополнение не пройдёт, деньги вернутся на баланс.</p>
   </div>
 </form>

@@ -144,7 +144,7 @@ def quote(config: Config, user: sqlite3.Row, product: dict[str, Any], units: Dec
 # Сомони → доллары при пополнении и смена курса дают «копеечную» нехватку: на экране 15.61 с. и цена 15.61 с.,
 # а в долларах не хватает сотой цента. Такую разницу (до 1 цента ≈ 0.1 с.) покрываем сами — только сайт и бот.
 ROUNDING_MICRO = 100
-ROUNDING_SOURCES = ("panel", "shopbot")
+ROUNDING_SOURCES = ("panel", "shopbot", "quick")
 
 
 def rounding_gap(balance_micro: int, total_micro: int, source: str) -> int:

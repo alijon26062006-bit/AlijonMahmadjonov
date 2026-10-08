@@ -4,7 +4,7 @@
 {% if user.guest %}
 <div class="balance-card guest-card">
   <div class="label-caps">Добро пожаловать</div>
-  <p class="small muted" style="margin:4px 0 10px">Смотрите игры и цены свободно. Чтобы купить или пополнить счёт — зарегистрируйтесь, это минута.</p>
+  <p class="small muted" style="margin:4px 0 10px">Покупайте без регистрации: выберите игру, введите ID и нажмите «Купить».</p>
   <a class="btn sm primary block" href="/register?next={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}">Регистрация</a>
   <a class="btn sm block" style="margin-top:6px" href="/login?next={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}">Войти</a>
 </div>
@@ -13,6 +13,7 @@
   <div class="label-caps">Баланс</div>
   <b>{{ money(user.balance_micro) }}</b>
   <a class="btn sm soft block" href="/panel/balance">{{ icon('plus', 18) }}Пополнить</a>
+  {% if is_guest_account(user) %}<a class="btn sm block" style="margin-top:6px" href="/panel/save">💾 Сохранить аккаунт</a>{% endif %}
 </div>
 {% endif %}
 {% endblock %}

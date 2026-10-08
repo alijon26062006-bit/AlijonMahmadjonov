@@ -6,7 +6,11 @@
   <h1>Профиль</h1>
   <p>Баланс, заказы и API в одном месте.</p>
 </section>
-<div class="app-hello only-app">Салом, <b>{{ user.login }}</b> 👋</div>
+<div class="app-hello only-app">Салом{% if not is_guest_account(user) %}, <b>{{ user.login }}</b>{% endif %} 👋</div>
+{% if is_guest_account(user) %}
+<a class="save-acc" href="/panel/save"><span style="font-size:1.5rem">💾</span>
+  <span class="grow"><b>Сохраните аккаунт</b><span>Вы купили без регистрации. Укажите почту и пароль — заказы и баланс будут доступны с любого телефона.</span></span>{{ icon('chevron', 18) }}</a>
+{% endif %}
 <div class="install-app install-card" role="region" aria-label="Приложение">
   <span style="font-size:1.6rem">📲</span>
   <span class="grow"><b>Приложение Donatix</b><small>Покупки в одно касание и уведомления о заказах</small></span>
@@ -49,7 +53,7 @@
 <div class="card quick">
   <div class="who-row">
     <span class="avatar">{{ user.login[:2] | upper }}</span>
-    <div class="who"><b>{{ user.login }}</b><span class="muted">{{ user.email }}</span></div>
+    <div class="who"><b>{{ 'Гость' if is_guest_account(user) else user.login }}</b><span class="muted">{{ 'аккаунт не сохранён' if is_guest_account(user) else user.email }}</span></div>
   </div>
   {% if tg_bot and not tg_linked %}
   <a class="btn block tg-btn" href="/auth/telegram?link=1" style="margin:12px 0 0">Привязать Telegram — вход одной кнопкой</a>
@@ -79,7 +83,7 @@
 
 <div class="label-caps section-label">Аккаунт</div>
 <div class="list">
-  <div class="kv"><span class="k">Email</span><span class="v">{{ user.email }}</span></div>
+  <div class="kv"><span class="k">Email</span><span class="v">{% if is_guest_account(user) %}<a href="/panel/save">Указать</a>{% else %}{{ user.email }}{% endif %}</span></div>
   <div class="kv"><span class="k">Валюта счёта</span><span class="v">USD</span></div>
   <div class="kv"><span class="k">Регистрация</span><span class="v mono">{{ user.created_at | dt }}</span></div>
   <form class="kv tz-row" method="post" action="/panel/timezone">

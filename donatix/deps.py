@@ -129,6 +129,14 @@ STATUS_TITLES = {
 templates.env.globals["status_titles"] = STATUS_TITLES
 
 
+def _is_guest_account(user) -> bool:
+    from .quickbuy import is_guest
+    return bool(user) and not (isinstance(user, dict) and user.get("guest")) and is_guest(user)
+
+
+templates.env.globals["is_guest_account"] = _is_guest_account
+
+
 class LoginRequired(Exception):
     pass
 

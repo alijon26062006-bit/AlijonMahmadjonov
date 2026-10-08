@@ -12,8 +12,9 @@ LIMITS = {
     "status": 120,
     "account": 60,
     "login": 10,      # попыток входа с одного IP за окно
+    "guest": 8,       # аккаунтов «купить без регистрации» с одного IP в час
 }
-WINDOWS = {"login": 15 * 60}
+WINDOWS = {"login": 15 * 60, "guest": 3600}
 
 
 class RateLimiter:
