@@ -6,35 +6,33 @@
 {% set base = "/admin/stats" %}{% set show_profit = true %}
 {% include "_stats.html" %}
 
-<div class="card fin-card">
-  <div class="card-head"><h3>Финансы за период</h3><span class="muted small">{{ a.periods[a.period] }}</span></div>
-  <div class="fin-flow">
-    <div class="fin-item"><span class="label">Получено от клиентов</span><b>${{ fmt(a.turnover) }}</b><span class="note">выполненные заказы</span></div>
-    <span class="fin-op">−</span>
-    <div class="fin-item"><span class="label">Ушло поставщику</span><b>${{ fmt(fin.cost) }}</b><span class="note">закупка у FazerCards</span></div>
-    <span class="fin-op">=</span>
-    <div class="fin-item profit"><span class="label">Ваша прибыль</span><b>${{ fmt(a.profit) }}</b><span class="note">маржа {{ fin.margin }}%</span></div>
+<div class="an-two">
+<div class="card an-card">
+  <div class="an-head"><h3>Финансы</h3><span class="muted small">{{ a.periods[a.period] }}</span></div>
+  <div class="an-rows">
+    <div><span>Выручка <small>выполненные заказы</small></span><b>{{ money(a.turnover) }}</b></div>
+    <div><span>Закупка <small>FazerCards</small></span><b>− {{ money(fin.cost) }}</b></div>
+    <div class="an-total"><span>Прибыль <small>маржа {{ fin.margin }}%</small></span><b class="c-done">{{ money(a.profit) }}</b></div>
   </div>
   {% if a.turnover %}
-  <div class="fin-bar" role="img" aria-label="Доля закупки и прибыли в выручке">
+  <div class="fin-bar an-bar" role="img" aria-label="Доля закупки и прибыли в выручке">
     <span class="cost" style="width: {{ 100 - fin.margin }}%"></span><span class="gain" style="width: {{ fin.margin }}%"></span>
   </div>
-  <div class="legend"><i class="lc"></i>закупка <i class="lg"></i>прибыль</div>
   {% endif %}
 </div>
 
-<div class="card fin-card">
-  <div class="card-head"><h3>Деньги сейчас</h3></div>
-  <div class="fin-rows">
-    <div><span>Клиенты пополнили за период</span><b>${{ fmt(a.topped) }}</b></div>
-    <div><span>Баланс у FazerCards</span><b>{% if fin.supplier is not none %}${{ fmt(fin.supplier) }}{% else %}—{% endif %}</b></div>
-    <div><span>Должны клиентам (их балансы)</span><b>${{ fmt(fin.owed) }}</b></div>
-    <div class="total {{ 'bad' if fin.free is not none and fin.free < 0 }}">
-      <span>Остаётся свободно у поставщика</span>
-      <b>{% if fin.free is not none %}${{ fmt(fin.free) }}{% else %}—{% endif %}</b></div>
+<div class="card an-card">
+  <div class="an-head"><h3>Деньги сейчас</h3></div>
+  <div class="an-rows">
+    <div><span>Пополнили за период</span><b>{{ money(a.topped) }}</b></div>
+    <div><span>Баланс у FazerCards</span><b>{% if fin.supplier is not none %}{{ money(fin.supplier) }}{% else %}—{% endif %}</b></div>
+    <div><span>Балансы клиентов</span><b>{{ money(fin.owed) }}</b></div>
+    <div class="an-total {{ 'bad' if fin.free is not none and fin.free < 0 }}"><span>Свободно у поставщика</span>
+      <b class="{{ 'c-ref' if fin.free is not none and fin.free < 0 else 'c-done' }}">{% if fin.free is not none %}{{ money(fin.free) }}{% else %}—{% endif %}</b></div>
   </div>
   {% if fin.free is not none and fin.free < 0 %}
-  <div class="flash error">{{ icon('alert', 20) }}<span>На FazerCards меньше денег, чем на балансах клиентов — пополните баланс поставщика, иначе часть заказов не пройдёт.</span></div>
+  <div class="flash error">{{ icon('alert', 18) }}<span>На FazerCards меньше денег, чем на балансах клиентов — пополните поставщика, иначе часть заказов не пройдёт.</span></div>
   {% endif %}
+</div>
 </div>
 {% endblock %}

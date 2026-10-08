@@ -45,6 +45,7 @@ def test_admin_finance_block(app, conn):
         accounts.post_ledger(conn, uid, 200_000, "Пополнение")
     admin = TestClient(app)
     web_login(admin, "admin@example.com", "adminpass123")
+    admin.cookies.set("dx_cur", "USD")
     page = admin.get("/admin/stats?period=7d").text
-    assert "Ушло поставщику" in page and "$9.7200" in page and "$1.0800" in page  # закупка и прибыль
+    assert "Закупка" in page and "$9.7200" in page and "$1.0800" in page  # закупка и прибыль
     assert "$30.0000" in page  # свободно: 50 − 20 долг клиенту

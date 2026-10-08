@@ -4,17 +4,25 @@
 </div>
 <p class="muted small tz">Часовой пояс: UTC{{ '%+d' | format(a.tz_hours) }}</p>
 
-<div class="grid scards">
-  <div class="scard"><div class="label">Создано заказов</div><div class="value c-created">{{ '{:,}'.format(a.created).replace(',', ' ') }}</div><div class="note">За период</div></div>
-  <div class="scard"><div class="label">Выполнено</div><div class="value c-done">{{ '{:,}'.format(a.done).replace(',', ' ') }}</div><div class="note">Успешные заказы</div></div>
-  <div class="scard"><div class="label">Возвраты</div><div class="value c-ref">{{ '{:,}'.format(a.refunded).replace(',', ' ') }}</div><div class="note">Деньги вернулись на баланс</div></div>
-  <div class="scard"><div class="label">Сумма выполненных</div><div class="value">{{ money(a.turnover) }}</div><div class="note">{% if show_profit %}Прибыль {{ money(a.profit) }}{% else %}Потрачено на выполненные{% endif %}</div></div>
-  <div class="scard"><div class="label">Пополнено</div><div class="value">{{ money(a.topped) }}</div><div class="note">Зачислено на баланс</div></div>
+{%- macro num(n) -%}{{ '{:,}'.format(n or 0).replace(',', ' ') }}{%- endmacro -%}
+<div class="an-kpis">
+  <div class="an-kpi"><span class="an-l"><i class="an-dot c-created"></i>Заказы</span><b class="an-v">{{ num(a.created) }}</b>
+    <span class="an-s">создано за период</span></div>
+  <div class="an-kpi"><span class="an-l"><i class="an-dot c-done"></i>Выполнено</span><b class="an-v">{{ num(a.done) }}</b>
+    <span class="an-s">{% if a.created %}{{ ((a.done or 0) * 100 / a.created) | round(1) }}% успешных{% else %}—{% endif %}</span></div>
+  <div class="an-kpi"><span class="an-l"><i class="an-dot c-ref"></i>Возвраты</span><b class="an-v">{{ num(a.refunded) }}</b>
+    <span class="an-s">деньги на балансе</span></div>
+  <div class="an-kpi"><span class="an-l">Оборот</span><b class="an-v">{{ money(a.turnover) }}</b>
+    <span class="an-s">{% if show_profit %}прибыль <em class="c-done">{{ money(a.profit) }}</em>{% else %}выполненные заказы{% endif %}</span></div>
+  <div class="an-kpi"><span class="an-l">Средний чек</span><b class="an-v">{% if a.done %}{{ money(a.turnover // a.done) }}{% else %}—{% endif %}</b>
+    <span class="an-s">на один заказ</span></div>
+  <div class="an-kpi"><span class="an-l">Пополнено</span><b class="an-v">{{ money(a.topped) }}</b>
+    <span class="an-s">зачислено на баланс</span></div>
 </div>
 
-<div class="card chart-card">
-  <div class="card-head"><h3>Динамика заказов</h3><span class="muted small">Создано · выполнено · возвраты</span></div>
-  <div class="legend big"><span><i class="c-created"></i>Создано заказов</span><span><i class="c-done"></i>Выполнено</span><span><i class="c-ref"></i>Возвраты</span></div>
+<div class="card chart-card an-card">
+  <div class="an-head"><h3>Динамика заказов</h3>
+    <div class="an-legend"><span><i class="c-created"></i>Создано</span><span><i class="c-done"></i>Выполнено</span><span><i class="c-ref"></i>Возвраты</span></div></div>
   {% set c = a.chart %}
   <div class="chart-wrap">
   <svg class="line-chart" viewBox="0 0 {{ c.w }} {{ c.h }}" role="img" aria-label="Динамика заказов за период" preserveAspectRatio="none">
@@ -33,13 +41,13 @@
   </div>
 </div>
 
-<div class="card kinds-card">
-  <div class="card-head"><h3>По типам товаров</h3><span class="muted small">Разбивка по категориям</span></div>
-  <div class="kinds-head"><span>Тип</span><span>Созд.</span><span>Вып.</span><span>Возвр.</span></div>
-  {% for k in a.by_kind %}
-  <div class="kind-row">
-    <div class="kr-top"><b>{{ k.title }}</b><span>{{ k.created }}</span><span class="c-done">{{ k.done or 0 }}</span><span class="c-ref">{{ k.refunded or 0 }}</span></div>
-    <div class="kr-sum"><span class="muted small">Оборот</span><b>{{ money(k.turnover) }}</b></div>
+<div class="card an-card">
+  <div class="an-head"><h3>По типам товаров</h3></div>
+  <div class="an-table">
+    <div class="an-tr an-th"><span>Тип</span><span>Созд</span><span>Вып</span><span>Возв</span><span>Сумма</span></div>
+    {% for k in a.by_kind %}
+    <div class="an-tr"><b>{{ k.title }}</b><span>{{ k.created }}</span><span class="c-done">{{ k.done or 0 }}</span>
+      <span class="c-ref">{{ k.refunded or 0 }}</span><span class="an-sum">{{ money(k.turnover) }}</span></div>
+    {% else %}<div class="empty small">За этот период заказов нет.</div>{% endfor %}
   </div>
-  {% else %}<div class="empty small">За этот период заказов нет.</div>{% endfor %}
 </div>
