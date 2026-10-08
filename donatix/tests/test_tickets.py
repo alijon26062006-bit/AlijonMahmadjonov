@@ -203,3 +203,31 @@ def test_support_bot_is_only_for_tickets(config, conn, monkeypatch):
     msgs = tickets.messages(conn, tid)
     assert msgs[-2]["text"] == "Зачислили" and msgs[-1]["file"].endswith(".ogg") and msgs[-1]["author"] == "admin"
     assert "Отправлено клиенту в тикет #1" in sent[-1][1]["text"]
+
+
+def test_support_buttons_lead_to_tickets_not_telegram(app, config, conn, monkeypatch):
+    """«Поддержка» на сайте — тикеты; в боте-магазине — мини-приложение, которое само входит и открывает тикеты."""
+    from test_shopbot import TG, FakeApi, msg
+
+    from donatix import shopbot
+    config.support_contact = "@donatix_support"
+    config.shop_bot_token = "777:shop-token"
+    make_client(conn)
+    c = TestClient(app)
+    web_login(c, "shop1@example.com", "password123")
+    home = c.get("/panel").text
+    assert 'href="/panel/support"' in home and "t.me/donatix_support" not in home
+
+    api = FakeApi()
+    bot = shopbot.ShopBot(config, None, api=api)
+    bot.handle(conn, msg("/start"))
+    su = shopbot.shop_user(conn, TG)
+    bot.on_button(conn, su, "sup", 1)
+    markup = [p for m, p in api.calls if m in ("editMessageText", "sendMessage")][-1]["reply_markup"]
+    assert markup["inline_keyboard"][0][0]["web_app"]["url"].endswith("/support-app/me")
+
+    guest = TestClient(app)                                   # покупатель бота открыл мини-приложение
+    assert guest.post("/support-app/me/login", json={"init": _init(str(TG), token="1:wrong")}).status_code == 403
+    r = guest.post("/support-app/me/login", json={"init": _init(str(TG), token="777:shop-token")})
+    assert r.json()["next"] == "/panel/support"
+    assert "Открыть обращение" in guest.get("/panel/support").text

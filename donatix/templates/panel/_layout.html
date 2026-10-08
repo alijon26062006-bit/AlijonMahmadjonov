@@ -63,6 +63,6 @@
 {% endblock %}
 {% block notice %}
 {% if user.status == 'pending' and not user.guest %}
-<div class="flash warn" role="status">{{ icon('clock', 20) }}<span>Аккаунт ждёт одобрения. Каталог уже можно смотреть, заказы откроются после активации{% if support_contact %} — напишите {{ support_contact }}{% endif %}.</span></div>
+<div class="flash warn" role="status">{{ icon('clock', 20) }}<span>Аккаунт ждёт одобрения. Каталог уже можно смотреть, заказы откроются после активации — <a href="/panel/support">напишите в поддержку</a>.</span></div>
 {% endif %}
 {% endblock %}

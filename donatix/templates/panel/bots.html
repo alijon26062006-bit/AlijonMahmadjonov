@@ -7,7 +7,7 @@
   <p>Свой бот-магазин за минуту: игры, звёзды и цены — уже внутри. Заказы оплачиваются с вашего баланса Donatix, прибыль — ваша наценка.</p>
 </section>
 {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
-{% if not ready %}<div class="flash warn">{{ icon('alert', 20) }}<span>Конструктор сейчас недоступен. Напишите в поддержку{{ ' ' ~ support_contact if support_contact }}.</span></div>{% endif %}
+{% if not ready %}<div class="flash warn">{{ icon('alert', 20) }}<span>Конструктор сейчас недоступен. <a href="/panel/support">Напишите в поддержку</a>.</span></div>{% endif %}
 
 {% if not elig.ok %}
 <div class="card bot-lock reveal">
@@ -19,8 +19,8 @@
   </div>
   <div class="muted small">Выполнено заказов: <b>{{ elig.done }} из {{ elig.need }}</b></div>
   <a class="btn primary" style="margin-top:12px" href="/panel/catalog?kind=topup">{{ icon('bag', 18) }}Сделать заказ</a>
-  {% elif elig.blocked and support_contact %}
-  <a class="btn primary" style="margin-top:12px" href="https://t.me/{{ support_contact | replace('@', '') }}" target="_blank" rel="noopener">Написать в поддержку</a>
+  {% elif elig.blocked %}
+  <a class="btn primary" style="margin-top:12px" href="/panel/support">Написать в поддержку</a>
   {% endif %}
 </div>
 {% elif bots | length < max_bots %}
@@ -55,7 +55,7 @@
     {% if b.warn_count and b.enabled %}
     <div class="flash warn" style="margin:10px 0 0">{{ icon('alert', 20) }}<span>Предупреждение {{ b.warn_count }}: в боте давно нет продаж. Если продаж не будет, бот отключится автоматически. Любая продажа снимает предупреждение.</span></div>
     {% elif b.disabled_reason == 'inactive' %}
-    <div class="flash warn" style="margin:10px 0 0">{{ icon('alert', 20) }}<span>Бот отключён автоматически: долго не было продаж. Включить снова может только администратор — напишите в поддержку{{ ' ' ~ support_contact if support_contact }}.</span></div>
+    <div class="flash warn" style="margin:10px 0 0">{{ icon('alert', 20) }}<span>Бот отключён автоматически: долго не было продаж. Включить снова может только администратор — <a href="/panel/support">напишите в поддержку</a>.</span></div>
     {% endif %}
     {% if b.conflict %}
     <div class="flash error" style="margin:10px 0 0">{{ icon('alert', 20) }}<span>Этот токен запущен ещё где-то — бот будет отвечать дважды. Остановите другую копию или создайте нового бота.</span></div>

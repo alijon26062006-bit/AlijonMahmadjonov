@@ -125,7 +125,7 @@
       <p class="hint center">{{ icon('shield', 16) }} {{ 'После проверки оплаты заказ оформится сам — придёт уведомление.' if buy else 'После проверки поступления баланс зачислится, вам придёт уведомление.' }}</p>
       </div>
       {% else %}
-      <p class="muted" style="margin-top:12px">Способы оплаты ещё не настроены.{% if support_contact %} Напишите {{ support_contact }}.{% endif %}</p>
+      <p class="muted" style="margin-top:12px">Способы оплаты ещё не настроены. <a href="/panel/support">Напишите в поддержку</a>.</p>
       {% endif %}
     </form>
     {% endif %}

@@ -1452,11 +1452,19 @@ class ShopBot:
             self.screen_order(conn, su, parts[1], mid)
         elif head == "rp" and len(parts) == 2:
             self.repeat(conn, su, parts[1], mid)
-        elif head == "sup":
-            from .supportbot import bot_username as support_name
-            name = support_name(conn, self.config)
-            contact = f"@{name}" if name else _e(self.config.support_contact or self.config.site_name)
-            self.show(tg_id, tr(lang, "support_text", contact=contact), [[(tr(lang, "home"), "h")]], edit=mid)
+        elif head == "sup":   # поддержка — тикетом: мини-приложение открывает «Поддержку» сайта, вход сам
+            text = ("🛟 <b>Поддержка</b>\nНапишите, что случилось — можно скриншот, чек или голосовое. Ответим там же "
+                    "и пришлём уведомление." if lang != "tj" else
+                    "🛟 <b>Дастгирӣ</b>\nНависед, чӣ шуд — акс, чек ё овоз ҳам мешавад. Ҷавоб ҳамон ҷо меояд.")
+            markup = {"inline_keyboard": [
+                [{"text": "💬 Написать в поддержку" if lang != "tj" else "💬 Ба дастгирӣ навиштан",
+                  "web_app": {"url": f"{self.config.base_url}/support-app/me"}}],
+                [{"text": tr(lang, "home"), "callback_data": "h"}]]}
+            try:
+                self.api("editMessageText", chat_id=tg_id, message_id=mid, text=text, parse_mode="HTML",
+                         reply_markup=markup)
+            except Exception:  # noqa: BLE001 — сообщение не правится (старое) — пришлём новое
+                self.api("sendMessage", chat_id=tg_id, text=text, parse_mode="HTML", reply_markup=markup)
         elif head == "adm" and self.is_admin(tg_id):
             self.state.pop(tg_id, None)
             self.screen_admin(conn, su, mid)

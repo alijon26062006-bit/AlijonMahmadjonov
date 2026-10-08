@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Поддержка</title>
+<meta name="robots" content="noindex">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; display: grid; place-items: center; background: var(--tg-theme-bg-color, #fff);
+    color: var(--tg-theme-text-color, #14161f); font: 16px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; text-align: center; }
+  .err { color: #e5484d; padding: 24px; }
+</style>
+</head>
+<body>
+<div id="msg">🛟 Открываем поддержку…</div>
+<script>
+(function () {
+  var tg = window.Telegram && Telegram.WebApp, box = document.getElementById("msg");
+  if (tg) { tg.ready(); tg.expand(); }
+  var init = tg ? tg.initData : "";
+  if (!init) { box.className = "err"; box.textContent = "Откройте поддержку из бота в Telegram."; return; }
+  fetch("/support-app/me/login", {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({init: init})}).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.next) location.replace(d.next); else { box.className = "err"; box.textContent = d.error || "Ошибка"; }
+    }).catch(function () { box.className = "err"; box.textContent = "Нет связи — попробуйте ещё раз."; });
+})();
+</script>
+</body>
+</html>

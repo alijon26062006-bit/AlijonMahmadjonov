@@ -67,9 +67,7 @@
   <a class="qrow" href="/panel/orders"><span><b>Заказы</b><small>История и статусы</small></span>{{ icon('chevron', 16) }}</a>
   <a class="qrow" href="/panel/transactions"><span><b>Транзакции</b><small>Все движения баланса</small></span>{{ icon('chevron', 16) }}</a>
   <a class="qrow" href="/panel/stats"><span><b>Аналитика</b><small>Расходы и заказы по дням</small></span>{{ icon('chevron', 16) }}</a>
-  {% if support_contact %}
-  <a class="qrow" href="{{ 'https://t.me/' ~ support_contact[1:] if support_contact.startswith('@') else support_contact }}" target="_blank" rel="noopener"><span><b>Поддержка</b><small>Написать в Telegram</small></span>{{ icon('chevron', 16) }}</a>
-  {% endif %}
+  <a class="qrow" href="/panel/support"><span><b>Поддержка</b><small>Открыть обращение — ответим здесь</small></span>{{ icon('chevron', 16) }}</a>
   <a class="qrow" href="/panel/logins"><span><b>История входов</b><small>Данные и безопасность</small></span>{{ icon('chevron', 16) }}</a>
 </div>
 

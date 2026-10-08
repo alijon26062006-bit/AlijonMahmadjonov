@@ -188,3 +188,34 @@ def app_file(name: str, s: str = "", config: Config = Depends(get_config)):
         return JSONResponse({"error": "not found"}, status_code=404)
     return FileResponse(path, media_type=tickets.media_type(name), headers={"Cache-Control": "private, max-age=86400"})
 
+
+
+# ── Покупатель бота-магазина: «🛟 Поддержка» открывает тикеты на сайте прямо в Telegram ──
+# Бот-магазин даёт кнопку-мини-приложение. Страница присылает подпись Telegram (ключ — токен бота-магазина),
+# по ней узнаём покупателя, входим в его аккаунт (тот же, что у бота) и открываем «Поддержку» на сайте.
+
+
+@router.get("/me")
+def me_page(request: Request):
+    return templates.TemplateResponse(request, "support_me.html", {})
+
+
+@router.post("/me/login")
+async def me_login(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    import secrets as _secrets
+
+    from . import db, shopbot
+    body = await request.json()
+    user = check_init(str(body.get("init") or ""), config.shop_bot_token)
+    su = shopbot.shop_user(conn, int(user["id"])) if user and user.get("id") else None
+    if su is None:
+        return JSONResponse({"error": "Откройте поддержку из бота-магазина."}, status_code=403)
+    u = accounts.get_user(conn, su["user_id"])
+    if u is None or u["status"] == "blocked":
+        return JSONResponse({"error": "Аккаунт недоступен."}, status_code=403)
+    sid = _secrets.token_urlsafe(24)
+    conn.execute("INSERT INTO logins (user_id, ip, user_agent, created_at, sid) VALUES (?, ?, ?, ?, ?)",
+                 (u["id"], (request.client.host if request.client else "?")[:64],
+                  "Telegram (бот-магазин)", db.now(), sid))
+    request.session["user_id"], request.session["sid"] = u["id"], sid
+    return {"ok": True, "next": "/panel/support"}
