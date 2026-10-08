@@ -22,7 +22,7 @@ import time
 from decimal import Decimal
 from typing import Any
 
-from . import accounts, orders, payments
+from . import accounts, db, orders, payments
 from .config import Config
 
 log = logging.getLogger(__name__)
@@ -43,6 +43,69 @@ def new_guest(conn: sqlite3.Connection) -> int:
     tag = secrets.token_hex(5)
     return accounts.create_user(conn, email=f"g{tag}@{GUEST_DOMAIN}", login=f"g{tag}",
                                 password=secrets.token_urlsafe(18), status="active")
+
+
+# ── Код покупателя и «запомнить браузер» ──────────────────────
+# Гость получает короткий код (G-7K3M9Q): видит его в кабинете, называет в поддержке, а админ находит
+# по нему клиента и всю историю. Браузер помнит гостя год (cookie dx_guest) — открыл сайт через месяц,
+# и его заказы, баланс и история на месте, без входа.
+
+GUEST_COOKIE = "dx_guest"
+GUEST_COOKIE_AGE = 365 * 86400
+_CODE_ABC = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"   # без 0/O, 1/I/L — код читают вслух
+
+
+def _hash(token: str) -> str:
+    import hashlib
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def issue_key(conn: sqlite3.Connection, user_id: int) -> str:
+    """Код покупателя и новый ключ браузера. Вернёт значение cookie: «<user_id>.<ключ>»."""
+    token = secrets.token_urlsafe(24)
+    row = conn.execute("SELECT code FROM guest_keys WHERE user_id = ?", (user_id,)).fetchone()
+    if row is not None:
+        conn.execute("UPDATE guest_keys SET token_hash = ? WHERE user_id = ?", (_hash(token), user_id))
+        return f"{user_id}.{token}"
+    for _ in range(20):
+        code = "G-" + "".join(secrets.choice(_CODE_ABC) for _ in range(6))
+        try:
+            conn.execute("INSERT INTO guest_keys (user_id, code, token_hash, created_at) VALUES (?, ?, ?, ?)",
+                         (user_id, code, _hash(token), db.now()))
+            return f"{user_id}.{token}"
+        except sqlite3.IntegrityError:
+            continue
+    raise RuntimeError("не удалось выдать код покупателя")
+
+
+def code_of(conn: sqlite3.Connection, user_id: int) -> str:
+    row = conn.execute("SELECT code FROM guest_keys WHERE user_id = ?", (user_id,)).fetchone()
+    return row["code"] if row else ""
+
+
+def by_code(conn: sqlite3.Connection, text: str) -> int | None:
+    """«G-7K3M9Q», «g7k3m9q», «G 7K3M9Q» → id клиента или None."""
+    import re
+    raw = re.sub(r"[\s\-]", "", (text or "").upper())
+    if not re.fullmatch(r"G[2-9A-Z]{6}", raw):
+        return None
+    row = conn.execute("SELECT user_id FROM guest_keys WHERE code = ?", (f"G-{raw[1:]}",)).fetchone()
+    return row["user_id"] if row else None
+
+
+def restore(conn: sqlite3.Connection, cookie: str | None) -> int | None:
+    """Ключ браузера из cookie → id гостя. Аккаунт, который уже сохранили (почта и пароль), так не входит."""
+    import hmac
+    try:
+        uid_text, token = (cookie or "").split(".", 1)
+        uid = int(uid_text)
+    except ValueError:
+        return None
+    row = conn.execute("SELECT k.token_hash, u.email, u.status FROM guest_keys k JOIN users u ON u.id = k.user_id "
+                       "WHERE k.user_id = ?", (uid,)).fetchone()
+    if row is None or row["status"] == "blocked" or not is_guest(row):
+        return None
+    return uid if hmac.compare_digest(row["token_hash"], _hash(token)) else None
 
 
 def precheck(supplier, product: dict[str, Any], quantity: Any, fields: dict[str, Any]) -> None:

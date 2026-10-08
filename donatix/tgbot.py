@@ -75,14 +75,26 @@ class TelegramApi:
 # ── События, которые бот присылает сам ─────────────────────────
 
 
+def client_name(conn: sqlite3.Connection, user_id: int, login: str) -> str:
+    """Логин клиента, а для купившего без регистрации — «Гость G-7K3M9Q» (по коду его находят в боте)."""
+    from .quickbuy import code_of, is_guest
+    u = accounts.get_user(conn, user_id)
+    code = code_of(conn, user_id) if u is not None and is_guest(u) else ""
+    return f"Гость {code}" if code else login
+
+
 def payment_event(conn: sqlite3.Connection, payment_id: int, config: Config | None = None) -> tuple[str, Buttons]:
     p = conn.execute("SELECT p.*, u.login, u.fraud_count, u.balance_micro FROM payments p "
                      "JOIN users u ON u.id = p.user_id WHERE p.id = ?", (payment_id,)).fetchone()
     title = payments.title_for(conn, config, p["method"]) if config else PAY_METHODS.get(p["method"], (p["method"],))[0]
     text = (f"💳 <b>Заявка на пополнение #{p['id']}</b>\n"
-            f"Клиент: {_e(p['login'])}\nСпособ: {_e(title)}\n"
+            f"Клиент: {_e(client_name(conn, p['user_id'], p['login']))}\nСпособ: {_e(title)}\n"
             f"К переводу: <b>{_e(p['pay_amount'])} {_e(p['pay_currency'])}</b> (${fmt(p['amount_micro'])})"
             + (f"\nЧек / хэш: <code>{_e(p['reference'])}</code>" if p["reference"] else ""))
+    from .quickbuy import describe
+    buy = describe(conn, payment_id)
+    if buy is not None:   # оплата покупки без регистрации: после зачисления заказ оформится сам
+        text += f"\n🛒 Покупка: {_e(buy['title'])} — заказ оформится сам после зачисления"
     su = buyer_of(conn, p["user_id"])
     if su is not None:
         text += f"\nTelegram: {tg_who(su)}"
@@ -105,7 +117,7 @@ def order_event(conn: sqlite3.Connection, order_id: int) -> tuple[str, Buttons]:
     o = conn.execute("SELECT o.*, u.login FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = ?",
                      (order_id,)).fetchone()
     text = (f"⚠️ <b>Заказ {_e(o['public_id'])} требует внимания</b>\n"
-            f"{_e(o['product_name'])} · ${fmt(o['total_micro'])} · клиент {_e(o['login'])}\n"
+            f"{_e(o['product_name'])} · ${fmt(o['total_micro'])} · клиент {_e(client_name(conn, o['user_id'], o['login']))}\n"
             f"{_e(o['error'] or 'Поставщик не подтвердил результат — проверьте заказ в панели FazerCards.')}")
     rows: Buttons = [[("💸 Вернуть деньги", f"ord:refund:{o['id']}"), ("✅ Выполнен", f"ord:done:{o['id']}")]]
     if o["supplier_order_id"]:
@@ -305,10 +317,15 @@ class AdminBot:
         if cmd in ("/menu", "🏠"):
             self.send(*screen_home(conn, self.config))
         elif cmd == "/client":
+            from .quickbuy import by_code
             login = text.split(maxsplit=1)[1].strip() if len(text.split()) > 1 else ""
             u = conn.execute("SELECT id FROM users WHERE login = ? OR email = ?", (login, login)).fetchone()
-            self.send(*screen_client(conn, self.config, u["id"]) if u else ("Клиент не найден. Пример: /client shop1",
-                                                                            [[("👤 Клиенты", "m:clients:0")]]))
+            uid = u["id"] if u else by_code(conn, login)
+            self.send(*screen_client(conn, self.config, uid) if uid else (
+                "Клиент не найден. Пример: <code>/client shop1</code> или код покупателя <code>G-7K3M9Q</code>",
+                [[("👤 Клиенты", "m:clients:0")]]))
+        elif _guest_code(conn, text) is not None:   # код покупателя без регистрации: G-7K3M9Q
+            self.send(*screen_client(conn, self.config, _guest_code(conn, text)))
         elif cmd == "/fake":   # /fake 123 — чек по заявке оказался поддельным
             arg = text.split()[1] if len(text.split()) > 1 else ""
             if not arg.isdigit():
@@ -810,6 +827,11 @@ def find_payments(conn: sqlite3.Connection, config: Config, query: str,
 # ── Покупатели бота-магазина ───────────────────────────────
 
 
+def _guest_code(conn: sqlite3.Connection, text: str) -> int | None:
+    from .quickbuy import by_code
+    return by_code(conn, text) if text and len(text) <= 12 else None
+
+
 def tg_who(su: sqlite3.Row) -> str:
     """Имя — ссылка на профиль (работает и без @username), @username, Telegram ID."""
     parts = [f'<a href="tg://user?id={int(su["tg_id"])}">{_e(su["name"] or "без имени")}</a>']
@@ -928,7 +950,7 @@ def screen_history(conn: sqlite3.Connection, config: Config, user_id: int, page:
     def m(micro: int) -> str:
         return f"{shopbot.money(micro, rate)} (${fmt(micro)})"
 
-    lines = [f"📜 <b>История клиента</b>\n{tg_who(su) if su is not None else _e(u['login'])}"]
+    lines = [f"📜 <b>История клиента</b>\n{tg_who(su) if su is not None else _e(client_name(conn, user_id, u['login']))}"]
     if page == 0:
         got = conn.execute("SELECT COALESCE(SUM(amount_micro), 0) FROM transactions WHERE user_id = ? "
                            "AND amount_micro > 0 AND note LIKE 'Пополнение%'", (user_id,)).fetchone()[0]
@@ -1048,7 +1070,11 @@ def screen_client(conn: sqlite3.Connection, config: Config, user_id: int) -> Scr
     n_bots = conn.execute("SELECT COUNT(*) FROM bots WHERE user_id = ?", (user_id,)).fetchone()[0]
     status = {"active": "✅ активен", "pending": "⏳ на проверке", "blocked": "⛔ заблокирован"}[u["status"]]
     markup = accounts.markup_for(u, config)
-    text = (f"👤 <b>{_e(u['login'])}</b> · {_e(u['email'])}\n"
+    from .quickbuy import code_of, is_guest
+    code = code_of(conn, user_id)
+    who = (f"🛒 <b>Гость {code}</b> · купил без регистрации" if is_guest(u) and code
+           else f"👤 <b>{_e(u['login'])}</b> · {_e(u['email'])}" + (f" · код {code}" if code else ""))
+    text = (f"{who}\n"
             + (f"Проект: {_e(u['project'])}\n" if u["project"] else "")
             + f"Статус: {status}\nБаланс: <b>${fmt(u['balance_micro'])}</b>\n"
             f"Уровень: {u['tier']} · наценка {markup}%\nЗаказов: {n_orders} · ботов: {n_bots}")

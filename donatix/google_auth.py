@@ -110,5 +110,5 @@ def link(conn: sqlite3.Connection, user_id: int, profile: dict[str, Any]) -> Non
     conn.execute("UPDATE users SET google_sub = ? WHERE id = ?", (profile["sub"], user_id))
     u = conn.execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
     busy = conn.execute("SELECT 1 FROM users WHERE email = ? AND id != ?", (profile["email"], user_id)).fetchone()
-    if u and u["email"].endswith("@telegram.user") and not busy:
+    if u and u["email"].endswith(("@telegram.user", "@guest.donatix.tj")) and not busy:
         conn.execute("UPDATE users SET email = ? WHERE id = ?", (profile["email"], user_id))

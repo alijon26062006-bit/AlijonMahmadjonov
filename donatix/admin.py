@@ -318,6 +318,10 @@ def users(request: Request, status: str = "", q: str = "", admin=Depends(admin_u
         where += " AND status = ?"
         args.append(status)
     if q:
+        from .quickbuy import by_code
+        guest = by_code(conn, q)   # код покупателя без регистрации: G-7K3M9Q
+        if guest is not None:
+            return _back(f"/admin/users/{guest}")
         where += " AND (email LIKE ? OR login LIKE ?)"
         args += [f"%{q}%", f"%{q}%"]
     rows = conn.execute(
@@ -334,8 +338,9 @@ def user_detail(user_id: int, request: Request, admin=Depends(admin_user), conn=
     if client is None:
         flash(request, "Нет такого пользователя.", "error")
         return _back("/admin/users")
+    from .quickbuy import code_of
     return render(request, "admin/user.html", {
-        "user": admin, "c": client, "tiers": TIERS, "markups": config.markups,
+        "user": admin, "c": client, "tiers": TIERS, "markups": config.markups, "guest_code_of": code_of(conn, user_id),
         "effective_markup": accounts.markup_for(client, config),
         "txs": conn.execute("SELECT * FROM transactions WHERE user_id = ? ORDER BY id DESC LIMIT 30",
                             (user_id,)).fetchall(),

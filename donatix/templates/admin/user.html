@@ -4,8 +4,8 @@
 {% from "_icons.html" import icon %}
 <section class="page-hero">
   <a class="back" href="/admin/users">{{ icon('arrow-left', 18) }}Клиенты</a>
-  <h1>{{ c.login }}</h1>
-  <p>{{ c.email }} · с {{ c.created_at | dt('%d.%m.%Y') }}{% if c.project %} · {{ c.project }}{% endif %}</p>
+  <h1>{% if guest_code_of and is_guest_account(c) %}Гость {{ guest_code_of }}{% else %}{{ c.login }}{% endif %}</h1>
+  <p>{% if guest_code_of %}<span class="badge accent">🛒 купил без регистрации · код {{ guest_code_of }}</span> {% endif %}{{ '' if is_guest_account(c) else c.email ~ ' · ' }}с {{ c.created_at | dt('%d.%m.%Y') }}{% if c.project %} · {{ c.project }}{% endif %}</p>
 </section>
 <div class="grid two">
   <div class="card reveal">

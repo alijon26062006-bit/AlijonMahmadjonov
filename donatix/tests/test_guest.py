@@ -42,6 +42,9 @@ def test_guest_buys_without_registration(app, config, conn, monkeypatch):
     pay = conn.execute("SELECT * FROM payments WHERE user_id = ?", (user["id"],)).fetchone()
     assert pay["intent"] and pay["pay_amount"] == tjs and float(tjs) < 500   # сумму считаем сами, минимума нет
     assert "заказ оформится сам" in r.text
+    from donatix import tgbot
+    note = tgbot.payment_event(conn, pay["id"], config)[0]                      # что видит админ в боте
+    assert "Клиент: Гость G-" in note and "🛒 Покупка:" in note and "123456789" in note
     assert conn.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 0
 
     payments.confirm(conn, config, pay["id"], 1, who="админ")
@@ -54,12 +57,34 @@ def test_guest_buys_without_registration(app, config, conn, monkeypatch):
 
     home = guest.get("/panel").text                                              # сохранить аккаунт
     assert "Сохраните аккаунт" in home
+    code = quickbuy.code_of(conn, user["id"])
+    assert code.startswith("G-") and code in home                               # код покупателя виден
+
+    later = TestClient(app)                                                      # вернулся через неделю: тот же браузер
+    later.cookies.set("dx_guest", guest.cookies.get("dx_guest"))
+    assert order["public_id"] in later.get("/panel/orders").text
+    stranger = TestClient(app)                                                   # подделанный ключ — не входит
+    stranger.cookies.set("dx_guest", f"{user['id']}.wrong")
+    assert stranger.get("/panel/orders", follow_redirects=False).status_code == 303
+
+    admin = TestClient(app)                                                      # админ находит по коду
+    web_login(admin, "admin@example.com", "adminpass123")
+    r = admin.get("/admin/users", params={"q": code.lower().replace("-", " ")}, follow_redirects=False)
+    assert r.headers["location"] == f"/admin/users/{user['id']}"
+    assert f"Гость {code}" in admin.get(r.headers["location"]).text
+    from donatix import tgbot
+    text, buttons = tgbot.screen_client(conn, config, quickbuy.by_code(conn, code))
+    assert f"Гость {code}" in text and any("hy:0:" in b[1] for row in buttons for b in row)
     save = guest.get("/panel/save").text
     guest.post("/panel/save", data={"csrf": csrf_of(save), "email": "ali@example.com", "login": "ali_2006",
                                     "password": "password123"})
     again = TestClient(app)
     web_login(again, "ali@example.com", "password123")
     assert order["public_id"] in again.get("/panel/orders").text
+    old_cookie = TestClient(app)                                                 # аккаунт сохранён — по cookie не входит
+    old_cookie.cookies.set("dx_guest", guest.cookies.get("dx_guest"))
+    assert old_cookie.get("/panel/orders", follow_redirects=False).status_code == 303
+    assert quickbuy.code_of(conn, user["id"]) == code                            # код для поиска остаётся
 
 
 def test_guest_wrong_id_creates_no_account(app, conn, monkeypatch):

@@ -229,6 +229,19 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
     app.state.supplier = supplier
     app.state.limiter = RateLimiter()
 
+    @app.middleware("http")
+    async def _guest_cookie(request, call_next):
+        """Покупка без регистрации: браузер запоминает гостя на год (ключ выдаёт web._start_guest)."""
+        response = await call_next(request)
+        value = getattr(request.state, "guest_cookie", None)
+        if value == "":
+            response.delete_cookie("dx_guest", path="/")
+        elif value:
+            from .quickbuy import GUEST_COOKIE_AGE
+            response.set_cookie("dx_guest", value, max_age=GUEST_COOKIE_AGE, httponly=True, samesite="lax",
+                                secure=config.base_url.startswith("https://"))
+        return response
+
     # Посещаемость. Добавлена ДО SessionMiddleware — значит, внутри неё и видит сессию (кто вошёл)
     app.add_middleware(_Traffic, db_path=config.db_path)
 

@@ -518,6 +518,12 @@ CREATE TABLE IF NOT EXISTS tg_logins (          -- вход на сайт чер
     ip           TEXT,
     link_user_id INTEGER                       -- привязка Telegram к уже открытому аккаунту
 );
+CREATE TABLE IF NOT EXISTS guest_keys (         -- покупка без регистрации: код покупателя и «запомнить браузер»
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id),
+    code        TEXT NOT NULL UNIQUE,              -- G-7K3M9Q: его видит покупатель, по нему ищет админ
+    token_hash  TEXT NOT NULL,                     -- sha256 ключа из cookie dx_guest
+    created_at  TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS bank_notices (       -- уведомления банка «Душанбе Сити» (юзербот): автоплатёж
     id          INTEGER PRIMARY KEY,
     source      TEXT NOT NULL,

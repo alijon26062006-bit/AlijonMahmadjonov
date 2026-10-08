@@ -13,7 +13,8 @@
   <div class="label-caps">Баланс</div>
   <b>{{ money(user.balance_micro) }}</b>
   <a class="btn sm soft block" href="/panel/balance">{{ icon('plus', 18) }}Пополнить</a>
-  {% if is_guest_account(user) %}<a class="btn sm block" style="margin-top:6px" href="/panel/save">💾 Сохранить аккаунт</a>{% endif %}
+  {% if is_guest_account(user) %}<div class="small muted" style="margin-top:8px">Код покупателя: <b class="mono">{{ guest_code }}</b></div>
+  <a class="btn sm block" style="margin-top:6px" href="/panel/save">🔐 Сохранить через Google</a>{% endif %}
 </div>
 {% endif %}
 {% endblock %}

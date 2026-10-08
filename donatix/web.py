@@ -681,6 +681,7 @@ def logout(request: Request, conn=Depends(get_conn)):
     if sid:   # сессия закрыта на сервере: копия cookie после выхода уже не войдёт
         conn.execute("UPDATE logins SET ended_at = ? WHERE sid = ? AND ended_at IS NULL", (db.now(), sid))
     request.session.clear()
+    request.state.guest_cookie = ""   # вышли — браузер больше не входит сам
     return _redirect("/")
 
 
@@ -921,6 +922,7 @@ def _start_guest(request: Request, conn) -> sqlite3.Row:
     referrals.attach(conn, uid, request.session.pop("ref", None))
     request.session["user_id"] = uid
     _record_login(conn, request, uid)
+    request.state.guest_cookie = quickbuy.issue_key(conn, uid)   # браузер помнит покупателя год
     return accounts.get_user(conn, uid)
 
 

@@ -8,8 +8,13 @@
 </section>
 <div class="app-hello only-app">Салом{% if not is_guest_account(user) %}, <b>{{ user.login }}</b>{% endif %} 👋</div>
 {% if is_guest_account(user) %}
-<a class="save-acc" href="/panel/save"><span style="font-size:1.5rem">💾</span>
-  <span class="grow"><b>Сохраните аккаунт</b><span>Вы купили без регистрации. Укажите почту и пароль — заказы и баланс будут доступны с любого телефона.</span></span>{{ icon('chevron', 18) }}</a>
+<div class="guest-id">
+  <div><small>Ваш код покупателя</small><b class="mono">{{ guest_code or '—' }}</b></div>
+  <button type="button" class="btn sm" data-copy="{{ guest_code }}">Копировать</button>
+</div>
+<p class="hint" style="margin:6px 2px 0">Назовите этот код в поддержке — мы сразу найдём ваши заказы. Этот браузер помнит вас: заказы и баланс будут здесь и в следующий раз.</p>
+<a class="save-acc" href="/panel/save"><span style="font-size:1.5rem">🔐</span>
+  <span class="grow"><b>Сохраните аккаунт через Google</b><span>Одна кнопка — и заказы будут доступны с любого телефона, даже если браузер очистится.</span></span>{{ icon('chevron', 18) }}</a>
 {% endif %}
 <div class="install-app install-card" role="region" aria-label="Приложение">
   <span style="font-size:1.6rem">📲</span>

@@ -171,6 +171,8 @@ def get_conn(request: Request) -> Iterator[sqlite3.Connection]:
 def session_user(request: Request, conn: sqlite3.Connection) -> sqlite3.Row | None:
     user_id = request.session.get("user_id")
     if not user_id:
+        user_id = _restore_guest(request, conn)
+    if not user_id:
         return None
     user = accounts.get_user(conn, int(user_id))
     sid = request.session.get("sid")
@@ -180,6 +182,24 @@ def session_user(request: Request, conn: sqlite3.Connection) -> sqlite3.Row | No
         request.session.clear()
         return None
     return user
+
+
+def _restore_guest(request: Request, conn: sqlite3.Connection) -> int | None:
+    """Купил без регистрации и вернулся через неделю: браузер помнит его (cookie dx_guest) — входим сами."""
+    cookie = request.cookies.get("dx_guest")
+    if not cookie:
+        return None
+    from . import quickbuy
+    uid = quickbuy.restore(conn, cookie)
+    if uid is None:
+        return None
+    import secrets as _secrets
+    sid = _secrets.token_urlsafe(24)
+    conn.execute("INSERT INTO logins (user_id, ip, user_agent, created_at, sid) VALUES (?, ?, ?, ?, ?)",
+                 (uid, (request.client.host if request.client else "?")[:64],
+                  request.headers.get("user-agent", "")[:300], db.now(), sid))
+    request.session["user_id"], request.session["sid"] = uid, sid
+    return uid
 
 
 def csrf_token(request: Request) -> str:
@@ -250,6 +270,9 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
         try:
             ctx["tz"], ctx["tz_choice"] = timez.resolve(c, ctx["user"], request.cookies.get("dx_tz"))
             ctx["unread"] = unread_count(c, ctx["user"]["id"])
+            from .quickbuy import code_of, is_guest
+            if not (isinstance(ctx["user"], dict) and ctx["user"].get("guest")) and is_guest(ctx["user"]):
+                ctx["guest_code"] = code_of(c, ctx["user"]["id"])   # код покупателя без регистрации
             from .popular import services as popular_services
             ctx["popular"] = popular_services(c)
             low = db.get_setting(c, "pay.low_balance_usd") or str(config.low_balance_usd)

@@ -1949,3 +1949,11 @@ body.rcc-open { overflow: hidden; }
   #catalog .catalog-link .chips { display: none; }
   #catalog .catalog-go { font-size: .82rem; }
 }
+.guest-id { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0 0; padding: 12px 16px;
+  border-radius: 16px; border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--surface); }
+.guest-id small { display: block; color: var(--muted); font-size: .78rem; }
+.guest-id b { font-size: 1.25rem; letter-spacing: .06em; }
+.google-btn { gap: 10px; }
+.google-btn svg { background: #fff; border-radius: 50%; padding: 2px; width: 24px; height: 24px; }
+.or-line { display: flex; align-items: center; gap: 10px; margin: 16px 0 4px; color: var(--muted); font-size: .85rem; }
+.or-line::before, .or-line::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
