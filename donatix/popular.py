@@ -111,7 +111,24 @@ def _best_sellers(conn: sqlite3.Connection, days: int = 30) -> list[dict[str, An
     return out
 
 
+def _cover(conn: sqlite3.Connection, kind: str) -> str | None:
+    """Картинка поставщика для раздела (Telegram, Steam), иначе — наша обложка."""
+    from .deps import kind_cover
+    kinds = ("telegram_stars", "telegram_premium") if kind == "telegram_stars" else (kind,)
+    row = conn.execute(f"SELECT MAX(image_url) FROM products WHERE active = 1 AND hidden = 0 AND kind IN "
+                       f"({','.join('?' * len(kinds))}) AND image_url LIKE 'http%'", kinds).fetchone()
+    return kind_cover(kind, row[0] if row else None)
+
+
 def compute(conn: sqlite3.Connection, limit: int = LIMIT) -> list[dict[str, Any]]:
+    out = _compute(conn, limit)
+    for item in out:
+        if not item.get("image_url"):
+            item["image_url"] = _cover(conn, item["kind"])
+    return out
+
+
+def _compute(conn: sqlite3.Connection, limit: int = LIMIT) -> list[dict[str, Any]]:
     pinned = _pinned(conn)
     out = list(pinned)
     # Игры, уже закреплённые по регионам (Free Fire СНГ/Индонезия), продажи не дублируют

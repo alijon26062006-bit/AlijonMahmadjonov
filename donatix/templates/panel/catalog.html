@@ -7,7 +7,7 @@
   <a class="back" href="/panel/catalog?kind={{ game.kind }}">{{ icon('arrow-left', 18) }}{{ kind_titles[game.kind] }}</a>
 </section>
 <div class="game-head">
-  {{ media(game.image_url, game.category_name, game.kind, 'cover') }}
+  {{ media(kind_cover(game.kind, game.image_url), game.category_name, game.kind, 'cover') }}
   <div>
     <h1>{{ game.category_name }}</h1>
     <p class="muted">{{ count }} {{ 'пакетов' if count != 1 else 'пакет' }}</p>
@@ -35,7 +35,7 @@
 <div class="grid games">
   {% for g in games %}
   <a class="game-card" href="/panel/catalog?kind={{ g.kind }}&category={{ g.category_id | urlencode }}">
-    {{ media(g.image_url, g.category_name, g.kind) }}
+    {{ media(kind_cover(g.kind, g.image_url), g.category_name, g.kind) }}
     <div class="game-name">{{ g.category_name }}</div>
     <div class="game-meta">
       <span>от {{ money(g.from_price) }}</span>

@@ -86,9 +86,9 @@
 {%- endmacro -%}
 
 {#- Обложка из каталога поставщика; без картинки — цветной квадрат с первыми буквами названия -#}
-{%- macro media(url, title, kind, cls='') -%}
+{%- macro media(url, title, kind, cls='', eager=False) -%}
 <div class="media k-{{ kind }} {{ cls }}">
-  {%- if url %}<img src="{{ url | img }}" alt="{{ title }}" loading="lazy" decoding="async" onerror="this.remove()">{% endif -%}
+  {%- if url %}<img src="{{ url | img }}" alt="{{ title }}" {% if eager %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async" onerror="this.remove()">{% endif -%}
   {%- set words = (title or '?').replace('-', ' ').split() -%}
   <span class="media-initials" aria-hidden="true">{{ (words[0][:1] ~ (words[1][:1] if words|length > 1 else words[0][1:2])) | upper }}</span>
 </div>

@@ -20,6 +20,17 @@ from .suppliers import KIND_TITLES
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
 templates.env.globals.update(fmt=fmt, fmt_unit=fmt_unit, kind_titles=KIND_TITLES)
 
+# Обложки разделов, если у поставщика своей картинки нет (Telegram, Steam) — лежат у нас, грузятся мгновенно
+KIND_COVERS = {"telegram_stars": "/static/img/tg-stars.svg", "telegram_premium": "/static/img/tg-premium.svg",
+               "steam_topup": "/static/img/steam.svg", "steam_gift": "/static/img/steam.svg"}
+
+
+def kind_cover(kind: str, url: str | None = None) -> str | None:
+    return url or KIND_COVERS.get(kind)
+
+
+templates.env.globals["kind_cover"] = kind_cover
+
 
 @pass_context
 def _dt(ctx: Any, value: Any, fmt: str = "%d.%m.%Y %H:%M") -> str:

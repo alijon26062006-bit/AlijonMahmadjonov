@@ -7,7 +7,7 @@
 {% set cart_ok = siblings | length > 1 and not multi and p.kind == 'topup' %}
 <a class="back" href="/panel/catalog?kind={{ p.kind }}" style="margin-top:14px">{{ icon('arrow-left', 18) }}{{ p.kind_title }}</a>
 <div class="buy-head">
-  {{ media(p.image_url, p.category_name, p.kind, 'cover') }}
+  {{ media(kind_cover(p.kind, p.image_url), p.category_name, p.kind, 'cover') }}
   <div class="grow">
     <div class="bh-kind">{{ p.kind_title }}</div>
     <h1>{{ p.category_name if siblings else p.title }}</h1>

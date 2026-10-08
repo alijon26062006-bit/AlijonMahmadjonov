@@ -2,7 +2,7 @@
 {% set short = {'topup': 'Пополнение', 'gift_card': 'Карта', 'game_key': 'Ключ', 'telegram_stars': 'Telegram', 'telegram_premium': 'Telegram', 'steam_topup': 'Steam', 'steam_gift': 'Steam гифт'} %}
 {% set pack = o.product_name | pack_title(o.kind) %}
 <a class="item order-card" href="/panel/orders/{{ o.public_id }}">
-  {% if o.image_url %}{{ media(o.image_url, o.game or o.product_name, o.kind, 'oc-img') }}{% else %}<span class="tile oc-img k-{{ o.kind }}">{{ kind_icon(o.kind, 26) }}</span>{% endif %}
+  {% if kind_cover(o.kind, o.image_url) %}{{ media(kind_cover(o.kind, o.image_url), o.game or o.product_name, o.kind, 'oc-img') }}{% else %}<span class="tile oc-img k-{{ o.kind }}">{{ kind_icon(o.kind, 26) }}</span>{% endif %}
   <div class="grow">
     <div class="head"><span class="title">{{ o.public_id }}</span><span class="amount">{{ money(o.total_micro) }}</span></div>
     {% if o.recipient is defined %}{% set who = o.recipient %}{% else %}{% set who = (o.fields_json | fromjson).values() | join(', ') %}{% endif %}

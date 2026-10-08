@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -28,7 +29,9 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024
 _lock = threading.Lock()
 _state: dict[str, Any] = {"running": False}
 _images: dict[str, str] = {}  # sha1(url)[:16] → имя файла в папке картинок
+_thumbs: set[str] = set()     # у каких картинок есть маленькая копия s/<ключ>.webp
 _images_dir: Path | None = None
+THUMB_PX = 400                # плитки на сайте ~150–200 px: 400 — чётко и на экранах с плотностью 2×
 
 
 # ── Картинки на своём сервере ────────────────────────────────
@@ -44,9 +47,50 @@ def load_image_index(config: Config) -> None:
     _images_dir = images_dir(config)
     _images_dir.mkdir(parents=True, exist_ok=True)
     _images.clear()
+    _thumbs.clear()
     for f in _images_dir.iterdir():
-        if f.is_file() and "." in f.name:
+        if f.is_file() and "." in f.name and not f.name.endswith(".part"):
             _images[f.name.split(".")[0]] = f.name
+    small = _images_dir / "s"
+    if small.is_dir():
+        _thumbs.update(f.name.split(".")[0] for f in small.iterdir() if f.name.endswith(".webp"))
+    missing = [k for k in _images if k not in _thumbs]
+    if missing:   # картинки, скачанные раньше, — сжать в фоне, сайт не ждёт
+        threading.Thread(target=_shrink_all, args=(_images_dir, missing), name="donatix-thumbs", daemon=True).start()
+
+
+def make_thumb(folder: Path, name: str) -> bool:
+    """Маленькая копия в WebP (в 10–30 раз легче оригинала). Нет Pillow — показываем оригинал."""
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        return False
+    key = name.split(".")[0]
+    small = folder / "s"
+    small.mkdir(exist_ok=True)
+    try:
+        with Image.open(folder / name) as im:
+            im = ImageOps.exif_transpose(im)
+            im.thumbnail((THUMB_PX, THUMB_PX), Image.LANCZOS)
+            im = im.convert("RGBA" if im.mode in ("RGBA", "LA", "P") else "RGB")
+            tmp = small / f"{key}.{os.getpid()}.part"
+            im.save(tmp, "WEBP", quality=82, method=4)   # .part: не .webp, пока не дописан
+        tmp.replace(small / f"{key}.webp")
+    except Exception:  # noqa: BLE001 — битая картинка: остаётся оригинал
+        log.debug("картинка %s не сжалась", name, exc_info=True)
+        return False
+    _thumbs.add(key)
+    return True
+
+
+def _shrink_all(folder: Path, keys: list[str]) -> None:
+    done = 0
+    for k in keys:
+        name = _images.get(k)
+        if name and make_thumb(folder, name):
+            done += 1
+    if done:
+        log.info("картинки: сжато %s", done)
 
 
 def _key(url: str) -> str:
@@ -57,7 +101,10 @@ def local_url(url: str | None) -> str | None:
     """Шаблоны показывают свою копию картинки, если она уже скачана, иначе — ссылку поставщика."""
     if not url:
         return url
-    name = _images.get(_key(url))
+    key = _key(url)
+    if key in _thumbs:
+        return f"/media/s/{key}.webp"
+    name = _images.get(key)
     return f"/media/{name}" if name else url
 
 
@@ -87,6 +134,7 @@ def _download(client: httpx.Client, folder: Path, url: str) -> str:
     tmp.write_bytes(data)
     tmp.replace(folder / name)
     _images[_key(url)] = name
+    make_thumb(folder, name)
     return "ok"
 
 

@@ -73,7 +73,7 @@ def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
             by_kind.setdefault(c["kind"], []).append(c)
         return by_kind, sum(c["n"] for c in cats), _price_examples(conn, config)
 
-    by_kind, total, examples = cache.get_or_set("home", 120, build)
+    by_kind, total, examples = cache.get_or_set("home", 600, build)   # правка каталога сбрасывает кеш сразу
     return render(request, "home.html", {
         "user": session_user(request, conn),
         "by_kind": by_kind,

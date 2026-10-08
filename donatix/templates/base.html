@@ -73,6 +73,8 @@
   {"prefetch": [{"where": {"and": [{"href_matches": "/*"},
       {"not": {"href_matches": ["/logout", "/auth/*", "/api/*", "/currency/*", "/admin*", "/panel/notifications*",
                                 "/panel/api*", "/login*", "/register*"]}}]},
+    "eagerness": "moderate"}],
+   "prerender": [{"where": {"href_matches": ["/panel/catalog*", "/panel/buy/*", "/panel/support", "/panel/orders*"]},
     "eagerness": "conservative"}]}
   </script>
   <meta name="mobile-web-app-capable" content="yes">
@@ -197,7 +199,7 @@
       })(start);
     });
   })();
-  // Заставка при входе: 3–5 секунд — не меньше 3 с (анимация и название), прячем, как только страница готова, не позже 5 с
+  // Заставка при входе: прячем, как только страница собрана (не ждём картинки), — не меньше 0,5 с, чтобы не мигала, и не дольше 1,2 с
   (function () {
     var d = document.documentElement;
     if (!d.classList.contains("splash-on")) return;
@@ -209,11 +211,11 @@
       setTimeout(function () {
         d.classList.add("splash-out");
         try { sessionStorage.setItem("dx-splash", "1"); } catch (e) {}
-        setTimeout(function () { d.classList.remove("splash-on", "splash-out"); }, 450);
-      }, Math.max(0, 3000 - (Date.now() - t0)));
+        setTimeout(function () { d.classList.remove("splash-on", "splash-out"); }, 240);
+      }, Math.max(0, 500 - (Date.now() - t0)));
     }
-    if (document.readyState === "complete") hide(); else window.addEventListener("load", hide);
-    setTimeout(hide, Math.max(3000, 5000 - (Date.now() - t0)));   // медленный интернет: не дольше 5 с
+    if (document.readyState !== "loading") hide(); else document.addEventListener("DOMContentLoaded", hide);
+    setTimeout(hide, Math.max(0, 1200 - (Date.now() - t0)));   // медленный интернет: не дольше 1,2 с
   })();
 
   // Переход между страницами: тонкая полоска сверху сразу после нажатия — видно, что приложение работает

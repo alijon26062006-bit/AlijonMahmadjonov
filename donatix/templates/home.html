@@ -47,7 +47,7 @@
       <div class="grid games pop-grid">
         {% for s in popular %}
         <a class="game-card" href="{{ s.href }}">
-          {% if s.image_url %}{{ media(s.image_url, s.title, s.kind) }}{% else %}<div class="media k-{{ s.kind }} pop-tile">{{ kind_icon(s.kind, 34) }}</div>{% endif %}
+          {% if s.image_url %}{{ media(s.image_url, s.title, s.kind, eager=loop.index <= 6) }}{% else %}<div class="media k-{{ s.kind }} pop-tile">{{ kind_icon(s.kind, 34) }}</div>{% endif %}
           <div class="game-name">{{ s.title }}</div>
         </a>
         {% endfor %}
@@ -77,7 +77,8 @@
                         "steam_topup": "/panel/buy/steam-topup", "steam_gift": "/panel/buy/steam-gift"} %}
         {% for kind, title in kind_titles.items() %}
         <a class="card feature catalog-link" href="{{ links.get(kind, '/panel/catalog?kind=' ~ kind) }}">
-          <div class="tile k-{{ kind }}">{{ kind_icon(kind, 20) }}</div>
+          {% set cov = kind_cover(kind, (by_kind.get(kind) or []) | selectattr('image_url') | map(attribute='image_url') | first) %}
+          {% if cov %}{{ media(cov, title, kind, 'cat-cover') }}{% else %}<div class="tile k-{{ kind }}">{{ kind_icon(kind, 20) }}</div>{% endif %}
           <h3>{{ title }}</h3>
           <div class="chips">
             {% if by_kind.get(kind) and kind in ('topup', 'gift_card', 'game_key') %}
