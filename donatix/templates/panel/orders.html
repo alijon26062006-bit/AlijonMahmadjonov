@@ -1,29 +1,54 @@
 {% extends "panel/_layout.html" %}
 {% block title %}Заказы — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="page-hero"><h1>Заказы</h1><p>{{ pr.label }}: {{ total }} · выполнено {{ totals.done }} на {{ money(totals.spent) }}{% if totals.failed %} · возвращено {{ totals.failed }}{% endif %}</p></section>
-<form class="card" method="get">
-  <div class="search-row"><input id="q" name="q" type="search" value="{{ q }}" placeholder="Поиск: номер, товар или ID игрока" aria-label="Поиск">
-    <button class="btn primary">Найти</button></div>
-  <details class="more-filters" {{ 'open' if status or request.query_params.get('period') or request.query_params.get('from') }}>
-  <summary>Фильтры: статус и даты</summary>
-  <div class="filters">
-  <div><label class="label-caps" for="status">Статус</label>
-    <select id="status" name="status">
-      <option value="">Все</option>
-      {% for s in ['processing', 'completed', 'failed'] %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ status_titles[s] }}</option>{% endfor %}
-    </select></div>
-  {% include "_period_filter.html" %}
-  <div style="display:flex;align-items:end"><button class="btn block">Показать</button></div>
-  </div></details></form>
-<div class="list" style="margin-top:16px">
-  {% for o in orders %}{% include "panel/_order_item.html" %}{% else %}<div class="card empty">Заказов нет.</div>{% endfor %}
+<section class="fc-hero"><h1>Заказы</h1><p>История заказов и статусы обработки.</p></section>
+<div class="fc-box">
+  <form class="fc-filter" method="get" id="orders-filter">
+    <input id="q" name="q" type="search" value="{{ q }}" placeholder="Поиск заказов (номер или название)" aria-label="Поиск" autocomplete="off">
+    <div class="fc-selects">
+      <div><label class="label-caps" for="status">Статус</label>
+        <select id="status" name="status">
+          <option value="">Все</option>
+          {% for s in ['processing', 'completed', 'failed'] %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ status_titles[s] }}</option>{% endfor %}
+        </select></div>
+      <div><label class="label-caps" for="kind">Тип заказа</label>
+        <select id="kind" name="kind">
+          <option value="">Все</option>
+          {% for k, t in kind_titles.items() %}<option value="{{ k }}" {{ 'selected' if k == kind }}>{{ t }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <details class="fc-dates" {{ 'open' if request.query_params.get('period') or request.query_params.get('date_from') }}>
+      <summary>Даты</summary>
+      <div class="filters">{% include "_period_filter.html" %}
+        <div style="display:flex;align-items:end"><button class="btn block">Показать</button></div></div>
+    </details>
+    {% if request.query_params.get('period') or request.query_params.get('date_from') %}
+    <div class="fc-count">{{ pr.label }}: {{ total }} · выполнено {{ totals.done }} на {{ money(totals.spent) }}{% if totals.failed %} · возвращено {{ totals.failed }}{% endif %}</div>
+    {% endif %}
+    {% if pages > 1 %}
+    {% set shown = [1, page - 1, page, page + 1, pages] | select('>=', 1) | select('<=', pages) | unique | sort | list %}
+    <nav class="fc-pager" aria-label="Страницы">
+      <a class="fc-pg fc-arrow {{ 'off' if page <= 1 }}" href="?{{ keep_all }}&page={{ [page - 1, 1] | max }}" aria-label="Назад">‹</a>
+      {% for n in shown %}
+        {% if not loop.first and n - loop.previtem > 1 %}<span class="fc-gap">…</span>{% endif %}
+        <a class="fc-pg {{ 'on' if n == page }}" href="?{{ keep_all }}&page={{ n }}" {{ 'aria-current=page' if n == page }}>{{ n }}</a>
+      {% endfor %}
+      <a class="fc-pg fc-arrow {{ 'off' if page >= pages }}" href="?{{ keep_all }}&page={{ [page + 1, pages] | min }}" aria-label="Вперёд">›</a>
+    </nav>
+    {% endif %}
+  </form>
+  <hr class="fc-sep">
+  <div class="list fc-list">
+    {% for o in orders %}{% include "panel/_order_item.html" %}{% else %}<div class="fc-empty">Заказов не найдено.</div>{% endfor %}
+  </div>
 </div>
-{% if pages > 1 %}
-<div class="pager">
-  {% if page > 1 %}<a class="btn sm" href="?{{ keep_all }}&page={{ page - 1 }}">←</a>{% endif %}
-  <span class="muted">{{ page }} / {{ pages }}</span>
-  {% if page < pages %}<a class="btn sm" href="?{{ keep_all }}&page={{ page + 1 }}">→</a>{% endif %}
-</div>
-{% endif %}
+<script>
+  (function () {
+    var f = document.getElementById("orders-filter"), q = document.getElementById("q"), t;
+    if (!f) return;
+    ["status", "kind"].forEach(function (id) { document.getElementById(id).addEventListener("change", function () { f.submit(); }); });
+    q.addEventListener("input", function () { clearTimeout(t); t = setTimeout(function () { f.submit(); }, 600); });
+    if (q.value) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+  })();
+</script>
 {% endblock %}

@@ -83,3 +83,19 @@ def test_stars_markup_applies_to_whole_project(config, conn):
     sitecfg.save(conn, config, {"markup_telegram_stars": "50"})
     assert accounts.markup_for(user, config, "telegram_stars") == Decimal("50")    # звёзды — для всех 50%
     assert accounts.markup_for(user, config, "topup") == Decimal("3")              # остальное — по личной
+
+
+def test_orders_filter_by_kind_and_numbered_pages(app, conn):
+    """Заказы как у FazerCards: фильтр «Тип заказа» и страницы цифрами ‹ 1 2 … N ›."""
+    uid, _ = make_client(conn)
+    now = periods.midnight(DUSHANBE) + timedelta(hours=1)
+    for n in range(1, 66):
+        _order(conn, uid, n, now)
+    conn.execute("UPDATE orders SET kind = 'topup' WHERE public_id = 'dx-p65'")
+    client = TestClient(app)
+    web_login(client, "shop1@example.com", "password123")
+    page = client.get("/panel/orders?kind=topup").text
+    assert "dx-p65" in page and "dx-p64" not in page and 'value="topup" selected' in page
+    page = client.get("/panel/orders").text
+    assert "Тип заказа" in page and 'class="fc-pg on"' in page and "page=3" in page
+    assert "dx-p64" in page and "dx-p1<" not in page

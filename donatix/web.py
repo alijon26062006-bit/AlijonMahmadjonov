@@ -16,7 +16,7 @@ from .config import PAY_METHODS, Config
 from .deps import (INDEXABLE, LoginRequired, TelegramRequired, check_csrf, flash, get_config, get_conn, render,
                    session_user)
 from .money import apply_markup, fmt, order_total_micro, to_decimal
-from .suppliers import KINDS, region_title
+from .suppliers import KIND_TITLES, KINDS, region_title
 
 router = APIRouter(include_in_schema=False)
 
@@ -1012,7 +1012,7 @@ def panel_gift_game(appid: int, request: Request, user=Depends(viewer), conn=Dep
 
 
 @router.get("/panel/orders")
-def panel_orders(request: Request, status: str = "", q: str = "", page: int = 1, period: str = "",
+def panel_orders(request: Request, status: str = "", q: str = "", page: int = 1, period: str = "", kind: str = "",
                  date_from: str = "", date_to: str = "", user=Depends(panel_user), conn=Depends(get_conn)):
     from urllib.parse import urlencode
 
@@ -1028,6 +1028,9 @@ def panel_orders(request: Request, status: str = "", q: str = "", page: int = 1,
     elif status in ("completed", "failed"):
         where += " AND status = ?"
         args.append(status)
+    if kind in KIND_TITLES:
+        where += " AND kind = ?"
+        args.append(kind)
     if q:
         where += " AND (public_id LIKE ? OR product_name LIKE ? OR fields_json LIKE ?)"
         args += [f"%{q}%"] * 3
@@ -1040,9 +1043,9 @@ def panel_orders(request: Request, status: str = "", q: str = "", page: int = 1,
     rows = conn.execute(f"SELECT * FROM orders WHERE {where} ORDER BY id DESC LIMIT ? OFFSET ?",
                         [*args, per, (page - 1) * per]).fetchall()
     rows = orders.with_images(conn, rows)   # картинка игры для карточек
-    keep = urlencode({"status": status, "q": q})
+    keep = urlencode({"status": status, "kind": kind if kind in KIND_TITLES else "", "q": q})
     return render(request, "panel/orders.html", {
-        "user": user, "orders": rows, "status": status, "q": q, "page": page,
+        "user": user, "orders": rows, "status": status, "kind": kind, "q": q, "page": page,
         "pages": max(1, -(-total // per)), "total": total, "totals": totals, "pr": pr, "presets": periods.PRESETS,
         "keep": keep, "keep_all": keep + "&" + urlencode({"period": pr.key if pr.key != "custom" else "",
                                                           "date_from": pr.date_from if pr.key == "custom" else "",

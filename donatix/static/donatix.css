@@ -1868,3 +1868,40 @@ body.rcc-open { overflow: hidden; }
 .dcv-agree input:disabled + span { opacity: .55; }
 .dcv-agree small { display: block; margin-top: 4px; color: var(--muted); font-size: .82rem; }
 .dcp-guide .dcv-frame { margin: 6px 0 10px; }
+
+/* ── Заказы в стиле FazerCards: рамка заголовка, фильтры, страницы цифрами ── */
+.fc-hero { margin: 14px 0 16px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 20px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), color-mix(in srgb, var(--accent) 3%, var(--surface))); }
+.fc-hero h1 { margin: 0; font-size: 1.55rem; font-weight: 800; letter-spacing: -.01em; }
+.fc-hero p { margin: 6px 0 0; color: var(--muted); font-size: 1rem; }
+.fc-box { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 12px; box-shadow: var(--shadow-1); }
+.fc-filter { border: 1px solid var(--line); border-radius: 18px; padding: 12px; }
+.fc-filter input[type=search] { width: 100%; height: 44px; border-radius: 14px; background: var(--surface-2); }
+.fc-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.fc-selects .label-caps { display: block; margin: 0 0 6px; }
+.fc-selects select { width: 100%; height: 44px; border-radius: 14px; }
+.fc-dates { margin-top: 10px; }
+.fc-dates summary { cursor: pointer; color: var(--muted); font-size: .85rem; font-weight: 600; }
+.fc-dates[open] summary { margin-bottom: 10px; }
+.fc-pager { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.fc-pg { min-width: 38px; height: 38px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text); font-weight: 700; font-size: .95rem; text-decoration: none; }
+.fc-pg:hover { text-decoration: none; background: var(--surface-2); }
+.fc-pg.on { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  color: var(--accent); box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 18%, transparent); }
+.fc-pg.fc-arrow { border-radius: 50%; color: var(--muted); }
+.fc-pg.off { opacity: .45; pointer-events: none; }
+.fc-gap { color: var(--muted); padding: 0 2px; }
+.fc-sep { border: 0; border-top: 1px solid var(--line); margin: 14px 4px; }
+.fc-list { gap: 10px; }
+.fc-list .order-card { box-shadow: none; }
+.fc-empty { padding: 28px 12px; text-align: center; color: var(--muted); }
+.fc-list .order-card { padding: 12px 14px; border-radius: 16px; gap: 12px; }
+.fc-list .order-card .oc-img { width: 50px; height: 50px; border-radius: 12px; }
+.fc-list .order-card .title { font-size: .95rem; font-weight: 700; }
+.fc-list .order-card .amount { font-size: .95rem; font-weight: 800; }
+.fc-list .order-card .oc-line { font-size: .8rem; margin-top: 3px; }
+.fc-list .order-card .meta { margin-top: 8px; gap: 8px; }
+.fc-list .order-card .meta .status { width: 26px; height: 26px; }
+.fc-list .order-card .meta .pill { font-size: .78rem; font-weight: 600; padding: 4px 10px; }
+.fc-count { margin-top: 8px; color: var(--muted); font-size: .85rem; }
