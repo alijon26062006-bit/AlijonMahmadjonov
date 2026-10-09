@@ -469,9 +469,7 @@ class AdminBot:
                 self.api("answerCallbackQuery", callback_query_id=cq["id"], text="Нет доступа")
                 return
             # Свою же заявку (аккаунт, привязанный к этому Telegram) кассир не решает — только админ
-            own = conn.execute("SELECT 1 FROM support_links WHERE tg_id = ? AND user_id = ?",
-                               (int(chat_id), p["user_id"])).fetchone()
-            if own is not None:
+            if p["user_id"] in cashier_own_users(conn, int(chat_id)):
                 self.api("answerCallbackQuery", callback_query_id=cq["id"],
                          text="Это ваша заявка — её проверяет админ")
                 return
@@ -803,13 +801,27 @@ def status_line(conn: sqlite3.Connection, config: Config, payment_id: int) -> st
     return f"Статус: {line}\nСоздана: {local_time(config, p['created_at'])}"
 
 
+def cashier_own_users(conn: sqlite3.Connection, tg_id: int) -> set[int]:
+    """Аккаунты, привязанные к Telegram кассира: бот поддержки, бот-магазин, вход через Telegram.
+    Свои заявки кассир не решает — иначе пополнил бы себе баланс своим же фальшивым чеком."""
+    own: set[int] = set()
+    for sql in ("SELECT user_id FROM support_links WHERE tg_id = ?",
+                "SELECT user_id FROM shop_users WHERE tg_id = ? AND user_id IS NOT NULL",
+                "SELECT user_id FROM tg_logins WHERE tg_id = ? AND user_id IS NOT NULL"):
+        try:
+            own.update(r[0] for r in conn.execute(sql, (tg_id,)))
+        except sqlite3.OperationalError:   # таблицы ещё нет (старая база)
+            continue
+    return own
+
+
 def queue_ids(conn: sqlite3.Connection, config: Config, cashier: sqlite3.Row | None = None) -> list[int]:
     """Чеки, которые ждут решения: админу — все, кассиру — по его банкам и не свои."""
     rows = conn.execute("SELECT id, method, user_id FROM payments WHERE status = 'pending' "
                         "AND receipt_file IS NOT NULL ORDER BY id").fetchall()
     if cashier is None:
         return [r["id"] for r in rows]
-    own = {r[0] for r in conn.execute("SELECT user_id FROM support_links WHERE tg_id = ?", (int(cashier["tg_id"]),))}
+    own = cashier_own_users(conn, int(cashier["tg_id"]))
     return [r["id"] for r in rows if r["user_id"] not in own and cashiers.handles(conn, config, cashier, r["method"])]
 
 

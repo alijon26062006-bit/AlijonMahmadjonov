@@ -401,8 +401,8 @@ def mark_fake(conn: sqlite3.Connection, config: Config, payment_id: int, admin_i
         p = conn.execute("SELECT * FROM payments WHERE id = ? AND status = 'paid'", (payment_id,)).fetchone()
         if p is None:
             raise PaymentError("Отметить поддельным можно только зачисленную заявку.")
-        if p["auto_kind"]:
-            raise PaymentError("Автоплатёж проверен блокчейном/Binance — поддельным он быть не может.")
+        if p["auto_kind"] and not p["receipt_file"]:   # «Душанбе Сити» по чеку (не по уведомлению банка) — можно
+            raise PaymentError("Автоплатёж проверен банком/блокчейном — поддельным он быть не может.")
         accounts.post_ledger(conn, p["user_id"], -p["amount_micro"],
                              f"Списание: перевод по заявке #{payment_id} не поступил (поддельный чек)",
                              created_by=admin_id, allow_negative=True)
@@ -600,6 +600,8 @@ def _attach_locked(conn: sqlite3.Connection, config: Config, user_id: int, payme
     dup = conn.execute("SELECT id FROM payments WHERE receipt_hash = ? AND id != ? "
                        f"AND status IN {receipt_ai.USED}", (digest, payment_id)).fetchone()
     twin = dup or (receipt_ai.duplicate(conn, payment_id, seen) if seen else None)
+    if not twin and seen and p["auto_kind"] == "dcbank":   # та же сумма от этого клиента уже пришла автоматом
+        twin = receipt_ai.auto_twin(conn, payment_id, user_id, seen)
     if twin:   # повтор не отклоняем — админ видит в заявке «ЭТОТ ЧЕК УЖЕ БЫЛ»
         seen = {**(seen or {}), "dup_of": twin["id"]}
     if reasons:   # чужие реквизиты, подделка, не чек — не принимаем вовсе
@@ -636,6 +638,10 @@ def _fix_amount_by_receipt(conn: sqlite3.Connection, p: sqlite3.Row, seen: dict)
     if (new_pay <= 0 or old_pay <= 0 or p["auto_kind"] or (seen.get("currency") or cur) != cur
             or receipt_ai.amount_matches(seen, str(old_pay), cur) is not False):
         return seen
+    if new_pay > old_pay:
+        # Сумму заявки по чеку только УМЕНЬШАЕМ: увеличить — значит поверить картинке на слово
+        # (отредактированный чек на 99 999 превращал заявку на 10 сомони в $9 000). Админ видит предупреждение.
+        return {**seen, "amount_more": f"{new_pay} {cur}"}
     micro = int(Decimal(p["amount_micro"]) * new_pay / old_pay)
     if micro <= 0:
         return seen

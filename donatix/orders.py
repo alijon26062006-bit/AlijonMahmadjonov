@@ -390,8 +390,12 @@ def fail_and_refund(conn: sqlite3.Connection, order_id: int, reason: str, *, by_
         if not changed:
             return False
         order = get_order_row(conn, order_id)
+        # Копеечное «округление курса», которое мы добавили к оплате, обратно не отдаём:
+        # иначе каждый неудавшийся заказ дарил бы клиенту цент
+        gift = conn.execute("SELECT COALESCE(SUM(amount_micro), 0) FROM transactions WHERE order_id = ? "
+                            "AND amount_micro > 0 AND note = 'Округление курса сомони'", (order_id,)).fetchone()[0]
         accounts.post_ledger(
-            conn, order["user_id"], order["total_micro"], f"Возврат за {order['public_id']}",
+            conn, order["user_id"], order["total_micro"] - gift, f"Возврат за {order['public_id']}",
             order_id=order_id, created_by=by_admin,
         )
         from .notify import notify

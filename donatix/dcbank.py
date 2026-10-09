@@ -230,7 +230,10 @@ def _confirm(conn, config, nid, p, notice) -> dict[str, Any]:
         _tell(config, f"⚠️ Оплата {amount_text(notice.amount)} TJS пришла, но заявка #{p['id']} уже закрыта "
                       "— повторно не зачислено. Проверьте.")
         return {"status": "ambiguous", "payment_id": p["id"]}
-    conn.execute("UPDATE payments SET ext_id = COALESCE(ext_id, ?) WHERE id = ?", (notice.op_code or None, p["id"]))
+    try:
+        conn.execute("UPDATE payments SET ext_id = COALESCE(ext_id, ?) WHERE id = ?", (notice.op_code or None, p["id"]))
+    except sqlite3.IntegrityError:   # код операции уже у другой заявки — зачисление уже прошло, только пометим
+        log.warning("dcbank: код операции %s уже записан у другой заявки", notice.op_code)
     _close(conn, nid, "matched", payment_id=p["id"],
            note="сумма отличалась от заявки" if credit else "точное совпадение")
     paid = conn.execute("SELECT p.amount_micro, u.login FROM payments p JOIN users u ON u.id = p.user_id "

@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -400,6 +401,11 @@ def init(path: Path | str) -> None:
         for col in ("auto_kind", "ext_id", "pay_url", "pay_address"):  # автоплатёж: TRC20 / Binance Pay
             if col not in pay_cols:
                 conn.execute(f"ALTER TABLE payments ADD COLUMN {col} TEXT")
+        try:   # один перевод (код операции банка, хэш USDT) — одно зачисление, даже если два процесса проверяют разом
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS payments_ext_uniq ON payments(ext_id) "
+                         "WHERE ext_id IS NOT NULL")
+        except sqlite3.IntegrityError:   # в старой базе уже есть повтор — сайт не роняем, админ проверит вручную
+            logging.getLogger(__name__).warning("payments.ext_id: есть повторы — уникальный индекс не создан")
         key_cols = {r[1] for r in conn.execute("PRAGMA table_info(api_keys)")}
         if "key_enc" not in key_cols:
             conn.execute("ALTER TABLE api_keys ADD COLUMN key_enc TEXT")

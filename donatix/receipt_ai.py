@@ -18,6 +18,7 @@ import json
 import logging
 import re
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -140,6 +141,26 @@ def loose_fingerprint(d: dict[str, Any]) -> str:
 USED = "('pending', 'paid', 'rejected', 'fake')"
 
 
+def _has_table(conn: sqlite3.Connection, name: str) -> bool:
+    return conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)).fetchone() is not None
+
+
+def auto_twin(conn: sqlite3.Connection, payment_id: int, user_id: int, d: dict[str, Any]) -> sqlite3.Row | None:
+    """Чек к заявке «Душанбе Сити», а ровно такая сумма от этого же клиента недавно уже пришла автоматически.
+    Номера операции в чеке может не быть — ловим по сумме: тот же клиент, та же сумма, последние 3 дня."""
+    try:
+        amount = round(float(d.get("amount") or 0) * 100)
+    except (TypeError, ValueError):
+        return None
+    if amount <= 0 or not _has_table(conn, "bank_notices"):
+        return None
+    since = (datetime.now(timezone.utc) - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M:%S")
+    return conn.execute("SELECT p.id, p.status FROM bank_notices n JOIN payments p ON p.id = n.payment_id "
+                        "WHERE n.status = 'matched' AND n.amount = ? AND p.user_id = ? AND p.id != ? "
+                        "AND n.seen_at >= ? ORDER BY n.id DESC LIMIT 1",
+                        (amount, user_id, payment_id, since)).fetchone()
+
+
 def duplicate(conn: sqlite3.Connection, payment_id: int, d: dict[str, Any]) -> sqlite3.Row | None:
     """Заявка с тем же чеком. Сравниваем по номеру операции, потом по сумме + дате-времени (+ банку).
 
@@ -149,6 +170,18 @@ def duplicate(conn: sqlite3.Connection, payment_id: int, d: dict[str, Any]) -> s
     if key:
         row = conn.execute(f"SELECT id, status FROM payments WHERE receipt_txn = ? AND id != ? AND status IN {USED}",
                            (key, payment_id)).fetchone()
+        if row:
+            return row
+        # Тот же перевод уже зачислен АВТОМАТИЧЕСКИ (Душанбе Сити — код операции банка, USDT — хэш):
+        # у автоплатежа нет чека, поэтому сверяем номер из чека с номером операции
+        norm = "UPPER(REPLACE(REPLACE(REPLACE({c}, ' ', ''), '-', ''), '/', ''))"
+        row = conn.execute(f"SELECT id, status FROM payments WHERE {norm.format(c='ext_id')} = ? AND id != ? "
+                           "AND status IN ('paid', 'fake')", (key, payment_id)).fetchone()
+        if row:
+            return row
+        row = conn.execute(f"SELECT p.id, p.status FROM bank_notices n JOIN payments p ON p.id = n.payment_id "
+                           f"WHERE {norm.format(c='n.op_code')} = ? AND p.id != ? AND n.status = 'matched'",
+                           (key, payment_id)).fetchone() if _has_table(conn, "bank_notices") else None
         if row:
             return row
     for column, value in (("receipt_fp", fp), ("receipt_fp2", loose)):
@@ -328,6 +361,9 @@ def summary(d: dict[str, Any] | None, pay_amount: Any = None, pay_currency: str 
         if not why.startswith(("получатель", "чек изменён", "в чеке перевод")):   # эти — ниже, своими строками
             line += f"\n🚨 {why[:1].upper() + why[1:]}"
     match = amount_matches(d, pay_amount, pay_currency)
+    if d.get("amount_more"):
+        line += (f"\n🚨 В ЧЕКЕ СУММА БОЛЬШЕ ЗАЯВКИ: {d['amount_more']} (заявка {pay_amount} {pay_currency}). "
+                 "Зачислится только сумма заявки — сверьте поступление в банке")
     if d.get("fixed_from"):
         line += (f"\n✏️ Клиент ошибся суммой — заявка исправлена по чеку: было {d['fixed_from']}, "
                  f"стало {pay_amount} {pay_currency}. Сверьте поступление в банке")

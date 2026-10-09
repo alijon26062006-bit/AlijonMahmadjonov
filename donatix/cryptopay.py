@@ -129,8 +129,11 @@ def check_trc20(conn: sqlite3.Connection, config: Config) -> int:
                     continue
                 if conn.execute("SELECT 1 FROM payments WHERE ext_id = ?", (t["tx"],)).fetchone():
                     continue  # этот перевод уже засчитан другой заявке
-                conn.execute("UPDATE payments SET ext_id = ?, reference = ? WHERE id = ? AND status = 'pending'",
-                             (t["tx"], t["tx"][:200], r["id"]))
+                try:
+                    conn.execute("UPDATE payments SET ext_id = ?, reference = ? WHERE id = ? AND status = 'pending'",
+                                 (t["tx"], t["tx"][:200], r["id"]))
+                except sqlite3.IntegrityError:   # другой процесс уже засчитал этот перевод
+                    continue
                 if payments.confirm(conn, config, r["id"], _admin_id(conn), who="автоматически"):
                     done += 1
                     _tell_admin(conn, config, r["id"], "USDT TRC20")
@@ -203,8 +206,11 @@ def check_bybit(conn: sqlite3.Connection, config: Config) -> int:
                 continue
             if conn.execute("SELECT 1 FROM payments WHERE ext_id = ?", (t["tx"],)).fetchone():
                 continue
-            conn.execute("UPDATE payments SET ext_id = ?, reference = ? WHERE id = ? AND status = 'pending'",
-                         (t["tx"], t["tx"][:200], r["id"]))
+            try:
+                conn.execute("UPDATE payments SET ext_id = ?, reference = ? WHERE id = ? AND status = 'pending'",
+                             (t["tx"], t["tx"][:200], r["id"]))
+            except sqlite3.IntegrityError:   # другой процесс уже засчитал этот перевод
+                continue
             if payments.confirm(conn, config, r["id"], _admin_id(conn), who="автоматически"):
                 done += 1
                 _tell_admin(conn, config, r["id"], "Bybit")
