@@ -17,51 +17,53 @@
 <main>
   <div class="wrap">
     {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
-    <section class="hero hero-play hx">
-      <h1>Донат в игры и Telegram&nbsp;Stars</h1>
-      <p class="lead">Быстрое пополнение по ID. Оплата в сомони.</p>
-      <a class="btn primary lg hx-cta" href="#games">Выбрать игру {{ icon('arrow-right', 18) }}</a>
-      <ul class="hx-points">
-        <li>{{ icon('check', 14) }}Алиф, Душанбе Сити, USDT</li>
-        <li>{{ icon('check', 14) }}Без регистрации и комиссии</li>
-        <li>{{ icon('check', 14) }}Не выполнился — вернём деньги</li>
-      </ul>
+    <section class="hero hero-play">
+      <div>
+        <h1>Алмазы Free Fire, UC PUBG и&nbsp;Telegram Stars — за&nbsp;секунды</h1>
+        <p class="lead">Без регистрации: выберите игру, введите ID и оплатите. Заказ придёт сам — обычно за минуту.</p>
+        <div class="cta">
+          <a class="btn primary lg" href="#games">Выбрать игру</a>
+        </div>
+        <ul class="hero-points">
+          <li>{{ icon('check', 16) }}Оплата: Алиф, Душанбе Сити, USDT</li>
+          <li>{{ icon('check', 16) }}Цены в сомони, без комиссии</li>
+          <li>{{ icon('check', 16) }}Не выполнился заказ — деньги вернутся</li>
+        </ul>
+      </div>
+      <div class="how-buy" aria-label="Как купить">
+        {% for n, t, d in [('1', 'Игра', 'Free Fire, PUBG, Telegram Stars и другие'),
+                           ('2', 'ID игрока', 'Мы проверим его — ошибки не будет'),
+                           ('3', 'Оплата', 'Алиф, Душанбе Сити или USDT — заказ придёт сам')] %}
+        <div class="hb-step"><span class="hb-n">{{ n }}</span><div><b>{{ t }}</b><span>{{ d }}</span></div></div>
+        {% endfor %}
+      </div>
     </section>
   </div>
 
   {% if popular %}
-  <section class="section sx" id="games">
+  <section class="section" id="games">
     <div class="wrap">
-      <div class="sx-head"><h2>Выберите игру</h2><span>Чаще всего покупают</span></div>
-      <div class="gx-grid">
+      <div class="section-head"><h2>Выберите игру</h2><p>Чаще всего покупают</p></div>
+      <div class="grid games pop-grid">
         {% for s in popular %}
-        <a class="gx-card" href="{{ s.href }}">
-          {{ media(s.image_url, s.title, s.kind, 'gx-img', eager=loop.index <= 6) if s.image_url
-             else '' }}{% if not s.image_url %}<div class="media gx-img k-{{ s.kind }} pop-tile">{{ kind_icon(s.kind, 30) }}</div>{% endif %}
-          {% if s.badge %}<span class="gx-badge">{{ s.badge }}</span>{% endif %}
-          <span class="gx-name">{{ s.title }}</span>
-          {% if s.from_price %}<span class="gx-price">от {{ money(s.from_price) }}</span>{% endif %}
+        <a class="game-card" href="{{ s.href }}">
+          {% if s.image_url %}{{ media(s.image_url, s.title, s.kind, eager=loop.index <= 6) }}{% else %}<div class="media k-{{ s.kind }} pop-tile">{{ kind_icon(s.kind, 34) }}</div>{% endif %}
+          <div class="game-name">{{ s.title }}</div>
         </a>
         {% endfor %}
       </div>
-      <ol class="hx-steps" aria-label="Как купить">
-        {% for n, t, d in [('1', 'Игра', 'Free Fire, PUBG, Stars'), ('2', 'ID игрока', 'проверим сами'),
-                           ('3', 'Оплата', 'заказ придёт сам')] %}
-        <li><span class="hb-n">{{ n }}</span><div><b>{{ t }}</b><span>{{ d }}</span></div></li>
-        {% endfor %}
-      </ol>
     </div>
   </section>
   {% endif %}
 
-  <section class="section sx" id="catalog">
+  <section class="section" data-reveal id="catalog">
     <div class="wrap">
-      <div class="sx-head">
+      <div class="section-head">
         <h2>{{ 'Весь каталог' if popular else 'Выберите игру' }}</h2>
-        {% if total_products %}<span>{{ '{:,}'.format(total_products).replace(',', ' ') }} позиций</span>{% endif %}
+        {% if total_products %}<p>{{ total_products }} позиций</p>{% endif %}
       </div>
       {% if not popular %}<span id="games"></span>{% endif %}
-      <div class="grid cx-grid">
+      <div class="grid">
         {% set defaults = {
           "telegram_stars": ["от 50 до 10 000 звёзд"],
           "telegram_premium": ["3, 6 и 12 месяцев"],
@@ -74,30 +76,35 @@
         {% set links = {"telegram_stars": "/panel/catalog?kind=telegram", "telegram_premium": "/panel/catalog?kind=telegram&tab=premium",
                         "steam_topup": "/panel/buy/steam-topup", "steam_gift": "/panel/buy/steam-gift"} %}
         {% for kind, title in kind_titles.items() %}
-        <a class="cx-card" href="{{ links.get(kind, '/panel/catalog?kind=' ~ kind) }}">
+        <a class="card feature catalog-link" href="{{ links.get(kind, '/panel/catalog?kind=' ~ kind) }}">
           {% set cov = kind_cover(kind, (by_kind.get(kind) or []) | selectattr('image_url') | map(attribute='image_url') | first) %}
-          {% if cov %}{{ media(cov, title, kind, 'cx-img') }}{% else %}<span class="tile cx-img k-{{ kind }}">{{ kind_icon(kind, 22) }}</span>{% endif %}
-          <span class="cx-text">
-            <b>{{ title }}</b>
-            <span class="cx-sub">{% if by_kind.get(kind) and kind in ('topup', 'gift_card', 'game_key') %}{{ by_kind[kind][:3] | map(attribute='category_name') | join(' · ') }}{% if by_kind[kind]|length > 3 %} · ещё {{ by_kind[kind]|length - 3 }}{% endif %}{% else %}{{ defaults[kind] | join(' · ') }}{% endif %}</span>
-          </span>
-          <span class="cx-go" aria-hidden="true">{{ icon('arrow-right', 16) }}</span>
+          {% if cov %}{{ media(cov, title, kind, 'cat-cover') }}{% else %}<div class="tile k-{{ kind }}">{{ kind_icon(kind, 20) }}</div>{% endif %}
+          <h3>{{ title }}</h3>
+          <div class="chips">
+            {% if by_kind.get(kind) and kind in ('topup', 'gift_card', 'game_key') %}
+              {% for c in by_kind[kind][:5] %}<span class="chip">{{ c.category_name }}</span>{% endfor %}
+              {% if by_kind[kind]|length > 5 %}<span class="chip">ещё {{ by_kind[kind]|length - 5 }}</span>{% endif %}
+            {% else %}
+              {% for d in defaults[kind] %}<span class="chip">{{ d }}</span>{% endfor %}
+            {% endif %}
+          </div>
+          <span class="catalog-go">Смотреть цены {{ icon('arrow-right', 14) }}</span>
         </a>
         {% endfor %}
       </div>
     </div>
   </section>
 
-  <section class="section sx" id="faq">
+  <section class="section" data-reveal id="faq">
     <div class="wrap" style="max-width:760px">
-      <div class="sx-head"><h2>Вопросы</h2></div>
+      <div class="section-head"><h2>Вопросы</h2></div>
       {% for q, a in faq %}
       <details class="faq"><summary>{{ q }}</summary><p>{{ a }}</p></details>
       {% endfor %}
     </div>
   </section>
 
-  <section class="section sx" id="business">
+  <section class="section" data-reveal id="business">
     <div class="wrap">
       <div class="card biz-card">
         <span class="badge accent">Для бизнеса</span>

@@ -12,11 +12,11 @@
     <span class="an-s">{% if a.created %}{{ ((a.done or 0) * 100 / a.created) | round(1) }}% успешных{% else %}—{% endif %}</span></div>
   <div class="an-kpi"><span class="an-l"><i class="an-dot c-ref"></i>Возвраты</span><b class="an-v">{{ num(a.refunded) }}</b>
     <span class="an-s">деньги на балансе</span></div>
-  <div class="an-kpi"><span class="an-l">Оборот</span><b class="an-v">{{ money2(a.turnover) }}</b>
-    <span class="an-s">{% if show_profit %}прибыль <em class="c-done">{{ money2(a.profit) }}</em>{% else %}выполненные заказы{% endif %}</span></div>
-  <div class="an-kpi"><span class="an-l">Средний чек</span><b class="an-v">{% if a.done %}{{ money2(a.turnover // a.done) }}{% else %}—{% endif %}</b>
+  <div class="an-kpi"><span class="an-l">Оборот</span><b class="an-v">{{ money(a.turnover) }}</b>
+    <span class="an-s">{% if show_profit %}прибыль <em class="c-done">{{ money(a.profit) }}</em>{% else %}выполненные заказы{% endif %}</span></div>
+  <div class="an-kpi"><span class="an-l">Средний чек</span><b class="an-v">{% if a.done %}{{ money(a.turnover // a.done) }}{% else %}—{% endif %}</b>
     <span class="an-s">на один заказ</span></div>
-  <div class="an-kpi"><span class="an-l">Пополнено</span><b class="an-v">{{ money2(a.topped) }}</b>
+  <div class="an-kpi"><span class="an-l">Пополнено</span><b class="an-v">{{ money(a.topped) }}</b>
     <span class="an-s">зачислено на баланс</span></div>
 </div>
 
@@ -47,7 +47,7 @@
     <div class="an-tr an-th"><span>Тип</span><span>Созд</span><span>Вып</span><span>Возв</span><span>Сумма</span></div>
     {% for k in a.by_kind %}
     <div class="an-tr"><b>{{ k.title }}</b><span>{{ k.created }}</span><span class="c-done">{{ k.done or 0 }}</span>
-      <span class="c-ref">{{ k.refunded or 0 }}</span><span class="an-sum">{{ money2(k.turnover) }}</span></div>
+      <span class="c-ref">{{ k.refunded or 0 }}</span><span class="an-sum">{{ money(k.turnover) }}</span></div>
     {% else %}<div class="empty small">За этот период заказов нет.</div>{% endfor %}
   </div>
 </div>

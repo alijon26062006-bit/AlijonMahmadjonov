@@ -212,7 +212,7 @@ def test_admin_page_and_broadcast(app, config, conn, supplier, monkeypatch):
     web_login(admin, "admin@example.com", "adminpass123")
     page = admin.get("/admin/shopbot").text
     assert "Продажи через бот" in page and "t.me/DonatixShopBot?start=g" in page
-    assert "Бот-магазин сегодня" in admin.get("/admin").text
+    assert "Через бот-магазин" in admin.get("/admin").text
     sent = FakeApi()
     shopbot.broadcast(config, "Скидка!", api=sent).join(5)
     assert [p["chat_id"] for m, p in sent.calls] == [TG]

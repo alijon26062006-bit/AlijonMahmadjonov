@@ -74,47 +74,17 @@ def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
         return by_kind, sum(c["n"] for c in cats), _price_examples(conn, config)
 
     by_kind, total, examples = cache.get_or_set("home", 600, build)   # правка каталога сбрасывает кеш сразу
-    user = session_user(request, conn)
     return render(request, "home.html", {
-        "user": user,
+        "user": session_user(request, conn),
         "by_kind": by_kind,
         "total_products": total,
         "markups": config.markups,
         "examples": examples,
         "faq": FAQ + (BOT_FAQ if sitecfg.client_bots_enabled(conn) else []),
-        "popular": _popular_cards(conn, config, user or _guest()),
+        "popular": popular.services(conn),
         "client_bots": sitecfg.client_bots_enabled(conn),
         "ref_percent": referrals.percent(conn),
     })
-
-
-_REGION_TAIL = re.compile(r"^(.*?)\s*\(([A-Za-z]{2,6})\)$")
-
-
-def _popular_cards(conn, config: Config, user) -> list[dict]:
-    """Плитки «Выберите игру»: регион из названия — маленькой меткой («Free Fire (TW)» → «Free Fire» + TW),
-    цена «от» — как в каталоге: самый дешёвый пакет игры с наценкой этого покупателя (у Telegram и Steam
-    цена за звезду/сумму — «от» не показываем)."""
-    cards = []
-    for item in popular.services(conn):
-        card = dict(item)
-        m = _REGION_TAIL.match(card["title"])
-        if m:
-            card["title"], card["badge"] = m.group(1), m.group(2).upper()
-        cid = card.get("category_id")
-        if cid and card["kind"] in ("topup", "gift_card", "game_key"):
-            sql, args = ("SELECT MIN(CAST(base_price AS REAL)) FROM products WHERE active = 1 AND hidden = 0 "
-                         "AND kind = ? AND category_id = ?", [card["kind"], cid])
-            if card.get("region"):
-                sql += " AND region = ?"
-                args.append(card["region"])
-            low = cache.get_or_set(f"from:{card['kind']}:{cid}:{card.get('region') or ''}", 600,
-                                   lambda sql=sql, args=args: conn.execute(sql, args).fetchone()[0])
-            if low:
-                card["from_price"] = _cents(apply_markup(to_decimal(str(low)),
-                                                         accounts.markup_for(user, config, card["kind"])))
-        cards.append(card)
-    return cards
 
 
 FAQ = [

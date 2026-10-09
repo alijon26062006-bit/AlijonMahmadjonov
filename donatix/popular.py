@@ -107,8 +107,7 @@ def _best_sellers(conn: sqlite3.Connection, days: int = 30) -> list[dict[str, An
                         "href": f"/panel/buy/{slug}", "kind": r["kind"], "image_url": None, "key": r["kind"]})
         else:
             out.append({"title": r["category_name"], "href": _link(r["kind"], r["category_id"]),
-                        "kind": r["kind"], "image_url": r["image_url"], "key": f"{r['kind']}:{r['category_id']}",
-                        "category_id": r["category_id"]})
+                        "kind": r["kind"], "image_url": r["image_url"], "key": f"{r['kind']}:{r['category_id']}"})
     return out
 
 

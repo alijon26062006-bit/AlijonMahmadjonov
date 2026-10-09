@@ -107,7 +107,7 @@ def test_admin_refunds_attention_order(client, conn, app, shop, supplier, monkey
     oid = conn.execute("SELECT id, status FROM orders").fetchone()
     assert oid["status"] == "attention"
     token = web_login(client, "admin@example.com", "adminpass123")
-    assert "требуют внимания: <b>1</b>" in client.get("/admin").text
+    assert "требующих внимания: 1" in client.get("/admin").text
     client.post(f"/admin/orders/{oid['id']}/refund", data={"csrf": token, "reason": "Нет у поставщика"})
     assert balance(conn, shop["id"]) == 1_000_000
     client.post(f"/admin/orders/{oid['id']}/refund", data={"csrf": token, "reason": "ещё раз"})
