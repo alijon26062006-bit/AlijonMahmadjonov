@@ -2360,3 +2360,37 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .adm .order-card .meta .pill { font-size: .7rem; padding: 2px 8px; }
 /* таблицы: длинные ID не ломают строку на 5 строчек */
 .adm td.mono, .adm td code, .adm td .mono { font-size: .72rem; word-break: break-all; }
+
+/* ══ Нижнее меню: ровное и тонкое (как в приложениях) ══
+   Раньше `font: 600 .7rem/1.1 inherit` браузер отбрасывал целиком (inherit в сокращённой записи нельзя):
+   у ссылок подпись была крупной, у кнопки «Ещё» — системным шрифтом другого размера. */
+@media (max-width: 900px) {
+  .app-ui .tabbar { padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); gap: 0;
+    background: color-mix(in srgb, var(--surface) 94%, transparent); -webkit-backdrop-filter: saturate(1.6) blur(14px);
+    backdrop-filter: saturate(1.6) blur(14px); box-shadow: 0 -6px 20px -16px rgb(0 0 0 / .35); }
+  /* Safari на iPhone: пока сворачивается адресная строка, меню на миг «отрывается» от низа —
+     сплошной фон под ним, чтобы страница там не просвечивала */
+  .app-ui .tabbar::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 160px; background: var(--surface); }
+  .app-ui .tabbar a, .app-ui .tabbar button { font-family: inherit; font-size: .64rem; font-weight: 600; line-height: 1.1;
+    letter-spacing: 0; height: 48px; gap: 3px; padding: 2px 0; color: var(--muted); -webkit-appearance: none; appearance: none; }
+  .app-ui .tabbar span { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app-ui .tabbar a:not(.tab-main) svg, .app-ui .tabbar button svg { width: 22px; height: 22px; padding: 3px 12px; }
+  .app-ui .tabbar .on { color: var(--accent); }
+  .app-ui .tabbar .tab-main { color: var(--text); }
+  .app-ui .tabbar .tab-main svg { width: 22px; height: 22px; padding: 8px; margin-top: -10px; border-radius: 13px;
+    box-shadow: 0 4px 12px -4px var(--accent); }
+  .app-ui main#main { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .app-ui .buy-bar { bottom: calc(57px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 900px) {
+  .app-ui .tabbar svg { box-sizing: content-box !important; flex: none; }
+  .app-ui .tabbar a, .app-ui .tabbar button { justify-content: flex-end; padding-bottom: 5px; }
+  .app-ui .tabbar .tab-main svg { width: 20px; height: 20px; padding: 9px; margin-top: 0; }
+  .app-ui .tabbar .tab-main { padding-bottom: 5px; }
+  .app-ui .tabbar .tab-main svg { transform: translateY(-6px); margin-bottom: -6px; }
+}
+@media (max-width: 900px) {
+  .app-ui .tabbar .tab-main { color: var(--muted); }
+  .app-ui .tabbar .tab-main.on { color: var(--accent); }
+  .app-ui .tabbar .tab-main svg { width: 18px; height: 18px; padding: 7px; border-radius: 11px; transform: translateY(-4px); margin-bottom: -4px; }
+}
