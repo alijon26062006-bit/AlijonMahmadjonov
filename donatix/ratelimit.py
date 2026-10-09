@@ -13,8 +13,10 @@ LIMITS = {
     "account": 60,
     "login": 10,      # попыток входа с одного IP за окно
     "guest": 8,       # аккаунтов «купить без регистрации» с одного IP в час
+    "ticket": 20,     # сообщений в тикеты за 10 минут — каждое уходит админу в Telegram
+    "ticket_new": 5,  # новых обращений в час
 }
-WINDOWS = {"login": 15 * 60, "guest": 3600}
+WINDOWS = {"login": 15 * 60, "guest": 3600, "ticket": 600, "ticket_new": 3600}
 
 
 class RateLimiter:

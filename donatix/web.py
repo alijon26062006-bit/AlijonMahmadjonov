@@ -1551,6 +1551,9 @@ def panel_support_new(request: Request, subject: str = Form(""), topic: str = Fo
                       order_ref: str = Form(""), text: str = Form(""), file: UploadFile | None = File(None),
                       user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
     from . import tickets
+    if request.app.state.limiter.hit("ticket_new", str(user["id"])) is not None:
+        flash(request, "Слишком много новых обращений подряд — напишите в уже открытое или подождите час.", "error")
+        return _redirect("/panel/support")
     data = file.file.read(tickets.MAX_AUDIO + 1) if file and file.filename else b""
     try:
         tid = tickets.create(conn, config, user["id"], subject, topic, order_ref, text, data)
@@ -1593,6 +1596,9 @@ def panel_ticket_reply(ticket_id: int, request: Request, text: str = Form(""), a
         tickets.set_status(conn, ticket_id, closed=True)
         flash(request, "Обращение закрыто. Если проблема вернётся — напишите сюда же, оно откроется снова.")
         return _redirect(f"/panel/support/{ticket_id}")
+    if request.app.state.limiter.hit("ticket", str(user["id"])) is not None:
+        flash(request, "Слишком много сообщений подряд — подождите несколько минут, мы уже видим ваше обращение.", "error")
+        return _redirect(f"/panel/support/{ticket_id}#end")
     data = file.file.read(tickets.MAX_AUDIO + 1) if file and file.filename else b""
     try:
         tickets.add(conn, config, ticket_id, "client", text, data)

@@ -19,7 +19,7 @@
 <script>
 (function () {
   var box = document.getElementById("tk-chat"); if (!box) return;
-  function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+  function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
   function file(m) {
     if (!m.file) return "";
     if (m.kind === "audio") return '<audio class="tk-audio" controls preload="none" src="' + esc(m.file) + '"></audio>';

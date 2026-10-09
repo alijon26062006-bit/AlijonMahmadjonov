@@ -269,3 +269,18 @@ def test_support_page_like_fazercards_and_thread_per_person(app, config, conn, m
     c.post("/panel/support/1", data={"csrf": csrf_of(r.text), "text": "Ещё жду"})
     second = [p for m, p in calls if m == "sendMessage"][-1]
     assert second["reply_parameters"]["message_id"] == tickets.get(conn, 1)["admin_msg"]   # та же ветка
+
+
+def test_ticket_spam_limited(client, conn, config):
+    import re
+
+    from conftest import make_client, web_login
+    from donatix import tickets
+    uid = make_client(conn, login="spammer")[0]
+    web_login(client, "spammer", "password123")
+    tid = tickets.create(conn, config, uid, "", "other", "", "помогите")
+    csrf = re.search(r'name="csrf" value="([^"]+)"', client.get(f"/panel/support/{tid}").text).group(1)
+    for i in range(25):
+        client.post(f"/panel/support/{tid}", data={"csrf": csrf, "text": f"msg {i}"})
+    n = conn.execute("SELECT COUNT(*) FROM ticket_messages WHERE ticket_id = ?", (tid,)).fetchone()[0]
+    assert n == 1 + 20   # первое сообщение + не больше 20 за 10 минут — админа в Telegram не заспамить

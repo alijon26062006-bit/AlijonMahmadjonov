@@ -78,7 +78,7 @@
   var state = {status: "active", ticket: null, last: 0, timer: null};
   var start = new URLSearchParams(location.search).get("t") || (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param);
 
-  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
   function when(iso) { try { var d = new Date(iso.replace(/\.\d+Z$/, "Z")); return d.toLocaleString("ru-RU", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"}); } catch (e) { return ""; } }
   function api(path, body) {
     return fetch("/support-app/api/" + path, {method: "POST", headers: {"Content-Type": "application/json", "X-Tg-Init": init},
