@@ -14,6 +14,10 @@ die() { printf '\n\033[1;31m✖ %s\033[0m\n' "$*"; exit 1; }
 command -v fail2ban-client >/dev/null || die "Сначала запустите protect.sh (он ставит fail2ban)"
 get() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"'"'"; }
 TOKEN=$(get DONATIX_ALERT_TELEGRAM_TOKEN); CHAT=$(get DONATIX_ALERT_TELEGRAM_CHAT_ID)
+# Значения попадают в команду, которую fail2ban выполняет от root: пропускаем только настоящий вид
+# токена и номера чата — иначе через .env можно было бы подсунуть свою команду
+[[ "$TOKEN" =~ ^[0-9]{5,15}:[A-Za-z0-9_-]{20,}$ ]] || TOKEN=""
+[[ "$CHAT" =~ ^-?[0-9]{3,20}$ ]] || CHAT=""
 
 say "1/3 Блокировки сохраняются после перезагрузки"
 # fail2ban хранит блокировки в своей базе и восстанавливает их при старте
@@ -31,6 +35,7 @@ if [ -n "$TOKEN" ] && [ -n "$CHAT" ]; then
 actionban = curl -s -m 15 "https://api.telegram.org/bot${TOKEN}/sendMessage" --data-urlencode "chat_id=${CHAT}" --data-urlencode "text=⛔ Заблокирован атакующий <ip> (правило <name>). Сайт защищён."
 actionunban =
 CONF
+  chmod 600 /etc/fail2ban/action.d/donatix-telegram.conf   # в файле токен бота — читать только root
   TG_LINE="
          donatix-telegram"
 else

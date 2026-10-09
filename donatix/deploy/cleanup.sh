@@ -31,34 +31,36 @@ echo "  диск: $(df -h / | awk 'NR==2{print $3" занято из "$2", св�
 echo "  проект: $(size "$HOME_DIR")   база: $(size "$DB") (+WAL $(size "$DB-wal"))   чеки: $(size "$DATA_DIR/receipts")"
 
 echo "== 1. Копия базы (до любых изменений)"
-mkdir -p "$BACKUP_DIR"; chown "$APP_USER": "$BACKUP_DIR"
+as_app() { sudo -u "$APP_USER" "$@"; }   # в папках donatix — только от его имени: root по подложенной ссылке
+                                          # удалил бы или поменял системный файл
+as_app mkdir -p "$BACKUP_DIR"; as_app chmod 700 "$BACKUP_DIR"
 COPY="$BACKUP_DIR/donatix-$(date +%F-%H%M).db"
 if sudo -u "$APP_USER" sqlite3 "$DB" ".backup '$COPY'" && [ -s "$COPY" ] \
-        && [ "$(sqlite3 "$COPY" 'PRAGMA quick_check' 2>/dev/null)" = "ok" ]; then
+        && [ "$(as_app sqlite3 "$COPY" 'PRAGMA quick_check' 2>/dev/null)" = "ok" ]; then
     ok "копия: $COPY ($(size "$COPY"))"
 else
-    echo "  ✗ копия базы не получилась — дальше не иду, ничего не удалено"; rm -f "$COPY"; exit 1
+    echo "  ✗ копия базы не получилась — дальше не иду, ничего не удалено"; as_app rm -f "$COPY"; exit 1
 fi
 # копии старше 14 дней — удалить, но 3 самые свежие оставить всегда
 ls -1t "$BACKUP_DIR"/donatix-*.db 2>/dev/null | tail -n +4 | while read -r f; do
-    [ -n "$(find "$f" -mtime +14 2>/dev/null)" ] && rm -f "$f"
+    [ -n "$(find "$f" -mtime +14 2>/dev/null)" ] && as_app rm -f "$f"
 done
 ok "копий базы: $(ls -1 "$BACKUP_DIR"/donatix-*.db 2>/dev/null | wc -l) ($(size "$BACKUP_DIR"))"
 
 echo "== 2. Кэш Python и pip"
-find "$APP_DIR" -name "__pycache__" -type d -prune -exec rm -rf {} + 2>/dev/null
-find "$APP_DIR" -name "*.py[co]" -type f -delete 2>/dev/null
-rm -rf "$APP_DIR"/.pytest_cache "$APP_DIR"/donatix/.pytest_cache "$APP_DIR"/donatix/.ruff_cache 2>/dev/null
-rm -rf "$HOME_DIR/.cache/pip" 2>/dev/null
+as_app find "$APP_DIR" -name "__pycache__" -type d -prune -exec rm -rf {} + 2>/dev/null
+as_app find "$APP_DIR" -name "*.py[co]" -type f -delete 2>/dev/null
+as_app rm -rf "$APP_DIR"/.pytest_cache "$APP_DIR"/donatix/.pytest_cache "$APP_DIR"/donatix/.ruff_cache 2>/dev/null
+as_app rm -rf "$HOME_DIR/.cache/pip" 2>/dev/null
 ok "убрано (Python сам создаст нужный кэш заново)"
 
 echo "== 3. Старые копии .env (там ключи — лишние копии лучше не держать)"
-ls -1t "$ENV_FILE".bak* 2>/dev/null | tail -n +4 | xargs -r rm -f
+ls -1t "$ENV_FILE".bak* 2>/dev/null | tail -n +4 | xargs -r sudo -u "$APP_USER" rm -f
 ok "оставлено: $(ls -1 "$ENV_FILE".bak* 2>/dev/null | wc -l)"
 
 echo "== 4. Временные файлы проекта"
-find "$DATA_DIR" -maxdepth 2 -type f \( -name "*.tmp" -o -name "*.part" \) -mmin +60 -delete 2>/dev/null
-find /tmp -maxdepth 1 -user "$APP_USER" -mtime +2 -exec rm -rf {} + 2>/dev/null
+as_app find "$DATA_DIR" -maxdepth 2 -type f \( -name "*.tmp" -o -name "*.part" \) -mmin +60 -delete 2>/dev/null
+as_app find /tmp -maxdepth 1 -user "$APP_USER" -mtime +2 -exec rm -rf {} + 2>/dev/null
 ok "готово"
 
 echo "== 5. Git"

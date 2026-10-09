@@ -71,7 +71,9 @@ APP=/home/donatix/app; ENV_FILE=$APP/donatix/.env; OUT=/home/donatix/backup
 get() { grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '"'"'"; }
 TOKEN=$(get DONATIX_ALERT_TELEGRAM_TOKEN); CHAT=$(get DONATIX_ALERT_TELEGRAM_CHAT_ID)
 DB=$(get DONATIX_DB); DB=${DB:-$APP/donatix/data/donatix.db}
-mkdir -p $OUT; F="$OUT/donatix-$(date +%F).db"
+# Скрипт работает от пользователя donatix, а не root (см. cron ниже): папка копий — его, и root, пишущий
+# или читающий там по подложенной ссылке, перезаписал бы или отправил бы любой системный файл
+umask 077; mkdir -p $OUT; chmod 700 $OUT; F="$OUT/donatix-$(date +%F).db"
 if ! "$APP/.venv/bin/python" - "$DB" "$F" <<'PY'
 import sqlite3, sys
 src, dst = sqlite3.connect(sys.argv[1]), sqlite3.connect(sys.argv[2])
@@ -85,7 +87,7 @@ then
        --data-urlencode "text=🔴 Ночная копия базы Donatix НЕ получилась — проверьте сервер." >/dev/null
   exit 1
 fi
-gzip -f "$F"; chown -R donatix:donatix $OUT; chmod 600 "$F.gz"
+gzip -f "$F"
 find $OUT -name 'donatix-*.db*' -mtime +14 -delete
 size=$(stat -c %s "$F.gz")
 if [ "$size" -lt 49000000 ]; then
@@ -100,11 +102,11 @@ chmod 755 /usr/local/bin/donatix-backup
 rm -f /etc/cron.d/donatix-backup   # старая копия через sqlite3 (его может не быть на сервере)
 cat > /etc/cron.d/donatix-guard <<'CRON'
 * * * * * root /usr/local/bin/donatix-guard >/dev/null 2>&1
-40 3 * * * root /usr/local/bin/donatix-backup >/dev/null 2>&1
+40 3 * * * donatix /usr/local/bin/donatix-backup >/dev/null 2>&1
 CRON
 chmod 644 /etc/cron.d/donatix-guard
 echo "Делаю первую копию сейчас — придёт файлом в админ-бот…"
-/usr/local/bin/donatix-backup && echo "копия отправлена" || echo "⚠ копия не получилась — пришлите вывод"
+sudo -u donatix /usr/local/bin/donatix-backup && echo "копия отправлена" || echo "⚠ копия не получилась — пришлите вывод"
 
 say "3/4 Автоматические обновления безопасности Ubuntu"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq unattended-upgrades >/dev/null 2>&1
