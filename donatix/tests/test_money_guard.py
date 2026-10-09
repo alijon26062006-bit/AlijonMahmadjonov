@@ -131,3 +131,17 @@ def test_cashier_cannot_decide_own_shopbot_request(app, config, conn):
     conn.execute("INSERT INTO shop_users (tg_id, user_id, created_at) VALUES (?, ?, ?)", (tg, uid, db.now()))
     cashiers.add(conn, tg, "Касса")
     assert uid in tgbot.cashier_own_users(conn, tg)
+
+
+def test_google_merge_revokes_planted_access(app, config, conn):
+    """Чужой заранее завёл аккаунт с почтой жертвы, создал API-ключ и привязал свой Telegram.
+    Жертва входит через Google — ключ и привязка сброшены."""
+    from donatix import google_auth
+    uid, _ = _user(conn, "victim")
+    key = accounts.create_api_key(conn, uid, "attacker")
+    if isinstance(key, tuple):
+        key = key[0]
+    conn.execute("INSERT INTO shop_users (tg_id, user_id, created_at) VALUES (?, ?, ?)", (424242, uid, db.now()))
+    google_auth.find_or_create(conn, config, {"sub": "g-1", "email": "victim@example.com"}, allow_new=True)
+    assert accounts.user_by_api_key(conn, key) is None
+    assert conn.execute("SELECT 1 FROM shop_users WHERE tg_id = 424242").fetchone() is None

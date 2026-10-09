@@ -374,8 +374,14 @@ def login(request: Request, email: str = Form(""), password: str = Form(""), con
     if wait is not None:
         return render(request, "login.html", {"form": {"email": email},
                                               "error": "Слишком много попыток входа. Подождите 15 минут."}, 429)
+    acct = email.strip().lower()[:120]
+    if request.app.state.limiter.full("login_acct", acct):   # подбор пароля к одному аккаунту с разных IP
+        return render(request, "login.html", {"form": {"email": email},
+                                              "error": "Слишком много неверных паролей к этому аккаунту. Подождите "
+                                                       "15 минут или войдите через Google / Telegram."}, 429)
     user = accounts.authenticate(conn, email, password)
     if user is None:
+        request.app.state.limiter.hit("login_acct", acct)
         return render(request, "login.html", {"form": {"email": email}, "error": "Неверный email или пароль."}, 400)
     if user["status"] == "blocked":
         return render(request, "login.html", {"form": {"email": email}, "error": "Аккаунт заблокирован."}, 403)

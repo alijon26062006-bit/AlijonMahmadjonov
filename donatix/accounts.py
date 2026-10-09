@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -68,9 +69,21 @@ def authenticate(conn: sqlite3.Connection, email_or_login: str, password: str) -
     user = conn.execute(
         "SELECT * FROM users WHERE email = lower(?) OR lower(login) = lower(?)", (ident, ident)
     ).fetchone()
-    if user is None or not verify_password(password, user["password_hash"]):
+    if user is None:
+        verify_password(password, _dummy_hash())   # то же время ответа: по скорости не узнать, есть ли такой аккаунт
+        return None
+    if not verify_password(password, user["password_hash"]):
         return None
     return user
+
+
+_DUMMY: list[str] = []
+
+
+def _dummy_hash() -> str:
+    if not _DUMMY:
+        _DUMMY.append(hash_password(secrets.token_urlsafe(16)))
+    return _DUMMY[0]
 
 
 def ensure_admin(conn: sqlite3.Connection, config: Config) -> None:

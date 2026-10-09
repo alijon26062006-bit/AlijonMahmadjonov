@@ -15,8 +15,9 @@ LIMITS = {
     "guest": 8,       # аккаунтов «купить без регистрации» с одного IP в час
     "ticket": 20,     # сообщений в тикеты за 10 минут — каждое уходит админу в Telegram
     "ticket_new": 5,  # новых обращений в час
+    "login_acct": 10, # неверных паролей к одному аккаунту за 15 минут — с любых IP
 }
-WINDOWS = {"login": 15 * 60, "guest": 3600, "ticket": 600, "ticket_new": 3600}
+WINDOWS = {"login": 15 * 60, "login_acct": 15 * 60, "guest": 3600, "ticket": 600, "ticket_new": 3600}
 
 
 class RateLimiter:
@@ -24,6 +25,16 @@ class RateLimiter:
         self.limits = dict(LIMITS if limits is None else limits)
         self._hits: dict[tuple[str, str], deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
+
+    def full(self, category: str, key: str) -> bool:
+        """Лимит уже исчерпан (без новой отметки)."""
+        limit = self.limits.get(category)
+        if not limit:
+            return False
+        now = time.monotonic()
+        with self._lock:
+            q = self._hits.get((category, key))
+            return bool(q) and len([t for t in q if t > now - WINDOWS.get(category, 60)]) >= limit
 
     def hit(self, category: str, key: str) -> float | None:
         """None — можно; число — сколько секунд подождать."""

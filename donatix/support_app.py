@@ -27,7 +27,10 @@ router = APIRouter(prefix="/support-app", include_in_schema=False)
 INIT_TTL = 24 * 3600
 
 
-def check_init(init_data: str, bot_token: str, now: float | None = None) -> dict[str, Any] | None:
+LOGIN_TTL = 3600   # вход покупателя по подписи Telegram — подпись не старше часа (её могли подсмотреть)
+
+
+def check_init(init_data: str, bot_token: str, now: float | None = None, ttl: int = INIT_TTL) -> dict[str, Any] | None:
     """Подпись Telegram WebApp: вернёт пользователя или None, если подпись чужая или старая."""
     if not init_data or not bot_token:
         return None
@@ -38,7 +41,7 @@ def check_init(init_data: str, bot_token: str, now: float | None = None) -> dict
     if not hmac.compare_digest(hmac.new(secret, check.encode(), hashlib.sha256).hexdigest(), got):
         return None
     try:
-        if (now or time.time()) - int(pairs.get("auth_date", "0")) > INIT_TTL:
+        if (now or time.time()) - int(pairs.get("auth_date", "0")) > ttl:
             return None
         return json.loads(pairs.get("user") or "{}")
     except ValueError:
@@ -205,14 +208,25 @@ async def me_login(request: Request, conn=Depends(get_conn), config: Config = De
     import secrets as _secrets
 
     from . import db, shopbot
-    body = await request.json()
-    user = check_init(str(body.get("init") or ""), config.shop_bot_token)
+    # Только настоящий JSON: форма с чужого сайта (text/plain) могла «залогинить» человека в чужой аккаунт,
+    # и его пополнение ушло бы туда. JSON с другого сайта браузер без нашего разрешения (CORS) не отправит.
+    if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+        return JSONResponse({"error": "Неверный запрос."}, status_code=415)
+    try:
+        body = await request.json()
+    except ValueError:
+        return JSONResponse({"error": "Неверный запрос."}, status_code=400)
+    user = check_init(str(body.get("init") or "") if isinstance(body, dict) else "", config.shop_bot_token,
+                      ttl=LOGIN_TTL)
     su = shopbot.shop_user(conn, int(user["id"])) if user and user.get("id") else None
     if su is None:
         return JSONResponse({"error": "Откройте поддержку из бота-магазина."}, status_code=403)
     u = accounts.get_user(conn, su["user_id"])
-    if u is None or u["status"] == "blocked":
+    if u is None or u["status"] != "active":
         return JSONResponse({"error": "Аккаунт недоступен."}, status_code=403)
+    if u["role"] != "client":   # админ входит только паролем и кодом (2FA), не через мини-приложение
+        return JSONResponse({"error": "Этот аккаунт входит на сайт через пароль."}, status_code=403)
+    request.session.clear()
     sid = _secrets.token_urlsafe(24)
     conn.execute("INSERT INTO logins (user_id, ip, user_agent, created_at, sid) VALUES (?, ?, ?, ?, ?)",
                  (u["id"], (request.client.host if request.client else "?")[:64],

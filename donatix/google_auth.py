@@ -75,6 +75,29 @@ def _free_login(conn: sqlite3.Connection, email: str) -> str:
     return login
 
 
+def _revoke_planted(conn: sqlite3.Connection, user_id: int) -> None:
+    """Аккаунт с этой почтой мог заранее завести чужой человек и оставить себе «ключи»: API-ключ, webhook,
+    привязанный свой Telegram, push на своё устройство. Через них он тратил бы деньги владельца и после
+    входа через Google. Владелец почты подтвердил её только сейчас — всё это сбрасываем."""
+    now = db.now()
+    revoked = conn.execute("UPDATE api_keys SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
+                           (now, user_id)).rowcount
+    conn.execute("UPDATE users SET webhook_url = NULL WHERE id = ?", (user_id,))
+    tg = 0
+    for table in ("push_subs", "support_links", "shop_users"):
+        try:
+            n = conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,)).rowcount
+        except sqlite3.OperationalError:   # таблицы ещё нет
+            continue
+        tg += n if table != "push_subs" else 0
+    if revoked or tg:
+        from .notify import notify
+        notify(conn, None, user_id, "Вход через Google подтвердил вашу почту. Для безопасности сброшены "
+               + ", ".join(x for x in (f"API-ключи ({revoked})" if revoked else "",
+                                       "привязка Telegram" if tg else "") if x)
+               + " — создайте и привяжите заново в профиле.", "/panel")
+
+
 def find_or_create(conn: sqlite3.Connection, config: Config, profile: dict[str, Any],
                    *, allow_new: bool) -> tuple[sqlite3.Row, bool]:
     """(пользователь, создан ли сейчас)."""
@@ -89,6 +112,7 @@ def find_or_create(conn: sqlite3.Connection, config: Config, profile: dict[str, 
                          (profile["sub"], hash_password(secrets.token_urlsafe(32)), user["id"]))
             conn.execute("UPDATE logins SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL",
                          (db.now(), user["id"]))
+            _revoke_planted(conn, user["id"])
     if user is not None:
         return user, False
     if not allow_new:

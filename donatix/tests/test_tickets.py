@@ -284,3 +284,23 @@ def test_ticket_spam_limited(client, conn, config):
         client.post(f"/panel/support/{tid}", data={"csrf": csrf, "text": f"msg {i}"})
     n = conn.execute("SELECT COUNT(*) FROM ticket_messages WHERE ticket_id = ?", (tid,)).fetchone()[0]
     assert n == 1 + 20   # первое сообщение + не больше 20 за 10 минут — админа в Telegram не заспамить
+
+
+def test_me_login_rejects_forms_and_admin(app, config, conn):
+    """Чужой сайт не может отправить форму text/plain и «залогинить» человека в чужой аккаунт;
+    админ через мини-приложение не входит (только пароль и код)."""
+    from test_shopbot import TG, FakeApi, msg
+
+    from donatix import shopbot
+    config.shop_bot_token = "777:shop-token"
+    bot = shopbot.ShopBot(config, None, api=FakeApi())
+    bot.handle(conn, msg("/start"))
+    init = _init(str(TG), token="777:shop-token")
+    c = TestClient(app)
+    r = c.post("/support-app/me/login", content=json.dumps({"init": init}), headers={"Content-Type": "text/plain"})
+    assert r.status_code == 415
+    old = _init(str(TG), token="777:shop-token", age=2 * 3600)
+    assert c.post("/support-app/me/login", json={"init": old}).status_code == 403     # подпись старше часа
+    admin_id = conn.execute("SELECT id FROM users WHERE role = 'admin'").fetchone()[0]
+    conn.execute("UPDATE shop_users SET user_id = ? WHERE tg_id = ?", (admin_id, TG))
+    assert c.post("/support-app/me/login", json={"init": init}).status_code == 403
