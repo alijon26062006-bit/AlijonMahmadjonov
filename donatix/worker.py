@@ -158,6 +158,11 @@ class Worker:
                 except Exception:
                     log.exception("покупка после оплаты")
                 try:
+                    from . import fivesim
+                    fivesim.maybe_watch(conn, self.config)   # виртуальные номера: пришёл ли код, возврат
+                except Exception:
+                    log.exception("виртуальные номера")
+                try:
                     from . import cryptopay
                     cryptopay.check_all(conn, self.config, min_interval=60)  # автоплатежи TRC20 / Binance
                 except Exception:

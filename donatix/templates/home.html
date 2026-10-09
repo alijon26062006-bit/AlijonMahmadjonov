@@ -38,6 +38,14 @@
         {% endfor %}
       </div>
     </section>
+    {% if vnumbers_on %}
+    <a class="card vn-promo" href="/panel/numbers">
+      <span class="vn-promo-ico" aria-hidden="true">📱</span>
+      <span class="grow"><b>Новое: виртуальные номера</b>
+        <span class="muted small">Номер для регистрации в Telegram и WhatsApp — СМС-код придёт на сайт. Не пришёл — деньги вернём.</span></span>
+      <span class="btn sm primary">Купить номер</span>
+    </a>
+    {% endif %}
   </div>
 
   {% if popular %}

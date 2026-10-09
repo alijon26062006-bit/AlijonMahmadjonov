@@ -1,0 +1,63 @@
+{% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Виртуальные номера — {{ site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero">
+  <h1>Виртуальный номер</h1>
+  <p class="muted">Номер для регистрации: СМС-код придёт сюда. Код не пришёл — деньги вернутся на баланс.</p>
+</section>
+{% if supplier_balance is not none %}<div class="flash">{{ icon('shield', 18) }}<span>Видно только админу: баланс 5sim — <b>{{ supplier_balance }}</b>, наценка {{ markup }}%</span></div>{% endif %}
+
+<div class="card">
+  <div class="seg" role="tablist" aria-label="Сервис">
+    {% for key, title in services.items() %}
+    <a role="tab" class="{{ 'on' if key == service }}" aria-selected="{{ 'true' if key == service else 'false' }}" href="?service={{ key }}">{{ title }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+{% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
+
+{% if rows %}
+<form class="search" onsubmit="return false" role="search" style="margin-top:12px">
+  {{ icon('grid', 18) }}<input id="vn-q" type="search" placeholder="Найти страну" aria-label="Найти страну" autocomplete="off">
+</form>
+<div class="list vn-list" id="vn-list" style="margin-top:10px">
+  {% for r in rows %}
+  <form class="pack-card vn-row" method="post" action="/panel/numbers/buy" data-name="{{ r.title | lower }} {{ r.country }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="service" value="{{ service }}">
+    <input type="hidden" name="country" value="{{ r.country }}">
+    <span class="pack-name">{{ r.title }}<small class="muted" style="display:block">{{ r.count }} номеров{% if r.rate %} · доставка {{ r.rate | round(0) | int }}%{% endif %}</small></span>
+    <span class="pack-price">{{ money(r.price_micro) }}</span>
+    <button class="btn sm primary" onclick="return confirm('Купить номер {{ services[service] }} · {{ r.title }} за ' + this.closest('form').querySelector('.pack-price').innerText + '?')">Купить</button>
+  </form>
+  {% endfor %}
+</div>
+<script>
+  (function () {
+    var q = document.getElementById("vn-q"), rows = document.querySelectorAll("#vn-list .vn-row");
+    q && q.addEventListener("input", function () {
+      var t = q.value.trim().toLowerCase();
+      rows.forEach(function (r) { r.style.display = !t || r.dataset.name.indexOf(t) >= 0 ? "" : "none"; });
+    });
+  })();
+</script>
+{% elif not error %}<div class="card empty">Сейчас номеров для этого сервиса нет — загляните позже.</div>{% endif %}
+
+{% if mine %}
+<div class="section-title"><h2>Мои номера</h2></div>
+<div class="list">
+  {% for n in mine %}
+  <a class="item" href="/panel/numbers/{{ n.id }}">
+    <span class="grow"><b>{{ n.service }} · {{ n.country }}</b><span class="sub">{{ n.phone or '—' }} · {{ n.status_title }}{% if n.code %} · код {{ n.code }}{% endif %}{% if n.refunded %} · возврат{% endif %}</span></span>
+    <span class="amount">{{ money(n.price_micro) }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+<style>
+  .vn-row { display: flex; align-items: center; gap: 10px; }
+  .vn-row .pack-name { flex: 1; min-width: 0; }
+  .vn-row .btn { flex: none; }
+</style>
+{% endblock %}

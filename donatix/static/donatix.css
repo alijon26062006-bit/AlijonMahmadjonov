@@ -2394,3 +2394,12 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
   .app-ui .tabbar .tab-main.on { color: var(--accent); }
   .app-ui .tabbar .tab-main svg { width: 18px; height: 18px; padding: 7px; border-radius: 11px; transform: translateY(-4px); margin-bottom: -4px; }
 }
+
+/* Плашка «Виртуальные номера» на главной */
+.vn-promo { display: flex; align-items: center; gap: 12px; margin: 14px 0 4px; padding: 14px 16px; color: var(--text);
+  text-decoration: none; border: 1px solid var(--accent-line); background: var(--accent-soft); }
+.vn-promo:hover { color: var(--text); text-decoration: none; }
+.vn-promo .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vn-promo-ico { font-size: 1.7rem; flex: none; }
+.vn-promo .btn { flex: none; }
+@media (max-width: 480px) { .vn-promo { flex-wrap: wrap; } .vn-promo .btn { width: 100%; justify-content: center; } }

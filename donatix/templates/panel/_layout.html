@@ -38,6 +38,7 @@
 {{ nav_link('/panel/buy/steam-topup', 'Пополнить Steam', 'wallet', current) }}
 {{ nav_link('/panel/buy/steam-gift', 'Steam Гифты (игры)', 'gift', current) }}
 {{ nav_link('/panel/catalog?kind=telegram', 'Telegram', 'zap-send', current) }}
+{% if vnumbers_on %}{{ nav_link('/panel/numbers', 'Виртуальные номера', 'chat', current) }}{% endif %}
 {{ nav_link('/panel/catalog?kind=gift_card', 'Подарочные карты', 'card', current) }}
 {{ nav_link('/panel/catalog?kind=game_key', 'Ключи игр', 'key', current) }}
 {{ nav_link('/panel/catalog?kind=topup', 'Пополнение сервисов', 'bolt', current) }}

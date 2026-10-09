@@ -1773,3 +1773,94 @@ def panel_webhook(request: Request, webhook_url: str = Form(""), rotate: str = F
     flash(request, "Настройки webhook сохранены.")
     return _redirect("/panel/api")
 
+
+
+# ── Виртуальные номера (5sim): номер на один СМС-код для Telegram, WhatsApp ─────────
+
+
+def _vnum_view(v) -> dict:
+    from . import fivesim
+    return {"id": v["id"], "service": fivesim.SERVICES.get(v["service"], v["service"]),
+            "country": fivesim.country_title(v["country"]), "phone": v["phone"], "code": v["code"],
+            "sms": v["sms_text"], "status": v["status"], "status_title": fivesim.STATUS_RU.get(v["status"], v["status"]),
+            "price_micro": v["price_micro"], "expires": v["expires"], "refunded": bool(v["refunded"]),
+            "open": v["status"] in ("PENDING", "RECEIVED") and not v["refunded"], "created_at": v["created_at"]}
+
+
+@router.get("/panel/numbers")
+def panel_numbers(request: Request, service: str = "telegram", user=Depends(panel_user), conn=Depends(get_conn),
+                  config: Config = Depends(get_config)):
+    from . import fivesim
+    if not fivesim.enabled(config):
+        return _redirect("/panel")
+    service = service if service in fivesim.SERVICES else "telegram"
+    error, rows = "", []
+    try:
+        rows = fivesim.prices(config, service)
+    except fivesim.FiveSimError as exc:
+        error = f"Список стран сейчас не загрузился ({exc}). Обновите страницу через минуту."
+    mine = [_vnum_view(v) for v in conn.execute(
+        "SELECT * FROM vnumbers WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user["id"],))]
+    supplier_balance = None
+    if user["role"] == "admin":
+        try:
+            supplier_balance = fivesim.balance(config)
+        except fivesim.FiveSimError as exc:
+            supplier_balance = f"ошибка: {exc}"
+    return render(request, "panel/numbers.html", {
+        "user": user, "service": service, "services": fivesim.SERVICES, "rows": rows, "error": error,
+        "mine": mine, "supplier_balance": supplier_balance, "markup": config.fivesim_markup})
+
+
+@router.post("/panel/numbers/buy", dependencies=[Depends(check_csrf)])
+def panel_numbers_buy(request: Request, service: str = Form(""), country: str = Form(""), user=Depends(panel_user),
+                      conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import fivesim
+    if not fivesim.enabled(config):
+        return _redirect("/panel")
+    if request.app.state.limiter.hit("orders", f"vnum{user['id']}") is not None:
+        flash(request, "Слишком много покупок подряд — подождите минуту.", "error")
+        return _redirect(f"/panel/numbers?service={service}")
+    try:
+        vid = fivesim.buy(conn, config, user, service, country[:40])
+    except fivesim.FiveSimError as exc:
+        flash(request, str(exc), "error")
+        if "баланс" in str(exc) and "вернулись" not in str(exc):
+            return _redirect("/panel/balance")
+        return _redirect(f"/panel/numbers?service={service}")
+    return _redirect(f"/panel/numbers/{vid}")
+
+
+@router.get("/panel/numbers/{vid:int}")
+def panel_number(vid: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
+    from . import fivesim
+    v = conn.execute("SELECT * FROM vnumbers WHERE id = ? AND user_id = ?", (vid, user["id"])).fetchone()
+    if v is None:
+        return _redirect("/panel/numbers")
+    if fivesim.enabled(config):
+        v = fivesim.refresh(conn, config, vid)
+    return render(request, "panel/number.html", {"user": user, "n": _vnum_view(v)})
+
+
+@router.get("/panel/data/number/{vid:int}")
+def panel_number_data(vid: int, user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import fivesim
+    v = conn.execute("SELECT * FROM vnumbers WHERE id = ? AND user_id = ?", (vid, user["id"])).fetchone()
+    if v is None:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    if fivesim.enabled(config):
+        v = fivesim.refresh(conn, config, vid)
+    return JSONResponse(_vnum_view(v), headers={"Cache-Control": "no-store"})
+
+
+@router.post("/panel/numbers/{vid:int}/cancel", dependencies=[Depends(check_csrf)])
+def panel_number_cancel(vid: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                        config: Config = Depends(get_config)):
+    from . import fivesim
+    try:
+        fivesim.cancel(conn, config, vid, user["id"])
+        flash(request, "Номер отменён — деньги вернулись на баланс.")
+    except fivesim.FiveSimError as exc:
+        flash(request, str(exc), "error")
+    return _redirect(f"/panel/numbers/{vid}")

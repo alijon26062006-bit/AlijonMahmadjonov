@@ -1,0 +1,50 @@
+{% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Номер {{ n.phone }} — {{ site_name }}{% endblock %}
+{% block content %}
+<a class="back" href="/panel/numbers">{{ icon('arrow-left', 18) }}Виртуальные номера</a>
+<section class="page-hero"><h1>{{ n.service }} · {{ n.country }}</h1></section>
+
+<div class="card vn-card" id="vn" data-id="{{ n.id }}" data-open="{{ 1 if n.open else 0 }}">
+  <div class="label-caps">Номер</div>
+  <div class="vn-phone">
+    <b id="vn-phone">{{ n.phone or '—' }}</b>
+    {% if n.phone %}<button class="btn sm" type="button" onclick="navigator.clipboard && navigator.clipboard.writeText('{{ n.phone }}'); this.textContent='Скопирован'">Копировать</button>{% endif %}
+  </div>
+  <div class="label-caps" style="margin-top:14px">Код из СМС</div>
+  <div class="vn-code" id="vn-code">{% if n.code %}{{ n.code }}{% elif n.open %}<span class="muted vn-wait">Ждём СМС…</span>{% else %}<span class="muted">—</span>{% endif %}</div>
+  {% if n.sms %}<p class="muted small" id="vn-sms">{{ n.sms }}</p>{% else %}<p class="muted small" id="vn-sms" hidden></p>{% endif %}
+  <p class="muted small">Статус: <b id="vn-status">{{ n.status_title }}</b>{% if n.refunded %} · деньги вернулись на баланс{% endif %} · цена {{ money(n.price_micro) }}</p>
+  <ol class="muted small vn-how">
+    <li>Откройте {{ n.service }} и введите этот номер.</li>
+    <li>Код появится здесь сам (обычно 1–3 минуты, ждём до 15 минут).</li>
+    <li>Код не пришёл — нажмите «Отменить»: деньги вернутся на баланс.</li>
+  </ol>
+  {% if n.open and not n.code %}
+  <form method="post" action="/panel/numbers/{{ n.id }}/cancel" onsubmit="return confirm('Отменить номер и вернуть деньги?')">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Отменить и вернуть деньги</button>
+  </form>
+  {% endif %}
+</div>
+<style>
+  .vn-phone { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+  .vn-code { font: 800 2.2rem/1.2 var(--font-num); letter-spacing: .08em; color: var(--accent); margin: 2px 0 6px; }
+  .vn-code .vn-wait { font-size: 1rem; letter-spacing: 0; font-weight: 500; }
+  .vn-how { padding-left: 18px; margin: 10px 0 14px; }
+</style>
+<script>
+  (function () {
+    var box = document.getElementById("vn");
+    if (!box || box.dataset.open !== "1") return;
+    var timer = setInterval(function () {
+      fetch("/panel/data/number/" + box.dataset.id, {credentials: "same-origin"}).then(function (r) { return r.json(); })
+        .then(function (d) {
+          document.getElementById("vn-status").textContent = d.status_title;
+          if (d.code) { document.getElementById("vn-code").textContent = d.code; }
+          if (d.sms) { var s = document.getElementById("vn-sms"); s.textContent = d.sms; s.hidden = false; }
+          if (!d.open || d.refunded) { clearInterval(timer); if (d.refunded || !d.code) location.reload(); }
+        }).catch(function () {});
+    }, 5000);
+  })();
+</script>
+{% endblock %}

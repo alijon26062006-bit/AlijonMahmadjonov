@@ -250,6 +250,7 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["site_name"] = config.site_name
     ctx["support_contact"] = config.support_contact
     ctx["tg_channel"] = config.tg_channel
+    ctx["vnumbers_on"] = bool(config.fivesim_token)   # виртуальные номера (5sim) подключены
     ctx["csrf"] = csrf_token(request)
     ctx["flashes"] = request.session.pop("flash", [])
     ctx["path"] = request.url.path

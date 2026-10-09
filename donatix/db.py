@@ -558,6 +558,27 @@ CREATE TABLE IF NOT EXISTS guest_keys (         -- покупка без рег�
     token_hash  TEXT NOT NULL,                     -- sha256 ключа из cookie dx_guest
     created_at  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS vnumbers (           -- виртуальные номера 5sim: номер на один СМС-код
+    id          INTEGER PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    service     TEXT NOT NULL,                 -- telegram · whatsapp
+    country     TEXT NOT NULL,
+    price_micro INTEGER NOT NULL,              -- сколько заплатил клиент
+    cost        TEXT NOT NULL DEFAULT '',      -- цена 5sim (в валюте аккаунта 5sim)
+    ext_id      TEXT,                          -- номер заказа у 5sim
+    phone       TEXT NOT NULL DEFAULT '',
+    operator    TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL,                 -- PENDING · RECEIVED · FINISHED · CANCELED · TIMEOUT · BANNED · FAILED
+    code        TEXT NOT NULL DEFAULT '',
+    sms_text    TEXT NOT NULL DEFAULT '',
+    expires     TEXT NOT NULL DEFAULT '',
+    refunded    INTEGER NOT NULL DEFAULT 0,
+    note        TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS vnumbers_user ON vnumbers(user_id, id DESC);
+CREATE INDEX IF NOT EXISTS vnumbers_open ON vnumbers(status, updated_at);
 CREATE TABLE IF NOT EXISTS bank_notices (       -- уведомления банка «Душанбе Сити» (юзербот): автоплатёж
     id          INTEGER PRIMARY KEY,
     source      TEXT NOT NULL,
