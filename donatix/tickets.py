@@ -208,7 +208,7 @@ def who_is(conn: sqlite3.Connection, user_id: int) -> str:
     su = buyer_of(conn, user_id)
     if su is not None and su["name"]:
         name = f"{su['name']} ({name})"
-    return name
+    return " ".join(name.split())[:80]   # одной строкой: перенос в имени подделал бы заголовок уведомления
 
 
 def attach_label(name: str | None) -> str:

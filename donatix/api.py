@@ -6,9 +6,9 @@
 from __future__ import annotations
 
 import sqlite3
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi import APIRouter, Depends, Header, Path, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -62,7 +62,7 @@ def api_user(
 
 
 def _page(page: int, limit: int) -> tuple[int, int]:
-    return max(page, 1), min(max(limit, 1), 100)
+    return min(max(page, 1), 100_000), min(max(limit, 1), 100)   # огромная страница ломала SQLite (ошибка 500)
 
 
 # ── Аккаунт ──────────────────────────────────────────────────
@@ -154,11 +154,11 @@ def categories(request: Request, user=Depends(api_user), conn=Depends(get_conn))
 @router.get("/products")
 def products(
     request: Request,
-    kind: str = "",
-    category_id: str = "",
+    kind: str = Query(default="", max_length=32),
+    category_id: str = Query(default="", max_length=64),
     q: str = Query(default="", max_length=100),
     limit: int = 100,
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0, le=1_000_000),
     user=Depends(api_user),
     conn=Depends(get_conn),
     config: Config = Depends(get_config),
@@ -341,7 +341,7 @@ def payment_create(body: PaymentIn, request: Request, user=Depends(api_user), co
 
 
 @router.post("/payments/{payment_id}/receipt")
-async def payment_receipt(payment_id: int, request: Request, user=Depends(api_user), conn=Depends(get_conn),
+async def payment_receipt(payment_id: Annotated[int, Path(ge=1, le=2**62)], request: Request, user=Depends(api_user), conn=Depends(get_conn),
                           config: Config = Depends(get_config)):
     """Чек: multipart-поле file (фото или PDF) или сырое тело с Content-Type image/* / application/pdf."""
     from . import payments
@@ -391,7 +391,7 @@ def payment_list(request: Request, user=Depends(api_user), conn=Depends(get_conn
 
 
 @router.get("/payments/{payment_id}")
-def payment_one(payment_id: int, user=Depends(api_user), conn=Depends(get_conn),
+def payment_one(payment_id: Annotated[int, Path(ge=1, le=2**62)], user=Depends(api_user), conn=Depends(get_conn),
                 config: Config = Depends(get_config)) -> dict[str, Any]:
     from . import payments
     row = conn.execute("SELECT * FROM payments WHERE id = ? AND user_id = ?", (payment_id, user["id"])).fetchone()

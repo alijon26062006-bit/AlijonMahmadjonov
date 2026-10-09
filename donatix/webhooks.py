@@ -71,8 +71,10 @@ def deliver_pending(conn: sqlite3.Connection, client: httpx.Client | None = None
             }
             ok = False
             try:
-                resp = client.post(row["webhook_url"], content=body, headers=headers)
-                ok = 200 <= resp.status_code < 300
+                # Нужен только код ответа: тело не читаем — медленный или огромный ответ партнёра
+                # не держит доставку остальным и не забивает память
+                with client.stream("POST", row["webhook_url"], content=body, headers=headers) as resp:
+                    ok = 200 <= resp.status_code < 300
             except httpx.HTTPError as exc:
                 log.info("webhook %s: %s", row["public_id"], exc)
             attempts = row["webhook_attempts"] + 1

@@ -787,6 +787,7 @@ def panel_catalog(
     request: Request, kind: str = "", q: str = "", category: str = "", region: str = "",
     user=Depends(viewer), conn=Depends(get_conn), config: Config = Depends(get_config),
 ):
+    kind, category, region, q = kind[:32], category[:64], region[:16], q[:100]   # длинные строки — мусор в кэше
     if kind == "telegram":
         return render(request, "panel/telegram.html",
                       _telegram_ctx(conn, config, user, request.query_params.get("tab", "")))

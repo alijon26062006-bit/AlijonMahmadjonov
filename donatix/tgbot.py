@@ -48,9 +48,20 @@ class TelegramApi:
         info = self("getFile", file_id=file_id) or {}
         if int(info.get("file_size") or 0) > max_bytes:
             raise RuntimeError("файл слишком большой")
-        resp = self._client.get(f"https://api.telegram.org/file/bot{self._token}/{info.get('file_path', '')}")
-        resp.raise_for_status()
-        return resp.content
+        # Адрес файла содержит токен бота: в тексте ошибки (а значит, в журнале и в чате) его быть не должно
+        url = f"https://api.telegram.org/file/bot{self._token}/{info.get('file_path', '')}"
+        try:
+            with self._client.stream("GET", url) as resp:
+                if resp.status_code != 200:
+                    raise RuntimeError(f"Telegram не отдал файл (HTTP {resp.status_code})")
+                data = b""
+                for chunk in resp.iter_bytes():
+                    data += chunk
+                    if len(data) > max_bytes:   # размер из getFile бывает пустым — режем по факту
+                        raise RuntimeError("файл слишком большой")
+                return data
+        except httpx.HTTPError as exc:
+            raise RuntimeError(f"Telegram: файл не скачался ({exc.__class__.__name__})") from None
 
     def upload(self, method: str, field: str, path, **payload: Any) -> Any:
         """Отправить файл с диска (видео-инструкция): multipart, длинный таймаут."""

@@ -94,7 +94,9 @@ def _clean_fields(product: dict[str, Any], raw: dict[str, Any] | None) -> dict[s
                 amount = to_decimal(value.replace(",", "."))
             except MoneyError:
                 raise OrderError("Сумма — число.", "invalid_field") from None
-            if amount <= 0 or amount != amount.quantize(Decimal("0.01")):
+            if not amount.is_finite() or amount <= 0 or amount > 1_000_000:   # 1e999999 ломал округление (ошибка 500)
+                raise OrderError("Сумма — положительное число, не больше 2 знаков после точки.", "invalid_field")
+            if amount != amount.quantize(Decimal("0.01")):
                 raise OrderError("Сумма — положительное число, не больше 2 знаков после точки.", "invalid_field")
             value = f"{amount:.2f}"
         result[key] = value

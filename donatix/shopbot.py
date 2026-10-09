@@ -40,6 +40,7 @@ MSG_LIMIT = (30, 10)          # не больше 30 действий за 10 с
 WATCH_EVERY = 4               # как часто проверять статусы заказов и пополнений, сек
 POLL_SECONDS = 25             # долгий опрос Telegram: новое сообщение приходит сразу, без пустых запросов
 HANDLERS = 8                  # сколько покупателей обслуживаем одновременно
+CHAT_QUEUE = 20               # больше сообщений одного покупателя в очереди не держим
 FINAL = ("completed", "failed", "cancelled", "refunded")
 
 GROUPS = {   # раздел меню → виды товаров
@@ -649,6 +650,8 @@ class ShopBot:
         self._local = threading.local()
         self._chat_locks: dict[int, threading.Lock] = {}
         self._locks_guard = threading.Lock()
+        self._queues: dict[int, list[dict[str, Any]]] = {}   # очередь сообщений каждого покупателя
+        self._draining: set[int] = set()                      # у кого очередь уже разбирается
 
     # цикл
     def start(self) -> None:
@@ -684,6 +687,32 @@ class ShopBot:
                 self.handle(self._thread_conn(), upd)
             except Exception:
                 log.exception("бот-магазин: обработка %s", upd.get("update_id"))
+
+    def _enqueue(self, upd: dict[str, Any]) -> None:
+        """Очередь на каждого покупателя: его сообщения — по порядку и в ОДНОМ потоке. Раньше каждое сообщение
+        занимало поток и ждало замка: 10 быстрых сообщений после чека занимали все потоки — бот молчал всем."""
+        chat = ((upd.get("callback_query") or {}).get("message") or upd.get("message") or {}).get("chat") or {}
+        cid = int(chat.get("id") or 0)
+        with self._locks_guard:
+            q = self._queues.setdefault(cid, [])
+            if len(q) >= CHAT_QUEUE:   # засыпает сообщениями — лишние не обрабатываем
+                return
+            q.append(upd)
+            if cid in self._draining:
+                return
+            self._draining.add(cid)
+        self._pool.submit(self._drain, cid)
+
+    def _drain(self, cid: int) -> None:
+        while True:
+            with self._locks_guard:
+                q = self._queues.get(cid)
+                if not q:
+                    self._queues.pop(cid, None)
+                    self._draining.discard(cid)
+                    return
+                upd = q.pop(0)
+            self._process(upd)
 
     def _watch_loop(self) -> None:
         """Статусы заказов и пополнений — в своём потоке: не ждут сообщений и не задерживают их."""
@@ -724,7 +753,7 @@ class ShopBot:
                     continue
                 for upd in updates:
                     offset = max(offset, int(upd["update_id"]) + 1)
-                    self._pool.submit(self._process, upd)
+                    self._enqueue(upd)
                 if updates:
                     db.set_setting(conn, "shop.tg_offset", str(offset))
         finally:

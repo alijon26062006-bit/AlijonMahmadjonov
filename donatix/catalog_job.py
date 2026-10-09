@@ -31,6 +31,7 @@ _state: dict[str, Any] = {"running": False}
 _images: dict[str, str] = {}  # sha1(url)[:16] → имя файла в папке картинок
 _thumbs: set[str] = set()     # у каких картинок есть маленькая копия s/<ключ>.webp
 _images_dir: Path | None = None
+MAX_PIXELS = 25_000_000      # больше 25 мегапикселей обложка игры не бывает
 THUMB_PX = 400                # плитки на сайте ~150–200 px: 400 — чётко и на экранах с плотностью 2×
 
 
@@ -70,6 +71,8 @@ def make_thumb(folder: Path, name: str) -> bool:
     small.mkdir(exist_ok=True)
     try:
         with Image.open(folder / name) as im:
+            if im.width * im.height > MAX_PIXELS:   # «картинка-бомба»: 0,6 МБ файла → 2 ГБ памяти при распаковке
+                return False
             im = ImageOps.exif_transpose(im)
             im.thumbnail((THUMB_PX, THUMB_PX), Image.LANCZOS)
             im = im.convert("RGBA" if im.mode in ("RGBA", "LA", "P") else "RGB")
@@ -289,7 +292,13 @@ def _download_all(config: Config, conn) -> None:
         return
     _say(f"Скачиваю картинки: {len(urls)} шт.")
     headers = {"User-Agent": "Donatix/1.0 (+catalog images)"}
-    with httpx.Client(timeout=20, follow_redirects=True, headers=headers) as client, \
+    def _check_hop(request: httpx.Request) -> None:   # перенаправление тоже — только на адреса в интернете
+        if not public_target(str(request.url)):
+            raise httpx.RequestError("адрес не в интернете", request=request)
+
+    from .webhooks import public_target
+    with httpx.Client(timeout=20, follow_redirects=True, headers=headers,
+                      event_hooks={"request": [_check_hop]}) as client, \
             ThreadPoolExecutor(max_workers=4) as pool:
         for url, res in zip(urls, pool.map(lambda u: _download(client, folder, u), urls), strict=True):
             with _lock:

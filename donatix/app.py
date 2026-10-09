@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from contextlib import asynccontextmanager
 
@@ -56,6 +57,23 @@ def quiet_http_logs() -> None:
     Токены не должны попадать в журнал сервера: оставляем только предупреждения и ошибки."""
     for name in ("httpx", "httpcore"):
         logging.getLogger(name).setLevel(logging.WARNING)
+    # Последняя страховка: токен бота (123456:AA…) в любом сообщении журнала заменяем звёздочками
+    for handler in logging.getLogger().handlers:
+        if not any(isinstance(f, _HideTokens) for f in handler.filters):
+            handler.addFilter(_HideTokens())
+
+
+class _HideTokens(logging.Filter):
+    _re = re.compile(r"(bot)?\d{6,12}:[A-Za-z0-9_-]{30,}")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            text = record.getMessage()
+        except Exception:  # noqa: BLE001 — кривой формат: журнал сам разберётся
+            return True
+        if self._re.search(text):
+            record.msg, record.args = self._re.sub("bot***", text), None
+        return True
 
 
 class _CookieJar:
@@ -112,8 +130,9 @@ class _Traffic:
 class _CacheAndTiming:
     """Cache-Control по адресу + журнал медленных запросов. Чистый ASGI — без лишних задач на каждый запрос."""
 
-    def __init__(self, app):
+    def __init__(self, app, https: bool = False):
         self.app = app
+        self.security = security_headers(https)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -126,9 +145,11 @@ class _CacheAndTiming:
         async def send_wrapper(message):
             if message["type"] == "http.response.start":
                 headers = list(message.get("headers") or [])
-                if not any(k.lower() == b"cache-control" for k, _ in headers):
+                have = {k.lower() for k, _ in headers}
+                if b"cache-control" not in have:
                     headers.append((b"cache-control", cache_policy(path, query, message["status"]).encode()))
-                    message = {**message, "headers": headers}
+                headers += [(k, v) for k, v in self.security if k not in have]
+                message = {**message, "headers": headers}
             await send(message)
 
         try:
@@ -137,6 +158,22 @@ class _CacheAndTiming:
             ms = (time.monotonic() - started) * 1000
             if ms >= SLOW_MS:   # journalctl -u donatix | grep медленно
                 log.warning("медленно: %s %s — %.0f мс", scope.get("method"), path, ms)
+
+
+def security_headers(https: bool) -> list[tuple[bytes, bytes]]:
+    """Защита браузера на каждом ответе.
+    frame-ancestors: сайт можно встроить только в сам сайт и в Telegram (мини-приложения) — не в чужую страницу,
+    где кнопку «Купить» или «Зачислить» подсунули бы под невидимый клик. HSTS — только по https."""
+    out = [
+        (b"x-content-type-options", b"nosniff"),
+        (b"referrer-policy", b"strict-origin-when-cross-origin"),
+        (b"content-security-policy", b"frame-ancestors 'self' https://web.telegram.org https://*.telegram.org "
+                                     b"https://telegram.org; base-uri 'self'; object-src 'none'"),
+        (b"permissions-policy", b"camera=(), geolocation=(), payment=(), usb=(), microphone=(self)"),
+    ]
+    if https:
+        out.append((b"strict-transport-security", b"max-age=31536000"))
+    return out
 
 
 def cache_policy(path: str, query: str, status: int) -> str:
@@ -255,7 +292,7 @@ def create_app(config: Config | None = None, supplier: Supplier | None = None) -
         same_site="lax",
         https_only=config.cookie_secure,
     )
-    app.add_middleware(_CacheAndTiming)
+    app.add_middleware(_CacheAndTiming, https=config.base_url.startswith("https://"))
     app.add_middleware(_SelectiveGZip, minimum_size=800, compresslevel=5)
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
     # Картинки каталога, скачанные с поставщика к себе (админка → Загрузка каталога)

@@ -42,7 +42,7 @@ def sync_games(conn: sqlite3.Connection, supplier: Supplier) -> int:
 
 def search(conn: sqlite3.Connection, q: str, limit: int = 30) -> list[dict[str, Any]]:
     q = q.strip()
-    if q.isdigit():
+    if q.isascii() and q.isdigit() and len(q) <= 12:   # «²» — тоже isdigit, но int() его не берёт
         rows = conn.execute("SELECT appid, name FROM steam_gift_games WHERE appid = ?", (int(q),)).fetchall()
     elif q:
         rows = conn.execute(

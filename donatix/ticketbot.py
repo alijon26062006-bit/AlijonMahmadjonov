@@ -18,7 +18,9 @@ from .config import Config
 log = logging.getLogger(__name__)
 
 POLL_SECONDS = 25
-_TICKET = re.compile(r"[Тт]икет #(\d+)")
+# Номер — только из заголовка уведомления (начало строки): имя клиента из Telegram стоит выше и может
+# само содержать «Тикет #1» — тогда ответ ушёл бы в чужой тикет
+_TICKET = re.compile(r"^(?:🎫 Новый тикет|💬 Тикет) #(\d+)", re.M)
 
 
 class TicketBot:

@@ -197,6 +197,13 @@ def _refresh_later(supplier: Supplier, product: dict[str, Any], fields: dict[str
 
 def check(supplier: Supplier, product: dict[str, Any], fields: dict[str, str]) -> dict[str, Any]:
     """{"valid": True/False/None, "player_name", "region", "message", "strict"}. None — проверить не удалось."""
+    # Только поля этого товара и только заполненные: иначе лишнее пустое поле сдвигало «ID игрока» в ключе кэша,
+    # и через API можно было пометить чужой ID «не найден» (его заказы отклонялись бы 6 часов)
+    keys = [f["key"] for f in product.get("fields") or []]
+    if keys:
+        fields = {k: str(fields.get(k, "")).strip()[:100] for k in keys}
+        if not all(fields.values()):
+            return {"valid": None, "player_name": None, "region": None, "message": "Заполните все поля", "strict": False}
     key = _store_key(supplier, product, fields)
     with _lock:
         hit = _results.get(key)

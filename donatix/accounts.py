@@ -261,5 +261,5 @@ def tx_public_id(tx_id: int) -> str:
 
 
 def parse_tx_id(public_id: str) -> int | None:
-    m = re.fullmatch(r"tx(\d+)", public_id.strip())
+    m = re.fullmatch(r"tx(\d{1,18})", public_id.strip())   # длиннее — не влезет в SQLite (была ошибка 500)
     return int(m.group(1)) if m else None

@@ -53,17 +53,36 @@ def get_or_set(key: str, ttl: float, make: Callable[[], Any]) -> Any:
         return _compute(key, ttl, make)
 
 
+MAX_KEYS = 3000   # разных запросов (поиск, фильтры) больше не держим: иначе запросами можно забить память
+
+
 def _compute(key: str, ttl: float, make: Callable[[], Any]) -> Any:
     value = make()
     with _lock:
         _store[key] = (time.monotonic() + ttl, value)
+        if len(_store) > MAX_KEYS:
+            _shrink()
     return value
+
+
+def _shrink() -> None:
+    """Под _lock: убрать устаревшее, а если всё ещё много — самые старые записи."""
+    now = time.monotonic()
+    for k in [k for k, (exp, _) in _store.items() if exp <= now]:
+        del _store[k]
+    if len(_store) > MAX_KEYS:
+        for k in sorted(_store, key=lambda k: _store[k][0])[: len(_store) - MAX_KEYS // 2]:
+            del _store[k]
+    for k in [k for k, lk in _key_locks.items() if k not in _store and not lk.locked()]:
+        del _key_locks[k]
 
 
 def clear(prefix: str = "") -> None:
     with _lock:
         for key in [k for k in _store if k.startswith(prefix)]:
             del _store[key]
+        for key in [k for k, lk in _key_locks.items() if k.startswith(prefix) and not lk.locked()]:
+            del _key_locks[key]
 
 
 # ── Несколько процессов сайта ──────────────────────────────────
