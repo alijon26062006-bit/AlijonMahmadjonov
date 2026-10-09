@@ -43,6 +43,10 @@ def dashboard(request: Request, admin=Depends(admin_user), conn=Depends(get_conn
         "failed_today": conn.execute("SELECT COUNT(*) FROM orders WHERE status = 'failed' AND created_at >= date('now')"
                                      ).fetchone()[0],
         "products": conn.execute("SELECT COUNT(*) FROM products WHERE active = 1").fetchone()[0],
+        "new_clients": conn.execute("SELECT COUNT(*) FROM users WHERE role = 'client' "
+                                    "AND created_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-30 days')").fetchone()[0],
+        "new_clients_today": conn.execute("SELECT COUNT(*) FROM users WHERE role = 'client' "
+                                          "AND created_at >= date('now')").fetchone()[0],
         "client_balances": conn.execute(
             "SELECT COALESCE(SUM(balance_micro), 0) FROM users WHERE role = 'client'").fetchone()[0],
     }

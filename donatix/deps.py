@@ -100,6 +100,26 @@ templates.env.globals["money"] = _money
 
 
 @pass_context
+def _money2(ctx, value):
+    """Сумма для сводок и KPI: 2 знака и пробел между тысячами ($6 034.23, 65 772.53 с.).
+    Точное значение (4 знака, в долларах) — во всплывающей подсказке; расчёты и база не меняются."""
+    from decimal import ROUND_HALF_UP, Decimal
+
+    from markupsafe import Markup, escape
+    usd = Decimal(int(value)) / 10_000 if isinstance(value, int) else Decimal(str(value or 0))
+    exact = f"${fmt(int(value))}" if isinstance(value, int) else f"${value}"
+    tjs = ctx.get("cur_code") == "TJS" and ctx.get("cur_rate")
+    shown = (usd * Decimal(str(ctx["cur_rate"]))) if tjs else usd
+    shown = shown.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    text = f"{shown:,.2f}".replace(",", "\u202f")
+    text = f"{text} с." if tjs else ("−$" + text[1:] if text.startswith("-") else f"${text}")
+    return Markup(f'<span class="m2" title="{escape(exact)}">{escape(text)}</span>')
+
+
+templates.env.globals["money2"] = _money2
+
+
+@pass_context
 def _dprice(ctx, usd: float) -> str:
     """Цена D-коина (доли цента) в валюте клиента: 3 значащие цифры — коротко и видно каждое движение."""
     import math

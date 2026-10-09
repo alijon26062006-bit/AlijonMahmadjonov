@@ -2394,3 +2394,179 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
   .app-ui .tabbar .tab-main.on { color: var(--accent); }
   .app-ui .tabbar .tab-main svg { width: 18px; height: 18px; padding: 7px; border-radius: 11px; transform: translateY(-4px); margin-bottom: -4px; }
 }
+
+/* ═════════════ Donatix UI v3 — единая система (магазин + админка) ═════════════
+   Токены → типографика → шапка → главная (первый экран, игры, каталог, FAQ) → нижнее меню.
+   Цвета только через переменные; тёмная тема — палитра бренда. */
+:root {
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+  --fs-xs: .75rem; --fs-sm: .8125rem; --fs-base: .9375rem; --fs-md: 1rem; --fs-h3: 1rem; --fs-h2: 1.375rem;
+  --r-card: 16px; --r-img: 12px;
+  --tap: 44px;
+  --dur: .18s;
+}
+:root[data-theme="dark"] {
+  --bg: #0e1017;
+  --surface: #171a24;
+  --surface-2: #202431;
+  --field: #131620;
+  --line: #2a2f3d;
+  --line-strong: #363c4d;
+  --text: #f5f6fa;
+  --muted: #a0a5b5;
+  --accent: #8b83f6;
+  --accent-hover: #a39cf8;
+  --accent-ink: #12102a;
+  --accent-soft: #1f1d3d;
+  --accent-line: #3b3670;
+}
+body { font-size: var(--fs-base); line-height: 1.5; }
+h2 { font-size: var(--fs-h2); font-weight: 700; }
+h3 { font-size: var(--fs-h3); font-weight: 600; }
+.muted, .small.muted { color: var(--muted); }
+
+/* Шапка: 60 px, все действия одной высоты и формы; учитываем вырез iPhone */
+.top { padding-top: env(safe-area-inset-top); }
+.top .wrap, .top .bar { height: 60px; gap: 10px; }
+.top .nav { gap: 8px; }
+.top .nav > a:not(.btn), .top .nav > button, .top .theme-btn, .top .nav-tg {
+  min-width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 12px; }
+.top .nav-tg { padding: 0 9px; border: 1px solid var(--line); background: var(--surface); }
+.top .btn.sm { height: 40px; min-height: 40px; padding: 0 14px; border-radius: 12px; font-size: .875rem; }
+.top .brand { font-size: 1.05rem; gap: 10px; }
+.top .brand svg, .top .brand img { width: 34px; height: 34px; }
+
+/* Секции: ровный ритм 32–40 px между блоками */
+.section.sx { padding: 18px 0; }
+.sx-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 14px; }
+.sx-head h2 { margin: 0; font-size: var(--fs-h2); }
+.sx-head > span { color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; }
+
+/* Первый экран: одна строка смысла и одно главное действие */
+.hero.hx { display: block; padding: 22px 0 6px; }
+.hero.hx h1 { font-size: clamp(1.9rem, 4.2vw, 2.75rem); line-height: 1.12; font-weight: 800; letter-spacing: -.02em;
+  margin: 0 0 8px; max-width: 16ch; }
+.hero.hx .lead { font-size: var(--fs-base); line-height: 1.5; color: var(--muted); margin: 0 0 16px; max-width: 46ch; }
+.hx-cta { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px;
+  padding: 0 28px; font-size: 1rem; font-weight: 700; border-radius: 14px; }
+.hx-points { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 0; margin: 14px 0 0;
+  color: var(--muted); font-size: var(--fs-sm); }
+.hx-points li { display: inline-flex; align-items: center; gap: 6px; }
+.hx-points .ico { color: var(--ok); }
+@media (max-width: 640px) { .hx-cta { display: flex; width: 100%; } }
+
+/* Карточки игр: 2 в ряд на телефоне, квадратная картинка, название в 2 строки, цена «от» */
+.gx-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 560px) { .gx-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .gx-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; } }
+.gx-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 10px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); text-decoration: none;
+  transition: border-color var(--dur) ease, transform var(--dur) ease, background var(--dur) ease;
+  -webkit-tap-highlight-color: transparent; }
+.gx-card:hover { color: var(--text); text-decoration: none; border-color: var(--accent-line); }
+.gx-card:active { transform: scale(.97); background: var(--surface-2); }
+.gx-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gx-card .gx-img { width: 100%; aspect-ratio: 1 / 1; max-width: none; border-radius: var(--r-img); }
+.gx-card .gx-img img { object-fit: cover; }
+.gx-name { font-size: var(--fs-base); font-weight: 600; line-height: 1.3; min-height: 2.6em; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.gx-price { margin-top: auto; font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+.gx-price .cur-tjs, .gx-price { white-space: nowrap; }
+.gx-badge { position: absolute; top: 16px; left: 16px; z-index: 1; padding: 2px 7px; border-radius: 6px;
+  font-size: .6875rem; font-weight: 700; letter-spacing: .03em; color: #fff; background: rgb(10 12 20 / .72);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+
+/* «Как купить» — тихая строка под играми, не отнимает первый экран */
+.hx-steps { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+  padding: 0; margin: 14px 0 0; }
+.hx-steps li { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 12px;
+  background: var(--surface-2); min-width: 0; }
+.hx-steps .hb-n { width: 24px; height: 24px; border-radius: 7px; font-size: .75rem; flex: none; }
+.hx-steps b { display: block; font-size: var(--fs-sm); line-height: 1.2; }
+.hx-steps li span:not(.hb-n) { display: block; font-size: .6875rem; color: var(--muted); line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Категории каталога: компактно, картинка 56 px, название и действие вместе */
+.cx-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 760px) { .cx-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); } }
+.cx-card { position: relative; display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 12px;
+  padding: 12px; min-height: 80px; border-radius: var(--r-card); background: var(--surface); border: 1px solid var(--line);
+  color: var(--text); text-decoration: none; transition: border-color var(--dur) ease, transform var(--dur) ease; }
+.cx-card:hover { color: var(--text); text-decoration: none; border-color: var(--accent-line); }
+.cx-card:active { transform: scale(.98); }
+.cx-card .cx-img { width: 56px; height: 56px; aspect-ratio: 1; border-radius: 14px; display: grid; place-items: center; }
+.cx-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-right: 18px; }
+.cx-text b { font-size: var(--fs-base); font-weight: 600; line-height: 1.25; }
+.cx-sub { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-go { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); display: flex; }
+.cx-card:hover .cx-go { color: var(--accent); }
+@media (max-width: 759px) {
+  .cx-card { grid-template-columns: 1fr; align-items: start; gap: 8px; min-height: 0; }
+  .cx-card .cx-img { width: 52px; height: 52px; }
+  .cx-go { top: 14px; right: 12px; transform: none; }
+  .cx-text { padding-right: 0; }
+  .cx-text b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; }
+}
+
+/* FAQ: строка ≥ 48 px, тонкие линии, плавное раскрытие */
+#faq details.faq summary { min-height: 48px; align-items: center; padding: 10px 0; font-size: var(--fs-base); }
+#faq details.faq summary::after { display: grid; place-items: center; width: 24px; height: 24px; flex: none;
+  transition: transform var(--dur) ease; }
+#faq details.faq::details-content { transition: height var(--dur) ease, content-visibility var(--dur) allow-discrete; }
+#faq details.faq p { font-size: var(--fs-sm); line-height: 1.55; margin: 0 0 12px; }
+
+/* Блок «Для бизнеса» — плотнее */
+#business .biz-card { padding: 18px; }
+#business .biz-card h2 { font-size: 1.15rem; }
+
+/* Нижнее меню: ровная полоса, «Пополнить» — заливка, но в одной линии с остальными */
+@media (max-width: 900px) {
+  .app-ui .tabbar .tab-main svg { transform: none; margin: 0; width: 18px; height: 18px; padding: 5px 13px;
+    border-radius: 999px; box-shadow: none; }
+  .app-ui .tabbar { padding-top: 5px; }
+  .app-ui .tabbar a, .app-ui .tabbar button { height: 46px; }
+}
+.hx-steps li > div { min-width: 0; }
+@media (max-width: 380px) { .hx-steps li span:not(.hb-n) { display: none; } .hx-steps li { padding: 8px; gap: 6px; } }
+
+/* ── Админка v3: сводка как финансовый дашборд ── */
+.m2 { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dx-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 0 12px; }
+@media (min-width: 900px) { .dx-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.dx-kpi { display: flex; flex-direction: column; gap: 4px; min-height: 104px; padding: 14px; border-radius: var(--r-card);
+  background: var(--surface); border: 1px solid var(--line); color: var(--text); text-decoration: none; min-width: 0;
+  transition: border-color var(--dur) ease; }
+.dx-kpi:hover { color: var(--text); text-decoration: none; border-color: var(--accent-line); }
+.dx-l { font-size: var(--fs-xs); font-weight: 600; color: var(--muted); }
+.dx-v { font: 750 clamp(1.2rem, 4.6vw, 1.6rem)/1.15 var(--font-num); font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em; overflow-wrap: anywhere; }
+.dx-s { margin-top: auto; font-size: var(--fs-xs); color: var(--muted); }
+.dx-sup .card-head { margin-bottom: 4px; }
+.dx-sup .card-head form { margin: 0; }
+.btn.ghost { background: transparent; border-color: var(--line); }
+.dx-rows { display: flex; flex-direction: column; }
+.dx-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line);
+  color: var(--text); text-decoration: none; min-width: 0; }
+.dx-row:first-child { border-top: 0; }
+a.dx-row:hover { color: var(--text); text-decoration: none; }
+.dx-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--ok); }
+.dx-dot.bad { background: var(--bad); }
+.dx-name { flex: 1; min-width: 0; font-weight: 600; font-size: var(--fs-base); }
+.dx-name small { display: block; font-weight: 400; font-size: var(--fs-xs); color: var(--muted); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.dx-amt { font: 700 1.05rem/1.2 var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dx-foot { margin-top: 6px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: var(--fs-xs); color: var(--muted); }
+.adm .todo-item b { font-weight: 800; }
+.adm .page-hero.dash-hero { margin-bottom: 10px; }
+/* Каталог: строка товара не шире экрана даже на 320 px — длинное название переносится */
+.packs-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+.pack-card { min-width: 0; }
+.pack-card .pack-name { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+.pack-card .badge, .pack-card .pack-price { flex: none; }
+@media (max-width: 400px) { .pack-card { gap: 8px; } .pack-card .badge { font-size: .625rem; padding: 2px 5px; } }
+.adm .todo-item.info { background: var(--accent-soft); border: 1px solid var(--accent-line); color: var(--text); }
+.adm .todo-item.info .ico { color: var(--accent); }
+.sx-head h2 { white-space: nowrap; }
+.sx-head > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 360px) { .sx-head h2 { font-size: 1.2rem; } }

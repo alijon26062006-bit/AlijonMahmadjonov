@@ -22,7 +22,7 @@ def test_topup_request_confirm_notify(app, config, conn):
 
     admin = TestClient(app)
     atoken = web_login(admin, "admin@example.com", "adminpass123")
-    assert "Заявок на пополнение: 1" in admin.get("/admin").text
+    assert "Ждут проверки пополнения: <b>1</b>" in admin.get("/admin").text
     assert "client1" in admin.get("/admin/payments").text
     admin.post("/admin/payments/1/confirm", data={"csrf": atoken, "credit": "50"})
     assert balance(conn, uid) == 500_000

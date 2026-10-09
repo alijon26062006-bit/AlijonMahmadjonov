@@ -31,4 +31,4 @@ def test_popular_has_images(conn):
 
 def test_home_shows_covers(client):
     html = client.get("/").text
-    assert "/static/img/tg-stars.svg" in html and "cat-cover" in html
+    assert "/static/img/tg-stars.svg" in html and "cx-img" in html
