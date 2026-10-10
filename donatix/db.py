@@ -406,6 +406,11 @@ def init(path: Path | str) -> None:
                          "WHERE ext_id IS NOT NULL")
         except sqlite3.IntegrityError:   # в старой базе уже есть повтор — сайт не роняем, админ проверит вручную
             logging.getLogger(__name__).warning("payments.ext_id: есть повторы — уникальный индекс не создан")
+        vn_cols = {r[1] for r in conn.execute("PRAGMA table_info(vnumbers)")}
+        if vn_cols and "kind" not in vn_cols:   # аренда номера на срок (5sim hosting) и все её СМС
+            conn.execute("ALTER TABLE vnumbers ADD COLUMN kind TEXT NOT NULL DEFAULT 'activation'")
+        if vn_cols and "sms_json" not in vn_cols:
+            conn.execute("ALTER TABLE vnumbers ADD COLUMN sms_json TEXT NOT NULL DEFAULT '[]'")
         key_cols = {r[1] for r in conn.execute("PRAGMA table_info(api_keys)")}
         if "key_enc" not in key_cols:
             conn.execute("ALTER TABLE api_keys ADD COLUMN key_enc TEXT")
@@ -574,6 +579,8 @@ CREATE TABLE IF NOT EXISTS vnumbers (           -- виртуальные ном
     expires     TEXT NOT NULL DEFAULT '',
     refunded    INTEGER NOT NULL DEFAULT 0,
     note        TEXT NOT NULL DEFAULT '',
+    kind        TEXT NOT NULL DEFAULT 'activation',  -- activation (один код) · hosting (аренда на срок)
+    sms_json    TEXT NOT NULL DEFAULT '[]',          -- все СМС (для аренды)
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );

@@ -1780,7 +1780,14 @@ def panel_webhook(request: Request, webhook_url: str = Form(""), rotate: str = F
 
 def _vnum_view(v, config: Config | None = None) -> dict:
     from . import fivesim
-    return {"id": v["id"], "service": fivesim.SERVICES.get(v["service"], v["service"]), "service_key": v["service"],
+    import json as _json
+    rent = v["kind"] == "hosting"
+    try:
+        sms = _json.loads(v["sms_json"] or "[]")
+    except ValueError:
+        sms = []
+    return {"id": v["id"], "service": fivesim.product_title(v["service"]),
+            "service_key": "rent" if rent else v["service"], "rent": rent, "sms_list": sms,
             "flag": fivesim.flag(config, v["country"]) if config else "🌐",
             "country": fivesim.country_title(v["country"]), "phone": v["phone"], "code": v["code"],
             "sms": v["sms_text"], "status": v["status"], "status_title": fivesim.STATUS_RU.get(v["status"], v["status"]),
@@ -1794,7 +1801,7 @@ def panel_numbers(request: Request, service: str = "telegram", user=Depends(pane
     from . import fivesim
     if not fivesim.enabled(config):
         return _redirect("/panel")
-    service = service if service in fivesim.SERVICES else "telegram"
+    service = service if service in fivesim.SERVICES or service in fivesim.RENT else "telegram"
     error, rows = "", []
     try:
         rows = fivesim.prices(config, service)
@@ -1809,7 +1816,8 @@ def panel_numbers(request: Request, service: str = "telegram", user=Depends(pane
         except fivesim.FiveSimError as exc:
             supplier_balance = f"ошибка: {exc}"
     return render(request, "panel/numbers.html", {
-        "user": user, "service": service, "services": fivesim.SERVICES, "rows": rows, "error": error,
+        "user": user, "service": service, "services": fivesim.SERVICES, "rent": fivesim.RENT,
+        "is_rent": service in fivesim.RENT, "title": fivesim.product_title(service), "rows": rows, "error": error,
         "mine": mine, "supplier_balance": supplier_balance, "markup": config.fivesim_markup})
 
 

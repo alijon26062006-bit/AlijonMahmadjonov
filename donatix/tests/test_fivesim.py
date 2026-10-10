@@ -9,7 +9,8 @@ from donatix import cache, fivesim
 PRICES = {"telegram": {
     "indonesia": {"virtual21": {"cost": 0.25, "count": 120, "rate": 91.5}, "virtual4": {"cost": 0.4, "count": 3}},
     "usa": {"virtual12": {"cost": 1.1, "count": 0}},          # нет номеров — не показываем
-    "tajikistan": {"any": {"cost": 0.5, "count": 7}}}}
+    "tajikistan": {"any": {"cost": 0.5, "count": 7}}},
+    "1day": {"indonesia": {"virtual21": {"cost": 1.0, "count": 5}, "virtual4": {"cost": 0.8, "count": 2}}}}
 
 
 @pytest.fixture
@@ -22,8 +23,10 @@ def five(config, monkeypatch):
         state["calls"].append(path)
         if path == "/guest/prices":
             if params.get("country"):
-                return {params["country"]: {params["product"]: PRICES["telegram"].get(params["country"], {})}}
-            return PRICES
+                return {params["country"]: {params["product"]: PRICES[params["product"]].get(params["country"], {})}}
+            return {params["product"]: PRICES[params["product"]]}
+        if path.startswith("/user/buy/hosting/"):
+            return {"id": 777, "phone": "+6280000001", "status": "PENDING", "expires": "2030-01-02T00:00:00Z"}
         if path.startswith("/user/buy/"):
             if state["buy"]:
                 raise fivesim.FiveSimError(state["buy"])
@@ -108,3 +111,30 @@ def test_flags_and_logos(app, client, config, conn, five):
     web_login(client, "shop1@example.com", "password123")
     page = client.get("/panel/numbers?service=telegram").text
     assert "wa-logo" in page and "tg-logo" in page and "🇮🇩" in page and "🇹🇯" in page
+
+
+def test_rent_number(app, client, config, conn, five):
+    """Аренда на 1 день: у самого дешёвого оператора, все СМС сохраняются, отменить нельзя, по таймауту — без возврата."""
+    from donatix import accounts
+    uid = make_client(conn, balance="5")[0]
+    vid = fivesim.buy(conn, config, accounts.get_user(conn, uid), "1day", "indonesia")
+    assert "/user/buy/hosting/indonesia/virtual4/1day" in five["calls"]
+    assert balance(conn, uid) == 50000 - 9000          # 0.80 × 1.12 = 0.896 → вверх до 0.90
+    five["check"] = {"status": "RECEIVED", "sms": [{"sender": "Telegram", "text": "code 111", "code": "111"},
+                                                    {"sender": "WhatsApp", "text": "code 222", "code": "222"}]}
+    v = fivesim.refresh(conn, config, vid)
+    import json
+    assert [m["code"] for m in json.loads(v["sms_json"])] == ["111", "222"]
+    with pytest.raises(fivesim.FiveSimError, match="Аренду отменить нельзя"):
+        fivesim.cancel(conn, config, vid, uid)
+    five["check"] = {"status": "TIMEOUT", "sms": []}
+    fivesim.refresh(conn, config, vid)
+    assert balance(conn, uid) == 50000 - 9000          # аренду 5sim не возвращает — и мы нет
+    web_login(client, "shop1@example.com", "password123")
+    page = client.get("/panel/numbers?service=1day").text
+    assert "Аренда номера" in page and "1 день" in page and "🇮🇩" in page
+
+
+def test_default_markup_is_25():
+    from donatix.config import Config
+    assert Config.__dataclass_fields__["fivesim_markup"].default == 25

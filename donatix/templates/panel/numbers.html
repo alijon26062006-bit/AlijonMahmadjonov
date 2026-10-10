@@ -9,11 +9,25 @@
 {% if supplier_balance is not none %}<div class="flash">{{ icon('shield', 18) }}<span>Видно только админу: баланс 5sim — <b>{{ supplier_balance }}</b>, наценка {{ markup }}%</span></div>{% endif %}
 
 <div class="card">
-  <div class="seg" role="tablist" aria-label="Сервис">
+  <div class="seg" role="tablist" aria-label="Что купить">
+    <a role="tab" class="{{ 'on' if not is_rent }}" href="?service=telegram">Номер на 1 код</a>
+    <a role="tab" class="{{ 'on' if is_rent }}" href="?service=1day">Аренда номера</a>
+  </div>
+  {% if not is_rent %}
+  <div class="seg" role="tablist" aria-label="Сервис" style="margin-top:8px">
     {% for key, title in services.items() %}
     <a role="tab" class="{{ 'on' if key == service }}" aria-selected="{{ 'true' if key == service else 'false' }}" href="?service={{ key }}">{{ service_logo(key, 20, 'vn-tab-logo') }}{{ title }}</a>
     {% endfor %}
   </div>
+  {% else %}
+  <div class="seg" role="tablist" aria-label="Срок" style="margin-top:8px">
+    {% for key, t in rent.items() %}
+    <a role="tab" class="{{ 'on' if key == service }}" aria-selected="{{ 'true' if key == service else 'false' }}" href="?service={{ key }}">{{ t }}</a>
+    {% endfor %}
+  </div>
+  <p class="muted small" style="margin:10px 2px 0">Номер ваш на весь срок: сюда приходят все СМС — Telegram, WhatsApp, любые сервисы.
+    Отменить аренду нельзя. После срока номер забирают — не оставляйте на нём важный аккаунт навсегда.</p>
+  {% endif %}
 </div>
 
 {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
@@ -30,7 +44,7 @@
     <span class="vn-flag" aria-hidden="true">{{ r.flag }}</span>
     <span class="pack-name">{{ r.title }}<small class="muted" style="display:block">{{ r.count }} номеров{% if r.rate %} · доставка {{ r.rate | round(0) | int }}%{% endif %}</small></span>
     <span class="pack-price">{{ money(r.price_micro) }}</span>
-    <button class="btn sm primary" onclick="return confirm('Купить номер {{ services[service] }} · {{ r.title }} за ' + this.closest('form').querySelector('.pack-price').innerText + '?')">Купить</button>
+    <button class="btn sm primary" onclick="return confirm('{{ title }} · {{ r.title }} за ' + this.closest('form').querySelector('.pack-price').innerText + '?')">Купить</button>
   </form>
   {% endfor %}
 </div>
@@ -61,7 +75,7 @@
 <div class="list">
   {% for n in mine %}
   <a class="item" href="/panel/numbers/{{ n.id }}">
-    {{ service_logo(n.service_key, 32, 'vn-item-logo') }}
+    {% if n.rent %}<span class="vn-rent-ico" aria-hidden="true">⏱</span>{% else %}{{ service_logo(n.service_key, 32, 'vn-item-logo') }}{% endif %}
     <span class="grow"><b>{{ n.flag }} {{ n.service }} · {{ n.country }}</b><span class="sub">{{ n.phone or '—' }} · {{ n.status_title }}{% if n.code %} · код {{ n.code }}{% endif %}{% if n.refunded %} · возврат{% endif %}</span></span>
     <span class="amount">{{ money(n.price_micro) }}</span>
   </a>
@@ -75,5 +89,7 @@
   .vn-flag { font-size: 1.6rem; line-height: 1; flex: none; width: 34px; text-align: center; }
   .seg a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
   .vn-tab-logo, .vn-item-logo { flex: none; }
+  .vn-rent-ico { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none;
+    background: var(--accent-soft); color: var(--accent); font-size: 1rem; }
 </style>
 {% endblock %}

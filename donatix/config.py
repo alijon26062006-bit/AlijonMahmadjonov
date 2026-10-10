@@ -71,7 +71,7 @@ class Config:
     vendoria_token: str = ""
     # Виртуальные номера (5sim.net): токен — только в .env; наценка, %; курс, если аккаунт 5sim в рублях
     fivesim_token: str = ""
-    fivesim_markup: Decimal = Decimal("12")
+    fivesim_markup: Decimal = Decimal("25")
     fivesim_rub_rate: Decimal = Decimal("0")
     vendoria_base_url: str = "https://vendoria.amadeustech.dev"
     vendoria_games: str = "Standoff 2,Clash of Clans"
@@ -199,7 +199,7 @@ class Config:
             coindrop_games=_env("DONATIX_COINDROP_GAMES"),
             vendoria_token=_env("DONATIX_VENDORIA_TOKEN"),
             fivesim_token=_env("DONATIX_FIVESIM_TOKEN"),
-            fivesim_markup=Decimal(_env("DONATIX_FIVESIM_MARKUP") or "12"),
+            fivesim_markup=Decimal(_env("DONATIX_FIVESIM_MARKUP") or "25"),
             fivesim_rub_rate=Decimal(_env("DONATIX_FIVESIM_RUB_RATE") or "0"),
             vendoria_base_url=_env("DONATIX_VENDORIA_BASE_URL", "https://vendoria.amadeustech.dev").rstrip("/"),
             vendoria_games=_env("DONATIX_VENDORIA_GAMES", "Standoff 2,Clash of Clans"),

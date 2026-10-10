@@ -4,7 +4,7 @@
 #   sudo bash /home/donatix/app/donatix/deploy/fivesim.sh 'ТОКЕН_5SIM' [наценка_%]
 #
 # Токен — «API key for 5SIM protocol» (длинный, начинается с eyJ) из кабинета 5sim → API. Пишется только
-# в donatix/.env (не в репозиторий). Наценка по умолчанию 12 %. Повторный запуск с новым токеном — заменит старый.
+# в donatix/.env (не в репозиторий). Наценка по умолчанию 25 %. Повторный запуск с новым токеном — заменит старый.
 set -euo pipefail
 APP_DIR="/home/donatix/app"; ENV_FILE="$APP_DIR/donatix/.env"; BRANCH="${DONATIX_BRANCH:-claude/website-api-sales-96wxcs}"
 die() { printf '\n\033[1;31m✖ %s\033[0m\n' "$*"; exit 1; }
@@ -12,10 +12,10 @@ ok() { printf '\033[1;32m✔ %s\033[0m\n' "$*"; }
 [ "$(id -u)" = 0 ] || die "Запустите через sudo."
 [ -f "$ENV_FILE" ] || die "Donatix не найден ($ENV_FILE)."
 
-TOKEN="${1:-${FIVESIM_TOKEN:-}}"; MARKUP="${2:-12}"
+TOKEN="${1:-${FIVESIM_TOKEN:-}}"; MARKUP="${2:-25}"
 [[ "$TOKEN" =~ ^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$ ]] || \
   die "Нужен токен 5sim, который начинается с eyJ (кабинет 5sim → API → «API key for 5SIM protocol»)."
-[[ "$MARKUP" =~ ^[0-9]{1,3}(\.[0-9]+)?$ ]] || die "Наценка — число процентов, например 12."
+[[ "$MARKUP" =~ ^[0-9]{1,3}(\.[0-9]+)?$ ]] || die "Наценка — число процентов, например 25."
 
 code=$(curl -s -m 20 -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
        https://5sim.net/v1/user/profile || true)

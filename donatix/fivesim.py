@@ -6,7 +6,7 @@
 3. Страница номера раз в несколько секунд спрашивает 5sim — пришёл ли код. Код пришёл — показываем крупно.
 4. Код не пришёл (отмена, время вышло, номер «забанен») — деньги возвращаются на баланс сами.
 
-Ключ — только в .env: DONATIX_FIVESIM_TOKEN (JWT из кабинета 5sim → API). Наценка — DONATIX_FIVESIM_MARKUP (12 %).
+Ключ — только в .env: DONATIX_FIVESIM_TOKEN (JWT из кабинета 5sim → API). Наценка — DONATIX_FIVESIM_MARKUP (25 %).
 Цены 5sim — в валюте аккаунта; если аккаунт в рублях — DONATIX_FIVESIM_RUB_RATE (рублей за $1).
 """
 
@@ -32,6 +32,12 @@ FINAL = ("FINISHED", "CANCELED", "TIMEOUT", "BANNED")
 
 # Сервисы, которые показываем (ключ 5sim → название). Потом можно добавить ещё.
 SERVICES = {"telegram": "Telegram", "whatsapp": "WhatsApp"}
+# Аренда номера на срок: все СМС за это время (любые сервисы). Отменить у 5sim нельзя — возврат только если не купился
+RENT = {"3hours": "3 часа", "1day": "1 день", "10days": "10 дней", "1month": "1 месяц"}
+
+
+def product_title(product: str) -> str:
+    return f"Аренда на {RENT[product]}" if product in RENT else SERVICES.get(product, product)
 
 # Названия стран по-русски — для частых; остальные — как у 5sim, с большой буквы
 COUNTRIES_RU = {
@@ -160,8 +166,8 @@ def quote(config: Config, service: str, country: str) -> dict[str, Any] | None:
     live = [o for o in data.values() if isinstance(o, dict) and o.get("count", 0) > 0 and o.get("cost")]
     if not live:
         return None
-    cost = min(o["cost"] for o in live)
-    return {"cost": cost, "price_micro": sale_micro(config, cost)}
+    operator, best = min(((name, o) for name, o in data.items() if o in live), key=lambda x: x[1]["cost"])
+    return {"cost": best["cost"], "operator": operator, "price_micro": sale_micro(config, best["cost"])}
 
 
 def balance(config: Config) -> Any:
@@ -173,23 +179,28 @@ def balance(config: Config) -> Any:
 
 def buy(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, service: str, country: str) -> int:
     """Купить номер. Вернёт id нашего заказа. Не получилось — деньги не списаны (или сразу возвращены)."""
-    if service not in SERVICES:
+    if service not in SERVICES and service not in RENT:
         raise FiveSimError("Выберите сервис.")
+    rent = service in RENT
     q = quote(config, service, country)
     if q is None:
         raise FiveSimError("В этой стране сейчас нет номеров — выберите другую.")
-    title = f"{SERVICES[service]} · {country_title(country)}"
+    title = f"{product_title(service)} · {country_title(country)}"
     with db.tx(conn):
         try:
             accounts.post_ledger(conn, user["id"], -q["price_micro"], f"Виртуальный номер {title}")
         except accounts.InsufficientBalance:
             raise FiveSimError("На балансе не хватает денег — пополните баланс.") from None
         vid = int(conn.execute(
-            "INSERT INTO vnumbers (user_id, service, country, price_micro, cost, status, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?)",
-            (user["id"], service, country, q["price_micro"], str(q["cost"]), db.now(), db.now())).lastrowid)
+            "INSERT INTO vnumbers (user_id, service, country, price_micro, cost, status, kind, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)",
+            (user["id"], service, country, q["price_micro"], str(q["cost"]), "hosting" if rent else "activation",
+             db.now(), db.now())).lastrowid)
     try:
-        res = _get(config, f"/user/buy/activation/{country}/any/{service}", {"maxPrice": q["cost"]})
+        if rent:   # аренда — у самого дешёвого оператора из свежей цены: заплатим ровно то, что видел клиент
+            res = _get(config, f"/user/buy/hosting/{country}/{q['operator']}/{service}")
+        else:
+            res = _get(config, f"/user/buy/activation/{country}/any/{service}", {"maxPrice": q["cost"]})
     except FiveSimError as exc:
         _refund(conn, vid, f"не удалось купить: {exc}", status="FAILED")
         text = str(exc).lower()
@@ -214,7 +225,7 @@ def _refund(conn: sqlite3.Connection, vid: int, why: str, status: str) -> bool:
         conn.execute("UPDATE vnumbers SET refunded = 1, status = ?, note = ?, updated_at = ? WHERE id = ?",
                      (status, why[:200], db.now(), vid))
         accounts.post_ledger(conn, v["user_id"], v["price_micro"],
-                             f"Возврат: виртуальный номер {SERVICES.get(v['service'], v['service'])} — {why[:80]}")
+                             f"Возврат: виртуальный номер {product_title(v['service'])} — {why[:80]}")
     from .notify import notify
     notify(conn, None, v["user_id"], f"Номер {v['phone'] or ''} — код не пришёл, деньги вернулись на баланс.",
            f"/panel/numbers/{vid}")
@@ -234,9 +245,15 @@ def refresh(conn: sqlite3.Connection, config: Config, vid: int) -> sqlite3.Row:
     status = res.get("status") or v["status"]
     sms = [s for s in res.get("sms") or [] if isinstance(s, dict)]
     code = next((s.get("code") or s.get("text") for s in reversed(sms) if s.get("code") or s.get("text")), "") or v["code"]
-    conn.execute("UPDATE vnumbers SET status = ?, code = ?, sms_text = ?, updated_at = ? WHERE id = ?",
-                 (status, code or "", (sms[-1].get("text") or "")[:500] if sms else v["sms_text"], db.now(), vid))
-    if status in ("CANCELED", "TIMEOUT", "BANNED") and not code:
+    import json
+    all_sms = [{"from": str(s.get("sender") or "")[:60], "text": str(s.get("text") or "")[:500],
+                "code": str(s.get("code") or "")[:40], "at": str(s.get("date") or s.get("created_at") or "")[:30]}
+               for s in sms][-50:]
+    conn.execute("UPDATE vnumbers SET status = ?, code = ?, sms_text = ?, sms_json = ?, updated_at = ? WHERE id = ?",
+                 (status, code or "", (sms[-1].get("text") or "")[:500] if sms else v["sms_text"],
+                  json.dumps(all_sms, ensure_ascii=False) if sms else v["sms_json"], db.now(), vid))
+    # Аренду 5sim не возвращает — у неё деньги не возвращаем (кроме неудачной покупки, см. buy)
+    if v["kind"] != "hosting" and status in ("CANCELED", "TIMEOUT", "BANNED") and not code:
         _refund(conn, vid, STATUS_RU.get(status, status).lower(), status)
     return conn.execute("SELECT * FROM vnumbers WHERE id = ?", (vid,)).fetchone()
 
@@ -245,6 +262,8 @@ def cancel(conn: sqlite3.Connection, config: Config, vid: int, user_id: int) -> 
     v = conn.execute("SELECT * FROM vnumbers WHERE id = ? AND user_id = ?", (vid, user_id)).fetchone()
     if v is None:
         raise FiveSimError("Номер не найден.")
+    if v["kind"] == "hosting":
+        raise FiveSimError("Аренду отменить нельзя — номер ваш до конца срока.")
     if v["code"]:
         raise FiveSimError("Код уже пришёл — отменить нельзя.")
     if v["status"] in FINAL + ("FAILED",):
