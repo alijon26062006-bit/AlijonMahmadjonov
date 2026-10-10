@@ -619,6 +619,12 @@ _RAW["DEPOSIT_ALREADY"] = (
     "кушоед.</blockquote>"
 )
 
+_RAW["DEPOSIT_LOOSE_RECEIPT"] = (
+    "[[ok]] <b>Чек гирифта шуд</b>\n\n"
+    "<blockquote>Онро ба админ фиристодам. Пас аз санҷиш баланс пур "
+    "мешавад ва ман менависам. Савол бошад: {support}</blockquote>"
+)
+
 _RAW["DEPOSIT_RECEIPT_TWICE"] = (
     "[[ok]] <b>Чек аллакай гирифта шуд</b>\n\n"
     "Аз рӯи дархост ба <b>{amount}</b> он дар мо ҳаст — боз фиристодан "
@@ -902,6 +908,15 @@ _RAW["ADMIN_ORDER_FAILED"] = (
     "├ {title} → <code>@{recipient}</code>\n"
     "└ Покупатель: <code>{user_id}</code>\n\n"
     "<blockquote expandable>{error}</blockquote>"
+)
+
+_RAW["ADMIN_LOOSE_RECEIPT"] = (
+    "🧾 <b>Чек без открытой заявки</b>\n"
+    f"<code>{LINE}</code>\n\n"
+    "├ Покупатель: {buyer}\n"
+    "└ ID: <code>{user_id}</code>\n\n"
+    "<blockquote>Заявки у клиента нет — сверьте сумму с выпиской и "
+    "начислите руками: /panel → 👥 Клиенты → ID → ➕ Начислить.</blockquote>"
 )
 
 _RAW["ADMIN_ALREADY_HANDLED"] = "Эта заявка уже обработана."

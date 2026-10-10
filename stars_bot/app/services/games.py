@@ -370,8 +370,7 @@ async def check(
         found = await recover(bot, conn, provider, order)
         if found is None:
             if _minutes_waiting(order) >= timeout_minutes():
-                await _refund_nameless(bot, conn, order)
-                return "timeout"
+                await _remind_slow(bot, conn, order)
             return "waiting"
         order = found
 
@@ -406,21 +405,44 @@ async def check(
         return "failed"
 
     if _minutes_waiting(order) >= timeout_minutes():
-        await _refund(bot, conn, order,
-                      f"{TIMEOUT_MARK} не выполнился за отведённое время")
-        await delivery.notify_admins(
-            bot,
-            "⚠️ <b>Игровой заказ висел слишком долго</b>\n"
-            f"├ Наш номер: <code>{order.id}</code>\n"
-            f"├ У поставщика: <code>{order.fragment_order_id}</code>\n"
-            f"└ Клиенту вернули <b>{fmt(order.price)}</b>\n\n"
-            "<blockquote>Проверьте кабинет поставщика: если заказ всё-таки "
-            "прошёл, товар ушёл бесплатно — списать деньги обратно можно "
-            "в разделе «Клиенты».</blockquote>",
-        )
-        return "timeout"
-
+        # Сам заказ не отменяем: поставщик мог задержаться, и возврат по
+        # часам раздавал бы товар бесплатно, когда тот всё-таки доходил.
+        # Бот продолжает следить, а владельцу один раз напоминает.
+        await _remind_slow(bot, conn, order)
     return "waiting"
+
+
+#: Пометка в заказе: владельцу уже напомнили, что заказ идёт долго.
+SLOW_MARK = "долго:"
+
+
+async def _remind_slow(bot: Bot, conn: aiosqlite.Connection, order: db.Order) -> None:
+    """Один раз сказать владельцу, что заказ идёт дольше обычного.
+
+    Деньги не трогаем: заказ закроется сам, когда поставщик ответит
+    «выполнен» (клиент получит товар) или «отменён» (деньги вернутся).
+    Решить раньше можно руками — командами /done и /refund.
+    """
+    if (order.error or "").startswith(SLOW_MARK):
+        return
+    from app.services import delivery
+
+    await db.update_order(conn, order.id,
+                          error=f"{SLOW_MARK} {order.error or ''}".strip()[:1000])
+    external = (f"<code>{order.fragment_order_id}</code>"
+                if order.fragment_order_id else "<i>номера нет</i>")
+    await delivery.notify_admins(
+        bot,
+        "⏳ <b>Игровой заказ идёт дольше обычного</b>\n"
+        f"├ Наш номер: <code>{order.id}</code> — {order.title}\n"
+        f"├ У поставщика: {external}\n"
+        f"├ ID игрока: <code>{order.recipient}</code>\n"
+        f"└ Оплачено: <b>{fmt(order.price)}</b>\n\n"
+        "<blockquote>Сам заказ бот <b>не отменяет</b> — ждёт ответа "
+        "поставщика и закроет его, когда тот ответит. Решить раньше: "
+        f"дошло → <code>/done {order.id}</code>, не дошло → "
+        f"<code>/refund {order.id}</code>.</blockquote>",
+    )
 
 
 #: Метка возврата заказа, так и не получившего номер у поставщика.
@@ -712,9 +734,9 @@ async def hold_place(
         "сам переспросит его раз в 5 минут и, если заказ там есть, дальше "
         "будет следить за ним сам.\n\nМожно решить и руками — кабинет "
         f"поставщика: дошло → <code>/done {order.id}</code>, "
-        f"нет → <code>/refund {order.id}</code>.\n\nБез решения деньги "
-        f"вернутся клиенту сами через {timeout_minutes()} мин."
-        "</blockquote>",
+        f"нет → <code>/refund {order.id}</code>.\n\nСам бот заказ не "
+        "отменяет — деньги клиента ждут вашего решения или ответа "
+        "поставщика.</blockquote>",
     )
 
 

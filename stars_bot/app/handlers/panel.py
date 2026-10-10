@@ -647,9 +647,10 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "webhook_public_url": ("🌐 Адрес бота",
                            "Публичный адрес бота, например "
                            "<code>https://bot.example.com</code>:", "text"),
-    "games_timeout_min": ("⏱ Ожидание выдачи (игры)",
-                          "Сколько минут ждать пополнение, прежде чем "
-                          "вернуть деньги клиенту. Обычно 20:", "int"),
+    "games_timeout_min": ("⏱ Напомнить о долгом заказе (игры)",
+                          "Через сколько минут напомнить вам о заказе, который "
+                          "поставщик ещё не выполнил. Сам заказ бот не "
+                          "отменяет. Обычно 20:", "int"),
     "support_notice": ("📝 Объявление в поддержке",
                        "Текст, который увидят клиенты в разделе «Поддержка» "
                        "(или <code>-</code>, чтобы убрать):", "text"),
@@ -3941,8 +3942,9 @@ async def games_text(conn: aiosqlite.Connection) -> str:
         f"{body}{warn}\n\n"
         "<blockquote>Цена пакета считается сама: себестоимость поставщика "
         "в долларах по курсу плюс наценка. Заказы почти всегда уходят "
-        "«в обработку», бот следит за ними и возвращает деньги, если "
-        f"пополнение не дошло за {gsvc.timeout_minutes()} мин.</blockquote>"
+        "«в обработку», бот следит за ними до ответа поставщика и сам их "
+        "не отменяет. Если заказ идёт дольше "
+        f"{gsvc.timeout_minutes()} мин — напомнит вам.</blockquote>"
     )
 
 
@@ -3966,7 +3968,7 @@ async def games_kb(conn: aiosqlite.Connection) -> InlineKeyboardMarkup:
         ))
     kb.row(btn("🔌 Проверить поставщика игр", "pn:games_check", style=PRIMARY))
     kb.row(InlineKeyboardButton(
-        text=f"⏱ Ожидание выдачи · {gsvc.timeout_minutes()} мин",
+        text=f"⏱ Напомнить о долгом заказе · {gsvc.timeout_minutes()} мин",
         callback_data="pn:set:games_timeout_min",
     ))
     kb.row(InlineKeyboardButton(text="🔑 Ключ поставщика для игр",
@@ -5412,8 +5414,8 @@ async def cb_games_check(call: CallbackQuery, conn: aiosqlite.Connection, provid
                      + ("" if seen else "\n   ⚠️ <i>ни одного отчёта ещё не "
                         "пришло — проверьте адрес в кабинете поставщика</i>"))
 
-    lines.append(f"⏱ Ожидание выдачи: <b>{gsvc.timeout_minutes()} мин</b>, "
-                 "потом деньги возвращаются клиенту")
+    lines.append(f"⏱ Напоминание о долгом заказе: <b>{gsvc.timeout_minutes()} мин</b>, "
+                 "сам заказ бот не отменяет")
 
     # ---- 4. чем кончились последние заказы
     recent = await db.last_game_orders(conn)

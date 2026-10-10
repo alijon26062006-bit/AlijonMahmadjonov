@@ -40,6 +40,10 @@ def editable(screen: object) -> bool:
     return callable(getattr(screen, "edit_text", None))
 
 
+#: Нажатия, которым старый экран не помеха.
+PASS_THROUGH = ("a:dep_ok:", "a:dep_no:")
+
+
 class StaleScreenGuard(BaseMiddleware):
     async def __call__(
         self,
@@ -49,6 +53,11 @@ class StaleScreenGuard(BaseMiddleware):
     ) -> Any:
         screen = getattr(event, "message", None)
         if editable(screen):
+            return await handler(event, data)
+        # Решение по заявке экран не перерисовывает — обработчик работает
+        # по номеру сообщения и справляется со старым сообщением сам.
+        # Чек недельной давности должно быть можно подтвердить кнопкой.
+        if str(getattr(event, "data", "") or "").startswith(PASS_THROUGH):
             return await handler(event, data)
 
         log.info("Нажатие на устаревший экран: %s", getattr(event, "data", "—"))

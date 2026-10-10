@@ -619,15 +619,23 @@ async def flow(conn) -> None:
 
     before = (await db.get_user(conn, BUYER)).balance
     result = await svc.check(bot, conn, provider, stuck)
-    check("зависший заказ закрывается возвратом", result == "timeout", result)
-    check("деньги вернулись клиенту",
-          (await db.get_user(conn, BUYER)).balance == before + 1400)
-    check("заказ помечен возвращённым",
-          (await db.get_order(conn, stuck.id)).status == db.ORDER_REFUNDED)
-    warn = [t for t in bot.to(ADMIN) if "висел" in t]
-    check("владельца предупредили", bool(warn), str(bot.to(ADMIN)))
-    check("в предупреждении номер у поставщика",
-          warn and "ord-old" in warn[0], str(warn[:1]))
+    check("долгий заказ сам НЕ отменяется", result == "waiting", result)
+    check("деньги клиенту по времени не возвращены",
+          (await db.get_user(conn, BUYER)).balance == before)
+    check("заказ остаётся в работе",
+          (await db.get_order(conn, stuck.id)).status == db.ORDER_DELIVERING)
+    warn = [t for t in bot.to(ADMIN) if "дольше обычного" in t]
+    check("владельцу напомнили", bool(warn), str(bot.to(ADMIN)))
+    check("в напоминании номер у поставщика и команды",
+          warn and "ord-old" in warn[0] and "/refund" in warn[0], str(warn[:1]))
+    await svc.check(bot, conn, provider, await db.get_order(conn, stuck.id))
+    check("напоминание одно, не на каждом круге",
+          len([t for t in bot.to(ADMIN) if "дольше обычного" in t]) == 1)
+    # Поставщик потом выполнил — заказ закрылся выдачей, как обычно.
+    await svc.check(bot, conn, GameProvider(status="completed"),
+                    await db.get_order(conn, stuck.id))
+    check("поздняя выдача закрывает заказ",
+          (await db.get_order(conn, stuck.id)).status == db.ORDER_DELIVERED)
 
     # свежий заказ в обработке не трогаем
     fresh = await db.create_order(
@@ -1555,8 +1563,8 @@ async def no_supplier_number(conn) -> None:
     check("владельцу сказали сразу", bool(told), str(bot.to(ADMIN)))
     check("в сообщении есть ID игрока", told and "1724367212" in told[0])
     check("подсказаны команды", told and "/done" in told[0] and "/refund" in told[0])
-    check("предупреждён автоматический возврат",
-          told and f"{svc.timeout_minutes()} мин" in told[0], str(told[:1]))
+    check("сказано, что бот сам не отменяет",
+          told and "не отменяет" in told[0], str(told[:1]))
 
     order = (await db.last_game_orders(conn))[0]
     check("заказ помечен зависшим", order.status == db.ORDER_FAILED, order.status)
@@ -1607,13 +1615,12 @@ async def no_supplier_number(conn) -> None:
 
     result = await svc.check(bot, conn, Silent(), lost)
     after = await db.get_order(conn, lost.id)
-    check("время вышло без номера — деньги вернулись, как обещали",
-          result == "timeout" and after.status == db.ORDER_REFUNDED
-          and (await db.get_user(conn, BUYER)).balance == before + 1400,
+    check("без номера и время вышло — заказ сам не отменён",
+          result == "waiting" and after.status == db.ORDER_FAILED
+          and (await db.get_user(conn, BUYER)).balance == before,
           f"{result} {after.status}")
-    check("владельцу сказали проверить кабинет по ID игрока",
-          any("без номера — деньги вернули" in t and "1724367212" in t
-              for t in bot.to(ADMIN)))
+    check("владельцу напомнили с ID игрока",
+          any("дольше обычного" in t and "1724367212" in t for t in bot.to(ADMIN)))
 
 
 async def supplier_refund(conn) -> None:
@@ -2170,7 +2177,9 @@ async def timeout_setting(conn) -> None:
     await conn.commit()
     result = await svc.check(bot, conn, GameProvider(status="processing"),
                              await db.get_order(conn, order.id))
-    check("укороченное ожидание работает", result == "timeout", result)
+    check("укороченное время напоминания работает",
+          result == "waiting" and "долго:" in
+          ((await db.get_order(conn, order.id)).error or ""), result)
 
     await runtime.set_value(conn, "games_timeout_min", "20")
 

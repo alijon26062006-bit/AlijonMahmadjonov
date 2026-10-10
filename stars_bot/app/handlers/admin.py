@@ -55,13 +55,23 @@ async def cmd_pending(message: Message, conn: aiosqlite.Connection) -> None:
 
 
 async def _resolve_deposit(
-    conn: aiosqlite.Connection, bot: Bot, deposit_id: int, admin_id: int, approved: bool
+    conn: aiosqlite.Connection, bot: Bot, deposit_id: int, admin_id: int, approved: bool,
+    pressed: tuple[int, int] | None = None,
 ) -> str:
+    """Зачислить или отклонить заявку. Один путь для кнопки, команды,
+    панели и автоплатежа.
+
+    pressed — (чат, сообщение), на котором нажали кнопку: туда ответ
+    придёт отдельно, а остальным админам — короткая пометка, кто решил.
+    """
     deposit = await db.get_deposit(conn, deposit_id)
     if deposit is None:
         return "Пополнение не найдено."
     if not await db.resolve_deposit(conn, deposit_id, approved=approved, admin_id=admin_id):
+        # Кто-то решил раньше — но кнопки на этой копии могли остаться.
+        await close_notices(conn, bot, deposit_id, None, admin_id, pressed)
         return texts.ADMIN_ALREADY_HANDLED
+    await close_notices(conn, bot, deposit_id, approved, admin_id, pressed)
 
     if not approved:
         await delivery.notify(bot, deposit.user_id, texts.DEPOSIT_REJECTED.format(
@@ -82,6 +92,43 @@ async def _resolve_deposit(
     return texts.ADMIN_DEPOSIT_OK.format(deposit_id=deposit.id, amount=fmt(deposit.amount))
 
 
+async def close_notices(
+    conn: aiosqlite.Connection, bot, deposit_id: int, approved: bool | None,
+    admin_id: int, pressed: tuple[int, int] | None = None,
+) -> None:
+    """Снять кнопки «Зачислить / Отклонить» у всех админов.
+
+    Заявка уходит каждому админу своей копией. Без этого после решения
+    одного у остальных кнопки висят дальше, и второй жмёт следом — в
+    лучшем случае видит «уже обработана», в худшем путается, что было.
+    """
+    rows = await db.take_notices(conn, "deposit", deposit_id)
+    if not rows or bot is None:
+        return
+    if approved is None:
+        note = ""
+    else:
+        if admin_id == 0:
+            who = "автоплатёж"
+        else:
+            user = await db.get_user(conn, admin_id)
+            who = (f"@{user.username}" if user and user.username
+                   else (user.first_name if user and user.first_name else str(admin_id)))
+        note = (f"{'✅ Зачислено' if approved else '❌ Отклонено'} — "
+                f"заявка №{deposit_id} · {who}")
+    for chat_id, message_id in rows:
+        try:
+            await bot.edit_message_reply_markup(
+                chat_id=chat_id, message_id=message_id, reply_markup=None)
+        except Exception as exc:  # noqa: BLE001 — кнопок уже нет или чат закрыт
+            log.debug("Кнопки заявки %s в %s не сняты: %s", deposit_id, chat_id, exc)
+        if note and (chat_id, message_id) != pressed:
+            try:
+                await bot.send_message(chat_id, note, reply_to_message_id=message_id)
+            except Exception as exc:  # noqa: BLE001
+                log.debug("Пометка о заявке %s в %s не ушла: %s", deposit_id, chat_id, exc)
+
+
 async def _pay_referral(
     conn: aiosqlite.Connection, bot: Bot, user: db.User | None, amount: int
 ) -> None:
@@ -100,22 +147,41 @@ async def _pay_referral(
 
 @router.callback_query(F.data.startswith("a:dep_ok:"))
 async def cb_dep_ok(call: CallbackQuery, conn: aiosqlite.Connection, bot: Bot) -> None:
-    report = await _resolve_deposit(
-        conn, bot, int(call.data.rsplit(":", 1)[1]), call.from_user.id, approved=True
-    )
-    await call.answer(report[:190])
-    await _strip(call)
-    await call.message.reply(report)
+    await _press_deposit(call, conn, bot, approved=True)
 
 
 @router.callback_query(F.data.startswith("a:dep_no:"))
 async def cb_dep_no(call: CallbackQuery, conn: aiosqlite.Connection, bot: Bot) -> None:
+    await _press_deposit(call, conn, bot, approved=False)
+
+
+async def _press_deposit(call: CallbackQuery, conn, bot: Bot, *, approved: bool) -> None:
+    """Кнопка под заявкой. Работает и на старом сообщении.
+
+    Сообщению старше двух суток Telegram отдаёт заглушку без правки и
+    ответа — поэтому всё делаем через bot по номеру чата и сообщения, а не
+    через call.message. Иначе заявку недельной давности было бы не
+    подтвердить кнопкой вовсе.
+    """
+    chat_id = call.message.chat.id
+    message_id = call.message.message_id
     report = await _resolve_deposit(
-        conn, bot, int(call.data.rsplit(":", 1)[1]), call.from_user.id, approved=False
+        conn, bot, int(call.data.rsplit(":", 1)[1]), call.from_user.id,
+        approved=approved, pressed=(chat_id, message_id),
     )
-    await call.answer(report[:190])
-    await _strip(call)
-    await call.message.reply(report)
+    try:
+        await call.answer(report[:190])
+    except TelegramAPIError:
+        pass
+    try:
+        await bot.edit_message_reply_markup(
+            chat_id=chat_id, message_id=message_id, reply_markup=None)
+    except TelegramAPIError as exc:
+        log.debug("Кнопки уже убраны: %s", exc)
+    try:
+        await bot.send_message(chat_id, report, reply_to_message_id=message_id)
+    except TelegramAPIError:
+        await bot.send_message(chat_id, report)
 
 
 @router.message(Command("dep_ok"))

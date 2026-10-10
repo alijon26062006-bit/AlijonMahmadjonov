@@ -6,6 +6,7 @@ import logging
 import aiosqlite
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
@@ -339,7 +340,26 @@ def _requisites(amount: int, reference: str) -> tuple[str, object]:
     return body, keyboards.deposit_pay(link, digits if len(digits) >= 8 else "")
 
 
-@router.callback_query(Deposit.receipt, F.data == "dep:paid")
+async def _restore(state: FSMContext, conn, user_id: int) -> dict:
+    """Вернуть шаг оплаты, если его стёр перезапуск бота.
+
+    Шаг диалога живёт в памяти, а заявка — в базе. Без этого клиент,
+    вернувшийся к оплате после перезапуска, жал «Я оплатил» и не получал
+    ничего: кнопка была от шага, которого больше нет.
+    """
+    data = await state.get_data()
+    if data.get("amount"):
+        return data
+    open_one = await db.open_deposit_of(conn, user_id)
+    if open_one is None:
+        return {}
+    await state.set_state(Deposit.receipt)
+    await state.update_data(amount=open_one.amount, deposit_id=open_one.id,
+                            reference=open_one.reference or "")
+    return await state.get_data()
+
+
+@router.callback_query(F.data == "dep:paid")
 async def cb_paid(
     call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
 ) -> None:
@@ -349,7 +369,7 @@ async def cb_paid(
     по прошлым переводам и узнаем этот. Просить у него скриншот каждый
     раз — работа без пользы.
     """
-    data = await state.get_data()
+    data = await _restore(state, conn, call.from_user.id)
     amount = data.get("amount")
     if not amount:
         await state.clear()
@@ -363,12 +383,12 @@ async def cb_paid(
     await call.answer()
 
 
-@router.callback_query(Deposit.receipt, F.data == "dep:back")
+@router.callback_query(F.data == "dep:back")
 async def cb_back_to_requisites(
     call: CallbackQuery, state: FSMContext, conn: aiosqlite.Connection
 ) -> None:
     """Вернуться к реквизитам: клиент мог закрыть банк, не заплатив."""
-    data = await state.get_data()
+    data = await _restore(state, conn, call.from_user.id)
     amount, reference = data.get("amount"), data.get("reference", "")
     if not amount:
         await state.clear()
@@ -526,9 +546,56 @@ async def _send_receipt(message, conn, deposit, amount: int, paid: bool) -> None
         targets.append(settings.orders_chat_id)
     for chat_id in targets:
         try:
-            await message.copy_to(chat_id, caption=caption, reply_markup=markup)
+            sent = await message.copy_to(chat_id, caption=caption, reply_markup=markup)
         except TelegramAPIError as exc:
             log.warning("Заявка %s не ушла в чат %s: %s", deposit.id, chat_id, exc)
+            continue
+        # Запоминаем копию с кнопками: когда решит один админ, у остальных
+        # кнопки снимутся сами.
+        sent_id = getattr(sent, "message_id", None)
+        if markup is not None and sent_id:
+            await db.save_notice(conn, "deposit", deposit.id, chat_id, sent_id)
+
+
+@router.message(StateFilter(None), F.photo | F.document)
+async def on_receipt_any_time(
+    message: Message, state: FSMContext, conn: aiosqlite.Connection, bot: Bot
+) -> None:
+    """Чек, присланный в любой момент — не только на шаге оплаты.
+
+    Шаг диалога теряется при перезапуске бота, да и клиент нередко шлёт
+    скриншот через час, когда уже вышел из меню. Раньше такой чек бот
+    молча не замечал. Теперь: есть открытая заявка — чек ложится к ней;
+    заявки нет — чек всё равно уходит админам, пусть решат руками.
+    """
+    open_one = await db.open_deposit_of(conn, message.from_user.id)
+    if open_one is not None:
+        await state.set_state(Deposit.receipt)
+        await state.update_data(amount=open_one.amount, deposit_id=open_one.id,
+                                reference=open_one.reference or "")
+        await on_receipt(message, state, conn, bot)
+        return
+
+    file_id = message.photo[-1].file_id if message.photo else message.document.file_id
+    if (await db.receipt_seen(conn, message.from_user.id, file_id)
+            or not await db.remember_loose_receipt(conn, message.from_user.id, file_id)):
+        await message.answer(texts.DEPOSIT_RECEIPT_OLD)
+        return
+    buyer = (f"@{message.from_user.username}" if message.from_user.username
+             else (message.from_user.first_name or "без имени"))
+    caption = texts.ADMIN_LOOSE_RECEIPT.format(buyer=buyer, user_id=message.from_user.id)
+    from app.services import access
+
+    targets = list(access.admins())
+    if settings.orders_chat_id:
+        targets.append(settings.orders_chat_id)
+    for chat_id in targets:
+        try:
+            await message.copy_to(chat_id, caption=caption)
+        except TelegramAPIError as exc:
+            log.warning("Чек без заявки не ушёл в чат %s: %s", chat_id, exc)
+    await message.answer(texts.DEPOSIT_LOOSE_RECEIPT.format(support=texts.support()),
+                         reply_markup=keyboards.back())
 
 
 @router.message(Deposit.receipt)

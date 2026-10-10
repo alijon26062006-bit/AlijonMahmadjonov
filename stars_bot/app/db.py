@@ -139,6 +139,25 @@ CREATE TABLE IF NOT EXISTS promo_uses (
     PRIMARY KEY (code, user_id)
 );
 
+-- Копии заявки, разосланные админам с кнопками. Когда один решил,
+-- кнопки снимаются у всех остальных — иначе второй нажмёт следом.
+CREATE TABLE IF NOT EXISTS admin_notices (
+    kind       TEXT NOT NULL,       -- 'deposit'
+    ref_id     INTEGER NOT NULL,    -- номер заявки
+    chat_id    INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    PRIMARY KEY (kind, ref_id, chat_id, message_id)
+);
+
+-- Чеки, присланные без открытой заявки: чтобы один и тот же не
+-- пересылать админам по многу раз.
+CREATE TABLE IF NOT EXISTS loose_receipts (
+    user_id    INTEGER NOT NULL,
+    file_id    TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, file_id)
+);
+
 -- Код на скидку, введённый заранее (в профиле). Применяется сам к
 -- следующей покупке; одна строка на клиента — новый код заменяет старый.
 CREATE TABLE IF NOT EXISTS promo_saved (
@@ -2042,6 +2061,43 @@ async def check_discount(
     if left <= 0:
         return "exhausted"
     return promo
+
+
+async def save_notice(
+    conn: aiosqlite.Connection, kind: str, ref_id: int, chat_id: int, message_id: int,
+) -> None:
+    await conn.execute(
+        "INSERT OR IGNORE INTO admin_notices (kind, ref_id, chat_id, message_id) "
+        "VALUES (?, ?, ?, ?)", (kind, ref_id, chat_id, message_id),
+    )
+    await conn.commit()
+
+
+async def remember_loose_receipt(
+    conn: aiosqlite.Connection, user_id: int, file_id: str,
+) -> bool:
+    """Запомнить чек без заявки. False — такой уже присылали."""
+    cur = await conn.execute(
+        "INSERT OR IGNORE INTO loose_receipts (user_id, file_id, created_at) "
+        "VALUES (?, ?, ?)", (user_id, file_id, _now()),
+    )
+    await conn.commit()
+    return cur.rowcount > 0
+
+
+async def take_notices(
+    conn: aiosqlite.Connection, kind: str, ref_id: int,
+) -> list[tuple[int, int]]:
+    """Забрать (и забыть) все копии: снимаем кнопки один раз."""
+    async with conn.execute(
+        "SELECT chat_id, message_id FROM admin_notices WHERE kind = ? AND ref_id = ?",
+        (kind, ref_id),
+    ) as cur:
+        rows = [(r["chat_id"], r["message_id"]) for r in await cur.fetchall()]
+    await conn.execute("DELETE FROM admin_notices WHERE kind = ? AND ref_id = ?",
+                       (kind, ref_id))
+    await conn.commit()
+    return rows
 
 
 async def save_promo_for(conn: aiosqlite.Connection, user_id: int, code: str) -> None:
