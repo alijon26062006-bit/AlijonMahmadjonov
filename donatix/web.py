@@ -1147,8 +1147,20 @@ def panel_order(public_id: str, request: Request, user=Depends(panel_user), conn
         flash(request, "Заказ не найден.", "error")
         return _redirect("/panel/orders")
     row = orders.refresh_if_stale(conn, request.app.state.supplier, row)
+    view = orders.public_view(row)
+    prod = conn.execute("SELECT category_name FROM products WHERE id = ?", (row["product_id"],)).fetchone()
+    game = (prod["category_name"] if prod else "") or view["product_name"].split(" — ")[0]
+    kind_title = {"topup": "Пополнение"}.get(row["kind"]) or KIND_TITLES.get(row["kind"], "Заказ")
+    # история статусов, как у FazerCards: создан → в обработке → выполнен / возврат
+    history = [("created", "Создан", "Создан", row["created_at"]),
+               ("processing", "В обработке", "В обработке", row["created_at"])]
+    if view["status"] == "completed":
+        history.append(("completed", "Выполнен", "Пополнение выполнено.", row["completed_at"] or row["updated_at"]))
+    elif view["status"] == "failed":
+        history.append(("refund", "Возврат", f"{view['error'] or 'Поставщик отклонил заказ.'} "
+                        f"Деньги вернулись на баланс.", row["updated_at"]))
     return render(request, "panel/order.html", {
-        "user": user, "o": row, "view": orders.public_view(row),
+        "user": user, "o": row, "view": view, "game": game, "kind_title": kind_title, "history": history,
         "delivery_pretty": json.dumps(orders.public_view(row)["delivery"], ensure_ascii=False, indent=2),
         "delivery_note": catalog.delivery_note(row["product_name"]),   # срок выдачи для Standoff 2 / CoC
     })

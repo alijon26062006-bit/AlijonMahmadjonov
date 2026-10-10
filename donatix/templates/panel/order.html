@@ -1,47 +1,102 @@
 {% extends "panel/_layout.html" %}
 {% block title %}{{ view.order_id }} — {{ site_name }}{% endblock %}
 {% block content %}
-{% from "_icons.html" import icon, kind_icon, status %}
+{% from "_icons.html" import icon %}
 {% set st = view.status %}
+{% set st_title = {'completed': 'Выполнен', 'failed': 'Возврат', 'processing': 'В обработке'}[st] %}
+{% set st_icon = {'completed': 'check', 'failed': 'swap', 'processing': 'clock'}[st] %}
+{% set st_cls = {'completed': 'od-ok', 'failed': 'od-refund', 'processing': 'od-proc'}[st] %}
 {% if st == 'processing' %}<meta http-equiv="refresh" content="5">{% endif %}
-<section class="page-hero">
-  <a class="back" href="/panel/orders">{{ icon('arrow-left', 18) }}Все заказы</a>
-  <h1>Заказ {{ view.order_id }}</h1>
-  <p style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">{{ status(st) }}<span class="badge {{ {'completed': 'ok', 'failed': 'bad', 'processing': 'warn'}[st] }}">{{ status_titles[st] }}</span></p>
-</section>
-<div class="grid two" style="align-items:start">
-  <div class="summary card" style="padding:0">
-    <div><span class="muted">Товар</span><span>{{ view.product_name | pack_title(view.kind) }}</span></div>
-    {% for k, v in view.fields.items() %}<div><span class="muted">{{ k }}</span><span class="mono">{{ v }}</span></div>{% endfor %}
-    <div><span class="muted">Количество</span><span>{{ view.quantity }}</span></div>
-    <div><span class="muted">Цена за единицу</span><span>{{ money(view.unit_price_usd) }}</span></div>
-    <div><span class="muted">Создан</span><span>{{ view.created_at | dt('%d.%m.%Y %H:%M:%S') }}</span></div>
-    <div class="total"><span>Сумма</span><span>{{ money(view.total_usd) }}</span></div>
-  </div>
-  <div class="card reveal">
-    {% if st == 'processing' %}
-      <h3>Выполняется…</h3>
-      {% if delivery_note %}<p class="muted">{{ delivery_note }} Страница обновится сама.</p>
-      {% else %}<p class="muted">Обычно это занимает несколько секунд. Страница обновится сама.</p>{% endif %}
-    {% elif st == 'failed' %}
-      <h3>Заказ не выполнен</h3>
-      <p>{{ view.error or 'Поставщик отклонил заказ.' }}</p>
-      <p class="muted">{{ money(view.total_usd) }} вернулись на баланс.</p>
-    {% else %}
-      <h3>Готово</h3>
-      {% set d = view.delivery or {} %}
-      {% set codes = d.get('codes') or d.get('keys') or [] %}
-      {% if codes %}
-        <p class="muted">{{ 'Ключи' if view.kind == 'game_key' else 'Коды' }}:</p>
-        {% for c in codes %}<pre class="keybox">{{ (c.get('key') or c.get('code') or c) if c is mapping else c }}</pre>{% endfor %}
-      {% elif d.message %}
-        <p>{{ d.message }}</p>
-      {% elif view.delivery %}
-        <pre class="keybox">{{ delivery_pretty }}</pre>
-      {% else %}
-        <p>Заказ выполнен.</p>
-      {% endif %}
-    {% endif %}
-  </div>
+<div class="od">
+  <section class="od-card">
+    <div class="od-head">
+      <h1 class="od-id">{{ view.order_id }}</h1>
+      <button type="button" class="od-copy" data-copy="{{ view.order_id }}" aria-label="Скопировать номер заказа">{{ icon('copy', 16) }}</button>
+    </div>
+    <p class="od-sub">{{ kind_title }} <span aria-hidden="true">•</span> {{ game }}</p>
+    <div class="od-pill {{ st_cls }}"><span class="od-ico">{{ icon(st_icon, 16) }}</span><b>{{ st_title }}</b>
+      <time>{{ (history[-1][3] if st != 'processing' else view.created_at) | dt('%d.%m.%Y %H:%M') }}</time></div>
+    <div class="od-rows">
+      <div class="od-row"><span>Игра/Сервис</span><b>{{ game }}</b></div>
+      <div class="od-row"><span>Продукт</span><b>{{ view.product_name | pack_title(view.kind) }}</b></div>
+      {% for k, v in view.fields.items() %}<div class="od-row"><span>{{ k }}</span><b class="mono">{{ v }}</b></div>{% endfor %}
+      {% if view.quantity > 1 %}<div class="od-row"><span>Количество</span><b>{{ view.quantity }}</b></div>{% endif %}
+      <div class="od-row"><span>Цена</span><b>{{ money(view.unit_price_usd) }}</b></div>
+      <div class="od-row"><span>К оплате</span><b>{{ money(view.total_usd) }}</b></div>
+    </div>
+  </section>
+
+  {% if st == 'completed' %}
+  {% set d = view.delivery or {} %}
+  {% set codes = d.get('codes') or d.get('keys') or [] %}
+  {% if codes or d.message or view.delivery %}
+  <section class="od-card">
+    <h2 class="od-h2">{{ 'Ключи' if view.kind == 'game_key' else 'Коды' if codes else 'Результат' }}</h2>
+    {% if codes %}{% for c in codes %}<pre class="keybox">{{ (c.get('key') or c.get('code') or c) if c is mapping else c }}</pre>{% endfor %}
+    {% elif d.message %}<p>{{ d.message }}</p>
+    {% else %}<pre class="keybox">{{ delivery_pretty }}</pre>{% endif %}
+  </section>
+  {% endif %}
+  {% endif %}
+
+  <section class="od-card">
+    <div class="od-rows">
+      <div class="od-row"><span>Создан</span><b>{{ view.created_at | dt('%d.%m.%Y %H:%M') }}</b></div>
+      <div class="od-row"><span>Статус</span><b>{{ st_title }}</b></div>
+    </div>
+    {% if st == 'processing' and delivery_note %}<p class="muted small" style="margin:10px 2px 0">{{ delivery_note }} Страница обновится сама.</p>{% endif %}
+    <h2 class="od-h2 od-hist-title">История статусов</h2>
+    <ol class="od-hist">
+      {% for key, title, text, at in history %}
+      {% set cls = {'created': 'od-created', 'processing': 'od-proc', 'completed': 'od-ok', 'refund': 'od-refund'}[key] %}
+      <li class="od-step {{ cls }}">
+        <span class="od-ico">{{ icon({'created': 'book', 'processing': 'clock', 'completed': 'check', 'refund': 'swap'}[key], 18) }}</span>
+        <div><b>{{ title }}</b><p>{{ text }}</p><time>{{ at | dt('%d.%m.%Y %H:%M') }}</time></div>
+      </li>
+      {% endfor %}
+    </ol>
+    <a class="od-back" href="/panel/orders">Назад к заказам</a>
+  </section>
 </div>
+<style>
+  .od { display: grid; gap: 14px; max-width: 720px; }
+  .od-card { background: var(--surface); box-shadow: var(--shadow-1); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px 14px; }
+  .od-head { display: flex; align-items: center; gap: 8px; }
+  .od-id { margin: 0; font-size: 1.5rem; font-weight: 800; word-break: break-all; }
+  .od-copy { border: 0; background: none; color: var(--muted); padding: 6px; cursor: pointer; border-radius: 8px; }
+  .od-copy:hover { color: var(--text); background: var(--bg); }
+  .od-sub { margin: 4px 0 12px; color: var(--muted); }
+  .od-sub span { margin: 0 6px; }
+  .od-pill { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--r); border: 1px solid var(--line); margin-bottom: 14px; }
+  .od-pill time { margin-left: auto; color: var(--muted); font-size: .9rem; }
+  .od-ico { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; border: 1px solid currentColor; }
+  .od-ok { --c: var(--ok); --cs: var(--ok-soft); } .od-refund { --c: var(--accent); --cs: var(--accent-soft); }
+  .od-proc { --c: var(--warn); --cs: var(--warn-soft); } .od-created { --c: var(--muted); --cs: var(--bg); }
+  .od-pill.od-ok, .od-pill.od-refund, .od-pill.od-proc { background: var(--cs); border-color: color-mix(in srgb, var(--c) 35%, transparent); }
+  .od-pill .od-ico, .od-step .od-ico { color: var(--c); background: var(--surface); }
+  .od-rows { display: grid; gap: 10px; }
+  .od-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px;
+    border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
+  .od-row span { color: var(--muted); }
+  .od-row b { text-align: right; word-break: break-word; }
+  .od-h2 { font-size: 1.05rem; margin: 0 0 10px; }
+  .od-hist-title { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); }
+  .od-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .od-step { display: flex; gap: 12px; padding: 14px; border-radius: var(--r); background: var(--cs);
+    border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
+  .od-step b { display: block; font-size: 1.05rem; }
+  .od-step p { margin: 2px 0 6px; color: var(--muted); }
+  .od-step time { color: var(--muted); font-size: .88rem; }
+  .od-back { display: block; text-align: center; margin-top: 14px; padding: 13px; border: 1px solid var(--line);
+    border-radius: var(--r); color: var(--text); font-weight: 600; }
+  .od-back:hover { text-decoration: none; background: var(--bg); }
+</style>
+<script>
+  document.querySelectorAll(".od-copy").forEach(function (b) {
+    b.addEventListener("click", function () {
+      navigator.clipboard && navigator.clipboard.writeText(b.dataset.copy);
+      b.style.color = "var(--ok)"; setTimeout(function () { b.style.color = ""; }, 1200);
+    });
+  });
+</script>
 {% endblock %}

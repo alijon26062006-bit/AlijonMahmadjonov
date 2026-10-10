@@ -70,7 +70,8 @@ def test_buy_in_panel(client, conn, supplier):
     assert r2.headers["location"] == r.headers["location"]
     assert conn.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 1
     orders.process_pending(conn, supplier)
-    assert "Готово" in client.get(r.headers["location"]).text
+    page = client.get(r.headers["location"]).text
+    assert "Выполнен" in page and "История статусов" in page
 
 
 def test_panel_buy_error_shown(client, conn):
