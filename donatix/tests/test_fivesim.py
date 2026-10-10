@@ -134,3 +134,13 @@ def test_rent_not_sold(app, client, config, conn, five):
 def test_default_markup_is_25():
     from donatix.config import Config
     assert Config.__dataclass_fields__["fivesim_markup"].default == 25
+
+
+def test_more_services_tiktok(app, client, config, conn, five):
+    for key in ("tiktok", "instagram", "google", "facebook", "discord", "viber"):
+        assert key in fivesim.SERVICES
+    PRICES["tiktok"] = {"indonesia": {"virtual21": {"cost": 0.3, "count": 9}}}
+    make_client(conn, balance="5")
+    web_login(client, "shop1@example.com", "password123")
+    page = client.get("/panel/numbers?service=tiktok").text
+    assert "tt-logo" in page and "ig-logo" in page and "Viber" in page and "🇮🇩" in page

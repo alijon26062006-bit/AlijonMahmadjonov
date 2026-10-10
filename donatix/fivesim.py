@@ -31,7 +31,8 @@ TIMEOUT = httpx.Timeout(20, connect=8)
 FINAL = ("FINISHED", "CANCELED", "TIMEOUT", "BANNED")
 
 # Сервисы, которые показываем (ключ 5sim → название). Потом можно добавить ещё.
-SERVICES = {"telegram": "Telegram", "whatsapp": "WhatsApp"}
+SERVICES = {"telegram": "Telegram", "whatsapp": "WhatsApp", "tiktok": "TikTok", "instagram": "Instagram",
+            "google": "Gmail", "facebook": "Facebook", "discord": "Discord", "viber": "Viber"}
 # Аренда номера на срок: все СМС за это время (любые сервисы). Отменить у 5sim нельзя — возврат только если не купился
 RENT = {"3hours": "3 часа", "1day": "1 день", "10days": "10 дней", "1month": "1 месяц"}
 
