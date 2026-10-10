@@ -22,6 +22,8 @@ def five(config, monkeypatch):
     def fake(cfg, path, params=None):
         state["calls"].append(path)
         if path == "/guest/prices":
+            if params["product"] in fivesim.RENT:
+                raise fivesim.FiveSimError("product is incorrect")     # как настоящий 5sim
             if params.get("country"):
                 return {params["country"]: {params["product"]: PRICES[params["product"]].get(params["country"], {})}}
             return {params["product"]: PRICES[params["product"]]}
@@ -37,7 +39,11 @@ def five(config, monkeypatch):
         if path.startswith("/user/cancel/"):
             return {"status": "CANCELED"}
         if path == "/guest/countries":
-            return {"indonesia": {"iso": {"id": 1}, "prefix": {"+62": 1}}, "tajikistan": {"iso": {"tj": 1}}}
+            return {"indonesia": {"iso": {"id": 1}, "prefix": {"+62": 1}, "virtual4": {"hosting": 1}},
+                    "tajikistan": {"iso": {"tj": 1}, "any": {"activation": 1}}}
+        if path.startswith("/guest/products/"):
+            country = path.split("/")[3]
+            return {"1day": {"Category": "hosting", "Qty": 5, "Price": 0.8}} if country == "indonesia" else {}
         if path == "/user/profile":
             return {"balance": 3.5}
         raise AssertionError(path)
@@ -118,7 +124,7 @@ def test_rent_number(app, client, config, conn, five):
     from donatix import accounts
     uid = make_client(conn, balance="5")[0]
     vid = fivesim.buy(conn, config, accounts.get_user(conn, uid), "1day", "indonesia")
-    assert "/user/buy/hosting/indonesia/virtual4/1day" in five["calls"]
+    assert "/user/buy/hosting/indonesia/any/1day" in five["calls"]
     assert balance(conn, uid) == 50000 - 9000          # 0.80 × 1.12 = 0.896 → вверх до 0.90
     five["check"] = {"status": "RECEIVED", "sms": [{"sender": "Telegram", "text": "code 111", "code": "111"},
                                                     {"sender": "WhatsApp", "text": "code 222", "code": "222"}]}

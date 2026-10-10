@@ -71,19 +71,26 @@ ISO = {"tajikistan": "tj", "uzbekistan": "uz", "kazakhstan": "kz", "kyrgyzstan":
        "ghana": "gh", "ukraine": "ua", "russia": "ru", "turkey": "tr", "china": "cn", "japan": "jp"}
 
 
-def _iso_map(config: Config) -> dict[str, str]:
-    """Название страны у 5sim → ISO из их же списка стран (раз в сутки); не загрузилось — запасной список."""
-    def load() -> dict[str, str]:
-        out = dict(ISO)
+def _countries(config: Config) -> dict[str, Any]:
+    """Список стран 5sim (ISO, операторы и что они умеют: activation / hosting) — раз в сутки."""
+    def load() -> dict[str, Any]:
         try:
-            for name, info in (_get(config, "/guest/countries") or {}).items():
-                iso = next(iter((info or {}).get("iso") or {}), "")
-                if len(iso) == 2:
-                    out[name] = iso.lower()
+            data = _get(config, "/guest/countries")
+            return data if isinstance(data, dict) else {}
         except FiveSimError as exc:
             log.info("5sim: список стран не загрузился: %s", exc)
-        return out
-    return cache.get_or_set("5sim:iso", 86400, load)
+            return {}
+    return cache.get_or_set("5sim:countries", 86400, load)
+
+
+def _iso_map(config: Config) -> dict[str, str]:
+    """Название страны у 5sim → ISO из их же списка стран; не загрузилось — запасной список."""
+    out = dict(ISO)
+    for name, info in _countries(config).items():
+        iso = next(iter((info or {}).get("iso") or {}), "") if isinstance(info, dict) else ""
+        if len(iso) == 2:
+            out[name] = iso.lower()
+    return out
 
 
 def flag(config: Config, country: str) -> str:
@@ -141,10 +148,53 @@ def sale_micro(config: Config, cost: Any) -> int:
     return int(usd.quantize(Decimal("0.01"), rounding=ROUND_CEILING) * 10_000)
 
 
+def _country_product(config: Config, country: str, product: str) -> dict[str, Any] | None:
+    """Цена товара в стране у любого оператора: /guest/products/{страна}/any → {"1day": {"Qty", "Price"}}."""
+    item = (_get(config, f"/guest/products/{country}/any") or {}).get(product)
+    if not isinstance(item, dict) or not item.get("Qty") or not item.get("Price"):
+        return None
+    return {"cost": item["Price"], "count": item["Qty"]}
+
+
+def _rent_countries(config: Config) -> list[str]:
+    """Страны, где у 5sim есть операторы с арендой (hosting); не знаем — частые страны из нашего списка."""
+    out = [name for name, info in _countries(config).items() if isinstance(info, dict) and any(
+        isinstance(v, dict) and "hosting" in v for v in info.values())]
+    return out or list(COUNTRIES_RU)
+
+
+def _prices_by_country(config: Config, product: str, countries: list[str]) -> list[dict[str, Any]]:
+    """Запасной путь (аренда, или 5sim не дал цены разом): по странам параллельно, не больше 60 стран."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(country: str) -> dict[str, Any] | None:
+        try:
+            got = _country_product(config, country, product)
+        except FiveSimError:
+            return None
+        if got is None:
+            return None
+        return {"country": country, "title": country_title(country), "flag": flag(config, country),
+                "cost": got["cost"], "count": got["count"], "rate": 0, "operator": "any",
+                "price_micro": sale_micro(config, got["cost"])}
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        rows = [r for r in pool.map(one, countries[:60]) if r]
+    return sorted(rows, key=lambda x: (x["price_micro"], -x["count"]))
+
+
 def prices(config: Config, service: str) -> list[dict[str, Any]]:
     """Страны с номерами для сервиса: самая дешёвая цена, где номера есть, и сколько их. Кэш 20 секунд."""
+    if service in RENT:   # сроки аренды /guest/prices не принимает («product is incorrect») — по странам
+        return cache.get_or_set(f"5sim:prices:{service}", 60,
+                                lambda: _prices_by_country(config, service, _rent_countries(config)))
+
     def load() -> list[dict[str, Any]]:
-        data = _get(config, "/guest/prices", {"product": service}).get(service) or {}
+        try:
+            data = _get(config, "/guest/prices", {"product": service}).get(service) or {}
+        except FiveSimError as exc:
+            if "incorrect" not in str(exc).lower():
+                raise
+            return _prices_by_country(config, service, list(COUNTRIES_RU))
         out = []
         for country, ops in data.items():
             live = [o for o in ops.values() if isinstance(o, dict) and o.get("count", 0) > 0 and o.get("cost")]
@@ -162,6 +212,10 @@ def prices(config: Config, service: str) -> list[dict[str, Any]]:
 
 def quote(config: Config, service: str, country: str) -> dict[str, Any] | None:
     """Свежая цена перед покупкой (не из кэша) — чтобы клиент заплатил за то, что купим."""
+    if service in RENT:
+        got = _country_product(config, country, service)
+        return None if got is None else {"cost": got["cost"], "operator": "any",
+                                         "price_micro": sale_micro(config, got["cost"])}
     data = (_get(config, "/guest/prices", {"country": country, "product": service}).get(country) or {}).get(service) or {}
     live = [o for o in data.values() if isinstance(o, dict) and o.get("count", 0) > 0 and o.get("cost")]
     if not live:
