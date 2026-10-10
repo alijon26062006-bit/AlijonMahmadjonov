@@ -119,37 +119,18 @@ def test_flags_and_logos(app, client, config, conn, five):
     assert "wa-logo" in page and "tg-logo" in page and "🇮🇩" in page and "🇹🇯" in page
 
 
-def test_rent_number(app, client, config, conn, five):
-    """Аренда на 1 день: у самого дешёвого оператора, все СМС сохраняются, отменить нельзя, по таймауту — без возврата."""
+def test_rent_not_sold(app, client, config, conn, five):
+    """Аренду убрали (у 5sim нет свободных номеров): ни вкладки, ни покупки."""
     from donatix import accounts
     uid = make_client(conn, balance="5")[0]
-    vid = fivesim.buy(conn, config, accounts.get_user(conn, uid), "1day", "indonesia")
-    assert "/user/buy/hosting/indonesia/any/1day" in five["calls"]
-    assert balance(conn, uid) == 50000 - 9000          # 0.80 × 1.12 = 0.896 → вверх до 0.90
-    five["check"] = {"status": "RECEIVED", "sms": [{"sender": "Telegram", "text": "code 111", "code": "111"},
-                                                    {"sender": "WhatsApp", "text": "code 222", "code": "222"}]}
-    v = fivesim.refresh(conn, config, vid)
-    import json
-    assert [m["code"] for m in json.loads(v["sms_json"])] == ["111", "222"]
-    with pytest.raises(fivesim.FiveSimError, match="Аренду отменить нельзя"):
-        fivesim.cancel(conn, config, vid, uid)
-    five["check"] = {"status": "TIMEOUT", "sms": []}
-    fivesim.refresh(conn, config, vid)
-    assert balance(conn, uid) == 50000 - 9000          # аренду 5sim не возвращает — и мы нет
+    with pytest.raises(fivesim.FiveSimError):
+        fivesim.buy(conn, config, accounts.get_user(conn, uid), "1day", "indonesia")
+    assert balance(conn, uid) == 50000 and not any("hosting" in c for c in five["calls"])
     web_login(client, "shop1@example.com", "password123")
     page = client.get("/panel/numbers?service=1day").text
-    assert "Аренда номера" in page and "1 день" in page and "🇮🇩" in page
+    assert "Аренда номера" not in page and "Telegram" in page
 
 
 def test_default_markup_is_25():
     from donatix.config import Config
     assert Config.__dataclass_fields__["fivesim_markup"].default == 25
-
-
-def test_rent_shows_no_refund_warning(app, client, config, conn, five):
-    make_client(conn, balance="5")
-    web_login(client, "shop1@example.com", "password123")
-    page = client.get("/panel/numbers?service=1day").text
-    assert "Аренду отменить и вернуть деньги нельзя" in page and "АРЕНДУ ВЕРНУТЬ НЕЛЬЗЯ" in page
-    assert "деньги вернутся на баланс" not in page   # на аренде не обещаем возврат
-    assert "вернуть деньги нельзя" not in client.get("/panel/numbers?service=telegram").text

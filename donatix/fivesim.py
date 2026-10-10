@@ -233,7 +233,7 @@ def balance(config: Config) -> Any:
 
 def buy(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, service: str, country: str) -> int:
     """Купить номер. Вернёт id нашего заказа. Не получилось — деньги не списаны (или сразу возвращены)."""
-    if service not in SERVICES and service not in RENT:
+    if service not in SERVICES:   # аренду не продаём: у 5sim нет свободных номеров
         raise FiveSimError("Выберите сервис.")
     rent = service in RENT
     q = quote(config, service, country)
