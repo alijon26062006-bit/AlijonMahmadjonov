@@ -138,3 +138,12 @@ def test_rent_number(app, client, config, conn, five):
 def test_default_markup_is_25():
     from donatix.config import Config
     assert Config.__dataclass_fields__["fivesim_markup"].default == 25
+
+
+def test_rent_shows_no_refund_warning(app, client, config, conn, five):
+    make_client(conn, balance="5")
+    web_login(client, "shop1@example.com", "password123")
+    page = client.get("/panel/numbers?service=1day").text
+    assert "Аренду отменить и вернуть деньги нельзя" in page and "АРЕНДУ ВЕРНУТЬ НЕЛЬЗЯ" in page
+    assert "деньги вернутся на баланс" not in page   # на аренде не обещаем возврат
+    assert "вернуть деньги нельзя" not in client.get("/panel/numbers?service=telegram").text

@@ -12,6 +12,7 @@
     {% if n.phone %}<button class="btn sm" type="button" onclick="navigator.clipboard && navigator.clipboard.writeText('{{ n.phone }}'); this.textContent='Скопирован'">Копировать</button>{% endif %}
   </div>
   {% if n.rent %}
+  <div class="vn-norefund" role="note">{{ icon('alert', 18) }}<div><b>Аренда не возвращается.</b> Отменить её и вернуть деньги нельзя.</div></div>
   <p class="muted small" style="margin-top:6px">Аренда до <b>{{ n.expires[:16] | replace('T', ' ') }}</b> (UTC) — все СМС на этот номер появятся ниже сами.</p>
   <div class="label-caps" style="margin-top:14px">СМС</div>
   <div class="vn-sms-list" id="vn-sms-list">
@@ -42,6 +43,9 @@
   .vn-code .vn-wait { font-size: 1rem; letter-spacing: 0; font-weight: 500; }
   .vn-head { display: flex; align-items: center; gap: 12px; }
   .vn-head h1 { margin: 0; }
+  .vn-norefund { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px;
+    background: var(--bad-soft); border: 1.5px solid var(--bad); color: var(--bad); font-size: .88rem; }
+  .vn-norefund .ico { flex: none; margin-top: 1px; }
   .vn-rent-big { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 1.4rem;
     background: var(--accent-soft); flex: none; }
   .vn-sms-list { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 10px; }

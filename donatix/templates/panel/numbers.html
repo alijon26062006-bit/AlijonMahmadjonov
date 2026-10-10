@@ -4,7 +4,7 @@
 {% block content %}
 <section class="page-hero">
   <h1>Виртуальный номер</h1>
-  <p class="muted">Номер для регистрации: СМС-код придёт сюда. Код не пришёл — деньги вернутся на баланс.</p>
+  <p class="muted">{% if is_rent %}Номер на срок: все СМС за это время придут сюда.{% else %}Номер для регистрации: СМС-код придёт сюда. Код не пришёл — деньги вернутся на баланс.{% endif %}</p>
 </section>
 {% if supplier_balance is not none %}<div class="flash">{{ icon('shield', 18) }}<span>Видно только админу: баланс 5sim — <b>{{ supplier_balance }}</b>, наценка {{ markup }}%</span></div>{% endif %}
 
@@ -25,8 +25,13 @@
     <a role="tab" class="{{ 'on' if key == service }}" aria-selected="{{ 'true' if key == service else 'false' }}" href="?service={{ key }}">{{ t }}</a>
     {% endfor %}
   </div>
-  <p class="muted small" style="margin:10px 2px 0">Номер ваш на весь срок: сюда приходят все СМС — Telegram, WhatsApp, любые сервисы.
-    Отменить аренду нельзя. После срока номер забирают — не оставляйте на нём важный аккаунт навсегда.</p>
+  <p class="muted small" style="margin:10px 2px 0">Номер ваш на весь срок: сюда приходят все СМС — Telegram, WhatsApp, любые сервисы.</p>
+  <div class="vn-norefund" role="alert">
+    {{ icon('alert', 20) }}
+    <div><b>Аренду отменить и вернуть деньги нельзя.</b>
+      Оплата за аренду не возвращается — даже если СМС не пришло или номер не подошёл сервису.
+      После окончания срока номер забирают: не оставляйте на нём важный аккаунт.</div>
+  </div>
   {% endif %}
 </div>
 
@@ -44,7 +49,7 @@
     <span class="vn-flag" aria-hidden="true">{{ r.flag }}</span>
     <span class="pack-name">{{ r.title }}<small class="muted" style="display:block">{{ r.count }} номеров{% if r.rate %} · доставка {{ r.rate | round(0) | int }}%{% endif %}</small></span>
     <span class="pack-price">{{ money(r.price_micro) }}</span>
-    <button class="btn sm primary" onclick="return confirm('{{ title }} · {{ r.title }} за ' + this.closest('form').querySelector('.pack-price').innerText + '?')">Купить</button>
+    <button class="btn sm primary" onclick="return confirm('{{ title }} · {{ r.title }} за ' + this.closest('form').querySelector('.pack-price').innerText + '?'{% if is_rent %} + '\n\n⚠️ АРЕНДУ ВЕРНУТЬ НЕЛЬЗЯ: деньги не возвращаются, даже если СМС не придёт.'{% endif %})">Купить</button>
   </form>
   {% endfor %}
 </div>
@@ -89,6 +94,10 @@
   .vn-flag { font-size: 1.6rem; line-height: 1; flex: none; width: 34px; text-align: center; }
   .seg a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
   .vn-tab-logo, .vn-item-logo { flex: none; }
+  .vn-norefund { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; padding: 12px 14px; border-radius: 12px;
+    background: var(--bad-soft); border: 1.5px solid var(--bad); color: var(--bad); font-size: .9rem; line-height: 1.45; }
+  .vn-norefund b { display: block; font-size: 1rem; margin-bottom: 2px; }
+  .vn-norefund .ico { flex: none; margin-top: 2px; }
   .vn-rent-ico { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none;
     background: var(--accent-soft); color: var(--accent); font-size: 1rem; }
 </style>
