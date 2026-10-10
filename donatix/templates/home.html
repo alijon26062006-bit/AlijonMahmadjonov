@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_icons.html" import icon, kind_icon, media, tg_logo %}
+{% from "_icons.html" import icon, kind_icon, media, tg_logo, wa_logo %}
 {% block title %}{{ site_name }} — алмазы Free Fire, UC PUBG и Telegram Stars без регистрации{% endblock %}
 {% block jsonld %}
 <script type="application/ld+json">{{ {
@@ -40,7 +40,7 @@
     </section>
     {% if vnumbers_on %}
     <a class="card vn-promo" href="/panel/numbers">
-      <span class="vn-promo-ico" aria-hidden="true">📱</span>
+      <span class="vn-promo-ico" aria-hidden="true">{{ tg_logo(34) }}{{ wa_logo(34) }}</span>
       <span class="grow"><b>Новое: виртуальные номера</b>
         <span class="muted small">Номер для регистрации в Telegram и WhatsApp — СМС-код придёт на сайт. Не пришёл — деньги вернём.</span></span>
       <span class="btn sm primary">Купить номер</span>

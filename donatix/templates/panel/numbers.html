@@ -1,5 +1,5 @@
 {% extends "panel/_layout.html" %}
-{% from "_icons.html" import icon %}
+{% from "_icons.html" import icon, service_logo %}
 {% block title %}Виртуальные номера — {{ site_name }}{% endblock %}
 {% block content %}
 <section class="page-hero">
@@ -11,7 +11,7 @@
 <div class="card">
   <div class="seg" role="tablist" aria-label="Сервис">
     {% for key, title in services.items() %}
-    <a role="tab" class="{{ 'on' if key == service }}" aria-selected="{{ 'true' if key == service else 'false' }}" href="?service={{ key }}">{{ title }}</a>
+    <a role="tab" class="{{ 'on' if key == service }}" aria-selected="{{ 'true' if key == service else 'false' }}" href="?service={{ key }}">{{ service_logo(key, 20, 'vn-tab-logo') }}{{ title }}</a>
     {% endfor %}
   </div>
 </div>
@@ -27,6 +27,7 @@
   <form class="pack-card vn-row" method="post" action="/panel/numbers/buy" data-name="{{ r.title | lower }} {{ r.country }}">
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="service" value="{{ service }}">
     <input type="hidden" name="country" value="{{ r.country }}">
+    <span class="vn-flag" aria-hidden="true">{{ r.flag }}</span>
     <span class="pack-name">{{ r.title }}<small class="muted" style="display:block">{{ r.count }} номеров{% if r.rate %} · доставка {{ r.rate | round(0) | int }}%{% endif %}</small></span>
     <span class="pack-price">{{ money(r.price_micro) }}</span>
     <button class="btn sm primary" onclick="return confirm('Купить номер {{ services[service] }} · {{ r.title }} за ' + this.closest('form').querySelector('.pack-price').innerText + '?')">Купить</button>
@@ -35,11 +36,22 @@
 </div>
 <script>
   (function () {
-    var q = document.getElementById("vn-q"), rows = document.querySelectorAll("#vn-list .vn-row");
-    q && q.addEventListener("input", function () {
-      var t = q.value.trim().toLowerCase();
-      rows.forEach(function (r) { r.style.display = !t || r.dataset.name.indexOf(t) >= 0 ? "" : "none"; });
-    });
+    var q = document.getElementById("vn-q");
+    function filter() {
+      var t = q ? q.value.trim().toLowerCase() : "";
+      document.querySelectorAll("#vn-list .vn-row").forEach(function (r) {
+        r.style.display = !t || r.dataset.name.indexOf(t) >= 0 ? "" : "none"; });
+    }
+    q && q.addEventListener("input", filter);
+    // Наличие номеров меняется быстро: раз в 20 с берём свежий список — закончившиеся страны исчезают сами
+    setInterval(function () {
+      if (document.hidden) return;
+      fetch(location.href, {credentials: "same-origin"}).then(function (r) { return r.text(); }).then(function (html) {
+        var fresh = new DOMParser().parseFromString(html, "text/html").getElementById("vn-list"),
+            list = document.getElementById("vn-list");
+        if (fresh && list) { list.innerHTML = fresh.innerHTML; filter(); }
+      }).catch(function () {});
+    }, 20000);
   })();
 </script>
 {% elif not error %}<div class="card empty">Сейчас номеров для этого сервиса нет — загляните позже.</div>{% endif %}
@@ -49,7 +61,8 @@
 <div class="list">
   {% for n in mine %}
   <a class="item" href="/panel/numbers/{{ n.id }}">
-    <span class="grow"><b>{{ n.service }} · {{ n.country }}</b><span class="sub">{{ n.phone or '—' }} · {{ n.status_title }}{% if n.code %} · код {{ n.code }}{% endif %}{% if n.refunded %} · возврат{% endif %}</span></span>
+    {{ service_logo(n.service_key, 32, 'vn-item-logo') }}
+    <span class="grow"><b>{{ n.flag }} {{ n.service }} · {{ n.country }}</b><span class="sub">{{ n.phone or '—' }} · {{ n.status_title }}{% if n.code %} · код {{ n.code }}{% endif %}{% if n.refunded %} · возврат{% endif %}</span></span>
     <span class="amount">{{ money(n.price_micro) }}</span>
   </a>
   {% endfor %}
@@ -59,5 +72,8 @@
   .vn-row { display: flex; align-items: center; gap: 10px; }
   .vn-row .pack-name { flex: 1; min-width: 0; }
   .vn-row .btn { flex: none; }
+  .vn-flag { font-size: 1.6rem; line-height: 1; flex: none; width: 34px; text-align: center; }
+  .seg a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .vn-tab-logo, .vn-item-logo { flex: none; }
 </style>
 {% endblock %}

@@ -52,6 +52,42 @@ STATUS_RU = {"PENDING": "Ждём СМС", "RECEIVED": "Код пришёл", "F
              "TIMEOUT": "Время вышло", "BANNED": "Номер не подошёл", "FAILED": "Не удалось купить"}
 
 
+# ISO-код страны — для флага. Основной источник — список стран 5sim (/guest/countries), это — запас
+ISO = {"tajikistan": "tj", "uzbekistan": "uz", "kazakhstan": "kz", "kyrgyzstan": "kg", "usa": "us", "england": "gb",
+       "india": "in", "indonesia": "id", "philippines": "ph", "vietnam": "vn", "thailand": "th", "malaysia": "my",
+       "brazil": "br", "mexico": "mx", "canada": "ca", "germany": "de", "france": "fr", "netherlands": "nl",
+       "poland": "pl", "spain": "es", "italy": "it", "portugal": "pt", "sweden": "se", "finland": "fi",
+       "georgia": "ge", "armenia": "am", "azerbaijan": "az", "moldova": "md", "turkmenistan": "tm", "mongolia": "mn",
+       "pakistan": "pk", "bangladesh": "bd", "nigeria": "ng", "kenya": "ke", "egypt": "eg", "southafrica": "za",
+       "colombia": "co", "argentina": "ar", "chile": "cl", "peru": "pe", "cambodia": "kh", "laos": "la",
+       "nepal": "np", "srilanka": "lk", "estonia": "ee", "latvia": "lv", "lithuania": "lt", "romania": "ro",
+       "bulgaria": "bg", "czech": "cz", "hongkong": "hk", "israel": "il", "saudiarabia": "sa", "morocco": "ma",
+       "ghana": "gh", "ukraine": "ua", "russia": "ru", "turkey": "tr", "china": "cn", "japan": "jp"}
+
+
+def _iso_map(config: Config) -> dict[str, str]:
+    """Название страны у 5sim → ISO из их же списка стран (раз в сутки); не загрузилось — запасной список."""
+    def load() -> dict[str, str]:
+        out = dict(ISO)
+        try:
+            for name, info in (_get(config, "/guest/countries") or {}).items():
+                iso = next(iter((info or {}).get("iso") or {}), "")
+                if len(iso) == 2:
+                    out[name] = iso.lower()
+        except FiveSimError as exc:
+            log.info("5sim: список стран не загрузился: %s", exc)
+        return out
+    return cache.get_or_set("5sim:iso", 86400, load)
+
+
+def flag(config: Config, country: str) -> str:
+    """Флаг-эмодзи по ISO-коду (🇹🇯). Нет кода — глобус."""
+    iso = _iso_map(config).get(country, "") if config.fivesim_token else ISO.get(country, "")
+    if len(iso) != 2 or not iso.isalpha():
+        return "🌐"
+    return "".join(chr(0x1F1E6 + ord(c) - ord("a")) for c in iso.lower())
+
+
 class FiveSimError(Exception):
     pass
 
@@ -100,7 +136,7 @@ def sale_micro(config: Config, cost: Any) -> int:
 
 
 def prices(config: Config, service: str) -> list[dict[str, Any]]:
-    """Страны с номерами для сервиса: самая дешёвая цена, где номера есть, и сколько их. Кэш 3 минуты."""
+    """Страны с номерами для сервиса: самая дешёвая цена, где номера есть, и сколько их. Кэш 20 секунд."""
     def load() -> list[dict[str, Any]]:
         data = _get(config, "/guest/prices", {"product": service}).get(service) or {}
         out = []
@@ -110,11 +146,12 @@ def prices(config: Config, service: str) -> list[dict[str, Any]]:
                 continue
             best = min(live, key=lambda o: o["cost"])
             rate = max((o.get("rate") or 0) for o in live)
-            out.append({"country": country, "title": country_title(country), "cost": best["cost"],
+            out.append({"country": country, "title": country_title(country), "flag": flag(config, country),
+                        "cost": best["cost"],
                         "count": sum(o["count"] for o in live), "rate": rate,
                         "price_micro": sale_micro(config, best["cost"])})
         return sorted(out, key=lambda x: (x["price_micro"], -x["count"]))
-    return cache.get_or_set(f"5sim:prices:{service}", 180, load)
+    return cache.get_or_set(f"5sim:prices:{service}", 20, load)   # наличие номеров меняется быстро — свежее раз в 20 с
 
 
 def quote(config: Config, service: str, country: str) -> dict[str, Any] | None:

@@ -1,9 +1,9 @@
 {% extends "panel/_layout.html" %}
-{% from "_icons.html" import icon %}
+{% from "_icons.html" import icon, service_logo %}
 {% block title %}Номер {{ n.phone }} — {{ site_name }}{% endblock %}
 {% block content %}
 <a class="back" href="/panel/numbers">{{ icon('arrow-left', 18) }}Виртуальные номера</a>
-<section class="page-hero"><h1>{{ n.service }} · {{ n.country }}</h1></section>
+<section class="page-hero vn-head">{{ service_logo(n.service_key, 44) }}<h1>{{ n.service }} · <span aria-hidden="true">{{ n.flag }}</span> {{ n.country }}</h1></section>
 
 <div class="card vn-card" id="vn" data-id="{{ n.id }}" data-open="{{ 1 if n.open else 0 }}">
   <div class="label-caps">Номер</div>
@@ -30,6 +30,8 @@
   .vn-phone { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
   .vn-code { font: 800 2.2rem/1.2 var(--font-num); letter-spacing: .08em; color: var(--accent); margin: 2px 0 6px; }
   .vn-code .vn-wait { font-size: 1rem; letter-spacing: 0; font-weight: 500; }
+  .vn-head { display: flex; align-items: center; gap: 12px; }
+  .vn-head h1 { margin: 0; }
   .vn-how { padding-left: 18px; margin: 10px 0 14px; }
 </style>
 <script>

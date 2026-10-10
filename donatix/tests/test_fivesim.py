@@ -33,6 +33,8 @@ def five(config, monkeypatch):
             return state["check"]
         if path.startswith("/user/cancel/"):
             return {"status": "CANCELED"}
+        if path == "/guest/countries":
+            return {"indonesia": {"iso": {"id": 1}, "prefix": {"+62": 1}}, "tajikistan": {"iso": {"tj": 1}}}
         if path == "/user/profile":
             return {"balance": 3.5}
         raise AssertionError(path)
@@ -98,3 +100,11 @@ def test_pages_and_cancel(app, client, config, conn, five):
     client.post(f"/panel/numbers/{vid}/cancel", data={"csrf": csrf})
     assert balance(conn, conn.execute("SELECT id FROM users WHERE login='shop1'").fetchone()[0]) == 50000
     assert "Виртуальные номера" in client.get("/").text or "виртуальные номера" in client.get("/").text
+
+
+def test_flags_and_logos(app, client, config, conn, five):
+    assert fivesim.flag(config, "tajikistan") == "🇹🇯" and fivesim.flag(config, "unknownland") == "🌐"
+    make_client(conn, balance="5")
+    web_login(client, "shop1@example.com", "password123")
+    page = client.get("/panel/numbers?service=telegram").text
+    assert "wa-logo" in page and "tg-logo" in page and "🇮🇩" in page and "🇹🇯" in page

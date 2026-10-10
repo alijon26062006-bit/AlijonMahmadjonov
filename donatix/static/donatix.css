@@ -2403,3 +2403,5 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .vn-promo-ico { font-size: 1.7rem; flex: none; }
 .vn-promo .btn { flex: none; }
 @media (max-width: 480px) { .vn-promo { flex-wrap: wrap; } .vn-promo .btn { width: 100%; justify-content: center; } }
+.vn-promo-ico { display: inline-flex; flex: none; }
+.vn-promo-ico svg + svg { margin-left: -8px; }
