@@ -11,10 +11,10 @@
   <section class="od-card">
     <div class="od-head">
       <h1 class="od-id">{{ view.order_id }}</h1>
-      <button type="button" class="od-copy" data-copy="{{ view.order_id }}" aria-label="Скопировать номер заказа">{{ icon('copy', 16) }}</button>
+      <button type="button" class="od-copy" data-copy="{{ view.order_id }}" aria-label="Скопировать номер заказа">{{ icon('copy', 14) }}</button>
     </div>
     <p class="od-sub">{{ kind_title }} <span aria-hidden="true">•</span> {{ game }}</p>
-    <div class="od-pill {{ st_cls }}"><span class="od-ico">{{ icon(st_icon, 16) }}</span><b>{{ st_title }}</b>
+    <div class="od-pill {{ st_cls }}"><span class="od-ico">{{ icon(st_icon, 13) }}</span><b>{{ st_title }}</b>
       <time>{{ (history[-1][3] if st != 'processing' else view.created_at) | dt('%d.%m.%Y %H:%M') }}</time></div>
     <div class="od-rows">
       <div class="od-row"><span>Игра/Сервис</span><b>{{ game }}</b></div>
@@ -50,7 +50,7 @@
       {% for key, title, text, at in history %}
       {% set cls = {'created': 'od-created', 'processing': 'od-proc', 'completed': 'od-ok', 'refund': 'od-refund'}[key] %}
       <li class="od-step {{ cls }}">
-        <span class="od-ico">{{ icon({'created': 'book', 'processing': 'clock', 'completed': 'check', 'refund': 'swap'}[key], 18) }}</span>
+        <span class="od-ico">{{ icon({'created': 'book', 'processing': 'clock', 'completed': 'check', 'refund': 'swap'}[key], 13) }}</span>
         <div><b>{{ title }}</b><p>{{ text }}</p><time>{{ at | dt('%d.%m.%Y %H:%M') }}</time></div>
       </li>
       {% endfor %}
@@ -59,35 +59,35 @@
   </section>
 </div>
 <style>
-  .od { display: grid; gap: 10px; font-size: .9rem; max-width: 720px; }
-  .od-card { background: var(--surface); box-shadow: var(--shadow-1); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px 12px; }
+  .od { display: grid; gap: 8px; font-size: .82rem; max-width: 720px; }
+  .od-card { background: var(--surface); box-shadow: var(--shadow-1); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 12px 10px; }
   .od-head { display: flex; align-items: center; gap: 8px; }
-  .od-id { margin: 0; font-size: 1.2rem; font-weight: 800; word-break: break-all; }
+  .od-id { margin: 0; font-size: 1.05rem; font-weight: 800; word-break: break-all; }
   .od-copy { border: 0; background: none; color: var(--muted); padding: 6px; cursor: pointer; border-radius: 8px; }
   .od-copy:hover { color: var(--text); background: var(--bg); }
-  .od-sub { margin: 2px 0 10px; font-size: .85rem; color: var(--muted); }
+  .od-sub { margin: 1px 0 8px; font-size: .78rem; color: var(--muted); }
   .od-sub span { margin: 0 6px; }
-  .od-pill { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--r); border: 1px solid var(--line); margin-bottom: 10px; }
-  .od-pill time { margin-left: auto; color: var(--muted); font-size: .8rem; }
-  .od-ico { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; border: 1px solid currentColor; }
+  .od-pill { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: var(--r-sm); border: 1px solid var(--line); margin-bottom: 8px; }
+  .od-pill time { margin-left: auto; color: var(--muted); font-size: .74rem; }
+  .od-ico { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; border: 1px solid currentColor; }
   .od-ok { --c: var(--ok); --cs: var(--ok-soft); } .od-refund { --c: var(--accent); --cs: var(--accent-soft); }
   .od-proc { --c: var(--warn); --cs: var(--warn-soft); } .od-created { --c: var(--muted); --cs: var(--bg); }
   .od-pill.od-ok, .od-pill.od-refund, .od-pill.od-proc { background: var(--cs); border-color: color-mix(in srgb, var(--c) 35%, transparent); }
   .od-pill .od-ico, .od-step .od-ico { color: var(--c); background: var(--surface); }
-  .od-rows { display: grid; gap: 7px; }
-  .od-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px;
+  .od-rows { display: grid; gap: 5px; }
+  .od-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 7px 10px;
     border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
   .od-row span { color: var(--muted); }
   .od-row b { text-align: right; word-break: break-word; }
-  .od-h2 { font-size: .95rem; margin: 0 0 10px; }
-  .od-hist-title { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); }
-  .od-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
-  .od-step { display: flex; gap: 10px; padding: 10px 12px; border-radius: var(--r); background: var(--cs);
+  .od-h2 { font-size: .85rem; margin: 0 0 10px; }
+  .od-hist-title { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); }
+  .od-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+  .od-step { display: flex; gap: 8px; padding: 7px 10px; border-radius: var(--r); background: var(--cs);
     border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
-  .od-step b { display: block; font-size: .95rem; }
-  .od-step p { margin: 1px 0 4px; color: var(--muted); font-size: .85rem; }
-  .od-step time { color: var(--muted); font-size: .78rem; }
-  .od-back { display: block; text-align: center; margin-top: 10px; padding: 10px; border: 1px solid var(--line);
+  .od-step b { display: block; font-size: .85rem; }
+  .od-step p { margin: 0 0 2px; color: var(--muted); font-size: .78rem; }
+  .od-step time { color: var(--muted); font-size: .72rem; }
+  .od-back { display: block; text-align: center; margin-top: 8px; padding: 8px; border: 1px solid var(--line);
     border-radius: var(--r); color: var(--text); font-weight: 600; }
   .od-back:hover { text-decoration: none; background: var(--bg); }
 </style>
