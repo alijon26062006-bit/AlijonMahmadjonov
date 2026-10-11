@@ -1,0 +1,88 @@
+{% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Glory клана {{ g.clan_id }} — {{ site_name }}{% endblock %}
+{% block content %}
+{% set cls = {'running': 'od-ok', 'starting': 'od-proc', 'stopped': 'od-created', 'failed': 'od-refund'}[g.status] %}
+<div class="od gl">
+  <section class="od-card">
+    <div class="gl-top">
+      <img src="/static/glory.svg" alt="" width="46" height="46">
+      <div><h1 class="od-id" id="gl-name">{{ g.clan.name or ('Клан ' ~ g.clan_id) }}</h1>
+        <p class="od-sub">ID {{ g.clan_id }} <span aria-hidden="true">•</span> {{ g.region | upper }}</p></div>
+    </div>
+    <div class="od-pill {{ cls }}" id="gl-pill"><span class="gl-dot" aria-hidden="true"></span><b id="gl-status">{{ g.status_title }}</b>
+      <time id="gl-uptime">{% if g.uptime %}в работе {{ g.uptime }}{% endif %}</time></div>
+
+    <div class="gl-live">
+      <div><span>Очки сейчас</span><b id="gl-glory">{{ g.glory }}</b></div>
+      <div><span>Набрано</span><b class="gl-plus" id="gl-farmed">+{{ g.farmed }}</b></div>
+    </div>
+    <div class="od-rows">
+      <div class="od-row"><span>Уровень клана</span><b id="gl-level">{{ g.clan.level or '—' }}</b></div>
+      <div class="od-row"><span>Участники</span><b id="gl-members">{% if g.clan.members %}{{ g.clan.members }}{% if g.clan.capacity %} / {{ g.clan.capacity }}{% endif %}{% else %}—{% endif %}</b></div>
+      <div class="od-row"><span>Ботов в работе</span><b id="gl-bots">{{ g.bots or '—' }}</b></div>
+      <div class="od-row"><span>Оплачено</span><b>{{ money(g.price_micro) }}</b></div>
+      <div class="od-row"><span>Запущено</span><b>{{ g.created_at | dt('%d.%m.%Y %H:%M') }}</b></div>
+    </div>
+    {% if g.status == 'failed' %}<p class="muted small" style="margin:10px 2px 0">Группа не запустилась — {{ money(g.price_micro) }} вернулись на баланс.</p>{% endif %}
+    {% if g.open %}<p class="muted small" id="gl-hint" style="margin:10px 2px 0">Обновляется само каждые 15 секунд — можно закрыть страницу, группа работает дальше.</p>{% endif %}
+    {% if g.status == 'running' %}
+    <form method="post" action="/panel/glory/{{ g.id }}/stop" style="margin-top:10px">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="od-back gl-stop" onclick="return confirm('Остановить группу? Деньги за запуск не возвращаются.')">Остановить</button>
+    </form>
+    {% endif %}
+    <a class="od-back" href="/panel/glory">Назад</a>
+  </section>
+</div>
+<style>
+  .od { display: grid; gap: 8px; max-width: 720px; font-size: .82rem; }
+  .od-card { background: var(--surface); box-shadow: var(--shadow-1); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 12px 10px; }
+  .od-id { margin: 0; font-size: 1.05rem; font-weight: 800; }
+  .od-sub { margin: 1px 0 0; color: var(--muted); font-size: .78rem; } .od-sub span { margin: 0 6px; }
+  .gl-top { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; } .gl-top img { border-radius: 12px; }
+  .od-pill { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: var(--r-sm); border: 1px solid var(--line); margin-bottom: 8px; }
+  .od-pill time { margin-left: auto; color: var(--muted); font-size: .74rem; }
+  .od-ok { --c: var(--ok); --cs: var(--ok-soft); } .od-refund { --c: var(--bad); --cs: var(--bad-soft); }
+  .od-proc { --c: var(--warn); --cs: var(--warn-soft); } .od-created { --c: var(--muted); --cs: var(--bg); }
+  .od-pill { background: var(--cs); border-color: color-mix(in srgb, var(--c) 35%, transparent); }
+  .gl-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+  .od-ok .gl-dot { animation: glpulse 1.6s infinite; }
+  @keyframes glpulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 60%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+  @media (prefers-reduced-motion: reduce) { .od-ok .gl-dot { animation: none; } }
+  .gl-live { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+  .gl-live div { padding: 10px; border-radius: var(--r); background: var(--bg); border: 1px solid var(--line); text-align: center; }
+  .gl-live span { display: block; color: var(--muted); font-size: .74rem; }
+  .gl-live b { display: block; font-size: 1.4rem; font-family: var(--font-num, inherit); }
+  .gl-plus { color: var(--ok); }
+  .od-rows { display: grid; gap: 5px; }
+  .od-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
+  .od-row span { color: var(--muted); }
+  .od-back { display: block; width: 100%; text-align: center; margin-top: 8px; padding: 8px; border: 1px solid var(--line);
+    border-radius: var(--r); color: var(--text); font-weight: 600; background: none; font: inherit; font-weight: 600; cursor: pointer; }
+  .od-back:hover { text-decoration: none; background: var(--bg); }
+  .gl-stop { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+</style>
+{% if g.open %}
+<script>
+  (function () {
+    var cls = {running: "od-ok", starting: "od-proc", stopped: "od-created", failed: "od-refund"};
+    function set(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    var timer = setInterval(function () {
+      fetch("/panel/data/glory/{{ g.id }}", {credentials: "same-origin"}).then(function (r) { return r.json(); }).then(function (d) {
+        if (!d || d.error) return;
+        set("gl-glory", d.glory); set("gl-farmed", "+" + d.farmed); set("gl-status", d.status_title);
+        set("gl-uptime", d.uptime ? "в работе " + d.uptime : ""); set("gl-bots", d.bots || "—");
+        if (d.clan) {
+          if (d.clan.name) set("gl-name", d.clan.name);
+          if (d.clan.level) set("gl-level", d.clan.level);
+          if (d.clan.members) set("gl-members", d.clan.members + (d.clan.capacity ? " / " + d.clan.capacity : ""));
+        }
+        document.getElementById("gl-pill").className = "od-pill " + (cls[d.status] || "");
+        if (!d.open) { clearInterval(timer); location.reload(); }
+      }).catch(function () {});
+    }, 15000);
+  })();
+</script>
+{% endif %}
+{% endblock %}

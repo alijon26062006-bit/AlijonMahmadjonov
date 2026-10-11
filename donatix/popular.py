@@ -144,3 +144,14 @@ def _compute(conn: sqlite3.Connection, limit: int = LIMIT) -> list[dict[str, Any
 
 def services(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return cache.get_or_set("popular", TTL, lambda: compute(conn))
+
+
+def with_extras(items: list[dict[str, Any]], config: Any) -> list[dict[str, Any]]:
+    """Сервисы не из каталога (не кэшируются вместе с каталогом): Glory клана Free Fire — если подключён FFGlory."""
+    if not (getattr(config, "ffglory_key", "") and getattr(config, "ffglory_master", "")):
+        return items
+    entry = {"title": "Glory клана Free Fire", "href": "/panel/glory", "kind": "glory",
+             "image_url": "/static/glory.svg", "key": "glory"}
+    out = [i for i in items if i.get("key") != "glory"]
+    out.insert(min(2, len(out)), entry)   # сразу после Free Fire
+    return out

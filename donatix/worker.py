@@ -163,6 +163,11 @@ class Worker:
                 except Exception:
                     log.exception("виртуальные номера")
                 try:
+                    from . import glory
+                    glory.maybe_watch(conn, self.config)   # Glory клана: работает ли группа, сколько очков
+                except Exception:
+                    log.exception("glory")
+                try:
                     from . import cryptopay
                     cryptopay.check_all(conn, self.config, min_interval=60)  # автоплатежи TRC20 / Binance
                 except Exception:

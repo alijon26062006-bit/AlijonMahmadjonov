@@ -81,7 +81,7 @@ def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
         "markups": config.markups,
         "examples": examples,
         "faq": FAQ + (BOT_FAQ if sitecfg.client_bots_enabled(conn) else []),
-        "popular": popular.services(conn),
+        "popular": popular.with_extras(popular.services(conn), config),
         "client_bots": sitecfg.client_bots_enabled(conn),
         "ref_percent": referrals.percent(conn),
     })
@@ -1885,3 +1885,86 @@ def panel_number_cancel(vid: int, request: Request, user=Depends(panel_user), co
     except fivesim.FiveSimError as exc:
         flash(request, str(exc), "error")
     return _redirect(f"/panel/numbers/{vid}")
+
+
+# ── Glory клана Free Fire (FFGlory) ──────────────────────
+
+
+@router.get("/panel/glory")
+def panel_glory(request: Request, user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import glory
+    if not glory.enabled(config):
+        return _redirect("/panel")
+    error, regions = "", []
+    try:
+        regions = glory.regions(config)
+    except glory.GloryError as exc:
+        error = f"Регионы сейчас не загрузились ({exc}). Обновите страницу через минуту."
+    mine = [glory.view(g) for g in conn.execute(
+        "SELECT * FROM glory_orders WHERE user_id = ? ORDER BY id DESC LIMIT 20", (user["id"],))]
+    credits = None
+    if user["role"] == "admin":
+        try:
+            me = glory._call(config, "GET", "/api/auth/me")
+            credits = f"обычных {me.get('basic_credits')}, премиум {me.get('premium_credits')}"
+        except glory.GloryError as exc:
+            credits = f"ошибка: {exc}"
+    return render(request, "panel/glory.html", {"user": user, "regions": regions, "error": error, "mine": mine,
+                                                "credits": credits, "markup": config.ffglory_markup})
+
+
+@router.post("/panel/glory/buy", dependencies=[Depends(check_csrf)])
+def panel_glory_buy(request: Request, region: str = Form(""), clan_id: str = Form(""), agree: str = Form(""),
+                    user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import glory
+    if not glory.enabled(config):
+        return _redirect("/panel")
+    if not agree:
+        flash(request, "Отметьте, что вы прочитали условия.", "error")
+        return _redirect("/panel/glory")
+    if request.app.state.limiter.hit("orders", f"glory{user['id']}") is not None:
+        flash(request, "Слишком много запусков подряд — подождите минуту.", "error")
+        return _redirect("/panel/glory")
+    try:
+        gid = glory.buy(conn, config, user, region[:20], clan_id[:30])
+    except glory.GloryError as exc:
+        flash(request, str(exc), "error")
+        if "баланс" in str(exc) and "вернулись" not in str(exc):
+            return _redirect("/panel/balance")
+        return _redirect("/panel/glory")
+    return _redirect(f"/panel/glory/{gid}")
+
+
+@router.get("/panel/glory/{gid:int}")
+def panel_glory_order(gid: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                      config: Config = Depends(get_config)):
+    from . import glory
+    g = conn.execute("SELECT * FROM glory_orders WHERE id = ? AND user_id = ?", (gid, user["id"])).fetchone()
+    if g is None:
+        return _redirect("/panel/glory")
+    if glory.enabled(config):
+        g = glory.refresh(conn, config, gid)
+    return render(request, "panel/glory_order.html", {"user": user, "g": glory.view(g)})
+
+
+@router.get("/panel/data/glory/{gid:int}")
+def panel_glory_data(gid: int, user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import glory
+    g = conn.execute("SELECT * FROM glory_orders WHERE id = ? AND user_id = ?", (gid, user["id"])).fetchone()
+    if g is None:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    if glory.enabled(config):
+        g = glory.refresh(conn, config, gid)
+    return JSONResponse(glory.view(g), headers={"Cache-Control": "no-store"})
+
+
+@router.post("/panel/glory/{gid:int}/stop", dependencies=[Depends(check_csrf)])
+def panel_glory_stop(gid: int, request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                     config: Config = Depends(get_config)):
+    from . import glory
+    try:
+        glory.stop(conn, config, gid, user["id"])
+        flash(request, "Группа остановлена.")
+    except glory.GloryError as exc:
+        flash(request, str(exc), "error")
+    return _redirect(f"/panel/glory/{gid}")

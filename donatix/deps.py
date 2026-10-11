@@ -251,6 +251,7 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["support_contact"] = config.support_contact
     ctx["tg_channel"] = config.tg_channel
     ctx["vnumbers_on"] = bool(config.fivesim_token)   # виртуальные номера (5sim) подключены
+    ctx["glory_on"] = bool(config.ffglory_key and config.ffglory_master)   # Glory клана (FFGlory)
     ctx["csrf"] = csrf_token(request)
     ctx["flashes"] = request.session.pop("flash", [])
     ctx["path"] = request.url.path
@@ -285,8 +286,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
             from .quickbuy import code_of, is_guest
             if not (isinstance(ctx["user"], dict) and ctx["user"].get("guest")) and is_guest(ctx["user"]):
                 ctx["guest_code"] = code_of(c, ctx["user"]["id"])   # код покупателя без регистрации
-            from .popular import services as popular_services
-            ctx["popular"] = popular_services(c)
+            from .popular import services as popular_services, with_extras
+            ctx["popular"] = with_extras(popular_services(c), config)
             low = db.get_setting(c, "pay.low_balance_usd") or str(config.low_balance_usd)
             ctx["low_balance_micro"] = int(float(low) * 10_000)
             if ctx["cur_code"] == "TJS":

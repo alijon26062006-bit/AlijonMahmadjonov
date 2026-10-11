@@ -586,6 +586,28 @@ CREATE TABLE IF NOT EXISTS vnumbers (           -- виртуальные ном
 );
 CREATE INDEX IF NOT EXISTS vnumbers_user ON vnumbers(user_id, id DESC);
 CREATE INDEX IF NOT EXISTS vnumbers_open ON vnumbers(status, updated_at);
+CREATE TABLE IF NOT EXISTS glory_orders (     -- FFGlory: накрутка очков славы (glory) клану Free Fire
+    id          INTEGER PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    region      TEXT NOT NULL,                 -- id региона FFGlory (me, bd, …)
+    tier        TEXT NOT NULL DEFAULT 'basic', -- basic · premium (сколько стоит кредит)
+    clan_id     TEXT NOT NULL,
+    price_micro INTEGER NOT NULL,              -- сколько заплатил клиент
+    cost_usd    TEXT NOT NULL DEFAULT '',      -- цена кредита FFGlory
+    group_id    TEXT,                          -- группа ботов у FFGlory
+    status      TEXT NOT NULL,                 -- starting · running · stopped · failed
+    glory       INTEGER NOT NULL DEFAULT 0,    -- очки сейчас
+    glory_start INTEGER,                       -- очки при запуске (чтобы показать «набрано»)
+    clan_json   TEXT NOT NULL DEFAULT '{}',    -- название, уровень, участники
+    uptime      TEXT NOT NULL DEFAULT '',
+    bots        INTEGER NOT NULL DEFAULT 0,
+    refunded    INTEGER NOT NULL DEFAULT 0,
+    note        TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS glory_user ON glory_orders(user_id, id DESC);
+CREATE INDEX IF NOT EXISTS glory_open ON glory_orders(status, updated_at);
 CREATE TABLE IF NOT EXISTS bank_notices (       -- уведомления банка «Душанбе Сити» (юзербот): автоплатёж
     id          INTEGER PRIMARY KEY,
     source      TEXT NOT NULL,
