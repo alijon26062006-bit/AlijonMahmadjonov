@@ -19,7 +19,7 @@ import logging
 import sqlite3
 import threading
 import time
-from decimal import ROUND_CEILING, Decimal
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 from typing import Any
 
 import httpx
@@ -77,8 +77,35 @@ def sale_micro(config: Config, usd: Any) -> int:
     return int(value.quantize(Decimal("0.01"), rounding=ROUND_CEILING) * 10_000)
 
 
-def regions(config: Config) -> list[dict[str, Any]]:
-    """Включённые регионы с нашей ценой."""
+# Флаг региона: код FFGlory → страна (ISO). Регион из многих стран — значок континента.
+_FLAG_ISO = {"IND": "IN", "NA": "US", "US": "US", "CIS": "RU", "RU": "RU", "EU": "EU", "UK": "GB", "SA": "SA"}
+_FLAG_ZONE = {"ME": "🌍", "MENA": "🌍", "SAC": "🌎", "LATAM": "🌎", "SEA": "🌏", "ASIA": "🌏", "AF": "🌍"}
+
+
+def flag(code: str) -> str:
+    code = (code or "").strip().upper()
+    if code in _FLAG_ZONE:
+        return _FLAG_ZONE[code]
+    iso = _FLAG_ISO.get(code, code)
+    if len(iso) != 2 or not iso.isalpha():
+        return "🌐"
+    return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in iso)
+
+
+def price_micro(conn: sqlite3.Connection | None, config: Config, cost: Any) -> int:
+    """Цена клиенту: одна цена в сомони для всех регионов (DONATIX_FFGLORY_PRICE_TJS, 30 с.) по курсу сайта;
+    если не задана — цена кредита FFGlory + наценка."""
+    tjs = Decimal(str(config.ffglory_price_tjs or 0))
+    if tjs > 0 and conn is not None:
+        from .payments import settings
+        rate = Decimal(str(settings(conn, config)["tjs_rate"] or 0))
+        if rate > 0:
+            return int((tjs / rate * 10_000).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return sale_micro(config, cost)
+
+
+def regions(config: Config, conn: sqlite3.Connection | None = None) -> list[dict[str, Any]]:
+    """Включённые регионы с нашей ценой и флагом."""
     p = pricing(config)
     out = []
     for r in p.get("regions") or []:
@@ -88,9 +115,11 @@ def regions(config: Config) -> list[dict[str, Any]]:
         cost = p.get(f"{tier}_credit_usd")
         if cost is None:
             continue
+        code = str(r.get("region_code") or r["id"])
         out.append({"id": str(r["id"]), "title": r.get("region_name") or str(r["id"]).upper(),
-                    "code": r.get("region_code") or "", "tier": tier, "cost": cost,
-                    "price_micro": sale_micro(config, cost)})
+                    "code": code, "flag": flag(code), "tier": tier, "cost": cost,
+                    "price_micro": price_micro(conn, config, cost)})
+        out[-1]["loss"] = out[-1]["price_micro"] < int(Decimal(str(cost)) * 10_000)   # продаём дешевле, чем берёт FFGlory
     return sorted(out, key=lambda x: (x["tier"] != "basic", x["title"]))
 
 
@@ -155,7 +184,7 @@ def _clean_clan(clan_id: str) -> str:
 def buy(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, region: str, clan_id: str) -> int:
     clan_id = _clean_clan(clan_id)
     try:
-        reg = next((r for r in regions(config) if r["id"] == region), None)
+        reg = next((r for r in regions(config, conn) if r["id"] == region), None)
     except GloryError:
         raise GloryError("Сервис сейчас недоступен — попробуйте через минуту.") from None
     if reg is None:
@@ -260,7 +289,8 @@ def stop(conn: sqlite3.Connection, config: Config, gid: int, user_id: int) -> No
 def view(g: sqlite3.Row) -> dict[str, Any]:
     clan = json.loads(g["clan_json"] or "{}")
     start = g["glory_start"]
-    return {"id": g["id"], "clan_id": g["clan_id"], "region": g["region"], "status": g["status"],
+    return {"id": g["id"], "clan_id": g["clan_id"], "region": g["region"], "flag": flag(g["region"]),
+            "status": g["status"],
             "status_title": STATUS_RU.get(g["status"], g["status"]), "open": g["status"] in OPEN,
             "glory": g["glory"], "farmed": max(0, g["glory"] - start) if start is not None else 0,
             "clan": clan, "uptime": g["uptime"], "bots": g["bots"], "price_micro": g["price_micro"],

@@ -1897,7 +1897,7 @@ def panel_glory(request: Request, user=Depends(panel_user), conn=Depends(get_con
         return _redirect("/panel")
     error, regions = "", []
     try:
-        regions = glory.regions(config)
+        regions = glory.regions(config, conn)
     except glory.GloryError as exc:
         error = f"Регионы сейчас не загрузились ({exc}). Обновите страницу через минуту."
     mine = [glory.view(g) for g in conn.execute(
@@ -1910,7 +1910,8 @@ def panel_glory(request: Request, user=Depends(panel_user), conn=Depends(get_con
         except glory.GloryError as exc:
             credits = f"ошибка: {exc}"
     return render(request, "panel/glory.html", {"user": user, "regions": regions, "error": error, "mine": mine,
-                                                "credits": credits, "markup": config.ffglory_markup})
+                                                "credits": credits, "markup": config.ffglory_markup,
+                                                "price_tjs": config.ffglory_price_tjs})
 
 
 @router.post("/panel/glory/buy", dependencies=[Depends(check_csrf)])

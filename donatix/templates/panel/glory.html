@@ -6,7 +6,7 @@
   <h1>Glory клана Free Fire</h1>
   <p class="muted">Боты заходят в игру за ваш клан и набирают очки славы. Очки, уровень и участников клана видно вживую на странице заказа.</p>
 </section>
-{% if credits is not none %}<div class="flash">{{ icon('shield', 18) }}<span>Видно только админу: кредиты FFGlory — <b>{{ credits }}</b>, наценка {{ markup }}%</span></div>{% endif %}
+{% if credits is not none %}<div class="flash">{{ icon('shield', 18) }}<span>Видно только админу: кредиты FFGlory — <b>{{ credits }}</b>, {% if price_tjs %}цена {{ price_tjs }} с. для всех регионов{% else %}наценка {{ markup }}%{% endif %}{% set loss = regions | selectattr('loss') | map(attribute='title') | list %}{% if loss %}. <b style="color:var(--bad)">В убыток (кредит дороже цены): {{ loss | join(', ') }}</b>{% endif %}</span></div>{% endif %}
 {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
 
 {% if regions %}
@@ -21,7 +21,7 @@
     {% for r in regions %}
     <label class="gl-reg">
       <input type="radio" name="region" value="{{ r.id }}" data-price="{{ money(r.price_micro) | striptags | trim }}" {{ 'checked' if loop.first }}>
-      <span><b>{{ r.title }}</b>{% if r.tier == 'premium' %}<small>премиум</small>{% endif %}</span>
+      <span><span class="gl-flag" aria-hidden="true">{{ r.flag }}</span><b>{{ r.title }}</b>{% if r.tier == 'premium' %}<small>премиум</small>{% endif %}</span>
       <span class="gl-price">{{ money(r.price_micro) }}</span>
     </label>
     {% endfor %}
@@ -47,7 +47,7 @@
   {% for g in mine %}
   <a class="pack-card gl-item" href="/panel/glory/{{ g.id }}">
     <img src="/static/glory.svg" alt="" width="32" height="32" style="border-radius:8px">
-    <span class="pack-name">{{ g.clan.name or ('Клан ' ~ g.clan_id) }}<small class="muted" style="display:block">ID {{ g.clan_id }} · {{ g.region | upper }} · {{ g.status_title }}{% if g.farmed %} · +{{ g.farmed }} glory{% endif %}</small></span>
+    <span class="pack-name">{{ g.clan.name or ('Клан ' ~ g.clan_id) }}<small class="muted" style="display:block">ID {{ g.clan_id }} · {{ g.flag }} {{ g.region | upper }} · {{ g.status_title }}{% if g.farmed %} · +{{ g.farmed }} glory{% endif %}</small></span>
     <span class="pack-price">{{ money(g.price_micro) }}</span>
   </a>
   {% endfor %}
@@ -62,6 +62,7 @@
   .gl-reg small { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 99px; background: var(--warn-soft); color: var(--warn); font-size: .72rem; }
   .gl-reg input, .gl-agree input { width: 18px !important; height: 18px; min-height: 0; flex: none; margin: 0; padding: 0; accent-color: var(--accent); }
   .gl-reg > span:not(.gl-price) { flex: 1; }
+  .gl-flag { font-size: 1.25rem; margin-right: 8px; vertical-align: -2px; }
   .gl-price { margin-left: auto; font-weight: 700; }
   .gl-warn { display: flex; gap: 10px; margin: 14px 0 10px; padding: 12px; border-radius: var(--r); background: var(--bad-soft);
     color: var(--bad); border: 1px solid color-mix(in srgb, var(--bad) 35%, transparent); font-size: .88rem; }

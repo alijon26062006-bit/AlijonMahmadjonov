@@ -21,6 +21,7 @@ class Err(glory.GloryError):
 @pytest.fixture
 def ffg(config, monkeypatch):
     config.ffglory_key, config.ffglory_master, config.ffglory_markup = "ak_x", "mk", Decimal("25")
+    config.ffglory_price_tjs = Decimal("0")
     cache.clear()
     st = {"calls": [], "launch": None, "status": "running", "glory": 1000}
 
@@ -134,3 +135,17 @@ def test_hidden_without_keys(app, client, config, conn):
     web_login(client, "shop1@example.com", "password123")
     assert client.get("/panel/glory", follow_redirects=False).status_code == 303
     assert 'href="/panel/glory"' not in client.get("/panel").text
+
+
+def test_flat_price_30_tjs_and_flags(app, config, conn, ffg):
+    from donatix.payments import settings
+    config.ffglory_price_tjs = Decimal("30")
+    rate = Decimal(str(settings(conn, config)["tjs_rate"]))
+    rows = glory.regions(config, conn)
+    assert len({r["price_micro"] for r in rows}) == 1                         # одна цена для всех регионов
+    assert (Decimal(rows[0]["price_micro"]) / 10_000 * rate).quantize(Decimal("0.01")) == Decimal("30.00")
+    assert {r["id"]: r["flag"] for r in rows} == {"bd": "🇧🇩", "me": "🌍"}
+    assert glory.flag("IND") == "🇮🇳" and glory.flag("??") == "🌐"
+    uid = make_client(conn, balance="5")[0]
+    glory.buy(conn, config, accounts.get_user(conn, uid), "me", "3012345678")
+    assert balance(conn, uid) == 50000 - rows[0]["price_micro"]
