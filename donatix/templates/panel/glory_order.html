@@ -25,6 +25,7 @@
       <div class="od-row"><span>Запущено</span><b>{{ g.created_at | dt('%d.%m.%Y %H:%M') }}</b></div>
     </div>
     {% if g.status == 'failed' %}<p class="muted small" style="margin:10px 2px 0">Группа не запустилась — {{ money(g.price_micro) }} вернулись на баланс.</p>{% endif %}
+    {% if g.status == 'failed' and g.note and user.role == 'admin' %}<p class="small" style="margin:6px 2px 0;color:var(--bad)">Видно только админу — ответ FFGlory: <b>{{ g.note }}</b></p>{% endif %}
     {% if g.open %}<p class="muted small" id="gl-hint" style="margin:10px 2px 0">Обновляется само каждые 15 секунд — можно закрыть страницу, группа работает дальше.</p>{% endif %}
     {% if g.status == 'running' %}
     <form method="post" action="/panel/glory/{{ g.id }}/stop" style="margin-top:10px">
