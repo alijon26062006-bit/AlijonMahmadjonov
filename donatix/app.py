@@ -38,7 +38,7 @@ class _SelectiveGZip:
         self.gzip = GZipMiddleware(app, **kw)
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] == "http" and scope.get("path", "").startswith("/media/"):
+        if scope["type"] == "http" and scope.get("path", "").startswith(("/media/", "/panel/data/live")):
             await self.plain(scope, receive, send)
         else:
             await self.gzip(scope, receive, send)
@@ -156,7 +156,7 @@ class _CacheAndTiming:
             await self.app(scope, receive, send_wrapper)
         finally:
             ms = (time.monotonic() - started) * 1000
-            if ms >= SLOW_MS:   # journalctl -u donatix | grep медленно
+            if ms >= SLOW_MS and path != "/panel/data/live":   # journalctl -u donatix | grep медленно
                 log.warning("медленно: %s %s — %.0f мс", scope.get("method"), path, ms)
 
 

@@ -9,7 +9,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response, StreamingResponse
 
 from . import accounts, cache, catalog, db, orders, popular, referrals, sitecfg
 from .config import PAY_METHODS, Config
@@ -1969,3 +1969,28 @@ def panel_glory_stop(gid: int, request: Request, user=Depends(panel_user), conn=
     except glory.GloryError as exc:
         flash(request, str(exc), "error")
     return _redirect(f"/panel/glory/{gid}")
+
+
+# ── «Живой» сайт: баланс, заказы, уведомления меняются сами, без обновления страницы ──
+
+
+@router.get("/panel/data/live")
+async def panel_live(request: Request, once: int = 0):
+    from . import live
+    config = request.app.state.config
+    pool = db.pool(config.db_path)
+    c = pool.acquire()
+    try:
+        user = session_user(request, c)
+    finally:
+        pool.release(c)
+    if user is None:
+        return JSONResponse({"error": "login"}, status_code=401)
+    cur = "USD" if request.cookies.get("dx_cur") == "USD" else "TJS"
+    admin = user["role"] == "admin"
+    if once:   # запасной путь, если браузер не держит соединение: раз в несколько секунд
+        import asyncio
+        data = await asyncio.to_thread(live.state, config, user["id"], admin, cur)
+        return JSONResponse(data, headers={"Cache-Control": "no-store"})
+    return StreamingResponse(live.stream(request, config, user["id"], admin, cur), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})

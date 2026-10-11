@@ -15,7 +15,7 @@
       <a class="btn sm primary" href="/register?next={{ here | urlencode }}">Регистрация</a>
       {% else %}
       <span class="hide-sm hide-app muted small" style="margin-right:6px">{{ 'Гость' if is_guest_account(user) else user.login }}</span>
-      <a class="icon-btn bell" href="/panel/notifications" aria-label="Уведомления{{ ': ' ~ unread if unread }}">{{ icon('bell') }}{% if unread %}<span class="dot-count">{{ unread if unread < 100 else '99+' }}</span>{% endif %}</a>
+      <a class="icon-btn bell" id="dx-bell" href="/panel/notifications" aria-label="Уведомления{{ ': ' ~ unread if unread }}">{{ icon('bell') }}{% if unread %}<span class="dot-count">{{ unread if unread < 100 else '99+' }}</span>{% endif %}</a>
       <span class="cur-switch" role="group" aria-label="Валюта">
         <a href="/currency/USD" class="{{ 'on' if cur_code != 'TJS' }}">USD</a><a href="/currency/TJS" class="{{ 'on' if cur_code == 'TJS' }}">TJS</a>
       </span>
@@ -233,5 +233,83 @@
     else fallback();
   });
 </script>
+{% if user and not user.guest %}
+<script>
+  /* «Живой» сайт: сервер сам сообщает об изменениях (баланс, заказы, уведомления) — без кнопки «обновить». */
+  (function () {
+    var LIVE = /^\/(panel(\/(orders|transactions|notifications|numbers|glory)(\/.*)?)?|admin(\/(orders|payments|users|money|finance)(\/.*)?)?)$/;
+    var last = null, pending = false, busy = false, fails = 0, poll = null, es = null;
+    function typing() {
+      var a = document.activeElement;
+      return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== "checkbox" && a.type !== "radio";
+    }
+    function bell(n) {
+      var b = document.getElementById("dx-bell"); if (!b) return;
+      var dot = b.querySelector(".dot-count");
+      if (!n) { if (dot) dot.remove(); return; }
+      if (!dot) { dot = document.createElement("span"); dot.className = "dot-count"; b.appendChild(dot); }
+      dot.textContent = n < 100 ? n : "99+";
+    }
+    function refreshMain() {
+      if (busy) { pending = true; return; }
+      if (typing() || document.querySelector("dialog[open]")) { pending = true; return; }
+      busy = true; pending = false;
+      fetch(location.href, {credentials: "same-origin", headers: {"X-Live": "1"}}).then(function (r) {
+        return r.ok && r.url.split("#")[0] === location.href.split("#")[0] ? r.text() : null;
+      }).then(function (html) {
+        if (!html || typing()) { if (html) pending = true; return; }
+        var fresh = new DOMParser().parseFromString(html, "text/html").getElementById("main");
+        var main = document.getElementById("main");
+        if (!fresh || !main) return;
+        main.innerHTML = fresh.innerHTML;
+        main.querySelectorAll("[data-reveal]").forEach(function (e) { e.classList.add("in", "shown", "visible"); });
+        main.querySelectorAll("script").forEach(function (old) {   // скрипты страницы — заново
+          var s = document.createElement("script"); s.textContent = old.textContent;
+          if (old.src) s.src = old.src; old.replaceWith(s);
+        });
+      }).catch(function () {}).then(function () { busy = false; });
+    }
+    document.addEventListener("focusout", function () { if (pending) setTimeout(refreshMain, 300); });
+    function apply(d) {
+      if (!d || d.gone) return;
+      if (last && d.balance !== last.balance) {
+        document.querySelectorAll('[data-live="balance"]').forEach(function (el) {
+          el.innerHTML = d.balance_html;
+          el.classList.remove("live-up", "live-down"); void el.offsetWidth;
+          el.classList.add(d.balance < last.balance ? "live-down" : "live-up");
+        });
+      }
+      bell(d.unread);
+      if (last && d.sig !== last.sig && LIVE.test(location.pathname)) refreshMain();
+      last = d;
+    }
+    function startPoll() {
+      if (poll) return;
+      poll = setInterval(function () {
+        if (document.hidden) return;
+        fetch("/panel/data/live?once=1", {credentials: "same-origin"}).then(function (r) { return r.ok ? r.json() : null; })
+          .then(apply).catch(function () {});
+      }, 3000);
+    }
+    if (!window.EventSource) { startPoll(); return; }
+    function connect() {
+      es = new EventSource("/panel/data/live");
+      es.onmessage = function (e) { fails = 0; try { apply(JSON.parse(e.data)); } catch (err) {} };
+      es.onerror = function () { if (++fails >= 4) { es.close(); startPoll(); } };
+    }
+    connect();
+    document.addEventListener("visibilitychange", function () {   // вернулись на вкладку — сразу свежие данные
+      if (!document.hidden && es && es.readyState === 2 && !poll) { fails = 0; connect(); }
+    });
+  })();
+</script>
+<style>
+  @keyframes liveDown { 0% { color: var(--bad); transform: scale(1.06); } 100% { color: inherit; transform: none; } }
+  @keyframes liveUp { 0% { color: var(--ok); transform: scale(1.06); } 100% { color: inherit; transform: none; } }
+  .live-down { animation: liveDown 1.6s ease-out; display: inline-block; }
+  .live-up { animation: liveUp 1.6s ease-out; display: inline-block; }
+  @media (prefers-reduced-motion: reduce) { .live-down, .live-up { animation: none; } }
+</style>
+{% endif %}
 {% endblock %}
 {% block footer %}{% endblock %}

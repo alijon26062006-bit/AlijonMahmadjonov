@@ -6,7 +6,7 @@
 
 <div class="grid two" style="align-items:start">
   <div class="stack">
-    {% if not buy %}<div class="stat reveal"><div class="label">Доступно</div><div class="value">{{ money(user.balance_micro) }}</div>
+    {% if not buy %}<div class="stat reveal"><div class="label">Доступно</div><div class="value" data-live="balance">{{ money(user.balance_micro) }}</div>
       <div class="note">Курс для оплаты в сомони: 1 USD = <b id="rate">{{ tjs_rate }}</b> TJS <span class="muted small" id="rate-at">· обновляется каждые 30 с</span></div></div>{% endif %}
 
     {% if waiting %}

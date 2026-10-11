@@ -253,7 +253,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
     ctx["vnumbers_on"] = bool(config.fivesim_token)   # виртуальные номера (5sim) подключены
     ctx["glory_on"] = bool(config.ffglory_key and config.ffglory_master)   # Glory клана (FFGlory)
     ctx["csrf"] = csrf_token(request)
-    ctx["flashes"] = request.session.pop("flash", [])
+    # Живое обновление страницы (X-Live) сообщения не «съедает» — их покажет следующий обычный переход
+    ctx["flashes"] = [] if request.headers.get("x-live") else request.session.pop("flash", [])
     ctx["path"] = request.url.path
     ctx["base_url"] = config.base_url
     ctx["google_verify"] = config.google_verify
