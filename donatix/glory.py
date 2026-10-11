@@ -202,11 +202,25 @@ def buy(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, region: str
             "updated_at) VALUES (?, ?, ?, ?, ?, ?, 'starting', ?, ?)",
             (user["id"], reg["id"], reg["tier"], clan_id, reg["price_micro"], str(reg["cost"]), db.now(),
              db.now())).lastrowid)
+    group_id, bots, err = "", 0, None
     try:
         res = _call(config, "POST", "/api/client/auto-clan-group", {"region": reg["id"], "clan_id": clan_id})
-        if not res.get("group_id"):
-            raise GloryError(str(res.get("error") or "нет group_id"))
+        group_id = str(_find(res, ("group_id", "groupId", "group")) or "")
+        if group_id.startswith("{"):            # «group»: {...} — id внутри
+            group_id = str(_find(_find(res, ("group",)), ("id", "group_id")) or "")
+        bots = _find(res, ("bot_count", "bots", "container_count"))
+        if not group_id:
+            log.warning("FFGlory: запуск без group_id в ответе: %s", str(res)[:300])
     except GloryError as exc:
+        err = exc
+    if not group_id and getattr(err, "status", 0) not in (400, 401, 402):
+        # Ответ не понят или оборвался, а группа могла запуститься — ищем её по ID клана, прежде чем возвращать деньги
+        found = _group_by_clan(config, clan_id)
+        if found:
+            group_id = str(found.get("group_id"))
+            bots = found.get("running_count") or found.get("container_count") or bots
+    if not group_id:
+        exc = err or GloryError("нет group_id в ответе")
         _refund(conn, gid, f"не запустилась: {exc}")
         code = getattr(exc, "status", 0)
         if code == 402:
@@ -216,8 +230,12 @@ def buy(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, region: str
             raise GloryError("Для этого клана сейчас нельзя запустить ещё одну группу — деньги вернулись на "
                              "баланс. Попробуйте позже.") from None
         raise GloryError("Не получилось запустить — деньги вернулись на баланс. Проверьте ID клана и регион.") from None
+    try:
+        bots = int(bots or 0)
+    except (TypeError, ValueError):
+        bots = 0
     conn.execute("UPDATE glory_orders SET group_id = ?, bots = ?, status = 'running', updated_at = ? WHERE id = ?",
-                 (str(res["group_id"]), int(res.get("bot_count") or 0), db.now(), gid))
+                 (group_id, bots, db.now(), gid))
     return gid
 
 
@@ -237,6 +255,19 @@ def _group(config: Config, group_id: str) -> dict[str, Any] | None:
     if isinstance(groups, dict):
         groups = groups.get("groups") or []
     return next((g for g in groups or [] if isinstance(g, dict) and str(g.get("group_id")) == group_id), None)
+
+
+def _group_by_clan(config: Config, clan_id: str) -> dict[str, Any] | None:
+    """Работающая группа нашего аккаунта для этого клана (свежий список, без кэша)."""
+    cache.clear("glory:groups")
+    try:
+        groups = _call(config, "GET", "/api/client/my-groups")
+    except GloryError:
+        return None
+    if isinstance(groups, dict):
+        groups = groups.get("groups") or []
+    return next((g for g in groups or [] if isinstance(g, dict) and str(g.get("clan_id")) == clan_id
+                 and str(g.get("status", "")).lower() in ("running", "starting", "pending")), None)
 
 
 def refresh(conn: sqlite3.Connection, config: Config, gid: int) -> sqlite3.Row:

@@ -149,3 +149,28 @@ def test_flat_price_30_tjs_and_flags(app, config, conn, ffg):
     uid = make_client(conn, balance="5")[0]
     glory.buy(conn, config, accounts.get_user(conn, uid), "me", "3012345678")
     assert balance(conn, uid) == 50000 - rows[0]["price_micro"]
+
+
+def test_launched_but_answer_odd_is_not_refunded(app, config, conn, ffg, monkeypatch):
+    """FFGlory запустил группу, но ответ без group_id (или оборвался) — находим группу по клану, денег не возвращаем."""
+    real = glory._call
+
+    def odd(cfg, method, path, body=None, auth=True):
+        if path == "/api/client/auto-clan-group":
+            return {"success": True, "message": "Group launched"}
+        return real(cfg, method, path, body, auth)
+    monkeypatch.setattr(glory, "_call", odd)
+    uid = make_client(conn, balance="5")[0]
+    gid = glory.buy(conn, config, accounts.get_user(conn, uid), "bd", "3012345678")
+    row = conn.execute("SELECT status, group_id, refunded FROM glory_orders WHERE id = ?", (gid,)).fetchone()
+    assert tuple(row) == ("running", "g1", 0) and balance(conn, uid) == 50000 - 18800
+
+
+def test_nested_group_id(app, config, conn, ffg, monkeypatch):
+    real = glory._call
+    monkeypatch.setattr(glory, "_call", lambda cfg, m, path, body=None, auth=True: (
+        {"success": True, "data": {"group_id": "g1", "bot_count": 4}} if path == "/api/client/auto-clan-group"
+        else real(cfg, m, path, body, auth)))
+    uid = make_client(conn, balance="5")[0]
+    gid = glory.buy(conn, config, accounts.get_user(conn, uid), "bd", "3012345678")
+    assert conn.execute("SELECT group_id, bots FROM glory_orders WHERE id = ?", (gid,)).fetchone()[0] == "g1"
