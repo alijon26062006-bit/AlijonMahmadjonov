@@ -352,3 +352,31 @@ def maybe_watch(conn: sqlite3.Connection, config: Config) -> None:
             return
         _last["at"] = time.monotonic()
     watch(conn, config)
+
+
+def relink(conn: sqlite3.Connection, config: Config, order_id: int | None = None) -> list[str]:
+    """Заказы «Не запустилась», у которых группа на самом деле работает у FFGlory: привязать группу,
+    чтобы были видны живые очки. Деньги второй раз НЕ списываются (клиенту их уже вернули)."""
+    sql = "SELECT * FROM glory_orders WHERE status = 'failed'"
+    args: tuple = ()
+    if order_id:
+        sql, args = sql + " AND id = ?", (order_id,)
+    else:
+        sql, args = sql + " AND created_at >= ?", (_ago(3 * 86400),)
+    out = []
+    for g in conn.execute(sql + " ORDER BY id DESC", args).fetchall():
+        if conn.execute("SELECT 1 FROM glory_orders WHERE clan_id = ? AND status IN ('starting', 'running')",
+                        (g["clan_id"],)).fetchone():
+            out.append(f"#{g['id']} клан {g['clan_id']}: у клана уже есть работающий заказ — пропущен")
+            continue
+        found = _group_by_clan(config, g["clan_id"])
+        if not found:
+            out.append(f"#{g['id']} клан {g['clan_id']}: работающей группы у FFGlory нет")
+            continue
+        conn.execute("UPDATE glory_orders SET status = 'running', group_id = ?, bots = ?, glory_start = NULL, "
+                     "note = 'группа привязана вручную, деньги повторно не списаны', updated_at = ? WHERE id = ?",
+                     (str(found.get("group_id")), int(found.get("running_count") or found.get("container_count") or 0),
+                      db.now(), g["id"]))
+        refresh(conn, config, g["id"])
+        out.append(f"#{g['id']} клан {g['clan_id']}: группа {found.get('group_id')} привязана ✓")
+    return out

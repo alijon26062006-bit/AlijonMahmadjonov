@@ -7,6 +7,7 @@
     python -m donatix prices                                 цены поставщика и ваши цены с наценкой
     python -m donatix bank-login                             вход юзербота автоплатежа «Душанбе Сити»
     python -m donatix bank-listen                            слушать уведомления банка (служба)
+    python -m donatix glory-relink [ID_ЗАКАЗА]               Glory: привязать группу, которая запустилась у FFGlory
 """
 
 from __future__ import annotations
@@ -31,6 +32,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("inspect")
     sub.add_parser("bank-login")
     sub.add_parser("bank-listen")
+    relink = sub.add_parser("glory-relink")
+    relink.add_argument("order_id", nargs="?", type=int, default=None)
     admin = sub.add_parser("create-admin")
     admin.add_argument("email")
     args = parser.parse_args(argv)
@@ -120,6 +123,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Готово и сохранено в базу: всего {total} активных товаров "
                   f"(из них CoinDrop {cd}); за этот раз загружено {result['products']}, "
                   f"выключено пропавших {result['disabled']}.", flush=True)
+        elif args.cmd == "glory-relink":
+            from . import glory
+            if not glory.enabled(config):
+                print("Ключи FFGlory не заданы в .env")
+                return 1
+            lines = glory.relink(conn, config, args.order_id) or ["Нет заказов «Не запустилась» за последние 3 дня"]
+            print("\n".join(lines))
+            return 0
         elif args.cmd == "check":
             supplier = make_supplier(config)
             try:

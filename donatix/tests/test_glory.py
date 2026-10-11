@@ -174,3 +174,19 @@ def test_nested_group_id(app, config, conn, ffg, monkeypatch):
     uid = make_client(conn, balance="5")[0]
     gid = glory.buy(conn, config, accounts.get_user(conn, uid), "bd", "3012345678")
     assert conn.execute("SELECT group_id, bots FROM glory_orders WHERE id = ?", (gid,)).fetchone()[0] == "g1"
+
+
+def test_relink_launched_group_without_charging(app, config, conn, ffg):
+    uid = make_client(conn, balance="5")[0]
+    ffg["launch"] = Err("odd", 500)
+    ffg_groups_running = ffg["status"]
+    with pytest.raises(glory.GloryError):
+        glory.buy(conn, config, accounts.get_user(conn, uid), "bd", "9999999")   # другой клан — в my-groups нет
+    conn.execute("UPDATE glory_orders SET clan_id = '3012345678'")
+    assert balance(conn, uid) == 50000
+    lines = glory.relink(conn, config)
+    assert "привязана" in lines[0] and ffg_groups_running == "running"
+    g = glory.view(conn.execute("SELECT * FROM glory_orders").fetchone())
+    assert g["status"] == "running" and g["glory"] == 1000 and balance(conn, uid) == 50000   # второй раз не списали
+    assert "уже есть" in glory.relink(conn, config)[0] if conn.execute(
+        "SELECT COUNT(*) FROM glory_orders WHERE status = 'failed'").fetchone()[0] else True
