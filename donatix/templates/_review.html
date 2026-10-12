@@ -1,0 +1,94 @@
+{#- Карточка отзыва: кружок с буквами, звёзды, игра, товар, текст, ответ магазина -#}
+{%- macro stars(n, size=16) -%}
+<span class="rv-stars" role="img" aria-label="Оценка {{ n }} из 5">{% for i in range(1, 6) %}<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" aria-hidden="true" class="{{ 'on' if i <= n }}"><path d="m12 2.6 2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1l-5.9 3.3 1.3-6.5L2.5 9.4l6.6-.8Z"/></svg>{% endfor %}</span>
+{%- endmacro -%}
+
+{%- macro review_card(r, site_name, admin=False, csrf='') -%}
+<article class="rv-card{{ ' rv-hidden' if r.hidden }}" id="r{{ r.id }}">
+  <header class="rv-head">
+    <span class="rv-ava" style="--h: {{ r.hue }}" aria-hidden="true">{{ r.initials }}</span>
+    <div class="rv-who">
+      <b>{{ r.name }}</b>
+      <div class="rv-meta">{{ stars(r.rating) }}{% if r.game %}<span class="rv-game">{{ r.game }}</span>{% endif %}</div>
+    </div>
+    <time class="rv-date">{{ r.created_at | dt('%d.%m.%Y') }}</time>
+  </header>
+  {% if r.product %}<p class="rv-product"><span aria-hidden="true">🛒</span> {{ r.product }} <span class="rv-ok" title="Покупка подтверждена">✓ покупка подтверждена</span></p>{% endif %}
+  <p class="rv-text">{{ r.text }}</p>
+  {% if r.reply %}
+  <div class="rv-reply">
+    <div class="rv-reply-head"><span class="rv-shield" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg></span><b>{{ site_name }}</b><time>· {{ r.reply_at | dt('%d.%m.%Y') }}</time></div>
+    <p>{{ r.reply }}</p>
+  </div>
+  {% endif %}
+  {% if admin %}
+  <div class="rv-admin">
+    {% if r.order %}<a class="muted small" href="/admin/orders?q={{ r.order }}">Заказ {{ r.order }}</a>{% endif %}
+    <form method="post" action="/admin/reviews/{{ r.id }}/reply">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <textarea name="text" rows="3" maxlength="1500" placeholder="Ответ от {{ site_name }}…">{{ r.reply or '' }}</textarea>
+      <div class="rv-admin-btns">
+        <button class="btn sm primary">{{ 'Изменить ответ' if r.reply else 'Ответить' }}</button>
+        <button class="btn sm" formaction="/admin/reviews/{{ r.id }}/hide" name="hidden" value="{{ 0 if r.hidden else 1 }}">{{ 'Показать' if r.hidden else 'Скрыть' }}</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</article>
+{%- endmacro -%}
+
+{%- macro review_styles() -%}
+<style>
+  .rv-list { display: grid; gap: 12px; }
+  .rv-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px; box-shadow: var(--shadow-1); }
+  .rv-hidden { opacity: .55; border-style: dashed; }
+  .rv-head { display: flex; gap: 12px; align-items: center; }
+  .rv-ava { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; flex: none; color: #fff; font-weight: 800;
+    background: linear-gradient(135deg, hsl(var(--h) 70% 58%), hsl(calc(var(--h) + 40) 70% 45%)); font-size: 1.05rem; }
+  .rv-who { min-width: 0; flex: 1; } .rv-who b { display: block; font-size: 1.02rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rv-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 3px; }
+  .rv-stars { display: inline-flex; gap: 1px; } .rv-stars svg { fill: var(--line-strong, #d0d4de); } .rv-stars svg.on { fill: #f5b301; }
+  .rv-game { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 3px 8px; border-radius: 6px;
+    background: var(--accent-soft); color: var(--accent); }
+  .rv-date { color: var(--muted); font-size: .8rem; align-self: flex-start; white-space: nowrap; }
+  .rv-product { margin: 10px 0 0; color: var(--muted); font-size: .86rem; }
+  .rv-ok { color: var(--ok); font-size: .74rem; margin-left: 4px; white-space: nowrap; }
+  .rv-text { margin: 8px 0 0; line-height: 1.5; white-space: pre-line; word-break: break-word; }
+  .rv-reply { margin-top: 12px; padding: 10px 12px; border-radius: var(--r); background: var(--accent-soft); border-left: 3px solid var(--accent); }
+  .rv-reply-head { display: flex; gap: 6px; align-items: center; font-size: .82rem; }
+  .rv-reply-head b { color: var(--accent); } .rv-reply-head time { color: var(--muted); }
+  .rv-shield { color: var(--accent); display: inline-grid; }
+  .rv-reply p { margin: 4px 0 0; font-size: .9rem; line-height: 1.5; white-space: pre-line; }
+  .rv-admin { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .rv-admin textarea { width: 100%; margin: 6px 0; }
+  .rv-admin-btns { display: flex; gap: 8px; }
+  .rv-sum { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; }
+  .rv-avg { text-align: center; } .rv-avg b { display: block; font-size: 2.6rem; line-height: 1; font-weight: 800; }
+  .rv-avg small { color: var(--muted); display: block; margin-top: 4px; }
+  .rv-bars { display: grid; gap: 4px; }
+  .rv-bar { display: grid; grid-template-columns: 30px 1fr 34px; gap: 8px; align-items: center; font-size: .8rem; color: var(--muted); text-decoration: none; }
+  .rv-bar i { height: 8px; border-radius: 99px; background: var(--bg); overflow: hidden; display: block; }
+  .rv-bar i span { display: block; height: 100%; background: #f5b301; border-radius: 99px; }
+  .rv-bar.on { color: var(--text); font-weight: 700; }
+  .rv-pick { display: flex; gap: 4px; flex-direction: row-reverse; justify-content: flex-end; }
+  .rv-pick input { position: absolute; opacity: 0; pointer-events: none; }
+  .rv-pick label { cursor: pointer; font-size: 2rem; line-height: 1; color: var(--line-strong, #c9cdd6); transition: transform .15s; }
+  .rv-pick label:hover, .rv-pick label:hover ~ label, .rv-pick input:checked ~ label { color: #f5b301; }
+  .rv-pick input:focus-visible + label { outline: 2px solid var(--accent); border-radius: 4px; }
+  @media (max-width: 420px) { .rv-card { padding: 14px 12px; } .rv-ava { width: 40px; height: 40px; } }
+</style>
+{%- endmacro -%}
+
+{#- Форма «Оставить отзыв» к заказу -#}
+{%- macro review_form(order_id, csrf, rating=0, text='') -%}
+<form class="card rv-form" method="post" action="/panel/reviews" id="review">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="order" value="{{ order_id }}">
+  <h3 style="margin:0 0 6px">{{ 'Изменить отзыв' if rating else 'Оцените заказ' }}</h3>
+  <div class="rv-pick" role="radiogroup" aria-label="Оценка">
+    {% for i in [5, 4, 3, 2, 1] %}<input type="radio" id="rv{{ i }}" name="rating" value="{{ i }}" {{ 'checked' if rating == i }} required><label for="rv{{ i }}" title="{{ i }} из 5">★</label>{% endfor %}
+  </div>
+  <textarea name="text" rows="3" maxlength="1000" required placeholder="Как всё прошло? Быстро ли пришло?" style="width:100%;margin:8px 0">{{ text }}</textarea>
+  <button class="btn primary block">{{ 'Сохранить' if rating else 'Отправить отзыв' }}</button>
+  <p class="muted small" style="margin:6px 0 0">Отзыв увидят все на странице «Отзывы».</p>
+</form>
+{%- endmacro -%}

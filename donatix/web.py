@@ -66,6 +66,7 @@ def _safe_next(url: str) -> str:
 
 @router.get("/")
 def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import reviews as reviews_mod
     def build():
         cats = [dict(c) for c in catalog.categories(conn)]
         by_kind: dict[str, list] = {}
@@ -82,6 +83,8 @@ def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
         "examples": examples,
         "faq": FAQ + (BOT_FAQ if sitecfg.client_bots_enabled(conn) else []),
         "popular": popular.with_extras(popular.services(conn), config),
+        "reviews_top": reviews_mod.listing(conn, limit=3),
+        "reviews_sum": reviews_mod.summary(conn),
         "client_bots": sitecfg.client_bots_enabled(conn),
         "ref_percent": referrals.percent(conn),
     })
@@ -1159,8 +1162,11 @@ def panel_order(public_id: str, request: Request, user=Depends(panel_user), conn
     elif view["status"] == "failed":
         history.append(("refund", "Возврат", f"{view['error'] or 'Поставщик отклонил заказ.'} "
                         f"Деньги вернулись на баланс.", row["updated_at"]))
+    from . import reviews
+    review = reviews.by_order(conn, row["id"])
     return render(request, "panel/order.html", {
         "user": user, "o": row, "view": view, "game": game, "kind_title": kind_title, "history": history,
+        "review": review,
         "delivery_pretty": json.dumps(orders.public_view(row)["delivery"], ensure_ascii=False, indent=2),
         "delivery_note": catalog.delivery_note(row["product_name"]),   # срок выдачи для Standoff 2 / CoC
     })
@@ -1994,3 +2000,32 @@ async def panel_live(request: Request, once: int = 0):
         return JSONResponse(data, headers={"Cache-Control": "no-store"})
     return StreamingResponse(live.stream(request, config, user["id"], admin, cur), media_type="text/event-stream",
                              headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+
+
+# ── Отзывы покупателей ───────────────────────────────────
+
+
+@router.get("/reviews")
+def reviews_page(request: Request, stars: int = 0, page: int = 1, conn=Depends(get_conn)):
+    from . import reviews
+    page = max(1, min(page, 200))
+    per = 20
+    items = reviews.listing(conn, stars=stars, limit=per + 1, offset=(page - 1) * per)
+    return render(request, "reviews.html", {"user": session_user(request, conn), "items": items[:per],
+                                            "more": len(items) > per, "page": page, "stars_filter": stars,
+                                            "s": reviews.summary(conn)})
+
+
+@router.post("/panel/reviews", dependencies=[Depends(check_csrf)])
+def panel_review_save(request: Request, order: str = Form(""), rating: str = Form(""), text: str = Form(""),
+                      user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import reviews
+    if request.app.state.limiter.hit("orders", f"review{user['id']}") is not None:
+        flash(request, "Слишком часто — подождите минуту.", "error")
+        return _redirect(f"/panel/orders/{order[:40]}")
+    try:
+        reviews.add(conn, config, user, order[:40], rating, text)
+        flash(request, "Спасибо за отзыв! Он уже на странице «Отзывы».")
+    except reviews.ReviewError as exc:
+        flash(request, str(exc), "error")
+    return _redirect(f"/panel/orders/{order[:40]}#review")

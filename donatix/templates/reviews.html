@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_review.html" import review_card, review_styles, stars %}
+{% block title %}Отзывы покупателей — {{ site_name }}{% endblock %}
+{% block description %}Отзывы покупателей {{ site_name }}: оценка {{ s.avg }} из 5 по {{ s.total }} отзывам. Только реальные заказы — каждая покупка подтверждена.{% endblock %}
+{% block body %}
+<main class="section">
+  <div class="wrap" style="max-width:760px">
+    <div class="section-head"><h1>Отзывы покупателей</h1><p>Оставить отзыв можно только к выполненному заказу — поэтому все отзывы настоящие.</p></div>
+    {% if s.total %}
+    <div class="card rv-sum">
+      <div class="rv-avg"><b>{{ s.avg }}</b>{{ stars(s.avg | round | int, 18) }}<small>{{ s.total }} {{ 'отзыв' if s.total % 10 == 1 and s.total % 100 != 11 else ('отзыва' if s.total % 10 in [2,3,4] and s.total % 100 not in [12,13,14] else 'отзывов') }}</small></div>
+      <div class="rv-bars">
+        {% for i in [5, 4, 3, 2, 1] %}
+        <a class="rv-bar {{ 'on' if stars_filter == i }}" href="{{ '/reviews' if stars_filter == i else '/reviews?stars=' ~ i }}">{{ i }} ★<i><span style="width: {{ s.pct[i] }}%"></span></i>{{ s.counts[i] }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0">
+      {% if user and not user.guest %}<a class="btn primary sm" href="/panel/orders?status=completed">✍️ Оставить отзыв о заказе</a>
+      {% else %}<a class="btn primary sm" href="/login?next=/panel/orders">✍️ Оставить отзыв</a>{% endif %}
+      {% if stars_filter %}<a class="btn sm" href="/reviews">Все отзывы</a>{% endif %}
+    </div>
+    <div class="rv-list">
+      {% for r in items %}{{ review_card(r, site_name) }}{% else %}<p class="muted">Пока нет отзывов{{ ' с такой оценкой' if stars_filter }}.</p>{% endfor %}
+    </div>
+    {% if more %}<a class="btn block" style="margin-top:14px" href="?{{ 'stars=' ~ stars_filter ~ '&' if stars_filter }}page={{ page + 1 }}">Показать ещё</a>{% endif %}
+  </div>
+</main>
+{{ review_styles() }}
+{% endblock %}

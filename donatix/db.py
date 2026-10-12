@@ -608,6 +608,22 @@ CREATE TABLE IF NOT EXISTS glory_orders (     -- FFGlory: накрутка оч�
 );
 CREATE INDEX IF NOT EXISTS glory_user ON glory_orders(user_id, id DESC);
 CREATE INDEX IF NOT EXISTS glory_open ON glory_orders(status, updated_at);
+CREATE TABLE IF NOT EXISTS reviews (          -- отзывы покупателей к выполненным заказам + ответ магазина
+    id          INTEGER PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    order_id    INTEGER UNIQUE REFERENCES orders(id),
+    rating      INTEGER NOT NULL,              -- 1..5
+    text        TEXT NOT NULL,
+    game        TEXT NOT NULL DEFAULT '',
+    product     TEXT NOT NULL DEFAULT '',
+    reply_text  TEXT,                          -- ответ магазина
+    reply_at    TEXT,
+    reply_by    INTEGER REFERENCES users(id),
+    hidden      INTEGER NOT NULL DEFAULT 0,    -- скрыт админом (спам, оскорбления)
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS reviews_list ON reviews(hidden, id DESC);
 CREATE TABLE IF NOT EXISTS bank_notices (       -- уведомления банка «Душанбе Сити» (юзербот): автоплатёж
     id          INTEGER PRIMARY KEY,
     source      TEXT NOT NULL,

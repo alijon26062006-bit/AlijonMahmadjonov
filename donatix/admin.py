@@ -720,3 +720,35 @@ def shopbot_broadcast(request: Request, text: str = Form(""), admin=Depends(admi
     shopbot.broadcast(config, html.escape(text[:3500], quote=False))
     flash(request, "Рассылка пошла — по 20 сообщений в секунду. Итог появится на этой странице.")
     return RedirectResponse("/admin/shopbot", status_code=303)
+
+
+# ── Отзывы ───────────────────────────────────────────────
+
+
+@router.get("/reviews")
+def reviews_admin(request: Request, show: str = "new", admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import reviews
+    show = "all" if show == "all" else "new"
+    items = reviews.listing(conn, include_hidden=True, unanswered=show == "new", limit=100)
+    return render(request, "admin/reviews.html", {"user": admin, "items": items, "show": show,
+                                                  "s": reviews.summary(conn)})
+
+
+@router.post("/reviews/{rid:int}/reply", dependencies=[Depends(check_csrf)])
+def reviews_reply(rid: int, request: Request, text: str = Form(""), admin=Depends(admin_user),
+                  conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import reviews
+    try:
+        reviews.reply(conn, config, admin, rid, text)
+        flash(request, "Ответ сохранён — покупатель получил уведомление." if text.strip() else "Ответ убран.")
+    except reviews.ReviewError as exc:
+        flash(request, str(exc), "error")
+    return _back(f"/admin/reviews?show=all#r{rid}")
+
+
+@router.post("/reviews/{rid:int}/hide", dependencies=[Depends(check_csrf)])
+def reviews_hide(rid: int, request: Request, hidden: int = Form(1), admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import reviews
+    reviews.set_hidden(conn, rid, bool(hidden))
+    flash(request, "Отзыв скрыт со страницы «Отзывы»." if hidden else "Отзыв снова виден всем.")
+    return _back(f"/admin/reviews?show=all#r{rid}")

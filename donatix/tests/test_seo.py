@@ -24,7 +24,7 @@ def test_robots_and_sitemap(client):
     assert "Disallow: /panel" in r.text and "Sitemap:" in r.text
     s = client.get("/sitemap.xml")
     assert s.headers["content-type"].startswith("application/xml")
-    assert s.text.count("<url>") == 5 and "/docs</loc>" in s.text
+    assert s.text.count("<url>") == 6 and "/docs</loc>" in s.text and "/reviews</loc>" in s.text
 
 
 def test_cache_headers_and_gzip(client):

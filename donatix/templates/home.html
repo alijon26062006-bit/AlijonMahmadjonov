@@ -103,6 +103,19 @@
     </div>
   </section>
 
+  {% if reviews_top %}
+  {% from "_review.html" import review_card, review_styles, stars %}
+  <section class="section" data-reveal id="reviews">
+    <div class="wrap" style="max-width:760px">
+      <div class="section-head"><h2>Отзывы покупателей</h2>
+        <p>{{ stars(reviews_sum.avg | round | int, 18) }} <b>{{ reviews_sum.avg }}</b> из 5 · {{ reviews_sum.total }} отзывов о настоящих заказах</p></div>
+      <div class="rv-list">{% for r in reviews_top %}{{ review_card(r, site_name) }}{% endfor %}</div>
+      <a class="btn block" style="margin-top:12px" href="/reviews">Все отзывы →</a>
+    </div>
+  </section>
+  {{ review_styles() }}
+  {% endif %}
+
   <section class="section" data-reveal id="faq">
     <div class="wrap" style="max-width:760px">
       <div class="section-head"><h2>Вопросы</h2></div>

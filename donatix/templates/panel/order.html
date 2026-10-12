@@ -57,6 +57,18 @@
     </ol>
     <a class="od-back" href="/panel/orders">Назад к заказам</a>
   </section>
+  {% if st == 'completed' %}
+  {% from "_review.html" import review_form, review_card, review_styles %}
+  {% if review and review.reply_text %}
+  <section id="review"><h2 class="od-h2" style="margin:6px 2px 8px">Ваш отзыв</h2>
+    {{ review_card({'id': review.id, 'name': user.login, 'initials': (user.login[:2] | upper), 'hue': 260, 'rating': review.rating,
+      'text': review.text, 'game': review.game, 'product': review.product, 'reply': review.reply_text, 'reply_at': review.reply_at,
+      'created_at': review.created_at, 'hidden': False}, site_name) }}</section>
+  {% else %}
+  {{ review_form(view.order_id, csrf, review.rating if review else 0, review.text if review else '') }}
+  {% endif %}
+  {{ review_styles() }}
+  {% endif %}
 </div>
 <style>
   .od { display: grid; gap: 8px; font-size: .82rem; max-width: 720px; }

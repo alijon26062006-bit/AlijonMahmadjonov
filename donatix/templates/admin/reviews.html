@@ -1,0 +1,14 @@
+{% extends "admin/_layout.html" %}
+{% from "_review.html" import review_card, review_styles %}
+{% block title %}Отзывы — {{ site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Отзывы</h1><p class="muted">Средняя оценка <b>{{ s.avg }}</b> из 5 · всего {{ s.total }} · без ответа <b>{{ s.unanswered }}</b>. <a href="/reviews">Страница для покупателей →</a></p></section>
+<div class="seg" style="margin-bottom:12px">
+  <a class="{{ 'on' if show == 'new' }}" href="?show=new">Без ответа</a>
+  <a class="{{ 'on' if show == 'all' }}" href="?show=all">Все</a>
+</div>
+<div class="rv-list">
+  {% for r in items %}{{ review_card(r, site_name, admin=True, csrf=csrf) }}{% else %}<p class="muted">{{ 'Все отзывы с ответом 👍' if show == 'new' else 'Отзывов пока нет.' }}</p>{% endfor %}
+</div>
+{{ review_styles() }}
+{% endblock %}
