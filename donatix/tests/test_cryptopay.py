@@ -140,7 +140,7 @@ def test_bybit_network_address_from_bybit(app, config, conn, monkeypatch):
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
     assert p["auto_kind"] == "bybit" and p["pay_address"] == "TXyzBybitDepositAddr"
     page = c.get(r.headers["location"]).text
-    assert "TXyzBybitDepositAddr" in page and "сеть <b>TRC20</b>" in page
+    assert "TXyzBybitDepositAddr" in page and "сеть <b>TRC20</b>" in page and "qr-box" in page
     deposits.append({"txID": "0xdead", "amount": p["pay_amount"], "depositStatus": 3,
                      "successAt": str(cryptopay._ms(p["created_at"]) + 5000), "coin": "USDT"})
     assert cryptopay.check_all(conn, config) == 1

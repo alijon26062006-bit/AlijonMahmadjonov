@@ -76,6 +76,26 @@ def _pay_targets(details: str) -> list[dict[str, str]]:
 templates.env.filters["pay_targets"] = _pay_targets
 
 
+def _qr_svg(text: str, size: int = 200) -> Markup:
+    """QR-код строки картинкой SVG прямо в странице (адрес кошелька — навести камеру и оплатить).
+    Библиотеки нет — QR просто не показываем, остальное работает."""
+    from markupsafe import Markup
+    try:
+        import segno
+    except ImportError:
+        return Markup("")
+    text = str(text or "").strip()
+    if not text or len(text) > 300:
+        return Markup("")
+    qr = segno.make(text, error="m", micro=False)
+    scale = max(2, size // (qr.symbol_size(border=2)[0] or 1))
+    svg = qr.svg_inline(scale=scale, border=2, dark="#111", light="#fff", omitsize=False)
+    return Markup(f'<span class="qr-box" role="img" aria-label="QR-код">{svg}</span>')
+
+
+templates.env.filters["qr_svg"] = _qr_svg
+
+
 def _pack_title(name: str, kind: str = "topup") -> str:
     """Название пакета игры по-русски со значком; «Free Fire — 100 Diamonds» → «Free Fire — 💎 100 алмазов»."""
     from .packs import full
