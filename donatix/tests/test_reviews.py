@@ -60,3 +60,19 @@ def test_pages(app, client, config, conn):
     assert "Быстро и честно" in pub and "покупка подтверждена" in pub and "Отзывы покупателей" in pub
     assert "Быстро и честно" in client.get("/").text                            # на главной — последние отзывы
     assert "Быстро и честно" not in client.get("/reviews?stars=1").text
+
+
+def test_stars_only_for_good_and_popup_after_completion(app, client, config, conn):
+    uid = make_client(conn, balance="5")[0]
+    oid = _order(conn, uid, "completed", 100000)
+    conn.execute("UPDATE orders SET source = 'panel', completed_at = updated_at WHERE id = ?", (oid,))
+    user = accounts.get_user(conn, uid)
+    with pytest.raises(reviews.ReviewError, match="что пошло не так"):
+        reviews.add(conn, config, user, _pub(conn, oid), 2, "")            # плохая оценка — нужен текст
+    token = web_login(client, "shop1@example.com", "password123")
+    page = client.get("/panel").text
+    assert 'id="rvask"' in page and "Заказ выполнен!" in page and _pub(conn, oid) in page
+    r = client.post("/panel/reviews", data={"csrf": token, "order": _pub(conn, oid), "rating": "5", "text": "",
+                                            "next": "/panel"}, follow_redirects=False)
+    assert r.headers["location"] == "/panel"                                      # вернули туда, где был
+    assert 'id="rvask"' not in client.get("/panel").text                          # отзыв есть — окна больше нет

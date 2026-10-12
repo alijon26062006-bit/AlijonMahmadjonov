@@ -14,6 +14,7 @@
 } | tojson }}</script>
 {% endblock %}
 {% block body %}
+<style>.rv-badge { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 8px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--text); font-size: .9rem; box-shadow: var(--shadow-1); } .rv-badge:hover { text-decoration: none; border-color: var(--accent); } .rv-badge-stars { color: #f5b301; letter-spacing: 1px; }</style>
 <main>
   <div class="wrap">
     {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
@@ -24,6 +25,10 @@
         <div class="cta">
           <a class="btn primary lg" href="#games">Выбрать игру</a>
         </div>
+        {% if reviews_sum and reviews_sum.total %}
+        <a class="rv-badge" href="/reviews"><span class="rv-badge-stars" aria-hidden="true">★</span>
+          <b>{{ reviews_sum.avg }}</b> из 5 · {{ reviews_sum.total }} отзывов покупателей →</a>
+        {% endif %}
         <ul class="hero-points">
           <li>{{ icon('check', 16) }}Оплата: Алиф, Душанбе Сити, USDT</li>
           <li>{{ icon('check', 16) }}Цены в сомони, без комиссии</li>
@@ -62,6 +67,19 @@
       </div>
     </div>
   </section>
+  {% endif %}
+
+  {% if reviews_top %}
+  {% from "_review.html" import review_card, review_styles, stars %}
+  <section class="section" data-reveal id="reviews">
+    <div class="wrap" style="max-width:760px">
+      <div class="section-head"><h2>Отзывы покупателей</h2>
+        <p>{{ stars(reviews_sum.avg | round | int, 18) }} <b>{{ reviews_sum.avg }}</b> из 5 · {{ reviews_sum.total }} отзывов о настоящих заказах</p></div>
+      <div class="rv-list">{% for r in reviews_top %}{{ review_card(r, site_name) }}{% endfor %}</div>
+      <a class="btn block" style="margin-top:12px" href="/reviews">Все отзывы →</a>
+    </div>
+  </section>
+  {{ review_styles() }}
   {% endif %}
 
   <section class="section" data-reveal id="catalog">
@@ -103,18 +121,6 @@
     </div>
   </section>
 
-  {% if reviews_top %}
-  {% from "_review.html" import review_card, review_styles, stars %}
-  <section class="section" data-reveal id="reviews">
-    <div class="wrap" style="max-width:760px">
-      <div class="section-head"><h2>Отзывы покупателей</h2>
-        <p>{{ stars(reviews_sum.avg | round | int, 18) }} <b>{{ reviews_sum.avg }}</b> из 5 · {{ reviews_sum.total }} отзывов о настоящих заказах</p></div>
-      <div class="rv-list">{% for r in reviews_top %}{{ review_card(r, site_name) }}{% endfor %}</div>
-      <a class="btn block" style="margin-top:12px" href="/reviews">Все отзывы →</a>
-    </div>
-  </section>
-  {{ review_styles() }}
-  {% endif %}
 
   <section class="section" data-reveal id="faq">
     <div class="wrap" style="max-width:760px">

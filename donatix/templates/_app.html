@@ -233,6 +233,7 @@
     else fallback();
   });
 </script>
+{% include "_review_ask.html" %}
 {% if user and not user.guest %}
 <script>
   /* «Живой» сайт: сервер сам сообщает об изменениях (баланс, заказы, уведомления) — без кнопки «обновить». */

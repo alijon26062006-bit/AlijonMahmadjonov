@@ -290,6 +290,8 @@ def render(request: Request, name: str, ctx: dict[str, Any] | None = None, statu
                 ctx["guest_code"] = code_of(c, ctx["user"]["id"])   # код покупателя без регистрации
             from .popular import services as popular_services, with_extras
             ctx["popular"] = with_extras(popular_services(c), config)
+            from .reviews import ask_for
+            ctx["review_ask"] = ask_for(c, ctx["user"])   # окно «Оцените заказ» после выполнения
             low = db.get_setting(c, "pay.low_balance_usd") or str(config.low_balance_usd)
             ctx["low_balance_micro"] = int(float(low) * 10_000)
             if ctx["cur_code"] == "TJS":

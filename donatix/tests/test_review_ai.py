@@ -77,3 +77,14 @@ def test_openai_down_leaves_review(app, config, conn):
     down = httpx.MockTransport(lambda r: httpx.Response(500, text="err"))
     assert review_ai.process(conn, config, rid, down) == "error"
     assert conn.execute("SELECT reply_text, hidden FROM reviews WHERE id = ?", (rid,)).fetchone()[0] is None
+
+
+def test_good_review_gets_thanks_and_mood(app, config, conn):
+    config.openai_api_key = "sk-test"
+    _, _, rid = _review(conn, config, "Rahmat, tez keldi!", rating=5)
+    seen = []
+    ans = {"mood": "good", "action": "reply", "reason": "похвала", "reply": "Rahmat sizga! Yana kutib qolamiz 💜"}
+    assert review_ai.process(conn, config, rid, _ai(ans, seen)) == "reply"
+    assert "ЛЮБОМ языке" in seen[0]["messages"][0]["content"]                    # понимает любой язык
+    r = conn.execute("SELECT reply_text, ai_note FROM reviews WHERE id = ?", (rid,)).fetchone()
+    assert r[0].startswith("Rahmat") and "доволен" in r[1]

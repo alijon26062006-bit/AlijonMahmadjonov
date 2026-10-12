@@ -44,6 +44,22 @@ def can_review(conn: sqlite3.Connection, user_id: int, public_id: str) -> sqlite
     return o
 
 
+def ask_for(conn: sqlite3.Connection, user: Any) -> dict[str, Any] | None:
+    """Последний выполненный заказ (за 7 дней) без отзыва — покупателю покажем окно «Оцените заказ»."""
+    if not user or (isinstance(user, dict) and user.get("guest")) or user["role"] == "admin":
+        return None
+    from datetime import datetime, timedelta, timezone
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S")
+    o = conn.execute("SELECT o.* FROM orders o WHERE o.user_id = ? AND o.status = 'completed' AND o.source != 'api' "
+                     "AND COALESCE(o.completed_at, o.updated_at) >= ? AND NOT EXISTS "
+                     "(SELECT 1 FROM reviews r WHERE r.order_id = o.id) ORDER BY o.id DESC LIMIT 1",
+                     (user["id"], since)).fetchone()
+    if o is None:
+        return None
+    game = _game(conn, o)
+    return {"order": o["public_id"], "game": game, "product": _product(o, game)}
+
+
 def by_order(conn: sqlite3.Connection, order_id: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM reviews WHERE order_id = ?", (order_id,)).fetchone()
 
@@ -56,8 +72,8 @@ def _clean(rating: Any, text: str) -> tuple[int, str]:
     if not 1 <= rating <= 5:
         raise ReviewError("Поставьте оценку — от 1 до 5 звёзд.")
     text = " ".join((text or "").split())[:MAX_TEXT]
-    if len(text) < 3:
-        raise ReviewError("Напишите пару слов о заказе.")
+    if len(text) < 3 and rating < 4:   # довольный может просто поставить звёзды; недовольный — пусть скажет, что не так
+        raise ReviewError("Напишите, что пошло не так — так мы быстрее разберёмся.")
     return rating, text
 
 

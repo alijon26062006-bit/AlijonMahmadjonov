@@ -1,0 +1,62 @@
+{#- Окно «Оцените заказ»: само появляется после выполнения заказа (последний выполненный за 7 дней без отзыва) -#}
+{% if review_ask and not request.url.path.startswith('/panel/orders/' ~ review_ask.order) and not request.url.path.startswith('/reviews') %}
+<div class="rvask" id="rvask" hidden role="dialog" aria-modal="true" aria-labelledby="rvask-t">
+  <div class="rvask-back" data-rvask-close></div>
+  <form class="rvask-box" method="post" action="/panel/reviews">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="order" value="{{ review_ask.order }}">
+    <input type="hidden" name="next" value="{{ request.url.path ~ ('?' ~ request.url.query if request.url.query else '') }}">
+    <button type="button" class="rvask-x" aria-label="Закрыть" data-rvask-close>×</button>
+    <div class="rvask-emoji" aria-hidden="true">🎉</div>
+    <h2 id="rvask-t">Заказ выполнен!</h2>
+    <p class="muted">{{ review_ask.game }}{% if review_ask.product %} · {{ review_ask.product }}{% endif %} · {{ review_ask.order }}<br>Как вам? Оцените — это займёт 5 секунд.</p>
+    <div class="rvask-stars" role="radiogroup" aria-label="Оценка">
+      {% for i in [5, 4, 3, 2, 1] %}<input type="radio" id="ra{{ i }}" name="rating" value="{{ i }}" required><label for="ra{{ i }}" title="{{ i }} из 5">★</label>{% endfor %}
+    </div>
+    <p class="rvask-hint muted small" id="rvask-hint">&nbsp;</p>
+    <textarea name="text" rows="3" maxlength="1000" id="rvask-text" placeholder="Пару слов о заказе (можно на любом языке)"></textarea>
+    <button class="btn primary block">Отправить отзыв</button>
+    <button type="button" class="rvask-later" data-rvask-close>Позже</button>
+  </form>
+</div>
+<style>
+  .rvask { position: fixed; inset: 0; z-index: 90; display: grid; align-items: end; justify-items: center; }
+  .rvask[hidden] { display: none; }
+  .rvask-back { position: absolute; inset: 0; background: rgb(0 0 0 / .45); animation: rvFade .25s ease-out; }
+  .rvask-box { position: relative; width: min(440px, 100%); background: var(--surface); border-radius: 22px 22px 0 0;
+    padding: 22px 18px calc(18px + env(safe-area-inset-bottom)); text-align: center; animation: rvUp .3s cubic-bezier(.2,.8,.2,1);
+    box-shadow: 0 -10px 40px rgb(0 0 0 / .25); }
+  @media (min-width: 640px) { .rvask { align-items: center; } .rvask-box { border-radius: 22px; } }
+  .rvask-box h2 { margin: 2px 0 4px; font-size: 1.25rem; }
+  .rvask-box p { margin: 0; }
+  .rvask-emoji { font-size: 2.2rem; }
+  .rvask-x { position: absolute; right: 10px; top: 8px; border: 0; background: none; font-size: 1.6rem; color: var(--muted); cursor: pointer; padding: 4px 10px; }
+  .rvask-stars { display: flex; flex-direction: row-reverse; justify-content: center; gap: 6px; margin: 14px 0 2px; }
+  .rvask-stars input { position: absolute; opacity: 0; pointer-events: none; }
+  .rvask-stars label { font-size: 2.5rem; line-height: 1; cursor: pointer; color: var(--line-strong, #c9cdd6); transition: transform .15s; }
+  .rvask-stars label:hover, .rvask-stars label:hover ~ label, .rvask-stars input:checked ~ label { color: #f5b301; }
+  .rvask-stars label:active { transform: scale(1.2); }
+  .rvask-stars input:focus-visible + label { outline: 2px solid var(--accent); border-radius: 6px; }
+  .rvask-box textarea { width: 100%; margin: 6px 0 10px; }
+  .rvask-later { border: 0; background: none; color: var(--muted); margin-top: 8px; padding: 8px; cursor: pointer; font: inherit; }
+  @keyframes rvUp { from { transform: translateY(40px); opacity: 0; } }
+  @keyframes rvFade { from { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .rvask-box, .rvask-back { animation: none; } }
+</style>
+<script>
+  (function () {
+    var box = document.getElementById("rvask"), key = "dx-rv-later-{{ review_ask.order }}";
+    try { if (localStorage.getItem(key)) return; } catch (e) {}
+    setTimeout(function () { box.hidden = false; }, 700);
+    box.querySelectorAll("[data-rvask-close]").forEach(function (b) {
+      b.addEventListener("click", function () { box.hidden = true; try { localStorage.setItem(key, "1"); } catch (e) {} });
+    });
+    var hints = {5: "Отлично! 😍", 4: "Хорошо 🙂", 3: "Нормально", 2: "Плохо — напишите, что не так", 1: "Очень плохо — напишите, что случилось"};
+    box.querySelectorAll("input[name=rating]").forEach(function (r) {
+      r.addEventListener("change", function () {
+        document.getElementById("rvask-hint").textContent = hints[r.value];
+        document.getElementById("rvask-text").required = r.value < 4;
+      });
+    });
+  })();
+</script>
+{% endif %}

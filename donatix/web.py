@@ -2018,6 +2018,7 @@ def reviews_page(request: Request, stars: int = 0, page: int = 1, conn=Depends(g
 
 @router.post("/panel/reviews", dependencies=[Depends(check_csrf)])
 def panel_review_save(request: Request, order: str = Form(""), rating: str = Form(""), text: str = Form(""),
+                      next: str = Form(""),
                       user=Depends(panel_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
     from . import reviews
     if request.app.state.limiter.hit("orders", f"review{user['id']}") is not None:
@@ -2028,4 +2029,5 @@ def panel_review_save(request: Request, order: str = Form(""), rating: str = For
         flash(request, "Спасибо за отзыв! Он уже на странице «Отзывы».")
     except reviews.ReviewError as exc:
         flash(request, str(exc), "error")
-    return _redirect(f"/panel/orders/{order[:40]}#review")
+        return _redirect(f"/panel/orders/{order[:40]}#review")
+    return _redirect(_safe_next(next) or f"/panel/orders/{order[:40]}#review")

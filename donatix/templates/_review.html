@@ -14,7 +14,7 @@
     <time class="rv-date">{{ r.created_at | dt('%d.%m.%Y') }}</time>
   </header>
   {% if r.product %}<p class="rv-product"><span aria-hidden="true">🛒</span> {{ r.product }} <span class="rv-ok" title="Покупка подтверждена">✓ покупка подтверждена</span></p>{% endif %}
-  <p class="rv-text">{{ r.text }}</p>
+  {% if r.text %}<p class="rv-text">{{ r.text }}</p>{% endif %}
   {% if r.reply %}
   <div class="rv-reply">
     <div class="rv-reply-head"><span class="rv-shield" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg></span><b>{{ site_name }}</b><time>· {{ r.reply_at | dt('%d.%m.%Y') }}</time></div>
@@ -90,7 +90,7 @@
   <div class="rv-pick" role="radiogroup" aria-label="Оценка">
     {% for i in [5, 4, 3, 2, 1] %}<input type="radio" id="rv{{ i }}" name="rating" value="{{ i }}" {{ 'checked' if rating == i }} required><label for="rv{{ i }}" title="{{ i }} из 5">★</label>{% endfor %}
   </div>
-  <textarea name="text" rows="3" maxlength="1000" required placeholder="Как всё прошло? Быстро ли пришло?" style="width:100%;margin:8px 0">{{ text }}</textarea>
+  <textarea name="text" rows="3" maxlength="1000" placeholder="Как всё прошло? Быстро ли пришло? (при 4–5 ★ можно не писать)" style="width:100%;margin:8px 0">{{ text }}</textarea>
   <button class="btn primary block">{{ 'Сохранить' if rating else 'Отправить отзыв' }}</button>
   <p class="muted small" style="margin:6px 0 0">Отзыв увидят все на странице «Отзывы».</p>
 </form>
