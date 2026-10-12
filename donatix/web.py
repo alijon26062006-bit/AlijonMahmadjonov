@@ -1307,6 +1307,9 @@ def panel_auto_pay(payment_id: int, request: Request, user=Depends(panel_user), 
     row = conn.execute("SELECT * FROM payments WHERE id = ? AND user_id = ?", (payment_id, user["id"])).fetchone()
     if row is None or not row["auto_kind"]:
         return _redirect("/panel/balance")
+    from . import cryptopay
+    if row["status"] == "pending" and cryptopay.expire(conn, payment_id):   # USDT: 15 минут вышли
+        row = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
     from . import dcbank
     wait = dcbank.receipt_after_min(conn) * 60
     age = payments._age(row["created_at"])
@@ -1328,7 +1331,8 @@ def panel_auto_pay(payment_id: int, request: Request, user=Depends(panel_user), 
     return render(request, "panel/auto_pay.html", {
         "user": user, "p": payments.public(conn, config, row), "dc": dc, "buy": quickbuy.describe(conn, payment_id),
         "receipt_now": row["auto_kind"] == "dcbank" and not row["receipt_file"] and age >= wait,
-        "receipt_wait": max(1, int(wait - age))})
+        "receipt_wait": max(1, int(wait - age)),
+        "pay_left": cryptopay.seconds_left(row["created_at"]) if row["auto_kind"] in ("trc20", "bybit") else 0})
 
 
 @router.post("/panel/dc-video/ack", dependencies=[Depends(check_csrf)])
@@ -1401,6 +1405,7 @@ def panel_payment_status(payment_id: int, request: Request, user=Depends(panel_u
         return JSONResponse({"status": "missing"}, status_code=404)
     if row["status"] == "pending" and row["auto_kind"]:
         cryptopay.check_all(conn, config)  # не чаще раза в 20 секунд на весь сайт
+        cryptopay.expire(conn, payment_id)  # USDT: 15 минут вышли — заявка закрыта
         row = conn.execute("SELECT status FROM payments WHERE id = ?", (payment_id,)).fetchone()
     from . import quickbuy
     buy = quickbuy.describe(conn, payment_id)

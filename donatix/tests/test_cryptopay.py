@@ -145,3 +145,29 @@ def test_bybit_network_address_from_bybit(app, config, conn, monkeypatch):
                      "successAt": str(cryptopay._ms(p["created_at"]) + 5000), "coin": "USDT"})
     assert cryptopay.check_all(conn, config) == 1
     assert balance(conn, uid) == 200_000
+
+
+def test_usdt_15_minutes_then_closed_but_late_transfer_credited(app, config, conn, monkeypatch):
+    """USDT: на оплату 15 минут — потом заявка закрыта. Перевод чуть позже всё равно зачисляется."""
+    from datetime import datetime, timedelta, timezone
+    _method(conn, config, "trc20", f"USDT TRC20: {ADDR}")
+    uid, c, token = _client(app, conn)
+    r = c.post("/panel/balance", data={"csrf": token, "method": "usdt", "amount": "20"}, follow_redirects=False)
+    p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
+    page = c.get(r.headers["location"]).text
+    assert 'id="ap-timer"' in page and "Оплатите за" in page
+    old = (datetime.now(timezone.utc) - timedelta(minutes=16)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    conn.execute("UPDATE payments SET created_at = ? WHERE id = ?", (old, p["id"]))
+    page = c.get(r.headers["location"]).text
+    assert "15 минут" in page and 'id="ap-timer"' not in page
+    assert conn.execute("SELECT status FROM payments WHERE id = ?", (p["id"],)).fetchone()[0] == "cancelled"
+    # хвост суммы занят — новой заявке такой же не выдадут
+    assert p["pay_amount"] in {r[0] for r in conn.execute("SELECT pay_amount FROM payments")}
+    txs = [{"transaction_id": "tx-late", "to": ADDR, "value": str(int(Decimal(p["pay_amount"]) * 1_000_000)),
+            "block_timestamp": cryptopay._ms(old) + 17 * 60_000,
+            "token_info": {"address": cryptopay.USDT_TRC20, "decimals": 6}}]
+    monkeypatch.setattr(cryptopay, "_get_json", lambda url, params, headers: {"data": txs})
+    cryptopay.reset()
+    assert cryptopay.check_all(conn, config) == 1
+    assert balance(conn, uid) == 200_000
+    assert conn.execute("SELECT status FROM payments WHERE id = ?", (p["id"],)).fetchone()[0] == "paid"

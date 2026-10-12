@@ -8,6 +8,9 @@
   .ap-qr .qr-box svg { width: 200px; height: 200px; image-rendering: pixelated; }
   .ap-qr small { color: var(--muted); font-size: .78rem; }
   .ap-qr:not(:has(.qr-box)) { display: none; }
+  .ap-timer { margin-top: 10px; padding: 8px 12px; border-radius: 12px; background: var(--surface-2, rgba(127,127,127,.12)); text-align: center; font-size: .92rem; }
+  .ap-timer b { font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+  .ap-timer.low { color: #e5484d; }
 </style>
 {% if dc and p.status == 'pending' %}
 <div class="dcp" id="autopay" data-id="{{ p.id }}" data-status="{{ p.status }}">
@@ -103,6 +106,7 @@
   <div class="ap-amount"><span id="ap-sum">{{ p.pay_amount }}</span> {{ p.pay_currency }}
     <button type="button" class="icon-btn" data-copy="{{ p.pay_amount }}" aria-label="Скопировать сумму">{{ icon('copy', 18) }}</button></div>
   <div class="ap-sub">Будет зачислено: <b>{{ money(p.amount_usd) }}</b></div>
+  {% if pay_left %}<div class="ap-timer" id="ap-timer" data-left="{{ pay_left }}">⏱ Оплатите за <b>{{ pay_left // 60 }}:{{ '%02d' % (pay_left % 60) }}</b></div>{% endif %}
 
   {% if p.auto == 'trc20' %}
   <div class="ap-qr">{{ p.address | qr_svg }}<small>Наведите камеру кошелька</small></div>
@@ -145,6 +149,18 @@
     });
   });
   if (!box || box.dataset.status !== "pending") return;
+  var at = document.getElementById("ap-timer");
+  if (at) {
+    var end = Date.now() + (+at.dataset.left || 0) * 1000, ab = at.querySelector("b");
+    var atick = function () {
+      var s = Math.max(0, Math.round((end - Date.now()) / 1000));
+      ab.textContent = Math.floor(s / 60) + ":" + ("0" + s % 60).slice(-2);
+      at.classList.toggle("low", s < 120);
+      if (s <= 0) { setTimeout(function () { location.reload(); }, 1500); return; }
+      setTimeout(atick, 1000);
+    };
+    atick();
+  }
   var rc = document.getElementById("dc-receipt"), tm = document.getElementById("dcp-timer");
   if (rc && tm) {
     var left = +tm.dataset.left || 0;

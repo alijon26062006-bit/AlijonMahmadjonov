@@ -21,7 +21,7 @@ import secrets
 import sqlite3
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import ROUND_UP, Decimal
 from typing import Any
 
@@ -41,6 +41,8 @@ AUTO_KINDS = {"trc20": "Автозачисление: USDT TRC20 (блокчей
 BYBIT = "https://api.bybit.com"
 UNIQUE_KINDS = ("trc20", "bybit")   # у этих перевод узнаём по «хвосту» суммы
 WINDOW_HOURS = 48          # сколько ждём перевод по заявке
+PAY_MINUTES = 15           # USDT (TRC20, Bybit): на оплату 15 минут, потом заявка закрывается
+EXPIRED_NOTE = "Время на оплату (15 минут) вышло — создайте новую заявку"
 
 _lock = threading.Lock()
 _last_check = 0.0
@@ -62,12 +64,46 @@ def unique_amount(conn: sqlite3.Connection, usd: Decimal) -> Decimal:
     """Сумма к переводу с «хвостом» 0.0001–0.0099, которого нет у других ждущих заявок."""
     base = usd.quantize(Decimal("0.01"), rounding=ROUND_UP)
     taken = {r[0] for r in conn.execute(
-        "SELECT pay_amount FROM payments WHERE auto_kind IN ('trc20', 'bybit') AND status = 'pending'")}
+        "SELECT pay_amount FROM payments WHERE auto_kind IN ('trc20', 'bybit') AND (status = 'pending' "
+        "OR (status = 'cancelled' AND admin_note = ? AND created_at >= ?))", (EXPIRED_NOTE, _since_hours(WINDOW_HOURS)))}
     for _ in range(200):
         amount = base + Decimal(secrets.randbelow(99) + 1) / 10000
         if str(amount) not in taken:
             return amount
     raise CryptoPayError("Слишком много заявок одновременно — попробуйте через минуту.")
+
+
+def _since_hours(hours: float) -> str:
+    return (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _waiting(conn: sqlite3.Connection, kind: str) -> list[sqlite3.Row]:
+    """Ждущие заявки и закрытые по таймеру (вдруг клиент перевёл чуть позже 15 минут — деньги не теряем)."""
+    rows = conn.execute("SELECT * FROM payments WHERE auto_kind = ? AND (status = 'pending' "
+                        "OR (status = 'cancelled' AND admin_note = ?)) AND created_at >= ? ORDER BY id",
+                        (kind, EXPIRED_NOTE, _since_hours(WINDOW_HOURS))).fetchall()
+    return [r for r in rows if time.time() * 1000 - _ms(r["created_at"]) < WINDOW_HOURS * 3600 * 1000]
+
+
+def _reopen(conn: sqlite3.Connection, r: sqlite3.Row) -> None:
+    if r["status"] == "cancelled":
+        conn.execute("UPDATE payments SET status = 'pending', admin_note = NULL, resolved_at = NULL "
+                     "WHERE id = ? AND status = 'cancelled' AND admin_note = ?", (r["id"], EXPIRED_NOTE))
+
+
+def expire(conn: sqlite3.Connection, payment_id: int | None = None) -> int:
+    """Закрыть USDT-заявки (TRC20, Bybit), которые ждут дольше 15 минут."""
+    sql = ("UPDATE payments SET status = 'cancelled', admin_note = ?, resolved_at = ? "
+           "WHERE auto_kind IN ('trc20', 'bybit') AND status = 'pending' AND created_at < ?")
+    args: list[Any] = [EXPIRED_NOTE, db.now(), _since_hours(PAY_MINUTES / 60)]
+    if payment_id is not None:
+        sql += " AND id = ?"
+        args.append(payment_id)
+    return conn.execute(sql, args).rowcount
+
+
+def seconds_left(created_at: str) -> int:
+    return max(0, int(PAY_MINUTES * 60 - (time.time() * 1000 - _ms(created_at)) / 1000))
 
 
 def _get_json(url: str, params: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
@@ -107,9 +143,7 @@ def _ms(stamp: str) -> int:
 def check_trc20(conn: sqlite3.Connection, config: Config) -> int:
     """Сверить ждущие TRC20-заявки с блокчейном. Возвращает, сколько зачислено."""
     from . import payments
-    rows = conn.execute(
-        "SELECT * FROM payments WHERE auto_kind = 'trc20' AND status = 'pending' ORDER BY id").fetchall()
-    fresh = [r for r in rows if time.time() * 1000 - _ms(r["created_at"]) < WINDOW_HOURS * 3600 * 1000]
+    fresh = _waiting(conn, "trc20")
     done = 0
     by_address: dict[str, list[sqlite3.Row]] = {}
     for r in fresh:
@@ -129,6 +163,7 @@ def check_trc20(conn: sqlite3.Connection, config: Config) -> int:
                     continue
                 if conn.execute("SELECT 1 FROM payments WHERE ext_id = ?", (t["tx"],)).fetchone():
                     continue  # этот перевод уже засчитан другой заявке
+                _reopen(conn, r)
                 try:
                     conn.execute("UPDATE payments SET ext_id = ?, reference = ? WHERE id = ? AND status = 'pending'",
                                  (t["tx"], t["tx"][:200], r["id"]))
@@ -215,9 +250,7 @@ def check_bybit(conn: sqlite3.Connection, config: Config) -> int:
     from . import payments
     if not bybit_ready(config):
         return 0
-    rows = [r for r in conn.execute("SELECT * FROM payments WHERE auto_kind = 'bybit' AND status = 'pending' "
-                                    "ORDER BY id").fetchall()
-            if time.time() * 1000 - _ms(r["created_at"]) < WINDOW_HOURS * 3600 * 1000]
+    rows = _waiting(conn, "bybit")
     if not rows:
         return 0
     try:
@@ -233,6 +266,7 @@ def check_bybit(conn: sqlite3.Connection, config: Config) -> int:
                 continue
             if conn.execute("SELECT 1 FROM payments WHERE ext_id = ?", (t["tx"],)).fetchone():
                 continue
+            _reopen(conn, r)
             try:
                 conn.execute("UPDATE payments SET ext_id = ?, reference = ? WHERE id = ? AND status = 'pending'",
                              (t["tx"], t["tx"][:200], r["id"]))
@@ -358,7 +392,9 @@ def check_all(conn: sqlite3.Connection, config: Config, min_interval: float = 20
         return 0
     try:
         _last_check = time.monotonic()
-        return check_trc20(conn, config) + check_bybit(conn, config) + check_binance(conn, config)
+        done = check_trc20(conn, config) + check_bybit(conn, config) + check_binance(conn, config)
+        expire(conn)   # сначала проверили поступления — потом закрываем просроченные
+        return done
     finally:
         _lock.release()
 
