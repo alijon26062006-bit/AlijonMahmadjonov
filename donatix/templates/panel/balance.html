@@ -9,6 +9,26 @@
   .pay-copy .btn { flex: none; }
   .pay-how { margin: 8px 0; padding: 10px 12px; border-radius: var(--r); background: var(--bg); border: 1px solid var(--line); font-size: .88rem; }
   .pay-how ol { margin: 6px 0 0; padding-left: 20px; } .pay-how li { margin: 3px 0; }
+  .cx { margin-top: 18px; }
+  .cx h4 { margin: 0 0 10px; font-size: 1rem; }
+  .cx-amt { display: flex; align-items: center; gap: 10px; padding: 0 18px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--bg); }
+  .cx-amt:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .cx-amt span { font-weight: 800; font-size: 1.5rem; color: var(--muted); }
+  .cx-amt input { flex: 1; min-width: 0; border: 0; background: none; box-shadow: none; padding: 16px 0; font-size: 1.5rem; font-weight: 800; outline: none; }
+  .cx-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 20px; }
+  .cx .cx-chips button { width: auto; min-height: 0; margin: 0; padding: 8px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); box-shadow: none; font-weight: 700; font-size: .88rem; cursor: pointer; color: var(--text, inherit); }
+  .cx .cx-chips button:hover, .cx .cx-chips button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--text, inherit); }
+  .cx-nets { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .cx-net { position: relative; display: flex; align-items: center; gap: 14px; margin: 0; padding: 16px; border: 1.5px solid var(--line); border-radius: 16px; cursor: pointer; }
+  .cx-net input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; opacity: 0; cursor: pointer; }
+  .cx-net:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
+  .cx-net:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .cx-net .cx-ico { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; }
+  .cx-net:has(input:checked) .cx-ico { background: #fff; }
+  .cx-net b { display: block; } .cx-net small { color: var(--muted); font-size: .8rem; }
+  .cx-go { display: flex; justify-content: flex-end; margin-top: 20px; }
+  .cx-go .btn { min-width: 170px; }
+  @media (max-width: 560px) { .cx-go .btn { width: 100%; } }
   .pay-warn { margin: 8px 0 12px; padding: 9px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn); font-size: .82rem; }
 </style>
 <section class="page-hero"><h1>{{ 'Оплата покупки' if buy else 'Баланс' }}</h1></section>
@@ -64,8 +84,19 @@
       {% if methods %}
       {% set codes = methods | map(attribute='code') | list %}
       {% set pre = pre_method if pre_method in codes else codes[0] %}
+      {% set tether %}<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#50AF95"/><path fill="#fff" d="M17.9 17.2v0c-.1 0-.7.1-1.9.1-1 0-1.7 0-1.9-.1v0c-3.7-.2-6.5-.8-6.5-1.6s2.8-1.4 6.5-1.6v2.5c.2 0 .9.1 1.9.1 1.2 0 1.8-.1 1.9-.1v-2.5c3.7.2 6.5.8 6.5 1.6s-2.8 1.4-6.5 1.6zm0-3.4v-2.2h5.2V8.1H8.9v3.5h5.2v2.2c-4.2.2-7.4 1-7.4 2s3.2 1.8 7.4 2v7.2h3.8v-7.2c4.2-.2 7.4-1 7.4-2s-3.2-1.8-7.4-2z"/></svg>{% endset %}
+      {% set crypto = methods | selectattr('auto', 'in', ['trc20', 'bybit']) | list %}
+      {% set crypto_codes = crypto | map(attribute='code') | list %}
+      {% set crypto_pre = pre in crypto_codes %}
       <div class="paymethods">
-        {% for m in methods %}
+        {% if crypto %}
+        <label class="paym {{ 'on' if crypto_pre }}" id="cx-tile">
+          <input type="radio" name="method" value="" data-crypto="1" data-cur="USDT" data-auto="1" {{ 'checked' if crypto_pre }}>
+          <span class="cx-ico">{{ tether | safe }}</span>
+          <span><b>Криптовалюта · USDT</b><span class="sub">{{ crypto | map(attribute='network') | select | join(', ') }} · <span class="auto-badge">⚡ авто</span></span></span>
+        </label>
+        {% endif %}
+        {% for m in methods if m.code not in crypto_codes %}
         <label class="paym {{ 'on' if m.code == pre }}">
           <input type="radio" name="method" value="{{ m.code }}" data-cur="{{ m.currency }}" data-auto="{{ '1' if m.auto else '' }}" data-dcv="{{ '1' if dcv and m.auto == 'dcbank' else '' }}" {{ 'checked' if m.code == pre }}>
           {% if m.icon_url %}<img class="pm-logo" src="{{ m.icon_url }}" alt="" width="36" height="36" loading="lazy">
@@ -90,7 +121,26 @@
         <button class="btn primary lg block" id="dcv-ok" formaction="/panel/dc-video/ack" formnovalidate disabled>✅ Дидам ва розӣ ҳастам</button>
       </div>
       {% endif %}
-      <div id="pay-rest">
+      {% if crypto %}
+      <div class="cx" id="cx-pane" {{ '' if crypto_pre else 'hidden' }}>
+        <h4>Сумма</h4>
+        <label class="cx-amt" for="cx-amount"><span>USDT</span>
+          <input id="cx-amount" name="amount" form="cryptoform" inputmode="decimal" placeholder="0.00" autocomplete="off"
+            {% if buy %}value="{{ '%.2f' % ((buy.tjs | float) / (tjs_rate | float)) }}" readonly{% endif %}></label>
+        {% if not buy %}<div class="cx-chips">{% for v in (100, 500, 1000, 3000) %}<button type="button" data-v="{{ v }}">{{ '{:,}'.format(v).replace(',', ' ') }} USDT</button>{% endfor %}</div>
+        {% else %}<div style="height:18px"></div>{% endif %}
+        <h4>Способ оплаты</h4>
+        <div class="cx-nets">
+          {% for m in crypto %}
+          <label class="cx-net"><input type="radio" name="method" form="cryptoform" value="{{ m.code }}" required {{ 'checked' if m.code == pre or (not crypto_pre and loop.first) }}>
+            <span class="cx-ico">{% if m.icon_url %}<img src="{{ m.icon_url }}" alt="" width="32" height="32" loading="lazy">{% else %}{{ tether | safe }}{% endif %}</span>
+            <span><b>USDT ({{ m.network or 'TRC20' }})</b><small>{% if min_usd and not buy %}от {{ min_usd }} USDT · {% endif %}зачислится сам</small></span></label>
+          {% endfor %}
+        </div>
+        <div class="cx-go"><button class="btn primary lg" form="cryptoform" id="cx-go">Продолжить</button></div>
+      </div>
+      {% endif %}
+      <div id="pay-rest" {{ 'hidden' if crypto_pre }}>
       <div class="step-head" style="margin-top:22px"><span class="n">2</span><h3>Сумма</h3></div>
       <div class="amt-cur" role="radiogroup" aria-label="Валюта суммы" {{ 'hidden' if buy }}>
         <label><input type="radio" name="amount_cur" value="TJS" checked> сомони</label>
@@ -153,6 +203,8 @@
       <p class="muted" style="margin-top:12px">Способы оплаты ещё не настроены. <a href="/panel/support">Напишите в поддержку</a>.</p>
       {% endif %}
     </form>
+    {% if methods and crypto %}<form id="cryptoform" method="post" action="/panel/balance" hidden>
+      <input type="hidden" name="csrf" value="{{ csrf }}">{% if buy %}<input type="hidden" name="buy" value="1">{% endif %}</form>{% endif %}
     {% endif %}
   </div>
 
@@ -314,8 +366,12 @@
     if (e.target.closest("[data-to-tjs]")) { setCur(true); upd(); inp.focus(); }
   });
   function upd() {
-    var r = f.querySelector("input[name=method]:checked"); if (!r) return;
+    var r = f.querySelector(".paymethods input[name=method]:checked"); if (!r) return;
     f.querySelectorAll(".paym").forEach(function (l) { l.classList.toggle("on", l.querySelector("input").checked); });
+    var cx = document.getElementById("cx-pane"), rest0 = document.getElementById("pay-rest");
+    if (cx) { var isCx = !!r.dataset.crypto; cx.hidden = !isCx; rest0.hidden = isCx; inp.required = !isCx;
+      var rc0 = document.getElementById("receipt"); if (rc0 && isCx) rc0.required = false;
+      if (isCx) return; }
     f.querySelectorAll(".details").forEach(function (d) { d.hidden = d.dataset.for !== r.value; });
     // Автоплатёж (крипта) проверяется сам — там чек не нужен; для переводов — обязателен
     var box = document.getElementById("receipt-box"), rc = document.getElementById("receipt");
@@ -356,6 +412,25 @@
       upd();
     }).catch(function () {});
   }, 30000);
+})();
+(function () {   // крипта: кнопки суммы и «Продолжить»
+  var a = document.getElementById("cx-amount"), form = document.getElementById("cryptoform");
+  if (!a || !form) return;
+  document.querySelectorAll(".cx-chips button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      a.value = b.dataset.v; a.dispatchEvent(new Event("input", {bubbles: true}));
+      document.querySelectorAll(".cx-chips button").forEach(function (x) { x.classList.toggle("on", x === b); });
+    });
+  });
+  a.addEventListener("input", function () {
+    document.querySelectorAll(".cx-chips button").forEach(function (x) { x.classList.toggle("on", x.dataset.v === a.value); });
+  });
+  form.addEventListener("submit", function (e) {
+    var v = parseFloat((a.value || "").replace(",", "."));
+    if (!(v > 0)) { e.preventDefault(); a.focus(); a.closest(".cx-amt").style.borderColor = "var(--danger, #e5484d)"; return; }
+    var go = document.getElementById("cx-go");
+    setTimeout(function () { go.disabled = true; go.textContent = "Секунду…"; }, 0);
+  });
 })();
 (function () {   // видео «Душанбе Сити»: галочка — после просмотра, кнопка — после галочки
   var ok = document.getElementById("dcv-ok"), agree = document.getElementById("dcv-agree");

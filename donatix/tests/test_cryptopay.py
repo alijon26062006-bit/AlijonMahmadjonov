@@ -171,3 +171,14 @@ def test_usdt_15_minutes_then_closed_but_late_transfer_credited(app, config, con
     assert cryptopay.check_all(conn, config) == 1
     assert balance(conn, uid) == 200_000
     assert conn.execute("SELECT status FROM payments WHERE id = ?", (p["id"],)).fetchone()[0] == "paid"
+
+
+def test_balance_crypto_pane(app, config, conn):
+    """Крипта: одна плитка «Криптовалюта · USDT», внутри сумма с кнопками и карточки сетей."""
+    payments.save_methods(conn, [
+        {"code": "u1", "title": "USDT TRC20", "currency": "USDT:TRC20", "details": "", "enabled": True, "auto": "bybit"},
+        {"code": "u2", "title": "USDT BEP20", "currency": "USDT:BEP20", "details": "", "enabled": True, "auto": "bybit"}])
+    uid, c, token = _client(app, conn)
+    page = c.get("/panel/balance").text
+    assert "Криптовалюта · USDT" in page and 'id="cx-pane"' in page and 'id="cryptoform"' in page
+    assert "USDT (TRC20)" in page and "USDT (BEP20)" in page and "1 000 USDT" in page
