@@ -211,7 +211,35 @@ def _bybit_get(config: Config, path: str, params: dict[str, Any]) -> dict[str, A
 
 
 # Сеть способа оплаты → как её называет Bybit
-BYBIT_CHAINS = {"TRC20": ("TRX", "TRC20"), "BEP20": ("BSC", "BEP20"), "TON": ("TON",), "ERC20": ("ETH", "ERC20")}
+BYBIT_CHAINS = {"TRC20": ("TRX", "TRC20"), "BEP20": ("BSC", "BEP20"), "TON": ("TON",), "ERC20": ("ETH", "ERC20"),
+                "APTOS": ("APTOS", "APT"), "SOL": ("SOL", "SOLANA")}
+_min_cache: dict[str, Any] = {}
+
+
+def bybit_deposit_min(config: Config, network: str) -> Decimal:
+    """Минимальное пополнение USDT в этой сети по данным самого Bybit (меньше — Bybit не зачислит). Держим 6 часов.
+    Не узнали — 0: тогда действует только ваш минимум."""
+    if not bybit_ready(config) or network not in BYBIT_CHAINS:
+        return Decimal(0)
+    if not _min_cache or time.monotonic() - _min_cache.get("at", 0) > 6 * 3600:
+        try:
+            rows = _bybit_get(config, "/v5/asset/coin/query-info", {"coin": "USDT"}).get("rows") or []
+            mins = {}
+            for c in (rows[0].get("chains") or []) if rows else []:
+                try:
+                    value = Decimal(str(c.get("depositMin") or "0"))
+                except Exception:  # noqa: BLE001
+                    continue
+                for name in (c.get("chain"), c.get("chainType")):
+                    if name:
+                        mins[str(name).upper()] = value
+            _min_cache.clear()
+            _min_cache.update({"at": time.monotonic(), "mins": mins})
+        except Exception as exc:  # noqa: BLE001 — Bybit молчит: не мешаем оплате
+            log.warning("bybit: минимум пополнения не узнали: %s", exc)
+            return Decimal(0)
+    mins = _min_cache.get("mins") or {}
+    return max((mins.get(n, Decimal(0)) for n in BYBIT_CHAINS[network]), default=Decimal(0))
 _addr_cache: dict[str, tuple[float, tuple[str, str]]] = {}
 
 

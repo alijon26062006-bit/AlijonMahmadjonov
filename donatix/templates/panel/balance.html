@@ -85,7 +85,7 @@
       {% set codes = methods | map(attribute='code') | list %}
       {% set pre = pre_method if pre_method in codes else codes[0] %}
       {% set tether %}<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#50AF95"/><path fill="#fff" d="M17.9 17.2v0c-.1 0-.7.1-1.9.1-1 0-1.7 0-1.9-.1v0c-3.7-.2-6.5-.8-6.5-1.6s2.8-1.4 6.5-1.6v2.5c.2 0 .9.1 1.9.1 1.2 0 1.8-.1 1.9-.1v-2.5c3.7.2 6.5.8 6.5 1.6s-2.8 1.4-6.5 1.6zm0-3.4v-2.2h5.2V8.1H8.9v3.5h5.2v2.2c-4.2.2-7.4 1-7.4 2s3.2 1.8 7.4 2v7.2h3.8v-7.2c4.2-.2 7.4-1 7.4-2s-3.2-1.8-7.4-2z"/></svg>{% endset %}
-      {% set crypto = methods | selectattr('auto', 'in', ['trc20', 'bybit']) | list %}
+      {% set crypto = methods | selectattr('auto', 'in', ['trc20', 'bybit']) | selectattr('network') | list %}
       {% set crypto_codes = crypto | map(attribute='code') | list %}
       {% set crypto_pre = pre in crypto_codes %}
       <div class="paymethods">
@@ -93,7 +93,7 @@
         <label class="paym {{ 'on' if crypto_pre }}" id="cx-tile">
           <input type="radio" name="method" value="" data-crypto="1" data-cur="USDT" data-auto="1" {{ 'checked' if crypto_pre }}>
           <span class="cx-ico">{{ tether | safe }}</span>
-          <span><b>Криптовалюта · USDT</b><span class="sub">{{ crypto | map(attribute='network') | select | join(', ') }} · <span class="auto-badge">⚡ авто</span></span></span>
+          <span><b>Криптовалюта · USDT</b><span class="sub">{{ crypto | map(attribute='net_short') | select | join(', ') }} · <span class="auto-badge">⚡ авто</span></span></span>
         </label>
         {% endif %}
         {% for m in methods if m.code not in crypto_codes %}
@@ -132,11 +132,12 @@
         <h4>Способ оплаты</h4>
         <div class="cx-nets">
           {% for m in crypto %}
-          <label class="cx-net"><input type="radio" name="method" form="cryptoform" value="{{ m.code }}" required {{ 'checked' if m.code == pre or (not crypto_pre and loop.first) }}>
+          <label class="cx-net"><input type="radio" name="method" form="cryptoform" value="{{ m.code }}" data-min="{{ m.min_usd or min_usd }}" data-max="{{ m.max_usd or 100000 }}" data-net="{{ m.net_short or m.network }}" required {{ 'checked' if m.code == pre or (not crypto_pre and loop.first) }}>
             <span class="cx-ico">{% if m.icon_url %}<img src="{{ m.icon_url }}" alt="" width="32" height="32" loading="lazy">{% else %}{{ tether | safe }}{% endif %}</span>
-            <span><b>USDT ({{ m.network or 'TRC20' }})</b><small>{% if min_usd and not buy %}от {{ min_usd }} USDT · {% endif %}зачислится сам</small></span></label>
+            <span><b>USDT ({{ m.net_short or m.network }})</b><small>{% if m.min_usd %}{{ m.min_usd }} – {{ '{:,}'.format(m.max_usd | float | int).replace(',', ' ') }} USDT за транзакцию{% elif min_usd %}от {{ min_usd }} USDT{% else %}зачислится сам{% endif %}</small></span></label>
           {% endfor %}
         </div>
+        <div class="flash warn" id="cx-lim" hidden role="alert"></div>
         <div class="cx-go"><button class="btn primary lg" form="cryptoform" id="cx-go">Продолжить</button></div>
       </div>
       {% endif %}
@@ -425,9 +426,22 @@
   a.addEventListener("input", function () {
     document.querySelectorAll(".cx-chips button").forEach(function (x) { x.classList.toggle("on", x.dataset.v === a.value); });
   });
+  var lim = document.getElementById("cx-lim");
+  function check() {   // сумма в пределах выбранной сети: «3 – 5 000 USDT»
+    var n = document.querySelector("input[form=cryptoform][name=method]:checked"), v = parseFloat((a.value || "").replace(",", "."));
+    if (!n || !(v > 0)) { lim.hidden = true; return true; }
+    var lo = parseFloat(n.dataset.min) || 0, hi = parseFloat(n.dataset.max) || 1e9;
+    var bad = v < lo ? "Минимум для USDT (" + n.dataset.net + ") — " + lo + " USDT."
+            : v > hi ? "Максимум для USDT (" + n.dataset.net + ") — " + hi + " USDT за одну оплату." : "";
+    lim.hidden = !bad; lim.textContent = bad ? "⚠️ " + bad : "";
+    return !bad;
+  }
+  a.addEventListener("input", check);
+  document.querySelectorAll("input[form=cryptoform][name=method]").forEach(function (x) { x.addEventListener("change", check); });
   form.addEventListener("submit", function (e) {
     var v = parseFloat((a.value || "").replace(",", "."));
     if (!(v > 0)) { e.preventDefault(); a.focus(); a.closest(".cx-amt").style.borderColor = "var(--danger, #e5484d)"; return; }
+    if (!check()) { e.preventDefault(); a.focus(); return; }
     var go = document.getElementById("cx-go");
     setTimeout(function () { go.disabled = true; go.textContent = "Секунду…"; }, 0);
   });

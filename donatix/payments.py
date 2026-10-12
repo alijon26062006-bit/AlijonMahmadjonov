@@ -33,7 +33,15 @@ NETWORKS = {
     "BEP20": "BNB Smart Chain (BEP20)",
     "ERC20": "Ethereum (ERC20)",
     "TON": "TON",
+    "APTOS": "Aptos",
+    "SOL": "Solana",
 }
+#: Короткое имя сети на карточке у клиента: «USDT (Aptos)»
+NET_SHORT = {"TRC20": "TRC20", "BEP20": "BEP20", "ERC20": "ERC20", "TON": "TON", "APTOS": "Aptos", "SOL": "Solana"}
+#: Bybit: сети одного способа — как у FazerCards, сразу готовые карточки. По умолчанию включены первые четыре
+BYBIT_NETS = ("TRC20", "BEP20", "TON", "APTOS", "SOL", "ERC20")
+BYBIT_NETS_ON = ("TRC20", "BEP20", "TON", "APTOS")
+NET_MIN_USD, NET_MAX_USD = "3", "5000"
 #: Варианты в админке: валюта и сеть одним списком
 CURRENCY_CHOICES = [("TJS", "TJS (сомони, по курсу)"), ("USD", "USD")] + [
     (f"USDT:{n}", f"USDT · {t}") for n, t in NETWORKS.items()] + [("USDT", "USDT (без сети — Binance Pay и т.п.)")]
@@ -78,15 +86,89 @@ def settings(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
     for m in all_methods:
         m["network"] = guess_network(m)
         m["choice"] = f"USDT:{m['network']}" if m["network"] else m["currency"]
+        if m.get("auto") == "bybit":
+            m["nets_view"] = nets_of(m)
+    stored, all_methods = all_methods, _expand(all_methods)
     rate = Decimal(db.get_setting(conn, "pay.tjs_rate") or config.tjs_rate)
     min_tjs = Decimal(db.get_setting(conn, "pay.min_tjs") or config.pay_min_tjs)
     low = Decimal(db.get_setting(conn, "pay.low_balance_usd") or config.low_balance_usd)
     return {
-        "all_methods": all_methods,
+        "all_methods": all_methods, "stored": stored,
         "details": {m["code"]: m["details"] for m in all_methods if m.get("enabled") and m["details"].strip()},
         "tjs_rate": rate, "min_tjs": min_tjs, "low_usd": low,
         "min_usd": (min_tjs / rate).quantize(Decimal("0.01"), rounding=ROUND_UP),
     }
+
+
+def nets_of(m: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
+    """Сети способа «Bybit»: {сеть: {on, min, max}}. None — старый способ «перевод по UID» (без сетей)."""
+    saved = m.get("nets")
+    if isinstance(saved, dict):
+        nets = {n: {"on": bool((saved.get(n) or {}).get("on")),
+                    "min": str((saved.get(n) or {}).get("min") or NET_MIN_USD),
+                    "max": str((saved.get(n) or {}).get("max") or NET_MAX_USD)} for n in BYBIT_NETS}
+        return nets if any(v["on"] for v in nets.values()) else None   # ни одной сети — перевод по UID
+    if m.get("network") or not re.search(r"\d{5,12}", m.get("details", "")):
+        # Старые настройки «одна строка — одна сеть»: сразу готовые сети, как у FazerCards
+        return {n: {"on": n in BYBIT_NETS_ON, "min": NET_MIN_USD, "max": NET_MAX_USD} for n in BYBIT_NETS}
+    return None
+
+
+def _expand(stored: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Способ «Bybit» с сетями → по карточке на сеть (код «<код>-trc20»). Сеть уже есть у другого способа — пропуск."""
+    out, done = [], set()
+    for m in stored:
+        nets = m.get("nets_view") if m.get("auto") == "bybit" else None
+        if not nets:
+            out.append(m)
+            continue
+        for n, v in nets.items():
+            if not v["on"] or n in done:
+                continue
+            done.add(n)
+            title = m["title"] if NET_SHORT[n].upper() in m["title"].upper() else f"{m['title']} · {NET_SHORT[n]}"
+            out.append({**m, "code": f"{m['code']}-{n.lower()}", "base": m["code"], "network": n, "title": title,
+                        "currency": "USDT", "choice": f"USDT:{n}", "min_usd": v["min"], "max_usd": v["max"],
+                        "details": f"Адрес USDT ({NET_SHORT[n]}) выдаст Bybit автоматически"})
+    return out
+
+
+def method_label(m: dict[str, Any]) -> str:
+    """Название для списков заявок: у карточки сети — с сетью («USDT · Bybit · TRC20»)."""
+    return m["title"]   # у карточки сети название уже с сетью
+
+
+def resolve(conf: dict[str, Any], code: str) -> str:
+    """Старый код способа Bybit (боты и API знают «usdt») → карточка его сети, иначе первая сеть способа."""
+    if code in conf["details"]:
+        return code
+    base = next((m for m in conf["stored"] if m["code"] == code), None)
+    nets = [m for m in conf["all_methods"] if m.get("base") == code]
+    if base is None or not nets:
+        return code
+    return next((m["code"] for m in nets if m["network"] == base.get("network")), nets[0]["code"])
+
+
+def find(conf: dict[str, Any], code: str) -> dict[str, Any]:
+    """Способ по коду — и карточка сети, и сам способ (у старых заявок код без сети)."""
+    return next((m for m in conf["all_methods"] + conf["stored"] if m["code"] == code), {})
+
+
+def _clean_nets(title: str, raw: Any) -> dict[str, dict[str, Any]] | None:
+    if not isinstance(raw, dict):
+        return None
+    out = {}
+    for n in BYBIT_NETS:
+        v = raw.get(n) or {}
+        try:
+            lo = to_decimal(str(v.get("min") or NET_MIN_USD).replace(",", "."))
+            hi = to_decimal(str(v.get("max") or NET_MAX_USD).replace(",", "."))
+        except MoneyError:
+            raise PaymentError(f"«{title}», сеть {NET_SHORT[n]}: минимум и максимум — числа.") from None
+        if lo <= 0 or hi < lo or hi > 100000:
+            raise PaymentError(f"«{title}», сеть {NET_SHORT[n]}: минимум больше нуля, максимум не меньше минимума.")
+        out[n] = {"on": bool(v.get("on")), "min": f"{lo.normalize():f}", "max": f"{hi.normalize():f}"}
+    return out
 
 
 def clean_methods(methods_in: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -122,9 +204,12 @@ def clean_methods(methods_in: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if not tron_address(details):
                 raise PaymentError(f"«{title}»: для автозачисления TRC20 в реквизитах нужен адрес кошелька (T…).")
         elif auto == "bybit":
-            # Сеть выбрана — адрес пополнения этой сети сайт берёт у Bybit сам; без сети — перевод по UID
+            # Сети отмечены — адрес пополнения каждой сети сайт берёт у Bybit сам; без сети — перевод по UID
             currency = "USDT"
-            if network:
+            nets = _clean_nets(title, m.get("nets"))
+            if nets is not None and any(v["on"] for v in nets.values()):
+                details = details or "Адрес USDT выдаст Bybit автоматически"
+            elif network:
                 details = details or f"Адрес USDT ({network}) выдаст Bybit автоматически"
             elif not re.search(r"\d{5,12}", details):
                 raise PaymentError(f"«{title}»: для автозачисления Bybit в реквизитах нужен ваш Bybit UID (цифры) "
@@ -132,8 +217,15 @@ def clean_methods(methods_in: list[dict[str, Any]]) -> list[dict[str, Any]]:
         elif auto == "binance":
             currency, network = "USDT", ""
             details = details or "Оплата через Binance Pay — кнопка появится после ввода суммы"
-        clean.append({"code": code, "title": title, "currency": currency, "network": network,
-                      "details": details, "enabled": bool(m.get("enabled")), "icon": icon, "auto": auto})
+        row = {"code": code, "title": title, "currency": currency, "network": network,
+               "details": details, "enabled": bool(m.get("enabled")), "icon": icon, "auto": auto}
+        if auto == "bybit":
+            nets = _clean_nets(title, m.get("nets"))
+            if nets is None and isinstance(m.get("nets_view"), dict):   # из админ-бота: сети не трогаем
+                nets = _clean_nets(title, m["nets_view"])
+            if nets is not None:
+                row["nets"] = nets
+        clean.append(row)
     return clean
 
 
@@ -176,7 +268,7 @@ def start_auto(conn: sqlite3.Connection, config: Config, payment_id: int) -> Non
     """Автоплатёж по способу заявки (TRC20 / Binance Pay). Не вышло — заявка отменяется и ошибка наверх."""
     from . import cryptopay
     p = conn.execute("SELECT method FROM payments WHERE id = ?", (payment_id,)).fetchone()
-    method = next((m for m in settings(conn, config)["all_methods"] if m["code"] == p["method"]), {})
+    method = find(settings(conn, config), p["method"])
     if not method.get("auto"):
         return
     if method["auto"] == "dcbank":
@@ -196,14 +288,16 @@ def is_auto(conn: sqlite3.Connection, config: Config, code: str) -> bool:
     """Способ с автоплатежом (крипта, «Душанбе Сити»): чек не нужен, поступление проверяется само.
     «Душанбе Сити» — только когда юзербот настроен, иначе это обычный перевод с чеком."""
     from .dcbank import ready
+    conf = settings(conn, config)
+    code = resolve(conf, code)
     return any(m["code"] == code and m.get("auto") and (m["auto"] != "dcbank" or ready(config))
-               for m in settings(conn, config)["all_methods"])
+               for m in conf["all_methods"])
 
 
 def title_for(conn: sqlite3.Connection, config: Config, code: str) -> str:
-    for m in settings(conn, config)["all_methods"]:
-        if m["code"] == code:
-            return m["title"]
+    m = find(settings(conn, config), code)
+    if m:
+        return method_label(m)
     return PAY_METHODS.get(code, (code,))[0]
 
 
@@ -214,7 +308,8 @@ def methods(conn: sqlite3.Connection, config: Config) -> list[dict[str, str]]:
              "icon_url": f"{config.base_url}/pay-icons/{m['icon']}" if m.get("icon") else "",
              "auto": (m.get("auto") or "") if m.get("auto") != "dcbank" or ready(config) else "",
              "network": m["network"], "network_title": NETWORKS.get(m["network"], ""),
-             "network_note": network_note(m["network"])}
+             "network_note": network_note(m["network"]), "net_short": NET_SHORT.get(m["network"], ""),
+             "min_usd": m.get("min_usd", ""), "max_usd": m.get("max_usd", "")}
             for m in conf["all_methods"] if m["code"] in conf["details"]]
 
 
@@ -229,6 +324,7 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
     """Заявка на пополнение. Сумма — в долларах (amount) или в сомони (amount_tjs, пересчёт по курсу).
     for_purchase — оплата конкретной покупки: минимум пополнения к ней не применяется."""
     conf = settings(conn, config)
+    method = resolve(conf, method)
     if method not in conf["details"]:
         raise PaymentError("Выберите способ оплаты.")
     try:
@@ -256,6 +352,15 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
                  "WHERE user_id = ? AND status = 'pending' AND receipt_file IS NULL "
                  "AND COALESCE(auto_kind, '') = ''", (db.now(), user["id"]))
     chosen = next(m for m in conf["all_methods"] if m["code"] == method)
+    if chosen.get("min_usd"):   # сеть USDT: от и до за одну заявку (и не меньше минимума самого Bybit)
+        low, high = Decimal(chosen["min_usd"]), Decimal(chosen["max_usd"])
+        from .cryptopay import bybit_deposit_min
+        low = max(low, bybit_deposit_min(config, chosen["network"]))
+        short = NET_SHORT.get(chosen["network"], chosen["network"])
+        if usd < low:
+            raise PaymentError(f"Минимум для USDT ({short}) — {low.normalize():f} USDT.")
+        if usd > high:
+            raise PaymentError(f"Максимум для USDT ({short}) — {high.normalize():f} USDT за одну заявку.")
     currency = chosen["currency"]
     pay, cur = pay_amount(conf["tjs_rate"], currency, usd)
     if chosen.get("auto") in ("trc20", "bybit"):
@@ -669,7 +774,7 @@ def public(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) -> dict[str
     """Заявка для API: без внутренних полей."""
     conf = settings(conn, config)
     details = conf["details"].get(p["method"], "")
-    network = next((m["network"] for m in conf["all_methods"] if m["code"] == p["method"]), "")
+    network = find(conf, p["method"]).get("network", "")
     return {
         "id": p["id"], "status": p["status"], "method": p["method"],
         "method_title": title_for(conn, config, p["method"]),

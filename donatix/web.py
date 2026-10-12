@@ -1215,7 +1215,7 @@ def panel_balance(request: Request, user=Depends(panel_user), conn=Depends(get_c
         "user": user, "methods": payments.methods(conn, config), "payments": rows, "tjs_rate": conf["tjs_rate"],
         "min_usd": conf["min_usd"], "min_tjs": conf["min_tjs"], "waiting": waiting,
         "boost_wait": payments.boost_wait(waiting) if waiting is not None else None,
-        "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()} | {m["code"]: m["title"] for m in conf["all_methods"]},
+        "pay_titles": {k: v[0] for k, v in PAY_METHODS.items()} | {m["code"]: payments.method_label(m) for m in conf["stored"] + conf["all_methods"]},
     })
 
 

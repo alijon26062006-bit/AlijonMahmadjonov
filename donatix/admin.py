@@ -365,9 +365,9 @@ def _pays_with_who(conn, where: str, args: tuple) -> list[dict]:
 
 
 def _pay_titles(conn, config: Config) -> dict[str, str]:
-    from .payments import settings
-    return ({k: v[0] for k, v in PAY_METHODS.items()}
-            | {m["code"]: m["title"] for m in settings(conn, config)["all_methods"]})
+    from .payments import method_label, settings
+    conf = settings(conn, config)
+    return {k: v[0] for k, v in PAY_METHODS.items()} | {m["code"]: method_label(m) for m in conf["stored"] + conf["all_methods"]}
 
 
 @router.post("/users/{user_id}", dependencies=[Depends(check_csrf)])
@@ -529,7 +529,8 @@ def payments_list(request: Request, status: str = "pending", admin=Depends(admin
     return render(request, "admin/payments.html", {
         "user": admin, "rows": rows, "status": status,
         "titles": {k: v[0] for k, v in PAY_METHODS.items()}
-        | {m["code"]: m["title"] for m in payments.settings(conn, request.app.state.config)["all_methods"]},
+        | {m["code"]: payments.method_label(m) for m in (lambda c: c["stored"] + c["all_methods"])(
+            payments.settings(conn, request.app.state.config))},
     })
 
 
@@ -539,6 +540,9 @@ def pay_settings(request: Request, admin=Depends(admin_user), conn=Depends(get_c
     from . import payments
     return render(request, "admin/pay_settings.html", {
         "user": admin, "conf": payments.settings(conn, config), "currencies": payments.CURRENCY_CHOICES,
+        "bybit_nets": payments.BYBIT_NETS, "net_short": payments.NET_SHORT,
+        "net_defaults": {n: {"on": n in payments.BYBIT_NETS_ON, "min": payments.NET_MIN_USD,
+                             "max": payments.NET_MAX_USD} for n in payments.BYBIT_NETS},
         "binance_ready": bool(config.binance_pay_key and config.binance_pay_secret),
         "bybit_ready": bool(config.bybit_key and config.bybit_secret),
         "dcbank_ready": bool(config.tg_api_id and config.tg_api_hash and config.bank_bot),
@@ -559,12 +563,15 @@ async def pay_settings_save(request: Request, admin=Depends(admin_user), conn=De
                             config: Config = Depends(get_config)):
     from . import payments
     form = await request.form()
-    old_icons = {m["code"]: m.get("icon", "") for m in payments.settings(conn, config)["all_methods"]}
+    old_icons = {m["code"]: m.get("icon", "") for m in payments.settings(conn, config)["stored"]}
     rows = []
     try:
         for i in range(int(form.get("n", 0) or 0) + 1):  # +1 — строка «новый способ»
             row = ({k: str(form.get(f"m{i}_{k}", "")) for k in ("code", "title", "currency", "details", "auto")}
                    | {"enabled": form.get(f"m{i}_enabled") == "1", "delete": form.get(f"m{i}_delete") == "1"})
+            if form.get(f"m{i}_nets") == "1":   # сети Bybit: галочка, минимум и максимум у каждой
+                row["nets"] = {n: {"on": form.get(f"m{i}_net_{n}") == "1", "min": str(form.get(f"m{i}_min_{n}", "")),
+                                   "max": str(form.get(f"m{i}_max_{n}", ""))} for n in payments.BYBIT_NETS}
             row["icon"] = "" if form.get(f"m{i}_icon_del") == "1" else old_icons.get(row["code"], "")
             upload = form.get(f"m{i}_icon")
             if upload is not None and getattr(upload, "filename", ""):

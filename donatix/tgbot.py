@@ -1435,7 +1435,7 @@ MENU_HANDLERS: dict[str, Callable[..., str | Screen]] = {
 
 
 def _methods(conn: sqlite3.Connection, config: Config) -> list[dict[str, Any]]:
-    return payments.settings(conn, config)["all_methods"]
+    return payments.settings(conn, config)["stored"]
 
 
 def _as_rows(methods: list[dict[str, Any]]) -> list[dict[str, Any]]:

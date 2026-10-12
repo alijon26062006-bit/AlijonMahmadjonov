@@ -192,3 +192,54 @@ def test_usdt_round_amount_tail_only_on_clash(conn, config):
     other = cryptopay.unique_amount(conn, Decimal("10"))
     assert Decimal("10") < other < Decimal("10.01")
     assert cryptopay.unique_amount(conn, Decimal("15")) == Decimal("15.00")
+
+
+def test_bybit_networks_ready_cards_and_limits(app, config, conn, monkeypatch):
+    """Bybit: сети сразу готовыми карточками (TRC20, BEP20, TON, Aptos), у каждой 3 – 5 000 USDT."""
+    from conftest import csrf_of
+    config.bybit_key, config.bybit_secret = "k", "s"
+    cryptopay._addr_cache.clear()
+    cryptopay._min_cache.clear()
+    payments.save_methods(conn, [{"code": "usdt", "title": "USDT", "currency": "USDT:BEP20", "details": "",
+                                  "enabled": True, "auto": "bybit"}])
+    conf = payments.settings(conn, config)
+    cards = [m for m in conf["all_methods"] if m.get("base") == "usdt"]
+    assert [m["network"] for m in cards] == ["TRC20", "BEP20", "TON", "APTOS"]
+    assert all(m["min_usd"] == "3" and m["max_usd"] == "5000" for m in cards)
+
+    def fake(cfg, path, params):
+        if path.endswith("query-address"):
+            return {"chains": [{"chainType": "Aptos", "chain": "APTOS", "addressDeposit": "0xaptos", "tagDeposit": ""},
+                               {"chainType": "BEP20", "chain": "BSC", "addressDeposit": "0xbsc", "tagDeposit": ""}]}
+        if path.endswith("coin/query-info"):
+            return {"rows": [{"coin": "USDT", "chains": [{"chain": "APTOS", "depositMin": "4"}]}]}
+        return {"rows": []}
+    monkeypatch.setattr(cryptopay, "_bybit_get", fake)
+    uid, c, token = _client(app, conn)
+    page = c.get("/panel/balance").text
+    assert "USDT (Aptos)" in page and "3 – 5 000 USDT за транзакцию" in page
+    r = c.post("/panel/balance", data={"csrf": token, "method": "usdt-bep20", "amount": "2"}, follow_redirects=True)
+    assert "Минимум для USDT (BEP20) — 3 USDT" in r.text
+    r = c.post("/panel/balance", data={"csrf": token, "method": "usdt-bep20", "amount": "6000"}, follow_redirects=True)
+    assert "Максимум для USDT (BEP20)" in r.text
+    r = c.post("/panel/balance", data={"csrf": token, "method": "usdt-aptos", "amount": "3"}, follow_redirects=True)
+    assert "Минимум для USDT (Aptos) — 4 USDT" in r.text            # у Bybit минимум выше нашего
+    # старый код «usdt» (боты, API) — его сеть BEP20
+    r = c.post("/panel/balance", data={"csrf": token, "method": "usdt", "amount": "10"}, follow_redirects=False)
+    p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
+    assert p["method"] == "usdt-bep20" and p["pay_address"] == "0xbsc" and p["pay_amount"] == "10.00"
+
+    # админка: галочки сетей и свои пределы
+    adm = TestClient(app)
+    web_login(adm, "admin@example.com", "adminpass123")
+    page = adm.get("/admin/pay-settings").text
+    assert "Сети USDT" in page and 'name="m0_net_APTOS"' in page
+    form = {"csrf": csrf_of(page), "n": "1", "tjs_rate": "10.9", "min_tjs": "0", "low_usd": "0",
+            "m0_code": "usdt", "m0_title": "USDT", "m0_currency": "USDT", "m0_details": "", "m0_auto": "bybit",
+            "m0_enabled": "1", "m0_nets": "1"}
+    for n in payments.BYBIT_NETS:
+        form |= {f"m0_min_{n}": "3", f"m0_max_{n}": "5000"}
+    form |= {"m0_net_TRC20": "1", "m0_net_SOL": "1", "m0_min_SOL": "5"}
+    adm.post("/admin/pay-settings", data=form)
+    cards = [m for m in payments.settings(conn, config)["all_methods"] if m.get("base") == "usdt"]
+    assert [(m["network"], m["min_usd"]) for m in cards] == [("TRC20", "3"), ("SOL", "5")]

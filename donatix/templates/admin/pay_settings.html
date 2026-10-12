@@ -5,7 +5,7 @@
 <section class="page-hero"><h1>Реквизиты и пополнение</h1><p>Меняйте реквизиты, добавляйте свои способы. Выключенный способ клиенты не видят.</p></section>
 <form method="post" action="/admin/pay-settings" class="pay-form" enctype="multipart/form-data">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <input type="hidden" name="n" value="{{ conf.all_methods | length }}">
+  <input type="hidden" name="n" value="{{ conf.stored | length }}">
 
   <div class="card">
     <h3>Условия</h3>
@@ -32,7 +32,7 @@
 
   <div class="section-title"><h2>Способы оплаты</h2></div>
   <div class="list">
-    {% for m in conf.all_methods + [{'code': '', 'title': '', 'currency': 'TJS', 'choice': 'TJS', 'details': '', 'enabled': True}] %}
+    {% for m in conf.stored + [{'code': '', 'title': '', 'currency': 'TJS', 'choice': 'TJS', 'details': '', 'enabled': True}] %}
     {% set i = loop.index0 %}{% set new = not m.code %}
     <div class="card pm {{ 'pm-new' if new }} {{ 'off' if not m.enabled and not new }}">
       <input type="hidden" name="m{{ i }}_code" value="{{ m.code }}">
@@ -59,12 +59,27 @@
         <label for="m{{ i }}_auto">Автозачисление <span class="muted">— баланс пополнится сам, без чека</span></label>
         <select id="m{{ i }}_auto" name="m{{ i }}_auto">
           <option value="" {{ 'selected' if not m.auto }}>Нет — вручную по чеку</option>
-          <option value="bybit" {{ 'selected' if m.auto == 'bybit' }}>Bybit — адрес пополнения сайт берёт у Bybit сам (выберите сеть в «Валюта») или перевод по UID{{ '' if bybit_ready else ' — сначала ключ Bybit' }}</option>
+          <option value="bybit" {{ 'selected' if m.auto == 'bybit' }}>Bybit — сети USDT готовыми карточками (TRC20, BEP20, TON, Aptos…), адрес сайт берёт у Bybit сам{{ '' if bybit_ready else ' — сначала ключ Bybit' }}</option>
           <option value="trc20" {{ 'selected' if m.auto == 'trc20' }}>Свой кошелёк TRC20 (Trust Wallet, TronLink) — адрес T… в реквизитах</option>
           
           <option value="dcbank" {{ 'selected' if m.auto == 'dcbank' }}>Душанбе Сити — сайт сам видит перевод по уведомлению банка (номер карты в реквизитах{{ '' if dcbank_ready else ', сначала подключите юзербот' }})</option>
           <option value="binance" {{ 'selected' if m.auto == 'binance' }}>Binance Pay{{ '' if binance_ready else ' — сначала добавьте ключи мерчанта' }}</option>
         </select>
+      </div>
+      {% set nets = m.nets_view or m.nets or net_defaults %}
+      <div class="pm-nets">
+        <input type="hidden" name="m{{ i }}_nets" value="1">
+        <b>Сети USDT</b> <span class="muted small">— клиент увидит карточку каждой отмеченной сети. Адрес пополнения сайт берёт у Bybit сам.</span>
+        <div class="pm-nets-grid">
+          {% for n in bybit_nets %}{% set v = nets[n] if n in nets else net_defaults[n] %}
+          <div class="pm-net">
+            <label class="switch"><input type="checkbox" name="m{{ i }}_net_{{ n }}" value="1" {{ 'checked' if v.on }}><span>USDT ({{ net_short[n] }})</span></label>
+            <span class="pm-net-lim"><input name="m{{ i }}_min_{{ n }}" inputmode="decimal" value="{{ v.min }}" aria-label="Минимум, $"> –
+              <input name="m{{ i }}_max_{{ n }}" inputmode="decimal" value="{{ v.max }}" aria-label="Максимум, $"> $</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="hint">ERC20 (Ethereum) — дорогая комиссия для клиента, лучше не включать. Снимите все галочки — будет перевод по Bybit UID из реквизитов.</div>
       </div>
       <div class="pm-icon-row">
         <label for="m{{ i }}_icon">Иконка / логотип <span class="muted">— PNG, JPG или WebP, лучше квадрат 200×200</span></label>
@@ -111,5 +126,13 @@
   </form>
   {% endfor %}
 </section>
+<style>
+.pm-nets { margin-top: 12px; padding: 12px; border: 1px dashed var(--line); border-radius: var(--r); }
+.pm:not(:has(select[name$="_auto"] option[value="bybit"]:checked)) .pm-nets { display: none; }
+.pm-nets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; margin-top: 8px; }
+.pm-net { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 10px; background: var(--bg); }
+.pm-net-lim { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.pm-net-lim input { width: 64px; min-height: 0; padding: 6px 8px; }
+</style>
 <style>.dcv-admin-row{display:grid;gap:8px;padding:14px 0;border-top:1px solid var(--line)}.dcv-admin-row label{display:grid;gap:4px}</style>
 {% endblock %}
