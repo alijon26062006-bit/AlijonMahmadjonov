@@ -433,10 +433,12 @@ def orders_list(request: Request, status: str = "", q: str = "", period: str = "
     if q:
         where += " AND (o.public_id LIKE ? OR o.supplier_order_id LIKE ? OR o.product_name LIKE ? OR u.login LIKE ?)"
         args += [f"%{q}%"] * 4
-    rows = conn.execute(
-        f"SELECT o.*, u.login FROM orders o JOIN users u ON u.id = o.user_id WHERE {where} "
-        f"ORDER BY (o.status = 'attention') DESC, o.id DESC LIMIT 200", args
-    ).fetchall()
+    # Сначала «требуют внимания», потом свежие. Двумя запросами по индексам — без сортировки всей таблицы
+    sel = f"SELECT o.*, u.login FROM orders o JOIN users u ON u.id = o.user_id WHERE {where}"
+    urgent = conn.execute(sel + " AND o.status = 'attention' ORDER BY o.id DESC LIMIT 200", args).fetchall()
+    rest = conn.execute(sel + " AND o.status != 'attention' ORDER BY o.id DESC LIMIT ?",
+                        [*args, 200 - len(urgent)]).fetchall() if len(urgent) < 200 else []
+    rows = urgent + rest
     rows = orders.with_images(conn, rows)
     totals = conn.execute(
         "SELECT COUNT(*) AS n, COALESCE(SUM(o.status = 'completed'), 0) AS done, "

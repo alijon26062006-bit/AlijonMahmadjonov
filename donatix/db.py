@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 CREATE INDEX IF NOT EXISTS orders_user ON orders(user_id, id DESC);
 CREATE INDEX IF NOT EXISTS orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS orders_created ON orders(created_at);   -- админка: заказы за период
 
 CREATE TABLE IF NOT EXISTS transactions (
     id                  INTEGER PRIMARY KEY,
@@ -291,7 +292,7 @@ CREATE TABLE IF NOT EXISTS dcoin_points (
     price  REAL NOT NULL,
     reason TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS dcoin_points_ts ON dcoin_points(ts);
+CREATE INDEX IF NOT EXISTS dcoin_points_tsp ON dcoin_points(ts, price);   -- график: цена по времени прямо из индекса
 CREATE INDEX IF NOT EXISTS visits_session ON visits(session, ts);
 CREATE INDEX IF NOT EXISTS visits_user ON visits(user_id) WHERE user_id IS NOT NULL;
 -- Быстрые отчёты: продажи/деньги за период, посещаемость без чтения всей таблицы
@@ -462,6 +463,7 @@ def init(path: Path | str) -> None:
         ledger_cols = {r[1] for r in conn.execute("PRAGMA table_info(dcoin_ledger)")}
         if "pending" not in ledger_cols:
             conn.execute("ALTER TABLE dcoin_ledger ADD COLUMN pending INTEGER NOT NULL DEFAULT 0")
+        conn.execute("DROP INDEX IF EXISTS dcoin_points_ts")   # заменён на (ts, price) — график читает только индекс
         point_cols = {r[1] for r in conn.execute("PRAGMA table_info(dcoin_points)")}
         if "reserve" not in point_cols:
             conn.execute("ALTER TABLE dcoin_points ADD COLUMN reserve INTEGER NOT NULL DEFAULT 0")

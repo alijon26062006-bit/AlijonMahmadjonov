@@ -157,6 +157,8 @@ def _rebase(conn: sqlite3.Connection) -> None:
     if reserve < 0:
         return
     conn.execute("UPDATE dcoin_points SET price = price * ?", (factor,))
+    from . import cache
+    cache.clear("dcoin:")
     conn.execute("UPDATE dcoin_points SET reserve = ? WHERE id = ?", (reserve, row["id"]))
 
 
@@ -410,10 +412,29 @@ def exchange(conn: sqlite3.Connection, user_id: int, units: int, now: datetime |
 
 
 # ── График: свечи ───────────────────────────────────────────────
+def _buckets(conn: sqlite3.Connection, step: int, since: str, until: str | None) -> dict[int, tuple]:
+    """Мин/макс и цена закрытия в каждом интервале [since, until) — считает база по индексу (ts, price)."""
+    sql = ("SELECT g.b, g.lo, g.hi, p.price AS close FROM (SELECT CAST(strftime('%s', substr(ts, 1, 19)) AS INTEGER) / ? "
+           "AS b, MIN(price) AS lo, MAX(price) AS hi, MAX(id) AS last_id FROM dcoin_points WHERE ts >= ?"
+           + (" AND ts < ?" if until else "") + " GROUP BY b) g JOIN dcoin_points p ON p.id = g.last_id")
+    rows = conn.execute(sql, (step, since, until) if until else (step, since)).fetchall()
+    return {int(r["b"]) * step: (float(r["lo"]), float(r["hi"]), float(r["close"])) for r in rows}
+
+
+def _price_before(conn: sqlite3.Connection, ts: str) -> float:
+    row = conn.execute("SELECT price FROM dcoin_points WHERE ts < ? ORDER BY ts DESC, id DESC LIMIT 1", (ts,)).fetchone()
+    return float(row["price"]) if row else 0.0
+
+
 def candles(conn: sqlite3.Connection, tf: str = "5m", count: int = CANDLES,
             now: datetime | None = None) -> dict[str, Any]:
     """Свечи [время_мс, открытие, максимум, минимум, закрытие] за последние count интервалов
-    (график листается назад — поэтому отдаём с запасом). Пустой интервал — ровная свеча."""
+    (график листается назад — поэтому отдаём с запасом). Пустой интервал — ровная свеча.
+
+    Скорость: прошлые (закрытые) свечи считаются один раз и держатся в памяти, пока не начнётся
+    новый интервал; каждую секунду заново считается только текущая свеча — поэтому даже «1 день»
+    за полгода отвечает за миллисекунды."""
+    from . import cache
     tf = tf if tf in TIMEFRAMES else "5m"
     step = TIMEFRAMES[tf]
     count = max(10, min(MAX_CANDLES, int(count)))
@@ -421,14 +442,16 @@ def candles(conn: sqlite3.Connection, tf: str = "5m", count: int = CANDLES,
     end = int(now.timestamp()) // step * step
     start = end - (count - 1) * step
     since = _iso(datetime.fromtimestamp(start, timezone.utc))
-    before = conn.execute("SELECT price FROM dcoin_points WHERE ts < ? ORDER BY id DESC LIMIT 1", (since,)).fetchone()
-    last = float(before["price"]) if before else 0.0
-    # свечи считает база: мин/макс и последняя цена в каждом интервале — не тянем все точки
-    rows = conn.execute(
-        "SELECT g.b, g.lo, g.hi, p.price AS close FROM (SELECT CAST(strftime('%s', substr(ts, 1, 19)) AS INTEGER) / ? "
-        "AS b, MIN(price) AS lo, MAX(price) AS hi, MAX(id) AS last_id FROM dcoin_points WHERE ts >= ? GROUP BY b) g "
-        "JOIN dcoin_points p ON p.id = g.last_id", (step, since)).fetchall()
-    buckets = {int(r["b"]) * step: (float(r["lo"]), float(r["hi"]), float(r["close"])) for r in rows}
+    cur_from = _iso(datetime.fromtimestamp(end, timezone.utc))
+
+    def closed() -> tuple[float, dict[int, tuple]]:
+        return _price_before(conn, since), _buckets(conn, step, since, cur_from)
+    if step >= 60:   # минуты, часы, дни — прошлое не меняется до нового интервала
+        last, buckets = cache.get_or_set(f"dcoin:candles:{tf}:{count}:{end}", min(step, 300), closed)
+        buckets = dict(buckets)
+    else:            # секунды — и так быстро
+        last, buckets = closed()
+    buckets.update(_buckets(conn, step, cur_from, None))
     out = []
     for t in range(start, end + step, step):
         o = last
@@ -447,12 +470,12 @@ def _site_midnight(conn: sqlite3.Connection, now: datetime | None = None) -> dat
 def _day_stats(conn: sqlite3.Connection, start: datetime, end: datetime) -> dict[str, Any] | None:
     """Сутки 00:00 → 24:00: цена на открытии, закрытии, максимум, минимум и изменение в %."""
     a, b = _iso(start.astimezone(timezone.utc)), _iso(end.astimezone(timezone.utc))
-    before = conn.execute("SELECT price FROM dcoin_points WHERE ts < ? ORDER BY id DESC LIMIT 1", (a,)).fetchone()
+    before = conn.execute("SELECT price FROM dcoin_points WHERE ts < ? ORDER BY ts DESC, id DESC LIMIT 1", (a,)).fetchone()
     row = conn.execute("SELECT MIN(price) AS lo, MAX(price) AS hi, COUNT(*) AS n FROM dcoin_points "
                        "WHERE ts >= ? AND ts < ? AND price > 0", (a, b)).fetchone()
-    last = conn.execute("SELECT price FROM dcoin_points WHERE ts < ? ORDER BY id DESC LIMIT 1", (b,)).fetchone()
+    last = conn.execute("SELECT price FROM dcoin_points WHERE ts < ? ORDER BY ts DESC, id DESC LIMIT 1", (b,)).fetchone()
     first_today = conn.execute("SELECT price FROM dcoin_points WHERE ts >= ? AND ts < ? AND price > 0 "
-                               "ORDER BY id LIMIT 1", (a, b)).fetchone()
+                               "ORDER BY ts, id LIMIT 1", (a, b)).fetchone()
     if before and before["price"] > 0:
         open_p = float(before["price"])
     else:
@@ -476,6 +499,13 @@ def change_today(conn: sqlite3.Connection, now: datetime | None = None) -> float
 def days(conn: sqlite3.Connection, n: int = 14, now: datetime | None = None) -> list[dict[str, Any]]:
     """Итоги прошлых дней: на сколько поднялась и опустилась цена с 00:00 до 24:00. Свежие сверху."""
     today = _site_midnight(conn, now)
+    if now is None:   # прошлые дни не меняются — считаем раз в 10 минут (и заново в полночь)
+        from . import cache
+        return cache.get_or_set(f"dcoin:days:{n}:{today.isoformat()}", 600, lambda: _days(conn, n, today))
+    return _days(conn, n, today)
+
+
+def _days(conn: sqlite3.Connection, n: int, today: datetime) -> list[dict[str, Any]]:
     out = []
     for back in range(1, n + 1):
         start = today - timedelta(days=back)
