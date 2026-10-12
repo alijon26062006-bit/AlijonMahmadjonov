@@ -60,10 +60,20 @@ AUDIENCES = {
 # ============================================================ главный экран
 
 
+def sale_rows(kb: InlineKeyboardBuilder, back: str) -> None:
+    """Кнопки «Продажа звёзд / Premium» — на самом видном месте. Бот сам гасит продажу, если подряд
+    не проходят заказы (кончились деньги), — владелец должен сразу видеть это и включать одной кнопкой."""
+    for key, label in (("stars_enabled", "⭐️ Звёзды"), ("premium_enabled", "👑 Premium")):
+        on = runtime.get_bool(key)
+        kb.row(btn(f"{label}: ✅ продаются · выключить" if on else f"{label}: 🚫 ВЫКЛЮЧЕНЫ · нажмите, чтобы включить",
+                   f"pn:toggle:{key}:{back}", style=None if on else SUCCESS))
+
+
 def home_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     from app.handlers import donatix
     if donatix.enabled():
+        sale_rows(kb, "home")
         # Бот из конструктора Donatix: только то, что нужно продавцу. Ключи, связь с
         # поставщиком, кошелёк и прочее ведёт сам Donatix.
         kb.row(btn("🏦 Счёт Donatix · пополнить", "dx:home", style=SUCCESS))
@@ -74,6 +84,7 @@ def home_kb() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="💳 Реквизиты", callback_data="pn:pay"),
         )
         kb.row(btn("👥 Мои клиенты · поиск и история", "pn:users", style=PRIMARY))
+        kb.row(InlineKeyboardButton(text="🔀 Разделы бота (звёзды, Premium, пополнение)", callback_data="pn:toggles"))
         kb.row(
             InlineKeyboardButton(text="📢 Обязательная подписка", callback_data="pn:sponsor"),
             InlineKeyboardButton(text="⭐️ Канал отзывов", callback_data="pn:reviews"),
@@ -155,11 +166,15 @@ async def home_text(conn: aiosqlite.Connection) -> str:
         alerts.append(f"⚠️ Заказов зависло: <b>{data['failed_orders']}</b>")
     if not runtime.get("pay_card_number"):
         alerts.append("❗️ <b>Не заданы реквизиты</b> — деньги принять нельзя")
+    from app.handlers import donatix as _dx
     if runtime.get_bool("autostopped"):
         alerts.append(
-            "🛑 <b>Продажа выключена ботом</b> — выдача не проходит. "
-            "Проверьте кошелёк."
+            "🛑 <b>Продажа выключена ботом</b> — заказы подряд не проходили. "
+            + ("Пополните «Счёт Donatix» и включите кнопками ниже." if _dx.enabled() else "Проверьте кошелёк.")
         )
+    elif not runtime.get_bool("stars_enabled") or not runtime.get_bool("premium_enabled"):
+        off = [t for k, t in (("stars_enabled", "звёзды"), ("premium_enabled", "Premium")) if not runtime.get_bool(k)]
+        alerts.append(f"🚫 <b>Не продаются: {', '.join(off)}</b> — клиенты их не видят. Включить — кнопкой ниже.")
     elif runtime.get_int("fail_streak"):
         alerts.append(
             f"⚠️ Подряд не прошло заказов: <b>{runtime.get_int('fail_streak')}</b>"
@@ -221,6 +236,7 @@ async def cb_help(call: CallbackQuery) -> None:
 
 def prices_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    sale_rows(kb, "prices")
     kb.row(
         InlineKeyboardButton(text="💲 Себестоимость", callback_data="pn:set:star_cost_e4"),
         InlineKeyboardButton(text="📈 Наценка %", callback_data="pn:set:margin_percent"),
@@ -1167,7 +1183,9 @@ async def cb_topby(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
 
 @router.callback_query(F.data.startswith("pn:toggle:"))
 async def cb_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
-    key = call.data.rsplit(":", 1)[1]
+    parts = call.data.split(":")   # pn:toggle:<ключ>[:home|prices]
+    key = parts[2] if len(parts) > 2 else ""
+    back = parts[3] if len(parts) > 3 else "toggles"
     if key not in ("stars_enabled", "premium_enabled", "deposit_enabled"):
         await call.answer("Неизвестный раздел.", show_alert=True)
         return
@@ -1178,8 +1196,14 @@ async def cb_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
     # уже предупреждала, и следующее отключение пройдёт молча.
     if turning_on and key in ("stars_enabled", "premium_enabled"):
         await runtime.set_value(conn, "autostopped", "0")
-    await call.answer("Готово")
-    await safe_edit(call, toggles_text(), toggles_kb())
+        await runtime.set_value(conn, "fail_streak", "0")
+    await call.answer("Включено ✅" if turning_on else "Выключено")
+    if back == "home":
+        await show_home(call, conn)
+    elif back == "prices":
+        await safe_edit(call, prices_text(), prices_kb())
+    else:
+        await safe_edit(call, toggles_text(), toggles_kb())
 
 
 # ============================================================== списки
