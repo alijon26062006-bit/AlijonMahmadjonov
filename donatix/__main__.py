@@ -60,10 +60,12 @@ def main(argv: list[str] | None = None) -> int:
         if workers > 1:
             logging.getLogger("donatix").info("сайт: %s процесса(ов)", workers)
             uvicorn.run("donatix.app:factory", factory=True, workers=workers, host=args.host, port=args.port,
-                        proxy_headers=True, forwarded_allow_ips="127.0.0.1")
+                        proxy_headers=True, forwarded_allow_ips="127.0.0.1", timeout_graceful_shutdown=3)
         else:
+            # «Живые» соединения страниц (/panel/data/live) открыты всегда — при перезапуске не ждём их
+            # 90 секунд: через 3 с закрываем, браузеры сами переподключатся к новому процессу
             uvicorn.run(create_app(config), host=args.host, port=args.port, proxy_headers=True,
-                        forwarded_allow_ips="127.0.0.1")
+                        forwarded_allow_ips="127.0.0.1", timeout_graceful_shutdown=3)
         return 0
 
     if args.cmd in ("bank-login", "bank-listen"):
