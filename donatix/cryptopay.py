@@ -42,6 +42,7 @@ BYBIT = "https://api.bybit.com"
 UNIQUE_KINDS = ("trc20", "bybit")   # у этих перевод узнаём по «хвосту» суммы
 WINDOW_HOURS = 48          # сколько ждём перевод по заявке
 PAY_MINUTES = 15           # USDT (TRC20, Bybit): на оплату 15 минут, потом заявка закрывается
+LATE_HOURS = 3             # перевод позже 15 минут ещё ловим 3 часа, потом сумма свободна для других
 EXPIRED_NOTE = "Время на оплату (15 минут) вышло — создайте новую заявку"
 
 _lock = threading.Lock()
@@ -61,14 +62,18 @@ def tron_address(details: str) -> str:
 
 
 def unique_amount(conn: sqlite3.Connection, usd: Decimal) -> Decimal:
-    """Сумма к переводу с «хвостом» 0.0001–0.0099, которого нет у других ждущих заявок."""
+    """Сумма к переводу. Обычно ровная (10.00): кто заплатил — узнаём по сумме. «Хвост» 0.0001–0.0099
+    добавляем, только если такую же сумму сейчас ждём от другого клиента, — иначе переводы не различить."""
     base = usd.quantize(Decimal("0.01"), rounding=ROUND_UP)
-    taken = {r[0] for r in conn.execute(
+    taken = {Decimal(r[0]) for r in conn.execute(
         "SELECT pay_amount FROM payments WHERE auto_kind IN ('trc20', 'bybit') AND (status = 'pending' "
-        "OR (status = 'cancelled' AND admin_note = ? AND created_at >= ?))", (EXPIRED_NOTE, _since_hours(WINDOW_HOURS)))}
+        "OR (status = 'cancelled' AND admin_note = ? AND created_at >= ?))", (EXPIRED_NOTE, _since_hours(LATE_HOURS)))
+        if r[0]}
+    if base not in taken:
+        return base
     for _ in range(200):
         amount = base + Decimal(secrets.randbelow(99) + 1) / 10000
-        if str(amount) not in taken:
+        if amount not in taken:
             return amount
     raise CryptoPayError("Слишком много заявок одновременно — попробуйте через минуту.")
 
@@ -79,9 +84,9 @@ def _since_hours(hours: float) -> str:
 
 def _waiting(conn: sqlite3.Connection, kind: str) -> list[sqlite3.Row]:
     """Ждущие заявки и закрытые по таймеру (вдруг клиент перевёл чуть позже 15 минут — деньги не теряем)."""
-    rows = conn.execute("SELECT * FROM payments WHERE auto_kind = ? AND (status = 'pending' "
-                        "OR (status = 'cancelled' AND admin_note = ?)) AND created_at >= ? ORDER BY id",
-                        (kind, EXPIRED_NOTE, _since_hours(WINDOW_HOURS))).fetchall()
+    rows = conn.execute("SELECT * FROM payments WHERE auto_kind = ? AND ((status = 'pending' AND created_at >= ?) "
+                        "OR (status = 'cancelled' AND admin_note = ? AND created_at >= ?)) ORDER BY id",
+                        (kind, _since_hours(WINDOW_HOURS), EXPIRED_NOTE, _since_hours(LATE_HOURS))).fetchall()
     return [r for r in rows if time.time() * 1000 - _ms(r["created_at"]) < WINDOW_HOURS * 3600 * 1000]
 
 

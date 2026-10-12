@@ -102,8 +102,9 @@
   <div class="flash error">Заявка закрыта{% if p.note %}: {{ p.note }}{% endif %}.</div>
   <a class="btn block" href="/panel/balance">Создать новую</a>
   {% else %}
+  {% set amt = p.pay_amount.rstrip('0').rstrip('.') if '.' in p.pay_amount and p.pay_amount.endswith('00') else p.pay_amount %}
   <div class="ap-label">К оплате</div>
-  <div class="ap-amount"><span id="ap-sum">{{ p.pay_amount }}</span> {{ p.pay_currency }}
+  <div class="ap-amount"><span id="ap-sum">{{ amt }}</span> {{ p.pay_currency }}
     <button type="button" class="icon-btn" data-copy="{{ p.pay_amount }}" aria-label="Скопировать сумму">{{ icon('copy', 18) }}</button></div>
   <div class="ap-sub">Будет зачислено: <b>{{ money(p.amount_usd) }}</b></div>
   {% if pay_left %}<div class="ap-timer" id="ap-timer" data-left="{{ pay_left }}">⏱ Оплатите за <b>{{ pay_left // 60 }}:{{ '%02d' % (pay_left % 60) }}</b></div>{% endif %}
@@ -113,7 +114,8 @@
   <div class="ap-label" style="margin-top:14px">Адрес USDT · сеть Tron (TRC20)</div>
   <div class="key-box"><code class="mono">{{ p.address }}</code>
     <button type="button" class="icon-btn" data-copy="{{ p.address }}" aria-label="Скопировать адрес">{{ icon('copy', 18) }}</button></div>
-  <div class="flash error net-warn">⚠️ Переведите <b>ровно {{ p.pay_amount }} USDT</b> в сети <b>TRC20</b>. По последним цифрам суммы мы узнаём ваш перевод — другая сумма или сеть не зачислится автоматически.</div>
+  <div class="flash error net-warn"><span>⚠️</span><span>Только <b>USDT</b> и только сеть <b>TRC20</b>. На адрес должно <b>прийти ровно {{ amt }} USDT</b> — по сумме мы узнаём ваш перевод.
+    <br><b>Комиссию сети и биржи платите вы</b>: переводите с биржи — прибавьте её комиссию сверху. Придёт меньше или в другой сети — автоматически не зачислится.</span></div>
   {% elif p.auto == 'bybit' and p.network %}
   <div class="ap-qr">{{ p.address | qr_svg }}<small>Наведите камеру кошелька</small></div>
   <div class="ap-label" style="margin-top:14px">Адрес USDT · сеть <b>{{ p.network }}</b></div>
@@ -122,13 +124,13 @@
   {% if p.memo %}<div class="ap-label" style="margin-top:10px">Memo / тег — <b>обязательно укажите</b></div>
   <div class="key-box"><code class="mono">{{ p.memo }}</code>
     <button type="button" class="icon-btn" data-copy="{{ p.memo }}" aria-label="Скопировать memo">{{ icon('copy', 18) }}</button></div>{% endif %}
-  <div class="flash error net-warn">⚠️ Только <b>USDT</b> и только сеть <b>{{ p.network }}</b>. Должно <b>прийти ровно {{ p.pay_amount }} USDT</b>:
-    если переводите с биржи, прибавьте её комиссию. По последним цифрам суммы мы узнаём ваш перевод.</div>
+  <div class="flash error net-warn"><span>⚠️</span><span>Только <b>USDT</b> и только сеть <b>{{ p.network }}</b>. На адрес должно <b>прийти ровно {{ amt }} USDT</b> — по сумме мы узнаём ваш перевод.
+    <br><b>Комиссию сети и биржи платите вы</b>: переводите с биржи — прибавьте её комиссию сверху. Придёт меньше или в другой сети — автоматически не зачислится.</span></div>
   {% elif p.auto == 'bybit' %}
   <div class="ap-label" style="margin-top:14px">Bybit UID получателя</div>
   <div class="key-box"><code class="mono">{{ p.address }}</code>
     <button type="button" class="icon-btn" data-copy="{{ p.address }}" aria-label="Скопировать UID">{{ icon('copy', 18) }}</button></div>
-  <div class="flash error net-warn">⚠️ В приложении Bybit: <b>Активы → Перевод → По UID</b>, монета USDT, сумма <b>ровно {{ p.pay_amount }}</b>. По последним цифрам суммы мы узнаём ваш перевод.</div>
+  <div class="flash error net-warn"><span>⚠️</span><span>В приложении Bybit: <b>Активы → Перевод → По UID</b>, монета USDT, сумма <b>ровно {{ amt }}</b> — по сумме мы узнаём ваш перевод.</span></div>
   {% elif p.auto == 'binance' %}
   <a class="btn primary block lg" href="{{ p.pay_url }}" target="_blank" rel="noopener" style="margin-top:14px">Оплатить в Binance</a>
   {% endif %}

@@ -28,7 +28,7 @@ def test_trc20_auto_credit(app, config, conn, monkeypatch):
     assert r.headers["location"].endswith("/pay")
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
     amount = Decimal(p["pay_amount"])
-    assert p["auto_kind"] == "trc20" and p["pay_address"] == ADDR and Decimal("20") < amount < Decimal("20.01")
+    assert p["auto_kind"] == "trc20" and p["pay_address"] == ADDR and amount == Decimal("20")   # ровная сумма
     page = c.get(r.headers["location"]).text
     assert p["pay_amount"] in page and ADDR in page
 
@@ -36,7 +36,7 @@ def test_trc20_auto_credit(app, config, conn, monkeypatch):
     monkeypatch.setattr(cryptopay, "_get_json", lambda url, params, headers: {"data": txs})
     assert cryptopay.check_all(conn, config) == 0          # денег ещё нет
     ts = cryptopay._ms(p["created_at"]) + 5000
-    txs.append({"transaction_id": "tx-wrong", "to": ADDR, "value": "20000000", "block_timestamp": ts,
+    txs.append({"transaction_id": "tx-wrong", "to": ADDR, "value": "19990000", "block_timestamp": ts,
                 "token_info": {"address": cryptopay.USDT_TRC20, "decimals": 6}})
     txs.append({"transaction_id": "tx-ok", "to": ADDR, "value": str(int(amount * 1_000_000)), "block_timestamp": ts,
                 "token_info": {"address": cryptopay.USDT_TRC20, "decimals": 6}})
@@ -182,3 +182,13 @@ def test_balance_crypto_pane(app, config, conn):
     page = c.get("/panel/balance").text
     assert "Криптовалюта · USDT" in page and 'id="cx-pane"' in page and 'id="cryptoform"' in page
     assert "USDT (TRC20)" in page and "USDT (BEP20)" in page and "1 000 USDT" in page
+
+
+def test_usdt_round_amount_tail_only_on_clash(conn, config):
+    """Сумма ровная; «хвост» — только когда такую же сумму уже ждём от другого клиента."""
+    assert cryptopay.unique_amount(conn, Decimal("10")) == Decimal("10.00")
+    conn.execute("INSERT INTO payments (user_id, method, amount_micro, pay_amount, pay_currency, status, auto_kind, "
+                 "created_at) VALUES (1, 'usdt', 100000, '10.00', 'USDT', 'pending', 'bybit', ?)", (cryptopay.db.now(),))
+    other = cryptopay.unique_amount(conn, Decimal("10"))
+    assert Decimal("10") < other < Decimal("10.01")
+    assert cryptopay.unique_amount(conn, Decimal("15")) == Decimal("15.00")
