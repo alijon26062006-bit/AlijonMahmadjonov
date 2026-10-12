@@ -122,9 +122,13 @@ def clean_methods(methods_in: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if not tron_address(details):
                 raise PaymentError(f"«{title}»: для автозачисления TRC20 в реквизитах нужен адрес кошелька (T…).")
         elif auto == "bybit":
-            currency, network = "USDT", ""
-            if not re.search(r"\d{5,12}", details):
-                raise PaymentError(f"«{title}»: для автозачисления Bybit в реквизитах нужен ваш Bybit UID (цифры).")
+            # Сеть выбрана — адрес пополнения этой сети сайт берёт у Bybit сам; без сети — перевод по UID
+            currency = "USDT"
+            if network:
+                details = details or f"Адрес USDT ({network}) выдаст Bybit автоматически"
+            elif not re.search(r"\d{5,12}", details):
+                raise PaymentError(f"«{title}»: для автозачисления Bybit в реквизитах нужен ваш Bybit UID (цифры) "
+                                   "или выберите сеть (TRC20, BEP20, TON) — тогда адрес даст Bybit сам.")
         elif auto == "binance":
             currency, network = "USDT", ""
             details = details or "Оплата через Binance Pay — кнопка появится после ввода суммы"
@@ -675,10 +679,13 @@ def public(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) -> dict[str
         "note": p["admin_note"] or "", "created_at": p["created_at"], "resolved_at": p["resolved_at"],
         "auto": p["auto_kind"] or "", "pay_url": (p["pay_url"] or "") if p["status"] == "pending" else "",
         "address": (p["pay_address"] or "") if p["status"] == "pending" else "",
+        "memo": (p["pay_memo"] or "") if p["status"] == "pending" and "pay_memo" in p.keys() else "",
         "auto_note": ("Переведите ровно эту сумму USDT (TRC20) — баланс пополнится сам за 1–3 минуты, чек не нужен."
                       if p["auto_kind"] == "trc20" else
-                      "Переведите в Bybit ровно эту сумму USDT по UID (Активы → Перевод → по UID) — "
-                      "баланс пополнится сам за 1–3 минуты, чек не нужен."
+                      (f"Переведите ровно эту сумму USDT в сети {network} на этот адрес — баланс пополнится сам "
+                       "за 1–5 минут, чек не нужен." if network else
+                       "Переведите в Bybit ровно эту сумму USDT по UID (Активы → Перевод → по UID) — "
+                       "баланс пополнится сам за 1–3 минуты, чек не нужен.")
                       if p["auto_kind"] == "bybit" else
                       "Оплатите по ссылке в Binance — баланс пополнится сам, чек не нужен."
                       if p["auto_kind"] == "binance" else

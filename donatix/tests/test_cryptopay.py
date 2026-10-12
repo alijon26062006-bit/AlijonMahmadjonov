@@ -118,3 +118,30 @@ def test_bybit_needs_uid(conn, config):
     import pytest
     with pytest.raises(payments.PaymentError):
         _method(conn, config, "bybit", "без номера")
+
+
+def test_bybit_network_address_from_bybit(app, config, conn, monkeypatch):
+    """Способ «Bybit» с выбранной сетью: адрес пополнения сайт берёт у Bybit сам, UID не нужен."""
+    config.bybit_key, config.bybit_secret = "k", "s"
+    cryptopay._addr_cache.clear()
+    payments.save_methods(conn, [{"code": "usdt", "title": "USDT TRC20", "currency": "USDT:TRC20", "details": "",
+                                  "enabled": True, "auto": "bybit"}])
+    deposits = []
+
+    def fake(cfg, path, params):
+        if path.endswith("query-address"):
+            return {"coin": "USDT", "chains": [
+                {"chainType": "ERC20", "chain": "ETH", "addressDeposit": "0xabc", "tagDeposit": ""},
+                {"chainType": "TRC20", "chain": "TRX", "addressDeposit": "TXyzBybitDepositAddr", "tagDeposit": ""}]}
+        return {"rows": deposits if path.endswith("query-record") else []}
+    monkeypatch.setattr(cryptopay, "_bybit_get", fake)
+    uid, c, token = _client(app, conn)
+    r = c.post("/panel/balance", data={"csrf": token, "method": "usdt", "amount": "20"}, follow_redirects=False)
+    p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
+    assert p["auto_kind"] == "bybit" and p["pay_address"] == "TXyzBybitDepositAddr"
+    page = c.get(r.headers["location"]).text
+    assert "TXyzBybitDepositAddr" in page and "сеть <b>TRC20</b>" in page
+    deposits.append({"txID": "0xdead", "amount": p["pay_amount"], "depositStatus": 3,
+                     "successAt": str(cryptopay._ms(p["created_at"]) + 5000), "coin": "USDT"})
+    assert cryptopay.check_all(conn, config) == 1
+    assert balance(conn, uid) == 200_000

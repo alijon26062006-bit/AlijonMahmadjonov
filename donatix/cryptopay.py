@@ -170,6 +170,31 @@ def _bybit_get(config: Config, path: str, params: dict[str, Any]) -> dict[str, A
     return data.get("result") or {}
 
 
+# Сеть способа оплаты → как её называет Bybit
+BYBIT_CHAINS = {"TRC20": ("TRX", "TRC20"), "BEP20": ("BSC", "BEP20"), "TON": ("TON",), "ERC20": ("ETH", "ERC20")}
+_addr_cache: dict[str, tuple[float, tuple[str, str]]] = {}
+
+
+def bybit_address(config: Config, network: str) -> tuple[str, str]:
+    """Адрес пополнения USDT на вашем Bybit в этой сети (и memo/тег, если сеть его требует). Держим час."""
+    hit = _addr_cache.get(network)
+    if hit and time.monotonic() - hit[0] < 3600:
+        return hit[1]
+    names = BYBIT_CHAINS.get(network)
+    if not names:
+        raise CryptoPayError(f"Сеть {network} для Bybit не поддерживается.")
+    chains = _bybit_get(config, "/v5/asset/deposit/query-address", {"coin": "USDT"}).get("chains") or []
+    for c in chains:
+        if str(c.get("chain", "")).upper() in names or str(c.get("chainType", "")).upper() in names:
+            addr = str(c.get("addressDeposit") or "").strip()
+            if addr:
+                got = (addr, str(c.get("tagDeposit") or "").strip())
+                _addr_cache[network] = (time.monotonic(), got)
+                return got
+    raise CryptoPayError(f"Bybit не дал адрес USDT в сети {network}. Откройте в Bybit «Активы → Пополнить → USDT → "
+                         f"{network}» один раз, чтобы адрес создался, и попробуйте снова.")
+
+
 def bybit_incoming(config: Config, since_ms: int) -> list[dict[str, Any]]:
     """Зачисленные USDT на аккаунт Bybit: внутренние переводы (по UID) и пополнения из блокчейна."""
     end = int(time.time() * 1000)
@@ -310,9 +335,16 @@ def start(conn: sqlite3.Connection, config: Config, payment_id: int, method: dic
         address = tron_address(method.get("details", ""))
         conn.execute("UPDATE payments SET auto_kind = 'trc20', pay_address = ? WHERE id = ?", (address, payment_id))
     elif kind == "bybit":
-        uid = re.search(r"\d{5,12}", method.get("details", ""))
-        conn.execute("UPDATE payments SET auto_kind = 'bybit', pay_address = ? WHERE id = ?",
-                     (uid.group(0) if uid else method.get("details", "")[:60], payment_id))
+        from .payments import guess_network
+        network = guess_network(method)
+        if network:   # адрес пополнения выбранной сети — сразу у Bybit
+            address, memo = bybit_address(config, network)
+            conn.execute("UPDATE payments SET auto_kind = 'bybit', pay_address = ?, pay_memo = ? WHERE id = ?",
+                         (address, memo or None, payment_id))
+        else:
+            uid = re.search(r"\d{5,12}", method.get("details", ""))
+            conn.execute("UPDATE payments SET auto_kind = 'bybit', pay_address = ? WHERE id = ?",
+                         (uid.group(0) if uid else method.get("details", "")[:60], payment_id))
     elif kind == "binance":
         order = binance_create(config, payment_id, p["pay_amount"])
         conn.execute("UPDATE payments SET auto_kind = 'binance', ext_id = ?, pay_url = ? WHERE id = ?",

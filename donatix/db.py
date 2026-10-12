@@ -399,7 +399,7 @@ def init(path: Path | str) -> None:
                           ("active_since", "TEXT"), ("disabled_reason", "TEXT")):
             if col not in bot_cols:  # неактивные боты: предупреждения и автоотключение
                 conn.execute(f"ALTER TABLE bots ADD COLUMN {col} {kind}")
-        for col in ("auto_kind", "ext_id", "pay_url", "pay_address"):  # автоплатёж: TRC20 / Binance Pay
+        for col in ("auto_kind", "ext_id", "pay_url", "pay_address", "pay_memo"):  # автоплатёж: TRC20 / Binance Pay
             if col not in pay_cols:
                 conn.execute(f"ALTER TABLE payments ADD COLUMN {col} TEXT")
         try:   # один перевод (код операции банка, хэш USDT) — одно зачисление, даже если два процесса проверяют разом
