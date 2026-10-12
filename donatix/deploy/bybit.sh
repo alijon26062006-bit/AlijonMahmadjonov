@@ -19,7 +19,9 @@ KEY="${1:-}"; SECRET="${2:-}"
 
 # Спросить у Bybit сведения о самом ключе: работает ли и какие у него права
 INFO=$(KEY="$KEY" SECRET="$SECRET" python3 - <<'PY'
-import hashlib, hmac, json, os, time, urllib.request
+import hashlib, hmac, json, os, socket, time, urllib.request
+_orig = socket.getaddrinfo   # только IPv4: ключ привязан к IPv4 сервера
+socket.getaddrinfo = lambda host, *a, **k: [x for x in _orig(host, *a, **k) if x[0] == socket.AF_INET]
 key, secret = os.environ["KEY"], os.environ["SECRET"]
 ts, window = str(int(time.time() * 1000)), "10000"
 sign = hmac.new(secret.encode(), f"{ts}{key}{window}".encode(), hashlib.sha256).hexdigest()

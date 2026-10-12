@@ -159,7 +159,9 @@ def _bybit_get(config: Config, path: str, params: dict[str, Any]) -> dict[str, A
     headers = {"X-BAPI-API-KEY": config.bybit_key, "X-BAPI-TIMESTAMP": ts, "X-BAPI-RECV-WINDOW": window,
                "X-BAPI-SIGN": sign}
     try:
-        r = httpx.get(f"{BYBIT}{path}?{query}", headers=headers, timeout=15)
+        # Только IPv4: ключ Bybit привязан к IPv4 сервера, а IPv6 Bybit в белый список не принимает
+        with httpx.Client(transport=httpx.HTTPTransport(local_address="0.0.0.0"), timeout=15) as client:
+            r = client.get(f"{BYBIT}{path}?{query}", headers=headers)
         data = r.json()
     except (httpx.HTTPError, ValueError) as exc:
         raise CryptoPayError(f"Bybit не отвечает: {exc}") from exc
