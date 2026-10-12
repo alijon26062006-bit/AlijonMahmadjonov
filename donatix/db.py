@@ -411,6 +411,10 @@ def init(path: Path | str) -> None:
             conn.execute("ALTER TABLE vnumbers ADD COLUMN kind TEXT NOT NULL DEFAULT 'activation'")
         if vn_cols and "sms_json" not in vn_cols:
             conn.execute("ALTER TABLE vnumbers ADD COLUMN sms_json TEXT NOT NULL DEFAULT '[]'")
+        rv_cols = {r[1] for r in conn.execute("PRAGMA table_info(reviews)")}
+        if rv_cols and "ai_state" not in rv_cols:   # ИИ отвечает на отзывы
+            conn.execute("ALTER TABLE reviews ADD COLUMN ai_state TEXT NOT NULL DEFAULT 'pending'")
+            conn.execute("ALTER TABLE reviews ADD COLUMN ai_note TEXT NOT NULL DEFAULT ''")
         key_cols = {r[1] for r in conn.execute("PRAGMA table_info(api_keys)")}
         if "key_enc" not in key_cols:
             conn.execute("ALTER TABLE api_keys ADD COLUMN key_enc TEXT")
@@ -620,6 +624,8 @@ CREATE TABLE IF NOT EXISTS reviews (          -- отзывы покупател
     reply_at    TEXT,
     reply_by    INTEGER REFERENCES users(id),
     hidden      INTEGER NOT NULL DEFAULT 0,    -- скрыт админом (спам, оскорбления)
+    ai_state    TEXT NOT NULL DEFAULT 'pending',  -- ИИ: pending · reply · hide · skip · error
+    ai_note     TEXT NOT NULL DEFAULT '',          -- почему ИИ так решил
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );

@@ -24,6 +24,7 @@
   {% if admin %}
   <div class="rv-admin">
     {% if r.order %}<a class="muted small" href="/admin/orders?q={{ r.order }}">Заказ {{ r.order }}</a>{% endif %}
+    {% if r.ai_state in ['reply', 'hide', 'skip', 'error'] %}<span class="rv-ai rv-ai-{{ r.ai_state }}">🤖 {{ {'reply': 'ИИ ответил', 'hide': 'ИИ скрыл', 'skip': 'ИИ оставил вам', 'error': 'ИИ не ответил'}[r.ai_state] }}{% if r.ai_note %} — {{ r.ai_note }}{% endif %}</span>{% endif %}
     <form method="post" action="/admin/reviews/{{ r.id }}/reply">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <textarea name="text" rows="3" maxlength="1500" placeholder="Ответ от {{ site_name }}…">{{ r.reply or '' }}</textarea>
@@ -61,6 +62,8 @@
   .rv-reply p { margin: 4px 0 0; font-size: .9rem; line-height: 1.5; white-space: pre-line; }
   .rv-admin { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
   .rv-admin textarea { width: 100%; margin: 6px 0; }
+  .rv-ai { display: block; margin-top: 4px; font-size: .78rem; color: var(--muted); }
+  .rv-ai-hide { color: var(--bad); } .rv-ai-reply { color: var(--ok); }
   .rv-admin-btns { display: flex; gap: 8px; }
   .rv-sum { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; }
   .rv-avg { text-align: center; } .rv-avg b { display: block; font-size: 2.6rem; line-height: 1; font-weight: 800; }

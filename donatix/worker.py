@@ -163,6 +163,11 @@ class Worker:
                 except Exception:
                     log.exception("виртуальные номера")
                 try:
+                    from . import review_ai
+                    review_ai.maybe_run(conn, self.config)   # ИИ: ответ на отзывы про заказы, спам — скрыть
+                except Exception:
+                    log.exception("отзывы ИИ")
+                try:
                     from . import glory
                     glory.maybe_watch(conn, self.config)   # Glory клана: работает ли группа, сколько очков
                 except Exception:

@@ -73,8 +73,8 @@ def add(conn: sqlite3.Connection, config: Any, user: sqlite3.Row, public_id: str
     if old is not None:
         if old["reply_text"]:
             raise ReviewError("Магазин уже ответил на отзыв — изменить его нельзя.")
-        conn.execute("UPDATE reviews SET rating = ?, text = ?, updated_at = ? WHERE id = ?",
-                     (rating, text, db.now(), old["id"]))
+        conn.execute("UPDATE reviews SET rating = ?, text = ?, hidden = 0, ai_state = 'pending', updated_at = ? "
+                     "WHERE id = ?", (rating, text, db.now(), old["id"]))
         return int(old["id"])
     rid = int(conn.execute(
         "INSERT INTO reviews (user_id, order_id, rating, text, game, product, created_at, updated_at) "
@@ -87,7 +87,8 @@ def add(conn: sqlite3.Connection, config: Any, user: sqlite3.Row, public_id: str
     return rid
 
 
-def reply(conn: sqlite3.Connection, config: Any, admin: sqlite3.Row, rid: int, text: str) -> None:
+def reply(conn: sqlite3.Connection, config: Any, admin: sqlite3.Row | None, rid: int, text: str) -> None:
+    """admin=None — ответил ИИ."""
     text = (text or "").strip()[:MAX_REPLY]
     r = conn.execute("SELECT * FROM reviews WHERE id = ?", (rid,)).fetchone()
     if r is None:
@@ -98,7 +99,7 @@ def reply(conn: sqlite3.Connection, config: Any, admin: sqlite3.Row, rid: int, t
         return
     first = not r["reply_text"]
     conn.execute("UPDATE reviews SET reply_text = ?, reply_at = ?, reply_by = ?, updated_at = ? WHERE id = ?",
-                 (text, db.now(), admin["id"], db.now(), rid))
+                 (text, db.now(), admin["id"] if admin else None, db.now(), rid))
     if first:
         from .notify import notify
         notify(conn, config, r["user_id"], f"Магазин ответил на ваш отзыв: {text[:160]}", "/reviews#r" + str(rid))
@@ -116,7 +117,8 @@ def _view(r: sqlite3.Row) -> dict[str, Any]:
     return {"id": r["id"], "name": name, "initials": initials, "hue": hue, "rating": r["rating"], "text": r["text"],
             "game": r["game"], "product": r["product"], "reply": r["reply_text"], "reply_at": r["reply_at"],
             "created_at": r["created_at"], "hidden": bool(r["hidden"]), "order": r["public_id"],
-            "user_id": r["user_id"]}
+            "user_id": r["user_id"], "ai_state": r["ai_state"], "ai_note": r["ai_note"],
+            "ai_reply": bool(r["reply_text"]) and r["reply_by"] is None}
 
 
 _SELECT = ("SELECT r.*, u.login, o.public_id FROM reviews r JOIN users u ON u.id = r.user_id "
