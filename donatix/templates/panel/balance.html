@@ -2,6 +2,15 @@
 {% from "_icons.html" import icon %}
 {% block title %}Баланс — {{ site_name }}{% endblock %}
 {% block content %}
+<style>
+  .pay-copy { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 10px 12px; margin-bottom: 8px;
+    border: 1px solid var(--accent-line, var(--line)); border-radius: var(--r); background: var(--accent-soft); }
+  .pay-copy small { display: block; color: var(--muted); font-size: .75rem; } .pay-copy b { font-size: 1.05rem; letter-spacing: .02em; word-break: break-all; }
+  .pay-copy .btn { flex: none; }
+  .pay-how { margin: 8px 0; padding: 10px 12px; border-radius: var(--r); background: var(--bg); border: 1px solid var(--line); font-size: .88rem; }
+  .pay-how ol { margin: 6px 0 0; padding-left: 20px; } .pay-how li { margin: 3px 0; }
+  .pay-warn { margin: 8px 0 12px; padding: 9px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn); font-size: .82rem; }
+</style>
 <section class="page-hero"><h1>{{ 'Оплата покупки' if buy else 'Баланс' }}</h1></section>
 
 <div class="grid two" style="align-items:start">
@@ -90,13 +99,29 @@
       <label for="amount" id="amount-label">{{ 'Сумма покупки, сомони' if buy else 'Сколько пополнить, сомони' }}</label>
       <input id="amount" name="amount_tjs" inputmode="decimal" required placeholder="Например, 500" autocomplete="off" {% if buy %}value="{{ buy.tjs }}" readonly{% endif %}>
       <div class="flash warn usd-warn" id="usd-warn" hidden role="alert"></div>
-      <div class="hint">{% if buy %}{% elif min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони (≈ {{ money(min_usd) }}). {% else %}Любая сумма. {% endif %}К переводу: <b id="topay">—</b></div>
+      <div class="hint">{% if buy %}{% elif min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони (≈ {{ money(min_usd) }}). {% else %}Любая сумма. {% endif %}К переводу: <b id="topay">—</b> <button type="button" class="btn sm" id="topay-copy" hidden data-copy="">📋 сумму</button></div>
 
       <div class="step-head" style="margin-top:22px"><span class="n">3</span><h3>Переведите по реквизитам</h3></div>
       {% for m in methods %}
       <div class="details" data-for="{{ m.code }}" {{ 'hidden' if m.code != pre }}>
         {% if m.network %}<div class="net-badge">Сеть: <b>{{ m.network_title }}</b></div>{% endif %}
+        {% set targets = m.details | pay_targets %}
+        {% for t in targets %}
+        <div class="pay-copy"><div><small>{{ t.label }}</small><b class="mono">{{ t.show }}</b></div>
+          <button type="button" class="btn sm primary" data-copy="{{ t.value }}">📋 Скопировать</button></div>
+        {% endfor %}
         <pre class="keybox">{{ m.details }}</pre>
+        {% if m.code in ('dc', 'dcbank') or 'душанбе' in m.title | lower %}
+        <div class="pay-how"><b>Как перевести в «Душанбе Сити»:</b>
+          <ol><li>Нажмите «📋 Скопировать» выше.</li><li>Приложение «Душанбе Сити» → <b>«Переводы»</b> → <b>«По номеру карты»</b>.</li>
+            <li>Вставьте номер, впишите сумму <b>ровно</b> как «К переводу».</li><li>Сделайте скриншот чека и прикрепите его ниже.</li></ol></div>
+        {% elif m.code == 'alif' %}
+        <div class="pay-how"><b>Как перевести в «Алиф»:</b>
+          <ol><li>Нажмите «📋 Скопировать» выше.</li><li>Alif Mobi → <b>«Переводы»</b> → на карту или по номеру телефона.</li>
+            <li>Вставьте номер, впишите сумму <b>ровно</b> как «К переводу».</li><li>Скриншот чека прикрепите ниже.</li></ol></div>
+        {% endif %}
+        <div class="pay-warn">⚠️ Переводите только на эти реквизиты и ровно указанную сумму. Перевод на другую карту или номер
+          мы не получаем и не зачисляем — за ошибку в реквизитах или сумме при переводе отвечает отправитель.</div>
         {% if m.network_note %}<div class="flash error net-warn" role="note">⚠️ {{ m.network_note }}</div>{% endif %}
       </div>
       {% endfor %}
@@ -309,6 +334,8 @@
       out = r.dataset.cur === "TJS" ? (Math.ceil(a * rate * 100) / 100).toFixed(2) + " TJS" : a.toFixed(2) + " " + r.dataset.cur;
     }
     document.getElementById("topay").textContent = out;
+    var tc = document.getElementById("topay-copy");   // копируем только число: банк ждёт сумму без «TJS»
+    if (tc) { var num = (out.match(/^[\d.]+/) || [""])[0]; tc.hidden = !num; tc.setAttribute("data-copy", num); }
     // Ввёл доллары, а переводит сомони — частая ошибка: «20» хотел сомони, а получилось $20 = 216 сомони
     var wrong = a > 0 && !inTjs && r.dataset.cur === "TJS";
     warn.hidden = !wrong;

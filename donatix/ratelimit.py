@@ -16,8 +16,9 @@ LIMITS = {
     "ticket": 20,     # сообщений в тикеты за 10 минут — каждое уходит админу в Telegram
     "ticket_new": 5,  # новых обращений в час
     "login_acct": 10, # неверных паролей к одному аккаунту за 15 минут — с любых IP
+    "apikey_bad": 30, # неверных API-ключей с одного IP за 15 минут — дальше 429 (подбор ключей)
 }
-WINDOWS = {"login": 15 * 60, "login_acct": 15 * 60, "guest": 3600, "ticket": 600, "ticket_new": 3600}
+WINDOWS = {"apikey_bad": 15 * 60, "login": 15 * 60, "login_acct": 15 * 60, "guest": 3600, "ticket": 600, "ticket_new": 3600}
 
 
 class RateLimiter:

@@ -53,6 +53,29 @@ def _img(url):
 templates.env.filters["img"] = _img
 
 
+def _pay_targets(details: str) -> list[dict[str, str]]:
+    """Что из реквизитов копировать одной кнопкой: номер карты, телефон, адрес кошелька, Binance ID."""
+    import re
+    out, seen = [], set()
+    for line in str(details or "").splitlines():
+        label = line.split(":", 1)[0].strip() if ":" in line else ""
+        for m in re.finditer(r"(?<![\w])(?:\+?\d[\d \-]{7,22}\d|T[1-9A-HJ-NP-Za-km-z]{33}|0x[0-9a-fA-F]{40})(?![\w])", line):
+            raw = m.group(0)
+            value = raw if raw.startswith(("T", "0x")) else re.sub(r"[ \-]", "", raw)
+            digits = re.sub(r"\D", "", value)
+            if value in seen or (not raw.startswith(("T", "0x")) and len(digits) < 8):
+                continue
+            seen.add(value)
+            kind = ("Кошелёк" if raw.startswith(("T", "0x")) else "Номер карты" if len(digits) in (16, 18, 19)
+                    else "Телефон" if len(digits) in (9, 12) else "Номер")
+            show = " ".join(value[i:i + 4] for i in range(0, len(value), 4)) if kind == "Номер карты" else raw.strip()
+            out.append({"label": label[:30] or kind, "value": value, "show": show})
+    return out[:4]
+
+
+templates.env.filters["pay_targets"] = _pay_targets
+
+
 def _pack_title(name: str, kind: str = "topup") -> str:
     """Название пакета игры по-русски со значком; «Free Fire — 100 Diamonds» → «Free Fire — 💎 100 алмазов»."""
     from .packs import full

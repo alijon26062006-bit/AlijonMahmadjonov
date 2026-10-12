@@ -2,11 +2,14 @@
 {% block title %}API — {{ site_name }}{% endblock %}
 {% block description %}API {{ site_name }}: заказы Telegram Stars, Premium, пополнений игр и Steam из вашего бота или сайта. Примеры на curl, Python и JavaScript, вебхуки.{% endblock %}
 {% block content %}
+<style>.rules-card ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; line-height: 1.55; }</style>
 <div class="docs">
   <aside class="docs-nav" aria-label="Разделы документации">
     <div class="label-caps">API v1</div>
     {% for id, t in [('start', 'Быстрый старт'), ('auth', 'Ключ и адрес'), ('methods', 'Методы'), ('ids', 'ID товаров'), ('fields', 'Поля заказа'),
-                     ('check', 'Проверка аккаунта'), ('errors', 'Ошибки'), ('webhook', 'Webhook'), ('examples', 'Примеры')] %}
+                     ('check', 'Проверка аккаунта'), ('payments', 'Пополнение баланса'), ('glory', 'Боты для гильдии'),
+                     ('errors', 'Ошибки'), ('rules', 'Правила и ответственность'), ('v2', 'API v2 (как FazerCards)'),
+                     ('webhook', 'Webhook'), ('examples', 'Примеры')] %}
     <a href="#{{ id }}">{{ t }}</a>
     {% endfor %}
     <a class="ext" href="/api/swagger">Swagger ↗</a>
@@ -78,6 +81,16 @@
           ('GET', '/orders/{order_id}', 'Заказ со статусом и выдачей'),
           ('GET', '/steam-gifts/games?q=', 'Поиск игр для Steam-гифтов'),
           ('GET', '/steam-gifts/games/{appid}', 'Издания и цены по регионам'),
+          ('GET', '/transactions/{id}', 'Одна запись движения денег'),
+          ('GET', '/payments/methods', 'Способы пополнения, курс сомони, минимум'),
+          ('POST', '/payments', 'Заявка на пополнение — реквизиты и сумма'),
+          ('POST', '/payments/{id}/receipt', 'Прислать чек перевода (фото/PDF)'),
+          ('GET', '/payments', 'Ваши заявки на пополнение'),
+          ('GET', '/payments/{id}', 'Статус заявки'),
+          ('GET', '/glory/regions', 'Боты для гильдии: регионы и цена'),
+          ('POST', '/glory/orders', 'Запустить ботов для клана'),
+          ('GET', '/glory/orders/{id}', 'Очки клана вживую, статус'),
+          ('POST', '/glory/orders/{id}/stop', 'Остановить'),
         ] %}
         <div class="ep"><span class="method {{ m | lower }}">{{ m }}</span><code>{{ path }}</code><span class="what">{{ what }}</span></div>
         {% endfor %}
@@ -157,20 +170,111 @@
 <pre data-lang="json" data-title="ответ">{"ok": true, "supported": true, "valid": true, "player_name": "Player_6789", "region": "GLOBAL"}</pre>
     </section>
 
+    <section id="payments" class="doc-sec">
+      <h2>Пополнение баланса</h2>
+      <p>Деньги за заказы списываются с вашего баланса в {{ site_name }}. Пополнить его можно в кабинете или через API:</p>
+      <h3><span class="step-n">1</span>Заявка</h3>
+<pre data-lang="bash">curl -X POST {{ base_url }}/api/v1/payments -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"method": "dc", "amount_tjs": "200"}'</pre>
+      <p>В ответе — реквизиты (номер карты/телефона) и <b>точная сумма к переводу</b>.</p>
+      <h3><span class="step-n">2</span>Перевод и чек</h3>
+      <p>Переведите <b>ровно эту сумму на указанные реквизиты</b> и пришлите чек:
+        <code>POST /payments/{id}/receipt</code> (multipart, поле <code>file</code>). Статус — <code>GET /payments/{id}</code>.</p>
+      <p class="hint">«Душанбе Сити»: приложение → «Переводы» → «По номеру карты» → вставьте номер карты из ответа.</p>
+    </section>
+
+    <section id="glory" class="doc-sec">
+      <h2>Боты для гильдии (Glory клана Free Fire)</h2>
+      <p>Группа ботов заходит в игру за клан и набирает очки славы (glory). Цена одна для всех регионов.
+        Не запустилось — деньги возвращаются сами. <b>После запуска деньги не возвращаются</b>, можно только остановить.</p>
+<pre data-lang="bash" data-title="регионы и цена">curl {{ base_url }}/api/v1/glory/regions -H "X-API-Key: $KEY"</pre>
+<pre data-lang="json">{"ok": true, "items": [{"id": "bd", "name": "Bangladesh", "code": "BD", "premium": false, "price_usd": "1.8349", "price_tjs": "20.00"}]}</pre>
+<pre data-lang="bash" data-title="запуск">curl -X POST {{ base_url }}/api/v1/glory/orders -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"region": "bd", "clan_id": "3012345678"}'</pre>
+<pre data-lang="json" data-title="GET /glory/orders/gl-15 — каждые 15–30 секунд">{"ok": true, "order": {"id": "gl-15", "clan_id": "3012345678", "status": "running", "glory": 48210, "farmed": 1350,
+  "clan": {"name": "TJ KINGS", "level": 6, "members": 47, "capacity": 55}, "uptime": "1h12m", "bots": 4, "price_usd": "1.8349"}}</pre>
+      <p class="hint">status: <code>running</code> работает · <code>stopped</code> закончила · <code>failed</code> не запустилась (деньги вернулись).
+        Ошибки: <code>invalid_clan_id</code> <code>invalid_region</code> <code>clan_busy</code> (для клана уже работает группа)
+        <code>insufficient_balance</code> <code>launch_failed</code>. Те же адреса есть в <code>/api/v2/glory/…</code>.</p>
+    </section>
+
     <section id="errors" class="doc-sec">
       <h2>Ошибки</h2>
 <pre data-lang="json" data-title="пример">{"ok": false, "error": "Недостаточно средств: нужно $1.6605, на балансе $0.5000.", "code": "insufficient_balance"}</pre>
       <div class="table-wrap card"><table>
         <tr><th>HTTP</th><th>code</th></tr>
-        <tr><td>400</td><td><code>missing_field</code> <code>invalid_field</code> <code>invalid_quantity</code> <code>account_not_found</code></td></tr>
-        <tr><td>401</td><td><code>unauthorized</code></td></tr>
+        <tr><td>400</td><td><code>missing_field</code> <code>invalid_field</code> <code>invalid_quantity</code> <code>account_not_found</code>
+          <code>player_not_found</code> — <b>неверный ID игрока</b> (игра не нашла такой аккаунт), <code>invalid_payment</code> — неверная сумма или способ оплаты,
+          <code>validation_error</code> — в теле запроса не хватает поля или оно не того типа</td></tr>
+        <tr><td>401</td><td><code>unauthorized</code> — нет ключа, ключ не полный, отозван или с ошибкой (текст ошибки скажет, что именно)</td></tr>
         <tr><td>402</td><td><code>insufficient_balance</code></td></tr>
         <tr><td>403</td><td><code>account_inactive</code> <code>account_blocked</code></td></tr>
         <tr><td>404</td><td><code>product_not_found</code> <code>not_found</code></td></tr>
         <tr><td>409</td><td><code>idempotency_key_reused</code> <code>out_of_stock</code></td></tr>
-        <tr><td>429</td><td><code>rate_limited</code> — ждите <code>Retry-After</code> секунд</td></tr>
+        <tr><td>413</td><td><code>payload_too_large</code> — тело запроса больше 64 КБ</td></tr>
+        <tr><td>429</td><td><code>rate_limited</code> — ждите <code>Retry-After</code> секунд. Также после 30 неверных ключей с одного IP за 15 минут
+          (защита от подбора) — даже верный ключ с этого IP подождёт 15 минут</td></tr>
+        <tr><td>503</td><td><code>not_available</code> <code>temporarily_unavailable</code> <code>supplier_unavailable</code> — повторите позже</td></tr>
       </table></div>
-      <p class="hint">Лимиты: 60 заказов и 120 запросов каталога в минуту.</p>
+      <p class="hint">Лимиты на ключ: 60 заказов, 120 запросов каталога, 120 проверок статуса, 60 запросов аккаунта в минуту.
+        Каталог кешируйте у себя на 5–15 минут, а не запрашивайте перед каждым заказом.</p>
+    </section>
+
+    <section id="rules" class="doc-sec">
+      <h2>Правила и ответственность</h2>
+      <div class="card rules-card">
+        <ol>
+          <li><b>Данные получателя вводит покупатель.</b> ID игрока, сервер, Telegram-username, Steam-логин, ссылка обмена,
+            ID клана — {{ site_name }} отправляет товар ровно туда, куда указано. Если заказ <b>выполнен</b> на неверно введённый ID
+            или username — <b>деньги не возвращаются и товар не переносится</b>. Перед заказом проверяйте аккаунт
+            (<code>POST /accounts/check</code> или <code>/api/v2/topups/validate-id</code>) и показывайте покупателю ник.</li>
+          <li><b>Оплата — только на реквизиты из ответа</b> <code>POST /payments</code> (или со страницы «Пополнить»). Перевод на другую карту
+            или номер, не ту сумму или по старым реквизитам {{ site_name }} не получает и <b>не зачисляет</b>. Реквизиты копируйте кнопкой, не вручную.</li>
+          <li><b>Возврат</b> — автоматически, если заказ не выполнен (статус <code>failed</code>): деньги сразу на баланс.
+            Выполненные заказы, аренда номеров и запущенные боты для гильдии не возвращаются.</li>
+          <li><b>Ключ — как пароль.</b> Не публикуйте его, не вставляйте в сайт или приложение, которое видят покупатели, — только на сервере.
+            Утёк — сразу отзовите в кабинете → API и создайте новый. За заказы по вашему ключу отвечаете вы.</li>
+          <li><b>Нельзя</b>: подбирать ключи и ID, обходить лимиты, слать заведомо неверные данные массово, перепродавать доступ к ключу.
+            За это ключ и аккаунт блокируются.</li>
+          <li><b>Цены</b> в API — уже с вашей наценкой уровня (bronze/silver/gold). Цена фиксируется в момент заказа.</li>
+          <li>Вопросы и спорные заказы — в поддержку (кабинет → «Поддержка»), с номером заказа <code>dx-…</code>.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="v2" class="doc-sec">
+      <h2>API v2 — совместимо с FazerCards</h2>
+      <p>Если ваш бот написан под FazerCards, поменяйте в нём только адрес и ключ — всё остальное работает как есть:</p>
+      <div class="grid two">
+        <div class="card"><div class="label-caps">Адрес</div><code class="mono">{{ base_url }}/api/v2</code></div>
+        <div class="card"><div class="label-caps">Ключ</div><code class="mono">X-API-Key: dx_live_…</code></div>
+      </div>
+      <div class="endpoints" style="margin-top:12px">
+        {% for m, path, what in [
+          ('GET', '/me · /balance · /subscription', 'Аккаунт (подписка у нас всегда активна)'),
+          ('GET', '/transactions · /transactions/{id}', 'Движение денег'),
+          ('GET', '/telegram/stars · /telegram/premium', 'Цены Stars и Premium'),
+          ('POST', '/telegram/stars/buy · /telegram/premium/buy', 'Купить Stars / Premium'),
+          ('GET', '/topups · /topups/offers?category_id=', 'Игры и пакеты'),
+          ('GET/POST', '/topups/validate-id', 'Проверка ID игрока'),
+          ('POST', '/topups/order', 'Пополнить игру'),
+          ('GET', '/giftcards · /giftcards/cards?category_id=', 'Подарочные карты'),
+          ('POST', '/giftcards/order', 'Купить карту'),
+          ('GET', '/gamekeys · /gamekeys/keys?game_id= · /gamekeys/region-restriction', 'Ключи игр'),
+          ('POST', '/gamekeys/order', 'Купить ключ'),
+          ('GET', '/steam-topup/rates · /steam-topup/public-rates', 'Курсы Steam'),
+          ('POST', '/steam-topup/check-login · /steam-topup/order', 'Пополнить Steam'),
+          ('GET', '/steam-gifts/games · /steam-gifts/games/{appid}', 'Steam-гифты'),
+          ('POST', '/steam-gifts/order', 'Отправить гифт'),
+          ('GET/POST', '/payments/methods · /payments/create · /payments/{id}', 'Пополнение баланса'),
+          ('GET', '/orders · /orders/{id}', 'Заказы'),
+          ('GET/POST', '/glory/…', 'Боты для гильдии (как в v1)'),
+        ] %}
+        <div class="ep"><span class="method {{ 'get' if m == 'GET' else 'post' }}">{{ m }}</span><code>{{ path }}</code><span class="what">{{ what }}</span></div>
+        {% endfor %}
+      </div>
+      <p class="hint">Номера заказов у нас вида <code>dx-123</code> (у FazerCards — <code>ord-123</code>). Ответы и ошибки — в том же формате
+        <code>{"ok": false, "error": "…", "code": "…"}</code>.</p>
     </section>
 
     <section id="webhook" class="doc-sec">

@@ -190,3 +190,43 @@ def test_relink_launched_group_without_charging(app, config, conn, ffg):
     assert g["status"] == "running" and g["glory"] == 1000 and balance(conn, uid) == 50000   # второй раз не списали
     assert "уже есть" in glory.relink(conn, config)[0] if conn.execute(
         "SELECT COUNT(*) FROM glory_orders WHERE status = 'failed'").fetchone()[0] else True
+
+
+def test_glory_via_api_for_partners(app, config, conn, ffg):
+    from fastapi.testclient import TestClient
+    config.ffglory_price_tjs = Decimal("20")
+    uid = make_client(conn, balance="5")[0]
+    key = accounts.create_api_key(conn, uid, "bot")
+    c, h = TestClient(app), {"X-API-Key": key}
+    regs = c.get("/api/v1/glory/regions", headers=h).json()
+    assert regs["ok"] and {r["id"] for r in regs["items"]} == {"bd", "me"} and regs["items"][0]["price_tjs"] == "20.00"
+    r = c.post("/api/v2/glory/orders", headers=h, json={"region": "bd", "clan_id": "3012345678"})
+    assert r.status_code == 201, r.text
+    oid = r.json()["order"]["id"]
+    assert oid.startswith("gl-")
+    live = c.get(f"/api/v1/glory/orders/{oid}", headers=h).json()["order"]
+    assert live["status"] == "running" and live["clan"]["name"] == "TJ Kings" and live["glory"] == 1000
+    assert c.post("/api/v1/glory/orders", headers=h, json={"region": "bd", "clan_id": "3012345678"}).json()["code"] == "clan_busy"
+    assert c.post("/api/v1/glory/orders", headers=h, json={"region": "bd", "clan_id": "abc"}).json()["code"] == "invalid_clan_id"
+    assert c.post(f"/api/v1/glory/orders/{oid}/stop", headers=h).json()["order"]["status"] == "stopped"
+    other = make_client(conn, login="other", balance="5")[0]
+    k2 = accounts.create_api_key(conn, other, "x")
+    assert c.get(f"/api/v1/glory/orders/{oid}", headers={"X-API-Key": k2}).status_code == 404   # чужой заказ не виден
+
+
+def test_finance_counts_numbers_and_glory(app, config, conn, ffg):
+    from datetime import datetime, timedelta, timezone
+
+    from donatix import db, finance
+    uid = make_client(conn, balance="5")[0]
+    glory.buy(conn, config, accounts.get_user(conn, uid), "bd", "3012345678")          # 1.88 $, кредит 1.5 $
+    conn.execute("INSERT INTO vnumbers (user_id, service, country, price_micro, cost, status, created_at, updated_at) "
+                 "VALUES (?, 'telegram', 'indonesia', 3000, '0.24', 'FINISHED', ?, ?)", (uid, db.now(), db.now()))
+    conn.execute("INSERT INTO vnumbers (user_id, service, country, price_micro, cost, status, refunded, created_at, "
+                 "updated_at) VALUES (?, 'telegram', 'usa', 9000, '0.7', 'TIMEOUT', 1, ?, ?)", (uid, db.now(), db.now()))
+    now = datetime.now(timezone.utc)
+    s = finance.summary(conn, config, now - timedelta(hours=1), now + timedelta(hours=1))
+    assert s["glory"] == {"n": 1, "revenue": 18800, "cost": 15000, "profit": 3800}
+    assert s["vnumbers"] == {"n": 1, "revenue": 3000, "cost": 2400, "profit": 600}      # возвращённый — не считаем
+    assert s["revenue"] == 21800 and s["gross_profit"] == 4400
+    assert "Боты для гильдии: 1 шт." in finance.report_text(s) and "Виртуальные номера: 1 шт." in finance.report_text(s)

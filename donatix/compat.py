@@ -271,9 +271,213 @@ def order_one(order_id: str, request: Request, user=Depends(api_user), conn=Depe
 
 
 @router.get("/orders")
-def order_list(request: Request, limit: int = 50, user=Depends(api_user), conn=Depends(get_conn)):
+def order_list(request: Request, limit: int = 50, page: int = 1, user=Depends(api_user), conn=Depends(get_conn)):
     _limit(request, "status", str(user["id"]))
-    rows = conn.execute("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT ?",
-                        (user["id"], min(max(limit, 1), 200))).fetchall()
+    limit, page = min(max(limit, 1), 200), min(max(page, 1), 100_000)
+    total = conn.execute("SELECT COUNT(*) FROM orders WHERE user_id = ?", (user["id"],)).fetchone()[0]
+    rows = conn.execute("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
+                        (user["id"], limit, (page - 1) * limit)).fetchall()
     items = [_order_out(r) for r in rows]
-    return {"ok": True, "orders": items, "items": items}
+    return {"ok": True, "orders": items, "items": items, "total": total, "page": page, "limit": limit}
+
+
+# ── Остальные разделы FazerCards: готовые боты обращаются к ним — раньше получали 404 ──
+
+
+@router.get("/transactions")
+def transactions(request: Request, page: int = 1, limit: int = 20, user=Depends(api_user), conn=Depends(get_conn)):
+    from . import api
+    return api.transactions(request, page, limit, user, conn)
+
+
+@router.get("/transactions/{transaction_id}")
+def transaction_one(transaction_id: str, request: Request, user=Depends(api_user), conn=Depends(get_conn)):
+    from . import api
+    return api.transaction(transaction_id[:40], request, user, conn)
+
+
+@router.get("/subscription")
+def subscription(user=Depends(api_user)) -> dict[str, Any]:
+    """Подписок у Donatix нет: тариф всегда активен (бот, который проверяет подписку, не останавливается)."""
+    return {"ok": True, "plan": user["tier"], "planExpiresAt": None, "planAutoRenew": False,
+            "subscriptionActive": True, "currency": "USD"}
+
+
+@router.get("/subscription/plans")
+@router.get("/website/subscription-prices")
+def subscription_plans() -> dict[str, Any]:
+    return {"ok": True, "plans": [], "note": "Donatix работает без подписки — платите только за заказы."}
+
+
+def _cats(conn, kind: str) -> list[dict[str, Any]]:
+    out, seen = [], set()
+    for p in catalog.list_products(conn, kind=kind, limit=10000):
+        if p["category_id"] in seen:
+            continue
+        seen.add(p["category_id"])
+        out.append(p)
+    return out
+
+
+def _page_meta(items: list, limit: int, cursor: str) -> tuple[list, dict[str, Any]]:
+    start = int(cursor) if cursor.isdigit() else 0
+    limit = min(max(limit, 1), 500)
+    chunk = items[start:start + limit]
+    more = start + limit < len(items)
+    return chunk, {"total": len(items), "has_more": more, "next_cursor": str(start + limit) if more else None}
+
+
+@router.get("/giftcards")
+def giftcard_categories(request: Request, limit: int = 50, cursor: str = "", user=Depends(api_user),
+                        conn=Depends(get_conn)) -> dict[str, Any]:
+    _limit(request, "catalog", str(user["id"]))
+    items = [{"category_id": p["category_id"], "name": p["category_name"], "imageurl": p.get("image_url")}
+             for p in _cats(conn, "gift_card")]
+    items, meta = _page_meta(items, limit, cursor[:12])
+    return {"ok": True, "kind": "gift_card", "items": items, "meta": meta}
+
+
+@router.get("/giftcards/cards")
+def giftcard_cards(category_id: str, request: Request, user=Depends(api_user), conn=Depends(get_conn),
+                   config: Config = Depends(get_config)) -> dict[str, Any]:
+    _limit(request, "catalog", str(user["id"]))
+    products = catalog.list_products(conn, kind="gift_card", category_id=category_id[:64], limit=500)
+    if not products:
+        raise ApiError("Unknown category", "category_not_found", 404)
+    offers = [{"card_id": p["id"], "name": p["name"], "price_usd": fmt_unit(_price(user, config, p)),
+               "stock": p.get("stock"), "min_order_quantity": p["min_qty"], "max_order_quantity": p["max_qty"]}
+              for p in products]
+    return {"ok": True, "category_id": category_id, "name": products[0]["category_name"], "offers": offers}
+
+
+class GiftOrderIn(BaseModel):
+    category_id: str = Field(default="", max_length=64)
+    card_id: str = Field(max_length=64)
+    quantity: int = 1
+
+
+@router.post("/giftcards/order")
+def giftcard_order(body: GiftOrderIn, request: Request, idempotency_key: str | None = Header(default=None),
+                   user=Depends(api_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    p = catalog.get_product(conn, body.card_id)
+    if p is None or p["kind"] != "gift_card" or (body.category_id and p["category_id"] != body.category_id):
+        raise ApiError("Card not found in this category", "offer_not_found", 404)
+    return _buy(request, conn, config, user, p["id"], body.quantity, {}, idempotency_key)
+
+
+@router.get("/gamekeys")
+def gamekey_games(request: Request, limit: int = 200, cursor: str = "", user=Depends(api_user),
+                  conn=Depends(get_conn)) -> dict[str, Any]:
+    _limit(request, "catalog", str(user["id"]))
+    items = []
+    for p in _cats(conn, "game_key"):
+        ref = p["supplier_ref"]
+        items.append({"name": p["category_name"], "game_id": p["category_id"], "region": p.get("region"),
+                      "platform": ref.get("platform"), "region_restriction": bool(ref.get("region_restriction")),
+                      "appid": ref.get("appid"), "imageurl": p.get("image_url")})
+    items, meta = _page_meta(items, limit, cursor[:12])
+    return {"ok": True, "kind": "game_key", "items": items, "meta": meta}
+
+
+@router.get("/gamekeys/keys")
+def gamekey_keys(game_id: str, request: Request, user=Depends(api_user), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)) -> dict[str, Any]:
+    _limit(request, "catalog", str(user["id"]))
+    products = catalog.list_products(conn, kind="game_key", category_id=game_id[:64], limit=500)
+    if not products:
+        raise ApiError("Unknown game", "category_not_found", 404)
+    ref = products[0]["supplier_ref"]
+    keys = [{"key_id": p["id"], "name": p["name"], "price_usd": fmt_unit(_price(user, config, p)),
+             "stock": p.get("stock"), "region": p.get("region"), "min_order_quantity": p["min_qty"],
+             "max_order_quantity": p["max_qty"]} for p in products]
+    return {"ok": True, "GameName": products[0]["category_name"], "game_id": game_id, "platform": ref.get("platform"),
+            "region_restriction": bool(ref.get("region_restriction")), "imageurl": products[0].get("image_url"),
+            "keys": keys}
+
+
+@router.get("/gamekeys/region-restriction")
+def gamekey_regions(game_id: str, request: Request, user=Depends(api_user)) -> dict[str, Any]:
+    _limit(request, "catalog", str(user["id"]))
+    from . import gamekeys
+    data = gamekeys.regions(request.app.state.supplier, game_id[:64])
+    return {"ok": True, "region_type": data.get("region_type", ""), "has_availability": bool(data.get("available")),
+            "available": data.get("available", []), "unavailable": data.get("unavailable", [])}
+
+
+class KeyOrderIn(BaseModel):
+    game_id: str = Field(default="", max_length=64)
+    key_id: str = Field(max_length=64)
+    quantity: int = 1
+
+
+@router.post("/gamekeys/order")
+def gamekey_order(body: KeyOrderIn, request: Request, idempotency_key: str | None = Header(default=None),
+                  user=Depends(api_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    p = catalog.get_product(conn, body.key_id)
+    if p is None or p["kind"] != "game_key" or (body.game_id and p["category_id"] != body.game_id):
+        raise ApiError("Key not found for this game", "offer_not_found", 404)
+    return _buy(request, conn, config, user, p["id"], body.quantity, {}, idempotency_key)
+
+
+@router.get("/steam-topup/public-rates")
+def steam_public_rates(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
+    p = catalog.get_product(conn, "steam-topup")
+    if p is None:
+        raise ApiError("Пополнение Steam сейчас недоступно.", "not_available", 503)
+    return {"ok": True, "wallet_rates": p["supplier_ref"].get("rates") or {}}
+
+
+@router.get("/steam-gifts/games")
+def steam_gift_games(request: Request, q: str = "", limit: int = 100, user=Depends(api_user), conn=Depends(get_conn)):
+    from . import api
+    return api.steam_gift_games(request, q[:100], limit, user, conn)
+
+
+@router.get("/steam-gifts/games/{appid}")
+def steam_gift_game(appid: int, request: Request, user=Depends(api_user), conn=Depends(get_conn),
+                    config: Config = Depends(get_config)):
+    from . import api
+    _limit(request, "catalog", str(user["id"]))
+    return api.steam_gift_view(request, conn, config, user, appid)
+
+
+class SteamGiftIn(BaseModel):
+    invite_url: str = Field(max_length=300)
+    sub_id: int
+    app_id: int
+    region: str = Field(max_length=16)
+
+
+@router.post("/steam-gifts/order")
+def steam_gift_order(body: SteamGiftIn, request: Request, idempotency_key: str | None = Header(default=None),
+                     user=Depends(api_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    fields = {"invite_url": body.invite_url.strip(), "sub_id": str(body.sub_id), "app_id": str(body.app_id),
+              "region": body.region.strip()}
+    return _buy(request, conn, config, user, "steam-gift", 1, fields, idempotency_key)
+
+
+@router.get("/payments/methods")
+def payment_methods(request: Request, user=Depends(api_user), conn=Depends(get_conn),
+                    config: Config = Depends(get_config)):
+    from . import api
+    return api.payment_methods(request, user, conn, config)
+
+
+class PaymentV2In(BaseModel):
+    method: str = Field(max_length=32)
+    amount: str | int | float = 0
+
+
+@router.post("/payments/create")
+def payment_create(body: PaymentV2In, request: Request, user=Depends(api_user), conn=Depends(get_conn),
+                   config: Config = Depends(get_config)):
+    from . import api
+    return api.payment_create(api.PaymentIn(method=body.method, amount_usd=str(body.amount)), request, user, conn, config)
+
+
+@router.get("/payments/{payment_id}")
+def payment_one(payment_id: int, user=Depends(api_user), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import api
+    if not 1 <= payment_id <= 2**62:
+        raise ApiError("Заявка не найдена.", "not_found", 404)
+    return api.payment_one(payment_id, user, conn, config)

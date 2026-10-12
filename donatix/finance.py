@@ -44,11 +44,45 @@ def _iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
 
-def _sales(conn: sqlite3.Connection, a: str, b: str) -> tuple[sqlite3.Row, int]:
-    o = conn.execute(
+def services(conn: sqlite3.Connection, a: str, b: str, rub_rate: Any = 0) -> dict[str, dict[str, int]]:
+    """Продажи не из каталога: виртуальные номера (5sim) и боты для гильдии (FFGlory).
+    Считаем только не возвращённые: за возвращённые клиент денег не заплатил."""
+    rate = Decimal(str(rub_rate or 0))
+
+    def micro(value: Any, rub: bool = False) -> int:
+        try:
+            v = Decimal(str(value or 0))
+        except Exception:  # noqa: BLE001
+            return 0
+        if rub and rate > 0:
+            v = v / rate
+        return int(v * 10_000)
+    out = {}
+    for key, sql, rub in (
+            ("vnumbers", "SELECT price_micro, cost FROM vnumbers WHERE refunded = 0 AND status != 'FAILED' "
+                         "AND created_at >= ? AND created_at < ?", True),
+            ("glory", "SELECT price_micro, cost_usd FROM glory_orders WHERE refunded = 0 AND status != 'failed' "
+                      "AND created_at >= ? AND created_at < ?", False)):
+        try:
+            rows = conn.execute(sql, (a, b)).fetchall()
+        except sqlite3.OperationalError:   # старая база без таблицы
+            rows = []
+        revenue = sum(int(r[0]) for r in rows)
+        cost = sum(micro(r[1], rub) for r in rows)
+        out[key] = {"n": len(rows), "revenue": revenue, "cost": cost, "profit": revenue - cost}
+    return out
+
+
+def _sales(conn: sqlite3.Connection, a: str, b: str, rub_rate: Any = 0) -> tuple[dict[str, int], int]:
+    row = conn.execute(
         "SELECT COUNT(*) AS n, COALESCE(SUM(total_micro), 0) AS revenue, COALESCE(SUM(cost_micro), 0) AS cost "
         "FROM orders WHERE status = 'completed' AND COALESCE(completed_at, created_at) >= ? "
         "AND COALESCE(completed_at, created_at) < ?", (a, b)).fetchone()
+    o = {"n": int(row["n"]), "revenue": int(row["revenue"]), "cost": int(row["cost"])}
+    for extra in services(conn, a, b, rub_rate).values():   # номера и боты для гильдии — тоже продажи
+        o["n"] += extra["n"]
+        o["revenue"] += extra["revenue"]
+        o["cost"] += extra["cost"]
     # Реферальные бонусы — наш расход: вычитаем, чтобы видеть чистую прибыль
     referral = int(conn.execute(
         "SELECT COALESCE(SUM(amount_micro), 0) FROM referral_rewards WHERE created_at >= ? AND created_at < ?",
@@ -89,7 +123,8 @@ def summary(conn: sqlite3.Connection, config: Config, start: datetime, end: date
     for m in methods:
         by_currency[m["currency"]] = by_currency.get(m["currency"], Decimal(0)) + m["paid"]
 
-    o, referral = _sales(conn, a, b)
+    o, referral = _sales(conn, a, b, config.fivesim_rub_rate)
+    extra = services(conn, a, b, config.fivesim_rub_rate)
     revenue, cost = int(o["revenue"]), int(o["cost"])
     profit = revenue - cost
     dcoin_pool = _dcoin(conn, a, b)
@@ -114,6 +149,8 @@ def summary(conn: sqlite3.Connection, config: Config, start: datetime, end: date
         "cashiers": staff, "cashiers_total": staff_total, "owner_profit": net - staff_total,
         "to_supplier": max(received - net - dcoin_pool, 0), "manual_credit": manual,
         "clients_balance": clients, "supplier_balance": supplier,
+        "vnumbers": extra["vnumbers"], "glory": extra["glory"],
+        "extra_cost": extra["vnumbers"]["cost"] + extra["glory"]["cost"],
     }
 
 
@@ -157,6 +194,10 @@ def report_text(s: dict[str, Any]) -> str:
     lines += ["",
               f"🛒 Продано: {s['orders']} {plural(s['orders'], 'заказ', 'заказа', 'заказов')} на {both(s['revenue'])}",
               f"🏭 Закупка у поставщика: {both(s['cost'])}",
+              *([f"📱 Виртуальные номера: {s['vnumbers']['n']} шт. на {both(s['vnumbers']['revenue'])}, "
+                 f"прибыль {both(s['vnumbers']['profit'])}"] if s.get("vnumbers", {}).get("n") else []),
+              *([f"🏆 Боты для гильдии: {s['glory']['n']} шт. на {both(s['glory']['revenue'])}, "
+                 f"прибыль {both(s['glory']['profit'])}"] if s.get("glory", {}).get("n") else []),
               *([f"📈 Прибыль с продаж: {both(s['gross_profit'])}"] if s.get("referral") or s.get("dcoin") else []),
               *([f"🎁 Бонусы рефералам: −{both(s['referral'])}"] if s.get("referral") else []),
               *([f"🪙 В копилку D-коина (отложить): −{both(s['dcoin'])}"] if s.get("dcoin") else []),
@@ -167,6 +208,7 @@ def report_text(s: dict[str, Any]) -> str:
                 [f"📈 <b>Ваша прибыль: {both(s['profit'])}</b>"]),
               "",
               f"➡️ <b>Отправить поставщику: {both(s['to_supplier'])}</b>",
+              *([f"   из них 5sim и FFGlory (свои кабинеты): {both(s['extra_cost'])}"] if s.get("extra_cost") else []),
               "<i>= поступило − прибыль. Прибыль забираете себе.</i>",
               "",
               f"👛 Деньги клиентов на балансах: {both(s['clients_balance'])}",

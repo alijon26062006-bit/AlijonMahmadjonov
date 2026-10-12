@@ -70,3 +70,34 @@ def test_errors_are_fazer_style(app, conn):
     assert c.get("/api/v2/balance", headers={"X-API-Key": "bad"}).json()["ok"] is False
     steam = c.get("/api/v2/steam-topup/rates", headers=h).json()
     assert steam["rate"]["currency"] == "RUB" and Decimal(steam["rate"]["price_usd"]) < Decimal("0.02")
+
+
+def test_all_fazercards_sections_answer(app, conn):
+    """Разделы, к которым обращаются готовые боты FazerCards, раньше давали 404 «API не работает»."""
+    uid, c, h = _client(app, conn)
+    for url in ("/api/v2/transactions", "/api/v2/subscription", "/api/v2/giftcards", "/api/v2/gamekeys",
+                "/api/v2/payments/methods", "/api/v2/steam-topup/public-rates", "/api/v2/orders?page=1&limit=10",
+                "/api/v2/giftcards/cards?category_id=steam_usd", "/api/v2/gamekeys/keys?game_id=elden-ring"):
+        r = c.get(url, headers=h)
+        assert r.status_code == 200 and r.json()["ok"], url
+    assert c.get("/api/v2/subscription", headers=h).json()["subscriptionActive"] is True
+    gc = c.post("/api/v2/giftcards/order", headers=h, json={"category_id": "steam_usd", "card_id": "gc-steam-5",
+                                                            "quantity": 2}).json()
+    assert gc["ok"] and gc["order"]["quantity"] == 2
+    gk = c.post("/api/v2/gamekeys/order", headers=h, json={"game_id": "elden-ring", "key_id": "gk-elden-ring-cis"}).json()
+    assert gk["ok"]
+    bad = c.post("/api/v2/gamekeys/order", headers=h, json={"game_id": "x", "key_id": "gc-steam-5"})
+    assert bad.status_code == 404 and bad.json()["ok"] is False
+    assert c.get("/api/v2/no-such-thing", headers=h).json()["ok"] is False          # неизвестный адрес — тоже JSON
+    tx = c.get("/api/v2/transactions", headers=h).json()["items"]
+    assert c.get(f"/api/v2/transactions/{tx[0]['id']}", headers=h).json()["ok"]
+
+
+def test_key_guessing_blocked_by_ip(app, conn):
+    uid, c, h = _client(app, conn)
+    for i in range(30):
+        assert c.get("/api/v1/balance", headers={"X-API-Key": f"dx_live_wrong{i}" + "x" * 40}).status_code == 401
+    r = c.get("/api/v1/balance", headers=h)                      # даже верный ключ с этого адреса — подождать
+    assert r.status_code == 429 and r.json()["code"] == "rate_limited"
+    big = c.post("/api/v2/topups/order", headers={**{"X-API-Key": "x"}, "content-length": "999999"}, content=b"{}")
+    assert big.status_code in (413, 429)

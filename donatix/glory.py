@@ -93,7 +93,7 @@ def flag(code: str) -> str:
 
 
 def price_micro(conn: sqlite3.Connection | None, config: Config, cost: Any) -> int:
-    """Цена клиенту: одна цена в сомони для всех регионов (DONATIX_FFGLORY_PRICE_TJS, 30 с.) по курсу сайта;
+    """Цена клиенту: одна цена в сомони для всех регионов (DONATIX_FFGLORY_PRICE_TJS, 20 с.) по курсу сайта;
     если не задана — цена кредита FFGlory + наценка."""
     tjs = Decimal(str(config.ffglory_price_tjs or 0))
     if tjs > 0 and conn is not None:

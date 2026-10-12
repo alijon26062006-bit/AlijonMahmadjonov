@@ -76,7 +76,7 @@ class Config:
     ffglory_key: str = ""          # api_key аккаунта FFGlory (свой у каждого)
     ffglory_master: str = ""       # x-api-key (общий «мастер-ключ» из их документации)
     ffglory_markup: Decimal = Decimal("25")
-    ffglory_price_tjs: Decimal = Decimal("30")   # одна цена для всех регионов, сомони (0 — по наценке)
+    ffglory_price_tjs: Decimal = Decimal("20")   # одна цена для всех регионов, сомони (0 — по наценке)
     vendoria_base_url: str = "https://vendoria.amadeustech.dev"
     vendoria_games: str = "Standoff 2,Clash of Clans"
 
@@ -209,7 +209,7 @@ class Config:
             ffglory_key=_env("DONATIX_FFGLORY_KEY"),
             ffglory_master=_env("DONATIX_FFGLORY_MASTER"),
             ffglory_markup=Decimal(_env("DONATIX_FFGLORY_MARKUP") or "25"),
-            ffglory_price_tjs=Decimal(_env("DONATIX_FFGLORY_PRICE_TJS") or "30"),
+            ffglory_price_tjs=Decimal(_env("DONATIX_FFGLORY_PRICE_TJS") or "20"),
             vendoria_base_url=_env("DONATIX_VENDORIA_BASE_URL", "https://vendoria.amadeustech.dev").rstrip("/"),
             vendoria_games=_env("DONATIX_VENDORIA_GAMES", "Standoff 2,Clash of Clans"),
             markups=markups,

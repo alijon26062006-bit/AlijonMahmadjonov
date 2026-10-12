@@ -19,6 +19,7 @@ from .deps import get_config, get_conn
 from .money import fmt
 
 router = APIRouter(prefix="/api/v1", tags=["API"])
+MAX_JSON = 64 * 1024   # тело JSON-запроса API — не больше 64 КБ (чек об оплате — отдельно, со своим лимитом)
 
 
 class ApiError(Exception):
@@ -51,10 +52,28 @@ def api_user(
     if not key and authorization and authorization.lower().startswith("bearer "):
         key = authorization[7:].strip()
     key = key.strip('"\'').strip()   # ключ, вставленный вместе с кавычками, тоже подходит
-    if not key:
+    ip = request.client.host if request.client else "?"
+    limiter = request.app.state.limiter
+    if ip in ("127.0.0.1", "::1", "testclient-local"):   # боты конструктора живут на нашем сервере — их не режем
+        ip = ""
+    if ip and limiter.full("apikey_bad", ip):   # с этого адреса подбирают ключи — не пускаем даже с верным
+        raise ApiError("Слишком много неверных ключей с вашего адреса. Подождите 15 минут.", "rate_limited", 429,
+                       {"Retry-After": "900"})
+    if request.method == "POST" and not request.url.path.endswith("/receipt"):
+        try:
+            size = int(request.headers.get("content-length") or 0)
+        except ValueError:
+            size = 0
+        if size > MAX_JSON:   # огромное тело забивало бы память сервера
+            raise ApiError("Слишком большой запрос.", "payload_too_large", 413)
+    if not key or len(key) > 200:
+        if ip:
+            limiter.hit("apikey_bad", ip)
         raise ApiError("Нет API-ключа. Передайте заголовок X-API-Key.", "unauthorized", 401)
     user = accounts.user_by_api_key(conn, key)
     if user is None:
+        if ip:
+            limiter.hit("apikey_bad", ip)
         raise ApiError(accounts.api_key_problem(conn, key), "unauthorized", 401)
     if user["status"] == "blocked":
         raise ApiError("Аккаунт заблокирован.", "account_blocked", 403)

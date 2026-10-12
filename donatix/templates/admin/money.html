@@ -23,7 +23,9 @@
     <div class="note">{{ s.payments }} пополн. · на карты ${{ usd(s.to_card) }}{% if s.crypto %} · крипта ${{ usd(s.crypto) }}{% endif %}</div></div>
   <div class="kpi"><span class="tile g5">{{ icon('bag', 20) }}</span>
     <div class="label">Продано</div><div class="value">{{ big(s.revenue) }}</div>
-    <div class="note">{{ s.orders }} выполненных заказов</div></div>
+    <div class="note">{{ s.orders }} выполненных заказов</div>
+    {% if s.vnumbers and s.vnumbers.n %}<div class="note">📱 номера: {{ s.vnumbers.n }} шт. · ${{ usd(s.vnumbers.revenue) }} · прибыль ${{ usd(s.vnumbers.profit) }}</div>{% endif %}
+    {% if s.glory and s.glory.n %}<div class="note">🏆 боты для гильдии: {{ s.glory.n }} шт. · ${{ usd(s.glory.revenue) }} · прибыль ${{ usd(s.glory.profit) }}</div>{% endif %}</div>
   <div class="kpi"><span class="tile">{{ icon('chart', 20) }}</span>
     <div class="label">Прибыль с продаж</div><div class="value">{{ big(s.gross_profit) }}</div>
     <div class="note">продажи − закупка ${{ usd(s.cost) }}</div></div>
