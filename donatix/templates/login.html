@@ -9,7 +9,7 @@
       <div class="tile g1">{{ icon("grid", 24) }}</div>
       <div><h2>Вход в панель</h2></div>
     </div>
-    {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
+    {% for f in flashes %}<div class="flash {{ f.kind }}" role="status"><span>{{ f.text }}</span></div>{% endfor %}
     {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
     {% if tg_login %}
     <a class="btn lg block tg-btn" href="/auth/telegram"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#fff"/><path fill="#229ED9" d="M5.4 11.7 16.9 7.3c.5-.2 1 .1.8.9l-2 9.3c-.1.6-.5.8-1 .5l-3-2.2-1.4 1.4c-.2.2-.3.3-.6.3l.2-3.1 5.6-5c.2-.2 0-.3-.4-.1l-6.9 4.3-3-.9c-.6-.2-.6-.6.2-.9z"/></svg>Войти через Telegram</a>

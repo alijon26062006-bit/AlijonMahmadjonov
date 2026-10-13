@@ -1,7 +1,8 @@
 {% extends "panel/_layout.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Подтвердите почту — {{ site_name }}{% endblock %}
 {% block content %}
-<section class="page-hero"><h1>📧 Подтвердите почту</h1>
+<section class="page-hero"><h1>Подтвердите почту</h1>
   <p>{% if has_code %}Мы отправили код из 6 цифр на <b>{{ user.email }}</b>. Письма нет — загляните в «Спам».
   {% else %}Ваша почта <b>{{ user.email }}</b> ещё не подтверждена. Подтвердите — так аккаунт защищён, а пароль
   можно восстановить по коду из письма.{% endif %}</p></section>
@@ -22,7 +23,7 @@
   {% else %}
   <form method="post" action="/panel/verify-email">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button class="btn primary lg block" id="vf-again" data-wait="{{ wait }}" {{ 'disabled' if wait }}>✅ Подтвердить — прислать код</button>
+    <button class="btn primary lg block" id="vf-again" data-wait="{{ wait }}" {{ 'disabled' if wait }}>{{ icon('mail', 18) }}Подтвердить — прислать код</button>
   </form>
   {% endif %}
   <a class="btn block vf-skip" href="/panel/verify-email/skip">Пропустить</a>

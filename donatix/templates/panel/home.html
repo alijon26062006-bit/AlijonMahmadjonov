@@ -1,5 +1,5 @@
 {% extends "panel/_layout.html" %}
-{% from "_icons.html" import icon, kind_icon, media %}
+{% from "_icons.html" import icon, kind_icon, media, place %}
 {% block title %}Профиль — {{ site_name }}{% endblock %}
 {% block content %}
 <section class="profile-hero hide-app">
@@ -35,10 +35,10 @@
 
 {% if cst and cst.on and not is_guest_account(user) %}
 <a class="cst-banner" href="/panel/referrals">
-  <span class="cb-trophy">🏆</span>
+  <span class="cb-trophy">{{ icon('trophy', 30) }}</span>
   <span class="grow">
     <b>Конкурс недели — пригласи друзей</b>
-    <span class="cb-prizes">{% for p in cst.prizes %}<i>{{ ['🥇','🥈','🥉'][loop.index0] }} {{ p }} с.</i>{% endfor %}</span>
+    <span class="cb-prizes">{% for p in cst.prizes %}<i>{{ place(loop.index, 18) }}{{ p }} с.</i>{% endfor %}</span>
     <small>{% if cst.mine %}Вы на <b>{{ cst.mine.place }} месте</b> · друзей: {{ cst.my_friends }}{% if cst.to_top3 %} · до призов {{ cst.to_top3 }}{% endif %}
       {% else %}Итоги в воскресенье {{ cst.end_local.strftime('%H:%M') }} — успейте попасть в тройку{% endif %}</small>
   </span>
@@ -48,11 +48,12 @@
 .cst-banner { display: flex; align-items: center; gap: 12px; margin: 14px 0; padding: 14px 16px; border-radius: 18px;
   color: #fff; text-decoration: none; background: linear-gradient(120deg, #4f46e5 0%, #7c3aed 55%, #f59e0b 140%);
   box-shadow: 0 8px 24px rgba(79,70,229,.25); }
+.cst-banner, .cst-banner:hover, .cst-banner *:not(.place-badge) { color: #fff; text-decoration: none; }
 .cst-banner .grow { display: grid; gap: 4px; min-width: 0; }
 .cst-banner b { font-size: 1rem; } .cst-banner small { opacity: .9; font-size: .8rem; }
-.cb-trophy { font-size: 2rem; line-height: 1; flex: none; }
+.cb-trophy { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: rgba(255,255,255,.18); flex: none; }
 .cb-prizes { display: flex; flex-wrap: wrap; gap: 6px; }
-.cb-prizes i { font-style: normal; font-weight: 700; font-size: .8rem; padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,.18); }
+.cb-prizes i { display: inline-flex; align-items: center; gap: 5px; font-style: normal; font-weight: 700; font-size: .8rem; padding: 3px 9px 3px 3px; border-radius: 999px; background: rgba(255,255,255,.18); }
 .cst-banner svg { flex: none; opacity: .85; }
 </style>
 {% endif %}

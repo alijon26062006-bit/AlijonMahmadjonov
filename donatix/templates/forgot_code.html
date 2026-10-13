@@ -6,7 +6,7 @@
   <div class="card tg-auth">
     <a class="back hide-in-app" href="/forgot">{{ icon('arrow-left', 18) }}Назад</a>
     <h2>Введите код</h2>
-    {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
+    {% for f in flashes %}<div class="flash {{ f.kind }}" role="status"><span>{{ f.text }}</span></div>{% endfor %}
     <p class="muted">Код из 6 цифр отправлен на <b>{{ email }}</b>. Он действует 10 минут.</p>
     <form method="post" action="/forgot/code" style="display:grid;gap:10px">
       <input type="hidden" name="csrf" value="{{ csrf }}">

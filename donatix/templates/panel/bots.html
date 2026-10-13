@@ -6,7 +6,7 @@
   <h1>Мой Telegram-бот</h1>
   <p>Свой бот-магазин за минуту: игры, звёзды и цены — уже внутри. Заказы оплачиваются с вашего баланса Donatix, прибыль — ваша наценка.</p>
 </section>
-{% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
+{% for f in flashes %}<div class="flash {{ f.kind }}" role="status"><span>{{ f.text }}</span></div>{% endfor %}
 {% if not ready %}<div class="flash warn">{{ icon('alert', 20) }}<span>Конструктор сейчас недоступен. <a href="/panel/support">Напишите в поддержку</a>.</span></div>{% endif %}
 
 {% if not elig.ok %}

@@ -700,7 +700,10 @@ def forgot_email(request: Request, email: str = Form(""), conn=Depends(get_conn)
         flash(request, "Впишите почту, на которую зарегистрирован аккаунт.", "error")
         return _redirect("/forgot")
     user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-    if (user is not None and user["role"] != "admin" and user["status"] != "blocked"
+    if user is not None and user["role"] == "admin":   # админу — не код, а подсказка в письме (на сайте не видно)
+        if request.app.state.limiter.hit("verify_mail", f"reset:{user['id']}") is None:
+            emailverify.send_admin_hint(config, email)
+    elif (user is not None and user["status"] != "blocked"
             and not emailverify.wait_left(conn, user["id"], "reset")
             and request.app.state.limiter.hit("verify_mail", f"reset:{user['id']}") is None):
         emailverify.send_code(conn, config, user["id"], email, kind="reset")
@@ -735,7 +738,7 @@ def forgot_code(request: Request, code: str = Form(""), conn=Depends(get_conn), 
     contest.mark_verified(conn, user["id"])   # код пришёл на почту — значит, почта его
     _finish_login(request, conn, accounts.get_user(conn, user["id"]))
     request.session["pw_reset_until"] = _time.time() + 900
-    flash(request, "✅ Почта подтверждена. Придумайте новый пароль.")
+    flash(request, "Почта подтверждена. Придумайте новый пароль.")
     return _redirect("/panel/password")
 
 
@@ -779,7 +782,7 @@ def verify_email(request: Request, t: str = "", conn=Depends(get_conn), config: 
         flash(request, "Ссылка устарела или неверная. Войдите и нажмите «Отправить письмо ещё раз».", "error")
     else:
         contest.mark_verified(conn, uid)
-        flash(request, "✅ Почта подтверждена. Спасибо!")
+        flash(request, "Почта подтверждена. Спасибо!")
     return _redirect("/panel" if session_user(request, conn) else "/login")
 
 
@@ -828,7 +831,7 @@ def panel_verify_code(request: Request, code: str = Form(""), user=Depends(panel
     got = emailverify.check_code(conn, config, user["id"], code)
     if got == "ok":
         contest.mark_verified(conn, user["id"])
-        flash(request, "✅ Почта подтверждена. Спасибо!")
+        flash(request, "Почта подтверждена. Спасибо!")
         return _redirect(_safe_next(request.session.pop("next", "")) or "/panel")
     flash(request, "Неверный код — проверьте цифры в письме." if got == "bad"
           else "Код устарел или попыток больше нет — нажмите «Отправить новый код».", "error")

@@ -17,7 +17,7 @@
 <style>.rv-badge { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 8px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--text); font-size: .9rem; box-shadow: var(--shadow-1); } .rv-badge:hover { text-decoration: none; border-color: var(--accent); } .rv-badge-stars { color: #f5b301; letter-spacing: 1px; }</style>
 <main>
   <div class="wrap">
-    {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
+    {% for f in flashes %}<div class="flash {{ f.kind }}" role="status"><span>{{ f.text }}</span></div>{% endfor %}
     <section class="hero hero-play">
       <div>
         <h1>Алмазы Free Fire, UC PUBG и&nbsp;Telegram Stars — за&nbsp;секунды</h1>

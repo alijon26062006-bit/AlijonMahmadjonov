@@ -1,5 +1,5 @@
 {% extends "panel/_layout.html" %}
-{% from "_icons.html" import icon %}
+{% from "_icons.html" import icon, place %}
 {% block title %}Пригласить друзей — {{ site_name }}{% endblock %}
 {% block content %}
 <section class="page-hero">
@@ -12,24 +12,24 @@
 {% if c.on %}
 <div class="card cst">
   <div class="cst-head">
-    <div><div class="label-caps">🏆 Конкурс недели</div>
+    <div><div class="label-caps cst-cap">{{ icon('trophy', 16) }}Конкурс недели</div>
       <h2>Пригласи больше всех друзей — получи приз</h2></div>
     <div class="cst-timer"><small>Итоги в воскресенье {{ c.end_local.strftime('%H:%M') }}</small>
       <b id="cst-left" data-end="{{ c.end_iso }}">—</b></div>
   </div>
   <div class="cst-prizes">
-    {% for p in c.prizes %}<div class="cst-prize cst-p{{ loop.index }}"><span>{{ ['🥇','🥈','🥉'][loop.index0] }}</span>
+    {% for p in c.prizes %}<div class="cst-prize cst-p{{ loop.index }}">{{ place(loop.index, 34) }}
       <b>{{ p }} сомони</b><small>{{ loop.index }} место</small></div>{% endfor %}
   </div>
   <div class="cst-me">
     {% if c.mine %}Вы на <b>{{ c.mine.place }} месте</b> · друзей: <b>{{ c.my_friends }}</b>
-      {% if c.to_top3 %} · до 3 места не хватает <b>{{ c.to_top3 }}</b>{% else %} · вы в тройке призёров! 🔥{% endif %}
+      {% if c.to_top3 %} · до 3 места не хватает <b>{{ c.to_top3 }}</b>{% else %} · вы в тройке призёров!{% endif %}
     {% else %}Пока у вас 0 друзей на этой неделе — пригласите {{ c.to_top3 }}, чтобы попасть в тройку.{% endif %}
     {% if c.pending %}<div class="muted small">Ещё {{ c.pending }} друг(а) зарегистрировались, но не подтвердили почту — напомните им.</div>{% endif %}
   </div>
   {% if c.top %}
   <ol class="cst-top">
-    {% for r in c.top %}<li class="{{ 'me' if c.mine and r.user_id == c.mine.user_id }}"><span class="cst-n">{{ r.place }}</span>
+    {% for r in c.top %}<li class="{{ 'me' if c.mine and r.user_id == c.mine.user_id }}">{% if r.place <= 3 %}{{ place(r.place, 26) }}{% else %}<span class="cst-n">{{ r.place }}</span>{% endif %}
       <span class="grow">{{ r.name }}{% if c.mine and r.user_id == c.mine.user_id %} (вы){% endif %}</span><b>{{ r.friends }}</b></li>{% endfor %}
   </ol>
   {% else %}<p class="muted small">На этой неделе ещё никого — станьте первым!</p>{% endif %}
@@ -43,7 +43,7 @@
     </ul></details>
   {% if c.winners %}
   <div class="cst-past"><div class="label-caps">Прошлые победители</div>
-    {% for w in c.winners %}<div>{{ ['🥇','🥈','🥉'][w.place - 1] }} {{ w.name }} — {{ w.friends }} друзей, {{ w.prize_tjs }} сомони
+    {% for w in c.winners %}<div class="cst-win">{{ place(w.place, 20) }} {{ w.name }} — {{ w.friends }} друзей, {{ w.prize_tjs }} сомони
       <span class="muted small">· неделя до {{ w.week }}</span></div>{% endfor %}</div>
   {% endif %}
 </div>
@@ -55,14 +55,15 @@
 .cst-timer b { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
 .cst-prizes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .cst-prize { display: grid; justify-items: center; gap: 2px; padding: 12px 6px; border-radius: 14px; background: var(--accent-soft); text-align: center; }
-.cst-prize span { font-size: 1.6rem; line-height: 1; } .cst-prize b { font-size: 1.05rem; } .cst-prize small { color: var(--muted); font-size: .75rem; }
+.cst-cap { display: inline-flex; align-items: center; gap: 6px; }
+.cst-win { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .cst-prize b { font-size: 1.05rem; } .cst-prize small { color: var(--muted); font-size: .75rem; }
 .cst-p1 { background: var(--warn-soft); }
 .cst-me { padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--line); }
 .cst-top { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .cst-top li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; background: var(--bg); }
 .cst-top li.me { outline: 2px solid var(--accent); }
 .cst-top .grow { flex: 1; min-width: 0; }
-.cst-n { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); font-weight: 700; font-size: .8rem; }
+.cst-n { width: 26px; height: 26px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); font-weight: 700; font-size: .8rem; }
 .cst-rules ul { margin: 8px 0 0; padding-left: 18px; font-size: .88rem; } .cst-rules li { margin: 3px 0; }
 .cst-past { display: grid; gap: 4px; font-size: .9rem; }
 </style>

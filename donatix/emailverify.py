@@ -158,6 +158,20 @@ def _send_reset(config: Config, email: str, code: str, wait: bool) -> bool:
     return True
 
 
+def send_admin_hint(config: Config, email: str) -> bool:
+    """Админ нажал «Забыли пароль?»: кода не даём (вход в админку защищён), но подсказываем, как войти."""
+    if not ready(config):
+        return False
+    text = (f"Кто-то (возможно, вы) запросил восстановление пароля на {config.site_name} для аккаунта "
+            "администратора.\n\nДля админа восстановление по коду на почту отключено — так безопаснее. "
+            "Войдите через «Войти через Google» этой же почтой, либо задайте пароль на сервере.\n\n"
+            "Если это были не вы — ничего не делайте, аккаунт в безопасности.")
+    html = "<p>" + text.replace("\n\n", "</p><p>") + "</p>"
+    threading.Thread(target=deliver, args=(config, email, f"Вход администратора {config.site_name}", text, html),
+                     daemon=True).start()
+    return True
+
+
 def check_code(conn: sqlite3.Connection, config: Config, uid: int, code: str, kind: str = "verify") -> str:
     """'ok' | 'bad' (неверный, попытки ещё есть) | 'expired' (устарел или попытки кончились — нужен новый)."""
     _ensure(conn)
@@ -186,6 +200,7 @@ def deliver(config: Config, to: str, subject: str, text: str, html: str) -> bool
             if r.status_code >= 300:
                 log.warning("Resend: письмо на %s не ушло: %s %s", to, r.status_code, r.text[:200])
                 return False
+            log.info("письмо «%s» отправлено на %s", subject.split(" — ")[-1], to)
             return True
         msg = EmailMessage()
         msg["Subject"] = subject

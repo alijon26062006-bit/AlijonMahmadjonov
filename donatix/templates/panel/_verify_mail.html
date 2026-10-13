@@ -1,7 +1,9 @@
+{% from "_icons.html" import icon %}
 {% if verify_mail %}
 <a class="flash warn verify-mail" href="/panel/verify-email">
-  <span>📧 Подтвердите почту <b>{{ user.email }}</b> — введите код из письма.</span>
+  <span class="vm-ico">{{ icon('mail', 20) }}</span>
+  <span>Подтвердите почту <b>{{ user.email }}</b> — введите код из письма.</span>
   <span class="btn sm">Ввести код</span>
 </a>
-<style>.verify-mail{align-items:center;flex-wrap:wrap;text-decoration:none}.verify-mail span:first-child{flex:1;min-width:200px}</style>
+<style>.verify-mail{align-items:center;flex-wrap:wrap;text-decoration:none}.verify-mail span:nth-child(2){flex:1;min-width:200px}.vm-ico{display:inline-grid;flex:none}</style>
 {% endif %}

@@ -1,18 +1,19 @@
 {% extends "admin/_layout.html" %}
+{% from "_icons.html" import icon, place %}
 {% block title %}Конкурс рефералов — админка{% endblock %}
 {% block content %}
-<section class="page-hero"><h1>🏆 Конкурс рефералов недели</h1>
+<section class="page-hero"><h1>Конкурс рефералов недели</h1>
   <p>Кто пригласил больше друзей с подтверждённой почтой — призы на баланс каждое воскресенье в {{ end.strftime('%H:%M') }}.
     Итоги этой недели: {{ end.strftime('%d.%m %H:%M') }}.</p></section>
 
-{% if not mail_ready %}<div class="flash error">⚠️ Отправка писем не настроена — друзья не смогут подтвердить почту
-  (кроме входа через Google). Настройте: <code>sudo bash /home/donatix/app/donatix/deploy/email.sh</code></div>{% endif %}
+{% if not mail_ready %}<div class="flash error"><span>Отправка писем не настроена — друзья не смогут подтвердить почту
+  (кроме входа через Google). Настройте: <code>sudo bash /home/donatix/app/donatix/deploy/resend.sh</code></span></div>{% endif %}
 
 <form class="card" method="post" action="/admin/contest">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <label class="switch"><input type="checkbox" name="enabled" value="1" {{ 'checked' if on }}><span>Конкурс включён</span></label>
   <div class="grid three" style="gap:12px;margin-top:12px">
-    {% for p in prizes %}<div><label for="p{{ loop.index }}">{{ ['🥇 1','🥈 2','🥉 3'][loop.index0] }} место, сомони</label>
+    {% for p in prizes %}<div><label for="p{{ loop.index }}">{{ loop.index }} место, сомони</label>
       <input id="p{{ loop.index }}" name="p{{ loop.index }}" inputmode="numeric" value="{{ p }}"></div>{% endfor %}
   </div>
   <button class="btn primary" style="margin-top:12px">Сохранить</button>
@@ -20,7 +21,7 @@
 
 <h2 class="section-title">Таблица этой недели</h2>
 <div class="list">
-  {% for r in top %}<div class="item"><div class="tile sm">{{ r.place }}</div>
+  {% for r in top %}<div class="item">{% if r.place <= 3 %}{{ place(r.place, 32) }}{% else %}<div class="tile sm">{{ r.place }}</div>{% endif %}
     <div class="grow"><div class="title">{{ r.login }}</div></div><b>{{ r.friends }} друзей</b></div>
   {% else %}<div class="card empty">Пока никого.</div>{% endfor %}
 </div>
@@ -29,7 +30,7 @@
 <div class="list">
   {% for p in people %}
   <div class="item">
-    <div class="tile sm {{ 'ok' if p.counted_at else '' }}">{{ '✅' if p.counted_at else ('🚫' if p.reason else '⏳') }}</div>
+    <div class="tile sm {{ 'ok' if p.counted_at else '' }}">{{ icon('check' if p.counted_at else ('x' if p.reason else 'clock'), 18) }}</div>
     <div class="grow"><div class="title">{{ p.login }} · {{ p.email }}</div>
       <div class="sub">пригласил <b>{{ p.ref_login }}</b> · {{ p.created_at | dt }} ·
         {% if p.counted_at %}засчитан{% elif p.reason %}не засчитан: {{ p.reason }}{% else %}ждёт подтверждения почты{% endif %}</div></div>
@@ -41,7 +42,7 @@
 
 <h2 class="section-title">Победители</h2>
 <div class="list">
-  {% for w in winners %}<div class="item"><div class="tile sm">{{ ['🥇','🥈','🥉'][w.place - 1] }}</div>
+  {% for w in winners %}<div class="item">{{ place(w.place, 32) }}
     <div class="grow"><div class="title">{{ w.login }} — {{ w.friends }} друзей</div>
       <div class="sub">неделя до {{ w.week }} · приз {{ w.prize_tjs }} сомони ({{ money(w.amount_micro) }})</div></div></div>
   {% else %}<div class="card empty">Итогов ещё не было.</div>{% endfor %}

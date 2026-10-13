@@ -2405,3 +2405,9 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 @media (max-width: 480px) { .vn-promo { flex-wrap: wrap; } .vn-promo .btn { width: 100%; justify-content: center; } }
 .vn-promo-ico { display: inline-flex; flex: none; }
 .vn-promo-ico svg + svg { margin-left: -8px; }
+
+.place-badge { display: inline-grid; place-items: center; flex: none; border-radius: 50%; font-weight: 800; line-height: 1;
+  color: #fff; background: var(--accent); box-shadow: inset 0 -2px 0 rgba(0,0,0,.15); }
+.place-badge.pb1 { background: linear-gradient(145deg, #ffd34d, #e0a400); color: #5a3d00; }
+.place-badge.pb2 { background: linear-gradient(145deg, #e9edf3, #a9b2bf); color: #3b4350; }
+.place-badge.pb3 { background: linear-gradient(145deg, #f0b07a, #c26f2e); color: #4a2304; }
