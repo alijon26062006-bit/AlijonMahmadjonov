@@ -107,3 +107,58 @@ def test_admin_contest_page(app, config, conn):
     assert "Конкурс рефералов недели" in page
     adm.post("/admin/contest", data={"csrf": csrf_of(page), "enabled": "1", "p1": "100", "p2": "60", "p3": "30"})
     assert contest.prizes(conn) == [100, 60, 30]
+
+
+def test_register_sends_code_and_code_verifies(app, config, conn, monkeypatch):
+    """Регистрация → на почту код из 6 цифр (через Resend) → ввёл код → почта подтверждена.
+    Неверный код — 5 попыток, потом нужен новый; новый код не чаще раза в минуту."""
+    import re
+    config.resend_key = "re_test_key_1234567890abcdef"
+    sent = []
+
+    class Resp:
+        status_code = 200
+        text = "{}"
+
+    def fake_post(url, **kw):
+        sent.append(kw["json"])
+        return Resp()
+    monkeypatch.setattr(emailverify.httpx, "post", fake_post)
+    monkeypatch.setattr(emailverify.threading, "Thread",
+                        lambda target, args, daemon: type("T", (), {"start": lambda self: target(*args)})())
+    c = TestClient(app)
+    page = c.get("/register").text
+    r = c.post("/register", data={"csrf": csrf_of(page), "email": "new@mail.ru", "login": "newbie",
+                                  "password": "password123", "password2": "password123"}, follow_redirects=False)
+    assert r.headers["location"] == "/panel/verify-email"
+    assert sent and sent[0]["to"] == ["new@mail.ru"]
+    code = re.search(r"\b(\d{6})\b", sent[0]["subject"]).group(1)
+    page = c.get("/panel/verify-email").text
+    assert "Код из письма" in page
+    token = csrf_of(page)
+    wrong = "000000" if code != "000000" else "111111"
+    r = c.post("/panel/verify-email/code", data={"csrf": token, "code": wrong}, follow_redirects=True)
+    assert "Неверный код" in r.text
+    r = c.post("/panel/verify-email", data={"csrf": token}, follow_redirects=True)   # сразу же — рано
+    assert "Новый можно через" in r.text and len(sent) == 1
+    r = c.post("/panel/verify-email/code", data={"csrf": token, "code": code[:3] + " " + code[3:]},
+               follow_redirects=True)
+    assert "Почта подтверждена" in r.text
+    uid = conn.execute("SELECT id FROM users WHERE email = 'new@mail.ru'").fetchone()[0]
+    assert conn.execute("SELECT email_verified_at FROM users WHERE id = ?", (uid,)).fetchone()[0]
+    assert emailverify.check_code(conn, config, uid, code) == "expired"     # код одноразовый
+
+
+def test_code_attempts_limit(config, conn):
+    config.resend_key = ""
+    config.smtp_host = "smtp.test"
+    uid = accounts.create_user(conn, email="t@mail.ru", login="tester", password="password123", status="active")
+    emailverify._ensure(conn)
+    import time
+    conn.execute("INSERT INTO email_codes (user_id, code_hash, email, expires_at, tries, sent_at) VALUES "
+                 "(?, ?, 't@mail.ru', ?, 0, ?)", (uid, emailverify._hash(config, uid, "123456"), time.time() + 600,
+                                                  time.time()))
+    for _ in range(4):
+        assert emailverify.check_code(conn, config, uid, "999999") == "bad"
+    assert emailverify.check_code(conn, config, uid, "999999") == "expired"
+    assert emailverify.check_code(conn, config, uid, "123456") == "expired"   # попытки кончились

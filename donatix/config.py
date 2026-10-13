@@ -139,6 +139,8 @@ class Config:
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    resend_key: str = ""        # Resend API (resend.com): письма с кодом подтверждения почты
+    mail_from: str = ""         # от кого: «Donatix <noreply@donatix.tj>» — домен подтверждён в Resend
     smtp_notify: bool = False   # дублировать уведомления на почту (по умолчанию нет — только письма подтверждения)
 
     # Куда писать клиентам для пополнения баланса и поддержки (например, @donatix_support).
@@ -271,5 +273,7 @@ class Config:
             smtp_user=_env("DONATIX_SMTP_USER"),
             smtp_password=_env("DONATIX_SMTP_PASSWORD"),
             smtp_notify=_env("DONATIX_SMTP_NOTIFY") == "1",
+            resend_key=_env("DONATIX_RESEND_KEY"),
+            mail_from=_env("DONATIX_MAIL_FROM"),
             smtp_from=_env("DONATIX_SMTP_FROM"),
         )

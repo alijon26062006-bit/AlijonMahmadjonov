@@ -76,7 +76,10 @@ def unique_amount(conn: sqlite3.Connection, usd: Decimal, address: str = "", exc
     if base not in taken:
         return base
     for _ in range(200):
-        amount = base + Decimal(secrets.randbelow(99) + 1) / 1000   # 10.001, 10.002 … 10.099
+        n = secrets.randbelow(99) + 1
+        if n % 10 == 0:   # 10.010 = 10.01 — такая сумма бывает и ровной у другого клиента
+            continue
+        amount = (base + Decimal(n) / 1000).quantize(Decimal("0.001"))   # 10.001, 10.002 … 10.099
         if amount not in taken:
             return amount
     raise CryptoPayError("Слишком много заявок одновременно — попробуйте через минуту.")

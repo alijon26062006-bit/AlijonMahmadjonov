@@ -1,9 +1,7 @@
 {% if verify_mail %}
-<form class="flash warn verify-mail" method="post" action="/panel/verify-email">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <span>📧 Подтвердите почту <b>{{ user.email }}</b> — откройте письмо от нас и нажмите «Подтвердить почту».
-    Письма нет? Проверьте «Спам».</span>
-  <button class="btn sm">Отправить ещё раз</button>
-</form>
-<style>.verify-mail{align-items:center;flex-wrap:wrap}.verify-mail span{flex:1;min-width:200px}</style>
+<a class="flash warn verify-mail" href="/panel/verify-email">
+  <span>📧 Подтвердите почту <b>{{ user.email }}</b> — введите код из письма.</span>
+  <span class="btn sm">Ввести код</span>
+</a>
+<style>.verify-mail{align-items:center;flex-wrap:wrap;text-decoration:none}.verify-mail span:first-child{flex:1;min-width:200px}</style>
 {% endif %}

@@ -238,5 +238,5 @@ def save_account(conn: sqlite3.Connection, user_id: int, email: str, login: str,
     if conn.execute("SELECT 1 FROM users WHERE (email = ? OR lower(login) = lower(?)) AND id != ?",
                     (email, login, user_id)).fetchone():
         raise accounts.AccountError("Такой email или имя уже заняты.")
-    conn.execute("UPDATE users SET email = ?, login = ?, password_hash = ? WHERE id = ?",
+    conn.execute("UPDATE users SET email = ?, login = ?, password_hash = ?, email_verified_at = NULL WHERE id = ?",
                  (email, login, hash_password(password), user_id))

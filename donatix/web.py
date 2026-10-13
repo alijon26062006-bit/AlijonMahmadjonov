@@ -349,7 +349,7 @@ def register(
         return render(request, "register.html", {"form": form, "error": str(exc)}, 400)
     _ref_signup(request, conn, user_id, verified=False)
     from . import emailverify
-    emailverify.send(config, user_id, email.strip().lower())   # письмо «подтвердите почту»
+    mailed = emailverify.send_code(conn, config, user_id, email.strip().lower())   # код подтверждения на почту
     request.session["user_id"] = user_id
     _record_login(conn, request, user_id)
     from .tgbot import user_event
@@ -359,6 +359,8 @@ def register(
         flash(request, "Аккаунт создан. Мы проверим заявку и активируем доступ — обычно в течение дня.")
     else:
         flash(request, "Аккаунт создан. Добро пожаловать!")
+    if mailed:   # сначала — код из письма; «потом» можно и пропустить
+        return _redirect("/panel/verify-email")
     return _redirect(_safe_next(request.session.pop("next", "")) or "/panel")
 
 
@@ -535,6 +537,9 @@ def panel_save(request: Request, email: str = Form(""), login: str = Form(""), p
         return render(request, "panel/save.html", {"user": user, "error": str(exc), "google": google_auth.enabled(config),
                                                    "form": {"email": email, "login": login}}, 400)
     flash(request, "✅ Аккаунт сохранён. Теперь входите по почте и паролю с любого устройства.")
+    from . import emailverify
+    if emailverify.send_code(conn, config, user["id"], email.strip().lower()):   # код на новую почту
+        return _redirect("/panel/verify-email")
     return _redirect("/panel")
 
 
@@ -720,20 +725,49 @@ def verify_email(request: Request, t: str = "", conn=Depends(get_conn), config: 
     return _redirect("/panel" if session_user(request, conn) else "/login")
 
 
+@router.get("/panel/verify-email")
+def panel_verify_page(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                      config: Config = Depends(get_config)):
+    from . import emailverify
+    if not emailverify.needs(user):
+        return _redirect(_safe_next(request.session.pop("next", "")) or "/panel")
+    return render(request, "panel/verify_email.html", {
+        "user": user, "ready": emailverify.ready(config), "wait": emailverify.wait_left(conn, user["id"]),
+        "next": _safe_next(request.session.get("next", "")) or "/panel"})
+
+
 @router.post("/panel/verify-email", dependencies=[Depends(check_csrf)])
 def panel_verify_email(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
                        config: Config = Depends(get_config)):
+    """Отправить код ещё раз."""
     from . import emailverify
     if not emailverify.needs(user):
         flash(request, "Почта уже подтверждена.")
-    elif not emailverify.ready(config):
+        return _redirect("/panel")
+    if not emailverify.ready(config):
         flash(request, "Отправка писем пока не настроена — напишите в поддержку.", "error")
+    elif emailverify.wait_left(conn, user["id"]):
+        flash(request, f"Код уже отправлен. Новый можно через {emailverify.wait_left(conn, user['id'])} сек.", "error")
     elif request.app.state.limiter.hit("verify_mail", str(user["id"])) is not None:
-        flash(request, "Письмо уже отправлено — проверьте почту и папку «Спам». Повторить можно через час.", "error")
+        flash(request, "Слишком много писем. Проверьте почту и папку «Спам» — повторить можно через час.", "error")
     else:
-        emailverify.send(config, user["id"], user["email"])
-        flash(request, f"Письмо отправлено на {user['email']}. Откройте его и нажмите «Подтвердить почту».")
-    return _redirect(_safe_next(request.headers.get("referer", "").split(request.url.netloc, 1)[-1]) or "/panel")
+        emailverify.send_code(conn, config, user["id"], user["email"])
+        flash(request, f"Новый код отправлен на {user['email']}.")
+    return _redirect("/panel/verify-email")
+
+
+@router.post("/panel/verify-email/code", dependencies=[Depends(check_csrf)])
+def panel_verify_code(request: Request, code: str = Form(""), user=Depends(panel_user), conn=Depends(get_conn),
+                      config: Config = Depends(get_config)):
+    from . import contest, emailverify
+    got = emailverify.check_code(conn, config, user["id"], code)
+    if got == "ok":
+        contest.mark_verified(conn, user["id"])
+        flash(request, "✅ Почта подтверждена. Спасибо!")
+        return _redirect(_safe_next(request.session.pop("next", "")) or "/panel")
+    flash(request, "Неверный код — проверьте цифры в письме." if got == "bad"
+          else "Код устарел или попыток больше нет — нажмите «Отправить новый код».", "error")
+    return _redirect("/panel/verify-email")
 
 
 # ── Кабинет ──────────────────────────────────────────────────
@@ -767,10 +801,7 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
 
 def _needs_verify(user) -> bool:
     from . import emailverify
-    try:
-        return emailverify.needs(user) and bool(user["referred_by"])
-    except (KeyError, IndexError):
-        return False
+    return emailverify.needs(user)
 
 
 def _dcoin_card(conn: sqlite3.Connection, user_id: int) -> dict[str, Any] | None:

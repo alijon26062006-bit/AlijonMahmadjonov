@@ -1,0 +1,38 @@
+{% extends "panel/_layout.html" %}
+{% block title %}Подтвердите почту — {{ site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>📧 Подтвердите почту</h1>
+  <p>Мы отправили код из 6 цифр на <b>{{ user.email }}</b>. Письма нет — загляните в «Спам».</p></section>
+<div class="card vf">
+  {% if not ready %}<div class="flash error">Отправка писем пока не настроена — напишите в поддержку.</div>{% endif %}
+  <form method="post" action="/panel/verify-email/code" class="vf-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="vf-code">Код из письма</label>
+    <input id="vf-code" name="code" class="vf-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7"
+      pattern="[0-9 ]{6,7}" placeholder="••••••" required autofocus>
+    <button class="btn primary lg block">Подтвердить</button>
+  </form>
+  <form method="post" action="/panel/verify-email" class="vf-again">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn block" id="vf-again" data-wait="{{ wait }}" {{ 'disabled' if wait }}>Отправить новый код</button>
+  </form>
+  <a class="muted small vf-skip" href="{{ next }}">Подтвердить позже</a>
+</div>
+<style>
+.vf { display: grid; gap: 12px; max-width: 420px; }
+.vf-form { display: grid; gap: 10px; }
+.vf-code { font-size: 2rem; font-weight: 800; letter-spacing: .5em; text-align: center; padding: 14px 8px; }
+.vf-skip { text-align: center; }
+</style>
+<script>
+(function () {
+  var b = document.getElementById("vf-again"); if (!b) return;
+  var left = +b.dataset.wait || 0, label = b.textContent;
+  function tick() {
+    if (left <= 0) { b.disabled = false; b.textContent = label; return; }
+    b.textContent = label + " (" + left + " сек)"; left -= 1; setTimeout(tick, 1000);
+  }
+  tick();
+})();
+</script>
+{% endblock %}

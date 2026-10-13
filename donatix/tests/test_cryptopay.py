@@ -278,3 +278,12 @@ def test_tail_only_for_same_amount_on_same_network(app, config, conn, monkeypatc
     assert cryptopay.check_all(conn, config) == 1
     st = {r["id"]: r["status"] for r in conn.execute("SELECT id, status FROM payments")}
     assert st[got[2]["id"]] == "paid" and st[got[0]["id"]] == "pending"
+
+
+def test_tail_always_three_digits(conn, config):
+    """Хвост — всегда третья цифра (10.001…10.099, без 10.010): не совпадёт с чужой ровной суммой 10.01."""
+    conn.execute("INSERT INTO payments (user_id, method, amount_micro, pay_amount, pay_currency, status, auto_kind, "
+                 "created_at) VALUES (1, 'usdt', 100000, '10.00', 'USDT', 'pending', 'bybit', ?)", (cryptopay.db.now(),))
+    for _ in range(300):
+        tail = str(cryptopay.unique_amount(conn, Decimal("10"))).split(".")[1]
+        assert len(tail) == 3 and tail[-1] != "0"
