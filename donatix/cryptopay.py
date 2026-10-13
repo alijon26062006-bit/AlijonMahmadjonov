@@ -62,7 +62,7 @@ def tron_address(details: str) -> str:
 
 
 def unique_amount(conn: sqlite3.Connection, usd: Decimal) -> Decimal:
-    """Сумма к переводу. Обычно ровная (10.00): кто заплатил — узнаём по сумме. «Хвост» 0.0001–0.0099
+    """Сумма к переводу. Обычно ровная (10.00): кто заплатил — узнаём по сумме. «Хвост» 0.001–0.099
     добавляем, только если такую же сумму сейчас ждём от другого клиента, — иначе переводы не различить."""
     base = usd.quantize(Decimal("0.01"), rounding=ROUND_UP)
     taken = {Decimal(r[0]) for r in conn.execute(
@@ -72,7 +72,7 @@ def unique_amount(conn: sqlite3.Connection, usd: Decimal) -> Decimal:
     if base not in taken:
         return base
     for _ in range(200):
-        amount = base + Decimal(secrets.randbelow(99) + 1) / 10000
+        amount = base + Decimal(secrets.randbelow(99) + 1) / 1000   # 10.001, 10.002 … 10.099
         if amount not in taken:
             return amount
     raise CryptoPayError("Слишком много заявок одновременно — попробуйте через минуту.")

@@ -11,6 +11,36 @@
   .ap-timer { margin-top: 10px; padding: 8px 12px; border-radius: 12px; background: var(--surface-2, rgba(127,127,127,.12)); text-align: center; font-size: .92rem; }
   .ap-timer b { font-variant-numeric: tabular-nums; font-size: 1.05rem; }
   .ap-timer.low { color: #e5484d; }
+  .cp { padding: 0; overflow: hidden; }
+  .cp-head { display: grid; justify-items: center; gap: 8px; padding: 22px 16px 20px; text-align: center; border-bottom: 1px solid var(--line); }
+  .cp-head.cp-wait { background: var(--accent-soft); }
+  .cp-head.cp-ok { background: var(--ok-soft); }
+  .cp-head.cp-off { background: var(--bg); }
+  .cp-status { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: .95rem; }
+  .cp-wait .cp-status { color: var(--warn); } .cp-ok .cp-status { color: var(--ok); } .cp-off .cp-status { color: var(--muted); }
+  .cp-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: cp-rot .9s linear infinite; }
+  @keyframes cp-rot { to { transform: rotate(360deg); } }
+  .cp-sum { font-size: clamp(2rem, 9vw, 2.6rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+  .cp-meta { display: flex; align-items: center; gap: 12px; }
+  .cp-chip { padding: 6px 14px; border-radius: 999px; background: var(--accent-line); color: var(--text, inherit); font-weight: 700; font-size: .9rem; }
+  .cp .ap-timer { margin: 0; padding: 0; background: none; color: var(--muted); font-size: 1rem; }
+  .cp .ap-timer b { font-weight: 600; }
+  .cp .ap-timer.low { color: var(--bad); }
+  .cp-body { padding: 18px 16px 20px; }
+  .cp-label { color: var(--muted); font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 8px; }
+  .cp-addr { font-size: 1rem; line-height: 1.5; word-break: break-all; margin-bottom: 10px; }
+  .cp-copy { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .cp-copy.copied span::after, .cp-copy-sum.copied span::after { content: " ✓"; }
+  .cp-warn { display: flex; gap: 12px; margin: 20px 0 6px; padding: 16px; border: 1.5px solid var(--warn); border-radius: 16px; background: var(--warn-soft); }
+  .cp-warn-ico { font-size: 1.3rem; line-height: 1; }
+  .cp-warn-cap { color: var(--warn); font-weight: 800; font-size: .82rem; letter-spacing: .04em; text-transform: uppercase; }
+  .cp-warn-sum { font-size: 1.9rem; font-weight: 800; margin: 4px 0 10px; }
+  .cp-copy-sum { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .cp-warn p { margin: 0; font-size: .92rem; line-height: 1.5; }
+  .cp-info { display: grid; gap: 4px; margin-top: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; }
+  .cp-info small { color: var(--muted); font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .cp-info b { font-weight: 600; }
+  .cp-done { margin: 0 0 14px; font-size: 1rem; }
 </style>
 {% if dc and p.status == 'pending' %}
 <div class="dcp" id="autopay" data-id="{{ p.id }}" data-status="{{ p.status }}">
@@ -85,6 +115,59 @@
     </ol>
     <p class="muted small">Дастӣ гузаронидан ҳам мумкин: рақами кортро нусха гиред ва <b>маҳз {{ p.pay_amount }}</b> гузаронед. Агар то {{ (receipt_wait // 60) + 1 if not receipt_now else 5 }} дақиқа пур нашавад — тугмаи «Чекро фиристед» пайдо мешавад.</p>
   </details>
+</div>
+{% elif p.auto in ('trc20', 'bybit') and p.network %}
+{% set amt = p.pay_amount.rstrip('0').rstrip('.') if '.' in p.pay_amount and p.pay_amount.endswith('00') else p.pay_amount %}
+<section class="page-hero"><h1>Оплата #{{ p.id }}</h1><p>{% if buy %}🛒 {{ buy.title }} · заказ оформится сам после оплаты{% else %}Пополнение баланса · зачислится автоматически{% endif %}</p></section>
+<div class="card cp" id="autopay" data-id="{{ p.id }}" data-status="{{ p.status }}">
+  <div class="cp-head cp-{{ 'wait' if p.status == 'pending' else 'ok' if p.status == 'paid' else 'off' }}">
+    <div class="cp-status">{% if p.status == 'pending' %}<span class="cp-spin"></span> В процессе{% elif p.status == 'paid' %}✓ Выполнено{% else %}✕ Отменено{% endif %}</div>
+    <div class="cp-sum">{{ amt }} USDT</div>
+    <div class="cp-meta"><span class="cp-chip">USDT {{ p.network_short }}</span>
+      {% if p.status == 'pending' and pay_left %}<span class="ap-timer" id="ap-timer" data-left="{{ pay_left }}"><b>{{ pay_left // 60 }}:{{ '%02d' % (pay_left % 60) }}</b></span>{% endif %}</div>
+  </div>
+
+  {% if p.status == 'paid' %}
+  <div class="cp-body">
+    <p class="cp-done">Оплата получена — {% if buy and buy.order and not buy.order.startswith('!') %}заказ оформлен.{% else %}баланс пополнен на <b>{{ money(p.amount_usd) }}</b>.{% endif %}</p>
+    {% if buy and buy.order and not buy.order.startswith('!') %}<a class="btn primary block lg" href="/panel/orders/{{ buy.order.split(',')[0] }}">Открыть заказ</a>
+    {% else %}<a class="btn primary block lg" href="{{ '/panel/orders' if buy else '/panel' }}">{{ 'Мои заказы' if buy else 'В профиль' }}</a>{% endif %}
+  </div>
+  {% elif p.status != 'pending' %}
+  <div class="cp-body">
+    <p class="cp-done">{{ p.note or 'Заявка закрыта.' }}</p>
+    <a class="btn primary block lg" href="/panel/balance">Создать новую</a>
+  </div>
+  {% else %}
+  <div class="cp-body">
+    <div class="cp-label">Адрес для оплаты</div>
+    <div class="cp-addr mono">{{ p.address }}</div>
+    <button type="button" class="btn block cp-copy" data-copy="{{ p.address }}">{{ icon('copy', 18) }} <span>Скопировать</span></button>
+    {% if p.memo %}<div class="cp-label" style="margin-top:14px">Memo / тег — обязательно укажите</div>
+    <div class="cp-addr mono">{{ p.memo }}</div>
+    <button type="button" class="btn block cp-copy" data-copy="{{ p.memo }}">{{ icon('copy', 18) }} <span>Скопировать memo</span></button>{% endif %}
+
+    <div class="cp-warn">
+      <span class="cp-warn-ico">⚠️</span>
+      <div>
+        <div class="cp-warn-cap">Отправьте ровно эту сумму</div>
+        <div class="cp-warn-sum">{{ amt }} USDT</div>
+        <button type="button" class="btn cp-copy-sum" data-copy="{{ amt }}">{{ icon('copy', 18) }} <span>Копировать сумму</span></button>
+        <p>Комиссию сети платите <b>ВЫ</b>. На адрес должно <b>ДОЙТИ ровно {{ amt }} USDT</b>. Если ваш кошелёк или биржа
+          вычитает комиссию из суммы — увеличьте отправляемую сумму, чтобы дошло ровно {{ amt }} USDT.
+          Даже на копейки меньше <b>НЕ зачислится</b> автоматически.</p>
+      </div>
+    </div>
+
+    <div class="ap-qr">{{ p.address | qr_svg }}<small>Отсканируйте для оплаты</small></div>
+
+    <div class="cp-info"><small>Сумма</small><b>{{ amt }} USDT</b></div>
+    <div class="cp-info"><small>Сеть</small><b>USDT {{ p.network_short }}</b></div>
+    <div class="cp-info"><small>Важно</small><b>Отправьте ровно {{ amt }} USDT на указанный адрес в сети {{ p.network_short }}.</b></div>
+    <div class="cp-info"><small>Обратите внимание</small><b>Неверная сумма, сеть или адрес могут привести к потере средств.</b></div>
+    <div class="ap-wait"><span class="spinner"></span> Ждём поступление — страница обновится сама.</div>
+  </div>
+  {% endif %}
 </div>
 {% else %}
 <section class="page-hero"><h1>Оплата #{{ p.id }}</h1><p>{% if buy %}🛒 {{ buy.title }} · заказ оформится сам после оплаты{% else %}{{ p.method_title }} · зачислится автоматически{% endif %}</p></section>

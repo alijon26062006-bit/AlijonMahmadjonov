@@ -780,7 +780,7 @@ def public(conn: sqlite3.Connection, config: Config, p: sqlite3.Row) -> dict[str
         "method_title": title_for(conn, config, p["method"]),
         "amount_usd": fmt(p["amount_micro"]), "pay_amount": p["pay_amount"], "pay_currency": p["pay_currency"],
         "details": details if p["status"] == "pending" else "", "receipt": bool(p["receipt_file"]),
-        "network": network, "network_note": network_note(network) if p["status"] == "pending" else "",
+        "network": network, "network_short": NET_SHORT.get(network, network), "network_note": network_note(network) if p["status"] == "pending" else "",
         "note": p["admin_note"] or "", "created_at": p["created_at"], "resolved_at": p["resolved_at"],
         "auto": p["auto_kind"] or "", "pay_url": (p["pay_url"] or "") if p["status"] == "pending" else "",
         "address": (p["pay_address"] or "") if p["status"] == "pending" else "",

@@ -30,7 +30,7 @@ def test_trc20_auto_credit(app, config, conn, monkeypatch):
     amount = Decimal(p["pay_amount"])
     assert p["auto_kind"] == "trc20" and p["pay_address"] == ADDR and amount == Decimal("20")   # ровная сумма
     page = c.get(r.headers["location"]).text
-    assert p["pay_amount"] in page and ADDR in page
+    assert "20 USDT" in page and ADDR in page and "В процессе" in page
 
     txs = []
     monkeypatch.setattr(cryptopay, "_get_json", lambda url, params, headers: {"data": txs})
@@ -44,6 +44,7 @@ def test_trc20_auto_credit(app, config, conn, monkeypatch):
     assert cryptopay.check_all(conn, config) == 1
     assert balance(conn, uid) == 200_000
     assert c.get(f"/panel/data/payment/{p['id']}").json()["status"] == "paid"
+    assert "✓ Выполнено" in c.get(f"/panel/balance/{p['id']}/pay").text   # зелёный статус
     # тот же перевод второй раз не засчитывается
     cryptopay.reset()
     assert cryptopay.check_all(conn, config) == 0
@@ -140,7 +141,7 @@ def test_bybit_network_address_from_bybit(app, config, conn, monkeypatch):
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
     assert p["auto_kind"] == "bybit" and p["pay_address"] == "TXyzBybitDepositAddr"
     page = c.get(r.headers["location"]).text
-    assert "TXyzBybitDepositAddr" in page and "сеть <b>TRC20</b>" in page and "qr-box" in page
+    assert "TXyzBybitDepositAddr" in page and "USDT TRC20" in page and "qr-box" in page and "Отправьте ровно эту сумму" in page
     deposits.append({"txID": "0xdead", "amount": p["pay_amount"], "depositStatus": 3,
                      "successAt": str(cryptopay._ms(p["created_at"]) + 5000), "coin": "USDT"})
     assert cryptopay.check_all(conn, config) == 1
@@ -155,7 +156,7 @@ def test_usdt_15_minutes_then_closed_but_late_transfer_credited(app, config, con
     r = c.post("/panel/balance", data={"csrf": token, "method": "usdt", "amount": "20"}, follow_redirects=False)
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
     page = c.get(r.headers["location"]).text
-    assert 'id="ap-timer"' in page and "Оплатите за" in page
+    assert 'id="ap-timer"' in page and "В процессе" in page
     old = (datetime.now(timezone.utc) - timedelta(minutes=16)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     conn.execute("UPDATE payments SET created_at = ? WHERE id = ?", (old, p["id"]))
     page = c.get(r.headers["location"]).text
@@ -190,7 +191,7 @@ def test_usdt_round_amount_tail_only_on_clash(conn, config):
     conn.execute("INSERT INTO payments (user_id, method, amount_micro, pay_amount, pay_currency, status, auto_kind, "
                  "created_at) VALUES (1, 'usdt', 100000, '10.00', 'USDT', 'pending', 'bybit', ?)", (cryptopay.db.now(),))
     other = cryptopay.unique_amount(conn, Decimal("10"))
-    assert Decimal("10") < other < Decimal("10.01")
+    assert Decimal("10") < other < Decimal("10.1") and len(str(other).split(".")[1]) == 3   # 10.001…
     assert cryptopay.unique_amount(conn, Decimal("15")) == Decimal("15.00")
 
 
