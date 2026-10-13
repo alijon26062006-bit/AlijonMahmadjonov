@@ -225,3 +225,19 @@ def test_attention_order_refunded_when_supplier_refunds(client, conn, shop, supp
     assert orders.recheck_attention(conn, supplier) == 0            # второй раз — ничего, возврат один
     refunds = conn.execute("SELECT COUNT(*) FROM transactions WHERE note LIKE 'Возврат%'").fetchone()[0]
     assert refunds == 1
+
+
+def test_site_price_changes_do_not_touch_api_partners(client, conn, config, shop):
+    """Админ поднял наценку сайта (уровни и Premium отдельно) — партнёр по API и его бот платят по-прежнему 8%."""
+    from donatix import accounts, sitecfg
+    before = client.get("/api/v1/products/tg-premium-3", headers=shop["h"]).json()["product"]["price_usd"]
+    assert before == "13.272984"   # 12.2898 × 1.08
+    sitecfg.save(conn, config, {"markup_bronze": "20", "markup_silver": "20", "markup_gold": "20",
+                                "markup_telegram_premium": "30"})
+    after = client.get("/api/v1/products/tg-premium-3", headers=shop["h"]).json()["product"]["price_usd"]
+    assert after == before
+    site_user = accounts.get_user(conn, shop["id"])          # тот же клиент, но на сайте (без API-ключа)
+    assert accounts.markup_for(site_user, config, "telegram_premium") == 30
+    assert accounts.markup_for(site_user, config, "game_topup") == 20
+    sitecfg.save(conn, config, {"markup_api": "10"})          # наценку API админ меняет отдельно
+    assert client.get("/api/v1/products/tg-premium-3", headers=shop["h"]).json()["product"]["price_usd"] == "13.51878"

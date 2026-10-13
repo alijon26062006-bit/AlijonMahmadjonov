@@ -99,11 +99,26 @@ def ensure_admin(conn: sqlite3.Connection, config: Config) -> None:
                 role="admin", status="active")
 
 
+def is_api(user) -> bool:
+    """Пользователь пришёл по API-ключу (бот партнёра, свой сайт партнёра), а не с сайта Donatix."""
+    try:
+        return bool(user is not None and "api_key_id" in user.keys() and user["api_key_id"])
+    except (AttributeError, TypeError):
+        return False
+
+
 def markup_for(user: sqlite3.Row, config: Config, kind: str = "") -> Decimal:
     """Наценка клиента: для вида товара (если задана в настройках) → личная → по уровню.
 
     Отдельная наценка на вид товара (Telegram Stars, Premium, Steam) действует на весь проект —
-    для всех клиентов, в том числе с личной наценкой."""
+    для всех клиентов, в том числе с личной наценкой.
+
+    Запрос по API-ключу (сюда же — боты партнёров) — личная наценка партнёра, если задана, иначе своя наценка API
+    (по умолчанию 8%): наценки уровней и видов товара на сайте на партнёров не влияют."""
+    if is_api(user):   # личная наценка партнёра (ваша договорённость с ним) — важнее; иначе наценка API
+        if user["markup_override"] not in (None, ""):
+            return to_decimal(user["markup_override"])
+        return config.api_kind_markups.get(kind, config.api_markup)
     if kind in config.kind_markups:
         return config.kind_markups[kind]
     if user["markup_override"] not in (None, ""):

@@ -79,6 +79,9 @@ def load(conn: sqlite3.Connection, config: Config) -> None:
         value = db.get_setting(conn, f"markup.{tier}")
         if value:
             config.markups[tier] = Decimal(value)
+    api = db.get_setting(conn, "markup.api")
+    if api:
+        config.api_markup = Decimal(api)
     for kind in KIND_KEYS:
         value = db.get_setting(conn, f"markup.{kind}")
         if value == "-":
@@ -138,6 +141,7 @@ def view(conn: sqlite3.Connection, config: Config) -> dict[str, Any]:
         "example_price": f"{apply_markup(Decimal('10'), config.markups.get('bronze', Decimal('0'))):.2f}",
         "markups": {t: config.markups.get(t) for t in TIERS},
         "kind_markups": {k: config.kind_markups.get(k) for k in KIND_KEYS},
+        "api_markup": config.api_markup,
         "support": config.support_contact,
         "tg_channel": config.tg_channel,
         "require_approval": config.require_approval,
@@ -202,6 +206,8 @@ def clean_channel(raw: str) -> str:
 
 def save(conn: sqlite3.Connection, config: Config, data: dict[str, Any]) -> None:
     values: dict[str, str] = {}
+    if str(data.get("markup_api", "")).strip():
+        values["markup.api"] = _pct(data["markup_api"], "Наценка для API и ботов партнёров")
     for tier in TIERS:
         if f"markup_{tier}" in data:
             values[f"markup.{tier}"] = _pct(data[f"markup_{tier}"], f"Наценка {tier}")

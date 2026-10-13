@@ -22,7 +22,14 @@
     </div>
     <div class="hint">Отдельная наценка (Stars, Premium, Steam) действует на весь проект — для всех клиентов, даже с личной наценкой. Пусто — считается по личной наценке клиента или по уровню.</div>
     <div class="markup-example">Сейчас: товар за <b>$10.00</b> у поставщика → клиент Bronze платит <b>${{ s.example_price }}</b>.
-      Новая наценка действует сразу после «Сохранить» — на сайте, в API и в ботах (в ботах — до 10 минут).</div>
+      Новая наценка действует сразу после «Сохранить» на сайте и в боте-магазине. Партнёров по API и их ботов она не касается — у них своя наценка ниже.</div>
+    <div class="api-markup">
+      <label for="markup_api">Наценка для API-ключей и ботов партнёров, %</label>
+      <input id="markup_api" name="markup_api" inputmode="decimal" value="{{ s.api_markup }}">
+      <div class="hint">Отдельно от сайта: наценки выше (уровни, личные, Stars/Premium) действуют только на покупателей
+        сайта и бота-магазина. Партнёры по API и их боты всегда платят по этой наценке.</div>
+    </div>
+    <style>.api-markup{margin-top:14px;padding:12px;border:1px dashed var(--line);border-radius:var(--r)}</style>
     <label class="switch" style="margin-top:10px"><input type="checkbox" name="same_for_all" value="1"><span>Одна наценка для всех уровней — как у Bronze</span></label>
     {% if s.personal %}
     <div class="flash warn" style="margin-top:10px">{{ icon('alert', 20) }}<span>У {{ s.personal | length }} клиент(ов) личная наценка — для них наценка уровня <b>не действует</b>:

@@ -88,6 +88,11 @@ class Config:
     # Своя наценка для вида товара (вместо наценки уровня). У Steam маржа тонкая.
     kind_markups: dict[str, Decimal] = field(default_factory=lambda: {"steam_topup": Decimal("1.5")})
 
+    # API-ключи и боты партнёров: своя наценка, цены сайта (уровни, личные, по видам) на неё не влияют.
+    # У Steam-пополнения своя тонкая маржа и в API (берётся из настроек при запуске, не из админки).
+    api_markup: Decimal = Decimal("8")
+    api_kind_markups: dict[str, Decimal] = field(default_factory=lambda: {"steam_topup": Decimal("1.5")})
+
     # Первый админ создаётся при запуске, если таких пользователей ещё нет.
     admin_email: str = ""
     admin_password: str = ""
@@ -217,6 +222,8 @@ class Config:
             vendoria_games=_env("DONATIX_VENDORIA_GAMES", "Standoff 2,Clash of Clans"),
             markups=markups,
             kind_markups=kind_markups,
+            api_kind_markups=dict(kind_markups),   # копия: админка меняет kind_markups сайта, API — нет
+            api_markup=Decimal(_env("DONATIX_MARKUP_API", "8")),
             admin_email=_env("DONATIX_ADMIN_EMAIL").lower(),
             admin_password=_env("DONATIX_ADMIN_PASSWORD"),
             run_worker=_flag("DONATIX_RUN_WORKER", True),
