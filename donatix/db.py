@@ -478,6 +478,9 @@ def init(path: Path | str) -> None:
         if "google_sub" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)")
+        if "email_verified_at" not in user_cols:   # почта подтверждена (письмо или Google) — для конкурса рефералов
+            conn.execute("ALTER TABLE users ADD COLUMN email_verified_at TEXT")
+            conn.execute("UPDATE users SET email_verified_at = created_at WHERE google_sub IS NOT NULL")
         conn.executescript("""
 CREATE TABLE IF NOT EXISTS shop_users (       -- покупатели из бота-магазина
     tg_id       INTEGER PRIMARY KEY,

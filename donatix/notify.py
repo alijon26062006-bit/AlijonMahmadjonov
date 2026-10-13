@@ -26,7 +26,7 @@ def notify(conn: sqlite3.Connection, config: Config | None, user_id: int, text: 
             webpush.send(conn, config, user_id, text, link)
         except Exception:  # noqa: BLE001 — уведомление не должно мешать зачислению или заказу
             log.exception("push-уведомление")
-    if config and config.smtp_host:
+    if config and config.smtp_host and config.smtp_notify:   # почта — для писем подтверждения; уведомления — по желанию
         row = conn.execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
         if row:
             threading.Thread(target=_send_email, args=(config, row["email"], text, link), daemon=True).start()

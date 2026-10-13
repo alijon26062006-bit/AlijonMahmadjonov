@@ -735,6 +735,41 @@ def shopbot_broadcast(request: Request, text: str = Form(""), admin=Depends(admi
 # ── Отзывы ───────────────────────────────────────────────
 
 
+@router.get("/contest")
+def contest_admin(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                  config: Config = Depends(get_config)):
+    from . import contest, emailverify
+    contest._ensure(conn)
+    start, end = contest.week_bounds(config.tz_offset)
+    return render(request, "admin/contest.html", {
+        "user": admin, "on": contest.enabled(conn), "prizes": contest.prizes(conn),
+        "top": contest.leaderboard(conn, start, end, 20), "people": contest.participants(conn, config.tz_offset),
+        "end": end.astimezone(contest._local(config.tz_offset)), "mail_ready": emailverify.ready(config),
+        "winners": conn.execute("SELECT w.*, u.login FROM contest_winners w JOIN users u ON u.id = w.user_id "
+                                "ORDER BY w.week DESC, w.place LIMIT 30").fetchall(),
+    })
+
+
+@router.post("/contest", dependencies=[Depends(check_csrf)])
+def contest_save(request: Request, enabled: str = Form(""), p1: str = Form(""), p2: str = Form(""),
+                 p3: str = Form(""), admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import contest
+    try:
+        contest.save_settings(conn, enabled == "1", [p1, p2, p3])
+        flash(request, "Конкурс сохранён.")
+    except ValueError as exc:
+        flash(request, str(exc), "error")
+    return _back("/admin/contest")
+
+
+@router.post("/contest/{uid:int}/drop", dependencies=[Depends(check_csrf)])
+def contest_drop(uid: int, request: Request, admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import contest
+    contest.disqualify(conn, uid)
+    flash(request, "Приглашённый снят с конкурса — пригласившему он больше не засчитывается.")
+    return _back("/admin/contest")
+
+
 @router.get("/reviews")
 def reviews_admin(request: Request, show: str = "new", admin=Depends(admin_user), conn=Depends(get_conn)):
     from . import reviews

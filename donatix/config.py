@@ -139,6 +139,7 @@ class Config:
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    smtp_notify: bool = False   # дублировать уведомления на почту (по умолчанию нет — только письма подтверждения)
 
     # Куда писать клиентам для пополнения баланса и поддержки (например, @donatix_support).
     support_contact: str = ""
@@ -269,5 +270,6 @@ class Config:
             smtp_port=int(_env("DONATIX_SMTP_PORT", "587")),
             smtp_user=_env("DONATIX_SMTP_USER"),
             smtp_password=_env("DONATIX_SMTP_PASSWORD"),
+            smtp_notify=_env("DONATIX_SMTP_NOTIFY") == "1",
             smtp_from=_env("DONATIX_SMTP_FROM"),
         )

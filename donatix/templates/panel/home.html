@@ -6,6 +6,7 @@
   <h1>Профиль</h1>
   <p>Баланс, заказы и API в одном месте.</p>
 </section>
+{% include "panel/_verify_mail.html" %}
 <div class="app-hello only-app">Салом{% if not is_guest_account(user) %}, <b>{{ user.login }}</b>{% endif %} 👋</div>
 {% if is_guest_account(user) %}
 <div class="guest-id">

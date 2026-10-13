@@ -347,8 +347,9 @@ def register(
         )
     except accounts.AccountError as exc:
         return render(request, "register.html", {"form": form, "error": str(exc)}, 400)
-    from . import referrals
-    referrals.attach(conn, user_id, request.session.pop("ref", None))
+    _ref_signup(request, conn, user_id, verified=False)
+    from . import emailverify
+    emailverify.send(config, user_id, email.strip().lower())   # письмо «подтвердите почту»
     request.session["user_id"] = user_id
     _record_login(conn, request, user_id)
     from .tgbot import user_event
@@ -649,8 +650,7 @@ def google_callback(request: Request, code: str = "", state: str = "", error: st
         flash(request, "Аккаунт заблокирован.", "error")
         return _redirect("/login")
     if created:
-        from . import referrals
-        referrals.attach(conn, user["id"], request.session.pop("ref", None))
+        _ref_signup(request, conn, user["id"], verified=True)   # Google почту уже подтвердил
         from .tgbot import user_event
         from .worker import notify_event
         if config.require_approval:
@@ -700,6 +700,42 @@ def _ip(request: Request) -> str:
     return request.client.host if request.client else "?"
 
 
+def _ref_signup(request: Request, conn, user_id: int, *, verified: bool) -> None:
+    """Новый аккаунт по реферальной ссылке: закрепить за пригласившим и запомнить устройство для конкурса недели."""
+    from . import contest, referrals
+    if referrals.attach(conn, user_id, request.session.pop("ref", None)):
+        contest.on_signup(conn, user_id, request.cookies.get("dx_vid", ""), _ip(request),
+                          request.headers.get("user-agent", "")[:300], verified=verified)
+
+
+@router.get("/verify-email")
+def verify_email(request: Request, t: str = "", conn=Depends(get_conn), config: Config = Depends(get_config)):
+    from . import contest, emailverify
+    uid = emailverify.check(conn, config, t)
+    if not uid:
+        flash(request, "Ссылка устарела или неверная. Войдите и нажмите «Отправить письмо ещё раз».", "error")
+    else:
+        contest.mark_verified(conn, uid)
+        flash(request, "✅ Почта подтверждена. Спасибо!")
+    return _redirect("/panel" if session_user(request, conn) else "/login")
+
+
+@router.post("/panel/verify-email", dependencies=[Depends(check_csrf)])
+def panel_verify_email(request: Request, user=Depends(panel_user), conn=Depends(get_conn),
+                       config: Config = Depends(get_config)):
+    from . import emailverify
+    if not emailverify.needs(user):
+        flash(request, "Почта уже подтверждена.")
+    elif not emailverify.ready(config):
+        flash(request, "Отправка писем пока не настроена — напишите в поддержку.", "error")
+    elif request.app.state.limiter.hit("verify_mail", str(user["id"])) is not None:
+        flash(request, "Письмо уже отправлено — проверьте почту и папку «Спам». Повторить можно через час.", "error")
+    else:
+        emailverify.send(config, user["id"], user["email"])
+        flash(request, f"Письмо отправлено на {user['email']}. Откройте его и нажмите «Подтвердить почту».")
+    return _redirect(_safe_next(request.headers.get("referer", "").split(request.url.netloc, 1)[-1]) or "/panel")
+
+
 # ── Кабинет ──────────────────────────────────────────────────
 
 
@@ -724,7 +760,17 @@ def panel_home(request: Request, user=Depends(panel_user), conn=Depends(get_conn
         "markup": accounts.markup_for(user, config),
         "ref_percent": referrals.percent(conn),
         "dc": _dcoin_card(conn, user["id"]),
+        # пришёл по ссылке друга — пусть подтвердит почту, тогда другу засчитается в конкурсе недели
+        "verify_mail": _needs_verify(user),
     })
+
+
+def _needs_verify(user) -> bool:
+    from . import emailverify
+    try:
+        return emailverify.needs(user) and bool(user["referred_by"])
+    except (KeyError, IndexError):
+        return False
 
 
 def _dcoin_card(conn: sqlite3.Connection, user_id: int) -> dict[str, Any] | None:
@@ -922,14 +968,14 @@ def _buy_ctx(request: Request, conn, config: Config, user, p: dict, **extra) -> 
 
 def _start_guest(request: Request, conn) -> sqlite3.Row:
     """Купить без регистрации: заводим аккаунт-гость и входим в него в этом браузере."""
-    from . import quickbuy, referrals
+    from . import quickbuy
     if not sitecfg.registration_open(conn):
         raise orders.OrderError("Покупка без входа сейчас недоступна — войдите в аккаунт.", "guest_closed", 403)
     if request.app.state.limiter.hit("guest", _ip(request)) is not None:
         raise orders.OrderError("Слишком много покупок с этого устройства. Подождите или войдите в аккаунт.",
                                 "rate_limited", 429)
     uid = quickbuy.new_guest(conn)
-    referrals.attach(conn, uid, request.session.pop("ref", None))
+    _ref_signup(request, conn, uid, verified=False)
     request.session["user_id"] = uid
     _record_login(conn, request, uid)
     request.state.guest_cookie = quickbuy.issue_key(conn, uid)   # браузер помнит покупателя год
@@ -1722,9 +1768,11 @@ def panel_referrals(request: Request, user=Depends(panel_user), conn=Depends(get
                     config: Config = Depends(get_config)):
     from . import referrals
     code = referrals.code_for(conn, user["id"])
+    from . import contest
     return render(request, "panel/referrals.html", {
         "user": user, "link": f"{config.base_url}/register?ref={code}", "percent": referrals.percent(conn),
-        "s": referrals.stats(conn, user["id"]),
+        "s": referrals.stats(conn, user["id"]), "c": contest.view(conn, config.tz_offset, user["id"]),
+        "verify_mail": _needs_verify(user),
     })
 
 

@@ -108,8 +108,9 @@ def find_or_create(conn: sqlite3.Connection, config: Config, profile: dict[str, 
             # Человек подтвердил через Google, что почта его, — привязываем и пускаем.
             # Но пароль при регистрации почту не подтверждал: аккаунт мог заранее завести чужой.
             # Поэтому его пароль и все открытые сессии гасим — войти дальше может только владелец почты.
-            conn.execute("UPDATE users SET google_sub = ?, password_hash = ? WHERE id = ?",
-                         (profile["sub"], hash_password(secrets.token_urlsafe(32)), user["id"]))
+            conn.execute("UPDATE users SET google_sub = ?, password_hash = ?, "
+                         "email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?",
+                         (profile["sub"], hash_password(secrets.token_urlsafe(32)), db.now(), user["id"]))
             conn.execute("UPDATE logins SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL",
                          (db.now(), user["id"]))
             _revoke_planted(conn, user["id"])
@@ -122,7 +123,8 @@ def find_or_create(conn: sqlite3.Connection, config: Config, profile: dict[str, 
         password=secrets.token_urlsafe(24),  # вход только через Google, пока клиент не задаст свой пароль
         status="pending" if config.require_approval else "active",
     )
-    conn.execute("UPDATE users SET google_sub = ? WHERE id = ?", (profile["sub"], uid))
+    conn.execute("UPDATE users SET google_sub = ?, email_verified_at = ? WHERE id = ?",
+                 (profile["sub"], db.now(), uid))
     return accounts.get_user(conn, uid), True
 
 
