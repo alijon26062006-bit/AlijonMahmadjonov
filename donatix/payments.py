@@ -364,11 +364,8 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
     currency = chosen["currency"]
     pay, cur = pay_amount(conf["tjs_rate"], currency, usd)
     if chosen.get("auto") in ("trc20", "bybit"):
-        from .cryptopay import CryptoPayError, unique_amount
-        try:
-            pay, cur = str(unique_amount(conn, usd)), "USDT"  # по «хвосту» суммы узнаём перевод в блокчейне
-        except CryptoPayError as exc:
-            raise PaymentError(str(exc)) from None
+        # Пока ровная сумма; «хвост» (если на этот адрес уже ждём такую же) — когда узнаем адрес, в cryptopay.start
+        pay, cur = str(usd.quantize(Decimal("0.01"), rounding=ROUND_UP)), "USDT"
     if amount_tjs.strip() and currency == "TJS":
         # Сумму назвали в сомони — ровно её и переводят, без копейки от пересчёта туда-обратно
         pay = str(to_decimal(amount_tjs.replace(",", ".").strip()).quantize(Decimal("0.01")))

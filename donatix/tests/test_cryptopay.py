@@ -244,3 +244,37 @@ def test_bybit_networks_ready_cards_and_limits(app, config, conn, monkeypatch):
     adm.post("/admin/pay-settings", data=form)
     cards = [m for m in payments.settings(conn, config)["all_methods"] if m.get("base") == "usdt"]
     assert [(m["network"], m["min_usd"]) for m in cards] == [("TRC20", "3"), ("SOL", "5")]
+
+
+def test_tail_only_for_same_amount_on_same_network(app, config, conn, monkeypatch):
+    """Двое платят по 10 $ в BEP20 — второму 10.0xx. Третий платит 10 $ в TRC20 — ровно 10 (другой адрес).
+    Перевод в TRC20 не засчитывается заявке BEP20, даже если сумма та же."""
+    config.bybit_key, config.bybit_secret = "k", "s"
+    cryptopay._addr_cache.clear()
+    cryptopay._min_cache.clear()
+    payments.save_methods(conn, [{"code": "usdt", "title": "USDT", "currency": "USDT:BEP20", "details": "",
+                                  "enabled": True, "auto": "bybit"}])
+    deposits = []
+
+    def fake(cfg, path, params):
+        if path.endswith("query-address"):
+            return {"chains": [{"chainType": "BEP20", "chain": "BSC", "addressDeposit": "0xBsc", "tagDeposit": ""},
+                               {"chainType": "TRC20", "chain": "TRX", "addressDeposit": "TTron", "tagDeposit": ""}]}
+        return {"rows": deposits if path.endswith("deposit/query-record") else []}
+    monkeypatch.setattr(cryptopay, "_bybit_get", fake)
+    got = []
+    for i, net in enumerate(("bep20", "bep20", "trc20")):
+        accounts.create_user(conn, email=f"u{i}@example.com", login=f"user{i}", password="password123", status="active")
+        c = TestClient(app)
+        token = web_login(c, f"u{i}@example.com", "password123")
+        c.post("/panel/balance", data={"csrf": token, "method": f"usdt-{net}", "amount": "10"}, follow_redirects=False)
+        got.append(conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone())
+    assert got[0]["pay_amount"] == "10.00" and got[2]["pay_amount"] == "10.00"
+    assert Decimal("10") < Decimal(got[1]["pay_amount"]) < Decimal("10.1")
+    # 10 USDT пришли на TRC20-адрес — зачислится только заявке TRC20
+    deposits.append({"txID": "0xt", "amount": "10", "depositStatus": 3, "toAddress": "TTron",
+                     "successAt": str(cryptopay._ms(got[2]["created_at"]) + 5000)})
+    cryptopay.reset()
+    assert cryptopay.check_all(conn, config) == 1
+    st = {r["id"]: r["status"] for r in conn.execute("SELECT id, status FROM payments")}
+    assert st[got[2]["id"]] == "paid" and st[got[0]["id"]] == "pending"

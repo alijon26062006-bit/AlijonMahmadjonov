@@ -61,14 +61,18 @@ def tron_address(details: str) -> str:
     return found.group(0) if found else ""
 
 
-def unique_amount(conn: sqlite3.Connection, usd: Decimal) -> Decimal:
-    """Сумма к переводу. Обычно ровная (10.00): кто заплатил — узнаём по сумме. «Хвост» 0.001–0.099
-    добавляем, только если такую же сумму сейчас ждём от другого клиента, — иначе переводы не различить."""
+def unique_amount(conn: sqlite3.Connection, usd: Decimal, address: str = "", exclude: int = 0) -> Decimal:
+    """Сумма к переводу. Обычно ровная (10.00). «Хвост» 0.001–0.099 — только если ровно такую же сумму сейчас ждём
+    НА ТОТ ЖЕ АДРЕС (та же сеть) от другого клиента: иначе два одинаковых перевода не различить.
+    10 $ в BEP20 и 10 $ в TRC20 — разные адреса, обоим ровно 10."""
     base = usd.quantize(Decimal("0.01"), rounding=ROUND_UP)
-    taken = {Decimal(r[0]) for r in conn.execute(
-        "SELECT pay_amount FROM payments WHERE auto_kind IN ('trc20', 'bybit') AND (status = 'pending' "
-        "OR (status = 'cancelled' AND admin_note = ? AND created_at >= ?))", (EXPIRED_NOTE, _since_hours(LATE_HOURS)))
-        if r[0]}
+    sql = ("SELECT pay_amount FROM payments WHERE auto_kind IN ('trc20', 'bybit') AND id != ? AND (status = 'pending' "
+           "OR (status = 'cancelled' AND admin_note = ? AND created_at >= ?))")
+    args: list[Any] = [exclude, EXPIRED_NOTE, _since_hours(LATE_HOURS)]
+    if address:
+        sql += " AND lower(pay_address) = lower(?)"
+        args.append(address)
+    taken = {Decimal(r[0]) for r in conn.execute(sql, args) if r[0]}
     if base not in taken:
         return base
     for _ in range(200):
@@ -271,11 +275,12 @@ def bybit_incoming(config: Config, since_ms: int) -> list[dict[str, Any]]:
     for r in _bybit_get(config, "/v5/asset/deposit/query-internal-record", params).get("rows") or []:
         if str(r.get("status")) == "2":  # 2 — успешно
             out.append({"tx": f"bybit-int-{r.get('id') or r.get('txID')}", "amount": Decimal(str(r.get("amount"))),
-                        "ts": int(r.get("createdTime") or 0)})
+                        "ts": int(r.get("createdTime") or 0), "uid": True, "address": ""})
     for r in _bybit_get(config, "/v5/asset/deposit/query-record", params).get("rows") or []:
         if str(r.get("depositStatus", r.get("status"))) == "3":  # 3 — зачислено
             out.append({"tx": f"bybit-{r.get('txID') or r.get('id')}", "amount": Decimal(str(r.get("amount"))),
-                        "ts": int(r.get("successAt") or r.get("createdTime") or 0)})
+                        "ts": int(r.get("successAt") or r.get("createdTime") or 0), "uid": False,
+                        "address": str(r.get("toAddress") or "").strip()})
     return out
 
 
@@ -294,8 +299,13 @@ def check_bybit(conn: sqlite3.Connection, config: Config) -> int:
     done = 0
     for r in rows:
         want = Decimal(r["pay_amount"])
+        by_uid = bool(re.fullmatch(r"\d{5,12}", r["pay_address"] or ""))
         for t in txs:
             if t["amount"] != want or (t["ts"] and t["ts"] < _ms(r["created_at"]) - 60_000):
+                continue
+            # перевод по UID — только к заявке «по UID»; из блокчейна — только на адрес этой заявки (её сеть)
+            if t.get("uid", by_uid) != by_uid or (t.get("address") and r["pay_address"]
+                                                   and t["address"].lower() != r["pay_address"].lower()):
                 continue
             if conn.execute("SELECT 1 FROM payments WHERE ext_id = ?", (t["tx"],)).fetchone():
                 continue
@@ -412,7 +422,11 @@ def start(conn: sqlite3.Connection, config: Config, payment_id: int, method: dic
             uid = re.search(r"\d{5,12}", method.get("details", ""))
             conn.execute("UPDATE payments SET auto_kind = 'bybit', pay_address = ? WHERE id = ?",
                          (uid.group(0) if uid else method.get("details", "")[:60], payment_id))
-    elif kind == "binance":
+    if kind in UNIQUE_KINDS:   # адрес известен — хвост, только если на этот адрес уже ждём такую же сумму
+        row = conn.execute("SELECT pay_amount, pay_address FROM payments WHERE id = ?", (payment_id,)).fetchone()
+        amount = unique_amount(conn, Decimal(row["pay_amount"]), row["pay_address"] or "", payment_id)
+        conn.execute("UPDATE payments SET pay_amount = ? WHERE id = ?", (str(amount), payment_id))
+    if kind == "binance":
         order = binance_create(config, payment_id, p["pay_amount"])
         conn.execute("UPDATE payments SET auto_kind = 'binance', ext_id = ?, pay_url = ? WHERE id = ?",
                      (order["trade_no"], order["url"], payment_id))
