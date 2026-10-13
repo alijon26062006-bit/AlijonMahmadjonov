@@ -396,9 +396,13 @@ def init(path: Path | str) -> None:
             conn.execute("ALTER TABLE orders ADD COLUMN api_key_id INTEGER")
         bot_cols = {r[1] for r in conn.execute("PRAGMA table_info(bots)")}
         for col, kind in (("warn_count", "INTEGER NOT NULL DEFAULT 0"), ("last_warn_at", "TEXT"),
-                          ("active_since", "TEXT"), ("disabled_reason", "TEXT")):
+                          ("active_since", "TEXT"), ("disabled_reason", "TEXT"), ("data_dir", "TEXT")):
             if col not in bot_cols:  # неактивные боты: предупреждения и автоотключение
                 conn.execute(f"ALTER TABLE bots ADD COLUMN {col} {kind}")
+        # Папка данных каждого Telegram-бота (клиенты, заказы, настройки) — помним и после удаления бота,
+        # чтобы при повторном подключении всё вернулось
+        conn.execute("CREATE TABLE IF NOT EXISTS bot_homes (tg_bot_id INTEGER PRIMARY KEY, data_dir TEXT NOT NULL, "
+                     "user_id INTEGER, username TEXT, updated_at TEXT)")
         for col in ("auto_kind", "ext_id", "pay_url", "pay_address", "pay_memo"):  # автоплатёж: TRC20 / Binance Pay
             if col not in pay_cols:
                 conn.execute(f"ALTER TABLE payments ADD COLUMN {col} TEXT")

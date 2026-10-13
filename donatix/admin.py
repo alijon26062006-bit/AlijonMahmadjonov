@@ -229,14 +229,15 @@ def bots_add(request: Request, token: str = Form(""), admin_ids: str = Form(""),
     from . import bots
     try:
         username = bots.check_token(token)
-        bots.create(conn, config, user_id=user_id or admin["id"], token=token, admin_ids=admin_ids, username=username)
+        bid = bots.create(conn, config, user_id=user_id or admin["id"], token=token, admin_ids=admin_ids,
+                          username=username)
     except bots.BotError as exc:
         flash(request, str(exc), "error")
         return _back("/admin/bots")
     if bots.RUNNER:
         bots.RUNNER.poke()
     flash(request, f"Бот @{username} подключён — запустится в течение минуты. "
-                   "Откройте его в Telegram и нажмите /start.")
+                   "Откройте его в Telegram и нажмите /start." + bots.restored_note(conn, config, bid))
     return _back("/admin/bots")
 
 
@@ -257,7 +258,7 @@ def bots_action(bot_id: int, action: str, request: Request, admin_ids: str = For
         elif action == "admins":
             bots.update_admins(conn, bot_id, admin_ids)
         elif action == "delete":
-            bots.delete(conn, bot_id)
+            bots.delete(conn, bot_id, request.app.state.config)
     except bots.BotError as exc:
         flash(request, str(exc), "error")
     if bots.RUNNER:

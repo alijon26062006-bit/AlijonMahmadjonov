@@ -195,3 +195,51 @@ def test_inactive_disabled_bot_blocks_client(app, config, conn, monkeypatch):
     bots.unblock_user(conn, uid)                                        # админ снял запрет
     r = c.post("/panel/bots", data={"csrf": tok, "token": "2:BBBBBB", "admin_ids": "777"})
     assert "подключён" in r.text
+
+
+def _fill(folder, clients):
+    import sqlite3
+    folder.mkdir(parents=True, exist_ok=True)
+    c = sqlite3.connect(folder / "bot.sqlite3")
+    c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, balance REAL)")
+    c.executemany("INSERT INTO users (balance) VALUES (?)", [(5.0,)] * clients)
+    c.commit()
+    c.close()
+
+
+def test_bot_data_comes_back_after_delete_and_new_token(config, conn):
+    """Удалили бота и подключили снова (даже с новым токеном того же бота) — клиенты и настройки на месте.
+    Другой бот чужую папку не получает, даже если ему достался тот же номер записи."""
+    uid = accounts.create_user(conn, email="p@example.com", login="partner", password="password123", status="active")
+    bid = bots.create(conn, config, user_id=uid, token=TOKEN, admin_ids="111", username="shop_test_bot")
+    home = bots.bot_dir(config, bid)
+    assert home.name == "tg123456789"
+    _fill(home, 3)
+    with pytest.raises(bots.BotError, match="уже подключён"):   # тот же бот с перевыпущенным токеном
+        bots.create(conn, config, user_id=uid, token="123456789:BBHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw2",
+                    admin_ids="111", username="shop_test_bot")
+    bots.delete(conn, bid, config)
+    other = bots.create(conn, config, user_id=uid, token="987654321:CCHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw3",
+                        admin_ids="111", username="other_bot")
+    assert bots.bot_dir(config, other) != home and bots.restored_note(conn, config, other) == ""
+    again = bots.create(conn, config, user_id=uid, token="123456789:BBHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw2",
+                        admin_ids="111", username="shop_test_bot")
+    assert bots.bot_dir(config, again) == home
+    assert "клиенты (3)" in bots.restored_note(conn, config, again)
+    row = conn.execute("SELECT * FROM bots WHERE id = ?", (again,)).fetchone()
+    assert bots.env_for(config, row, "http://x")["DB_PATH"] == str(home / "bot.sqlite3")
+
+
+def test_old_folder_without_record_found_by_fsm(config, conn):
+    """Бот, удалённый до обновления: папка «7» без записи — узнаём бота по fsm.sqlite3 и возвращаем данные."""
+    import sqlite3
+    old = bots.bots_dir(config) / "7"
+    _fill(old, 2)
+    f = sqlite3.connect(old / "fsm.sqlite3")
+    f.execute("CREATE TABLE fsm (k TEXT PRIMARY KEY, state TEXT, data TEXT NOT NULL DEFAULT '{}')")
+    f.execute("INSERT INTO fsm (k) VALUES ('123456789:555:555:0::default')")
+    f.commit()
+    f.close()
+    uid = accounts.create_user(conn, email="p@example.com", login="partner", password="password123", status="active")
+    bid = bots.create(conn, config, user_id=uid, token=TOKEN, admin_ids="111", username="shop_test_bot")
+    assert bots.bot_dir(config, bid) == old and "клиенты (2)" in bots.restored_note(conn, config, bid)

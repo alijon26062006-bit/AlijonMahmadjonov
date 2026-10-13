@@ -45,8 +45,84 @@ def bots_dir(config: Config) -> Path:
     return Path(config.db_path).parent / "bots"
 
 
-def bot_dir(config: Config, bot_id: int) -> Path:
-    return bots_dir(config) / str(bot_id)
+def bot_dir(config: Config, bot_id: int, data_dir: str | None = None) -> Path:
+    """Папка данных бота. Своя у каждого Telegram-бота (data_dir) — не меняется при переподключении."""
+    if data_dir is None:
+        try:
+            c = sqlite3.connect(str(config.db_path), timeout=5)
+            try:
+                row = c.execute("SELECT data_dir FROM bots WHERE id = ?", (bot_id,)).fetchone()
+            finally:
+                c.close()
+            data_dir = row[0] if row else None
+        except sqlite3.Error:
+            data_dir = None
+    return bots_dir(config) / (data_dir or str(bot_id))
+
+
+def tg_bot_id(token: str) -> int:
+    """ID бота в Telegram — первая часть токена. Не меняется, даже если токен перевыпустить в @BotFather."""
+    head = (token or "").strip().split(":", 1)[0]
+    return int(head) if head.isdigit() else 0
+
+
+def _fsm_bot_id(folder: Path) -> int:
+    """У старой папки без записи — какой это был бот: ID бота стоит в начале ключей fsm.sqlite3."""
+    f = folder / "fsm.sqlite3"
+    if not f.exists():
+        return 0
+    try:
+        c = sqlite3.connect(f"file:{f}?mode=ro", uri=True, timeout=2)
+        try:
+            row = c.execute("SELECT k FROM fsm LIMIT 1").fetchone()
+        finally:
+            c.close()
+    except sqlite3.Error:
+        return 0
+    head = str(row[0]).split(":", 1)[0] if row else ""
+    return int(head) if head.isdigit() else 0
+
+
+def remember_homes(conn: sqlite3.Connection, config: Config) -> None:
+    """Запомнить, где лежат данные каждого Telegram-бота: и подключённых, и удалённых раньше (по старым папкам)."""
+    for row in conn.execute("SELECT id, token_enc, data_dir, user_id, username FROM bots").fetchall():
+        data_dir = row["data_dir"] or str(row["id"])
+        if not row["data_dir"]:
+            conn.execute("UPDATE bots SET data_dir = ? WHERE id = ?", (data_dir, row["id"]))
+        tid = tg_bot_id(unseal(config.secret_key, row["token_enc"]) or "")
+        if tid:
+            conn.execute("INSERT INTO bot_homes (tg_bot_id, data_dir, user_id, username, updated_at) "
+                         "VALUES (?, ?, ?, ?, ?) ON CONFLICT(tg_bot_id) DO UPDATE SET data_dir = excluded.data_dir, "
+                         "user_id = excluded.user_id, username = excluded.username, updated_at = excluded.updated_at",
+                         (tid, data_dir, row["user_id"], row["username"], db.now()))
+    root = bots_dir(config)
+    if not root.is_dir():
+        return
+    used = {r[0] for r in conn.execute("SELECT data_dir FROM bot_homes")}
+    orphans = sorted((d for d in root.iterdir() if d.is_dir() and d.name not in used and d.name != "venv"
+                      and (d / "bot.sqlite3").exists()), key=lambda d: (d / "bot.sqlite3").stat().st_mtime)
+    for d in orphans:   # позже изменённая папка — свежее; она и останется
+        tid = _fsm_bot_id(d)
+        if tid:
+            conn.execute("INSERT INTO bot_homes (tg_bot_id, data_dir, updated_at) VALUES (?, ?, ?) "
+                         "ON CONFLICT(tg_bot_id) DO UPDATE SET data_dir = excluded.data_dir "
+                         "WHERE bot_homes.data_dir NOT IN (SELECT data_dir FROM bots WHERE data_dir IS NOT NULL)",
+                         (tid, d.name, db.now()))
+
+
+def saved_clients(config: Config, data_dir: str) -> int:
+    """Сколько клиентов в сохранённой базе бота (0 — данных нет)."""
+    f = bots_dir(config) / data_dir / "bot.sqlite3"
+    if not f.exists():
+        return 0
+    try:
+        c = sqlite3.connect(f"file:{f}?mode=ro", uri=True, timeout=2)
+        try:
+            return int(c.execute("SELECT COUNT(*) FROM users").fetchone()[0])
+        finally:
+            c.close()
+    except sqlite3.Error:
+        return 0
 
 
 # ── Данные ───────────────────────────────────────────────────
@@ -93,22 +169,40 @@ def create(conn: sqlite3.Connection, config: Config, *, user_id: int, token: str
     owner = accounts.get_user(conn, user_id)
     if owner is None:
         raise BotError("Клиент не найден.")
+    tid = tg_bot_id(token)
     for row in conn.execute("SELECT token_enc FROM bots"):
-        if unseal(config.secret_key, row["token_enc"]) == token:
+        other = unseal(config.secret_key, row["token_enc"]) or ""
+        if other == token or (tid and tg_bot_id(other) == tid):   # тот же бот с новым токеном — тоже он
             raise BotError("Этот бот уже подключён.")
     from . import sitecfg
     limit = sitecfg.max_bots_total(conn)
     if limit and conn.execute("SELECT COUNT(*) FROM bots WHERE enabled = 1").fetchone()[0] >= limit:
         raise BotError(f"На сервере уже {limit} ботов — это предел. Напишите администратору.")
+    remember_homes(conn, config)
+    # Этот Telegram-бот уже был у нас (удаляли, отключали) — его папка с клиентами, заказами и настройками
+    home = conn.execute("SELECT data_dir FROM bot_homes WHERE tg_bot_id = ?", (tid,)).fetchone() if tid else None
+    data_dir = home["data_dir"] if home else (f"tg{tid}" if tid else None)
     with db.tx(conn):
         key = accounts.create_api_key(conn, user_id, f"Бот @{username}"[:64], config.secret_key)
         key_id = conn.execute("SELECT MAX(id) FROM api_keys WHERE user_id = ?", (user_id,)).fetchone()[0]
         cur = conn.execute(
             "INSERT INTO bots (user_id, token_enc, username, admin_ids, api_key_id, key_enc, enabled, created_at, "
-            "updated_at, active_since) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
+            "updated_at, active_since, data_dir) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)",
             (user_id, seal(config.secret_key, token), username, admins, key_id, seal(config.secret_key, key),
-             db.now(), db.now(), db.now()))
-    return int(cur.lastrowid)
+             db.now(), db.now(), db.now(), data_dir))
+        bid = int(cur.lastrowid)
+        if not data_dir:
+            conn.execute("UPDATE bots SET data_dir = ? WHERE id = ?", (str(bid), bid))
+        remember_homes(conn, config)
+    return bid
+
+
+def restored_note(conn: sqlite3.Connection, config: Config, bot_id: int) -> str:
+    """Подключили бота, который у нас уже был, — что вернулось."""
+    row = conn.execute("SELECT data_dir FROM bots WHERE id = ?", (bot_id,)).fetchone()
+    n = saved_clients(config, row["data_dir"]) if row and row["data_dir"] else 0
+    return (f" ♻️ Это бот, который уже был подключён: вернулись его клиенты ({n}), балансы, заказы, цены, "
+            "разделы и настройки.") if n else ""
 
 
 def set_enabled(conn: sqlite3.Connection, bot_id: int, enabled: bool, *, by_admin: bool = False) -> None:
@@ -126,12 +220,14 @@ def update_admins(conn: sqlite3.Connection, bot_id: int, admin_ids: str) -> None
                  (parse_admin_ids(admin_ids), db.now(), bot_id))
 
 
-def delete(conn: sqlite3.Connection, bot_id: int) -> None:
+def delete(conn: sqlite3.Connection, bot_id: int, config: Config | None = None) -> None:
     """Удалить бота и отозвать его ключ. База бота остаётся на диске — на случай, если передумаете."""
     row = conn.execute("SELECT * FROM bots WHERE id = ?", (bot_id,)).fetchone()
     if row is None:
         return
     with db.tx(conn):
+        if config is not None:
+            remember_homes(conn, config)   # данные бота остаются — подключат снова, и всё вернётся
         if row["api_key_id"]:
             accounts.revoke_api_key(conn, row["user_id"], row["api_key_id"])
         conn.execute("DELETE FROM bots WHERE id = ?", (bot_id,))
@@ -246,7 +342,7 @@ def runner_alive(conn: sqlite3.Connection) -> bool:
 
 def env_for(config: Config, row: sqlite3.Row, base_url: str) -> dict[str, str]:
     """Настройки процесса бота: всё через переменные окружения, .env в папке шаблона не нужен."""
-    folder = bot_dir(config, row["id"])
+    folder = bot_dir(config, row["id"], row["data_dir"])
     env = {k: v for k, v in os.environ.items() if k in ("PATH", "LANG", "LC_ALL", "HOME", "TZ", "SSL_CERT_FILE",
                                                          "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY")}
     env.update({
@@ -391,7 +487,7 @@ class BotRunner:
                 self._spawn(py, row)
 
     def _spawn(self, py: str, row: sqlite3.Row) -> None:
-        folder = bot_dir(self.config, row["id"])
+        folder = bot_dir(self.config, row["id"], row["data_dir"])
         folder.mkdir(parents=True, exist_ok=True)
         _kill_stale(folder / "bot.pid")
         logfile = folder / "bot.log"

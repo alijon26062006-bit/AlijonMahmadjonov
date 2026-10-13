@@ -608,14 +608,15 @@ def connect_bot(conn: sqlite3.Connection, config: Config, tg_id: int, token: str
         return e["reason"]
     try:
         username = bots.check_token(token)
-        bots.create(conn, config, user_id=user["id"], token=token, admin_ids=str(tg_id), username=username)
+        bid = bots.create(conn, config, user_id=user["id"], token=token, admin_ids=str(tg_id), username=username)
     except bots.BotError as exc:
         return f"Не получилось подключить: {exc}"
     if bots.RUNNER:
         bots.RUNNER.poke()
     notify_admin(config, f"🤖 Клиент {user['login']} подключил бота @{username} через бота поддержки.")
     return (f"✅ Бот @{username} подключён и запустится в течение минуты. Вы — его админ.\n"
-            f"Откройте @{username}, нажмите /start, затем /panel — там игры, цены и реквизиты.\n\n"
+            f"Откройте @{username}, нажмите /start, затем /panel — там игры, цены и реквизиты."
+            f"{bots.restored_note(conn, config, bid)}\n\n"
             f"✅ Бот @{username} пайваст шуд. Онро кушоед, /start ва баъд /panel-ро пахш кунед.")
 
 

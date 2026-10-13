@@ -1243,7 +1243,7 @@ def panel_bots_add(request: Request, token: str = Form(""), admin_ids: str = For
         return _redirect("/panel/bots")
     try:
         username = bots.check_token(token)
-        bots.create(conn, config, user_id=user["id"], token=token, admin_ids=admin_ids, username=username)
+        bid = bots.create(conn, config, user_id=user["id"], token=token, admin_ids=admin_ids, username=username)
     except bots.BotError as exc:
         flash(request, str(exc), "error")
         return _redirect("/panel/bots")
@@ -1251,7 +1251,7 @@ def panel_bots_add(request: Request, token: str = Form(""), admin_ids: str = For
         bots.RUNNER.poke()
     notify_admin(config, f"🤖 Клиент {user['login']} подключил бота @{username} в конструкторе.")
     flash(request, f"Бот @{username} подключён — запустится в течение минуты. Откройте его и нажмите /start, "
-                   "затем /panel — там игры, цены и реквизиты.")
+                   "затем /panel — там игры, цены и реквизиты." + bots.restored_note(conn, config, bid))
     return _redirect("/panel/bots")
 
 
@@ -1276,8 +1276,9 @@ def panel_bots_action(bot_id: int, action: str, request: Request, admin_ids: str
             bots.update_admins(conn, bot_id, admin_ids)
             flash(request, "Админы бота обновлены.")
         elif action == "delete":
-            bots.delete(conn, bot_id)
-            flash(request, "Бот удалён, его API-ключ отозван.")
+            bots.delete(conn, bot_id, request.app.state.config)
+            flash(request, "Бот удалён, его API-ключ отозван. Клиенты, заказы и настройки бота сохранены — "
+                           "подключите этот же бот снова, и всё вернётся.")
     except bots.BotError as exc:
         flash(request, str(exc), "error")
     if bots.RUNNER:
