@@ -52,15 +52,6 @@
         </div>
         {% else %}
         <p>Чек получен ✅ Администратор проверяет поступление — обычно до 1 часа. Как только проверит, баланс пополнится и придёт уведомление 🔔.</p>
-        {% if boost_wait == 0 %}
-        <form method="post" action="/panel/balance/{{ waiting.id }}/boost" class="boost-form">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <button class="btn primary boost-btn">⚡ Ускорить проверку</button>
-        </form>
-        <p class="hint">Заявка ещё раз придёт администратору — наверх списка.</p>
-        {% else %}
-        <p class="hint" id="boost-soon" data-left="{{ boost_wait }}">Если проверка затянется, через {{ boost_wait // 60 + 1 }} мин. здесь появится кнопка «⚡ Ускорить».</p>
-        {% endif %}
         <p class="hint">Новую заявку можно отправить сразу после проверки этой. Страница обновится сама.</p>
         <form class="inline" method="post" action="/panel/balance/{{ waiting.id }}/cancel"
               onsubmit="return confirm('Отменить заявку #{{ waiting.id }}? Если вы уже перевели деньги — не отменяйте, дождитесь проверки.')">
@@ -247,9 +238,6 @@
         }).catch(function () {});
     }, 8000);
   }
-  // Кнопка «Ускорить» появится сама, когда подойдёт время
-  var soon = document.getElementById("boost-soon");
-  if (soon) setTimeout(function () { location.reload(); }, (parseInt(soon.dataset.left, 10) + 2) * 1000);
   // Чек сразу копируем в память. На Android (особенно внутри Instagram/Telegram) выбранный файл
   // к моменту отправки часто уже недоступен — ERR_UPLOAD_FILE_CHANGED. Копия в памяти не пропадёт.
   var pf = document.getElementById("payform"), ps = document.getElementById("paysend");
