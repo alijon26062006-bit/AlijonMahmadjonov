@@ -207,39 +207,66 @@ def _fill(folder, clients):
     c.close()
 
 
-def test_bot_data_comes_back_after_delete_and_new_token(config, conn):
-    """Удалили бота и подключили снова (даже с новым токеном того же бота) — клиенты и настройки на месте.
-    Другой бот чужую папку не получает, даже если ему достался тот же номер записи."""
+def test_bot_data_belongs_to_partner_account(config, conn):
+    """Данные бота принадлежат аккаунту партнёра: удалил бота и подключил ДРУГОЙ бот — клиенты и настройки на месте.
+    Чужой партнёр эти данные не получает."""
     uid = accounts.create_user(conn, email="p@example.com", login="partner", password="password123", status="active")
+    other_uid = accounts.create_user(conn, email="o@example.com", login="other", password="password123",
+                                     status="active")
     bid = bots.create(conn, config, user_id=uid, token=TOKEN, admin_ids="111", username="shop_test_bot")
     home = bots.bot_dir(config, bid)
-    assert home.name == "tg123456789"
+    assert home.name == f"u{uid}"
     _fill(home, 3)
     with pytest.raises(bots.BotError, match="уже подключён"):   # тот же бот с перевыпущенным токеном
         bots.create(conn, config, user_id=uid, token="123456789:BBHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw2",
                     admin_ids="111", username="shop_test_bot")
     bots.delete(conn, bid, config)
-    other = bots.create(conn, config, user_id=uid, token="987654321:CCHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw3",
-                        admin_ids="111", username="other_bot")
-    assert bots.bot_dir(config, other) != home and bots.restored_note(conn, config, other) == ""
-    again = bots.create(conn, config, user_id=uid, token="123456789:BBHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw2",
-                        admin_ids="111", username="shop_test_bot")
+    stranger = bots.create(conn, config, user_id=other_uid, token="555555555:DDHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw4",
+                           admin_ids="222", username="stranger_bot")
+    assert bots.bot_dir(config, stranger) != home and bots.restored_note(conn, config, stranger) == ""
+    again = bots.create(conn, config, user_id=uid, token="987654321:CCHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw3",
+                        admin_ids="111", username="new_bot")          # совсем другой бот того же партнёра
     assert bots.bot_dir(config, again) == home
     assert "клиенты (3)" in bots.restored_note(conn, config, again)
     row = conn.execute("SELECT * FROM bots WHERE id = ?", (again,)).fetchone()
     assert bots.env_for(config, row, "http://x")["DB_PATH"] == str(home / "bot.sqlite3")
+    # второй бот одновременно — своя новая папка, первая занята
+    second = bots.create(conn, config, user_id=uid, token=TOKEN, admin_ids="111", username="shop_test_bot")
+    assert bots.bot_dir(config, second).name == f"u{uid}-2"
 
 
-def test_old_folder_without_record_found_by_fsm(config, conn):
-    """Бот, удалённый до обновления: папка «7» без записи — узнаём бота по fsm.sqlite3 и возвращаем данные."""
+def test_old_folder_of_deleted_bot_found_by_orders(config, conn):
+    """Бот, удалённый до обновления: папка «7» без записи. Заказы в ней шли через ключ API партнёра —
+    по ним узнаём владельца, и его новый бот получает эти данные."""
     import sqlite3
+    uid = accounts.create_user(conn, email="p@example.com", login="partner", password="password123", status="active")
+    accounts.create_api_key(conn, uid, "Бот @old", config.secret_key)
+    key_id = conn.execute("SELECT MAX(id) FROM api_keys").fetchone()[0]
+    conn.execute("INSERT INTO orders (public_id, user_id, product_id, kind, product_name, quantity, unit_price, "
+                 "total_micro, cost_micro, status, supplier_idem_key, created_at, updated_at, api_key_id) "
+                 "VALUES ('dx-777', ?, 'p', 'x', 'x', 1, '1', 1, 1, 'completed', 'idem-777', "
+                 "'2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', ?)", (uid, key_id))
     old = bots.bots_dir(config) / "7"
     _fill(old, 2)
-    f = sqlite3.connect(old / "fsm.sqlite3")
-    f.execute("CREATE TABLE fsm (k TEXT PRIMARY KEY, state TEXT, data TEXT NOT NULL DEFAULT '{}')")
-    f.execute("INSERT INTO fsm (k) VALUES ('123456789:555:555:0::default')")
-    f.commit()
-    f.close()
-    uid = accounts.create_user(conn, email="p@example.com", login="partner", password="password123", status="active")
+    c = sqlite3.connect(old / "bot.sqlite3")
+    c.execute("CREATE TABLE orders (id INTEGER PRIMARY KEY, fragment_order_id TEXT)")
+    c.execute("INSERT INTO orders (fragment_order_id) VALUES ('dx-777')")
+    c.commit()
+    c.close()
     bid = bots.create(conn, config, user_id=uid, token=TOKEN, admin_ids="111", username="shop_test_bot")
     assert bots.bot_dir(config, bid) == old and "клиенты (2)" in bots.restored_note(conn, config, bid)
+
+
+def test_daily_backup_of_bot_databases(config, conn):
+    """Раз в сутки — копия базы каждого бота; второй раз за день не копирует, старые копии сверх 14 удаляются."""
+    import sqlite3
+    _fill(bots.bots_dir(config) / "u5", 4)
+    assert bots.backup_all(config) == 1 and bots.backup_all(config) == 0
+    dest = config.db_path.parent / "backup" / "bots"
+    copy = next(dest.glob("u5-*.sqlite3"))
+    assert sqlite3.connect(copy).execute("SELECT COUNT(*) FROM users").fetchone()[0] == 4
+    for i in range(20):
+        (dest / f"u5-2020-01-{i + 1:02d}.sqlite3").write_bytes(b"")
+    copy.unlink()
+    bots.backup_all(config)
+    assert len(list(dest.glob("u5-*.sqlite3"))) == bots.BACKUP_KEEP

@@ -1278,7 +1278,7 @@ def panel_bots_action(bot_id: int, action: str, request: Request, admin_ids: str
         elif action == "delete":
             bots.delete(conn, bot_id, request.app.state.config)
             flash(request, "Бот удалён, его API-ключ отозван. Клиенты, заказы и настройки бота сохранены — "
-                           "подключите этот же бот снова, и всё вернётся.")
+                           "подключите снова этот или любой другой свой бот, и всё вернётся.")
     except bots.BotError as exc:
         flash(request, str(exc), "error")
     if bots.RUNNER:

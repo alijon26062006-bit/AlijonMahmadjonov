@@ -20,6 +20,7 @@ import sqlite3
 import subprocess
 import sys
 import threading
+from datetime import datetime, timezone
 import time
 from pathlib import Path
 from typing import Any
@@ -83,31 +84,116 @@ def _fsm_bot_id(folder: Path) -> int:
     return int(head) if head.isdigit() else 0
 
 
+def _owner_by_orders(conn: sqlite3.Connection, folder: Path) -> int:
+    """Чья старая папка: заказы бота шли через ключ API владельца — по ним и узнаём аккаунт."""
+    f = folder / "bot.sqlite3"
+    try:
+        c = sqlite3.connect(f"file:{f}?mode=ro", uri=True, timeout=2)
+        try:
+            refs = [str(r[0]) for r in c.execute("SELECT fragment_order_id FROM orders WHERE fragment_order_id "
+                                                 "IS NOT NULL ORDER BY id DESC LIMIT 20")]
+        finally:
+            c.close()
+    except sqlite3.Error:
+        return 0
+    for ref in refs:
+        row = conn.execute("SELECT k.user_id FROM orders o JOIN api_keys k ON k.id = o.api_key_id "
+                           "WHERE o.public_id = ? OR CAST(o.id AS TEXT) = ?", (ref, ref)).fetchone()
+        if row:
+            return int(row[0])
+    return 0
+
+
 def remember_homes(conn: sqlite3.Connection, config: Config) -> None:
-    """Запомнить, где лежат данные каждого Telegram-бота: и подключённых, и удалённых раньше (по старым папкам)."""
+    """Запомнить, чьи данные в какой папке: у подключённых ботов — их владелец; старые папки удалённых ботов —
+    по заказам (ключ API владельца) или по тому же Telegram-боту."""
     for row in conn.execute("SELECT id, token_enc, data_dir, user_id, username FROM bots").fetchall():
         data_dir = row["data_dir"] or str(row["id"])
         if not row["data_dir"]:
             conn.execute("UPDATE bots SET data_dir = ? WHERE id = ?", (data_dir, row["id"]))
         tid = tg_bot_id(unseal(config.secret_key, row["token_enc"]) or "")
-        if tid:
-            conn.execute("INSERT INTO bot_homes (tg_bot_id, data_dir, user_id, username, updated_at) "
-                         "VALUES (?, ?, ?, ?, ?) ON CONFLICT(tg_bot_id) DO UPDATE SET data_dir = excluded.data_dir, "
-                         "user_id = excluded.user_id, username = excluded.username, updated_at = excluded.updated_at",
-                         (tid, data_dir, row["user_id"], row["username"], db.now()))
+        conn.execute("INSERT INTO bot_data (data_dir, user_id, tg_bot_id, username, updated_at) VALUES (?, ?, ?, ?, ?) "
+                     "ON CONFLICT(data_dir) DO UPDATE SET user_id = excluded.user_id, tg_bot_id = excluded.tg_bot_id, "
+                     "username = excluded.username, updated_at = excluded.updated_at",
+                     (data_dir, row["user_id"], tid or None, row["username"], db.now()))
     root = bots_dir(config)
     if not root.is_dir():
         return
-    used = {r[0] for r in conn.execute("SELECT data_dir FROM bot_homes")}
-    orphans = sorted((d for d in root.iterdir() if d.is_dir() and d.name not in used and d.name != "venv"
-                      and (d / "bot.sqlite3").exists()), key=lambda d: (d / "bot.sqlite3").stat().st_mtime)
-    for d in orphans:   # позже изменённая папка — свежее; она и останется
+    known = {r[0]: r[1] for r in conn.execute("SELECT data_dir, user_id FROM bot_data")}
+    for d in root.iterdir():
+        if not d.is_dir() or d.name == "venv" or not (d / "bot.sqlite3").exists():
+            continue
+        if d.name in known and known[d.name]:
+            continue
         tid = _fsm_bot_id(d)
-        if tid:
-            conn.execute("INSERT INTO bot_homes (tg_bot_id, data_dir, updated_at) VALUES (?, ?, ?) "
-                         "ON CONFLICT(tg_bot_id) DO UPDATE SET data_dir = excluded.data_dir "
-                         "WHERE bot_homes.data_dir NOT IN (SELECT data_dir FROM bots WHERE data_dir IS NOT NULL)",
-                         (tid, d.name, db.now()))
+        owner = _owner_by_orders(conn, d)
+        if not owner and tid:   # тот же Telegram-бот был у кого-то подключён — значит, его папка
+            r = conn.execute("SELECT user_id FROM bot_data WHERE tg_bot_id = ? AND user_id IS NOT NULL "
+                             "ORDER BY updated_at DESC LIMIT 1", (tid,)).fetchone()
+            owner = int(r[0]) if r else 0
+        stamp = datetime.fromtimestamp((d / "bot.sqlite3").stat().st_mtime, timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%S.000Z")
+        conn.execute("INSERT INTO bot_data (data_dir, user_id, tg_bot_id, updated_at) VALUES (?, ?, ?, ?) "
+                     "ON CONFLICT(data_dir) DO UPDATE SET user_id = COALESCE(bot_data.user_id, excluded.user_id), "
+                     "tg_bot_id = COALESCE(bot_data.tg_bot_id, excluded.tg_bot_id)",
+                     (d.name, owner or None, tid or None, stamp))
+
+
+def _pick_home(conn: sqlite3.Connection, user_id: int, tid: int) -> str:
+    """Папка для нового бота партнёра: его прежние данные (тот же бот — в первую очередь, иначе самые свежие),
+    которые сейчас не заняты другим его ботом. Прежних нет — новая папка «u<аккаунт>»."""
+    busy = {r[0] for r in conn.execute("SELECT data_dir FROM bots WHERE data_dir IS NOT NULL")}
+    free = [r for r in conn.execute("SELECT data_dir, tg_bot_id FROM bot_data WHERE user_id = ? "
+                                    "ORDER BY updated_at DESC", (user_id,)) if r["data_dir"] not in busy]
+    same = [r for r in free if tid and r["tg_bot_id"] == tid]
+    if same or free:
+        return (same or free)[0]["data_dir"]
+    taken = busy | {r[0] for r in conn.execute("SELECT data_dir FROM bot_data")}
+    name, n = f"u{user_id}", 1
+    while name in taken:
+        n += 1
+        name = f"u{user_id}-{n}"
+    return name
+
+
+BACKUP_KEEP = 14   # дней
+
+
+def backup_all(config: Config) -> int:
+    """Копия базы каждого бота раз в сутки: data/backup/bots/<папка>-<дата>.sqlite3, храним 14 дней.
+    Даже если файл бота испортится — клиенты и балансы партнёров восстановятся из копии."""
+    root = bots_dir(config)
+    if not root.is_dir():
+        return 0
+    dest = Path(config.db_path).parent / "backup" / "bots"
+    dest.mkdir(parents=True, exist_ok=True)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    made = 0
+    for d in root.iterdir():
+        src_file = d / "bot.sqlite3"
+        if not d.is_dir() or d.name == "venv" or not src_file.exists():
+            continue
+        target = dest / f"{d.name}-{today}.sqlite3"
+        if target.exists():
+            continue
+        try:
+            src = sqlite3.connect(f"file:{src_file}?mode=ro", uri=True, timeout=10)
+            dst = sqlite3.connect(str(target))
+            try:
+                src.backup(dst)
+            finally:
+                dst.close()
+                src.close()
+            target.chmod(0o600)
+            made += 1
+        except (sqlite3.Error, OSError) as exc:
+            log.warning("копия базы бота %s не удалась: %s", d.name, exc)
+            target.unlink(missing_ok=True)
+            continue
+        copies = sorted(dest.glob(f"{d.name}-????-??-??.sqlite3"))
+        for old in copies[:-BACKUP_KEEP]:
+            old.unlink(missing_ok=True)
+    return made
 
 
 def saved_clients(config: Config, data_dir: str) -> int:
@@ -179,9 +265,8 @@ def create(conn: sqlite3.Connection, config: Config, *, user_id: int, token: str
     if limit and conn.execute("SELECT COUNT(*) FROM bots WHERE enabled = 1").fetchone()[0] >= limit:
         raise BotError(f"На сервере уже {limit} ботов — это предел. Напишите администратору.")
     remember_homes(conn, config)
-    # Этот Telegram-бот уже был у нас (удаляли, отключали) — его папка с клиентами, заказами и настройками
-    home = conn.execute("SELECT data_dir FROM bot_homes WHERE tg_bot_id = ?", (tid,)).fetchone() if tid else None
-    data_dir = home["data_dir"] if home else (f"tg{tid}" if tid else None)
+    # Данные принадлежат аккаунту партнёра: удалял бота, подключает тот же или новый — клиенты и настройки на месте
+    data_dir = _pick_home(conn, user_id, tid)
     with db.tx(conn):
         key = accounts.create_api_key(conn, user_id, f"Бот @{username}"[:64], config.secret_key)
         key_id = conn.execute("SELECT MAX(id) FROM api_keys WHERE user_id = ?", (user_id,)).fetchone()[0]
@@ -191,8 +276,6 @@ def create(conn: sqlite3.Connection, config: Config, *, user_id: int, token: str
             (user_id, seal(config.secret_key, token), username, admins, key_id, seal(config.secret_key, key),
              db.now(), db.now(), db.now(), data_dir))
         bid = int(cur.lastrowid)
-        if not data_dir:
-            conn.execute("UPDATE bots SET data_dir = ? WHERE id = ?", (str(bid), bid))
         remember_homes(conn, config)
     return bid
 
@@ -201,8 +284,7 @@ def restored_note(conn: sqlite3.Connection, config: Config, bot_id: int) -> str:
     """Подключили бота, который у нас уже был, — что вернулось."""
     row = conn.execute("SELECT data_dir FROM bots WHERE id = ?", (bot_id,)).fetchone()
     n = saved_clients(config, row["data_dir"]) if row and row["data_dir"] else 0
-    return (f" ♻️ Это бот, который уже был подключён: вернулись его клиенты ({n}), балансы, заказы, цены, "
-            "разделы и настройки.") if n else ""
+    return (f" ♻️ Ваши прежние данные на месте: клиенты ({n}), балансы, заказы, цены, разделы и настройки.") if n else ""
 
 
 def set_enabled(conn: sqlite3.Connection, bot_id: int, enabled: bool, *, by_admin: bool = False) -> None:

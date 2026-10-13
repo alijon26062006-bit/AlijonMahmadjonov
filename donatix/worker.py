@@ -151,6 +151,11 @@ class Worker:
                         bot_watch.check(conn, self.config)  # боты без продаж: предупредить / отключить
                     except Exception:
                         log.exception("проверка ботов")
+                    try:
+                        from . import bots
+                        bots.backup_all(self.config)   # раз в сутки — копия базы каждого бота партнёра
+                    except Exception:
+                        log.exception("копия баз ботов")
                     last_watch = now
                 try:
                     from . import quickbuy
