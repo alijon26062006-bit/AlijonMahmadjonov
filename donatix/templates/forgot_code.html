@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Код из письма — {{ site_name }}{% endblock %}
+{% block body %}
+<main class="auth">
+  <div class="card tg-auth">
+    <a class="back hide-in-app" href="/forgot">{{ icon('arrow-left', 18) }}Назад</a>
+    <h2>Введите код</h2>
+    {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
+    <p class="muted">Код из 6 цифр отправлен на <b>{{ email }}</b>. Он действует 10 минут.</p>
+    <form method="post" action="/forgot/code" style="display:grid;gap:10px">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required autofocus
+        placeholder="••••••" style="font-size:2rem;font-weight:800;letter-spacing:.5em;text-align:center;padding:14px 8px">
+      <button class="btn primary lg block">Подтвердить</button>
+    </form>
+    <p class="hint center"><a href="/forgot">Не пришло? Отправить ещё раз</a></p>
+  </div>
+</main>
+{% endblock %}

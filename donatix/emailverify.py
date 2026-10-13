@@ -38,10 +38,13 @@ def ready(config: Config) -> bool:
     return bool(config.resend_key or config.smtp_host)
 
 
+KINDS = ("verify", "reset")   # подтвердить почту / восстановить пароль
+
+
 def _ensure(conn: sqlite3.Connection) -> None:
-    conn.execute("CREATE TABLE IF NOT EXISTS email_codes (user_id INTEGER PRIMARY KEY, code_hash TEXT NOT NULL, "
-                 "email TEXT NOT NULL, expires_at REAL NOT NULL, tries INTEGER NOT NULL DEFAULT 0, "
-                 "sent_at REAL NOT NULL)")
+    conn.execute("CREATE TABLE IF NOT EXISTS mail_codes (user_id INTEGER NOT NULL, kind TEXT NOT NULL, "
+                 "code_hash TEXT NOT NULL, email TEXT NOT NULL, expires_at REAL NOT NULL, "
+                 "tries INTEGER NOT NULL DEFAULT 0, sent_at REAL NOT NULL, PRIMARY KEY (user_id, kind))")
 
 
 # ── Ссылка (запасной способ) ─────────────────────────────────
@@ -75,8 +78,8 @@ def check(conn: sqlite3.Connection, config: Config, raw: str) -> int:
 # ── Код ──────────────────────────────────────────────────────
 
 
-def _hash(config: Config, uid: int, code: str) -> str:
-    return hmac.new(config.secret_key.encode(), f"code:{uid}:{code}".encode(), hashlib.sha256).hexdigest()
+def _hash(config: Config, uid: int, code: str, kind: str = "verify") -> str:
+    return hmac.new(config.secret_key.encode(), f"code:{kind}:{uid}:{code}".encode(), hashlib.sha256).hexdigest()
 
 
 def needs(user) -> bool:
@@ -87,24 +90,35 @@ def needs(user) -> bool:
         return False
 
 
-def wait_left(conn: sqlite3.Connection, uid: int) -> int:
+def wait_left(conn: sqlite3.Connection, uid: int, kind: str = "verify") -> int:
     """Сколько секунд ждать до следующего письма (0 — можно)."""
     _ensure(conn)
-    row = conn.execute("SELECT sent_at FROM email_codes WHERE user_id = ?", (uid,)).fetchone()
+    row = conn.execute("SELECT sent_at FROM mail_codes WHERE user_id = ? AND kind = ?", (uid, kind)).fetchone()
     return max(0, int(RESEND_GAP - (time.time() - row["sent_at"]))) if row else 0
 
 
-def send_code(conn: sqlite3.Connection, config: Config, uid: int, email: str, *, wait: bool = False) -> bool:
-    """Новый код на почту (старый перестаёт действовать)."""
+def has_code(conn: sqlite3.Connection, uid: int, kind: str = "verify") -> bool:
+    """Код уже отправлен и ещё действует — показываем поле для кода, а не вопрос «подтвердить?»."""
+    _ensure(conn)
+    row = conn.execute("SELECT expires_at, tries FROM mail_codes WHERE user_id = ? AND kind = ?",
+                       (uid, kind)).fetchone()
+    return bool(row and row["expires_at"] > time.time() and row["tries"] < CODE_TRIES)
+
+
+def send_code(conn: sqlite3.Connection, config: Config, uid: int, email: str, *, kind: str = "verify",
+              wait: bool = False) -> bool:
+    """Новый код на почту (старый перестаёт действовать). kind: verify — подтвердить почту, reset — новый пароль."""
     if not ready(config) or email.endswith(FAKE_DOMAINS):
         return False
     _ensure(conn)
     code = f"{secrets.randbelow(1_000_000):06d}"
     now = time.time()
-    conn.execute("INSERT INTO email_codes (user_id, code_hash, email, expires_at, tries, sent_at) "
-                 "VALUES (?, ?, ?, ?, 0, ?) ON CONFLICT(user_id) DO UPDATE SET code_hash = excluded.code_hash, "
+    conn.execute("INSERT INTO mail_codes (user_id, kind, code_hash, email, expires_at, tries, sent_at) "
+                 "VALUES (?, ?, ?, ?, ?, 0, ?) ON CONFLICT(user_id, kind) DO UPDATE SET code_hash = excluded.code_hash, "
                  "email = excluded.email, expires_at = excluded.expires_at, tries = 0, sent_at = excluded.sent_at",
-                 (uid, _hash(config, uid, code), email.lower(), now + CODE_TTL, now))
+                 (uid, kind, _hash(config, uid, code, kind), email.lower(), now + CODE_TTL, now))
+    if kind == "reset":
+        return _send_reset(config, email, code, wait)
     link = f"{config.base_url}/verify-email?t={token(config, uid, email)}"
     subject = f"{code} — код подтверждения {config.site_name}"
     text = (f"Ваш код подтверждения: {code}\n\nВведите его на сайте {config.site_name}. Код действует 10 минут.\n"
@@ -126,19 +140,37 @@ def send_code(conn: sqlite3.Connection, config: Config, uid: int, email: str, *,
     return True
 
 
-def check_code(conn: sqlite3.Connection, config: Config, uid: int, code: str) -> str:
+def _send_reset(config: Config, email: str, code: str, wait: bool) -> bool:
+    subject = f"{code} — восстановление пароля {config.site_name}"
+    text = (f"Код для восстановления пароля: {code}\n\nВведите его на сайте {config.site_name}. Код действует "
+            "10 минут.\nЕсли вы не просили восстановить пароль — просто удалите это письмо, ваш аккаунт в "
+            f"безопасности.\n\nРамзи барқарорсозии парол: {code}\n\n— {config.site_name}")
+    html = (f'<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;color:#111">'
+            f'<h2 style="margin:0 0 12px">{config.site_name}</h2><p>Код для восстановления пароля:</p>'
+            f'<div style="font-size:34px;font-weight:800;letter-spacing:8px;padding:16px;background:#f3f4ff;'
+            f'border-radius:12px;text-align:center">{code}</div>'
+            f'<p style="color:#555">Введите его на сайте. Код действует <b>10 минут</b>.</p>'
+            f'<p style="color:#888;font-size:13px">Если вы не просили восстановить пароль — просто удалите это '
+            f'письмо, ваш аккаунт в безопасности.<br>Рамзи барқарорсозии парол: <b>{code}</b></p></div>')
+    if wait:
+        return deliver(config, email, subject, text, html)
+    threading.Thread(target=deliver, args=(config, email, subject, text, html), daemon=True).start()
+    return True
+
+
+def check_code(conn: sqlite3.Connection, config: Config, uid: int, code: str, kind: str = "verify") -> str:
     """'ok' | 'bad' (неверный, попытки ещё есть) | 'expired' (устарел или попытки кончились — нужен новый)."""
     _ensure(conn)
     code = "".join(ch for ch in (code or "") if ch.isdigit())
-    row = conn.execute("SELECT * FROM email_codes WHERE user_id = ?", (uid,)).fetchone()
+    row = conn.execute("SELECT * FROM mail_codes WHERE user_id = ? AND kind = ?", (uid, kind)).fetchone()
     u = conn.execute("SELECT email FROM users WHERE id = ?", (uid,)).fetchone()
     if row is None or u is None or row["email"] != u["email"].lower() or row["expires_at"] < time.time() \
             or row["tries"] >= CODE_TRIES:
         return "expired"
-    if len(code) != 6 or not hmac.compare_digest(row["code_hash"], _hash(config, uid, code)):
-        conn.execute("UPDATE email_codes SET tries = tries + 1 WHERE user_id = ?", (uid,))
+    if len(code) != 6 or not hmac.compare_digest(row["code_hash"], _hash(config, uid, code, kind)):
+        conn.execute("UPDATE mail_codes SET tries = tries + 1 WHERE user_id = ? AND kind = ?", (uid, kind))
         return "expired" if row["tries"] + 1 >= CODE_TRIES else "bad"
-    conn.execute("DELETE FROM email_codes WHERE user_id = ?", (uid,))
+    conn.execute("DELETE FROM mail_codes WHERE user_id = ? AND kind = ?", (uid, kind))
     return "ok"
 
 

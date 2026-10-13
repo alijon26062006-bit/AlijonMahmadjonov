@@ -8,6 +8,15 @@
     <h2>Забыли пароль?</h2>
     {% for f in flashes %}<div class="flash {{ f.kind }}" role="status">{{ f.text }}</div>{% endfor %}
     <p class="muted">Подтвердите, что аккаунт ваш, — и сразу придумаете новый пароль. Баланс и заказы останутся.</p>
+    {% if mail %}
+    <form method="post" action="/forgot/email" class="fg-mail">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label for="fg-email">Почта аккаунта</label>
+      <input id="fg-email" name="email" type="email" required autocomplete="email" placeholder="you@gmail.com">
+      <button class="btn primary lg block">📧 Получить код на почту</button>
+    </form>
+    {% if ways.google or ways.telegram %}<p class="hint center">или</p>{% endif %}
+    {% endif %}
     {% if ways.google %}
     <a class="btn lg block google-btn" href="/auth/google?reset=1">{{ google_logo(20) }}Восстановить через Google</a>
     <p class="hint">Выберите Google-почту, на которую зарегистрирован аккаунт (или которую вы привязали).</p>
@@ -16,8 +25,8 @@
     <a class="btn lg block tg-btn" href="/auth/telegram?reset=1">{{ tg_logo(22) }}Восстановить через Telegram</a>
     <p class="hint">Если к аккаунту привязан Telegram — подтвердите в боте одной кнопкой.</p>
     {% endif %}
-    {% if not ways.google and not ways.telegram %}<p>Напишите в поддержку{% if support_contact %}: {{ support_contact }}{% endif %}.</p>{% endif %}
-    {% if support_contact and (ways.google or ways.telegram) %}<p class="hint center">Не получается? Напишите {{ support_contact }}</p>{% endif %}
+    {% if not ways.google and not ways.telegram and not mail %}<p>Напишите в поддержку{% if support_contact %}: {{ support_contact }}{% endif %}.</p>{% endif %}
+    {% if support_contact and (ways.google or ways.telegram or mail) %}<p class="hint center">Не получается? Напишите {{ support_contact }}</p>{% endif %}
   </div>
 </main>
 {% endblock %}

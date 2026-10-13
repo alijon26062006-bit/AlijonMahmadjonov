@@ -2,9 +2,12 @@
 {% block title %}Подтвердите почту — {{ site_name }}{% endblock %}
 {% block content %}
 <section class="page-hero"><h1>📧 Подтвердите почту</h1>
-  <p>Мы отправили код из 6 цифр на <b>{{ user.email }}</b>. Письма нет — загляните в «Спам».</p></section>
+  <p>{% if has_code %}Мы отправили код из 6 цифр на <b>{{ user.email }}</b>. Письма нет — загляните в «Спам».
+  {% else %}Ваша почта <b>{{ user.email }}</b> ещё не подтверждена. Подтвердите — так аккаунт защищён, а пароль
+  можно восстановить по коду из письма.{% endif %}</p></section>
 <div class="card vf">
   {% if not ready %}<div class="flash error">Отправка писем пока не настроена — напишите в поддержку.</div>{% endif %}
+  {% if has_code %}
   <form method="post" action="/panel/verify-email/code" class="vf-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label for="vf-code">Код из письма</label>
@@ -16,7 +19,13 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <button class="btn block" id="vf-again" data-wait="{{ wait }}" {{ 'disabled' if wait }}>Отправить новый код</button>
   </form>
-  <a class="muted small vf-skip" href="{{ next }}">Подтвердить позже</a>
+  {% else %}
+  <form method="post" action="/panel/verify-email">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn primary lg block" id="vf-again" data-wait="{{ wait }}" {{ 'disabled' if wait }}>✅ Подтвердить — прислать код</button>
+  </form>
+  {% endif %}
+  <a class="btn block vf-skip" href="/panel/verify-email/skip">Пропустить</a>
 </div>
 <style>
 .vf { display: grid; gap: 12px; max-width: 420px; }

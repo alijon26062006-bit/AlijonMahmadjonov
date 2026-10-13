@@ -418,6 +418,11 @@ def _finish_login(request: Request, conn, user) -> RedirectResponse:
         return _redirect("/login/code")
     request.session["user_id"] = user["id"]
     _record_login(conn, request, user["id"])
+    from . import emailverify
+    if user["role"] != "admin" and emailverify.needs(user) and emailverify.ready(config):
+        if nxt:   # сначала спросим про почту, потом — туда, куда шёл
+            request.session["next"] = nxt
+        return _redirect("/panel/verify-email")   # «Подтвердите почту»: подтвердить или пропустить
     return _redirect("/admin" if user["role"] == "admin" else (nxt or "/panel"))
 
 
@@ -677,8 +682,61 @@ def google_callback(request: Request, code: str = "", state: str = "", error: st
 
 @router.get("/forgot")
 def forgot_password(request: Request, conn=Depends(get_conn), config: Config = Depends(get_config)):
-    from . import tglogin
-    return render(request, "forgot.html", {"ways": tglogin.methods(conn, config), "noindex": True})
+    from . import emailverify, tglogin
+    return render(request, "forgot.html", {"ways": tglogin.methods(conn, config), "noindex": True,
+                                           "mail": emailverify.ready(config)})
+
+
+@router.post("/forgot/email", dependencies=[Depends(check_csrf)])
+def forgot_email(request: Request, email: str = Form(""), conn=Depends(get_conn),
+                 config: Config = Depends(get_config)):
+    """Код восстановления на почту. Есть ли такой аккаунт — не говорим (чужие почты так не проверить)."""
+    from . import emailverify
+    email = email.strip().lower()[:120]
+    if request.app.state.limiter.hit("login", _ip(request)) is not None:
+        flash(request, "Слишком много попыток. Подождите 15 минут.", "error")
+        return _redirect("/forgot")
+    if not accounts.EMAIL_RE.match(email):
+        flash(request, "Впишите почту, на которую зарегистрирован аккаунт.", "error")
+        return _redirect("/forgot")
+    user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if (user is not None and user["role"] != "admin" and user["status"] != "blocked"
+            and not emailverify.wait_left(conn, user["id"], "reset")
+            and request.app.state.limiter.hit("verify_mail", f"reset:{user['id']}") is None):
+        emailverify.send_code(conn, config, user["id"], email, kind="reset")
+    request.session["reset_email"] = email
+    flash(request, f"Если аккаунт с почтой {email} есть — мы отправили на неё код. Проверьте и папку «Спам».")
+    return _redirect("/forgot/code")
+
+
+@router.get("/forgot/code")
+def forgot_code_form(request: Request):
+    email = request.session.get("reset_email", "")
+    if not email:
+        return _redirect("/forgot")
+    return render(request, "forgot_code.html", {"email": email, "noindex": True})
+
+
+@router.post("/forgot/code", dependencies=[Depends(check_csrf)])
+def forgot_code(request: Request, code: str = Form(""), conn=Depends(get_conn), config: Config = Depends(get_config)):
+    import time as _time
+
+    from . import contest, emailverify
+    email = request.session.get("reset_email", "")
+    user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone() if email else None
+    if request.app.state.limiter.hit("login", _ip(request)) is not None:
+        flash(request, "Слишком много попыток. Подождите 15 минут.", "error")
+        return _redirect("/forgot/code")
+    got = emailverify.check_code(conn, config, user["id"], code, "reset") if user is not None else "bad"
+    if got != "ok" or user is None or user["role"] == "admin" or user["status"] == "blocked":
+        flash(request, "Неверный код — проверьте цифры в письме." if got == "bad"
+              else "Код устарел — запросите новый.", "error")
+        return _redirect("/forgot/code" if got == "bad" else "/forgot")
+    contest.mark_verified(conn, user["id"])   # код пришёл на почту — значит, почта его
+    _finish_login(request, conn, accounts.get_user(conn, user["id"]))
+    request.session["pw_reset_until"] = _time.time() + 900
+    flash(request, "✅ Почта подтверждена. Придумайте новый пароль.")
+    return _redirect("/panel/password")
 
 
 def _record_login(conn, request: Request, user_id: int) -> None:
@@ -733,7 +791,14 @@ def panel_verify_page(request: Request, user=Depends(panel_user), conn=Depends(g
         return _redirect(_safe_next(request.session.pop("next", "")) or "/panel")
     return render(request, "panel/verify_email.html", {
         "user": user, "ready": emailverify.ready(config), "wait": emailverify.wait_left(conn, user["id"]),
+        "has_code": emailverify.has_code(conn, user["id"]),
         "next": _safe_next(request.session.get("next", "")) or "/panel"})
+
+
+@router.get("/panel/verify-email/skip")
+def panel_verify_skip(request: Request, user=Depends(panel_user)):
+    """«Пропустить» — дальше без подтверждения; спросим при следующем входе."""
+    return _redirect(_safe_next(request.session.pop("next", "")) or "/panel")
 
 
 @router.post("/panel/verify-email", dependencies=[Depends(check_csrf)])

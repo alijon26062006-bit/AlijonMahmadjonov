@@ -155,10 +155,72 @@ def test_code_attempts_limit(config, conn):
     uid = accounts.create_user(conn, email="t@mail.ru", login="tester", password="password123", status="active")
     emailverify._ensure(conn)
     import time
-    conn.execute("INSERT INTO email_codes (user_id, code_hash, email, expires_at, tries, sent_at) VALUES "
-                 "(?, ?, 't@mail.ru', ?, 0, ?)", (uid, emailverify._hash(config, uid, "123456"), time.time() + 600,
-                                                  time.time()))
+    conn.execute("INSERT INTO mail_codes (user_id, kind, code_hash, email, expires_at, tries, sent_at) VALUES "
+                 "(?, 'verify', ?, 't@mail.ru', ?, 0, ?)", (uid, emailverify._hash(config, uid, "123456"),
+                                                            time.time() + 600, time.time()))
     for _ in range(4):
         assert emailverify.check_code(conn, config, uid, "999999") == "bad"
     assert emailverify.check_code(conn, config, uid, "999999") == "expired"
     assert emailverify.check_code(conn, config, uid, "123456") == "expired"   # попытки кончились
+
+
+
+def _mailbox(monkeypatch):
+    sent = []
+
+    class Resp:
+        status_code = 200
+        text = "{}"
+    monkeypatch.setattr(emailverify.httpx, "post", lambda url, **kw: (sent.append(kw["json"]), Resp())[1])
+    monkeypatch.setattr(emailverify.threading, "Thread",
+                        lambda target, args, daemon: type("T", (), {"start": lambda self: target(*args)})())
+    return sent
+
+
+def test_login_asks_to_confirm_email_or_skip(app, config, conn, monkeypatch):
+    """При входе с неподтверждённой почтой — «Подтвердить» (код) или «Пропустить». Telegram-аккаунтам не показываем."""
+    import re
+    config.resend_key = "re_test_key_1234567890abcdef"
+    sent = _mailbox(monkeypatch)
+    accounts.create_user(conn, email="old@mail.ru", login="olduser", password="password123", status="active")
+    c = TestClient(app)
+    page = c.get("/login").text
+    r = c.post("/login", data={"csrf": csrf_of(page), "email": "old@mail.ru", "password": "password123"},
+               follow_redirects=False)
+    assert r.headers["location"] == "/panel/verify-email"
+    page = c.get("/panel/verify-email").text
+    assert "Подтвердить — прислать код" in page and "Пропустить" in page and not sent
+    assert c.get("/panel/verify-email/skip", follow_redirects=False).headers["location"] == "/panel"
+    c.post("/panel/verify-email", data={"csrf": csrf_of(page)})
+    code = re.search(r"\b(\d{6})\b", sent[0]["subject"]).group(1)
+    assert "Код из письма" in c.get("/panel/verify-email").text
+    r = c.post("/panel/verify-email/code", data={"csrf": csrf_of(page), "code": code}, follow_redirects=True)
+    assert "Почта подтверждена" in r.text
+    # Telegram-аккаунт (ненастоящая почта) — не спрашиваем
+    accounts.create_user(conn, email="123@telegram.user", login="tguser", password="password123", status="active")
+    c2 = TestClient(app)
+    page = c2.get("/login").text
+    r = c2.post("/login", data={"csrf": csrf_of(page), "email": "123@telegram.user", "password": "password123"},
+                follow_redirects=False)
+    assert r.headers["location"] == "/panel"
+
+
+def test_forgot_password_by_email_code(app, config, conn, monkeypatch):
+    import re
+    config.resend_key = "re_test_key_1234567890abcdef"
+    sent = _mailbox(monkeypatch)
+    accounts.create_user(conn, email="lost@mail.ru", login="lostone", password="password123", status="active")
+    c = TestClient(app)
+    page = c.get("/forgot").text
+    assert "Получить код на почту" in page
+    r = c.post("/forgot/email", data={"csrf": csrf_of(page), "email": "nobody@mail.ru"}, follow_redirects=True)
+    assert "Если аккаунт" in r.text and not sent                     # чужую почту так не проверить
+    r = c.post("/forgot/email", data={"csrf": csrf_of(page), "email": "lost@mail.ru"}, follow_redirects=True)
+    assert len(sent) == 1 and "восстановление пароля" in sent[0]["subject"]
+    code = re.search(r"\b(\d{6})\b", sent[0]["subject"]).group(1)
+    page = c.get("/forgot/code").text
+    r = c.post("/forgot/code", data={"csrf": csrf_of(page), "code": code}, follow_redirects=False)
+    assert r.headers["location"] == "/panel/password"
+    page = c.get("/panel/password").text
+    c.post("/panel/password", data={"csrf": csrf_of(page), "new": "newpass1234", "new2": "newpass1234"})
+    assert accounts.authenticate(conn, "lost@mail.ru", "newpass1234") is not None
