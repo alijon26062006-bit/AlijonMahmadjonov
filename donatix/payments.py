@@ -119,7 +119,7 @@ def _expand(stored: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out, done = [], set()
     for m in stored:
         nets = m.get("nets_view") if m.get("auto") == "bybit" else None
-        if not nets:
+        if not nets or not m.get("enabled"):   # выключенный способ сети не занимает — их получит включённый
             out.append(m)
             continue
         for n, v in nets.items():

@@ -66,12 +66,13 @@
           <option value="binance" {{ 'selected' if m.auto == 'binance' }}>Binance Pay{{ '' if binance_ready else ' — сначала добавьте ключи мерчанта' }}</option>
         </select>
       </div>
-      {% set nets = m.nets_view or m.nets or net_defaults %}
+      {# Перевод по UID (у способа нет сетей) — галочки пустые, чтобы «Сохранить» не превратил его в сети #}
+      {% set nets = m.nets_view or (net_defaults if new or m.auto != 'bybit' else {}) %}
       <div class="pm-nets">
         <input type="hidden" name="m{{ i }}_nets" value="1">
         <b>Сети USDT</b> <span class="muted small">— клиент увидит карточку каждой отмеченной сети. Адрес пополнения сайт берёт у Bybit сам.</span>
         <div class="pm-nets-grid">
-          {% for n in bybit_nets %}{% set v = nets[n] if n in nets else net_defaults[n] %}
+          {% for n in bybit_nets %}{% set v = nets[n] if n in nets else {'on': False, 'min': net_defaults[n].min, 'max': net_defaults[n].max} %}
           <div class="pm-net">
             <label class="switch"><input type="checkbox" name="m{{ i }}_net_{{ n }}" value="1" {{ 'checked' if v.on }}><span>USDT ({{ net_short[n] }})</span></label>
             <span class="pm-net-lim"><input name="m{{ i }}_min_{{ n }}" inputmode="decimal" value="{{ v.min }}" aria-label="Минимум, $"> –

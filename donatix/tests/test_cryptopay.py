@@ -287,3 +287,16 @@ def test_tail_always_three_digits(conn, config):
     for _ in range(300):
         tail = str(cryptopay.unique_amount(conn, Decimal("10"))).split(".")[1]
         assert len(tail) == 3 and tail[-1] != "0"
+
+
+def test_disabled_bybit_method_does_not_steal_networks(app, config, conn):
+    """Как у вас на сервере: выключенный «Bybit UID» стоит раньше включённого «USDT» — сети получает включённый."""
+    payments.save_methods(conn, [
+        {"code": "uid", "title": "Bybit UID", "currency": "USDT", "details": "422439155", "enabled": False,
+         "auto": "bybit", "nets": {n: {"on": n in payments.BYBIT_NETS_ON} for n in payments.BYBIT_NETS}},
+        {"code": "usdt", "title": "USDT", "currency": "USDT:BEP20", "details": "", "enabled": True, "auto": "bybit",
+         "nets": {n: {"on": n in payments.BYBIT_NETS_ON} for n in payments.BYBIT_NETS}}])
+    shown = [m["code"] for m in payments.methods(conn, config)]
+    assert shown == ["usdt-trc20", "usdt-bep20", "usdt-ton", "usdt-aptos"]
+    uid, c, token = _client(app, conn)
+    assert "Криптовалюта · USDT" in c.get("/panel/balance").text
