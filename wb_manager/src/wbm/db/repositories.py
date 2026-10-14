@@ -43,7 +43,7 @@ def normalize_email(email: str) -> str:
 
 
 async def create_user(session: AsyncSession, email: str, password_hash: str) -> User:
-    user = User(email=normalize_email(email), password_hash=password_hash)
+    user = User(email=normalize_email(email), password_hash=password_hash, is_active=True)
     session.add(user)
     try:
         await session.flush()
@@ -61,9 +61,36 @@ async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     return result.scalar_one_or_none()
 
 
-async def get_user_by_telegram(session: AsyncSession, chat_id: int) -> User | None:
-    result = await session.execute(select(User).where(User.telegram_chat_id == chat_id))
+async def get_user_by_telegram(session: AsyncSession, telegram_user_id: int) -> User | None:
+    result = await session.execute(select(User).where(User.telegram_user_id == telegram_user_id))
     return result.scalar_one_or_none()
+
+
+async def get_or_create_telegram_user(
+    session: AsyncSession, *, telegram_user_id: int, chat_id: int, name: str | None
+) -> User:
+    user = await get_user_by_telegram(session, telegram_user_id)
+    if user is None:
+        user = User(telegram_user_id=telegram_user_id, telegram_chat_id=chat_id, name=name)
+        session.add(user)
+    else:
+        user.telegram_chat_id = chat_id
+        user.name = name or user.name
+    await session.flush()
+    return user
+
+
+async def set_phone(session: AsyncSession, user_id: int, phone: str) -> None:
+    user = await session.get(User, user_id)
+    if user is None:
+        raise ValueError("Пользователь не найден")
+    user.phone = normalize_phone(phone)
+    await session.flush()
+
+
+def normalize_phone(phone: str) -> str:
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    return f"+{digits}" if digits else ""
 
 
 # ── попытки входа ─────────────────────────────────────────────────────────────
@@ -175,6 +202,7 @@ async def enqueue_run(
     shop_id: int,
     source: RunSource = RunSource.WEB,
     period_days: int = 30,
+    notify_chat_id: int | None = None,
 ) -> AnalysisRun | None:
     """Ставит анализ в очередь. Если по магазину анализ уже идёт — возвращает его.
 
@@ -194,6 +222,7 @@ async def enqueue_run(
     run = AnalysisRun(
         shop_id=shop_id,
         source=source,
+        notify_chat_id=notify_chat_id,
         period_days=period_days,
         status=RunStatus.QUEUED,
         progress=0,
@@ -355,3 +384,95 @@ async def requeue_stale_runs(
             run.stage = "Перезапуск после сбоя"
     await session.flush()
     return len(stale)
+
+
+async def set_notify_message(session: AsyncSession, run_id: int, message_id: int) -> None:
+    run = await session.get(AnalysisRun, run_id)
+    if run is not None:
+        run.notify_message_id = message_id
+        await session.flush()
+
+
+async def get_run_for_worker(session: AsyncSession, run_id: int) -> AnalysisRun | None:
+    """Анализ вместе с магазином — только для воркера (без проверки владельца)."""
+    result = await session.execute(
+        select(AnalysisRun).where(AnalysisRun.id == run_id).options(selectinload(AnalysisRun.shop))
+    )
+    return result.scalar_one_or_none()
+
+
+async def latest_finished_run(
+    session: AsyncSession, shop_id: int, *, before_run_id: int
+) -> AnalysisRun | None:
+    result = await session.execute(
+        select(AnalysisRun)
+        .where(
+            AnalysisRun.shop_id == shop_id,
+            AnalysisRun.status == RunStatus.DONE,
+            AnalysisRun.id < before_run_id,
+        )
+        .order_by(AnalysisRun.id.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def find_shop_by_seller(session: AsyncSession, user_id: int, seller_id: str) -> Shop | None:
+    result = await session.execute(
+        select(Shop).where(Shop.user_id == user_id, Shop.seller_id == seller_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def update_shop_token(
+    session: AsyncSession,
+    shop: Shop,
+    *,
+    name: str,
+    token_encrypted: str,
+    token_fingerprint: str,
+    token_kind: int | None,
+    token_expires_at: datetime | None,
+    token_categories: Sequence[str],
+    sandbox: bool,
+) -> Shop:
+    shop.name = name
+    shop.token_encrypted = token_encrypted
+    shop.token_fingerprint = token_fingerprint
+    shop.token_kind = token_kind
+    shop.token_expires_at = token_expires_at
+    shop.token_categories = list(token_categories)
+    shop.token_checked_at = utcnow()
+    shop.sandbox = sandbox
+    await session.flush()
+    return shop
+
+
+async def count_shops(session: AsyncSession, user_id: int) -> int:
+    result = await session.execute(select(func.count()).where(Shop.user_id == user_id))
+    return int(result.scalar_one())
+
+
+async def heartbeat(
+    session: AsyncSession, run_id: int, worker_id: str, *, now: datetime | None = None
+) -> bool:
+    """Отметка «воркер жив» — чтобы долгий анализ не сочли зависшим."""
+    run = await _own_running_run(session, run_id, worker_id)
+    if run is None:
+        return False
+    run.heartbeat_at = now or utcnow()
+    await session.flush()
+    return True
+
+
+async def load_run_details(session: AsyncSession, run_id: int) -> AnalysisRun | None:
+    """Анализ с магазином и результатами — для воркера (уведомление и PDF)."""
+    result = await session.execute(
+        select(AnalysisRun)
+        .where(AnalysisRun.id == run_id)
+        .options(
+            selectinload(AnalysisRun.shop),
+            selectinload(AnalysisRun.checks).selectinload(CheckResult.findings),
+        )
+    )
+    return result.scalar_one_or_none()

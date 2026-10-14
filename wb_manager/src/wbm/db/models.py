@@ -63,22 +63,24 @@ class RunSource(StrEnum):
 
 
 class User(Base):
+    """Пользователь. В v1 вход через Telegram: email и пароль — на будущее (веб-кабинет)."""
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(BigInt, primary_key=True, autoincrement=True)
-    email: Mapped[str] = mapped_column(String(254), unique=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    telegram_user_id: Mapped[int | None] = mapped_column(
+        BigInt, unique=True, nullable=True, default=None
+    )
     telegram_chat_id: Mapped[int | None] = mapped_column(
         BigInt, unique=True, nullable=True, default=None
     )
-    telegram_link_code: Mapped[str | None] = mapped_column(
-        String(64), unique=True, nullable=True, default=None
-    )
-    telegram_link_expires_at: Mapped[datetime | None] = mapped_column(
-        UTCDateTime, nullable=True, default=None
-    )
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True, default=None)
+    """Номер, которым пользователь поделился в Telegram (подтверждён Telegram)."""
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    email: Mapped[str | None] = mapped_column(String(254), unique=True, nullable=True, default=None)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
     shops: Mapped[list[Shop]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -156,6 +158,10 @@ class AnalysisRun(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     report_text: Mapped[str | None] = mapped_column(LongText, nullable=True)
+    notify_chat_id: Mapped[int | None] = mapped_column(BigInt, nullable=True)
+    """Куда прислать прогресс и итог (чат Telegram)."""
+    notify_message_id: Mapped[int | None] = mapped_column(BigInt, nullable=True)
+    """Сообщение с прогрессом, которое бот обновляет."""
 
     shop: Mapped[Shop] = relationship()
     datasets: Mapped[list[RunDataset]] = relationship(

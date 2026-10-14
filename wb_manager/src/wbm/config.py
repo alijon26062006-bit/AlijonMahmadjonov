@@ -53,6 +53,24 @@ class ReportSettings(BaseSettings):
     anthropic_timeout: float = Field(default=120.0, gt=0)
 
 
+class TelegramSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    telegram_bot_token: SecretStr
+
+
+class WorkerSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="WORKER_", env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+    concurrency: int = Field(default=2, ge=1, le=20)
+    poll_seconds: float = Field(default=2.0, gt=0)
+    heartbeat_seconds: float = Field(default=30.0, gt=0)
+    stale_seconds: float = Field(default=300.0, gt=0)
+    max_attempts: int = Field(default=3, ge=1)
+
+
 class AppSettings(BaseSettings):
     """Общие настройки приложения."""
 
@@ -84,3 +102,13 @@ def get_security_settings() -> SecuritySettings:
 @lru_cache(maxsize=1)
 def get_report_settings() -> ReportSettings:
     return ReportSettings()
+
+
+@lru_cache(maxsize=1)
+def get_telegram_settings() -> TelegramSettings:
+    return TelegramSettings()
+
+
+@lru_cache(maxsize=1)
+def get_worker_settings() -> WorkerSettings:
+    return WorkerSettings()

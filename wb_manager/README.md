@@ -3,6 +3,15 @@
 План и архитектура — [docs/PLAN.md](docs/PLAN.md). Что подтверждено в документации WB —
 [docs/WB_API.md](docs/WB_API.md).
 
+## Запуск
+
+```bash
+cp .env.example .env            # заполнить: TELEGRAM_BOT_TOKEN, DATABASE_URL, FERNET_KEYS, ANTHROPIC_API_KEY
+.venv/bin/alembic upgrade head  # таблицы в MySQL
+.venv/bin/python -m wbm.bot     # Telegram-бот
+.venv/bin/python -m wbm.worker  # фоновые анализы (отдельный процесс)
+```
+
 ## Разработка
 
 ```bash
@@ -43,3 +52,9 @@ WBM_TEST_MYSQL_URL="mysql+aiomysql://wbm:пароль@127.0.0.1:3306/wbm_test?ch
   получает только готовые цифры; любое число в его тексте, которого нет в данных, — текст
   отбрасывается и заменяется шаблоном. Без ключа, при отказе или сбое Claude — шаблоны.
   Включён серверный запасной вариант Anthropic (`fallbacks: "default"`) на случай отказа модели.
+- `src/wbm/bot/` — Telegram-бот (интерфейс v1): вход по Telegram + номер телефона, токен в чат
+  (сообщение сразу удаляется, токен хранится зашифрованным), себестоимость файлом, /analyze,
+  /history с PDF, /shops. Логика — в `services.py`, обработчики — в `handlers.py`.
+- `src/wbm/worker/` — очередь анализов: прогресс в Telegram, итог (топ-5) и полный отчёт PDF.
+- `src/wbm/collectors/` — загрузка данных WB; сборщики добавляются по мере сверки документации.
+- `src/wbm/costs.py` — файл себестоимости (CSV/Excel).
