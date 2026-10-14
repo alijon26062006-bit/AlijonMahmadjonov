@@ -84,7 +84,13 @@
   <p class="dcp-under">Барнома худаш кушода мешавад — корт ва маблағ тайёранд, фақат <b>тасдиқ</b> кунед.</p>
   {% endif %}
 
-  <div class="dcp-wait" role="status" aria-live="polite">
+  <button type="button" class="btn lg block dcp-done" id="dcp-done">✓ Ман пардохт кардам / Я оплатил</button>
+  <div class="dcp-find" id="dcp-find" hidden role="status" aria-live="polite">
+    <span class="spinner"></span><b>Пардохтро меҷӯем… / Ищем ваш платёж…</b>
+    <div class="dcp-find-bar"><i id="dcp-find-bar"></i></div>
+    <small>Одатан 10–60 сония. Саҳифаро набандед.</small>
+  </div>
+  <div class="dcp-wait" id="dcp-wait" role="status" aria-live="polite">
     <span class="spinner"></span><span>Интизори пардохт…</span>
     <b class="dcp-timer" id="dcp-timer" data-left="{{ 0 if receipt_now else receipt_wait }}"></b>
   </div>
@@ -234,6 +240,33 @@
     });
   });
   if (!box || box.dataset.status !== "pending") return;
+  // «Душанбе Сити»: «Я оплатил» → ищем платёж каждые 2 секунды до 90 секунд; нашли — «Тасдиқ шуд», не нашли — чек
+  var done = document.getElementById("dcp-done"), find = document.getElementById("dcp-find");
+  if (done && find) done.addEventListener("click", function () {
+    done.hidden = true; find.hidden = false;
+    var w = document.getElementById("dcp-wait"); if (w) w.hidden = true;
+    var bar = document.getElementById("dcp-find-bar"), t0 = Date.now(), LIMIT = 90000;
+    (function poll() {
+      var spent = Date.now() - t0;
+      bar.style.width = Math.min(96, spent / LIMIT * 100) + "%";
+      fetch("/panel/data/payment/" + box.dataset.id, {credentials: "same-origin"})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.status === "paid") {
+            bar.style.width = "100%"; find.classList.add("ok");
+            find.querySelector("b").textContent = "✓ Пардохт тасдиқ шуд / Оплата подтверждена";
+            find.querySelector(".spinner").remove();
+            setTimeout(function () { location.href = d.order ? "/panel/orders/" + d.order : location.href; }, 1200);
+            return;
+          }
+          if (d.status && d.status !== "pending") { location.reload(); return; }
+          if (spent < LIMIT) { setTimeout(poll, 2000); return; }
+          find.hidden = true; done.hidden = false; done.textContent = "↻ Боз санҷидан / Проверить ещё раз";
+          var rc0 = document.getElementById("dc-receipt"); if (rc0) rc0.hidden = false;
+        })
+        .catch(function () { if (Date.now() - t0 < LIMIT) setTimeout(poll, 3000); });
+    })();
+  });
   var at = document.getElementById("ap-timer");
   if (at) {
     var end = Date.now() + (+at.dataset.left || 0) * 1000, ab = at.querySelector("b");

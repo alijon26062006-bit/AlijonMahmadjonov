@@ -2422,3 +2422,13 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
   background: var(--warn-soft); color: var(--warn); font-size: .85rem; line-height: 1.45; }
 .id-only svg { flex: none; margin-top: 1px; }
 .hero-indep { margin: 10px 0 0; font-size: .85rem; color: var(--muted); max-width: 520px; }
+
+/* «Душанбе Сити»: «Я оплатил» и поиск платежа */
+.dcp-done { margin-top: 12px; background: var(--ok-soft); color: var(--ok); border: 1.5px solid var(--ok); font-weight: 800; }
+.dcp-find { display: grid; justify-items: center; gap: 8px; margin-top: 12px; padding: 16px; border-radius: var(--r);
+  background: var(--accent-soft); text-align: center; }
+.dcp-find small { color: var(--muted); }
+.dcp-find-bar { width: 100%; height: 6px; border-radius: 999px; background: rgba(127,127,127,.2); overflow: hidden; }
+.dcp-find-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .6s; }
+.dcp-find.ok { background: var(--ok-soft); color: var(--ok); }
+.dcp-find.ok .dcp-find-bar i { background: var(--ok); }

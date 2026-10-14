@@ -141,9 +141,9 @@
       <label for="amount" id="amount-label">{{ 'Сумма покупки, сомони' if buy else 'Сколько пополнить, сомони' }}</label>
       <input id="amount" name="amount_tjs" inputmode="decimal" required placeholder="Например, 500" autocomplete="off" {% if buy %}value="{{ buy.tjs }}" readonly{% endif %}>
       <div class="flash warn usd-warn" id="usd-warn" hidden role="alert"></div>
-      <div class="hint">{% if buy %}{% elif min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони (≈ {{ money(min_usd) }}). {% else %}Любая сумма. {% endif %}К переводу: <b id="topay">—</b> <button type="button" class="btn sm" id="topay-copy" hidden data-copy="">📋 сумму</button></div>
+      <div class="hint">{% if buy %}{% elif min_tjs > 0 %}Минимум {{ min_tjs | string | replace(".00", "") }} сомони. {% else %}Любая сумма. {% endif %}К переводу: <b id="topay">—</b> <button type="button" class="btn sm" id="topay-copy" hidden data-copy="">📋 сумму</button></div>
 
-      <div class="step-head" style="margin-top:22px"><span class="n">3</span><h3>Переведите по реквизитам</h3></div>
+      <div class="step-head" id="step3" style="margin-top:22px"><span class="n">3</span><h3>Переведите по реквизитам</h3></div>
       {% for m in methods %}
       <div class="details" data-for="{{ m.code }}" {{ 'hidden' if m.code != pre }}>
         {% if m.network %}<div class="net-badge">Сеть: <b>{{ m.network_title }}</b></div>{% endif %}
@@ -176,8 +176,10 @@
       <div class="hint" id="receipt-state" role="status"></div>
       <div class="hint">Без чека заявку не проверить — отправить её не получится.</div>
       </div>
+      <div id="ref-box">
       <label for="reference">Номер чека / хэш перевода <span class="muted">(желательно)</span></label>
       <input id="reference" name="reference" maxlength="200" placeholder="Например, 4821 или TX-хэш" autocomplete="off">
+      </div>
       <button class="btn primary lg block" style="margin-top:18px" id="paysend">Я оплатил — отправить заявку</button>
       <div class="rc-check" id="rc-check" hidden role="status" aria-live="polite">
         <div class="rcc-card">
@@ -361,7 +363,12 @@
     if (cx) { var isCx = !!r.dataset.crypto; cx.hidden = !isCx; rest0.hidden = isCx; inp.required = !isCx;
       var rc0 = document.getElementById("receipt"); if (rc0 && isCx) rc0.required = false;
       if (isCx) return; }
-    f.querySelectorAll(".details").forEach(function (d) { d.hidden = d.dataset.for !== r.value; });
+    // Автоплатёж («Душанбе Сити · авто» и т.п.): реквизиты и номер чека — на следующем экране, здесь только сумма
+    var auto = !!r.dataset.auto;
+    f.querySelectorAll(".details").forEach(function (d) { d.hidden = auto || d.dataset.for !== r.value; });
+    ["step3", "ref-box"].forEach(function (id) { var el = document.getElementById(id); if (el) el.hidden = auto; });
+    var send = document.getElementById("paysend");
+    if (send && !send.disabled) send.textContent = auto ? "Перейти к оплате →" : "Я оплатил — отправить заявку";
     // Автоплатёж (крипта) проверяется сам — там чек не нужен; для переводов — обязателен
     var box = document.getElementById("receipt-box"), rc = document.getElementById("receipt");
     if (box && rc) { box.hidden = !!r.dataset.auto; rc.required = !r.dataset.auto; }
