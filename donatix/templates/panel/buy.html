@@ -1,6 +1,6 @@
 {% extends "panel/_layout.html" %}
 {% from "_icons.html" import icon, kind_icon, media, pack_icon %}
-{% block title %}{{ p.title }} — {{ site_name }}{% endblock %}
+{% block title %}{{ p.title }} — купить в {{ site_name }} (независимый сервис){% endblock %}
 {% block content %}
 {% if p.kind == 'steam_topup' %}{% include "panel/_buy_steam.html" %}{% elif p.kind == 'steam_gift' %}{% include "panel/_buy_gift.html" %}{% else %}
 {% set multi = p.max_quantity > 1 %}
@@ -10,11 +10,12 @@
   {{ media(kind_cover(p.kind, p.image_url), p.category_name, p.kind, 'cover') }}
   <div class="grow">
     <div class="bh-kind">{{ p.kind_title }}</div>
-    <h1>{{ p.category_name if siblings else p.title }}</h1>
+    <h1>{{ ('Пополнение для ' ~ p.category_name) if siblings else p.title }}</h1>
     <div class="bh-tags">
       {% if p.region %}<span class="badge">{{ p.region_title }}</span>{% endif %}
       {% if p.platform %}<span class="badge accent">{{ p.platform }}</span>{% endif %}
       {% if can_check %}<span class="badge ok">{{ icon('shield', 13) }}Проверка ID</span>{% endif %}
+      <span class="badge">Неофициальный реселлер</span>
     </div>
     {% if not user.guest and not is_guest_account(user) %}<div class="api-id muted small">ID для API: <code>{{ p.product_id }}</code>
       <button class="link-btn" type="button" data-copy="{{ p.product_id }}">Копировать</button>
@@ -76,9 +77,14 @@
              {% if f.key == 'telegram_username' %}placeholder="@username" autocapitalize="off" spellcheck="false"
              {% else %}placeholder="Например, 5123456789"{% endif %}>
       {% endif %}
-    {% else %}
-      <p class="muted" style="margin:10px 0 0">После оплаты {{ 'ключ' if p.kind == 'game_key' else 'код' }} появится на странице заказа и придёт на ваш webhook.</p>
     {% endfor %}
+    {% if p.fields %}
+      <p class="id-only">{{ icon('shield', 16) }}<span>Неофициальный сервис. Вводите только ID игрока, никогда не вводите
+        пароль. / Unofficial service: enter only the player ID, never your password.</span></p>
+    {% endif %}
+    {% if not p.fields %}
+      <p class="muted" style="margin:10px 0 0">После оплаты {{ 'ключ' if p.kind == 'game_key' else 'код' }} появится на странице заказа и придёт на ваш webhook.</p>
+    {% endif %}
     {% if p.kind == 'game_key' %}
       <div class="regions-box" id="gk-regions" data-url="/panel/data/gamekey-regions/{{ p.product_id | urlencode }}">
         <div class="muted small">Проверяем, где активируется ключ…</div>

@@ -71,7 +71,7 @@
     const box = $("g-games");
     if (!d.items.length) { box.innerHTML = '<div class="empty small">Ничего не найдено</div>'; return; }
     box.innerHTML = d.items.map(g => row(
-      `<img class="cover" src="${g.cover}" alt="" loading="lazy" onerror="this.remove()"><span class="grow"><b>${esc(g.name)}</b><span class="sub">AppID · ${g.appid}</span></span>`,
+      `<span class="grow"><b>${esc(g.name)}</b><span class="sub">AppID · ${g.appid}</span></span>`,
       st.game && st.game.appid === g.appid, `data-app="${g.appid}" data-name="${esc(g.name)}"`)).join("");
   }
 

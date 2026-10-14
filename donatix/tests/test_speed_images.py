@@ -19,7 +19,7 @@ def test_thumb_made_and_used(tmp_path, monkeypatch):
 
 def test_covers_for_kinds_without_image():
     assert kind_cover("telegram_stars") == "/static/img/tg-stars.svg"
-    assert kind_cover("telegram_stars", "https://x/y.png") == "https://x/y.png"
+    assert kind_cover("telegram_stars", "https://x/y.png") == "/static/img/tg-stars.svg"   # своя иконка важнее
     assert kind_cover("topup") is None
 
 

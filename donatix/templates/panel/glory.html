@@ -1,9 +1,9 @@
 {% extends "panel/_layout.html" %}
 {% from "_icons.html" import icon %}
-{% block title %}Glory клана Free Fire — {{ site_name }}{% endblock %}
+{% block title %}Glory для клана в Free Fire — {{ site_name }}, независимый сервис{% endblock %}
 {% block content %}
 <section class="page-hero">
-  <h1>Glory клана Free Fire</h1>
+  <h1>Glory для клана в Free Fire</h1>
   <p class="muted">Боты заходят в игру за ваш клан и набирают очки славы. Очки, уровень и участников клана видно вживую на странице заказа.</p>
 </section>
 {% if credits is not none %}<div class="flash">{{ icon('shield', 18) }}<span>Видно только админу: кредиты FFGlory — <b>{{ credits }}</b>, {% if price_tjs %}цена {{ price_tjs }} с. для всех регионов{% else %}наценка {{ markup }}%{% endif %}{% set loss = regions | selectattr('loss') | map(attribute='title') | list %}{% if loss %}. <b style="color:var(--bad)">В убыток (кредит дороже цены): {{ loss | join(', ') }}</b>{% endif %}</span></div>{% endif %}
@@ -14,6 +14,7 @@
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <label for="gl-clan">ID клана</label>
   <input id="gl-clan" name="clan_id" inputmode="numeric" pattern="[0-9]{5,15}" required placeholder="Например, 3012345678" autocomplete="off">
+  <p class="id-only">{{ icon('shield', 16) }}<span>Неофициальный сервис. Вводите только ID клана, никогда не вводите пароль от игрового аккаунта.</span></p>
   <p class="muted small">В игре: Клан → информация о клане → ID.</p>
 
   <label style="margin-top:12px">Регион сервера клана</label>

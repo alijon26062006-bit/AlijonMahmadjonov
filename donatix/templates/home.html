@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon, kind_icon, media, tg_logo, wa_logo %}
-{% block title %}{{ site_name }} — алмазы Free Fire, UC PUBG и Telegram Stars без регистрации{% endblock %}
+{% block title %}{{ site_name }} — независимый сервис пополнения: алмазы для Free Fire, UC для PUBG Mobile, Telegram Stars{% endblock %}
 {% block jsonld %}
 <script type="application/ld+json">{{ {
   "@context": "https://schema.org",
@@ -20,8 +20,10 @@
     {% for f in flashes %}<div class="flash {{ f.kind }}" role="status"><span>{{ f.text }}</span></div>{% endfor %}
     <section class="hero hero-play">
       <div>
-        <h1>Алмазы Free Fire, UC PUBG и&nbsp;Telegram Stars — за&nbsp;секунды</h1>
+        <h1>Алмазы для Free Fire, UC для PUBG и&nbsp;Telegram Stars — за&nbsp;секунды</h1>
         <p class="lead">Без регистрации: выберите игру, введите ID и оплатите. Заказ придёт сам — обычно за минуту.</p>
+        <p class="hero-indep">Независимый сервис пополнения — не официальный сайт Garena, Tencent, Moonton, Valve или Telegram.
+          Нужен только ID игрока, пароль не нужен никогда.</p>
         <div class="cta">
           <a class="btn primary lg" href="#games">Выбрать игру</a>
         </div>

@@ -1,6 +1,6 @@
 {% extends "panel/_layout.html" %}
 {% from "_icons.html" import icon, kind_icon, pack_icon, media %}
-{% block title %}{{ game.category_name if game else kind_titles.get(kind, 'Каталог') }} — {{ site_name }}{% endblock %}
+{% block title %}{{ ('Пополнение для ' ~ game.category_name) if game else kind_titles.get(kind, 'Каталог') }} — {{ site_name }}, независимый сервис{% endblock %}
 {% block content %}
 {% if game %}
 <section class="page-hero">
@@ -9,8 +9,8 @@
 <div class="game-head">
   {{ media(kind_cover(game.kind, game.image_url), game.category_name, game.kind, 'cover') }}
   <div>
-    <h1>{{ game.category_name }}</h1>
-    <p class="muted">{{ count }} {{ 'пакетов' if count != 1 else 'пакет' }}</p>
+    <h1>Пополнение для {{ game.category_name }}</h1>
+    <p class="muted">{{ count }} {{ 'пакетов' if count != 1 else 'пакет' }} · неофициальный реселлер</p>
   </div>
 </div>
 {% if regions|length > 1 %}

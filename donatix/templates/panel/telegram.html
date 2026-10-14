@@ -1,10 +1,10 @@
 {% extends "panel/_layout.html" %}
 {% from "_icons.html" import icon, kind_icon %}
-{% block title %}Telegram звёзды и Premium — {{ site_name }}{% endblock %}
+{% block title %}Звёзды и Premium для Telegram — {{ site_name }}, независимый сервис{% endblock %}
 {% block content %}
 <section class="page-hero tg-hero">
-  <h1>Telegram звёзды и Premium</h1>
-  <p class="muted">Звёзды и Premium-подписка на любой аккаунт по @username</p>
+  <h1>Звёзды и Premium для Telegram</h1>
+  <p class="muted">Звёзды и Premium-подписка на любой аккаунт по @username. Независимый сервис — не связан с Telegram.</p>
 </section>
 {% if error %}<div class="flash error" role="alert">{{ icon('alert', 20) }}<span>{{ error }}</span></div>{% endif %}
 
@@ -27,6 +27,7 @@
       <label for="tg-user">Имя пользователя</label>
       <input id="tg-user" name="field_telegram_username" required placeholder="@username" autocomplete="off"
              autocapitalize="off" spellcheck="false" value="{{ form.get('telegram_username', '') }}">
+      <p class="id-only">{{ icon('shield', 16) }}<span>Неофициальный сервис. Нужно только имя пользователя (@username) — никогда не вводите пароль или код из Telegram.</span></p>
     </div>
 
     <div class="card tab-pane" data-pane="stars" {{ 'hidden' if tab != 'stars' }}>

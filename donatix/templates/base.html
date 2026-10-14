@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="format-detection" content="email=no, address=no">
   <title>{% block title %}{{ site_name }}{% endblock %}</title>
-  <meta name="description" content="{% block description %}{{ site_name }} — оптовые Telegram Stars, Telegram Premium, пополнения игр (Free Fire, PUBG, Mobile Legends) и Steam для магазинов и ботов. API, автоматическая выдача за секунды.{% endblock %}">
+  <meta name="description" content="{% block description %}{{ site_name }} — независимый сервис пополнения: Telegram Stars и Premium, валюта для игр (Free Fire, PUBG Mobile, Mobile Legends) и Steam. Независимый реселлер, не связан с Garena, Tencent, Moonton, Valve или Telegram.{% endblock %}">
   {% if noindex %}<meta name="robots" content="noindex, nofollow">
   {% else %}<meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="{{ canonical }}">
@@ -151,7 +151,8 @@
       <a href="/panel/support">Поддержка</a>
     </div>
   </div>
-  <div class="wrap small" style="margin-top:24px">© {{ site_name }}</div>
+  <div class="wrap">{% include "_disclaimer.html" %}</div>
+  <div class="wrap small" style="margin-top:16px">© {{ site_name }} · независимый сервис пополнения / independent top-up service</div>
 </footer>
 {% endblock %}
 {% block fab %}{% endblock %}

@@ -27,7 +27,7 @@
   --code-text: #e4e6eb;
   --tg: #2481cc;   --tg-soft: #e7f2fb;
   --steam: #1b2838; --steam-soft: #eaedf2;
-  --game: #c2410c; --game-soft: #fdf1e9;
+  --game: #0f766e; --game-soft: #e6f6f4;
   --card: #a21caf; --card-soft: #faecfb;
   /* Мягкие тени вместо жёстких рамок: карточка «лежит» на фоне */
   --shadow-1: 0 1px 2px rgb(18 21 33 / .04), 0 2px 8px -2px rgb(18 21 33 / .06);
@@ -63,7 +63,7 @@
   --code-bg: #0b0c10;
   --tg: #5cb3f0;   --tg-soft: #13253a;
   --steam: #aab8c8; --steam-soft: #1c232d;
-  --game: #fb923c; --game-soft: #2c1a0e;
+  --game: #2dd4bf; --game-soft: #0f2a27;
   --card: #e879f9; --card-soft: #2a1530;
   --shadow-1: 0 1px 2px rgb(0 0 0 / .3);
   --shadow-2: 0 14px 32px -14px rgb(0 0 0 / .6);
@@ -2411,3 +2411,14 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .place-badge.pb1 { background: linear-gradient(145deg, #ffd34d, #e0a400); color: #5a3d00; }
 .place-badge.pb2 { background: linear-gradient(145deg, #e9edf3, #a9b2bf); color: #3b4350; }
 .place-badge.pb3 { background: linear-gradient(145deg, #f0b07a, #c26f2e); color: #4a2304; }
+
+/* Дисклеймер: независимый сервис, не официальный сайт правообладателей */
+.disclaimer { margin-top: 20px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface); color: var(--muted); font-size: .8rem; line-height: 1.5; }
+.disclaimer p { margin: 0; } .disclaimer p + p { margin-top: 6px; }
+.disclaimer a { color: inherit; text-decoration: underline; }
+.app-foot { padding: 8px 16px 96px; max-width: 1100px; margin: 0 auto; }
+.id-only { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; padding: 10px 12px; border-radius: var(--r);
+  background: var(--warn-soft); color: var(--warn); font-size: .85rem; line-height: 1.45; }
+.id-only svg { flex: none; margin-top: 1px; }
+.hero-indep { margin: 10px 0 0; font-size: .85rem; color: var(--muted); max-width: 520px; }

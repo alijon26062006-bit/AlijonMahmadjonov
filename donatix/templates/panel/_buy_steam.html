@@ -22,6 +22,7 @@
     <label class="label-caps" for="f_steam_login" style="margin-top:20px">Логин Steam</label>
     <input id="f_steam_login" name="field_steam_login" required placeholder="Логин Steam" autocapitalize="off"
            autocomplete="off" spellcheck="false" value="{{ form.get('steam_login', '') }}">
+    <p class="id-only">{{ icon('shield', 16) }}<span>Неофициальный сервис. Нужен только логин Steam — никогда не вводите пароль или код Steam Guard.</span></p>
     <div class="hint">Введите логин аккаунта Steam (не никнейм) для пополнения.</div>
 
     <label class="label-caps" for="f_amount" style="margin-top:20px">Сумма</label>
