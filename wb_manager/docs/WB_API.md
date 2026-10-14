@@ -5,7 +5,7 @@
 
 ## Общее
 
-- Авторизация: заголовок с токеном (`HeaderApiKey`, в документации это заголовок `Authorization`).
+- Авторизация: схема `HeaderApiKey`. Имя заголовка нужно сверить (предположительно `Authorization`).
 - Формат ошибки (Контент):
   ```json
   {"data": null, "error": true, "errorText": "...", "additionalErrors": "..."}
