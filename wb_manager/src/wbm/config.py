@@ -42,6 +42,17 @@ class SecuritySettings(BaseSettings):
     fernet_keys: SecretStr
 
 
+class ReportSettings(BaseSettings):
+    """Текст отчёта от Claude. Без ANTHROPIC_API_KEY отчёт собирается по шаблонам."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    anthropic_api_key: SecretStr | None = None
+    anthropic_model: str = "claude-opus-5-5"
+    anthropic_effort: str = Field(default="low", pattern="^(low|medium|high|xhigh|max)$")
+    anthropic_timeout: float = Field(default=120.0, gt=0)
+
+
 class AppSettings(BaseSettings):
     """Общие настройки приложения."""
 
@@ -68,3 +79,8 @@ def get_database_settings() -> DatabaseSettings:
 @lru_cache(maxsize=1)
 def get_security_settings() -> SecuritySettings:
     return SecuritySettings()
+
+
+@lru_cache(maxsize=1)
+def get_report_settings() -> ReportSettings:
+    return ReportSettings()

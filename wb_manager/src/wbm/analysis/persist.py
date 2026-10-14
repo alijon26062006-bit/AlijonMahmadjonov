@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from wbm.checks.base import SEVERITY_ORDER, CheckOutcome
 from wbm.db.models import CheckResult, Finding, RunDataset
@@ -34,7 +34,11 @@ def dataset_records(data: DataBundle) -> list[RunDataset]:
     return records
 
 
-def check_records(outcomes: Iterable[CheckOutcome]) -> list[CheckResult]:
+def check_records(
+    outcomes: Iterable[CheckOutcome], texts: Mapping[str, str] | None = None
+) -> list[CheckResult]:
+    """texts — текст отчёта по ключу проблемы c{проверка}f{проблема}."""
+    texts = texts or {}
     return [
         CheckResult(
             check_id=outcome.check_id,
@@ -52,6 +56,7 @@ def check_records(outcomes: Iterable[CheckOutcome]) -> list[CheckResult]:
                     reason=finding.reason,
                     recommendation=finding.recommendation,
                     caveat=finding.caveat,
+                    text=texts.get(f"c{position}f{index}"),
                 )
                 for index, finding in enumerate(outcome.findings)
             ],
