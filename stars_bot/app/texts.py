@@ -831,6 +831,10 @@ _RAW["TOP_EMPTY"] = (
 )
 
 _RAW["BANNED"] = "[[block]] <b>Дастрасӣ ба бот баста шуд.</b>"
+_RAW["UNBANNED"] = (
+    "[[ok]] <b>Дастрасӣ ба бот барқарор шуд</b>\n\n"
+    "Боз хуш омадед! Менюро кушоед: /start"
+)
 _RAW["SPONSOR_ASK"] = (
     "[[warn]] <b>Як қадам монд</b>\n"
     f"<code>{LINE}</code>\n\n"

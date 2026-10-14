@@ -2504,7 +2504,9 @@ async def cb_users(call: CallbackQuery, state: FSMContext, conn: aiosqlite.Conne
         )
         tail = f"\n\n✍️ <b>Последние правки</b>\n{rows}"
 
+    _, banned = await db.banned_users(conn, limit=1)
     kb = InlineKeyboardBuilder()
+    kb.row(btn(f"🚫 Заблокированные ({banned})", "pn:banned:0"))
     kb.row(btn("📥 Перенести балансы со старого бота", "pn:transfer"))
     kb.row(InlineKeyboardButton(text="‹ В панель", callback_data="pn:home"))
 
@@ -2985,7 +2987,83 @@ async def cb_ban_toggle(call: CallbackQuery, conn: aiosqlite.Connection) -> None
         return
     await db.set_banned(conn, user_id, not user.is_banned)
     await call.answer("Разблокирован" if user.is_banned else "Заблокирован")
+    if user.is_banned:
+        await _tell_unbanned(call.bot, user_id)
     await show_user(call, conn, user_id)
+
+
+#: Сколько заблокированных на одной странице.
+BANNED_PAGE = 8
+
+
+def _who(user: db.User) -> str:
+    return f"@{user.username}" if user.username else (user.first_name or "без имени")
+
+
+async def _tell_unbanned(bot, user_id: int) -> None:
+    """Сказать человеку, что он снова может пользоваться ботом."""
+    try:
+        await bot.send_message(user_id, texts.UNBANNED)
+    except Exception as exc:  # noqa: BLE001 — он мог заблокировать бота сам
+        log.debug("Не сообщил %s о разблокировке: %s", user_id, exc)
+
+
+async def show_banned(call: CallbackQuery, conn: aiosqlite.Connection, page: int) -> None:
+    users, total = await db.banned_users(conn, limit=BANNED_PAGE,
+                                         offset=page * BANNED_PAGE)
+    if not users and page > 0:
+        page = 0
+        users, total = await db.banned_users(conn, limit=BANNED_PAGE)
+    kb = InlineKeyboardBuilder()
+    if not users:
+        text = ("🚫 <b>Заблокированные</b>\n\n"
+                "<blockquote>Никто не заблокирован.</blockquote>")
+    else:
+        rows = "\n".join(
+            f"├ {_who(u)} · <code>{u.id}</code> · баланс {fmt(u.balance)}"
+            for u in users
+        )
+        text = (f"🚫 <b>Заблокированные: {total}</b>\n"
+                f"<code>{texts.LINE}</code>\n\n{rows}\n\n"
+                "<blockquote>✅ — разблокировать сразу, 👤 — открыть "
+                "карточку клиента.</blockquote>")
+        for u in users:
+            kb.row(
+                btn(f"✅ {_who(u)}"[:40], f"pn:unban:{u.id}:{page}", style=SUCCESS),
+                btn("👤", f"pn:user:{u.id}"),
+            )
+        pages = (total + BANNED_PAGE - 1) // BANNED_PAGE
+        if pages > 1:
+            nav = []
+            if page > 0:
+                nav.append(btn("‹", f"pn:banned:{page - 1}"))
+            nav.append(btn(f"{page + 1}/{pages}", f"pn:banned:{page}"))
+            if page + 1 < pages:
+                nav.append(btn("›", f"pn:banned:{page + 1}"))
+            kb.row(*nav)
+    kb.row(btn("‹ К клиентам", "pn:users"))
+    await safe_edit(call, substitute(text), kb.as_markup())
+
+
+@router.callback_query(F.data.startswith("pn:banned:"))
+async def cb_banned(call: CallbackQuery, state: FSMContext,
+                    conn: aiosqlite.Connection) -> None:
+    await state.clear()
+    await show_banned(call, conn, int(call.data.rsplit(":", 1)[1]))
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("pn:unban:"))
+async def cb_unban(call: CallbackQuery, conn: aiosqlite.Connection) -> None:
+    _, _, user_id, page = call.data.split(":")
+    user = await db.get_user(conn, int(user_id))
+    if user is None or not user.is_banned:
+        await call.answer("Уже разблокирован.")
+    else:
+        await db.set_banned(conn, user.id, False)
+        await call.answer(f"✅ {_who(user)} разблокирован")
+        await _tell_unbanned(call.bot, user.id)
+    await show_banned(call, conn, int(page))
 
 
 # ═════════════════════════════════════════════════════════ Deep Links

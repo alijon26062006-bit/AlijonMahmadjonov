@@ -876,6 +876,19 @@ async def set_banned(conn: aiosqlite.Connection, user_id: int, banned: bool) -> 
     await conn.commit()
 
 
+async def banned_users(
+    conn: aiosqlite.Connection, limit: int = 10, offset: int = 0,
+) -> tuple[list[User], int]:
+    """Заблокированные клиенты страницей и сколько их всего."""
+    async with conn.execute("SELECT COUNT(*) AS n FROM users WHERE is_banned = 1") as cur:
+        total = (await cur.fetchone())["n"] or 0
+    async with conn.execute(
+        "SELECT * FROM users WHERE is_banned = 1 ORDER BY id DESC LIMIT ? OFFSET ?",
+        (limit, offset),
+    ) as cur:
+        return [_from_row(User, row) for row in await cur.fetchall()], total
+
+
 async def find_user(conn: aiosqlite.Connection, query: str) -> User | None:
     """Найти клиента по ID или юзернейму — под рукой бывает любое из двух."""
     query = query.strip().lstrip("@")
