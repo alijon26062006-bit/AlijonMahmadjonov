@@ -45,6 +45,7 @@ def app(config, supplier):
 @pytest.fixture
 def conn(app, config):
     c = db.connect(config.db_path)
+    db.set_setting(c, "pay.min_tjs", "0")   # тесты пополняют и на 1 сомони; минимум 10 — в test_min_topup
     yield c
     c.close()
 

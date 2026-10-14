@@ -40,7 +40,7 @@ def test_guest_buys_without_registration(app, config, conn, monkeypatch):
     r = guest.post("/panel/balance", data={"csrf": csrf_of(page), "method": "alif", "amount_tjs": "1", "buy": "1"},
                    files=RECEIPT)
     pay = conn.execute("SELECT * FROM payments WHERE user_id = ?", (user["id"],)).fetchone()
-    assert pay["intent"] and pay["pay_amount"] == tjs and float(tjs) < 500   # сумму считаем сами, минимума нет
+    assert pay["intent"] and pay["pay_amount"] == tjs == "500.00"   # сумму считаем сами; меньше минимума — минимум
     assert "заказ оформится сам" in r.text
     from donatix import tgbot
     note = tgbot.payment_event(conn, pay["id"], config)[0]                      # что видит админ в боте

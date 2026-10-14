@@ -136,9 +136,12 @@ def pending(session: dict) -> dict[str, Any] | None:
 
 def to_pay_tjs(conn: sqlite3.Connection, config: Config, need_micro: int, balance_micro: int) -> Decimal:
     """Сколько сомони перевести: недостающее, округлённое вверх до дирама — зачисленного точно хватит."""
-    rate = payments.settings(conn, config)["tjs_rate"]
+    conf = payments.settings(conn, config)
+    rate = conf["tjs_rate"]
     short = max(0, need_micro - max(balance_micro, 0))
-    return Decimal(math.ceil(Decimal(short) / 10_000 * rate * 100)) / 100
+    tjs = Decimal(math.ceil(Decimal(short) / 10_000 * rate * 100)) / 100
+    # Меньше минимума пополнения не переводят: не хватает 4 сомони — платят 10, остаток на балансе
+    return max(tjs, conf["min_tjs"]).quantize(Decimal("0.01")) if tjs > 0 else tjs
 
 
 def attach(conn: sqlite3.Connection, payment_id: int, intent: dict[str, Any]) -> None:

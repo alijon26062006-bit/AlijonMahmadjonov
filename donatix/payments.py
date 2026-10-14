@@ -337,8 +337,10 @@ def create(conn: sqlite3.Connection, config: Config, user: sqlite3.Row, method: 
         raise PaymentError("Сумма — число, например 50.") from None
     if usd < Decimal("0.01") or usd > Decimal("100000"):
         raise PaymentError("Укажите сумму больше нуля.")
-    if conf["min_tjs"] > 0 and usd * conf["tjs_rate"] < conf["min_tjs"] and not for_purchase:
-        raise PaymentError(f"Минимальная сумма пополнения — {conf['min_tjs']:f} сомони (${conf['min_usd']}).")
+    tjs_total = tjs if amount_tjs.strip() else usd * conf["tjs_rate"]
+    if conf["min_tjs"] > 0 and tjs_total < conf["min_tjs"]:   # для любого способа, и для оплаты покупки тоже
+        raise PaymentError(f"Минимальная сумма пополнения — {conf['min_tjs'].normalize():f} сомони "
+                           f"(${conf['min_usd']}).")
     # Заявка «Душанбе Сити», которую так и не оплатили за окно ожидания, новой не мешает
     from .dcbank import _since, window_hours
     conn.execute("UPDATE payments SET status = 'cancelled', resolved_at = ?, resolved_who = 'истекла' "
