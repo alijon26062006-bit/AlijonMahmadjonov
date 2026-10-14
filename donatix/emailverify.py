@@ -105,6 +105,58 @@ def has_code(conn: sqlite3.Connection, uid: int, kind: str = "verify") -> bool:
     return bool(row and row["expires_at"] > time.time() and row["tries"] < CODE_TRIES)
 
 
+def layout(config: Config, *, title: str, lead: str, code: str = "", note: str = "",
+           button: tuple[str, str] | None = None, tj: str = "", footer: str = "") -> str:
+    """Письмо в стиле сайта: шапка с логотипом, крупный код, кнопка, подвал. Таблицы и стили в строке —
+    так письмо одинаково выглядит в Gmail, Mail.ru, Яндексе, Outlook и на телефоне."""
+    site = config.site_name
+    font = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;"
+    code_html = ""
+    if code:
+        cells = '<td style="width:8px"></td>'.join(
+            f'<td style="{font}width:44px;height:56px;background:#ffffff;border:2px solid #e2e4ff;border-radius:12px;'
+            f'font-size:30px;font-weight:800;color:#1e1b4b;text-align:center;vertical-align:middle">{d}</td>'
+            for d in code)
+        code_html = (f'<table role="presentation" cellpadding="0" cellspacing="0" align="center" '
+                     f'style="margin:18px auto 6px"><tr>{cells}</tr></table>'
+                     f'<p style="{font}margin:0 0 4px;text-align:center;font-size:12px;color:#8a8fa8">'
+                     f'Код можно скопировать: <b style="color:#1e1b4b;letter-spacing:3px">{code}</b></p>')
+    btn_html = ""
+    if button:
+        btn_html = (f'<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:22px auto 4px">'
+                    f'<tr><td style="border-radius:12px;background:#4f46e5;background-image:linear-gradient(135deg,#4f46e5,'
+                    f'#7c3aed)"><a href="{button[1]}" style="{font}display:inline-block;padding:14px 28px;color:#ffffff;'
+                    f'font-size:15px;font-weight:700;text-decoration:none;border-radius:12px">{button[0]}</a></td></tr></table>')
+    tj_html = (f'<p style="{font}margin:18px 0 0;padding:12px 14px;background:#f6f7ff;border-radius:10px;'
+               f'font-size:13px;color:#4b4f6b;text-align:center">{tj}</p>') if tj else ""
+    return f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light">
+<title>{title}</title></head>
+<body style="margin:0;padding:0;background:#eef0f7">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef0f7;padding:28px 12px">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px">
+  <tr><td style="padding:0 0 14px" align="center">
+    <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+      <td style="width:38px;height:38px;border-radius:10px;background:#4f46e5;color:#ffffff;{font}font-size:22px;
+        font-weight:800;text-align:center;vertical-align:middle">D</td>
+      <td style="{font}padding-left:10px;font-size:20px;font-weight:800;color:#1e1b4b">{site}</td>
+    </tr></table></td></tr>
+  <tr><td style="background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 6px 24px rgba(30,27,75,.08)">
+    <div style="height:6px;background:#4f46e5;background-image:linear-gradient(90deg,#4f46e5,#7c3aed,#f59e0b)"></div>
+    <div style="padding:30px 28px 28px">
+      <h1 style="{font}margin:0 0 10px;font-size:22px;color:#1e1b4b;text-align:center">{title}</h1>
+      <p style="{font}margin:0;font-size:15px;color:#4b4f6b;text-align:center;line-height:1.5">{lead}</p>
+      {code_html}
+      <p style="{font}margin:14px 0 0;font-size:14px;color:#4b4f6b;text-align:center;line-height:1.5">{note}</p>
+      {btn_html}{tj_html}
+    </div></td></tr>
+  <tr><td style="{font}padding:18px 20px 0;font-size:12px;color:#8a8fa8;text-align:center;line-height:1.6">
+    {footer}<br><a href="{config.base_url}" style="color:#4f46e5;text-decoration:none;font-weight:600">{config.base_url.split("//")[-1]}</a>
+    · Письмо отправлено автоматически, отвечать на него не нужно.</td></tr>
+</table></td></tr></table></body></html>"""
+
+
 def send_code(conn: sqlite3.Connection, config: Config, uid: int, email: str, *, kind: str = "verify",
               wait: bool = False) -> bool:
     """Новый код на почту (старый перестаёт действовать). kind: verify — подтвердить почту, reset — новый пароль."""
@@ -124,16 +176,12 @@ def send_code(conn: sqlite3.Connection, config: Config, uid: int, email: str, *,
     text = (f"Ваш код подтверждения: {code}\n\nВведите его на сайте {config.site_name}. Код действует 10 минут.\n"
             f"Или откройте ссылку: {link}\n\nЕсли вы не регистрировались — просто удалите это письмо.\n\n"
             f"Рамзи тасдиқ: {code}\n\n— {config.site_name}")
-    html = (f'<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;color:#111">'
-            f'<h2 style="margin:0 0 12px">{config.site_name}</h2>'
-            f'<p>Ваш код подтверждения почты:</p>'
-            f'<div style="font-size:34px;font-weight:800;letter-spacing:8px;padding:16px;background:#f3f4ff;'
-            f'border-radius:12px;text-align:center">{code}</div>'
-            f'<p style="color:#555">Введите его на сайте. Код действует <b>10 минут</b>.</p>'
-            f'<p><a href="{link}" style="display:inline-block;padding:12px 22px;background:#4f46e5;color:#fff;'
-            f'border-radius:10px;text-decoration:none;font-weight:700">Или подтвердить одной кнопкой</a></p>'
-            f'<p style="color:#888;font-size:13px">Если вы не регистрировались — просто удалите это письмо.<br>'
-            f'Рамзи тасдиқ: <b>{code}</b></p></div>')
+    html = layout(config, title="Подтвердите почту", lead="Ваш код подтверждения:", code=code,
+                  note="Введите его на сайте. Код действует <b>10 минут</b>.",
+                  button=("Подтвердить одной кнопкой", link),
+                  tj=f"Рамзи тасдиқ: <b>{code}</b> — онро дар сайт ворид кунед.",
+                  footer="Вы получили это письмо, потому что указали эту почту на сайте. "
+                         "Если это были не вы — просто удалите письмо.")
     if wait:
         return deliver(config, email, subject, text, html)
     threading.Thread(target=deliver, args=(config, email, subject, text, html), daemon=True).start()
@@ -145,13 +193,11 @@ def _send_reset(config: Config, email: str, code: str, wait: bool) -> bool:
     text = (f"Код для восстановления пароля: {code}\n\nВведите его на сайте {config.site_name}. Код действует "
             "10 минут.\nЕсли вы не просили восстановить пароль — просто удалите это письмо, ваш аккаунт в "
             f"безопасности.\n\nРамзи барқарорсозии парол: {code}\n\n— {config.site_name}")
-    html = (f'<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;color:#111">'
-            f'<h2 style="margin:0 0 12px">{config.site_name}</h2><p>Код для восстановления пароля:</p>'
-            f'<div style="font-size:34px;font-weight:800;letter-spacing:8px;padding:16px;background:#f3f4ff;'
-            f'border-radius:12px;text-align:center">{code}</div>'
-            f'<p style="color:#555">Введите его на сайте. Код действует <b>10 минут</b>.</p>'
-            f'<p style="color:#888;font-size:13px">Если вы не просили восстановить пароль — просто удалите это '
-            f'письмо, ваш аккаунт в безопасности.<br>Рамзи барқарорсозии парол: <b>{code}</b></p></div>')
+    html = layout(config, title="Восстановление пароля", lead="Код для восстановления пароля:", code=code,
+                  note="Введите его на сайте и придумайте новый пароль. Код действует <b>10 минут</b>.",
+                  tj=f"Рамзи барқарорсозии парол: <b>{code}</b>",
+                  footer="Если вы не просили восстановить пароль — просто удалите это письмо. "
+                         "Ваш аккаунт в безопасности, никто не сможет войти без этого кода.")
     if wait:
         return deliver(config, email, subject, text, html)
     threading.Thread(target=deliver, args=(config, email, subject, text, html), daemon=True).start()
@@ -166,7 +212,12 @@ def send_admin_hint(config: Config, email: str) -> bool:
             "администратора.\n\nДля админа восстановление по коду на почту отключено — так безопаснее. "
             "Войдите через «Войти через Google» этой же почтой, либо задайте пароль на сервере.\n\n"
             "Если это были не вы — ничего не делайте, аккаунт в безопасности.")
-    html = "<p>" + text.replace("\n\n", "</p><p>") + "</p>"
+    html = layout(config, title="Вход администратора",
+                  lead="Кто-то (возможно, вы) запросил восстановление пароля для аккаунта администратора.",
+                  note="Для админа восстановление по коду отключено — так безопаснее. Войдите кнопкой "
+                       "<b>«Войти через Google»</b> этой же почтой.",
+                  button=("Открыть вход", f"{config.base_url}/login"),
+                  footer="Если это были не вы — ничего не делайте, аккаунт в безопасности.")
     threading.Thread(target=deliver, args=(config, email, f"Вход администратора {config.site_name}", text, html),
                      daemon=True).start()
     return True
