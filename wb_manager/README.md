@@ -13,7 +13,13 @@ python3 -m venv .venv
 .venv/bin/pytest            # тесты
 .venv/bin/ruff check src tests
 .venv/bin/ruff format --check src tests
-.venv/bin/mypy              # строгая проверка типов (src и tests)
+.venv/bin/mypy              # строгая проверка типов (src, tests, migrations)
+
+# Те же тесты базы на настоящем MySQL 8 (иначе только SQLite):
+WBM_TEST_MYSQL_URL="mysql+aiomysql://wbm:пароль@127.0.0.1:3306/wbm_test?charset=utf8mb4" .venv/bin/pytest
+
+# Миграции базы (адрес — DATABASE_URL):
+.venv/bin/alembic upgrade head
 ```
 
 ## Что уже есть
@@ -23,3 +29,7 @@ python3 -m venv .venv
   повтор при 429 / 5xx / сбоях сети, таймауты, песочница через `WB_SANDBOX`, логи без токена.
 - `src/wbm/wb_client/token_check.py` — проверка токена при подключении магазина.
 - `src/wbm/logging_setup.py` — логи с вычисткой токенов, ключей и паролей.
+- `src/wbm/db/` — модели MySQL (SQLAlchemy 2), репозитории с доступом только к своим
+  данным, очередь анализов в базе (SKIP LOCKED), миграции Alembic в `migrations/`.
+- `src/wbm/security/` — шифрование токенов WB (Fernet, со сменой ключа), пароли argon2id.
+  Новый ключ: `python -m wbm.security.keygen`.

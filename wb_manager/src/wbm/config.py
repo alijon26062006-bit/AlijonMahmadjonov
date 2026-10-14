@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +26,22 @@ class WBSettings(BaseSettings):
     max_concurrency: int = Field(default=4, ge=1, le=32)
 
 
+class DatabaseSettings(BaseSettings):
+    """DATABASE_URL, например mysql+aiomysql://wbm:пароль@mysql:3306/wbm?charset=utf8mb4."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    database_url: SecretStr
+
+
+class SecuritySettings(BaseSettings):
+    """FERNET_KEYS — ключи шифрования токенов через запятую, первый — текущий."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    fernet_keys: SecretStr
+
+
 class AppSettings(BaseSettings):
     """Общие настройки приложения."""
 
@@ -42,3 +58,13 @@ def get_wb_settings() -> WBSettings:
 @lru_cache(maxsize=1)
 def get_app_settings() -> AppSettings:
     return AppSettings()
+
+
+@lru_cache(maxsize=1)
+def get_database_settings() -> DatabaseSettings:
+    return DatabaseSettings()
+
+
+@lru_cache(maxsize=1)
+def get_security_settings() -> SecuritySettings:
+    return SecuritySettings()
