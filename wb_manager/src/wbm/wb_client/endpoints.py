@@ -114,6 +114,63 @@ SELLER_RATING = Endpoint(
 )
 
 
+# ── Отчёты: основные (Статистика) ─────────────────────────────────────────────
+
+STATS_ORDERS = Endpoint(
+    name="statistics.orders",
+    category=Category.STATISTICS,
+    method="GET",
+    path="/api/v1/supplier/orders",
+    limits={
+        TokenKind.PERSONAL: RateLimit(period_s=60, limit=1, interval_s=60, burst=10),
+        TokenKind.SERVICE: RateLimit(period_s=60, limit=1, interval_s=60, burst=10),
+        TokenKind.BASE: RateLimit(period_s=10_800, limit=1, interval_s=10_800, burst=1),
+    },
+    doc="Отчёты → Основные отчёты → Заказы",
+)
+
+# ── Отчёты: платное хранение (Аналитика, асинхронный отчёт) ───────────────────
+
+PAID_STORAGE_CREATE = Endpoint(
+    name="analytics.paid_storage.create",
+    category=Category.ANALYTICS,
+    method="GET",
+    path="/api/v1/paid_storage",
+    limits={
+        TokenKind.PERSONAL: RateLimit(period_s=60, limit=1, interval_s=60, burst=5),
+        TokenKind.SERVICE: RateLimit(period_s=60, limit=1, interval_s=60, burst=5),
+        TokenKind.BASE: RateLimit(period_s=3600, limit=1, interval_s=3600, burst=1),
+    },
+    doc="Отчёты → Платное хранение → Создать отчёт",
+)
+
+PAID_STORAGE_STATUS = Endpoint(
+    name="analytics.paid_storage.status",
+    category=Category.ANALYTICS,
+    method="GET",
+    path="/api/v1/paid_storage/tasks/{task_id}/status",
+    limits={
+        TokenKind.PERSONAL: RateLimit(period_s=5, limit=1, interval_s=5, burst=5),
+        TokenKind.SERVICE: RateLimit(period_s=5, limit=1, interval_s=5, burst=5),
+        TokenKind.BASE: RateLimit(period_s=3600, limit=2, interval_s=1800, burst=2),
+    },
+    doc="Отчёты → Платное хранение → Проверить статус",
+)
+
+PAID_STORAGE_DOWNLOAD = Endpoint(
+    name="analytics.paid_storage.download",
+    category=Category.ANALYTICS,
+    method="GET",
+    path="/api/v1/paid_storage/tasks/{task_id}/download",
+    limits={
+        TokenKind.PERSONAL: RateLimit(period_s=60, limit=1, interval_s=60, burst=1),
+        TokenKind.SERVICE: RateLimit(period_s=60, limit=1, interval_s=60, burst=1),
+        TokenKind.BASE: RateLimit(period_s=3600, limit=2, interval_s=1800, burst=1),
+    },
+    doc="Отчёты → Платное хранение → Получить отчёт",
+)
+
+
 def _build_registry(*endpoints: Endpoint) -> dict[str, Endpoint]:
     registry: dict[str, Endpoint] = {}
     for endpoint in endpoints:
@@ -127,7 +184,15 @@ def _build_registry(*endpoints: Endpoint) -> dict[str, Endpoint]:
     return registry
 
 
-ENDPOINTS: dict[str, Endpoint] = _build_registry(*PING.values(), SELLER_INFO, SELLER_RATING)
+ENDPOINTS: dict[str, Endpoint] = _build_registry(
+    *PING.values(),
+    SELLER_INFO,
+    SELLER_RATING,
+    STATS_ORDERS,
+    PAID_STORAGE_CREATE,
+    PAID_STORAGE_STATUS,
+    PAID_STORAGE_DOWNLOAD,
+)
 
 
 def is_registered(endpoint: Endpoint) -> bool:

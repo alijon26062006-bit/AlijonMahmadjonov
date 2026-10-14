@@ -30,7 +30,7 @@ class Collector:
 
 
 COLLECTORS: list[Collector] = []
-"""Подключённые сборщики. Пусто, пока методы данных не сверены с документацией."""
+"""Подключённые сборщики — только сверенные с документацией (см. register_default_collectors)."""
 
 NOT_CONNECTED = "метод WB ещё не подключён (ждём сверки с документацией)"
 
@@ -74,3 +74,22 @@ async def collect_all(
             logger.exception("%s: сбой сборщика %s", client.log_name, collector.dataset)
             result = DataResult.error("внутренняя ошибка при загрузке")
         data.set_result(collector.dataset, result)
+
+
+def _register_default_collectors() -> None:
+    from wbm.collectors.reports import collect_orders, collect_paid_storage
+
+    COLLECTORS.extend(
+        [
+            Collector(Dataset.ORDERS, Category.STATISTICS, "заказы", collect_orders),
+            Collector(
+                Dataset.PAID_STORAGE,
+                Category.ANALYTICS,
+                "отчёт о платном хранении",
+                collect_paid_storage,
+            ),
+        ]
+    )
+
+
+_register_default_collectors()

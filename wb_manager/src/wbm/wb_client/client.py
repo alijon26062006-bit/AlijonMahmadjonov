@@ -121,6 +121,10 @@ class WBClient:
     async def aclose(self) -> None:
         await self._http.aclose()
 
+    async def sleep(self, seconds: float) -> None:
+        """Пауза между опросами асинхронного отчёта (в тестах — управляемые часы)."""
+        await self._sleep(seconds)
+
     async def request(
         self,
         endpoint: Endpoint,

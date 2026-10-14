@@ -166,3 +166,57 @@ canceled_by_missed_call, postponed_delivery.
 
 ⚠️ **Поля заказа не видны:** в присланном тексте примеры ответов свёрнуты (`"orders": [{}]`).
 Пока полей нет, методы в белый список не добавлены.
+
+## Отчёты (раздел «Отчёты» на dev.wildberries.ru, прислан 14.10.2026, на русском)
+
+### Основные отчёты — токен «Статистика», хост `statistics-api` (есть песочница)
+
+**Заказы** `GET /api/v1/supplier/orders` ✅ подключено (сборщик `orders`)
+- Параметры: `dateFrom` (RFC3339, **время Москвы UTC+3**; дата или дата-время) — строки с
+  `lastChangeDate` > dateFrom; `flag` (0 по умолчанию; 1 — все за день dateFrom).
+- 1 строка = 1 заказ = 1 единица товара; уникальный id — `srid`. Хранится 90 дней. Обновление раз в 30 мин.
+- До ~80 000 строк за ответ; следующая страница: `dateFrom` = полное `lastChangeDate` последней строки;
+  пустой массив `[]` — всё выгружено. Данные предварительные (для мониторинга).
+- Лимит: Персональный/Сервисный/Базовый с секретом — 1 мин / 1 / 1 мин / всплеск 10; **Базовый — 3 ч / 1 / 3 ч / 1**.
+- Поля (по примеру): date, lastChangeDate, warehouseName, warehouseType («Склад продавца»…),
+  countryName, oblastOkrugName, regionName, supplierArticle, nmId, barcode, category, subject, brand,
+  techSize, incomeID, isSupply, isRealization, totalPrice, discountPercent, spp, finishedPrice,
+  priceWithDisc, isCancel, cancelDate, sticker, gNumber, srid.
+- Наши допущения (⚠️ сверить по описанию полей): `date` — время Москвы, как у параметров;
+  цена заказа для отчёта — `priceWithDisc` (цена со скидкой продавца).
+
+**Продажи и возвраты** `GET /api/v1/supplier/sales` — ⏸ не подключено
+- Параметры и пагинация как у заказов. Лимит: 1 мин / 1 / 1 мин / всплеск **1**; Базовый — 2 ч / 1 / 2 ч / 1.
+- Поля (по примеру): … как у заказов + paymentSaleAmount, forPay, saleID («S9993700024»).
+- ❓ **Как отличить возврат от продажи — в тексте не сказано** (по saleID? по знаку сумм?). Нужно
+  описание полей ответа (раскрыть «200 Успешно» → схема).
+
+### Аналитика — токен «Аналитика», хост `seller-analytics-api` (песочницы нет)
+
+**Остатки на складах WB** (асинхронный отчёт) — ⏸ не подключено
+- `GET /api/v1/warehouse_remains` (создать; groupByNm и др.) → `GET …/tasks/{task_id}/status` →
+  `GET …/tasks/{task_id}/download`. Готовый отчёт хранится 2 ч.
+- Лимиты: создать 1 мин/1/1 мин/5 (Базовый 1 ч/4/15 мин/1); статус 5 с/1/5 с/5; скачать 1 мин/1/1 мин/1.
+- ❓ Поля внутри `warehouses: []` не видны — нужен раскрытый пример.
+
+**Платное хранение** (асинхронный отчёт) ✅ подключено (сборщик `paid_storage`)
+- `GET /api/v1/paid_storage?dateFrom&dateTo` — **максимум 8 дней** за отчёт → статус → скачать (204 — нет данных).
+- Лимиты: создать 1 мин/1/1 мин/5 (Базовый 1 ч/1/1 ч/1); статус 5 с/1/5 с/5 (Базовый 1 ч/2/30 мин/2);
+  скачать 1 мин/1/1 мин/1 (Базовый 1 ч/2/30 мин/1).
+- Статус готовности: `"done"` (другие значения в тексте не перечислены — ждём done, иначе таймаут).
+- Поля: date, logWarehouseCoef, officeId, warehouse, warehouseCoef, giId, chrtId, size, barcode,
+  subject, brand, vendorCode, nmId, volume, calcType, warehousePrice, barcodesCount, palletPlaceCode,
+  palletCount, originalDate, loyaltyDiscount, tariffFixDate, tariffLowerDate.
+- Допущение (⚠️ сверить): `warehousePrice` — стоимость хранения строки за день `date`, ₽.
+
+**Операции при приёмке** (асинхронный, максимум 31 день) — поля: count, giCreateDate, incomeId, nmID,
+shkCreateDate, subjectName, total. Это платная приёмка, а не расхождения «отгружено/принято» — пока не используем.
+
+**Отчёты об удержаниях** — пути и лимиты известны, поля свёрнуты (не подключено):
+`GET /api/analytics/v1/measurement-penalties` (занижение габаритов), `…/warehouse-measurements`,
+`…/deductions` (подмены и неверные вложения), `GET /api/v1/analytics/antifraud-details` (самовыкупы,
+еженедельно по средам), `GET /api/v1/analytics/goods-labeling` (маркировка, ≤31 дня).
+
+**Заблокированные карточки** `GET /api/v1/analytics/banned-products/blocked?sort&order` — поля свёрнуты.
+**Возвраты** `GET /api/analytics/v1/item-returns` (новый; `goods-return` отключат 26 октября) — поля свёрнуты.
+**Продажи по регионам** — отключат 3 ноября. **Доля бренда**, **маркировка (excise-report)** — для v1 не нужны.
