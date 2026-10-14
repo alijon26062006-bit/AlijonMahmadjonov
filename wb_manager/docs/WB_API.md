@@ -134,3 +134,35 @@
 | Родительские категории | `GET /content/v2/object/parent/all` | нет (не включён) |
 
 **Ждут текста документации:** список карточек, карточки с ошибками, характеристики предмета.
+
+## Маркетплейс → Заказы DBW (Delivery by WB)
+
+Токен категории «Маркетплейс». Хост: `marketplace-api.wildberries.ru`.
+
+**Лимит** (общий для методов сборочных заданий, контактов и получения/удаления маркировки):
+1 мин / 300 запросов / интервал 200 мс / всплеск 20. **Ответ 4xx считается за 10 запросов.**
+У метода отмены указан отдельный лимит для базового токена: 1 ч / 10 запросов / 6 мин / всплеск 1.
+Закрепление маркировки: 1 мин / 1000 / 60 мс / 20.
+
+Формат ошибки маркетплейса: `{"code": "IncorrectParameter", "message": ""}`.
+
+| Метод | Путь | Чтение? | Для v1 |
+|---|---|---|---|
+| Новые сборочные задания | `GET /api/v3/dbw/orders/new` | да | возможно |
+| Завершённые сборочные задания | `GET /api/v3/dbw/orders` — `limit` (1–1000), `next` (0 в первом запросе, дальше из ответа), `dateFrom`, `dateTo` (Unix timestamp), период ≤ 30 дней | да | возможно |
+| Статусы сборочных заданий | `POST /api/v3/dbw/orders/status` — `{"orders": [id, …]}` до 1000 | да (POST-чтение) | возможно |
+| Дата и время доставки | `POST /api/v3/dbw/orders/delivery-date` | да | нет |
+| Информация о покупателе | `POST /api/marketplace/v3/dbw/orders/client` | да, **персональные данные** | нет — не забираем |
+| Курьер | `POST /api/v3/dbw/orders/courier` | да, персональные данные | нет |
+| Стикеры | `POST /api/v3/dbw/orders/stickers` | да | нет |
+| Маркировка: получить | `POST /api/marketplace/v3/dbw/orders/meta/details` | да | нет |
+| На сборку, отмена | `PATCH …/{orderId}/confirm`, `PATCH …/{orderId}/cancel` | **запись** | запрещено |
+| В доставку | `POST /api/marketplace/v3/dbw/orders/status/deliver` | **запись** | запрещено |
+| Маркировка: удалить, закрепить | `POST …/meta/delete`, `POST …/meta/sgtin`, `PUT …/meta/uin|imei|gtin` | **запись** | запрещено |
+
+`supplierStatus`: new, confirm, complete, receive, reject, cancel, cancel_missed_call.
+`wbStatus`: waiting, sold, canceled, canceled_by_client, declined_by_client, defect,
+canceled_by_missed_call, postponed_delivery.
+
+⚠️ **Поля заказа не видны:** в присланном тексте примеры ответов свёрнуты (`"orders": [{}]`).
+Пока полей нет, методы в белый список не добавлены.
