@@ -47,6 +47,7 @@ src = ["src", "tests", "migrations"]
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC", "S", "PT", "RET", "C4"]
 ignore = [
+    "E501",    # длину строк держит ruff format; длинные русские тексты сообщений не режем
     "RUF001",  # кириллица в строках — это нормально для русского интерфейса
     "RUF002",
     "RUF003",

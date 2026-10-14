@@ -27,6 +27,24 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from wbm.db.base import Base, BigInt, LongText, UTCDateTime, utcnow
+from wbm.domain.enums import CheckStatus, DatasetStatus, Severity
+
+__all__ = [
+    "ACTIVE_RUN_STATUSES",
+    "AnalysisRun",
+    "CheckResult",
+    "CheckStatus",
+    "CostPrice",
+    "DatasetStatus",
+    "Finding",
+    "LoginAttempt",
+    "RunDataset",
+    "RunSource",
+    "RunStatus",
+    "Severity",
+    "Shop",
+    "User",
+]
 
 
 class RunStatus(StrEnum):
@@ -42,28 +60,6 @@ ACTIVE_RUN_STATUSES = (RunStatus.QUEUED, RunStatus.RUNNING)
 class RunSource(StrEnum):
     WEB = "web"
     TELEGRAM = "telegram"
-
-
-class DatasetStatus(StrEnum):
-    OK = "ok"
-    EMPTY = "empty"
-    ERROR = "error"
-    ANOMALY = "anomaly"
-    SKIPPED = "skipped"
-
-
-class CheckStatus(StrEnum):
-    PROBLEMS = "problems"
-    OK = "ok"
-    NO_DATA = "no_data"
-    NEEDS_COST = "needs_cost"
-    ERROR = "error"
-
-
-class Severity(StrEnum):
-    CRITICAL = "critical"
-    IMPORTANT = "important"
-    ADVICE = "advice"
 
 
 class User(Base):
