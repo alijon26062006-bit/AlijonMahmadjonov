@@ -26,8 +26,7 @@ KIND_COVERS = {"telegram_stars": "/static/img/tg-stars.svg", "telegram_premium":
 
 
 def kind_cover(kind: str, url: str | None = None) -> str | None:
-    """Своя нейтральная иконка вида товара важнее картинки поставщика (логотипы правообладателей не показываем)."""
-    return KIND_COVERS.get(kind) or url
+    return url or KIND_COVERS.get(kind)
 
 
 templates.env.globals["kind_cover"] = kind_cover

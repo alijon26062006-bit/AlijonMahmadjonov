@@ -1,4 +1,4 @@
-"""Сайт явно независимый: дисклеймер на всех страницах, нет логотипов правообладателей, только ID — без пароля."""
+"""Сайт явно независимый: дисклеймер на всех страницах, только ID — без пароля."""
 
 import re
 
@@ -23,13 +23,9 @@ def test_disclaimer_on_public_and_panel_pages(app, conn):
     assert RU in text
 
 
-def test_no_supplier_logos_and_id_only_notice(app, conn):
-    conn.execute("UPDATE products SET image_url = 'https://cdn.example/garena-ff-logo.png' WHERE kind = 'topup'")
+def test_id_only_notice(app, conn):
     pid = conn.execute("SELECT id FROM products WHERE kind = 'topup' AND active = 1 LIMIT 1").fetchone()["id"]
-    guest = TestClient(app)
-    for url in ("/", "/panel/catalog?kind=topup", f"/panel/buy/{pid}"):
-        assert "garena-ff-logo" not in guest.get(url).text, url
-    buy = guest.get(f"/panel/buy/{pid}").text
+    buy = TestClient(app).get(f"/panel/buy/{pid}").text
     assert "Вводите только ID игрока, никогда не вводите" in buy and "Неофициальный реселлер" in buy
 
 
