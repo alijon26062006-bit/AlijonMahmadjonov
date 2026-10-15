@@ -735,6 +735,29 @@ def shopbot_broadcast(request: Request, text: str = Form(""), admin=Depends(admi
 # ── Отзывы ───────────────────────────────────────────────
 
 
+@router.get("/promo")
+def promo_admin(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
+                config: Config = Depends(get_config)):
+    from . import promo
+    return render(request, "admin/promo.html", {"user": admin, **promo.admin_view(conn, config)})
+
+
+@router.post("/promo", dependencies=[Depends(check_csrf)])
+def promo_save(request: Request, product_id: str = Form(""), price_tjs: str = Form(""), days: str = Form("3"),
+               title: str = Form(""), action: str = Form("save"), admin=Depends(admin_user), conn=Depends(get_conn)):
+    from . import promo
+    if action == "stop":
+        promo.stop(conn)
+        flash(request, "Акция остановлена — цена снова обычная.")
+        return _back("/admin/promo")
+    try:
+        promo.save(conn, product_id=product_id, price_tjs=price_tjs, days=days, title=title, on=True)
+        flash(request, "Акция запущена — баннер уже на главной.")
+    except ValueError as exc:
+        flash(request, str(exc), "error")
+    return _back("/admin/promo")
+
+
 @router.get("/contest")
 def contest_admin(request: Request, admin=Depends(admin_user), conn=Depends(get_conn),
                   config: Config = Depends(get_config)):

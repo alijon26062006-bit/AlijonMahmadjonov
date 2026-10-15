@@ -59,7 +59,7 @@
       {% else %}<span class="tile k-{{ p.kind }}">{{ pack_icon(p.kind, p.name, 20) }}</span>{% endif %}
       <span class="pack-name">{{ p.title }}</span>
       {% if p.region %}<span class="badge">{{ p.region_title }}</span>{% endif %}
-      <span class="pack-price">{{ money(p.price_usd) }}{% if p.unit == 'star' %}<small> / звезда</small>{% endif %}</span>
+      <span class="pack-price">{% if p.promo %}<s class="promo-old">{{ money(p.regular_usd) }}</s> {% endif %}{{ money(p.price_usd) }}{% if p.unit == 'star' %}<small> / звезда</small>{% endif %}</span>
     </a>
     {% endfor %}
   </div>

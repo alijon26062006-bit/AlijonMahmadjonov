@@ -173,9 +173,17 @@ def categories(conn: sqlite3.Connection, kind: str = "", q: str = "") -> list[sq
     return cache.get_or_set(f"cats:{kind}\x1f{q}", 60, lambda: conn.execute(sql, args).fetchall())
 
 
-def public_view(product: dict[str, Any], markup: Decimal) -> dict[str, Any]:
-    """Товар, как его видит клиент: наша цена, без закупочной и без данных поставщика."""
+def public_view(product: dict[str, Any], markup: Decimal, *, config: Any = None, user: Any = None) -> dict[str, Any]:
+    """Товар, как его видит клиент: наша цена, без закупочной и без данных поставщика.
+
+    config передают сайт и свой бот — тогда действует акция (promo); API её не передаёт."""
     price = apply_markup(to_decimal(product["base_price"]), markup)
+    promo_price = None
+    if config is not None:
+        from . import promo
+        promo_price = promo.unit_usd(config, user, product.get("id", ""))
+        if promo_price is not None:
+            regular, price = price, promo_price
     return {
         "product_id": product["id"],
         "kind": product["kind"],
@@ -186,6 +194,8 @@ def public_view(product: dict[str, Any], markup: Decimal) -> dict[str, Any]:
         **_pack_view(product),
         "unit": product["unit"],
         "price_usd": fmt_unit(price),
+        "promo": promo_price is not None,
+        **({"regular_usd": fmt_unit(regular)} if promo_price is not None else {}),
         "min_quantity": product["min_qty"],
         "max_quantity": product["max_qty"],
         "stock": product["stock"],

@@ -2436,3 +2436,43 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .dcp-go-again { min-height: 0 !important; padding: 10px 14px !important; background: none !important; color: var(--muted) !important;
   border: 1px dashed var(--line); font-weight: 600; font-size: .9rem; box-shadow: none !important; order: 2; }
 .dcp:has(.dcp-go-again) .dcp-done { font-size: 1.05rem; }
+
+/* ── Акция на главной (promo.py) ───────────────────────── */
+.promo-hero { position: relative; overflow: hidden; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 22px;
+  margin: 8px 0 22px; padding: 22px 26px; border-radius: 22px; color: #fff; text-decoration: none;
+  background: radial-gradient(120% 140% at 0% 0%, #6d28d9 0%, #3b0764 45%, #1a0b2e 100%);
+  box-shadow: 0 18px 50px -18px rgba(124, 58, 237, .65), inset 0 0 0 1px rgba(255,255,255,.08); isolation: isolate; }
+.promo-hero:hover { text-decoration: none; transform: translateY(-2px); transition: transform .2s; }
+.promo-glow { position: absolute; inset: -40% -10% auto auto; width: 60%; height: 180%; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255,122,61,.55), rgba(255,61,127,.25) 55%, transparent 75%); animation: promo-pulse 3.2s ease-in-out infinite; }
+@keyframes promo-pulse { 50% { opacity: .55; transform: scale(1.08); } }
+.promo-art svg { display: block; filter: drop-shadow(0 10px 22px rgba(255,90,90,.45)); animation: promo-float 4s ease-in-out infinite; }
+@keyframes promo-float { 50% { transform: translateY(-6px) rotate(-3deg); } }
+.promo-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.promo-kicker { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px;
+  font-size: .78rem; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; background: linear-gradient(90deg, #ff8a3d, #ff3d7f); }
+.promo-title { font-size: clamp(1.35rem, 3.2vw, 2rem); font-weight: 800; line-height: 1.1; }
+.promo-game { opacity: .8; font-size: .95rem; }
+.promo-prices { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-top: 2px; }
+.promo-price { font-size: clamp(2.2rem, 6vw, 3.2rem); line-height: 1; font-weight: 900;
+  background: linear-gradient(90deg, #ffe08a, #ff8a3d 55%, #ff3d7f); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.promo-price small { font-size: .4em; font-weight: 800; }
+.promo-was { opacity: .6; font-size: 1.05rem; }
+.promo-off { padding: 2px 8px; border-radius: 8px; background: #22c55e; color: #052e16; font-weight: 800; font-size: .9rem; }
+.promo-timer { display: flex; gap: 8px; margin-top: 6px; }
+.promo-timer > span { display: flex; flex-direction: column; align-items: center; min-width: 50px; padding: 6px 8px; border-radius: 12px;
+  background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+.promo-timer b { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.promo-timer i { font-style: normal; font-size: .68rem; opacity: .75; text-transform: uppercase; }
+.promo-cta { display: inline-flex; align-items: center; gap: 8px; padding: 14px 22px; border-radius: 14px; font-weight: 800; white-space: nowrap;
+  color: #1a0b2e; background: linear-gradient(90deg, #ffe08a, #ff8a3d); box-shadow: 0 10px 24px -8px rgba(255,138,61,.8); }
+.promo-old { opacity: .55; font-weight: 400; margin-right: 2px; }
+.promo-tag { display: inline-block; padding: 1px 6px; border-radius: 6px; background: #ff3d7f; color: #fff; font-size: .72rem; }
+@media (max-width: 720px) {
+  .promo-hero { grid-template-columns: 1fr; text-align: left; padding: 20px 18px; gap: 14px; }
+  .promo-art { position: absolute; right: -4px; top: 46px; opacity: .9; }
+  .promo-art svg { width: 92px; height: 92px; }
+  .promo-cta { justify-content: center; }
+  .promo-timer > span { min-width: 0; flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .promo-glow, .promo-art svg { animation: none; } }

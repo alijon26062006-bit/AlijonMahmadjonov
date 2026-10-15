@@ -139,7 +139,10 @@ def _clean_quantity(product: dict[str, Any], quantity: Any) -> int:
 
 
 def quote(config: Config, user: sqlite3.Row, product: dict[str, Any], units: Decimal | int) -> dict[str, Any]:
-    unit = apply_markup(to_decimal(product["base_price"]), accounts.markup_for(user, config, product["kind"]))
+    from . import promo
+    unit = promo.unit_usd(config, user, product.get("id", ""))   # акция — только сайт и свой бот, не API
+    if unit is None:
+        unit = apply_markup(to_decimal(product["base_price"]), accounts.markup_for(user, config, product["kind"]))
     return {"unit_price": unit, "total_micro": order_total_micro(unit, units)}
 
 

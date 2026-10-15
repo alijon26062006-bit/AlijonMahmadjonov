@@ -42,7 +42,7 @@
           {% else %}<span class="pp-ico k-{{ s.kind }}">{{ pack_icon(s.kind, s.name, 18) }}</span>{% endif %}
           <span class="pp-name">{{ s.title }}</span>
           {% if s.region and regions_many is not defined %}<span class="pp-reg">{{ s.region_title }}</span>{% endif %}
-          <span class="pp-price">{{ money(s.price_usd | price(s.unit)) }}</span>
+          <span class="pp-price">{% if s.promo %}<s class="promo-old">{{ money(s.regular_usd | price) }}</s> {% endif %}{{ money(s.price_usd | price(s.unit)) }}</span>
         </a>
         {% if cart_ok and (s.region or '') == (p.region or '') %}<button type="button" class="pp-add" data-pid="{{ s.product_id }}" data-usd="{{ s.price_usd }}"
           data-title="{{ (s.emoji ~ ' ' if s.emoji else '') ~ s.title }}" aria-label="Добавить «{{ s.title }}» в корзину">{{ icon('plus', 16) }}</button>{% endif %}
@@ -127,7 +127,7 @@
         {% if p.fields %}<div><span>Получатель</span><span id="s-to" class="wrap-text">—</span></div>{% endif %}
         {% if can_check %}<div><span>Игрок</span><span id="s-player" class="wrap-text">—</span></div>{% endif %}
         {% if multi %}<div><span>Количество</span><span id="s-qty">—</span></div>{% endif %}
-        <div id="s-price"><span>Цена{{ ' за звезду' if p.unit == 'star' else (' за шт.' if multi) }}</span><span>{{ money(p.price_usd | price(p.unit)) }}</span></div>
+        <div id="s-price"><span>Цена{{ ' за звезду' if p.unit == 'star' else (' за шт.' if multi) }}</span><span>{% if p.promo %}<s class="promo-old">{{ money(p.regular_usd | price) }}</s> <b class="promo-tag">Акция</b> {% endif %}{{ money(p.price_usd | price(p.unit)) }}</span></div>
         {% if not user.guest %}<div><span>Ваш баланс</span><span>{{ money(user.balance_micro) }}</span></div>{% endif %}
         <div class="total"><span>К оплате</span><span id="s-total">{{ money(p.price_usd | price) }}</span></div>
       </div>

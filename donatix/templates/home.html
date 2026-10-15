@@ -45,6 +45,41 @@
         {% endfor %}
       </div>
     </section>
+    {% if promo %}
+    <a class="promo-hero" href="/panel/buy/{{ promo.product_id }}" aria-label="Акция: {{ promo.title }} за {{ promo.price }} сомони">
+      <span class="promo-glow" aria-hidden="true"></span>
+      <span class="promo-art" aria-hidden="true">
+        <svg viewBox="0 0 120 120" width="120" height="120"><defs>
+          <linearGradient id="pg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset=".5" stop-color="#ff8a3d"/><stop offset="1" stop-color="#ff3d7f"/></linearGradient>
+          <linearGradient id="pg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+          <rect x="14" y="30" width="92" height="60" rx="12" fill="url(#pg1)"/>
+          <circle cx="14" cy="60" r="9" fill="#1a0b2e"/><circle cx="106" cy="60" r="9" fill="#1a0b2e"/>
+          <path d="M60 42l11 8-11 22-11-22z" fill="#fff"/><path d="M49 50h22l-11 22z" fill="#ffd1e3"/>
+          <rect x="14" y="30" width="92" height="22" rx="12" fill="url(#pg2)" opacity=".35"/>
+          <text x="60" y="84" text-anchor="middle" font-size="10" font-weight="800" fill="#1a0b2e">30 ДНЕЙ</text>
+        </svg>
+      </span>
+      <span class="promo-body">
+        <span class="promo-kicker">{{ icon('flame', 16) }} Акция · <span data-promo-end>ограниченное время</span></span>
+        <span class="promo-title">{{ promo.title }}</span>
+        <span class="promo-game">{{ promo.game }}{% if promo.region_title %} · {{ promo.region_title }}{% endif %}</span>
+        <span class="promo-prices">
+          <b class="promo-price">{{ promo.price }}<small> сомони</small></b>
+          {% if promo.old %}<s class="promo-was">{{ promo.old }} с.</s><span class="promo-off">−{{ promo.off }}%</span>{% endif %}
+        </span>
+        <span class="promo-timer" data-promo-timer="{{ promo.ends }}" aria-live="off">
+          <span><b data-t="d">0</b><i>дн</i></span><span><b data-t="h">00</b><i>ч</i></span><span><b data-t="m">00</b><i>мин</i></span><span><b data-t="s">00</b><i>сек</i></span>
+        </span>
+      </span>
+      <span class="promo-cta">Купить за {{ promo.price }} с. {{ icon('arrow-right', 18) }}</span>
+    </a>
+    <script>(function(){var el=document.querySelector('[data-promo-timer]');if(!el)return;var end=+el.dataset.promoTimer*1000,
+      q=function(k){return el.querySelector('[data-t="'+k+'"]')},p=function(n){return (n<10?'0':'')+n};
+      var lbl=document.querySelector('[data-promo-end]');
+      function tick(){var s=Math.max(0,Math.floor((end-Date.now())/1000));if(!s){var b=el.closest('.promo-hero');if(b)b.remove();return}
+        q('d').textContent=Math.floor(s/86400);q('h').textContent=p(Math.floor(s%86400/3600));q('m').textContent=p(Math.floor(s%3600/60));q('s').textContent=p(s%60);
+        if(lbl){var d=Math.floor(s/86400);lbl.textContent=d>=1?'осталось '+(d+1)+' дн.':'последний день';}setTimeout(tick,1000)}tick()})();</script>
+    {% endif %}
     {% if vnumbers_on %}
     <a class="card vn-promo" href="/panel/numbers">
       <span class="vn-promo-ico" aria-hidden="true">{{ tg_logo(34) }}{{ wa_logo(34) }}</span>

@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response, StreamingResponse
 
-from . import accounts, cache, catalog, db, orders, popular, referrals, sitecfg
+from . import accounts, cache, catalog, db, orders, popular, promo, referrals, sitecfg
 from .config import PAY_METHODS, Config
 from .deps import (INDEXABLE, LoginRequired, TelegramRequired, check_csrf, flash, get_config, get_conn, render,
                    session_user)
@@ -87,6 +87,7 @@ def home(request: Request, conn=Depends(get_conn), config: Config = Depends(get_
         "reviews_sum": reviews_mod.summary(conn),
         "client_bots": sitecfg.client_bots_enabled(conn),
         "ref_percent": referrals.percent(conn),
+        "promo": promo.banner(conn, config),
     })
 
 
@@ -970,7 +971,8 @@ def panel_catalog(
     game = products[0] if category and products else None
     if region:
         products = [p for p in products if p.get("region") == region]
-    items = [catalog.public_view(p, accounts.markup_for(user, config, p["kind"])) for p in products]
+    items = [catalog.public_view(p, accounts.markup_for(user, config, p["kind"]), config=config, user=user)
+             for p in products]
     groups: dict[str, list] = {}
     if game and game["kind"] == "topup":
         # Пакеты одной игры: 💎 алмазы → 🎟 ваучеры и пропуска → ⚡ прокачка
@@ -1062,13 +1064,13 @@ def _buy_ctx(request: Request, conn, config: Config, user, p: dict, **extra) -> 
     markup = accounts.markup_for(user, config, p["kind"])
     siblings = []
     if p["kind"] in _BY_GAME:
-        siblings = [catalog.public_view(s, markup) for s in
+        siblings = [catalog.public_view(s, markup, config=config, user=user) for s in
                     catalog.list_products(conn, kind=p["kind"], category_id=p["category_id"], limit=200)]
         if p["kind"] == "topup":
             from . import packs
             siblings.sort(key=lambda i: packs.order_key(i["name"], float(i["price_usd"])))
     return {
-        "user": user, "p": catalog.public_view(p, markup), "siblings": siblings, "idem": str(uuid.uuid4()),
+        "user": user, "p": catalog.public_view(p, markup, config=config, user=user), "siblings": siblings, "idem": str(uuid.uuid4()),
         "can_check": account_check.can_check(request.app.state.supplier, p), "form": {},
         "delivery_note": catalog.delivery_note(p.get("category_name")), **extra,
     }

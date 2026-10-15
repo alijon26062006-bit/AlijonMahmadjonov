@@ -1,0 +1,34 @@
+{% extends "admin/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Акция на главной — админка{% endblock %}
+{% block content %}
+<section class="page-hero"><h1>Акция на главной</h1>
+  <p>Один товар по особой цене в сомони на несколько дней: большой баннер с таймером на главной, зачёркнутая цена в каталоге.
+    Только для покупателей сайта и нашего Telegram-бота — по API и в ботах партнёров цена обычная. Срок вышел — всё вернётся само.</p></section>
+
+{% if live %}
+<div class="flash ok"><span>Сейчас идёт: <b>{{ promo.title or promo.product_id }}</b> за <b>{{ promo.price_tjs }} с.</b>
+  до <span data-end="{{ promo.ends | int }}"></span>.
+  {% if cost_tjs is not none %}Закупка сейчас: {{ cost_tjs }} с.{% if cost_tjs > (promo.price_tjs | float) %} — <b>продаёте в минус!</b>{% endif %}{% endif %}</span></div>
+{% endif %}
+
+<form class="card" method="post" action="/admin/promo">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label for="pid">Товар (ваучеры и пропуска)</label>
+  <select id="pid" name="product_id" required>
+    <option value="">— выберите —</option>
+    {% for o in options %}<option value="{{ o.id }}" {{ 'selected' if o.id == promo.product_id }}>{{ o.label }} · закупка {{ o.cost }} с.</option>{% endfor %}
+  </select>
+  <div class="grid three" style="gap:12px;margin-top:12px">
+    <div><label for="pr">Цена, сомони</label><input id="pr" name="price_tjs" inputmode="decimal" value="{{ promo.price_tjs or '49' }}" required></div>
+    <div><label for="dd">Сколько дней</label><input id="dd" name="days" inputmode="decimal" value="{{ promo.days or '3' }}"></div>
+    <div><label for="tt">Заголовок (необязательно)</label><input id="tt" name="title" maxlength="80" value="{{ promo.title or 'Ваучер на месяц' }}"></div>
+  </div>
+  <p class="muted small">Если товар и цена те же, а акция ещё идёт — таймер не сбрасывается.</p>
+  <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+    <button class="btn primary" name="action" value="save">{{ 'Сохранить' if live else 'Запустить акцию' }}</button>
+    {% if live %}<button class="btn" name="action" value="stop" onclick="return confirm('Остановить акцию?')">Остановить</button>{% endif %}
+  </div>
+</form>
+<script>document.querySelectorAll('[data-end]').forEach(function(e){e.textContent=new Date(+e.dataset.end*1000).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})})</script>
+{% endblock %}
