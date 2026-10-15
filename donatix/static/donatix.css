@@ -2424,7 +2424,7 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .hero-indep { margin: 10px 0 0; font-size: .85rem; color: var(--muted); max-width: 520px; }
 
 /* «Душанбе Сити»: «Я оплатил» и поиск платежа */
-.dcp-done { margin-top: 12px; background: var(--ok-soft); color: var(--ok); border: 1.5px solid var(--ok); font-weight: 800; }
+.dcp-done { margin-top: 12px; min-height: 58px; background: linear-gradient(135deg, #16a34a, #22c55e); color: #fff; border: 0; font-weight: 800; box-shadow: 0 8px 22px rgba(22,163,74,.3); }
 .dcp-find { display: grid; justify-items: center; gap: 8px; margin-top: 12px; padding: 16px; border-radius: var(--r);
   background: var(--accent-soft); text-align: center; }
 .dcp-find small { color: var(--muted); }
@@ -2432,3 +2432,7 @@ p.tz { font-size: .72rem; margin: 6px 0 0; }
 .dcp-find-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .6s; }
 .dcp-find.ok { background: var(--ok-soft); color: var(--ok); }
 .dcp-find.ok .dcp-find-bar i { background: var(--ok); }
+.dcp-go { background: linear-gradient(135deg, #16a34a, #22c55e) !important; color: #fff !important; font-weight: 800; }
+.dcp-go-again { min-height: 0 !important; padding: 10px 14px !important; background: none !important; color: var(--muted) !important;
+  border: 1px dashed var(--line); font-weight: 600; font-size: .9rem; box-shadow: none !important; order: 2; }
+.dcp:has(.dcp-go-again) .dcp-done { font-size: 1.05rem; }

@@ -35,8 +35,8 @@ def test_dc_auto_paid_receipt_reuse_is_flagged(app, config, conn):
         p1 = payments.create(conn, config, user, "dc", "", amount_tjs="100")
     payments.start_auto(conn, config, p1)
     r1 = conn.execute("SELECT * FROM payments WHERE id=?", (p1,)).fetchone()
-    assert r1["pay_amount"] == "100.01"
-    res = dcbank.handle(conn, config, source="dc_next_bot", message_id=1, text=_notice("100.01", "555001"))
+    assert r1["pay_amount"] == "100.00"
+    res = dcbank.handle(conn, config, source="dc_next_bot", message_id=1, text=_notice("100.00", "555001"))
     assert res["status"] == "matched"
     first = balance(conn, uid)
     assert first > 0
@@ -46,9 +46,9 @@ def test_dc_auto_paid_receipt_reuse_is_flagged(app, config, conn):
         p2 = payments.create(conn, config, user, "dc", "", amount_tjs="100")
     payments.start_auto(conn, config, p2)
     r2 = conn.execute("SELECT * FROM payments WHERE id=?", (p2,)).fetchone()
-    assert r2["pay_amount"] == "100.01"
+    assert r2["pay_amount"] == "100.00"
     now_local = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
-    seen = {"is_receipt": True, "bank": "Душанбе Сити", "amount": 100.01, "currency": "TJS",
+    seen = {"is_receipt": True, "bank": "Душанбе Сити", "amount": 100.00, "currency": "TJS",
             "datetime": now_local, "txn_id": "555001", "recipient": "5058 **** **** 5678", "status": "success",
             "recipient_ok": "yes", "forgery": "real", "signs": []}
     payments.attach_receipt(conn, config, uid, p2, PNG1, seen=seen)
@@ -66,11 +66,11 @@ def test_dc_same_amount_without_txn_is_flagged(app, config, conn):
     with db.tx(conn):
         p1 = payments.create(conn, config, user, "dc", "", amount_tjs="100")
     payments.start_auto(conn, config, p1)
-    dcbank.handle(conn, config, source="dc_next_bot", message_id=1, text=_notice("100.01", "555002"))
+    dcbank.handle(conn, config, source="dc_next_bot", message_id=1, text=_notice("100.00", "555002"))
     with db.tx(conn):
         p2 = payments.create(conn, config, user, "dc", "", amount_tjs="100")
     payments.start_auto(conn, config, p2)
-    seen = {"is_receipt": True, "bank": "Душанбе Сити", "amount": 100.01, "currency": "TJS", "datetime": "",
+    seen = {"is_receipt": True, "bank": "Душанбе Сити", "amount": 100.00, "currency": "TJS", "datetime": "",
             "txn_id": "", "recipient": "", "status": "success", "recipient_ok": "yes", "forgery": "real", "signs": []}
     payments.attach_receipt(conn, config, uid, p2, PNG1, seen=seen)
     import json

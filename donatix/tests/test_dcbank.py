@@ -69,27 +69,28 @@ def test_auto_credit_without_receipt(app, dc, conn):
     r = _pay(c, token)
     assert r.headers["location"].endswith("/pay")
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
-    assert p["auto_kind"] == "dcbank" and p["pay_amount"] == "100.01" and p["pay_address"] == "5058270012345678"
-    assert "pay.dc.tj" in p["pay_url"] and "s=100.01" in p["pay_url"] and f"%23{p['id']}" in p["pay_url"]
+    assert p["auto_kind"] == "dcbank" and p["pay_amount"] == "100.00" and p["pay_address"] == "5058270012345678"
+    assert "pay.dc.tj" in p["pay_url"] and "s=100" in p["pay_url"] and f"%23{p['id']}" in p["pay_url"]
     page = c.get(r.headers["location"]).text
-    assert "Пардохт дар «Душанбе Сити»" in page and "100.01" in page and "5058 2700 1234 5678" in page
-    assert "Алиджон" in page and "⚡ АВТО" in page
+    # ровная сумма, реквизиты не показываем — карта и сумма подставятся в приложении по кнопке
+    assert "Перейти к оплате" in page and "100.00" in page and "5058 2700 1234 5678" not in page
+    assert "Я оплатил" in page and "⚡ АВТО" in page
     assert "Открыть оплату" in c.get("/panel/balance").text
 
     uid2, c2, token2 = _client(app, conn, 2)
     _pay(c2, token2)
     p2 = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
-    assert p2["pay_amount"] == "100.02"                     # второй клиент — свои копейки
+    assert p2["pay_amount"] == "100.01"                     # второй клиент на ту же сумму — свои копейки
 
     before = balance(conn, uid)
-    assert _handle(conn, dc, notice("100.01", "777001"), 1)["status"] == "matched"
+    assert _handle(conn, dc, notice("100.00", "777001"), 1)["status"] == "matched"
     assert conn.execute("SELECT status FROM payments WHERE id = ?", (p["id"],)).fetchone()[0] == "paid"
     assert balance(conn, uid) > before
     assert conn.execute("SELECT status FROM payments WHERE id = ?", (p2["id"],)).fetchone()[0] == "pending"
     # тот же перевод второй раз (другое сообщение, тот же код банка) — дубль
     now = balance(conn, uid)
-    assert _handle(conn, dc, notice("100.01", "777001"), 2)["status"] == "duplicate"
-    assert _handle(conn, dc, notice("100.01", "777001"), 1)["status"] == "duplicate"
+    assert _handle(conn, dc, notice("100.00", "777001"), 2)["status"] == "duplicate"
+    assert _handle(conn, dc, notice("100.00", "777001"), 1)["status"] == "duplicate"
     assert balance(conn, uid) == now
     assert c.get(f"/panel/data/payment/{p['id']}").json()["status"] == "paid"
 
@@ -98,8 +99,9 @@ def test_round_sum_and_ambiguous(app, dc, conn):
     uid, c, token = _client(app, conn)
     _pay(c, token, "50")
     p = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchone()
-    # клиент перевёл 50.00 вместо 50.01 — одна заявка рядом: зачисляем пришедшее
-    assert _handle(conn, dc, notice("50.00", "1"), 10)["status"] == "matched"
+    assert p["pay_amount"] == "50.00"   # такую сумму никто не ждёт — ровно, без копеек
+    # клиент перевёл 49.99 вместо 50.00 — одна заявка рядом: зачисляем пришедшее
+    assert _handle(conn, dc, notice("49.99", "1"), 10)["status"] == "matched"
     paid = conn.execute("SELECT amount_micro FROM payments WHERE id = ?", (p["id"],)).fetchone()[0]
     assert paid < p["amount_micro"]
 
@@ -108,7 +110,7 @@ def test_round_sum_and_ambiguous(app, dc, conn):
     _pay(c2, t2, "30")
     _pay(c3, t3, "30")
     b2, b3 = balance(conn, uid2), balance(conn, uid3)
-    assert _handle(conn, dc, notice("30.00", "2", sender="1110000***2222"), 11)["status"] == "ambiguous"
+    assert _handle(conn, dc, notice("30.05", "2", sender="1110000***2222"), 11)["status"] == "ambiguous"   # близко к обеим
     assert (balance(conn, uid2), balance(conn, uid3)) == (b2, b3)
     assert _handle(conn, dc, notice("999.00", "3"), 12)["status"] == "unknown"
 
@@ -204,20 +206,20 @@ def test_shop_bot_replaces_requisites_with_paid(app, dc, conn, supplier):
     bot.handle(conn, press("t"))
     bot.handle(conn, press(bot.api.button("Душанбе")))
     bot.handle(conn, msg("1"))
-    shown = next(p for m, p in reversed(bot.api.calls) if "1.01" in (p.get("text") or ""))
+    shown = next(p for m, p in reversed(bot.api.calls) if "1.00" in (p.get("text") or ""))
     req_mid = bot.api.mid if "message_id" not in shown else shown["message_id"]
     p = conn.execute("SELECT * FROM payments").fetchone()
 
     conn.execute("BEGIN")                                   # бот держит старый снимок базы
     conn.execute("SELECT status FROM payments WHERE id = ?", (p["id"],)).fetchone()
     other = db.connect(dc.db_path)                          # банк подтверждает из своей службы
-    assert _handle(other, dc, notice("1.01", "8801"), 50)["status"] == "matched"
+    assert _handle(other, dc, notice("1.00", "8801"), 50)["status"] == "matched"
     other.close()
 
     bot.watch(conn, force=True)
     method, last = bot.api.calls[-1]
     assert method == "editMessageText" and last["message_id"] == req_mid
-    assert "Пардохт гирифта шуд" in last["text"] and "1.01" in last["text"]
+    assert "Пардохт гирифта шуд" in last["text"] and "1 с." in last["text"]
 
 
 MP4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 64
@@ -402,3 +404,23 @@ def test_bot_cancel_from_balance_and_topup_screens(app, dc, conn, supplier):
     assert conn.execute("SELECT status FROM payments WHERE id = ?", (p["id"],)).fetchone()[0] == "cancelled"
     bot.handle(conn, press("b"))
     assert not any((b.get("callback_data") or "").startswith("pc:") for b in bot.api.last_buttons())
+
+
+def test_same_sum_at_once_gets_tail_and_one_transfer_credits_once(app, dc, conn):
+    """Двое одновременно на 20 сомони: первому ровно 20.00, второму 20.01. Перевод 20.00 зачисляется только
+    первому и только один раз; заявка закрыта — повтор того же уведомления ничего не начисляет."""
+    uid1, c1, t1 = _client(app, conn, 4)
+    uid2, c2, t2 = _client(app, conn, 5)
+    _pay(c1, t1, "20")
+    _pay(c2, t2, "20")
+    p1, p2 = conn.execute("SELECT * FROM payments ORDER BY id DESC LIMIT 2").fetchall()[::-1]
+    assert (p1["pay_amount"], p2["pay_amount"]) == ("20.00", "20.01")
+    b1, b2 = balance(conn, uid1), balance(conn, uid2)
+    assert _handle(conn, dc, notice("20.00", "9901"), 70)["status"] == "matched"
+    assert _handle(conn, dc, notice("20.00", "9901"), 70)["status"] == "duplicate"
+    assert balance(conn, uid1) > b1 and balance(conn, uid2) == b2
+    assert conn.execute("SELECT status FROM payments WHERE id = ?", (p1["id"],)).fetchone()[0] == "paid"
+    # после оплаты сумма 20.00 свободна — следующему снова ровно
+    uid3, c3, t3 = _client(app, conn, 6)
+    _pay(c3, t3, "20")
+    assert conn.execute("SELECT pay_amount FROM payments ORDER BY id DESC").fetchone()[0] == "20.00"

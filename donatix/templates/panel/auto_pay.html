@@ -58,13 +58,13 @@
   </div>
 
   <div class="dcp-card">
-    <div class="dcp-cap">Ба ин корт гузаронед</div>
+    <div class="dcp-cap">{{ 'Маблағи пардохт / К оплате' if p.pay_url else 'Ба ин корт гузаронед' }}</div>
     <button type="button" class="dcp-sum" data-copy="{{ p.pay_amount }}" aria-label="Нусха гирифтани маблағ">
-      <span class="dcp-num">{{ p.pay_amount }}</span><span class="dcp-cur">сомонӣ</span>
+      <span class="dcp-num">{{ p.pay_amount[:-3] if p.pay_amount.endswith('.00') else p.pay_amount }}</span><span class="dcp-cur">сомонӣ</span>
       <span class="dcp-copy">{{ icon('copy', 18) }}</span>
     </button>
     <div class="dcp-hint" data-copied="✓ Нусха гирифта шуд">Барои нусха гирифтан пахш кунед</div>
-    {% if dc.card %}
+    {% if dc.card and not p.pay_url %}{# есть ссылка в приложение — карта подставится сама, реквизиты не показываем #}
     <button type="button" class="dcp-acc" data-copy="{{ p.address }}" aria-label="Нусха гирифтани рақами корт">
       <span class="grow"><span class="dcp-cap">Рақами корт</span><b class="dcp-cardno">{{ dc.card }}</b>
         {% if dc.holder %}<span class="dcp-holder">{{ dc.holder }}</span>{% endif %}</span>
@@ -74,17 +74,19 @@
     <div class="dcp-credit">Ба баланс: <b>{{ money(p.amount_usd) }}</b></div>
   </div>
 
+  {% if not p.pay_url %}
   <div class="dcp-auto">
     <b>⚡ Тасдиқи худкор</b>
-    <p>Маҳз <b>{{ p.pay_amount }} сомонӣ</b>-ро бо дирамҳояш гузаронед — бо онҳо мо интиқоли шуморо мешиносем. Чек лозим нест: баланс худаш пур мешавад.</p>
+    <p>Маҳз <b>{{ p.pay_amount }} сомонӣ</b>-ро гузаронед — бо маблағ мо интиқоли шуморо мешиносем. Чек лозим нест: баланс худаш пур мешавад.</p>
   </div>
-
-  {% if p.pay_url %}
-  <a class="dcp-pay" href="{{ p.pay_url }}" target="_blank" rel="noopener">📲 Пардохт дар «Душанбе Сити»</a>
-  <p class="dcp-under">Барнома худаш кушода мешавад — корт ва маблағ тайёранд, фақат <b>тасдиқ</b> кунед.</p>
   {% endif %}
 
-  <button type="button" class="btn lg block dcp-done" id="dcp-done">✓ Ман пардохт кардам / Я оплатил</button>
+  {% if p.pay_url %}
+  <a class="dcp-pay dcp-go" id="dcp-go" href="{{ p.pay_url }}" target="_blank" rel="noopener">Гузаштан ба пардохт / Перейти к оплате →</a>
+  <p class="dcp-under" id="dcp-under">«Душанбе Сити» кушода мешавад — корт ва маблағ тайёранд, фақат <b>тасдиқ</b> кунед ва ба сайт баргардед.</p>
+  {% endif %}
+
+  <button type="button" class="btn lg block dcp-done" id="dcp-done" data-id="{{ p.id }}" {{ 'hidden' if p.pay_url }}>✓ Ман пардохт кардам / Я оплатил</button>
   <div class="dcp-find" id="dcp-find" hidden role="status" aria-live="polite">
     <span class="spinner"></span><b>Пардохтро меҷӯем… / Ищем ваш платёж…</b>
     <div class="dcp-find-bar"><i id="dcp-find-bar"></i></div>
@@ -242,6 +244,17 @@
   if (!box || box.dataset.status !== "pending") return;
   // «Душанбе Сити»: «Я оплатил» → ищем платёж каждые 2 секунды до 90 секунд; нашли — «Тасдиқ шуд», не нашли — чек
   var done = document.getElementById("dcp-done"), find = document.getElementById("dcp-find");
+  var go = document.getElementById("dcp-go"), goKey = "dcp-go-" + box.dataset.id;
+  function paidMode() {   // вернулся из «Душанбе Сити» — главная кнопка теперь «Я оплатил»
+    if (!done || !go) return;
+    done.hidden = false; go.parentNode.insertBefore(done, go); go.classList.add("dcp-go-again"); go.textContent = "↗ Боз кушодан / Открыть оплату ещё раз";
+    var u = document.getElementById("dcp-under"); if (u) u.hidden = true;
+  }
+  try { if (sessionStorage.getItem(goKey)) paidMode(); } catch (e) {}
+  if (go) go.addEventListener("click", function () {
+    try { sessionStorage.setItem(goKey, "1"); } catch (e) {}
+    setTimeout(paidMode, 600);
+  });
   if (done && find) done.addEventListener("click", function () {
     done.hidden = true; find.hidden = false;
     var w = document.getElementById("dcp-wait"); if (w) w.hidden = true;

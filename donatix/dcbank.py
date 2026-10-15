@@ -117,7 +117,8 @@ def _live(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 
 
 def unique_amount(conn: sqlite3.Connection, tjs: Decimal, codes: list[str] | tuple = ()) -> Decimal:
-    """Сумма с первым свободным хвостом. Сравниваем со ВСЕМИ живыми заявками: 10.07 сталкивается
+    """Сумма к переводу: ровная, если такую же сейчас никто не ждёт; иначе — с первым свободным хвостом.
+    Сравниваем со ВСЕМИ живыми заявками: 10.07 сталкивается
     и с базой 10.00, и с 10.06. codes — способы «Душанбе Сити»: соседняя заявка могла ещё не получить
     auto_kind (его ставят сразу после создания), но сумму она уже заняла."""
     base = cents(tjs.quantize(Decimal("0.01")))
@@ -127,6 +128,8 @@ def unique_amount(conn: sqlite3.Connection, tjs: Decimal, codes: list[str] | tup
         + (f" OR method IN ({marks})" if codes else "") + ")",
         (_since(window_hours(conn)), KIND, *codes)).fetchall()
     busy = {cents(r["pay_amount"]) for r in rows}
+    if base not in busy:   # такую сумму сейчас никто не ждёт — ровно 10.00, без копеек
+        return (Decimal(base) / 100).quantize(Decimal("0.01"))
     for tail in range(1, TAIL_LAST + 1):
         if base + tail not in busy:
             return Decimal(base + tail) / 100
