@@ -142,15 +142,11 @@ def quote(config: Config, user: sqlite3.Row, product: dict[str, Any], units: Dec
     from . import promo
     regular = apply_markup(to_decimal(product["base_price"]), accounts.markup_for(user, config, product["kind"]))
     unit = promo.unit_usd(config, user, product.get("id", ""))   # акция — только сайт и свой бот, не API
-    promo_micro = 0   # > 0 недополучили по акции, < 0 вернули надбавкой (promo_ledger)
+    promo_micro = 0   # сколько недополучили по акции (обычная цена − цена акции) — заберём из копилки D-коина
     if unit is not None:
         promo_micro = max(0, order_total_micro(regular, units) - order_total_micro(unit, units))
     else:
         unit = regular
-        pct = promo.recoup_pct(config, user)
-        if pct:
-            unit = apply_markup(regular, pct)
-            promo_micro = order_total_micro(regular, units) - order_total_micro(unit, units)
     return {"unit_price": unit, "total_micro": order_total_micro(unit, units), "promo_micro": promo_micro}
 
 
@@ -447,6 +443,11 @@ def complete(conn: sqlite3.Connection, order_id: int, delivery: dict[str, Any] |
             dcoin.award(conn, order_id)       # D-коины клиенту и доля прибыли в копилку
         except Exception:  # noqa: BLE001
             log.exception("D-коины за заказ %s", order_id)
+        try:
+            from . import promo
+            promo.settle_all(conn)            # ваучер по акции: минус — из копилки D-коина, цена вниз
+        except Exception:  # noqa: BLE001
+            log.exception("акция: минус за заказ %s", order_id)
     return bool(changed)
 
 

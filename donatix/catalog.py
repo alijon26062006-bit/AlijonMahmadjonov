@@ -184,10 +184,6 @@ def public_view(product: dict[str, Any], markup: Decimal, *, config: Any = None,
         promo_price = promo.unit_usd(config, user, product.get("id", ""))
         if promo_price is not None:
             regular, price = price, promo_price
-        else:
-            pct = promo.recoup_pct(config, user)   # возврат минуса акции — та же надбавка, что при списании
-            if pct:
-                price = apply_markup(price, pct)
     return {
         "product_id": product["id"],
         "kind": product["kind"],

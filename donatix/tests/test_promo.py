@@ -133,39 +133,49 @@ def _buy(conn, config, supplier, uid, pid, key):
     return order
 
 
-def test_lost_money_comes_back_via_other_goods(conn, config, supplier, shop):
+def _dcoin_on(conn):
+    from donatix import dcoin
+    db.set_setting(conn, "dcoin.per_usd", "100")
+    db.set_setting(conn, "dcoin.pool_pct", "10")
+    s = dcoin.state(conn)
+    dcoin._point(conn, 50_000, s["supply"] or 1_000_000, "seed", reserve=s["reserve"])   # в копилке $5
+    return dcoin
+
+
+def test_other_goods_price_unchanged(conn, config, supplier):
     pid = _ff(conn)
     other = conn.execute("SELECT id FROM products WHERE kind = 'topup' AND id != ? ORDER BY id LIMIT 1",
                          (pid,)).fetchone()["id"]
-    _start(conn, pid, price="1")
     uid = accounts.create_user(conn, email="r@example.com", login="recoup1", password="password123", status="active")
     with db.tx(conn):
         accounts.post_ledger(conn, uid, 50_000_000, "Пополнение")
     user = accounts.get_user(conn, uid)
-    regular_other = orders.quote(config, user, catalog.get_product(conn, other), 1)["total_micro"]
-    assert promo.recoup_pct(config, user) is None            # пока ничего не продали — надбавки нет
+    before = orders.quote(config, user, catalog.get_product(conn, other), 1)["total_micro"]
+    _start(conn, pid, price="1")
+    _buy(conn, config, supplier, uid, pid, "v1")
+    assert orders.quote(config, user, catalog.get_product(conn, other), 1)["total_micro"] == before
 
-    _buy(conn, config, supplier, uid, pid, "v1")              # ваучер по акции → минус
+
+def test_loss_taken_from_dcoin_pool_on_completion(conn, config, supplier):
+    dcoin = _dcoin_on(conn)
+    pid = _ff(conn)
+    _start(conn, pid, price="1")
+    uid = accounts.create_user(conn, email="d@example.com", login="dcoin1", password="password123", status="active")
+    with db.tx(conn):
+        accounts.post_ledger(conn, uid, 1_000_000, "Пополнение")
+    order = _buy(conn, config, supplier, uid, pid, "d1")
     t = promo.totals(conn)
-    assert t["sold"] == 1 and t["lost"] > 0
-    assert promo.recoup_pct(config, user) == promo.RECOUP_PCT
-    api_user = conn.execute("SELECT u.*, k.id AS api_key_id FROM users u JOIN api_keys k ON k.user_id = u.id "
-                            "WHERE u.id = ?", (shop["id"],)).fetchone()
-    assert promo.recoup_pct(config, api_user) is None         # партнёры по API — без надбавки
+    assert t["sold"] == 1 and t["lost"] > 0 and t["back"] == 0     # заказ ещё в работе — копилку не трогаем
+    pool_before, price_before = dcoin.state(conn)["pool"], dcoin.price(conn)
 
-    q = orders.quote(config, user, catalog.get_product(conn, other), 1)
-    assert q["total_micro"] > regular_other and q["promo_micro"] < 0
-    view = catalog.public_view(catalog.get_product(conn, other), accounts.markup_for(user, config, "topup"),
-                               config=config, user=user)
-    assert int(Decimal(view["price_usd"]) * 10_000) >= q["total_micro"] - 1
-
-    n = 0
-    while promo.totals(conn)["left"] > 0 and n < 2000:      # покупают другое — минус уходит
-        _buy(conn, config, supplier, uid, other, f"o{n}")
-        n += 1
-    assert promo.totals(conn)["left"] == 0
-    assert promo.recoup_pct(config, user) is None             # вернули — надбавка снялась
-    assert orders.quote(config, user, catalog.get_product(conn, other), 1)["total_micro"] == regular_other
+    orders.process_pending(conn, supplier)                          # выполнен
+    assert conn.execute("SELECT status FROM orders WHERE id = ?", (order["id"],)).fetchone()[0] == "completed"
+    t = promo.totals(conn)
+    assert t["back"] == t["lost"] and t["left"] == 0
+    s = dcoin.state(conn)
+    assert s["pool"] < pool_before + 1 and dcoin.price(conn) < price_before + 1e-18
+    assert conn.execute("SELECT 1 FROM dcoin_points WHERE reason = 'promo'").fetchone()
+    assert promo.settle(conn, order["id"]) == 0                    # второй раз — не забираем
 
 
 def test_failed_order_not_counted(conn, config, supplier):
@@ -177,18 +187,11 @@ def test_failed_order_not_counted(conn, config, supplier):
     order = _buy(conn, config, supplier, uid, pid, "f1")
     conn.execute("UPDATE orders SET status = 'failed' WHERE public_id = ?", (order["public_id"],))
     assert promo.totals(conn)["lost"] == 0
+    assert promo.settle(conn, order["id"]) == 0
 
 
-def test_recoup_stops_after_tail_days(conn, config, supplier):
-    import json
-    pid = _ff(conn)
-    _start(conn, pid, price="1")
-    uid = accounts.create_user(conn, email="t@example.com", login="tail1", password="password123", status="active")
-    with db.tx(conn):
-        accounts.post_ledger(conn, uid, 1_000_000, "Пополнение")
-    _buy(conn, config, supplier, uid, pid, "t1")
-    p = promo.get(conn)
-    p["ends"] = time.time() - promo.RECOUP_DAYS * 86400 - 1
-    db.set_setting(conn, promo.KEY, json.dumps(p))
-    cache.clear()
-    assert promo.totals(conn)["left"] > 0 and promo.recoup_pct(config, None) is None
+def test_take_never_empties_pool(conn):
+    dcoin = _dcoin_on(conn)
+    pool = dcoin.state(conn)["pool"]
+    taken = dcoin.take_for_promo(conn, pool * 10)
+    assert taken == int(pool * dcoin.PROMO_MAX_TAKE) and dcoin.state(conn)["pool"] > 0

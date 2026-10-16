@@ -16,13 +16,11 @@
 <div class="grid three" style="gap:12px;margin-bottom:14px">
   <div class="card"><div class="muted small">Продано по акции</div><b style="font-size:1.4rem">{{ sold }} шт.</b></div>
   <div class="card"><div class="muted small">Недополучили (обычная цена − цена акции)</div><b style="font-size:1.4rem">{{ lost_tjs }} с.</b></div>
-  <div class="card"><div class="muted small">Уже вернули надбавкой</div><b style="font-size:1.4rem">{{ back_tjs }} с.</b>
-    <div class="muted small">осталось {{ left_tjs }} с.</div></div>
+  <div class="card"><div class="muted small">Забрали из копилки D-коина</div><b style="font-size:1.4rem">{{ back_tjs }} с.</b>
+    <div class="muted small">ещё не забрали {{ left_tjs }} с. (заказы в работе)</div></div>
 </div>
-<div class="flash {{ 'ok' if recouping else '' }}"><span>
-  {% if recouping %}Сейчас на остальные товары сайта и бота <b>+{{ recoup_pct }}%</b> — пока не вернём {{ left_tjs }} с.
-    Вернём — надбавка снимется сама (не позже {{ recoup_days }} дней после конца акции). По API и в ботах партнёров цены обычные.
-  {% else %}Надбавки сейчас нет — цены остальных товаров обычные.{% endif %}</span></div>
+<p class="muted small">Минус каждого ваучера после выполнения заказа забирается из копилки D-коина — цена D-коина падает.
+  Цены остальных товаров не меняются.</p>
 {% endif %}
 
 <form class="card" method="post" action="/admin/promo">

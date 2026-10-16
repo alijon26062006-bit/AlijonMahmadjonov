@@ -957,9 +957,8 @@ def panel_catalog(
         # Цена «от» — уже с наценкой клиента, закупочную не показываем
         games = [
             {**dict(c), "regions": sorted(filter(None, (c["regions"] or "").split(","))),
-             "from_price": _cents(apply_markup(apply_markup(to_decimal(str(c["from_price"])),
-                                                           accounts.markup_for(user, config, c["kind"])),
-                                              promo.recoup_pct(config, user) or 0))}
+             "from_price": _cents(apply_markup(to_decimal(str(c["from_price"])),
+                                               accounts.markup_for(user, config, c["kind"])))}
             for c in _cached(f"cats:{kind}", q, lambda: [dict(c) for c in catalog.categories(conn, kind=kind, q=q)])
         ]
         return render(request, "panel/catalog.html", {

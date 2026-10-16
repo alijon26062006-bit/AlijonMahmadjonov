@@ -369,6 +369,30 @@ def _on_refund(conn: sqlite3.Connection, order_id: int) -> bool:
     return True
 
 
+PROMO_MAX_TAKE = 0.9   # из копилки за раз — не больше 90%: цена падает, но не до нуля
+
+
+def _take_for_promo(conn: sqlite3.Connection, micro: int) -> int:
+    """Минус ваучера по акции — из копилки: копилка меньше, монеты те же, значит цена D вниз (красная свеча).
+    Вернёт, сколько забрали (микро-доллары)."""
+    s = state(conn)
+    if micro <= 0 or s["pool"] <= 0:
+        return 0
+    take = min(int(micro), int(s["pool"] * PROMO_MAX_TAKE))
+    if take <= 0:
+        return 0
+    pool = s["pool"] - take
+    _wick(conn, s, pool, s["supply"], s["reserve"])
+    _point(conn, pool, s["supply"], "promo", reserve=s["reserve"])
+    from . import cache
+    cache.clear("dcoin:")
+    return take
+
+
+def take_for_promo(conn: sqlite3.Connection, micro: int) -> int:
+    return _atomic(conn, _take_for_promo, micro)
+
+
 class ExchangeError(Exception):
     pass
 
